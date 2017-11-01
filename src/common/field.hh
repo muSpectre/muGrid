@@ -34,6 +34,8 @@
 #include <string>
 #include <utility>
 #include <typeinfo>
+#include <vector>
+#include <algorithm>
 #include <Eigen/Dense>
 #include <cmath>
 #include <memory>
@@ -120,7 +122,10 @@ namespace muSpectre {
     public:
       using parent = FieldBase<FieldCollection>;
       using base = parent;
-      using storage_type = Eigen::Array<T, Eigen::Dynamic, NbComponents>;
+      //using storage_type = Eigen::Array<T, Eigen::Dynamic, NbComponents>;
+      using stored_type = Eigen::Array<T, NbComponents, 1>;
+      using storage_type = std::vector<stored_type,
+                                       Eigen::aligned_allocator<stored_type>>;
       TypedFieldBase(std::string unique_name,
                      FieldCollection& collection);
       virtual ~TypedFieldBase() = default;
@@ -299,28 +304,28 @@ namespace muSpectre {
     void
     TypedFieldBase<FieldCollection, T, NbComponents>::
     set_zero() {
-      this->array = T{};
+      std::fill(this->array.begin(), this->array.end(), T{});
     }
 
     /* ---------------------------------------------------------------------- */
     template <class FieldCollection, typename T, Dim_t NbComponents>
     T* TypedFieldBase<FieldCollection, T, NbComponents>::
     get_ptr_to_entry(const size_t&& index) {
-      return &this->array(std::move(index), 0);
+      return &this->array[std::move(index)](0, 0);
     }
 
     /* ---------------------------------------------------------------------- */
     template <class FieldCollection, typename T, Dim_t NbComponents>
     T& TypedFieldBase<FieldCollection, T, NbComponents>::
     get_ref_to_entry(const size_t && index) {
-      return this->array(std::move(index), 0);
+      return this->array[std::move(index)](0, 0);
     }
 
     /* ---------------------------------------------------------------------- */
     template <class FieldCollection, typename T, Dim_t NbComponents>
     void TypedFieldBase<FieldCollection, T, NbComponents>::
     initialise(size_t size) {
-      this->array = storage_type(size, NbComponents);
+      this->array.resize(size);
     }
 
   }  // internal
