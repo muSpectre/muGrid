@@ -48,7 +48,7 @@ namespace muSpectre {
                        >
   {
   public:
-    using parent = internal::FieldMap<FieldCollection, T,
+    using Parent = internal::FieldMap<FieldCollection, T,
                                       TensorFieldMap::nb_components()>;
     using Ccoord = Ccoord_t<FieldCollection::spatial_dim()>;
     using Sizes = typename SizesByOrder<order, dim>::Sizes;
@@ -56,12 +56,12 @@ namespace muSpectre {
     using value_type = Eigen::TensorMap<T_t>;
     using reference = value_type; // since it's a resource handle
     using const_reference = Eigen::TensorMap<const T_t>;
-    using size_type = typename parent::size_type;
+    using size_type = typename Parent::size_type;
     using pointer = std::unique_ptr<value_type>;
-    using TypedField = typename parent::TypedField;
-    using Field = typename TypedField::parent;
-    using iterator = typename parent::template iterator<TensorFieldMap>;
-    using const_iterator = typename parent::template iterator<TensorFieldMap, true>;
+    using TypedField = typename Parent::TypedField;
+    using Field = typename TypedField::Parent;
+    using iterator = typename Parent::template iterator<TensorFieldMap>;
+    using const_iterator = typename Parent::template iterator<TensorFieldMap, true>;
     using reverse_iterator = std::reverse_iterator<iterator>;
     using const_reverse_iterator = std::reverse_iterator<const_iterator>;
     friend iterator;
@@ -111,7 +111,7 @@ namespace muSpectre {
   template<class FieldCollection, typename T, Dim_t order, Dim_t dim>
   TensorFieldMap<FieldCollection, T, order, dim>::
   TensorFieldMap(Field & field)
-    :parent(field) {
+    :Parent(field) {
     this->check_compatibility();
   }
 

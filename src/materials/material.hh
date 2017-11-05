@@ -84,7 +84,7 @@ namespace muSpectre {
 
     //! allocate memory, etc
     //! TODO: this won't work. for materials with additional info per pixel (see above TODO), we neet to allocate before we know for sure how many pixels the material is responsible for.
-    virtual void initialize() = 0;
+    virtual void initialize(bool stiffness = false) = 0;
 
 
     //! computes the first Piola-Kirchhoff stress for finite strain problems
@@ -127,6 +127,7 @@ namespace muSpectre {
     //! members
     const std::string name;
     MFieldCollection_t internal_fields;
+
 
   private:
   };

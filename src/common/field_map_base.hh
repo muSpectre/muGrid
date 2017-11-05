@@ -65,7 +65,7 @@ namespace muSpectre {
     public:
       using TypedField = ::muSpectre::internal::TypedFieldBase
         <FieldCollection, T, NbComponents>;
-      using Field = typename TypedField::parent;
+      using Field = typename TypedField::Parent;
       using size_type = std::size_t;
 
       //! Default constructor

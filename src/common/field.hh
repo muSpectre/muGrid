@@ -89,7 +89,7 @@ namespace muSpectre {
       //! return type_id of stored type
       virtual const std::type_info & get_stored_typeid() const = 0;
 
-      inline size_t size() const;
+      virtual size_t size() const = 0;
 
       //! initialise field to zero (do more complicated initialisations through
       //! fully typed maps)
@@ -101,7 +101,7 @@ namespace muSpectre {
     protected:
       /* ---------------------------------------------------------------------- */
       //! allocate memory etc
-      virtual void initialise(size_t size) = 0;
+      virtual void resize(size_t size) = 0;
       const std::string name;
       const size_t nb_components;
       const FieldCollection & collection;
@@ -120,12 +120,12 @@ namespace muSpectre {
     {
       friend class FieldMap<FieldCollection, T, NbComponents>;
     public:
-      using parent = FieldBase<FieldCollection>;
-      using base = parent;
+      using Parent = FieldBase<FieldCollection>;
+      using Base = Parent;
       //using storage_type = Eigen::Array<T, Eigen::Dynamic, NbComponents>;
-      using stored_type = Eigen::Array<T, NbComponents, 1>;
-      using storage_type = std::vector<stored_type,
-                                       Eigen::aligned_allocator<stored_type>>;
+      using StoredType = Eigen::Array<T, NbComponents, 1>;
+      using StorageType = std::vector<StoredType,
+                                       Eigen::aligned_allocator<StoredType>>;
       TypedFieldBase(std::string unique_name,
                      FieldCollection& collection);
       virtual ~TypedFieldBase() = default;
@@ -135,11 +135,15 @@ namespace muSpectre {
       //! initialise field to zero (do more complicated initialisations through
       //! fully typed maps)
       inline void set_zero() override final;
+      inline void push_back(const StoredType & value);
+      template< class... Args>
+      inline void emplace_back(Args&&... args);
+      size_t size() const override final;
     protected:
       inline T* get_ptr_to_entry(const size_t&& index);
       inline T& get_ref_to_entry(const size_t&& index);
-      inline virtual void initialise(size_t size) override final;
-      storage_type array;
+      inline virtual void resize(size_t size) override final;
+      StorageType array;
     };
 
   }  // internal
@@ -151,10 +155,10 @@ namespace muSpectre {
                                                      ipow(dim,order)>
   {
   public:
-    using parent = internal::TypedFieldBase<FieldCollection,
+    using Parent = internal::TypedFieldBase<FieldCollection,
                                             T,
                                             ipow(dim,order)>;
-    using base = typename parent::base;
+    using Base = typename Parent::Base;
     using Field_p = std::unique_ptr<internal::FieldBase<FieldCollection>>;
     using component_type = T;
     //! Copy constructor
@@ -179,7 +183,7 @@ namespace muSpectre {
 
     //! factory function
     template<class FieldType, class CollectionType, typename... Args>
-    friend typename FieldType::base&  make_field(std::string unique_name,
+    friend typename FieldType::Base&  make_field(std::string unique_name,
                              CollectionType & collection,
                              Args&&... args);
 
@@ -197,10 +201,10 @@ namespace muSpectre {
                                                      NbRow*NbCol>
   {
   public:
-    using parent = internal::TypedFieldBase<FieldCollection,
+    using Parent = internal::TypedFieldBase<FieldCollection,
                                             T,
                                             NbRow*NbCol>;
-    using base = typename parent::base;
+    using Base = typename Parent::Base;
     using Field_p = std::unique_ptr<internal::FieldBase<FieldCollection>>;
     using component_type = T;
     //! Copy constructor
@@ -225,7 +229,7 @@ namespace muSpectre {
 
     //! factory function
     template<class FieldType, class CollectionType, typename... Args>
-    friend typename FieldType::base&  make_field(std::string unique_name,
+    friend typename FieldType::Base&  make_field(std::string unique_name,
                              CollectionType & collection,
                              Args&&... args);
 
@@ -272,13 +276,6 @@ namespace muSpectre {
     }
 
     /* ---------------------------------------------------------------------- */
-    template <class FieldCollection>
-    inline size_t FieldBase<FieldCollection>::
-    size() const {
-      return this->collection.size();
-    }
-
-    /* ---------------------------------------------------------------------- */
     template <class FieldCollection, typename T, Dim_t NbComponents>
     TypedFieldBase<FieldCollection, T, NbComponents>::
     TypedFieldBase(std::string unique_name, FieldCollection & collection)
@@ -309,6 +306,13 @@ namespace muSpectre {
 
     /* ---------------------------------------------------------------------- */
     template <class FieldCollection, typename T, Dim_t NbComponents>
+    size_t TypedFieldBase<FieldCollection, T, NbComponents>::
+    size() const {
+      return this->array.size();
+    }
+
+    /* ---------------------------------------------------------------------- */
+    template <class FieldCollection, typename T, Dim_t NbComponents>
     T* TypedFieldBase<FieldCollection, T, NbComponents>::
     get_ptr_to_entry(const size_t&& index) {
       return &this->array[std::move(index)](0, 0);
@@ -324,8 +328,23 @@ namespace muSpectre {
     /* ---------------------------------------------------------------------- */
     template <class FieldCollection, typename T, Dim_t NbComponents>
     void TypedFieldBase<FieldCollection, T, NbComponents>::
-    initialise(size_t size) {
+    resize(size_t size) {
       this->array.resize(size);
+    }
+
+    /* ---------------------------------------------------------------------- */
+    template <class FieldCollection, typename T, Dim_t NbComponents>
+    void TypedFieldBase<FieldCollection, T, NbComponents>::
+    push_back(const StoredType & value) {
+      this->array.push_back(value);
+    }
+
+    /* ---------------------------------------------------------------------- */
+    template <class FieldCollection, typename T, Dim_t NbComponents>
+    template <class... Args>
+    void TypedFieldBase<FieldCollection, T, NbComponents>::
+    emplace_back(Args&&... args) {
+      this->array.emplace_back(std::move(args...));
     }
 
   }  // internal
@@ -334,7 +353,7 @@ namespace muSpectre {
   //! Factory function, guarantees that only fields get created that are
   //! properly registered and linked to a collection.
   template<class FieldType, class FieldCollection, typename... Args>
-  typename FieldType::base &
+  typename FieldType::Base &
   make_field(std::string unique_name,
              FieldCollection & collection,
              Args&&... args) {
@@ -349,7 +368,7 @@ namespace muSpectre {
   template <class FieldCollection, typename T, Dim_t order, Dim_t dim>
   TensorField<FieldCollection, T, order, dim>::
   TensorField(std::string unique_name, FieldCollection & collection)
-    :parent(unique_name, collection) {}
+    :Parent(unique_name, collection) {}
 
   /* ---------------------------------------------------------------------- */
   template <class FieldCollection, typename T, Dim_t order, Dim_t dim>
@@ -369,7 +388,7 @@ namespace muSpectre {
   template <class FieldCollection, typename T, Dim_t NbRow, Dim_t NbCol>
   MatrixField<FieldCollection, T, NbRow, NbCol>::
   MatrixField(std::string unique_name, FieldCollection & collection)
-    :parent(unique_name, collection) {}
+    :Parent(unique_name, collection) {}
 
   /* ---------------------------------------------------------------------- */
   template <class FieldCollection, typename T, Dim_t NbRow, Dim_t NbCol>

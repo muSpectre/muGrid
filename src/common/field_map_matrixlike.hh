@@ -57,19 +57,19 @@ namespace muSpectre {
                                               EigenArray::SizeAtCompileTime>
     {
     public:
-      using parent = FieldMap<FieldCollection,
+      using Parent = FieldMap<FieldCollection,
                               typename EigenArray::Scalar,
                               EigenArray::SizeAtCompileTime>;
       using Ccoord = Ccoord_t<FieldCollection::spatial_dim()>;
       using value_type = EigenArray;
       using reference = value_type; // since it's a resource handle
       using const_reference = const value_type;
-      using size_type = typename parent::size_type;
+      using size_type = typename Parent::size_type;
       using pointer = std::unique_ptr<EigenArray>;
-      using TypedField = typename parent::TypedField;
-      using Field = typename TypedField::parent;
-      using iterator = typename parent::template iterator<MatrixLikeFieldMap>;
-      using const_iterator= typename parent::template iterator<MatrixLikeFieldMap, true>;
+      using TypedField = typename Parent::TypedField;
+      using Field = typename TypedField::Parent;
+      using iterator = typename Parent::template iterator<MatrixLikeFieldMap>;
+      using const_iterator= typename Parent::template iterator<MatrixLikeFieldMap, true>;
       using reverse_iterator = std::reverse_iterator<iterator>;
       using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
@@ -125,7 +125,7 @@ namespace muSpectre {
     template<class FieldCollection, class EigenArray, Map_t map_type>
     MatrixLikeFieldMap<FieldCollection, EigenArray, map_type>::
     MatrixLikeFieldMap(Field & field)
-      :parent(field) {
+      :Parent(field) {
       this->check_compatibility();
     }
     /* ---------------------------------------------------------------------- */

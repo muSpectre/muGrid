@@ -107,7 +107,15 @@ namespace muSpectre {
     template <bool NotGlobal = !Global>
     inline std::enable_if_t<NotGlobal> add_pixel(const Ccoord & local_ccoord);
 
-    //! allocate memory, etc
+    //! allocate memory, etc. At this point, the field knows how many
+    //! entries it should have (global fields know from the 'sizes'
+    //! parameter and non-global fields know from the size of the
+    //! pixel container, which was grown using 'add_pixel(...)'. The
+    //! job of initialise is to check that all fields are either of
+    //! size 0, in which case they need to be allocated, or are of the
+    //! same size as the pixel_container. Any field of a different
+    //! size is wrong. TODO: check whether it makes sense to put a
+    //! runtime check here
     template <bool NotGlobal = !Global>
     inline std::enable_if_t<NotGlobal> initialise();
     template <bool isGlobal = Global>
@@ -182,7 +190,18 @@ namespace muSpectre {
     this->size_ = this->ccoords.size();
     std::for_each(std::begin(this->fields), std::end(this->fields),
                   [this](auto && item) {
-                    item.second->initialise(this->size());
+                    auto && field = *item.second;
+                    const auto field_size = field.size();
+                    if (field_size == 0) {
+                      field.resize(this->size());
+                    } else if (field_size != this->size()) {
+                      std::stringstream err_stream;
+                      err_stream << "Field '" << field.get_name()
+                                 << "' contains " << field_size
+                                 << " entries, but the field collection "
+                                 << "has " << this->size() << " pixels";
+                      throw FieldCollectionError(err_stream.str());
+                    }
                   });
     this->is_initialised = true;
   }
@@ -197,7 +216,18 @@ namespace muSpectre {
     this->sizes = sizes;
     std::for_each(std::begin(this->fields), std::end(this->fields),
                   [this](auto && item) {
-                    item.second->initialise(this->size());
+                    auto && field = *item.second;
+                    const auto field_size = field.size();
+                    if (field_size == 0) {
+                      field.resize(this->size());
+                    } else if (field_size != this->size()) {
+                      std::stringstream err_stream;
+                      err_stream << "Field '" << field.get_name()
+                                 << "' contains " << field_size
+                                 << " entries, but the field collection "
+                                 << "has " << this->size() << " pixels";
+                      throw FieldCollectionError(err_stream.str());
+                    }
                   });
     this->is_initialised = true;
   }

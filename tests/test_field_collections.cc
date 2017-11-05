@@ -234,7 +234,7 @@ namespace muSpectre {
     for (auto && s: size) {
       s = 3;
     }
-    F::fc.initialise(size);
+    BOOST_CHECK_NO_THROW(F::fc.initialise(size));
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(init_test_loca, F, mult_collections_f, F) {
@@ -247,23 +247,47 @@ namespace muSpectre {
       F::fc.add_pixel(pixel);
     }
 
-    F::fc.initialise();
+    BOOST_CHECK_NO_THROW(F::fc.initialise());
+  }
+
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(init_test_loca_with_push_back, F, mult_collections_f, F) {
+    constexpr auto mdim = F::mdim();
+    constexpr int nb_pix = 7;
+    testGoodies::RandRange<Int> rng;
+    using ftype = internal::TypedFieldBase<decltype(F::fc), Real,  mdim*mdim*mdim*mdim>;
+    using stype = Eigen::Array<Real, mdim*mdim*mdim*mdim, 1>;
+    auto & field = reinterpret_cast<ftype&>(F::fc["Tensorfield Real o4"]);
+    field.push_back(stype());
+    for (int i = 0; i < nb_pix; ++i) {
+      Ccoord_t<F::sdim()> pixel;
+      for (auto && s: pixel) {
+        s = rng.randval(0, 7);
+      }
+      F::fc.add_pixel(pixel);
+    }
+
+    BOOST_CHECK_THROW(F::fc.initialise(), FieldCollectionError);
+    for (int i = 0; i < nb_pix-1; ++i) {
+      field.push_back(stype());
+    }
+    BOOST_CHECK_NO_THROW(F::fc.initialise());
+
   }
 
   //! Test fixture for iterators over multiple fields
   template <Dim_t DimS, Dim_t DimM, bool Global>
   struct FC_iterator_fixture
     : public FC_multi_fixture<DimS, DimM, Global> {
-    using parent = FC_multi_fixture<DimS, DimM, Global>;
+    using Parent = FC_multi_fixture<DimS, DimM, Global>;
     FC_iterator_fixture()
-      :parent() {
+      :Parent() {
       this-> fill();
     }
 
     template <bool isGlobal = Global>
     std::enable_if_t<isGlobal> fill() {
       static_assert(Global==isGlobal, "You're breaking my SFINAE plan");
-      Ccoord_t<parent::sdim()> size;
+      Ccoord_t<Parent::sdim()> size;
       for (auto && s: size) {
         s = cube_size();
       }
@@ -275,7 +299,7 @@ namespace muSpectre {
       static_assert(notGlobal != Global, "You're breaking my SFINAE plan");
       testGoodies::RandRange<Int> rng;
       for (int i = 0*dummy; i < sele_size(); ++i) {
-        Ccoord_t<parent::sdim()> pixel;
+        Ccoord_t<Parent::sdim()> pixel;
         for (auto && s: pixel) {
           s = rng.randval(0, 7);
         }
@@ -297,17 +321,17 @@ namespace muSpectre {
                                             FC_iterator_fixture<3, 3, false>>;
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(iter_field_test, F, iter_collections, F) {
-    using FC_t = typename F::parent::FC_t;
-    using Tensor4Map = TensorFieldMap<FC_t, Real, order, F::parent::mdim()>;
+    using FC_t = typename F::Parent::FC_t;
+    using Tensor4Map = TensorFieldMap<FC_t, Real, order, F::Parent::mdim()>;
     Tensor4Map T4map{F::fc["Tensorfield Real o4"]};
     F::fc["Tensorfield Real o4"].set_zero();
     for (auto && tens:T4map) {
       BOOST_CHECK_EQUAL(Real(Eigen::Tensor<Real, 0>(tens.abs().sum().eval())()), 0);
     }
 
-    using Tensor2Map = TensorFieldMap<FC_t, Real, matrix_order, F::parent::mdim()>;
-    using MSqMap = MatrixFieldMap<FC_t, Real, F::parent::mdim(), F::parent::mdim()>;
-    using ASqMap =  ArrayFieldMap<FC_t, Real, F::parent::mdim(), F::parent::mdim()>;
+    using Tensor2Map = TensorFieldMap<FC_t, Real, matrix_order, F::Parent::mdim()>;
+    using MSqMap = MatrixFieldMap<FC_t, Real, F::Parent::mdim(), F::Parent::mdim()>;
+    using ASqMap =  ArrayFieldMap<FC_t, Real, F::Parent::mdim(), F::Parent::mdim()>;
     Tensor2Map T2map{F::fc["Tensorfield Real o2"]};
     MSqMap Mmap{F::fc["Tensorfield Real o2"]};
     ASqMap Amap{F::fc["Tensorfield Real o2"]};
@@ -340,7 +364,7 @@ namespace muSpectre {
                                            FC_iterator_fixture<3, 3, true>>;
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(ccoord_indexing_test, F, glob_iter_colls, F) {
-    using FC_t = typename F::parent::FC_t;
+    using FC_t = typename F::Parent::FC_t;
     using ScalarMap = ScalarFieldMap<FC_t, Int>;
     ScalarMap s_map{F::fc["integer Scalar"]};
     for (Uint i = 0; i < s_map.size(); ++i) {
@@ -358,8 +382,8 @@ namespace muSpectre {
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(iterator_methods_test, F, iter_collections, F) {
-    using FC_t = typename F::parent::FC_t;
-    using Tensor4Map = TensorFieldMap<FC_t, Real, order, F::parent::mdim()>;
+    using FC_t = typename F::Parent::FC_t;
+    using Tensor4Map = TensorFieldMap<FC_t, Real, order, F::Parent::mdim()>;
     Tensor4Map T4map{F::fc["Tensorfield Real o4"]};
     using it_t = typename Tensor4Map::iterator;
     std::ptrdiff_t diff{3}; // arbitrary, as long as it is smaller than the container size
@@ -455,12 +479,12 @@ namespace muSpectre {
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(const_tensor_iter_test, F, iter_collections, F) {
-    using FC_t = typename F::parent::FC_t;
-    using Tensor4Map = TensorFieldMap<FC_t, Real, order, F::parent::mdim()>;
+    using FC_t = typename F::Parent::FC_t;
+    using Tensor4Map = TensorFieldMap<FC_t, Real, order, F::Parent::mdim()>;
     Tensor4Map T4map{F::fc["Tensorfield Real o4"]};
 
     using T_t = typename Tensor4Map::T_t;
-    Eigen::TensorMap<const T_t> Tens2(T4map[0].data(), F::parent::sdim(), F::parent::sdim(), F::parent::sdim(), F::parent::sdim());
+    Eigen::TensorMap<const T_t> Tens2(T4map[0].data(), F::Parent::sdim(), F::Parent::sdim(), F::Parent::sdim(), F::Parent::sdim());
 
     for (auto it = T4map.cbegin(); it != T4map.cend(); ++it) {
       // maps to const tensors can't be initialised with a const pointer this sucks
@@ -481,7 +505,7 @@ namespace muSpectre {
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(const_matrix_iter_test, F, iter_collections, F) {
-    using FC_t = typename F::parent::FC_t;
+    using FC_t = typename F::Parent::FC_t;
     using MatrixMap = MatrixFieldMap<FC_t, Complex, F::sdim(), F::mdim()>;
     MatrixMap Mmap{F::fc["Matrixfield Complex sdim x mdim"]};
 
@@ -504,7 +528,7 @@ namespace muSpectre {
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(const_scalar_iter_test, F, iter_collections, F) {
-    using FC_t = typename F::parent::FC_t;
+    using FC_t = typename F::Parent::FC_t;
     using ScalarMap = ScalarFieldMap<FC_t, Int>;
     ScalarMap Smap{F::fc["integer Scalar"]};
 

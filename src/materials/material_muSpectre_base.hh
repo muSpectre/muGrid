@@ -41,10 +41,12 @@
 
 namespace muSpectre {
 
+  //! 'Material' is a CRTP
   template<class Material>
   class MaterialMuSpectre: public<MaterialBase<Material::sdim(), Material::mdim()>>
   {
   public:
+
     //! Default constructor
     MaterialMuSpectre() = delete;
 
