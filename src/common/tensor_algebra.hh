@@ -31,10 +31,12 @@
 #ifndef TENSOR_ALGEBRA_H
 #define TENSOR_ALGEBRA_H
 
-#include "common/common.hh"
+#include <type_traits>
+
 #include <Eigen/Dense>
 #include <unsupported/Eigen/CXX11/Tensor>
 
+#include "common/common.hh"
 
 namespace muSpectre {
 
@@ -56,12 +58,31 @@ namespace muSpectre {
     }
 
     /* ---------------------------------------------------------------------- */
+    //! Check whether a given expression represents a Tensor specified order
+    template<class T, Dim_t order>
+    struct is_tensor {
+      constexpr static bool value = (std::is_convertible
+                      <T, Eigen::Tensor<Real, order>>::value ||
+                    std::is_convertible
+                      <T, Eigen::Tensor<Int, order>>::value ||
+                    std::is_convertible
+                      <T, Eigen::Tensor<Complex, order>>::value);
+    };
+    /* ---------------------------------------------------------------------- */
     /** compile-time outer tensor product as defined by Curnier
      *  R_ijkl = A_ij.B_klxx
      *    0123     01   23
      */
     template<Dim_t dim, typename T1, typename T2>
     constexpr inline decltype(auto) outer(T1 && A, T2 && B) {
+      // Just make sure that the right type of parameters have been given
+      constexpr Dim_t order{2};
+      static_assert(is_tensor<T1, order>::value,
+                    "T1 needs to be convertible to a second order Tensor");
+      static_assert(is_tensor<T2, order>::value,
+                    "T2 needs to be convertible to a second order Tensor");
+
+      // actual function
       std::array<Eigen::IndexPair<Dim_t>, 0> dims{};
       return A.contract(B, dims);
     }
@@ -70,6 +91,7 @@ namespace muSpectre {
     /** compile-time underlined outer tensor product as defined by Curnier
      *  R_ijkl = A_ik.B_jlxx
      *    0123     02   13
+     *    0213     01   23 <- this defines the shuffle order
      */
     template<Dim_t dim, typename T1, typename T2>
     constexpr inline decltype(auto) outer_under(T1 && A, T2 && B) {
@@ -81,14 +103,15 @@ namespace muSpectre {
     /** compile-time overlined outer tensor product as defined by Curnier
      *  R_ijkl = A_il.B_jkxx
      *    0123     03   12
+     *    0231     01   23 <- this defines the shuffle order
      */
     template<Dim_t dim, typename T1, typename T2>
     constexpr inline decltype(auto) outer_over(T1 && A, T2 && B) {
       constexpr size_t order{4};
-      return outer<dim>(A, B).shuffle(std::array<Dim_t, order>{0, 3, 1, 2});
+      return outer<dim>(A, B).shuffle(std::array<Dim_t, order>{0, 2, 3, 1});
     }
 
-
+  }  // Tensors
 }  // muSpectre
 
 

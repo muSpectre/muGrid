@@ -34,7 +34,7 @@
 #include <sstream>
 #include <iostream>
 #include "common/common.hh"
-#include "materials/tensor_algebra.hh"
+#include "common/tensor_algebra.hh"
 
 namespace muSpectre {
 
@@ -55,7 +55,6 @@ namespace muSpectre {
     std::ostream & operator<<(std::ostream & os, StressMeasure s) {
       switch (s) {
       case StressMeasure::Cauchy:    {os << "Cauchy";    break;}
-      case StressMeasure::PK1:       {os << "PK1";       break;}
       case StressMeasure::PK1:       {os << "PK1";       break;}
       case StressMeasure::PK2:       {os << "PK2";       break;}
       case StressMeasure::Kirchhoff: {os << "Kirchhoff"; break;}
@@ -87,12 +86,13 @@ namespace muSpectre {
           ("a strain measure must be missing");
         break;
       }
+      return os;
     }
 
     /* ---------------------------------------------------------------------- */
     //! set of functions returning an expression for PK2 stress based on
-    template <StressMeasure StressM, class Tens1, class Tens2>
-    decltype(auto) PK2_stress(Tens1 && stress, Tens2 && Strain) {
+    template <StressMeasure StressM>
+    auto PK2_stress = [](auto && stress, auto && Strain)  -> decltype(auto) {
       // the following test always fails to generate a compile-time error
       static_assert((StressM == StressMeasure::Cauchy) &&
                     (StressM == StressMeasure::PK1),
@@ -100,14 +100,14 @@ namespace muSpectre {
                     "You either made a programming mistake or need to "
                     "implement it as a specialisation of this function. "
                     "See PK2stress<PK1,T1, T2> for an example.");
-    }
+    };
 
     /* ---------------------------------------------------------------------- */
-    template <class Tens1, class Tens2>
-    decltype(auto)
-    PK2_stress<StressMeasure::PK1, Tens1, Tens2>(Tens1 && S, Tens2 && F) {
+    template <>
+    auto PK2_stress<StressMeasure::PK1> =
+      [](auto && S, auto && F) -> decltype(auto) {
       return F*S;
-    }
+    };
 
     /* ---------------------------------------------------------------------- */
     //! set of functions returning ∂strain/∂F (where F is the transformation
@@ -118,8 +118,8 @@ namespace muSpectre {
     //! and the major symmetry due to the existance of an elastic potential
     //! W(E). Do not rely on this function if you are using exotic stress
     //! measures
-    template<StrainMeasure StrainM, class Tens>
-    decltype(auto) StrainDerivative(Tens && F) {
+    template<StrainMeasure StrainM>
+    auto StrainDerivative = [](auto && F) decltype(auto) {
       // the following test always fails to generate a compile-time error
       static_assert((StrainM == StrainMeasure::Almansi) &&
                     (StrainM == StrainMeasure::Biot),
@@ -129,16 +129,17 @@ namespace muSpectre {
                     "function. See "
                     "StrainDerivative<StrainMeasure::GreenLagrange> for an "
                     "example.");
-    }
+    };
 
     /* ---------------------------------------------------------------------- */
-    template<class Tens>
-    decltype(auto)
-    StrainDerivative<StrainMeasure::GreenLagrange, Tens> (Tens && F) {
+    template<>
+    auto StrainDerivative<StrainMeasure::GreenLagrange> =
+      [] (auto && F) -> decltype(auto) {
       constexpr size_t order{2};
       constexpr Dim_t dim{F.Dimensions[0]};
       return Tensors::outer_under<dim>
         (F.shuffle(std::array<Dim_t, order>{1,0}), Tensors::I2<dim>());
+    };
 
     /* ---------------------------------------------------------------------- */
     //! function returning expressions for PK2 stress and stiffness
