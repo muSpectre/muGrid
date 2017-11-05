@@ -27,7 +27,7 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include "material.hh"
+#include "materials/material.hh"
 
 namespace muSpectre {
 

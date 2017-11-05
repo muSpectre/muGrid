@@ -159,7 +159,7 @@ namespace muSpectre {
                                             T,
                                             ipow(dim,order)>;
     using Base = typename Parent::Base;
-    using Field_p = std::unique_ptr<internal::FieldBase<FieldCollection>>;
+    using Field_p = typename FieldCollection::Field_p;
     using component_type = T;
     //! Copy constructor
     TensorField(const TensorField &other) = delete;

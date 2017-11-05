@@ -298,6 +298,7 @@ namespace muSpectre {
     std::enable_if_t<notGlobal> fill (int dummy = 0) {
       static_assert(notGlobal != Global, "You're breaking my SFINAE plan");
       testGoodies::RandRange<Int> rng;
+      this->fc.add_pixel({0,0});
       for (int i = 0*dummy; i < sele_size(); ++i) {
         Ccoord_t<Parent::sdim()> pixel;
         for (auto && s: pixel) {
@@ -470,9 +471,9 @@ namespace muSpectre {
     // check cell coordinates
     using Ccoord = Ccoord_t<F::sdim()>;
     Ccoord a{itstart.get_ccoord()};
-    Ccoord b{};
+    Ccoord b{0};
 
-    // Weirdly, boost::has_left_shift<std::ostream, T>::value is falso for Ccoords, even though the operator is implemented :(
+    // Weirdly, boost::has_left_shift<std::ostream, T>::value is false for Ccoords, even though the operator is implemented :(
     //BOOST_CHECK_EQUAL(a, b);
     bool check2 = (a==b);
     BOOST_CHECK(check2);

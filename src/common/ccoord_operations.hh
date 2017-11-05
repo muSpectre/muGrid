@@ -46,7 +46,7 @@ namespace muSpectre {
       Dim_t factor{1};
       for (Dim_t i = dim-1; i >=0; --i) {
         retval[i] = index/factor%sizes[i];
-        if (dim != 0 ) {
+        if (i != 0 ) {
           factor *= sizes[i];
         }
       }
@@ -61,7 +61,7 @@ namespace muSpectre {
       Dim_t factor{1};
       for (Dim_t i = dim-1; i >=0; --i) {
         retval += ccoord[i]*factor;
-        if (dim != 0) {
+        if (i != 0) {
           factor *= sizes[i];
         }
       }
