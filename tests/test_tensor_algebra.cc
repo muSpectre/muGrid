@@ -141,9 +141,9 @@ namespace muSpectre {
     Strain_tw D = A;
     //static_assert(!std::is_convertible<Strain_t, Strain_tw>::value,
     //              "Tensors not size-protected");
-    if (std::is_convertible<Strain_t, Strain_tw>::value) {
-      throw std::runtime_error("this is not good, should I abandon Tensors?");
-    }
+    //if (std::is_convertible<Strain_t, Strain_tw>::value) {
+    //  throw std::runtime_error("this is not good, should I abandon Tensors?");
+    //}
     std::cout << "D = "  << D << std::endl;
     
 
