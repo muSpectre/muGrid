@@ -78,8 +78,13 @@ namespace muSpectre {
 
   //! continuum mechanics flags
   enum class Formulation{finite_strain, small_strain};
+  std::ostream & operator<<(std::ostream & os, Formulation f);
 
 
 }  // muSpectre
+
+#ifndef EXPLICITLY_TURNED_ON_CXX17
+#include "common/utilities.hh"
+#endif
 
 #endif /* COMMON_H */

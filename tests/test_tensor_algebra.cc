@@ -138,15 +138,11 @@ namespace muSpectre {
     auto a = T::Dimensions::total_size;
     auto b = Strain_tw::Dimensions::total_size;
     std::cout << "a, b = " << a << ", " << b << std::endl;
-    Strain_tw D = A;
     //static_assert(!std::is_convertible<Strain_t, Strain_tw>::value,
     //              "Tensors not size-protected");
     if (std::is_convertible<Strain_t, Strain_tw>::value) {
-      throw std::runtime_error("this is not good, should I abandon Tensors?");
+      std::cout << "this is not good, should I abandon Tensors?";
     }
-    std::cout << "D = "  << D << std::endl;
-    
-
     // this test seems useless. I use to detect if Eigen changed the
     // default tensor product
     Real error = TerrNorm(FF1-ref);

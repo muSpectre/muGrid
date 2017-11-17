@@ -85,7 +85,6 @@ namespace muSpectre {
     //! returns the cell coordinates corresponding to a linear index
     inline Ccoord get_ccoord(size_t index) const;
 
-
   protected:
     //! container of pixel coords for non-global collections
     std::vector<Ccoord> ccoords;

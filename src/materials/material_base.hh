@@ -1,5 +1,5 @@
 /**
- * file   material.hh
+ * file   material_base.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -34,8 +34,8 @@
 #include "common/field_collection.hh"
 
 
-#ifndef MATERIAL_H
-#define MATERIAL_H
+#ifndef MATERIAL_BASE_H
+#define MATERIAL_BASE_H
 
 namespace muSpectre {
 
@@ -86,43 +86,23 @@ namespace muSpectre {
     //! TODO: this won't work. for materials with additional info per pixel (see above TODO), we neet to allocate before we know for sure how many pixels the material is responsible for.
     virtual void initialize(bool stiffness = false) = 0;
 
-
-    //! computes the first Piola-Kirchhoff stress for finite strain problems
-    virtual void compute_stress(const StrainMap_t & F,
-                                StressMap_t & P);
-    //! computes the first Piola-Kirchhoff stress and the tangent stiffness
-    //! for finite strain problems
-    virtual void compute_stress_stiffness(const StrainMap_t & F,
-                                          StressMap_t & P,
-                                          StiffnessMap_t & K);
-
-
-    //! computes Cauchy stress for small strain problems
-    virtual void compute_cauchy(const StrainMap_t & eps,
-                                StressMap_t &sig);
-
-    //! computes Cauchy stress and stiffness for small strain problems
-    virtual void compute_cauchy_stiffness(const StrainMap_t & eps,
-                                          StressMap_t &sig,
-                                          StiffnessMap_t & K);
     //! return the materil's name
     const std::string & get_name() const;
 
     //! for static inheritance stuff
     constexpr static Dim_t sdim() {return DimS;}
     constexpr static Dim_t mdim() {return DimM;}
-
-  protected:
     //! computes stress
     virtual void compute_stress(const StrainMap_t & F,
                                 StressMap_t & P,
-                                Formulation form);
+                                Formulation form) = 0;
     //! computes stress and tangent stiffness
-    //! for finite strain problems
     virtual void compute_stress_stiffness(const StrainMap_t & F,
                                           StressMap_t & P,
                                           StiffnessMap_t & K,
-                                          Formulation form);
+                                          Formulation form) = 0;
+
+  protected:
 
     //! members
     const std::string name;
@@ -133,4 +113,4 @@ namespace muSpectre {
   };
 }  // muSpectre
 
-#endif /* MATERIAL_H */
+#endif /* MATERIAL_BASE_H */

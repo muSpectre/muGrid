@@ -1,11 +1,11 @@
 /**
- * file   material.cc
+ * file   common.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
- * @date   01 Nov 2017
+ * @date   15 Nov 2017
  *
- * @brief  implementation of materi
+ * @brief  Implementation for common functions
  *
  * @section LICENCE
  *
@@ -27,20 +27,25 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include "materials/material.hh"
+#include <stdexcept>
+
+#include "common/common.hh"
+
 
 namespace muSpectre {
 
-  //----------------------------------------------------------------------------//
-  template<Dim_t s_dim, Dim_t m_dim>
-  MaterialBase<s_dim, m_dim>::MaterialBase(std::string name):name(name){
-    static_assert((m_dim == oneD)||
-                  (m_dim == twoD)||
-                  (m_dim == threeD), "only 1, 2, or threeD supported");
+  /* ---------------------------------------------------------------------- */
+  std::ostream & operator<<(std::ostream & os, Formulation f) {
+    switch (f) {
+    case Formulation::small_strain:  {os << "small_strain";  break;}
+    case Formulation::finite_strain: {os << "finite_strain"; break;}
+    default:
+      throw std::runtime_error
+        ("unknown formulation.");
+      break;
+    }
+    return os;
   }
 
-  template class MaterialBase<2, 2>;
-  template class MaterialBase<2, 3>;
-  template class MaterialBase<3, 3>;
 
 }  // muSpectre

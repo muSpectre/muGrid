@@ -93,7 +93,7 @@ namespace muSpectre {
     FieldCollectionBase& operator=(FieldCollectionBase &&other) noexcept = delete;
 
     //! Register a new field (fields need to be in heap, so I want to keep them
-    //! yas shared pointers
+    //! as shared pointers
     void register_field(Field_p&& field);
 
     //! for return values of iterators

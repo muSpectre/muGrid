@@ -1,5 +1,5 @@
 set (materials_SRC
-  material.cc
+  material_base.cc
   #material_hyper_elastic.cc
   #material_linear_elastic.cc
   )
