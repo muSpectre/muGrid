@@ -47,5 +47,96 @@ namespace muSpectre {
     return os;
   }
 
+  /* ---------------------------------------------------------------------- */
+  std::ostream & operator<<(std::ostream & os, StressMeasure s) {
+    switch (s) {
+    case StressMeasure::Cauchy:    {os << "Cauchy";    break;}
+    case StressMeasure::PK1:       {os << "PK1";       break;}
+    case StressMeasure::PK2:       {os << "PK2";       break;}
+    case StressMeasure::Kirchhoff: {os << "Kirchhoff"; break;}
+    case StressMeasure::Biot:      {os << "Biot";      break;}
+    case StressMeasure::Mandel:    {os << "Mandel";    break;}
+    default:
+      throw std::runtime_error
+        ("a stress measure must be missing");
+      break;
+    }
+    return os;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  std::ostream & operator<<(std::ostream & os, StrainMeasure s) {
+    switch (s) {
+    case StrainMeasure::Gradient:      {os << "Gradient"; break;}
+    case StrainMeasure::Infinitesimal: {os << "Infinitesimal"; break;}
+    case StrainMeasure::GreenLagrange: {os << "Green-Lagrange"; break;}
+    case StrainMeasure::Biot:          {os << "Biot"; break;}
+    case StrainMeasure::Log:           {os << "Logarithmic"; break;}
+    case StrainMeasure::Almansi:       {os << "Almansi"; break;}
+    case StrainMeasure::RCauchyGreen:  {os << "Right Cauchy-Green"; break;}
+    case StrainMeasure::LCauchyGreen:  {os << "Left Cauchy-Green"; break;}
+    default:
+      throw std::runtime_error
+        ("a strain measure must be missing");
+
+    }
+    return os;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /** Compile-time functions to set the stress and strain measures
+      stored by mu_spectre depending on the formulation
+  **/
+  constexpr StrainMeasure get_stored_strain_type(Formulation form) {
+    switch (form) {
+    case Formulation::finite_strain: {
+      return StrainMeasure::Gradient;
+      break;
+    }
+    case Formulation::small_strain: {
+      return StrainMeasure::Infinitesimal;
+      break;
+    }
+    default:
+      return StrainMeasure::__nostrain__;
+      break;
+    }
+  }
+
+  constexpr StressMeasure get_stored_stress_type(Formulation form) {
+    switch (form) {
+    case Formulation::finite_strain: {
+      return StressMeasure::PK1;
+      break;
+    }
+    case Formulation::small_strain: {
+      return StressMeasure::Cauchy;
+      break;
+    }
+    default:
+      return StressMeasure::__nostress__;
+      break;
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  constexpr StrainMeasure get_formulation_strain_type(Formulation form,
+                                                      StrainMeasure expected) {
+    switch (form) {
+    case Formulation::finite_strain: {
+      return expected;
+      break;
+    }
+    case Formulation::small_strain: {
+      return get_stored_strain_type(form);
+      break;
+    }
+    default:
+      return StrainMeasure::__nostrain__;
+      break;
+    }
+  }
+
+
 
 }  // muSpectre

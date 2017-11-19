@@ -1,5 +1,5 @@
 /**
- * file   material_hyperelastic1.cc
+ * file   material_hyper_elastic1.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -27,28 +27,40 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include "materials/material_hyperelastic1.hh"
+#include "materials/material_hyper_elastic1.hh"
 #include "common/tensor_algebra.hh"
+#include <tuple>
 
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  Materialhyperelastic1<DimS, DimM>::MaterialHyperElastic1(std::string name,
+  MaterialHyperElastic1<DimS, DimM>::MaterialHyperElastic1(std::string name,
                                                            Real young,
                                                            Real poisson)
-    :young{young}, poisson{poisson},
+    :Parent(name), young{young}, poisson{poisson},
      lambda{young*poisson/((1+poisson)*(1-2*poisson))},
      mu{young/(2*(1+poisson))},
-     C{lambda*Tensors::outer<DimM>(Tensors::I2<DimM>(),Tensors::I2<DimM>()) +
-        2*mu*Tensors::I4S<DimM>()}
+     C{lambda*Tensors::outer<DimM>(Tensors::I2<DimM>(),Tensors::I2<DimM>())}// +
+     //2*mu*Tensors::I4S<DimM>()}
   {}
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  MaterialHyperElastic1<DimS, DimM>::evaluate_stress(const Strain_t & E,
-                                                    Stress_t & S) {
-    S = E.trace()*lambda * Strain_t::Identity() + 2*mu*E;
+  decltype(auto)
+  MaterialHyperElastic1<DimS, DimM>::evaluate_stress(const Strain_t & E) {
+    return E.trace()*lambda * Strain_t::Identity() + 2*mu*E;
   }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  decltype(auto)
+  MaterialHyperElastic1<DimS, DimM>::evaluate_stress_tangent(const Strain_t & E) {
+    return std::forward_as_tuple(this->evaluate_stress(E), this->C);
+  }
+
+  template class MaterialHyperElastic1<2, 2>;
+  template class MaterialHyperElastic1<2, 3>;
+  template class MaterialHyperElastic1<3, 3>;
 
 }  // muSpectre

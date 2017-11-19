@@ -48,50 +48,51 @@ namespace muSpectre {
         :std::runtime_error(what){}
     };
 
-    /* ---------------------------------------------------------------------- */
-    //! Material laws can declare which type of stress measure they provide,
-    //! and µSpectre will handle conversions
-    enum class StressMeasure {
-      Cauchy, PK1, PK2, Kirchhoff, Biot, Mandel, __nostress__};
-    std::ostream & operator<<(std::ostream & os, StressMeasure s) {
-      switch (s) {
-      case StressMeasure::Cauchy:    {os << "Cauchy";    break;}
-      case StressMeasure::PK1:       {os << "PK1";       break;}
-      case StressMeasure::PK2:       {os << "PK2";       break;}
-      case StressMeasure::Kirchhoff: {os << "Kirchhoff"; break;}
-      case StressMeasure::Biot:      {os << "Biot";      break;}
-      case StressMeasure::Mandel:    {os << "Mandel";    break;}
-      default:
-        throw MaterialsToolboxError
-          ("a stress measure must be missing");
-        break;
-      }
-      return os;
-    }
 
     /* ---------------------------------------------------------------------- */
-    //! Material laws can declare which type of strain measure they require and
-    //! µSpectre will provide it
-    enum class StrainMeasure {
-      Gradient, Infinitesimal, GreenLagrange, Biot, Log, Almansi,
-      RCauchyGreen, LCauchyGreen, __nostrain__};
-    std::ostream & operator<<(std::ostream & os, StrainMeasure s) {
-      switch (s) {
-      case StrainMeasure::Gradient:      {os << "Gradient"; break;}
-      case StrainMeasure::Infinitesimal: {os << "Infinitesimal"; break;}
-      case StrainMeasure::GreenLagrange: {os << "Green-Lagrange"; break;}
-      case StrainMeasure::Biot:          {os << "Biot"; break;}
-      case StrainMeasure::Log:           {os << "Logarithmic"; break;}
-      case StrainMeasure::Almansi:       {os << "Almansi"; break;}
-      case StrainMeasure::RCauchyGreen:  {os << "Right Cauchy-Green"; break;}
-      case StrainMeasure::LCauchyGreen:  {os << "Left Cauchy-Green"; break;}
-      default:
-        throw MaterialsToolboxError
-          ("a strain measure must be missing");
-        break;
+    /** Structure for functions returning one strain measure as a
+        function of another
+     **/
+    namespace internal {
+
+      template <StrainMeasure In, StrainMeasure Out = In>
+      struct ConvertStrain {
+        template <class Strain_t>
+        inline static decltype(auto)
+        compute(Strain_t&& input) {
+          // transparent case, in which no conversion is required:
+          // just a perfect forwarding
+          static_assert
+            ((In == Out),
+             "This particular strain conversion is not implemented");
+          return std::forward<Strain_t>(input);
+        }
+      };
+
+      /* ---------------------------------------------------------------------- */
+      /** Specialisation for getting Green-Lagrange strain from the
+          transformation gradient
+      **/
+      template <>
+      template <class Strain_t>
+      decltype(auto)
+      ConvertStrain<StrainMeasure::Gradient, StrainMeasure::GreenLagrange>::
+      compute(Strain_t && F) {
+        return (F.transpose()*F - Strain_t::PlainObject::Identity());
       }
-      return os;
-    }
+
+    }  // internal
+
+    /* ---------------------------------------------------------------------- */
+    //! set of functions returning one strain measure as a function of
+    //! another
+    template <StrainMeasure In, StrainMeasure Out,
+              class Strain_t>
+    decltype(auto) convert_strain(Strain_t && strain) {
+      return internal::ConvertStrain<In, Out>::compute(std::move(strain));
+    };
+
+
 
     /* ---------------------------------------------------------------------- */
     /** Structure for functions returning PK1 stress from other stress measures
@@ -114,9 +115,9 @@ namespace muSpectre {
                         "See PK2stress<PK1,T1, T2> for an example.");
         }
 
-        template <class Stress_t, class Strain_t, class Stiffness_t>
+        template <class Stress_t, class Strain_t, class Tangent_t>
         inline static decltype(auto)
-        compute(Stress_t && /*stress*/, Stiffness_t && /*stiffness*/,
+        compute(Stress_t && /*stress*/, Tangent_t && /*stiffness*/,
                 Strain_t && /*strain*/) {
           // the following test always fails to generate a compile-time error
           static_assert((StressM == StressMeasure::Cauchy) &&
@@ -154,9 +155,9 @@ namespace muSpectre {
         public PK1_stress<StressMeasure::PK1,
                           StrainMeasure::__nostrain__> {
 
-        template <class Stress_t, class Strain_t, class Stiffness_t>
+        template <class Stress_t, class Strain_t, class Tangent_t>
         decltype(auto)
-        compute(Stress_t && P, Stiffness_t && K, Strain_t && /*dummy*/) {
+        compute(Stress_t && P, Tangent_t && K, Strain_t && /*dummy*/) {
           return std::forward_as_tuple(P, K);
         }
       };
@@ -187,10 +188,10 @@ namespace muSpectre {
         public PK1_stress<StressMeasure::PK2,
                           StrainMeasure::__nostrain__> {
 
-        template <class Stress_t, class Strain_t, class Stiffness_t>
+        template <class Stress_t, class Strain_t, class Tangent_t>
         inline static decltype(auto)
-        compute(Stress_t && S, Stiffness_t && C, Strain_t && F) {
-          using T4 = typename Stiffness_t::PlainObject;
+        compute(Stress_t && S, Tangent_t && C, Strain_t && F) {
+          using T4 = typename Tangent_t::PlainObject;
           T4 K;
           K.setZero();
           constexpr int dim{Strain_t::ColsAtCompileTime};
@@ -217,8 +218,7 @@ namespace muSpectre {
     //! set of functions returning an expression for PK2 stress based on
     template <StressMeasure StressM, StrainMeasure StrainM,
               class Stress_t, class Strain_t>
-    decltype(auto) PK1_stress(Stress_t && stress,
-                              Strain_t && strain) {
+    decltype(auto) PK1_stress(Strain_t && strain, Stress_t && stress) {
       return internal::PK1_stress<StressM>::compute(std::move(stress),
                                                     std::move(strain));
     };
@@ -226,10 +226,10 @@ namespace muSpectre {
     /* ---------------------------------------------------------------------- */
     //! set of functions returning an expression for PK2 stress based on
     template <StressMeasure StressM, StrainMeasure StrainM,
-              class Stress_t, class Strain_t, class Stiffness_t>
-    decltype(auto) PK1_stress(Stress_t && stress,
-                              Strain_t && strain,
-                              Stiffness_t && stiffness) {
+              class Stress_t, class Strain_t, class Tangent_t>
+    decltype(auto) PK1_stress(Strain_t && strain,
+                              Stress_t && stress,
+                              Tangent_t && stiffness) {
       return internal::PK1_stress<StressM>::compute(std::move(stress),
                                                     std::move(strain),
                                                     std::move(stiffness));
@@ -298,13 +298,6 @@ namespace muSpectre {
       return Tensors::outer_under<dim>
         (F.shuffle(std::array<Dim_t, order>{1,0}), Tensors::I2<dim>());
     };
-
-    /* ---------------------------------------------------------------------- */
-    //! function returning expressions for PK2 stress and stiffness
-    template <class Tens1, class Tens2,
-              StressMeasure StressM, StrainMeasure StrainM>
-    decltype(auto) PK2_stress_stiffness(Tens1 && stress, Tens2 && F) {
-    }
 
   }  // MatTB
 

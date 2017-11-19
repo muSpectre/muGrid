@@ -40,7 +40,7 @@ namespace muSpectre {
   namespace internal {
 
     /* ---------------------------------------------------------------------- */
-    enum class Map_t{Matrix, Array};
+    enum class Map_t{Matrix, Array, T4Matrix};
     template<Map_t map_type>
     struct NameWrapper {
       const static std::string field_info_root;
@@ -49,6 +49,8 @@ namespace muSpectre {
     const std::string NameWrapper<Map_t::Array>::field_info_root{"Array"};
     template<>
     const std::string NameWrapper<Map_t::Matrix>::field_info_root{"Matrix"};
+    template<>
+    const std::string NameWrapper<Map_t::T4Matrix>::field_info_root{"T4Matrix"};
 
     /* ---------------------------------------------------------------------- */
     template <class FieldCollection, class EigenArray, Map_t map_type>
@@ -170,7 +172,6 @@ namespace muSpectre {
     }
 
   }  // internal
-
 
   /* ---------------------------------------------------------------------- */
   //! short-hand for an Eigen matrix map as iterate

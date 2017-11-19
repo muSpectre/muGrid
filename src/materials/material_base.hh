@@ -30,7 +30,7 @@
 #include <string>
 
 #include "common/common.hh"
-#include "common/field_map_tensor.hh"
+#include "common/field_map_matrixlike.hh"
 #include "common/field_collection.hh"
 
 
@@ -52,9 +52,9 @@ namespace muSpectre {
     //! plastic strains, damage variables, etc, but also for managing which
     //! pixels the material is responsible for
     using MFieldCollection_t = FieldCollection<DimS, DimM, false>;
-    using StressMap_t = TensorFieldMap<GFieldCollection_t, Real, 2, DimM>;
+    using StressMap_t = MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
     using StrainMap_t = StressMap_t;
-    using StiffnessMap_t = TensorFieldMap<GFieldCollection_t, Real, 4, DimM>;
+    using TangentMap_t = MatrixFieldMap<GFieldCollection_t, Real, DimM*DimM, DimM*DimM>;
     using Ccoord = Ccoord_t<DimS>;
     //! Default constructor
     MaterialBase() = delete;
@@ -99,7 +99,7 @@ namespace muSpectre {
     //! computes stress and tangent stiffness
     virtual void compute_stress_stiffness(const StrainMap_t & F,
                                           StressMap_t & P,
-                                          StiffnessMap_t & K,
+                                          TangentMap_t & K,
                                           Formulation form) = 0;
 
   protected:

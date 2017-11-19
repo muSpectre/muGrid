@@ -80,6 +80,38 @@ namespace muSpectre {
   enum class Formulation{finite_strain, small_strain};
   std::ostream & operator<<(std::ostream & os, Formulation f);
 
+  /* ---------------------------------------------------------------------- */
+  //! Material laws can declare which type of stress measure they provide,
+  //! and µSpectre will handle conversions
+  enum class StressMeasure {
+    Cauchy, PK1, PK2, Kirchhoff, Biot, Mandel, __nostress__};
+  std::ostream & operator<<(std::ostream & os, StressMeasure s);
+
+  /* ---------------------------------------------------------------------- */
+  //! Material laws can declare which type of strain measure they require and
+  //! µSpectre will provide it
+  enum class StrainMeasure {
+    Gradient, Infinitesimal, GreenLagrange, Biot, Log, Almansi,
+    RCauchyGreen, LCauchyGreen, __nostrain__};
+  std::ostream & operator<<(std::ostream & os, StrainMeasure s);
+
+  /* ---------------------------------------------------------------------- */
+  /** Compile-time functions to set the stress and strain measures
+      stored by mu_spectre depending on the formulation
+   **/
+  constexpr StrainMeasure get_stored_strain_type(Formulation form);
+  constexpr StressMeasure get_stored_stress_type(Formulation form);
+
+  /* ---------------------------------------------------------------------- */
+  /** Compile-time functions to get the stress and strain measures
+      after they may have been modified by choosing a formulation.
+
+      For instance, a law that expecs a Green-Lagrange strain as input
+      will get the infinitesimal strain tensor instead in a small
+      strain computation
+   **/
+  constexpr StrainMeasure get_formulation_strain_type(Formulation form,
+                                                      StrainMeasure expected);
 
 }  // muSpectre
 

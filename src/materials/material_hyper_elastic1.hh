@@ -1,5 +1,5 @@
 /**
- * file   material_hyperelastic1.hh
+ * file   material_hyper_elastic1.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -32,29 +32,29 @@
 
 #include "materials/material_muSpectre_base.hh"
 
-#ifndef MATERIAL_HYPERELASTIC1_H
-#define MATERIAL_HYPERELASTIC1_H
+#ifndef MATERIAL_HYPER_ELASTIC1_H
+#define MATERIAL_HYPER_ELASTIC1_H
 
 namespace muSpectre {
 
   //! DimS spatial dimension (dimension of problem
   //! DimM material_dimension (dimension of constitutive law)
   template<Dim_t DimS, Dim_t DimM>
-  class MaterialHyperElastic1: public MaterialMuSpectre<MaterialHyperElastic1>
+  class MaterialHyperElastic1: public MaterialMuSpectre<MaterialHyperElastic1<DimS, DimM>, DimS, DimM>
   {
   public:
-    using Parent = public MaterialMuSpectre<MaterialHyperElastic1>;
+    using Parent = MaterialMuSpectre<MaterialHyperElastic1, DimS, DimM>;
     // declare what type of strain measure your law takes as input
-    constexpr static auto strain_measure{MatTB::StrainMeasure::GreenLagrange};
+    constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
     // declare what type of stress measure your law yields as output
-    constexpr static auto strain_measure{MatTB::StressMeasure::PK2};
+    constexpr static auto stress_measure{StressMeasure::PK2};
     // declare whether the derivative of stress with respect to strain is uniform
     constexpr static bool uniform_stiffness = true;
     // declare the type in which you wish to receive your strain measure
     using Strain_t = Eigen::Matrix<Real, DimM, DimM>;
     using Stress_t = Strain_t;
-    using Stiffness_t = Eigen::TensorFixedSize
-      <Real, Eigen::Sizes<DimM, DimM, DimM, Dim>, Eigen::RowMajor>;
+    using Tangent_t = Eigen::TensorFixedSize
+      <Real, Eigen::Sizes<DimM, DimM, DimM, DimM>, Eigen::RowMajor>;
 
     //! Default constructor
     MaterialHyperElastic1() = delete;
@@ -63,7 +63,7 @@ namespace muSpectre {
     MaterialHyperElastic1(const MaterialHyperElastic1 &other) = delete;
 
     //! Construct by name, Young's modulus and Poisson's ratio
-    MaterialMuSpectre(std::string name, Real young, real Poisson);
+    MaterialHyperElastic1(std::string name, Real young, Real poisson);
 
 
     //! Move constructor
@@ -79,16 +79,16 @@ namespace muSpectre {
     MaterialHyperElastic1& operator=(MaterialHyperElastic1 &&other) noexcept = delete;
 
     decltype(auto) evaluate_stress(const Strain_t & E);
+    decltype(auto) evaluate_stress_tangent(const Strain_t & E);
 
-    const Stiffness_t & get_stiffness() const;
-
+    const Tangent_t & get_stiffness() const;
 
   protected:
     const Real young, poisson, lambda, mu;
-    const Stiffness_t C;
+    const Tangent_t C;
   private:
   };
 
 }  // muSpectre
 
-#endif /* MATERIAL_HYPERELASTIC1_H */
+#endif /* MATERIAL_HYPER_ELASTIC1_H */
