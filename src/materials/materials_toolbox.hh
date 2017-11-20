@@ -103,9 +103,9 @@ namespace muSpectre {
                 StrainMeasure StrainM = StrainMeasure::__nostrain__>
       struct PK1_stress {
 
-        template <class Stress_t, class Strain_t>
+        template <class Strain_t, class Stress_t>
         inline static decltype(auto)
-        compute(Stress_t && /*stress*/, Strain_t && /*strain*/) {
+        compute(Strain_t && /*strain*/, Stress_t && /*stress*/) {
           // the following test always fails to generate a compile-time error
           static_assert((StressM == StressMeasure::Cauchy) &&
                         (StressM == StressMeasure::PK1),
@@ -115,10 +115,10 @@ namespace muSpectre {
                         "See PK2stress<PK1,T1, T2> for an example.");
         }
 
-        template <class Stress_t, class Strain_t, class Tangent_t>
+        template <class Strain_t, class Stress_t, class Tangent_t>
         inline static decltype(auto)
-        compute(Stress_t && /*stress*/, Tangent_t && /*stiffness*/,
-                Strain_t && /*strain*/) {
+        compute(Strain_t && /*strain*/, Stress_t && /*stress*/,
+                Tangent_t && /*stiffness*/) {
           // the following test always fails to generate a compile-time error
           static_assert((StressM == StressMeasure::Cauchy) &&
                         (StressM == StressMeasure::PK1),
@@ -138,9 +138,9 @@ namespace muSpectre {
         public PK1_stress<StressMeasure::__nostress__,
                           StrainMeasure::__nostrain__> {
 
-        template <class Stress_t, class Strain_t>
+        template <class Strain_t, class Stress_t>
         inline static decltype(auto)
-        compute(Stress_t && P, Strain_t && /*dummy*/) {
+        compute(Strain_t && /*dummy*/, Stress_t && P) {
           return std::forward<Stress_t>(P);
         }
       };
@@ -155,9 +155,9 @@ namespace muSpectre {
         public PK1_stress<StressMeasure::PK1,
                           StrainMeasure::__nostrain__> {
 
-        template <class Stress_t, class Strain_t, class Tangent_t>
+        template <class Strain_t, class Stress_t, class Tangent_t>
         decltype(auto)
-        compute(Stress_t && P, Tangent_t && K, Strain_t && /*dummy*/) {
+        compute(Strain_t && /*dummy*/, Stress_t && P, Tangent_t && K) {
           return std::forward_as_tuple(P, K);
         }
       };
@@ -171,9 +171,9 @@ namespace muSpectre {
         public PK1_stress<StressMeasure::__nostress__,
                           StrainMeasure::__nostrain__> {
 
-        template <class Stress_t, class Strain_t>
+        template <class Strain_t, class Stress_t>
         inline static decltype(auto)
-        compute(Stress_t && S, Strain_t && F) {
+        compute(Strain_t && F, Stress_t && S) {
           return F*S;
         }
       };
@@ -188,9 +188,9 @@ namespace muSpectre {
         public PK1_stress<StressMeasure::PK2,
                           StrainMeasure::__nostrain__> {
 
-        template <class Stress_t, class Strain_t, class Tangent_t>
+        template <class Strain_t, class Stress_t, class Tangent_t>
         inline static decltype(auto)
-        compute(Stress_t && S, Tangent_t && C, Strain_t && F) {
+        compute(Strain_t && F, Stress_t && S, Tangent_t && C) {
           using T4 = typename Tangent_t::PlainObject;
           T4 K;
           K.setZero();

@@ -52,9 +52,9 @@ namespace muSpectre {
     //! plastic strains, damage variables, etc, but also for managing which
     //! pixels the material is responsible for
     using MFieldCollection_t = FieldCollection<DimS, DimM, false>;
-    using StressMap_t = MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
-    using StrainMap_t = StressMap_t;
-    using TangentMap_t = MatrixFieldMap<GFieldCollection_t, Real, DimM*DimM, DimM*DimM>;
+    using StressField_t = TensorField<GFieldCollection_t, Real, secondOrder, DimM>;
+    using StrainField_t = StressField_t;
+    using TangentField_t = TensorField<GFieldCollection_t, Real, fourthOrder, DimM>;
     using Ccoord = Ccoord_t<DimS>;
     //! Default constructor
     MaterialBase() = delete;
@@ -78,12 +78,15 @@ namespace muSpectre {
     MaterialBase& operator=(MaterialBase &&other) noexcept = delete;
 
 
-    //! take responsibility for a pixel identified by its cell coordinates
-    //! TODO: this won't work. for materials with additional info per pixel (as, e.g. for eigenstrain), we need to pass more parameters, so this needs to be a variadic function.
+    /**
+     *  take responsibility for a pixel identified by its cell coordinates
+     *  WARNING: this won't work for materials with additional info per pixel
+     *  (as, e.g. for eigenstrain), we need to pass more parameters. Materials
+     *  of this tye need to overload add_pixel
+     */
     void add_pixel(const Ccoord & ccord);
 
     //! allocate memory, etc
-    //! TODO: this won't work. for materials with additional info per pixel (see above TODO), we neet to allocate before we know for sure how many pixels the material is responsible for.
     virtual void initialize(bool stiffness = false) = 0;
 
     //! return the materil's name
@@ -93,13 +96,13 @@ namespace muSpectre {
     constexpr static Dim_t sdim() {return DimS;}
     constexpr static Dim_t mdim() {return DimM;}
     //! computes stress
-    virtual void compute_stress(const StrainMap_t & F,
-                                StressMap_t & P,
-                                Formulation form) = 0;
-    //! computes stress and tangent stiffness
-    virtual void compute_stress_stiffness(const StrainMap_t & F,
-                                          StressMap_t & P,
-                                          TangentMap_t & K,
+    virtual void compute_stresses(const StrainField_t & F,
+                                   StressField_t & P,
+                                   Formulation form) = 0;
+    //! computes stress and tangent moduli
+    virtual void compute_stresses_tangent(const StrainField_t & F,
+                                          StressField_t & P,
+                                          TangentField_t & K,
                                           Formulation form) = 0;
 
   protected:

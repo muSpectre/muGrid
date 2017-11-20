@@ -150,6 +150,8 @@ namespace muSpectre {
     using T_type = Real;
     using T_TFM1_t = TensorFieldMap<FC_t, T_type, order, F::mdim()>;
     using T_TFM2_t = TensorFieldMap<FC_t, T_type, 2, F::mdim()*F::mdim()>; //! dangerous
+    using T4_Map_t = T4MatrixFieldMap<FC_t, Real, F::mdim()>;
+
     // impossible maptypes for Real tensor fields
     using T_SFM_t = ScalarFieldMap<FC_t, T_type>;
     using T_MFM_t = MatrixFieldMap<FC_t, T_type, 1, 1>;
@@ -163,6 +165,8 @@ namespace muSpectre {
     BOOST_CHECK_THROW(T_SFM_t(F::fc.at(T_name)), FieldInterpretationError);
     BOOST_CHECK_NO_THROW(T_TFM1_t(F::fc.at(T_name)));
     BOOST_CHECK_NO_THROW(T_TFM2_t(F::fc.at(T_name)));
+    BOOST_CHECK_NO_THROW(T4_Map_t(F::fc.at(T_name)));
+    BOOST_CHECK_THROW(T4_Map_t(F::fc.at(T_name_w)), std::out_of_range);
     BOOST_CHECK_THROW(T_MFM_t(F::fc.at(T_name)), FieldInterpretationError);
     BOOST_CHECK_THROW(T_AFM_t(F::fc.at(T_name)), FieldInterpretationError);
     BOOST_CHECK_THROW(T_MFMw1_t(F::fc.at(T_name)), FieldInterpretationError);
@@ -178,6 +182,7 @@ namespace muSpectre {
     using S_TFM2_t = TensorFieldMap<FC_t, S_type, 2, 1>;
     using S_MFM_t = MatrixFieldMap<FC_t, S_type, 1, 1>;
     using S_AFM_t = ArrayFieldMap<FC_t, S_type, 1, 1>;
+    using S4_Map_t = T4MatrixFieldMap<FC_t, S_type, 1>;
     // impossible maptypes for integer scalar fields
     using S_MFMw1_t = MatrixFieldMap<FC_t, Int, 1, 2>;
     using S_MFMw2_t = MatrixFieldMap<FC_t, Real, 1, 2>;
@@ -190,7 +195,9 @@ namespace muSpectre {
     BOOST_CHECK_NO_THROW(S_TFM2_t(F::fc.at(S_name)));
     BOOST_CHECK_NO_THROW(S_MFM_t(F::fc.at(S_name)));
     BOOST_CHECK_NO_THROW(S_AFM_t(F::fc.at(S_name)));
+    BOOST_CHECK_NO_THROW(S4_Map_t(F::fc.at(S_name)));
     BOOST_CHECK_THROW(S_MFMw1_t(F::fc.at(S_name)), FieldInterpretationError);
+    BOOST_CHECK_THROW(T4_Map_t(F::fc.at(S_name)), FieldInterpretationError);
     BOOST_CHECK_THROW(S_MFMw2_t(F::fc.at(S_name)), FieldInterpretationError);
     BOOST_CHECK_THROW(S_MFMw2_t(F::fc.at(S_name)), FieldInterpretationError);
     BOOST_CHECK_THROW(S_MFMw3_t(F::fc.at(S_name)), FieldInterpretationError);

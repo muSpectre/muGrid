@@ -134,9 +134,9 @@ namespace std {
   template <class F, class Tuple>
   constexpr decltype(auto) apply(F &&f, Tuple &&t)
   {
-    return detail::apply_impl(
-                              std::forward<F>(f), std::forward<Tuple>(t),
-                              std::make_index_sequence<std::tuple_size<std::decay_t<Tuple>>::value>{});
+    return detail::apply_impl
+      (std::forward<F>(f), std::forward<Tuple>(t),
+       std::make_index_sequence<std::tuple_size<std::decay_t<Tuple>>::value>{});
   }
 } //namespace std
 

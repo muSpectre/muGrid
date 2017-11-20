@@ -34,6 +34,7 @@
 #include <Eigen/Dense>
 
 #include "common/field_map_base.hh"
+#include "common/T4_map_proxy.hh"
 
 namespace muSpectre {
 
@@ -180,6 +181,14 @@ namespace muSpectre {
     <FieldCollection,
      Eigen::Map<Eigen::Matrix<T, NbRows, NbCols>>,
      internal::Map_t::Matrix>;
+
+  /* ---------------------------------------------------------------------- */
+  //! short-hand for an Eigen matrix map as iterate
+  template <class FieldCollection, typename T, Dim_t Dim, bool Symmetric=false>
+  using T4MatrixFieldMap = internal::MatrixLikeFieldMap
+    <FieldCollection,
+     T4Map<T, Dim, Symmetric>,
+     internal::Map_t::T4Matrix>;
 
   /* ---------------------------------------------------------------------- */
   //! short-hand for an Eigen array map as iterate

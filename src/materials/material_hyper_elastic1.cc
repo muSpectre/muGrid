@@ -41,22 +41,24 @@ namespace muSpectre {
     :Parent(name), young{young}, poisson{poisson},
      lambda{young*poisson/((1+poisson)*(1-2*poisson))},
      mu{young/(2*(1+poisson))},
-     C{lambda*Tensors::outer<DimM>(Tensors::I2<DimM>(),Tensors::I2<DimM>())}// +
-     //2*mu*Tensors::I4S<DimM>()}
+     C{lambda*Tensors::outer<DimM>(Tensors::I2<DimM>(),Tensors::I2<DimM>()) +
+     2*mu*Tensors::I4S<DimM>()}
   {}
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
+  template <class s_t>
   decltype(auto)
-  MaterialHyperElastic1<DimS, DimM>::evaluate_stress(const Strain_t & E) {
+  MaterialHyperElastic1<DimS, DimM>::evaluate_stress(s_t && E) {
     return E.trace()*lambda * Strain_t::Identity() + 2*mu*E;
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
+  template <class s_t>
   decltype(auto)
-  MaterialHyperElastic1<DimS, DimM>::evaluate_stress_tangent(const Strain_t & E) {
-    return std::forward_as_tuple(this->evaluate_stress(E), this->C);
+  MaterialHyperElastic1<DimS, DimM>::evaluate_stress_tangent(s_t && E) {
+    return std::forward_as_tuple(this->evaluate_stress(std::move(E)), this->C);
   }
 
   template class MaterialHyperElastic1<2, 2>;

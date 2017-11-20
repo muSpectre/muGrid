@@ -44,6 +44,8 @@ namespace muSpectre {
   const Dim_t oneD{1};
   const Dim_t twoD{2};
   const Dim_t threeD{3};
+  const Dim_t secondOrder{2};
+  const Dim_t fourthOrder{4};
 
   //! Ccoord_t are cell coordinates, i.e. integer coordinates
   template<Dim_t dim>
@@ -99,8 +101,36 @@ namespace muSpectre {
   /** Compile-time functions to set the stress and strain measures
       stored by mu_spectre depending on the formulation
    **/
-  constexpr StrainMeasure get_stored_strain_type(Formulation form);
-  constexpr StressMeasure get_stored_stress_type(Formulation form);
+  constexpr StrainMeasure get_stored_strain_type(Formulation form) {
+    switch (form) {
+    case Formulation::finite_strain: {
+      return StrainMeasure::Gradient;
+      break;
+    }
+    case Formulation::small_strain: {
+      return StrainMeasure::Infinitesimal;
+      break;
+    }
+    default:
+      return StrainMeasure::__nostrain__;
+      break;
+    }
+  }
+  constexpr StressMeasure get_stored_stress_type(Formulation form) {
+    switch (form) {
+    case Formulation::finite_strain: {
+      return StressMeasure::PK1;
+      break;
+    }
+    case Formulation::small_strain: {
+      return StressMeasure::Cauchy;
+      break;
+    }
+    default:
+      return StressMeasure::__nostress__;
+      break;
+    }
+  }
 
   /* ---------------------------------------------------------------------- */
   /** Compile-time functions to get the stress and strain measures
@@ -111,7 +141,21 @@ namespace muSpectre {
       strain computation
    **/
   constexpr StrainMeasure get_formulation_strain_type(Formulation form,
-                                                      StrainMeasure expected);
+                                                      StrainMeasure expected) {
+    switch (form) {
+    case Formulation::finite_strain: {
+      return expected;
+      break;
+    }
+    case Formulation::small_strain: {
+      return get_stored_strain_type(form);
+      break;
+    }
+    default:
+      return StrainMeasure::__nostrain__;
+      break;
+    }
+  }
 
 }  // muSpectre
 

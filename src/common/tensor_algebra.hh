@@ -111,6 +111,13 @@ namespace muSpectre {
       return outer<dim>(A, B).shuffle(std::array<Dim_t, order>{0, 2, 3, 1});
     }
 
+    //! compile-time fourth-order symmetrising identity
+    template<Dim_t dim>
+    constexpr inline Tens4_t<dim> I4S() {
+      auto I = I2<dim>();
+      return 0.5*(outer_under<dim>(I, I) + outer_over<dim>(I, I));
+    }
+
   }  // Tensors
 }  // muSpectre
 

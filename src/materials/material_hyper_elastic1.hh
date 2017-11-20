@@ -44,6 +44,7 @@ namespace muSpectre {
   {
   public:
     using Parent = MaterialMuSpectre<MaterialHyperElastic1, DimS, DimM>;
+    using GFieldCollection_t = typename Parent::GFieldCollection_t;
     // declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
     // declare what type of stress measure your law yields as output
@@ -51,10 +52,14 @@ namespace muSpectre {
     // declare whether the derivative of stress with respect to strain is uniform
     constexpr static bool uniform_stiffness = true;
     // declare the type in which you wish to receive your strain measure
-    using Strain_t = Eigen::Matrix<Real, DimM, DimM>;
-    using Stress_t = Strain_t;
-    using Tangent_t = Eigen::TensorFixedSize
-      <Real, Eigen::Sizes<DimM, DimM, DimM, DimM>, Eigen::RowMajor>;
+    using StrainMap_t = MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
+    using StressMap_t = StrainMap_t;
+    using TangentMap_t = T4MatrixFieldMap<GFieldCollection_t, Real, fourthOrder, DimM>;
+    using Strain_t = typename StrainMap_t::const_reference;
+    using Stress_t = typename StressMap_t::reference;
+    using Tangent_t = typename TangentMap_t::reference;
+    using Stiffness_t = Eigen::TensorFixedSize
+      <Real, Eigen::Sizes<DimM, DimM, DimM, DimM>>;
 
     //! Default constructor
     MaterialHyperElastic1() = delete;
@@ -78,14 +83,16 @@ namespace muSpectre {
     //! Move assignment operator
     MaterialHyperElastic1& operator=(MaterialHyperElastic1 &&other) noexcept = delete;
 
-    decltype(auto) evaluate_stress(const Strain_t & E);
-    decltype(auto) evaluate_stress_tangent(const Strain_t & E);
+    template <class s_t>
+    decltype(auto) evaluate_stress(s_t && E);
+    template <class s_t>
+    decltype(auto) evaluate_stress_tangent(s_t &&  E);
 
     const Tangent_t & get_stiffness() const;
 
   protected:
     const Real young, poisson, lambda, mu;
-    const Tangent_t C;
+    const Stiffness_t C;
   private:
   };
 
