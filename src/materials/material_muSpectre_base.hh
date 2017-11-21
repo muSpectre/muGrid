@@ -200,10 +200,7 @@ namespace muSpectre {
        IterableSmallStrain_t,
        IterableFiniteStrain_t>;
 
-    constexpr auto stored_strain_m = get_stored_strain_type(Form);
-    constexpr auto expected_strain_m = get_formulation_strain_type(Form, Material::strain_measure);
-
-    /* This lambda is executed for every integration point.
+    /* These lambdas are executed for every integration point.
 
        F contains the transformation gradient for finite strain calculations and
        the infinitesimal strain tensor in small strain problems
@@ -211,21 +208,33 @@ namespace muSpectre {
        The internal_variables tuple contains whatever internal variables
        Material declared (e.g., eigenstrain, strain rate, etc.)
     */
-    auto constitutive_law = [this](auto && F, auto && ...  internal_variables) {
+    auto constitutive_law_small_strain = [this]
+      (auto && F, auto && ...  internal_variables) {
+      constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
+      constexpr StrainMeasure expected_strain_m{
+      get_formulation_strain_type(Form, Material::strain_measure)};
       auto && strain = MatTB::convert_strain<stored_strain_m, expected_strain_m>(F);
       // return value contains a tuple of rvalue_refs to both stress and tangent moduli
       auto && stress_tgt = static_cast<Material&>(*this).evaluate_stress_tangent(std::move(strain), internal_variables...);
-      if (Form == Formulation::small_strain) {
-        return std::move(stress_tgt);
-      } else {
-        auto && stress = std::get<0>(stress_tgt);
-        auto && tangent = std::get<1>(stress_tgt);
-        return MatTB::PK1_stress<Material::stress_measure, Material::strain_measure>
-        (F, stress, tangent);
-      }
+      return std::move(stress_tgt);
     };
 
-    iterable it{*this};
+    auto constitutive_law_finite_strain = [this]
+      (auto && F, auto && ...  internal_variables) {
+      constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
+      constexpr StrainMeasure expected_strain_m{
+      get_formulation_strain_type(Form, Material::strain_measure)};
+
+      auto && strain = MatTB::convert_strain<stored_strain_m, expected_strain_m>(F);
+      // return value contains a tuple of rvalue_refs to both stress and tangent moduli
+      auto && stress_tgt = static_cast<Material&>(*this).evaluate_stress_tangent(std::move(strain), internal_variables...);
+      auto && stress = std::get<0>(stress_tgt);
+      auto && tangent = std::get<1>(stress_tgt);
+      return MatTB::PK1_stress<Material::stress_measure, Material::strain_measure>
+      (F, stress, tangent);
+    };
+
+    iterable it{*this, F, P, K};
     for (auto && tuples: it) {
       // the iterator yields a pair of tuples. this first tuple contains
       // references to stress and stiffness in the global arrays, the second
@@ -233,7 +242,17 @@ namespace muSpectre {
       // (some of them are const).
       auto && stress_tgt = std::get<0>(tuples);
       auto && inputs = std::get<1>(tuples);
-      stress_tgt = std::apply(constitutive_law, std::move(inputs));
+
+      switch (Form) {
+      case Formulation::small_strain: {
+        stress_tgt = std::apply(constitutive_law_small_strain, std::move(inputs));
+        break;
+      }
+      case Formulation::finite_strain: {
+        stress_tgt = std::apply(constitutive_law_finite_strain, std::move(inputs));
+        break;
+      }
+      }
     }
   }
 
@@ -245,13 +264,23 @@ namespace muSpectre {
   public:
     //! Default constructor
     iterable_proxy() = delete;
-
+    using NeedTangent =
+      typename MaterialMuSpectre<Material, DimS, DimM>::NeedTangent;
     /** Iterator uses the material's internal variables field
         collection to iterate selectively over the global fields
         (such as the transformation gradient F and first
         Piola-Kirchhoff stress P.
     **/
-    iterable_proxy(const MaterialMuSpectre & mat);
+    template<bool DoNeedTgt=(NeedTgt == NeedTangent::yes)>
+    iterable_proxy(const MaterialMuSpectre & mat,
+                   const StrainField_t & F,
+                   StressField_t & P,
+                   std::enable_if_t<DoNeedTgt, TangentField_t> & K);
+
+    template<bool DontNeedTgt=(NeedTgt == NeedTangent::no)>
+    iterable_proxy(const MaterialMuSpectre & mat,
+                   const StrainField_t & F,
+                   std::enable_if_t<DontNeedTgt, StressField_t> & P);
 
     using Strain_t = typename Material::Strain_t;
     using Stress_t = typename Material::Stress_t;
@@ -290,7 +319,8 @@ namespace muSpectre {
           (such as the transformation gradient F and first
           Piola-Kirchhoff stress P.
       **/
-      iterator(const MaterialMuSpectre & mat, bool begin = true);
+      iterator(const iterable_proxy & it, bool begin = true)
+        : it{it}, index{begin ? 0:it.mat.internal_fields.size()}{}
 
 
       //! Copy constructor
@@ -317,7 +347,7 @@ namespace muSpectre {
 
 
     protected:
-      const MaterialMuSpectre & material;
+      const iterable_proxy & it;
       size_t index;
     private:
     };
@@ -326,25 +356,48 @@ namespace muSpectre {
     iterator end() {return iterator(*this, false);}
 
   protected:
+    using StressTup = std::conditional_t
+      <(NeedTgt == NeedTangent::yes),
+       std::tuple<StressField_t&, TangentField_t&>,
+       std::tuple<StressField_t&>>;
     const MaterialMuSpectre & material;
+    const StrainField_t & strain_field;
+    StressTup stress_tup;
   private:
   };
 
   /* ---------------------------------------------------------------------- */
-  template<class Material, Dim_t DimS, Dim_t DimM>
-  template<typename MaterialMuSpectre<Material, DimS, DimM>::NeedTangent Tangent>
+  template <class Material, Dim_t DimS, Dim_t DimM>
+  template <typename MaterialMuSpectre<Material, DimS, DimM>::NeedTangent Tangent>
+  template <bool DoNeedTgt>
   MaterialMuSpectre<Material, DimS, DimM>::iterable_proxy<Tangent>::
-  iterable_proxy(const MaterialMuSpectre<Material, DimS, DimM> & mat)
-    : material{mat}
-  {}
+  iterable_proxy(const MaterialMuSpectre<Material, DimS, DimM> & mat,
+                 const StrainField_t & F,
+                 StressField_t & P,
+                 std::enable_if_t<DoNeedTgt, TangentField_t> & K)
+    : material{mat}, strain_field{F}, stress_tup(P, K)
+  {
+    static_assert((Tangent == NeedTangent::yes),
+                  "Explicitly choosing the template parameter 'DoNeedTgt' "
+                  "breaks the SFINAE intention of thi code. Let it be deduced "
+                  "by the compiler.");
+  }
 
   /* ---------------------------------------------------------------------- */
-  template<class Material, Dim_t DimS, Dim_t DimM>
-  template<typename MaterialMuSpectre<Material, DimS, DimM>::NeedTangent Tangent>
+  template <class Material, Dim_t DimS, Dim_t DimM>
+  template <typename MaterialMuSpectre<Material, DimS, DimM>::NeedTangent Tangent>
+  template <bool DontNeedTgt>
   MaterialMuSpectre<Material, DimS, DimM>::iterable_proxy<Tangent>::
-  iterator::iterator(const MaterialMuSpectre<Material, DimS, DimM> & mat, bool begin)
-    : material{mat}, index{begin ? 0:mat.internal_fields.size()}
-  {}
+  iterable_proxy(const MaterialMuSpectre<Material, DimS, DimM> & mat,
+                 const StrainField_t & F,
+                 std::enable_if_t<DontNeedTgt, StressField_t> & P)
+    : material{mat}, strain_field{F}, stress_tup(P)
+  {
+    static_assert((Tangent == NeedTangent::no),
+                  "Explicitly choosing the template parameter 'DontNeedTgt' "
+                  "breaks the SFINAE intention of thi code. Let it be deduced "
+                  "by the compiler.");
+  }
 
   /* ---------------------------------------------------------------------- */
   //! pre-increment
