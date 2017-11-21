@@ -59,6 +59,8 @@ namespace muSpectre {
     using StressField_t = typename Parent::StressField_t;
     using StrainField_t = typename Parent::StrainField_t;
     using TangentField_t = typename Parent::TangentField_t;
+
+
     //! Default constructor
     MaterialMuSpectre() = delete;
 
@@ -108,6 +110,36 @@ namespace muSpectre {
 
   private:
   };
+
+  /* ---------------------------------------------------------------------- */
+  template <class Material, Dim_t DimS, Dim_t DimM>
+  MaterialMuSpectre<Material, DimS, DimM>::
+  MaterialMuSpectre(std::string name):Parent(name) {
+    using stress_compatible = typename Material::StressMap_t::
+      template is_compatible<StressField_t>;
+    using strain_compatible = typename Material::StrainMap_t::
+      template is_compatible<StrainField_t>;
+    using tangent_compatible = typename Material::TangentMap_t::
+      template is_compatible<TangentField_t>;
+
+    static_assert((stress_compatible::value &&
+                   stress_compatible::explain()),
+                  "The material's declared stress map is not compatible "
+                  "with the stress field. More info in previously shown "
+                  "assert.");
+
+    static_assert((strain_compatible::value &&
+                   strain_compatible::explain()),
+                  "The material's declared strain map is not compatible "
+                  "with the strain field. More info in previously shown "
+                  "assert.");
+
+    static_assert((tangent_compatible::value &&
+                   tangent_compatible::explain()),
+                  "The material's declared tangent map is not compatible "
+                  "with the tangent field. More info in previously shown "
+                  "assert.");
+  }
 
   /* ---------------------------------------------------------------------- */
   template <class Material, Dim_t DimS, Dim_t DimM>

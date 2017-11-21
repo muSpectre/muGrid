@@ -85,6 +85,15 @@ namespace muSpectre {
     }
   }
 
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(assign_matrix_test, F, fix_collection, F) {
+    decltype(F::matrix) matrix;
+    matrix.setRandom();
+    F::tensor = matrix;
+    for (Dim_t i = 0; i < ipow(F::dim,4); ++i) {
+      BOOST_CHECK_EQUAL(F::matrix.data()[i], matrix.data()[i]);
+    }
+  }
+
   BOOST_AUTO_TEST_SUITE_END();
 
 }  // muSpectre

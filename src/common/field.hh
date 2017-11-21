@@ -60,6 +60,7 @@ namespace muSpectre {
                 FieldCollection & collection);
 
     public:
+      using collection_t = FieldCollection;
 
       //! Copy constructor
       FieldBase(const FieldBase &other) = delete;
@@ -120,7 +121,10 @@ namespace muSpectre {
     {
       friend class FieldMap<FieldCollection, T, NbComponents>;
     public:
+      constexpr static auto nb_components{NbComponents};
       using Parent = FieldBase<FieldCollection>;
+      using Parent::collection_t;
+      using Scalar = T;
       using Base = Parent;
       //using storage_type = Eigen::Array<T, Eigen::Dynamic, NbComponents>;
       using StoredType = Eigen::Array<T, NbComponents, 1>;

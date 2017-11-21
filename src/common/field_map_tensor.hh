@@ -49,7 +49,7 @@ namespace muSpectre {
   {
   public:
     using Parent = internal::FieldMap<FieldCollection, T,
-                                      TensorFieldMap::nb_components()>;
+                                      TensorFieldMap::nb_components>;
     using Ccoord = Ccoord_t<FieldCollection::spatial_dim()>;
     using Sizes = typename SizesByOrder<order, dim>::Sizes;
     using T_t = Eigen::TensorFixedSize<T, Sizes>;

@@ -27,8 +27,10 @@
  * Boston, MA 02111-1307, USA.
  */
 
+#include <type_traits>
+
 #include <Eigen/Dense>
-#include "Eigen/src/Core/util/Constants.h"
+#include <Eigen/src/Core/util/Constants.h>
 
 
 #ifndef T4_MAP_PROXY_H
@@ -42,16 +44,22 @@ namespace muSpectre {
       byte-compatible with Tensors (i.e., you can map this onto a
       tensor instead of a matrix)
   **/
-  template <typename T, Dim_t Dim, bool Symmetric=false,
+  template <typename T, Dim_t Dim, bool MapConst=false, bool Symmetric=false,
             int MapOptions=Eigen::Unaligned,
             typename StrideType=Eigen::Stride<0, 0>>
   class T4Map:
-    public Eigen::MapBase<T4Map<T, Dim, Symmetric, MapOptions, StrideType>> {
+    public Eigen::MapBase<T4Map<T, Dim, MapConst, Symmetric,
+                                MapOptions, StrideType>>
+  {
     public:
     typedef Eigen::MapBase<T4Map> Base;
     EIGEN_DENSE_PUBLIC_INTERFACE(T4Map);
 
-    using PlainObjectType = Eigen::Matrix<T, Dim*Dim, Dim*Dim>;
+    using matrix_type = Eigen::Matrix<T, Dim*Dim, Dim*Dim>;
+    using PlainObjectType =
+      std::conditional_t<MapConst,
+                         const matrix_type, matrix_type>;
+    using ConstType = T4Map<T, Dim, true, Symmetric, MapOptions, StrideType>;
     using Base::colStride;
     using Base::rowStride;
     using Base::IsRowMajor;
@@ -64,6 +72,12 @@ namespace muSpectre {
     inline Eigen::Index innerStride() const
     {
       return StrideType::InnerStrideAtCompileTime != 0 ? m_stride.inner() : 1;
+    }
+
+    template <class Derived>
+    inline T4Map & operator=(const Eigen::MatrixBase<Derived> & other) {
+      this->map = other;
+      return *this;
     }
 
     EIGEN_DEVICE_FUNC
@@ -125,9 +139,10 @@ namespace Eigen {
 
   /* ---------------------------------------------------------------------- */
   namespace internal {
-    template<typename T, muSpectre::Dim_t Dim, bool Symmetric,
+    template<typename T, muSpectre::Dim_t Dim, bool MapConst, bool Symmetric,
              int MapOptions, typename StrideType>
-    struct traits<muSpectre::T4Map<T, Dim, Symmetric, MapOptions, StrideType> >
+    struct traits<muSpectre::T4Map<T, Dim, MapConst, Symmetric,
+                                   MapOptions, StrideType> >
       : public traits<Matrix<T, Dim*Dim, Dim*Dim>>
     {
       using PlainObjectType = Matrix<T, Dim*Dim, Dim*Dim>;

@@ -63,6 +63,7 @@ namespace muSpectre {
     class FieldMap
     {
     public:
+      constexpr static auto nb_components{NbComponents};
       using TypedField = ::muSpectre::internal::TypedFieldBase
         <FieldCollection, T, NbComponents>;
       using Field = typename TypedField::Parent;
@@ -72,6 +73,9 @@ namespace muSpectre {
       FieldMap() = delete;
 
       FieldMap(Field & field);
+
+      template<class FC, typename T2, Dim_t NbC>
+      FieldMap(TypedFieldBase<FC, T2, NbC> & field);
 
       //! Copy constructor
       FieldMap(const FieldMap &other) = delete;
@@ -87,9 +91,6 @@ namespace muSpectre {
 
       //! Move assignment operator
       FieldMap& operator=(FieldMap &&other) noexcept = delete;
-
-      //! give static access to nb_components
-      inline constexpr static size_t nb_components();
 
       //! give human-readable field map type
       virtual std::string info_string() const = 0;
@@ -110,6 +111,10 @@ namespace muSpectre {
 
       //! convenience call to collection's size method
       inline size_t size() const;
+
+      //! compile-time compatibility check
+      template<class Field>
+      struct is_compatible;
 
       template <class FullyTypedFieldMap, bool isConst=false>
       class iterator
@@ -219,6 +224,20 @@ namespace muSpectre {
     }
 
     /* ---------------------------------------------------------------------- */
+    template <class FieldCollection, typename T, Dim_t NbComponents>
+    template <class FC, typename T2, Dim_t NbC>
+    FieldMap<FieldCollection, T, NbComponents>::
+    FieldMap(TypedFieldBase<FC, T2, NbC> & field)
+      :collection(field.get_collection()), field(static_cast<TypedField&>(field)) {
+      static_assert(std::is_same<FC, FieldCollection>::value,
+                    "The field does not have the expected FieldCollection type");
+      static_assert(std::is_same<T2, T>::value,
+                    "The field does not have the expected Scalar type");
+      static_assert((NbC == NbComponents),
+                    "The field does not have the expected number of components");
+    }
+
+    /* ---------------------------------------------------------------------- */
     template<class FieldCollection, typename T, Dim_t NbComponents>
     void
     FieldMap<FieldCollection, T, NbComponents>::
@@ -250,12 +269,23 @@ namespace muSpectre {
     }
 
     /* ---------------------------------------------------------------------- */
-    template<class FieldCollection, typename T, Dim_t NbComponents>
-    constexpr size_t
-    FieldMap<FieldCollection, T, NbComponents>::
-    nb_components() {
-      return NbComponents;
-    }
+    template <class FieldCollection, typename T, Dim_t NbComponents>
+    template <class Field>
+    struct FieldMap<FieldCollection, T, NbComponents>::is_compatible {
+      constexpr static bool explain() {
+        static_assert
+          (std::is_same<typename Field::collection_t, FieldCollection>::value,
+           "The field does not have the expected FieldCollection type");
+        static_assert
+          (std::is_same<typename Field::Scalar, T>::value,
+           "The // FIXME: eld does not have the expected Scalar type");
+        static_assert((Field::nb_components == NbComponents),
+                      "The field does not have the expected number of components");
+        //The static asserts wouldn't pass in the incompatible case, so this is it
+        return true;
+      }
+      constexpr static bool value{std::is_base_of<TypedField, Field>::value};
+    };
 
     /* ---------------------------------------------------------------------- */
     template<class FieldCollection, typename T, Dim_t NbComponents>

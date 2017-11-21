@@ -81,7 +81,20 @@ namespace muSpectre {
       //! Default constructor
       MatrixLikeFieldMap() = delete;
 
+      /**
+       * Constructor using a (non-typed) field. Compatibility is enforced at
+       * runtime.  This should not be a performance concern, as this constructor
+       * will not be called in anny inner loops (if used as intended).
+       */
       MatrixLikeFieldMap(Field & field);
+
+      /**
+       * Constructor using a typed field. Compatibility is enforced
+       * statically. It is not always possible to call this constructor, as the
+       * type of the field might not be known at compile time.
+       */
+      template<class FC, typename T2, Dim_t NbC>
+      MatrixLikeFieldMap(TypedFieldBase<FC, T2, NbC> & field);
 
       //! Copy constructor
       MatrixLikeFieldMap(const MatrixLikeFieldMap &other) = delete;
@@ -131,6 +144,15 @@ namespace muSpectre {
       :Parent(field) {
       this->check_compatibility();
     }
+
+    /* ---------------------------------------------------------------------- */
+    template<class FieldCollection, class EigenArray, Map_t map_type>
+    template<class FC, typename T2, Dim_t NbC>
+    MatrixLikeFieldMap<FieldCollection, EigenArray, map_type>::
+    MatrixLikeFieldMap(TypedFieldBase<FC, T2, NbC> & field)
+      :Parent(field) {
+    }
+
     /* ---------------------------------------------------------------------- */
     //! human-readable field map type
     template<class FieldCollection, class EigenArray, Map_t map_type>
@@ -184,10 +206,11 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   //! short-hand for an Eigen matrix map as iterate
-  template <class FieldCollection, typename T, Dim_t Dim, bool Symmetric=false>
+  template <class FieldCollection, typename T, Dim_t Dim,
+            bool MapConst=false, bool Symmetric=false>
   using T4MatrixFieldMap = internal::MatrixLikeFieldMap
     <FieldCollection,
-     T4Map<T, Dim, Symmetric>,
+     T4Map<T, Dim, MapConst, Symmetric>,
      internal::Map_t::T4Matrix>;
 
   /* ---------------------------------------------------------------------- */

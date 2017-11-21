@@ -30,12 +30,15 @@
 #ifndef MATERIALS_TOOLBOX_H
 #define MATERIALS_TOOLBOX_H
 
+#include <Eigen/Dense>
 #include <exception>
 #include <sstream>
 #include <iostream>
 #include <tuple>
 #include "common/common.hh"
 #include "common/tensor_algebra.hh"
+#include "common/eigen_tools.hh"
+#include "common/T4_map_proxy.hh"
 
 namespace muSpectre {
 
@@ -99,8 +102,9 @@ namespace muSpectre {
      **/
     namespace internal {
 
-      template <StressMeasure StressM,
-                StrainMeasure StrainM = StrainMeasure::__nostrain__>
+      template <Dim_t Dim,
+                StressMeasure StressM,
+                StrainMeasure StrainM>
       struct PK1_stress {
 
         template <class Strain_t, class Stress_t>
@@ -133,9 +137,9 @@ namespace muSpectre {
       /** Specialisation for the transparent case, where we already
           have PK1 stress
        **/
-      template <StrainMeasure StrainM>
-      struct PK1_stress<StressMeasure::PK1, StrainM>:
-        public PK1_stress<StressMeasure::__nostress__,
+      template <Dim_t Dim, StrainMeasure StrainM>
+      struct PK1_stress<Dim, StressMeasure::PK1, StrainM>:
+        public PK1_stress<Dim, StressMeasure::__nostress__,
                           StrainMeasure::__nostrain__> {
 
         template <class Strain_t, class Stress_t>
@@ -150,10 +154,14 @@ namespace muSpectre {
           stress *and* stiffness is given with respect to the transformation
           gradient
        **/
-      template <>
-      struct PK1_stress<StressMeasure::PK1, StrainMeasure::Gradient>:
-        public PK1_stress<StressMeasure::PK1,
+      template <Dim_t Dim>
+      struct PK1_stress<Dim, StressMeasure::PK1, StrainMeasure::Gradient>:
+        public PK1_stress<Dim, StressMeasure::PK1,
                           StrainMeasure::__nostrain__> {
+
+        using Parent = PK1_stress<Dim, StressMeasure::PK1,
+                                  StrainMeasure::__nostrain__>;
+        using Parent::compute;
 
         template <class Strain_t, class Stress_t, class Tangent_t>
         decltype(auto)
@@ -166,9 +174,9 @@ namespace muSpectre {
       /**
        * Specialisation for the case where we get material stress (PK2)
        */
-      template <StrainMeasure StrainM>
-      struct PK1_stress<StressMeasure::PK2, StrainM>:
-        public PK1_stress<StressMeasure::__nostress__,
+      template <Dim_t Dim, StrainMeasure StrainM>
+      struct PK1_stress<Dim, StressMeasure::PK2, StrainM>:
+        public PK1_stress<Dim, StressMeasure::__nostress__,
                           StrainMeasure::__nostrain__> {
 
         template <class Strain_t, class Stress_t>
@@ -183,33 +191,40 @@ namespace muSpectre {
        * Specialisation for the case where we get material stress (PK2) derived
        * with respect to Green-Lagrange strain
        */
-      template <>
-      struct PK1_stress<StressMeasure::PK2, StrainMeasure::GreenLagrange>:
-        public PK1_stress<StressMeasure::PK2,
+      template <Dim_t Dim>
+      struct PK1_stress<Dim, StressMeasure::PK2, StrainMeasure::GreenLagrange>:
+        public PK1_stress<Dim, StressMeasure::PK2,
                           StrainMeasure::__nostrain__> {
-
+        using Parent = PK1_stress<Dim, StressMeasure::PK2,
+                                  StrainMeasure::__nostrain__>;
+        using Parent::compute;
+        
         template <class Strain_t, class Stress_t, class Tangent_t>
         inline static decltype(auto)
         compute(Strain_t && F, Stress_t && S, Tangent_t && C) {
           using T4 = typename Tangent_t::PlainObject;
+          using Tmap = T4Map<Real, Dim>;
           T4 K;
+          Tmap Kmap{K.data()};
           K.setZero();
           constexpr int dim{Strain_t::ColsAtCompileTime};
           for (int i = 0; i < dim; ++i) {
             for (int m = 0; m < dim; ++m) {
               for (int n = 0; n < dim; ++n) {
-                K(i,m,i,n) += S(m,n);
+                Kmap(i,m,i,n) += S(m,n);
                 for (int j = 0; j < dim; ++j) {
                   for (int r = 0; r < dim; ++r) {
                     for (int s = 0; s < dim; ++s) {
-                      K(i,m,j,n) += F(i,r)*C(r,m,n,s)*(F(j,s));
+                      Kmap(i,m,j,n) += F(i,r)*C(r,m,n,s)*(F(j,s));
                     }
                   }
                 }
               }
             }
           }
-          return K;
+          auto && P = compute(std::forward<Strain_t>(F),
+                              std::forward<Stress_t>(S));
+          return std::forward_as_tuple(std::move(P), K);
         }
       };
 
@@ -219,20 +234,27 @@ namespace muSpectre {
     template <StressMeasure StressM, StrainMeasure StrainM,
               class Stress_t, class Strain_t>
     decltype(auto) PK1_stress(Strain_t && strain, Stress_t && stress) {
-      return internal::PK1_stress<StressM>::compute(std::move(stress),
-                                                    std::move(strain));
+      constexpr Dim_t dim{EigenCheck::TensorDim(strain)};
+      static_assert((dim == EigenCheck::TensorDim(stress)),
+                    "Stress and strain tensors have differing dimensions");
+      return internal::PK1_stress<dim, StressM, StrainM>::compute
+        (std::move(stress), std::move(strain));
     };
 
     /* ---------------------------------------------------------------------- */
     //! set of functions returning an expression for PK2 stress based on
     template <StressMeasure StressM, StrainMeasure StrainM,
               class Stress_t, class Strain_t, class Tangent_t>
-    decltype(auto) PK1_stress(Strain_t && strain,
-                              Stress_t && stress,
-                              Tangent_t && stiffness) {
-      return internal::PK1_stress<StressM>::compute(std::move(stress),
-                                                    std::move(strain),
-                                                    std::move(stiffness));
+    decltype(auto) PK1_stress(Strain_t  && strain,
+                              Stress_t  && stress,
+                              Tangent_t && tangent) {
+      constexpr Dim_t dim{EigenCheck::TensorDim(strain)};
+      static_assert((dim == EigenCheck::TensorDim(stress)),
+                    "Stress and strain tensors have differing dimensions");
+      static_assert((dim*dim == EigenCheck::TensorDim(tangent)),
+                    "Stress and tangent tensors have differing dimensions");
+      return internal::PK1_stress<dim, StressM, StrainM>::compute
+        (std::move(stress), std::move(strain), std::move(tangent));
     };
 
     /* ---------------------------------------------------------------------- */

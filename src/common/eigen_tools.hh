@@ -88,6 +88,52 @@ namespace muSpectre {
       call(std::forward<Fun_t>(fun));
   }
 
+
+  /**
+   * Structure to determine whether an expression can be evaluated into a Matrix, Array, etc. and which helps determine compile-time size
+   */
+  struct EigenCheck {
+    template <class Derived>
+    constexpr static bool isDense(const Eigen::DenseBase<Derived> & /*mat*/) {
+      return true;
+    }
+
+    template <class Derived>
+    constexpr static bool isMatrix(const Eigen::MatrixBase<Derived> & /*mat*/) {
+      return true;
+    }
+    template <class T>
+    constexpr static bool isFixed(T && t) {
+      static_assert
+        (isDense(t),
+         "The type you check for fixed size is not a Eigen::Dense type");
+      using bT = std::remove_reference_t<T>;
+      return ((bT::RowsAtCompileTime != Eigen::Dynamic) &&
+
+              (bT::ColsAtCompileTime != Eigen::Dynamic));
+    }
+
+    template <class T>
+    constexpr static bool isSquare(T && t) {
+      static_assert
+        (isDense(t),
+         "The type you check for fixed size is not a Eigen::Dense type");
+      using bT = std::remove_reference_t<T>;
+      return (bT::RowsAtCompileTime == bT::ColsAtCompileTime);
+    }
+
+    template <class T>
+    constexpr static int TensorDim(T && t) {
+      static_assert
+        (isMatrix(t), "The type of t is not understood as an Eigen::Matrix");
+      static_assert(isFixed(t), "t's dimension is not known at compile time");
+      static_assert(isSquare(t), "t's matrix isn't square");
+      return std::remove_reference_t<T>::RowsAtCompileTime;
+    }
+  };
+
+
+
 }  // muSpectre
 
 
