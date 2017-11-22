@@ -87,9 +87,9 @@ namespace muSpectre {
 
   protected:
     //! container of pixel coords for non-global collections
-    std::vector<Ccoord> ccoords;
+    std::vector<Ccoord> ccoords{};
     //! container of indices for non-global collections (slow!)
-    std::map<Ccoord, size_t> indices;
+    std::map<Ccoord, size_t> indices{};
   private:
   };
 

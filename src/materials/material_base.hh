@@ -109,7 +109,7 @@ namespace muSpectre {
 
     //! members
     const std::string name;
-    MFieldCollection_t internal_fields;
+    MFieldCollection_t internal_fields{};
 
 
   private:

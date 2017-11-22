@@ -44,6 +44,7 @@ namespace muSpectre {
   {
   public:
     using Parent = MaterialMuSpectre<MaterialHyperElastic1, DimS, DimM>;
+    using NeedTangent = typename Parent::NeedTangent;
     using GFieldCollection_t = typename Parent::GFieldCollection_t;
     // declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
@@ -60,6 +61,8 @@ namespace muSpectre {
     using Tangent_t = typename TangentMap_t::reference::ConstType;
     using Stiffness_t = Eigen::TensorFixedSize
       <Real, Eigen::Sizes<DimM, DimM, DimM, DimM>>;
+
+    using InternalVariables = typename Parent::DefaultInternalVariables;
 
     //! Default constructor
     MaterialHyperElastic1() = delete;

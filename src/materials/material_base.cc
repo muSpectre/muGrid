@@ -33,7 +33,8 @@ namespace muSpectre {
 
   //----------------------------------------------------------------------------//
   template<Dim_t s_dim, Dim_t m_dim>
-  MaterialBase<s_dim, m_dim>::MaterialBase(std::string name):name(name) {
+  MaterialBase<s_dim, m_dim>::MaterialBase(std::string name)
+    :name(name) {
     static_assert((m_dim == oneD)||
                   (m_dim == twoD)||
                   (m_dim == threeD), "only 1, 2, or threeD supported");

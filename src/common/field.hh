@@ -147,7 +147,7 @@ namespace muSpectre {
       inline T* get_ptr_to_entry(const size_t&& index);
       inline T& get_ref_to_entry(const size_t&& index);
       inline virtual void resize(size_t size) override final;
-      StorageType array;
+      StorageType array{};
     };
 
   }  // internal

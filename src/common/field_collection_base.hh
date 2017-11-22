@@ -113,11 +113,11 @@ namespace muSpectre {
     inline size_t size() const {return this->size_;}
 
   protected:
-    std::map<const std::string, Field_p> fields;
-    bool is_initialised = false;
+    std::map<const std::string, Field_p> fields{};
+    bool is_initialised{false};
     const Uint id;
     static Uint counter;
-    size_t size_ = 0;
+    size_t size_{0};
   private:
   };
 
