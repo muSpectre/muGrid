@@ -40,28 +40,34 @@ namespace muSpectre {
 
 
   /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T, Dim_t order, Dim_t dim>
+  template <class FieldCollection, typename T, Dim_t order, Dim_t dim,
+            bool ConstField=false>
   class TensorFieldMap: public
     internal::FieldMap<FieldCollection,
                        T,
-                       SizesByOrder<order, dim>::Sizes::total_size
-                       >
+                       SizesByOrder<order, dim>::Sizes::total_size,
+                       ConstField>
   {
   public:
     using Parent = internal::FieldMap<FieldCollection, T,
-                                      TensorFieldMap::nb_components>;
+                                      TensorFieldMap::nb_components, ConstField>;
     using Ccoord = Ccoord_t<FieldCollection::spatial_dim()>;
     using Sizes = typename SizesByOrder<order, dim>::Sizes;
     using T_t = Eigen::TensorFixedSize<T, Sizes>;
     using value_type = Eigen::TensorMap<T_t>;
-    using reference = value_type; // since it's a resource handle
     using const_reference = Eigen::TensorMap<const T_t>;
+    using reference = std::conditional_t<ConstField,
+                                         const_reference,
+                                         value_type>; // since it's a resource handle
     using size_type = typename Parent::size_type;
     using pointer = std::unique_ptr<value_type>;
     using TypedField = typename Parent::TypedField;
     using Field = typename TypedField::Parent;
-    using iterator = typename Parent::template iterator<TensorFieldMap>;
     using const_iterator = typename Parent::template iterator<TensorFieldMap, true>;
+    using iterator = std::conditional_t<
+      ConstField,
+      const_iterator,
+      typename Parent::template iterator<TensorFieldMap>>;
     using reverse_iterator = std::reverse_iterator<iterator>;
     using const_reverse_iterator = std::reverse_iterator<const_iterator>;
     friend iterator;
@@ -69,7 +75,10 @@ namespace muSpectre {
     //! Default constructor
     TensorFieldMap() = delete;
 
-    TensorFieldMap(Field & field);
+    template <bool isntConst=!ConstField>
+    TensorFieldMap(std::enable_if_t<isntConst, Field &> field);
+    template <bool isConst=ConstField>
+    TensorFieldMap(std::enable_if_t<isConst, const Field &> field);
 
     //! Copy constructor
     TensorFieldMap(const TensorFieldMap &other) = delete;
@@ -108,19 +117,36 @@ namespace muSpectre {
   };
 
   /* ---------------------------------------------------------------------- */
-  template<class FieldCollection, typename T, Dim_t order, Dim_t dim>
-  TensorFieldMap<FieldCollection, T, order, dim>::
-  TensorFieldMap(Field & field)
+  template<class FieldCollection, typename T, Dim_t order, Dim_t dim,
+           bool ConstField>
+  template <bool isntConst>
+  TensorFieldMap<FieldCollection, T, order, dim, ConstField>::
+  TensorFieldMap(std::enable_if_t<isntConst, Field &> field)
     :Parent(field) {
+    static_assert((isntConst != ConstField),
+                  "let the compiler deduce isntConst, this is a SFINAE "
+                  "parameter");
     this->check_compatibility();
   }
 
+  /* ---------------------------------------------------------------------- */
+  template<class FieldCollection, typename T, Dim_t order, Dim_t dim,
+           bool ConstField>
+  template <bool isConst>
+  TensorFieldMap<FieldCollection, T, order, dim, ConstField>::
+  TensorFieldMap(std::enable_if_t<isConst, const Field &> field)
+    :Parent(field) {
+    static_assert((isConst == ConstField),
+                  "let the compiler deduce isntConst, this is a SFINAE "
+                  "parameter");
+    this->check_compatibility();
+  }
 
   /* ---------------------------------------------------------------------- */
   //! human-readable field map type
-  template<class FieldCollection, typename T, Dim_t order, Dim_t dim>
+  template<class FieldCollection, typename T, Dim_t order, Dim_t dim, bool ConstField>
   std::string
-  TensorFieldMap<FieldCollection, T, order, dim>::info_string() const {
+  TensorFieldMap<FieldCollection, T, order, dim, ConstField>::info_string() const {
     std::stringstream info;
     info << "Tensor(" << typeid(T).name() << ", " << order
          << "_o, " << dim << "_d)";
@@ -129,18 +155,18 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   //! member access
-  template <class FieldCollection, typename T, Dim_t order, Dim_t dim>
+  template <class FieldCollection, typename T, Dim_t order, Dim_t dim, bool ConstField>
   template <class ref_t>
   ref_t
-  TensorFieldMap<FieldCollection, T, order, dim>::operator[](size_type index) {
+  TensorFieldMap<FieldCollection, T, order, dim, ConstField>::operator[](size_type index) {
     auto && lambda = [this, &index](auto&&...tens_sizes) {
       return ref_t(this->get_ptr_to_entry(index), tens_sizes...);
     };
     return call_sizes<order, dim>(lambda);
   }
-  template<class FieldCollection, typename T, Dim_t order, Dim_t dim>
-  typename TensorFieldMap<FieldCollection, T, order, dim>::reference
-  TensorFieldMap<FieldCollection, T, order, dim>::
+  template<class FieldCollection, typename T, Dim_t order, Dim_t dim, bool ConstField>
+  typename TensorFieldMap<FieldCollection, T, order, dim, ConstField>::reference
+  TensorFieldMap<FieldCollection, T, order, dim, ConstField>::
   operator[](const Ccoord & ccoord) {
     auto && index = this->collection.get_index(ccoord);
     auto && lambda = [this, &index](auto&&...sizes) {
@@ -151,9 +177,9 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   //! for sad, legacy iterator use. Don't use unless you have to.
-  template<class FieldCollection, typename T, Dim_t order, Dim_t dim>
-  typename TensorFieldMap<FieldCollection, T, order, dim>::pointer
-  TensorFieldMap<FieldCollection, T, order, dim>::
+  template<class FieldCollection, typename T, Dim_t order, Dim_t dim, bool ConstField>
+  typename TensorFieldMap<FieldCollection, T, order, dim, ConstField>::pointer
+  TensorFieldMap<FieldCollection, T, order, dim, ConstField>::
   ptr_to_val_t(size_type index) {
     auto && lambda = [this, &index](auto&&... tens_sizes) {
       return std::make_unique<value_type>(this->get_ptr_to_entry(index),

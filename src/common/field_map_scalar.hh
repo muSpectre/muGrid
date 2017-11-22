@@ -34,21 +34,26 @@
 
 namespace muSpectre {
 
-  template <class FieldCollection, typename T>
+  template <class FieldCollection, typename T, bool ConstField=false>
   class ScalarFieldMap
-    : public internal::FieldMap<FieldCollection, T, 1>
+    : public internal::FieldMap<FieldCollection, T, 1, ConstField>
     {
     public:
-      using parent = internal::FieldMap<FieldCollection, T, 1>;
+      using parent = internal::FieldMap<FieldCollection, T, 1, ConstField>;
       using Ccoord = Ccoord_t<FieldCollection::spatial_dim()>;
       using value_type = T;
-      using reference = value_type &;
       using const_reference = const value_type &;
+      using reference = std::conditional_t<ConstField,
+                                           const_reference,
+                                           value_type &>;
       using size_type = typename parent::size_type;
       using pointer = T*;
       using Field = typename parent::Field;
-      using iterator = typename parent::template iterator<ScalarFieldMap>;
       using const_iterator= typename parent::template iterator<ScalarFieldMap, true>;
+      using iterator = std::conditional_t
+        <ConstField,
+         const_iterator,
+         typename parent::template iterator<ScalarFieldMap>>;
       using reverse_iterator = std::reverse_iterator<iterator>;
       using const_reverse_iterator = std::reverse_iterator<const_iterator>;
       friend iterator;
@@ -56,7 +61,10 @@ namespace muSpectre {
       //! Default constructor
       ScalarFieldMap() = delete;
 
-      ScalarFieldMap(Field & field);
+      template <bool isntConst=!ConstField>
+      ScalarFieldMap(std::enable_if_t<isntConst, Field &> field);
+      template <bool isConst=ConstField>
+      ScalarFieldMap(std::enable_if_t<isConst, const Field &> field);
 
       //! Copy constructor
       ScalarFieldMap(const ScalarFieldMap &other) = delete;
@@ -95,42 +103,60 @@ namespace muSpectre {
       const static std::string field_info_root;
     private:
   };
+
   /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T>
-  ScalarFieldMap<FieldCollection, T>::ScalarFieldMap(Field & field)
+  template <class FieldCollection, typename T, bool ConstField>
+  template <bool isntConst>
+  ScalarFieldMap<FieldCollection, T, ConstField>::
+  ScalarFieldMap(std::enable_if_t<isntConst, Field &> field)
     :parent(field) {
+    static_assert((isntConst != ConstField),
+                  "let the compiler deduce isntConst, this is a SFINAE "
+                  "parameter");
+    this->check_compatibility();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <class FieldCollection, typename T, bool ConstField>
+  template <bool isConst>
+  ScalarFieldMap<FieldCollection, T, ConstField>::
+  ScalarFieldMap(std::enable_if_t<isConst, const Field &> field)
+    :parent(field) {
+    static_assert((isConst == ConstField),
+                  "let the compiler deduce isntConst, this is a SFINAE "
+                  "parameter");
     this->check_compatibility();
   }
 
   /* ---------------------------------------------------------------------- */
   //! human-readable field map type
-  template<class FieldCollection, typename T>
+  template<class FieldCollection, typename T, bool ConstField>
   std::string
-  ScalarFieldMap<FieldCollection, T>::info_string() const {
+  ScalarFieldMap<FieldCollection, T, ConstField>::info_string() const {
     std::stringstream info;
     info << "Scalar(" << typeid(T).name() << ")";
     return info.str();
   }
 
   /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T>
-  const std::string ScalarFieldMap<FieldCollection, T>::field_info_root{
+  template <class FieldCollection, typename T, bool ConstField>
+  const std::string ScalarFieldMap<FieldCollection, T, ConstField>::field_info_root{
     "Scalar"};
 
   /* ---------------------------------------------------------------------- */
   //! member access
-  template <class FieldCollection, typename T>
+  template <class FieldCollection, typename T, bool ConstField>
   template <class ref_t>
   ref_t
-  ScalarFieldMap<FieldCollection, T>::operator[](size_type index) {
+  ScalarFieldMap<FieldCollection, T, ConstField>::operator[](size_type index) {
     return this->get_ref_to_entry(std::move(index));
   }
 
   /* ---------------------------------------------------------------------- */
   //! member access
-  template <class FieldCollection, typename T>
-  typename ScalarFieldMap<FieldCollection, T>::reference
-  ScalarFieldMap<FieldCollection, T>::operator[](const Ccoord& ccoord) {
+  template <class FieldCollection, typename T, bool ConstField>
+  typename ScalarFieldMap<FieldCollection, T, ConstField>::reference
+  ScalarFieldMap<FieldCollection, T, ConstField>::operator[](const Ccoord& ccoord) {
     auto && index = this->collection.get_index(std::move(ccoord));
     return this->get_ref_to_entry(std::move(index));
   }

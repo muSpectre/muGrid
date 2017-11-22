@@ -53,8 +53,8 @@ namespace muSpectre {
     // declare whether the derivative of stress with respect to strain is uniform
     constexpr static bool uniform_stiffness = true;
     // declare the type in which you wish to receive your strain measure
-    using StrainMap_t = MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
-    using StressMap_t = StrainMap_t;
+    using StrainMap_t = MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM, true>;
+    using StressMap_t = MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
     using TangentMap_t = T4MatrixFieldMap<GFieldCollection_t, Real, DimM>;
     using Strain_t = typename StrainMap_t::const_reference;
     using Stress_t = typename StressMap_t::reference;

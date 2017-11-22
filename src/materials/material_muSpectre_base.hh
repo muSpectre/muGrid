@@ -255,8 +255,6 @@ namespace muSpectre {
       (F, stress, tangent);
     };
 
-    MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM> Pmap(P);
-    const MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM> Fmap(F);
     auto it{this->get_zipped_fields(F, P, K)};
     for (auto && tuples: it) {
       // the iterator yields a pair of tuples. this first tuple contains
@@ -285,7 +283,11 @@ namespace muSpectre {
   decltype(auto)
   MaterialMuSpectre<Material, DimS, DimM>::
   get_zipped_fields(const StrainField_t & F, StressField_t & P) {
-    return this->get_zipped_fields_worker(F, P);
+    typename Material::StrainMap_t Fmap(F);//TODO: think about whether F and P should be std::forward<>()'ed
+    typename Material::StressMap_t Pmap(P);
+
+    return this->get_zipped_fields_worker(std::move(Fmap),
+                                          std::move(Pmap));
   }
 
   /* ---------------------------------------------------------------------- */
@@ -294,10 +296,13 @@ namespace muSpectre {
   MaterialMuSpectre<Material, DimS, DimM>::
   get_zipped_fields(const StrainField_t & F, StressField_t & P,
                     TangentField_t & K) {
-    auto test = boost::begin(F);
-    std::cout << test ;
+    typename Material::StrainMap_t Fmap(F);
+    typename Material::StressMap_t Pmap(P);
+    typename Material::TangentMap_t Kmap(K);
 
-    return this->get_zipped_fields_worker(F, P, K);
+    return this->get_zipped_fields_worker(std::move(Fmap),
+                                          std::move(Pmap),
+                                          std::move(Kmap));
   }
 
   /* ---------------------------------------------------------------------- */

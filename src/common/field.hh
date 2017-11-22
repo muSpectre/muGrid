@@ -112,14 +112,15 @@ namespace muSpectre {
 
     /* ---------------------------------------------------------------------- */
     //! declaraton for friending
-    template <class FieldCollection, typename T, Dim_t NbComponents>
+    template <class FieldCollection, typename T, Dim_t NbComponents, bool isConst>
     class FieldMap;
 
     /* ---------------------------------------------------------------------- */
     template <class FieldCollection, typename T, Dim_t NbComponents>
     class TypedFieldBase: public FieldBase<FieldCollection>
     {
-      friend class FieldMap<FieldCollection, T, NbComponents>;
+      friend class FieldMap<FieldCollection, T, NbComponents, true>;
+      friend class FieldMap<FieldCollection, T, NbComponents, false>;
     public:
       constexpr static auto nb_components{NbComponents};
       using Parent = FieldBase<FieldCollection>;
