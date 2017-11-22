@@ -42,6 +42,7 @@
 #include "materials/materials_toolbox.hh"
 #include "common/field_collection.hh"
 #include "common/field.hh"
+#include "common//utilities.hh"
 
 
 #ifndef MATERIAL_MUSPECTRE_BASE_H
@@ -230,18 +231,17 @@ namespace muSpectre {
        Material declared (e.g., eigenstrain, strain rate, etc.)
     */
     auto constitutive_law_small_strain = [this]
-      (auto && F, auto && ...  internal_variables) {
+      (auto && F, auto && P, auto && K, auto && ...  internal_variables) {
       constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
       constexpr StrainMeasure expected_strain_m{
       get_formulation_strain_type(Form, Material::strain_measure)};
       auto && strain = MatTB::convert_strain<stored_strain_m, expected_strain_m>(F);
       // return value contains a tuple of rvalue_refs to both stress and tangent moduli
-      auto && stress_tgt = static_cast<Material&>(*this).evaluate_stress_tangent(std::move(strain), internal_variables...);
-      return std::move(stress_tgt);
+      std::tie(P, K) = static_cast<Material&>(*this).evaluate_stress_tangent(std::move(strain), internal_variables...);
     };
 
     auto constitutive_law_finite_strain = [this]
-      (auto && F, auto && ...  internal_variables) {
+      (auto && F, auto && P, auto && K, auto && ...  internal_variables) {
       constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
       constexpr StrainMeasure expected_strain_m{
       get_formulation_strain_type(Form, Material::strain_measure)};
@@ -251,26 +251,26 @@ namespace muSpectre {
       auto && stress_tgt = static_cast<Material&>(*this).evaluate_stress_tangent(std::move(strain), internal_variables...);
       auto && stress = std::get<0>(stress_tgt);
       auto && tangent = std::get<1>(stress_tgt);
-      return MatTB::PK1_stress<Material::stress_measure, Material::strain_measure>
+      std::tie(P, K) =  MatTB::PK1_stress<Material::stress_measure, Material::strain_measure>
       (F, stress, tangent);
     };
 
     auto it{this->get_zipped_fields(F, P, K)};
-    for (auto && tuples: it) {
+    for (auto && arglist: it) {
       // the iterator yields a pair of tuples. this first tuple contains
       // references to stress and stiffness in the global arrays, the second
       // contains references to the deformation gradient and internal variables
       // (some of them are const).
-      auto && stress_tgt = std::get<0>(tuples);
-      auto && inputs = std::get<1>(tuples);
+      //auto && stress_tgt = std::get<0>(tuples);
+      //auto && inputs = std::get<1>(tuples);TODO:clean this
 
       switch (Form) {
       case Formulation::small_strain: {
-        stress_tgt = std::apply(constitutive_law_small_strain, std::move(inputs));
+        std::apply(constitutive_law_small_strain, asStdTuple(arglist));
         break;
       }
       case Formulation::finite_strain: {
-        stress_tgt = std::apply(constitutive_law_finite_strain, std::move(inputs));
+        std::apply(constitutive_law_finite_strain, asStdTuple(arglist));
         break;
       }
       }

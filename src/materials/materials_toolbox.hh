@@ -35,6 +35,7 @@
 #include <sstream>
 #include <iostream>
 #include <tuple>
+#include <type_traits>
 #include "common/common.hh"
 #include "common/tensor_algebra.hh"
 #include "common/eigen_tools.hh"

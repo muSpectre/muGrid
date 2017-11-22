@@ -94,6 +94,25 @@ namespace muSpectre {
     }
   }
 
+  BOOST_AUTO_TEST_CASE(Return_ref_from_const_test) {
+    constexpr Dim_t dim{2};
+    using T = int;
+    using M4 = Eigen::Matrix<T, dim*dim, dim*dim>;
+    using M4c = const Eigen::Matrix<T, dim*dim, dim*dim>;
+    using T4 = T4Map<T, dim>;
+    using T4c = T4Map<T, dim, true>;
+
+    M4 mat;
+    mat.setRandom();
+    M4c cmat{mat};
+    T4 tensor{mat.data()};
+    T4c ctensor{mat.data()};
+
+    T a = tensor(0,0,0,1);
+    T b = ctensor(0,0,0,1);
+    BOOST_CHECK_EQUAL(a, b);
+  }
+
   BOOST_AUTO_TEST_SUITE_END();
 
 }  // muSpectre

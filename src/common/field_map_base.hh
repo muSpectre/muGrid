@@ -38,6 +38,7 @@
 #include <unsupported/Eigen/CXX11/Tensor>
 
 #include "common/field.hh"
+#include "field_collection_base.hh"
 #include "common/common.hh"
 
 
@@ -64,8 +65,11 @@ namespace muSpectre {
     {
     public:
       constexpr static auto nb_components{NbComponents};
-      using TypedField = ::muSpectre::internal::TypedFieldBase
+      using TypedField_nc = TypedFieldBase
         <FieldCollection, T, NbComponents>;
+      using TypedField = std::conditional_t<ConstField,
+                                            const TypedField_nc,
+                                            TypedField_nc>;
       using Field = typename TypedField::Parent;
       using size_type = std::size_t;
 
@@ -236,7 +240,7 @@ namespace muSpectre {
     template <bool isConst>
     FieldMap<FieldCollection, T, NbComponents, ConstField>::
     FieldMap(std::enable_if_t<isConst, const Field &> field)
-      :collection(field.get_collection()), field(static_cast<TypedField&>(field)) {
+      :collection(field.get_collection()), field(static_cast<const TypedField&>(field)) {
       static_assert(NbComponents>0,
                     "Only fields with more than 0 components allowed");
     }
@@ -262,11 +266,12 @@ namespace muSpectre {
     check_compatibility() {
      if (typeid(T).hash_code() !=
           this->field.get_stored_typeid().hash_code()) {
-        throw FieldInterpretationError
-          ("Cannot create a Map of type '" +
+       std::string err{"Cannot create a Map of type '" +
            this->info_string() +
            "' for field '" + this->field.get_name() + "' of type '" +
-           this->field.get_stored_typeid().name() + "'");
+           this->field.get_stored_typeid().name() + "'"};
+        throw FieldInterpretationError
+          (err);
       }
       //check size compatibility
       if (NbComponents != this->field.get_nb_components()) {

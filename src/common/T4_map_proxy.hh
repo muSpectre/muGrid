@@ -65,6 +65,7 @@ namespace muSpectre {
     using Base::IsRowMajor;
     typedef typename Base::PointerType PointerType;
     typedef PointerType PointerArgType;
+    using trueScalar = std::conditional_t<MapConst, const Scalar, Scalar>;
     EIGEN_DEVICE_FUNC
     inline PointerType cast_to_pointer_type(PointerArgType ptr) { return ptr; }
 
@@ -107,22 +108,22 @@ namespace muSpectre {
     /** My accessor to mimick tensorial access
      **/
     inline const Scalar& operator()(Dim_t i, Dim_t j, Dim_t k, Dim_t l ) const {
-      constexpr auto myColStride{
-        (colStride() == 1) ? colStride(): colStride()/Dim};
-      constexpr auto myRowStride{
-        (rowStride() == 1) ? rowStride(): rowStride()/Dim};
-      return this->operator()(i * myRowStride + j * myColStride,
-                              k * myRowStride + l * myColStride);
-    }
-
-
-    inline Scalar& operator()(Dim_t i, Dim_t j, Dim_t k, Dim_t l ) {
       const auto myColStride{
         (colStride() == 1) ? colStride(): colStride()/Dim};
       const auto myRowStride{
         (rowStride() == 1) ? rowStride(): rowStride()/Dim};
-      return this->map(i * myRowStride + j * myColStride,
-                       k * myRowStride + l * myColStride);
+      return this->map.coeff(i * myRowStride + j * myColStride,
+                             k * myRowStride + l * myColStride);
+    }
+
+
+    inline trueScalar& operator()(Dim_t i, Dim_t j, Dim_t k, Dim_t l ) {
+      const auto myColStride{
+        (colStride() == 1) ? colStride(): colStride()/Dim};
+      const auto myRowStride{
+        (rowStride() == 1) ? rowStride(): rowStride()/Dim};
+      return this->map.coeffRef(i * myRowStride + j * myColStride,
+                                k * myRowStride + l * myColStride);
     }
 
   protected:
