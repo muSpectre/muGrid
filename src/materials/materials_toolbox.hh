@@ -216,7 +216,7 @@ namespace muSpectre {
                 for (int j = 0; j < dim; ++j) {
                   for (int r = 0; r < dim; ++r) {
                     for (int s = 0; s < dim; ++s) {
-                      Kmap(i,m,j,n) += F(i,r)*C(r,m,n,s)*(F(j,s));
+                      Kmap(i,m,j,n) += F(i,r)*get(C,r,m,n,s)*(F(j,s));
                     }
                   }
                 }

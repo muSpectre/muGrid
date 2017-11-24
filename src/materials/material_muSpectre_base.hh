@@ -109,8 +109,8 @@ namespace muSpectre {
     //! this iterable class is a default for simple laws that just take a strain
     //! the iterable is just a templated wrapper to provide a range to iterate over
     //! that does or does not include tangent moduli
-    //template<NeedTangent need_tgt = NeedTangent::no>
-    //class iterable_proxy; TODO: clean this
+    template<NeedTangent need_tgt = NeedTangent::no>
+    class iterable_proxy;
 
     /**
      * get a combined range that can be used to iterate over all fields
@@ -318,118 +318,129 @@ namespace muSpectre {
   }
 
 
-  //TODO: CLEAN BELOW
-  ///* ---------------------------------------------------------------------- */
-  ////! this iterator class is a default for simple laws that just take a strain
-  //template <class Material, Dim_t DimS, Dim_t DimM>
-  //template <typename MaterialMuSpectre<Material, DimS, DimM>::NeedTangent NeedTgt>
-  //class MaterialMuSpectre<Material, DimS, DimM>::iterable_proxy {
-  //public:
-  //  //! Default constructor
-  //  iterable_proxy() = delete;
-  //  using NeedTangent =
-  //    typename MaterialMuSpectre<Material, DimS, DimM>::NeedTangent;
-  //  /** Iterator uses the material's internal variables field
-  //      collection to iterate selectively over the global fields
-  //      (such as the transformation gradient F and first
-  //      Piola-Kirchhoff stress P.
-  //  **/
-  //  template<bool DoNeedTgt=(NeedTgt == NeedTangent::yes)>
-  //  iterable_proxy(const MaterialMuSpectre & mat,
-  //                 const StrainField_t & F,
-  //                 StressField_t & P,
-  //                 std::enable_if_t<DoNeedTgt, TangentField_t> & K);
-  //
-  //  template<bool DontNeedTgt=(NeedTgt == NeedTangent::no)>
-  //  iterable_proxy(const MaterialMuSpectre & mat,
-  //                 const StrainField_t & F,
-  //                 std::enable_if_t<DontNeedTgt, StressField_t> & P);
-  //
-  //  using Strain_t = typename Material::Strain_t;
-  //  using Stress_t = typename Material::Stress_t;
-  //  using Tangent_t = typename Material::Tangent_t;
-  //
-  //  //! Copy constructor
-  //  iterable_proxy(const iterable_proxy &other) = default;
-  //
-  //  //! Move constructor
-  //  iterable_proxy(iterable_proxy &&other) noexcept = default;
-  //
-  //  //! Destructor
-  //  virtual ~iterable_proxy() noexcept = default;
-  //
-  //  //! Copy assignment operator
-  //  iterable_proxy& operator=(const iterable_proxy &other) = default;
-  //
-  //  //! Move assignment operator
-  //  iterable_proxy& operator=(iterable_proxy &&other) noexcept = default;
-  //
-  //  class iterator
-  //  {
-  //  public:
-  //    using value_type =
-  //      std::conditional_t
-  //      <(NeedTgt == NeedTangent::yes),
-  //       std::tuple<std::tuple<Stress_t, Tangent_t>, std::tuple<Strain_t>>,
-  //       std::tuple<std::tuple<Stress_t>, std::tuple<Strain_t>>>;
-  //    using iterator_category = std::forward_iterator_tag;
-  //
-  //    //! Default constructor
-  //    iterator() = delete;
-  //
-  //    /** Iterator uses the material's internal variables field
-  //        collection to iterate selectively over the global fields
-  //        (such as the transformation gradient F and first
-  //        Piola-Kirchhoff stress P.
-  //    **/
-  //    iterator(const iterable_proxy & it, bool begin = true)
-  //      : it{it}, index{begin ? 0:it.mat.internal_fields.size()}{}
-  //
-  //
-  //    //! Copy constructor
-  //    iterator(const iterator &other) = default;
-  //
-  //    //! Move constructor
-  //    iterator(iterator &&other) noexcept = default;
-  //
-  //    //! Destructor
-  //    virtual ~iterator() noexcept = default;
-  //
-  //    //! Copy assignment operator
-  //    iterator& operator=(const iterator &other) = default;
-  //
-  //    //! Move assignment operator
-  //    iterator& operator=(iterator &&other) noexcept = default;
-  //
-  //    //! pre-increment
-  //    inline iterator & operator++();
-  //    //! dereference
-  //    inline value_type operator*();
-  //    //! inequality
-  //    inline bool operator!=(const iterator & other) const;
-  //
-  //
-  //  protected:
-  //    const iterable_proxy & it;
-  //    size_t index;
-  //  private:
-  //  };
-  //
-  //  iterator begin() {return iterator(*this);}
-  //  iterator end() {return iterator(*this, false);}
-  //
-  //protected:
-  //  using StressTup = std::conditional_t
-  //    <(NeedTgt == NeedTangent::yes),
-  //     std::tuple<StressField_t&, TangentField_t&>,
-  //     std::tuple<StressField_t&>>;
-  //  const MaterialMuSpectre & material;
-  //  const StrainField_t & strain_field;
-  //  auto ZippedFields;
-  //  std::tupleStrainField_t
-  //  StressTup stress_tup;
-  //private:
-  //};
+
+  /**
+   * Struct with a single variadic function only used to determine the
+   * tuple type to store the various sub-iterators in
+   */
+  template<typename MaterialMuSpectre<Material, DimS, DimM>::NeedTangent Needtgt>
+  strict tuple_type {
+    using NeedTangent =
+      typename MaterialMuSpectre<Material, DimS, DimM>::NeedTangent;
+    template <
+  }
+  
+  /* ---------------------------------------------------------------------- */
+  //! this iterator class is a default for simple laws that just take a strain
+  template <class Material, Dim_t DimS, Dim_t DimM>
+  template <typename MaterialMuSpectre<Material, DimS, DimM>::NeedTangent NeedTgt>
+  class MaterialMuSpectre<Material, DimS, DimM>::iterable_proxy {
+  public:
+    //! Default constructor
+    iterable_proxy() = delete;
+    using NeedTangent =
+      typename MaterialMuSpectre<Material, DimS, DimM>::NeedTangent;
+    /** Iterator uses the material's internal variables field
+        collection to iterate selectively over the global fields
+        (such as the transformation gradient F and first
+        Piola-Kirchhoff stress P.
+    **/
+    template<bool DoNeedTgt=(NeedTgt == NeedTangent::yes)>
+    iterable_proxy(const MaterialMuSpectre & mat,
+                   const StrainField_t & F,
+                   StressField_t & P,
+                   std::enable_if_t<DoNeedTgt, TangentField_t> & K);
+
+    template<bool DontNeedTgt=(NeedTgt == NeedTangent::no)>
+    iterable_proxy(const MaterialMuSpectre & mat,
+                   const StrainField_t & F,
+                   std::enable_if_t<DontNeedTgt, StressField_t> & P);
+
+    using Strain_t = typename Material::Strain_t;
+    using Stress_t = typename Material::Stress_t;
+    using Tangent_t = typename Material::Tangent_t;
+
+    //! Copy constructor
+    iterable_proxy(const iterable_proxy &other) = default;
+
+    //! Move constructor
+    iterable_proxy(iterable_proxy &&other) noexcept = default;
+
+    //! Destructor
+    virtual ~iterable_proxy() noexcept = default;
+
+    //! Copy assignment operator
+    iterable_proxy& operator=(const iterable_proxy &other) = default;
+
+    //! Move assignment operator
+    iterable_proxy& operator=(iterable_proxy &&other) noexcept = default;
+
+    class iterator
+    {
+    public:
+      using value_type =
+        std::conditional_t
+        <(NeedTgt == NeedTangent::yes),
+         std::tuple<std::tuple<Stress_t, Tangent_t>, std::tuple<Strain_t>>,
+         std::tuple<std::tuple<Stress_t>, std::tuple<Strain_t>>>;
+      using iterator_category = std::forward_iterator_tag;
+
+      //! Default constructor
+      iterator() = delete;
+
+      /** Iterator uses the material's internal variables field
+          collection to iterate selectively over the global fields
+          (such as the transformation gradient F and first
+          Piola-Kirchhoff stress P.
+      **/
+      iterator(const iterable_proxy & it, bool begin = true)
+        : it{it}, index{begin ? 0:it.mat.internal_fields.size()}{}
+
+
+      //! Copy constructor
+      iterator(const iterator &other) = default;
+
+      //! Move constructor
+      iterator(iterator &&other) noexcept = default;
+
+      //! Destructor
+      virtual ~iterator() noexcept = default;
+
+      //! Copy assignment operator
+      iterator& operator=(const iterator &other) = default;
+
+      //! Move assignment operator
+      iterator& operator=(iterator &&other) noexcept = default;
+
+      //! pre-increment
+      inline iterator & operator++();
+      //! dereference
+      inline value_type operator*();
+      //! inequality
+      inline bool operator!=(const iterator & other) const;
+
+
+    protected:
+      const iterable_proxy & it;
+      size_t index;
+    private:
+    };
+
+    iterator begin() {return iterator(*this);}
+    iterator end() {return iterator(*this, false);}
+
+  protected:
+    using StressTup = std::conditional_t
+      <(NeedTgt == NeedTangent::yes),
+       std::tuple<StressField_t&, TangentField_t&>,
+       std::tuple<StressField_t&>>;
+    const MaterialMuSpectre & material;
+    const StrainField_t & strain_field;
+    auto ZippedFields;
+    std::tupleStrainField_t
+    StressTup stress_tup;
+  private:
+  };
   //
   ///* ---------------------------------------------------------------------- */
   //template <class Material, Dim_t DimS, Dim_t DimM>

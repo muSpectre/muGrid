@@ -89,6 +89,25 @@ namespace muSpectre {
   }
 
 
+  //compile-time square root
+  static constexpr Dim_t ct_sqrt(Dim_t res, Dim_t l, Dim_t r){
+    if(l == r){
+      return r;
+    } else {
+      const auto mid = (r + l) / 2;
+
+      if(mid * mid >= res){
+        return ct_sqrt(res, l, mid);
+      } else {
+        return ct_sqrt(res, mid + 1, r);
+      }
+    }
+  }
+
+  static constexpr Dim_t ct_sqrt(Dim_t res){
+    return ct_sqrt(res, 1, res);
+  }
+
   /**
    * Structure to determine whether an expression can be evaluated into a Matrix, Array, etc. and which helps determine compile-time size
    */
@@ -129,6 +148,20 @@ namespace muSpectre {
       static_assert(isFixed(t), "t's dimension is not known at compile time");
       static_assert(isSquare(t), "t's matrix isn't square");
       return std::remove_reference_t<T>::RowsAtCompileTime;
+    }
+
+    template <class T>
+    constexpr static int Tensor4Dim(T && t) {
+      static_assert
+        (isMatrix(t), "The type of t is not understood as an Eigen::Matrix");
+      static_assert(isFixed(t), "t's dimension is not known at compile time");
+      static_assert(isSquare(t), "t's matrix isn't square");
+      constexpr Dim_t rows{std::remove_reference_t<T>::RowsAtCompileTime};
+      constexpr Dim_t dim{ct_sqrt(rows)};
+      static_assert((dim*dim == rows),
+                    "This is not a fourth-order tensor mapped on a square "
+                    "matrix");
+      return dim;
     }
   };
 

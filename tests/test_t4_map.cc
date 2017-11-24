@@ -51,8 +51,8 @@ namespace muSpectre {
     T4_fixture():matrix{}, tensor(matrix.data()){}
 
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-    using M4 = Eigen::Matrix<T, Dim*Dim, Dim*Dim>;
-    using T4 = T4Map<T, Dim>;
+    using M4 = T4Mat<T, Dim>;
+    using T4 = T4MatMap<T, Dim>;
     constexpr static Dim_t dim{Dim};
     M4 matrix;
     T4 tensor;
@@ -74,7 +74,7 @@ namespace muSpectre {
       for (Dim_t j = 0; j < F::dim; ++j) {
         for (Dim_t k = 0; k < F::dim; ++k) {
           for (Dim_t l = 0; l < F::dim; ++l) {
-            t4(i,j,k,l) = 1000*(i+1) + 100*(j+1) + 10*(k+1) + l+1;
+            get(t4,i,j,k,l) = 1000*(i+1) + 100*(j+1) + 10*(k+1) + l+1;
             t4c(i,j,k,l) = 1000*(i+1) + 100*(j+1) + 10*(k+1) + l+1;
           }
         }

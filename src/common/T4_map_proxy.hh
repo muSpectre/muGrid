@@ -32,11 +32,35 @@
 #include <Eigen/Dense>
 #include <Eigen/src/Core/util/Constants.h>
 
+#include "common/eigen_tools.hh"
 
 #ifndef T4_MAP_PROXY_H
 #define T4_MAP_PROXY_H
 
 namespace muSpectre {
+
+  /**
+   * simple adapter function to create a matrix that can be mapped as a tensor
+   */
+  template <typename T, Dim_t Dim>
+  using T4Mat = Eigen::Matrix<T, Dim*Dim, Dim*Dim>;
+  template <typename T, Dim_t Dim, bool ConstMap=false>
+  using T4MatMap = std::conditional_t<ConstMap,
+                                      const Eigen::Map<T4Mat<T, Dim>>,
+                                      Eigen::Map<T4Mat<T, Dim>>>;
+
+
+  template <typename T4>
+  inline decltype(auto) get(T4&& t4, Dim_t i, Dim_t j, Dim_t k, Dim_t l) {
+    constexpr Dim_t Dim{EigenCheck::Tensor4Dim(t4)};
+    const auto myColStride{
+      (t4.colStride() == 1) ? t4.colStride(): t4.colStride()/Dim};
+    const auto myRowStride{
+      (t4.rowStride() == 1) ? t4.rowStride(): t4.rowStride()/Dim};
+    return t4.coeffRef(i * myRowStride + j * myColStride,
+                       k * myRowStride + l * myColStride);
+
+  }
 
   /* ---------------------------------------------------------------------- */
   /** Proxy class mapping a fourth-order tensor onto a 2D matrix (in

@@ -58,7 +58,7 @@ namespace muSpectre {
     using TangentMap_t = T4MatrixFieldMap<GFieldCollection_t, Real, DimM>;
     using Strain_t = typename StrainMap_t::const_reference;
     using Stress_t = typename StressMap_t::reference;
-    using Tangent_t = typename TangentMap_t::reference::ConstType;
+    using Tangent_t = typename TangentMap_t::reference;
     using Stiffness_t = Eigen::TensorFixedSize
       <Real, Eigen::Sizes<DimM, DimM, DimM, DimM>>;
 

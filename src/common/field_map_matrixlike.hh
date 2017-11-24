@@ -44,14 +44,19 @@ namespace muSpectre {
     enum class Map_t{Matrix, Array, T4Matrix};
     template<Map_t map_type>
     struct NameWrapper {
-      const static std::string field_info_root;
     };
     template<>
-    const std::string NameWrapper<Map_t::Array>::field_info_root{"Array"};
+    struct NameWrapper<Map_t::Array> {
+      static std::string field_info_root() {return "Array";}
+    };
     template<>
-    const std::string NameWrapper<Map_t::Matrix>::field_info_root{"Matrix"};
+    struct NameWrapper<Map_t::Matrix> {
+      static std::string field_info_root() {return "Matrix";}
+    };
     template<>
-    const std::string NameWrapper<Map_t::T4Matrix>::field_info_root{"T4Matrix"};
+    struct NameWrapper<Map_t::T4Matrix> {
+      static std::string field_info_root() {return "T4Matrix";}
+    };
 
     /* ---------------------------------------------------------------------- */
     template <class FieldCollection, class EigenArray, Map_t map_type,
@@ -146,8 +151,9 @@ namespace muSpectre {
     /* ---------------------------------------------------------------------- */
     template <class FieldCollection, class EigenArray, Map_t map_type,
               bool ConstField>
-    const std::string MatrixLikeFieldMap<FieldCollection, EigenArray, map_type, ConstField>::
-      field_info_root{NameWrapper<map_type>::field_info_root};
+    const std::string MatrixLikeFieldMap<FieldCollection, EigenArray, map_type,
+                                         ConstField>::
+    field_info_root{NameWrapper<map_type>::field_info_root()};
 
     /* ---------------------------------------------------------------------- */
     template<class FieldCollection, class EigenArray, Map_t map_type,
@@ -245,10 +251,10 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   //! short-hand for an Eigen matrix map as iterate
   template <class FieldCollection, typename T, Dim_t Dim,
-            bool MapConst=false, bool Symmetric=false>
+            bool MapConst=false>
   using T4MatrixFieldMap = internal::MatrixLikeFieldMap
     <FieldCollection,
-     T4Map<T, Dim, MapConst, Symmetric>,
+     T4MatMap<T, Dim, MapConst>,
      internal::Map_t::T4Matrix, MapConst>;
 
   /* ---------------------------------------------------------------------- */
