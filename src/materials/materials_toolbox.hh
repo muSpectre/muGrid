@@ -54,6 +54,52 @@ namespace muSpectre {
 
 
     /* ---------------------------------------------------------------------- */
+    /**
+     * Flag used to designate whether the material should compute both stress
+     * and tangent moduli or only stress
+     */
+    enum class NeedTangent {
+      yes, // compute both stress and tangent moduli
+      no}; // compute only stress
+    /**
+     * Struct with a single variadic function only used to determine the
+     * tuple type to store in the various sub-iterators or to return
+     */
+
+    template <MatTB::NeedTangent NeedTgt>
+    struct StoredTuple {
+      template <class ... Args>
+      decltype(auto) operator()(Args && ... args) {
+        return std::tie(args ... );
+      }
+    };
+
+    /**
+     * struct used to determine the exact type of a tuple of references obtained
+     * when a bunch of iterators over fiel_maps are dereferenced and their
+     * results are concatenated into a tuple
+     */
+    template <class... T>
+    struct ReferenceTuple {
+      using type = std::tuple<typename T::reference ...>;
+    };
+
+    /**
+     * specialisation for tuples
+     */
+    template <>
+    template <class... T>
+    struct ReferenceTuple<std::tuple<T...>> {
+      using type = typename ReferenceTuple<T...>::type;
+    };
+
+    /**
+     * helper type for ReferenceTuple
+     */
+    template <class... T>
+    using ReferenceTuple_t = typename ReferenceTuple<T...>::type;
+
+    /* ---------------------------------------------------------------------- */
     /** Structure for functions returning one strain measure as a
         function of another
      **/
@@ -199,7 +245,7 @@ namespace muSpectre {
         using Parent = PK1_stress<Dim, StressMeasure::PK2,
                                   StrainMeasure::__nostrain__>;
         using Parent::compute;
-        
+
         template <class Strain_t, class Stress_t, class Tangent_t>
         inline static decltype(auto)
         compute(Strain_t && F, Stress_t && S, Tangent_t && C) {

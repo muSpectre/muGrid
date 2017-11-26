@@ -67,10 +67,10 @@ namespace muSpectre {
       ScalarFieldMap(std::enable_if_t<isConst, const Field &> field);
 
       //! Copy constructor
-      ScalarFieldMap(const ScalarFieldMap &other) = delete;
+      ScalarFieldMap(const ScalarFieldMap &other) = default;
 
       //! Move constructor
-      ScalarFieldMap(ScalarFieldMap &&other) noexcept = delete;
+      ScalarFieldMap(ScalarFieldMap &&other) noexcept = default;
 
       //! Destructor
       virtual ~ScalarFieldMap() noexcept = default;

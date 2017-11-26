@@ -81,10 +81,10 @@ namespace muSpectre {
     TensorFieldMap(std::enable_if_t<isConst, const Field &> field);
 
     //! Copy constructor
-    TensorFieldMap(const TensorFieldMap &other) = delete;
+    TensorFieldMap(const TensorFieldMap &other) = default;
 
     //! Move constructor
-    TensorFieldMap(TensorFieldMap &&other) noexcept = delete;
+    TensorFieldMap(TensorFieldMap &&other) noexcept = default;
 
     //! Destructor
     virtual ~TensorFieldMap() noexcept = default;

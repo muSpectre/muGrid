@@ -147,6 +147,8 @@ namespace muSpectre {
     protected:
       inline T* get_ptr_to_entry(const size_t&& index);
       inline T& get_ref_to_entry(const size_t&& index);
+      inline const T* get_ptr_to_entry(const size_t&& index) const;
+      inline const T& get_ref_to_entry(const size_t&& index) const;
       inline virtual void resize(size_t size) override final;
       StorageType array{};
     };
@@ -327,6 +329,20 @@ namespace muSpectre {
     template <class FieldCollection, typename T, Dim_t NbComponents>
     T& TypedFieldBase<FieldCollection, T, NbComponents>::
     get_ref_to_entry(const size_t && index) {
+      return this->array[std::move(index)](0, 0);
+    }
+
+    /* ---------------------------------------------------------------------- */
+    template <class FieldCollection, typename T, Dim_t NbComponents>
+    const T* TypedFieldBase<FieldCollection, T, NbComponents>::
+    get_ptr_to_entry(const size_t&& index) const {
+      return &this->array[std::move(index)](0, 0);
+    }
+
+    /* ---------------------------------------------------------------------- */
+    template <class FieldCollection, typename T, Dim_t NbComponents>
+    const T& TypedFieldBase<FieldCollection, T, NbComponents>::
+    get_ref_to_entry(const size_t && index) const {
       return this->array[std::move(index)](0, 0);
     }
 

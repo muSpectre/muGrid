@@ -58,9 +58,9 @@ namespace muSpectre {
   template <class s_t>
   decltype(auto)
   MaterialHyperElastic1<DimS, DimM>::evaluate_stress_tangent(s_t && E) {
+    throw 12;
     return std::forward_as_tuple(this->evaluate_stress(std::move(E)),
                                  Tangent_t(const_cast<double*>(this->C.data())));
-    throw 12;
   }
 
   template class MaterialHyperElastic1<2, 2>;

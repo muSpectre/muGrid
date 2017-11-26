@@ -72,7 +72,9 @@ namespace muSpectre {
                                             TypedField_nc>;
       using Field = typename TypedField::Parent;
       using size_type = std::size_t;
-
+      using pointer = std::conditional_t<ConstField,
+                                         const T*,
+                                         T*>;
       //! Default constructor
       FieldMap() = delete;
 
@@ -85,10 +87,10 @@ namespace muSpectre {
       FieldMap(TypedFieldBase<FC, T2, NbC> & field);
 
       //! Copy constructor
-      FieldMap(const FieldMap &other) = delete;
+      FieldMap(const FieldMap &other) = default;
 
       //! Move constructor
-      FieldMap(FieldMap &&other) noexcept = delete;
+      FieldMap(FieldMap &&other) noexcept = default;
 
       //! Destructor
       virtual ~FieldMap() noexcept = default;
@@ -214,8 +216,10 @@ namespace muSpectre {
 
 
     protected:
-      inline T* get_ptr_to_entry(size_t index);
+      inline pointer get_ptr_to_entry(size_t index);
+      inline const T* get_ptr_to_entry(size_t index) const;
       inline T& get_ref_to_entry(size_t index);
+      inline const T& get_ref_to_entry(size_t index) const;
       const FieldCollection & collection;
       TypedField  & field;
     private:
@@ -532,15 +536,33 @@ namespace muSpectre {
 
     /* ---------------------------------------------------------------------- */
     template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
-    T*
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::get_ptr_to_entry(size_t index) {
+    typename FieldMap<FieldCollection, T, NbComponents, ConstField>::pointer
+    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    get_ptr_to_entry(size_t index) {
+      return this->field.get_ptr_to_entry(std::move(index));
+    }
+
+    /* ---------------------------------------------------------------------- */
+    template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
+    const T*
+    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    get_ptr_to_entry(size_t index) const {
       return this->field.get_ptr_to_entry(std::move(index));
     }
 
     /* ---------------------------------------------------------------------- */
     template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
     T&
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::get_ref_to_entry(size_t index) {
+    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    get_ref_to_entry(size_t index) {
+      return this->field.get_ref_to_entry(std::move(index));
+    }
+
+    /* ---------------------------------------------------------------------- */
+    template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
+    const T&
+    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    get_ref_to_entry(size_t index) const {
       return this->field.get_ref_to_entry(std::move(index));
     }
 

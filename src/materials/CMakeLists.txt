@@ -1,6 +1,6 @@
 set (materials_SRC
   material_base.cc
-  #material_hyper_elastic1.cc
+  material_hyper_elastic1.cc
   #material_linear_elastic.cc
   )
 

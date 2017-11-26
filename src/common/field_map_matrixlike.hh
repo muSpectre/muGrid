@@ -112,10 +112,10 @@ namespace muSpectre {
       MatrixLikeFieldMap(TypedFieldBase<FC, T2, NbC> & field);
 
       //! Copy constructor
-      MatrixLikeFieldMap(const MatrixLikeFieldMap &other) = delete;
+      MatrixLikeFieldMap(const MatrixLikeFieldMap &other) = default;
 
       //! Move constructor
-      MatrixLikeFieldMap(MatrixLikeFieldMap &&other) noexcept = delete;
+      MatrixLikeFieldMap(MatrixLikeFieldMap &&other) noexcept = default;
 
       //! Destructor
       virtual ~MatrixLikeFieldMap() noexcept = default;
@@ -221,7 +221,8 @@ namespace muSpectre {
     typename MatrixLikeFieldMap<FieldCollection, EigenArray, map_type, ConstField>::reference
     MatrixLikeFieldMap<FieldCollection, EigenArray, map_type, ConstField>::
     operator[](const Ccoord & ccoord) {
-      auto && index = this->collection.get_index(ccoord);
+      size_t index{};
+      index = this->collection.get_index(ccoord);
       return reference(this->get_ptr_to_entry(std::move(index)));
     }
 

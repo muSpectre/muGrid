@@ -81,7 +81,8 @@ namespace muSpectre {
 
 
     //! returns the linear index corresponding to cell coordinates
-    inline size_t get_index(Ccoord && ccoord) const;
+    template <class CcoordRef>
+    inline size_t get_index(CcoordRef && ccoord) const;
     //! returns the cell coordinates corresponding to a linear index
     inline Ccoord get_ccoord(size_t index) const;
 
@@ -139,9 +140,15 @@ namespace muSpectre {
   //----------------------------------------------------------------------------//
   //! returns the linear index corresponding to cell coordinates
   template <Dim_t DimS, Dim_t DimM>
+  template <class CcoordRef>
   size_t
-  LocalFieldCollection<DimS, DimM>::get_index(Ccoord && ccoord) const {
-    return this->indices[std::move(ccoord)];
+  LocalFieldCollection<DimS, DimM>::get_index(CcoordRef && ccoord) const {
+    static_assert(std::is_same<
+                    Ccoord,
+                    std::remove_const_t<
+                      std::remove_reference_t<CcoordRef>>>::value,
+                  "can only be called with values or references of Ccoord");
+    return this->indices[std::forward<CcoordRef>(ccoord)];
   }
 
 
