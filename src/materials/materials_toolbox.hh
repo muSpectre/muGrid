@@ -107,6 +107,11 @@ namespace muSpectre {
 
       template <StrainMeasure In, StrainMeasure Out = In>
       struct ConvertStrain {
+        static_assert((In == StrainMeasure::Gradient) ||
+                      (In == StrainMeasure::Infinitesimal),
+                      "This situation makes me suspect that you are not using "
+                      "MatTb as intended. Disable this assert only if you are "
+                      "sure about what you are doing.");
         template <class Strain_t>
         inline static decltype(auto)
         compute(Strain_t&& input) {
@@ -128,7 +133,7 @@ namespace muSpectre {
       decltype(auto)
       ConvertStrain<StrainMeasure::Gradient, StrainMeasure::GreenLagrange>::
       compute(Strain_t && F) {
-        return (F.transpose()*F - Strain_t::PlainObject::Identity());
+        return .5*(F.transpose()*F - Strain_t::PlainObject::Identity());
       }
 
     }  // internal

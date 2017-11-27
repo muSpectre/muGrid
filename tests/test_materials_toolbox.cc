@@ -26,25 +26,120 @@
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
  */
+#include <boost/mpl/list.hpp>
 
-#include <unsupported/Eigen/CXX11/Tensor>
-#include <unsupported/Eigen/CXX11/TensorSymmetry>
+#include <Eigen/Dense>
 
 #include "tests.hh"
 #include "materials/materials_toolbox.hh"
+#include "common/T4_map_proxy.hh"
+#include "common/tensor_algebra.hh"
+#include "common/test_goodies.hh"
 
 
 namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE(materials_toolbox)
 
-  BOOST_AUTO_TEST_CASE(test_linearisation) {
-    constexpr Dim_t dim{2};
-    using Stress_t = Eigen::TensorFixedSize<Real, Eigen::Sizes<dim, dim, dim, dim>>;
-    using Strain_t = Eigen::TensorFixedSize<Real, Eigen::Sizes<dim, dim>>;
-    Strain_t F;
+  template <Dim_t Dim>
+  struct dimFixture{
+    constexpr static Dim_t dim{Dim};
+  };
+
+  using dimlist = boost::mpl::list<dimFixture<oneD>,
+                                   dimFixture<twoD>,
+                                   dimFixture<threeD>>;
+
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_strain_conversion, Fix, dimlist, Fix){
+    constexpr Dim_t dim{Fix::dim};
+    using T2 = Eigen::Matrix<Real, dim, dim>;
+
+    T2 F;
     F.setRandom();
-    auto E = .5*(F.shuffle(std::array<Dim_t, dim>{1,0})*F-Tensors::I2<dim>());
+    auto Eref = .5*(F.transpose()*F-T2::Identity());
+
+    auto E_tb = MatTB::convert_strain<StrainMeasure::Gradient,
+                                      StrainMeasure::GreenLagrange>
+      (Eigen::Map<Eigen::Matrix<Real, dim, dim>>(F.data()));
+
+    auto error = (Eref-E_tb).norm();
+    BOOST_CHECK_LT(error, tol);
+
+    auto F_tb = MatTB::convert_strain<StrainMeasure::Gradient, StrainMeasure::Gradient>(F);
+
+    error = (F-F_tb).norm();
+    BOOST_CHECK_LT(error, tol);
+  }
+
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(dumb_tensor_mult_test, Fix, dimlist, Fix) {
+    constexpr Dim_t dim{Fix::dim};
+    using T4 = T4Mat<Real, dim>;
+    T4 A,B, R1, R2;
+    A.setRandom();
+    B.setRandom();
+    R1 = A*B;
+    R2.setZero();
+    for (Dim_t i = 0; i < dim; ++i) {
+      for (Dim_t j = 0; j < dim; ++j) {
+        for (Dim_t a = 0; a < dim; ++a) {
+          for (Dim_t b = 0; b < dim; ++b) {
+            for (Dim_t k = 0; k < dim; ++k) {
+              for (Dim_t l = 0; l < dim; ++l) {
+                get(R2,i,j,k,l) += get(A, i,j,a,b)*get(B, a,b, k,l);
+              }
+            }
+          }
+        }
+      }
+    }
+    auto error{(R1-R2).norm()};
+    BOOST_CHECK_LT(error, tol);
+  }
+
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_PK1_stress, Fix, dimlist, Fix) {
+    using namespace Matrices;
+    constexpr Dim_t dim{Fix::dim};
+    using T2 = Eigen::Matrix<Real, dim, dim>;
+    using T4 = T4Mat<Real, dim>;
+    testGoodies::RandRange<Real> rng;
+    T2 F;
+    F.setRandom();
+    auto E_tb = MatTB::convert_strain<StrainMeasure::Gradient, StrainMeasure::GreenLagrange>
+      (Eigen::Map<Eigen::Matrix<Real, dim, dim>>(F.data()));
+    Real lambda = rng.randval(1, 2);
+    Real mu = 0*rng.randval(1,2);
+    T4 J = Itrac<dim>();
+    T2 I = I2<dim>();
+    T4 I4 = Isymm<dim>();
+    T4 C = lambda*J + 2*mu*I4;
+    T2 S = tensmult(C, E_tb);
+    T2 Sref = lambda*E_tb.trace()*I + 2*mu*E_tb;
+
+    auto error{(Sref-S).norm()};
+    BOOST_CHECK_LT(error, tol);
+
+    T4 K = outer_under(I,S) + outer_under(F,I)*C*outer_under(F.transpose(),I);
+
+    // See Curnier, 2000, "Méthodes numériques en mécanique des solides", p 252
+    T4 Kref;
+    Real Fkrkr = (F.array()*F.array()).sum();
+    T2 Fkmkn = F.transpose()*F;
+    T2 Fisjs = F*F.transpose();
+    Kref.setZero();
+    for (Dim_t i = 0; i < dim; ++i) {
+      for (Dim_t j = 0; j < dim; ++j) {
+        for (Dim_t m = 0; m < dim; ++m) {
+          for (Dim_t n = 0; n < dim; ++n) {
+            get(Kref, i, m, j, n) =
+              (lambda*((Fkrkr-dim)/2 * I(i,j)*I(m,n) + F(i,m)*F(j,n)) +
+               mu * (I(i,j)*Fkmkn(m,n) + Fisjs(i,j)*I(m,n) -
+                     I(i,j) *I(m,n) + F(i,n)*F(j,m)));
+          }
+        }
+      }
+    }
+    error = (Kref-K).norm();
+    BOOST_CHECK_LT(error, tol);
   }
 
   BOOST_AUTO_TEST_SUITE_END();

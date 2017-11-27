@@ -36,7 +36,10 @@
 #include <Eigen/Dense>
 #include <unsupported/Eigen/CXX11/Tensor>
 
+
+#include "common/T4_map_proxy.hh"
 #include "common/common.hh"
+#include "common/eigen_tools.hh"
 
 namespace muSpectre {
 
@@ -119,6 +122,156 @@ namespace muSpectre {
     }
 
   }  // Tensors
+  namespace Matrices {
+
+    template<Dim_t dim>
+    using Tens2_t = Eigen::Matrix<Real, dim, dim>;
+    template<Dim_t dim>
+    using Tens4_t = T4Mat<Real, dim>;
+
+    //----------------------------------------------------------------------------//
+    //! compile-time second-order identity
+    template<Dim_t dim>
+    constexpr inline Tens2_t<dim> I2() {
+      return Tens2_t<dim>::Identity();
+    }
+
+    /* ---------------------------------------------------------------------- */
+    /** compile-time outer tensor product as defined by Curnier
+     *  R_ijkl = A_ij.B_klxx
+     *    0123     01   23
+     */
+    template<typename T1, typename T2>
+    constexpr inline decltype(auto) outer(T1 && A, T2 && B) {
+      // Just make sure that the right type of parameters have been given
+      constexpr Dim_t dim{EigenCheck::TensorDim(A)};
+      static_assert((dim == EigenCheck::TensorDim(B)),
+                     "A and B do not have the same dimension");
+
+      Tens4_t<dim> product;
+
+      for (Dim_t i = 0; i < dim; ++i) {
+        for (Dim_t j = 0; j < dim; ++j) {
+          for (Dim_t k = 0; k < dim; ++k) {
+            for (Dim_t l = 0; l < dim; ++l) {
+              get(product, i, j, k, l) = A(i, j) * B(k, l);
+            }
+          }
+        }
+      }
+      return product;
+    }
+
+    /* ---------------------------------------------------------------------- */
+    /** compile-time underlined outer tensor product as defined by Curnier
+     *  R_ijkl = A_ik.B_jlxx
+     *    0123     02   13
+     *    0213     01   23 <- this defines the shuffle order
+     */
+    template<typename T1, typename T2>
+    constexpr inline decltype(auto) outer_under(T1 && A, T2 && B) {
+      // Just make sure that the right type of parameters have been given
+      constexpr Dim_t dim{EigenCheck::TensorDim(A)};
+      static_assert((dim == EigenCheck::TensorDim(B)),
+                     "A and B do not have the same dimension");
+
+      Tens4_t<dim> product;
+
+      for (Dim_t i = 0; i < dim; ++i) {
+        for (Dim_t j = 0; j < dim; ++j) {
+          for (Dim_t k = 0; k < dim; ++k) {
+            for (Dim_t l = 0; l < dim; ++l) {
+              get(product, i, j, k, l) = A(i, k) * B(j, l);
+            }
+          }
+        }
+      }
+      return product;
+    }
+
+    /* ---------------------------------------------------------------------- */
+    /** compile-time overlined outer tensor product as defined by Curnier
+     *  R_ijkl = A_il.B_jkxx
+     *    0123     03   12
+     *    0231     01   23 <- this defines the shuffle order
+     */
+    template<typename T1, typename T2>
+    constexpr inline decltype(auto) outer_over(T1 && A, T2 && B) {
+      // Just make sure that the right type of parameters have been given
+      constexpr Dim_t dim{EigenCheck::TensorDim(A)};
+      static_assert((dim == EigenCheck::TensorDim(B)),
+                     "A and B do not have the same dimension");
+
+      Tens4_t<dim> product;
+
+      for (Dim_t i = 0; i < dim; ++i) {
+        for (Dim_t j = 0; j < dim; ++j) {
+          for (Dim_t k = 0; k < dim; ++k) {
+            for (Dim_t l = 0; l < dim; ++l) {
+              get(product, i, j, k, l) = A(i, l) * B(j, k);
+            }
+          }
+        }
+      }
+      return product;
+    }
+
+
+    /**
+     * Standart tensor multiplication
+     */
+    template<typename T4, typename T2>
+    constexpr inline decltype(auto) tensmult(T4 && A, T2 && B) {
+      constexpr Dim_t dim{EigenCheck::Tensor4Dim(A)};
+      static_assert((dim == EigenCheck::TensorDim(B)),
+                    "Dimensionality check failed. Expects A to be a fourth-"
+                    "order tensor of dimension dim and B to be a second-order "
+                    "Tensor of same dimension");
+      Tens2_t<dim> result;
+      result.setZero();
+
+      for (Dim_t i = 0; i < dim; ++i) {
+        for (Dim_t j = 0; j < dim; ++j) {
+          for (Dim_t k = 0; k < dim; ++k) {
+            for (Dim_t l = 0; l < dim; ++l) {
+              result(i,j) +=get(A, i, j, k, l) * B(k, l);
+            }
+          }
+        }
+      }
+      return result;
+    }
+
+    //! compile-time fourth-order tracer
+    template <Dim_t dim>
+    constexpr inline Tens4_t<dim> Itrac() {
+      auto I = I2<dim>();
+      return outer(I,I);
+    }
+
+    //! compile-time fourth-order identity
+    template <Dim_t dim>
+    constexpr inline Tens4_t<dim> Iiden() {
+      auto I = I2<dim>();
+      return outer_under(I,I);
+    }
+
+    //! compile-time fourth-order transposer
+    template <Dim_t dim>
+    constexpr inline Tens4_t<dim> Itrns() {
+      auto I = I2<dim>();
+      return outer_over(I,I);
+    }
+
+    //! compile-time fourth-order symmetriser
+    template<Dim_t dim>
+    constexpr inline Tens4_t<dim> Isymm() {
+      auto I = I2<dim>();
+      return 0.5*(outer_under(I, I) + outer_over(I, I));
+    }
+
+
+  }  // Matrices
 }  // muSpectre
 
 
