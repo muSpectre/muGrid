@@ -102,12 +102,12 @@ namespace muSpectre {
     using T2 = Eigen::Matrix<Real, dim, dim>;
     using T4 = T4Mat<Real, dim>;
     testGoodies::RandRange<Real> rng;
-    T2 F;
-    F.setRandom();
-    auto E_tb = MatTB::convert_strain<StrainMeasure::Gradient, StrainMeasure::GreenLagrange>
+    T2 F=T2::Identity()*2 ;
+    //F.setRandom();
+    T2 E_tb = MatTB::convert_strain<StrainMeasure::Gradient, StrainMeasure::GreenLagrange>
       (Eigen::Map<Eigen::Matrix<Real, dim, dim>>(F.data()));
-    Real lambda = rng.randval(1, 2);
-    Real mu = 0*rng.randval(1,2);
+    Real lambda = 3;//rng.randval(1, 2);
+    Real mu = 4;//rng.randval(1,2);
     T4 J = Itrac<dim>();
     T2 I = I2<dim>();
     T4 I4 = Isymm<dim>();
@@ -139,6 +139,31 @@ namespace muSpectre {
       }
     }
     error = (Kref-K).norm();
+    BOOST_CHECK_LT(error, tol);
+
+    T2 P = MatTB::PK1_stress<StressMeasure::PK2, StrainMeasure::GreenLagrange>(F, S);
+    T2 Pref = F*S;
+    error = (P-Pref).norm();
+    BOOST_CHECK_LT(error, tol);
+
+    auto && stress_tgt = MatTB::PK1_stress<StressMeasure::PK2, StrainMeasure::GreenLagrange>(F, S, C);
+    T2 P_t = std::move(std::get<0>(stress_tgt));
+    T4 K_t = std::move(std::get<1>(stress_tgt));
+    error = (P_t-Pref).norm();
+    BOOST_CHECK_LT(error, tol);
+
+    error = (K_t-Kref).norm();
+    BOOST_CHECK_LT(error, tol);
+
+    auto && stress_tgt_trivial =
+      MatTB::PK1_stress<StressMeasure::PK1, StrainMeasure::Gradient>(F, P, K);
+    T2 P_u = std::move(std::get<0>(stress_tgt_trivial));
+    T4 K_u = std::move(std::get<1>(stress_tgt_trivial));
+
+    error = (P_u-Pref).norm();
+    BOOST_CHECK_LT(error, tol);
+
+    error = (K_u-Kref).norm();
     BOOST_CHECK_LT(error, tol);
   }
 

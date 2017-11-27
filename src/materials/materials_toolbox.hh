@@ -216,9 +216,10 @@ namespace muSpectre {
         using Parent::compute;
 
         template <class Strain_t, class Stress_t, class Tangent_t>
-        decltype(auto)
+        inline static decltype(auto)
         compute(Strain_t && /*dummy*/, Stress_t && P, Tangent_t && K) {
-          return std::forward_as_tuple(P, K);
+          return std::make_tuple(std::forward<Stress_t>(P),
+                                 std::forward<Tangent_t>(K));
         }
       };
 
@@ -254,19 +255,19 @@ namespace muSpectre {
         template <class Strain_t, class Stress_t, class Tangent_t>
         inline static decltype(auto)
         compute(Strain_t && F, Stress_t && S, Tangent_t && C) {
-          using T4 = typename Tangent_t::PlainObject;
+          using T4 = typename std::remove_reference_t<Tangent_t>::PlainObject;
           using Tmap = T4Map<Real, Dim>;
           T4 K;
           Tmap Kmap{K.data()};
           K.setZero();
-          constexpr int dim{Strain_t::ColsAtCompileTime};
-          for (int i = 0; i < dim; ++i) {
-            for (int m = 0; m < dim; ++m) {
-              for (int n = 0; n < dim; ++n) {
+
+          for (int i = 0; i < Dim; ++i) {
+            for (int m = 0; m < Dim; ++m) {
+              for (int n = 0; n < Dim; ++n) {
                 Kmap(i,m,i,n) += S(m,n);
-                for (int j = 0; j < dim; ++j) {
-                  for (int r = 0; r < dim; ++r) {
-                    for (int s = 0; s < dim; ++s) {
+                for (int j = 0; j < Dim; ++j) {
+                  for (int r = 0; r < Dim; ++r) {
+                    for (int s = 0; s < Dim; ++s) {
                       Kmap(i,m,j,n) += F(i,r)*get(C,r,m,n,s)*(F(j,s));
                     }
                   }
@@ -276,7 +277,7 @@ namespace muSpectre {
           }
           auto && P = compute(std::forward<Strain_t>(F),
                               std::forward<Stress_t>(S));
-          return std::forward_as_tuple(std::move(P), K);
+          return std::make_tuple(std::move(P), std::move(K));
         }
       };
 
@@ -290,7 +291,8 @@ namespace muSpectre {
       static_assert((dim == EigenCheck::TensorDim(stress)),
                     "Stress and strain tensors have differing dimensions");
       return internal::PK1_stress<dim, StressM, StrainM>::compute
-        (std::move(stress), std::move(strain));
+        (std::forward<Strain_t>(strain),
+         std::forward<Stress_t>(stress));
     };
 
     /* ---------------------------------------------------------------------- */
@@ -306,72 +308,11 @@ namespace muSpectre {
       static_assert((dim*dim == EigenCheck::TensorDim(tangent)),
                     "Stress and tangent tensors have differing dimensions");
       return internal::PK1_stress<dim, StressM, StrainM>::compute
-        (std::move(stress), std::move(strain), std::move(tangent));
+        (std::forward<Strain_t>(strain),
+         std::forward<Stress_t>(stress),
+         std::forward<Tangent_t>(tangent));
     };
 
-    /* ---------------------------------------------------------------------- */
-    /** Structure for functions returning ∂strain/∂F (where F is the transformation
-      * gradient. (e.g. for a material law expressed as PK2 stress S as
-      * function of Green-Lagrange strain E, this would return F^T ⊗̲ I) (⊗_
-      * refers to Curnier's notation) WARNING: this function assumes that your
-      * stress measure has the two minor symmetries due to stress equilibrium
-      * and the major symmetry due to the existance of an elastic potential
-      * W(E). Do not rely on this function if you are using exotic stress
-      * measures
-     **/
-    namespace internal {
-
-      template<StrainMeasure StrainM>
-      struct StrainDerivative
-      {
-        template <class Grad_t>
-        inline static decltype(auto)
-        compute (Grad_t && grad) {
-          // the following test always fails to generate a compile-time error
-          static_assert((StrainM == StrainMeasure::Almansi) &&
-                        (StrainM == StrainMeasure::Biot),
-                        "The requested StrainDerivative calculation is not "
-                        "implemented. You either made a programming mistake or "
-                        "need to implement it as a specialisation of this "
-                        "function. See "
-                        "StrainDerivative<StrainMeasure::GreenLagrange> for an "
-                        "example.");
-        }
-      };
-
-      template <>
-      template <class Grad_t>
-      decltype(auto) StrainDerivative<StrainMeasure::GreenLagrange>::
-      compute(Grad_t && grad) {
-      }
-
-    }  // internal
-
-
-    /* ---------------------------------------------------------------------- */
-    //! set of functions returning ∂strain/∂F
-    template<StrainMeasure StrainM>
-    auto StrainDerivative = [](auto && F) decltype(auto) {
-      // the following test always fails to generate a compile-time error
-      static_assert((StrainM == StrainMeasure::Almansi) &&
-                    (StrainM == StrainMeasure::Biot),
-                    "The requested StrainDerivative calculation is not "
-                    "implemented. You either made a programming mistake or "
-                    "need to implement it as a specialisation of this "
-                    "function. See "
-                    "StrainDerivative<StrainMeasure::GreenLagrange> for an "
-                    "example.");
-    };
-
-    /* ---------------------------------------------------------------------- */
-    template<>
-    auto StrainDerivative<StrainMeasure::GreenLagrange> =
-      [] (auto && F) -> decltype(auto) {
-      constexpr size_t order{2};
-      constexpr Dim_t dim{F.Dimensions[0]};
-      return Tensors::outer_under<dim>
-        (F.shuffle(std::array<Dim_t, order>{1,0}), Tensors::I2<dim>());
-    };
 
   }  // MatTB
 
