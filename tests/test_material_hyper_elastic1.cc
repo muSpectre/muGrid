@@ -42,12 +42,13 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   struct MaterialFixture
   {
+    using Mat_t = MaterialHyperElastic1<DimS, DimM>;
     constexpr static Real lambda{2}, mu{1.5};
     MaterialFixture():mat("Name", lambda, mu){};
     constexpr static Dim_t sdim{DimS};
     constexpr static Dim_t mdim{DimM};
 
-    MaterialHyperElastic1<sdim, mdim> mat;
+    Mat_t mat;
   };
 
   using mat_list = boost::mpl::list<MaterialFixture<twoD, twoD>,
@@ -84,12 +85,13 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   struct MaterialFixtureFilled: public MaterialFixture<DimS, DimM>
   {
+    using Mat_t = typename MaterialFixture<DimS, DimM>::Mat_t;
     constexpr static Dim_t box_size{3};
     MaterialFixtureFilled():MaterialFixture<DimS, DimM>(){
       using Ccoord = Ccoord_t<DimS>;
-      Ccoord sizes{CcoordOps::get_cube<DimS>(box_size)};
-      CcoordOps::Pixels<DimS> pix(sizes);
-      for (auto pixel: pix) {
+      Ccoord cube{CcoordOps::get_cube<DimS>(box_size)};
+      CcoordOps::Pixels<DimS> pixels(cube);
+      for (auto pixel: pixels) {
         this->mat.add_pixel(pixel);
       }
       this->mat.initialise();
@@ -100,8 +102,35 @@ namespace muSpectre {
                                     MaterialFixtureFilled<twoD, threeD>,
                                     MaterialFixtureFilled<threeD, threeD>>;
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_evaluale_law, Fix, mat_fill, Fix) {
-    const auto cube{CcoordOps::get_cube<Fix::sdim>(Fix::box_size)};
-    FieldCollection<Fix::sdim, Fix::mdim> globalfields;
+    constexpr auto cube{CcoordOps::get_cube<Fix::sdim>(Fix::box_size)};
+
+    using FC_t = FieldCollection<Fix::sdim, Fix::mdim>;
+    FC_t globalfields;
+    auto & grad_field = make_field<typename Fix::Mat_t::StrainField_t>
+      ("Transformation Gradient", globalfields);
+    auto & P1 = make_field<typename Fix::Mat_t::StressField_t>
+      ("Nominal Stress1", globalfields); // to be computed alone
+    auto & P2 = make_field<typename Fix::Mat_t::StressField_t>
+      ("Nominal Stress2", globalfields); // to be computed with tangent
+    auto & K = make_field<typename Fix::Mat_t::TangentField_t>
+      ("Tangent Moduli", globalfields); // to be computed with tangent
+    auto & Pref = make_field<typename Fix::Mat_t::StressField_t>
+      ("Nominal Stress reference", globalfields);
+    auto & Kref = make_field<typename Fix::Mat_t::TangentField_t>
+      ("Tangent Moduli reference", globalfields); // to be computed with tangent
+
+    globalfields.initialise(cube);
+
+    typename Fix::Mat_t::StressMap_t grad_map(grad_field);
+    for (auto F: typename Fix::Mat_t::StressMap_t(grad_field)) {
+      F.setRandom();
+    }
+    grad_map[0] = grad_map[0].Identity();
+    grad_map[1] = 1.2*grad_map[1].Identity();
+    size_t counter{0};
+    for (auto F: grad_map) {
+      std::cout << "F(" << counter++ << ")" << std::endl << F << std::endl;
+    }
   }
 
   BOOST_AUTO_TEST_SUITE_END();

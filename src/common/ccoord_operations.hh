@@ -30,6 +30,7 @@
 #include <functional>
 #include <numeric>
 #include <vector>
+#include <utility>
 
 #include "common/common.hh"
 
@@ -40,12 +41,19 @@ namespace muSpectre {
 
   namespace CcoordOps {
 
+    namespace internal {
+      constexpr Dim_t ret(Dim_t val, size_t /*dummy*/) {return val;}
+
+      template <Dim_t Dim, size_t... I>
+      constexpr Ccoord_t<Dim> funt(Dim_t val, std::index_sequence<I...>) {
+        return Ccoord_t<Dim>{ret(val, I)...};
+      }
+    }  // internal
+
     //----------------------------------------------------------------------------//
     template <size_t dim>
-    Ccoord_t<dim> get_cube(Dim_t size) {
-      Ccoord_t<dim> retval{0};
-      for(auto & val: retval) val=size;
-      return retval;
+    constexpr Ccoord_t<dim> get_cube(Dim_t size) {
+      return internal::funt<dim>(size, std::make_index_sequence<dim>{});
     }
 
     //----------------------------------------------------------------------------//
@@ -80,8 +88,11 @@ namespace muSpectre {
     //----------------------------------------------------------------------------//
     template <size_t dim>
     constexpr size_t get_size(const Ccoord_t<dim>& sizes) {
-      return std::accumulate(sizes.begin(), sizes.end(), 1,
-                             std::multiplies<size_t>());
+      Dim_t retval{1};
+      for (size_t i = 0; i < dim; ++i) {
+        retval *= sizes[i];
+      }
+      return retval;
     }
 
     /* ---------------------------------------------------------------------- */
