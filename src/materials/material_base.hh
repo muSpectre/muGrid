@@ -84,10 +84,10 @@ namespace muSpectre {
      *  (as, e.g. for eigenstrain), we need to pass more parameters. Materials
      *  of this tye need to overload add_pixel
      */
-    void add_pixel(const Ccoord & ccord);
+    void add_pixel(const Ccoord & ccooord);
 
     //! allocate memory, etc
-    virtual void initialize(bool stiffness = false) = 0;
+    virtual void initialise(bool stiffness = false) = 0;
 
     //! return the materil's name
     const std::string & get_name() const;

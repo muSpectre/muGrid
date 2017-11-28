@@ -49,8 +49,20 @@
 
 namespace muSpectre {
 
+  template <class Material>
+  struct MaterialMuSpectre_traits {
+  };
+
+  template <class Material, Dim_t DimS, Dim_t DimM>
+  class MaterialMuSpectre;
+
+  template <>
+  struct MaterialMuSpectre_traits<void> {
+    using DefaultInternalVariables = std::tuple<>;
+  };
+
   //! 'Material' is a CRTP
-  template<class Material, Dim_t DimS, Dim_t DimM>
+  template <class Material, Dim_t DimS, Dim_t DimM>
   class MaterialMuSpectre: public MaterialBase<DimS, DimM>
   {
   public:
@@ -63,6 +75,7 @@ namespace muSpectre {
     using TangentField_t = typename Parent::TangentField_t;
 
     using DefaultInternalVariables = std::tuple<>;
+    using traits = MaterialMuSpectre_traits<Material>;
 
     //! Default constructor
     MaterialMuSpectre() = delete;
@@ -84,6 +97,10 @@ namespace muSpectre {
 
     //! Move assignment operator
     MaterialMuSpectre& operator=(MaterialMuSpectre &&other) noexcept = delete;
+
+
+    //* allocate memory, etc
+    virtual void initialise(bool stiffness = false);
 
     //! computes stress
     virtual void compute_stresses(const StrainField_t & F,
@@ -120,6 +137,7 @@ namespace muSpectre {
     decltype(auto) get_internals() const {
       // the default material has no internal variables
       return typename Material::InternalVariables{};}
+    typename traits::InternalVariables internal_variables{};
 
   private:
   };
@@ -152,6 +170,14 @@ namespace muSpectre {
                   "The material's declared tangent map is not compatible "
                   "with the tangent field. More info in previously shown "
                   "assert.");
+  }
+
+
+  /* ---------------------------------------------------------------------- */
+  template <class Material, Dim_t DimS, Dim_t DimM>
+  void MaterialMuSpectre<Material, DimS, DimM>::
+  initialise(bool /*stiffness*/) {
+    this->internal_fields.initialise();
   }
 
   /* ---------------------------------------------------------------------- */
@@ -425,12 +451,16 @@ namespace muSpectre {
     iterable_proxy(const MaterialMuSpectre & mat,
                    const StrainField_t & F,
                    StressField_t & P,
-                   std::enable_if_t<DoNeedTgt, TangentField_t> & K);
+                   std::enable_if_t<DoNeedTgt, TangentField_t> & K)
+      :material(mat), strain_field(F), stress_tup{P,K},
+       internals(material.internal_variables){};
 
     template<bool DontNeedTgt=(NeedTgt == NeedTangent::no)>
     iterable_proxy(const MaterialMuSpectre & mat,
                    const StrainField_t & F,
-                   std::enable_if_t<DontNeedTgt, StressField_t> & P);
+                   std::enable_if_t<DontNeedTgt, StressField_t> & P)
+      :material(mat), strain_field(F), stress_tup{P},
+       internals(material.internal_variables){};
 
     using StrainMap_t = typename Material::StrainMap_t;
     using StressMap_t = typename Material::StressMap_t;
@@ -526,8 +556,9 @@ namespace muSpectre {
   protected:
     const MaterialMuSpectre & material;
     const StrainField_t & strain_field;
-    InternalVariables & internals;
     StressFieldTup stress_tup;
+    const InternalVariables & internals;
+
   private:
   };
 
@@ -552,6 +583,7 @@ namespace muSpectre {
     return *this;
   }
 
+  /* ---------------------------------------------------------------------- */
   template <class Material, Dim_t DimS, Dim_t DimM>
   template <MatTB::NeedTangent NeedTgT>
   typename MaterialMuSpectre<Material, DimS, DimM>::

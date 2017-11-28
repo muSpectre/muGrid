@@ -32,12 +32,24 @@
 namespace muSpectre {
 
   //----------------------------------------------------------------------------//
-  template<Dim_t s_dim, Dim_t m_dim>
-  MaterialBase<s_dim, m_dim>::MaterialBase(std::string name)
+  template <Dim_t DimS, Dim_t DimM>
+  MaterialBase<DimS, DimM>::MaterialBase(std::string name)
     :name(name) {
-    static_assert((m_dim == oneD)||
-                  (m_dim == twoD)||
-                  (m_dim == threeD), "only 1, 2, or threeD supported");
+    static_assert((DimM == oneD)||
+                  (DimM == twoD)||
+                  (DimM == threeD), "only 1, 2, or threeD supported");
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  const std::string & MaterialBase<DimS, DimM>::get_name() const {
+    return this->name;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  void MaterialBase<DimS, DimM>::add_pixel(const Ccoord &ccoord) {
+    this->internal_fields.add_pixel(ccoord);
   }
 
   template class MaterialBase<2, 2>;

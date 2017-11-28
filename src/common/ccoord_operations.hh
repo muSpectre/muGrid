@@ -29,6 +29,7 @@
 
 #include <functional>
 #include <numeric>
+#include <vector>
 
 #include "common/common.hh"
 
@@ -38,6 +39,14 @@
 namespace muSpectre {
 
   namespace CcoordOps {
+
+    //----------------------------------------------------------------------------//
+    template <size_t dim>
+    Ccoord_t<dim> get_cube(Dim_t size) {
+      Ccoord_t<dim> retval{0};
+      for(auto & val: retval) val=size;
+      return retval;
+    }
 
     //----------------------------------------------------------------------------//
     template <size_t dim>
@@ -75,7 +84,61 @@ namespace muSpectre {
                              std::multiplies<size_t>());
     }
 
+    /* ---------------------------------------------------------------------- */
+    template <size_t dim>
+    class Pixels
+    {
+    public:
+      Pixels(const Ccoord_t<dim> & sizes):sizes(sizes){};
+      virtual ~Pixels() = default;
+      class iterator
+      {
+      public:
+        using value_type = Ccoord_t<dim>;
+        using iterator_category = std::forward_iterator_tag;
+        iterator(const Pixels & pixels, bool begin=true);
+        virtual ~iterator() = default;
+        inline value_type operator*() const;
+        inline iterator & operator++();
+        inline bool operator!=(const iterator & other) const;
 
+      protected:
+        const Pixels& pixels;
+        size_t index;
+      };
+      inline iterator begin() const {return iterator(*this);}
+      inline iterator end() const {return iterator(*this, false);}
+    protected:
+      const Ccoord_t<dim> & sizes;
+    };
+
+    /* ---------------------------------------------------------------------- */
+    template <size_t dim>
+    Pixels<dim>::iterator::iterator(const Pixels & pixels, bool begin)
+      :pixels{pixels}, index{begin? 0: get_size(pixels.sizes)}
+    {}
+
+    /* ---------------------------------------------------------------------- */
+    template <size_t dim>
+    typename Pixels<dim>::iterator::value_type
+    Pixels<dim>::iterator::operator*() const {
+      return get_ccoord(pixels.sizes, this->index);
+    }
+
+    /* ---------------------------------------------------------------------- */
+    template <size_t dim>
+    bool
+    Pixels<dim>::iterator::operator!=(const iterator &other) const {
+      return (this->index != other.index) && (&this->pixels != &other.pixels);
+    }
+
+    /* ---------------------------------------------------------------------- */
+    template <size_t dim>
+    typename Pixels<dim>::iterator&
+    Pixels<dim>::iterator::operator++() {
+      ++this->index;
+      return *this;
+    }
 
   }  // CcoordOps
 

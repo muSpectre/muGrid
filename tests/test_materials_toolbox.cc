@@ -26,7 +26,6 @@
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
  */
-#include <boost/mpl/list.hpp>
 
 #include <Eigen/Dense>
 
@@ -158,6 +157,16 @@ namespace muSpectre {
     BOOST_CHECK_LT(error, tol);
 
     error = (K_u-Kref).norm();
+    BOOST_CHECK_LT(error, tol);
+
+    T2 P_g;
+    T4 K_g;
+    std::tie(P_g, K_g) = testGoodies::objective_hooke_explicit(lambda, mu, F);
+
+    error = (P_g-Pref).norm();
+    BOOST_CHECK_LT(error, tol);
+
+    error = (K_g-Kref).norm();
     BOOST_CHECK_LT(error, tol);
   }
 

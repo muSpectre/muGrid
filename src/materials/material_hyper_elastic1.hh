@@ -36,6 +36,16 @@
 #define MATERIAL_HYPER_ELASTIC1_H
 
 namespace muSpectre {
+  template<Dim_t DimS, Dim_t DimM>
+  class MaterialHyperElastic1;
+
+  template <>
+  template <Dim_t DimS, Dim_t DimM>
+  struct MaterialMuSpectre_traits<MaterialHyperElastic1<DimS, DimM>>:
+    public MaterialMuSpectre_traits<void> {
+    using Parent = MaterialMuSpectre_traits<void>;
+    using InternalVariables = typename Parent::DefaultInternalVariables;
+  };
 
   //! DimS spatial dimension (dimension of problem
   //! DimM material_dimension (dimension of constitutive law)
@@ -87,9 +97,9 @@ namespace muSpectre {
     MaterialHyperElastic1& operator=(MaterialHyperElastic1 &&other) noexcept = delete;
 
     template <class s_t>
-    decltype(auto) evaluate_stress(s_t && E);
+    inline decltype(auto) evaluate_stress(s_t && E);
     template <class s_t>
-    decltype(auto) evaluate_stress_tangent(s_t &&  E);
+    inline decltype(auto) evaluate_stress_tangent(s_t &&  E);
 
     const Tangent_t & get_stiffness() const;
 
@@ -98,6 +108,25 @@ namespace muSpectre {
     const Stiffness_t C;
   private:
   };
+
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  template <class s_t>
+  decltype(auto)
+  MaterialHyperElastic1<DimS, DimM>::evaluate_stress(s_t && E) {
+    return E.trace()*lambda * Strain_t::Identity() + 2*mu*E;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  template <class s_t>
+  decltype(auto)
+  MaterialHyperElastic1<DimS, DimM>::evaluate_stress_tangent(s_t && E) {
+    throw 12;
+    return std::forward_as_tuple(this->evaluate_stress(std::move(E)),
+                                 Tangent_t(const_cast<double*>(this->C.data())));
+  }
 
 }  // muSpectre
 

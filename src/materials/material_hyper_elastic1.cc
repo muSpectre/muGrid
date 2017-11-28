@@ -45,26 +45,8 @@ namespace muSpectre {
      2*mu*Tensors::I4S<DimM>()}
   {}
 
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  template <class s_t>
-  decltype(auto)
-  MaterialHyperElastic1<DimS, DimM>::evaluate_stress(s_t && E) {
-    return E.trace()*lambda * Strain_t::Identity() + 2*mu*E;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  template <class s_t>
-  decltype(auto)
-  MaterialHyperElastic1<DimS, DimM>::evaluate_stress_tangent(s_t && E) {
-    throw 12;
-    return std::forward_as_tuple(this->evaluate_stress(std::move(E)),
-                                 Tangent_t(const_cast<double*>(this->C.data())));
-  }
-
-  template class MaterialHyperElastic1<2, 2>;
-  template class MaterialHyperElastic1<2, 3>;
-  template class MaterialHyperElastic1<3, 3>;
+  template class MaterialHyperElastic1<twoD, twoD>;
+  template class MaterialHyperElastic1<twoD, threeD>;
+  template class MaterialHyperElastic1<threeD, threeD>;
 
 }  // muSpectre

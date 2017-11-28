@@ -29,6 +29,7 @@
 
 #include <random>
 #include <type_traits>
+#include "common/tensor_algebra.hh"
 
 #ifndef TEST_GOODIES_H
 #define TEST_GOODIES_H
@@ -46,6 +47,7 @@ namespace muSpectre {
                                    dimFixture<twoD>,
                                    dimFixture<threeD>>;
 
+    /* ---------------------------------------------------------------------- */
     template<typename T>
     class RandRange {
     public:
@@ -71,6 +73,57 @@ namespace muSpectre {
       std::random_device rd;
       std::default_random_engine gen;
     };
+
+
+
+    /**
+     * explicit computation of linearisation of PK1 stress for an
+     * objective Hooke's law. This implementation is not meant to be
+     * efficient, but te reflect exactly the formulation in Curnier
+     * 2000, "Méthodes numériques en mécanique des solides" for
+     * reference and testing
+     */
+    template <Dim_t Dim>
+    decltype(auto) objective_hooke_explicit(Real lambda, Real mu,
+                                           const Matrices::Tens2_t<Dim>& F) {
+      using namespace Matrices;
+      using T2 = Tens2_t<Dim>;
+      using T4 = Tens4_t<Dim>;
+      T2 P;
+      T2 I = P.Identity();
+      T4 K;
+      // See Curnier, 2000, "Méthodes numériques en mécanique des
+      // solides", p 252, (6.95b)
+      Real Fjrjr = (F.array()*F.array()).sum();
+      T2 Fjrjm = F.transpose()*F;
+      P.setZero();
+      for (Dim_t i = 0; i < Dim; ++i) {
+        for (Dim_t m = 0; m < Dim; ++m) {
+          P(i,m) += lambda/2*(Fjrjr-Dim)*F(i,m);
+          for (Dim_t r = 0; r < Dim; ++r) {
+            P(i,m) += mu*F(i,r)*(Fjrjm(r,m) - I(r,m));
+          }
+        }
+      }
+      // See Curnier, 2000, "Méthodes numériques en mécanique des solides", p 252
+      Real Fkrkr = (F.array()*F.array()).sum();
+      T2 Fkmkn = F.transpose()*F;
+      T2 Fisjs = F*F.transpose();
+      K.setZero();
+      for (Dim_t i = 0; i < Dim; ++i) {
+        for (Dim_t j = 0; j < Dim; ++j) {
+          for (Dim_t m = 0; m < Dim; ++m) {
+            for (Dim_t n = 0; n < Dim; ++n) {
+              get(K, i, m, j, n) =
+                (lambda*((Fkrkr-Dim)/2 * I(i,j)*I(m,n) + F(i,m)*F(j,n)) +
+                 mu * (I(i,j)*Fkmkn(m,n) + Fisjs(i,j)*I(m,n) -
+                       I(i,j) *I(m,n) + F(i,n)*F(j,m)));
+            }
+          }
+        }
+      }
+      return std::make_tuple(P,K);
+    }
 
   }  // testGoodies
 
