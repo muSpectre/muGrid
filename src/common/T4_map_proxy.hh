@@ -51,7 +51,8 @@ namespace muSpectre {
 
 
   template <typename T4>
-  inline decltype(auto) get(T4&& t4, Dim_t i, Dim_t j, Dim_t k, Dim_t l) {
+  inline auto get(T4&& t4, Dim_t i, Dim_t j, Dim_t k, Dim_t l)
+    -> decltype(t4.coeffRef(i,j)) {
     constexpr Dim_t Dim{EigenCheck::Tensor4Dim(t4)};
     const auto myColStride{
       (t4.colStride() == 1) ? t4.colStride(): t4.colStride()/Dim};

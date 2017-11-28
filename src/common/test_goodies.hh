@@ -37,6 +37,15 @@ namespace muSpectre {
 
   namespace testGoodies {
 
+    template <Dim_t Dim>
+    struct dimFixture{
+      constexpr static Dim_t dim{Dim};
+    };
+
+    using dimlist = boost::mpl::list<dimFixture<oneD>,
+                                   dimFixture<twoD>,
+                                   dimFixture<threeD>>;
+
     template<typename T>
     class RandRange {
     public:

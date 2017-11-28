@@ -122,6 +122,8 @@ namespace muSpectre {
     }
 
   }  // Tensors
+
+
   namespace Matrices {
 
     template<Dim_t dim>

@@ -33,6 +33,7 @@
 
 #include "common/tensor_algebra.hh"
 #include "tests.hh"
+#include "common/test_goodies.hh"
 
 
 namespace muSpectre {
@@ -43,7 +44,7 @@ namespace muSpectre {
   };
 
   /* ---------------------------------------------------------------------- */
-  BOOST_AUTO_TEST_CASE(outer_product_test) {
+  BOOST_AUTO_TEST_CASE(tensor_outer_product_test) {
     constexpr Dim_t dim{2};
     Eigen::TensorFixedSize<Real, Eigen::Sizes<dim,dim>> A, B;
     // use prime numbers so that every multiple is uniquely identifiable
@@ -100,6 +101,45 @@ namespace muSpectre {
     error = TerrNorm(Res3 - Tensors::outer<dim>(A, B));
     BOOST_CHECK_GT(error, tol);
   };
+
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(outer_products, Fix,
+                                   testGoodies::dimlist, Fix) {
+    constexpr auto dim{Fix::dim};
+    using T2 = Tensors::Tens2_t<dim>;
+    using M2 = Matrices::Tens2_t<dim>;
+    using Map2 = Eigen::Map<const M2>;
+    using T4 = Tensors::Tens4_t<dim>;
+    using M4 = Matrices::Tens4_t<dim>;
+    using Map4 = Eigen::Map<const M4>;
+    T2 A, B;
+    T4 RT;
+    A.setRandom();
+    B.setRandom();
+    Map2 Amap(A.data());
+    Map2 Bmap(B.data());
+    M2 C, D;
+    M4 RM;
+    C = Amap;
+    D = Bmap;
+
+    auto error =[](const T4& A, const M4& B) {return (B - Map4(A.data())).norm();};
+
+    // Check outer product
+    RT = Tensors::outer<dim>(A, B);
+    RM = Matrices::outer(C, D);
+    BOOST_CHECK_LT(error(RT, RM), tol);
+
+    // Check outer_under product
+    RT = Tensors::outer_under<dim>(A, B);
+    RM = Matrices::outer_under(C, D);
+    BOOST_CHECK_LT(error(RT, RM), tol);
+
+    // Check outer_over product
+    RT = Tensors::outer_over<dim>(A, B);
+    RM = Matrices::outer_over(C, D);
+    BOOST_CHECK_LT(error(RT, RM), tol);
+
+  }
 
   BOOST_AUTO_TEST_CASE(tensor_multiplication) {
     constexpr Dim_t dim{2};
@@ -185,6 +225,80 @@ namespace muSpectre {
     BOOST_CHECK_LT(error, tol);
 
   }
+
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_tensmult, Fix,
+                                   testGoodies::dimlist, Fix) {
+    using namespace Matrices;
+    constexpr Dim_t dim{Fix::dim};
+    using T4 = Tens4_t<dim>;
+    using T2 = Tens2_t<dim>;
+    using V2 = Eigen::Matrix<Real, dim*dim, 1>;
+    T4 C;
+    C.setRandom();
+    T2 E;
+    E.setRandom();
+    Eigen::Map<const V2> Ev(E.data());
+    T2 R = tensmult(C, E);
+
+    auto error = (Eigen::Map<const V2>(R.data())-C*Ev).norm();
+    BOOST_CHECK_LT(error, tol);
+  }
+
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_tracer, Fix,
+                                   testGoodies::dimlist, Fix) {
+    using namespace Matrices;
+    constexpr Dim_t dim{Fix::dim};
+    using T2 = Tens2_t<dim>;
+    auto tracer = Itrac<dim>();
+    T2 F;
+    F.setRandom();
+    auto Ftrac = tensmult(tracer, F);
+    auto error = (Ftrac-F.trace()*F.Identity()).norm();
+    BOOST_CHECK_LT(error, tol);
+  }
+
+
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_identity, Fix,
+                                   testGoodies::dimlist, Fix) {
+    using namespace Matrices;
+    constexpr Dim_t dim{Fix::dim};
+    using T2 = Tens2_t<dim>;
+    auto ident = Iiden<dim>();
+    T2 F;
+    F.setRandom();
+    auto Fiden = tensmult(ident, F);
+    auto error = (Fiden-F).norm();
+    BOOST_CHECK_LT(error, tol);
+  }
+
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_transposer, Fix,
+                                   testGoodies::dimlist, Fix) {
+    using namespace Matrices;
+    constexpr Dim_t dim{Fix::dim};
+    using T2 = Tens2_t<dim>;
+    auto trnst = Itrns<dim>();
+    T2 F;
+    F.setRandom();
+    auto Ftrns = tensmult(trnst, F);
+    auto error = (Ftrns-F.transpose()).norm();
+    BOOST_CHECK_LT(error, tol);
+  }
+
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_symmetriser, Fix,
+                                   testGoodies::dimlist, Fix) {
+    using namespace Matrices;
+    constexpr Dim_t dim{Fix::dim};
+    using T2 = Tens2_t<dim>;
+    auto symmt = Isymm<dim>();
+    T2 F;
+    F.setRandom();
+    auto Fsymm = tensmult(symmt, F);
+    auto error = (Fsymm-.5*(F+F.transpose())).norm();
+    BOOST_CHECK_LT(error, tol);
+    std::cout << " F =" << std::endl << F << std::endl;
+    std::cout << "IF =" << std::endl << Fsymm << std::endl;
+  }
+
   BOOST_AUTO_TEST_SUITE_END();
 
 }  // muSpectre

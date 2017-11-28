@@ -41,16 +41,8 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE(materials_toolbox)
 
-  template <Dim_t Dim>
-  struct dimFixture{
-    constexpr static Dim_t dim{Dim};
-  };
-
-  using dimlist = boost::mpl::list<dimFixture<oneD>,
-                                   dimFixture<twoD>,
-                                   dimFixture<threeD>>;
-
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_strain_conversion, Fix, dimlist, Fix){
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_strain_conversion, Fix,
+                                   testGoodies::dimlist, Fix){
     constexpr Dim_t dim{Fix::dim};
     using T2 = Eigen::Matrix<Real, dim, dim>;
 
@@ -71,7 +63,8 @@ namespace muSpectre {
     BOOST_CHECK_LT(error, tol);
   }
 
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(dumb_tensor_mult_test, Fix, dimlist, Fix) {
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(dumb_tensor_mult_test, Fix,
+                                   testGoodies::dimlist, Fix) {
     constexpr Dim_t dim{Fix::dim};
     using T4 = T4Mat<Real, dim>;
     T4 A,B, R1, R2;
@@ -96,7 +89,8 @@ namespace muSpectre {
     BOOST_CHECK_LT(error, tol);
   }
 
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_PK1_stress, Fix, dimlist, Fix) {
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_PK1_stress, Fix,
+                                   testGoodies::dimlist, Fix) {
     using namespace Matrices;
     constexpr Dim_t dim{Fix::dim};
     using T2 = Eigen::Matrix<Real, dim, dim>;
