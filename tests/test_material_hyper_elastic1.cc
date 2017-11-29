@@ -30,6 +30,7 @@
 #include <type_traits>
 
 #include <boost/mpl/list.hpp>
+#include <boost/range/combine.hpp>
 
 #include "materials/material_hyper_elastic1.hh"
 #include "tests.hh"
@@ -46,7 +47,9 @@ namespace muSpectre {
   {
     using Mat_t = MaterialHyperElastic1<DimS, DimM>;
     constexpr static Real lambda{2}, mu{1.5};
-    MaterialFixture():mat("Name", lambda, mu){};
+    constexpr static Real young{mu*(3*lambda + 2*mu)/(lambda + mu)};
+    constexpr static Real poisson{lambda/(2*(lambda + mu))};
+    MaterialFixture():mat("Name", young, poisson){};
     constexpr static Dim_t sdim{DimS};
     constexpr static Dim_t mdim{DimM};
 
@@ -148,10 +151,6 @@ namespace muSpectre {
       }
       grad_map[0] = grad_map[0].Identity(); // identifiable gradients for debug
       grad_map[1] = 1.2*grad_map[1].Identity(); // ditto
-      size_t counter{0};
-      for (auto F_: grad_map) {
-        std::cout << "F(" << counter++ << ")" << std::endl << F_ << std::endl;
-      }
     }
 
     //compute stresses using material
@@ -167,26 +166,47 @@ namespace muSpectre {
                                     Formulation::finite_strain),
        std::runtime_error);
 
-    //mat.compute_stresses_tangent(globalfields["Transformation Gradient"],
-    //                             globalfields["Nominal Stress2"],
-    //                             globalfields["Tangent Moduli"],
-    //                             Formulation::finite_strain);
+    mat.compute_stresses_tangent(globalfields["Transformation Gradient"],
+                                 globalfields["Nominal Stress2"],
+                                 globalfields["Tangent Moduli"],
+                                 Formulation::finite_strain);
 
-    // auto zip_it = akantu::zip
-    //   (typename Fix::Mat_t::StrainMap_t(globalfields["Transformation Gradient"]),
-    //    typename Fix::Mat_t::StressMap_t(globalfields["Nominal Stress reference"]),
-    //    typename Fix::Mat_t::TangentMap_t(globalfields["Tangent Moduli reference"]));
-    // for (auto tup: zip_it) {
     typename Fix::Mat_t::StrainMap_t Fmap(globalfields["Transformation Gradient"]);
-    typename Fix::Mat_t::StressMap_t Pmap(globalfields["Nominal Stress reference"]);
-    typename Fix::Mat_t::TangentMap_t Kmap(globalfields["Tangent Moduli reference"]);
-    for (size_t i = 0; i < globalfields.size(); ++i) {
-      const typename Fix::Mat_t::Strain_t F_ = Fmap[i];//std::get<0>(tup);
-      std::cout << "F" << std::endl << F_ << std::endl;
-      typename Fix::Mat_t::Stress_t P_ = Pmap[i];//std::get<1>(tup);
-      typename Fix::Mat_t::Tangent_t K_ = Kmap[i];//std::get<2>(tup);
+    typename Fix::Mat_t::StressMap_t Pmap_ref(globalfields["Nominal Stress reference"]);
+    typename Fix::Mat_t::TangentMap_t Kmap_ref(globalfields["Tangent Moduli reference"]);
+
+    for (auto tup: boost::combine(Fmap, Pmap_ref, Kmap_ref)) {
+      auto F_ = boost::get<0>(tup);
+      auto P_ = boost::get<1>(tup);
+      auto K_ = boost::get<2>(tup);
       std::tie(P_,K_) = testGoodies::objective_hooke_explicit<Fix::mdim>
         (Fix::lambda, Fix::mu, F_);
+    }
+
+    typename Fix::Mat_t::StressMap_t Pmap_1(globalfields["Nominal Stress1"]);
+    for (auto tup: boost::combine(Pmap_ref, Pmap_1)) {
+      auto P_r = boost::get<0>(tup);
+      auto P_1 = boost::get<1>(tup);
+      Real error = (P_r - P_1).norm();
+      BOOST_CHECK_LT(error, tol);
+    }
+
+    typename Fix::Mat_t::StressMap_t Pmap_2(globalfields["Nominal Stress2"]);
+    typename Fix::Mat_t::TangentMap_t Kmap(globalfields["Tangent Moduli"]);
+    for (auto tup: boost::combine(Pmap_ref, Pmap_2, Kmap_ref, Kmap)) {
+      auto P_r = boost::get<0>(tup);
+      auto P = boost::get<1>(tup);
+      Real error = (P_r - P).norm();
+      std::cout << "P_r =" << std::endl << P_r << std::endl;
+      std::cout << "P =" << std::endl << P << std::endl;
+      BOOST_CHECK_LT(error, tol);
+
+      auto K_r = boost::get<2>(tup);
+      auto K = boost::get<3>(tup);
+      std::cout << "K_r =" << std::endl << K_r << std::endl;
+      std::cout << "K =" << std::endl << K << std::endl;
+      error = (K_r - K).norm();
+      BOOST_CHECK_LT(error, tol);
     }
 
   }

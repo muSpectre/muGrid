@@ -50,7 +50,8 @@ namespace muSpectre {
   //! DimS spatial dimension (dimension of problem
   //! DimM material_dimension (dimension of constitutive law)
   template<Dim_t DimS, Dim_t DimM>
-  class MaterialHyperElastic1: public MaterialMuSpectre<MaterialHyperElastic1<DimS, DimM>, DimS, DimM>
+  class MaterialHyperElastic1:
+    public MaterialMuSpectre<MaterialHyperElastic1<DimS, DimM>, DimS, DimM>
   {
   public:
     using Parent = MaterialMuSpectre<MaterialHyperElastic1, DimS, DimM>;
@@ -123,7 +124,6 @@ namespace muSpectre {
   template <class s_t>
   decltype(auto)
   MaterialHyperElastic1<DimS, DimM>::evaluate_stress_tangent(s_t && E) {
-    throw 12;
     return std::forward_as_tuple(this->evaluate_stress(std::move(E)),
                                  Tangent_t(const_cast<double*>(this->C.data())));
   }

@@ -134,6 +134,8 @@ namespace muSpectre {
       public:
         using value_type =
           const_corrector_t<FullyTypedFieldMap, ConstIter>;
+        using const_value_type =
+          const_corrector_t<FullyTypedFieldMap, true>;
         using pointer = typename FullyTypedFieldMap::pointer;
         using difference_type = std::ptrdiff_t;
         using iterator_category = std::random_access_iterator_tag;
@@ -169,6 +171,8 @@ namespace muSpectre {
         inline iterator operator++(int);
         //! dereference
         inline value_type operator*();
+        //! dereference
+        inline const_value_type operator*() const;
         //! member of pointer
         inline pointer operator->();
         //! pre-decrement
@@ -376,9 +380,21 @@ namespace muSpectre {
     //! dereference
     template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
     template<class FullyTypedFieldMap, bool ConstIter>
-    typename FieldMap<FieldCollection, T, NbComponents, ConstField>::template iterator<FullyTypedFieldMap, ConstIter>::value_type
+    typename FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    template iterator<FullyTypedFieldMap, ConstIter>::value_type
     FieldMap<FieldCollection, T, NbComponents, ConstField>::iterator<FullyTypedFieldMap, ConstIter>::
     operator*() {
+      return this->fieldmap.template operator[]<value_type>(this->index);
+    }
+
+    /* ---------------------------------------------------------------------- */
+    //! dereference
+    template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
+    template<class FullyTypedFieldMap, bool ConstIter>
+    typename FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    template iterator<FullyTypedFieldMap, ConstIter>::const_value_type
+    FieldMap<FieldCollection, T, NbComponents, ConstField>::iterator<FullyTypedFieldMap, ConstIter>::
+    operator*() const {
       return this->fieldmap.template operator[]<value_type>(this->index);
     }
 

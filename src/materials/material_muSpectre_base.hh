@@ -239,8 +239,11 @@ namespace muSpectre {
        The internal_variables tuple contains whatever internal variables
        Material declared (e.g., eigenstrain, strain rate, etc.)
     */
+    using Strains_t = std::tuple<typename Material::Strain_t>;
+    using Stresses_t = std::tuple<typename Material::Stress_t,
+                                  typename Material::Tangent_t>;
     auto constitutive_law_small_strain = [this]
-      (auto && Strains, auto && Stresses, auto && internal_variables) {
+      (Strains_t Strains, Stresses_t Stresses, auto && internal_variables) {
       constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
       constexpr StrainMeasure expected_strain_m{
       get_formulation_strain_type(Form, Material::strain_measure)};
@@ -260,7 +263,7 @@ namespace muSpectre {
     };
 
     auto constitutive_law_finite_strain = [this]
-      (auto && Strains, auto && Stresses, auto && internal_variables) {
+      (Strains_t Strains, Stresses_t Stresses, auto && internal_variables) {
       constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
       constexpr StrainMeasure expected_strain_m{
       get_formulation_strain_type(Form, Material::strain_measure)};
@@ -278,16 +281,19 @@ namespace muSpectre {
 
       // return value contains a tuple of rvalue_refs to both stress
       // and tangent moduli
-      auto && stress_tgt =
+      auto stress_tgt =
         std::apply([&strain, &this_mat] (auto && ... internals) {
                      return
                      this_mat.evaluate_stress_tangent(std::move(strain),
                                                       internals...);},
                    internal_variables);
-      auto && stress = std::get<0>(stress_tgt);
-      auto && tangent = std::get<1>(stress_tgt);
+      //auto && stress = std::get<0>(stress_tgt);
+      //auto && tangent = std::get<1>(stress_tgt);
+      Eigen::Matrix<Real, DimM, DimM> stress = std::get<0>(stress_tgt);
+      Eigen::Matrix<Real, DimM*DimM, DimM*DimM> tangent = std::get<1>(stress_tgt);
       Stresses = MatTB::PK1_stress<Material::stress_measure, Material::strain_measure>
-      (F, stress, tangent);
+      (std::move(F), std::move(stress), std::move(tangent));
+      std::cout << "bla" << std::endl;
     };
 
     iterable_proxy<NeedTangent::yes> fields{*this, F, P, K};
@@ -346,8 +352,11 @@ namespace muSpectre {
        The internal_variables tuple contains whatever internal variables
        Material declared (e.g., eigenstrain, strain rate, etc.)
     */
+
+    using Strains_t = std::tuple<typename Material::Strain_t>;
+    using Stresses_t = std::tuple<typename Material::Stress_t>;
     auto constitutive_law_small_strain = [this]
-      (auto && Strains, auto && Stresses, auto && internal_variables) {
+      (Strains_t Strains, Stresses_t Stresses, auto && internal_variables) {
       constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
       constexpr StrainMeasure expected_strain_m{
       get_formulation_strain_type(Form, Material::strain_measure)};
@@ -368,10 +377,14 @@ namespace muSpectre {
     };
 
     auto constitutive_law_finite_strain = [this]
-      (auto && Strains, auto && Stresses, auto && internal_variables) {
+      (Strains_t Strains, Stresses_t && Stresses, auto && internal_variables) {
       constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
       constexpr StrainMeasure expected_strain_m{
       get_formulation_strain_type(Form, Material::strain_measure)};
+      size_t StrainsSize = sizeof(Strains_t);
+      std::cout << "Size of strain type = " << StrainsSize << ",  map_size = "
+      << sizeof(typename Material::Strain_t) << " ptr_size = "
+      << sizeof(typename Material::Strain_t::PointerType)  << std::endl;
       auto & this_mat = static_cast<Material&>(*this);
 
       // Transformation gradient is first in the strains tuple
