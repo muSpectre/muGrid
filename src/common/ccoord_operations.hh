@@ -140,7 +140,7 @@ namespace muSpectre {
     template <size_t dim>
     bool
     Pixels<dim>::iterator::operator!=(const iterator &other) const {
-      return (this->index != other.index) && (&this->pixels != &other.pixels);
+      return (this->index != other.index) || (&this->pixels != &other.pixels);
     }
 
     /* ---------------------------------------------------------------------- */

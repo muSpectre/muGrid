@@ -27,6 +27,7 @@
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
  */
+#include <type_traits>
 
 #include <boost/mpl/list.hpp>
 
@@ -34,6 +35,7 @@
 #include "tests.hh"
 #include "common/test_goodies.hh"
 #include "common/field_collection.hh"
+#include "common/iterators.hh"
 
 namespace muSpectre {
 
@@ -101,36 +103,92 @@ namespace muSpectre {
   using mat_fill = boost::mpl::list<MaterialFixtureFilled<twoD, twoD>,
                                     MaterialFixtureFilled<twoD, threeD>,
                                     MaterialFixtureFilled<threeD, threeD>>;
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_evaluale_law, Fix, mat_fill, Fix) {
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_evaluate_law, Fix, mat_fill, Fix) {
     constexpr auto cube{CcoordOps::get_cube<Fix::sdim>(Fix::box_size)};
+    auto & mat{Fix::mat};
 
     using FC_t = FieldCollection<Fix::sdim, Fix::mdim>;
     FC_t globalfields;
-    auto & grad_field = make_field<typename Fix::Mat_t::StrainField_t>
-      ("Transformation Gradient", globalfields);
+    auto & F{make_field<typename Fix::Mat_t::StrainField_t>
+        ("Transformation Gradient", globalfields)};
     auto & P1 = make_field<typename Fix::Mat_t::StressField_t>
       ("Nominal Stress1", globalfields); // to be computed alone
     auto & P2 = make_field<typename Fix::Mat_t::StressField_t>
       ("Nominal Stress2", globalfields); // to be computed with tangent
     auto & K = make_field<typename Fix::Mat_t::TangentField_t>
       ("Tangent Moduli", globalfields); // to be computed with tangent
-    auto & Pref = make_field<typename Fix::Mat_t::StressField_t>
+    auto & Pr = make_field<typename Fix::Mat_t::StressField_t>
       ("Nominal Stress reference", globalfields);
-    auto & Kref = make_field<typename Fix::Mat_t::TangentField_t>
+    auto & Kr = make_field<typename Fix::Mat_t::TangentField_t>
       ("Tangent Moduli reference", globalfields); // to be computed with tangent
 
     globalfields.initialise(cube);
 
-    typename Fix::Mat_t::StressMap_t grad_map(grad_field);
-    for (auto F: typename Fix::Mat_t::StressMap_t(grad_field)) {
-      F.setRandom();
+    static_assert(std::is_same<decltype(P1),
+                  typename Fix::Mat_t::StressField_t&>::value,
+                  "oh oh");
+    static_assert(std::is_same<decltype(F),
+                  typename Fix::Mat_t::StrainField_t&>::value,
+                  "oh oh");
+    static_assert(std::is_same<decltype(P1), decltype(P2)&>::value,
+                  "oh oh");
+    static_assert(std::is_same<decltype(K),
+                  typename Fix::Mat_t::TangentField_t&>::value,
+                  "oh oh");
+    static_assert(std::is_same<decltype(Pr), decltype(P1)&>::value,
+                  "oh oh");
+    static_assert(std::is_same<decltype(Kr), decltype(K)&>::value,
+                  "oh oh");
+
+    { // block to contain not-constant gradient map
+      typename Fix::Mat_t::StressMap_t grad_map
+        (globalfields["Transformation Gradient"]);
+      for (auto F_: grad_map) {
+        F_.setRandom();
+      }
+      grad_map[0] = grad_map[0].Identity(); // identifiable gradients for debug
+      grad_map[1] = 1.2*grad_map[1].Identity(); // ditto
+      size_t counter{0};
+      for (auto F_: grad_map) {
+        std::cout << "F(" << counter++ << ")" << std::endl << F_ << std::endl;
+      }
     }
-    grad_map[0] = grad_map[0].Identity();
-    grad_map[1] = 1.2*grad_map[1].Identity();
-    size_t counter{0};
-    for (auto F: grad_map) {
-      std::cout << "F(" << counter++ << ")" << std::endl << F << std::endl;
+
+    //compute stresses using material
+    mat.compute_stresses(globalfields["Transformation Gradient"],
+                         globalfields["Nominal Stress1"],
+                         Formulation::finite_strain);
+
+    //compute stresses and tangent moduli using material
+    BOOST_CHECK_THROW
+      (mat.compute_stresses_tangent(globalfields["Transformation Gradient"],
+                                    globalfields["Nominal Stress2"],
+                                    globalfields["Nominal Stress2"],
+                                    Formulation::finite_strain),
+       std::runtime_error);
+
+    //mat.compute_stresses_tangent(globalfields["Transformation Gradient"],
+    //                             globalfields["Nominal Stress2"],
+    //                             globalfields["Tangent Moduli"],
+    //                             Formulation::finite_strain);
+
+    // auto zip_it = akantu::zip
+    //   (typename Fix::Mat_t::StrainMap_t(globalfields["Transformation Gradient"]),
+    //    typename Fix::Mat_t::StressMap_t(globalfields["Nominal Stress reference"]),
+    //    typename Fix::Mat_t::TangentMap_t(globalfields["Tangent Moduli reference"]));
+    // for (auto tup: zip_it) {
+    typename Fix::Mat_t::StrainMap_t Fmap(globalfields["Transformation Gradient"]);
+    typename Fix::Mat_t::StressMap_t Pmap(globalfields["Nominal Stress reference"]);
+    typename Fix::Mat_t::TangentMap_t Kmap(globalfields["Tangent Moduli reference"]);
+    for (size_t i = 0; i < globalfields.size(); ++i) {
+      const typename Fix::Mat_t::Strain_t F_ = Fmap[i];//std::get<0>(tup);
+      std::cout << "F" << std::endl << F_ << std::endl;
+      typename Fix::Mat_t::Stress_t P_ = Pmap[i];//std::get<1>(tup);
+      typename Fix::Mat_t::Tangent_t K_ = Kmap[i];//std::get<2>(tup);
+      std::tie(P_,K_) = testGoodies::objective_hooke_explicit<Fix::mdim>
+        (Fix::lambda, Fix::mu, F_);
     }
+
   }
 
   BOOST_AUTO_TEST_SUITE_END();

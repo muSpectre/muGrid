@@ -175,9 +175,6 @@ namespace muSpectre {
     using Strain_tw = Eigen::TensorFixedSize<Real, Eigen::Sizes<dim+1, dim+1>>;
     Strain_tw C;
     C.setConstant(100);
-    auto a = T::Dimensions::total_size;
-    auto b = Strain_tw::Dimensions::total_size;
-    std::cout << "a, b = " << a << ", " << b << std::endl;
     //static_assert(!std::is_convertible<Strain_t, Strain_tw>::value,
     //              "Tensors not size-protected");
     if (std::is_convertible<Strain_t, Strain_tw>::value) {
@@ -295,8 +292,6 @@ namespace muSpectre {
     auto Fsymm = tensmult(symmt, F);
     auto error = (Fsymm-.5*(F+F.transpose())).norm();
     BOOST_CHECK_LT(error, tol);
-    std::cout << " F =" << std::endl << F << std::endl;
-    std::cout << "IF =" << std::endl << Fsymm << std::endl;
   }
 
   BOOST_AUTO_TEST_SUITE_END();

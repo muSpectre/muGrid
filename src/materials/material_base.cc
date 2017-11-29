@@ -52,6 +52,28 @@ namespace muSpectre {
     this->internal_fields.add_pixel(ccoord);
   }
 
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  void MaterialBase<DimS, DimM>::compute_stresses(const Field_t & F,
+                                                  Field_t & P,
+                                                  Formulation form) {
+    this->compute_stresses(StrainField_t::check_ref(F),
+                           StressField_t::check_ref(P),
+                           form);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  void MaterialBase<DimS, DimM>::compute_stresses_tangent(const Field_t & F,
+                                                          Field_t & P,
+                                                          Field_t & K,
+                                                          Formulation form) {
+    this->compute_stresses_tangent(StrainField_t::check_ref(F),
+                                   StressField_t::check_ref(P),
+                                   TangentField_t::check_ref(K),
+                                   form);
+  }
+
   template class MaterialBase<2, 2>;
   template class MaterialBase<2, 3>;
   template class MaterialBase<3, 3>;

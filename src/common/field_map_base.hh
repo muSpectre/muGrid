@@ -218,8 +218,6 @@ namespace muSpectre {
     protected:
       inline pointer get_ptr_to_entry(size_t index);
       inline const T* get_ptr_to_entry(size_t index) const;
-      inline T& get_ref_to_entry(size_t index);
-      inline const T& get_ref_to_entry(size_t index) const;
       const FieldCollection & collection;
       TypedField  & field;
     private:
@@ -549,23 +547,6 @@ namespace muSpectre {
     get_ptr_to_entry(size_t index) const {
       return this->field.get_ptr_to_entry(std::move(index));
     }
-
-    /* ---------------------------------------------------------------------- */
-    template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
-    T&
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::
-    get_ref_to_entry(size_t index) {
-      return this->field.get_ref_to_entry(std::move(index));
-    }
-
-    /* ---------------------------------------------------------------------- */
-    template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
-    const T&
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::
-    get_ref_to_entry(size_t index) const {
-      return this->field.get_ref_to_entry(std::move(index));
-    }
-
 
   }  // internal
 

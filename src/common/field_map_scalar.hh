@@ -149,7 +149,7 @@ namespace muSpectre {
   template <class ref_t>
   ref_t
   ScalarFieldMap<FieldCollection, T, ConstField>::operator[](size_type index) {
-    return this->get_ref_to_entry(std::move(index));
+    return this->get_ptr_to_entry(std::move(index))[0];
   }
 
   /* ---------------------------------------------------------------------- */
@@ -158,7 +158,7 @@ namespace muSpectre {
   typename ScalarFieldMap<FieldCollection, T, ConstField>::reference
   ScalarFieldMap<FieldCollection, T, ConstField>::operator[](const Ccoord& ccoord) {
     auto && index = this->collection.get_index(std::move(ccoord));
-    return this->get_ref_to_entry(std::move(index));
+    return this->get_ptr_to_entry(std::move(index))[0];
   }
 }  // muSpectre
 

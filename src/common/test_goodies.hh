@@ -56,7 +56,7 @@ namespace muSpectre {
       template <typename dummyT = T>
       std::enable_if_t<std::is_floating_point<dummyT>::value, dummyT>
       randval(T&& lower, T&& upper) {
-        static_assert(std::is_same<T, dummyT>::value);
+        static_assert(std::is_same<T, dummyT>::value, "SFINAE");
         auto distro = std::uniform_real_distribution<T>(lower, upper);
         return distro(this->gen);
       }
@@ -64,7 +64,7 @@ namespace muSpectre {
       template <typename dummyT = T>
       std::enable_if_t<std::is_integral<dummyT>::value, dummyT>
       randval(T&& lower, T&& upper) {
-        static_assert(std::is_same<T, dummyT>::value);
+        static_assert(std::is_same<T, dummyT>::value, "SFINAE");
         auto distro = std::uniform_int_distribution<T>(lower, upper);
         return distro(this->gen);
       }

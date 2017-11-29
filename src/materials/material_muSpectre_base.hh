@@ -102,6 +102,8 @@ namespace muSpectre {
     //* allocate memory, etc
     virtual void initialise(bool stiffness = false);
 
+    using Parent::compute_stresses;
+    using Parent::compute_stresses_tangent;
     //! computes stress
     virtual void compute_stresses(const StrainField_t & F,
                                   StressField_t & P,

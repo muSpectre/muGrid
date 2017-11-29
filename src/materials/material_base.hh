@@ -52,6 +52,7 @@ namespace muSpectre {
     //! plastic strains, damage variables, etc, but also for managing which
     //! pixels the material is responsible for
     using MFieldCollection_t = FieldCollection<DimS, DimM, false>;
+    using Field_t = internal::FieldBase<GFieldCollection_t>;
     using StressField_t = TensorField<GFieldCollection_t, Real, secondOrder, DimM>;
     using StrainField_t = StressField_t;
     using TangentField_t = TensorField<GFieldCollection_t, Real, fourthOrder, DimM>;
@@ -97,13 +98,32 @@ namespace muSpectre {
     constexpr static Dim_t mdim() {return DimM;}
     //! computes stress
     virtual void compute_stresses(const StrainField_t & F,
-                                   StressField_t & P,
-                                   Formulation form) = 0;
+                                  StressField_t & P,
+                                  Formulation form) = 0;
+    /**
+     * Convenience function to compute stresses, mostly for debugging and
+     * testing. Has runtime-cost associated with compatibility-checking and
+     * conversion of the Field_t arguments that can be avoided by using the
+     * version with strongly typed field references
+     */
+    void compute_stresses(const Field_t & F,
+                          Field_t & P,
+                          Formulation form);
     //! computes stress and tangent moduli
     virtual void compute_stresses_tangent(const StrainField_t & F,
                                           StressField_t & P,
                                           TangentField_t & K,
                                           Formulation form) = 0;
+    /**
+     * Convenience function to compute stresses and tangent moduli, mostly for
+     * debugging and testing. Has runtime-cost associated with
+     * compatibility-checking and conversion of the Field_t arguments that can
+     * be avoided by using the version with strongly typed field references
+     */
+    void compute_stresses_tangent(const Field_t & F,
+                                  Field_t & P,
+                                  Field_t & K,
+                                  Formulation form);
 
   protected:
 
