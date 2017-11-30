@@ -167,18 +167,13 @@ namespace muSpectre {
     }
 
 
-    using T = Eigen::TensorFixedSize<Real, Eigen::Sizes<2, 2> >;
-    constexpr Dim_t my_size =
-      T::NumIndices;
-    std::cout << "size = " << my_size << std::endl;
-
     using Strain_tw = Eigen::TensorFixedSize<Real, Eigen::Sizes<dim+1, dim+1>>;
     Strain_tw C;
     C.setConstant(100);
     //static_assert(!std::is_convertible<Strain_t, Strain_tw>::value,
     //              "Tensors not size-protected");
     if (std::is_convertible<Strain_t, Strain_tw>::value) {
-      std::cout << "this is not good, should I abandon Tensors?";
+      //std::cout << "this is not good, should I abandon Tensors?";
     }
     // this test seems useless. I use to detect if Eigen changed the
     // default tensor product

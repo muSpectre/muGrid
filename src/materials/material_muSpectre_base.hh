@@ -287,13 +287,10 @@ namespace muSpectre {
                      this_mat.evaluate_stress_tangent(std::move(strain),
                                                       internals...);},
                    internal_variables);
-      //auto && stress = std::get<0>(stress_tgt);
-      //auto && tangent = std::get<1>(stress_tgt);
-      Eigen::Matrix<Real, DimM, DimM> stress = std::get<0>(stress_tgt);
-      Eigen::Matrix<Real, DimM*DimM, DimM*DimM> tangent = std::get<1>(stress_tgt);
+      auto && stress = std::get<0>(stress_tgt);
+      auto && tangent = std::get<1>(stress_tgt);
       Stresses = MatTB::PK1_stress<Material::stress_measure, Material::strain_measure>
       (std::move(F), std::move(stress), std::move(tangent));
-      std::cout << "bla" << std::endl;
     };
 
     iterable_proxy<NeedTangent::yes> fields{*this, F, P, K};
@@ -381,10 +378,6 @@ namespace muSpectre {
       constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
       constexpr StrainMeasure expected_strain_m{
       get_formulation_strain_type(Form, Material::strain_measure)};
-      size_t StrainsSize = sizeof(Strains_t);
-      std::cout << "Size of strain type = " << StrainsSize << ",  map_size = "
-      << sizeof(typename Material::Strain_t) << " ptr_size = "
-      << sizeof(typename Material::Strain_t::PointerType)  << std::endl;
       auto & this_mat = static_cast<Material&>(*this);
 
       // Transformation gradient is first in the strains tuple
