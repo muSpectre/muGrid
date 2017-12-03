@@ -50,7 +50,6 @@ namespace muSpectre {
   //! Ccoord_t are cell coordinates, i.e. integer coordinates
   template<Dim_t dim>
   using Ccoord_t = std::array<Dim_t, dim>;
-
   template<size_t dim>
   std::ostream & operator << (std::ostream & os, const Ccoord_t<dim> & index) {
     os << "(";
@@ -158,6 +157,7 @@ namespace muSpectre {
   }
 
 }  // muSpectre
+
 
 #ifndef EXPLICITLY_TURNED_ON_CXX17
 #include "common/utilities.hh"

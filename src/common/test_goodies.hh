@@ -29,7 +29,11 @@
 
 #include <random>
 #include <type_traits>
+
+#include <boost/mpl/list.hpp>
+
 #include "common/tensor_algebra.hh"
+
 
 #ifndef TEST_GOODIES_H
 #define TEST_GOODIES_H

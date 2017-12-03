@@ -29,56 +29,71 @@
 
 #include "common/common.hh"
 #include "common/field_collection.hh"
-#include "common/field.hh"
+
 
 #ifndef FFT_ENGINE_BASE_H
 #define FFT_ENGINE_BASE_H
-
 
 namespace muSpectre {
 
   enum class FFT_PlanFlags {estimate, measure, patient};
 
-  template<class Projection>
-  struct Projection_traits {
-  };
-
   template <Dim_t DimS, Dim_t DimM>
-  class ProjectionBase
+  class FFT_Engine_base
   {
   public:
+
     using Ccoord = Ccoord_t<DimS>;
     using GFieldCollection_t = FieldCollection<DimS, DimM, true>;
-    using t = TensorField<GFieldCollection_t, Real, 2, DimM>;
-    using FFT_out_t = TensorField<GFieldCollection_t, Real, 2, DimM>;
+    using LFieldCollection_t = FieldCollection<DimS, DimM, false>;
+    using Field_t = TensorField<GFieldCollection_t, Real, 2, DimM>;
+    using Workspace_t = TensorField<LFieldCollection_t, Complex, 2, DimM>;
+    using iterator = typename LFieldCollection_t::iterator;
+
     //! Default constructor
-    ProjectionBase() = delete;
+    FFT_Engine_base() = delete;
 
     //! Constructor with system sizes
-    ProjectionBase(Ccoord sizes);
+    FFT_Engine_base(Ccoord sizes);
 
     //! Copy constructor
-    ProjectionBase(const ProjectionBase &other) = delete;
+    FFT_Engine_base(const FFT_Engine_base &other) = delete;
 
     //! Move constructor
-    ProjectionBase(ProjectionBase &&other) noexcept = default;
+    FFT_Engine_base(FFT_Engine_base &&other) noexcept = default;
 
     //! Destructor
-    virtual ~ProjectionBase() noexcept = default;
+    virtual ~FFT_Engine_base() noexcept = default;
 
     //! Copy assignment operator
-    ProjectionBase& operator=(const ProjectionBase &other) = delete;
+    FFT_Engine_base& operator=(const FFT_Engine_base &other) = delete;
 
     //! Move assignment operator
-    ProjectionBase& operator=(ProjectionBase &&other) noexcept = default;
+    FFT_Engine_base& operator=(FFT_Engine_base &&other) noexcept = default;
 
+    // compute the plan, etc
+    void initialise(FFT_PlanFlags plan_flags);
+
+    //! forward transform
+    Workspace_t & fft(const Field_t & field);
+
+    //! inverse transform
+    void ifft(Field_t & field) const;
+
+    /**
+     * iterators over only thos pixels that exist in frequency space
+     * (i.e. about half of all pixels, see rfft)
+     */
+    iterator begin();
+    iterator end();
 
   protected:
-    Ccoord sizes;
+    LFieldCollection_t work_space_container{};
+    const Ccoord sizes;
+    Workspace_t & work;
   private:
   };
 
 }  // muSpectre
-
 
 #endif /* FFT_ENGINE_BASE_H */

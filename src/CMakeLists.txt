@@ -7,5 +7,5 @@ include_directories(
 
 add_subdirectory(common)
 add_subdirectory(materials)
-#add_subdirectory(fft)
+add_subdirectory(fft)
 add_subdirectory(system)

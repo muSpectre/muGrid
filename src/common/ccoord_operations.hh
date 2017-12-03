@@ -48,12 +48,24 @@ namespace muSpectre {
       constexpr Ccoord_t<Dim> funt(Dim_t val, std::index_sequence<I...>) {
         return Ccoord_t<Dim>{ret(val, I)...};
       }
+
+      template <Dim_t Dim, size_t... I>
+      constexpr Ccoord_t<Dim> herm(const Ccoord_t<Dim> & full_sizes,
+                                   std::index_sequence<I...>) {
+        return Ccoord_t<Dim>{full_sizes[I]..., (full_sizes.back()+1)/2};
+      }
     }  // internal
 
     //----------------------------------------------------------------------------//
     template <size_t dim>
     constexpr Ccoord_t<dim> get_cube(Dim_t size) {
       return internal::funt<dim>(size, std::make_index_sequence<dim>{});
+    }
+
+    /* ---------------------------------------------------------------------- */
+    template <size_t dim>
+    constexpr Ccoord_t<dim> get_hermitian_sizes(Ccoord_t<dim> full_sizes) {
+      return internal::herm<dim>(full_sizes, std::make_index_sequence<dim-1>{});
     }
 
     //----------------------------------------------------------------------------//

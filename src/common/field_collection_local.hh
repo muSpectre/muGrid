@@ -46,6 +46,8 @@ namespace muSpectre {
                                        LocalFieldCollection<DimS, DimM>>;
     using Ccoord = typename Parent::Ccoord;
     using Field_p = typename Parent::Field_p;
+    using ccoords_container = std::vector<Ccoord>;
+    using iterator = typename ccoords_container::iterator;
 
     //! Default constructor
     LocalFieldCollection();
@@ -86,9 +88,12 @@ namespace muSpectre {
     //! returns the cell coordinates corresponding to a linear index
     inline Ccoord get_ccoord(size_t index) const;
 
+    inline iterator begin() {return this->ccoords.begin();}
+    inline iterator end() {return this->ccoords.end();}
+
   protected:
     //! container of pixel coords for non-global collections
-    std::vector<Ccoord> ccoords{};
+    ccoords_container ccoords{};
     //! container of indices for non-global collections (slow!)
     std::map<Ccoord, size_t> indices{};
   private:
