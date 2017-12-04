@@ -4,6 +4,7 @@ project(µSpectre_prototype)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(BUILD_SHARED_LIBS ON)
 
 add_compile_options(-Wall -Wextra -Weffc++)
 
@@ -21,7 +22,7 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     add_compile_options(-march=native)
   endif()
   if ("debug" STREQUAL "${build_type}" )
-    add_compile_options(-O0 -fPIE)
+    add_compile_options(-O0)
   endif()
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
   # using Intel C++
