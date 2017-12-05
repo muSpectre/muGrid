@@ -91,10 +91,20 @@ namespace muSpectre {
     size_t size() const;
     size_t workspace_size() const;
 
+    //! factor by which to multiply projection before inverse transform (this is
+    //! typically 1/nb_pixels for so-called unnormalized transforms (see,
+    //! e.g. http://www.fftw.org/fftw3_doc/Multi_002dDimensional-DFTs-of-Real-Data.html#Multi_002dDimensional-DFTs-of-Real-Data
+    //! or https://docs.scipy.org/doc/numpy-1.13.0/reference/routines.fft.html
+    //! . Rather than scaling the inverse transform (which would cost one more
+    //! loop), FFT engines provide this value so it can be used in the
+    //! projection operator (where no additional loop is required)
+    inline Real normalisation() const {return norm_factor;};
+
   protected:
     LFieldCollection_t work_space_container{};
     const Ccoord sizes;
     Workspace_t & work;
+    const Real norm_factor;
   private:
   };
 

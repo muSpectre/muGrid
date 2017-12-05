@@ -81,17 +81,8 @@ namespace muSpectre {
     auto & complex_field = Fix::engine.fft(input);
     using cmap_t = MatrixFieldMap<FieldCollection<Fix::sdim, Fix::mdim, false>, Complex, Fix::mdim, Fix::mdim>;
     cmap_t complex_map(complex_field);
-    auto fft_it = complex_map.begin();
-    auto fft_end = complex_map.end();
-    for (; fft_it != fft_end; ++fft_it) {
-      auto ccoord = fft_it.get_ccoord();
-      std::cout << ccoord << std::endl;
-      std::cout << complex_map[ccoord] << std::endl;
-      if (ccoord.back() == Fix::box_size/2) {
-        Real error = complex_map[ccoord].imag().norm();
-        BOOST_CHECK_LT(error, tol);
-      }
-    }
+    Real error = complex_map[0].imag().norm();
+    BOOST_CHECK_LT(error, tol);
 
     /* make sure, the engine has not modified input (which is
        unfortunately const-casted internally, hence this test) */
@@ -103,8 +94,11 @@ namespace muSpectre {
     /* make sure that the ifft of fft returns the original*/
     Fix::engine.ifft(result);
     for (auto && tup: boost::combine(map_t(result), map_t(ref))) {
-      Real error{(boost::get<0>(tup) - boost::get<1>(tup)).norm()};
+      Real error{(boost::get<0>(tup)*Fix::engine.normalisation() - boost::get<1>(tup)).norm()};
       BOOST_CHECK_LT(error, tol);
+      if (error > tol) {
+        std::cout << boost::get<0>(tup).array()/boost::get<1>(tup).array() << std::endl << std::endl;
+      }
     }
   }
 
