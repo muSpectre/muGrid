@@ -1,11 +1,12 @@
 /**
- * file   projection_base.hh
+ * file   projection_finite_strain.hh
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
- * @date   03 Dec 2017
+ * @date   05 Dec 2017
  *
- * @brief  Base class for Projection operators
+ * @brief  Class for standard finite-strain gradient projections see de Geus et
+ *         al. (https://doi.org/10.1016/j.cma.2016.12.032) for derivation
  *
  * @section LICENCE
  *
@@ -27,50 +28,47 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#ifndef PROJECTION_BASE_H
-#define PROJECTION_BASE_H
 
+#ifndef PROJECTION_FINITE_STRAIN_H
+#define PROJECTION_FINITE_STRAIN_H
+
+#include "fft/projection_base.hh"
 #include "common/common.hh"
 #include "common/field_collection.hh"
-#include "common/field.hh"
-#include "fft/fft_engine_base.hh"
 
 namespace muSpectre {
 
-
-  template<class Projection>
-  struct Projection_traits {
-  };
-
   template <Dim_t DimS, Dim_t DimM, class FFT_Engine>
-  class ProjectionBase
+  class ProjectionFiniteStrain: public ProjectionBase<DimS, DimM, FFT_Engine>
   {
   public:
-    using Ccoord = FFT_Engine::Ccoord;
-    using GFieldCollection_t = FFT_Engine::GFieldCollection_t;
-    using Field_t = FFT_Engine::Field_t;
-    using iterator = FFT_Engine::iterator;
+    using Parent = ProjectionBase<DimS, DimM, FFT_Engine>;
+    using Ccoord = typename Parent::Ccoord;
+    using GFieldCollection_t = FieldCollection<DimS, DimM, true>;
+    using LFieldCollection_t = FieldCollection<DimS, DimM, false>;
+    using Field_t = TensorField<GFieldCollection_t, Real, secondOrder, DimM>;
+    using Proj_t = TensorField<LFieldCollection_t, Real, fourthOrder, DimM>;
 
     //! Default constructor
-    ProjectionBase() = delete;
+    ProjectionFiniteStrain() = delete;
 
     //! Constructor with system sizes
-    ProjectionBase(Ccoord sizes);
+    ProjectionFiniteStrain(Ccoord sizes);
 
     //! Copy constructor
-    ProjectionBase(const ProjectionBase &other) = delete;
+    ProjectionFiniteStrain(const ProjectionFiniteStrain &other) = delete;
 
     //! Move constructor
-    ProjectionBase(ProjectionBase &&other) noexcept = default;
+    ProjectionFiniteStrain(ProjectionFiniteStrain &&other) = default;
 
     //! Destructor
-    virtual ~ProjectionBase() noexcept = default;
+    virtual ~ProjectionFiniteStrain() noexcept = default;
 
     //! Copy assignment operator
-    ProjectionBase& operator=(const ProjectionBase &other) = delete;
+    ProjectionFiniteStrain& operator=(const ProjectionFiniteStrain &other) = delete;
 
     //! Move assignment operator
-    ProjectionBase& operator=(ProjectionBase &&other) noexcept = default;
+    ProjectionFiniteStrain& operator=(ProjectionFiniteStrain &&other) noexcept = default;
 
     //! initialises the fft engine (plan the transform)
     void initialise(FFT_PlanFlags flags = FFT_PlanFlags::estimate);
@@ -79,15 +77,12 @@ namespace muSpectre {
     void apply_projection(Field_t & field) const;
 
   protected:
-    FFT_Engine fft_engine;
-    Ccoord sizes;
-    bool initialised{false};
-
+    FFT_engine engine;
+    LFieldCollection_t projection_container{};
+    Proj_t Ghat;
   private:
   };
 
 }  // muSpectre
 
-
-
-#endif /* PROJECTION_BASE_H */
+#endif /* PROJECTION_FINITE_STRAIN_H */
