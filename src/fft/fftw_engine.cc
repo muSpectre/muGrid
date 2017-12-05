@@ -35,7 +35,94 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   FFTW_Engine<DimS, DimM>::FFTW_Engine(Ccoord sizes)
     :Parent{sizes},
-     hermitian_sizes{get_hermitian_sizes(sizes)}
-  {}
+     hermitian_sizes{CcoordOps::get_hermitian_sizes(sizes)}
+  {
+    for (auto && pixel: CcoordOps::Pixels<DimS>(this->hermitian_sizes)) {
+      this->work_space_container.add_pixel(pixel);
+    }
+  }
 
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  void FFTW_Engine<DimS, DimM>::initialise(FFT_PlanFlags plan_flags) {
+    Parent::initialise(plan_flags);
+
+    const int & rank = DimS;
+    std::array<int, DimS> narr;
+    const int * const n = &narr[0];
+    std::copy(this->sizes.begin(), this->sizes.end(), narr.begin());
+    int howmany = Field_t::nb_components;
+    //temporary buffer for plan
+    Real * r_work_space = fftw_alloc_real(CcoordOps::get_size(this->sizes) *howmany);
+    Real * in = r_work_space;
+    const int * const inembed = nullptr;//nembed are tricky: they refer to physical layout
+    int  istride = howmany;
+    int idist = 1;
+    fftw_complex * out = reinterpret_cast<fftw_complex*>(this->work.data());
+    const int * const onembed = nullptr;
+    int ostride = howmany;
+    int odist = idist;
+
+    unsigned int flags;
+    if (plan_flags == FFT_PlanFlags::estimate) {
+      flags = FFTW_ESTIMATE;
+    }
+    if (plan_flags == FFT_PlanFlags::measure) {
+      flags = FFTW_MEASURE;
+    }
+    if (plan_flags == FFT_PlanFlags::patient) {
+      flags = FFTW_PATIENT;
+    }
+
+    this->plan_fft = fftw_plan_many_dft_r2c(rank, n, howmany, in, inembed, istride,
+                                            idist, out, onembed, ostride, odist,
+                                            FFTW_PRESERVE_INPUT | flags);
+    if (this->plan_fft == nullptr) {
+      throw std::runtime_error("Plan failed");
+    }
+
+    fftw_complex * i_in = reinterpret_cast<fftw_complex*>(this->work.data());
+    Real * i_out = r_work_space;
+
+    this->plan_ifft = fftw_plan_many_dft_c2r(rank, n, howmany, i_in, inembed,
+                                             istride, idist, i_out, onembed,
+                                             ostride, odist, flags);
+
+    if (this->plan_ifft == nullptr) {
+      throw std::runtime_error("Plan failed");
+    }
+    fftw_free(r_work_space);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  FFTW_Engine<DimS, DimM>::~FFTW_Engine<DimS, DimM>() noexcept {
+    fftw_destroy_plan(this->plan_fft);
+    fftw_destroy_plan(this->plan_ifft);
+    fftw_cleanup();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  typename FFTW_Engine<DimS, DimM>::Workspace_t &
+  FFTW_Engine<DimS, DimM>::fft (const Field_t & field) {
+    fftw_execute_dft_r2c(this->plan_fft,
+                         const_cast<Real*>(field.data()),
+                         reinterpret_cast<fftw_complex*>(this->work.data()));
+    return this->work;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  void
+  FFTW_Engine<DimS, DimM>::ifft (Field_t & field) const {
+    fftw_execute_dft_c2r(this->plan_ifft,
+                         reinterpret_cast<fftw_complex*>(this->work.data()),
+                         field.data());
+  }
+
+  template class FFTW_Engine<twoD, twoD>;
+  template class FFTW_Engine<twoD, threeD>;
+  template class FFTW_Engine<threeD, threeD>;
 }  // muSpectre

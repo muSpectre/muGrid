@@ -31,12 +31,33 @@
 
 namespace muSpectre {
 
+  /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   FFT_Engine_base<DimS, DimM>::FFT_Engine_base(Ccoord sizes)
     :sizes{sizes},
      work{make_field<Workspace_t>("work space", work_space_container)}
-  {
-    
+  {}
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  void FFT_Engine_base<DimS, DimM>::initialise(FFT_PlanFlags /*plan_flags*/) {
+    this->work_space_container.initialise();
   }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  size_t FFT_Engine_base<DimS, DimM>::size() const {
+    return CcoordOps::get_size(this->sizes);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  size_t FFT_Engine_base<DimS, DimM>::workspace_size() const {
+    return this->work_space_container.size();
+  }
+
+  template class FFT_Engine_base<twoD, twoD>;
+  template class FFT_Engine_base<twoD, threeD>;
+  template class FFT_Engine_base<threeD, threeD>;
 
 }  // muSpectre

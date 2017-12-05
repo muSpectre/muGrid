@@ -153,7 +153,7 @@ namespace muSpectre {
                     std::remove_const_t<
                       std::remove_reference_t<CcoordRef>>>::value,
                   "can only be called with values or references of Ccoord");
-    return this->indices[std::forward<CcoordRef>(ccoord)];
+    return this->indices.at(std::forward<CcoordRef>(ccoord));
   }
 
 

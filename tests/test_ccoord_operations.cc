@@ -35,26 +35,6 @@
 #include "tests.hh"
 
 
-namespace std {
-
-  template<int dim>
-  std::ostream & operator << (std::ostream & os, const muSpectre::Ccoord_t<dim> & index) {
-    return muSpectre::operator<<(os, index);
-  }
-
-
-}  // std
-namespace boost {
-namespace test_tools {
-namespace tt_detail {
-  template <size_t dim>
-std::ostream& operator<<(std::ostream& os, const muSpectre::Ccoord_t<dim> & index)
-{
-    return muSpectre::operator<<(os, index);
-}
-}  // namespace tt_detail
-}  // namespace test_tools
-}  // namespace boost
 namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE(ccoords_operations);

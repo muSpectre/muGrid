@@ -42,6 +42,8 @@ namespace muSpectre {
   public:
     using Parent = FFT_Engine_base<DimS, DimM>;
     using Ccoord = typename Parent::Ccoord;
+    using Workspace_t = typename Parent::Workspace_t;
+    using Field_t = typename Parent::Field_t;
     //! Default constructor
     FFTW_Engine() = delete;
 
@@ -52,22 +54,30 @@ namespace muSpectre {
     FFTW_Engine(const FFTW_Engine &other) = delete;
 
     //! Move constructor
-    FFTW_Engine(FFTW_Engine &&other) noexcept = default;
+    FFTW_Engine(FFTW_Engine &&other) = default;
 
     //! Destructor
-    virtual ~FFTW_Engine() noexcept = default;
+    virtual ~FFTW_Engine() noexcept;
 
     //! Copy assignment operator
     FFTW_Engine& operator=(const FFTW_Engine &other) = delete;
 
     //! Move assignment operator
-    FFTW_Engine& operator=(FFTW_Engine &&other) noexcept = default;
+    FFTW_Engine& operator=(FFTW_Engine &&other) = default;
 
+    // compute the plan, etc
+    void initialise(FFT_PlanFlags plan_flags);
+
+    //! forward transform
+    Workspace_t & fft(const Field_t & field);
+
+    //! inverse transform
+    void ifft(Field_t & field) const;
 
   protected:
     Ccoord hermitian_sizes;
     fftw_plan plan_fft{};
-    fftw_plan plat_ifft{};
+    fftw_plan plan_ifft{};
   private:
   };
 

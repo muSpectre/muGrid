@@ -48,7 +48,7 @@ find_package(FFTW REQUIRED)
 file( GLOB TEST_SRCS "${CMAKE_SOURCE_DIR}/tests/test_*.cc")
 
 add_executable(main_test_suite tests/main_test_suite.cc ${TEST_SRCS})
-target_link_libraries(main_test_suite ${Boost_LIBRARIES} Eigen3::Eigen materials common systems)
+target_link_libraries(main_test_suite ${Boost_LIBRARIES} Eigen3::Eigen materials common systems fft)
 add_test(main_test_suite main_test_suite --report_level=detailed --build_info=TRUE)
 #add_test(main_test_suite main_test_suite --build_info=TRUE)
 

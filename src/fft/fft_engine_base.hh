@@ -72,13 +72,13 @@ namespace muSpectre {
     FFT_Engine_base& operator=(FFT_Engine_base &&other) noexcept = default;
 
     // compute the plan, etc
-    void initialise(FFT_PlanFlags plan_flags);
+    void initialise(FFT_PlanFlags /*plan_flags*/);
 
-    //! forward transform
-    Workspace_t & fft(const Field_t & field);
+    //! forward transform (dummy for interface)
+    Workspace_t & fft(const Field_t & /*field*/);
 
-    //! inverse transform
-    void ifft(Field_t & field) const;
+    //! inverse transform (dummy for interface)
+    void ifft(Field_t & /*field*/) const;
 
     /**
      * iterators over only thos pixels that exist in frequency space
@@ -86,6 +86,10 @@ namespace muSpectre {
      */
     iterator begin();
     iterator end();
+
+    //! nb of pixels (mostly for debugging)
+    size_t size() const;
+    size_t workspace_size() const;
 
   protected:
     LFieldCollection_t work_space_container{};

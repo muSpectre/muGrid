@@ -135,7 +135,7 @@ namespace muSpectre {
         <ArrayStore,
          std::vector<StoredType,
                      Eigen::aligned_allocator<StoredType>>,
-         std::vector<T>>;
+         std::vector<T,Eigen::aligned_allocator<T>>>;
       TypedFieldBase(std::string unique_name,
                      FieldCollection& collection);
       virtual ~TypedFieldBase() = default;
@@ -155,6 +155,9 @@ namespace muSpectre {
 
       static TypedFieldBase & check_ref(Parent & other);
       static const TypedFieldBase & check_ref(const Base & parent);
+
+      inline T* data() {return this->get_ptr_to_entry(0);}
+      inline const T* data() const {return this->get_ptr_to_entry(0);}
     protected:
 
       template <bool isArray=ArrayStore>
