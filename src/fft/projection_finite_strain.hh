@@ -35,25 +35,29 @@
 #include "fft/projection_base.hh"
 #include "common/common.hh"
 #include "common/field_collection.hh"
+#include "common/field_map.hh"
 
 namespace muSpectre {
 
-  template <Dim_t DimS, Dim_t DimM, class FFT_Engine>
-  class ProjectionFiniteStrain: public ProjectionBase<DimS, DimM, FFT_Engine>
+  template <Dim_t DimS, Dim_t DimM>
+  class ProjectionFiniteStrain: public ProjectionBase<DimS, DimM>
   {
   public:
-    using Parent = ProjectionBase<DimS, DimM, FFT_Engine>;
+    using Parent = ProjectionBase<DimS, DimM>;
+    using FFT_Engine = typename Parent::FFT_Engine;
     using Ccoord = typename Parent::Ccoord;
     using GFieldCollection_t = FieldCollection<DimS, DimM, true>;
     using LFieldCollection_t = FieldCollection<DimS, DimM, false>;
     using Field_t = TensorField<GFieldCollection_t, Real, secondOrder, DimM>;
     using Proj_t = TensorField<LFieldCollection_t, Real, fourthOrder, DimM>;
+    using Proj_map = T4MatrixFieldMap<LFieldCollection_t, Real, DimM>;
+    using Vector_map = MatrixFieldMap<LFieldCollection_t, Complex, DimM*DimM, 1>;
 
     //! Default constructor
     ProjectionFiniteStrain() = delete;
 
     //! Constructor with system sizes
-    ProjectionFiniteStrain(Ccoord sizes);
+    ProjectionFiniteStrain(FFT_Engine & engine);
 
     //! Copy constructor
     ProjectionFiniteStrain(const ProjectionFiniteStrain &other) = delete;
@@ -68,16 +72,17 @@ namespace muSpectre {
     ProjectionFiniteStrain& operator=(const ProjectionFiniteStrain &other) = delete;
 
     //! Move assignment operator
-    ProjectionFiniteStrain& operator=(ProjectionFiniteStrain &&other) noexcept = default;
+    ProjectionFiniteStrain& operator=(ProjectionFiniteStrain &&other)
+      noexcept = default;
 
     //! initialises the fft engine (plan the transform)
     void initialise(FFT_PlanFlags flags = FFT_PlanFlags::estimate);
 
     //! apply the projection operator to a field
-    void apply_projection(Field_t & field) const;
+    void apply_projection(Field_t & field);
 
   protected:
-    Proj_t& Ghat;
+    Proj_map Ghat;
   private:
   };
 

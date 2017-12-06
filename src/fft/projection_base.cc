@@ -33,9 +33,10 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM, class FFT_Engine>
-  ProjectionBase<DimS, DimM, FFT_Engine>::ProjectionBase(Ccoord sizes)
-    : fft_engine{sizes}, projection_container{}, sizes{sizes}
+  template <Dim_t DimS, Dim_t DimM>
+  ProjectionBase<DimS, DimM>::ProjectionBase(FFT_Engine & engine)
+    : fft_engine{engine}, projection_container{engine.get_field_collection()},
+      sizes{engine.get_sizes()}
   {
     static_assert((DimS == FFT_Engine::sdim),
                   "spatial dimensions are incompatible");
@@ -44,11 +45,13 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM, class FFT_Engine>
-  void ProjectionBase<DimS, DimM, FFT_Engine>::
+  template <Dim_t DimS, Dim_t DimM>
+  void ProjectionBase<DimS, DimM>::
   initialise(FFT_PlanFlags flags) {
     fft_engine.initialise(flags);
-    projection_container.initialise(
   }
 
+  template class ProjectionBase<twoD,   twoD>;
+  template class ProjectionBase<twoD,   threeD>;
+  template class ProjectionBase<threeD, threeD>;
 }  // muSpectre

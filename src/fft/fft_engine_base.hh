@@ -73,24 +73,29 @@ namespace muSpectre {
     FFT_Engine_base& operator=(FFT_Engine_base &&other) noexcept = default;
 
     // compute the plan, etc
-    void initialise(FFT_PlanFlags /*plan_flags*/);
+    virtual void initialise(FFT_PlanFlags /*plan_flags*/);
 
     //! forward transform (dummy for interface)
-    Workspace_t & fft(const Field_t & /*field*/);
+    virtual Workspace_t & fft(const Field_t & /*field*/) = 0;
 
     //! inverse transform (dummy for interface)
-    void ifft(Field_t & /*field*/) const;
+    virtual void ifft(Field_t & /*field*/) const = 0;
 
     /**
      * iterators over only thos pixels that exist in frequency space
      * (i.e. about half of all pixels, see rfft)
      */
-    iterator begin();
-    iterator end();
+    inline iterator begin() {return this->work_space_container.begin();}
+    inline iterator end()  {return this->work_space_container.end();}
 
     //! nb of pixels (mostly for debugging)
     size_t size() const;
     size_t workspace_size() const;
+
+    //!
+    const Ccoord & get_sizes() const {return this->sizes;}
+    LFieldCollection_t & get_field_collection() {
+      return this->work_space_container;}
 
     //! factor by which to multiply projection before inverse transform (this is
     //! typically 1/nb_pixels for so-called unnormalized transforms (see,

@@ -32,26 +32,25 @@
 #include "fft/projection_finite_strain.hh"
 #include "fft/fftw_engine.hh"
 #include "fft/fft_utils.hh"
-#include "common/field_map_matrixlike.hh"
+#include "common/field_map.hh"
 
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM, class FFT_Engine>
-  ProjectionFiniteStrain<DimS, DimM, FFT_Engine>::
-  ProjectionFiniteStrain(Ccoord sizes)
-    :Parent{sizes}, Ghat{make_field<Proj_t>("Projection Operator",
+  template <Dim_t DimS, Dim_t DimM>
+  ProjectionFiniteStrain<DimS, DimM>::
+  ProjectionFiniteStrain(FFT_Engine & engine)
+    :Parent{engine}, Ghat{make_field<Proj_t>("Projection Operator",
                                             this->projection_container)}
   {}
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM, class FFT_Engine>
-  void ProjectionFiniteStrain<DimS, DimM, FFT_Engine>::
+  template <Dim_t DimS, Dim_t DimM>
+  void ProjectionFiniteStrain<DimS, DimM>::
   initialise(FFT_PlanFlags flags) {
     Parent::initialise(flags);
     FFT_freqs<DimS> fft_freqs(this->sizes);
-    auto proj_map = T4MatrixFieldMap<LFieldCollection_t, Real, DimM>(Ghat);
-    for (auto && tup: boost::combine(this->fft_engine, proj_map)) {
+    for (auto && tup: boost::combine(this->fft_engine, this->Ghat)) {
       const auto & ccoord = boost::get<0> (tup);
       auto & G = boost::get<1>(tup);
       auto xi = fft_freqs.get_unit_xi(ccoord);
@@ -65,10 +64,20 @@ namespace muSpectre {
     }
   }
 
-  template class ProjectionFiniteStrain<twoD, twoD,
-                                        FFTW_Engine<twoD, twoD>>;
-  template class ProjectionFiniteStrain<twoD, threeD,
-                                        FFTW_Engine<twoD, threeD>>;
-  template class ProjectionFiniteStrain<threeD, threeD,
-                                        FFTW_Engine<threeD, threeD>>;
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  void ProjectionFiniteStrain<DimS, DimM>::apply_projection(Field_t & field) {
+    Vector_map field_map{this->fft_engine.fft(field)};
+    Real factor = this->fft_engine.normalisation();
+    for (auto && tup: boost::combine(this->Ghat, field_map)) {
+      auto & G{boost::get<0>(tup)};
+      auto & f{boost::get<1>(tup)};
+      f = factor * (G*f).eval();
+    }
+  }
+
+  template class ProjectionFiniteStrain<twoD,   twoD>;
+  template class ProjectionFiniteStrain<twoD,   threeD>;
+  template class ProjectionFiniteStrain<threeD, threeD>;
 }  // muSpectre

@@ -66,13 +66,13 @@ namespace muSpectre {
     FFTW_Engine& operator=(FFTW_Engine &&other) = default;
 
     // compute the plan, etc
-    void initialise(FFT_PlanFlags plan_flags);
+    virtual void initialise(FFT_PlanFlags plan_flags) override;
 
     //! forward transform
-    Workspace_t & fft(const Field_t & field);
+    virtual Workspace_t & fft(const Field_t & field) override;
 
     //! inverse transform
-    void ifft(Field_t & field) const;
+    virtual void ifft(Field_t & field) const override;
 
   protected:
     Ccoord hermitian_sizes;

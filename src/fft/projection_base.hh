@@ -41,10 +41,11 @@ namespace muSpectre {
   struct Projection_traits {
   };
 
-  template <Dim_t DimS, Dim_t DimM, class FFT_Engine>
+  template <Dim_t DimS, Dim_t DimM>
   class ProjectionBase
   {
   public:
+    using FFT_Engine = FFT_Engine_base<DimS, DimM>;
     using Ccoord = typename FFT_Engine::Ccoord;
     using GFieldCollection_t = typename FFT_Engine::GFieldCollection_t;
     using LFieldCollection_t = typename FFT_Engine::LFieldCollection_t;
@@ -55,7 +56,7 @@ namespace muSpectre {
     ProjectionBase() = delete;
 
     //! Constructor with system sizes
-    ProjectionBase(Ccoord sizes);
+    ProjectionBase(FFT_Engine & engine);
 
     //! Copy constructor
     ProjectionBase(const ProjectionBase &other) = delete;
@@ -79,7 +80,7 @@ namespace muSpectre {
     void apply_projection(Field_t & field) const;
 
   protected:
-    FFT_Engine fft_engine;
+    FFT_Engine & fft_engine;
     LFieldCollection_t & projection_container{};
     Ccoord sizes;
 

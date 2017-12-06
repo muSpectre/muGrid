@@ -1,6 +1,7 @@
 set (fft_engine_SRC
   fft_engine_base.cc
   fftw_engine.cc
+  projection_base.cc
   projection_finite_strain.cc
   )
 
