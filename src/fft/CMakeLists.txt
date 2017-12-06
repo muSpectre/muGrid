@@ -1,6 +1,7 @@
 set (fft_engine_SRC
   fft_engine_base.cc
   fftw_engine.cc
+  projection_finite_strain.cc
   )
 
 find_package(FFTW REQUIRED)

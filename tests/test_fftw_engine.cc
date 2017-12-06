@@ -69,12 +69,15 @@ namespace muSpectre {
     using FC_t = FieldCollection<Fix::sdim, Fix::mdim>;
     FC_t fc;
     auto & input{make_field<TensorField<FC_t, Real, order, Fix::mdim>>("input", fc)};
-    auto & ref{make_field<TensorField<FC_t, Real, order, Fix::mdim>>("reference", fc)};
+    auto & ref  {make_field<TensorField<FC_t, Real, order, Fix::mdim>>("reference", fc)};
     auto & result{make_field<TensorField<FC_t, Real, order, Fix::mdim>>("result", fc)};
     fc.initialise(CcoordOps::get_cube<Fix::sdim>(Fix::box_size));
 
     using map_t = MatrixFieldMap<FC_t, Real, Fix::mdim, Fix::mdim>;
-    for (auto && tup: boost::combine(map_t(input), map_t(ref))) {
+    auto inmap{map_t{input}};
+    auto refmap{map_t{ref}};
+    auto resultmap{map_t{result}};
+    for (auto tup: boost::combine(inmap, refmap)) {
       boost::get<0>(tup).setRandom();
       boost::get<1>(tup) = boost::get<0>(tup);
     }
@@ -86,14 +89,14 @@ namespace muSpectre {
 
     /* make sure, the engine has not modified input (which is
        unfortunately const-casted internally, hence this test) */
-    for (auto && tup: boost::combine(map_t(input), map_t(ref))) {
+    for (auto && tup: boost::combine(inmap, refmap)) {
       Real error{(boost::get<0>(tup) - boost::get<1>(tup)).norm()};
       BOOST_CHECK_LT(error, tol);
     }
 
     /* make sure that the ifft of fft returns the original*/
     Fix::engine.ifft(result);
-    for (auto && tup: boost::combine(map_t(result), map_t(ref))) {
+    for (auto && tup: boost::combine(resultmap, refmap)) {
       Real error{(boost::get<0>(tup)*Fix::engine.normalisation() - boost::get<1>(tup)).norm()};
       BOOST_CHECK_LT(error, tol);
       if (error > tol) {

@@ -77,9 +77,7 @@ namespace muSpectre {
     void apply_projection(Field_t & field) const;
 
   protected:
-    FFT_engine engine;
-    LFieldCollection_t projection_container{};
-    Proj_t Ghat;
+    Proj_t& Ghat;
   private:
   };
 

@@ -42,7 +42,8 @@ namespace muSpectre {
   class FFT_Engine_base
   {
   public:
-
+    constexpr static Dim_t sdim{DimS};
+    constexpr static Dim_t mdim{DimM};
     using Ccoord = Ccoord_t<DimS>;
     using GFieldCollection_t = FieldCollection<DimS, DimM, true>;
     using LFieldCollection_t = FieldCollection<DimS, DimM, false>;

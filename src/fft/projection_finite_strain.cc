@@ -27,8 +27,12 @@
  * Boston, MA 02111-1307, USA.
  */
 
+#include <boost/range/combine.hpp>
+
 #include "fft/projection_finite_strain.hh"
 #include "fft/fftw_engine.hh"
+#include "fft/fft_utils.hh"
+#include "common/field_map_matrixlike.hh"
 
 namespace muSpectre {
 
@@ -36,14 +40,35 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM, class FFT_Engine>
   ProjectionFiniteStrain<DimS, DimM, FFT_Engine>::
   ProjectionFiniteStrain(Ccoord sizes)
-    :Parent{sizes}, engine{sizes} {}
+    :Parent{sizes}, Ghat{make_field<Proj_t>("Projection Operator",
+                                            this->projection_container)}
+  {}
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM, class FFT_Engine>
   void ProjectionFiniteStrain<DimS, DimM, FFT_Engine>::
   initialise(FFT_PlanFlags flags) {
     Parent::initialise(flags);
-
-    
+    FFT_freqs<DimS> fft_freqs(this->sizes);
+    auto proj_map = T4MatrixFieldMap<LFieldCollection_t, Real, DimM>(Ghat);
+    for (auto && tup: boost::combine(this->fft_engine, proj_map)) {
+      const auto & ccoord = boost::get<0> (tup);
+      auto & G = boost::get<1>(tup);
+      auto xi = fft_freqs.get_unit_xi(ccoord);
+      for (Dim_t im = 0; im < DimS; ++im) {
+        for (Dim_t j = 0; j < DimS; ++j) {
+          for (Dim_t l = 0; l < DimS; ++l) {
+            get(G, im, j, l, im) = xi(j)*xi(l);
+          }
+        }
+      }
+    }
   }
+
+  template class ProjectionFiniteStrain<twoD, twoD,
+                                        FFTW_Engine<twoD, twoD>>;
+  template class ProjectionFiniteStrain<twoD, threeD,
+                                        FFTW_Engine<twoD, threeD>>;
+  template class ProjectionFiniteStrain<threeD, threeD,
+                                        FFTW_Engine<threeD, threeD>>;
 }  // muSpectre
