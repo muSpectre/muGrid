@@ -28,7 +28,7 @@
  */
 
 #include <boost/mpl/list.hpp>
-#include "boost/range/combine.hpp"
+#include <boost/range/combine.hpp>
 
 #include "tests.hh"
 #include "fft/fftw_engine.hh"

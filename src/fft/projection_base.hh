@@ -82,7 +82,6 @@ namespace muSpectre {
   protected:
     FFT_Engine & fft_engine;
     LFieldCollection_t & projection_container{};
-    Ccoord sizes;
 
   private:
   };
