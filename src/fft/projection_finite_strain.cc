@@ -57,7 +57,7 @@ namespace muSpectre {
       auto & G = boost::get<1>(tup);
       auto xi = fft_freqs.get_unit_xi(ccoord);
       //! this is simplyfiable usinc Curnier's Méthodes numériques, 6.69(c)
-      G = Matrices::outer_over(Matrices::I2<DimM>(), xi*xi.transpose());
+      G = Matrices::outer_under(Matrices::I2<DimM>(), xi*xi.transpose());
       // for (Dim_t im = 0; im < DimS; ++im) {
       //   for (Dim_t j = 0; j < DimS; ++j) {
       //     for (Dim_t l = 0; l < DimS; ++l) {
@@ -80,6 +80,7 @@ namespace muSpectre {
       auto & f{boost::get<1>(tup)};
       f = factor * (G*f).eval();
     }
+    this->fft_engine.ifft(field);
   }
 
   template class ProjectionFiniteStrain<twoD,   twoD>;

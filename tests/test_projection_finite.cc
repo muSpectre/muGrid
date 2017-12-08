@@ -28,12 +28,14 @@
  */
 
 #include <boost/mpl/list.hpp>
+#include "boost/range/combine.hpp"
 
 #include "tests.hh"
 #include "fft/fftw_engine.hh"
 #include "fft/projection_finite_strain.hh"
 #include "common/common.hh"
 #include "common/field_collection.hh"
+#include "common/field_map.hh"
 
 namespace muSpectre {
 
@@ -59,10 +61,12 @@ namespace muSpectre {
   struct ProjectionFixture {
     using Engine = FFTW_Engine<DimS, DimM>;
     using Parent = ProjectionFiniteStrain<DimS, DimM>;
+    constexpr static Dim_t sdim{DimS};
+    constexpr static Dim_t mdim{DimM};
     ProjectionFixture(): engine{Sizes<DimS>::get_value()},
-                         parent(engine){}
+                         projector(engine){}
     Engine engine;
-    Parent parent;
+    Parent projector;
   };
 
   /* ---------------------------------------------------------------------- */
@@ -71,12 +75,67 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(constructor_test, fix, fixlist, fix) {
-    BOOST_CHECK_NO_THROW(fix::parent.initialise(FFT_PlanFlags::estimate));
+    BOOST_CHECK_NO_THROW(fix::projector.initialise(FFT_PlanFlags::estimate));
   }
 
 
   /* ---------------------------------------------------------------------- */
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(Ctest_name, type_name, TL, F)
+  using F3 = ProjectionFixture<threeD, threeD>;
+  BOOST_FIXTURE_TEST_CASE(Helmholtz_decomposition, F3) {
+    // create a field that is explicitely the sum of a gradient and a
+    // curl, then verify that the projected field corresponds to the
+    // gradient (without the zero'th component)
+    using Fields = FieldCollection<sdim, mdim>;
+    Fields fields{};
+    using FieldT = TensorField<Fields, Real, secondOrder, mdim>;
+    using FieldMap = MatrixFieldMap<Fields, Real, mdim, mdim>;
+    FieldT & f_grad{make_field<FieldT>("gradient", fields)};
+    FieldT & f_curl{make_field<FieldT>("curl", fields)};
+    FieldT & f_sum{make_field<FieldT>("sum", fields)};
+    FieldT & f_var{make_field<FieldT>("working field", fields)};
+
+    FieldMap grad(f_grad);
+    FieldMap curl(f_curl);
+    FieldMap sum(f_sum);
+    FieldMap var(f_var);
+
+    fields.initialise(Sizes<sdim>::get_value());
+
+    for (auto && tup: boost::combine(fields, grad, curl, sum, var)) {
+      auto & ccoord = boost::get<0>(tup);
+      auto & g = boost::get<1>(tup);
+      auto & c = boost::get<2>(tup);
+      auto & s = boost::get<3>(tup);
+      auto & v = boost::get<4>(tup);
+      auto vec = CcoordOps::get_vector(ccoord);
+      g.row(0) << vec(1)*vec(2), vec(0)*vec(2), vec(1)*vec(2);
+      c.row(0) << 0, vec(0)*vec(1), -vec(0)*vec(2);
+      v.row(0) = s.row(0) = g.row(0) + c.row(0);
+    }
+
+    projector.initialise(FFT_PlanFlags::estimate);
+    projector.apply_projection(f_var);
+
+    for (auto && tup: boost::combine(fields, grad, curl, sum, var)) {
+      auto & ccoord = boost::get<0>(tup);
+      auto & g = boost::get<1>(tup);
+      auto & c = boost::get<2>(tup);
+      auto & s = boost::get<3>(tup);
+      auto & v = boost::get<4>(tup);
+      auto vec = CcoordOps::get_vector(ccoord);
+
+      Real error = (s-g).norm();
+      BOOST_CHECK_LT(error, tol);
+      if (error >=tol) {
+        std::cout << std::endl << "grad_ref :"  << std::endl << g << std::endl;
+        std::cout << std::endl << "grad_proj :" << std::endl << v << std::endl;
+        std::cout << std::endl << "curl :"      << std::endl << c << std::endl;
+        std::cout << std::endl << "sum :"       << std::endl << s << std::endl;
+        std::cout << std::endl << "ccoord :"    << std::endl << ccoord << std::endl;
+        std::cout << std::endl << "vector :"    << std::endl << vec.transpose() << std::endl;
+      }
+    }
+  }
   BOOST_AUTO_TEST_SUITE_END();
 
 }  // muSpectre

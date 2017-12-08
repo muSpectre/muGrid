@@ -49,6 +49,7 @@ namespace muSpectre {
       <DimS, DimM, GlobalFieldCollection<DimS, DimM>>;
     using Ccoord = typename Parent::Ccoord;
     using Field_p = typename Parent::Field_p;
+    using iterator = typename CcoordOps::Pixels<DimS>::iterator;
     //! Default constructor
     GlobalFieldCollection();
 
@@ -89,18 +90,23 @@ namespace muSpectre {
     //! returns the cell coordinates corresponding to a linear index
     inline Ccoord get_ccoord(size_t index) const;
 
+    inline iterator begin();
+    inline iterator end();
+
+
     static constexpr inline Dim_t spatial_dim() {return DimS;}
     static constexpr inline Dim_t material_dim() {return DimM;}
   protected:
     //! number of discretisation cells in each of the DimS spatial directions
     Ccoord sizes{0};
+    CcoordOps::Pixels<DimS> pixels;
   private:
   };
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   GlobalFieldCollection<DimS, DimM>::GlobalFieldCollection()
-    :Parent(){}
+    :Parent(), pixels{{0}}{}
 
 
 
@@ -108,6 +114,7 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   void GlobalFieldCollection<DimS, DimM>::
   initialise(Ccoord sizes) {
+    this->pixels = CcoordOps::Pixels<DimS>(sizes);
     this->size_ = std::accumulate(sizes.begin(), sizes.end(), 1,
                                    std::multiplies<Dim_t>());
     this->sizes = sizes;
@@ -145,6 +152,20 @@ namespace muSpectre {
     return CcoordOps::get_ccoord(this->get_sizes(), std::move(index));
   }
 
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  typename GlobalFieldCollection<DimS, DimM>::iterator
+  GlobalFieldCollection<DimS, DimM>::begin() {
+    return this->pixels.begin();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  typename GlobalFieldCollection<DimS, DimM>::iterator
+  GlobalFieldCollection<DimS, DimM>::end() {
+    return this->pixels.end();
+  }
   //----------------------------------------------------------------------------//
   //! returns the linear index corresponding to cell coordinates
   template <Dim_t DimS, Dim_t DimM>

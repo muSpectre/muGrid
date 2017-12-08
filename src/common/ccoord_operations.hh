@@ -32,6 +32,8 @@
 #include <vector>
 #include <utility>
 
+#include <Eigen/Dense>
+
 #include "common/common.hh"
 
 #ifndef CCOORD_OPERATIONS_H
@@ -67,6 +69,28 @@ namespace muSpectre {
     constexpr Ccoord_t<dim> get_hermitian_sizes(Ccoord_t<dim> full_sizes) {
       return internal::herm<dim>(full_sizes, std::make_index_sequence<dim-1>{});
     }
+
+    /* ---------------------------------------------------------------------- */
+    template <size_t dim, typename T=Real>
+    Eigen::Matrix<T, dim, 1> get_vector(const Ccoord_t<dim> & ccoord, T pix_size = T{1.}) {
+      Eigen::Matrix<T, dim, 1> retval;
+      for (size_t i = 0; i < dim; ++i) {
+        retval[i] = pix_size * ccoord[i];
+      }
+      return retval;
+    }
+
+    /* ---------------------------------------------------------------------- */
+    template <size_t dim, typename T>
+    Eigen::Matrix<T, dim, 1> get_vector(const Ccoord_t<dim> & ccoord,
+                                        Eigen::Matrix<T, dim, 1> pix_size) {
+      Eigen::Matrix<T, dim, 1> retval = pix_size;
+      for (size_t i = 0; i < dim; ++i) {
+        retval[i] *= ccoord[i];
+      }
+      return retval;
+    }
+
 
     //----------------------------------------------------------------------------//
     template <size_t dim>
@@ -113,17 +137,24 @@ namespace muSpectre {
     {
     public:
       Pixels(const Ccoord_t<dim> & sizes):sizes(sizes){};
+      Pixels(const Pixels & other) = default;
+      Pixels & operator=(const Pixels & other) = default;
       virtual ~Pixels() = default;
       class iterator
       {
       public:
         using value_type = Ccoord_t<dim>;
+        using const_value_type = const value_type;
+        using pointer = value_type*;
+        using difference_type = std::ptrdiff_t;
         using iterator_category = std::forward_iterator_tag;
+        using reference = value_type;
         iterator(const Pixels & pixels, bool begin=true);
         virtual ~iterator() = default;
         inline value_type operator*() const;
         inline iterator & operator++();
         inline bool operator!=(const iterator & other) const;
+        inline bool operator==(const iterator & other) const;
 
       protected:
         const Pixels& pixels;
@@ -132,7 +163,7 @@ namespace muSpectre {
       inline iterator begin() const {return iterator(*this);}
       inline iterator end() const {return iterator(*this, false);}
     protected:
-      const Ccoord_t<dim> & sizes;
+      Ccoord_t<dim>  sizes;
     };
 
     /* ---------------------------------------------------------------------- */
@@ -153,6 +184,13 @@ namespace muSpectre {
     bool
     Pixels<dim>::iterator::operator!=(const iterator &other) const {
       return (this->index != other.index) || (&this->pixels != &other.pixels);
+    }
+
+    /* ---------------------------------------------------------------------- */
+    template <size_t dim>
+    bool
+    Pixels<dim>::iterator::operator==(const iterator &other) const {
+      return !(*this!= other);
     }
 
     /* ---------------------------------------------------------------------- */
