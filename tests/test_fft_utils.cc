@@ -57,7 +57,25 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_CASE(wave_vector_computation) {
     // here, build a FFT_freqs and check it returns the correct xi's
-    BOOST_CHECK(false);
+    constexpr Dim_t dim{twoD};
+    FFT_freqs<dim> freq_struc{{12, 10}, {1., 10.}};
+    Ccoord_t<dim> ccoord1{2, 3};
+    auto xi{freq_struc.get_xi(ccoord1)};
+    auto unit_xi{freq_struc.get_unit_xi(ccoord1)};
+    typename FFT_freqs<dim>::Vector ref;
+    ref << 2., .3; // from above tests
+    BOOST_CHECK_LT((xi-ref).norm(), tol);
+    BOOST_CHECK_LT(abs(xi.dot(unit_xi)-xi.norm()), xi.norm()*tol);
+    BOOST_CHECK_LT(abs(unit_xi.norm()-1.), tol);
+
+    ccoord1={7, 8};
+    xi = freq_struc.get_xi(ccoord1);
+    unit_xi = freq_struc.get_unit_xi(ccoord1);
+
+    ref << -5., -.2;
+    BOOST_CHECK_LT((xi-ref).norm(), tol);
+    BOOST_CHECK_LT(abs(xi.dot(unit_xi)-xi.norm()), xi.norm()*tol);
+    BOOST_CHECK_LT(abs(unit_xi.norm()-1.), tol);
   }
 
   BOOST_AUTO_TEST_SUITE_END();
