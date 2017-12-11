@@ -51,7 +51,8 @@ namespace muSpectre {
   void ProjectionFiniteStrain<DimS, DimM>::
   initialise(FFT_PlanFlags flags) {
     Parent::initialise(flags);
-    FFT_freqs<DimS> fft_freqs(this->fft_engine.get_sizes());
+    FFT_freqs<DimS> fft_freqs(this->fft_engine.get_resolutions(),
+                              this->fft_engine.get_lengths());
     for (auto && tup: boost::combine(this->fft_engine, this->Ghat)) {
       const auto & ccoord = boost::get<0> (tup);
       auto & G = boost::get<1>(tup);

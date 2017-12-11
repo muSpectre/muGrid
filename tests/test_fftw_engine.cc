@@ -44,10 +44,12 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   struct FFTW_fixture {
-    constexpr static Dim_t box_size{3};
+    constexpr static Dim_t box_resolution{3};
+    constexpr static Real box_length{4.5};
     constexpr static Dim_t sdim{DimS};
     constexpr static Dim_t mdim{DimM};
-    FFTW_fixture() :engine(CcoordOps::get_cube<DimS>(box_size)){}
+    FFTW_fixture() :engine(CcoordOps::get_cube<DimS>(box_resolution),
+                           CcoordOps::get_cube<DimS>(box_length)){}
     FFTW_Engine<DimS, DimM> engine;
   };
 
@@ -59,7 +61,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(Constructor_test, Fix, fixlist, Fix) {
     BOOST_CHECK_NO_THROW(Fix::engine.initialise(FFT_PlanFlags::estimate));
-    BOOST_CHECK_EQUAL(Fix::engine.size(), ipow(Fix::box_size, Fix::sdim));
+    BOOST_CHECK_EQUAL(Fix::engine.size(), ipow(Fix::box_resolution, Fix::sdim));
   }
 
   /* ---------------------------------------------------------------------- */
@@ -71,7 +73,7 @@ namespace muSpectre {
     auto & input{make_field<TensorField<FC_t, Real, order, Fix::mdim>>("input", fc)};
     auto & ref  {make_field<TensorField<FC_t, Real, order, Fix::mdim>>("reference", fc)};
     auto & result{make_field<TensorField<FC_t, Real, order, Fix::mdim>>("result", fc)};
-    fc.initialise(CcoordOps::get_cube<Fix::sdim>(Fix::box_size));
+    fc.initialise(CcoordOps::get_cube<Fix::sdim>(Fix::box_resolution));
 
     using map_t = MatrixFieldMap<FC_t, Real, Fix::mdim, Fix::mdim>;
     auto inmap{map_t{input}};

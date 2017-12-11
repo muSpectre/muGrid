@@ -44,11 +44,12 @@ namespace muSpectre {
   namespace CcoordOps {
 
     namespace internal {
-      constexpr Dim_t ret(Dim_t val, size_t /*dummy*/) {return val;}
+      template <typename T>
+      constexpr T ret(T val, size_t /*dummy*/) {return val;}
 
-      template <Dim_t Dim, size_t... I>
-      constexpr Ccoord_t<Dim> funt(Dim_t val, std::index_sequence<I...>) {
-        return Ccoord_t<Dim>{ret(val, I)...};
+      template <Dim_t Dim, typename T, size_t... I>
+      constexpr std::array<T, Dim> cube_fun(T val, std::index_sequence<I...>) {
+        return std::array<T, Dim>{ret(val, I)...};
       }
 
       template <Dim_t Dim, size_t... I>
@@ -59,9 +60,9 @@ namespace muSpectre {
     }  // internal
 
     //----------------------------------------------------------------------------//
-    template <size_t dim>
-    constexpr Ccoord_t<dim> get_cube(Dim_t size) {
-      return internal::funt<dim>(size, std::make_index_sequence<dim>{});
+    template <size_t dim, typename T>
+    constexpr std::array<T, dim> get_cube(T size) {
+      return internal::cube_fun<dim>(size, std::make_index_sequence<dim>{});
     }
 
     /* ---------------------------------------------------------------------- */

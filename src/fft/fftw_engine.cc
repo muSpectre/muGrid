@@ -33,11 +33,11 @@
 namespace muSpectre {
 
   template <Dim_t DimS, Dim_t DimM>
-  FFTW_Engine<DimS, DimM>::FFTW_Engine(Ccoord sizes)
-    :Parent{sizes},
-     hermitian_sizes{CcoordOps::get_hermitian_sizes(sizes)}
+  FFTW_Engine<DimS, DimM>::FFTW_Engine(Ccoord resolutions, Lengths lengths)
+    :Parent{resolutions, lengths},
+     hermitian_resolutions{CcoordOps::get_hermitian_sizes(resolutions)}
   {
-    for (auto && pixel: CcoordOps::Pixels<DimS>(this->hermitian_sizes)) {
+    for (auto && pixel: CcoordOps::Pixels<DimS>(this->hermitian_resolutions)) {
       this->work_space_container.add_pixel(pixel);
     }
   }
@@ -51,10 +51,10 @@ namespace muSpectre {
     const int & rank = DimS;
     std::array<int, DimS> narr;
     const int * const n = &narr[0];
-    std::copy(this->sizes.begin(), this->sizes.end(), narr.begin());
+    std::copy(this->resolutions.begin(), this->resolutions.end(), narr.begin());
     int howmany = Field_t::nb_components;
     //temporary buffer for plan
-    Real * r_work_space = fftw_alloc_real(CcoordOps::get_size(this->sizes) *howmany);
+    Real * r_work_space = fftw_alloc_real(CcoordOps::get_size(this->resolutions) *howmany);
     Real * in = r_work_space;
     const int * const inembed = nullptr;//nembed are tricky: they refer to physical layout
     int  istride = howmany;

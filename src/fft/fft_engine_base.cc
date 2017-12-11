@@ -33,10 +33,10 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  FFT_Engine_base<DimS, DimM>::FFT_Engine_base(Ccoord sizes)
-    :sizes{sizes},
+  FFT_Engine_base<DimS, DimM>::FFT_Engine_base(Ccoord resolutions, Lengths lengths)
+    :resolutions{resolutions}, lengths{lengths},
      work{make_field<Workspace_t>("work space", work_space_container)},
-     norm_factor{1./CcoordOps::get_size(sizes)}
+     norm_factor{1./CcoordOps::get_size(resolutions)}
   {}
 
   /* ---------------------------------------------------------------------- */
@@ -48,7 +48,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   size_t FFT_Engine_base<DimS, DimM>::size() const {
-    return CcoordOps::get_size(this->sizes);
+    return CcoordOps::get_size(this->resolutions);
   }
 
   /* ---------------------------------------------------------------------- */

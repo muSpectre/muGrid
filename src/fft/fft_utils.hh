@@ -56,7 +56,9 @@ namespace muSpectre {
   }
 
   /**
-   * compute fft frequencies in correct length or time units
+   * compute fft frequencies in correct length or time units. Here,
+   * length refers to the total size of the domain over which the fft
+   * is taken (for instance the length of an edge of an RVE)
    */
   std::valarray<Real> fft_freqs(size_t nb_samples, Real length) {
     return fft_freqs(nb_samples)/length;
@@ -66,10 +68,11 @@ namespace muSpectre {
    * Get fft_freqs for a grid
    */
   template <size_t dim>
-  std::array<std::valarray<Real>, dim> fft_freqs(Ccoord_t<dim> sizes) {
+  std::array<std::valarray<Real>, dim> fft_freqs(Ccoord_t<dim> sizes,
+                                                 std::array<Real, dim> lengths) {
     std::array<std::valarray<Real>, dim> retval{};
     for (size_t i = 0; i < dim; ++i) {
-      retval[i] = std::move(fft_freqs(sizes[i]));
+      retval[i] = std::move(fft_freqs(sizes[i], lengths[i]));
     }
     return retval;
   }
@@ -87,8 +90,8 @@ namespace muSpectre {
     FFT_freqs() = delete;
 
     //! constructor with problem sizes
-    FFT_freqs(Ccoord_t<dim> sizes)
-      : freqs{fft_freqs(sizes)} {}
+    FFT_freqs(Ccoord_t<dim> sizes, std::array<Real, dim> lengths)
+      : freqs{fft_freqs(sizes, lengths)} {}
 
     //! Copy constructor
     FFT_freqs(const FFT_freqs &other) = delete;
@@ -125,7 +128,7 @@ namespace muSpectre {
   FFT_freqs<dim>::get_xi(const Ccoord_t<dim> ccoord) const {
     Vector retval{};
     for (Dim_t i = 0; i < dim; ++i) {
-      retval(i) = ccoord[i];
+      retval(i) = this->freqs[i][ccoord[i]];
     }
     return retval;
   }

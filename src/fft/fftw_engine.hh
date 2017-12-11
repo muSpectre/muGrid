@@ -42,13 +42,14 @@ namespace muSpectre {
   public:
     using Parent = FFT_Engine_base<DimS, DimM>;
     using Ccoord = typename Parent::Ccoord;
+    using Lengths = typename Parent::Lengths;
     using Workspace_t = typename Parent::Workspace_t;
     using Field_t = typename Parent::Field_t;
     //! Default constructor
     FFTW_Engine() = delete;
 
-    //! Constructor with system sizes
-    FFTW_Engine(Ccoord sizes);
+    //! Constructor with system resolutions
+    FFTW_Engine(Ccoord resolutions, Lengths lengths);
 
     //! Copy constructor
     FFTW_Engine(const FFTW_Engine &other) = delete;
@@ -75,7 +76,7 @@ namespace muSpectre {
     virtual void ifft(Field_t & field) const override;
 
   protected:
-    Ccoord hermitian_sizes;
+    Ccoord hermitian_resolutions;
     fftw_plan plan_fft{};
     fftw_plan plan_ifft{};
   private:
