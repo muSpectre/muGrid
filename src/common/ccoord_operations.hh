@@ -72,9 +72,9 @@ namespace muSpectre {
     }
 
     /* ---------------------------------------------------------------------- */
-    template <size_t dim, typename T=Real>
-    Eigen::Matrix<T, dim, 1> get_vector(const Ccoord_t<dim> & ccoord, T pix_size = T{1.}) {
-      Eigen::Matrix<T, dim, 1> retval;
+    template <size_t dim>
+    Eigen::Matrix<Real, dim, 1> get_vector(const Ccoord_t<dim> & ccoord, Real pix_size = 1.) {
+      Eigen::Matrix<Real, dim, 1> retval;
       for (size_t i = 0; i < dim; ++i) {
         retval[i] = pix_size * ccoord[i];
       }
@@ -84,10 +84,21 @@ namespace muSpectre {
     /* ---------------------------------------------------------------------- */
     template <size_t dim, typename T>
     Eigen::Matrix<T, dim, 1> get_vector(const Ccoord_t<dim> & ccoord,
-                                        Eigen::Matrix<T, dim, 1> pix_size) {
+                                        Eigen::Matrix<T, Dim_t(dim), 1> pix_size) {
       Eigen::Matrix<T, dim, 1> retval = pix_size;
       for (size_t i = 0; i < dim; ++i) {
         retval[i] *= ccoord[i];
+      }
+      return retval;
+    }
+
+    /* ---------------------------------------------------------------------- */
+    template <size_t dim, typename T>
+    Eigen::Matrix<T, dim, 1> get_vector(const Ccoord_t<dim> & ccoord,
+                                        const std::array<T, dim>& pix_size) {
+      Eigen::Matrix<T, dim, 1> retval{};
+      for (size_t i = 0; i < dim; ++i) {
+        retval[i] = pix_size[i]*ccoord[i];
       }
       return retval;
     }

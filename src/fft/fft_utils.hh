@@ -43,32 +43,20 @@ namespace muSpectre {
    * compute fft frequencies (in time (or length) units of of sampling
    * periods), see numpy's fftfreq function for reference
    */
-  std::valarray<Real> fft_freqs(size_t nb_samples) {
-    std::valarray<Real> retval(nb_samples);
-    Int N = (nb_samples-1)/2 + 1; // needs to be signed int for neg freqs
-    for (Int i = 0; i < N; ++i) {
-      retval[i] = i;
-    }
-    for (Int i = N; i < Int(nb_samples); ++i) {
-      retval[i] = -Int(nb_samples)/2+i-N;
-    }
-    return retval;
-  }
+  std::valarray<Real> fft_freqs(size_t nb_samples);
 
   /**
    * compute fft frequencies in correct length or time units. Here,
    * length refers to the total size of the domain over which the fft
    * is taken (for instance the length of an edge of an RVE)
    */
-  std::valarray<Real> fft_freqs(size_t nb_samples, Real length) {
-    return fft_freqs(nb_samples)/length;
-  }
+  std::valarray<Real> fft_freqs(size_t nb_samples, Real length);
 
   /**
    * Get fft_freqs for a grid
    */
   template <size_t dim>
-  std::array<std::valarray<Real>, dim> fft_freqs(Ccoord_t<dim> sizes,
+  inline std::array<std::valarray<Real>, dim> fft_freqs(Ccoord_t<dim> sizes,
                                                  std::array<Real, dim> lengths) {
     std::array<std::valarray<Real>, dim> retval{};
     for (size_t i = 0; i < dim; ++i) {

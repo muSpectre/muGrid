@@ -66,6 +66,9 @@ namespace muSpectre {
   using Real = double;
   using Complex = std::complex<Real>;
 
+  //! convenience definitions
+  constexpr Real pi{atan(1.)*4};
+
   //! compile-time potentiation required for field-size computations
   template <typename I>
   constexpr I ipow(I base, I exponent) {
