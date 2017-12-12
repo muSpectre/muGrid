@@ -41,11 +41,12 @@ namespace muSpectre {
   //! Eigen uses signed integers for dimensions. For consistency, µSpectre uses
   //! them througout the code
   using Dim_t = int;// needs to represent -1 for eigen
-  const Dim_t oneD{1};
-  const Dim_t twoD{2};
-  const Dim_t threeD{3};
-  const Dim_t secondOrder{2};
-  const Dim_t fourthOrder{4};
+  constexpr Dim_t oneD{1};
+  constexpr Dim_t twoD{2};
+  constexpr Dim_t threeD{3};
+  constexpr Dim_t firstOrder{1};
+  constexpr Dim_t secondOrder{2};
+  constexpr Dim_t fourthOrder{4};
 
   //! Scalar types used for mathematical calculations
   using Uint = unsigned int;

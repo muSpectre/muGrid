@@ -35,6 +35,7 @@
 #include "tests.hh"
 #include "fft/fftw_engine.hh"
 #include "fft/projection_finite_strain.hh"
+#include "fft/projection_finite_strain_fast.hh"
 #include "fft/fft_utils.hh"
 #include "common/common.hh"
 #include "common/field_collection.hh"
@@ -82,10 +83,10 @@ namespace muSpectre {
   };
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM, class SizeGiver>
+  template <Dim_t DimS, Dim_t DimM, class SizeGiver, class Proj>
   struct ProjectionFixture {
     using Engine = FFTW_Engine<DimS, DimM>;
-    using Parent = ProjectionFiniteStrain<DimS, DimM>;
+    using Parent = Proj;
     constexpr static Dim_t sdim{DimS};
     constexpr static Dim_t mdim{DimM};
     ProjectionFixture(): engine{SizeGiver::get_resolution(),
@@ -97,10 +98,15 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   using fixlist =
-    boost::mpl::list<ProjectionFixture<twoD, twoD, Squares<twoD>>,
-                     ProjectionFixture<threeD, threeD, Squares<threeD>>,
-                     ProjectionFixture<twoD, twoD, Sizes<twoD>>,
-                     ProjectionFixture<threeD, threeD, Sizes<threeD>>>;
+    boost::mpl::list<ProjectionFixture<twoD, twoD, Squares<twoD>, ProjectionFiniteStrain<twoD, twoD>>,
+                     ProjectionFixture<threeD, threeD, Squares<threeD>, ProjectionFiniteStrain<threeD, threeD>>,
+                     ProjectionFixture<twoD, twoD, Sizes<twoD>, ProjectionFiniteStrain<twoD, twoD>>,
+                     ProjectionFixture<threeD, threeD, Sizes<threeD>, ProjectionFiniteStrain<threeD, threeD>>,
+
+                     ProjectionFixture<twoD, twoD, Squares<twoD>, ProjectionFiniteStrainFast<twoD, twoD>>,
+                     ProjectionFixture<threeD, threeD, Squares<threeD>, ProjectionFiniteStrainFast<threeD, threeD>>,
+                     ProjectionFixture<twoD, twoD, Sizes<twoD>, ProjectionFiniteStrainFast<twoD, twoD>>,
+                     ProjectionFixture<threeD, threeD, Sizes<threeD>, ProjectionFiniteStrainFast<threeD, threeD>>>;
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(constructor_test, fix, fixlist, fix) {
