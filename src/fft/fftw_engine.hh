@@ -42,14 +42,14 @@ namespace muSpectre {
   public:
     using Parent = FFT_Engine_base<DimS, DimM>;
     using Ccoord = typename Parent::Ccoord;
-    using Lengths = typename Parent::Lengths;
+    using Rcoord = typename Parent::Rcoord;
     using Workspace_t = typename Parent::Workspace_t;
     using Field_t = typename Parent::Field_t;
     //! Default constructor
     FFTW_Engine() = delete;
 
     //! Constructor with system resolutions
-    FFTW_Engine(Ccoord resolutions, Lengths lengths);
+    FFTW_Engine(Ccoord resolutions, Rcoord lengths);
 
     //! Copy constructor
     FFTW_Engine(const FFTW_Engine &other) = delete;

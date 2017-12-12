@@ -52,34 +52,55 @@ namespace muSpectre {
   template<>
   struct Sizes<twoD> {
     constexpr static Ccoord_t<twoD> get_resolution() {
-      return Ccoord_t<twoD>{13, 15};}
-    constexpr static std::array<Real, twoD> get_lengths() {
-      return std::array<Real, twoD>{3.4, 5.8};}
+      return Ccoord_t<twoD>{3, 5};}
+    constexpr static Rcoord_t<twoD> get_lengths() {
+      return Rcoord_t<twoD>{3.4, 5.8};}
   };
   template<>
   struct Sizes<threeD> {
     constexpr static Ccoord_t<threeD> get_resolution() {
-      return Ccoord_t<threeD>{13, 15, 17};}
-    constexpr static std::array<Real, threeD> get_lengths() {
-      return std::array<Real, threeD>{3.4, 5.8, 6.7};}
+      return Ccoord_t<threeD>{3, 5, 7};}
+    constexpr static Rcoord_t<threeD> get_lengths() {
+      return Rcoord_t<threeD>{3.4, 5.8, 6.7};}
   };
+  template <Dim_t DimS>
+  struct Squares {
+  };
+  template<>
+  struct Squares<twoD> {
+    constexpr static Ccoord_t<twoD> get_resolution() {
+      return Ccoord_t<twoD>{5, 5};}
+    constexpr static Rcoord_t<twoD> get_lengths() {
+      return Rcoord_t<twoD>{5, 5};}
+  };
+  template<>
+  struct Squares<threeD> {
+    constexpr static Ccoord_t<threeD> get_resolution() {
+      return Ccoord_t<threeD>{7, 7, 7};}
+    constexpr static Rcoord_t<threeD> get_lengths() {
+      return Rcoord_t<threeD>{7, 7, 7};}
+  };
+
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimS, Dim_t DimM, class SizeGiver>
   struct ProjectionFixture {
     using Engine = FFTW_Engine<DimS, DimM>;
     using Parent = ProjectionFiniteStrain<DimS, DimM>;
     constexpr static Dim_t sdim{DimS};
     constexpr static Dim_t mdim{DimM};
-    ProjectionFixture(): engine{Sizes<DimS>::get_resolution(),
-        Sizes<DimS>::get_lengths()},
+    ProjectionFixture(): engine{SizeGiver::get_resolution(),
+        SizeGiver::get_lengths()},
                          projector(engine){}
     Engine engine;
     Parent projector;
   };
 
   /* ---------------------------------------------------------------------- */
-  using fixlist = boost::mpl::list<ProjectionFixture<twoD, twoD>,
-                                   ProjectionFixture<threeD, threeD>>;
+  using fixlist =
+    boost::mpl::list<ProjectionFixture<twoD, twoD, Squares<twoD>>,
+                     ProjectionFixture<threeD, threeD, Squares<threeD>>,
+                     ProjectionFixture<twoD, twoD, Sizes<twoD>>,
+                     ProjectionFixture<threeD, threeD, Sizes<threeD>>>;
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(constructor_test, fix, fixlist, fix) {
@@ -108,7 +129,7 @@ namespace muSpectre {
     FieldMap grad(f_grad);
     FieldMap var(f_var);
 
-    fields.initialise(Sizes<sdim>::get_resolution());
+    fields.initialise(fix::engine.get_resolutions());
     FFT_freqs<dim> freqs{fix::engine.get_resolutions(),
         fix::engine.get_lengths()};
     Vector k; for (Dim_t i = 0; i < dim; ++i) {
@@ -121,9 +142,11 @@ namespace muSpectre {
       auto & ccoord = boost::get<0>(tup);
       auto & g = boost::get<1>(tup);
       auto & v = boost::get<2>(tup);
-      Vector vec = CcoordOps::get_vector(ccoord, fix::engine.get_lengths());
-      g.col(0) << 2*pi * k * cos(k.dot(vec));
-      v.col(0) = g.col(0);
+      Vector vec = CcoordOps::get_vector(ccoord,
+                                         fix::engine.get_lengths()/
+                                         fix::engine.get_resolutions());
+      g.row(0) << k.transpose() * cos(k.dot(vec));
+      v.row(0) = g.row(0);
     }
 
     fix::projector.initialise(FFT_PlanFlags::estimate);
@@ -133,8 +156,9 @@ namespace muSpectre {
       auto & ccoord = boost::get<0>(tup);
       auto & g = boost::get<1>(tup);
       auto & v = boost::get<2>(tup);
-      auto vec = CcoordOps::get_vector(ccoord);
-
+      Vector vec = CcoordOps::get_vector(ccoord,
+                                         fix::engine.get_lengths()/
+                                         fix::engine.get_resolutions());
       Real error = (g-v).norm();
       BOOST_CHECK_LT(error, tol);
       if (error >=tol) {
@@ -147,67 +171,67 @@ namespace muSpectre {
 
   }
 
-  /* ---------------------------------------------------------------------- */
-  using F3 = ProjectionFixture<threeD, threeD>;
-  BOOST_FIXTURE_TEST_CASE(Helmholtz_decomposition, F3) {
-    // create a field that is explicitely the sum of a gradient and a
-    // curl, then verify that the projected field corresponds to the
-    // gradient (without the zero'th component)
-    constexpr Dim_t sdim{F3::sdim}, mdim{F3::mdim};
-    using Fields = FieldCollection<sdim, mdim>;
-    Fields fields{};
-    using FieldT = TensorField<Fields, Real, secondOrder, mdim>;
-    using FieldMap = MatrixFieldMap<Fields, Real, mdim, mdim>;
-    FieldT & f_grad{make_field<FieldT>("gradient", fields)};
-    FieldT & f_curl{make_field<FieldT>("curl", fields)};
-    FieldT & f_sum{make_field<FieldT>("sum", fields)};
-    FieldT & f_var{make_field<FieldT>("working field", fields)};
+  // /* ---------------------------------------------------------------------- */
+  // using F3 = ProjectionFixture<threeD, threeD, Squares<threeD>>;
+  // BOOST_FIXTURE_TEST_CASE(Helmholtz_decomposition, F3) {
+  //   // create a field that is explicitely the sum of a gradient and a
+  //   // curl, then verify that the projected field corresponds to the
+  //   // gradient (without the zero'th component)
+  //   constexpr Dim_t sdim{F3::sdim}, mdim{F3::mdim};
+  //   using Fields = FieldCollection<sdim, mdim>;
+  //   Fields fields{};
+  //   using FieldT = TensorField<Fields, Real, secondOrder, mdim>;
+  //   using FieldMap = MatrixFieldMap<Fields, Real, mdim, mdim>;
+  //   FieldT & f_grad{make_field<FieldT>("gradient", fields)};
+  //   FieldT & f_curl{make_field<FieldT>("curl", fields)};
+  //   FieldT & f_sum{make_field<FieldT>("sum", fields)};
+  //   FieldT & f_var{make_field<FieldT>("working field", fields)};
 
-    FieldMap grad(f_grad);
-    FieldMap curl(f_curl);
-    FieldMap sum(f_sum);
-    FieldMap var(f_var);
+  //   FieldMap grad(f_grad);
+  //   FieldMap curl(f_curl);
+  //   FieldMap sum(f_sum);
+  //   FieldMap var(f_var);
 
-    fields.initialise(Sizes<sdim>::get_resolution());
+  //   fields.initialise(F3::engine.get_resolutions());
 
-    for (auto && tup: boost::combine(fields, grad, curl, sum, var)) {
-      auto & ccoord = boost::get<0>(tup);
-      auto & g = boost::get<1>(tup);
-      auto & c = boost::get<2>(tup);
-      auto & s = boost::get<3>(tup);
-      auto & v = boost::get<4>(tup);
-      auto vec = CcoordOps::get_vector(ccoord);
-      Real & x{vec(0)};
-      Real & y{vec(1)};
-      Real & z{vec(2)};
-      g.col(0) << y*z, x*z, y*z;
-      c.col(0) << 0, x*y, -x*z;
-      v.col(0) = s.col(0) = g.col(0) + c.col(0);
-    }
+  //   for (auto && tup: boost::combine(fields, grad, curl, sum, var)) {
+  //     auto & ccoord = boost::get<0>(tup);
+  //     auto & g = boost::get<1>(tup);
+  //     auto & c = boost::get<2>(tup);
+  //     auto & s = boost::get<3>(tup);
+  //     auto & v = boost::get<4>(tup);
+  //     auto vec = CcoordOps::get_vector(ccoord);
+  //     Real & x{vec(0)};
+  //     Real & y{vec(1)};
+  //     Real & z{vec(2)};
+  //     g.row(0) << y*z, x*z, y*z;
+  //     c.row(0) << 0, x*y, -x*z;
+  //     v.row(0) = s.row(0) = g.row(0) + c.row(0);
+  //   }
 
-    projector.initialise(FFT_PlanFlags::estimate);
-    projector.apply_projection(f_var);
+  //   projector.initialise(FFT_PlanFlags::estimate);
+  //   projector.apply_projection(f_var);
 
-    for (auto && tup: boost::combine(fields, grad, curl, sum, var)) {
-      auto & ccoord = boost::get<0>(tup);
-      auto & g = boost::get<1>(tup);
-      auto & c = boost::get<2>(tup);
-      auto & s = boost::get<3>(tup);
-      auto & v = boost::get<4>(tup);
-      auto vec = CcoordOps::get_vector(ccoord);
+  //   for (auto && tup: boost::combine(fields, grad, curl, sum, var)) {
+  //     auto & ccoord = boost::get<0>(tup);
+  //     auto & g = boost::get<1>(tup);
+  //     auto & c = boost::get<2>(tup);
+  //     auto & s = boost::get<3>(tup);
+  //     auto & v = boost::get<4>(tup);
+  //     auto vec = CcoordOps::get_vector(ccoord);
 
-      Real error = (s-g).norm();
-      //BOOST_CHECK_LT(error, tol);
-      if (error >=tol) {
-        std::cout << std::endl << "grad_ref :"  << std::endl << g << std::endl;
-        std::cout << std::endl << "grad_proj :" << std::endl << v << std::endl;
-        std::cout << std::endl << "curl :"      << std::endl << c << std::endl;
-        std::cout << std::endl << "sum :"       << std::endl << s << std::endl;
-        std::cout << std::endl << "ccoord :"    << std::endl << ccoord << std::endl;
-        std::cout << std::endl << "vector :"    << std::endl << vec.transpose() << std::endl;
-      }
-    }
-  }
+  //     Real error = (s-g).norm();
+  //     //BOOST_CHECK_LT(error, tol);
+  //     if (error >=tol) {
+  //       std::cout << std::endl << "grad_ref :"  << std::endl << g << std::endl;
+  //       std::cout << std::endl << "grad_proj :" << std::endl << v << std::endl;
+  //       std::cout << std::endl << "curl :"      << std::endl << c << std::endl;
+  //       std::cout << std::endl << "sum :"       << std::endl << s << std::endl;
+  //       std::cout << std::endl << "ccoord :"    << std::endl << ccoord << std::endl;
+  //       std::cout << std::endl << "vector :"    << std::endl << vec.transpose() << std::endl;
+  //     }
+  //   }
+  // }
   BOOST_AUTO_TEST_SUITE_END();
 
 }  // muSpectre

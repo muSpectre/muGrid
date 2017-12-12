@@ -85,8 +85,8 @@ namespace muSpectre {
   BOOST_AUTO_TEST_CASE(vector_test) {
     constexpr Ccoord_t<threeD> c3{1, 2, 3};
     constexpr Ccoord_t<twoD> c2{c3[0], c3[1]};
-    constexpr std::array<Real, threeD> s3{1.3, 2.8, 5.7};
-    constexpr std::array<Real, twoD> s2{s3[0], s3[1]};
+    constexpr Rcoord_t<threeD> s3{1.3, 2.8, 5.7};
+    constexpr Rcoord_t<twoD> s2{s3[0], s3[1]};
 
     Eigen::Matrix<Real, twoD, 1> v2; v2 << s3[0], s3[1]; 
     Eigen::Matrix<Real, threeD, 1> v3; v3 << s3[0], s3[1], s3[2];

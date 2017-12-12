@@ -47,11 +47,22 @@ namespace muSpectre {
   const Dim_t secondOrder{2};
   const Dim_t fourthOrder{4};
 
+  //! Scalar types used for mathematical calculations
+  using Uint = unsigned int;
+  using Int = int;
+  using Real = double;
+  using Complex = std::complex<Real>;
+
   //! Ccoord_t are cell coordinates, i.e. integer coordinates
   template<Dim_t dim>
   using Ccoord_t = std::array<Dim_t, dim>;
-  template<size_t dim>
-  std::ostream & operator << (std::ostream & os, const Ccoord_t<dim> & index) {
+  //! Real space coordinates
+  template<Dim_t dim>
+  using Rcoord_t = std::array<Real, dim>;
+
+  template<typename T, size_t dim>
+  std::ostream & operator << (std::ostream & os,
+                              const std::array<T, dim> & index) {
     os << "(";
     for (size_t i = 0; i < dim-1; ++i) {
       os << index[i] << ", ";
@@ -60,11 +71,23 @@ namespace muSpectre {
     return os;
   }
 
-  //! Scalar types used for mathematical calculations
-  using Uint = unsigned int;
-  using Int = int;
-  using Real = double;
-  using Complex = std::complex<Real>;
+  template <size_t dim>
+  Rcoord_t<dim> operator/(const Rcoord_t<dim> & a, const Rcoord_t<dim> & b) {
+    Rcoord_t<dim> retval{a};
+    for (size_t i = 0; i < dim; ++i) {
+      retval[i]/=b[i];
+    }
+    return retval;
+  }
+
+  template <size_t dim>
+  Rcoord_t<dim> operator/(const Rcoord_t<dim> & a, const Ccoord_t<dim> & b) {
+    Rcoord_t<dim> retval{a};
+    for (size_t i = 0; i < dim; ++i) {
+      retval[i]/=b[i];
+    }
+    return retval;
+  }
 
   //! convenience definitions
   constexpr Real pi{atan(1.)*4};

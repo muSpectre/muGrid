@@ -45,7 +45,7 @@ namespace muSpectre {
     constexpr static Dim_t sdim{DimS};
     constexpr static Dim_t mdim{DimM};
     using Ccoord = Ccoord_t<DimS>;
-    using Lengths = std::array<Real, DimS>;
+    using Rcoord = std::array<Real, DimS>;
     using GFieldCollection_t = FieldCollection<DimS, DimM, true>;
     using LFieldCollection_t = FieldCollection<DimS, DimM, false>;
     using Field_t = TensorField<GFieldCollection_t, Real, 2, DimM>;
@@ -56,7 +56,7 @@ namespace muSpectre {
     FFT_Engine_base() = delete;
 
     //! Constructor with system resolutions
-    FFT_Engine_base(Ccoord resolutions, Lengths lengths);
+    FFT_Engine_base(Ccoord resolutions, Rcoord lengths);
 
     //! Copy constructor
     FFT_Engine_base(const FFT_Engine_base &other) = delete;
@@ -95,7 +95,7 @@ namespace muSpectre {
 
     //!
     const Ccoord & get_resolutions() const {return this->resolutions;}
-    const Lengths & get_lengths() const {return this->lengths;}
+    const Rcoord & get_lengths() const {return this->lengths;}
     LFieldCollection_t & get_field_collection() {
       return this->work_space_container;}
 
@@ -111,7 +111,7 @@ namespace muSpectre {
   protected:
     LFieldCollection_t work_space_container{};
     const Ccoord resolutions;
-    const Lengths lengths;
+    const Rcoord lengths;
     Workspace_t & work;
     const Real norm_factor;
   private:

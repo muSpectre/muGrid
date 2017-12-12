@@ -33,7 +33,7 @@
 namespace muSpectre {
 
   template <Dim_t DimS, Dim_t DimM>
-  FFTW_Engine<DimS, DimM>::FFTW_Engine(Ccoord resolutions, Lengths lengths)
+  FFTW_Engine<DimS, DimM>::FFTW_Engine(Ccoord resolutions, Rcoord lengths)
     :Parent{resolutions, lengths},
      hermitian_resolutions{CcoordOps::get_hermitian_sizes(resolutions)}
   {
@@ -117,6 +117,9 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   void
   FFTW_Engine<DimS, DimM>::ifft (Field_t & field) const {
+    if (field.size() != CcoordOps::get_size(this->resolutions)) {
+      throw std::runtime_error("size mismatch");
+    }
     fftw_execute_dft_c2r(this->plan_ifft,
                          reinterpret_cast<fftw_complex*>(this->work.data()),
                          field.data());
