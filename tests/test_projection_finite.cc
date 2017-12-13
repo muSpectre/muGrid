@@ -97,16 +97,24 @@ namespace muSpectre {
   };
 
   /* ---------------------------------------------------------------------- */
-  using fixlist =
-    boost::mpl::list<ProjectionFixture<twoD, twoD, Squares<twoD>, ProjectionFiniteStrain<twoD, twoD>>,
-                     ProjectionFixture<threeD, threeD, Squares<threeD>, ProjectionFiniteStrain<threeD, threeD>>,
-                     ProjectionFixture<twoD, twoD, Sizes<twoD>, ProjectionFiniteStrain<twoD, twoD>>,
-                     ProjectionFixture<threeD, threeD, Sizes<threeD>, ProjectionFiniteStrain<threeD, threeD>>,
+  using fixlist = boost::mpl::list<
+    ProjectionFixture<twoD, twoD, Squares<twoD>,
+                      ProjectionFiniteStrain<twoD, twoD>>,
+    ProjectionFixture<threeD, threeD, Squares<threeD>,
+                      ProjectionFiniteStrain<threeD, threeD>>,
+    ProjectionFixture<twoD, twoD, Sizes<twoD>,
+                      ProjectionFiniteStrain<twoD, twoD>>,
+    ProjectionFixture<threeD, threeD, Sizes<threeD>,
+                      ProjectionFiniteStrain<threeD, threeD>>,
 
-                     ProjectionFixture<twoD, twoD, Squares<twoD>, ProjectionFiniteStrainFast<twoD, twoD>>,
-                     ProjectionFixture<threeD, threeD, Squares<threeD>, ProjectionFiniteStrainFast<threeD, threeD>>,
-                     ProjectionFixture<twoD, twoD, Sizes<twoD>, ProjectionFiniteStrainFast<twoD, twoD>>,
-                     ProjectionFixture<threeD, threeD, Sizes<threeD>, ProjectionFiniteStrainFast<threeD, threeD>>>;
+    ProjectionFixture<twoD, twoD, Squares<twoD>,
+                      ProjectionFiniteStrainFast<twoD, twoD>>,
+    ProjectionFixture<threeD, threeD, Squares<threeD>,
+                      ProjectionFiniteStrainFast<threeD, threeD>>,
+    ProjectionFixture<twoD, twoD, Sizes<twoD>,
+                      ProjectionFiniteStrainFast<twoD, twoD>>,
+    ProjectionFixture<threeD, threeD, Sizes<threeD>,
+                      ProjectionFiniteStrainFast<threeD, threeD>>>;
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(constructor_test, fix, fixlist, fix) {

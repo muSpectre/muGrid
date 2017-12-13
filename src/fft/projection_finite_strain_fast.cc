@@ -64,7 +64,7 @@ namespace muSpectre {
     for (auto && tup: boost::combine(this->xis, field_map)) {
       auto & xi{boost::get<0>(tup)};
       auto & f{boost::get<1>(tup)};
-      f = factor * (xi*(f*xi).eval().transpose());
+      f = factor * ((f*xi).eval()*xi.transpose());
     }
     this->fft_engine.ifft(field);
   }
