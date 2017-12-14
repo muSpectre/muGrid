@@ -99,6 +99,7 @@ namespace muSpectre {
 
       //! give access to collections
       friend FieldCollection;
+      friend typename FieldCollection::Parent;
 
     protected:
       /* ---------------------------------------------------------------------- */

@@ -47,6 +47,7 @@ namespace muSpectre {
   public:
     using FFT_Engine = FFT_Engine_base<DimS, DimM>;
     using Ccoord = typename FFT_Engine::Ccoord;
+    using Rcoord = typename FFT_Engine::Rcoord;
     using GFieldCollection_t = typename FFT_Engine::GFieldCollection_t;
     using LFieldCollection_t = typename FFT_Engine::LFieldCollection_t;
     using Field_t = typename FFT_Engine::Field_t;
@@ -78,6 +79,12 @@ namespace muSpectre {
 
     //! apply the projection operator to a field
     void apply_projection(Field_t & field) const;
+
+    //!
+    const Ccoord & get_resolutions() const {
+      return this->fft_engine.get_resolutions();}
+    const Rcoord & get_lengths() const {
+      return this->fft_engine.get_lengths();}
 
   protected:
     FFT_Engine & fft_engine;

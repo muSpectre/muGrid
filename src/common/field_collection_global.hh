@@ -114,6 +114,9 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   void GlobalFieldCollection<DimS, DimM>::
   initialise(Ccoord sizes) {
+    if (this->is_initialised) {
+      throw std::runtime_error("double initialisation");
+    }
     this->pixels = CcoordOps::Pixels<DimS>(sizes);
     this->size_ = std::accumulate(sizes.begin(), sizes.end(), 1,
                                    std::multiplies<Dim_t>());

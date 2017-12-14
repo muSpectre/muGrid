@@ -27,11 +27,101 @@
  * Boston, MA 02111-1307, USA.
  */
 
+#include <sstream>
+#include <algorithm>
+
 #include "system/system_base.hh"
+#include "common/ccoord_operations.hh"
 
 
 namespace muSpectre {
 
-  
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  SystemBase<DimS, DimM>::SystemBase(Projection_ptr projection)
+    :resolutions{projection->get_resolutions()},
+     lengths{projection->get_lengths()},
+     F{make_field<StrainField_t>("Gradient", this->fields)},
+     P{make_field<StressField_t>("Piola-Kirchhoff-1", this->fields)},
+     K_ptr{nullptr}, projection{std::move(projection)}
+  {}
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  void SystemBase<DimS, DimM>::add_material(Material_ptr mat) {
+    this->materials.push_back(std::move(mat));
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  typename SystemBase<DimS, DimM>::FullResponse_t
+  SystemBase<DimS, DimM>::evaluate_stress_tangent(StrainField_t & grad) {
+    if (this->is_initialised == false) {
+      this->initialise();
+    }
+    //! High level compatibility checks
+    if (grad.size() != this->F.size()) {
+      throw std::runtime_error("Size mismatch");
+    }
+    if (this->K_ptr == nullptr) {
+      K_ptr = &make_field<TangentField_t>("Tangent Stiffness", this->fields);
+    }
+
+    for (auto & mat: this->materials) {
+      mat->compute_stresses_tangent(grad, this->P, *this->K_ptr, form);
+    }
+    return std::tie(this->P, *this->K_ptr);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  void SystemBase<DimS, DimM>::initialise() {
+    this->check_material_coverage();
+    this->fields.initialise(this->resolutions);
+    this->is_initialised = true;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  void SystemBase<DimS, DimM>::check_material_coverage() {
+    auto nb_pixels = CcoordOps::get_size(this->resolutions);
+    std::vector<MaterialBase<DimS, DimM>*> assignments(nb_pixels, nullptr);
+    for (auto & mat: this->materials) {
+      for (auto & pixel: *mat) {
+        auto index = CcoordOps::get_index(this->resolutions, pixel);
+        auto& assignment{assignments.at(index)};
+        if (assignment != nullptr) {
+          std::stringstream err{};
+          err << "Pixel " << pixel << "is already assigned to material '"
+              << assignment->get_name()
+              << "' and cannot be reassigned to material '" << mat->get_name();
+          throw std::runtime_error(err.str());
+        } else {
+          assignments[index] = mat.get();
+        }
+      }
+    }
+
+    // find and identify unassigned pixels
+    std::vector<Ccoord> unassigned_pixels;
+    for (size_t i = 0; i < assignments.size(); ++i) {
+      if (assignments[i] == nullptr) {
+        unassigned_pixels.push_back(CcoordOps::get_ccoord(this->resolutions, i));
+      }
+    }
+
+    if (unassigned_pixels.size() != 0) {
+      std::stringstream err {};
+      err << "The following pixels have were not assigned a material: ";
+      for (auto & pixel: unassigned_pixels) {
+        err << pixel << ", ";
+      }
+      err << "and that cannot be handled";
+      throw std::runtime_error(err.str());
+    }
+  }
+
+  template class SystemBase<twoD, twoD>;
+  template class SystemBase<threeD, threeD>;
 
 }  // muSpectre

@@ -52,6 +52,7 @@ namespace muSpectre {
     //! plastic strains, damage variables, etc, but also for managing which
     //! pixels the material is responsible for
     using MFieldCollection_t = FieldCollection<DimS, DimM, false>;
+    using iterator = typename MFieldCollection_t::iterator;
     using Field_t = internal::FieldBase<GFieldCollection_t>;
     using StressField_t = TensorField<GFieldCollection_t, Real, secondOrder, DimM>;
     using StrainField_t = StressField_t;
@@ -124,6 +125,9 @@ namespace muSpectre {
                                   Field_t & P,
                                   Field_t & K,
                                   Formulation form);
+
+    inline iterator begin() {return this->internal_fields.begin();}
+    inline iterator end()  {return this->internal_fields.end();}
 
   protected:
 

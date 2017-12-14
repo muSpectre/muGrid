@@ -146,6 +146,9 @@ namespace muSpectre {
       }
       throw FieldCollectionError(err_str.str());
     }
+    if (this->is_initialised) {
+      field->resize(this->size());
+    }
     this->fields[field->get_name()] = std::move(field);
   }
 

@@ -122,6 +122,9 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   void LocalFieldCollection<DimS, DimM>::
   initialise() {
+    if (this->is_initialised) {
+      throw std::runtime_error("double initialisation");
+    }
     this->size_ = this->ccoords.size();
     std::for_each(std::begin(this->fields), std::end(this->fields),
                   [this](auto && item) {
