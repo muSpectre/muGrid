@@ -30,6 +30,8 @@
 #ifndef PROJECTION_BASE_H
 #define PROJECTION_BASE_H
 
+#include <memory>
+
 #include "common/common.hh"
 #include "common/field_collection.hh"
 #include "common/field.hh"
@@ -46,6 +48,7 @@ namespace muSpectre {
   {
   public:
     using FFT_Engine = FFT_Engine_base<DimS, DimM>;
+    using FFT_Engine_ptr = std::unique_ptr<FFT_Engine>;
     using Ccoord = typename FFT_Engine::Ccoord;
     using Rcoord = typename FFT_Engine::Rcoord;
     using GFieldCollection_t = typename FFT_Engine::GFieldCollection_t;
@@ -57,7 +60,7 @@ namespace muSpectre {
     ProjectionBase() = delete;
 
     //! Constructor with system sizes
-    ProjectionBase(FFT_Engine & engine);
+    ProjectionBase(FFT_Engine_ptr engine);
 
     //! Copy constructor
     ProjectionBase(const ProjectionBase &other) = delete;
@@ -82,12 +85,12 @@ namespace muSpectre {
 
     //!
     const Ccoord & get_resolutions() const {
-      return this->fft_engine.get_resolutions();}
+      return this->fft_engine->get_resolutions();}
     const Rcoord & get_lengths() const {
-      return this->fft_engine.get_lengths();}
+      return this->fft_engine->get_lengths();}
 
   protected:
-    FFT_Engine & fft_engine;
+    FFT_Engine_ptr fft_engine;
     LFieldCollection_t & projection_container{};
 
   private:

@@ -30,8 +30,6 @@
  *
  */
 /* -------------------------------------------------------------------------- */
-//#include <cassert>
-//#include <iostream>
 #include <tuple>
 #include <utility>
 /* -------------------------------------------------------------------------- */
@@ -45,120 +43,70 @@ namespace tuple {
   /* ------------------------------------------------------------------------ */
   namespace details {
     template <size_t N> struct Foreach {
-      template <class F, class Tuple>
-      static inline decltype(auto) transform_forward(F && func,
-                                                     Tuple && tuple) {
-        return std::tuple_cat(
-            Foreach<N - 1>::transform_forward(std::forward<F>(func),
-                                              std::forward<Tuple>(tuple)),
-            std::forward_as_tuple(std::forward<F>(func)(
-                std::get<N - 1>(std::forward<Tuple>(tuple)))));
-      }
-
-      template <class F, class Tuple>
-      static inline decltype(auto) transform(F && func, Tuple && tuple) {
-        return std::tuple_cat(
-            Foreach<N - 1>::transform(std::forward<F>(func),
-                                      std::forward<Tuple>(tuple)),
-            std::make_tuple(std::forward<F>(func)(
-                std::get<N - 1>(std::forward<Tuple>(tuple)))));
-      }
-
-      template <class F, class Tuple>
-      static inline void foreach (F && func, Tuple && tuple) {
-        Foreach<N - 1>::foreach (std::forward<F>(func),
-                                 std::forward<Tuple>(tuple));
-        std::forward<F>(func)(std::get<N - 1>(std::forward<Tuple>(tuple)));
-      }
-
-      template <class Tuple> static inline bool equal(Tuple && a, Tuple && b) {
-        if (not(std::get<N - 1>(std::forward<Tuple>(a)) ==
-                std::get<N - 1>(std::forward<Tuple>(b))))
+      template <class Tuple>
+      static inline bool not_equal(Tuple && a, Tuple && b) {
+        if (std::get<N - 1>(std::forward<Tuple>(a)) ==
+            std::get<N - 1>(std::forward<Tuple>(b)))
           return false;
-        return Foreach<N - 1>::equal(std::forward<Tuple>(a),
-                                     std::forward<Tuple>(b));
+        return Foreach<N - 1>::not_equal(std::forward<Tuple>(a),
+                                         std::forward<Tuple>(b));
       }
     };
 
-    /* ------------------------------------------------------------------------
-     */
-    template <> struct Foreach<1> {
-      template <class F, class Tuple>
-      static inline decltype(auto) transform_forward(F && func,
-                                                     Tuple && tuple) {
-        return std::forward_as_tuple(
-            std::forward<F>(func)(std::get<0>(std::forward<Tuple>(tuple))));
-      }
-
-      template <class F, class Tuple>
-      static inline decltype(auto) transform(F && func, Tuple && tuple) {
-        return std::make_tuple(
-            std::forward<F>(func)(std::get<0>(std::forward<Tuple>(tuple))));
-      }
-
-      template <class F, class Tuple>
-      static inline void foreach (F && func, Tuple && tuple) {
-        std::forward<F>(func)(std::get<0>(std::forward<Tuple>(tuple)));
-      }
-
-      template <class Tuple> static inline bool equal(Tuple && a, Tuple && b) {
-        return std::get<0>(std::forward<Tuple>(a)) ==
+    /* ---------------------------------------------------------------------- */
+    template <> struct Foreach<0> {
+      template <class Tuple>
+      static inline bool not_equal(Tuple && a, Tuple && b) {
+        return std::get<0>(std::forward<Tuple>(a)) !=
                std::get<0>(std::forward<Tuple>(b));
       }
     };
-  } // namespace details
+
+    template <typename... Ts>
+    decltype(auto) make_tuple_no_decay(Ts &&... args) {
+      return std::tuple<Ts...>(std::forward<Ts>(args)...);
+    }
+
+    template <class F, class Tuple, size_t... Is>
+    void foreach_impl(F && func, Tuple && tuple,
+                      std::index_sequence<Is...> &&) {
+      (void)std::initializer_list<int>{
+          (std::forward<F>(func)(std::get<Is>(std::forward<Tuple>(tuple))),
+           0)...};
+    }
+
+    template <class F, class Tuple, size_t... Is>
+    decltype(auto) transform_impl(F && func, Tuple && tuple,
+                                  std::index_sequence<Is...> &&) {
+      return make_tuple_no_decay(
+          std::forward<F>(func)(std::get<Is>(std::forward<Tuple>(tuple)))...);
+    }
+  }; // namespace details
+
   /* ------------------------------------------------------------------------ */
-  template <class Tuple> bool are_equal(Tuple && a, Tuple && b) {
-    return details::Foreach<std::tuple_size<std::decay_t<Tuple>>::value>::equal(
-        std::forward<Tuple>(a), std::forward<Tuple>(b));
+  template <class Tuple> bool are_not_equal(Tuple && a, Tuple && b) {
+    return details::Foreach<std::tuple_size<std::decay_t<Tuple>>::value>::
+        not_equal(std::forward<Tuple>(a), std::forward<Tuple>(b));
   }
 
   template <class F, class Tuple> void foreach (F && func, Tuple && tuple) {
-    details::Foreach<std::tuple_size<std::decay_t<Tuple>>::value>::foreach (
-        std::forward<F>(func), std::forward<Tuple>(tuple));
-  }
-
-  template <class F, class Tuple>
-  decltype(auto) transform_forward(F && func, Tuple && tuple) {
-    return details::Foreach<std::tuple_size<std::decay_t<Tuple>>::value>::
-        transform_forward(std::forward<F>(func), std::forward<Tuple>(tuple));
+    return details::foreach_impl(
+        std::forward<F>(func), std::forward<Tuple>(tuple),
+        std::make_index_sequence<
+            std::tuple_size<std::decay_t<Tuple>>::value>{});
   }
 
   template <class F, class Tuple>
   decltype(auto) transform(F && func, Tuple && tuple) {
-    return details::Foreach<std::tuple_size<std::decay_t<Tuple>>::value>::
-        transform(std::forward<F>(func), std::forward<Tuple>(tuple));
+    return details::transform_impl(
+        std::forward<F>(func), std::forward<Tuple>(tuple),
+        std::make_index_sequence<
+            std::tuple_size<std::decay_t<Tuple>>::value>{});
   }
 } // namespace tuple
 
+/* -------------------------------------------------------------------------- */
 namespace iterators {
-  namespace details {
-    struct dereference_iterator {
-      template <class Iter> decltype(auto) operator()(Iter & it) const {
-        return std::forward<decltype(*it)>(*it);
-      }
-    };
-
-    struct increment_iterator {
-      template <class Iter> void operator()(Iter & it) const { ++it; }
-    };
-
-    struct begin_container {
-      template <class Container>
-      decltype(auto) operator()(Container && cont) const {
-        return std::forward<Container>(cont).begin();
-      }
-    };
-
-    struct end_container {
-      template <class Container>
-      decltype(auto) operator()(Container && cont) const {
-        return std::forward<Container>(cont).end();
-      }
-    };
-  } // namespace details
-
-  /* ------------------------------------------------------------------------ */
   template <class... Iterators> class ZipIterator {
   private:
     using tuple_t = std::tuple<Iterators...>;
@@ -167,21 +115,20 @@ namespace iterators {
     explicit ZipIterator(tuple_t iterators) : iterators(std::move(iterators)) {}
 
     decltype(auto) operator*() {
-      return tuple::transform_forward(details::dereference_iterator(),
-                                      iterators);
+      return tuple::transform([] (auto && it) -> decltype(auto) {return *it;}, iterators);
     }
 
     ZipIterator & operator++() {
-      tuple::foreach (details::increment_iterator(), iterators);
+      tuple::foreach ([] (auto && it) { ++it; }, iterators);
       return *this;
     }
 
     bool operator==(const ZipIterator & other) const {
-      return tuple::are_equal(iterators, other.iterators);
+      return not tuple::are_not_equal(iterators, other.iterators);
     }
 
     bool operator!=(const ZipIterator & other) const {
-      return not operator==(other);
+      return tuple::are_not_equal(iterators, other.iterators);
     }
 
   private:
@@ -189,7 +136,6 @@ namespace iterators {
   };
 } // namespace iterators
 
-/* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 template <class... Iterators>
 decltype(auto) zip_iterator(std::tuple<Iterators...> && iterators_tuple) {
@@ -209,25 +155,25 @@ namespace containers {
 
     decltype(auto) begin() const {
       return zip_iterator(
-          tuple::transform(iterators::details::begin_container(),
+          tuple::transform([] (auto && c) { return c.begin(); },
                            std::forward<containers_t>(containers)));
     }
 
     decltype(auto) end() const {
       return zip_iterator(
-          tuple::transform(iterators::details::end_container(),
+          tuple::transform([] (auto && c) { return c.end(); },
                            std::forward<containers_t>(containers)));
     }
 
     decltype(auto) begin() {
       return zip_iterator(
-          tuple::transform(iterators::details::begin_container(),
+          tuple::transform([] (auto && c) { return c.begin(); },
                            std::forward<containers_t>(containers)));
     }
 
     decltype(auto) end() {
       return zip_iterator(
-          tuple::transform(iterators::details::end_container(),
+          tuple::transform([] (auto && c) { return c.end(); },
                            std::forward<containers_t>(containers)));
     }
 
@@ -295,7 +241,7 @@ namespace containers {
       return val;
     }
 
-    constexpr size_t size() { return (stop - start) / step; }
+    constexpr T size() { return (stop - start) / step; }
 
     constexpr iterator begin() { return iterator(start, step); }
     constexpr iterator end() { return iterator(stop, step); }
@@ -305,14 +251,29 @@ namespace containers {
   };
 } // namespace containers
 
-template <class T> inline decltype(auto) arange(T stop) {
+template <class T,
+          typename = std::enable_if_t<std::is_integral<std::decay_t<T>>::value>>
+inline decltype(auto) arange(const T & stop) {
   return containers::ArangeContainer<T>(stop);
 }
 
-template <class T>
-inline constexpr decltype(auto) arange(T start, T stop, T step = 1) {
-  return containers::ArangeContainer<T>(start, stop, step);
+template <class T1, class T2,
+          typename = std::enable_if_t<
+              std::is_integral<std::common_type_t<T1, T2>>::value>>
+inline constexpr decltype(auto) arange(const T1 & start, const T2 & stop) {
+  return containers::ArangeContainer<std::common_type_t<T1, T2>>(start, stop);
 }
+
+template <class T1, class T2, class T3,
+          typename = std::enable_if_t<
+              std::is_integral<std::common_type_t<T1, T2, T3>>::value>>
+inline constexpr decltype(auto) arange(const T1 & start, const T2 & stop,
+                                       const T3 & step) {
+  return containers::ArangeContainer<std::common_type_t<T1, T2, T3>>(
+      start, stop, step);
+}
+
+/* -------------------------------------------------------------------------- */
 
 template <class Container>
 inline constexpr decltype(auto) enumerate(Container && container,

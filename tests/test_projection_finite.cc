@@ -27,6 +27,7 @@
  * Boston, MA 02111-1307, USA.
  */
 #include <cmath>
+#include <memory>
 
 #include <boost/mpl/list.hpp>
 #include <boost/range/combine.hpp>
@@ -89,10 +90,9 @@ namespace muSpectre {
     using Parent = Proj;
     constexpr static Dim_t sdim{DimS};
     constexpr static Dim_t mdim{DimM};
-    ProjectionFixture(): engine{SizeGiver::get_resolution(),
-        SizeGiver::get_lengths()},
-                         projector(engine){}
-    Engine engine;
+    ProjectionFixture()
+      :projector(std::make_unique<Engine>(SizeGiver::get_resolution(),
+                                          SizeGiver::get_lengths())){}
     Parent projector;
   };
 
@@ -143,13 +143,13 @@ namespace muSpectre {
     FieldMap grad(f_grad);
     FieldMap var(f_var);
 
-    fields.initialise(fix::engine.get_resolutions());
-    FFT_freqs<dim> freqs{fix::engine.get_resolutions(),
-        fix::engine.get_lengths()};
+    fields.initialise(fix::projector.get_resolutions());
+    FFT_freqs<dim> freqs{fix::projector.get_resolutions(),
+        fix::projector.get_lengths()};
     Vector k; for (Dim_t i = 0; i < dim; ++i) {
       // the wave vector has to be such that it leads to an integer
       // number of periods in each length of the domain
-      k(i) = (i+1)*2*pi/fix::engine.get_lengths()[i]; ;
+      k(i) = (i+1)*2*pi/fix::projector.get_lengths()[i]; ;
     }
 
     for (auto && tup: boost::combine(fields, grad, var)) {
@@ -157,8 +157,8 @@ namespace muSpectre {
       auto & g = boost::get<1>(tup);
       auto & v = boost::get<2>(tup);
       Vector vec = CcoordOps::get_vector(ccoord,
-                                         fix::engine.get_lengths()/
-                                         fix::engine.get_resolutions());
+                                         fix::projector.get_lengths()/
+                                         fix::projector.get_resolutions());
       g.row(0) << k.transpose() * cos(k.dot(vec));
       v.row(0) = g.row(0);
     }
@@ -171,8 +171,8 @@ namespace muSpectre {
       auto & g = boost::get<1>(tup);
       auto & v = boost::get<2>(tup);
       Vector vec = CcoordOps::get_vector(ccoord,
-                                         fix::engine.get_lengths()/
-                                         fix::engine.get_resolutions());
+                                         fix::projector.get_lengths()/
+                                         fix::projector.get_resolutions());
       Real error = (g-v).norm();
       BOOST_CHECK_LT(error, tol);
       if (error >=tol) {

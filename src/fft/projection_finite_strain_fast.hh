@@ -42,7 +42,7 @@ namespace muSpectre {
   {
   public:
     using Parent = ProjectionBase<DimS, DimM>;
-    using FFT_Engine = typename Parent::FFT_Engine;
+    using FFT_Engine_ptr = typename Parent::FFT_Engine_ptr;
     using Ccoord = typename Parent::Ccoord;
     using GFieldCollection_t = FieldCollection<DimS, DimM, true>;
     using LFieldCollection_t = FieldCollection<DimS, DimM, false>;
@@ -57,7 +57,7 @@ namespace muSpectre {
     ProjectionFiniteStrainFast() = delete;
 
     //! Constructor with fft_engine
-    ProjectionFiniteStrainFast(FFT_Engine & engine);
+    ProjectionFiniteStrainFast(FFT_Engine_ptr engine);
 
     //! Copy constructor
     ProjectionFiniteStrainFast(const ProjectionFiniteStrainFast &other) = delete;

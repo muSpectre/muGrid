@@ -40,6 +40,7 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   SystemBase<DimS, DimM>::SystemBase(Projection_ptr projection)
     :resolutions{projection->get_resolutions()},
+     pixels(resolutions),
      lengths{projection->get_lengths()},
      F{make_field<StrainField_t>("Gradient", this->fields)},
      P{make_field<StressField_t>("Piola-Kirchhoff-1", this->fields)},
@@ -73,12 +74,45 @@ namespace muSpectre {
     return std::tie(this->P, *this->K_ptr);
   }
 
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  typename SystemBase<DimS, DimM>::StrainField_t &
+  SystemBase<DimS, DimM>::get_strain() {
+    if (this->is_initialised == false) {
+      this->initialise();
+    }
+    return this->F;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  const typename SystemBase<DimS, DimM>::StressField_t &
+  SystemBase<DimS, DimM>::get_stress() const {
+    return this->P;
+  }
+
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   void SystemBase<DimS, DimM>::initialise() {
     this->check_material_coverage();
     this->fields.initialise(this->resolutions);
     this->is_initialised = true;
+  }
+
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  typename SystemBase<DimS, DimM>::iterator
+  SystemBase<DimS, DimM>::begin() {
+    return this->pixels.begin();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  typename SystemBase<DimS, DimM>::iterator
+  SystemBase<DimS, DimM>::end() {
+    return this->pixels.end();
   }
 
   /* ---------------------------------------------------------------------- */

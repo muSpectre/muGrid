@@ -35,9 +35,10 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   ProjectionFiniteStrainFast<DimS, DimM>::
-  ProjectionFiniteStrainFast(FFT_Engine & engine)
-    :Parent{engine}, xis{make_field<Proj_t>("Projection Operator",
-                                            this->projection_container)}
+  ProjectionFiniteStrainFast(FFT_Engine_ptr engine)
+    :Parent{std::move(engine)},
+     xis{make_field<Proj_t>("Projection Operator",
+                            this->projection_container)}
   {}
 
   /* ---------------------------------------------------------------------- */
@@ -45,9 +46,9 @@ namespace muSpectre {
   void ProjectionFiniteStrainFast<DimS, DimM>::
   initialise(FFT_PlanFlags flags) {
     Parent::initialise(flags);
-    FFT_freqs<DimS> fft_freqs(this->fft_engine.get_resolutions(),
-                              this->fft_engine.get_lengths());
-    for (auto && tup: boost::combine(this->fft_engine, this->xis)) {
+    FFT_freqs<DimS> fft_freqs(this->fft_engine->get_resolutions(),
+                              this->fft_engine->get_lengths());
+    for (auto && tup: boost::combine(*this->fft_engine, this->xis)) {
       const auto & ccoord = boost::get<0> (tup);
       auto & xi = boost::get<1>(tup);
       xi = fft_freqs.get_unit_xi(ccoord);
@@ -59,14 +60,14 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   void ProjectionFiniteStrainFast<DimS, DimM>::apply_projection(Field_t & field) {
-    Grad_map field_map{this->fft_engine.fft(field)};
-    Real factor = this->fft_engine.normalisation();
+    Grad_map field_map{this->fft_engine->fft(field)};
+    Real factor = this->fft_engine->normalisation();
     for (auto && tup: boost::combine(this->xis, field_map)) {
       auto & xi{boost::get<0>(tup)};
       auto & f{boost::get<1>(tup)};
       f = factor * ((f*xi).eval()*xi.transpose());
     }
-    this->fft_engine.ifft(field);
+    this->fft_engine->ifft(field);
   }
 
   template class ProjectionFiniteStrainFast<twoD,   twoD>;

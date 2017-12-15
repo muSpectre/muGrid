@@ -145,8 +145,7 @@ namespace muSpectre {
 
     /* ---------------------------------------------------------------------- */
     template <size_t dim>
-    class Pixels
-    {
+    class Pixels {
     public:
       Pixels(const Ccoord_t<dim> & sizes):sizes(sizes){};
       Pixels(const Pixels & other) = default;
@@ -174,6 +173,7 @@ namespace muSpectre {
       };
       inline iterator begin() const {return iterator(*this);}
       inline iterator end() const {return iterator(*this, false);}
+      inline size_t size() const {return get_size(this->sizes);}
     protected:
       Ccoord_t<dim>  sizes;
     };

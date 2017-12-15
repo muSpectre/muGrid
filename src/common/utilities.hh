@@ -31,6 +31,7 @@
 #ifndef UTILITIES_H
 #define UTILITIES_H
 
+#include <tuple>
 #include <boost/tuple/tuple.hpp>
 namespace std {
 

@@ -33,6 +33,7 @@
 #include <tuple>
 
 #include "common/common.hh"
+#include "common/ccoord_operations.hh"
 #include "common/field_collection.hh"
 #include "materials/material_base.hh"
 #include "fft/projection_base.hh"
@@ -56,8 +57,9 @@ namespace muSpectre {
     using Projection_ptr = std::unique_ptr<ProjectionBase<DimS, DimM>>;
     using StrainField_t = TensorField<FieldCollection_t, Real, secondOrder, DimM>;
     using StressField_t = TensorField<FieldCollection_t, Real, secondOrder, DimM>;
-    using TangentField_t = TensorField<FieldCollection_t, Real, secondOrder, DimM>;
+    using TangentField_t = TensorField<FieldCollection_t, Real, fourthOrder, DimM>;
     using FullResponse_t = std::tuple<const StressField_t&, const TangentField_t&>;
+    using iterator = typename CcoordOps::Pixels<DimS>::iterator;
 
     //! Default constructor
     SystemBase() = delete;
@@ -78,7 +80,7 @@ namespace muSpectre {
     SystemBase& operator=(const SystemBase &other) = delete;
 
     //! Move assignment operator
-    SystemBase& operator=(SystemBase &&other) noexcept = default;
+    SystemBase& operator=(SystemBase &&other) = default;
 
     /**
      * Materials can only be moved. This is to assure exclusive
@@ -88,12 +90,21 @@ namespace muSpectre {
 
     FullResponse_t evaluate_stress_tangent(StrainField_t & F);
 
+    StrainField_t & get_strain();
+
+    const StressField_t & get_stress() const;
+
     void initialise();
+
+    iterator begin();
+    iterator end();
+    size_t size() const {return pixels.size();}
   protected:
     //! make sure that every pixel is assigned to one and only one material
     void check_material_coverage();
 
     const Ccoord & resolutions;
+    CcoordOps::Pixels<DimS> pixels;
     const Rcoord & lengths;
     FieldCollection_t fields{};
     StrainField_t & F;
@@ -106,7 +117,6 @@ namespace muSpectre {
     bool is_initialised{false};
   private:
   };
-
 
 }  // muSpectre
 

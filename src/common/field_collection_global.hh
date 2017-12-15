@@ -58,7 +58,7 @@ namespace muSpectre {
 
     //! Move constructor
     GlobalFieldCollection
-      (GlobalFieldCollection &&other) noexcept = delete;
+      (GlobalFieldCollection &&other) noexcept = default;
 
     //! Destructor
     virtual ~GlobalFieldCollection() noexcept = default;
@@ -69,7 +69,7 @@ namespace muSpectre {
 
     //! Move assignment operator
     GlobalFieldCollection&
-    operator=(GlobalFieldCollection &&other) noexcept = delete;
+    operator=(GlobalFieldCollection &&other) noexcept = default;
 
     /** allocate memory, etc. At this point, the collection is
         informed aboud the size and shape of the domain (through the
