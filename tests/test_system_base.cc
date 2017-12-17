@@ -91,12 +91,6 @@ namespace muSpectre {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(simple_evaluation_test, fix, fixlist, fix) {
     using fc = typename fix::FieldCollection_t;
     constexpr Dim_t dim{fix::sdim};
-    auto & F = fix::get_strain();
-    MatrixFieldMap<fc, Real, dim, dim> F_map(F);
-    for (auto grad: F_map) {
-      grad = grad.Identity();
-    }
-    BOOST_CHECK_THROW(fix::evaluate_stress_tangent(F), std::runtime_error);
     using Mat_t = MaterialHyperElastic1<dim, dim>;
     const Real Young{210e9}, Poisson{.33};
     const Real lambda{Young*Poisson/((1+Poisson)*(1-2*Poisson))};
@@ -108,19 +102,27 @@ namespace muSpectre {
     }
 
     fix::add_material(std::move(Material_hard));
+    auto & F = fix::get_strain();
+    MatrixFieldMap<fc, Real, dim, dim> F_map(F);
+    for (auto grad: F_map) {
+      grad = grad.Identity();
+    }
 
     auto res_tup{fix::evaluate_stress_tangent(F)};
     MatrixFieldMap<fc, Real, dim, dim, true> stress(std::get<0>(res_tup));
-    T4MatrixFieldMap<fc, Real, dim, true> tangent{std::get<1>(res_tup)};
+    T4MatrixFieldMap<fc, Real, dim, true> tangent(std::get<1>(res_tup));
+
     auto tup = testGoodies::objective_hooke_explicit
-      (lambda, mu, Matrices::Tens2_t<dim>::Identity());
+      (lambda, mu, Matrices::I2<dim>());
+    auto P_ref = std::get<0>(tup);
     for (auto mat: stress) {
-      Real norm = (mat - std::get<0>(tup)).norm();
+      Real norm = (mat - P_ref).norm();
       BOOST_CHECK_EQUAL(norm, 0.);
     }
 
-    for (auto tan: tangent) {
-      Real norm = (tan - std::get<1>(tup)).norm();
+    auto tan_ref = std::get<1>(tup);
+    for (const auto tan: tangent) {
+      Real norm = (tan - tan_ref).norm();
       BOOST_CHECK_EQUAL(norm, 0.);
     }
   }

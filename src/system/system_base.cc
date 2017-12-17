@@ -97,6 +97,9 @@ namespace muSpectre {
   void SystemBase<DimS, DimM>::initialise() {
     this->check_material_coverage();
     this->fields.initialise(this->resolutions);
+    for (auto && mat: this->materials) {
+      mat->initialise();
+    }
     this->is_initialised = true;
   }
 

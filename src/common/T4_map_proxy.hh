@@ -46,7 +46,7 @@ namespace muSpectre {
   using T4Mat = Eigen::Matrix<T, Dim*Dim, Dim*Dim>;
   template <typename T, Dim_t Dim, bool ConstMap=false>
   using T4MatMap = std::conditional_t<ConstMap,
-                                      const Eigen::Map<T4Mat<T, Dim>>,
+                                      Eigen::Map<const T4Mat<T, Dim>>,
                                       Eigen::Map<T4Mat<T, Dim>>>;
 
 
