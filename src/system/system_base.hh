@@ -106,7 +106,7 @@ namespace muSpectre {
     const Ccoord & resolutions;
     CcoordOps::Pixels<DimS> pixels;
     const Rcoord & lengths;
-    FieldCollection_t fields{};
+    FieldCollection_t fields;
     StrainField_t & F;
     StressField_t & P;
     //! Tangent field migth not even be required; so this is a

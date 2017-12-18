@@ -38,14 +38,15 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  SystemBase<DimS, DimM>::SystemBase(Projection_ptr projection)
-    :resolutions{projection->get_resolutions()},
+  SystemBase<DimS, DimM>::SystemBase(Projection_ptr projection_)
+    :resolutions{projection_->get_resolutions()},
      pixels(resolutions),
-     lengths{projection->get_lengths()},
+     lengths{projection_->get_lengths()},
+     fields{},
      F{make_field<StrainField_t>("Gradient", this->fields)},
      P{make_field<StressField_t>("Piola-Kirchhoff-1", this->fields)},
-     K_ptr{nullptr}, projection{std::move(projection)}
-  {}
+     K_ptr{nullptr}, projection{std::move(projection_)}
+  { }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>

@@ -41,6 +41,26 @@
 
 namespace muSpectre {
 
+
+  /**
+   * Create a unique ptr to a Projection operator (with appropriate
+   * FFT_engine) to be used in a system constructor
+   */
+  template <Dim_t DimS, Dim_t DimM,
+            typename FFT_Engine=FFTW_Engine<DimS, DimM>,
+            typename Projection=ProjectionFiniteStrainFast<DimS, DimM>>
+  inline
+  std::unique_ptr<Projection> system_input(Ccoord_t<DimS> resolutions,
+                     Rcoord_t<DimS> lengths=CcoordOps::get_cube<DimS>(1.)) {
+    auto fft_ptr{std::make_unique<FFT_Engine>(resolutions, lengths)};
+    return std::make_unique<Projection>(std::move(fft_ptr));
+  }
+
+
+  /**
+   * convenience function to create a system (avoids having to build
+   * and move the chain of unique_ptrs
+   */
   template <Dim_t DimS, Dim_t DimM,
             typename System=SystemBase<DimS, DimM>,
             typename FFT_Engine=FFTW_Engine<DimS, DimM>,
@@ -48,9 +68,9 @@ namespace muSpectre {
   inline
   System make_system(Ccoord_t<DimS> resolutions,
                      Rcoord_t<DimS> lengths=CcoordOps::get_cube<DimS>(1.)) {
-    auto && fft_ptr{std::make_unique<FFT_Engine>(resolutions, lengths)};
-    auto && proj_ptr{std::make_unique<Projection>(std::move(fft_ptr))};
-    return System{std::move(proj_ptr)};
+    return System{
+      std::move(system_input<DimS, DimM, FFT_Engine, Projection>
+                (resolutions, lengths))};
   }
 
 }  // muSpectre

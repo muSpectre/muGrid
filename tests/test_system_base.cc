@@ -69,12 +69,26 @@ namespace muSpectre {
     constexpr static Dim_t mdim{DimM};
     SystemBaseFixture()
       :SystemBase<DimS, DimM>{
-      make_system<DimS, DimM>(Sizes<DimS>::get_resolution(),
-                              Sizes<DimS>::get_lengths())} {}
+      std::move(system_input<DimS, DimM>(Sizes<DimS>::get_resolution(),
+                                         Sizes<DimS>::get_lengths()))} {}
   };
 
   using fixlist = boost::mpl::list<SystemBaseFixture<twoD, twoD>,
                                    SystemBaseFixture<threeD, threeD>>;
+
+  BOOST_AUTO_TEST_CASE(manual_construction) {
+    constexpr Dim_t dim{twoD};
+
+    Ccoord_t<dim> resolutions{3, 3};
+    Rcoord_t<dim> lengths{2.3, 2.7};
+    auto fft_ptr{std::make_unique<FFTW_Engine<dim, dim>>(resolutions, lengths)};
+    auto proj_ptr{std::make_unique<ProjectionFiniteStrainFast<dim, dim>>(std::move(fft_ptr))};
+    SystemBase<dim, dim> sys{std::move(proj_ptr)};
+
+    auto sys2{make_system<dim, dim>(resolutions, lengths)};
+    auto sys2b{std::move(sys2)};
+    BOOST_CHECK_EQUAL(sys2b.size(), sys.size());
+  }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(constructor_test, fix, fixlist, fix) {
     BOOST_CHECK_THROW(fix::check_material_coverage(), std::runtime_error);
@@ -128,8 +142,6 @@ namespace muSpectre {
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(evaluation_test, fix, fixlist, fix) {
-    auto & F = fix::get_strain();
-    BOOST_CHECK_THROW(fix::evaluate_stress_tangent(F), std::runtime_error);
     constexpr Dim_t dim{fix::sdim};
     using Mat_t = MaterialHyperElastic1<dim, dim>;
     auto Material_hard = std::make_unique<Mat_t>("hard", 210e9, .33);
@@ -147,6 +159,9 @@ namespace muSpectre {
 
     fix::add_material(std::move(Material_hard));
     fix::add_material(std::move(Material_soft));
+
+    auto & F = fix::get_strain();
+    fix::evaluate_stress_tangent(F);
 
     fix::evaluate_stress_tangent(F);
   }
