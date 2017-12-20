@@ -45,7 +45,8 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void SolverCG<DimS, DimM>::solve(Fun_t& tangent_effect, const Field_t & rhs,
+  void SolverCG<DimS, DimM>::solve(const Fun_t& tangent_effect,
+                                   const Field_t & rhs,
                               Field_t & x_f) {
     // Following implementation of algorithm 5.2 in Nocedal's Numerical Optimization (p. 112)
 
@@ -86,8 +87,14 @@ namespace muSpectre {
     }
   }
 
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  typename SolverCG<DimS, DimM>::Tg_req_t
+  SolverCG<DimS, DimM>::get_tangent_req() const {
+    return tangent_requirement;
+  }
 
   template class SolverCG<twoD, twoD>;
-  template class SolverCG<twoD, threeD>;
+  //template class SolverCG<twoD, threeD>;
   template class SolverCG<threeD, threeD>;
 }  // muSpectre

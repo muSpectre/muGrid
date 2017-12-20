@@ -140,12 +140,12 @@ namespace muSpectre {
 
       //! return an iterator to head of field for ranges
       inline iterator begin(){return iterator(*this);}
-      inline const_iterator cbegin() {return const_iterator(*this);}
-      //inline const_iterator begin() const {return this->cbegin();}
+      inline const_iterator cbegin() const {return const_iterator(*this);}
+      inline const_iterator begin() const {return this->cbegin();}
       //! return an iterator to tail of field for ranges
       inline iterator end(){return iterator(*this, false);};
-      inline const_iterator cend() {return const_iterator(*this, false);}
-      //inline const_iterator end() const {return this->cend();}
+      inline const_iterator cend() const {return const_iterator(*this, false);}
+      inline const_iterator end() const {return this->cend();}
 
     protected:
       //! for sad, legacy iterator use

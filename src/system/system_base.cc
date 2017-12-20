@@ -82,15 +82,13 @@ namespace muSpectre {
   void SystemBase<DimS, DimM>::directional_stiffness(const TangentField_t &K,
                                                      const StrainField_t &delF,
                                                      StressField_t &delP) {
-    // for (auto && tup:
-    //        akantu::zip(K.get_map(), delF.get_map(), delP.get_map())){
-    //   auto & k = std::get<0>(tup);
-    //   auto & df = std::get<1>(tup);
-    //   auto & dp = std::get<2>(tup);
-    //   dp = Matrices::tensmult(k, df);
-    // }
-    K.get_map();
-    delF.get_map();
+    for (auto && tup:
+           akantu::zip(K.get_map(), delF.get_map(), delP.get_map())){
+      auto & k = std::get<0>(tup);
+      auto & df = std::get<1>(tup);
+      auto & dp = std::get<2>(tup);
+      dp = Matrices::tensmult(k, df);
+    }
     this->projection->apply_projection(delP);
   }
 

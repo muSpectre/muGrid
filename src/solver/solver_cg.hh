@@ -40,14 +40,15 @@
 namespace muSpectre {
 
   template <Dim_t DimS, Dim_t DimM=DimS>
-  class SolverCG: SolverBase<DimS, DimM>
+  class SolverCG: public SolverBase<DimS, DimM>
   {
   public:
     using Parent = SolverBase<DimS, DimM>;
     using Ccoord = typename Parent::Ccoord;
     using Tg_req_t = typename Parent::TangentRequirement;
     // cg only needs to handle fields that look like strain and stress
-    using Field_t = TensorField<typename Parent::Collection_t, Real, secondOrder, DimM>;
+    using Field_t = TensorField<
+      typename Parent::Collection_t, Real, secondOrder, DimM>;
     using Fun_t = std::function<void(const Field_t& in, Field_t & out)>;
 
     constexpr static Tg_req_t tangent_requirement{Tg_req_t::NeedEffect};
@@ -73,7 +74,7 @@ namespace muSpectre {
     SolverCG& operator=(SolverCG &&other) noexcept = default;
 
     //! actual solver
-    void solve(Fun_t & tangent_effect,
+    void solve(const Fun_t & tangent_effect,
                const Field_t & rhs,
                Field_t & x);
 

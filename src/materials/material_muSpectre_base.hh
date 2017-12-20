@@ -37,6 +37,7 @@
 #include <iterator>
 #include <stdexcept>
 
+#include "common/common.hh"
 #include "materials/material_base.hh"
 #include "materials/materials_toolbox.hh"
 #include "common/field_collection.hh"
@@ -186,7 +187,7 @@ namespace muSpectre {
   template <class Material, Dim_t DimS, Dim_t DimM>
   void MaterialMuSpectre<Material, DimS, DimM>::
   compute_stresses(const StrainField_t &F, StressField_t &P,
-                 muSpectre::Formulation form) {
+                   Formulation form) {
     switch (form) {
     case Formulation::finite_strain: {
       this->template compute_stresses_worker<Formulation::finite_strain>(F, P);
@@ -207,7 +208,7 @@ namespace muSpectre {
   void MaterialMuSpectre<Material, DimS, DimM>::
   compute_stresses_tangent(const StrainField_t & F, StressField_t & P,
                            TangentField_t & K,
-                           muSpectre::Formulation form) {
+                           Formulation form) {
     switch (form) {
     case Formulation::finite_strain: {
       this->template compute_stresses_worker<Formulation::finite_strain>(F, P, K);

@@ -30,6 +30,7 @@
  */
 
 
+#include "common/common.hh"
 #include "materials/material_muSpectre_base.hh"
 
 #ifndef MATERIAL_HYPER_ELASTIC1_H

@@ -39,30 +39,6 @@
 #include "common/tensor_algebra.hh"
 
 namespace muSpectre {
-  template <Dim_t Dim>
-  using Grad_t = Matrices::Tens2_t<Dim>;
-  template <Dim_t Dim>
-  using GradIncrements = std::vector<Grad_t<Dim>,
-                                     Eigen::aligned_allocator<Grad_t<Dim>>>;
-
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM=DimS>
-  typename SystemBase<DimS, DimM>::StrainField_t &
-  newton_cg (SystemBase<DimS, DimM> & sys, const Grad_t<DimM> & delF0,
-             const Real cg_tol, const Real newton_tol, const Uint maxiter=0,
-             bool verbose = false){
-    return newton_cg(sys, GradIncrements<DimM>{delF0},
-                    cg_tol, newton_tol, maxiter, verbose);
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM=DimS>
-  typename SystemBase<DimS, DimM>::StrainField_t &
-  newton_cg (SystemBase<DimS, DimM> & sys,
-             const GradIncrements<DimM> & delF0,
-             const Real cg_tol, const Real newton_tol, const Uint maxiter=0,
-             bool verbose = false);
-
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM=DimS>
   class SolverBase
