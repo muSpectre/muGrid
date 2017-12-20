@@ -88,17 +88,46 @@ namespace muSpectre {
      */
     void add_material(Material_ptr mat);
 
+    /**
+     * evaluates all materials
+     */
     FullResponse_t evaluate_stress_tangent(StrainField_t & F);
+
+    /**
+     * evaluate directional stiffness (i.e. G:K:δF)
+     */
+
+    void directional_stiffness(const TangentField_t & K,
+                               const StrainField_t & delF,
+                               StressField_t & delP);
+
+    /**
+     * Convenience function circumventing the neeed to use the
+     * underlying projection
+     */
+    void convolve(StressField_t & field);
 
     StrainField_t & get_strain();
 
     const StressField_t & get_stress() const;
 
-    void initialise();
+    /**
+     * general initialisation; initialises the projection and
+     * fft_engine (i.e. infrastructure) but not the materials. These
+     * need to be initialised separately
+     */
+    void initialise(FFT_PlanFlags flags = FFT_PlanFlags::estimate);
+    /**
+     * initialise materials (including resetting any history variables)
+     */
+    void initialise_materials(bool stiffness=false);
 
     iterator begin();
     iterator end();
     size_t size() const {return pixels.size();}
+
+    const Ccoord & get_resolutions() const {return this->resolutions;}
+    const Rcoord & get_lengths() const {return this->lengths;}
   protected:
     //! make sure that every pixel is assigned to one and only one material
     void check_material_coverage();

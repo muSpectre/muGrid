@@ -26,10 +26,10 @@
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
  */
-#include <boost/range/combine.hpp>
 
 #include "fft/projection_finite_strain_fast.hh"
 #include "fft/fft_utils.hh"
+#include "common/iterators.hh"
 
 namespace muSpectre {
   /* ---------------------------------------------------------------------- */
@@ -48,9 +48,9 @@ namespace muSpectre {
     Parent::initialise(flags);
     FFT_freqs<DimS> fft_freqs(this->fft_engine->get_resolutions(),
                               this->fft_engine->get_lengths());
-    for (auto && tup: boost::combine(*this->fft_engine, this->xis)) {
-      const auto & ccoord = boost::get<0> (tup);
-      auto & xi = boost::get<1>(tup);
+    for (auto && tup: akantu::zip(*this->fft_engine, this->xis)) {
+      const auto & ccoord = std::get<0> (tup);
+      auto & xi = std::get<1>(tup);
       xi = fft_freqs.get_unit_xi(ccoord);
     }
     this->xis[0].setZero();
@@ -62,9 +62,11 @@ namespace muSpectre {
   void ProjectionFiniteStrainFast<DimS, DimM>::apply_projection(Field_t & field) {
     Grad_map field_map{this->fft_engine->fft(field)};
     Real factor = this->fft_engine->normalisation();
-    for (auto && tup: boost::combine(this->xis, field_map)) {
-      auto & xi{boost::get<0>(tup)};
-      auto & f{boost::get<1>(tup)};
+    auto it = xis.begin();
+    it++;
+    for (auto && tup: akantu::zip(this->xis, field_map)) {
+      auto & xi{std::get<0>(tup)};
+      auto & f{std::get<1>(tup)};
       f = factor * ((f*xi).eval()*xi.transpose());
     }
     this->fft_engine->ifft(field);

@@ -70,27 +70,28 @@ namespace muSpectre {
   //! Test fixture for multiple fields in the collection
   template <Dim_t DimS, Dim_t DimM, bool Global>
   struct FC_multi_fixture{
-    FC_multi_fixture()
-      :fc() {
-      //add Real tensor field
-      make_field<TensorField<FC_t, Real, order, DimM>>
-        ("Tensorfield Real o4", fc);
-      //add Real tensor field
-      make_field<TensorField<FC_t, Real, matrix_order, DimM>>
-        ("Tensorfield Real o2", fc);
-      //add integer scalar field
-      make_field<ScalarField<FC_t, Int>>
-        ("integer Scalar", fc);
-      //add complex matrix field
-      make_field<MatrixField<FC_t, Complex, DimS, DimM>>
-        ("Matrixfield Complex sdim x mdim", fc);
+    using FC_t = FieldCollection<DimS, DimM, Global>;
+    using T4_t = TensorField<FC_t, Real, order, DimM>;
+    using T2_t = TensorField<FC_t, Real, matrix_order, DimM>;
+    using Sc_t = ScalarField<FC_t, Int>;
+    using M2_t = MatrixField<FC_t, Complex, DimS, DimM>;
 
+    FC_multi_fixture()
+      :fc(),
+       t4_field{make_field<T4_t>("Tensorfield Real o4", fc)},//Real tensor field
+       t2_field{make_field<T2_t>("Tensorfield Real o2", fc)},//Real tensor field
+       sc_field{make_field<Sc_t>("integer Scalar", fc)}, // integer scalar field
+       m2_field{make_field<M2_t>("Matrixfield Complex sdim x mdim", fc)} //complex matrix field
+    {
     }
     inline static constexpr Dim_t sdim(){return DimS;}
     inline static constexpr Dim_t mdim(){return DimM;}
     inline static constexpr bool global(){return Global;}
-    using FC_t = FieldCollection<DimS, DimM, Global>;
     FC_t fc;
+    T4_t & t4_field;
+    T2_t & t2_field;
+    Sc_t & sc_field;
+    M2_t & m2_field;
   };
 
   using mult_collections = boost::mpl::list<FC_multi_fixture<2, 2, true>,

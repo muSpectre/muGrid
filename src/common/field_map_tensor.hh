@@ -92,6 +92,9 @@ namespace muSpectre {
     //! Copy assignment operator
     TensorFieldMap& operator=(const TensorFieldMap &other) = delete;
 
+    //! Assign a matrixlike value to every entry
+    inline TensorFieldMap & operator=(const T_t & val);
+
     //! Move assignment operator
     TensorFieldMap& operator=(TensorFieldMap &&other) noexcept = delete;
 
@@ -155,16 +158,21 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   //! member access
-  template <class FieldCollection, typename T, Dim_t order, Dim_t dim, bool ConstField>
+  template <class FieldCollection, typename T, Dim_t order, Dim_t dim,
+            bool ConstField>
   template <class ref_t>
   ref_t
-  TensorFieldMap<FieldCollection, T, order, dim, ConstField>::operator[](size_type index) {
+  TensorFieldMap<FieldCollection, T, order, dim, ConstField>::
+  operator[](size_type index) {
     auto && lambda = [this, &index](auto&&...tens_sizes) {
       return ref_t(this->get_ptr_to_entry(index), tens_sizes...);
     };
     return call_sizes<order, dim>(lambda);
   }
-  template<class FieldCollection, typename T, Dim_t order, Dim_t dim, bool ConstField>
+
+  /* ---------------------------------------------------------------------- */
+  template<class FieldCollection, typename T, Dim_t order, Dim_t dim,
+           bool ConstField>
   typename TensorFieldMap<FieldCollection, T, order, dim, ConstField>::reference
   TensorFieldMap<FieldCollection, T, order, dim, ConstField>::
   operator[](const Ccoord & ccoord) {
@@ -174,6 +182,19 @@ namespace muSpectre {
     };
     return call_sizes<order, dim>(lambda);
   }
+
+  /* ---------------------------------------------------------------------- */
+  template<class FieldCollection, typename T, Dim_t order, Dim_t dim,
+           bool ConstField>
+  TensorFieldMap<FieldCollection, T, order, dim, ConstField> &
+  TensorFieldMap<FieldCollection, T, order, dim, ConstField>::
+  operator=(const T_t & val) {
+    for (auto && tens: *this) {
+      tens = val;
+    }
+    return *this;
+  }
+
 
   /* ---------------------------------------------------------------------- */
   //! for sad, legacy iterator use. Don't use unless you have to.

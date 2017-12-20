@@ -38,32 +38,6 @@
 
 namespace muSpectre {
   /* ---------------------------------------------------------------------- */
-  class FieldCollectionError: public std::runtime_error {
-  public:
-    explicit FieldCollectionError(const std::string& what)
-      :std::runtime_error(what){}
-    explicit FieldCollectionError(const char * what)
-      :std::runtime_error(what){}
-  };
-
-  class FieldError: public FieldCollectionError {
-    using Parent = FieldCollectionError;
-  public:
-    explicit FieldError(const std::string& what)
-      :Parent(what){}
-    explicit FieldError(const char * what)
-      :Parent(what){}
-  };
-  class FieldInterpretationError: public FieldError
-  {
-  public:
-    explicit FieldInterpretationError(const std::string & what)
-      :FieldError(what){}
-    explicit FieldInterpretationError(const char * what)
-      :FieldError(what){}
-  };
-
-  /* ---------------------------------------------------------------------- */
   //! DimS spatial dimension (dimension of problem)
   //! DimM material_dimension (dimension of constitutive law)
   template <Dim_t DimS, Dim_t DimM, class FieldCollectionDerived>

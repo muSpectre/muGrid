@@ -81,6 +81,9 @@ namespace muSpectre {
       //! Move assignment operator
       ScalarFieldMap& operator=(ScalarFieldMap &&other) noexcept = delete;
 
+      //! Assign a value to every entry
+      ScalarFieldMap& operator=(T val);
+
       //! give human-readable field map type
       inline std::string info_string() const override final;
 
@@ -150,6 +153,17 @@ namespace muSpectre {
   ref_t
   ScalarFieldMap<FieldCollection, T, ConstField>::operator[](size_type index) {
     return this->get_ptr_to_entry(std::move(index))[0];
+  }
+
+  /* ---------------------------------------------------------------------- */
+  //! Assign a value to every entry
+  template <class FieldCollection, typename T, bool ConstField>
+  ScalarFieldMap<FieldCollection, T, ConstField> &
+  ScalarFieldMap<FieldCollection, T, ConstField>::operator=(T val) {
+    for (auto & scalar:*this) {
+      scalar = val;
+    }
+    return *this;
   }
 
   /* ---------------------------------------------------------------------- */

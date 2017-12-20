@@ -32,6 +32,8 @@
 
 #include "system/system_base.hh"
 #include "common/ccoord_operations.hh"
+#include "common/iterators.hh"
+#include "common/tensor_algebra.hh"
 
 
 namespace muSpectre {
@@ -75,6 +77,28 @@ namespace muSpectre {
     return std::tie(this->P, *this->K_ptr);
   }
 
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  void SystemBase<DimS, DimM>::directional_stiffness(const TangentField_t &K,
+                                                     const StrainField_t &delF,
+                                                     StressField_t &delP) {
+    // for (auto && tup:
+    //        akantu::zip(K.get_map(), delF.get_map(), delP.get_map())){
+    //   auto & k = std::get<0>(tup);
+    //   auto & df = std::get<1>(tup);
+    //   auto & dp = std::get<2>(tup);
+    //   dp = Matrices::tensmult(k, df);
+    // }
+    K.get_map();
+    delF.get_map();
+    this->projection->apply_projection(delP);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  void SystemBase<DimS, DimM>::convolve(StressField_t &field) {
+    this->projection->apply_projection(field);
+  }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
@@ -95,13 +119,22 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void SystemBase<DimS, DimM>::initialise() {
+  void SystemBase<DimS, DimM>::initialise(FFT_PlanFlags flags) {
+    // check that all pixels have been assigned exactly one material
     this->check_material_coverage();
+    // resize all global fields (strain, stress, etc)
     this->fields.initialise(this->resolutions);
-    for (auto && mat: this->materials) {
-      mat->initialise();
-    }
+    // initialise the projection and compute the fft plan
+    this->projection->initialise(flags);
     this->is_initialised = true;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  void SystemBase<DimS, DimM>::initialise_materials(bool stiffness) {
+    for (auto && mat: this->materials) {
+      mat->initialise(stiffness);
+    }
   }
 
 

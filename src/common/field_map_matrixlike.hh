@@ -126,6 +126,10 @@ namespace muSpectre {
       //! Move assignment operator
       MatrixLikeFieldMap& operator=(MatrixLikeFieldMap &&other) noexcept = delete;
 
+      //! Assign a matrixlike value to every entry
+      template <class Derived>
+      inline MatrixLikeFieldMap & operator=(const Eigen::EigenBase<Derived> & val);
+
       //! give human-readable field map type
       inline std::string info_string() const override final;
 
@@ -136,10 +140,12 @@ namespace muSpectre {
 
       //! return an iterator to head of field for ranges
       inline iterator begin(){return iterator(*this);}
-      inline const_iterator cbegin(){return const_iterator(*this);}
+      inline const_iterator cbegin() {return const_iterator(*this);}
+      //inline const_iterator begin() const {return this->cbegin();}
       //! return an iterator to tail of field for ranges
       inline iterator end(){return iterator(*this, false);};
-      inline const_iterator cend(){return const_iterator(*this, false);}
+      inline const_iterator cend() {return const_iterator(*this, false);}
+      //inline const_iterator end() const {return this->cend();}
 
     protected:
       //! for sad, legacy iterator use
@@ -224,6 +230,18 @@ namespace muSpectre {
       size_t index{};
       index = this->collection.get_index(ccoord);
       return reference(this->get_ptr_to_entry(std::move(index)));
+    }
+
+    template <class FieldCollection, class EigenArray, Map_t map_type,
+              bool ConstField>
+    template <class Derived>
+    MatrixLikeFieldMap<FieldCollection, EigenArray, map_type, ConstField> &
+    MatrixLikeFieldMap<FieldCollection, EigenArray, map_type, ConstField>::
+    operator=(const Eigen::EigenBase<Derived> & val) {
+      for (auto && entry: *this) {
+        entry = val;
+      }
+      return *this;
     }
 
     /* ---------------------------------------------------------------------- */

@@ -141,6 +141,7 @@ namespace muSpectre {
         using iterator_category = std::random_access_iterator_tag;
         using Ccoord = typename FieldCollection::Ccoord;
         using reference = typename FullyTypedFieldMap::reference;
+
         //! Default constructor
         iterator() = delete;
 
@@ -181,6 +182,8 @@ namespace muSpectre {
         inline iterator operator--(int);
         //! access subscripting
         inline value_type operator[](difference_type diff);
+        //! access subscripting
+        inline const_value_type operator[](const difference_type diff) const;
         //! equality
         inline bool operator==(const iterator & other) const;
         //! inequality
@@ -382,7 +385,8 @@ namespace muSpectre {
     template<class FullyTypedFieldMap, bool ConstIter>
     typename FieldMap<FieldCollection, T, NbComponents, ConstField>::
     template iterator<FullyTypedFieldMap, ConstIter>::value_type
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::iterator<FullyTypedFieldMap, ConstIter>::
+    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    iterator<FullyTypedFieldMap, ConstIter>::
     operator*() {
       return this->fieldmap.template operator[]<value_type>(this->index);
     }
@@ -393,9 +397,10 @@ namespace muSpectre {
     template<class FullyTypedFieldMap, bool ConstIter>
     typename FieldMap<FieldCollection, T, NbComponents, ConstField>::
     template iterator<FullyTypedFieldMap, ConstIter>::const_value_type
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::iterator<FullyTypedFieldMap, ConstIter>::
+    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    iterator<FullyTypedFieldMap, ConstIter>::
     operator*() const {
-      return this->fieldmap.template operator[]<value_type>(this->index);
+      return this->fieldmap.template operator[]<const_value_type>(this->index);
     }
 
     /* ---------------------------------------------------------------------- */
@@ -403,7 +408,8 @@ namespace muSpectre {
     template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
     template<class FullyTypedFieldMap, bool ConstIter>
     typename FullyTypedFieldMap::pointer
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::iterator<FullyTypedFieldMap, ConstIter>::
+    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    iterator<FullyTypedFieldMap, ConstIter>::
     operator->() {
       return this->fieldmap.ptr_to_val_t(this->index);
     }
@@ -412,8 +418,10 @@ namespace muSpectre {
     //! pre-decrement
     template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
     template<class FullyTypedFieldMap, bool ConstIter>
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::iterator<FullyTypedFieldMap, ConstIter> &
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::iterator<FullyTypedFieldMap, ConstIter>::
+    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    iterator<FullyTypedFieldMap, ConstIter> &
+    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    iterator<FullyTypedFieldMap, ConstIter>::
     operator--() {
       this->index--;
       return *this;
@@ -423,8 +431,10 @@ namespace muSpectre {
     //! post-decrement
     template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
     template<class FullyTypedFieldMap, bool ConstIter>
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::iterator<FullyTypedFieldMap, ConstIter>
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::iterator<FullyTypedFieldMap, ConstIter>::
+    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    iterator<FullyTypedFieldMap, ConstIter>
+    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    iterator<FullyTypedFieldMap, ConstIter>::
     operator--(int) {
       iterator current = *this;
       this->index--;
@@ -435,9 +445,22 @@ namespace muSpectre {
     //! Access subscripting
     template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
     template<class FullyTypedFieldMap, bool ConstIter>
-    typename FieldMap<FieldCollection, T, NbComponents, ConstField>::template iterator<FullyTypedFieldMap, ConstIter>::value_type
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::iterator<FullyTypedFieldMap, ConstIter>::
+    typename FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    template iterator<FullyTypedFieldMap, ConstIter>::value_type
+    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    iterator<FullyTypedFieldMap, ConstIter>::
     operator[](difference_type diff) {
+      return this->fieldmap[this->index+diff];
+    }
+
+    /* ---------------------------------------------------------------------- */
+    //! Access subscripting
+    template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
+    template<class FullyTypedFieldMap, bool ConstIter>
+    typename FieldMap<FieldCollection, T, NbComponents, ConstField>::template iterator<FullyTypedFieldMap, ConstIter>::const_value_type
+    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    iterator<FullyTypedFieldMap, ConstIter>::
+    operator[](const difference_type diff) const {
       return this->fieldmap[this->index+diff];
     }
 
@@ -446,7 +469,8 @@ namespace muSpectre {
     template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
     template<class FullyTypedFieldMap, bool ConstIter>
     bool
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::iterator<FullyTypedFieldMap, ConstIter>::
+    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    iterator<FullyTypedFieldMap, ConstIter>::
     operator==(const iterator & other) const {
       return (this->index == other.index &&
               &this->fieldmap == &other.fieldmap);
@@ -457,7 +481,8 @@ namespace muSpectre {
     template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
     template<class FullyTypedFieldMap, bool ConstIter>
     bool
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::iterator<FullyTypedFieldMap, ConstIter>::
+    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    iterator<FullyTypedFieldMap, ConstIter>::
     operator!=(const iterator & other) const {
       return !(*this == other);
     }
@@ -467,28 +492,32 @@ namespace muSpectre {
     template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
     template<class FullyTypedFieldMap, bool ConstIter>
     bool
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::iterator<FullyTypedFieldMap, ConstIter>::
+    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    iterator<FullyTypedFieldMap, ConstIter>::
     operator<(const iterator & other) const {
       return (this->index < other.index);
     }
     template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
     template<class FullyTypedFieldMap, bool ConstIter>
     bool
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::iterator<FullyTypedFieldMap, ConstIter>::
+    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    iterator<FullyTypedFieldMap, ConstIter>::
     operator<=(const iterator & other) const {
       return (this->index <= other.index);
     }
     template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
     template<class FullyTypedFieldMap, bool ConstIter>
     bool
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::iterator<FullyTypedFieldMap, ConstIter>::
+    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    iterator<FullyTypedFieldMap, ConstIter>::
     operator>(const iterator & other) const {
       return (this->index > other.index);
     }
     template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
     template<class FullyTypedFieldMap, bool ConstIter>
     bool
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::iterator<FullyTypedFieldMap, ConstIter>::
+    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    iterator<FullyTypedFieldMap, ConstIter>::
     operator>=(const iterator & other) const {
       return (this->index >= other.index);
     }
@@ -497,30 +526,38 @@ namespace muSpectre {
     //! additions, subtractions and corresponding assignments
     template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
     template<class FullyTypedFieldMap, bool ConstIter>
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::iterator<FullyTypedFieldMap, ConstIter>
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::iterator<FullyTypedFieldMap, ConstIter>::
+    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    iterator<FullyTypedFieldMap, ConstIter>
+    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    iterator<FullyTypedFieldMap, ConstIter>::
     operator+(difference_type diff) const {
       return iterator(this->fieldmap, this->index + diff);
     }
     template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
     template<class FullyTypedFieldMap, bool ConstIter>
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::iterator<FullyTypedFieldMap, ConstIter>
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::iterator<FullyTypedFieldMap, ConstIter>::
+    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    iterator<FullyTypedFieldMap, ConstIter>
+    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    iterator<FullyTypedFieldMap, ConstIter>::
     operator-(difference_type diff) const {
       return iterator(this->fieldmap, this->index - diff);
     }
     template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
     template<class FullyTypedFieldMap, bool ConstIter>
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::iterator<FullyTypedFieldMap, ConstIter> &
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::iterator<FullyTypedFieldMap, ConstIter>::
+    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    iterator<FullyTypedFieldMap, ConstIter> &
+    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    iterator<FullyTypedFieldMap, ConstIter>::
     operator+=(difference_type diff) {
       this->index += diff;
       return *this;
     }
     template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
     template<class FullyTypedFieldMap, bool ConstIter>
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::iterator<FullyTypedFieldMap, ConstIter> &
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::iterator<FullyTypedFieldMap, ConstIter>::
+    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    iterator<FullyTypedFieldMap, ConstIter> &
+    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    iterator<FullyTypedFieldMap, ConstIter>::
     operator-=(difference_type diff) {
       this->index -= diff;
       return *this;
@@ -531,7 +568,8 @@ namespace muSpectre {
     template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
     template<class FullyTypedFieldMap, bool ConstIter>
     typename FieldCollection::Ccoord
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::iterator<FullyTypedFieldMap, ConstIter>::
+    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    iterator<FullyTypedFieldMap, ConstIter>::
     get_ccoord() const {
       return this->collection.get_ccoord(this->index);
     }

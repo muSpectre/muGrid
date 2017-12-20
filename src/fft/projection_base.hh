@@ -81,7 +81,7 @@ namespace muSpectre {
     void initialise(FFT_PlanFlags flags = FFT_PlanFlags::estimate);
 
     //! apply the projection operator to a field
-    void apply_projection(Field_t & field) const;
+    virtual void apply_projection(Field_t & field) = 0;
 
     //!
     const Ccoord & get_resolutions() const {

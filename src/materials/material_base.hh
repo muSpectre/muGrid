@@ -30,7 +30,7 @@
 #include <string>
 
 #include "common/common.hh"
-#include "common/field_map_matrixlike.hh"
+#include "common/field.hh"
 #include "common/field_collection.hh"
 
 
@@ -88,7 +88,7 @@ namespace muSpectre {
      */
     void add_pixel(const Ccoord & ccooord);
 
-    //! allocate memory, etc
+    //! allocate memory, etc, but also: wipe history variables!
     virtual void initialise(bool stiffness = false) = 0;
 
     //! return the materil's name

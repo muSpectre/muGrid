@@ -103,7 +103,6 @@ namespace muSpectre {
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(simple_evaluation_test, fix, fixlist, fix) {
-    using fc = typename fix::FieldCollection_t;
     constexpr Dim_t dim{fix::sdim};
     using Mat_t = MaterialHyperElastic1<dim, dim>;
     const Real Young{210e9}, Poisson{.33};
@@ -117,14 +116,15 @@ namespace muSpectre {
 
     fix::add_material(std::move(Material_hard));
     auto & F = fix::get_strain();
-    MatrixFieldMap<fc, Real, dim, dim> F_map(F);
+    auto F_map = F.get_map();
     for (auto grad: F_map) {
       grad = grad.Identity();
     }
 
+    fix::initialise_materials();
     auto res_tup{fix::evaluate_stress_tangent(F)};
-    MatrixFieldMap<fc, Real, dim, dim, true> stress(std::get<0>(res_tup));
-    T4MatrixFieldMap<fc, Real, dim, true> tangent(std::get<1>(res_tup));
+    auto stress{std::get<0>(res_tup).get_map()};
+    auto tangent{std::get<1>(res_tup).get_map()};
 
     auto tup = testGoodies::objective_hooke_explicit
       (lambda, mu, Matrices::I2<dim>());
@@ -161,6 +161,7 @@ namespace muSpectre {
     fix::add_material(std::move(Material_soft));
 
     auto & F = fix::get_strain();
+    fix::initialise_materials();
     fix::evaluate_stress_tangent(F);
 
     fix::evaluate_stress_tangent(F);

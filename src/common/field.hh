@@ -42,7 +42,36 @@
 #include <memory>
 #include <type_traits>
 
+#include "common/T4_map_proxy.hh"
+
 namespace muSpectre {
+
+  /* ---------------------------------------------------------------------- */
+  class FieldCollectionError: public std::runtime_error {
+  public:
+    explicit FieldCollectionError(const std::string& what)
+      :std::runtime_error(what){}
+    explicit FieldCollectionError(const char * what)
+      :std::runtime_error(what){}
+  };
+
+  class FieldError: public FieldCollectionError {
+    using Parent = FieldCollectionError;
+  public:
+    explicit FieldError(const std::string& what)
+      :Parent(what){}
+    explicit FieldError(const char * what)
+      :Parent(what){}
+  };
+  class FieldInterpretationError: public FieldError
+  {
+  public:
+    explicit FieldInterpretationError(const std::string & what)
+      :FieldError(what){}
+    explicit FieldInterpretationError(const char * what)
+      :FieldError(what){}
+  };
+
 
   namespace internal {
 
@@ -137,6 +166,20 @@ namespace muSpectre {
          std::vector<StoredType,
                      Eigen::aligned_allocator<StoredType>>,
          std::vector<T,Eigen::aligned_allocator<T>>>;
+
+      using EigenRep = Eigen::Array<T, NbComponents, Eigen::Dynamic>;
+      using EigenMap = std::conditional_t<
+        ArrayStore,
+        Eigen::Map<EigenRep, Eigen::Aligned,
+                   Eigen::OuterStride<sizeof(StoredType)/sizeof(T)>>,
+        Eigen::Map<EigenRep>>;
+
+      using ConstEigenMap = std::conditional_t<
+        ArrayStore,
+        Eigen::Map<const EigenRep, Eigen::Aligned,
+                   Eigen::OuterStride<sizeof(StoredType)/sizeof(T)>>,
+        Eigen::Map<const EigenRep>>;
+
       TypedFieldBase(std::string unique_name,
                      FieldCollection& collection);
       virtual ~TypedFieldBase() = default;
@@ -152,6 +195,9 @@ namespace muSpectre {
                             value);
       template <bool componentStore = !ArrayStore>
       inline std::enable_if_t<componentStore> push_back(const StoredType & value);
+
+      //! Number of stored arrays (i.e. total number of stored
+      //! scalars/NbComponents)
       size_t size() const override final;
 
       static TypedFieldBase & check_ref(Parent & other);
@@ -159,6 +205,13 @@ namespace muSpectre {
 
       inline T* data() {return this->get_ptr_to_entry(0);}
       inline const T* data() const {return this->get_ptr_to_entry(0);}
+
+      inline EigenMap eigen();
+      inline ConstEigenMap eigen() const;
+
+      template<typename otherT>
+      inline Real inner_product(const TypedFieldBase<FieldCollection, otherT, NbComponents,
+                                ArrayStore> & other) const;
     protected:
 
       template <bool isArray=ArrayStore>
@@ -180,6 +233,7 @@ namespace muSpectre {
     };
 
   }  // internal
+
 
   /* ---------------------------------------------------------------------- */
   template <class FieldCollection, typename T, Dim_t order, Dim_t dim>
@@ -224,6 +278,15 @@ namespace muSpectre {
       return static_cast<TensorField &>(Parent::check_ref(other));}
     static const TensorField & check_ref(const Base & other) {
       return static_cast<const TensorField &>(Parent::check_ref(other));}
+
+    /**
+     * Pure convenience functions to get a MatrixFieldMap of
+     * appropriate dimensions mapped to this field. You can also
+     * create other types of maps, as long as they have the right
+     * fundamental type (T) and the correct size (nbComponents).
+     */
+    decltype(auto) get_map();
+    decltype(auto) get_map() const;
 
   protected:
     //! constructor protected!
@@ -276,6 +339,10 @@ namespace muSpectre {
     static const MatrixField & check_ref(const Base & other) {
       return static_cast<const MatrixField &>(Parent::check_ref(other));}
 
+    decltype(auto) get_map();
+    decltype(auto) get_map() const;
+
+
 protected:
     //! constructor protected!
     MatrixField(std::string unique_name, FieldCollection & collection);
@@ -284,9 +351,9 @@ protected:
   };
 
   /* ---------------------------------------------------------------------- */
-  //! convenience alias
+  //! convenience alias (
   template <class FieldCollection, typename T>
-  using ScalarField = TensorField<FieldCollection, T, 1, 1>;
+  using ScalarField = MatrixField<FieldCollection, T, 1, 1>;
   /* ---------------------------------------------------------------------- */
   // Implementations
   namespace internal {
@@ -361,7 +428,8 @@ protected:
     /* ---------------------------------------------------------------------- */
     template <class FieldCollection, typename T, Dim_t NbComponents, bool ArrayStore>
     TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore> &
-    TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::check_ref(Base & other) {
+    TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
+    check_ref(Base & other) {
       if (typeid(T).hash_code() != other.get_stored_typeid().hash_code()) {
         std::string err ="Cannot create a Reference of requested type " +(
            "for field '" + other.get_name() + "' of type '" +
@@ -381,7 +449,8 @@ protected:
     }
 
     /* ---------------------------------------------------------------------- */
-    template <class FieldCollection, typename T, Dim_t NbComponents, bool ArrayStore>
+    template <class FieldCollection, typename T, Dim_t NbComponents,
+              bool ArrayStore>
     const TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore> &
     TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
     check_ref(const Base & other) {
@@ -403,6 +472,36 @@ protected:
       }
       return static_cast<const TypedFieldBase&>(other);
     }
+
+    /* ---------------------------------------------------------------------- */
+    template <class FieldCollection, typename T, Dim_t NbComponents,
+              bool ArrayStore>
+    typename TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::EigenMap
+    TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
+    eigen() {
+      return EigenMap(this->data(), NbComponents, this->size());
+    }
+
+    /* ---------------------------------------------------------------------- */
+    template <class FieldCollection, typename T, Dim_t NbComponents,
+              bool ArrayStore>
+    typename TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::ConstEigenMap
+    TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
+    eigen() const {
+      return ConstEigenMap(this->data(), NbComponents, this->size());
+    }
+
+    /* ---------------------------------------------------------------------- */
+    template <class FieldCollection, typename T, Dim_t NbComponents,
+              bool ArrayStore>
+    template<typename otherT>
+    Real
+    TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
+    inner_product(const TypedFieldBase<FieldCollection, otherT, NbComponents,
+                  ArrayStore> & other) const {
+      return (this->eigen() * other.eigen()).sum();
+    }
+
 
     /* ---------------------------------------------------------------------- */
     template <class FieldCollection, typename T, Dim_t NbComponents, bool ArrayStore>
@@ -512,6 +611,7 @@ protected:
     return dim;
   }
 
+
   /* ---------------------------------------------------------------------- */
   template <class FieldCollection, typename T, Dim_t NbRow, Dim_t NbCol>
   MatrixField<FieldCollection, T, NbRow, NbCol>::
@@ -533,4 +633,94 @@ protected:
   }
 
 }  // muSpectre
+
+#include "common/field_map.hh"
+
+namespace muSpectre {
+
+  namespace internal {
+
+    /* ---------------------------------------------------------------------- */
+    template <class FieldCollection, typename T, size_t order, Dim_t dim,
+              bool ConstMap>
+    struct tensor_map_type {
+    };
+
+    template <class FieldCollection, typename T, Dim_t dim, bool ConstMap>
+    struct tensor_map_type<FieldCollection, T, firstOrder, dim, ConstMap> {
+      using type = MatrixFieldMap<FieldCollection, T, dim, 1, ConstMap>;
+    };
+
+    template <class FieldCollection, typename T, Dim_t dim, bool ConstMap>
+    struct tensor_map_type<FieldCollection, T, secondOrder, dim, ConstMap> {
+      using type = MatrixFieldMap<FieldCollection, T, dim, dim, ConstMap>;
+    };
+
+    template <class FieldCollection, typename T, Dim_t dim, bool ConstMap>
+    struct tensor_map_type<FieldCollection, T, fourthOrder, dim, ConstMap> {
+      using type = T4MatrixFieldMap<FieldCollection, T, dim, ConstMap>;
+    };
+
+    /* ---------------------------------------------------------------------- */
+    template <class FieldCollection, typename T, Dim_t NbRow, Dim_t NbCol,
+              bool ConstMap>
+    struct matrix_map_type {
+      using type =
+        MatrixFieldMap<FieldCollection, T, NbRow, NbCol, ConstMap>;
+    };
+
+    template <class FieldCollection, typename T, bool ConstMap>
+    struct matrix_map_type<FieldCollection, T, oneD, oneD, ConstMap> {
+      using type = ScalarFieldMap<FieldCollection, T, ConstMap>;
+    };
+
+  }  // internal
+
+  /* ---------------------------------------------------------------------- */
+  template <class FieldCollection, typename T, Dim_t order, Dim_t dim>
+  decltype(auto) TensorField<FieldCollection, T, order, dim>::
+  get_map() {
+    constexpr bool map_constness{false};
+    using RawMap_t =
+      typename internal::tensor_map_type<FieldCollection, T, order, dim,
+                                         map_constness>::type;
+    return RawMap_t(*this);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <class FieldCollection, typename T, Dim_t order, Dim_t dim>
+  decltype(auto) TensorField<FieldCollection, T, order, dim>::
+  get_map() const {
+    constexpr bool map_constness{true};
+    using RawMap_t =
+      typename internal::tensor_map_type<FieldCollection, T, order, dim,
+                                         map_constness>::type;
+    return RawMap_t(*this);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <class FieldCollection, typename T, Dim_t NbRow, Dim_t NbCol>
+  decltype(auto) MatrixField<FieldCollection, T, NbRow, NbCol>::
+  get_map() {
+    constexpr bool map_constness{false};
+    using RawMap_t =
+      typename internal::matrix_map_type<FieldCollection, T, NbRow, NbCol,
+                                         map_constness>::type;
+    return RawMap_t(*this);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <class FieldCollection, typename T, Dim_t NbRow, Dim_t NbCol>
+  decltype(auto) MatrixField<FieldCollection, T, NbRow, NbCol>::
+  get_map() const {
+    constexpr bool map_constness{true};
+    using RawMap_t =
+      typename internal::matrix_map_type<FieldCollection, T, NbRow, NbCol,
+                                         map_constness>::type;
+    return RawMap_t(*this);
+  }
+
+
+}  // muSpectre
+
 #endif /* FIELD_H */

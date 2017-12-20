@@ -78,10 +78,7 @@ namespace muSpectre {
     void initialise(FFT_PlanFlags flags = FFT_PlanFlags::estimate);
 
     //! apply the projection operator to a field
-    void apply_projection(Field_t & field);
-
-
-
+    void apply_projection(Field_t & field) override final;
 
   protected:
     Proj_map xis;
