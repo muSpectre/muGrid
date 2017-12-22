@@ -75,7 +75,7 @@ namespace muSpectre {
     constexpr bool verbose{true};
 
     GradIncrements<dim> grads; grads.push_back(delF0);
-    newton_cg(sys, grads, cg_tol, newton_tol, maxiter, verbose);
+    de_geus(sys, grads, cg_tol, newton_tol, maxiter, verbose);
   }
 
   BOOST_AUTO_TEST_SUITE_END();

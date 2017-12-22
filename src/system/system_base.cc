@@ -79,7 +79,8 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void SystemBase<DimS, DimM>::directional_stiffness(const TangentField_t &K,
+  typename SystemBase<DimS, DimM>::StressField_t &
+  SystemBase<DimS, DimM>::directional_stiffness(const TangentField_t &K,
                                                      const StrainField_t &delF,
                                                      StressField_t &delP) {
     for (auto && tup:
@@ -89,13 +90,15 @@ namespace muSpectre {
       auto & dp = std::get<2>(tup);
       dp = Matrices::tensmult(k, df);
     }
-    this->projection->apply_projection(delP);
+    return this->project(delP);
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void SystemBase<DimS, DimM>::convolve(StressField_t &field) {
+  typename SystemBase<DimS, DimM>::StressField_t &
+  SystemBase<DimS, DimM>::project(StressField_t &field) {
     this->projection->apply_projection(field);
+    return field;
   }
 
   /* ---------------------------------------------------------------------- */

@@ -97,15 +97,15 @@ namespace muSpectre {
      * evaluate directional stiffness (i.e. G:K:δF)
      */
 
-    void directional_stiffness(const TangentField_t & K,
-                               const StrainField_t & delF,
-                               StressField_t & delP);
+    StressField_t & directional_stiffness(const TangentField_t & K,
+                                          const StrainField_t & delF,
+                                          StressField_t & delP);
 
     /**
      * Convenience function circumventing the neeed to use the
      * underlying projection
      */
-    void convolve(StressField_t & field);
+    StressField_t & project(StressField_t & field);
 
     StrainField_t & get_strain();
 

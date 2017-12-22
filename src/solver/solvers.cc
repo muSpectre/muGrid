@@ -35,9 +35,116 @@ namespace muSpectre {
 
   template <Dim_t DimS, Dim_t DimM>
   typename SystemBase<DimS, DimM>::StrainField_t &
+  de_geus (SystemBase<DimS, DimM> & sys, const GradIncrements<DimM> & delFs,
+           const Real cg_tol, const Real newton_tol, Uint maxiter,
+           bool verbose) {
+    using Field_t = typename MaterialBase<DimS, DimM>::StrainField_t;
+    auto solver_fields{std::make_unique<GlobalFieldCollection<DimS, DimM>>()};
+    solver_fields->initialise(sys.get_resolutions());
+
+    // Corresponds to symbol δF or δε
+    auto & incrF{make_field<Field_t>("δF", *solver_fields)};
+
+    // Corresponds to symbol ΔF or Δε
+    auto & DeltaF{make_field<Field_t>("ΔF", *solver_fields)};
+
+    // field to store the rhs for cg calculations
+    auto & rhs{make_field<Field_t>("rhs", *solver_fields)};
+
+    SolverCG<DimS, DimM> cg(sys.get_resolutions(),
+                            cg_tol, maxiter, verbose);
+    cg.initialise();
+
+
+    if (maxiter == 0) {
+      maxiter = sys.size()*DimM*DimM*10;
+    }
+    if (verbose) {
+      //setup of algorithm 5.2 in Nocedal, Numerical Optimization (p. 111)
+      std::cout << "Algo 5.2 with newton_tol = " << newton_tol << ", cg_tol = "
+                << cg_tol << " maxiter = " << maxiter << " and ΔF =" <<std::endl;
+      for (auto&& tup: akantu::enumerate(delFs)) {
+        auto && counter{std::get<0>(tup)};
+        auto && grad{std::get<1>(tup)};
+        std::cout << "Step " << counter + 1 << ":" << std::endl
+                  << grad << std::endl;
+      }
+    }
+
+    // initialise F = I
+    auto & F{sys.get_strain()};
+    F.get_map() = Matrices::I2<DimM>();
+
+    // initialise materials
+    constexpr bool need_tangent{true};
+    sys.initialise_materials(need_tangent);
+
+    Grad_t<DimM> previous_grad{Grad_t<DimM>::Zero()};
+    for (const auto & delF: delFs) { //incremental loop
+
+      Real incrNorm{2*newton_tol}, gradNorm{1};
+      for (Uint newt_iter{0};
+           (newt_iter < maxiter) && ((incrNorm/gradNorm > newton_tol) ||
+                                     (newt_iter==1));
+           ++newt_iter) {
+
+        // obtain material response
+        auto res_tup{sys.evaluate_stress_tangent(F)};
+        auto & P{std::get<0>(res_tup)};
+        auto & K{std::get<1>(res_tup)};
+
+        auto tangent_effect = [&sys, &K] (const Field_t & delF, Field_t & delP) {
+          sys.directional_stiffness(K, delF, delP);
+        };
+
+
+        if (newt_iter == 0) {
+          DeltaF.get_map() = -(delF-previous_grad); // neg sign because rhs
+          tangent_effect(DeltaF, rhs);
+          cg.solve(tangent_effect, rhs, incrF);
+        } else {
+          rhs.eigen() = -P.eigen();
+          sys.project(rhs);
+          cg.solve(tangent_effect, rhs, incrF);
+        }
+
+        F.eigen() += incrF.eigen();
+
+        incrNorm = incrF.eigen().matrix().norm();
+        gradNorm = F.eigen().matrix().norm();
+      }
+      // update previous gradient
+      previous_grad = delF;
+
+      //store history variables here
+
+    }
+
+    return F;
+
+  }
+
+  template typename SystemBase<twoD, twoD>::StrainField_t &
+  de_geus (SystemBase<twoD, twoD> & sys, const GradIncrements<twoD>& delF0,
+           const Real cg_tol, const Real newton_tol, Uint maxiter,
+           bool verbose);
+
+  // template typename SystemBase<twoD, threeD>::StrainField_t &
+  // de_geus (SystemBase<twoD, threeD> & sys, const GradIncrements<threeD>& delF0,
+  //            const Real cg_tol, const Real newton_tol, Uint maxiter,
+  //            bool verbose);
+
+  template typename SystemBase<threeD, threeD>::StrainField_t &
+  de_geus (SystemBase<threeD, threeD> & sys, const GradIncrements<threeD>& delF0,
+           const Real cg_tol, const Real newton_tol, Uint maxiter,
+           bool verbose);
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  typename SystemBase<DimS, DimM>::StrainField_t &
   newton_cg (SystemBase<DimS, DimM> & sys, const GradIncrements<DimM> & delFs,
-            const Real cg_tol, const Real newton_tol, Uint maxiter,
-            bool verbose) {
+             const Real cg_tol, const Real newton_tol, Uint maxiter,
+             bool verbose) {
     using Field_t = typename MaterialBase<DimS, DimM>::StrainField_t;
     auto solver_fields{std::make_unique<GlobalFieldCollection<DimS, DimM>>()};
     solver_fields->initialise(sys.get_resolutions());
@@ -94,12 +201,11 @@ namespace muSpectre {
         auto & K{std::get<1>(res_tup)};
 
         auto fun = [&sys, &K] (const Field_t & delF, Field_t & delP) {
-          delP.eigen() = delF.eigen();
           sys.directional_stiffness(K, delF, delP);
         };
 
         rhs.eigen() = -P.eigen();
-        sys.convolve(rhs);
+        sys.project(rhs);
         cg.solve(fun, rhs, incrF);
 
         F.eigen() += incrF.eigen();

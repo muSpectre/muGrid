@@ -59,6 +59,24 @@ namespace muSpectre {
                     cg_tol, newton_tol, maxiter, verbose);
   }
 
+    /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM=DimS>
+  typename SystemBase<DimS, DimM>::StrainField_t &
+  de_geus (SystemBase<DimS, DimM> & sys,
+           const GradIncrements<DimM> & delF0,
+           const Real cg_tol, const Real newton_tol, const Uint maxiter=0,
+           bool verbose = false);
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM=DimS>
+  inline typename SystemBase<DimS, DimM>::StrainField_t &
+  de_geus (SystemBase<DimS, DimM> & sys, const Grad_t<DimM> & delF0,
+           const Real cg_tol, const Real newton_tol, const Uint maxiter=0,
+           bool verbose = false){
+    return de_geus(sys, GradIncrements<DimM>{delF0},
+                   cg_tol, newton_tol, maxiter, verbose);
+  }
+
 }  // muSpectre
 
 #endif /* SOLVERS_H */
