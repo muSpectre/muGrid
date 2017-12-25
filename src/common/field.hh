@@ -229,7 +229,7 @@ namespace muSpectre {
       get_ptr_to_entry(std::enable_if_t<noArray, const size_t&&> index) const;
 
       inline virtual void resize(size_t size) override final;
-      StorageType array{};
+      StorageType values{};
     };
 
   }  // internal
@@ -411,7 +411,7 @@ protected:
     void
     TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
     set_zero() {
-      std::fill(this->array.begin(), this->array.end(), T{});
+      std::fill(this->values.begin(), this->values.end(), T{});
     }
 
     /* ---------------------------------------------------------------------- */
@@ -419,9 +419,9 @@ protected:
     size_t TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
     size() const {
       if (ArrayStore) {
-        return this->array.size();
+        return this->values.size();
       } else  {
-        return this->array.size()/NbComponents;
+        return this->values.size()/NbComponents;
       }
     }
 
@@ -510,7 +510,7 @@ protected:
     TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
     get_ptr_to_entry(const size_t&& index) {
       static_assert (isArray == ArrayStore, "SFINAE");
-      return &this->array[std::move(index)](0, 0);
+      return &this->values[std::move(index)](0, 0);
     }
 
     /* ---------------------------------------------------------------------- */
@@ -519,7 +519,7 @@ protected:
     T* TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
     get_ptr_to_entry(std::enable_if_t<noArray, const size_t&&> index) {
       static_assert (noArray != ArrayStore, "SFINAE");
-      return &this->array[NbComponents*std::move(index)];
+      return &this->values[NbComponents*std::move(index)];
     }
 
     /* ---------------------------------------------------------------------- */
@@ -529,7 +529,7 @@ protected:
     TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
     get_ptr_to_entry(const size_t&& index) const {
       static_assert (isArray == ArrayStore, "SFINAE");
-      return &this->array[std::move(index)](0, 0);
+      return &this->values[std::move(index)](0, 0);
     }
 
     /* ---------------------------------------------------------------------- */
@@ -538,7 +538,7 @@ protected:
     const T* TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
     get_ptr_to_entry(std::enable_if_t<noArray, const size_t&&> index) const {
       static_assert (noArray != ArrayStore, "SFINAE");
-      return &this->array[NbComponents*std::move(index)];
+      return &this->values[NbComponents*std::move(index)];
     }
 
     /* ---------------------------------------------------------------------- */
@@ -546,9 +546,9 @@ protected:
     void TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
     resize(size_t size) {
       if (ArrayStore) {
-        this->array.resize(size);
+        this->values.resize(size);
       } else {
-        this->array.resize(size*NbComponents);
+        this->values.resize(size*NbComponents);
       }
     }
 
@@ -559,7 +559,7 @@ protected:
     TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
     push_back(const std::enable_if_t<isArrayStore,StoredType> & value) {
       static_assert(isArrayStore == ArrayStore, "SFINAE");
-      this->array.push_back(value);
+      this->values.push_back(value);
     }
 
     /* ---------------------------------------------------------------------- */
@@ -570,7 +570,7 @@ protected:
     push_back(const StoredType & value) {
       static_assert(componentStore != ArrayStore, "SFINAE");
       for (Dim_t i = 0; i < NbComponents; ++i) {
-        this->array.push_back(value(i));
+        this->values.push_back(value(i));
       }
     }
 

@@ -27,7 +27,6 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include <boost/range/combine.hpp>
 #include "Eigen/Dense"
 
 #include "fft/projection_finite_strain.hh"
@@ -35,6 +34,7 @@
 #include "fft/fft_utils.hh"
 #include "common/field_map.hh"
 #include "common/tensor_algebra.hh"
+#include "common/iterators.hh"
 
 namespace muSpectre {
 
@@ -53,9 +53,9 @@ namespace muSpectre {
     Parent::initialise(flags);
     FFT_freqs<DimS> fft_freqs(this->fft_engine->get_resolutions(),
                               this->fft_engine->get_lengths());
-    for (auto && tup: boost::combine(*this->fft_engine, this->Ghat)) {
-      const auto & ccoord = boost::get<0> (tup);
-      auto & G = boost::get<1>(tup);
+    for (auto && tup: akantu::zip(*this->fft_engine, this->Ghat)) {
+      const auto & ccoord = std::get<0> (tup);
+      auto & G = std::get<1>(tup);
       auto xi = fft_freqs.get_unit_xi(ccoord);
       //! this is simplyfiable usinc Curnier's Méthodes numériques, 6.69(c)
       G = Matrices::outer_under(Matrices::I2<DimM>(), xi*xi.transpose());
@@ -76,9 +76,9 @@ namespace muSpectre {
   void ProjectionFiniteStrain<DimS, DimM>::apply_projection(Field_t & field) {
     Vector_map field_map{this->fft_engine->fft(field)};
     Real factor = this->fft_engine->normalisation();
-    for (auto && tup: boost::combine(this->Ghat, field_map)) {
-      auto & G{boost::get<0>(tup)};
-      auto & f{boost::get<1>(tup)};
+    for (auto && tup: akantu::zip(this->Ghat, field_map)) {
+      auto & G{std::get<0>(tup)};
+      auto & f{std::get<1>(tup)};
       f = factor * (G*f).eval();
     }
     this->fft_engine->ifft(field);

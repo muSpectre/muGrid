@@ -30,7 +30,6 @@
 #include <memory>
 
 #include <boost/mpl/list.hpp>
-#include <boost/range/combine.hpp>
 #include <Eigen/Dense>
 
 #include "tests.hh"
@@ -41,6 +40,7 @@
 #include "common/common.hh"
 #include "common/field_collection.hh"
 #include "common/field_map.hh"
+#include "common/iterators.hh"
 
 namespace muSpectre {
 
@@ -152,10 +152,10 @@ namespace muSpectre {
       k(i) = (i+1)*2*pi/fix::projector.get_lengths()[i]; ;
     }
 
-    for (auto && tup: boost::combine(fields, grad, var)) {
-      auto & ccoord = boost::get<0>(tup);
-      auto & g = boost::get<1>(tup);
-      auto & v = boost::get<2>(tup);
+    for (auto && tup: akantu::zip(fields, grad, var)) {
+      auto & ccoord = std::get<0>(tup);
+      auto & g = std::get<1>(tup);
+      auto & v = std::get<2>(tup);
       Vector vec = CcoordOps::get_vector(ccoord,
                                          fix::projector.get_lengths()/
                                          fix::projector.get_resolutions());
@@ -166,10 +166,10 @@ namespace muSpectre {
     fix::projector.initialise(FFT_PlanFlags::estimate);
     fix::projector.apply_projection(f_var);
 
-    for (auto && tup: boost::combine(fields, grad, var)) {
-      auto & ccoord = boost::get<0>(tup);
-      auto & g = boost::get<1>(tup);
-      auto & v = boost::get<2>(tup);
+    for (auto && tup: akantu::zip(fields, grad, var)) {
+      auto & ccoord = std::get<0>(tup);
+      auto & g = std::get<1>(tup);
+      auto & v = std::get<2>(tup);
       Vector vec = CcoordOps::get_vector(ccoord,
                                          fix::projector.get_lengths()/
                                          fix::projector.get_resolutions());
@@ -208,12 +208,12 @@ namespace muSpectre {
 
   //   fields.initialise(F3::engine.get_resolutions());
 
-  //   for (auto && tup: boost::combine(fields, grad, curl, sum, var)) {
-  //     auto & ccoord = boost::get<0>(tup);
-  //     auto & g = boost::get<1>(tup);
-  //     auto & c = boost::get<2>(tup);
-  //     auto & s = boost::get<3>(tup);
-  //     auto & v = boost::get<4>(tup);
+  //   for (auto && tup: akantu::zip(fields, grad, curl, sum, var)) {
+  //     auto & ccoord = std::get<0>(tup);
+  //     auto & g = std::get<1>(tup);
+  //     auto & c = std::get<2>(tup);
+  //     auto & s = std::get<3>(tup);
+  //     auto & v = std::get<4>(tup);
   //     auto vec = CcoordOps::get_vector(ccoord);
   //     Real & x{vec(0)};
   //     Real & y{vec(1)};
@@ -226,12 +226,12 @@ namespace muSpectre {
   //   projector.initialise(FFT_PlanFlags::estimate);
   //   projector.apply_projection(f_var);
 
-  //   for (auto && tup: boost::combine(fields, grad, curl, sum, var)) {
-  //     auto & ccoord = boost::get<0>(tup);
-  //     auto & g = boost::get<1>(tup);
-  //     auto & c = boost::get<2>(tup);
-  //     auto & s = boost::get<3>(tup);
-  //     auto & v = boost::get<4>(tup);
+  //   for (auto && tup: akantu::zip(fields, grad, curl, sum, var)) {
+  //     auto & ccoord = std::get<0>(tup);
+  //     auto & g = std::get<1>(tup);
+  //     auto & c = std::get<2>(tup);
+  //     auto & s = std::get<3>(tup);
+  //     auto & v = std::get<4>(tup);
   //     auto vec = CcoordOps::get_vector(ccoord);
 
   //     Real error = (s-g).norm();

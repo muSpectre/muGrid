@@ -70,7 +70,7 @@ namespace muSpectre {
     virtual void initialise(FFT_PlanFlags plan_flags) override;
 
     //! forward transform
-    virtual Workspace_t & fft(const Field_t & field) override;
+    virtual Workspace_t & fft(Field_t & field) override;
 
     //! inverse transform
     virtual void ifft(Field_t & field) const override;

@@ -28,14 +28,13 @@
  */
 
 #include <boost/mpl/list.hpp>
-#include <boost/range/combine.hpp>
 
 #include "tests.hh"
 #include "fft/fftw_engine.hh"
 #include "common/ccoord_operations.hh"
 #include "common/field_collection.hh"
 #include "common/field_map.hh"
-
+#include "common/iterators.hh"
 
 namespace muSpectre {
 
@@ -76,12 +75,16 @@ namespace muSpectre {
     fc.initialise(CcoordOps::get_cube<Fix::sdim>(Fix::box_resolution));
 
     using map_t = MatrixFieldMap<FC_t, Real, Fix::mdim, Fix::mdim>;
-    auto inmap{map_t{input}};
+    map_t inmap{input};
     auto refmap{map_t{ref}};
     auto resultmap{map_t{result}};
-    for (auto tup: boost::combine(inmap, refmap)) {
-      boost::get<0>(tup).setRandom();
-      boost::get<1>(tup) = boost::get<0>(tup);
+    size_t cntr{0};
+    for (auto tup: akantu::zip(inmap, refmap)) {
+      cntr++;
+      auto & in_{std::get<0>(tup)};
+      auto & ref_{std::get<1>(tup)};
+      in_.setRandom();
+      ref_ = in_;
     }
     auto & complex_field = Fix::engine.fft(input);
     using cmap_t = MatrixFieldMap<FieldCollection<Fix::sdim, Fix::mdim, false>, Complex, Fix::mdim, Fix::mdim>;
@@ -91,18 +94,18 @@ namespace muSpectre {
 
     /* make sure, the engine has not modified input (which is
        unfortunately const-casted internally, hence this test) */
-    for (auto && tup: boost::combine(inmap, refmap)) {
-      Real error{(boost::get<0>(tup) - boost::get<1>(tup)).norm()};
+    for (auto && tup: akantu::zip(inmap, refmap)) {
+      Real error{(std::get<0>(tup) - std::get<1>(tup)).norm()};
       BOOST_CHECK_LT(error, tol);
     }
 
     /* make sure that the ifft of fft returns the original*/
     Fix::engine.ifft(result);
-    for (auto && tup: boost::combine(resultmap, refmap)) {
-      Real error{(boost::get<0>(tup)*Fix::engine.normalisation() - boost::get<1>(tup)).norm()};
+    for (auto && tup: akantu::zip(resultmap, refmap)) {
+      Real error{(std::get<0>(tup)*Fix::engine.normalisation() - std::get<1>(tup)).norm()};
       BOOST_CHECK_LT(error, tol);
       if (error > tol) {
-        std::cout << boost::get<0>(tup).array()/boost::get<1>(tup).array() << std::endl << std::endl;
+        std::cout << std::get<0>(tup).array()/std::get<1>(tup).array() << std::endl << std::endl;
       }
     }
   }

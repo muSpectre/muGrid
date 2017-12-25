@@ -54,7 +54,8 @@ namespace muSpectre {
     std::copy(this->resolutions.begin(), this->resolutions.end(), narr.begin());
     int howmany = Field_t::nb_components;
     //temporary buffer for plan
-    Real * r_work_space = fftw_alloc_real(CcoordOps::get_size(this->resolutions) *howmany);
+    size_t alloc_size = CcoordOps::get_size(this->resolutions) *howmany;
+    Real * r_work_space = fftw_alloc_real(alloc_size);
     Real * in = r_work_space;
     const int * const inembed = nullptr;//nembed are tricky: they refer to physical layout
     int  istride = howmany;
@@ -65,14 +66,22 @@ namespace muSpectre {
     int odist = idist;
 
     unsigned int flags;
-    if (plan_flags == FFT_PlanFlags::estimate) {
+    switch (plan_flags) {
+    case FFT_PlanFlags::estimate: {
       flags = FFTW_ESTIMATE;
+      break;
     }
-    if (plan_flags == FFT_PlanFlags::measure) {
+    case FFT_PlanFlags::measure: {
       flags = FFTW_MEASURE;
+      break;
     }
-    if (plan_flags == FFT_PlanFlags::patient) {
+    case FFT_PlanFlags::patient: {
       flags = FFTW_PATIENT;
+      break;
+    }
+    default:
+      throw std::runtime_error("unknown planner flag type");
+      break;
     }
 
     this->plan_fft = fftw_plan_many_dft_r2c(rank, n, howmany, in, inembed, istride,
@@ -81,6 +90,9 @@ namespace muSpectre {
     if (this->plan_fft == nullptr) {
       throw std::runtime_error("Plan failed");
     }
+    fftw_execute_dft_r2c(this->plan_fft,
+                         in,
+                         reinterpret_cast<fftw_complex*>(this->work.data()));
 
     fftw_complex * i_in = reinterpret_cast<fftw_complex*>(this->work.data());
     Real * i_out = r_work_space;
@@ -106,9 +118,9 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   typename FFTW_Engine<DimS, DimM>::Workspace_t &
-  FFTW_Engine<DimS, DimM>::fft (const Field_t & field) {
+  FFTW_Engine<DimS, DimM>::fft (Field_t & field) {
     fftw_execute_dft_r2c(this->plan_fft,
-                         const_cast<Real*>(field.data()),
+                         field.data(),
                          reinterpret_cast<fftw_complex*>(this->work.data()));
     return this->work;
   }

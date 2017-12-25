@@ -175,32 +175,32 @@ namespace muSpectre {
     typename Fix::Mat_t::StressMap_t Pmap_ref(globalfields["Nominal Stress reference"]);
     typename Fix::Mat_t::TangentMap_t Kmap_ref(globalfields["Tangent Moduli reference"]);
 
-    for (auto tup: boost::combine(Fmap, Pmap_ref, Kmap_ref)) {
-      auto F_ = boost::get<0>(tup);
-      auto P_ = boost::get<1>(tup);
-      auto K_ = boost::get<2>(tup);
+    for (auto tup: akantu::zip(Fmap, Pmap_ref, Kmap_ref)) {
+      auto F_ = std::get<0>(tup);
+      auto P_ = std::get<1>(tup);
+      auto K_ = std::get<2>(tup);
       std::tie(P_,K_) = testGoodies::objective_hooke_explicit<Fix::mdim>
         (Fix::lambda, Fix::mu, F_);
     }
 
     typename Fix::Mat_t::StressMap_t Pmap_1(globalfields["Nominal Stress1"]);
-    for (auto tup: boost::combine(Pmap_ref, Pmap_1)) {
-      auto P_r = boost::get<0>(tup);
-      auto P_1 = boost::get<1>(tup);
+    for (auto tup: akantu::zip(Pmap_ref, Pmap_1)) {
+      auto P_r = std::get<0>(tup);
+      auto P_1 = std::get<1>(tup);
       Real error = (P_r - P_1).norm();
       BOOST_CHECK_LT(error, tol);
     }
 
     typename Fix::Mat_t::StressMap_t Pmap_2(globalfields["Nominal Stress2"]);
     typename Fix::Mat_t::TangentMap_t Kmap(globalfields["Tangent Moduli"]);
-    for (auto tup: boost::combine(Pmap_ref, Pmap_2, Kmap_ref, Kmap)) {
-      auto P_r = boost::get<0>(tup);
-      auto P = boost::get<1>(tup);
+    for (auto tup: akantu::zip(Pmap_ref, Pmap_2, Kmap_ref, Kmap)) {
+      auto P_r = std::get<0>(tup);
+      auto P = std::get<1>(tup);
       Real error = (P_r - P).norm();
       BOOST_CHECK_LT(error, tol);
 
-      auto K_r = boost::get<2>(tup);
-      auto K = boost::get<3>(tup);
+      auto K_r = std::get<2>(tup);
+      auto K = std::get<3>(tup);
       error = (K_r - K).norm();
       BOOST_CHECK_LT(error, tol);
     }

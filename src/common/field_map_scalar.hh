@@ -88,16 +88,20 @@ namespace muSpectre {
       inline std::string info_string() const override final;
 
       //! member access
-      template <class ref_t = reference>
-      inline ref_t operator[](size_type index);
+      inline reference operator[](size_type index);
       inline reference operator[](const Ccoord&  ccoord);
+
+      inline const_reference operator[] (size_type index) const;
+      inline const_reference operator[] (const Ccoord&  ccoord) const;
 
       //! return an iterator to head of field for ranges
       inline iterator begin(){return iterator(*this);}
-      inline const_iterator cbegin(){return const_iterator(*this);}
+      inline const_iterator cbegin() const {return const_iterator(*this);}
+      inline const_iterator begin() const {return this->cbegin();}
       //! return an iterator to tail of field for ranges
       inline iterator end(){return iterator(*this, false);}
-      inline const_iterator cend(){return const_iterator(*this, false);}
+      inline const_iterator cend() const {return const_iterator(*this, false);}
+      inline const_iterator end() const {return this->cend();}
 
     protected:
       //! for sad, legacy iterator use
@@ -149,9 +153,36 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   //! member access
   template <class FieldCollection, typename T, bool ConstField>
-  template <class ref_t>
-  ref_t
+  typename ScalarFieldMap<FieldCollection, T, ConstField>::reference
   ScalarFieldMap<FieldCollection, T, ConstField>::operator[](size_type index) {
+    return this->get_ptr_to_entry(std::move(index))[0];
+  }
+
+  /* ---------------------------------------------------------------------- */
+  //! member access
+  template <class FieldCollection, typename T, bool ConstField>
+  typename ScalarFieldMap<FieldCollection, T, ConstField>::reference
+  ScalarFieldMap<FieldCollection, T, ConstField>::operator[](const Ccoord& ccoord) {
+    auto && index = this->collection.get_index(std::move(ccoord));
+    return this->get_ptr_to_entry(std::move(index))[0];
+  }
+
+  /* ---------------------------------------------------------------------- */
+  //! member access
+  template <class FieldCollection, typename T, bool ConstField>
+  typename ScalarFieldMap<FieldCollection, T, ConstField>::const_reference
+  ScalarFieldMap<FieldCollection, T, ConstField>::
+  operator[](size_type index) const {
+    return this->get_ptr_to_entry(std::move(index))[0];
+  }
+
+  /* ---------------------------------------------------------------------- */
+  //! member access
+  template <class FieldCollection, typename T, bool ConstField>
+  typename ScalarFieldMap<FieldCollection, T, ConstField>::const_reference
+  ScalarFieldMap<FieldCollection, T, ConstField>::
+  operator[](const Ccoord& ccoord) const {
+    auto && index = this->collection.get_index(std::move(ccoord));
     return this->get_ptr_to_entry(std::move(index))[0];
   }
 
@@ -166,14 +197,6 @@ namespace muSpectre {
     return *this;
   }
 
-  /* ---------------------------------------------------------------------- */
-  //! member access
-  template <class FieldCollection, typename T, bool ConstField>
-  typename ScalarFieldMap<FieldCollection, T, ConstField>::reference
-  ScalarFieldMap<FieldCollection, T, ConstField>::operator[](const Ccoord& ccoord) {
-    auto && index = this->collection.get_index(std::move(ccoord));
-    return this->get_ptr_to_entry(std::move(index))[0];
-  }
 }  // muSpectre
 
 #endif /* FIELD_MAP_SCALAR_H */

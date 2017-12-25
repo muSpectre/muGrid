@@ -59,8 +59,8 @@ namespace muSpectre {
     };
 
     /* ---------------------------------------------------------------------- */
-    template <class FieldCollection, class EigenArray, Map_t map_type,
-              bool ConstField>
+    template <class FieldCollection, class EigenArray, class EigenConstArray,
+              Map_t map_type, bool ConstField>
     class MatrixLikeFieldMap: public FieldMap<FieldCollection,
                                               typename EigenArray::Scalar,
                                               EigenArray::SizeAtCompileTime,
@@ -72,7 +72,7 @@ namespace muSpectre {
                               EigenArray::SizeAtCompileTime, ConstField>;
       using Ccoord = Ccoord_t<FieldCollection::spatial_dim()>;
       using value_type = EigenArray;
-      using const_reference = const value_type;
+      using const_reference = EigenConstArray;
       using reference = std::conditional_t<ConstField,
                                            const_reference,
                                            value_type>; // since it's a resource handle
@@ -134,9 +134,11 @@ namespace muSpectre {
       inline std::string info_string() const override final;
 
       //! member access
-      template <class ref = reference>
-      inline ref operator[](size_type index);
+      inline reference operator[](size_type index);
       inline reference operator[](const Ccoord& ccoord);
+
+      inline const_reference operator[](size_type index) const;
+      inline const_reference operator[](const Ccoord& ccoord) const;
 
       //! return an iterator to head of field for ranges
       inline iterator begin(){return iterator(*this);}
@@ -155,17 +157,19 @@ namespace muSpectre {
     };
 
     /* ---------------------------------------------------------------------- */
-    template <class FieldCollection, class EigenArray, Map_t map_type,
-              bool ConstField>
-    const std::string MatrixLikeFieldMap<FieldCollection, EigenArray, map_type,
+    template <class FieldCollection, class EigenArray, class EigenConstArray, 
+              Map_t map_type,  bool ConstField>
+    const std::string MatrixLikeFieldMap<FieldCollection, EigenArray,
+                                         EigenConstArray, map_type,
                                          ConstField>::
     field_info_root{NameWrapper<map_type>::field_info_root()};
 
     /* ---------------------------------------------------------------------- */
-    template<class FieldCollection, class EigenArray, Map_t map_type,
-              bool ConstField>
+    template<class FieldCollection, class EigenArray, class EigenConstArray, 
+              Map_t map_type,  bool ConstField>
     template <bool isntConst>
-    MatrixLikeFieldMap<FieldCollection, EigenArray, map_type, ConstField>::
+    MatrixLikeFieldMap<FieldCollection, EigenArray, EigenConstArray, map_type,
+                       ConstField>::
     MatrixLikeFieldMap(std::enable_if_t<isntConst, Field &> field)
       :Parent(field) {
       static_assert((isntConst != ConstField),
@@ -175,10 +179,11 @@ namespace muSpectre {
     }
 
     /* ---------------------------------------------------------------------- */
-    template<class FieldCollection, class EigenArray, Map_t map_type,
-              bool ConstField>
+    template<class FieldCollection, class EigenArray, class EigenConstArray, 
+              Map_t map_type,  bool ConstField>
     template <bool isConst>
-    MatrixLikeFieldMap<FieldCollection, EigenArray, map_type, ConstField>::
+    MatrixLikeFieldMap<FieldCollection, EigenArray, EigenConstArray, map_type,
+                       ConstField>::
     MatrixLikeFieldMap(std::enable_if_t<isConst, const Field &> field)
       :Parent(field) {
       static_assert((isConst == ConstField),
@@ -188,20 +193,22 @@ namespace muSpectre {
     }
 
     /* ---------------------------------------------------------------------- */
-    template<class FieldCollection, class EigenArray, Map_t map_type,
-              bool ConstField>
+    template<class FieldCollection, class EigenArray, class EigenConstArray, 
+              Map_t map_type,  bool ConstField>
     template<class FC, typename T2, Dim_t NbC>
-    MatrixLikeFieldMap<FieldCollection, EigenArray, map_type, ConstField>::
+    MatrixLikeFieldMap<FieldCollection, EigenArray, EigenConstArray, map_type,
+                       ConstField>::
     MatrixLikeFieldMap(TypedFieldBase<FC, T2, NbC> & field)
       :Parent(field) {
     }
 
     /* ---------------------------------------------------------------------- */
     //! human-readable field map type
-    template<class FieldCollection, class EigenArray, Map_t map_type,
-              bool ConstField>
+    template<class FieldCollection, class EigenArray, class EigenConstArray, 
+              Map_t map_type,  bool ConstField>
     std::string
-    MatrixLikeFieldMap<FieldCollection, EigenArray, map_type, ConstField>::
+    MatrixLikeFieldMap<FieldCollection, EigenArray, EigenConstArray, map_type,
+                       ConstField>::
     info_string() const {
       std::stringstream info;
       info << field_info_root << "("
@@ -213,30 +220,59 @@ namespace muSpectre {
 
     /* ---------------------------------------------------------------------- */
     //! member access
-    template<class FieldCollection, class EigenArray, Map_t map_type,
-              bool ConstField>
-    template <class ref>
-    ref
-    MatrixLikeFieldMap<FieldCollection, EigenArray, map_type, ConstField>::
+    template<class FieldCollection, class EigenArray, class EigenConstArray, 
+              Map_t map_type,  bool ConstField>
+    typename MatrixLikeFieldMap<FieldCollection, EigenArray, EigenConstArray,
+                                map_type, ConstField>::reference
+    MatrixLikeFieldMap<FieldCollection, EigenArray, EigenConstArray, map_type,
+                       ConstField>::
     operator[](size_type index) {
-      return ref(this->get_ptr_to_entry(index));
+      return reference(this->get_ptr_to_entry(index));
     }
 
-    template<class FieldCollection, class EigenArray, Map_t map_type,
-              bool ConstField>
-    typename MatrixLikeFieldMap<FieldCollection, EigenArray, map_type, ConstField>::reference
-    MatrixLikeFieldMap<FieldCollection, EigenArray, map_type, ConstField>::
+    template<class FieldCollection, class EigenArray, class EigenConstArray, 
+              Map_t map_type,  bool ConstField>
+    typename MatrixLikeFieldMap<FieldCollection, EigenArray, EigenConstArray,
+                                map_type, ConstField>::reference
+    MatrixLikeFieldMap<FieldCollection, EigenArray, EigenConstArray, map_type,
+                       ConstField>::
     operator[](const Ccoord & ccoord) {
       size_t index{};
       index = this->collection.get_index(ccoord);
       return reference(this->get_ptr_to_entry(std::move(index)));
     }
 
-    template <class FieldCollection, class EigenArray, Map_t map_type,
-              bool ConstField>
+    /* ---------------------------------------------------------------------- */
+    //! member access
+    template<class FieldCollection, class EigenArray, class EigenConstArray, 
+              Map_t map_type,  bool ConstField>
+    typename MatrixLikeFieldMap<FieldCollection, EigenArray, EigenConstArray,
+                                map_type, ConstField>::const_reference
+    MatrixLikeFieldMap<FieldCollection, EigenArray, EigenConstArray, map_type,
+                       ConstField>::
+    operator[](size_type index) const {
+      return const_reference(this->get_ptr_to_entry(index));
+    }
+
+    template<class FieldCollection, class EigenArray, class EigenConstArray, 
+              Map_t map_type,  bool ConstField>
+    typename MatrixLikeFieldMap<FieldCollection, EigenArray, EigenConstArray,
+                                map_type, ConstField>::const_reference
+    MatrixLikeFieldMap<FieldCollection, EigenArray, EigenConstArray, map_type, ConstField>::
+    operator[](const Ccoord & ccoord) const{
+      size_t index{};
+      index = this->collection.get_index(ccoord);
+      return const_reference(this->get_ptr_to_entry(std::move(index)));
+    }
+
+    //----------------------------------------------------------------------------//
+    template <class FieldCollection, class EigenArray, class EigenConstArray, 
+              Map_t map_type,  bool ConstField>
     template <class Derived>
-    MatrixLikeFieldMap<FieldCollection, EigenArray, map_type, ConstField> &
-    MatrixLikeFieldMap<FieldCollection, EigenArray, map_type, ConstField>::
+    MatrixLikeFieldMap<FieldCollection, EigenArray, EigenConstArray, map_type,
+                       ConstField> &
+    MatrixLikeFieldMap<FieldCollection, EigenArray, EigenConstArray, map_type,
+                       ConstField>::
     operator=(const Eigen::EigenBase<Derived> & val) {
       for (auto && entry: *this) {
         entry = val;
@@ -245,10 +281,12 @@ namespace muSpectre {
     }
 
     /* ---------------------------------------------------------------------- */
-    template<class FieldCollection, class EigenArray, Map_t map_type,
-              bool ConstField>
-    typename MatrixLikeFieldMap<FieldCollection, EigenArray, map_type, ConstField>::pointer
-    MatrixLikeFieldMap<FieldCollection, EigenArray, map_type, ConstField>::
+    template<class FieldCollection, class EigenArray, class EigenConstArray, 
+              Map_t map_type,  bool ConstField>
+    typename MatrixLikeFieldMap<FieldCollection, EigenArray, EigenConstArray,
+                                map_type, ConstField>::pointer
+    MatrixLikeFieldMap<FieldCollection, EigenArray, EigenConstArray, map_type,
+                       ConstField>::
     ptr_to_val_t(size_type index) {
       return std::make_unique<value_type>
         (this->get_ptr_to_entry(std::move(index)));
@@ -265,6 +303,7 @@ namespace muSpectre {
      std::conditional_t<ConstField,
                         Eigen::Map<const Eigen::Matrix<T, NbRows, NbCols>>,
                         Eigen::Map<Eigen::Matrix<T, NbRows, NbCols>>>,
+     Eigen::Map<const Eigen::Matrix<T, NbRows, NbCols>>,
      internal::Map_t::Matrix, ConstField>;
 
   /* ---------------------------------------------------------------------- */
@@ -274,6 +313,7 @@ namespace muSpectre {
   using T4MatrixFieldMap = internal::MatrixLikeFieldMap
     <FieldCollection,
      T4MatMap<T, Dim, MapConst>,
+     T4MatMap<T, Dim, true>,
      internal::Map_t::T4Matrix, MapConst>;
 
   /* ---------------------------------------------------------------------- */
@@ -285,6 +325,7 @@ namespace muSpectre {
      std::conditional_t<ConstField,
                         Eigen::Map<const Eigen::Array<T, NbRows, NbCols>>,
                         Eigen::Map<Eigen::Array<T, NbRows, NbCols>>>,
+     Eigen::Map<const Eigen::Array<T, NbRows, NbCols>>,
      internal::Map_t::Array, ConstField>;
 
 

@@ -141,15 +141,18 @@ namespace muSpectre {
         using iterator_category = std::random_access_iterator_tag;
         using Ccoord = typename FieldCollection::Ccoord;
         using reference = typename FullyTypedFieldMap::reference;
+        using TypedRef = std::conditional_t<ConstIter,
+                                            const FullyTypedFieldMap &,
+                                            FullyTypedFieldMap>;
 
         //! Default constructor
         iterator() = delete;
 
         //! constructor
-        inline iterator(FullyTypedFieldMap & fieldmap, bool begin=true);
+        inline iterator(TypedRef fieldmap, bool begin=true);
 
         //! constructor for random access
-        inline iterator(FullyTypedFieldMap & fieldmap, size_t index);
+        inline iterator(TypedRef fieldmap, size_t index);
 
         //! Copy constructor
         iterator(const iterator &other)= default;
@@ -216,7 +219,7 @@ namespace muSpectre {
 
       protected:
         const FieldCollection & collection;
-        FullyTypedFieldMap  & fieldmap;
+        TypedRef fieldmap;
         size_t index;
       private:
       };
@@ -343,7 +346,7 @@ namespace muSpectre {
     template<class FullyTypedFieldMap, bool ConstIter>
     FieldMap<FieldCollection, T, NbComponents, ConstField>::iterator
     <FullyTypedFieldMap, ConstIter>::
-    iterator(FullyTypedFieldMap & fieldmap, bool begin)
+    iterator(TypedRef fieldmap, bool begin)
       :collection(fieldmap.get_collection()), fieldmap(fieldmap),
        index(begin ? 0 : fieldmap.field.size()) {}
 
@@ -352,7 +355,7 @@ namespace muSpectre {
     template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
     template<class FullyTypedFieldMap, bool ConstIter>
     FieldMap<FieldCollection, T, NbComponents, ConstField>::iterator<FullyTypedFieldMap, ConstIter>::
-    iterator(FullyTypedFieldMap & fieldmap, size_t index)
+    iterator(TypedRef fieldmap, size_t index)
       :collection(fieldmap.collection), fieldmap(fieldmap),
        index(index) {}
 
@@ -388,7 +391,7 @@ namespace muSpectre {
     FieldMap<FieldCollection, T, NbComponents, ConstField>::
     iterator<FullyTypedFieldMap, ConstIter>::
     operator*() {
-      return this->fieldmap.template operator[]<value_type>(this->index);
+      return this->fieldmap.operator[](this->index);
     }
 
     /* ---------------------------------------------------------------------- */
@@ -400,7 +403,7 @@ namespace muSpectre {
     FieldMap<FieldCollection, T, NbComponents, ConstField>::
     iterator<FullyTypedFieldMap, ConstIter>::
     operator*() const {
-      return this->fieldmap.template operator[]<const_value_type>(this->index);
+      return this->fieldmap.operator[](this->index);
     }
 
     /* ---------------------------------------------------------------------- */
@@ -472,8 +475,7 @@ namespace muSpectre {
     FieldMap<FieldCollection, T, NbComponents, ConstField>::
     iterator<FullyTypedFieldMap, ConstIter>::
     operator==(const iterator & other) const {
-      return (this->index == other.index &&
-              &this->fieldmap == &other.fieldmap);
+      return (this->index == other.index);
     }
 
     /* ---------------------------------------------------------------------- */

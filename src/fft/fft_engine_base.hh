@@ -77,7 +77,7 @@ namespace muSpectre {
     virtual void initialise(FFT_PlanFlags /*plan_flags*/);
 
     //! forward transform (dummy for interface)
-    virtual Workspace_t & fft(const Field_t & /*field*/) = 0;
+    virtual Workspace_t & fft(Field_t & /*field*/) = 0;
 
     //! inverse transform (dummy for interface)
     virtual void ifft(Field_t & /*field*/) const = 0;

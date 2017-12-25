@@ -102,16 +102,21 @@ namespace muSpectre {
     inline std::string info_string() const override final;
 
     //! member access
-    template <class ref_t = reference>
-    inline ref_t operator[](size_type index);
+    inline reference operator[](size_type index);
     inline reference operator[](const Ccoord & ccoord);
+
+    inline const_reference operator[](size_type index) const;
+    inline const_reference operator[](const Ccoord& ccoord) const;
+
 
     //! return an iterator to head of field for ranges
     inline iterator begin(){return iterator(*this);}
-    inline const_iterator cbegin(){return const_iterator(*this);}
+    inline const_iterator cbegin() const {return const_iterator(*this);}
+    inline const_iterator begin() const {return this->cbegin();}
     //! return an iterator to tail of field for ranges
     inline iterator end(){return iterator(*this, false);}
-    inline const_iterator cend(){return const_iterator(*this, false);}
+    inline const_iterator cend() const {return const_iterator(*this, false);}
+    inline const_iterator end() const {return this->cend();}
 
   protected:
     //! for sad, legacy iterator use
@@ -160,17 +165,15 @@ namespace muSpectre {
   //! member access
   template <class FieldCollection, typename T, Dim_t order, Dim_t dim,
             bool ConstField>
-  template <class ref_t>
-  ref_t
+  typename TensorFieldMap<FieldCollection, T, order, dim, ConstField>::reference
   TensorFieldMap<FieldCollection, T, order, dim, ConstField>::
   operator[](size_type index) {
     auto && lambda = [this, &index](auto&&...tens_sizes) {
-      return ref_t(this->get_ptr_to_entry(index), tens_sizes...);
+      return reference(this->get_ptr_to_entry(index), tens_sizes...);
     };
     return call_sizes<order, dim>(lambda);
   }
 
-  /* ---------------------------------------------------------------------- */
   template<class FieldCollection, typename T, Dim_t order, Dim_t dim,
            bool ConstField>
   typename TensorFieldMap<FieldCollection, T, order, dim, ConstField>::reference
@@ -178,7 +181,37 @@ namespace muSpectre {
   operator[](const Ccoord & ccoord) {
     auto && index = this->collection.get_index(ccoord);
     auto && lambda = [this, &index](auto&&...sizes) {
-      return ref_t(this->get_ptr_to_entry(index), sizes...);
+      return reference(this->get_ptr_to_entry(index), sizes...);
+    };
+    return call_sizes<order, dim>(lambda);
+  }
+
+  template <class FieldCollection, typename T, Dim_t order, Dim_t dim,
+            bool ConstField>
+  typename TensorFieldMap<FieldCollection, T, order, dim, ConstField>::
+  const_reference
+  TensorFieldMap<FieldCollection, T, order, dim, ConstField>::
+  operator[](size_type index) const {
+    // Warning: due to a inconsistency in Eigen's API, tensor maps
+    // cannot be constructed from a const ptr, hence this nasty const
+    // cast :(
+    auto && lambda = [this, &index](auto&&...tens_sizes) {
+      return const_reference(const_cast<T*>(this->get_ptr_to_entry(index)),
+                   tens_sizes...);
+    };
+    return call_sizes<order, dim>(lambda);
+  }
+
+  template<class FieldCollection, typename T, Dim_t order, Dim_t dim,
+           bool ConstField>
+  typename TensorFieldMap<FieldCollection, T, order, dim, ConstField>::
+  const_reference
+  TensorFieldMap<FieldCollection, T, order, dim, ConstField>::
+  operator[](const Ccoord & ccoord) const {
+    auto && index = this->collection.get_index(ccoord);
+    auto && lambda = [this, &index](auto&&...sizes) {
+      return const_reference(const_cast<T*>(this->get_ptr_to_entry(index)),
+                             sizes...);
     };
     return call_sizes<order, dim>(lambda);
   }
