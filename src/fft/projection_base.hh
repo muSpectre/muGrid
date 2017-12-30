@@ -78,7 +78,7 @@ namespace muSpectre {
     ProjectionBase& operator=(ProjectionBase &&other) noexcept = default;
 
     //! initialises the fft engine (plan the transform)
-    void initialise(FFT_PlanFlags flags = FFT_PlanFlags::estimate);
+    virtual void initialise(FFT_PlanFlags flags = FFT_PlanFlags::estimate);
 
     //! apply the projection operator to a field
     virtual void apply_projection(Field_t & field) = 0;

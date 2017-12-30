@@ -29,6 +29,7 @@
 
 #include "fft/projection_finite_strain_fast.hh"
 #include "fft/fft_utils.hh"
+#include "common/tensor_algebra.hh"
 #include "common/iterators.hh"
 
 namespace muSpectre {
@@ -62,8 +63,6 @@ namespace muSpectre {
   void ProjectionFiniteStrainFast<DimS, DimM>::apply_projection(Field_t & field) {
     Grad_map field_map{this->fft_engine->fft(field)};
     Real factor = this->fft_engine->normalisation();
-    auto it = xis.begin();
-    it++;
     for (auto && tup: akantu::zip(this->xis, field_map)) {
       auto & xi{std::get<0>(tup)};
       auto & f{std::get<1>(tup)};

@@ -141,6 +141,7 @@ namespace muSpectre {
       // the default material has no internal variables
       return typename Material::InternalVariables{};}
     typename traits::InternalVariables internal_variables{};
+    bool is_initialised{false};
 
   private:
   };
@@ -180,7 +181,10 @@ namespace muSpectre {
   template <class Material, Dim_t DimS, Dim_t DimM>
   void MaterialMuSpectre<Material, DimS, DimM>::
   initialise(bool /*stiffness*/) {
-    this->internal_fields.initialise();
+    if (!this->is_initialised) {
+      this->internal_fields.initialise();
+      this->is_initialised = true;
+    }
   }
 
   /* ---------------------------------------------------------------------- */

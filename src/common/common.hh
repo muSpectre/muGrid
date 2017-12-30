@@ -94,10 +94,10 @@ namespace muSpectre {
   constexpr Real pi{atan(1.)*4};
 
   //! compile-time potentiation required for field-size computations
-  template <typename I>
-  constexpr I ipow(I base, I exponent) {
+  template <typename R, typename I>
+  constexpr R ipow(R base, I exponent) {
     static_assert(std::is_integral<I>::value, "Type must be integer");
-    I retval{1};
+    R retval{1};
     for (I i = 0; i < exponent; ++i) {
       retval *= base;
     }

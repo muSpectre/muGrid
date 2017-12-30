@@ -27,6 +27,9 @@
  * Boston, MA 02111-1307, USA.
  */
 
+#include <iomanip>
+#include <cmath>
+
 #include "solvers.hh"
 #include "solver/solver_cg.hh"
 #include "common/iterators.hh"
@@ -59,6 +62,8 @@ namespace muSpectre {
     if (maxiter == 0) {
       maxiter = sys.size()*DimM*DimM*10;
     }
+
+    size_t count_width{};
     if (verbose) {
       //setup of algorithm 5.2 in Nocedal, Numerical Optimization (p. 111)
       std::cout << "Algo 5.2 with newton_tol = " << newton_tol << ", cg_tol = "
@@ -69,6 +74,7 @@ namespace muSpectre {
         std::cout << "Step " << counter + 1 << ":" << std::endl
                   << grad << std::endl;
       }
+      count_width = size_t(std::log10(maxiter))+1;
     }
 
     // initialise F = I
@@ -102,6 +108,7 @@ namespace muSpectre {
           DeltaF.get_map() = -(delF-previous_grad); // neg sign because rhs
           tangent_effect(DeltaF, rhs);
           cg.solve(tangent_effect, rhs, incrF);
+          F.eigen() -= DeltaF.eigen();
         } else {
           rhs.eigen() = -P.eigen();
           sys.project(rhs);
@@ -112,6 +119,12 @@ namespace muSpectre {
 
         incrNorm = incrF.eigen().matrix().norm();
         gradNorm = F.eigen().matrix().norm();
+        if (verbose) {
+          std::cout << "at Newton step " << std::setw(count_width) << newt_iter
+                    << ", |δF|/|ΔF| = " << std::setw(17) << incrNorm/gradNorm
+                    << ", tol = " << newton_tol << std::endl;
+          std::cout << "<F> =" << std::endl << F.get_map().mean() << std::endl;
+        }
       }
       // update previous gradient
       previous_grad = delF;
@@ -163,6 +176,8 @@ namespace muSpectre {
     if (maxiter == 0) {
       maxiter = sys.size()*DimM*DimM*10;
     }
+
+    size_t count_width{};
     if (verbose) {
       //setup of algorithm 5.2 in Nocedal, Numerical Optimization (p. 111)
       std::cout << "Algo 5.2 with newton_tol = " << newton_tol << ", cg_tol = "
@@ -173,6 +188,7 @@ namespace muSpectre {
         std::cout << "Step " << counter + 1 << ":" << std::endl
                   << grad << std::endl;
       }
+      count_width = size_t(std::log10(maxiter))+1;
     }
 
     // initialise F = I
@@ -212,6 +228,13 @@ namespace muSpectre {
 
         incrNorm = incrF.eigen().matrix().norm();
         gradNorm = F.eigen().matrix().norm();
+        if (verbose) {
+          std::cout << "at Newton step " << std::setw(count_width) << newt_iter
+                    << ", |δF|/|ΔF| = " << std::setw(17) << incrNorm/gradNorm
+                    << ", tol = " << newton_tol << std::endl;
+          std::cout << "<F> =" << std::endl << F.get_map().mean() << std::endl;
+        }
+
       }
       // update previous gradient
       previous_grad = delF;

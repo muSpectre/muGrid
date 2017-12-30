@@ -75,7 +75,7 @@ namespace muSpectre {
     ProjectionFiniteStrainFast& operator=(ProjectionFiniteStrainFast &&other) = default;
 
     //! initialises the fft engine (plan the transform)
-    void initialise(FFT_PlanFlags flags = FFT_PlanFlags::estimate);
+    virtual void initialise(FFT_PlanFlags flags = FFT_PlanFlags::estimate) override final;
 
     //! apply the projection operator to a field
     void apply_projection(Field_t & field) override final;

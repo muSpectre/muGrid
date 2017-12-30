@@ -41,20 +41,24 @@ namespace muSpectre {
   BOOST_AUTO_TEST_SUITE(newton_cg_tests);
 
   BOOST_AUTO_TEST_CASE(manual_construction_test) {
-    constexpr Dim_t dim{twoD};
+    // constexpr Dim_t dim{twoD};
+    constexpr Dim_t dim{threeD};
 
-    constexpr Ccoord_t<dim> resolutions{3, 3};
-    constexpr Rcoord_t<dim> lengths{2.3, 2.7};
+    // constexpr Ccoord_t<dim> resolutions{3, 3};
+    // constexpr Rcoord_t<dim> lengths{2.3, 2.7};
+    constexpr Ccoord_t<dim> resolutions{5, 5, 5};
+    constexpr Rcoord_t<dim> lengths{5, 5, 5};
     auto fft_ptr{std::make_unique<FFTW_Engine<dim, dim>>(resolutions, lengths)};
     auto proj_ptr{std::make_unique<ProjectionFiniteStrainFast<dim, dim>>(std::move(fft_ptr))};
     SystemBase<dim, dim> sys(std::move(proj_ptr));
 
     using Mat_t = MaterialHyperElastic1<dim, dim>;
-    const Real Young{210e9}, Poisson{.33};
+    //const Real Young{210e9}, Poisson{.33};
+    const Real Young{1.0030648180242636}, Poisson{0.29930675909878679};
     // const Real lambda{Young*Poisson/((1+Poisson)*(1-2*Poisson))};
     // const Real mu{Young/(2*(1+Poisson))};
-    auto Material_hard = std::make_unique<Mat_t>("hard", Young, Poisson);
-    auto Material_soft = std::make_unique<Mat_t>("soft", Young*.1, Poisson);
+    auto Material_hard = std::make_unique<Mat_t>("hard", 10*Young, Poisson);
+    auto Material_soft = std::make_unique<Mat_t>("soft", Young, Poisson);
 
     for (auto && tup: akantu::enumerate(sys)) {
       auto && pixel = std::get<1>(tup);
@@ -66,16 +70,19 @@ namespace muSpectre {
     }
     sys.add_material(std::move(Material_hard));
     sys.add_material(std::move(Material_soft));
+    sys.initialise();
 
     Grad_t<dim> delF0;
-    delF0 << 0, .1, 0, 0;
-    constexpr Real cg_tol{1e-5}, newton_tol{1e-5};
-    constexpr Uint maxiter
-      {CcoordOps::get_size(resolutions)*ipow(dim, secondOrder)*10};
+    delF0 << 0, 1., 0, 0, 0, 0, 0, 0, 0;
+    constexpr Real cg_tol{1e-8}, newton_tol{1e-5};
+    constexpr Uint maxiter{CcoordOps::get_size(resolutions)*ipow(dim, secondOrder)*10};
     constexpr bool verbose{true};
 
     GradIncrements<dim> grads; grads.push_back(delF0);
-    de_geus(sys, grads, cg_tol, newton_tol, maxiter, verbose);
+    Eigen::ArrayXXd res1{de_geus(sys, grads, cg_tol, newton_tol, maxiter, verbose).eigen()};
+
+    Eigen::ArrayXXd res2{newton_cg(sys, grads, cg_tol, newton_tol, maxiter, verbose).eigen()};
+    BOOST_CHECK_LE(abs(res1-res2).mean(), 0);
   }
 
   BOOST_AUTO_TEST_SUITE_END();

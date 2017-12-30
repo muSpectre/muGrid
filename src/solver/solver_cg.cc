@@ -27,7 +27,11 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include "solver_cg.hh"
+#include <iomanip>
+#include <cmath>
+
+#include "solver/solver_cg.hh"
+#include "solver/solver_error.hh"
 
 
 namespace muSpectre {
@@ -56,17 +60,24 @@ namespace muSpectre {
     auto x = x_f.eigen();
 
     // initialisation of algo
-    tangent_effect(this->r_k, x_f);
-    r = rhs.eigen();
+    tangent_effect(x_f, this->r_k);
+
+    r -= rhs.eigen();
     p = -r;
 
     this->converged = false;
     Real rdr = (r*r).sum();
+    Real tol2 = ipow(this->tol,2);
 
-    for (Uint i = 0; i < this->maxiter && rdr > this->tol; ++i) {
-      tangent_effect(this->Ap_k, this->p_k);
+    size_t count_width{}; // for output formatting in verbose case
+    if (this->verbose) {
+      count_width = size_t(std::log10(this->maxiter))+1;
+    }
 
-      Real alpha = rdr/(r*Ap).sum();
+    for (Uint i = 0; i < this->maxiter && rdr > tol2; ++i) {
+      tangent_effect(this->p_k, this->Ap_k);
+
+      Real alpha = rdr/(p*Ap).sum();
 
       x += alpha * p;
       r += alpha * Ap;
@@ -76,14 +87,17 @@ namespace muSpectre {
       rdr = new_rdr;
 
       if (this->verbose) {
-        std::cout << "at CG step " << i << ": |r| = " << std::sqrt(rdr)
+        std::cout << "  at CG step " << std::setw(count_width) << i
+                  << ": |r| = " << std::setw(17) << std::sqrt(rdr)
                   << ", cg_tol = " << this->tol << std::endl;
       }
 
       p = -r+beta*p;
     }
-    if (rdr < this->tol) {
+    if (rdr < tol2) {
       this->converged=true;
+    } else {
+      throw ConvergenceError("Conjugate gradient has not converged");
     }
   }
 

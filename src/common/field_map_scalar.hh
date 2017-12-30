@@ -103,6 +103,8 @@ namespace muSpectre {
       inline const_iterator cend() const {return const_iterator(*this, false);}
       inline const_iterator end() const {return this->cend();}
 
+      inline T mean() const;
+
     protected:
       //! for sad, legacy iterator use
       inline pointer ptr_to_val_t(size_type index);
@@ -195,6 +197,19 @@ namespace muSpectre {
       scalar = val;
     }
     return *this;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <class FieldCollection, typename T, bool ConstField>
+  T
+  ScalarFieldMap<FieldCollection, T, ConstField>::
+  mean() const {
+    T mean{0};
+    for (auto && val: *this) {
+      mean += val;
+    }
+    mean /= Real(this->size());
+    return mean;
   }
 
 }  // muSpectre

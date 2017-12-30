@@ -118,6 +118,7 @@ namespace muSpectre {
     inline const_iterator cend() const {return const_iterator(*this, false);}
     inline const_iterator end() const {return this->cend();}
 
+    inline T_t mean() const;
   protected:
     //! for sad, legacy iterator use
     inline pointer ptr_to_val_t(size_type index);
@@ -228,10 +229,24 @@ namespace muSpectre {
     return *this;
   }
 
+  /* ---------------------------------------------------------------------- */
+  template <class FieldCollection, typename T, Dim_t order, Dim_t dim,
+            bool ConstField>
+  typename TensorFieldMap<FieldCollection, T, order, dim, ConstField>::T_t
+  TensorFieldMap<FieldCollection, T, order, dim, ConstField>::
+  mean() const {
+    T_t mean{T_t::Zero()};
+    for (auto && val: *this) {
+      mean += val;
+    }
+    mean *= 1./Real(this->size());
+    return mean;
+  }
 
   /* ---------------------------------------------------------------------- */
   //! for sad, legacy iterator use. Don't use unless you have to.
-  template<class FieldCollection, typename T, Dim_t order, Dim_t dim, bool ConstField>
+  template<class FieldCollection, typename T, Dim_t order, Dim_t dim,
+           bool ConstField>
   typename TensorFieldMap<FieldCollection, T, order, dim, ConstField>::pointer
   TensorFieldMap<FieldCollection, T, order, dim, ConstField>::
   ptr_to_val_t(size_type index) {
