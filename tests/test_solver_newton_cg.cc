@@ -76,13 +76,13 @@ namespace muSpectre {
     delF0 << 0, 1., 0, 0, 0, 0, 0, 0, 0;
     constexpr Real cg_tol{1e-8}, newton_tol{1e-5};
     constexpr Uint maxiter{CcoordOps::get_size(resolutions)*ipow(dim, secondOrder)*10};
-    constexpr bool verbose{true};
+    constexpr bool verbose{false};
 
     GradIncrements<dim> grads; grads.push_back(delF0);
     Eigen::ArrayXXd res1{de_geus(sys, grads, cg_tol, newton_tol, maxiter, verbose).eigen()};
 
     Eigen::ArrayXXd res2{newton_cg(sys, grads, cg_tol, newton_tol, maxiter, verbose).eigen()};
-    BOOST_CHECK_LE(abs(res1-res2).mean(), 0);
+    BOOST_CHECK_LE(abs(res1-res2).mean(), cg_tol);
   }
 
   BOOST_AUTO_TEST_SUITE_END();

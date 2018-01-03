@@ -47,7 +47,7 @@ namespace muSpectre {
      fields{},
      F{make_field<StrainField_t>("Gradient", this->fields)},
      P{make_field<StressField_t>("Piola-Kirchhoff-1", this->fields)},
-     K_ptr{nullptr}, projection{std::move(projection_)}
+     projection{std::move(projection_)}
   { }
 
   /* ---------------------------------------------------------------------- */
@@ -67,14 +67,14 @@ namespace muSpectre {
     if (grad.size() != this->F.size()) {
       throw std::runtime_error("Size mismatch");
     }
-    if (this->K_ptr == nullptr) {
-      K_ptr = &make_field<TangentField_t>("Tangent Stiffness", this->fields);
+    if (!this->K) {
+      this->K = make_field<TangentField_t>("Tangent Stiffness", this->fields);
     }
 
     for (auto & mat: this->materials) {
-      mat->compute_stresses_tangent(grad, this->P, *this->K_ptr, form);
+      mat->compute_stresses_tangent(grad, this->P, this->K.value(), form);
     }
-    return std::tie(this->P, *this->K_ptr);
+    return std::tie(this->P, this->K.value());
   }
 
   /* ---------------------------------------------------------------------- */

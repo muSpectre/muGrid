@@ -35,6 +35,7 @@
 #include <Eigen/Dense>
 
 #include "common/common.hh"
+#include "common/iterators.hh"
 
 #ifndef CCOORD_OPERATIONS_H
 #define CCOORD_OPERATIONS_H
@@ -104,6 +105,20 @@ namespace muSpectre {
     }
 
 
+    /* ---------------------------------------------------------------------- */
+    template <size_t dim>
+    constexpr Ccoord_t<dim> get_default_strides(const Ccoord_t<dim> & sizes) {
+      Ccoord_t<dim> retval{};
+      size_t factor{1};
+      for (Dim_t i = dim-1; i >= 0; --i) {
+        retval[i] = factor;
+        if (i != 0 ) {
+          factor *= sizes[i];
+        }
+      }
+      return retval;
+    }
+
     //----------------------------------------------------------------------------//
     template <size_t dim>
     constexpr Ccoord_t<dim> get_ccoord(const Ccoord_t<dim> & sizes, Dim_t index) {
@@ -135,12 +150,32 @@ namespace muSpectre {
 
     //----------------------------------------------------------------------------//
     template <size_t dim>
+    constexpr Dim_t get_index_from_strides(const Ccoord_t<dim> & strides,
+                                           const Ccoord_t<dim> & ccoord) {
+      Dim_t retval{0};
+      for (const auto & tup: akantu::zip(strides, ccoord)) {
+        const auto & stride = std::get<0>(tup);
+        const auto & ccord_ = std::get<1>(tup);
+        retval += stride * ccord_;
+      }
+      return retval;
+    }
+
+    //----------------------------------------------------------------------------//
+    template <size_t dim>
     constexpr size_t get_size(const Ccoord_t<dim>& sizes) {
       Dim_t retval{1};
       for (size_t i = 0; i < dim; ++i) {
         retval *= sizes[i];
       }
       return retval;
+    }
+
+    //----------------------------------------------------------------------------//
+    template <size_t dim>
+    constexpr size_t get_size_from_strides(const Ccoord_t<dim>& sizes,
+                                           const Ccoord_t<dim>& strides) {
+      return 1 + get_index_from_strides(strides, sizes);
     }
 
     /* ---------------------------------------------------------------------- */

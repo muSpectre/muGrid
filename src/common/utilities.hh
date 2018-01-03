@@ -33,7 +33,8 @@
 
 #include <tuple>
 #include <boost/tuple/tuple.hpp>
-namespace std {
+#include <experimental/optional>
+namespace std_replacement {
 
   namespace detail {
     template <class T>
@@ -129,7 +130,7 @@ namespace std {
     template <class F, class Tuple, std::size_t... I>
     constexpr decltype(auto) apply_impl(F &&f, Tuple &&t, std::index_sequence<I...>)
     {
-      return std::invoke(std::forward<F>(f), std::get<I>(std::forward<Tuple>(t))...);
+      return std_replacement::invoke(std::forward<F>(f), std::get<I>(std::forward<Tuple>(t))...);
     }
   }  // namespace detail
 
@@ -142,9 +143,14 @@ namespace std {
   }
 
 
-} //namespace std
+} //namespace std_replacement
 
 namespace muSpectre {
+
+  using std_replacement::apply;
+
+  template <class T>
+  using optional = typename std::experimental::optional<T>;
 
   /* ---------------------------------------------------------------------- */
   template <typename BoostTuple, std::size_t... Is>

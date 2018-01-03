@@ -260,11 +260,11 @@ namespace muSpectre {
       auto && strain = MatTB::convert_strain<stored_strain_m, expected_strain_m>(F);
       // return value contains a tuple of rvalue_refs to both stress and tangent moduli
       Stresses =
-        std::apply([&strain, &this_mat] (auto && ... internals) {
-                    return
-                    this_mat.evaluate_stress_tangent(std::move(strain),
-                                                     internals...);},
-                   internal_variables);
+        apply([&strain, &this_mat] (auto && ... internals) {
+            return
+            this_mat.evaluate_stress_tangent(std::move(strain),
+                                             internals...);},
+          internal_variables);
     };
 
     auto constitutive_law_finite_strain = [this]
@@ -287,11 +287,11 @@ namespace muSpectre {
       // return value contains a tuple of rvalue_refs to both stress
       // and tangent moduli
       auto stress_tgt =
-        std::apply([&strain, &this_mat] (auto && ... internals) {
-                     return
-                     this_mat.evaluate_stress_tangent(std::move(strain),
-                                                      internals...);},
-                   internal_variables);
+        apply([&strain, &this_mat] (auto && ... internals) {
+            return
+            this_mat.evaluate_stress_tangent(std::move(strain),
+                                             internals...);},
+          internal_variables);
       auto && stress = std::get<0>(stress_tgt);
       auto && tangent = std::get<1>(stress_tgt);
       Stresses = MatTB::PK1_stress<Material::stress_measure, Material::strain_measure>
@@ -327,11 +327,11 @@ namespace muSpectre {
 
       switch (Form) {
       case Formulation::small_strain: {
-        std::apply(constitutive_law_small_strain, std::move(arglist));
+        apply(constitutive_law_small_strain, std::move(arglist));
         break;
       }
       case Formulation::finite_strain: {
-        std::apply(constitutive_law_finite_strain, std::move(arglist));
+        apply(constitutive_law_finite_strain, std::move(arglist));
         break;
       }
       }
@@ -371,11 +371,11 @@ namespace muSpectre {
       // return value contains a tuple of rvalue_refs to both stress and tangent moduli
       auto && sigma = std::get<0>(Stresses);
       sigma =
-        std::apply([&strain, &this_mat] (auto && ... internals) {
-                    return
-                    this_mat.evaluate_stress(std::move(strain),
-                                             internals...);},
-                   internal_variables);
+        apply([&strain, &this_mat] (auto && ... internals) {
+            return
+            this_mat.evaluate_stress(std::move(strain),
+                                     internals...);},
+          internal_variables);
     };
 
     auto constitutive_law_finite_strain = [this]
@@ -398,11 +398,11 @@ namespace muSpectre {
       // return value contains a tuple of rvalue_refs to both stress
       // and tangent moduli
       auto && stress =
-        std::apply([&strain, &this_mat] (auto && ... internals) {
-                     return
-                     this_mat.evaluate_stress(std::move(strain),
-                                              internals...);},
-                   internal_variables);
+        apply([&strain, &this_mat] (auto && ... internals) {
+            return
+            this_mat.evaluate_stress(std::move(strain),
+                                     internals...);},
+          internal_variables);
       auto && P = get<0>(Stresses);
       P = MatTB::PK1_stress<Material::stress_measure, Material::strain_measure>
       (F, stress);
@@ -433,11 +433,11 @@ namespace muSpectre {
 
       switch (Form) {
       case Formulation::small_strain: {
-        std::apply(constitutive_law_small_strain, std::move(arglist));
+        apply(constitutive_law_small_strain, std::move(arglist));
         break;
       }
       case Formulation::finite_strain: {
-        std::apply(constitutive_law_finite_strain, std::move(arglist));
+        apply(constitutive_law_finite_strain, std::move(arglist));
         break;
       }
       }
@@ -610,13 +610,13 @@ namespace muSpectre {
     auto && strain = std::make_tuple(this->strain_map[pixel]);
 
     auto && stresses =
-      std::apply([&pixel] (auto && ... stress_tgt) {
+      apply([&pixel] (auto && ... stress_tgt) {
           return std::make_tuple(stress_tgt[pixel]...);},
         this->stress_map);
     const auto & internal = this->it.material.get_internals();
     const auto id{index};
     auto && internals =
-      std::apply([&internal, id] (auto && ... internals) {
+      apply([&internal, id] (auto && ... internals) {
           return std::make_tuple(internals[id]...);},
         internal);
     return std::make_tuple(std::move(strain),

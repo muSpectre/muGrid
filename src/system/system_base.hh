@@ -31,10 +31,12 @@
 #include <vector>
 #include <memory>
 #include <tuple>
+#include <functional>
 
 #include "common/common.hh"
 #include "common/ccoord_operations.hh"
-#include "common/field_collection.hh"
+#include "common/field.hh"
+#include "common/utilities.hh"
 #include "materials/material_base.hh"
 #include "fft/projection_base.hh"
 
@@ -138,9 +140,9 @@ namespace muSpectre {
     FieldCollection_t fields;
     StrainField_t & F;
     StressField_t & P;
-    //! Tangent field migth not even be required; so this is a
+    //! Tangent field might not even be required; so this is a
     //! pointer instead of a ref
-    TangentField_t * K_ptr;
+    optional<std::reference_wrapper<TangentField_t>> K{};
     std::vector<Material_ptr> materials{};
     Projection_ptr projection;
     bool is_initialised{false};

@@ -76,10 +76,19 @@ namespace muSpectre {
         sizes parameter). The job of initialise is to make sure that
         all fields are either of size 0, in which case they need to be
         allocated, or are of the same size as the product of 'sizes'
-        any field of a different size is wrong TODO: check whether it
-        makes sense to put a runtime check here
+        (if standard strides apply) any field of a different size is
+        wrong.
+
+        Attention: The strides are typically not needed, as by
+        default, the strides can be inferred from the sizes (e.g.,
+        using Ccoordops::get_default_strides). FFTW3-MPI, however,
+        need a padding in the case of an even number of pixels in the
+        contiguous direction with r2c and c2r transforms. This means
+        that the data is not necessarily contiguous in the input array
+
+        TODO: check whether it makes sense to put a runtime check here
      **/
-    inline void initialise(Ccoord sizes);
+    inline void initialise(Ccoord sizes, Ccoord strides=CcoordOps::get_cube<DimS>(-1));
 
     //! return the pixel sizes
     inline const Ccoord & get_sizes() const;
@@ -98,7 +107,8 @@ namespace muSpectre {
     static constexpr inline Dim_t material_dim() {return DimM;}
   protected:
     //! number of discretisation cells in each of the DimS spatial directions
-    Ccoord sizes{0};
+    Ccoord sizes{};
+    Ccoord strides{};
     CcoordOps::Pixels<DimS> pixels;
   private:
   };
@@ -113,14 +123,25 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   void GlobalFieldCollection<DimS, DimM>::
-  initialise(Ccoord sizes) {
+  initialise(Ccoord sizes, Ccoord strides) {
     if (this->is_initialised) {
       throw std::runtime_error("double initialisation");
     }
+    if (strides == CcoordOps::get_cube<DimS>(-1)) {
+      this->strides = CcoordOps::get_default_strides(sizes);
+    } else {
+      this->strides = strides;
+    }
     this->pixels = CcoordOps::Pixels<DimS>(sizes);
-    this->size_ = std::accumulate(sizes.begin(), sizes.end(), 1,
-                                   std::multiplies<Dim_t>());
+    this->size_ = CcoordOps::get_size(sizes);
     this->sizes = sizes;
+    size_t logical_size{CcoordOps::get_size_from_strides(this->sizes, this->strides)};
+    if (logical_size != this->size()) {
+      std::cout << "TODO: size warning" << std::endl;
+    } else {
+      std::cout << "TODO: standard sizing" << std::endl;
+    }
+
     std::for_each(std::begin(this->fields), std::end(this->fields),
                   [this](auto && item) {
                     auto && field = *item.second;
