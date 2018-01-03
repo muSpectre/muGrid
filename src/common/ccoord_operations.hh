@@ -58,6 +58,25 @@ namespace muSpectre {
                                    std::index_sequence<I...>) {
         return Ccoord_t<Dim>{full_sizes[I]..., (full_sizes.back()+1)/2};
       }
+
+      template <Dim_t Dim>
+      constexpr Dim_t stride(const Ccoord_t<Dim> & sizes,
+                             const size_t index) {
+        static_assert(Dim > 0, "only for positive numbers of dimensions");
+
+        auto const diff{Dim - 1 - Dim_t(index)};
+        Dim_t ret_val{1};
+        for (Dim_t i{0}; i < diff; ++i) {
+          ret_val *= sizes[Dim-1-i];
+        }
+        return ret_val;
+      }
+
+      template <Dim_t Dim, size_t... I>
+      constexpr Ccoord_t<Dim> compute_strides(const Ccoord_t<Dim> & sizes,
+                                              std::index_sequence<I...>) {
+        return Ccoord_t<Dim>{stride<Dim>(sizes, I)...};
+      }
     }  // internal
 
     //----------------------------------------------------------------------------//
@@ -108,15 +127,8 @@ namespace muSpectre {
     /* ---------------------------------------------------------------------- */
     template <size_t dim>
     constexpr Ccoord_t<dim> get_default_strides(const Ccoord_t<dim> & sizes) {
-      Ccoord_t<dim> retval{};
-      size_t factor{1};
-      for (Dim_t i = dim-1; i >= 0; --i) {
-        retval[i] = factor;
-        if (i != 0 ) {
-          factor *= sizes[i];
-        }
-      }
-      return retval;
+      return internal::compute_strides<dim>(sizes,
+                                            std::make_index_sequence<dim>{});
     }
 
     //----------------------------------------------------------------------------//
@@ -175,7 +187,7 @@ namespace muSpectre {
     template <size_t dim>
     constexpr size_t get_size_from_strides(const Ccoord_t<dim>& sizes,
                                            const Ccoord_t<dim>& strides) {
-      return 1 + get_index_from_strides(strides, sizes);
+      return sizes[0]*strides[0];
     }
 
     /* ---------------------------------------------------------------------- */
