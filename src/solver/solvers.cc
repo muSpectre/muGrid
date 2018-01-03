@@ -40,7 +40,7 @@ namespace muSpectre {
   typename SystemBase<DimS, DimM>::StrainField_t &
   de_geus (SystemBase<DimS, DimM> & sys, const GradIncrements<DimM> & delFs,
            const Real cg_tol, const Real newton_tol, Uint maxiter,
-           bool verbose) {
+           Dim_t verbose) {
     using Field_t = typename MaterialBase<DimS, DimM>::StrainField_t;
     auto solver_fields{std::make_unique<GlobalFieldCollection<DimS, DimM>>()};
     solver_fields->initialise(sys.get_resolutions());
@@ -55,7 +55,7 @@ namespace muSpectre {
     auto & rhs{make_field<Field_t>("rhs", *solver_fields)};
 
     SolverCG<DimS, DimM> cg(sys.get_resolutions(),
-                            cg_tol, maxiter, verbose);
+                            cg_tol, maxiter, verbose-1>0);
     cg.initialise();
 
 
@@ -64,7 +64,7 @@ namespace muSpectre {
     }
 
     size_t count_width{};
-    if (verbose) {
+    if (verbose > 0) {
       //setup of algorithm 5.2 in Nocedal, Numerical Optimization (p. 111)
       std::cout << "Algo 5.2 with newton_tol = " << newton_tol << ", cg_tol = "
                 << cg_tol << " maxiter = " << maxiter << " and ΔF =" <<std::endl;
@@ -119,7 +119,7 @@ namespace muSpectre {
 
         incrNorm = incrF.eigen().matrix().norm();
         gradNorm = F.eigen().matrix().norm();
-        if (verbose) {
+        if (verbose>0) {
           std::cout << "at Newton step " << std::setw(count_width) << newt_iter
                     << ", |δF|/|ΔF| = " << std::setw(17) << incrNorm/gradNorm
                     << ", tol = " << newton_tol << std::endl;
@@ -140,24 +140,24 @@ namespace muSpectre {
   template typename SystemBase<twoD, twoD>::StrainField_t &
   de_geus (SystemBase<twoD, twoD> & sys, const GradIncrements<twoD>& delF0,
            const Real cg_tol, const Real newton_tol, Uint maxiter,
-           bool verbose);
+           Dim_t verbose);
 
   // template typename SystemBase<twoD, threeD>::StrainField_t &
   // de_geus (SystemBase<twoD, threeD> & sys, const GradIncrements<threeD>& delF0,
   //            const Real cg_tol, const Real newton_tol, Uint maxiter,
-  //            bool verbose);
+  //            Dim_t verbose);
 
   template typename SystemBase<threeD, threeD>::StrainField_t &
   de_geus (SystemBase<threeD, threeD> & sys, const GradIncrements<threeD>& delF0,
            const Real cg_tol, const Real newton_tol, Uint maxiter,
-           bool verbose);
+           Dim_t verbose);
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   typename SystemBase<DimS, DimM>::StrainField_t &
   newton_cg (SystemBase<DimS, DimM> & sys, const GradIncrements<DimM> & delFs,
              const Real cg_tol, const Real newton_tol, Uint maxiter,
-             bool verbose) {
+             Dim_t verbose) {
     using Field_t = typename MaterialBase<DimS, DimM>::StrainField_t;
     auto solver_fields{std::make_unique<GlobalFieldCollection<DimS, DimM>>()};
     solver_fields->initialise(sys.get_resolutions());
@@ -169,7 +169,7 @@ namespace muSpectre {
     auto & rhs{make_field<Field_t>("rhs", *solver_fields)};
 
     SolverCG<DimS, DimM> cg(sys.get_resolutions(),
-                            cg_tol, maxiter, verbose);
+                            cg_tol, maxiter, verbose-1>0);
     cg.initialise();
 
 
@@ -178,7 +178,7 @@ namespace muSpectre {
     }
 
     size_t count_width{};
-    if (verbose) {
+    if (verbose > 0) {
       //setup of algorithm 5.2 in Nocedal, Numerical Optimization (p. 111)
       std::cout << "Algo 5.2 with newton_tol = " << newton_tol << ", cg_tol = "
                 << cg_tol << " maxiter = " << maxiter << " and ΔF =" <<std::endl;
@@ -228,7 +228,7 @@ namespace muSpectre {
 
         incrNorm = incrF.eigen().matrix().norm();
         gradNorm = F.eigen().matrix().norm();
-        if (verbose) {
+        if (verbose > 0) {
           std::cout << "at Newton step " << std::setw(count_width) << newt_iter
                     << ", |δF|/|ΔF| = " << std::setw(17) << incrNorm/gradNorm
                     << ", tol = " << newton_tol << std::endl;
@@ -250,17 +250,17 @@ namespace muSpectre {
   template typename SystemBase<twoD, twoD>::StrainField_t &
   newton_cg (SystemBase<twoD, twoD> & sys, const GradIncrements<twoD>& delF0,
              const Real cg_tol, const Real newton_tol, Uint maxiter,
-             bool verbose);
+             Dim_t verbose);
 
   // template typename SystemBase<twoD, threeD>::StrainField_t &
   // newton_cg (SystemBase<twoD, threeD> & sys, const GradIncrements<threeD>& delF0,
   //            const Real cg_tol, const Real newton_tol, Uint maxiter,
-  //            bool verbose);
+  //            Dim_t verbose);
 
   template typename SystemBase<threeD, threeD>::StrainField_t &
   newton_cg (SystemBase<threeD, threeD> & sys, const GradIncrements<threeD>& delF0,
              const Real cg_tol, const Real newton_tol, Uint maxiter,
-             bool verbose);
+             Dim_t verbose);
 
 
 }  // muSpectre

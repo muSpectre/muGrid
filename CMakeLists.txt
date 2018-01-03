@@ -66,8 +66,8 @@ file( GLOB binaries "${CMAKE_SOURCE_DIR}/bin/*.cc")
 foreach(binaryfile ${binaries})
   get_filename_component(binaryname  ${binaryfile} NAME_WE)
   add_executable(${binaryname} ${binaryfile})
-  target_link_libraries(${binaryname} ${Boost_LIBRARIES} Eigen3::Eigen materials common systems solvers)
-endforeach(binaryfile ${binarys})
+  target_link_libraries(${binaryname} ${Boost_LIBRARIES} Eigen3::Eigen materials common systems fft solvers)
+endforeach(binaryfile ${binaries})
 
 
 # compile benchmarks

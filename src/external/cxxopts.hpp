@@ -479,6 +479,10 @@ namespace cxxopts
       {
       }
 
+      standard_value(const standard_value & ) = delete;
+
+      standard_value & operator=(const standard_value & ) = delete;
+
       void
       parse(const std::string& text) const
       {
@@ -564,10 +568,10 @@ namespace cxxopts
       protected:
       std::shared_ptr<T> m_result;
       T* m_store;
-      bool m_default = false;
-      std::string m_default_value;
+      bool m_default{false};
+      std::string m_default_value{};
       bool m_implicit = false;
-      std::string m_implicit_value;
+      std::string m_implicit_value{};
     };
   }
 
@@ -669,9 +673,9 @@ namespace cxxopts
 
   struct HelpGroupDetails
   {
-    std::string name;
-    std::string description;
-    std::vector<HelpOptionDetails> options;
+    std::string name{};
+    std::string description{};
+    std::vector<HelpOptionDetails> options{};
   };
 
   class Options
@@ -796,13 +800,13 @@ namespace cxxopts
     std::string m_program;
     String m_help_string;
 
-    std::map<std::string, std::shared_ptr<OptionDetails>> m_options;
-    std::vector<std::string> m_positional;
-    std::vector<std::string>::iterator m_next_positional;
-    std::unordered_set<std::string> m_positional_set;
+    std::map<std::string, std::shared_ptr<OptionDetails>> m_options{};
+    std::vector<std::string> m_positional{};
+    std::vector<std::string>::iterator m_next_positional{};
+    std::unordered_set<std::string> m_positional_set{};
 
     //mapping from groups to help options
-    std::map<std::string, HelpGroupDetails> m_help;
+    std::map<std::string, HelpGroupDetails> m_help{};
   };
 
   class OptionAdder
