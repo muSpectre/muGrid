@@ -119,7 +119,7 @@ int main(int argc, char *argv[])
 
   system.add_material(std::move(Material_soft));
   system.add_material(std::move(Material_hard));
-  system.initialise();
+  system.initialise(FFT_PlanFlags::measure);
 
   constexpr Real newton_tol{1e-4};
   constexpr Real cg_tol{1e-7};
@@ -131,7 +131,7 @@ int main(int argc, char *argv[])
 
   auto start = std::chrono::high_resolution_clock::now();
   GradIncrements<dim> grads{DeltaF};
-  newton_cg(system, grads, cg_tol, newton_tol, maxiter, verbose);
+  de_geus(system, grads, cg_tol, newton_tol, maxiter, verbose);
   std::chrono::duration<Real> dur = std::chrono::high_resolution_clock::now() - start;
   std::cout << "Resolution time = " << dur.count() << "s" << std::endl;
 
