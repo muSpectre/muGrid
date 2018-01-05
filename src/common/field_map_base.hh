@@ -122,7 +122,7 @@ namespace muSpectre {
       inline size_t size() const;
 
       //! compile-time compatibility check
-      template<class Field>
+      template<class TypedField>
       struct is_compatible;
 
       template <class FullyTypedFieldMap, bool ConstIter=false>
@@ -305,21 +305,21 @@ namespace muSpectre {
 
     /* ---------------------------------------------------------------------- */
     template <class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
-    template <class Field>
+    template <class myField>
     struct FieldMap<FieldCollection, T, NbComponents, ConstField>::is_compatible {
       constexpr static bool explain() {
         static_assert
-          (std::is_same<typename Field::collection_t, FieldCollection>::value,
+          (std::is_same<typename myField::collection_t, FieldCollection>::value,
            "The field does not have the expected FieldCollection type");
         static_assert
-          (std::is_same<typename Field::Scalar, T>::value,
-           "The // FIXME: eld does not have the expected Scalar type");
-        static_assert((Field::nb_components == NbComponents),
+          (std::is_same<typename myField::Scalar, T>::value,
+           "The // field does not have the expected Scalar type");
+        static_assert((TypedField::nb_components == NbComponents),
                       "The field does not have the expected number of components");
         //The static asserts wouldn't pass in the incompatible case, so this is it
         return true;
       }
-      constexpr static bool value{std::is_base_of<TypedField, Field>::value};
+      constexpr static bool value{std::is_base_of<TypedField, myField>::value};
     };
 
     /* ---------------------------------------------------------------------- */
@@ -363,7 +363,8 @@ namespace muSpectre {
     //! pre-increment
     template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
     template<class FullyTypedFieldMap, bool ConstIter>
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::iterator<FullyTypedFieldMap, ConstIter> &
+    typename FieldMap<FieldCollection, T, NbComponents, ConstField>::template
+    iterator<FullyTypedFieldMap, ConstIter> &
     FieldMap<FieldCollection, T, NbComponents, ConstField>::iterator<FullyTypedFieldMap, ConstIter>::
     operator++() {
       this->index++;
@@ -374,7 +375,8 @@ namespace muSpectre {
     //! post-increment
     template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
     template<class FullyTypedFieldMap, bool ConstIter>
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::iterator<FullyTypedFieldMap, ConstIter>
+    typename FieldMap<FieldCollection, T, NbComponents, ConstField>::template
+    iterator<FullyTypedFieldMap, ConstIter>
     FieldMap<FieldCollection, T, NbComponents, ConstField>::iterator<FullyTypedFieldMap, ConstIter>::
     operator++(int) {
       iterator current = *this;
@@ -421,7 +423,7 @@ namespace muSpectre {
     //! pre-decrement
     template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
     template<class FullyTypedFieldMap, bool ConstIter>
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    typename FieldMap<FieldCollection, T, NbComponents, ConstField>::template
     iterator<FullyTypedFieldMap, ConstIter> &
     FieldMap<FieldCollection, T, NbComponents, ConstField>::
     iterator<FullyTypedFieldMap, ConstIter>::
@@ -434,7 +436,7 @@ namespace muSpectre {
     //! post-decrement
     template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
     template<class FullyTypedFieldMap, bool ConstIter>
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    typename FieldMap<FieldCollection, T, NbComponents, ConstField>::template
     iterator<FullyTypedFieldMap, ConstIter>
     FieldMap<FieldCollection, T, NbComponents, ConstField>::
     iterator<FullyTypedFieldMap, ConstIter>::
@@ -528,7 +530,7 @@ namespace muSpectre {
     //! additions, subtractions and corresponding assignments
     template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
     template<class FullyTypedFieldMap, bool ConstIter>
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    typename FieldMap<FieldCollection, T, NbComponents, ConstField>::template
     iterator<FullyTypedFieldMap, ConstIter>
     FieldMap<FieldCollection, T, NbComponents, ConstField>::
     iterator<FullyTypedFieldMap, ConstIter>::
@@ -537,7 +539,7 @@ namespace muSpectre {
     }
     template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
     template<class FullyTypedFieldMap, bool ConstIter>
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    typename FieldMap<FieldCollection, T, NbComponents, ConstField>::template
     iterator<FullyTypedFieldMap, ConstIter>
     FieldMap<FieldCollection, T, NbComponents, ConstField>::
     iterator<FullyTypedFieldMap, ConstIter>::
@@ -546,7 +548,7 @@ namespace muSpectre {
     }
     template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
     template<class FullyTypedFieldMap, bool ConstIter>
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    typename FieldMap<FieldCollection, T, NbComponents, ConstField>::template
     iterator<FullyTypedFieldMap, ConstIter> &
     FieldMap<FieldCollection, T, NbComponents, ConstField>::
     iterator<FullyTypedFieldMap, ConstIter>::
@@ -556,7 +558,7 @@ namespace muSpectre {
     }
     template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
     template<class FullyTypedFieldMap, bool ConstIter>
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    typename FieldMap<FieldCollection, T, NbComponents, ConstField>::template
     iterator<FullyTypedFieldMap, ConstIter> &
     FieldMap<FieldCollection, T, NbComponents, ConstField>::
     iterator<FullyTypedFieldMap, ConstIter>::

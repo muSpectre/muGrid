@@ -101,7 +101,7 @@ namespace muSpectre {
 
 
     //* allocate memory, etc
-    virtual void initialise(bool stiffness = false);
+    virtual void initialise(bool stiffness = false) override final;
 
     using Parent::compute_stresses;
     using Parent::compute_stresses_tangent;
@@ -149,7 +149,8 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <class Material, Dim_t DimS, Dim_t DimM>
   MaterialMuSpectre<Material, DimS, DimM>::
-  MaterialMuSpectre(std::string name):Parent(name) {
+  MaterialMuSpectre(std::string name)
+    :Parent(name) {
     using stress_compatible = typename Material::StressMap_t::
       template is_compatible<StressField_t>;
     using strain_compatible = typename Material::StrainMap_t::
@@ -508,7 +509,7 @@ namespace muSpectre {
     iterable_proxy& operator=(const iterable_proxy &other) = default;
 
     //! Move assignment operator
-    iterable_proxy& operator=(iterable_proxy &&other) noexcept = default;
+    iterable_proxy& operator=(iterable_proxy &&other) = default;
 
     class iterator
     {
@@ -545,7 +546,7 @@ namespace muSpectre {
       iterator& operator=(const iterator &other) = default;
 
       //! Move assignment operator
-      iterator& operator=(iterator &&other) noexcept = default;
+      iterator& operator=(iterator &&other) = default;
 
       //! pre-increment
       inline iterator & operator++();
@@ -616,7 +617,7 @@ namespace muSpectre {
     const auto & internal = this->it.material.get_internals();
     const auto id{index};
     auto && internals =
-      apply([&internal, id] (auto && ... internals) {
+      apply([id] (auto && ... internals) {
           return std::make_tuple(internals[id]...);},
         internal);
     return std::make_tuple(std::move(strain),

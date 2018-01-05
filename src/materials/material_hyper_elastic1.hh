@@ -40,7 +40,6 @@ namespace muSpectre {
   template<Dim_t DimS, Dim_t DimM>
   class MaterialHyperElastic1;
 
-  template <>
   template <Dim_t DimS, Dim_t DimM>
   struct MaterialMuSpectre_traits<MaterialHyperElastic1<DimS, DimM>>:
     public MaterialMuSpectre_traits<void> {

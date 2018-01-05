@@ -87,7 +87,7 @@ namespace muSpectre {
     /**
      * specialisation for tuples
      */
-    template <>
+    //template <>
     template <class... T>
     struct ReferenceTuple<std::tuple<T...>> {
       using type = typename ReferenceTuple<T...>::type;
@@ -112,6 +112,7 @@ namespace muSpectre {
                       "This situation makes me suspect that you are not using "
                       "MatTb as intended. Disable this assert only if you are "
                       "sure about what you are doing.");
+
         template <class Strain_t>
         inline static decltype(auto)
         compute(Strain_t&& input) {
@@ -129,13 +130,16 @@ namespace muSpectre {
           transformation gradient
       **/
       template <>
-      template <class Strain_t>
-      decltype(auto)
-      ConvertStrain<StrainMeasure::Gradient, StrainMeasure::GreenLagrange>::
-      compute(Strain_t && F) {
-        return .5*(F.transpose()*F - Strain_t::PlainObject::Identity());
-      }
+      struct ConvertStrain<StrainMeasure::Gradient, StrainMeasure::GreenLagrange> {
 
+        template <class Strain_t>
+        inline static decltype(auto)
+        compute(Strain_t&& F) {
+          return .5*(F.transpose()*F - Strain_t::PlainObject::Identity());
+
+        }
+      };
+ 
     }  // internal
 
     /* ---------------------------------------------------------------------- */
@@ -256,7 +260,7 @@ namespace muSpectre {
         inline static decltype(auto)
         compute(Strain_t && F, Stress_t && S, Tangent_t && C) {
           using T4 = typename std::remove_reference_t<Tangent_t>::PlainObject;
-          using Tmap = T4Map<Real, Dim>;
+          using Tmap = T4MatMap<Real, Dim>;
           T4 K;
           Tmap Kmap{K.data()};
           K.setZero();
@@ -264,11 +268,11 @@ namespace muSpectre {
           for (int i = 0; i < Dim; ++i) {
             for (int m = 0; m < Dim; ++m) {
               for (int n = 0; n < Dim; ++n) {
-                Kmap(i,m,i,n) += S(m,n);
+                get(Kmap,i,m,i,n) += S(m,n);
                 for (int j = 0; j < Dim; ++j) {
                   for (int r = 0; r < Dim; ++r) {
                     for (int s = 0; s < Dim; ++s) {
-                      Kmap(i,m,j,n) += F(i,r)*get(C,r,m,n,s)*(F(j,s));
+                      get(Kmap,i,m,j,n) += F(i,r)*get(C,r,m,n,s)*(F(j,s));
                     }
                   }
                 }
@@ -287,8 +291,8 @@ namespace muSpectre {
     template <StressMeasure StressM, StrainMeasure StrainM,
               class Stress_t, class Strain_t>
     decltype(auto) PK1_stress(Strain_t && strain, Stress_t && stress) {
-      constexpr Dim_t dim{EigenCheck::TensorDim(strain)};
-      static_assert((dim == EigenCheck::TensorDim(stress)),
+      constexpr Dim_t dim{EigenCheck::tensor_dim<Strain_t>::value};
+      static_assert((dim == EigenCheck::tensor_dim<Stress_t>::value),
                     "Stress and strain tensors have differing dimensions");
       return internal::PK1_stress<dim, StressM, StrainM>::compute
         (std::forward<Strain_t>(strain),
@@ -302,10 +306,10 @@ namespace muSpectre {
     decltype(auto) PK1_stress(Strain_t  && strain,
                               Stress_t  && stress,
                               Tangent_t && tangent) {
-      constexpr Dim_t dim{EigenCheck::TensorDim(strain)};
-      static_assert((dim == EigenCheck::TensorDim(stress)),
+      constexpr Dim_t dim{EigenCheck::tensor_dim<Strain_t>::value};
+      static_assert((dim == EigenCheck::tensor_dim<Stress_t>::value),
                     "Stress and strain tensors have differing dimensions");
-      static_assert((dim*dim == EigenCheck::TensorDim(tangent)),
+      static_assert((dim== EigenCheck::tensor_4_dim<Tangent_t>::value),
                     "Stress and tangent tensors have differing dimensions");
       return internal::PK1_stress<dim, StressM, StrainM>::compute
         (std::forward<Strain_t>(strain),

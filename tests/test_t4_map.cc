@@ -99,8 +99,8 @@ namespace muSpectre {
     using T = int;
     using M4 = Eigen::Matrix<T, dim*dim, dim*dim>;
     using M4c = const Eigen::Matrix<T, dim*dim, dim*dim>;
-    using T4 = T4Map<T, dim>;
-    using T4c = T4Map<T, dim, true>;
+    using T4 = T4MatMap<T, dim>;
+    using T4c = T4MatMap<T, dim, true>;
 
     M4 mat;
     mat.setRandom();
@@ -108,8 +108,8 @@ namespace muSpectre {
     T4 tensor{mat.data()};
     T4c ctensor{mat.data()};
 
-    T a = tensor(0,0,0,1);
-    T b = ctensor(0,0,0,1);
+    T a = get(tensor,0,0,0,1);
+    T b = get(ctensor,0,0,0,1);
     BOOST_CHECK_EQUAL(a, b);
   }
 

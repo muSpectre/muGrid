@@ -31,6 +31,7 @@
 #define EIGEN_TOOLS_H
 
 #include <utility>
+#include <type_traits>
 #include <unsupported/Eigen/CXX11/Tensor>
 #include "common/common.hh"
 
@@ -111,58 +112,48 @@ namespace muSpectre {
   /**
    * Structure to determine whether an expression can be evaluated into a Matrix, Array, etc. and which helps determine compile-time size
    */
-  struct EigenCheck {
+  namespace EigenCheck {
     template <class Derived>
-    constexpr static bool isDense(const Eigen::DenseBase<Derived> & /*mat*/) {
-      return true;
-    }
+    struct is_matrix {
+      using T = std::remove_reference_t<Derived>;
+      constexpr static bool value{std::is_same<typename Eigen::internal::traits<T>::XprKind,
+                                               Eigen::MatrixXpr>::value};
+    };
 
     template <class Derived>
-    constexpr static bool isMatrix(const Eigen::MatrixBase<Derived> & /*mat*/) {
-      return true;
-    }
-    template <class T>
-    constexpr static bool isFixed(T && t) {
-      static_assert
-        (isDense(t),
-         "The type you check for fixed size is not a Eigen::Dense type");
-      using bT = std::remove_reference_t<T>;
-      return ((bT::RowsAtCompileTime != Eigen::Dynamic) &&
+    struct is_fixed {
+      using T = std::remove_reference_t<Derived>;
+      constexpr static bool value{T::SizeAtCompileTime != Eigen::Dynamic};
+    };
 
-              (bT::ColsAtCompileTime != Eigen::Dynamic));
-    }
+    template <class Derived>
+    struct is_square {
+      using T = std::remove_reference_t<Derived>;
+      constexpr static bool value{
+        (T::RowsAtCompileTime == T::ColsAtCompileTime) &&
+          is_fixed<T>::value};
 
-    template <class T>
-    constexpr static bool isSquare(T && t) {
-      static_assert
-        (isDense(t),
-         "The type you check for fixed size is not a Eigen::Dense type");
-      using bT = std::remove_reference_t<T>;
-      return (bT::RowsAtCompileTime == bT::ColsAtCompileTime);
-    }
+    };
 
-    template <class T>
-    constexpr static int TensorDim(T && t) {
-      static_assert
-        (isMatrix(t), "The type of t is not understood as an Eigen::Matrix");
-      static_assert(isFixed(t), "t's dimension is not known at compile time");
-      static_assert(isSquare(t), "t's matrix isn't square");
-      return std::remove_reference_t<T>::RowsAtCompileTime;
-    }
+    template <class Derived>
+    struct tensor_dim {
+      using T = std::remove_reference_t<Derived>;
+      static_assert(is_matrix<T>::value, "The type of t is not understood as an Eigen::Matrix");
+      static_assert(is_square<T>::value, "t's matrix isn't square");
+      constexpr static Dim_t value{T::RowsAtCompileTime};
+    };
 
-    template <class T>
-    constexpr static int Tensor4Dim(T && t) {
-      static_assert
-        (isMatrix(t), "The type of t is not understood as an Eigen::Matrix");
-      static_assert(isFixed(t), "t's dimension is not known at compile time");
-      static_assert(isSquare(t), "t's matrix isn't square");
-      constexpr Dim_t rows{std::remove_reference_t<T>::RowsAtCompileTime};
-      constexpr Dim_t dim{ct_sqrt(rows)};
-      static_assert((dim*dim == rows),
+    template <class Derived>
+    struct tensor_4_dim {
+      using T = std::remove_reference_t<Derived>;
+      static_assert(is_matrix<T>::value, "The type of t is not understood as an Eigen::Matrix");
+      static_assert(is_square<T>::value, "t's matrix isn't square");
+      constexpr static Dim_t value{ct_sqrt(T::RowsAtCompileTime)};
+      static_assert(value*value == T::RowsAtCompileTime,
                     "This is not a fourth-order tensor mapped on a square "
                     "matrix");
-      return dim;
-    }
+    };
+
   };
 
 

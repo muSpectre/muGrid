@@ -28,6 +28,7 @@
  */
 
 #include <array>
+#include <cmath>
 #include <complex>
 #include <iostream>
 #include <type_traits>
@@ -91,7 +92,7 @@ namespace muSpectre {
   }
 
   //! convenience definitions
-  constexpr Real pi{atan(1.)*4};
+  constexpr Real pi{3.1415926535897932384626433};
 
   //! compile-time potentiation required for field-size computations
   template <typename R, typename I>

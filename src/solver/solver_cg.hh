@@ -71,7 +71,7 @@ namespace muSpectre {
     SolverCG& operator=(const SolverCG &other) = delete;
 
     //! Move assignment operator
-    SolverCG& operator=(SolverCG &&other) noexcept = default;
+    SolverCG& operator=(SolverCG &&other) = default;
 
     //! actual solver
     void solve(const Fun_t & tangent_effect,

@@ -72,14 +72,13 @@ namespace muSpectre {
     ProjectionFiniteStrain& operator=(const ProjectionFiniteStrain &other) = delete;
 
     //! Move assignment operator
-    ProjectionFiniteStrain& operator=(ProjectionFiniteStrain &&other)
-      noexcept = default;
+    ProjectionFiniteStrain& operator=(ProjectionFiniteStrain &&other) = default;
 
     //! initialises the fft engine (plan the transform)
     virtual void initialise(FFT_PlanFlags flags = FFT_PlanFlags::estimate) override final;
 
     //! apply the projection operator to a field
-    void apply_projection(Field_t & field);
+    void apply_projection(Field_t & field) override final;
 
   protected:
     Proj_map Ghat;

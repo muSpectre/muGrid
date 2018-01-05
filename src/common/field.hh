@@ -37,10 +37,11 @@
 #include <typeinfo>
 #include <vector>
 #include <algorithm>
-#include <Eigen/Dense>
 #include <cmath>
 #include <memory>
 #include <type_traits>
+
+#include <Eigen/Dense>
 
 #include "common/T4_map_proxy.hh"
 
@@ -156,7 +157,7 @@ namespace muSpectre {
     public:
       constexpr static auto nb_components{NbComponents};
       using Parent = FieldBase<FieldCollection>;
-      using Parent::collection_t;
+      using collection_t = typename Parent::collection_t;
       using Scalar = T;
       using Base = Parent;
       //using storage_type = Eigen::Array<T, Eigen::Dynamic, NbComponents>;
@@ -184,7 +185,7 @@ namespace muSpectre {
                      FieldCollection& collection);
       virtual ~TypedFieldBase() = default;
       //! return type_id of stored type
-      virtual const std::type_info & get_stored_typeid() const;
+      virtual const std::type_info & get_stored_typeid() const override final;
 
       //! initialise field to zero (do more complicated initialisations through
       //! fully typed maps)
@@ -248,6 +249,7 @@ namespace muSpectre {
     using Base = typename Parent::Base;
     using Field_p = typename FieldCollection::Field_p;
     using component_type = T;
+    using Scalar = typename Parent::Scalar;
     //! Copy constructor
     TensorField(const TensorField &other) = delete;
 

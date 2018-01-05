@@ -99,7 +99,7 @@ namespace muSpectre {
     template<Dim_t dim, typename T1, typename T2>
     constexpr inline decltype(auto) outer_under(T1 && A, T2 && B) {
       constexpr size_t order{4};
-      return outer<dim>(A, B).shuffle(std::array<Dim_t, order>{0, 2, 1, 3});
+      return outer<dim>(A, B).shuffle(std::array<Dim_t, order>{{0, 2, 1, 3}});
     }
 
     /* ---------------------------------------------------------------------- */
@@ -111,7 +111,7 @@ namespace muSpectre {
     template<Dim_t dim, typename T1, typename T2>
     constexpr inline decltype(auto) outer_over(T1 && A, T2 && B) {
       constexpr size_t order{4};
-      return outer<dim>(A, B).shuffle(std::array<Dim_t, order>{0, 2, 3, 1});
+      return outer<dim>(A, B).shuffle(std::array<Dim_t, order>{{0, 2, 3, 1}});
     }
 
     //! compile-time fourth-order symmetrising identity
@@ -146,8 +146,8 @@ namespace muSpectre {
     template<typename T1, typename T2>
     constexpr inline decltype(auto) outer(T1 && A, T2 && B) {
       // Just make sure that the right type of parameters have been given
-      constexpr Dim_t dim{EigenCheck::TensorDim(A)};
-      static_assert((dim == EigenCheck::TensorDim(B)),
+      constexpr Dim_t dim{EigenCheck::tensor_dim<T1>::value};
+      static_assert((dim == EigenCheck::tensor_dim<T2>::value),
                      "A and B do not have the same dimension");
 
       Tens4_t<dim> product;
@@ -173,8 +173,8 @@ namespace muSpectre {
     template<typename T1, typename T2>
     constexpr inline decltype(auto) outer_under(T1 && A, T2 && B) {
       // Just make sure that the right type of parameters have been given
-      constexpr Dim_t dim{EigenCheck::TensorDim(A)};
-      static_assert((dim == EigenCheck::TensorDim(B)),
+      constexpr Dim_t dim{EigenCheck::tensor_dim<T1>::value};
+      static_assert((dim == EigenCheck::tensor_dim<T2>::value),
                      "A and B do not have the same dimension");
 
       Tens4_t<dim> product;
@@ -200,8 +200,8 @@ namespace muSpectre {
     template<typename T1, typename T2>
     constexpr inline decltype(auto) outer_over(T1 && A, T2 && B) {
       // Just make sure that the right type of parameters have been given
-      constexpr Dim_t dim{EigenCheck::TensorDim(A)};
-      static_assert((dim == EigenCheck::TensorDim(B)),
+      constexpr Dim_t dim{EigenCheck::tensor_dim<T1>::value};
+      static_assert((dim == EigenCheck::tensor_dim<T2>::value),
                      "A and B do not have the same dimension");
 
       Tens4_t<dim> product;
@@ -224,8 +224,8 @@ namespace muSpectre {
      */
     template<typename T4, typename T2>
     constexpr inline decltype(auto) tensmult(T4 && A, T2 && B) {
-      constexpr Dim_t dim{EigenCheck::Tensor4Dim(A)};
-      static_assert((dim == EigenCheck::TensorDim(B)),
+      constexpr Dim_t dim{EigenCheck::tensor_4_dim<T4>::value};
+      static_assert((dim == EigenCheck::tensor_dim<T2>::value),
                     "Dimensionality check failed. Expects A to be a fourth-"
                     "order tensor of dimension dim and B to be a second-order "
                     "Tensor of same dimension");

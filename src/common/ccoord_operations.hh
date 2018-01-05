@@ -134,7 +134,7 @@ namespace muSpectre {
     //----------------------------------------------------------------------------//
     template <size_t dim>
     constexpr Ccoord_t<dim> get_ccoord(const Ccoord_t<dim> & sizes, Dim_t index) {
-      Ccoord_t<dim> retval{0};
+      Ccoord_t<dim> retval{{0}};
       Dim_t factor{1};
       for (Dim_t i = dim-1; i >=0; --i) {
         retval[i] = index/factor%sizes[i];
@@ -194,7 +194,7 @@ namespace muSpectre {
     template <size_t dim>
     class Pixels {
     public:
-      Pixels(const Ccoord_t<dim> & sizes):sizes(sizes){};
+      Pixels(const Ccoord_t<dim> & sizes=Ccoord_t<dim>{}):sizes(sizes){};
       Pixels(const Pixels & other) = default;
       Pixels & operator=(const Pixels & other) = default;
       virtual ~Pixels() = default;

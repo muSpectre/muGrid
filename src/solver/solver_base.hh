@@ -68,7 +68,7 @@ namespace muSpectre {
     SolverBase& operator=(const SolverBase &other) = delete;
 
     //! Move assignment operator
-    SolverBase& operator=(SolverBase &&other) noexcept = default;
+    SolverBase& operator=(SolverBase &&other) = default;
 
     //! Allocate fields used during the solution
     void initialise() {this->collection.initialise(resolutions);}

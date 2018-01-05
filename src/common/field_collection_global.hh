@@ -69,7 +69,7 @@ namespace muSpectre {
 
     //! Move assignment operator
     GlobalFieldCollection&
-    operator=(GlobalFieldCollection &&other) noexcept = default;
+    operator=(GlobalFieldCollection &&other) = default;
 
     /** allocate memory, etc. At this point, the collection is
         informed aboud the size and shape of the domain (through the
@@ -102,15 +102,15 @@ namespace muSpectre {
     //! number of discretisation cells in each of the DimS spatial directions
     Ccoord sizes{};
     Ccoord strides{};
-    CcoordOps::Pixels<DimS> pixels;
+    CcoordOps::Pixels<DimS> pixels{};
   private:
   };
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   GlobalFieldCollection<DimS, DimM>::GlobalFieldCollection()
-    :Parent(), pixels{{0}}{}
-
+    :Parent()
+  {}
 
 
   /* ---------------------------------------------------------------------- */
