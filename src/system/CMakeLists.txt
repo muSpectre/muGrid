@@ -1,6 +1,8 @@
 set (systems_SRC
-  system_base.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/system_base.cc
   )
 
-add_library(systems ${systems_SRC})
-target_link_libraries(systems Eigen3::Eigen common)
+set (muSpectre_SRC
+  ${muSpectre_SRC}
+  ${systems_SRC}
+  PARENT_SCOPE)

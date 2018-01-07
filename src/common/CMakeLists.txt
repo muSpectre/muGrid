@@ -1,9 +1,10 @@
 set (common_SRC
-  #units.cc
-  common.cc
-  voigt_conversion.cc
+  #${CMAKE_CURRENT_SOURCE_DIR}/units.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/common.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/voigt_conversion.cc
   )
 
-add_library(common ${common_SRC})
-target_link_libraries(common Eigen3::Eigen)
-
+set (muSpectre_SRC
+  ${muSpectre_SRC}
+  ${common_SRC}
+  PARENT_SCOPE)

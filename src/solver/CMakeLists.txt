@@ -1,8 +1,10 @@
 set (solvers_SRC
-  solver_base.cc
-  solver_cg.cc
-  solvers.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/solver_base.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/solver_cg.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/solvers.cc
   )
 
-add_library(solvers ${solvers_SRC})
-target_link_libraries(solvers Eigen3::Eigen common systems)
+set (muSpectre_SRC
+  ${muSpectre_SRC}
+  ${solvers_SRC}
+  PARENT_SCOPE)
