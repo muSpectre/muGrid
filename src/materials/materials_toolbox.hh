@@ -30,16 +30,18 @@
 #ifndef MATERIALS_TOOLBOX_H
 #define MATERIALS_TOOLBOX_H
 
+#include "common/common.hh"
+#include "common/tensor_algebra.hh"
+#include "common/eigen_tools.hh"
+#include "common/T4_map_proxy.hh"
+
 #include <Eigen/Dense>
+
 #include <exception>
 #include <sstream>
 #include <iostream>
 #include <tuple>
 #include <type_traits>
-#include "common/common.hh"
-#include "common/tensor_algebra.hh"
-#include "common/eigen_tools.hh"
-#include "common/T4_map_proxy.hh"
 
 namespace muSpectre {
 

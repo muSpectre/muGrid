@@ -31,16 +31,16 @@
 #ifndef FIELD_MAP_H
 #define FIELD_MAP_H
 
-#include <array>
-#include <string>
-#include <memory>
-#include <type_traits>
-#include <unsupported/Eigen/CXX11/Tensor>
-
 #include "common/field.hh"
 #include "field_collection_base.hh"
 #include "common/common.hh"
 
+#include <unsupported/Eigen/CXX11/Tensor>
+
+#include <array>
+#include <string>
+#include <memory>
+#include <type_traits>
 
 namespace muSpectre {
 

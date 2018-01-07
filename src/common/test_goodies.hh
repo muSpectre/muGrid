@@ -27,16 +27,15 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include <random>
-#include <type_traits>
-
-#include <boost/mpl/list.hpp>
+#ifndef TEST_GOODIES_H
+#define TEST_GOODIES_H
 
 #include "common/tensor_algebra.hh"
 
+#include <boost/mpl/list.hpp>
 
-#ifndef TEST_GOODIES_H
-#define TEST_GOODIES_H
+#include <random>
+#include <type_traits>
 
 namespace muSpectre {
 

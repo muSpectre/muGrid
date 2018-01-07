@@ -30,10 +30,12 @@
 #ifndef EIGEN_TOOLS_H
 #define EIGEN_TOOLS_H
 
+#include "common/common.hh"
+
+#include <unsupported/Eigen/CXX11/Tensor>
+
 #include <utility>
 #include <type_traits>
-#include <unsupported/Eigen/CXX11/Tensor>
-#include "common/common.hh"
 
 namespace muSpectre {
 

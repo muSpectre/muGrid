@@ -30,11 +30,12 @@
 #ifndef FIELD_MAP_MATRIXLIKE_H
 #define FIELD_MAP_MATRIXLIKE_H
 
-#include <memory>
-#include <Eigen/Dense>
-
 #include "common/field_map_base.hh"
 #include "common/T4_map_proxy.hh"
+
+#include <Eigen/Dense>
+
+#include <memory>
 
 namespace muSpectre {
 

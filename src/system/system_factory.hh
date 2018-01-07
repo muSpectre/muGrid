@@ -30,14 +30,14 @@
 #ifndef SYSTEM_FACTORY_H
 #define SYSTEM_FACTORY_H
 
-#include <memory>
-
 #include "common/common.hh"
 #include "common/ccoord_operations.hh"
 #include "system/system_base.hh"
 #include "fft/projection_finite_strain_fast.hh"
 #include "fft/projection_finite_strain.hh"
 #include "fft/fftw_engine.hh"
+
+#include <memory>
 
 namespace muSpectre {
 

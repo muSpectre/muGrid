@@ -27,12 +27,11 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include <iomanip>
-#include <cmath>
-
 #include "solver/solver_cg.hh"
 #include "solver/solver_error.hh"
 
+#include <iomanip>
+#include <cmath>
 
 namespace muSpectre {
 

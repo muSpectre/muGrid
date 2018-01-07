@@ -32,10 +32,10 @@
 #ifndef SOLVER_CG_H
 #define SOLVER_CG_H
 
-#include <functional>
-
 #include "solver/solver_base.hh"
 #include "common/field.hh"
+
+#include <functional>
 
 namespace muSpectre {
 

@@ -27,14 +27,14 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include "Eigen/Dense"
-
 #include "fft/projection_finite_strain.hh"
 #include "fft/fftw_engine.hh"
 #include "fft/fft_utils.hh"
 #include "common/field_map.hh"
 #include "common/tensor_algebra.hh"
 #include "common/iterators.hh"
+
+#include "Eigen/Dense"
 
 namespace muSpectre {
 

@@ -31,9 +31,11 @@
 #ifndef UTILITIES_H
 #define UTILITIES_H
 
-#include <tuple>
 #include <boost/tuple/tuple.hpp>
+
+#include <tuple>
 #include <experimental/optional>
+
 namespace std_replacement {
 
   namespace detail {

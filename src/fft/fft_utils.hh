@@ -30,12 +30,12 @@
 #ifndef FFT_UTILS_H
 #define FFT_UTILS_H
 
-#include <valarray>
-#include <array>
+#include "common/common.hh"
 
 #include <Eigen/Dense>
 
-#include "common/common.hh"
+#include <valarray>
+#include <array>
 
 namespace muSpectre {
 

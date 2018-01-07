@@ -32,10 +32,8 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include <tuple>
-#include <type_traits>
-#include <iterator>
-#include <stdexcept>
+#ifndef MATERIAL_MUSPECTRE_BASE_H
+#define MATERIAL_MUSPECTRE_BASE_H
 
 #include "common/common.hh"
 #include "materials/material_base.hh"
@@ -44,9 +42,10 @@
 #include "common/field.hh"
 #include "common//utilities.hh"
 
-
-#ifndef MATERIAL_MUSPECTRE_BASE_H
-#define MATERIAL_MUSPECTRE_BASE_H
+#include <tuple>
+#include <type_traits>
+#include <iterator>
+#include <stdexcept>
 
 namespace muSpectre {
 

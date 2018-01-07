@@ -27,12 +27,11 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include "common/common.hh"
-#include "common/field_collection.hh"
-
-
 #ifndef FFT_ENGINE_BASE_H
 #define FFT_ENGINE_BASE_H
+
+#include "common/common.hh"
+#include "common/field_collection.hh"
 
 namespace muSpectre {
 

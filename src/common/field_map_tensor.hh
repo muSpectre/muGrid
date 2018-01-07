@@ -30,11 +30,11 @@
 #ifndef FIELD_MAP_TENSOR_H
 #define FIELD_MAP_TENSOR_H
 
-#include <sstream>
-#include <memory>
 #include "common/eigen_tools.hh"
 #include "common/field_map_base.hh"
 
+#include <sstream>
+#include <memory>
 
 namespace muSpectre {
 

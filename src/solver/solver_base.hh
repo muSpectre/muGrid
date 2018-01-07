@@ -30,14 +30,14 @@
 #ifndef SOLVER_BASE_H
 #define SOLVER_BASE_H
 
-#include <vector>
-
-#include <Eigen/Dense>
-
 #include "solver/solver_error.hh"
 #include "common/common.hh"
 #include "system/system_base.hh"
 #include "common/tensor_algebra.hh"
+
+#include <Eigen/Dense>
+
+#include <vector>
 
 namespace muSpectre {
   /* ---------------------------------------------------------------------- */

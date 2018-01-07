@@ -30,12 +30,12 @@
 #ifndef PROJECTION_BASE_H
 #define PROJECTION_BASE_H
 
-#include <memory>
-
 #include "common/common.hh"
 #include "common/field_collection.hh"
 #include "common/field.hh"
 #include "fft/fft_engine_base.hh"
+
+#include <memory>
 
 namespace muSpectre {
 

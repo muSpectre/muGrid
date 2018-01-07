@@ -32,7 +32,6 @@
 
 #include "solver/solver_cg.hh"
 
-
 namespace muSpectre {
 
   template <Dim_t Dim>

@@ -28,15 +28,15 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include "common/common.hh"
-#include <Eigen/Dense>
-#include <unsupported/Eigen/CXX11/Tensor>
-#include <iostream>
-
 #ifndef VOIGT_CONVERSION_H
 #define VOIGT_CONVERSION_H
 
+#include "common/common.hh"
 
+#include <Eigen/Dense>
+#include <unsupported/Eigen/CXX11/Tensor>
+
+#include <iostream>
 
 namespace muSpectre {
 

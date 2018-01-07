@@ -27,13 +27,13 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include <sstream>
-#include <algorithm>
-
 #include "system/system_base.hh"
 #include "common/ccoord_operations.hh"
 #include "common/iterators.hh"
 #include "common/tensor_algebra.hh"
+
+#include <sstream>
+#include <algorithm>
 
 
 namespace muSpectre {

@@ -27,15 +27,14 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include <string>
+#ifndef MATERIAL_BASE_H
+#define MATERIAL_BASE_H
 
 #include "common/common.hh"
 #include "common/field.hh"
 #include "common/field_collection.hh"
 
-
-#ifndef MATERIAL_BASE_H
-#define MATERIAL_BASE_H
+#include <string>
 
 namespace muSpectre {
 

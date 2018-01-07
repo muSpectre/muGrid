@@ -27,13 +27,13 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include <iostream>
-#include <memory>
-
 #include "solver/solver_base.hh"
 #include "solver/solver_cg.hh"
 #include "common/field.hh"
 #include "common/iterators.hh"
+
+#include <iostream>
+#include <memory>
 
 
 namespace muSpectre {

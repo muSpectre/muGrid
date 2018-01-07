@@ -30,11 +30,11 @@
 #ifndef FIELD_COLLECTION_BASE_H
 #define FIELD_COLLECTION_BASE_H
 
-#include <map>
-#include <vector>
 #include "common/common.hh"
 #include "common/field.hh"
 
+#include <map>
+#include <vector>
 
 namespace muSpectre {
   /* ---------------------------------------------------------------------- */

@@ -28,17 +28,18 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include <vector>
-#include <memory>
-#include <tuple>
-#include <functional>
-
 #include "common/common.hh"
 #include "common/ccoord_operations.hh"
 #include "common/field.hh"
 #include "common/utilities.hh"
 #include "materials/material_base.hh"
 #include "fft/projection_base.hh"
+
+#include <vector>
+#include <memory>
+#include <tuple>
+#include <functional>
+
 
 #ifndef SYSTEM_BASE_H
 #define SYSTEM_BASE_H

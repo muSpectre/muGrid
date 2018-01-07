@@ -27,12 +27,12 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include <fftw3.h>
+#ifndef FFTW_ENGINE_H
+#define FFTW_ENGINE_H
 
 #include "fft/fft_engine_base.hh"
 
-#ifndef FFTW_ENGINE_H
-#define FFTW_ENGINE_H
+#include <fftw3.h>
 
 namespace muSpectre {
 

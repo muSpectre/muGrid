@@ -31,6 +31,10 @@
 #ifndef FIELD_H
 #define FIELD_H
 
+#include "common/T4_map_proxy.hh"
+
+#include <Eigen/Dense>
+
 #include <string>
 #include <sstream>
 #include <utility>
@@ -40,10 +44,6 @@
 #include <cmath>
 #include <memory>
 #include <type_traits>
-
-#include <Eigen/Dense>
-
-#include "common/T4_map_proxy.hh"
 
 namespace muSpectre {
 

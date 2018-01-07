@@ -31,15 +31,14 @@
 #ifndef TENSOR_ALGEBRA_H
 #define TENSOR_ALGEBRA_H
 
-#include <type_traits>
+#include "common/T4_map_proxy.hh"
+#include "common/common.hh"
+#include "common/eigen_tools.hh"
 
 #include <Eigen/Dense>
 #include <unsupported/Eigen/CXX11/Tensor>
 
-
-#include "common/T4_map_proxy.hh"
-#include "common/common.hh"
-#include "common/eigen_tools.hh"
+#include <type_traits>
 
 namespace muSpectre {
 

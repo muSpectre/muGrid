@@ -27,15 +27,15 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include <type_traits>
+#ifndef T4_MAP_PROXY_H
+#define T4_MAP_PROXY_H
+
+#include "common/eigen_tools.hh"
 
 #include <Eigen/Dense>
 #include <Eigen/src/Core/util/Constants.h>
 
-#include "common/eigen_tools.hh"
-
-#ifndef T4_MAP_PROXY_H
-#define T4_MAP_PROXY_H
+#include <type_traits>
 
 namespace muSpectre {
 

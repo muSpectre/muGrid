@@ -30,11 +30,11 @@
  */
 
 
-#include "common/common.hh"
-#include "materials/material_muSpectre_base.hh"
-
 #ifndef MATERIAL_HYPER_ELASTIC1_H
 #define MATERIAL_HYPER_ELASTIC1_H
+
+#include "common/common.hh"
+#include "materials/material_muSpectre_base.hh"
 
 namespace muSpectre {
   template<Dim_t DimS, Dim_t DimM>
