@@ -61,16 +61,18 @@ namespace muSpectre {
    * convenience function to create a system (avoids having to build
    * and move the chain of unique_ptrs
    */
-  template <Dim_t DimS, Dim_t DimM,
+  template <size_t DimS, size_t DimM=DimS,
             typename System=SystemBase<DimS, DimM>,
             typename FFT_Engine=FFTW_Engine<DimS, DimM>,
             typename Projection=ProjectionFiniteStrainFast<DimS, DimM>>
   inline
   System make_system(Ccoord_t<DimS> resolutions,
-                     Rcoord_t<DimS> lengths=CcoordOps::get_cube<DimS>(1.)) {
+                     Rcoord_t<DimS> lengths=CcoordOps::get_cube<DimS>(1.),
+                     Formulation form=Formulation::finite_strain) {
     return System{
       std::move(system_input<DimS, DimM, FFT_Engine, Projection>
-                (resolutions, lengths))};
+                (resolutions, lengths)),
+        form};
   }
 
 }  // muSpectre

@@ -87,6 +87,8 @@ int main(int argc, char *argv[])
   const Dim_t nb_dofs{ipow(size, dim)*ipow(dim, 2)};
   std::cout << "Number of dofs: " <<  nb_dofs << std::endl;
 
+  constexpr Formulation form{Formulation::finite_strain};
+
   const Rcoord_t<dim> lengths{CcoordOps::get_cube<dim>(fsize)};
   const Ccoord_t<dim> resolutions{CcoordOps::get_cube<dim>(size)};
 
@@ -131,7 +133,7 @@ int main(int argc, char *argv[])
 
   auto start = std::chrono::high_resolution_clock::now();
   GradIncrements<dim> grads{DeltaF};
-  de_geus(system, grads, cg_tol, newton_tol, maxiter, verbose);
+  de_geus(system, grads, form, cg_tol, newton_tol, maxiter, verbose);
   std::chrono::duration<Real> dur = std::chrono::high_resolution_clock::now() - start;
   std::cout << "Resolution time = " << dur.count() << "s" << std::endl;
 

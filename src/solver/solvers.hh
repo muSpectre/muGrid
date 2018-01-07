@@ -45,6 +45,7 @@ namespace muSpectre {
   typename SystemBase<DimS, DimM>::StrainField_t &
   newton_cg (SystemBase<DimS, DimM> & sys,
              const GradIncrements<DimM> & delF0,
+             Formulation form,
              const Real cg_tol, const Real newton_tol, const Uint maxiter=0,
              Dim_t verbose = 0);
 
@@ -52,9 +53,10 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM=DimS>
   inline typename SystemBase<DimS, DimM>::StrainField_t &
   newton_cg (SystemBase<DimS, DimM> & sys, const Grad_t<DimM> & delF0,
+             Formulation form,
              const Real cg_tol, const Real newton_tol, const Uint maxiter=0,
              Dim_t verbose = 0){
-    return newton_cg(sys, GradIncrements<DimM>{delF0},
+    return newton_cg(sys, GradIncrements<DimM>{delF0}, form,
                     cg_tol, newton_tol, maxiter, verbose);
   }
 
@@ -63,6 +65,7 @@ namespace muSpectre {
   typename SystemBase<DimS, DimM>::StrainField_t &
   de_geus (SystemBase<DimS, DimM> & sys,
            const GradIncrements<DimM> & delF0,
+           Formulation form,
            const Real cg_tol, const Real newton_tol, const Uint maxiter=0,
            Dim_t verbose = 0);
 
@@ -70,9 +73,10 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM=DimS>
   inline typename SystemBase<DimS, DimM>::StrainField_t &
   de_geus (SystemBase<DimS, DimM> & sys, const Grad_t<DimM> & delF0,
+           Formulation form,
            const Real cg_tol, const Real newton_tol, const Uint maxiter=0,
            Dim_t verbose = 0){
-    return de_geus(sys, GradIncrements<DimM>{delF0},
+    return de_geus(sys, GradIncrements<DimM>{delF0}, form,
                    cg_tol, newton_tol, maxiter, verbose);
   }
 

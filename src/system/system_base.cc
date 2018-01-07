@@ -40,14 +40,16 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  SystemBase<DimS, DimM>::SystemBase(Projection_ptr projection_)
+  SystemBase<DimS, DimM>::SystemBase(Projection_ptr projection_,
+                                     Formulation form)
     :resolutions{projection_->get_resolutions()},
      pixels(resolutions),
      lengths{projection_->get_lengths()},
      fields{},
      F{make_field<StrainField_t>("Gradient", this->fields)},
      P{make_field<StressField_t>("Piola-Kirchhoff-1", this->fields)},
-     projection{std::move(projection_)}
+     projection{std::move(projection_)},
+     form{form}
   { }
 
   /* ---------------------------------------------------------------------- */
@@ -72,7 +74,8 @@ namespace muSpectre {
     }
 
     for (auto & mat: this->materials) {
-      mat->compute_stresses_tangent(grad, this->P, this->K.value(), form);
+      mat->compute_stresses_tangent(grad, this->P, this->K.value(),
+                                    this->form);
     }
     return std::tie(this->P, this->K.value());
   }

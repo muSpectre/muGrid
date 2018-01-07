@@ -63,18 +63,26 @@ namespace muSpectre {
       return Rcoord_t<sdim>{3.4, 5.8, 6.7};}
   };
 
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimS, Dim_t DimM, Formulation form>
   struct SystemBaseFixture: SystemBase<DimS, DimM> {
     constexpr static Dim_t sdim{DimS};
     constexpr static Dim_t mdim{DimM};
+    constexpr static Formulation formulation{form};
     SystemBaseFixture()
       :SystemBase<DimS, DimM>{
       std::move(system_input<DimS, DimM>(Sizes<DimS>::get_resolution(),
-                                         Sizes<DimS>::get_lengths()))} {}
+                                         Sizes<DimS>::get_lengths())),
+        form} {}
   };
 
-  using fixlist = boost::mpl::list<SystemBaseFixture<twoD, twoD>,
-                                   SystemBaseFixture<threeD, threeD>>;
+  using fixlist = boost::mpl::list<SystemBaseFixture<twoD, twoD,
+                                                     Formulation::finite_strain>,
+                                   SystemBaseFixture<threeD, threeD,
+                                                     Formulation::finite_strain>,
+                                   SystemBaseFixture<twoD, twoD,
+                                                     Formulation::small_strain>,
+                                   SystemBaseFixture<threeD, threeD,
+                                                     Formulation::small_strain>>;
 
   BOOST_AUTO_TEST_CASE(manual_construction) {
     constexpr Dim_t dim{twoD};
@@ -104,6 +112,7 @@ namespace muSpectre {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(simple_evaluation_test, fix, fixlist, fix) {
     constexpr Dim_t dim{fix::sdim};
+    constexpr Formulation form{fix::formulation};
     using Mat_t = MaterialHyperElastic1<dim, dim>;
     const Real Young{210e9}, Poisson{.33};
     const Real lambda{Young*Poisson/((1+Poisson)*(1-2*Poisson))};
@@ -117,8 +126,22 @@ namespace muSpectre {
     fix::add_material(std::move(Material_hard));
     auto & F = fix::get_strain();
     auto F_map = F.get_map();
+    // finite strain formulation expects the deformation gradient F,
+    // while small strain expects infinitesimal strain ε
     for (auto grad: F_map) {
-      grad = grad.Identity();
+      switch (form) {
+      case Formulation::finite_strain: {
+        grad = grad.Identity();
+        break;
+      }
+      case Formulation::small_strain: {
+        grad = grad.Zero();
+        break;
+      }
+      default:
+        BOOST_CHECK(false);
+        break;
+      }
     }
 
     fix::initialise_materials();

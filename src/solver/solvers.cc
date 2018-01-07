@@ -39,6 +39,7 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   typename SystemBase<DimS, DimM>::StrainField_t &
   de_geus (SystemBase<DimS, DimM> & sys, const GradIncrements<DimM> & delFs,
+           Formulation form,
            const Real cg_tol, const Real newton_tol, Uint maxiter,
            Dim_t verbose) {
     using Field_t = typename MaterialBase<DimS, DimM>::StrainField_t;
@@ -77,9 +78,21 @@ namespace muSpectre {
       count_width = size_t(std::log10(maxiter))+1;
     }
 
-    // initialise F = I
+    // initialise F = I or ε = 0
     auto & F{sys.get_strain()};
-    F.get_map() = Matrices::I2<DimM>();
+    switch (form) {
+    case Formulation::finite_strain: {
+      F.get_map() = Matrices::I2<DimM>();
+      break;
+    }
+    case Formulation::small_strain: {
+      F.get_map() = Matrices::I2<DimM>().Zero();
+      break;
+    }
+    default:
+      throw SolverError("Unknown formulation");
+      break;
+    }
 
     // initialise materials
     constexpr bool need_tangent{true};
@@ -141,6 +154,7 @@ namespace muSpectre {
 
   template typename SystemBase<twoD, twoD>::StrainField_t &
   de_geus (SystemBase<twoD, twoD> & sys, const GradIncrements<twoD>& delF0,
+           Formulation form,
            const Real cg_tol, const Real newton_tol, Uint maxiter,
            Dim_t verbose);
 
@@ -151,6 +165,7 @@ namespace muSpectre {
 
   template typename SystemBase<threeD, threeD>::StrainField_t &
   de_geus (SystemBase<threeD, threeD> & sys, const GradIncrements<threeD>& delF0,
+           Formulation form,
            const Real cg_tol, const Real newton_tol, Uint maxiter,
            Dim_t verbose);
 
@@ -158,6 +173,7 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   typename SystemBase<DimS, DimM>::StrainField_t &
   newton_cg (SystemBase<DimS, DimM> & sys, const GradIncrements<DimM> & delFs,
+             Formulation form,
              const Real cg_tol, const Real newton_tol, Uint maxiter,
              Dim_t verbose) {
     using Field_t = typename MaterialBase<DimS, DimM>::StrainField_t;
@@ -193,9 +209,21 @@ namespace muSpectre {
       count_width = size_t(std::log10(maxiter))+1;
     }
 
-    // initialise F = I
+    // initialise F = I or ε = 0
     auto & F{sys.get_strain()};
-    F.get_map() = Matrices::I2<DimM>();
+    switch (form) {
+    case Formulation::finite_strain: {
+      F.get_map() = Matrices::I2<DimM>();
+      break;
+    }
+    case Formulation::small_strain: {
+      F.get_map() = Matrices::I2<DimM>().Zero();
+      break;
+    }
+    default:
+      throw SolverError("Unknown formulation");
+      break;
+    }
 
     // initialise materials
     constexpr bool need_tangent{true};
@@ -254,6 +282,7 @@ namespace muSpectre {
 
   template typename SystemBase<twoD, twoD>::StrainField_t &
   newton_cg (SystemBase<twoD, twoD> & sys, const GradIncrements<twoD>& delF0,
+             Formulation form,
              const Real cg_tol, const Real newton_tol, Uint maxiter,
              Dim_t verbose);
 
@@ -264,6 +293,7 @@ namespace muSpectre {
 
   template typename SystemBase<threeD, threeD>::StrainField_t &
   newton_cg (SystemBase<threeD, threeD> & sys, const GradIncrements<threeD>& delF0,
+             Formulation form,
              const Real cg_tol, const Real newton_tol, Uint maxiter,
              Dim_t verbose);
 

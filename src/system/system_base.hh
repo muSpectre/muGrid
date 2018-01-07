@@ -28,6 +28,9 @@
  * Boston, MA 02111-1307, USA.
  */
 
+#ifndef SYSTEM_BASE_H
+#define SYSTEM_BASE_H
+
 #include "common/common.hh"
 #include "common/ccoord_operations.hh"
 #include "common/field.hh"
@@ -40,10 +43,6 @@
 #include <tuple>
 #include <functional>
 
-
-#ifndef SYSTEM_BASE_H
-#define SYSTEM_BASE_H
-
 namespace muSpectre {
 
   //! DimS spatial dimension (dimension of problem
@@ -52,23 +51,28 @@ namespace muSpectre {
   class SystemBase
   {
   public:
-    constexpr static Formulation form{Formulation::finite_strain};
     using Ccoord = Ccoord_t<DimS>;
     using Rcoord = Rcoord_t<DimS>;
     using FieldCollection_t = FieldCollection<DimS, DimM>;
-    using Material_ptr = std::unique_ptr<MaterialBase<DimS, DimM>>;
+    using Material_t = MaterialBase<DimS, DimM>;
+    using Material_ptr = std::unique_ptr<Material_t>;
     using Projection_ptr = std::unique_ptr<ProjectionBase<DimS, DimM>>;
-    using StrainField_t = TensorField<FieldCollection_t, Real, secondOrder, DimM>;
-    using StressField_t = TensorField<FieldCollection_t, Real, secondOrder, DimM>;
-    using TangentField_t = TensorField<FieldCollection_t, Real, fourthOrder, DimM>;
-    using FullResponse_t = std::tuple<const StressField_t&, const TangentField_t&>;
+    using StrainField_t =
+      TensorField<FieldCollection_t, Real, secondOrder, DimM>;
+    using StressField_t =
+      TensorField<FieldCollection_t, Real, secondOrder, DimM>;
+    using TangentField_t =
+      TensorField<FieldCollection_t, Real, fourthOrder, DimM>;
+    using FullResponse_t =
+      std::tuple<const StressField_t&, const TangentField_t&>;
     using iterator = typename CcoordOps::Pixels<DimS>::iterator;
 
     //! Default constructor
     SystemBase() = delete;
 
     //! constructor using sizes and resolution
-    SystemBase(Projection_ptr projection);
+    SystemBase(Projection_ptr projection,
+               Formulation form=Formulation::finite_strain);
 
     //! Copy constructor
     SystemBase(const SystemBase &other) = delete;
@@ -141,11 +145,12 @@ namespace muSpectre {
     FieldCollection_t fields;
     StrainField_t & F;
     StressField_t & P;
-    //! Tangent field might not even be required; so this is a
-    //! pointer instead of a ref
+    //! Tangent field might not even be required; so this is an
+    //! optional ref_wrapper instead of a ref
     optional<std::reference_wrapper<TangentField_t>> K{};
     std::vector<Material_ptr> materials{};
     Projection_ptr projection;
+    Formulation form;
     bool is_initialised{false};
   private:
   };
