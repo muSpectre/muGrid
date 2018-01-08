@@ -14,7 +14,7 @@
  *
  * @section LICENCE
  *
- * Copyright (C) 2017 Till Junge
+ * Copyright © 2017 Till Junge
  *
  * µSpectre is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as

@@ -9,7 +9,7 @@
  *
  * @section LICENCE
  *
- * Copyright (C) 2018 Till Junge
+ * Copyright © 2018 Till Junge
  *
  * µSpectre is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -79,6 +79,16 @@ using namespace muSpectre;
 
 int main(int argc, char *argv[])
 {
+
+  std::cout
+    << "µSpectre demonstrator1  Copyright © 2018  Till Junge <till.junge@epfl.ch>"
+    << std::endl
+    << "This program comes with ABSOLUTELY NO WARRANTY."
+    << std::endl
+    << "This is free software, and you are welcome to redistribute it"
+    << std::endl
+    << "under certain conditions, see the license file."
+    << std::endl << std::endl;
   auto options{parse_args(argc, argv)};
   auto & opt{*options};
   const Dim_t size{opt["N0"].as<int>()};
