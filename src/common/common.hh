@@ -113,7 +113,7 @@ namespace muSpectre {
   //! Material laws can declare which type of stress measure they provide,
   //! and µSpectre will handle conversions
   enum class StressMeasure {
-    Cauchy, PK1, PK2, Kirchhoff, Biot, Mandel, __nostress__};
+    Cauchy, PK1, PK2, Kirchhoff, Biot, Mandel, no_stress_};
   std::ostream & operator<<(std::ostream & os, StressMeasure s);
 
   /* ---------------------------------------------------------------------- */
@@ -121,7 +121,7 @@ namespace muSpectre {
   //! µSpectre will provide it
   enum class StrainMeasure {
     Gradient, Infinitesimal, GreenLagrange, Biot, Log, Almansi,
-    RCauchyGreen, LCauchyGreen, __nostrain__};
+    RCauchyGreen, LCauchyGreen, no_strain_};
   std::ostream & operator<<(std::ostream & os, StrainMeasure s);
 
   /* ---------------------------------------------------------------------- */
@@ -139,7 +139,7 @@ namespace muSpectre {
       break;
     }
     default:
-      return StrainMeasure::__nostrain__;
+      return StrainMeasure::no_strain_;
       break;
     }
   }
@@ -154,7 +154,7 @@ namespace muSpectre {
       break;
     }
     default:
-      return StressMeasure::__nostress__;
+      return StressMeasure::no_stress_;
       break;
     }
   }
@@ -179,7 +179,7 @@ namespace muSpectre {
       break;
     }
     default:
-      return StrainMeasure::__nostrain__;
+      return StrainMeasure::no_strain_;
       break;
     }
   }

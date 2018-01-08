@@ -1,11 +1,11 @@
-# =============================================================================
+#==============================================================================
 # file   CMakeLists.txt
 #
 # @author Till Junge <till.junge@epfl.ch>
 #
 # @date   08 Jan 2018
 #
-# @brief  Configuration for libmuSpectre
+# @brief  configuration for language bindings
 #
 # @section LICENCE
 #
@@ -25,26 +25,6 @@
 # along with GNU Emacs; see the file COPYING. If not, write to the
 # Free Software Foundation, Inc., 59 Temple Place - Suite 330,
 # Boston, MA 02111-1307, USA.
-# =============================================================================
+#
 
-include_directories(
-  common
-  materials
-  system
-  external
-  )
-
-set (muSpectre_SRC
-  )
-add_subdirectory(common)
-add_subdirectory(materials)
-add_subdirectory(fft)
-add_subdirectory(system)
-add_subdirectory(solver)
-
-find_package(FFTW REQUIRED)
-
-add_library(muSpectre ${muSpectre_SRC})
-target_link_libraries(muSpectre Eigen3::Eigen ${FFTW_LIBRARIES})
-
-add_subdirectory(language_bindings)
+add_subdirectory(python)

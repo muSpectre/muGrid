@@ -197,8 +197,8 @@ namespace muSpectre {
        **/
       template <Dim_t Dim, StrainMeasure StrainM>
       struct PK1_stress<Dim, StressMeasure::PK1, StrainM>:
-        public PK1_stress<Dim, StressMeasure::__nostress__,
-                          StrainMeasure::__nostrain__> {
+        public PK1_stress<Dim, StressMeasure::no_stress_,
+                          StrainMeasure::no_strain_> {
 
         template <class Strain_t, class Stress_t>
         inline static decltype(auto)
@@ -215,10 +215,10 @@ namespace muSpectre {
       template <Dim_t Dim>
       struct PK1_stress<Dim, StressMeasure::PK1, StrainMeasure::Gradient>:
         public PK1_stress<Dim, StressMeasure::PK1,
-                          StrainMeasure::__nostrain__> {
+                          StrainMeasure::no_strain_> {
 
         using Parent = PK1_stress<Dim, StressMeasure::PK1,
-                                  StrainMeasure::__nostrain__>;
+                                  StrainMeasure::no_strain_>;
         using Parent::compute;
 
         template <class Strain_t, class Stress_t, class Tangent_t>
@@ -235,8 +235,8 @@ namespace muSpectre {
        */
       template <Dim_t Dim, StrainMeasure StrainM>
       struct PK1_stress<Dim, StressMeasure::PK2, StrainM>:
-        public PK1_stress<Dim, StressMeasure::__nostress__,
-                          StrainMeasure::__nostrain__> {
+        public PK1_stress<Dim, StressMeasure::no_stress_,
+                          StrainMeasure::no_strain_> {
 
         template <class Strain_t, class Stress_t>
         inline static decltype(auto)
@@ -253,9 +253,9 @@ namespace muSpectre {
       template <Dim_t Dim>
       struct PK1_stress<Dim, StressMeasure::PK2, StrainMeasure::GreenLagrange>:
         public PK1_stress<Dim, StressMeasure::PK2,
-                          StrainMeasure::__nostrain__> {
+                          StrainMeasure::no_strain_> {
         using Parent = PK1_stress<Dim, StressMeasure::PK2,
-                                  StrainMeasure::__nostrain__>;
+                                  StrainMeasure::no_strain_>;
         using Parent::compute;
 
         template <class Strain_t, class Stress_t, class Tangent_t>
