@@ -35,8 +35,6 @@
 
 namespace muSpectre {
 
-  enum class FFT_PlanFlags {estimate, measure, patient};
-
   template <Dim_t DimS, Dim_t DimM>
   class FFT_Engine_base
   {

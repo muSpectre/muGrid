@@ -33,7 +33,6 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include <string>
 #include <sstream>
 
 using namespace muSpectre;
@@ -103,6 +102,11 @@ PYBIND11_PLUGIN(common) {
     .value("RCauchyGreen", StrainMeasure::RCauchyGreen)
     .value("LCauchyGreen", StrainMeasure::LCauchyGreen)
     .value("no_strain_", StrainMeasure::no_strain_);
+
+  py::enum_<FFT_PlanFlags>(mod, "FFT_PlanFlags")
+    .value("estimate", FFT_PlanFlags::estimate)
+    .value("measure", FFT_PlanFlags::measure)
+    .value("patient", FFT_PlanFlags::patient);
 
   add_get_cube(mod);
 

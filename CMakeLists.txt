@@ -38,7 +38,6 @@ set(BUILD_SHARED_LIBS ON)
 add_compile_options(-Wall -Wextra -Weffc++)
 
 
-
 enable_testing()
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
@@ -108,3 +107,11 @@ foreach(benchmark ${benchmarks})
   add_executable(${benchmark_name} ${benchmark})
   target_link_libraries(${benchmark_name} ${BOOST_LIBRARIES} muSpectre)
 endforeach(benchmark ${benchmark})
+
+
+# copy python test
+configure_file(
+  "${CMAKE_SOURCE_DIR}/tests/python_binding_tests.py"
+  "${CMAKE_BINARY_DIR}/python_binding_tests.py"
+  COPYONLY)
+add_test(python_binding_test python_binding_tests.py)

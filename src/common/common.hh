@@ -105,6 +105,13 @@ namespace muSpectre {
     return retval;
   }
 
+
+  /**
+   * Planner flags for FFT (follows FFTW, hopefully this choice will
+   * be compatible with alternative FFT implementations)
+   */
+  enum class FFT_PlanFlags {estimate, measure, patient};
+
   //! continuum mechanics flags
   enum class Formulation{finite_strain, small_strain};
   std::ostream & operator<<(std::ostream & os, Formulation f);

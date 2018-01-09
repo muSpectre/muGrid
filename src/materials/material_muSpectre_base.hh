@@ -116,14 +116,21 @@ namespace muSpectre {
 
   protected:
     //! computes stress with the formulation available at compile time
+    //! __attribute__ required by g++-6 and g++-7 because of this bug:
+    //! https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80947
     template <Formulation Form>
     inline void compute_stresses_worker(const StrainField_t & F,
-                                        StressField_t & P);
+                                        StressField_t & P)
+      __attribute__ ((visibility ("default")));
+
     //! computes stress with the formulation available at compile time
-    template <Formulation Form>
+    //! __attribute__ required by g++-6 and g++-7 because of this bug:
+    //! https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80947
+   template <Formulation Form>
     inline void compute_stresses_worker(const StrainField_t & F,
                                         StressField_t & P,
-                                        TangentField_t & K);
+                                        TangentField_t & K)
+      __attribute__ ((visibility ("default")));
     //! this iterable class is a default for simple laws that just take a strain
     //! the iterable is just a templated wrapper to provide a range to iterate over
     //! that does or does not include tangent moduli
