@@ -40,7 +40,7 @@
 //#    pragma warning ( disable : 383 )
 #  elif defined (__clang__) // test clang to be sure that when we test for gnu it is only gnu
 #    pragma clang diagnostic push
-#    pragma clang diagnostic ignored "Weffc++"
+#    pragma clang diagnostic ignored "-Weffc++"
 #  elif (defined(__GNUC__) || defined(__GNUG__))
 #    pragma GCC diagnostic push
 #    pragma GCC diagnostic ignored "-Weffc++"
@@ -50,7 +50,7 @@
 //#    pragma warning ( disable : 383 )
 #  elif defined (__clang__) // test clang to be sure that when we test for gnu it is only gnu
 #    pragma clang diagnostic pop
-#    pragma clang diagnostic ignored "Weffc++"
+#    pragma clang diagnostic ignored "-Weffc++"
 #  elif (defined(__GNUC__) || defined(__GNUG__))
 #    pragma GCC diagnostic pop
 #    pragma GCC diagnostic ignored "-Weffc++"
@@ -66,8 +66,6 @@ namespace std_replacement {
     struct is_reference_wrapper : std::false_type {};
     template <class U>
     struct is_reference_wrapper<std::reference_wrapper<U>> : std::true_type {};
-    template <class T>
-    constexpr bool is_reference_wrapper_v = is_reference_wrapper<T>::value;
 
     template <class Base, class T, class Derived, class... Args>
     auto INVOKE(T Base::*pmf, Derived&& ref, Args&&... args)
@@ -83,7 +81,7 @@ namespace std_replacement {
     auto INVOKE(T Base::*pmf, RefWrap&& ref, Args&&... args)
       noexcept(noexcept((ref.get().*pmf)(std::forward<Args>(args)...)))
       -> std::enable_if_t<std::is_function<T>::value &&
-                          is_reference_wrapper_v<std::decay_t<RefWrap>>,
+                          is_reference_wrapper<std::decay_t<RefWrap>>::value,
                           decltype((ref.get().*pmf)(std::forward<Args>(args)...))>
 
     {
@@ -94,7 +92,7 @@ namespace std_replacement {
     auto INVOKE(T Base::*pmf, Pointer&& ptr, Args&&... args)
       noexcept(noexcept(((*std::forward<Pointer>(ptr)).*pmf)(std::forward<Args>(args)...)))
       -> std::enable_if_t<std::is_function<T>::value &&
-                          !is_reference_wrapper_v<std::decay_t<Pointer>> &&
+                          !is_reference_wrapper<std::decay_t<Pointer>>::value &&
                           !std::is_base_of<Base, std::decay_t<Pointer>>::value,
                           decltype(((*std::forward<Pointer>(ptr)).*pmf)(std::forward<Args>(args)...))>
     {
@@ -115,7 +113,7 @@ namespace std_replacement {
     auto INVOKE(T Base::*pmd, RefWrap&& ref)
       noexcept(noexcept(ref.get().*pmd))
       -> std::enable_if_t<!std::is_function<T>::value &&
-                          is_reference_wrapper_v<std::decay_t<RefWrap>>,
+                          is_reference_wrapper<std::decay_t<RefWrap>>::value,
                           decltype(ref.get().*pmd)>
     {
       return ref.get().*pmd;
@@ -125,7 +123,7 @@ namespace std_replacement {
     auto INVOKE(T Base::*pmd, Pointer&& ptr)
       noexcept(noexcept((*std::forward<Pointer>(ptr)).*pmd))
       -> std::enable_if_t<!std::is_function<T>::value &&
-                          !is_reference_wrapper_v<std::decay_t<Pointer>> &&
+                          !is_reference_wrapper<std::decay_t<Pointer>>::value &&
                           !std::is_base_of<Base, std::decay_t<Pointer>>::value,
                           decltype((*std::forward<Pointer>(ptr)).*pmd)>
     {
