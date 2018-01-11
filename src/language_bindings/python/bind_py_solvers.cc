@@ -127,11 +127,11 @@ void add_solvers(py::module & mod) {
   add_solver_helper<threeD>(mod);
 }
 
-PYBIND11_PLUGIN(solvers) {
+PYBIND11_MODULE(solvers, mod) {
   py::module::import("common");
   py::module::import("system");
 
-  py::module mod("solvers", "bindings for solvers");
+  mod.doc() = "bindings for solvers";
+
   add_solvers(mod);
-  return mod.ptr();
 }

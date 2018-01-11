@@ -27,24 +27,14 @@
 # Boston, MA 02111-1307, USA.
 #
 
-if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-  # using Clang
-  # this seems to be required because of this bug:
-  # https://github.com/pybind/pybind11/issues/639
-  set(HAS_LTO_FLAG "0")
-endif()
-
-find_package(pybind11 REQUIRED)
-
 pybind11_add_module(common bind_py_common.cc)
-target_link_libraries(common muSpectre)
+target_link_libraries(common PRIVATE muSpectre)
 
 pybind11_add_module(system bind_py_system.cc)
-target_link_libraries(system muSpectre)
+target_link_libraries(system PRIVATE muSpectre)
 
 pybind11_add_module(material bind_py_material.cc)
-target_link_libraries(material muSpectre)
+target_link_libraries(material PRIVATE muSpectre)
 
 pybind11_add_module(solvers bind_py_solvers.cc)
-target_link_libraries(solvers muSpectre)
-
+target_link_libraries(solvers PRIVATE muSpectre)

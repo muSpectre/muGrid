@@ -91,10 +91,9 @@ void add_system_base(py::module & mod) {
 }
 
 
-PYBIND11_PLUGIN(system) {
+PYBIND11_MODULE(system, mod) {
   py::module::import("common");
-  py::module mod("system", "bindings for systems and system factories");
+  mod.doc() = "bindings for systems and system factories";
   add_system_factory(mod);
   add_system_base(mod);
-  return mod.ptr();
 }

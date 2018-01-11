@@ -77,13 +77,11 @@ void add_material(py::module & mod) {
   add_material_helper<threeD>(mod);
 }
 
-PYBIND11_PLUGIN(material) {
-  (py::object) py::module::import("common");
-  (py::object) py::module::import("system");
+PYBIND11_MODULE(material, mod) {
+  py::module::import("common");
+  py::module::import("system");
 
-  py::module mod("material", "bindings for constitutive laws");
+  mod.doc() = "bindings for constitutive laws";
 
   add_material(mod);
-
-  return mod.ptr();
 }

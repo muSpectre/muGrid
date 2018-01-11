@@ -37,10 +37,11 @@ set(BUILD_SHARED_LIBS ON)
 
 add_compile_options(-Wall -Wextra -Weffc++)
 
-
 enable_testing()
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
+include(muspectreTools)
+
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
   # using Clang
   add_compile_options(-Wno-missing-braces)
@@ -60,12 +61,14 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
 endif()
 
 find_package(Boost COMPONENTS unit_test_framework REQUIRED)
-find_package(Eigen3 3.3 REQUIRED NO_MODULE)
+
+add_external_package(Eigen3 VERSION 3.3 CONFIG IGNORE_SYSTEM)
+add_external_package(pybind11 VERSION 2.2 CONFIG IGNORE_SYSTEM)
+#find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 
 include_directories(
   tests
   src
-  ${EIGEN3_INCLUDE_DIRS}
   )
 
 #find_package(MPI REQUIRED)
