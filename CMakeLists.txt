@@ -66,6 +66,8 @@ include_directories(
   tests
   src
   ${EIGEN3_INCLUDE_DIRS}
+  ${Boost_INCLUDE_DIRS}
+  ${FFTW_INCLUDES}
   )
 
 #find_package(MPI REQUIRED)

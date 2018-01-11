@@ -34,7 +34,30 @@
 #include <boost/tuple/tuple.hpp>
 
 #include <tuple>
-#include <experimental/optional>
+
+#ifdef NO_EXPERIMENTAL
+#  if defined(__INTEL_COMPILER)
+//#    pragma warning ( disable : 383 )
+#  elif defined (__clang__) // test clang to be sure that when we test for gnu it is only gnu
+#    pragma clang diagnostic push
+#    pragma clang diagnostic ignored "Weffc++"
+#  elif (defined(__GNUC__) || defined(__GNUG__))
+#    pragma GCC diagnostic push
+#    pragma GCC diagnostic ignored "-Weffc++"
+#  endif
+#  include <boost/optional.hpp>
+#  if defined(__INTEL_COMPILER)
+//#    pragma warning ( disable : 383 )
+#  elif defined (__clang__) // test clang to be sure that when we test for gnu it is only gnu
+#    pragma clang diagnostic pop
+#    pragma clang diagnostic ignored "Weffc++"
+#  elif (defined(__GNUC__) || defined(__GNUG__))
+#    pragma GCC diagnostic pop
+#    pragma GCC diagnostic ignored "-Weffc++"
+#  endif
+#else
+#  include <experimental/optional>
+#endif
 
 namespace std_replacement {
 
@@ -147,12 +170,17 @@ namespace std_replacement {
 
 } //namespace std_replacement
 
+
 namespace muSpectre {
 
   using std_replacement::apply;
 
   template <class T>
+#ifdef NO_EXPERIMENTAL
+  using optional = typename boost::optional<T>;
+#else
   using optional = typename std::experimental::optional<T>;
+#endif
 
   /* ---------------------------------------------------------------------- */
   template <typename BoostTuple, std::size_t... Is>

@@ -27,7 +27,6 @@
  * Boston, MA 02111-1307, USA.
  */
 #include <boost/mpl/list.hpp>
-#include "boost/range/combine.hpp"
 
 #include "tests.hh"
 #include "fft/fft_utils.hh"

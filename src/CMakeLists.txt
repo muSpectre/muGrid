@@ -44,6 +44,22 @@ add_subdirectory(solver)
 
 find_package(FFTW REQUIRED)
 
+
+# The following checks whether std::optional exists and replaces it by
+# boost::optional if necessary
+include(CheckCXXSourceCompiles)
+CHECK_CXX_SOURCE_COMPILES(
+    "#include <experimental/optional>
+int main() {
+std::experimental::optional<double> A{};
+}"
+    HAS_STD_OPTIONAL)
+
+if( NOT HAS_STD_OPTIONAL)
+  add_definitions(-DNO_EXPERIMENTAL)
+endif()
+
+
 add_library(muSpectre ${muSpectre_SRC})
 target_link_libraries(muSpectre Eigen3::Eigen ${FFTW_LIBRARIES})
 
