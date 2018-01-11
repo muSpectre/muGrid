@@ -29,6 +29,7 @@
 
 #include "common/common.hh"
 #include "materials/material_hyper_elastic1.hh"
+#include "system/system_base.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -49,9 +50,22 @@ void add_material_hyper_elastic_helper(py::module & mod) {
   name_stream << "MaterialHooke" << dim << 'd';
   auto && name {name_stream.str().c_str()};
 
-  py::class_<MaterialHyperElastic1<dim, dim>>(mod, name)
-    .def(py::init<std::string, Real, Real>(), "name"_a, "Young"_a, "Poisson"_a);
+  using Mat_t = MaterialHyperElastic1<dim, dim>;
+  using Sys_t = SystemBase<dim, dim>;
+  py::class_<Mat_t>(mod, name)
+    .def(py::init<std::string, Real, Real>(), "name"_a, "Young"_a, "Poisson"_a)
+    .def_static("make",
+                [](Sys_t & sys, std::string n, Real e, Real p) -> Mat_t & {
+                  return Mat_t::make(sys, n, e, p);
+                },
+                "system"_a, "name"_a, "Young"_a, "Poisson"_a,
+                py::return_value_policy::reference, py::keep_alive<1, 0>())
+    .def("add_pixel",
+         [] (Mat_t & mat, Ccoord_t<dim> pix) {
+           mat.add_pixel(pix);},
+         "pixel"_a);
 }
+
 
 template <Dim_t dim>
 void add_material_helper(py::module & mod) {

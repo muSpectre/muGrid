@@ -82,4 +82,19 @@ namespace muSpectre {
     return os;
   }
 
+  /* ---------------------------------------------------------------------- */
+  void banner(std::string name, Uint year, std::string cpy_holder) {
+    std::cout
+      << std::endl
+      << "µSpectre "<< name << std::endl
+      << "Copyright © " << year << "  " << cpy_holder
+      << std::endl
+      << "This program comes with ABSOLUTELY NO WARRANTY."
+      << std::endl
+      << "This is free software, and you are welcome to redistribute it"
+      << std::endl
+      << "under certain conditions, see the license file."
+      << std::endl << std::endl;
+  }
+
 }  // muSpectre

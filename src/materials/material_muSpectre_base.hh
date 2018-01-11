@@ -49,6 +49,12 @@
 
 namespace muSpectre {
 
+  /**
+   * Forward declaration for factory function
+   */
+  template <Dim_t DimS, Dim_t DimM>
+  class SystemBase;
+
   template <class Material>
   struct MaterialMuSpectre_traits {
   };
@@ -91,6 +97,11 @@ namespace muSpectre {
 
     //! Destructor
     virtual ~MaterialMuSpectre() noexcept = default;
+
+    //! Factory
+    template <class... ConstructorArgs>
+    static Material & make(SystemBase<DimS, DimM> & sys,
+                           ConstructorArgs &&... args);
 
     //! Copy assignment operator
     MaterialMuSpectre& operator=(const MaterialMuSpectre &other) = delete;
@@ -181,6 +192,19 @@ namespace muSpectre {
                   "The material's declared tangent map is not compatible "
                   "with the tangent field. More info in previously shown "
                   "assert.");
+  }
+
+
+  /* ---------------------------------------------------------------------- */
+  template <class Material, Dim_t DimS, Dim_t DimM>
+  template <class... ConstructorArgs>
+  Material & MaterialMuSpectre<Material, DimS, DimM>::
+  make(SystemBase<DimS, DimM> & sys,
+                  ConstructorArgs && ... args) {
+    auto mat = std::make_unique<Material>(args...);
+    auto & mat_ref = *mat;
+    sys.add_material(std::move(mat));
+    return mat_ref;
   }
 
 

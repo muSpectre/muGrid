@@ -54,8 +54,10 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void SystemBase<DimS, DimM>::add_material(Material_ptr mat) {
+  typename SystemBase<DimS, DimM>::Material_t &
+  SystemBase<DimS, DimM>::add_material(Material_ptr mat) {
     this->materials.push_back(std::move(mat));
+    return *this->materials.back();
   }
 
   /* ---------------------------------------------------------------------- */

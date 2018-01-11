@@ -58,19 +58,18 @@ namespace muSpectre {
     const Real Young{1.0030648180242636}, Poisson{0.29930675909878679};
     // const Real lambda{Young*Poisson/((1+Poisson)*(1-2*Poisson))};
     // const Real mu{Young/(2*(1+Poisson))};
-    auto Material_hard = std::make_unique<Mat_t>("hard", 10*Young, Poisson);
-    auto Material_soft = std::make_unique<Mat_t>("soft", Young, Poisson);
+
+    auto& Material_hard = Mat_t::make(sys, "hard", 10*Young, Poisson);
+    auto& Material_soft = Mat_t::make(sys, "soft",    Young, Poisson);
 
     for (auto && tup: akantu::enumerate(sys)) {
       auto && pixel = std::get<1>(tup);
       if (std::get<0>(tup) == 0) {
-        Material_hard->add_pixel(pixel);
+        Material_hard.add_pixel(pixel);
       } else {
-        Material_soft->add_pixel(pixel);
+        Material_soft.add_pixel(pixel);
       }
     }
-    sys.add_material(std::move(Material_hard));
-    sys.add_material(std::move(Material_soft));
     sys.initialise();
 
     Grad_t<dim> delF0;

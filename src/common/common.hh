@@ -32,6 +32,7 @@
 #include <complex>
 #include <iostream>
 #include <type_traits>
+#include <string>
 
 #ifndef COMMON_H
 #define COMMON_H
@@ -104,6 +105,13 @@ namespace muSpectre {
     }
     return retval;
   }
+
+  /**
+   * Copyright banner to be printed to the terminal by executables
+   * Arguments are the executable's name, year of writing and the name
+   * + address of the copyright holder
+   */
+  void banner(std::string name, Uint year, std::string cpy_holder);
 
 
   /**

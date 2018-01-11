@@ -47,7 +47,7 @@ namespace muSpectre {
 
   //! DimS spatial dimension (dimension of problem
   //! DimM material_dimension (dimension of constitutive law)
-  template<Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimS, Dim_t DimM>
   class SystemBase
   {
   public:
@@ -93,7 +93,7 @@ namespace muSpectre {
      * Materials can only be moved. This is to assure exclusive
      * ownership of any material by this system
      */
-    void add_material(Material_ptr mat);
+    Material_t & add_material(Material_ptr mat);
 
     /**
      * evaluates all materials

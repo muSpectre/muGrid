@@ -108,6 +108,8 @@ PYBIND11_PLUGIN(common) {
     .value("measure", FFT_PlanFlags::measure)
     .value("patient", FFT_PlanFlags::patient);
 
+  mod.def("banner", &banner, "name"_a, "year"_a, "copyright_holder"_a);
+
   add_get_cube(mod);
 
   add_Pixels(mod);

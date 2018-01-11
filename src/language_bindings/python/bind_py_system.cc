@@ -64,7 +64,7 @@ void add_system_factory_helper(py::module & mod) {
 }
 
 void add_system_factory(py::module & mod) {
-  add_system_factory_helper<twoD>(mod);
+  add_system_factory_helper<twoD  >(mod);
   add_system_factory_helper<threeD>(mod);
 }
 
@@ -76,8 +76,13 @@ void add_system_base_helper(py::module & mod) {
   std::stringstream name{};
   name << "SystemBase" << dim << 'd';
   auto && name_str{name.str().c_str()};
-
-  py::class_<SystemBase<dim, dim>>(mod, name_str);
+  using sys_t = SystemBase<dim, dim>;
+  py::class_<sys_t>(mod, name_str)
+    .def("__len__", &sys_t::size)
+    .def("__iter__", [](sys_t & s) {
+        return py::make_iterator(s.begin(), s.end());
+      })
+    .def("initialise", &sys_t::initialise, "flags"_a=FFT_PlanFlags::estimate);
 }
 
 void add_system_base(py::module & mod) {

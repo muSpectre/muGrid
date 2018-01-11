@@ -48,14 +48,13 @@ template <Dim_t sdim>
 void add_newton_cg_helper(py::module & mod) {
   std::stringstream name_stream {};
   name_stream << "newton_cg" << sdim << "d";
-  auto && name{name_stream.str().c_str()};
 
   constexpr Dim_t mdim{sdim};
   using sys = SystemBase<sdim, mdim>;
   using grad = Grad_t<sdim>;
   using grad_vec = Grad_t<sdim>;
 
-  mod.def(name,
+  mod.def(name_stream.str().c_str(),
           [](sys & s, const grad & g, Formulation f, Real ct, Real nt,
              Uint max, Dim_t verb) -> typename sys::StrainField_t & {
             return newton_cg(s, g, f, ct, nt, max, verb);
@@ -67,7 +66,7 @@ void add_newton_cg_helper(py::module & mod) {
           "newton_tol"_a,
           "maxiter"_a=0,
           "verbose"_a=0);
-  mod.def(name,
+  mod.def(name_stream.str().c_str(),
           [](sys & s, const grad_vec & g, Formulation f, Real ct, Real nt,
              Uint max, Dim_t verb) -> typename sys::StrainField_t & {
             return newton_cg(s, g, f, ct, nt, max, verb);
@@ -85,14 +84,13 @@ template <Dim_t sdim>
 void add_de_geus_helper(py::module & mod) {
   std::stringstream name_stream {};
   name_stream << "de_geus" << sdim << "d";
-  auto && name{name_stream.str().c_str()};
 
   constexpr Dim_t mdim{sdim};
   using sys = SystemBase<sdim, mdim>;
   using grad = Grad_t<sdim>;
   using grad_vec = Grad_t<sdim>;
 
-  mod.def(name,
+  mod.def(name_stream.str().c_str(),
           [](sys & s, const grad & g, Formulation f, Real ct, Real nt,
              Uint max, Dim_t verb) -> typename sys::StrainField_t & {
             return de_geus(s, g, f, ct, nt, max, verb);
@@ -104,7 +102,7 @@ void add_de_geus_helper(py::module & mod) {
           "newton_tol"_a,
           "maxiter"_a=0,
           "verbose"_a=0);
-  mod.def(name,
+  mod.def(name_stream.str().c_str(),
           [](sys & s, const grad_vec & g, Formulation f, Real ct, Real nt,
              Uint max, Dim_t verb) -> typename sys::StrainField_t & {
             return de_geus(s, g, f, ct, nt, max, verb);
