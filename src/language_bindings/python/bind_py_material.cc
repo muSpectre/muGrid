@@ -48,11 +48,11 @@ template <Dim_t dim>
 void add_material_hyper_elastic_helper(py::module & mod) {
   std::stringstream name_stream{};
   name_stream << "MaterialHooke" << dim << 'd';
-  auto && name {name_stream.str().c_str()};
+  const auto name {name_stream.str()};
 
   using Mat_t = MaterialHyperElastic1<dim, dim>;
   using Sys_t = SystemBase<dim, dim>;
-  py::class_<Mat_t>(mod, name)
+  py::class_<Mat_t>(mod, name.c_str())
     .def(py::init<std::string, Real, Real>(), "name"_a, "Young"_a, "Poisson"_a)
     .def_static("make",
                 [](Sys_t & sys, std::string n, Real e, Real p) -> Mat_t & {
@@ -73,17 +73,8 @@ void add_material_helper(py::module & mod) {
 }
 
 void add_material(py::module & mod) {
-  add_material_helper<twoD  >(mod);
-  add_material_helper<threeD>(mod);
-}
-
-PYBIND11_PLUGIN(material) {
-  (py::object) py::module::import("common");
-  (py::object) py::module::import("system");
-
-  py::module mod("material", "bindings for constitutive laws");
-
-  add_material(mod);
-
-  return mod.ptr();
+  auto material{mod.def_submodule("material")};
+  material.doc() = "bindings for constitutive laws";
+  add_material_helper<twoD  >(material);
+  add_material_helper<threeD>(material);
 }

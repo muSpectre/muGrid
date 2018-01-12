@@ -47,14 +47,12 @@ using namespace pybind11::literals;
  */
 template <Dim_t dim>
 void add_system_factory_helper(py::module & mod) {
-  std::stringstream name {};
-  name << "SystemFactory" << dim << "d";
   using Ccoord = Ccoord_t<dim>;
   using Rcoord = Rcoord_t<dim>;
   using Form = Formulation;
 
   mod.def
-    (name.str().c_str(),
+    ("SystemFactory",
      [](Ccoord res, Rcoord lens, Form form) {
       return make_system(std::move(res), std::move(lens), std::move(form));
      },
@@ -73,11 +71,11 @@ void add_system_factory(py::module & mod) {
  */
 template <Dim_t dim>
 void add_system_base_helper(py::module & mod) {
-  std::stringstream name{};
-  name << "SystemBase" << dim << 'd';
-  auto && name_str{name.str().c_str()};
+  std::stringstream name_stream{};
+  name_stream << "SystemBase" << dim << 'd';
+  const std::string name = name_stream.str();
   using sys_t = SystemBase<dim, dim>;
-  py::class_<sys_t>(mod, name_str)
+  py::class_<sys_t>(mod, name.c_str())
     .def("__len__", &sys_t::size)
     .def("__iter__", [](sys_t & s) {
         return py::make_iterator(s.begin(), s.end());
@@ -90,11 +88,10 @@ void add_system_base(py::module & mod) {
   add_system_base_helper<threeD>(mod);
 }
 
-
-PYBIND11_PLUGIN(system) {
-  py::module::import("common");
-  py::module mod("system", "bindings for systems and system factories");
+void add_system(py::module & mod) {
   add_system_factory(mod);
-  add_system_base(mod);
-  return mod.ptr();
+
+  auto system{mod.def_submodule("system")};
+  system.doc() = "bindings for systems and system factories";
+  add_system_base(system);
 }

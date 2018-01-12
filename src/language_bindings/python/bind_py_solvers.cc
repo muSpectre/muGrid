@@ -123,15 +123,9 @@ void add_solver_helper(py::module & mod) {
 }
 
 void add_solvers(py::module & mod) {
-  add_solver_helper<twoD  >(mod);
-  add_solver_helper<threeD>(mod);
-}
+  auto solvers{mod.def_submodule("solvers")};
+  solvers.doc() = "bindings for solvers";
 
-PYBIND11_PLUGIN(solvers) {
-  py::module::import("common");
-  py::module::import("system");
-
-  py::module mod("solvers", "bindings for solvers");
-  add_solvers(mod);
-  return mod.ptr();
+  add_solver_helper<twoD  >(solvers);
+  add_solver_helper<threeD>(solvers);
 }

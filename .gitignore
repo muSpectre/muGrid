@@ -3,3 +3,6 @@
 /build/*
 /build-o3/
 /build*
+
+/src/external/pybind11
+/src/external/Eigen3

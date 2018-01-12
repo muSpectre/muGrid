@@ -71,9 +71,7 @@ void add_Pixels(py::module & mod) {
 }
 
 
-PYBIND11_PLUGIN(common) {
-  py::module mod("common", "Common utilities for pymuSpectre");
-
+void add_common (py::module & mod) {
   py::enum_<Formulation>(mod, "Formulation")
     .value("finite_strain", Formulation::finite_strain)
     //"µSpectre handles a problem in terms of tranformation gradient F and"
@@ -113,5 +111,4 @@ PYBIND11_PLUGIN(common) {
   add_get_cube(mod);
 
   add_Pixels(mod);
-  return mod.ptr();
 }

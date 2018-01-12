@@ -36,10 +36,7 @@ import numpy as np
 sys.path.append(os.path.join(os.getcwd(), "src/language_bindings/python"))
 
 try:
-    import common
-    import system
-    import solvers
-    import material
+    import pyMuSpectre as µ
 except ImportError as err:
     print(err)
     sys.exit(-1)
@@ -51,13 +48,13 @@ class SystemCheck(unittest.TestCase):
         """
         resolution = [5,7]
         lengths = [5.2, 8.3]
-        formulation = common.Formulation.small_strain
+        formulation = µ.Formulation.small_strain
         try:
-            sys = system.SystemFactory2d(resolution,
-                                         lengths,
-                                         formulation)
-            mat = material.MaterialHooke2d.make(sys, "material", 210e9, .33)
-        except Exception(err):
+            sys = µ.SystemFactory(resolution,
+                                  lengths,
+                                  formulation)
+            mat = µ.material.MaterialHooke2d.make(sys, "material", 210e9, .33)
+        except Exception as err:
             print(err)
             raise err
 
@@ -65,11 +62,11 @@ class MaterialHooke2dCheck(unittest.TestCase):
     def setUp(self):
         self.resolution = [5,7]
         self.lengths = [5.2, 8.3]
-        self.formulation = common.Formulation.small_strain
-        self.sys = system.SystemFactory2d(self.resolution,
-                                          self.lengths,
-                                          self.formulation)
-        self.mat = material.MaterialHooke2d.make(
+        self.formulation = µ.Formulation.small_strain
+        self.sys = µ.SystemFactory(self.resolution,
+                                   self.lengths,
+                                   self.formulation)
+        self.mat = µ.material.MaterialHooke2d.make(
             self.sys, "material", 210e9, .33)
 
     def test_add_material(self):
@@ -80,13 +77,13 @@ class SolverCheck(unittest.TestCase):
     def setUp(self):
         self.resolution = [5,7]
         self.lengths = [5.2, 8.3]
-        self.formulation = common.Formulation.small_strain
-        self.sys = system.SystemFactory2d(self.resolution,
-                                          self.lengths,
-                                          self.formulation)
-        self.hard = material.MaterialHooke2d.make(
+        self.formulation = µ.Formulation.small_strain
+        self.sys = µ.SystemFactory(self.resolution,
+                                   self.lengths,
+                                   self.formulation)
+        self.hard = µ.material.MaterialHooke2d.make(
             self.sys, "hard", 210e9, .33)
-        self.soft = material.MaterialHooke2d.make(
+        self.soft = µ.material.MaterialHooke2d.make(
             self.sys, "soft",  70e9, .33)
 
     def test_solve(self):
