@@ -1,0 +1,77 @@
+/**
+ * file   small_case.cc
+ *
+ * @author Till Junge <till.junge@epfl.ch>
+ *
+ * @date   12 Jan 2018
+ *
+ * @brief  small case for debugging
+ *
+ * @section LICENCE
+ *
+ * Copyright © 2018 Till Junge
+ *
+ * µSpectre is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation, either version 3, or (at
+ * your option) any later version.
+ *
+ * µSpectre is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with GNU Emacs; see the file COPYING. If not, write to the
+ * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+ * Boston, MA 02111-1307, USA.
+ */
+
+#include "common/common.hh"
+#include "common/iterators.hh"
+#include "system/system_factory.hh"
+#include "materials/material_hyper_elastic1.hh"
+#include "solver/solvers.hh"
+
+#include <iostream>
+
+
+using namespace muSpectre;
+
+
+int main()
+{
+  constexpr Dim_t dim{twoD};
+
+  Ccoord_t<dim> resolution{3, 3};
+  Rcoord_t<dim> lengths{CcoordOps::get_cube<dim>(3.)};//{5.2e-9, 8.3e-9, 8.3e-9};
+  Formulation form{Formulation::finite_strain};
+
+  auto rve{make_system(resolution, lengths, form)};
+
+  auto & hard{MaterialHyperElastic1<dim, dim>::make(rve, "hard", 2*2e9, .33)};
+  auto & soft{MaterialHyperElastic1<dim, dim>::make(rve, "soft",  2e9, .33)};
+
+  for (auto && tup: akantu::enumerate(rve)) {
+    //auto & i = std::get<0>(tup);
+    auto & pixel = std::get<1>(tup);
+    std::cout << pixel << std::boolalpha << (pixel[0] == 0) << std::endl;
+    if (pixel[0] == 0) {// (i < 5) {
+      hard.add_pixel(pixel);
+    } else {
+      soft.add_pixel(pixel);
+    }
+  }
+  rve.initialise();
+
+  Real tol{1e-6};
+  Grad_t<dim> Del0{};
+  Del0 << 0, .1,
+          0,  0;
+  Dim_t maxiter{11}, verbose{1};
+  GradIncrements<dim> grads{Del0};
+
+  auto & res = de_geus(rve, grads, form, tol, tol, maxiter, verbose);
+  std::cout << res.eigen().transpose() << std::endl;
+  return 0;
+}

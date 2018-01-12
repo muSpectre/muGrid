@@ -100,8 +100,9 @@ class SolverCheck(unittest.TestCase):
         maxiter = 100
         verbose = 2
         # the following segfaults:
-        #TODO solvers.de_geus2d(self.sys, Del0, self.formulation,
-        #                  tol, tol, maxiter, verbose)
+        r = µ.solvers.de_geus2d(self.sys, Del0, self.formulation,
+                                tol, tol, maxiter, verbose)
+        print(r)
 
 
 

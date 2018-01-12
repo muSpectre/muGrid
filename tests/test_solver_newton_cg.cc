@@ -104,7 +104,7 @@ namespace muSpectre {
     auto sys{make_system(resolutions, lengths, form)};
 
     using Mat_t = MaterialHyperElastic1<dim, dim>;
-    constexpr Real Young{2}, Poisson{.33};
+    constexpr Real Young{2e9}, Poisson{.33};
     auto material_hard{std::make_unique<Mat_t>("hard", contrast*Young, Poisson)};
     auto material_soft{std::make_unique<Mat_t>("soft",          Young, Poisson)};
 
@@ -126,7 +126,7 @@ namespace muSpectre {
 
     constexpr Real cg_tol{1e-8}, newton_tol{1e-5};
     constexpr Uint maxiter{CcoordOps::get_size(resolutions)*ipow(dim, secondOrder)*10};
-    constexpr bool verbose{false};
+    constexpr bool verbose{true};
 
     auto & result = newton_cg(sys, delEps0, form, cg_tol, newton_tol, maxiter, verbose);
     if (verbose) {

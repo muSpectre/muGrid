@@ -100,6 +100,17 @@ foreach(binaryfile ${binaries})
   add_executable(${binaryname} ${binaryfile})
   target_link_libraries(${binaryname} ${Boost_LIBRARIES} muSpectre)
 endforeach(binaryfile ${binaries})
+#or copy them
+file (GLOB pybins "${CMAKE_SOURCE_DIR}/bin/*.py")
+foreach(pybin ${pybins})
+
+  get_filename_component(binaryname  ${pybin} NAME_WE)
+  message("configuring file '${pybin}', to be copied to '${CMAKE_BINARY_DIR}/${binaryname}'")
+  configure_file(
+    ${pybin}
+    "${CMAKE_BINARY_DIR}/${binaryname}.py"
+    COPYONLY)
+endforeach(pybin ${pybins})
 
 
 # compile benchmarks
