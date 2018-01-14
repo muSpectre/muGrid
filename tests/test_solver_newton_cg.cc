@@ -80,9 +80,9 @@ namespace muSpectre {
     constexpr Formulation form{Formulation::finite_strain};
 
     GradIncrements<dim> grads; grads.push_back(delF0);
-    Eigen::ArrayXXd res1{de_geus(sys, grads, form, cg_tol, newton_tol, maxiter, verbose).eigen()};
+    Eigen::ArrayXXd res1{de_geus(sys, grads, cg_tol, newton_tol, maxiter, verbose).eigen()};
 
-    Eigen::ArrayXXd res2{newton_cg(sys, grads, form, cg_tol, newton_tol, maxiter, verbose).eigen()};
+    Eigen::ArrayXXd res2{newton_cg(sys, grads, cg_tol, newton_tol, maxiter, verbose).eigen()};
     BOOST_CHECK_LE(abs(res1-res2).mean(), cg_tol);
   }
 
@@ -128,7 +128,7 @@ namespace muSpectre {
     constexpr Uint maxiter{CcoordOps::get_size(resolutions)*ipow(dim, secondOrder)*10};
     constexpr bool verbose{true};
 
-    auto & result = newton_cg(sys, delEps0, form, cg_tol, newton_tol, maxiter, verbose);
+    auto & result = newton_cg(sys, delEps0, cg_tol, newton_tol, maxiter, verbose);
     if (verbose) {
       std::cout << "result:" << std::endl << result.eigen() << std::endl;
       std::cout << "mean strain = " << std::endl << result.get_map().mean() << std::endl;

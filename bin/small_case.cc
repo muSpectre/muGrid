@@ -45,33 +45,34 @@ int main()
 
   Ccoord_t<dim> resolution{3, 3};
   Rcoord_t<dim> lengths{CcoordOps::get_cube<dim>(3.)};//{5.2e-9, 8.3e-9, 8.3e-9};
-  Formulation form{Formulation::finite_strain};
+  Formulation form{Formulation::small_strain};
 
   auto rve{make_system(resolution, lengths, form)};
 
-  auto & hard{MaterialHyperElastic1<dim, dim>::make(rve, "hard", 2*2e9, .33)};
-  auto & soft{MaterialHyperElastic1<dim, dim>::make(rve, "soft",  2e9, .33)};
+  auto & hard{MaterialHyperElastic1<dim, dim>::make(rve, "hard", 210e9, .33)};
+  auto & soft{MaterialHyperElastic1<dim, dim>::make(rve, "soft",  70e9, .33)};
 
   for (auto && tup: akantu::enumerate(rve)) {
-    //auto & i = std::get<0>(tup);
+    auto & i = std::get<0>(tup);
     auto & pixel = std::get<1>(tup);
-    std::cout << pixel << std::boolalpha << (pixel[0] == 0) << std::endl;
-    if (pixel[0] == 0) {// (i < 5) {
+    if (i < 3) {
       hard.add_pixel(pixel);
     } else {
       soft.add_pixel(pixel);
     }
+    std::cout << i << ", " << pixel << std::endl;
   }
   rve.initialise();
 
   Real tol{1e-6};
   Grad_t<dim> Del0{};
-  Del0 << 0, .1,
-          0,  0;
+  Del0 <<  0, .1,
+          .1,  0;
   Dim_t maxiter{11}, verbose{1};
-  GradIncrements<dim> grads{Del0};
+  //GradIncrements<dim> grads{Del0};
 
-  auto & res = de_geus(rve, grads, form, tol, tol, maxiter, verbose);
+  auto & res = de_geus(rve, Del0, tol, tol, maxiter, verbose);
+
   std::cout << res.eigen().transpose() << std::endl;
   return 0;
 }

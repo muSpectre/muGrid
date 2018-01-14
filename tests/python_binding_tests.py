@@ -77,7 +77,7 @@ class SolverCheck(unittest.TestCase):
     def setUp(self):
         self.resolution = [5,7]
         self.lengths = [5.2, 8.3]
-        self.formulation = µ.Formulation.small_strain
+        self.formulation = µ.Formulation.finite_strain
         self.sys = µ.SystemFactory(self.resolution,
                                    self.lengths,
                                    self.formulation)

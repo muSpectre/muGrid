@@ -105,7 +105,6 @@ file (GLOB pybins "${CMAKE_SOURCE_DIR}/bin/*.py")
 foreach(pybin ${pybins})
 
   get_filename_component(binaryname  ${pybin} NAME_WE)
-  message("configuring file '${pybin}', to be copied to '${CMAKE_BINARY_DIR}/${binaryname}'")
   configure_file(
     ${pybin}
     "${CMAKE_BINARY_DIR}/${binaryname}.py"

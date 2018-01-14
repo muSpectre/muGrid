@@ -39,9 +39,9 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   typename SystemBase<DimS, DimM>::StrainField_t &
   de_geus (SystemBase<DimS, DimM> & sys, const GradIncrements<DimM> & delFs,
-           Formulation form,
            const Real cg_tol, const Real newton_tol, Uint maxiter,
            Dim_t verbose) {
+
     using Field_t = typename MaterialBase<DimS, DimM>::StrainField_t;
     auto solver_fields{std::make_unique<GlobalFieldCollection<DimS, DimM>>()};
     solver_fields->initialise(sys.get_resolutions());
@@ -80,7 +80,7 @@ namespace muSpectre {
 
     // initialise F = I or ε = 0
     auto & F{sys.get_strain()};
-    switch (form) {
+    switch (sys.get_formulation()) {
     case Formulation::finite_strain: {
       F.get_map() = Matrices::I2<DimM>();
       break;
@@ -154,7 +154,6 @@ namespace muSpectre {
 
   template typename SystemBase<twoD, twoD>::StrainField_t &
   de_geus (SystemBase<twoD, twoD> & sys, const GradIncrements<twoD>& delF0,
-           Formulation form,
            const Real cg_tol, const Real newton_tol, Uint maxiter,
            Dim_t verbose);
 
@@ -165,7 +164,6 @@ namespace muSpectre {
 
   template typename SystemBase<threeD, threeD>::StrainField_t &
   de_geus (SystemBase<threeD, threeD> & sys, const GradIncrements<threeD>& delF0,
-           Formulation form,
            const Real cg_tol, const Real newton_tol, Uint maxiter,
            Dim_t verbose);
 
@@ -173,7 +171,6 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   typename SystemBase<DimS, DimM>::StrainField_t &
   newton_cg (SystemBase<DimS, DimM> & sys, const GradIncrements<DimM> & delFs,
-             Formulation form,
              const Real cg_tol, const Real newton_tol, Uint maxiter,
              Dim_t verbose) {
     using Field_t = typename MaterialBase<DimS, DimM>::StrainField_t;
@@ -211,7 +208,7 @@ namespace muSpectre {
 
     // initialise F = I or ε = 0
     auto & F{sys.get_strain()};
-    switch (form) {
+    switch (sys.get_formulation()) {
     case Formulation::finite_strain: {
       F.get_map() = Matrices::I2<DimM>();
       break;
@@ -282,7 +279,6 @@ namespace muSpectre {
 
   template typename SystemBase<twoD, twoD>::StrainField_t &
   newton_cg (SystemBase<twoD, twoD> & sys, const GradIncrements<twoD>& delF0,
-             Formulation form,
              const Real cg_tol, const Real newton_tol, Uint maxiter,
              Dim_t verbose);
 
@@ -293,7 +289,6 @@ namespace muSpectre {
 
   template typename SystemBase<threeD, threeD>::StrainField_t &
   newton_cg (SystemBase<threeD, threeD> & sys, const GradIncrements<threeD>& delF0,
-             Formulation form,
              const Real cg_tol, const Real newton_tol, Uint maxiter,
              Dim_t verbose);
 

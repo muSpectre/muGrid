@@ -71,8 +71,8 @@ namespace muSpectre {
     SystemBaseFixture()
       :SystemBase<DimS, DimM>{
       std::move(system_input<DimS, DimM>(Sizes<DimS>::get_resolution(),
-                                         Sizes<DimS>::get_lengths())),
-        form} {}
+                                         Sizes<DimS>::get_lengths(),
+                                         form))} {}
   };
 
   using fixlist = boost::mpl::list<SystemBaseFixture<twoD, twoD,
@@ -89,11 +89,12 @@ namespace muSpectre {
 
     Ccoord_t<dim> resolutions{3, 3};
     Rcoord_t<dim> lengths{2.3, 2.7};
+    Formulation form{Formulation::finite_strain};
     auto fft_ptr{std::make_unique<FFTW_Engine<dim, dim>>(resolutions, lengths)};
     auto proj_ptr{std::make_unique<ProjectionFiniteStrainFast<dim, dim>>(std::move(fft_ptr))};
     SystemBase<dim, dim> sys{std::move(proj_ptr)};
 
-    auto sys2{make_system<dim, dim>(resolutions, lengths)};
+    auto sys2{make_system<dim, dim>(resolutions, lengths, form)};
     auto sys2b{std::move(sys2)};
     BOOST_CHECK_EQUAL(sys2b.size(), sys.size());
   }

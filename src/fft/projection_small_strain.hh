@@ -1,16 +1,18 @@
 /**
- * file   projection_finite_strain.hh
+ * file   projection_small_strain.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
- * @date   05 Dec 2017
+ * @date   14 Jan 2018
  *
- * @brief  Class for standard finite-strain gradient projections see de Geus et
- *         al. (https://doi.org/10.1016/j.cma.2016.12.032) for derivation
+ * @brief  Small strain projection operator as defined in Appendix A1 of
+ *         DOI: 10.1002/nme.5481 ("A finite element perspective on nonlinear
+ *         FFT-based micromechanical simulations", Int. J. Numer. Meth. Engng
+ *         2017; 111 :903–926)
  *
  * @section LICENCE
  *
- * Copyright © 2017 Till Junge
+ * Copyright © 2018 Till Junge
  *
  * µSpectre is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -28,19 +30,15 @@
  * Boston, MA 02111-1307, USA.
  */
 
-
-#ifndef PROJECTION_FINITE_STRAIN_H
-#define PROJECTION_FINITE_STRAIN_H
+#ifndef PROJECTION_SMALL_STRAIN_H
+#define PROJECTION_SMALL_STRAIN_H
 
 #include "fft/projection_default.hh"
-#include "common/common.hh"
-#include "common/field_collection.hh"
-#include "common/field_map.hh"
 
 namespace muSpectre {
 
   template <Dim_t DimS, Dim_t DimM>
-  class ProjectionFiniteStrain: public ProjectionDefault<DimS, DimM>
+  class ProjectionSmallStrain: public ProjectionDefault<DimS, DimM>
   {
   public:
     using Parent = ProjectionDefault<DimS, DimM>;
@@ -54,25 +52,25 @@ namespace muSpectre {
     using Vector_map = MatrixFieldMap<LFieldCollection_t, Complex, DimM*DimM, 1>;
 
     //! Default constructor
-    ProjectionFiniteStrain() = delete;
+    ProjectionSmallStrain() = delete;
 
     //! Constructor with fft_engine
-    ProjectionFiniteStrain(FFT_Engine_ptr engine);
+    ProjectionSmallStrain(FFT_Engine_ptr engine);
 
     //! Copy constructor
-    ProjectionFiniteStrain(const ProjectionFiniteStrain &other) = delete;
+    ProjectionSmallStrain(const ProjectionSmallStrain &other) = delete;
 
     //! Move constructor
-    ProjectionFiniteStrain(ProjectionFiniteStrain &&other) = default;
+    ProjectionSmallStrain(ProjectionSmallStrain &&other) = default;
 
     //! Destructor
-    virtual ~ProjectionFiniteStrain() noexcept = default;
+    virtual ~ProjectionSmallStrain() = default;
 
     //! Copy assignment operator
-    ProjectionFiniteStrain& operator=(const ProjectionFiniteStrain &other) = delete;
+    ProjectionSmallStrain& operator=(const ProjectionSmallStrain &other) = delete;
 
     //! Move assignment operator
-    ProjectionFiniteStrain& operator=(ProjectionFiniteStrain &&other) = default;
+    ProjectionSmallStrain& operator=(ProjectionSmallStrain &&other) = delete;
 
     //! initialises the fft engine (plan the transform)
     virtual void initialise(FFT_PlanFlags flags = FFT_PlanFlags::estimate) override final;
@@ -81,6 +79,7 @@ namespace muSpectre {
   private:
   };
 
+
 }  // muSpectre
 
-#endif /* PROJECTION_FINITE_STRAIN_H */
+#endif /* PROJECTION_SMALL_STRAIN_H */

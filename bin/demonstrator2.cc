@@ -50,7 +50,7 @@ int main()
   const Rcoord_t<dim> lengths{5.2, 8.3};
   const Ccoord_t<dim> resolutions{5, 7};
 
-  auto system{make_system<dim, dim>(resolutions, lengths)};
+  auto system{make_system<dim, dim>(resolutions, lengths, form)};
 
   constexpr Real E{1.0030648180242636};
   constexpr Real nu{0.29930675909878679};
@@ -83,7 +83,7 @@ int main()
 
   auto start = std::chrono::high_resolution_clock::now();
   GradIncrements<dim> grads{DeltaF};
-  auto &res = de_geus(system, grads, form, cg_tol, newton_tol, maxiter, verbose);
+  auto &res = de_geus(system, grads, cg_tol, newton_tol, maxiter, verbose);
   std::chrono::duration<Real> dur = std::chrono::high_resolution_clock::now() - start;
   std::cout << "Resolution time = " << dur.count() << "s" << std::endl;
 

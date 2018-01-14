@@ -1,15 +1,15 @@
 /**
- * file   projection_finite_strain.cc
+ * file   projection_small_strain.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
- * @date   05 Dec 2017
+ * @date   14 Jan 2018
  *
- * @brief  implementation of standard finite strain projection operator
+ * @brief  Implementation for ProjectionSmallStrain
  *
  * @section LICENCE
  *
- * Copyright © 2017 Till Junge
+ * Copyright © 2018 Till Junge
  *
  * µSpectre is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -27,48 +27,50 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include "fft/projection_finite_strain.hh"
-#include "fft/fftw_engine.hh"
+#include "fft/projection_small_strain.hh"
 #include "fft/fft_utils.hh"
-#include "common/field_map.hh"
-#include "common/tensor_algebra.hh"
-#include "common/iterators.hh"
-
-#include "Eigen/Dense"
 
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  ProjectionFiniteStrain<DimS, DimM>::
-  ProjectionFiniteStrain(FFT_Engine_ptr engine)
-    :Parent{std::move(engine), Formulation::finite_strain}
+  ProjectionSmallStrain<DimS, DimM>::
+  ProjectionSmallStrain(FFT_Engine_ptr engine)
+    : Parent{std::move(engine), Formulation::small_strain}
   {}
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void ProjectionFiniteStrain<DimS, DimM>::
-  initialise(FFT_PlanFlags flags) {
+  void ProjectionSmallStrain<DimS, DimM>::initialise(FFT_PlanFlags flags) {
     Parent::initialise(flags);
+
     FFT_freqs<DimS> fft_freqs(this->fft_engine->get_resolutions(),
                               this->fft_engine->get_lengths());
     for (auto && tup: akantu::zip(*this->fft_engine, this->Ghat)) {
       const auto & ccoord = std::get<0> (tup);
       auto & G = std::get<1>(tup);
       auto xi = fft_freqs.get_unit_xi(ccoord);
-      //! this is simplifiable using Curnier's Méthodes numériques, 6.69(c)
-      G = Matrices::outer_under(Matrices::I2<DimM>(), xi*xi.transpose());
-      // for (Dim_t im = 0; im < DimS; ++im) {
-      //   for (Dim_t j = 0; j < DimS; ++j) {
-      //     for (Dim_t l = 0; l < DimS; ++l) {
-      //       get(G, im, j, l, im) = xi(j)*xi(l);
-      //     }
-      //   }
-      // }
+      auto kron = [](const Dim_t i, const Dim_t j) -> Real{
+        return (i==j) ? 1. : 0.;
+      };
+      for (Dim_t i{0}; i < DimS; ++i) {
+        for (Dim_t j{0}; j < DimS; ++j) {
+          for (Dim_t l{0}; l < DimS; ++l) {
+            for (Dim_t m{0}; m < DimS; ++m ) {
+              Real & g = get(G, i, j, l, m);
+              g = 0.5* (xi(i) * kron(j, l) * xi(m) +
+                        xi(i) * kron(j, m) * xi(l) +
+                        xi(j) * kron(j, l) * xi(m) +
+                        xi(j) * kron(i, m) * xi(l)) -
+                xi(i)*xi(j)*xi(l)*xi(m);
+            }
+          }
+        }
+      }
     }
     this->Ghat[0].setZero();
   }
 
-  template class ProjectionFiniteStrain<twoD,   twoD>;
-  template class ProjectionFiniteStrain<threeD, threeD>;
+  template class ProjectionSmallStrain<twoD,   twoD>;
+  template class ProjectionSmallStrain<threeD, threeD>;
 }  // muSpectre

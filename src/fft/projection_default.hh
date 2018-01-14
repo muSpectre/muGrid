@@ -1,16 +1,18 @@
 /**
- * file   projection_finite_strain.hh
+ * file   projection_default.hh
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
- * @date   05 Dec 2017
+ * @date   14 Jan 2018
  *
- * @brief  Class for standard finite-strain gradient projections see de Geus et
- *         al. (https://doi.org/10.1016/j.cma.2016.12.032) for derivation
+ * @brief  virtual base class for default projection implementation, where the
+ *         projection operator is stored as a full fourth-order tensor per
+ *         k-space point (as opposed to 'smart' faster implementations, such as
+ *         ProjectionFiniteStrainFast
  *
  * @section LICENCE
  *
- * Copyright © 2017 Till Junge
+ * Copyright (C) 2018 Till Junge
  *
  * µSpectre is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -28,59 +30,56 @@
  * Boston, MA 02111-1307, USA.
  */
 
+#ifndef PROJECTION_DEFAULT_H
+#define PROJECTION_DEFAULT_H
 
-#ifndef PROJECTION_FINITE_STRAIN_H
-#define PROJECTION_FINITE_STRAIN_H
-
-#include "fft/projection_default.hh"
-#include "common/common.hh"
-#include "common/field_collection.hh"
-#include "common/field_map.hh"
+#include "fft/projection_base.hh"
 
 namespace muSpectre {
 
   template <Dim_t DimS, Dim_t DimM>
-  class ProjectionFiniteStrain: public ProjectionDefault<DimS, DimM>
+  class ProjectionDefault: public ProjectionBase<DimS, DimM>
   {
   public:
-    using Parent = ProjectionDefault<DimS, DimM>;
+    using Parent = ProjectionBase<DimS, DimM>;
     using FFT_Engine_ptr = typename Parent::FFT_Engine_ptr;
     using Ccoord = typename Parent::Ccoord;
-    //using GFieldCollection_t = FieldCollection<DimS, DimM, true>;
+    using GFieldCollection_t = FieldCollection<DimS, DimM, true>;
     using LFieldCollection_t = FieldCollection<DimS, DimM, false>;
-    //using Field_t = TensorField<GFieldCollection_t, Real, secondOrder, DimM>;
+    using Field_t = TensorField<GFieldCollection_t, Real, secondOrder, DimM>;
     using Proj_t = TensorField<LFieldCollection_t, Real, fourthOrder, DimM>;
     using Proj_map = T4MatrixFieldMap<LFieldCollection_t, Real, DimM>;
     using Vector_map = MatrixFieldMap<LFieldCollection_t, Complex, DimM*DimM, 1>;
-
     //! Default constructor
-    ProjectionFiniteStrain() = delete;
+    ProjectionDefault() = delete;
 
-    //! Constructor with fft_engine
-    ProjectionFiniteStrain(FFT_Engine_ptr engine);
+    //! Constructor with system sizes and formulation
+    ProjectionDefault(FFT_Engine_ptr engine, Formulation form);
 
     //! Copy constructor
-    ProjectionFiniteStrain(const ProjectionFiniteStrain &other) = delete;
+    ProjectionDefault(const ProjectionDefault &other) = delete;
 
     //! Move constructor
-    ProjectionFiniteStrain(ProjectionFiniteStrain &&other) = default;
+    ProjectionDefault(ProjectionDefault &&other) = default;
 
     //! Destructor
-    virtual ~ProjectionFiniteStrain() noexcept = default;
+    virtual ~ProjectionDefault() = default;
 
     //! Copy assignment operator
-    ProjectionFiniteStrain& operator=(const ProjectionFiniteStrain &other) = delete;
+    ProjectionDefault& operator=(const ProjectionDefault &other) = delete;
 
     //! Move assignment operator
-    ProjectionFiniteStrain& operator=(ProjectionFiniteStrain &&other) = default;
+    ProjectionDefault& operator=(ProjectionDefault &&other) = delete;
 
-    //! initialises the fft engine (plan the transform)
-    virtual void initialise(FFT_PlanFlags flags = FFT_PlanFlags::estimate) override final;
+    //! apply the projection operator to a field
+    void apply_projection(Field_t & field) override final;
+
 
   protected:
+    Proj_map Ghat;
   private:
   };
 
 }  // muSpectre
 
-#endif /* PROJECTION_FINITE_STRAIN_H */
+#endif /* PROJECTION_DEFAULT_H */

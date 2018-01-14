@@ -60,7 +60,7 @@ namespace muSpectre {
     ProjectionBase() = delete;
 
     //! Constructor with system sizes
-    ProjectionBase(FFT_Engine_ptr engine);
+    ProjectionBase(FFT_Engine_ptr engine, Formulation form);
 
     //! Copy constructor
     ProjectionBase(const ProjectionBase &other) = delete;
@@ -89,8 +89,11 @@ namespace muSpectre {
     const Rcoord & get_lengths() const {
       return this->fft_engine->get_lengths();}
 
+    const Formulation & get_formulation() const {return this->form;}
+
   protected:
     FFT_Engine_ptr fft_engine;
+    const Formulation form;
     LFieldCollection_t & projection_container{};
 
   private:

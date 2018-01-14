@@ -34,7 +34,7 @@
 #include "common/ccoord_operations.hh"
 #include "system/system_base.hh"
 #include "fft/projection_finite_strain_fast.hh"
-#include "fft/projection_finite_strain.hh"
+#include "fft/projection_small_strain.hh"
 #include "fft/fftw_engine.hh"
 
 #include <memory>
@@ -47,13 +47,30 @@ namespace muSpectre {
    * FFT_engine) to be used in a system constructor
    */
   template <Dim_t DimS, Dim_t DimM,
-            typename FFT_Engine=FFTW_Engine<DimS, DimM>,
-            typename Projection=ProjectionFiniteStrainFast<DimS, DimM>>
+            typename FFT_Engine=FFTW_Engine<DimS, DimM>>
   inline
-  std::unique_ptr<Projection> system_input(Ccoord_t<DimS> resolutions,
-                     Rcoord_t<DimS> lengths=CcoordOps::get_cube<DimS>(1.)) {
+  std::unique_ptr<ProjectionBase<DimS, DimM>>
+  system_input(Ccoord_t<DimS> resolutions,
+               Rcoord_t<DimS> lengths,
+               Formulation form) {
     auto fft_ptr{std::make_unique<FFT_Engine>(resolutions, lengths)};
-    return std::make_unique<Projection>(std::move(fft_ptr));
+    switch (form)
+      {
+      case Formulation::finite_strain: {
+        using Projection = ProjectionFiniteStrainFast<DimS, DimM>;
+        return std::make_unique<Projection>(std::move(fft_ptr));
+        break;
+      }
+      case Formulation::small_strain: {
+        using Projection = ProjectionSmallStrain<DimS, DimM>;
+        return std::make_unique<Projection>(std::move(fft_ptr));
+        break;
+      }
+      default: {
+        throw std::runtime_error("unknow formulation");
+        break;
+      }
+    }
   }
 
 
@@ -63,16 +80,14 @@ namespace muSpectre {
    */
   template <size_t DimS, size_t DimM=DimS,
             typename System=SystemBase<DimS, DimM>,
-            typename FFT_Engine=FFTW_Engine<DimS, DimM>,
-            typename Projection=ProjectionFiniteStrainFast<DimS, DimM>>
+            typename FFT_Engine=FFTW_Engine<DimS, DimM>>
   inline
   System make_system(Ccoord_t<DimS> resolutions,
-                     Rcoord_t<DimS> lengths=CcoordOps::get_cube<DimS>(1.),
-                     Formulation form=Formulation::finite_strain) {
-    return System{
-      std::move(system_input<DimS, DimM, FFT_Engine, Projection>
-                (resolutions, lengths)),
-        form};
+                     Rcoord_t<DimS> lengths,
+                     Formulation form) {
+
+    auto && input = system_input<DimS, DimM, FFT_Engine>(resolutions, lengths, form);
+    return System{std::move(input)};
   }
 
 }  // muSpectre

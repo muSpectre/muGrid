@@ -71,8 +71,7 @@ namespace muSpectre {
     SystemBase() = delete;
 
     //! constructor using sizes and resolution
-    SystemBase(Projection_ptr projection,
-               Formulation form=Formulation::finite_strain);
+    SystemBase(Projection_ptr projection);
 
     //! Copy constructor
     SystemBase(const SystemBase &other) = delete;
@@ -101,7 +100,7 @@ namespace muSpectre {
     FullResponse_t evaluate_stress_tangent(StrainField_t & F);
 
     /**
-     * evaluate directional stiffness (i.e. G:K:δF)
+     * evaluate directional stiffness (i.e. G:K:δF or G:K:δε)
      */
 
     StressField_t & directional_stiffness(const TangentField_t & K,
@@ -135,6 +134,12 @@ namespace muSpectre {
 
     const Ccoord & get_resolutions() const {return this->resolutions;}
     const Rcoord & get_lengths() const {return this->lengths;}
+
+    /**
+     * formulation is hard set by the choice of the projection class
+     */
+    const Formulation & get_formulation() const {
+      return this->projection->get_formulation();}
   protected:
     //! make sure that every pixel is assigned to one and only one material
     void check_material_coverage();
@@ -150,8 +155,8 @@ namespace muSpectre {
     optional<std::reference_wrapper<TangentField_t>> K{};
     std::vector<Material_ptr> materials{};
     Projection_ptr projection;
-    Formulation form;
     bool is_initialised{false};
+    const Formulation form;
   private:
   };
 

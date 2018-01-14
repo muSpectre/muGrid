@@ -36,10 +36,10 @@ sys.path.append(os.path.join(os.getcwd(), "src/language_bindings/python"))
 import pyMuSpectre as µ
 
 
-resolution = [5, 7]
+resolution = [3, 3]
 
-lengths = [5.2, 8.3]
-formulation = µ.Formulation.small_strain
+lengths = [3., 3.]
+formulation = µ.Formulation.finite_strain
 
 rve = µ.SystemFactory(resolution,
                       lengths,
@@ -56,13 +56,15 @@ for i, pixel in enumerate(rve):
     else:
         soft.add_pixel(pixel)
 
+    print("{}, {}".format(i, tuple(pixel)))
+
 rve.initialise()
 tol = 1e-6
 Del0 = np.array([[0, .1],
                  [0,  0]])
-maxiter = 100
+maxiter = 11
 verbose = 2
 # the following segfaults:
-r = µ.solvers.de_geus2d(rve, Del0, formulation,
+µ.solvers.de_geus2d(rve, Del0, formulation,
                         tol, tol, maxiter, verbose)
-print(r)
+#print(r.eigen().T)

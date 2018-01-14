@@ -37,7 +37,7 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   ProjectionFiniteStrainFast<DimS, DimM>::
   ProjectionFiniteStrainFast(FFT_Engine_ptr engine)
-    :Parent{std::move(engine)},
+    :Parent{std::move(engine), Formulation::finite_strain},
      xis{make_field<Proj_t>("Projection Operator",
                             this->projection_container)}
   {}

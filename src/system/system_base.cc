@@ -40,8 +40,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  SystemBase<DimS, DimM>::SystemBase(Projection_ptr projection_,
-                                     Formulation form)
+  SystemBase<DimS, DimM>::SystemBase(Projection_ptr projection_)
     :resolutions{projection_->get_resolutions()},
      pixels(resolutions),
      lengths{projection_->get_lengths()},
@@ -49,7 +48,7 @@ namespace muSpectre {
      F{make_field<StrainField_t>("Gradient", this->fields)},
      P{make_field<StressField_t>("Piola-Kirchhoff-1", this->fields)},
      projection{std::move(projection_)},
-     form{form}
+     form{projection->get_formulation()}
   { }
 
   /* ---------------------------------------------------------------------- */

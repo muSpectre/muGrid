@@ -55,25 +55,23 @@ void add_newton_cg_helper(py::module & mod) {
   using grad_vec = Grad_t<sdim>;
 
   mod.def(name_stream.str().c_str(),
-          [](sys & s, const grad & g, Formulation f, Real ct, Real nt,
+          [](sys & s, const grad & g, Real ct, Real nt,
              Uint max, Dim_t verb) -> typename sys::StrainField_t & {
-            return newton_cg(s, g, f, ct, nt, max, verb);
+            return newton_cg(s, g, ct, nt, max, verb);
           },
           "system"_a,
           "ΔF₀"_a,
-          "formulation"_a,
           "cg_tol"_a,
           "newton_tol"_a,
           "maxiter"_a=0,
           "verbose"_a=0);
   mod.def(name_stream.str().c_str(),
-          [](sys & s, const grad_vec & g, Formulation f, Real ct, Real nt,
+          [](sys & s, const grad_vec & g, Real ct, Real nt,
              Uint max, Dim_t verb) -> typename sys::StrainField_t & {
-            return newton_cg(s, g, f, ct, nt, max, verb);
+            return newton_cg(s, g, ct, nt, max, verb);
           },
           "system"_a,
           "ΔF₀"_a,
-          "formulation"_a,
           "cg_tol"_a,
           "newton_tol"_a,
           "maxiter"_a=0,
@@ -91,25 +89,23 @@ void add_de_geus_helper(py::module & mod) {
   using grad_vec = Grad_t<sdim>;
 
   mod.def(name_stream.str().c_str(),
-          [](sys & s, const grad & g, Formulation f, Real ct, Real nt,
+          [](sys & s, const grad & g, Real ct, Real nt,
              Uint max, Dim_t verb) -> typename sys::StrainField_t & {
-            return de_geus(s, g, f, ct, nt, max, verb);
+            return de_geus(s, g, ct, nt, max, verb);
           },
           "system"_a,
           "ΔF₀"_a,
-          "formulation"_a,
           "cg_tol"_a,
           "newton_tol"_a,
           "maxiter"_a=0,
           "verbose"_a=0);
   mod.def(name_stream.str().c_str(),
-          [](sys & s, const grad_vec & g, Formulation f, Real ct, Real nt,
+          [](sys & s, const grad_vec & g, Real ct, Real nt,
              Uint max, Dim_t verb) -> typename sys::StrainField_t & {
-            return de_geus(s, g, f, ct, nt, max, verb);
+            return de_geus(s, g, ct, nt, max, verb);
           },
           "system"_a,
           "ΔF₀"_a,
-          "formulation"_a,
           "cg_tol"_a,
           "newton_tol"_a,
           "maxiter"_a=0,

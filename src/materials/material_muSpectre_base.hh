@@ -306,8 +306,8 @@ namespace muSpectre {
       auto & this_mat = static_cast<Material&>(*this);
 
       // Transformation gradient is first in the strains tuple
-      auto && F = std::get<0>(Strains);
-      auto && strain = MatTB::convert_strain<stored_strain_m, expected_strain_m>(F);
+      auto && grad = std::get<0>(Strains);
+      auto && strain = MatTB::convert_strain<stored_strain_m, expected_strain_m>(grad);
 
       // TODO: Figure this out: I can't std::move(internals...),
       // because if there are no internals, compilation fails with "no
@@ -326,7 +326,7 @@ namespace muSpectre {
       auto && stress = std::get<0>(stress_tgt);
       auto && tangent = std::get<1>(stress_tgt);
       Stresses = MatTB::PK1_stress<Material::stress_measure, Material::strain_measure>
-      (std::move(F), std::move(stress), std::move(tangent));
+      (std::move(grad), std::move(stress), std::move(tangent));
     };
 
     iterable_proxy<NeedTangent::yes> fields{*this, F, P, K};
