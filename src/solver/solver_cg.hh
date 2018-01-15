@@ -62,10 +62,10 @@ namespace muSpectre {
     SolverCG(const SolverCG &other) = delete;
 
     //! Move constructor
-    SolverCG(SolverCG &&other) noexcept = default;
+    SolverCG(SolverCG &&other) = default;
 
     //! Destructor
-    virtual ~SolverCG() noexcept = default;
+    virtual ~SolverCG() = default;
 
     //! Copy assignment operator
     SolverCG& operator=(const SolverCG &other) = delete;

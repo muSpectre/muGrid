@@ -88,7 +88,7 @@ namespace muSpectre {
     FFT_freqs(FFT_freqs &&other)  = default;
 
     //! Destructor
-    virtual ~FFT_freqs() noexcept = default;
+    virtual ~FFT_freqs() = default;
 
     //! Copy assignment operator
     FFT_freqs& operator=(const FFT_freqs &other) = delete;

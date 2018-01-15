@@ -67,8 +67,9 @@ add_external_package(pybind11 VERSION 2.2 CONFIG)
 #find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 
 include_directories(
-  tests
-  src
+  ${CMAKE_SOURCE_DIR}/tests
+  ${CMAKE_SOURCE_DIR}/src
+  ${CMAKE_SOURCE_DIR}
   )
 
 #find_package(MPI REQUIRED)
@@ -89,7 +90,10 @@ add_test(main_test_suite main_test_suite --report_level=detailed --build_info=TR
 # compile the library
 add_compile_options( -Werror)
 add_subdirectory(
-  "${CMAKE_SOURCE_DIR}/src/"
+  ${CMAKE_SOURCE_DIR}/src/
+  )
+add_subdirectory(
+  ${CMAKE_SOURCE_DIR}/language_bindings/
   )
 
 

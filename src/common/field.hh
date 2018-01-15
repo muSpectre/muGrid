@@ -97,16 +97,16 @@ namespace muSpectre {
       FieldBase(const FieldBase &other) = delete;
 
       //! Move constructor
-      FieldBase(FieldBase &&other) noexcept = delete;
+      FieldBase(FieldBase &&other) = delete;
 
       //! Destructor
-      virtual ~FieldBase() noexcept = default;
+      virtual ~FieldBase() = default;
 
       //! Copy assignment operator
       FieldBase& operator=(const FieldBase &other) = delete;
 
       //! Move assignment operator
-      FieldBase& operator=(FieldBase &&other) noexcept = delete;
+      FieldBase& operator=(FieldBase &&other) = delete;
 
       /* ---------------------------------------------------------------------- */
       //!Identifying accessors
@@ -142,6 +142,50 @@ namespace muSpectre {
     };
 
 
+    /**
+     * dummy intermediate class to provide a run-time polymorphic
+     * typed field. Mainly for binding python
+     */
+    template <class FieldCollection, typename T>
+    class TypedFieldBase: public FieldBase<FieldCollection>
+    {
+    public:
+      using Parent = FieldBase<FieldCollection>;
+      using collection_t = typename Parent::collection_t;
+      using Scalar = T;
+      using Base = Parent;
+      using EigenRep = Eigen::Array<T, Eigen::Dynamic, Eigen::Dynamic>;
+      using EigenMap = Eigen::Map<EigenRep>;
+      //! Default constructor
+      TypedFieldBase() = delete;
+
+      TypedFieldBase(std::string unique_name,
+                     size_t nb_components,
+                     FieldCollection& collection);
+
+      //! Copy constructor
+      TypedFieldBase(const TypedFieldBase &other) = delete;
+
+      //! Move constructor
+      TypedFieldBase(TypedFieldBase &&other) = delete;
+
+      //! Destructor
+      virtual ~TypedFieldBase() = default;
+
+      //! Copy assignment operator
+      TypedFieldBase& operator=(const TypedFieldBase &other) = delete;
+
+      //! Move assignment operator
+      TypedFieldBase& operator=(TypedFieldBase &&other) = delete;
+
+      //! return type_id of stored type
+      virtual const std::type_info & get_stored_typeid() const override final;
+
+
+    protected:
+    private:
+    };
+
     /* ---------------------------------------------------------------------- */
     //! declaraton for friending
     template <class FieldCollection, typename T, Dim_t NbComponents, bool isConst>
@@ -150,16 +194,16 @@ namespace muSpectre {
     /* ---------------------------------------------------------------------- */
     template <class FieldCollection, typename T, Dim_t NbComponents,
               bool ArrayStore=false>
-    class TypedFieldBase: public FieldBase<FieldCollection>
+    class TypedSizedFieldBase: public TypedFieldBase<FieldCollection, T>
     {
       friend class FieldMap<FieldCollection, T, NbComponents, true>;
       friend class FieldMap<FieldCollection, T, NbComponents, false>;
     public:
       constexpr static auto nb_components{NbComponents};
-      using Parent = FieldBase<FieldCollection>;
+      using Parent = TypedFieldBase<FieldCollection, T>;
       using collection_t = typename Parent::collection_t;
       using Scalar = T;
-      using Base = Parent;
+      using Base = typename Parent::Base;
       //using storage_type = Eigen::Array<T, Eigen::Dynamic, NbComponents>;
       using StoredType = Eigen::Array<T, NbComponents, 1>;
       using StorageType = std::conditional_t
@@ -181,11 +225,9 @@ namespace muSpectre {
                    Eigen::OuterStride<sizeof(StoredType)/sizeof(T)>>,
         Eigen::Map<const EigenRep>>;
 
-      TypedFieldBase(std::string unique_name,
+      TypedSizedFieldBase(std::string unique_name,
                      FieldCollection& collection);
-      virtual ~TypedFieldBase() = default;
-      //! return type_id of stored type
-      virtual const std::type_info & get_stored_typeid() const override final;
+      virtual ~TypedSizedFieldBase() = default;
 
       //! initialise field to zero (do more complicated initialisations through
       //! fully typed maps)
@@ -201,8 +243,8 @@ namespace muSpectre {
       //! scalars/NbComponents)
       size_t size() const override final;
 
-      static TypedFieldBase & check_ref(Parent & other);
-      static const TypedFieldBase & check_ref(const Base & parent);
+      static TypedSizedFieldBase & check_ref(Base & other);
+      static const TypedSizedFieldBase & check_ref(const Base & parent);
 
       inline T* data() {return this->get_ptr_to_entry(0);}
       inline const T* data() const {return this->get_ptr_to_entry(0);}
@@ -211,7 +253,7 @@ namespace muSpectre {
       inline ConstEigenMap eigen() const;
 
       template<typename otherT>
-      inline Real inner_product(const TypedFieldBase<FieldCollection, otherT, NbComponents,
+      inline Real inner_product(const TypedSizedFieldBase<FieldCollection, otherT, NbComponents,
                                 ArrayStore> & other) const;
     protected:
 
@@ -238,12 +280,12 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <class FieldCollection, typename T, Dim_t order, Dim_t dim>
-  class TensorField: public internal::TypedFieldBase<FieldCollection,
+  class TensorField: public internal::TypedSizedFieldBase<FieldCollection,
                                                      T,
                                                      ipow(dim,order)>
   {
   public:
-    using Parent = internal::TypedFieldBase<FieldCollection,
+    using Parent = internal::TypedSizedFieldBase<FieldCollection,
                                             T,
                                             ipow(dim,order)>;
     using Base = typename Parent::Base;
@@ -254,16 +296,16 @@ namespace muSpectre {
     TensorField(const TensorField &other) = delete;
 
     //! Move constructor
-    TensorField(TensorField &&other) noexcept = delete;
+    TensorField(TensorField &&other) = delete;
 
     //! Destructor
-    virtual ~TensorField() noexcept = default;
+    virtual ~TensorField() = default;
 
     //! Copy assignment operator
     TensorField& operator=(const TensorField &other) = delete;
 
     //! Move assignment operator
-    TensorField& operator=(TensorField &&other) noexcept = delete;
+    TensorField& operator=(TensorField &&other) = delete;
 
     //! accessors
     inline Dim_t get_order() const;
@@ -299,12 +341,12 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <class FieldCollection, typename T, Dim_t NbRow, Dim_t NbCol=NbRow>
-  class MatrixField: public internal::TypedFieldBase<FieldCollection,
+  class MatrixField: public internal::TypedSizedFieldBase<FieldCollection,
                                                      T,
                                                      NbRow*NbCol>
   {
   public:
-    using Parent = internal::TypedFieldBase<FieldCollection,
+    using Parent = internal::TypedSizedFieldBase<FieldCollection,
                                             T,
                                             NbRow*NbCol>;
     using Base = typename Parent::Base;
@@ -314,16 +356,16 @@ namespace muSpectre {
     MatrixField(const MatrixField &other) = delete;
 
     //! Move constructor
-    MatrixField(MatrixField &&other) noexcept = delete;
+    MatrixField(MatrixField &&other) = delete;
 
     //! Destructor
-    virtual ~MatrixField() noexcept = default;
+    virtual ~MatrixField() = default;
 
     //! Copy assignment operator
     MatrixField& operator=(const MatrixField &other) = delete;
 
     //! Move assignment operator
-    MatrixField& operator=(MatrixField &&other) noexcept = delete;
+    MatrixField& operator=(MatrixField &&other) = delete;
 
     //! accessors
     inline Dim_t get_nb_row() const;
@@ -388,37 +430,45 @@ protected:
     }
 
     /* ---------------------------------------------------------------------- */
-    template <class FieldCollection, typename T, Dim_t NbComponents, bool ArrayStore>
-    TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
-    TypedFieldBase(std::string unique_name, FieldCollection & collection)
-      :FieldBase<FieldCollection>(unique_name, NbComponents, collection){
-      static_assert
-        ((std::is_arithmetic<T>::value ||
-          std::is_same<T, Complex>::value),
-         "Use TypedFieldBase for integer, real or complex scalars for T");
-      static_assert(NbComponents > 0,
-                    "Only fields with more than 0 components");
-    }
+    template <class FieldCollection, typename T>
+    TypedFieldBase<FieldCollection, T>::
+    TypedFieldBase(std::string unique_name, size_t nb_components,
+                   FieldCollection & collection)
+      :Parent(unique_name, nb_components, collection)
+    {}
 
     /* ---------------------------------------------------------------------- */
     //! return type_id of stored type
-    template <class FieldCollection, typename T, Dim_t NbComponents, bool ArrayStore>
-    const std::type_info & TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
+    template <class FieldCollection, typename T>
+    const std::type_info & TypedFieldBase<FieldCollection, T>::
     get_stored_typeid() const {
       return typeid(T);
     }
 
     /* ---------------------------------------------------------------------- */
+    template <class FieldCollection, typename T, Dim_t NbComponents, bool ArrayStore>
+    TypedSizedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
+    TypedSizedFieldBase(std::string unique_name, FieldCollection & collection)
+      :Parent(unique_name, NbComponents, collection){
+      static_assert
+        ((std::is_arithmetic<T>::value ||
+          std::is_same<T, Complex>::value),
+         "Use TypedSizedFieldBase for integer, real or complex scalars for T");
+      static_assert(NbComponents > 0,
+                    "Only fields with more than 0 components");
+    }
+
+    /* ---------------------------------------------------------------------- */
     template<class FieldCollection, typename T, Dim_t NbComponents, bool ArrayStore>
     void
-    TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
+    TypedSizedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
     set_zero() {
       std::fill(this->values.begin(), this->values.end(), T{});
     }
 
     /* ---------------------------------------------------------------------- */
     template <class FieldCollection, typename T, Dim_t NbComponents, bool ArrayStore>
-    size_t TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
+    size_t TypedSizedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
     size() const {
       if (ArrayStore) {
         return this->values.size();
@@ -429,8 +479,8 @@ protected:
 
     /* ---------------------------------------------------------------------- */
     template <class FieldCollection, typename T, Dim_t NbComponents, bool ArrayStore>
-    TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore> &
-    TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
+    TypedSizedFieldBase<FieldCollection, T, NbComponents, ArrayStore> &
+    TypedSizedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
     check_ref(Base & other) {
       if (typeid(T).hash_code() != other.get_stored_typeid().hash_code()) {
         std::string err ="Cannot create a Reference of requested type " +(
@@ -447,14 +497,14 @@ protected:
            "for field '" + other.get_name() + "' with " +
            std::to_string(other.get_nb_components()) + " components");
       }
-      return static_cast<TypedFieldBase&>(other);
+      return static_cast<TypedSizedFieldBase&>(other);
     }
 
     /* ---------------------------------------------------------------------- */
     template <class FieldCollection, typename T, Dim_t NbComponents,
               bool ArrayStore>
-    const TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore> &
-    TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
+    const TypedSizedFieldBase<FieldCollection, T, NbComponents, ArrayStore> &
+    TypedSizedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
     check_ref(const Base & other) {
       if (typeid(T).hash_code() != other.get_stored_typeid().hash_code()) {
         std::stringstream err_str{};
@@ -472,14 +522,14 @@ protected:
            "for field '" + other.get_name() + "' with " +
            std::to_string(other.get_nb_components()) + " components");
       }
-      return static_cast<const TypedFieldBase&>(other);
+      return static_cast<const TypedSizedFieldBase&>(other);
     }
 
     /* ---------------------------------------------------------------------- */
     template <class FieldCollection, typename T, Dim_t NbComponents,
               bool ArrayStore>
-    typename TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::EigenMap
-    TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
+    typename TypedSizedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::EigenMap
+    TypedSizedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
     eigen() {
       return EigenMap(this->data(), NbComponents, this->size());
     }
@@ -487,8 +537,8 @@ protected:
     /* ---------------------------------------------------------------------- */
     template <class FieldCollection, typename T, Dim_t NbComponents,
               bool ArrayStore>
-    typename TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::ConstEigenMap
-    TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
+    typename TypedSizedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::ConstEigenMap
+    TypedSizedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
     eigen() const {
       return ConstEigenMap(this->data(), NbComponents, this->size());
     }
@@ -498,8 +548,8 @@ protected:
               bool ArrayStore>
     template<typename otherT>
     Real
-    TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
-    inner_product(const TypedFieldBase<FieldCollection, otherT, NbComponents,
+    TypedSizedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
+    inner_product(const TypedSizedFieldBase<FieldCollection, otherT, NbComponents,
                   ArrayStore> & other) const {
       return (this->eigen() * other.eigen()).sum();
     }
@@ -509,7 +559,7 @@ protected:
     template <class FieldCollection, typename T, Dim_t NbComponents, bool ArrayStore>
     template <bool isArray>
     std::enable_if_t<isArray, T*>
-    TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
+    TypedSizedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
     get_ptr_to_entry(const size_t&& index) {
       static_assert (isArray == ArrayStore, "SFINAE");
       return &this->values[std::move(index)](0, 0);
@@ -518,7 +568,7 @@ protected:
     /* ---------------------------------------------------------------------- */
     template <class FieldCollection, typename T, Dim_t NbComponents, bool ArrayStore>
     template <bool noArray>
-    T* TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
+    T* TypedSizedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
     get_ptr_to_entry(std::enable_if_t<noArray, const size_t&&> index) {
       static_assert (noArray != ArrayStore, "SFINAE");
       return &this->values[NbComponents*std::move(index)];
@@ -528,7 +578,7 @@ protected:
     template <class FieldCollection, typename T, Dim_t NbComponents, bool ArrayStore>
     template <bool isArray>
     std::enable_if_t<isArray, const T*>
-    TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
+    TypedSizedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
     get_ptr_to_entry(const size_t&& index) const {
       static_assert (isArray == ArrayStore, "SFINAE");
       return &this->values[std::move(index)](0, 0);
@@ -537,7 +587,7 @@ protected:
     /* ---------------------------------------------------------------------- */
     template <class FieldCollection, typename T, Dim_t NbComponents, bool ArrayStore>
     template <bool noArray>
-    const T* TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
+    const T* TypedSizedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
     get_ptr_to_entry(std::enable_if_t<noArray, const size_t&&> index) const {
       static_assert (noArray != ArrayStore, "SFINAE");
       return &this->values[NbComponents*std::move(index)];
@@ -545,7 +595,7 @@ protected:
 
     /* ---------------------------------------------------------------------- */
     template <class FieldCollection, typename T, Dim_t NbComponents, bool ArrayStore>
-    void TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
+    void TypedSizedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
     resize(size_t size) {
       if (ArrayStore) {
         this->values.resize(size);
@@ -558,7 +608,7 @@ protected:
     template <class FieldCollection, typename T, Dim_t NbComponents, bool ArrayStore>
     template <bool isArrayStore>
     void
-    TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
+    TypedSizedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
     push_back(const std::enable_if_t<isArrayStore,StoredType> & value) {
       static_assert(isArrayStore == ArrayStore, "SFINAE");
       this->values.push_back(value);
@@ -568,7 +618,7 @@ protected:
     template <class FieldCollection, typename T, Dim_t NbComponents, bool ArrayStore>
     template <bool componentStore>
     std::enable_if_t<componentStore>
-    TypedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
+    TypedSizedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
     push_back(const StoredType & value) {
       static_assert(componentStore != ArrayStore, "SFINAE");
       for (Dim_t i = 0; i < NbComponents; ++i) {

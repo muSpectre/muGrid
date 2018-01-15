@@ -66,7 +66,7 @@ namespace muSpectre {
     ProjectionFiniteStrain(ProjectionFiniteStrain &&other) = default;
 
     //! Destructor
-    virtual ~ProjectionFiniteStrain() noexcept = default;
+    virtual ~ProjectionFiniteStrain() = default;
 
     //! Copy assignment operator
     ProjectionFiniteStrain& operator=(const ProjectionFiniteStrain &other) = delete;

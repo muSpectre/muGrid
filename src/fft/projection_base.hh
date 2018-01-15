@@ -66,16 +66,16 @@ namespace muSpectre {
     ProjectionBase(const ProjectionBase &other) = delete;
 
     //! Move constructor
-    ProjectionBase(ProjectionBase &&other) noexcept = default;
+    ProjectionBase(ProjectionBase &&other) = default;
 
     //! Destructor
-    virtual ~ProjectionBase() noexcept = default;
+    virtual ~ProjectionBase() = default;
 
     //! Copy assignment operator
     ProjectionBase& operator=(const ProjectionBase &other) = delete;
 
     //! Move assignment operator
-    ProjectionBase& operator=(ProjectionBase &&other) noexcept = default;
+    ProjectionBase& operator=(ProjectionBase &&other) = default;
 
     //! initialises the fft engine (plan the transform)
     virtual void initialise(FFT_PlanFlags flags = FFT_PlanFlags::estimate);

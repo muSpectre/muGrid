@@ -67,16 +67,16 @@ namespace muSpectre {
     MaterialBase(const MaterialBase &other) = delete;
 
     //! Move constructor
-    MaterialBase(MaterialBase &&other) noexcept = delete;
+    MaterialBase(MaterialBase &&other) = delete;
 
     //! Destructor
-    virtual ~MaterialBase() noexcept = default;
+    virtual ~MaterialBase() = default;
 
     //! Copy assignment operator
     MaterialBase& operator=(const MaterialBase &other) = delete;
 
     //! Move assignment operator
-    MaterialBase& operator=(MaterialBase &&other) noexcept = delete;
+    MaterialBase& operator=(MaterialBase &&other) = delete;
 
 
     /**

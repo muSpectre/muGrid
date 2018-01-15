@@ -190,11 +190,13 @@ namespace muSpectre {
     BOOST_CHECK_NO_THROW(F::fc.initialise());
   }
 
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(init_test_loca_with_push_back, F, mult_collections_f, F) {
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(init_test_loca_with_push_back, F,
+                                   mult_collections_f, F) {
     constexpr auto mdim = F::mdim();
     constexpr int nb_pix = 7;
     testGoodies::RandRange<Int> rng;
-    using ftype = internal::TypedFieldBase<decltype(F::fc), Real,  mdim*mdim*mdim*mdim>;
+    using ftype = internal::TypedSizedFieldBase<
+      decltype(F::fc), Real,  mdim*mdim*mdim*mdim>;
     using stype = Eigen::Array<Real, mdim*mdim*mdim*mdim, 1>;
     auto & field = reinterpret_cast<ftype&>(F::fc["Tensorfield Real o4"]);
     field.push_back(stype());

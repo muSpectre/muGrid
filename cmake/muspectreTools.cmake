@@ -174,7 +174,7 @@ function(add_external_package package)
   include(CMakeParseArguments)
 
   set(_cmake_includes ${PROJECT_SOURCE_DIR}/cmake)
-  set(_${package}_external_dir ${PROJECT_SOURCE_DIR}/src/external)
+  set(_${package}_external_dir ${PROJECT_BINARY_DIR}/external)
 
   set(_aep_flags
     IGNORE_SYSTEM

@@ -81,7 +81,7 @@ namespace muSpectre {
       using size_type = typename Parent::size_type;
       using pointer = std::unique_ptr<EigenArray>;
       using TypedField = typename Parent::TypedField;
-      using Field = typename TypedField::Parent;
+      using Field = typename TypedField::Base;
       using const_iterator= typename Parent::template iterator<MatrixLikeFieldMap, true>;
       using iterator = std::conditional_t<
         ConstField,
@@ -111,22 +111,22 @@ namespace muSpectre {
        * type of the field might not be known at compile time.
        */
       template<class FC, typename T2, Dim_t NbC>
-      MatrixLikeFieldMap(TypedFieldBase<FC, T2, NbC> & field);
+      MatrixLikeFieldMap(TypedSizedFieldBase<FC, T2, NbC> & field);
 
       //! Copy constructor
       MatrixLikeFieldMap(const MatrixLikeFieldMap &other) = default;
 
       //! Move constructor
-      MatrixLikeFieldMap(MatrixLikeFieldMap &&other) noexcept = default;
+      MatrixLikeFieldMap(MatrixLikeFieldMap &&other) = default;
 
       //! Destructor
-      virtual ~MatrixLikeFieldMap() noexcept = default;
+      virtual ~MatrixLikeFieldMap()  = default;
 
       //! Copy assignment operator
       MatrixLikeFieldMap& operator=(const MatrixLikeFieldMap &other) = delete;
 
       //! Move assignment operator
-      MatrixLikeFieldMap& operator=(MatrixLikeFieldMap &&other) noexcept = delete;
+      MatrixLikeFieldMap& operator=(MatrixLikeFieldMap &&other) = delete;
 
       //! Assign a matrixlike value to every entry
       template <class Derived>
@@ -202,7 +202,7 @@ namespace muSpectre {
     template<class FC, typename T2, Dim_t NbC>
     MatrixLikeFieldMap<FieldCollection, EigenArray, EigenConstArray,
                        EigenPlain, map_type, ConstField>::
-    MatrixLikeFieldMap(TypedFieldBase<FC, T2, NbC> & field)
+    MatrixLikeFieldMap(TypedSizedFieldBase<FC, T2, NbC> & field)
       :Parent(field) {
     }
 

@@ -62,7 +62,7 @@ namespace muSpectre {
     using size_type = typename Parent::size_type;
     using pointer = std::unique_ptr<value_type>;
     using TypedField = typename Parent::TypedField;
-    using Field = typename TypedField::Parent;
+    using Field = typename TypedField::Base;
     using const_iterator = typename Parent::template iterator<TensorFieldMap, true>;
     using iterator = std::conditional_t<
       ConstField,
@@ -84,10 +84,10 @@ namespace muSpectre {
     TensorFieldMap(const TensorFieldMap &other) = default;
 
     //! Move constructor
-    TensorFieldMap(TensorFieldMap &&other) noexcept = default;
+    TensorFieldMap(TensorFieldMap &&other) = default;
 
     //! Destructor
-    virtual ~TensorFieldMap() noexcept = default;
+    virtual ~TensorFieldMap() = default;
 
     //! Copy assignment operator
     TensorFieldMap& operator=(const TensorFieldMap &other) = delete;
@@ -96,7 +96,7 @@ namespace muSpectre {
     inline TensorFieldMap & operator=(const T_t & val);
 
     //! Move assignment operator
-    TensorFieldMap& operator=(TensorFieldMap &&other) noexcept = delete;
+    TensorFieldMap& operator=(TensorFieldMap &&other) = delete;
 
     //! give human-readable field map type
     inline std::string info_string() const override final;

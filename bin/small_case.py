@@ -39,7 +39,7 @@ import pyMuSpectre as µ
 resolution = [3, 3]
 
 lengths = [3., 3.]
-formulation = µ.Formulation.small_strain
+formulation = µ.Formulation.finite_strain
 
 rve = µ.SystemFactory(resolution,
                       lengths,

@@ -70,16 +70,16 @@ namespace muSpectre {
       ScalarFieldMap(const ScalarFieldMap &other) = default;
 
       //! Move constructor
-      ScalarFieldMap(ScalarFieldMap &&other) noexcept = default;
+      ScalarFieldMap(ScalarFieldMap &&other) = default;
 
       //! Destructor
-      virtual ~ScalarFieldMap() noexcept = default;
+      virtual ~ScalarFieldMap() = default;
 
       //! Copy assignment operator
       ScalarFieldMap& operator=(const ScalarFieldMap &other) = delete;
 
       //! Move assignment operator
-      ScalarFieldMap& operator=(ScalarFieldMap &&other) noexcept = delete;
+      ScalarFieldMap& operator=(ScalarFieldMap &&other) = delete;
 
       //! Assign a value to every entry
       ScalarFieldMap& operator=(T val);

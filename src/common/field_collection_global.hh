@@ -58,10 +58,10 @@ namespace muSpectre {
 
     //! Move constructor
     GlobalFieldCollection
-      (GlobalFieldCollection &&other) noexcept = default;
+      (GlobalFieldCollection &&other) = default;
 
     //! Destructor
-    virtual ~GlobalFieldCollection() noexcept = default;
+    virtual ~GlobalFieldCollection()  = default;
 
     //! Copy assignment operator
     GlobalFieldCollection&

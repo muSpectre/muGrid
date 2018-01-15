@@ -59,16 +59,16 @@ namespace muSpectre {
     FFT_Engine_base(const FFT_Engine_base &other) = delete;
 
     //! Move constructor
-    FFT_Engine_base(FFT_Engine_base &&other) noexcept = default;
+    FFT_Engine_base(FFT_Engine_base &&other) = default;
 
     //! Destructor
-    virtual ~FFT_Engine_base() noexcept = default;
+    virtual ~FFT_Engine_base() = default;
 
     //! Copy assignment operator
     FFT_Engine_base& operator=(const FFT_Engine_base &other) = delete;
 
     //! Move assignment operator
-    FFT_Engine_base& operator=(FFT_Engine_base &&other) noexcept = default;
+    FFT_Engine_base& operator=(FFT_Engine_base &&other) = default;
 
     // compute the plan, etc
     virtual void initialise(FFT_PlanFlags /*plan_flags*/);

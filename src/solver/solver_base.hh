@@ -62,7 +62,7 @@ namespace muSpectre {
     SolverBase(SolverBase &&other) = default;
 
     //! Destructor
-    virtual ~SolverBase() noexcept = default;
+    virtual ~SolverBase() = default;
 
     //! Copy assignment operator
     SolverBase& operator=(const SolverBase &other) = delete;

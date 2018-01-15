@@ -56,16 +56,16 @@ namespace muSpectre {
     LocalFieldCollection(const LocalFieldCollection &other) = delete;
 
     //! Move constructor
-    LocalFieldCollection(LocalFieldCollection &&other) noexcept = delete;
+    LocalFieldCollection(LocalFieldCollection &&other) = delete;
 
     //! Destructor
-    virtual ~LocalFieldCollection() noexcept = default;
+    virtual ~LocalFieldCollection()  = default;
 
     //! Copy assignment operator
     LocalFieldCollection& operator=(const LocalFieldCollection &other) = delete;
 
     //! Move assignment operator
-    LocalFieldCollection& operator=(LocalFieldCollection &&other) noexcept = delete;
+    LocalFieldCollection& operator=(LocalFieldCollection &&other) = delete;
 
     //! add a pixel/voxel to the field collection
     inline void add_pixel(const Ccoord & local_ccoord);

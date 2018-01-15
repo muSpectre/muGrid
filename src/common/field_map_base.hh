@@ -65,12 +65,12 @@ namespace muSpectre {
     {
     public:
       constexpr static auto nb_components{NbComponents};
-      using TypedField_nc = TypedFieldBase
+      using TypedField_nc = TypedSizedFieldBase
         <FieldCollection, T, NbComponents>;
       using TypedField = std::conditional_t<ConstField,
                                             const TypedField_nc,
                                             TypedField_nc>;
-      using Field = typename TypedField::Parent;
+      using Field = typename TypedField::Base;
       using size_type = std::size_t;
       using pointer = std::conditional_t<ConstField,
                                          const T*,
@@ -84,22 +84,22 @@ namespace muSpectre {
       FieldMap(std::enable_if_t<isConst, const Field &> field);
 
       template<class FC, typename T2, Dim_t NbC>
-      FieldMap(TypedFieldBase<FC, T2, NbC> & field);
+      FieldMap(TypedSizedFieldBase<FC, T2, NbC> & field);
 
       //! Copy constructor
       FieldMap(const FieldMap &other) = default;
 
       //! Move constructor
-      FieldMap(FieldMap &&other) noexcept = default;
+      FieldMap(FieldMap &&other) = default;
 
       //! Destructor
-      virtual ~FieldMap() noexcept = default;
+      virtual ~FieldMap() = default;
 
       //! Copy assignment operator
       FieldMap& operator=(const FieldMap &other) = delete;
 
       //! Move assignment operator
-      FieldMap& operator=(FieldMap &&other) noexcept = delete;
+      FieldMap& operator=(FieldMap &&other) = delete;
 
       //! give human-readable field map type
       virtual std::string info_string() const = 0;
@@ -158,16 +158,16 @@ namespace muSpectre {
         iterator(const iterator &other)= default;
 
         //! Move constructor
-        iterator(iterator &&other) noexcept = default;
+        iterator(iterator &&other) = default;
 
         //! Destructor
-        virtual ~iterator() noexcept = default;
+        virtual ~iterator() = default;
 
         //! Copy assignment operator
         iterator& operator=(const iterator &other) = default;
 
         //! Move assignment operator
-        iterator& operator=(iterator &&other) noexcept = default;
+        iterator& operator=(iterator &&other) = default;
 
         //! pre-increment
         inline iterator & operator++();
@@ -261,7 +261,7 @@ namespace muSpectre {
     template <class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
     template <class FC, typename T2, Dim_t NbC>
     FieldMap<FieldCollection, T, NbComponents, ConstField>::
-    FieldMap(TypedFieldBase<FC, T2, NbC> & field)
+    FieldMap(TypedSizedFieldBase<FC, T2, NbC> & field)
       :collection(field.get_collection()), field(static_cast<TypedField&>(field)) {
       static_assert(std::is_same<FC, FieldCollection>::value,
                     "The field does not have the expected FieldCollection type");

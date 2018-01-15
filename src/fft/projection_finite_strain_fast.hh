@@ -63,10 +63,10 @@ namespace muSpectre {
     ProjectionFiniteStrainFast(const ProjectionFiniteStrainFast &other) = delete;
 
     //! Move constructor
-    ProjectionFiniteStrainFast(ProjectionFiniteStrainFast &&other) noexcept = default;
+    ProjectionFiniteStrainFast(ProjectionFiniteStrainFast &&other) = default;
 
     //! Destructor
-    virtual ~ProjectionFiniteStrainFast() noexcept = default;
+    virtual ~ProjectionFiniteStrainFast() = default;
 
     //! Copy assignment operator
     ProjectionFiniteStrainFast& operator=(const ProjectionFiniteStrainFast &other) = delete;

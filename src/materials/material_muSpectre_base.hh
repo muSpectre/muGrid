@@ -93,10 +93,10 @@ namespace muSpectre {
     MaterialMuSpectre(const MaterialMuSpectre &other) = delete;
 
     //! Move constructor
-    MaterialMuSpectre(MaterialMuSpectre &&other) noexcept = delete;
+    MaterialMuSpectre(MaterialMuSpectre &&other) = delete;
 
     //! Destructor
-    virtual ~MaterialMuSpectre() noexcept = default;
+    virtual ~MaterialMuSpectre() = default;
 
     //! Factory
     template <class... ConstructorArgs>
@@ -107,7 +107,7 @@ namespace muSpectre {
     MaterialMuSpectre& operator=(const MaterialMuSpectre &other) = delete;
 
     //! Move assignment operator
-    MaterialMuSpectre& operator=(MaterialMuSpectre &&other) noexcept = delete;
+    MaterialMuSpectre& operator=(MaterialMuSpectre &&other) = delete;
 
 
     //* allocate memory, etc
@@ -532,10 +532,10 @@ namespace muSpectre {
     iterable_proxy(const iterable_proxy &other) = default;
 
     //! Move constructor
-    iterable_proxy(iterable_proxy &&other) noexcept = default;
+    iterable_proxy(iterable_proxy &&other) = default;
 
     //! Destructor
-    virtual ~iterable_proxy() noexcept = default;
+    virtual ~iterable_proxy() = default;
 
     //! Copy assignment operator
     iterable_proxy& operator=(const iterable_proxy &other) = default;
@@ -569,10 +569,10 @@ namespace muSpectre {
       iterator(const iterator &other) = default;
 
       //! Move constructor
-      iterator(iterator &&other) noexcept = default;
+      iterator(iterator &&other) = default;
 
       //! Destructor
-      virtual ~iterator() noexcept = default;
+      virtual ~iterator() = default;
 
       //! Copy assignment operator
       iterator& operator=(const iterator &other) = default;

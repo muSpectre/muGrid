@@ -78,10 +78,10 @@ namespace muSpectre {
     SystemBase(const SystemBase &other) = delete;
 
     //! Move constructor
-    SystemBase(SystemBase &&other) noexcept = default;
+    SystemBase(SystemBase &&other) = default;
 
     //! Destructor
-    virtual ~SystemBase() noexcept = default;
+    virtual ~SystemBase() = default;
 
     //! Copy assignment operator
     SystemBase& operator=(const SystemBase &other) = delete;

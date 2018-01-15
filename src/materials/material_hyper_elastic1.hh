@@ -86,16 +86,16 @@ namespace muSpectre {
 
 
     //! Move constructor
-    MaterialHyperElastic1(MaterialHyperElastic1 &&other) noexcept = delete;
+    MaterialHyperElastic1(MaterialHyperElastic1 &&other) = delete;
 
     //! Destructor
-    virtual ~MaterialHyperElastic1() noexcept = default;
+    virtual ~MaterialHyperElastic1() = default;
 
     //! Copy assignment operator
     MaterialHyperElastic1& operator=(const MaterialHyperElastic1 &other) = delete;
 
     //! Move assignment operator
-    MaterialHyperElastic1& operator=(MaterialHyperElastic1 &&other) noexcept = delete;
+    MaterialHyperElastic1& operator=(MaterialHyperElastic1 &&other) = delete;
 
     template <class s_t>
     inline decltype(auto) evaluate_stress(s_t && E);

@@ -31,7 +31,6 @@ include_directories(
   common
   materials
   system
-  external
   )
 
 set (muSpectre_SRC
@@ -63,4 +62,3 @@ endif()
 add_library(muSpectre ${muSpectre_SRC})
 target_link_libraries(muSpectre Eigen3::Eigen ${FFTW_LIBRARIES})
 
-add_subdirectory(language_bindings)
