@@ -55,7 +55,7 @@ namespace muSpectre {
     FieldCollectionBase(const FieldCollectionBase &other) = delete;
 
     //! Move constructor
-    FieldCollectionBase(FieldCollectionBase &&other) noexcept = default;
+    FieldCollectionBase(FieldCollectionBase &&other) = delete; //noexcept = default;
 
     //! Destructor
     virtual ~FieldCollectionBase() noexcept = default;
@@ -64,7 +64,7 @@ namespace muSpectre {
     FieldCollectionBase& operator=(const FieldCollectionBase &other) = delete;
 
     //! Move assignment operator
-    FieldCollectionBase& operator=(FieldCollectionBase &&other) noexcept = default;
+    FieldCollectionBase& operator=(FieldCollectionBase &&other) = delete; //noexcept = default;
 
     //! Register a new field (fields need to be in heap, so I want to keep them
     //! as shared pointers

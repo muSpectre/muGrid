@@ -39,7 +39,7 @@ import pyMuSpectre as µ
 resolution = [3, 3]
 
 lengths = [3., 3.]
-formulation = µ.Formulation.finite_strain
+formulation = µ.Formulation.small_strain
 
 rve = µ.SystemFactory(resolution,
                       lengths,
@@ -59,12 +59,13 @@ for i, pixel in enumerate(rve):
     print("{}, {}".format(i, tuple(pixel)))
 
 rve.initialise()
+
 tol = 1e-6
+
 Del0 = np.array([[0, .1],
                  [0,  0]])
-maxiter = 11
+maxiter = 31
 verbose = 2
-# the following segfaults:
-µ.solvers.de_geus2d(rve, Del0, formulation,
-                        tol, tol, maxiter, verbose)
-#print(r.eigen().T)
+
+r = µ.solvers.de_geus2d(rve, Del0, tol, tol, maxiter, verbose)
+print(r) #print(r.eigen().T)

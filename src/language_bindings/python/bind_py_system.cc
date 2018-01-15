@@ -36,7 +36,7 @@
 #include <pybind11/stl.h>
 
 #include <sstream>
-
+#include <memory>
 
 using namespace muSpectre;
 namespace py=pybind11;

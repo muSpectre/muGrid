@@ -54,6 +54,7 @@ namespace muSpectre {
     using Ccoord = Ccoord_t<DimS>;
     using Rcoord = Rcoord_t<DimS>;
     using FieldCollection_t = FieldCollection<DimS, DimM>;
+    using Collection_ptr = std::unique_ptr<FieldCollection_t>;
     using Material_t = MaterialBase<DimS, DimM>;
     using Material_ptr = std::unique_ptr<Material_t>;
     using Projection_ptr = std::unique_ptr<ProjectionBase<DimS, DimM>>;
@@ -147,7 +148,7 @@ namespace muSpectre {
     const Ccoord & resolutions;
     CcoordOps::Pixels<DimS> pixels;
     const Rcoord & lengths;
-    FieldCollection_t fields;
+    Collection_ptr fields;
     StrainField_t & F;
     StressField_t & P;
     //! Tangent field might not even be required; so this is an

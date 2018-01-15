@@ -44,9 +44,9 @@ namespace muSpectre {
     :resolutions{projection_->get_resolutions()},
      pixels(resolutions),
      lengths{projection_->get_lengths()},
-     fields{},
-     F{make_field<StrainField_t>("Gradient", this->fields)},
-     P{make_field<StressField_t>("Piola-Kirchhoff-1", this->fields)},
+     fields{std::make_unique<FieldCollection_t>()},
+     F{make_field<StrainField_t>("Gradient", *this->fields)},
+     P{make_field<StressField_t>("Piola-Kirchhoff-1", *this->fields)},
      projection{std::move(projection_)},
      form{projection->get_formulation()}
   { }
@@ -71,7 +71,7 @@ namespace muSpectre {
       throw std::runtime_error("Size mismatch");
     }
     if (!this->K) {
-      this->K = make_field<TangentField_t>("Tangent Stiffness", this->fields);
+      this->K = make_field<TangentField_t>("Tangent Stiffness", *this->fields);
     }
 
     for (auto & mat: this->materials) {
@@ -128,7 +128,7 @@ namespace muSpectre {
     // check that all pixels have been assigned exactly one material
     this->check_material_coverage();
     // resize all global fields (strain, stress, etc)
-    this->fields.initialise(this->resolutions);
+    this->fields->initialise(this->resolutions);
     // initialise the projection and compute the fft plan
     this->projection->initialise(flags);
     this->is_initialised = true;

@@ -138,10 +138,9 @@ namespace muSpectre {
         inline static decltype(auto)
         compute(Strain_t&& F) {
           return .5*(F.transpose()*F - Strain_t::PlainObject::Identity());
-
         }
       };
- 
+
     }  // internal
 
     /* ---------------------------------------------------------------------- */
@@ -311,8 +310,9 @@ namespace muSpectre {
       constexpr Dim_t dim{EigenCheck::tensor_dim<Strain_t>::value};
       static_assert((dim == EigenCheck::tensor_dim<Stress_t>::value),
                     "Stress and strain tensors have differing dimensions");
-      static_assert((dim== EigenCheck::tensor_4_dim<Tangent_t>::value),
+      static_assert((dim == EigenCheck::tensor_4_dim<Tangent_t>::value),
                     "Stress and tangent tensors have differing dimensions");
+
       return internal::PK1_stress<dim, StressM, StrainM>::compute
         (std::forward<Strain_t>(strain),
          std::forward<Stress_t>(stress),

@@ -65,9 +65,25 @@ namespace muSpectre {
     }
 
     size_t count_width{};
+    const auto form{sys.get_formulation()};
     if (verbose > 0) {
       //setup of algorithm 5.2 in Nocedal, Numerical Optimization (p. 111)
-      std::cout << "Algo 5.2 with newton_tol = " << newton_tol << ", cg_tol = "
+      std::cout << "de Geus for ";
+      switch (form) {
+      case Formulation::small_strain: {
+        std::cout << "small";
+        break;
+      }
+      case Formulation::finite_strain: {
+        std::cout << "finite";
+        break;
+      }
+      default:
+        throw SolverError("unknown formulation");
+        break;
+      }
+      std::cout << " strain with" << std::endl
+                << "newton_tol = " << newton_tol << ", cg_tol = "
                 << cg_tol << " maxiter = " << maxiter << " and ΔF =" <<std::endl;
       for (auto&& tup: akantu::enumerate(delFs)) {
         auto && counter{std::get<0>(tup)};
@@ -80,7 +96,7 @@ namespace muSpectre {
 
     // initialise F = I or ε = 0
     auto & F{sys.get_strain()};
-    switch (sys.get_formulation()) {
+    switch (form) {
     case Formulation::finite_strain: {
       F.get_map() = Matrices::I2<DimM>();
       break;
@@ -193,9 +209,25 @@ namespace muSpectre {
     }
 
     size_t count_width{};
+    const auto form{sys.get_formulation()};
     if (verbose > 0) {
       //setup of algorithm 5.2 in Nocedal, Numerical Optimization (p. 111)
-      std::cout << "Algo 5.2 with newton_tol = " << newton_tol << ", cg_tol = "
+      std::cout << "Newton-CG for ";
+      switch (form) {
+      case Formulation::small_strain: {
+        std::cout << "small";
+        break;
+      }
+      case Formulation::finite_strain: {
+        std::cout << "finite";
+        break;
+      }
+      default:
+        throw SolverError("unknown formulation");
+        break;
+      }
+      std::cout << " strain with" << std::endl
+                << "newton_tol = " << newton_tol << ", cg_tol = "
                 << cg_tol << " maxiter = " << maxiter << " and ΔF =" <<std::endl;
       for (auto&& tup: akantu::enumerate(delFs)) {
         auto && counter{std::get<0>(tup)};

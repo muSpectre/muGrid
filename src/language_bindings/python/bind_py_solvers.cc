@@ -56,8 +56,9 @@ void add_newton_cg_helper(py::module & mod) {
 
   mod.def(name_stream.str().c_str(),
           [](sys & s, const grad & g, Real ct, Real nt,
-             Uint max, Dim_t verb) -> typename sys::StrainField_t & {
-            return newton_cg(s, g, ct, nt, max, verb);
+             Uint max, Dim_t verb) -> Dim_t {//typename sys::StrainField_t & {
+            newton_cg(s, g, ct, nt, max, verb);
+            return -1; //! temporary dummy return
           },
           "system"_a,
           "ΔF₀"_a,
@@ -67,8 +68,9 @@ void add_newton_cg_helper(py::module & mod) {
           "verbose"_a=0);
   mod.def(name_stream.str().c_str(),
           [](sys & s, const grad_vec & g, Real ct, Real nt,
-             Uint max, Dim_t verb) -> typename sys::StrainField_t & {
-            return newton_cg(s, g, ct, nt, max, verb);
+             Uint max, Dim_t verb) -> Dim_t {//typename sys::StrainField_t & {
+            newton_cg(s, g, ct, nt, max, verb);
+            return -1;
           },
           "system"_a,
           "ΔF₀"_a,
@@ -90,8 +92,9 @@ void add_de_geus_helper(py::module & mod) {
 
   mod.def(name_stream.str().c_str(),
           [](sys & s, const grad & g, Real ct, Real nt,
-             Uint max, Dim_t verb) -> typename sys::StrainField_t & {
-            return de_geus(s, g, ct, nt, max, verb);
+             Uint max, Dim_t verb) -> Dim_t {//typename sys::StrainField_t & {
+            de_geus(s, g, ct, nt, max, verb);
+            return -1;
           },
           "system"_a,
           "ΔF₀"_a,
@@ -101,8 +104,9 @@ void add_de_geus_helper(py::module & mod) {
           "verbose"_a=0);
   mod.def(name_stream.str().c_str(),
           [](sys & s, const grad_vec & g, Real ct, Real nt,
-             Uint max, Dim_t verb) -> typename sys::StrainField_t & {
-            return de_geus(s, g, ct, nt, max, verb);
+             Uint max, Dim_t verb) -> Dim_t {//typename sys::StrainField_t & {
+            de_geus(s, g, ct, nt, max, verb);
+            return -1;
           },
           "system"_a,
           "ΔF₀"_a,

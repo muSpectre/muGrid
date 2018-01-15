@@ -326,7 +326,9 @@ namespace muSpectre {
       auto && stress = std::get<0>(stress_tgt);
       auto && tangent = std::get<1>(stress_tgt);
       Stresses = MatTB::PK1_stress<Material::stress_measure, Material::strain_measure>
-      (std::move(grad), std::move(stress), std::move(tangent));
+      (std::move(grad),
+       std::move(stress),
+       std::move(tangent));
     };
 
     iterable_proxy<NeedTangent::yes> fields{*this, F, P, K};

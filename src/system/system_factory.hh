@@ -87,7 +87,8 @@ namespace muSpectre {
                      Formulation form) {
 
     auto && input = system_input<DimS, DimM, FFT_Engine>(resolutions, lengths, form);
-    return System{std::move(input)};
+    auto system{System{std::move(input)}};
+    return system;
   }
 
 }  // muSpectre

@@ -77,7 +77,6 @@ namespace muSpectre {
     constexpr Real cg_tol{1e-8}, newton_tol{1e-5};
     constexpr Uint maxiter{CcoordOps::get_size(resolutions)*ipow(dim, secondOrder)*10};
     constexpr bool verbose{false};
-    constexpr Formulation form{Formulation::finite_strain};
 
     GradIncrements<dim> grads; grads.push_back(delF0);
     Eigen::ArrayXXd res1{de_geus(sys, grads, cg_tol, newton_tol, maxiter, verbose).eigen()};
@@ -126,7 +125,7 @@ namespace muSpectre {
 
     constexpr Real cg_tol{1e-8}, newton_tol{1e-5};
     constexpr Uint maxiter{CcoordOps::get_size(resolutions)*ipow(dim, secondOrder)*10};
-    constexpr bool verbose{true};
+    constexpr Dim_t verbose{2};
 
     auto & result = newton_cg(sys, delEps0, cg_tol, newton_tol, maxiter, verbose);
     if (verbose) {
