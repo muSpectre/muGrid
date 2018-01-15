@@ -43,9 +43,9 @@ int main()
 {
   constexpr Dim_t dim{twoD};
 
-  Ccoord_t<dim> resolution{3, 3};
+  Ccoord_t<dim> resolution{11, 11};
 
-  Rcoord_t<dim> lengths{CcoordOps::get_cube<dim>(3.)};//{5.2e-9, 8.3e-9, 8.3e-9};
+  Rcoord_t<dim> lengths{CcoordOps::get_cube<dim>(11.)};//{5.2e-9, 8.3e-9, 8.3e-9};
   Formulation form{Formulation::finite_strain};
 
   auto rve{make_system(resolution,
@@ -53,9 +53,9 @@ int main()
                        form)};
 
   auto & hard{MaterialHyperElastic1<dim, dim>::make
-      (rve, "hard", 210e9, .33)};
+      (rve, "hard", 210., .33)};
   auto & soft{MaterialHyperElastic1<dim, dim>::make
-      (rve, "soft",  70e9, .33)};
+      (rve, "soft",  70., .33)};
 
   for (auto && tup: akantu::enumerate(rve)) {
     auto & i = std::get<0>(tup);

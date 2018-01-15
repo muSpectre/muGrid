@@ -36,9 +36,9 @@ sys.path.append(os.path.join(os.getcwd(), "language_bindings/python"))
 import pyMuSpectre as µ
 
 
-resolution = [3, 3]
+resolution = [5, 5]
 
-lengths = [3., 3.]
+lengths = [5., 5.]
 formulation = µ.Formulation.finite_strain
 
 rve = µ.SystemFactory(resolution,

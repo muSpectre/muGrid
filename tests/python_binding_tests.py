@@ -33,7 +33,7 @@ import sys
 import os
 import numpy as np
 
-sys.path.append(os.path.join(os.getcwd(), "src/language_bindings/python"))
+sys.path.append(os.path.join(os.getcwd(), "language_bindings/python"))
 
 try:
     import pyMuSpectre as µ
@@ -75,8 +75,8 @@ class MaterialHooke2dCheck(unittest.TestCase):
 
 class SolverCheck(unittest.TestCase):
     def setUp(self):
-        self.resolution = [5,7]
-        self.lengths = [5.2, 8.3]
+        self.resolution = [3, 3]#[5,7]
+        self.lengths = [3., 3.]#[5.2, 8.3]
         self.formulation = µ.Formulation.finite_strain
         self.sys = µ.SystemFactory(self.resolution,
                                    self.lengths,
@@ -100,8 +100,8 @@ class SolverCheck(unittest.TestCase):
         maxiter = 100
         verbose = 2
         # the following segfaults:
-        r = µ.solvers.de_geus2d(self.sys, Del0, self.formulation,
-                                tol, tol, maxiter, verbose)
+        r = µ.solvers.de_geus(self.sys, Del0,
+                              tol, tol, maxiter, verbose)
         print(r)
 
 
