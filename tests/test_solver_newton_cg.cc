@@ -79,9 +79,9 @@ namespace muSpectre {
     constexpr bool verbose{false};
 
     GradIncrements<dim> grads; grads.push_back(delF0);
-    Eigen::ArrayXXd res1{de_geus(sys, grads, cg_tol, newton_tol, maxiter, verbose).eigen()};
+    Eigen::ArrayXXd res1{de_geus(sys, grads, cg_tol, newton_tol, maxiter, verbose)[0].grad};
 
-    Eigen::ArrayXXd res2{newton_cg(sys, grads, cg_tol, newton_tol, maxiter, verbose).eigen()};
+    Eigen::ArrayXXd res2{newton_cg(sys, grads, cg_tol, newton_tol, maxiter, verbose)[0].grad};
     BOOST_CHECK_LE(abs(res1-res2).mean(), cg_tol);
   }
 
@@ -127,10 +127,11 @@ namespace muSpectre {
     constexpr Uint maxiter{CcoordOps::get_size(resolutions)*ipow(dim, secondOrder)*10};
     constexpr Dim_t verbose{2};
 
-    auto & result = newton_cg(sys, delEps0, cg_tol, newton_tol, maxiter, verbose);
+    auto result = newton_cg(sys, delEps0, cg_tol, newton_tol, maxiter, verbose);
     if (verbose) {
-      std::cout << "result:" << std::endl << result.eigen() << std::endl;
-      std::cout << "mean strain = " << std::endl << result.get_map().mean() << std::endl;
+      std::cout << "result:" << std::endl << result.grad << std::endl;
+      std::cout << "mean strain = " << std::endl
+                << sys.get_strain().get_map().mean() << std::endl;
     }
 
     /**
@@ -159,9 +160,9 @@ namespace muSpectre {
 
     for (const auto & pixel: sys) {
       if (pixel[0] < Dim_t(nb_lays)) {
-        BOOST_CHECK_LE((Eps_hard-result.get_map()[pixel]).norm(), tol);
+        BOOST_CHECK_LE((Eps_hard-sys.get_strain().get_map()[pixel]).norm(), tol);
       } else {
-        BOOST_CHECK_LE((Eps_soft-result.get_map()[pixel]).norm(), tol);
+        BOOST_CHECK_LE((Eps_soft-sys.get_strain().get_map()[pixel]).norm(), tol);
       }
     }
 

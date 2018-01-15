@@ -78,6 +78,13 @@ namespace muSpectre {
                const Field_t & rhs,
                Field_t & x);
 
+    //! reset the iteration counter to zero
+    void reset_counter();
+
+    //! get the count of how many solve steps have been executed since
+    //! construction of most recent counter reset
+    Uint get_counter() const;
+
 
 
   protected:
@@ -88,6 +95,7 @@ namespace muSpectre {
     const Real tol;
     const Uint maxiter;
     const bool verbose;
+    Uint counter{};
   private:
   };
 

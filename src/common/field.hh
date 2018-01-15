@@ -181,6 +181,15 @@ namespace muSpectre {
       //! return type_id of stored type
       virtual const std::type_info & get_stored_typeid() const override final;
 
+      virtual size_t size() const override = 0;
+
+      //! initialise field to zero (do more complicated initialisations through
+      //! fully typed maps)
+      virtual void set_zero() override = 0;
+      virtual T* data() = 0;
+      virtual const T* data() const = 0;
+
+      EigenMap eigen();
 
     protected:
     private:
@@ -246,8 +255,8 @@ namespace muSpectre {
       static TypedSizedFieldBase & check_ref(Base & other);
       static const TypedSizedFieldBase & check_ref(const Base & parent);
 
-      inline T* data() {return this->get_ptr_to_entry(0);}
-      inline const T* data() const {return this->get_ptr_to_entry(0);}
+      inline T* data() override final {return this->get_ptr_to_entry(0);}
+      inline const T* data() const override final {return this->get_ptr_to_entry(0);}
 
       inline EigenMap eigen();
       inline ConstEigenMap eigen() const;
@@ -444,6 +453,15 @@ protected:
     get_stored_typeid() const {
       return typeid(T);
     }
+
+    /* ---------------------------------------------------------------------- */
+    template <class FieldCollection, typename T>
+    typename TypedFieldBase<FieldCollection, T>::EigenMap
+    TypedFieldBase<FieldCollection, T>::
+    eigen() {
+      return EigenMap(this->data(), this->get_nb_components(), this->size());
+    }
+
 
     /* ---------------------------------------------------------------------- */
     template <class FieldCollection, typename T, Dim_t NbComponents, bool ArrayStore>

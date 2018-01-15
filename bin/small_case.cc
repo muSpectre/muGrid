@@ -77,7 +77,7 @@ int main()
   Dim_t maxiter{31};
   Dim_t verbose{3};
 
-  auto & res = de_geus(rve, Del0, tol, tol, maxiter, verbose);
-  std::cout << res.eigen().transpose() << std::endl;
+  auto res = de_geus(rve, Del0, tol, tol, maxiter, verbose);
+  std::cout << res.grad.transpose() << std::endl;
   return 0;
 }

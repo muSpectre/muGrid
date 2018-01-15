@@ -37,7 +37,7 @@
 namespace muSpectre {
 
   template <Dim_t DimS, Dim_t DimM>
-  typename SystemBase<DimS, DimM>::StrainField_t &
+  std::vector<OptimizeResult>
   de_geus (SystemBase<DimS, DimM> & sys, const GradIncrements<DimM> & delFs,
            const Real cg_tol, const Real newton_tol, Uint maxiter,
            Dim_t verbose) {
@@ -110,6 +110,9 @@ namespace muSpectre {
       break;
     }
 
+    // initialise return value
+    std::vector<OptimizeResult> ret_val{};
+
     // initialise materials
     constexpr bool need_tangent{true};
     sys.initialise_materials(need_tangent);
@@ -118,8 +121,12 @@ namespace muSpectre {
     for (const auto & delF: delFs) { //incremental loop
 
       Real incrNorm{2*newton_tol}, gradNorm{1};
-      for (Uint newt_iter{0};
-           (newt_iter < maxiter) && ((incrNorm/gradNorm > newton_tol) ||
+      auto convergence_test = [&incrNorm, &gradNorm, &newton_tol] () {
+        return incrNorm/gradNorm <= newton_tol;
+      };
+      Uint newt_iter{0};
+      for (;
+           (newt_iter < maxiter) && (!convergence_test() ||
                                      (newt_iter==1));
            ++newt_iter) {
 
@@ -160,15 +167,21 @@ namespace muSpectre {
       // update previous gradient
       previous_grad = delF;
 
-      //store history variables here
+      ret_val.push_back(OptimizeResult{F.eigen(), sys.get_stress().eigen(),
+            convergence_test(), Int(convergence_test()),
+            "message not yet implemented",
+            newt_iter, cg.get_counter()});
+
+
+      //!store history variables here
 
     }
 
-    return F;
+    return ret_val;
 
   }
 
-  template typename SystemBase<twoD, twoD>::StrainField_t &
+  template std::vector<OptimizeResult>
   de_geus (SystemBase<twoD, twoD> & sys, const GradIncrements<twoD>& delF0,
            const Real cg_tol, const Real newton_tol, Uint maxiter,
            Dim_t verbose);
@@ -178,14 +191,14 @@ namespace muSpectre {
   //            const Real cg_tol, const Real newton_tol, Uint maxiter,
   //            Dim_t verbose);
 
-  template typename SystemBase<threeD, threeD>::StrainField_t &
+  template std::vector<OptimizeResult>
   de_geus (SystemBase<threeD, threeD> & sys, const GradIncrements<threeD>& delF0,
            const Real cg_tol, const Real newton_tol, Uint maxiter,
            Dim_t verbose);
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  typename SystemBase<DimS, DimM>::StrainField_t &
+  std::vector<OptimizeResult>
   newton_cg (SystemBase<DimS, DimM> & sys, const GradIncrements<DimM> & delFs,
              const Real cg_tol, const Real newton_tol, Uint maxiter,
              Dim_t verbose) {
@@ -254,6 +267,9 @@ namespace muSpectre {
       break;
     }
 
+    // initialise return value
+    std::vector<OptimizeResult> ret_val{};
+
     // initialise materials
     constexpr bool need_tangent{true};
     sys.initialise_materials(need_tangent);
@@ -266,8 +282,13 @@ namespace muSpectre {
       }
 
       Real incrNorm{2*newton_tol}, gradNorm{1};
-      for (Uint newt_iter{0};
-           newt_iter < maxiter && incrNorm/gradNorm> newton_tol;
+      auto convergence_test = [&incrNorm, &gradNorm, &newton_tol] () {
+        return incrNorm/gradNorm <= newton_tol;
+      };
+      Uint newt_iter{0};
+
+      for (;
+           newt_iter < maxiter && !convergence_test();
            ++newt_iter) {
 
         // obtain material response
@@ -301,15 +322,20 @@ namespace muSpectre {
       // update previous gradient
       previous_grad = delF;
 
+      ret_val.push_back(OptimizeResult{F.eigen(), sys.get_stress().eigen(),
+            convergence_test(), Int(convergence_test()),
+            "message not yet implemented",
+            newt_iter, cg.get_counter()});
+
       //store history variables here
 
     }
 
-    return F;
+    return ret_val;
 
   }
 
-  template typename SystemBase<twoD, twoD>::StrainField_t &
+  template std::vector<OptimizeResult>
   newton_cg (SystemBase<twoD, twoD> & sys, const GradIncrements<twoD>& delF0,
              const Real cg_tol, const Real newton_tol, Uint maxiter,
              Dim_t verbose);
@@ -319,7 +345,7 @@ namespace muSpectre {
   //            const Real cg_tol, const Real newton_tol, Uint maxiter,
   //            Dim_t verbose);
 
-  template typename SystemBase<threeD, threeD>::StrainField_t &
+  template std::vector<OptimizeResult>
   newton_cg (SystemBase<threeD, threeD> & sys, const GradIncrements<threeD>& delF0,
              const Real cg_tol, const Real newton_tol, Uint maxiter,
              Dim_t verbose);

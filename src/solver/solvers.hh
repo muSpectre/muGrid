@@ -32,7 +32,34 @@
 
 #include "solver/solver_cg.hh"
 
+#include <Eigen/Dense>
+
+#include <vector>
+#include <string>
+
 namespace muSpectre {
+
+  /**
+   * emulates scipy.optimize.OptimizeResult
+   */
+  struct OptimizeResult
+  {
+    //! Strain ε or Gradient F at solution
+    Eigen::ArrayXXd grad;
+    //! Cauchy stress σ or first Piola-Kirchhoff stress P at solution
+    Eigen::ArrayXXd stress;
+    //! whether or not the solver exited successfully
+    bool success;
+    //! Termination status of the optimizer. Its value depends on the
+    //! underlying solver. Refer to message for details.
+    Int status;
+    //! Description of the cause of the termination.
+    std::string message;
+    //! number of iterations
+    Uint nb_it;
+    //! number of system evaluations
+    Uint nb_fev;
+  };
 
   template <Dim_t Dim>
   using Grad_t = Matrices::Tens2_t<Dim>;
@@ -42,7 +69,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM=DimS>
-  typename SystemBase<DimS, DimM>::StrainField_t &
+  std::vector<OptimizeResult>
   newton_cg (SystemBase<DimS, DimM> & sys,
              const GradIncrements<DimM> & delF0,
              const Real cg_tol, const Real newton_tol, const Uint maxiter=0,
@@ -50,17 +77,17 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM=DimS>
-  inline typename SystemBase<DimS, DimM>::StrainField_t &
+  inline OptimizeResult
   newton_cg (SystemBase<DimS, DimM> & sys, const Grad_t<DimM> & delF0,
              const Real cg_tol, const Real newton_tol, const Uint maxiter=0,
              Dim_t verbose = 0){
     return newton_cg(sys, GradIncrements<DimM>{delF0},
-                    cg_tol, newton_tol, maxiter, verbose);
+                     cg_tol, newton_tol, maxiter, verbose)[0];
   }
 
     /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM=DimS>
-  typename SystemBase<DimS, DimM>::StrainField_t &
+  std::vector<OptimizeResult>
   de_geus (SystemBase<DimS, DimM> & sys,
            const GradIncrements<DimM> & delF0,
            const Real cg_tol, const Real newton_tol, const Uint maxiter=0,
@@ -68,12 +95,12 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM=DimS>
-  inline typename SystemBase<DimS, DimM>::StrainField_t &
+  OptimizeResult
   de_geus (SystemBase<DimS, DimM> & sys, const Grad_t<DimM> & delF0,
            const Real cg_tol, const Real newton_tol, const Uint maxiter=0,
            Dim_t verbose = 0){
     return de_geus(sys, GradIncrements<DimM>{delF0},
-                   cg_tol, newton_tol, maxiter, verbose);
+                   cg_tol, newton_tol, maxiter, verbose)[0];
   }
 
 }  // muSpectre

@@ -43,7 +43,7 @@ namespace muSpectre {
      r_k{make_field<Field_t>("residual r_k", this->collection)},
      p_k{make_field<Field_t>("search direction r_k", this->collection)},
      Ap_k{make_field<Field_t>("Effect of tangent A*p_k", this->collection)},
-     tol{tol}, maxiter{maxiter}, verbose{verbose}
+     tol{tol}, maxiter{maxiter}, verbose{verbose}, counter{0}
   {}
 
   /* ---------------------------------------------------------------------- */
@@ -73,7 +73,7 @@ namespace muSpectre {
       count_width = size_t(std::log10(this->maxiter))+1;
     }
 
-    for (Uint i = 0; i < this->maxiter && rdr > tol2; ++i) {
+    for (Uint i = 0; i < this->maxiter && rdr > tol2; ++i, ++this->counter) {
       tangent_effect(this->p_k, this->Ap_k);
 
       Real alpha = rdr/(p*Ap).sum();
@@ -98,6 +98,18 @@ namespace muSpectre {
     } else {
       throw ConvergenceError("Conjugate gradient has not converged");
     }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  void SolverCG<DimS, DimM>::reset_counter() {
+    this->counter = 0;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  Uint SolverCG<DimS, DimM>::get_counter() const {
+    return this->counter;
   }
 
   /* ---------------------------------------------------------------------- */

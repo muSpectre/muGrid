@@ -34,8 +34,6 @@
 #include <pybind11/stl.h>
 #include <pybind11/eigen.h>
 
-#include <sstream>
-
 using namespace muSpectre;
 namespace py=pybind11;
 using namespace pybind11::literals;
@@ -46,19 +44,18 @@ using namespace pybind11::literals;
 
 template <Dim_t sdim>
 void add_newton_cg_helper(py::module & mod) {
-  std::stringstream name_stream {};
-  name_stream << "newton_cg" << sdim << "d";
 
+  const char name []{"newton_cg"};
   constexpr Dim_t mdim{sdim};
   using sys = SystemBase<sdim, mdim>;
   using grad = Grad_t<sdim>;
-  using grad_vec = Grad_t<sdim>;
+  using grad_vec = GradIncrements<sdim>;
 
-  mod.def(name_stream.str().c_str(),
+  mod.def(name,
           [](sys & s, const grad & g, Real ct, Real nt,
-             Uint max, Dim_t verb) -> Dim_t {//typename sys::StrainField_t & {
-            newton_cg(s, g, ct, nt, max, verb);
-            return -1; //! temporary dummy return
+             Uint max, Dim_t verb) -> OptimizeResult {
+            return newton_cg(s, g, ct, nt, max, verb);
+
           },
           "system"_a,
           "ΔF₀"_a,
@@ -66,11 +63,10 @@ void add_newton_cg_helper(py::module & mod) {
           "newton_tol"_a,
           "maxiter"_a=0,
           "verbose"_a=0);
-  mod.def(name_stream.str().c_str(),
+  mod.def(name,
           [](sys & s, const grad_vec & g, Real ct, Real nt,
-             Uint max, Dim_t verb) -> Dim_t {//typename sys::StrainField_t & {
-            newton_cg(s, g, ct, nt, max, verb);
-            return -1;
+             Uint max, Dim_t verb) -> std::vector<OptimizeResult> {
+            return newton_cg(s, g, ct, nt, max, verb);
           },
           "system"_a,
           "ΔF₀"_a,
@@ -82,19 +78,16 @@ void add_newton_cg_helper(py::module & mod) {
 
 template <Dim_t sdim>
 void add_de_geus_helper(py::module & mod) {
-  std::stringstream name_stream {};
-  name_stream << "de_geus" << sdim << "d";
-
+  const char name []{"de_geus"};
   constexpr Dim_t mdim{sdim};
   using sys = SystemBase<sdim, mdim>;
   using grad = Grad_t<sdim>;
-  using grad_vec = Grad_t<sdim>;
+  using grad_vec = GradIncrements<sdim>;
 
-  mod.def(name_stream.str().c_str(),
+  mod.def(name,
           [](sys & s, const grad & g, Real ct, Real nt,
-             Uint max, Dim_t verb) -> Dim_t {//typename sys::StrainField_t & {
-            de_geus(s, g, ct, nt, max, verb);
-            return -1;
+             Uint max, Dim_t verb) -> OptimizeResult {
+            return de_geus(s, g, ct, nt, max, verb);
           },
           "system"_a,
           "ΔF₀"_a,
@@ -102,11 +95,10 @@ void add_de_geus_helper(py::module & mod) {
           "newton_tol"_a,
           "maxiter"_a=0,
           "verbose"_a=0);
-  mod.def(name_stream.str().c_str(),
+  mod.def(name,
           [](sys & s, const grad_vec & g, Real ct, Real nt,
-             Uint max, Dim_t verb) -> Dim_t {//typename sys::StrainField_t & {
-            de_geus(s, g, ct, nt, max, verb);
-            return -1;
+             Uint max, Dim_t verb) -> std::vector<OptimizeResult> {
+            return de_geus(s, g, ct, nt, max, verb);
           },
           "system"_a,
           "ΔF₀"_a,
@@ -125,6 +117,17 @@ void add_solver_helper(py::module & mod) {
 void add_solvers(py::module & mod) {
   auto solvers{mod.def_submodule("solvers")};
   solvers.doc() = "bindings for solvers";
+
+  py::class_<OptimizeResult>(mod, "OptimizeResult")
+    .def_readwrite("grad", &OptimizeResult::grad)
+    .def_readwrite("stress", &OptimizeResult::stress)
+    .def_readwrite("success", &OptimizeResult::success)
+    .def_readwrite("status", &OptimizeResult::status)
+    .def_readwrite("message", &OptimizeResult::message)
+    .def_readwrite("nb_it", &OptimizeResult::nb_it)
+    .def_readwrite("nb_fev", &OptimizeResult::nb_fev);
+
+
 
   add_solver_helper<twoD  >(solvers);
   add_solver_helper<threeD>(solvers);

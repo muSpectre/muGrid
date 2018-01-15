@@ -82,11 +82,10 @@ int main()
   Dim_t verbose {1};
 
   auto start = std::chrono::high_resolution_clock::now();
-  GradIncrements<dim> grads{DeltaF};
-  auto &res = de_geus(system, grads, cg_tol, newton_tol, maxiter, verbose);
+  auto res = de_geus(system, DeltaF, cg_tol, newton_tol, maxiter, verbose);
   std::chrono::duration<Real> dur = std::chrono::high_resolution_clock::now() - start;
   std::cout << "Resolution time = " << dur.count() << "s" << std::endl;
 
-  std::cout << res.eigen().transpose() << std::endl;
+  std::cout << res.grad.transpose() << std::endl;
   return 0;
 }

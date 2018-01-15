@@ -32,7 +32,7 @@ import sys
 import os
 import numpy as np
 
-sys.path.append(os.path.join(os.getcwd(), "src/language_bindings/python"))
+sys.path.append(os.path.join(os.getcwd(), "language_bindings/python"))
 import pyMuSpectre as µ
 
 
@@ -67,5 +67,7 @@ Del0 = np.array([[0, .1],
 maxiter = 31
 verbose = 2
 
-r = µ.solvers.de_geus2d(rve, Del0, tol, tol, maxiter, verbose)
-print(r) #print(r.eigen().T)
+r = µ.solvers.de_geus(rve, Del0, tol, tol, maxiter, verbose)
+print(r.grad.T)
+print(r.stress.T)
+print(r)
