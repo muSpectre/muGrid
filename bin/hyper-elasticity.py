@@ -72,8 +72,8 @@ def compute(ex):
     cell.initialise();
     cg_tol, newton_tol = 1e-7, 1e-5
     maxiter = 40
-    verbose = 2
-    dF_bar = np.array([[1, .0, 0], [0, 0, 0], [0, 0, 0]])
+    verbose = 3
+    dF_bar = np.array([[.01, .0, 0], [0, 0, 0], [0, 0, 0]])
 
     if formulation == µ.Formulation.small_strain:
         dF_bar = .5*(dF_bar + dF_bar.T)

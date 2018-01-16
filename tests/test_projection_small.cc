@@ -1,15 +1,15 @@
 /**
- * file   test_projection_finite.cc
+ * file   test_projection_small.cc
  *
- * @author Till Junge <till.junge@epfl.ch>
+ * @author Till Junge <till.junge@altermail.ch>
  *
- * @date   07 Dec 2017
+ * @date   16 Jan 2018
  *
- * @brief  tests for standard finite strain projection operator
+ * @brief  tests for standard small strain projection operator
  *
  * @section LICENCE
  *
- * Copyright © 2017 Till Junge
+ * Copyright © 2018 Till Junge
  *
  * µSpectre is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -26,36 +26,26 @@
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
  */
-#include "fft/projection_finite_strain.hh"
-#include "fft/projection_finite_strain_fast.hh"
-#include "fft/fft_utils.hh"
+
+#include "fft/projection_small_strain.hh"
 #include "test_projection.hh"
+#include "fft/fft_utils.hh"
 
 #include <Eigen/Dense>
 
 namespace muSpectre {
 
-  BOOST_AUTO_TEST_SUITE(projection_finite_strain);
+  BOOST_AUTO_TEST_SUITE(projection_small_strain);
 
-  /* ---------------------------------------------------------------------- */
   using fixlist = boost::mpl::list<
     ProjectionFixture<twoD, twoD, Squares<twoD>,
-                      ProjectionFiniteStrain<twoD, twoD>>,
+                      ProjectionSmallStrain<twoD, twoD>>,
     ProjectionFixture<threeD, threeD, Squares<threeD>,
-                      ProjectionFiniteStrain<threeD, threeD>>,
+                      ProjectionSmallStrain<threeD, threeD>>,
     ProjectionFixture<twoD, twoD, Sizes<twoD>,
-                      ProjectionFiniteStrain<twoD, twoD>>,
+                      ProjectionSmallStrain<twoD, twoD>>,
     ProjectionFixture<threeD, threeD, Sizes<threeD>,
-                      ProjectionFiniteStrain<threeD, threeD>>,
-
-    ProjectionFixture<twoD, twoD, Squares<twoD>,
-                      ProjectionFiniteStrainFast<twoD, twoD>>,
-    ProjectionFixture<threeD, threeD, Squares<threeD>,
-                      ProjectionFiniteStrainFast<threeD, threeD>>,
-    ProjectionFixture<twoD, twoD, Sizes<twoD>,
-                      ProjectionFiniteStrainFast<twoD, twoD>>,
-    ProjectionFixture<threeD, threeD, Sizes<threeD>,
-                      ProjectionFiniteStrainFast<threeD, threeD>>>;
+                      ProjectionSmallStrain<threeD, threeD>>>;
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(constructor_test, fix, fixlist, fix) {
@@ -77,7 +67,7 @@ namespace muSpectre {
     using Vector = Eigen::Matrix<Real, dim, 1>;
 
     Fields fields{};
-    FieldT & f_grad{make_field<FieldT>("gradient", fields)};
+    FieldT & f_grad{make_field<FieldT>("strain", fields)};
     FieldT & f_var{make_field<FieldT>("working field", fields)};
 
     FieldMap grad(f_grad);
@@ -86,10 +76,12 @@ namespace muSpectre {
     fields.initialise(fix::projector.get_resolutions());
     FFT_freqs<dim> freqs{fix::projector.get_resolutions(),
         fix::projector.get_lengths()};
-    Vector k; for (Dim_t i = 0; i < dim; ++i) {
+
+    Vector k;
+    for (Dim_t i = 0; i < dim; ++i) {
       // the wave vector has to be such that it leads to an integer
       // number of periods in each length of the domain
-      k(i) = (i+1)*2*pi/fix::projector.get_lengths()[i]; ;
+      k(i) = (i+1)*2*pi/fix::projector.get_lengths()[i];
     }
 
     for (auto && tup: akantu::zip(fields, grad, var)) {
@@ -99,13 +91,16 @@ namespace muSpectre {
       Vector vec = CcoordOps::get_vector(ccoord,
                                          fix::projector.get_lengths()/
                                          fix::projector.get_resolutions());
-      g.row(0) = k.transpose() * cos(k.dot(vec));
-      v.row(0) = g.row(0);
+      g.row(0) << k.transpose() * cos(k.dot(vec));
+
+      g = 0.5*((g-g.Identity()).transpose() + (g-g.Identity())).eval();
+      v = g;
     }
 
     fix::projector.initialise(FFT_PlanFlags::estimate);
     fix::projector.apply_projection(f_var);
 
+    constexpr bool verbose{true};
     for (auto && tup: akantu::zip(fields, grad, var)) {
       auto & ccoord = std::get<0>(tup);
       auto & g = std::get<1>(tup);
@@ -115,7 +110,7 @@ namespace muSpectre {
                                          fix::projector.get_resolutions());
       Real error = (g-v).norm();
       BOOST_CHECK_LT(error, tol);
-      if (error >=tol) {
+      if ((error >=tol) || verbose) {
         std::cout << std::endl << "grad_ref :"  << std::endl << g << std::endl;
         std::cout << std::endl << "grad_proj :" << std::endl << v << std::endl;
         std::cout << std::endl << "ccoord :"    << std::endl << ccoord << std::endl;
