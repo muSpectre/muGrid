@@ -127,7 +127,7 @@ namespace muSpectre {
 
     inline iterator begin() {return this->internal_fields.begin();}
     inline iterator end()  {return this->internal_fields.end();}
-
+    inline size_t size() const {return this->internal_fields.size();}
   protected:
 
     //! members

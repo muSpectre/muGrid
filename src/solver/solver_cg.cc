@@ -66,7 +66,9 @@ namespace muSpectre {
 
     this->converged = false;
     Real rdr = (r*r).sum();
-    Real tol2 = ipow(this->tol,2);
+    Real rhs_norm2 = (rhs.eigen()*rhs.eigen()).sum();
+    Real tol2 = ipow(this->tol,2)*rhs_norm2;
+
 
     size_t count_width{}; // for output formatting in verbose case
     if (this->verbose) {

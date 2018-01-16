@@ -159,7 +159,7 @@ namespace muSpectre {
           std::cout << "at Newton step " << std::setw(count_width) << newt_iter
                     << ", |δF|/|ΔF| = " << std::setw(17) << incrNorm/gradNorm
                     << ", tol = " << newton_tol << std::endl;
-          if (verbose>1) {
+          if (verbose-1>1) {
             std::cout << "<F> =" << std::endl << F.get_map().mean() << std::endl;
           }
         }
@@ -313,7 +313,7 @@ namespace muSpectre {
                     << ", |δF|/|ΔF| = " << std::setw(17) << incrNorm/gradNorm
                     << ", tol = " << newton_tol << std::endl;
 
-          if (verbose>1) {
+          if (verbose-1>1) {
             std::cout << "<F> =" << std::endl << F.get_map().mean() << std::endl;
           }
         }

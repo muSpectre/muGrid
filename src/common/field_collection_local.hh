@@ -116,6 +116,7 @@ namespace muSpectre {
     }
     this->indices[local_ccoord] = this->ccoords.size();
     this->ccoords.push_back(local_ccoord);
+    this->size_++;
   }
 
   /* ---------------------------------------------------------------------- */
@@ -125,7 +126,6 @@ namespace muSpectre {
     if (this->is_initialised) {
       throw std::runtime_error("double initialisation");
     }
-    this->size_ = this->ccoords.size();
     std::for_each(std::begin(this->fields), std::end(this->fields),
                   [this](auto && item) {
                     auto && field = *item.second;

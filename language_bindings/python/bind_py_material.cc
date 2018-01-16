@@ -63,7 +63,8 @@ void add_material_hyper_elastic_helper(py::module & mod) {
     .def("add_pixel",
          [] (Mat_t & mat, Ccoord_t<dim> pix) {
            mat.add_pixel(pix);},
-         "pixel"_a);
+         "pixel"_a)
+    .def("size", &Mat_t::size);
 }
 
 
