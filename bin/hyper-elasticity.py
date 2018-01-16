@@ -51,27 +51,32 @@ def compute(ex):
     lens = [1., 1., 1.]
     incl_size = 3
 
+    formulation = µ.Formulation.small_strain
     cell = µ.SystemFactory(N,
                            lens,
-                           µ.Formulation.finite_strain)
+                           formulation)
     hard = µ.material.MaterialHooke3d.make(cell, "hard",
                                            210.*ex, .33)
     soft = µ.material.MaterialHooke3d.make(cell, "soft",
                                             70.*ex, .33)
     for  pixel in cell:
-        if ((pixel[0] >= N[0]-incl_size) and
-            (pixel[1] < incl_size) and
-            (pixel[2] >= N[2]-incl_size)):
+        # if ((pixel[0] >= N[0]-incl_size) and
+        #     (pixel[1] < incl_size) and
+        #     (pixel[2] >= N[2]-incl_size)):
+        if (pixel[0] < 1):
             hard.add_pixel(pixel)
         else:
             soft.add_pixel(pixel)
 
     print("{} pixels in the inclusion".format(hard.size()))
     cell.initialise();
-    cg_tol, newton_tol = 1e-8, 1e-5
-    maxiter = 200
-    verbose = 1
-    dF_bar = np.array([[0, 1., 0], [0, 0, 0], [0, 0, 0]])
+    cg_tol, newton_tol = 1e-7, 1e-5
+    maxiter = 40
+    verbose = 2
+    dF_bar = np.array([[1, .0, 0], [0, 0, 0], [0, 0, 0]])
+
+    if formulation == µ.Formulation.small_strain:
+        dF_bar = .5*(dF_bar + dF_bar.T)
 
     optimize_res = µ.solvers.de_geus(
         cell, dF_bar, cg_tol, newton_tol, maxiter, verbose)

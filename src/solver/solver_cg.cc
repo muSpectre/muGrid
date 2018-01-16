@@ -89,7 +89,7 @@ namespace muSpectre {
 
       if (this->verbose) {
         std::cout << "  at CG step " << std::setw(count_width) << i
-                  << ": |r| = " << std::setw(17) << std::sqrt(rdr)
+                  << ": |r|/|b| = " << std::setw(15) << std::sqrt(rdr)/rhs_norm2
                   << ", cg_tol = " << this->tol << std::endl;
       }
 

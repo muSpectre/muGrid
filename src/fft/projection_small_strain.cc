@@ -60,7 +60,7 @@ namespace muSpectre {
               Real & g = get(G, i, j, l, m);
               g = 0.5* (xi(i) * kron(j, l) * xi(m) +
                         xi(i) * kron(j, m) * xi(l) +
-                        xi(j) * kron(j, l) * xi(m) +
+                        xi(j) * kron(i, l) * xi(m) +
                         xi(j) * kron(i, m) * xi(l)) -
                 xi(i)*xi(j)*xi(l)*xi(m);
             }

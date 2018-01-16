@@ -103,6 +103,14 @@ namespace muSpectre {
                    cg_tol, newton_tol, maxiter, verbose)[0];
   }
 
+  /* ---------------------------------------------------------------------- */
+  /**
+   * check whether a strain is symmetric, for the purposes of small
+   * strain problems
+   */
+  bool check_symmetry(const Eigen::Ref<const Eigen::ArrayXXd>& eps,
+                      Real rel_tol = 1e-8);
+
 }  // muSpectre
 
 #endif /* SOLVERS_H */

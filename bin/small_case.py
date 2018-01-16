@@ -38,7 +38,7 @@ import pyMuSpectre as µ
 
 resolution = [5, 5]
 
-lengths = [5., 5.]
+lengths = [7., 5.]
 formulation = µ.Formulation.finite_strain
 
 rve = µ.SystemFactory(resolution,
@@ -56,18 +56,16 @@ for i, pixel in enumerate(rve):
     else:
         soft.add_pixel(pixel)
 
-    print("{}, {}".format(i, tuple(pixel)))
-
-rve.initialise()
-
 tol = 1e-6
 
-Del0 = np.array([[0, .1],
+Del0 = np.array([[0, .001],
                  [0,  0]])
-maxiter = 31
-verbose = 2
+if formulation == µ.Formulation.small_strain:
+    Del0 = .5*(Del0 + Del0.T)
+maxiter = 301
+verbose = 3
 
 r = µ.solvers.de_geus(rve, Del0, tol, tol, maxiter, verbose)
-print(r.grad.T)
-print(r.stress.T)
-print(r)
+print(r.grad.T[:3])
+print(r.stress.T[:3])
+print(r.nb_fev)

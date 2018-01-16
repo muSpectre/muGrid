@@ -45,7 +45,7 @@ int main()
   constexpr Rcoord_t<dim> lens{CcoordOps::get_cube<dim>(1.)};
   constexpr Dim_t incl_size{3};
 
-  auto cell{make_system(N, lens, Formulation::finite_strain)};
+  auto cell{make_system(N, lens, Formulation::small_strain)};
 
   // constexpr Real K_hard{8.33}, K_soft{.833};
   // constexpr Real mu_hard{3.86}, mu_soft{.386};

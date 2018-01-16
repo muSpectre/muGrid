@@ -103,6 +103,11 @@ namespace muSpectre {
     }
     case Formulation::small_strain: {
       F.get_map() = Matrices::I2<DimM>().Zero();
+      for (const auto & delF: delFs) {
+        if (!check_symmetry(delF)) {
+          throw SolverError("all Δε must be symmetric!");
+        }
+      }
       break;
     }
     default:
@@ -135,8 +140,8 @@ namespace muSpectre {
         auto & P{std::get<0>(res_tup)};
         auto & K{std::get<1>(res_tup)};
 
-        auto tangent_effect = [&sys, &K] (const Field_t & delF, Field_t & delP) {
-          sys.directional_stiffness(K, delF, delP);
+        auto tangent_effect = [&sys, &K] (const Field_t & dF, Field_t & dP) {
+          sys.directional_stiffness(K, dF, dP);
         };
 
 
@@ -260,6 +265,11 @@ namespace muSpectre {
     }
     case Formulation::small_strain: {
       F.get_map() = Matrices::I2<DimM>().Zero();
+      for (const auto & delF: delFs) {
+        if (!check_symmetry(delF)) {
+          throw SolverError("all Δε must be symmetric!");
+        }
+      }
       break;
     }
     default:
@@ -296,13 +306,13 @@ namespace muSpectre {
         auto & P{std::get<0>(res_tup)};
         auto & K{std::get<1>(res_tup)};
 
-        auto fun = [&sys, &K] (const Field_t & delF, Field_t & delP) {
-          sys.directional_stiffness(K, delF, delP);
+        auto tangent_effect = [&sys, &K] (const Field_t & dF, Field_t & dP) {
+          sys.directional_stiffness(K, dF, dP);
         };
 
         rhs.eigen() = -P.eigen();
         sys.project(rhs);
-        cg.solve(fun, rhs, incrF);
+        cg.solve(tangent_effect, rhs, incrF);
 
         F.eigen() += incrF.eigen();
 
@@ -349,6 +359,13 @@ namespace muSpectre {
   newton_cg (SystemBase<threeD, threeD> & sys, const GradIncrements<threeD>& delF0,
              const Real cg_tol, const Real newton_tol, Uint maxiter,
              Dim_t verbose);
+
+
+  /* ---------------------------------------------------------------------- */
+  bool check_symmetry(const Eigen::Ref<const Eigen::ArrayXXd>& eps,
+                      Real rel_tol){
+    return rel_tol >= (eps-eps.transpose()).matrix().norm()/eps.matrix().norm();
+  }
 
 
 }  // muSpectre
