@@ -29,17 +29,11 @@ Boston, MA 02111-1307, USA.
 """
 
 import unittest
-import sys
-import os
 import numpy as np
 
-sys.path.append(os.path.join(os.getcwd(), "language_bindings/python"))
+from python_test_imports import µ
 
-try:
-    import pyMuSpectre as µ
-except ImportError as err:
-    print(err)
-    sys.exit(-1)
+from python_fft_tests import FFT_Check
 
 class SystemCheck(unittest.TestCase):
     def test_Construction(self):
@@ -98,11 +92,11 @@ class SolverCheck(unittest.TestCase):
         Del0 = np.array([[0, .1],
                          [0,  0]])
         maxiter = 100
-        verbose = 2
+        verbose = 0
         # the following segfaults:
         r = µ.solvers.de_geus(self.sys, Del0,
                               tol, tol, maxiter, verbose)
-        print(r)
+        #print(r)
 
 
 

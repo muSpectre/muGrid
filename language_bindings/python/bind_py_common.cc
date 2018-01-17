@@ -49,11 +49,22 @@ void add_get_cube_helper(py::module & mod) {
      "return a Ccoord with the value 'size' repeated in each dimension");
 }
 
+template <Dim_t dim>
+void add_get_hermitian_helper(py::module & mod) {
+  mod.def
+    ("get_hermitian_sizes", &CcoordOps::get_hermitian_sizes<dim>,
+     "full_sizes"_a,
+     "return the hermitian sizes corresponding to the true sizes");
+}
+
 void add_get_cube(py::module & mod) {
   add_get_cube_helper<twoD, Dim_t>(mod);
   add_get_cube_helper<twoD, Real>(mod);
   add_get_cube_helper<threeD, Dim_t>(mod);
   add_get_cube_helper<threeD, Real>(mod);
+
+  add_get_hermitian_helper<  twoD>(mod);
+  add_get_hermitian_helper<threeD>(mod);
 }
 
 template <Dim_t dim>

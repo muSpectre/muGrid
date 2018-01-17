@@ -35,3 +35,4 @@ void add_common(py::module & mod);
 void add_system(py::module & mod);
 void add_material(py::module & mod);
 void add_solvers(py::module & mod);
+void add_fft_engines(py::module & mod);

@@ -46,6 +46,9 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   void FFTW_Engine<DimS, DimM>::initialise(FFT_PlanFlags plan_flags) {
+    if (this->initialised) {
+      throw std::runtime_error("double initialisation, will leak memory");
+    }
     Parent::initialise(plan_flags);
 
     const int & rank = DimS;
@@ -105,6 +108,7 @@ namespace muSpectre {
       throw std::runtime_error("Plan failed");
     }
     fftw_free(r_work_space);
+    this->initialised = true;
   }
 
   /* ---------------------------------------------------------------------- */

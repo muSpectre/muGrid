@@ -127,8 +127,14 @@ endforeach(benchmark ${benchmark})
 
 
 # copy python test
-configure_file(
-  "${CMAKE_SOURCE_DIR}/tests/python_binding_tests.py"
-  "${CMAKE_BINARY_DIR}/python_binding_tests.py"
-  COPYONLY)
+#build tests
+file( GLOB PY_TEST_SRCS "${CMAKE_SOURCE_DIR}/tests/python_*.py")
+
+foreach(pytest ${PY_TEST_SRCS})
+  get_filename_component(pytest_name ${pytest} NAME)
+  configure_file(
+    ${pytest}
+    "${CMAKE_BINARY_DIR}/${pytest_name}"
+    COPYONLY)
+endforeach(pytest ${PY_TEST_SRCS})
 add_test(python_binding_test python_binding_tests.py)

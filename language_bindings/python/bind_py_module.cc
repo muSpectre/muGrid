@@ -41,4 +41,5 @@ PYBIND11_MODULE(pyMuSpectre, mod) {
   add_system(mod);
   add_material(mod);
   add_solvers(mod);
+  add_fft_engines(mod);
 }

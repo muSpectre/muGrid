@@ -56,7 +56,7 @@ namespace muSpectre {
       template <Dim_t Dim, size_t... I>
       constexpr Ccoord_t<Dim> herm(const Ccoord_t<Dim> & full_sizes,
                                    std::index_sequence<I...>) {
-        return Ccoord_t<Dim>{full_sizes[I]..., (full_sizes.back()+1)/2};
+        return Ccoord_t<Dim>{full_sizes[I]..., full_sizes.back()/2+1};
       }
 
       template <Dim_t Dim>

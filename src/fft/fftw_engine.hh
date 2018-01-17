@@ -79,6 +79,7 @@ namespace muSpectre {
     Ccoord hermitian_resolutions;
     fftw_plan plan_fft{};
     fftw_plan plan_ifft{};
+    bool initialised{false};
   private:
   };
 
