@@ -7,7 +7,7 @@
 #
 # @brief  configuration for files in common
 #
-# @section LICENCE
+# @section LICENSE
 #
 # Copyright © 2018 Till Junge
 #

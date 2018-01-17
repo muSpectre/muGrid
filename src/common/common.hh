@@ -7,7 +7,7 @@
  *
  * @brief  Small definitions of commonly used types througout µSpectre
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

@@ -7,7 +7,7 @@
  *
  * @brief  header for python bindings for the common part of µSpectre
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2018 Till Junge
  *

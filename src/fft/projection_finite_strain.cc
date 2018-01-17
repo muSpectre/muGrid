@@ -7,7 +7,7 @@
  *
  * @brief  implementation of standard finite strain projection operator
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

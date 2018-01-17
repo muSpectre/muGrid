@@ -7,7 +7,7 @@
  *
  * @brief  collection of functions used in the context of spectral operations
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

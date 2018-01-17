@@ -7,7 +7,7 @@
 #
 # @brief  some tool to help to do stuff with cmake in µSpectre
 #
-# @section LICENCE
+# @section LICENSE
 #
 # Copyright © 2018 Till Junge
 #

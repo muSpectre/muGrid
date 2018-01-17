@@ -7,7 +7,7 @@
  *
  * @brief  maps over scalar fields
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

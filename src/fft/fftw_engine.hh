@@ -7,7 +7,7 @@
  *
  * @brief  FFT engine using FFTW
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

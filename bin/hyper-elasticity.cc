@@ -7,7 +7,7 @@
  *
  * @brief  Recreation of GooseFFT's hyper-elasticity.py calculation
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2018 Till Junge
  *

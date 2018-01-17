@@ -9,7 +9,7 @@
  *         2017. This follows the simplest and likely not most efficient
  *         implementation (with exception of the Python law)
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

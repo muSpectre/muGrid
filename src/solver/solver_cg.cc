@@ -7,7 +7,7 @@
  *
  * @brief  Implementation of cg solver
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

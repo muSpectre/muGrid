@@ -7,7 +7,7 @@
  *
  * @brief  Free functions for solving
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

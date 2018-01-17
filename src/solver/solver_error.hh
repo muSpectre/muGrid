@@ -7,7 +7,7 @@
  *
  * @brief  Errors raised by solvers
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

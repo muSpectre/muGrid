@@ -7,7 +7,7 @@
 #
 # @brief  configuration for python binding using pybind11
 #
-# @section LICENCE
+# @section LICENSE
 #
 # Copyright © 2018 Till Junge
 #

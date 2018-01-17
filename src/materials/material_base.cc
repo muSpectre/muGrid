@@ -7,7 +7,7 @@
  *
  * @brief  implementation of materi
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

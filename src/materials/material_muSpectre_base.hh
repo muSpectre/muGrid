@@ -12,7 +12,7 @@
  *         second Piola-Kirchhoff stress and Tangent. This class uses the
  *         "curiously recurring template parameter" to avoid virtual calls.
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

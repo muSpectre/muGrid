@@ -8,7 +8,7 @@
  * @brief  Provides pixel-iterable containers for scalar and tensorial fields,
  *         addressable by field name
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

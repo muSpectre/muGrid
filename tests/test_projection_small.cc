@@ -93,14 +93,16 @@ namespace muSpectre {
                                          fix::projector.get_resolutions());
       g.row(0) << k.transpose() * cos(k.dot(vec));
 
-      g = 0.5*((g-g.Identity()).transpose() + (g-g.Identity())).eval();
+      // We need to add I to the term, because this field has a net
+      // zero gradient, which leads to a net -I strain
+      g = 0.5*((g-g.Identity()).transpose() + (g-g.Identity())).eval()+g.Identity();
       v = g;
     }
 
     fix::projector.initialise(FFT_PlanFlags::estimate);
     fix::projector.apply_projection(f_var);
 
-    constexpr bool verbose{true};
+    constexpr bool verbose{false};
     for (auto && tup: akantu::zip(fields, grad, var)) {
       auto & ccoord = std::get<0>(tup);
       auto & g = std::get<1>(tup);
@@ -115,6 +117,11 @@ namespace muSpectre {
         std::cout << std::endl << "grad_proj :" << std::endl << v << std::endl;
         std::cout << std::endl << "ccoord :"    << std::endl << ccoord << std::endl;
         std::cout << std::endl << "vector :"    << std::endl << vec.transpose() << std::endl;
+        std::cout << "means:" << std::endl
+                  << "<strain>:" << std::endl
+                  << grad.mean() << std::endl
+                  << "<proj>:" << std::endl
+                  << var.mean();
       }
     }
   }

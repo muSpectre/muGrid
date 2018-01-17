@@ -7,7 +7,7 @@
  *
  * @brief  helpers for testing
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

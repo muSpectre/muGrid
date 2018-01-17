@@ -8,7 +8,7 @@
  * @brief Base class representing a unit cell system with single
  *        projection operator
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -57,7 +57,8 @@ namespace muSpectre {
     using Collection_ptr = std::unique_ptr<FieldCollection_t>;
     using Material_t = MaterialBase<DimS, DimM>;
     using Material_ptr = std::unique_ptr<Material_t>;
-    using Projection_ptr = std::unique_ptr<ProjectionBase<DimS, DimM>>;
+    using Projection_t = ProjectionBase<DimS, DimM>;
+    using Projection_ptr = std::unique_ptr<Projection_t>;
     using StrainField_t =
       TensorField<FieldCollection_t, Real, secondOrder, DimM>;
     using StressField_t =
@@ -107,6 +108,14 @@ namespace muSpectre {
     StressField_t & directional_stiffness(const TangentField_t & K,
                                           const StrainField_t & delF,
                                           StressField_t & delP);
+    /**
+     * Evaluate directional stiffness into a temporary array and
+     * return a copy. This is a costly and wasteful interface to
+     * directional_stiffness and should only be used for debugging or
+     * in the python interface
+     */
+    Eigen::ArrayXXd directional_stiffness_with_copy
+      (Eigen::Ref<Eigen::ArrayXXd> delF);
 
     /**
      * Convenience function circumventing the neeed to use the
@@ -117,6 +126,10 @@ namespace muSpectre {
     StrainField_t & get_strain();
 
     const StressField_t & get_stress() const;
+
+    const TangentField_t & get_tangent(bool create = false);
+
+    StrainField_t & get_managed_field(std::string unique_name);
 
     /**
      * general initialisation; initialises the projection and
@@ -141,6 +154,11 @@ namespace muSpectre {
      */
     const Formulation & get_formulation() const {
       return this->projection->get_formulation();}
+
+    bool is_initialised() const {return this->initialised;}
+
+    Eigen::Map<Eigen::ArrayXXd> get_projection() {
+      return this->projection->get_operator();}
   protected:
     //! make sure that every pixel is assigned to one and only one material
     void check_material_coverage();
@@ -156,7 +174,7 @@ namespace muSpectre {
     optional<std::reference_wrapper<TangentField_t>> K{};
     std::vector<Material_ptr> materials{};
     Projection_ptr projection;
-    bool is_initialised{false};
+    bool initialised{false};
     const Formulation form;
   private:
   };

@@ -7,7 +7,7 @@
  *
  * @brief  header-only implementation of a field for field collections
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -260,6 +260,7 @@ namespace muSpectre {
 
       inline EigenMap eigen();
       inline ConstEigenMap eigen() const;
+      inline typename Parent::EigenMap dyn_eigen() {return Parent::eigen();}
 
       template<typename otherT>
       inline Real inner_product(const TypedSizedFieldBase<FieldCollection, otherT, NbComponents,

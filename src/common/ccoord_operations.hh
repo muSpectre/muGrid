@@ -7,7 +7,7 @@
  *
  * @brief  common operations on pixel addressing 
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

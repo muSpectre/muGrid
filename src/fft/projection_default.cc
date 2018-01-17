@@ -7,7 +7,7 @@
  *
  * @brief  Implementation default projection implementation
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2018 Till Junge
  *
@@ -38,8 +38,9 @@ namespace muSpectre {
   ProjectionDefault<DimS, DimM>::ProjectionDefault(FFT_Engine_ptr engine,
                                                    Formulation form)
     :Parent{std::move(engine), form},
-     Ghat{make_field<Proj_t>("Projection Operator",
-                             this->projection_container)}
+     Gfield{make_field<Proj_t>("Projection Operator",
+                               this->projection_container)},
+     Ghat{Gfield}
   {}
 
   /* ---------------------------------------------------------------------- */
@@ -53,6 +54,12 @@ namespace muSpectre {
       f = factor * (G*f).eval();
     }
     this->fft_engine->ifft(field);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  Eigen::Map<Eigen::ArrayXXd> ProjectionDefault<DimS, DimM>::get_operator() {
+    return this->Gfield.dyn_eigen();
   }
 
   template class ProjectionDefault<twoD,   twoD>;

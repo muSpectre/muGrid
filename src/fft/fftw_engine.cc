@@ -7,7 +7,7 @@
  *
  * @brief  implements the fftw engine
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

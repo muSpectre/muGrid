@@ -7,7 +7,7 @@
  *
  * @brief  Python bindings for the common part of µSpectre
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2018 Till Junge
  *
@@ -54,6 +54,18 @@ void add_get_cube(py::module & mod) {
   add_get_cube_helper<twoD, Real>(mod);
   add_get_cube_helper<threeD, Dim_t>(mod);
   add_get_cube_helper<threeD, Real>(mod);
+}
+
+template <Dim_t dim>
+void add_get_index_helper(py::module & mod) {
+  mod.def("get_index", &CcoordOps::get_index<dim>, "sizes"_a, "ccoord"_a,
+          "return the linear index corresponding to grid point 'ccoord' in a "
+          "grid of size 'sizes'");
+}
+
+void add_get_index(py::module & mod) {
+  add_get_index_helper<  twoD>(mod);
+  add_get_index_helper<threeD>(mod);
 }
 
 template <Dim_t dim>
@@ -111,4 +123,6 @@ void add_common (py::module & mod) {
   add_get_cube(mod);
 
   add_Pixels(mod);
+
+  add_get_index(mod);
 }

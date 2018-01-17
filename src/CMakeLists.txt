@@ -7,7 +7,7 @@
 #
 # @brief  Configuration for libmuSpectre
 #
-# @section LICENCE
+# @section LICENSE
 #
 # Copyright © 2018 Till Junge
 #

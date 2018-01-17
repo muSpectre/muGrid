@@ -7,7 +7,7 @@
  *
  * @brief  implementation for fast projection in finite strain
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -38,8 +38,9 @@ namespace muSpectre {
   ProjectionFiniteStrainFast<DimS, DimM>::
   ProjectionFiniteStrainFast(FFT_Engine_ptr engine)
     :Parent{std::move(engine), Formulation::finite_strain},
-     xis{make_field<Proj_t>("Projection Operator",
-                            this->projection_container)}
+     xiField{make_field<Proj_t>("Projection Operator",
+                                this->projection_container)},
+     xis(xiField)
   {}
 
   /* ---------------------------------------------------------------------- */
@@ -69,6 +70,13 @@ namespace muSpectre {
       f = factor * ((f*xi).eval()*xi.transpose());
     }
     this->fft_engine->ifft(field);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  Eigen::Map<Eigen::ArrayXXd> ProjectionFiniteStrainFast<DimS, DimM>::
+  get_operator() {
+    return this->xiField.dyn_eigen();
   }
 
   template class ProjectionFiniteStrainFast<twoD,   twoD>;

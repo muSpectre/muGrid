@@ -7,7 +7,7 @@
 #
 # @brief  configuration for system implementations
 #
-# @section LICENCE
+# @section LICENSE
 #
 # Copyright © 2018 Till Junge
 #

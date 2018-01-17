@@ -9,7 +9,7 @@
  *        solver. This follows algorithm 5.2 in Nocedal's Numerical
  *        Optimization (p 112)
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

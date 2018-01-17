@@ -7,7 +7,7 @@
  *
  * @brief  FieldCollection base-class for global fields
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

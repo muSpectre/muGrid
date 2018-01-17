@@ -7,7 +7,7 @@
  *
  * @brief  Python bindings for µSpectre
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2018 Till Junge
  *

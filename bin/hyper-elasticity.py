@@ -8,7 +8,7 @@ file   hyper-elasticity.py
 
 @brief  Recreation of GooseFFT's hyper-elasticity.py calculation
 
-@section LICENCE
+@section LICENSE
 
 Copyright © 2018 Till Junge
 
@@ -36,29 +36,19 @@ import argparse
 sys.path.append(os.path.join(os.getcwd(), "language_bindings/python"))
 import pyMuSpectre as µ
 
-def parse_args():
-    parser = argparse.ArgumentParser(description='hyper-elastic example')
-    parser.add_argument("prefactor", metavar="fac", type=float,
-                        help="factor")
-    args = parser.parse_args()
-    if args.prefactor <= 0:
-        parser.error("prefactor must be a positive and non-zero float")
-    return args
-
-
-def compute(ex):
+def compute():
     N = [11, 11, 11]
     lens = [1., 1., 1.]
     incl_size = 3
 
-    formulation = µ.Formulation.small_strain
+    formulation = µ.Formulation.finite_strain
     cell = µ.SystemFactory(N,
                            lens,
                            formulation)
     hard = µ.material.MaterialHooke3d.make(cell, "hard",
-                                           210.*ex, .33)
+                                           210.e9, .33)
     soft = µ.material.MaterialHooke3d.make(cell, "soft",
-                                            70.*ex, .33)
+                                            70.e9, .33)
     for  pixel in cell:
         # if ((pixel[0] >= N[0]-incl_size) and
         #     (pixel[1] < incl_size) and
@@ -70,21 +60,23 @@ def compute(ex):
 
     print("{} pixels in the inclusion".format(hard.size()))
     cell.initialise();
-    cg_tol, newton_tol = 1e-7, 1e-5
+    cg_tol, newton_tol = 1e-8, 1e-5
     maxiter = 40
     verbose = 3
-    dF_bar = np.array([[.01, .0, 0], [0, 0, 0], [0, 0, 0]])
+    dF_bar = np.array([[0, .02, 0], [0, 0, 0], [0, 0, 0]])
 
     if formulation == µ.Formulation.small_strain:
         dF_bar = .5*(dF_bar + dF_bar.T)
 
+    test_grad = np.zeros((9, cell.size()))
+    test_grad[:,:] = dF_bar.reshape(-1,1)
+    print(cell.directional_stiffness(test_grad)[:,:3])
     optimize_res = µ.solvers.de_geus(
         cell, dF_bar, cg_tol, newton_tol, maxiter, verbose)
     print("nb_cg: {}\n{}".format(optimize_res.nb_fev, optimize_res.grad.T[:2,:]))
 
 def main():
-    args = parse_args()
-    compute(args.prefactor)
+    compute()
 
 if __name__ == "__main__":
     main()

@@ -7,7 +7,7 @@
  *
  * @brief  Python bindings for the system factory function
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2018 Till Junge
  *
@@ -34,6 +34,7 @@
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include "pybind11/eigen.h"
 
 #include <sstream>
 #include <memory>
@@ -80,7 +81,75 @@ void add_system_base_helper(py::module & mod) {
     .def("__iter__", [](sys_t & s) {
         return py::make_iterator(s.begin(), s.end());
       })
-    .def("initialise", &sys_t::initialise, "flags"_a=FFT_PlanFlags::estimate);
+    .def("initialise", &sys_t::initialise, "flags"_a=FFT_PlanFlags::estimate)
+    .def("directional_stiffness",
+         [](sys_t& cell, py::EigenDRef<Eigen::ArrayXXd>& v) {
+           if ((size_t(v.cols()) != cell.size() ||
+                size_t(v.rows()) != dim*dim)) {
+             std::stringstream err{};
+             err << "need array of shape (" << dim*dim << ", "
+                 << cell.size() << ") but got (" << v.rows() << ", "
+                 << v.cols() << ").";
+             throw std::runtime_error(err.str());
+           }
+           if (!cell.is_initialised()) {
+             cell.initialise();
+           }
+           const std::string out_name{"temp output for directional stiffness"};
+           const std::string in_name{"temp input for directional stiffness"};
+           constexpr bool create_tangent{true};
+           auto & K = cell.get_tangent(create_tangent);
+           auto & input = cell.get_managed_field(in_name);
+           auto & output = cell.get_managed_field(out_name);
+           input.eigen() = v;
+           cell.directional_stiffness(K, input, output);
+           return output.eigen();
+         },
+         "δF"_a)
+    .def("project",
+         [](sys_t& cell, py::EigenDRef<Eigen::ArrayXXd>& v) {
+           if ((size_t(v.cols()) != cell.size() ||
+                size_t(v.rows()) != dim*dim)) {
+             std::stringstream err{};
+             err << "need array of shape (" << dim*dim << ", "
+                 << cell.size() << ") but got (" << v.rows() << ", "
+                 << v.cols() << ").";
+             throw std::runtime_error(err.str());
+           }
+           if (!cell.is_initialised()) {
+             cell.initialise();
+           }
+           const std::string in_name{"temp input for projection"};
+           auto & input = cell.get_managed_field(in_name);
+           input.eigen() = v;
+           cell.project(input);
+           return input.eigen();
+         },
+         "field"_a)
+    .def("get_strain",[](sys_t & s) {
+        return Eigen::ArrayXXd(s.get_strain().eigen());
+      })
+    .def("get_stress",[](sys_t & s) {
+        return Eigen::ArrayXXd(s.get_stress().eigen());
+      })
+    .def("size", &sys_t::size)
+    .def("evaluate_stress_tangent",
+         [](sys_t& cell, py::EigenDRef<Eigen::ArrayXXd>& v ) {
+           if ((size_t(v.cols()) != cell.size() ||
+                size_t(v.rows()) != dim*dim)) {
+             std::stringstream err{};
+             err << "need array of shape (" << dim*dim << ", "
+                 << cell.size() << ") but got (" << v.rows() << ", "
+                 << v.cols() << ").";
+             throw std::runtime_error(err.str());
+           }
+           auto & strain{cell.get_strain()};
+           strain.eigen() = v;
+           cell.evaluate_stress_tangent(strain);
+         },
+         "strain"_a)
+    .def("get_G",
+         &sys_t::get_projection);
 }
 
 void add_system_base(py::module & mod) {
@@ -93,5 +162,9 @@ void add_system(py::module & mod) {
 
   auto system{mod.def_submodule("system")};
   system.doc() = "bindings for systems and system factories";
+ 
+  system.def("scale_by_2", [](py::EigenDRef<Eigen::ArrayXXd>& v) {
+      v *= 2;
+    });
   add_system_base(system);
 }

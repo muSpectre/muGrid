@@ -8,7 +8,7 @@
  * @brief  collection of compile-time quantities and algrebraic functions for
  *         tensor operations
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
