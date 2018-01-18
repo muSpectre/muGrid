@@ -28,6 +28,7 @@
  */
 
 #include "fft/fftw_engine.hh"
+#include "bind_py_declarations.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -83,4 +84,5 @@ void add_fft_engines(py::module & mod) {
   auto fft{mod.def_submodule("fft")};
   fft.doc() = "bindings for µSpectre's fft engines";
   add_engine(fft);
+  add_projections(fft);
 }

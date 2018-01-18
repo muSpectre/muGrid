@@ -34,6 +34,7 @@ import numpy as np
 from python_test_imports import µ
 
 from python_fft_tests import FFT_Check
+from python_projection_tests import *
 
 class SystemCheck(unittest.TestCase):
     def test_Construction(self):

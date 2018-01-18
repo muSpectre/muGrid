@@ -27,12 +27,17 @@
  * Boston, MA 02111-1307, USA.
  */
 
+#ifndef BIND_PY_DECLARATIONS_H
+#define BIND_PY_DECLARATIONS_H
+
 #include <pybind11/pybind11.h>
 namespace py = pybind11;
-
 
 void add_common(py::module & mod);
 void add_system(py::module & mod);
 void add_material(py::module & mod);
 void add_solvers(py::module & mod);
 void add_fft_engines(py::module & mod);
+void add_projections(py::module & submodule);
+
+#endif /* BIND_PY_DECLARATIONS_H */
