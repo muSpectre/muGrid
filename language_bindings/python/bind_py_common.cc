@@ -57,6 +57,16 @@ void add_get_hermitian_helper(py::module & mod) {
      "return the hermitian sizes corresponding to the true sizes");
 }
 
+template <Dim_t dim>
+void add_get_ccoord_helper(py::module & mod) {
+  mod.def
+    ("get_ccoord", &CcoordOps::get_ccoord<dim>,
+     "resolutions"_a,
+     "i"_a,
+     "return the cell coordinate corresponding to the i'th cell in a grid of "
+     "shape resolutions");
+}
+
 void add_get_cube(py::module & mod) {
   add_get_cube_helper<twoD, Dim_t>(mod);
   add_get_cube_helper<twoD, Real>(mod);
@@ -65,6 +75,9 @@ void add_get_cube(py::module & mod) {
 
   add_get_hermitian_helper<  twoD>(mod);
   add_get_hermitian_helper<threeD>(mod);
+
+  add_get_ccoord_helper<  twoD>(mod);
+  add_get_ccoord_helper<threeD>(mod);
 }
 
 template <Dim_t dim>

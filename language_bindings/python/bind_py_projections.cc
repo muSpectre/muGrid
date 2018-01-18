@@ -84,7 +84,7 @@ void add_proj_helper(py::module & mod, std::string name_start) {
                 "currently only for DimS==DimM");
 
   std::stringstream name{};
-  name << name_start << DimS << "d";
+  name << name_start << '_' << DimS << 'd';
 
   py::class_<Proj>(mod, name.str().c_str())
     .def(py::init([](Ccoord res, Rcoord lengths) {
