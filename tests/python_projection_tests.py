@@ -90,7 +90,7 @@ class FiniteStrainProjectionGooseFFT(object):
         # NB can be vectorized (faster, less readable), see: "elasto-plasticity.py"
         # - support function / look-up list / zero initialize
         delta  = lambda i,j: np.float(i==j)            # Dirac delta function
-        N = self.ndim
+        N = self.resolution
         freq   = np.fft.fftfreq(N, 1/N)        # coordinate axis -> freq. axis
         Ghat4  = np.zeros([ndim,ndim,ndim,ndim,*shape]) # zero initialize
         # - compute
@@ -196,9 +196,9 @@ def build_test_classes(Projection, RefProjection, name):
             self.shape = list((self.resolution for _ in range(self.ndim)))
             self.projection = Projection(self.shape, self.shape)
             self.projection.initialise()
-            self.tol = 1e-14
+            self.tol = 1e-12*np.prod(self.shape)
 
-        def test_Ghat4(self):
+        def test_CompareGhat4(self):
             # refG is rowmajor and the dims are i,j,k,l,x,y(,z)
             # reshape refG so they are n² × n² × ¶(resolution)
             refG = self.ref.Ghat4.reshape(
@@ -210,21 +210,57 @@ def build_test_classes(Projection, RefProjection, name):
             msp_sizes = µ.get_hermitian_sizes(self.shape)
             hermitian_size = np.prod(msp_sizes)
             mspG = self.projection.get_operator()
-            print(refG.shape)
-            print(mspG.shape)
             rando = np.random.random((self.ndim, self.ndim))
             for i in range(hermitian_size):
                 coord = µ.get_ccoord(msp_sizes, i)
                 ref_id = µ.get_index(ref_sizes, coord)
                 msp_id = µ.get_index(msp_sizes, coord)
-                msp_g = mspG[:, msp_id].reshape(self.ndim**2, self.ndim**2)
+
+                # story behind this order vector:
+                # There was this issue with the projection operator of
+                # de Geus acting on the the transpose of the gradient. 
+                order = np.arange(9).reshape(3, 3).T.reshape(-1)
+                msp_g = mspG[:, msp_id].reshape(self.ndim**2, self.ndim**2)[order, :]
                 error = np.linalg.norm(refG[:, :, ref_id] -
                                        msp_g)
                 condition = error < self.tol
                 if not condition:
-                    print("G_µ{} =\n{}".format(coord, msp_g))
-                    print("G_g{} =\n{}".format(coord, refG[:, :, ref_id]))
+                    print("G_µ{}, at index {} =\n{}".format(coord, msp_id, msp_g))
+                    print("G_g{}, at index {} =\n{}".format(coord, ref_id, refG[:, :, ref_id]))
                 self.assertTrue(condition)
+
+        def test_projection_result(self):
+            # create a bogus strain field in GooseFFT format
+            # dim × dim × N × N (× N)
+            strain_shape = (self.ndim, self.ndim, *self.shape)
+            strain = np.arange(np.prod(strain_shape)).reshape(strain_shape)
+            # if we're testing small strain projections, it needs to be symmetric
+            if self.projection.get_formulation() == µ.Formulation.small_strain:
+                strain += strain.transpose(1, 0, *range(2, len(strain.shape)))
+            strain_g = strain.copy()
+            b_g = self.ref.G(strain_g).reshape(strain_g.shape)
+            strain_µ = np.zeros((*self.shape, self.ndim, self.ndim))
+            for ijk in itertools.product(range(self.resolution), repeat=self.ndim):
+                index_µ = tuple((*ijk, slice(None), slice(None)))
+                index_g = tuple((slice(None), slice(None), *ijk))
+                strain_µ[index_µ] = strain_g[index_g].T
+            b_µ = self.projection.apply_projection(strain_µ.reshape(
+                np.prod(self.shape), self.ndim**2).T).T.reshape(strain_µ.shape, order="f")
+            for ijk in itertools.product(range(self.resolution), repeat=self.ndim):
+                index_µ = tuple((*ijk, slice(None), slice(None)))
+                index_g = tuple((slice(None), slice(None), *ijk))
+                b_µ_sl = b_µ[index_µ]
+                b_g_sl = b_g[index_g]
+                error = np.linalg.norm(b_µ_sl-b_g_sl)
+                condition = error < self.tol
+                slice_printer = lambda tup: "({})".format(
+                    ", ".join("{}".format(":" if val == slice(None) else val) for val in tup))
+                if not condition:
+                    print("error = {}, tol = {}".format(error, self.tol))
+                    print("b_µ{} =\n{}".format(slice_printer(index_µ), b_µ_sl))
+                    print("b_g{} =\n{}".format(slice_printer(index_g), b_g_sl))
+                self.assertTrue(condition)
+
 
     return ProjectionCheck
 
@@ -234,7 +270,5 @@ get_finite_goose = lambda ndim: FiniteStrainProjectionGooseFFT(
 FiniteStrainProjectionCheck = build_test_classes(µ.fft.ProjectionFiniteStrain_3d,
                                                 get_finite_goose(3),
                                                 "FiniteStrainDefaultProjection")
-
 if __name__ == "__main__":
-    f = FiniteStrainProjectionCheck()
-    f.setUp()
+    unittest.main()

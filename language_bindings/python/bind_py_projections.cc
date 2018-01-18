@@ -103,7 +103,10 @@ void add_proj_helper(py::module & mod, std::string name_start) {
            proj.apply_projection(temp);
            return Eigen::ArrayXXd{temp.eigen()};
          })
-    .def("get_operator", &Proj::get_operator);
+    .def("get_operator", &Proj::get_operator)
+    .def("get_formulation", &Proj::get_formulation,
+         "return a Formulation enum indicating whether the projection is small"
+         " or finite strain");
 }
 
 void add_proj_dispatcher(py::module & mod) {

@@ -58,6 +58,17 @@ namespace muSpectre {
       auto xi = fft_freqs.get_unit_xi(ccoord);
       //! this is simplifiable using Curnier's Méthodes numériques, 6.69(c)
       G = Matrices::outer_under(Matrices::I2<DimM>(), xi*xi.transpose());
+      // The commented block below corresponds to the original
+      // definition of the operator in de Geus et
+      // al. (https://doi.org/10.1016/j.cma.2016.12.032). However,
+      // they use a bizarre definition of the double contraction
+      // between fourth-order and second-order tensors that has a
+      // built-in transpose operation (i.e., C = A:B <-> AᵢⱼₖₗBₗₖ =
+      // Cᵢⱼ , note the inverted ₗₖ instead of ₖₗ), here, we define
+      // the double contraction without the transposition. As a
+      // result, the Projection operator produces the transpose of de
+      // Geus's
+
       // for (Dim_t im = 0; im < DimS; ++im) {
       //   for (Dim_t j = 0; j < DimS; ++j) {
       //     for (Dim_t l = 0; l < DimS; ++l) {
