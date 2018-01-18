@@ -38,7 +38,7 @@ from python_test_imports import µ
 
 def get_bulk_shear(E, nu):
     return E/(3*(1-2*nu)), E/(2*(1+nu))
-class FiniteStrainProjectionGooseFFT(object):
+class ProjectionGooseFFT(object):
     def __init__(self, ndim, resolution, incl_size, E, nu, contrast):
         """
         wraps the GooseFFT hyper-elasticity script into a more user-friendly
@@ -96,10 +96,8 @@ class FiniteStrainProjectionGooseFFT(object):
         # - compute
         for xyz    in itertools.product(range(N),   repeat=self.ndim):
             q = np.array([freq[index] for index in xyz])  # frequency vector
-            if not q.dot(q) == 0:                      # zero freq. -> mean
-                for i,j,l,m in itertools.product(range(ndim),repeat=4):
-                    index = tuple((i,j,l,m,*xyz))
-                    Ghat4[index] = delta(i,m)*q[j]*q[l]/(q.dot(q))
+            index = tuple((*(slice(None) for _ in range(4)), *xyz))
+            Ghat4[index] = self.comp_ghat(q)
 
         # (inverse) Fourier transform (for each tensor component in each direction)
         fft    = lambda x  : np.fft.fftn (x, shape)
@@ -109,6 +107,9 @@ class FiniteStrainProjectionGooseFFT(object):
         G      = lambda A2 : np.real( ifft( ddot42(Ghat4,fft(A2)) ) ).reshape(-1)
         K_dF   = lambda dFm: trans2(ddot42(self.K4,trans2(dFm.reshape(ndim,ndim,*shape))))
         G_K_dF = lambda dFm: G(K_dF(dFm))
+        K_deps   = lambda depsm: ddot42(self.C4,depsm.reshape(ndim,ndim,N,N,N))
+        G_K_deps = lambda depsm: G(K_deps(depsm))
+
 
         # ------------------- PROBLEM DEFINITION / CONSTITIVE MODEL ----------------
 
@@ -126,8 +127,9 @@ class FiniteStrainProjectionGooseFFT(object):
         mu = param(self.mu, self.contrast*self.mu)
 
         # constitutive model: grid of "F" -> grid of "P", "K4"        [grid of tensors]
+        self.C4 = K*II+2.*mu*(I4s-1./3.*II)
         def constitutive(F):
-            C4 = K*II+2.*mu*(I4s-1./3.*II)
+            C4 = self.C4
             S  = ddot42(C4,.5*(dot22(trans2(F),F)-I))
             P  = dot22(F,S)
             K4 = dot24(S,I4)+ddot44(ddot44(I4rt,dot42(dot24(F,C4),trans2(F))),I4rt)
@@ -138,6 +140,19 @@ class FiniteStrainProjectionGooseFFT(object):
         self.G = G
         self.G_K_dF = G_K_dF
         self.Ghat4 = Ghat4
+        self.G_K_deps = G_K_deps
+
+class FiniteStrainProjectionGooseFFT(ProjectionGooseFFT):
+    def __init__(self, ndim, resolution, incl_size, E, nu, contrast):
+        super().__init__(ndim, resolution, incl_size, E, nu, contrast)
+
+    def comp_ghat(self, q):
+        temp = np.zeros((self.ndim, self.ndim, self.ndim, self.ndim))
+        delta  = lambda i,j: np.float(i==j)            # Dirac delta function
+        if not q.dot(q) == 0:                      # zero freq. -> mean
+            for i,j,l,m in itertools.product(range(self.ndim),repeat=4):
+                temp[i, j, l, m] = delta(i,m)*q[j]*q[l]/(q.dot(q))
+        return temp
 
     def run(self):
         ndim = self.ndim
@@ -181,6 +196,67 @@ class FiniteStrainProjectionGooseFFT(object):
 
         print("nb_cg: {0}".format(acc.counter))
 
+class SmallStrainProjectionGooseFFT(ProjectionGooseFFT):
+    def __init__(self, ndim, resolution, incl_size, E, nu, contrast):
+        super().__init__(ndim, resolution, incl_size, E, nu, contrast)
+
+    def comp_ghat(self, q):
+        temp = np.zeros((self.ndim, self.ndim, self.ndim, self.ndim))
+        delta  = lambda i,j: np.float(i==j)            # Dirac delta function
+        if not q.dot(q) == 0:                      # zero freq. -> mean
+            for i,j,l,m in itertools.product(range(self.ndim),repeat=4):
+                temp[i, j, l, m] = -(q[i]*q[j]*q[l]*q[m])/(q.dot(q))**2+\
+             (delta(j,l)*q[i]*q[m]+delta(j,m)*q[i]*q[l]+\
+              delta(i,l)*q[j]*q[m]+delta(i,m)*q[j]*q[l])/(2.*q.dot(q))
+        return temp
+
+    def tangent_stiffness(self, field):
+        return self.constitutive(F)[0]
+
+    def run(self):
+        ndim = self.ndim
+        shape = tuple((self.resolution for _ in range(ndim)))
+        # ----------------------------- NEWTON ITERATIONS -----------------------------
+
+        # initialize stress and strain tensor              [grid of tensors]
+        sig      = np.zeros([ndim,ndim,N,N,N])
+        eps      = np.zeros([ndim,ndim,N,N,N])
+
+        # set macroscopic loading
+        DE       = np.zeros([ndim,ndim,N,N,N])
+        DE[0,1] += 0.01
+        DE[1,0] += 0.01
+
+        # initial residual: distribute "barF" over grid using "K4"
+        b     = -self.G_K_deps(DE)
+        eps     +=           DE
+        En       = np.linalg.norm(eps)
+        iiter    = 0
+
+        # iterate as long as the iterative update does not vanish
+        class accumul(object):
+            def __init__(self):
+                self.counter = 0
+            def __call__(self, dummy):
+                self.counter += 1
+
+        acc = accumul()
+        while True:
+            depsm,_ = sp.cg(tol=1.e-8,
+                            A = sp.LinearOperator(shape=(
+                                eps.size,eps.size),matvec=self.G_K_deps,dtype='float'),
+                            b = b,
+                            callback=acc
+            )                                     # solve linear system using CG
+            eps  += depsm.reshape(ndim,ndim,*shape)  # update DOFs (array -> tens.grid)
+            sig  = ddot42(self.C4, eps)           # new residual stress and tangent
+            b     = -self.G(sig)                         # convert res.stress to residual
+            print('%10.2e'%(np.linalg.norm(depsm)/En)) # print residual to the screen
+            if np.linalg.norm(depsm)/en<1.e-5 and iiter>0: break # check convergence
+            iiter += 1
+
+        print("nb_cg: {0}".format(acc.counter))
+
 
 
 def build_test_classes(Projection, RefProjection, name):
@@ -210,6 +286,11 @@ def build_test_classes(Projection, RefProjection, name):
             msp_sizes = µ.get_hermitian_sizes(self.shape)
             hermitian_size = np.prod(msp_sizes)
             mspG = self.projection.get_operator()
+            #this test only makes sense for fully stored ghats (i.e.,
+            #not for the faster alternative implementation
+            if mspG.size != hermitian_size*self.ndim**4:
+                return
+
             rando = np.random.random((self.ndim, self.ndim))
             for i in range(hermitian_size):
                 coord = µ.get_ccoord(msp_sizes, i)
@@ -218,8 +299,9 @@ def build_test_classes(Projection, RefProjection, name):
 
                 # story behind this order vector:
                 # There was this issue with the projection operator of
-                # de Geus acting on the the transpose of the gradient. 
-                order = np.arange(9).reshape(3, 3).T.reshape(-1)
+                # de Geus acting on the the transpose of the gradient.
+                order = np.arange(self.ndim**2).reshape(
+                    self.ndim, self.ndim).T.reshape(-1)
                 msp_g = mspG[:, msp_id].reshape(self.ndim**2, self.ndim**2)[order, :]
                 error = np.linalg.norm(refG[:, :, ref_id] -
                                        msp_g)
@@ -244,12 +326,13 @@ def build_test_classes(Projection, RefProjection, name):
                 index_µ = tuple((*ijk, slice(None), slice(None)))
                 index_g = tuple((slice(None), slice(None), *ijk))
                 strain_µ[index_µ] = strain_g[index_g].T
+
             b_µ = self.projection.apply_projection(strain_µ.reshape(
-                np.prod(self.shape), self.ndim**2).T).T.reshape(strain_µ.shape, order="f")
+                np.prod(self.shape), self.ndim**2).T).T.reshape(strain_µ.shape)
             for ijk in itertools.product(range(self.resolution), repeat=self.ndim):
                 index_µ = tuple((*ijk, slice(None), slice(None)))
                 index_g = tuple((slice(None), slice(None), *ijk))
-                b_µ_sl = b_µ[index_µ]
+                b_µ_sl = b_µ[index_µ].T
                 b_g_sl = b_g[index_g]
                 error = np.linalg.norm(b_µ_sl-b_g_sl)
                 condition = error < self.tol
@@ -264,11 +347,31 @@ def build_test_classes(Projection, RefProjection, name):
 
     return ProjectionCheck
 
-get_finite_goose = lambda ndim: FiniteStrainProjectionGooseFFT(
-    ndim, 11, 3, 70e9, .33, 3.)
+get_goose = lambda ndim, proj_type: proj_type(
+    ndim, 5, 2, 70e9, .33, 3.)
+get_finite_goose = lambda ndim: get_goose(ndim, FiniteStrainProjectionGooseFFT)
+get_small_goose  = lambda ndim: get_goose(ndim,  SmallStrainProjectionGooseFFT)
 
-FiniteStrainProjectionCheck = build_test_classes(µ.fft.ProjectionFiniteStrain_3d,
-                                                get_finite_goose(3),
-                                                "FiniteStrainDefaultProjection")
+
+small_default_3 = build_test_classes(µ.fft.ProjectionSmallStrain_3d,
+                                     get_small_goose(3),
+                                     "SmallStrainDefaultProjection3d")
+small_default_2 = build_test_classes(µ.fft.ProjectionSmallStrain_2d,
+                                     get_small_goose(2),
+                                     "SmallStrainDefaultProjection2d")
+
+finite_default_3 = build_test_classes(µ.fft.ProjectionFiniteStrain_3d,
+                                      get_finite_goose(3),
+                                      "FiniteStrainDefaultProjection3d")
+finite_default_2 = build_test_classes(µ.fft.ProjectionFiniteStrain_2d,
+                                      get_finite_goose(2),
+                                      "FiniteStrainDefaultProjection2d")
+
+finite_fast_3 = build_test_classes(µ.fft.ProjectionFiniteStrainFast_3d,
+                                   get_finite_goose(3),
+                                   "FiniteStrainFastProjection3d")
+finite_fast_2 = build_test_classes(µ.fft.ProjectionFiniteStrainFast_2d,
+                                   get_finite_goose(2),
+                                   "FiniteStrainFastProjection2d")
 if __name__ == "__main__":
     unittest.main()
