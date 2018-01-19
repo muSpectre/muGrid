@@ -31,6 +31,8 @@
 #include "solver/solver_cg.hh"
 #include "common/iterators.hh"
 
+#include <Eigen/IterativeLinearSolvers>
+
 #include <iomanip>
 #include <cmath>
 
@@ -55,9 +57,14 @@ namespace muSpectre {
     // field to store the rhs for cg calculations
     auto & rhs{make_field<Field_t>("rhs", *solver_fields)};
 
-    SolverCG<DimS, DimM> cg(sys.get_resolutions(),
-                            cg_tol, maxiter, verbose-1>0);
-    cg.initialise();
+    // SolverCG<DimS, DimM> cg(sys.get_resolutions(),
+    //                         cg_tol, maxiter, verbose-1>0);
+    // cg.initialise();
+    Eigen::ConjugateGradient<typename SystemBase<DimS, DimM>::Adaptor, Eigen::Lower|Eigen::Upper, Eigen::IdentityPreconditioner> cg{};
+    cg.setTolerance(cg_tol);
+    cg.setMaxIterations(maxiter);
+    auto adaptor = sys.get_adaptor();
+    cg.compute(adaptor);
 
 
     if (maxiter == 0) {
@@ -127,6 +134,7 @@ namespace muSpectre {
     sys.initialise_materials(need_tangent);
 
     Grad_t<DimM> previous_grad{Grad_t<DimM>::Zero()};
+    Uint cg_counter{0};
     for (const auto & delF: delFs) { //incremental loop
 
       Real incrNorm{2*newton_tol}, gradNorm{1};
@@ -152,14 +160,20 @@ namespace muSpectre {
         if (newt_iter == 0) {
           DeltaF.get_map() = -(delF-previous_grad); // neg sign because rhs
           tangent_effect(DeltaF, rhs);
-          cg.solve(tangent_effect, rhs, incrF);
+          // cg.solve(tangent_effect, rhs, incrF);
+          incrF.eigenvec() = cg.solve(rhs.eigenvec());
           F.eigen() -= DeltaF.eigen();
         } else {
           rhs.eigen() = -P.eigen();
           sys.project(rhs);
-          cg.solve(tangent_effect, rhs, incrF);
+          //cg.solve(tangent_effect, rhs, incrF);
+          incrF.eigenvec() = cg.solve(rhs.eigenvec());
+        }
+        if (cg.info() != Eigen::Success) {
+          throw SolverError("cg did not converge");
         }
 
+        cg_counter += cg.iterations();
         F.eigen() += incrF.eigen();
 
         incrNorm = incrF.eigen().matrix().norm();
@@ -181,7 +195,7 @@ namespace muSpectre {
       ret_val.push_back(OptimizeResult{F.eigen(), sys.get_stress().eigen(),
             convergence_test(), Int(convergence_test()),
             "message not yet implemented",
-            newt_iter, cg.get_counter()});
+            newt_iter, cg_counter});
 
 
       //!store history variables here

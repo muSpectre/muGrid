@@ -36,7 +36,7 @@ sys.path.append(os.path.join(os.getcwd(), "language_bindings/python"))
 import pyMuSpectre as µ
 
 
-resolution = [555, 555]
+resolution = [251, 251]
 center = np.array([r//2 for r in resolution])
 incl = resolution[0]//5
 
@@ -53,16 +53,16 @@ soft = µ.material.MaterialHooke2d.make(
 
 
 for i, pixel in enumerate(rve):
-    #if np.linalg.norm(center - np.array(pixel))<incl:
-    if (abs(center - np.array(pixel)).max()<incl or
-        np.linalg.norm(center/2 - np.array(pixel))<incl):
+    if np.linalg.norm(center - np.array(pixel),2)<incl:
+    #if (abs(center - np.array(pixel)).max()<incl or
+    #    np.linalg.norm(center/2 - np.array(pixel))<incl):
         hard.add_pixel(pixel)
     else:
         soft.add_pixel(pixel)
 
 tol = 1e-6
 
-Del0 = np.array([[.03, .01],
+Del0 = np.array([[.0, .0],
                  [0,  .03]])
 if formulation == µ.Formulation.small_strain:
     Del0 = .5*(Del0 + Del0.T)

@@ -47,6 +47,7 @@ if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
   add_compile_options(-Wno-missing-braces)
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
   # using GCC
+  add_compile_options(-Wno-non-virtual-dtor)
   string( TOLOWER "${CMAKE_BUILD_TYPE}" build_type )
   if ("release" STREQUAL "${build_type}" )
     add_compile_options(-march=native)

@@ -98,6 +98,33 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
+  typename SystemBase<DimS, DimM>::SolvVectorOut
+  SystemBase<DimS, DimM>::directional_stiffness_vec(const SolvVectorIn &delF) {
+    if (!this->K) {
+      throw std::runtime_error
+        ("corrently only implemented for cases where a stiffness matrix "
+         "exists");
+    }
+    if (delF.size() != this->nb_dof()) {
+      std::stringstream err{};
+      err << "input should be of size ndof = ¶(" << this->resolutions <<") × "
+          << DimS << "² = "<< this->nb_dof() << " but I got " << delF.size();
+      throw std::runtime_error(err.str());
+    }
+    const std::string out_name{"temp output for directional stiffness"};
+    const std::string in_name{"temp input for directional stiffness"};
+
+    auto & out_tempref = this->get_managed_field(out_name);
+    auto & in_tempref = this->get_managed_field(in_name);
+    SolvVectorOut(in_tempref.data(), this->nb_dof()) = delF;
+
+    this->directional_stiffness(this->K.value(), in_tempref, out_tempref);
+    return SolvVectorOut(out_tempref.data(), this->nb_dof());
+
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
   Eigen::ArrayXXd
   SystemBase<DimS, DimM>::
   directional_stiffness_with_copy
@@ -201,6 +228,13 @@ namespace muSpectre {
   typename SystemBase<DimS, DimM>::iterator
   SystemBase<DimS, DimM>::end() {
     return this->pixels.end();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  SystemAdaptor<SystemBase<DimS, DimM>>
+  SystemBase<DimS, DimM>::get_adaptor() {
+    return Adaptor(*this);
   }
 
   /* ---------------------------------------------------------------------- */
