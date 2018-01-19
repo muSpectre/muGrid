@@ -36,10 +36,12 @@ sys.path.append(os.path.join(os.getcwd(), "language_bindings/python"))
 import pyMuSpectre as µ
 
 
-resolution = [5, 5]
+resolution = [555, 555]
+center = np.array([r//2 for r in resolution])
+incl = resolution[0]//5
 
 lengths = [7., 5.]
-formulation = µ.Formulation.finite_strain
+formulation = µ.Formulation.small_strain
 
 rve = µ.SystemFactory(resolution,
                       lengths,
@@ -51,15 +53,17 @@ soft = µ.material.MaterialHooke2d.make(
 
 
 for i, pixel in enumerate(rve):
-    if i < 3:
+    #if np.linalg.norm(center - np.array(pixel))<incl:
+    if (abs(center - np.array(pixel)).max()<incl or
+        np.linalg.norm(center/2 - np.array(pixel))<incl):
         hard.add_pixel(pixel)
     else:
         soft.add_pixel(pixel)
 
 tol = 1e-6
 
-Del0 = np.array([[0, .001],
-                 [0,  0]])
+Del0 = np.array([[.03, .01],
+                 [0,  .03]])
 if formulation == µ.Formulation.small_strain:
     Del0 = .5*(Del0 + Del0.T)
 maxiter = 301
@@ -69,3 +73,20 @@ r = µ.solvers.de_geus(rve, Del0, tol, tol, maxiter, verbose)
 print(r.grad.T[:3])
 print(r.stress.T[:3])
 print(r.nb_fev)
+
+print(r.grad.T.shape)
+import matplotlib.pyplot as plt
+stress = r.stress.T.reshape(*resolution, 2, 2)
+def comp_von_mises(arr):
+    out_arr = np.zeros(resolution)
+    s11 = arr[:,:,0,0]
+    s22 = arr[:,:,1,1]
+    s21_2 = arr[:,:,0,1]*arr[:,:,1,0]
+
+    out_arr[:] = np.sqrt(.5*((s11-s22)**2) + s11**2 + s22**2 + 6*s21_2)
+    return out_arr
+
+von_mises = comp_von_mises(stress)
+plt.pcolormesh(von_mises)
+plt.colorbar()
+plt.show()

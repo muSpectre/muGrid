@@ -66,15 +66,18 @@ namespace muSpectre {
 
     size_t count_width{};
     const auto form{sys.get_formulation()};
+    std::string strain_symb{};
     if (verbose > 0) {
       //setup of algorithm 5.2 in Nocedal, Numerical Optimization (p. 111)
       std::cout << "de Geus for ";
       switch (form) {
       case Formulation::small_strain: {
+        strain_symb = "ε";
         std::cout << "small";
         break;
       }
       case Formulation::finite_strain: {
+        strain_symb = "F";
         std::cout << "finite";
         break;
       }
@@ -84,7 +87,8 @@ namespace muSpectre {
       }
       std::cout << " strain with" << std::endl
                 << "newton_tol = " << newton_tol << ", cg_tol = "
-                << cg_tol << " maxiter = " << maxiter << " and ΔF =" <<std::endl;
+                << cg_tol << " maxiter = " << maxiter << " and Δ"
+                << strain_symb << " =" <<std::endl;
       for (auto&& tup: akantu::enumerate(delFs)) {
         auto && counter{std::get<0>(tup)};
         auto && grad{std::get<1>(tup)};
@@ -162,10 +166,12 @@ namespace muSpectre {
         gradNorm = F.eigen().matrix().norm();
         if (verbose>0) {
           std::cout << "at Newton step " << std::setw(count_width) << newt_iter
-                    << ", |δF|/|ΔF| = " << std::setw(17) << incrNorm/gradNorm
+                    << ", |δ" << strain_symb << "|/|Δ" << strain_symb
+                    << "| = " << std::setw(17) << incrNorm/gradNorm
                     << ", tol = " << newton_tol << std::endl;
           if (verbose-1>1) {
-            std::cout << "<F> =" << std::endl << F.get_map().mean() << std::endl;
+            std::cout << "<" << strain_symb << "> =" << std::endl
+                      << F.get_map().mean() << std::endl;
           }
         }
       }
@@ -228,15 +234,18 @@ namespace muSpectre {
 
     size_t count_width{};
     const auto form{sys.get_formulation()};
+    std::string strain_symb{};
     if (verbose > 0) {
       //setup of algorithm 5.2 in Nocedal, Numerical Optimization (p. 111)
       std::cout << "Newton-CG for ";
       switch (form) {
       case Formulation::small_strain: {
+        strain_symb = "ε";
         std::cout << "small";
         break;
       }
       case Formulation::finite_strain: {
+        strain_symb = "Fy";
         std::cout << "finite";
         break;
       }
@@ -246,7 +255,8 @@ namespace muSpectre {
       }
       std::cout << " strain with" << std::endl
                 << "newton_tol = " << newton_tol << ", cg_tol = "
-                << cg_tol << " maxiter = " << maxiter << " and ΔF =" <<std::endl;
+                << cg_tol << " maxiter = " << maxiter << " and Δ"
+                << strain_symb << " =" <<std::endl;
       for (auto&& tup: akantu::enumerate(delFs)) {
         auto && counter{std::get<0>(tup)};
         auto && grad{std::get<1>(tup)};
@@ -320,11 +330,13 @@ namespace muSpectre {
         gradNorm = F.eigen().matrix().norm();
         if (verbose > 0) {
           std::cout << "at Newton step " << std::setw(count_width) << newt_iter
-                    << ", |δF|/|ΔF| = " << std::setw(17) << incrNorm/gradNorm
+                    << ", |δ" << strain_symb << "|/|Δ" << strain_symb
+                    << "| = " << std::setw(17) << incrNorm/gradNorm
                     << ", tol = " << newton_tol << std::endl;
 
           if (verbose-1>1) {
-            std::cout << "<F> =" << std::endl << F.get_map().mean() << std::endl;
+            std::cout << "<" << strain_symb << "> =" << std::endl
+                      << F.get_map().mean() << std::endl;
           }
         }
 
