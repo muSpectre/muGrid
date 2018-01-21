@@ -157,6 +157,7 @@ namespace muSpectre {
       using EigenRep = Eigen::Array<T, Eigen::Dynamic, Eigen::Dynamic>;
       using EigenMap = Eigen::Map<EigenRep>;
       using EigenVec = Eigen::Map<Eigen::VectorXd>;
+      using EigenVecConst = Eigen::Map<const Eigen::VectorXd>;
       //! Default constructor
       TypedFieldBase() = delete;
 
@@ -192,6 +193,7 @@ namespace muSpectre {
 
       EigenMap eigen();
       EigenVec eigenvec();
+      EigenVecConst eigenvec() const;
 
     protected:
     private:
@@ -471,6 +473,14 @@ protected:
     TypedFieldBase<FieldCollection, T>::
     eigenvec() {
       return EigenVec(this->data(), this->get_nb_components() * this->size());
+    }
+
+    /* ---------------------------------------------------------------------- */
+    template <class FieldCollection, typename T>
+    typename TypedFieldBase<FieldCollection, T>::EigenVecConst
+    TypedFieldBase<FieldCollection, T>::
+    eigenvec() const{
+      return EigenVecConst(this->data(), this->get_nb_components() * this->size());
     }
 
 

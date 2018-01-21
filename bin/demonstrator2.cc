@@ -82,7 +82,8 @@ int main()
   Dim_t verbose {1};
 
   auto start = std::chrono::high_resolution_clock::now();
-  auto res = de_geus(system, DeltaF, cg_tol, newton_tol, maxiter, verbose);
+  SolverCG<dim, dim> cg{system, cg_tol, maxiter, bool(verbose)};
+  auto res = de_geus(system, DeltaF, cg, newton_tol, verbose);
   std::chrono::duration<Real> dur = std::chrono::high_resolution_clock::now() - start;
   std::cout << "Resolution time = " << dur.count() << "s" << std::endl;
 

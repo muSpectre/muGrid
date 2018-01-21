@@ -30,6 +30,7 @@
 set (solvers_SRC
   ${CMAKE_CURRENT_SOURCE_DIR}/solver_base.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/solver_cg.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/solver_cg_eigen.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/solvers.cc
   )
 

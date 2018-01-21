@@ -46,14 +46,19 @@ namespace muSpectre {
   {
   public:
     enum class TangentRequirement{NoNeed, NeedEffect, NeedTangents};
+    using Sys_t = SystemBase<DimS, DimM>;
     using Ccoord = Ccoord_t<DimS>;
     using Collection_t = GlobalFieldCollection<DimS, DimM>;
+    using SolvVectorIn = Eigen::Ref<Eigen::VectorXd>;
+    using SolvVectorInC = Eigen::Ref<const Eigen::VectorXd>;
+    using SolvVectorOut = Eigen::VectorXd;
+
 
     //! Default constructor
     SolverBase() = delete;
 
     //! Constructor with domain resolutions
-    SolverBase(Ccoord resolutions): resolutions{resolutions} {}
+    SolverBase(Sys_t & sys, Real tol, Uint maxiter=0, bool verbose =false);
 
     //! Copy constructor
     SolverBase(const SolverBase &other) = delete;
@@ -71,7 +76,7 @@ namespace muSpectre {
     SolverBase& operator=(SolverBase &&other) = default;
 
     //! Allocate fields used during the solution
-    void initialise() {this->collection.initialise(resolutions);}
+    virtual void initialise() {this->collection.initialise(this->sys.get_resolutions());}
 
     bool need_tangents() const {
       return (this->get_tangent_req() == TangentRequirement::NeedTangents);}
@@ -82,14 +87,36 @@ namespace muSpectre {
     bool no_need_tangent() const {
       return (this->get_tangent_req() == TangentRequirement::NoNeed);}
 
-    bool has_converged() const {return this->converged;}
+    virtual bool has_converged() const = 0;
+
+    //! reset the iteration counter to zero
+    void reset_counter();
+
+    //! get the count of how many solve steps have been executed since
+    //! construction of most recent counter reset
+    Uint get_counter() const;
+
+    virtual SolvVectorOut solve(const SolvVectorInC rhs, SolvVectorIn x_0) = 0;
+
+    Sys_t & get_system() {return sys;}
+
+    Uint get_maxiter() const {return this->maxiter;}
+    void set_maxiter(Uint val) {this->maxiter = val;}
+
+    Real get_tol() const {return this->tol;}
+    void set_tol(Real val) {this->tol = val;}
+
+    virtual std::string name() const = 0;
 
   protected:
     virtual TangentRequirement get_tangent_req() const = 0;
-    Ccoord resolutions;
+    Sys_t & sys;
+    Real tol;
+    Uint maxiter;
+    bool verbose;
+    Uint counter{0};
     //! storage for internal fields to avoid reallocations between calls
     Collection_t collection{};
-    bool converged{false};
   private:
   };
 

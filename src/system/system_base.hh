@@ -49,7 +49,7 @@ namespace muSpectre {
   class SystemAdaptor;
   //! DimS spatial dimension (dimension of problem
   //! DimM material_dimension (dimension of constitutive law)
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimS, Dim_t DimM=DimS>
   class SystemBase
   {
   public:

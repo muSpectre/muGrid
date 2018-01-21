@@ -41,7 +41,7 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   std::vector<OptimizeResult>
   de_geus (SystemBase<DimS, DimM> & sys, const GradIncrements<DimM> & delFs,
-           const Real cg_tol, const Real newton_tol, Uint maxiter,
+           SolverBase<DimS, DimM> & solver, Real newton_tol,
            Dim_t verbose) {
 
     using Field_t = typename MaterialBase<DimS, DimM>::StrainField_t;
@@ -57,18 +57,11 @@ namespace muSpectre {
     // field to store the rhs for cg calculations
     auto & rhs{make_field<Field_t>("rhs", *solver_fields)};
 
-    // SolverCG<DimS, DimM> cg(sys.get_resolutions(),
-    //                         cg_tol, maxiter, verbose-1>0);
-    // cg.initialise();
-    Eigen::ConjugateGradient<typename SystemBase<DimS, DimM>::Adaptor, Eigen::Lower|Eigen::Upper, Eigen::IdentityPreconditioner> cg{};
-    cg.setTolerance(cg_tol);
-    cg.setMaxIterations(maxiter);
-    auto adaptor = sys.get_adaptor();
-    cg.compute(adaptor);
+    solver.initialise();
 
 
-    if (maxiter == 0) {
-      maxiter = sys.size()*DimM*DimM*10;
+    if (solver.get_maxiter() == 0) {
+      solver.set_maxiter(sys.size()*DimM*DimM*10);
     }
 
     size_t count_width{};
@@ -76,7 +69,7 @@ namespace muSpectre {
     std::string strain_symb{};
     if (verbose > 0) {
       //setup of algorithm 5.2 in Nocedal, Numerical Optimization (p. 111)
-      std::cout << "de Geus for ";
+      std::cout << "de Geus-" << solver.name() << " for ";
       switch (form) {
       case Formulation::small_strain: {
         strain_symb = "ε";
@@ -94,7 +87,7 @@ namespace muSpectre {
       }
       std::cout << " strain with" << std::endl
                 << "newton_tol = " << newton_tol << ", cg_tol = "
-                << cg_tol << " maxiter = " << maxiter << " and Δ"
+                << solver.get_tol() << " maxiter = " << solver.get_maxiter() << " and Δ"
                 << strain_symb << " =" <<std::endl;
       for (auto&& tup: akantu::enumerate(delFs)) {
         auto && counter{std::get<0>(tup)};
@@ -102,7 +95,7 @@ namespace muSpectre {
         std::cout << "Step " << counter + 1 << ":" << std::endl
                   << grad << std::endl;
       }
-      count_width = size_t(std::log10(maxiter))+1;
+      count_width = size_t(std::log10(solver.get_maxiter()))+1;
     }
 
     // initialise F = I or ε = 0
@@ -134,7 +127,6 @@ namespace muSpectre {
     sys.initialise_materials(need_tangent);
 
     Grad_t<DimM> previous_grad{Grad_t<DimM>::Zero()};
-    Uint cg_counter{0};
     for (const auto & delF: delFs) { //incremental loop
 
       Real incrNorm{2*newton_tol}, gradNorm{1};
@@ -143,7 +135,7 @@ namespace muSpectre {
       };
       Uint newt_iter{0};
       for (;
-           (newt_iter < maxiter) && (!convergence_test() ||
+           (newt_iter < solver.get_maxiter()) && (!convergence_test() ||
                                      (newt_iter==1));
            ++newt_iter) {
 
@@ -160,20 +152,14 @@ namespace muSpectre {
         if (newt_iter == 0) {
           DeltaF.get_map() = -(delF-previous_grad); // neg sign because rhs
           tangent_effect(DeltaF, rhs);
-          // cg.solve(tangent_effect, rhs, incrF);
-          incrF.eigenvec() = cg.solve(rhs.eigenvec());
+          incrF.eigenvec() = solver.solve(rhs.eigenvec(), incrF.eigenvec());
           F.eigen() -= DeltaF.eigen();
         } else {
           rhs.eigen() = -P.eigen();
           sys.project(rhs);
-          //cg.solve(tangent_effect, rhs, incrF);
-          incrF.eigenvec() = cg.solve(rhs.eigenvec());
-        }
-        if (cg.info() != Eigen::Success) {
-          throw SolverError("cg did not converge");
+          incrF.eigenvec() = solver.solve(rhs.eigenvec(), incrF.eigenvec());
         }
 
-        cg_counter += cg.iterations();
         F.eigen() += incrF.eigen();
 
         incrNorm = incrF.eigen().matrix().norm();
@@ -195,7 +181,7 @@ namespace muSpectre {
       ret_val.push_back(OptimizeResult{F.eigen(), sys.get_stress().eigen(),
             convergence_test(), Int(convergence_test()),
             "message not yet implemented",
-            newt_iter, cg_counter});
+            newt_iter, solver.get_counter()});
 
 
       //!store history variables here
@@ -208,7 +194,7 @@ namespace muSpectre {
 
   template std::vector<OptimizeResult>
   de_geus (SystemBase<twoD, twoD> & sys, const GradIncrements<twoD>& delF0,
-           const Real cg_tol, const Real newton_tol, Uint maxiter,
+           SolverBase<twoD, twoD> & solver, Real newton_tol,
            Dim_t verbose);
 
   // template typename SystemBase<twoD, threeD>::StrainField_t &
@@ -218,14 +204,14 @@ namespace muSpectre {
 
   template std::vector<OptimizeResult>
   de_geus (SystemBase<threeD, threeD> & sys, const GradIncrements<threeD>& delF0,
-           const Real cg_tol, const Real newton_tol, Uint maxiter,
+           SolverBase<threeD, threeD> & solver, Real newton_tol,
            Dim_t verbose);
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   std::vector<OptimizeResult>
   newton_cg (SystemBase<DimS, DimM> & sys, const GradIncrements<DimM> & delFs,
-             const Real cg_tol, const Real newton_tol, Uint maxiter,
+             SolverBase<DimS, DimM> & solver, Real newton_tol,
              Dim_t verbose) {
     using Field_t = typename MaterialBase<DimS, DimM>::StrainField_t;
     auto solver_fields{std::make_unique<GlobalFieldCollection<DimS, DimM>>()};
@@ -237,13 +223,10 @@ namespace muSpectre {
     // field to store the rhs for cg calculations
     auto & rhs{make_field<Field_t>("rhs", *solver_fields)};
 
-    SolverCG<DimS, DimM> cg(sys.get_resolutions(),
-                            cg_tol, maxiter, verbose-1>0);
-    cg.initialise();
+    solver.initialise();
 
-
-    if (maxiter == 0) {
-      maxiter = sys.size()*DimM*DimM*10;
+    if (solver.get_maxiter() == 0) {
+      solver.set_maxiter(sys.size()*DimM*DimM*10);
     }
 
     size_t count_width{};
@@ -251,7 +234,7 @@ namespace muSpectre {
     std::string strain_symb{};
     if (verbose > 0) {
       //setup of algorithm 5.2 in Nocedal, Numerical Optimization (p. 111)
-      std::cout << "Newton-CG for ";
+      std::cout << "Newton-" << solver.name() << " for ";
       switch (form) {
       case Formulation::small_strain: {
         strain_symb = "ε";
@@ -269,7 +252,7 @@ namespace muSpectre {
       }
       std::cout << " strain with" << std::endl
                 << "newton_tol = " << newton_tol << ", cg_tol = "
-                << cg_tol << " maxiter = " << maxiter << " and Δ"
+                << solver.get_tol() << " maxiter = " << solver.get_maxiter() << " and Δ"
                 << strain_symb << " =" <<std::endl;
       for (auto&& tup: akantu::enumerate(delFs)) {
         auto && counter{std::get<0>(tup)};
@@ -277,7 +260,7 @@ namespace muSpectre {
         std::cout << "Step " << counter + 1 << ":" << std::endl
                   << grad << std::endl;
       }
-      count_width = size_t(std::log10(maxiter))+1;
+      count_width = size_t(std::log10(solver.get_maxiter()))+1;
     }
 
     // initialise F = I or ε = 0
@@ -322,21 +305,17 @@ namespace muSpectre {
       Uint newt_iter{0};
 
       for (;
-           newt_iter < maxiter && !convergence_test();
+           newt_iter < solver.get_maxiter() && !convergence_test();
            ++newt_iter) {
 
         // obtain material response
         auto res_tup{sys.evaluate_stress_tangent(F)};
         auto & P{std::get<0>(res_tup)};
-        auto & K{std::get<1>(res_tup)};
-
-        auto tangent_effect = [&sys, &K] (const Field_t & dF, Field_t & dP) {
-          sys.directional_stiffness(K, dF, dP);
-        };
 
         rhs.eigen() = -P.eigen();
         sys.project(rhs);
-        cg.solve(tangent_effect, rhs, incrF);
+        incrF.eigenvec() = solver.solve(rhs.eigenvec(), incrF.eigenvec());
+
 
         F.eigen() += incrF.eigen();
 
@@ -361,7 +340,7 @@ namespace muSpectre {
       ret_val.push_back(OptimizeResult{F.eigen(), sys.get_stress().eigen(),
             convergence_test(), Int(convergence_test()),
             "message not yet implemented",
-            newt_iter, cg.get_counter()});
+            newt_iter, solver.get_counter()});
 
       //store history variables here
 
@@ -373,7 +352,7 @@ namespace muSpectre {
 
   template std::vector<OptimizeResult>
   newton_cg (SystemBase<twoD, twoD> & sys, const GradIncrements<twoD>& delF0,
-             const Real cg_tol, const Real newton_tol, Uint maxiter,
+             SolverBase<twoD, twoD> & solver, Real newton_tol,
              Dim_t verbose);
 
   // template typename SystemBase<twoD, threeD>::StrainField_t &
@@ -383,7 +362,7 @@ namespace muSpectre {
 
   template std::vector<OptimizeResult>
   newton_cg (SystemBase<threeD, threeD> & sys, const GradIncrements<threeD>& delF0,
-             const Real cg_tol, const Real newton_tol, Uint maxiter,
+             SolverBase<threeD, threeD> & solver, Real newton_tol,
              Dim_t verbose);
 
 

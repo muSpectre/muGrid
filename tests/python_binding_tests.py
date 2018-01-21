@@ -95,8 +95,9 @@ class SolverCheck(unittest.TestCase):
         maxiter = 100
         verbose = 0
         # the following segfaults:
+        solver=µ.solvers.SolverCG(self.sys, tol, maxiter, verbose)
         r = µ.solvers.de_geus(self.sys, Del0,
-                              tol, tol, maxiter, verbose)
+                              solver,tol, verbose)
         #print(r)
 
 

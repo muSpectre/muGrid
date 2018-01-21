@@ -126,7 +126,7 @@ int main(int argc, char *argv[])
 
   constexpr Real newton_tol{1e-4};
   constexpr Real cg_tol{1e-7};
-  const size_t maxiter = nb_dofs;
+  const Uint maxiter = nb_dofs;
 
   Grad_t<dim> DeltaF{Grad_t<dim>::Zero()};
   DeltaF(0, 1) = .1;
@@ -134,7 +134,8 @@ int main(int argc, char *argv[])
 
   auto start = std::chrono::high_resolution_clock::now();
   GradIncrements<dim> grads{DeltaF};
-  de_geus(system, grads, cg_tol, newton_tol, maxiter, verbose);
+  SolverCG<dim> cg{system, cg_tol, maxiter, bool(verbose)};
+  de_geus(system, grads, cg, newton_tol, verbose);
   std::chrono::duration<Real> dur = std::chrono::high_resolution_clock::now() - start;
   std::cout << "Resolution time = " << dur.count() << "s" << std::endl;
 

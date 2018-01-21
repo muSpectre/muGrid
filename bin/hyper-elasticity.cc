@@ -31,6 +31,7 @@
 #include "system/system_factory.hh"
 #include "materials/material_hyper_elastic1.hh"
 #include "solver/solvers.hh"
+#include "solver/solver_cg.hh"
 
 #include <iostream>
 #include <iomanip>
@@ -82,8 +83,8 @@ int main()
 
   Grad_t<dim> dF_bar{Grad_t<dim>::Zero()};
   dF_bar(0, 1) = 1.;
-
-  auto optimize_res = de_geus(cell, dF_bar, cg_tol, newton_tol, maxiter, verbose);
+  SolverCG<dim> cg{cell, cg_tol, maxiter, verbose};
+  auto optimize_res = de_geus(cell, dF_bar, cg, newton_tol, verbose);
 
   std::cout << "nb_cg: " << optimize_res.nb_fev << std::endl;
   std::cout << optimize_res.grad.transpose().block(0,0,10,9) << std::endl;
