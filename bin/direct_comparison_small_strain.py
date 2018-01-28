@@ -13,7 +13,7 @@ import pyMuSpectre as µ
 # ----------------------------------- GRID ------------------------------------
 
 ndim   = 2            # number of dimensions
-N      = 99 #31  # number of voxels (assumed equal for all directions)
+N      = 31 #31  # number of voxels (assumed equal for all directions)
 offset = 3 #9
 ndof   = ndim**2*N**2 # number of degrees-of-freedom
 
@@ -77,14 +77,37 @@ G_K_deps = lambda depsm: G(K_deps(depsm))
 
 # phase indicator: cubical inclusion of volume fraction (9**3)/(31**3)
 
+E2, E1 = 75e10, 70e9
+poisson = .33
+
+hard = µ.material.MaterialHooke2d.make(cell, "hard",
+                                       E2, poisson)
+soft = µ.material.MaterialHooke2d.make(cell, "soft",
+                                       E1, poisson)
+
+#for pixel in cell:
+#    if ((pixel[0] >= N-offset) and
+#        (pixel[1] < offset)):
+#        hard.add_pixel(pixel)
+#    else:
+#        soft.add_pixel(pixel)
+#
 phase  = np.zeros(shape); phase[-offset:,:offset,] = 1.
 phase  = np.zeros(shape); phase[0,:] = 1.
+
+phase  = np.zeros(shape);
+for i, j in itertools.product(range(N),   repeat=ndim):
+    c = N//2
+    if (i-c)**2 + (j-c)**2 < (N//5)**2:
+    #if j<10:
+        phase[i,j] = 1.
+        hard.add_pixel([i,j])
+    else:
+        soft.add_pixel([i,j])
 # material parameters + function to convert to grid of scalars
 param  = lambda M0,M1: M0*np.ones(shape)*(1.-phase)+M1*np.ones(shape)*phase
 # K      = param(0.833,8.33)  # bulk  modulus                   [grid of scalars]
 # mu     = param(0.386,3.86)  # shear modulus                   [grid of scalars]
-E2, E1 = 210e9, 70e9
-poisson = .33
 K2, K1 = (E/(3*(1-2*poisson)) for E in (E2, E1))
 m2, m1 = (E/(2*(1+poisson)) for E in (E2, E1))
 K =  param(K1, K2)
@@ -93,17 +116,6 @@ mu = param(m1, m2)
 # stiffness tensor                                            [grid of tensors]
 K4     = K*II+2.*mu*(I4s-1./3.*II)
 
-hard = µ.material.MaterialHooke2d.make(cell, "hard",
-                                       E2, poisson)
-soft = µ.material.MaterialHooke2d.make(cell, "soft",
-                                       E1, poisson)
-
-for pixel in cell:
-    if ((pixel[0] >= N-offset) and
-        (pixel[1] < offset)):
-        hard.add_pixel(pixel)
-    else:
-        soft.add_pixel(pixel)
 
 
 
@@ -117,6 +129,7 @@ eps      = np.zeros([ndim,ndim,N,N])
 DE       = np.zeros([ndim,ndim,N,N])
 DE[0,1] += 0.01
 DE[1,0] += 0.01
+delEps0 = DE[:ndim, :ndim, 0, 0]
 
 µDE = np.zeros([ndim**2, cell.size()])
 cell.evaluate_stress_tangent(µDE);
@@ -125,8 +138,9 @@ cell.evaluate_stress_tangent(µDE);
 
 # initial residual: distribute "DE" over grid using "K4"
 b        = -G_K_deps(DE)
-G_K_deps2 = lambda de: cell.directional_stiffness(de)
-b2       = -G_K_deps2(µDE)
+G_K_deps2 = lambda de: cell.directional_stiffness(de.reshape(µDE.shape)).ravel()
+b2       = -G_K_deps2(µDE).ravel()
+print("b2.shape = {}".format(b2.shape))
 
 eps     +=           DE
 En       = np.linalg.norm(eps)
@@ -136,20 +150,37 @@ iiter    = 0
 class accumul(object):
     def __init__(self):
         self.counter = 0
-    def __call__(self, dummy):
+    def __call__(self, x):
         self.counter += 1
+        print("at step {}: ||Ax-b||/||b|| = {}".format(
+            self.counter,
+            np.linalg.norm(G_K_deps(x)-b)/np.linalg.norm(b)))
 
 acc = accumul()
+cg_tol = 1e-8
+maxiter = 60
+solver = µ.solvers.SolverCGEigen(cell, cg_tol, maxiter, verbose=True)
+solver = µ.solvers.SolverCG(cell, cg_tol, maxiter, verbose=True)
+try:
+    r = µ.solvers.newton_cg(cell, delEps0, solver, 1e-5, verbose=True)
+except Exception as err:
+    print(err)
 while True:
-    depsm,_ = sp.cg(tol=1.e-8,
+    depsm,_ = sp.cg(tol=cg_tol,
                     A = sp.LinearOperator(shape=(ndof,ndof),matvec=G_K_deps,dtype='float'),
                     b = b,
                     callback=acc
     )                                     # solve linear system using CG
+    #depsm2,_ = sp.cg(tol=1.e-8,
+    #                 A = sp.LinearOperator(shape=(ndof,ndof),matvec=G_K_deps2,dtype='float'),
+    #                 b = b2,
+    #                 callback=acc
+    #)                                     # solve linear system using CG
     eps += depsm.reshape(ndim,ndim,N,N) # update DOFs (array -> tens.grid)
     sig  = ddot42(K4,eps)                 # new residual stress
     b     = -G(sig)                       # convert residual stress to residual
     print('%10.2e'%(np.max(depsm)/En))    # print residual to the screen
+    print(np.linalg.norm(depsm)/np.linalg.norm(En))
     if np.linalg.norm(depsm)/En<1.e-5 and iiter>0: break # check convergence
     iiter += 1
 
@@ -157,5 +188,41 @@ print("nb_cg: {0}".format(acc.counter))
 
 import matplotlib.pyplot as plt
 
-plt.pcolormesh(eps[0,0,:,:])
+
+s11 = sig[0,0, :,:]
+s22 = sig[1,1, :,:]
+s21_2 = sig[0,1, :, :]*sig[1,0,:, :]
+vonM1 = np.sqrt(.5*((s11-s22)**2) + s11**2 + s22**2 + 6*s21_2)
+
+#vonM1 = np.sqrt(sig[0, 0, :, :]**2 + sig[1, 1, :, :]**2 - sig[0, 0, :, :] * sig[1, 1, :, :] + 3 * sig[0,1]**2)
+
+plt.figure()
+img = plt.pcolormesh(vonM1)#eps[0,1,:,:])
+plt.title("goose")
+plt.colorbar(img)
+
+try:
+    print(r.stress.shape)
+    arr = r.stress.T.reshape(N, N, ndim, ndim)
+    s11 = arr[:,:,0,0]
+    s22 = arr[:,:,1,1]
+    s21_2 = arr[:,:,0,1]*arr[:,:,1,0]
+    vonM2 = np.sqrt(.5*((s11-s22)**2) + s11**2 + s22**2 + 6*s21_2)
+
+    plt.figure()
+    plt.title("µSpectre")
+    img = plt.pcolormesh(vonM2)#eps[0,1,:,:])
+    plt.colorbar(img)
+    print("err = {}".format (np.linalg.norm(vonM1-vonM2)))
+    print("err2 = {}".format (np.linalg.norm(vonM1-vonM1.T)))
+    print("err3 = {}".format (np.linalg.norm(vonM2-vonM2.T)))
+
+    plt.figure()
+    plt.title("diff")
+    img = plt.pcolormesh(vonM1-vonM2.T)#eps[0,1,:,:])
+    plt.colorbar(img)
+except Exception as err:
+    print(err)
+
+
 plt.show()

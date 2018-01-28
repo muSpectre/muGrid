@@ -157,6 +157,7 @@ namespace muSpectre {
         } else {
           rhs.eigen() = -P.eigen();
           sys.project(rhs);
+          incrF.eigen() = 0;
           incrF.eigenvec() = solver.solve(rhs.eigenvec(), incrF.eigenvec());
         }
 
@@ -314,6 +315,7 @@ namespace muSpectre {
 
         rhs.eigen() = -P.eigen();
         sys.project(rhs);
+        incrF.eigen() = 0;
         incrF.eigenvec() = solver.solve(rhs.eigenvec(), incrF.eigenvec());
 
 
