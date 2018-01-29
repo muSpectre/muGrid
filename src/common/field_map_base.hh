@@ -7,7 +7,7 @@
  *
  * @brief  Defined a strongly defines proxy that iterates efficiently over a field
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

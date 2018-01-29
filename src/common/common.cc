@@ -7,7 +7,7 @@
  *
  * @brief  Implementation for common functions
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

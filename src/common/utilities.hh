@@ -7,7 +7,7 @@
  *
  * @brief  additions to the standard name space to anticipate C++17 features
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

@@ -1,15 +1,15 @@
 /**
- * file   solver_error.hh
+ * file   system_traits.hh
  *
- * @author Till Junge <till.junge@altermail.ch>
+ * @author Till Junge <till.junge@epfl.ch>
  *
- * @date   28 Dec 2017
+ * @date   19 Jan 2018
  *
- * @brief  Errors raised by solvers
+ * @brief  Provides traits for Eigen solvers to be able to use Systems
  *
  * @section LICENSE
  *
- * Copyright © 2017 Till Junge
+ * Copyright © 2018 Till Junge
  *
  * µSpectre is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -27,22 +27,24 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#ifndef SOLVER_ERROR_H
-#define SOLVER_ERROR_H
+#include "common/common.hh"
 
-#include <stdexcept>
+#include <Eigen/IterativeLinearSolvers>
 
 namespace muSpectre {
 
-  class SolverError: public std::runtime_error {
-    using runtime_error::runtime_error;
-  };
-
-  class ConvergenceError: public SolverError {
-    using SolverError::SolverError;
-  };
+  template <class System>
+  class SystemAdaptor;
 
 }  // muSpectre
 
-
-#endif /* SOLVER_ERROR_H */
+namespace Eigen {
+  namespace internal {
+    using Dim_t = muSpectre::Dim_t;
+    using Real =  muSpectre::Real;
+    template<class System>
+    struct traits<muSpectre::SystemAdaptor<System>> :
+      public Eigen::internal::traits<Eigen::SparseMatrix<Real> >
+    {};
+  }  // internal
+}  // Eigen

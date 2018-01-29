@@ -7,7 +7,7 @@
  *
  * @brief  python bindings for µSpectre's materials
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2018 Till Junge
  *

@@ -29,6 +29,8 @@
 
 #include "tests.hh"
 #include "solver/solvers.hh"
+#include "solver/solver_cg.hh"
+#include "solver/solver_cg_eigen.hh"
 #include "fft/fftw_engine.hh"
 #include "fft/projection_finite_strain_fast.hh"
 #include "materials/material_hyper_elastic1.hh"
@@ -79,9 +81,11 @@ namespace muSpectre {
     constexpr bool verbose{false};
 
     GradIncrements<dim> grads; grads.push_back(delF0);
-    Eigen::ArrayXXd res1{de_geus(sys, grads, cg_tol, newton_tol, maxiter, verbose)[0].grad};
+    SolverCG<dim> cg{sys, cg_tol, maxiter, bool(verbose)};
+    Eigen::ArrayXXd res1{de_geus(sys, grads, cg, newton_tol, verbose)[0].grad};
 
-    Eigen::ArrayXXd res2{newton_cg(sys, grads, cg_tol, newton_tol, maxiter, verbose)[0].grad};
+    SolverCG<dim> cg2{sys, cg_tol, maxiter, bool(verbose)};
+    Eigen::ArrayXXd res2{newton_cg(sys, grads, cg2, newton_tol, verbose)[0].grad};
     BOOST_CHECK_LE(abs(res1-res2).mean(), cg_tol);
   }
 
@@ -89,9 +93,9 @@ namespace muSpectre {
     constexpr Dim_t dim{twoD};
     using Ccoord = Ccoord_t<dim>;
     using Rcoord = Rcoord_t<dim>;
-    constexpr Ccoord resolutions{3, 3};
-    constexpr Rcoord lengths{3, 3};
-    constexpr Formulation form{Formulation::finite_strain};
+    constexpr Ccoord resolutions{CcoordOps::get_cube<dim>(3)};
+    constexpr Rcoord lengths{CcoordOps::get_cube<dim>(1.)};
+    constexpr Formulation form{Formulation::small_strain};
 
     // number of layers in the hard material
     constexpr Uint nb_lays{1};
@@ -103,7 +107,7 @@ namespace muSpectre {
     auto sys{make_system(resolutions, lengths, form)};
 
     using Mat_t = MaterialHyperElastic1<dim, dim>;
-    constexpr Real Young{2e9}, Poisson{.33};
+    constexpr Real Young{2.}, Poisson{.33};
     auto material_hard{std::make_unique<Mat_t>("hard", contrast*Young, Poisson)};
     auto material_soft{std::make_unique<Mat_t>("soft",          Young, Poisson)};
 
@@ -119,15 +123,17 @@ namespace muSpectre {
     sys.add_material(std::move(material_soft));
     sys.initialise();
 
-    Grad_t<dim> delEps0;
+    Grad_t<dim> delEps0{Grad_t<dim>::Zero()};
     constexpr Real eps0 = 1.;
-    delEps0 << eps0, 0, 0, 0;
+    //delEps0(0, 1) = delEps0(1, 0) = eps0;
+    delEps0(0, 0) = eps0;
 
     constexpr Real cg_tol{1e-8}, newton_tol{1e-5};
-    constexpr Uint maxiter{CcoordOps::get_size(resolutions)*ipow(dim, secondOrder)*10};
+    constexpr Uint maxiter{dim*10};
     constexpr Dim_t verbose{0};
 
-    auto result = newton_cg(sys, delEps0, cg_tol, newton_tol, maxiter, verbose);
+    SolverCGEigen<dim> cg{sys, cg_tol, maxiter, bool(verbose)};
+    auto result = de_geus(sys, delEps0, cg, newton_tol, verbose);
     if (verbose) {
       std::cout << "result:" << std::endl << result.grad << std::endl;
       std::cout << "mean strain = " << std::endl
@@ -158,16 +164,31 @@ namespace muSpectre {
     Grad_t<dim> Eps_hard; Eps_hard << eps_hard, 0, 0, 0;
     Grad_t<dim> Eps_soft; Eps_soft << eps_soft, 0, 0, 0;
 
-    // TODO small strain projection incorrect
-    // for (const auto & pixel: sys) {
-    //   if (pixel[0] < Dim_t(nb_lays)) {
-    //     BOOST_CHECK_LE((Eps_hard-sys.get_strain().get_map()[pixel]).norm(), tol);
-    //   } else {
-    //     BOOST_CHECK_LE((Eps_soft-sys.get_strain().get_map()[pixel]).norm(), tol);
-    //   }
-    // }
+    // verify uniaxial tension patch test
+    for (const auto & pixel: sys) {
+      if (pixel[0] < Dim_t(nb_lays)) {
+        BOOST_CHECK_LE((Eps_hard-sys.get_strain().get_map()[pixel]).norm(), tol);
+      } else {
+        BOOST_CHECK_LE((Eps_soft-sys.get_strain().get_map()[pixel]).norm(), tol);
+      }
+    }
 
+    delEps0 = Grad_t<dim>::Zero();
+    delEps0(0, 1) = delEps0(1, 0) = eps0;
 
+    SolverCG<dim> cg2{sys, cg_tol, maxiter, bool(verbose)};
+    result = newton_cg(sys, delEps0, cg2, newton_tol, verbose);
+    Eps_hard << 0, eps_hard, eps_hard, 0;
+    Eps_soft << 0, eps_soft, eps_soft, 0;
+
+    // verify pure shear patch test
+    for (const auto & pixel: sys) {
+      if (pixel[0] < Dim_t(nb_lays)) {
+        BOOST_CHECK_LE((Eps_hard-sys.get_strain().get_map()[pixel]).norm(), tol);
+      } else {
+        BOOST_CHECK_LE((Eps_soft-sys.get_strain().get_map()[pixel]).norm(), tol);
+      }
+    }
   }
 
   BOOST_AUTO_TEST_SUITE_END();

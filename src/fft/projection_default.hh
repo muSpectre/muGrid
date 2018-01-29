@@ -10,7 +10,7 @@
  *         k-space point (as opposed to 'smart' faster implementations, such as
  *         ProjectionFiniteStrainFast
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright (C) 2018 Till Junge
  *
@@ -74,8 +74,11 @@ namespace muSpectre {
     //! apply the projection operator to a field
     void apply_projection(Field_t & field) override final;
 
+    Eigen::Map<Eigen::ArrayXXd> get_operator() override final;
+
 
   protected:
+    Proj_t & Gfield;
     Proj_map Ghat;
   private:
   };

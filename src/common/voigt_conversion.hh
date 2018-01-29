@@ -8,7 +8,7 @@
  * @brief  utilities to transform vector notation arrays into voigt notation
  *         arrays and vice-versa
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

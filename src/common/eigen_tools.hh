@@ -7,7 +7,7 @@
  *
  * @brief  small tools to be used with Eigen
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

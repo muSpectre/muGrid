@@ -7,7 +7,7 @@
  *
  * @brief  Python bindings for the common part of µSpectre
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2018 Till Junge
  *
@@ -49,11 +49,47 @@ void add_get_cube_helper(py::module & mod) {
      "return a Ccoord with the value 'size' repeated in each dimension");
 }
 
+template <Dim_t dim>
+void add_get_hermitian_helper(py::module & mod) {
+  mod.def
+    ("get_hermitian_sizes", &CcoordOps::get_hermitian_sizes<dim>,
+     "full_sizes"_a,
+     "return the hermitian sizes corresponding to the true sizes");
+}
+
+template <Dim_t dim>
+void add_get_ccoord_helper(py::module & mod) {
+  mod.def
+    ("get_ccoord", &CcoordOps::get_ccoord<dim>,
+     "resolutions"_a,
+     "i"_a,
+     "return the cell coordinate corresponding to the i'th cell in a grid of "
+     "shape resolutions");
+}
+
 void add_get_cube(py::module & mod) {
   add_get_cube_helper<twoD, Dim_t>(mod);
   add_get_cube_helper<twoD, Real>(mod);
   add_get_cube_helper<threeD, Dim_t>(mod);
   add_get_cube_helper<threeD, Real>(mod);
+
+  add_get_hermitian_helper<  twoD>(mod);
+  add_get_hermitian_helper<threeD>(mod);
+
+  add_get_ccoord_helper<  twoD>(mod);
+  add_get_ccoord_helper<threeD>(mod);
+}
+
+template <Dim_t dim>
+void add_get_index_helper(py::module & mod) {
+  mod.def("get_index", &CcoordOps::get_index<dim>, "sizes"_a, "ccoord"_a,
+          "return the linear index corresponding to grid point 'ccoord' in a "
+          "grid of size 'sizes'");
+}
+
+void add_get_index(py::module & mod) {
+  add_get_index_helper<  twoD>(mod);
+  add_get_index_helper<threeD>(mod);
 }
 
 template <Dim_t dim>
@@ -111,4 +147,6 @@ void add_common (py::module & mod) {
   add_get_cube(mod);
 
   add_Pixels(mod);
+
+  add_get_index(mod);
 }

@@ -7,7 +7,7 @@
  *
  * @brief  Implementation of cg solver
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -32,41 +32,50 @@
 
 #include <iomanip>
 #include <cmath>
+#include <sstream>
 
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  SolverCG<DimS, DimM>::SolverCG(Ccoord resolutions, Real tol, Uint maxiter,
+  SolverCG<DimS, DimM>::SolverCG(Sys_t& sys, Real tol, Uint maxiter,
                                  bool verbose)
-    :Parent(resolutions),
+    :Parent(sys, tol, maxiter, verbose),
      r_k{make_field<Field_t>("residual r_k", this->collection)},
      p_k{make_field<Field_t>("search direction r_k", this->collection)},
-     Ap_k{make_field<Field_t>("Effect of tangent A*p_k", this->collection)},
-     tol{tol}, maxiter{maxiter}, verbose{verbose}, counter{0}
+     Ap_k{make_field<Field_t>("Effect of tangent A*p_k", this->collection)}
   {}
+
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void SolverCG<DimS, DimM>::solve(const Fun_t& tangent_effect,
-                                   const Field_t & rhs,
-                              Field_t & x_f) {
+  void SolverCG<DimS, DimM>::solve(const Field_t & rhs,
+                                   Field_t & x_f) {
+    x_f.eigenvec() = this-> solve(rhs.eigenvec(), x_f.eigenvec());
+  };
+
+  //----------------------------------------------------------------------------//
+  template <Dim_t DimS, Dim_t DimM>
+  typename SolverCG<DimS, DimM>::SolvVectorOut
+  SolverCG<DimS, DimM>::solve(const SolvVectorInC rhs, SolvVectorIn x_0) {
+
     // Following implementation of algorithm 5.2 in Nocedal's Numerical Optimization (p. 112)
 
     auto r = this->r_k.eigen();
     auto p = this->p_k.eigen();
     auto Ap = this->Ap_k.eigen();
-    auto x = x_f.eigen();
+    auto x = typename Field_t::EigenMap(x_0.data(), r.rows(), r.cols());
 
     // initialisation of algo
-    tangent_effect(x_f, this->r_k);
+    r = this->sys.directional_stiffness_with_copy(x);
 
-    r -= rhs.eigen();
+
+    r -= typename Field_t::ConstEigenMap(rhs.data(), r.rows(), r.cols());
     p = -r;
 
     this->converged = false;
     Real rdr = (r*r).sum();
-    Real rhs_norm2 = (rhs.eigen()*rhs.eigen()).sum();
+    Real rhs_norm2 = rhs.squaredNorm();
     Real tol2 = ipow(this->tol,2)*rhs_norm2;
 
 
@@ -76,7 +85,7 @@ namespace muSpectre {
     }
 
     for (Uint i = 0; i < this->maxiter && rdr > tol2; ++i, ++this->counter) {
-      tangent_effect(this->p_k, this->Ap_k);
+      Ap = this->sys.directional_stiffness_with_copy(p);
 
       Real alpha = rdr/(p*Ap).sum();
 
@@ -89,7 +98,7 @@ namespace muSpectre {
 
       if (this->verbose) {
         std::cout << "  at CG step " << std::setw(count_width) << i
-                  << ": |r| = " << std::setw(17) << std::sqrt(rdr)
+                  << ": |r|/|b| = " << std::setw(15) << std::sqrt(rdr/rhs_norm2)
                   << ", cg_tol = " << this->tol << std::endl;
       }
 
@@ -98,21 +107,16 @@ namespace muSpectre {
     if (rdr < tol2) {
       this->converged=true;
     } else {
-      throw ConvergenceError("Conjugate gradient has not converged");
+      std::stringstream err {};
+      err << " After " << this->counter << " steps, the solver "
+          << " FAILED with  |r|/|b| = "
+          << std::setw(15) << std::sqrt(rdr/rhs_norm2)
+          << ", cg_tol = " << this->tol << std::endl;
+      throw ConvergenceError("Conjugate gradient has not converged." + err.str());
     }
+    return x_0;
   }
 
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void SolverCG<DimS, DimM>::reset_counter() {
-    this->counter = 0;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  Uint SolverCG<DimS, DimM>::get_counter() const {
-    return this->counter;
-  }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>

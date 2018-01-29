@@ -7,7 +7,7 @@
  *
  * @brief  small case for debugging
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2018 Till Junge
  *
@@ -32,6 +32,7 @@
 #include "system/system_factory.hh"
 #include "materials/material_hyper_elastic1.hh"
 #include "solver/solvers.hh"
+#include "solver/solver_cg.hh"
 
 #include <iostream>
 
@@ -74,10 +75,11 @@ int main()
   Del0 <<  0, .1,
            0,  0;
 
-  Dim_t maxiter{31};
+  Uint maxiter{31};
   Dim_t verbose{3};
 
-  auto res = de_geus(rve, Del0, tol, tol, maxiter, verbose);
+  SolverCG<dim> cg{rve, tol, maxiter, bool(verbose)};
+  auto res = de_geus(rve, Del0, cg, tol, verbose);
   std::cout << res.grad.transpose() << std::endl;
   return 0;
 }

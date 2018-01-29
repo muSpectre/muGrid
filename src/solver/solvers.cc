@@ -7,7 +7,7 @@
  *
  * @brief  implementation of solver functions
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -31,6 +31,8 @@
 #include "solver/solver_cg.hh"
 #include "common/iterators.hh"
 
+#include <Eigen/IterativeLinearSolvers>
+
 #include <iomanip>
 #include <cmath>
 
@@ -39,7 +41,7 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   std::vector<OptimizeResult>
   de_geus (SystemBase<DimS, DimM> & sys, const GradIncrements<DimM> & delFs,
-           const Real cg_tol, const Real newton_tol, Uint maxiter,
+           SolverBase<DimS, DimM> & solver, Real newton_tol,
            Dim_t verbose) {
 
     using Field_t = typename MaterialBase<DimS, DimM>::StrainField_t;
@@ -55,26 +57,27 @@ namespace muSpectre {
     // field to store the rhs for cg calculations
     auto & rhs{make_field<Field_t>("rhs", *solver_fields)};
 
-    SolverCG<DimS, DimM> cg(sys.get_resolutions(),
-                            cg_tol, maxiter, verbose-1>0);
-    cg.initialise();
+    solver.initialise();
 
 
-    if (maxiter == 0) {
-      maxiter = sys.size()*DimM*DimM*10;
+    if (solver.get_maxiter() == 0) {
+      solver.set_maxiter(sys.size()*DimM*DimM*10);
     }
 
     size_t count_width{};
     const auto form{sys.get_formulation()};
+    std::string strain_symb{};
     if (verbose > 0) {
       //setup of algorithm 5.2 in Nocedal, Numerical Optimization (p. 111)
-      std::cout << "de Geus for ";
+      std::cout << "de Geus-" << solver.name() << " for ";
       switch (form) {
       case Formulation::small_strain: {
+        strain_symb = "ε";
         std::cout << "small";
         break;
       }
       case Formulation::finite_strain: {
+        strain_symb = "F";
         std::cout << "finite";
         break;
       }
@@ -84,14 +87,15 @@ namespace muSpectre {
       }
       std::cout << " strain with" << std::endl
                 << "newton_tol = " << newton_tol << ", cg_tol = "
-                << cg_tol << " maxiter = " << maxiter << " and ΔF =" <<std::endl;
+                << solver.get_tol() << " maxiter = " << solver.get_maxiter() << " and Δ"
+                << strain_symb << " =" <<std::endl;
       for (auto&& tup: akantu::enumerate(delFs)) {
         auto && counter{std::get<0>(tup)};
         auto && grad{std::get<1>(tup)};
         std::cout << "Step " << counter + 1 << ":" << std::endl
                   << grad << std::endl;
       }
-      count_width = size_t(std::log10(maxiter))+1;
+      count_width = size_t(std::log10(solver.get_maxiter()))+1;
     }
 
     // initialise F = I or ε = 0
@@ -103,6 +107,11 @@ namespace muSpectre {
     }
     case Formulation::small_strain: {
       F.get_map() = Matrices::I2<DimM>().Zero();
+      for (const auto & delF: delFs) {
+        if (!check_symmetry(delF)) {
+          throw SolverError("all Δε must be symmetric!");
+        }
+      }
       break;
     }
     default:
@@ -126,7 +135,7 @@ namespace muSpectre {
       };
       Uint newt_iter{0};
       for (;
-           (newt_iter < maxiter) && (!convergence_test() ||
+           (newt_iter < solver.get_maxiter()) && (!convergence_test() ||
                                      (newt_iter==1));
            ++newt_iter) {
 
@@ -135,20 +144,21 @@ namespace muSpectre {
         auto & P{std::get<0>(res_tup)};
         auto & K{std::get<1>(res_tup)};
 
-        auto tangent_effect = [&sys, &K] (const Field_t & delF, Field_t & delP) {
-          sys.directional_stiffness(K, delF, delP);
+        auto tangent_effect = [&sys, &K] (const Field_t & dF, Field_t & dP) {
+          sys.directional_stiffness(K, dF, dP);
         };
 
 
         if (newt_iter == 0) {
           DeltaF.get_map() = -(delF-previous_grad); // neg sign because rhs
           tangent_effect(DeltaF, rhs);
-          cg.solve(tangent_effect, rhs, incrF);
+          incrF.eigenvec() = solver.solve(rhs.eigenvec(), incrF.eigenvec());
           F.eigen() -= DeltaF.eigen();
         } else {
           rhs.eigen() = -P.eigen();
           sys.project(rhs);
-          cg.solve(tangent_effect, rhs, incrF);
+          incrF.eigen() = 0;
+          incrF.eigenvec() = solver.solve(rhs.eigenvec(), incrF.eigenvec());
         }
 
         F.eigen() += incrF.eigen();
@@ -157,10 +167,12 @@ namespace muSpectre {
         gradNorm = F.eigen().matrix().norm();
         if (verbose>0) {
           std::cout << "at Newton step " << std::setw(count_width) << newt_iter
-                    << ", |δF|/|ΔF| = " << std::setw(17) << incrNorm/gradNorm
+                    << ", |δ" << strain_symb << "|/|Δ" << strain_symb
+                    << "| = " << std::setw(17) << incrNorm/gradNorm
                     << ", tol = " << newton_tol << std::endl;
           if (verbose-1>1) {
-            std::cout << "<F> =" << std::endl << F.get_map().mean() << std::endl;
+            std::cout << "<" << strain_symb << "> =" << std::endl
+                      << F.get_map().mean() << std::endl;
           }
         }
       }
@@ -170,7 +182,7 @@ namespace muSpectre {
       ret_val.push_back(OptimizeResult{F.eigen(), sys.get_stress().eigen(),
             convergence_test(), Int(convergence_test()),
             "message not yet implemented",
-            newt_iter, cg.get_counter()});
+            newt_iter, solver.get_counter()});
 
 
       //!store history variables here
@@ -183,7 +195,7 @@ namespace muSpectre {
 
   template std::vector<OptimizeResult>
   de_geus (SystemBase<twoD, twoD> & sys, const GradIncrements<twoD>& delF0,
-           const Real cg_tol, const Real newton_tol, Uint maxiter,
+           SolverBase<twoD, twoD> & solver, Real newton_tol,
            Dim_t verbose);
 
   // template typename SystemBase<twoD, threeD>::StrainField_t &
@@ -193,14 +205,14 @@ namespace muSpectre {
 
   template std::vector<OptimizeResult>
   de_geus (SystemBase<threeD, threeD> & sys, const GradIncrements<threeD>& delF0,
-           const Real cg_tol, const Real newton_tol, Uint maxiter,
+           SolverBase<threeD, threeD> & solver, Real newton_tol,
            Dim_t verbose);
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   std::vector<OptimizeResult>
   newton_cg (SystemBase<DimS, DimM> & sys, const GradIncrements<DimM> & delFs,
-             const Real cg_tol, const Real newton_tol, Uint maxiter,
+             SolverBase<DimS, DimM> & solver, Real newton_tol,
              Dim_t verbose) {
     using Field_t = typename MaterialBase<DimS, DimM>::StrainField_t;
     auto solver_fields{std::make_unique<GlobalFieldCollection<DimS, DimM>>()};
@@ -212,26 +224,26 @@ namespace muSpectre {
     // field to store the rhs for cg calculations
     auto & rhs{make_field<Field_t>("rhs", *solver_fields)};
 
-    SolverCG<DimS, DimM> cg(sys.get_resolutions(),
-                            cg_tol, maxiter, verbose-1>0);
-    cg.initialise();
+    solver.initialise();
 
-
-    if (maxiter == 0) {
-      maxiter = sys.size()*DimM*DimM*10;
+    if (solver.get_maxiter() == 0) {
+      solver.set_maxiter(sys.size()*DimM*DimM*10);
     }
 
     size_t count_width{};
     const auto form{sys.get_formulation()};
+    std::string strain_symb{};
     if (verbose > 0) {
       //setup of algorithm 5.2 in Nocedal, Numerical Optimization (p. 111)
-      std::cout << "Newton-CG for ";
+      std::cout << "Newton-" << solver.name() << " for ";
       switch (form) {
       case Formulation::small_strain: {
+        strain_symb = "ε";
         std::cout << "small";
         break;
       }
       case Formulation::finite_strain: {
+        strain_symb = "Fy";
         std::cout << "finite";
         break;
       }
@@ -241,14 +253,15 @@ namespace muSpectre {
       }
       std::cout << " strain with" << std::endl
                 << "newton_tol = " << newton_tol << ", cg_tol = "
-                << cg_tol << " maxiter = " << maxiter << " and ΔF =" <<std::endl;
+                << solver.get_tol() << " maxiter = " << solver.get_maxiter() << " and Δ"
+                << strain_symb << " =" <<std::endl;
       for (auto&& tup: akantu::enumerate(delFs)) {
         auto && counter{std::get<0>(tup)};
         auto && grad{std::get<1>(tup)};
         std::cout << "Step " << counter + 1 << ":" << std::endl
                   << grad << std::endl;
       }
-      count_width = size_t(std::log10(maxiter))+1;
+      count_width = size_t(std::log10(solver.get_maxiter()))+1;
     }
 
     // initialise F = I or ε = 0
@@ -260,6 +273,11 @@ namespace muSpectre {
     }
     case Formulation::small_strain: {
       F.get_map() = Matrices::I2<DimM>().Zero();
+      for (const auto & delF: delFs) {
+        if (!check_symmetry(delF)) {
+          throw SolverError("all Δε must be symmetric!");
+        }
+      }
       break;
     }
     default:
@@ -288,21 +306,18 @@ namespace muSpectre {
       Uint newt_iter{0};
 
       for (;
-           newt_iter < maxiter && !convergence_test();
+           newt_iter < solver.get_maxiter() && !convergence_test();
            ++newt_iter) {
 
         // obtain material response
         auto res_tup{sys.evaluate_stress_tangent(F)};
         auto & P{std::get<0>(res_tup)};
-        auto & K{std::get<1>(res_tup)};
-
-        auto fun = [&sys, &K] (const Field_t & delF, Field_t & delP) {
-          sys.directional_stiffness(K, delF, delP);
-        };
 
         rhs.eigen() = -P.eigen();
         sys.project(rhs);
-        cg.solve(fun, rhs, incrF);
+        incrF.eigen() = 0;
+        incrF.eigenvec() = solver.solve(rhs.eigenvec(), incrF.eigenvec());
+
 
         F.eigen() += incrF.eigen();
 
@@ -310,11 +325,13 @@ namespace muSpectre {
         gradNorm = F.eigen().matrix().norm();
         if (verbose > 0) {
           std::cout << "at Newton step " << std::setw(count_width) << newt_iter
-                    << ", |δF|/|ΔF| = " << std::setw(17) << incrNorm/gradNorm
+                    << ", |δ" << strain_symb << "|/|Δ" << strain_symb
+                    << "| = " << std::setw(17) << incrNorm/gradNorm
                     << ", tol = " << newton_tol << std::endl;
 
           if (verbose-1>1) {
-            std::cout << "<F> =" << std::endl << F.get_map().mean() << std::endl;
+            std::cout << "<" << strain_symb << "> =" << std::endl
+                      << F.get_map().mean() << std::endl;
           }
         }
 
@@ -325,7 +342,7 @@ namespace muSpectre {
       ret_val.push_back(OptimizeResult{F.eigen(), sys.get_stress().eigen(),
             convergence_test(), Int(convergence_test()),
             "message not yet implemented",
-            newt_iter, cg.get_counter()});
+            newt_iter, solver.get_counter()});
 
       //store history variables here
 
@@ -337,7 +354,7 @@ namespace muSpectre {
 
   template std::vector<OptimizeResult>
   newton_cg (SystemBase<twoD, twoD> & sys, const GradIncrements<twoD>& delF0,
-             const Real cg_tol, const Real newton_tol, Uint maxiter,
+             SolverBase<twoD, twoD> & solver, Real newton_tol,
              Dim_t verbose);
 
   // template typename SystemBase<twoD, threeD>::StrainField_t &
@@ -347,8 +364,15 @@ namespace muSpectre {
 
   template std::vector<OptimizeResult>
   newton_cg (SystemBase<threeD, threeD> & sys, const GradIncrements<threeD>& delF0,
-             const Real cg_tol, const Real newton_tol, Uint maxiter,
+             SolverBase<threeD, threeD> & solver, Real newton_tol,
              Dim_t verbose);
+
+
+  /* ---------------------------------------------------------------------- */
+  bool check_symmetry(const Eigen::Ref<const Eigen::ArrayXXd>& eps,
+                      Real rel_tol){
+    return rel_tol >= (eps-eps.transpose()).matrix().norm()/eps.matrix().norm();
+  }
 
 
 }  // muSpectre

@@ -7,7 +7,7 @@
  *
  * @brief  System factories to help create systems with ease
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

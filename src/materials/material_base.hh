@@ -7,7 +7,7 @@
  *
  * @brief  Base class for materials (constitutive models)
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

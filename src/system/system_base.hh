@@ -8,7 +8,7 @@
  * @brief Base class representing a unit cell system with single
  *        projection operator
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -37,6 +37,7 @@
 #include "common/utilities.hh"
 #include "materials/material_base.hh"
 #include "fft/projection_base.hh"
+#include "system/system_traits.hh"
 
 #include <vector>
 #include <memory>
@@ -44,10 +45,11 @@
 #include <functional>
 
 namespace muSpectre {
-
+  template <class System>
+  class SystemAdaptor;
   //! DimS spatial dimension (dimension of problem
   //! DimM material_dimension (dimension of constitutive law)
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimS, Dim_t DimM=DimS>
   class SystemBase
   {
   public:
@@ -57,7 +59,8 @@ namespace muSpectre {
     using Collection_ptr = std::unique_ptr<FieldCollection_t>;
     using Material_t = MaterialBase<DimS, DimM>;
     using Material_ptr = std::unique_ptr<Material_t>;
-    using Projection_ptr = std::unique_ptr<ProjectionBase<DimS, DimM>>;
+    using Projection_t = ProjectionBase<DimS, DimM>;
+    using Projection_ptr = std::unique_ptr<Projection_t>;
     using StrainField_t =
       TensorField<FieldCollection_t, Real, secondOrder, DimM>;
     using StressField_t =
@@ -67,6 +70,9 @@ namespace muSpectre {
     using FullResponse_t =
       std::tuple<const StressField_t&, const TangentField_t&>;
     using iterator = typename CcoordOps::Pixels<DimS>::iterator;
+    using SolvVectorIn = Eigen::Ref<const Eigen::VectorXd>;
+    using SolvVectorOut = Eigen::Map<Eigen::VectorXd>;
+    using Adaptor = SystemAdaptor<SystemBase>;
 
     //! Default constructor
     SystemBase() = delete;
@@ -107,6 +113,19 @@ namespace muSpectre {
     StressField_t & directional_stiffness(const TangentField_t & K,
                                           const StrainField_t & delF,
                                           StressField_t & delP);
+    /**
+     * vectorized version for eigen solvers, no copy, but only works
+     * when fields have ArrayStore=false
+     */
+     SolvVectorOut directional_stiffness_vec(const SolvVectorIn & delF);
+    /**
+     * Evaluate directional stiffness into a temporary array and
+     * return a copy. This is a costly and wasteful interface to
+     * directional_stiffness and should only be used for debugging or
+     * in the python interface
+     */
+    Eigen::ArrayXXd directional_stiffness_with_copy
+      (Eigen::Ref<Eigen::ArrayXXd> delF);
 
     /**
      * Convenience function circumventing the neeed to use the
@@ -117,6 +136,10 @@ namespace muSpectre {
     StrainField_t & get_strain();
 
     const StressField_t & get_stress() const;
+
+    const TangentField_t & get_tangent(bool create = false);
+
+    StrainField_t & get_managed_field(std::string unique_name);
 
     /**
      * general initialisation; initialises the projection and
@@ -141,6 +164,18 @@ namespace muSpectre {
      */
     const Formulation & get_formulation() const {
       return this->projection->get_formulation();}
+
+    bool is_initialised() const {return this->initialised;}
+
+    Eigen::Map<Eigen::ArrayXXd> get_projection() {
+      return this->projection->get_operator();}
+
+    constexpr static Dim_t get_sdim() {return DimS;};
+
+    Adaptor get_adaptor();
+    Dim_t nb_dof() const {return this->size()*ipow(DimS, 2);};
+
+
   protected:
     //! make sure that every pixel is assigned to one and only one material
     void check_material_coverage();
@@ -156,11 +191,61 @@ namespace muSpectre {
     optional<std::reference_wrapper<TangentField_t>> K{};
     std::vector<Material_ptr> materials{};
     Projection_ptr projection;
-    bool is_initialised{false};
+    bool initialised{false};
     const Formulation form;
   private:
   };
 
+
+  template <class System>
+  class SystemAdaptor: public Eigen::EigenBase<SystemAdaptor<System>> {
+
+  public:
+    using Scalar = double;
+    using RealScalar = double;
+    using StorageIndex = int;
+    enum {
+      ColsAtCompileTime = Eigen::Dynamic,
+      MaxColsAtCompileTime = Eigen::Dynamic,
+      RowsAtCompileTime = Eigen::Dynamic,
+      MaxRowsAtCompileTime = Eigen::Dynamic,
+      IsRowMajor = false
+    };
+
+    SystemAdaptor(System & sys):sys{sys}{}
+    Eigen::Index rows() const {return this->sys.nb_dof();}
+    Eigen::Index cols() const {return this->rows();}
+
+    template<typename Rhs>
+    Eigen::Product<SystemAdaptor,Rhs,Eigen::AliasFreeProduct>
+    operator*(const Eigen::MatrixBase<Rhs>& x) const {
+      return Eigen::Product<SystemAdaptor,Rhs,Eigen::AliasFreeProduct>
+        (*this, x.derived());
+    }
+    System & sys;
+  };
+
 }  // muSpectre
+
+// Implementation of SystemAdaptor * Eigen::DenseVector though a specialization of internal::generic_product_impl:
+namespace Eigen {
+  namespace internal {
+    template<typename Rhs, class SystemAdaptor>
+    struct generic_product_impl<SystemAdaptor, Rhs, SparseShape, DenseShape, GemvProduct> // GEMV stands for matrix-vector
+      : generic_product_impl_base<SystemAdaptor,Rhs,generic_product_impl<SystemAdaptor,Rhs> >
+    {
+      typedef typename Product<SystemAdaptor,Rhs>::Scalar Scalar;
+      template<typename Dest>
+      static void scaleAndAddTo(Dest& dst, const SystemAdaptor& lhs, const Rhs& rhs, const Scalar& /*alpha*/)
+      {
+        // This method should implement "dst += alpha * lhs * rhs" inplace,
+        // however, for iterative solvers, alpha is always equal to 1, so let's not bother about it.
+        // Here we could simply call dst.noalias() += lhs.my_matrix() * rhs,
+        dst.noalias() += const_cast<SystemAdaptor&>(lhs).sys.directional_stiffness_vec(rhs);
+      }
+    };
+  }
+}
+
 
 #endif /* SYSTEM_BASE_H */

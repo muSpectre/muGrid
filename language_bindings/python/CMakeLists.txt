@@ -7,7 +7,7 @@
 #
 # @brief  configuration for python binding using pybind11
 #
-# @section LICENCE
+# @section LICENSE
 #
 # Copyright © 2018 Till Junge
 #
@@ -34,6 +34,8 @@ set (PY_BINDING_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_system.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_solvers.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_fftengine.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_projections.cc
   )
 
 pybind11_add_module(pyMuSpectre ${PY_BINDING_SRCS})

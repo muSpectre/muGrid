@@ -7,7 +7,7 @@
  *
  * @brief  Base class for Projection operators
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -90,6 +90,11 @@ namespace muSpectre {
       return this->fft_engine->get_lengths();}
 
     const Formulation & get_formulation() const {return this->form;}
+
+    //! return the raw projection operator. This is mainly intended
+    //! for maintenance and debugging and should never be required in
+    //! regular use
+    virtual Eigen::Map<Eigen::ArrayXXd> get_operator() = 0;
 
   protected:
     FFT_Engine_ptr fft_engine;

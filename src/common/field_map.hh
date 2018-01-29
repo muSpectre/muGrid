@@ -7,7 +7,7 @@
  *
  * @brief  just and indirection to include all iterables defined for fields
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

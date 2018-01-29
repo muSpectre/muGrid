@@ -8,7 +8,7 @@ file   small_case.py
 
 @brief  small case for debugging
 
-@section LICENCE
+@section LICENSE
 
 Copyright © 2018 Till Junge
 
@@ -36,38 +36,77 @@ sys.path.append(os.path.join(os.getcwd(), "language_bindings/python"))
 import pyMuSpectre as µ
 
 
-resolution = [5, 5]
+resolution = [51, 51]
+center = np.array([r//2 for r in resolution])
+incl = resolution[0]//5
 
-lengths = [5., 5.]
-formulation = µ.Formulation.finite_strain
+lengths = [7., 5.]
+formulation = µ.Formulation.small_strain
 
 rve = µ.SystemFactory(resolution,
                       lengths,
                       formulation)
 hard = µ.material.MaterialHooke2d.make(
-    rve, "hard", 210e9, .33)
+    rve, "hard", 10e9, .33)
 soft = µ.material.MaterialHooke2d.make(
     rve, "soft",  70e9, .33)
 
 
 for i, pixel in enumerate(rve):
-    if i < 3:
+    if np.linalg.norm(center - np.array(pixel),2)<incl:
+    #if (abs(center - np.array(pixel)).max()<incl or
+    #    np.linalg.norm(center/2 - np.array(pixel))<incl):
         hard.add_pixel(pixel)
     else:
         soft.add_pixel(pixel)
 
-    print("{}, {}".format(i, tuple(pixel)))
+tol = 1e-5
+cg_tol = 1e-8
 
-rve.initialise()
-
-tol = 1e-6
-
-Del0 = np.array([[0, .1],
-                 [0,  0]])
-maxiter = 31
+Del0 = np.array([[.0, .0],
+                 [0,  .03]])
+if formulation == µ.Formulation.small_strain:
+    Del0 = .5*(Del0 + Del0.T)
+maxiter = 401
 verbose = 2
 
-r = µ.solvers.de_geus(rve, Del0, tol, tol, maxiter, verbose)
-print(r.grad.T)
-print(r.stress.T)
-print(r)
+for solvclass in (µ.solvers.SolverCG,
+                  µ.solvers.SolverCGEigen,
+                  µ.solvers.SolverBiCGSTABEigen,
+                  µ.solvers.SolverGMRESEigen,
+                  µ.solvers.SolverDGMRESEigen,
+                  µ.solvers.SolverMINRESEigen):
+    print()
+    try:
+        solver = solvclass(rve, cg_tol, maxiter, verbose=False)
+        r = µ.solvers.newton_cg(rve, Del0, solver, tol, verbose)
+        print("nb of {} iterations: {}".format(solver.name(), r.nb_fev))
+    except RuntimeError as err:
+        print(err)
+    try:
+        solver = solvclass(rve, cg_tol, maxiter, verbose=False)
+        r = µ.solvers.de_geus(rve, Del0, solver, tol, verbose)
+        print("nb of {} iterations: {}".format(solver.name(), r.nb_fev))
+    except RuntimeError as err:
+        print(err)
+
+
+# print(r.grad.T[:3])
+# print(r.stress.T[:3])
+# 
+# print(r.grad.T.shape)
+# import matplotlib.pyplot as plt
+# stress = r.stress.T.reshape(*resolution, 2, 2)
+# def comp_von_mises(arr):
+#     out_arr = np.zeros(resolution)
+#     s11 = arr[:,:,0,0]
+#     s22 = arr[:,:,1,1]
+#     s21_2 = arr[:,:,0,1]*arr[:,:,1,0]
+# 
+#     out_arr[:] = np.sqrt(.5*((s11-s22)**2) + s11**2 + s22**2 + 6*s21_2)
+#     return out_arr
+# 
+# von_mises = comp_von_mises(stress)
+# plt.pcolormesh(von_mises)
+# plt.colorbar()
+# plt.show()

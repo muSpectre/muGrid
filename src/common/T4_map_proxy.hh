@@ -7,7 +7,7 @@
  *
  * @brief  Map type to allow fourth-order tensor-like maps on 2D matrices
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

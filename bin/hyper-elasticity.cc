@@ -7,7 +7,7 @@
  *
  * @brief  Recreation of GooseFFT's hyper-elasticity.py calculation
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2018 Till Junge
  *
@@ -31,6 +31,7 @@
 #include "system/system_factory.hh"
 #include "materials/material_hyper_elastic1.hh"
 #include "solver/solvers.hh"
+#include "solver/solver_cg.hh"
 
 #include <iostream>
 #include <iomanip>
@@ -45,7 +46,7 @@ int main()
   constexpr Rcoord_t<dim> lens{CcoordOps::get_cube<dim>(1.)};
   constexpr Dim_t incl_size{3};
 
-  auto cell{make_system(N, lens, Formulation::finite_strain)};
+  auto cell{make_system(N, lens, Formulation::small_strain)};
 
   // constexpr Real K_hard{8.33}, K_soft{.833};
   // constexpr Real mu_hard{3.86}, mu_soft{.386};
@@ -82,8 +83,8 @@ int main()
 
   Grad_t<dim> dF_bar{Grad_t<dim>::Zero()};
   dF_bar(0, 1) = 1.;
-
-  auto optimize_res = de_geus(cell, dF_bar, cg_tol, newton_tol, maxiter, verbose);
+  SolverCG<dim> cg{cell, cg_tol, maxiter, verbose};
+  auto optimize_res = de_geus(cell, dF_bar, cg, newton_tol, verbose);
 
   std::cout << "nb_cg: " << optimize_res.nb_fev << std::endl;
   std::cout << optimize_res.grad.transpose().block(0,0,10,9) << std::endl;

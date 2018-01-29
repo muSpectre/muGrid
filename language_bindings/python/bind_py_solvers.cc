@@ -7,7 +7,7 @@
  *
  * @brief  python bindings for the muSpectre solvers
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2018 Till Junge
  *
@@ -29,6 +29,8 @@
 
 #include "common/common.hh"
 #include "solver/solvers.hh"
+#include "solver/solver_cg.hh"
+#include "solver/solver_cg_eigen.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -42,37 +44,76 @@ using namespace pybind11::literals;
  * Solvers instanciated for systems with equal spatial and material dimension
  */
 
+template <Dim_t sdim, class Solver>
+void add_iterative_solver_helper(py::module & mod, std::string name_start) {
+  using sys = SystemBase<sdim>;
+  std::stringstream name{};
+  name << name_start << '_' << sdim << 'd';
+  py::class_<Solver, typename Solver::Parent>(mod, name.str().c_str())
+    .def(py::init<sys&, Real, Uint, bool>(),
+         "cell"_a,
+         "tol"_a,
+         "maxiter"_a,
+         "verbose"_a)
+    .def("name", &Solver::name);
+  mod.def(name_start.c_str(),
+          [](sys& cell, Real tol, Uint maxiter, bool verbose) {
+            return std::make_unique<Solver>(cell, tol, maxiter, verbose);
+          },
+          "cell"_a,
+          "tol"_a,
+          "maxiter"_a,
+          "verbose"_a);
+}
+
+template <Dim_t sdim>
+void add_iterative_solver_dispatcher(py::module & mod) {
+  std::stringstream name{};
+  name << "SolverBase_" << sdim << 'd';
+  py::class_<SolverBase<sdim>>(mod, name.str().c_str());
+  add_iterative_solver_helper<sdim, SolverCG<sdim>>(mod, "SolverCG");
+  add_iterative_solver_helper<sdim, SolverCGEigen<sdim>>(mod, "SolverCGEigen");
+  add_iterative_solver_helper<sdim, SolverGMRESEigen<sdim>>(mod, "SolverGMRESEigen");
+  add_iterative_solver_helper<sdim, SolverBiCGSTABEigen<sdim>>(mod, "SolverBiCGSTABEigen");
+  add_iterative_solver_helper<sdim, SolverDGMRESEigen<sdim>>(mod, "SolverDGMRESEigen");
+  add_iterative_solver_helper<sdim, SolverMINRESEigen<sdim>>(mod, "SolverMINRESEigen");
+}
+
+void add_iterative_solver(py::module & mod) {
+  add_iterative_solver_dispatcher<  twoD>(mod);
+  add_iterative_solver_dispatcher<threeD>(mod);
+}
+
 template <Dim_t sdim>
 void add_newton_cg_helper(py::module & mod) {
 
   const char name []{"newton_cg"};
   constexpr Dim_t mdim{sdim};
   using sys = SystemBase<sdim, mdim>;
+  using solver = SolverBase<sdim, mdim>;
   using grad = Grad_t<sdim>;
   using grad_vec = GradIncrements<sdim>;
 
   mod.def(name,
-          [](sys & s, const grad & g, Real ct, Real nt,
-             Uint max, Dim_t verb) -> OptimizeResult {
-            return newton_cg(s, g, ct, nt, max, verb);
+          [](sys & s, const grad & g, solver & so, Real nt,
+             Dim_t verb) -> OptimizeResult {
+            return newton_cg(s, g, so, nt, verb);
 
           },
           "system"_a,
           "ΔF₀"_a,
-          "cg_tol"_a,
+          "solver"_a,
           "newton_tol"_a,
-          "maxiter"_a=0,
           "verbose"_a=0);
   mod.def(name,
-          [](sys & s, const grad_vec & g, Real ct, Real nt,
-             Uint max, Dim_t verb) -> std::vector<OptimizeResult> {
-            return newton_cg(s, g, ct, nt, max, verb);
+          [](sys & s, const grad_vec & g, solver & so, Real nt,
+             Dim_t verb) -> std::vector<OptimizeResult> {
+            return newton_cg(s, g, so, nt, verb);
           },
           "system"_a,
           "ΔF₀"_a,
-          "cg_tol"_a,
+          "solver"_a,
           "newton_tol"_a,
-          "maxiter"_a=0,
           "verbose"_a=0);
 }
 
@@ -81,30 +122,30 @@ void add_de_geus_helper(py::module & mod) {
   const char name []{"de_geus"};
   constexpr Dim_t mdim{sdim};
   using sys = SystemBase<sdim, mdim>;
+  using solver = SolverBase<sdim, mdim>; 
   using grad = Grad_t<sdim>;
   using grad_vec = GradIncrements<sdim>;
 
   mod.def(name,
-          [](sys & s, const grad & g, Real ct, Real nt,
-             Uint max, Dim_t verb) -> OptimizeResult {
-            return de_geus(s, g, ct, nt, max, verb);
+          [](sys & s, const grad & g, solver & so, Real nt,
+             Dim_t verb) -> OptimizeResult {
+            return de_geus(s, g, so, nt, verb);
+
           },
           "system"_a,
           "ΔF₀"_a,
-          "cg_tol"_a,
+          "solver"_a,
           "newton_tol"_a,
-          "maxiter"_a=0,
           "verbose"_a=0);
   mod.def(name,
-          [](sys & s, const grad_vec & g, Real ct, Real nt,
-             Uint max, Dim_t verb) -> std::vector<OptimizeResult> {
-            return de_geus(s, g, ct, nt, max, verb);
+          [](sys & s, const grad_vec & g, solver & so, Real nt,
+             Dim_t verb) -> std::vector<OptimizeResult> {
+            return de_geus(s, g, so, nt, verb);
           },
           "system"_a,
           "ΔF₀"_a,
-          "cg_tol"_a,
+          "solver"_a,
           "newton_tol"_a,
-          "maxiter"_a=0,
           "verbose"_a=0);
 }
 
@@ -127,7 +168,7 @@ void add_solvers(py::module & mod) {
     .def_readwrite("nb_it", &OptimizeResult::nb_it)
     .def_readwrite("nb_fev", &OptimizeResult::nb_fev);
 
-
+  add_iterative_solver(solvers);
 
   add_solver_helper<twoD  >(solvers);
   add_solver_helper<threeD>(solvers);

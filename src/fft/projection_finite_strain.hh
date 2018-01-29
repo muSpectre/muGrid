@@ -8,7 +8,7 @@
  * @brief  Class for standard finite-strain gradient projections see de Geus et
  *         al. (https://doi.org/10.1016/j.cma.2016.12.032) for derivation
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

@@ -3,6 +3,7 @@ download_external_project(pybind11
   TAG "v${_pybind11_version}"
   BACKEND GIT
   THIRD_PARTY_SRC_DIR ${_pybind11_external_dir}
+  NO_UPDATE
   )
 
 set(PYBIND11_LTO_CXX_FLAGS "" CACHE INTERNAL "")

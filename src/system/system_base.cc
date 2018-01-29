@@ -7,7 +7,7 @@
  *
  * @brief  Implementation for system base class
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -63,16 +63,15 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   typename SystemBase<DimS, DimM>::FullResponse_t
   SystemBase<DimS, DimM>::evaluate_stress_tangent(StrainField_t & grad) {
-    if (this->is_initialised == false) {
+    if (this->initialised == false) {
       this->initialise();
     }
     //! High level compatibility checks
     if (grad.size() != this->F.size()) {
       throw std::runtime_error("Size mismatch");
     }
-    if (!this->K) {
-      this->K = make_field<TangentField_t>("Tangent Stiffness", *this->fields);
-    }
+    constexpr bool create_tangent{true};
+    this->get_tangent(create_tangent);
 
     for (auto & mat: this->materials) {
       mat->compute_stresses_tangent(grad, this->P, this->K.value(),
@@ -85,8 +84,8 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   typename SystemBase<DimS, DimM>::StressField_t &
   SystemBase<DimS, DimM>::directional_stiffness(const TangentField_t &K,
-                                                     const StrainField_t &delF,
-                                                     StressField_t &delP) {
+                                                const StrainField_t &delF,
+                                                StressField_t &delP) {
     for (auto && tup:
            akantu::zip(K.get_map(), delF.get_map(), delP.get_map())){
       auto & k = std::get<0>(tup);
@@ -95,6 +94,54 @@ namespace muSpectre {
       dp = Matrices::tensmult(k, df);
     }
     return this->project(delP);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  typename SystemBase<DimS, DimM>::SolvVectorOut
+  SystemBase<DimS, DimM>::directional_stiffness_vec(const SolvVectorIn &delF) {
+    if (!this->K) {
+      throw std::runtime_error
+        ("corrently only implemented for cases where a stiffness matrix "
+         "exists");
+    }
+    if (delF.size() != this->nb_dof()) {
+      std::stringstream err{};
+      err << "input should be of size ndof = ¶(" << this->resolutions <<") × "
+          << DimS << "² = "<< this->nb_dof() << " but I got " << delF.size();
+      throw std::runtime_error(err.str());
+    }
+    const std::string out_name{"temp output for directional stiffness"};
+    const std::string in_name{"temp input for directional stiffness"};
+
+    auto & out_tempref = this->get_managed_field(out_name);
+    auto & in_tempref = this->get_managed_field(in_name);
+    SolvVectorOut(in_tempref.data(), this->nb_dof()) = delF;
+
+    this->directional_stiffness(this->K.value(), in_tempref, out_tempref);
+    return SolvVectorOut(out_tempref.data(), this->nb_dof());
+
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  Eigen::ArrayXXd
+  SystemBase<DimS, DimM>::
+  directional_stiffness_with_copy
+    (Eigen::Ref<Eigen::ArrayXXd> delF) {
+    if (!this->K) {
+      throw std::runtime_error
+        ("corrently only implemented for cases where a stiffness matrix "
+         "exists");
+    }
+    const std::string out_name{"temp output for directional stiffness"};
+    const std::string in_name{"temp input for directional stiffness"};
+
+    auto & out_tempref = this->get_managed_field(out_name);
+    auto & in_tempref = this->get_managed_field(in_name);
+    in_tempref.eigen() = delF;
+    this->directional_stiffness(this->K.value(), in_tempref, out_tempref);
+    return out_tempref.eigen();
   }
 
   /* ---------------------------------------------------------------------- */
@@ -109,7 +156,7 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   typename SystemBase<DimS, DimM>::StrainField_t &
   SystemBase<DimS, DimM>::get_strain() {
-    if (this->is_initialised == false) {
+    if (this->initialised == false) {
       this->initialise();
     }
     return this->F;
@@ -124,6 +171,32 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
+  const typename SystemBase<DimS, DimM>::TangentField_t &
+  SystemBase<DimS, DimM>::get_tangent(bool create) {
+    if (!this->K) {
+      if (create) {
+        this->K = make_field<TangentField_t>("Tangent Stiffness", *this->fields);
+      } else {
+        throw std::runtime_error
+          ("K does not exist");
+      }
+    }
+    return this->K.value();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  typename SystemBase<DimS, DimM>::StrainField_t &
+  SystemBase<DimS, DimM>::get_managed_field(std::string unique_name) {
+    if (!this->fields->check_field_exists(unique_name)) {
+      return make_field<StressField_t>(unique_name, *this->fields);
+    } else {
+      return static_cast<StressField_t&>(this->fields->at(unique_name));
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
   void SystemBase<DimS, DimM>::initialise(FFT_PlanFlags flags) {
     // check that all pixels have been assigned exactly one material
     this->check_material_coverage();
@@ -131,7 +204,7 @@ namespace muSpectre {
     this->fields->initialise(this->resolutions);
     // initialise the projection and compute the fft plan
     this->projection->initialise(flags);
-    this->is_initialised = true;
+    this->initialised = true;
   }
 
   /* ---------------------------------------------------------------------- */
@@ -155,6 +228,13 @@ namespace muSpectre {
   typename SystemBase<DimS, DimM>::iterator
   SystemBase<DimS, DimM>::end() {
     return this->pixels.end();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  SystemAdaptor<SystemBase<DimS, DimM>>
+  SystemBase<DimS, DimM>::get_adaptor() {
+    return Adaptor(*this);
   }
 
   /* ---------------------------------------------------------------------- */

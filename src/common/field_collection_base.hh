@@ -7,7 +7,7 @@
  *
  * @brief  Base class for field collections
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -86,6 +86,10 @@ namespace muSpectre {
     //! by the collection, not the number of fields
     inline size_t size() const {return this->size_;}
 
+    //! check whether a field is present
+    bool check_field_exists(std::string unique_name);
+
+
   protected:
     std::map<const std::string, Field_p> fields{};
     bool is_initialised{false};
@@ -154,6 +158,14 @@ namespace muSpectre {
   FieldCollectionBase<DimS, DimM, FieldCollectionDerived>::
   at(std::string unique_name) {
     return *(this->fields.at(unique_name));
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM, class FieldCollectionDerived>
+  bool
+  FieldCollectionBase<DimS, DimM, FieldCollectionDerived>::
+  check_field_exists(std::string unique_name) {
+    return this->fields.find(unique_name) != this->fields.end();
   }
 
 

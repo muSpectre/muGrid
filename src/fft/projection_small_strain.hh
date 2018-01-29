@@ -10,7 +10,7 @@
  *         FFT-based micromechanical simulations", Int. J. Numer. Meth. Engng
  *         2017; 111 :903–926)
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2018 Till Junge
  *

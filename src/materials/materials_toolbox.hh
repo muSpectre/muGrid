@@ -7,7 +7,7 @@
  *
  * @brief  collection of common continuum mechanics tools
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

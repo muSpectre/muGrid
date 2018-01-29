@@ -7,7 +7,7 @@
  *
  * @brief  Eigen-Matrix and -Array maps over strongly typed fields
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

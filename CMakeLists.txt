@@ -7,7 +7,7 @@
 #
 # @brief  Main configuration file
 #
-# @section LICENCE
+# @section LICENSE
 #
 # Copyright © 2018 Till Junge
 #
@@ -47,6 +47,7 @@ if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
   add_compile_options(-Wno-missing-braces)
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
   # using GCC
+  add_compile_options(-Wno-non-virtual-dtor)
   string( TOLOWER "${CMAKE_BUILD_TYPE}" build_type )
   if ("release" STREQUAL "${build_type}" )
     add_compile_options(-march=native)
@@ -125,8 +126,14 @@ endforeach(benchmark ${benchmark})
 
 
 # copy python test
-configure_file(
-  "${CMAKE_SOURCE_DIR}/tests/python_binding_tests.py"
-  "${CMAKE_BINARY_DIR}/python_binding_tests.py"
-  COPYONLY)
+#build tests
+file( GLOB PY_TEST_SRCS "${CMAKE_SOURCE_DIR}/tests/python_*.py")
+
+foreach(pytest ${PY_TEST_SRCS})
+  get_filename_component(pytest_name ${pytest} NAME)
+  configure_file(
+    ${pytest}
+    "${CMAKE_BINARY_DIR}/${pytest_name}"
+    COPYONLY)
+endforeach(pytest ${PY_TEST_SRCS})
 add_test(python_binding_test python_binding_tests.py)

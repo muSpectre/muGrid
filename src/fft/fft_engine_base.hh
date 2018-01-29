@@ -7,7 +7,7 @@
  *
  * @brief  Interface for FFT engines
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -93,8 +93,12 @@ namespace muSpectre {
     //!
     const Ccoord & get_resolutions() const {return this->resolutions;}
     const Rcoord & get_lengths() const {return this->lengths;}
+
+    //! only required for testing and debugging
     LFieldCollection_t & get_field_collection() {
       return this->work_space_container;}
+    //! only required for testing and debugging
+    Workspace_t& get_work_space() {return this->work;}
 
     //! factor by which to multiply projection before inverse transform (this is
     //! typically 1/nb_pixels for so-called unnormalized transforms (see,

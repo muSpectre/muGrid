@@ -7,7 +7,7 @@
  *
  * @brief  header-only implementation of a field for field collections
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -156,6 +156,8 @@ namespace muSpectre {
       using Base = Parent;
       using EigenRep = Eigen::Array<T, Eigen::Dynamic, Eigen::Dynamic>;
       using EigenMap = Eigen::Map<EigenRep>;
+      using EigenVec = Eigen::Map<Eigen::VectorXd>;
+      using EigenVecConst = Eigen::Map<const Eigen::VectorXd>;
       //! Default constructor
       TypedFieldBase() = delete;
 
@@ -190,6 +192,8 @@ namespace muSpectre {
       virtual const T* data() const = 0;
 
       EigenMap eigen();
+      EigenVec eigenvec();
+      EigenVecConst eigenvec() const;
 
     protected:
     private:
@@ -260,6 +264,7 @@ namespace muSpectre {
 
       inline EigenMap eigen();
       inline ConstEigenMap eigen() const;
+      inline typename Parent::EigenMap dyn_eigen() {return Parent::eigen();}
 
       template<typename otherT>
       inline Real inner_product(const TypedSizedFieldBase<FieldCollection, otherT, NbComponents,
@@ -460,6 +465,22 @@ protected:
     TypedFieldBase<FieldCollection, T>::
     eigen() {
       return EigenMap(this->data(), this->get_nb_components(), this->size());
+    }
+
+    /* ---------------------------------------------------------------------- */
+    template <class FieldCollection, typename T>
+    typename TypedFieldBase<FieldCollection, T>::EigenVec
+    TypedFieldBase<FieldCollection, T>::
+    eigenvec() {
+      return EigenVec(this->data(), this->get_nb_components() * this->size());
+    }
+
+    /* ---------------------------------------------------------------------- */
+    template <class FieldCollection, typename T>
+    typename TypedFieldBase<FieldCollection, T>::EigenVecConst
+    TypedFieldBase<FieldCollection, T>::
+    eigenvec() const{
+      return EigenVecConst(this->data(), this->get_nb_components() * this->size());
     }
 
 

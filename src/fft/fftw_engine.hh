@@ -7,7 +7,7 @@
  *
  * @brief  FFT engine using FFTW
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -79,6 +79,7 @@ namespace muSpectre {
     Ccoord hermitian_resolutions;
     fftw_plan plan_fft{};
     fftw_plan plan_ifft{};
+    bool initialised{false};
   private:
   };
 

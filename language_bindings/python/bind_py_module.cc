@@ -7,7 +7,7 @@
  *
  * @brief  Python bindings for µSpectre
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2018 Till Junge
  *
@@ -41,4 +41,5 @@ PYBIND11_MODULE(pyMuSpectre, mod) {
   add_system(mod);
   add_material(mod);
   add_solvers(mod);
+  add_fft_engines(mod);
 }

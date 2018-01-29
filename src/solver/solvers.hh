@@ -7,7 +7,7 @@
  *
  * @brief  Free functions for solving
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -30,7 +30,7 @@
 #ifndef SOLVERS_H
 #define SOLVERS_H
 
-#include "solver/solver_cg.hh"
+#include "solver/solver_base.hh"
 
 #include <Eigen/Dense>
 
@@ -72,17 +72,17 @@ namespace muSpectre {
   std::vector<OptimizeResult>
   newton_cg (SystemBase<DimS, DimM> & sys,
              const GradIncrements<DimM> & delF0,
-             const Real cg_tol, const Real newton_tol, const Uint maxiter=0,
+             SolverBase<DimS, DimM> & solver, Real newton_tol,
              Dim_t verbose = 0);
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM=DimS>
   inline OptimizeResult
   newton_cg (SystemBase<DimS, DimM> & sys, const Grad_t<DimM> & delF0,
-             const Real cg_tol, const Real newton_tol, const Uint maxiter=0,
+             SolverBase<DimS, DimM> & solver, Real newton_tol,
              Dim_t verbose = 0){
     return newton_cg(sys, GradIncrements<DimM>{delF0},
-                     cg_tol, newton_tol, maxiter, verbose)[0];
+                     solver, newton_tol, verbose)[0];
   }
 
     /* ---------------------------------------------------------------------- */
@@ -90,18 +90,26 @@ namespace muSpectre {
   std::vector<OptimizeResult>
   de_geus (SystemBase<DimS, DimM> & sys,
            const GradIncrements<DimM> & delF0,
-           const Real cg_tol, const Real newton_tol, const Uint maxiter=0,
+           SolverBase<DimS, DimM> & solver, Real newton_tol,
            Dim_t verbose = 0);
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM=DimS>
   OptimizeResult
   de_geus (SystemBase<DimS, DimM> & sys, const Grad_t<DimM> & delF0,
-           const Real cg_tol, const Real newton_tol, const Uint maxiter=0,
+           SolverBase<DimS, DimM> & solver, Real newton_tol,
            Dim_t verbose = 0){
     return de_geus(sys, GradIncrements<DimM>{delF0},
-                   cg_tol, newton_tol, maxiter, verbose)[0];
+                   solver, newton_tol, verbose)[0];
   }
+
+  /* ---------------------------------------------------------------------- */
+  /**
+   * check whether a strain is symmetric, for the purposes of small
+   * strain problems
+   */
+  bool check_symmetry(const Eigen::Ref<const Eigen::ArrayXXd>& eps,
+                      Real rel_tol = 1e-8);
 
 }  // muSpectre
 

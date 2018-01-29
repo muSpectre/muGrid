@@ -9,7 +9,7 @@
  *        solver. This follows algorithm 5.2 in Nocedal's Numerical
  *        Optimization (p 112)
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -44,6 +44,10 @@ namespace muSpectre {
   {
   public:
     using Parent = SolverBase<DimS, DimM>;
+    using SolvVectorIn = typename Parent::SolvVectorIn;
+    using SolvVectorInC = typename Parent::SolvVectorInC;
+    using SolvVectorOut = typename Parent::SolvVectorOut;
+    using Sys_t = typename Parent::Sys_t;
     using Ccoord = typename Parent::Ccoord;
     using Tg_req_t = typename Parent::TangentRequirement;
     // cg only needs to handle fields that look like strain and stress
@@ -56,7 +60,7 @@ namespace muSpectre {
     SolverCG() = delete;
 
     //! Constructor with domain resolutions, etc,
-    SolverCG(Ccoord resolutions, Real tol, Uint maxiter=0, bool verbose =false);
+    SolverCG(Sys_t& sys, Real tol, Uint maxiter=0, bool verbose =false);
 
     //! Copy constructor
     SolverCG(const SolverCG &other) = delete;
@@ -73,29 +77,24 @@ namespace muSpectre {
     //! Move assignment operator
     SolverCG& operator=(SolverCG &&other) = default;
 
+    bool has_converged() const override final {return this->converged;}
+
     //! actual solver
-    void solve(const Fun_t & tangent_effect,
-               const Field_t & rhs,
+    void solve(const Field_t & rhs,
                Field_t & x);
 
-    //! reset the iteration counter to zero
-    void reset_counter();
+    // this simplistic implementation has no initialisation phase so the default is ok
 
-    //! get the count of how many solve steps have been executed since
-    //! construction of most recent counter reset
-    Uint get_counter() const;
+    SolvVectorOut solve(const SolvVectorInC rhs, SolvVectorIn x_0) override final;
 
-
+    std::string name() const override final {return "CG";}
 
   protected:
     Tg_req_t get_tangent_req() const override final;
     Field_t & r_k; // residual
     Field_t & p_k; // search direction
     Field_t & Ap_k; // effect of tangent on search direction
-    const Real tol;
-    const Uint maxiter;
-    const bool verbose;
-    Uint counter{};
+    bool converged{false};
   private:
   };
 

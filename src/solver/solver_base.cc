@@ -7,7 +7,7 @@
  *
  * @brief  definitions for solvers
  *
- * @section LICENCE
+ * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -37,4 +37,29 @@
 
 
 namespace muSpectre {
+
+  //----------------------------------------------------------------------------//
+  template <Dim_t DimS, Dim_t DimM>
+  SolverBase<DimS, DimM>::SolverBase(Sys_t & sys, Real tol, Uint maxiter,
+                                     bool verbose )
+    : sys{sys}, tol{tol}, maxiter{maxiter}, verbose{verbose}
+  {}
+
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  void SolverBase<DimS, DimM>::reset_counter() {
+    this->counter = 0;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  Uint SolverBase<DimS, DimM>::get_counter() const {
+    return this->counter;
+  }
+
+  template class SolverBase<twoD, twoD>;
+  //template class SolverBase<twoD, threeD>;
+  template class SolverBase<threeD, threeD>;
+
 }  // muSpectre
