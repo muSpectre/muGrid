@@ -28,7 +28,7 @@
  */
 
 #include "common/common.hh"
-#include "materials/material_hyper_elastic1.hh"
+#include "materials/material_linear_elastic1.hh"
 #include "system/system_base.hh"
 
 #include <pybind11/pybind11.h>
@@ -45,12 +45,12 @@ using namespace pybind11::literals;
  * python binding for the optionally objective form of Hooke's law
  */
 template <Dim_t dim>
-void add_material_hyper_elastic_helper(py::module & mod) {
+void add_material_linear_elastic_helper(py::module & mod) {
   std::stringstream name_stream{};
   name_stream << "MaterialHooke" << dim << 'd';
   const auto name {name_stream.str()};
 
-  using Mat_t = MaterialHyperElastic1<dim, dim>;
+  using Mat_t = MaterialLinearElastic1<dim, dim>;
   using Sys_t = SystemBase<dim, dim>;
   py::class_<Mat_t>(mod, name.c_str())
     .def(py::init<std::string, Real, Real>(), "name"_a, "Young"_a, "Poisson"_a)
@@ -70,7 +70,7 @@ void add_material_hyper_elastic_helper(py::module & mod) {
 
 template <Dim_t dim>
 void add_material_helper(py::module & mod) {
-  add_material_hyper_elastic_helper<dim>(mod);
+  add_material_linear_elastic_helper<dim>(mod);
 }
 
 void add_material(py::module & mod) {

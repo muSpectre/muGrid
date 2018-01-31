@@ -1,11 +1,11 @@
 /**
- * file   material_hyper_elastic1.hh
+ * file   material_linear_elastic1.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   13 Nov 2017
  *
- * @brief  Implementation for hyperelastic reference material like in de Geus
+ * @brief  Implementation for linear elastic reference material like in de Geus
  *         2017. This follows the simplest and likely not most efficient
  *         implementation (with exception of the Python law)
  *
@@ -30,18 +30,18 @@
  */
 
 
-#ifndef MATERIAL_HYPER_ELASTIC1_H
-#define MATERIAL_HYPER_ELASTIC1_H
+#ifndef MATERIAL_LINEAR_ELASTIC1_H
+#define MATERIAL_LINEAR_ELASTIC1_H
 
 #include "common/common.hh"
 #include "materials/material_muSpectre_base.hh"
 
 namespace muSpectre {
   template<Dim_t DimS, Dim_t DimM>
-  class MaterialHyperElastic1;
+  class MaterialLinearElastic1;
 
   template <Dim_t DimS, Dim_t DimM>
-  struct MaterialMuSpectre_traits<MaterialHyperElastic1<DimS, DimM>>:
+  struct MaterialMuSpectre_traits<MaterialLinearElastic1<DimS, DimM>>:
     public MaterialMuSpectre_traits<void> {
     using Parent = MaterialMuSpectre_traits<void>;
     using InternalVariables = typename Parent::DefaultInternalVariables;
@@ -50,11 +50,11 @@ namespace muSpectre {
   //! DimS spatial dimension (dimension of problem
   //! DimM material_dimension (dimension of constitutive law)
   template<Dim_t DimS, Dim_t DimM>
-  class MaterialHyperElastic1:
-    public MaterialMuSpectre<MaterialHyperElastic1<DimS, DimM>, DimS, DimM>
+  class MaterialLinearElastic1:
+    public MaterialMuSpectre<MaterialLinearElastic1<DimS, DimM>, DimS, DimM>
   {
   public:
-    using Parent = MaterialMuSpectre<MaterialHyperElastic1, DimS, DimM>;
+    using Parent = MaterialMuSpectre<MaterialLinearElastic1, DimS, DimM>;
     using NeedTangent = typename Parent::NeedTangent;
     using GFieldCollection_t = typename Parent::GFieldCollection_t;
     // declare what type of strain measure your law takes as input
@@ -76,26 +76,26 @@ namespace muSpectre {
     using InternalVariables = typename Parent::DefaultInternalVariables;
 
     //! Default constructor
-    MaterialHyperElastic1() = delete;
+    MaterialLinearElastic1() = delete;
 
     //! Copy constructor
-    MaterialHyperElastic1(const MaterialHyperElastic1 &other) = delete;
+    MaterialLinearElastic1(const MaterialLinearElastic1 &other) = delete;
 
     //! Construct by name, Young's modulus and Poisson's ratio
-    MaterialHyperElastic1(std::string name, Real young, Real poisson);
+    MaterialLinearElastic1(std::string name, Real young, Real poisson);
 
 
     //! Move constructor
-    MaterialHyperElastic1(MaterialHyperElastic1 &&other) = delete;
+    MaterialLinearElastic1(MaterialLinearElastic1 &&other) = delete;
 
     //! Destructor
-    virtual ~MaterialHyperElastic1() = default;
+    virtual ~MaterialLinearElastic1() = default;
 
     //! Copy assignment operator
-    MaterialHyperElastic1& operator=(const MaterialHyperElastic1 &other) = delete;
+    MaterialLinearElastic1& operator=(const MaterialLinearElastic1 &other) = delete;
 
     //! Move assignment operator
-    MaterialHyperElastic1& operator=(MaterialHyperElastic1 &&other) = delete;
+    MaterialLinearElastic1& operator=(MaterialLinearElastic1 &&other) = delete;
 
     template <class s_t>
     inline decltype(auto) evaluate_stress(s_t && E);
@@ -115,7 +115,7 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   template <class s_t>
   decltype(auto)
-  MaterialHyperElastic1<DimS, DimM>::evaluate_stress(s_t && E) {
+  MaterialLinearElastic1<DimS, DimM>::evaluate_stress(s_t && E) {
     return E.trace()*lambda * Strain_t::Identity() + 2*mu*E;
   }
 
@@ -123,11 +123,11 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   template <class s_t>
   decltype(auto)
-  MaterialHyperElastic1<DimS, DimM>::evaluate_stress_tangent(s_t && E) {
+  MaterialLinearElastic1<DimS, DimM>::evaluate_stress_tangent(s_t && E) {
     return std::make_tuple(std::move(this->evaluate_stress(std::move(E))),
                            std::move(Tangent_t(const_cast<double*>(this->C.data()))));
   }
 
 }  // muSpectre
 
-#endif /* MATERIAL_HYPER_ELASTIC1_H */
+#endif /* MATERIAL_LINEAR_ELASTIC1_H */

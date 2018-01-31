@@ -1,11 +1,11 @@
 /**
- * file   material_hyper_elastic1.cc
+ * file   material_linear_elastic1.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   14 Nov 2017
  *
- * @brief  Implementation for materialhyperelastic1
+ * @brief  Implementation for materiallinearelastic1
  *
  * @section LICENSE
  *
@@ -27,7 +27,7 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include "materials/material_hyper_elastic1.hh"
+#include "materials/material_linear_elastic1.hh"
 #include "common/tensor_algebra.hh"
 
 #include <tuple>
@@ -36,7 +36,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  MaterialHyperElastic1<DimS, DimM>::MaterialHyperElastic1(std::string name,
+  MaterialLinearElastic1<DimS, DimM>::MaterialLinearElastic1(std::string name,
                                                            Real young,
                                                            Real poisson)
     :Parent(name), young{young}, poisson{poisson},
@@ -46,8 +46,8 @@ namespace muSpectre {
      2*mu*Tensors::I4S<DimM>()}
   {}
 
-  template class MaterialHyperElastic1<twoD, twoD>;
-  template class MaterialHyperElastic1<twoD, threeD>;
-  template class MaterialHyperElastic1<threeD, threeD>;
+  template class MaterialLinearElastic1<twoD, twoD>;
+  template class MaterialLinearElastic1<twoD, threeD>;
+  template class MaterialLinearElastic1<threeD, threeD>;
 
 }  // muSpectre

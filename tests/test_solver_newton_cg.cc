@@ -33,7 +33,7 @@
 #include "solver/solver_cg_eigen.hh"
 #include "fft/fftw_engine.hh"
 #include "fft/projection_finite_strain_fast.hh"
-#include "materials/material_hyper_elastic1.hh"
+#include "materials/material_linear_elastic1.hh"
 #include "common/iterators.hh"
 #include "common/ccoord_operations.hh"
 #include "system/system_factory.hh"
@@ -55,7 +55,7 @@ namespace muSpectre {
     auto proj_ptr{std::make_unique<ProjectionFiniteStrainFast<dim, dim>>(std::move(fft_ptr))};
     SystemBase<dim, dim> sys(std::move(proj_ptr));
 
-    using Mat_t = MaterialHyperElastic1<dim, dim>;
+    using Mat_t = MaterialLinearElastic1<dim, dim>;
     //const Real Young{210e9}, Poisson{.33};
     const Real Young{1.0030648180242636}, Poisson{0.29930675909878679};
     // const Real lambda{Young*Poisson/((1+Poisson)*(1-2*Poisson))};
@@ -106,7 +106,7 @@ namespace muSpectre {
 
     auto sys{make_system(resolutions, lengths, form)};
 
-    using Mat_t = MaterialHyperElastic1<dim, dim>;
+    using Mat_t = MaterialLinearElastic1<dim, dim>;
     constexpr Real Young{2.}, Poisson{.33};
     auto material_hard{std::make_unique<Mat_t>("hard", contrast*Young, Poisson)};
     auto material_soft{std::make_unique<Mat_t>("soft",          Young, Poisson)};

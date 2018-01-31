@@ -34,7 +34,7 @@
 #include "common/common.hh"
 #include "common/ccoord_operations.hh"
 #include "system/system_factory.hh"
-#include "materials/material_hyper_elastic1.hh"
+#include "materials/material_linear_elastic1.hh"
 #include "solver/solvers.hh"
 #include "solver/solver_cg.hh"
 
@@ -55,7 +55,7 @@ int main()
   constexpr Real E{1.0030648180242636};
   constexpr Real nu{0.29930675909878679};
 
-  using Material_t = MaterialHyperElastic1<dim, dim>;
+  using Material_t = MaterialLinearElastic1<dim, dim>;
   auto & soft{Material_t::make(system, "soft",    E, nu)};
   auto & hard{Material_t::make(system, "hard", 10*E, nu)};
 

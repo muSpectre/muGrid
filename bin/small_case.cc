@@ -30,7 +30,7 @@
 #include "common/common.hh"
 #include "common/iterators.hh"
 #include "system/system_factory.hh"
-#include "materials/material_hyper_elastic1.hh"
+#include "materials/material_linear_elastic1.hh"
 #include "solver/solvers.hh"
 #include "solver/solver_cg.hh"
 
@@ -53,9 +53,9 @@ int main()
                        lengths,
                        form)};
 
-  auto & hard{MaterialHyperElastic1<dim, dim>::make
+  auto & hard{MaterialLinearElastic1<dim, dim>::make
       (rve, "hard", 210., .33)};
-  auto & soft{MaterialHyperElastic1<dim, dim>::make
+  auto & soft{MaterialLinearElastic1<dim, dim>::make
       (rve, "soft",  70., .33)};
 
   for (auto && tup: akantu::enumerate(rve)) {

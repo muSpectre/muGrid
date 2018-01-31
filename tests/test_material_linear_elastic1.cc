@@ -1,5 +1,5 @@
 /**
- * file   test_material_hyper_elastic1.cc
+ * file   test_material_linear_elastic1.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -32,7 +32,7 @@
 #include <boost/mpl/list.hpp>
 #include <boost/range/combine.hpp>
 
-#include "materials/material_hyper_elastic1.hh"
+#include "materials/material_linear_elastic1.hh"
 #include "tests.hh"
 #include "common/test_goodies.hh"
 #include "common/field_collection.hh"
@@ -40,12 +40,12 @@
 
 namespace muSpectre {
 
-  BOOST_AUTO_TEST_SUITE(material_hyper_elastic_1);
+  BOOST_AUTO_TEST_SUITE(material_linear_elastic_1);
 
   template <Dim_t DimS, Dim_t DimM>
   struct MaterialFixture
   {
-    using Mat_t = MaterialHyperElastic1<DimS, DimM>;
+    using Mat_t = MaterialLinearElastic1<DimS, DimM>;
     constexpr static Real lambda{2}, mu{1.5};
     constexpr static Real young{mu*(3*lambda + 2*mu)/(lambda + mu)};
     constexpr static Real poisson{lambda/(2*(lambda + mu))};
