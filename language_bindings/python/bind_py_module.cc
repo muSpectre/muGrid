@@ -34,7 +34,7 @@
 using namespace pybind11::literals;
 namespace py=pybind11;
 
-PYBIND11_MODULE(pyMuSpectre, mod) {
+PYBIND11_MODULE(muSpectre, mod) {
   mod.doc() = "Python bindings to the µSpectre library";
 
   add_common(mod);
