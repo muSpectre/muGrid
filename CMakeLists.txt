@@ -95,6 +95,10 @@ add_subdirectory(
   ${CMAKE_SOURCE_DIR}/language_bindings/
   )
 
+add_subdirectory(
+  ${CMAKE_SOURCE_DIR}/doc/
+  )
+
 
 #compile executables
 file( GLOB binaries "${CMAKE_SOURCE_DIR}/bin/*.cc")
