@@ -40,22 +40,22 @@ set(SPHINX_HTML_DIR "${CMAKE_CURRENT_BINARY_DIR}/html")
 
 configure_file(
   "${CMAKE_CURRENT_SOURCE_DIR}/dev-docs/source/conf.py"
-  "${BINARY_BUILD_DIR}/conf.py"
+  "${CMAKE_CURRENT_BINARY_DIR}/conf.py"
   @ONLY)
 
 configure_file(
   "${CMAKE_CURRENT_SOURCE_DIR}/dev-docs/source/Doxyfile"
-  "${BINARY_BUILD_DIR}/Doxyfile"
+  "${CMAKE_CURRENT_BINARY_DIR}/Doxyfile"
   @ONLY)
 
 configure_file(
   "${CMAKE_CURRENT_SOURCE_DIR}/dev-docs/source/input_def.in"
-  "${BINARY_BUILD_DIR}/input_def"
+  "${CMAKE_CURRENT_BINARY_DIR}/input_def"
   @ONLY)
 
 configure_file(
   "${CMAKE_CURRENT_SOURCE_DIR}/dev-docs/source/xml_output_def.in"
-  "${BINARY_BUILD_DIR}/xml_output_def"
+  "${CMAKE_CURRENT_BINARY_DIR}/xml_output_def"
   @ONLY)
 
 add_custom_target(muSpectre_docs ALL
