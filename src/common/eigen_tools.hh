@@ -7,8 +7,6 @@
  *
  * @brief  small tools to be used with Eigen
  *
- * @section LICENSE
- *
  * Copyright © 2017 Till Junge
  *
  * µSpectre is free software; you can redistribute it and/or

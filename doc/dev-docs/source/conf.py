@@ -44,7 +44,7 @@ read_the_docs_build = os.environ.get('READTHEDOCS', None) == 'True'
 if read_the_docs_build:
     muspectre_path = "."
 else:
-    muspectre_path = "@BINARY_BUILD_DIR@"
+    muspectre_path = "@CMAKE_CURRENT_BINARY_DIR@"
 print("muspectre_path = '{}'".format(muspectre_path))
 subprocess.call('ls; pwd', shell=True)
 subprocess.call("cd {} && doxygen".format(muspectre_path), shell=True)
