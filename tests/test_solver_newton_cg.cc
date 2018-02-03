@@ -1,13 +1,11 @@
 /**
- * file   test_solver_newton_cg.cc
+* @file   test_solver_newton_cg.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   20 Dec 2017
  *
  * @brief  Tests for the standard Newton-Raphson + Conjugate Gradient solver
- *
- * @section LICENCE
  *
  * Copyright © 2017 Till Junge
  *

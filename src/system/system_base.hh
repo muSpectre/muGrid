@@ -1,5 +1,5 @@
 /**
- * file   system_base.hh
+* @file   system_base.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -7,8 +7,6 @@
  *
  * @brief Base class representing a unit cell system with single
  *        projection operator
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -53,25 +51,39 @@ namespace muSpectre {
   class SystemBase
   {
   public:
-    using Ccoord = Ccoord_t<DimS>;
-    using Rcoord = Rcoord_t<DimS>;
+    using Ccoord = Ccoord_t<DimS>; //!< cell coordinates type
+    using Rcoord = Rcoord_t<DimS>; //!< physical coordinates type
+    //! global field collection
     using FieldCollection_t = FieldCollection<DimS, DimM>;
+    //! the collection is handled in a `std::unique_ptr`
     using Collection_ptr = std::unique_ptr<FieldCollection_t>;
+    //! polymorphic base material type
     using Material_t = MaterialBase<DimS, DimM>;
+    //! materials handled through `std::unique_ptr`s
     using Material_ptr = std::unique_ptr<Material_t>;
+    //! polymorphic base projection type
     using Projection_t = ProjectionBase<DimS, DimM>;
+    //! projections handled through `std::unique_ptr`s
     using Projection_ptr = std::unique_ptr<Projection_t>;
+    //! expected type for strain fields
     using StrainField_t =
       TensorField<FieldCollection_t, Real, secondOrder, DimM>;
+    //! expected type for stress fields
     using StressField_t =
       TensorField<FieldCollection_t, Real, secondOrder, DimM>;
+    //! expected type for tangent stiffness fields
     using TangentField_t =
       TensorField<FieldCollection_t, Real, fourthOrder, DimM>;
+    //! combined stress and tangent field
     using FullResponse_t =
       std::tuple<const StressField_t&, const TangentField_t&>;
+    //! iterator type over all cell pixel's
     using iterator = typename CcoordOps::Pixels<DimS>::iterator;
+    //! input vector for solvers
     using SolvVectorIn = Eigen::Ref<const Eigen::VectorXd>;
+    //! output vector for solvers
     using SolvVectorOut = Eigen::Map<Eigen::VectorXd>;
+    //! sparse matrix emulation
     using Adaptor = SystemAdaptor<SystemBase>;
 
     //! Default constructor
@@ -133,12 +145,16 @@ namespace muSpectre {
      */
     StressField_t & project(StressField_t & field);
 
+    //! returns a ref to the cell's strain field
     StrainField_t & get_strain();
 
+    //! returns a ref to the cell's stress field
     const StressField_t & get_stress() const;
 
+    //! returns a ref to the cell's tangent stiffness field
     const TangentField_t & get_tangent(bool create = false);
 
+    //! returns a ref to a temporary field managed by the system
     StrainField_t & get_managed_field(std::string unique_name);
 
     /**
@@ -152,11 +168,14 @@ namespace muSpectre {
      */
     void initialise_materials(bool stiffness=false);
 
-    iterator begin();
-    iterator end();
+    iterator begin(); //!< iterator to the first pixel
+    iterator end();  //!< iterator past the last pixel
+    //! number of pixels in the cell
     size_t size() const {return pixels.size();}
 
+    //! return the resolutions of the cell
     const Ccoord & get_resolutions() const {return this->resolutions;}
+    //! return the sizes of the cell
     const Rcoord & get_lengths() const {return this->lengths;}
 
     /**
@@ -165,14 +184,22 @@ namespace muSpectre {
     const Formulation & get_formulation() const {
       return this->projection->get_formulation();}
 
+    //! for handling double initialisations right
     bool is_initialised() const {return this->initialised;}
 
+    /**
+     * get a reference to the projection object. should only be
+     * required for debugging
+     */
     Eigen::Map<Eigen::ArrayXXd> get_projection() {
       return this->projection->get_operator();}
 
+    //! returns the spatial size
     constexpr static Dim_t get_sdim() {return DimS;};
 
+    //! return a sparse matrix adaptor to the cell
     Adaptor get_adaptor();
+    //! returns the number of degrees of freedom in the cell
     Dim_t nb_dof() const {return this->size()*ipow(DimS, 2);};
 
 
@@ -180,30 +207,36 @@ namespace muSpectre {
     //! make sure that every pixel is assigned to one and only one material
     void check_material_coverage();
 
-    const Ccoord & resolutions;
-    CcoordOps::Pixels<DimS> pixels;
-    const Rcoord & lengths;
-    Collection_ptr fields;
-    StrainField_t & F;
-    StressField_t & P;
+    const Ccoord & resolutions; //!< the cell's resolutions
+    CcoordOps::Pixels<DimS> pixels; //!< helper to iterate over the pixels
+    const Rcoord & lengths; //!< the cell's lengths
+    Collection_ptr fields; //!< handle for the global fields of the cell
+    StrainField_t & F; //!< ref to strain field
+    StressField_t & P; //!< ref to stress field
     //! Tangent field might not even be required; so this is an
     //! optional ref_wrapper instead of a ref
     optional<std::reference_wrapper<TangentField_t>> K{};
+    //! container of the materials present in the cell
     std::vector<Material_ptr> materials{};
-    Projection_ptr projection;
-    bool initialised{false};
-    const Formulation form;
+    Projection_ptr projection; //!< handle for the projection operator
+    bool initialised{false}; //!< to handle double initialisation right
+    const Formulation form; //!< formulation for solution
   private:
   };
 
 
+  /**
+   * lightweight resource handle wrapping a `muSpectre::SystemBase` or
+   * a subclass thereof into `Eigen::EigenBase`, so it can be
+   * interpreted as a sparse matrix by Eigen solvers
+   */
   template <class System>
   class SystemAdaptor: public Eigen::EigenBase<SystemAdaptor<System>> {
 
   public:
-    using Scalar = double;
-    using RealScalar = double;
-    using StorageIndex = int;
+    using Scalar = double;     //!< sparse matrix traits
+    using RealScalar = double; //!< sparse matrix traits
+    using StorageIndex = int;  //!< sparse matrix traits
     enum {
       ColsAtCompileTime = Eigen::Dynamic,
       MaxColsAtCompileTime = Eigen::Dynamic,
@@ -212,29 +245,38 @@ namespace muSpectre {
       IsRowMajor = false
     };
 
+    //! constructor
     SystemAdaptor(System & sys):sys{sys}{}
+    //!returns the number of logical rows
     Eigen::Index rows() const {return this->sys.nb_dof();}
+    //!returns the number of logical columns
     Eigen::Index cols() const {return this->rows();}
 
+    //! implementation of the evaluation
     template<typename Rhs>
     Eigen::Product<SystemAdaptor,Rhs,Eigen::AliasFreeProduct>
     operator*(const Eigen::MatrixBase<Rhs>& x) const {
       return Eigen::Product<SystemAdaptor,Rhs,Eigen::AliasFreeProduct>
         (*this, x.derived());
     }
-    System & sys;
+    System & sys; //!< ref to the cell
   };
 
 }  // muSpectre
 
-// Implementation of SystemAdaptor * Eigen::DenseVector though a specialization of internal::generic_product_impl:
+
 namespace Eigen {
   namespace internal {
+    //! Implementation of `muSpectre::SystemAdaptor` * `Eigen::DenseVector` through a
+    //! specialization of `Eigen::internal::generic_product_impl`:
     template<typename Rhs, class SystemAdaptor>
     struct generic_product_impl<SystemAdaptor, Rhs, SparseShape, DenseShape, GemvProduct> // GEMV stands for matrix-vector
       : generic_product_impl_base<SystemAdaptor,Rhs,generic_product_impl<SystemAdaptor,Rhs> >
     {
+      //! undocumented
       typedef typename Product<SystemAdaptor,Rhs>::Scalar Scalar;
+
+      //! undocumented
       template<typename Dest>
       static void scaleAndAddTo(Dest& dst, const SystemAdaptor& lhs, const Rhs& rhs, const Scalar& /*alpha*/)
       {

@@ -1,13 +1,11 @@
 /**
- * file   projection_base.hh
+* @file   projection_base.hh
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
  * @date   03 Dec 2017
  *
  * @brief  Base class for Projection operators
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -43,17 +41,33 @@ namespace muSpectre {
   struct Projection_traits {
   };
 
+  /**
+   * defines the interface which must be implemented by projection operators
+   */
   template <Dim_t DimS, Dim_t DimM>
   class ProjectionBase
   {
   public:
+    //! type of fft_engine used
     using FFT_Engine = FFT_Engine_base<DimS, DimM>;
+    //! reference to fft engine is safely managed through a `std::unique_ptr`
     using FFT_Engine_ptr = std::unique_ptr<FFT_Engine>;
+    //! cell coordinates type
     using Ccoord = typename FFT_Engine::Ccoord;
+    //! spatial coordinates type
     using Rcoord = typename FFT_Engine::Rcoord;
+    //! global FieldCollection
     using GFieldCollection_t = typename FFT_Engine::GFieldCollection_t;
+    //! local FieldCollection (for Fourier-space pixels)
     using LFieldCollection_t = typename FFT_Engine::LFieldCollection_t;
+    //! Field type on which to apply the projection
     using Field_t = typename FFT_Engine::Field_t;
+    /**
+     * iterator over all pixels. This is taken from the FFT engine,
+     * because depending on the real-to-complex FFT employed, only
+     * roughly half of the pixels are present in Fourier space
+     * (because of the hermitian nature of the transform)
+     */
     using iterator = typename FFT_Engine::iterator;
 
     //! Default constructor
@@ -83,12 +97,18 @@ namespace muSpectre {
     //! apply the projection operator to a field
     virtual void apply_projection(Field_t & field) = 0;
 
-    //!
+    //! returns the resolutions of the cell
     const Ccoord & get_resolutions() const {
       return this->fft_engine->get_resolutions();}
+    //! returns the physical sizes of the cell
     const Rcoord & get_lengths() const {
       return this->fft_engine->get_lengths();}
 
+    /**
+     * return the `muSpectre::Formulation` that is used in solving
+     * this system. This allows tho check whether a projection is
+     * compatible with the chosen formulation
+     */
     const Formulation & get_formulation() const {return this->form;}
 
     //! return the raw projection operator. This is mainly intended
@@ -97,8 +117,22 @@ namespace muSpectre {
     virtual Eigen::Map<Eigen::ArrayXXd> get_operator() = 0;
 
   protected:
+    //! handle on the fft_engine used
     FFT_Engine_ptr fft_engine;
+    /**
+     * formulation this projection can be applied to (determines
+     * whether the projection enforces gradients, small strain tensor
+     * or symmetric smal strain tensor
+     */
     const Formulation form;
+    /**
+     * A local `muSpectre::FieldCollection` to store the projection
+     * operator per k-space point. This is a local rather than a
+     * global collection, since the pixels considered depend on the
+     * FFT implementation. See
+     * http://www.fftw.org/fftw3_doc/Multi_002dDimensional-DFTs-of-Real-Data.html#Multi_002dDimensional-DFTs-of-Real-Data
+     * for an example
+     */
     LFieldCollection_t & projection_container{};
 
   private:

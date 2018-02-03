@@ -1,13 +1,11 @@
 /**
- * file   test_fields.cc
+* @file   test_fields.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
  * @date   20 Sep 2017
  *
  * @brief  Test Fields that are used in FieldCollections
- *
- * @section LICENCE
  *
  * Copyright © 2017 Till Junge
  *

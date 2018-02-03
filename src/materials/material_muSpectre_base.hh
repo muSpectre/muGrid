@@ -1,5 +1,5 @@
 /**
- * file   material_muSpectre_base.hh
+ * @file   material_muSpectre_base.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -11,8 +11,6 @@
  *         laws and is merely required to provide the methods for computing the
  *         second Piola-Kirchhoff stress and Tangent. This class uses the
  *         "curiously recurring template parameter" to avoid virtual calls.
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -49,12 +47,15 @@
 
 namespace muSpectre {
 
-  /**
-   * Forward declaration for factory function
-   */
+  // Forward declaration for factory function
   template <Dim_t DimS, Dim_t DimM>
   class SystemBase;
 
+  /**
+   * material traits are used by `muSpectre::MaterialMuSpectre` to
+   * break the circular dependence created by the curiously recurring
+   * template parameter
+   */
   template <class Material>
   struct MaterialMuSpectre_traits {
   };
@@ -62,9 +63,12 @@ namespace muSpectre {
   template <class Material, Dim_t DimS, Dim_t DimM>
   class MaterialMuSpectre;
 
+  /**
+   * Specialisation for materials without internal variables to inherit from
+   */
   template <>
   struct MaterialMuSpectre_traits<void> {
-    using DefaultInternalVariables = std::tuple<>;
+    using DefaultInternalVariables = std::tuple<>;//!< no internals by default
   };
 
   //! 'Material' is a CRTP
@@ -72,15 +76,25 @@ namespace muSpectre {
   class MaterialMuSpectre: public MaterialBase<DimS, DimM>
   {
   public:
+    /**
+     * type used to determine whether the
+     * `muSpectre::MaterialMuSpectre::iterable_proxy` evaluate only
+     * stresses or also tangent stiffnesses
+     */
     using NeedTangent = MatTB::NeedTangent;
-    using Parent = MaterialBase<DimS, DimM>;
+    using Parent = MaterialBase<DimS, DimM>; //!< base class
+    //! global field collection
     using GFieldCollection_t = typename Parent::GFieldCollection_t;
-    using MFieldCollection_t = typename Parent::MFieldCollection_t;
+    //! expected type for stress fields
     using StressField_t = typename Parent::StressField_t;
+    //! expected type for strain fields
     using StrainField_t = typename Parent::StrainField_t;
+    //! expected type for tangent stiffness fields
     using TangentField_t = typename Parent::TangentField_t;
 
+    //! by default, inheriting classes have no internal variables
     using DefaultInternalVariables = std::tuple<>;
+    //! traits for the CRTP subclass
     using traits = MaterialMuSpectre_traits<Material>;
 
     //! Default constructor
@@ -110,7 +124,7 @@ namespace muSpectre {
     MaterialMuSpectre& operator=(MaterialMuSpectre &&other) = delete;
 
 
-    //* allocate memory, etc
+    //! allocate memory, etc
     virtual void initialise(bool stiffness = false) override final;
 
     using Parent::compute_stresses;
@@ -154,11 +168,13 @@ namespace muSpectre {
     decltype(auto) get_internals() {
       // the default material has no internal variables
       return typename Material::InternalVariables{};}
+    //! see `MaterialMuSpectre::get_internals()`
     decltype(auto) get_internals() const {
       // the default material has no internal variables
       return typename Material::InternalVariables{};}
+    //! tuple of internal variables
     typename traits::InternalVariables internal_variables{};
-    bool is_initialised{false};
+    bool is_initialised{false}; //!< to handle double initialisation right
 
   private:
   };
@@ -486,6 +502,11 @@ namespace muSpectre {
   public:
     //! Default constructor
     iterable_proxy() = delete;
+    /**
+     * type used to determine whether the
+     * `muSpectre::MaterialMuSpectre::iterable_proxy` evaluate only
+     * stresses or also tangent stiffnesses
+     */
     using NeedTangent =
       typename MaterialMuSpectre<Material, DimS, DimM>::NeedTangent;
     /** Iterator uses the material's internal variables field
@@ -501,6 +522,11 @@ namespace muSpectre {
       :material(mat), strain_field(F), stress_tup{P,K},
        internals(material.internal_variables){};
 
+    /** Iterator uses the material's internal variables field
+        collection to iterate selectively over the global fields
+        (such as the transformation gradient F and first
+        Piola-Kirchhoff stress P.
+    **/
     template<bool DontNeedTgt=(NeedTgt == NeedTangent::no)>
     iterable_proxy(const MaterialMuSpectre & mat,
                    const StrainField_t & F,
@@ -508,21 +534,32 @@ namespace muSpectre {
       :material(mat), strain_field(F), stress_tup{P},
        internals(material.internal_variables){};
 
+    //! Expected type for strain fields
     using StrainMap_t = typename Material::StrainMap_t;
+    //! Expected type for stress fields
     using StressMap_t = typename Material::StressMap_t;
+    //! Expected type for tangent stiffness fields
     using TangentMap_t = typename Material::TangentMap_t;
+    //! expected type for strain values
     using Strain_t = typename Material::Strain_t;
+    //! expected type for stress values
     using Stress_t = typename Material::Stress_t;
+    //! expected type for tangent stiffness values
     using Tangent_t = typename Material::Tangent_t;
+
+    //! tuple of intervnal variables, depends on the material
     using InternalVariables = typename Material::InternalVariables;
+    //! tuple containing a stress and possibly a tangent stiffness field
     using StressFieldTup = std::conditional_t
       <(NeedTgt == NeedTangent::yes),
        std::tuple<StressField_t&, TangentField_t&>,
        std::tuple<StressField_t&>>;
+    //! tuple containing a stress and possibly a tangent stiffness field map
     using StressMapTup = std::conditional_t
       <(NeedTgt == NeedTangent::yes),
        std::tuple<StressMap_t, TangentMap_t>,
        std::tuple<StressMap_t>>;
+    //! tuple containing a stress and possibly a tangent stiffness value ref
     using Stress_tTup = std::conditional_t<(NeedTgt == NeedTangent::yes),
                                            std::tuple<Stress_t, Tangent_t>,
                                            std::tuple<Stress_t>>;
@@ -543,13 +580,20 @@ namespace muSpectre {
     //! Move assignment operator
     iterable_proxy& operator=(iterable_proxy &&other) = default;
 
+    /**
+     * dereferences into a tuple containing strains, and internal
+     * variables, as well as maps to the stress and potentially
+     * stiffness maps where to write the response of a pixel
+     */
     class iterator
     {
     public:
+      //! type to refer to internal variables owned by a CRTP material
       using InternalReferences = MatTB::ReferenceTuple_t<InternalVariables>;
+      //! return type to be unpacked per pixel my the constitutive law
       using value_type =
         std::tuple<std::tuple<Strain_t>, Stress_tTup, InternalReferences>;
-      using iterator_category = std::forward_iterator_tag;
+      using iterator_category = std::forward_iterator_tag; //!< stl conformance
 
       //! Default constructor
       iterator() = delete;
@@ -589,20 +633,25 @@ namespace muSpectre {
 
 
     protected:
-      const iterable_proxy & it;
-      StrainMap_t strain_map;
+      const iterable_proxy & it; //!< ref to the proxy
+      StrainMap_t strain_map;    //!< map onto the global strain field
+      //! map onto the global stress field and possibly tangent stiffness
       StressMapTup stress_map;
-      size_t index;
+      size_t index; //!< index or pixel currently referred to
     private:
     };
 
+    //! returns iterator to first pixel if this material
     iterator begin() {return std::move(iterator(*this));}
+    //! returns iterator past the last pixel in this material
     iterator end() {return std::move(iterator(*this, false));}
 
   protected:
-    const MaterialMuSpectre & material;
-    const StrainField_t & strain_field;
+    const MaterialMuSpectre & material; //!< reference to the proxied material
+    const StrainField_t & strain_field; //!< cell's global strain field
+    //! references to the global stress field and perhaps tangent stiffness
     StressFieldTup stress_tup;
+    //! references to the internal variables
     const InternalVariables & internals;
 
   private:

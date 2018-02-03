@@ -1,13 +1,11 @@
 /**
- * file   solver_cg_eigen.cc
+* @file   solver_cg_eigen.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   19 Jan 2018
  *
  * @brief  implementation for binding to Eigen's conjugate gradient solver
- *
- * @section LICENCE
  *
  * Copyright (C) 2018 Till Junge
  *

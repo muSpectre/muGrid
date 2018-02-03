@@ -1,13 +1,11 @@
 /**
- * file   system_base.cc
+* @file   system_base.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   01 Nov 2017
  *
  * @brief  Implementation for system base class
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

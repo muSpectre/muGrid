@@ -1,13 +1,11 @@
 /**
- * file   T4_map_proxy.hh
+* @file   T4_map_proxy.hh
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
  * @date   19 Nov 2017
  *
  * @brief  Map type to allow fourth-order tensor-like maps on 2D matrices
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -44,12 +42,20 @@ namespace muSpectre {
    */
   template <typename T, Dim_t Dim>
   using T4Mat = Eigen::Matrix<T, Dim*Dim, Dim*Dim>;
+
+  /**
+   * Map onto `muSpectre::T4Mat`
+   */
   template <typename T, Dim_t Dim, bool ConstMap=false>
   using T4MatMap = std::conditional_t<ConstMap,
                                       Eigen::Map<const T4Mat<T, Dim>>,
                                       Eigen::Map<T4Mat<T, Dim>>>;
 
 
+  /**
+   * provides index-based access to fourth-order Tensors represented
+   * by square matrices
+   */
   template <typename T4>
   inline auto get(T4&& t4, Dim_t i, Dim_t j, Dim_t k, Dim_t l)
     -> decltype(t4.coeffRef(i,j)) {

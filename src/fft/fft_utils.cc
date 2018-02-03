@@ -1,13 +1,11 @@
 /**
- * file   fft_utils.cc
+* @file   fft_utils.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
  * @date   11 Dec 2017
  *
  * @brief  implementation of fft utilities
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

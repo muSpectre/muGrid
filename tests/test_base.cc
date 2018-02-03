@@ -1,13 +1,11 @@
 /**
- * file   test_base.cc
+* @file   test_base.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   01 May 2017
  *
  * @brief  Base test (tests only whether the tests compile
- *
- * @section LICENCE
  *
  * Copyright © 2017 Till Junge
  *

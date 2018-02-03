@@ -1,13 +1,11 @@
 /**
- * file   projection_base.cc
+* @file   projection_base.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   06 Dec 2017
  *
  * @brief  implementation of base class for projections
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

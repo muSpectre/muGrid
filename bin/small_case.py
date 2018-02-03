@@ -33,7 +33,7 @@ import os
 import numpy as np
 
 sys.path.append(os.path.join(os.getcwd(), "language_bindings/python"))
-import pyMuSpectre as µ
+import muSpectre as µ
 
 
 resolution = [51, 51]

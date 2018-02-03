@@ -1,13 +1,11 @@
 /**
- * file   solver_cg.cc
+* @file   solver_cg.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   20 Dec 2017
  *
  * @brief  Implementation of cg solver
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

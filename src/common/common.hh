@@ -1,5 +1,5 @@
 /**
- * file   common.hh
+* @file   common.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -7,7 +7,7 @@
  *
  * @brief  Small definitions of commonly used types througout µSpectre
  *
- * @section LICENSE
+ * @section  LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -40,21 +40,28 @@
 
 namespace muSpectre {
 
-  //! Eigen uses signed integers for dimensions. For consistency, µSpectre uses
-  //! them througout the code
-  using Dim_t = int;// needs to represent -1 for eigen
-  constexpr Dim_t oneD{1};
-  constexpr Dim_t twoD{2};
-  constexpr Dim_t threeD{3};
-  constexpr Dim_t firstOrder{1};
-  constexpr Dim_t secondOrder{2};
-  constexpr Dim_t fourthOrder{4};
+  /**
+   * Eigen uses signed integers for dimensions. For consistency,
+   µSpectre uses them througout the code. needs to represent -1 for
+   eigen
+   */
+  using Dim_t = int;
 
+  constexpr Dim_t oneD{1}; //!< constant for a one-dimensional problem
+  constexpr Dim_t twoD{2}; //!< constant for a two-dimensional problem
+  constexpr Dim_t threeD{3}; //!< constant for a three-dimensional problem
+  constexpr Dim_t firstOrder{1}; //!< constant for vectors
+  constexpr Dim_t secondOrder{2}; //!< constant second-order tensors
+  constexpr Dim_t fourthOrder{4}; //!< constant fourth-order tensors
+
+  //@{
+  //! @anchor scalars
   //! Scalar types used for mathematical calculations
   using Uint = unsigned int;
   using Int = int;
   using Real = double;
   using Complex = std::complex<Real>;
+  //@}
 
   //! Ccoord_t are cell coordinates, i.e. integer coordinates
   template<Dim_t dim>
@@ -63,6 +70,10 @@ namespace muSpectre {
   template<Dim_t dim>
   using Rcoord_t = std::array<Real, dim>;
 
+  /**
+   * Allows inserting `muSpectre::Ccoord_t` and `muSpectre::Rcoord_t`
+   * into `std::ostream`s
+   */
   template<typename T, size_t dim>
   std::ostream & operator << (std::ostream & os,
                               const std::array<T, dim> & index) {
@@ -74,6 +85,7 @@ namespace muSpectre {
     return os;
   }
 
+  //! element-wise division
   template <size_t dim>
   Rcoord_t<dim> operator/(const Rcoord_t<dim> & a, const Rcoord_t<dim> & b) {
     Rcoord_t<dim> retval{a};
@@ -83,6 +95,7 @@ namespace muSpectre {
     return retval;
   }
 
+  //! element-wise division
   template <size_t dim>
   Rcoord_t<dim> operator/(const Rcoord_t<dim> & a, const Ccoord_t<dim> & b) {
     Rcoord_t<dim> retval{a};
@@ -117,31 +130,57 @@ namespace muSpectre {
   /**
    * Planner flags for FFT (follows FFTW, hopefully this choice will
    * be compatible with alternative FFT implementations)
+   * @enum muSpectre::FFT_PlanFlags
    */
-  enum class FFT_PlanFlags {estimate, measure, patient};
+  enum class FFT_PlanFlags {
+    estimate, //!< cheapest plan for slowest execution
+    measure,  //!< more expensive plan for fast execution
+    patient   //!< very expensive plan for fastest execution
+  };
 
   //! continuum mechanics flags
-  enum class Formulation{finite_strain, small_strain};
+  enum class Formulation{
+    finite_strain, //!< causes evaluation in PK1(F)
+    small_strain   //!< causes evaluation in   σ(ε)
+  };
+  //! inserts `muSpectre::Formulation`s into `std::ostream`s
   std::ostream & operator<<(std::ostream & os, Formulation f);
 
   /* ---------------------------------------------------------------------- */
   //! Material laws can declare which type of stress measure they provide,
   //! and µSpectre will handle conversions
   enum class StressMeasure {
-    Cauchy, PK1, PK2, Kirchhoff, Biot, Mandel, no_stress_};
+    Cauchy,      //!< Cauchy stress σ
+    PK1,         //!< First Piola-Kirchhoff strell
+    PK2,         //!< Second Piola-Kirchhoff strell
+    Kirchhoff,   //!< Kirchhoff stress τ
+    Biot,        //!< Biot stress
+    Mandel,      //!< Mandel stress
+    no_stress_   //!< only for triggering static_asserts
+  };
+  //! inserts `muSpectre::StressMeasure`s into `std::ostream`s
   std::ostream & operator<<(std::ostream & os, StressMeasure s);
 
   /* ---------------------------------------------------------------------- */
   //! Material laws can declare which type of strain measure they require and
   //! µSpectre will provide it
   enum class StrainMeasure {
-    Gradient, Infinitesimal, GreenLagrange, Biot, Log, Almansi,
-    RCauchyGreen, LCauchyGreen, no_strain_};
+    Gradient,      //!< placement gradient (δy/δx)
+    Infinitesimal, //!< small strain tensor .5(∇u + ∇uᵀ)
+    GreenLagrange, //!< Green-Lagrange strain .5(Fᵀ·F - I)
+    Biot,          //!< Biot strain
+    Log,           //!< logarithmic strain
+    Almansi,       //!< Almansi strain
+    RCauchyGreen,  //!< Right Cauchy-Green tensor
+    LCauchyGreen,  //!< Left Cauchy-Green tensor
+    no_strain_     //!< only for triggering static_assert
+  };
+  //! inserts `muSpectre::StrainMeasure`s into `std::ostream`s
   std::ostream & operator<<(std::ostream & os, StrainMeasure s);
 
   /* ---------------------------------------------------------------------- */
-  /** Compile-time functions to set the stress and strain measures
-      stored by mu_spectre depending on the formulation
+  /** Compile-time function to g strain measure stored by muSpectre
+      depending on the formulation
    **/
   constexpr StrainMeasure get_stored_strain_type(Formulation form) {
     switch (form) {
@@ -158,6 +197,10 @@ namespace muSpectre {
       break;
     }
   }
+
+  /** Compile-time function to g stress measure stored by muSpectre
+      depending on the formulation
+   **/
   constexpr StressMeasure get_stored_stress_type(Formulation form) {
     switch (form) {
     case Formulation::finite_strain: {

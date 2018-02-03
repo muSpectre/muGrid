@@ -1,13 +1,11 @@
 /**
- * file   fft_engine_base.cc
+* @file   fft_engine_base.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
  * @date   03 Dec 2017
  *
  * @brief  implementation for FFT engine base class
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

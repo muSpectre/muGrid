@@ -1,13 +1,11 @@
 /**
- * file   bind_py_system.cc
+* @file   bind_py_system.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   09 Jan 2018
  *
  * @brief  Python bindings for the system factory function
- *
- * @section LICENSE
  *
  * Copyright © 2018 Till Junge
  *

@@ -1,13 +1,11 @@
 /**
- * file   test_system_base.cc
+* @file   test_system_base.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   14 Dec 2017
  *
  * @brief  Tests for the basic system class
- *
- * @section LICENCE
  *
  * Copyright © 2017 Till Junge
  *
@@ -35,7 +33,7 @@
 #include "common/common.hh"
 #include "common/iterators.hh"
 #include "common/field_map.hh"
-#include "common/test_goodies.hh"
+#include "tests/test_goodies.hh"
 #include "system/system_factory.hh"
 #include "materials/material_hyper_elastic1.hh"
 

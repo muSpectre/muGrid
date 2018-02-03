@@ -1,13 +1,11 @@
 /**
- * file   ccoord_operations.hh
+* @file   ccoord_operations.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   29 Sep 2017
  *
  * @brief  common operations on pixel addressing 
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -45,20 +43,24 @@ namespace muSpectre {
   namespace CcoordOps {
 
     namespace internal {
+      //! simple helper returning the first argument and ignoring the second
       template <typename T>
       constexpr T ret(T val, size_t /*dummy*/) {return val;}
 
+      //! helper to build cubes
       template <Dim_t Dim, typename T, size_t... I>
       constexpr std::array<T, Dim> cube_fun(T val, std::index_sequence<I...>) {
         return std::array<T, Dim>{ret(val, I)...};
       }
 
+      //! computes hermitian size according to FFTW
       template <Dim_t Dim, size_t... I>
       constexpr Ccoord_t<Dim> herm(const Ccoord_t<Dim> & full_sizes,
                                    std::index_sequence<I...>) {
         return Ccoord_t<Dim>{full_sizes[I]..., full_sizes.back()/2+1};
       }
 
+      //! compute the stride in a direction of a row-major grid
       template <Dim_t Dim>
       constexpr Dim_t stride(const Ccoord_t<Dim> & sizes,
                              const size_t index) {
@@ -72,6 +74,7 @@ namespace muSpectre {
         return ret_val;
       }
 
+      //! get all strides from a row-major grid (helper function)
       template <Dim_t Dim, size_t... I>
       constexpr Ccoord_t<Dim> compute_strides(const Ccoord_t<Dim> & sizes,
                                               std::index_sequence<I...>) {
@@ -80,18 +83,21 @@ namespace muSpectre {
     }  // internal
 
     //----------------------------------------------------------------------------//
+    //! returns a grid of equal resolutions in each direction
     template <size_t dim, typename T>
     constexpr std::array<T, dim> get_cube(T size) {
       return internal::cube_fun<dim>(size, std::make_index_sequence<dim>{});
     }
 
     /* ---------------------------------------------------------------------- */
+    //! returns the hermition grid to correcsponding to a full grid
     template <size_t dim>
     constexpr Ccoord_t<dim> get_hermitian_sizes(Ccoord_t<dim> full_sizes) {
       return internal::herm<dim>(full_sizes, std::make_index_sequence<dim-1>{});
     }
 
     /* ---------------------------------------------------------------------- */
+    //! return physical vector of a cell of cubic pixels
     template <size_t dim>
     Eigen::Matrix<Real, dim, 1> get_vector(const Ccoord_t<dim> & ccoord, Real pix_size = 1.) {
       Eigen::Matrix<Real, dim, 1> retval;
@@ -102,6 +108,7 @@ namespace muSpectre {
     }
 
     /* ---------------------------------------------------------------------- */
+    //! return physical vector of a cell of general pixels
     template <size_t dim, typename T>
     Eigen::Matrix<T, dim, 1> get_vector(const Ccoord_t<dim> & ccoord,
                                         Eigen::Matrix<T, Dim_t(dim), 1> pix_size) {
@@ -113,6 +120,7 @@ namespace muSpectre {
     }
 
     /* ---------------------------------------------------------------------- */
+    //! return physical vector of a cell of general pixels
     template <size_t dim, typename T>
     Eigen::Matrix<T, dim, 1> get_vector(const Ccoord_t<dim> & ccoord,
                                         const std::array<T, dim>& pix_size) {
@@ -125,6 +133,7 @@ namespace muSpectre {
 
 
     /* ---------------------------------------------------------------------- */
+    //! get all strides from a row-major grid
     template <size_t dim>
     constexpr Ccoord_t<dim> get_default_strides(const Ccoord_t<dim> & sizes) {
       return internal::compute_strides<dim>(sizes,
@@ -132,6 +141,7 @@ namespace muSpectre {
     }
 
     //----------------------------------------------------------------------------//
+    //! get the i-th pixel in a grid of size sizes
     template <size_t dim>
     constexpr Ccoord_t<dim> get_ccoord(const Ccoord_t<dim> & sizes, Dim_t index) {
       Ccoord_t<dim> retval{{0}};
@@ -146,6 +156,7 @@ namespace muSpectre {
     }
 
     //----------------------------------------------------------------------------//
+    //! get the linear index of a pixel in a given grid
     template <size_t dim>
     constexpr Dim_t get_index(const Ccoord_t<dim> & sizes,
                               const Ccoord_t<dim> & ccoord) {
@@ -161,6 +172,7 @@ namespace muSpectre {
     }
 
     //----------------------------------------------------------------------------//
+    //! get the linear index of a pixel given a set of strides
     template <size_t dim>
     constexpr Dim_t get_index_from_strides(const Ccoord_t<dim> & strides,
                                            const Ccoord_t<dim> & ccoord) {
@@ -174,6 +186,7 @@ namespace muSpectre {
     }
 
     //----------------------------------------------------------------------------//
+    //! get the number of pixels in a grid
     template <size_t dim>
     constexpr size_t get_size(const Ccoord_t<dim>& sizes) {
       Dim_t retval{1};
@@ -184,6 +197,7 @@ namespace muSpectre {
     }
 
     //----------------------------------------------------------------------------//
+    //! get the number of pixels in a grid given its strides
     template <size_t dim>
     constexpr size_t get_size_from_strides(const Ccoord_t<dim>& sizes,
                                            const Ccoord_t<dim>& strides) {
@@ -191,38 +205,57 @@ namespace muSpectre {
     }
 
     /* ---------------------------------------------------------------------- */
+    /**
+     * centralises iterating over square (or cubic) discretisation grids
+     */
     template <size_t dim>
     class Pixels {
     public:
+      //! constructor
       Pixels(const Ccoord_t<dim> & sizes=Ccoord_t<dim>{}):sizes(sizes){};
+      //! copy constructor
       Pixels(const Pixels & other) = default;
+      //! assignment operator
       Pixels & operator=(const Pixels & other) = default;
       virtual ~Pixels() = default;
+
+      /**
+       * iterators over `Pixels` dereferences to cell coordinates
+       */
       class iterator
       {
       public:
-        using value_type = Ccoord_t<dim>;
-        using const_value_type = const value_type;
-        using pointer = value_type*;
-        using difference_type = std::ptrdiff_t;
-        using iterator_category = std::forward_iterator_tag;
-        using reference = value_type;
+        using value_type = Ccoord_t<dim>; //!< stl conformance
+        using const_value_type = const value_type; //!< stl conformance
+        using pointer = value_type*; //!< stl conformance
+        using difference_type = std::ptrdiff_t; //!< stl conformance
+        using iterator_category = std::forward_iterator_tag;//!<stl conformance
+        using reference = value_type; //!< stl conformance
+
+        //! constructor
         iterator(const Pixels & pixels, bool begin=true);
         virtual ~iterator() = default;
+        //! dereferencing
         inline value_type operator*() const;
+        //! pre-increment
         inline iterator & operator++();
+        //! inequality
         inline bool operator!=(const iterator & other) const;
+        //! equality
         inline bool operator==(const iterator & other) const;
 
       protected:
-        const Pixels& pixels;
-        size_t index;
+        const Pixels& pixels; //!< ref to pixels in cell
+        size_t index; //!< index of currect pointed-to pixel
       };
+      //! stl conformance
       inline iterator begin() const {return iterator(*this);}
+      //! stl conformance
       inline iterator end() const {return iterator(*this, false);}
+      //! stl conformance
       inline size_t size() const {return get_size(this->sizes);}
     protected:
-      Ccoord_t<dim>  sizes;
+      Ccoord_t<dim>  sizes; //!< resolutions of cell
     };
 
     /* ---------------------------------------------------------------------- */

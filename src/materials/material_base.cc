@@ -1,13 +1,11 @@
 /**
- * file   material_base.cc
+* @file   material_base.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   01 Nov 2017
  *
  * @brief  implementation of materi
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

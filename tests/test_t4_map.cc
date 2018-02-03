@@ -1,13 +1,11 @@
 /**
- * file   test_t4_map.cc
+* @file   test_t4_map.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   20 Nov 2017
  *
  * @brief  Test the fourth-order map on second-order tensor implementation
- *
- * @section LICENCE
  *
  * Copyright © 2017 Till Junge
  *

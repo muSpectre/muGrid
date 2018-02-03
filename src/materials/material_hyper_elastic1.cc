@@ -1,13 +1,11 @@
 /**
- * file   material_hyper_elastic1.cc
+* @file   material_hyper_elastic1.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   14 Nov 2017
  *
  * @brief  Implementation for materialhyperelastic1
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
