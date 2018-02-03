@@ -56,7 +56,6 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   typename SolverCG<DimS, DimM>::SolvVectorOut
   SolverCG<DimS, DimM>::solve(const SolvVectorInC rhs, SolvVectorIn x_0) {
-
     // Following implementation of algorithm 5.2 in Nocedal's Numerical Optimization (p. 112)
 
     auto r = this->r_k.eigen();
@@ -67,7 +66,6 @@ namespace muSpectre {
     // initialisation of algo
     r = this->sys.directional_stiffness_with_copy(x);
 
-
     r -= typename Field_t::ConstEigenMap(rhs.data(), r.rows(), r.cols());
     p = -r;
 
@@ -76,13 +74,14 @@ namespace muSpectre {
     Real rhs_norm2 = rhs.squaredNorm();
     Real tol2 = ipow(this->tol,2)*rhs_norm2;
 
-
     size_t count_width{}; // for output formatting in verbose case
     if (this->verbose) {
       count_width = size_t(std::log10(this->maxiter))+1;
     }
 
-    for (Uint i = 0; i < this->maxiter && rdr > tol2; ++i, ++this->counter) {
+    for (Uint i = 0;
+         i < this->maxiter && (rdr > tol2 || i == 0);
+         ++i, ++this->counter) {
       Ap = this->sys.directional_stiffness_with_copy(p);
 
       Real alpha = rdr/(p*Ap).sum();
@@ -105,11 +104,12 @@ namespace muSpectre {
     if (rdr < tol2) {
       this->converged=true;
     } else {
+      Real * a = nullptr;
       std::stringstream err {};
       err << " After " << this->counter << " steps, the solver "
           << " FAILED with  |r|/|b| = "
           << std::setw(15) << std::sqrt(rdr/rhs_norm2)
-          << ", cg_tol = " << this->tol << std::endl;
+          << ", cg_tol = " << this->tol << *a << std::endl;
       throw ConvergenceError("Conjugate gradient has not converged." + err.str());
     }
     return x_0;

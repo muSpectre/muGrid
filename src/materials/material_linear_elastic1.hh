@@ -132,12 +132,20 @@ namespace muSpectre {
     template <class s_t>
     inline decltype(auto) evaluate_stress_tangent(s_t &&  E);
 
+    /**
+     * return the empty internals tuple
+     */
+    InternalVariables & get_internals() {
+      return this->internal_variables;};
+
   protected:
     const Real young;  //!< Young's modulus
     const Real poisson;//!< Poisson's ratio
     const Real lambda; //!< first Lamé constant
     const Real mu;     //!< second Lamé constant (shear modulus)
     const Stiffness_t C; //!< stiffness tensor
+    //! empty tuple
+    InternalVariables internal_variables{};
   private:
   };
 

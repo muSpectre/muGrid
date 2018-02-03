@@ -165,15 +165,9 @@ namespace muSpectre {
     /**
      * inheriting classes with internal variables need to overload this function
      */
-    decltype(auto) get_internals() {
-      // the default material has no internal variables
-      return typename Material::InternalVariables{};}
-    //! see `MaterialMuSpectre::get_internals()`
-    decltype(auto) get_internals() const {
-      // the default material has no internal variables
-      return typename Material::InternalVariables{};}
-    //! tuple of internal variables
-    typename traits::InternalVariables internal_variables{};
+    typename traits::InternalVariables& get_internals() {
+      return static_cast<Material&>(*this).get_internals();}
+
     bool is_initialised{false}; //!< to handle double initialisation right
 
   private:
@@ -515,12 +509,12 @@ namespace muSpectre {
         Piola-Kirchhoff stress P.
     **/
     template<bool DoNeedTgt=(NeedTgt == NeedTangent::yes)>
-    iterable_proxy(const MaterialMuSpectre & mat,
+    iterable_proxy(MaterialMuSpectre & mat,
                    const StrainField_t & F,
                    StressField_t & P,
                    std::enable_if_t<DoNeedTgt, TangentField_t> & K)
-      :material(mat), strain_field(F), stress_tup{P,K},
-       internals(material.internal_variables){};
+      :material{mat}, strain_field{F}, stress_tup{P,K},
+       internals{material.get_internals()}{};
 
     /** Iterator uses the material's internal variables field
         collection to iterate selectively over the global fields
@@ -528,11 +522,11 @@ namespace muSpectre {
         Piola-Kirchhoff stress P.
     **/
     template<bool DontNeedTgt=(NeedTgt == NeedTangent::no)>
-    iterable_proxy(const MaterialMuSpectre & mat,
+    iterable_proxy(MaterialMuSpectre & mat,
                    const StrainField_t & F,
                    std::enable_if_t<DontNeedTgt, StressField_t> & P)
-      :material(mat), strain_field(F), stress_tup{P},
-       internals(material.internal_variables){};
+      :material{mat}, strain_field{F}, stress_tup{P},
+       internals{material.get_internals()}{};
 
     //! Expected type for strain fields
     using StrainMap_t = typename Material::StrainMap_t;
@@ -647,12 +641,12 @@ namespace muSpectre {
     iterator end() {return std::move(iterator(*this, false));}
 
   protected:
-    const MaterialMuSpectre & material; //!< reference to the proxied material
+    MaterialMuSpectre & material; //!< reference to the proxied material
     const StrainField_t & strain_field; //!< cell's global strain field
     //! references to the global stress field and perhaps tangent stiffness
     StressFieldTup stress_tup;
     //! references to the internal variables
-    const InternalVariables & internals;
+    InternalVariables & internals;
 
   private:
   };
@@ -696,7 +690,7 @@ namespace muSpectre {
           return std::make_tuple(stress_tgt[pixel]...);},
         this->stress_map);
     const auto & internal = this->it.material.get_internals();
-    const auto id{index};
+    const auto id{this->index};
     auto && internals =
       apply([id] (auto && ... internals) {
           return std::make_tuple(internals[id]...);},

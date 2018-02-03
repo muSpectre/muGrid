@@ -126,12 +126,13 @@ namespace muSpectre {
     //delEps0(0, 1) = delEps0(1, 0) = eps0;
     delEps0(0, 0) = eps0;
 
-    constexpr Real cg_tol{1e-8}, newton_tol{1e-5};
+    constexpr Real cg_tol{1e-8}, newton_tol{1e-5}, equil_tol{1e-10};
     constexpr Uint maxiter{dim*10};
     constexpr Dim_t verbose{0};
 
     SolverCGEigen<dim> cg{sys, cg_tol, maxiter, bool(verbose)};
-    auto result = de_geus(sys, delEps0, cg, newton_tol, verbose);
+    auto result = de_geus(sys, delEps0, cg, newton_tol,
+                          equil_tol, verbose);
     if (verbose) {
       std::cout << "result:" << std::endl << result.grad << std::endl;
       std::cout << "mean strain = " << std::endl
@@ -175,7 +176,8 @@ namespace muSpectre {
     delEps0(0, 1) = delEps0(1, 0) = eps0;
 
     SolverCG<dim> cg2{sys, cg_tol, maxiter, bool(verbose)};
-    result = newton_cg(sys, delEps0, cg2, newton_tol, verbose);
+    result = newton_cg(sys, delEps0, cg2, newton_tol,
+                       equil_tol, verbose);
     Eps_hard << 0, eps_hard, eps_hard, 0;
     Eps_soft << 0, eps_soft, eps_soft, 0;
 

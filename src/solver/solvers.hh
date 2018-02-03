@@ -82,6 +82,7 @@ namespace muSpectre {
   newton_cg (SystemBase<DimS, DimM> & sys,
              const GradIncrements<DimM> & delF0,
              SolverBase<DimS, DimM> & solver, Real newton_tol,
+             Real stress_tol,
              Dim_t verbose = 0);
 
   /* ---------------------------------------------------------------------- */
@@ -93,9 +94,10 @@ namespace muSpectre {
   inline OptimizeResult
   newton_cg (SystemBase<DimS, DimM> & sys, const Grad_t<DimM> & delF0,
              SolverBase<DimS, DimM> & solver, Real newton_tol,
+             Real stress_tol,
              Dim_t verbose = 0){
     return newton_cg(sys, GradIncrements<DimM>{delF0},
-                     solver, newton_tol, verbose)[0];
+                     solver, newton_tol, stress_tol, verbose)[0];
   }
 
   /* ---------------------------------------------------------------------- */
@@ -108,6 +110,7 @@ namespace muSpectre {
   de_geus (SystemBase<DimS, DimM> & sys,
            const GradIncrements<DimM> & delF0,
            SolverBase<DimS, DimM> & solver, Real newton_tol,
+           Real stress_tol,
            Dim_t verbose = 0);
 
   /* ---------------------------------------------------------------------- */
@@ -119,9 +122,10 @@ namespace muSpectre {
   OptimizeResult
   de_geus (SystemBase<DimS, DimM> & sys, const Grad_t<DimM> & delF0,
            SolverBase<DimS, DimM> & solver, Real newton_tol,
+           Real stress_tol,
            Dim_t verbose = 0){
     return de_geus(sys, GradIncrements<DimM>{delF0},
-                   solver, newton_tol, verbose)[0];
+                   solver, newton_tol, stress_tol, verbose)[0];
   }
 
   /* ---------------------------------------------------------------------- */
