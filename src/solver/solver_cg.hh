@@ -1,5 +1,5 @@
 /**
- * file   solver_cg.hh
+* @file   solver_cg.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -8,8 +8,6 @@
  * @brief class for a simple implementation of a conjugate gradient
  *        solver. This follows algorithm 5.2 in Nocedal's Numerical
  *        Optimization (p 112)
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -39,22 +37,33 @@
 
 namespace muSpectre {
 
+  /**
+   * implements the `muSpectre::SolverBase` interface using a
+   * conjugate gradient solver. This particular class is useful for
+   * trouble shooting, as it can be made very verbose, but for
+   * production runs, it is probably better to use
+   * `muSpectre::SolverCGEigen`.
+   */
   template <Dim_t DimS, Dim_t DimM=DimS>
   class SolverCG: public SolverBase<DimS, DimM>
   {
   public:
-    using Parent = SolverBase<DimS, DimM>;
+    using Parent = SolverBase<DimS, DimM>; //!< base class
+    //! Input vector for solvers
     using SolvVectorIn = typename Parent::SolvVectorIn;
+    //! Input vector for solvers
     using SolvVectorInC = typename Parent::SolvVectorInC;
+    //! Output vector for solvers
     using SolvVectorOut = typename Parent::SolvVectorOut;
-    using Sys_t = typename Parent::Sys_t;
-    using Ccoord = typename Parent::Ccoord;
+    using Sys_t = typename Parent::Sys_t; //!< cell type
+    using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
+    //! kind of tangent that is required
     using Tg_req_t = typename Parent::TangentRequirement;
-    // cg only needs to handle fields that look like strain and stress
+    //! cg only needs to handle fields that look like strain and stress
     using Field_t = TensorField<
       typename Parent::Collection_t, Real, secondOrder, DimM>;
-    using Fun_t = std::function<void(const Field_t& in, Field_t & out)>;
 
+    //! conjugate gradient needs directional stiffness
     constexpr static Tg_req_t tangent_requirement{Tg_req_t::NeedEffect};
     //! Default constructor
     SolverCG() = delete;
@@ -90,11 +99,12 @@ namespace muSpectre {
     std::string name() const override final {return "CG";}
 
   protected:
+    //! returns `muSpectre::Tg_req_t::NeedEffect`
     Tg_req_t get_tangent_req() const override final;
-    Field_t & r_k; // residual
-    Field_t & p_k; // search direction
-    Field_t & Ap_k; // effect of tangent on search direction
-    bool converged{false};
+    Field_t & r_k;  //!< residual
+    Field_t & p_k;  //!< search direction
+    Field_t & Ap_k; //!< effect of tangent on search direction
+    bool converged{false}; //!< whether the solver has converged
   private:
   };
 

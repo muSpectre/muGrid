@@ -1,13 +1,11 @@
 /**
- * file   projection_finite_strain_fast.cc
+* @file   projection_finite_strain_fast.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   12 Dec 2017
  *
  * @brief  implementation for fast projection in finite strain
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

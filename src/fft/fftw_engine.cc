@@ -1,13 +1,11 @@
 /**
- * file   fftw_engine.cc
+* @file   fftw_engine.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
  * @date   03 Dec 2017
  *
  * @brief  implements the fftw engine
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

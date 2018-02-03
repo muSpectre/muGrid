@@ -1,13 +1,11 @@
 /**
- * file   fft_engine_base.hh
+* @file   fft_engine_base.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   01 Dec 2017
  *
  * @brief  Interface for FFT engines
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -35,18 +33,34 @@
 
 namespace muSpectre {
 
+  /**
+   * Virtual base class for FFT engines. To be implemented by all
+   * FFT_engine implementations.
+   */
   template <Dim_t DimS, Dim_t DimM>
   class FFT_Engine_base
   {
   public:
-    constexpr static Dim_t sdim{DimS};
-    constexpr static Dim_t mdim{DimM};
+    constexpr static Dim_t sdim{DimS}; //!< spatial dimension of the cell
+    constexpr static Dim_t mdim{DimM}; //!< material dimension of the cell
+    //! cell coordinates type
     using Ccoord = Ccoord_t<DimS>;
+    //! spatial coordinates type
     using Rcoord = std::array<Real, DimS>;
+    //! global FieldCollection
     using GFieldCollection_t = FieldCollection<DimS, DimM, true>;
+    //! local FieldCollection (for Fourier-space pixels)
     using LFieldCollection_t = FieldCollection<DimS, DimM, false>;
+    //! Field type on which to apply the projection
     using Field_t = TensorField<GFieldCollection_t, Real, 2, DimM>;
+    /**
+     * Field type holding a Fourier-space representation of a
+     * real-valued second-order tensor field
+     */
     using Workspace_t = TensorField<LFieldCollection_t, Complex, 2, DimM>;
+    /**
+     * iterator over Fourier-space discretisation point
+     */
     using iterator = typename LFieldCollection_t::iterator;
 
     //! Default constructor
@@ -70,7 +84,7 @@ namespace muSpectre {
     //! Move assignment operator
     FFT_Engine_base& operator=(FFT_Engine_base &&other) = default;
 
-    // compute the plan, etc
+    //! compute the plan, etc
     virtual void initialise(FFT_PlanFlags /*plan_flags*/);
 
     //! forward transform (dummy for interface)
@@ -80,18 +94,22 @@ namespace muSpectre {
     virtual void ifft(Field_t & /*field*/) const = 0;
 
     /**
-     * iterators over only thos pixels that exist in frequency space
+     * iterators over only those pixels that exist in frequency space
      * (i.e. about half of all pixels, see rfft)
      */
+    //! returns an iterator to the first pixel in Fourier space
     inline iterator begin() {return this->work_space_container.begin();}
+    //! returns an iterator past to the last pixel in Fourier space
     inline iterator end()  {return this->work_space_container.end();}
 
     //! nb of pixels (mostly for debugging)
     size_t size() const;
+    //! nb of pixels in Fourier space
     size_t workspace_size() const;
 
-    //!
+    //! returns the resolutions of the cell
     const Ccoord & get_resolutions() const {return this->resolutions;}
+    //! returns the physical sizes of the cell
     const Rcoord & get_lengths() const {return this->lengths;}
 
     //! only required for testing and debugging
@@ -110,11 +128,15 @@ namespace muSpectre {
     inline Real normalisation() const {return norm_factor;};
 
   protected:
+    /**
+     * Field collection in which to store fields associated with
+     * Fourier-space points
+     */
     LFieldCollection_t work_space_container{};
-    const Ccoord resolutions;
-    const Rcoord lengths;
-    Workspace_t & work;
-    const Real norm_factor;
+    const Ccoord resolutions; //!< resolutions of the cell
+    const Rcoord lengths;     //!< physical sizes of the cell
+    Workspace_t & work;       //!< field to store the Fourier transform of P
+    const Real norm_factor; //!< normalisation coefficient of fourier transform
   private:
   };
 

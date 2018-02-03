@@ -1,13 +1,11 @@
 /**
- * file   field_collection_base.hh
+* @file   field_collection_base.hh
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
  * @date   05 Nov 2017
  *
  * @brief  Base class for field collections
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -44,9 +42,10 @@ namespace muSpectre {
   class FieldCollectionBase
   {
   public:
+    //! polymorphic base type to store
     using Field = internal::FieldBase<FieldCollectionDerived>;
-    using Field_p = std::unique_ptr<Field>;
-    using Ccoord = Ccoord_t<DimS>;
+    using Field_p = std::unique_ptr<Field>; //!< stored type
+    using Ccoord = Ccoord_t<DimS>; //!< cell coordinates type
 
     //! Default constructor
     FieldCollectionBase();
@@ -91,11 +90,11 @@ namespace muSpectre {
 
 
   protected:
-    std::map<const std::string, Field_p> fields{};
-    bool is_initialised{false};
-    const Uint id;
-    static Uint counter;
-    size_t size_{0};
+    std::map<const std::string, Field_p> fields{}; //!< contains the field ptrs
+    bool is_initialised{false}; //!< to handle double initialisation correctly
+    const Uint id; //!< unique identifier
+    static Uint counter; //!< used to assign unique identifiers
+    size_t size_{0}; //!< holds the number of pixels after initialisation
   private:
   };
 

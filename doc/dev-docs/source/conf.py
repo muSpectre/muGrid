@@ -45,6 +45,7 @@ if read_the_docs_build:
     muspectre_path = "."
 else:
     muspectre_path = "@CMAKE_CURRENT_BINARY_DIR@"
+    os.makedirs("@CMAKE_CURRENT_BINARY_DIR@/_static", exist_ok=True)
 print("muspectre_path = '{}'".format(muspectre_path))
 subprocess.call('ls; pwd', shell=True)
 subprocess.call("cd {} && doxygen".format(muspectre_path), shell=True)

@@ -1,13 +1,11 @@
 /**
- * file   projection_small_strain.cc
+* @file   projection_small_strain.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
  * @date   14 Jan 2018
  *
  * @brief  Implementation for ProjectionSmallStrain
- *
- * @section LICENSE
  *
  * Copyright © 2018 Till Junge
  *

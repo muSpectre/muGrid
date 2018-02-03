@@ -1,13 +1,11 @@
 /**
- * file   bind_py_material.cc
+* @file   bind_py_material.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   09 Jan 2018
  *
  * @brief  python bindings for µSpectre's materials
- *
- * @section LICENSE
  *
  * Copyright © 2018 Till Junge
  *

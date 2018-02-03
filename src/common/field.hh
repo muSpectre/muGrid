@@ -1,13 +1,11 @@
 /**
- * file   field.hh
+* @file   field.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   07 Sep 2017
  *
  * @brief  header-only implementation of a field for field collections
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -48,27 +46,42 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
+  /**
+   * base class for field collection-related exceptions
+   */
   class FieldCollectionError: public std::runtime_error {
   public:
+    //! constructor
     explicit FieldCollectionError(const std::string& what)
       :std::runtime_error(what){}
+    //! constructor
     explicit FieldCollectionError(const char * what)
       :std::runtime_error(what){}
   };
 
+  /// base class for field-related exceptions
   class FieldError: public FieldCollectionError {
     using Parent = FieldCollectionError;
   public:
+    //! constructor
     explicit FieldError(const std::string& what)
       :Parent(what){}
+    //! constructor
     explicit FieldError(const char * what)
       :Parent(what){}
   };
+
+  /**
+   * Thrown when a associating a field map to and incompatible field
+   * is attempted
+   */
   class FieldInterpretationError: public FieldError
   {
   public:
+    //! constructor
     explicit FieldInterpretationError(const std::string & what)
       :FieldError(what){}
+    //! constructor
     explicit FieldInterpretationError(const char * what)
       :FieldError(what){}
   };
@@ -77,6 +90,11 @@ namespace muSpectre {
   namespace internal {
 
     /* ---------------------------------------------------------------------- */
+    /**
+     * Virtual base class for all fields. Used for type and size
+     * checking at runtime and for storage of polymorphic pointers to
+     * fully typed and sized fields
+     */
     template <class FieldCollection>
     class FieldBase
     {
@@ -91,7 +109,7 @@ namespace muSpectre {
                 FieldCollection & collection);
 
     public:
-      using collection_t = FieldCollection;
+      using collection_t = FieldCollection; //!< for type checks
 
       //! Copy constructor
       FieldBase(const FieldBase &other) = delete;
@@ -121,6 +139,7 @@ namespace muSpectre {
       //! return type_id of stored type
       virtual const std::type_info & get_stored_typeid() const = 0;
 
+      //! number of pixels in the field
       virtual size_t size() const = 0;
 
       //! initialise field to zero (do more complicated initialisations through
@@ -129,14 +148,16 @@ namespace muSpectre {
 
       //! give access to collections
       friend FieldCollection;
+      //! give access to collection's base class
       friend typename FieldCollection::Parent;
 
     protected:
       /* ---------------------------------------------------------------------- */
       //! allocate memory etc
       virtual void resize(size_t size) = 0;
-      const std::string name;
-      const size_t nb_components;
+      const std::string name; //!< the field's unique name
+      const size_t nb_components; //!< number of components per entry
+      //! reference to the collection this field belongs to
       const FieldCollection & collection;
     private:
     };
@@ -150,17 +171,23 @@ namespace muSpectre {
     class TypedFieldBase: public FieldBase<FieldCollection>
     {
     public:
-      using Parent = FieldBase<FieldCollection>;
+      using Parent = FieldBase<FieldCollection>; //!< base class
+      //! for type checks when mapping this field
       using collection_t = typename Parent::collection_t;
-      using Scalar = T;
-      using Base = Parent;
+      using Scalar = T; //!< for type checks
+      using Base = Parent; //!< for uniformity of interface
+      //! Plain Eigen type to map
       using EigenRep = Eigen::Array<T, Eigen::Dynamic, Eigen::Dynamic>;
+      //! map returned when iterating over field
       using EigenMap = Eigen::Map<EigenRep>;
+      //! Plain eigen vector to map
       using EigenVec = Eigen::Map<Eigen::VectorXd>;
+      //! vector map returned when iterating over field
       using EigenVecConst = Eigen::Map<const Eigen::VectorXd>;
       //! Default constructor
       TypedFieldBase() = delete;
 
+      //! constructor
       TypedFieldBase(std::string unique_name,
                      size_t nb_components,
                      FieldCollection& collection);
@@ -188,11 +215,17 @@ namespace muSpectre {
       //! initialise field to zero (do more complicated initialisations through
       //! fully typed maps)
       virtual void set_zero() override = 0;
+
+      //! raw pointer to content (e.g., for Eigen maps)
       virtual T* data() = 0;
+      //! raw pointer to content (e.g., for Eigen maps)
       virtual const T* data() const = 0;
 
+      //! return a map representing the entire field as a single `Eigen::Array`
       EigenMap eigen();
+      //! return a map representing the entire field as a single Eigen vector
       EigenVec eigenvec();
+      //! return a map representing the entire field as a single Eigen vector
       EigenVecConst eigenvec() const;
 
     protected:
@@ -205,6 +238,11 @@ namespace muSpectre {
     class FieldMap;
 
     /* ---------------------------------------------------------------------- */
+    /**
+     * implements Fields that contain a statically known number of
+     * scalars of a statically known type per pixel in a
+     * `muSpectre::FieldCollection`
+     */
     template <class FieldCollection, typename T, Dim_t NbComponents,
               bool ArrayStore=false>
     class TypedSizedFieldBase: public TypedFieldBase<FieldCollection, T>
@@ -212,32 +250,38 @@ namespace muSpectre {
       friend class FieldMap<FieldCollection, T, NbComponents, true>;
       friend class FieldMap<FieldCollection, T, NbComponents, false>;
     public:
+      //! for compatibility checks
       constexpr static auto nb_components{NbComponents};
-      using Parent = TypedFieldBase<FieldCollection, T>;
-      using collection_t = typename Parent::collection_t;
-      using Scalar = T;
-      using Base = typename Parent::Base;
-      //using storage_type = Eigen::Array<T, Eigen::Dynamic, NbComponents>;
+      using Parent = TypedFieldBase<FieldCollection, T>; //!< base class
+      using Scalar = T; //!< for type checking
+      using Base = typename Parent::Base; //!< root base class
+
+      //! type stored if ArrayStore is true
       using StoredType = Eigen::Array<T, NbComponents, 1>;
+      //! storage container
       using StorageType = std::conditional_t
         <ArrayStore,
          std::vector<StoredType,
                      Eigen::aligned_allocator<StoredType>>,
          std::vector<T,Eigen::aligned_allocator<T>>>;
 
+      //! Plain type that is being mapped (Eigen lingo)
       using EigenRep = Eigen::Array<T, NbComponents, Eigen::Dynamic>;
+      //! maps returned when iterating over field
       using EigenMap = std::conditional_t<
         ArrayStore,
         Eigen::Map<EigenRep, Eigen::Aligned,
                    Eigen::OuterStride<sizeof(StoredType)/sizeof(T)>>,
         Eigen::Map<EigenRep>>;
 
+      //! maps returned when iterating over field
       using ConstEigenMap = std::conditional_t<
         ArrayStore,
         Eigen::Map<const EigenRep, Eigen::Aligned,
                    Eigen::OuterStride<sizeof(StoredType)/sizeof(T)>>,
         Eigen::Map<const EigenRep>>;
 
+      //! constructor
       TypedSizedFieldBase(std::string unique_name,
                      FieldCollection& collection);
       virtual ~TypedSizedFieldBase() = default;
@@ -245,10 +289,14 @@ namespace muSpectre {
       //! initialise field to zero (do more complicated initialisations through
       //! fully typed maps)
       inline void set_zero() override final;
+
+      //! add a new value at the end of the field
       template <bool isArrayStore = ArrayStore>
       inline void push_back(const
                             std::enable_if_t<isArrayStore, StoredType> &
                             value);
+
+      //! add a new value at the end of the field
       template <bool componentStore = !ArrayStore>
       inline std::enable_if_t<componentStore> push_back(const StoredType & value);
 
@@ -256,36 +304,60 @@ namespace muSpectre {
       //! scalars/NbComponents)
       size_t size() const override final;
 
+      /**
+       * returns an upcasted reference to a field, or throws an
+       * exception if the field is incompatible
+       */
       static TypedSizedFieldBase & check_ref(Base & other);
-      static const TypedSizedFieldBase & check_ref(const Base & parent);
+      /**
+       * returns an upcasted reference to a field, or throws an
+       * exception if the field is incompatible
+       */
+      static const TypedSizedFieldBase & check_ref(const Base & other);
 
+      //! return raw pointer to stored data (necessary for Eigen maps)
       inline T* data() override final {return this->get_ptr_to_entry(0);}
+      //! return raw pointer to stored data (necessary for Eigen maps)
       inline const T* data() const override final {return this->get_ptr_to_entry(0);}
 
+      //! return a map representing the entire field as a single `Eigen::Array`
       inline EigenMap eigen();
+      //! return a map representing the entire field as a single `Eigen::Array`
       inline ConstEigenMap eigen() const;
+      /**
+       * return a map representing the entire field as a single
+       * dynamically sized `Eigen::Array` (for python bindings)
+       */
       inline typename Parent::EigenMap dyn_eigen() {return Parent::eigen();}
 
+      //! inner product between compatible fields
       template<typename otherT>
       inline Real inner_product(const TypedSizedFieldBase<FieldCollection, otherT, NbComponents,
                                 ArrayStore> & other) const;
     protected:
 
+      //! returns a raw pointer to the entry, for `Eigen::Map`
       template <bool isArray=ArrayStore>
       inline std::enable_if_t<isArray, T*> get_ptr_to_entry(const size_t&& index);
 
+      //! returns a raw pointer to the entry, for `Eigen::Map`
       template <bool isArray=ArrayStore>
       inline std::enable_if_t<isArray, const T*>
       get_ptr_to_entry(const size_t&& index) const;
 
+      //! returns a raw pointer to the entry, for `Eigen::Map`
       template <bool noArray = !ArrayStore>
       inline T* get_ptr_to_entry(std::enable_if_t<noArray, const size_t&&> index);
 
+      //! returns a raw pointer to the entry, for `Eigen::Map`
       template <bool noArray = !ArrayStore>
       inline const T*
       get_ptr_to_entry(std::enable_if_t<noArray, const size_t&&> index) const;
 
+      //! set the storage size of this field
       inline virtual void resize(size_t size) override final;
+
+      //! The actual storage container
       StorageType values{};
     };
 
@@ -293,19 +365,25 @@ namespace muSpectre {
 
 
   /* ---------------------------------------------------------------------- */
+  /**
+   * subclass of `muSpectre::internal::TypedSizedFieldBase` to
+   * represent tensorial fields defined by a stored scalar type,
+   * spatial dimension, and tensorial order
+   */
   template <class FieldCollection, typename T, Dim_t order, Dim_t dim>
   class TensorField: public internal::TypedSizedFieldBase<FieldCollection,
                                                      T,
                                                      ipow(dim,order)>
   {
   public:
+    //! base class
     using Parent = internal::TypedSizedFieldBase<FieldCollection,
                                             T,
                                             ipow(dim,order)>;
-    using Base = typename Parent::Base;
+    using Base = typename Parent::Base; //!< root base class
+    //! polymorphic base class
     using Field_p = typename FieldCollection::Field_p;
-    using component_type = T;
-    using Scalar = typename Parent::Scalar;
+    using Scalar = typename Parent::Scalar; //!< for type checking
     //! Copy constructor
     TensorField(const TensorField &other) = delete;
 
@@ -321,8 +399,9 @@ namespace muSpectre {
     //! Move assignment operator
     TensorField& operator=(TensorField &&other) = delete;
 
-    //! accessors
+    //! return the order of the stored tensor
     inline Dim_t get_order() const;
+    //! return the dimension of the stored tensor
     inline Dim_t get_dim() const;
 
 
@@ -332,8 +411,10 @@ namespace muSpectre {
                              CollectionType & collection,
                              Args&&... args);
 
+    //! return a reference or throw an exception if `other` is incompatible
     static TensorField & check_ref(Base & other) {
       return static_cast<TensorField &>(Parent::check_ref(other));}
+    //! return a reference or throw an exception if `other` is incompatible
     static const TensorField & check_ref(const Base & other) {
       return static_cast<const TensorField &>(Parent::check_ref(other));}
 
@@ -344,6 +425,12 @@ namespace muSpectre {
      * fundamental type (T) and the correct size (nbComponents).
      */
     decltype(auto) get_map();
+    /**
+     * Pure convenience functions to get a MatrixFieldMap of
+     * appropriate dimensions mapped to this field. You can also
+     * create other types of maps, as long as they have the right
+     * fundamental type (T) and the correct size (nbComponents).
+     */
     decltype(auto) get_map() const;
 
   protected:
@@ -354,18 +441,24 @@ namespace muSpectre {
   };
 
   /* ---------------------------------------------------------------------- */
+  /**
+   * subclass of `muSpectre::internal::TypedSizedFieldBase` to
+   * represent matrix fields defined by a stored scalar type and the
+   * number of rows and columns of the field
+   */
   template <class FieldCollection, typename T, Dim_t NbRow, Dim_t NbCol=NbRow>
   class MatrixField: public internal::TypedSizedFieldBase<FieldCollection,
                                                      T,
                                                      NbRow*NbCol>
   {
   public:
+    //! base class
     using Parent = internal::TypedSizedFieldBase<FieldCollection,
                                             T,
                                             NbRow*NbCol>;
-    using Base = typename Parent::Base;
+    using Base = typename Parent::Base; //!< root base class
+    //! polymorphic base field ptr to store
     using Field_p = std::unique_ptr<internal::FieldBase<FieldCollection>>;
-    using component_type = T;
     //! Copy constructor
     MatrixField(const MatrixField &other) = delete;
 
@@ -381,8 +474,9 @@ namespace muSpectre {
     //! Move assignment operator
     MatrixField& operator=(MatrixField &&other) = delete;
 
-    //! accessors
+    //! returns the number of rows
     inline Dim_t get_nb_row() const;
+    //! returns the number of columns
     inline Dim_t get_nb_col() const;
 
 
@@ -392,12 +486,16 @@ namespace muSpectre {
                              CollectionType & collection,
                              Args&&... args);
 
+    //! returns a `MatrixField` reference if `other` is a compatible field
     static MatrixField & check_ref(Base & other) {
       return static_cast<MatrixField &>(Parent::check_ref(other));}
+    //! returns a `MatrixField` reference if `other` is a compatible field
     static const MatrixField & check_ref(const Base & other) {
       return static_cast<const MatrixField &>(Parent::check_ref(other));}
 
+    //! returns the default map type
     decltype(auto) get_map();
+    //! returns the default map type
     decltype(auto) get_map() const;
 
 
@@ -732,36 +830,53 @@ namespace muSpectre {
   namespace internal {
 
     /* ---------------------------------------------------------------------- */
+    /**
+     * defines the default mapped type obtained when calling
+     * `muSpectre::TensorField::get_map()`
+     */
     template <class FieldCollection, typename T, size_t order, Dim_t dim,
               bool ConstMap>
     struct tensor_map_type {
     };
 
+    /// specialisation for vectors
     template <class FieldCollection, typename T, Dim_t dim, bool ConstMap>
     struct tensor_map_type<FieldCollection, T, firstOrder, dim, ConstMap> {
+      //! use this type
       using type = MatrixFieldMap<FieldCollection, T, dim, 1, ConstMap>;
     };
 
+    /// specialisation to second-order tensors (matrices)
     template <class FieldCollection, typename T, Dim_t dim, bool ConstMap>
     struct tensor_map_type<FieldCollection, T, secondOrder, dim, ConstMap> {
+      //! use this type
       using type = MatrixFieldMap<FieldCollection, T, dim, dim, ConstMap>;
     };
 
+    /// specialisation to fourth-order tensors
     template <class FieldCollection, typename T, Dim_t dim, bool ConstMap>
     struct tensor_map_type<FieldCollection, T, fourthOrder, dim, ConstMap> {
+      //! use this type
       using type = T4MatrixFieldMap<FieldCollection, T, dim, ConstMap>;
     };
 
     /* ---------------------------------------------------------------------- */
+    /**
+     * defines the default mapped type obtained when calling
+     * `muSpectre::MatrixField::get_map()`
+     */
     template <class FieldCollection, typename T, Dim_t NbRow, Dim_t NbCol,
               bool ConstMap>
     struct matrix_map_type {
+      //! mapping type
       using type =
         MatrixFieldMap<FieldCollection, T, NbRow, NbCol, ConstMap>;
     };
 
+    //! spectialisation to scalar fields
     template <class FieldCollection, typename T, bool ConstMap>
     struct matrix_map_type<FieldCollection, T, oneD, oneD, ConstMap> {
+      //! mapping type
       using type = ScalarFieldMap<FieldCollection, T, ConstMap>;
     };
 

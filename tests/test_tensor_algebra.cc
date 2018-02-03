@@ -1,13 +1,11 @@
 /**
- * file   test_tensor_algebra.cc
+* @file   test_tensor_algebra.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   05 Nov 2017
  *
  * @brief  Tests for the tensor algebra functions
- *
- * @section LICENCE
  *
  * Copyright © 2017 Till Junge
  *
@@ -33,7 +31,7 @@
 
 #include "common/tensor_algebra.hh"
 #include "tests.hh"
-#include "common/test_goodies.hh"
+#include "tests/test_goodies.hh"
 
 
 namespace muSpectre {

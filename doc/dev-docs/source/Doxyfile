@@ -1,9 +1,11 @@
 PROJECT_NAME           = muSpectre
 ## this is for read the docs, which builds in-place
-INPUT                  = ../../../src ../../../language_bindings
+INPUT                  = ../../../src
 ## this overwrites the INPUT path for local builds
 @INCLUDE               = input_def
 RECURSIVE              = YES
+
+SOURCE_BROWSER         = YES
 
 GENERATE_HTML          = YES
 GENERATE_LATEX         = NO

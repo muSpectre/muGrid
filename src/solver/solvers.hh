@@ -1,13 +1,11 @@
 /**
- * file   solvers.hh
+* @file   solvers.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   20 Dec 2017
  *
  * @brief  Free functions for solving
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -61,13 +59,24 @@ namespace muSpectre {
     Uint nb_fev;
   };
 
+  /**
+   * Field type that solvers expect gradients to be expressed in
+   */
   template <Dim_t Dim>
   using Grad_t = Matrices::Tens2_t<Dim>;
+  /**
+   * multiple increments can be submitted at once (useful for
+   * path-dependent materials)
+   */
   template <Dim_t Dim>
   using GradIncrements = std::vector<Grad_t<Dim>,
                                      Eigen::aligned_allocator<Grad_t<Dim>>>;
 
   /* ---------------------------------------------------------------------- */
+  /**
+   * Uses the Newton-conjugate Gradient method to find the static
+   * equilibrium of a cell given a series of mean applied strains
+   */
   template <Dim_t DimS, Dim_t DimM=DimS>
   std::vector<OptimizeResult>
   newton_cg (SystemBase<DimS, DimM> & sys,
@@ -76,6 +85,10 @@ namespace muSpectre {
              Dim_t verbose = 0);
 
   /* ---------------------------------------------------------------------- */
+  /**
+   * Uses the Newton-conjugate Gradient method to find the static
+   * equilibrium of a cell given a mean applied strain
+   */
   template <Dim_t DimS, Dim_t DimM=DimS>
   inline OptimizeResult
   newton_cg (SystemBase<DimS, DimM> & sys, const Grad_t<DimM> & delF0,
@@ -85,7 +98,11 @@ namespace muSpectre {
                      solver, newton_tol, verbose)[0];
   }
 
-    /* ---------------------------------------------------------------------- */
+  /* ---------------------------------------------------------------------- */
+  /**
+   * Uses the method proposed by de Geus method to find the static
+   * equilibrium of a cell given a series of mean applied strains
+   */
   template <Dim_t DimS, Dim_t DimM=DimS>
   std::vector<OptimizeResult>
   de_geus (SystemBase<DimS, DimM> & sys,
@@ -94,6 +111,10 @@ namespace muSpectre {
            Dim_t verbose = 0);
 
   /* ---------------------------------------------------------------------- */
+  /**
+   * Uses the method proposed by de Geus method to find the static
+   * equilibrium of a cell given a mean applied strain
+   */
   template <Dim_t DimS, Dim_t DimM=DimS>
   OptimizeResult
   de_geus (SystemBase<DimS, DimM> & sys, const Grad_t<DimM> & delF0,

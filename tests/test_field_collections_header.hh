@@ -1,13 +1,11 @@
 /**
- * file   test_field_collections_header.hh
+* @file   test_field_collections_header.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   23 Nov 2017
  *
  * @brief  declares fixtures for field_collection tests, so that they can be split
- *
- * @section LICENCE
  *
  * Copyright © 2017 Till Junge
  *
@@ -38,7 +36,7 @@
 
 #include "common/common.hh"
 #include "common/ccoord_operations.hh"
-#include "common/test_goodies.hh"
+#include "tests/test_goodies.hh"
 #include "tests.hh"
 #include "common/field_collection.hh"
 #include "common/field.hh"

@@ -1,13 +1,11 @@
 /**
- * file   material_base.hh
+* @file   material_base.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   25 Oct 2017
  *
  * @brief  Base class for materials (constitutive models)
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -51,12 +49,17 @@ namespace muSpectre {
     //! plastic strains, damage variables, etc, but also for managing which
     //! pixels the material is responsible for
     using MFieldCollection_t = FieldCollection<DimS, DimM, false>;
-    using iterator = typename MFieldCollection_t::iterator;
+
+    using iterator = typename MFieldCollection_t::iterator; //!< pixel iterator
+    //! polymorphic base class for fields only to be used for debugging
     using Field_t = internal::FieldBase<GFieldCollection_t>;
+    //! Full type for stress fields
     using StressField_t = TensorField<GFieldCollection_t, Real, secondOrder, DimM>;
+    //! Full type for strain fields
     using StrainField_t = StressField_t;
+    //! Full type for tangent stiffness fields fields
     using TangentField_t = TensorField<GFieldCollection_t, Real, fourthOrder, DimM>;
-    using Ccoord = Ccoord_t<DimS>;
+    using Ccoord = Ccoord_t<DimS>; //!< cell coordinates type
     //! Default constructor
     MaterialBase() = delete;
 
@@ -93,8 +96,9 @@ namespace muSpectre {
     //! return the materil's name
     const std::string & get_name() const;
 
-    //! for static inheritance stuff
+    //! spatial dimension for static inheritance
     constexpr static Dim_t sdim() {return DimS;}
+    //! material dimension for static inheritance
     constexpr static Dim_t mdim() {return DimM;}
     //! computes stress
     virtual void compute_stresses(const StrainField_t & F,
@@ -125,14 +129,16 @@ namespace muSpectre {
                                   Field_t & K,
                                   Formulation form);
 
+    //! iterator to first pixel handled by this material
     inline iterator begin() {return this->internal_fields.begin();}
+    //! iterator past the last pixel handled by this material
     inline iterator end()  {return this->internal_fields.end();}
+    //! number of pixels assigned to this material
     inline size_t size() const {return this->internal_fields.size();}
   protected:
 
-    //! members
-    const std::string name;
-    MFieldCollection_t internal_fields{};
+    const std::string name; //!< material's name (for output and debugging)
+    MFieldCollection_t internal_fields{};//!< storage for internal variables
 
 
   private:

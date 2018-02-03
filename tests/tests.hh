@@ -1,13 +1,11 @@
 /**
- * file   tests.hh
+* @file   tests.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   10 May 2017
  *
  * @brief  common defs for tests
- *
- * @section LICENCE
  *
  * Copyright © 2017 Till Junge
  *

@@ -1,13 +1,11 @@
 /**
- * file   projection_default.cc
+* @file   projection_default.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
  * @date   14 Jan 2018
  *
  * @brief  Implementation default projection implementation
- *
- * @section LICENSE
  *
  * Copyright © 2018 Till Junge
  *

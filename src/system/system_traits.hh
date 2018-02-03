@@ -1,13 +1,11 @@
 /**
- * file   system_traits.hh
+* @file   system_traits.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   19 Jan 2018
  *
  * @brief  Provides traits for Eigen solvers to be able to use Systems
- *
- * @section LICENSE
  *
  * Copyright © 2018 Till Junge
  *
@@ -40,8 +38,8 @@ namespace muSpectre {
 
 namespace Eigen {
   namespace internal {
-    using Dim_t = muSpectre::Dim_t;
-    using Real =  muSpectre::Real;
+    using Dim_t = muSpectre::Dim_t; //!< universal index type
+    using Real =  muSpectre::Real;  //!< universal real value type
     template<class System>
     struct traits<muSpectre::SystemAdaptor<System>> :
       public Eigen::internal::traits<Eigen::SparseMatrix<Real> >

@@ -1,5 +1,5 @@
 /**
- * file   projection_small_strain.cc
+* @file   projection_small_strain.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
@@ -9,8 +9,6 @@
  *         DOI: 10.1002/nme.5481 ("A finite element perspective on nonlinear
  *         FFT-based micromechanical simulations", Int. J. Numer. Meth. Engng
  *         2017; 111 :903–926)
- *
- * @section LICENSE
  *
  * Copyright © 2018 Till Junge
  *
@@ -37,18 +35,28 @@
 
 namespace muSpectre {
 
+  /**
+   * Implements the small strain projection operator as defined in
+   * Appendix A1 of DOI: 10.1002/nme.5481 ("A finite element
+   * perspective on nonlinear FFT-based micromechanical
+   * simulations", Int. J. Numer. Meth. Engng 2017; 111
+   * :903–926)
+   */
   template <Dim_t DimS, Dim_t DimM>
   class ProjectionSmallStrain: public ProjectionDefault<DimS, DimM>
   {
   public:
-    using Parent = ProjectionDefault<DimS, DimM>;
+    using Parent = ProjectionDefault<DimS, DimM>; //!< base class
+    //! polymorphic pointer to FFT engines
     using FFT_Engine_ptr = typename Parent::FFT_Engine_ptr;
-    using Ccoord = typename Parent::Ccoord;
-    //using GFieldCollection_t = FieldCollection<DimS, DimM, true>;
+    using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
+    //! local field collection (for Fourier-space representations)
     using LFieldCollection_t = FieldCollection<DimS, DimM, false>;
-    //using Field_t = TensorField<GFieldCollection_t, Real, secondOrder, DimM>;
+    //! Fourier-space field containing the projection operator itself
     using Proj_t = TensorField<LFieldCollection_t, Real, fourthOrder, DimM>;
+    //! iterable operator
     using Proj_map = T4MatrixFieldMap<LFieldCollection_t, Real, DimM>;
+    //! iterable vectorised version of the Fourier-space tensor field
     using Vector_map = MatrixFieldMap<LFieldCollection_t, Complex, DimM*DimM, 1>;
 
     //! Default constructor

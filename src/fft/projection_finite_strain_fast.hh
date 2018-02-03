@@ -1,13 +1,11 @@
 /**
- * file   projection_finite_strain_fast.hh
+* @file   projection_finite_strain_fast.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   12 Dec 2017
  *
  * @brief  Faster alternative to ProjectionFinitestrain
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -37,18 +35,31 @@
 
 namespace muSpectre {
 
+  /**
+   * replaces `muSpectre::ProjectionFiniteStrain` with a faster and
+   * less memory-hungry alternative formulation. Use this if you don't
+   * have a very good reason not to (and tell me (author) about it,
+   * I'd be interested to hear it).
+   */
   template <Dim_t DimS, Dim_t DimM>
   class ProjectionFiniteStrainFast: public ProjectionBase<DimS, DimM>
   {
   public:
-    using Parent = ProjectionBase<DimS, DimM>;
+    using Parent = ProjectionBase<DimS, DimM>; //!< base class
+    //! polymorphic pointer to FFT engines
     using FFT_Engine_ptr = typename Parent::FFT_Engine_ptr;
-    using Ccoord = typename Parent::Ccoord;
+    using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
+    //! global field collection (for real-space representations)
     using GFieldCollection_t = FieldCollection<DimS, DimM, true>;
+    //! local field collection (for Fourier-space representations)
     using LFieldCollection_t = FieldCollection<DimS, DimM, false>;
+    //! Real space second order tensor fields (to be projected)
     using Field_t = TensorField<GFieldCollection_t, Real, secondOrder, DimM>;
+    //! Fourier-space field containing the projection operator itself
     using Proj_t = TensorField<LFieldCollection_t, Real, firstOrder, DimM>;
+    //! iterable form of the operator
     using Proj_map = MatrixFieldMap<LFieldCollection_t, Real, DimM, 1>;
+    //! iterable Fourier-space second-order tensor field
     using Grad_map = MatrixFieldMap<LFieldCollection_t, Complex, DimM, DimM>;
 
 
@@ -84,8 +95,8 @@ namespace muSpectre {
 
 
   protected:
-    Proj_t & xiField;
-    Proj_map xis;
+    Proj_t & xiField; //!< field of normalised wave vectors
+    Proj_map xis;     //!< iterable normalised wave vectors
   private:
   };
 

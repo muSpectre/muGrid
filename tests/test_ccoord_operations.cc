@@ -1,13 +1,11 @@
 /**
- * file   test_ccoord_operations.cc
+* @file   test_ccoord_operations.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
  * @date   03 Dec 2017
  *
  * @brief  tests for cell coordinate operations
- *
- * @section LICENCE
  *
  * Copyright © 2017 Till Junge
  *
@@ -31,7 +29,7 @@
 
 #include "common/common.hh"
 #include "common/ccoord_operations.hh"
-#include "common/test_goodies.hh"
+#include "tests/test_goodies.hh"
 #include "tests.hh"
 
 

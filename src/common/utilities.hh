@@ -1,13 +1,11 @@
 /**
- * file   utilities.hh
+* @file   utilities.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   17 Nov 2017
  *
  * @brief  additions to the standard name space to anticipate C++17 features
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -67,6 +65,7 @@ namespace std_replacement {
     template <class U>
     struct is_reference_wrapper<std::reference_wrapper<U>> : std::true_type {};
 
+    //! from cppreference
     template <class Base, class T, class Derived, class... Args>
     auto INVOKE(T Base::*pmf, Derived&& ref, Args&&... args)
       noexcept(noexcept((std::forward<Derived>(ref).*pmf)(std::forward<Args>(args)...)))
@@ -77,6 +76,7 @@ namespace std_replacement {
       return (std::forward<Derived>(ref).*pmf)(std::forward<Args>(args)...);
     }
 
+    //! from cppreference
     template <class Base, class T, class RefWrap, class... Args>
     auto INVOKE(T Base::*pmf, RefWrap&& ref, Args&&... args)
       noexcept(noexcept((ref.get().*pmf)(std::forward<Args>(args)...)))
@@ -88,6 +88,7 @@ namespace std_replacement {
       return (ref.get().*pmf)(std::forward<Args>(args)...);
     }
 
+    //! from cppreference
     template <class Base, class T, class Pointer, class... Args>
     auto INVOKE(T Base::*pmf, Pointer&& ptr, Args&&... args)
       noexcept(noexcept(((*std::forward<Pointer>(ptr)).*pmf)(std::forward<Args>(args)...)))
@@ -99,6 +100,7 @@ namespace std_replacement {
       return ((*std::forward<Pointer>(ptr)).*pmf)(std::forward<Args>(args)...);
     }
 
+    //! from cppreference
     template <class Base, class T, class Derived>
     auto INVOKE(T Base::*pmd, Derived&& ref)
       noexcept(noexcept(std::forward<Derived>(ref).*pmd))
@@ -109,6 +111,7 @@ namespace std_replacement {
       return std::forward<Derived>(ref).*pmd;
     }
 
+    //! from cppreference
     template <class Base, class T, class RefWrap>
     auto INVOKE(T Base::*pmd, RefWrap&& ref)
       noexcept(noexcept(ref.get().*pmd))
@@ -119,6 +122,7 @@ namespace std_replacement {
       return ref.get().*pmd;
     }
 
+    //! from cppreference
     template <class Base, class T, class Pointer>
     auto INVOKE(T Base::*pmd, Pointer&& ptr)
       noexcept(noexcept((*std::forward<Pointer>(ptr)).*pmd))
@@ -130,6 +134,7 @@ namespace std_replacement {
       return (*std::forward<Pointer>(ptr)).*pmd;
     }
 
+    //! from cppreference
     template <class F, class... Args>
     auto INVOKE(F&& f, Args&&... args)
       noexcept(noexcept(std::forward<F>(f)(std::forward<Args>(args)...)))
@@ -140,6 +145,7 @@ namespace std_replacement {
     }
   } // namespace detail
 
+  //! from cppreference
   template< class F, class... ArgTypes >
   auto invoke(F&& f, ArgTypes&&... args)
   // exception specification for QoI
@@ -150,6 +156,7 @@ namespace std_replacement {
   }
 
   namespace detail {
+    //! from cppreference
     template <class F, class Tuple, std::size_t... I>
     constexpr decltype(auto) apply_impl(F &&f, Tuple &&t, std::index_sequence<I...>)
     {
@@ -157,6 +164,7 @@ namespace std_replacement {
     }
   }  // namespace detail
 
+  //! from cppreference
   template <class F, class Tuple>
   constexpr decltype(auto) apply(F &&f, Tuple &&t)
   {
@@ -173,6 +181,9 @@ namespace muSpectre {
 
   using std_replacement::apply;
 
+  /**
+   * emulation `std::optional` (a C++17 feature)
+   */
   template <class T>
 #ifdef NO_EXPERIMENTAL
   using optional = typename boost::optional<T>;
@@ -181,11 +192,17 @@ namespace muSpectre {
 #endif
 
   /* ---------------------------------------------------------------------- */
+  /**
+   * conversion helper from `boost::tuple` to `std::tuple`
+   */
   template <typename BoostTuple, std::size_t... Is>
   auto asStdTuple(BoostTuple&& boostTuple, std::index_sequence<Is...>) {
     return std::tuple<typename boost::tuples::element<Is, std::decay_t<BoostTuple>>::type...>
       (boost::get<Is>(std::forward<BoostTuple>(boostTuple))...);
   }
+  /**
+   * conversion from `boost::tuple` to `std::tuple`
+   */
   template <typename BoostTuple>
   auto asStdTuple(BoostTuple&& boostTuple) {
     return asStdTuple(std::forward<BoostTuple>(boostTuple),

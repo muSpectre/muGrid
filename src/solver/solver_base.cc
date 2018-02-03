@@ -1,13 +1,11 @@
 /**
- * file   solver_base.cc
+* @file   solver_base.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   18 Dec 2017
  *
  * @brief  definitions for solvers
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

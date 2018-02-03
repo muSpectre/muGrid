@@ -1,13 +1,11 @@
 /**
- * file   solvers.cc
+* @file   solvers.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   20 Dec 2017
  *
  * @brief  implementation of solver functions
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -193,6 +191,7 @@ namespace muSpectre {
 
   }
 
+  //! instantiation for two-dimensional cells
   template std::vector<OptimizeResult>
   de_geus (SystemBase<twoD, twoD> & sys, const GradIncrements<twoD>& delF0,
            SolverBase<twoD, twoD> & solver, Real newton_tol,
@@ -203,6 +202,7 @@ namespace muSpectre {
   //            const Real cg_tol, const Real newton_tol, Uint maxiter,
   //            Dim_t verbose);
 
+  //! instantiation for three-dimensional cells
   template std::vector<OptimizeResult>
   de_geus (SystemBase<threeD, threeD> & sys, const GradIncrements<threeD>& delF0,
            SolverBase<threeD, threeD> & solver, Real newton_tol,
@@ -352,6 +352,7 @@ namespace muSpectre {
 
   }
 
+  //! instantiation for two-dimensional cells
   template std::vector<OptimizeResult>
   newton_cg (SystemBase<twoD, twoD> & sys, const GradIncrements<twoD>& delF0,
              SolverBase<twoD, twoD> & solver, Real newton_tol,
@@ -362,6 +363,7 @@ namespace muSpectre {
   //            const Real cg_tol, const Real newton_tol, Uint maxiter,
   //            Dim_t verbose);
 
+  //! instantiation for three-dimensional cells
   template std::vector<OptimizeResult>
   newton_cg (SystemBase<threeD, threeD> & sys, const GradIncrements<threeD>& delF0,
              SolverBase<threeD, threeD> & solver, Real newton_tol,

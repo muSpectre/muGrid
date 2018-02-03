@@ -1,5 +1,5 @@
 /**
- * file   main_test_suite.cc
+* @file   main_test_suite.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -7,8 +7,6 @@
  *
  * @brief  Main test suite. Running this suite tests all available tests for
  *         µSpectre
- *
- * @section LICENCE
  *
  * Copyright © 2017 Till Junge
  *

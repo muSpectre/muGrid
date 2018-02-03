@@ -1,5 +1,5 @@
 /**
- * file   projection_finite_strain.hh
+* @file   projection_finite_strain.hh
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
@@ -7,8 +7,6 @@
  *
  * @brief  Class for standard finite-strain gradient projections see de Geus et
  *         al. (https://doi.org/10.1016/j.cma.2016.12.032) for derivation
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -39,18 +37,24 @@
 
 namespace muSpectre {
 
+  /**
+   * Implements the finite strain gradient projection operator as
+   * defined in de Geus et
+   * al. (https://doi.org/10.1016/j.cma.2016.12.032) for derivation
+   */
   template <Dim_t DimS, Dim_t DimM>
   class ProjectionFiniteStrain: public ProjectionDefault<DimS, DimM>
   {
   public:
-    using Parent = ProjectionDefault<DimS, DimM>;
+    using Parent = ProjectionDefault<DimS, DimM>; //!< base class
+    //! polymorphic pointer to FFT engines
     using FFT_Engine_ptr = typename Parent::FFT_Engine_ptr;
-    using Ccoord = typename Parent::Ccoord;
-    //using GFieldCollection_t = FieldCollection<DimS, DimM, true>;
+    using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
+    //! local field collection (for Fourier-space representations)
     using LFieldCollection_t = FieldCollection<DimS, DimM, false>;
-    //using Field_t = TensorField<GFieldCollection_t, Real, secondOrder, DimM>;
-    using Proj_t = TensorField<LFieldCollection_t, Real, fourthOrder, DimM>;
+    //! iterable operator
     using Proj_map = T4MatrixFieldMap<LFieldCollection_t, Real, DimM>;
+    //! iterable vectorised version of the Fourier-space tensor field
     using Vector_map = MatrixFieldMap<LFieldCollection_t, Complex, DimM*DimM, 1>;
 
     //! Default constructor

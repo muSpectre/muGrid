@@ -1,18 +1,13 @@
-.. _Reference
-
 Reference
 ---------
 
 .. doxygenclass:: muSpectre::SystemBase
-   :members:
 
-.. Doxygen index
-   -------------
+Doxygen index
+-------------
 
-.. .. doxygenindex::
+.. doxygenindex::
    :project: µSpectre
-   :outline:
-
 
 .. Doxygennamespace
    ----------------

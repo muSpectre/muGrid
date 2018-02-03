@@ -1,13 +1,11 @@
 /**
- * file   field_map_matrixlike.hh
+* @file   field_map_matrixlike.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   26 Sep 2017
  *
  * @brief  Eigen-Matrix and -Array maps over strongly typed fields
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -42,24 +40,55 @@ namespace muSpectre {
   namespace internal {
 
     /* ---------------------------------------------------------------------- */
-    enum class Map_t{Matrix, Array, T4Matrix};
+    /**
+     * lists all matrix-like types consideres by
+     * `muSpectre::internal::MatrixLikeFieldMap`
+     */
+    enum class Map_t{
+      Matrix,  //!< for wrapping `Eigen::Matrix`
+      Array,   //!< for wrapping `Eigen::Array`
+      T4Matrix //!< for wrapping `Eigen::T4Matrix`
+    };
+
+    /**
+     * traits structure to define the name shown when a
+     * `muSpectre::MatrixLikeFieldMap` output into an ostream
+     */
     template<Map_t map_type>
     struct NameWrapper {
     };
+
+    /// specialisation for `muSpectre::ArrayFieldMap`
     template<>
     struct NameWrapper<Map_t::Array> {
+      //! string to use for printing
       static std::string field_info_root() {return "Array";}
     };
+
+    /// specialisation for `muSpectre::MatrixFieldMap`
     template<>
     struct NameWrapper<Map_t::Matrix> {
+      //! string to use for printing
       static std::string field_info_root() {return "Matrix";}
     };
+
+    /// specialisation for `muSpectre::T4MatrixFieldMap`
     template<>
     struct NameWrapper<Map_t::T4Matrix> {
+      //! string to use for printing
       static std::string field_info_root() {return "T4Matrix";}
     };
 
     /* ---------------------------------------------------------------------- */
+    /*!
+     * base class for maps of matrices, arrays and fourth-order
+     * tensors mapped onty matrices
+     *
+     * It should never be necessary to call directly any of the
+     * constructors if this class, but rather use the template aliases
+     * `muSpectre::ArrayFieldMap`, `muSpectre::MatrixFieldMap`, and
+     * `muSpectre::T4MatrixFieldMap`
+     */
     template <class FieldCollection, class EigenArray, class EigenConstArray,
               class EigenPlain, Map_t map_type, bool ConstField>
     class MatrixLikeFieldMap: public FieldMap<FieldCollection,
@@ -68,28 +97,34 @@ namespace muSpectre {
                                               ConstField>
     {
     public:
+      //! base class
       using Parent = FieldMap<FieldCollection,
                               typename EigenArray::Scalar,
                               EigenArray::SizeAtCompileTime, ConstField>;
-      using T_t = EigenPlain;
+      using T_t = EigenPlain; //!< plain Eigen type to map
+      //! cell coordinates type
       using Ccoord = Ccoord_t<FieldCollection::spatial_dim()>;
-      using value_type = EigenArray;
-      using const_reference = EigenConstArray;
+      using value_type = EigenArray; //!< stl conformance
+      using const_reference = EigenConstArray; //!< stl conformance
+      //! stl conformance
       using reference = std::conditional_t<ConstField,
                                            const_reference,
                                            value_type>; // since it's a resource handle
-      using size_type = typename Parent::size_type;
-      using pointer = std::unique_ptr<EigenArray>;
-      using TypedField = typename Parent::TypedField;
-      using Field = typename TypedField::Base;
+      using size_type = typename Parent::size_type; //!< stl conformance
+      using pointer = std::unique_ptr<EigenArray>; //!< stl conformance
+      using TypedField = typename Parent::TypedField; //!< stl conformance
+      using Field = typename TypedField::Base; //!< stl conformance
+      //! stl conformance
       using const_iterator= typename Parent::template iterator<MatrixLikeFieldMap, true>;
+      //! stl conformance
       using iterator = std::conditional_t<
         ConstField,
         const_iterator,
         typename Parent::template iterator<MatrixLikeFieldMap>>;
-      using reverse_iterator = std::reverse_iterator<iterator>;
+      using reverse_iterator = std::reverse_iterator<iterator>; //!< stl conformance
+       //! stl conformance
       using const_reverse_iterator = std::reverse_iterator<const_iterator>;
-
+      //! stl conformance
       friend iterator;
 
       //! Default constructor
@@ -102,6 +137,11 @@ namespace muSpectre {
        */
       template <bool isntConst=!ConstField>
       MatrixLikeFieldMap(std::enable_if_t<isntConst, Field &> field);
+      /**
+       * Constructor using a (non-typed) field. Compatibility is enforced at
+       * runtime.  This should not be a performance concern, as this constructor
+       * will not be called in anny inner loops (if used as intended).
+       */
       template <bool isConst=ConstField>
       MatrixLikeFieldMap(std::enable_if_t<isConst, const Field &> field);
 
@@ -137,26 +177,34 @@ namespace muSpectre {
 
       //! member access
       inline reference operator[](size_type index);
+      //! member access
       inline reference operator[](const Ccoord& ccoord);
 
+      //! member access
       inline const_reference operator[](size_type index) const;
+      //! member access
       inline const_reference operator[](const Ccoord& ccoord) const;
 
       //! return an iterator to head of field for ranges
       inline iterator begin(){return iterator(*this);}
+      //! return an iterator to head of field for ranges
       inline const_iterator cbegin() const {return const_iterator(*this);}
+      //! return an iterator to head of field for ranges
       inline const_iterator begin() const {return this->cbegin();}
       //! return an iterator to tail of field for ranges
       inline iterator end(){return iterator(*this, false);};
+      //! return an iterator to tail of field for ranges
       inline const_iterator cend() const {return const_iterator(*this, false);}
+      //! return an iterator to tail of field for ranges
       inline const_iterator end() const {return this->cend();}
 
+      //! evaluate the average of the field
       inline T_t mean() const;
 
     protected:
       //! for sad, legacy iterator use
       inline pointer ptr_to_val_t(size_type index);
-      const static std::string field_info_root;
+      const static std::string field_info_root; //!< for printing and debug
     private:
     };
 

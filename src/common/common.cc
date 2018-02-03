@@ -1,13 +1,11 @@
 /**
- * file   common.cc
+* @file   common.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   15 Nov 2017
  *
  * @brief  Implementation for common functions
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

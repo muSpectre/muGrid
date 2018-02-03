@@ -1,5 +1,5 @@
 /**
- * file   test_field_collections_2.cc
+* @file   test_field_collections_2.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -7,8 +7,6 @@
  *
  * @brief Continuation of tests from test_field_collection.cc, split for faster
  *        compilation
- *
- * @section LICENCE
  *
  * Copyright © 2017 Till Junge
  *

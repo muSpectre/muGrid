@@ -1,13 +1,11 @@
 /**
- * file   bind_py_solver.cc
+* @file   bind_py_solver.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   09 Jan 2018
  *
  * @brief  python bindings for the muSpectre solvers
- *
- * @section LICENSE
  *
  * Copyright © 2018 Till Junge
  *

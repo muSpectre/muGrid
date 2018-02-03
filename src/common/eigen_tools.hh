@@ -1,5 +1,5 @@
 /**
- * file   eigen_tools.hh
+ * @file   eigen_tools.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -38,34 +38,40 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  //! Creates a Eigen::Sizes type for a Tensor defined by an order and dim
   namespace internal {
 
+    //! Creates a Eigen::Sizes type for a Tensor defined by an order and dim
     template <Dim_t order, Dim_t dim, Dim_t... dims>
     struct SizesByOrderHelper {
+      //! type to use
       using Sizes = typename SizesByOrderHelper<order-1, dim, dim, dims...>::Sizes;
     };
+    //! Creates a Eigen::Sizes type for a Tensor defined by an order and dim
     template <Dim_t dim, Dim_t... dims>
     struct SizesByOrderHelper<0, dim, dims...> {
+      //! type to use
       using Sizes = Eigen::Sizes<dims...>;
     };
 
   }  // internal
 
+  //! Creates a Eigen::Sizes type for a Tensor defined by an order and dim
   template <Dim_t order, Dim_t dim>
   struct SizesByOrder {
     static_assert(order > 0, "works only for order greater than zero");
+    //! `Eigen::Sizes`
     using Sizes = typename
       internal::SizesByOrderHelper<order-1, dim, dim>::Sizes;
   };
 
   /* ---------------------------------------------------------------------- */
-  //! Call a passed lambda with the unpacked sizes as arguments
   namespace internal {
 
     /* ---------------------------------------------------------------------- */
+    //! Call a passed lambda with the unpacked sizes as arguments
     template<Dim_t order, typename Fun_t, Dim_t dim, Dim_t ... args>
     struct CallSizesHelper {
+      //! applies the call
       static decltype(auto) call(Fun_t && fun) {
         static_assert(order > 0, "can't handle empty sizes b)");
         return CallSizesHelper<order-1, Fun_t, dim, dim, args...>::call
@@ -75,13 +81,22 @@ namespace muSpectre {
 
     /* ---------------------------------------------------------------------- */
     template<typename Fun_t, Dim_t dim, Dim_t ... args>
+    //! Call a passed lambda with the unpacked sizes as arguments
     struct CallSizesHelper<0, Fun_t, dim, args...> {
+      //! applies the call
       static decltype(auto) call(Fun_t && fun) {
         return fun(args...);
       }
     };
 
   }  // internal
+
+  /**
+   * takes a lambda and calls it with the proper `Eigen::Sizes`
+   * unpacked as arguments. Is used to call constructors of a
+   * `Eigen::Tensor` or map thereof in a context where the spatial
+   * dimension is templated
+   */
   template<Dim_t order, Dim_t dim, typename Fun_t>
   inline decltype(auto) call_sizes(Fun_t && fun) {
     static_assert(order > 1, "can't handle empty sizes");
@@ -109,45 +124,71 @@ namespace muSpectre {
     return ct_sqrt(res, 1, res);
   }
 
-  /**
-   * Structure to determine whether an expression can be evaluated into a Matrix, Array, etc. and which helps determine compile-time size
-   */
   namespace EigenCheck {
+    /**
+     * Structure to determine whether an expression can be evaluated
+     * into a `Eigen::Matrix`, `Eigen::Array`, etc. and which helps
+     * determine compile-time size
+     */
     template <class Derived>
     struct is_matrix {
+      //! raw type for testing
       using T = std::remove_reference_t<Derived>;
+      //! evaluated test
       constexpr static bool value{std::is_same<typename Eigen::internal::traits<T>::XprKind,
                                                Eigen::MatrixXpr>::value};
     };
 
+    /**
+     * Helper class to check whether an `Eigen::Array` or
+     * `Eigen::Matrix` is statically sized
+     */
     template <class Derived>
     struct is_fixed {
+      //! raw type for testing
       using T = std::remove_reference_t<Derived>;
+      //! evaluated test
       constexpr static bool value{T::SizeAtCompileTime != Eigen::Dynamic};
     };
 
+    /**
+     * Helper class to check whether an `Eigen::Array` or `Eigen::Matrix` is a
+     * static-size and square.
+     */
     template <class Derived>
     struct is_square {
+      //! raw type for testing
       using T = std::remove_reference_t<Derived>;
+      //! true if the object is square and statically sized
       constexpr static bool value{
         (T::RowsAtCompileTime == T::ColsAtCompileTime) &&
           is_fixed<T>::value};
 
     };
 
+    /**
+     * computes the dimension from a second order tensor represented
+     * square matrix or array
+     */
     template <class Derived>
     struct tensor_dim {
+      //! raw type for testing
       using T = std::remove_reference_t<Derived>;
       static_assert(is_matrix<T>::value, "The type of t is not understood as an Eigen::Matrix");
       static_assert(is_square<T>::value, "t's matrix isn't square");
+      //! evaluated dimension
       constexpr static Dim_t value{T::RowsAtCompileTime};
     };
 
+    //! computes the dimension from a fourth order tensor represented
+    //! by a square matrix
     template <class Derived>
     struct tensor_4_dim {
+      //! raw type for testing
       using T = std::remove_reference_t<Derived>;
       static_assert(is_matrix<T>::value, "The type of t is not understood as an Eigen::Matrix");
       static_assert(is_square<T>::value, "t's matrix isn't square");
+      //! evaluated dimension
       constexpr static Dim_t value{ct_sqrt(T::RowsAtCompileTime)};
       static_assert(value*value == T::RowsAtCompileTime,
                     "This is not a fourth-order tensor mapped on a square "

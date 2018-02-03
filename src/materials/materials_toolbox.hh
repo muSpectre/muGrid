@@ -1,13 +1,11 @@
 /**
- * file   materials_toolbox.hh
+* @file   materials_toolbox.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   02 Nov 2017
  *
  * @brief  collection of common continuum mechanics tools
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -46,10 +44,16 @@
 namespace muSpectre {
 
   namespace MatTB {
+    /**
+     * thrown when generic materials-related runtime errors occur
+     * (mostly continuum mechanics problems)
+     */
     class MaterialsToolboxError:public std::runtime_error{
     public:
+      //! constructor
       explicit MaterialsToolboxError(const std::string& what)
         :std::runtime_error(what){}
+      //! constructor
       explicit MaterialsToolboxError(const char * what)
         :std::runtime_error(what){}
     };
@@ -61,19 +65,8 @@ namespace muSpectre {
      * and tangent moduli or only stress
      */
     enum class NeedTangent {
-      yes, // compute both stress and tangent moduli
-      no}; // compute only stress
-    /**
-     * Struct with a single variadic function only used to determine the
-     * tuple type to store in the various sub-iterators or to return
-     */
-
-    template <MatTB::NeedTangent NeedTgt>
-    struct StoredTuple {
-      template <class ... Args>
-      decltype(auto) operator()(Args && ... args) {
-        return std::tie(args ... );
-      }
+      yes, //!< compute both stress and tangent moduli
+      no   //!< compute only stress
     };
 
     /**
@@ -83,6 +76,7 @@ namespace muSpectre {
      */
     template <class... T>
     struct ReferenceTuple {
+      //! use this type
       using type = std::tuple<typename T::reference ...>;
     };
 
@@ -92,6 +86,7 @@ namespace muSpectre {
     //template <>
     template <class... T>
     struct ReferenceTuple<std::tuple<T...>> {
+      //! use this type
       using type = typename ReferenceTuple<T...>::type;
     };
 
@@ -102,11 +97,11 @@ namespace muSpectre {
     using ReferenceTuple_t = typename ReferenceTuple<T...>::type;
 
     /* ---------------------------------------------------------------------- */
-    /** Structure for functions returning one strain measure as a
-        function of another
-     **/
     namespace internal {
 
+      /** Structure for functions returning one strain measure as a
+       *  function of another
+       **/
       template <StrainMeasure In, StrainMeasure Out = In>
       struct ConvertStrain {
         static_assert((In == StrainMeasure::Gradient) ||
@@ -115,6 +110,7 @@ namespace muSpectre {
                       "MatTb as intended. Disable this assert only if you are "
                       "sure about what you are doing.");
 
+        //! returns the converted strain
         template <class Strain_t>
         inline static decltype(auto)
         compute(Strain_t&& input) {
@@ -134,6 +130,7 @@ namespace muSpectre {
       template <>
       struct ConvertStrain<StrainMeasure::Gradient, StrainMeasure::GreenLagrange> {
 
+        //! returns the converted strain
         template <class Strain_t>
         inline static decltype(auto)
         compute(Strain_t&& F) {
@@ -155,15 +152,16 @@ namespace muSpectre {
 
 
     /* ---------------------------------------------------------------------- */
-    /** Structure for functions returning PK1 stress from other stress measures
-     **/
     namespace internal {
 
+      /** Structure for functions returning PK1 stress from other stress measures
+       **/
       template <Dim_t Dim,
                 StressMeasure StressM,
                 StrainMeasure StrainM>
       struct PK1_stress {
 
+        //! returns the converted stress
         template <class Strain_t, class Stress_t>
         inline static decltype(auto)
         compute(Strain_t && /*strain*/, Stress_t && /*stress*/) {
@@ -176,6 +174,7 @@ namespace muSpectre {
                         "See PK2stress<PK1,T1, T2> for an example.");
         }
 
+        //! returns the converted stress and stiffness
         template <class Strain_t, class Stress_t, class Tangent_t>
         inline static decltype(auto)
         compute(Strain_t && /*strain*/, Stress_t && /*stress*/,
@@ -199,6 +198,7 @@ namespace muSpectre {
         public PK1_stress<Dim, StressMeasure::no_stress_,
                           StrainMeasure::no_strain_> {
 
+        //! returns the converted stress
         template <class Strain_t, class Stress_t>
         inline static decltype(auto)
         compute(Strain_t && /*dummy*/, Stress_t && P) {
@@ -216,10 +216,12 @@ namespace muSpectre {
         public PK1_stress<Dim, StressMeasure::PK1,
                           StrainMeasure::no_strain_> {
 
+        //! base class
         using Parent = PK1_stress<Dim, StressMeasure::PK1,
                                   StrainMeasure::no_strain_>;
         using Parent::compute;
 
+        //! returns the converted stress and stiffness
         template <class Strain_t, class Stress_t, class Tangent_t>
         inline static decltype(auto)
         compute(Strain_t && /*dummy*/, Stress_t && P, Tangent_t && K) {
@@ -237,6 +239,7 @@ namespace muSpectre {
         public PK1_stress<Dim, StressMeasure::no_stress_,
                           StrainMeasure::no_strain_> {
 
+        //! returns the converted stress
         template <class Strain_t, class Stress_t>
         inline static decltype(auto)
         compute(Strain_t && F, Stress_t && S) {
@@ -253,10 +256,12 @@ namespace muSpectre {
       struct PK1_stress<Dim, StressMeasure::PK2, StrainMeasure::GreenLagrange>:
         public PK1_stress<Dim, StressMeasure::PK2,
                           StrainMeasure::no_strain_> {
+        //! base class
         using Parent = PK1_stress<Dim, StressMeasure::PK2,
                                   StrainMeasure::no_strain_>;
         using Parent::compute;
 
+        //! returns the converted stress and stiffness
         template <class Strain_t, class Stress_t, class Tangent_t>
         inline static decltype(auto)
         compute(Strain_t && F, Stress_t && S, Tangent_t && C) {

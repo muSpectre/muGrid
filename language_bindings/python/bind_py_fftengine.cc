@@ -1,13 +1,11 @@
 /**
- * file   bind_py_fftengine.cc
+* @file   bind_py_fftengine.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
  * @date   17 Jan 2018
  *
  * @brief  Python bindings for the FFT engines
- *
- * @section LICENSE
  *
  * Copyright © 2018 Till Junge
  *

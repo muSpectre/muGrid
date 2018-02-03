@@ -1,1 +1,1 @@
-INPUT = @CMAKE_SOURCE_DIR@/src @CMAKE_SOURCE_DIR@/language_bindings
+INPUT = @CMAKE_SOURCE_DIR@/src
