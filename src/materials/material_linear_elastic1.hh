@@ -1,5 +1,5 @@
 /**
- * file   material_linear_elastic1.hh
+ * @file   material_linear_elastic1.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -8,8 +8,6 @@
  * @brief  Implementation for linear elastic reference material like in de Geus
  *         2017. This follows the simplest and likely not most efficient
  *         implementation (with exception of the Python law)
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -40,39 +38,61 @@ namespace muSpectre {
   template<Dim_t DimS, Dim_t DimM>
   class MaterialLinearElastic1;
 
+  /**
+   * traits for objective linear elasticity
+   */
   template <Dim_t DimS, Dim_t DimM>
   struct MaterialMuSpectre_traits<MaterialLinearElastic1<DimS, DimM>>:
     public MaterialMuSpectre_traits<void> {
-    using Parent = MaterialMuSpectre_traits<void>;
+    using Parent = MaterialMuSpectre_traits<void>;//!< base for elasticity
+    //! elasticity without internal variables
     using InternalVariables = typename Parent::DefaultInternalVariables;
   };
 
   //! DimS spatial dimension (dimension of problem
   //! DimM material_dimension (dimension of constitutive law)
+  /**
+   * implements objective linear elasticity
+   */
   template<Dim_t DimS, Dim_t DimM>
   class MaterialLinearElastic1:
     public MaterialMuSpectre<MaterialLinearElastic1<DimS, DimM>, DimS, DimM>
   {
   public:
+    //! base class
     using Parent = MaterialMuSpectre<MaterialLinearElastic1, DimS, DimM>;
+    /**
+     * type used to determine whether the
+     * `muSpectre::MaterialMuSpectre::iterable_proxy` evaluate only
+     * stresses or also tangent stiffnesses
+     */
     using NeedTangent = typename Parent::NeedTangent;
+    //! global field collection
     using GFieldCollection_t = typename Parent::GFieldCollection_t;
-    // declare what type of strain measure your law takes as input
+    //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
-    // declare what type of stress measure your law yields as output
+    //! declare what type of stress measure your law yields as output
     constexpr static auto stress_measure{StressMeasure::PK2};
-    // declare whether the derivative of stress with respect to strain is uniform
+    //! declare whether the derivative of stress with respect to strain is uniform
     constexpr static bool uniform_stiffness = true;
-    // declare the type in which you wish to receive your strain measure
+
+    //! expected map type for strain fields
     using StrainMap_t = MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM, true>;
+    //! expected map type for stress fields
     using StressMap_t = MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
+    //! expected map type for tangent stiffness fields
     using TangentMap_t = T4MatrixFieldMap<GFieldCollection_t, Real, DimM>;
+    //! expected type for strain values
     using Strain_t = typename StrainMap_t::const_reference;
+    //! expected type for stressvalues
     using Stress_t = typename StressMap_t::reference;
+    //! expected type for tangent stiffness values
     using Tangent_t = typename TangentMap_t::reference;
+    //! type for the stiffness (actual value, not a map or reference)
     using Stiffness_t = Eigen::TensorFixedSize
       <Real, Eigen::Sizes<DimM, DimM, DimM, DimM>>;
 
+    //! this law does not have any internal variables
     using InternalVariables = typename Parent::DefaultInternalVariables;
 
     //! Default constructor
@@ -97,16 +117,27 @@ namespace muSpectre {
     //! Move assignment operator
     MaterialLinearElastic1& operator=(MaterialLinearElastic1 &&other) = delete;
 
+    /**
+     * evaluates second Piola-Kirchhoff stress given the Green-Lagrange
+     * strain (or Cauchy stress if called with a small strain tensor)
+     */
     template <class s_t>
     inline decltype(auto) evaluate_stress(s_t && E);
+
+    /**
+     * evaluates both second Piola-Kirchhoff stress and stiffness given
+     * the Green-Lagrange strain (or Cauchy stress and stiffness if
+     * called with a small strain tensor)
+     */
     template <class s_t>
     inline decltype(auto) evaluate_stress_tangent(s_t &&  E);
 
-    const Tangent_t & get_stiffness() const;
-
   protected:
-    const Real young, poisson, lambda, mu;
-    const Stiffness_t C;
+    const Real young;  //!< Young's modulus
+    const Real poisson;//!< Poisson's ratio
+    const Real lambda; //!< first Lamé constant
+    const Real mu;     //!< second Lamé constant (shear modulus)
+    const Stiffness_t C; //!< stiffness tensor
   private:
   };
 

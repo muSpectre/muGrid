@@ -1,5 +1,5 @@
 /**
- * file   projection_default.hh
+* @file   projection_default.hh
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
@@ -9,8 +9,6 @@
  *         projection operator is stored as a full fourth-order tensor per
  *         k-space point (as opposed to 'smart' faster implementations, such as
  *         ProjectionFiniteStrainFast
- *
- * @section LICENSE
  *
  * Copyright (C) 2018 Till Junge
  *
@@ -37,18 +35,30 @@
 
 namespace muSpectre {
 
+  /**
+   * base class to inherit from if one implements a projection
+   * operator that is stored in form of a fourth-order tensor of real
+   * values per k-grid point
+   */
   template <Dim_t DimS, Dim_t DimM>
   class ProjectionDefault: public ProjectionBase<DimS, DimM>
   {
   public:
-    using Parent = ProjectionBase<DimS, DimM>;
+    using Parent = ProjectionBase<DimS, DimM>; //!< base class
+    //! polymorphic FFT pointer type
     using FFT_Engine_ptr = typename Parent::FFT_Engine_ptr;
-    using Ccoord = typename Parent::Ccoord;
+    using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
+    //! global field collection
     using GFieldCollection_t = FieldCollection<DimS, DimM, true>;
+    //! local field collection for Fourier-space fields
     using LFieldCollection_t = FieldCollection<DimS, DimM, false>;
+    //! Real space second order tensor fields (to be projected)
     using Field_t = TensorField<GFieldCollection_t, Real, secondOrder, DimM>;
+    //! Fourier-space field containing the projection operator itself
     using Proj_t = TensorField<LFieldCollection_t, Real, fourthOrder, DimM>;
+    //! iterable form of the operator
     using Proj_map = T4MatrixFieldMap<LFieldCollection_t, Real, DimM>;
+    //! vectorized version of the Fourier-space second-order tensor field
     using Vector_map = MatrixFieldMap<LFieldCollection_t, Complex, DimM*DimM, 1>;
     //! Default constructor
     ProjectionDefault() = delete;
@@ -78,8 +88,8 @@ namespace muSpectre {
 
 
   protected:
-    Proj_t & Gfield;
-    Proj_map Ghat;
+    Proj_t & Gfield; //!< field holding the operator
+    Proj_map Ghat;   //!< iterable version of operator
   private:
   };
 

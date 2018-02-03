@@ -1,13 +1,11 @@
 /**
- * file   bind_py_common.cc
+* @file   bind_py_common.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   08 Jan 2018
  *
  * @brief  Python bindings for the common part of µSpectre
- *
- * @section LICENSE
  *
  * Copyright © 2018 Till Junge
  *

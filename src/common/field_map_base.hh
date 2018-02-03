@@ -1,13 +1,11 @@
 /**
- * file   field_map.hh
+* @file   field_map.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   12 Sep 2017
  *
  * @brief  Defined a strongly defines proxy that iterates efficiently over a field
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -49,13 +47,18 @@ namespace muSpectre {
     //! little helper to automate creation of const maps without duplication
     template<class T, bool isConst>
     struct const_corrector {
+      //! non-const type
       using type = typename T::reference;
     };
+
+    //! specialisation for constant case
     template<class T>
     struct const_corrector<T, true> {
+      //! const type
       using type = typename T::const_reference;
     };
 
+    //! convenience alias
     template<class T, bool isConst>
     using const_corrector_t = typename const_corrector<T, isConst>::type;
 
@@ -64,25 +67,30 @@ namespace muSpectre {
     class FieldMap
     {
     public:
+      //! number of scalars per entry
       constexpr static auto nb_components{NbComponents};
       using TypedField_nc = TypedSizedFieldBase
-        <FieldCollection, T, NbComponents>;
+        <FieldCollection, T, NbComponents>; //!< non-constant version of field
+      //! field type as seen from iterator
       using TypedField = std::conditional_t<ConstField,
                                             const TypedField_nc,
                                             TypedField_nc>;
-      using Field = typename TypedField::Base;
-      using size_type = std::size_t;
+      using Field = typename TypedField::Base; //!< iterated field type
+      using size_type = std::size_t;  //!< stl conformance
       using pointer = std::conditional_t<ConstField,
                                          const T*,
-                                         T*>;
+                                         T*>; //!< stl conformance
       //! Default constructor
       FieldMap() = delete;
 
+      //! constructor
       template <bool isntConst=!ConstField>
       FieldMap(std::enable_if_t<isntConst, Field &> field);
+      //! constructor
       template <bool isConst=ConstField>
       FieldMap(std::enable_if_t<isConst, const Field &> field);
 
+      //! constructor with run-time cost (for python and debugging)
       template<class FC, typename T2, Dim_t NbC>
       FieldMap(TypedSizedFieldBase<FC, T2, NbC> & field);
 
@@ -125,6 +133,10 @@ namespace muSpectre {
       template<class TypedField>
       struct is_compatible;
 
+      /**
+       * iterates over all pixels in the `muSpectre::FieldCollection`
+       * and dereferences to an Eigen map to the currently used field.
+       */
       template <class FullyTypedFieldMap, bool ConstIter=false>
       class iterator
       {
@@ -132,15 +144,23 @@ namespace muSpectre {
                       "You can't have a non-const iterator over a const "
                       "field");
       public:
+        //! stl conformance
         using value_type =
           const_corrector_t<FullyTypedFieldMap, ConstIter>;
+        //! stl conformance
         using const_value_type =
           const_corrector_t<FullyTypedFieldMap, true>;
+        //! stl conformance
         using pointer = typename FullyTypedFieldMap::pointer;
+        //! stl conformance
         using difference_type = std::ptrdiff_t;
+        //! stl conformance
         using iterator_category = std::random_access_iterator_tag;
+        //! cell coordinates type
         using Ccoord = typename FieldCollection::Ccoord;
+        //! stl conformance
         using reference = typename FullyTypedFieldMap::reference;
+        //! fully typed reference as seen by the iterator
         using TypedRef = std::conditional_t<ConstIter,
                                             const FullyTypedFieldMap &,
                                             FullyTypedFieldMap>;
@@ -193,13 +213,19 @@ namespace muSpectre {
         inline bool operator!=(const iterator & other) const;
         //! div. comparisons
         inline bool operator<(const iterator & other) const;
+        //! div. comparisons
         inline bool operator<=(const iterator & other) const;
+        //! div. comparisons
         inline bool operator>(const iterator & other) const;
+        //! div. comparisons
         inline bool operator>=(const iterator & other) const;
         //! additions, subtractions and corresponding assignments
         inline iterator operator+(difference_type diff) const;
+        //! additions, subtractions and corresponding assignments
         inline iterator operator-(difference_type diff) const;
+        //! additions, subtractions and corresponding assignments
         inline iterator& operator+=(difference_type diff);
+        //! additions, subtractions and corresponding assignments
         inline iterator& operator-=(difference_type diff);
 
         //! get pixel coordinates
@@ -218,18 +244,20 @@ namespace muSpectre {
         }
 
       protected:
-        const FieldCollection & collection;
-        TypedRef fieldmap;
-        size_t index;
+        const FieldCollection & collection; //!< collection of the field
+        TypedRef fieldmap; //!< ref to the field itself
+        size_t index; //!< index of currently pointed-to pixel
       private:
       };
 
 
     protected:
+      //! raw pointer to entry (for Eigen Map)
       inline pointer get_ptr_to_entry(size_t index);
+      //! raw pointer to entry (for Eigen Map)
       inline const T* get_ptr_to_entry(size_t index) const;
-      const FieldCollection & collection;
-      TypedField  & field;
+      const FieldCollection & collection; //!< collection holding Field
+      TypedField  & field;  //!< mapped Field
     private:
     };
   }  // internal
@@ -307,6 +335,7 @@ namespace muSpectre {
     template <class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
     template <class myField>
     struct FieldMap<FieldCollection, T, NbComponents, ConstField>::is_compatible {
+      //! creates a more readable compile error
       constexpr static bool explain() {
         static_assert
           (std::is_same<typename myField::collection_t, FieldCollection>::value,
@@ -319,6 +348,7 @@ namespace muSpectre {
         //The static asserts wouldn't pass in the incompatible case, so this is it
         return true;
       }
+      //! evaluated compatibility
       constexpr static bool value{std::is_base_of<TypedField, myField>::value};
     };
 

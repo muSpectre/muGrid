@@ -1,13 +1,11 @@
 /**
- * file   bind_py_solver.cc
+* @file   bind_py_solver.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   09 Jan 2018
  *
  * @brief  python bindings for the muSpectre solvers
- *
- * @section LICENSE
  *
  * Copyright © 2018 Till Junge
  *
@@ -54,7 +52,7 @@ void add_iterative_solver_helper(py::module & mod, std::string name_start) {
          "cell"_a,
          "tol"_a,
          "maxiter"_a,
-         "verbose"_a)
+         "verbose"_a=false)
     .def("name", &Solver::name);
   mod.def(name_start.c_str(),
           [](sys& cell, Real tol, Uint maxiter, bool verbose) {
@@ -63,7 +61,7 @@ void add_iterative_solver_helper(py::module & mod, std::string name_start) {
           "cell"_a,
           "tol"_a,
           "maxiter"_a,
-          "verbose"_a);
+          "verbose"_a=false);
 }
 
 template <Dim_t sdim>

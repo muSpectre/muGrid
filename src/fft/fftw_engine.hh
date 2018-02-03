@@ -1,13 +1,11 @@
 /**
- * file   fftw_engine.hh
+* @file   fftw_engine.hh
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
  * @date   03 Dec 2017
  *
  * @brief  FFT engine using FFTW
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -36,14 +34,20 @@
 
 namespace muSpectre {
 
+  /**
+   * implements the `muSpectre::Fft_Engine_Base` interface using the
+   * FFTW library
+   */
   template <Dim_t DimS, Dim_t DimM>
   class FFTW_Engine: public FFT_Engine_base<DimS, DimM>
   {
   public:
-    using Parent = FFT_Engine_base<DimS, DimM>;
-    using Ccoord = typename Parent::Ccoord;
-    using Rcoord = typename Parent::Rcoord;
+    using Parent = FFT_Engine_base<DimS, DimM>; //!< base class
+    using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
+    using Rcoord = typename Parent::Rcoord; //!< spatial coordinates type
+    //! field for Fourier transform of second-order tensor
     using Workspace_t = typename Parent::Workspace_t;
+    //! real-valued second-order tensor
     using Field_t = typename Parent::Field_t;
     //! Default constructor
     FFTW_Engine() = delete;
@@ -76,10 +80,10 @@ namespace muSpectre {
     virtual void ifft(Field_t & field) const override;
 
   protected:
-    Ccoord hermitian_resolutions;
-    fftw_plan plan_fft{};
-    fftw_plan plan_ifft{};
-    bool initialised{false};
+    Ccoord hermitian_resolutions; //!< resolutions of Fourier-space grid
+    fftw_plan plan_fft{}; //!< holds the plan for forward fourier transform
+    fftw_plan plan_ifft{}; //!< holds the plan for inverse fourier transform
+    bool initialised{false}; //!< to prevent double initialisation
   private:
   };
 

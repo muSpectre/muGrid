@@ -1,5 +1,5 @@
 /**
- * file   voigt_conversion.hh
+* @file   voigt_conversion.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -7,8 +7,6 @@
  *
  * @brief  utilities to transform vector notation arrays into voigt notation
  *         arrays and vice-versa
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -40,6 +38,9 @@
 
 namespace muSpectre {
 
+  /**
+   * compile time computation of voigt vector
+   */
   template<bool sym=true>
   constexpr Dim_t vsize(Dim_t dim) {
     if (sym) {
@@ -49,6 +50,10 @@ namespace muSpectre {
     }
   }
 
+  /**
+   * implements a bunch of static functions to convert between full
+   * and Voigt notation of tensors
+   */
   template<Dim_t dim>
   class VoigtConversion
   {
@@ -56,38 +61,45 @@ namespace muSpectre {
     VoigtConversion();
     virtual ~VoigtConversion();
 
+    //! obtain a fourth order voigt matrix from a tensor
     template<class Tens4, class Voigt, bool sym=true>
     inline static void fourth_to_voigt(const Tens4 & t, Voigt & v);
+    //! return a fourth order voigt matrix from a tensor
     template<class Tens4, bool sym=true>
     inline static Eigen::Matrix<Real, vsize<sym>(dim), vsize<sym>(dim)>
       fourth_to_voigt(const Tens4 & t);
 
+    //! return a fourth order non-symmetric voigt matrix from a tensor
     template<class Tens4>
     inline static Eigen::Matrix<Real, vsize<false>(dim), vsize<false>(dim)>
     fourth_to_2d(const Tens4 & t) {
       return  fourth_to_voigt<Tens4, false>(t);
     }
 
+    //! probably obsolete
     template<class Tens2, class Voigt, bool sym=true>
     inline static void second_to_voigt(const Tens2 & t, Voigt & v);
 
+    //! probably obsolete
     template<class Tens2, class Voigt>
     inline static void gradient_to_voigt_strain(const Tens2 & F, Voigt & v);
 
+    //! probably obsolete
     template<class Tens2, class Voigt>
     inline static void gradient_to_voigt_GreenLagrange_strain(const Tens2 & F, Voigt & v);
 
+    //! probably obsolete
     template<class Tens2, class Voigt, bool sym=true>
     inline static void stress_from_voigt(const Voigt & v, Tens2 & sigma);
 
   public:
-    // matrix of vector index I as function of tensor indices i,j
+    //! matrix of vector index I as function of tensor indices i,j
     const static Eigen::Matrix<Dim_t, dim, dim> mat;
-    // matrix of vector index I as function of tensor indices i,j
+    //! matrix of vector index I as function of tensor indices i,j
     const static Eigen::Matrix<Dim_t, dim, dim> sym_mat;
-    // array of matrix indices ij as function of vector index I
+    //! array of matrix indices ij as function of vector index I
     const static Eigen::Matrix<Dim_t, dim*dim, 2>vec;
-    // factors to multiply the strain by for voigt notation
+    //! factors to multiply the strain by for voigt notation
     const static Eigen::Matrix<Real, vsize(dim), 1> factors;
 
   };

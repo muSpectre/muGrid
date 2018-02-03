@@ -1,13 +1,11 @@
 /**
- * file   test_fftw_engine.cc
+* @file   test_fftw_engine.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   05 Dec 2017
  *
  * @brief  tests for the fftw fft engine implementation
- *
- * @section LICENCE
  *
  * Copyright © 2017 Till Junge
  *

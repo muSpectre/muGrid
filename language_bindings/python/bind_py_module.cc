@@ -1,13 +1,11 @@
 /**
- * file   bind_py_module.cc
+* @file   bind_py_module.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   12 Jan 2018
  *
  * @brief  Python bindings for µSpectre
- *
- * @section LICENSE
  *
  * Copyright © 2018 Till Junge
  *
@@ -34,7 +32,7 @@
 using namespace pybind11::literals;
 namespace py=pybind11;
 
-PYBIND11_MODULE(pyMuSpectre, mod) {
+PYBIND11_MODULE(muSpectre, mod) {
   mod.doc() = "Python bindings to the µSpectre library";
 
   add_common(mod);

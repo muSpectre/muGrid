@@ -1,13 +1,11 @@
 /**
- * file   field_map_scalar.hh
+* @file   field_map_scalar.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   26 Sep 2017
  *
  * @brief  maps over scalar fields
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -33,36 +31,48 @@
 #include "common/field_map_base.hh"
 
 namespace muSpectre {
-
+  /**
+   * implements maps on scalar fields (i.e. material properties,
+   * temperatures, etc)
+   */
   template <class FieldCollection, typename T, bool ConstField=false>
   class ScalarFieldMap
     : public internal::FieldMap<FieldCollection, T, 1, ConstField>
     {
     public:
+      //! base class
       using parent = internal::FieldMap<FieldCollection, T, 1, ConstField>;
+      //! cell coordinates type
       using Ccoord = Ccoord_t<FieldCollection::spatial_dim()>;
-      using value_type = T;
-      using const_reference = const value_type &;
+      using value_type = T; //!< stl conformance
+      using const_reference = const value_type &; //!< stl conformance
+      //! stl conformance
       using reference = std::conditional_t<ConstField,
                                            const_reference,
                                            value_type &>;
-      using size_type = typename parent::size_type;
-      using pointer = T*;
-      using Field = typename parent::Field;
+      using size_type = typename parent::size_type; //!< stl conformance
+      using pointer = T*; //!< stl conformance
+      using Field = typename parent::Field; //!< stl conformance
+      //! stl conformance
       using const_iterator= typename parent::template iterator<ScalarFieldMap, true>;
+      //! iterator over a scalar field
       using iterator = std::conditional_t
         <ConstField,
          const_iterator,
          typename parent::template iterator<ScalarFieldMap>>;
-      using reverse_iterator = std::reverse_iterator<iterator>;
+      using reverse_iterator = std::reverse_iterator<iterator>; //!< stl conformance
+      //! stl conformance
       using const_reverse_iterator = std::reverse_iterator<const_iterator>;
+      //! give access to the protected fields
       friend iterator;
 
       //! Default constructor
       ScalarFieldMap() = delete;
 
+      //! constructor
       template <bool isntConst=!ConstField>
       ScalarFieldMap(std::enable_if_t<isntConst, Field &> field);
+      //! constructor
       template <bool isConst=ConstField>
       ScalarFieldMap(std::enable_if_t<isConst, const Field &> field);
 
@@ -94,21 +104,27 @@ namespace muSpectre {
       inline const_reference operator[] (size_type index) const;
       inline const_reference operator[] (const Ccoord&  ccoord) const;
 
-      //! return an iterator to head of field for ranges
+      //! return an iterator to the first pixel of the field
       inline iterator begin(){return iterator(*this);}
+      //! return an iterator to the first pixel of the field
       inline const_iterator cbegin() const {return const_iterator(*this);}
+      //! return an iterator to the first pixel of the field
       inline const_iterator begin() const {return this->cbegin();}
       //! return an iterator to tail of field for ranges
       inline iterator end(){return iterator(*this, false);}
+      //! return an iterator to tail of field for ranges
       inline const_iterator cend() const {return const_iterator(*this, false);}
+      //! return an iterator to tail of field for ranges
       inline const_iterator end() const {return this->cend();}
 
+      //! evaluate the average of the field
       inline T mean() const;
 
     protected:
       //! for sad, legacy iterator use
       inline pointer ptr_to_val_t(size_type index);
 
+      //! type identifier for printing and debugging
       const static std::string field_info_root;
     private:
   };

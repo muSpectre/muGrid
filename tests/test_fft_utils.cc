@@ -1,13 +1,11 @@
 /**
- * file   test_fft_utils.cc
+* @file   test_fft_utils.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   11 Dec 2017
  *
  * @brief  test the small utility functions used by the fft engines and projections
- *
- * @section LICENCE
  *
  * Copyright © 2017 Till Junge
  *

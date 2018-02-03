@@ -1,13 +1,11 @@
 /**
- * file   test_projection_finite.cc
+* @file   test_projection_finite.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   07 Dec 2017
  *
  * @brief  tests for standard finite strain projection operator
- *
- * @section LICENCE
  *
  * Copyright © 2017 Till Junge
  *

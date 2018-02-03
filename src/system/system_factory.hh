@@ -1,13 +1,11 @@
 /**
- * file   system_factory.hh
+* @file   system_factory.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   15 Dec 2017
  *
  * @brief  System factories to help create systems with ease
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

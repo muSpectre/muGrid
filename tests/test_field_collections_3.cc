@@ -1,5 +1,5 @@
 /**
- * file   test_field_collections_3.cc
+* @file   test_field_collections_3.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -7,8 +7,6 @@
  *
  * @brief  Continuation of tests from test_field_collection_2.cc, split for faster
  * compilation
- *
- * @section LICENCE
  *
  * Copyright © 2017 Till Junge
  *
@@ -29,7 +27,7 @@
  */
 #include <Eigen/Dense>
 #include "test_field_collections_header.hh"
-#include "common/test_goodies.hh"
+#include "tests/test_goodies.hh"
 #include "common/tensor_algebra.hh"
 
 

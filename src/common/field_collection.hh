@@ -1,5 +1,5 @@
 /**
- * file   field_collection.hh
+* @file   field_collection.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -7,8 +7,6 @@
  *
  * @brief  Provides pixel-iterable containers for scalar and tensorial fields,
  *         addressable by field name
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -36,6 +34,10 @@
 
 namespace muSpectre {
 
+  /**
+   * Convenience aliases to unify the local and global
+   * Field_collection interface
+   */
   template <Dim_t DimS, Dim_t DimM, bool Global = true>
   using FieldCollection = std::conditional_t<
     Global,

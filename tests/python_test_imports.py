@@ -35,7 +35,7 @@ import os
 sys.path.append(os.path.join(os.getcwd(), "language_bindings/python"))
 
 try:
-    import pyMuSpectre as µ
+    import muSpectre as µ
 except ImportError as err:
     print(err)
     sys.exit(-1)

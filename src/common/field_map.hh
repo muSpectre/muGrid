@@ -1,13 +1,11 @@
 /**
- * file   field_map.hh
+* @file   field_map.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   26 Sep 2017
  *
  * @brief  just and indirection to include all iterables defined for fields
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

@@ -1,5 +1,5 @@
 /**
- * file   test_field_collections.cc
+* @file   test_field_collections.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -7,8 +7,6 @@
  *
  * @brief  Test the FieldCollection classes which provide fast optimized iterators
  *         over run-time typed fields
- *
- * @section LICENCE
  *
  * Copyright © 2017 Till Junge
  *

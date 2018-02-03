@@ -1,5 +1,5 @@
 /**
- * file   test_projection.hh
+* @file   test_projection.hh
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
@@ -7,8 +7,6 @@
  *
  * @brief  common declarations for testing both the small and finite strain
  *         projection operators
- *
- * @section LICENCE
  *
  * Copyright © 2018 Till Junge
  *

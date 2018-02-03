@@ -1,13 +1,11 @@
 /**
- * file   demonstrator1.cc
+* @file   demonstrator1.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
  * @date   03 Jan 2018
  *
  * @brief  larger problem to show off
- *
- * @section LICENSE
  *
  * Copyright © 2018 Till Junge
  *

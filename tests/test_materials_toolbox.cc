@@ -1,13 +1,11 @@
 /**
- * file   test_materials_toolbox.cc
+* @file   test_materials_toolbox.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
  * @date   05 Nov 2017
  *
  * @brief  Tests for the materials toolbox
- *
- * @section LICENCE
  *
  * Copyright © 2017 Till Junge
  *
@@ -33,7 +31,7 @@
 #include "materials/materials_toolbox.hh"
 #include "common/T4_map_proxy.hh"
 #include "common/tensor_algebra.hh"
-#include "common/test_goodies.hh"
+#include "tests/test_goodies.hh"
 
 
 namespace muSpectre {

@@ -1,13 +1,11 @@
 /**
- * file   projection_finite_strain.cc
+* @file   projection_finite_strain.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
  * @date   05 Dec 2017
  *
  * @brief  implementation of standard finite strain projection operator
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

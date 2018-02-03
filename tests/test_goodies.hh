@@ -1,13 +1,11 @@
 /**
- * file   test_goodies.hh
+* @file   test_goodies.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   27 Sep 2017
  *
  * @brief  helpers for testing
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

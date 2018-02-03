@@ -1,13 +1,11 @@
 /**
- * file   field_map_tensor.hh
+* @file   field_map_tensor.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   26 Sep 2017
  *
  * @brief  Defines an Eigen-Tensor map over strongly typed fields
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -40,6 +38,11 @@ namespace muSpectre {
 
 
   /* ---------------------------------------------------------------------- */
+  /**
+   * maps onto a `muSpectre::internal::TypedSizedFieldBase` and lets
+   * you iterate over it in the form ot
+   * `Eigen::TensorMap<TensorFixedSize<...>>`
+   */
   template <class FieldCollection, typename T, Dim_t order, Dim_t dim,
             bool ConstField=false>
   class TensorFieldMap: public
@@ -49,34 +52,47 @@ namespace muSpectre {
                        ConstField>
   {
   public:
+    //! base class
     using Parent = internal::FieldMap<FieldCollection, T,
                                       TensorFieldMap::nb_components, ConstField>;
+    //! cell coordinates type
     using Ccoord = Ccoord_t<FieldCollection::spatial_dim()>;
+    //! static tensor size
     using Sizes = typename SizesByOrder<order, dim>::Sizes;
+    //! plain Eigen type
     using T_t = Eigen::TensorFixedSize<T, Sizes>;
-    using value_type = Eigen::TensorMap<T_t>;
-    using const_reference = Eigen::TensorMap<const T_t>;
+    using value_type = Eigen::TensorMap<T_t>; //!< stl conformance
+    using const_reference = Eigen::TensorMap<const T_t>; //!< stl conformance
+    //! stl conformance
     using reference = std::conditional_t<ConstField,
                                          const_reference,
                                          value_type>; // since it's a resource handle
-    using size_type = typename Parent::size_type;
-    using pointer = std::unique_ptr<value_type>;
-    using TypedField = typename Parent::TypedField;
+    using size_type = typename Parent::size_type; //!< stl conformance
+    using pointer = std::unique_ptr<value_type>; //!< stl conformance
+    using TypedField = typename Parent::TypedField; //!< field to map
+    //! polymorphic base field type (for debug and python)
     using Field = typename TypedField::Base;
+    //! stl conformance
     using const_iterator = typename Parent::template iterator<TensorFieldMap, true>;
+    //! stl conformance
     using iterator = std::conditional_t<
       ConstField,
       const_iterator,
       typename Parent::template iterator<TensorFieldMap>>;
+    //! stl conformance
     using reverse_iterator = std::reverse_iterator<iterator>;
+    //! stl conformance
     using const_reverse_iterator = std::reverse_iterator<const_iterator>;
+    //! stl conformance
     friend iterator;
 
     //! Default constructor
     TensorFieldMap() = delete;
 
+    //! constructor
     template <bool isntConst=!ConstField>
     TensorFieldMap(std::enable_if_t<isntConst, Field &> field);
+    //! constructor
     template <bool isConst=ConstField>
     TensorFieldMap(std::enable_if_t<isConst, const Field &> field);
 
@@ -103,21 +119,28 @@ namespace muSpectre {
 
     //! member access
     inline reference operator[](size_type index);
+    //! member access
     inline reference operator[](const Ccoord & ccoord);
 
+    //! member access
     inline const_reference operator[](size_type index) const;
+    //! member access
     inline const_reference operator[](const Ccoord& ccoord) const;
 
-
-    //! return an iterator to head of field for ranges
+    //! return an iterator to first entry of field
     inline iterator begin(){return iterator(*this);}
+    //! return an iterator to first entry of field
     inline const_iterator cbegin() const {return const_iterator(*this);}
+    //! return an iterator to first entry of field
     inline const_iterator begin() const {return this->cbegin();}
-    //! return an iterator to tail of field for ranges
+    //! return an iterator past the last entry of field
     inline iterator end(){return iterator(*this, false);}
+    //! return an iterator past the last entry of field
     inline const_iterator cend() const {return const_iterator(*this, false);}
+    //! return an iterator past the last entry of field
     inline const_iterator end() const {return this->cend();}
 
+    //! evaluate the average of the field
     inline T_t mean() const;
   protected:
     //! for sad, legacy iterator use

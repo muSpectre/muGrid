@@ -7,7 +7,7 @@ import itertools
 import os
 import sys
 sys.path.append(os.path.join(os.getcwd(), "language_bindings/python"))
-import pyMuSpectre as µ
+import muSpectre as µ
 
 
 # ----------------------------------- GRID ------------------------------------

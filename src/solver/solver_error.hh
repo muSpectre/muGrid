@@ -1,13 +1,11 @@
 /**
- * file   solver_error.hh
+* @file   solver_error.hh
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
  * @date   28 Dec 2017
  *
  * @brief  Errors raised by solvers
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *

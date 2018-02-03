@@ -1,13 +1,11 @@
 /**
- * file   field_collection_local.hh
+* @file   field_collection_local.hh
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
  * @date   05 Nov 2017
  *
  * @brief  FieldCollection base-class for local fields
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -42,11 +40,13 @@ namespace muSpectre {
     public FieldCollectionBase<DimS, DimM, LocalFieldCollection<DimS, DimM>>
   {
   public:
+    //! base class
     using Parent = FieldCollectionBase<DimS, DimM,
                                        LocalFieldCollection<DimS, DimM>>;
-    using Ccoord = typename Parent::Ccoord;
-    using Field_p = typename Parent::Field_p;
-    using ccoords_container = std::vector<Ccoord>;
+    using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
+    using Field_p = typename Parent::Field_p; //!< field pointer
+    using ccoords_container = std::vector<Ccoord>; //!< list of pixels
+    //! iterator over managed pixels
     using iterator = typename ccoords_container::iterator;
 
     //! Default constructor
@@ -88,7 +88,9 @@ namespace muSpectre {
     //! returns the cell coordinates corresponding to a linear index
     inline Ccoord get_ccoord(size_t index) const;
 
+    //! iterator to first pixel
     inline iterator begin() {return this->ccoords.begin();}
+    //! iterator past last pixel
     inline iterator end() {return this->ccoords.end();}
 
   protected:

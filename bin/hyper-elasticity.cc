@@ -1,13 +1,11 @@
 /**
- * file   hyper-elasticity.cc
+* @file   hyper-elasticity.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   16 Jan 2018
  *
  * @brief  Recreation of GooseFFT's hyper-elasticity.py calculation
- *
- * @section LICENSE
  *
  * Copyright © 2018 Till Junge
  *

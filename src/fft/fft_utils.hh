@@ -1,13 +1,11 @@
 /**
- * file   fft_utils.hh
+* @file   fft_utils.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   06 Dec 2017
  *
  * @brief  collection of functions used in the context of spectral operations
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -73,6 +71,7 @@ namespace muSpectre {
   class FFT_freqs
   {
   public:
+    //! return type for wave vectors
     using Vector = Eigen::Matrix<Real, dim, 1>;
     //! Default constructor
     FFT_freqs() = delete;
@@ -106,6 +105,7 @@ namespace muSpectre {
     }
 
   protected:
+    //! container for frequencies ordered by spatial dimension
     const std::array<std::valarray<Real>, dim> freqs;
   private:
   };

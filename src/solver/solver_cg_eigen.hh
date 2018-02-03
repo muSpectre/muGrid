@@ -1,13 +1,11 @@
 /**
- * file   solver_cg_eigen.hh
+* @file   solver_cg_eigen.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   19 Jan 2018
  *
  * @brief  binding to Eigen's conjugate gradient solver
- *
- * @section LICENCE
  *
  * Copyright © 2018 Till Junge
  *
@@ -62,9 +60,10 @@ namespace muSpectre {
     struct Solver_traits {
     };
 
-
+    //! traits for the Eigen conjugate gradient solver
     template <Dim_t DimS, Dim_t DimM>
     struct Solver_traits<SolverCGEigen<DimS, DimM>> {
+      //! Eigen Iterative Solver
       using Solver =
         Eigen::ConjugateGradient<typename SolverEigen<SolverCGEigen<DimS, DimM>,
                                                       DimS, DimM>::Adaptor,
@@ -72,32 +71,40 @@ namespace muSpectre {
                                  Eigen::IdentityPreconditioner>;
     };
 
+    //! traits for the Eigen GMRES solver
     template <Dim_t DimS, Dim_t DimM>
     struct Solver_traits<SolverGMRESEigen<DimS, DimM>> {
+      //! Eigen Iterative Solver
       using Solver =
         Eigen::GMRES<typename SolverEigen<SolverGMRESEigen<DimS, DimM>,
                                           DimS, DimM>::Adaptor,
                      Eigen::IdentityPreconditioner>;
     };
 
+    //! traits for the Eigen BiCGSTAB solver
     template <Dim_t DimS, Dim_t DimM>
     struct Solver_traits<SolverBiCGSTABEigen<DimS, DimM>> {
+      //! Eigen Iterative Solver
       using Solver =
         Eigen::BiCGSTAB<typename SolverEigen<SolverBiCGSTABEigen<DimS, DimM>,
                                              DimS, DimM>::Adaptor,
                         Eigen::IdentityPreconditioner>;
     };
 
+    //! traits for the Eigen DGMRES solver
     template <Dim_t DimS, Dim_t DimM>
     struct Solver_traits<SolverDGMRESEigen<DimS, DimM>> {
+      //! Eigen Iterative Solver
       using Solver =
         Eigen::DGMRES<typename SolverEigen<SolverDGMRESEigen<DimS, DimM>,
                                            DimS, DimM>::Adaptor,
                       Eigen::IdentityPreconditioner>;
     };
 
+    //! traits for the Eigen MINRES solver
     template <Dim_t DimS, Dim_t DimM>
     struct Solver_traits<SolverMINRESEigen<DimS, DimM>> {
+      //! Eigen Iterative Solver
       using Solver =
         Eigen::MINRES<typename SolverEigen<SolverMINRESEigen<DimS, DimM>,
                                            DimS, DimM>::Adaptor,
@@ -107,20 +114,30 @@ namespace muSpectre {
 
   }  // internal
 
+  /**
+   * base class for iterative solvers from Eigen
+   */
   template <class SolverType, Dim_t DimS, Dim_t DimM=DimS>
   class SolverEigen: public SolverBase<DimS, DimM>
   {
   public:
-    using Parent = SolverBase<DimS, DimM>;
+    using Parent = SolverBase<DimS, DimM>; //!< base class
+    //! Input vector for solvers
     using SolvVectorIn = typename Parent::SolvVectorIn;
+    //! Input vector for solvers
     using SolvVectorInC = typename Parent::SolvVectorInC;
+    //! Output vector for solvers
     using SolvVectorOut = typename Parent::SolvVectorOut;
-    using Sys_t = typename Parent::Sys_t;
-    using Ccoord = typename Parent::Ccoord;
+    using Sys_t = typename Parent::Sys_t; //!< cell type
+    using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
+    //! kind of tangent that is required
     using Tg_req_t = typename Parent::TangentRequirement;
+    //! handle for the cell to fit Eigen's sparse matrix interface
     using Adaptor = typename Sys_t::Adaptor;
+    //! traits obtained from CRTP
     using Solver = typename internal::Solver_traits<SolverType>::Solver;
 
+    //! All Eigen solvers need directional stiffness
     constexpr static Tg_req_t tangent_requirement{Tg_req_t::NeedEffect};
 
         //! Default constructor
@@ -144,20 +161,27 @@ namespace muSpectre {
     //! Move assignment operator
     SolverEigen& operator=(SolverEigen &&other) = default;
 
+    //! returns whether the solver has converged
     bool has_converged() const override final {return this->solver.info() == Eigen::Success;}
 
+    //! Allocate fields used during the solution
     void initialise() override final;
 
+    //! executes the solver
     SolvVectorOut solve(const SolvVectorInC rhs, SolvVectorIn x_0) override final;
 
 
   protected:
-    Tg_req_t get_tangent_req() const override final;
-    Adaptor adaptor;
-    Solver solver;
+    //! returns `muSpectre::Tg_req_t::NeedEffect`
+    Tg_req_t get_tangent_req() const override final; 
+    Adaptor adaptor; //!< cell handle
+    Solver solver; //!< Eigen's Iterative solver
 
   };
 
+  /**
+   * Binding to Eigen's conjugate gradient solver
+   */
   template <Dim_t DimS, Dim_t DimM>
   class SolverCGEigen:
     public SolverEigen<SolverCGEigen<DimS, DimM>, DimS, DimM> {
@@ -166,6 +190,9 @@ namespace muSpectre {
     std::string name() const override final {return "CG";}
   };
 
+  /**
+   * Binding to Eigen's GMRES solver
+   */
   template <Dim_t DimS, Dim_t DimM>
   class SolverGMRESEigen:
     public SolverEigen<SolverGMRESEigen<DimS, DimM>, DimS, DimM> {
@@ -174,27 +201,39 @@ namespace muSpectre {
     std::string name() const override final {return "GMRES";}
   };
 
+  /**
+   * Binding to Eigen's BiCGSTAB solver
+   */
   template <Dim_t DimS, Dim_t DimM>
   class SolverBiCGSTABEigen:
     public SolverEigen<SolverBiCGSTABEigen<DimS, DimM>, DimS, DimM> {
   public:
     using SolverEigen<SolverBiCGSTABEigen<DimS, DimM>, DimS, DimM>::SolverEigen;
+    //! Solver's name
     std::string name() const override final {return "BiCGSTAB";}
   };
 
+  /**
+   * Binding to Eigen's DGMRES solver
+   */
   template <Dim_t DimS, Dim_t DimM>
   class SolverDGMRESEigen:
     public SolverEigen<SolverDGMRESEigen<DimS, DimM>, DimS, DimM> {
   public:
     using SolverEigen<SolverDGMRESEigen<DimS, DimM>, DimS, DimM>::SolverEigen;
+    //! Solver's name
     std::string name() const override final {return "DGMRES";}
   };
 
+  /**
+   * Binding to Eigen's MINRES solver
+   */
   template <Dim_t DimS, Dim_t DimM>
   class SolverMINRESEigen:
     public SolverEigen<SolverMINRESEigen<DimS, DimM>, DimS, DimM> {
   public:
     using SolverEigen<SolverMINRESEigen<DimS, DimM>, DimS, DimM>::SolverEigen;
+    //! Solver's name
     std::string name() const override final {return "MINRES";}
   };
 

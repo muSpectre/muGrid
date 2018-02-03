@@ -34,7 +34,7 @@ import numpy as np
 import argparse
 
 sys.path.append(os.path.join(os.getcwd(), "language_bindings/python"))
-import pyMuSpectre as µ
+import muSpectre as µ
 
 def compute():
     N = [11, 11, 11]
@@ -71,8 +71,9 @@ def compute():
     test_grad = np.zeros((9, cell.size()))
     test_grad[:,:] = dF_bar.reshape(-1,1)
     print(cell.directional_stiffness(test_grad)[:,:3])
+    solver = µ.solvers.SolverCG(cell, cg_tol, maxiter, verbose=False);
     optimize_res = µ.solvers.de_geus(
-        cell, dF_bar, cg_tol, newton_tol, maxiter, verbose)
+        cell, dF_bar, solver, newton_tol, verbose)
     print("nb_cg: {}\n{}".format(optimize_res.nb_fev, optimize_res.grad.T[:2,:]))
 
 def main():

@@ -1,13 +1,11 @@
 /**
- * file   test_projection_small.cc
+* @file   test_projection_small.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
  * @date   16 Jan 2018
  *
  * @brief  tests for standard small strain projection operator
- *
- * @section LICENCE
  *
  * Copyright © 2018 Till Junge
  *

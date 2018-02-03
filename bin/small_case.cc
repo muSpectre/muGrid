@@ -1,13 +1,11 @@
 /**
- * file   small_case.cc
+* @file   small_case.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   12 Jan 2018
  *
  * @brief  small case for debugging
- *
- * @section LICENSE
  *
  * Copyright © 2018 Till Junge
  *

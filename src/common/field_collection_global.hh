@@ -1,13 +1,11 @@
 /**
- * file   field_collection_global.hh
+* @file   field_collection_global.hh
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
  * @date   05 Nov 2017
  *
  * @brief  FieldCollection base-class for global fields
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -46,9 +44,10 @@ namespace muSpectre {
   {
   public:
     using Parent = FieldCollectionBase
-      <DimS, DimM, GlobalFieldCollection<DimS, DimM>>;
-    using Ccoord = typename Parent::Ccoord;
-    using Field_p = typename Parent::Field_p;
+      <DimS, DimM, GlobalFieldCollection<DimS, DimM>>; //!< base class
+    using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
+    using Field_p = typename Parent::Field_p; //!< spatial coordinates type
+    //! iterator over all pixels contained it the collection
     using iterator = typename CcoordOps::Pixels<DimS>::iterator;
     //! Default constructor
     GlobalFieldCollection();
@@ -92,17 +91,17 @@ namespace muSpectre {
     //! returns the cell coordinates corresponding to a linear index
     inline Ccoord get_ccoord(size_t index) const;
 
-    inline iterator begin();
-    inline iterator end();
+    inline iterator begin(); //!< returns iterator to first pixel
+    inline iterator end(); //!< returns iterator past the last pixel
 
-
+    //! return spatial dimension (template parameter)
     static constexpr inline Dim_t spatial_dim() {return DimS;}
+    //! return material dimension (template parameter)
     static constexpr inline Dim_t material_dim() {return DimM;}
   protected:
     //! number of discretisation cells in each of the DimS spatial directions
     Ccoord sizes{};
-    Ccoord strides{};
-    CcoordOps::Pixels<DimS> pixels{};
+    CcoordOps::Pixels<DimS> pixels{}; //!< helper to iterate over the grid
   private:
   };
 

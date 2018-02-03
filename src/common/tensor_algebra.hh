@@ -1,5 +1,5 @@
 /**
- * file   tensor_algebra.hh
+* @file   tensor_algebra.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -7,8 +7,6 @@
  *
  * @brief  collection of compile-time quantities and algrebraic functions for
  *         tensor operations
- *
- * @section LICENSE
  *
  * Copyright © 2017 Till Junge
  *
@@ -44,8 +42,10 @@ namespace muSpectre {
 
   namespace Tensors {
 
+    //! second-order tensor representation
     template<Dim_t dim>
     using Tens2_t = Eigen::TensorFixedSize<Real, Eigen::Sizes<dim, dim>>;
+    //! fourth-order tensor representation
     template<Dim_t dim>
     using Tens4_t = Eigen::TensorFixedSize<Real, Eigen::Sizes<dim, dim, dim, dim>>;
 
@@ -63,6 +63,7 @@ namespace muSpectre {
     //! Check whether a given expression represents a Tensor specified order
     template<class T, Dim_t order>
     struct is_tensor {
+      //! evaluated test
       constexpr static bool value = (std::is_convertible
                       <T, Eigen::Tensor<Real, order>>::value ||
                     std::is_convertible
@@ -125,8 +126,10 @@ namespace muSpectre {
 
   namespace Matrices {
 
+    //! second-order tensor representation
     template<Dim_t dim>
     using Tens2_t = Eigen::Matrix<Real, dim, dim>;
+    //! fourth-order tensor representation
     template<Dim_t dim>
     using Tens4_t = T4Mat<Real, dim>;
 

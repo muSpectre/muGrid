@@ -1,5 +1,5 @@
 /**
- * file   test_material_linear_elastic1.cc
+ * @file   test_material_linear_elastic1.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -7,8 +7,6 @@
  *
  * @brief  Tests for the large-strain, objective Hooke's law, implemented in
  *         the convenient strategy (i.e., using MaterialMuSpectre)
- *
- * @section LICENCE
  *
  * Copyright © 2017 Till Junge
  *
@@ -34,7 +32,7 @@
 
 #include "materials/material_linear_elastic1.hh"
 #include "tests.hh"
-#include "common/test_goodies.hh"
+#include "tests/test_goodies.hh"
 #include "common/field_collection.hh"
 #include "common/iterators.hh"
 

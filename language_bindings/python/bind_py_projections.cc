@@ -1,13 +1,11 @@
 /**
- * file   bind_py_projections.cc
+* @file   bind_py_projections.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
  * @date   18 Jan 2018
  *
  * @brief  Python bindings for the Projection operators
- *
- * @section LICENSE
  *
  * Copyright © 2018 Till Junge
  *
@@ -52,7 +50,9 @@ using namespace pybind11::literals;
 template <Dim_t DimS, Dim_t DimM>
 class PyProjectionBase: public ProjectionBase<DimS, DimM> {
 public:
+  //! base class
   using Parent = ProjectionBase<DimS, DimM>;
+  //! field type on which projection is applied
   using Field_t = typename Parent::Field_t;
 
   void apply_projection(Field_t & field) override {

@@ -40,3 +40,5 @@ set (PY_BINDING_SRCS
 
 pybind11_add_module(pyMuSpectre ${PY_BINDING_SRCS})
 target_link_libraries(pyMuSpectre PRIVATE muSpectre)
+# Want to rename the output, so that the python module is called muSpectre
+set_target_properties(pyMuSpectre PROPERTIES OUTPUT_NAME muSpectre)
