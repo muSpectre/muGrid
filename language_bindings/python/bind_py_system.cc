@@ -1,5 +1,5 @@
 /**
-* @file   bind_py_system.cc
+ * @file   bind_py_system.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *

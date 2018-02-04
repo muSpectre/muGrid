@@ -1,5 +1,5 @@
 /**
-* @file   solver_error.hh
+ * @file   solver_error.hh
  *
  * @author Till Junge <till.junge@altermail.ch>
  *

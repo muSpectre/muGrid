@@ -1,5 +1,5 @@
 /**
-* @file   common.cc
+ * @file   common.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *

@@ -1,5 +1,5 @@
 /**
-* @file   test_materials_toolbox.cc
+ * @file   test_materials_toolbox.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  *

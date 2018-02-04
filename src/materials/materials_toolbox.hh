@@ -1,5 +1,5 @@
 /**
-* @file   materials_toolbox.hh
+ * @file   materials_toolbox.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *

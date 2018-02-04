@@ -1,5 +1,5 @@
 /**
-* @file   test_fields.cc
+ * @file   test_fields.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  *

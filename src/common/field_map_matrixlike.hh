@@ -1,5 +1,5 @@
 /**
-* @file   field_map_matrixlike.hh
+ * @file   field_map_matrixlike.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *

@@ -1,5 +1,5 @@
 /**
-* @file   field_collection.hh
+ * @file   field_collection.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *

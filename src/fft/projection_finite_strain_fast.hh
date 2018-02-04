@@ -1,5 +1,5 @@
 /**
-* @file   projection_finite_strain_fast.hh
+ * @file   projection_finite_strain_fast.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *

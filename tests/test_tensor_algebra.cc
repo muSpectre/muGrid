@@ -1,5 +1,5 @@
 /**
-* @file   test_tensor_algebra.cc
+ * @file   test_tensor_algebra.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *

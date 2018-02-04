@@ -1,5 +1,5 @@
 /**
-* @file   bind_py_solver.cc
+ * @file   bind_py_solver.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *

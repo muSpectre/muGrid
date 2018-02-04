@@ -1,5 +1,5 @@
 /**
-* @file   test_t4_map.cc
+ * @file   test_t4_map.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *

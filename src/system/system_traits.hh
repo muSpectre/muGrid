@@ -1,5 +1,5 @@
 /**
-* @file   system_traits.hh
+ * @file   system_traits.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *

@@ -1,5 +1,5 @@
 /**
-* @file   material_base.cc
+ * @file   material_base.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *

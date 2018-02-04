@@ -1,5 +1,5 @@
 /**
-* @file   voigt_conversion.hh
+ * @file   voigt_conversion.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *

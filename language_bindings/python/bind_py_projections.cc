@@ -1,5 +1,5 @@
 /**
-* @file   bind_py_projections.cc
+ * @file   bind_py_projections.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  *

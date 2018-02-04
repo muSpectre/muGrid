@@ -1,5 +1,5 @@
 /**
-* @file   test_solver_newton_cg.cc
+ * @file   test_solver_newton_cg.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *

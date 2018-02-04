@@ -1,5 +1,5 @@
 /**
-* @file   bind_py_material.cc
+ * @file   bind_py_material.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *

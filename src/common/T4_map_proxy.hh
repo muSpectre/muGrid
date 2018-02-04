@@ -1,5 +1,5 @@
 /**
-* @file   T4_map_proxy.hh
+ * @file   T4_map_proxy.hh
  *
  * @author Till Junge <till.junge@altermail.ch>
  *

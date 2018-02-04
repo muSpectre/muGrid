@@ -1,5 +1,5 @@
 /**
-* @file   test_projection_small.cc
+ * @file   test_projection_small.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  *

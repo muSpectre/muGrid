@@ -1,5 +1,5 @@
 /**
-* @file   projection_base.cc
+ * @file   projection_base.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
