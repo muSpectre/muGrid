@@ -309,7 +309,7 @@ namespace muSpectre {
       auto & this_mat = static_cast<Material&>(*this);
 
       // Transformation gradient is first in the strains tuple
-      auto && F = std::get<0>(Strains);
+      auto & F = std::get<0>(Strains);
       auto && strain = MatTB::convert_strain<stored_strain_m, expected_strain_m>(F);
       // return value contains a tuple of rvalue_refs to both stress and tangent moduli
       Stresses =
@@ -328,7 +328,7 @@ namespace muSpectre {
       auto & this_mat = static_cast<Material&>(*this);
 
       // Transformation gradient is first in the strains tuple
-      auto && grad = std::get<0>(Strains);
+      auto & grad = std::get<0>(Strains);
       auto && strain = MatTB::convert_strain<stored_strain_m, expected_strain_m>(grad);
 
       // TODO: Figure this out: I can't std::move(internals...),
@@ -345,8 +345,8 @@ namespace muSpectre {
             this_mat.evaluate_stress_tangent(std::move(strain),
                                              internals...);},
           internal_variables);
-      auto && stress = std::get<0>(stress_tgt);
-      auto && tangent = std::get<1>(stress_tgt);
+      auto & stress = std::get<0>(stress_tgt);
+      auto & tangent = std::get<1>(stress_tgt);
       Stresses = MatTB::PK1_stress<traits::stress_measure, traits::strain_measure>
       (std::move(grad),
        std::move(stress),

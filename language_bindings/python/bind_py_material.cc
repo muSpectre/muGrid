@@ -27,10 +27,12 @@
 
 #include "common/common.hh"
 #include "materials/material_linear_elastic1.hh"
+#include "materials/material_linear_elastic2.hh"
 #include "system/system_base.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <pybind11/eigen.h>
 
 #include <sstream>
 #include <string>
@@ -43,9 +45,9 @@ using namespace pybind11::literals;
  * python binding for the optionally objective form of Hooke's law
  */
 template <Dim_t dim>
-void add_material_linear_elastic_helper(py::module & mod) {
+void add_material_linear_elastic1_helper(py::module & mod) {
   std::stringstream name_stream{};
-  name_stream << "MaterialHooke" << dim << 'd';
+  name_stream << "MaterialLinearElastic1_" << dim << 'd';
   const auto name {name_stream.str()};
 
   using Mat_t = MaterialLinearElastic1<dim, dim>;
@@ -65,10 +67,37 @@ void add_material_linear_elastic_helper(py::module & mod) {
     .def("size", &Mat_t::size);
 }
 
+template <Dim_t dim>
+void add_material_linear_elastic2_helper(py::module & mod) {
+  std::stringstream name_stream{};
+  name_stream << "MaterialLinearElastic2_" << dim << 'd';
+  const auto name {name_stream.str()};
+
+  using Mat_t = MaterialLinearElastic2<dim, dim>;
+  using Sys_t = SystemBase<dim, dim>;
+
+  py::class_<Mat_t>(mod, name.c_str())
+    .def(py::init<std::string, Real, Real>(), "name"_a, "Young"_a, "Poisson"_a)
+    .def_static("make",
+                [](Sys_t & sys, std::string n, Real e, Real p) -> Mat_t & {
+                  return Mat_t::make(sys, n, e, p);
+                },
+                "system"_a, "name"_a, "Young"_a, "Poisson"_a,
+                py::return_value_policy::reference, py::keep_alive<1, 0>())
+    .def("add_pixel",
+         [] (Mat_t & mat, Ccoord_t<dim> pix, py::EigenDRef<Eigen::ArrayXXd>& eig) {
+           Eigen::Matrix<Real, dim, dim> eig_strain{eig};
+           mat.add_pixel(pix, eig_strain);},
+         "pixel"_a,
+         "eigenstrain"_a)
+    .def("size", &Mat_t::size);
+}
+
 
 template <Dim_t dim>
 void add_material_helper(py::module & mod) {
-  add_material_linear_elastic_helper<dim>(mod);
+  add_material_linear_elastic1_helper<dim>(mod);
+  add_material_linear_elastic2_helper<dim>(mod);
 }
 
 void add_material(py::module & mod) {

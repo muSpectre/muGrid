@@ -162,6 +162,10 @@ namespace muSpectre {
         if (newt_iter == 0) {
           DeltaF.get_map() = -(delF-previous_grad); // neg sign because rhs
           tangent_effect(DeltaF, rhs);
+          stressNorm = rhs.eigen().matrix().norm();
+          if (convergence_test()) {
+            break;
+          }
           incrF.eigenvec() = solver.solve(rhs.eigenvec(), incrF.eigenvec());
           F.eigen() -= DeltaF.eigen();
         } else {

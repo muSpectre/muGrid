@@ -1,15 +1,17 @@
 /**
- * @file   test_material_linear_elastic1.cc
+ * @file   test_material_linear_elastic2.cc
  *
- * @author Till Junge <till.junge@epfl.ch>
+ * @author Till Junge <till.junge@altermail.ch>
  *
- * @date   28 Nov 2017
+ * @date   04 Feb 2018
  *
- * @brief  Tests for the large-strain, objective Hooke's law, implemented in
- *         the convenient strategy (i.e., using MaterialMuSpectre), also used
- *         to test parts of MaterialLinearElastic2
+ * @brief Tests for the objective Hooke's law with eigenstrains,
+ *        (tests that do not require add_pixel are integrated into
+ *        `test_material_linear_elastic1.cc`
  *
- * Copyright © 2017 Till Junge
+ * @section LICENSE
+ *
+ * Copyright © 2018 Till Junge
  *
  * µSpectre is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -26,21 +28,20 @@
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
  */
+
 #include <type_traits>
 
 #include <boost/mpl/list.hpp>
 #include <boost/range/combine.hpp>
 
-#include "materials/material_linear_elastic1.hh"
 #include "materials/material_linear_elastic2.hh"
 #include "tests.hh"
 #include "tests/test_goodies.hh"
 #include "common/field_collection.hh"
 #include "common/iterators.hh"
-
 namespace muSpectre {
 
-  BOOST_AUTO_TEST_SUITE(material_linear_elastic_1);
+  BOOST_AUTO_TEST_SUITE(material_linear_elastic_2);
 
   template <class Mat_t>
   struct MaterialFixture
@@ -56,19 +57,7 @@ namespace muSpectre {
     Mat_t mat;
   };
 
-  template <class Mat_t>
-  struct has_internals {constexpr static bool value{false};};
-
-  template <Dim_t DimS, Dim_t DimM>
-  struct has_internals<MaterialLinearElastic2<DimS, DimM>>
-  {
-    constexpr static bool value{true};
-  };
-
-  using mat_list = boost::mpl::list
-    <MaterialFixture<MaterialLinearElastic1<twoD, twoD>>,
-     MaterialFixture<MaterialLinearElastic1<twoD, threeD>>,
-     MaterialFixture<MaterialLinearElastic1<threeD, threeD>>,
+  using mat_list = boost::mpl::list<
      MaterialFixture<MaterialLinearElastic2<twoD, twoD>>,
      MaterialFixture<MaterialLinearElastic2<twoD, threeD>>,
      MaterialFixture<MaterialLinearElastic2<threeD, threeD>>>;
@@ -94,18 +83,65 @@ namespace muSpectre {
       for (Dim_t j = 0; j < sdim; ++j) {
         c[j] = rng.randval(0, box_size);
       }
-      if (!has_internals<typename Fix::Mat>::value) {
-        BOOST_CHECK_NO_THROW(mat.add_pixel(c));
-      }
+      Eigen::Matrix<Real, Fix::mdim, Fix::mdim> Zero = Eigen::Matrix<Real, Fix::mdim, Fix::mdim>::Zero();
+      BOOST_CHECK_NO_THROW
+        (mat.add_pixel(c, Zero));
     }
 
     BOOST_CHECK_NO_THROW(mat.initialise());
+  }
+
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_eigenstrain_equivalence, Fix,
+                                   mat_list, Fix) {
+    auto & mat{Fix::mat};
+
+    const Dim_t nb_pixel{2};
+    constexpr auto cube{CcoordOps::get_cube<Fix::sdim>(nb_pixel)};
+
+    using Mat_t = Eigen::Matrix<Real, Fix::mdim, Fix::mdim>;
+    using FC_t = FieldCollection<Fix::sdim, Fix::mdim>;
+    FC_t globalfields;
+    auto & F_f{make_field<typename Fix::Mat::StrainField_t>
+        ("Transformation Gradient", globalfields)};
+    auto & P1_f = make_field<typename Fix::Mat::StressField_t>
+      ("Nominal Stress1", globalfields); // to be computed alone
+    auto & K_f = make_field<typename Fix::Mat::TangentField_t>
+      ("Tangent Moduli", globalfields); // to be computed with tangent
+    globalfields.initialise(cube);
+
+    Mat_t zero{Mat_t::Zero()};
+    Mat_t F{Mat_t::Random()/100 + Mat_t::Identity()};
+    Mat_t strain{-.5*(F+F.transpose())-Mat_t::Identity()};
+
+    using Ccoord = Ccoord_t<Fix::sdim>;
+    Ccoord pix0{0};
+    Ccoord pix1{1};
+
+    mat.add_pixel(pix0, zero);
+    mat.add_pixel(pix1, strain);
+    mat.initialise();
+
+    F_f.get_map()[pix0] = -strain;
+    F_f.get_map()[pix1] = zero;
+
+    mat.compute_stresses_tangent(F_f, P1_f, K_f, Formulation::small_strain);
+
+    Real error{(P1_f.get_map()[pix0]-P1_f.get_map()[pix1]).norm()};
+
+    Real tol{1e-12};
+    if (error >= tol) {
+      std::cout << "error = " << error << " >= " << tol << " = tol" << std::endl;
+      std::cout << "P(0) =" << std::endl << P1_f.get_map()[pix0]  << std::endl;
+      std::cout << "P(1) =" << std::endl << P1_f.get_map()[pix1]  << std::endl;
+    }
+    BOOST_CHECK_LT(error, tol);
   }
 
   template <class Mat_t>
   struct MaterialFixtureFilled:
     public MaterialFixture<Mat_t>
   {
+    using Par = MaterialFixture<Mat_t>;
     using Mat = Mat_t;
     constexpr static Dim_t box_size{3};
     MaterialFixtureFilled():MaterialFixture<Mat_t>(){
@@ -113,16 +149,18 @@ namespace muSpectre {
       Ccoord cube{CcoordOps::get_cube<Mat_t::sdim()>(box_size)};
       CcoordOps::Pixels<Mat_t::sdim()> pixels(cube);
       for (auto pixel: pixels) {
-        this->mat.add_pixel(pixel);
+        Eigen::Matrix<Real, Par::mdim, Par::mdim> Zero = Eigen::Matrix<Real, Par::mdim, Par::mdim>::Zero();
+        this->mat.add_pixel(pixel,
+                            Zero);
       }
       this->mat.initialise();
     };
   };
 
   using mat_fill = boost::mpl::list
-    <MaterialFixtureFilled<MaterialLinearElastic1<twoD, twoD>>,
-     MaterialFixtureFilled<MaterialLinearElastic1<twoD, threeD>>,
-     MaterialFixtureFilled<MaterialLinearElastic1<threeD, threeD>>>;
+    <MaterialFixtureFilled<MaterialLinearElastic2<twoD, twoD>>,
+     MaterialFixtureFilled<MaterialLinearElastic2<twoD, threeD>>,
+     MaterialFixtureFilled<MaterialLinearElastic2<threeD, threeD>>>;
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_evaluate_law, Fix, mat_fill, Fix) {
     constexpr auto cube{CcoordOps::get_cube<Fix::sdim>(Fix::box_size)};
@@ -215,6 +253,11 @@ namespace muSpectre {
       auto P_r = std::get<0>(tup);
       auto P = std::get<1>(tup);
       Real error = (P_r - P).norm();
+      if (error >= tol) {
+        std::cout << "error = " << error << " >= " << tol << " = tol" << std::endl;
+        std::cout << "P(0) =" << std::endl << P_r << std::endl;
+        std::cout << "P(1) =" << std::endl << P   << std::endl;
+      }
       BOOST_CHECK_LT(error, tol);
 
       auto K_r = std::get<2>(tup);

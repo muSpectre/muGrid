@@ -104,12 +104,11 @@ namespace muSpectre {
     if (rdr < tol2) {
       this->converged=true;
     } else {
-      Real * a = nullptr;
       std::stringstream err {};
       err << " After " << this->counter << " steps, the solver "
           << " FAILED with  |r|/|b| = "
           << std::setw(15) << std::sqrt(rdr/rhs_norm2)
-          << ", cg_tol = " << this->tol << *a << std::endl;
+          << ", cg_tol = " << this->tol << std::endl;
       throw ConvergenceError("Conjugate gradient has not converged." + err.str());
     }
     return x_0;
