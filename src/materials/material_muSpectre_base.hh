@@ -54,24 +54,38 @@ namespace muSpectre {
   /**
    * material traits are used by `muSpectre::MaterialMuSpectre` to
    * break the circular dependence created by the curiously recurring
-   * template parameter
+   * template parameter. These traits must define
+   * - these `muSpectre::FieldMap`s:
+   *   - `StrainMap_t`: typically a `muSpectre::MatrixFieldMap` for a
+   *                    constant second-order `muSpectre::TensorField`
+   *   - `StressMap_t`: typically a `muSpectre::MatrixFieldMap` for a
+   *                    writable secord-order `muSpectre::TensorField`
+   *   - `TangentMap_t`: typically a `muSpectre::T4MatrixFieldMap` for a
+   *                     writable fourth-order `muSpectre::TensorField`
+   * - `strain_measure`: the expected strain type (will be replaced by the
+   *                     small-strain tensor ε
+   *                     `muspectre::StrainMeasure::Infinitesimal` in small
+   *                     strain computations)
+   * - `stress_measure`: the measure of the returned stress. Is used by
+   *                     `muspectre::MaterialMuSpectre` to transform it into
+   *                     Cauchy stress (`muspectre::StressMeasure::Cauchy`) in
+   *                     small-strain computations and into first 
+   *                     Piola-Kirchhoff stress `muspectre::StressMeasure::PK1`
+   *                     in finite-strain computations
+   * - `InternalVariables`: a tuple of `muSpectre::FieldMap`s containing 
+   *                        internal variables
    */
   template <class Material>
   struct MaterialMuSpectre_traits {
+
   };
 
   template <class Material, Dim_t DimS, Dim_t DimM>
   class MaterialMuSpectre;
 
   /**
-   * Specialisation for materials without internal variables to inherit from
+   * Base class for most convenient implementation of materials
    */
-  template <>
-  struct MaterialMuSpectre_traits<void> {
-    using DefaultInternalVariables = std::tuple<>;//!< no internals by default
-  };
-
-  //! 'Material' is a CRTP
   template <class Material, Dim_t DimS, Dim_t DimM>
   class MaterialMuSpectre: public MaterialBase<DimS, DimM>
   {
@@ -92,8 +106,6 @@ namespace muSpectre {
     //! expected type for tangent stiffness fields
     using TangentField_t = typename Parent::TangentField_t;
 
-    //! by default, inheriting classes have no internal variables
-    using DefaultInternalVariables = std::tuple<>;
     //! traits for the CRTP subclass
     using traits = MaterialMuSpectre_traits<Material>;
 
@@ -178,11 +190,11 @@ namespace muSpectre {
   MaterialMuSpectre<Material, DimS, DimM>::
   MaterialMuSpectre(std::string name)
     :Parent(name) {
-    using stress_compatible = typename Material::StressMap_t::
+    using stress_compatible = typename traits::StressMap_t::
       template is_compatible<StressField_t>;
-    using strain_compatible = typename Material::StrainMap_t::
+    using strain_compatible = typename traits::StrainMap_t::
       template is_compatible<StrainField_t>;
-    using tangent_compatible = typename Material::TangentMap_t::
+    using tangent_compatible = typename traits::TangentMap_t::
       template is_compatible<TangentField_t>;
 
     static_assert((stress_compatible::value &&
@@ -285,14 +297,14 @@ namespace muSpectre {
        The internal_variables tuple contains whatever internal variables
        Material declared (e.g., eigenstrain, strain rate, etc.)
     */
-    using Strains_t = std::tuple<typename Material::Strain_t>;
-    using Stresses_t = std::tuple<typename Material::Stress_t,
-                                  typename Material::Tangent_t>;
+    using Strains_t = std::tuple<typename traits::StrainMap_t::reference>;
+    using Stresses_t = std::tuple<typename traits::StressMap_t::reference,
+                                  typename traits::TangentMap_t::reference>;
     auto constitutive_law_small_strain = [this]
       (Strains_t Strains, Stresses_t Stresses, auto && internal_variables) {
       constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
       constexpr StrainMeasure expected_strain_m{
-      get_formulation_strain_type(Form, Material::strain_measure)};
+      get_formulation_strain_type(Form, traits::strain_measure)};
 
       auto & this_mat = static_cast<Material&>(*this);
 
@@ -312,7 +324,7 @@ namespace muSpectre {
       (Strains_t Strains, Stresses_t Stresses, auto && internal_variables) {
       constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
       constexpr StrainMeasure expected_strain_m{
-      get_formulation_strain_type(Form, Material::strain_measure)};
+      get_formulation_strain_type(Form, traits::strain_measure)};
       auto & this_mat = static_cast<Material&>(*this);
 
       // Transformation gradient is first in the strains tuple
@@ -335,7 +347,7 @@ namespace muSpectre {
           internal_variables);
       auto && stress = std::get<0>(stress_tgt);
       auto && tangent = std::get<1>(stress_tgt);
-      Stresses = MatTB::PK1_stress<Material::stress_measure, Material::strain_measure>
+      Stresses = MatTB::PK1_stress<traits::stress_measure, traits::strain_measure>
       (std::move(grad),
        std::move(stress),
        std::move(tangent));
@@ -352,17 +364,17 @@ namespace muSpectre {
 
       //auto && stress_tgt = std::get<0>(tuples);
       //auto && inputs = std::get<1>(tuples);TODO:clean this
-      static_assert(std::is_same<typename Material::Strain_t,
+      static_assert(std::is_same<typename traits::StrainMap_t::reference,
                     std::remove_reference_t<
                     decltype(std::get<0>(std::get<0>(arglist)))>>::value,
                     "Type mismatch for strain reference, check iterator "
                     "value_type");
-      static_assert(std::is_same<typename Material::Stress_t,
+      static_assert(std::is_same<typename traits::StressMap_t::reference,
                     std::remove_reference_t<
                     decltype(std::get<0>(std::get<1>(arglist)))>>::value,
                     "Type mismatch for stress reference, check iterator"
                     "value_type");
-      static_assert(std::is_same<typename Material::Tangent_t,
+      static_assert(std::is_same<typename traits::TangentMap_t::reference,
                     std::remove_reference_t<
                     decltype(std::get<1>(std::get<1>(arglist)))>>::value,
                     "Type mismatch for tangent reference, check iterator"
@@ -398,21 +410,21 @@ namespace muSpectre {
        Material declared (e.g., eigenstrain, strain rate, etc.)
     */
 
-    using Strains_t = std::tuple<typename Material::Strain_t>;
-    using Stresses_t = std::tuple<typename Material::Stress_t>;
+    using Strains_t = std::tuple<typename traits::StrainMap_t::reference>;
+    using Stresses_t = std::tuple<typename traits::StressMap_t::reference>;
     auto constitutive_law_small_strain = [this]
       (Strains_t Strains, Stresses_t Stresses, auto && internal_variables) {
       constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
       constexpr StrainMeasure expected_strain_m{
-      get_formulation_strain_type(Form, Material::strain_measure)};
+      get_formulation_strain_type(Form, traits::strain_measure)};
 
       auto & this_mat = static_cast<Material&>(*this);
 
       // Transformation gradient is first in the strains tuple
-      auto && F = std::get<0>(Strains);
+      auto & F = std::get<0>(Strains);
       auto && strain = MatTB::convert_strain<stored_strain_m, expected_strain_m>(F);
       // return value contains a tuple of rvalue_refs to both stress and tangent moduli
-      auto && sigma = std::get<0>(Stresses);
+      auto & sigma = std::get<0>(Stresses);
       sigma =
         apply([&strain, &this_mat] (auto && ... internals) {
             return
@@ -425,11 +437,11 @@ namespace muSpectre {
       (Strains_t Strains, Stresses_t && Stresses, auto && internal_variables) {
       constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
       constexpr StrainMeasure expected_strain_m{
-      get_formulation_strain_type(Form, Material::strain_measure)};
+      get_formulation_strain_type(Form, traits::strain_measure)};
       auto & this_mat = static_cast<Material&>(*this);
 
       // Transformation gradient is first in the strains tuple
-      auto && F = std::get<0>(Strains);
+      auto & F = std::get<0>(Strains);
       auto && strain = MatTB::convert_strain<stored_strain_m, expected_strain_m>(F);
 
       // TODO: Figure this out: I can't std::move(internals...),
@@ -446,8 +458,8 @@ namespace muSpectre {
             this_mat.evaluate_stress(std::move(strain),
                                      internals...);},
           internal_variables);
-      auto && P = get<0>(Stresses);
-      P = MatTB::PK1_stress<Material::stress_measure, Material::strain_measure>
+      auto & P = get<0>(Stresses);
+      P = MatTB::PK1_stress<traits::stress_measure, traits::strain_measure>
       (F, stress);
     };
 
@@ -463,12 +475,12 @@ namespace muSpectre {
 
       //auto && stress_tgt = std::get<0>(tuples);
       //auto && inputs = std::get<1>(tuples);TODO:clean this
-      static_assert(std::is_same<typename Material::Strain_t,
+      static_assert(std::is_same<typename traits::StrainMap_t::reference,
                     std::remove_reference_t<
                     decltype(std::get<0>(std::get<0>(arglist)))>>::value,
                     "Type mismatch for strain reference, check iterator "
                     "value_type");
-      static_assert(std::is_same<typename Material::Stress_t,
+      static_assert(std::is_same<typename traits::StressMap_t::reference,
                     std::remove_reference_t<
                     decltype(std::get<0>(std::get<1>(arglist)))>>::value,
                     "Type mismatch for stress reference, check iterator"
@@ -529,20 +541,20 @@ namespace muSpectre {
        internals{material.get_internals()}{};
 
     //! Expected type for strain fields
-    using StrainMap_t = typename Material::StrainMap_t;
+    using StrainMap_t = typename traits::StrainMap_t;
     //! Expected type for stress fields
-    using StressMap_t = typename Material::StressMap_t;
+    using StressMap_t = typename traits::StressMap_t;
     //! Expected type for tangent stiffness fields
-    using TangentMap_t = typename Material::TangentMap_t;
+    using TangentMap_t = typename traits::TangentMap_t;
     //! expected type for strain values
-    using Strain_t = typename Material::Strain_t;
+    using Strain_t = typename traits::StrainMap_t::reference;
     //! expected type for stress values
-    using Stress_t = typename Material::Stress_t;
+    using Stress_t = typename traits::StressMap_t::reference;
     //! expected type for tangent stiffness values
-    using Tangent_t = typename Material::Tangent_t;
+    using Tangent_t = typename traits::TangentMap_t::reference;
 
     //! tuple of intervnal variables, depends on the material
-    using InternalVariables = typename Material::InternalVariables;
+    using InternalVariables = typename traits::InternalVariables;
     //! tuple containing a stress and possibly a tangent stiffness field
     using StressFieldTup = std::conditional_t
       <(NeedTgt == NeedTangent::yes),

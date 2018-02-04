@@ -26,9 +26,6 @@
  */
 
 #include "materials/material_linear_elastic1.hh"
-#include "common/tensor_algebra.hh"
-
-#include <tuple>
 
 namespace muSpectre {
 
@@ -38,10 +35,9 @@ namespace muSpectre {
                                                            Real young,
                                                            Real poisson)
     :Parent(name), young{young}, poisson{poisson},
-     lambda{young*poisson/((1+poisson)*(1-2*poisson))},
-     mu{young/(2*(1+poisson))},
-     C{lambda*Tensors::outer<DimM>(Tensors::I2<DimM>(),Tensors::I2<DimM>()) +
-     2*mu*Tensors::I4S<DimM>()}
+     lambda{Hooke::compute_lambda(young, poisson)},
+     mu{Hooke::compute_mu(young, poisson)},
+     C{Hooke::compute_C(lambda, mu)}
   {}
 
   template class MaterialLinearElastic1<twoD, twoD>;

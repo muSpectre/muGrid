@@ -324,6 +324,67 @@ namespace muSpectre {
          std::forward<Tangent_t>(tangent));
     };
 
+    //! static inline implementation of Hooke's law
+    template <Dim_t Dim, class Strain_t, class Tangent_t>
+    struct Hooke {
+      /**
+       * compute Lamé's first constant
+       * @param young: Young's modulus
+       * @param poisson: Poisson's ratio
+       */
+      inline static constexpr Real
+      compute_lambda(const Real & young, const Real & poisson) {
+        return young*poisson/((1+poisson)*(1-2*poisson));
+      }
+
+      /**
+       * compute Lamé's second constant (i.e., shear modulus)
+       * @param young: Young's modulus
+       * @param poisson: Poisson's ratio
+       */
+      inline static constexpr Real
+      compute_mu(const Real & young, const Real & poisson) {
+        return young/(2*(1+poisson));
+      }
+
+      /**
+       * compute the stiffness tensor
+       * @param lambda: Lamé's first constant
+       * @param mu: Lamé's second constant (i.e., shear modulus)
+       */
+      inline static Eigen::TensorFixedSize<Real, Eigen::Sizes<Dim, Dim, Dim, Dim>>
+      compute_C(const Real & lambda, const Real & mu) {
+        return lambda*Tensors::outer<Dim>(Tensors::I2<Dim>(),Tensors::I2<Dim>()) +
+          2*mu*Tensors::I4S<Dim>();
+      }
+
+      /**
+       * return stress
+       * @param lambda: First Lamé's constant
+       * @param mu: Second Lamé's constant (i.e. shear modulus)
+       * @param E: Green-Lagrange or small strain tensor
+       */
+      template <class s_t>
+      inline static decltype(auto)
+      evaluate_stress(const Real & lambda, const Real & mu, s_t && E) {
+        return E.trace()*lambda * Strain_t::Identity() + 2*mu*E;
+      }
+
+      /**
+       * return stress and tangent stiffness
+       * @param lambda: First Lamé's constant
+       * @param mu: Second Lamé's constant (i.e. shear modulus)
+       * @param E: Green-Lagrange or small strain tensor
+       */
+      template <class s_t>
+      inline static decltype(auto)
+      evaluate_stress(const Real & lambda, const Real & mu,
+                      Tangent_t && C, s_t && E) {
+        return std::make_tuple
+          (std::move(evaluate_stress(lambda, mu, std::move(E))),
+           std::move(C));
+      }
+    };
 
   }  // MatTB
 

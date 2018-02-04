@@ -140,9 +140,9 @@ namespace muSpectre {
                   "oh oh");
     static_assert(std::is_same<decltype(Kr), decltype(K)&>::value,
                   "oh oh");
-
+    using traits = MaterialMuSpectre_traits<typename Fix::Mat_t>;
     { // block to contain not-constant gradient map
-      typename Fix::Mat_t::StressMap_t grad_map
+      typename traits::StressMap_t grad_map
         (globalfields["Transformation Gradient"]);
       for (auto F_: grad_map) {
         F_.setRandom();
@@ -169,9 +169,9 @@ namespace muSpectre {
                                  globalfields["Tangent Moduli"],
                                  Formulation::finite_strain);
 
-    typename Fix::Mat_t::StrainMap_t Fmap(globalfields["Transformation Gradient"]);
-    typename Fix::Mat_t::StressMap_t Pmap_ref(globalfields["Nominal Stress reference"]);
-    typename Fix::Mat_t::TangentMap_t Kmap_ref(globalfields["Tangent Moduli reference"]);
+    typename traits::StrainMap_t Fmap(globalfields["Transformation Gradient"]);
+    typename traits::StressMap_t Pmap_ref(globalfields["Nominal Stress reference"]);
+    typename traits::TangentMap_t Kmap_ref(globalfields["Tangent Moduli reference"]);
 
     for (auto tup: akantu::zip(Fmap, Pmap_ref, Kmap_ref)) {
       auto F_ = std::get<0>(tup);
@@ -181,7 +181,7 @@ namespace muSpectre {
         (Fix::lambda, Fix::mu, F_);
     }
 
-    typename Fix::Mat_t::StressMap_t Pmap_1(globalfields["Nominal Stress1"]);
+    typename traits::StressMap_t Pmap_1(globalfields["Nominal Stress1"]);
     for (auto tup: akantu::zip(Pmap_ref, Pmap_1)) {
       auto P_r = std::get<0>(tup);
       auto P_1 = std::get<1>(tup);
@@ -189,8 +189,8 @@ namespace muSpectre {
       BOOST_CHECK_LT(error, tol);
     }
 
-    typename Fix::Mat_t::StressMap_t Pmap_2(globalfields["Nominal Stress2"]);
-    typename Fix::Mat_t::TangentMap_t Kmap(globalfields["Tangent Moduli"]);
+    typename traits::StressMap_t Pmap_2(globalfields["Nominal Stress2"]);
+    typename traits::TangentMap_t Kmap(globalfields["Tangent Moduli"]);
     for (auto tup: akantu::zip(Pmap_ref, Pmap_2, Kmap_ref, Kmap)) {
       auto P_r = std::get<0>(tup);
       auto P = std::get<1>(tup);
