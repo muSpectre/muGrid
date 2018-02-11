@@ -1,5 +1,5 @@
 /**
-* @file   material_base.hh
+ * @file   material_base.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -88,7 +88,7 @@ namespace muSpectre {
      *  (as, e.g. for eigenstrain), we need to pass more parameters. Materials
      *  of this tye need to overload add_pixel
      */
-    void add_pixel(const Ccoord & ccooord);
+    virtual void add_pixel(const Ccoord & ccooord);
 
     //! allocate memory, etc, but also: wipe history variables!
     virtual void initialise(bool stiffness = false) = 0;

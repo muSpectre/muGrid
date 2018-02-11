@@ -1,5 +1,5 @@
 /**
-* @file   test_projection_finite.cc
+ * @file   test_projection_finite.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *

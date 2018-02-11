@@ -1,5 +1,5 @@
 /**
-* @file   bind_py_solver.cc
+ * @file   bind_py_solver.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -94,24 +94,26 @@ void add_newton_cg_helper(py::module & mod) {
 
   mod.def(name,
           [](sys & s, const grad & g, solver & so, Real nt,
-             Dim_t verb) -> OptimizeResult {
-            return newton_cg(s, g, so, nt, verb);
+             Real eqt, Dim_t verb) -> OptimizeResult {
+            return newton_cg(s, g, so, nt, eqt, verb);
 
           },
           "system"_a,
           "ΔF₀"_a,
           "solver"_a,
           "newton_tol"_a,
+          "equil_tol"_a,
           "verbose"_a=0);
   mod.def(name,
           [](sys & s, const grad_vec & g, solver & so, Real nt,
-             Dim_t verb) -> std::vector<OptimizeResult> {
-            return newton_cg(s, g, so, nt, verb);
+             Real eqt, Dim_t verb) -> std::vector<OptimizeResult> {
+            return newton_cg(s, g, so, nt, eqt, verb);
           },
           "system"_a,
           "ΔF₀"_a,
           "solver"_a,
           "newton_tol"_a,
+          "equilibrium_tol"_a,
           "verbose"_a=0);
 }
 
@@ -120,30 +122,32 @@ void add_de_geus_helper(py::module & mod) {
   const char name []{"de_geus"};
   constexpr Dim_t mdim{sdim};
   using sys = SystemBase<sdim, mdim>;
-  using solver = SolverBase<sdim, mdim>; 
+  using solver = SolverBase<sdim, mdim>;
   using grad = Grad_t<sdim>;
   using grad_vec = GradIncrements<sdim>;
 
   mod.def(name,
           [](sys & s, const grad & g, solver & so, Real nt,
-             Dim_t verb) -> OptimizeResult {
-            return de_geus(s, g, so, nt, verb);
+             Real eqt, Dim_t verb) -> OptimizeResult {
+            return de_geus(s, g, so, nt, eqt, verb);
 
           },
           "system"_a,
           "ΔF₀"_a,
           "solver"_a,
           "newton_tol"_a,
+          "equilibrium_tol"_a,
           "verbose"_a=0);
   mod.def(name,
           [](sys & s, const grad_vec & g, solver & so, Real nt,
-             Dim_t verb) -> std::vector<OptimizeResult> {
-            return de_geus(s, g, so, nt, verb);
+             Real eqt, Dim_t verb) -> std::vector<OptimizeResult> {
+            return de_geus(s, g, so, nt, eqt, verb);
           },
           "system"_a,
           "ΔF₀"_a,
           "solver"_a,
           "newton_tol"_a,
+          "equilibrium_tol"_a,
           "verbose"_a=0);
 }
 

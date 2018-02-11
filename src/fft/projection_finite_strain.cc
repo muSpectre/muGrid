@@ -1,5 +1,5 @@
 /**
-* @file   projection_finite_strain.cc
+ * @file   projection_finite_strain.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  *

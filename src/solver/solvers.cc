@@ -1,5 +1,5 @@
 /**
-* @file   solvers.cc
+ * @file   solvers.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -40,8 +40,8 @@ namespace muSpectre {
   std::vector<OptimizeResult>
   de_geus (SystemBase<DimS, DimM> & sys, const GradIncrements<DimM> & delFs,
            SolverBase<DimS, DimM> & solver, Real newton_tol,
+           Real equil_tol,
            Dim_t verbose) {
-
     using Field_t = typename MaterialBase<DimS, DimM>::StrainField_t;
     auto solver_fields{std::make_unique<GlobalFieldCollection<DimS, DimM>>()};
     solver_fields->initialise(sys.get_resolutions());
@@ -127,13 +127,25 @@ namespace muSpectre {
     Grad_t<DimM> previous_grad{Grad_t<DimM>::Zero()};
     for (const auto & delF: delFs) { //incremental loop
 
+      std::string message{"Has not converged"};
       Real incrNorm{2*newton_tol}, gradNorm{1};
-      auto convergence_test = [&incrNorm, &gradNorm, &newton_tol] () {
-        return incrNorm/gradNorm <= newton_tol;
+      Real stressNorm{2*equil_tol};
+      bool has_converged{false};
+      auto convergence_test = [&incrNorm, &gradNorm, &newton_tol,
+                               &stressNorm, &equil_tol, &message, &has_converged] () {
+        bool incr_test = incrNorm/gradNorm <= newton_tol;
+        bool stress_test = stressNorm < equil_tol;
+        if (incr_test) {
+          message = "Residual  tolerance reached";
+        } else if (stress_test) {
+          message = "Reached stress divergence tolerance";
+        }
+        has_converged = incr_test || stress_test;
+        return has_converged;
       };
       Uint newt_iter{0};
       for (;
-           (newt_iter < solver.get_maxiter()) && (!convergence_test() ||
+           (newt_iter < solver.get_maxiter()) && (!has_converged ||
                                      (newt_iter==1));
            ++newt_iter) {
 
@@ -150,11 +162,19 @@ namespace muSpectre {
         if (newt_iter == 0) {
           DeltaF.get_map() = -(delF-previous_grad); // neg sign because rhs
           tangent_effect(DeltaF, rhs);
+          stressNorm = rhs.eigen().matrix().norm();
+          if (convergence_test()) {
+            break;
+          }
           incrF.eigenvec() = solver.solve(rhs.eigenvec(), incrF.eigenvec());
           F.eigen() -= DeltaF.eigen();
         } else {
           rhs.eigen() = -P.eigen();
           sys.project(rhs);
+          stressNorm = rhs.eigen().matrix().norm();
+          if (convergence_test()) {
+            break;
+          }
           incrF.eigen() = 0;
           incrF.eigenvec() = solver.solve(rhs.eigenvec(), incrF.eigenvec());
         }
@@ -173,13 +193,15 @@ namespace muSpectre {
                       << F.get_map().mean() << std::endl;
           }
         }
+        convergence_test();
+
       }
       // update previous gradient
       previous_grad = delF;
 
       ret_val.push_back(OptimizeResult{F.eigen(), sys.get_stress().eigen(),
-            convergence_test(), Int(convergence_test()),
-            "message not yet implemented",
+            has_converged, Int(has_converged),
+            message,
             newt_iter, solver.get_counter()});
 
 
@@ -195,6 +217,7 @@ namespace muSpectre {
   template std::vector<OptimizeResult>
   de_geus (SystemBase<twoD, twoD> & sys, const GradIncrements<twoD>& delF0,
            SolverBase<twoD, twoD> & solver, Real newton_tol,
+           Real equil_tol,
            Dim_t verbose);
 
   // template typename SystemBase<twoD, threeD>::StrainField_t &
@@ -206,6 +229,7 @@ namespace muSpectre {
   template std::vector<OptimizeResult>
   de_geus (SystemBase<threeD, threeD> & sys, const GradIncrements<threeD>& delF0,
            SolverBase<threeD, threeD> & solver, Real newton_tol,
+           Real equil_tol,
            Dim_t verbose);
 
   /* ---------------------------------------------------------------------- */
@@ -213,6 +237,7 @@ namespace muSpectre {
   std::vector<OptimizeResult>
   newton_cg (SystemBase<DimS, DimM> & sys, const GradIncrements<DimM> & delFs,
              SolverBase<DimS, DimM> & solver, Real newton_tol,
+             Real equil_tol,
              Dim_t verbose) {
     using Field_t = typename MaterialBase<DimS, DimM>::StrainField_t;
     auto solver_fields{std::make_unique<GlobalFieldCollection<DimS, DimM>>()};
@@ -299,14 +324,26 @@ namespace muSpectre {
         grad += delF - previous_grad;
       }
 
+      std::string message{"Has not converged"};
       Real incrNorm{2*newton_tol}, gradNorm{1};
-      auto convergence_test = [&incrNorm, &gradNorm, &newton_tol] () {
-        return incrNorm/gradNorm <= newton_tol;
+      Real stressNorm{2*equil_tol};
+      bool has_converged{false};
+      auto convergence_test = [&incrNorm, &gradNorm, &newton_tol,
+                               &stressNorm, &equil_tol, &message, &has_converged] () {
+        bool incr_test = incrNorm/gradNorm <= newton_tol;
+        bool stress_test = stressNorm < equil_tol;
+        if (incr_test) {
+          message = "Residual  tolerance reached";
+        } else if (stress_test) {
+          message = "Reached stress divergence tolerance";
+        }
+        has_converged = incr_test || stress_test;
+        return has_converged;
       };
       Uint newt_iter{0};
 
       for (;
-           newt_iter < solver.get_maxiter() && !convergence_test();
+           newt_iter < solver.get_maxiter() && !has_converged;
            ++newt_iter) {
 
         // obtain material response
@@ -315,7 +352,12 @@ namespace muSpectre {
 
         rhs.eigen() = -P.eigen();
         sys.project(rhs);
+        stressNorm = rhs.eigen().matrix().norm();
+        if (convergence_test()) {
+          break;
+        }
         incrF.eigen() = 0;
+
         incrF.eigenvec() = solver.solve(rhs.eigenvec(), incrF.eigenvec());
 
 
@@ -334,6 +376,7 @@ namespace muSpectre {
                       << F.get_map().mean() << std::endl;
           }
         }
+        convergence_test();
 
       }
       // update previous gradient
@@ -341,7 +384,7 @@ namespace muSpectre {
 
       ret_val.push_back(OptimizeResult{F.eigen(), sys.get_stress().eigen(),
             convergence_test(), Int(convergence_test()),
-            "message not yet implemented",
+            message,
             newt_iter, solver.get_counter()});
 
       //store history variables here
@@ -356,6 +399,7 @@ namespace muSpectre {
   template std::vector<OptimizeResult>
   newton_cg (SystemBase<twoD, twoD> & sys, const GradIncrements<twoD>& delF0,
              SolverBase<twoD, twoD> & solver, Real newton_tol,
+             Real equil_tol,
              Dim_t verbose);
 
   // template typename SystemBase<twoD, threeD>::StrainField_t &
@@ -367,13 +411,15 @@ namespace muSpectre {
   template std::vector<OptimizeResult>
   newton_cg (SystemBase<threeD, threeD> & sys, const GradIncrements<threeD>& delF0,
              SolverBase<threeD, threeD> & solver, Real newton_tol,
+             Real equil_tol,
              Dim_t verbose);
 
 
   /* ---------------------------------------------------------------------- */
   bool check_symmetry(const Eigen::Ref<const Eigen::ArrayXXd>& eps,
                       Real rel_tol){
-    return rel_tol >= (eps-eps.transpose()).matrix().norm()/eps.matrix().norm();
+    return (rel_tol >= (eps-eps.transpose()).matrix().norm()/eps.matrix().norm() ||
+            rel_tol >= eps.matrix().norm());
   }
 
 

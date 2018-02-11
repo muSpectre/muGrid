@@ -1,5 +1,5 @@
 /**
-* @file   utilities.hh
+ * @file   utilities.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *

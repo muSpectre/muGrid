@@ -1,5 +1,5 @@
 /**
-* @file   fft_utils.cc
+ * @file   fft_utils.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  *

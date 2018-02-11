@@ -1,11 +1,11 @@
 /**
-* @file   material_hyper_elastic1.cc
+ * @file   material_linear_elastic1.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   14 Nov 2017
  *
- * @brief  Implementation for materialhyperelastic1
+ * @brief  Implementation for materiallinearelastic1
  *
  * Copyright © 2017 Till Junge
  *
@@ -25,27 +25,23 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include "materials/material_hyper_elastic1.hh"
-#include "common/tensor_algebra.hh"
-
-#include <tuple>
+#include "materials/material_linear_elastic1.hh"
 
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  MaterialHyperElastic1<DimS, DimM>::MaterialHyperElastic1(std::string name,
+  MaterialLinearElastic1<DimS, DimM>::MaterialLinearElastic1(std::string name,
                                                            Real young,
                                                            Real poisson)
     :Parent(name), young{young}, poisson{poisson},
-     lambda{young*poisson/((1+poisson)*(1-2*poisson))},
-     mu{young/(2*(1+poisson))},
-     C{lambda*Tensors::outer<DimM>(Tensors::I2<DimM>(),Tensors::I2<DimM>()) +
-     2*mu*Tensors::I4S<DimM>()}
+     lambda{Hooke::compute_lambda(young, poisson)},
+     mu{Hooke::compute_mu(young, poisson)},
+     C{Hooke::compute_C(lambda, mu)}
   {}
 
-  template class MaterialHyperElastic1<twoD, twoD>;
-  template class MaterialHyperElastic1<twoD, threeD>;
-  template class MaterialHyperElastic1<threeD, threeD>;
+  template class MaterialLinearElastic1<twoD, twoD>;
+  template class MaterialLinearElastic1<twoD, threeD>;
+  template class MaterialLinearElastic1<threeD, threeD>;
 
 }  // muSpectre

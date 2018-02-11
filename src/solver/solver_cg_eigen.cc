@@ -1,5 +1,5 @@
 /**
-* @file   solver_cg_eigen.cc
+ * @file   solver_cg_eigen.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *

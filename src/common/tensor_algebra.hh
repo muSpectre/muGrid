@@ -1,5 +1,5 @@
 /**
-* @file   tensor_algebra.hh
+ * @file   tensor_algebra.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *

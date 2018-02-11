@@ -1,11 +1,13 @@
 /**
- * @file   projection_default.cc
+ * @file   material_linear_elastic_eigenstrain.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
- * @date   14 Jan 2018
+ * @date   04 Feb 2018
  *
- * @brief  Implementation default projection implementation
+ * @brief  implementation for linear elastic material with eigenstrain
+ *
+ * @section LICENSE
  *
  * Copyright © 2018 Till Junge
  *
@@ -25,41 +27,39 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include "fft/projection_default.hh"
-#include "fft/fft_engine_base.hh"
-
+#include "materials/material_linear_elastic2.hh"
 
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  ProjectionDefault<DimS, DimM>::ProjectionDefault(FFT_Engine_ptr engine,
-                                                   Formulation form)
-    :Parent{std::move(engine), form},
-     Gfield{make_field<Proj_t>("Projection Operator",
-                               this->projection_container)},
-     Ghat{Gfield}
-  {}
+  MaterialLinearElastic2<DimS, DimM>::
+  MaterialLinearElastic2(std::string name, Real young, Real poisson)
+    :Parent{name}, material{name, young, poisson},
+     eigen_field{make_field<Field_t>("Eigenstrain", this->internal_fields)},
+     internal_variables(eigen_field.get_const_map())
+    {}
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void ProjectionDefault<DimS, DimM>::apply_projection(Field_t & field) {
-    Vector_map field_map{this->fft_engine->fft(field)};
-    Real factor = this->fft_engine->normalisation();
-    for (auto && tup: akantu::zip(this->Ghat, field_map)) {
-      auto & G{std::get<0>(tup)};
-      auto & f{std::get<1>(tup)};
-      f = factor * (G*f).eval();
-    }
-    this->fft_engine->ifft(field);
+  void MaterialLinearElastic2<DimS, DimM>::
+  add_pixel(const Ccoord_t<DimS> & /*pixel*/) {
+    throw std::runtime_error
+      ("this material needs pixels with and eigenstrain");
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  Eigen::Map<Eigen::ArrayXXd> ProjectionDefault<DimS, DimM>::get_operator() {
-    return this->Gfield.dyn_eigen();
+  void MaterialLinearElastic2<DimS, DimM>::
+  add_pixel(const Ccoord_t<DimS> & pixel,
+            const StrainTensor & E_eig) {
+    this->internal_fields.add_pixel(pixel);
+    Eigen::Map<const Eigen::Array<Real, DimM*DimM, 1>> strain_array(E_eig.data());
+    this->eigen_field.push_back(strain_array);
   }
 
-  template class ProjectionDefault<twoD,   twoD>;
-  template class ProjectionDefault<threeD, threeD>;
+  template class MaterialLinearElastic2<twoD, twoD>;
+  template class MaterialLinearElastic2<twoD, threeD>;
+  template class MaterialLinearElastic2<threeD, threeD>;
+
 }  // muSpectre

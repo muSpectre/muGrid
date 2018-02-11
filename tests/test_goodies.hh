@@ -1,5 +1,5 @@
 /**
-* @file   test_goodies.hh
+ * @file   test_goodies.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *

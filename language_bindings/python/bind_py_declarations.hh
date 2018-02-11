@@ -1,5 +1,5 @@
 /**
-* @file   bind_py_common.hh
+ * @file   bind_py_common.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *

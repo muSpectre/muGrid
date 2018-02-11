@@ -1,5 +1,5 @@
 /**
-* @file   ccoord_operations.hh
+ * @file   ccoord_operations.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *

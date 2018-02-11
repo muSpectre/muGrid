@@ -1,5 +1,5 @@
 /**
-* @file   system_base.cc
+ * @file   system_base.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *

@@ -1,5 +1,5 @@
 /**
-* @file   field_collection_global.hh
+ * @file   field_collection_global.hh
  *
  * @author Till Junge <till.junge@altermail.ch>
  *

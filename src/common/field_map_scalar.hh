@@ -1,5 +1,5 @@
 /**
-* @file   field_map_scalar.hh
+ * @file   field_map_scalar.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *

@@ -1,5 +1,5 @@
 /**
-* @file   test_fftw_engine.cc
+ * @file   test_fftw_engine.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *

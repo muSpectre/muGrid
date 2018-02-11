@@ -1,5 +1,5 @@
 /**
-* @file   test_system_base.cc
+ * @file   test_system_base.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -35,7 +35,7 @@
 #include "common/field_map.hh"
 #include "tests/test_goodies.hh"
 #include "system/system_factory.hh"
-#include "materials/material_hyper_elastic1.hh"
+#include "materials/material_linear_elastic1.hh"
 
 
 namespace muSpectre {
@@ -104,7 +104,7 @@ namespace muSpectre {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(add_material_test, fix, fixlist, fix) {
     constexpr Dim_t dim{fix::sdim};
-    using Material_t = MaterialHyperElastic1<dim, dim>;
+    using Material_t = MaterialLinearElastic1<dim, dim>;
     auto Material_hard = std::make_unique<Material_t>("hard", 210e9, .33);
     BOOST_CHECK_NO_THROW(fix::add_material(std::move(Material_hard)));
   }
@@ -112,7 +112,7 @@ namespace muSpectre {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(simple_evaluation_test, fix, fixlist, fix) {
     constexpr Dim_t dim{fix::sdim};
     constexpr Formulation form{fix::formulation};
-    using Mat_t = MaterialHyperElastic1<dim, dim>;
+    using Mat_t = MaterialLinearElastic1<dim, dim>;
     const Real Young{210e9}, Poisson{.33};
     const Real lambda{Young*Poisson/((1+Poisson)*(1-2*Poisson))};
     const Real mu{Young/(2*(1+Poisson))};
@@ -165,7 +165,7 @@ namespace muSpectre {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(evaluation_test, fix, fixlist, fix) {
     constexpr Dim_t dim{fix::sdim};
-    using Mat_t = MaterialHyperElastic1<dim, dim>;
+    using Mat_t = MaterialLinearElastic1<dim, dim>;
     auto Material_hard = std::make_unique<Mat_t>("hard", 210e9, .33);
     auto Material_soft = std::make_unique<Mat_t>("soft",  70e9, .3);
 

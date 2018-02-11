@@ -1,5 +1,5 @@
 /**
-* @file   field.hh
+ * @file   field.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -431,6 +431,13 @@ namespace muSpectre {
      * create other types of maps, as long as they have the right
      * fundamental type (T) and the correct size (nbComponents).
      */
+    decltype(auto) get_const_map();
+    /**
+     * Pure convenience functions to get a MatrixFieldMap of
+     * appropriate dimensions mapped to this field. You can also
+     * create other types of maps, as long as they have the right
+     * fundamental type (T) and the correct size (nbComponents).
+     */
     decltype(auto) get_map() const;
 
   protected:
@@ -495,6 +502,8 @@ namespace muSpectre {
 
     //! returns the default map type
     decltype(auto) get_map();
+    //! returns the default map type
+    decltype(auto) get_const_map();
     //! returns the default map type
     decltype(auto) get_map() const;
 
@@ -896,6 +905,17 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <class FieldCollection, typename T, Dim_t order, Dim_t dim>
   decltype(auto) TensorField<FieldCollection, T, order, dim>::
+  get_const_map() {
+    constexpr bool map_constness{true};
+    using RawMap_t =
+      typename internal::tensor_map_type<FieldCollection, T, order, dim,
+                                         map_constness>::type;
+    return RawMap_t(*this);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <class FieldCollection, typename T, Dim_t order, Dim_t dim>
+  decltype(auto) TensorField<FieldCollection, T, order, dim>::
   get_map() const {
     constexpr bool map_constness{true};
     using RawMap_t =
@@ -909,6 +929,17 @@ namespace muSpectre {
   decltype(auto) MatrixField<FieldCollection, T, NbRow, NbCol>::
   get_map() {
     constexpr bool map_constness{false};
+    using RawMap_t =
+      typename internal::matrix_map_type<FieldCollection, T, NbRow, NbCol,
+                                         map_constness>::type;
+    return RawMap_t(*this);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <class FieldCollection, typename T, Dim_t NbRow, Dim_t NbCol>
+  decltype(auto) MatrixField<FieldCollection, T, NbRow, NbCol>::
+  get_const_map() {
+    constexpr bool map_constness{true};
     using RawMap_t =
       typename internal::matrix_map_type<FieldCollection, T, NbRow, NbCol,
                                          map_constness>::type;

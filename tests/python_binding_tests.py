@@ -48,12 +48,12 @@ class SystemCheck(unittest.TestCase):
             sys = µ.SystemFactory(resolution,
                                   lengths,
                                   formulation)
-            mat = µ.material.MaterialHooke2d.make(sys, "material", 210e9, .33)
+            mat = µ.material.MaterialLinearElastic1_2d.make(sys, "material", 210e9, .33)
         except Exception as err:
             print(err)
             raise err
 
-class MaterialHooke2dCheck(unittest.TestCase):
+class MaterialLinearElastic1_2dCheck(unittest.TestCase):
     def setUp(self):
         self.resolution = [5,7]
         self.lengths = [5.2, 8.3]
@@ -61,7 +61,7 @@ class MaterialHooke2dCheck(unittest.TestCase):
         self.sys = µ.SystemFactory(self.resolution,
                                    self.lengths,
                                    self.formulation)
-        self.mat = µ.material.MaterialHooke2d.make(
+        self.mat = µ.material.MaterialLinearElastic1_2d.make(
             self.sys, "material", 210e9, .33)
 
     def test_add_material(self):
@@ -76,9 +76,9 @@ class SolverCheck(unittest.TestCase):
         self.sys = µ.SystemFactory(self.resolution,
                                    self.lengths,
                                    self.formulation)
-        self.hard = µ.material.MaterialHooke2d.make(
+        self.hard = µ.material.MaterialLinearElastic1_2d.make(
             self.sys, "hard", 210e9, .33)
-        self.soft = µ.material.MaterialHooke2d.make(
+        self.soft = µ.material.MaterialLinearElastic1_2d.make(
             self.sys, "soft",  70e9, .33)
 
     def test_solve(self):
@@ -94,11 +94,70 @@ class SolverCheck(unittest.TestCase):
                          [0,  0]])
         maxiter = 100
         verbose = 0
-        # the following segfaults:
+
         solver=µ.solvers.SolverCG(self.sys, tol, maxiter, verbose)
         r = µ.solvers.de_geus(self.sys, Del0,
                               solver,tol, verbose)
         #print(r)
+
+
+class EigenStrainCheck(unittest.TestCase):
+    def setUp(self):
+        self.resolution = [3, 3]#[5,7]
+        self.lengths = [3., 3.]#[5.2, 8.3]
+        self.formulation = µ.Formulation.small_strain
+        self.cell1 = µ.SystemFactory(self.resolution,
+                                    self.lengths,
+                                    self.formulation)
+        self.cell2 = µ.SystemFactory(self.resolution,
+                                    self.lengths,
+                                    self.formulation)
+        self.mat1 = µ.material.MaterialLinearElastic1_2d.make(
+            self.cell1, "simple", 210e9, .33)
+        self.mat2 = µ.material.MaterialLinearElastic2_2d.make(
+            self.cell2, "eigen", 210e9, .33)
+
+    def test_solve(self):
+        print("start test_solve")
+        grad = np.array([[1.1,  .2],
+                         [ .3, 1.5]])
+        gl_strain = -0.5*(grad.T.dot(grad) - np.eye(2))
+        gl_strain = -0.5*(grad.T + grad - 2*np.eye(2))
+        grad = -gl_strain
+        print("grad =\n{}\ngl_strain =\n{}".format(grad, gl_strain))
+        for i, pixel in enumerate(self.cell1):
+            self.mat1.add_pixel(pixel)
+            self.mat2.add_pixel(pixel, gl_strain)
+        self.cell1.initialise()
+        self.cell2.initialise()
+        tol = 1e-6
+        Del0_1 = grad
+        Del0_2 = np.zeros_like(grad)
+        maxiter = 2
+        verbose = 0
+
+        def solve(cell, grad):
+            solver=µ.solvers.SolverCG(cell, tol, maxiter, verbose)
+            r = µ.solvers.newton_cg(cell, grad,
+                                    solver, tol, tol, verbose)
+            return r
+        results = [solve(cell, del0) for (cell, del0)
+                   in zip((self.cell1, self.cell2),
+                          (Del0_1, Del0_2))]
+        P1 = results[0].stress
+        P2 = results[1].stress
+        error = np.linalg.norm(P1-P2)/np.linalg.norm(.5*(P1+P2))
+
+        print("cell 1, no eigenstrain")
+        print("P1:\n{}".format(P1[:,0]))
+        print("F1:\n{}".format(results[0].grad[:,0]))
+
+        print("cell 2, with eigenstrain")
+        print("P2:\n{}".format(P2[:,0]))
+        print("F2:\n{}".format(results[1].grad[:,0]))
+        print("end test_solve")
+        self.assertLess(error, tol)
+
 
 
 

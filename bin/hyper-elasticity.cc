@@ -27,7 +27,7 @@
 
 
 #include "system/system_factory.hh"
-#include "materials/material_hyper_elastic1.hh"
+#include "materials/material_linear_elastic1.hh"
 #include "solver/solvers.hh"
 #include "solver/solver_cg.hh"
 
@@ -51,14 +51,14 @@ int main()
   // auto E = [](Real K, Real G) {return 9*K*G / (3*K+G);}; //G is mu
   // auto nu= [](Real K, Real G) {return (3*K-2*G) / (2*(3*K+G));};
 
-  // auto & hard{MaterialHyperElastic1<dim, dim>::make(cell, "hard",
+  // auto & hard{MaterialLinearElastic1<dim, dim>::make(cell, "hard",
   //                                                   E(K_hard, mu_hard),
   //                                                   nu(K_hard, mu_hard))};
-  // auto & soft{MaterialHyperElastic1<dim, dim>::make(cell, "soft",
+  // auto & soft{MaterialLinearElastic1<dim, dim>::make(cell, "soft",
   //                                                   E(K_soft, mu_soft),
   //                                                   nu(K_soft, mu_soft))};
   Real ex{1e-5};
-  using Mat_t = MaterialHyperElastic1<dim, dim>;
+  using Mat_t = MaterialLinearElastic1<dim, dim>;
   auto & hard{Mat_t::make(cell, "hard",
                           210.*ex, .33)};
   auto & soft{Mat_t::make(cell, "soft",

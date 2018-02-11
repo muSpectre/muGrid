@@ -1,5 +1,5 @@
 /**
-* @file   fftw_engine.hh
+ * @file   fftw_engine.hh
  *
  * @author Till Junge <till.junge@altermail.ch>
  *

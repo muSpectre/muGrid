@@ -1,5 +1,5 @@
 /**
-* @file   field_map_tensor.hh
+ * @file   field_map_tensor.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *

@@ -58,7 +58,7 @@ configure_file(
   "${CMAKE_CURRENT_BINARY_DIR}/xml_output_def"
   @ONLY)
 
-add_custom_target(muSpectre_docs
+add_custom_target(dev_doc
   ${SPHINX_EXECUTABLE}
   -q -b html
   -c "${CMAKE_CURRENT_BINARY_DIR}"

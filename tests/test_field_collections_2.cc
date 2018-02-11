@@ -1,5 +1,5 @@
 /**
-* @file   test_field_collections_2.cc
+ * @file   test_field_collections_2.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *

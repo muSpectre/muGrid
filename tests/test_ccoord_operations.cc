@@ -1,5 +1,5 @@
 /**
-* @file   test_ccoord_operations.cc
+ * @file   test_ccoord_operations.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  *

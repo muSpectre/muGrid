@@ -1,11 +1,11 @@
 /**
-* @file   material_hyper_elastic1.hh
+ * @file   material_linear_elastic1.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   13 Nov 2017
  *
- * @brief  Implementation for hyperelastic reference material like in de Geus
+ * @brief  Implementation for linear elastic reference material like in de Geus
  *         2017. This follows the simplest and likely not most efficient
  *         implementation (with exception of the Python law)
  *
@@ -28,25 +28,42 @@
  */
 
 
-#ifndef MATERIAL_HYPER_ELASTIC1_H
-#define MATERIAL_HYPER_ELASTIC1_H
+#ifndef MATERIAL_LINEAR_ELASTIC1_H
+#define MATERIAL_LINEAR_ELASTIC1_H
 
 #include "common/common.hh"
 #include "materials/material_muSpectre_base.hh"
+#include "materials/materials_toolbox.hh"
 
 namespace muSpectre {
   template<Dim_t DimS, Dim_t DimM>
-  class MaterialHyperElastic1;
+  class MaterialLinearElastic1;
 
   /**
    * traits for objective linear elasticity
    */
   template <Dim_t DimS, Dim_t DimM>
-  struct MaterialMuSpectre_traits<MaterialHyperElastic1<DimS, DimM>>:
-    public MaterialMuSpectre_traits<void> {
+  struct MaterialMuSpectre_traits<MaterialLinearElastic1<DimS, DimM>> {
     using Parent = MaterialMuSpectre_traits<void>;//!< base for elasticity
+
+    //! global field collection
+    using GFieldCollection_t = typename
+      MaterialBase<DimS, DimM>::GFieldCollection_t;
+
+    //! expected map type for strain fields
+    using StrainMap_t = MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM, true>;
+    //! expected map type for stress fields
+    using StressMap_t = MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
+    //! expected map type for tangent stiffness fields
+    using TangentMap_t = T4MatrixFieldMap<GFieldCollection_t, Real, DimM>;
+
+    //! declare what type of strain measure your law takes as input
+    constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
+    //! declare what type of stress measure your law yields as output
+    constexpr static auto stress_measure{StressMeasure::PK2};
+
     //! elasticity without internal variables
-    using InternalVariables = typename Parent::DefaultInternalVariables;
+    using InternalVariables = std::tuple<>;
   };
 
   //! DimS spatial dimension (dimension of problem
@@ -55,12 +72,12 @@ namespace muSpectre {
    * implements objective linear elasticity
    */
   template<Dim_t DimS, Dim_t DimM>
-  class MaterialHyperElastic1:
-    public MaterialMuSpectre<MaterialHyperElastic1<DimS, DimM>, DimS, DimM>
+  class MaterialLinearElastic1:
+    public MaterialMuSpectre<MaterialLinearElastic1<DimS, DimM>, DimS, DimM>
   {
   public:
     //! base class
-    using Parent = MaterialMuSpectre<MaterialHyperElastic1, DimS, DimM>;
+    using Parent = MaterialMuSpectre<MaterialLinearElastic1, DimS, DimM>;
     /**
      * type used to determine whether the
      * `muSpectre::MaterialMuSpectre::iterable_proxy` evaluate only
@@ -68,54 +85,43 @@ namespace muSpectre {
      */
     using NeedTangent = typename Parent::NeedTangent;
     //! global field collection
-    using GFieldCollection_t = typename Parent::GFieldCollection_t;
-    //! declare what type of strain measure your law takes as input
-    constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
-    //! declare what type of stress measure your law yields as output
-    constexpr static auto stress_measure{StressMeasure::PK2};
-    //! declare whether the derivative of stress with respect to strain is uniform
-    constexpr static bool uniform_stiffness = true;
 
-    //! expected map type for strain fields
-    using StrainMap_t = MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM, true>;
-    //! expected map type for stress fields
-    using StressMap_t = MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
-    //! expected map type for tangent stiffness fields
-    using TangentMap_t = T4MatrixFieldMap<GFieldCollection_t, Real, DimM>;
-    //! expected type for strain values
-    using Strain_t = typename StrainMap_t::const_reference;
-    //! expected type for stressvalues
-    using Stress_t = typename StressMap_t::reference;
-    //! expected type for tangent stiffness values
-    using Tangent_t = typename TangentMap_t::reference;
-    //! type for the stiffness (actual value, not a map or reference)
     using Stiffness_t = Eigen::TensorFixedSize
       <Real, Eigen::Sizes<DimM, DimM, DimM, DimM>>;
 
+    //! traits of this material
+    using traits = MaterialMuSpectre_traits<MaterialLinearElastic1>;
+
     //! this law does not have any internal variables
-    using InternalVariables = typename Parent::DefaultInternalVariables;
+    using InternalVariables = typename traits::InternalVariables;
+
+    //! Hooke's law implementation
+    using Hooke = typename
+      MatTB::Hooke<DimM,
+                   typename traits::StrainMap_t::reference,
+                   typename traits::TangentMap_t::reference>;
 
     //! Default constructor
-    MaterialHyperElastic1() = delete;
+    MaterialLinearElastic1() = delete;
 
     //! Copy constructor
-    MaterialHyperElastic1(const MaterialHyperElastic1 &other) = delete;
+    MaterialLinearElastic1(const MaterialLinearElastic1 &other) = delete;
 
     //! Construct by name, Young's modulus and Poisson's ratio
-    MaterialHyperElastic1(std::string name, Real young, Real poisson);
+    MaterialLinearElastic1(std::string name, Real young, Real poisson);
 
 
     //! Move constructor
-    MaterialHyperElastic1(MaterialHyperElastic1 &&other) = delete;
+    MaterialLinearElastic1(MaterialLinearElastic1 &&other) = delete;
 
     //! Destructor
-    virtual ~MaterialHyperElastic1() = default;
+    virtual ~MaterialLinearElastic1() = default;
 
     //! Copy assignment operator
-    MaterialHyperElastic1& operator=(const MaterialHyperElastic1 &other) = delete;
+    MaterialLinearElastic1& operator=(const MaterialLinearElastic1 &other) = delete;
 
     //! Move assignment operator
-    MaterialHyperElastic1& operator=(MaterialHyperElastic1 &&other) = delete;
+    MaterialLinearElastic1& operator=(MaterialLinearElastic1 &&other) = delete;
 
     /**
      * evaluates second Piola-Kirchhoff stress given the Green-Lagrange
@@ -132,33 +138,52 @@ namespace muSpectre {
     template <class s_t>
     inline decltype(auto) evaluate_stress_tangent(s_t &&  E);
 
+    /**
+     * return the empty internals tuple
+     */
+    InternalVariables & get_internals() {
+      return this->internal_variables;};
+
   protected:
     const Real young;  //!< Young's modulus
     const Real poisson;//!< Poisson's ratio
     const Real lambda; //!< first Lamé constant
     const Real mu;     //!< second Lamé constant (shear modulus)
     const Stiffness_t C; //!< stiffness tensor
+    //! empty tuple
+    InternalVariables internal_variables{};
   private:
   };
-
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   template <class s_t>
   decltype(auto)
-  MaterialHyperElastic1<DimS, DimM>::evaluate_stress(s_t && E) {
-    return E.trace()*lambda * Strain_t::Identity() + 2*mu*E;
+  MaterialLinearElastic1<DimS, DimM>::evaluate_stress(s_t && E) {
+    return Hooke::evaluate_stress(this->lambda, this->mu,
+                                  std::move(E));
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   template <class s_t>
   decltype(auto)
-  MaterialHyperElastic1<DimS, DimM>::evaluate_stress_tangent(s_t && E) {
-    return std::make_tuple(std::move(this->evaluate_stress(std::move(E))),
-                           std::move(Tangent_t(const_cast<double*>(this->C.data()))));
+  MaterialLinearElastic1<DimS, DimM>::evaluate_stress_tangent(s_t && E) {
+    using Tangent_t = typename traits::TangentMap_t::reference;
+
+
+    // using mat = Eigen::Matrix<Real, DimM, DimM>;
+    // mat ecopy{E};
+    // std::cout << "E" << std::endl << ecopy << std::endl;
+    // std::cout << "P1" << std::endl << mat{
+    //   std::get<0>(Hooke::evaluate_stress(this->lambda, this->mu,
+    //                                      Tangent_t(const_cast<double*>(this->C.data())),
+    //                                      std::move(E)))} << std::endl;
+    return Hooke::evaluate_stress(this->lambda, this->mu,
+                                  Tangent_t(const_cast<double*>(this->C.data())),
+                                  std::move(E));
   }
 
 }  // muSpectre
 
-#endif /* MATERIAL_HYPER_ELASTIC1_H */
+#endif /* MATERIAL_LINEAR_ELASTIC1_H */

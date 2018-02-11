@@ -1,5 +1,5 @@
 /**
-* @file   fft_engine_base.hh
+ * @file   fft_engine_base.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
