@@ -105,7 +105,7 @@ class EigenStrainCheck(unittest.TestCase):
     def setUp(self):
         self.resolution = [3, 3]#[5,7]
         self.lengths = [3., 3.]#[5.2, 8.3]
-        self.formulation = µ.Formulation.finite_strain
+        self.formulation = µ.Formulation.small_strain
         self.cell1 = µ.SystemFactory(self.resolution,
                                     self.lengths,
                                     self.formulation)
@@ -115,19 +115,23 @@ class EigenStrainCheck(unittest.TestCase):
         self.mat1 = µ.material.MaterialLinearElastic1_2d.make(
             self.cell1, "simple", 210e9, .33)
         self.mat2 = µ.material.MaterialLinearElastic2_2d.make(
-            self.cell2, "eigen",  70e9, .33)
+            self.cell2, "eigen", 210e9, .33)
 
     def test_solve(self):
+        print("start test_solve")
         grad = np.array([[1.1,  .2],
                          [ .3, 1.5]])
-        gl_strain = -0.5*(grad*grad.T - np.eye(2))
+        gl_strain = -0.5*(grad.T.dot(grad) - np.eye(2))
+        gl_strain = -0.5*(grad.T + grad - 2*np.eye(2))
+        grad = -gl_strain
+        print("grad =\n{}\ngl_strain =\n{}".format(grad, gl_strain))
         for i, pixel in enumerate(self.cell1):
             self.mat1.add_pixel(pixel)
             self.mat2.add_pixel(pixel, gl_strain)
         self.cell1.initialise()
         self.cell2.initialise()
         tol = 1e-6
-        Del0_1 = grad-np.eye(2)
+        Del0_1 = grad
         Del0_2 = np.zeros_like(grad)
         maxiter = 2
         verbose = 0
@@ -144,10 +148,14 @@ class EigenStrainCheck(unittest.TestCase):
         P2 = results[1].stress
         error = np.linalg.norm(P1-P2)/np.linalg.norm(.5*(P1+P2))
 
-        print("P1:\n{}".format(P1))
-        print("P2:\n{}".format(P2))
-        print("F1:\n{}".format(results[0].grad))
-        print("F2:\n{}".format(results[1].grad))
+        print("cell 1, no eigenstrain")
+        print("P1:\n{}".format(P1[:,0]))
+        print("F1:\n{}".format(results[0].grad[:,0]))
+
+        print("cell 2, with eigenstrain")
+        print("P2:\n{}".format(P2[:,0]))
+        print("F2:\n{}".format(results[1].grad[:,0]))
+        print("end test_solve")
         self.assertLess(error, tol)
 
 

@@ -418,7 +418,8 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   bool check_symmetry(const Eigen::Ref<const Eigen::ArrayXXd>& eps,
                       Real rel_tol){
-    return rel_tol >= (eps-eps.transpose()).matrix().norm()/eps.matrix().norm();
+    return (rel_tol >= (eps-eps.transpose()).matrix().norm()/eps.matrix().norm() ||
+            rel_tol >= eps.matrix().norm());
   }
 
 

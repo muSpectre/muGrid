@@ -189,13 +189,13 @@ namespace muSpectre {
   decltype(auto)
   MaterialLinearElastic2<DimS, DimM>::
   evaluate_stress_tangent(s_t && E, eigen_s_t && E_eig) {
-    using mat = Eigen::Matrix<Real, DimM, DimM>;
-    mat ecopy{E};
-    mat eig_copy{E_eig};
-    mat ediff{ecopy-eig_copy};
-    std::cout << std::endl << ediff-(E-E_eig) << std::endl;
-    std::cout << "P1" << std::endl << mat{std::get<0>(this->material.evaluate_stress_tangent(E-E_eig))} << std::endl;
-    std::cout << "P2" << std::endl << mat{std::get<0>(this->material.evaluate_stress_tangent(std::move(ediff)))} << std::endl;
+    // using mat = Eigen::Matrix<Real, DimM, DimM>;
+    // mat ecopy{E};
+    // mat eig_copy{E_eig};
+    // mat ediff{ecopy-eig_copy};
+    // std::cout << "eidff - (E-E_eig)" << std::endl << ediff-(E-E_eig) << std::endl;
+    // std::cout << "P1 <internal>" << std::endl << mat{std::get<0>(this->material.evaluate_stress_tangent(E-E_eig))} << "</internal>" << std::endl;
+    // std::cout << "P2" << std::endl << mat{std::get<0>(this->material.evaluate_stress_tangent(std::move(ediff)))} << std::endl;
     return this->material.evaluate_stress_tangent(E-E_eig);
   }
 
