@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
 import numpy as np
-import muSpectre as µ
+import muSpectre as msp
 import matplotlib.pyplot as plt
 
 
-## currently, µSpectre is restricted to odd-numbered resolutions for
+## currently, muSpectre is restricted to odd-numbered resolutions for
 ## reasons explained in T.W.J. de Geus, J. Vondřejc, J. Zeman,
 ## R.H.J. Peerlings, M.G.D. Geers, Finite strain FFT-based non-linear
 ## solvers made simple, Computer Methods in Applied Mechanics and
@@ -18,18 +18,18 @@ incl = resolution[0]//5
 
 ## Domain dimensions
 lengths = [7., 5.]
-## formulation (small_strain: σ = σ(ε), finite_strain: P = P(F))
-formulation = µ.Formulation.small_strain
+## formulation (small_strain or finite_strain)
+formulation = msp.Formulation.small_strain
 
 ## build a computational domain
-rve = µ.SystemFactory(resolution,
+rve = msp.SystemFactory(resolution,
                       lengths,
                       formulation)
 
 ## define the material properties of the matrix and inclusion
-hard = µ.material.MaterialLinearElastic1_2d.make(
+hard = msp.material.MaterialLinearElastic1_2d.make(
     rve, "hard", 10e9, .33)
-soft = µ.material.MaterialLinearElastic1_2d.make(
+soft = msp.material.MaterialLinearElastic1_2d.make(
     rve, "soft",  70e9, .33)
 
 ## assign each pixel to exactly one material
@@ -57,7 +57,7 @@ maxiter = 50 ## for linear system solver
 ## SolverCG, SolverCGEigen, SolverBiCGSTABEigen, SolverGMRESEigen,
 ## SolverDGMRESEigen, SolverMINRESEigen.
 ## See Reference for explanations
-solver = µ.solvers.SolverCGEigen(rve, cg_tol, maxiter, verbose=True)
+solver = msp.solvers.SolverCGEigen(rve, cg_tol, maxiter, verbose=True)
 
 
 ## Verbosity levels:
@@ -68,14 +68,14 @@ verbose = 1
 ## Choose a solution strategy. Currently available:
 ## de_geus: is discribed in de Geus et al. see Ref above
 ## newton_cg: classical Newton-Conjugate Gradient solver. Recommended
-result = µ.solvers.newton_cg(rve, Del0, solver, tol, verbose)
+result = msp.solvers.newton_cg(rve, Del0, solver, tol, verbose)
 
 print(result)
 
 ## visualise e.g., stress in y-direction
 stress = result.stress
 ## stress is stored in a flatten stress tensor per pixel, i.e., a
-## dim² × Π(resolutionᵢ) array, so it needs to be reshaped
+## dim^2 × prod(resolution_i) array, so it needs to be reshaped
 stress = stress.T.reshape(*resolution, 2, 2)
 
 plt.pcolormesh(stress[:, :, 1, 1])
