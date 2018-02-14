@@ -1,13 +1,11 @@
 /**
- * @file   material_linear_elastic_eigenstrain.cc
+ * @file   material_linear_elastic2.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
  * @date   04 Feb 2018
  *
  * @brief  implementation for linear elastic material with eigenstrain
- *
- * @section LICENSE
  *
  * Copyright © 2018 Till Junge
  *
