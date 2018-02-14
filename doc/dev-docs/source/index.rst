@@ -10,6 +10,7 @@
    :caption: Contents:
 
    Summary
+   Tutorials
    Reference
    License
 
