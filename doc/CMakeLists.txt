@@ -60,6 +60,7 @@ configure_file(
 
 add_custom_target(dev_doc
   ${SPHINX_EXECUTABLE}
+  -j 4
   -q -b html
   -c "${CMAKE_CURRENT_BINARY_DIR}"
   -d "${SPHINX_CACHE_DIR}"
