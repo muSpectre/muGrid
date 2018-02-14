@@ -43,15 +43,48 @@ namespace muSpectre {
     constexpr Dim_t dim{Fix::dim};
     using T2 = Eigen::Matrix<Real, dim, dim>;
 
-    T2 F;
-    F.setRandom();
-    auto Eref = .5*(F.transpose()*F-T2::Identity());
+    T2 F{(T2::Random() -.5*T2::Ones())/20 + T2::Identity()};
 
-    auto E_tb = MatTB::convert_strain<StrainMeasure::Gradient,
+    // checking Green-Lagrange
+    T2 Eref = .5*(F.transpose()*F-T2::Identity());
+
+    T2 E_tb = MatTB::convert_strain<StrainMeasure::Gradient,
                                       StrainMeasure::GreenLagrange>
       (Eigen::Map<Eigen::Matrix<Real, dim, dim>>(F.data()));
 
-    auto error = (Eref-E_tb).norm();
+    Real error = (Eref-E_tb).norm();
+    BOOST_CHECK_LT(error, tol);
+
+    // checking Left Cauchy-Green
+    Eref = F*F.transpose();
+    E_tb = MatTB::convert_strain<StrainMeasure::Gradient,
+                                 StrainMeasure::LCauchyGreen>(F);
+
+    error = (Eref-E_tb).norm();
+    BOOST_CHECK_LT(error, tol);
+
+    // checking Right Cauchy-Green
+    Eref = F.transpose()*F;
+    E_tb = MatTB::convert_strain<StrainMeasure::Gradient,
+                                 StrainMeasure::RCauchyGreen>(F);
+
+    error = (Eref-E_tb).norm();
+    BOOST_CHECK_LT(error, tol);
+
+    // checking Hencky (logarithmic) strain
+    Eref = F.transpose()*F;
+    Eigen::SelfAdjointEigenSolver<T2> EigSolv(Eref);
+    Eref.setZero();
+    for (size_t i{0}; i < dim; ++i) {
+      auto && vec = EigSolv.eigenvectors().col(i);
+      auto && val = EigSolv.eigenvalues()(i);
+      Eref += .5*std::log(val) * vec*vec.transpose();
+    }
+
+    E_tb = MatTB::convert_strain<StrainMeasure::Gradient,
+                                 StrainMeasure::Log>(F);
+
+    error = (Eref-E_tb).norm();
     BOOST_CHECK_LT(error, tol);
 
     auto F_tb = MatTB::convert_strain<StrainMeasure::Gradient, StrainMeasure::Gradient>(F);

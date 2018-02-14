@@ -34,6 +34,7 @@
 #include "common/T4_map_proxy.hh"
 
 #include <Eigen/Dense>
+#include <unsupported/Eigen/MatrixFunctions>
 
 #include <exception>
 #include <sstream>
@@ -126,6 +127,7 @@ namespace muSpectre {
       /* ---------------------------------------------------------------------- */
       /** Specialisation for getting Green-Lagrange strain from the
           transformation gradient
+          E = ¹/₂ (C - I) = ¹/₂ (Fᵀ·F - I)
       **/
       template <>
       struct ConvertStrain<StrainMeasure::Gradient, StrainMeasure::GreenLagrange> {
@@ -135,6 +137,55 @@ namespace muSpectre {
         inline static decltype(auto)
         compute(Strain_t&& F) {
           return .5*(F.transpose()*F - Strain_t::PlainObject::Identity());
+        }
+      };
+
+      /* ---------------------------------------------------------------------- */
+      /** Specialisation for getting Left Cauchy-Green strain from the
+          transformation gradient
+          B = F·Fᵀ = V²
+      **/
+      template <>
+      struct ConvertStrain<StrainMeasure::Gradient, StrainMeasure::LCauchyGreen> {
+
+        //! returns the converted strain
+        template <class Strain_t>
+        inline static decltype(auto)
+        compute(Strain_t&& F) {
+          return F*F.transpose();
+        }
+      };
+
+      /* ---------------------------------------------------------------------- */
+      /** Specialisation for getting Right Cauchy-Green strain from the
+          transformation gradient
+          C = Fᵀ·F = U²
+      **/
+      template <>
+      struct ConvertStrain<StrainMeasure::Gradient, StrainMeasure::RCauchyGreen> {
+
+        //! returns the converted strain
+        template <class Strain_t>
+        inline static decltype(auto)
+        compute(Strain_t&& F) {
+          return F.transpose()*F;
+        }
+      };
+
+      /* ---------------------------------------------------------------------- */
+      /** Specialisation for getting logarithmic (Hencky) strain from the
+          transformation gradient
+          E₀ = ¹/₂ ln C = ¹/₂ ln (Fᵀ·F)
+      **/
+      template <>
+      struct ConvertStrain<StrainMeasure::Gradient, StrainMeasure::Log> {
+
+        //! returns the converted strain
+        template <class Strain_t>
+        inline static decltype(auto)
+        compute(Strain_t&& F) {
+          constexpr Dim_t dim{EigenCheck::tensor_dim<Strain_t>::value};
+          return (.5*logm(Eigen::Matrix<Real, dim, dim>{F.transpose()*F})).eval();
         }
       };
 
