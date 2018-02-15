@@ -35,7 +35,7 @@ This README contains only a small quick start guide. Please refer to the [full d
 == Simple usage example ==
 The following is a simple example for using µSpectre through its convenient Python interface
 
-#!/usr/bin/env python3
+    #!/usr/bin/env python3
 
     import numpy as np
     import muSpectre as µ
