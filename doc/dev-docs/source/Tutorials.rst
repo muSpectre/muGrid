@@ -68,3 +68,22 @@ The easiest and intended way of using **µSpectre** is through its Python bindin
 
 .. literalinclude:: ../../../bin/tutorial_example.py
    :language: python
+
+More examples both both python and c++ executables can be found in the ``/bin`` folder.
+
+Getting help
+************
+
+µSpectre is in a very early stage of development and the documentation is currently spotty. Also, there is no FAQ page yet. If you run into trouble, please contact us on the `µSpectre chat room <https://c4science.ch/Z69>`_ and someone will answer as soon as possible. You can also check the API :ref:`reference`.
+
+
+Reporting Bugs
+**************
+
+If you think you found a bug, you are probably right. Please report it! The preferred way is for you to create a task on `µSpectre's workboard <https://c4science.ch/project/board/1447/>`_ and assign it to user ``junge``. Include steps to reproduce the bug if possible. Someone will answer as soon as possible.
+
+
+Contribute
+**********
+
+We welcome contributions both for new features and bug fixes. New features must be documented and have unit tests. Please submit contributions for review as `Arcanist revisions <https://secure.phabricator.com/book/phabricator/article/arcanist/>`_. More detailed guidelines for submissions will follow soonᵀᴹ.
