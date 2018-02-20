@@ -27,6 +27,11 @@
 # Boston, MA 02111-1307, USA.
 #
 
+if(APPLE)
+  # pybind11 (installed via homebrew) does not set include directories properly.
+  # This is necessary to find Python.h.
+  find_package(PythonLibs 3)
+endif()
 
 set (PY_BINDING_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_module.cc
