@@ -35,6 +35,7 @@ from python_test_imports import µ
 
 from python_fft_tests import FFT_Check
 from python_projection_tests import *
+from python_material_linear_elastic3_test import  MaterialLinearElastic3_Check
 
 class SystemCheck(unittest.TestCase):
     def test_Construction(self):
