@@ -68,7 +68,7 @@ namespace muSpectre {
     using LFieldColl_t = LocalFieldCollection<DimS, DimM>;
     //! local strain type
     using LStrainMap_t = MatrixFieldMap<LFieldColl_t, Real, DimM, DimM, true>;
-    //! elasticity without internal variables
+    //! elasticity with eigenstrain
     using InternalVariables = std::tuple<LStrainMap_t>;
 
   };
@@ -90,8 +90,8 @@ namespace muSpectre {
      * stresses or also tangent stiffnesses
      */
     using NeedTangent = typename Parent::NeedTangent;
-    //! global field collection
 
+    //! type for stiffness tensor construction
     using Stiffness_t = Eigen::TensorFixedSize
       <Real, Eigen::Sizes<DimM, DimM, DimM, DimM>>;
 
@@ -147,7 +147,7 @@ namespace muSpectre {
     evaluate_stress_tangent(s_t &&  E, eigen_s_t && E_eig);
 
     /**
-     * return the empty internals tuple
+     * return the internals tuple
      */
     InternalVariables & get_internals() {
       return this->internal_variables;};

@@ -701,11 +701,11 @@ namespace muSpectre {
       apply([&pixel] (auto && ... stress_tgt) {
           return std::make_tuple(stress_tgt[pixel]...);},
         this->stress_map);
-    const auto & internal = this->it.material.get_internals();
+    auto && internal = this->it.material.get_internals();
     const auto id{this->index};
     auto && internals =
-      apply([id] (auto && ... internals) {
-          return std::make_tuple(internals[id]...);},
+      apply([id] (auto && ... internals_) {
+          return InternalReferences{internals_[id]...};},
         internal);
     return std::make_tuple(std::move(strain),
                            std::move(stresses),

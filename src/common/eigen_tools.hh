@@ -301,6 +301,25 @@ namespace muSpectre {
     return Mat{log_comp::Sum(Solver.eigenvalues(), mat)};
   }
 
+
+  /**
+   * compute the matrix exponential. This may not be the most
+   * efficient way to do this
+   */
+  template <Dim_t dim>
+  inline decltype(auto) expm(const log_comp::Mat_t<dim>& mat) {
+    using Mat = log_comp::Mat_t<dim>;
+    Eigen::SelfAdjointEigenSolver<Mat> Solver{};
+    Solver.computeDirect(mat, Eigen::ComputeEigenvectors);
+    Mat retval{Mat::Zero()};
+    for (Dim_t i = 0; i < dim; ++i) {
+      auto && val = Solver.eigenvalues()(i);
+      auto && vec = Solver.eigenvectors().col(i);
+      retval += std::exp(val) * vec * vec.transpose();
+    }
+    return retval;
+  }
+
 }  // muSpectre
 
 

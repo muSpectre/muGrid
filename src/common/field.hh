@@ -408,8 +408,8 @@ namespace muSpectre {
     //! factory function
     template<class FieldType, class CollectionType, typename... Args>
     friend FieldType& make_field(std::string unique_name,
-                             CollectionType & collection,
-                             Args&&... args);
+                                 CollectionType & collection,
+                                 Args&&... args);
 
     //! return a reference or throw an exception if `other` is incompatible
     static TensorField & check_ref(Base & other) {
@@ -490,8 +490,8 @@ namespace muSpectre {
     //! factory function
     template<class FieldType, class CollectionType, typename... Args>
     friend FieldType&  make_field(std::string unique_name,
-                             CollectionType & collection,
-                             Args&&... args);
+                                  CollectionType & collection,
+                                  Args&&... args);
 
     //! returns a `MatrixField` reference if `other` is a compatible field
     static MatrixField & check_ref(Base & other) {

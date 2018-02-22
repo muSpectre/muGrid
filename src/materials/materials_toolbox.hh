@@ -342,7 +342,67 @@ namespace muSpectre {
         }
       };
 
+      /* ---------------------------------------------------------------------- */
+      /**
+       * Specialisation for the case where we get Kirchhoff stress (τ)
+       */
+      template <Dim_t Dim, StrainMeasure StrainM>
+      struct PK1_stress<Dim, StressMeasure::Kirchhoff, StrainM>:
+        public PK1_stress<Dim, StressMeasure::no_stress_,
+                          StrainMeasure::no_strain_> {
+
+        //! returns the converted stress
+        template <class Strain_t, class Stress_t>
+        inline static decltype(auto)
+        compute(Strain_t && F, Stress_t && tau) {
+          return tau*F.inverse().transpose();
+        }
+      };
+
+      /* ---------------------------------------------------------------------- */
+      /**
+       * Specialisation for the case where we get Kirchhoff stress (τ) derived
+       * with respect to Gradient
+       */
+      template <Dim_t Dim>
+      struct PK1_stress<Dim, StressMeasure::Kirchhoff, StrainMeasure::Gradient>:
+        public PK1_stress<Dim, StressMeasure::Kirchhoff,
+                          StrainMeasure::no_strain_> {
+
+        using Parent = PK1_stress<Dim, StressMeasure::Kirchhoff,
+                                  StrainMeasure::no_strain_>;
+        using Parent::compute;
+
+        //! returns the converted stress and stiffness
+        template <class Strain_t, class Stress_t, class Tangent_t>
+        inline static decltype(auto)
+        compute(Strain_t && F, Stress_t && tau, Tangent_t && C) {
+          using T4 = typename std::remove_reference_t<Tangent_t>::PlainObject;
+          using Tmap = T4MatMap<Real, Dim>;
+          T4 K;
+          Tmap Kmap{K.data()};
+          K.setZero();
+          auto && F_inv{F.inverse()};
+          for (int i = 0; i < Dim; ++i) {
+            for (int m = 0; m < Dim; ++m) {
+              for (int n = 0; n < Dim; ++n) {
+                for (int j = 0; j < Dim; ++j) {
+                  for (int r = 0; r < Dim; ++r) {
+                    for (int s = 0; s < Dim; ++s) {
+                      get(Kmap,i,m,j,n) += F_inv(i,r)*get(C,r,m,n,s);
+                    }
+                  }
+                }
+              }
+            }
+          }
+          auto && P = tau * F_inv.transpose();
+          return std::make_tuple(std::move(P), std::move(K));
+        }
+      };
+
     }  // internal
+
     /* ---------------------------------------------------------------------- */
     //! set of functions returning an expression for PK2 stress based on
     template <StressMeasure StressM, StrainMeasure StrainM,
@@ -399,6 +459,16 @@ namespace muSpectre {
       }
 
       /**
+       * compute the bulk modulus
+       * @param young: Young's modulus
+       * @param poisson: Poisson's ratio
+       */
+      inline static constexpr Real
+      compute_K(const Real & young, const Real & poisson) {
+        return young/(3*(1-2*poisson));
+      }
+
+      /**
        * compute the stiffness tensor
        * @param lambda: Lamé's first constant
        * @param mu: Lamé's second constant (i.e., shear modulus)
@@ -407,6 +477,16 @@ namespace muSpectre {
       compute_C(const Real & lambda, const Real & mu) {
         return lambda*Tensors::outer<Dim>(Tensors::I2<Dim>(),Tensors::I2<Dim>()) +
           2*mu*Tensors::I4S<Dim>();
+      }
+
+      /**
+       * compute the stiffness tensor
+       * @param lambda: Lamé's first constant
+       * @param mu: Lamé's second constant (i.e., shear modulus)
+       */
+      inline static T4Mat<Real, Dim>
+      compute_C_T4(const Real & lambda, const Real & mu) {
+        return lambda*Matrices::Itrac<Dim>() + 2*mu*Matrices::Isymm<Dim>();
       }
 
       /**

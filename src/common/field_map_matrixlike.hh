@@ -369,9 +369,7 @@ namespace muSpectre {
             bool ConstField=false>
   using MatrixFieldMap = internal::MatrixLikeFieldMap
     <FieldCollection,
-     std::conditional_t<ConstField,
-                        Eigen::Map<const Eigen::Matrix<T, NbRows, NbCols>>,
-                        Eigen::Map<Eigen::Matrix<T, NbRows, NbCols>>>,
+     Eigen::Map<Eigen::Matrix<T, NbRows, NbCols>>,
      Eigen::Map<const Eigen::Matrix<T, NbRows, NbCols>>,
      Eigen::Matrix<T, NbRows, NbCols>,
      internal::Map_t::Matrix, ConstField>;
@@ -382,7 +380,7 @@ namespace muSpectre {
             bool MapConst=false>
   using T4MatrixFieldMap = internal::MatrixLikeFieldMap
     <FieldCollection,
-     T4MatMap<T, Dim, MapConst>,
+     T4MatMap<T, Dim, false>,
      T4MatMap<T, Dim, true>,
      T4Mat<T, Dim>,
      internal::Map_t::T4Matrix, MapConst>;
@@ -393,9 +391,7 @@ namespace muSpectre {
             bool ConstField=false>
   using ArrayFieldMap = internal::MatrixLikeFieldMap
     <FieldCollection,
-     std::conditional_t<ConstField,
-                        Eigen::Map<const Eigen::Array<T, NbRows, NbCols>>,
-                        Eigen::Map<Eigen::Array<T, NbRows, NbCols>>>,
+     Eigen::Map<Eigen::Array<T, NbRows, NbCols>>,
      Eigen::Map<const Eigen::Array<T, NbRows, NbCols>>,
      Eigen::Array<T, NbRows, NbCols>,
      internal::Map_t::Array, ConstField>;

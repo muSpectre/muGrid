@@ -12,8 +12,6 @@
  *
  * @brief  ${1:description}
  *
- * @section LICENSE
- *
  * Copyright © `(format-time-string "%Y")` `user-full-name`
  *
  * ${2:µSpectre} is free software; you can redistribute it and/or
