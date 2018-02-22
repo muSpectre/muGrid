@@ -31,12 +31,15 @@ You can compile **µSpectre** using  `CMake <https://cmake.org/>`_. The current 
 - `FFTW <http://www.fftw.org>`_
 - `Sphinx <http://www.sphinx-doc.org>`_ and `Breathe <https://breathe.readthedocs.io>`_
 
-**µSpectre** requires a relatively modern compiler as it makes heavy use of C++14 features. It has successfully been compiled and tested using the following compilers
+**µSpectre** requires a relatively modern compiler as it makes heavy use of C++14 features. It has successfully been compiled and tested using the following compilers under Linux
 
 - gcc-7.2
 - gcc-6.4
+- gcc-5.4
 - clang-5.0
 - clang-4.0
+
+and using clang-4.0 under MacOS.
 
 It does *not* compile on Intel's most recent compiler, as it is still lacking some C++14 support. Work-arounds are planned, but will have to wait for someone to pick up the `task <https://c4science.ch/T1852>`_.
 
