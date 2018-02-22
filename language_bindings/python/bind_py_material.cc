@@ -54,8 +54,7 @@ void add_material_linear_elastic1_helper(py::module & mod) {
   using Mat_t = MaterialLinearElastic1<dim, dim>;
   using Sys_t = SystemBase<dim, dim>;
   py::class_<Mat_t>(mod, name.c_str())
-    .def(py::init<std::string, Real, Real>(), "name"_a, "Young"_a, "Poisson"_a)
-    .def_static("make",
+     .def_static("make",
                 [](Sys_t & sys, std::string n, Real e, Real p) -> Mat_t & {
                   return Mat_t::make(sys, n, e, p);
                 },
@@ -78,8 +77,7 @@ void add_material_linear_elastic2_helper(py::module & mod) {
   using Sys_t = SystemBase<dim, dim>;
 
   py::class_<Mat_t>(mod, name.c_str())
-    .def(py::init<std::string, Real, Real>(), "name"_a, "Young"_a, "Poisson"_a)
-    .def_static("make",
+     .def_static("make",
                 [](Sys_t & sys, std::string n, Real e, Real p) -> Mat_t & {
                   return Mat_t::make(sys, n, e, p);
                 },
