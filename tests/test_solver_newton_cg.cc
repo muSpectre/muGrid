@@ -36,7 +36,6 @@
 #include "common/ccoord_operations.hh"
 #include "system/system_factory.hh"
 
-
 namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE(newton_cg_tests);

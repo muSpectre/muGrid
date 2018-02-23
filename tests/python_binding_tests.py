@@ -35,6 +35,7 @@ from python_test_imports import µ
 
 from python_fft_tests import FFT_Check
 from python_projection_tests import *
+from python_material_linear_elastic3_test import  MaterialLinearElastic3_Check
 
 class SystemCheck(unittest.TestCase):
     def test_Construction(self):
@@ -118,13 +119,16 @@ class EigenStrainCheck(unittest.TestCase):
             self.cell2, "eigen", 210e9, .33)
 
     def test_solve(self):
-        print("start test_solve")
+        verbose_test = False
+        if verbose_test:
+            print("start test_solve")
         grad = np.array([[1.1,  .2],
                          [ .3, 1.5]])
         gl_strain = -0.5*(grad.T.dot(grad) - np.eye(2))
         gl_strain = -0.5*(grad.T + grad - 2*np.eye(2))
         grad = -gl_strain
-        print("grad =\n{}\ngl_strain =\n{}".format(grad, gl_strain))
+        if verbose_test:
+            print("grad =\n{}\ngl_strain =\n{}".format(grad, gl_strain))
         for i, pixel in enumerate(self.cell1):
             self.mat1.add_pixel(pixel)
             self.mat2.add_pixel(pixel, gl_strain)
@@ -148,14 +152,15 @@ class EigenStrainCheck(unittest.TestCase):
         P2 = results[1].stress
         error = np.linalg.norm(P1-P2)/np.linalg.norm(.5*(P1+P2))
 
-        print("cell 1, no eigenstrain")
-        print("P1:\n{}".format(P1[:,0]))
-        print("F1:\n{}".format(results[0].grad[:,0]))
+        if verbose_test:
+            print("cell 1, no eigenstrain")
+            print("P1:\n{}".format(P1[:,0]))
+            print("F1:\n{}".format(results[0].grad[:,0]))
 
-        print("cell 2, with eigenstrain")
-        print("P2:\n{}".format(P2[:,0]))
-        print("F2:\n{}".format(results[1].grad[:,0]))
-        print("end test_solve")
+            print("cell 2, with eigenstrain")
+            print("P2:\n{}".format(P2[:,0]))
+            print("F2:\n{}".format(results[1].grad[:,0]))
+            print("end test_solve")
         self.assertLess(error, tol)
 
 
