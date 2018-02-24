@@ -32,19 +32,4 @@
 #include "common/field_collection_global.hh"
 #include "common/field_collection_local.hh"
 
-namespace muSpectre {
-
-  /**
-   * Convenience aliases to unify the local and global
-   * Field_collection interface
-   */
-  template <Dim_t DimS, Dim_t DimM, bool Global = true>
-  using FieldCollection = std::conditional_t<
-    Global,
-    GlobalFieldCollection<DimS, DimM>,
-    LocalFieldCollection<DimS, DimM>>;
-
-
-}  // muSpectre
-
 #endif /* FIELD_COLLECTION_H */

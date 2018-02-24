@@ -49,9 +49,9 @@ namespace muSpectre {
     using FFT_Engine_ptr = typename Parent::FFT_Engine_ptr;
     using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
     //! global field collection
-    using GFieldCollection_t = FieldCollection<DimS, DimM, true>;
+    using GFieldCollection_t = GlobalFieldCollection<DimS, DimM>;
     //! local field collection for Fourier-space fields
-    using LFieldCollection_t = FieldCollection<DimS, DimM, false>;
+    using LFieldCollection_t = LocalFieldCollection<DimS, DimM>;
     //! Real space second order tensor fields (to be projected)
     using Field_t = TensorField<GFieldCollection_t, Real, secondOrder, DimM>;
     //! Fourier-space field containing the projection operator itself

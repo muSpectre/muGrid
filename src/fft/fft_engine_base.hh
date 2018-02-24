@@ -48,9 +48,9 @@ namespace muSpectre {
     //! spatial coordinates type
     using Rcoord = std::array<Real, DimS>;
     //! global FieldCollection
-    using GFieldCollection_t = FieldCollection<DimS, DimM, true>;
+    using GFieldCollection_t = GlobalFieldCollection<DimS, DimM>;
     //! local FieldCollection (for Fourier-space pixels)
-    using LFieldCollection_t = FieldCollection<DimS, DimM, false>;
+    using LFieldCollection_t = LocalFieldCollection<DimS, DimM>;
     //! Field type on which to apply the projection
     using Field_t = TensorField<GFieldCollection_t, Real, 2, DimM>;
     /**

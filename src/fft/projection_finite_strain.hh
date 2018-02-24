@@ -51,7 +51,7 @@ namespace muSpectre {
     using FFT_Engine_ptr = typename Parent::FFT_Engine_ptr;
     using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
     //! local field collection (for Fourier-space representations)
-    using LFieldCollection_t = FieldCollection<DimS, DimM, false>;
+    using LFieldCollection_t = LocalFieldCollection<DimS, DimM>;
     //! iterable operator
     using Proj_map = T4MatrixFieldMap<LFieldCollection_t, Real, DimM>;
     //! iterable vectorised version of the Fourier-space tensor field

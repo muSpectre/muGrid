@@ -37,7 +37,7 @@ namespace muSpectre {
     const Dim_t sdim = 2;
     const Dim_t mdim = 2;
     const Dim_t order = 4;
-    using FC_t = FieldCollection<sdim, mdim>;
+    using FC_t = GlobalFieldCollection<sdim, mdim>;
     FC_t fc;
 
     using TF_t = TensorField<FC_t, Real, order, mdim>;
