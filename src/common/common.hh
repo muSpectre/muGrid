@@ -151,8 +151,8 @@ namespace muSpectre {
   //! and µSpectre will handle conversions
   enum class StressMeasure {
     Cauchy,      //!< Cauchy stress σ
-    PK1,         //!< First Piola-Kirchhoff strell
-    PK2,         //!< Second Piola-Kirchhoff strell
+    PK1,         //!< First Piola-Kirchhoff stress
+    PK2,         //!< Second Piola-Kirchhoff stress
     Kirchhoff,   //!< Kirchhoff stress τ
     Biot,        //!< Biot stress
     Mandel,      //!< Mandel stress
