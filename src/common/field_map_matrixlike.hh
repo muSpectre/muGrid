@@ -81,13 +81,15 @@ namespace muSpectre {
 
     /* ---------------------------------------------------------------------- */
     /*!
-     * base class for maps of matrices, arrays and fourth-order
-     * tensors mapped onty matrices
+     * A `MatrixLikeFieldMap` is the base class for maps of matrices, arrays and
+     * fourth-order tensors mapped onto matrices.
      *
      * It should never be necessary to call directly any of the
-     * constructors if this class, but rather use the template aliases
-     * `muSpectre::ArrayFieldMap`, `muSpectre::MatrixFieldMap`, and
-     * `muSpectre::T4MatrixFieldMap`
+     * constructors if this class, but rather use the template aliases:
+     * - `ArrayFieldMap`: iterate in the form of `Eigen::Array<...>`.
+     * - `MatrixFieldMap`: iterate in the form of
+     * `Eigen::Matrix<...>`.
+     * - `T4MatrixFieldMap`: iterate in the form of `T4MatMap`.
      */
     template <class FieldCollection, class EigenArray, class EigenConstArray,
               class EigenPlain, Map_t map_type, bool ConstField>

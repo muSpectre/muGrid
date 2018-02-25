@@ -32,8 +32,9 @@
 
 namespace muSpectre {
   /**
-   * implements maps on scalar fields (i.e. material properties,
-   * temperatures, etc)
+   * Implements maps on scalar fields (i.e. material properties,
+   * temperatures, etc). Maps onto a `muSpectre::internal::TypedSizedFieldBase`
+   * and lets you iterate over it in the form of the bare type of the field.
    */
   template <class FieldCollection, typename T, bool ConstField=false>
   class ScalarFieldMap
