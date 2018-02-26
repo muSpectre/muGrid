@@ -39,9 +39,8 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   /**
-   * maps onto a `muSpectre::internal::TypedSizedFieldBase` and lets
-   * you iterate over it in the form ot
-   * `Eigen::TensorMap<TensorFixedSize<...>>`
+   * Maps onto a `muSpectre::internal::TypedSizedFieldBase` and lets
+   * you iterate over it in the form of `Eigen::TensorMap<TensorFixedSize<...>>`
    */
   template <class FieldCollection, typename T, Dim_t order, Dim_t dim,
             bool ConstField=false>

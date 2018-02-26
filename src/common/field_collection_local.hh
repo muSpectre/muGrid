@@ -33,8 +33,13 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  //! DimS spatial dimension (dimension of problem)
-  //! DimM material_dimension (dimension of constitutive law)
+  /** `LocalFieldCollection` derives from `FieldCollectionBase` and stores
+    * local fields, i.e. fields that are only defined for a subset of all pixels
+    * in the computational domain. The coordinates of these active pixels are
+    * explicitly stored by this field collection.
+    * `LocalFieldCollection::add_pixel` allows to add individual pixels to the
+    * field collection.
+    */
   template<Dim_t DimS, Dim_t DimM>
   class LocalFieldCollection:
     public FieldCollectionBase<DimS, DimM, LocalFieldCollection<DimS, DimM>>

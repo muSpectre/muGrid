@@ -54,7 +54,7 @@ namespace muSpectre {
     using Ccoord = Ccoord_t<DimS>; //!< cell coordinates type
     using Rcoord = Rcoord_t<DimS>; //!< physical coordinates type
     //! global field collection
-    using FieldCollection_t = FieldCollection<DimS, DimM>;
+    using FieldCollection_t = GlobalFieldCollection<DimS, DimM>;
     //! the collection is handled in a `std::unique_ptr`
     using Collection_ptr = std::unique_ptr<FieldCollection_t>;
     //! polymorphic base material type

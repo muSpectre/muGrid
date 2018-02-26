@@ -63,6 +63,16 @@ namespace muSpectre {
     using const_corrector_t = typename const_corrector<T, isConst>::type;
 
     //----------------------------------------------------------------------------//
+    /**
+     * `FieldMap` provides two central mechanisms:
+     * - Map a field (that knows only about the size of the underlying object,
+     * onto the mathematical object (reprensented by the respective Eigen class)
+     * that provides linear algebra functionality.
+     * - Provide an iterator that allows to iterate over all pixels.
+     * A field is represented by `FieldBase` or a derived class.
+     * `FieldMap` has the specialisations `MatrixLikeFieldMap`,
+     * `ScalarFieldMap` and `TensorFieldMap`.
+     */
     template <class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
     class FieldMap
     {

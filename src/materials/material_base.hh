@@ -44,11 +44,11 @@ namespace muSpectre {
   public:
     //! typedefs for data handled by this interface
     //! global field collection for system-wide fields, like stress, strain, etc
-    using GFieldCollection_t = FieldCollection<DimS, DimM, true>;
+    using GFieldCollection_t = GlobalFieldCollection<DimS, DimM>;
     //! field collection for internal variables, such as eigen-strains,
     //! plastic strains, damage variables, etc, but also for managing which
     //! pixels the material is responsible for
-    using MFieldCollection_t = FieldCollection<DimS, DimM, false>;
+    using MFieldCollection_t = LocalFieldCollection<DimS, DimM>;
 
     using iterator = typename MFieldCollection_t::iterator; //!< pixel iterator
     //! polymorphic base class for fields only to be used for debugging

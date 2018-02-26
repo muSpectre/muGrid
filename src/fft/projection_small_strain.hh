@@ -51,7 +51,7 @@ namespace muSpectre {
     using FFT_Engine_ptr = typename Parent::FFT_Engine_ptr;
     using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
     //! local field collection (for Fourier-space representations)
-    using LFieldCollection_t = FieldCollection<DimS, DimM, false>;
+    using LFieldCollection_t = LocalFieldCollection<DimS, DimM>;
     //! Fourier-space field containing the projection operator itself
     using Proj_t = TensorField<LFieldCollection_t, Real, fourthOrder, DimM>;
     //! iterable operator

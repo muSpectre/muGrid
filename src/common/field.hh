@@ -91,9 +91,19 @@ namespace muSpectre {
 
     /* ---------------------------------------------------------------------- */
     /**
-     * Virtual base class for all fields. Used for type and size
-     * checking at runtime and for storage of polymorphic pointers to
-     * fully typed and sized fields
+     * Virtual base class for all fields. A field represents meta-information
+     * for the per-pixel storage for a scalar, vector or tensor quantity and
+     * is therefore the abstract class defining the field. It is used for type
+     * and size checking at runtime and for storage of polymorphic pointers to
+     * fully typed and sized fields. `FieldBase` (and its children) are
+     * templated with a specific `FieldCollection`. A `FieldCollection` stores
+     * multiple fields that all apply to the same set of pixels. Allocating
+     * and managing the data for all pixels is handled by the `FieldCollection`.
+     * Note that `FieldBase` does not know anything about about mathematical
+     * operations on the data or how to iterate over all pixels. Mapping the
+     * raw data onto Eigen classes and iterating over those is handled by
+     * the `FieldMap`.
+     * `FieldBase` has the specialisation `TypedFieldBase`.
      */
     template <class FieldCollection>
     class FieldBase
@@ -164,8 +174,11 @@ namespace muSpectre {
 
 
     /**
-     * dummy intermediate class to provide a run-time polymorphic
-     * typed field. Mainly for binding python
+     * Dummy intermediate class to provide a run-time polymorphic
+     * typed field. Mainly for binding Python. TypedFieldBase specifies methods
+     * that return typed Eigen maps and vectors in addition to pointers to the
+     * raw data.
+     * `TypedFieldBase` has the specialisation `TypedSizedFieldBase`.
      */
     template <class FieldCollection, typename T>
     class TypedFieldBase: public FieldBase<FieldCollection>
@@ -239,9 +252,12 @@ namespace muSpectre {
 
     /* ---------------------------------------------------------------------- */
     /**
-     * implements Fields that contain a statically known number of
-     * scalars of a statically known type per pixel in a
-     * `muSpectre::FieldCollection`
+     * A `TypedSizeFieldBase` is the base class for fields that contain
+     * statically known number of scalars of a statically known type per pixel
+     * in a `muSpectre::FieldCollection`. The actual data for all pixels is
+     * stored in `TypedSizeFieldBase::values`.
+     * `TypedSizedFieldBase` has the specialisations `MatrixField` and
+     * `TensorField`.
      */
     template <class FieldCollection, typename T, Dim_t NbComponents,
               bool ArrayStore=false>
@@ -366,9 +382,12 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   /**
-   * subclass of `muSpectre::internal::TypedSizedFieldBase` to
-   * represent tensorial fields defined by a stored scalar type,
-   * spatial dimension, and tensorial order
+   * The `TensorField` is a subclass of `muSpectre::internal::TypedSizedFieldBase`
+   * that represents tensorial fields, i.e. arbitrary-dimensional arrays with
+   * identical number of rows/columns (that typically correspond to the spatial
+   * cartesian dimensions). It is defined by the stored scalar type @a T, the
+   * tensorial order @a order (often also called degree or rank) and the
+   * number of spatial dimensions @a dim.
    */
   template <class FieldCollection, typename T, Dim_t order, Dim_t dim>
   class TensorField: public internal::TypedSizedFieldBase<FieldCollection,
@@ -419,24 +438,42 @@ namespace muSpectre {
       return static_cast<const TensorField &>(Parent::check_ref(other));}
 
     /**
-     * Pure convenience functions to get a MatrixFieldMap of
-     * appropriate dimensions mapped to this field. You can also
-     * create other types of maps, as long as they have the right
-     * fundamental type (T) and the correct size (nbComponents).
+     * Convenience functions to return a map onto this field. A map allows
+     * iteration over all pixels. The map's iterator returns an object that
+     * represents the underlying mathematical structure of the field and
+     * implements common linear algebra operations on it.
+     * Specifically, this function returns
+     * - A `MatrixFieldMap` with @a dim rows and one column if the tensorial
+     * order @a order is unity.
+     * - A `MatrixFieldMap` with @a dim rows and @a dim columns if the tensorial
+     * order @a order is 2.
+     * - A `T4MatrixFieldMap` if the tensorial order is 4.
      */
     decltype(auto) get_map();
     /**
-     * Pure convenience functions to get a MatrixFieldMap of
-     * appropriate dimensions mapped to this field. You can also
-     * create other types of maps, as long as they have the right
-     * fundamental type (T) and the correct size (nbComponents).
+     * Convenience functions to return a map onto this field. A map allows
+     * iteration over all pixels. The map's iterator returns an object that
+     * represents the underlying mathematical structure of the field and
+     * implements common linear algebra operations on it.
+     * Specifically, this function returns
+     * - A `MatrixFieldMap` with @a dim rows and one column if the tensorial
+     * order @a order is unity.
+     * - A `MatrixFieldMap` with @a dim rows and @a dim columns if the tensorial
+     * order @a order is 2.
+     * - A `T4MatrixFieldMap` if the tensorial order is 4.
      */
     decltype(auto) get_const_map();
     /**
-     * Pure convenience functions to get a MatrixFieldMap of
-     * appropriate dimensions mapped to this field. You can also
-     * create other types of maps, as long as they have the right
-     * fundamental type (T) and the correct size (nbComponents).
+     * Convenience functions to return a map onto this field. A map allows
+     * iteration over all pixels. The map's iterator returns an object that
+     * represents the underlying mathematical structure of the field and
+     * implements common linear algebra operations on it.
+     * Specifically, this function returns
+     * - A `MatrixFieldMap` with @a dim rows and one column if the tensorial
+     * order @a order is unity.
+     * - A `MatrixFieldMap` with @a dim rows and @a dim columns if the tensorial
+     * order @a order is 2.
+     * - A `T4MatrixFieldMap` if the tensorial order is 4.
      */
     decltype(auto) get_map() const;
 
@@ -449,9 +486,10 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   /**
-   * subclass of `muSpectre::internal::TypedSizedFieldBase` to
-   * represent matrix fields defined by a stored scalar type and the
-   * number of rows and columns of the field
+   * The `MatrixField` is subclass of `muSpectre::internal::TypedSizedFieldBase`
+   * that represents matrix fields, i.e. a two dimensional arrays, defined by
+   * the stored scalar type @a T and the number of rows @a NbRow and columns
+   * @a NbCol of the matrix.
    */
   template <class FieldCollection, typename T, Dim_t NbRow, Dim_t NbCol=NbRow>
   class MatrixField: public internal::TypedSizedFieldBase<FieldCollection,
@@ -500,11 +538,38 @@ namespace muSpectre {
     static const MatrixField & check_ref(const Base & other) {
       return static_cast<const MatrixField &>(Parent::check_ref(other));}
 
-    //! returns the default map type
+    /**
+      * Convenience functions to return a map onto this field. A map allows
+      * iteration over all pixels. The map's iterator returns an object that
+      * represents the underlying mathematical structure of the field and
+      * implements common linear algebra operations on it.
+      * Specifically, this function returns
+      * - A `ScalarFieldMap` if @a NbRows and @a NbCols are unity.
+      * - A `MatrixFieldMap` with @a NbRows rows and @a NbCols columns
+      * otherwise.
+      */
     decltype(auto) get_map();
-    //! returns the default map type
+    /**
+     * Convenience functions to return a map onto this field. A map allows
+     * iteration over all pixels. The map's iterator returns an object that
+     * represents the underlying mathematical structure of the field and
+     * implements common linear algebra operations on it.
+     * Specifically, this function returns
+     * - A `ScalarFieldMap` if @a NbRows and @a NbCols are unity.
+     * - A `MatrixFieldMap` with @a NbRows rows and @a NbCols columns
+     * otherwise.
+     */
     decltype(auto) get_const_map();
-    //! returns the default map type
+    /**
+     * Convenience functions to return a map onto this field. A map allows
+     * iteration over all pixels. The map's iterator returns an object that
+     * represents the underlying mathematical structure of the field and
+     * implements common linear algebra operations on it.
+     * Specifically, this function returns
+     * - A `ScalarFieldMap` if @a NbRows and @a NbCols are unity.
+     * - A `MatrixFieldMap` with @a NbRows rows and @a NbCols columns
+     * otherwise.
+     */
     decltype(auto) get_map() const;
 
 
@@ -882,7 +947,7 @@ namespace muSpectre {
         MatrixFieldMap<FieldCollection, T, NbRow, NbCol, ConstMap>;
     };
 
-    //! spectialisation to scalar fields
+    //! specialisation to scalar fields
     template <class FieldCollection, typename T, bool ConstMap>
     struct matrix_map_type<FieldCollection, T, oneD, oneD, ConstMap> {
       //! mapping type
