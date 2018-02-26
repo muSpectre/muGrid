@@ -5,6 +5,15 @@
 µSpectre, FFT-based Homogenisation without Linear Reference Medium
 ==================================================================
 
+.. toctree::
+   :maxdepth: 2
+   :caption: Contents:
+
+   Summary
+   Tutorials
+   Reference
+   License
+
 µSpectre is free software; you can redistribute it and/or
 modify it under the :term:``s of the GNU General Public License as
 published by the Free Software Foundation, either version 3, or (at
@@ -20,14 +29,6 @@ along with GNU Emacs; see the file COPYING. If not, write to the
 Free Software Foundation, Inc., 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.
 
-.. toctree::
-   :maxdepth: 2
-   :caption: Contents:
-
-   Summary
-   Tutorials
-   Reference
-   License
 
 
 

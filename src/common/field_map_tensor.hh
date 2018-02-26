@@ -169,7 +169,7 @@ namespace muSpectre {
   TensorFieldMap(std::enable_if_t<isConst, const Field &> field)
     :Parent(field) {
     static_assert((isConst == ConstField),
-                  "let the compiler deduce isntConst, this is a SFINAE "
+                  "let the compiler deduce isConst, this is a SFINAE "
                   "parameter");
     this->check_compatibility();
   }

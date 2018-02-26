@@ -82,12 +82,6 @@ namespace muSpectre {
 
     //! base class
     using Parent = MaterialMuSpectre<MaterialLinearElastic2, DimS, DimM>;
-    /**
-     * type used to determine whether the
-     * `muSpectre::MaterialMuSpectre::iterable_proxy` evaluate only
-     * stresses or also tangent stiffnesses
-     */
-    using NeedTangent = typename Parent::NeedTangent;
 
     //! type for stiffness tensor construction
     using Stiffness_t = Eigen::TensorFixedSize

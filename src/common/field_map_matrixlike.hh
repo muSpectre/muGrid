@@ -365,17 +365,6 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   //! short-hand for an Eigen matrix map as iterate
-  template <class FieldCollection, typename T, Dim_t NbRows, Dim_t NbCols,
-            bool ConstField=false>
-  using MatrixFieldMap = internal::MatrixLikeFieldMap
-    <FieldCollection,
-     Eigen::Map<Eigen::Matrix<T, NbRows, NbCols>>,
-     Eigen::Map<const Eigen::Matrix<T, NbRows, NbCols>>,
-     Eigen::Matrix<T, NbRows, NbCols>,
-     internal::Map_t::Matrix, ConstField>;
-
-  /* ---------------------------------------------------------------------- */
-  //! short-hand for an Eigen matrix map as iterate
   template <class FieldCollection, typename T, Dim_t Dim,
             bool MapConst=false>
   using T4MatrixFieldMap = internal::MatrixLikeFieldMap
@@ -384,6 +373,17 @@ namespace muSpectre {
      T4MatMap<T, Dim, true>,
      T4Mat<T, Dim>,
      internal::Map_t::T4Matrix, MapConst>;
+
+  /* ---------------------------------------------------------------------- */
+  //! short-hand for an Eigen matrix map as iterate
+  template <class FieldCollection, typename T, Dim_t NbRows, Dim_t NbCols,
+            bool ConstField=false>
+  using MatrixFieldMap = internal::MatrixLikeFieldMap
+    <FieldCollection,
+     Eigen::Map<Eigen::Matrix<T, NbRows, NbCols>>,
+     Eigen::Map<const Eigen::Matrix<T, NbRows, NbCols>>,
+     Eigen::Matrix<T, NbRows, NbCols>,
+     internal::Map_t::Matrix, ConstField>;
 
   /* ---------------------------------------------------------------------- */
   //! short-hand for an Eigen array map as iterate
