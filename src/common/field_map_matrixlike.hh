@@ -86,10 +86,10 @@ namespace muSpectre {
      *
      * It should never be necessary to call directly any of the
      * constructors if this class, but rather use the template aliases:
-     * - `ArrayFieldMap`: iterate in the form of `Eigen::Array<...>`.
-     * - `MatrixFieldMap`: iterate in the form of
+     * - `muSpectre::ArrayFieldMap`: iterate in the form of `Eigen::Array<...>`.
+     * - `muSpectre::MatrixFieldMap`: iterate in the form of
      * `Eigen::Matrix<...>`.
-     * - `T4MatrixFieldMap`: iterate in the form of `T4MatMap`.
+     * - `muSpectre::T4MatrixFieldMap`: iterate in the form of `muSpectre::T4MatMap`.
      */
     template <class FieldCollection, class EigenArray, class EigenConstArray,
               class EigenPlain, Map_t map_type, bool ConstField>

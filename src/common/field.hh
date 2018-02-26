@@ -91,19 +91,21 @@ namespace muSpectre {
 
     /* ---------------------------------------------------------------------- */
     /**
-     * Virtual base class for all fields. A field represents meta-information
-     * for the per-pixel storage for a scalar, vector or tensor quantity and
-     * is therefore the abstract class defining the field. It is used for type
-     * and size checking at runtime and for storage of polymorphic pointers to
-     * fully typed and sized fields. `FieldBase` (and its children) are
-     * templated with a specific `FieldCollection`. A `FieldCollection` stores
-     * multiple fields that all apply to the same set of pixels. Allocating
-     * and managing the data for all pixels is handled by the `FieldCollection`.
-     * Note that `FieldBase` does not know anything about about mathematical
-     * operations on the data or how to iterate over all pixels. Mapping the
-     * raw data onto Eigen classes and iterating over those is handled by
-     * the `FieldMap`.
-     * `FieldBase` has the specialisation `TypedFieldBase`.
+     * Virtual base class for all fields. A field represents
+     * meta-information for the per-pixel storage for a scalar, vector
+     * or tensor quantity and is therefore the abstract class defining
+     * the field. It is used for type and size checking at runtime and
+     * for storage of polymorphic pointers to fully typed and sized
+     * fields. `FieldBase` (and its children) are templated with a
+     * specific `FieldCollection` (derived from
+     * `muSpectre::FieldCollectionBase`). A `FieldCollection` stores
+     * multiple fields that all apply to the same set of
+     * pixels. Addressing and managing the data for all pixels is
+     * handled by the `FieldCollection`.  Note that `FieldBase` does
+     * not know anything about about mathematical operations on the
+     * data or how to iterate over all pixels. Mapping the raw data
+     * onto for instance Eigen maps and iterating over those is
+     * handled by the `FieldMap`.
      */
     template <class FieldCollection>
     class FieldBase
@@ -178,7 +180,6 @@ namespace muSpectre {
      * typed field. Mainly for binding Python. TypedFieldBase specifies methods
      * that return typed Eigen maps and vectors in addition to pointers to the
      * raw data.
-     * `TypedFieldBase` has the specialisation `TypedSizedFieldBase`.
      */
     template <class FieldCollection, typename T>
     class TypedFieldBase: public FieldBase<FieldCollection>
@@ -252,11 +253,11 @@ namespace muSpectre {
 
     /* ---------------------------------------------------------------------- */
     /**
-     * A `TypedSizeFieldBase` is the base class for fields that contain
+     * A `TypedSizedFieldBase` is the base class for fields that contain a
      * statically known number of scalars of a statically known type per pixel
-     * in a `muSpectre::FieldCollection`. The actual data for all pixels is
+     * in a `FieldCollection`. The actual data for all pixels is
      * stored in `TypedSizeFieldBase::values`.
-     * `TypedSizedFieldBase` has the specialisations `MatrixField` and
+     * `TypedSizedFieldBase` is the base class for `MatrixField` and
      * `TensorField`.
      */
     template <class FieldCollection, typename T, Dim_t NbComponents,
