@@ -232,6 +232,12 @@ namespace muSpectre {
     err = nu - comp;
     BOOST_CHECK_LT(err, tol);
 
+    comp = convert_elastic_modulus<ElasticModulus::Young,
+                                   ElasticModulus::lambda,
+                                   ElasticModulus::Shear>(lambda, mu);
+    err = E - comp;
+    BOOST_CHECK_LT(err, tol);
+
     // check inversion resistance
     Real compA = convert_elastic_modulus<ElasticModulus::Poisson,
                                          ElasticModulus::Bulk,
