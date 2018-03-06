@@ -44,6 +44,7 @@ namespace muSpectre {
                                     GlobalFieldCollection<DimS, DimM>,
                                     LocalFieldCollection<DimS, DimM>>;
     using Field_t = TensorField<FC_t, Real, secondOrder, DimM>;
+    using ScalField_t = ScalarField<FC_t, Real>;
     constexpr static size_t nb_mem{2};
     constexpr static Dim_t sdim{DimS};
     constexpr static Dim_t mdim{DimM};
@@ -51,9 +52,10 @@ namespace muSpectre {
 
 
     SF_Fixture()
-      :fc{}, sf("prefix", fc), self{*this} {}
+      :fc{}, sf("prefix", fc), scalar_f("scalar", fc), self{*this} {}
     FC_t fc;
     StateField<Field_t, nb_mem> sf;
+    StateField<ScalField_t, nb_mem> scalar_f;
     SF_Fixture & self;
   };
 
@@ -159,6 +161,42 @@ namespace muSpectre {
       BOOST_CHECK_LT(error, tol);
 
       error = (wrapper.template old<2>() - 2* I).norm();
+      BOOST_CHECK_LT(error, tol);
+
+    }
+  }
+
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_scalar_map, Fix, typelist, Fix) {
+    internal::init<Fix::global, decltype(Fix::self)>::run(Fix::self);
+
+    constexpr bool verbose{false};
+    auto scalar_map{Fix::scalar_f.get_map()};
+
+    for (size_t i = 0; i < Fix::nb_mem+1; ++i) {
+      for (auto && wrapper: scalar_map) {
+        wrapper.current() += (i+1);
+        if (verbose) {
+          std::cout << "pixel " << wrapper.get_ccoord() << ", memory cycle " << i << std::endl;
+          std::cout << wrapper.current() << std::endl;
+          std::cout << wrapper.old() << std::endl;
+          std::cout << wrapper.template old<2>() << std::endl << std::endl;
+        }
+      }
+      Fix::scalar_f.cycle();
+    }
+
+    auto scalar_const_map{Fix::scalar_f.get_const_map()};
+
+    BOOST_CHECK_EQUAL(scalar_const_map[0].current(), scalar_const_map[1].current());
+
+    for (auto wrapper: scalar_const_map) {
+      Real error{wrapper.current() - 1};
+      BOOST_CHECK_LT(error, tol);
+
+      error = wrapper.old() - 3;
+      BOOST_CHECK_LT(error, tol);
+
+      error = wrapper.template old<2>() - 2;
       BOOST_CHECK_LT(error, tol);
 
     }

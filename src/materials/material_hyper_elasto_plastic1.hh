@@ -35,6 +35,7 @@
 #include "materials/material_muSpectre_base.hh"
 #include "materials/materials_toolbox.hh"
 #include "common/eigen_tools.hh"
+#include "common/statefield.hh"
 
 #include <algorithm>
 
@@ -67,20 +68,22 @@ namespace muSpectre {
 
     //! local field collection used for internals
     using LFieldColl_t = LocalFieldCollection<DimS, DimM>;
+
     //! storage type for plastic flow measure (εₚ in the papers)
-    using ScalarMap_t = ScalarFieldMap<LFieldColl_t, Real>;
+    using LScalarMap_t = StateFieldMap<ScalarFieldMap<LFieldColl_t, Real>>;
     /**
      * storage type for for previous gradient Fᵗ and elastic left
      * Cauchy-Green deformation tensor bₑᵗ
      */
-    using LStrainMap_t = MatrixFieldMap<LFieldColl_t, Real, DimM, DimM, false>;
+    using LStrainMap_t = StateFieldMap<
+      MatrixFieldMap<LFieldColl_t, Real, DimM, DimM, false>>;
     /**
      * format in which to receive internals (previous gradient Fᵗ,
      * previous elastic lef Cauchy-Green deformation tensor bₑᵗ, and
      * the plastic flow measure εₚ
      */
     using InternalVariables = std::tuple<LStrainMap_t, LStrainMap_t,
-                                         ScalarMap_t>;
+                                         LScalarMap_t>;
 
   };
 
@@ -114,8 +117,10 @@ namespace muSpectre {
                    typename traits::StrainMap_t::reference,
                    typename traits::TangentMap_t::reference>;
 
-    //! type in which the previous strain is referenced
-    using StrainRef_t = typename traits::LStrainMap_t::reference;
+    //! type in which the previous strain state is referenced
+    using StrainStRef_t = typename traits::LStrainMap_t::reference &;
+    //! type in which the previous plastic flow is referenced
+    using FlowStRef_t = typename traits::LScalarMap_t::reference &;
 
     //! Default constructor
     MaterialHyperElastoPlastic1() = delete;
@@ -145,9 +150,9 @@ namespace muSpectre {
      * εₚ
      */
     template <class grad_t>
-    inline decltype(auto) evaluate_stress(grad_t && F, StrainRef_t F_prev,
-                                          StrainRef_t be_prev,
-                                          Real & plast_flow);
+    inline decltype(auto) evaluate_stress(grad_t && F, StrainStRef_t F_prev,
+                                          StrainStRef_t be_prev,
+                                          FlowStRef_t plast_flow);
 
     /**
      * evaluates Kirchhoff stress and stiffness given the current placement gradient
@@ -155,9 +160,9 @@ namespace muSpectre {
      * εₚ
      */
     template <class grad_t>
-    inline decltype(auto) evaluate_stress_tangent(grad_t && F, StrainRef_t F_prev,
-                                                  StrainRef_t be_prev,
-                                                  Real & plast_flow);
+    inline decltype(auto) evaluate_stress_tangent(grad_t && F, StrainStRef_t F_prev,
+                                                  StrainStRef_t be_prev,
+                                                  FlowStRef_t plast_flow);
 
     /**
      * return the internals tuple
@@ -172,19 +177,20 @@ namespace muSpectre {
      * worker function computing stresses and internal variables
      */
     template <class grad_t>
-    inline decltype(auto) stress_n_internals_worker(grad_t && F, StrainRef_t F_prev,
-                                                    StrainRef_t be_prev,
-                                                    Real & plast_flow);
+    inline decltype(auto) stress_n_internals_worker(grad_t && F,
+                                                    StrainStRef_t F_prev,
+                                                    StrainStRef_t be_prev,
+                                                    FlowStRef_t plast_flow);
 
     using LColl_t = LocalFieldCollection<DimS, DimM>;
     //! storage for cumulated plastic flow εₚ
-    ScalarField<LColl_t, Real> & plast_flow_field;
+    StateField<ScalarField<LColl_t, Real>>  plast_flow_field;
 
     //! storage for previous gradient Fᵗ
-    TensorField<LColl_t, Real, secondOrder, DimM> & F_prev_field;
+    StateField<TensorField<LColl_t, Real, secondOrder, DimM>> F_prev_field;
 
     //! storage for elastic left Cauchy-Green deformation tensor bₑᵗ
-    TensorField<LColl_t, Real, secondOrder, DimM> & be_prev_field;
+    StateField<TensorField<LColl_t, Real, secondOrder, DimM>> be_prev_field;
 
     // material properties
     const Real young;          //!< Young's modulus
@@ -205,15 +211,15 @@ namespace muSpectre {
   template <class grad_t>
   decltype(auto)
   MaterialHyperElastoPlastic1<DimS, DimM>::
-  stress_n_internals_worker(grad_t && F, StrainRef_t F_prev,
-                            StrainRef_t be_prev, Real & eps_p)  {
+  stress_n_internals_worker(grad_t && F, StrainStRef_t F_prev,
+                            StrainStRef_t be_prev, FlowStRef_t eps_p)  {
 
     // the notation in this function follows Geers 2003
     // (https://doi.org/10.1016/j.cma.2003.07.014).
 
     // computation of trial state
-    auto && f{F*F_prev.inverse()};
-    log_comp::Mat_t<DimM> be_star{f*be_prev*f.transpose()};
+    auto && f{F*F_prev.old().inverse()};
+    log_comp::Mat_t<DimM> be_star{f*be_prev.old()*f.transpose()};
     auto && ln_be_star{logm(be_star)};
     auto && tau_star{.5*Hooke::evaluate_stress(this->lambda, this->mu, ln_be_star)};
     // deviatoric part of Kirchhoff stress
@@ -223,7 +229,7 @@ namespace muSpectre {
                                  tau_d_star.transpose().array()).sum())};
     auto && N_star{3*.5*tau_d_star/tau_eq_star};
     // this is eq (27), and the std::min enforces the Kuhn-Tucker relation (16)
-    auto && phi_star{std::min(tau_eq_star - this->tau_y0 - this->H * eps_p, 0.)};
+    auto && phi_star{std::min(tau_eq_star - this->tau_y0 - this->H * eps_p.old(), 0.)};
 
     // return mapping
     auto && Del_gamma{phi_star/(this->H + 3 * this->mu)};
@@ -231,9 +237,9 @@ namespace muSpectre {
     //auto && tau_eq{tau_eq_star - 3*this->mu*Del_gamma};
 
     // update the previous values to the new ones
-    F_prev = F;
-    be_prev = expm(log_comp::Mat_t<DimM>(ln_be_star-2*Del_gamma*N_star));
-    eps_p += Del_gamma;
+    F_prev.current() = F;
+    be_prev.current() = expm(log_comp::Mat_t<DimM>(ln_be_star-2*Del_gamma*N_star));
+    eps_p.current() += Del_gamma;
 
 
     // transmit info whether this is a plastic step or not
@@ -247,8 +253,8 @@ namespace muSpectre {
   template <class grad_t>
   decltype(auto)
   MaterialHyperElastoPlastic1<DimS, DimM>::
-  evaluate_stress(grad_t && F, StrainRef_t F_prev, StrainRef_t be_prev,
-                  Real & eps_p)  {
+  evaluate_stress(grad_t && F, StrainStRef_t F_prev, StrainStRef_t be_prev,
+                  FlowStRef_t eps_p)  {
     return std::get<0>(this->stress_n_internals_worker
                        (std::forward<grad_t>(F), F_prev, be_prev, eps_p));
   }
@@ -257,8 +263,8 @@ namespace muSpectre {
   template <class grad_t>
   decltype(auto)
   MaterialHyperElastoPlastic1<DimS, DimM>::
-  evaluate_stress_tangent(grad_t && F, StrainRef_t F_prev, StrainRef_t be_prev,
-                          Real & eps_p)  {
+  evaluate_stress_tangent(grad_t && F, StrainStRef_t F_prev, StrainStRef_t be_prev,
+                          FlowStRef_t eps_p)  {
     //! after the stress computation, all internals are up to date
     auto && vals{this->stress_n_internals_worker
         (std::forward<grad_t>(F), F_prev, be_prev, eps_p)};

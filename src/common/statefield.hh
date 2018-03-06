@@ -237,9 +237,13 @@ namespace muSpectre {
      */
     class iterator;
 
+    using reference = typename iterator::reference;
+    using value_type = typename iterator::value_type;
+    using size_type = typename iterator::size_type;
 
     using FieldCollection= typename FieldMap::Field::collection_t;
     using StateFieldBase_t = StateFieldBase<nb_memory>;
+    using FieldMap_t = FieldMap;
     using ConstFieldMap_t = typename FieldMap::ConstMap;
 
     //! Default constructor
@@ -276,6 +280,10 @@ namespace muSpectre {
     //! Move assignment operator
     StateFieldMap& operator=(StateFieldMap &&other) = delete;
 
+    value_type operator[](size_type index) {
+      return *iterator(*this, index);
+    }
+
 
     iterator begin() {
       return iterator(*this, 0);}
@@ -303,6 +311,7 @@ namespace muSpectre {
     using const_value_type = value_type;
     using pointer_type = value_type*;
     using difference_type = std::ptrdiff_t;
+    using size_type = size_t;
     using iterator_category = std::random_access_iterator_tag;
     using reference = StateWrapper;
 
@@ -405,17 +414,16 @@ namespace muSpectre {
     //! FieldMap is an `Eigen::Map` or `Eigen::TensorMap` here
     template <class FieldMap, size_t size, size_t... I,
               class iterator, class maps_t, class indices_t>
-    std::array<FieldMap, size>
+    inline decltype(auto)
     build_old_vals_helper(iterator& it, maps_t & maps, indices_t & indices,
                           std::index_sequence<I...>) {
-      return std::array<FieldMap, size>{
-          maps[indices[I+1]][it.get_index()]...};
+      return tuple_array<FieldMap, size>(std::forward_as_tuple(maps[indices[I+1]][it.get_index()]...));
     }
 
     template <class FieldMap, size_t size, class iterator, class maps_t, class indices_t>
-    inline std::array<FieldMap, size>
+    inline decltype(auto)
     build_old_vals(iterator& it, maps_t & maps, indices_t & indices) {
-      return std::array<FieldMap, size>{build_old_vals_helper<FieldMap, size>
+      return tuple_array<FieldMap, size>{build_old_vals_helper<FieldMap, size>
           (it, maps, indices, std::make_index_sequence<size>{})};
     }
 
@@ -469,7 +477,7 @@ namespace muSpectre {
       static_assert (nb_steps_ago > 0,
                      "Did you mean to access the current value? If so, use "
                      "current()");
-      return this->old_vals[nb_memory - nb_steps_ago];
+      return std::get<nb_memory-nb_steps_ago>(this->old_vals);
     }
 
     inline Ccoord get_ccoord() const {
@@ -479,7 +487,7 @@ namespace muSpectre {
   protected:
     iterator& it;
     Map current_val;
-    std::array<ConstMap, nb_memory> old_vals;
+    tuple_array<ConstMap, nb_memory> old_vals;
   private:
   };
 }  // muSpectre

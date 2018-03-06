@@ -192,18 +192,18 @@ namespace muSpectre {
     };
 
     template <typename T, size_t size>
-    struct tuple_array {
+    struct tuple_array_provider {
       class type: public tuple_array_helper<size, T>::type {
       public:
         using Parent = typename tuple_array_helper<size, T>::type;
 
         inline type(Parent && parent):Parent{parent}{};
-        T operator[](size_t index) {
-          return reinterpret_cast<T*>(this)[index];
-        }
-        T operator[](size_t index) const {
-          return reinterpret_cast<T*>(this)[index];
-        }
+        // T operator[](size_t index) {
+        //   return reinterpret_cast<T*>(this)[index];
+        // }
+        // T operator[](size_t index) const {
+        //   return reinterpret_cast<T*>(this)[index];
+        // }
       };
     };
   }  // internal
@@ -220,7 +220,7 @@ namespace muSpectre {
    * and you wish to do so efficiently.
    */
   template <typename T, size_t nb_elem>
-  using tuple_array = typename internal::tuple_array<T, nb_elem>::type;
+  using tuple_array = typename internal::tuple_array_provider<T, nb_elem>::type;
 
   using std_replacement::apply;
 

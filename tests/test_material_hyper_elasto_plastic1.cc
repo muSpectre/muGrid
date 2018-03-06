@@ -74,22 +74,43 @@ namespace muSpectre {
 
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_evaluate_stress, Fix, mats, Fix) {
-    constexpr Dim_t dim{Fix::mdim};
+    constexpr Dim_t mdim{Fix::mdim}, sdim{Fix::sdim};
     constexpr bool verbose{false};
-    using Strain_t = Eigen::Matrix<Real, dim, dim>;
-    using StrainRef_t = Eigen::Map<Strain_t>;
+    using Strain_t = Eigen::Matrix<Real, mdim, mdim>;
+    using traits = MaterialMuSpectre_traits<MaterialHyperElastoPlastic1<sdim, mdim>>;
+    using LColl_t = typename traits::LFieldColl_t;
+    using StrainStField_t = StateField<
+      TensorField<LColl_t, Real, secondOrder, mdim>>;
+    using FlowStField_t = StateField<
+      ScalarField<LColl_t, Real>>;
 
+    // using StrainStRef_t = typename traits::LStrainMap_t::reference;
+    // using ScalarStRef_t = typename traits::LScalarMap_t::reference;
+
+    // create statefields
+    LColl_t coll{};
+    coll.add_pixel({0});
+    coll.initialise();
+
+    StrainStField_t F_("previous gradient", coll);
+    StrainStField_t be_("previous elastic strain", coll);
+    FlowStField_t eps_("plastic flow", coll);
+
+    auto F_prev{F_.get_map()};
+    F_prev[0].current() = Strain_t::Identity();
+    auto be_prev{be_.get_map()};
+    be_prev[0].current() = Strain_t::Identity();
+    auto eps_prev{eps_.get_map()};
+    eps_prev[0].current() = 0;
     // elastic deformation
     Strain_t F{Strain_t::Identity()};
     F(0, 1) = 1e-5;
-    Strain_t F_prev{Strain_t::Identity()};
-    Strain_t be_prev{Strain_t::Identity()};
-    Real eps_prev{0};
+
 
     Strain_t stress{Fix::mat.evaluate_stress(F,
-                                             StrainRef_t(F_prev.data()),
-                                             StrainRef_t(be_prev.data()),
-                                             eps_prev)};
+                                             F_prev[0],
+                                             be_prev[0],
+                                             eps_prev[0])};
 
     if (verbose) {
       std::cout << "τ  =" << std::endl << stress << std::endl
