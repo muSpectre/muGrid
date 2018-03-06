@@ -443,7 +443,7 @@ namespace muSpectre {
     StateWrapper() = delete;
 
     //! Copy constructor
-    StateWrapper(const StateWrapper &other) = delete;
+    StateWrapper(const StateWrapper &other) = default;
 
     //! Move constructor
     StateWrapper(StateWrapper &&other) = default;
@@ -461,10 +461,10 @@ namespace muSpectre {
     virtual ~StateWrapper() = default;
 
     //! Copy assignment operator
-    StateWrapper& operator=(const StateWrapper &other) = delete;
+    StateWrapper& operator=(const StateWrapper &other) = default;
 
     //! Move assignment operator
-    StateWrapper& operator=(StateWrapper &&other) = delete;
+    StateWrapper& operator=(StateWrapper &&other) = default;
 
     inline Map& current() {
       return this->current_val;

@@ -168,6 +168,13 @@ namespace muSpectre {
      */
     void initialise_materials(bool stiffness=false);
 
+    /**
+     * for materials with state variables, these typically need to be
+     * saved/updated an the end of each load increment, this function
+     * calls this update for each material in the cell
+     */
+    void save_history_variables();
+
     iterator begin(); //!< iterator to the first pixel
     iterator end();  //!< iterator past the last pixel
     //! number of pixels in the cell

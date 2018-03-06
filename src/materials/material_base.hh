@@ -93,7 +93,15 @@ namespace muSpectre {
     //! allocate memory, etc, but also: wipe history variables!
     virtual void initialise(bool stiffness = false) = 0;
 
-    //! return the materil's name
+    /**
+     * for materials with state variables, these typically need to be
+     * saved/updated an the end of each load increment, the virtual
+     * base implementation does nothing, but materials with history
+     * variables need to implement this
+     */
+    virtual void save_history_variables() {};
+
+    //! return the material's name
     const std::string & get_name() const;
 
     //! spatial dimension for static inheritance

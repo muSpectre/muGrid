@@ -118,9 +118,9 @@ namespace muSpectre {
                    typename traits::TangentMap_t::reference>;
 
     //! type in which the previous strain state is referenced
-    using StrainStRef_t = typename traits::LStrainMap_t::reference &;
+    using StrainStRef_t = typename traits::LStrainMap_t::reference;
     //! type in which the previous plastic flow is referenced
-    using FlowStRef_t = typename traits::LScalarMap_t::reference &;
+    using FlowStRef_t = typename traits::LScalarMap_t::reference;
 
     //! Default constructor
     MaterialHyperElastoPlastic1() = delete;
@@ -163,6 +163,11 @@ namespace muSpectre {
     inline decltype(auto) evaluate_stress_tangent(grad_t && F, StrainStRef_t F_prev,
                                                   StrainStRef_t be_prev,
                                                   FlowStRef_t plast_flow);
+
+    /**
+     * The statefields need to be cycled at the end of each load increment
+     */
+    virtual void save_history_variables() override;
 
     /**
      * return the internals tuple

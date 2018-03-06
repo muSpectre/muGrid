@@ -213,6 +213,13 @@ namespace muSpectre {
     }
   }
 
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  void SystemBase<DimS, DimM>::save_history_variables() {
+    for (auto && mat: this->materials) {
+      mat->save_history_variables();
+    }
+  }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>

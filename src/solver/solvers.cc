@@ -205,7 +205,8 @@ namespace muSpectre {
             newt_iter, solver.get_counter()});
 
 
-      //!store history variables here
+      // store history variables here
+      sys.save_history_variables();
 
     }
 
@@ -387,7 +388,8 @@ namespace muSpectre {
             message,
             newt_iter, solver.get_counter()});
 
-      //store history variables here
+      //store history variables for next load increment
+      sys.save_history_variables();
 
     }
 

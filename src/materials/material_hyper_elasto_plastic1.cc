@@ -38,7 +38,8 @@ namespace muSpectre {
     : Parent{name},
       plast_flow_field("cumulated plastic flow εₚ", this->internal_fields),
       F_prev_field("Previous placement gradient Fᵗ", this->internal_fields),
-      be_prev_field("Previous left Cauchy-Green deformation bₑᵗ", this->internal_fields),
+      be_prev_field("Previous left Cauchy-Green deformation bₑᵗ",
+                    this->internal_fields),
       young{young}, poisson{poisson},
       lambda{Hooke::compute_lambda(young, poisson)},
       mu{Hooke::compute_mu(young, poisson)},
@@ -48,6 +49,14 @@ namespace muSpectre {
       internal_variables{F_prev_field.get_map(), be_prev_field.get_map(),
           plast_flow_field.get_map()}
   {}
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  void MaterialHyperElastoPlastic1<DimS, DimM>::save_history_variables() {
+    this->plast_flow_field.cycle();
+    this->F_prev_field.cycle();
+    this->be_prev_field.cycle();
+  }
 
   template class MaterialHyperElastoPlastic1<  twoD,   twoD>;
   template class MaterialHyperElastoPlastic1<  twoD, threeD>;

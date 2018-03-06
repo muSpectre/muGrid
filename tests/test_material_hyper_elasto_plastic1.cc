@@ -75,7 +75,7 @@ namespace muSpectre {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_evaluate_stress, Fix, mats, Fix) {
     constexpr Dim_t mdim{Fix::mdim}, sdim{Fix::sdim};
-    constexpr bool verbose{false};
+    constexpr bool verbose{true};
     using Strain_t = Eigen::Matrix<Real, mdim, mdim>;
     using traits = MaterialMuSpectre_traits<MaterialHyperElastoPlastic1<sdim, mdim>>;
     using LColl_t = typename traits::LFieldColl_t;
@@ -106,7 +106,9 @@ namespace muSpectre {
     Strain_t F{Strain_t::Identity()};
     F(0, 1) = 1e-5;
 
-
+    F_.cycle();
+    be_.cycle();
+    eps_.cycle();
     Strain_t stress{Fix::mat.evaluate_stress(F,
                                              F_prev[0],
                                              be_prev[0],
@@ -115,17 +117,29 @@ namespace muSpectre {
     if (verbose) {
       std::cout << "τ  =" << std::endl << stress << std::endl
                 << "F  =" << std::endl << F << std::endl
-                << "Fₜ =" << std::endl << F_prev << std::endl
-                << "bₑ =" << std::endl << be_prev << std::endl
-                << "εₚ =" << std::endl << eps_prev << std::endl;
+                << "Fₜ =" << std::endl << F_prev[0].current() << std::endl
+                << "bₑ =" << std::endl << be_prev[0].current() << std::endl
+                << "εₚ =" << std::endl << eps_prev[0].current() << std::endl;
     }
+    F_.cycle();
+    be_.cycle();
+    eps_.cycle();
 
+    std::cout << "Post Cycle" << std::endl;
     // plastic deformation
     F(0, 1) = .2;
     stress = Fix::mat.evaluate_stress(F,
-                                      StrainRef_t(F_prev.data()),
-                                      StrainRef_t(be_prev.data()),
-                                      eps_prev);
+                                      F_prev[0],
+                                      be_prev[0],
+                                      eps_prev[0]);
+
+    if (verbose) {
+      std::cout << "τ  =" << std::endl << stress << std::endl
+                << "F  =" << std::endl << F << std::endl
+                << "Fₜ =" << std::endl << F_prev[0].current() << std::endl
+                << "bₑ =" << std::endl << be_prev[0].current() << std::endl
+                << "εₚ =" << std::endl << eps_prev[0].current() << std::endl;
+    }
   }
 
   BOOST_AUTO_TEST_SUITE_END();
