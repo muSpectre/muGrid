@@ -41,7 +41,9 @@ add_subdirectory(fft)
 add_subdirectory(system)
 add_subdirectory(solver)
 
+find_package(MPI)
 find_package(FFTW REQUIRED)
+find_package(FFTWMPI)
 
 
 # The following checks whether std::optional exists and replaces it by
@@ -60,5 +62,11 @@ endif()
 
 
 add_library(muSpectre ${muSpectre_SRC})
-target_link_libraries(muSpectre Eigen3::Eigen ${FFTW_LIBRARIES})
-
+set(muSpectre_LIBRARIES Eigen3::Eigen ${FFTW_LIBRARIES})
+if(FFTWMPI_FOUND)
+  set(muSpectre_LIBRARIES
+    ${muSpectre_LIBRARIES}
+    ${FFTWMPI_LIBRARIES}
+    ${MPI_LIBRARIES})
+endif()
+target_link_libraries(muSpectre ${muSpectre_LIBRARIES})

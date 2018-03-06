@@ -72,9 +72,9 @@ include_directories(
   ${CMAKE_SOURCE_DIR}
   )
 
-#find_package(MPI REQUIRED)
+find_package(MPI)
 find_package(FFTW REQUIRED)
-#find_package(FFTWMPI REQUIRED)
+find_package(FFTWMPI)
 
 
 #build tests

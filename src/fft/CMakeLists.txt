@@ -38,6 +38,13 @@ set (fft_engine_SRC
   ${CMAKE_CURRENT_SOURCE_DIR}/projection_finite_strain_fast.cc
   )
 
+if(FFTWMPI_FOUND)
+  set(fft_engine_SRC
+    ${fft_engine_SRC}
+    ${CMAKE_CURRENT_SOURCE_DIR}/fftw_engine_mpi.cc
+    )
+endif()
+
 set (muSpectre_SRC
   ${muSpectre_SRC}
   ${fft_engine_SRC}
