@@ -778,13 +778,13 @@ protected:
   //! Factory function, guarantees that only fields get created that are
   //! properly registered and linked to a collection.
   template<class FieldType, class FieldCollection, typename... Args>
-  FieldType &
+  inline FieldType &
   make_field(std::string unique_name,
              FieldCollection & collection,
              Args&&... args) {
-    auto ptr = std::unique_ptr<FieldType>{
+    std::unique_ptr<FieldType> ptr{
       new FieldType(unique_name, collection, args...)};
-    auto& retref = *ptr;
+    auto& retref{*ptr};
     collection.register_field(std::move(ptr));
     return retref;
   }

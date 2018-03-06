@@ -179,6 +179,49 @@ namespace std_replacement {
 
 namespace muSpectre {
 
+  namespace internal {
+
+    template <size_t size, typename T, typename... tail>
+    struct tuple_array_helper {
+      using type = typename tuple_array_helper<size-1, T, T, tail...>::type;
+    };
+
+    template< typename T, typename... tail>
+    struct tuple_array_helper<0, T, tail...> {
+      using type = std::tuple<tail...>;
+    };
+
+    template <typename T, size_t size>
+    struct tuple_array {
+      class type: public tuple_array_helper<size, T>::type {
+      public:
+        using Parent = typename tuple_array_helper<size, T>::type;
+
+        inline type(Parent && parent):Parent{parent}{};
+        T operator[](size_t index) {
+          return reinterpret_cast<T*>(this)[index];
+        }
+        T operator[](size_t index) const {
+          return reinterpret_cast<T*>(this)[index];
+        }
+      };
+    };
+  }  // internal
+
+  /**
+   * This is a convenience structure to create a tuple of `nb_elem`
+   * entries of type `T`. It is named tuple_array, because it is
+   * somewhat similar to an `std::array<T, nb_elem>`. The reason for
+   * this structure is that the `std::array` is not allowed by the
+   * standard to store references (8.3.2 References, paragraph 5:
+   * "There shall be no references to references, no arrays of
+   * references, and no pointers to references.") use this, if you
+   * want to have a statically known number of references to store,
+   * and you wish to do so efficiently.
+   */
+  template <typename T, size_t nb_elem>
+  using tuple_array = typename internal::tuple_array<T, nb_elem>::type;
+
   using std_replacement::apply;
 
   /**

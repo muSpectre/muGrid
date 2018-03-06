@@ -212,7 +212,8 @@ namespace muSpectre {
     class Pixels {
     public:
       //! constructor
-      Pixels(const Ccoord_t<dim> & sizes=Ccoord_t<dim>{}):sizes(sizes){};
+      Pixels(const Ccoord_t<dim> & resolutions=Ccoord_t<dim>{})
+        :resolutions{resolutions}{};
       //! copy constructor
       Pixels(const Pixels & other) = default;
       //! assignment operator
@@ -253,22 +254,22 @@ namespace muSpectre {
       //! stl conformance
       inline iterator end() const {return iterator(*this, false);}
       //! stl conformance
-      inline size_t size() const {return get_size(this->sizes);}
+      inline size_t size() const {return get_size(this->resolutions);}
     protected:
-      Ccoord_t<dim>  sizes; //!< resolutions of cell
+      Ccoord_t<dim>  resolutions; //!< resolutions of cell
     };
 
     /* ---------------------------------------------------------------------- */
     template <size_t dim>
     Pixels<dim>::iterator::iterator(const Pixels & pixels, bool begin)
-      :pixels{pixels}, index{begin? 0: get_size(pixels.sizes)}
+      :pixels{pixels}, index{begin? 0: get_size(pixels.resolutions)}
     {}
 
     /* ---------------------------------------------------------------------- */
     template <size_t dim>
     typename Pixels<dim>::iterator::value_type
     Pixels<dim>::iterator::operator*() const {
-      return get_ccoord(pixels.sizes, this->index);
+      return get_ccoord(pixels.resolutions, this->index);
     }
 
     /* ---------------------------------------------------------------------- */

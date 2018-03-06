@@ -75,9 +75,9 @@ namespace muSpectre {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_evaluate_stress, Fix, mats, Fix) {
     constexpr Dim_t dim{Fix::mdim};
+    constexpr bool verbose{false};
     using Strain_t = Eigen::Matrix<Real, dim, dim>;
     using StrainRef_t = Eigen::Map<Strain_t>;
-
 
     // elastic deformation
     Strain_t F{Strain_t::Identity()};
@@ -91,11 +91,13 @@ namespace muSpectre {
                                              StrainRef_t(be_prev.data()),
                                              eps_prev)};
 
-    std::cout << "τ  =" << std::endl << stress << std::endl
-              << "F  =" << std::endl << F << std::endl
-              << "Fₜ =" << std::endl << F_prev << std::endl
-              << "bₑ =" << std::endl << be_prev << std::endl
-              << "εₚ =" << std::endl << eps_prev << std::endl;
+    if (verbose) {
+      std::cout << "τ  =" << std::endl << stress << std::endl
+                << "F  =" << std::endl << F << std::endl
+                << "Fₜ =" << std::endl << F_prev << std::endl
+                << "bₑ =" << std::endl << be_prev << std::endl
+                << "εₚ =" << std::endl << eps_prev << std::endl;
+    }
 
     // plastic deformation
     F(0, 1) = .2;
