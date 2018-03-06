@@ -60,6 +60,10 @@ namespace muSpectre {
     index_t indices; ///< these are cycled through
   };
 
+  // early declaration
+  template <class FieldMap, size_t nb_memory>
+  class StateFieldMap;
+
   namespace internal {
 
     template <class Field, size_t size, size_t... I>
@@ -171,6 +175,30 @@ namespace muSpectre {
      }
 
     /**
+     * Pure convenience functions to get a MatrixFieldMap of
+     * appropriate dimensions mapped to this field. You can also
+     * create other types of maps, as long as they have the right
+     * fundamental type (T), the correct size (nbComponents), and
+     * memory (nb_memory).
+     */
+    inline decltype(auto) get_map() {
+      using FieldMap = decltype(std::get<0>(this->fields).get_map());
+      return StateFieldMap<FieldMap, nb_memory>(*this);
+    }
+
+    /**
+     * Pure convenience functions to get a MatrixFieldMap of
+     * appropriate dimensions mapped to this field. You can also
+     * create other types of maps, as long as they have the right
+     * fundamental type (T), the correct size (nbComponents), and
+     * memory (nb_memory).
+     */
+    inline decltype(auto) get_const_map() {
+      using FieldMap = decltype(std::get<0>(this->fields).get_const_map());
+      return StateFieldMap<FieldMap, nb_memory>(*this);
+    }
+
+    /**
      * cycle the fields (current becomes old, old becomes older,
      * oldest becomes current)
      */
@@ -237,7 +265,7 @@ namespace muSpectre {
     StateFieldMap(const StateFieldMap &other) = delete;
 
     //! Move constructor
-    StateFieldMap(StateFieldMap &&other) = delete;
+    StateFieldMap(StateFieldMap &&other) = default;
 
     //! Destructor
     virtual ~StateFieldMap() = default;

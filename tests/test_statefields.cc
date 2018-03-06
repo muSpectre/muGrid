@@ -91,6 +91,7 @@ namespace muSpectre {
     };
 
   }  // internal
+
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_iteration, Fix, typelist, Fix) {
     internal::init<Fix::global, decltype(Fix::self)>::run(Fix::self);
 
@@ -126,6 +127,42 @@ namespace muSpectre {
       BOOST_CHECK_LT(error, tol);
 
     }
+  }
+
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_default_map, Fix, typelist, Fix) {
+    internal::init<Fix::global, decltype(Fix::self)>::run(Fix::self);
+
+    constexpr bool verbose{false};
+    auto matrix_map{Fix::sf.get_map()};
+
+    for (size_t i = 0; i < Fix::nb_mem+1; ++i) {
+      for (auto && wrapper: matrix_map) {
+        wrapper.current() += (i+1)*wrapper.current().Identity();
+        if (verbose) {
+          std::cout << "pixel " << wrapper.get_ccoord() << ", memory cycle " << i << std::endl;
+          std::cout << wrapper.current() << std::endl;
+          std::cout << wrapper.old() << std::endl;
+          std::cout << wrapper.template old<2>() << std::endl << std::endl;
+        }
+      }
+      Fix::sf.cycle();
+    }
+
+    auto matrix_const_map{Fix::sf.get_const_map()};
+
+    for (auto && wrapper: matrix_const_map) {
+      auto I{wrapper.current().Identity()};
+      Real error{(wrapper.current() - I).norm()};
+      BOOST_CHECK_LT(error, tol);
+
+      error = (wrapper.old() - 3*I).norm();
+      BOOST_CHECK_LT(error, tol);
+
+      error = (wrapper.template old<2>() - 2* I).norm();
+      BOOST_CHECK_LT(error, tol);
+
+    }
+
   }
 
 }  // muSpectre
