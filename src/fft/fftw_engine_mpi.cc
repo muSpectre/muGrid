@@ -1,11 +1,11 @@
 /**
- * @file   fftw_engine.cc
+ * @file   fftw_engine_mpi.cc
  *
- * @author Till Junge <till.junge@altermail.ch>
+ * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
- * @date   03 Dec 2017
+ * @date   06 Mar 2017
  *
- * @brief  implements the fftw engine
+ * @brief  implements the MPI-parallel fftw engine
  *
  * Copyright © 2017 Till Junge
  *
