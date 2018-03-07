@@ -28,7 +28,7 @@
 #ifndef MPI_CONTEXT_H
 #define MPI_CONTEXT_H
 
-#include <mpi.h>
+#include "common/communicator.hh"
 
 namespace µSpectre {
 
@@ -37,14 +37,14 @@ namespace µSpectre {
    */
   class MPIContext {
   public:
-    MPI_Comm comm;
+    Communicator comm;
     static MPIContext &get_context() {
       static MPIContext context;
       return context;
     }
 
   private:
-    MPIContext(): comm(MPI_COMM_WORLD) {
+    MPIContext(): comm(Communicator(MPI_COMM_WORLD)) {
       BOOST_TEST_MESSAGE("MPI_Init");
       MPI_Init(&boost::unit_test::framework::master_test_suite().argc,
                &boost::unit_test::framework::master_test_suite().argv);

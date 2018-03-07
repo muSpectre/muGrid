@@ -35,7 +35,7 @@ namespace muSpectre {
 
   template <Dim_t DimS, Dim_t DimM>
   FFTWMPIEngine<DimS, DimM>::FFTWMPIEngine(Ccoord resolutions, Rcoord lengths,
-                                           MPI_Comm comm)
+                                           µSpectre::Communicator comm)
     :Parent{resolutions, lengths}, comm{comm},
      hermitian_resolutions{CcoordOps::get_hermitian_sizes(resolutions)}
   {
@@ -65,8 +65,8 @@ namespace muSpectre {
     ptrdiff_t loc_res_x, loc_loc_x;
     ptrdiff_t loc_alloc_size{
       fftw_mpi_local_size_many(
-        rank, narr.data(), howmany, FFTW_MPI_DEFAULT_BLOCK, this->comm,
-        &loc_res_x, &loc_loc_x)};
+        rank, narr.data(), howmany, FFTW_MPI_DEFAULT_BLOCK,
+        this->comm.get_mpi_comm(), &loc_res_x, &loc_loc_x)};
     this->resolutions[0] = loc_res_x;
     this->locations[0] = loc_loc_x;
 
@@ -100,7 +100,7 @@ namespace muSpectre {
     narr[2] = this->domain_resolutions[2];
     this->plan_fft = fftw_mpi_plan_many_dft_r2c(
       rank, narr.data(), howmany, FFTW_MPI_DEFAULT_BLOCK,
-      FFTW_MPI_DEFAULT_BLOCK, in, out, this->comm,
+      FFTW_MPI_DEFAULT_BLOCK, in, out, this->comm.get_mpi_comm(),
       FFTW_PRESERVE_INPUT | flags);
     if (this->plan_fft == nullptr) {
       throw std::runtime_error("r2c plan failed");
@@ -113,7 +113,7 @@ namespace muSpectre {
 
     this->plan_ifft = fftw_mpi_plan_many_dft_c2r(
       rank, narr.data(), howmany, FFTW_MPI_DEFAULT_BLOCK,
-      FFTW_MPI_DEFAULT_BLOCK, i_in, i_out, this->comm,
+      FFTW_MPI_DEFAULT_BLOCK, i_in, i_out, this->comm.get_mpi_comm(),
       FFTW_PRESERVE_INPUT | flags);
 
     if (this->plan_ifft == nullptr) {
