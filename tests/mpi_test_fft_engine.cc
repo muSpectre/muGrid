@@ -50,7 +50,7 @@ namespace muSpectre {
       return CcoordOps::get_cube<DimS>(box_resolution);
     }
     FFTW_fixture(): engine(res(), CcoordOps::get_cube<DimS>(box_length),
-                           µSpectre::MPIContext::get_context().comm) {}
+                           MPIContext::get_context().comm) {}
     FFTWMPIEngine<DimS, DimM> engine;
   };
 
@@ -60,7 +60,7 @@ namespace muSpectre {
     constexpr static Dim_t mdim{twoD};
     constexpr static Ccoord_t<sdim> res() {return {6, 4};}
     FFTW_fixture_python_segfault():
-      engine{res(), {3., 3}, µSpectre::MPIContext::get_context().comm} {}
+      engine{res(), {3., 3}, MPIContext::get_context().comm} {}
     FFTWMPIEngine<sdim, mdim> engine;
   };
 
@@ -75,13 +75,12 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(Constructor_test, Fix, fixlist, Fix) {
-    µSpectre::Communicator &comm = µSpectre::MPIContext::get_context().comm;
+    Communicator &comm = MPIContext::get_context().comm;
     BOOST_CHECK_NO_THROW(Fix::engine.initialise(FFT_PlanFlags::estimate));
     BOOST_CHECK_EQUAL(comm.sum(Fix::engine.size()),
                       CcoordOps::get_size(Fix::res()));
   }
 
-#if 0
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(fft_test, Fix, fixlist, Fix) {
     Fix::engine.initialise(FFT_PlanFlags::estimate);
@@ -91,7 +90,7 @@ namespace muSpectre {
     auto & input{make_field<TensorField<FC_t, Real, order, Fix::mdim>>("input", fc)};
     auto & ref  {make_field<TensorField<FC_t, Real, order, Fix::mdim>>("reference", fc)};
     auto & result{make_field<TensorField<FC_t, Real, order, Fix::mdim>>("result", fc)};
-    fc.initialise(Fix::res());
+    fc.initialise(Fix::engine.get_resolutions());
 
     using map_t = MatrixFieldMap<FC_t, Real, Fix::mdim, Fix::mdim>;
     map_t inmap{input};
@@ -128,7 +127,6 @@ namespace muSpectre {
       }
     }
   }
-#endif
 
   BOOST_AUTO_TEST_SUITE_END();
 

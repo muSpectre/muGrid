@@ -32,7 +32,9 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   FFT_Engine_base<DimS, DimM>::FFT_Engine_base(Ccoord resolutions, Rcoord lengths)
-    :resolutions{resolutions}, locations{}, domain_resolutions{resolutions},
+    :resolutions{resolutions}, locations{},
+     fourier_resolutions{CcoordOps::get_hermitian_sizes(resolutions)},
+     fourier_locations{}, domain_resolutions{resolutions},
      lengths{lengths},
      work{make_field<Workspace_t>("work space", work_space_container)},
      norm_factor{1./CcoordOps::get_size(resolutions)}

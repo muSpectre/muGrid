@@ -35,13 +35,12 @@ namespace muSpectre {
 
   template <Dim_t DimS, Dim_t DimM>
   FFTWMPIEngine<DimS, DimM>::FFTWMPIEngine(Ccoord resolutions, Rcoord lengths,
-                                           µSpectre::Communicator comm)
-    :Parent{resolutions, lengths}, comm{comm},
-     hermitian_resolutions{CcoordOps::get_hermitian_sizes(resolutions)}
+                                           Communicator comm)
+    :Parent{resolutions, lengths}, comm{comm}
   {
     if (!this->nb_engines) fftw_mpi_init();
     this->nb_engines++;
-    for (auto && pixel: CcoordOps::Pixels<DimS>(this->hermitian_resolutions)) {
+    for (auto && pixel: CcoordOps::Pixels<DimS>(this->fourier_resolutions)) {
       this->work_space_container.add_pixel(pixel);
     }
   }

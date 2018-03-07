@@ -32,7 +32,7 @@
 #include <mpi.h>
 #endif
 
-namespace µSpectre {
+namespace muSpectre {
 
 #ifdef WITH_MPI
 

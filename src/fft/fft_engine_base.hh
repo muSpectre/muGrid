@@ -111,6 +111,10 @@ namespace muSpectre {
     const Ccoord & get_resolutions() const {return this->resolutions;}
     //! returns the process-local locations of the cell
     const Ccoord & get_locations() const {return this->locations;}
+    //! returns the process-local resolutions of the cell in Fourier space
+    const Ccoord & get_fourier_resolutions() const {return this->fourier_resolutions;}
+    //! returns the process-local locations of the cell in Fourier space
+    const Ccoord & get_fourier_locations() const {return this->fourier_locations;}
     //! returns the resolutions of the cell
     const Ccoord & get_domain_resolutions() const {return this->domain_resolutions;}
     //! returns the physical sizes of the cell
@@ -139,6 +143,8 @@ namespace muSpectre {
     LFieldCollection_t work_space_container{};
     Ccoord resolutions; //!< resolutions of the process-local portion of the cell
     Ccoord locations; // !< location of the process-local portion of the cell
+    Ccoord fourier_resolutions; //!< resolutions of the process-local portion of the Fourier transformed data
+    Ccoord fourier_locations; // !< location of the process-local portion of the Fourier transformed data
     const Ccoord domain_resolutions; //!< resolutions of the cell
     const Rcoord lengths; //!< physical sizes of the cell
     Workspace_t & work; //!< field to store the Fourier transform of P

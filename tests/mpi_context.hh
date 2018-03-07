@@ -30,7 +30,7 @@
 
 #include "common/communicator.hh"
 
-namespace µSpectre {
+namespace muSpectre {
 
   /*!
    * MPI context singleton. Initialize MPI once when needed.
