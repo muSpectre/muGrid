@@ -53,7 +53,8 @@ namespace muSpectre {
     FFTWMPIEngine() = delete;
 
     //! Constructor with system resolutions
-    FFTWMPIEngine(Ccoord resolutions, Rcoord lengths);
+    FFTWMPIEngine(Ccoord resolutions, Rcoord lengths,
+                  MPI_Comm comm=MPI_COMM_NULL);
 
     //! Copy constructor
     FFTWMPIEngine(const FFTWMPIEngine &other) = delete;
@@ -81,6 +82,7 @@ namespace muSpectre {
 
   protected:
     static int nb_engines;
+    MPI_Comm comm; //!< communicator
     Ccoord hermitian_resolutions; //!< resolutions of Fourier-space grid
     fftw_plan plan_fft{}; //!< holds the plan for forward fourier transform
     fftw_plan plan_ifft{}; //!< holds the plan for inverse fourier transform
