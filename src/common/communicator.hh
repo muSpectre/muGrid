@@ -54,6 +54,7 @@ namespace µSpectre {
     Communicator(MPI_Comm comm=MPI_COMM_NULL): comm{comm} {};
     ~Communicator() {};
 
+    //! sum reduction on scalar types
     template<typename T>
     constexpr T sum(const T &arg) {
       T res;
@@ -75,6 +76,7 @@ namespace µSpectre {
     Communicator() {};
     ~Communicator() {};
 
+    //! sum reduction on scalar types
     template<typename T>
     constexpr T sum(T &arg) { return arg; }
   };
