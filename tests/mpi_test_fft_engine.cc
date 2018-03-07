@@ -28,6 +28,7 @@
 #include <boost/mpl/list.hpp>
 
 #include "tests.hh"
+#include "mpi_context.hh"
 #include "fft/fftwmpi_engine.hh"
 #include "common/ccoord_operations.hh"
 #include "common/field_collection.hh"
@@ -35,26 +36,6 @@
 #include "common/iterators.hh"
 
 namespace muSpectre {
-
-  struct MPI_fixture {
-    static int nfix;
-    MPI_fixture() {
-      if (!MPI_fixture::nfix) {
-        BOOST_TEST_MESSAGE("MPI_Init");
-        MPI_Init(&boost::unit_test::framework::master_test_suite().argc,
-                 &boost::unit_test::framework::master_test_suite().argv);
-      }
-      MPI_fixture::nfix++;
-    }
-    ~MPI_fixture() {
-      //MPI_fixture::nfix--;
-      //if (!MPI_fixture::nfix) {
-      //  BOOST_TEST_MESSAGE("MPI_Finalize");
-      //  MPI_Finalize();
-      //}
-    }
-  };
-  int MPI_fixture::nfix{0};
 
   BOOST_AUTO_TEST_SUITE(fftw_engine_mpi);
 
@@ -68,9 +49,7 @@ namespace muSpectre {
     constexpr static Ccoord_t<sdim> res() {
       return CcoordOps::get_cube<DimS>(box_resolution);
     }
-    FFTW_fixture() :mpi(), engine(res(),
-                                  CcoordOps::get_cube<DimS>(box_length)){}
-    MPI_fixture mpi;
+    FFTW_fixture(): engine(res(), CcoordOps::get_cube<DimS>(box_length)) {}
     FFTWMPIEngine<DimS, DimM> engine;
   };
 
@@ -79,8 +58,7 @@ namespace muSpectre {
     constexpr static Dim_t sdim{twoD};
     constexpr static Dim_t mdim{twoD};
     constexpr static Ccoord_t<sdim> res() {return {6, 4};}
-    FFTW_fixture_python_segfault():mpi(), engine{res(), {3., 3}} {}
-    MPI_fixture mpi;
+    FFTW_fixture_python_segfault(): engine{res(), {3., 3}} {}
     FFTWMPIEngine<sdim, mdim> engine;
   };
 
@@ -95,12 +73,14 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(Constructor_test, Fix, fixlist, Fix) {
+    µSpectre::MPIContext &mpi = µSpectre::MPIContext::get_context();
     BOOST_CHECK_NO_THROW(Fix::engine.initialise(FFT_PlanFlags::estimate));
     BOOST_CHECK_EQUAL(Fix::engine.size(), CcoordOps::get_size(Fix::res()));
   }
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(fft_test, Fix, fixlist, Fix) {
+    µSpectre::MPIContext &mpi = µSpectre::MPIContext::get_context();
     Fix::engine.initialise(FFT_PlanFlags::estimate);
     constexpr Dim_t order{2};
     using FC_t = GlobalFieldCollection<Fix::sdim, Fix::mdim>;

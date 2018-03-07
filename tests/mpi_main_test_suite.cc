@@ -1,12 +1,12 @@
 /**
- * @file   main_test_suite.cc
+ * @file   mpi_main_test_suite.cc
  *
- * @author Till Junge <till.junge@epfl.ch>
+ * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
- * @date   01 May 2017
+ * @date   07 Mar 2018
  *
- * @brief  Main test suite. Running this suite tests all available tests for
- *         µSpectre
+ * @brief  Main test suite for MPI specific modules. Running this suite tests
+ *         all available tests for µSpectre that depend on MPI.
  *
  * Copyright © 2017 Till Junge
  *
