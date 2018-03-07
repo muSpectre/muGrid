@@ -76,6 +76,10 @@ find_package(MPI)
 find_package(FFTW REQUIRED)
 find_package(FFTWMPI)
 
+if(MPI_FOUND)
+  add_definitions(-DWITH_MPI)
+endif()
+
 
 #build tests
 file( GLOB TEST_SRCS "${CMAKE_SOURCE_DIR}/tests/test_*.cc")
