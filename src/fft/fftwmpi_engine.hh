@@ -25,8 +25,8 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#ifndef FFTW_ENGINE_MPI_H
-#define FFTW_ENGINE_MPI_H
+#ifndef FFTWMPI_ENGINE_H
+#define FFTWMPI_ENGINE_H
 
 #include "fft/fft_engine_base.hh"
 
@@ -39,7 +39,7 @@ namespace muSpectre {
    * FFTW library
    */
   template <Dim_t DimS, Dim_t DimM>
-  class FFTWEngineMPI: public FFT_Engine_base<DimS, DimM>
+  class FFTWMPIEngine: public FFT_Engine_base<DimS, DimM>
   {
   public:
     using Parent = FFT_Engine_base<DimS, DimM>; //!< base class
@@ -50,25 +50,25 @@ namespace muSpectre {
     //! real-valued second-order tensor
     using Field_t = typename Parent::Field_t;
     //! Default constructor
-    FFTWEngineMPI() = delete;
+    FFTWMPIEngine() = delete;
 
     //! Constructor with system resolutions
-    FFTWEngineMPI(Ccoord resolutions, Rcoord lengths);
+    FFTWMPIEngine(Ccoord resolutions, Rcoord lengths);
 
     //! Copy constructor
-    FFTWEngineMPI(const FFTWEngineMPI &other) = delete;
+    FFTWMPIEngine(const FFTWMPIEngine &other) = delete;
 
     //! Move constructor
-    FFTWEngineMPI(FFTWEngineMPI &&other) = default;
+    FFTWMPIEngine(FFTWMPIEngine &&other) = default;
 
     //! Destructor
-    virtual ~FFTWEngineMPI() noexcept;
+    virtual ~FFTWMPIEngine() noexcept;
 
     //! Copy assignment operator
-    FFTWEngineMPI& operator=(const FFTWEngineMPI &other) = delete;
+    FFTWMPIEngine& operator=(const FFTWMPIEngine &other) = delete;
 
     //! Move assignment operator
-    FFTWEngineMPI& operator=(FFTWEngineMPI &&other) = default;
+    FFTWMPIEngine& operator=(FFTWMPIEngine &&other) = default;
 
     // compute the plan, etc
     virtual void initialise(FFT_PlanFlags plan_flags) override;
@@ -90,4 +90,4 @@ namespace muSpectre {
 
 }  // muSpectre
 
-#endif /* FFTW_ENGINE_MPI_H */
+#endif /* FFTWMPI_ENGINE_H */

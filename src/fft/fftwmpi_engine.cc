@@ -26,15 +26,15 @@
  */
 
 #include "common/ccoord_operations.hh"
-#include "fft/fftw_engine_mpi.hh"
+#include "fft/fftwmpi_engine.hh"
 
 namespace muSpectre {
 
   template <Dim_t DimsS, Dim_t DimM>
-  int FFTWEngineMPI<DimsS, DimM>::nb_engines{0};
+  int FFTWMPIEngine<DimsS, DimM>::nb_engines{0};
 
   template <Dim_t DimS, Dim_t DimM>
-  FFTWEngineMPI<DimS, DimM>::FFTWEngineMPI(Ccoord resolutions, Rcoord lengths)
+  FFTWMPIEngine<DimS, DimM>::FFTWMPIEngine(Ccoord resolutions, Rcoord lengths)
     :Parent{resolutions, lengths},
      hermitian_resolutions{CcoordOps::get_hermitian_sizes(resolutions)}
   {
@@ -48,7 +48,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void FFTWEngineMPI<DimS, DimM>::initialise(FFT_PlanFlags plan_flags) {
+  void FFTWMPIEngine<DimS, DimM>::initialise(FFT_PlanFlags plan_flags) {
     if (this->initialised) {
       throw std::runtime_error("double initialisation, will leak memory");
     }
@@ -124,7 +124,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  FFTWEngineMPI<DimS, DimM>::~FFTWEngineMPI<DimS, DimM>() noexcept {
+  FFTWMPIEngine<DimS, DimM>::~FFTWMPIEngine<DimS, DimM>() noexcept {
     fftw_destroy_plan(this->plan_fft);
     fftw_destroy_plan(this->plan_ifft);
     this->nb_engines--;
@@ -133,8 +133,8 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  typename FFTWEngineMPI<DimS, DimM>::Workspace_t &
-  FFTWEngineMPI<DimS, DimM>::fft (Field_t & field) {
+  typename FFTWMPIEngine<DimS, DimM>::Workspace_t &
+  FFTWMPIEngine<DimS, DimM>::fft (Field_t & field) {
     fftw_mpi_execute_dft_r2c(
       this->plan_fft, field.data(),
       reinterpret_cast<fftw_complex*>(this->work.data()));
@@ -144,7 +144,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   void
-  FFTWEngineMPI<DimS, DimM>::ifft (Field_t & field) const {
+  FFTWMPIEngine<DimS, DimM>::ifft (Field_t & field) const {
     if (field.size() != CcoordOps::get_size(this->resolutions)) {
       throw std::runtime_error("size mismatch");
     }
@@ -153,7 +153,7 @@ namespace muSpectre {
       field.data());
   }
 
-  template class FFTWEngineMPI<twoD, twoD>;
-  template class FFTWEngineMPI<twoD, threeD>;
-  template class FFTWEngineMPI<threeD, threeD>;
+  template class FFTWMPIEngine<twoD, twoD>;
+  template class FFTWMPIEngine<twoD, threeD>;
+  template class FFTWMPIEngine<threeD, threeD>;
 }  // muSpectre

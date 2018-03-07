@@ -41,7 +41,7 @@ set (fft_engine_SRC
 if(FFTWMPI_FOUND)
   set(fft_engine_SRC
     ${fft_engine_SRC}
-    ${CMAKE_CURRENT_SOURCE_DIR}/fftw_engine_mpi.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/fftwmpi_engine.cc
     )
 endif()
 
