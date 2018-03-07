@@ -52,7 +52,7 @@ namespace muSpectre {
     //! Default constructor
     FFTW_Engine() = delete;
 
-    //! Constructor with system resolutions
+    //! Constructor with cell resolutions
     FFTW_Engine(Ccoord resolutions, Rcoord lengths);
 
     //! Copy constructor

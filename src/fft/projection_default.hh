@@ -63,7 +63,7 @@ namespace muSpectre {
     //! Default constructor
     ProjectionDefault() = delete;
 
-    //! Constructor with system sizes and formulation
+    //! Constructor with cell sizes and formulation
     ProjectionDefault(FFT_Engine_ptr engine, Formulation form);
 
     //! Copy constructor

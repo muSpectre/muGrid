@@ -1,11 +1,11 @@
 /**
- * @file   bind_py_system.cc
+ * @file   bind_py_cell.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   09 Jan 2018
  *
- * @brief  Python bindings for the system factory function
+ * @brief  Python bindings for the cell factory function
  *
  * Copyright © 2018 Till Junge
  *
@@ -27,8 +27,8 @@
 
 #include "common/common.hh"
 #include "common/ccoord_operations.hh"
-#include "system/system_factory.hh"
-#include "system/system_base.hh"
+#include "cell/cell_factory.hh"
+#include "cell/cell_base.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -42,38 +42,38 @@ namespace py=pybind11;
 using namespace pybind11::literals;
 
 /**
- * the system factory is only bound for default template parameters
+ * the cell factory is only bound for default template parameters
  */
 template <Dim_t dim>
-void add_system_factory_helper(py::module & mod) {
+void add_cell_factory_helper(py::module & mod) {
   using Ccoord = Ccoord_t<dim>;
   using Rcoord = Rcoord_t<dim>;
   using Form = Formulation;
 
   mod.def
-    ("SystemFactory",
+    ("CellFactory",
      [](Ccoord res, Rcoord lens, Form form) {
-      return make_system(std::move(res), std::move(lens), std::move(form));
+      return make_cell(std::move(res), std::move(lens), std::move(form));
      },
      "resolutions"_a,
      "lengths"_a=CcoordOps::get_cube<dim>(1.),
      "formulation"_a=Formulation::finite_strain);
 }
 
-void add_system_factory(py::module & mod) {
-  add_system_factory_helper<twoD  >(mod);
-  add_system_factory_helper<threeD>(mod);
+void add_cell_factory(py::module & mod) {
+  add_cell_factory_helper<twoD  >(mod);
+  add_cell_factory_helper<threeD>(mod);
 }
 
 /**
- * SystemBase for which the material and spatial dimension are identical
+ * CellBase for which the material and spatial dimension are identical
  */
 template <Dim_t dim>
-void add_system_base_helper(py::module & mod) {
+void add_cell_base_helper(py::module & mod) {
   std::stringstream name_stream{};
-  name_stream << "SystemBase" << dim << 'd';
+  name_stream << "CellBase" << dim << 'd';
   const std::string name = name_stream.str();
-  using sys_t = SystemBase<dim, dim>;
+  using sys_t = CellBase<dim, dim>;
   py::class_<sys_t>(mod, name.c_str())
     .def("__len__", &sys_t::size)
     .def("__iter__", [](sys_t & s) {
@@ -150,19 +150,19 @@ void add_system_base_helper(py::module & mod) {
          &sys_t::get_projection);
 }
 
-void add_system_base(py::module & mod) {
-  add_system_base_helper<twoD>  (mod);
-  add_system_base_helper<threeD>(mod);
+void add_cell_base(py::module & mod) {
+  add_cell_base_helper<twoD>  (mod);
+  add_cell_base_helper<threeD>(mod);
 }
 
-void add_system(py::module & mod) {
-  add_system_factory(mod);
+void add_cell(py::module & mod) {
+  add_cell_factory(mod);
 
-  auto system{mod.def_submodule("system")};
-  system.doc() = "bindings for systems and system factories";
+  auto cell{mod.def_submodule("cell")};
+  cell.doc() = "bindings for cells and cell factories";
  
-  system.def("scale_by_2", [](py::EigenDRef<Eigen::ArrayXXd>& v) {
+  cell.def("scale_by_2", [](py::EigenDRef<Eigen::ArrayXXd>& v) {
       v *= 2;
     });
-  add_system_base(system);
+  add_cell_base(cell);
 }

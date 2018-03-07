@@ -115,7 +115,7 @@ namespace muSpectre {
       //! constructor
       //! unique name (whithin Collection)
       //! number of components
-      //! collection to which this field belongs (eg, material, system)
+      //! collection to which this field belongs (eg, material, cell)
       FieldBase(std::string unique_name,
                 size_t nb_components,
                 FieldCollection & collection);

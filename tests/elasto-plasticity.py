@@ -260,13 +260,13 @@ for inc in range(1,ninc):
     # iterate as long as the iterative update does not vanish
     while True:
 
-        # solve linear system using the Conjugate Gradient iterative solver
+        # solve linear cell using the Conjugate Gradient iterative solver
         dFm,_ = sp.cg(tol=1.e-8,
           A   = sp.LinearOperator(shape=(F.size,F.size),matvec=G_K_dF,dtype='float'),
           b   = b,
         )
 
-        # add solution of linear system to DOFs
+        # add solution of linear cell to DOFs
         F += dFm.reshape(3,3,Nx,Ny,Nz)
 
         # compute residual stress and tangent, convert to residual

@@ -17,7 +17,7 @@ N      = 31 #31  # number of voxels (assumed equal for all directions)
 offset = 3 #9
 ndof   = ndim**2*N**2 # number of degrees-of-freedom
 
-cell = µ.SystemFactory(µ.get_2d_cube(N),
+cell = µ.CellFactory(µ.get_2d_cube(N),
                        µ.get_2d_cube(1.),
                        µ.Formulation.small_strain)
 
@@ -170,12 +170,12 @@ while True:
                     A = sp.LinearOperator(shape=(ndof,ndof),matvec=G_K_deps,dtype='float'),
                     b = b,
                     callback=acc
-    )                                     # solve linear system using CG
+    )                                     # solve linear cell using CG
     #depsm2,_ = sp.cg(tol=1.e-8,
     #                 A = sp.LinearOperator(shape=(ndof,ndof),matvec=G_K_deps2,dtype='float'),
     #                 b = b2,
     #                 callback=acc
-    #)                                     # solve linear system using CG
+    #)                                     # solve linear cell using CG
     eps += depsm.reshape(ndim,ndim,N,N) # update DOFs (array -> tens.grid)
     sig  = ddot42(K4,eps)                 # new residual stress
     b     = -G(sig)                       # convert residual stress to residual

@@ -66,7 +66,7 @@ namespace muSpectre {
     //! Default constructor
     FFT_Engine_base() = delete;
 
-    //! Constructor with system resolutions
+    //! Constructor with cell resolutions
     FFT_Engine_base(Ccoord resolutions, Rcoord lengths);
 
     //! Copy constructor

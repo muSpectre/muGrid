@@ -30,7 +30,7 @@
 include_directories(
   common
   materials
-  system
+  cell
   )
 
 set (muSpectre_SRC
@@ -38,7 +38,7 @@ set (muSpectre_SRC
 add_subdirectory(common)
 add_subdirectory(materials)
 add_subdirectory(fft)
-add_subdirectory(system)
+add_subdirectory(cell)
 add_subdirectory(solver)
 
 find_package(FFTW REQUIRED)

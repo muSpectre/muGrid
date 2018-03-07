@@ -22,7 +22,7 @@ lengths = [7., 5.]
 formulation = msp.Formulation.small_strain
 
 ## build a computational domain
-rve = msp.SystemFactory(resolution,
+rve = msp.CellFactory(resolution,
                       lengths,
                       formulation)
 
@@ -41,7 +41,7 @@ for i, pixel in enumerate(rve):
 
 ## define the convergence tolerance for the Newton-Raphson increment
 tol = 1e-5
-## tolerance for the solver of the linear system
+## tolerance for the solver of the linear cell
 cg_tol = 1e-8
 
 
@@ -51,9 +51,9 @@ Del0 = np.array([[.0, .0],
 Del0 = .5*(Del0 + Del0.T)
 
 
-maxiter = 50 ## for linear system solver
+maxiter = 50 ## for linear cell solver
 
-## Choose a solver for the linear systems. Currently avaliable:
+## Choose a solver for the linear cells. Currently avaliable:
 ## SolverCG, SolverCGEigen, SolverBiCGSTABEigen, SolverGMRESEigen,
 ## SolverDGMRESEigen, SolverMINRESEigen.
 ## See Reference for explanations

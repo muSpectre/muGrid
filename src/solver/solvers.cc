@@ -38,7 +38,7 @@ namespace muSpectre {
 
   template <Dim_t DimS, Dim_t DimM>
   std::vector<OptimizeResult>
-  de_geus (SystemBase<DimS, DimM> & sys, const GradIncrements<DimM> & delFs,
+  de_geus (CellBase<DimS, DimM> & sys, const GradIncrements<DimM> & delFs,
            SolverBase<DimS, DimM> & solver, Real newton_tol,
            Real equil_tol,
            Dim_t verbose) {
@@ -216,19 +216,19 @@ namespace muSpectre {
 
   //! instantiation for two-dimensional cells
   template std::vector<OptimizeResult>
-  de_geus (SystemBase<twoD, twoD> & sys, const GradIncrements<twoD>& delF0,
+  de_geus (CellBase<twoD, twoD> & sys, const GradIncrements<twoD>& delF0,
            SolverBase<twoD, twoD> & solver, Real newton_tol,
            Real equil_tol,
            Dim_t verbose);
 
-  // template typename SystemBase<twoD, threeD>::StrainField_t &
-  // de_geus (SystemBase<twoD, threeD> & sys, const GradIncrements<threeD>& delF0,
+  // template typename CellBase<twoD, threeD>::StrainField_t &
+  // de_geus (CellBase<twoD, threeD> & sys, const GradIncrements<threeD>& delF0,
   //            const Real cg_tol, const Real newton_tol, Uint maxiter,
   //            Dim_t verbose);
 
   //! instantiation for three-dimensional cells
   template std::vector<OptimizeResult>
-  de_geus (SystemBase<threeD, threeD> & sys, const GradIncrements<threeD>& delF0,
+  de_geus (CellBase<threeD, threeD> & sys, const GradIncrements<threeD>& delF0,
            SolverBase<threeD, threeD> & solver, Real newton_tol,
            Real equil_tol,
            Dim_t verbose);
@@ -236,7 +236,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   std::vector<OptimizeResult>
-  newton_cg (SystemBase<DimS, DimM> & sys, const GradIncrements<DimM> & delFs,
+  newton_cg (CellBase<DimS, DimM> & sys, const GradIncrements<DimM> & delFs,
              SolverBase<DimS, DimM> & solver, Real newton_tol,
              Real equil_tol,
              Dim_t verbose) {
@@ -399,19 +399,19 @@ namespace muSpectre {
 
   //! instantiation for two-dimensional cells
   template std::vector<OptimizeResult>
-  newton_cg (SystemBase<twoD, twoD> & sys, const GradIncrements<twoD>& delF0,
+  newton_cg (CellBase<twoD, twoD> & sys, const GradIncrements<twoD>& delF0,
              SolverBase<twoD, twoD> & solver, Real newton_tol,
              Real equil_tol,
              Dim_t verbose);
 
-  // template typename SystemBase<twoD, threeD>::StrainField_t &
-  // newton_cg (SystemBase<twoD, threeD> & sys, const GradIncrements<threeD>& delF0,
+  // template typename CellBase<twoD, threeD>::StrainField_t &
+  // newton_cg (CellBase<twoD, threeD> & sys, const GradIncrements<threeD>& delF0,
   //            const Real cg_tol, const Real newton_tol, Uint maxiter,
   //            Dim_t verbose);
 
   //! instantiation for three-dimensional cells
   template std::vector<OptimizeResult>
-  newton_cg (SystemBase<threeD, threeD> & sys, const GradIncrements<threeD>& delF0,
+  newton_cg (CellBase<threeD, threeD> & sys, const GradIncrements<threeD>& delF0,
              SolverBase<threeD, threeD> & solver, Real newton_tol,
              Real equil_tol,
              Dim_t verbose);

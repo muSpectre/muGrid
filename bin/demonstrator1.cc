@@ -32,7 +32,7 @@
 
 #include "common/common.hh"
 #include "common/ccoord_operations.hh"
-#include "system/system_factory.hh"
+#include "cell/cell_factory.hh"
 #include "materials/material_linear_elastic1.hh"
 #include "solver/solvers.hh"
 #include "solver/solver_cg.hh"
@@ -91,7 +91,7 @@ int main(int argc, char *argv[])
   const Rcoord_t<dim> lengths{CcoordOps::get_cube<dim>(fsize)};
   const Ccoord_t<dim> resolutions{CcoordOps::get_cube<dim>(size)};
 
-  auto system{make_system<dim, dim>(resolutions, lengths, form)};
+  auto cell{make_cell<dim, dim>(resolutions, lengths, form)};
 
   constexpr Real E{1.0030648180242636};
   constexpr Real nu{0.29930675909878679};
@@ -101,7 +101,7 @@ int main(int argc, char *argv[])
   auto Material_hard{std::make_unique<Material_t>("hard", 10*E, nu)};
 
   int counter{0};
-  for (const auto && pixel:system) {
+  for (const auto && pixel:cell) {
 
     int sum = 0;
     for (Dim_t i = 0; i < dim; ++i) {
@@ -115,12 +115,12 @@ int main(int argc, char *argv[])
       Material_soft->add_pixel(pixel);
     }
   }
-  std::cout << counter << " Pixel out of " << system.size()
+  std::cout << counter << " Pixel out of " << cell.size()
             << " are in the hard material" << std::endl;
 
-  system.add_material(std::move(Material_soft));
-  system.add_material(std::move(Material_hard));
-  system.initialise(FFT_PlanFlags::measure);
+  cell.add_material(std::move(Material_soft));
+  cell.add_material(std::move(Material_hard));
+  cell.initialise(FFT_PlanFlags::measure);
 
   constexpr Real newton_tol{1e-4};
   constexpr Real cg_tol{1e-7};
@@ -132,8 +132,8 @@ int main(int argc, char *argv[])
 
   auto start = std::chrono::high_resolution_clock::now();
   GradIncrements<dim> grads{DeltaF};
-  SolverCG<dim> cg{system, cg_tol, maxiter, bool(verbose)};
-  de_geus(system, grads, cg, newton_tol, verbose);
+  SolverCG<dim> cg{cell, cg_tol, maxiter, bool(verbose)};
+  de_geus(cell, grads, cg, newton_tol, verbose);
   std::chrono::duration<Real> dur = std::chrono::high_resolution_clock::now() - start;
   std::cout << "Resolution time = " << dur.count() << "s" << std::endl;
 

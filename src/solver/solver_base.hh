@@ -30,7 +30,7 @@
 
 #include "solver/solver_error.hh"
 #include "common/common.hh"
-#include "system/system_base.hh"
+#include "cell/cell_base.hh"
 #include "common/tensor_algebra.hh"
 
 #include <Eigen/Dense>
@@ -50,7 +50,7 @@ namespace muSpectre {
      * Enum to describe in what kind the solver relies tangent stiffnesses
      */
     enum class TangentRequirement{NoNeed, NeedEffect, NeedTangents};
-    using Sys_t = SystemBase<DimS, DimM>; //!< Cell type
+    using Sys_t = CellBase<DimS, DimM>; //!< Cell type
     using Ccoord = Ccoord_t<DimS>; //!< cell coordinates type
     //! Field collection to store temporary fields in
     using Collection_t = GlobalFieldCollection<DimS, DimM>;
@@ -112,7 +112,7 @@ namespace muSpectre {
     virtual SolvVectorOut solve(const SolvVectorInC rhs, SolvVectorIn x_0) = 0;
 
     //! return a reference to the cell
-    Sys_t & get_system() {return sys;}
+    Sys_t & get_cell() {return sys;}
 
     //! read the current maximum number of iterations setting
     Uint get_maxiter() const {return this->maxiter;}

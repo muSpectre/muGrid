@@ -43,7 +43,7 @@ namespace muSpectre {
   {
   public:
     //! typedefs for data handled by this interface
-    //! global field collection for system-wide fields, like stress, strain, etc
+    //! global field collection for cell-wide fields, like stress, strain, etc
     using GFieldCollection_t = GlobalFieldCollection<DimS, DimM>;
     //! field collection for internal variables, such as eigen-strains,
     //! plastic strains, damage variables, etc, but also for managing which

@@ -31,7 +31,7 @@
 
 #include "common/common.hh"
 #include "common/ccoord_operations.hh"
-#include "system/system_factory.hh"
+#include "cell/cell_factory.hh"
 #include "materials/material_linear_elastic1.hh"
 #include "solver/solvers.hh"
 #include "solver/solver_cg.hh"
@@ -48,17 +48,17 @@ int main()
   const Rcoord_t<dim> lengths{5.2, 8.3};
   const Ccoord_t<dim> resolutions{5, 7};
 
-  auto system{make_system<dim, dim>(resolutions, lengths, form)};
+  auto cell{make_cell<dim, dim>(resolutions, lengths, form)};
 
   constexpr Real E{1.0030648180242636};
   constexpr Real nu{0.29930675909878679};
 
   using Material_t = MaterialLinearElastic1<dim, dim>;
-  auto & soft{Material_t::make(system, "soft",    E, nu)};
-  auto & hard{Material_t::make(system, "hard", 10*E, nu)};
+  auto & soft{Material_t::make(cell, "soft",    E, nu)};
+  auto & hard{Material_t::make(cell, "hard", 10*E, nu)};
 
   int counter{0};
-  for (const auto && pixel:system) {
+  for (const auto && pixel:cell) {
     if (counter < 3) {
       hard.add_pixel(pixel);
       counter++;
@@ -66,10 +66,10 @@ int main()
       soft.add_pixel(pixel);
     }
   }
-  std::cout << counter << " Pixel out of " << system.size()
+  std::cout << counter << " Pixel out of " << cell.size()
             << " are in the hard material" << std::endl;
 
-  system.initialise();
+  cell.initialise();
 
   constexpr Real newton_tol{1e-4};
   constexpr Real cg_tol{1e-7};
@@ -80,8 +80,8 @@ int main()
   Dim_t verbose {1};
 
   auto start = std::chrono::high_resolution_clock::now();
-  SolverCG<dim, dim> cg{system, cg_tol, maxiter, bool(verbose)};
-  auto res = de_geus(system, DeltaF, cg, newton_tol, verbose);
+  SolverCG<dim, dim> cg{cell, cg_tol, maxiter, bool(verbose)};
+  auto res = de_geus(cell, DeltaF, cg, newton_tol, verbose);
   std::chrono::duration<Real> dur = std::chrono::high_resolution_clock::now() - start;
   std::cout << "Resolution time = " << dur.count() << "s" << std::endl;
 

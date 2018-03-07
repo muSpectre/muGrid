@@ -73,7 +73,7 @@ namespace muSpectre {
     //! Default constructor
     ProjectionBase() = delete;
 
-    //! Constructor with system sizes
+    //! Constructor with cell sizes
     ProjectionBase(FFT_Engine_ptr engine, Formulation form);
 
     //! Copy constructor
@@ -106,7 +106,7 @@ namespace muSpectre {
 
     /**
      * return the `muSpectre::Formulation` that is used in solving
-     * this system. This allows tho check whether a projection is
+     * this cell. This allows tho check whether a projection is
      * compatible with the chosen formulation
      */
     const Formulation & get_formulation() const {return this->form;}

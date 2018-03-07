@@ -186,7 +186,7 @@ class FiniteStrainProjectionGooseFFT(ProjectionGooseFFT):
                               F.size,F.size),matvec=self.G_K_dF,dtype='float'),
                           b = b,
                           callback=acc
-            )                                     # solve linear system using CG
+            )                                     # solve linear cell using CG
             F    += dFm.reshape(ndim,ndim,*shape)  # update DOFs (array -> tens.grid)
             P,K4  = self.constitutive(F)          # new residual stress and tangent
             b     = -self.G(P)                         # convert res.stress to residual
@@ -247,7 +247,7 @@ class SmallStrainProjectionGooseFFT(ProjectionGooseFFT):
                                 eps.size,eps.size),matvec=self.G_K_deps,dtype='float'),
                             b = b,
                             callback=acc
-            )                                     # solve linear system using CG
+            )                                     # solve linear cell using CG
             eps  += depsm.reshape(ndim,ndim,*shape)  # update DOFs (array -> tens.grid)
             sig  = ddot42(self.C4, eps)           # new residual stress and tangent
             b     = -self.G(sig)                         # convert res.stress to residual
