@@ -75,8 +75,10 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(Constructor_test, Fix, fixlist, Fix) {
+    µSpectre::Communicator &comm = µSpectre::MPIContext::get_context().comm;
     BOOST_CHECK_NO_THROW(Fix::engine.initialise(FFT_PlanFlags::estimate));
-    BOOST_CHECK_EQUAL(Fix::engine.size(), CcoordOps::get_size(Fix::res()));
+    BOOST_CHECK_EQUAL(comm.sum(Fix::engine.size()),
+                      CcoordOps::get_size(Fix::res()));
   }
 
 #if 0
