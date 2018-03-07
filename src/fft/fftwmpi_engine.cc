@@ -1,5 +1,5 @@
 /**
- * @file   fftw_engine_mpi.cc
+ * @file   fftwmpi_engine.cc
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
@@ -40,9 +40,6 @@ namespace muSpectre {
   {
     if (!this->nb_engines) fftw_mpi_init();
     this->nb_engines++;
-    for (auto && pixel: CcoordOps::Pixels<DimS>(this->fourier_resolutions)) {
-      this->work_space_container.add_pixel(pixel);
-    }
   }
 
 
@@ -52,27 +49,31 @@ namespace muSpectre {
     if (this->initialised) {
       throw std::runtime_error("double initialisation, will leak memory");
     }
-    Parent::initialise(plan_flags);
-
     const int & rank = DimS;
-    int howmany = Field_t::nb_components;
+    ptrdiff_t howmany = Field_t::nb_components;
 
     std::array<ptrdiff_t, 3> narr;
     std::copy(this->domain_resolutions.begin(), this->domain_resolutions.end(),
               narr.begin());
     narr[2] = this->domain_resolutions[2]/2+1;
-    ptrdiff_t loc_res_x, loc_loc_x;
+    ptrdiff_t res_x, loc_x, res_y, loc_y;
     ptrdiff_t loc_alloc_size{
-      fftw_mpi_local_size_many(
+      fftw_mpi_local_size_many_transposed(
         rank, narr.data(), howmany, FFTW_MPI_DEFAULT_BLOCK,
-        this->comm.get_mpi_comm(), &loc_res_x, &loc_loc_x)};
-    this->resolutions[0] = loc_res_x;
-    this->locations[0] = loc_loc_x;
+        FFTW_MPI_DEFAULT_BLOCK, this->comm.get_mpi_comm(),
+        &res_x, &loc_x, &res_y, &loc_y)};
+    this->fourier_resolutions[1] = this->resolutions[0];
+    this->fourier_locations[1] = this->locations[0];
+    this->resolutions[0] = res_x;
+    this->locations[0] = loc_x;
+    this->fourier_resolutions[0] = res_y;
+    this->fourier_locations[0] = loc_y;
 
-    //std::array<int, DimS> narr;
-    //const int * const n = &narr[0];
-    //std::copy(this->resolutions.begin(), this->resolutions.end(), narr.begin());
-    //temporary buffer for plan
+    for (auto && pixel: CcoordOps::Pixels<DimS>(this->fourier_resolutions)) {
+      this->work_space_container.add_pixel(pixel);
+    }
+    Parent::initialise(plan_flags);
+
     Real * r_work_space = fftw_alloc_real(2*loc_alloc_size);
     Real * in = r_work_space;
     fftw_complex * out = reinterpret_cast<fftw_complex*>(this->work.data());
@@ -100,7 +101,7 @@ namespace muSpectre {
     this->plan_fft = fftw_mpi_plan_many_dft_r2c(
       rank, narr.data(), howmany, FFTW_MPI_DEFAULT_BLOCK,
       FFTW_MPI_DEFAULT_BLOCK, in, out, this->comm.get_mpi_comm(),
-      FFTW_PRESERVE_INPUT | flags);
+      FFTW_PRESERVE_INPUT | FFTW_MPI_TRANSPOSED_OUT | flags);
     if (this->plan_fft == nullptr) {
       throw std::runtime_error("r2c plan failed");
     }
@@ -113,7 +114,7 @@ namespace muSpectre {
     this->plan_ifft = fftw_mpi_plan_many_dft_c2r(
       rank, narr.data(), howmany, FFTW_MPI_DEFAULT_BLOCK,
       FFTW_MPI_DEFAULT_BLOCK, i_in, i_out, this->comm.get_mpi_comm(),
-      FFTW_PRESERVE_INPUT | flags);
+      FFTW_PRESERVE_INPUT | FFTW_MPI_TRANSPOSED_IN | flags);
 
     if (this->plan_ifft == nullptr) {
       throw std::runtime_error("c2r plan failed");

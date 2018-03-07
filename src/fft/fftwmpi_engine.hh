@@ -1,5 +1,5 @@
 /**
- * @file   fftw_engine_mpi.hh
+ * @file   fftwmpi_engine.hh
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
