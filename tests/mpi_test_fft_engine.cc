@@ -28,7 +28,7 @@
 #include <boost/mpl/list.hpp>
 
 #include "tests.hh"
-#include "fft/fftw_engine_mpi.hh"
+#include "fft/fftwmpi_engine.hh"
 #include "common/ccoord_operations.hh"
 #include "common/field_collection.hh"
 #include "common/field_map.hh"
@@ -71,7 +71,7 @@ namespace muSpectre {
     FFTW_fixture() :mpi(), engine(res(),
                                   CcoordOps::get_cube<DimS>(box_length)){}
     MPI_fixture mpi;
-    FFTWEngineMPI<DimS, DimM> engine;
+    FFTWMPIEngine<DimS, DimM> engine;
   };
 
   struct FFTW_fixture_python_segfault{
@@ -81,7 +81,7 @@ namespace muSpectre {
     constexpr static Ccoord_t<sdim> res() {return {6, 4};}
     FFTW_fixture_python_segfault():mpi(), engine{res(), {3., 3}} {}
     MPI_fixture mpi;
-    FFTWEngineMPI<sdim, mdim> engine;
+    FFTWMPIEngine<sdim, mdim> engine;
   };
 
   using fixlist = boost::mpl::list<FFTW_fixture<  twoD,   twoD, 3>,

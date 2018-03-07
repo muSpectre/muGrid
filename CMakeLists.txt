@@ -84,6 +84,13 @@ add_executable(main_test_suite tests/main_test_suite.cc ${TEST_SRCS})
 target_link_libraries(main_test_suite ${Boost_LIBRARIES} muSpectre)
 add_test(main_test_suite main_test_suite --report_level=detailed --build_info=TRUE)
 
+if(MPI_FOUND)
+  file( GLOB TEST_SRCS "${CMAKE_SOURCE_DIR}/tests/mpi_test_*.cc")
+
+  add_executable(mpi_main_test_suite tests/mpi_main_test_suite.cc ${TEST_SRCS})
+  target_link_libraries(mpi_main_test_suite ${Boost_LIBRARIES} muSpectre)
+  add_test(mpi_main_test_suite main_test_suite --report_level=detailed --build_info=TRUE) 
+endif()
 
 
 # compile the library
