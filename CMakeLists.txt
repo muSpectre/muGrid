@@ -27,7 +27,7 @@
 # Boston, MA 02111-1307, USA.
 # =============================================================================
 
-cmake_minimum_required(VERSION 3.7.0)
+cmake_minimum_required(VERSION 3.5.0)
 project(µSpectre)
 
 set(CMAKE_CXX_STANDARD 14)
@@ -42,7 +42,7 @@ enable_testing()
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
 include(muspectreTools)
 
-if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
   # using Clang
   add_compile_options(-Wno-missing-braces)
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")

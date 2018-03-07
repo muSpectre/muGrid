@@ -1,7 +1,6 @@
-.. µSpectre documentation master file, created by
-   sphinx-quickstart on Thu Feb  1 12:01:24 2018.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+
+
+.. image:: ../logo_flat.png
 
 µSpectre, FFT-based Homogenisation without Linear Reference Medium
 ==================================================================
@@ -11,8 +10,25 @@
    :caption: Contents:
 
    Summary
+   Tutorials
    Reference
    License
+
+µSpectre is free software; you can redistribute it and/or
+modify it under the :term:``s of the GNU General Public License as
+published by the Free Software Foundation, either version 3, or (at
+your option) any later version.
+
+µSpectre is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with GNU Emacs; see the file COPYING. If not, write to the
+Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+Boston, MA 02111-1307, USA.
+
 
 
 

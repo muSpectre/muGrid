@@ -36,8 +36,19 @@
 
 namespace muSpectre {
   /* ---------------------------------------------------------------------- */
-  //! DimS spatial dimension (dimension of problem)
-  //! DimM material_dimension (dimension of constitutive law)
+  /** `FieldCollectionBase` is the base class for collections of fields. All
+    * fields in a field collection have the same number of pixels. The field
+    * collection is templated with @a DimS is the spatial dimension (i.e.
+    * whether the simulation domain is one, two or three-dimensional) and
+    * @a DimM is the material dimension (i.e., the dimension of constitutive
+    * law; even for e.g. two-dimensional problems the constitutive law could
+    * live in three-dimensional space for e.g. plane strain or stress problems).
+    * All fields within a field collection have a unique string identifier.
+    * A `FieldCollectionBase` is therefore comparable to a dictionary of fields
+    * that live on the same grid.
+    * `FieldCollectionBase` has the specialisations `GlobalFieldCollection` and
+    * `LocalFieldCollection`.
+    */
   template <Dim_t DimS, Dim_t DimM, class FieldCollectionDerived>
   class FieldCollectionBase
   {

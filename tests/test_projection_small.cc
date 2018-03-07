@@ -59,7 +59,7 @@ namespace muSpectre {
     static_assert(dim == fix::mdim,
         "These tests assume that the material and spatial dimension are "
         "identical");
-    using Fields = FieldCollection<sdim, mdim>;
+    using Fields = GlobalFieldCollection<sdim, mdim>;
     using FieldT = TensorField<Fields, Real, secondOrder, mdim>;
     using FieldMap = MatrixFieldMap<Fields, Real, mdim, mdim>;
     using Vector = Eigen::Matrix<Real, dim, 1>;

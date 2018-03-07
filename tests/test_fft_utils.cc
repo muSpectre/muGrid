@@ -38,7 +38,7 @@ namespace muSpectre {
     const std::valarray<Real> ref{0.,  1.,  2.,  3.,  4.,  5., -6.,
         -5., -4., -3., -2., -1.};
     auto res{fft_freqs(12)};
-    Real error = abs(res-ref).sum();
+    Real error = std::abs(res-ref).sum();
     BOOST_CHECK_EQUAL(error, 0.);
   }
 
@@ -48,7 +48,7 @@ namespace muSpectre {
         -0.4, -0.3, -0.2, -0.1};
 
     auto res{fft_freqs(10, 10.)};
-    Real error = abs(res-ref).sum();
+    Real error = std::abs(res-ref).sum();
     BOOST_CHECK_EQUAL(error, 0.);
   }
 
@@ -62,8 +62,8 @@ namespace muSpectre {
     typename FFT_freqs<dim>::Vector ref;
     ref << 2., .3; // from above tests
     BOOST_CHECK_LT((xi-ref).norm(), tol);
-    BOOST_CHECK_LT(abs(xi.dot(unit_xi)-xi.norm()), xi.norm()*tol);
-    BOOST_CHECK_LT(abs(unit_xi.norm()-1.), tol);
+    BOOST_CHECK_LT(std::abs(xi.dot(unit_xi)-xi.norm()), xi.norm()*tol);
+    BOOST_CHECK_LT(std::abs(unit_xi.norm()-1.), tol);
 
     ccoord1={7, 8};
     xi = freq_struc.get_xi(ccoord1);
@@ -71,8 +71,8 @@ namespace muSpectre {
 
     ref << -5., -.2;
     BOOST_CHECK_LT((xi-ref).norm(), tol);
-    BOOST_CHECK_LT(abs(xi.dot(unit_xi)-xi.norm()), xi.norm()*tol);
-    BOOST_CHECK_LT(abs(unit_xi.norm()-1.), tol);
+    BOOST_CHECK_LT(std::abs(xi.dot(unit_xi)-xi.norm()), xi.norm()*tol);
+    BOOST_CHECK_LT(std::abs(unit_xi.norm()-1.), tol);
   }
 
   BOOST_AUTO_TEST_SUITE_END();

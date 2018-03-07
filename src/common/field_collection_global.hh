@@ -36,8 +36,10 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  //! DimS spatial dimension (dimension of problem)
-  //! DimM material_dimension (dimension of constitutive law)
+  /** `GlobalFieldCollection` derives from `FieldCollectionBase` and stores
+    * global fields that live throughout the whole computational domain, i.e.
+    * are defined for each pixel.
+    */
   template<Dim_t DimS, Dim_t DimM>
   class GlobalFieldCollection:
     public FieldCollectionBase<DimS, DimM, GlobalFieldCollection<DimS, DimM>>

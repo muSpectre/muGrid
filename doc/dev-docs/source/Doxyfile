@@ -5,6 +5,8 @@ INPUT                  = ../../../src
 @INCLUDE               = input_def
 RECURSIVE              = YES
 
+EXTRACT_ALL            = YES
+
 SOURCE_BROWSER         = YES
 
 GENERATE_HTML          = YES

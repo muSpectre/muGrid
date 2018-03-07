@@ -661,7 +661,7 @@ namespace muSpectre {
        * @param lambda: First Lamé's constant
        * @param mu: Second Lamé's constant (i.e. shear modulus)
        * @param E: Green-Lagrange or small strain tensor
-       * @param C: Stiffness tensor (with respect to `E`)
+       * @param C: stiffness tensor (Piola-Kirchhoff 2 (or σ) w.r.t to `E`)
        */
       template <class s_t>
       inline static decltype(auto)

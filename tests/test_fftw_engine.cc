@@ -81,7 +81,7 @@ namespace muSpectre {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(fft_test, Fix, fixlist, Fix) {
     Fix::engine.initialise(FFT_PlanFlags::estimate);
     constexpr Dim_t order{2};
-    using FC_t = FieldCollection<Fix::sdim, Fix::mdim>;
+    using FC_t = GlobalFieldCollection<Fix::sdim, Fix::mdim>;
     FC_t fc;
     auto & input{make_field<TensorField<FC_t, Real, order, Fix::mdim>>("input", fc)};
     auto & ref  {make_field<TensorField<FC_t, Real, order, Fix::mdim>>("reference", fc)};
@@ -101,7 +101,7 @@ namespace muSpectre {
       ref_ = in_;
     }
     auto & complex_field = Fix::engine.fft(input);
-    using cmap_t = MatrixFieldMap<FieldCollection<Fix::sdim, Fix::mdim, false>, Complex, Fix::mdim, Fix::mdim>;
+    using cmap_t = MatrixFieldMap<LocalFieldCollection<Fix::sdim, Fix::mdim>, Complex, Fix::mdim, Fix::mdim>;
     cmap_t complex_map(complex_field);
     Real error = complex_map[0].imag().norm();
     BOOST_CHECK_LT(error, tol);
