@@ -1,11 +1,11 @@
 /**
- * @file   test_fftw_engine_mpi.cc
+ * @file   mpi_test_fft_engine.cc
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
  * @date   06 Mar 2017
  *
- * @brief  tests for the fftw MPI-parallel fft engine implementation
+ * @brief  tests for MPI-parallel fft engine implementations
  *
  * Copyright © 2017 Till Junge
  *
@@ -37,7 +37,7 @@
 
 namespace muSpectre {
 
-  BOOST_AUTO_TEST_SUITE(fftw_engine_mpi);
+  BOOST_AUTO_TEST_SUITE(fftwmpi_engine);
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM, Dim_t resolution>
