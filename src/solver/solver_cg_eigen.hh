@@ -128,12 +128,12 @@ namespace muSpectre {
     using SolvVectorInC = typename Parent::SolvVectorInC;
     //! Output vector for solvers
     using SolvVectorOut = typename Parent::SolvVectorOut;
-    using Sys_t = typename Parent::Sys_t; //!< cell type
+    using Cell_t = typename Parent::Cell_t; //!< cell type
     using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
     //! kind of tangent that is required
     using Tg_req_t = typename Parent::TangentRequirement;
     //! handle for the cell to fit Eigen's sparse matrix interface
-    using Adaptor = typename Sys_t::Adaptor;
+    using Adaptor = typename Cell_t::Adaptor;
     //! traits obtained from CRTP
     using Solver = typename internal::Solver_traits<SolverType>::Solver;
 
@@ -144,7 +144,7 @@ namespace muSpectre {
     SolverEigen() = delete;
 
     //! Constructor with domain resolutions, etc,
-    SolverEigen(Sys_t& sys, Real tol, Uint maxiter=0, bool verbose =false);
+    SolverEigen(Cell_t& cell, Real tol, Uint maxiter=0, bool verbose =false);
 
     //! Copy constructor
     SolverEigen(const SolverEigen &other) = delete;

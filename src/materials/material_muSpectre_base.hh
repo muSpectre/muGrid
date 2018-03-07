@@ -126,7 +126,7 @@ namespace muSpectre {
 
     //! Factory
     template <class... ConstructorArgs>
-    static Material & make(CellBase<DimS, DimM> & sys,
+    static Material & make(CellBase<DimS, DimM> & cell,
                            ConstructorArgs &&... args);
 
     //! Copy assignment operator
@@ -221,11 +221,11 @@ namespace muSpectre {
   template <class Material, Dim_t DimS, Dim_t DimM>
   template <class... ConstructorArgs>
   Material & MaterialMuSpectre<Material, DimS, DimM>::
-  make(CellBase<DimS, DimM> & sys,
+  make(CellBase<DimS, DimM> & cell,
                   ConstructorArgs && ... args) {
     auto mat = std::make_unique<Material>(args...);
     auto & mat_ref = *mat;
-    sys.add_material(std::move(mat));
+    cell.add_material(std::move(mat));
     return mat_ref;
   }
 

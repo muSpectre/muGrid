@@ -39,7 +39,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   ProjectionFiniteStrain<DimS, DimM>::
-  ProjectionFiniteStrain(FFT_Engine_ptr engine)
+  ProjectionFiniteStrain(FFTEngine_ptr engine)
     :Parent{std::move(engine), Formulation::finite_strain}
   {}
 

@@ -67,7 +67,7 @@ namespace muSpectre {
     constexpr static auto stress_measure{StressMeasure::Kirchhoff};
 
     //! local field collection used for internals
-    using LFieldColl_t = LocalFieldCollection<DimS, DimM>;
+    using LFieldColl_t = LocalFieldCollection<DimS>;
 
     //! storage type for plastic flow measure (εₚ in the papers)
     using LScalarMap_t = StateFieldMap<ScalarFieldMap<LFieldColl_t, Real>>;
@@ -192,7 +192,7 @@ namespace muSpectre {
                                                     StrainStRef_t& be_prev,
                                                     FlowStRef_t& plast_flow);
     //! Local FieldCollection type for field storage
-    using LColl_t = LocalFieldCollection<DimS, DimM>;
+    using LColl_t = LocalFieldCollection<DimS>;
     //! storage for cumulated plastic flow εₚ
     StateField<ScalarField<LColl_t, Real>>  plast_flow_field;
 

@@ -40,13 +40,13 @@ namespace muSpectre {
     * global fields that live throughout the whole computational domain, i.e.
     * are defined for each pixel.
     */
-  template<Dim_t DimS, Dim_t DimM>
+  template<Dim_t DimS>
   class GlobalFieldCollection:
-    public FieldCollectionBase<DimS, DimM, GlobalFieldCollection<DimS, DimM>>
+    public FieldCollectionBase<DimS, GlobalFieldCollection<DimS>>
   {
   public:
     using Parent = FieldCollectionBase
-      <DimS, DimM, GlobalFieldCollection<DimS, DimM>>; //!< base class
+      <DimS, GlobalFieldCollection<DimS>>; //!< base class
     using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
     using Field_p = typename Parent::Field_p; //!< spatial coordinates type
     //! iterator over all pixels contained it the collection
@@ -98,8 +98,6 @@ namespace muSpectre {
 
     //! return spatial dimension (template parameter)
     static constexpr inline Dim_t spatial_dim() {return DimS;}
-    //! return material dimension (template parameter)
-    static constexpr inline Dim_t material_dim() {return DimM;}
   protected:
     //! number of discretisation cells in each of the DimS spatial directions
     Ccoord sizes{};
@@ -108,15 +106,15 @@ namespace muSpectre {
   };
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  GlobalFieldCollection<DimS, DimM>::GlobalFieldCollection()
+  template <Dim_t DimS>
+  GlobalFieldCollection<DimS>::GlobalFieldCollection()
     :Parent()
   {}
 
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void GlobalFieldCollection<DimS, DimM>::
+  template <Dim_t DimS>
+  void GlobalFieldCollection<DimS>::
   initialise(Ccoord sizes) {
     if (this->is_initialised) {
       throw std::runtime_error("double initialisation");
@@ -145,40 +143,40 @@ namespace muSpectre {
 
   //----------------------------------------------------------------------------//
   //! return the pixel sizes
-  template <Dim_t DimS, Dim_t DimM>
-  const typename GlobalFieldCollection<DimS, DimM>::Ccoord &
-  GlobalFieldCollection<DimS, DimM>::get_sizes() const {
+  template <Dim_t DimS>
+  const typename GlobalFieldCollection<DimS>::Ccoord &
+  GlobalFieldCollection<DimS>::get_sizes() const {
     return this->sizes;
   }
 
   //----------------------------------------------------------------------------//
   //! returns the cell coordinates corresponding to a linear index
-  template <Dim_t DimS, Dim_t DimM>
-  typename GlobalFieldCollection<DimS, DimM>::Ccoord
-  GlobalFieldCollection<DimS, DimM>::get_ccoord(size_t index) const {
+  template <Dim_t DimS>
+  typename GlobalFieldCollection<DimS>::Ccoord
+  GlobalFieldCollection<DimS>::get_ccoord(size_t index) const {
     return CcoordOps::get_ccoord(this->get_sizes(), std::move(index));
   }
 
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  typename GlobalFieldCollection<DimS, DimM>::iterator
-  GlobalFieldCollection<DimS, DimM>::begin() {
+  template <Dim_t DimS>
+  typename GlobalFieldCollection<DimS>::iterator
+  GlobalFieldCollection<DimS>::begin() {
     return this->pixels.begin();
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  typename GlobalFieldCollection<DimS, DimM>::iterator
-  GlobalFieldCollection<DimS, DimM>::end() {
+  template <Dim_t DimS>
+  typename GlobalFieldCollection<DimS>::iterator
+  GlobalFieldCollection<DimS>::end() {
     return this->pixels.end();
   }
   //----------------------------------------------------------------------------//
   //! returns the linear index corresponding to cell coordinates
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimS>
   template <class CcoordRef>
   size_t
-  GlobalFieldCollection<DimS, DimM>::get_index(CcoordRef && ccoord) const {
+  GlobalFieldCollection<DimS>::get_index(CcoordRef && ccoord) const {
     static_assert(std::is_same<
                     Ccoord,
                     std::remove_const_t<

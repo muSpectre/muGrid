@@ -63,7 +63,7 @@ namespace muSpectre {
     constexpr static auto stress_measure{StressMeasure::PK2};
 
     //! local field_collections used for internals
-    using LFieldColl_t = LocalFieldCollection<DimS, DimM>;
+    using LFieldColl_t = LocalFieldCollection<DimS>;
     //! local stiffness tensor type
     using LStiffnessMap_t = T4MatrixFieldMap<LFieldColl_t, Real, DimM, true>;
     //! elasticity without internal variables
@@ -164,7 +164,7 @@ namespace muSpectre {
   protected:
     //! storage for stiffness tensor
     using Field_t =
-      TensorField<LocalFieldCollection<DimS,DimM>, Real, fourthOrder, DimM>;
+      TensorField<LocalFieldCollection<DimS>, Real, fourthOrder, DimM>;
     Field_t & C_field; //!< field of stiffness tensors
     //! tuple for iterable eigen_field
     InternalVariables internal_variables;

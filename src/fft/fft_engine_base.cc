@@ -31,7 +31,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  FFT_Engine_base<DimS, DimM>::FFT_Engine_base(Ccoord resolutions, Rcoord lengths)
+  FFTEngineBase<DimS, DimM>::FFTEngineBase(Ccoord resolutions, Rcoord lengths)
     :resolutions{resolutions}, lengths{lengths},
      work{make_field<Workspace_t>("work space", work_space_container)},
      norm_factor{1./CcoordOps::get_size(resolutions)}
@@ -39,24 +39,24 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void FFT_Engine_base<DimS, DimM>::initialise(FFT_PlanFlags /*plan_flags*/) {
+  void FFTEngineBase<DimS, DimM>::initialise(FFT_PlanFlags /*plan_flags*/) {
     this->work_space_container.initialise();
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  size_t FFT_Engine_base<DimS, DimM>::size() const {
+  size_t FFTEngineBase<DimS, DimM>::size() const {
     return CcoordOps::get_size(this->resolutions);
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  size_t FFT_Engine_base<DimS, DimM>::workspace_size() const {
+  size_t FFTEngineBase<DimS, DimM>::workspace_size() const {
     return this->work_space_container.size();
   }
 
-  template class FFT_Engine_base<twoD, twoD>;
-  template class FFT_Engine_base<twoD, threeD>;
-  template class FFT_Engine_base<threeD, threeD>;
+  template class FFTEngineBase<twoD, twoD>;
+  template class FFTEngineBase<twoD, threeD>;
+  template class FFTEngineBase<threeD, threeD>;
 
 }  // muSpectre

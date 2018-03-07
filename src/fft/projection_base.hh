@@ -49,32 +49,32 @@ namespace muSpectre {
   {
   public:
     //! type of fft_engine used
-    using FFT_Engine = FFT_Engine_base<DimS, DimM>;
+    using FFTEngine = FFTEngineBase<DimS, DimM>;
     //! reference to fft engine is safely managed through a `std::unique_ptr`
-    using FFT_Engine_ptr = std::unique_ptr<FFT_Engine>;
+    using FFTEngine_ptr = std::unique_ptr<FFTEngine>;
     //! cell coordinates type
-    using Ccoord = typename FFT_Engine::Ccoord;
+    using Ccoord = typename FFTEngine::Ccoord;
     //! spatial coordinates type
-    using Rcoord = typename FFT_Engine::Rcoord;
+    using Rcoord = typename FFTEngine::Rcoord;
     //! global FieldCollection
-    using GFieldCollection_t = typename FFT_Engine::GFieldCollection_t;
+    using GFieldCollection_t = typename FFTEngine::GFieldCollection_t;
     //! local FieldCollection (for Fourier-space pixels)
-    using LFieldCollection_t = typename FFT_Engine::LFieldCollection_t;
+    using LFieldCollection_t = typename FFTEngine::LFieldCollection_t;
     //! Field type on which to apply the projection
-    using Field_t = typename FFT_Engine::Field_t;
+    using Field_t = typename FFTEngine::Field_t;
     /**
      * iterator over all pixels. This is taken from the FFT engine,
      * because depending on the real-to-complex FFT employed, only
      * roughly half of the pixels are present in Fourier space
      * (because of the hermitian nature of the transform)
      */
-    using iterator = typename FFT_Engine::iterator;
+    using iterator = typename FFTEngine::iterator;
 
     //! Default constructor
     ProjectionBase() = delete;
 
     //! Constructor with cell sizes
-    ProjectionBase(FFT_Engine_ptr engine, Formulation form);
+    ProjectionBase(FFTEngine_ptr engine, Formulation form);
 
     //! Copy constructor
     ProjectionBase(const ProjectionBase &other) = delete;
@@ -118,7 +118,7 @@ namespace muSpectre {
 
   protected:
     //! handle on the fft_engine used
-    FFT_Engine_ptr fft_engine;
+    FFTEngine_ptr fft_engine;
     /**
      * formulation this projection can be applied to (determines
      * whether the projection enforces gradients, small strain tensor

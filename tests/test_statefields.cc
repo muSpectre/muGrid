@@ -41,8 +41,8 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM, bool Global>
   struct SF_Fixture {
     using FC_t = std::conditional_t<Global,
-                                    GlobalFieldCollection<DimS, DimM>,
-                                    LocalFieldCollection<DimS, DimM>>;
+                                    GlobalFieldCollection<DimS>,
+                                    LocalFieldCollection<DimS>>;
     using Field_t = TensorField<FC_t, Real, secondOrder, DimM>;
     using ScalField_t = ScalarField<FC_t, Real>;
     constexpr static size_t nb_mem{2};

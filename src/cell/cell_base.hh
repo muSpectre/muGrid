@@ -54,7 +54,7 @@ namespace muSpectre {
     using Ccoord = Ccoord_t<DimS>; //!< cell coordinates type
     using Rcoord = Rcoord_t<DimS>; //!< physical coordinates type
     //! global field collection
-    using FieldCollection_t = GlobalFieldCollection<DimS, DimM>;
+    using FieldCollection_t = GlobalFieldCollection<DimS>;
     //! the collection is handled in a `std::unique_ptr`
     using Collection_ptr = std::unique_ptr<FieldCollection_t>;
     //! polymorphic base material type
@@ -253,9 +253,9 @@ namespace muSpectre {
     };
 
     //! constructor
-    CellAdaptor(Cell & sys):sys{sys}{}
+    CellAdaptor(Cell & cell):cell{cell}{}
     //!returns the number of logical rows
-    Eigen::Index rows() const {return this->sys.nb_dof();}
+    Eigen::Index rows() const {return this->cell.nb_dof();}
     //!returns the number of logical columns
     Eigen::Index cols() const {return this->rows();}
 
@@ -266,7 +266,7 @@ namespace muSpectre {
       return Eigen::Product<CellAdaptor,Rhs,Eigen::AliasFreeProduct>
         (*this, x.derived());
     }
-    Cell & sys; //!< ref to the cell
+    Cell & cell; //!< ref to the cell
   };
 
 }  // muSpectre
@@ -290,7 +290,7 @@ namespace Eigen {
         // This method should implement "dst += alpha * lhs * rhs" inplace,
         // however, for iterative solvers, alpha is always equal to 1, so let's not bother about it.
         // Here we could simply call dst.noalias() += lhs.my_matrix() * rhs,
-        dst.noalias() += const_cast<CellAdaptor&>(lhs).sys.directional_stiffness_vec(rhs);
+        dst.noalias() += const_cast<CellAdaptor&>(lhs).cell.directional_stiffness_vec(rhs);
       }
     };
   }

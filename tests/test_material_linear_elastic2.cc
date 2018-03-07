@@ -99,7 +99,7 @@ namespace muSpectre {
     constexpr auto cube{CcoordOps::get_cube<Fix::sdim>(nb_pixel)};
 
     using Mat_t = Eigen::Matrix<Real, Fix::mdim, Fix::mdim>;
-    using FC_t = GlobalFieldCollection<Fix::sdim, Fix::mdim>;
+    using FC_t = GlobalFieldCollection<Fix::sdim>;
     FC_t globalfields;
     auto & F_f{make_field<typename Fix::Mat::StrainField_t>
         ("Transformation Gradient", globalfields)};
@@ -166,7 +166,7 @@ namespace muSpectre {
     constexpr auto cube{CcoordOps::get_cube<Fix::sdim>(Fix::box_size)};
     auto & mat{Fix::mat};
 
-    using FC_t = GlobalFieldCollection<Fix::sdim, Fix::mdim>;
+    using FC_t = GlobalFieldCollection<Fix::sdim>;
     FC_t globalfields;
     auto & F{make_field<typename Fix::Mat::StrainField_t>
         ("Transformation Gradient", globalfields)};

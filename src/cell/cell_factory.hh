@@ -45,13 +45,13 @@ namespace muSpectre {
    * FFT_engine) to be used in a cell constructor
    */
   template <Dim_t DimS, Dim_t DimM,
-            typename FFT_Engine=FFTW_Engine<DimS, DimM>>
+            typename FFTEngine=FFTWEngine<DimS, DimM>>
   inline
   std::unique_ptr<ProjectionBase<DimS, DimM>>
   cell_input(Ccoord_t<DimS> resolutions,
                Rcoord_t<DimS> lengths,
                Formulation form) {
-    auto fft_ptr{std::make_unique<FFT_Engine>(resolutions, lengths)};
+    auto fft_ptr{std::make_unique<FFTEngine>(resolutions, lengths)};
     switch (form)
       {
       case Formulation::finite_strain: {
@@ -78,13 +78,13 @@ namespace muSpectre {
    */
   template <size_t DimS, size_t DimM=DimS,
             typename Cell=CellBase<DimS, DimM>,
-            typename FFT_Engine=FFTW_Engine<DimS, DimM>>
+            typename FFTEngine=FFTWEngine<DimS, DimM>>
   inline
   Cell make_cell(Ccoord_t<DimS> resolutions,
                      Rcoord_t<DimS> lengths,
                      Formulation form) {
 
-    auto && input = cell_input<DimS, DimM, FFT_Engine>(resolutions, lengths, form);
+    auto && input = cell_input<DimS, DimM, FFTEngine>(resolutions, lengths, form);
     auto cell{Cell{std::move(input)}};
     return cell;
   }

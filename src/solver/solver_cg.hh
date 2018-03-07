@@ -55,7 +55,7 @@ namespace muSpectre {
     using SolvVectorInC = typename Parent::SolvVectorInC;
     //! Output vector for solvers
     using SolvVectorOut = typename Parent::SolvVectorOut;
-    using Sys_t = typename Parent::Sys_t; //!< cell type
+    using Cell_t = typename Parent::Cell_t; //!< cell type
     using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
     //! kind of tangent that is required
     using Tg_req_t = typename Parent::TangentRequirement;
@@ -69,7 +69,7 @@ namespace muSpectre {
     SolverCG() = delete;
 
     //! Constructor with domain resolutions, etc,
-    SolverCG(Sys_t& sys, Real tol, Uint maxiter=0, bool verbose =false);
+    SolverCG(Cell_t& cell, Real tol, Uint maxiter=0, bool verbose =false);
 
     //! Copy constructor
     SolverCG(const SolverCG &other) = delete;

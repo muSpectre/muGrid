@@ -38,9 +38,9 @@ namespace muSpectre {
 
   //----------------------------------------------------------------------------//
   template <Dim_t DimS, Dim_t DimM>
-  SolverBase<DimS, DimM>::SolverBase(Sys_t & sys, Real tol, Uint maxiter,
+  SolverBase<DimS, DimM>::SolverBase(Cell_t & cell, Real tol, Uint maxiter,
                                      bool verbose )
-    : sys{sys}, tol{tol}, maxiter{maxiter}, verbose{verbose}
+    : cell{cell}, tol{tol}, maxiter{maxiter}, verbose{verbose}
   {}
 
 

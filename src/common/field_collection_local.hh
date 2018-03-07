@@ -40,14 +40,14 @@ namespace muSpectre {
     * `LocalFieldCollection::add_pixel` allows to add individual pixels to the
     * field collection.
     */
-  template<Dim_t DimS, Dim_t DimM>
+  template<Dim_t DimS>
   class LocalFieldCollection:
-    public FieldCollectionBase<DimS, DimM, LocalFieldCollection<DimS, DimM>>
+    public FieldCollectionBase<DimS, LocalFieldCollection<DimS>>
   {
   public:
     //! base class
-    using Parent = FieldCollectionBase<DimS, DimM,
-                                       LocalFieldCollection<DimS, DimM>>;
+    using Parent = FieldCollectionBase<DimS,
+                                       LocalFieldCollection<DimS>>;
     using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
     using Field_p = typename Parent::Field_p; //!< field pointer
     using ccoords_container = std::vector<Ccoord>; //!< list of pixels
@@ -108,13 +108,13 @@ namespace muSpectre {
 
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  LocalFieldCollection<DimS, DimM>::LocalFieldCollection()
+  template <Dim_t DimS>
+  LocalFieldCollection<DimS>::LocalFieldCollection()
     :Parent(){}
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void LocalFieldCollection<DimS, DimM>::
+  template <Dim_t DimS>
+  void LocalFieldCollection<DimS>::
   add_pixel(const Ccoord & local_ccoord) {
     if (this->is_initialised) {
       throw FieldCollectionError
@@ -127,8 +127,8 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void LocalFieldCollection<DimS, DimM>::
+  template <Dim_t DimS>
+  void LocalFieldCollection<DimS>::
   initialise() {
     if (this->is_initialised) {
       throw std::runtime_error("double initialisation");
@@ -154,10 +154,10 @@ namespace muSpectre {
 
   //----------------------------------------------------------------------------//
   //! returns the linear index corresponding to cell coordinates
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimS>
   template <class CcoordRef>
   size_t
-  LocalFieldCollection<DimS, DimM>::get_index(CcoordRef && ccoord) const {
+  LocalFieldCollection<DimS>::get_index(CcoordRef && ccoord) const {
     static_assert(std::is_same<
                     Ccoord,
                     std::remove_const_t<
@@ -169,9 +169,9 @@ namespace muSpectre {
 
   //----------------------------------------------------------------------------//
   //! returns the cell coordinates corresponding to a linear index
-  template <Dim_t DimS, Dim_t DimM>
-  typename LocalFieldCollection<DimS, DimM>::Ccoord
-  LocalFieldCollection<DimS, DimM>::get_ccoord(size_t index) const {
+  template <Dim_t DimS>
+  typename LocalFieldCollection<DimS>::Ccoord
+  LocalFieldCollection<DimS>::get_ccoord(size_t index) const {
     return this->ccoords[std::move(index)];
   }
 
