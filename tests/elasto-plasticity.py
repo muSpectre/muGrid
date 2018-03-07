@@ -149,8 +149,10 @@ def constitutive(F,F_t,be_t,ep_t):
     taueq_s  = np.sqrt(3./2.*ddot22(taud_s,taud_s))
     print("taueq_s = {}".format(taueq_s))
     N_s      = 3./2.*taud_s/taueq_s
+    print("N_s =\n{}".format(N_s.reshape([3, 3])))
+    print("tauy0 = {}".format(tauy0))
     phi_s    = taueq_s-(tauy0+H*ep_t)
-    print("phi_s = {}".format(phi_s))
+    print("phi_s(before) = {}".format(phi_s))
     print("ep_t = {}".format(ep_t))
     phi_s    = 1./2.*(phi_s+np.abs(phi_s))
     print("phi_s = {}".format(phi_s))
@@ -171,11 +173,12 @@ def constitutive(F,F_t,be_t,ep_t):
     dlnbe4_s = dln2_d2(be_s)
     dbe4_s   = 2.*dot42(I4s,be_s)
     K4       = (C4e/2.)*(phi_s<=0.).astype(np.float)+C4ep*(phi_s>0.).astype(np.float)
+    C4       = K4.copy()
     K4       = ddot44(K4,ddot44(dlnbe4_s,dbe4_s))
     K4       = dot42(-I4rt,tau)+K4
     K4       = dot42(dot24(inv2(F),K4),trans2(inv2(F)))
 
-    return tau, P,K4,be,ep
+    return tau, C4, P,K4,be,ep
 
 # phase indicator: square inclusion of volume fraction (3*3*15)/(11*13*15)
 phase  = np.zeros([Nx,Ny,Nz]); phase[:3,:3,:] = 1.
@@ -185,8 +188,8 @@ param  = lambda M0,M1: M0*np.ones([Nx,Ny,Nz])*(1.-phase)+\
 # material parameters
 K      = param(0.833,0.833)  # bulk      modulus
 mu     = param(0.386,0.386)  # shear     modulus
-H      = param(0.004,0.008)  # hardening modulus
-tauy0  = param(0.003,0.006)  # initial yield stress
+H      = param(0.004,0.004)  # hardening modulus
+tauy0  = param(0.003,0.003)  # initial yield stress
 
 # ---------------------------------- LOADING ----------------------------------
 
@@ -209,7 +212,7 @@ K4     = K*II+2.*mu*(I4s-1./3.*II)
 
 F      = np.array(I,copy=True)
 F[0, 1] = 1.e-5
-tau, P,K4,be,ep = constitutive(F, F_t, be_t, ep_t)
+tau, C4, P,K4,be,ep = constitutive(F, F_t, be_t, ep_t)
 # end-of-increment: update history
 barF_t = np.array(barF,copy=True)
 F_t    = np.array(F   ,copy=True)
@@ -219,14 +222,16 @@ print("tau1 =\n{}".format(tau.reshape([3, 3])))
 print("F_t1 =\n{}".format(F_t.reshape([3, 3])))
 print("be_t1 =\n{}".format(be_t.reshape([3, 3])))
 print("ep_t1 =\n{}".format(ep_t.reshape([1])))
+print("C4 =\n{}".format(C4.reshape([9, 9])))
 F      = np.array(I,copy=True)
 F[0, 1] = .2
-tau, P,K4,be,ep = constitutive(F, F_t, be_t, ep_t)
+tau, C4, P,K4,be,ep = constitutive(F, F_t, be_t, ep_t)
 print("tau2 =\n{}".format(tau.reshape([3, 3])))
 print("tau2 =\n{}".format(tau.reshape([3, 3])))
-print("F_t2 =\n{}".format(F_t.reshape([3, 3])))
-print("be_t2 =\n{}".format(be_t.reshape([3, 3])))
-print("ep_t2 =\n{}".format(ep_t.reshape([1])))
+print("F_t2 =\n{}".format(F.reshape([3, 3])))
+print("be_t2 =\n{}".format(be.reshape([3, 3])))
+print("ep_t2 =\n{}".format(ep.reshape([1])))
+print("C4 =\n{}".format(C4.reshape([9, 9])))
 
 sys.exit()
 # incremental deformation

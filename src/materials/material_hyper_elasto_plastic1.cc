@@ -45,7 +45,9 @@ namespace muSpectre {
       mu{Hooke::compute_mu(young, poisson)},
       K{Hooke::compute_K(young, poisson)},
       tau_y0{tau_y0}, H{H},
-      C{Hooke::compute_C_T4(lambda, mu)},
+      // the factor .5 comes from equation (18) in Geers 2003
+      // (https://doi.org/10.1016/j.cma.2003.07.014)
+      C{0.5*Hooke::compute_C_T4(lambda, mu)},
       internal_variables{F_prev_field.get_map(), be_prev_field.get_map(),
           plast_flow_field.get_map()}
   {}
