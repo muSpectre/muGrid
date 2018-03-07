@@ -18,8 +18,6 @@
  * state field as well as state maps using the Field, FieldCollection
  * and FieldMap abstractions of µSpectre
  *
- * @section LICENSE
- *
  * Copyright © 2018 Till Junge
  *
  * µSpectre is free software; you can redistribute it and/or
@@ -50,17 +48,23 @@
 
 namespace muSpectre {
 
+  /**
+   * Base class for state fields, useful for storing polymorphic references
+   */
   template <size_t nb_memory>
   class StateFieldBase {
   public:
+    //! the current (historically accurate) ordering of the fields
     using index_t = std::array<size_t, nb_memory+1>;
+    //! get the current ordering of the fields
     inline const index_t & get_indices() const {return this->indices;}
   protected:
+    //! constructor
     StateFieldBase(index_t indices):indices{indices}{};
     index_t indices; ///< these are cycled through
   };
 
-  // early declaration
+  //! early declaration
   template <class FieldMap, size_t nb_memory>
   class StateFieldMap;
 
@@ -88,23 +92,33 @@ namespace muSpectre {
 
   }  // internal
 
-  /* ---------------------------------------------------------------------- */
+  /**
+   * A statefield is an abstraction around a Field that can hold a
+   * current and `nb_memory` previous values. There are useful for
+   * history variables, for instance.
+   */
   template <class Field_t, size_t nb_memory=1>
   class StateField: public StateFieldBase<nb_memory>
   {
   public:
+    //! Base class for all state fields of same memory 
     using Base = StateFieldBase<nb_memory>;
+    //! the underlying field's collection type
     using FieldCollection = typename Field_t::Base::collection_t;
-    using Field_p = typename Field_t::Field_p;
+    /**
+     * storage of field refs (can't be a `std::array`, because arrays
+     * of refs are explicitely forbidden
+     */
     using Fields_t = tuple_array<Field_t&, nb_memory+1>;
 
     //! Default constructor
     StateField() = delete;
 
     /**
-     * Constructor. The @param unique_prefix is used to create the
-     * names of the fields that this abstraction creates in the
-     * background
+     * Constructor.  @param unique_prefix is used to create the names
+     * of the fields that this abstraction creates in the background
+     * @param collection is the field collection in which the
+     * subfields will be stored
      */
     inline StateField(std::string unique_prefix, FieldCollection & collection)
       : Base{internal::build_indices<nb_memory+1>(std::make_index_sequence<nb_memory+1>{})},
@@ -209,6 +223,10 @@ namespace muSpectre {
     }
 
   protected:
+    /**
+     * the unique prefix is used as the first part of the unique name
+     * of the subfields belonging to this state field
+     */
     std::string prefix;
     Fields_t fields; //!< container for the states
   private:
@@ -225,7 +243,9 @@ namespace muSpectre {
 
   }  // internal
 
-  /* ---------------------------------------------------------------------- */
+  /**
+   * extends the StateField <-> Field equivalence to StateFieldMap <-> FieldMap
+   */
   template <class FieldMap, size_t nb_memory=1>
   class StateFieldMap
   {
@@ -237,13 +257,20 @@ namespace muSpectre {
      */
     class iterator;
 
+    //! stl conformance
     using reference = typename iterator::reference;
+    //! stl conformance
     using value_type = typename iterator::value_type;
+    //! stl conformance
     using size_type = typename iterator::size_type;
 
+    //! field collection type where this state field can be stored
     using FieldCollection= typename FieldMap::Field::collection_t;
+    //! base class (for polymorphic references)
     using StateFieldBase_t = StateFieldBase<nb_memory>;
+    //! for traits access
     using FieldMap_t = FieldMap;
+    //! for traits access
     using ConstFieldMap_t = typename FieldMap::ConstMap;
 
     //! Default constructor
@@ -280,13 +307,23 @@ namespace muSpectre {
     //! Move assignment operator
     StateFieldMap& operator=(StateFieldMap &&other) = delete;
 
+    //! access the wrapper to a given pixel directly
     value_type operator[](size_type index) {
       return *iterator(*this, index);
     }
 
+    /**
+     * return a ref to the current field map. useful for instance for
+     * initialisations of `StateField` instances
+     */
+    FieldMap& current() {
+      return this->maps[this->statefield.get_indices()[0]];
+    }
 
+    //! stl conformance
     iterator begin() {
       return iterator(*this, 0);}
+    //! stl conformance
     iterator end() {
       return iterator(*this, this->collection.size());}
 
@@ -299,25 +336,28 @@ namespace muSpectre {
   private:
   };
 
-
+  /**
+   * Iterator class used by the `StateFieldMap`
+   */
   template <class FieldMap, size_t nb_memory>
   class StateFieldMap<FieldMap, nb_memory>::iterator
   {
   public:
     class StateWrapper;
 
-    using Ccoord = typename FieldMap::Ccoord;
-    using value_type = StateWrapper;
-    using const_value_type = value_type;
-    using pointer_type = value_type*;
-    using difference_type = std::ptrdiff_t;
-    using size_type = size_t;
-    using iterator_category = std::random_access_iterator_tag;
-    using reference = StateWrapper;
+    using Ccoord = typename FieldMap::Ccoord; //!< cell coordinates type
+    using value_type = StateWrapper; //!< stl conformance
+    using const_value_type = value_type; //!< stl conformance
+    using pointer_type = value_type*; //!< stl conformance
+    using difference_type = std::ptrdiff_t; //!< stl conformance
+    using size_type = size_t; //!< stl conformance
+    using iterator_category = std::random_access_iterator_tag; //!< stl conformance
+    using reference = StateWrapper; //!< stl conformance
 
     //! Default constructor
     iterator() = delete;
 
+    //! constructor
     iterator(StateFieldMap& map, size_t index = 0)
       :index{index}, map{map}
     {};
@@ -402,8 +442,8 @@ namespace muSpectre {
     inline const size_t & get_index() const {return this->index;}
 
   protected:
-    size_t index;
-    StateFieldMap& map;
+    size_t index; //!< current pixel this iterator refers to
+    StateFieldMap& map; //!< map over with `this` iterates
   private:
   };
 
@@ -429,14 +469,22 @@ namespace muSpectre {
 
   }  // internal
 
-  /* ---------------------------------------------------------------------- */
+  /**
+   * Light-weight resource-handle representing the current and old
+   * values of a field at a given pixel identified by an iterator
+   * pointing to it
+   */
   template <class FieldMap, size_t nb_memory>
   class StateFieldMap<FieldMap, nb_memory>::iterator::StateWrapper
   {
   public:
+    //! short-hand
     using iterator = typename StateFieldMap::iterator;
+    //! short-hand
     using Ccoord = typename iterator::Ccoord;
+    //! short-hand
     using Map = typename FieldMap::reference;
+    //! short-hand
     using ConstMap = typename FieldMap::const_reference;
 
     //! Default constructor
@@ -466,10 +514,12 @@ namespace muSpectre {
     //! Move assignment operator
     StateWrapper& operator=(StateWrapper &&other) = default;
 
+    //! returns reference to the currectly mapped value
     inline Map& current() {
       return this->current_val;
     }
 
+    //! recurnts reference the the value that was current `nb_steps_ago` ago
     template <size_t nb_steps_ago = 1>
     inline const ConstMap & old() const{
       static_assert (nb_steps_ago <= nb_memory,
@@ -480,14 +530,15 @@ namespace muSpectre {
       return std::get<nb_memory-nb_steps_ago>(this->old_vals);
     }
 
+    //! read the coordinates of the current pixel
     inline Ccoord get_ccoord() const {
       return this->it.get_ccoord();
     }
 
   protected:
-    iterator& it;
-    Map current_val;
-    tuple_array<ConstMap, nb_memory> old_vals;
+    iterator& it; //!< ref to the iterator that dereferences to `this`
+    Map current_val; //!< current value
+    tuple_array<ConstMap, nb_memory> old_vals; //!< all stored old values
   private:
   };
 }  // muSpectre

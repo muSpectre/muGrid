@@ -75,6 +75,7 @@ namespace muSpectre {
                                             const TypedField_nc,
                                             TypedField_nc>;
       using Field = typename TypedField::Base; //!< iterated field type
+      //! const-correct field type
       using Field_c = std::conditional_t<ConstField,
                                          const Field,
                                          Field>;

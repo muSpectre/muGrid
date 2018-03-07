@@ -9,8 +9,6 @@
  *        type traits. Uses the MaterialMuSpectre facilities to keep it
  *        simple
  *
- * @section LICENSE
- *
  * Copyright © 2018 Till Junge
  *
  * µSpectre is free software; you can redistribute it and/or
@@ -98,6 +96,10 @@ namespace muSpectre {
     //! traits of this material
     using traits = MaterialMuSpectre_traits<MaterialLinearElastic2>;
 
+    /**
+     * tuple type storing the maps over internal fields (previous
+     * strains, plastic flow, etc
+     */
     using InternalVariables = typename traits::InternalVariables;
 
     //! Hooke's law implementation
@@ -164,11 +166,11 @@ namespace muSpectre {
                    const StrainTensor & E_eig);
 
   protected:
-    MaterialLinearElastic1<DimS, DimM> material;
+    MaterialLinearElastic1<DimS, DimM> material;//!< used to do the stress comp
     //! storage for eigenstrain
     using Field_t =
       TensorField<LocalFieldCollection<DimS,DimM>, Real, secondOrder, DimM>;
-    Field_t & eigen_field;
+    Field_t & eigen_field; //!< field holding the eigen strain per pixel
     //! tuple for iterable eigen_field
     InternalVariables internal_variables;
   private:

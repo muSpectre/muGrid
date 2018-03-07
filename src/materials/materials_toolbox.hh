@@ -369,6 +369,7 @@ namespace muSpectre {
         public PK1_stress<Dim, StressMeasure::Kirchhoff,
                           StrainMeasure::no_strain_> {
 
+        //! short-hand
         using Parent = PK1_stress<Dim, StressMeasure::Kirchhoff,
                                   StrainMeasure::no_strain_>;
         using Parent::compute;
@@ -437,8 +438,10 @@ namespace muSpectre {
 
     namespace internal {
 
+      //! Base template for elastic modulus conversion
       template <ElasticModulus Out, ElasticModulus In1, ElasticModulus In2>
       struct Converter {
+        //! wrapped function (raison d'être)
         inline constexpr static Real compute(const Real& /*in1*/,
                                       const Real& /*in2*/) {
           // if no return has happened until now, the conversion is not
@@ -458,6 +461,7 @@ namespace muSpectre {
        */
       template <ElasticModulus Out, ElasticModulus In>
       struct Converter<Out, Out, In> {
+        //! wrapped function (raison d'être)
         inline constexpr static Real compute(const Real & A, const Real & /*B*/) {
           return A;
         }
@@ -468,6 +472,7 @@ namespace muSpectre {
        */
       template <ElasticModulus Out, ElasticModulus In>
       struct Converter<Out, In, Out> {
+        //! wrapped function (raison d'être)
         inline constexpr static Real compute(const Real & /*A*/, const Real & B) {
           return B;
         }
@@ -480,6 +485,7 @@ namespace muSpectre {
       struct Converter<ElasticModulus::Shear,
                        ElasticModulus::Young,
                        ElasticModulus::Poisson> {
+        //! wrapped function (raison d'être)
         inline constexpr static Real compute(const Real & E, const Real & nu) {
           return E/(2*(1+nu));
         }
@@ -492,6 +498,7 @@ namespace muSpectre {
       struct Converter<ElasticModulus::lambda,
                        ElasticModulus::Young,
                        ElasticModulus::Poisson> {
+        //! wrapped function (raison d'être)
         inline constexpr static Real compute(const Real & E, const Real & nu) {
           return E*nu/((1+nu)*(1-2*nu));
         }
@@ -504,6 +511,7 @@ namespace muSpectre {
       struct Converter<ElasticModulus::Bulk,
                        ElasticModulus::Young,
                        ElasticModulus::Poisson> {
+        //! wrapped function (raison d'être)
         inline constexpr static Real compute(const Real & E, const Real & nu) {
           return E/(3*(1-2*nu));
         }
@@ -516,6 +524,7 @@ namespace muSpectre {
       struct Converter<ElasticModulus::Young,
                        ElasticModulus::Bulk,
                        ElasticModulus::Shear> {
+        //! wrapped function (raison d'être)
         inline constexpr static Real compute(const Real & K, const Real & G) {
         return 9*K*G/(3*K+G);
         }
@@ -528,6 +537,7 @@ namespace muSpectre {
       struct Converter<ElasticModulus::Poisson,
                        ElasticModulus::Bulk,
                        ElasticModulus::Shear> {
+        //! wrapped function (raison d'être)
         inline constexpr static Real compute(const Real & K, const Real & G) {
           return (3*K - 2*G) /(2*(3*K + G));
         }
@@ -540,6 +550,7 @@ namespace muSpectre {
       struct Converter<ElasticModulus::Young,
                        ElasticModulus::lambda,
                        ElasticModulus::Shear> {
+        //! wrapped function (raison d'être)
         inline constexpr static Real compute(const Real & lambda, const Real & G) {
           return G * (3*lambda + 2*G)/(lambda + G);
         }
@@ -547,6 +558,10 @@ namespace muSpectre {
 
     }  // internal
 
+    /**
+     * allows the conversion from any two distinct input moduli to a
+     * chosen output modulus
+     */
     template <ElasticModulus Out, ElasticModulus In1, ElasticModulus In2>
     inline constexpr Real convert_elastic_modulus(const Real& in1,
                                                   const Real& in2) {
@@ -646,6 +661,7 @@ namespace muSpectre {
        * @param lambda: First Lamé's constant
        * @param mu: Second Lamé's constant (i.e. shear modulus)
        * @param E: Green-Lagrange or small strain tensor
+       * @param C: Stiffness tensor (with respect to `E`)
        */
       template <class s_t>
       inline static decltype(auto)

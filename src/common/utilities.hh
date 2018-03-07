@@ -181,29 +181,39 @@ namespace muSpectre {
 
   namespace internal {
 
+    /**
+     * helper struct template to compute the type of a tuple with a
+     * given number of entries of the same type
+     */
     template <size_t size, typename T, typename... tail>
     struct tuple_array_helper {
+      //! underlying tuple
       using type = typename tuple_array_helper<size-1, T, T, tail...>::type;
     };
 
+    /**
+     * helper struct template to compute the type of a tuple with a
+     * given number of entries of the same type
+     */
     template< typename T, typename... tail>
     struct tuple_array_helper<0, T, tail...> {
+      //! underlying tuple
       using type = std::tuple<tail...>;
     };
 
+    /**
+     * helper struct that provides the tuple_array.
+     */
     template <typename T, size_t size>
     struct tuple_array_provider {
+      //! tuple type that can be used (almost) like an `std::array`
       class type: public tuple_array_helper<size, T>::type {
       public:
+        //! short-hand
         using Parent = typename tuple_array_helper<size, T>::type;
 
+        //! constructor
         inline type(Parent && parent):Parent{parent}{};
-        // T operator[](size_t index) {
-        //   return reinterpret_cast<T*>(this)[index];
-        // }
-        // T operator[](size_t index) const {
-        //   return reinterpret_cast<T*>(this)[index];
-        // }
       };
     };
   }  // internal

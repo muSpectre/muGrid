@@ -137,7 +137,7 @@ namespace muSpectre {
 
 
     //! allocate memory, etc
-    virtual void initialise(bool stiffness = false) override final;
+    virtual void initialise(bool stiffness = false) override;
 
     using Parent::compute_stresses;
     using Parent::compute_stresses_tangent;

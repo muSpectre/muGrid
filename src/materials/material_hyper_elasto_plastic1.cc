@@ -60,6 +60,17 @@ namespace muSpectre {
     this->be_prev_field.cycle();
   }
 
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  void MaterialHyperElastoPlastic1<DimS, DimM>::initialise(bool /*stiffness*/) {
+    Parent::initialise();
+    this->F_prev_field.get_map().current() =
+      Eigen::Matrix<Real, DimM, DimM>::Identity();
+    this->be_prev_field.get_map().current() =
+      Eigen::Matrix<Real, DimM, DimM>::Identity();
+    this->save_history_variables();
+  }
+
   template class MaterialHyperElastoPlastic1<  twoD,   twoD>;
   template class MaterialHyperElastoPlastic1<  twoD, threeD>;
   template class MaterialHyperElastoPlastic1<threeD, threeD>;

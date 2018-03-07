@@ -170,6 +170,11 @@ namespace muSpectre {
     virtual void save_history_variables() override;
 
     /**
+     * set the previous gradients to identity
+     */
+    virtual void initialise(bool stiffness=false) override final;
+
+    /**
      * return the internals tuple
      */
     typename traits::InternalVariables & get_internals() {
@@ -183,10 +188,10 @@ namespace muSpectre {
      */
     template <class grad_t>
     inline decltype(auto) stress_n_internals_worker(grad_t && F,
-                                                    StrainStRef_t F_prev,
-                                                    StrainStRef_t be_prev,
-                                                    FlowStRef_t plast_flow);
-
+                                                    StrainStRef_t& F_prev,
+                                                    StrainStRef_t& be_prev,
+                                                    FlowStRef_t& plast_flow);
+    //! Local FieldCollection type for field storage
     using LColl_t = LocalFieldCollection<DimS, DimM>;
     //! storage for cumulated plastic flow εₚ
     StateField<ScalarField<LColl_t, Real>>  plast_flow_field;
@@ -207,6 +212,7 @@ namespace muSpectre {
     const Real H;              //!< hardening modulus
     const T4Mat<Real, DimM> C; //!< stiffness tensor
 
+    //! Field maps and state field maps over internal fields
     typename traits::InternalVariables internal_variables;
   private:
   };
@@ -216,8 +222,8 @@ namespace muSpectre {
   template <class grad_t>
   decltype(auto)
   MaterialHyperElastoPlastic1<DimS, DimM>::
-  stress_n_internals_worker(grad_t && F, StrainStRef_t F_prev,
-                            StrainStRef_t be_prev, FlowStRef_t eps_p)  {
+  stress_n_internals_worker(grad_t && F, StrainStRef_t& F_prev,
+                            StrainStRef_t& be_prev, FlowStRef_t& eps_p)  {
 
     // the notation in this function follows Geers 2003
     // (https://doi.org/10.1016/j.cma.2003.07.014).
