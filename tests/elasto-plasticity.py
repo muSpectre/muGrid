@@ -145,13 +145,19 @@ def constitutive(F,F_t,be_t,ep_t):
     tau_s    = ddot42(C4e,lnbe_s)/2.
     taum_s   = ddot22(tau_s,I)/3.
     taud_s   = tau_s-taum_s*I
+    print("taud_s =\n{}".format(taud_s.reshape([3, 3])))
     taueq_s  = np.sqrt(3./2.*ddot22(taud_s,taud_s))
+    print("taueq_s = {}".format(taueq_s))
     N_s      = 3./2.*taud_s/taueq_s
     phi_s    = taueq_s-(tauy0+H*ep_t)
+    print("phi_s = {}".format(phi_s))
+    print("ep_t = {}".format(ep_t))
     phi_s    = 1./2.*(phi_s+np.abs(phi_s))
+    print("phi_s = {}".format(phi_s))
 
     # return map
     dgamma   = phi_s/(H+3.*mu)
+    print("dgamma = {}".format(dgamma))
     ep       = ep_t  +   dgamma
     tau      = tau_s -2.*dgamma*N_s*mu
     lnbe     = lnbe_s-2.*dgamma*N_s
@@ -217,6 +223,10 @@ F      = np.array(I,copy=True)
 F[0, 1] = .2
 tau, P,K4,be,ep = constitutive(F, F_t, be_t, ep_t)
 print("tau2 =\n{}".format(tau.reshape([3, 3])))
+print("tau2 =\n{}".format(tau.reshape([3, 3])))
+print("F_t2 =\n{}".format(F_t.reshape([3, 3])))
+print("be_t2 =\n{}".format(be_t.reshape([3, 3])))
+print("ep_t2 =\n{}".format(ep_t.reshape([1])))
 
 sys.exit()
 # incremental deformation

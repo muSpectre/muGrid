@@ -313,8 +313,8 @@ namespace muSpectre {
     Solver.computeDirect(mat, Eigen::ComputeEigenvectors);
     Mat retval{Mat::Zero()};
     for (Dim_t i = 0; i < dim; ++i) {
-      auto && val = Solver.eigenvalues()(i);
-      auto && vec = Solver.eigenvectors().col(i);
+      const Real & val = Solver.eigenvalues()(i);
+      auto & vec = Solver.eigenvectors().col(i);
       retval += std::exp(val) * vec * vec.transpose();
     }
     return retval;

@@ -52,7 +52,7 @@ namespace muSpectre {
       MatTB::convert_elastic_modulus<ElasticModulus::Poisson,
                                      ElasticModulus::Bulk,
                                      ElasticModulus::Shear>(K, mu)};
-    MaterialFixture():mat("Name", young, poisson, H, tau_y0){};
+    MaterialFixture():mat("Name", young, poisson, tau_y0, H){};
     constexpr static Dim_t sdim{Mat_t::sdim()};
     constexpr static Dim_t mdim{Mat_t::mdim()};
 
@@ -115,11 +115,11 @@ namespace muSpectre {
                                              eps_prev[0])};
 
     if (verbose) {
-      std::cout << "τ  =" << std::endl << stress << std::endl
-                << "F  =" << std::endl << F << std::endl
-                << "Fₜ =" << std::endl << F_prev[0].current() << std::endl
-                << "bₑ =" << std::endl << be_prev[0].current() << std::endl
-                << "εₚ =" << std::endl << eps_prev[0].current() << std::endl;
+      std::cout << "τ  =" << std::endl << stress << std::endl;
+      std::cout << "F  =" << std::endl << F << std::endl;
+      std::cout << "Fₜ =" << std::endl << F_prev[0].current() << std::endl;
+      std::cout << "bₑ =" << std::endl << be_prev[0].current() << std::endl;
+      std::cout << "εₚ =" << std::endl << eps_prev[0].current() << std::endl;
     }
     F_.cycle();
     be_.cycle();

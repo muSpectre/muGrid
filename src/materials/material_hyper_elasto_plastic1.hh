@@ -223,18 +223,18 @@ namespace muSpectre {
     // (https://doi.org/10.1016/j.cma.2003.07.014).
 
     // computation of trial state
+    using Mat_t = Eigen::Matrix<Real, DimM, DimM>;
     auto && f{F*F_prev.old().inverse()};
-    log_comp::Mat_t<DimM> be_star{f*be_prev.old()*f.transpose()};
-    auto && ln_be_star{logm(be_star)};
+    Mat_t be_star{f*be_prev.old()*f.transpose()};
+    auto && ln_be_star{logm(std::move(be_star))};
     auto && tau_star{.5*Hooke::evaluate_stress(this->lambda, this->mu, ln_be_star)};
     // deviatoric part of Kirchhoff stress
-    // TODO: There seems to be disagreement regarding whether the deviator in 2D also needs to have 3 times the trace subtracted or just 2 times. Have an eye on this!
-    auto && tau_d_star{tau_star - tau_star.trace()/3*tau_star.Identity()};
+    auto && tau_d_star{tau_star - tau_star.trace()/DimM*tau_star.Identity()};
     auto && tau_eq_star{std::sqrt(3*.5*(tau_d_star.array()*
-                                 tau_d_star.transpose().array()).sum())};
+                                     tau_d_star.transpose().array()).sum())};
     auto && N_star{3*.5*tau_d_star/tau_eq_star};
     // this is eq (27), and the std::min enforces the Kuhn-Tucker relation (16)
-    auto && phi_star{std::min(tau_eq_star - this->tau_y0 - this->H * eps_p.old(), 0.)};
+    Real phi_star{std::max(tau_eq_star - this->tau_y0 - this->H * eps_p.old(), 0.)};
 
     // return mapping
     auto && Del_gamma{phi_star/(this->H + 3 * this->mu)};
@@ -243,15 +243,17 @@ namespace muSpectre {
 
     // update the previous values to the new ones
     F_prev.current() = F;
-    be_prev.current() = expm(log_comp::Mat_t<DimM>(ln_be_star-2*Del_gamma*N_star));
+    ln_be_star -= 2*Del_gamma*N_star;
+    be_prev.current() = expm(std::move(ln_be_star));
     eps_p.current() += Del_gamma;
 
 
     // transmit info whether this is a plastic step or not
-    auto && is_plastic{phi_star >= 0};
-    return std::make_tuple(std::move(tau), std::move(tau_eq_star),
-                           std::move(Del_gamma), std::move(N_star),
-                           std::move(is_plastic));
+    bool is_plastic{phi_star > 0};
+    return std::tuple<Mat_t, Real, Real, Mat_t, bool>
+      (std::move(tau), std::move(tau_eq_star),
+       std::move(Del_gamma), std::move(N_star),
+       std::move(is_plastic));
   }
   //----------------------------------------------------------------------------//
   template <Dim_t DimS, Dim_t DimM>
@@ -260,8 +262,9 @@ namespace muSpectre {
   MaterialHyperElastoPlastic1<DimS, DimM>::
   evaluate_stress(grad_t && F, StrainStRef_t F_prev, StrainStRef_t be_prev,
                   FlowStRef_t eps_p)  {
-    return std::get<0>(this->stress_n_internals_worker
-                       (std::forward<grad_t>(F), F_prev, be_prev, eps_p));
+    auto retval(std::move(std::get<0>(this->stress_n_internals_worker
+                                                                 (std::forward<grad_t>(F), F_prev, be_prev, eps_p))));
+    return retval;
   }
   //----------------------------------------------------------------------------//
   template <Dim_t DimS, Dim_t DimM>
