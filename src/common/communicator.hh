@@ -37,8 +37,14 @@ namespace µSpectre {
 #ifdef WITH_MPI
 
   template<typename T> decltype(auto) mpi_type() { };
+  template<> decltype(auto) mpi_type<char>() { return MPI_CHAR; }
+  template<> decltype(auto) mpi_type<short>() { return MPI_SHORT; }
   template<> decltype(auto) mpi_type<int>() { return MPI_INT; }
   template<> decltype(auto) mpi_type<long>() { return MPI_LONG; }
+  template<> decltype(auto) mpi_type<unsigned char>() { return MPI_UNSIGNED_CHAR; }
+  template<> decltype(auto) mpi_type<unsigned short>() { return MPI_UNSIGNED_SHORT; }
+  template<> decltype(auto) mpi_type<unsigned int>() { return MPI_UNSIGNED; }
+  template<> decltype(auto) mpi_type<unsigned long>() { return MPI_UNSIGNED_LONG; }
   template<> decltype(auto) mpi_type<float>() { return MPI_FLOAT; }
   template<> decltype(auto) mpi_type<double>() { return MPI_DOUBLE; }
 
