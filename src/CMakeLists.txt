@@ -66,7 +66,16 @@ set(muSpectre_LIBRARIES Eigen3::Eigen ${FFTW_LIBRARIES})
 if(FFTWMPI_FOUND)
   set(muSpectre_LIBRARIES
     ${muSpectre_LIBRARIES}
-    ${FFTWMPI_LIBRARIES}
+    ${FFTWMPI_LIBRARIES})
+endif()
+if(PFFT_FOUND)
+  set(muSpectre_LIBRARIES
+    ${muSpectre_LIBRARIES}
+    ${PFFT_LIBRARIES})
+endif()
+if(FFTWMPI_FOUND OR PFFT_FOUND)
+  set(muSpectre_LIBRARIES
+    ${muSpectre_LIBRARIES}
     ${MPI_LIBRARIES})
 endif()
 target_link_libraries(muSpectre ${muSpectre_LIBRARIES})

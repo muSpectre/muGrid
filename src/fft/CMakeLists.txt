@@ -45,6 +45,13 @@ if(FFTWMPI_FOUND)
     )
 endif()
 
+if (PFFT_FOUND)
+  set(fft_engine_SRC
+    ${fft_engine_SRC}
+    ${CMAKE_CURRENT_SOURCE_DIR}/pfft_engine.cc
+    )
+endif()
+
 set (muSpectre_SRC
   ${muSpectre_SRC}
   ${fft_engine_SRC}

@@ -75,6 +75,7 @@ include_directories(
 find_package(MPI)
 find_package(FFTW REQUIRED)
 find_package(FFTWMPI)
+find_package(PFFT)
 
 if(MPI_FOUND)
   add_definitions(-DWITH_MPI)
