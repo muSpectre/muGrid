@@ -40,20 +40,21 @@ namespace muSpectre {
   BOOST_AUTO_TEST_SUITE(fftwmpi_engine);
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM, Dim_t resolution>
+  template <typename Engine, Dim_t resolution>
   struct FFTW_fixture {
     constexpr static Dim_t box_resolution{resolution};
     constexpr static Real box_length{4.5};
-    constexpr static Dim_t sdim{DimS};
-    constexpr static Dim_t mdim{DimM};
+    constexpr static Dim_t sdim{Engine::sdim};
+    constexpr static Dim_t mdim{Engine::mdim};
     constexpr static Ccoord_t<sdim> res() {
-      return CcoordOps::get_cube<DimS>(box_resolution);
+      return CcoordOps::get_cube<sdim>(box_resolution);
     }
-    FFTW_fixture(): engine(res(), CcoordOps::get_cube<DimS>(box_length),
+    FFTW_fixture(): engine(res(), CcoordOps::get_cube<sdim>(box_length),
                            MPIContext::get_context().comm) {}
-    FFTWMPIEngine<DimS, DimM> engine;
+    Engine engine;
   };
 
+  template <typename Engine>
   struct FFTW_fixture_python_segfault{
     constexpr static Dim_t  dim{twoD};
     constexpr static Dim_t sdim{twoD};
@@ -61,16 +62,16 @@ namespace muSpectre {
     constexpr static Ccoord_t<sdim> res() {return {6, 4};}
     FFTW_fixture_python_segfault():
       engine{res(), {3., 3}, MPIContext::get_context().comm} {}
-    FFTWMPIEngine<sdim, mdim> engine;
+    Engine engine;
   };
 
-  using fixlist = boost::mpl::list<FFTW_fixture<  twoD,   twoD, 3>,
-                                   FFTW_fixture<  twoD, threeD, 3>,
-                                   FFTW_fixture<threeD, threeD, 3>,
-                                   FFTW_fixture<  twoD,   twoD, 4>,
-                                   FFTW_fixture<  twoD, threeD, 4>,
-                                   FFTW_fixture<threeD, threeD, 4>,
-                                   FFTW_fixture_python_segfault>;
+  using fixlist = boost::mpl::list<FFTW_fixture<FFTWMPIEngine<  twoD,   twoD>, 3>,
+                                   FFTW_fixture<FFTWMPIEngine<  twoD, threeD>, 3>,
+                                   FFTW_fixture<FFTWMPIEngine<threeD, threeD>, 3>,
+                                   FFTW_fixture<FFTWMPIEngine<  twoD,   twoD>, 4>,
+                                   FFTW_fixture<FFTWMPIEngine<  twoD, threeD>, 4>,
+                                   FFTW_fixture<FFTWMPIEngine<threeD, threeD>, 4>,
+                                   FFTW_fixture_python_segfault<FFTWMPIEngine<twoD, twoD>>>;
 
 
   /* ---------------------------------------------------------------------- */
