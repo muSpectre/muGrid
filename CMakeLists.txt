@@ -72,6 +72,10 @@ include_directories(
   ${CMAKE_SOURCE_DIR}
   )
 
+if(APPLE)
+  include_directories(${CMAKE_INSTALL_PREFIX}/include ${Boost_INCLUDE_DIRS})
+endif()
+
 find_package(MPI)
 find_package(FFTW REQUIRED)
 find_package(FFTWMPI)
