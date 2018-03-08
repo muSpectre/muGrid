@@ -103,6 +103,10 @@ namespace muSpectre {
       using Parent = FieldMap<FieldCollection,
                               typename EigenArray::Scalar,
                               EigenArray::SizeAtCompileTime, ConstField>;
+      //! sister class with all params equal, but ConstField guaranteed true
+      using ConstMap = MatrixLikeFieldMap<FieldCollection,
+                                          EigenArray, EigenConstArray,
+                                          EigenPlain, map_type, true>;
       using T_t = EigenPlain; //!< plain Eigen type to map
       //! cell coordinates type
       using Ccoord = Ccoord_t<FieldCollection::spatial_dim()>;
@@ -115,7 +119,8 @@ namespace muSpectre {
       using size_type = typename Parent::size_type; //!< stl conformance
       using pointer = std::unique_ptr<EigenArray>; //!< stl conformance
       using TypedField = typename Parent::TypedField; //!< stl conformance
-      using Field = typename TypedField::Base; //!< stl conformance
+      using Field = typename Parent::Field; //!< stl conformance
+      using Field_c  = typename Parent::Field_c; //!< stl conformance
       //! stl conformance
       using const_iterator= typename Parent::template iterator<MatrixLikeFieldMap, true>;
       //! stl conformance
@@ -137,15 +142,7 @@ namespace muSpectre {
        * runtime.  This should not be a performance concern, as this constructor
        * will not be called in anny inner loops (if used as intended).
        */
-      template <bool isntConst=!ConstField>
-      MatrixLikeFieldMap(std::enable_if_t<isntConst, Field &> field);
-      /**
-       * Constructor using a (non-typed) field. Compatibility is enforced at
-       * runtime.  This should not be a performance concern, as this constructor
-       * will not be called in anny inner loops (if used as intended).
-       */
-      template <bool isConst=ConstField>
-      MatrixLikeFieldMap(std::enable_if_t<isConst, const Field &> field);
+      MatrixLikeFieldMap(Field_c & field);
 
       /**
        * Constructor using a typed field. Compatibility is enforced
@@ -221,28 +218,10 @@ namespace muSpectre {
     /* ---------------------------------------------------------------------- */
     template<class FieldCollection, class EigenArray, class EigenConstArray,
              class EigenPlain, Map_t map_type,  bool ConstField>
-    template <bool isntConst>
     MatrixLikeFieldMap<FieldCollection, EigenArray, EigenConstArray, EigenPlain,
                        map_type, ConstField>::
-    MatrixLikeFieldMap(std::enable_if_t<isntConst, Field &> field)
+    MatrixLikeFieldMap(Field_c & field)
       :Parent(field) {
-      static_assert((isntConst != ConstField),
-                    "let the compiler deduce isntConst, this is a SFINAE "
-                    "parameter");
-      this->check_compatibility();
-    }
-
-    /* ---------------------------------------------------------------------- */
-    template<class FieldCollection, class EigenArray, class EigenConstArray,
-              class EigenPlain, Map_t map_type,  bool ConstField>
-    template <bool isConst>
-    MatrixLikeFieldMap<FieldCollection, EigenArray, EigenConstArray, EigenPlain,
-                       map_type, ConstField>::
-    MatrixLikeFieldMap(std::enable_if_t<isConst, const Field &> field)
-      :Parent(field) {
-      static_assert((isConst == ConstField),
-                    "let the compiler deduce isntConst, this is a SFINAE "
-                    "parameter");
       this->check_compatibility();
     }
 
@@ -367,17 +346,6 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   //! short-hand for an Eigen matrix map as iterate
-  template <class FieldCollection, typename T, Dim_t Dim,
-            bool MapConst=false>
-  using T4MatrixFieldMap = internal::MatrixLikeFieldMap
-    <FieldCollection,
-     T4MatMap<T, Dim, false>,
-     T4MatMap<T, Dim, true>,
-     T4Mat<T, Dim>,
-     internal::Map_t::T4Matrix, MapConst>;
-
-  /* ---------------------------------------------------------------------- */
-  //! short-hand for an Eigen matrix map as iterate
   template <class FieldCollection, typename T, Dim_t NbRows, Dim_t NbCols,
             bool ConstField=false>
   using MatrixFieldMap = internal::MatrixLikeFieldMap
@@ -386,6 +354,17 @@ namespace muSpectre {
      Eigen::Map<const Eigen::Matrix<T, NbRows, NbCols>>,
      Eigen::Matrix<T, NbRows, NbCols>,
      internal::Map_t::Matrix, ConstField>;
+
+  /* ---------------------------------------------------------------------- */
+  //! short-hand for an Eigen matrix map as iterate
+  template <class FieldCollection, typename T, Dim_t Dim,
+            bool MapConst=false>
+  using T4MatrixFieldMap = internal::MatrixLikeFieldMap
+    <FieldCollection,
+     T4MatMap<T, Dim, false>,
+     T4MatMap<T, Dim, true>,
+     T4Mat<T, Dim>,
+     internal::Map_t::T4Matrix, MapConst>;
 
   /* ---------------------------------------------------------------------- */
   //! short-hand for an Eigen array map as iterate

@@ -1,11 +1,11 @@
 /**
- * @file   system_base.cc
+ * @file   cell_base.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   01 Nov 2017
  *
- * @brief  Implementation for system base class
+ * @brief  Implementation for cell base class
  *
  * Copyright © 2017 Till Junge
  *
@@ -25,7 +25,7 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include "system/system_base.hh"
+#include "cell/cell_base.hh"
 #include "common/ccoord_operations.hh"
 #include "common/iterators.hh"
 #include "common/tensor_algebra.hh"
@@ -38,7 +38,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  SystemBase<DimS, DimM>::SystemBase(Projection_ptr projection_)
+  CellBase<DimS, DimM>::CellBase(Projection_ptr projection_)
     :resolutions{projection_->get_resolutions()},
      pixels(resolutions),
      lengths{projection_->get_lengths()},
@@ -51,16 +51,16 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  typename SystemBase<DimS, DimM>::Material_t &
-  SystemBase<DimS, DimM>::add_material(Material_ptr mat) {
+  typename CellBase<DimS, DimM>::Material_t &
+  CellBase<DimS, DimM>::add_material(Material_ptr mat) {
     this->materials.push_back(std::move(mat));
     return *this->materials.back();
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  typename SystemBase<DimS, DimM>::FullResponse_t
-  SystemBase<DimS, DimM>::evaluate_stress_tangent(StrainField_t & grad) {
+  typename CellBase<DimS, DimM>::FullResponse_t
+  CellBase<DimS, DimM>::evaluate_stress_tangent(StrainField_t & grad) {
     if (this->initialised == false) {
       this->initialise();
     }
@@ -80,8 +80,8 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  typename SystemBase<DimS, DimM>::StressField_t &
-  SystemBase<DimS, DimM>::directional_stiffness(const TangentField_t &K,
+  typename CellBase<DimS, DimM>::StressField_t &
+  CellBase<DimS, DimM>::directional_stiffness(const TangentField_t &K,
                                                 const StrainField_t &delF,
                                                 StressField_t &delP) {
     for (auto && tup:
@@ -96,8 +96,8 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  typename SystemBase<DimS, DimM>::SolvVectorOut
-  SystemBase<DimS, DimM>::directional_stiffness_vec(const SolvVectorIn &delF) {
+  typename CellBase<DimS, DimM>::SolvVectorOut
+  CellBase<DimS, DimM>::directional_stiffness_vec(const SolvVectorIn &delF) {
     if (!this->K) {
       throw std::runtime_error
         ("corrently only implemented for cases where a stiffness matrix "
@@ -124,7 +124,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   Eigen::ArrayXXd
-  SystemBase<DimS, DimM>::
+  CellBase<DimS, DimM>::
   directional_stiffness_with_copy
     (Eigen::Ref<Eigen::ArrayXXd> delF) {
     if (!this->K) {
@@ -144,16 +144,16 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  typename SystemBase<DimS, DimM>::StressField_t &
-  SystemBase<DimS, DimM>::project(StressField_t &field) {
+  typename CellBase<DimS, DimM>::StressField_t &
+  CellBase<DimS, DimM>::project(StressField_t &field) {
     this->projection->apply_projection(field);
     return field;
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  typename SystemBase<DimS, DimM>::StrainField_t &
-  SystemBase<DimS, DimM>::get_strain() {
+  typename CellBase<DimS, DimM>::StrainField_t &
+  CellBase<DimS, DimM>::get_strain() {
     if (this->initialised == false) {
       this->initialise();
     }
@@ -162,15 +162,15 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  const typename SystemBase<DimS, DimM>::StressField_t &
-  SystemBase<DimS, DimM>::get_stress() const {
+  const typename CellBase<DimS, DimM>::StressField_t &
+  CellBase<DimS, DimM>::get_stress() const {
     return this->P;
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  const typename SystemBase<DimS, DimM>::TangentField_t &
-  SystemBase<DimS, DimM>::get_tangent(bool create) {
+  const typename CellBase<DimS, DimM>::TangentField_t &
+  CellBase<DimS, DimM>::get_tangent(bool create) {
     if (!this->K) {
       if (create) {
         this->K = make_field<TangentField_t>("Tangent Stiffness", *this->fields);
@@ -184,8 +184,8 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  typename SystemBase<DimS, DimM>::StrainField_t &
-  SystemBase<DimS, DimM>::get_managed_field(std::string unique_name) {
+  typename CellBase<DimS, DimM>::StrainField_t &
+  CellBase<DimS, DimM>::get_managed_field(std::string unique_name) {
     if (!this->fields->check_field_exists(unique_name)) {
       return make_field<StressField_t>(unique_name, *this->fields);
     } else {
@@ -195,7 +195,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void SystemBase<DimS, DimM>::initialise(FFT_PlanFlags flags) {
+  void CellBase<DimS, DimM>::initialise(FFT_PlanFlags flags) {
     // check that all pixels have been assigned exactly one material
     this->check_material_coverage();
     // resize all global fields (strain, stress, etc)
@@ -207,37 +207,44 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void SystemBase<DimS, DimM>::initialise_materials(bool stiffness) {
+  void CellBase<DimS, DimM>::initialise_materials(bool stiffness) {
     for (auto && mat: this->materials) {
       mat->initialise(stiffness);
     }
   }
 
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  void CellBase<DimS, DimM>::save_history_variables() {
+    for (auto && mat: this->materials) {
+      mat->save_history_variables();
+    }
+  }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  typename SystemBase<DimS, DimM>::iterator
-  SystemBase<DimS, DimM>::begin() {
+  typename CellBase<DimS, DimM>::iterator
+  CellBase<DimS, DimM>::begin() {
     return this->pixels.begin();
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  typename SystemBase<DimS, DimM>::iterator
-  SystemBase<DimS, DimM>::end() {
+  typename CellBase<DimS, DimM>::iterator
+  CellBase<DimS, DimM>::end() {
     return this->pixels.end();
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  SystemAdaptor<SystemBase<DimS, DimM>>
-  SystemBase<DimS, DimM>::get_adaptor() {
+  CellAdaptor<CellBase<DimS, DimM>>
+  CellBase<DimS, DimM>::get_adaptor() {
     return Adaptor(*this);
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void SystemBase<DimS, DimM>::check_material_coverage() {
+  void CellBase<DimS, DimM>::check_material_coverage() {
     auto nb_pixels = CcoordOps::get_size(this->resolutions);
     std::vector<MaterialBase<DimS, DimM>*> assignments(nb_pixels, nullptr);
     for (auto & mat: this->materials) {
@@ -275,7 +282,7 @@ namespace muSpectre {
     }
   }
 
-  template class SystemBase<twoD, twoD>;
-  template class SystemBase<threeD, threeD>;
+  template class CellBase<twoD, twoD>;
+  template class CellBase<threeD, threeD>;
 
 }  // muSpectre

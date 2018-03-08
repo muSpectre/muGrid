@@ -55,7 +55,7 @@ namespace muSpectre {
     std::string message;
     //! number of iterations
     Uint nb_it;
-    //! number of system evaluations
+    //! number of cell evaluations
     Uint nb_fev;
   };
 
@@ -79,7 +79,7 @@ namespace muSpectre {
    */
   template <Dim_t DimS, Dim_t DimM=DimS>
   std::vector<OptimizeResult>
-  newton_cg (SystemBase<DimS, DimM> & sys,
+  newton_cg (CellBase<DimS, DimM> & cell,
              const GradIncrements<DimM> & delF0,
              SolverBase<DimS, DimM> & solver, Real newton_tol,
              Real equil_tol,
@@ -92,11 +92,11 @@ namespace muSpectre {
    */
   template <Dim_t DimS, Dim_t DimM=DimS>
   inline OptimizeResult
-  newton_cg (SystemBase<DimS, DimM> & sys, const Grad_t<DimM> & delF0,
+  newton_cg (CellBase<DimS, DimM> & cell, const Grad_t<DimM> & delF0,
              SolverBase<DimS, DimM> & solver, Real newton_tol,
              Real equil_tol,
              Dim_t verbose = 0){
-    return newton_cg(sys, GradIncrements<DimM>{delF0},
+    return newton_cg(cell, GradIncrements<DimM>{delF0},
                      solver, newton_tol, equil_tol, verbose)[0];
   }
 
@@ -107,7 +107,7 @@ namespace muSpectre {
    */
   template <Dim_t DimS, Dim_t DimM=DimS>
   std::vector<OptimizeResult>
-  de_geus (SystemBase<DimS, DimM> & sys,
+  de_geus (CellBase<DimS, DimM> & cell,
            const GradIncrements<DimM> & delF0,
            SolverBase<DimS, DimM> & solver, Real newton_tol,
            Real equil_tol,
@@ -120,11 +120,11 @@ namespace muSpectre {
    */
   template <Dim_t DimS, Dim_t DimM=DimS>
   OptimizeResult
-  de_geus (SystemBase<DimS, DimM> & sys, const Grad_t<DimM> & delF0,
+  de_geus (CellBase<DimS, DimM> & cell, const Grad_t<DimM> & delF0,
            SolverBase<DimS, DimM> & solver, Real newton_tol,
            Real equil_tol,
            Dim_t verbose = 0){
-    return de_geus(sys, GradIncrements<DimM>{delF0},
+    return de_geus(cell, GradIncrements<DimM>{delF0},
                    solver, newton_tol, equil_tol, verbose)[0];
   }
 

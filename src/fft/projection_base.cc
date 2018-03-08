@@ -32,14 +32,14 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  ProjectionBase<DimS, DimM>::ProjectionBase(FFT_Engine_ptr engine,
+  ProjectionBase<DimS, DimM>::ProjectionBase(FFTEngine_ptr engine,
                                              Formulation form)
     : fft_engine{std::move(engine)}, form{form},
       projection_container{this->fft_engine->get_field_collection()}
   {
-    static_assert((DimS == FFT_Engine::sdim),
+    static_assert((DimS == FFTEngine::sdim),
                   "spatial dimensions are incompatible");
-    static_assert((DimM == FFT_Engine::mdim),
+    static_assert((DimM == FFTEngine::mdim),
                   "material dimensions are incompatible");
   }
 

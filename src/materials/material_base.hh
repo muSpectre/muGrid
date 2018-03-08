@@ -37,18 +37,23 @@
 namespace muSpectre {
 
   //! DimS spatial dimension (dimension of problem
-  //! DimM material_dimension (dimension of constitutive law)
+  //! DimM material_dimension (dimension of constitutive law) and
+  /**
+   * @a DimM is the material dimension (i.e., the dimension of constitutive
+   * law; even for e.g. two-dimensional problems the constitutive law could
+   * live in three-dimensional space for e.g. plane strain or stress problems)
+   */
   template<Dim_t DimS, Dim_t DimM>
   class MaterialBase
   {
   public:
     //! typedefs for data handled by this interface
-    //! global field collection for system-wide fields, like stress, strain, etc
-    using GFieldCollection_t = GlobalFieldCollection<DimS, DimM>;
+    //! global field collection for cell-wide fields, like stress, strain, etc
+    using GFieldCollection_t = GlobalFieldCollection<DimS>;
     //! field collection for internal variables, such as eigen-strains,
     //! plastic strains, damage variables, etc, but also for managing which
     //! pixels the material is responsible for
-    using MFieldCollection_t = LocalFieldCollection<DimS, DimM>;
+    using MFieldCollection_t = LocalFieldCollection<DimS>;
 
     using iterator = typename MFieldCollection_t::iterator; //!< pixel iterator
     //! polymorphic base class for fields only to be used for debugging
@@ -93,7 +98,15 @@ namespace muSpectre {
     //! allocate memory, etc, but also: wipe history variables!
     virtual void initialise(bool stiffness = false) = 0;
 
-    //! return the materil's name
+    /**
+     * for materials with state variables, these typically need to be
+     * saved/updated an the end of each load increment, the virtual
+     * base implementation does nothing, but materials with history
+     * variables need to implement this
+     */
+    virtual void save_history_variables() {};
+
+    //! return the material's name
     const std::string & get_name() const;
 
     //! spatial dimension for static inheritance

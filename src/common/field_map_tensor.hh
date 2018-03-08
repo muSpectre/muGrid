@@ -54,6 +54,8 @@ namespace muSpectre {
     //! base class
     using Parent = internal::FieldMap<FieldCollection, T,
                                       TensorFieldMap::nb_components, ConstField>;
+    //! sister class with all params equal, but ConstField guaranteed true
+    using ConstMap = TensorFieldMap<FieldCollection, T, order, dim, true>;
     //! cell coordinates type
     using Ccoord = Ccoord_t<FieldCollection::spatial_dim()>;
     //! static tensor size
@@ -70,7 +72,9 @@ namespace muSpectre {
     using pointer = std::unique_ptr<value_type>; //!< stl conformance
     using TypedField = typename Parent::TypedField; //!< field to map
     //! polymorphic base field type (for debug and python)
-    using Field = typename TypedField::Base;
+    using Field = typename Parent::Field;
+    //! polymorphic base field type (for debug and python)
+    using Field_c = typename Parent::Field_c;
     //! stl conformance
     using const_iterator = typename Parent::template iterator<TensorFieldMap, true>;
     //! stl conformance
@@ -89,11 +93,7 @@ namespace muSpectre {
     TensorFieldMap() = delete;
 
     //! constructor
-    template <bool isntConst=!ConstField>
-    TensorFieldMap(std::enable_if_t<isntConst, Field &> field);
-    //! constructor
-    template <bool isConst=ConstField>
-    TensorFieldMap(std::enable_if_t<isConst, const Field &> field);
+    TensorFieldMap(Field_c & field);
 
     //! Copy constructor
     TensorFieldMap(const TensorFieldMap &other) = default;
@@ -150,26 +150,9 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template<class FieldCollection, typename T, Dim_t order, Dim_t dim,
            bool ConstField>
-  template <bool isntConst>
   TensorFieldMap<FieldCollection, T, order, dim, ConstField>::
-  TensorFieldMap(std::enable_if_t<isntConst, Field &> field)
+  TensorFieldMap(Field_c & field)
     :Parent(field) {
-    static_assert((isntConst != ConstField),
-                  "let the compiler deduce isntConst, this is a SFINAE "
-                  "parameter");
-    this->check_compatibility();
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template<class FieldCollection, typename T, Dim_t order, Dim_t dim,
-           bool ConstField>
-  template <bool isConst>
-  TensorFieldMap<FieldCollection, T, order, dim, ConstField>::
-  TensorFieldMap(std::enable_if_t<isConst, const Field &> field)
-    :Parent(field) {
-    static_assert((isConst == ConstField),
-                  "let the compiler deduce isConst, this is a SFINAE "
-                  "parameter");
     this->check_compatibility();
   }
 

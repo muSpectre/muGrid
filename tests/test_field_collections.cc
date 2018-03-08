@@ -32,9 +32,8 @@ namespace muSpectre {
   BOOST_AUTO_TEST_SUITE(field_collection_tests);
 
   BOOST_AUTO_TEST_CASE(simple) {
-    const Dim_t sdim = 2;
-    const Dim_t mdim = 2;
-    using FC_t = GlobalFieldCollection<sdim, mdim>;
+    constexpr Dim_t sdim = 2;
+    using FC_t = GlobalFieldCollection<sdim>;
     FC_t fc;
 
     BOOST_CHECK_EQUAL(FC_t::spatial_dim(), sdim);

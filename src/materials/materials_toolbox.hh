@@ -369,6 +369,7 @@ namespace muSpectre {
         public PK1_stress<Dim, StressMeasure::Kirchhoff,
                           StrainMeasure::no_strain_> {
 
+        //! short-hand
         using Parent = PK1_stress<Dim, StressMeasure::Kirchhoff,
                                   StrainMeasure::no_strain_>;
         using Parent::compute;
@@ -435,6 +436,154 @@ namespace muSpectre {
          std::forward<Tangent_t>(tangent));
     };
 
+    namespace internal {
+
+      //! Base template for elastic modulus conversion
+      template <ElasticModulus Out, ElasticModulus In1, ElasticModulus In2>
+      struct Converter {
+        //! wrapped function (raison d'être)
+        inline constexpr static Real compute(const Real& /*in1*/,
+                                      const Real& /*in2*/) {
+          // if no return has happened until now, the conversion is not
+          // implemented yet
+          static_assert((In1 == In2),
+                        "This conversion has not been implemented yet, please add "
+                        "it here below as a specialisation of this function "
+                        "template. Check "
+                        "https://en.wikipedia.org/wiki/Lam%C3%A9_parameters for "
+                        "// TODO: he formula.");
+          return 0;
+        }
+      };
+
+      /**
+       * Spectialisation for when the output is the first input
+       */
+      template <ElasticModulus Out, ElasticModulus In>
+      struct Converter<Out, Out, In> {
+        //! wrapped function (raison d'être)
+        inline constexpr static Real compute(const Real & A, const Real & /*B*/) {
+          return A;
+        }
+      };
+
+      /**
+       * Spectialisation for when the output is the second input
+       */
+      template <ElasticModulus Out, ElasticModulus In>
+      struct Converter<Out, In, Out> {
+        //! wrapped function (raison d'être)
+        inline constexpr static Real compute(const Real & /*A*/, const Real & B) {
+          return B;
+        }
+      };
+
+      /**
+       * Specialisation μ(E, ν)
+       */
+      template <>
+      struct Converter<ElasticModulus::Shear,
+                       ElasticModulus::Young,
+                       ElasticModulus::Poisson> {
+        //! wrapped function (raison d'être)
+        inline constexpr static Real compute(const Real & E, const Real & nu) {
+          return E/(2*(1+nu));
+        }
+      };
+
+      /**
+       * Specialisation λ(E, ν)
+       */
+      template <>
+      struct Converter<ElasticModulus::lambda,
+                       ElasticModulus::Young,
+                       ElasticModulus::Poisson> {
+        //! wrapped function (raison d'être)
+        inline constexpr static Real compute(const Real & E, const Real & nu) {
+          return E*nu/((1+nu)*(1-2*nu));
+        }
+      };
+
+      /**
+       * Specialisation K(E, ν)
+       */
+      template <>
+      struct Converter<ElasticModulus::Bulk,
+                       ElasticModulus::Young,
+                       ElasticModulus::Poisson> {
+        //! wrapped function (raison d'être)
+        inline constexpr static Real compute(const Real & E, const Real & nu) {
+          return E/(3*(1-2*nu));
+        }
+      };
+
+      /**
+       * Specialisation E(K, µ)
+       */
+      template <>
+      struct Converter<ElasticModulus::Young,
+                       ElasticModulus::Bulk,
+                       ElasticModulus::Shear> {
+        //! wrapped function (raison d'être)
+        inline constexpr static Real compute(const Real & K, const Real & G) {
+        return 9*K*G/(3*K+G);
+        }
+      };
+
+      /**
+       * Specialisation ν(K, µ)
+       */
+      template <>
+      struct Converter<ElasticModulus::Poisson,
+                       ElasticModulus::Bulk,
+                       ElasticModulus::Shear> {
+        //! wrapped function (raison d'être)
+        inline constexpr static Real compute(const Real & K, const Real & G) {
+          return (3*K - 2*G) /(2*(3*K + G));
+        }
+      };
+
+      /**
+       * Specialisation E(λ, µ)
+       */
+      template <>
+      struct Converter<ElasticModulus::Young,
+                       ElasticModulus::lambda,
+                       ElasticModulus::Shear> {
+        //! wrapped function (raison d'être)
+        inline constexpr static Real compute(const Real & lambda, const Real & G) {
+          return G * (3*lambda + 2*G)/(lambda + G);
+        }
+      };
+
+    }  // internal
+
+    /**
+     * allows the conversion from any two distinct input moduli to a
+     * chosen output modulus
+     */
+    template <ElasticModulus Out, ElasticModulus In1, ElasticModulus In2>
+    inline constexpr Real convert_elastic_modulus(const Real& in1,
+                                                  const Real& in2) {
+      // enforcing sanity
+      static_assert((In1 != In2),
+                    "The input modulus types cannot be identical");
+
+      // enforcing independence from order in which moduli are supplied
+      constexpr bool inverted{In1 > In2};
+      using Converter = std::conditional_t<inverted,
+                                           internal::Converter<Out, In2, In1>,
+                                           internal::Converter<Out, In1, In2>>;
+      if (inverted) {
+        return Converter::compute(std::move(in2),
+                                  std::move(in1));
+      } else {
+        return Converter::compute(std::move(in1),
+                                  std::move(in2));
+      }
+    }
+
+
     //! static inline implementation of Hooke's law
     template <Dim_t Dim, class Strain_t, class Tangent_t>
     struct Hooke {
@@ -445,7 +594,9 @@ namespace muSpectre {
        */
       inline static constexpr Real
       compute_lambda(const Real & young, const Real & poisson) {
-        return young*poisson/((1+poisson)*(1-2*poisson));
+        return convert_elastic_modulus<ElasticModulus::lambda,
+                                       ElasticModulus::Young,
+                                       ElasticModulus::Poisson>(young, poisson);
       }
 
       /**
@@ -455,7 +606,9 @@ namespace muSpectre {
        */
       inline static constexpr Real
       compute_mu(const Real & young, const Real & poisson) {
-        return young/(2*(1+poisson));
+        return convert_elastic_modulus<ElasticModulus::Shear,
+                                       ElasticModulus::Young,
+                                       ElasticModulus::Poisson>(young, poisson);
       }
 
       /**
@@ -465,7 +618,9 @@ namespace muSpectre {
        */
       inline static constexpr Real
       compute_K(const Real & young, const Real & poisson) {
-        return young/(3*(1-2*poisson));
+        return convert_elastic_modulus<ElasticModulus::Bulk,
+                                       ElasticModulus::Young,
+                                       ElasticModulus::Poisson>(young, poisson);
       }
 
       /**
@@ -506,7 +661,7 @@ namespace muSpectre {
        * @param lambda: First Lamé's constant
        * @param mu: Second Lamé's constant (i.e. shear modulus)
        * @param E: Green-Lagrange or small strain tensor
-       * @param C: stiffness tensor (wrt. Piola-Kirchhoff 2)
+       * @param C: stiffness tensor (Piola-Kirchhoff 2 (or σ) w.r.t to `E`)
        */
       template <class s_t>
       inline static decltype(auto)

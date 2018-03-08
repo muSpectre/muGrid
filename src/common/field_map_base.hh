@@ -38,7 +38,6 @@
 #include <array>
 #include <string>
 #include <memory>
-#include <type_traits>
 
 namespace muSpectre {
 
@@ -86,6 +85,10 @@ namespace muSpectre {
                                             const TypedField_nc,
                                             TypedField_nc>;
       using Field = typename TypedField::Base; //!< iterated field type
+      //! const-correct field type
+      using Field_c = std::conditional_t<ConstField,
+                                         const Field,
+                                         Field>;
       using size_type = std::size_t;  //!< stl conformance
       using pointer = std::conditional_t<ConstField,
                                          const T*,
@@ -94,11 +97,7 @@ namespace muSpectre {
       FieldMap() = delete;
 
       //! constructor
-      template <bool isntConst=!ConstField>
-      FieldMap(std::enable_if_t<isntConst, Field &> field);
-      //! constructor
-      template <bool isConst=ConstField>
-      FieldMap(std::enable_if_t<isConst, const Field &> field);
+      FieldMap(Field_c & field);
 
       //! constructor with run-time cost (for python and debugging)
       template<class FC, typename T2, Dim_t NbC>
@@ -277,20 +276,9 @@ namespace muSpectre {
 
     /* ---------------------------------------------------------------------- */
     template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
-    template <bool isntConst>
     FieldMap<FieldCollection, T, NbComponents, ConstField>::
-    FieldMap(std::enable_if_t<isntConst, Field &> field)
+    FieldMap(Field_c& field)
       :collection(field.get_collection()), field(static_cast<TypedField&>(field)) {
-      static_assert(NbComponents>0,
-                    "Only fields with more than 0 components allowed");
-    }
-
-    /* ---------------------------------------------------------------------- */
-    template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
-    template <bool isConst>
-    FieldMap<FieldCollection, T, NbComponents, ConstField>::
-    FieldMap(std::enable_if_t<isConst, const Field &> field)
-      :collection(field.get_collection()), field(static_cast<const TypedField&>(field)) {
       static_assert(NbComponents>0,
                     "Only fields with more than 0 components allowed");
     }

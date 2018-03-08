@@ -34,7 +34,7 @@
 #include "materials/material_linear_elastic1.hh"
 #include "common/iterators.hh"
 #include "common/ccoord_operations.hh"
-#include "system/system_factory.hh"
+#include "cell/cell_factory.hh"
 
 namespace muSpectre {
 
@@ -48,9 +48,9 @@ namespace muSpectre {
     // constexpr Rcoord_t<dim> lengths{2.3, 2.7};
     constexpr Ccoord_t<dim> resolutions{5, 5, 5};
     constexpr Rcoord_t<dim> lengths{5, 5, 5};
-    auto fft_ptr{std::make_unique<FFTW_Engine<dim, dim>>(resolutions, lengths)};
+    auto fft_ptr{std::make_unique<FFTWEngine<dim, dim>>(resolutions, lengths)};
     auto proj_ptr{std::make_unique<ProjectionFiniteStrainFast<dim, dim>>(std::move(fft_ptr))};
-    SystemBase<dim, dim> sys(std::move(proj_ptr));
+    CellBase<dim, dim> sys(std::move(proj_ptr));
 
     using Mat_t = MaterialLinearElastic1<dim, dim>;
     //const Real Young{210e9}, Poisson{.33};
@@ -101,7 +101,7 @@ namespace muSpectre {
                   "the number or layers in the hard material must be smaller "
                   "than the total number of layers in dimension 0");
 
-    auto sys{make_system(resolutions, lengths, form)};
+    auto sys{make_cell(resolutions, lengths, form)};
 
     using Mat_t = MaterialLinearElastic1<dim, dim>;
     constexpr Real Young{2.}, Poisson{.33};

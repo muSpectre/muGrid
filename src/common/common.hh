@@ -151,8 +151,8 @@ namespace muSpectre {
   //! and µSpectre will handle conversions
   enum class StressMeasure {
     Cauchy,      //!< Cauchy stress σ
-    PK1,         //!< First Piola-Kirchhoff strell
-    PK2,         //!< Second Piola-Kirchhoff strell
+    PK1,         //!< First Piola-Kirchhoff stress
+    PK2,         //!< Second Piola-Kirchhoff stress
     Kirchhoff,   //!< Kirchhoff stress τ
     Biot,        //!< Biot stress
     Mandel,      //!< Mandel stress
@@ -178,6 +178,36 @@ namespace muSpectre {
   //! inserts `muSpectre::StrainMeasure`s into `std::ostream`s
   std::ostream & operator<<(std::ostream & os, StrainMeasure s);
 
+    /* ---------------------------------------------------------------------- */
+    /**
+     * all isotropic elastic moduli to identify conversions, such as E
+     * = µ(3λ + 2µ)/(λ+µ). For the full description, see
+     * https://en.wikipedia.org/wiki/Lam%C3%A9_parameters
+     * Not all the conversions are implemented, so please add as needed
+     */
+    enum class ElasticModulus {
+      Bulk,          //!< Bulk modulus K
+      K = Bulk,      //!< alias for ``ElasticModulus::Bulk``
+      Young,         //!< Young's modulus E
+      E = Young,     //!< alias for ``ElasticModulus::Young``
+      lambda,        //!< Lamé's first parameter λ
+      Shear,         //!< Shear modulus G or µ
+      G = Shear,     //!< alias for ``ElasticModulus::Shear``
+      mu = Shear,    //!< alias for ``ElasticModulus::Shear``
+      Poisson,       //!< Poisson's ratio ν
+      nu = Poisson,  //!< alias for ``ElasticModulus::Poisson``
+      Pwave,         //!< P-wave modulus M
+      M=Pwave,       //!< alias for ``ElasticModulus::Pwave``
+      no_modulus_};  //!< only for triggering static_asserts
+
+    /**
+     * define comparison in order to exploit that moduli can be
+     * expressed in terms of any two other moduli in any order (e.g. K
+     * = K(E, ν) = K(ν, E)
+     */
+    constexpr inline bool operator<(ElasticModulus A, ElasticModulus B) {
+      return static_cast<int>(A) < static_cast<int>(B);
+    }
   /* ---------------------------------------------------------------------- */
   /** Compile-time function to g strain measure stored by muSpectre
       depending on the formulation

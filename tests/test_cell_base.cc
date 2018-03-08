@@ -1,11 +1,11 @@
 /**
- * @file   test_system_base.cc
+ * @file   test_cell_base.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   14 Dec 2017
  *
- * @brief  Tests for the basic system class
+ * @brief  Tests for the basic cell class
  *
  * Copyright © 2017 Till Junge
  *
@@ -34,13 +34,13 @@
 #include "common/iterators.hh"
 #include "common/field_map.hh"
 #include "tests/test_goodies.hh"
-#include "system/system_factory.hh"
+#include "cell/cell_factory.hh"
 #include "materials/material_linear_elastic1.hh"
 
 
 namespace muSpectre {
 
-  BOOST_AUTO_TEST_SUITE(system_base);
+  BOOST_AUTO_TEST_SUITE(cell_base);
   template <Dim_t DimS>
   struct Sizes {
   };
@@ -62,24 +62,24 @@ namespace muSpectre {
   };
 
   template <Dim_t DimS, Dim_t DimM, Formulation form>
-  struct SystemBaseFixture: SystemBase<DimS, DimM> {
+  struct CellBaseFixture: CellBase<DimS, DimM> {
     constexpr static Dim_t sdim{DimS};
     constexpr static Dim_t mdim{DimM};
     constexpr static Formulation formulation{form};
-    SystemBaseFixture()
-      :SystemBase<DimS, DimM>{
-      std::move(system_input<DimS, DimM>(Sizes<DimS>::get_resolution(),
+    CellBaseFixture()
+      :CellBase<DimS, DimM>{
+      std::move(cell_input<DimS, DimM>(Sizes<DimS>::get_resolution(),
                                          Sizes<DimS>::get_lengths(),
                                          form))} {}
   };
 
-  using fixlist = boost::mpl::list<SystemBaseFixture<twoD, twoD,
+  using fixlist = boost::mpl::list<CellBaseFixture<twoD, twoD,
                                                      Formulation::finite_strain>,
-                                   SystemBaseFixture<threeD, threeD,
+                                   CellBaseFixture<threeD, threeD,
                                                      Formulation::finite_strain>,
-                                   SystemBaseFixture<twoD, twoD,
+                                   CellBaseFixture<twoD, twoD,
                                                      Formulation::small_strain>,
-                                   SystemBaseFixture<threeD, threeD,
+                                   CellBaseFixture<threeD, threeD,
                                                      Formulation::small_strain>>;
 
   BOOST_AUTO_TEST_CASE(manual_construction) {
@@ -88,11 +88,11 @@ namespace muSpectre {
     Ccoord_t<dim> resolutions{3, 3};
     Rcoord_t<dim> lengths{2.3, 2.7};
     Formulation form{Formulation::finite_strain};
-    auto fft_ptr{std::make_unique<FFTW_Engine<dim, dim>>(resolutions, lengths)};
+    auto fft_ptr{std::make_unique<FFTWEngine<dim, dim>>(resolutions, lengths)};
     auto proj_ptr{std::make_unique<ProjectionFiniteStrainFast<dim, dim>>(std::move(fft_ptr))};
-    SystemBase<dim, dim> sys{std::move(proj_ptr)};
+    CellBase<dim, dim> sys{std::move(proj_ptr)};
 
-    auto sys2{make_system<dim, dim>(resolutions, lengths, form)};
+    auto sys2{make_cell<dim, dim>(resolutions, lengths, form)};
     auto sys2b{std::move(sys2)};
     BOOST_CHECK_EQUAL(sys2b.size(), sys.size());
   }

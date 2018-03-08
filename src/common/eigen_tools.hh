@@ -200,8 +200,10 @@ namespace muSpectre {
 
 
   namespace log_comp {
+    //! Matrix type used for logarithm evaluation
     template <Dim_t dim>
     using Mat_t = Eigen::Matrix<Real, dim, dim>;
+    //! Vector type used for logarithm evaluation
     template <Dim_t dim>
     using Vec_t = Eigen::Matrix<Real, dim, 1>;
 
@@ -211,75 +213,86 @@ namespace muSpectre {
     /* ---------------------------------------------------------------------- */
     template <Dim_t dim, Dim_t i, Dim_t j = dim-1>
     struct Proj {
+      //! wrapped function (raison d'être)
       static inline decltype(auto) compute(const Vec_t<dim> & eigs, const Mat_t<dim> & T) {
         static_assert(dim > 0, "only works for positive dimensions");
         return 1./(eigs(i) -eigs(j))*(T-eigs(j)*Mat_t<dim>::Identity()) * Proj<dim, i, j-1>::compute(eigs, T);
       }
     };
 
-    // catch the case when there's nothing to do
+    //! catch the case when there's nothing to do
     template <Dim_t dim, Dim_t other>
     struct Proj<dim,other,other> {
+      //! wrapped function (raison d'être)
       static inline decltype(auto) compute(const Vec_t<dim> & eigs, const Mat_t<dim> & T) {
         static_assert(dim > 0, "only works for positive dimensions");
         return Proj<dim, other, other-1>::compute(eigs, T);
       }
     };
 
-    // catch the normal tail case
+    //! catch the normal tail case
     template <Dim_t dim, Dim_t i>
     struct Proj<dim,i,0> {
-      static constexpr Dim_t j{0};
+      static constexpr Dim_t j{0}; //!< short-hand
+      //! wrapped function (raison d'être)
       static inline decltype(auto) compute(const Vec_t<dim> & eigs, const Mat_t<dim> & T) {
         static_assert(dim > 0, "only works for positive dimensions");
         return 1./(eigs(i) -eigs(j))*(T-eigs(j)*Mat_t<dim>::Identity());
       }
     };
 
-    // catch the tail case when the last dimension is i
+    //! catch the tail case when the last dimension is i
     template <Dim_t dim>
     struct Proj<dim,0,1> {
-      static constexpr Dim_t i{0};
-      static constexpr Dim_t j{1};
+      static constexpr Dim_t i{0}; //!< short-hand
+      static constexpr Dim_t j{1}; //!< short-hand
+
+      //! wrapped function (raison d'être)
       static inline decltype(auto) compute(const Vec_t<dim> & eigs, const Mat_t<dim> & T) {
         static_assert(dim > 0, "only works for positive dimensions");
         return 1./(eigs(i) -eigs(j))*(T-eigs(j)*Mat_t<dim>::Identity());
       }
     };
 
+    //! catch the general tail case
     template <>
     struct Proj<1, 0, 0> {
-      static constexpr Dim_t dim{1};
-      static constexpr Dim_t i{0};
-      static constexpr Dim_t j{0};
+      static constexpr Dim_t dim{1}; //!< short-hand
+      static constexpr Dim_t i{0};   //!< short-hand
+      static constexpr Dim_t j{0};   //!< short-hand
 
+      //! wrapped function (raison d'être)
       static inline decltype(auto) compute(const Vec_t<dim> & /*eigs*/, const Mat_t<dim> & /*T*/) {
         return Mat_t<dim>::Identity();
       }
     };
 
-
+    //! Product term
     template <Dim_t dim, Dim_t i>
     inline decltype(auto) P(const Vec_t<dim> & eigs, const Mat_t<dim> & T) {
       return Proj<dim, i>::compute(eigs, T);
     }
 
-    /* ---------------------------------------------------------------------- */
+    //! sum term
     template  <Dim_t dim, Dim_t i = dim-1>
     struct Summand {
+      //! wrapped function (raison d'être)
       static inline  decltype(auto) compute(const Vec_t<dim> & eigs, const Mat_t<dim> & T) {
         return std::log(eigs(i))*P<dim, i>(eigs, T) + Summand<dim, i-1>::compute(eigs, T);
       }
     };
 
+    //! sum term
     template  <Dim_t dim>
     struct Summand <dim, 0>{
-      static constexpr Dim_t i{0};
+      static constexpr Dim_t i{0}; //!< short-hand
+      //! wrapped function (raison d'être)
       static inline  decltype(auto) compute(const Vec_t<dim> & eigs, const Mat_t<dim> & T) {
         return std::log(eigs(i))*P<dim, i>(eigs, T);
       }
     };
 
+    //! sum implementation
     template <Dim_t dim>
     inline decltype(auto) Sum(const Vec_t<dim> & eigs, const Mat_t<dim> & T) {
       return Summand<dim>::compute(eigs, T);
@@ -313,8 +326,8 @@ namespace muSpectre {
     Solver.computeDirect(mat, Eigen::ComputeEigenvectors);
     Mat retval{Mat::Zero()};
     for (Dim_t i = 0; i < dim; ++i) {
-      auto && val = Solver.eigenvalues()(i);
-      auto && vec = Solver.eigenvectors().col(i);
+      const Real & val = Solver.eigenvalues()(i);
+      auto & vec = Solver.eigenvectors().col(i);
       retval += std::exp(val) * vec * vec.transpose();
     }
     return retval;

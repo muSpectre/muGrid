@@ -46,12 +46,12 @@ namespace muSpectre {
   public:
     using Parent = ProjectionBase<DimS, DimM>; //!< base class
     //! polymorphic FFT pointer type
-    using FFT_Engine_ptr = typename Parent::FFT_Engine_ptr;
+    using FFTEngine_ptr = typename Parent::FFTEngine_ptr;
     using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
     //! global field collection
-    using GFieldCollection_t = GlobalFieldCollection<DimS, DimM>;
+    using GFieldCollection_t = GlobalFieldCollection<DimS>;
     //! local field collection for Fourier-space fields
-    using LFieldCollection_t = LocalFieldCollection<DimS, DimM>;
+    using LFieldCollection_t = LocalFieldCollection<DimS>;
     //! Real space second order tensor fields (to be projected)
     using Field_t = TensorField<GFieldCollection_t, Real, secondOrder, DimM>;
     //! Fourier-space field containing the projection operator itself
@@ -63,8 +63,8 @@ namespace muSpectre {
     //! Default constructor
     ProjectionDefault() = delete;
 
-    //! Constructor with system sizes and formulation
-    ProjectionDefault(FFT_Engine_ptr engine, Formulation form);
+    //! Constructor with cell sizes and formulation
+    ProjectionDefault(FFTEngine_ptr engine, Formulation form);
 
     //! Copy constructor
     ProjectionDefault(const ProjectionDefault &other) = delete;

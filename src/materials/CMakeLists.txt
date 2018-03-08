@@ -32,6 +32,7 @@ set (materials_SRC
   ${CMAKE_CURRENT_SOURCE_DIR}/material_linear_elastic1.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/material_linear_elastic2.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/material_linear_elastic3.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/material_hyper_elasto_plastic1.cc
   )
 
 set (muSpectre_SRC

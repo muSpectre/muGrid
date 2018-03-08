@@ -48,16 +48,16 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM, bool Global>
   struct FC_fixture:
     public std::conditional_t<Global,
-                              GlobalFieldCollection<DimS, DimM>,
-                              LocalFieldCollection<DimS, DimM>> {
+                              GlobalFieldCollection<DimS>,
+                              LocalFieldCollection<DimS>> {
     FC_fixture()
       :fc() {}
     inline static constexpr Dim_t sdim(){return DimS;}
     inline static constexpr Dim_t mdim(){return DimM;}
     inline static constexpr bool global(){return Global;}
     using FC_t = std::conditional_t<Global,
-                                    GlobalFieldCollection<DimS, DimM>,
-                                    LocalFieldCollection<DimS, DimM>>;
+                                    GlobalFieldCollection<DimS>,
+                                    LocalFieldCollection<DimS>>;
     FC_t fc;
   };
 
@@ -73,8 +73,8 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM, bool Global>
   struct FC_multi_fixture{
     using FC_t = std::conditional_t<Global,
-                                   GlobalFieldCollection<DimS, DimM>,
-                                   LocalFieldCollection<DimS, DimM>>;
+                                   GlobalFieldCollection<DimS>,
+                                   LocalFieldCollection<DimS>>;
     using T4_t = TensorField<FC_t, Real, order, DimM>;
     using T2_t = TensorField<FC_t, Real, matrix_order, DimM>;
     using Sc_t = ScalarField<FC_t, Int>;

@@ -38,7 +38,7 @@ namespace muSpectre {
    * FFT_engine implementations.
    */
   template <Dim_t DimS, Dim_t DimM>
-  class FFT_Engine_base
+  class FFTEngineBase
   {
   public:
     constexpr static Dim_t sdim{DimS}; //!< spatial dimension of the cell
@@ -48,9 +48,9 @@ namespace muSpectre {
     //! spatial coordinates type
     using Rcoord = std::array<Real, DimS>;
     //! global FieldCollection
-    using GFieldCollection_t = GlobalFieldCollection<DimS, DimM>;
+    using GFieldCollection_t = GlobalFieldCollection<DimS>;
     //! local FieldCollection (for Fourier-space pixels)
-    using LFieldCollection_t = LocalFieldCollection<DimS, DimM>;
+    using LFieldCollection_t = LocalFieldCollection<DimS>;
     //! Field type on which to apply the projection
     using Field_t = TensorField<GFieldCollection_t, Real, 2, DimM>;
     /**
@@ -64,25 +64,25 @@ namespace muSpectre {
     using iterator = typename LFieldCollection_t::iterator;
 
     //! Default constructor
-    FFT_Engine_base() = delete;
+    FFTEngineBase() = delete;
 
-    //! Constructor with system resolutions
-    FFT_Engine_base(Ccoord resolutions, Rcoord lengths);
+    //! Constructor with cell resolutions
+    FFTEngineBase(Ccoord resolutions, Rcoord lengths);
 
     //! Copy constructor
-    FFT_Engine_base(const FFT_Engine_base &other) = delete;
+    FFTEngineBase(const FFTEngineBase &other) = delete;
 
     //! Move constructor
-    FFT_Engine_base(FFT_Engine_base &&other) = default;
+    FFTEngineBase(FFTEngineBase &&other) = default;
 
     //! Destructor
-    virtual ~FFT_Engine_base() = default;
+    virtual ~FFTEngineBase() = default;
 
     //! Copy assignment operator
-    FFT_Engine_base& operator=(const FFT_Engine_base &other) = delete;
+    FFTEngineBase& operator=(const FFTEngineBase &other) = delete;
 
     //! Move assignment operator
-    FFT_Engine_base& operator=(FFT_Engine_base &&other) = default;
+    FFTEngineBase& operator=(FFTEngineBase &&other) = default;
 
     //! compute the plan, etc
     virtual void initialise(FFT_PlanFlags /*plan_flags*/);

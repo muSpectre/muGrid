@@ -26,7 +26,7 @@
  */
 
 
-#include "system/system_factory.hh"
+#include "cell/cell_factory.hh"
 #include "materials/material_linear_elastic1.hh"
 #include "solver/solvers.hh"
 #include "solver/solver_cg.hh"
@@ -44,7 +44,7 @@ int main()
   constexpr Rcoord_t<dim> lens{CcoordOps::get_cube<dim>(1.)};
   constexpr Dim_t incl_size{3};
 
-  auto cell{make_system(N, lens, Formulation::small_strain)};
+  auto cell{make_cell(N, lens, Formulation::small_strain)};
 
   // constexpr Real K_hard{8.33}, K_soft{.833};
   // constexpr Real mu_hard{3.86}, mu_soft{.386};

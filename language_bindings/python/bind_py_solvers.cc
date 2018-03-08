@@ -39,12 +39,12 @@ namespace py=pybind11;
 using namespace pybind11::literals;
 
 /**
- * Solvers instanciated for systems with equal spatial and material dimension
+ * Solvers instanciated for cells with equal spatial and material dimension
  */
 
 template <Dim_t sdim, class Solver>
 void add_iterative_solver_helper(py::module & mod, std::string name_start) {
-  using sys = SystemBase<sdim>;
+  using sys = CellBase<sdim>;
   std::stringstream name{};
   name << name_start << '_' << sdim << 'd';
   py::class_<Solver, typename Solver::Parent>(mod, name.str().c_str())
@@ -87,7 +87,7 @@ void add_newton_cg_helper(py::module & mod) {
 
   const char name []{"newton_cg"};
   constexpr Dim_t mdim{sdim};
-  using sys = SystemBase<sdim, mdim>;
+  using sys = CellBase<sdim, mdim>;
   using solver = SolverBase<sdim, mdim>;
   using grad = Grad_t<sdim>;
   using grad_vec = GradIncrements<sdim>;
@@ -98,7 +98,7 @@ void add_newton_cg_helper(py::module & mod) {
             return newton_cg(s, g, so, nt, eqt, verb);
 
           },
-          "system"_a,
+          "cell"_a,
           "ΔF₀"_a,
           "solver"_a,
           "newton_tol"_a,
@@ -109,7 +109,7 @@ void add_newton_cg_helper(py::module & mod) {
              Real eqt, Dim_t verb) -> std::vector<OptimizeResult> {
             return newton_cg(s, g, so, nt, eqt, verb);
           },
-          "system"_a,
+          "cell"_a,
           "ΔF₀"_a,
           "solver"_a,
           "newton_tol"_a,
@@ -121,7 +121,7 @@ template <Dim_t sdim>
 void add_de_geus_helper(py::module & mod) {
   const char name []{"de_geus"};
   constexpr Dim_t mdim{sdim};
-  using sys = SystemBase<sdim, mdim>;
+  using sys = CellBase<sdim, mdim>;
   using solver = SolverBase<sdim, mdim>;
   using grad = Grad_t<sdim>;
   using grad_vec = GradIncrements<sdim>;
@@ -132,7 +132,7 @@ void add_de_geus_helper(py::module & mod) {
             return de_geus(s, g, so, nt, eqt, verb);
 
           },
-          "system"_a,
+          "cell"_a,
           "ΔF₀"_a,
           "solver"_a,
           "newton_tol"_a,
@@ -143,7 +143,7 @@ void add_de_geus_helper(py::module & mod) {
              Real eqt, Dim_t verb) -> std::vector<OptimizeResult> {
             return de_geus(s, g, so, nt, eqt, verb);
           },
-          "system"_a,
+          "cell"_a,
           "ΔF₀"_a,
           "solver"_a,
           "newton_tol"_a,

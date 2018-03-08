@@ -74,8 +74,8 @@ void add_engine_helper(py::module & mod, std::string name) {
 }
 
 void add_engine(py::module & mod) {
-  add_engine_helper<  twoD, FFTW_Engine<  twoD,   twoD>>(mod, "FFTW_2d");
-  add_engine_helper<threeD, FFTW_Engine<threeD, threeD>>(mod, "FFTW_3d");
+  add_engine_helper<  twoD, FFTWEngine<  twoD,   twoD>>(mod, "FFTW_2d");
+  add_engine_helper<threeD, FFTWEngine<threeD, threeD>>(mod, "FFTW_3d");
 }
 
 void add_fft_engines(py::module & mod) {

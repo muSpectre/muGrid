@@ -34,10 +34,10 @@ namespace muSpectre {
 
   //----------------------------------------------------------------------------//
   template <class SolverType, Dim_t DimS, Dim_t DimM>
-  SolverEigen<SolverType, DimS, DimM>::SolverEigen(Sys_t& sys, Real tol, Uint maxiter,
+  SolverEigen<SolverType, DimS, DimM>::SolverEigen(Cell_t& cell, Real tol, Uint maxiter,
                                                    bool verbose)
-    :Parent(sys, tol, maxiter, verbose),
-     adaptor{sys.get_adaptor()},
+    :Parent(cell, tol, maxiter, verbose),
+     adaptor{cell.get_adaptor()},
      solver{}
   {}
 

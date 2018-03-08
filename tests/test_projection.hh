@@ -73,7 +73,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM, class SizeGiver, class Proj>
   struct ProjectionFixture {
-    using Engine = FFTW_Engine<DimS, DimM>;
+    using Engine = FFTWEngine<DimS, DimM>;
     using Parent = Proj;
     constexpr static Dim_t sdim{DimS};
     constexpr static Dim_t mdim{DimM};

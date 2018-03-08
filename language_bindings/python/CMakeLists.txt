@@ -36,7 +36,7 @@ endif()
 set (PY_BINDING_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_module.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_common.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_system.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_cell.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_solvers.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_fftengine.cc

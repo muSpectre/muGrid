@@ -63,7 +63,7 @@ namespace muSpectre {
     constexpr static auto stress_measure{StressMeasure::PK2};
 
     //! local field_collections used for internals
-    using LFieldColl_t = LocalFieldCollection<DimS, DimM>;
+    using LFieldColl_t = LocalFieldCollection<DimS>;
     //! local strain type
     using LStrainMap_t = MatrixFieldMap<LFieldColl_t, Real, DimM, DimM, true>;
     //! elasticity with eigenstrain
@@ -161,8 +161,8 @@ namespace muSpectre {
     MaterialLinearElastic1<DimS, DimM> material;
     //! storage for eigenstrain
     using Field_t =
-      TensorField<LocalFieldCollection<DimS,DimM>, Real, secondOrder, DimM>;
-    Field_t & eigen_field; //!< field of eigenstrains
+      TensorField<LocalFieldCollection<DimS>, Real, secondOrder, DimM>;
+    Field_t & eigen_field; //!< field holding the eigen strain per pixel
     //! tuple for iterable eigen_field
     InternalVariables internal_variables;
   private:

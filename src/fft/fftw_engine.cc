@@ -31,7 +31,7 @@
 namespace muSpectre {
 
   template <Dim_t DimS, Dim_t DimM>
-  FFTW_Engine<DimS, DimM>::FFTW_Engine(Ccoord resolutions, Rcoord lengths)
+  FFTWEngine<DimS, DimM>::FFTWEngine(Ccoord resolutions, Rcoord lengths)
     :Parent{resolutions, lengths},
      hermitian_resolutions{CcoordOps::get_hermitian_sizes(resolutions)}
   {
@@ -43,7 +43,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void FFTW_Engine<DimS, DimM>::initialise(FFT_PlanFlags plan_flags) {
+  void FFTWEngine<DimS, DimM>::initialise(FFT_PlanFlags plan_flags) {
     if (this->initialised) {
       throw std::runtime_error("double initialisation, will leak memory");
     }
@@ -111,7 +111,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  FFTW_Engine<DimS, DimM>::~FFTW_Engine<DimS, DimM>() noexcept {
+  FFTWEngine<DimS, DimM>::~FFTWEngine<DimS, DimM>() noexcept {
     fftw_destroy_plan(this->plan_fft);
     fftw_destroy_plan(this->plan_ifft);
     fftw_cleanup();
@@ -119,8 +119,8 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  typename FFTW_Engine<DimS, DimM>::Workspace_t &
-  FFTW_Engine<DimS, DimM>::fft (Field_t & field) {
+  typename FFTWEngine<DimS, DimM>::Workspace_t &
+  FFTWEngine<DimS, DimM>::fft (Field_t & field) {
     fftw_execute_dft_r2c(this->plan_fft,
                          field.data(),
                          reinterpret_cast<fftw_complex*>(this->work.data()));
@@ -130,7 +130,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   void
-  FFTW_Engine<DimS, DimM>::ifft (Field_t & field) const {
+  FFTWEngine<DimS, DimM>::ifft (Field_t & field) const {
     if (field.size() != CcoordOps::get_size(this->resolutions)) {
       throw std::runtime_error("size mismatch");
     }
@@ -139,7 +139,7 @@ namespace muSpectre {
                          field.data());
   }
 
-  template class FFTW_Engine<twoD, twoD>;
-  template class FFTW_Engine<twoD, threeD>;
-  template class FFTW_Engine<threeD, threeD>;
+  template class FFTWEngine<twoD, twoD>;
+  template class FFTWEngine<twoD, threeD>;
+  template class FFTWEngine<threeD, threeD>;
 }  // muSpectre

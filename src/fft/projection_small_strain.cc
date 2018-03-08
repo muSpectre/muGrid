@@ -33,7 +33,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   ProjectionSmallStrain<DimS, DimM>::
-  ProjectionSmallStrain(FFT_Engine_ptr engine)
+  ProjectionSmallStrain(FFTEngine_ptr engine)
     : Parent{std::move(engine), Formulation::small_strain}
   {}
 

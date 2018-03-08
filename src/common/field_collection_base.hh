@@ -39,17 +39,14 @@ namespace muSpectre {
   /** `FieldCollectionBase` is the base class for collections of fields. All
     * fields in a field collection have the same number of pixels. The field
     * collection is templated with @a DimS is the spatial dimension (i.e.
-    * whether the simulation domain is one, two or three-dimensional) and
-    * @a DimM is the material dimension (i.e., the dimension of constitutive
-    * law; even for e.g. two-dimensional problems the constitutive law could
-    * live in three-dimensional space for e.g. plane strain or stress problems).
+    * whether the simulation domain is one, two or three-dimensional).
     * All fields within a field collection have a unique string identifier.
     * A `FieldCollectionBase` is therefore comparable to a dictionary of fields
     * that live on the same grid.
     * `FieldCollectionBase` has the specialisations `GlobalFieldCollection` and
     * `LocalFieldCollection`.
     */
-  template <Dim_t DimS, Dim_t DimM, class FieldCollectionDerived>
+  template <Dim_t DimS, class FieldCollectionDerived>
   class FieldCollectionBase
   {
   public:
@@ -110,18 +107,18 @@ namespace muSpectre {
   };
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM, class FieldCollectionDerived>
-  Uint FieldCollectionBase<DimS, DimM, FieldCollectionDerived>::counter{0};
+  template <Dim_t DimS, class FieldCollectionDerived>
+  Uint FieldCollectionBase<DimS, FieldCollectionDerived>::counter{0};
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM, class FieldCollectionDerived>
-  FieldCollectionBase<DimS, DimM, FieldCollectionDerived>::FieldCollectionBase()
+  template <Dim_t DimS, class FieldCollectionDerived>
+  FieldCollectionBase<DimS, FieldCollectionDerived>::FieldCollectionBase()
     :id(counter++){}
 
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM, class FieldCollectionDerived>
-  void FieldCollectionBase<DimS, DimM, FieldCollectionDerived>::register_field(Field_p &&field) {
+  template <Dim_t DimS, class FieldCollectionDerived>
+  void FieldCollectionBase<DimS, FieldCollectionDerived>::register_field(Field_p &&field) {
     auto&& search_it = this->fields.find(field->get_name());
     auto&& does_exist = search_it != this->fields.end();
     if (does_exist) {
@@ -141,39 +138,39 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM, class FieldCollectionDerived>
-  constexpr Dim_t FieldCollectionBase<DimS, DimM, FieldCollectionDerived>::
+  template <Dim_t DimS, class FieldCollectionDerived>
+  constexpr Dim_t FieldCollectionBase<DimS, FieldCollectionDerived>::
   spatial_dim() {
     return DimS;
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM, class FieldCollectionDerived>
-  Dim_t FieldCollectionBase<DimS, DimM, FieldCollectionDerived>::
+  template <Dim_t DimS, class FieldCollectionDerived>
+  Dim_t FieldCollectionBase<DimS, FieldCollectionDerived>::
   get_spatial_dim() const {
     return DimS;
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM, class FieldCollectionDerived>
-  typename FieldCollectionBase<DimS, DimM, FieldCollectionDerived>::Field&
-  FieldCollectionBase<DimS, DimM, FieldCollectionDerived>::
+  template <Dim_t DimS, class FieldCollectionDerived>
+  typename FieldCollectionBase<DimS, FieldCollectionDerived>::Field&
+  FieldCollectionBase<DimS, FieldCollectionDerived>::
   operator[](std::string unique_name) {
     return *(this->fields[unique_name]);
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM, class FieldCollectionDerived>
-  typename FieldCollectionBase<DimS, DimM, FieldCollectionDerived>::Field&
-  FieldCollectionBase<DimS, DimM, FieldCollectionDerived>::
+  template <Dim_t DimS, class FieldCollectionDerived>
+  typename FieldCollectionBase<DimS, FieldCollectionDerived>::Field&
+  FieldCollectionBase<DimS, FieldCollectionDerived>::
   at(std::string unique_name) {
     return *(this->fields.at(unique_name));
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM, class FieldCollectionDerived>
+  template <Dim_t DimS, class FieldCollectionDerived>
   bool
-  FieldCollectionBase<DimS, DimM, FieldCollectionDerived>::
+  FieldCollectionBase<DimS, FieldCollectionDerived>::
   check_field_exists(std::string unique_name) {
     return this->fields.find(unique_name) != this->fields.end();
   }

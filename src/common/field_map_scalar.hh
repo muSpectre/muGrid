@@ -42,7 +42,9 @@ namespace muSpectre {
     {
     public:
       //! base class
-      using parent = internal::FieldMap<FieldCollection, T, 1, ConstField>;
+      using Parent = internal::FieldMap<FieldCollection, T, 1, ConstField>;
+      //! sister class with all params equal, but ConstField guaranteed true
+      using ConstMap = ScalarFieldMap<FieldCollection, T, true>;
       //! cell coordinates type
       using Ccoord = Ccoord_t<FieldCollection::spatial_dim()>;
       using value_type = T; //!< stl conformance
@@ -51,16 +53,17 @@ namespace muSpectre {
       using reference = std::conditional_t<ConstField,
                                            const_reference,
                                            value_type &>;
-      using size_type = typename parent::size_type; //!< stl conformance
+      using size_type = typename Parent::size_type; //!< stl conformance
       using pointer = T*; //!< stl conformance
-      using Field = typename parent::Field; //!< stl conformance
+      using Field = typename Parent::Field; //!< stl conformance
+      using Field_c = typename Parent::Field_c; //!< stl conformance
       //! stl conformance
-      using const_iterator= typename parent::template iterator<ScalarFieldMap, true>;
+      using const_iterator= typename Parent::template iterator<ScalarFieldMap, true>;
       //! iterator over a scalar field
       using iterator = std::conditional_t
         <ConstField,
          const_iterator,
-         typename parent::template iterator<ScalarFieldMap>>;
+         typename Parent::template iterator<ScalarFieldMap>>;
       using reverse_iterator = std::reverse_iterator<iterator>; //!< stl conformance
       //! stl conformance
       using const_reverse_iterator = std::reverse_iterator<const_iterator>;
@@ -71,11 +74,7 @@ namespace muSpectre {
       ScalarFieldMap() = delete;
 
       //! constructor
-      template <bool isntConst=!ConstField>
-      ScalarFieldMap(std::enable_if_t<isntConst, Field &> field);
-      //! constructor
-      template <bool isConst=ConstField>
-      ScalarFieldMap(std::enable_if_t<isConst, const Field &> field);
+      ScalarFieldMap(Field_c & field);
 
       //! Copy constructor
       ScalarFieldMap(const ScalarFieldMap &other) = default;
@@ -132,25 +131,9 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <class FieldCollection, typename T, bool ConstField>
-  template <bool isntConst>
   ScalarFieldMap<FieldCollection, T, ConstField>::
-  ScalarFieldMap(std::enable_if_t<isntConst, Field &> field)
-    :parent(field) {
-    static_assert((isntConst != ConstField),
-                  "let the compiler deduce isntConst, this is a SFINAE "
-                  "parameter");
-    this->check_compatibility();
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T, bool ConstField>
-  template <bool isConst>
-  ScalarFieldMap<FieldCollection, T, ConstField>::
-  ScalarFieldMap(std::enable_if_t<isConst, const Field &> field)
-    :parent(field) {
-    static_assert((isConst == ConstField),
-                  "let the compiler deduce isntConst, this is a SFINAE "
-                  "parameter");
+  ScalarFieldMap(Field_c & field)
+    :Parent(field) {
     this->check_compatibility();
   }
 

@@ -49,7 +49,7 @@ namespace muSpectre {
 
   // Forward declaration for factory function
   template <Dim_t DimS, Dim_t DimM>
-  class SystemBase;
+  class CellBase;
 
   /**
    * material traits are used by `muSpectre::MaterialMuSpectre` to
@@ -126,7 +126,7 @@ namespace muSpectre {
 
     //! Factory
     template <class... ConstructorArgs>
-    static Material & make(SystemBase<DimS, DimM> & sys,
+    static Material & make(CellBase<DimS, DimM> & cell,
                            ConstructorArgs &&... args);
 
     //! Copy assignment operator
@@ -137,7 +137,7 @@ namespace muSpectre {
 
 
     //! allocate memory, etc
-    virtual void initialise(bool stiffness = false) override final;
+    virtual void initialise(bool stiffness = false) override;
 
     using Parent::compute_stresses;
     using Parent::compute_stresses_tangent;
@@ -221,11 +221,11 @@ namespace muSpectre {
   template <class Material, Dim_t DimS, Dim_t DimM>
   template <class... ConstructorArgs>
   Material & MaterialMuSpectre<Material, DimS, DimM>::
-  make(SystemBase<DimS, DimM> & sys,
+  make(CellBase<DimS, DimM> & cell,
                   ConstructorArgs && ... args) {
     auto mat = std::make_unique<Material>(args...);
     auto & mat_ref = *mat;
-    sys.add_material(std::move(mat));
+    cell.add_material(std::move(mat));
     return mat_ref;
   }
 

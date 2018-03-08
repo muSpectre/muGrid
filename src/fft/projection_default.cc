@@ -33,7 +33,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  ProjectionDefault<DimS, DimM>::ProjectionDefault(FFT_Engine_ptr engine,
+  ProjectionDefault<DimS, DimM>::ProjectionDefault(FFTEngine_ptr engine,
                                                    Formulation form)
     :Parent{std::move(engine), form},
      Gfield{make_field<Proj_t>("Projection Operator",

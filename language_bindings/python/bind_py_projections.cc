@@ -77,7 +77,7 @@ template <class Proj, Dim_t DimS, Dim_t DimM=DimS>
 void add_proj_helper(py::module & mod, std::string name_start) {
   using Ccoord = Ccoord_t<DimS>;
   using Rcoord = Rcoord_t<DimS>;
-  using Engine = FFTW_Engine<DimS, DimM>;
+  using Engine = FFTWEngine<DimS, DimM>;
   using Field_t = typename Proj::Field_t;
 
   static_assert(DimS == DimM,

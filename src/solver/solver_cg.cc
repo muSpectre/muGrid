@@ -36,9 +36,9 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  SolverCG<DimS, DimM>::SolverCG(Sys_t& sys, Real tol, Uint maxiter,
+  SolverCG<DimS, DimM>::SolverCG(Cell_t& cell, Real tol, Uint maxiter,
                                  bool verbose)
-    :Parent(sys, tol, maxiter, verbose),
+    :Parent(cell, tol, maxiter, verbose),
      r_k{make_field<Field_t>("residual r_k", this->collection)},
      p_k{make_field<Field_t>("search direction r_k", this->collection)},
      Ap_k{make_field<Field_t>("Effect of tangent A*p_k", this->collection)}
@@ -64,7 +64,7 @@ namespace muSpectre {
     typename Field_t::EigenMap x(x_0.data(), r.rows(), r.cols());
 
     // initialisation of algo
-    r = this->sys.directional_stiffness_with_copy(x);
+    r = this->cell.directional_stiffness_with_copy(x);
 
     r -= typename Field_t::ConstEigenMap(rhs.data(), r.rows(), r.cols());
     p = -r;
@@ -82,7 +82,7 @@ namespace muSpectre {
     for (Uint i = 0;
          i < this->maxiter && (rdr > tol2 || i == 0);
          ++i, ++this->counter) {
-      Ap = this->sys.directional_stiffness_with_copy(p);
+      Ap = this->cell.directional_stiffness_with_copy(p);
 
       Real alpha = rdr/(p*Ap).sum();
 

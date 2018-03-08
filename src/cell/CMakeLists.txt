@@ -5,7 +5,7 @@
 #
 # @date   08 Jan 2018
 #
-# @brief  configuration for system implementations
+# @brief  configuration for cell implementations
 #
 # @section LICENSE
 #
@@ -27,11 +27,11 @@
 # Boston, MA 02111-1307, USA.
 # =============================================================================
 
-set (systems_SRC
-  ${CMAKE_CURRENT_SOURCE_DIR}/system_base.cc
+set (cells_SRC
+  ${CMAKE_CURRENT_SOURCE_DIR}/cell_base.cc
   )
 
 set (muSpectre_SRC
   ${muSpectre_SRC}
-  ${systems_SRC}
+  ${cells_SRC}
   PARENT_SCOPE)

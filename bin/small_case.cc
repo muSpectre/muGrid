@@ -27,7 +27,7 @@
 
 #include "common/common.hh"
 #include "common/iterators.hh"
-#include "system/system_factory.hh"
+#include "cell/cell_factory.hh"
 #include "materials/material_linear_elastic1.hh"
 #include "solver/solvers.hh"
 #include "solver/solver_cg.hh"
@@ -47,9 +47,9 @@ int main()
   Rcoord_t<dim> lengths{CcoordOps::get_cube<dim>(11.)};//{5.2e-9, 8.3e-9, 8.3e-9};
   Formulation form{Formulation::finite_strain};
 
-  auto rve{make_system(resolution,
-                       lengths,
-                       form)};
+  auto rve{make_cell(resolution,
+                     lengths,
+                     form)};
 
   auto & hard{MaterialLinearElastic1<dim, dim>::make
       (rve, "hard", 210., .33)};

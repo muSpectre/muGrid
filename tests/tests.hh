@@ -53,7 +53,7 @@
 namespace muSpectre {
 
 
-  const Real tol = 1e-14*100; //it's in percent
+  constexpr Real tol = 1e-14*100; //it's in percent
 
 }  // muSpectre
 

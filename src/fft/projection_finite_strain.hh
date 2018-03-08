@@ -48,10 +48,10 @@ namespace muSpectre {
   public:
     using Parent = ProjectionDefault<DimS, DimM>; //!< base class
     //! polymorphic pointer to FFT engines
-    using FFT_Engine_ptr = typename Parent::FFT_Engine_ptr;
+    using FFTEngine_ptr = typename Parent::FFTEngine_ptr;
     using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
     //! local field collection (for Fourier-space representations)
-    using LFieldCollection_t = LocalFieldCollection<DimS, DimM>;
+    using LFieldCollection_t = LocalFieldCollection<DimS>;
     //! iterable operator
     using Proj_map = T4MatrixFieldMap<LFieldCollection_t, Real, DimM>;
     //! iterable vectorised version of the Fourier-space tensor field
@@ -61,7 +61,7 @@ namespace muSpectre {
     ProjectionFiniteStrain() = delete;
 
     //! Constructor with fft_engine
-    ProjectionFiniteStrain(FFT_Engine_ptr engine);
+    ProjectionFiniteStrain(FFTEngine_ptr engine);
 
     //! Copy constructor
     ProjectionFiniteStrain(const ProjectionFiniteStrain &other) = delete;

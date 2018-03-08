@@ -201,6 +201,65 @@ namespace muSpectre {
     BOOST_CHECK_LT(error, tol);
   }
 
+  BOOST_AUTO_TEST_CASE(elastic_modulus_conversions)
+  {
+    // define original input
+    constexpr Real E{123.456};
+    constexpr Real nu{.3};
+
+    using namespace MatTB;
+    // derived values
+    constexpr Real K{convert_elastic_modulus<ElasticModulus::Bulk,
+                                             ElasticModulus::Young,
+                                             ElasticModulus::Poisson>(E, nu)};
+    constexpr Real lambda{convert_elastic_modulus<ElasticModulus::lambda,
+                                                  ElasticModulus::Young,
+                                                  ElasticModulus::Poisson>(E, nu)};
+    constexpr Real mu{convert_elastic_modulus<ElasticModulus::Shear,
+                                              ElasticModulus::Young,
+                                              ElasticModulus::Poisson>(E, nu)};
+
+    // recover original inputs
+    Real comp = convert_elastic_modulus<ElasticModulus::Young,
+                                        ElasticModulus::Bulk,
+                                        ElasticModulus::Shear>(K, mu);
+    Real err = E - comp;
+    BOOST_CHECK_LT(err, tol);
+
+    comp = convert_elastic_modulus<ElasticModulus::Poisson,
+                                   ElasticModulus::Bulk,
+                                   ElasticModulus::Shear>(K, mu);
+    err = nu - comp;
+    BOOST_CHECK_LT(err, tol);
+
+    comp = convert_elastic_modulus<ElasticModulus::Young,
+                                   ElasticModulus::lambda,
+                                   ElasticModulus::Shear>(lambda, mu);
+    err = E - comp;
+    BOOST_CHECK_LT(err, tol);
+
+    // check inversion resistance
+    Real compA = convert_elastic_modulus<ElasticModulus::Poisson,
+                                         ElasticModulus::Bulk,
+                                         ElasticModulus::Shear>(K, mu);
+    Real compB = convert_elastic_modulus<ElasticModulus::Poisson,
+                                         ElasticModulus::Shear,
+                                         ElasticModulus::Bulk>(mu, K);
+    BOOST_CHECK_EQUAL(compA, compB);
+
+    // check trivial self-returning
+    comp = convert_elastic_modulus<ElasticModulus::Bulk,
+                                   ElasticModulus::Bulk,
+                                   ElasticModulus::Shear>(K, mu);
+    BOOST_CHECK_EQUAL(K, comp);
+
+    comp = convert_elastic_modulus<ElasticModulus::Shear,
+                                   ElasticModulus::Bulk,
+                                   ElasticModulus::Shear>(K, mu);
+    BOOST_CHECK_EQUAL(mu, comp);
+
+  }
+
   BOOST_AUTO_TEST_SUITE_END();
 
 }  // muSpectre

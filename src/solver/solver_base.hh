@@ -30,7 +30,7 @@
 
 #include "solver/solver_error.hh"
 #include "common/common.hh"
-#include "system/system_base.hh"
+#include "cell/cell_base.hh"
 #include "common/tensor_algebra.hh"
 
 #include <Eigen/Dense>
@@ -50,10 +50,10 @@ namespace muSpectre {
      * Enum to describe in what kind the solver relies tangent stiffnesses
      */
     enum class TangentRequirement{NoNeed, NeedEffect, NeedTangents};
-    using Sys_t = SystemBase<DimS, DimM>; //!< Cell type
+    using Cell_t = CellBase<DimS, DimM>; //!< Cell type
     using Ccoord = Ccoord_t<DimS>; //!< cell coordinates type
     //! Field collection to store temporary fields in
-    using Collection_t = GlobalFieldCollection<DimS, DimM>;
+    using Collection_t = GlobalFieldCollection<DimS>;
     //! Input vector for solvers
     using SolvVectorIn = Eigen::Ref<Eigen::VectorXd>;
     //! Input vector for solvers
@@ -66,7 +66,7 @@ namespace muSpectre {
     SolverBase() = delete;
 
     //! Constructor with domain resolutions
-    SolverBase(Sys_t & sys, Real tol, Uint maxiter=0, bool verbose =false);
+    SolverBase(Cell_t & cell, Real tol, Uint maxiter=0, bool verbose =false);
 
     //! Copy constructor
     SolverBase(const SolverBase &other) = delete;
@@ -84,7 +84,7 @@ namespace muSpectre {
     SolverBase& operator=(SolverBase &&other) = default;
 
     //! Allocate fields used during the solution
-    virtual void initialise() {this->collection.initialise(this->sys.get_resolutions());}
+    virtual void initialise() {this->collection.initialise(this->cell.get_resolutions());}
 
     //! determine whether this solver requires full tangent stiffnesses
     bool need_tangents() const {
@@ -112,7 +112,7 @@ namespace muSpectre {
     virtual SolvVectorOut solve(const SolvVectorInC rhs, SolvVectorIn x_0) = 0;
 
     //! return a reference to the cell
-    Sys_t & get_system() {return sys;}
+    Cell_t & get_cell() {return cell;}
 
     //! read the current maximum number of iterations setting
     Uint get_maxiter() const {return this->maxiter;}
@@ -130,7 +130,7 @@ namespace muSpectre {
   protected:
     //! returns the tangent requirements of this solver
     virtual TangentRequirement get_tangent_req() const = 0;
-    Sys_t & sys; //!< reference to the cell
+    Cell_t & cell; //!< reference to the cell
     Real tol;    //!< convergence tolerance
     Uint maxiter;//!< maximum number of iterations
     bool verbose;//!< whether or not to write information to the std output

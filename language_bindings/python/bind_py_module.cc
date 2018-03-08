@@ -36,7 +36,7 @@ PYBIND11_MODULE(muSpectre, mod) {
   mod.doc() = "Python bindings to the µSpectre library";
 
   add_common(mod);
-  add_system(mod);
+  add_cell(mod);
   add_material(mod);
   add_solvers(mod);
   add_fft_engines(mod);

@@ -35,14 +35,14 @@
 namespace muSpectre {
 
   /**
-   * implements the `muSpectre::Fft_Engine_Base` interface using the
+   * implements the `muSpectre::FftEngine_Base` interface using the
    * FFTW library
    */
   template <Dim_t DimS, Dim_t DimM>
-  class FFTW_Engine: public FFT_Engine_base<DimS, DimM>
+  class FFTWEngine: public FFTEngineBase<DimS, DimM>
   {
   public:
-    using Parent = FFT_Engine_base<DimS, DimM>; //!< base class
+    using Parent = FFTEngineBase<DimS, DimM>; //!< base class
     using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
     using Rcoord = typename Parent::Rcoord; //!< spatial coordinates type
     //! field for Fourier transform of second-order tensor
@@ -50,25 +50,25 @@ namespace muSpectre {
     //! real-valued second-order tensor
     using Field_t = typename Parent::Field_t;
     //! Default constructor
-    FFTW_Engine() = delete;
+    FFTWEngine() = delete;
 
-    //! Constructor with system resolutions
-    FFTW_Engine(Ccoord resolutions, Rcoord lengths);
+    //! Constructor with cell resolutions
+    FFTWEngine(Ccoord resolutions, Rcoord lengths);
 
     //! Copy constructor
-    FFTW_Engine(const FFTW_Engine &other) = delete;
+    FFTWEngine(const FFTWEngine &other) = delete;
 
     //! Move constructor
-    FFTW_Engine(FFTW_Engine &&other) = default;
+    FFTWEngine(FFTWEngine &&other) = default;
 
     //! Destructor
-    virtual ~FFTW_Engine() noexcept;
+    virtual ~FFTWEngine() noexcept;
 
     //! Copy assignment operator
-    FFTW_Engine& operator=(const FFTW_Engine &other) = delete;
+    FFTWEngine& operator=(const FFTWEngine &other) = delete;
 
     //! Move assignment operator
-    FFTW_Engine& operator=(FFTW_Engine &&other) = default;
+    FFTWEngine& operator=(FFTWEngine &&other) = default;
 
     // compute the plan, etc
     virtual void initialise(FFT_PlanFlags plan_flags) override;

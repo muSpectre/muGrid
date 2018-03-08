@@ -50,7 +50,7 @@ namespace muSpectre {
     }
     FFTW_fixture() :engine(res(),
                            CcoordOps::get_cube<DimS>(box_length)){}
-    FFTW_Engine<DimS, DimM> engine;
+    FFTWEngine<DimS, DimM> engine;
   };
 
   struct FFTW_fixture_python_segfault{
@@ -59,7 +59,7 @@ namespace muSpectre {
     constexpr static Dim_t mdim{twoD};
     constexpr static Ccoord_t<sdim> res() {return {6, 4};}
     FFTW_fixture_python_segfault():engine{res(), {3., 3}} {}
-    FFTW_Engine<sdim, mdim> engine;
+    FFTWEngine<sdim, mdim> engine;
   };
 
   using fixlist = boost::mpl::list<FFTW_fixture<  twoD,   twoD, 3>,
@@ -81,7 +81,7 @@ namespace muSpectre {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(fft_test, Fix, fixlist, Fix) {
     Fix::engine.initialise(FFT_PlanFlags::estimate);
     constexpr Dim_t order{2};
-    using FC_t = GlobalFieldCollection<Fix::sdim, Fix::mdim>;
+    using FC_t = GlobalFieldCollection<Fix::sdim>;
     FC_t fc;
     auto & input{make_field<TensorField<FC_t, Real, order, Fix::mdim>>("input", fc)};
     auto & ref  {make_field<TensorField<FC_t, Real, order, Fix::mdim>>("reference", fc)};
@@ -101,7 +101,7 @@ namespace muSpectre {
       ref_ = in_;
     }
     auto & complex_field = Fix::engine.fft(input);
-    using cmap_t = MatrixFieldMap<LocalFieldCollection<Fix::sdim, Fix::mdim>, Complex, Fix::mdim, Fix::mdim>;
+    using cmap_t = MatrixFieldMap<LocalFieldCollection<Fix::sdim>, Complex, Fix::mdim, Fix::mdim>;
     cmap_t complex_map(complex_field);
     Real error = complex_map[0].imag().norm();
     BOOST_CHECK_LT(error, tol);

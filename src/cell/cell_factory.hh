@@ -1,11 +1,11 @@
 /**
- * @file   system_factory.hh
+ * @file   cell_factory.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   15 Dec 2017
  *
- * @brief  System factories to help create systems with ease
+ * @brief  Cell factories to help create cells with ease
  *
  * Copyright © 2017 Till Junge
  *
@@ -25,12 +25,12 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#ifndef SYSTEM_FACTORY_H
-#define SYSTEM_FACTORY_H
+#ifndef CELL_FACTORY_H
+#define CELL_FACTORY_H
 
 #include "common/common.hh"
 #include "common/ccoord_operations.hh"
-#include "system/system_base.hh"
+#include "cell/cell_base.hh"
 #include "fft/projection_finite_strain_fast.hh"
 #include "fft/projection_small_strain.hh"
 #include "fft/fftw_engine.hh"
@@ -42,16 +42,16 @@ namespace muSpectre {
 
   /**
    * Create a unique ptr to a Projection operator (with appropriate
-   * FFT_engine) to be used in a system constructor
+   * FFT_engine) to be used in a cell constructor
    */
   template <Dim_t DimS, Dim_t DimM,
-            typename FFT_Engine=FFTW_Engine<DimS, DimM>>
+            typename FFTEngine=FFTWEngine<DimS, DimM>>
   inline
   std::unique_ptr<ProjectionBase<DimS, DimM>>
-  system_input(Ccoord_t<DimS> resolutions,
+  cell_input(Ccoord_t<DimS> resolutions,
                Rcoord_t<DimS> lengths,
                Formulation form) {
-    auto fft_ptr{std::make_unique<FFT_Engine>(resolutions, lengths)};
+    auto fft_ptr{std::make_unique<FFTEngine>(resolutions, lengths)};
     switch (form)
       {
       case Formulation::finite_strain: {
@@ -73,24 +73,24 @@ namespace muSpectre {
 
 
   /**
-   * convenience function to create a system (avoids having to build
+   * convenience function to create a cell (avoids having to build
    * and move the chain of unique_ptrs
    */
   template <size_t DimS, size_t DimM=DimS,
-            typename System=SystemBase<DimS, DimM>,
-            typename FFT_Engine=FFTW_Engine<DimS, DimM>>
+            typename Cell=CellBase<DimS, DimM>,
+            typename FFTEngine=FFTWEngine<DimS, DimM>>
   inline
-  System make_system(Ccoord_t<DimS> resolutions,
+  Cell make_cell(Ccoord_t<DimS> resolutions,
                      Rcoord_t<DimS> lengths,
                      Formulation form) {
 
-    auto && input = system_input<DimS, DimM, FFT_Engine>(resolutions, lengths, form);
-    auto system{System{std::move(input)}};
-    return system;
+    auto && input = cell_input<DimS, DimM, FFTEngine>(resolutions, lengths, form);
+    auto cell{Cell{std::move(input)}};
+    return cell;
   }
 
 }  // muSpectre
 
-#endif /* SYSTEM_FACTORY_H */
+#endif /* CELL_FACTORY_H */
 
 

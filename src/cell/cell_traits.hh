@@ -1,11 +1,11 @@
 /**
- * @file   system_traits.hh
+ * @file   cell_traits.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   19 Jan 2018
  *
- * @brief  Provides traits for Eigen solvers to be able to use Systems
+ * @brief  Provides traits for Eigen solvers to be able to use Cells
  *
  * Copyright © 2018 Till Junge
  *
@@ -31,8 +31,8 @@
 
 namespace muSpectre {
 
-  template <class System>
-  class SystemAdaptor;
+  template <class Cell>
+  class CellAdaptor;
 
 }  // muSpectre
 
@@ -40,8 +40,8 @@ namespace Eigen {
   namespace internal {
     using Dim_t = muSpectre::Dim_t; //!< universal index type
     using Real =  muSpectre::Real;  //!< universal real value type
-    template<class System>
-    struct traits<muSpectre::SystemAdaptor<System>> :
+    template<class Cell>
+    struct traits<muSpectre::CellAdaptor<Cell>> :
       public Eigen::internal::traits<Eigen::SparseMatrix<Real> >
     {};
   }  // internal

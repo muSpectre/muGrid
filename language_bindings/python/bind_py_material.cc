@@ -29,7 +29,7 @@
 #include "materials/material_linear_elastic1.hh"
 #include "materials/material_linear_elastic2.hh"
 #include "materials/material_linear_elastic3.hh"
-#include "system/system_base.hh"
+#include "cell/cell_base.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -52,13 +52,13 @@ void add_material_linear_elastic1_helper(py::module & mod) {
   const auto name {name_stream.str()};
 
   using Mat_t = MaterialLinearElastic1<dim, dim>;
-  using Sys_t = SystemBase<dim, dim>;
+  using Sys_t = CellBase<dim, dim>;
   py::class_<Mat_t>(mod, name.c_str())
      .def_static("make",
                 [](Sys_t & sys, std::string n, Real e, Real p) -> Mat_t & {
                   return Mat_t::make(sys, n, e, p);
                 },
-                "system"_a, "name"_a, "Young"_a, "Poisson"_a,
+                "cell"_a, "name"_a, "Young"_a, "Poisson"_a,
                 py::return_value_policy::reference, py::keep_alive<1, 0>())
     .def("add_pixel",
          [] (Mat_t & mat, Ccoord_t<dim> pix) {
@@ -74,14 +74,14 @@ void add_material_linear_elastic2_helper(py::module & mod) {
   const auto name {name_stream.str()};
 
   using Mat_t = MaterialLinearElastic2<dim, dim>;
-  using Sys_t = SystemBase<dim, dim>;
+  using Sys_t = CellBase<dim, dim>;
 
   py::class_<Mat_t>(mod, name.c_str())
      .def_static("make",
                 [](Sys_t & sys, std::string n, Real e, Real p) -> Mat_t & {
                   return Mat_t::make(sys, n, e, p);
                 },
-                "system"_a, "name"_a, "Young"_a, "Poisson"_a,
+                "cell"_a, "name"_a, "Young"_a, "Poisson"_a,
                 py::return_value_policy::reference, py::keep_alive<1, 0>())
     .def("add_pixel",
          [] (Mat_t & mat, Ccoord_t<dim> pix, py::EigenDRef<Eigen::ArrayXXd>& eig) {
@@ -100,7 +100,7 @@ void add_material_linear_elastic3_helper(py::module & mod) {
   const auto name {name_stream.str()};
 
   using Mat_t = MaterialLinearElastic3<dim, dim>;
-  using Sys_t = SystemBase<dim, dim>;
+  using Sys_t = CellBase<dim, dim>;
 
   py::class_<Mat_t>(mod, name.c_str())
     .def(py::init<std::string>(), "name"_a)
@@ -108,7 +108,7 @@ void add_material_linear_elastic3_helper(py::module & mod) {
                 [](Sys_t & sys, std::string n) -> Mat_t & {
                   return Mat_t::make(sys, n);
                 },
-                "system"_a, "name"_a,
+                "cell"_a, "name"_a,
                 py::return_value_policy::reference, py::keep_alive<1, 0>())
     .def("add_pixel",
          [] (Mat_t & mat, Ccoord_t<dim> pix, Real Young, Real Poisson) {

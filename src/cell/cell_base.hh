@@ -1,11 +1,11 @@
 /**
- * @file   system_base.hh
+ * @file   cell_base.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   01 Nov 2017
  *
- * @brief Base class representing a unit cell system with single
+ * @brief Base class representing a unit cell cell with single
  *        projection operator
  *
  * Copyright © 2017 Till Junge
@@ -26,8 +26,8 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#ifndef SYSTEM_BASE_H
-#define SYSTEM_BASE_H
+#ifndef CELL_BASE_H
+#define CELL_BASE_H
 
 #include "common/common.hh"
 #include "common/ccoord_operations.hh"
@@ -35,7 +35,7 @@
 #include "common/utilities.hh"
 #include "materials/material_base.hh"
 #include "fft/projection_base.hh"
-#include "system/system_traits.hh"
+#include "cell/cell_traits.hh"
 
 #include <vector>
 #include <memory>
@@ -43,18 +43,18 @@
 #include <functional>
 
 namespace muSpectre {
-  template <class System>
-  class SystemAdaptor;
+  template <class Cell>
+  class CellAdaptor;
   //! DimS spatial dimension (dimension of problem
   //! DimM material_dimension (dimension of constitutive law)
   template <Dim_t DimS, Dim_t DimM=DimS>
-  class SystemBase
+  class CellBase
   {
   public:
     using Ccoord = Ccoord_t<DimS>; //!< cell coordinates type
     using Rcoord = Rcoord_t<DimS>; //!< physical coordinates type
     //! global field collection
-    using FieldCollection_t = GlobalFieldCollection<DimS, DimM>;
+    using FieldCollection_t = GlobalFieldCollection<DimS>;
     //! the collection is handled in a `std::unique_ptr`
     using Collection_ptr = std::unique_ptr<FieldCollection_t>;
     //! polymorphic base material type
@@ -84,32 +84,32 @@ namespace muSpectre {
     //! output vector for solvers
     using SolvVectorOut = Eigen::Map<Eigen::VectorXd>;
     //! sparse matrix emulation
-    using Adaptor = SystemAdaptor<SystemBase>;
+    using Adaptor = CellAdaptor<CellBase>;
 
     //! Default constructor
-    SystemBase() = delete;
+    CellBase() = delete;
 
     //! constructor using sizes and resolution
-    SystemBase(Projection_ptr projection);
+    CellBase(Projection_ptr projection);
 
     //! Copy constructor
-    SystemBase(const SystemBase &other) = delete;
+    CellBase(const CellBase &other) = delete;
 
     //! Move constructor
-    SystemBase(SystemBase &&other) = default;
+    CellBase(CellBase &&other) = default;
 
     //! Destructor
-    virtual ~SystemBase() = default;
+    virtual ~CellBase() = default;
 
     //! Copy assignment operator
-    SystemBase& operator=(const SystemBase &other) = delete;
+    CellBase& operator=(const CellBase &other) = delete;
 
     //! Move assignment operator
-    SystemBase& operator=(SystemBase &&other) = default;
+    CellBase& operator=(CellBase &&other) = default;
 
     /**
      * Materials can only be moved. This is to assure exclusive
-     * ownership of any material by this system
+     * ownership of any material by this cell
      */
     Material_t & add_material(Material_ptr mat);
 
@@ -154,7 +154,7 @@ namespace muSpectre {
     //! returns a ref to the cell's tangent stiffness field
     const TangentField_t & get_tangent(bool create = false);
 
-    //! returns a ref to a temporary field managed by the system
+    //! returns a ref to a temporary field managed by the cell
     StrainField_t & get_managed_field(std::string unique_name);
 
     /**
@@ -167,6 +167,13 @@ namespace muSpectre {
      * initialise materials (including resetting any history variables)
      */
     void initialise_materials(bool stiffness=false);
+
+    /**
+     * for materials with state variables, these typically need to be
+     * saved/updated an the end of each load increment, this function
+     * calls this update for each material in the cell
+     */
+    void save_history_variables();
 
     iterator begin(); //!< iterator to the first pixel
     iterator end();  //!< iterator past the last pixel
@@ -226,12 +233,12 @@ namespace muSpectre {
 
 
   /**
-   * lightweight resource handle wrapping a `muSpectre::SystemBase` or
+   * lightweight resource handle wrapping a `muSpectre::CellBase` or
    * a subclass thereof into `Eigen::EigenBase`, so it can be
    * interpreted as a sparse matrix by Eigen solvers
    */
-  template <class System>
-  class SystemAdaptor: public Eigen::EigenBase<SystemAdaptor<System>> {
+  template <class Cell>
+  class CellAdaptor: public Eigen::EigenBase<CellAdaptor<Cell>> {
 
   public:
     using Scalar = double;     //!< sparse matrix traits
@@ -246,20 +253,20 @@ namespace muSpectre {
     };
 
     //! constructor
-    SystemAdaptor(System & sys):sys{sys}{}
+    CellAdaptor(Cell & cell):cell{cell}{}
     //!returns the number of logical rows
-    Eigen::Index rows() const {return this->sys.nb_dof();}
+    Eigen::Index rows() const {return this->cell.nb_dof();}
     //!returns the number of logical columns
     Eigen::Index cols() const {return this->rows();}
 
     //! implementation of the evaluation
     template<typename Rhs>
-    Eigen::Product<SystemAdaptor,Rhs,Eigen::AliasFreeProduct>
+    Eigen::Product<CellAdaptor,Rhs,Eigen::AliasFreeProduct>
     operator*(const Eigen::MatrixBase<Rhs>& x) const {
-      return Eigen::Product<SystemAdaptor,Rhs,Eigen::AliasFreeProduct>
+      return Eigen::Product<CellAdaptor,Rhs,Eigen::AliasFreeProduct>
         (*this, x.derived());
     }
-    System & sys; //!< ref to the cell
+    Cell & cell; //!< ref to the cell
   };
 
 }  // muSpectre
@@ -267,27 +274,27 @@ namespace muSpectre {
 
 namespace Eigen {
   namespace internal {
-    //! Implementation of `muSpectre::SystemAdaptor` * `Eigen::DenseVector` through a
+    //! Implementation of `muSpectre::CellAdaptor` * `Eigen::DenseVector` through a
     //! specialization of `Eigen::internal::generic_product_impl`:
-    template<typename Rhs, class SystemAdaptor>
-    struct generic_product_impl<SystemAdaptor, Rhs, SparseShape, DenseShape, GemvProduct> // GEMV stands for matrix-vector
-      : generic_product_impl_base<SystemAdaptor,Rhs,generic_product_impl<SystemAdaptor,Rhs> >
+    template<typename Rhs, class CellAdaptor>
+    struct generic_product_impl<CellAdaptor, Rhs, SparseShape, DenseShape, GemvProduct> // GEMV stands for matrix-vector
+      : generic_product_impl_base<CellAdaptor,Rhs,generic_product_impl<CellAdaptor,Rhs> >
     {
       //! undocumented
-      typedef typename Product<SystemAdaptor,Rhs>::Scalar Scalar;
+      typedef typename Product<CellAdaptor,Rhs>::Scalar Scalar;
 
       //! undocumented
       template<typename Dest>
-      static void scaleAndAddTo(Dest& dst, const SystemAdaptor& lhs, const Rhs& rhs, const Scalar& /*alpha*/)
+      static void scaleAndAddTo(Dest& dst, const CellAdaptor& lhs, const Rhs& rhs, const Scalar& /*alpha*/)
       {
         // This method should implement "dst += alpha * lhs * rhs" inplace,
         // however, for iterative solvers, alpha is always equal to 1, so let's not bother about it.
         // Here we could simply call dst.noalias() += lhs.my_matrix() * rhs,
-        dst.noalias() += const_cast<SystemAdaptor&>(lhs).sys.directional_stiffness_vec(rhs);
+        dst.noalias() += const_cast<CellAdaptor&>(lhs).cell.directional_stiffness_vec(rhs);
       }
     };
   }
 }
 
 
-#endif /* SYSTEM_BASE_H */
+#endif /* CELL_BASE_H */
