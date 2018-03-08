@@ -37,14 +37,14 @@
 namespace muSpectre {
 
   /**
-   * implements the `muSpectre::Fft_Engine_Base` interface using the
+   * implements the `muSpectre::FFTEngineBase` interface using the
    * FFTW library
    */
   template <Dim_t DimS, Dim_t DimM>
-  class FFTWMPIEngine: public FFT_Engine_base<DimS, DimM>
+  class FFTWMPIEngine: public FFTEngineBase<DimS, DimM>
   {
   public:
-    using Parent = FFT_Engine_base<DimS, DimM>; //!< base class
+    using Parent = FFTEngineBase<DimS, DimM>; //!< base class
     using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
     using Rcoord = typename Parent::Rcoord; //!< spatial coordinates type
     //! field for Fourier transform of second-order tensor
