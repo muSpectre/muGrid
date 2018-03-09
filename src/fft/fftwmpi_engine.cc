@@ -56,17 +56,19 @@ namespace muSpectre {
     std::copy(this->domain_resolutions.begin(), this->domain_resolutions.end(),
               narr.begin());
     narr[DimS-1] = this->domain_resolutions[DimS-1]/2+1;
-    ptrdiff_t res_x, loc_x, res_y, loc_y;
-    this->workspace_size = fftw_mpi_local_size_many_transposed(
-        rank, narr.data(), howmany, FFTW_MPI_DEFAULT_BLOCK,
+    ptrdiff_t res_x, loc_x;//, res_y, loc_y;
+    this->workspace_size = fftw_mpi_local_size_many(
+        rank, narr.data(), howmany, //FFTW_MPI_DEFAULT_BLOCK,
         FFTW_MPI_DEFAULT_BLOCK, this->comm.get_mpi_comm(),
-        &res_x, &loc_x, &res_y, &loc_y);
-    this->fourier_resolutions[1] = this->resolutions[0];
-    this->fourier_locations[1] = this->locations[0];
+                                                    &res_x, &loc_x);//, &res_y, &loc_y);
+    //this->fourier_resolutions[1] = this->resolutions[0];
+    //this->fourier_locations[1] = this->locations[0];
     this->resolutions[0] = res_x;
     this->locations[0] = loc_x;
-    this->fourier_resolutions[0] = res_y;
-    this->fourier_locations[0] = loc_y;
+    //this->fourier_resolutions[0] = res_y;
+    //this->fourier_locations[0] = loc_y;
+    this->fourier_resolutions[0] = res_x;
+    this->fourier_locations[0] = loc_x;
 
     for (auto && pixel: CcoordOps::Pixels<DimS>(this->fourier_resolutions)) {
       this->work_space_container.add_pixel(pixel);
@@ -100,10 +102,11 @@ namespace muSpectre {
     this->plan_fft = fftw_mpi_plan_many_dft_r2c(
       rank, narr.data(), howmany, FFTW_MPI_DEFAULT_BLOCK,
       FFTW_MPI_DEFAULT_BLOCK, in, out, this->comm.get_mpi_comm(),
-      FFTW_MPI_TRANSPOSED_OUT | flags);
+      flags);
     if (this->plan_fft == nullptr) {
       throw std::runtime_error("r2c plan failed");
     }
+
     fftw_mpi_execute_dft_r2c(
       this->plan_fft, in, reinterpret_cast<fftw_complex*>(this->work.data()));
 
@@ -113,8 +116,7 @@ namespace muSpectre {
     this->plan_ifft = fftw_mpi_plan_many_dft_c2r(
       rank, narr.data(), howmany, FFTW_MPI_DEFAULT_BLOCK,
       FFTW_MPI_DEFAULT_BLOCK, i_in, i_out, this->comm.get_mpi_comm(),
-      FFTW_MPI_TRANSPOSED_IN | flags);
-
+      flags);
     if (this->plan_ifft == nullptr) {
       throw std::runtime_error("c2r plan failed");
     }
@@ -124,9 +126,9 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   FFTWMPIEngine<DimS, DimM>::~FFTWMPIEngine<DimS, DimM>() noexcept {
-    if (this->real_workspace) fftw_free(this->real_workspace);
-    fftw_destroy_plan(this->plan_fft);
-    fftw_destroy_plan(this->plan_ifft);
+    if (this->real_workspace != nullptr) fftw_free(this->real_workspace);
+    if (this->plan_fft != nullptr) fftw_destroy_plan(this->plan_fft);
+    if (this->plan_ifft != nullptr) fftw_destroy_plan(this->plan_ifft);
     this->nb_engines--;
     if (!this->nb_engines) fftw_mpi_cleanup();
   }
@@ -136,12 +138,15 @@ namespace muSpectre {
   typename FFTWMPIEngine<DimS, DimM>::Workspace_t &
   FFTWMPIEngine<DimS, DimM>::fft (Field_t & field) {
     // Copy non-padded field to padded real_workspace
-    ptrdiff_t fstride = field.size()/this->resolutions[DimS-1];
-    ptrdiff_t wstride = this->workspace_size/this->fourier_resolutions[DimS-1];
+    ptrdiff_t fstride = Field_t::nb_components*this->resolutions[DimS-1];
+    ptrdiff_t wstride = Field_t::nb_components*this->fourier_resolutions[DimS-1];
+    ptrdiff_t n = this->workspace_size/wstride;
+    wstride *= 2;
+
     auto fdata = field.data();
     auto wdata = this->real_workspace;
-    for (int i = 0; i < this->fourier_resolutions[DimS-1]; i++) {
-      std::copy(field.data(), field.data()+fstride, this->real_workspace);
+    for (int i = 0; i < n; i++) {
+      std::copy(fdata, fdata+fstride, wdata);
       fdata += fstride;
       wdata += wstride;
     }
@@ -163,14 +168,16 @@ namespace muSpectre {
     fftw_mpi_execute_dft_c2r(
       this->plan_ifft, reinterpret_cast<fftw_complex*>(this->work.data()),
       this->real_workspace);
-    // Copy real_workspace to non-padded field
-    ptrdiff_t fstride = field.size()/this->resolutions[DimS-1];
-    ptrdiff_t wstride = this->workspace_size/this->fourier_resolutions[DimS-1];
+    // Copy non-padded field to padded real_workspace
+    ptrdiff_t fstride = Field_t::nb_components*this->resolutions[DimS-1];
+    ptrdiff_t wstride = Field_t::nb_components*this->fourier_resolutions[DimS-1];
+    ptrdiff_t n = this->workspace_size/wstride;
+    wstride *= 2;
+  
     auto fdata = field.data();
     auto wdata = this->real_workspace;
-    for (int i = 0; i < this->fourier_resolutions[DimS-1]; i++) {
-      std::copy(this->real_workspace, this->real_workspace+fstride,
-                field.data());
+    for (int i = 0; i < n; i++) {
+      std::copy(wdata, wdata+fstride, fdata);
       fdata += fstride;
       wdata += wstride;
     }
