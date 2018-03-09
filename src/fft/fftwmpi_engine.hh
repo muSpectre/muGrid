@@ -87,6 +87,8 @@ namespace muSpectre {
     Communicator comm; //!< communicator
     fftw_plan plan_fft{}; //!< holds the plan for forward fourier transform
     fftw_plan plan_ifft{}; //!< holds the plan for inverse fourier transform
+    ptrdiff_t workspace_size;
+    Real *real_workspace;
     bool initialised{false}; //!< to prevent double initialisation
   private:
   };

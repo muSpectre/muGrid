@@ -36,7 +36,7 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   FFTWMPIEngine<DimS, DimM>::FFTWMPIEngine(Ccoord resolutions, Rcoord lengths,
                                            Communicator comm)
-    :Parent{resolutions, lengths}, comm{comm}
+    :Parent{resolutions, lengths}, comm{comm}, real_workspace{nullptr}
   {
     if (!this->nb_engines) fftw_mpi_init();
     this->nb_engines++;
@@ -52,16 +52,15 @@ namespace muSpectre {
     const int & rank = DimS;
     ptrdiff_t howmany = Field_t::nb_components;
 
-    std::array<ptrdiff_t, 3> narr;
+    std::array<ptrdiff_t, DimS> narr;
     std::copy(this->domain_resolutions.begin(), this->domain_resolutions.end(),
               narr.begin());
-    narr[2] = this->domain_resolutions[2]/2+1;
+    narr[DimS-1] = this->domain_resolutions[DimS-1]/2+1;
     ptrdiff_t res_x, loc_x, res_y, loc_y;
-    ptrdiff_t loc_alloc_size{
-      fftw_mpi_local_size_many_transposed(
+    this->workspace_size = fftw_mpi_local_size_many_transposed(
         rank, narr.data(), howmany, FFTW_MPI_DEFAULT_BLOCK,
         FFTW_MPI_DEFAULT_BLOCK, this->comm.get_mpi_comm(),
-        &res_x, &loc_x, &res_y, &loc_y)};
+        &res_x, &loc_x, &res_y, &loc_y);
     this->fourier_resolutions[1] = this->resolutions[0];
     this->fourier_locations[1] = this->locations[0];
     this->resolutions[0] = res_x;
@@ -74,8 +73,8 @@ namespace muSpectre {
     }
     Parent::initialise(plan_flags);
 
-    Real * r_work_space = fftw_alloc_real(2*loc_alloc_size);
-    Real * in = r_work_space;
+    this->real_workspace = fftw_alloc_real(2*this->workspace_size);
+    Real * in = this->real_workspace;
     fftw_complex * out = reinterpret_cast<fftw_complex*>(this->work.data());
 
     unsigned int flags;
@@ -97,11 +96,11 @@ namespace muSpectre {
       break;
     }
 
-    narr[2] = this->domain_resolutions[2];
+    narr[DimS-1] = this->domain_resolutions[DimS-1];
     this->plan_fft = fftw_mpi_plan_many_dft_r2c(
       rank, narr.data(), howmany, FFTW_MPI_DEFAULT_BLOCK,
       FFTW_MPI_DEFAULT_BLOCK, in, out, this->comm.get_mpi_comm(),
-      FFTW_PRESERVE_INPUT | FFTW_MPI_TRANSPOSED_OUT | flags);
+      FFTW_MPI_TRANSPOSED_OUT | flags);
     if (this->plan_fft == nullptr) {
       throw std::runtime_error("r2c plan failed");
     }
@@ -109,23 +108,23 @@ namespace muSpectre {
       this->plan_fft, in, reinterpret_cast<fftw_complex*>(this->work.data()));
 
     fftw_complex * i_in = reinterpret_cast<fftw_complex*>(this->work.data());
-    Real * i_out = r_work_space;
+    Real * i_out = this->real_workspace;
 
     this->plan_ifft = fftw_mpi_plan_many_dft_c2r(
       rank, narr.data(), howmany, FFTW_MPI_DEFAULT_BLOCK,
       FFTW_MPI_DEFAULT_BLOCK, i_in, i_out, this->comm.get_mpi_comm(),
-      FFTW_PRESERVE_INPUT | FFTW_MPI_TRANSPOSED_IN | flags);
+      FFTW_MPI_TRANSPOSED_IN | flags);
 
     if (this->plan_ifft == nullptr) {
       throw std::runtime_error("c2r plan failed");
     }
-    fftw_free(r_work_space);
     this->initialised = true;
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   FFTWMPIEngine<DimS, DimM>::~FFTWMPIEngine<DimS, DimM>() noexcept {
+    if (this->real_workspace) fftw_free(this->real_workspace);
     fftw_destroy_plan(this->plan_fft);
     fftw_destroy_plan(this->plan_ifft);
     this->nb_engines--;
@@ -136,8 +135,19 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   typename FFTWMPIEngine<DimS, DimM>::Workspace_t &
   FFTWMPIEngine<DimS, DimM>::fft (Field_t & field) {
+    // Copy non-padded field to padded real_workspace
+    ptrdiff_t fstride = field.size()/this->resolutions[DimS-1];
+    ptrdiff_t wstride = this->workspace_size/this->fourier_resolutions[DimS-1];
+    auto fdata = field.data();
+    auto wdata = this->real_workspace;
+    for (int i = 0; i < this->fourier_resolutions[DimS-1]; i++) {
+      std::copy(field.data(), field.data()+fstride, this->real_workspace);
+      fdata += fstride;
+      wdata += wstride;
+    }
+    // Compute FFT
     fftw_mpi_execute_dft_r2c(
-      this->plan_fft, field.data(),
+      this->plan_fft, this->real_workspace,
       reinterpret_cast<fftw_complex*>(this->work.data()));
     return this->work;
   }
@@ -149,9 +159,21 @@ namespace muSpectre {
     if (field.size() != CcoordOps::get_size(this->resolutions)) {
       throw std::runtime_error("size mismatch");
     }
+    // Compute inverse FFT
     fftw_mpi_execute_dft_c2r(
       this->plan_ifft, reinterpret_cast<fftw_complex*>(this->work.data()),
-      field.data());
+      this->real_workspace);
+    // Copy real_workspace to non-padded field
+    ptrdiff_t fstride = field.size()/this->resolutions[DimS-1];
+    ptrdiff_t wstride = this->workspace_size/this->fourier_resolutions[DimS-1];
+    auto fdata = field.data();
+    auto wdata = this->real_workspace;
+    for (int i = 0; i < this->fourier_resolutions[DimS-1]; i++) {
+      std::copy(this->real_workspace, this->real_workspace+fstride,
+                field.data());
+      fdata += fstride;
+      wdata += wstride;
+    }
   }
 
   template class FFTWMPIEngine<twoD, twoD>;
