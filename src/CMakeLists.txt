@@ -49,7 +49,7 @@ find_package(FFTWMPI)
 # The following checks whether std::optional exists and replaces it by
 # boost::optional if necessary
 include(CheckCXXSourceCompiles)
-CHECK_CXX_SOURCE_COMPILES(
+check_cxx_source_compiles(
     "#include <experimental/optional>
 int main() {
 std::experimental::optional<double> A{};
@@ -60,7 +60,9 @@ if( NOT HAS_STD_OPTIONAL)
   add_definitions(-DNO_EXPERIMENTAL)
 endif()
 
+file(GLOB_RECURSE _headers RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "*.hh")
 
+list(APPEND muSpectre_SRC ${_headers})
 add_library(muSpectre ${muSpectre_SRC})
 set(muSpectre_LIBRARIES Eigen3::Eigen ${FFTW_LIBRARIES})
 if(FFTWMPI_FOUND)
@@ -79,3 +81,5 @@ if(FFTWMPI_FOUND OR PFFT_FOUND)
     ${MPI_LIBRARIES})
 endif()
 target_link_libraries(muSpectre ${muSpectre_LIBRARIES})
+
+set_property(TARGET muSpectre PROPERTY PUBLIC_HEADER ${_headers})
