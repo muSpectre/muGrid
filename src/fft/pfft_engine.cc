@@ -36,10 +36,14 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   PFFTEngine<DimS, DimM>::PFFTEngine(Ccoord resolutions, Rcoord lengths,
                                      Communicator comm)
-    :Parent{resolutions, lengths}, comm{comm}
+    :Parent{resolutions, lengths}, comm{comm}, plan_fft{nullptr},
+     plan_ifft{nullptr}
   {
     if (!this->nb_engines) pfft_init();
     this->nb_engines++;
+      for (auto && pixel: CcoordOps::Pixels<DimS>(this->fourier_resolutions)) {
+          this->work_space_container.add_pixel(pixel);
+      }
   }
 
 
@@ -49,6 +53,7 @@ namespace muSpectre {
     if (this->initialised) {
       throw std::runtime_error("double initialisation, will leak memory");
     }
+      Parent::initialise(plan_flags);
     const int & rank = DimS;
     ptrdiff_t howmany = Field_t::nb_components;
 
@@ -68,11 +73,6 @@ namespace muSpectre {
 
     std::cout << "Real space: " << this->locations << " " << this->resolutions << std::endl;
     std::cout << "Fourier space: " << this->fourier_locations << " " << this->fourier_resolutions << std::endl;
-
-    for (auto && pixel: CcoordOps::Pixels<DimS>(this->fourier_resolutions)) {
-      this->work_space_container.add_pixel(pixel);
-    }
-    Parent::initialise(plan_flags);
 
     Real * r_work_space = pfft_alloc_real(2*loc_alloc_size);
     Real * in = r_work_space;
@@ -124,8 +124,8 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   PFFTEngine<DimS, DimM>::~PFFTEngine<DimS, DimM>() noexcept {
-    pfft_destroy_plan(this->plan_fft);
-    pfft_destroy_plan(this->plan_ifft);
+    if (this->plan_fft) pfft_destroy_plan(this->plan_fft);
+    if (this->plan_ifft) pfft_destroy_plan(this->plan_ifft);
     this->nb_engines--;
     if (!this->nb_engines) pfft_cleanup();
   }
@@ -134,6 +134,9 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   typename PFFTEngine<DimS, DimM>::Workspace_t &
   PFFTEngine<DimS, DimM>::fft (Field_t & field) {
+    if (!this->plan_fft) {
+        throw std::runtime_error("fft plan not allocated");
+    }
     pfft_execute_dft_r2c(
       this->plan_fft, field.data(),
       reinterpret_cast<pfft_complex*>(this->work.data()));
@@ -144,6 +147,9 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   void
   PFFTEngine<DimS, DimM>::ifft (Field_t & field) const {
+    if (!this->plan_ifft) {
+        throw std::runtime_error("ifft plan not allocated");
+    }
     if (field.size() != CcoordOps::get_size(this->resolutions)) {
       throw std::runtime_error("size mismatch");
     }
