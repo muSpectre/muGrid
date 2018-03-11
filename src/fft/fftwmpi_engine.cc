@@ -56,20 +56,18 @@ namespace muSpectre {
     std::copy(this->domain_resolutions.begin(), this->domain_resolutions.end(),
               narr.begin());
     narr[DimS-1] = this->domain_resolutions[DimS-1]/2+1;
-    ptrdiff_t res_x, loc_x;//, res_y, loc_y;
-    this->workspace_size = fftw_mpi_local_size_many(
-        rank, narr.data(), howmany, //FFTW_MPI_DEFAULT_BLOCK,
+    ptrdiff_t res_x, loc_x, res_y, loc_y;
+    this->workspace_size = fftw_mpi_local_size_many_transposed(
+        rank, narr.data(), howmany, FFTW_MPI_DEFAULT_BLOCK,
         FFTW_MPI_DEFAULT_BLOCK, this->comm.get_mpi_comm(),
-                                                    &res_x, &loc_x);//, &res_y, &loc_y);
-    //this->fourier_resolutions[1] = this->resolutions[0];
-    //this->fourier_locations[1] = this->locations[0];
+        &res_x, &loc_x, &res_y, &loc_y);
+    this->fourier_resolutions[1] = this->fourier_resolutions[0];
+    this->fourier_locations[1] = this->fourier_locations[0];
     this->resolutions[0] = res_x;
     this->locations[0] = loc_x;
-    //this->fourier_resolutions[0] = res_y;
-    //this->fourier_locations[0] = loc_y;
-    this->fourier_resolutions[0] = res_x;
-    this->fourier_locations[0] = loc_x;
-
+    this->fourier_resolutions[0] = res_y;
+    this->fourier_locations[0] = loc_y;
+    
     for (auto && pixel: CcoordOps::Pixels<DimS>(this->fourier_resolutions)) {
       this->work_space_container.add_pixel(pixel);
     }
@@ -102,7 +100,7 @@ namespace muSpectre {
     this->plan_fft = fftw_mpi_plan_many_dft_r2c(
       rank, narr.data(), howmany, FFTW_MPI_DEFAULT_BLOCK,
       FFTW_MPI_DEFAULT_BLOCK, in, out, this->comm.get_mpi_comm(),
-      flags);
+      FFTW_MPI_TRANSPOSED_OUT | flags);
     if (this->plan_fft == nullptr) {
       throw std::runtime_error("r2c plan failed");
     }
@@ -116,7 +114,7 @@ namespace muSpectre {
     this->plan_ifft = fftw_mpi_plan_many_dft_c2r(
       rank, narr.data(), howmany, FFTW_MPI_DEFAULT_BLOCK,
       FFTW_MPI_DEFAULT_BLOCK, i_in, i_out, this->comm.get_mpi_comm(),
-      flags);
+      FFTW_MPI_TRANSPOSED_IN | flags);
     if (this->plan_ifft == nullptr) {
       throw std::runtime_error("c2r plan failed");
     }
@@ -137,12 +135,16 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   typename FFTWMPIEngine<DimS, DimM>::Workspace_t &
   FFTWMPIEngine<DimS, DimM>::fft (Field_t & field) {
-    // Copy non-padded field to padded real_workspace
+    if (field.size() != CcoordOps::get_size(this->resolutions)) {
+      throw std::runtime_error("size mismatch");
+    }
+    // Copy non-padded field to padded real_workspace.
+    // Transposed output of M x N x L transform for >= 3 dimensions is padded
+    // M x N x 2*(L/2+1).
     ptrdiff_t fstride = Field_t::nb_components*this->resolutions[DimS-1];
-    ptrdiff_t wstride = Field_t::nb_components*this->fourier_resolutions[DimS-1];
-    ptrdiff_t n = this->workspace_size/wstride;
-    wstride *= 2;
-
+    ptrdiff_t wstride = Field_t::nb_components*2*(this->resolutions[DimS-1]/2+1);
+    ptrdiff_t n = field.size()/this->resolutions[DimS-1];
+    
     auto fdata = field.data();
     auto wdata = this->real_workspace;
     for (int i = 0; i < n; i++) {
@@ -168,12 +170,13 @@ namespace muSpectre {
     fftw_mpi_execute_dft_c2r(
       this->plan_ifft, reinterpret_cast<fftw_complex*>(this->work.data()),
       this->real_workspace);
-    // Copy non-padded field to padded real_workspace
+    // Copy non-padded field to padded real_workspace.
+    // Transposed output of M x N x L transform for >= 3 dimensions is padded
+    // N x M x 2*(L/2+1).
     ptrdiff_t fstride = Field_t::nb_components*this->resolutions[DimS-1];
-    ptrdiff_t wstride = Field_t::nb_components*this->fourier_resolutions[DimS-1];
-    ptrdiff_t n = this->workspace_size/wstride;
-    wstride *= 2;
-  
+    ptrdiff_t wstride = Field_t::nb_components*2*(this->resolutions[DimS-1]/2+1);
+    ptrdiff_t n = field.size()/this->resolutions[DimS-1];
+    
     auto fdata = field.data();
     auto wdata = this->real_workspace;
     for (int i = 0; i < n; i++) {
