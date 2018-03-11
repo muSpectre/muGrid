@@ -66,21 +66,21 @@ namespace muSpectre {
     Engine engine;
   };
 
-  //using fixlist = boost::mpl::list<FFTW_fixture<FFTWMPIEngine<  twoD,   twoD>, 3>,
-  //                                 FFTW_fixture<FFTWMPIEngine<  twoD, threeD>, 3>,
-  //                                 FFTW_fixture<FFTWMPIEngine<threeD, threeD>, 3>,
-  //                                 FFTW_fixture<FFTWMPIEngine<  twoD,   twoD>, 4>,
-  //                                 FFTW_fixture<FFTWMPIEngine<  twoD, threeD>, 4>,
-  //                                 FFTW_fixture<FFTWMPIEngine<threeD, threeD>, 4>,
-  //                                 FFTW_fixture_python_segfault<FFTWMPIEngine<twoD, twoD>>>;
+  using fixlist = boost::mpl::list<FFTW_fixture<FFTWMPIEngine<  twoD,   twoD>, 3>,
+                                   FFTW_fixture<FFTWMPIEngine<  twoD, threeD>, 3>,
+                                   FFTW_fixture<FFTWMPIEngine<threeD, threeD>, 3>,
+                                   FFTW_fixture<FFTWMPIEngine<  twoD,   twoD>, 4>,
+                                   FFTW_fixture<FFTWMPIEngine<  twoD, threeD>, 4>,
+                                   FFTW_fixture<FFTWMPIEngine<threeD, threeD>, 4>,
+                                   FFTW_fixture_python_segfault<FFTWMPIEngine<twoD, twoD>>>;
 
 
-  using fixlist = boost::mpl::list<FFTW_fixture<PFFTEngine<  twoD,   twoD>, 3>,
-                                   FFTW_fixture<PFFTEngine<  twoD, threeD>, 3>,
-                                   FFTW_fixture<PFFTEngine<threeD, threeD>, 3>,
-                                   FFTW_fixture<PFFTEngine<  twoD,   twoD>, 4>,
-                                   FFTW_fixture<PFFTEngine<  twoD, threeD>, 4>,
-                                   FFTW_fixture<PFFTEngine<threeD, threeD>, 4>>;
+  //using fixlist = boost::mpl::list<FFTW_fixture<PFFTEngine<  twoD,   twoD>, 3>,
+  //                                 FFTW_fixture<PFFTEngine<  twoD, threeD>, 3>,
+  //                                 FFTW_fixture<PFFTEngine<threeD, threeD>, 3>,
+  //                                 FFTW_fixture<PFFTEngine<  twoD,   twoD>, 4>,
+  //                                 FFTW_fixture<PFFTEngine<  twoD, threeD>, 4>,
+  //                                 FFTW_fixture<PFFTEngine<threeD, threeD>, 4>>;
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(Constructor_test, Fix, fixlist, Fix) {
