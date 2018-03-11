@@ -172,7 +172,7 @@ namespace muSpectre {
       this->real_workspace);
     // Copy non-padded field to padded real_workspace.
     // Transposed output of M x N x L transform for >= 3 dimensions is padded
-    // N x M x 2*(L/2+1).
+    // M x N x 2*(L/2+1).
     ptrdiff_t fstride = Field_t::nb_components*this->resolutions[DimS-1];
     ptrdiff_t wstride = Field_t::nb_components*2*(this->resolutions[DimS-1]/2+1);
     ptrdiff_t n = field.size()/this->resolutions[DimS-1];
