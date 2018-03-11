@@ -97,9 +97,15 @@ namespace muSpectre {
     //! apply the projection operator to a field
     virtual void apply_projection(Field_t & field) = 0;
 
-    //! returns the resolutions of the cell
+    //! returns the process-local resolutions of the cell
     const Ccoord & get_resolutions() const {
       return this->fft_engine->get_resolutions();}
+    //! returns the process-local locations of the cell
+    const Ccoord & get_locations() const {
+      return this->fft_engine->get_locations();}
+    //! returns the resolutions of the cell
+    const Ccoord & get_domain_resolutions() const {
+      return this->fft_engine->get_domain_resolutions();}
     //! returns the physical sizes of the cell
     const Rcoord & get_lengths() const {
       return this->fft_engine->get_lengths();}
