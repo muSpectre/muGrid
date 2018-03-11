@@ -68,7 +68,8 @@ namespace muSpectre {
     this->fourier_resolutions[0] = res_y;
     this->fourier_locations[0] = loc_y;
     
-    for (auto && pixel: CcoordOps::Pixels<DimS>(this->fourier_resolutions)) {
+    for (auto && pixel:
+         CcoordOps::Pixels<DimS, true>(this->fourier_resolutions)) {
       this->work_space_container.add_pixel(pixel);
     }
     Parent::initialise(plan_flags);
