@@ -143,11 +143,25 @@ namespace muSpectre {
     //----------------------------------------------------------------------------//
     //! get the i-th pixel in a grid of size sizes
     template <size_t dim>
-    constexpr Ccoord_t<dim> get_ccoord(const Ccoord_t<dim> & sizes, Dim_t index) {
+    constexpr Ccoord_t<dim> get_ccoord(const Ccoord_t<dim> & sizes,
+                                       Dim_t index, bool transposed=false) {
       Ccoord_t<dim> retval{{0}};
       Dim_t factor{1};
       for (Dim_t i = dim-1; i >=0; --i) {
-        retval[i] = index/factor%sizes[i];
+        if (transposed) {
+          if (i == 0) {
+            retval[1] = index/factor%sizes[0];
+          }
+          else if (i == 1) {
+            retval[0] = index/factor%sizes[1];
+          }
+          else {
+            retval[i] = index/factor%sizes[i];
+          }
+        }
+        else {
+          retval[i] = index/factor%sizes[i];
+        }
         if (i != 0 ) {
           factor *= sizes[i];
         }
@@ -208,7 +222,7 @@ namespace muSpectre {
     /**
      * centralises iterating over square (or cubic) discretisation grids
      */
-    template <size_t dim>
+    template <size_t dim, bool transposed=false>
     class Pixels {
     public:
       //! constructor
@@ -260,36 +274,36 @@ namespace muSpectre {
     };
 
     /* ---------------------------------------------------------------------- */
-    template <size_t dim>
-    Pixels<dim>::iterator::iterator(const Pixels & pixels, bool begin)
+    template <size_t dim, bool transposed>
+    Pixels<dim, transposed>::iterator::iterator(const Pixels & pixels, bool begin)
       :pixels{pixels}, index{begin? 0: get_size(pixels.resolutions)}
     {}
 
     /* ---------------------------------------------------------------------- */
-    template <size_t dim>
-    typename Pixels<dim>::iterator::value_type
-    Pixels<dim>::iterator::operator*() const {
-      return get_ccoord(pixels.resolutions, this->index);
+    template <size_t dim, bool transposed>
+    typename Pixels<dim, transposed>::iterator::value_type
+    Pixels<dim, transposed>::iterator::operator*() const {
+      return get_ccoord(pixels.resolutions, this->index, transposed);
     }
 
     /* ---------------------------------------------------------------------- */
-    template <size_t dim>
+    template <size_t dim, bool transposed>
     bool
-    Pixels<dim>::iterator::operator!=(const iterator &other) const {
+    Pixels<dim, transposed>::iterator::operator!=(const iterator &other) const {
       return (this->index != other.index) || (&this->pixels != &other.pixels);
     }
 
     /* ---------------------------------------------------------------------- */
-    template <size_t dim>
+    template <size_t dim, bool transposed>
     bool
-    Pixels<dim>::iterator::operator==(const iterator &other) const {
+    Pixels<dim, transposed>::iterator::operator==(const iterator &other) const {
       return !(*this!= other);
     }
 
     /* ---------------------------------------------------------------------- */
-    template <size_t dim>
-    typename Pixels<dim>::iterator&
-    Pixels<dim>::iterator::operator++() {
+    template <size_t dim, bool transposed>
+    typename Pixels<dim, transposed>::iterator&
+    Pixels<dim, transposed>::iterator::operator++() {
       ++this->index;
       return *this;
     }
