@@ -49,8 +49,6 @@ namespace muSpectre {
     if (this->initialised) {
       throw std::runtime_error("double initialisation, will leak memory");
     }
-    const int & rank = DimS;
-    ptrdiff_t howmany = Field_t::nb_components;
 
     std::array<ptrdiff_t, DimS> narr;
     std::copy(this->domain_resolutions.begin(), this->domain_resolutions.end(),
@@ -58,7 +56,7 @@ namespace muSpectre {
     narr[DimS-1] = this->domain_resolutions[DimS-1]/2+1;
     ptrdiff_t res_x, loc_x, res_y, loc_y;
     this->workspace_size = fftw_mpi_local_size_many_transposed(
-        rank, narr.data(), howmany, FFTW_MPI_DEFAULT_BLOCK,
+        DimS, narr.data(), Field_t::nb_components, FFTW_MPI_DEFAULT_BLOCK,
         FFTW_MPI_DEFAULT_BLOCK, this->comm.get_mpi_comm(),
         &res_x, &loc_x, &res_y, &loc_y);
     this->fourier_resolutions[1] = this->fourier_resolutions[0];
@@ -67,17 +65,22 @@ namespace muSpectre {
     this->locations[0] = loc_x;
     this->fourier_resolutions[0] = res_y;
     this->fourier_locations[0] = loc_y;
-    
+
     for (auto && pixel:
-         CcoordOps::Pixels<DimS, true>(this->fourier_resolutions)) {
+         CcoordOps::Pixels<DimS, true>(this->fourier_resolutions,
+                                       this->fourier_locations)) {
       this->work_space_container.add_pixel(pixel);
     }
     Parent::initialise(plan_flags);
-
     this->real_workspace = fftw_alloc_real(2*this->workspace_size);
-    Real * in = this->real_workspace;
-    fftw_complex * out = reinterpret_cast<fftw_complex*>(this->work.data());
-
+    // We need to check whether the workspace provided by our field is large
+    // enough. MPI parallel FFTW may request a workspace size larger than the
+    // nominal size of the complex buffer.
+    if (long(this->work.size()*Field_t::nb_components) < this->workspace_size) {
+      this->work.resize((this->workspace_size+Field_t::nb_components-1)/
+                        Field_t::nb_components);
+    }
+    
     unsigned int flags;
     switch (plan_flags) {
     case FFT_PlanFlags::estimate: {
@@ -97,23 +100,24 @@ namespace muSpectre {
       break;
     }
 
+    Real * in = this->real_workspace;
+    fftw_complex * out = reinterpret_cast<fftw_complex*>(this->work.data());
     narr[DimS-1] = this->domain_resolutions[DimS-1];
     this->plan_fft = fftw_mpi_plan_many_dft_r2c(
-      rank, narr.data(), howmany, FFTW_MPI_DEFAULT_BLOCK,
+      DimS, narr.data(), Field_t::nb_components, FFTW_MPI_DEFAULT_BLOCK,
       FFTW_MPI_DEFAULT_BLOCK, in, out, this->comm.get_mpi_comm(),
       FFTW_MPI_TRANSPOSED_OUT | flags);
     if (this->plan_fft == nullptr) {
       throw std::runtime_error("r2c plan failed");
     }
 
-    fftw_mpi_execute_dft_r2c(
-      this->plan_fft, in, reinterpret_cast<fftw_complex*>(this->work.data()));
+    fftw_mpi_execute_dft_r2c(this->plan_fft, in, out);
 
     fftw_complex * i_in = reinterpret_cast<fftw_complex*>(this->work.data());
     Real * i_out = this->real_workspace;
 
     this->plan_ifft = fftw_mpi_plan_many_dft_c2r(
-      rank, narr.data(), howmany, FFTW_MPI_DEFAULT_BLOCK,
+      DimS, narr.data(), Field_t::nb_components, FFTW_MPI_DEFAULT_BLOCK,
       FFTW_MPI_DEFAULT_BLOCK, i_in, i_out, this->comm.get_mpi_comm(),
       FFTW_MPI_TRANSPOSED_IN | flags);
     if (this->plan_ifft == nullptr) {
