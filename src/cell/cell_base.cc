@@ -40,7 +40,9 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   CellBase<DimS, DimM>::CellBase(Projection_ptr projection_)
     :resolutions{projection_->get_resolutions()},
-     pixels(resolutions),
+     locations{projection_->get_locations()},
+     domain_resolutions{projection_->get_domain_resolutions()},
+     pixels(resolutions, locations),
      lengths{projection_->get_lengths()},
      fields{std::make_unique<FieldCollection_t>()},
      F{make_field<StrainField_t>("Gradient", *this->fields)},
@@ -267,7 +269,8 @@ namespace muSpectre {
     std::vector<Ccoord> unassigned_pixels;
     for (size_t i = 0; i < assignments.size(); ++i) {
       if (assignments[i] == nullptr) {
-        unassigned_pixels.push_back(CcoordOps::get_ccoord(this->resolutions, i));
+        unassigned_pixels.push_back(
+          CcoordOps::get_ccoord(this->resolutions, this->locations, i));
       }
     }
 

@@ -143,27 +143,28 @@ namespace muSpectre {
     //----------------------------------------------------------------------------//
     //! get the i-th pixel in a grid of size sizes
     template <size_t dim>
-    constexpr Ccoord_t<dim> get_ccoord(const Ccoord_t<dim> & sizes,
+    constexpr Ccoord_t<dim> get_ccoord(const Ccoord_t<dim> & resolutions,
+                                       const Ccoord_t<dim> & locations,
                                        Dim_t index, bool transposed=false) {
       Ccoord_t<dim> retval{{0}};
       Dim_t factor{1};
       for (Dim_t i = dim-1; i >=0; --i) {
         if (transposed) {
           if (i == 0) {
-            retval[1] = index/factor%sizes[0];
+            retval[1] = index/factor%resolutions[0] + locations[0];
           }
           else if (i == 1) {
-            retval[0] = index/factor%sizes[1];
+            retval[0] = index/factor%resolutions[1] + locations[1];
           }
           else {
-            retval[i] = index/factor%sizes[i];
+            retval[i] = index/factor%resolutions[i] + locations[i];
           }
         }
         else {
-          retval[i] = index/factor%sizes[i];
+          retval[i] = index/factor%resolutions[i] + locations[i];
         }
         if (i != 0 ) {
-          factor *= sizes[i];
+          factor *= resolutions[i];
         }
       }
       return retval;
@@ -226,8 +227,9 @@ namespace muSpectre {
     class Pixels {
     public:
       //! constructor
-      Pixels(const Ccoord_t<dim> & resolutions=Ccoord_t<dim>{})
-        :resolutions{resolutions}{};
+      Pixels(const Ccoord_t<dim> & resolutions=Ccoord_t<dim>{},
+             const Ccoord_t<dim> & locations=Ccoord_t<dim>{})
+        :resolutions{resolutions}, locations{locations}{};
       //! copy constructor
       Pixels(const Pixels & other) = default;
       //! assignment operator
@@ -270,7 +272,8 @@ namespace muSpectre {
       //! stl conformance
       inline size_t size() const {return get_size(this->resolutions);}
     protected:
-      Ccoord_t<dim>  resolutions; //!< resolutions of cell
+      Ccoord_t<dim> resolutions; //!< resolutions of this domain
+      Ccoord_t<dim> locations; //!< locations of this domain
     };
 
     /* ---------------------------------------------------------------------- */
@@ -283,7 +286,8 @@ namespace muSpectre {
     template <size_t dim, bool transposed>
     typename Pixels<dim, transposed>::iterator::value_type
     Pixels<dim, transposed>::iterator::operator*() const {
-      return get_ccoord(pixels.resolutions, this->index, transposed);
+      return get_ccoord(pixels.resolutions, pixels.locations, this->index,
+                        transposed);
     }
 
     /* ---------------------------------------------------------------------- */
