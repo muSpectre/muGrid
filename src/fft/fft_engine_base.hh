@@ -141,11 +141,11 @@ namespace muSpectre {
      * Fourier-space points
      */
     LFieldCollection_t work_space_container{};
-    Ccoord resolutions; //!< resolutions of the process-local portion of the cell
-    Ccoord locations; // !< location of the process-local portion of the cell
-    Ccoord fourier_resolutions; //!< resolutions of the process-local portion of the Fourier transformed data
-    Ccoord fourier_locations; // !< location of the process-local portion of the Fourier transformed data
-    const Ccoord domain_resolutions; //!< resolutions of the cell
+    Ccoord resolutions; //!< resolutions of the process-local (subdomain) portion of the cell
+    Ccoord locations; // !< location of the process-local (subdomain) portion of the cell
+    Ccoord fourier_resolutions; //!< resolutions of the process-local (subdomain) portion of the Fourier transformed data
+    Ccoord fourier_locations; // !< location of the process-local (subdomain) portion of the Fourier transformed data
+    const Ccoord domain_resolutions; //!< resolutions of the full domain of the cell
     const Rcoord lengths; //!< physical sizes of the cell
     Workspace_t & work; //!< field to store the Fourier transform of P
     const Real norm_factor; //!< normalisation coefficient of fourier transform
