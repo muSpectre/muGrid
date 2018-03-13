@@ -40,6 +40,25 @@ namespace muSpectre {
   {
     if (!this->nb_engines) fftw_mpi_init();
     this->nb_engines++;
+
+    std::array<ptrdiff_t, DimS> narr;
+    std::copy(this->domain_resolutions.begin(), this->domain_resolutions.end(),
+              narr.begin());
+    narr[DimS-1] = this->domain_resolutions[DimS-1]/2+1;
+    ptrdiff_t res_x, loc_x, res_y, loc_y;
+    this->workspace_size =
+      fftw_mpi_local_size_many_transposed(DimS, narr.data(),
+                                          Field_t::nb_components,
+                                          FFTW_MPI_DEFAULT_BLOCK,
+                                          FFTW_MPI_DEFAULT_BLOCK,
+                                          this->comm.get_mpi_comm(),
+                                          &res_x, &loc_x, &res_y, &loc_y);
+    this->fourier_resolutions[1] = this->fourier_resolutions[0];
+    this->fourier_locations[1] = this->fourier_locations[0];
+    this->resolutions[0] = res_x;
+    this->locations[0] = loc_x;
+    this->fourier_resolutions[0] = res_y;
+    this->fourier_locations[0] = loc_y;
   }
 
 
@@ -50,28 +69,16 @@ namespace muSpectre {
       throw std::runtime_error("double initialisation, will leak memory");
     }
 
-    std::array<ptrdiff_t, DimS> narr;
-    std::copy(this->domain_resolutions.begin(), this->domain_resolutions.end(),
-              narr.begin());
-    narr[DimS-1] = this->domain_resolutions[DimS-1]/2+1;
-    ptrdiff_t res_x, loc_x, res_y, loc_y;
-    this->workspace_size = fftw_mpi_local_size_many_transposed(
-        DimS, narr.data(), Field_t::nb_components, FFTW_MPI_DEFAULT_BLOCK,
-        FFTW_MPI_DEFAULT_BLOCK, this->comm.get_mpi_comm(),
-        &res_x, &loc_x, &res_y, &loc_y);
-    this->fourier_resolutions[1] = this->fourier_resolutions[0];
-    this->fourier_locations[1] = this->fourier_locations[0];
-    this->resolutions[0] = res_x;
-    this->locations[0] = loc_x;
-    this->fourier_resolutions[0] = res_y;
-    this->fourier_locations[0] = loc_y;
-
     for (auto && pixel:
          CcoordOps::Pixels<DimS, true>(this->fourier_resolutions,
                                        this->fourier_locations)) {
       this->work_space_container.add_pixel(pixel);
     }
+
+    // Initialize parent after local resolutions have been determined and
+    // work space has been initialized 
     Parent::initialise(plan_flags);
+
     this->real_workspace = fftw_alloc_real(2*this->workspace_size);
     // We need to check whether the workspace provided by our field is large
     // enough. MPI parallel FFTW may request a workspace size larger than the
@@ -100,9 +107,11 @@ namespace muSpectre {
       break;
     }
 
+    std::array<ptrdiff_t, DimS> narr;
+    std::copy(this->domain_resolutions.begin(), this->domain_resolutions.end(),
+              narr.begin());
     Real * in = this->real_workspace;
     fftw_complex * out = reinterpret_cast<fftw_complex*>(this->work.data());
-    narr[DimS-1] = this->domain_resolutions[DimS-1];
     this->plan_fft = fftw_mpi_plan_many_dft_r2c(
       DimS, narr.data(), Field_t::nb_components, FFTW_MPI_DEFAULT_BLOCK,
       FFTW_MPI_DEFAULT_BLOCK, in, out, this->comm.get_mpi_comm(),
@@ -140,6 +149,9 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   typename FFTWMPIEngine<DimS, DimM>::Workspace_t &
   FFTWMPIEngine<DimS, DimM>::fft (Field_t & field) {
+    if (this->plan_fft == nullptr) {
+      throw std::runtime_error("fft plan not initialised");
+    }
     if (field.size() != CcoordOps::get_size(this->resolutions)) {
       throw std::runtime_error("size mismatch");
     }
@@ -168,6 +180,9 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   void
   FFTWMPIEngine<DimS, DimM>::ifft (Field_t & field) const {
+    if (this->plan_ifft == nullptr) {
+      throw std::runtime_error("ifft plan not initialised");
+    }
     if (field.size() != CcoordOps::get_size(this->resolutions)) {
       throw std::runtime_error("size mismatch");
     }
