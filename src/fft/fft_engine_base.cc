@@ -37,7 +37,7 @@ namespace muSpectre {
      fourier_locations{}, domain_resolutions{resolutions},
      lengths{lengths},
      work{make_field<Workspace_t>("work space", work_space_container)},
-     norm_factor{1./CcoordOps::get_size(resolutions)}
+     norm_factor{1./CcoordOps::get_size(domain_resolutions)}
   {}
 
   /* ---------------------------------------------------------------------- */
