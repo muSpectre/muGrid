@@ -481,6 +481,8 @@ namespace cxxopts
 
       standard_value(const standard_value & ) = delete;
 
+      virtual ~standard_value() = default;
+
       standard_value & operator=(const standard_value & ) = delete;
 
       void
