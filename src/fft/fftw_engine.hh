@@ -80,7 +80,6 @@ namespace muSpectre {
     virtual void ifft(Field_t & field) const override;
 
   protected:
-    Ccoord hermitian_resolutions; //!< resolutions of Fourier-space grid
     fftw_plan plan_fft{}; //!< holds the plan for forward fourier transform
     fftw_plan plan_ifft{}; //!< holds the plan for inverse fourier transform
     bool initialised{false}; //!< to prevent double initialisation

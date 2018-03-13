@@ -32,10 +32,9 @@ namespace muSpectre {
 
   template <Dim_t DimS, Dim_t DimM>
   FFTWEngine<DimS, DimM>::FFTWEngine(Ccoord resolutions, Rcoord lengths)
-    :Parent{resolutions, lengths},
-     hermitian_resolutions{CcoordOps::get_hermitian_sizes(resolutions)}
+    :Parent{resolutions, lengths}
   {
-    for (auto && pixel: CcoordOps::Pixels<DimS>(this->hermitian_resolutions)) {
+    for (auto && pixel: CcoordOps::Pixels<DimS>(this->fourier_resolutions)) {
       this->work_space_container.add_pixel(pixel);
     }
   }
@@ -121,6 +120,12 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   typename FFTWEngine<DimS, DimM>::Workspace_t &
   FFTWEngine<DimS, DimM>::fft (Field_t & field) {
+    if (this->plan_fft == nullptr) {
+      throw std::runtime_error("fft plan not initialised");
+    }
+    if (field.size() != CcoordOps::get_size(this->resolutions)) {
+      throw std::runtime_error("size mismatch");
+    }
     fftw_execute_dft_r2c(this->plan_fft,
                          field.data(),
                          reinterpret_cast<fftw_complex*>(this->work.data()));
@@ -131,6 +136,9 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   void
   FFTWEngine<DimS, DimM>::ifft (Field_t & field) const {
+    if (this->plan_ifft == nullptr) {
+      throw std::runtime_error("ifft plan not initialised");
+    }
     if (field.size() != CcoordOps::get_size(this->resolutions)) {
       throw std::runtime_error("size mismatch");
     }
