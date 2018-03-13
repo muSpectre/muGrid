@@ -116,8 +116,11 @@ namespace muSpectre {
     auto & complex_field = Fix::engine.fft(input);
     using cmap_t = MatrixFieldMap<LocalFieldCollection<Fix::sdim>, Complex, Fix::mdim, Fix::mdim>;
     cmap_t complex_map(complex_field);
-    Real error = complex_map[0].imag().norm();
-    BOOST_CHECK_LT(error, tol);
+    if (Fix::engine.get_locations() == CcoordOps::get_cube<Fix::sdim>(0)) {
+      // Check that 0,0 location has no imaginary part.
+      Real error = complex_map[0].imag().norm();
+      BOOST_CHECK_LT(error, tol);
+    }
 
     /* make sure, the engine has not modified input (which is
        unfortunately const-casted internally, hence this test) */
