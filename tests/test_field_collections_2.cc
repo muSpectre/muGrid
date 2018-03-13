@@ -80,7 +80,9 @@ namespace muSpectre {
 
     for (size_t i = 0; i < CcoordOps::get_size(F::fc.get_sizes()); ++i) {
       BOOST_CHECK_EQUAL(CcoordOps::get_index(F::fc.get_sizes(),
-                                             CcoordOps::get_ccoord(F::fc.get_sizes(), i)), i);
+                                             CcoordOps::get_ccoord(F::fc.get_sizes(),
+                                                                   F::fc.get_locations(),
+                                                                   i)), i);
     }
 
   }

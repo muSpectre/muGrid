@@ -103,13 +103,14 @@ namespace muSpectre {
       sizes[i] = rng.randval(2, 5);
     }
     Ccoord stride = CcoordOps::get_default_strides(sizes);
+    Ccoord locations{};
 
     const size_t nb_pix{CcoordOps::get_size(sizes)};
 
     for (size_t i {0}; i < nb_pix ; ++i) {
       BOOST_CHECK_EQUAL(i,
                         CcoordOps::get_index_from_strides
-                        (stride, CcoordOps::get_ccoord(sizes, i)));
+                        (stride, CcoordOps::get_ccoord(sizes, locations, i)));
     }
 
   }
