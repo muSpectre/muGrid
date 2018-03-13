@@ -154,9 +154,6 @@ namespace muSpectre {
       //! number of pixels in the field
       virtual size_t size() const = 0;
 
-      //! allocate memory etc
-      virtual void resize(size_t size) = 0;
-
       //! initialise field to zero (do more complicated initialisations through
       //! fully typed maps)
       virtual void set_zero() = 0;
@@ -168,6 +165,8 @@ namespace muSpectre {
 
     protected:
       /* ---------------------------------------------------------------------- */
+      //! allocate memory etc
+      virtual void resize(size_t size) = 0;
       const std::string name; //!< the field's unique name
       const size_t nb_components; //!< number of components per entry
       //! reference to the collection this field belongs to
@@ -322,9 +321,6 @@ namespace muSpectre {
       //! scalars/NbComponents)
       size_t size() const override final;
 
-      //! set the storage size of this field
-      inline virtual void resize(size_t size) override final;
-
       /**
        * returns an upcasted reference to a field, or throws an
        * exception if the field is incompatible
@@ -374,6 +370,9 @@ namespace muSpectre {
       template <bool noArray = !ArrayStore>
       inline const T*
       get_ptr_to_entry(std::enable_if_t<noArray, const size_t&&> index) const;
+
+      //! set the storage size of this field
+      inline virtual void resize(size_t size) override final;
 
       //! The actual storage container
       StorageType values{};
