@@ -77,8 +77,8 @@ namespace muSpectre {
     // enough. MPI parallel FFTW may request a workspace size larger than the
     // nominal size of the complex buffer.
     if (long(this->work.size()*Field_t::nb_components) < this->workspace_size) {
-      this->work.resize((this->workspace_size+Field_t::nb_components-1)/
-                        Field_t::nb_components);
+      this->work.set_pad_size(this->workspace_size -
+                              Field_t::nb_components*this->work.size());
     }
     
     unsigned int flags;

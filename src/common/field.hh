@@ -153,6 +153,13 @@ namespace muSpectre {
 
       //! number of pixels in the field
       virtual size_t size() const = 0;
+      
+      //! add a pad region to the end of the field buffer; required for
+      //! using this as e.g. an FFT workspace
+      virtual void set_pad_size(size_t pad_size_) = 0;
+      
+      //! pad region size
+      virtual size_t get_pad_size() const {return this->pad_size;};
 
       //! initialise field to zero (do more complicated initialisations through
       //! fully typed maps)
@@ -171,6 +178,7 @@ namespace muSpectre {
       const size_t nb_components; //!< number of components per entry
       //! reference to the collection this field belongs to
       const FieldCollection & collection;
+      size_t pad_size; //!< size of padding region at end of buffer
     private:
     };
 
@@ -320,6 +328,10 @@ namespace muSpectre {
       //! Number of stored arrays (i.e. total number of stored
       //! scalars/NbComponents)
       size_t size() const override final;
+
+      //! add a pad region to the end of the field buffer; required for
+      //! using this as e.g. an FFT workspace
+      void set_pad_size(size_t pad_size_) override final;
 
       /**
        * returns an upcasted reference to a field, or throws an
@@ -594,7 +606,7 @@ protected:
                                           size_t nb_components_,
                                           FieldCollection & collection_)
       :name(unique_name), nb_components(nb_components_),
-       collection(collection_) {}
+    collection(collection_), pad_size{0} {}
 
     /* ---------------------------------------------------------------------- */
     template <class FieldCollection>
@@ -683,9 +695,9 @@ protected:
     size_t TypedSizedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
     size() const {
       if (ArrayStore) {
-        return this->values.size();
+        return this->values.size() - this->pad_size;
       } else  {
-        return this->values.size()/NbComponents;
+        return (this->values.size() - this->pad_size)/NbComponents;
       }
     }
 
@@ -803,6 +815,18 @@ protected:
     get_ptr_to_entry(std::enable_if_t<noArray, const size_t&&> index) const {
       static_assert (noArray != ArrayStore, "SFINAE");
       return &this->values[NbComponents*std::move(index)];
+    }
+
+    /* ---------------------------------------------------------------------- */
+    template <class FieldCollection, typename T, Dim_t NbComponents, bool ArrayStore>
+    void TypedSizedFieldBase<FieldCollection, T, NbComponents, ArrayStore>::
+    set_pad_size(size_t pad_size) {
+      if (ArrayStore) {
+        this->values.resize(this->size() + pad_size);
+      } else {
+        this->values.resize(this->size()*NbComponents + pad_size);
+      }
+      this->pad_size = pad_size;
     }
 
     /* ---------------------------------------------------------------------- */

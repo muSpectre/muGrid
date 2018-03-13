@@ -31,6 +31,8 @@
 
 #include <Eigen/Dense>
 
+#if 0
+
 namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE(mpi_projection_small_strain);
@@ -127,3 +129,5 @@ namespace muSpectre {
   BOOST_AUTO_TEST_SUITE_END();
 
 }  // muSpectre
+
+#endif
