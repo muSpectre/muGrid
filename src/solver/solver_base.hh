@@ -84,7 +84,10 @@ namespace muSpectre {
     SolverBase& operator=(SolverBase &&other) = default;
 
     //! Allocate fields used during the solution
-    virtual void initialise() {this->collection.initialise(this->cell.get_resolutions());}
+    virtual void initialise() {
+      this->collection.initialise(this->cell.get_resolutions(),
+                                  this->cell.get_locations());
+    }
 
     //! determine whether this solver requires full tangent stiffnesses
     bool need_tangents() const {

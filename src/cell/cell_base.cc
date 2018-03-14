@@ -201,7 +201,7 @@ namespace muSpectre {
     // check that all pixels have been assigned exactly one material
     this->check_material_coverage();
     // resize all global fields (strain, stress, etc)
-    this->fields->initialise(this->resolutions);
+    this->fields->initialise(this->resolutions, this->locations);
     // initialise the projection and compute the fft plan
     this->projection->initialise(flags);
     this->initialised = true;
