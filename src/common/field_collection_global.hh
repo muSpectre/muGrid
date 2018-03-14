@@ -82,10 +82,12 @@ namespace muSpectre {
 
         TODO: check whether it makes sense to put a runtime check here
      **/
-    inline void initialise(Ccoord sizes);
+    inline void initialise(Ccoord sizes, Ccoord locations);
 
-    //! return the pixel sizes
+    //! return subdomain resolutions
     inline const Ccoord & get_sizes() const;
+    //! return subdomain locations
+    inline const Ccoord & get_locations() const;
 
     //! returns the linear index corresponding to cell coordinates
     template <class CcoordRef>
@@ -101,6 +103,7 @@ namespace muSpectre {
   protected:
     //! number of discretisation cells in each of the DimS spatial directions
     Ccoord sizes{};
+    Ccoord locations{};
     CcoordOps::Pixels<DimS> pixels{}; //!< helper to iterate over the grid
   private:
   };
@@ -115,13 +118,14 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS>
   void GlobalFieldCollection<DimS>::
-  initialise(Ccoord sizes) {
+  initialise(Ccoord sizes, Ccoord locations) {
     if (this->is_initialised) {
       throw std::runtime_error("double initialisation");
     }
-    this->pixels = CcoordOps::Pixels<DimS>(sizes);
+    this->pixels = CcoordOps::Pixels<DimS>(sizes, locations);
     this->size_ = CcoordOps::get_size(sizes);
     this->sizes = sizes;
+    this->locations = locations;
 
     std::for_each(std::begin(this->fields), std::end(this->fields),
                   [this](auto && item) {
@@ -142,7 +146,7 @@ namespace muSpectre {
   }
 
   //----------------------------------------------------------------------------//
-  //! return the pixel sizes
+  //! return subdomain resolutions
   template <Dim_t DimS>
   const typename GlobalFieldCollection<DimS>::Ccoord &
   GlobalFieldCollection<DimS>::get_sizes() const {
@@ -150,11 +154,20 @@ namespace muSpectre {
   }
 
   //----------------------------------------------------------------------------//
+  //! return subdomain locations
+  template <Dim_t DimS>
+  const typename GlobalFieldCollection<DimS>::Ccoord &
+  GlobalFieldCollection<DimS>::get_locations() const {
+    return this->locations;
+  }
+
+  //----------------------------------------------------------------------------//
   //! returns the cell coordinates corresponding to a linear index
   template <Dim_t DimS>
   typename GlobalFieldCollection<DimS>::Ccoord
   GlobalFieldCollection<DimS>::get_ccoord(size_t index) const {
-    return CcoordOps::get_ccoord(this->get_sizes(), std::move(index));
+    return CcoordOps::get_ccoord(this->get_sizes(), this->get_locations(),
+                                 std::move(index));
   }
 
 
