@@ -90,9 +90,6 @@ namespace muSpectre {
     if (this->plan_fft == nullptr) {
       throw std::runtime_error("Plan failed");
     }
-    fftw_execute_dft_r2c(this->plan_fft,
-                         in,
-                         reinterpret_cast<fftw_complex*>(this->work.data()));
 
     fftw_complex * i_in = reinterpret_cast<fftw_complex*>(this->work.data());
     Real * i_out = r_work_space;
