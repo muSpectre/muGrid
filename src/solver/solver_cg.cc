@@ -37,8 +37,8 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   SolverCG<DimS, DimM>::SolverCG(Cell_t& cell, Real tol, Uint maxiter,
-                                 bool verbose)
-    :Parent(cell, tol, maxiter, verbose),
+                                 bool verbose, Communicator comm)
+    :Parent(cell, tol, maxiter, verbose), comm{comm},
      r_k{make_field<Field_t>("residual r_k", this->collection)},
      p_k{make_field<Field_t>("search direction r_k", this->collection)},
      Ap_k{make_field<Field_t>("Effect of tangent A*p_k", this->collection)}
@@ -49,7 +49,7 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   void SolverCG<DimS, DimM>::solve(const Field_t & rhs,
                                    Field_t & x_f) {
-    x_f.eigenvec() = this-> solve(rhs.eigenvec(), x_f.eigenvec());
+    x_f.eigenvec() = this->solve(rhs.eigenvec(), x_f.eigenvec());
   };
 
   //----------------------------------------------------------------------------//
@@ -70,8 +70,8 @@ namespace muSpectre {
     p = -r;
 
     this->converged = false;
-    Real rdr = (r*r).sum();
-    Real rhs_norm2 = rhs.squaredNorm();
+    Real rdr = this->comm.sum((r*r).sum());
+    Real rhs_norm2 = this->comm.sum(rhs.squaredNorm());
     Real tol2 = ipow(this->tol,2)*rhs_norm2;
 
     size_t count_width{}; // for output formatting in verbose case
@@ -84,12 +84,12 @@ namespace muSpectre {
          ++i, ++this->counter) {
       Ap = this->cell.directional_stiffness_with_copy(p);
 
-      Real alpha = rdr/(p*Ap).sum();
+      Real alpha = rdr/this->comm.sum((p*Ap).sum());
 
       x += alpha * p;
       r += alpha * Ap;
 
-      Real new_rdr = (r*r).sum();
+      Real new_rdr = this->comm.sum((r*r).sum());
       Real beta = new_rdr/rdr;
       rdr = new_rdr;
 

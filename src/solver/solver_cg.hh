@@ -31,6 +31,7 @@
 #define SOLVER_CG_H
 
 #include "solver/solver_base.hh"
+#include "common/communicator.hh"
 #include "common/field.hh"
 
 #include <functional>
@@ -69,7 +70,8 @@ namespace muSpectre {
     SolverCG() = delete;
 
     //! Constructor with domain resolutions, etc,
-    SolverCG(Cell_t& cell, Real tol, Uint maxiter=0, bool verbose =false);
+    SolverCG(Cell_t& cell, Real tol, Uint maxiter=0, bool verbose=false,
+             Communicator comm=Communicator());
 
     //! Copy constructor
     SolverCG(const SolverCG &other) = delete;
@@ -99,6 +101,7 @@ namespace muSpectre {
     std::string name() const override final {return "CG";}
 
   protected:
+    Communicator comm; //!< communicator
     //! returns `muSpectre::Tg_req_t::NeedEffect`
     Tg_req_t get_tangent_req() const override final;
     Field_t & r_k;  //!< residual
