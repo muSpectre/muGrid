@@ -54,9 +54,16 @@ namespace muSpectre {
     Communicator(MPI_Comm comm=MPI_COMM_NULL): comm{comm} {};
     ~Communicator() {};
 
+    //! get rank of present process
+    int rank() {
+      int res;
+      MPI_Comm_rank(this->comm, &res);
+      return res;
+    }
+
     //! sum reduction on scalar types
     template<typename T>
-    constexpr T sum(const T &arg) {
+    T sum(const T &arg) {
       T res;
       MPI_Allreduce(&arg, &res, 1, mpi_type<T>(), MPI_SUM, this->comm);
       return res;
@@ -76,9 +83,14 @@ namespace muSpectre {
     Communicator() {};
     ~Communicator() {};
 
+    //! get rank of present process
+    int rank() {
+      return 0;
+    }
+
     //! sum reduction on scalar types
     template<typename T>
-    constexpr T sum(T &arg) { return arg; }
+    T sum(T &arg) { return arg; }
   };
 
 #endif
