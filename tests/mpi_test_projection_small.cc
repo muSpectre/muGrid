@@ -74,8 +74,6 @@ namespace muSpectre {
     FieldMap var(f_var);
 
     fields.initialise(fix::projector.get_resolutions());
-    FFT_freqs<dim> freqs{fix::projector.get_resolutions(),
-        fix::projector.get_lengths()};
 
     Vector k;
     for (Dim_t i = 0; i < dim; ++i) {

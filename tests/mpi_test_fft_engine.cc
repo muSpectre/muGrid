@@ -99,7 +99,8 @@ namespace muSpectre {
     auto & input{make_field<TensorField<FC_t, Real, order, Fix::mdim>>("input", fc)};
     auto & ref  {make_field<TensorField<FC_t, Real, order, Fix::mdim>>("reference", fc)};
     auto & result{make_field<TensorField<FC_t, Real, order, Fix::mdim>>("result", fc)};
-    fc.initialise(Fix::engine.get_resolutions());
+
+    fc.initialise(Fix::engine.get_resolutions(), Fix::engine.get_locations());
 
     using map_t = MatrixFieldMap<FC_t, Real, Fix::mdim, Fix::mdim>;
     map_t inmap{input};
