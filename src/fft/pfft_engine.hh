@@ -56,7 +56,7 @@ namespace muSpectre {
 
     //! Constructor with system resolutions
     PFFTEngine(Ccoord resolutions, Rcoord lengths,
-                  Communicator comm=Communicator());
+               Communicator comm=Communicator());
 
     //! Copy constructor
     PFFTEngine(const PFFTEngine &other) = delete;
