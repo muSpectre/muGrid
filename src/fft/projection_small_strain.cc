@@ -42,7 +42,7 @@ namespace muSpectre {
   void ProjectionSmallStrain<DimS, DimM>::initialise(FFT_PlanFlags flags) {
     Parent::initialise(flags);
 
-    FFT_freqs<DimS> fft_freqs(this->fft_engine->get_resolutions(),
+    FFT_freqs<DimS> fft_freqs(this->fft_engine->get_domain_resolutions(),
                               this->fft_engine->get_lengths());
     for (auto && tup: akantu::zip(*this->fft_engine, this->Ghat)) {
       const auto & ccoord = std::get<0> (tup);
