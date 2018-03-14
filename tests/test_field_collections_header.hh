@@ -119,10 +119,11 @@ namespace muSpectre {
     std::enable_if_t<isGlobal> fill() {
       static_assert(Global==isGlobal, "You're breaking my SFINAE plan");
       Ccoord_t<Parent::sdim()> size;
+      Ccoord_t<Parent::sdim()> loc{};
       for (auto && s: size) {
         s = cube_size();
       }
-      this->fc.initialise(size);
+      this->fc.initialise(size, loc);
     }
 
     template <bool notGlobal = !Global>

@@ -168,10 +168,11 @@ namespace muSpectre {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(init_test_glob, F, mult_collections_t, F) {
     Ccoord_t<F::sdim()> size;
+    Ccoord_t<F::sdim()> loc{};
     for (auto && s: size) {
       s = 3;
     }
-    BOOST_CHECK_NO_THROW(F::fc.initialise(size));
+    BOOST_CHECK_NO_THROW(F::fc.initialise(size, loc));
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(init_test_loca, F, mult_collections_f, F) {

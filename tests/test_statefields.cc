@@ -76,7 +76,8 @@ namespace muSpectre {
     struct init{
       static void run(Fixture_t & fix) {
         constexpr Dim_t dim{std::remove_reference_t<Fixture_t>::sdim};
-        fix.fc.initialise(CcoordOps::get_cube<dim>(3));
+        fix.fc.initialise(CcoordOps::get_cube<dim>(3),
+                          CcoordOps::get_cube<dim>(0));
       }
     };
 
@@ -84,7 +85,8 @@ namespace muSpectre {
     struct init<false, Fixture_t>{
       static void run(Fixture_t & fix) {
         constexpr Dim_t dim{std::remove_reference_t<Fixture_t>::sdim};
-        CcoordOps::Pixels<dim> pixels(CcoordOps::get_cube<dim>(3));
+        CcoordOps::Pixels<dim> pixels(CcoordOps::get_cube<dim>(3),
+                                      CcoordOps::get_cube<dim>(0));
         for (auto && pix: pixels) {
           fix.fc.add_pixel(pix);
         }

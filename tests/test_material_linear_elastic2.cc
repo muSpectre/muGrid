@@ -97,6 +97,7 @@ namespace muSpectre {
 
     const Dim_t nb_pixel{2};
     constexpr auto cube{CcoordOps::get_cube<Fix::sdim>(nb_pixel)};
+    constexpr auto loc{CcoordOps::get_cube<Fix::sdim>(0)};
 
     using Mat_t = Eigen::Matrix<Real, Fix::mdim, Fix::mdim>;
     using FC_t = GlobalFieldCollection<Fix::sdim>;
@@ -107,7 +108,7 @@ namespace muSpectre {
       ("Nominal Stress1", globalfields); // to be computed alone
     auto & K_f = make_field<typename Fix::Mat::TangentField_t>
       ("Tangent Moduli", globalfields); // to be computed with tangent
-    globalfields.initialise(cube);
+    globalfields.initialise(cube, loc);
 
     Mat_t zero{Mat_t::Zero()};
     Mat_t F{Mat_t::Random()/100 + Mat_t::Identity()};
@@ -164,6 +165,7 @@ namespace muSpectre {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_evaluate_law, Fix, mat_fill, Fix) {
     constexpr auto cube{CcoordOps::get_cube<Fix::sdim>(Fix::box_size)};
+    constexpr auto loc{CcoordOps::get_cube<Fix::sdim>(0)};
     auto & mat{Fix::mat};
 
     using FC_t = GlobalFieldCollection<Fix::sdim>;
@@ -181,7 +183,7 @@ namespace muSpectre {
     auto & Kr = make_field<typename Fix::Mat::TangentField_t>
       ("Tangent Moduli reference", globalfields); // to be computed with tangent
 
-    globalfields.initialise(cube);
+    globalfields.initialise(cube, loc);
 
     static_assert(std::is_same<decltype(P1),
                   typename Fix::Mat::StressField_t&>::value,

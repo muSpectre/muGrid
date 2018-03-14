@@ -48,6 +48,9 @@ namespace muSpectre {
     constexpr static Ccoord_t<sdim> res() {
       return CcoordOps::get_cube<DimS>(box_resolution);
     }
+    constexpr static Ccoord_t<sdim> loc() {
+      return CcoordOps::get_cube<DimS>(0);
+    }
     FFTW_fixture() :engine(res(),
                            CcoordOps::get_cube<DimS>(box_length)){}
     FFTWEngine<DimS, DimM> engine;
@@ -58,6 +61,7 @@ namespace muSpectre {
     constexpr static Dim_t sdim{twoD};
     constexpr static Dim_t mdim{twoD};
     constexpr static Ccoord_t<sdim> res() {return {6, 4};}
+    constexpr static Ccoord_t<sdim> loc() {return {0, 0};}
     FFTW_fixture_python_segfault():engine{res(), {3., 3}} {}
     FFTWEngine<sdim, mdim> engine;
   };
@@ -86,7 +90,7 @@ namespace muSpectre {
     auto & input{make_field<TensorField<FC_t, Real, order, Fix::mdim>>("input", fc)};
     auto & ref  {make_field<TensorField<FC_t, Real, order, Fix::mdim>>("reference", fc)};
     auto & result{make_field<TensorField<FC_t, Real, order, Fix::mdim>>("result", fc)};
-    fc.initialise(Fix::res());
+    fc.initialise(Fix::res(), Fix::loc());
 
     using map_t = MatrixFieldMap<FC_t, Real, Fix::mdim, Fix::mdim>;
     map_t inmap{input};

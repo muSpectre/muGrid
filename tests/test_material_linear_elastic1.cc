@@ -126,6 +126,7 @@ namespace muSpectre {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_evaluate_law, Fix, mat_fill, Fix) {
     constexpr auto cube{CcoordOps::get_cube<Fix::sdim>(Fix::box_size)};
+    constexpr auto loc{CcoordOps::get_cube<Fix::sdim>(0)};
     auto & mat{Fix::mat};
 
     using FC_t = GlobalFieldCollection<Fix::sdim>;
@@ -143,7 +144,7 @@ namespace muSpectre {
     auto & Kr = make_field<typename Fix::Mat::TangentField_t>
       ("Tangent Moduli reference", globalfields); // to be computed with tangent
 
-    globalfields.initialise(cube);
+    globalfields.initialise(cube, loc);
 
     static_assert(std::is_same<decltype(P1),
                   typename Fix::Mat::StressField_t&>::value,
