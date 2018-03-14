@@ -59,6 +59,11 @@ namespace muSpectre {
     this->locations[0] = loc_x;
     this->fourier_resolutions[0] = res_y;
     this->fourier_locations[0] = loc_y;
+
+    for (auto && pixel: CcoordOps::Pixels<DimS, true>(this->fourier_resolutions,
+                                                      this->fourier_locations)) {
+           this->work_space_container.add_pixel(pixel);
+    }
   }
 
 
@@ -67,12 +72,6 @@ namespace muSpectre {
   void FFTWMPIEngine<DimS, DimM>::initialise(FFT_PlanFlags plan_flags) {
     if (this->initialised) {
       throw std::runtime_error("double initialisation, will leak memory");
-    }
-
-    for (auto && pixel:
-         CcoordOps::Pixels<DimS, true>(this->fourier_resolutions,
-                                       this->fourier_locations)) {
-      this->work_space_container.add_pixel(pixel);
     }
 
     // Initialize parent after local resolutions have been determined and
