@@ -41,7 +41,8 @@ namespace muSpectre {
   {
     if (!this->nb_engines) pfft_init();
     this->nb_engines++;
-      for (auto && pixel: CcoordOps::Pixels<DimS>(this->fourier_resolutions)) {
+      for (auto && pixel: CcoordOps::Pixels<DimS>(this->fourier_resolutions,
+                                                  this->fourier_locations)) {
           this->work_space_container.add_pixel(pixel);
       }
   }
