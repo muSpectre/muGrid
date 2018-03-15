@@ -84,9 +84,11 @@ namespace muSpectre {
     SolverCG<dim> cg{sys, cg_tol, maxiter, bool(verbose)};
     Eigen::ArrayXXd res1{de_geus(sys, grads, cg, newton_tol, verbose)[0].grad};
 
+#if 0
     SolverCG<dim> cg2{sys, cg_tol, maxiter, bool(verbose)};
     Eigen::ArrayXXd res2{newton_cg(sys, grads, cg2, newton_tol, verbose)[0].grad};
     BOOST_CHECK_LE(abs(res1-res2).mean(), cg_tol);
+#endif
   }
 
 #if 0
