@@ -48,7 +48,7 @@ namespace muSpectre {
   template<> inline decltype(auto) mpi_type<float>() { return MPI_FLOAT; }
   template<> inline decltype(auto) mpi_type<double>() { return MPI_DOUBLE; }
 
-  //! lightweight abstraction for communicator object
+  //! lightweight abstraction for the MPI communicator object
   class Communicator {
   public:
     Communicator(MPI_Comm comm=MPI_COMM_NULL): comm{comm} {};
@@ -56,6 +56,7 @@ namespace muSpectre {
 
     //! get rank of present process
     int rank() {
+      if (comm == MPI_COMM_NULL) return 0;
       int res;
       MPI_Comm_rank(this->comm, &res);
       return res;
@@ -64,6 +65,7 @@ namespace muSpectre {
     //! sum reduction on scalar types
     template<typename T>
     T sum(const T &arg) {
+      if (comm == MPI_COMM_NULL) return arg;
       T res;
       MPI_Allreduce(&arg, &res, 1, mpi_type<T>(), MPI_SUM, this->comm);
       return res;
@@ -90,7 +92,7 @@ namespace muSpectre {
 
     //! sum reduction on scalar types
     template<typename T>
-    T sum(T &arg) { return arg; }
+    T sum(const T &arg) { return arg; }
   };
 
 #endif

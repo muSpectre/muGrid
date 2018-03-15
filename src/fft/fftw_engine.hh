@@ -53,7 +53,8 @@ namespace muSpectre {
     FFTWEngine() = delete;
 
     //! Constructor with cell resolutions
-    FFTWEngine(Ccoord resolutions, Rcoord lengths);
+    FFTWEngine(Ccoord resolutions, Rcoord lengths,
+               Communicator comm=Communicator());
 
     //! Copy constructor
     FFTWEngine(const FFTWEngine &other) = delete;

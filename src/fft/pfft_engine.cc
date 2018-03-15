@@ -36,7 +36,7 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   PFFTEngine<DimS, DimM>::PFFTEngine(Ccoord resolutions, Rcoord lengths,
                                      Communicator comm)
-    :Parent{resolutions, lengths}, comm{comm}, plan_fft{nullptr},
+    :Parent{resolutions, lengths, comm}, plan_fft{nullptr},
      plan_ifft{nullptr}
   {
     if (!this->nb_engines) pfft_init();

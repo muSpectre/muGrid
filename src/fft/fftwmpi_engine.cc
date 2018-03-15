@@ -36,7 +36,7 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   FFTWMPIEngine<DimS, DimM>::FFTWMPIEngine(Ccoord resolutions, Rcoord lengths,
                                            Communicator comm)
-    :Parent{resolutions, lengths}, comm{comm}, real_workspace{nullptr}
+    :Parent{resolutions, lengths, comm}, real_workspace{nullptr}
   {
     if (!this->nb_engines) fftw_mpi_init();
     this->nb_engines++;

@@ -29,6 +29,7 @@
 #define FFT_ENGINE_BASE_H
 
 #include "common/common.hh"
+#include "common/communicator.hh"
 #include "common/field_collection.hh"
 
 namespace muSpectre {
@@ -67,7 +68,8 @@ namespace muSpectre {
     FFTEngineBase() = delete;
 
     //! Constructor with cell resolutions
-    FFTEngineBase(Ccoord resolutions, Rcoord lengths);
+    FFTEngineBase(Ccoord resolutions, Rcoord lengths,
+                  Communicator comm=Communicator());
 
     //! Copy constructor
     FFTEngineBase(const FFTEngineBase &other) = delete;
@@ -107,6 +109,9 @@ namespace muSpectre {
     //! nb of pixels in Fourier space
     size_t workspace_size() const;
 
+    //! return the communicator object
+    const Communicator & get_communicator() const {return this->comm;}
+    
     //! returns the process-local resolutions of the cell
     const Ccoord & get_resolutions() const {return this->resolutions;}
     //! returns the process-local locations of the cell
@@ -140,6 +145,7 @@ namespace muSpectre {
      * Field collection in which to store fields associated with
      * Fourier-space points
      */
+    Communicator comm; //!< communicator
     LFieldCollection_t work_space_container{};
     Ccoord resolutions; //!< resolutions of the process-local (subdomain) portion of the cell
     Ccoord locations; // !< location of the process-local (subdomain) portion of the cell

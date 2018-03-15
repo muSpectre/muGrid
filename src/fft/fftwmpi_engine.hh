@@ -28,8 +28,6 @@
 #ifndef FFTWMPI_ENGINE_H
 #define FFTWMPI_ENGINE_H
 
-#include "common/communicator.hh"
-
 #include "fft/fft_engine_base.hh"
 
 #include <fftw3-mpi.h>
@@ -84,7 +82,6 @@ namespace muSpectre {
 
   protected:
     static int nb_engines;
-    Communicator comm; //!< communicator
     fftw_plan plan_fft{}; //!< holds the plan for forward fourier transform
     fftw_plan plan_ifft{}; //!< holds the plan for inverse fourier transform
     ptrdiff_t workspace_size;

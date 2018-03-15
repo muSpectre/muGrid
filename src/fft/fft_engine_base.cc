@@ -31,8 +31,9 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  FFTEngineBase<DimS, DimM>::FFTEngineBase(Ccoord resolutions, Rcoord lengths)
-    :resolutions{resolutions}, locations{},
+  FFTEngineBase<DimS, DimM>::FFTEngineBase(Ccoord resolutions, Rcoord lengths,
+                                           Communicator comm)
+    :comm{comm}, resolutions{resolutions}, locations{},
      fourier_resolutions{CcoordOps::get_hermitian_sizes(resolutions)},
      fourier_locations{}, domain_resolutions{resolutions},
      lengths{lengths},
