@@ -196,6 +196,7 @@ namespace muSpectre {
                       std::remove_reference_t<CcoordRef>>>::value,
                   "can only be called with values or references of Ccoord");
     return CcoordOps::get_index(this->get_sizes(),
+                                this->get_locations(),
                                 std::forward<CcoordRef>(ccoord));
   }
 

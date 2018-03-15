@@ -214,7 +214,11 @@ namespace muSpectre {
     //! returns the number of degrees of freedom in the cell
     Dim_t nb_dof() const {return this->size()*ipow(DimS, 2);};
 
-
+    //! return the communicator object
+    const Communicator & get_communicator() const {
+      return this->projection->get_communicator();
+    }
+    
   protected:
     //! make sure that every pixel is assigned to one and only one material
     void check_material_coverage();

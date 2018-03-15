@@ -174,11 +174,12 @@ namespace muSpectre {
     //! get the linear index of a pixel in a given grid
     template <size_t dim>
     constexpr Dim_t get_index(const Ccoord_t<dim> & sizes,
+                              const Ccoord_t<dim> & locations,
                               const Ccoord_t<dim> & ccoord) {
       Dim_t retval{0};
       Dim_t factor{1};
       for (Dim_t i = dim-1; i >=0; --i) {
-        retval += ccoord[i]*factor;
+        retval += (ccoord[i]-locations[i])*factor;
         if (i != 0) {
           factor *= sizes[i];
         }

@@ -122,6 +122,11 @@ namespace muSpectre {
     //! regular use
     virtual Eigen::Map<Eigen::ArrayXXd> get_operator() = 0;
 
+    //! return the communicator object
+    const Communicator & get_communicator() const {
+      return this->fft_engine->get_communicator();
+    }
+
   protected:
     //! handle on the fft_engine used
     FFTEngine_ptr fft_engine;

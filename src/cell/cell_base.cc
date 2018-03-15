@@ -251,7 +251,8 @@ namespace muSpectre {
     std::vector<MaterialBase<DimS, DimM>*> assignments(nb_pixels, nullptr);
     for (auto & mat: this->materials) {
       for (auto & pixel: *mat) {
-        auto index = CcoordOps::get_index(this->resolutions, pixel);
+        auto index = CcoordOps::get_index(this->resolutions, this->locations,
+                                          pixel);
         auto& assignment{assignments.at(index)};
         if (assignment != nullptr) {
           std::stringstream err{};
