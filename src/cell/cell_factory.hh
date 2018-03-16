@@ -35,8 +35,8 @@
 #include "fft/projection_small_strain.hh"
 #include "fft/fftw_engine.hh"
 
-#ifdef HAVE_MPI
-#include "common/communicator.h"
+#ifdef WITH_MPI
+#include "common/communicator.hh"
 #include "fft/fftwmpi_engine.hh"
 #endif
 
