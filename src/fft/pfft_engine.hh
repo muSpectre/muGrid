@@ -83,7 +83,7 @@ namespace muSpectre {
     virtual void ifft(Field_t & field) const override;
 
   protected:
-    static int nb_engines;
+    static int nb_engines; //!< number of times this engine has been instatiated
     pfft_plan plan_fft{}; //!< holds the plan for forward fourier transform
     pfft_plan plan_ifft{}; //!< holds the plan for inverse fourier transform
     bool initialised{false}; //!< to prevent double initialisation
