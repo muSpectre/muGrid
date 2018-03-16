@@ -83,6 +83,7 @@ find_package(PFFT)
 
 if(MPI_FOUND)
   add_definitions(-DWITH_MPI)
+  include_directories(SYSTEM ${MPI_C_INCLUDE_PATH})
 endif()
 
 

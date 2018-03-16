@@ -30,7 +30,7 @@
 #include "tests.hh"
 #include "mpi_context.hh"
 #include "fft/fftwmpi_engine.hh"
-#include "fft/pfft_engine.hh"
+
 #include "common/ccoord_operations.hh"
 #include "common/field_collection.hh"
 #include "common/field_map.hh"
