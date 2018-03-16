@@ -49,7 +49,7 @@ void add_engine_helper(py::module & mod, std::string name) {
            using Coll_t = typename Engine::GFieldCollection_t;
            using Field_t = typename Engine::Field_t;
            Coll_t coll{};
-           coll.initialise(eng.get_resolutions());
+           coll.initialise(eng.get_resolutions(), eng.get_locations());
            Field_t & temp{make_field<Field_t>("temp_field", coll)};
            temp.eigen() = v;
            return ArrayXXc{eng.fft(temp).eigen()};
@@ -61,7 +61,7 @@ void add_engine_helper(py::module & mod, std::string name) {
            using Coll_t = typename Engine::GFieldCollection_t;
            using Field_t = typename Engine::Field_t;
            Coll_t coll{};
-           coll.initialise(eng.get_resolutions());
+           coll.initialise(eng.get_resolutions(), eng.get_locations());
            Field_t & temp{make_field<Field_t>("temp_field", coll)};
            eng.get_work_space().eigen()=v;
            eng.ifft(temp);

@@ -97,7 +97,7 @@ void add_proj_helper(py::module & mod, std::string name_start) {
     .def("apply_projection",
          [](Proj & proj, py::EigenDRef<Eigen::ArrayXXd> v){
            typename Engine::GFieldCollection_t coll{};
-           coll.initialise(proj.get_resolutions());
+           coll.initialise(proj.get_resolutions(), proj.get_locations());
            Field_t & temp{make_field<Field_t>("temp_field", coll)};
            temp.eigen() = v;
            proj.apply_projection(temp);

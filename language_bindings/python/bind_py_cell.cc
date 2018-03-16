@@ -53,11 +53,22 @@ void add_cell_factory_helper(py::module & mod) {
   mod.def
     ("CellFactory",
      [](Ccoord res, Rcoord lens, Form form) {
-      return make_cell(std::move(res), std::move(lens), std::move(form));
+       return make_cell(std::move(res), std::move(lens), std::move(form));
      },
      "resolutions"_a,
      "lengths"_a=CcoordOps::get_cube<dim>(1.),
      "formulation"_a=Formulation::finite_strain);
+
+#ifdef WITH_MPI
+  mod.def
+    ("ParallelCellFactory",
+     [](Ccoord res, Rcoord lens, Form form) {
+       return make_cell(std::move(res), std::move(lens), std::move(form));
+     },
+     "resolutions"_a,
+     "lengths"_a=CcoordOps::get_cube<dim>(1.),
+     "formulation"_a=Formulation::finite_strain);
+#endif
 }
 
 void add_cell_factory(py::module & mod) {
