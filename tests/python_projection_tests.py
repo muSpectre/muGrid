@@ -70,9 +70,9 @@ def build_test_classes(Projection, RefProjection, name):
 
             rando = np.random.random((self.ndim, self.ndim))
             for i in range(hermitian_size):
-                coord = µ.get_ccoord(msp_sizes, i)
-                ref_id = µ.get_index(ref_sizes, coord)
-                msp_id = µ.get_index(msp_sizes, coord)
+                coord = µ.get_domain_ccoord(msp_sizes, i)
+                ref_id = µ.get_domain_index(ref_sizes, coord)
+                msp_id = µ.get_domain_index(msp_sizes, coord)
 
                 # story behind this order vector:
                 # There was this issue with the projection operator of
