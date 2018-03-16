@@ -42,6 +42,8 @@ namespace muSpectre {
   BOOST_AUTO_TEST_SUITE(newton_cg_tests);
 
   BOOST_AUTO_TEST_CASE(manual_construction_test) {
+    const Communicator & comm = MPIContext::get_context().comm;
+
     // constexpr Dim_t dim{twoD};
     constexpr Dim_t dim{threeD};
 
@@ -50,7 +52,7 @@ namespace muSpectre {
     constexpr Ccoord_t<dim> resolutions{5, 5, 5};
     constexpr Rcoord_t<dim> lengths{5, 5, 5};
     auto fft_ptr{std::make_unique<FFTWMPIEngine<dim, dim>>(resolutions, lengths,
-                                                           MPIContext::get_context().comm)};
+                                                           comm)};
     auto proj_ptr{std::make_unique<ProjectionFiniteStrainFast<dim, dim>>(std::move(fft_ptr))};
     CellBase<dim, dim> sys(std::move(proj_ptr));
 
@@ -78,21 +80,19 @@ namespace muSpectre {
     delF0 << 0, 1., 0, 0, 0, 0, 0, 0, 0;
     constexpr Real cg_tol{1e-8}, newton_tol{1e-5};
     constexpr Uint maxiter{CcoordOps::get_size(resolutions)*ipow(dim, secondOrder)*10};
-    constexpr bool verbose{true};
+    constexpr bool verbose{false};
 
     GradIncrements<dim> grads; grads.push_back(delF0);
     SolverCG<dim> cg{sys, cg_tol, maxiter, bool(verbose)};
     Eigen::ArrayXXd res1{de_geus(sys, grads, cg, newton_tol, verbose)[0].grad};
 
-#if 0
     SolverCG<dim> cg2{sys, cg_tol, maxiter, bool(verbose)};
     Eigen::ArrayXXd res2{newton_cg(sys, grads, cg2, newton_tol, verbose)[0].grad};
     BOOST_CHECK_LE(abs(res1-res2).mean(), cg_tol);
-#endif
   }
 
-#if 0
   BOOST_AUTO_TEST_CASE(small_strain_patch_test) {
+    const Communicator & comm = MPIContext::get_context().comm;
     constexpr Dim_t dim{twoD};
     using Ccoord = Ccoord_t<dim>;
     using Rcoord = Rcoord_t<dim>;
@@ -107,7 +107,7 @@ namespace muSpectre {
                   "the number or layers in the hard material must be smaller "
                   "than the total number of layers in dimension 0");
 
-    auto sys{make_cell(resolutions, lengths, form)};
+    auto sys{make_parallel_cell(resolutions, lengths, form, comm)};
 
     using Mat_t = MaterialLinearElastic1<dim, dim>;
     constexpr Real Young{2.}, Poisson{.33};
@@ -195,7 +195,6 @@ namespace muSpectre {
       }
     }
   }
-#endif
 
   BOOST_AUTO_TEST_SUITE_END();
 
