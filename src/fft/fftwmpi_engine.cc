@@ -75,7 +75,7 @@ namespace muSpectre {
     }
 
     // Initialize parent after local resolutions have been determined and
-    // work space has been initialized 
+    // work space has been initialized
     Parent::initialise(plan_flags);
 
     this->real_workspace = fftw_alloc_real(2*this->workspace_size);
@@ -86,7 +86,7 @@ namespace muSpectre {
       this->work.set_pad_size(this->workspace_size -
                               Field_t::nb_components*this->work.size());
     }
-    
+
     unsigned int flags;
     switch (plan_flags) {
     case FFT_PlanFlags::estimate: {
@@ -160,7 +160,7 @@ namespace muSpectre {
     ptrdiff_t fstride = Field_t::nb_components*this->resolutions[DimS-1];
     ptrdiff_t wstride = Field_t::nb_components*2*(this->resolutions[DimS-1]/2+1);
     ptrdiff_t n = field.size()/this->resolutions[DimS-1];
-    
+
     auto fdata = field.data();
     auto wdata = this->real_workspace;
     for (int i = 0; i < n; i++) {
@@ -195,7 +195,7 @@ namespace muSpectre {
     ptrdiff_t fstride = Field_t::nb_components*this->resolutions[DimS-1];
     ptrdiff_t wstride = Field_t::nb_components*2*(this->resolutions[DimS-1]/2+1);
     ptrdiff_t n = field.size()/this->resolutions[DimS-1];
-    
+
     auto fdata = field.data();
     auto wdata = this->real_workspace;
     for (int i = 0; i < n; i++) {

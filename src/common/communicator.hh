@@ -51,30 +51,31 @@ namespace muSpectre {
   //! lightweight abstraction for the MPI communicator object
   class Communicator {
   public:
-    Communicator(MPI_Comm comm=MPI_COMM_NULL): comm{comm} {};
+    using MPI_Comm_ref = std::remove_pointer_t<MPI_Comm>&;
+    Communicator(MPI_Comm comm=MPI_COMM_NULL): comm{*comm} {};
     ~Communicator() {};
 
     //! get rank of present process
     int rank() const {
-      if (comm == MPI_COMM_NULL) return 0;
+      if (&comm == MPI_COMM_NULL) return 0;
       int res;
-      MPI_Comm_rank(this->comm, &res);
+      MPI_Comm_rank(&this->comm, &res);
       return res;
     }
 
     //! sum reduction on scalar types
     template<typename T>
     T sum(const T &arg) const {
-      if (comm == MPI_COMM_NULL) return arg;
+      if (&comm == MPI_COMM_NULL) return arg;
       T res;
-      MPI_Allreduce(&arg, &res, 1, mpi_type<T>(), MPI_SUM, this->comm);
+      MPI_Allreduce(&arg, &res, 1, mpi_type<T>(), MPI_SUM, &this->comm);
       return res;
     }
 
-    MPI_Comm get_mpi_comm() { return this->comm; }
+    MPI_Comm get_mpi_comm() { return &this->comm; }
 
   private:
-    MPI_Comm comm;
+    MPI_Comm_ref comm;
   };
 
 #else /* WITH_MPI */
