@@ -27,6 +27,9 @@
 # Boston, MA 02111-1307, USA.
 # =============================================================================
 
+find_package(FFTWMPI)
+find_package(PFFT)
+
 set (fft_engine_SRC
   ${CMAKE_CURRENT_SOURCE_DIR}/fft_utils.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/fft_engine_base.cc

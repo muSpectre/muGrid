@@ -52,8 +52,8 @@ if( PFFT_ROOT )
   #find includes
   find_path(
     PFFT_INCLUDES
-    NAMES "fftw3.h"
-    PATHS ${FFTW_ROOT}
+    NAMES "pfft.h"
+    PATHS ${PFFT_ROOT}
     PATH_SUFFIXES "include"
     NO_DEFAULT_PATH
   )
