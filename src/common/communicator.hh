@@ -71,7 +71,7 @@ namespace muSpectre {
       return res;
     }
 
-    constexpr MPI_Comm get_mpi_comm() { return this->comm; }
+    MPI_Comm get_mpi_comm() { return this->comm; }
 
   private:
     MPI_Comm comm;
