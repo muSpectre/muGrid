@@ -242,6 +242,7 @@ namespace muSpectre {
              Real equil_tol,
              Dim_t verbose) {
     using Field_t = typename MaterialBase<DimS, DimM>::StrainField_t;
+    const Communicator & comm = cell.get_communicator();
     auto solver_fields{std::make_unique<GlobalFieldCollection<DimS>>()};
     solver_fields->initialise(cell.get_resolutions(), cell.get_locations());
 
@@ -354,7 +355,7 @@ namespace muSpectre {
 
         rhs.eigen() = -P.eigen();
         cell.project(rhs);
-        stressNorm = rhs.eigen().matrix().norm();
+        stressNorm = std::sqrt(comm.sum(rhs.eigen().matrix().squaredNorm()));
         if (convergence_test()) {
           break;
         }
@@ -365,8 +366,8 @@ namespace muSpectre {
 
         F.eigen() += incrF.eigen();
 
-        incrNorm = incrF.eigen().matrix().norm();
-        gradNorm = F.eigen().matrix().norm();
+        incrNorm = std::sqrt(comm.sum(incrF.eigen().matrix().squaredNorm()));
+        gradNorm = std::sqrt(comm.sum(F.eigen().matrix().squaredNorm()));
         if (verbose > 0) {
           std::cout << "at Newton step " << std::setw(count_width) << newt_iter
                     << ", |δ" << strain_symb << "|/|Δ" << strain_symb
