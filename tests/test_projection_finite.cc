@@ -61,6 +61,16 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
+  BOOST_AUTO_TEST_CASE(even_grid_test) {
+    using Engine = FFTWEngine<twoD, twoD>;
+    using proj = ProjectionFiniteStrainFast<twoD, twoD>;
+    auto engine = std::make_unique<Engine>(Ccoord_t<twoD>{2, 2},
+					   Rcoord_t<twoD>{4.3, 4.3});
+    BOOST_CHECK_THROW(proj (std::move(engine)),
+		      std::runtime_error);
+  }
+
+  /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(Gradient_preservation_test,
                                    fix, fixlist, fix) {
     // create a gradient field with a zero mean gradient and verify

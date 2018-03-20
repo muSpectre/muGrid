@@ -61,6 +61,14 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
   # using Visual Studio C++
 endif()
 
+# Do not trust old gcc. the std::optional has memory bugs
+if(${CMAKE_COMPILER_IS_GNUCC})
+  if(${CMAKE_CXX_COMPILER_VERSION} VERSION_LESS 6.0.0)
+    add_definitions(-DNO_EXPERIMENTAL)
+  endif()
+endif()
+
+
 find_package(Boost COMPONENTS unit_test_framework REQUIRED)
 
 add_external_package(Eigen3 VERSION 3.3 CONFIG)

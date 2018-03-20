@@ -37,6 +37,19 @@
 
 namespace muSpectre {
 
+  /**
+   * base class for projection related exceptions
+   */
+  class ProjectionError: public std::runtime_error {
+  public:
+    //! constructor
+    explicit ProjectionError(const std::string& what)
+      :std::runtime_error(what){}
+    //! constructor
+    explicit ProjectionError(const char * what)
+      :std::runtime_error(what){}
+  };
+
   template<class Projection>
   struct Projection_traits {
   };

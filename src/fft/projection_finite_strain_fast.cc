@@ -39,7 +39,14 @@ namespace muSpectre {
      xiField{make_field<Proj_t>("Projection Operator",
                                 this->projection_container)},
      xis(xiField)
-  {}
+  {
+    for (auto res: this->fft_engine->get_resolutions()) {
+      if (res % 2 == 0) {
+      	throw ProjectionError
+	  ("Only an odd number of gridpoints in each direction is supported");
+      }
+    }
+  }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
