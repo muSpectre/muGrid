@@ -5,7 +5,7 @@
  *
  * @date   01 May 2017
  *
- * @brief  Small definitions of commonly used types througout µSpectre
+ * @brief  Small definitions of commonly used types throughout µSpectre
  *
  * @section  LICENSE
  *

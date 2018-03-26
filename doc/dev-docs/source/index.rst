@@ -2,8 +2,8 @@
 
 .. image:: ../logo_flat.png
 
-µSpectre, FFT-based Homogenisation without Linear Reference Medium
-==================================================================
+*µ*\Spectre, FFT-based Homogenisation without Linear Reference Medium
+=====================================================================
 
 .. toctree::
    :maxdepth: 2
@@ -11,15 +11,16 @@
 
    Summary
    Tutorials
+   CodingConvention
    Reference
    License
 
-µSpectre is free software; you can redistribute it and/or
-modify it under the :term:``s of the GNU General Public License as
+*µ*\Spectre is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License as
 published by the Free Software Foundation, either version 3, or (at
 your option) any later version.
 
-µSpectre is distributed in the hope that it will be useful, but
+*µ*\Spectre is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
 General Public License for more details.

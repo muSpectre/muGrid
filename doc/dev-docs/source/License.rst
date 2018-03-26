@@ -1,11 +1,11 @@
 License
 -------
 
-µSpectre is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3, or (at your option) any later version.
+*µ*\Spectre is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3, or (at your option) any later version.
 
-µSpectre is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+*µ*\Spectre is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
-You are **not** allowed to use µSpectre in commercial products.
+You are **not** allowed to use *µ*\Spectre in commercial products.
 
 GNU GENERAL PUBLIC LICENSE
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

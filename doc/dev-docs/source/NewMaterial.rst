@@ -1,7 +1,7 @@
 Writing a New Constitutive Law
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The abstraction for a constitutive law in **µSpectre** is the ``Material``, and new such materials must inherit from the class :cpp:class:`muSpectre::MaterialBase`. Most often, however, it will be most convenient to inherit from the derived class :cpp:class:`muSpectre::MaterialMuSpectre`, as it implements a lot of the machinery that is commonly used by constitutive laws. This section describes how to implement a new constitutive law with internal variables (sometimes also called state variables). The example material implemented here is :cpp:class:`MaterialTutorial`, an objective linear elastic law with a distribution of eigenstrains as internal variables. The constitutive law is defined by the relationship between material (or second Piola-Kirchhoff) stress :math:`\mathbf{S}` and Green-Lagrange strain :math:`\mathbf{E}`
+The abstraction for a constitutive law in *µ*\Spectre** is the ``Material``, and new such materials must inherit from the class :cpp:class:`muSpectre::MaterialBase`. Most often, however, it will be most convenient to inherit from the derived class :cpp:class:`muSpectre::MaterialMuSpectre`, as it implements a lot of the machinery that is commonly used by constitutive laws. This section describes how to implement a new constitutive law with internal variables (sometimes also called state variables). The example material implemented here is :cpp:class:`MaterialTutorial`, an objective linear elastic law with a distribution of eigenstrains as internal variables. The constitutive law is defined by the relationship between material (or second Piola-Kirchhoff) stress :math:`\mathbf{S}` and Green-Lagrange strain :math:`\mathbf{E}`
 
 .. math::
    :nowrap:
@@ -11,7 +11,7 @@ The abstraction for a constitutive law in **µSpectre** is the ``Material``, and
       S_{ij} &= C_{ijkl}\left(E_{kl}-e_{kl}\right), \\
    \end{align}
 
-where :math:`\mathbb C` is the elastic stiffness tensor and :math:`\mathbf e` is the local eigenstrain. Note that the implementation sketched out here is the most convenient to quickly get started with using **µSpectre**, but not the most efficient one. For a most efficient implementation, refer to the implementation of :cpp:class:`muSpectre::MaterialLinearElastic2`.
+where :math:`\mathbb C` is the elastic stiffness tensor and :math:`\mathbf e` is the local eigenstrain. Note that the implementation sketched out here is the most convenient to quickly get started with using *µ*\Spectre**, but not the most efficient one. For a most efficient implementation, refer to the implementation of :cpp:class:`muSpectre::MaterialLinearElastic2`.
 
 The :cpp:class:`muSpectre::MaterialMuSpectre` class
 ***************************************************
@@ -157,7 +157,7 @@ A possible implementation for the constructor would be::
     }
   }
 
-as an exercise, you could check how :cpp:class:`muSpectre::MaterialLinearElastic1` uses **µSpectre**'s materials toolbox (in namespace ``MatTB``) to compute :math:`\mathbb C` in a much more convenient fashion. The evaluation of the stress could be (here, we make use of the ``Matrices`` namespace that defines common tensor algebra operations)::
+as an exercise, you could check how :cpp:class:`muSpectre::MaterialLinearElastic1` uses *µ*\Spectre**'s materials toolbox (in namespace ``MatTB``) to compute :math:`\mathbb C` in a much more convenient fashion. The evaluation of the stress could be (here, we make use of the ``Matrices`` namespace that defines common tensor algebra operations)::
 
   template <Dim_t DimS, Dim_t DimM>
   template <class s_t, class eigen_s_t>
