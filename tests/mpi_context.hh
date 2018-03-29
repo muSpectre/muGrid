@@ -45,12 +45,12 @@ namespace muSpectre {
 
   private:
     MPIContext(): comm(Communicator(MPI_COMM_WORLD)) {
-      BOOST_TEST_MESSAGE("MPI_Init");
       MPI_Init(&boost::unit_test::framework::master_test_suite().argc,
                &boost::unit_test::framework::master_test_suite().argv);
     }
     ~MPIContext() {
-      BOOST_TEST_MESSAGE("MPI_Finalize");
+      // Wait for all processes to finish before calling finalize.
+      MPI_Barrier(comm.get_mpi_comm());
       MPI_Finalize();
     }
   public:

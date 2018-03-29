@@ -66,7 +66,7 @@ namespace muSpectre {
     size_t count_width{};
     const auto form{cell.get_formulation()};
     std::string strain_symb{};
-    if (verbose > 0) {
+    if (verbose > 0 && comm.rank() == 0) {
       //setup of algorithm 5.2 in Nocedal, Numerical Optimization (p. 111)
       std::cout << "de Geus-" << solver.name() << " for ";
       switch (form) {
@@ -184,7 +184,7 @@ namespace muSpectre {
 
         incrNorm = std::sqrt(comm.sum(incrF.eigen().matrix().squaredNorm()));
         gradNorm = std::sqrt(comm.sum(F.eigen().matrix().squaredNorm()));
-        if (verbose>0) {
+        if (verbose > 0 && comm.rank() == 0) {
           std::cout << "at Newton step " << std::setw(count_width) << newt_iter
                     << ", |δ" << strain_symb << "|/|Δ" << strain_symb
                     << "| = " << std::setw(17) << incrNorm/gradNorm
@@ -261,7 +261,7 @@ namespace muSpectre {
     size_t count_width{};
     const auto form{cell.get_formulation()};
     std::string strain_symb{};
-    if (verbose > 0) {
+    if (verbose > 0 && comm.rank() == 0) {
       //setup of algorithm 5.2 in Nocedal, Numerical Optimization (p. 111)
       std::cout << "Newton-" << solver.name() << " for ";
       switch (form) {
@@ -368,7 +368,7 @@ namespace muSpectre {
 
         incrNorm = std::sqrt(comm.sum(incrF.eigen().matrix().squaredNorm()));
         gradNorm = std::sqrt(comm.sum(F.eigen().matrix().squaredNorm()));
-        if (verbose > 0) {
+        if (verbose > 0 && comm.rank() == 0) {
           std::cout << "at Newton step " << std::setw(count_width) << newt_iter
                     << ", |δ" << strain_symb << "|/|Δ" << strain_symb
                     << "| = " << std::setw(17) << incrNorm/gradNorm

@@ -43,9 +43,7 @@ incl = resolution[0]//5
 lengths = [7., 5.]
 formulation = µ.Formulation.small_strain
 
-rve = µ.CellFactory(resolution,
-                      lengths,
-                      formulation)
+rve = µ.Cell(resolution, lengths, formulation)
 hard = µ.material.MaterialHooke2d.make(
     rve, "hard", 10e9, .33)
 soft = µ.material.MaterialHooke2d.make(

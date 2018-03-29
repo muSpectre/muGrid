@@ -44,9 +44,9 @@ class MaterialLinearElastic3_Check(unittest.TestCase):
         self.resolution = [5,5]
         self.lengths = [2.5, 3.1]
         self.formulation = µ.Formulation.small_strain
-        self.sys = µ.CellFactory(self.resolution,
-                                   self.lengths,
-                                   self.formulation)
+        self.sys = µ.Cell(self.resolution,
+                          self.lengths,
+                          self.formulation)
         self.mat = µ.material.MaterialLinearElastic3_2d.make(
             self.sys, "material")
 

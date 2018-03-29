@@ -25,11 +25,20 @@
  * Boston, MA 02111-1307, USA.
  */
 
+#define BOOST_MPL_CFG_NO_PREPROCESSED_HEADERS
+#define BOOST_MPL_LIMIT_LIST_SIZE 50
+
 #include <boost/mpl/list.hpp>
 
 #include "tests.hh"
 #include "mpi_context.hh"
+#include "fft/fftw_engine.hh"
+#ifdef WITH_FFTWMPI
 #include "fft/fftwmpi_engine.hh"
+#endif
+#ifdef WITH_PFFT
+#include "fft/pfft_engine.hh"
+#endif
 
 #include "common/ccoord_operations.hh"
 #include "common/field_collection.hh"
@@ -41,9 +50,10 @@ namespace muSpectre {
   BOOST_AUTO_TEST_SUITE(mpi_fft_engine);
 
   /* ---------------------------------------------------------------------- */
-  template <typename Engine, Dim_t resolution>
+  template <typename Engine, Dim_t resolution, bool serial=false>
   struct FFTW_fixture {
     constexpr static Dim_t box_resolution{resolution};
+    constexpr static Dim_t serial_engine{serial};
     constexpr static Real box_length{4.5};
     constexpr static Dim_t sdim{Engine::sdim};
     constexpr static Dim_t mdim{Engine::mdim};
@@ -57,6 +67,7 @@ namespace muSpectre {
 
   template <typename Engine>
   struct FFTW_fixture_python_segfault{
+    constexpr static Dim_t serial_engine{false};
     constexpr static Dim_t  dim{twoD};
     constexpr static Dim_t sdim{twoD};
     constexpr static Dim_t mdim{twoD};
@@ -66,33 +77,54 @@ namespace muSpectre {
     Engine engine;
   };
 
-  using fixlist = boost::mpl::list<FFTW_fixture<FFTWMPIEngine<  twoD,   twoD>, 3>,
+  using fixlist = boost::mpl::list<
+#ifdef WITH_FFTWMPI
+                                   FFTW_fixture<FFTWMPIEngine<  twoD,   twoD>, 3>,
                                    FFTW_fixture<FFTWMPIEngine<  twoD, threeD>, 3>,
                                    FFTW_fixture<FFTWMPIEngine<threeD, threeD>, 3>,
                                    FFTW_fixture<FFTWMPIEngine<  twoD,   twoD>, 4>,
                                    FFTW_fixture<FFTWMPIEngine<  twoD, threeD>, 4>,
                                    FFTW_fixture<FFTWMPIEngine<threeD, threeD>, 4>,
-                                   FFTW_fixture_python_segfault<FFTWMPIEngine<twoD, twoD>>>;
+                                   FFTW_fixture_python_segfault<FFTWMPIEngine<twoD, twoD>>,
+#endif
+#ifdef WITH_PFFT
+                                   FFTW_fixture<PFFTEngine<  twoD,   twoD>, 3>,
+                                   FFTW_fixture<PFFTEngine<  twoD, threeD>, 3>,
+                                   FFTW_fixture<PFFTEngine<threeD, threeD>, 3>,
+                                   FFTW_fixture<PFFTEngine<  twoD,   twoD>, 4>,
+                                   FFTW_fixture<PFFTEngine<  twoD, threeD>, 4>,
+                                   FFTW_fixture<PFFTEngine<threeD, threeD>, 4>,
+                                   FFTW_fixture_python_segfault<PFFTEngine<twoD, twoD>>,
+#endif
+                                   FFTW_fixture<FFTWEngine<  twoD,   twoD>, 3, true>>;
 
-
-  //using fixlist = boost::mpl::list<FFTW_fixture<PFFTEngine<  twoD,   twoD>, 3>,
-  //                                 FFTW_fixture<PFFTEngine<  twoD, threeD>, 3>,
-  //                                 FFTW_fixture<PFFTEngine<threeD, threeD>, 3>,
-  //                                 FFTW_fixture<PFFTEngine<  twoD,   twoD>, 4>,
-  //                                 FFTW_fixture<PFFTEngine<  twoD, threeD>, 4>,
-  //                                 FFTW_fixture<PFFTEngine<threeD, threeD>, 4>>;
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(Constructor_test, Fix, fixlist, Fix) {
     Communicator &comm = MPIContext::get_context().comm;
-    BOOST_CHECK_NO_THROW(Fix::engine.initialise(FFT_PlanFlags::estimate));
+    if (Fix::serial_engine && comm.size() > 1) {
+      BOOST_CHECK_THROW(Fix::engine.initialise(FFT_PlanFlags::estimate),
+                        std::runtime_error);
+      return;
+    }
+    else {
+      BOOST_CHECK_NO_THROW(Fix::engine.initialise(FFT_PlanFlags::estimate));
+    }
     BOOST_CHECK_EQUAL(comm.sum(Fix::engine.size()),
                       CcoordOps::get_size(Fix::res()));
   }
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(fft_test, Fix, fixlist, Fix) {
-    Fix::engine.initialise(FFT_PlanFlags::estimate);
+    if (Fix::serial_engine && Fix::engine.get_communicator().size() > 1) {
+      // expect initialization failure
+      BOOST_CHECK_THROW(Fix::engine.initialise(FFT_PlanFlags::estimate),
+                        std::runtime_error);
+      return;
+    }
+    else {
+      Fix::engine.initialise(FFT_PlanFlags::estimate);
+    }
     constexpr Dim_t order{2};
     using FC_t = GlobalFieldCollection<Fix::sdim>;
     FC_t fc;

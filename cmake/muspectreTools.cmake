@@ -170,7 +170,7 @@ function(mark_as_advanced_prefix prefix)
 endfunction()
 
 # ------------------------------------------------------------------------------
-function(add_external_package package)
+macro(add_external_package package)
   include(CMakeParseArguments)
 
   set(_cmake_includes ${PROJECT_SOURCE_DIR}/cmake)
@@ -201,14 +201,11 @@ function(add_external_package package)
 
   if(NOT _aep_args_IGNORE_SYSTEM)
     find_package(${package} ${_${package}_version} ${_required} ${_aep_UNPARSED_ARGUMENTS} QUIET)
-    if(${package}_FOUND AND NOT ${package}_FOUND_EXTERNAL)
-      return()
+  endif()
+
+  if(NOT ${${package}_FOUND})
+    if(EXISTS ${_cmake_includes}/${package}.cmake)
+      include(${_cmake_includes}/${package}.cmake)
     endif()
   endif()
-
-
-
-  if(EXISTS ${_cmake_includes}/${package}.cmake)
-    include(${_cmake_includes}/${package}.cmake)
-  endif()
-endfunction()
+endmacro()

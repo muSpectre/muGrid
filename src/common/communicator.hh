@@ -41,10 +41,18 @@ namespace muSpectre {
   template<> inline decltype(auto) mpi_type<short>() { return MPI_SHORT; }
   template<> inline decltype(auto) mpi_type<int>() { return MPI_INT; }
   template<> inline decltype(auto) mpi_type<long>() { return MPI_LONG; }
-  template<> inline decltype(auto) mpi_type<unsigned char>() { return MPI_UNSIGNED_CHAR; }
-  template<> inline decltype(auto) mpi_type<unsigned short>() { return MPI_UNSIGNED_SHORT; }
-  template<> inline decltype(auto) mpi_type<unsigned int>() { return MPI_UNSIGNED; }
-  template<> inline decltype(auto) mpi_type<unsigned long>() { return MPI_UNSIGNED_LONG; }
+  template<> inline decltype(auto) mpi_type<unsigned char>() {
+    return MPI_UNSIGNED_CHAR;
+  }
+  template<> inline decltype(auto) mpi_type<unsigned short>() {
+    return MPI_UNSIGNED_SHORT;
+  }
+  template<> inline decltype(auto) mpi_type<unsigned int>() {
+    return MPI_UNSIGNED;
+  }
+  template<> inline decltype(auto) mpi_type<unsigned long>() {
+    return MPI_UNSIGNED_LONG;
+  }
   template<> inline decltype(auto) mpi_type<float>() { return MPI_FLOAT; }
   template<> inline decltype(auto) mpi_type<double>() { return MPI_DOUBLE; }
 
@@ -60,6 +68,14 @@ namespace muSpectre {
       if (&comm == MPI_COMM_NULL) return 0;
       int res;
       MPI_Comm_rank(&this->comm, &res);
+      return res;
+    }
+
+    //! get total number of processes
+    int size() const {
+      if (&comm == MPI_COMM_NULL) return 1;
+      int res;
+      MPI_Comm_size(&this->comm, &res);
       return res;
     }
 
@@ -87,13 +103,18 @@ namespace muSpectre {
     ~Communicator() {};
 
     //! get rank of present process
-    int rank() {
+    int rank() const {
       return 0;
+    }
+
+    //! get total number of processes
+    int size() const {
+      return 1;
     }
 
     //! sum reduction on scalar types
     template<typename T>
-    T sum(const T &arg) { return arg; }
+    T sum(const T &arg) const { return arg; }
   };
 
 #endif

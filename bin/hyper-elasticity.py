@@ -42,9 +42,7 @@ def compute():
     incl_size = 3
 
     formulation = µ.Formulation.finite_strain
-    cell = µ.CellFactory(N,
-                           lens,
-                           formulation)
+    cell = µ.Cell(N, lens, formulation)
     hard = µ.material.MaterialHooke3d.make(cell, "hard",
                                            210.e9, .33)
     soft = µ.material.MaterialHooke3d.make(cell, "soft",

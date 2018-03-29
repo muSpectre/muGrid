@@ -28,7 +28,6 @@
 
 #include "tests.hh"
 #include "mpi_context.hh"
-#include "fft/fftwmpi_engine.hh"
 
 #include <boost/mpl/list.hpp>
 #include <Eigen/Dense>
@@ -72,12 +71,13 @@ namespace muSpectre {
   };
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM, class SizeGiver, class Proj>
+  template <Dim_t DimS, Dim_t DimM, class SizeGiver, class Proj, class Engine,
+            bool parallel=true>
   struct ProjectionFixture {
-    using Engine = FFTWMPIEngine<DimS, DimM>;
     using Parent = Proj;
     constexpr static Dim_t sdim{DimS};
     constexpr static Dim_t mdim{DimM};
+    constexpr static bool is_parallel{parallel};
     ProjectionFixture()
       :projector(std::make_unique<Engine>(SizeGiver::get_resolution(),
                                           SizeGiver::get_lengths(),

@@ -30,6 +30,13 @@
 #include "cell/cell_factory.hh"
 #include "cell/cell_base.hh"
 
+#ifdef WITH_FFTWMPI
+#include "fft/fftwmpi_engine.hh"
+#endif
+#ifdef WITH_PFFT
+#include "fft/pfft_engine.hh"
+#endif
+
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include "pybind11/eigen.h"
@@ -42,32 +49,66 @@ namespace py=pybind11;
 using namespace pybind11::literals;
 
 /**
+ * cell factory for specific FFT engine
+ */
+template <Dim_t dim, class FFTEngine>
+void add_parallel_cell_factory_helper(py::module & mod,
+                                      const char *name) {
+  using Ccoord = Ccoord_t<dim>;
+  using Rcoord = Rcoord_t<dim>;
+
+#ifdef WITH_MPI
+  mod.def
+    (name,
+     [](Ccoord res, Rcoord lens, Formulation form, size_t comm) {
+       return make_parallel_cell
+         <dim, dim, CellBase<dim, dim>, FFTEngine>
+         (std::move(res), std::move(lens), std::move(form),
+          std::move(Communicator(MPI_Comm(comm))));
+     },
+     "resolutions"_a,
+     "lengths"_a=CcoordOps::get_cube<dim>(1.),
+     "formulation"_a=Formulation::finite_strain,
+     "communicator"_a=size_t(MPI_COMM_SELF));
+#else
+  mod.def
+  (name,
+   [](Ccoord res, Rcoord lens, Formulation form) {
+     return make_parallel_cell
+     <dim, dim, CellBase<dim, dim>, FFTEngine>
+     (std::move(res), std::move(lens), std::move(form));
+   },
+   "resolutions"_a,
+   "lengths"_a=CcoordOps::get_cube<dim>(1.),
+   "formulation"_a=Formulation::finite_strain);
+#endif
+}
+
+/**
  * the cell factory is only bound for default template parameters
  */
 template <Dim_t dim>
 void add_cell_factory_helper(py::module & mod) {
   using Ccoord = Ccoord_t<dim>;
   using Rcoord = Rcoord_t<dim>;
-  using Form = Formulation;
 
   mod.def
     ("CellFactory",
-     [](Ccoord res, Rcoord lens, Form form) {
+     [](Ccoord res, Rcoord lens, Formulation form) {
        return make_cell(std::move(res), std::move(lens), std::move(form));
      },
      "resolutions"_a,
      "lengths"_a=CcoordOps::get_cube<dim>(1.),
      "formulation"_a=Formulation::finite_strain);
 
-#ifdef WITH_MPI
-  mod.def
-    ("ParallelCellFactory",
-     [](Ccoord res, Rcoord lens, Form form) {
-       return make_cell(std::move(res), std::move(lens), std::move(form));
-     },
-     "resolutions"_a,
-     "lengths"_a=CcoordOps::get_cube<dim>(1.),
-     "formulation"_a=Formulation::finite_strain);
+#ifdef WITH_FFTWMPI
+  add_parallel_cell_factory_helper<dim, FFTWMPIEngine<dim, dim>>(
+    mod, "FFTWMPICellFactory");
+#endif
+
+#ifdef WITH_PFFT
+  add_parallel_cell_factory_helper<dim, PFFTEngine<dim, dim>>(
+    mod, "PFFTCellFactory");
 #endif
 }
 

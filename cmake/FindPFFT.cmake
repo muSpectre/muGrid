@@ -26,7 +26,7 @@ find_package(PkgConfig)
 
 #Determine from PKG
 if( PKG_CONFIG_FOUND AND NOT PFFT_ROOT )
-  pkg_check_modules( PKG_PFFT QUIET "PFFT" )
+  pkg_check_modules( PKG_PFFT "pfft" QUIET )
 endif()
 
 #Check whether to search static or dynamic libs
@@ -38,41 +38,21 @@ else()
   set( CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_SHARED_LIBRARY_SUFFIX} )
 endif()
 
-if( PFFT_ROOT )
+#find libs
+find_library(
+  PFFT_LIBRARIES
+  NAMES "pfft"
+  PATHS ${PFFT_ROOT} ${PKG_PFFT_PREFIX} ${PKG_PFFT_LIBRARY_DIRS} ${LIB_INSTALL_DIR}
+  PATH_SUFFIXES "lib" "lib64"
+)
 
-  #find libs
-  find_library(
-    PFFT_LIBRARIES
-    NAMES "pfft"
-    PATHS ${PFFT_ROOT}
-    PATH_SUFFIXES "lib" "lib64"
-    NO_DEFAULT_PATH
-  )
-
-  #find includes
-  find_path(
-    PFFT_INCLUDES
-    NAMES "pfft.h"
-    PATHS ${PFFT_ROOT}
-    PATH_SUFFIXES "include"
-    NO_DEFAULT_PATH
-  )
-
-else()
-
-  find_library(
-    PFFT_LIBRARIES
-    NAMES "pfft"
-    PATHS ${PKG_PFFT_LIBRARY_DIRS} ${LIB_INSTALL_DIR}
-  )
-
-  find_path(
-    PFFT_INCLUDES
-    NAMES "pfft.h"
-    PATHS ${PKG_PFFT_INCLUDE_DIRS} ${INCLUDE_INSTALL_DIR}
-  )
-
-endif( PFFT_ROOT )
+#find includes
+find_path(
+  PFFT_INCLUDES
+  NAMES "pfft.h"
+  PATHS ${PFFT_ROOT} ${PKG_PFFT_PREFIX} ${PKG_PFFT_INCLUDE_DIRS} ${INCLUDE_INSTALL_DIR}
+  PATH_SUFFIXES "include"
+)
 
 set( CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES_SAV} )
 

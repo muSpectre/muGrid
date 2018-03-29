@@ -40,7 +40,7 @@ namespace muSpectre {
                                 this->projection_container)},
      xis(xiField)
   {
-    for (auto res: this->fft_engine->get_resolutions()) {
+    for (auto res: this->fft_engine->get_domain_resolutions()) {
       if (res % 2 == 0) {
       	throw ProjectionError
 	  ("Only an odd number of gridpoints in each direction is supported");
@@ -60,7 +60,9 @@ namespace muSpectre {
       auto & xi = std::get<1>(tup);
       xi = fft_freqs.get_unit_xi(ccoord);
     }
-    this->xis[0].setZero();
+    if (this->get_locations() == Ccoord{}) {
+      this->xis[0].setZero();
+    }
   }
 
 

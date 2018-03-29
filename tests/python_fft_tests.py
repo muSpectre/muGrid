@@ -34,33 +34,67 @@ import numpy as np
 
 from python_test_imports import µ
 
+try:
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+except ImportError:
+    comm = None
+
+
 class FFT_Check(unittest.TestCase):
     def setUp(self):
         self.resolution = [6, 4]
         self.dim = len(self.resolution)
         self.lengths = [3., 3.]
-        self.engine = µ.fft.FFTW_2d(self.resolution, self.lengths)
-        self.engine.initialise()
-        self.tol = 1e-14*np.prod(self.resolution)
+        self.engines = [('fftw', False),
+                        ('fftwmpi', True),
+                        ('pfft', True)]
+        self.tol = 1e-14 * np.prod(self.resolution)
 
     def test_forward_transform(self):
-        in_arr = np.random.random([*self.resolution, self.dim, self.dim])
-        out_ref = np.fft.rfftn(in_arr, axes=(0,1))
-        out_msp = self.engine.fft(in_arr.reshape(-1, self.dim**2).T).T
-        err = np.linalg.norm(out_ref -
-                             out_msp.reshape(out_ref.shape))
-        self.assertTrue(err< self.tol)
+        for engine_str, transposed in self.engines:
+            try:
+                engine = µ.fft.FFT(self.resolution, self.lengths,
+                                   fft=engine_str)
+            except KeyError:
+                # This FFT engine has not been compiled into the code. Skip
+                # test.
+                continue
+            engine.initialise()
+            in_arr = np.random.random([*self.resolution, self.dim, self.dim])
+            out_ref = np.fft.rfftn(in_arr, axes=(0, 1))
+            if transposed:
+                out_ref = out_ref.swapaxes(0, 1)
+            out_msp = engine.fft(in_arr.reshape(-1, self.dim**2).T).T
+            err = np.linalg.norm(out_ref -
+                                 out_msp.reshape(out_ref.shape))
+            self.assertTrue(err < self.tol)
 
     def test_reverse_transform(self):
-        complex_res = µ.get_hermitian_sizes(self.resolution)
-        in_arr = np.zeros([*complex_res, self.dim, self.dim], dtype=complex)
-        in_arr.real = np.random.random(in_arr.shape)
-        in_arr.imag = np.random.random(in_arr.shape)
+        for engine_str, transposed in self.engines:
+            try:
+                engine = µ.fft.FFT(self.resolution, self.lengths,
+                                   fft=engine_str)
+            except KeyError:
+                # This FFT engine has not been compiled into the code. Skip
+                # test.
+                continue
+            engine.initialise()
 
-        out_ref = np.fft.irfftn(in_arr, axes=(0,1))
+            complex_res = µ.get_hermitian_sizes(self.resolution)
+            in_arr = np.zeros([*complex_res, self.dim, self.dim],
+                              dtype=complex)
+            in_arr.real = np.random.random(in_arr.shape)
+            in_arr.imag = np.random.random(in_arr.shape)
 
-        out_msp = self.engine.ifft(in_arr.reshape(-1, self.dim**2).T).T
-        out_msp *= self.engine.normalisation()
-        err = np.linalg.norm(out_ref -
-                             out_msp.reshape(out_ref.shape))
-        self.assertTrue(err< self.tol)
+            out_ref = np.fft.irfftn(in_arr, axes=(0, 1))
+            if transposed:
+                in_arr = in_arr.swapaxes(0, 1)
+            out_msp = engine.ifft(in_arr.reshape(-1, self.dim**2).T).T
+            out_msp *= engine.normalisation()
+            err = np.linalg.norm(out_ref -
+                                 out_msp.reshape(out_ref.shape))
+            self.assertTrue(err < self.tol)
+
+if __name__ == '__main__':
+    unittest.main()

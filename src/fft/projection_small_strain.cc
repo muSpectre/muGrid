@@ -36,7 +36,7 @@ namespace muSpectre {
   ProjectionSmallStrain(FFTEngine_ptr engine)
     : Parent{std::move(engine), Formulation::small_strain}
   {
-    for (auto res: this->fft_engine->get_resolutions()) {
+    for (auto res: this->fft_engine->get_domain_resolutions()) {
       if (res % 2 == 0) {
       	throw ProjectionError
 	  ("Only an odd number of gridpoints in each direction is supported");
@@ -73,7 +73,9 @@ namespace muSpectre {
         }
       }
     }
-    this->Ghat[0].setZero();
+    if (this->get_locations() == Ccoord{}) {
+      this->Ghat[0].setZero();
+    }
   }
 
   template class ProjectionSmallStrain<twoD,   twoD>;

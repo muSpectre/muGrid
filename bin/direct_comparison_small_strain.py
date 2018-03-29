@@ -17,9 +17,9 @@ N      = 31 #31  # number of voxels (assumed equal for all directions)
 offset = 3 #9
 ndof   = ndim**2*N**2 # number of degrees-of-freedom
 
-cell = µ.CellFactory(µ.get_2d_cube(N),
-                       µ.get_2d_cube(1.),
-                       µ.Formulation.small_strain)
+cell = µ.Cell(µ.get_2d_cube(N),
+              µ.get_2d_cube(1.),
+              µ.Formulation.small_strain)
 
 # ---------------------- PROJECTION, TENSORS, OPERATIONS ----------------------
 

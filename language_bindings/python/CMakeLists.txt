@@ -27,11 +27,16 @@
 # Boston, MA 02111-1307, USA.
 #
 
-if(APPLE)
-  # pybind11 (installed via homebrew) does not set include directories properly.
-  # This is necessary to find Python.h.
-  find_package(PythonLibs 3)
+# FIXME! The user should have a choice to configure this path.
+execute_process(COMMAND "${PYTHON_EXECUTABLE}" "-m" "site" "--user-site"
+  RESULT_VARIABLE _PYTHON_SUCCESS
+  OUTPUT_VARIABLE PYTHON_USER_SITE
+  ERROR_VARIABLE _PYTHON_ERROR_VALUE)
+if(NOT _PYTHON_SUCCESS MATCHES 0)
+  message(FATAL_ERROR
+          "Python config failure:\n${_PYTHON_ERROR_VALUE}")
 endif()
+string(REGEX REPLACE "\n" "" PYTHON_USER_SITE ${PYTHON_USER_SITE})
 
 set (PY_BINDING_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_module.cc
@@ -43,7 +48,16 @@ set (PY_BINDING_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_projections.cc
   )
 
-pybind11_add_module(pyMuSpectre ${PY_BINDING_SRCS})
-target_link_libraries(pyMuSpectre PRIVATE muSpectre)
+
+pybind11_add_module(pyMuSpectreLib ${PY_BINDING_SRCS})
+target_link_libraries(pyMuSpectreLib PRIVATE muSpectre)
 # Want to rename the output, so that the python module is called muSpectre
-set_target_properties(pyMuSpectre PROPERTIES OUTPUT_NAME muSpectre)
+set_target_properties(pyMuSpectreLib PROPERTIES OUTPUT_NAME _muSpectre)
+
+add_custom_target(pyMuSpectre ALL SOURCES muSpectre/__init__.py)
+add_custom_command(TARGET pyMuSpectre POST_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E copy_directory
+                       ${CMAKE_SOURCE_DIR}/language_bindings/python/muSpectre $<TARGET_FILE_DIR:pyMuSpectreLib>/muSpectre)
+
+install(TARGETS pyMuSpectreLib LIBRARY DESTINATION ${PYTHON_USER_SITE})
+install(FILES muSpectre/__init__.py DESTINATION ${PYTHON_USER_SITE}/muSpectre)

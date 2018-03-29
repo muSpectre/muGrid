@@ -36,7 +36,7 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   FFTWMPIEngine<DimS, DimM>::FFTWMPIEngine(Ccoord resolutions, Rcoord lengths,
                                            Communicator comm)
-    :Parent{resolutions, lengths, comm}, real_workspace{nullptr}
+    :Parent{resolutions, lengths, comm}
   {
     if (!this->nb_engines) fftw_mpi_init();
     this->nb_engines++;
@@ -60,8 +60,26 @@ namespace muSpectre {
     this->fourier_resolutions[0] = res_y;
     this->fourier_locations[0] = loc_y;
 
-    for (auto && pixel: CcoordOps::Pixels<DimS, true>(this->fourier_resolutions,
-                                                      this->fourier_locations)) {
+    for (auto & n: this->resolutions) {
+      if (n == 0) {
+        throw std::runtime_error("FFTW MPI planning returned zero resolution. "
+                                 "You may need to run on fewer processes.");
+      }
+    }
+    for (auto & n: this->fourier_resolutions) {
+      if (n == 0) {
+        throw std::runtime_error("FFTW MPI planning returned zero Fourier "
+                                 "resolution. You may need to run on fewer "
+                                 "processes.");
+      }
+    }
+
+    for (auto && pixel:
+         std::conditional_t<
+           DimS==2,
+           CcoordOps::Pixels<DimS, 1, 0>,
+           CcoordOps::Pixels<DimS, 1, 0, 2>
+         >(this->fourier_resolutions, this->fourier_locations)) {
            this->work_space_container.add_pixel(pixel);
     }
   }
@@ -109,8 +127,8 @@ namespace muSpectre {
     std::array<ptrdiff_t, DimS> narr;
     std::copy(this->domain_resolutions.begin(), this->domain_resolutions.end(),
               narr.begin());
-    Real * in = this->real_workspace;
-    fftw_complex * out = reinterpret_cast<fftw_complex*>(this->work.data());
+    Real * in{this->real_workspace};
+    fftw_complex * out{reinterpret_cast<fftw_complex*>(this->work.data())};
     this->plan_fft = fftw_mpi_plan_many_dft_r2c(
       DimS, narr.data(), Field_t::nb_components, FFTW_MPI_DEFAULT_BLOCK,
       FFTW_MPI_DEFAULT_BLOCK, in, out, this->comm.get_mpi_comm(),
@@ -118,8 +136,6 @@ namespace muSpectre {
     if (this->plan_fft == nullptr) {
       throw std::runtime_error("r2c plan failed");
     }
-
-    fftw_mpi_execute_dft_r2c(this->plan_fft, in, out);
 
     fftw_complex * i_in = reinterpret_cast<fftw_complex*>(this->work.data());
     Real * i_out = this->real_workspace;
@@ -140,8 +156,10 @@ namespace muSpectre {
     if (this->real_workspace != nullptr) fftw_free(this->real_workspace);
     if (this->plan_fft != nullptr) fftw_destroy_plan(this->plan_fft);
     if (this->plan_ifft != nullptr) fftw_destroy_plan(this->plan_ifft);
-    this->nb_engines--;
-    if (!this->nb_engines) fftw_mpi_cleanup();
+    // TODO: We cannot run fftw_mpi_cleanup since also calls fftw_cleanup
+    // and any running FFTWEngine will fail afterwards.
+    //this->nb_engines--;
+    //if (!this->nb_engines) fftw_mpi_cleanup();
   }
 
   /* ---------------------------------------------------------------------- */
@@ -192,12 +210,12 @@ namespace muSpectre {
     // Copy non-padded field to padded real_workspace.
     // Transposed output of M x N x L transform for >= 3 dimensions is padded
     // M x N x 2*(L/2+1).
-    ptrdiff_t fstride = Field_t::nb_components*this->resolutions[DimS-1];
-    ptrdiff_t wstride = Field_t::nb_components*2*(this->resolutions[DimS-1]/2+1);
-    ptrdiff_t n = field.size()/this->resolutions[DimS-1];
+    ptrdiff_t fstride{Field_t::nb_components*this->resolutions[DimS-1]};
+    ptrdiff_t wstride{Field_t::nb_components*2*(this->resolutions[DimS-1]/2+1)};
+    ptrdiff_t n(field.size()/this->resolutions[DimS-1]);
 
-    auto fdata = field.data();
-    auto wdata = this->real_workspace;
+    auto fdata{field.data()};
+    auto wdata{this->real_workspace};
     for (int i = 0; i < n; i++) {
       std::copy(wdata, wdata+fstride, fdata);
       fdata += fstride;

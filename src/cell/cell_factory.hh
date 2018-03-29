@@ -106,9 +106,9 @@ namespace muSpectre {
   inline
   std::unique_ptr<ProjectionBase<DimS, DimM>>
   parallel_cell_input(Ccoord_t<DimS> resolutions,
-             Rcoord_t<DimS> lengths,
-             Formulation form,
-             const Communicator & comm) {
+                      Rcoord_t<DimS> lengths,
+                      Formulation form,
+                      const Communicator & comm) {
     auto fft_ptr{std::make_unique<FFTEngine>(resolutions, lengths, comm)};
     switch (form)
     {
@@ -123,7 +123,7 @@ namespace muSpectre {
         break;
       }
       default: {
-        throw std::runtime_error("unknow formulation");
+        throw std::runtime_error("unknown formulation");
         break;
       }
     }

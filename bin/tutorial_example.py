@@ -22,9 +22,7 @@ lengths = [7., 5.]
 formulation = msp.Formulation.small_strain
 
 ## build a computational domain
-rve = msp.CellFactory(resolution,
-                      lengths,
-                      formulation)
+rve = msp.Cell(resolution, lengths, formulation)
 
 ## define the material properties of the matrix and inclusion
 hard = msp.material.MaterialLinearElastic1_2d.make(

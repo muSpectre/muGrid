@@ -85,7 +85,7 @@ namespace muSpectre {
     fftw_plan plan_fft{}; //!< holds the plan for forward fourier transform
     fftw_plan plan_ifft{}; //!< holds the plan for inverse fourier transform
     ptrdiff_t workspace_size{}; //!< size of workspace buffer returned by planner
-    Real *real_workspace; //!< temporary real workspace that is correctly padded
+    Real *real_workspace{}; //!< temporary real workspace that is correctly padded
     bool initialised{false}; //!< to prevent double initialisation
   private:
   };

@@ -17,8 +17,8 @@
 #
 
 #If environment variable FFTWMPIDIR is specified, it has same effect as FFTWMPI_ROOT
-if( NOT FFTWMPI_ROOT AND ENV{FFTWMPIDIR} )
-  set( FFTWMPI_ROOT $ENV{FFTWMPIDIR} )
+if( NOT FFTWMPI_ROOT AND ENV{FFTWDIR} )
+  set( FFTWMPI_ROOT $ENV{FFTWDIR} )
 endif()
 
 # Check if we can use PkgConfig
@@ -26,7 +26,7 @@ find_package(PkgConfig)
 
 #Determine from PKG
 if( PKG_CONFIG_FOUND AND NOT FFTWMPI_ROOT )
-  pkg_check_modules( PKG_FFTWMPI QUIET "fftw3_mpi" )
+  pkg_check_modules( PKG_FFTWMPI QUIET "fftw3" )
 endif()
 
 #Check whether to search static or dynamic libs
@@ -38,72 +38,41 @@ else()
   set( CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_SHARED_LIBRARY_SUFFIX} )
 endif()
 
-if( FFTWMPI_ROOT )
+#find libs
+find_library(
+  FFTWMPI_LIB
+  NAMES "fftw3_mpi"
+  PATHS ${FFTWMPI_ROOT} ${PKG_FFTWMPI_PREFIX} ${PKG_FFTWMPI_LIBRARY_DIRS} ${LIB_INSTALL_DIR}
+  PATH_SUFFIXES "lib" "lib64"
+)
 
-  #find libs
-  find_library(
-    FFTWMPI_LIB
-    NAMES "fftw3_mpi"
-    PATHS ${FFTWMPI_ROOT}
-    PATH_SUFFIXES "lib" "lib64"
-    NO_DEFAULT_PATH
-  )
+find_library(
+  FFTWMPIF_LIB
+  NAMES "fftw3f_mpi"
+  PATHS ${FFTWMPI_ROOT} ${PKG_FFTWMPI_PREFIX} ${PKG_FFTWMPI_LIBRARY_DIRS} ${LIB_INSTALL_DIR}
+  PATH_SUFFIXES "lib" "lib64"
+)
 
-  find_library(
-    FFTWMPIF_LIB
-    NAMES "fftw3f_mpi"
-    PATHS ${FFTWMPI_ROOT}
-    PATH_SUFFIXES "lib" "lib64"
-    NO_DEFAULT_PATH
-  )
+find_library(
+  FFTWMPIL_LIB
+  NAMES "fftw3l_mpi"
+  PATHS ${FFTWMPI_ROOT} ${PKG_FFTWMPI_PREFIX} ${PKG_FFTWMPI_LIBRARY_DIRS} ${LIB_INSTALL_DIR}
+  PATH_SUFFIXES "lib" "lib64"
+)
 
-  find_library(
-    FFTWMPIL_LIB
-    NAMES "fftw3l_mpi"
-    PATHS ${FFTWMPI_ROOT}
-    PATH_SUFFIXES "lib" "lib64"
-    NO_DEFAULT_PATH
-  )
+#find includes
+find_path(
+  FFTWMPI_INCLUDES
+  NAMES "fftw3-mpi.h"
+  PATHS ${FFTWMPI_ROOT} ${PKG_FFTWMPI_PREFIX} ${PKG_FFTWMPI_INCLUDE_DIRS} ${INCLUDE_INSTALL_DIR}
+  PATH_SUFFIXES "include"
+)
 
-  #find includes
-  find_path(
-    FFTWMPI_INCLUDES
-    NAMES "fftw3-mpi.h"
-    PATHS ${FFTWMPI_ROOT}
-    PATH_SUFFIXES "include"
-    NO_DEFAULT_PATH
-  )
+set(FFTWMPI_LIBRARIES ${FFTWMPI_LIB})
 
-else()
-
-  find_library(
-    FFTWMPI_LIB
-    NAMES "fftw3_mpi"
-    PATHS ${PKG_FFTWMPI_LIBRARY_DIRS} ${LIB_INSTALL_DIR}
-  )
-
-  find_library(
-    FFTWMPIF_LIB
-    NAMES "fftw3f_mpi"
-    PATHS ${PKG_FFTWMPI_LIBRARY_DIRS} ${LIB_INSTALL_DIR}
-  )
-
-
-  find_library(
-    FFTWMPIL_LIB
-    NAMES "fftw3l_mpi"
-    PATHS ${PKG_FFTWMPI_LIBRARY_DIRS} ${LIB_INSTALL_DIR}
-  )
-
-  find_path(
-    FFTWMPI_INCLUDES
-    NAMES "fftw3-mpi.h"
-    PATHS ${PKG_FFTWMPI_INCLUDE_DIRS} ${INCLUDE_INSTALL_DIR}
-  )
-
-endif( FFTWMPI_ROOT )
-
-set(FFTWMPI_LIBRARIES ${FFTWMPI_LIB} ${FFTWMPIF_LIB})
+if(FFTWMPIF_LIB)
+  set(FFTWMPI_LIBRARIES ${FFTWMPI_LIBRARIES} ${FFTWMPIF_LIB})
+endif()
 
 if(FFTWMPIL_LIB)
   set(FFTWMPI_LIBRARIES ${FFTWMPI_LIBRARIES} ${FFTWMPIL_LIB})

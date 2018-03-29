@@ -44,6 +44,11 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   void FFTWEngine<DimS, DimM>::initialise(FFT_PlanFlags plan_flags) {
+    if (this->comm.size() > 1) {
+      throw std::runtime_error("Attempting to run in parallel, but standard "
+                               "FFTW engine does not support parallel "
+                               "execution.");
+    }
     if (this->initialised) {
       throw std::runtime_error("double initialisation, will leak memory");
     }
@@ -111,7 +116,9 @@ namespace muSpectre {
   FFTWEngine<DimS, DimM>::~FFTWEngine<DimS, DimM>() noexcept {
     fftw_destroy_plan(this->plan_fft);
     fftw_destroy_plan(this->plan_ifft);
-    fftw_cleanup();
+    // TODO: We cannot run fftw_cleanup since subsequent FFTW calls will fail
+    // but multiple FFT engines can be active at the same time.
+    //fftw_cleanup();
   }
 
   /* ---------------------------------------------------------------------- */

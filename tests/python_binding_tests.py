@@ -46,9 +46,9 @@ class CellCheck(unittest.TestCase):
         lengths = [5.2, 8.3]
         formulation = µ.Formulation.small_strain
         try:
-            sys = µ.CellFactory(resolution,
-                                  lengths,
-                                  formulation)
+            sys = µ.Cell(resolution,
+                         lengths,
+                         formulation)
             mat = µ.material.MaterialLinearElastic1_2d.make(sys, "material", 210e9, .33)
         except Exception as err:
             print(err)
@@ -59,9 +59,9 @@ class MaterialLinearElastic1_2dCheck(unittest.TestCase):
         self.resolution = [5,7]
         self.lengths = [5.2, 8.3]
         self.formulation = µ.Formulation.small_strain
-        self.sys = µ.CellFactory(self.resolution,
-                                   self.lengths,
-                                   self.formulation)
+        self.sys = µ.Cell(self.resolution,
+                          self.lengths,
+                          self.formulation)
         self.mat = µ.material.MaterialLinearElastic1_2d.make(
             self.sys, "material", 210e9, .33)
 
@@ -74,9 +74,9 @@ class SolverCheck(unittest.TestCase):
         self.resolution = [3, 3]#[5,7]
         self.lengths = [3., 3.]#[5.2, 8.3]
         self.formulation = µ.Formulation.finite_strain
-        self.sys = µ.CellFactory(self.resolution,
-                                   self.lengths,
-                                   self.formulation)
+        self.sys = µ.Cell(self.resolution,
+                          self.lengths,
+                          self.formulation)
         self.hard = µ.material.MaterialLinearElastic1_2d.make(
             self.sys, "hard", 210e9, .33)
         self.soft = µ.material.MaterialLinearElastic1_2d.make(
@@ -107,12 +107,12 @@ class EigenStrainCheck(unittest.TestCase):
         self.resolution = [3, 3]#[5,7]
         self.lengths = [3., 3.]#[5.2, 8.3]
         self.formulation = µ.Formulation.small_strain
-        self.cell1 = µ.CellFactory(self.resolution,
-                                    self.lengths,
-                                    self.formulation)
-        self.cell2 = µ.CellFactory(self.resolution,
-                                    self.lengths,
-                                    self.formulation)
+        self.cell1 = µ.Cell(self.resolution,
+                            self.lengths,
+                            self.formulation)
+        self.cell2 = µ.Cell(self.resolution,
+                            self.lengths,
+                            self.formulation)
         self.mat1 = µ.material.MaterialLinearElastic1_2d.make(
             self.cell1, "simple", 210e9, .33)
         self.mat2 = µ.material.MaterialLinearElastic2_2d.make(

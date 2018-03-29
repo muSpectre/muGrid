@@ -35,6 +35,7 @@ import itertools
 
 from python_test_imports import µ
 from python_goose_ref import SmallStrainProjectionGooseFFT, FiniteStrainProjectionGooseFFT
+import _muSpectre
 
 def build_test_classes(Projection, RefProjection, name):
     class ProjectionCheck(unittest.TestCase):
@@ -130,24 +131,24 @@ get_finite_goose = lambda ndim: get_goose(ndim, FiniteStrainProjectionGooseFFT)
 get_small_goose  = lambda ndim: get_goose(ndim,  SmallStrainProjectionGooseFFT)
 
 
-small_default_3 = build_test_classes(µ.fft.ProjectionSmallStrain_3d,
+small_default_3 = build_test_classes(_muSpectre.fft.ProjectionSmallStrain_3d,
                                      get_small_goose(3),
                                      "SmallStrainDefaultProjection3d")
-small_default_2 = build_test_classes(µ.fft.ProjectionSmallStrain_2d,
+small_default_2 = build_test_classes(_muSpectre.fft.ProjectionSmallStrain_2d,
                                      get_small_goose(2),
                                      "SmallStrainDefaultProjection2d")
 
-finite_default_3 = build_test_classes(µ.fft.ProjectionFiniteStrain_3d,
+finite_default_3 = build_test_classes(_muSpectre.fft.ProjectionFiniteStrain_3d,
                                       get_finite_goose(3),
                                       "FiniteStrainDefaultProjection3d")
-finite_default_2 = build_test_classes(µ.fft.ProjectionFiniteStrain_2d,
+finite_default_2 = build_test_classes(_muSpectre.fft.ProjectionFiniteStrain_2d,
                                       get_finite_goose(2),
                                       "FiniteStrainDefaultProjection2d")
 
-finite_fast_3 = build_test_classes(µ.fft.ProjectionFiniteStrainFast_3d,
+finite_fast_3 = build_test_classes(_muSpectre.fft.ProjectionFiniteStrainFast_3d,
                                    get_finite_goose(3),
                                    "FiniteStrainFastProjection3d")
-finite_fast_2 = build_test_classes(µ.fft.ProjectionFiniteStrainFast_2d,
+finite_fast_2 = build_test_classes(_muSpectre.fft.ProjectionFiniteStrainFast_2d,
                                    get_finite_goose(2),
                                    "FiniteStrainFastProjection2d")
 if __name__ == "__main__":

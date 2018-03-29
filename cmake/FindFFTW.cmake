@@ -38,72 +38,41 @@ else()
   set( CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_SHARED_LIBRARY_SUFFIX} )
 endif()
 
-if( FFTW_ROOT )
+#find libs
+find_library(
+  FFTW_LIB
+  NAMES "fftw3"
+  PATHS ${FFTW_ROOT} ${PKG_FFTW_PREFIX} ${PKG_FFTW_LIBRARY_DIRS} ${LIB_INSTALL_DIR}
+  PATH_SUFFIXES "lib" "lib64"
+)
 
-  #find libs
-  find_library(
-    FFTW_LIB
-    NAMES "fftw3"
-    PATHS ${FFTW_ROOT}
-    PATH_SUFFIXES "lib" "lib64"
-    NO_DEFAULT_PATH
-  )
+find_library(
+  FFTWF_LIB
+  NAMES "fftw3f"
+  PATHS ${FFTW_ROOT} ${PKG_FFTW_PREFIX} ${PKG_FFTW_LIBRARY_DIRS} ${LIB_INSTALL_DIR}
+  PATH_SUFFIXES "lib" "lib64"
+)
 
-  find_library(
-    FFTWF_LIB
-    NAMES "fftw3f"
-    PATHS ${FFTW_ROOT}
-    PATH_SUFFIXES "lib" "lib64"
-    NO_DEFAULT_PATH
-  )
+find_library(
+  FFTWL_LIB
+  NAMES "fftw3l"
+  PATHS ${FFTW_ROOT} ${PKG_FFTW_PREFIX} ${PKG_FFTW_LIBRARY_DIRS} ${LIB_INSTALL_DIR}
+  PATH_SUFFIXES "lib" "lib64"
+)
 
-  find_library(
-    FFTWL_LIB
-    NAMES "fftw3l"
-    PATHS ${FFTW_ROOT}
-    PATH_SUFFIXES "lib" "lib64"
-    NO_DEFAULT_PATH
-  )
+#find includes
+find_path(
+  FFTW_INCLUDES
+  NAMES "fftw3.h"
+  PATHS ${FFTW_ROOT} ${PKG_FFTW_PREFIX} ${PKG_FFTW_INCLUDE_DIRS} ${INCLUDE_INSTALL_DIR}
+  PATH_SUFFIXES "include"
+)
 
-  #find includes
-  find_path(
-    FFTW_INCLUDES
-    NAMES "fftw3.h"
-    PATHS ${FFTW_ROOT}
-    PATH_SUFFIXES "include"
-    NO_DEFAULT_PATH
-  )
+set(FFTW_LIBRARIES ${FFTW_LIB})
 
-else()
-
-  find_library(
-    FFTW_LIB
-    NAMES "fftw3"
-    PATHS ${PKG_FFTW_LIBRARY_DIRS} ${LIB_INSTALL_DIR}
-  )
-
-  find_library(
-    FFTWF_LIB
-    NAMES "fftw3f"
-    PATHS ${PKG_FFTW_LIBRARY_DIRS} ${LIB_INSTALL_DIR}
-  )
-
-
-  find_library(
-    FFTWL_LIB
-    NAMES "fftw3l"
-    PATHS ${PKG_FFTW_LIBRARY_DIRS} ${LIB_INSTALL_DIR}
-  )
-
-  find_path(
-    FFTW_INCLUDES
-    NAMES "fftw3.h"
-    PATHS ${PKG_FFTW_INCLUDE_DIRS} ${INCLUDE_INSTALL_DIR}
-  )
-
-endif( FFTW_ROOT )
-
-set(FFTW_LIBRARIES ${FFTW_LIB} ${FFTWF_LIB})
+if(FFTWF_LIB)
+  set(FFTW_LIBRARIES ${FFTW_LIBRARIES} ${FFTWF_LIB})
+endif()
 
 if(FFTWL_LIB)
   set(FFTW_LIBRARIES ${FFTW_LIBRARIES} ${FFTWL_LIB})

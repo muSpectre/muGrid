@@ -32,7 +32,7 @@ Boston, MA 02111-1307, USA.
 import sys
 import os
 
-sys.path.append(os.path.join(os.getcwd(), "language_bindings/python"))
+sys.path.insert(0, os.path.join(os.getcwd(), "language_bindings/python"))
 
 try:
     import muSpectre as µ
