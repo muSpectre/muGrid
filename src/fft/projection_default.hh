@@ -48,6 +48,7 @@ namespace muSpectre {
     //! polymorphic FFT pointer type
     using FFTEngine_ptr = typename Parent::FFTEngine_ptr;
     using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
+    using Rcoord = typename Parent::Rcoord; //!< spatial coordinates type
     //! global field collection
     using GFieldCollection_t = GlobalFieldCollection<DimS>;
     //! local field collection for Fourier-space fields
@@ -64,7 +65,7 @@ namespace muSpectre {
     ProjectionDefault() = delete;
 
     //! Constructor with cell sizes and formulation
-    ProjectionDefault(FFTEngine_ptr engine, Formulation form);
+    ProjectionDefault(FFTEngine_ptr engine, Rcoord lengths, Formulation form);
 
     //! Copy constructor
     ProjectionDefault(const ProjectionDefault &other) = delete;

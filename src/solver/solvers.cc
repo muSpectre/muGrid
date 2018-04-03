@@ -45,7 +45,8 @@ namespace muSpectre {
     using Field_t = typename MaterialBase<DimS, DimM>::StrainField_t;
     const Communicator & comm = cell.get_communicator();
     auto solver_fields{std::make_unique<GlobalFieldCollection<DimS>>()};
-    solver_fields->initialise(cell.get_resolutions(), cell.get_locations());
+    solver_fields->initialise(cell.get_subdomain_resolutions(),
+                              cell.get_subdomain_locations());
 
     // Corresponds to symbol δF or δε
     auto & incrF{make_field<Field_t>("δF", *solver_fields)};
@@ -244,7 +245,8 @@ namespace muSpectre {
     using Field_t = typename MaterialBase<DimS, DimM>::StrainField_t;
     const Communicator & comm = cell.get_communicator();
     auto solver_fields{std::make_unique<GlobalFieldCollection<DimS>>()};
-    solver_fields->initialise(cell.get_resolutions(), cell.get_locations());
+    solver_fields->initialise(cell.get_subdomain_resolutions(),
+                              cell.get_subdomain_locations());
 
     // Corresponds to symbol δF or δε
     auto & incrF{make_field<Field_t>("δF", *solver_fields)};

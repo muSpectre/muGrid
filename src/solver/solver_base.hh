@@ -85,8 +85,8 @@ namespace muSpectre {
 
     //! Allocate fields used during the solution
     virtual void initialise() {
-      this->collection.initialise(this->cell.get_resolutions(),
-                                  this->cell.get_locations());
+      this->collection.initialise(this->cell.get_subdomain_resolutions(),
+                                  this->cell.get_subdomain_locations());
     }
 
     //! determine whether this solver requires full tangent stiffnesses

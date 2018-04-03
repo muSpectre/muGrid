@@ -33,8 +33,9 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   ProjectionBase<DimS, DimM>::ProjectionBase(FFTEngine_ptr engine,
+                                             Rcoord domain_lengths,
                                              Formulation form)
-    : fft_engine{std::move(engine)}, form{form},
+    : fft_engine{std::move(engine)}, domain_lengths{domain_lengths}, form{form},
       projection_container{this->fft_engine->get_field_collection()}
   {
     static_assert((DimS == FFTEngine::sdim),

@@ -44,7 +44,6 @@ namespace muSpectre {
   public:
     using Parent = FFTEngineBase<DimS, DimM>; //!< base class
     using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
-    using Rcoord = typename Parent::Rcoord; //!< spatial coordinates type
     //! field for Fourier transform of second-order tensor
     using Workspace_t = typename Parent::Workspace_t;
     //! real-valued second-order tensor
@@ -53,8 +52,7 @@ namespace muSpectre {
     FFTWMPIEngine() = delete;
 
     //! Constructor with system resolutions
-    FFTWMPIEngine(Ccoord resolutions, Rcoord lengths,
-                  Communicator comm=Communicator());
+    FFTWMPIEngine(Ccoord resolutions, Communicator comm=Communicator());
 
     //! Copy constructor
     FFTWMPIEngine(const FFTWMPIEngine &other) = delete;

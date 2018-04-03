@@ -35,7 +35,7 @@ _factories = {'fftw': ('FFTW_2d', 'FFTW_3d', False),
               'p3dfft': ('P3DFFT_2d', 'P3DFFT_3d', True)}
 
 
-def FFT(resolutions, lengths, fft='fftw', communicator=None):
+def FFT(resolutions, fft='fftw', communicator=None):
     """
     Instantiate a muSpectre FFT class.
 
@@ -43,8 +43,6 @@ def FFT(resolutions, lengths, fft='fftw', communicator=None):
     ----------
     resolutions: list
         Grid resolutions in the Cartesian directions.
-    lengths: list
-        Physical size of the cell in the Cartesian directions.
     fft: string
         FFT engine to use. Options are 'fftw', 'fftwmpi', 'pfft' and 'p3dfft'.
         Default is 'fftw'.
@@ -58,9 +56,6 @@ def FFT(resolutions, lengths, fft='fftw', communicator=None):
     cell: object
         Return a muSpectre Cell object.
     """
-    if len(resolutions) != len(lengths):
-        raise ValueError("'resolutions' and 'lengths' must have identical "
-                         "lengths.")
     try:
         factory_name_2d, factory_name_3d, is_parallel = _factories[fft]
     except KeyError:
@@ -80,10 +75,9 @@ def FFT(resolutions, lengths, fft='fftw', communicator=None):
     if is_parallel:
         if communicator is None:
             communicator = mpi4py.MPI.COMM_SELF
-        return factory(resolutions, lengths,
-                       mpi4py.MPI._handleof(communicator))
+        return factory(resolutions, mpi4py.MPI._handleof(communicator))
     else:
         if communicator is not None:
             raise ValueError("FFT engine '{}' does not support parallel "
                              "execution.".format(fft))
-        return factory(resolutions, lengths)
+        return factory(resolutions)

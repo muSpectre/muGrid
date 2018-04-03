@@ -51,8 +51,7 @@ namespace muSpectre {
     constexpr static Ccoord_t<sdim> loc() {
       return CcoordOps::get_cube<DimS>(0);
     }
-    FFTW_fixture() :engine(res(),
-                           CcoordOps::get_cube<DimS>(box_length)){}
+    FFTW_fixture() : engine(res()) {}
     FFTWEngine<DimS, DimM> engine;
   };
 
@@ -62,7 +61,7 @@ namespace muSpectre {
     constexpr static Dim_t mdim{twoD};
     constexpr static Ccoord_t<sdim> res() {return {6, 4};}
     constexpr static Ccoord_t<sdim> loc() {return {0, 0};}
-    FFTW_fixture_python_segfault():engine{res(), {3., 3}} {}
+    FFTW_fixture_python_segfault() : engine{res()} {}
     FFTWEngine<sdim, mdim> engine;
   };
 

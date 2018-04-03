@@ -34,8 +34,9 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   ProjectionDefault<DimS, DimM>::ProjectionDefault(FFTEngine_ptr engine,
+                                                   Rcoord lengths,
                                                    Formulation form)
-    :Parent{std::move(engine), form},
+    :Parent{std::move(engine), lengths, form},
      Gfield{make_field<Proj_t>("Projection Operator",
                                this->projection_container)},
      Ghat{Gfield}

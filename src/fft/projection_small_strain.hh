@@ -50,6 +50,7 @@ namespace muSpectre {
     //! polymorphic pointer to FFT engines
     using FFTEngine_ptr = typename Parent::FFTEngine_ptr;
     using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
+    using Rcoord = typename Parent::Rcoord; //!< spatial coordinates type
     //! local field collection (for Fourier-space representations)
     using LFieldCollection_t = LocalFieldCollection<DimS>;
     //! Fourier-space field containing the projection operator itself
@@ -63,7 +64,7 @@ namespace muSpectre {
     ProjectionSmallStrain() = delete;
 
     //! Constructor with fft_engine
-    ProjectionSmallStrain(FFTEngine_ptr engine);
+    ProjectionSmallStrain(FFTEngine_ptr engine, Rcoord lengths);
 
     //! Copy constructor
     ProjectionSmallStrain(const ProjectionSmallStrain &other) = delete;

@@ -39,8 +39,8 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   ProjectionFiniteStrain<DimS, DimM>::
-  ProjectionFiniteStrain(FFTEngine_ptr engine)
-    :Parent{std::move(engine), Formulation::finite_strain}
+  ProjectionFiniteStrain(FFTEngine_ptr engine, Rcoord lengths)
+    :Parent{std::move(engine), lengths, Formulation::finite_strain}
   {
     for (auto res: this->fft_engine->get_domain_resolutions()) {
       if (res % 2 == 0) {
@@ -56,7 +56,7 @@ namespace muSpectre {
   initialise(FFT_PlanFlags flags) {
     Parent::initialise(flags);
     FFT_freqs<DimS> fft_freqs(this->fft_engine->get_domain_resolutions(),
-                              this->fft_engine->get_lengths());
+                              this->domain_lengths);
     for (auto && tup: akantu::zip(*this->fft_engine, this->Ghat)) {
       const auto & ccoord = std::get<0> (tup);
       auto & G = std::get<1>(tup);
@@ -82,7 +82,7 @@ namespace muSpectre {
       //   }
       // }
     }
-    if (this->get_locations() == Ccoord{}) {
+    if (this->get_subdomain_locations() == Ccoord{}) {
       this->Ghat[0].setZero();
     }
   }

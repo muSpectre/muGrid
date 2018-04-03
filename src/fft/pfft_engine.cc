@@ -34,9 +34,8 @@ namespace muSpectre {
   int PFFTEngine<DimsS, DimM>::nb_engines{0};
 
   template <Dim_t DimS, Dim_t DimM>
-  PFFTEngine<DimS, DimM>::PFFTEngine(Ccoord resolutions, Rcoord lengths,
-                                     Communicator comm)
-    :Parent{resolutions, lengths, comm}, mpi_comm{comm.get_mpi_comm()}
+  PFFTEngine<DimS, DimM>::PFFTEngine(Ccoord resolutions, Communicator comm)
+    :Parent{resolutions, comm}, mpi_comm{comm.get_mpi_comm()}
   {
     if (!this->nb_engines) pfft_init();
     this->nb_engines++;
@@ -77,8 +76,8 @@ namespace muSpectre {
                                    this->mpi_comm,
                                    PFFT_TRANSPOSED_OUT,
                                    res, loc, fres, floc);
-    std::copy(res, res+DimS, this->resolutions.begin());
-    std::copy(loc, loc+DimS, this->locations.begin());
+    std::copy(res, res+DimS, this->subdomain_resolutions.begin());
+    std::copy(loc, loc+DimS, this->subdomain_locations.begin());
     std::copy(fres, fres+DimS, this->fourier_resolutions.begin());
     std::copy(floc, floc+DimS, this->fourier_locations.begin());
     // TODO: Enable this to enable 2d process mesh. This does not pass tests.
@@ -88,7 +87,7 @@ namespace muSpectre {
       std::swap(this->fourier_locations[i], this->fourier_locations[i+1]);
     }
     
-    for (auto & n: this->resolutions) {
+    for (auto & n: this->subdomain_resolutions) {
       if (n == 0) {
         throw std::runtime_error("PFFT planning returned zero resolution. "
                                  "You may need to run on fewer processes.");
@@ -211,7 +210,7 @@ namespace muSpectre {
     if (!this->plan_fft) {
         throw std::runtime_error("fft plan not allocated");
     }
-    if (field.size() != CcoordOps::get_size(this->resolutions)) {
+    if (field.size() != CcoordOps::get_size(this->subdomain_resolutions)) {
       throw std::runtime_error("size mismatch");
     }
     // Copy field data to workspace buffer. This is necessary because workspace
@@ -231,7 +230,7 @@ namespace muSpectre {
     if (!this->plan_ifft) {
         throw std::runtime_error("ifft plan not allocated");
     }
-    if (field.size() != CcoordOps::get_size(this->resolutions)) {
+    if (field.size() != CcoordOps::get_size(this->subdomain_resolutions)) {
       throw std::runtime_error("size mismatch");
     }
     pfft_execute_dft_c2r(

@@ -49,6 +49,7 @@ namespace muSpectre {
     //! polymorphic pointer to FFT engines
     using FFTEngine_ptr = typename Parent::FFTEngine_ptr;
     using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
+    using Rcoord = typename Parent::Rcoord; //!< spatial coordinates type
     //! global field collection (for real-space representations)
     using GFieldCollection_t = GlobalFieldCollection<DimS>;
     //! local field collection (for Fourier-space representations)
@@ -68,7 +69,7 @@ namespace muSpectre {
     ProjectionFiniteStrainFast() = delete;
 
     //! Constructor with fft_engine
-    ProjectionFiniteStrainFast(FFTEngine_ptr engine);
+    ProjectionFiniteStrainFast(FFTEngine_ptr engine, Rcoord lengths);
 
     //! Copy constructor
     ProjectionFiniteStrainFast(const ProjectionFiniteStrainFast &other) = delete;

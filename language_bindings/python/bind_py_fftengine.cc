@@ -45,27 +45,25 @@ using namespace pybind11::literals;
 template <Dim_t dim, class Engine>
 void add_engine_helper(py::module & mod, std::string name) {
   using Ccoord = Ccoord_t<dim>;
-  using Rcoord = Rcoord_t<dim>;
   using ArrayXXc = Eigen::Array<Complex, Eigen::Dynamic,
                                 Eigen::Dynamic>;
   py::class_<Engine>(mod, name.c_str())
 #ifdef WITH_MPI
-    .def(py::init([](Ccoord res, Rcoord lengths, size_t comm) {
-           return new Engine(res, lengths,
-                             std::move(Communicator(MPI_Comm(comm))));
+    .def(py::init([](Ccoord res, size_t comm) {
+           return new Engine(res, std::move(Communicator(MPI_Comm(comm))));
          }),
          "resolutions"_a,
-         "lengths"_a,
          "communicator"_a=size_t(MPI_COMM_SELF))
 #else
-    .def(py::init<Ccoord, Rcoord>())
+    .def(py::init<Ccoord>())
 #endif
     .def("fft",
          [](Engine & eng, py::EigenDRef<Eigen::ArrayXXd> v) {
            using Coll_t = typename Engine::GFieldCollection_t;
            using Field_t = typename Engine::Field_t;
            Coll_t coll{};
-           coll.initialise(eng.get_resolutions(), eng.get_locations());
+           coll.initialise(eng.get_subdomain_resolutions(),
+                           eng.get_subdomain_locations());
            Field_t & temp{make_field<Field_t>("temp_field", coll)};
            temp.eigen() = v;
            return ArrayXXc{eng.fft(temp).eigen()};
@@ -77,7 +75,8 @@ void add_engine_helper(py::module & mod, std::string name) {
            using Coll_t = typename Engine::GFieldCollection_t;
            using Field_t = typename Engine::Field_t;
            Coll_t coll{};
-           coll.initialise(eng.get_resolutions(), eng.get_locations());
+           coll.initialise(eng.get_subdomain_resolutions(),
+                           eng.get_subdomain_locations());
            Field_t & temp{make_field<Field_t>("temp_field", coll)};
            eng.get_work_space().eigen() = v;
            eng.ifft(temp);

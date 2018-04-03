@@ -60,8 +60,7 @@ namespace muSpectre {
     constexpr static Ccoord_t<sdim> res() {
       return CcoordOps::get_cube<sdim>(box_resolution);
     }
-    FFTW_fixture(): engine(res(), CcoordOps::get_cube<sdim>(box_length),
-                           MPIContext::get_context().comm) {}
+    FFTW_fixture(): engine(res(), MPIContext::get_context().comm) {}
     Engine engine;
   };
 
@@ -73,7 +72,7 @@ namespace muSpectre {
     constexpr static Dim_t mdim{twoD};
     constexpr static Ccoord_t<sdim> res() {return {6, 4};}
     FFTW_fixture_python_segfault():
-      engine{res(), {3., 3}, MPIContext::get_context().comm} {}
+      engine{res(), MPIContext::get_context().comm} {}
     Engine engine;
   };
 
@@ -132,7 +131,8 @@ namespace muSpectre {
     auto & ref  {make_field<TensorField<FC_t, Real, order, Fix::mdim>>("reference", fc)};
     auto & result{make_field<TensorField<FC_t, Real, order, Fix::mdim>>("result", fc)};
 
-    fc.initialise(Fix::engine.get_resolutions(), Fix::engine.get_locations());
+    fc.initialise(Fix::engine.get_subdomain_resolutions(),
+                  Fix::engine.get_subdomain_locations());
 
     using map_t = MatrixFieldMap<FC_t, Real, Fix::mdim, Fix::mdim>;
     map_t inmap{input};
@@ -149,7 +149,8 @@ namespace muSpectre {
     auto & complex_field = Fix::engine.fft(input);
     using cmap_t = MatrixFieldMap<LocalFieldCollection<Fix::sdim>, Complex, Fix::mdim, Fix::mdim>;
     cmap_t complex_map(complex_field);
-    if (Fix::engine.get_locations() == CcoordOps::get_cube<Fix::sdim>(0)) {
+    if (Fix::engine.get_subdomain_locations() ==
+        CcoordOps::get_cube<Fix::sdim>(0)) {
       // Check that 0,0 location has no imaginary part.
       Real error = complex_map[0].imag().norm();
       BOOST_CHECK_LT(error, tol);

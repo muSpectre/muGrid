@@ -56,17 +56,17 @@ namespace muSpectre {
   cell_input(Ccoord_t<DimS> resolutions,
                Rcoord_t<DimS> lengths,
                Formulation form) {
-    auto fft_ptr{std::make_unique<FFTEngine>(resolutions, lengths)};
+    auto fft_ptr{std::make_unique<FFTEngine>(resolutions)};
     switch (form)
       {
       case Formulation::finite_strain: {
         using Projection = ProjectionFiniteStrainFast<DimS, DimM>;
-        return std::make_unique<Projection>(std::move(fft_ptr));
+        return std::make_unique<Projection>(std::move(fft_ptr), lengths);
         break;
       }
       case Formulation::small_strain: {
         using Projection = ProjectionSmallStrain<DimS, DimM>;
-        return std::make_unique<Projection>(std::move(fft_ptr));
+        return std::make_unique<Projection>(std::move(fft_ptr), lengths);
         break;
       }
       default: {
@@ -109,17 +109,17 @@ namespace muSpectre {
                       Rcoord_t<DimS> lengths,
                       Formulation form,
                       const Communicator & comm) {
-    auto fft_ptr{std::make_unique<FFTEngine>(resolutions, lengths, comm)};
+    auto fft_ptr{std::make_unique<FFTEngine>(resolutions, comm)};
     switch (form)
     {
       case Formulation::finite_strain: {
         using Projection = ProjectionFiniteStrainFast<DimS, DimM>;
-        return std::make_unique<Projection>(std::move(fft_ptr));
+        return std::make_unique<Projection>(std::move(fft_ptr), lengths);
         break;
       }
       case Formulation::small_strain: {
         using Projection = ProjectionSmallStrain<DimS, DimM>;
-        return std::make_unique<Projection>(std::move(fft_ptr));
+        return std::make_unique<Projection>(std::move(fft_ptr), lengths);
         break;
       }
       default: {

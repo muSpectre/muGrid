@@ -88,8 +88,8 @@ namespace muSpectre {
     Ccoord_t<dim> resolutions{3, 3};
     Rcoord_t<dim> lengths{2.3, 2.7};
     Formulation form{Formulation::finite_strain};
-    auto fft_ptr{std::make_unique<FFTWEngine<dim, dim>>(resolutions, lengths)};
-    auto proj_ptr{std::make_unique<ProjectionFiniteStrainFast<dim, dim>>(std::move(fft_ptr))};
+    auto fft_ptr{std::make_unique<FFTWEngine<dim, dim>>(resolutions)};
+    auto proj_ptr{std::make_unique<ProjectionFiniteStrainFast<dim, dim>>(std::move(fft_ptr), lengths)};
     CellBase<dim, dim> sys{std::move(proj_ptr)};
 
     auto sys2{make_cell<dim, dim>(resolutions, lengths, form)};

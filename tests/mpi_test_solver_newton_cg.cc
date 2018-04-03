@@ -51,9 +51,8 @@ namespace muSpectre {
     // constexpr Rcoord_t<dim> lengths{2.3, 2.7};
     constexpr Ccoord_t<dim> resolutions{5, 5, 5};
     constexpr Rcoord_t<dim> lengths{5, 5, 5};
-    auto fft_ptr{std::make_unique<FFTWMPIEngine<dim, dim>>(resolutions, lengths,
-                                                           comm)};
-    auto proj_ptr{std::make_unique<ProjectionFiniteStrainFast<dim, dim>>(std::move(fft_ptr))};
+    auto fft_ptr{std::make_unique<FFTWMPIEngine<dim, dim>>(resolutions, comm)};
+    auto proj_ptr{std::make_unique<ProjectionFiniteStrainFast<dim, dim>>(std::move(fft_ptr), lengths)};
     CellBase<dim, dim> sys(std::move(proj_ptr));
 
     using Mat_t = MaterialLinearElastic1<dim, dim>;
@@ -65,7 +64,7 @@ namespace muSpectre {
     auto& Material_hard = Mat_t::make(sys, "hard", 10*Young, Poisson);
     auto& Material_soft = Mat_t::make(sys, "soft",    Young, Poisson);
 
-    auto& loc = sys.get_locations();
+    auto& loc = sys.get_subdomain_locations();
     for (auto && tup: akantu::enumerate(sys)) {
       auto && pixel = std::get<1>(tup);
       if (loc == Ccoord_t<threeD>{0, 0} && std::get<0>(tup) == 0) {

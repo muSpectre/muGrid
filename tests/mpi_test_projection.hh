@@ -80,8 +80,8 @@ namespace muSpectre {
     constexpr static bool is_parallel{parallel};
     ProjectionFixture()
       :projector(std::make_unique<Engine>(SizeGiver::get_resolution(),
-                                          SizeGiver::get_lengths(),
-                                          MPIContext::get_context().comm)){}
+                                          MPIContext::get_context().comm),
+                 SizeGiver::get_lengths()){}
     Parent projector;
   };
 

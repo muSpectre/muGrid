@@ -45,7 +45,6 @@ class FFT_Check(unittest.TestCase):
     def setUp(self):
         self.resolution = [6, 4]
         self.dim = len(self.resolution)
-        self.lengths = [3., 3.]
         self.engines = [('fftw', False),
                         ('fftwmpi', True),
                         ('pfft', True)]
@@ -54,8 +53,7 @@ class FFT_Check(unittest.TestCase):
     def test_forward_transform(self):
         for engine_str, transposed in self.engines:
             try:
-                engine = µ.fft.FFT(self.resolution, self.lengths,
-                                   fft=engine_str)
+                engine = µ.fft.FFT(self.resolution, fft=engine_str)
             except KeyError:
                 # This FFT engine has not been compiled into the code. Skip
                 # test.
@@ -73,8 +71,7 @@ class FFT_Check(unittest.TestCase):
     def test_reverse_transform(self):
         for engine_str, transposed in self.engines:
             try:
-                engine = µ.fft.FFT(self.resolution, self.lengths,
-                                   fft=engine_str)
+                engine = µ.fft.FFT(self.resolution, fft=engine_str)
             except KeyError:
                 # This FFT engine has not been compiled into the code. Skip
                 # test.

@@ -39,11 +39,11 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   CellBase<DimS, DimM>::CellBase(Projection_ptr projection_)
-    :resolutions{projection_->get_resolutions()},
-     locations{projection_->get_locations()},
+    :subdomain_resolutions{projection_->get_subdomain_resolutions()},
+     subdomain_locations{projection_->get_subdomain_locations()},
      domain_resolutions{projection_->get_domain_resolutions()},
-     pixels(resolutions, locations),
-     lengths{projection_->get_lengths()},
+     pixels(subdomain_resolutions, subdomain_locations),
+     domain_lengths{projection_->get_domain_lengths()},
      fields{std::make_unique<FieldCollection_t>()},
      F{make_field<StrainField_t>("Gradient", *this->fields)},
      P{make_field<StressField_t>("Piola-Kirchhoff-1", *this->fields)},
@@ -107,8 +107,9 @@ namespace muSpectre {
     }
     if (delF.size() != this->nb_dof()) {
       std::stringstream err{};
-      err << "input should be of size ndof = ¶(" << this->resolutions <<") × "
-          << DimS << "² = "<< this->nb_dof() << " but I got " << delF.size();
+      err << "input should be of size ndof = ¶(" << this->subdomain_resolutions
+          << ") × " << DimS << "² = "<< this->nb_dof() << " but I got "
+          << delF.size();
       throw std::runtime_error(err.str());
     }
     const std::string out_name{"temp output for directional stiffness"};
@@ -201,7 +202,7 @@ namespace muSpectre {
     // check that all pixels have been assigned exactly one material
     this->check_material_coverage();
     // resize all global fields (strain, stress, etc)
-    this->fields->initialise(this->resolutions, this->locations);
+    this->fields->initialise(this->subdomain_resolutions, this->subdomain_locations);
     // initialise the projection and compute the fft plan
     this->projection->initialise(flags);
     this->initialised = true;
@@ -247,11 +248,12 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   void CellBase<DimS, DimM>::check_material_coverage() {
-    auto nb_pixels = CcoordOps::get_size(this->resolutions);
+    auto nb_pixels = CcoordOps::get_size(this->subdomain_resolutions);
     std::vector<MaterialBase<DimS, DimM>*> assignments(nb_pixels, nullptr);
     for (auto & mat: this->materials) {
       for (auto & pixel: *mat) {
-        auto index = CcoordOps::get_index(this->resolutions, this->locations,
+        auto index = CcoordOps::get_index(this->subdomain_resolutions,
+                                          this->subdomain_locations,
                                           pixel);
         auto& assignment{assignments.at(index)};
         if (assignment != nullptr) {
@@ -271,7 +273,8 @@ namespace muSpectre {
     for (size_t i = 0; i < assignments.size(); ++i) {
       if (assignments[i] == nullptr) {
         unassigned_pixels.push_back(
-          CcoordOps::get_ccoord(this->resolutions, this->locations, i));
+          CcoordOps::get_ccoord(this->subdomain_resolutions,
+                                this->subdomain_locations, i));
       }
     }
 
