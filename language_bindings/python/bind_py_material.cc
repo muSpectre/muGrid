@@ -29,6 +29,7 @@
 #include "materials/material_linear_elastic1.hh"
 #include "materials/material_linear_elastic2.hh"
 #include "materials/material_linear_elastic3.hh"
+#include "materials/material_linear_elastic4.hh"
 #include "cell/cell_base.hh"
 
 #include <pybind11/pybind11.h>
@@ -119,12 +120,39 @@ void add_material_linear_elastic3_helper(py::module & mod) {
     .def("size", &Mat_t::size);
 }
 
+template <Dim_t dim>
+void add_material_linear_elastic4_helper(py::module & mod) {
+  std::stringstream name_stream{};
+  name_stream << "MaterialLinearElastic4_" << dim << 'd';
+  const auto name {name_stream.str()};
+
+  using Mat_t = MaterialLinearElastic4<dim, dim>;
+  using Sys_t = CellBase<dim, dim>;
+
+  py::class_<Mat_t>(mod, name.c_str())
+    .def(py::init<std::string>(), "name"_a)
+    .def_static("make",
+                [](Sys_t & sys, std::string n) -> Mat_t & {
+                  return Mat_t::make(sys, n);
+                },
+                "cell"_a, "name"_a,
+                py::return_value_policy::reference, py::keep_alive<1, 0>())
+    .def("add_pixel",
+         [] (Mat_t & mat, Ccoord_t<dim> pix, Real Young, Real Poisson) {
+	   mat.add_pixel(pix, Young, Poisson);},
+         "pixel"_a,
+         "Young"_a,
+	 "Poisson"_a)
+    .def("size", &Mat_t::size);
+}
+
 
 template <Dim_t dim>
 void add_material_helper(py::module & mod) {
   add_material_linear_elastic1_helper<dim>(mod);
   add_material_linear_elastic2_helper<dim>(mod);
   add_material_linear_elastic3_helper<dim>(mod);
+  add_material_linear_elastic4_helper<dim>(mod);
 }
 
 void add_material(py::module & mod) {

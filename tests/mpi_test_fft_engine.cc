@@ -102,8 +102,6 @@ namespace muSpectre {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(Constructor_test, Fix, fixlist, Fix) {
     Communicator &comm = MPIContext::get_context().comm;
     if (Fix::serial_engine && comm.size() > 1) {
-      BOOST_CHECK_THROW(Fix::engine.initialise(FFT_PlanFlags::estimate),
-                        std::runtime_error);
       return;
     }
     else {
@@ -116,9 +114,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(fft_test, Fix, fixlist, Fix) {
     if (Fix::serial_engine && Fix::engine.get_communicator().size() > 1) {
-      // expect initialization failure
-      BOOST_CHECK_THROW(Fix::engine.initialise(FFT_PlanFlags::estimate),
-                        std::runtime_error);
+      // dont test serial engies in parallel
       return;
     }
     else {

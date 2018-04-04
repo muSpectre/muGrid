@@ -43,11 +43,6 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   void FFTWEngine<DimS, DimM>::initialise(FFT_PlanFlags plan_flags) {
-    if (this->comm.size() > 1) {
-      throw std::runtime_error("Attempting to run in parallel, but standard "
-                               "FFTW engine does not support parallel "
-                               "execution.");
-    }
     if (this->initialised) {
       throw std::runtime_error("double initialisation, will leak memory");
     }

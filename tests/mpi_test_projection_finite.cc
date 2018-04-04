@@ -114,10 +114,6 @@ namespace muSpectre {
     if (fix::is_parallel || fix::projector.get_communicator().size() == 1) {
       BOOST_CHECK_NO_THROW(fix::projector.initialise(FFT_PlanFlags::estimate));
     }
-    else {
-      BOOST_CHECK_THROW(fix::projector.initialise(FFT_PlanFlags::estimate),
-                        std::runtime_error);
-    }
   }
 
   /* ---------------------------------------------------------------------- */

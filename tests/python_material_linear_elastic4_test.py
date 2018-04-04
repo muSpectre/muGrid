@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
-@file   python_material_linear_elastic3.py
+@file   python_material_linear_elastic4_test.py
 
 @author Richard Leute <richard.leute@imtek.uni-freiburg.de>
 
-@date   20 Feb 2018
+@date   27 Mar 2018
 
 @brief  description
 
@@ -34,29 +34,30 @@ import numpy as np
 
 from python_test_imports import µ
 
-class MaterialLinearElastic3_Check(unittest.TestCase):
+class MaterialLinearElastic4_Check(unittest.TestCase):
     """
-    Check the implementation of the fourth order stiffness tensor C for each
-    cell. Assign the same Youngs modulus and Poisson ratio to each cell,
-    calculate the stress and compare the result with stress=2*mu*Del0
-    (Hooke law for small symmetric strains).
+    Check the implementation of storing the first and second Lame constant in
+    each cell. Assign the same Youngs modulus and Poisson ratio to each cell,
+    from which the two Lame constants are internally computed. Then calculate
+    the stress and compare the result with stress=2*mu*Del0 (Hooke law for small
+    symmetric strains).
     """
     def setUp(self):
-        self.resolution = [5,5]
-        self.lengths = [2.5, 3.1]
+        self.resolution = [7,7]
+        self.lengths = [2.3, 3.9]
         self.formulation = µ.Formulation.small_strain
         self.sys = µ.Cell(self.resolution,
                           self.lengths,
                           self.formulation)
-        self.mat = µ.material.MaterialLinearElastic3_2d.make(
+        self.mat = µ.material.MaterialLinearElastic4_2d.make(
             self.sys, "material")
 
     def test_solver(self):
-        Young   = 10.
-        Poisson = 0.3
+        Youngs_modulus = 10.
+        Poisson_ratio  = 0.3
 
         for i, pixel in enumerate(self.sys):
-            self.mat.add_pixel(pixel, Young, Poisson)
+            self.mat.add_pixel(pixel, Youngs_modulus, Poisson_ratio)
 
         self.sys.initialise()
         tol = 1e-6
@@ -70,7 +71,7 @@ class MaterialLinearElastic3_Check(unittest.TestCase):
                                 solver, tol, tol, verbose)
 
         #compare the computed stress with the trivial by hand computed stress
-        mu = (Young/(2*(1+Poisson)))
+        mu = (Youngs_modulus/(2*(1+Poisson_ratio)))
         stress = 2*mu*Del0
 
         self.assertLess(np.linalg.norm(r.stress-stress.reshape(-1,1)), 1e-8)
