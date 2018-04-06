@@ -48,11 +48,14 @@ set (PY_BINDING_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_projections.cc
   )
 
+find_package(PythonLibs REQUIRED)
 
 pybind11_add_module(pyMuSpectreLib ${PY_BINDING_SRCS})
 target_link_libraries(pyMuSpectreLib PRIVATE muSpectre)
 # Want to rename the output, so that the python module is called muSpectre
 set_target_properties(pyMuSpectreLib PROPERTIES OUTPUT_NAME _muSpectre)
+
+target_include_directories(pyMuSpectreLib PUBLIC ${PYTHON_INCLUDE_DIRS})
 
 add_custom_target(pyMuSpectre ALL SOURCES muSpectre/__init__.py)
 add_custom_command(TARGET pyMuSpectre POST_BUILD

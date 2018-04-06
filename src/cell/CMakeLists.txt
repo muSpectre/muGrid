@@ -31,7 +31,4 @@ set (cells_SRC
   ${CMAKE_CURRENT_SOURCE_DIR}/cell_base.cc
   )
 
-set (muSpectre_SRC
-  ${muSpectre_SRC}
-  ${cells_SRC}
-  PARENT_SCOPE)
+target_sources(muSpectre PRIVATE ${cells_SRC})

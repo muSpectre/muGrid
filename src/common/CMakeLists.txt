@@ -33,7 +33,4 @@ set (common_SRC
   ${CMAKE_CURRENT_SOURCE_DIR}/voigt_conversion.cc
   )
 
-set (muSpectre_SRC
-  ${muSpectre_SRC}
-  ${common_SRC}
-  PARENT_SCOPE)
+target_sources(muSpectre PRIVATE ${common_SRC})

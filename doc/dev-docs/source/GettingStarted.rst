@@ -30,7 +30,6 @@ You can compile *µ*\Spectre using  `CMake <https://cmake.org/>`_. The current (
 - `Boost unit test framework <http://www.boost.org/doc/libs/1_66_0/libs/test/doc/html/index.html>`_
 - `FFTW <http://www.fftw.org>`_
 - `Sphinx <http://www.sphinx-doc.org>`_ and `Breathe <https://breathe.readthedocs.io>`_
-- `Mercurial <https://www.mercurial-scm.org/>`_
 - `git <https://git-scm.com/>`_
 
 *µ*\Spectre requires a relatively modern compiler as it makes heavy use of C++14 features. It has successfully been compiled and tested using the following compilers under Linux

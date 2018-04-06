@@ -94,7 +94,7 @@ namespace muSpectre {
     auto cell{Cell{std::move(input)}};
     return cell;
   }
-  
+
 #ifdef WITH_MPI
 
   /**
@@ -129,7 +129,7 @@ namespace muSpectre {
     }
   }
 
-  
+
   /**
    * convenience function to create a parallel cell (avoids having to build
    * and move the chain of unique_ptrs
@@ -142,7 +142,7 @@ namespace muSpectre {
                           Rcoord_t<DimS> lengths,
                           Formulation form,
                           const Communicator & comm) {
-    
+
     auto && input = parallel_cell_input<DimS, DimM, FFTEngine>(resolutions,
                                                                lengths,
                                                                form, comm);
@@ -155,5 +155,3 @@ namespace muSpectre {
 }  // muSpectre
 
 #endif /* CELL_FACTORY_H */
-
-

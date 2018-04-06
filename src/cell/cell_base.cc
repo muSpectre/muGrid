@@ -102,7 +102,7 @@ namespace muSpectre {
   CellBase<DimS, DimM>::directional_stiffness_vec(const SolvVectorIn &delF) {
     if (!this->K) {
       throw std::runtime_error
-        ("corrently only implemented for cases where a stiffness matrix "
+        ("currently only implemented for cases where a stiffness matrix "
          "exists");
     }
     if (delF.size() != this->nb_dof()) {
@@ -132,7 +132,7 @@ namespace muSpectre {
     (Eigen::Ref<Eigen::ArrayXXd> delF) {
     if (!this->K) {
       throw std::runtime_error
-        ("corrently only implemented for cases where a stiffness matrix "
+        ("currently only implemented for cases where a stiffness matrix "
          "exists");
     }
     const std::string out_name{"temp output for directional stiffness"};

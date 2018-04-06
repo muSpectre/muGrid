@@ -34,7 +34,4 @@ set (solvers_SRC
   ${CMAKE_CURRENT_SOURCE_DIR}/solvers.cc
   )
 
-set (muSpectre_SRC
-  ${muSpectre_SRC}
-  ${solvers_SRC}
-  PARENT_SCOPE)
+target_sources(muSpectre PRIVATE ${solvers_SRC})

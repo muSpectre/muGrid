@@ -37,9 +37,26 @@ set(BUILD_SHARED_LIBS ON)
 
 add_compile_options(-Wall -Wextra -Weffc++)
 
-enable_testing()
-
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
+set(MAKE_DOC_TARGET "OFF" CACHE BOOL "If on, a target dev_doc (which builds the documentation) is added")
+set(MAKE_TESTS "ON" CACHE BOOL "If on, several ctest targets will be built automatically")
+set(MAKE_EXAMPLES "ON" CACHE BOOL "If on, the executables in the bin folder will be compiled")
+set(MAKE_BENCHMARKS "ON" CACHE BOOL "If on, the benchmarks will be compiled")
+set(MPI_PARALLEL "OFF" CACHE BOOL "If on, MPI-parallel solvers become available")
+
+if(${MAKE_TESTS})
+  enable_testing()
+  find_package(Boost COMPONENTS unit_test_framework REQUIRED)
+endif(${MAKE_TESTS})
+
+if(${MPI_PARALLEL})
+  add_definitions(-DWITH_MPI)
+  find_package(MPI)
+  if (NOT ${MPI_FOUND})
+    message(SEND_ERROR "You chose MPI but CMake cannot find the MPI package")
+  endif(NOT ${MPI_FOUND})
+endif(${MPI_PARALLEL})
+
 include(muspectreTools)
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
@@ -68,13 +85,11 @@ if(${CMAKE_COMPILER_IS_GNUCC})
   endif()
 endif()
 
-find_package(Boost COMPONENTS unit_test_framework REQUIRED)
 
-add_external_package(Eigen3 VERSION 3.3 CONFIG)
+add_external_package(Eigen3 VERSION 3.3.0 CONFIG)
 add_external_package(pybind11 VERSION 2.2 CONFIG)
 
 include_directories(
-  ${CMAKE_SOURCE_DIR}/tests
   ${CMAKE_SOURCE_DIR}/src
   ${CMAKE_SOURCE_DIR}
   )
@@ -83,42 +98,43 @@ if(APPLE)
   include_directories(${CMAKE_INSTALL_PREFIX}/include ${Boost_INCLUDE_DIRS})
 endif()
 
-find_package(MPI)
-find_package(FFTWMPI)
-find_package(PFFT)
-if(MPI_FOUND)
-  add_definitions(-DWITH_MPI)
-  include_directories(SYSTEM ${MPI_C_INCLUDE_PATH})
-endif()
-if (FFTWMPI_FOUND)
-  add_definitions(-DWITH_FFTWMPI)
-endif()
-if (PFFT_FOUND)
-  add_definitions(-DWITH_PFFT)
-  include_directories(SYSTEM ${PFFT_INCLUDES})
-endif()
-if (P3DFFT_FOUND)
-  add_definitions(-DWITH_P3DFFT)
-endif()
 
+#build tests (these are before we add -Werror to the compile options)
+if (${MAKE_TESTS})
+  ##############################################################################
+  # build tests
+  file( GLOB TEST_SRCS "${CMAKE_SOURCE_DIR}/tests/test_*.cc")
 
-#build tests
-file( GLOB TEST_SRCS "${CMAKE_SOURCE_DIR}/tests/test_*.cc")
+  add_executable(main_test_suite tests/main_test_suite.cc ${TEST_SRCS})
+  target_link_libraries(main_test_suite ${Boost_LIBRARIES} muSpectre)
+  add_test(main_test_suite main_test_suite --report_level=detailed --build_info=TRUE)
 
-add_executable(main_test_suite tests/main_test_suite.cc ${TEST_SRCS})
-target_link_libraries(main_test_suite ${Boost_LIBRARIES} muSpectre)
-add_test(main_test_suite main_test_suite --report_level=detailed --build_info=TRUE)
+  ##############################################################################
+  # copy python test
+  file( GLOB PY_TEST_SRCS "${CMAKE_SOURCE_DIR}/tests/python_*.py")
 
-if(MPI_FOUND)
-  file( GLOB TEST_SRCS "${CMAKE_SOURCE_DIR}/tests/mpi_test_*.cc")
+  foreach(pytest ${PY_TEST_SRCS})
+    get_filename_component(pytest_name ${pytest} NAME)
+    configure_file(
+      ${pytest}
+      "${CMAKE_BINARY_DIR}/${pytest_name}"
+      COPYONLY)
+  endforeach(pytest ${PY_TEST_SRCS})
+  add_test(python_binding_test python_binding_tests.py)
 
-  add_executable(mpi_main_test_suite tests/mpi_main_test_suite.cc ${TEST_SRCS})
-  target_link_libraries(mpi_main_test_suite ${Boost_LIBRARIES} muSpectre)
-  add_test(mpi_main_test_suite1 ${MPIEXEC} ${MPIEXEC_PREFLAGS} ${MPIEXEC_NUMPROC_FLAG} 1 mpi_main_test_suite --report_level=detailed --build_info=TRUE)
-  add_test(mpi_main_test_suite2 ${MPIEXEC} ${MPIEXEC_PREFLAGS} ${MPIEXEC_NUMPROC_FLAG} 2 mpi_main_test_suite --report_level=detailed --build_info=TRUE)
-endif()
+  if(${MPI_PARALLEL})
+    ############################################################################
+    # add MPI tests
+    file( GLOB TEST_SRCS "${CMAKE_SOURCE_DIR}/tests/mpi_test_*.cc")
 
+    add_executable(mpi_main_test_suite tests/mpi_main_test_suite.cc ${TEST_SRCS})
+    target_link_libraries(mpi_main_test_suite ${Boost_LIBRARIES} muSpectre)
+    add_test(mpi_main_test_suite1 ${MPIEXEC_EXECUTABLE} ${MPIEXEC_PREFLAGS} ${MPIEXEC_NUMPROC_FLAG} 1 mpi_main_test_suite --report_level=detailed --build_info=TRUE)
+    add_test(mpi_main_test_suite2 ${MPIEXEC_EXECUTABLE} ${MPIEXEC_PREFLAGS} ${MPIEXEC_NUMPROC_FLAG} 2 mpi_main_test_suite --report_level=detailed --build_info=TRUE)
+  endif(${MPI_PARALLEL})
+endif(${MAKE_TESTS})
 
+################################################################################
 # compile the library
 add_compile_options( -Werror)
 add_subdirectory(
@@ -128,49 +144,54 @@ add_subdirectory(
   ${CMAKE_SOURCE_DIR}/language_bindings/
   )
 
-add_subdirectory(
-  ${CMAKE_SOURCE_DIR}/doc/
-  )
+if (${MAKE_DOC_TARGET}) 
+  add_subdirectory(
+    ${CMAKE_SOURCE_DIR}/doc/
+    )
+endif()
 
+################################################################################
+if (${MAKE_EXAMPLES})
+  #compile executables
 
-#compile executables
-file( GLOB binaries "${CMAKE_SOURCE_DIR}/bin/*.cc")
-foreach(binaryfile ${binaries})
-  get_filename_component(binaryname  ${binaryfile} NAME_WE)
-  add_executable(${binaryname} ${binaryfile})
-  target_link_libraries(${binaryname} ${Boost_LIBRARIES} muSpectre)
-endforeach(binaryfile ${binaries})
-#or copy them
-file (GLOB pybins "${CMAKE_SOURCE_DIR}/bin/*.py")
-foreach(pybin ${pybins})
+  set(binaries
+    ${CMAKE_SOURCE_DIR}/bin/demonstrator1.cc
+    ${CMAKE_SOURCE_DIR}/bin/demonstrator2.cc
+    ${CMAKE_SOURCE_DIR}/bin/hyper-elasticity.cc
+    ${CMAKE_SOURCE_DIR}/bin/small_case.cc)
 
-  get_filename_component(binaryname  ${pybin} NAME_WE)
-  configure_file(
-    ${pybin}
-    "${CMAKE_BINARY_DIR}/${binaryname}.py"
-    COPYONLY)
-endforeach(pybin ${pybins})
+  if (${MPI_PARALLEL})
+    set (binaries
+      ${binaries}
+      ${CMAKE_SOURCE_DIR}/bin/demonstrator_mpi.cc
+      )
+  endif (${MPI_PARALLEL})
 
+  foreach(binaryfile ${binaries})
+    get_filename_component(binaryname  ${binaryfile} NAME_WE)
+    add_executable(${binaryname} ${binaryfile})
+    target_link_libraries(${binaryname} ${Boost_LIBRARIES} muSpectre)
+  endforeach(binaryfile ${binaries})
 
+  #or copy them
+  file (GLOB pybins "${CMAKE_SOURCE_DIR}/bin/*.py")
+  foreach(pybin ${pybins})
+
+    get_filename_component(binaryname  ${pybin} NAME_WE)
+    configure_file(
+      ${pybin}
+      "${CMAKE_BINARY_DIR}/${binaryname}.py"
+      COPYONLY)
+  endforeach(pybin ${pybins})
+endif (${MAKE_EXAMPLES})
+
+################################################################################
 # compile benchmarks
-
-file(GLOB benchmarks "${CMAKE_SOURCE_DIR}/benchmarks/benchmark*cc")
-foreach(benchmark ${benchmarks})
-  get_filename_component(benchmark_name ${benchmark} NAME_WE)
-  add_executable(${benchmark_name} ${benchmark})
-  target_link_libraries(${benchmark_name} ${BOOST_LIBRARIES} muSpectre)
-endforeach(benchmark ${benchmark})
-
-
-# copy python test
-#build tests
-file( GLOB PY_TEST_SRCS "${CMAKE_SOURCE_DIR}/tests/python_*.py")
-
-foreach(pytest ${PY_TEST_SRCS})
-  get_filename_component(pytest_name ${pytest} NAME)
-  configure_file(
-    ${pytest}
-    "${CMAKE_BINARY_DIR}/${pytest_name}"
-    COPYONLY)
-endforeach(pytest ${PY_TEST_SRCS})
-add_test(python_binding_test python_binding_tests.py)
+if(${MAKE_BENCHMARKS})
+  file(GLOB benchmarks "${CMAKE_SOURCE_DIR}/benchmarks/benchmark*cc")
+  foreach(benchmark ${benchmarks})
+    get_filename_component(benchmark_name ${benchmark} NAME_WE)
+    add_executable(${benchmark_name} ${benchmark})
+    target_link_libraries(${benchmark_name} ${BOOST_LIBRARIES} muSpectre)
+  endforeach(benchmark ${benchmark})
+endif(${MAKE_BENCHMARKS})
