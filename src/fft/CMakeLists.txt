@@ -40,10 +40,8 @@ if (${MPI_PARALLEL})
       message (SEND_ERROR "You chose FFTWMPI but CMake cannot find it")
     endif (NOT ${FFTWMPI_FOUND})
 
-    set (PRIVATE_MUSPECTRE_LIBS
-      ${PRIVATE_MUSPECTRE_LIBS}
-      ${FFTWMPI_LIBRARIES}
-      PARENT_SCOPE)
+    list(APPEND PRIVATE_MUSPECTRE_LIBS
+      ${FFTWMPI_LIBRARIES})
 
     target_include_directories(muSpectre PRIVATE ${FFTWMPI_INCLUDES})
   endif (${USE_FFTWMPI})
@@ -56,10 +54,8 @@ if (${MPI_PARALLEL})
       message (SEND_ERROR "You chose PFFT but CMake cannot find it")
     endif (NOT ${PFFT_FOUND})
 
-    set (PRIVATE_MUSPECTRE_LIBS
-      ${PRIVATE_MUSPECTRE_LIBS}
-      ${PFFT_LIBRARIES}
-      PARENT_SCOPE)
+    list(APPEND PRIVATE_MUSPECTRE_LIBS
+      ${PFFT_LIBRARIES})
 
     target_include_directories(muSpectre PRIVATE ${PFFT_INCLUDES})
   endif (${USE_PFFT})
@@ -70,6 +66,8 @@ if (${MPI_PARALLEL})
   endif (NOT ${USE_FFTWMPI} AND NOT ${USE_PFFT})
 
 endif(${MPI_PARALLEL})
+
+set(PRIVATE_MUSPECTRE_LIBS ${PRIVATE_MUSPECTRE_LIBS} PARENT_SCOPE)
 
 if (${USE_FFTWMPI})
   add_definitions(-DWITH_FFTWMPI)

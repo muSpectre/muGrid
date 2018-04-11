@@ -65,15 +65,6 @@ file(GLOB_RECURSE _headers RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "*.hh")
 
 list(APPEND muSpectre_SRC ${_headers})
 
-if(PFFT_FOUND)
-  set(muSpectre_INCLUDES
-    ${muSpectre_INCLUDES}
-    ${PFFT_INCLUDES})
-  set(muSpectre_LIBRARIES
-    ${muSpectre_LIBRARIES}
-    ${PFFT_LIBRARIES})
-endif()
-
 set(muSpectre_INCLUDES ${FFTW_INCLUDES})
 target_include_directories(muSpectre INTERFACE ${muSpectre_INCLUDES})
 

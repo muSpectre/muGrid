@@ -30,6 +30,12 @@
 #include "fft/projection_finite_strain_fast.hh"
 
 #include "fft/fftw_engine.hh"
+#ifdef WITH_FFTWMPI
+#include "fft/fftwmpi_engine.hh"
+#endif
+#ifdef WITH_PFFT
+#include "fft/pfft_engine.hh"
+#endif
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -77,7 +83,6 @@ template <class Proj, Dim_t DimS, Dim_t DimM=DimS>
 void add_proj_helper(py::module & mod, std::string name_start) {
   using Ccoord = Ccoord_t<DimS>;
   using Rcoord = Rcoord_t<DimS>;
-  using Engine = FFTWEngine<DimS, DimM>;
   using Field_t = typename Proj::Field_t;
 
   static_assert(DimS == DimM,
@@ -87,16 +92,63 @@ void add_proj_helper(py::module & mod, std::string name_start) {
   name << name_start << '_' << DimS << 'd';
 
   py::class_<Proj>(mod, name.str().c_str())
-    .def(py::init([](Ccoord res, Rcoord lengths) {
-          auto engine = std::make_unique<Engine>(res);
-          return Proj(std::move(engine), lengths);
-        }))
+#ifdef WITH_MPI
+    .def(py::init([](Ccoord res, Rcoord lengths, const std::string & fft,
+                     size_t comm) {
+          if (fft == "fftw") {
+            auto engine = std::make_unique<FFTWEngine<DimS, DimM>>
+              (res, std::move(Communicator(MPI_Comm(comm))));
+            return Proj(std::move(engine), lengths);
+          }
+#else
+    .def(py::init([](Ccoord res, Rcoord lengths, const std::string & fft) {
+          if (fft == "fftw") {
+            auto engine = std::make_unique<FFTWEngine<DimS, DimM>>(res);
+            return Proj(std::move(engine), lengths);
+          }
+#endif
+#ifdef WITH_FFTWMPI
+          else if (fft == "fftwmpi") {
+            auto engine = std::make_unique<FFTWMPIEngine<DimS, DimM>>
+              (res, std::move(Communicator(MPI_Comm(comm))));
+            return Proj(std::move(engine), lengths);
+          }
+#endif
+#ifdef WITH_PFFT
+          else if (fft == "pfft") {
+            auto engine = std::make_unique<PFFTEngine<DimS, DimM>>
+              (res, std::move(Communicator(MPI_Comm(comm))));
+            return Proj(std::move(engine), lengths);
+          }
+#endif
+          else {
+            throw std::runtime_error("Unknown FFT engine '"+fft+"' specified.");
+          }
+        }),
+         "resolutions"_a,
+         "lengths"_a,
+#ifdef WITH_MPI
+         "fft"_a="fftw",
+         "communicator"_a=size_t(MPI_COMM_SELF))
+#else
+         "fft"_a="fftw")
+#endif
     .def("initialise", &Proj::initialise,
          "flags"_a=FFT_PlanFlags::estimate,
          "initialises the fft engine (plan the transform)")
     .def("apply_projection",
          [](Proj & proj, py::EigenDRef<Eigen::ArrayXXd> v){
-           typename Engine::GFieldCollection_t coll{};
+           typename FFTEngineBase<DimS, DimM>::GFieldCollection_t coll{};
+           Eigen::Index subdomain_size =
+             CcoordOps::get_size(proj.get_subdomain_resolutions());
+           if (v.rows() != DimS*DimM || v.cols() != subdomain_size) {
+             throw std::runtime_error("Expected input array of shape ("+
+                                      std::to_string(DimS*DimM)+", "+
+                                      std::to_string(subdomain_size)+
+                                      "), but input array has shape ("+
+                                      std::to_string(v.rows())+", "+
+                                      std::to_string(v.cols())+").");
+           }
            coll.initialise(proj.get_subdomain_resolutions(),
                            proj.get_subdomain_locations());
            Field_t & temp{make_field<Field_t>("temp_field", coll)};
@@ -107,7 +159,11 @@ void add_proj_helper(py::module & mod, std::string name_start) {
     .def("get_operator", &Proj::get_operator)
     .def("get_formulation", &Proj::get_formulation,
          "return a Formulation enum indicating whether the projection is small"
-         " or finite strain");
+         " or finite strain")
+    .def("get_subdomain_resolutions", &Proj::get_subdomain_resolutions)
+    .def("get_subdomain_locations", &Proj::get_subdomain_locations)
+    .def("get_domain_resolutions", &Proj::get_domain_resolutions)
+    .def("get_domain_lengths", &Proj::get_domain_resolutions);
 }
 
 void add_proj_dispatcher(py::module & mod) {
@@ -131,10 +187,8 @@ void add_proj_dispatcher(py::module & mod) {
   add_proj_helper<
     ProjectionFiniteStrainFast<threeD, threeD>,
     threeD>(mod, "ProjectionFiniteStrainFast");
-
 }
 
 void add_projections(py::module & mod) {
   add_proj_dispatcher(mod);
-
 }

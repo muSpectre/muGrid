@@ -120,6 +120,7 @@ if (${MAKE_TESTS})
       "${CMAKE_BINARY_DIR}/${pytest_name}"
       COPYONLY)
   endforeach(pytest ${PY_TEST_SRCS})
+  find_package(PythonInterp 3 REQUIRED)
   add_test(python_binding_test python_binding_tests.py)
 
   if(${MPI_PARALLEL})
@@ -131,6 +132,9 @@ if (${MAKE_TESTS})
     target_link_libraries(mpi_main_test_suite ${Boost_LIBRARIES} muSpectre)
     add_test(mpi_main_test_suite1 ${MPIEXEC_EXECUTABLE} ${MPIEXEC_PREFLAGS} ${MPIEXEC_NUMPROC_FLAG} 1 mpi_main_test_suite --report_level=detailed --build_info=TRUE)
     add_test(mpi_main_test_suite2 ${MPIEXEC_EXECUTABLE} ${MPIEXEC_PREFLAGS} ${MPIEXEC_NUMPROC_FLAG} 2 mpi_main_test_suite --report_level=detailed --build_info=TRUE)
+
+    add_test(python_mpi_binding_test1 ${MPIEXEC} ${MPIEXEC_PREFLAGS} ${MPIEXEC_NUMPROC_FLAG} 1 ${PYTHON_EXECUTABLE} python_mpi_binding_tests.py)
+    add_test(python_mpi_binding_test2 ${MPIEXEC} ${MPIEXEC_PREFLAGS} ${MPIEXEC_NUMPROC_FLAG} 2 ${PYTHON_EXECUTABLE} python_mpi_binding_tests.py)
   endif(${MPI_PARALLEL})
 endif(${MAKE_TESTS})
 

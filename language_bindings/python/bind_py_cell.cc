@@ -187,8 +187,12 @@ void add_cell_base_helper(py::module & mod) {
            cell.evaluate_stress_tangent(strain);
          },
          "strain"_a)
-    .def("get_G",
-         &sys_t::get_projection);
+    .def("get_projection",
+         &sys_t::get_projection)
+    .def("get_subdomain_resolutions", &sys_t::get_subdomain_resolutions)
+    .def("get_subdomain_locations", &sys_t::get_subdomain_locations)
+    .def("get_domain_resolutions", &sys_t::get_domain_resolutions)
+    .def("get_domain_lengths", &sys_t::get_domain_resolutions);
 }
 
 void add_cell_base(py::module & mod) {

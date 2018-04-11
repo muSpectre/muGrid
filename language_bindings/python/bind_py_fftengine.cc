@@ -42,7 +42,7 @@ using namespace muSpectre;
 namespace py=pybind11;
 using namespace pybind11::literals;
 
-template <Dim_t dim, class Engine>
+template <class Engine, Dim_t dim>
 void add_engine_helper(py::module & mod, std::string name) {
   using Ccoord = Ccoord_t<dim>;
   using ArrayXXc = Eigen::Array<Complex, Eigen::Dynamic,
@@ -85,21 +85,26 @@ void add_engine_helper(py::module & mod, std::string name) {
          "array"_a)
     .def("initialise", &Engine::initialise,
          "flags"_a=FFT_PlanFlags::estimate)
-    .def("normalisation", &Engine::normalisation);
+    .def("normalisation", &Engine::normalisation)
+    .def("get_subdomain_resolutions", &Engine::get_subdomain_resolutions)
+    .def("get_subdomain_locations", &Engine::get_subdomain_locations)
+    .def("get_fourier_resolutions", &Engine::get_fourier_resolutions)
+    .def("get_fourier_locations", &Engine::get_fourier_locations)
+    .def("get_domain_resolutions", &Engine::get_domain_resolutions);
 }
 
 void add_fft_engines(py::module & mod) {
   auto fft{mod.def_submodule("fft")};
   fft.doc() = "bindings for µSpectre's fft engines";
-  add_engine_helper<  twoD, FFTWEngine<  twoD,   twoD>>(fft, "FFTW_2d");
-  add_engine_helper<threeD, FFTWEngine<threeD, threeD>>(fft, "FFTW_3d");
+  add_engine_helper<FFTWEngine<  twoD,   twoD>,  twoD>(fft, "FFTW_2d");
+  add_engine_helper<FFTWEngine<threeD, threeD>, threeD>(fft, "FFTW_3d");
 #ifdef WITH_FFTWMPI
-  add_engine_helper<  twoD, FFTWMPIEngine<  twoD,   twoD>>(fft, "FFTWMPI_2d");
-  add_engine_helper<threeD, FFTWMPIEngine<threeD, threeD>>(fft, "FFTWMPI_3d");
+  add_engine_helper<FFTWMPIEngine<  twoD,   twoD>,   twoD>(fft, "FFTWMPI_2d");
+  add_engine_helper<FFTWMPIEngine<threeD, threeD>, threeD>(fft, "FFTWMPI_3d");
 #endif
 #ifdef WITH_PFFT
-  add_engine_helper<  twoD, PFFTEngine<  twoD,   twoD>>(fft, "PFFT_2d");
-  add_engine_helper<threeD, PFFTEngine<threeD, threeD>>(fft, "PFFT_3d");
+  add_engine_helper<PFFTEngine<  twoD,   twoD>,   twoD>(fft, "PFFT_2d");
+  add_engine_helper<PFFTEngine<threeD, threeD>, threeD>(fft, "PFFT_3d");
 #endif
   add_projections(fft);
 }
