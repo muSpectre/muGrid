@@ -111,7 +111,7 @@ function(download_external_project project_name)
     set(_src_dir ${_dep_args_THIRD_PARTY_SRC_DIR}/${project_name})
   endif()
 
-  if(EXISTS ${_src_dir} AND _dep_args_NO_UPDATE)
+  if(EXISTS ${_src_dir}/.DOWNLOAD_SUCCESS AND _dep_args_NO_UPDATE)
     return()
   endif()
 
@@ -157,6 +157,7 @@ ExternalProject_Add(${project_name}
       " ${_working_dir}/build-error.log for more details")
   endif()
 
+  file(WRITE ${_src_dir}/.DOWNLOAD_SUCCESS "")
 endfunction()
 
 # ------------------------------------------------------------------------------
