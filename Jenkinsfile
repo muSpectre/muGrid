@@ -7,13 +7,13 @@ pipeline {
 
     agent {
         dockerfile {
-            filename '${DOCKERFILE}'
+            filename '${params.DOCKERFILE}'
                      dir 'dockerfiles'
             }
     }
 
     environment {
-      BUILD_DIR = 'build_${DOCKERFILE}'
+      BUILD_DIR = 'build_${params.DOCKERFILE}'
                  OMPI_MCA_plm = 'isolated'
                  OMPI_MCA_btl = 'tcp,self'
     }
