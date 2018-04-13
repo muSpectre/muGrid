@@ -19,6 +19,18 @@ pipeline {
     }
 
     stages {
+      stage ('wipe build') {
+              when {
+                  anyOf{
+                      changeset glob: "**/*.cmake"
+                                        changeset glob: "**/CMakeLists.txt"
+
+                    }
+                }
+                   steps {
+                     sh ' rm -rf ${BUILD_DIR}'
+                   }
+            }
       stage ('configure') {
               steps {
                   sh '''
