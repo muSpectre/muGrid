@@ -74,11 +74,11 @@ pipeline {
                 sh 'rm -rf test_results/*'
                 sh ''' set +x
                 python3 -c "import os; import json; msg = {'buildTargetPHID':  os.environ['TARGET_PHID'],
-                                                                'artifactKey': 'Jenkins URI',
+                                                                'artifactKey': 'Jenkins URI {}'.format(os.environ['CXX_COMPILER']),
                                                                 'artifactType': 'uri',
                                                                 'artifactData': {
                                                                     'uri': os.environ['BUILD_URL'],
-                                                                    'name': 'View External Build Results',
+                                                                    'name': 'View Jenkins results',
                                                                     'ui.external': True
                                                                     }
                      }; print(json.dumps(msg))" | arc call-conduit --conduit-uri https://c4science.ch/ --conduit-token ${API_TOKEN} harbormaster.createartifact
