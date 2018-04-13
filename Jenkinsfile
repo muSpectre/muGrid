@@ -7,13 +7,13 @@ pipeline {
 
     agent {
         dockerfile {
-            filename '${params.DOCKERFILE}'
+            filename 'docker_debian_testing'
                      dir 'dockerfiles'
             }
     }
 
     environment {
-      BUILD_DIR = 'build_${params.DOCKERFILE}'
+      BUILD_DIR = 'build_docker_debian_testing'
                  OMPI_MCA_plm = 'isolated'
                  OMPI_MCA_btl = 'tcp,self'
     }
