@@ -34,6 +34,7 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(BUILD_SHARED_LIBS ON)
+set(MUSPECTRE_PYTHON_MAJOR_VERSION 3)
 
 add_compile_options(-Wall -Wextra -Weffc++)
 
@@ -43,6 +44,7 @@ set(MAKE_TESTS "ON" CACHE BOOL "If on, several ctest targets will be built autom
 set(MAKE_EXAMPLES "ON" CACHE BOOL "If on, the executables in the bin folder will be compiled")
 set(MAKE_BENCHMARKS "ON" CACHE BOOL "If on, the benchmarks will be compiled")
 set(MPI_PARALLEL "OFF" CACHE BOOL "If on, MPI-parallel solvers become available")
+set(RUNNING_IN_CI "OFF" CACHE INTERNAL "changes output format for tests")
 
 if(${MAKE_TESTS})
   enable_testing()
@@ -102,12 +104,14 @@ endif()
 #build tests (these are before we add -Werror to the compile options)
 if (${MAKE_TESTS})
   ##############################################################################
+
   # build tests
   file( GLOB TEST_SRCS "${CMAKE_SOURCE_DIR}/tests/test_*.cc")
 
   add_executable(main_test_suite tests/main_test_suite.cc ${TEST_SRCS})
   target_link_libraries(main_test_suite ${Boost_LIBRARIES} muSpectre)
-  add_test(main_test_suite main_test_suite --report_level=detailed --build_info=TRUE)
+
+  muSpectre_add_test(main_test_suite TYPE BOOST main_test_suite --report_level=detailed --build_info=TRUE)
 
   ##############################################################################
   # copy python test
@@ -120,8 +124,8 @@ if (${MAKE_TESTS})
       "${CMAKE_BINARY_DIR}/${pytest_name}"
       COPYONLY)
   endforeach(pytest ${PY_TEST_SRCS})
-  find_package(PythonInterp 3 REQUIRED)
-  add_test(python_binding_test python_binding_tests.py)
+  find_package(PythonInterp ${MUSPECTRE_PYTHON_MAJOR_VERSION} REQUIRED)
+  muSpectre_add_test(python_binding_test  TYPE PYTHON python_binding_tests.py)
 
   if(${MPI_PARALLEL})
     ############################################################################
@@ -130,11 +134,16 @@ if (${MAKE_TESTS})
 
     add_executable(mpi_main_test_suite tests/mpi_main_test_suite.cc ${TEST_SRCS})
     target_link_libraries(mpi_main_test_suite ${Boost_LIBRARIES} muSpectre)
-    add_test(mpi_main_test_suite1 ${MPIEXEC_EXECUTABLE} ${MPIEXEC_PREFLAGS} ${MPIEXEC_NUMPROC_FLAG} 1 mpi_main_test_suite --report_level=detailed --build_info=TRUE)
-    add_test(mpi_main_test_suite2 ${MPIEXEC_EXECUTABLE} ${MPIEXEC_PREFLAGS} ${MPIEXEC_NUMPROC_FLAG} 2 mpi_main_test_suite --report_level=detailed --build_info=TRUE)
 
-    add_test(python_mpi_binding_test1 ${MPIEXEC} ${MPIEXEC_PREFLAGS} ${MPIEXEC_NUMPROC_FLAG} 1 ${PYTHON_EXECUTABLE} python_mpi_binding_tests.py)
-    add_test(python_mpi_binding_test2 ${MPIEXEC} ${MPIEXEC_PREFLAGS} ${MPIEXEC_NUMPROC_FLAG} 2 ${PYTHON_EXECUTABLE} python_mpi_binding_tests.py)
+    muSpectre_add_test(mpi_main_test_suite1 TYPE BOOST MPI_NB_PROCS 1
+      mpi_main_test_suite --report_level=detailed --build_info=TRUE)
+    muSpectre_add_test(mpi_main_test_suite2 TYPE BOOST MPI_NB_PROCS 2
+      mpi_main_test_suite --report_level=detailed --build_info=TRUE)
+
+    muSpectre_add_test(python_mpi_binding_test1 TYPE PYTHON MPI_NB_PROCS 1
+      python_mpi_binding_tests.py)
+    muSpectre_add_test(python_mpi_binding_test2 TYPE PYTHON MPI_NB_PROCS 2
+      python_mpi_binding_tests.py)
   endif(${MPI_PARALLEL})
 endif(${MAKE_TESTS})
 
@@ -148,7 +157,7 @@ add_subdirectory(
   ${CMAKE_SOURCE_DIR}/language_bindings/
   )
 
-if (${MAKE_DOC_TARGET}) 
+if (${MAKE_DOC_TARGET})
   add_subdirectory(
     ${CMAKE_SOURCE_DIR}/doc/
     )

@@ -8,6 +8,7 @@ download_external_project(pybind11
 
 set(PYBIND11_LTO_CXX_FLAGS "" CACHE INTERNAL "")
 set(PYBIND11_LTO_LINKER_FLAGS "" CACHE INTERNAL "")
+set(PYBIND11_PYTHON_VERSION "${MUSPECTRE_PYTHON_MAJOR_VERSION}" CACHE INTERNAL "")
 
 add_subdirectory(${_pybind11_external_dir}/pybind11)
 
