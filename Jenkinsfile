@@ -46,6 +46,8 @@ pipeline {
                   sh '''
                      cd ${BUILD_DIR}
                      ctest || true
+                     mkdir -p ../test_results
+                     mv test_results*.xml ../test_results
                      '''
                   }
                   }
@@ -54,7 +56,19 @@ pipeline {
 
     post {
       always {
-          junit '**/*.xml'
+          junit 'test_results/*.xml'
+                sh 'rm -rf test_results/*'
+                sh ''' set +x
+                python3 -c "import os; import json; msg = {'buildTargetPHID':  os.environ['TARGET_PHID'],
+                                                                'artifactKey': 'Jenkins URI',
+                                                                'artifactType': 'uri',
+                                                                'artifactData': {
+                                                                    'uri': os.environ['BUILD_URL'],
+                                                                    'name': 'View External Build Results',
+                                                                    'ui.external': True
+                                                                    }
+                     }; print(json.dumps(msg))" | arc call-conduit --conduit-uri https://c4science.ch/ --conduit-token ${API_TOKEN} harbormaster.createartifact
+                '''
         }
 
 	         success {
