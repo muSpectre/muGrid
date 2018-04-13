@@ -44,14 +44,16 @@ pipeline {
               steps {
                   sh '''
                      cd ${BUILD_DIR}
+                     ctest
+                     '''
                   }
                   }
     }
 
-    
+
     post {
       always {
-          junit 'results.xml'
+          junit 'test_results*.xml'
         }
 
 	         success {
