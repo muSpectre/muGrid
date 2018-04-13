@@ -24,7 +24,7 @@ pipeline {
                   sh '''
                      mkdir -p ${BUILD_DIR}
                      cd ${BUILD_DIR}
-                     CXX=${CXX_COMPILER} cmake -DCMAKE_BUILD_TYPE:STRING=Release ..
+                     CXX=${CXX_COMPILER} cmake -DCMAKE_BUILD_TYPE:STRING=Release -DRUNNING_IN_CI=ON ..
                      '''
                 }
             }
@@ -45,7 +45,7 @@ pipeline {
               steps {
                   sh '''
                      cd ${BUILD_DIR}
-                     ctest
+                     ctest || true
                      '''
                   }
                   }
@@ -54,26 +54,20 @@ pipeline {
 
     post {
       always {
-          junit 'test_results*.xml'
+          junit '**/*.xml'
         }
 
 	         success {
                sh '''
                   set +x
-                  echo "{
-                    \"buildTargetPHID\": \"${TARGET_PHID}\",
-                      \"type\": \"pass\"
-                      }" | arc call-conduit --conduit-uri https://c4science.ch/ --conduit-token ${API_TOKEN} harbormaster.sendmessage
+                  python3 -c "import os; import json; msg = {'buildTargetPHID': os.environ['TARGET_PHID'], 'type':'pass'}; print(json.dumps(msg))" | arc call-conduit --conduit-uri https://c4science.ch/ --conduit-token ${API_TOKEN} harbormaster.sendmessage
                   '''
         }
 
 	         failure {
                sh '''
                   set +x
-                  echo "{
-                    \"buildTargetPHID\": \"${TARGET_PHID}\",
-                     \"type\": \"fail\"
-                     }" | arc call-conduit --conduit-uri https://c4science.ch/ --conduit-token ${API_TOKEN} harbormaster.sendmessage
+                  python3 -c "import os; import json; msg = {'buildTargetPHID': os.environ['TARGET_PHID'], 'type':'fail'}; print(json.dumps(msg))" | arc call-conduit --conduit-uri https://c4science.ch/ --conduit-token ${API_TOKEN} harbormaster.sendmessage
                   '''
         }
     }

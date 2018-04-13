@@ -111,7 +111,7 @@ if (${MAKE_TESTS})
   add_executable(main_test_suite tests/main_test_suite.cc ${TEST_SRCS})
   target_link_libraries(main_test_suite ${Boost_LIBRARIES} muSpectre)
 
-  muSpectre_add_test(main_test_suite TYPE BOOST main_test_suite --report_level=detailed --build_info=TRUE)
+  muSpectre_add_test(main_test_suite TYPE BOOST main_test_suite --report_level=detailed)
 
   ##############################################################################
   # copy python test
@@ -136,9 +136,9 @@ if (${MAKE_TESTS})
     target_link_libraries(mpi_main_test_suite ${Boost_LIBRARIES} muSpectre)
 
     muSpectre_add_test(mpi_main_test_suite1 TYPE BOOST MPI_NB_PROCS 1
-      mpi_main_test_suite --report_level=detailed --build_info=TRUE)
+      mpi_main_test_suite --report_level=detailed)
     muSpectre_add_test(mpi_main_test_suite2 TYPE BOOST MPI_NB_PROCS 2
-      mpi_main_test_suite --report_level=detailed --build_info=TRUE)
+      mpi_main_test_suite --report_level=detailed)
 
     muSpectre_add_test(python_mpi_binding_test1 TYPE PYTHON MPI_NB_PROCS 1
       python_mpi_binding_tests.py)
