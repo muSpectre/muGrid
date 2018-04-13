@@ -17,7 +17,9 @@ pipeline {
                  OMPI_MCA_plm = 'isolated'
                  OMPI_MCA_btl = 'tcp,self'
     }
-
+    options {
+      disableConcurrentBuilds()
+    }
     stages {
       stage ('wipe build') {
               when {
@@ -28,21 +30,21 @@ pipeline {
                     }
                 }
                    steps {
-                     sh ' rm -rf ${BUILD_DIR}'
+                     sh ' rm -rf ${BUILD_DIR}_${CXX_COMPILER}'
                    }
             }
       stage ('configure') {
               steps {
                   sh '''
-                     mkdir -p ${BUILD_DIR}
-                     cd ${BUILD_DIR}
+                     mkdir -p ${BUILD_DIR}_${CXX_COMPILER}
+                     cd ${BUILD_DIR}_${CXX_COMPILER}
                      CXX=${CXX_COMPILER} cmake -DCMAKE_BUILD_TYPE:STRING=Release -DRUNNING_IN_CI=ON ..
                      '''
                 }
             }
             stage ('build') {
               steps {
-                  sh 'make -C ${BUILD_DIR}'
+                  sh 'make -C ${BUILD_DIR}_${CXX_COMPILER}'
                   }
               }
 
@@ -56,7 +58,7 @@ pipeline {
             stage ('test') {
               steps {
                   sh '''
-                     cd ${BUILD_DIR}
+                     cd ${BUILD_DIR}_${CXX_COMPILER}
                      ctest || true
                      mkdir -p ../test_results
                      mv test_results*.xml ../test_results
