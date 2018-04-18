@@ -26,8 +26,8 @@
  */
 
 
-#ifndef FIELD_MAP_H
-#define FIELD_MAP_H
+#ifndef FIELD_MAP_BASE_H
+#define FIELD_MAP_BASE_H
 
 #include "common/field.hh"
 #include "field_collection_base.hh"
@@ -259,6 +259,7 @@ namespace muSpectre {
       private:
       };
 
+      TypedField & get_field() {return this->field;}
 
     protected:
       //! raw pointer to entry (for Eigen Map)
@@ -266,7 +267,7 @@ namespace muSpectre {
       //! raw pointer to entry (for Eigen Map)
       inline const T* get_ptr_to_entry(size_t index) const;
       const FieldCollection & collection; //!< collection holding Field
-      TypedField  & field;  //!< mapped Field
+      TypedField & field;  //!< mapped Field
     private:
     };
   }  // internal
@@ -639,4 +640,4 @@ namespace muSpectre {
 
 }  // muSpectre
 
-#endif /* FIELD_MAP_H */
+#endif /* FIELD_MAP_BASE_H */
