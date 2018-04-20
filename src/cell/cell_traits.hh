@@ -29,6 +29,9 @@
 
 #include <Eigen/IterativeLinearSolvers>
 
+#ifndef CELL_TRAITS_H
+#define CELL_TRAITS_H
+
 namespace muSpectre {
 
   template <class Cell>
@@ -46,3 +49,6 @@ namespace Eigen {
     {};
   }  // internal
 }  // Eigen
+
+
+#endif /* CELL_TRAITS_H */
