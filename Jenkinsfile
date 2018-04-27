@@ -7,7 +7,7 @@ pipeline {
 
     agent {
         dockerfile {
-            filename 'docker_debian_testing'
+            filename 'docker_debian_stable'
             dir 'dockerfiles'
         }
     }
