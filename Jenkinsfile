@@ -5,7 +5,7 @@ pipeline {
                 string(defaultValue: '', description: 'Commit id', name: 'COMMIT_ID')
     }
 
-    agent none
+    agent any
 
     environment {
         OMPI_MCA_plm = 'isolated'
@@ -16,7 +16,6 @@ pipeline {
     }
     stages {
         stage ('wipe build') {
-            agent any
             when {
                 anyOf{
                     changeset glob: "**/*.cmake"
@@ -98,17 +97,12 @@ pipeline {
                         }
                     }
                     steps {
-                        sh '''#!/bin/bash
-CONTAINER_NAME=docker_debian_testing
-BUILD_DIR=build_${CONTAINER_NAME}
-for CXX_COMPILER in g++ clang++
-do
-    cd ${BUILD_DIR}_${CXX_COMPILER}
-    ctest || true
-    mkdir -p ../test_results
-    ##mv test_results*.xml ../test_results
-done
-                     '''
+                        run_test('docker_debian_testing')
+                    }
+                    post {
+                        always {
+                            collect_test_results('docker_debian_testing')
+                        }
                     }
                 }
                 stage ('docker_debian_stable') {
@@ -119,17 +113,12 @@ done
                         }
                     }
                     steps {
-                        sh '''#!/bin/bash
-CONTAINER_NAME=docker_debian_stable
-BUILD_DIR=build_${CONTAINER_NAME}
-for CXX_COMPILER in g++ clang++
-do
-    cd ${BUILD_DIR}_${CXX_COMPILER}
-    ctest || true
-    mkdir -p ../test_results
-    ##mv test_results*.xml ../test_results
-done
-                     '''
+                        run_test('docker_debian_stable')
+                    }
+                    post {
+                        always {
+                            collect_test_results('docker_debian_stable')
+                        }
                     }
                 }
             }
@@ -139,49 +128,14 @@ done
 
     post {
         always {
-            junit '**/test_results*.xml'
-            sh 'rm -rf test_results/*'
-            sh ''' set +x
-##                python3 -c "import os; import json; msg = {'buildTargetPHID':  os.environ['TARGET_PHID'],
-##                                                                'artifactKey': 'Jenkins URI {}'.format(os.environ['CXX_COMPILER']),
-##                                                                'artifactType': 'uri',
-##                                                                'artifactData': {
-##                                                                    'uri': os.environ['BUILD_URL'],
-##                                                                    'name': 'View Jenkins results for {}'.format(os.environ['CXX_COMPILER']),
-##                                                                    'ui.external': True
-##                                                                    }
-##                     }; print(json.dumps(msg))" | arc call-conduit --conduit-uri https://c4science.ch/ --conduit-token ${API_TOKEN} harbormaster.createartifact
-curl https://c4science.ch/api/harbormaster.createartifact \
--d api.token=${API_TOKEN} \
--d buildTargetPHID=${TARGET_PHID} \
--d artifactKey="Jenkins URI" \
--d artifactType=uri \
--d artifactData[uri]=${BUILD_URL} \
--d artifactData[name]="View Jenkins result" \
--d artifactData[ui.external]=1
-'''
+            createartifact()
         }
-
 	    success {
-            sh '''
-                  set +x
-#python3 -c "import os; import json; msg = {'buildTargetPHID': os.environ['TARGET_PHID'], 'type':'pass'}; print(json.dumps(msg))" | arc call-conduit --conduit-uri https://c4science.ch/ --conduit-token ${API_TOKEN} harbormaster.sendmessage
-curl https://c4science.ch/api/harbormaster.sendmessage \
--d api.token=${API_TOKEN} \
--d buildTargetPHID=${TARGET_PHID} \
--d type="pass"
-                  '''
+            send_fail_pass('pass')
         }
 
 	    failure {
-            sh '''
-                  set +x
-#                  python3 -c "import os; import json; msg = {'buildTargetPHID': os.environ['TARGET_PHID'], 'type':'fail'}; print(json.dumps(msg))" | arc call-conduit --conduit-uri https://c4science.ch/ --conduit-token ${API_TOKEN} harbormaster.sendmessage
-curl https://c4science.ch/api/harbormaster.sendmessage \
--d api.token=${API_TOKEN} \
--d buildTargetPHID=${TARGET_PHID} \
--d type="fail"
-                  '''
+            send_fail_pass('fail')
         }
     }
 }
@@ -203,4 +157,46 @@ def build(container_name) {
     for (CXX_COMPILER in ["g++", "clang++"]) {
         sh "make -C ${BUILD_DIR}_${CXX_COMPILER}"
     }
+}
+
+def run_test(container_name) {
+    def BUILD_DIR = "build_${container_name}"
+    for (CXX_COMPILER in ["g++", "clang++"]) {
+        sh """
+cd ${BUILD_DIR}_${CXX_COMPILER}
+ctest || true
+"""
+    }
+}
+
+def send_fail_pass(state) {
+    sh """
+set +x
+curl https://c4science.ch/api/harbormaster.sendmessage \
+-d api.token=${API_TOKEN} \
+-d buildTargetPHID=${TARGET_PHID} \
+-d type=${state}
+"""
+}
+
+
+def collect_test_results(container_name) {
+    def BUILD_DIR = "build_${container_name}"
+    for (CXX_COMPILER in ["g++", "clang++"]) {
+        junit "${BUILD_DIR}_${CXX_COMPILER}/test_results*.xml"
+    }
+}
+
+def createartifact() {
+    sh """ set +x
+curl https://c4science.ch/api/harbormaster.createartifact \
+-d api.token=${API_TOKEN} \
+-d buildTargetPHID=${TARGET_PHID} \
+-d artifactKey="Jenkins URI" \
+-d artifactType=uri \
+-d artifactData[uri]=${BUILD_URL} \
+-d artifactData[name]="View Jenkins result" \
+-d artifactData[ui.external]=1
+"""
+
 }
