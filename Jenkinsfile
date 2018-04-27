@@ -91,7 +91,7 @@ pipeline {
         stage ('test') {
             parallel {
                 ////////////////////////////////////////////////////
-                stage ('docker_debian_testing_g++') {
+                stage ('docker_debian_testing') {
                     agent {
                         dockerfile {
                             filename 'docker_debian_testing'
@@ -101,31 +101,18 @@ pipeline {
                     steps {
                         run_test('docker_debian_testing', 'g++')
                     }
-                    post {
-                        always {
-                            collect_test_results('docker_debian_testing', 'g++')
-                        }
-                    }
-                }
-                ////////////////////////////////////////////////////
-                stage ('docker_debian_testing_clang++') {
-                    agent {
-                        dockerfile {
-                            filename 'docker_debian_testing'
-                            dir 'dockerfiles'
-                        }
-                    }
                     steps {
                         run_test('docker_debian_testing', 'clang++')
                     }
                     post {
                         always {
+                            collect_test_results('docker_debian_testing', 'g++')
                             collect_test_results('docker_debian_testing', 'clang++')
                         }
                     }
                 }
                 ////////////////////////////////////////////////////
-                stage ('docker_debian_stable_g++') {
+                stage ('docker_debian_stable') {
                     agent {
                         dockerfile {
                             filename 'docker_debian_stable'
@@ -135,25 +122,12 @@ pipeline {
                     steps {
                         run_test('docker_debian_stable', 'g++')
                     }
-                    post {
-                        always {
-                            collect_test_results('docker_debian_stable', 'g++')
-                        }
-                    }
-                }
-                ////////////////////////////////////////////////////
-                stage ('docker_debian_stable_clang++') {
-                    agent {
-                        dockerfile {
-                            filename 'docker_debian_stable'
-                            dir 'dockerfiles'
-                        }
-                    }
                     steps {
                         run_test('docker_debian_stable', 'clang++')
                     }
                     post {
                         always {
+                            collect_test_results('docker_debian_stable', 'g++')
                             collect_test_results('docker_debian_stable', 'clang++')
                         }
                     }
