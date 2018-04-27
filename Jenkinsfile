@@ -37,7 +37,6 @@ pipeline {
         stage ('configure') {
             steps {
                 sh '''
-                     ##git checkout ${COMMIT_ID}
                      mkdir -p ${BUILD_DIR}_${CXX_COMPILER}
                      cd ${BUILD_DIR}_${CXX_COMPILER}
                      CXX=${CXX_COMPILER} cmake -DCMAKE_BUILD_TYPE:STRING=Release -DRUNNING_IN_CI=ON ..
@@ -80,7 +79,7 @@ pipeline {
                                                                 'artifactType': 'uri',
                                                                 'artifactData': {
                                                                     'uri': os.environ['BUILD_URL'],
-                                                                    'name': 'View Jenkins results',
+                                                                    'name': 'View Jenkins results for {}'.format(os.environ['CXX_COMPILER']),
                                                                     'ui.external': True
                                                                     }
                      }; print(json.dumps(msg))" | arc call-conduit --conduit-uri https://c4science.ch/ --conduit-token ${API_TOKEN} harbormaster.createartifact
