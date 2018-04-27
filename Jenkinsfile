@@ -36,6 +36,7 @@ pipeline {
         }
         stage ('configure') {
             steps {
+                git branch ${params.COMMIT_ID}
                 sh '''
                      git checkout ${COMMIT_ID}
                      mkdir -p ${BUILD_DIR}_${CXX_COMPILER}
