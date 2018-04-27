@@ -38,17 +38,7 @@ pipeline {
                         }
                     }
                     steps {
-                        sh '''#!/bin/bash
-CONTAINER_NAME=docker_debian_testing
-BUILD_DIR=build_${CONTAINER_NAME}
-for CXX_COMPILER in g++ clang++
-do
-    mkdir -p ${BUILD_DIR}_${CXX_COMPILER}
-    cd ${BUILD_DIR}_${CXX_COMPILER}
-    CXX=${CXX_COMPILER} cmake -DCMAKE_BUILD_TYPE:STRING=Release -DRUNNING_IN_CI=ON ..
-    cd ..
-done
-'''
+                        configure("docker_debian_testing")
                     }
                 }
                 stage ('docker_debian_stable') {
@@ -59,17 +49,7 @@ done
                         }
                     }
                     steps {
-                        sh '''#!/bin/bash
-CONTAINER_NAME=docker_debian_stable
-BUILD_DIR=build_${CONTAINER_NAME}
-for CXX_COMPILER in g++ clang++
-do
-    mkdir -p ${BUILD_DIR}_${CXX_COMPILER}
-    cd ${BUILD_DIR}_${CXX_COMPILER}
-    CXX=${CXX_COMPILER} cmake -DCMAKE_BUILD_TYPE:STRING=Release -DRUNNING_IN_CI=ON ..
-    cd ..
-done
-'''
+                        configure("docker_debian_stable")
                     }
                 }
             }
@@ -84,14 +64,7 @@ done
                         }
                     }
                     steps {
-                        sh '''#!/bin/bash
-CONTAINER_NAME=docker_debian_testing
-BUILD_DIR=build_${CONTAINER_NAME}
-for CXX_COMPILER in g++ clang++
-do
-    make -C ${BUILD_DIR}_${CXX_COMPILER}
-done
-'''
+                        build("docker_debian_testing")
                     }
                 }
                 stage ('docker_debian_stable') {
@@ -102,14 +75,7 @@ done
                         }
                     }
                     steps {
-                        sh '''#!/bin/bash
-CONTAINER_NAME=docker_debian_stable
-BUILD_DIR=build_${CONTAINER_NAME}
-for CXX_COMPILER in g++ clang++
-do
-    make -C ${BUILD_DIR}_${CXX_COMPILER}
-done
-'''
+                        build("docker_debian_stable")
                     }
                 }
             }
@@ -218,4 +184,28 @@ curl https://c4science.ch/api/harbormaster.sendmessage \
                   '''
         }
     }
+}
+
+
+def configure(container_name) {
+    sh '''#!/bin/bash
+BUILD_DIR=build_${container_name}
+for CXX_COMPILER in g++ clang++
+do
+    mkdir -p ${BUILD_DIR}_${CXX_COMPILER}
+    cd ${BUILD_DIR}_${CXX_COMPILER}
+    CXX=${CXX_COMPILER} cmake -DCMAKE_BUILD_TYPE:STRING=Release -DRUNNING_IN_CI=ON ..
+    cd ..
+done
+'''
+}
+
+def build(container_name) {
+    sh '''#!/bin/bash
+BUILD_DIR=build_${container_name}
+for CXX_COMPILER in g++ clang++
+do
+    make -C ${BUILD_DIR}_${CXX_COMPILER}
+done
+'''
 }
