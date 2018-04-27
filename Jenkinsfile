@@ -2,7 +2,6 @@ pipeline {
     parameters {string(defaultValue: '', description: 'api-token', name: 'API_TOKEN')
 	            string(defaultValue: '', description: 'buildable phid', name: 'TARGET_PHID')
 	            string(defaultValue: 'docker_debian_testing', description: 'docker file to use', name: 'DOCKERFILE')
-                string(defaultValue: 'g++', description: 'c++ compiler', name: 'CXX_COMPILER')
                 string(defaultValue: '', description: 'Commit id', name: 'COMMIT_ID')
     }
 
@@ -14,7 +13,6 @@ pipeline {
     }
 
     environment {
-        BUILD_DIR = 'build_docker_debian_testing'
         OMPI_MCA_plm = 'isolated'
         OMPI_MCA_btl = 'tcp,self'
     }
@@ -31,21 +29,67 @@ pipeline {
                 }
             }
             steps {
-                sh ' rm -rf ${BUILD_DIR}_${CXX_COMPILER}'
+                sh ' rm -rf build_*'
             }
         }
         stage ('configure') {
-            steps {
-                sh '''
-                     mkdir -p ${BUILD_DIR}_${CXX_COMPILER}
-                     cd ${BUILD_DIR}_${CXX_COMPILER}
-                     CXX=${CXX_COMPILER} cmake -DCMAKE_BUILD_TYPE:STRING=Release -DRUNNING_IN_CI=ON ..
-                     '''
+            parallel {
+                stage ('docker_debian_testing') {
+                    steps {
+                        sh '''#!/bin/bash
+CONTAINER_NAME=docker_debian_testing
+BUILD_DIR=build_${CONTAINER_NAME}
+for CXX_COMPILER in g++ clang++
+do
+    mkdir -p ${BUILD_DIR}_${CXX_COMPILER}
+    cd ${BUILD_DIR}_${CXX_COMPILER}
+    CXX=${CXX_COMPILER} cmake -DCMAKE_BUILD_TYPE:STRING=Release -DRUNNING_IN_CI=ON ..
+done
+'''
+                    }
+                }
+                stage ('docker_debian_stable') {
+                    steps {
+                        sh '''#!/bin/bash
+CONTAINER_NAME=docker_debian_stable
+BUILD_DIR=build_${CONTAINER_NAME}
+for CXX_COMPILER in g++ clang++
+do
+    mkdir -p ${BUILD_DIR}_${CXX_COMPILER}
+    cd ${BUILD_DIR}_${CXX_COMPILER}
+    CXX=${CXX_COMPILER} cmake -DCMAKE_BUILD_TYPE:STRING=Release -DRUNNING_IN_CI=ON ..
+done
+'''
+                    }
+                }
             }
         }
         stage ('build') {
-            steps {
-                sh 'make -C ${BUILD_DIR}_${CXX_COMPILER}'
+            parallel {
+                stage ('docker_debian_testing') {
+                    steps {
+                        sh '''#!/bin/bash
+CONTAINER_NAME=docker_debian_testing
+BUILD_DIR=build_${CONTAINER_NAME}
+for CXX_COMPILER in g++ clang++
+do
+    make -C ${BUILD_DIR}_${CXX_COMPILER}
+done
+'''
+                    }
+                }
+                stage ('docker_debian_stable') {
+                    steps {
+                        sh '''#!/bin/bash
+CONTAINER_NAME=docker_debian_stable
+BUILD_DIR=build_${CONTAINER_NAME}
+for CXX_COMPILER in g++ clang++
+do
+    make -C ${BUILD_DIR}_${CXX_COMPILER}
+done
+'''
+                    }
+                }
             }
         }
 
@@ -57,13 +101,21 @@ pipeline {
         }
 
         stage ('test') {
-            steps {
-                sh '''
-                     cd ${BUILD_DIR}_${CXX_COMPILER}
-                     ctest || true
-                     mkdir -p ../test_results
-                     mv test_results*.xml ../test_results
+            parallel {
+                stage ('docker_debian_testing') {
+                    steps {
+                        sh '''#!/bin/bash
+CONTAINER_NAME=docker_debian_stable
+BUILD_DIR=build_${CONTAINER_NAME}
+for CXX_COMPILER in g++ clang++
+do
+    cd ${BUILD_DIR}_${CXX_COMPILER}
+    ctest || true
+    mkdir -p ../test_results
+    ##mv test_results*.xml ../test_results
                      '''
+                    }
+                }
             }
         }
     }
@@ -71,7 +123,7 @@ pipeline {
 
     post {
         always {
-            junit 'test_results/*.xml'
+            junit '**/test_results*.xml'
             sh 'rm -rf test_results/*'
             sh ''' set +x
                 python3 -c "import os; import json; msg = {'buildTargetPHID':  os.environ['TARGET_PHID'],
