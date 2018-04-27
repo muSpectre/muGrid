@@ -89,7 +89,8 @@ pipeline {
 
         stage ('test') {
             parallel {
-                stage ('docker_debian_testing') {
+                ////////////////////////////////////////////////////
+                stage ('docker_debian_testing_g++') {
                     agent {
                         dockerfile {
                             filename 'docker_debian_testing'
@@ -97,15 +98,33 @@ pipeline {
                         }
                     }
                     steps {
-                        run_test('docker_debian_testing')
+                        run_test('docker_debian_testing', 'g++')
                     }
                     post {
                         always {
-                            collect_test_results('docker_debian_testing')
+                            collect_test_results('docker_debian_testing', 'g++')
                         }
                     }
                 }
-                stage ('docker_debian_stable') {
+                ////////////////////////////////////////////////////
+                stage ('docker_debian_testing_clang++') {
+                    agent {
+                        dockerfile {
+                            filename 'docker_debian_testing'
+                            dir 'dockerfiles'
+                        }
+                    }
+                    steps {
+                        run_test('docker_debian_testing', 'clang++')
+                    }
+                    post {
+                        always {
+                            collect_test_results('docker_debian_testing', 'clang++')
+                        }
+                    }
+                }
+                ////////////////////////////////////////////////////
+                stage ('docker_debian_stable_g++') {
                     agent {
                         dockerfile {
                             filename 'docker_debian_stable'
@@ -113,11 +132,28 @@ pipeline {
                         }
                     }
                     steps {
-                        run_test('docker_debian_stable')
+                        run_test('docker_debian_stable', 'g++')
                     }
                     post {
                         always {
-                            collect_test_results('docker_debian_stable')
+                            collect_test_results('docker_debian_stable', 'g++')
+                        }
+                    }
+                }
+                ////////////////////////////////////////////////////
+                stage ('docker_debian_stable_clang++') {
+                    agent {
+                        dockerfile {
+                            filename 'docker_debian_stable'
+                            dir 'dockerfiles'
+                        }
+                    }
+                    steps {
+                        run_test('docker_debian_stable', 'clang++')
+                    }
+                    post {
+                        always {
+                            collect_test_results('docker_debian_stable', 'clang++')
                         }
                     }
                 }
@@ -159,14 +195,9 @@ def build(container_name) {
     }
 }
 
-def run_test(container_name) {
+def run_test(container_name, cxx_compiler) {
     def BUILD_DIR = "build_${container_name}"
-    for (CXX_COMPILER in ["g++", "clang++"]) {
-        sh """
-cd ${BUILD_DIR}_${CXX_COMPILER}
-ctest || true
-"""
-    }
+    sh "cd ${BUILD_DIR}_${cxx_compiler} && ctest || true"
 }
 
 def send_fail_pass(state) {
@@ -180,11 +211,9 @@ curl https://c4science.ch/api/harbormaster.sendmessage \
 }
 
 
-def collect_test_results(container_name) {
+def collect_test_results(container_name, cxx_compiler) {
     def BUILD_DIR = "build_${container_name}"
-    for (CXX_COMPILER in ["g++", "clang++"]) {
-        junit "${BUILD_DIR}_${CXX_COMPILER}/test_results*.xml"
-    }
+    junit "${BUILD_DIR}_${cxx_compiler}/test_results*.xml"
 }
 
 def createartifact() {
