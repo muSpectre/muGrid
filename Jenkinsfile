@@ -64,7 +64,6 @@ pipeline {
                     }
                     steps {
                         build('docker_debian_testing')
-                        stash name: "debian_testing_build", includes: "build*"
                     }
                 }
                 stage ('docker_debian_stable') {
