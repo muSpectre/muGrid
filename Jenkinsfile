@@ -16,6 +16,7 @@ pipeline {
     }
     stages {
         stage ('wipe build') {
+            agent any
             when {
                 anyOf{
                     changeset glob: "**/*.cmake"
