@@ -179,29 +179,45 @@ done
             junit '**/test_results*.xml'
             sh 'rm -rf test_results/*'
             sh ''' set +x
-                python3 -c "import os; import json; msg = {'buildTargetPHID':  os.environ['TARGET_PHID'],
-                                                                'artifactKey': 'Jenkins URI {}'.format(os.environ['CXX_COMPILER']),
-                                                                'artifactType': 'uri',
-                                                                'artifactData': {
-                                                                    'uri': os.environ['BUILD_URL'],
-                                                                    'name': 'View Jenkins results for {}'.format(os.environ['CXX_COMPILER']),
-                                                                    'ui.external': True
-                                                                    }
-                     }; print(json.dumps(msg))" | arc call-conduit --conduit-uri https://c4science.ch/ --conduit-token ${API_TOKEN} harbormaster.createartifact
-                '''
+##                python3 -c "import os; import json; msg = {'buildTargetPHID':  os.environ['TARGET_PHID'],
+##                                                                'artifactKey': 'Jenkins URI {}'.format(os.environ['CXX_COMPILER']),
+##                                                                'artifactType': 'uri',
+##                                                                'artifactData': {
+##                                                                    'uri': os.environ['BUILD_URL'],
+##                                                                    'name': 'View Jenkins results for {}'.format(os.environ['CXX_COMPILER']),
+##                                                                    'ui.external': True
+##                                                                    }
+##                     }; print(json.dumps(msg))" | arc call-conduit --conduit-uri https://c4science.ch/ --conduit-token ${API_TOKEN} harbormaster.createartifact
+curl https://c4science.ch/api/harbormaster.createartifact \
+-d api.token=${API_TOKEN} \
+-d buildTargetPHID=${TARGET_PHID} \
+-d artifactKey="Jenkins URI" \
+-d artifactType=uri \
+-d artifactData[uri]=${BUILD_URL} \
+-d artifactData[name]="View Jenkins result" \
+-d artifactData[ui.external]=1
+'''
         }
 
 	    success {
             sh '''
                   set +x
-                  python3 -c "import os; import json; msg = {'buildTargetPHID': os.environ['TARGET_PHID'], 'type':'pass'}; print(json.dumps(msg))" | arc call-conduit --conduit-uri https://c4science.ch/ --conduit-token ${API_TOKEN} harbormaster.sendmessage
+#python3 -c "import os; import json; msg = {'buildTargetPHID': os.environ['TARGET_PHID'], 'type':'pass'}; print(json.dumps(msg))" | arc call-conduit --conduit-uri https://c4science.ch/ --conduit-token ${API_TOKEN} harbormaster.sendmessage
+curl https://c4science.ch/api/harbormaster.sendmessage \
+-d api.token=${API_TOKEN} \
+-d buildTargetPHID=${TARGET_PHID} \
+-d type="pass"
                   '''
         }
 
 	    failure {
             sh '''
                   set +x
-                  python3 -c "import os; import json; msg = {'buildTargetPHID': os.environ['TARGET_PHID'], 'type':'fail'}; print(json.dumps(msg))" | arc call-conduit --conduit-uri https://c4science.ch/ --conduit-token ${API_TOKEN} harbormaster.sendmessage
+#                  python3 -c "import os; import json; msg = {'buildTargetPHID': os.environ['TARGET_PHID'], 'type':'fail'}; print(json.dumps(msg))" | arc call-conduit --conduit-uri https://c4science.ch/ --conduit-token ${API_TOKEN} harbormaster.sendmessage
+curl https://c4science.ch/api/harbormaster.sendmessage \
+-d api.token=${API_TOKEN} \
+-d buildTargetPHID=${TARGET_PHID} \
+-d type="fail"
                   '''
         }
     }
