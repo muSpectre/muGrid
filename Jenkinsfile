@@ -35,6 +35,12 @@ pipeline {
         stage ('configure') {
             parallel {
                 stage ('docker_debian_testing') {
+                    agent {
+                        dockerfile {
+                            filename 'docker_debian_testing'
+                            dir 'dockerfiles'
+                        }
+                    }
                     steps {
                         sh '''#!/bin/bash
 CONTAINER_NAME=docker_debian_testing
@@ -49,6 +55,12 @@ done
                     }
                 }
                 stage ('docker_debian_stable') {
+                    agent {
+                        dockerfile {
+                            filename 'docker_debian_stable'
+                            dir 'dockerfiles'
+                        }
+                    }
                     steps {
                         sh '''#!/bin/bash
 CONTAINER_NAME=docker_debian_stable
@@ -67,6 +79,12 @@ done
         stage ('build') {
             parallel {
                 stage ('docker_debian_testing') {
+                    agent {
+                        dockerfile {
+                            filename 'docker_debian_testing'
+                            dir 'dockerfiles'
+                        }
+                    }
                     steps {
                         sh '''#!/bin/bash
 CONTAINER_NAME=docker_debian_testing
@@ -79,6 +97,12 @@ done
                     }
                 }
                 stage ('docker_debian_stable') {
+                    agent {
+                        dockerfile {
+                            filename 'docker_debian_stable'
+                            dir 'dockerfiles'
+                        }
+                    }
                     steps {
                         sh '''#!/bin/bash
 CONTAINER_NAME=docker_debian_stable
@@ -103,6 +127,32 @@ done
         stage ('test') {
             parallel {
                 stage ('docker_debian_testing') {
+                    agent {
+                        dockerfile {
+                            filename 'docker_debian_testing'
+                            dir 'dockerfiles'
+                        }
+                    }
+                    steps {
+                        sh '''#!/bin/bash
+CONTAINER_NAME=docker_debian_testing
+BUILD_DIR=build_${CONTAINER_NAME}
+for CXX_COMPILER in g++ clang++
+do
+    cd ${BUILD_DIR}_${CXX_COMPILER}
+    ctest || true
+    mkdir -p ../test_results
+    ##mv test_results*.xml ../test_results
+                     '''
+                    }
+                }
+                stage ('docker_debian_stable') {
+                    agent {
+                        dockerfile {
+                            filename 'docker_debian_stable'
+                            dir 'dockerfiles'
+                        }
+                    }
                     steps {
                         sh '''#!/bin/bash
 CONTAINER_NAME=docker_debian_stable
