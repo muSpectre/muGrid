@@ -100,8 +100,6 @@ pipeline {
                     }
                     steps {
                         run_test('docker_debian_testing', 'g++')
-                    }
-                    steps {
                         run_test('docker_debian_testing', 'clang++')
                     }
                     post {
@@ -121,8 +119,6 @@ pipeline {
                     }
                     steps {
                         run_test('docker_debian_stable', 'g++')
-                    }
-                    steps {
                         run_test('docker_debian_stable', 'clang++')
                     }
                     post {
