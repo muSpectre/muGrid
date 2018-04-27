@@ -3,8 +3,7 @@ pipeline {
 	                  string(defaultValue: '', description: 'buildable phid', name: 'TARGET_PHID')
 	                  string(defaultValue: 'docker_debian_testing', description: 'docker file to use', name: 'DOCKERFILE')
                       string(defaultValue: 'g++', description: 'c++ compiler', name: 'CXX_COMPILER')
-                      string(defaultValue: '', description: 'Differential Id (if applicable)', name: 'DIFF_ID')
-                      string(defaultValue: '', description: 'Differential Revision (if applicable)', name: 'DIFF_REV')
+                      string(defaultValue: '', description: 'Commit id', name: 'COMMIT_ID')
       }
 
     agent {
@@ -36,7 +35,9 @@ pipeline {
                    }
             }
       stage ('configure') {
-              steps {
+               steps {
+                  git branch ${params.COMMIT_ID}
+
                   sh '''
                      mkdir -p ${BUILD_DIR}_${CXX_COMPILER}
                      cd ${BUILD_DIR}_${CXX_COMPILER}
