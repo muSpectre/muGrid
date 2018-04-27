@@ -5,12 +5,7 @@ pipeline {
                 string(defaultValue: '', description: 'Commit id', name: 'COMMIT_ID')
     }
 
-    agent {
-        dockerfile {
-            filename 'docker_debian_stable'
-            dir 'dockerfiles'
-        }
-    }
+    agent none
 
     environment {
         OMPI_MCA_plm = 'isolated'
