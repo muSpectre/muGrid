@@ -142,7 +142,9 @@ ExternalProject_Add(${project_name}
   if(_result)
     message(FATAL_ERROR "Something went wrong (${_result}) during the download"
       " process of ${project_name} check the file"
-      " ${_working_dir}/configure-error.log for more details")
+      " ${_working_dir}/configure-error.log for more details:")
+    file(STRINGS "${_working_dir}/configure-error.log" ERROR_MSG)
+    message("${ERROR_MSG}")
   endif()
 
   execute_process(COMMAND "${CMAKE_COMMAND}" --build .
