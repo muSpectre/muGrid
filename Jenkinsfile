@@ -3,6 +3,8 @@ pipeline {
 	                  string(defaultValue: '', description: 'buildable phid', name: 'TARGET_PHID')
 	                  string(defaultValue: 'docker_debian_testing', description: 'docker file to use', name: 'DOCKERFILE')
                       string(defaultValue: 'g++', description: 'c++ compiler', name: 'CXX_COMPILER')
+                      string(defaultValue: '', description: 'Differential Id (if applicable)', name: 'DIFF_ID')
+                      string(defaultValue: '', description: 'Differential Revision (if applicable)', name: 'DIFF_REV')
       }
 
     agent {
@@ -41,6 +43,12 @@ pipeline {
                      CXX=${CXX_COMPILER} cmake -DCMAKE_BUILD_TYPE:STRING=Release -DRUNNING_IN_CI=ON ..
                      '''
                 }
+              steps {
+                sh '''
+                   echo "printing diff id if it exists: '$DIFF_ID'"
+                   echo "princing diff revision id if it exists: '$DIFF_REV'"
+                   '''
+              }
             }
             stage ('build') {
               steps {
