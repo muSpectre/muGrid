@@ -188,7 +188,7 @@ curl https://c4science.ch/api/harbormaster.sendmessage \
 
 
 def configure(container_name) {
-    BUILD_DIR = "build_${container_name}"
+    def BUILD_DIR = "build_${container_name}"
     for (CXX_COMPILER in ["g++", "clang++"]) {
         sh """
 mkdir -p ${BUILD_DIR}_${CXX_COMPILER}
@@ -199,7 +199,7 @@ CXX=${CXX_COMPILER} cmake -DCMAKE_BUILD_TYPE:STRING=Release -DRUNNING_IN_CI=ON .
 }
 
 def build(container_name) {
-    BUILD_DIR = "build_${container_name}"
+    def BUILD_DIR = "build_${container_name}"
     for (CXX_COMPILER in ["g++", "clang++"]) {
         sh "make -C ${BUILD_DIR}_${CXX_COMPILER}"
     }
