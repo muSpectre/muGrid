@@ -188,6 +188,8 @@ curl https://c4science.ch/api/harbormaster.sendmessage \
 
 
 def configure(container_name) {
+    echo "$container_name"
+    echo '$container_name'
     sh '''#!/bin/bash
 BUILD_DIR=build_${container_name}
 for CXX_COMPILER in g++ clang++
