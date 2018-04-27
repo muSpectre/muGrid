@@ -64,6 +64,7 @@ pipeline {
                     }
                     steps {
                         build('docker_debian_testing')
+                        stash name: "debian_testing_build", includes: "build*"
                     }
                 }
                 stage ('docker_debian_stable') {
@@ -192,14 +193,12 @@ def build(container_name) {
     def BUILD_DIR = "build_${container_name}"
     for (CXX_COMPILER in ["g++", "clang++"]) {
         sh "make -C ${BUILD_DIR}_${CXX_COMPILER}"
-        stash name: "${container_name}_${CXX_COMPILER}", includes: "${BUILD_DIR}_${CXX_COMPILER}"
     }
 
 }
 
 def run_test(container_name, cxx_compiler) {
     def BUILD_DIR = "build_${container_name}"
-    unstash name: "${container_name}_${CXX_COMPILER}"u
     sh "cd ${BUILD_DIR}_${cxx_compiler} && ctest || true"
 }
 
