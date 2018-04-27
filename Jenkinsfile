@@ -190,7 +190,7 @@ curl https://c4science.ch/api/harbormaster.sendmessage \
 def configure(container_name) {
     echo "$container_name"
     echo '$container_name'
-    sh '''#!/bin/bash
+    sh """#!/bin/bash
 BUILD_DIR=build_${container_name}
 for CXX_COMPILER in g++ clang++
 do
@@ -199,15 +199,17 @@ do
     CXX=${CXX_COMPILER} cmake -DCMAKE_BUILD_TYPE:STRING=Release -DRUNNING_IN_CI=ON ..
     cd ..
 done
-'''
+"""
 }
 
 def build(container_name) {
-    sh '''#!/bin/bash
+    echo "$container_name"
+    echo '$container_name'
+    sh """#!/bin/bash
 BUILD_DIR=build_${container_name}
 for CXX_COMPILER in g++ clang++
 do
     make -C ${BUILD_DIR}_${CXX_COMPILER}
 done
-'''
+"""
 }
