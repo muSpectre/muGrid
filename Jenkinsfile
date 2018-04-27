@@ -38,7 +38,7 @@ pipeline {
                         }
                     }
                     steps {
-                        configure("docker_debian_testing")
+                        configure('docker_debian_testing')
                     }
                 }
                 stage ('docker_debian_stable') {
@@ -49,7 +49,7 @@ pipeline {
                         }
                     }
                     steps {
-                        configure("docker_debian_stable")
+                        configure('docker_debian_stable')
                     }
                 }
             }
@@ -64,7 +64,7 @@ pipeline {
                         }
                     }
                     steps {
-                        build("docker_debian_testing")
+                        build('docker_debian_testing')
                     }
                 }
                 stage ('docker_debian_stable') {
@@ -75,7 +75,7 @@ pipeline {
                         }
                     }
                     steps {
-                        build("docker_debian_stable")
+                        build('docker_debian_stable')
                     }
                 }
             }
