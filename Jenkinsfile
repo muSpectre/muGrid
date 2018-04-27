@@ -70,6 +70,7 @@ do
     mkdir -p ${BUILD_DIR}_${CXX_COMPILER}
     cd ${BUILD_DIR}_${CXX_COMPILER}
     CXX=${CXX_COMPILER} cmake -DCMAKE_BUILD_TYPE:STRING=Release -DRUNNING_IN_CI=ON ..
+    cd ..
 done
 '''
                     }
@@ -143,6 +144,7 @@ do
     ctest || true
     mkdir -p ../test_results
     ##mv test_results*.xml ../test_results
+done
                      '''
                     }
                 }
@@ -163,6 +165,7 @@ do
     ctest || true
     mkdir -p ../test_results
     ##mv test_results*.xml ../test_results
+done
                      '''
                     }
                 }
