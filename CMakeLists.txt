@@ -27,7 +27,7 @@
 # Boston, MA 02111-1307, USA.
 # =============================================================================
 
-cmake_minimum_required(VERSION 3.5.0)
+cmake_minimum_required(VERSION 3.0.0)
 
 project(µSpectre)
 
