@@ -40,6 +40,7 @@ extensions = ['sphinx.ext.autodoc',
               'sphinx.ext.viewcode',
               'breathe']
 read_the_docs_build = os.environ.get('READTHEDOCS', None) == 'True'
+print("${READTHEDOCS} = " + os.environ.get('READTHEDOCS', None))
 
 if read_the_docs_build:
     muspectre_path = "."
@@ -89,7 +90,7 @@ language = None
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This patterns also effect to html_static_path and html_extra_path
-exclude_patterns = []
+exclude_patterns = ["CmakeLists.txt"]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
