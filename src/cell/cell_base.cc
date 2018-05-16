@@ -47,8 +47,29 @@ namespace muSpectre {
      fields{std::make_unique<FieldCollection_t>()},
      F{make_field<StrainField_t>("Gradient", *this->fields)},
      P{make_field<StressField_t>("Piola-Kirchhoff-1", *this->fields)},
-     projection{std::move(projection_)},
-     form{projection->get_formulation()}
+     projection{std::move(projection_)}
+  { }
+
+  /**
+   * turns out that the default move container in combination with
+   * clang segfaults under certain (unclear) cicumstances, because the
+   * move constructor of the optional appears to be busted in gcc
+   * 7.2. Copying it (K) instead of moving it fixes the issue, and
+   * since it is a reference, the cost is practically nil
+   */
+  template <Dim_t DimS, Dim_t DimM>
+  CellBase<DimS, DimM>::CellBase(CellBase && other):
+    subdomain_resolutions{std::move(other.subdomain_resolutions)},
+    subdomain_locations{std::move(other.subdomain_locations)},
+    domain_resolutions{std::move(other.domain_resolutions)},
+    pixels{std::move(other.pixels)},
+    domain_lengths{std::move(other.domain_lengths)},
+    fields{std::move(other.fields)},
+    F{other.F},
+    P{other.P},
+    K{other.K}, // this seems to segfault under clang if it's not a move
+    materials{std::move(other.materials)},
+    projection{std::move(other.projection)}
   { }
 
   /* ---------------------------------------------------------------------- */
@@ -86,7 +107,7 @@ namespace muSpectre {
       this->initialise();
     }
     for (auto & mat: this->materials) {
-      mat->compute_stresses(this->F, this->P, this->form);
+      mat->compute_stresses(this->F, this->P, this->get_formulation());
     }
 
     return this->P.const_eigenvec();
@@ -105,7 +126,7 @@ namespace muSpectre {
 
     for (auto & mat: this->materials) {
       mat->compute_stresses_tangent(this->F, this->P, this->K.value(),
-                                    this->form);
+                                    this->get_formulation());
     }
     const TangentField_t & k = this->K.value();
     return std::array<ConstVector_ref, 2>{
@@ -191,7 +212,7 @@ namespace muSpectre {
 
     for (auto & mat: this->materials) {
       mat->compute_stresses_tangent(grad, this->P, this->K.value(),
-                                    this->form);
+                                    this->get_formulation());
     }
     return std::tie(this->P, this->K.value());
   }

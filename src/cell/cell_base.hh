@@ -241,7 +241,7 @@ namespace muSpectre {
     CellBase(const CellBase &other) = delete;
 
     //! Move constructor
-    CellBase(CellBase &&other) = default;
+    CellBase(CellBase &&other);
 
     //! Destructor
     virtual ~CellBase() = default;
@@ -437,7 +437,7 @@ namespace muSpectre {
     //! container of the materials present in the cell
     std::vector<Material_ptr> materials{};
     Projection_ptr projection; //!< handle for the projection operator
-    const Formulation form; //!< formulation for solution
+
   private:
   };
 
