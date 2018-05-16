@@ -41,16 +41,154 @@
 #include <memory>
 #include <tuple>
 #include <functional>
+#include <array>
 
 namespace muSpectre {
+  /**
+   * Cell adaptors implement the matrix-vector multiplication and
+   * allow the system to be used like a sparse matrix in
+   * conjugate-gradient-type solvers
+   */
   template <class Cell>
   class CellAdaptor;
+
+  /**
+   * Base class for cells that is not templated and therefore can be
+   * in solvers that see cells as runtime-polymorphic objects. This
+   * allows the use of standard
+   * (i.e. spectral-method-implementation-agnostic) solvers, as for
+   * instance the scipy solvers
+   */
+
+  class Cell
+  {
+  public:
+    //! sparse matrix emulation
+    using Adaptor = CellAdaptor<Cell>;
+
+    //! dynamic vector type for interactions with numpy/scipy/solvers etc.
+    using Vector_t = Eigen::Matrix<Real, Eigen::Dynamic, 1>;
+
+    //! dynamic matrix type for setting strains
+    using Matrix_t = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
+
+    //! ref to constant vector
+    using ConstVector_ref = Eigen::Map<const Vector_t>;
+
+    //! output vector reference for solvers
+    using Vector_ref = Eigen::Map<Vector_t>;
+
+    //! Default constructor
+    Cell() = default;
+
+    //! Copy constructor
+    Cell(const Cell &other) = default;
+
+    //! Move constructor
+    Cell(Cell &&other) = default;
+
+    //! Destructor
+    virtual ~Cell()  = default;
+
+    //! Copy assignment operator
+    Cell& operator=(const Cell &other) = default;
+
+    //! Move assignment operator
+    Cell& operator=(Cell &&other) = default;
+
+    //! for handling double initialisations right
+    bool is_initialised() const {return this->initialised;}
+
+    //! returns the number of degrees of freedom in the cell
+    virtual Dim_t get_nb_dof() const = 0;
+
+    //! return the communicator object
+    virtual const Communicator & get_communicator() const = 0;
+
+    /**
+     * formulation is hard set by the choice of the projection class
+     */
+    virtual const Formulation & get_formulation() const = 0;
+
+    /**
+     * returns the material dimension of the problem
+     */
+    virtual Dim_t get_material_dim() const = 0;
+
+    /**
+     * returns the number of rows and cols for the strain matrix type
+     * (for full storage, the strain is stored in material_dim ×
+     * material_dim matrices, but in symmetriy storage, it is a column
+     * vector)
+     */
+    virtual std::array<Dim_t, 2> get_strain_shape() const = 0;
+
+    /**
+     * returns a writable map onto the strain field of this cell. This
+     * corresponds to the unknowns in a typical solve cycle.
+     */
+    virtual Vector_ref get_strain_vector() = 0;
+
+    /**
+     * returns a read-only map onto the stress field of this
+     * cell. This corresponds to the intermediate (and finally, total)
+     * solution in a typical solve cycle
+     */
+    virtual ConstVector_ref get_stress_vector() const = 0;
+
+
+    /**
+     * evaluates and returns the stress for the currently set strain
+     */
+    virtual ConstVector_ref evaluate_stress() = 0;
+
+    /**
+     * evaluates and returns the stress and stiffness for the currently set strain
+     */
+    virtual std::array<ConstVector_ref, 2> evaluate_stress_tangent() = 0;
+
+
+    /**
+     * applies the projection operator in-place on the input vector
+     */
+    virtual void apply_projection(Eigen::Ref<Vector_t> vec) = 0;
+
+    /**
+     * freezes all the history variables of the materials
+     */
+    virtual void save_history_variables() = 0;
+
+    /**
+     * evaluates the directional and projected stiffness (this
+     * corresponds to G:K:δF in de Geus 2017,
+     * http://dx.doi.org/10.1016/j.cma.2016.12.032). It seems that
+     * this operation needs to be implemented with a copy in oder to
+     * be compatible with scipy and EigenCG etc (At the very least,
+     * the copy is only made once)
+     */
+    virtual Vector_ref evaluate_projected_directional_stiffness
+      (Eigen::Ref<const Vector_t> delF) = 0;
+
+
+    /**
+     * set uniform strain (typically used to initialise problems
+     */
+    virtual void set_uniform_strain(const Eigen::Ref<const Matrix_t> &) = 0;
+
+    //! get a sparse matrix view on the cell
+    virtual Adaptor get_adaptor() = 0;
+  protected:
+    bool initialised{false}; //!< to handle double initialisation right
+
+  private:
+  };
   //! DimS spatial dimension (dimension of problem
   //! DimM material_dimension (dimension of constitutive law)
   template <Dim_t DimS, Dim_t DimM=DimS>
-  class CellBase
+  class CellBase: public Cell
   {
   public:
+    using Parent = Cell;
     using Ccoord = Ccoord_t<DimS>; //!< cell coordinates type
     using Rcoord = Rcoord_t<DimS>; //!< physical coordinates type
     //! global field collection
@@ -79,12 +217,19 @@ namespace muSpectre {
       std::tuple<const StressField_t&, const TangentField_t&>;
     //! iterator type over all cell pixel's
     using iterator = typename CcoordOps::Pixels<DimS>::iterator;
-    //! input vector for solvers
-    using SolvVectorIn = Eigen::Ref<const Eigen::VectorXd>;
-    //! output vector for solvers
-    using SolvVectorOut = Eigen::Map<Eigen::VectorXd>;
+
+    //! dynamic vector type for interactions with numpy/scipy/solvers etc.
+    using Vector_t = typename Parent::Vector_t;
+
+    //! ref to constant vector
+    using ConstVector_ref = typename Parent::ConstVector_ref;
+
+    //! output vector reference for solvers
+    using Vector_ref = typename Parent::Vector_ref;
+
+
     //! sparse matrix emulation
-    using Adaptor = CellAdaptor<CellBase>;
+    using Adaptor = Parent::Adaptor;
 
     //! Default constructor
     CellBase() = delete;
@@ -113,6 +258,66 @@ namespace muSpectre {
      */
     Material_t & add_material(Material_ptr mat);
 
+
+    /**
+     * returns a writable map onto the strain field of this cell. This
+     * corresponds to the unknowns in a typical solve cycle.
+     */
+    virtual Vector_ref get_strain_vector() override;
+
+    /**
+     * returns a read-only map onto the stress field of this
+     * cell. This corresponds to the intermediate (and finally, total)
+     * solution in a typical solve cycle
+     */
+    virtual ConstVector_ref get_stress_vector() const override;
+
+    /**
+     * evaluates and returns the stress for the currently set strain
+     */
+    virtual ConstVector_ref evaluate_stress() override;
+
+    /**
+     * evaluates and returns the stress and stiffness for the currently set strain
+     */
+    virtual std::array<ConstVector_ref, 2> evaluate_stress_tangent() override;
+
+
+    /**
+     * evaluates the directional and projected stiffness (this
+     * corresponds to G:K:δF in de Geus 2017,
+     * http://dx.doi.org/10.1016/j.cma.2016.12.032). It seems that
+     * this operation needs to be implemented with a copy in oder to
+     * be compatible with scipy and EigenCG etc. (At the very least,
+     * the copy is only made once)
+     */
+    virtual Vector_ref evaluate_projected_directional_stiffness
+      (Eigen::Ref<const Vector_t> delF) override;
+
+    //! return the template param DimM (required for polymorphic use of `Cell`
+    Dim_t get_material_dim() const override final {return DimM;}
+
+    /**
+     * returns the number of rows and cols for the strain matrix type
+     * (for full storage, the strain is stored in material_dim ×
+     * material_dim matrices, but in symmetriy storage, it is a column
+     * vector)
+     */
+    std::array<Dim_t, 2> get_strain_shape() const override final;
+
+    /**
+     * applies the projection operator in-place on the input vector
+     */
+    void apply_projection(Eigen::Ref<Vector_t> vec) override final;
+
+
+
+    /**
+     * set uniform strain (typically used to initialise problems
+     */
+    void set_uniform_strain(const Eigen::Ref<const Matrix_t> &) override;
+
+
     /**
      * evaluates all materials
      */
@@ -129,7 +334,7 @@ namespace muSpectre {
      * vectorized version for eigen solvers, no copy, but only works
      * when fields have ArrayStore=false
      */
-     SolvVectorOut directional_stiffness_vec(const SolvVectorIn & delF);
+    Vector_ref directional_stiffness_vec(const Eigen::Ref<const Vector_t> & delF);
     /**
      * Evaluate directional stiffness into a temporary array and
      * return a copy. This is a costly and wasteful interface to
@@ -163,17 +368,13 @@ namespace muSpectre {
      * need to be initialised separately
      */
     void initialise(FFT_PlanFlags flags = FFT_PlanFlags::estimate);
-    /**
-     * initialise materials (including resetting any history variables)
-     */
-    void initialise_materials(bool stiffness=false);
 
     /**
      * for materials with state variables, these typically need to be
      * saved/updated an the end of each load increment, this function
      * calls this update for each material in the cell
      */
-    void save_history_variables();
+    void save_history_variables() override final;
 
     iterator begin(); //!< iterator to the first pixel
     iterator end();  //!< iterator past the last pixel
@@ -195,11 +396,8 @@ namespace muSpectre {
     /**
      * formulation is hard set by the choice of the projection class
      */
-    const Formulation & get_formulation() const {
+    const Formulation & get_formulation() const override final {
       return this->projection->get_formulation();}
-
-    //! for handling double initialisations right
-    bool is_initialised() const {return this->initialised;}
 
     /**
      * get a reference to the projection object. should only be
@@ -212,15 +410,15 @@ namespace muSpectre {
     constexpr static Dim_t get_sdim() {return DimS;};
 
     //! return a sparse matrix adaptor to the cell
-    Adaptor get_adaptor();
+    Adaptor get_adaptor() override;
     //! returns the number of degrees of freedom in the cell
-    Dim_t nb_dof() const {return this->size()*ipow(DimS, 2);};
+    Dim_t get_nb_dof() const override {return this->size()*ipow(DimS, 2);};
 
     //! return the communicator object
-    const Communicator & get_communicator() const {
+    virtual const Communicator & get_communicator() const override {
       return this->projection->get_communicator();
     }
-    
+
   protected:
     //! make sure that every pixel is assigned to one and only one material
     void check_material_coverage();
@@ -239,14 +437,13 @@ namespace muSpectre {
     //! container of the materials present in the cell
     std::vector<Material_ptr> materials{};
     Projection_ptr projection; //!< handle for the projection operator
-    bool initialised{false}; //!< to handle double initialisation right
     const Formulation form; //!< formulation for solution
   private:
   };
 
 
   /**
-   * lightweight resource handle wrapping a `muSpectre::CellBase` or
+   * lightweight resource handle wrapping a `muSpectre::Cell` or
    * a subclass thereof into `Eigen::EigenBase`, so it can be
    * interpreted as a sparse matrix by Eigen solvers
    */
@@ -268,7 +465,7 @@ namespace muSpectre {
     //! constructor
     CellAdaptor(Cell & cell):cell{cell}{}
     //!returns the number of logical rows
-    Eigen::Index rows() const {return this->cell.nb_dof();}
+    Eigen::Index rows() const {return this->cell.get_nb_dof();}
     //!returns the number of logical columns
     Eigen::Index cols() const {return this->rows();}
 
@@ -303,7 +500,8 @@ namespace Eigen {
         // This method should implement "dst += alpha * lhs * rhs" inplace,
         // however, for iterative solvers, alpha is always equal to 1, so let's not bother about it.
         // Here we could simply call dst.noalias() += lhs.my_matrix() * rhs,
-        dst.noalias() += const_cast<CellAdaptor&>(lhs).cell.directional_stiffness_vec(rhs);
+        dst.noalias() += const_cast<CellAdaptor&>(lhs).cell.
+          evaluate_projected_directional_stiffness(rhs);
       }
     };
   }

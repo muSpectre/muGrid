@@ -172,7 +172,7 @@ namespace muSpectre {
     /**
      * set the previous gradients to identity
      */
-    virtual void initialise(bool stiffness=false) override final;
+    virtual void initialise() override final;
 
     /**
      * return the internals tuple

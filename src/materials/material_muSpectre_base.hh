@@ -137,7 +137,7 @@ namespace muSpectre {
 
 
     //! allocate memory, etc
-    virtual void initialise(bool stiffness = false) override;
+    virtual void initialise() override;
 
     using Parent::compute_stresses;
     using Parent::compute_stresses_tangent;
@@ -233,7 +233,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <class Material, Dim_t DimS, Dim_t DimM>
   void MaterialMuSpectre<Material, DimS, DimM>::
-  initialise(bool /*stiffness*/) {
+  initialise() {
     if (!this->is_initialised) {
       this->internal_fields.initialise();
       this->is_initialised = true;

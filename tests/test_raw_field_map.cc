@@ -28,7 +28,7 @@
  */
 
 
-#include "test_field_collections_header.hh"
+#include "test_field_collections.hh"
 #include "common/field_map.hh"
 
 namespace muSpectre {

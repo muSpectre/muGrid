@@ -30,31 +30,32 @@
 
 namespace muSpectre {
 
-  template <Dim_t DimS, Dim_t DimM>
-  FFTWEngine<DimS, DimM>::FFTWEngine(Ccoord resolutions, Communicator comm)
-    :Parent{resolutions, comm}
+  template <Dim_t Dim>
+  FFTWEngine<Dim>::FFTWEngine(Ccoord resolutions, Dim_t nb_components,
+                              Communicator comm)
+    :Parent{resolutions, nb_components, comm}
   {
-    for (auto && pixel: CcoordOps::Pixels<DimS>(this->fourier_resolutions)) {
+    for (auto && pixel: CcoordOps::Pixels<Dim>(this->fourier_resolutions)) {
       this->work_space_container.add_pixel(pixel);
     }
   }
 
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void FFTWEngine<DimS, DimM>::initialise(FFT_PlanFlags plan_flags) {
+  template <Dim_t Dim>
+  void FFTWEngine<Dim>::initialise(FFT_PlanFlags plan_flags) {
     if (this->initialised) {
       throw std::runtime_error("double initialisation, will leak memory");
     }
     Parent::initialise(plan_flags);
 
-    const int & rank = DimS;
-    std::array<int, DimS> narr;
+    const int & rank = Dim;
+    std::array<int, Dim> narr;
     const int * const n = &narr[0];
     std::copy(this->subdomain_resolutions.begin(),
               this->subdomain_resolutions.end(),
               narr.begin());
-    int howmany = Field_t::nb_components;
+    int howmany = this->nb_components;
     //temporary buffer for plan
     size_t alloc_size = (CcoordOps::get_size(this->subdomain_resolutions)*
                          howmany);
@@ -109,8 +110,8 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  FFTWEngine<DimS, DimM>::~FFTWEngine<DimS, DimM>() noexcept {
+  template <Dim_t Dim>
+  FFTWEngine<Dim>::~FFTWEngine<Dim>() noexcept {
     fftw_destroy_plan(this->plan_fft);
     fftw_destroy_plan(this->plan_ifft);
     // TODO: We cannot run fftw_cleanup since subsequent FFTW calls will fail
@@ -119,9 +120,9 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  typename FFTWEngine<DimS, DimM>::Workspace_t &
-  FFTWEngine<DimS, DimM>::fft (Field_t & field) {
+  template <Dim_t Dim>
+  typename FFTWEngine<Dim>::Workspace_t &
+  FFTWEngine<Dim>::fft (Field_t & field) {
     if (this->plan_fft == nullptr) {
       throw std::runtime_error("fft plan not initialised");
     }
@@ -135,9 +136,9 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t Dim>
   void
-  FFTWEngine<DimS, DimM>::ifft (Field_t & field) const {
+  FFTWEngine<Dim>::ifft (Field_t & field) const {
     if (this->plan_ifft == nullptr) {
       throw std::runtime_error("ifft plan not initialised");
     }
@@ -149,7 +150,6 @@ namespace muSpectre {
                          field.data());
   }
 
-  template class FFTWEngine<twoD, twoD>;
-  template class FFTWEngine<twoD, threeD>;
-  template class FFTWEngine<threeD, threeD>;
+  template class FFTWEngine<twoD>;
+  template class FFTWEngine<threeD>;
 }  // muSpectre

@@ -44,6 +44,10 @@ namespace muSpectre {
    * particularly useful when interacting with external solvers, such
    * as scipy and Eigen
    * @param EigenMap needs to be statically sized a Eigen::Map<XXX>
+   *
+   * @warning This type is not safe for re-use. I.e., after there has
+   * been an assignment to the underlying eigen array, the
+   * `RawFieldMap` might be invalidated!
    */
   template <class EigenMap>
   class RawFieldMap
@@ -56,41 +60,67 @@ namespace muSpectre {
     constexpr static bool IsConst{
       std::is_const<
         std::remove_pointer_t<typename EigenMap::PointerArgType>>::value};
-    // short-hand for the basic scalar type
+    //! short-hand for the basic scalar type
     using T = typename EigenMap::Scalar;
-    // raw pointer type to store
+    //! raw pointer type to store
     using T_ptr = std::conditional_t<IsConst,
                                      const T*,
                                      T*>;
-    // input array (~field) type to be mapped
+    //! input array (~field) type to be mapped
     using FieldVec_t = std::conditional_t<IsConst,
                                           const Eigen::VectorXd,
                                           Eigen::VectorXd>;
+
+    //! Plain mapped Eigen type
+    using EigenPlain = typename EigenMap::PlainObject;
+
     //! Default constructor
     RawFieldMap() = delete;
 
     //! constructor from a *contiguous* array
-    RawFieldMap(Eigen::Map<FieldVec_t> vec):
-      data{vec.data()}, nb_pixels{vec.size()/NbComponents}
+    RawFieldMap(Eigen::Map<FieldVec_t> vec,
+                Dim_t nb_rows=EigenMap::RowsAtCompileTime,
+                Dim_t nb_cols=EigenMap::ColsAtCompileTime):
+      data{vec.data()},
+      nb_rows{nb_rows},
+      nb_cols{nb_cols},
+      nb_components{nb_rows * nb_cols},
+      nb_pixels(vec.size()/nb_components)
     {
-      if (vec.size() % NbComponents != 0) {
+      if ((nb_rows == Eigen::Dynamic) or
+          (nb_cols == Eigen::Dynamic)) {
+        throw FieldError
+          ("You have to specify the number of rows and columns if you map a "
+           "dynamically sized Eigen Map type.");
+      }
+      if ((nb_rows < 1) or (nb_cols < 1)) {
+        throw FieldError("Only positive numbers of rows and columns make "
+                         "sense");
+      }
+      if (vec.size() % this->nb_components != 0) {
         std::stringstream err{};
         err << "The vector size of " << vec.size()
             << " is not an integer multiple of the size of value_type, which "
-            << "is " << NbComponents << ".";
+            << "is " << this->nb_components << ".";
         throw std::runtime_error(err.str());
       }
     }
 
     //! constructor from a *contiguous* array
-    RawFieldMap(Eigen::Ref<FieldVec_t> vec):
-      data{vec.data()}, nb_pixels{vec.size()/NbComponents}
+    RawFieldMap(Eigen::Ref<FieldVec_t> vec,
+                Dim_t nb_rows=EigenMap::RowsAtCompileTime,
+                Dim_t nb_cols=EigenMap::ColsAtCompileTime):
+      data{vec.data()},
+      nb_rows{nb_rows},
+      nb_cols{nb_cols},
+      nb_components{nb_rows * nb_cols},
+      nb_pixels(vec.size()/nb_components)
     {
-      if (vec.size() % NbComponents != 0) {
+      if (vec.size() % this->nb_components != 0) {
         std::stringstream err{};
         err << "The vector size of " << vec.size()
             << " is not an integer multiple of the size of value_type, which "
-            << "is " << NbComponents << ".";
+            << "is " << this->nb_components << ".";
         throw std::runtime_error(err.str());
       }
     }
@@ -114,18 +144,39 @@ namespace muSpectre {
     size_t size() const {return this->nb_pixels;}
 
     //! forward declaration of iterator type
-    class iterator;
+    template <bool IsConst>
+    class iterator_t;
+    using iterator = iterator_t<false>;
+    using const_iterator = iterator_t<true>;
 
     //! returns an iterator to the first element
-    iterator begin() { return iterator{this->data, 0};}
+    iterator begin() { return iterator{*this, 0};}
+    const_iterator begin() const {
+      return const_iterator{*this, 0};}
     //! returns an iterator past the last element
-    iterator end() {return iterator{this->data, this->size()};}
+    iterator end() {return iterator{*this, this->size()};}
+    const_iterator end() const {
+      return const_iterator{*this, this->size()};}
+
+    //! evaluates the average of the field
+    EigenPlain mean () const {
+      using T_t = EigenPlain;
+      T_t mean(T_t::Zero(this->nb_rows, this->nb_cols));
+      for (auto && val: *this) {
+        mean += val;
+      }
+      mean /= this->size();
+      return mean;
+    }
 
   protected:
-    //! statically known size of the mapped type
-    constexpr static size_t NbComponents{EigenMap::SizeAtCompileTime};
+    inline T_ptr get_data() {return data;}
+    inline const T_ptr get_data() const {return data;}
     //! raw data pointer (ugly, I know)
     T_ptr data;
+    const Dim_t nb_rows;
+    const Dim_t nb_cols;
+    const Dim_t nb_components;
     //! number of EigenMaps stored within the array
     size_t nb_pixels;
   private:
@@ -135,7 +186,8 @@ namespace muSpectre {
    * Small iterator class to be used with the RawFieldMap
    */
   template <class EigenMap>
-  class RawFieldMap<EigenMap>::iterator
+  template <bool IsConst>
+  class RawFieldMap<EigenMap>::iterator_t
   {
   public:
     //! short hand for the raw field map's type
@@ -144,56 +196,71 @@ namespace muSpectre {
     //! the  map needs to be friend in order to access the protected constructor
     friend Parent;
     //! stl compliance
-    using value_type = EigenMap;
+    using value_type = std::conditional_t
+      <IsConst,
+       Eigen::Map<const typename EigenMap::PlainObject>,
+       EigenMap>;
+    using T_ptr = std::conditional_t<IsConst,
+                                     const Parent::T_ptr,
+                                     Parent::T_ptr>;
     //! stl compliance
     using iterator_category = std::forward_iterator_tag;
 
     //! Default constructor
-    iterator() = delete;
+    iterator_t() = delete;
 
     //! Copy constructor
-    iterator(const iterator &other) = default;
+    iterator_t(const iterator_t &other) = default;
 
     //! Move constructor
-    iterator(iterator &&other) = default;
+    iterator_t(iterator_t &&other) = default;
 
     //! Destructor
-    virtual ~iterator() = default;
+    virtual ~iterator_t() = default;
 
     //! Copy assignment operator
-    iterator& operator=(const iterator &other) = default;
+    iterator_t& operator=(const iterator_t &other) = default;
 
     //! Move assignment operator
-    iterator& operator=(iterator &&other) = default;
+    iterator_t& operator=(iterator_t &&other) = default;
 
     //! pre-increment
-    inline iterator & operator++() {
+    inline iterator_t & operator++() {
       ++this->index;
       return *this;
     }
 
     //! dereference
     inline value_type operator *() {
-      return EigenMap(raw_map + Parent::NbComponents*index);
+      return value_type(raw_ptr + this->map.nb_components*index,
+                        this->map.nb_rows, this->map.nb_cols);
     }
 
     //! inequality
-    inline bool operator != (const iterator & other) const {
+    inline bool operator != (const iterator_t & other) const {
       return this->index != other.index;
     }
 
     //! equality
-    inline bool operator == (const iterator & other) const {
+    inline bool operator == (const iterator_t & other) const {
       return this->index == other.index;
     }
 
   protected:
-
     //! protected constructor
-    iterator (Parent::T_ptr raw_map, size_t start):
-      raw_map{raw_map}, index{start} {}
+    iterator_t (const Parent& map,
+                size_t start):
+      raw_ptr{map.get_data()}, map{map}, index{start} { }
+
+    template <bool dummy_non_const = not IsConst>
+    iterator_t (std::enable_if_t<dummy_non_const, Parent&> map,
+                size_t start):
+      raw_ptr{map.data}, map{map}, index{start} {
+        static_assert(dummy_non_const == not IsConst, "SFINAE");}
     //! raw data
-    Parent::T_ptr raw_map;
+    T_ptr raw_ptr;
+    //! ref to underlying map
+    const Parent & map;
     //! currently pointed-to element
     size_t index;
   private:

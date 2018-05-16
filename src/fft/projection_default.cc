@@ -61,6 +61,13 @@ namespace muSpectre {
     return this->Gfield.dyn_eigen();
   }
 
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  std::array<Dim_t, 2> ProjectionDefault<DimS, DimM>::get_strain_shape() const {
+    return std::array<Dim_t, 2>{DimM, DimM};
+  }
+
+  /* ---------------------------------------------------------------------- */
   template class ProjectionDefault<twoD,   twoD>;
   template class ProjectionDefault<threeD, threeD>;
 }  // muSpectre

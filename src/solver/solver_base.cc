@@ -1,13 +1,15 @@
 /**
- * @file   solver_base.cc
+ * file   solver_base.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
- * @date   18 Dec 2017
+ * @date   24 Apr 2018
  *
- * @brief  definitions for solvers
+ * @brief  implementation of SolverBase
  *
- * Copyright © 2017 Till Junge
+ * @section LICENSE
+ *
+ * Copyright © 2018 Till Junge
  *
  * µSpectre is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -26,38 +28,38 @@
  */
 
 #include "solver/solver_base.hh"
-#include "solver/solver_cg.hh"
-#include "common/field.hh"
-#include "common/iterators.hh"
-
-#include <iostream>
-#include <memory>
-
 
 namespace muSpectre {
 
-  //----------------------------------------------------------------------------//
-  template <Dim_t DimS, Dim_t DimM>
-  SolverBase<DimS, DimM>::SolverBase(Cell_t & cell, Real tol, Uint maxiter,
-                                     bool verbose )
-    : cell{cell}, tol{tol}, maxiter{maxiter}, verbose{verbose}
+  /* ---------------------------------------------------------------------- */
+  SolverBase::SolverBase(Cell & cell, Real tol, Uint maxiter, bool verbose):
+    cell(cell), tol{tol}, maxiter{maxiter}, verbose{verbose}
   {}
 
-
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void SolverBase<DimS, DimM>::reset_counter() {
-    this->counter = 0;
+  bool SolverBase::has_converged() const {
+    return this->converged;
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  Uint SolverBase<DimS, DimM>::get_counter() const {
+  void SolverBase::reset_counter() {
+    this->counter = 0;
+    this->converged = false;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  Uint SolverBase::get_counter() const {
     return this->counter;
   }
 
-  template class SolverBase<twoD, twoD>;
-  //template class SolverBase<twoD, threeD>;
-  template class SolverBase<threeD, threeD>;
+  /* ---------------------------------------------------------------------- */
+  Real SolverBase::get_tol() const {
+    return this->tol;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  Uint SolverBase::get_maxiter() const {
+    return this->maxiter;
+  }
 
 }  // muSpectre

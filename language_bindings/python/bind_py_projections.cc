@@ -96,28 +96,31 @@ void add_proj_helper(py::module & mod, std::string name_start) {
     .def(py::init([](Ccoord res, Rcoord lengths, const std::string & fft,
                      size_t comm) {
           if (fft == "fftw") {
-            auto engine = std::make_unique<FFTWEngine<DimS, DimM>>
-              (res, std::move(Communicator(MPI_Comm(comm))));
+            auto engine = std::make_unique<FFTWEngine<DimS>>
+              (res, Proj::NbComponents(), std::move(Communicator(MPI_Comm(comm))));
             return Proj(std::move(engine), lengths);
           }
 #else
     .def(py::init([](Ccoord res, Rcoord lengths, const std::string & fft) {
           if (fft == "fftw") {
-            auto engine = std::make_unique<FFTWEngine<DimS, DimM>>(res);
+            auto engine = std::make_unique<FFTWEngine<DimS>>
+              (res, Proj::NbComponents());
             return Proj(std::move(engine), lengths);
           }
 #endif
 #ifdef WITH_FFTWMPI
           else if (fft == "fftwmpi") {
-            auto engine = std::make_unique<FFTWMPIEngine<DimS, DimM>>
-              (res, std::move(Communicator(MPI_Comm(comm))));
+            auto engine = std::make_unique<FFTWMPIEngine<DimS>>
+              (res, Proj::NbComponents(),
+               std::move(Communicator(MPI_Comm(comm))));
             return Proj(std::move(engine), lengths);
           }
 #endif
 #ifdef WITH_PFFT
           else if (fft == "pfft") {
-            auto engine = std::make_unique<PFFTEngine<DimS, DimM>>
-              (res, std::move(Communicator(MPI_Comm(comm))));
+            auto engine = std::make_unique<PFFTEngine<DimS>>
+              (res, Proj::NbComponents(),
+               std::move(Communicator(MPI_Comm(comm))));
             return Proj(std::move(engine), lengths);
           }
 #endif
@@ -138,7 +141,7 @@ void add_proj_helper(py::module & mod, std::string name_start) {
          "initialises the fft engine (plan the transform)")
     .def("apply_projection",
          [](Proj & proj, py::EigenDRef<Eigen::ArrayXXd> v){
-           typename FFTEngineBase<DimS, DimM>::GFieldCollection_t coll{};
+           typename FFTEngineBase<DimS>::GFieldCollection_t coll{};
            Eigen::Index subdomain_size =
              CcoordOps::get_size(proj.get_subdomain_resolutions());
            if (v.rows() != DimS*DimM || v.cols() != subdomain_size) {
@@ -151,7 +154,8 @@ void add_proj_helper(py::module & mod, std::string name_start) {
            }
            coll.initialise(proj.get_subdomain_resolutions(),
                            proj.get_subdomain_locations());
-           Field_t & temp{make_field<Field_t>("temp_field", coll)};
+           Field_t & temp{make_field<Field_t>("temp_field", coll,
+                                              proj.get_nb_components())};
            temp.eigen() = v;
            proj.apply_projection(temp);
            return Eigen::ArrayXXd{temp.eigen()};

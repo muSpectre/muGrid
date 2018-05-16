@@ -1,13 +1,15 @@
 /**
- * @file   solver_error.hh
+ * file   solver_common.cc
  *
- * @author Till Junge <till.junge@altermail.ch>
+ * @author Till Junge <till.junge@epfl.ch>
  *
- * @date   28 Dec 2017
+ * @date   15 May 2018
  *
- * @brief  Errors raised by solvers
+ * @brief  implementation for solver utilities
  *
- * Copyright © 2017 Till Junge
+ * @section LICENSE
+ *
+ * Copyright © 2018 Till Junge
  *
  * µSpectre is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -25,22 +27,16 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#ifndef SOLVER_ERROR_H
-#define SOLVER_ERROR_H
-
-#include <stdexcept>
-
+#include "solver/solver_common.hh"
 namespace muSpectre {
 
-  class SolverError: public std::runtime_error {
-    using runtime_error::runtime_error;
-  };
-
-  class ConvergenceError: public SolverError {
-    using SolverError::SolverError;
-  };
+  /* ---------------------------------------------------------------------- */
+  bool check_symmetry(const Eigen::Ref<const Eigen::ArrayXXd>& eps,
+                      Real rel_tol){
+    return (rel_tol >= (eps-eps.transpose()).matrix().norm()/eps.matrix().norm() ||
+            rel_tol >= eps.matrix().norm());
+  }
 
 }  // muSpectre
 
 
-#endif /* SOLVER_ERROR_H */

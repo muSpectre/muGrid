@@ -1,13 +1,15 @@
 /**
- * @file   solver_base.hh
+ * file   solver_base.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
- * @date   18 Dec 2017
+ * @date   24 Apr 2018
  *
- * @brief  Base class for solvers
+ * @brief  Base class for iterative solvers for linear systems of equations
  *
- * Copyright © 2017 Till Junge
+ * @section LICENSE
+ *
+ * Copyright © 2018 Till Junge
  *
  * µSpectre is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -28,45 +30,38 @@
 #ifndef SOLVER_BASE_H
 #define SOLVER_BASE_H
 
-#include "solver/solver_error.hh"
-#include "common/common.hh"
+#include "solver/solver_common.hh"
 #include "cell/cell_base.hh"
-#include "common/tensor_algebra.hh"
 
 #include <Eigen/Dense>
 
-#include <vector>
-
 namespace muSpectre {
-  /* ---------------------------------------------------------------------- */
+
   /**
-   * Virtual base class for solvers. Any implementation of this interface can be used with the solver functions prototyped in solvers.hh
+   * Virtual base class for solvers. An implementation of this interface
+   * can be used with the solution strategies in solvers.hh
    */
-  template <Dim_t DimS, Dim_t DimM=DimS>
   class SolverBase
   {
   public:
-    /**
-     * Enum to describe in what kind the solver relies tangent stiffnesses
-     */
-    enum class TangentRequirement{NoNeed, NeedEffect, NeedTangents};
-    using Cell_t = CellBase<DimS, DimM>; //!< Cell type
-    using Ccoord = Ccoord_t<DimS>; //!< cell coordinates type
-    //! Field collection to store temporary fields in
-    using Collection_t = GlobalFieldCollection<DimS>;
-    //! Input vector for solvers
-    using SolvVectorIn = Eigen::Ref<Eigen::VectorXd>;
-    //! Input vector for solvers
-    using SolvVectorInC = Eigen::Ref<const Eigen::VectorXd>;
-    //! Output vector for solvers
-    using SolvVectorOut = Eigen::VectorXd;
 
+    //! underlying vector type
+    using Vector_t = Eigen::Matrix<Real, Eigen::Dynamic, 1>;
+    //! Input vector for solvers
+    using Vector_ref = Eigen::Ref<Vector_t>;
+    //! Input vector for solvers
+    using ConstVector_ref = Eigen::Ref<const Vector_t>;
+    //! Output vector for solvers
+    using Vector_map = Eigen::Map<Vector_t>;
 
     //! Default constructor
     SolverBase() = delete;
 
-    //! Constructor with domain resolutions
-    SolverBase(Cell_t & cell, Real tol, Uint maxiter=0, bool verbose =false);
+    /**
+     * Constructor takes a Cell, tolerance, max number of iterations
+     * and verbosity flag as input
+     */
+    SolverBase(Cell & cell, Real tol, Uint maxiter, bool verbose=false);
 
     //! Copy constructor
     SolverBase(const SolverBase &other) = delete;
@@ -84,25 +79,10 @@ namespace muSpectre {
     SolverBase& operator=(SolverBase &&other) = default;
 
     //! Allocate fields used during the solution
-    virtual void initialise() {
-      this->collection.initialise(this->cell.get_subdomain_resolutions(),
-                                  this->cell.get_subdomain_locations());
-    }
-
-    //! determine whether this solver requires full tangent stiffnesses
-    bool need_tangents() const {
-      return (this->get_tangent_req() == TangentRequirement::NeedTangents);}
-
-    //! determine whether this solver requires evaluation of directional tangent
-    bool need_effect() const {
-      return (this->get_tangent_req() == TangentRequirement::NeedEffect);}
-
-    //! determine whether this solver has no need for tangents
-    bool no_need_tangent() const {
-      return (this->get_tangent_req() == TangentRequirement::NoNeed);}
+    virtual void initialise() = 0;
 
     //! returns whether the solver has converged
-    virtual bool has_converged() const = 0;
+    bool has_converged() const ;
 
     //! reset the iteration counter to zero
     void reset_counter();
@@ -111,37 +91,29 @@ namespace muSpectre {
     //! construction of most recent counter reset
     Uint get_counter() const;
 
-    //! executes the solver
-    virtual SolvVectorOut solve(const SolvVectorInC rhs, SolvVectorIn x_0) = 0;
+    //! returns the max number of iterations
+    Uint get_maxiter() const;
 
-    //! return a reference to the cell
-    Cell_t & get_cell() {return cell;}
+    //! returns the resolution tolerance
+    Real get_tol() const;
 
-    //! read the current maximum number of iterations setting
-    Uint get_maxiter() const {return this->maxiter;}
-    //! set the maximum number of iterations
-    void set_maxiter(Uint val) {this->maxiter = val;}
+    //! returns the solver's name (i.e. 'CG', 'GMRES', etc)
+    virtual std::string get_name() const = 0;
 
-    //! read the current tolerance setting
-    Real get_tol() const {return this->tol;}
-    //! set the torelance setting
-    void set_tol(Real val) {this->tol = val;}
-
-    //! returns the name of the solver
-    virtual std::string name() const = 0;
+    //! run the solve operation
+    virtual Vector_map solve(const ConstVector_ref rhs) = 0;
 
   protected:
-    //! returns the tangent requirements of this solver
-    virtual TangentRequirement get_tangent_req() const = 0;
-    Cell_t & cell; //!< reference to the cell
-    Real tol;    //!< convergence tolerance
-    Uint maxiter;//!< maximum number of iterations
-    bool verbose;//!< whether or not to write information to the std output
-    Uint counter{0}; //!< iteration counter
-    //! storage for internal fields to avoid reallocations between calls
-    Collection_t collection{};
+    Cell & cell;           //!< reference to the problem's cell
+    Real tol;              //!< convergence tolerance
+    Uint maxiter;          //!< maximum allowed number of iterations
+    bool verbose;          //!< whether to write information to the stdout
+    Uint counter{0};       //!< iteration counter
+    bool converged{false}; //!< whether the solver has converged
+
   private:
   };
+
 
 }  // muSpectre
 

@@ -96,7 +96,7 @@ namespace muSpectre {
     virtual void add_pixel(const Ccoord & ccooord);
 
     //! allocate memory, etc, but also: wipe history variables!
-    virtual void initialise(bool stiffness = false) = 0;
+    virtual void initialise() = 0;
 
     /**
      * for materials with state variables, these typically need to be

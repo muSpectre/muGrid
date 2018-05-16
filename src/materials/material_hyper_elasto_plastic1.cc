@@ -62,7 +62,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void MaterialHyperElastoPlastic1<DimS, DimM>::initialise(bool /*stiffness*/) {
+  void MaterialHyperElastoPlastic1<DimS, DimM>::initialise() {
     Parent::initialise();
     this->F_prev_field.get_map().current() =
       Eigen::Matrix<Real, DimM, DimM>::Identity();

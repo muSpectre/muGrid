@@ -79,9 +79,9 @@ int main()
   constexpr Dim_t maxiter{200};
   constexpr Dim_t verbose{1};
 
-  Grad_t<dim> dF_bar{Grad_t<dim>::Zero()};
+  Eigen::MatrixXd dF_bar{Eigen::MatrixXd::Zero(dim, dim)};
   dF_bar(0, 1) = 1.;
-  SolverCG<dim> cg{cell, cg_tol, maxiter, verbose};
+  SolverCG cg{cell, cg_tol, maxiter, verbose};
   auto optimize_res = de_geus(cell, dF_bar, cg, newton_tol, verbose);
 
   std::cout << "nb_cg: " << optimize_res.nb_fev << std::endl;

@@ -170,6 +170,7 @@ if (${MAKE_EXAMPLES})
 
   set(binaries
     ${CMAKE_SOURCE_DIR}/bin/demonstrator1.cc
+    ${CMAKE_SOURCE_DIR}/bin/demonstrator_dynamic_solve.cc
     ${CMAKE_SOURCE_DIR}/bin/demonstrator2.cc
     ${CMAKE_SOURCE_DIR}/bin/hyper-elasticity.cc
     ${CMAKE_SOURCE_DIR}/bin/small_case.cc)

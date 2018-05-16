@@ -38,11 +38,11 @@ namespace muSpectre {
    * implements the `muSpectre::FFTEngineBase` interface using the
    * FFTW library
    */
-  template <Dim_t DimS, Dim_t DimM>
-  class FFTWMPIEngine: public FFTEngineBase<DimS, DimM>
+  template <Dim_t Dim>
+  class FFTWMPIEngine: public FFTEngineBase<Dim>
   {
   public:
-    using Parent = FFTEngineBase<DimS, DimM>; //!< base class
+    using Parent = FFTEngineBase<Dim>; //!< base class
     using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
     //! field for Fourier transform of second-order tensor
     using Workspace_t = typename Parent::Workspace_t;
@@ -52,7 +52,8 @@ namespace muSpectre {
     FFTWMPIEngine() = delete;
 
     //! Constructor with system resolutions
-    FFTWMPIEngine(Ccoord resolutions, Communicator comm=Communicator());
+    FFTWMPIEngine(Ccoord resolutions, Dim_t nb_components,
+                  Communicator comm=Communicator());
 
     //! Copy constructor
     FFTWMPIEngine(const FFTWMPIEngine &other) = delete;

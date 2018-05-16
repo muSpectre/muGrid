@@ -61,8 +61,10 @@ namespace muSpectre {
   class ProjectionBase
   {
   public:
+    //! Eigen type to replace fields
+    using Vector_t = Eigen::Matrix<Real, Eigen::Dynamic, 1>;
     //! type of fft_engine used
-    using FFTEngine = FFTEngineBase<DimS, DimM>;
+    using FFTEngine = FFTEngineBase<DimS>;
     //! reference to fft engine is safely managed through a `std::unique_ptr`
     using FFTEngine_ptr = std::unique_ptr<FFTEngine>;
     //! cell coordinates type
@@ -74,7 +76,7 @@ namespace muSpectre {
     //! local FieldCollection (for Fourier-space pixels)
     using LFieldCollection_t = typename FFTEngine::LFieldCollection_t;
     //! Field type on which to apply the projection
-    using Field_t = typename FFTEngine::Field_t;
+    using Field_t = TypedField<GFieldCollection_t, Real>;
     /**
      * iterator over all pixels. This is taken from the FFT engine,
      * because depending on the real-to-complex FFT employed, only
@@ -138,6 +140,19 @@ namespace muSpectre {
     const Communicator & get_communicator() const {
       return this->fft_engine->get_communicator();
     }
+
+    /**
+     * returns the number of rows and cols for the strain matrix type
+     * (for full storage, the strain is stored in material_dim ×
+     * material_dim matrices, but in symmetriy storage, it is a column
+     * vector)
+     */
+    virtual std::array<Dim_t, 2> get_strain_shape() const = 0;
+
+    //! get number of components to project per pixel
+    virtual Dim_t get_nb_components() const {
+      return DimM*DimM;}
+
 
   protected:
     //! handle on the fft_engine used

@@ -1,5 +1,5 @@
 /**
- * @file   test_field_collections_header.hh
+ * @file   test_field_collections.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -25,8 +25,8 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#ifndef TEST_FIELD_COLLECTIONS_HEADER_H
-#define TEST_FIELD_COLLECTIONS_HEADER_H
+#ifndef TEST_FIELD_COLLECTIONS_H
+#define TEST_FIELD_COLLECTIONS_H
 #include <stdexcept>
 #include <boost/mpl/list.hpp>
 #include <random>
@@ -79,13 +79,15 @@ namespace muSpectre {
     using T2_t = TensorField<FC_t, Real, matrix_order, DimM>;
     using Sc_t = ScalarField<FC_t, Int>;
     using M2_t = MatrixField<FC_t, Complex, DimS, DimM>;
+    using Dyn_t = TypedField<FC_t, Real>;
 
     FC_multi_fixture()
       :fc(),
        t4_field{make_field<T4_t>("Tensorfield Real o4", fc)},//Real tensor field
        t2_field{make_field<T2_t>("Tensorfield Real o2", fc)},//Real tensor field
        sc_field{make_field<Sc_t>("integer Scalar", fc)}, // integer scalar field
-       m2_field{make_field<M2_t>("Matrixfield Complex sdim x mdim", fc)} //complex matrix field
+       m2_field{make_field<M2_t>("Matrixfield Complex sdim x mdim", fc)}, //complex matrix field
+       dyn_field{make_field<Dyn_t>("Dynamically sized Field", fc, 12)}
     {
     }
     inline static constexpr Dim_t sdim(){return DimS;}
@@ -96,6 +98,7 @@ namespace muSpectre {
     T2_t & t2_field;
     Sc_t & sc_field;
     M2_t & m2_field;
+    Dyn_t & dyn_field;
   };
 
   using mult_collections = boost::mpl::list<FC_multi_fixture<2, 2, true>,
@@ -160,4 +163,4 @@ namespace muSpectre {
 }  // muSpectre
 
 
-#endif /* TEST_FIELD_COLLECTIONS_HEADER_H */
+#endif /* TEST_FIELD_COLLECTIONS_H */

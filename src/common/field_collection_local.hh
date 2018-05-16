@@ -45,6 +45,9 @@ namespace muSpectre {
     public FieldCollectionBase<DimS, LocalFieldCollection<DimS>>
   {
   public:
+    //! for compile time check
+    constexpr static bool Global{false};
+
     //! base class
     using Parent = FieldCollectionBase<DimS,
                                        LocalFieldCollection<DimS>>;

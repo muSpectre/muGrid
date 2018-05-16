@@ -51,7 +51,7 @@ for fft, (factory_name_2d, factory_name_3d, is_parallel) in _factories.items():
         fft_engines += [(fft, is_parallel)]
 
 
-def FFT(resolutions, fft='fftw', communicator=None):
+def FFT(resolutions, nb_components, fft='fftw', communicator=None):
     """
     Instantiate a muSpectre FFT class.
 
@@ -59,6 +59,8 @@ def FFT(resolutions, fft='fftw', communicator=None):
     ----------
     resolutions: list
         Grid resolutions in the Cartesian directions.
+    nb_components: int
+        number of degrees of freedom per pixel in the transform
     fft: string
         FFT engine to use. Options are 'fftw', 'fftwmpi', 'pfft' and 'p3dfft'.
         Default is 'fftw'.
@@ -94,12 +96,12 @@ def FFT(resolutions, fft='fftw', communicator=None):
                                ' not be imported.')
         if communicator is None:
             communicator = MPI.COMM_SELF
-        return factory(resolutions, MPI._handleof(communicator))
+        return factory(resolutions, nb_components, MPI._handleof(communicator))
     else:
         if communicator is not None:
             raise ValueError("FFT engine '{}' does not support parallel "
                              "execution.".format(fft))
-        return factory(resolutions)
+        return factory(resolutions, nb_components)
 
 
 def Projection(resolutions, lengths,

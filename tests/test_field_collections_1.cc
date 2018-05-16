@@ -1,5 +1,5 @@
 /**
- * @file   test_field_collections.cc
+ * @file   test_field_collections_1.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -26,7 +26,7 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include "test_field_collections_header.hh"
+#include "test_field_collections.hh"
 namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE(field_collection_tests);

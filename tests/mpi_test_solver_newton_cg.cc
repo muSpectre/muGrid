@@ -27,9 +27,9 @@
 
 #include "tests.hh"
 #include "mpi_context.hh"
-#include "solver/solvers.hh"
-#include "solver/solver_cg.hh"
-#include "solver/solver_cg_eigen.hh"
+#include "solver/deprecated_solvers.hh"
+#include "solver/deprecated_solver_cg.hh"
+#include "solver/deprecated_solver_cg_eigen.hh"
 #include "fft/fftwmpi_engine.hh"
 #include "fft/projection_finite_strain_fast.hh"
 #include "materials/material_linear_elastic1.hh"
@@ -51,7 +51,7 @@ namespace muSpectre {
     // constexpr Rcoord_t<dim> lengths{2.3, 2.7};
     constexpr Ccoord_t<dim> resolutions{5, 5, 5};
     constexpr Rcoord_t<dim> lengths{5, 5, 5};
-    auto fft_ptr{std::make_unique<FFTWMPIEngine<dim, dim>>(resolutions, comm)};
+    auto fft_ptr{std::make_unique<FFTWMPIEngine<dim>>(resolutions, dim*dim, comm)};
     auto proj_ptr{std::make_unique<ProjectionFiniteStrainFast<dim, dim>>(std::move(fft_ptr), lengths)};
     CellBase<dim, dim> sys(std::move(proj_ptr));
 
@@ -82,11 +82,11 @@ namespace muSpectre {
     constexpr bool verbose{false};
 
     GradIncrements<dim> grads; grads.push_back(delF0);
-    SolverCG<dim> cg{sys, cg_tol, maxiter, bool(verbose)};
-    Eigen::ArrayXXd res1{de_geus(sys, grads, cg, newton_tol, verbose)[0].grad};
+    DeprecatedSolverCG<dim> cg{sys, cg_tol, maxiter, bool(verbose)};
+    Eigen::ArrayXXd res1{deprecated_de_geus(sys, grads, cg, newton_tol, verbose)[0].grad};
 
-    SolverCG<dim> cg2{sys, cg_tol, maxiter, bool(verbose)};
-    Eigen::ArrayXXd res2{newton_cg(sys, grads, cg2, newton_tol, verbose)[0].grad};
+    DeprecatedSolverCG<dim> cg2{sys, cg_tol, maxiter, bool(verbose)};
+    Eigen::ArrayXXd res2{deprecated_newton_cg(sys, grads, cg2, newton_tol, verbose)[0].grad};
     BOOST_CHECK_LE(abs(res1-res2).mean(), cg_tol);
   }
 
@@ -134,8 +134,8 @@ namespace muSpectre {
     constexpr Uint maxiter{dim*10};
     constexpr Dim_t verbose{0};
 
-    SolverCGEigen<dim> cg{sys, cg_tol, maxiter, bool(verbose)};
-    auto result = de_geus(sys, delEps0, cg, newton_tol,
+    DeprecatedSolverCGEigen<dim> cg{sys, cg_tol, maxiter, bool(verbose)};
+    auto result = deprecated_de_geus(sys, delEps0, cg, newton_tol,
                           equil_tol, verbose);
     if (verbose) {
       std::cout << "result:" << std::endl << result.grad << std::endl;
@@ -179,8 +179,8 @@ namespace muSpectre {
     delEps0 = Grad_t<dim>::Zero();
     delEps0(0, 1) = delEps0(1, 0) = eps0;
 
-    SolverCG<dim> cg2{sys, cg_tol, maxiter, bool(verbose)};
-    result = newton_cg(sys, delEps0, cg2, newton_tol,
+    DeprecatedSolverCG<dim> cg2{sys, cg_tol, maxiter, bool(verbose)};
+    result = deprecated_newton_cg(sys, delEps0, cg2, newton_tol,
                        equil_tol, verbose);
     Eps_hard << 0, eps_hard, eps_hard, 0;
     Eps_soft << 0, eps_soft, eps_soft, 0;

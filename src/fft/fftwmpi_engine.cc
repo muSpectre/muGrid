@@ -30,25 +30,26 @@
 
 namespace muSpectre {
 
-  template <Dim_t DimsS, Dim_t DimM>
-  int FFTWMPIEngine<DimsS, DimM>::nb_engines{0};
+  template <Dim_t Dim>
+  int FFTWMPIEngine<Dim>::nb_engines{0};
 
-  template <Dim_t DimS, Dim_t DimM>
-  FFTWMPIEngine<DimS, DimM>::FFTWMPIEngine(Ccoord resolutions,
-                                           Communicator comm)
-    :Parent{resolutions, comm}
+  template <Dim_t Dim>
+  FFTWMPIEngine<Dim>::FFTWMPIEngine(Ccoord resolutions,
+                                    Dim_t nb_components,
+                                    Communicator comm)
+    :Parent{resolutions, nb_components, comm}
   {
     if (!this->nb_engines) fftw_mpi_init();
     this->nb_engines++;
 
-    std::array<ptrdiff_t, DimS> narr;
+    std::array<ptrdiff_t, Dim> narr;
     std::copy(this->domain_resolutions.begin(), this->domain_resolutions.end(),
               narr.begin());
-    narr[DimS-1] = this->domain_resolutions[DimS-1]/2+1;
+    narr[Dim-1] = this->domain_resolutions[Dim-1]/2+1;
     ptrdiff_t res_x, loc_x, res_y, loc_y;
     this->workspace_size =
-      fftw_mpi_local_size_many_transposed(DimS, narr.data(),
-                                          Field_t::nb_components,
+      fftw_mpi_local_size_many_transposed(Dim, narr.data(),
+                                          this->nb_components,
                                           FFTW_MPI_DEFAULT_BLOCK,
                                           FFTW_MPI_DEFAULT_BLOCK,
                                           this->comm.get_mpi_comm(),
@@ -76,9 +77,9 @@ namespace muSpectre {
 
     for (auto && pixel:
          std::conditional_t<
-           DimS==2,
-           CcoordOps::Pixels<DimS, 1, 0>,
-           CcoordOps::Pixels<DimS, 1, 0, 2>
+           Dim==2,
+           CcoordOps::Pixels<Dim, 1, 0>,
+           CcoordOps::Pixels<Dim, 1, 0, 2>
          >(this->fourier_resolutions, this->fourier_locations)) {
            this->work_space_container.add_pixel(pixel);
     }
@@ -86,8 +87,8 @@ namespace muSpectre {
 
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void FFTWMPIEngine<DimS, DimM>::initialise(FFT_PlanFlags plan_flags) {
+  template <Dim_t Dim>
+  void FFTWMPIEngine<Dim>::initialise(FFT_PlanFlags plan_flags) {
     if (this->initialised) {
       throw std::runtime_error("double initialisation, will leak memory");
     }
@@ -100,9 +101,9 @@ namespace muSpectre {
     // We need to check whether the workspace provided by our field is large
     // enough. MPI parallel FFTW may request a workspace size larger than the
     // nominal size of the complex buffer.
-    if (long(this->work.size()*Field_t::nb_components) < this->workspace_size) {
+    if (long(this->work.size()*this->nb_components) < this->workspace_size) {
       this->work.set_pad_size(this->workspace_size -
-                              Field_t::nb_components*this->work.size());
+                              this->nb_components*this->work.size());
     }
 
     unsigned int flags;
@@ -124,13 +125,13 @@ namespace muSpectre {
       break;
     }
 
-    std::array<ptrdiff_t, DimS> narr;
+    std::array<ptrdiff_t, Dim> narr;
     std::copy(this->domain_resolutions.begin(), this->domain_resolutions.end(),
               narr.begin());
     Real * in{this->real_workspace};
     fftw_complex * out{reinterpret_cast<fftw_complex*>(this->work.data())};
     this->plan_fft = fftw_mpi_plan_many_dft_r2c(
-      DimS, narr.data(), Field_t::nb_components, FFTW_MPI_DEFAULT_BLOCK,
+      Dim, narr.data(), this->nb_components, FFTW_MPI_DEFAULT_BLOCK,
       FFTW_MPI_DEFAULT_BLOCK, in, out, this->comm.get_mpi_comm(),
       FFTW_MPI_TRANSPOSED_OUT | flags);
     if (this->plan_fft == nullptr) {
@@ -141,7 +142,7 @@ namespace muSpectre {
     Real * i_out = this->real_workspace;
 
     this->plan_ifft = fftw_mpi_plan_many_dft_c2r(
-      DimS, narr.data(), Field_t::nb_components, FFTW_MPI_DEFAULT_BLOCK,
+      Dim, narr.data(), this->nb_components, FFTW_MPI_DEFAULT_BLOCK,
       FFTW_MPI_DEFAULT_BLOCK, i_in, i_out, this->comm.get_mpi_comm(),
       FFTW_MPI_TRANSPOSED_IN | flags);
     if (this->plan_ifft == nullptr) {
@@ -151,8 +152,8 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  FFTWMPIEngine<DimS, DimM>::~FFTWMPIEngine<DimS, DimM>() noexcept {
+  template <Dim_t Dim>
+  FFTWMPIEngine<Dim>::~FFTWMPIEngine<Dim>() noexcept {
     if (this->real_workspace != nullptr) fftw_free(this->real_workspace);
     if (this->plan_fft != nullptr) fftw_destroy_plan(this->plan_fft);
     if (this->plan_ifft != nullptr) fftw_destroy_plan(this->plan_ifft);
@@ -163,9 +164,9 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  typename FFTWMPIEngine<DimS, DimM>::Workspace_t &
-  FFTWMPIEngine<DimS, DimM>::fft (Field_t & field) {
+  template <Dim_t Dim>
+  typename FFTWMPIEngine<Dim>::Workspace_t &
+  FFTWMPIEngine<Dim>::fft (Field_t & field) {
     if (this->plan_fft == nullptr) {
       throw std::runtime_error("fft plan not initialised");
     }
@@ -175,11 +176,11 @@ namespace muSpectre {
     // Copy non-padded field to padded real_workspace.
     // Transposed output of M x N x L transform for >= 3 dimensions is padded
     // M x N x 2*(L/2+1).
-    ptrdiff_t fstride = (Field_t::nb_components*
-                         this->subdomain_resolutions[DimS-1]);
-    ptrdiff_t wstride = (Field_t::nb_components*2*
-                         (this->subdomain_resolutions[DimS-1]/2+1));
-    ptrdiff_t n = field.size()/this->subdomain_resolutions[DimS-1];
+    ptrdiff_t fstride = (this->nb_components*
+                         this->subdomain_resolutions[Dim-1]);
+    ptrdiff_t wstride = (this->nb_components*2*
+                         (this->subdomain_resolutions[Dim-1]/2+1));
+    ptrdiff_t n = field.size()/this->subdomain_resolutions[Dim-1];
 
     auto fdata = field.data();
     auto wdata = this->real_workspace;
@@ -196,9 +197,9 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t Dim>
   void
-  FFTWMPIEngine<DimS, DimM>::ifft (Field_t & field) const {
+  FFTWMPIEngine<Dim>::ifft (Field_t & field) const {
     if (this->plan_ifft == nullptr) {
       throw std::runtime_error("ifft plan not initialised");
     }
@@ -213,12 +214,12 @@ namespace muSpectre {
     // Transposed output of M x N x L transform for >= 3 dimensions is padded
     // M x N x 2*(L/2+1).
     ptrdiff_t fstride{
-      Field_t::nb_components*this->subdomain_resolutions[DimS-1]
+      this->nb_components*this->subdomain_resolutions[Dim-1]
     };
     ptrdiff_t wstride{
-      Field_t::nb_components*2*(this->subdomain_resolutions[DimS-1]/2+1)
+      this->nb_components*2*(this->subdomain_resolutions[Dim-1]/2+1)
     };
-    ptrdiff_t n(field.size()/this->subdomain_resolutions[DimS-1]);
+    ptrdiff_t n(field.size()/this->subdomain_resolutions[Dim-1]);
 
     auto fdata{field.data()};
     auto wdata{this->real_workspace};
@@ -229,7 +230,6 @@ namespace muSpectre {
     }
   }
 
-  template class FFTWMPIEngine<twoD, twoD>;
-  template class FFTWMPIEngine<twoD, threeD>;
-  template class FFTWMPIEngine<threeD, threeD>;
+  template class FFTWMPIEngine<twoD>;
+  template class FFTWMPIEngine<threeD>;
 }  // muSpectre

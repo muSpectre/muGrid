@@ -86,6 +86,14 @@ namespace muSpectre {
     return this->xiField.dyn_eigen();
   }
 
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  std::array<Dim_t, 2> ProjectionFiniteStrainFast<DimS, DimM>::
+  get_strain_shape() const {
+    return std::array<Dim_t, 2>{DimM, DimM};
+  }
+
+  /* ---------------------------------------------------------------------- */
   template class ProjectionFiniteStrainFast<twoD,   twoD>;
   template class ProjectionFiniteStrainFast<threeD, threeD>;
 }  // muSpectre

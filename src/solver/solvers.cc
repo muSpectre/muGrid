@@ -1,13 +1,15 @@
 /**
- * @file   solvers.cc
+ * file   solvers.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
- * @date   20 Dec 2017
+ * @date   24 Apr 2018
  *
- * @brief  implementation of solver functions
+ * @brief  implementation of dynamic newton-cg solver
  *
- * Copyright © 2017 Till Junge
+ * @section LICENSE
+ *
+ * Copyright © 2018 Till Junge
  *
  * µSpectre is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -25,51 +27,39 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include "solver/solvers.hh"
-#include "solver/solver_cg.hh"
-#include "common/iterators.hh"
+#include "solvers.hh"
 
-#include <Eigen/IterativeLinearSolvers>
+#include <Eigen/Dense>
 
 #include <iomanip>
-#include <cmath>
 
 namespace muSpectre {
 
-  template <Dim_t DimS, Dim_t DimM>
+  //----------------------------------------------------------------------------//
   std::vector<OptimizeResult>
-  de_geus (CellBase<DimS, DimM> & cell, const GradIncrements<DimM> & delFs,
-           SolverBase<DimS, DimM> & solver, Real newton_tol,
-           Real equil_tol,
-           Dim_t verbose) {
-    using Field_t = typename MaterialBase<DimS, DimM>::StrainField_t;
+  newton_cg(Cell & cell, const LoadSteps_t & load_steps,
+            SolverBase & solver, Real newton_tol,
+            Real equil_tol, Dim_t verbose) {
     const Communicator & comm = cell.get_communicator();
-    auto solver_fields{std::make_unique<GlobalFieldCollection<DimS>>()};
-    solver_fields->initialise(cell.get_subdomain_resolutions(),
-                              cell.get_subdomain_locations());
+
+    using Vector_t = Eigen::Matrix<Real, Eigen::Dynamic, 1>;
+    using Matrix_t = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
 
     // Corresponds to symbol δF or δε
-    auto & incrF{make_field<Field_t>("δF", *solver_fields)};
-
-    // Corresponds to symbol ΔF or Δε
-    auto & DeltaF{make_field<Field_t>("ΔF", *solver_fields)};
+    Vector_t incrF(cell.get_nb_dof());
 
     // field to store the rhs for cg calculations
-    auto & rhs{make_field<Field_t>("rhs", *solver_fields)};
+    Vector_t rhs(cell.get_nb_dof());
 
     solver.initialise();
 
-
-    if (solver.get_maxiter() == 0) {
-      solver.set_maxiter(cell.size()*DimM*DimM*10);
-    }
 
     size_t count_width{};
     const auto form{cell.get_formulation()};
     std::string strain_symb{};
     if (verbose > 0 && comm.rank() == 0) {
       //setup of algorithm 5.2 in Nocedal, Numerical Optimization (p. 111)
-      std::cout << "de Geus-" << solver.name() << " for ";
+      std::cout << "Newton-" << solver.get_name() << " for ";
       switch (form) {
       case Formulation::small_strain: {
         strain_symb = "ε";
@@ -89,7 +79,7 @@ namespace muSpectre {
                 << "newton_tol = " << newton_tol << ", cg_tol = "
                 << solver.get_tol() << " maxiter = " << solver.get_maxiter() << " and Δ"
                 << strain_symb << " =" <<std::endl;
-      for (auto&& tup: akantu::enumerate(delFs)) {
+      for (auto&& tup: akantu::enumerate(load_steps)) {
         auto && counter{std::get<0>(tup)};
         auto && grad{std::get<1>(tup)};
         std::cout << "Step " << counter + 1 << ":" << std::endl
@@ -98,245 +88,66 @@ namespace muSpectre {
       count_width = size_t(std::log10(solver.get_maxiter()))+1;
     }
 
-    // initialise F = I or ε = 0
-    auto & F{cell.get_strain()};
+    auto shape{cell.get_strain_shape()};
+
     switch (form) {
     case Formulation::finite_strain: {
-      F.get_map() = Matrices::I2<DimM>();
+      cell.set_uniform_strain(Matrix_t::Identity(shape[0], shape[1]));
+      for (const auto & delF: load_steps) {
+        if (not ((delF.rows() == shape[0]) and (delF.cols() == shape[1]))) {
+          std::stringstream err{};
+          err << "Load increments need to be given in " << shape[0] << "×"
+              << shape[1] << " matrices, but I got a " << delF.rows() << "×"
+              << delF.cols() << " matrix:" << std::endl << delF;
+          throw SolverError(err.str());
+        }
+      }
       break;
     }
     case Formulation::small_strain: {
-      F.get_map() = Matrices::I2<DimM>().Zero();
-      for (const auto & delF: delFs) {
-        if (!check_symmetry(delF)) {
+      cell.set_uniform_strain(Matrix_t::Zero(shape[0], shape[1]));
+      for (const auto & delF: load_steps) {
+        if (not ((delF.rows() == shape[0]) and (delF.cols() == shape[1]))) {
+          std::stringstream err{};
+          err << "Load increments need to be given in " << shape[0] << "×"
+              << shape[1] << " matrices, but I got a " << delF.rows() << "×"
+              << delF.cols() << " matrix:" << std::endl << delF;
+          throw SolverError(err.str());
+        }
+        if (not check_symmetry(delF)) {
           throw SolverError("all Δε must be symmetric!");
         }
       }
       break;
     }
     default:
-      throw SolverError("Unknown formulation");
+      throw SolverError("Unknown strain measure");
       break;
     }
 
     // initialise return value
     std::vector<OptimizeResult> ret_val{};
 
-    // initialise materials
-    constexpr bool need_tangent{true};
-    cell.initialise_materials(need_tangent);
+    // storage for the previous mean strain (to compute ΔF or Δε)
+    Matrix_t previous_macro_strain{load_steps.back().Zero(shape[0], shape[1])};
 
-    Grad_t<DimM> previous_grad{Grad_t<DimM>::Zero()};
-    for (const auto & delF: delFs) { //incremental loop
-
-      std::string message{"Has not converged"};
-      Real incrNorm{2*newton_tol}, gradNorm{1};
-      Real stressNorm{2*equil_tol};
-      bool has_converged{false};
-      auto convergence_test = [&incrNorm, &gradNorm, &newton_tol,
-                               &stressNorm, &equil_tol, &message, &has_converged] () {
-        bool incr_test = incrNorm/gradNorm <= newton_tol;
-        bool stress_test = stressNorm < equil_tol;
-        if (incr_test) {
-          message = "Residual  tolerance reached";
-        } else if (stress_test) {
-          message = "Reached stress divergence tolerance";
-        }
-        has_converged = incr_test || stress_test;
-        return has_converged;
-      };
-      Uint newt_iter{0};
-      for (;
-           (newt_iter < solver.get_maxiter()) && (!has_converged ||
-                                     (newt_iter==1));
-           ++newt_iter) {
-
-        // obtain material response
-        auto res_tup{cell.evaluate_stress_tangent(F)};
-        auto & P{std::get<0>(res_tup)};
-        auto & K{std::get<1>(res_tup)};
-
-        auto tangent_effect = [&cell, &K] (const Field_t & dF, Field_t & dP) {
-          cell.directional_stiffness(K, dF, dP);
-        };
-
-
-        if (newt_iter == 0) {
-          DeltaF.get_map() = -(delF-previous_grad); // neg sign because rhs
-          tangent_effect(DeltaF, rhs);
-          stressNorm = std::sqrt(comm.sum(rhs.eigen().matrix().squaredNorm()));
-          if (convergence_test()) {
-            break;
-          }
-          incrF.eigenvec() = solver.solve(rhs.eigenvec(), incrF.eigenvec());
-          F.eigen() -= DeltaF.eigen();
-        } else {
-          rhs.eigen() = -P.eigen();
-          cell.project(rhs);
-          stressNorm = std::sqrt(comm.sum(rhs.eigen().matrix().squaredNorm()));
-          if (convergence_test()) {
-            break;
-          }
-          incrF.eigen() = 0;
-          incrF.eigenvec() = solver.solve(rhs.eigenvec(), incrF.eigenvec());
-        }
-
-        F.eigen() += incrF.eigen();
-
-        incrNorm = std::sqrt(comm.sum(incrF.eigen().matrix().squaredNorm()));
-        gradNorm = std::sqrt(comm.sum(F.eigen().matrix().squaredNorm()));
-        if (verbose > 0 && comm.rank() == 0) {
-          std::cout << "at Newton step " << std::setw(count_width) << newt_iter
-                    << ", |δ" << strain_symb << "|/|Δ" << strain_symb
-                    << "| = " << std::setw(17) << incrNorm/gradNorm
-                    << ", tol = " << newton_tol << std::endl;
-          if (verbose-1>1) {
-            std::cout << "<" << strain_symb << "> =" << std::endl
-                      << F.get_map().mean() << std::endl;
-          }
-        }
-        convergence_test();
-
-      }
-      // update previous gradient
-      previous_grad = delF;
-
-      ret_val.push_back(OptimizeResult{F.eigen(), cell.get_stress().eigen(),
-            has_converged, Int(has_converged),
-            message,
-            newt_iter, solver.get_counter()});
-
-
-      // store history variables here
-      cell.save_history_variables();
-
-    }
-
-    return ret_val;
-
-  }
-
-  //! instantiation for two-dimensional cells
-  template std::vector<OptimizeResult>
-  de_geus (CellBase<twoD, twoD> & cell, const GradIncrements<twoD>& delF0,
-           SolverBase<twoD, twoD> & solver, Real newton_tol,
-           Real equil_tol,
-           Dim_t verbose);
-
-  // template typename CellBase<twoD, threeD>::StrainField_t &
-  // de_geus (CellBase<twoD, threeD> & cell, const GradIncrements<threeD>& delF0,
-  //            const Real cg_tol, const Real newton_tol, Uint maxiter,
-  //            Dim_t verbose);
-
-  //! instantiation for three-dimensional cells
-  template std::vector<OptimizeResult>
-  de_geus (CellBase<threeD, threeD> & cell, const GradIncrements<threeD>& delF0,
-           SolverBase<threeD, threeD> & solver, Real newton_tol,
-           Real equil_tol,
-           Dim_t verbose);
-
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  std::vector<OptimizeResult>
-  newton_cg (CellBase<DimS, DimM> & cell, const GradIncrements<DimM> & delFs,
-             SolverBase<DimS, DimM> & solver, Real newton_tol,
-             Real equil_tol,
-             Dim_t verbose) {
-    using Field_t = typename MaterialBase<DimS, DimM>::StrainField_t;
-    const Communicator & comm = cell.get_communicator();
-    auto solver_fields{std::make_unique<GlobalFieldCollection<DimS>>()};
-    solver_fields->initialise(cell.get_subdomain_resolutions(),
-                              cell.get_subdomain_locations());
-
-    // Corresponds to symbol δF or δε
-    auto & incrF{make_field<Field_t>("δF", *solver_fields)};
-
-    // field to store the rhs for cg calculations
-    auto & rhs{make_field<Field_t>("rhs", *solver_fields)};
-
-    solver.initialise();
-
-    if (solver.get_maxiter() == 0) {
-      solver.set_maxiter(cell.size()*DimM*DimM*10);
-    }
-
-    size_t count_width{};
-    const auto form{cell.get_formulation()};
-    std::string strain_symb{};
-    if (verbose > 0 && comm.rank() == 0) {
-      //setup of algorithm 5.2 in Nocedal, Numerical Optimization (p. 111)
-      std::cout << "Newton-" << solver.name() << " for ";
-      switch (form) {
-      case Formulation::small_strain: {
-        strain_symb = "ε";
-        std::cout << "small";
-        break;
-      }
-      case Formulation::finite_strain: {
-        strain_symb = "Fy";
-        std::cout << "finite";
-        break;
-      }
-      default:
-        throw SolverError("unknown formulation");
-        break;
-      }
-      std::cout << " strain with" << std::endl
-                << "newton_tol = " << newton_tol << ", cg_tol = "
-                << solver.get_tol() << " maxiter = " << solver.get_maxiter() << " and Δ"
-                << strain_symb << " =" <<std::endl;
-      for (auto&& tup: akantu::enumerate(delFs)) {
-        auto && counter{std::get<0>(tup)};
-        auto && grad{std::get<1>(tup)};
-        std::cout << "Step " << counter + 1 << ":" << std::endl
-                  << grad << std::endl;
-      }
-      count_width = size_t(std::log10(solver.get_maxiter()))+1;
-    }
-
-    // initialise F = I or ε = 0
-    auto & F{cell.get_strain()};
-    switch (cell.get_formulation()) {
-    case Formulation::finite_strain: {
-      F.get_map() = Matrices::I2<DimM>();
-      break;
-    }
-    case Formulation::small_strain: {
-      F.get_map() = Matrices::I2<DimM>().Zero();
-      for (const auto & delF: delFs) {
-        if (!check_symmetry(delF)) {
-          throw SolverError("all Δε must be symmetric!");
-        }
-      }
-      break;
-    }
-    default:
-      throw SolverError("Unknown formulation");
-      break;
-    }
-
-    // initialise return value
-    std::vector<OptimizeResult> ret_val{};
-
-    // initialise materials
-    constexpr bool need_tangent{true};
-    cell.initialise_materials(need_tangent);
-
-    Grad_t<DimM> previous_grad{Grad_t<DimM>::Zero()};
-    for (const auto & delF: delFs) { //incremental loop
-      // apply macroscopic strain increment
-      for (auto && grad: F.get_map()) {
-        grad += delF - previous_grad;
+    auto F{cell.get_strain_vector()};
+    //! incremental loop
+    for (const auto & macro_strain: load_steps) {
+      using StrainMap_t = RawFieldMap<Eigen::Map<Eigen::MatrixXd>>;
+      for (auto && strain: StrainMap_t(F, shape[0], shape[1])) {
+        strain += macro_strain - previous_macro_strain;
       }
 
       std::string message{"Has not converged"};
-      Real incrNorm{2*newton_tol}, gradNorm{1};
-      Real stressNorm{2*equil_tol};
+      Real incr_norm{2*newton_tol}, grad_norm{1};
+      Real stress_norm{2*equil_tol};
       bool has_converged{false};
-      auto convergence_test = [&incrNorm, &gradNorm, &newton_tol,
-                               &stressNorm, &equil_tol, &message, &has_converged] () {
-        bool incr_test = incrNorm/gradNorm <= newton_tol;
-        bool stress_test = stressNorm < equil_tol;
+
+      auto convergence_test = [&incr_norm, &grad_norm, &newton_tol,
+                               &stress_norm, &equil_tol, &message, &has_converged] () {
+        bool incr_test = incr_norm/grad_norm <= newton_tol;
+        bool stress_test = stress_norm < equil_tol;
         if (incr_test) {
           message = "Residual  tolerance reached";
         } else if (stress_test) {
@@ -350,83 +161,244 @@ namespace muSpectre {
       for (;
            newt_iter < solver.get_maxiter() && !has_converged;
            ++newt_iter) {
-
         // obtain material response
-        auto res_tup{cell.evaluate_stress_tangent(F)};
+        auto res_tup{cell.evaluate_stress_tangent()};
         auto & P{std::get<0>(res_tup)};
 
-        rhs.eigen() = -P.eigen();
-        cell.project(rhs);
-        stressNorm = std::sqrt(comm.sum(rhs.eigen().matrix().squaredNorm()));
+        rhs = -P;
+        cell.apply_projection(rhs);
+        stress_norm = std::sqrt(comm.sum(rhs.squaredNorm()));
+
         if (convergence_test()) {
           break;
         }
-        incrF.eigen() = 0;
 
-        incrF.eigenvec() = solver.solve(rhs.eigenvec(), incrF.eigenvec());
+        //! this is a potentially avoidable copy TODO: check this out
+        incrF = solver.solve(rhs);
 
+        F += incrF;
 
-        F.eigen() += incrF.eigen();
+        incr_norm = std::sqrt(comm.sum(incrF.squaredNorm()));
+        grad_norm = std::sqrt(comm.sum(F.squaredNorm()));
 
-        incrNorm = std::sqrt(comm.sum(incrF.eigen().matrix().squaredNorm()));
-        gradNorm = std::sqrt(comm.sum(F.eigen().matrix().squaredNorm()));
-        if (verbose > 0 && comm.rank() == 0) {
+        if ((verbose > 0) and (comm.rank() == 0)) {
           std::cout << "at Newton step " << std::setw(count_width) << newt_iter
                     << ", |δ" << strain_symb << "|/|Δ" << strain_symb
-                    << "| = " << std::setw(17) << incrNorm/gradNorm
+                    << "| = " << std::setw(17) << incr_norm/grad_norm
                     << ", tol = " << newton_tol << std::endl;
 
           if (verbose-1>1) {
             std::cout << "<" << strain_symb << "> =" << std::endl
-                      << F.get_map().mean() << std::endl;
+                      << StrainMap_t(F, shape[0], shape[1]).mean() << std::endl;
           }
         }
         convergence_test();
-
       }
-      // update previous gradient
-      previous_grad = delF;
 
-      ret_val.push_back(OptimizeResult{F.eigen(), cell.get_stress().eigen(),
+
+      // update previous macroscopic strain
+      previous_macro_strain = macro_strain;
+
+      // store results
+      ret_val.emplace_back(OptimizeResult{F, cell.get_stress_vector(),
             convergence_test(), Int(convergence_test()),
-            message,
-            newt_iter, solver.get_counter()});
+            message, newt_iter, solver.get_counter()});
 
-      //store history variables for next load increment
+      // store history variables for next load increment
       cell.save_history_variables();
-
     }
 
     return ret_val;
-
   }
 
-  //! instantiation for two-dimensional cells
-  template std::vector<OptimizeResult>
-  newton_cg (CellBase<twoD, twoD> & cell, const GradIncrements<twoD>& delF0,
-             SolverBase<twoD, twoD> & solver, Real newton_tol,
-             Real equil_tol,
-             Dim_t verbose);
+  //----------------------------------------------------------------------------//
+  std::vector<OptimizeResult>
+  de_geus(Cell & cell,
+          const LoadSteps_t & load_steps,
+          SolverBase & solver, Real newton_tol,
+          Real equil_tol,
+          Dim_t verbose) {
+    const Communicator & comm = cell.get_communicator();
 
-  // template typename CellBase<twoD, threeD>::StrainField_t &
-  // newton_cg (CellBase<twoD, threeD> & cell, const GradIncrements<threeD>& delF0,
-  //            const Real cg_tol, const Real newton_tol, Uint maxiter,
-  //            Dim_t verbose);
+    using Vector_t = Eigen::Matrix<Real, Eigen::Dynamic, 1>;
+    using Matrix_t = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
 
-  //! instantiation for three-dimensional cells
-  template std::vector<OptimizeResult>
-  newton_cg (CellBase<threeD, threeD> & cell, const GradIncrements<threeD>& delF0,
-             SolverBase<threeD, threeD> & solver, Real newton_tol,
-             Real equil_tol,
-             Dim_t verbose);
+    // Corresponds to symbol δF or δε
+    Vector_t incrF(cell.get_nb_dof());
+
+    // Corresponds to symbol ΔF or Δε
+    Vector_t DeltaF(cell.get_nb_dof());
+
+    // field to store the rhs for cg calculations
+    Vector_t rhs(cell.get_nb_dof());
+
+    solver.initialise();
 
 
-  /* ---------------------------------------------------------------------- */
-  bool check_symmetry(const Eigen::Ref<const Eigen::ArrayXXd>& eps,
-                      Real rel_tol){
-    return (rel_tol >= (eps-eps.transpose()).matrix().norm()/eps.matrix().norm() ||
-            rel_tol >= eps.matrix().norm());
+    size_t count_width{};
+    const auto form{cell.get_formulation()};
+    std::string strain_symb{};
+    if (verbose > 0 && comm.rank() == 0) {
+      //setup of algorithm 5.2 in Nocedal, Numerical Optimization (p. 111)
+      std::cout << "de Geus-" << solver.get_name() << " for ";
+      switch (form) {
+      case Formulation::small_strain: {
+        strain_symb = "ε";
+        std::cout << "small";
+        break;
+      }
+      case Formulation::finite_strain: {
+        strain_symb = "F";
+        std::cout << "finite";
+        break;
+      }
+      default:
+        throw SolverError("unknown formulation");
+        break;
+      }
+      std::cout << " strain with" << std::endl
+                << "newton_tol = " << newton_tol << ", cg_tol = "
+                << solver.get_tol() << " maxiter = " << solver.get_maxiter() << " and Δ"
+                << strain_symb << " =" <<std::endl;
+      for (auto&& tup: akantu::enumerate(load_steps)) {
+        auto && counter{std::get<0>(tup)};
+        auto && grad{std::get<1>(tup)};
+        std::cout << "Step " << counter + 1 << ":" << std::endl
+                  << grad << std::endl;
+      }
+      count_width = size_t(std::log10(solver.get_maxiter()))+1;
+    }
+
+    auto shape{cell.get_strain_shape()};
+
+    switch (form) {
+    case Formulation::finite_strain: {
+      cell.set_uniform_strain(Matrix_t::Identity(shape[0], shape[1]));
+      for (const auto & delF: load_steps) {
+        auto rows = delF.rows();
+        auto cols = delF.cols();
+        if (not ((rows == shape[0]) and (cols == shape[1]))) {
+          std::stringstream err{};
+          err << "Load increments need to be given in " << shape[0] << "×"
+              << shape[1] << " matrices, but I got a " << delF.rows() << "×"
+              << delF.cols() << " matrix:" << std::endl << delF;
+          throw SolverError(err.str());
+        }
+      }
+      break;
+    }
+    case Formulation::small_strain: {
+      cell.set_uniform_strain(Matrix_t::Zero(shape[0], shape[1]));
+      for (const auto & delF: load_steps) {
+        if (not ((delF.rows() == shape[0]) and (delF.cols() == shape[1]))) {
+          std::stringstream err{};
+          err << "Load increments need to be given in " << shape[0] << "×"
+              << shape[1] << " matrices, but I got a " << delF.rows() << "×"
+              << delF.cols() << " matrix:" << std::endl << delF;
+          throw SolverError(err.str());
+        }
+        if (not check_symmetry(delF)) {
+          throw SolverError("all Δε must be symmetric!");
+        }
+      }
+      break;
+    }
+    default:
+      throw SolverError("Unknown strain measure");
+      break;
+    }
+
+    // initialise return value
+    std::vector<OptimizeResult> ret_val{};
+
+    // storage for the previous mean strain (to compute ΔF or Δε)
+    Matrix_t previous_macro_strain{load_steps.back().Zero(shape[0], shape[1])};
+
+    auto F{cell.get_strain_vector()};
+    //! incremental loop
+    for (const auto & macro_strain: load_steps) {
+      using StrainMap_t = RawFieldMap<Eigen::Map<Eigen::MatrixXd>>;
+
+      std::string message{"Has not converged"};
+      Real incr_norm{2*newton_tol}, grad_norm{1};
+      Real stress_norm{2*equil_tol};
+      bool has_converged{false};
+
+      auto convergence_test = [&incr_norm, &grad_norm, &newton_tol,
+                               &stress_norm, &equil_tol, &message, &has_converged] () {
+        bool incr_test = incr_norm/grad_norm <= newton_tol;
+        bool stress_test = stress_norm < equil_tol;
+        if (incr_test) {
+          message = "Residual  tolerance reached";
+        } else if (stress_test) {
+          message = "Reached stress divergence tolerance";
+        }
+        has_converged = incr_test || stress_test;
+        return has_converged;
+      };
+      Uint newt_iter{0};
+
+      for (;
+           newt_iter < solver.get_maxiter() && !has_converged;
+           ++newt_iter) {
+        // obtain material response
+        auto res_tup{cell.evaluate_stress_tangent()};
+        auto & P{std::get<0>(res_tup)};
+
+        if (newt_iter == 0) {
+          for (auto && strain: StrainMap_t(DeltaF, shape[0], shape[1])) {
+            strain = macro_strain -previous_macro_strain;
+          }
+          rhs = - cell.evaluate_projected_directional_stiffness(DeltaF);
+          stress_norm = std::sqrt(comm.sum(rhs.matrix().squaredNorm()));
+          if (convergence_test()) {
+            break;
+          }
+          incrF = solver.solve(rhs);
+          F += DeltaF;
+        }
+        else {
+          rhs = -P;
+          cell.apply_projection(rhs);
+          stress_norm = std::sqrt(comm.sum(rhs.matrix().squaredNorm()));
+          if (convergence_test()) {
+            break;
+          }
+          incrF = solver.solve(rhs);
+        }
+
+        F += incrF;
+
+        incr_norm = std::sqrt(comm.sum(incrF.squaredNorm()));
+        grad_norm = std::sqrt(comm.sum(F.squaredNorm()));
+
+        if ((verbose > 0) and (comm.rank() == 0)) {
+          std::cout << "at Newton step " << std::setw(count_width) << newt_iter
+                    << ", |δ" << strain_symb << "|/|Δ" << strain_symb
+                    << "| = " << std::setw(17) << incr_norm/grad_norm
+                    << ", tol = " << newton_tol << std::endl;
+
+          if (verbose-1>1) {
+            std::cout << "<" << strain_symb << "> =" << std::endl
+                      << StrainMap_t(F, shape[0], shape[1]).mean() << std::endl;
+          }
+        }
+        convergence_test();
+      }
+
+
+      // update previous macroscopic strain
+      previous_macro_strain = macro_strain;
+
+      // store results
+      ret_val.emplace_back(OptimizeResult{F, cell.get_stress_vector(),
+            convergence_test(), Int(convergence_test()),
+            message, newt_iter, solver.get_counter()});
+
+      // store history variables for next load increment
+      cell.save_history_variables();
+    }
+
+    return ret_val;
   }
-
-
 }  // muSpectre

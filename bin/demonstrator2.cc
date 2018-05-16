@@ -75,12 +75,12 @@ int main()
   constexpr Real cg_tol{1e-7};
   const size_t maxiter = 100;
 
-  Grad_t<dim> DeltaF{Grad_t<dim>::Zero()};
+  Eigen::MatrixXd DeltaF{Eigen::MatrixXd::Zero(dim, dim)};
   DeltaF(0, 1) = .1;
   Dim_t verbose {1};
 
   auto start = std::chrono::high_resolution_clock::now();
-  SolverCG<dim, dim> cg{cell, cg_tol, maxiter, bool(verbose)};
+  SolverCG cg{cell, cg_tol, maxiter, bool(verbose)};
   auto res = de_geus(cell, DeltaF, cg, newton_tol, verbose);
   std::chrono::duration<Real> dur = std::chrono::high_resolution_clock::now() - start;
   std::cout << "Resolution time = " << dur.count() << "s" << std::endl;

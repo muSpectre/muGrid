@@ -50,34 +50,34 @@ namespace muSpectre {
 #ifdef WITH_FFTWMPI
     ProjectionFixture<twoD, twoD, Squares<twoD>,
                       ProjectionSmallStrain<twoD, twoD>,
-                      FFTWMPIEngine<twoD, twoD>>,
+                      FFTWMPIEngine<twoD>>,
     ProjectionFixture<threeD, threeD, Squares<threeD>,
                       ProjectionSmallStrain<threeD, threeD>,
-                      FFTWMPIEngine<threeD, threeD>>,
+                      FFTWMPIEngine<threeD>>,
     ProjectionFixture<twoD, twoD, Sizes<twoD>,
                       ProjectionSmallStrain<twoD, twoD>,
-                      FFTWMPIEngine<twoD, twoD>>,
+                      FFTWMPIEngine<twoD>>,
     ProjectionFixture<threeD, threeD, Sizes<threeD>,
                       ProjectionSmallStrain<threeD, threeD>,
-                      FFTWMPIEngine<threeD, threeD>>,
+                      FFTWMPIEngine<threeD>>,
 #endif
 #ifdef WITH_PFFT
     ProjectionFixture<twoD, twoD, Squares<twoD>,
                       ProjectionSmallStrain<twoD, twoD>,
-                      PFFTEngine<twoD, twoD>>,
+                      PFFTEngine<twoD>>,
     ProjectionFixture<threeD, threeD, Squares<threeD>,
                       ProjectionSmallStrain<threeD, threeD>,
-                      PFFTEngine<threeD, threeD>>,
+                      PFFTEngine<threeD>>,
     ProjectionFixture<twoD, twoD, Sizes<twoD>,
                       ProjectionSmallStrain<twoD, twoD>,
-                      PFFTEngine<twoD, twoD>>,
+                      PFFTEngine<twoD>>,
     ProjectionFixture<threeD, threeD, Sizes<threeD>,
                       ProjectionSmallStrain<threeD, threeD>,
-                      PFFTEngine<threeD, threeD>>,
+                      PFFTEngine<threeD>>,
 #endif
     ProjectionFixture<twoD, twoD, Squares<twoD>,
                       ProjectionSmallStrain<twoD, twoD>,
-                      FFTWEngine<twoD, twoD>,
+                      FFTWEngine<twoD>,
                       false>
   >;
 

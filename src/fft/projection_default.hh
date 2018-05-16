@@ -45,6 +45,7 @@ namespace muSpectre {
   {
   public:
     using Parent = ProjectionBase<DimS, DimM>; //!< base class
+    using Vector_t = typename Parent::Vector_t; //!< to represent fields
     //! polymorphic FFT pointer type
     using FFTEngine_ptr = typename Parent::FFTEngine_ptr;
     using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
@@ -54,7 +55,7 @@ namespace muSpectre {
     //! local field collection for Fourier-space fields
     using LFieldCollection_t = LocalFieldCollection<DimS>;
     //! Real space second order tensor fields (to be projected)
-    using Field_t = TensorField<GFieldCollection_t, Real, secondOrder, DimM>;
+    using Field_t = TypedField<GFieldCollection_t, Real>;
     //! Fourier-space field containing the projection operator itself
     using Proj_t = TensorField<LFieldCollection_t, Real, fourthOrder, DimM>;
     //! iterable form of the operator
@@ -87,6 +88,15 @@ namespace muSpectre {
 
     Eigen::Map<Eigen::ArrayXXd> get_operator() override final;
 
+    /**
+     * returns the number of rows and cols for the strain matrix type
+     * (for full storage, the strain is stored in material_dim ×
+     * material_dim matrices, but in symmetriy storage, it is a column
+     * vector)
+     */
+    std::array<Dim_t, 2> get_strain_shape() const override final;
+
+    constexpr static Dim_t NbComponents() {return ipow(DimM, 2);}
 
   protected:
     Proj_t & Gfield; //!< field holding the operator

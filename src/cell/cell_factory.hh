@@ -50,13 +50,15 @@ namespace muSpectre {
    * FFT_engine) to be used in a cell constructor
    */
   template <Dim_t DimS, Dim_t DimM,
-            typename FFTEngine=FFTWEngine<DimS, DimM>>
+            typename FFTEngine=FFTWEngine<DimS>>
   inline
   std::unique_ptr<ProjectionBase<DimS, DimM>>
   cell_input(Ccoord_t<DimS> resolutions,
                Rcoord_t<DimS> lengths,
                Formulation form) {
-    auto fft_ptr{std::make_unique<FFTEngine>(resolutions)};
+    auto fft_ptr{
+      std::make_unique<FFTEngine>(resolutions,
+                                  dof_for_formulation(form, DimS))};
     switch (form)
       {
       case Formulation::finite_strain: {
@@ -83,7 +85,7 @@ namespace muSpectre {
    */
   template <size_t DimS, size_t DimM=DimS,
             typename Cell=CellBase<DimS, DimM>,
-            typename FFTEngine=FFTWEngine<DimS, DimM>>
+            typename FFTEngine=FFTWEngine<DimS>>
   inline
   Cell make_cell(Ccoord_t<DimS> resolutions,
                  Rcoord_t<DimS> lengths,
@@ -102,14 +104,16 @@ namespace muSpectre {
    * FFT_engine) to be used in a cell constructor
    */
   template <Dim_t DimS, Dim_t DimM,
-  typename FFTEngine=FFTWMPIEngine<DimS, DimM>>
+  typename FFTEngine=FFTWMPIEngine<DimS>>
   inline
   std::unique_ptr<ProjectionBase<DimS, DimM>>
   parallel_cell_input(Ccoord_t<DimS> resolutions,
                       Rcoord_t<DimS> lengths,
                       Formulation form,
                       const Communicator & comm) {
-    auto fft_ptr{std::make_unique<FFTEngine>(resolutions, comm)};
+    auto fft_ptr{std::make_unique<FFTEngine>(resolutions,
+                                             dof_for_formulation(form, DimM),
+                                             comm)};
     switch (form)
     {
       case Formulation::finite_strain: {
@@ -136,7 +140,7 @@ namespace muSpectre {
    */
   template <size_t DimS, size_t DimM=DimS,
   typename Cell=CellBase<DimS, DimM>,
-  typename FFTEngine=FFTWMPIEngine<DimS, DimM>>
+  typename FFTEngine=FFTWMPIEngine<DimS>>
   inline
   Cell make_parallel_cell(Ccoord_t<DimS> resolutions,
                           Rcoord_t<DimS> lengths,

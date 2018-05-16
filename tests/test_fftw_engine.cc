@@ -51,8 +51,8 @@ namespace muSpectre {
     constexpr static Ccoord_t<sdim> loc() {
       return CcoordOps::get_cube<DimS>(0);
     }
-    FFTW_fixture() : engine(res()) {}
-    FFTWEngine<DimS, DimM> engine;
+    FFTW_fixture() : engine(res(), DimM*DimM) {}
+    FFTWEngine<DimS> engine;
   };
 
   struct FFTW_fixture_python_segfault{
@@ -61,8 +61,8 @@ namespace muSpectre {
     constexpr static Dim_t mdim{twoD};
     constexpr static Ccoord_t<sdim> res() {return {6, 4};}
     constexpr static Ccoord_t<sdim> loc() {return {0, 0};}
-    FFTW_fixture_python_segfault() : engine{res()} {}
-    FFTWEngine<sdim, mdim> engine;
+    FFTW_fixture_python_segfault() : engine{res(), mdim*mdim} {}
+    FFTWEngine<sdim> engine;
   };
 
   using fixlist = boost::mpl::list<FFTW_fixture<  twoD,   twoD, 3>,

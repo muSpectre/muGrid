@@ -1,11 +1,11 @@
 /**
- * @file   projection_base.cc
+ * @file   deprecated_solver_base.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
- * @date   06 Dec 2017
+ * @date   18 Dec 2017
  *
- * @brief  implementation of base class for projections
+ * @brief  definitions for solvers
  *
  * Copyright © 2017 Till Junge
  *
@@ -25,34 +25,39 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include "fft/projection_base.hh"
+#include "solver/deprecated_solver_base.hh"
+#include "solver/deprecated_solver_cg.hh"
+#include "common/field.hh"
+#include "common/iterators.hh"
+
+#include <iostream>
+#include <memory>
 
 
 namespace muSpectre {
 
+  //----------------------------------------------------------------------------//
+  template <Dim_t DimS, Dim_t DimM>
+  DeprecatedSolverBase<DimS, DimM>::DeprecatedSolverBase(Cell_t & cell, Real tol, Uint maxiter,
+                                     bool verbose )
+    : cell{cell}, tol{tol}, maxiter{maxiter}, verbose{verbose}
+  {}
+
+
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  ProjectionBase<DimS, DimM>::ProjectionBase(FFTEngine_ptr engine,
-                                             Rcoord domain_lengths,
-                                             Formulation form)
-    : fft_engine{std::move(engine)}, domain_lengths{domain_lengths}, form{form},
-      projection_container{this->fft_engine->get_field_collection()}
-  {
-    static_assert((DimS == FFTEngine::sdim),
-                  "spatial dimensions are incompatible");
-    if (this->get_nb_components() != fft_engine->get_nb_components()) {
-      throw ProjectionError("Incompatible number of components per pixel");
-    }
+  void DeprecatedSolverBase<DimS, DimM>::reset_counter() {
+    this->counter = 0;
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void ProjectionBase<DimS, DimM>::
-  initialise(FFT_PlanFlags flags) {
-    fft_engine->initialise(flags);
+  Uint DeprecatedSolverBase<DimS, DimM>::get_counter() const {
+    return this->counter;
   }
 
-  template class ProjectionBase<twoD,   twoD>;
-  template class ProjectionBase<twoD,   threeD>;
-  template class ProjectionBase<threeD, threeD>;
+  template class DeprecatedSolverBase<twoD, twoD>;
+  //template class DeprecatedSolverBase<twoD, threeD>;
+  template class DeprecatedSolverBase<threeD, threeD>;
+
 }  // muSpectre

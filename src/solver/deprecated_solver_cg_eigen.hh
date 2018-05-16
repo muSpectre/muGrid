@@ -1,5 +1,5 @@
 /**
- * @file   solver_cg_eigen.hh
+ * @file   deprecated_solver_cg_eigen.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -25,10 +25,10 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#ifndef SOLVER_EIGEN_H
-#define SOLVER_EIGEN_H
+#ifndef DEPRECATED_SOLVER_EIGEN_H
+#define DEPRECATED_SOLVER_EIGEN_H
 
-#include "solver/solver_base.hh"
+#include "solver/deprecated_solver_base.hh"
 
 #include <Eigen/IterativeLinearSolvers>
 #include <unsupported/Eigen/IterativeSolvers>
@@ -36,36 +36,36 @@
 #include <type_traits>
 
 namespace muSpectre {
-  template <class SolverType, Dim_t DimS, Dim_t DimM>
-  class SolverEigen;
+  template <class DeprecatedSolverType, Dim_t DimS, Dim_t DimM>
+  class DeprecatedSolverEigen;
 
   template <Dim_t DimS, Dim_t DimM=DimS>
-  class SolverCGEigen;
+  class DeprecatedSolverCGEigen;
 
   template <Dim_t DimS, Dim_t DimM=DimS>
-  class SolverGMRESEigen;
+  class DeprecatedSolverGMRESEigen;
 
   template <Dim_t DimS, Dim_t DimM=DimS>
-  class SolverBiCGSTABEigen;
+  class DeprecatedSolverBiCGSTABEigen;
 
   template <Dim_t DimS, Dim_t DimM=DimS>
-  class SolverDGMRESEigen;
+  class DeprecatedSolverDGMRESEigen;
 
   template <Dim_t DimS, Dim_t DimM=DimS>
-  class SolverMINRESEigen;
+  class DeprecatedSolverMINRESEigen;
 
   namespace internal {
 
-    template <class Solver>
-    struct Solver_traits {
+    template <class DeprecatedSolver>
+    struct DeprecatedSolver_traits {
     };
 
     //! traits for the Eigen conjugate gradient solver
     template <Dim_t DimS, Dim_t DimM>
-    struct Solver_traits<SolverCGEigen<DimS, DimM>> {
-      //! Eigen Iterative Solver
-      using Solver =
-        Eigen::ConjugateGradient<typename SolverEigen<SolverCGEigen<DimS, DimM>,
+    struct DeprecatedSolver_traits<DeprecatedSolverCGEigen<DimS, DimM>> {
+      //! Eigen Iterative DeprecatedSolver
+      using DeprecatedSolver =
+        Eigen::ConjugateGradient<typename DeprecatedSolverEigen<DeprecatedSolverCGEigen<DimS, DimM>,
                                                       DimS, DimM>::Adaptor,
                                  Eigen::Lower|Eigen::Upper,
                                  Eigen::IdentityPreconditioner>;
@@ -73,40 +73,40 @@ namespace muSpectre {
 
     //! traits for the Eigen GMRES solver
     template <Dim_t DimS, Dim_t DimM>
-    struct Solver_traits<SolverGMRESEigen<DimS, DimM>> {
-      //! Eigen Iterative Solver
-      using Solver =
-        Eigen::GMRES<typename SolverEigen<SolverGMRESEigen<DimS, DimM>,
+    struct DeprecatedSolver_traits<DeprecatedSolverGMRESEigen<DimS, DimM>> {
+      //! Eigen Iterative DeprecatedSolver
+      using DeprecatedSolver =
+        Eigen::GMRES<typename DeprecatedSolverEigen<DeprecatedSolverGMRESEigen<DimS, DimM>,
                                           DimS, DimM>::Adaptor,
                      Eigen::IdentityPreconditioner>;
     };
 
     //! traits for the Eigen BiCGSTAB solver
     template <Dim_t DimS, Dim_t DimM>
-    struct Solver_traits<SolverBiCGSTABEigen<DimS, DimM>> {
-      //! Eigen Iterative Solver
-      using Solver =
-        Eigen::BiCGSTAB<typename SolverEigen<SolverBiCGSTABEigen<DimS, DimM>,
+    struct DeprecatedSolver_traits<DeprecatedSolverBiCGSTABEigen<DimS, DimM>> {
+      //! Eigen Iterative DeprecatedSolver
+      using DeprecatedSolver =
+        Eigen::BiCGSTAB<typename DeprecatedSolverEigen<DeprecatedSolverBiCGSTABEigen<DimS, DimM>,
                                              DimS, DimM>::Adaptor,
                         Eigen::IdentityPreconditioner>;
     };
 
     //! traits for the Eigen DGMRES solver
     template <Dim_t DimS, Dim_t DimM>
-    struct Solver_traits<SolverDGMRESEigen<DimS, DimM>> {
-      //! Eigen Iterative Solver
-      using Solver =
-        Eigen::DGMRES<typename SolverEigen<SolverDGMRESEigen<DimS, DimM>,
+    struct DeprecatedSolver_traits<DeprecatedSolverDGMRESEigen<DimS, DimM>> {
+      //! Eigen Iterative DeprecatedSolver
+      using DeprecatedSolver =
+        Eigen::DGMRES<typename DeprecatedSolverEigen<DeprecatedSolverDGMRESEigen<DimS, DimM>,
                                            DimS, DimM>::Adaptor,
                       Eigen::IdentityPreconditioner>;
     };
 
     //! traits for the Eigen MINRES solver
     template <Dim_t DimS, Dim_t DimM>
-    struct Solver_traits<SolverMINRESEigen<DimS, DimM>> {
-      //! Eigen Iterative Solver
-      using Solver =
-        Eigen::MINRES<typename SolverEigen<SolverMINRESEigen<DimS, DimM>,
+    struct DeprecatedSolver_traits<DeprecatedSolverMINRESEigen<DimS, DimM>> {
+      //! Eigen Iterative DeprecatedSolver
+      using DeprecatedSolver =
+        Eigen::MINRES<typename DeprecatedSolverEigen<DeprecatedSolverMINRESEigen<DimS, DimM>,
                                            DimS, DimM>::Adaptor,
                       Eigen::Lower|Eigen::Upper,
                       Eigen::IdentityPreconditioner>;
@@ -117,11 +117,11 @@ namespace muSpectre {
   /**
    * base class for iterative solvers from Eigen
    */
-  template <class SolverType, Dim_t DimS, Dim_t DimM=DimS>
-  class SolverEigen: public SolverBase<DimS, DimM>
+  template <class DeprecatedSolverType, Dim_t DimS, Dim_t DimM=DimS>
+  class DeprecatedSolverEigen: public DeprecatedSolverBase<DimS, DimM>
   {
   public:
-    using Parent = SolverBase<DimS, DimM>; //!< base class
+    using Parent = DeprecatedSolverBase<DimS, DimM>; //!< base class
     //! Input vector for solvers
     using SolvVectorIn = typename Parent::SolvVectorIn;
     //! Input vector for solvers
@@ -135,31 +135,31 @@ namespace muSpectre {
     //! handle for the cell to fit Eigen's sparse matrix interface
     using Adaptor = typename Cell_t::Adaptor;
     //! traits obtained from CRTP
-    using Solver = typename internal::Solver_traits<SolverType>::Solver;
+    using DeprecatedSolver = typename internal::DeprecatedSolver_traits<DeprecatedSolverType>::DeprecatedSolver;
 
     //! All Eigen solvers need directional stiffness
     constexpr static Tg_req_t tangent_requirement{Tg_req_t::NeedEffect};
 
         //! Default constructor
-    SolverEigen() = delete;
+    DeprecatedSolverEigen() = delete;
 
     //! Constructor with domain resolutions, etc,
-    SolverEigen(Cell_t& cell, Real tol, Uint maxiter=0, bool verbose =false);
+    DeprecatedSolverEigen(Cell_t& cell, Real tol, Uint maxiter=0, bool verbose =false);
 
     //! Copy constructor
-    SolverEigen(const SolverEigen &other) = delete;
+    DeprecatedSolverEigen(const DeprecatedSolverEigen &other) = delete;
 
     //! Move constructor
-    SolverEigen(SolverEigen &&other) = default;
+    DeprecatedSolverEigen(DeprecatedSolverEigen &&other) = default;
 
     //! Destructor
-    virtual ~SolverEigen() = default;
+    virtual ~DeprecatedSolverEigen() = default;
 
     //! Copy assignment operator
-    SolverEigen& operator=(const SolverEigen &other) = delete;
+    DeprecatedSolverEigen& operator=(const DeprecatedSolverEigen &other) = delete;
 
     //! Move assignment operator
-    SolverEigen& operator=(SolverEigen &&other) = default;
+    DeprecatedSolverEigen& operator=(DeprecatedSolverEigen &&other) = default;
 
     //! returns whether the solver has converged
     bool has_converged() const override final {return this->solver.info() == Eigen::Success;}
@@ -175,7 +175,7 @@ namespace muSpectre {
     //! returns `muSpectre::Tg_req_t::NeedEffect`
     Tg_req_t get_tangent_req() const override final; 
     Adaptor adaptor; //!< cell handle
-    Solver solver; //!< Eigen's Iterative solver
+    DeprecatedSolver solver; //!< Eigen's Iterative solver
 
   };
 
@@ -183,10 +183,10 @@ namespace muSpectre {
    * Binding to Eigen's conjugate gradient solver
    */
   template <Dim_t DimS, Dim_t DimM>
-  class SolverCGEigen:
-    public SolverEigen<SolverCGEigen<DimS, DimM>, DimS, DimM> {
+  class DeprecatedSolverCGEigen:
+    public DeprecatedSolverEigen<DeprecatedSolverCGEigen<DimS, DimM>, DimS, DimM> {
   public:
-    using SolverEigen<SolverCGEigen<DimS, DimM>, DimS, DimM>::SolverEigen;
+    using DeprecatedSolverEigen<DeprecatedSolverCGEigen<DimS, DimM>, DimS, DimM>::DeprecatedSolverEigen;
     std::string name() const override final {return "CG";}
   };
 
@@ -194,10 +194,10 @@ namespace muSpectre {
    * Binding to Eigen's GMRES solver
    */
   template <Dim_t DimS, Dim_t DimM>
-  class SolverGMRESEigen:
-    public SolverEigen<SolverGMRESEigen<DimS, DimM>, DimS, DimM> {
+  class DeprecatedSolverGMRESEigen:
+    public DeprecatedSolverEigen<DeprecatedSolverGMRESEigen<DimS, DimM>, DimS, DimM> {
   public:
-    using SolverEigen<SolverGMRESEigen<DimS, DimM>, DimS, DimM>::SolverEigen;
+    using DeprecatedSolverEigen<DeprecatedSolverGMRESEigen<DimS, DimM>, DimS, DimM>::DeprecatedSolverEigen;
     std::string name() const override final {return "GMRES";}
   };
 
@@ -205,11 +205,11 @@ namespace muSpectre {
    * Binding to Eigen's BiCGSTAB solver
    */
   template <Dim_t DimS, Dim_t DimM>
-  class SolverBiCGSTABEigen:
-    public SolverEigen<SolverBiCGSTABEigen<DimS, DimM>, DimS, DimM> {
+  class DeprecatedSolverBiCGSTABEigen:
+    public DeprecatedSolverEigen<DeprecatedSolverBiCGSTABEigen<DimS, DimM>, DimS, DimM> {
   public:
-    using SolverEigen<SolverBiCGSTABEigen<DimS, DimM>, DimS, DimM>::SolverEigen;
-    //! Solver's name
+    using DeprecatedSolverEigen<DeprecatedSolverBiCGSTABEigen<DimS, DimM>, DimS, DimM>::DeprecatedSolverEigen;
+    //! DeprecatedSolver's name
     std::string name() const override final {return "BiCGSTAB";}
   };
 
@@ -217,11 +217,11 @@ namespace muSpectre {
    * Binding to Eigen's DGMRES solver
    */
   template <Dim_t DimS, Dim_t DimM>
-  class SolverDGMRESEigen:
-    public SolverEigen<SolverDGMRESEigen<DimS, DimM>, DimS, DimM> {
+  class DeprecatedSolverDGMRESEigen:
+    public DeprecatedSolverEigen<DeprecatedSolverDGMRESEigen<DimS, DimM>, DimS, DimM> {
   public:
-    using SolverEigen<SolverDGMRESEigen<DimS, DimM>, DimS, DimM>::SolverEigen;
-    //! Solver's name
+    using DeprecatedSolverEigen<DeprecatedSolverDGMRESEigen<DimS, DimM>, DimS, DimM>::DeprecatedSolverEigen;
+    //! DeprecatedSolver's name
     std::string name() const override final {return "DGMRES";}
   };
 
@@ -229,14 +229,14 @@ namespace muSpectre {
    * Binding to Eigen's MINRES solver
    */
   template <Dim_t DimS, Dim_t DimM>
-  class SolverMINRESEigen:
-    public SolverEigen<SolverMINRESEigen<DimS, DimM>, DimS, DimM> {
+  class DeprecatedSolverMINRESEigen:
+    public DeprecatedSolverEigen<DeprecatedSolverMINRESEigen<DimS, DimM>, DimS, DimM> {
   public:
-    using SolverEigen<SolverMINRESEigen<DimS, DimM>, DimS, DimM>::SolverEigen;
-    //! Solver's name
+    using DeprecatedSolverEigen<DeprecatedSolverMINRESEigen<DimS, DimM>, DimS, DimM>::DeprecatedSolverEigen;
+    //! DeprecatedSolver's name
     std::string name() const override final {return "MINRES";}
   };
 
 } // muSpectre
 
-#endif /* SOLVER_EIGEN_H */
+#endif /* DEPRECATED_SOLVER_EIGEN_H */

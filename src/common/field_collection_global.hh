@@ -45,6 +45,9 @@ namespace muSpectre {
     public FieldCollectionBase<DimS, GlobalFieldCollection<DimS>>
   {
   public:
+    //! for compile time check
+    constexpr static bool Global{true};
+
     using Parent = FieldCollectionBase
       <DimS, GlobalFieldCollection<DimS>>; //!< base class
     using Ccoord = typename Parent::Ccoord; //!< cell coordinates type

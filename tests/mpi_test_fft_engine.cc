@@ -56,11 +56,11 @@ namespace muSpectre {
     constexpr static Dim_t serial_engine{serial};
     constexpr static Real box_length{4.5};
     constexpr static Dim_t sdim{Engine::sdim};
-    constexpr static Dim_t mdim{Engine::mdim};
+    constexpr static Dim_t nb_components{sdim*sdim};
     constexpr static Ccoord_t<sdim> res() {
       return CcoordOps::get_cube<sdim>(box_resolution);
     }
-    FFTW_fixture(): engine(res(), MPIContext::get_context().comm) {}
+    FFTW_fixture(): engine(res(), nb_components, MPIContext::get_context().comm) {}
     Engine engine;
   };
 
@@ -78,24 +78,20 @@ namespace muSpectre {
 
   using fixlist = boost::mpl::list<
 #ifdef WITH_FFTWMPI
-                                   FFTW_fixture<FFTWMPIEngine<  twoD,   twoD>, 3>,
-                                   FFTW_fixture<FFTWMPIEngine<  twoD, threeD>, 3>,
-                                   FFTW_fixture<FFTWMPIEngine<threeD, threeD>, 3>,
-                                   FFTW_fixture<FFTWMPIEngine<  twoD,   twoD>, 4>,
-                                   FFTW_fixture<FFTWMPIEngine<  twoD, threeD>, 4>,
-                                   FFTW_fixture<FFTWMPIEngine<threeD, threeD>, 4>,
-                                   FFTW_fixture_python_segfault<FFTWMPIEngine<twoD, twoD>>,
+                                   FFTW_fixture<FFTWMPIEngine<  twoD>, 3>,
+                                   FFTW_fixture<FFTWMPIEngine<threeD>, 3>,
+                                   FFTW_fixture<FFTWMPIEngine<  twoD>, 4>,
+                                   FFTW_fixture<FFTWMPIEngine<threeD>, 4>,
+                                   FFTW_fixture_python_segfault<FFTWMPIEngine<twoD>>,
 #endif
 #ifdef WITH_PFFT
-                                   FFTW_fixture<PFFTEngine<  twoD,   twoD>, 3>,
-                                   FFTW_fixture<PFFTEngine<  twoD, threeD>, 3>,
-                                   FFTW_fixture<PFFTEngine<threeD, threeD>, 3>,
-                                   FFTW_fixture<PFFTEngine<  twoD,   twoD>, 4>,
-                                   FFTW_fixture<PFFTEngine<  twoD, threeD>, 4>,
-                                   FFTW_fixture<PFFTEngine<threeD, threeD>, 4>,
-                                   FFTW_fixture_python_segfault<PFFTEngine<twoD, twoD>>,
+                                   FFTW_fixture<PFFTEngine<  twoD>, 3>,
+                                   FFTW_fixture<PFFTEngine<threeD>, 3>,
+                                   FFTW_fixture<PFFTEngine<  twoD>, 4>,
+                                   FFTW_fixture<PFFTEngine<threeD>, 4>,
+                                   FFTW_fixture_python_segfault<PFFTEngine<twoD>>,
 #endif
-                                   FFTW_fixture<FFTWEngine<  twoD,   twoD>, 3, true>>;
+                                   FFTW_fixture<FFTWEngine<  twoD>, 3, true>>;
 
 
   /* ---------------------------------------------------------------------- */
@@ -123,14 +119,14 @@ namespace muSpectre {
     constexpr Dim_t order{2};
     using FC_t = GlobalFieldCollection<Fix::sdim>;
     FC_t fc;
-    auto & input{make_field<TensorField<FC_t, Real, order, Fix::mdim>>("input", fc)};
-    auto & ref  {make_field<TensorField<FC_t, Real, order, Fix::mdim>>("reference", fc)};
-    auto & result{make_field<TensorField<FC_t, Real, order, Fix::mdim>>("result", fc)};
+    auto & input{make_field<TensorField<FC_t, Real, order, Fix::sdim>>("input", fc)};
+    auto & ref  {make_field<TensorField<FC_t, Real, order, Fix::sdim>>("reference", fc)};
+    auto & result{make_field<TensorField<FC_t, Real, order, Fix::sdim>>("result", fc)};
 
     fc.initialise(Fix::engine.get_subdomain_resolutions(),
                   Fix::engine.get_subdomain_locations());
 
-    using map_t = MatrixFieldMap<FC_t, Real, Fix::mdim, Fix::mdim>;
+    using map_t = MatrixFieldMap<FC_t, Real, Fix::sdim, Fix::sdim>;
     map_t inmap{input};
     auto refmap{map_t{ref}};
     auto resultmap{map_t{result}};
@@ -143,7 +139,7 @@ namespace muSpectre {
       ref_ = in_;
     }
     auto & complex_field = Fix::engine.fft(input);
-    using cmap_t = MatrixFieldMap<LocalFieldCollection<Fix::sdim>, Complex, Fix::mdim, Fix::mdim>;
+    using cmap_t = MatrixFieldMap<LocalFieldCollection<Fix::sdim>, Complex, Fix::sdim, Fix::sdim>;
     cmap_t complex_map(complex_field);
     if (Fix::engine.get_subdomain_locations() ==
         CcoordOps::get_cube<Fix::sdim>(0)) {

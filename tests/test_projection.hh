@@ -73,12 +73,12 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM, class SizeGiver, class Proj>
   struct ProjectionFixture {
-    using Engine = FFTWEngine<DimS, DimM>;
+    using Engine = FFTWEngine<DimS>;
     using Parent = Proj;
     constexpr static Dim_t sdim{DimS};
     constexpr static Dim_t mdim{DimM};
     ProjectionFixture()
-      : projector(std::make_unique<Engine>(SizeGiver::get_resolution()),
+      : projector(std::make_unique<Engine>(SizeGiver::get_resolution(), mdim*mdim),
                   SizeGiver::get_lengths()) {}
     Parent projector;
   };

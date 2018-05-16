@@ -28,10 +28,15 @@
 # =============================================================================
 
 set (solvers_SRC
+  ${CMAKE_CURRENT_SOURCE_DIR}/solver_common.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/deprecated_solver_base.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/deprecated_solver_cg.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/deprecated_solver_cg_eigen.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/deprecated_solvers.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/solver_base.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/solver_cg.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/solver_cg_eigen.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/solvers.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/solver_cg.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/solver_eigen.cc
   )
 
 target_sources(muSpectre PRIVATE ${solvers_SRC})

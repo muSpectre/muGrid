@@ -69,14 +69,14 @@ int main()
   rve.initialise();
 
   Real tol{1e-6};
-  Grad_t<dim> Del0{};
+  Eigen::MatrixXd Del0{};
   Del0 <<  0, .1,
            0,  0;
 
   Uint maxiter{31};
   Dim_t verbose{3};
 
-  SolverCG<dim> cg{rve, tol, maxiter, bool(verbose)};
+  SolverCG cg{rve, tol, maxiter, bool(verbose)};
   auto res = de_geus(rve, Del0, cg, tol, verbose);
   std::cout << res.grad.transpose() << std::endl;
   return 0;

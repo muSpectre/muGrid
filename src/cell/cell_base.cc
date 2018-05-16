@@ -59,6 +59,122 @@ namespace muSpectre {
     return *this->materials.back();
   }
 
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  auto CellBase<DimS, DimM>::get_strain_vector() -> Vector_ref {
+    return this->get_strain().eigenvec();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  auto CellBase<DimS, DimM>::get_stress_vector() const -> ConstVector_ref {
+    return this->get_stress().eigenvec();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  void CellBase<DimS, DimM>::
+  set_uniform_strain(const Eigen::Ref<const Matrix_t> & strain) {
+    this->F.get_map() = strain;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  auto CellBase<DimS, DimM>::evaluate_stress() -> ConstVector_ref {
+    if (not this->initialised) {
+      this->initialise();
+    }
+    for (auto & mat: this->materials) {
+      mat->compute_stresses(this->F, this->P, this->form);
+    }
+
+    return this->P.const_eigenvec();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  auto CellBase<DimS, DimM>::
+  evaluate_stress_tangent() -> std::array<ConstVector_ref, 2> {
+    if (not this->initialised) {
+      this->initialise();
+    }
+
+    constexpr bool create_tangent{true};
+    this->get_tangent(create_tangent);
+
+    for (auto & mat: this->materials) {
+      mat->compute_stresses_tangent(this->F, this->P, this->K.value(),
+                                    this->form);
+    }
+    const TangentField_t & k = this->K.value();
+    return std::array<ConstVector_ref, 2>{
+      this->P.const_eigenvec(), k.const_eigenvec()};
+
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  auto CellBase<DimS, DimM>::
+  evaluate_projected_directional_stiffness
+  (Eigen::Ref<const Vector_t> delF) -> Vector_ref {
+    // the following const_cast should be safe, as long as the
+    // constructed delF_field is const itself
+    const TypedField<FieldCollection_t, Real> delF_field
+      ("Proxied raw memory for strain increment",
+       *this->fields,
+       Eigen::Map<Vector_t>(const_cast<Real *>(delF.data()), delF.size()),
+       this->F.get_nb_components());
+
+    if (!this->K) {
+      throw std::runtime_error
+        ("currently only implemented for cases where a stiffness matrix "
+         "exists");
+    }
+
+    if (delF.size() != this->get_nb_dof()) {
+      std::stringstream err{};
+      err << "input should be of size ndof = ¶(" << this->subdomain_resolutions
+          << ") × " << DimS << "² = "<< this->get_nb_dof() << " but I got "
+          << delF.size();
+      throw std::runtime_error(err.str());
+    }
+
+    const std::string out_name{"δP; temp output for directional stiffness"};
+    auto & delP = this->get_managed_field(out_name);
+
+    auto Kmap{this->K.value().get().get_map()};
+    auto delPmap{delP.get_map()};
+    MatrixFieldMap<FieldCollection_t, Real, DimM, DimM, true> delFmap(delF_field);
+
+    for (auto && tup:
+           akantu::zip(Kmap, delFmap, delPmap)) {
+      auto & k = std::get<0>(tup);
+      auto & df = std::get<1>(tup);
+      auto & dp = std::get<2>(tup);
+      dp = Matrices::tensmult(k, df);
+    }
+
+    return Vector_ref(this->project(delP).data(), this->get_nb_dof());
+
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  std::array<Dim_t, 2> CellBase<DimS, DimM>::get_strain_shape() const {
+    return this->projection->get_strain_shape();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  void CellBase<DimS, DimM>::apply_projection(Eigen::Ref<Vector_t> vec) {
+    TypedField<FieldCollection_t, Real> field("Proxy for projection",
+                                              *this->fields,
+                                              vec,
+                                              this->F.get_nb_components());
+    this->projection->apply_projection(field);
+  }
+
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   typename CellBase<DimS, DimM>::FullResponse_t
@@ -84,8 +200,8 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   typename CellBase<DimS, DimM>::StressField_t &
   CellBase<DimS, DimM>::directional_stiffness(const TangentField_t &K,
-                                                const StrainField_t &delF,
-                                                StressField_t &delP) {
+                                              const StrainField_t &delF,
+                                              StressField_t &delP) {
     for (auto && tup:
            akantu::zip(K.get_map(), delF.get_map(), delP.get_map())){
       auto & k = std::get<0>(tup);
@@ -98,17 +214,17 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  typename CellBase<DimS, DimM>::SolvVectorOut
-  CellBase<DimS, DimM>::directional_stiffness_vec(const SolvVectorIn &delF) {
+  typename CellBase<DimS, DimM>::Vector_ref
+  CellBase<DimS, DimM>::directional_stiffness_vec(const Eigen::Ref<const Vector_t> &delF) {
     if (!this->K) {
       throw std::runtime_error
         ("currently only implemented for cases where a stiffness matrix "
          "exists");
     }
-    if (delF.size() != this->nb_dof()) {
+    if (delF.size() != this->get_nb_dof()) {
       std::stringstream err{};
       err << "input should be of size ndof = ¶(" << this->subdomain_resolutions
-          << ") × " << DimS << "² = "<< this->nb_dof() << " but I got "
+          << ") × " << DimS << "² = "<< this->get_nb_dof() << " but I got "
           << delF.size();
       throw std::runtime_error(err.str());
     }
@@ -117,10 +233,10 @@ namespace muSpectre {
 
     auto & out_tempref = this->get_managed_field(out_name);
     auto & in_tempref = this->get_managed_field(in_name);
-    SolvVectorOut(in_tempref.data(), this->nb_dof()) = delF;
+    Vector_ref(in_tempref.data(), this->get_nb_dof()) = delF;
 
     this->directional_stiffness(this->K.value(), in_tempref, out_tempref);
-    return SolvVectorOut(out_tempref.data(), this->nb_dof());
+    return Vector_ref(out_tempref.data(), this->get_nb_dof());
 
   }
 
@@ -201,19 +317,14 @@ namespace muSpectre {
   void CellBase<DimS, DimM>::initialise(FFT_PlanFlags flags) {
     // check that all pixels have been assigned exactly one material
     this->check_material_coverage();
+    for (auto && mat: this->materials) {
+      mat->initialise();
+    }
     // resize all global fields (strain, stress, etc)
     this->fields->initialise(this->subdomain_resolutions, this->subdomain_locations);
     // initialise the projection and compute the fft plan
     this->projection->initialise(flags);
     this->initialised = true;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void CellBase<DimS, DimM>::initialise_materials(bool stiffness) {
-    for (auto && mat: this->materials) {
-      mat->initialise(stiffness);
-    }
   }
 
   /* ---------------------------------------------------------------------- */
@@ -240,8 +351,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  CellAdaptor<CellBase<DimS, DimM>>
-  CellBase<DimS, DimM>::get_adaptor() {
+  auto CellBase<DimS, DimM>::get_adaptor() -> Adaptor {
     return Adaptor(*this);
   }
 

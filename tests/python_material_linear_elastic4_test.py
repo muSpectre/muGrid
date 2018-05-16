@@ -49,6 +49,7 @@ class MaterialLinearElastic4_Check(unittest.TestCase):
         self.sys = µ.Cell(self.resolution,
                           self.lengths,
                           self.formulation)
+        self.dim = len (self.lengths)
         self.mat = µ.material.MaterialLinearElastic4_2d.make(
             self.sys, "material")
 
@@ -64,7 +65,7 @@ class MaterialLinearElastic4_Check(unittest.TestCase):
         Del0 = np.array([[0, 0.025],
                          [0.025,  0]])
         maxiter = 100
-        verbose = 1
+        verbose = False
 
         solver=µ.solvers.SolverCG(self.sys, tol, maxiter, verbose)
         r = µ.solvers.newton_cg(self.sys, Del0,
@@ -74,4 +75,5 @@ class MaterialLinearElastic4_Check(unittest.TestCase):
         mu = (Youngs_modulus/(2*(1+Poisson_ratio)))
         stress = 2*mu*Del0
 
-        self.assertLess(np.linalg.norm(r.stress-stress.reshape(-1,1)), 1e-8)
+        self.assertLess(np.linalg.norm(r.stress.reshape(-1, self.dim**2) -
+                                       stress.reshape(1,self.dim**2)), 1e-8)

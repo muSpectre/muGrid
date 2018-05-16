@@ -1,15 +1,17 @@
 /**
- * @file   solver_cg.hh
+ * file   solver_cg.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
- * @date   20 Dec 2017
+ * @date   24 Apr 2018
  *
- * @brief class for a simple implementation of a conjugate gradient
- *        solver. This follows algorithm 5.2 in Nocedal's Numerical
- *        Optimization (p 112)
+ * @brief  class fo a simple implementation of a conjugate gradient solver.
+ *         This follows algorithm 5.2 in Nocedal's Numerical Optimization
+ *         (p 112)
  *
- * Copyright © 2017 Till Junge
+ * @section LICENSE
+ *
+ * Copyright © 2018 Till Junge
  *
  * µSpectre is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -31,10 +33,6 @@
 #define SOLVER_CG_H
 
 #include "solver/solver_base.hh"
-#include "common/communicator.hh"
-#include "common/field.hh"
-
-#include <functional>
 
 namespace muSpectre {
 
@@ -45,35 +43,30 @@ namespace muSpectre {
    * production runs, it is probably better to use
    * `muSpectre::SolverCGEigen`.
    */
-  template <Dim_t DimS, Dim_t DimM=DimS>
-  class SolverCG: public SolverBase<DimS, DimM>
+  class SolverCG: public SolverBase
   {
   public:
-    using Parent = SolverBase<DimS, DimM>; //!< base class
+    using Parent = SolverBase; //!< standard short-hand for base class
+    //! for storage of fields
+    using Vector_t = Parent::Vector_t;
     //! Input vector for solvers
-    using SolvVectorIn = typename Parent::SolvVectorIn;
+    using Vector_ref = Parent::Vector_ref;
     //! Input vector for solvers
-    using SolvVectorInC = typename Parent::SolvVectorInC;
+    using ConstVector_ref = Parent::ConstVector_ref;
     //! Output vector for solvers
-    using SolvVectorOut = typename Parent::SolvVectorOut;
-    using Cell_t = typename Parent::Cell_t; //!< cell type
-    using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
-    //! kind of tangent that is required
-    using Tg_req_t = typename Parent::TangentRequirement;
-    //! cg only needs to handle fields that look like strain and stress
-    using Field_t = TensorField<
-      typename Parent::Collection_t, Real, secondOrder, DimM>;
+    using Vector_map = Parent::Vector_map;
 
-    //! conjugate gradient needs directional stiffness
-    constexpr static Tg_req_t tangent_requirement{Tg_req_t::NeedEffect};
     //! Default constructor
     SolverCG() = delete;
 
-    //! Constructor with domain resolutions, etc,
-    SolverCG(Cell_t& cell, Real tol, Uint maxiter=0, bool verbose=false);
-
     //! Copy constructor
     SolverCG(const SolverCG &other) = delete;
+
+    /**
+     * Constructor takes a Cell, tolerance, max number of iterations
+     * and verbosity flag as input
+     */
+    SolverCG(Cell & cell, Real tol, Uint maxiter, bool verbose=false);
 
     //! Move constructor
     SolverCG(SolverCG &&other) = default;
@@ -87,25 +80,23 @@ namespace muSpectre {
     //! Move assignment operator
     SolverCG& operator=(SolverCG &&other) = default;
 
-    bool has_converged() const override final {return this->converged;}
+    //! initialisation does not need to do anything in this case
+    void initialise() override final {};
 
-    //! actual solver
-    void solve(const Field_t & rhs,
-               Field_t & x);
+    //! returns the solver's name
+    std::string get_name() const override final {return "CG";}
 
-    // this simplistic implementation has no initialisation phase so the default is ok
+    //! the actual solver
+    Vector_map solve(const ConstVector_ref rhs) override final;
 
-    SolvVectorOut solve(const SolvVectorInC rhs, SolvVectorIn x_0) override final;
+    
 
-    std::string name() const override final {return "CG";}
 
   protected:
-    //! returns `muSpectre::Tg_req_t::NeedEffect`
-    Tg_req_t get_tangent_req() const override final;
-    Field_t & r_k;  //!< residual
-    Field_t & p_k;  //!< search direction
-    Field_t & Ap_k; //!< effect of tangent on search direction
-    bool converged{false}; //!< whether the solver has converged
+    Vector_t r_k;  //!< residual
+    Vector_t p_k;  //!< search direction
+    Vector_t Ap_k; //!< directional stiffness
+    Vector_t x_k;  //!< current solution
   private:
   };
 

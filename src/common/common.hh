@@ -140,9 +140,38 @@ namespace muSpectre {
 
   //! continuum mechanics flags
   enum class Formulation{
-    finite_strain, //!< causes evaluation in PK1(F)
-    small_strain   //!< causes evaluation in   σ(ε)
+    finite_strain,   //!< causes evaluation in PK1(F)
+    small_strain,    //!< causes evaluation in   σ(ε)
+    small_strain_sym //!< symmetric storage as vector ε
   };
+
+  /**
+   * compile time computation of voigt vector
+   */
+  template<bool sym=true>
+  constexpr Dim_t vsize(Dim_t dim) {
+    if (sym) {
+      return (dim * (dim - 1) / 2 + dim);
+    } else {
+      return dim*dim;
+    }
+  }
+
+  //! compute the number of degrees of freedom to store for the strain
+  //! tenor given dimension dim
+  constexpr Dim_t dof_for_formulation(const Formulation form,
+                                      const Dim_t dim) {
+    switch (form) {
+    case Formulation::small_strain_sym: {
+      return vsize(dim);
+      break;
+    }
+    default:
+      return ipow(dim, 2);
+      break;
+    }
+  }
+
   //! inserts `muSpectre::Formulation`s into `std::ostream`s
   std::ostream & operator<<(std::ostream & os, Formulation f);
 

@@ -39,18 +39,6 @@
 namespace muSpectre {
 
   /**
-   * compile time computation of voigt vector
-   */
-  template<bool sym=true>
-  constexpr Dim_t vsize(Dim_t dim) {
-    if (sym) {
-      return (dim * (dim - 1) / 2 + dim);
-    } else {
-      return dim*dim;
-    }
-  }
-
-  /**
    * implements a bunch of static functions to convert between full
    * and Voigt notation of tensors
    */

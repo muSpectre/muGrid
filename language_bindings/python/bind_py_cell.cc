@@ -91,12 +91,12 @@ void add_cell_factory_helper(py::module & mod) {
      "formulation"_a=Formulation::finite_strain);
 
 #ifdef WITH_FFTWMPI
-  add_parallel_cell_factory_helper<dim, FFTWMPIEngine<dim, dim>>(
+  add_parallel_cell_factory_helper<dim, FFTWMPIEngine<dim>>(
     mod, "FFTWMPICellFactory");
 #endif
 
 #ifdef WITH_PFFT
-  add_parallel_cell_factory_helper<dim, PFFTEngine<dim, dim>>(
+  add_parallel_cell_factory_helper<dim, PFFTEngine<dim>>(
     mod, "PFFTCellFactory");
 #endif
 }
@@ -115,7 +115,7 @@ void add_cell_base_helper(py::module & mod) {
   name_stream << "CellBase" << dim << 'd';
   const std::string name = name_stream.str();
   using sys_t = CellBase<dim, dim>;
-  py::class_<sys_t>(mod, name.c_str())
+  py::class_<sys_t, Cell>(mod, name.c_str())
     .def("__len__", &sys_t::size)
     .def("__iter__", [](sys_t & s) {
         return py::make_iterator(s.begin(), s.end());
@@ -196,6 +196,7 @@ void add_cell_base_helper(py::module & mod) {
 }
 
 void add_cell_base(py::module & mod) {
+  py::class_<Cell>(mod, "Cell");
   add_cell_base_helper<twoD>  (mod);
   add_cell_base_helper<threeD>(mod);
 }
@@ -205,9 +206,5 @@ void add_cell(py::module & mod) {
 
   auto cell{mod.def_submodule("cell")};
   cell.doc() = "bindings for cells and cell factories";
- 
-  cell.def("scale_by_2", [](py::EigenDRef<Eigen::ArrayXXd>& v) {
-      v *= 2;
-    });
   add_cell_base(cell);
 }

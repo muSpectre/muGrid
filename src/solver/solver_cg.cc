@@ -1,13 +1,15 @@
 /**
- * @file   solver_cg.cc
+ * file   solver_cg.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
- * @date   20 Dec 2017
+ * @date   24 Apr 2018
  *
- * @brief  Implementation of cg solver
+ * @brief  implements SolverCG
  *
- * Copyright © 2017 Till Junge
+ * @section LICENSE
+ *
+ * Copyright © 2018 Till Junge
  *
  * µSpectre is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -26,54 +28,40 @@
  */
 
 #include "solver/solver_cg.hh"
-#include "solver/solver_error.hh"
+#include "common/communicator.hh"
 
 #include <iomanip>
-#include <cmath>
 #include <sstream>
+
 
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  SolverCG<DimS, DimM>::SolverCG(Cell_t& cell, Real tol, Uint maxiter,
-                                 bool verbose)
-    :Parent(cell, tol, maxiter, verbose),
-     r_k{make_field<Field_t>("residual r_k", this->collection)},
-     p_k{make_field<Field_t>("search direction r_k", this->collection)},
-     Ap_k{make_field<Field_t>("Effect of tangent A*p_k", this->collection)}
+  SolverCG::SolverCG(Cell & cell, Real tol, Uint maxiter, bool verbose):
+    Parent(cell, tol, maxiter, verbose),
+    r_k(cell.get_nb_dof()),
+    p_k(cell.get_nb_dof()),
+    Ap_k(cell.get_nb_dof()),
+    x_k(cell.get_nb_dof())
   {}
 
-
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void SolverCG<DimS, DimM>::solve(const Field_t & rhs,
-                                   Field_t & x_f) {
-    x_f.eigenvec() = this->solve(rhs.eigenvec(), x_f.eigenvec());
-  };
-
-  //----------------------------------------------------------------------------//
-  template <Dim_t DimS, Dim_t DimM>
-  typename SolverCG<DimS, DimM>::SolvVectorOut
-  SolverCG<DimS, DimM>::solve(const SolvVectorInC rhs, SolvVectorIn x_0) {
+  auto SolverCG::solve(const ConstVector_ref rhs) -> Vector_map {
+    this->x_k.setZero();
     const Communicator & comm = this->cell.get_communicator();
-    // Following implementation of algorithm 5.2 in Nocedal's Numerical Optimization (p. 112)
 
-    auto r = this->r_k.eigen();
-    auto p = this->p_k.eigen();
-    auto Ap = this->Ap_k.eigen();
-    typename Field_t::EigenMap x(x_0.data(), r.rows(), r.cols());
+    // Following implementation of algorithm 5.2 in Nocedal's
+    // Numerical Optimization (p. 112)
 
-    // initialisation of algo
-    r = this->cell.directional_stiffness_with_copy(x);
-
-    r -= typename Field_t::ConstEigenMap(rhs.data(), r.rows(), r.cols());
-    p = -r;
-
+    //initialisation of algorithm
+    this->r_k = (this->cell.evaluate_projected_directional_stiffness(this->x_k)
+                 - rhs);
+    this->p_k = -this->r_k;
     this->converged = false;
-    Real rdr = comm.sum((r*r).sum());
+
+    Real rdr = comm.sum(this->r_k.dot(this->r_k));
     Real rhs_norm2 = comm.sum(rhs.squaredNorm());
-    Real tol2 = ipow(this->tol,2)*rhs_norm2;
+    Real tol2 = ipow(this->tol, 2) * rhs_norm2;
 
     size_t count_width{}; // for output formatting in verbose case
     if (this->verbose) {
@@ -83,14 +71,14 @@ namespace muSpectre {
     for (Uint i = 0;
          i < this->maxiter && (rdr > tol2 || i == 0);
          ++i, ++this->counter) {
-      Ap = this->cell.directional_stiffness_with_copy(p);
+      this->Ap_k = this->cell.evaluate_projected_directional_stiffness(this->p_k);
 
-      Real alpha = rdr/comm.sum((p*Ap).sum());
+      Real alpha = rdr/comm.sum(this->p_k.dot(this->Ap_k));
 
-      x += alpha * p;
-      r += alpha * Ap;
+      this->x_k += alpha * this->p_k;
+      this->r_k += alpha * this->Ap_k;
 
-      Real new_rdr = comm.sum((r*r).sum());
+      Real new_rdr = comm.sum(this->r_k.dot(this->r_k));
       Real beta = new_rdr/rdr;
       rdr = new_rdr;
 
@@ -100,30 +88,22 @@ namespace muSpectre {
                   << ", cg_tol = " << this->tol << std::endl;
       }
 
-      p = -r+beta*p;
+      this->p_k = - this->r_k + beta * this->p_k;
     }
+
     if (rdr < tol2) {
-      this->converged=true;
+      this->converged = true;
     } else {
-      std::stringstream err {};
+      std::stringstream err{};
       err << " After " << this->counter << " steps, the solver "
           << " FAILED with  |r|/|b| = "
           << std::setw(15) << std::sqrt(rdr/rhs_norm2)
           << ", cg_tol = " << this->tol << std::endl;
       throw ConvergenceError("Conjugate gradient has not converged." + err.str());
     }
-    return x_0;
+    return Vector_map(this->x_k.data(), this->x_k.size());
   }
 
 
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  typename SolverCG<DimS, DimM>::Tg_req_t
-  SolverCG<DimS, DimM>::get_tangent_req() const {
-    return tangent_requirement;
-  }
 
-  template class SolverCG<twoD, twoD>;
-  //template class SolverCG<twoD, threeD>;
-  template class SolverCG<threeD, threeD>;
 }  // muSpectre

@@ -28,7 +28,7 @@
 #include "common/common.hh"
 #include "solver/solvers.hh"
 #include "solver/solver_cg.hh"
-#include "solver/solver_cg_eigen.hh"
+#include "solver/solver_eigen.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -42,60 +42,41 @@ using namespace pybind11::literals;
  * Solvers instanciated for cells with equal spatial and material dimension
  */
 
-template <Dim_t sdim, class Solver>
-void add_iterative_solver_helper(py::module & mod, std::string name_start) {
-  using sys = CellBase<sdim>;
-  std::stringstream name{};
-  name << name_start << '_' << sdim << 'd';
-  py::class_<Solver, typename Solver::Parent>(mod, name.str().c_str())
-    .def(py::init<sys&, Real, Uint, bool>(),
+template <class Solver>
+void add_iterative_solver_helper(py::module & mod, std::string name) {
+  py::class_<Solver, typename Solver::Parent>(mod, name.c_str())
+    .def(py::init<Cell&, Real, Uint, bool>(),
          "cell"_a,
          "tol"_a,
          "maxiter"_a,
          "verbose"_a=false)
-    .def("name", &Solver::name);
-  mod.def(name_start.c_str(),
-          [](sys& cell, Real tol, Uint maxiter, bool verbose) {
-            return std::make_unique<Solver>(cell, tol, maxiter, verbose);
-          },
-          "cell"_a,
-          "tol"_a,
-          "maxiter"_a,
-          "verbose"_a=false);
-}
-
-template <Dim_t sdim>
-void add_iterative_solver_dispatcher(py::module & mod) {
-  std::stringstream name{};
-  name << "SolverBase_" << sdim << 'd';
-  py::class_<SolverBase<sdim>>(mod, name.str().c_str());
-  add_iterative_solver_helper<sdim, SolverCG<sdim>>(mod, "SolverCG");
-  add_iterative_solver_helper<sdim, SolverCGEigen<sdim>>(mod, "SolverCGEigen");
-  add_iterative_solver_helper<sdim, SolverGMRESEigen<sdim>>(mod, "SolverGMRESEigen");
-  add_iterative_solver_helper<sdim, SolverBiCGSTABEigen<sdim>>(mod, "SolverBiCGSTABEigen");
-  add_iterative_solver_helper<sdim, SolverDGMRESEigen<sdim>>(mod, "SolverDGMRESEigen");
-  add_iterative_solver_helper<sdim, SolverMINRESEigen<sdim>>(mod, "SolverMINRESEigen");
+    .def("name", &Solver::get_name);
 }
 
 void add_iterative_solver(py::module & mod) {
-  add_iterative_solver_dispatcher<  twoD>(mod);
-  add_iterative_solver_dispatcher<threeD>(mod);
+  std::stringstream name{};
+  name << "SolverBase";
+  py::class_<SolverBase>(mod, name.str().c_str());
+  add_iterative_solver_helper<SolverCG>(mod, "SolverCG");
+  add_iterative_solver_helper<SolverCGEigen>(mod, "SolverCGEigen");
+  add_iterative_solver_helper<SolverGMRESEigen>(mod, "SolverGMRESEigen");
+  add_iterative_solver_helper<SolverBiCGSTABEigen>(mod, "SolverBiCGSTABEigen");
+  add_iterative_solver_helper<SolverDGMRESEigen>(mod, "SolverDGMRESEigen");
+  add_iterative_solver_helper<SolverMINRESEigen>(mod, "SolverMINRESEigen");
 }
 
-template <Dim_t sdim>
 void add_newton_cg_helper(py::module & mod) {
 
   const char name []{"newton_cg"};
-  constexpr Dim_t mdim{sdim};
-  using sys = CellBase<sdim, mdim>;
-  using solver = SolverBase<sdim, mdim>;
-  using grad = Grad_t<sdim>;
-  using grad_vec = GradIncrements<sdim>;
+  using solver = SolverBase;
+  using grad = py::EigenDRef<Eigen::MatrixXd>;
+  using grad_vec = LoadSteps_t;
 
   mod.def(name,
-          [](sys & s, const grad & g, solver & so, Real nt,
+          [](Cell & s, const grad & g, solver & so, Real nt,
              Real eqt, Dim_t verb) -> OptimizeResult {
-            return newton_cg(s, g, so, nt, eqt, verb);
+            Eigen::MatrixXd tmp{g};
+            return newton_cg(s, tmp, so, nt, eqt, verb);
 
           },
           "cell"_a,
@@ -105,7 +86,7 @@ void add_newton_cg_helper(py::module & mod) {
           "equil_tol"_a,
           "verbose"_a=0);
   mod.def(name,
-          [](sys & s, const grad_vec & g, solver & so, Real nt,
+          [](Cell & s, const grad_vec & g, solver & so, Real nt,
              Real eqt, Dim_t verb) -> std::vector<OptimizeResult> {
             return newton_cg(s, g, so, nt, eqt, verb);
           },
@@ -117,19 +98,17 @@ void add_newton_cg_helper(py::module & mod) {
           "verbose"_a=0);
 }
 
-template <Dim_t sdim>
 void add_de_geus_helper(py::module & mod) {
   const char name []{"de_geus"};
-  constexpr Dim_t mdim{sdim};
-  using sys = CellBase<sdim, mdim>;
-  using solver = SolverBase<sdim, mdim>;
-  using grad = Grad_t<sdim>;
-  using grad_vec = GradIncrements<sdim>;
+  using solver = SolverBase;
+  using grad = py::EigenDRef<Eigen::MatrixXd>;
+  using grad_vec = LoadSteps_t;
 
   mod.def(name,
-          [](sys & s, const grad & g, solver & so, Real nt,
+          [](Cell & s, const grad & g, solver & so, Real nt,
              Real eqt, Dim_t verb) -> OptimizeResult {
-            return de_geus(s, g, so, nt, eqt, verb);
+            Eigen::MatrixXd tmp{g};
+            return de_geus(s, tmp, so, nt, eqt, verb);
 
           },
           "cell"_a,
@@ -139,7 +118,7 @@ void add_de_geus_helper(py::module & mod) {
           "equilibrium_tol"_a,
           "verbose"_a=0);
   mod.def(name,
-          [](sys & s, const grad_vec & g, solver & so, Real nt,
+          [](Cell & s, const grad_vec & g, solver & so, Real nt,
              Real eqt, Dim_t verb) -> std::vector<OptimizeResult> {
             return de_geus(s, g, so, nt, eqt, verb);
           },
@@ -151,10 +130,9 @@ void add_de_geus_helper(py::module & mod) {
           "verbose"_a=0);
 }
 
-template <Dim_t dim>
 void add_solver_helper(py::module & mod) {
-  add_newton_cg_helper<dim>(mod);
-  add_de_geus_helper  <dim>(mod);
+  add_newton_cg_helper(mod);
+  add_de_geus_helper  (mod);
 }
 
 void add_solvers(py::module & mod) {
@@ -172,6 +150,5 @@ void add_solvers(py::module & mod) {
 
   add_iterative_solver(solvers);
 
-  add_solver_helper<twoD  >(solvers);
-  add_solver_helper<threeD>(solvers);
+  add_solver_helper(solvers);
 }

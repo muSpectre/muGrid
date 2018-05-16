@@ -26,7 +26,7 @@
  * Boston, MA 02111-1307, USA.
  */
 #include <Eigen/Dense>
-#include "test_field_collections_header.hh"
+#include "test_field_collections.hh"
 #include "tests/test_goodies.hh"
 #include "common/tensor_algebra.hh"
 
@@ -35,6 +35,7 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE(field_collection_tests);
 
+  /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(assignment_test, Fix, iter_collections, Fix) {
     auto t4map = Fix::t4_field.get_map();
     auto t2map = Fix::t2_field.get_map();
@@ -59,6 +60,7 @@ namespace muSpectre {
     BOOST_CHECK_EQUAL((m2map[rnd.randval(0, nb_pts-1)] - m2map_val).norm(), 0.);
   }
 
+  /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(Eigentest, Fix, iter_collections, Fix) {
     auto t4eigen = Fix::t4_field.eigen();
     auto t2eigen = Fix::t2_field.eigen();
@@ -74,7 +76,65 @@ namespace muSpectre {
 
     BOOST_CHECK_EQUAL((Fix::t2_field.get_map()[0] - test_mat).norm(), 0.);
 
+  }
 
+  /* ---------------------------------------------------------------------- */
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(field_proxy_test, Fix, iter_collections,
+                                   Fix) {
+    Eigen::VectorXd t4values{Fix::t4_field.eigenvec()};
+
+    using FieldProxy_t = TypedField<typename Fix::FC_t, Real>;
+
+    //! create a field proxy
+    FieldProxy_t proxy("proxy to 'Tensorfield Real o4'",
+                       Fix::fc, t4values,
+                       Fix::t4_field.get_nb_components());
+
+    Eigen::VectorXd wrong_size_not_multiple{
+      Eigen::VectorXd::Zero(t4values.size()+1)};
+    BOOST_CHECK_THROW(FieldProxy_t("size not a multiple of nb_components",
+                                   Fix::fc, wrong_size_not_multiple,
+                                   Fix::t4_field.get_nb_components()),
+                      FieldError);
+
+    Eigen::VectorXd wrong_size_but_multiple{
+      Eigen::VectorXd::Zero(t4values.size()+
+                            Fix::t4_field.get_nb_components())};
+    BOOST_CHECK_THROW(FieldProxy_t("size wrong multiple of nb_components",
+                                   Fix::fc, wrong_size_but_multiple,
+                                   Fix::t4_field.get_nb_components()),
+                      FieldError);
+
+    using Tensor4Map = T4MatrixFieldMap<typename Fix::FC_t, Real, Fix::Parent::mdim()>;
+    Tensor4Map ref_map{Fix::t4_field};
+    Tensor4Map proxy_map{proxy};
+
+    for (auto tup: akantu::zip(ref_map, proxy_map)) {
+      auto & ref = std::get<0>(tup);
+      auto & prox = std::get<1>(tup);
+      BOOST_CHECK_EQUAL((ref-prox).norm(), 0);
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(field_proxy_of_existing_field, Fix, iter_collections, Fix ) {
+    Eigen::Ref<Eigen::VectorXd> t4values{Fix::t4_field.eigenvec()};
+    using FieldProxy_t = TypedField<typename Fix::FC_t, Real>;
+
+    //! create a field proxy
+    FieldProxy_t proxy("proxy to 'Tensorfield Real o4'",
+                       Fix::fc, t4values,
+                       Fix::t4_field.get_nb_components());
+
+    using Tensor4Map = T4MatrixFieldMap<typename Fix::FC_t, Real, Fix::Parent::mdim()>;
+    Tensor4Map ref_map{Fix::t4_field};
+    Tensor4Map proxy_map{proxy};
+    for (auto tup: akantu::zip(ref_map, proxy_map)) {
+      auto & ref = std::get<0>(tup);
+      auto & prox = std::get<1>(tup);
+      prox += prox.Identity();
+      BOOST_CHECK_EQUAL((ref-prox).norm(), 0);
+    }
   }
 
   BOOST_AUTO_TEST_SUITE_END();

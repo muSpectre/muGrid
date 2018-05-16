@@ -26,7 +26,7 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include "test_field_collections_header.hh"
+#include "test_field_collections.hh"
 namespace muSpectre {
   BOOST_AUTO_TEST_SUITE(field_collection_tests);
 
@@ -42,9 +42,15 @@ namespace muSpectre {
     using Tensor2Map = TensorFieldMap<FC_t, Real, matrix_order, F::Parent::mdim()>;
     using MSqMap = MatrixFieldMap<FC_t, Real, F::Parent::mdim(), F::Parent::mdim()>;
     using ASqMap =  ArrayFieldMap<FC_t, Real, F::Parent::mdim(), F::Parent::mdim()>;
+    using A2Map = ArrayFieldMap<FC_t, Real, 3, 4>;
+    using WrongMap = ArrayFieldMap<FC_t, Real, 7, 4>;
     Tensor2Map T2map{F::fc["Tensorfield Real o2"]};
     MSqMap Mmap{F::fc["Tensorfield Real o2"]};
     ASqMap Amap{F::fc["Tensorfield Real o2"]};
+    A2Map DynMap{F::fc["Dynamically sized Field"]};
+    auto & fc_ref{F::fc};
+    BOOST_CHECK_THROW(WrongMap{fc_ref["Dynamically sized Field"]},
+                      FieldInterpretationError);
     auto t2_it = T2map.begin();
     auto t2_it_end = T2map.end();
     auto m_it = Mmap.begin();
@@ -56,13 +62,28 @@ namespace muSpectre {
       BOOST_CHECK(comp);
     }
 
+    size_t counter{0};
+    for (auto val: DynMap) {
+      ++counter;
+      val += val.Ones()*counter;
+    }
+
+    counter = 0;
+    for (auto val: DynMap) {
+      ++counter;
+      val -= val.Ones()*counter;
+      auto error {val.matrix().norm()};
+      BOOST_CHECK_LT(error, tol);
+    }
+
+
     using ScalarMap = ScalarFieldMap<FC_t, Int>;
     ScalarMap s_map{F::fc["integer Scalar"]};
     for (Uint i = 0; i < s_map.size(); ++i) {
       s_map[i] = i;
     }
-    Uint counter{0};
 
+    counter = 0;
     for (const auto& val: s_map) {
       BOOST_CHECK_EQUAL(counter++, val);
     }
