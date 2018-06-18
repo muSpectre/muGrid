@@ -1,5 +1,6 @@
 pipeline {
     parameters {string(defaultValue: '', description: 'api-token', name: 'API_TOKEN')
+                string(defaultValue: '', description: 'Token for readthedocs', name: 'RTD_TOKEN')
 	            string(defaultValue: '', description: 'buildable phid', name: 'TARGET_PHID')
 	            string(defaultValue: 'docker_debian_testing', description: 'docker file to use', name: 'DOCKERFILE')
                 string(defaultValue: '', description: 'Commit id', name: 'COMMIT_ID')
@@ -138,6 +139,7 @@ pipeline {
         }
 	    success {
             send_fail_pass('pass')
+            trigger_readthedocs()
         }
 
 	    failure {
@@ -178,6 +180,20 @@ curl https://c4science.ch/api/harbormaster.sendmessage \
 -d api.token=${API_TOKEN} \
 -d buildTargetPHID=${TARGET_PHID} \
 -d type=${state}
+"""
+}
+
+def trigger_readthedocs() {
+    sh """ 
+set +x
+curl -X POST \
+-d "token=${RTD_TOKEN}" \
+-d "branches=master" \
+https://readthedocs.org/api/v2/webhook/muspectre/26537/
+
+curl -X POST \
+-d "token=${RTD_TOKEN}" \
+https://readthedocs.org/api/v2/webhook/muspectre/26537/
 """
 }
 
