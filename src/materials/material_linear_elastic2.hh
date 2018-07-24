@@ -171,18 +171,18 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   template <class s_t, class eigen_s_t>
-  decltype(auto)
+  auto
   MaterialLinearElastic2<DimS, DimM>::
-  evaluate_stress(s_t && E, eigen_s_t && E_eig) {
+  evaluate_stress(s_t && E, eigen_s_t && E_eig) -> decltype(auto) {
     return this->material.evaluate_stress(E-E_eig);
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   template <class s_t, class eigen_s_t>
-  decltype(auto)
+  auto
   MaterialLinearElastic2<DimS, DimM>::
-  evaluate_stress_tangent(s_t && E, eigen_s_t && E_eig) {
+  evaluate_stress_tangent(s_t && E, eigen_s_t && E_eig) -> decltype(auto) {
     // using mat = Eigen::Matrix<Real, DimM, DimM>;
     // mat ecopy{E};
     // mat eig_copy{E_eig};

@@ -137,6 +137,15 @@ namespace muSpectre {
     }
   }
 
+  /* ---------------------------------------------------------------------- */
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(typed_field_getter, Fix,
+                                   mult_collections, Fix) {
+    constexpr auto mdim{Fix::mdim()};
+    auto & fc{Fix::fc};
+    auto & field = fc.template get_typed_field<Real>("Tensorfield Real o4");
+    BOOST_CHECK_EQUAL(field.get_nb_components(), ipow(mdim, fourthOrder));
+  }
+
   BOOST_AUTO_TEST_SUITE_END();
 
 

@@ -8,8 +8,6 @@
  * @brief  Typed Field for dynamically sized fields and base class for fields 
  *         of tensors, matrices, etc
  *
- * @section LICENSE
- *
  * Copyright © 2018 Till Junge
  *
  * µSpectre is free software; you can redistribute it and/or
@@ -54,16 +52,19 @@ namespace muSpectre {
     using Base = Parent; //!< for uniformity of interface
     //! Plain Eigen type to map
     using EigenRep_t = Eigen::Array<T, Eigen::Dynamic, Eigen::Dynamic>;
-    //! map returned when iterating over field
+    using EigenVecRep_t = Eigen::Matrix<T, Eigen::Dynamic, 1>;
+    //! map returned when accessing entire field
     using EigenMap_t = Eigen::Map<EigenRep_t>;
+    //! map returned when accessing entire const field
+    using EigenMapConst_t = Eigen::Map<const EigenRep_t>;
     //! Plain eigen vector to map
-    using EigenVec_t = Eigen::Map<Eigen::VectorXd>;
-    //! vector map returned when iterating over field
-    using EigenVecConst_t = Eigen::Map<const Eigen::VectorXd>;
+    using EigenVec_t = Eigen::Map<EigenVecRep_t>;
+    //! vector map returned when accessing entire field
+    using EigenVecConst_t = Eigen::Map<const EigenVecRep_t>;
 
     /**
      * type stored (unfortunately, we can't statically size the second
-     * dimension due to an Eigen bug,i.e., creating a row vector
+     * dimension due to an Eigen bug, i.e., creating a row vector
      * reference to a column vector does not raise an error :(
      */
     using Stored_t = Eigen::Array<T, Eigen::Dynamic, Eigen::Dynamic>;
@@ -127,12 +128,16 @@ namespace muSpectre {
 
     //! return a map representing the entire field as a single `Eigen::Array`
     EigenMap_t eigen();
+    //! return a map representing the entire field as a single `Eigen::Array`
+    EigenMapConst_t eigen() const ;
     //! return a map representing the entire field as a single Eigen vector
     EigenVec_t eigenvec();
     //! return a map representing the entire field as a single Eigen vector
     EigenVecConst_t eigenvec() const;
     //! return a map representing the entire field as a single Eigen vector
     EigenVecConst_t const_eigenvec() const;
+
+    
 
   protected:
     //! returns a raw pointer to the entry, for `Eigen::Map`
@@ -231,14 +236,24 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <class FieldCollection, typename T>
+  auto TypedField<FieldCollection, T>::eigen() const -> EigenMapConst_t {
+    return EigenMapConst_t(this->data(), this->get_nb_components(), this->size());
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <class FieldCollection, typename T>
   auto TypedField<FieldCollection, T>::eigenvec() -> EigenVec_t {
-    return EigenVec_t(this->data(), this->get_nb_components() * this->size());
+    return EigenVec_t(this->data(),
+                      this->get_nb_components() * this->size(),
+                      1);
   }
 
   /* ---------------------------------------------------------------------- */
   template <class FieldCollection, typename T>
   auto TypedField<FieldCollection, T>:: eigenvec() const -> EigenVecConst_t {
-    return EigenVecConst_t(this->data(), this->get_nb_components() * this->size());
+    return EigenVecConst_t(this->data(),
+                           this->get_nb_components() * this->size(),
+                           1);
   }
 
   /* ---------------------------------------------------------------------- */

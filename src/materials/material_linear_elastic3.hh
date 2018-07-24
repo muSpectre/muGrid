@@ -174,18 +174,18 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   template <class s_t, class stiffness_t>
-  decltype(auto)
+  auto
   MaterialLinearElastic3<DimS, DimM>::
-  evaluate_stress(s_t && E, stiffness_t && C) {
+  evaluate_stress(s_t && E, stiffness_t && C) -> decltype(auto) {
     return Matrices::tensmult(C, E);
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   template <class s_t, class stiffness_t>
-  decltype(auto)
+  auto
   MaterialLinearElastic3<DimS, DimM>::
-  evaluate_stress_tangent(s_t && E, stiffness_t && C) {
+  evaluate_stress_tangent(s_t && E, stiffness_t && C) -> decltype(auto) {
     return std::make_tuple
       (evaluate_stress(E, C), C);
   }

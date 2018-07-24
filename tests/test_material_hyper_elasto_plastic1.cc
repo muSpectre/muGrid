@@ -99,9 +99,9 @@ namespace muSpectre {
     coll.add_pixel({0});
     coll.initialise();
 
-    StrainStField_t F_("previous gradient", coll);
-    StrainStField_t be_("previous elastic strain", coll);
-    FlowStField_t eps_("plastic flow", coll);
+    auto & F_{make_statefield<StrainStField_t>("previous gradient", coll)};
+    auto & be_{make_statefield<StrainStField_t>("previous elastic strain", coll)};
+    auto & eps_{make_statefield<FlowStField_t>("plastic flow", coll)};
 
     auto F_prev{F_.get_map()};
     F_prev[0].current() = Strain_t::Identity();
@@ -220,9 +220,9 @@ namespace muSpectre {
     coll.add_pixel({0});
     coll.initialise();
 
-    StrainStField_t F_("previous gradient", coll);
-    StrainStField_t be_("previous elastic strain", coll);
-    FlowStField_t eps_("plastic flow", coll);
+    auto & F_{make_statefield<StrainStField_t>("previous gradient", coll)};
+    auto & be_{make_statefield<StrainStField_t>("previous elastic strain", coll)};
+    auto & eps_{make_statefield<FlowStField_t>("plastic flow", coll)};
 
     auto F_prev{F_.get_map()};
     F_prev[0].current() = Strain_t::Identity();

@@ -31,6 +31,7 @@
 #include "materials/material_linear_elastic3.hh"
 #include "materials/material_linear_elastic4.hh"
 #include "cell/cell_base.hh"
+#include "common/field_collection.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -54,7 +55,7 @@ void add_material_linear_elastic1_helper(py::module & mod) {
 
   using Mat_t = MaterialLinearElastic1<dim, dim>;
   using Sys_t = CellBase<dim, dim>;
-  py::class_<Mat_t>(mod, name.c_str())
+  py::class_<Mat_t, MaterialBase<dim, dim>>(mod, name.c_str())
      .def_static("make",
                 [](Sys_t & sys, std::string n, Real e, Real p) -> Mat_t & {
                   return Mat_t::make(sys, n, e, p);
@@ -77,7 +78,7 @@ void add_material_linear_elastic2_helper(py::module & mod) {
   using Mat_t = MaterialLinearElastic2<dim, dim>;
   using Sys_t = CellBase<dim, dim>;
 
-  py::class_<Mat_t>(mod, name.c_str())
+  py::class_<Mat_t, MaterialBase<dim, dim>>(mod, name.c_str())
      .def_static("make",
                 [](Sys_t & sys, std::string n, Real e, Real p) -> Mat_t & {
                   return Mat_t::make(sys, n, e, p);
@@ -103,7 +104,7 @@ void add_material_linear_elastic3_helper(py::module & mod) {
   using Mat_t = MaterialLinearElastic3<dim, dim>;
   using Sys_t = CellBase<dim, dim>;
 
-  py::class_<Mat_t>(mod, name.c_str())
+  py::class_<Mat_t, MaterialBase<dim, dim>>(mod, name.c_str())
     .def(py::init<std::string>(), "name"_a)
     .def_static("make",
                 [](Sys_t & sys, std::string n) -> Mat_t & {
@@ -129,7 +130,7 @@ void add_material_linear_elastic4_helper(py::module & mod) {
   using Mat_t = MaterialLinearElastic4<dim, dim>;
   using Sys_t = CellBase<dim, dim>;
 
-  py::class_<Mat_t>(mod, name.c_str())
+  py::class_<Mat_t, MaterialBase<dim, dim>>(mod, name.c_str())
     .def(py::init<std::string>(), "name"_a)
     .def_static("make",
                 [](Sys_t & sys, std::string n) -> Mat_t & {
@@ -149,6 +150,22 @@ void add_material_linear_elastic4_helper(py::module & mod) {
 
 template <Dim_t dim>
 void add_material_helper(py::module & mod) {
+  std::stringstream name_stream{};
+  name_stream << "Material_" << dim << 'd';
+  const std::string name{name_stream.str()};
+  using Mat_t = MaterialBase<dim, dim>;
+  using FC_t = LocalFieldCollection<dim>;
+  using FCBase_t = FieldCollectionBase<dim, FC_t>;
+
+  py::class_<Mat_t>(mod, name.c_str()).
+    def_property_readonly
+    ("collection",
+     [](Mat_t & material) -> FCBase_t &{
+      return material.get_collection();},
+     "returns the field collection containing internal "
+     "fields of this material",
+     py::return_value_policy::reference_internal);
+
   add_material_linear_elastic1_helper<dim>(mod);
   add_material_linear_elastic2_helper<dim>(mod);
   add_material_linear_elastic3_helper<dim>(mod);

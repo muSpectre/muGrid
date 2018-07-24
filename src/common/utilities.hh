@@ -202,6 +202,63 @@ namespace muSpectre {
     };
 
     /**
+     * helper struct for runtime index access to
+     * tuples. RecursionLevel indicates how much more we can recurse
+     * down
+     */
+    template <class TupArr, size_t Index=0, size_t RecursionLevel=TupArr::Size-1>
+    struct Accessor {
+      using Stored_t = typename TupArr::Stored_t;
+
+      inline static Stored_t
+      get(const size_t & index, TupArr & container) {
+        if (index == Index) {
+          return std::get<Index>(container);
+        } else {
+          return Accessor<TupArr, Index+1, RecursionLevel-1>::get(index, container);
+        }
+      }
+      inline static const Stored_t
+      get(const size_t & index, const TupArr & container) {
+        if (index == Index) {
+          return std::get<Index>(container);
+        } else {
+          return Accessor<TupArr, Index+1, RecursionLevel-1>::get(index, container);
+        }
+      }
+    };
+
+    /**
+     * specialisation for recursion end
+     */
+    template <class TupArr, size_t Index>
+    struct Accessor<TupArr, Index, 0> {
+      using Stored_t = typename TupArr::Stored_t;
+
+      inline static Stored_t
+      get(const size_t & index, TupArr & container) {
+        if (index == Index) {
+          return std::get<Index>(container);
+        } else {
+          std::stringstream err{};
+          err << "Index " << index << "is out of range.";
+          throw std::runtime_error(err.str());
+        }
+      }
+
+      inline static const Stored_t
+      get(const size_t & index, const TupArr & container) {
+        if (index == Index) {
+          return std::get<Index>(container);
+        } else {
+          std::stringstream err{};
+          err << "Index " << index << "is out of range.";
+          throw std::runtime_error(err.str());
+        }
+      }
+    };
+
+    /**
      * helper struct that provides the tuple_array.
      */
     template <typename T, size_t size>
@@ -211,9 +268,22 @@ namespace muSpectre {
       public:
         //! short-hand
         using Parent = typename tuple_array_helper<size, T>::type;
+        using Stored_t = T;
+        constexpr static size_t Size{size};
 
         //! constructor
         inline type(Parent && parent):Parent{parent}{};
+
+        //! element access
+        T operator[] (const size_t & index) {
+          return Accessor<type>::get(index, *this);
+        }
+
+        //! element access
+        const T operator[](const size_t & index) const  {
+          return Accessor<type>::get(index, *this);
+        }
+      protected:
       };
     };
   }  // internal

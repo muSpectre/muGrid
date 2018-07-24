@@ -592,8 +592,8 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <class FieldCollection, typename T, Dim_t order, Dim_t dim>
-  decltype(auto) TensorField<FieldCollection, T, order, dim>::
-  get_map() {
+  auto TensorField<FieldCollection, T, order, dim>::
+  get_map() -> decltype(auto) {
     constexpr bool map_constness{false};
     using RawMap_t =
       typename internal::tensor_map_type<FieldCollection, T, order, dim,
@@ -603,8 +603,8 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <class FieldCollection, typename T, Dim_t order, Dim_t dim>
-  decltype(auto) TensorField<FieldCollection, T, order, dim>::
-  get_const_map() {
+  auto TensorField<FieldCollection, T, order, dim>::
+  get_const_map() -> decltype(auto) {
     constexpr bool map_constness{true};
     using RawMap_t =
       typename internal::tensor_map_type<FieldCollection, T, order, dim,
@@ -614,8 +614,8 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <class FieldCollection, typename T, Dim_t order, Dim_t dim>
-  decltype(auto) TensorField<FieldCollection, T, order, dim>::
-  get_map() const {
+  auto TensorField<FieldCollection, T, order, dim>::
+  get_map() const -> decltype(auto) {
     constexpr bool map_constness{true};
     using RawMap_t =
       typename internal::tensor_map_type<FieldCollection, T, order, dim,
@@ -625,8 +625,8 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <class FieldCollection, typename T, Dim_t NbRow, Dim_t NbCol>
-  decltype(auto) MatrixField<FieldCollection, T, NbRow, NbCol>::
-  get_map() {
+  auto MatrixField<FieldCollection, T, NbRow, NbCol>::
+  get_map() -> decltype(auto) {
     constexpr bool map_constness{false};
     using RawMap_t =
       typename internal::matrix_map_type<FieldCollection, T, NbRow, NbCol,
@@ -636,8 +636,8 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <class FieldCollection, typename T, Dim_t NbRow, Dim_t NbCol>
-  decltype(auto) MatrixField<FieldCollection, T, NbRow, NbCol>::
-  get_const_map() {
+  auto MatrixField<FieldCollection, T, NbRow, NbCol>::
+  get_const_map() -> decltype(auto) {
     constexpr bool map_constness{true};
     using RawMap_t =
       typename internal::matrix_map_type<FieldCollection, T, NbRow, NbCol,
@@ -647,8 +647,8 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <class FieldCollection, typename T, Dim_t NbRow, Dim_t NbCol>
-  decltype(auto) MatrixField<FieldCollection, T, NbRow, NbCol>::
-  get_map() const {
+  auto MatrixField<FieldCollection, T, NbRow, NbCol>::
+  get_map() const -> decltype(auto) {
     constexpr bool map_constness{true};
     using RawMap_t =
       typename internal::matrix_map_type<FieldCollection, T, NbRow, NbCol,

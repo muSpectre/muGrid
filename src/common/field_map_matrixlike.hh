@@ -203,17 +203,10 @@ namespace muSpectre {
     protected:
       //! for sad, legacy iterator use
       inline pointer ptr_to_val_t(size_type index);
-      const static std::string field_info_root; //!< for printing and debug
+      const static std::string field_info_root() {
+        return NameWrapper<map_type>::field_info_root();} //!< for printing and debug
     private:
     };
-
-    /* ---------------------------------------------------------------------- */
-    template <class FieldCollection, class EigenArray, class EigenConstArray,
-              class EigenPlain, Map_t map_type,  bool ConstField>
-    const std::string MatrixLikeFieldMap<FieldCollection, EigenArray,
-                                         EigenConstArray, EigenPlain, map_type,
-                                         ConstField>::
-    field_info_root{NameWrapper<map_type>::field_info_root()};
 
     /* ---------------------------------------------------------------------- */
     template<class FieldCollection, class EigenArray, class EigenConstArray,
@@ -244,7 +237,7 @@ namespace muSpectre {
                        EigenPlain, map_type, ConstField>::
     info_string() const {
       std::stringstream info;
-      info << field_info_root << "("
+      info << this->field_info_root() << "("
            << typeid(typename EigenArray::value_type).name() << ", "
            << EigenArray::RowsAtCompileTime << "x"
            << EigenArray::ColsAtCompileTime << ")";

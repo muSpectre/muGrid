@@ -148,6 +148,9 @@ namespace muSpectre {
     inline iterator end()  {return this->internal_fields.end();}
     //! number of pixels assigned to this material
     inline size_t size() const {return this->internal_fields.size();}
+
+    //! gives access to internal fields
+    inline MFieldCollection_t& get_collection() {return this->internal_fields;}
   protected:
 
     const std::string name; //!< material's name (for output and debugging)

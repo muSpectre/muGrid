@@ -49,13 +49,19 @@ namespace muSpectre {
     constexpr static Dim_t sdim{DimS};
     constexpr static Dim_t mdim{DimM};
     constexpr static bool global{Global};
-
+    constexpr static size_t get_nb_mem() {return nb_mem;}
+    constexpr static Dim_t  get_sdim  () {return sdim;}
+    constexpr static Dim_t  get_mdim  () {return mdim;}
+    constexpr static bool   get_global() {return global;}
 
     SF_Fixture()
-      :fc{}, sf("prefix", fc), scalar_f("scalar", fc), self{*this} {}
+      :fc{},
+       sf{make_statefield<StateField<Field_t, nb_mem>>("prefix", fc)},
+       scalar_f{make_statefield<StateField<ScalField_t, nb_mem>>("scalar", fc)},
+       self{*this} {}
     FC_t fc;
-    StateField<Field_t, nb_mem> sf;
-    StateField<ScalField_t, nb_mem> scalar_f;
+    StateField<Field_t, nb_mem> & sf;
+    StateField<ScalField_t, nb_mem>  & scalar_f;
     SF_Fixture & self;
   };
 
@@ -66,8 +72,40 @@ namespace muSpectre {
                                     SF_Fixture<  twoD, threeD,  true>,
                                     SF_Fixture<threeD, threeD,  true>>;
 
+  BOOST_AUTO_TEST_SUITE(statefield);
+
+  BOOST_AUTO_TEST_CASE(old_values_test) {
+    constexpr Dim_t Dim{twoD};
+    constexpr size_t NbMem{2};
+    constexpr bool verbose{false};
+    using FC_t = LocalFieldCollection<Dim>;
+    FC_t fc{};
+    using Field_t = ScalarField<FC_t, Int>;
+    auto & statefield{make_statefield<StateField<Field_t, NbMem>>("name", fc)};
+    fc.add_pixel({});
+    fc.initialise();
+    for (size_t i{0}; i < NbMem+1; ++i) {
+      statefield.current().eigen() = i+1;
+      if (verbose) {
+        std::cout << "current = " << statefield.current().eigen() << std::endl
+                  << "old 1   = " << statefield.old().eigen() << std::endl
+                  << "old 2   = " << statefield.template old<2>().eigen()
+                  << std::endl
+                  << "indices = " << statefield.get_indices() << std::endl
+                  << std::endl;
+      }
+      statefield.cycle();
+    }
+    BOOST_CHECK_EQUAL(statefield.current().eigen()(0), 1);
+    BOOST_CHECK_EQUAL(statefield.old().eigen()(0), 3);
+    BOOST_CHECK_EQUAL(statefield.template old<2>().eigen()(0), 2);
+
+  }
+
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(constructor_test, Fix, typelist, Fix) {
-    BOOST_CHECK_EQUAL("prefix", Fix::sf.get_prefix());
+    const std::string ref{"prefix"};
+    const std::string & fix{Fix::sf.get_prefix()};
+    BOOST_CHECK_EQUAL(ref, fix);
   }
 
   namespace internal {
@@ -204,5 +242,57 @@ namespace muSpectre {
     }
 
   }
+
+
+  /* ---------------------------------------------------------------------- */
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(Polymorphic_access_by_name, Fix, typelist, Fix) {
+    internal::init<Fix::global, decltype(Fix::self)>::run(Fix::self);
+
+    //constexpr bool verbose{true};
+    auto & tensor_field = Fix::fc.get_statefield("prefix");
+    BOOST_CHECK_EQUAL(tensor_field.get_nb_memory(), Fix::get_nb_mem());
+
+    auto & field = Fix::fc.template get_current<Real>("prefix");
+    BOOST_CHECK_EQUAL(field.get_nb_components(),
+                      ipow(Fix::get_mdim(), secondOrder));
+    BOOST_CHECK_THROW(Fix::fc.template get_current<Int>("prefix"), std::runtime_error);
+    auto & old_field = Fix::fc.template get_old<Real>("prefix");
+    BOOST_CHECK_EQUAL(old_field.get_nb_components(),
+                      field.get_nb_components());
+    BOOST_CHECK_THROW(Fix::fc.template get_old<Real>("prefix", Fix::get_nb_mem()+1),
+                      std::out_of_range);
+
+    auto & statefield{Fix::fc.get_statefield("prefix")};
+    auto & typed_statefield{Fix::fc.template get_typed_statefield<Real>("prefix")};
+    auto map{ArrayFieldMap
+        <decltype(Fix::fc), Real, ipow(Fix::get_mdim(), secondOrder), 1>
+        (typed_statefield.get_current_field())};
+    for (auto arr: map) {
+      arr.setConstant(1);
+    }
+
+
+
+    Eigen::ArrayXXd field_copy{field.eigen()};
+    statefield.cycle();
+    auto & alt_old_field{typed_statefield.get_old_field()};
+
+    Real err{(field_copy - alt_old_field.eigen()).matrix().norm()/
+        field_copy.matrix().norm()};
+    BOOST_CHECK_LT(err, tol);
+    if (not(err<tol)) {
+      std::cout << field_copy << std::endl
+                << std::endl
+                << typed_statefield.get_current_field().eigen() << std::endl
+                << std::endl
+                << typed_statefield.get_old_field(1).eigen() << std::endl
+                << std::endl
+                << typed_statefield.get_old_field(2).eigen() << std::endl;
+    }
+
+
+  }
+
+  BOOST_AUTO_TEST_SUITE_END();
 
 }  // muSpectre

@@ -46,6 +46,7 @@ set (PY_BINDING_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_solvers.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_fftengine.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_projections.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_field_collection.cc
   )
 
 if (${USE_FFTWMPI})

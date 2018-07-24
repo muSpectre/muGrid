@@ -40,7 +40,8 @@ extensions = ['sphinx.ext.autodoc',
               'sphinx.ext.viewcode',
               'breathe']
 read_the_docs_build = os.environ.get('READTHEDOCS', None) == 'True'
-print("${READTHEDOCS} = " + os.environ.get('READTHEDOCS', None))
+if os.environ.get('READTHEDOCS', None) is not None:
+    print("${READTHEDOCS} = " + os.environ.get('READTHEDOCS', None))
 
 if read_the_docs_build:
     muspectre_path = "."

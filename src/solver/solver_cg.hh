@@ -9,8 +9,6 @@
  *         This follows algorithm 5.2 in Nocedal's Numerical Optimization
  *         (p 112)
  *
- * @section LICENSE
- *
  * Copyright © 2018 Till Junge
  *
  * µSpectre is free software; you can redistribute it and/or

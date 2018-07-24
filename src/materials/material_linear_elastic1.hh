@@ -158,8 +158,9 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   template <class s_t>
-  decltype(auto)
-  MaterialLinearElastic1<DimS, DimM>::evaluate_stress(s_t && E) {
+  auto
+  MaterialLinearElastic1<DimS, DimM>::evaluate_stress(s_t && E)
+    -> decltype(auto) {
     return Hooke::evaluate_stress(this->lambda, this->mu,
                                   std::move(E));
   }
@@ -167,8 +168,9 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   template <class s_t>
-  decltype(auto)
-  MaterialLinearElastic1<DimS, DimM>::evaluate_stress_tangent(s_t && E) {
+  auto
+  MaterialLinearElastic1<DimS, DimM>::evaluate_stress_tangent(s_t && E)
+    -> decltype(auto) {
     using Tangent_t = typename traits::TangentMap_t::reference;
 
 

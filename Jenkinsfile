@@ -184,7 +184,7 @@ curl https://c4science.ch/api/harbormaster.sendmessage \
 }
 
 def trigger_readthedocs() {
-    sh """ 
+    sh """
 set +x
 curl -X POST \
 -d "token=${RTD_TOKEN}" \

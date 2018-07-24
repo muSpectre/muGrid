@@ -36,10 +36,15 @@ namespace muSpectre {
   MaterialHyperElastoPlastic1(std::string name, Real young, Real poisson,
                               Real tau_y0, Real H)
     : Parent{name},
-      plast_flow_field("cumulated plastic flow εₚ", this->internal_fields),
-      F_prev_field("Previous placement gradient Fᵗ", this->internal_fields),
-      be_prev_field("Previous left Cauchy-Green deformation bₑᵗ",
-                    this->internal_fields),
+      plast_flow_field{make_statefield<StateField<ScalarField<LColl_t, Real>>>
+          ("cumulated plastic flow εₚ", this->internal_fields)},
+      F_prev_field{make_statefield<StateField<
+          TensorField<LColl_t, Real, secondOrder, DimM>>>
+          ("Previous placement gradient Fᵗ", this->internal_fields)},
+      be_prev_field{make_statefield<StateField<TensorField<
+          LColl_t, Real, secondOrder, DimM>>>
+          ("Previous left Cauchy-Green deformation bₑᵗ",
+           this->internal_fields)},
       young{young}, poisson{poisson},
       lambda{Hooke::compute_lambda(young, poisson)},
       mu{Hooke::compute_mu(young, poisson)},

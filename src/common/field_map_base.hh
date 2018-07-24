@@ -76,6 +76,8 @@ namespace muSpectre {
     class FieldMap
     {
     public:
+      //! Fundamental type stored
+      using Scalar = T;
       //! number of scalars per entry
       constexpr static auto nb_components{NbComponents};
       using TypedField_nc = TypedSizedFieldBase

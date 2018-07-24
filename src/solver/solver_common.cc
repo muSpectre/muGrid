@@ -7,8 +7,6 @@
  *
  * @brief  implementation for solver utilities
  *
- * @section LICENSE
- *
  * Copyright © 2018 Till Junge
  *
  * µSpectre is free software; you can redistribute it and/or

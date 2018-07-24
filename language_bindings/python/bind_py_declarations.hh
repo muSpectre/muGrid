@@ -37,5 +37,6 @@ void add_material(py::module & mod);
 void add_solvers(py::module & mod);
 void add_fft_engines(py::module & mod);
 void add_projections(py::module & submodule);
+void add_field_collections(py::module & submodule);
 
 #endif /* BIND_PY_DECLARATIONS_H */

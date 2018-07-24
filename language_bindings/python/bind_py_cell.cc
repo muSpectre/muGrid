@@ -171,7 +171,7 @@ void add_cell_base_helper(py::module & mod) {
     .def("get_stress",[](sys_t & s) {
         return Eigen::ArrayXXd(s.get_stress().eigen());
       })
-    .def("size", &sys_t::size)
+    .def_property_readonly("size", &sys_t::size)
     .def("evaluate_stress_tangent",
          [](sys_t& cell, py::EigenDRef<Eigen::ArrayXXd>& v ) {
            if ((size_t(v.cols()) != cell.size() ||

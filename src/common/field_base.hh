@@ -7,8 +7,6 @@
  *
  * @brief  Virtual base class for fields
  *
- * @section LICENSE
- *
  * Copyright © 2018 Till Junge
  *
  * µSpectre is free software; you can redistribute it and/or
@@ -136,7 +134,7 @@ namespace muSpectre {
       //inline const Field_t & get_type() const;
       //! return my collection (for iterating)
       inline const FieldCollection & get_collection() const;
-      //! return my collection (for iterating)
+      //! return number of components (e.g., dimensions) of this field
       inline const size_t & get_nb_components() const;
       //! return type_id of stored type
       virtual const std::type_info & get_stored_typeid() const = 0;
@@ -158,7 +156,8 @@ namespace muSpectre {
       //! give access to collections
       friend FieldCollection;
       //! give access to collection's base class
-      friend typename FieldCollection::Parent;
+      using FParent_t = typename FieldCollection::Parent;
+      friend FParent_t;
 
     protected:
       /* ---------------------------------------------------------------------- */
