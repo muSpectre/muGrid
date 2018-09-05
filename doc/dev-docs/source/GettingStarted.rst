@@ -25,12 +25,20 @@ The latter option requires you to have a user account on c4science (`create <htt
 Building *µ*\Spectre
 ********************
 
-You can compile *µ*\Spectre using  `CMake <https://cmake.org/>`_. The current (and possibly incomplete list of) dependencies are
+You can compile *µ*\Spectre using  `CMake <https://cmake.org/>`_ (3.1.0 or higher). The current (and possibly incomplete list of) dependencies are
 
+- `CMake <https://cmake.org/>`_ (3.1.0 or higher)
 - `Boost unit test framework <http://www.boost.org/doc/libs/1_66_0/libs/test/doc/html/index.html>`_
 - `FFTW <http://www.fftw.org>`_
-- `Sphinx <http://www.sphinx-doc.org>`_ and `Breathe <https://breathe.readthedocs.io>`_
 - `git <https://git-scm.com/>`_
+- `Python3 <https://www.python.org/>`_ including the header files.
+- `numpy <http://www.numpy.org/>`_ and `scipy <https://scipy.org/>`_.
+
+Recommended:
+
+- `Sphinx <http://www.sphinx-doc.org>`_ and `Breathe <https://breathe.readthedocs.io>`_ (necessary if you want to build the documentation (turned off by default)
+- `Eigen <http://eigen.tuxfamily.org/>`_ (3.3.0 or higher). If you do not install this, it will be downloaded automatically at configuration time, so this is not strictly necessary. The download can be slow, though, so we recommend installing it on your system.
+- The CMake curses graphical user interface (``ccmake``).
 
 *µ*\Spectre requires a relatively modern compiler as it makes heavy use of C++14 features. It has successfully been compiled and tested using the following compilers under Linux
 
@@ -71,7 +79,7 @@ Running *µ*\Spectre
 
 The easiest and intended way of using *µ*\Spectre is through its Python bindings. The following simple example computes the response of a two-dimensional stretched periodic RVE cell. The cell consist of a soft matrix with a circular hard inclusion.
 
-.. literalinclude:: ../../../bin/tutorial_example.py
+.. literalinclude:: ../../../bin/tutorial_examplex.py
    :language: python
 
 More examples both both python and c++ executables can be found in the ``/bin`` folder.
@@ -79,13 +87,13 @@ More examples both both python and c++ executables can be found in the ``/bin`` 
 Getting help
 ************
 
-*µ*\Spectre is in a very early stage of development and the documentation is currently spotty. Also, there is no FAQ page yet. If you run into trouble, please contact us on the `*µ*\Spectre chat room <https://c4science.ch/Z69>`_ and someone will answer as soon as possible. You can also check the API :ref:`reference`.
+*µ*\Spectre is in a very early stage of development and the documentation is currently spotty. Also, there is no FAQ page yet. If you run into trouble, please contact us on the `µSpectre chat room <https://c4science.ch/Z69>`_ and someone will answer as soon as possible. You can also check the API :ref:`reference`.
 
 
 Reporting Bugs
 **************
 
-If you think you found a bug, you are probably right. Please report it! The preferred way is for you to create a task on `*µ*\Spectre's workboard <https://c4science.ch/project/board/1447/>`_ and assign it to user ``junge``. Include steps to reproduce the bug if possible. Someone will answer as soon as possible.
+If you think you found a bug, you are probably right. Please report it! The preferred way is for you to create a task on `µSpectre's workboard <https://c4science.ch/project/board/1447/>`_ and assign it to user ``junge``. Include steps to reproduce the bug if possible. Someone will answer as soon as possible.
 
 
 Contribute

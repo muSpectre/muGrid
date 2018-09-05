@@ -31,7 +31,7 @@ soft = msp.material.MaterialLinearElastic1_2d.make(
     rve, "soft",  70e9, .33)
 
 ## assign each pixel to exactly one material
-for i, pixel in enumerate(rve):
+for pixel in rve:
     if np.linalg.norm(center - np.array(pixel),2)<incl:
         hard.add_pixel(pixel)
     else:
