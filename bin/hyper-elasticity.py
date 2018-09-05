@@ -43,9 +43,9 @@ def compute():
 
     formulation = µ.Formulation.finite_strain
     cell = µ.Cell(N, lens, formulation)
-    hard = µ.material.MaterialHooke3d.make(cell, "hard",
+    hard = µ.material.MaterialLinearElastic1_3d.make(cell, "hard",
                                            210.e9, .33)
-    soft = µ.material.MaterialHooke3d.make(cell, "soft",
+    soft = µ.material.MaterialLinearElastic1_3d.make(cell, "soft",
                                             70.e9, .33)
     for  pixel in cell:
         # if ((pixel[0] >= N[0]-incl_size) and
@@ -66,7 +66,7 @@ def compute():
     if formulation == µ.Formulation.small_strain:
         dF_bar = .5*(dF_bar + dF_bar.T)
 
-    test_grad = np.zeros((9, cell.size()))
+    test_grad = np.zeros((9, cell.size))
     test_grad[:,:] = dF_bar.reshape(-1,1)
     print(cell.directional_stiffness(test_grad)[:,:3])
     solver = µ.solvers.SolverCG(cell, cg_tol, maxiter, verbose=False);
