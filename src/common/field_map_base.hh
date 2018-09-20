@@ -42,7 +42,13 @@
 namespace muSpectre {
 
   namespace internal {
-    //----------------------------------------------------------------------------//
+    /**
+     * Forward-declaration
+     */
+    template <class FieldCollection, typename T, Dim_t NbComponents>
+    class TypedSizedFieldBase;
+
+
     //! little helper to automate creation of const maps without duplication
     template<class T, bool isConst>
     struct const_corrector {
@@ -75,18 +81,28 @@ namespace muSpectre {
     template <class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
     class FieldMap
     {
+      static_assert((NbComponents != 0),
+                    "Fields with now components make no sense.");
+      /*
+       * Eigen::Dynamic is equal to -1, and is a legal value, hence
+       * the following peculiar check
+       */
+      static_assert((NbComponents > -2),
+                    "Fields with a negative number of components make no sense.");
     public:
       //! Fundamental type stored
       using Scalar = T;
       //! number of scalars per entry
       constexpr static auto nb_components{NbComponents};
-      using TypedField_nc = TypedSizedFieldBase
-        <FieldCollection, T, NbComponents>; //!< non-constant version of field
+      //! non-constant version of field
+      using TypedField_nc = std::conditional_t<(NbComponents >= 1),
+        TypedSizedFieldBase<FieldCollection, T, NbComponents>,
+        TypedField<FieldCollection, T>>;
       //! field type as seen from iterator
-      using TypedField = std::conditional_t<ConstField,
-                                            const TypedField_nc,
-                                            TypedField_nc>;
-      using Field = typename TypedField::Base; //!< iterated field type
+      using TypedField_t = std::conditional_t<ConstField,
+                                              const TypedField_nc,
+                                              TypedField_nc>;
+      using Field = typename TypedField_nc::Base; //!< iterated field type
       //! const-correct field type
       using Field_c = std::conditional_t<ConstField,
                                          const Field,
@@ -149,119 +165,18 @@ namespace muSpectre {
        * and dereferences to an Eigen map to the currently used field.
        */
       template <class FullyTypedFieldMap, bool ConstIter=false>
-      class iterator
-      {
-        static_assert(!((ConstIter==false) && (ConstField==true)),
-                      "You can't have a non-const iterator over a const "
-                      "field");
-      public:
-        //! stl conformance
-        using value_type =
-          const_corrector_t<FullyTypedFieldMap, ConstIter>;
-        //! stl conformance
-        using const_value_type =
-          const_corrector_t<FullyTypedFieldMap, true>;
-        //! stl conformance
-        using pointer = typename FullyTypedFieldMap::pointer;
-        //! stl conformance
-        using difference_type = std::ptrdiff_t;
-        //! stl conformance
-        using iterator_category = std::random_access_iterator_tag;
-        //! cell coordinates type
-        using Ccoord = typename FieldCollection::Ccoord;
-        //! stl conformance
-        using reference = typename FullyTypedFieldMap::reference;
-        //! fully typed reference as seen by the iterator
-        using TypedRef = std::conditional_t<ConstIter,
-                                            const FullyTypedFieldMap &,
-                                            FullyTypedFieldMap>;
+      class iterator;
 
-        //! Default constructor
-        iterator() = delete;
+      /**
+       * Simple iterable proxy wrapper object around a FieldMap. When
+       * iterated over, rather than dereferencing to the reference
+       * type of iterator, it dereferences to a tuple of the pixel,
+       * and the reference type of iterator
+       */
+      template<class Iterator>
+      class enumerator;
 
-        //! constructor
-        inline iterator(TypedRef fieldmap, bool begin=true);
-
-        //! constructor for random access
-        inline iterator(TypedRef fieldmap, size_t index);
-
-        //! Copy constructor
-        iterator(const iterator &other)= default;
-
-        //! Move constructor
-        iterator(iterator &&other) = default;
-
-        //! Destructor
-        virtual ~iterator() = default;
-
-        //! Copy assignment operator
-        iterator& operator=(const iterator &other) = default;
-
-        //! Move assignment operator
-        iterator& operator=(iterator &&other) = default;
-
-        //! pre-increment
-        inline iterator & operator++();
-        //! post-increment
-        inline iterator operator++(int);
-        //! dereference
-        inline value_type operator*();
-        //! dereference
-        inline const_value_type operator*() const;
-        //! member of pointer
-        inline pointer operator->();
-        //! pre-decrement
-        inline iterator & operator--();
-        //! post-decrement
-        inline iterator operator--(int);
-        //! access subscripting
-        inline value_type operator[](difference_type diff);
-        //! access subscripting
-        inline const_value_type operator[](const difference_type diff) const;
-        //! equality
-        inline bool operator==(const iterator & other) const;
-        //! inequality
-        inline bool operator!=(const iterator & other) const;
-        //! div. comparisons
-        inline bool operator<(const iterator & other) const;
-        //! div. comparisons
-        inline bool operator<=(const iterator & other) const;
-        //! div. comparisons
-        inline bool operator>(const iterator & other) const;
-        //! div. comparisons
-        inline bool operator>=(const iterator & other) const;
-        //! additions, subtractions and corresponding assignments
-        inline iterator operator+(difference_type diff) const;
-        //! additions, subtractions and corresponding assignments
-        inline iterator operator-(difference_type diff) const;
-        //! additions, subtractions and corresponding assignments
-        inline iterator& operator+=(difference_type diff);
-        //! additions, subtractions and corresponding assignments
-        inline iterator& operator-=(difference_type diff);
-
-        //! get pixel coordinates
-        inline Ccoord get_ccoord() const;
-
-        //! ostream operator (mainly for debug
-        friend std::ostream & operator<<(std::ostream & os,
-                                         const iterator& it) {
-          if (ConstIter) {
-            os << "const ";
-          }
-          os << "iterator on field '"
-             << it.fieldmap.get_name()
-             << "', entry " << it.index;
-          return os;
-        }
-
-      protected:
-        const FieldCollection & collection; //!< collection of the field
-        TypedRef fieldmap; //!< ref to the field itself
-        size_t index; //!< index of currently pointed-to pixel
-      private:
-      };
-
-      TypedField & get_field() {return this->field;}
+      TypedField_t & get_field() {return this->field;}
 
     protected:
       //! raw pointer to entry (for Eigen Map)
@@ -269,9 +184,318 @@ namespace muSpectre {
       //! raw pointer to entry (for Eigen Map)
       inline const T* get_ptr_to_entry(size_t index) const;
       const FieldCollection & collection; //!< collection holding Field
-      TypedField & field;  //!< mapped Field
+      TypedField_t & field;  //!< mapped Field
     private:
     };
+
+
+    /**
+     * iterates over all pixels in the `muSpectre::FieldCollection`
+     * and dereferences to an Eigen map to the currently used field.
+     */
+    template <class FieldCollection, typename T, Dim_t NbComponents,
+              bool ConstField>
+    template <class FullyTypedFieldMap, bool ConstIter>
+    class FieldMap<FieldCollection, T, NbComponents, ConstField>::iterator
+    {
+      static_assert(!((ConstIter==false) && (ConstField==true)),
+                    "You can't have a non-const iterator over a const "
+                    "field");
+    public:
+      //! for use by enumerator
+      using FullyTypedFieldMap_t = FullyTypedFieldMap;
+      //! stl conformance
+      using value_type =
+        const_corrector_t<FullyTypedFieldMap, ConstIter>;
+      //! stl conformance
+      using const_value_type =
+        const_corrector_t<FullyTypedFieldMap, true>;
+      //! stl conformance
+      using pointer = typename FullyTypedFieldMap::pointer;
+      //! stl conformance
+      using difference_type = std::ptrdiff_t;
+      //! stl conformance
+      using iterator_category = std::random_access_iterator_tag;
+      //! cell coordinates type
+      using Ccoord = typename FieldCollection::Ccoord;
+      //! stl conformance
+      using reference = typename FullyTypedFieldMap::reference;
+      //! fully typed reference as seen by the iterator
+      using TypedRef = std::conditional_t<ConstIter,
+                                          const FullyTypedFieldMap,
+                                          FullyTypedFieldMap> &;
+
+      //! Default constructor
+      iterator() = delete;
+
+      //! constructor
+      inline iterator(TypedRef fieldmap, bool begin=true);
+
+      //! constructor for random access
+      inline iterator(TypedRef fieldmap, size_t index);
+
+      //! Move constructor
+      iterator(iterator &&other) = default;
+
+      //! Destructor
+      virtual ~iterator() = default;
+
+      //! Copy assignment operator
+      iterator& operator=(const iterator &other) = default;
+
+      //! Move assignment operator
+      iterator& operator=(iterator &&other) = default;
+
+      //! pre-increment
+      inline iterator & operator++();
+      //! post-increment
+      inline iterator operator++(int);
+      //! dereference
+      inline value_type operator*();
+      //! dereference
+      inline const_value_type operator*() const;
+      //! member of pointer
+      inline pointer operator->();
+      //! pre-decrement
+      inline iterator & operator--();
+      //! post-decrement
+      inline iterator operator--(int);
+      //! access subscripting
+      inline value_type operator[](difference_type diff);
+      //! access subscripting
+      inline const_value_type operator[](const difference_type diff) const;
+      //! equality
+      inline bool operator==(const iterator & other) const;
+      //! inequality
+      inline bool operator!=(const iterator & other) const;
+      //! div. comparisons
+      inline bool operator<(const iterator & other) const;
+      //! div. comparisons
+      inline bool operator<=(const iterator & other) const;
+      //! div. comparisons
+      inline bool operator>(const iterator & other) const;
+      //! div. comparisons
+      inline bool operator>=(const iterator & other) const;
+      //! additions, subtractions and corresponding assignments
+      inline iterator operator+(difference_type diff) const;
+      //! additions, subtractions and corresponding assignments
+      inline iterator operator-(difference_type diff) const;
+      //! additions, subtractions and corresponding assignments
+      inline iterator& operator+=(difference_type diff);
+      //! additions, subtractions and corresponding assignments
+      inline iterator& operator-=(difference_type diff);
+
+      //! get pixel coordinates
+      inline Ccoord get_ccoord() const;
+
+      //! ostream operator (mainly for debugging)
+      friend std::ostream & operator<<(std::ostream & os,
+                                       const iterator& it) {
+        if (ConstIter) {
+          os << "const ";
+        }
+        os << "iterator on field '"
+           << it.fieldmap.get_name()
+           << "', entry " << it.index;
+        return os;
+      }
+
+    protected:
+      //! Copy constructor
+      iterator(const iterator &other) = default;
+
+      const FieldCollection & collection; //!< collection of the field
+      TypedRef fieldmap; //!< ref to the field itself
+      size_t index; //!< index of currently pointed-to pixel
+    private:
+    };
+
+
+    /* ---------------------------------------------------------------------- */
+    template <class FieldCollection, typename T, Dim_t NbComponents,
+              bool ConstField>
+    template <class Iterator>
+    class FieldMap<FieldCollection, T, NbComponents, ConstField>::enumerator
+    {
+    public:
+      //! fully typed reference as seen by the iterator
+      using TypedRef =typename Iterator::TypedRef;
+
+      //! Default constructor
+      enumerator() = delete;
+
+      //! constructor with field mapped
+      enumerator(TypedRef& field_map): field_map{field_map} {}
+
+      /**
+       * similar to iterators of the field map, but dereferences to a
+       * tuple containing the cell coordinates and teh corresponding
+       * entry
+       */
+      class iterator;
+
+      iterator begin() {return iterator(this->field_map);}
+      iterator end() {return iterator(this->field_map, false);}
+
+    protected:
+      TypedRef & field_map;
+    };
+
+    /* ---------------------------------------------------------------------- */
+    template <class FieldCollection, typename T, Dim_t NbComponents,
+              bool ConstField>
+    template <class SimpleIterator>
+    class FieldMap<FieldCollection, T, NbComponents, ConstField>::
+    enumerator<SimpleIterator>::iterator {
+    public:
+      //! cell coordinates type
+      using Ccoord = typename FieldCollection::Ccoord;
+      //! stl conformance
+      using value_type = std::tuple<Ccoord, typename SimpleIterator::value_type>;
+      //! stl conformance
+      using const_value_type = std::tuple<Ccoord,
+                                          typename SimpleIterator::const_value_type>;
+      //! stl conformance
+      using difference_type = std::ptrdiff_t;
+      //! stl conformance
+      using iterator_category = std::random_access_iterator_tag;
+      //! stl conformance
+      using reference = std::tuple<
+        Ccoord,
+        typename SimpleIterator::FullyTypedFieldMap_t::reference>;
+
+      //! Default constructor
+      iterator() = delete;
+
+      //! constructor for begin/end
+      iterator(TypedRef fieldmap, bool begin=true): it{fieldmap, begin} {}
+
+      //! constructor for random access
+      iterator(TypedRef fieldmap, size_t index): it{fieldmap, index} {}
+
+      //! constructor from iterator
+      iterator(const SimpleIterator & it): it{it} {}
+
+      //! Copy constructor
+      iterator(const iterator &other) = default;
+
+      //! Move constructor
+      iterator(iterator &&other) = default;
+
+      //! Destructor
+      virtual ~iterator() = default;
+
+      //! Copy assignment operator
+      iterator& operator=(const iterator &other) = default;
+
+      //! Move assignment operator
+      iterator& operator=(iterator &&other) = default;
+
+      //! pre-increment
+      iterator & operator++() {
+        ++(this->it);
+        return *this;
+      }
+
+      //! post-increment
+      iterator operator++(int) {
+        iterator current = *this;
+        ++(this->it);
+        return current;
+      }
+
+      //! dereference
+      value_type operator*() {
+        return value_type{it.get_ccoord(), *this->it};
+      }
+
+      //! dereference
+      const_value_type operator*() const {
+        return const_value_type{it.get_ccoord(), *this->it};
+      };
+
+      //! pre-decrement
+      iterator & operator--() {
+        --(this->it);
+        return *this;
+      }
+
+      //! post-decrement
+      iterator operator--(int) {
+        iterator current = *this;
+        --(this->it);
+        return current;
+      }
+
+      //! access subscripting
+      value_type operator[](difference_type diff) {
+        SimpleIterator accessed{this->it + diff};
+        return *accessed;
+      }
+
+      //! access subscripting
+      const_value_type operator[](const difference_type diff) const {
+        SimpleIterator accessed{this->it + diff};
+        return *accessed;
+      }
+
+      //! equality
+      bool operator==(const iterator & other) const {
+        return this->it == other.it;
+      }
+
+      //! inequality
+      bool operator!=(const iterator & other) const {
+        return this->it != other.it;
+      }
+
+      //! div. comparisons
+      bool operator<(const iterator & other) const {
+        return this->it < other.it;
+      }
+
+      //! div. comparisons
+      bool operator<=(const iterator & other) const {
+        return this->it <= other.it;
+      }
+
+      //! div. comparisons
+      bool operator>(const iterator & other) const {
+        return this->it > other.it;
+      }
+
+      //! div. comparisons
+      bool operator>=(const iterator & other) const {
+        return this->it >= other.it;
+      }
+
+      //! additions, subtractions and corresponding assignments
+      iterator operator+(difference_type diff) const {
+        return iterator{this->it + diff};
+      }
+
+      //! additions, subtractions and corresponding assignments
+      iterator operator-(difference_type diff) const {
+        return iterator{this->it - diff};
+      }
+
+      //! additions, subtractions and corresponding assignments
+      iterator& operator+=(difference_type diff) {
+        this->it += diff;
+      }
+
+      //! additions, subtractions and corresponding assignments
+      iterator& operator-=(difference_type diff) {
+        this->it -= diff;
+      }
+
+    protected:
+      SimpleIterator it;
+    private:
+    };
+
+
+
   }  // internal
 
 
@@ -281,8 +505,8 @@ namespace muSpectre {
     template<class FieldCollection, typename T, Dim_t NbComponents, bool ConstField>
     FieldMap<FieldCollection, T, NbComponents, ConstField>::
     FieldMap(Field_c& field)
-      :collection(field.get_collection()), field(static_cast<TypedField&>(field)) {
-      static_assert(NbComponents>0,
+      :collection(field.get_collection()), field(static_cast<TypedField_t&>(field)) {
+      static_assert((NbComponents > 0) or (NbComponents == Eigen::Dynamic),
                     "Only fields with more than 0 components allowed");
     }
 
@@ -291,7 +515,7 @@ namespace muSpectre {
     template <class FC, typename T2, Dim_t NbC>
     FieldMap<FieldCollection, T, NbComponents, ConstField>::
     FieldMap(TypedSizedFieldBase<FC, T2, NbC> & field)
-      :collection(field.get_collection()), field(static_cast<TypedField&>(field)) {
+      :collection(field.get_collection()), field(static_cast<TypedField_t&>(field)) {
       static_assert(std::is_same<FC, FieldCollection>::value,
                     "The field does not have the expected FieldCollection type");
       static_assert(std::is_same<T2, T>::value,
@@ -305,21 +529,22 @@ namespace muSpectre {
     void
     FieldMap<FieldCollection, T, NbComponents, ConstField>::
     check_compatibility() {
-     if (typeid(T).hash_code() !=
+      if (typeid(T).hash_code() !=
           this->field.get_stored_typeid().hash_code()) {
-       std::string err{"Cannot create a Map of type '" +
-           this->info_string() +
-           "' for field '" + this->field.get_name() + "' of type '" +
-           this->field.get_stored_typeid().name() + "'"};
+        std::string err{"Cannot create a Map of type '" +
+            this->info_string() +
+            "' for field '" + this->field.get_name() + "' of type '" +
+            this->field.get_stored_typeid().name() + "'"};
         throw FieldInterpretationError
           (err);
       }
       //check size compatibility
-      if (NbComponents != this->field.get_nb_components()) {
+      if ((NbComponents != Dim_t(this->field.get_nb_components())) and
+          (NbComponents != Eigen::Dynamic)) {
         throw FieldInterpretationError
           ("Cannot create a Map of type '" +
-           this->info_string() +
-           "' for field '" + this->field.get_name() + "' with " +
+           this->info_string()
+           +           "' for field '" + this->field.get_name() + "' with " +
            std::to_string(this->field.get_nb_components()) + " components");
       }
     }
@@ -344,13 +569,13 @@ namespace muSpectre {
         static_assert
           (std::is_same<typename myField::Scalar, T>::value,
            "The // field does not have the expected Scalar type");
-        static_assert((TypedField::nb_components == NbComponents),
+        static_assert((TypedField_t::nb_components == NbComponents),
                       "The field does not have the expected number of components");
         //The static asserts wouldn't pass in the incompatible case, so this is it
         return true;
       }
       //! evaluated compatibility
-      constexpr static bool value{std::is_base_of<TypedField, myField>::value};
+      constexpr static bool value{std::is_base_of<TypedField_t, myField>::value};
     };
 
     /* ---------------------------------------------------------------------- */

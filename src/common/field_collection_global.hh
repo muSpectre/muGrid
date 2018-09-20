@@ -35,12 +35,17 @@
 
 namespace muSpectre {
 
-  /* ---------------------------------------------------------------------- */
+  /**
+   * forward declaration
+   */
+  template <Dim_t DimS>
+  class LocalFieldCollection;
+
   /** `GlobalFieldCollection` derives from `FieldCollectionBase` and stores
     * global fields that live throughout the whole computational domain, i.e.
     * are defined for each pixel.
     */
-  template<Dim_t DimS>
+  template <Dim_t DimS>
   class GlobalFieldCollection:
     public FieldCollectionBase<DimS, GlobalFieldCollection<DimS>>
   {
@@ -50,6 +55,10 @@ namespace muSpectre {
 
     using Parent = FieldCollectionBase
       <DimS, GlobalFieldCollection<DimS>>; //!< base class
+    //! helpful for functions that fill global fields from local fields
+    using LocalFieldCollection_t = LocalFieldCollection<DimS>;
+    //! helpful for functions that fill global fields from local fields
+    using GlobalFieldCollection_t = GlobalFieldCollection<DimS>;
     using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
     using Field_p = typename Parent::Field_p; //!< spatial coordinates type
     //! iterator over all pixels contained it the collection
@@ -98,11 +107,14 @@ namespace muSpectre {
     //! returns the cell coordinates corresponding to a linear index
     inline Ccoord get_ccoord(size_t index) const;
 
-    inline iterator begin(); //!< returns iterator to first pixel
-    inline iterator end(); //!< returns iterator past the last pixel
+    inline iterator begin() const; //!< returns iterator to first pixel
+    inline iterator end() const; //!< returns iterator past the last pixel
 
     //! return spatial dimension (template parameter)
     static constexpr inline Dim_t spatial_dim() {return DimS;}
+
+    //! return globalness at compile time
+    static constexpr inline bool is_global() {return Global;}
   protected:
     //! number of discretisation cells in each of the DimS spatial directions
     Ccoord sizes{};
@@ -177,14 +189,14 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS>
   typename GlobalFieldCollection<DimS>::iterator
-  GlobalFieldCollection<DimS>::begin() {
+  GlobalFieldCollection<DimS>::begin() const {
     return this->pixels.begin();
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS>
   typename GlobalFieldCollection<DimS>::iterator
-  GlobalFieldCollection<DimS>::end() {
+  GlobalFieldCollection<DimS>::end() const {
     return this->pixels.end();
   }
   //----------------------------------------------------------------------------//

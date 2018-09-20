@@ -5,7 +5,7 @@
  *
  * @date   10 Apr 2018
  *
- * @brief  Typed Field for dynamically sized fields and base class for fields 
+ * @brief  Typed Field for dynamically sized fields and base class for fields
  *         of tensors, matrices, etc
  *
  * Copyright © 2018 Till Junge
@@ -29,11 +29,28 @@
 #ifndef FIELD_TYPED_H
 #define FIELD_TYPED_H
 
-#include "field_base.hh"
+#include "common/field_base.hh"
+#include "common/field_helpers.hh"
 
 #include <sstream>
 
 namespace muSpectre {
+
+  /**
+   * forward-declaration
+   */
+  template <class FieldCollection, typename T, bool ConstField>
+  class TypedFieldMap;
+
+  namespace internal {
+
+    /* ---------------------------------------------------------------------- */
+    //! declaraton for friending
+    template <class FieldCollection, typename T, Dim_t NbComponents, bool isConst>
+    class FieldMap;
+
+  }  // internal
+
 
   /**
    * Dummy intermediate class to provide a run-time polymorphic
@@ -44,10 +61,29 @@ namespace muSpectre {
   template <class FieldCollection, typename T>
   class TypedField: public internal::FieldBase<FieldCollection>
   {
+    friend class internal::FieldMap<FieldCollection, T, Eigen::Dynamic, true>;
+    friend class internal::FieldMap<FieldCollection, T, Eigen::Dynamic, false>;
+
+    static constexpr bool Global{FieldCollection::is_global()};
+
   public:
     using Parent = internal::FieldBase<FieldCollection>; //!< base class
     //! for type checks when mapping this field
     using collection_t = typename Parent::collection_t;
+
+    //! for filling global fields from local fields and vice-versa
+    using LocalField_t =
+      std::conditional_t<Global,
+                         TypedField<typename
+                                    FieldCollection::LocalFieldCollection_t, T>,
+                         TypedField>;
+    //! for filling global fields from local fields and vice-versa
+    using GlobalField_t =
+      std::conditional_t<Global,
+                         TypedField,
+                         TypedField<typename
+                                    FieldCollection::GlobalFieldCollection_t, T>>;
+
     using Scalar = T; //!< for type checks
     using Base = Parent; //!< for uniformity of interface
     //! Plain Eigen type to map
@@ -61,6 +97,10 @@ namespace muSpectre {
     using EigenVec_t = Eigen::Map<EigenVecRep_t>;
     //! vector map returned when accessing entire field
     using EigenVecConst_t = Eigen::Map<const EigenVecRep_t>;
+    //! associated non-const field map
+    using FieldMap_t = TypedFieldMap<FieldCollection, T, false>;
+    //! associated const field map
+    using ConstFieldMap_t = TypedFieldMap<FieldCollection, T, true>;
 
     /**
      * type stored (unfortunately, we can't statically size the second
@@ -107,6 +147,11 @@ namespace muSpectre {
     //! return type_id of stored type
     virtual const std::type_info & get_stored_typeid() const override final;
 
+    //! safe reference cast
+    static TypedField & check_ref(Base & other);
+    //! safe reference cast
+    static const TypedField & check_ref(const Base & other);
+
     virtual size_t size() const override final;
 
     //! add a pad region to the end of the field buffer; required for
@@ -118,7 +163,8 @@ namespace muSpectre {
     virtual void set_zero() override final;
 
     //! add a new value at the end of the field
-    inline void push_back(const Stored_t & value);
+    template <class Derived>
+    inline void push_back(const Eigen::DenseBase<Derived> & value);
 
 
     //! raw pointer to content (e.g., for Eigen maps)
@@ -137,7 +183,53 @@ namespace muSpectre {
     //! return a map representing the entire field as a single Eigen vector
     EigenVecConst_t const_eigenvec() const;
 
-    
+    /**
+     * Convenience function to return a map onto this field. A map
+     * allows iteration over all pixels. The map's iterator returns a
+     * dynamically sized `Eigen::Map` the data associated with a
+     * pixel.
+     */
+    inline FieldMap_t get_map();
+
+    /**
+     * Convenience function to return a map onto this field. A map
+     * allows iteration over all pixels. The map's iterator returns a
+     * dynamically sized `Eigen::Map` the data associated with a
+     * pixel.
+     */
+    inline ConstFieldMap_t get_map() const;
+
+    /**
+     * Convenience function to return a map onto this field. A map
+     * allows iteration over all pixels. The map's iterator returns a
+     * dynamically sized `Eigen::Map` the data associated with a
+     * pixel.
+     */
+    inline ConstFieldMap_t get_const_map() const;
+
+
+    /**
+     * creates a `TypedField` same size and type as this, but all
+     * entries are zero. Convenience function
+     */
+    inline TypedField & get_zeros_like(std::string unique_name) const;
+
+    /**
+     * Fill the content of the local field into the global field
+     * (obviously only for pixels that actually are present in the
+     * local field)
+     */
+    template <bool IsGlobal = Global>
+    inline std::enable_if_t<IsGlobal>
+    fill_from_local(const LocalField_t & local);
+
+    /**
+     * For pixels that are present in the local field, fill them with
+     * the content of the global field at those pixels
+     */
+    template <bool IsLocal = not Global>
+    inline std::enable_if_t<IsLocal>
+    fill_from_global(const GlobalField_t & global);
 
   protected:
     //! returns a raw pointer to the entry, for `Eigen::Map`
@@ -183,6 +275,12 @@ namespace muSpectre {
 
   private:
   };
+}  // muSpectre
+
+#include "common/field_map_dynamic.hh"
+
+namespace muSpectre {
+
 
   /* ---------------------------------------------------------------------- */
   /* Implementations                                                        */
@@ -264,6 +362,77 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <class FieldCollection, typename T>
+  auto TypedField<FieldCollection, T>::get_map() -> FieldMap_t {
+    return FieldMap_t(*this);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <class FieldCollection, typename T>
+  auto TypedField<FieldCollection, T>::get_map() const -> ConstFieldMap_t {
+    return ConstFieldMap_t(*this);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <class FieldCollection, typename T>
+  auto TypedField<FieldCollection, T>::get_const_map() const -> ConstFieldMap_t {
+    return ConstFieldMap_t(*this);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <class FieldCollection, typename T>
+  auto TypedField<FieldCollection, T>::
+  get_zeros_like(std::string unique_name) const -> TypedField& {
+    return make_field<TypedField>(unique_name,
+                                  this->collection,
+                                  this->nb_components);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <class FieldCollection, typename T>
+  template <bool IsGlobal>
+  std::enable_if_t<IsGlobal> TypedField<FieldCollection, T>::
+  fill_from_local(const LocalField_t & local) {
+    static_assert(IsGlobal == Global, "SFINAE parameter, do not touch");
+    if (not (local.get_nb_components() == this->get_nb_components())) {
+      std::stringstream err_str{};
+      err_str << "Fields not compatible: You are trying to write a local "
+              << local.get_nb_components() << "-component field into a global "
+              << this->get_nb_components() << "-component field.";
+      throw std::runtime_error(err_str.str());
+    }
+    auto this_map{this->get_map()};
+    for (const auto && key_val: local.get_map().enumerate()) {
+      const auto & key{std::get<0>(key_val)};
+      const auto & value{std::get<1>(key_val)};
+      this_map[key] = value;
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <class FieldCollection, typename T>
+  template <bool IsLocal>
+  std::enable_if_t<IsLocal> TypedField<FieldCollection, T>::
+  fill_from_global(const GlobalField_t & global) {
+    static_assert(IsLocal == not Global, "SFINAE parameter, do not touch");
+    if (not (global.get_nb_components() == this->get_nb_components())) {
+      std::stringstream err_str{};
+      err_str << "Fields not compatible: You are trying to write a global "
+              << global.get_nb_components() << "-component field into a local "
+              << this->get_nb_components() << "-component field.";
+      throw std::runtime_error(err_str.str());
+    }
+
+    auto global_map{global.get_map()};
+
+    for (auto && key_val: this->get_map().enumerate()) {
+      const auto & key{std::get<0>(key_val)};
+      auto & value{std::get<1>(key_val)};
+      value = global_map[key];
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <class FieldCollection, typename T>
   void TypedField<FieldCollection, T>::resize(size_t size) {
     if (this->alt_values) {
       throw FieldError("Field proxies can't resize.");
@@ -277,6 +446,33 @@ namespace muSpectre {
   template <class FieldCollection, typename T>
   void TypedField<FieldCollection, T>::set_zero() {
     std::fill(this->values.begin(), this->values.end(), T{});
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <class FieldCollection, typename T>
+  auto TypedField<FieldCollection, T>::check_ref(Base & other) -> TypedField & {
+    if (typeid(T).hash_code() != other.get_stored_typeid().hash_code()) {
+        std::string err ="Cannot create a Reference of requested type " +(
+           "for field '" + other.get_name() + "' of type '" +
+           other.get_stored_typeid().name() + "'");
+        throw std::runtime_error
+          (err);
+      }
+    return static_cast<TypedField&>(other);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <class FieldCollection, typename T>
+  auto TypedField<FieldCollection, T>::
+  check_ref(const Base & other) -> const TypedField & {
+    if (typeid(T).hash_code() != other.get_stored_typeid().hash_code()) {
+        std::string err ="Cannot create a Reference of requested type " +(
+           "for field '" + other.get_name() + "' of type '" +
+           other.get_stored_typeid().name() + "'");
+        throw std::runtime_error
+          (err);
+      }
+    return static_cast<const TypedField&>(other);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -314,8 +510,9 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <class FieldCollection, typename T>
+  template <class Derived>
   void TypedField<FieldCollection, T>::
-  push_back(const Stored_t & value) {
+  push_back(const Eigen::DenseBase<Derived> & value) {
     static_assert (not FieldCollection::Global,
                    "You can only push_back data into local field collections");
     if (value.cols() != 1) {

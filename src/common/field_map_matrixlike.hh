@@ -118,7 +118,7 @@ namespace muSpectre {
                                            value_type>; // since it's a resource handle
       using size_type = typename Parent::size_type; //!< stl conformance
       using pointer = std::unique_ptr<EigenArray>; //!< stl conformance
-      using TypedField = typename Parent::TypedField; //!< stl conformance
+
       using Field = typename Parent::Field; //!< stl conformance
       using Field_c  = typename Parent::Field_c; //!< stl conformance
       //! stl conformance
@@ -131,7 +131,14 @@ namespace muSpectre {
       using reverse_iterator = std::reverse_iterator<iterator>; //!< stl conformance
        //! stl conformance
       using const_reverse_iterator = std::reverse_iterator<const_iterator>;
-      //! stl conformance
+      //! enumerator over a constant scalar field
+      using const_enumerator = typename Parent::template enumerator<const_iterator>;
+      //! enumerator over a scalar field
+      using enumerator = std::conditional_t<
+        ConstField,
+        const_enumerator,
+        typename Parent::template enumerator<iterator>>;
+      //! give access to the protected fields
       friend iterator;
 
       //! Default constructor
@@ -153,9 +160,9 @@ namespace muSpectre {
       MatrixLikeFieldMap(TypedSizedFieldBase<FC, T2, NbC> & field);
 
       //! Copy constructor
-      MatrixLikeFieldMap(const MatrixLikeFieldMap &other) = default;
+      MatrixLikeFieldMap(const MatrixLikeFieldMap &other) = delete;
 
-      //! Move constructor
+      //! Move constructorxo
       MatrixLikeFieldMap(MatrixLikeFieldMap &&other) = default;
 
       //! Destructor
@@ -185,7 +192,7 @@ namespace muSpectre {
       inline const_reference operator[](const Ccoord& ccoord) const;
 
       //! return an iterator to head of field for ranges
-      inline iterator begin(){return iterator(*this);}
+      inline iterator begin(){return std::move(iterator(*this));}
       //! return an iterator to head of field for ranges
       inline const_iterator cbegin() const {return const_iterator(*this);}
       //! return an iterator to head of field for ranges
@@ -196,6 +203,17 @@ namespace muSpectre {
       inline const_iterator cend() const {return const_iterator(*this, false);}
       //! return an iterator to tail of field for ranges
       inline const_iterator end() const {return this->cend();}
+
+      /**
+       * return an iterable proxy to this field that can be iterated
+       * in Ccoord-value tuples
+       */
+      enumerator enumerate() {return enumerator(*this);}
+      /**
+       * return an iterable proxy to this field that can be iterated
+       * in Ccoord-value tuples
+       */
+      const_enumerator enumerate() const {return const_enumerator(*this);}
 
       //! evaluate the average of the field
       inline T_t mean() const;
@@ -263,9 +281,8 @@ namespace muSpectre {
     MatrixLikeFieldMap<FieldCollection, EigenArray, EigenConstArray, EigenPlain,
                        map_type, ConstField>::
     operator[](const Ccoord & ccoord) {
-      size_t index{};
-      index = this->collection.get_index(ccoord);
-      return reference(this->get_ptr_to_entry(std::move(index)));
+      size_t && index{this->collection.get_index(ccoord)};
+      return reference(this->get_ptr_to_entry(index));
     }
 
     /* ---------------------------------------------------------------------- */
@@ -287,9 +304,8 @@ namespace muSpectre {
     MatrixLikeFieldMap<FieldCollection, EigenArray, EigenConstArray, EigenPlain,
                        map_type, ConstField>::
     operator[](const Ccoord & ccoord) const{
-      size_t index{};
-      index = this->collection.get_index(ccoord);
-      return const_reference(this->get_ptr_to_entry(std::move(index)));
+      size_t && index{this->collection.get_index(ccoord)};
+      return const_reference(this->get_ptr_to_entry(index));
     }
 
     //----------------------------------------------------------------------------//

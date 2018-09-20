@@ -39,6 +39,7 @@
 #ifndef STATEFIELD_H
 #define STATEFIELD_H
 
+#include "common/field_helpers.hh"
 #include "common/field.hh"
 #include "common/utilities.hh"
 
@@ -47,6 +48,13 @@
 #include <sstream>
 
 namespace muSpectre {
+
+  /**
+   * Forward-declaration
+   */
+  template <class FieldCollection, typename T>
+  class TypedField;
+
 
   /**
    * Base class for state fields, useful for storing polymorphic references

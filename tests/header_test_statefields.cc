@@ -1,5 +1,5 @@
 /**
- * file   test_statefields.cc
+ * file   header_test_statefields.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *

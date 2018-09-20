@@ -96,7 +96,6 @@ namespace muSpectre {
       return internal::herm<dim>(full_sizes, std::make_index_sequence<dim-1>{});
     }
 
-    /* ---------------------------------------------------------------------- */
     //! return physical vector of a cell of cubic pixels
     template <size_t dim>
     Eigen::Matrix<Real, dim, 1> get_vector(const Ccoord_t<dim> & ccoord, Real pix_size = 1.) {

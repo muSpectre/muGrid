@@ -62,14 +62,18 @@ endif(${MPI_PARALLEL})
 
 include(muspectreTools)
 
+string( TOLOWER "${CMAKE_BUILD_TYPE}" build_type )
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
   # using Clang
   add_compile_options(-Wno-missing-braces)
+  if ("debug" STREQUAL "${build_type}")
+    add_compile_options(-O0)
+  endif()
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
   # using GCC
   add_compile_options(-Wno-non-virtual-dtor)
-  string( TOLOWER "${CMAKE_BUILD_TYPE}" build_type )
-  if ("release" STREQUAL "${build_type}" )
+  add_compile_options(-march=native)
+  if (("relwithdebinfo" STREQUAL "${build_type}") OR ("release" STREQUAL "${build_type}" ))
     add_compile_options(-march=native)
   endif()
   if ("debug" STREQUAL "${build_type}" )
@@ -106,13 +110,30 @@ endif()
 if (${MAKE_TESTS})
   ##############################################################################
 
-  # build tests
+  # build library tests
   file( GLOB TEST_SRCS "${CMAKE_SOURCE_DIR}/tests/test_*.cc")
 
   add_executable(main_test_suite tests/main_test_suite.cc ${TEST_SRCS})
   target_link_libraries(main_test_suite ${Boost_LIBRARIES} muSpectre)
 
+
   muSpectre_add_test(main_test_suite TYPE BOOST main_test_suite --report_level=detailed)
+
+  # build header tests
+  file( GLOB HEADER_TEST_SRCS "${CMAKE_SOURCE_DIR}/tests/header_test_*.cc")
+  foreach(header_test ${HEADER_TEST_SRCS})
+    get_filename_component(header_test_name ${header_test} NAME_WE)
+    string(SUBSTRING ${header_test_name} 12 -1 test_name)
+    list(APPEND header_tests ${test_name})
+    add_executable(${test_name} tests/main_test_suite.cc ${header_test})
+    target_link_libraries(${test_name} ${Boost_LIBRARIES} Eigen3::Eigen)
+    target_include_directories(${test_name} INTERFACE ${muSpectre_INCLUDES})
+    muSpectre_add_test(${test_name} TYPE BOOST ${test_name}
+      --report_level=detailed)
+  endforeach(header_test ${HEADER_TEST_SRCS})
+
+  add_custom_target(header_tests)
+  add_dependencies(header_tests ${header_tests})
 
   ##############################################################################
   # copy python test

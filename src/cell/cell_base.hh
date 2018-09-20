@@ -72,6 +72,14 @@ namespace muSpectre {
     //! dynamic matrix type for setting strains
     using Matrix_t = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
 
+    //! dynamic generic array type for interaction with numpy, i/o, etc
+    template <typename T>
+    using Array_t = Eigen::Array<T, Eigen::Dynamic, Eigen::Dynamic>;
+
+    //! ref to dynamic generic array
+    template <typename T>
+    using Array_ref = Eigen::Map<Array_t<T>>;
+
     //! ref to constant vector
     using ConstVector_ref = Eigen::Map<const Vector_t>;
 
@@ -101,6 +109,9 @@ namespace muSpectre {
 
     //! returns the number of degrees of freedom in the cell
     virtual Dim_t get_nb_dof() const = 0;
+
+    //! number of pixels in the cell
+    virtual size_t size() const = 0;
 
     //! return the communicator object
     virtual const Communicator & get_communicator() const = 0;
@@ -171,6 +182,42 @@ namespace muSpectre {
 
 
     /**
+     * returns a ref to a field named 'unique_name" of real values
+     * managed by the cell. If the field does not yet exist, it is
+     * created.
+     *
+     * @param unique_name name of the field. If the field already
+     * exists, an array ref mapped onto it is returned. Else, a new
+     * field with that name is created and returned-
+     *
+     * @param nb_components number of components to be stored *per
+     * pixel*. For new fields any positive number can be chosen. When
+     * accessing an existing field, this must correspond to the
+     * existing field size, and a `std::runtime_error` is thrown if
+     * this is not satisfied
+     */
+    virtual Array_ref<Real> get_managed_real_array(std::string unique_name,
+                                                   size_t nb_components) = 0;
+
+    /**
+     * Convenience function to copy local (internal) fields of
+     * materials into a global field. At least one of the materials in
+     * the cell needs to contain an internal field named
+     * `unique_name`. If multiple materials contain such a field, they
+     * all need to be of same scalar type and same number of
+     * components. This does not work for split pixel cells or
+     * laminate pixel cells, as they can have multiple entries for the
+     * same pixel. Pixels for which no field named `unique_name`
+     * exists get an array of zeros.
+     *
+     * @param unique_name fieldname to fill the global field with. At
+     * least one material must have such a field, or a
+     * `std::runtime_error` is thrown
+     */
+    virtual Array_ref<Real>
+    get_globalised_internal_real_array(const std::string & unique_name) = 0;
+
+    /**
      * set uniform strain (typically used to initialise problems
      */
     virtual void set_uniform_strain(const Eigen::Ref<const Matrix_t> &) = 0;
@@ -203,6 +250,9 @@ namespace muSpectre {
     using Projection_t = ProjectionBase<DimS, DimM>;
     //! projections handled through `std::unique_ptr`s
     using Projection_ptr = std::unique_ptr<Projection_t>;
+    //! dynamic global fields
+    template <typename T>
+    using Field_t = TypedField<FieldCollection_t, T>;
     //! expected type for strain fields
     using StrainField_t =
       TensorField<FieldCollection_t, Real, secondOrder, DimM>;
@@ -227,6 +277,13 @@ namespace muSpectre {
     //! output vector reference for solvers
     using Vector_ref = typename Parent::Vector_ref;
 
+    //! dynamic array type for interactions with numpy/scipy/solvers, etc.
+    template <typename T>
+    using Array_t = typename Parent::Array_t<T>;
+
+    //! dynamic array type for interactions with numpy/scipy/solvers, etc.
+    template <typename T>
+    using Array_ref = typename Parent::Array_ref<T>;
 
     //! sparse matrix emulation
     using Adaptor = Parent::Adaptor;
@@ -360,7 +417,27 @@ namespace muSpectre {
     const TangentField_t & get_tangent(bool create = false);
 
     //! returns a ref to a temporary field managed by the cell
-    StrainField_t & get_managed_field(std::string unique_name);
+    StrainField_t & get_managed_T2_field(std::string unique_name);
+
+    //! returns a ref to a temporary field of real values managed by the cell
+    Field_t<Real> & get_managed_real_field(std::string unique_name,
+                                           size_t nb_components);
+
+    //! returns a Array ref to a temporary field of real values managed by the cell
+    virtual Array_ref<Real>
+    get_managed_real_array(std::string unique_name,
+                           size_t nb_components) override final;
+
+    /**
+     * returns a global field filled from local (internal) fields of
+     * the materials. see `Cell::get_globalised_internal_array` for
+     * details.
+     */
+    Field_t<Real> & get_globalised_internal_real_field(const std::string & unique_name);
+
+    //! see `Cell::get_globalised_internal_array` for details
+    Array_ref<Real>
+    get_globalised_internal_real_array(const std::string & unique_name) override final;
 
     /**
      * general initialisation; initialises the projection and
@@ -379,7 +456,7 @@ namespace muSpectre {
     iterator begin(); //!< iterator to the first pixel
     iterator end();  //!< iterator past the last pixel
     //! number of pixels in the cell
-    size_t size() const {return pixels.size();}
+    size_t size() const override final{return pixels.size();}
 
     //! return the subdomain resolutions of the cell
     const Ccoord & get_subdomain_resolutions() const {

@@ -30,7 +30,7 @@
 #define FIELD_H
 
 #include "common/T4_map_proxy.hh"
-#include "field_typed.hh"
+#include "common/field_typed.hh"
 
 #include <Eigen/Dense>
 
@@ -41,7 +41,6 @@
 #include <vector>
 #include <algorithm>
 #include <cmath>
-#include <memory>
 #include <type_traits>
 
 namespace muSpectre {
@@ -74,8 +73,6 @@ namespace muSpectre {
       using Scalar = T; //!< for type checking
       using Base = typename Parent::Base; //!< root base class
 
-      //! type stored if ArrayStore is true
-      using Stored_t = Eigen::Array<T, NbComponents, 1>;
       //! storage container
       using Storage_t = typename Parent::Storage_t;
 
@@ -93,7 +90,8 @@ namespace muSpectre {
       virtual ~TypedSizedFieldBase() = default;
 
       //! add a new value at the end of the field
-      inline void push_back(const Stored_t & value);
+      template <class Derived>
+      inline void push_back(const Eigen::DenseBase<Derived> & value);
 
       //! add a new scalar value at the end of the field
       template <bool scalar_store = NbComponents==1>
@@ -125,8 +123,8 @@ namespace muSpectre {
       template <typename T2>
       inline Real inner_product(const TypedSizedFieldBase<
                                 FieldCollection, T2, NbComponents> & other) const;
-    protected:
 
+    protected:
       //! returns a raw pointer to the entry, for `Eigen::Map`
       inline T* get_ptr_to_entry(const size_t&& index);
 
@@ -151,8 +149,7 @@ namespace muSpectre {
   template <class FieldCollection, typename T, Dim_t order, Dim_t dim>
   class TensorField: public internal::TypedSizedFieldBase<FieldCollection,
                                                      T,
-                                                     ipow(dim,order)>
-  {
+                                                     ipow(dim,order)>  {
   public:
     //! base class
     using Parent = internal::TypedSizedFieldBase<FieldCollection,
@@ -208,7 +205,7 @@ namespace muSpectre {
      * order @a order is 2.
      * - A `T4MatrixFieldMap` if the tensorial order is 4.
      */
-    decltype(auto) get_map();
+    inline decltype(auto) get_map();
     /**
      * Convenience functions to return a map onto this field. A map allows
      * iteration over all pixels. The map's iterator returns an object that
@@ -221,7 +218,7 @@ namespace muSpectre {
      * order @a order is 2.
      * - A `T4MatrixFieldMap` if the tensorial order is 4.
      */
-    decltype(auto) get_const_map();
+    inline decltype(auto) get_const_map();
     /**
      * Convenience functions to return a map onto this field. A map allows
      * iteration over all pixels. The map's iterator returns an object that
@@ -234,7 +231,13 @@ namespace muSpectre {
      * order @a order is 2.
      * - A `T4MatrixFieldMap` if the tensorial order is 4.
      */
-    decltype(auto) get_map() const;
+    inline decltype(auto) get_map() const;
+
+    /**
+     * creates a `TensorField` same size and type as this, but all
+     * entries are zero. Convenience function
+     */
+    inline TensorField & get_zeros_like(std::string unique_name) const;
 
   protected:
     //! constructor protected!
@@ -307,7 +310,7 @@ namespace muSpectre {
       * - A `MatrixFieldMap` with @a NbRows rows and @a NbCols columns
       * otherwise.
       */
-    decltype(auto) get_map();
+    inline decltype(auto) get_map();
     /**
      * Convenience functions to return a map onto this field. A map allows
      * iteration over all pixels. The map's iterator returns an object that
@@ -318,7 +321,7 @@ namespace muSpectre {
      * - A `MatrixFieldMap` with @a NbRows rows and @a NbCols columns
      * otherwise.
      */
-    decltype(auto) get_const_map();
+    inline decltype(auto) get_const_map();
     /**
      * Convenience functions to return a map onto this field. A map allows
      * iteration over all pixels. The map's iterator returns an object that
@@ -329,8 +332,13 @@ namespace muSpectre {
      * - A `MatrixFieldMap` with @a NbRows rows and @a NbCols columns
      * otherwise.
      */
-    decltype(auto) get_map() const;
+    inline decltype(auto) get_map() const;
 
+    /**
+     * creates a `MatrixField` same size and type as this, but all
+     * entries are zero. Convenience function
+     */
+    inline MatrixField & get_zeros_like(std::string unique_name) const;
 
 protected:
     //! constructor protected!
@@ -367,19 +375,20 @@ protected:
     TypedSizedFieldBase<FieldCollection, T, NbComponents>::
     check_ref(Base & other) {
       if (typeid(T).hash_code() != other.get_stored_typeid().hash_code()) {
-        std::string err ="Cannot create a Reference of requested type " +(
-           "for field '" + other.get_name() + "' of type '" +
-           other.get_stored_typeid().name() + "'");
-        throw std::runtime_error
-          (err);
+        std::stringstream err_str{};
+        err_str << "Cannot create a reference of type '" << typeid(T).name()
+                << "' for field '" << other.get_name() << "' of type '"
+                << other.get_stored_typeid().name() << "'";
+      throw std::runtime_error(err_str.str());
       }
       //check size compatibility
       if (NbComponents != other.get_nb_components()) {
-        throw std::runtime_error
-          ("Cannot create a Reference to a field with " +
-           std::to_string(NbComponents) + " components " +
-           "for field '" + other.get_name() + "' with " +
-           std::to_string(other.get_nb_components()) + " components");
+        std::stringstream err_str{};
+        err_str << "Cannot create a reference to a field with "
+                << NbComponents << " components "
+                << "for field '" << other.get_name() << "' with "
+                << other.get_nb_components() << " components";
+        throw std::runtime_error{err_str.str()};
       }
       return static_cast<TypedSizedFieldBase&>(other);
     }
@@ -391,19 +400,20 @@ protected:
     check_ref(const Base & other) {
       if (typeid(T).hash_code() != other.get_stored_typeid().hash_code()) {
         std::stringstream err_str{};
-        err_str << "Cannot create a Reference of requested type "
-                << "for field '"  << other.get_name() << "' of type '"
+        err_str << "Cannot create a reference of type '" << typeid(T).name()
+                << "' for field '"  << other.get_name() << "' of type '"
                 << other.get_stored_typeid().name() << "'";
         throw std::runtime_error
           (err_str.str());
       }
       //check size compatibility
       if (NbComponents != other.get_nb_components()) {
-        throw std::runtime_error
-          ("Cannot create a Reference to a field with " +
-           std::to_string(NbComponents) + " components " +
-           "for field '" + other.get_name() + "' with " +
-           std::to_string(other.get_nb_components()) + " components");
+        std::stringstream err_str{};
+        err_str << "Cannot create a reference toy a field with "
+                << NbComponents << " components "
+                << "for field '" << other.get_name() << "' with "
+                << other.get_nb_components() << " components";
+        throw std::runtime_error{err_str.str()};
       }
       return static_cast<const TypedSizedFieldBase&>(other);
     }
@@ -447,11 +457,17 @@ protected:
 
     /* ---------------------------------------------------------------------- */
     template <class FieldCollection, typename T, Dim_t NbComponents>
+    template <class Derived>
     void TypedSizedFieldBase<FieldCollection, T, NbComponents>::
-    push_back(const Stored_t & value) {
+    push_back(const Eigen::DenseBase<Derived> & value) {
+      static_assert(Derived::SizeAtCompileTime == NbComponents,
+                    "You provided an array with the wrong number of entries.");
+      static_assert((Derived::RowsAtCompileTime == 1) or
+                    (Derived::ColsAtCompileTime == 1),
+                    "You have not provided a column or row vector.");
       static_assert (not FieldCollection::Global,
                      "You can only push_back data into local field "
-                     "collections");
+                     "collections.");
       for (Dim_t i = 0; i < NbComponents; ++i) {
         this->values.push_back(value(i));
       }
@@ -472,21 +488,6 @@ protected:
     }
 
   }  // internal
-
-  /* ---------------------------------------------------------------------- */
-  //! Factory function, guarantees that only fields get created that are
-  //! properly registered and linked to a collection.
-  template <class FieldType, class FieldCollection, typename... Args>
-  inline FieldType &
-  make_field(std::string unique_name,
-             FieldCollection & collection,
-             Args&&... args) {
-    std::unique_ptr<FieldType> ptr{
-      new FieldType(unique_name, collection, args...)};
-    auto& retref{*ptr};
-    collection.register_field(std::move(ptr));
-    return retref;
-  }
 
   /* ---------------------------------------------------------------------- */
   template <class FieldCollection, typename T, Dim_t order, Dim_t dim>
@@ -624,6 +625,14 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
+  template <class FieldCollection, typename T, Dim_t order, Dim_t dim>
+  auto TensorField<FieldCollection, T, order, dim>::
+  get_zeros_like(std::string unique_name) const -> TensorField & {
+    return make_field<TensorField>(unique_name,
+                                   this->collection);
+  }
+
+  /* ---------------------------------------------------------------------- */
   template <class FieldCollection, typename T, Dim_t NbRow, Dim_t NbCol>
   auto MatrixField<FieldCollection, T, NbRow, NbCol>::
   get_map() -> decltype(auto) {
@@ -655,6 +664,15 @@ namespace muSpectre {
                                          map_constness>::type;
     return RawMap_t(*this);
   }
+
+  /* ---------------------------------------------------------------------- */
+  template <class FieldCollection, typename T, Dim_t order, Dim_t dim>
+  auto MatrixField<FieldCollection, T, order, dim>::
+  get_zeros_like(std::string unique_name) const -> MatrixField & {
+    return make_field<MatrixField>(unique_name,
+                                   this->collection);
+  }
+
 
 
 }  // muSpectre

@@ -32,7 +32,12 @@
 
 namespace muSpectre {
 
-  /* ---------------------------------------------------------------------- */
+    /**
+   * forward declaration
+   */
+  template <Dim_t DimS>
+  class GlobalFieldCollection;
+
   /** `LocalFieldCollection` derives from `FieldCollectionBase` and stores
     * local fields, i.e. fields that are only defined for a subset of all pixels
     * in the computational domain. The coordinates of these active pixels are
@@ -40,7 +45,7 @@ namespace muSpectre {
     * `LocalFieldCollection::add_pixel` allows to add individual pixels to the
     * field collection.
     */
-  template<Dim_t DimS>
+  template <Dim_t DimS>
   class LocalFieldCollection:
     public FieldCollectionBase<DimS, LocalFieldCollection<DimS>>
   {
@@ -51,11 +56,17 @@ namespace muSpectre {
     //! base class
     using Parent = FieldCollectionBase<DimS,
                                        LocalFieldCollection<DimS>>;
+    //! helpful for functions that fill local fields from global fields
+    using GlobalFieldCollection_t = GlobalFieldCollection<DimS>;
+    //! helpful for functions that fill local fields from global fields
+    using LocalFieldCollection_t = LocalFieldCollection<DimS>;
     using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
     using Field_p = typename Parent::Field_p; //!< field pointer
     using ccoords_container = std::vector<Ccoord>; //!< list of pixels
     //! iterator over managed pixels
     using iterator = typename ccoords_container::iterator;
+    //! const iterator over managed pixels
+    using const_iterator = typename ccoords_container::const_iterator;
 
     //! Default constructor
     LocalFieldCollection();
@@ -101,6 +112,14 @@ namespace muSpectre {
     //! iterator past last pixel
     inline iterator end() {return this->ccoords.end();}
 
+    //! const iterator to first pixel
+    inline const_iterator begin() const {return this->ccoords.cbegin();}
+    //! const iterator past last pixel
+    inline const_iterator end() const {return this->ccoords.cend();}
+
+
+    //! return globalness at compile time
+    static constexpr inline bool is_global() {return Global;}
   protected:
     //! container of pixel coords for non-global collections
     ccoords_container ccoords{};

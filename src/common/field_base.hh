@@ -166,7 +166,7 @@ namespace muSpectre {
       const std::string name; //!< the field's unique name
       const size_t nb_components; //!< number of components per entry
       //! reference to the collection this field belongs to
-      const FieldCollection & collection;
+      FieldCollection & collection;
       size_t pad_size; //!< size of padding region at end of buffer
     private:
     };

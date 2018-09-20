@@ -138,8 +138,8 @@ void add_cell_base_helper(py::module & mod) {
            const std::string in_name{"temp input for directional stiffness"};
            constexpr bool create_tangent{true};
            auto & K = cell.get_tangent(create_tangent);
-           auto & input = cell.get_managed_field(in_name);
-           auto & output = cell.get_managed_field(out_name);
+           auto & input = cell.get_managed_T2_field(in_name);
+           auto & output = cell.get_managed_T2_field(out_name);
            input.eigen() = v;
            cell.directional_stiffness(K, input, output);
            return output.eigen();
@@ -159,7 +159,7 @@ void add_cell_base_helper(py::module & mod) {
              cell.initialise();
            }
            const std::string in_name{"temp input for projection"};
-           auto & input = cell.get_managed_field(in_name);
+           auto & input = cell.get_managed_T2_field(in_name);
            input.eigen() = v;
            cell.project(input);
            return input.eigen();
@@ -196,7 +196,24 @@ void add_cell_base_helper(py::module & mod) {
 }
 
 void add_cell_base(py::module & mod) {
-  py::class_<Cell>(mod, "Cell");
+  py::class_<Cell>(mod, "Cell")
+    .def("get_globalised_internal_real_array",
+         &Cell::get_globalised_internal_real_array,
+         "unique_name"_a,
+         "Convenience function to copy local (internal) fields of "
+         "materials into a global field. At least one of the materials in "
+         "the cell needs to contain an internal field named "
+         "`unique_name`. If multiple materials contain such a field, they "
+         "all need to be of same scalar type and same number of "
+         "components. This does not work for split pixel cells or "
+         "laminate pixel cells, as they can have multiple entries for the "
+         "same pixel. Pixels for which no field named `unique_name` "
+         "exists get an array of zeros."
+         "\n"
+         "Parameters:\n"
+         "unique_name: fieldname to fill the global field with. At "
+         "least one material must have such a field, or an "
+         "Exception is raised.");
   add_cell_base_helper<twoD>  (mod);
   add_cell_base_helper<threeD>(mod);
 }

@@ -1,5 +1,5 @@
 /**
- * file   test_raw_field_map.cc
+ * file   header_test_raw_field_map.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *

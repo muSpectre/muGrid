@@ -1,5 +1,5 @@
 /**
- * @file   test_eigen_tools.cc
+ * @file   header_test_eigen_tools.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  *

@@ -32,7 +32,8 @@
 
 #include <sstream>
 #include <algorithm>
-
+#include <set>
+#include <functional>
 
 namespace muSpectre {
 
@@ -48,7 +49,10 @@ namespace muSpectre {
      F{make_field<StrainField_t>("Gradient", *this->fields)},
      P{make_field<StressField_t>("Piola-Kirchhoff-1", *this->fields)},
      projection{std::move(projection_)}
-  { }
+  {
+    // resize all global fields (strain, stress, etc)
+    this->fields->initialise(this->subdomain_resolutions, this->subdomain_locations);
+  }
 
   /**
    * turns out that the default move container in combination with
@@ -162,7 +166,7 @@ namespace muSpectre {
     }
 
     const std::string out_name{"δP; temp output for directional stiffness"};
-    auto & delP = this->get_managed_field(out_name);
+    auto & delP = this->get_managed_T2_field(out_name);
 
     auto Kmap{this->K.value().get().get_map()};
     auto delPmap{delP.get_map()};
@@ -252,8 +256,8 @@ namespace muSpectre {
     const std::string out_name{"temp output for directional stiffness"};
     const std::string in_name{"temp input for directional stiffness"};
 
-    auto & out_tempref = this->get_managed_field(out_name);
-    auto & in_tempref = this->get_managed_field(in_name);
+    auto & out_tempref = this->get_managed_T2_field(out_name);
+    auto & in_tempref = this->get_managed_T2_field(in_name);
     Vector_ref(in_tempref.data(), this->get_nb_dof()) = delF;
 
     this->directional_stiffness(this->K.value(), in_tempref, out_tempref);
@@ -275,8 +279,8 @@ namespace muSpectre {
     const std::string out_name{"temp output for directional stiffness"};
     const std::string in_name{"temp input for directional stiffness"};
 
-    auto & out_tempref = this->get_managed_field(out_name);
-    auto & in_tempref = this->get_managed_field(in_name);
+    auto & out_tempref = this->get_managed_T2_field(out_name);
+    auto & in_tempref = this->get_managed_T2_field(in_name);
     in_tempref.eigen() = delF;
     this->directional_stiffness(this->K.value(), in_tempref, out_tempref);
     return out_tempref.eigen();
@@ -325,12 +329,108 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   typename CellBase<DimS, DimM>::StrainField_t &
-  CellBase<DimS, DimM>::get_managed_field(std::string unique_name) {
+  CellBase<DimS, DimM>::get_managed_T2_field(std::string unique_name) {
     if (!this->fields->check_field_exists(unique_name)) {
       return make_field<StressField_t>(unique_name, *this->fields);
     } else {
       return static_cast<StressField_t&>(this->fields->at(unique_name));
     }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  auto
+  CellBase<DimS, DimM>::get_managed_real_field(std::string unique_name,
+                                               size_t nb_components) ->
+    Field_t<Real> & {
+    if (!this->fields->check_field_exists(unique_name)) {
+      return make_field<Field_t<Real>>(unique_name, *this->fields,
+                                       nb_components);
+    } else {
+      auto & ret_ref{Field_t<Real>::check_ref(this->fields->at(unique_name))};
+      if (ret_ref.get_nb_components() != nb_components) {
+        std::stringstream err{};
+        err << "Field '" << unique_name << "' already exists and it has "
+            << ret_ref.get_nb_components() << " components. You asked for a field "
+            << "with " << nb_components << "components.";
+        throw std::runtime_error(err.str());
+      }
+      return ret_ref;
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  auto CellBase<DimS, DimM>::
+  get_globalised_internal_real_field(const std::string & unique_name)
+    -> Field_t<Real> &
+  {
+    using LField_t = typename Field_t<Real>::LocalField_t;
+    // start by checking that the field exists at least once, and that
+    // it always has th same number of components
+    std::set<Dim_t> nb_component_categories{};
+    std::vector<std::reference_wrapper<LField_t>> local_fields;
+    for (auto & mat: this->materials) {
+      auto & coll = mat->get_collection();
+      if (coll.check_field_exists(unique_name)) {
+        auto & field{LField_t::check_ref(coll[unique_name])};
+        local_fields.emplace_back(field);
+        nb_component_categories.insert(field.get_nb_components());
+      }
+    }
+    if (nb_component_categories.size() != 1) {
+      const auto & nb_match{nb_component_categories.size()};
+      std::stringstream err_str{};
+      if (nb_match > 1) {
+        err_str << "The fields named '" << unique_name << "' do not have the "
+                << "same number of components in every material, which is a "
+                << "requirement for globalising them! The following values were "
+                << "found by material:" << std::endl;
+        for (auto & mat: this->materials) {
+          auto & coll = mat->get_collection();
+          if (coll.check_field_exists(unique_name)) {
+            auto & field{LField_t::check_ref(coll[unique_name])};
+            err_str << field.get_nb_components() << " components in material '"
+                    << mat->get_name() << "'" << std::endl;
+          }
+        }
+      } else {
+        err_str << "The field named '" << unique_name << "' does not exist in "
+                << "any of the materials and can therefore not be globalised!";
+      }
+      throw std::runtime_error(err_str.str());
+    }
+    const Dim_t nb_components{*nb_component_categories.begin()};
+
+    // get and prepare the field
+    auto & field{this->get_managed_real_field(unique_name, nb_components)};
+    field.set_zero();
+
+    // fill it with local internal values
+    for (auto & local_field: local_fields) {
+      field.fill_from_local(local_field);
+    }
+    return field;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  auto CellBase<DimS, DimM>::get_managed_real_array(std::string unique_name,
+                                                    size_t nb_components)
+    -> Array_ref<Real>
+  {
+    auto & field{this->get_managed_real_field(unique_name, nb_components)};
+    return Array_ref<Real>
+      {field.data(), Dim_t(nb_components), Dim_t(field.size())};
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  auto CellBase<DimS, DimM>::
+  get_globalised_internal_real_array(const std::string & unique_name) -> Array_ref<Real> {
+    auto & field{this->get_globalised_internal_real_field(unique_name)};
+    return Array_ref<Real>
+      {field.data(), Dim_t(field.get_nb_components()), Dim_t(field.size())};
   }
 
   /* ---------------------------------------------------------------------- */
@@ -341,8 +441,6 @@ namespace muSpectre {
     for (auto && mat: this->materials) {
       mat->initialise();
     }
-    // resize all global fields (strain, stress, etc)
-    this->fields->initialise(this->subdomain_resolutions, this->subdomain_locations);
     // initialise the projection and compute the fft plan
     this->projection->initialise(flags);
     this->initialised = true;
