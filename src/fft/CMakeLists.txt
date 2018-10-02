@@ -57,7 +57,7 @@ if (${MPI_PARALLEL})
     list(APPEND PRIVATE_MUSPECTRE_LIBS
       ${PFFT_LIBRARIES})
 
-    target_include_directories(muSpectre PRIVATE ${PFFT_INCLUDES})
+    target_include_directories(muSpectre PUBLIC ${PFFT_INCLUDES})
   endif (${USE_PFFT})
 
   ##############################################################################

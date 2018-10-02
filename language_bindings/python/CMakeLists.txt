@@ -73,4 +73,4 @@ add_custom_command(TARGET pyMuSpectre POST_BUILD
                        ${CMAKE_SOURCE_DIR}/language_bindings/python/muSpectre $<TARGET_FILE_DIR:pyMuSpectreLib>/muSpectre)
 
 install(TARGETS pyMuSpectreLib LIBRARY DESTINATION ${PYTHON_USER_SITE})
-install(FILES muSpectre/__init__.py DESTINATION ${PYTHON_USER_SITE}/muSpectre)
+install(FILES muSpectre/__init__.py muSpectre/fft.py DESTINATION ${PYTHON_USER_SITE}/muSpectre)

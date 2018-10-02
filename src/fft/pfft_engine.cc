@@ -30,12 +30,14 @@
 
 namespace muSpectre {
 
-  template <Dim_t DimsS, Dim_t DimM>
-  int PFFTEngine<DimsS, DimM>::nb_engines{0};
+  template <Dim_t DimsS>
+  int PFFTEngine<DimsS>::nb_engines{0};
 
-  template <Dim_t DimS, Dim_t DimM>
-  PFFTEngine<DimS, DimM>::PFFTEngine(Ccoord resolutions, Communicator comm)
-    :Parent{resolutions, comm}, mpi_comm{comm.get_mpi_comm()}
+  template <Dim_t DimS>
+  PFFTEngine<DimS>::PFFTEngine(Ccoord resolutions,
+                               Dim_t nb_components,
+                               Communicator comm)
+    :Parent{resolutions, nb_components, comm}, mpi_comm{comm.get_mpi_comm()}
   {
     if (!this->nb_engines) pfft_init();
     this->nb_engines++;
@@ -71,7 +73,7 @@ namespace muSpectre {
     ptrdiff_t res[DimS], loc[DimS], fres[DimS], floc[DimS];
     this->workspace_size =
       pfft_local_size_many_dft_r2c(DimS, narr.data(), narr.data(), narr.data(),
-                                   Field_t::nb_components,
+                                   this->nb_components,
                                    PFFT_DEFAULT_BLOCKS, PFFT_DEFAULT_BLOCKS,
                                    this->mpi_comm,
                                    PFFT_TRANSPOSED_OUT,
@@ -116,8 +118,8 @@ namespace muSpectre {
 
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void PFFTEngine<DimS, DimM>::initialise(FFT_PlanFlags plan_flags) {
+  template <Dim_t DimS>
+  void PFFTEngine<DimS>::initialise(FFT_PlanFlags plan_flags) {
     if (this->initialised) {
       throw std::runtime_error("double initialisation, will leak memory");
     }
@@ -130,9 +132,9 @@ namespace muSpectre {
     // We need to check whether the workspace provided by our field is large
     // enough. PFFT may request a workspace size larger than the nominal size
     // of the complex buffer.
-    if (long(this->work.size()*Field_t::nb_components) < this->workspace_size) {
+    if (long(this->work.size()*this->nb_components) < this->workspace_size) {
       this->work.set_pad_size(this->workspace_size -
-                              Field_t::nb_components*this->work.size());
+                              this->nb_components*this->work.size());
     }
 
     unsigned int flags;
@@ -160,7 +162,7 @@ namespace muSpectre {
     Real * in{this->real_workspace};
     pfft_complex * out{reinterpret_cast<pfft_complex*>(this->work.data())};
     this->plan_fft = pfft_plan_many_dft_r2c(DimS, narr.data(), narr.data(),
-                                            narr.data(), Field_t::nb_components,
+                                            narr.data(), this->nb_components,
                                             PFFT_DEFAULT_BLOCKS,
                                             PFFT_DEFAULT_BLOCKS,
                                             in, out, this->mpi_comm,
@@ -175,7 +177,7 @@ namespace muSpectre {
 
     this->plan_ifft = pfft_plan_many_dft_c2r(DimS, narr.data(), narr.data(),
                                              narr.data(),
-                                             Field_t::nb_components,
+                                             this->nb_components,
                                              PFFT_DEFAULT_BLOCKS,
                                              PFFT_DEFAULT_BLOCKS,
                                              i_in, i_out,
@@ -189,8 +191,8 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  PFFTEngine<DimS, DimM>::~PFFTEngine<DimS, DimM>() noexcept {
+  template <Dim_t DimS>
+  PFFTEngine<DimS>::~PFFTEngine<DimS>() noexcept {
     if (this->real_workspace != nullptr) pfft_free(this->real_workspace);
     if (this->plan_fft != nullptr) pfft_destroy_plan(this->plan_fft);
     if (this->plan_ifft != nullptr) pfft_destroy_plan(this->plan_ifft);
@@ -204,9 +206,9 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  typename PFFTEngine<DimS, DimM>::Workspace_t &
-  PFFTEngine<DimS, DimM>::fft (Field_t & field) {
+  template <Dim_t DimS>
+  typename PFFTEngine<DimS>::Workspace_t &
+  PFFTEngine<DimS>::fft (Field_t & field) {
     if (!this->plan_fft) {
         throw std::runtime_error("fft plan not allocated");
     }
@@ -215,7 +217,7 @@ namespace muSpectre {
     }
     // Copy field data to workspace buffer. This is necessary because workspace
     // buffer is larger than field buffer.
-    std::copy(field.data(), field.data()+Field_t::nb_components*field.size(),
+    std::copy(field.data(), field.data()+this->nb_components*field.size(),
               this->real_workspace);
     pfft_execute_dft_r2c(
       this->plan_fft, this->real_workspace,
@@ -224,9 +226,9 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimS>
   void
-  PFFTEngine<DimS, DimM>::ifft (Field_t & field) const {
+  PFFTEngine<DimS>::ifft (Field_t & field) const {
     if (!this->plan_ifft) {
         throw std::runtime_error("ifft plan not allocated");
     }
@@ -237,11 +239,10 @@ namespace muSpectre {
       this->plan_ifft, reinterpret_cast<pfft_complex*>(this->work.data()),
       this->real_workspace);
     std::copy(this->real_workspace,
-              this->real_workspace+Field_t::nb_components*field.size(),
+              this->real_workspace+this->nb_components*field.size(),
               field.data());
   }
 
-  template class PFFTEngine<twoD, twoD>;
-  template class PFFTEngine<twoD, threeD>;
-  template class PFFTEngine<threeD, threeD>;
+  template class PFFTEngine<twoD>;
+  template class PFFTEngine<threeD>;
 }  // muSpectre
