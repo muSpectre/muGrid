@@ -52,21 +52,49 @@ namespace muSpectre {
                                       Eigen::Map<T4Mat<T, Dim>>>;
 
 
+  template<class Derived>
+  struct DimCounter{};
+
+  template <class Derived>
+  struct DimCounter<Eigen::MatrixBase<Derived>> {
+  private:
+    using Type = Eigen::MatrixBase<Derived>;
+    constexpr static Dim_t Rows{Type::RowsAtCompileTime};
+  public:
+    static_assert(Rows != Eigen::Dynamic,
+                  "matrix type not statically sized");
+    static_assert(Rows == Type::ColsAtCompileTime,
+                  "matrix type not square");
+    constexpr static Dim_t value{ct_sqrt(Rows)};
+    static_assert(value*value == Rows,
+                  "Only integer numbers of dimensions allowed");
+  };
   /**
    * provides index-based access to fourth-order Tensors represented
    * by square matrices
    */
   template <typename T4>
-  inline auto get(T4&& t4, Dim_t i, Dim_t j, Dim_t k, Dim_t l)
+  inline auto get(const Eigen::MatrixBase<T4>& t4, Dim_t i, Dim_t j, Dim_t k, Dim_t l)
+    -> decltype(auto) {
+    constexpr Dim_t Dim{DimCounter<Eigen::MatrixBase<T4>>::value};
+    const auto myColStride{
+      (t4.colStride() == 1) ? t4.colStride(): t4.colStride()/Dim};
+    const auto myRowStride{
+      (t4.rowStride() == 1) ? t4.rowStride(): t4.rowStride()/Dim};
+    return t4(i * myRowStride + j * myColStride,
+              k * myRowStride + l * myColStride);
+  }
+
+  template <typename T4>
+  inline auto get(Eigen::MatrixBase<T4>& t4, Dim_t i, Dim_t j, Dim_t k, Dim_t l)
     -> decltype(t4.coeffRef(i,j)) {
-    constexpr Dim_t Dim{EigenCheck::tensor_4_dim<T4>::value};
+    constexpr Dim_t Dim{DimCounter<Eigen::MatrixBase<T4>>::value};
     const auto myColStride{
       (t4.colStride() == 1) ? t4.colStride(): t4.colStride()/Dim};
     const auto myRowStride{
       (t4.rowStride() == 1) ? t4.rowStride(): t4.rowStride()/Dim};
     return t4.coeffRef(i * myRowStride + j * myColStride,
                        k * myRowStride + l * myColStride);
-
   }
 
   // /* ---------------------------------------------------------------------- */

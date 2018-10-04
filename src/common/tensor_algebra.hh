@@ -225,12 +225,17 @@ namespace muSpectre {
      * Standart tensor multiplication
      */
     template<typename T4, typename T2>
-    constexpr inline decltype(auto) tensmult(T4 && A, T2 && B) {
-      constexpr Dim_t dim{EigenCheck::tensor_4_dim<T4>::value};
-      static_assert((dim == EigenCheck::tensor_dim<T2>::value),
-                    "Dimensionality check failed. Expects A to be a fourth-"
-                    "order tensor of dimension dim and B to be a second-order "
-                    "Tensor of same dimension");
+    constexpr inline decltype(auto)
+    tensmult(const Eigen::MatrixBase<T4> & A, const Eigen::MatrixBase<T2> & B) {
+      constexpr Dim_t dim{T2::RowsAtCompileTime};
+      static_assert (dim == T2::ColsAtCompileTime,
+                     "B is not square");
+      static_assert (dim != Eigen::Dynamic,
+                     "B not statically sized");
+      static_assert(dim*dim == T4::RowsAtCompileTime,
+                    "A and B not compatible");
+      static_assert(T4::RowsAtCompileTime == T4::ColsAtCompileTime,
+                    "A is not square");
       Tens2_t<dim> result;
       result.setZero();
 

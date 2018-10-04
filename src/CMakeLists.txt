@@ -72,8 +72,6 @@ target_link_libraries(muSpectre PRIVATE ${FFTW_LIBRARIES} ${PRIVATE_MUSPECTRE_LI
 
 target_link_libraries(muSpectre PUBLIC Eigen3::Eigen)
 
-target_compile_definitions(muSpectre PRIVATE  ${-DNO_EXPERIMENTAL})
-
 set_property(TARGET muSpectre PROPERTY PUBLIC_HEADER ${_headers})
 
 install(TARGETS muSpectre

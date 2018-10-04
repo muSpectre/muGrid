@@ -33,6 +33,7 @@ set (materials_SRC
   ${CMAKE_CURRENT_SOURCE_DIR}/material_linear_elastic2.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/material_linear_elastic3.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/material_linear_elastic4.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/material_linear_elastic_generic.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/material_hyper_elasto_plastic1.cc
   )
 

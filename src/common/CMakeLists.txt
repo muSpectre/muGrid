@@ -28,9 +28,7 @@
 # =============================================================================
 
 set (common_SRC
-  #${CMAKE_CURRENT_SOURCE_DIR}/units.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/common.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/voigt_conversion.cc
   )
 
 target_sources(muSpectre PRIVATE ${common_SRC})
