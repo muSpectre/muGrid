@@ -2055,7 +2055,7 @@ Start each file with license boilerplate. e.g., for file ``common.hh`` authored 
     *
     * @date   01 May 2017
     *
-    * @brief  Small definitions of commonly used types throughout µSpectre
+    * @brief  Small prototypes of commonly used types throughout µSpectre
     *
     * @section  LICENSE
     *
@@ -2072,7 +2072,7 @@ Start each file with license boilerplate. e.g., for file ``common.hh`` authored 
     * General Public License for more details.
     *
     * You should have received a copy of the GNU General Public License
-    * along with GNU Emacs; see the file COPYING. If not, write to the
+    * along with µSpectre; see the file COPYING. If not, write to the
     * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
     * Boston, MA 02111-1307, USA.
     */
