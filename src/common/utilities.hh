@@ -36,8 +36,6 @@
 #ifndef UTILITIES_H
 #define UTILITIES_H
 
-#include <boost/tuple/tuple.hpp>
-
 #include <tuple>
 
 #ifdef NO_EXPERIMENTAL

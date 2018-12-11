@@ -66,6 +66,10 @@ endif(${USE_PFFT})
 
 find_package(PythonLibsNew ${MUSPECTRE_PYTHON_MAJOR_VERSION} MODULE REQUIRED)
 
+# On OS X, add -Wno-deprecated-declarations
+IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  add_compile_options(-Wno-deprecated-declarations)
+ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
 pybind11_add_module(pyMuSpectreLib ${PY_BINDING_SRCS})
 target_link_libraries(pyMuSpectreLib PRIVATE muSpectre)

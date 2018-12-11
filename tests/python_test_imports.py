@@ -39,7 +39,11 @@ Program grant you additional permission to convey the resulting work.
 import sys
 import os
 
+# Default path of the library
 sys.path.insert(0, os.path.join(os.getcwd(), "language_bindings/python"))
+
+# Path of the library when compiling with Xcode
+sys.path.insert(0, os.path.join(os.getcwd(), "language_bindings/python/Debug"))
 
 try:
     import muSpectre as µ
