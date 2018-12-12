@@ -50,7 +50,8 @@ namespace muSpectre {
    * Virtual base class for solvers. Any implementation of this interface can be
    * used with the solver functions prototyped in solvers.hh
    */
-  template <Dim_t DimS, Dim_t DimM = DimS> class DeprecatedSolverBase {
+  template <Dim_t DimS, Dim_t DimM = DimS>
+  class DeprecatedSolverBase {
    public:
     /**
      * Enum to describe in what kind the solver relies tangent stiffnesses
@@ -71,23 +72,24 @@ namespace muSpectre {
     DeprecatedSolverBase() = delete;
 
     //! Constructor with domain resolutions
-    DeprecatedSolverBase(Cell_t &cell, Real tol, Uint maxiter = 0,
+    DeprecatedSolverBase(Cell_t & cell, Real tol, Uint maxiter = 0,
                          bool verbose = false);
 
     //! Copy constructor
-    DeprecatedSolverBase(const DeprecatedSolverBase &other) = delete;
+    DeprecatedSolverBase(const DeprecatedSolverBase & other) = delete;
 
     //! Move constructor
-    DeprecatedSolverBase(DeprecatedSolverBase &&other) = default;
+    DeprecatedSolverBase(DeprecatedSolverBase && other) = default;
 
     //! Destructor
     virtual ~DeprecatedSolverBase() = default;
 
     //! Copy assignment operator
-    DeprecatedSolverBase &operator=(const DeprecatedSolverBase &other) = delete;
+    DeprecatedSolverBase &
+    operator=(const DeprecatedSolverBase & other) = delete;
 
     //! Move assignment operator
-    DeprecatedSolverBase &operator=(DeprecatedSolverBase &&other) = default;
+    DeprecatedSolverBase & operator=(DeprecatedSolverBase && other) = default;
 
     //! Allocate fields used during the solution
     virtual void initialise() {
@@ -124,7 +126,7 @@ namespace muSpectre {
     virtual SolvVectorOut solve(const SolvVectorInC rhs, SolvVectorIn x_0) = 0;
 
     //! return a reference to the cell
-    Cell_t &get_cell() { return cell; }
+    Cell_t & get_cell() { return cell; }
 
     //! read the current maximum number of iterations setting
     Uint get_maxiter() const { return this->maxiter; }
@@ -142,7 +144,7 @@ namespace muSpectre {
    protected:
     //! returns the tangent requirements of this solver
     virtual TangentRequirement get_tangent_req() const = 0;
-    Cell_t &cell;     //!< reference to the cell
+    Cell_t & cell;    //!< reference to the cell
     Real tol;         //!< convergence tolerance
     Uint maxiter;     //!< maximum number of iterations
     bool verbose;     //!< whether or not to write information to the std output

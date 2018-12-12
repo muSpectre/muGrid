@@ -92,8 +92,8 @@ namespace muSpectre {
     using Vector = Eigen::Matrix<Real, dim, 1>;
 
     Fields fields{};
-    FieldT &f_grad{make_field<FieldT>("gradient", fields)};
-    FieldT &f_var{make_field<FieldT>("working field", fields)};
+    FieldT & f_grad{make_field<FieldT>("gradient", fields)};
+    FieldT & f_var{make_field<FieldT>("working field", fields)};
 
     FieldMap grad(f_grad);
     FieldMap var(f_var);
@@ -109,10 +109,10 @@ namespace muSpectre {
       k(i) = (i + 1) * 2 * pi / fix::projector.get_domain_lengths()[i];
     }
 
-    for (auto &&tup : akantu::zip(fields, grad, var)) {
-      auto &ccoord = std::get<0>(tup);
-      auto &g = std::get<1>(tup);
-      auto &v = std::get<2>(tup);
+    for (auto && tup : akantu::zip(fields, grad, var)) {
+      auto & ccoord = std::get<0>(tup);
+      auto & g = std::get<1>(tup);
+      auto & v = std::get<2>(tup);
       Vector vec = CcoordOps::get_vector(
           ccoord, fix::projector.get_domain_lengths() /
                       fix::projector.get_domain_resolutions());
@@ -123,10 +123,10 @@ namespace muSpectre {
     fix::projector.initialise(FFT_PlanFlags::estimate);
     fix::projector.apply_projection(f_var);
 
-    for (auto &&tup : akantu::zip(fields, grad, var)) {
-      auto &ccoord = std::get<0>(tup);
-      auto &g = std::get<1>(tup);
-      auto &v = std::get<2>(tup);
+    for (auto && tup : akantu::zip(fields, grad, var)) {
+      auto & ccoord = std::get<0>(tup);
+      auto & g = std::get<1>(tup);
+      auto & v = std::get<2>(tup);
       Vector vec = CcoordOps::get_vector(
           ccoord, fix::projector.get_domain_lengths() /
                       fix::projector.get_domain_resolutions());

@@ -45,7 +45,8 @@
 
 namespace muSpectre {
 
-  template <Dim_t DimS, Dim_t DimM, bool Global> struct SF_Fixture {
+  template <Dim_t DimS, Dim_t DimM, bool Global>
+  struct SF_Fixture {
     using FC_t = std::conditional_t<Global, GlobalFieldCollection<DimS>,
                                     LocalFieldCollection<DimS>>;
     using Field_t = TensorField<FC_t, Real, secondOrder, DimM>;
@@ -65,9 +66,9 @@ namespace muSpectre {
               make_statefield<StateField<ScalField_t, nb_mem>>("scalar", fc)},
           self{*this} {}
     FC_t fc;
-    StateField<Field_t, nb_mem> &sf;
-    StateField<ScalField_t, nb_mem> &scalar_f;
-    SF_Fixture &self;
+    StateField<Field_t, nb_mem> & sf;
+    StateField<ScalField_t, nb_mem> & scalar_f;
+    SF_Fixture & self;
   };
 
   using typelist = boost::mpl::list<
@@ -84,7 +85,7 @@ namespace muSpectre {
     using FC_t = LocalFieldCollection<Dim>;
     FC_t fc{};
     using Field_t = ScalarField<FC_t, Int>;
-    auto &statefield{make_statefield<StateField<Field_t, NbMem>>("name", fc)};
+    auto & statefield{make_statefield<StateField<Field_t, NbMem>>("name", fc)};
     fc.add_pixel({});
     fc.initialise();
     for (size_t i{0}; i < NbMem + 1; ++i) {
@@ -106,26 +107,28 @@ namespace muSpectre {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(constructor_test, Fix, typelist, Fix) {
     const std::string ref{"prefix"};
-    const std::string &fix{Fix::sf.get_prefix()};
+    const std::string & fix{Fix::sf.get_prefix()};
     BOOST_CHECK_EQUAL(ref, fix);
   }
 
   namespace internal {
 
-    template <bool global, class Fixture_t> struct init {
-      static void run(Fixture_t &fix) {
+    template <bool global, class Fixture_t>
+    struct init {
+      static void run(Fixture_t & fix) {
         constexpr Dim_t dim{std::remove_reference_t<Fixture_t>::sdim};
         fix.fc.initialise(CcoordOps::get_cube<dim>(3),
                           CcoordOps::get_cube<dim>(0));
       }
     };
 
-    template <class Fixture_t> struct init<false, Fixture_t> {
-      static void run(Fixture_t &fix) {
+    template <class Fixture_t>
+    struct init<false, Fixture_t> {
+      static void run(Fixture_t & fix) {
         constexpr Dim_t dim{std::remove_reference_t<Fixture_t>::sdim};
         CcoordOps::Pixels<dim> pixels(CcoordOps::get_cube<dim>(3),
                                       CcoordOps::get_cube<dim>(0));
-        for (auto &&pix : pixels) {
+        for (auto && pix : pixels) {
           fix.fc.add_pixel(pix);
         }
         fix.fc.initialise();
@@ -145,7 +148,7 @@ namespace muSpectre {
     StateFMap matrix_map(Fix::sf);
 
     for (size_t i = 0; i < Fix::nb_mem + 1; ++i) {
-      for (auto &&wrapper : matrix_map) {
+      for (auto && wrapper : matrix_map) {
         wrapper.current() += (i + 1) * wrapper.current().Identity();
         if (verbose) {
           std::cout << "pixel " << wrapper.get_ccoord() << ", memory cycle "
@@ -158,7 +161,7 @@ namespace muSpectre {
       Fix::sf.cycle();
     }
 
-    for (auto &&wrapper : matrix_map) {
+    for (auto && wrapper : matrix_map) {
       auto I{wrapper.current().Identity()};
       Real error{(wrapper.current() - I).norm()};
       BOOST_CHECK_LT(error, tol);
@@ -178,7 +181,7 @@ namespace muSpectre {
     auto matrix_map{Fix::sf.get_map()};
 
     for (size_t i = 0; i < Fix::nb_mem + 1; ++i) {
-      for (auto &&wrapper : matrix_map) {
+      for (auto && wrapper : matrix_map) {
         wrapper.current() += (i + 1) * wrapper.current().Identity();
         if (verbose) {
           std::cout << "pixel " << wrapper.get_ccoord() << ", memory cycle "
@@ -193,7 +196,7 @@ namespace muSpectre {
 
     auto matrix_const_map{Fix::sf.get_const_map()};
 
-    for (auto &&wrapper : matrix_const_map) {
+    for (auto && wrapper : matrix_const_map) {
       auto I{wrapper.current().Identity()};
       Real error{(wrapper.current() - I).norm()};
       BOOST_CHECK_LT(error, tol);
@@ -213,7 +216,7 @@ namespace muSpectre {
     auto scalar_map{Fix::scalar_f.get_map()};
 
     for (size_t i = 0; i < Fix::nb_mem + 1; ++i) {
-      for (auto &&wrapper : scalar_map) {
+      for (auto && wrapper : scalar_map) {
         wrapper.current() += (i + 1);
         if (verbose) {
           std::cout << "pixel " << wrapper.get_ccoord() << ", memory cycle "
@@ -249,22 +252,22 @@ namespace muSpectre {
     internal::init<Fix::global, decltype(Fix::self)>::run(Fix::self);
 
     // constexpr bool verbose{true};
-    auto &tensor_field = Fix::fc.get_statefield("prefix");
+    auto & tensor_field = Fix::fc.get_statefield("prefix");
     BOOST_CHECK_EQUAL(tensor_field.get_nb_memory(), Fix::get_nb_mem());
 
-    auto &field = Fix::fc.template get_current<Real>("prefix");
+    auto & field = Fix::fc.template get_current<Real>("prefix");
     BOOST_CHECK_EQUAL(field.get_nb_components(),
                       ipow(Fix::get_mdim(), secondOrder));
     BOOST_CHECK_THROW(Fix::fc.template get_current<Int>("prefix"),
                       std::runtime_error);
-    auto &old_field = Fix::fc.template get_old<Real>("prefix");
+    auto & old_field = Fix::fc.template get_old<Real>("prefix");
     BOOST_CHECK_EQUAL(old_field.get_nb_components(), field.get_nb_components());
     BOOST_CHECK_THROW(
         Fix::fc.template get_old<Real>("prefix", Fix::get_nb_mem() + 1),
         std::out_of_range);
 
-    auto &statefield{Fix::fc.get_statefield("prefix")};
-    auto &typed_statefield{
+    auto & statefield{Fix::fc.get_statefield("prefix")};
+    auto & typed_statefield{
         Fix::fc.template get_typed_statefield<Real>("prefix")};
     auto map{ArrayFieldMap<decltype(Fix::fc), Real,
                            ipow(Fix::get_mdim(), secondOrder), 1>(
@@ -275,7 +278,7 @@ namespace muSpectre {
 
     Eigen::ArrayXXd field_copy{field.eigen()};
     statefield.cycle();
-    auto &alt_old_field{typed_statefield.get_old_field()};
+    auto & alt_old_field{typed_statefield.get_old_field()};
 
     Real err{(field_copy - alt_old_field.eigen()).matrix().norm() /
              field_copy.matrix().norm()};

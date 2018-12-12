@@ -44,7 +44,8 @@
 
 namespace muSpectre {
 
-  template <Dim_t DimS, Dim_t DimM> class MaterialLinearElastic3;
+  template <Dim_t DimS, Dim_t DimM>
+  class MaterialLinearElastic3;
 
   /**
    * traits for objective linear elasticity with eigenstrain
@@ -115,20 +116,21 @@ namespace muSpectre {
     explicit MaterialLinearElastic3(std::string name);
 
     //! Copy constructor
-    MaterialLinearElastic3(const MaterialLinearElastic3 &other) = delete;
+    MaterialLinearElastic3(const MaterialLinearElastic3 & other) = delete;
 
     //! Move constructor
-    MaterialLinearElastic3(MaterialLinearElastic3 &&other) = delete;
+    MaterialLinearElastic3(MaterialLinearElastic3 && other) = delete;
 
     //! Destructor
     virtual ~MaterialLinearElastic3() = default;
 
     //! Copy assignment operator
     MaterialLinearElastic3 &
-    operator=(const MaterialLinearElastic3 &other) = delete;
+    operator=(const MaterialLinearElastic3 & other) = delete;
 
     //! Move assignment operator
-    MaterialLinearElastic3 &operator=(MaterialLinearElastic3 &&other) = delete;
+    MaterialLinearElastic3 &
+    operator=(MaterialLinearElastic3 && other) = delete;
 
     /**
      * evaluates second Piola-Kirchhoff stress given the Green-Lagrange
@@ -136,7 +138,7 @@ namespace muSpectre {
      * and the local stiffness tensor.
      */
     template <class s_t, class stiffness_t>
-    inline decltype(auto) evaluate_stress(s_t &&E, stiffness_t &&C);
+    inline decltype(auto) evaluate_stress(s_t && E, stiffness_t && C);
 
     /**
      * evaluates both second Piola-Kirchhoff stress and stiffness given
@@ -144,29 +146,29 @@ namespace muSpectre {
      * called with a small strain tensor) and the local stiffness tensor.
      */
     template <class s_t, class stiffness_t>
-    inline decltype(auto) evaluate_stress_tangent(s_t &&E, stiffness_t &&C);
+    inline decltype(auto) evaluate_stress_tangent(s_t && E, stiffness_t && C);
 
     /**
      * return the empty internals tuple
      */
-    InternalVariables &get_internals() { return this->internal_variables; }
+    InternalVariables & get_internals() { return this->internal_variables; }
 
     /**
      * overload add_pixel to write into loacal stiffness tensor
      */
-    void add_pixel(const Ccoord_t<DimS> &pixel) final;
+    void add_pixel(const Ccoord_t<DimS> & pixel) final;
 
     /**
      * overload add_pixel to write into local stiffness tensor
      */
-    void add_pixel(const Ccoord_t<DimS> &pixel, const Real &Young,
-                   const Real &PoissonRatio);
+    void add_pixel(const Ccoord_t<DimS> & pixel, const Real & Young,
+                   const Real & PoissonRatio);
 
    protected:
     //! storage for stiffness tensor
     using Field_t =
         TensorField<LocalFieldCollection<DimS>, Real, fourthOrder, DimM>;
-    Field_t &C_field;  //!< field of stiffness tensors
+    Field_t & C_field;  //!< field of stiffness tensors
     //! tuple for iterable eigen_field
     InternalVariables internal_variables;
 
@@ -176,8 +178,8 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   template <class s_t, class stiffness_t>
-  auto MaterialLinearElastic3<DimS, DimM>::evaluate_stress(s_t &&E,
-                                                           stiffness_t &&C)
+  auto MaterialLinearElastic3<DimS, DimM>::evaluate_stress(s_t && E,
+                                                           stiffness_t && C)
       -> decltype(auto) {
     return Matrices::tensmult(C, E);
   }
@@ -186,7 +188,7 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   template <class s_t, class stiffness_t>
   auto MaterialLinearElastic3<DimS, DimM>::evaluate_stress_tangent(
-      s_t &&E, stiffness_t &&C) -> decltype(auto) {
+      s_t && E, stiffness_t && C) -> decltype(auto) {
     return std::make_tuple(evaluate_stress(E, C), C);
   }
 

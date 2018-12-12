@@ -49,42 +49,43 @@ namespace muSpectre {
    * implements a bunch of static functions to convert between full
    * and Voigt notation of tensors
    */
-  template <Dim_t dim> class VoigtConversion {
+  template <Dim_t dim>
+  class VoigtConversion {
    public:
     VoigtConversion();
     virtual ~VoigtConversion();
 
     //! obtain a fourth order voigt matrix from a tensor
     template <class Tens4, class Voigt, bool sym = true>
-    inline static void fourth_to_voigt(const Tens4 &t, Voigt &v);
+    inline static void fourth_to_voigt(const Tens4 & t, Voigt & v);
     //! return a fourth order voigt matrix from a tensor
     template <class Tens4, bool sym = true>
     inline static Eigen::Matrix<Real, vsize<sym>(dim), vsize<sym>(dim)>
-    fourth_to_voigt(const Tens4 &t);
+    fourth_to_voigt(const Tens4 & t);
 
     //! return a fourth order non-symmetric voigt matrix from a tensor
     template <class Tens4>
     inline static Eigen::Matrix<Real, vsize<false>(dim), vsize<false>(dim)>
-    fourth_to_2d(const Tens4 &t) {
+    fourth_to_2d(const Tens4 & t) {
       return fourth_to_voigt<Tens4, false>(t);
     }
 
     //! probably obsolete
     template <class Tens2, class Voigt, bool sym = true>
-    inline static void second_to_voigt(const Tens2 &t, Voigt &v);
+    inline static void second_to_voigt(const Tens2 & t, Voigt & v);
 
     //! probably obsolete
     template <class Tens2, class Voigt>
-    inline static void gradient_to_voigt_strain(const Tens2 &F, Voigt &v);
+    inline static void gradient_to_voigt_strain(const Tens2 & F, Voigt & v);
 
     //! probably obsolete
     template <class Tens2, class Voigt>
-    inline static void gradient_to_voigt_GreenLagrange_strain(const Tens2 &F,
-                                                              Voigt &v);
+    inline static void gradient_to_voigt_GreenLagrange_strain(const Tens2 & F,
+                                                              Voigt & v);
 
     //! probably obsolete
     template <class Tens2, class Voigt, bool sym = true>
-    inline static void stress_from_voigt(const Voigt &v, Tens2 &sigma);
+    inline static void stress_from_voigt(const Voigt & v, Tens2 & sigma);
 
    public:
     //! matrix of vector index I as function of tensor indices i,j
@@ -151,14 +152,15 @@ namespace muSpectre {
   //----------------------------------------------------------------------------//
   template <Dim_t dim>
   template <class Tens4, class Voigt, bool sym>
-  inline void VoigtConversion<dim>::fourth_to_voigt(const Tens4 &t, Voigt &v) {
+  inline void VoigtConversion<dim>::fourth_to_voigt(const Tens4 & t,
+                                                    Voigt & v) {
     // upper case indices for Voigt notation, lower case for standard tensorial
     for (Dim_t I = 0; I < vsize<sym>(dim); ++I) {
-      auto &&i = vec(I, 0);
-      auto &&j = vec(I, 1);
+      auto && i = vec(I, 0);
+      auto && j = vec(I, 1);
       for (Dim_t J = 0; J < vsize<sym>(dim); ++J) {
-        auto &&k = vec(J, 0);
-        auto &&l = vec(J, 1);
+        auto && k = vec(J, 0);
+        auto && l = vec(J, 1);
         v(I, J) = t(i, j, k, l);
       }
     }
@@ -168,7 +170,7 @@ namespace muSpectre {
   template <Dim_t dim>
   template <class Tens4, bool sym>
   inline Eigen::Matrix<Real, vsize<sym>(dim), vsize<sym>(dim)>
-  VoigtConversion<dim>::fourth_to_voigt(const Tens4 &t) {
+  VoigtConversion<dim>::fourth_to_voigt(const Tens4 & t) {
     using V_t = Eigen::Matrix<Real, vsize<sym>(dim), vsize<sym>(dim)>;
     V_t temp;
     fourth_to_voigt<decltype(t), V_t, sym>(t, temp);
@@ -178,10 +180,11 @@ namespace muSpectre {
   //----------------------------------------------------------------------------//
   template <Dim_t dim>
   template <class Tens2, class Voigt, bool sym>
-  inline void VoigtConversion<dim>::second_to_voigt(const Tens2 &F, Voigt &v) {
+  inline void VoigtConversion<dim>::second_to_voigt(const Tens2 & F,
+                                                    Voigt & v) {
     for (Dim_t I = 0; I < vsize(dim); ++I) {
-      auto &&i = vec(I, 0);
-      auto &&j = vec(I, 1);
+      auto && i = vec(I, 0);
+      auto && j = vec(I, 1);
       v(I) = F(i, j);
     }
   }
@@ -189,11 +192,11 @@ namespace muSpectre {
   //----------------------------------------------------------------------------//
   template <Dim_t dim>
   template <class Tens2, class Voigt>
-  inline void VoigtConversion<dim>::gradient_to_voigt_strain(const Tens2 &F,
-                                                             Voigt &v) {
+  inline void VoigtConversion<dim>::gradient_to_voigt_strain(const Tens2 & F,
+                                                             Voigt & v) {
     for (Dim_t I = 0; I < vsize(dim); ++I) {
-      auto &&i = vec(I, 0);
-      auto &&j = vec(I, 1);
+      auto && i = vec(I, 0);
+      auto && j = vec(I, 1);
       v(I) = (F(i, j) + F(j, i)) / 2 * factors(I);
     }
   }
@@ -202,13 +205,13 @@ namespace muSpectre {
   template <Dim_t dim>
   template <class Tens2, class Voigt>
   inline void
-  VoigtConversion<dim>::gradient_to_voigt_GreenLagrange_strain(const Tens2 &F,
-                                                               Voigt &v) {
+  VoigtConversion<dim>::gradient_to_voigt_GreenLagrange_strain(const Tens2 & F,
+                                                               Voigt & v) {
     using mat = Eigen::Matrix<Real, dim, dim>;
     mat E = 0.5 * (F.transpose() * F - mat::Identity());
     for (Dim_t I = 0; I < vsize(dim); ++I) {
-      auto &&i = vec(I, 0);
-      auto &&j = vec(I, 1);
+      auto && i = vec(I, 0);
+      auto && j = vec(I, 1);
       v(I) = E(i, j) * factors(I);
     }
   }

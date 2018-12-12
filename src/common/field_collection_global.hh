@@ -43,7 +43,8 @@ namespace muSpectre {
   /**
    * forward declaration
    */
-  template <Dim_t DimS> class LocalFieldCollection;
+  template <Dim_t DimS>
+  class LocalFieldCollection;
 
   /** `GlobalFieldCollection` derives from `FieldCollectionBase` and stores
    * global fields that live throughout the whole computational domain, i.e.
@@ -70,20 +71,20 @@ namespace muSpectre {
     GlobalFieldCollection();
 
     //! Copy constructor
-    GlobalFieldCollection(const GlobalFieldCollection &other) = delete;
+    GlobalFieldCollection(const GlobalFieldCollection & other) = delete;
 
     //! Move constructor
-    GlobalFieldCollection(GlobalFieldCollection &&other) = default;
+    GlobalFieldCollection(GlobalFieldCollection && other) = default;
 
     //! Destructor
     virtual ~GlobalFieldCollection() = default;
 
     //! Copy assignment operator
     GlobalFieldCollection &
-    operator=(const GlobalFieldCollection &other) = delete;
+    operator=(const GlobalFieldCollection & other) = delete;
 
     //! Move assignment operator
-    GlobalFieldCollection &operator=(GlobalFieldCollection &&other) = default;
+    GlobalFieldCollection & operator=(GlobalFieldCollection && other) = default;
 
     /** allocate memory, etc. At this point, the collection is
         informed aboud the size and shape of the domain (through the
@@ -98,13 +99,13 @@ namespace muSpectre {
     inline void initialise(Ccoord sizes, Ccoord locations);
 
     //! return subdomain resolutions
-    inline const Ccoord &get_sizes() const;
+    inline const Ccoord & get_sizes() const;
     //! return subdomain locations
-    inline const Ccoord &get_locations() const;
+    inline const Ccoord & get_locations() const;
 
     //! returns the linear index corresponding to cell coordinates
     template <class CcoordRef>
-    inline size_t get_index(CcoordRef &&ccoord) const;
+    inline size_t get_index(CcoordRef && ccoord) const;
     //! returns the cell coordinates corresponding to a linear index
     inline Ccoord get_ccoord(size_t index) const;
 
@@ -141,8 +142,8 @@ namespace muSpectre {
     this->locations = locations;
 
     std::for_each(
-        std::begin(this->fields), std::end(this->fields), [this](auto &&item) {
-          auto &&field = *item.second;
+        std::begin(this->fields), std::end(this->fields), [this](auto && item) {
+          auto && field = *item.second;
           const auto field_size = field.size();
           if (field_size == 0) {
             field.resize(this->size());
@@ -199,7 +200,7 @@ namespace muSpectre {
   //! returns the linear index corresponding to cell coordinates
   template <Dim_t DimS>
   template <class CcoordRef>
-  size_t GlobalFieldCollection<DimS>::get_index(CcoordRef &&ccoord) const {
+  size_t GlobalFieldCollection<DimS>::get_index(CcoordRef && ccoord) const {
     static_assert(
         std::is_same<Ccoord, std::remove_const_t<
                                  std::remove_reference_t<CcoordRef>>>::value,

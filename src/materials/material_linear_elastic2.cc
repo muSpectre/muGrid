@@ -55,8 +55,8 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   void
-  MaterialLinearElastic2<DimS, DimM>::add_pixel(const Ccoord_t<DimS> &pixel,
-                                                const StrainTensor &E_eig) {
+  MaterialLinearElastic2<DimS, DimM>::add_pixel(const Ccoord_t<DimS> & pixel,
+                                                const StrainTensor & E_eig) {
     this->internal_fields.add_pixel(pixel);
     Eigen::Map<const Eigen::Array<Real, DimM * DimM, 1>> strain_array(
         E_eig.data());

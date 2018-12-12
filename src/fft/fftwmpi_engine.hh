@@ -45,7 +45,8 @@ namespace muSpectre {
    * implements the `muSpectre::FFTEngineBase` interface using the
    * FFTW library
    */
-  template <Dim_t Dim> class FFTWMPIEngine : public FFTEngineBase<Dim> {
+  template <Dim_t Dim>
+  class FFTWMPIEngine : public FFTEngineBase<Dim> {
    public:
     using Parent = FFTEngineBase<Dim>;       //!< base class
     using Ccoord = typename Parent::Ccoord;  //!< cell coordinates type
@@ -61,28 +62,28 @@ namespace muSpectre {
                   Communicator comm = Communicator());
 
     //! Copy constructor
-    FFTWMPIEngine(const FFTWMPIEngine &other) = delete;
+    FFTWMPIEngine(const FFTWMPIEngine & other) = delete;
 
     //! Move constructor
-    FFTWMPIEngine(FFTWMPIEngine &&other) = default;
+    FFTWMPIEngine(FFTWMPIEngine && other) = default;
 
     //! Destructor
     virtual ~FFTWMPIEngine() noexcept;
 
     //! Copy assignment operator
-    FFTWMPIEngine &operator=(const FFTWMPIEngine &other) = delete;
+    FFTWMPIEngine & operator=(const FFTWMPIEngine & other) = delete;
 
     //! Move assignment operator
-    FFTWMPIEngine &operator=(FFTWMPIEngine &&other) = default;
+    FFTWMPIEngine & operator=(FFTWMPIEngine && other) = default;
 
     // compute the plan, etc
     void initialise(FFT_PlanFlags plan_flags) override;
 
     //! forward transform
-    Workspace_t &fft(Field_t &field) override;
+    Workspace_t & fft(Field_t & field) override;
 
     //! inverse transform
-    void ifft(Field_t &field) const override;
+    void ifft(Field_t & field) const override;
 
    protected:
     static int
@@ -91,7 +92,7 @@ namespace muSpectre {
     fftw_plan plan_ifft{};  //!< holds the plan for inverse fourier transform
     ptrdiff_t
         workspace_size{};     //!< size of workspace buffer returned by planner
-    Real *real_workspace{};   //!< temporary real workspace that is correctly
+    Real * real_workspace{};  //!< temporary real workspace that is correctly
                               //!< padded
     bool initialised{false};  //!< to prevent double initialisation
 

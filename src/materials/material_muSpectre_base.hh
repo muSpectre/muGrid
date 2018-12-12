@@ -55,7 +55,8 @@
 namespace muSpectre {
 
   // Forward declaration for factory function
-  template <Dim_t DimS, Dim_t DimM> class CellBase;
+  template <Dim_t DimS, Dim_t DimM>
+  class CellBase;
 
   /**
    * material traits are used by `muSpectre::MaterialMuSpectre` to
@@ -81,9 +82,11 @@ namespace muSpectre {
    * - `InternalVariables`: a tuple of `muSpectre::FieldMap`s containing
    *                        internal variables
    */
-  template <class Material> struct MaterialMuSpectre_traits {};
+  template <class Material>
+  struct MaterialMuSpectre_traits {};
 
-  template <class Material, Dim_t DimS, Dim_t DimM> class MaterialMuSpectre;
+  template <class Material, Dim_t DimS, Dim_t DimM>
+  class MaterialMuSpectre;
 
   /**
    * Base class for most convenient implementation of materials
@@ -117,24 +120,24 @@ namespace muSpectre {
     explicit MaterialMuSpectre(std::string name);
 
     //! Copy constructor
-    MaterialMuSpectre(const MaterialMuSpectre &other) = delete;
+    MaterialMuSpectre(const MaterialMuSpectre & other) = delete;
 
     //! Move constructor
-    MaterialMuSpectre(MaterialMuSpectre &&other) = delete;
+    MaterialMuSpectre(MaterialMuSpectre && other) = delete;
 
     //! Destructor
     virtual ~MaterialMuSpectre() = default;
 
     //! Factory
     template <class... ConstructorArgs>
-    static Material &make(CellBase<DimS, DimM> &cell,
-                          ConstructorArgs &&... args);
+    static Material & make(CellBase<DimS, DimM> & cell,
+                           ConstructorArgs &&... args);
 
     //! Copy assignment operator
-    MaterialMuSpectre &operator=(const MaterialMuSpectre &other) = delete;
+    MaterialMuSpectre & operator=(const MaterialMuSpectre & other) = delete;
 
     //! Move assignment operator
-    MaterialMuSpectre &operator=(MaterialMuSpectre &&other) = delete;
+    MaterialMuSpectre & operator=(MaterialMuSpectre && other) = delete;
 
     //! allocate memory, etc
     void initialise() override;
@@ -142,38 +145,38 @@ namespace muSpectre {
     using Parent::compute_stresses;
     using Parent::compute_stresses_tangent;
     //! computes stress
-    void compute_stresses(const StrainField_t &F, StressField_t &P,
+    void compute_stresses(const StrainField_t & F, StressField_t & P,
                           Formulation form) final;
     //! computes stress and tangent modulus
-    void compute_stresses_tangent(const StrainField_t &F,
-                                  StressField_t &P, TangentField_t &K,
-                                  Formulation form) final;
+    void compute_stresses_tangent(const StrainField_t & F, StressField_t & P,
+                                  TangentField_t & K, Formulation form) final;
 
    protected:
     //! computes stress with the formulation available at compile time
     //! __attribute__ required by g++-6 and g++-7 because of this bug:
     //! https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80947
     template <Formulation Form>
-    inline void compute_stresses_worker(const StrainField_t &F,
-                                        StressField_t &P)
+    inline void compute_stresses_worker(const StrainField_t & F,
+                                        StressField_t & P)
         __attribute__((visibility("default")));
 
     //! computes stress with the formulation available at compile time
     //! __attribute__ required by g++-6 and g++-7 because of this bug:
     //! https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80947
     template <Formulation Form>
-    inline void compute_stresses_worker(const StrainField_t &F,
-                                        StressField_t &P, TangentField_t &K)
+    inline void compute_stresses_worker(const StrainField_t & F,
+                                        StressField_t & P, TangentField_t & K)
         __attribute__((visibility("default")));
     //! this iterable class is a default for simple laws that just take a strain
     //! the iterable is just a templated wrapper to provide a range to iterate
     //! over that does or does not include tangent moduli
-    template <NeedTangent need_tgt = NeedTangent::no> class iterable_proxy;
+    template <NeedTangent need_tgt = NeedTangent::no>
+    class iterable_proxy;
 
     /**
      * inheriting classes with internal variables need to overload this function
      */
-    typename traits::InternalVariables &get_internals() {
+    typename traits::InternalVariables & get_internals() {
       return static_cast<Material &>(*this).get_internals();
     }
 
@@ -213,10 +216,10 @@ namespace muSpectre {
   template <class Material, Dim_t DimS, Dim_t DimM>
   template <class... ConstructorArgs>
   Material &
-  MaterialMuSpectre<Material, DimS, DimM>::make(CellBase<DimS, DimM> &cell,
+  MaterialMuSpectre<Material, DimS, DimM>::make(CellBase<DimS, DimM> & cell,
                                                 ConstructorArgs &&... args) {
     auto mat = std::make_unique<Material>(args...);
-    auto &mat_ref = *mat;
+    auto & mat_ref = *mat;
     cell.add_material(std::move(mat));
     return mat_ref;
   }
@@ -233,7 +236,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <class Material, Dim_t DimS, Dim_t DimM>
   void MaterialMuSpectre<Material, DimS, DimM>::compute_stresses(
-      const StrainField_t &F, StressField_t &P, Formulation form) {
+      const StrainField_t & F, StressField_t & P, Formulation form) {
     switch (form) {
     case Formulation::finite_strain: {
       this->template compute_stresses_worker<Formulation::finite_strain>(F, P);
@@ -252,7 +255,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <class Material, Dim_t DimS, Dim_t DimM>
   void MaterialMuSpectre<Material, DimS, DimM>::compute_stresses_tangent(
-      const StrainField_t &F, StressField_t &P, TangentField_t &K,
+      const StrainField_t & F, StressField_t & P, TangentField_t & K,
       Formulation form) {
     switch (form) {
     case Formulation::finite_strain: {
@@ -275,7 +278,7 @@ namespace muSpectre {
   template <class Material, Dim_t DimS, Dim_t DimM>
   template <Formulation Form>
   void MaterialMuSpectre<Material, DimS, DimM>::compute_stresses_worker(
-      const StrainField_t &F, StressField_t &P, TangentField_t &K) {
+      const StrainField_t & F, StressField_t & P, TangentField_t & K) {
     /* These lambdas are executed for every integration point.
 
        F contains the transformation gradient for finite strain calculations and
@@ -289,16 +292,16 @@ namespace muSpectre {
                                   typename traits::TangentMap_t::reference>;
     auto constitutive_law_small_strain = [this](Strains_t Strains,
                                                 Stresses_t Stresses,
-                                                auto &&internal_variables) {
+                                                auto && internal_variables) {
       constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
       constexpr StrainMeasure expected_strain_m{
           get_formulation_strain_type(Form, traits::strain_measure)};
 
-      auto &this_mat = static_cast<Material &>(*this);
+      auto & this_mat = static_cast<Material &>(*this);
 
       // Transformation gradient is first in the strains tuple
-      auto &F = std::get<0>(Strains);
-      auto &&strain =
+      auto & F = std::get<0>(Strains);
+      auto && strain =
           MatTB::convert_strain<stored_strain_m, expected_strain_m>(F);
       // return value contains a tuple of rvalue_refs to both stress and tangent
       // moduli
@@ -312,15 +315,15 @@ namespace muSpectre {
 
     auto constitutive_law_finite_strain = [this](Strains_t Strains,
                                                  Stresses_t Stresses,
-                                                 auto &&internal_variables) {
+                                                 auto && internal_variables) {
       constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
       constexpr StrainMeasure expected_strain_m{
           get_formulation_strain_type(Form, traits::strain_measure)};
-      auto &this_mat = static_cast<Material &>(*this);
+      auto & this_mat = static_cast<Material &>(*this);
 
       // Transformation gradient is first in the strains tuple
-      auto &grad = std::get<0>(Strains);
-      auto &&strain =
+      auto & grad = std::get<0>(Strains);
+      auto && strain =
           MatTB::convert_strain<stored_strain_m, expected_strain_m>(grad);
       // TODO(junge): Figure this out: I can't std::move(internals...),
       // because if there are no internals, compilation fails with "no
@@ -336,15 +339,15 @@ namespace muSpectre {
                                                     internals...);
           },
           internal_variables);
-      auto &stress = std::get<0>(stress_tgt);
-      auto &tangent = std::get<1>(stress_tgt);
+      auto & stress = std::get<0>(stress_tgt);
+      auto & tangent = std::get<1>(stress_tgt);
       Stresses =
           MatTB::PK1_stress<traits::stress_measure, traits::strain_measure>(
               std::move(grad), std::move(stress), std::move(tangent));
     };
 
     iterable_proxy<NeedTangent::yes> fields{*this, F, P, K};
-    for (auto &&arglist : fields) {
+    for (auto && arglist : fields) {
       /**
        * arglist is a tuple of three tuples containing only Lvalue
        * references (see value_tye in the class definition of
@@ -387,7 +390,7 @@ namespace muSpectre {
   template <class Material, Dim_t DimS, Dim_t DimM>
   template <Formulation Form>
   void MaterialMuSpectre<Material, DimS, DimM>::compute_stresses_worker(
-      const StrainField_t &F, StressField_t &P) {
+      const StrainField_t & F, StressField_t & P) {
     /* These lambdas are executed for every integration point.
 
        F contains the transformation gradient for finite strain calculations and
@@ -401,20 +404,20 @@ namespace muSpectre {
     using Stresses_t = std::tuple<typename traits::StressMap_t::reference>;
     auto constitutive_law_small_strain = [this](Strains_t Strains,
                                                 Stresses_t Stresses,
-                                                auto &&internal_variables) {
+                                                auto && internal_variables) {
       constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
       constexpr StrainMeasure expected_strain_m{
           get_formulation_strain_type(Form, traits::strain_measure)};
 
-      auto &this_mat = static_cast<Material &>(*this);
+      auto & this_mat = static_cast<Material &>(*this);
 
       // Transformation gradient is first in the strains tuple
-      auto &F = std::get<0>(Strains);
-      auto &&strain =
+      auto & F = std::get<0>(Strains);
+      auto && strain =
           MatTB::convert_strain<stored_strain_m, expected_strain_m>(F);
       // return value contains a tuple of rvalue_refs to both stress and tangent
       // moduli
-      auto &sigma = std::get<0>(Stresses);
+      auto & sigma = std::get<0>(Stresses);
       sigma = apply(
           [&strain, &this_mat](auto &&... internals) {
             return this_mat.evaluate_stress(std::move(strain), internals...);
@@ -423,16 +426,16 @@ namespace muSpectre {
     };
 
     auto constitutive_law_finite_strain = [this](Strains_t Strains,
-                                                 Stresses_t &&Stresses,
-                                                 auto &&internal_variables) {
+                                                 Stresses_t && Stresses,
+                                                 auto && internal_variables) {
       constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
       constexpr StrainMeasure expected_strain_m{
           get_formulation_strain_type(Form, traits::strain_measure)};
-      auto &this_mat = static_cast<Material &>(*this);
+      auto & this_mat = static_cast<Material &>(*this);
 
       // Transformation gradient is first in the strains tuple
-      auto &F = std::get<0>(Strains);
-      auto &&strain =
+      auto & F = std::get<0>(Strains);
+      auto && strain =
           MatTB::convert_strain<stored_strain_m, expected_strain_m>(F);
 
       // TODO(junge): Figure this out: I can't std::move(internals...),
@@ -443,19 +446,19 @@ namespace muSpectre {
 
       // return value contains a tuple of rvalue_refs to both stress
       // and tangent moduli
-      auto &&stress = apply(
+      auto && stress = apply(
           [&strain, &this_mat](auto &&... internals) {
             return this_mat.evaluate_stress(std::move(strain), internals...);
           },
           internal_variables);
-      auto &P = get<0>(Stresses);
+      auto & P = get<0>(Stresses);
       P = MatTB::PK1_stress<traits::stress_measure, traits::strain_measure>(
           F, stress);
     };
 
     iterable_proxy<NeedTangent::no> fields{*this, F, P};
 
-    for (auto &&arglist : fields) {
+    for (auto && arglist : fields) {
       /**
        * arglist is a tuple of three tuples containing only Lvalue
        * references (see value_tye in the class definition of
@@ -510,9 +513,9 @@ namespace muSpectre {
         Piola-Kirchhoff stress P.
     **/
     template <bool DoNeedTgt = (NeedTgt == NeedTangent::yes)>
-    iterable_proxy(MaterialMuSpectre &mat, const StrainField_t &F,
-                   StressField_t &P,
-                   std::enable_if_t<DoNeedTgt, TangentField_t> &K)
+    iterable_proxy(MaterialMuSpectre & mat, const StrainField_t & F,
+                   StressField_t & P,
+                   std::enable_if_t<DoNeedTgt, TangentField_t> & K)
         : material{mat}, strain_field{F},
           stress_tup{P, K}, internals{material.get_internals()} {};
 
@@ -522,8 +525,8 @@ namespace muSpectre {
         Piola-Kirchhoff stress P.
     **/
     template <bool DontNeedTgt = (NeedTgt == NeedTangent::no)>
-    iterable_proxy(MaterialMuSpectre &mat, const StrainField_t &F,
-                   std::enable_if_t<DontNeedTgt, StressField_t> &P)
+    iterable_proxy(MaterialMuSpectre & mat, const StrainField_t & F,
+                   std::enable_if_t<DontNeedTgt, StressField_t> & P)
         : material{mat}, strain_field{F},
           stress_tup{P}, internals{material.get_internals()} {};
 
@@ -558,19 +561,19 @@ namespace muSpectre {
                                            std::tuple<Stress_t>>;
 
     //! Copy constructor
-    iterable_proxy(const iterable_proxy &other) = default;
+    iterable_proxy(const iterable_proxy & other) = default;
 
     //! Move constructor
-    iterable_proxy(iterable_proxy &&other) = default;
+    iterable_proxy(iterable_proxy && other) = default;
 
     //! Destructor
     virtual ~iterable_proxy() = default;
 
     //! Copy assignment operator
-    iterable_proxy &operator=(const iterable_proxy &other) = default;
+    iterable_proxy & operator=(const iterable_proxy & other) = default;
 
     //! Move assignment operator
-    iterable_proxy &operator=(iterable_proxy &&other) = default;
+    iterable_proxy & operator=(iterable_proxy && other) = default;
 
     /**
      * dereferences into a tuple containing strains, and internal
@@ -594,35 +597,35 @@ namespace muSpectre {
           (such as the transformation gradient F and first
           Piola-Kirchhoff stress P.
       **/
-      explicit iterator(const iterable_proxy &it, bool begin = true)
-        : it{it}, strain_map{it.strain_field}, stress_map(it.stress_tup),
+      explicit iterator(const iterable_proxy & it, bool begin = true)
+          : it{it}, strain_map{it.strain_field}, stress_map(it.stress_tup),
             index{begin ? 0 : it.material.internal_fields.size()} {}
 
       //! Copy constructor
-      iterator(const iterator &other) = default;
+      iterator(const iterator & other) = default;
 
       //! Move constructor
-      iterator(iterator &&other) = default;
+      iterator(iterator && other) = default;
 
       //! Destructor
       virtual ~iterator() = default;
 
       //! Copy assignment operator
-      iterator &operator=(const iterator &other) = default;
+      iterator & operator=(const iterator & other) = default;
 
       //! Move assignment operator
-      iterator &operator=(iterator &&other) = default;
+      iterator & operator=(iterator && other) = default;
 
       //! pre-increment
-      inline iterator &operator++();
+      inline iterator & operator++();
       //! dereference
       inline value_type operator*();
       //! inequality
-      inline bool operator!=(const iterator &other) const;
+      inline bool operator!=(const iterator & other) const;
 
      protected:
-      const iterable_proxy &it;  //!< ref to the proxy
-      StrainMap_t strain_map;    //!< map onto the global strain field
+      const iterable_proxy & it;  //!< ref to the proxy
+      StrainMap_t strain_map;     //!< map onto the global strain field
       //! map onto the global stress field and possibly tangent stiffness
       StressMapTup stress_map;
       size_t index;  //!< index or pixel currently referred to
@@ -636,12 +639,12 @@ namespace muSpectre {
     iterator end() { return std::move(iterator(*this, false)); }
 
    protected:
-    MaterialMuSpectre &material;        //!< reference to the proxied material
-    const StrainField_t &strain_field;  //!< cell's global strain field
+    MaterialMuSpectre & material;        //!< reference to the proxied material
+    const StrainField_t & strain_field;  //!< cell's global strain field
     //! references to the global stress field and perhaps tangent stiffness
     StressFieldTup stress_tup;
     //! references to the internal variables
-    InternalVariables &internals;
+    InternalVariables & internals;
 
    private:
   };
@@ -651,7 +654,7 @@ namespace muSpectre {
   template <MatTB::NeedTangent NeedTgt>
   bool
   MaterialMuSpectre<Material, DimS, DimM>::iterable_proxy<NeedTgt>::iterator::
-  operator!=(const iterator &other) const {
+  operator!=(const iterator & other) const {
     return (this->index != other.index);
   }
 
@@ -675,16 +678,16 @@ namespace muSpectre {
                         DimM>::iterable_proxy<NeedTgT>::iterator::operator*() {
     const Ccoord_t<DimS> pixel{
         this->it.material.internal_fields.get_ccoord(this->index)};
-    auto &&strain = std::make_tuple(this->strain_map[pixel]);
+    auto && strain = std::make_tuple(this->strain_map[pixel]);
 
-    auto &&stresses = apply(
+    auto && stresses = apply(
         [&pixel](auto &&... stress_tgt) {
           return std::make_tuple(stress_tgt[pixel]...);
         },
         this->stress_map);
-    auto &&internal = this->it.material.get_internals();
+    auto && internal = this->it.material.get_internals();
     const auto id{this->index};
-    auto &&internals = apply(
+    auto && internals = apply(
         [id](auto &&... internals_) {
           return InternalReferences{internals_[id]...};
         },

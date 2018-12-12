@@ -76,29 +76,28 @@ namespace muSpectre {
     ProjectionFiniteStrainFast(FFTEngine_ptr engine, Rcoord lengths);
 
     //! Copy constructor
-    ProjectionFiniteStrainFast(const ProjectionFiniteStrainFast &other) =
+    ProjectionFiniteStrainFast(const ProjectionFiniteStrainFast & other) =
         delete;
 
     //! Move constructor
-    ProjectionFiniteStrainFast(ProjectionFiniteStrainFast &&other) = default;
+    ProjectionFiniteStrainFast(ProjectionFiniteStrainFast && other) = default;
 
     //! Destructor
     virtual ~ProjectionFiniteStrainFast() = default;
 
     //! Copy assignment operator
     ProjectionFiniteStrainFast &
-    operator=(const ProjectionFiniteStrainFast &other) = delete;
+    operator=(const ProjectionFiniteStrainFast & other) = delete;
 
     //! Move assignment operator
     ProjectionFiniteStrainFast &
-    operator=(ProjectionFiniteStrainFast &&other) = default;
+    operator=(ProjectionFiniteStrainFast && other) = default;
 
     //! initialises the fft engine (plan the transform)
-    void
-    initialise(FFT_PlanFlags flags = FFT_PlanFlags::estimate) final;
+    void initialise(FFT_PlanFlags flags = FFT_PlanFlags::estimate) final;
 
     //! apply the projection operator to a field
-    void apply_projection(Field_t &field) final;
+    void apply_projection(Field_t & field) final;
 
     Eigen::Map<Eigen::ArrayXXd> get_operator() final;
 
@@ -113,8 +112,8 @@ namespace muSpectre {
     constexpr static Dim_t NbComponents() { return ipow(DimM, 2); }
 
    protected:
-    Proj_t &xiField;  //!< field of normalised wave vectors
-    Proj_map xis;     //!< iterable normalised wave vectors
+    Proj_t & xiField;  //!< field of normalised wave vectors
+    Proj_map xis;      //!< iterable normalised wave vectors
 
    private:
   };

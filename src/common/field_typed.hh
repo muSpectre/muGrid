@@ -117,7 +117,7 @@ namespace muSpectre {
     TypedField() = delete;
 
     //! constructor
-    TypedField(std::string unique_name, FieldCollection &collection,
+    TypedField(std::string unique_name, FieldCollection & collection,
                size_t nb_components);
 
     /**
@@ -125,32 +125,32 @@ namespace muSpectre {
      * memory. These cannot be registered in field collections and
      * should only be used for transient temporaries
      */
-    TypedField(std::string unique_name, FieldCollection &collection,
+    TypedField(std::string unique_name, FieldCollection & collection,
                Eigen::Ref<Eigen::Matrix<Real, Eigen::Dynamic, 1>> vec,
                size_t nb_components);
 
     //! Copy constructor
-    TypedField(const TypedField &other) = delete;
+    TypedField(const TypedField & other) = delete;
 
     //! Move constructor
-    TypedField(TypedField &&other) = default;
+    TypedField(TypedField && other) = default;
 
     //! Destructor
     virtual ~TypedField() = default;
 
     //! Copy assignment operator
-    TypedField &operator=(const TypedField &other) = delete;
+    TypedField & operator=(const TypedField & other) = delete;
 
     //! Move assignment operator
-    TypedField &operator=(TypedField &&other) = delete;
+    TypedField & operator=(TypedField && other) = delete;
 
     //! return type_id of stored type
-    const std::type_info &get_stored_typeid() const final;
+    const std::type_info & get_stored_typeid() const final;
 
     //! safe reference cast
-    static TypedField &check_ref(Base &other);
+    static TypedField & check_ref(Base & other);
     //! safe reference cast
-    static const TypedField &check_ref(const Base &other);
+    static const TypedField & check_ref(const Base & other);
 
     size_t size() const final;
 
@@ -164,12 +164,12 @@ namespace muSpectre {
 
     //! add a new value at the end of the field
     template <class Derived>
-    inline void push_back(const Eigen::DenseBase<Derived> &value);
+    inline void push_back(const Eigen::DenseBase<Derived> & value);
 
     //! raw pointer to content (e.g., for Eigen maps)
-    virtual T *data() { return this->get_ptr_to_entry(0); }
+    virtual T * data() { return this->get_ptr_to_entry(0); }
     //! raw pointer to content (e.g., for Eigen maps)
-    virtual const T *data() const { return this->get_ptr_to_entry(0); }
+    virtual const T * data() const { return this->get_ptr_to_entry(0); }
 
     //! return a map representing the entire field as a single `Eigen::Array`
     EigenMap_t eigen();
@@ -210,7 +210,7 @@ namespace muSpectre {
      * creates a `TypedField` same size and type as this, but all
      * entries are zero. Convenience function
      */
-    inline TypedField &get_zeros_like(std::string unique_name) const;
+    inline TypedField & get_zeros_like(std::string unique_name) const;
 
     /**
      * Fill the content of the local field into the global field
@@ -219,7 +219,7 @@ namespace muSpectre {
      */
     template <bool IsGlobal = Global>
     inline std::enable_if_t<IsGlobal>
-    fill_from_local(const LocalField_t &local);
+    fill_from_local(const LocalField_t & local);
 
     /**
      * For pixels that are present in the local field, fill them with
@@ -227,14 +227,14 @@ namespace muSpectre {
      */
     template <bool IsLocal = not Global>
     inline std::enable_if_t<IsLocal>
-    fill_from_global(const GlobalField_t &global);
+    fill_from_global(const GlobalField_t & global);
 
    protected:
     //! returns a raw pointer to the entry, for `Eigen::Map`
-    inline T *get_ptr_to_entry(const size_t &&index);
+    inline T * get_ptr_to_entry(const size_t && index);
 
     //! returns a raw pointer to the entry, for `Eigen::Map`
-    inline const T *get_ptr_to_entry(const size_t &&index) const;
+    inline const T * get_ptr_to_entry(const size_t && index) const;
 
     //! set the storage size of this field
     inline void resize(size_t size) final;
@@ -268,7 +268,7 @@ namespace muSpectre {
      * needs to be followed by an update of data_ptr, or we will get
      * super annoying memory bugs.
      */
-    T *data_ptr{};
+    T * data_ptr{};
 
    private:
   };
@@ -283,14 +283,14 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <class FieldCollection, typename T>
   TypedField<FieldCollection, T>::TypedField(std::string unique_name,
-                                             FieldCollection &collection,
+                                             FieldCollection & collection,
                                              size_t nb_components)
       : Parent(unique_name, nb_components, collection), current_size{0} {}
 
   /* ---------------------------------------------------------------------- */
   template <class FieldCollection, typename T>
   TypedField<FieldCollection, T>::TypedField(
-      std::string unique_name, FieldCollection &collection,
+      std::string unique_name, FieldCollection & collection,
       Eigen::Ref<Eigen::Matrix<Real, Eigen::Dynamic, 1>> vec,
       size_t nb_components)
       : Parent(unique_name, nb_components, collection), alt_values{vec},
@@ -386,7 +386,7 @@ namespace muSpectre {
   template <class FieldCollection, typename T>
   template <bool IsGlobal>
   std::enable_if_t<IsGlobal>
-  TypedField<FieldCollection, T>::fill_from_local(const LocalField_t &local) {
+  TypedField<FieldCollection, T>::fill_from_local(const LocalField_t & local) {
     static_assert(IsGlobal == Global, "SFINAE parameter, do not touch");
     if (not(local.get_nb_components() == this->get_nb_components())) {
       std::stringstream err_str{};
@@ -397,9 +397,9 @@ namespace muSpectre {
     }
     auto this_map{this->get_map()};
     auto local_map{local.get_map()};
-    for (const auto &&key_val : local_map.enumerate()) {
-      const auto &key{std::get<0>(key_val)};
-      const auto &value{std::get<1>(key_val)};
+    for (const auto && key_val : local_map.enumerate()) {
+      const auto & key{std::get<0>(key_val)};
+      const auto & value{std::get<1>(key_val)};
       this_map[key] = value;
     }
   }
@@ -408,7 +408,7 @@ namespace muSpectre {
   template <class FieldCollection, typename T>
   template <bool IsLocal>
   std::enable_if_t<IsLocal> TypedField<FieldCollection, T>::fill_from_global(
-      const GlobalField_t &global) {
+      const GlobalField_t & global) {
     static_assert(IsLocal == not Global, "SFINAE parameter, do not touch");
     if (not(global.get_nb_components() == this->get_nb_components())) {
       std::stringstream err_str{};
@@ -421,9 +421,9 @@ namespace muSpectre {
     auto global_map{global.get_map()};
 
     auto this_map{this->get_map()};
-    for (auto &&key_val : this_map.enumerate()) {
-      const auto &key{std::get<0>(key_val)};
-      auto &value{std::get<1>(key_val)};
+    for (auto && key_val : this_map.enumerate()) {
+      const auto & key{std::get<0>(key_val)};
+      auto & value{std::get<1>(key_val)};
       value = global_map[key];
     }
   }
@@ -447,7 +447,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <class FieldCollection, typename T>
-  auto TypedField<FieldCollection, T>::check_ref(Base &other) -> TypedField & {
+  auto TypedField<FieldCollection, T>::check_ref(Base & other) -> TypedField & {
     if (typeid(T).hash_code() != other.get_stored_typeid().hash_code()) {
       std::string err = "Cannot create a Reference of requested type " +
                         ("for field '" + other.get_name() + "' of type '" +
@@ -459,7 +459,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <class FieldCollection, typename T>
-  auto TypedField<FieldCollection, T>::check_ref(const Base &other)
+  auto TypedField<FieldCollection, T>::check_ref(const Base & other)
       -> const TypedField & {
     if (typeid(T).hash_code() != other.get_stored_typeid().hash_code()) {
       std::string err = "Cannot create a Reference of requested type " +
@@ -489,14 +489,14 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <class FieldCollection, typename T>
-  T *TypedField<FieldCollection, T>::get_ptr_to_entry(const size_t &&index) {
+  T * TypedField<FieldCollection, T>::get_ptr_to_entry(const size_t && index) {
     return this->data_ptr + this->get_nb_components() * std::move(index);
   }
 
   /* ---------------------------------------------------------------------- */
   template <class FieldCollection, typename T>
-  const T *
-  TypedField<FieldCollection, T>::get_ptr_to_entry(const size_t &&index) const {
+  const T * TypedField<FieldCollection, T>::get_ptr_to_entry(
+      const size_t && index) const {
     return this->data_ptr + this->get_nb_components() * std::move(index);
   }
 
@@ -504,7 +504,7 @@ namespace muSpectre {
   template <class FieldCollection, typename T>
   template <class Derived>
   void TypedField<FieldCollection, T>::push_back(
-      const Eigen::DenseBase<Derived> &value) {
+      const Eigen::DenseBase<Derived> & value) {
     static_assert(not FieldCollection::Global,
                   "You can only push_back data into local field collections");
     if (value.cols() != 1) {

@@ -54,12 +54,12 @@ int main() {
 
   auto rve{make_cell(resolution, lengths, form)};
 
-  auto &hard{MaterialLinearElastic1<dim, dim>::make(rve, "hard", 210., .33)};
-  auto &soft{MaterialLinearElastic1<dim, dim>::make(rve, "soft", 70., .33)};
+  auto & hard{MaterialLinearElastic1<dim, dim>::make(rve, "hard", 210., .33)};
+  auto & soft{MaterialLinearElastic1<dim, dim>::make(rve, "soft", 70., .33)};
 
-  for (auto &&tup : akantu::enumerate(rve)) {
-    auto &i = std::get<0>(tup);
-    auto &pixel = std::get<1>(tup);
+  for (auto && tup : akantu::enumerate(rve)) {
+    auto & i = std::get<0>(tup);
+    auto & pixel = std::get<1>(tup);
     if (i < 3) {
       hard.add_pixel(pixel);
     } else {

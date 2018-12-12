@@ -50,18 +50,18 @@ namespace muSpectre {
    * Uses the Newton-conjugate Gradient method to find the static
    * equilibrium of a cell given a series of mean applied strains
    */
-  std::vector<OptimizeResult> newton_cg(Cell &cell,
-                                        const LoadSteps_t &load_steps,
-                                        SolverBase &solver, Real newton_tol,
+  std::vector<OptimizeResult> newton_cg(Cell & cell,
+                                        const LoadSteps_t & load_steps,
+                                        SolverBase & solver, Real newton_tol,
                                         Real equil_tol, Dim_t verbose = 0);
 
   /**
    * Uses the Newton-conjugate Gradient method to find the static
    * equilibrium of a cell given a mean applied strain
    */
-  OptimizeResult newton_cg(Cell &cell,
+  OptimizeResult newton_cg(Cell & cell,
                            const Eigen::Ref<Eigen::MatrixXd> load_step,
-                           SolverBase &solver, Real newton_tol, Real equil_tol,
+                           SolverBase & solver, Real newton_tol, Real equil_tol,
                            Dim_t verbose = 0) {
     LoadSteps_t load_steps{load_step};
     return newton_cg(cell, load_steps, solver, newton_tol, equil_tol, verbose)
@@ -73,8 +73,9 @@ namespace muSpectre {
    * Uses the method proposed by de Geus method to find the static
    * equilibrium of a cell given a series of mean applied strains
    */
-  std::vector<OptimizeResult> de_geus(Cell &cell, const LoadSteps_t &load_steps,
-                                      SolverBase &solver, Real newton_tol,
+  std::vector<OptimizeResult> de_geus(Cell & cell,
+                                      const LoadSteps_t & load_steps,
+                                      SolverBase & solver, Real newton_tol,
                                       Real equil_tol, Dim_t verbose = 0);
 
   /* ---------------------------------------------------------------------- */
@@ -82,9 +83,9 @@ namespace muSpectre {
    * Uses the method proposed by de Geus method to find the static
    * equilibrium of a cell given a mean applied strain
    */
-  OptimizeResult de_geus(Cell &cell,
+  OptimizeResult de_geus(Cell & cell,
                          const Eigen::Ref<Eigen::MatrixXd> load_step,
-                         SolverBase &solver, Real newton_tol, Real equil_tol,
+                         SolverBase & solver, Real newton_tol, Real equil_tol,
                          Dim_t verbose = 0) {
     return de_geus(cell, LoadSteps_t{load_step}, solver, newton_tol, equil_tol,
                    verbose)[0];

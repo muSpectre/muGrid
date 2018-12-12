@@ -50,7 +50,7 @@ namespace py = pybind11;
 using namespace pybind11::literals;  // NOLINT: recommended usage
 
 template <Dim_t Dim, class FieldCollectionDerived>
-void add_field_collection(py::module &mod) {
+void add_field_collection(py::module & mod) {
   std::stringstream name_stream{};
   name_stream << "_" << (FieldCollectionDerived::Global ? "Global" : "Local")
               << "FieldCollection_" << Dim << 'd';
@@ -121,7 +121,7 @@ void add_field_collection(py::module &mod) {
 }
 
 template <typename T, class FieldCollection>
-void add_field(py::module &mod, std::string dtype_name) {
+void add_field(py::module & mod, std::string dtype_name) {
   using Field_t = TypedField<FieldCollection, T>;
   std::stringstream name_stream{};
   name_stream << (FieldCollection::Global ? "Global" : "Local") << "Field"
@@ -129,22 +129,22 @@ void add_field(py::module &mod, std::string dtype_name) {
   std::string name{name_stream.str()};
   using Ref_t = py::EigenDRef<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>>;
   py::class_<Field_t, typename Field_t::Parent>(mod, name.c_str())
-      .def_property("array", [](Field_t &field) { return field.eigen(); },
-                    [](Field_t &field, Ref_t mat) { field.eigen() = mat; },
+      .def_property("array", [](Field_t & field) { return field.eigen(); },
+                    [](Field_t & field, Ref_t mat) { field.eigen() = mat; },
                     "array of stored data")
-      .def_property_readonly("array",
-                             [](const Field_t &field) { return field.eigen(); },
-                             "array of stored data")
-      .def_property("vector", [](Field_t &field) { return field.eigenvec(); },
-                    [](Field_t &field, Ref_t mat) { field.eigen() = mat; },
+      .def_property_readonly(
+          "array", [](const Field_t & field) { return field.eigen(); },
+          "array of stored data")
+      .def_property("vector", [](Field_t & field) { return field.eigenvec(); },
+                    [](Field_t & field, Ref_t mat) { field.eigen() = mat; },
                     "flattened array of stored data")
       .def_property_readonly(
-          "vector", [](const Field_t &field) { return field.eigenvec(); },
+          "vector", [](const Field_t & field) { return field.eigenvec(); },
           "flattened array of stored data");
 }
 
 template <Dim_t Dim, class FieldCollection>
-void add_field_helper(py::module &mod) {
+void add_field_helper(py::module & mod) {
   std::stringstream name_stream{};
   name_stream << (FieldCollection::Global ? "Global" : "Local") << "Field"
               << "_" << Dim;
@@ -156,10 +156,11 @@ void add_field_helper(py::module &mod) {
                              "Collection containing this field")
       .def_property_readonly("nb_components", &Field_t::get_nb_components,
                              "number of scalars stored per pixel in this field")
-      .def_property_readonly(
-          "stored_type",
-          [](const Field_t &field) { return field.get_stored_typeid().name(); },
-          "fundamental type of scalars stored in this field")
+      .def_property_readonly("stored_type",
+                             [](const Field_t & field) {
+                               return field.get_stored_typeid().name();
+                             },
+                             "fundamental type of scalars stored in this field")
       .def_property_readonly("size", &Field_t::size,
                              "number of pixels in this field")
       .def("set_zero", &Field_t::set_zero,
@@ -170,7 +171,7 @@ void add_field_helper(py::module &mod) {
 }
 
 template <typename T, class FieldCollection>
-void add_statefield(py::module &mod, std::string dtype_name) {
+void add_statefield(py::module & mod, std::string dtype_name) {
   using StateField_t = TypedStateField<FieldCollection, T>;
   std::stringstream name_stream{};
   name_stream << (FieldCollection::Global ? "Global" : "Local") << "StateField"
@@ -186,7 +187,7 @@ void add_statefield(py::module &mod, std::string dtype_name) {
 }
 
 template <Dim_t Dim, class FieldCollection>
-void add_statefield_helper(py::module &mod) {
+void add_statefield_helper(py::module & mod) {
   std::stringstream name_stream{};
   name_stream << (FieldCollection::Global ? "Global" : "Local") << "StateField"
               << "_" << Dim;
@@ -201,7 +202,7 @@ void add_statefield_helper(py::module &mod) {
                              "number of old states stored")
       .def_property_readonly(
           "stored_type",
-          [](const StateField_t &field) {
+          [](const StateField_t & field) {
             return field.get_stored_typeid().name();
           },
           "fundamental type of scalars stored in this field");
@@ -210,7 +211,8 @@ void add_statefield_helper(py::module &mod) {
   add_statefield<Int, FieldCollection>(mod, "Int");
 }
 
-template <Dim_t Dim> void add_field_collection_helper(py::module &mod) {
+template <Dim_t Dim>
+void add_field_collection_helper(py::module & mod) {
   add_field_helper<Dim, GlobalFieldCollection<Dim>>(mod);
   add_field_helper<Dim, LocalFieldCollection<Dim>>(mod);
 
@@ -221,7 +223,7 @@ template <Dim_t Dim> void add_field_collection_helper(py::module &mod) {
   add_field_collection<Dim, LocalFieldCollection<Dim>>(mod);
 }
 
-void add_field_collections(py::module &mod) {
+void add_field_collections(py::module & mod) {
   add_field_collection_helper<twoD>(mod);
   add_field_collection_helper<threeD>(mod);
 }

@@ -44,20 +44,23 @@ using namespace muSpectre;  // NOLINT // TODO(junge): figure this out
 namespace py = pybind11;
 using namespace pybind11::literals;  // NOLINT: recommended usage
 
-template <Dim_t dim, typename T> void add_get_cube_helper(py::module &mod) {
+template <Dim_t dim, typename T>
+void add_get_cube_helper(py::module & mod) {
   std::stringstream name{};
   name << "get_" << dim << "d_cube";
   mod.def(name.str().c_str(), &CcoordOps::get_cube<dim, T>, "size"_a,
           "return a Ccoord with the value 'size' repeated in each dimension");
 }
 
-template <Dim_t dim> void add_get_hermitian_helper(py::module &mod) {
+template <Dim_t dim>
+void add_get_hermitian_helper(py::module & mod) {
   mod.def("get_hermitian_sizes", &CcoordOps::get_hermitian_sizes<dim>,
           "full_sizes"_a,
           "return the hermitian sizes corresponding to the true sizes");
 }
 
-template <Dim_t dim> void add_get_ccoord_helper(py::module &mod) {
+template <Dim_t dim>
+void add_get_ccoord_helper(py::module & mod) {
   using Ccoord = Ccoord_t<dim>;
   mod.def(
       "get_domain_ccoord",
@@ -69,7 +72,7 @@ template <Dim_t dim> void add_get_ccoord_helper(py::module &mod) {
       "shape resolutions");
 }
 
-void add_get_cube(py::module &mod) {
+void add_get_cube(py::module & mod) {
   add_get_cube_helper<twoD, Dim_t>(mod);
   add_get_cube_helper<twoD, Real>(mod);
   add_get_cube_helper<threeD, Dim_t>(mod);
@@ -82,7 +85,8 @@ void add_get_cube(py::module &mod) {
   add_get_ccoord_helper<threeD>(mod);
 }
 
-template <Dim_t dim> void add_get_index_helper(py::module &mod) {
+template <Dim_t dim>
+void add_get_index_helper(py::module & mod) {
   using Ccoord = Ccoord_t<dim>;
   mod.def("get_domain_index",
           [](Ccoord sizes, Ccoord ccoord) {
@@ -93,12 +97,13 @@ template <Dim_t dim> void add_get_index_helper(py::module &mod) {
           "grid of size 'sizes'");
 }
 
-void add_get_index(py::module &mod) {
+void add_get_index(py::module & mod) {
   add_get_index_helper<twoD>(mod);
   add_get_index_helper<threeD>(mod);
 }
 
-template <Dim_t dim> void add_Pixels_helper(py::module &mod) {
+template <Dim_t dim>
+void add_Pixels_helper(py::module & mod) {
   std::stringstream name{};
   name << "Pixels" << dim << "d";
   using Ccoord = Ccoord_t<dim>;
@@ -106,12 +111,12 @@ template <Dim_t dim> void add_Pixels_helper(py::module &mod) {
   Pixels.def(py::init<Ccoord>());
 }
 
-void add_Pixels(py::module &mod) {
+void add_Pixels(py::module & mod) {
   add_Pixels_helper<twoD>(mod);
   add_Pixels_helper<threeD>(mod);
 }
 
-void add_common(py::module &mod) {
+void add_common(py::module & mod) {
   py::enum_<Formulation>(mod, "Formulation")
       .value("finite_strain", Formulation::finite_strain)
       .value("small_strain", Formulation::small_strain);

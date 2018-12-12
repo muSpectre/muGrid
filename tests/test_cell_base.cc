@@ -46,8 +46,10 @@
 namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE(cell_base);
-  template <Dim_t DimS> struct Sizes {};
-  template <> struct Sizes<twoD> {
+  template <Dim_t DimS>
+  struct Sizes {};
+  template <>
+  struct Sizes<twoD> {
     constexpr static Dim_t sdim{twoD};
     constexpr static Ccoord_t<sdim> get_resolution() {
       return Ccoord_t<sdim>{3, 5};
@@ -56,7 +58,8 @@ namespace muSpectre {
       return Rcoord_t<sdim>{3.4, 5.8};
     }
   };
-  template <> struct Sizes<threeD> {
+  template <>
+  struct Sizes<threeD> {
     constexpr static Dim_t sdim{threeD};
     constexpr static Ccoord_t<sdim> get_resolution() {
       return Ccoord_t<sdim>{3, 5, 7};
@@ -120,12 +123,12 @@ namespace muSpectre {
     const Real mu{Young / (2 * (1 + Poisson))};
     auto Material_hard = std::make_unique<Mat_t>("hard", Young, Poisson);
 
-    for (auto &&pixel : *this) {
+    for (auto && pixel : *this) {
       Material_hard->add_pixel(pixel);
     }
 
     fix::add_material(std::move(Material_hard));
-    auto &F = fix::get_strain();
+    auto & F = fix::get_strain();
     auto F_map = F.get_map();
     // finite strain formulation expects the deformation gradient F,
     // while small strain expects infinitesimal strain ε
@@ -170,9 +173,9 @@ namespace muSpectre {
     auto Material_hard = std::make_unique<Mat_t>("hard", 210e9, .33);
     auto Material_soft = std::make_unique<Mat_t>("soft", 70e9, .3);
 
-    for (auto &&cnt_pixel : akantu::enumerate(*this)) {
+    for (auto && cnt_pixel : akantu::enumerate(*this)) {
       auto counter = std::get<0>(cnt_pixel);
-      auto &&pixel = std::get<1>(cnt_pixel);
+      auto && pixel = std::get<1>(cnt_pixel);
       if (counter < 5) {
         Material_hard->add_pixel(pixel);
       } else {
@@ -183,7 +186,7 @@ namespace muSpectre {
     fix::add_material(std::move(Material_hard));
     fix::add_material(std::move(Material_soft));
 
-    auto &F = fix::get_strain();
+    auto & F = fix::get_strain();
     fix::evaluate_stress_tangent(F);
 
     fix::evaluate_stress_tangent(F);
@@ -196,9 +199,9 @@ namespace muSpectre {
     auto Material_hard = std::make_unique<Mat_t>("hard", 210e9, .33);
     auto Material_soft = std::make_unique<Mat_t>("soft", 70e9, .3);
 
-    for (auto &&cnt_pixel : akantu::enumerate(*this)) {
+    for (auto && cnt_pixel : akantu::enumerate(*this)) {
       auto counter = std::get<0>(cnt_pixel);
-      auto &&pixel = std::get<1>(cnt_pixel);
+      auto && pixel = std::get<1>(cnt_pixel);
       if (counter < 5) {
         Material_hard->add_pixel(pixel);
       } else {
@@ -217,8 +220,8 @@ namespace muSpectre {
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_managed_fields, Fix, fixlist, Fix) {
-    Cell &dyn_handle{*this};
-    CellBase<Fix::sdim, Fix::mdim> &base_handle{*this};
+    Cell & dyn_handle{*this};
+    CellBase<Fix::sdim, Fix::mdim> & base_handle{*this};
 
     const std::string name1{"aaa"};
     constexpr size_t nb_comp{5};
@@ -230,7 +233,7 @@ namespace muSpectre {
     BOOST_CHECK_THROW(dyn_handle.get_managed_real_array(name1, nb_comp + 1),
                       std::runtime_error);
 
-    auto &new_field{base_handle.get_managed_real_field(name1, nb_comp)};
+    auto & new_field{base_handle.get_managed_real_field(name1, nb_comp)};
     BOOST_CHECK_EQUAL(new_field.get_nb_components(), nb_comp);
     BOOST_CHECK_EQUAL(new_field.size(), dyn_handle.size());
 
@@ -242,12 +245,12 @@ namespace muSpectre {
     constexpr Dim_t Dim{Fix::sdim};
     using Mat_t = MaterialLinearElastic1<Dim, Dim>;
     using LColl_t = typename Mat_t::MFieldCollection_t;
-    auto &material_soft{Mat_t::make(*this, "soft", 70e9, .3)};
-    auto &material_hard{Mat_t::make(*this, "hard", 210e9, .3)};
+    auto & material_soft{Mat_t::make(*this, "soft", 70e9, .3)};
+    auto & material_hard{Mat_t::make(*this, "hard", 210e9, .3)};
 
-    for (auto &&tup : akantu::enumerate(*this)) {
-      const auto &i{std::get<0>(tup)};
-      const auto &pixel{std::get<1>(tup)};
+    for (auto && tup : akantu::enumerate(*this)) {
+      const auto & i{std::get<0>(tup)};
+      const auto & pixel{std::get<1>(tup)};
       if (i % 2) {
         material_soft.add_pixel(pixel);
       } else {
@@ -257,20 +260,20 @@ namespace muSpectre {
     material_soft.initialise();
     material_hard.initialise();
 
-    auto &col_soft{material_soft.get_collection()};
-    auto &col_hard{material_hard.get_collection()};
+    auto & col_soft{material_soft.get_collection()};
+    auto & col_hard{material_hard.get_collection()};
 
     // compatible fields:
     const std::string compatible_name{"compatible"};
-    auto &compatible_soft{
+    auto & compatible_soft{
         make_field<TypedField<LColl_t, Real>>(compatible_name, col_soft, Dim)};
-    auto &compatible_hard{
+    auto & compatible_hard{
         make_field<TypedField<LColl_t, Real>>(compatible_name, col_hard, Dim)};
-    auto pixler = [](auto &field) {
+    auto pixler = [](auto & field) {
       auto map{field.get_map()};
-      for (auto &&tup : map.enumerate()) {
-        const auto &pixel{std::get<0>(tup)};
-        auto &val{std::get<1>(tup)};
+      for (auto && tup : map.enumerate()) {
+        const auto & pixel{std::get<0>(tup)};
+        auto & val{std::get<1>(tup)};
         for (Dim_t i{0}; i < Dim; ++i) {
           val(i) = pixel[i];
         }
@@ -279,13 +282,13 @@ namespace muSpectre {
     pixler(compatible_soft);
     pixler(compatible_hard);
 
-    auto &global_compatible_field{
+    auto & global_compatible_field{
         this->get_globalised_internal_real_field(compatible_name)};
 
     auto glo_map{global_compatible_field.get_map()};
-    for (auto &&tup : glo_map.enumerate()) {
-      const auto &pixel{std::get<0>(tup)};
-      const auto &val(std::get<1>(tup));
+    for (auto && tup : glo_map.enumerate()) {
+      const auto & pixel{std::get<0>(tup)};
+      const auto & val(std::get<1>(tup));
 
       using Map_t = Eigen::Map<const Eigen::Array<Dim_t, Dim, 1>>;
       Real err{

@@ -45,19 +45,20 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  const std::string &MaterialBase<DimS, DimM>::get_name() const {
+  const std::string & MaterialBase<DimS, DimM>::get_name() const {
     return this->name;
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void MaterialBase<DimS, DimM>::add_pixel(const Ccoord &ccoord) {
+  void MaterialBase<DimS, DimM>::add_pixel(const Ccoord & ccoord) {
     this->internal_fields.add_pixel(ccoord);
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void MaterialBase<DimS, DimM>::compute_stresses(const Field_t &F, Field_t &P,
+  void MaterialBase<DimS, DimM>::compute_stresses(const Field_t & F,
+                                                  Field_t & P,
                                                   Formulation form) {
     this->compute_stresses(StrainField_t::check_ref(F),
                            StressField_t::check_ref(P), form);
@@ -65,9 +66,9 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void MaterialBase<DimS, DimM>::compute_stresses_tangent(const Field_t &F,
-                                                          Field_t &P,
-                                                          Field_t &K,
+  void MaterialBase<DimS, DimM>::compute_stresses_tangent(const Field_t & F,
+                                                          Field_t & P,
+                                                          Field_t & K,
                                                           Formulation form) {
     this->compute_stresses_tangent(StrainField_t::check_ref(F),
                                    StressField_t::check_ref(P),

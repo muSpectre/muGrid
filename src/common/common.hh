@@ -70,16 +70,19 @@ namespace muSpectre {
   //@}
 
   //! Ccoord_t are cell coordinates, i.e. integer coordinates
-  template <Dim_t dim> using Ccoord_t = std::array<Dim_t, dim>;
+  template <Dim_t dim>
+  using Ccoord_t = std::array<Dim_t, dim>;
   //! Real space coordinates
-  template <Dim_t dim> using Rcoord_t = std::array<Real, dim>;
+  template <Dim_t dim>
+  using Rcoord_t = std::array<Real, dim>;
 
   /**
    * Allows inserting `muSpectre::Ccoord_t` and `muSpectre::Rcoord_t`
    * into `std::ostream`s
    */
   template <typename T, size_t dim>
-  std::ostream &operator<<(std::ostream &os, const std::array<T, dim> &index) {
+  std::ostream & operator<<(std::ostream & os,
+                            const std::array<T, dim> & index) {
     os << "(";
     for (size_t i = 0; i < dim - 1; ++i) {
       os << index[i] << ", ";
@@ -90,7 +93,7 @@ namespace muSpectre {
 
   //! element-wise division
   template <size_t dim>
-  Rcoord_t<dim> operator/(const Rcoord_t<dim> &a, const Rcoord_t<dim> &b) {
+  Rcoord_t<dim> operator/(const Rcoord_t<dim> & a, const Rcoord_t<dim> & b) {
     Rcoord_t<dim> retval{a};
     for (size_t i = 0; i < dim; ++i) {
       retval[i] /= b[i];
@@ -100,7 +103,7 @@ namespace muSpectre {
 
   //! element-wise division
   template <size_t dim>
-  Rcoord_t<dim> operator/(const Rcoord_t<dim> &a, const Ccoord_t<dim> &b) {
+  Rcoord_t<dim> operator/(const Rcoord_t<dim> & a, const Ccoord_t<dim> & b) {
     Rcoord_t<dim> retval{a};
     for (size_t i = 0; i < dim; ++i) {
       retval[i] /= b[i];
@@ -112,7 +115,8 @@ namespace muSpectre {
   constexpr Real pi{3.1415926535897932384626433};
 
   //! compile-time potentiation required for field-size computations
-  template <typename R, typename I> constexpr R ipow(R base, I exponent) {
+  template <typename R, typename I>
+  constexpr R ipow(R base, I exponent) {
     static_assert(std::is_integral<I>::value, "Type must be integer");
     R retval{1};
     for (I i = 0; i < exponent; ++i) {
@@ -149,7 +153,8 @@ namespace muSpectre {
   /**
    * compile time computation of voigt vector
    */
-  template <bool sym = true> constexpr Dim_t vsize(Dim_t dim) {
+  template <bool sym = true>
+  constexpr Dim_t vsize(Dim_t dim) {
     if (sym) {
       return (dim * (dim - 1) / 2 + dim);
     } else {
@@ -172,7 +177,7 @@ namespace muSpectre {
   }
 
   //! inserts `muSpectre::Formulation`s into `std::ostream`s
-  std::ostream &operator<<(std::ostream &os, Formulation f);
+  std::ostream & operator<<(std::ostream & os, Formulation f);
 
   /* ---------------------------------------------------------------------- */
   //! Material laws can declare which type of stress measure they provide,
@@ -187,7 +192,7 @@ namespace muSpectre {
     no_stress_  //!< only for triggering static_asserts
   };
   //! inserts `muSpectre::StressMeasure`s into `std::ostream`s
-  std::ostream &operator<<(std::ostream &os, StressMeasure s);
+  std::ostream & operator<<(std::ostream & os, StressMeasure s);
 
   /* ---------------------------------------------------------------------- */
   //! Material laws can declare which type of strain measure they require and
@@ -204,7 +209,7 @@ namespace muSpectre {
     no_strain_      //!< only for triggering static_assert
   };
   //! inserts `muSpectre::StrainMeasure`s into `std::ostream`s
-  std::ostream &operator<<(std::ostream &os, StrainMeasure s);
+  std::ostream & operator<<(std::ostream & os, StrainMeasure s);
 
   /* ---------------------------------------------------------------------- */
   /**

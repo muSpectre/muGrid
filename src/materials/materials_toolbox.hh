@@ -59,10 +59,10 @@ namespace muSpectre {
     class MaterialsToolboxError : public std::runtime_error {
      public:
       //! constructor
-      explicit MaterialsToolboxError(const std::string &what)
+      explicit MaterialsToolboxError(const std::string & what)
           : std::runtime_error(what) {}
       //! constructor
-      explicit MaterialsToolboxError(const char *what)
+      explicit MaterialsToolboxError(const char * what)
           : std::runtime_error(what) {}
     };
 
@@ -81,7 +81,8 @@ namespace muSpectre {
      * when a bunch of iterators over fiel_maps are dereferenced and their
      * results are concatenated into a tuple
      */
-    template <class... T> struct ReferenceTuple {
+    template <class... T>
+    struct ReferenceTuple {
       //! use this type
       using type = std::tuple<typename T::reference...>;
     };
@@ -90,7 +91,8 @@ namespace muSpectre {
      * specialisation for tuples
      */
     // template <>
-    template <class... T> struct ReferenceTuple<std::tuple<T...>> {
+    template <class... T>
+    struct ReferenceTuple<std::tuple<T...>> {
       //! use this type
       using type = typename ReferenceTuple<T...>::type;
     };
@@ -107,7 +109,8 @@ namespace muSpectre {
       /** Structure for functions returning one strain measure as a
        *  function of another
        **/
-      template <StrainMeasure In, StrainMeasure Out = In> struct ConvertStrain {
+      template <StrainMeasure In, StrainMeasure Out = In>
+      struct ConvertStrain {
         static_assert((In == StrainMeasure::Gradient) ||
                           (In == StrainMeasure::Infinitesimal),
                       "This situation makes me suspect that you are not using "
@@ -116,7 +119,7 @@ namespace muSpectre {
 
         //! returns the converted strain
         template <class Strain_t>
-        inline static decltype(auto) compute(Strain_t &&input) {
+        inline static decltype(auto) compute(Strain_t && input) {
           // transparent case, in which no conversion is required:
           // just a perfect forwarding
           static_assert((In == Out),
@@ -136,7 +139,7 @@ namespace muSpectre {
                            StrainMeasure::GreenLagrange> {
         //! returns the converted strain
         template <class Strain_t>
-        inline static decltype(auto) compute(Strain_t &&F) {
+        inline static decltype(auto) compute(Strain_t && F) {
           return .5 * (F.transpose() * F - Strain_t::PlainObject::Identity());
         }
       };
@@ -152,7 +155,7 @@ namespace muSpectre {
                            StrainMeasure::LCauchyGreen> {
         //! returns the converted strain
         template <class Strain_t>
-        inline static decltype(auto) compute(Strain_t &&F) {
+        inline static decltype(auto) compute(Strain_t && F) {
           return F * F.transpose();
         }
       };
@@ -168,7 +171,7 @@ namespace muSpectre {
                            StrainMeasure::RCauchyGreen> {
         //! returns the converted strain
         template <class Strain_t>
-        inline static decltype(auto) compute(Strain_t &&F) {
+        inline static decltype(auto) compute(Strain_t && F) {
           return F.transpose() * F;
         }
       };
@@ -183,7 +186,7 @@ namespace muSpectre {
       struct ConvertStrain<StrainMeasure::Gradient, StrainMeasure::Log> {
         //! returns the converted strain
         template <class Strain_t>
-        inline static decltype(auto) compute(Strain_t &&F) {
+        inline static decltype(auto) compute(Strain_t && F) {
           constexpr Dim_t dim{EigenCheck::tensor_dim<Strain_t>::value};
           return (.5 * logm(Eigen::Matrix<Real, dim, dim>{F.transpose() * F}))
               .eval();
@@ -196,7 +199,7 @@ namespace muSpectre {
     //! set of functions returning one strain measure as a function of
     //! another
     template <StrainMeasure In, StrainMeasure Out, class Strain_t>
-    decltype(auto) convert_strain(Strain_t &&strain) {
+    decltype(auto) convert_strain(Strain_t && strain) {
       return internal::ConvertStrain<In, Out>::compute(std::move(strain));
     }
 
@@ -204,7 +207,7 @@ namespace muSpectre {
     namespace internal {
 
       /** Structure for functions returning PK1 stress from other stress
-        *measures
+       *measures
        **/
       template <Dim_t Dim, StressMeasure StressM, StrainMeasure StrainM>
       struct PK1_stress {
@@ -248,7 +251,7 @@ namespace muSpectre {
         //! returns the converted stress
         template <class Strain_t, class Stress_t>
         inline static decltype(auto) compute(Strain_t && /*dummy*/,
-                                             Stress_t &&P) {
+                                             Stress_t && P) {
           return std::forward<Stress_t>(P);
         }
       };
@@ -271,7 +274,7 @@ namespace muSpectre {
         //! returns the converted stress and stiffness
         template <class Strain_t, class Stress_t, class Tangent_t>
         inline static decltype(auto) compute(Strain_t && /*dummy*/,
-                                             Stress_t &&P, Tangent_t &&K) {
+                                             Stress_t && P, Tangent_t && K) {
           return std::make_tuple(std::forward<Stress_t>(P),
                                  std::forward<Tangent_t>(K));
         }
@@ -288,7 +291,7 @@ namespace muSpectre {
                               StrainMeasure::no_strain_> {
         //! returns the converted stress
         template <class Strain_t, class Stress_t>
-        inline static decltype(auto) compute(Strain_t &&F, Stress_t &&S) {
+        inline static decltype(auto) compute(Strain_t && F, Stress_t && S) {
           return F * S;
         }
       };
@@ -310,8 +313,8 @@ namespace muSpectre {
 
         //! returns the converted stress and stiffness
         template <class Strain_t, class Stress_t, class Tangent_t>
-        inline static decltype(auto) compute(Strain_t &&F, Stress_t &&S,
-                                             Tangent_t &&C) {
+        inline static decltype(auto) compute(Strain_t && F, Stress_t && S,
+                                             Tangent_t && C) {
           using T4 = typename std::remove_reference_t<Tangent_t>::PlainObject;
           using Tmap = T4MatMap<Real, Dim>;
           T4 K;
@@ -333,7 +336,7 @@ namespace muSpectre {
               }
             }
           }
-          auto &&P =
+          auto && P =
               compute(std::forward<Strain_t>(F), std::forward<Stress_t>(S));
           return std::make_tuple(std::move(P), std::move(K));
         }
@@ -350,7 +353,7 @@ namespace muSpectre {
                               StrainMeasure::no_strain_> {
         //! returns the converted stress
         template <class Strain_t, class Stress_t>
-        inline static decltype(auto) compute(Strain_t &&F, Stress_t &&tau) {
+        inline static decltype(auto) compute(Strain_t && F, Stress_t && tau) {
           return tau * F.inverse().transpose();
         }
       };
@@ -372,14 +375,14 @@ namespace muSpectre {
 
         //! returns the converted stress and stiffness
         template <class Strain_t, class Stress_t, class Tangent_t>
-        inline static decltype(auto) compute(Strain_t &&F, Stress_t &&tau,
-                                             Tangent_t &&C) {
+        inline static decltype(auto) compute(Strain_t && F, Stress_t && tau,
+                                             Tangent_t && C) {
           using T4 = typename std::remove_reference_t<Tangent_t>::PlainObject;
           using Tmap = T4MatMap<Real, Dim>;
           T4 K;
           Tmap Kmap{K.data()};
           K.setZero();
-          auto &&F_inv{F.inverse()};
+          auto && F_inv{F.inverse()};
           for (int i = 0; i < Dim; ++i) {
             for (int m = 0; m < Dim; ++m) {
               for (int n = 0; n < Dim; ++n) {
@@ -393,7 +396,7 @@ namespace muSpectre {
               }
             }
           }
-          auto &&P = tau * F_inv.transpose();
+          auto && P = tau * F_inv.transpose();
           return std::make_tuple(std::move(P), std::move(K));
         }
       };
@@ -404,7 +407,7 @@ namespace muSpectre {
     //! set of functions returning an expression for PK2 stress based on
     template <StressMeasure StressM, StrainMeasure StrainM, class Stress_t,
               class Strain_t>
-    decltype(auto) PK1_stress(Strain_t &&strain, Stress_t &&stress) {
+    decltype(auto) PK1_stress(Strain_t && strain, Stress_t && stress) {
       constexpr Dim_t dim{EigenCheck::tensor_dim<Strain_t>::value};
       static_assert((dim == EigenCheck::tensor_dim<Stress_t>::value),
                     "Stress and strain tensors have differing dimensions");
@@ -416,8 +419,8 @@ namespace muSpectre {
     //! set of functions returning an expression for PK2 stress based on
     template <StressMeasure StressM, StrainMeasure StrainM, class Stress_t,
               class Strain_t, class Tangent_t>
-    decltype(auto) PK1_stress(Strain_t &&strain, Stress_t &&stress,
-                              Tangent_t &&tangent) {
+    decltype(auto) PK1_stress(Strain_t && strain, Stress_t && stress,
+                              Tangent_t && tangent) {
       constexpr Dim_t dim{EigenCheck::tensor_dim<Strain_t>::value};
       static_assert((dim == EigenCheck::tensor_dim<Stress_t>::value),
                     "Stress and strain tensors have differing dimensions");
@@ -456,7 +459,7 @@ namespace muSpectre {
       template <ElasticModulus Out, ElasticModulus In>
       struct Converter<Out, Out, In> {
         //! wrapped function (raison d'être)
-        inline constexpr static Real compute(const Real &A,
+        inline constexpr static Real compute(const Real & A,
                                              const Real & /*B*/) {
           return A;
         }
@@ -469,7 +472,7 @@ namespace muSpectre {
       struct Converter<Out, In, Out> {
         //! wrapped function (raison d'être)
         inline constexpr static Real compute(const Real & /*A*/,
-                                             const Real &B) {
+                                             const Real & B) {
           return B;
         }
       };
@@ -481,7 +484,7 @@ namespace muSpectre {
       struct Converter<ElasticModulus::Shear, ElasticModulus::Young,
                        ElasticModulus::Poisson> {
         //! wrapped function (raison d'être)
-        inline constexpr static Real compute(const Real &E, const Real &nu) {
+        inline constexpr static Real compute(const Real & E, const Real & nu) {
           return E / (2 * (1 + nu));
         }
       };
@@ -493,7 +496,7 @@ namespace muSpectre {
       struct Converter<ElasticModulus::lambda, ElasticModulus::Young,
                        ElasticModulus::Poisson> {
         //! wrapped function (raison d'être)
-        inline constexpr static Real compute(const Real &E, const Real &nu) {
+        inline constexpr static Real compute(const Real & E, const Real & nu) {
           return E * nu / ((1 + nu) * (1 - 2 * nu));
         }
       };
@@ -505,7 +508,7 @@ namespace muSpectre {
       struct Converter<ElasticModulus::Bulk, ElasticModulus::Young,
                        ElasticModulus::Poisson> {
         //! wrapped function (raison d'être)
-        inline constexpr static Real compute(const Real &E, const Real &nu) {
+        inline constexpr static Real compute(const Real & E, const Real & nu) {
           return E / (3 * (1 - 2 * nu));
         }
       };
@@ -517,7 +520,7 @@ namespace muSpectre {
       struct Converter<ElasticModulus::Young, ElasticModulus::Bulk,
                        ElasticModulus::Shear> {
         //! wrapped function (raison d'être)
-        inline constexpr static Real compute(const Real &K, const Real &G) {
+        inline constexpr static Real compute(const Real & K, const Real & G) {
           return 9 * K * G / (3 * K + G);
         }
       };
@@ -529,7 +532,7 @@ namespace muSpectre {
       struct Converter<ElasticModulus::Poisson, ElasticModulus::Bulk,
                        ElasticModulus::Shear> {
         //! wrapped function (raison d'être)
-        inline constexpr static Real compute(const Real &K, const Real &G) {
+        inline constexpr static Real compute(const Real & K, const Real & G) {
           return (3 * K - 2 * G) / (2 * (3 * K + G));
         }
       };
@@ -541,8 +544,8 @@ namespace muSpectre {
       struct Converter<ElasticModulus::Young, ElasticModulus::lambda,
                        ElasticModulus::Shear> {
         //! wrapped function (raison d'être)
-        inline constexpr static Real compute(const Real &lambda,
-                                             const Real &G) {
+        inline constexpr static Real compute(const Real & lambda,
+                                             const Real & G) {
           return G * (3 * lambda + 2 * G) / (lambda + G);
         }
       };
@@ -554,8 +557,8 @@ namespace muSpectre {
      * chosen output modulus
      */
     template <ElasticModulus Out, ElasticModulus In1, ElasticModulus In2>
-    inline constexpr Real convert_elastic_modulus(const Real &in1,
-                                                  const Real &in2) {
+    inline constexpr Real convert_elastic_modulus(const Real & in1,
+                                                  const Real & in2) {
       // enforcing sanity
       static_assert((In1 != In2),
                     "The input modulus types cannot be identical");
@@ -573,14 +576,15 @@ namespace muSpectre {
     }
 
     //! static inline implementation of Hooke's law
-    template <Dim_t Dim, class Strain_t, class Tangent_t> struct Hooke {
+    template <Dim_t Dim, class Strain_t, class Tangent_t>
+    struct Hooke {
       /**
        * compute Lamé's first constant
        * @param young: Young's modulus
        * @param poisson: Poisson's ratio
        */
-      inline static constexpr Real compute_lambda(const Real &young,
-                                                  const Real &poisson) {
+      inline static constexpr Real compute_lambda(const Real & young,
+                                                  const Real & poisson) {
         return convert_elastic_modulus<ElasticModulus::lambda,
                                        ElasticModulus::Young,
                                        ElasticModulus::Poisson>(young, poisson);
@@ -591,8 +595,8 @@ namespace muSpectre {
        * @param young: Young's modulus
        * @param poisson: Poisson's ratio
        */
-      inline static constexpr Real compute_mu(const Real &young,
-                                              const Real &poisson) {
+      inline static constexpr Real compute_mu(const Real & young,
+                                              const Real & poisson) {
         return convert_elastic_modulus<ElasticModulus::Shear,
                                        ElasticModulus::Young,
                                        ElasticModulus::Poisson>(young, poisson);
@@ -603,8 +607,8 @@ namespace muSpectre {
        * @param young: Young's modulus
        * @param poisson: Poisson's ratio
        */
-      inline static constexpr Real compute_K(const Real &young,
-                                             const Real &poisson) {
+      inline static constexpr Real compute_K(const Real & young,
+                                             const Real & poisson) {
         return convert_elastic_modulus<ElasticModulus::Bulk,
                                        ElasticModulus::Young,
                                        ElasticModulus::Poisson>(young, poisson);
@@ -617,7 +621,7 @@ namespace muSpectre {
        */
       inline static Eigen::TensorFixedSize<Real,
                                            Eigen::Sizes<Dim, Dim, Dim, Dim>>
-      compute_C(const Real &lambda, const Real &mu) {
+      compute_C(const Real & lambda, const Real & mu) {
         return lambda *
                    Tensors::outer<Dim>(Tensors::I2<Dim>(), Tensors::I2<Dim>()) +
                2 * mu * Tensors::I4S<Dim>();
@@ -628,8 +632,8 @@ namespace muSpectre {
        * @param lambda: Lamé's first constant
        * @param mu: Lamé's second constant (i.e., shear modulus)
        */
-      inline static T4Mat<Real, Dim> compute_C_T4(const Real &lambda,
-                                                  const Real &mu) {
+      inline static T4Mat<Real, Dim> compute_C_T4(const Real & lambda,
+                                                  const Real & mu) {
         return lambda * Matrices::Itrac<Dim>() +
                2 * mu * Matrices::Isymm<Dim>();
       }
@@ -641,8 +645,8 @@ namespace muSpectre {
        * @param E: Green-Lagrange or small strain tensor
        */
       template <class s_t>
-      inline static decltype(auto) evaluate_stress(const Real &lambda,
-                                                   const Real &mu, s_t &&E) {
+      inline static decltype(auto) evaluate_stress(const Real & lambda,
+                                                   const Real & mu, s_t && E) {
         return E.trace() * lambda * Strain_t::Identity() + 2 * mu * E;
       }
 
@@ -654,9 +658,9 @@ namespace muSpectre {
        * @param C: stiffness tensor (Piola-Kirchhoff 2 (or σ) w.r.t to `E`)
        */
       template <class s_t>
-      inline static decltype(auto) evaluate_stress(const Real &lambda,
-                                                   const Real &mu,
-                                                   Tangent_t &&C, s_t &&E) {
+      inline static decltype(auto) evaluate_stress(const Real & lambda,
+                                                   const Real & mu,
+                                                   Tangent_t && C, s_t && E) {
         return std::make_tuple(
             std::move(evaluate_stress(lambda, mu, std::move(E))), std::move(C));
       }

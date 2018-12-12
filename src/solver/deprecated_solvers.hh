@@ -52,9 +52,9 @@ namespace muSpectre {
    */
   template <Dim_t DimS, Dim_t DimM = DimS>
   std::vector<OptimizeResult>
-  deprecated_newton_cg(CellBase<DimS, DimM> &cell,
-                       const GradIncrements<DimM> &delF0,
-                       DeprecatedSolverBase<DimS, DimM> &solver,
+  deprecated_newton_cg(CellBase<DimS, DimM> & cell,
+                       const GradIncrements<DimM> & delF0,
+                       DeprecatedSolverBase<DimS, DimM> & solver,
                        Real newton_tol, Real equil_tol, Dim_t verbose = 0);
 
   /* ---------------------------------------------------------------------- */
@@ -64,8 +64,8 @@ namespace muSpectre {
    */
   template <Dim_t DimS, Dim_t DimM = DimS>
   inline OptimizeResult
-  deprecated_newton_cg(CellBase<DimS, DimM> &cell, const Grad_t<DimM> &delF0,
-                       DeprecatedSolverBase<DimS, DimM> &solver,
+  deprecated_newton_cg(CellBase<DimS, DimM> & cell, const Grad_t<DimM> & delF0,
+                       DeprecatedSolverBase<DimS, DimM> & solver,
                        Real newton_tol, Real equil_tol, Dim_t verbose = 0) {
     return deprecated_newton_cg(cell, GradIncrements<DimM>{delF0}, solver,
                                 newton_tol, equil_tol, verbose)[0];
@@ -78,9 +78,9 @@ namespace muSpectre {
    */
   template <Dim_t DimS, Dim_t DimM = DimS>
   std::vector<OptimizeResult>
-  deprecated_de_geus(CellBase<DimS, DimM> &cell,
-                     const GradIncrements<DimM> &delF0,
-                     DeprecatedSolverBase<DimS, DimM> &solver, Real newton_tol,
+  deprecated_de_geus(CellBase<DimS, DimM> & cell,
+                     const GradIncrements<DimM> & delF0,
+                     DeprecatedSolverBase<DimS, DimM> & solver, Real newton_tol,
                      Real equil_tol, Dim_t verbose = 0);
 
   /* ---------------------------------------------------------------------- */
@@ -90,8 +90,8 @@ namespace muSpectre {
    */
   template <Dim_t DimS, Dim_t DimM = DimS>
   OptimizeResult
-  deprecated_de_geus(CellBase<DimS, DimM> &cell, const Grad_t<DimM> &delF0,
-                     DeprecatedSolverBase<DimS, DimM> &solver, Real newton_tol,
+  deprecated_de_geus(CellBase<DimS, DimM> & cell, const Grad_t<DimM> & delF0,
+                     DeprecatedSolverBase<DimS, DimM> & solver, Real newton_tol,
                      Real equil_tol, Dim_t verbose = 0) {
     return deprecated_de_geus(cell, GradIncrements<DimM>{delF0}, solver,
                               newton_tol, equil_tol, verbose)[0];

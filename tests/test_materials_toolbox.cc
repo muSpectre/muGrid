@@ -82,8 +82,8 @@ namespace muSpectre {
     Eigen::SelfAdjointEigenSolver<T2> EigSolv(Eref);
     Eref.setZero();
     for (size_t i{0}; i < dim; ++i) {
-      auto &&vec = EigSolv.eigenvectors().col(i);
-      auto &&val = EigSolv.eigenvalues()(i);
+      auto && vec = EigSolv.eigenvectors().col(i);
+      auto && val = EigSolv.eigenvalues()(i);
       Eref += .5 * std::log(val) * vec * vec.transpose();
     }
 
@@ -186,7 +186,7 @@ namespace muSpectre {
     error = (P - Pref).norm();
     BOOST_CHECK_LT(error, tol);
 
-    auto &&stress_tgt =
+    auto && stress_tgt =
         MatTB::PK1_stress<StressMeasure::PK2, StrainMeasure::GreenLagrange>(
             F, S, C);
     T2 P_t = std::move(std::get<0>(stress_tgt));
@@ -197,7 +197,7 @@ namespace muSpectre {
     error = (K_t - Kref).norm();
     BOOST_CHECK_LT(error, tol);
 
-    auto &&stress_tgt_trivial =
+    auto && stress_tgt_trivial =
         MatTB::PK1_stress<StressMeasure::PK1, StrainMeasure::Gradient>(F, P, K);
     T2 P_u = std::move(std::get<0>(stress_tgt_trivial));
     T4 K_u = std::move(std::get<1>(stress_tgt_trivial));

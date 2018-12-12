@@ -45,24 +45,24 @@ namespace muSpectre {
 
   template <Dim_t DimS, Dim_t DimM>
   std::vector<OptimizeResult>
-  deprecated_de_geus(CellBase<DimS, DimM> &cell,
-                     const GradIncrements<DimM> &delFs,
-                     DeprecatedSolverBase<DimS, DimM> &solver, Real newton_tol,
+  deprecated_de_geus(CellBase<DimS, DimM> & cell,
+                     const GradIncrements<DimM> & delFs,
+                     DeprecatedSolverBase<DimS, DimM> & solver, Real newton_tol,
                      Real equil_tol, Dim_t verbose) {
     using Field_t = typename MaterialBase<DimS, DimM>::StrainField_t;
-    const Communicator &comm = cell.get_communicator();
+    const Communicator & comm = cell.get_communicator();
     auto solver_fields{std::make_unique<GlobalFieldCollection<DimS>>()};
     solver_fields->initialise(cell.get_subdomain_resolutions(),
                               cell.get_subdomain_locations());
 
     // Corresponds to symbol δF or δε
-    auto &incrF{make_field<Field_t>("δF", *solver_fields)};
+    auto & incrF{make_field<Field_t>("δF", *solver_fields)};
 
     // Corresponds to symbol ΔF or Δε
-    auto &DeltaF{make_field<Field_t>("ΔF", *solver_fields)};
+    auto & DeltaF{make_field<Field_t>("ΔF", *solver_fields)};
 
     // field to store the rhs for cg calculations
-    auto &rhs{make_field<Field_t>("rhs", *solver_fields)};
+    auto & rhs{make_field<Field_t>("rhs", *solver_fields)};
 
     solver.initialise();
 
@@ -96,9 +96,9 @@ namespace muSpectre {
                 << ", cg_tol = " << solver.get_tol()
                 << " maxiter = " << solver.get_maxiter() << " and Δ"
                 << strain_symb << " =" << std::endl;
-      for (auto &&tup : akantu::enumerate(delFs)) {
-        auto &&counter{std::get<0>(tup)};
-        auto &&grad{std::get<1>(tup)};
+      for (auto && tup : akantu::enumerate(delFs)) {
+        auto && counter{std::get<0>(tup)};
+        auto && grad{std::get<1>(tup)};
         std::cout << "Step " << counter + 1 << ":" << std::endl
                   << grad << std::endl;
       }
@@ -106,7 +106,7 @@ namespace muSpectre {
     }
 
     // initialise F = I or ε = 0
-    auto &F{cell.get_strain()};
+    auto & F{cell.get_strain()};
     switch (form) {
     case Formulation::finite_strain: {
       F.get_map() = Matrices::I2<DimM>();
@@ -114,7 +114,7 @@ namespace muSpectre {
     }
     case Formulation::small_strain: {
       F.get_map() = Matrices::I2<DimM>().Zero();
-      for (const auto &delF : delFs) {
+      for (const auto & delF : delFs) {
         if (!check_symmetry(delF)) {
           throw SolverError("all Δε must be symmetric!");
         }
@@ -130,7 +130,7 @@ namespace muSpectre {
     std::vector<OptimizeResult> ret_val{};
 
     Grad_t<DimM> previous_grad{Grad_t<DimM>::Zero()};
-    for (const auto &delF : delFs) {  // incremental loop
+    for (const auto & delF : delFs) {  // incremental loop
       std::string message{"Has not converged"};
       Real incrNorm{2 * newton_tol}, gradNorm{1};
       Real stressNorm{2 * equil_tol};
@@ -153,10 +153,10 @@ namespace muSpectre {
            ++newt_iter) {
         // obtain material response
         auto res_tup{cell.evaluate_stress_tangent(F)};
-        auto &P{std::get<0>(res_tup)};
-        auto &K{std::get<1>(res_tup)};
+        auto & P{std::get<0>(res_tup)};
+        auto & K{std::get<1>(res_tup)};
 
-        auto tangent_effect = [&cell, &K](const Field_t &dF, Field_t &dP) {
+        auto tangent_effect = [&cell, &K](const Field_t & dF, Field_t & dP) {
           cell.directional_stiffness(K, dF, dP);
         };
 
@@ -212,36 +212,36 @@ namespace muSpectre {
 
   //! instantiation for two-dimensional cells
   template std::vector<OptimizeResult>
-  deprecated_de_geus(CellBase<twoD, twoD> &cell,
-                     const GradIncrements<twoD> &delF0,
-                     DeprecatedSolverBase<twoD, twoD> &solver, Real newton_tol,
+  deprecated_de_geus(CellBase<twoD, twoD> & cell,
+                     const GradIncrements<twoD> & delF0,
+                     DeprecatedSolverBase<twoD, twoD> & solver, Real newton_tol,
                      Real equil_tol, Dim_t verbose);
 
   //! instantiation for three-dimensional cells
   template std::vector<OptimizeResult>
-  deprecated_de_geus(CellBase<threeD, threeD> &cell,
-                     const GradIncrements<threeD> &delF0,
-                     DeprecatedSolverBase<threeD, threeD> &solver,
+  deprecated_de_geus(CellBase<threeD, threeD> & cell,
+                     const GradIncrements<threeD> & delF0,
+                     DeprecatedSolverBase<threeD, threeD> & solver,
                      Real newton_tol, Real equil_tol, Dim_t verbose);
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   std::vector<OptimizeResult>
-  deprecated_newton_cg(CellBase<DimS, DimM> &cell,
-                       const GradIncrements<DimM> &delFs,
-                       DeprecatedSolverBase<DimS, DimM> &solver,
+  deprecated_newton_cg(CellBase<DimS, DimM> & cell,
+                       const GradIncrements<DimM> & delFs,
+                       DeprecatedSolverBase<DimS, DimM> & solver,
                        Real newton_tol, Real equil_tol, Dim_t verbose) {
     using Field_t = typename MaterialBase<DimS, DimM>::StrainField_t;
-    const Communicator &comm = cell.get_communicator();
+    const Communicator & comm = cell.get_communicator();
     auto solver_fields{std::make_unique<GlobalFieldCollection<DimS>>()};
     solver_fields->initialise(cell.get_subdomain_resolutions(),
                               cell.get_subdomain_locations());
 
     // Corresponds to symbol δF or δε
-    auto &incrF{make_field<Field_t>("δF", *solver_fields)};
+    auto & incrF{make_field<Field_t>("δF", *solver_fields)};
 
     // field to store the rhs for cg calculations
-    auto &rhs{make_field<Field_t>("rhs", *solver_fields)};
+    auto & rhs{make_field<Field_t>("rhs", *solver_fields)};
 
     solver.initialise();
 
@@ -275,9 +275,9 @@ namespace muSpectre {
                 << ", cg_tol = " << solver.get_tol()
                 << " maxiter = " << solver.get_maxiter() << " and Δ"
                 << strain_symb << " =" << std::endl;
-      for (auto &&tup : akantu::enumerate(delFs)) {
-        auto &&counter{std::get<0>(tup)};
-        auto &&grad{std::get<1>(tup)};
+      for (auto && tup : akantu::enumerate(delFs)) {
+        auto && counter{std::get<0>(tup)};
+        auto && grad{std::get<1>(tup)};
         std::cout << "Step " << counter + 1 << ":" << std::endl
                   << grad << std::endl;
       }
@@ -285,7 +285,7 @@ namespace muSpectre {
     }
 
     // initialise F = I or ε = 0
-    auto &F{cell.get_strain()};
+    auto & F{cell.get_strain()};
     switch (cell.get_formulation()) {
     case Formulation::finite_strain: {
       F.get_map() = Matrices::I2<DimM>();
@@ -293,7 +293,7 @@ namespace muSpectre {
     }
     case Formulation::small_strain: {
       F.get_map() = Matrices::I2<DimM>().Zero();
-      for (const auto &delF : delFs) {
+      for (const auto & delF : delFs) {
         if (!check_symmetry(delF)) {
           throw SolverError("all Δε must be symmetric!");
         }
@@ -309,9 +309,9 @@ namespace muSpectre {
     std::vector<OptimizeResult> ret_val{};
 
     Grad_t<DimM> previous_grad{Grad_t<DimM>::Zero()};
-    for (const auto &delF : delFs) {  // incremental loop
+    for (const auto & delF : delFs) {  // incremental loop
       // apply macroscopic strain increment
-      for (auto &&grad : F.get_map()) {
+      for (auto && grad : F.get_map()) {
         grad += delF - previous_grad;
       }
 
@@ -336,7 +336,7 @@ namespace muSpectre {
       for (; newt_iter < solver.get_maxiter() && !has_converged; ++newt_iter) {
         // obtain material response
         auto res_tup{cell.evaluate_stress_tangent(F)};
-        auto &P{std::get<0>(res_tup)};
+        auto & P{std::get<0>(res_tup)};
 
         rhs.eigen() = -P.eigen();
         cell.project(rhs);
@@ -381,16 +381,16 @@ namespace muSpectre {
 
   //! instantiation for two-dimensional cells
   template std::vector<OptimizeResult>
-  deprecated_newton_cg(CellBase<twoD, twoD> &cell,
-                       const GradIncrements<twoD> &delF0,
-                       DeprecatedSolverBase<twoD, twoD> &solver,
+  deprecated_newton_cg(CellBase<twoD, twoD> & cell,
+                       const GradIncrements<twoD> & delF0,
+                       DeprecatedSolverBase<twoD, twoD> & solver,
                        Real newton_tol, Real equil_tol, Dim_t verbose);
 
   //! instantiation for three-dimensional cells
   template std::vector<OptimizeResult>
-  deprecated_newton_cg(CellBase<threeD, threeD> &cell,
-                       const GradIncrements<threeD> &delF0,
-                       DeprecatedSolverBase<threeD, threeD> &solver,
+  deprecated_newton_cg(CellBase<threeD, threeD> & cell,
+                       const GradIncrements<threeD> & delF0,
+                       DeprecatedSolverBase<threeD, threeD> & solver,
                        Real newton_tol, Real equil_tol, Dim_t verbose);
 
 }  // namespace muSpectre

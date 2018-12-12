@@ -45,7 +45,8 @@ namespace muSpectre {
    * implements the `muSpectre::FftEngine_Base` interface using the
    * FFTW library
    */
-  template <Dim_t Dim> class FFTWEngine : public FFTEngineBase<Dim> {
+  template <Dim_t Dim>
+  class FFTWEngine : public FFTEngineBase<Dim> {
    public:
     using Parent = FFTEngineBase<Dim>;       //!< base class
     using Ccoord = typename Parent::Ccoord;  //!< cell coordinates type
@@ -61,28 +62,28 @@ namespace muSpectre {
                Communicator comm = Communicator());
 
     //! Copy constructor
-    FFTWEngine(const FFTWEngine &other) = delete;
+    FFTWEngine(const FFTWEngine & other) = delete;
 
     //! Move constructor
-    FFTWEngine(FFTWEngine &&other) = default;
+    FFTWEngine(FFTWEngine && other) = default;
 
     //! Destructor
     virtual ~FFTWEngine() noexcept;
 
     //! Copy assignment operator
-    FFTWEngine &operator=(const FFTWEngine &other) = delete;
+    FFTWEngine & operator=(const FFTWEngine & other) = delete;
 
     //! Move assignment operator
-    FFTWEngine &operator=(FFTWEngine &&other) = default;
+    FFTWEngine & operator=(FFTWEngine && other) = default;
 
     // compute the plan, etc
     void initialise(FFT_PlanFlags plan_flags) override;
 
     //! forward transform
-    Workspace_t &fft(Field_t &field) override;
+    Workspace_t & fft(Field_t & field) override;
 
     //! inverse transform
-    void ifft(Field_t &field) const override;
+    void ifft(Field_t & field) const override;
 
    protected:
     fftw_plan plan_fft{};     //!< holds the plan for forward fourier transform

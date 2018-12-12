@@ -60,9 +60,9 @@ namespace muSpectre {
     Parent::initialise(flags);
     FFT_freqs<DimS> fft_freqs(this->fft_engine->get_domain_resolutions(),
                               this->domain_lengths);
-    for (auto &&tup : akantu::zip(*this->fft_engine, this->xis)) {
-      const auto &ccoord = std::get<0>(tup);
-      auto &xi = std::get<1>(tup);
+    for (auto && tup : akantu::zip(*this->fft_engine, this->xis)) {
+      const auto & ccoord = std::get<0>(tup);
+      auto & xi = std::get<1>(tup);
       xi = fft_freqs.get_unit_xi(ccoord);
     }
     if (this->get_subdomain_locations() == Ccoord{}) {
@@ -73,12 +73,12 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   void
-  ProjectionFiniteStrainFast<DimS, DimM>::apply_projection(Field_t &field) {
+  ProjectionFiniteStrainFast<DimS, DimM>::apply_projection(Field_t & field) {
     Grad_map field_map{this->fft_engine->fft(field)};
     Real factor = this->fft_engine->normalisation();
-    for (auto &&tup : akantu::zip(this->xis, field_map)) {
-      auto &xi{std::get<0>(tup)};
-      auto &f{std::get<1>(tup)};
+    for (auto && tup : akantu::zip(this->xis, field_map)) {
+      auto & xi{std::get<0>(tup)};
+      auto & f{std::get<1>(tup)};
       f = factor * ((f * xi).eval() * xi.transpose());
     }
     this->fft_engine->ifft(field);

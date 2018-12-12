@@ -55,12 +55,14 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim> size_t FFTEngineBase<Dim>::size() const {
+  template <Dim_t Dim>
+  size_t FFTEngineBase<Dim>::size() const {
     return CcoordOps::get_size(this->subdomain_resolutions);
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim> size_t FFTEngineBase<Dim>::workspace_size() const {
+  template <Dim_t Dim>
+  size_t FFTEngineBase<Dim>::workspace_size() const {
     return this->work_space_container.size();
   }
 

@@ -49,7 +49,7 @@ namespace muSpectre {
   BOOST_AUTO_TEST_SUITE(newton_cg_tests);
 
   BOOST_AUTO_TEST_CASE(manual_construction_test) {
-    const Communicator &comm = MPIContext::get_context().comm;
+    const Communicator & comm = MPIContext::get_context().comm;
 
     // constexpr Dim_t dim{twoD};
     constexpr Dim_t dim{threeD};
@@ -70,12 +70,12 @@ namespace muSpectre {
     // const Real lambda{Young*Poisson/((1+Poisson)*(1-2*Poisson))};
     // const Real mu{Young/(2*(1+Poisson))};
 
-    auto &Material_hard = Mat_t::make(sys, "hard", 10 * Young, Poisson);
-    auto &Material_soft = Mat_t::make(sys, "soft", Young, Poisson);
+    auto & Material_hard = Mat_t::make(sys, "hard", 10 * Young, Poisson);
+    auto & Material_soft = Mat_t::make(sys, "soft", Young, Poisson);
 
-    auto &loc = sys.get_subdomain_locations();
-    for (auto &&tup : akantu::enumerate(sys)) {
-      auto &&pixel = std::get<1>(tup);
+    auto & loc = sys.get_subdomain_locations();
+    for (auto && tup : akantu::enumerate(sys)) {
+      auto && pixel = std::get<1>(tup);
       if (loc == Ccoord_t<threeD>{0, 0} && std::get<0>(tup) == 0) {
         Material_hard.add_pixel(pixel);
       } else {
@@ -106,7 +106,7 @@ namespace muSpectre {
   }
 
   BOOST_AUTO_TEST_CASE(small_strain_patch_test) {
-    const Communicator &comm = MPIContext::get_context().comm;
+    const Communicator & comm = MPIContext::get_context().comm;
     constexpr Dim_t dim{twoD};
     using Ccoord = Ccoord_t<dim>;
     using Rcoord = Rcoord_t<dim>;
@@ -129,7 +129,7 @@ namespace muSpectre {
         std::make_unique<Mat_t>("hard", contrast * Young, Poisson)};
     auto material_soft{std::make_unique<Mat_t>("soft", Young, Poisson)};
 
-    for (const auto &pixel : sys) {
+    for (const auto & pixel : sys) {
       if (pixel[0] < Dim_t(nb_lays)) {
         material_hard->add_pixel(pixel);
       } else {
@@ -187,7 +187,7 @@ namespace muSpectre {
     Eps_soft << eps_soft, 0, 0, 0;
 
     // verify uniaxial tension patch test
-    for (const auto &pixel : sys) {
+    for (const auto & pixel : sys) {
       if (pixel[0] < Dim_t(nb_lays)) {
         BOOST_CHECK_LE((Eps_hard - sys.get_strain().get_map()[pixel]).norm(),
                        tol);
@@ -208,7 +208,7 @@ namespace muSpectre {
     Eps_soft << 0, eps_soft, eps_soft, 0;
 
     // verify pure shear patch test
-    for (const auto &pixel : sys) {
+    for (const auto & pixel : sys) {
       if (pixel[0] < Dim_t(nb_lays)) {
         BOOST_CHECK_LE((Eps_hard - sys.get_strain().get_map()[pixel]).norm(),
                        tol);

@@ -47,7 +47,8 @@ namespace muSpectre {
    * implements the `muSpectre::FFTEngineBase` interface using the
    * FFTW library
    */
-  template <Dim_t DimS> class PFFTEngine : public FFTEngineBase<DimS> {
+  template <Dim_t DimS>
+  class PFFTEngine : public FFTEngineBase<DimS> {
    public:
     using Parent = FFTEngineBase<DimS>;      //!< base class
     using Ccoord = typename Parent::Ccoord;  //!< cell coordinates type
@@ -63,28 +64,28 @@ namespace muSpectre {
                Communicator comm = Communicator());
 
     //! Copy constructor
-    PFFTEngine(const PFFTEngine &other) = delete;
+    PFFTEngine(const PFFTEngine & other) = delete;
 
     //! Move constructor
-    PFFTEngine(PFFTEngine &&other) = default;
+    PFFTEngine(PFFTEngine && other) = default;
 
     //! Destructor
     virtual ~PFFTEngine() noexcept;
 
     //! Copy assignment operator
-    PFFTEngine &operator=(const PFFTEngine &other) = delete;
+    PFFTEngine & operator=(const PFFTEngine & other) = delete;
 
     //! Move assignment operator
-    PFFTEngine &operator=(PFFTEngine &&other) = default;
+    PFFTEngine & operator=(PFFTEngine && other) = default;
 
     // compute the plan, etc
     void initialise(FFT_PlanFlags plan_flags) override;
 
     //! forward transform
-    Workspace_t &fft(Field_t &field) override;
+    Workspace_t & fft(Field_t & field) override;
 
     //! inverse transform
-    void ifft(Field_t &field) const override;
+    void ifft(Field_t & field) const override;
 
    protected:
     MPI_Comm mpi_comm;  //! < MPI communicator
@@ -94,7 +95,7 @@ namespace muSpectre {
     pfft_plan plan_ifft{};  //!< holds the plan for inverse fourier transform
     ptrdiff_t
         workspace_size{};     //!< size of workspace buffer returned by planner
-    Real *real_workspace{};   //!< temporary real workspace that is correctly
+    Real * real_workspace{};  //!< temporary real workspace that is correctly
                               //!< padded
     bool initialised{false};  //!< to prevent double initialisation
 

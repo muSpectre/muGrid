@@ -46,7 +46,8 @@ namespace muSpectre {
   BOOST_AUTO_TEST_SUITE(fftw_engine);
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM, Dim_t resolution> struct FFTW_fixture {
+  template <Dim_t DimS, Dim_t DimM, Dim_t resolution>
+  struct FFTW_fixture {
     constexpr static Dim_t box_resolution{resolution};
     constexpr static Real box_length{4.5};
     constexpr static Dim_t sdim{DimS};
@@ -89,11 +90,11 @@ namespace muSpectre {
     constexpr Dim_t order{2};
     using FC_t = GlobalFieldCollection<Fix::sdim>;
     FC_t fc;
-    auto &input{
+    auto & input{
         make_field<TensorField<FC_t, Real, order, Fix::mdim>>("input", fc)};
-    auto &ref{
+    auto & ref{
         make_field<TensorField<FC_t, Real, order, Fix::mdim>>("reference", fc)};
-    auto &result{
+    auto & result{
         make_field<TensorField<FC_t, Real, order, Fix::mdim>>("result", fc)};
     fc.initialise(Fix::res(), Fix::loc());
 
@@ -104,12 +105,12 @@ namespace muSpectre {
     size_t cntr{0};
     for (auto tup : akantu::zip(inmap, refmap)) {
       cntr++;
-      auto &in_{std::get<0>(tup)};
-      auto &ref_{std::get<1>(tup)};
+      auto & in_{std::get<0>(tup)};
+      auto & ref_{std::get<1>(tup)};
       in_.setRandom();
       ref_ = in_;
     }
-    auto &complex_field = Fix::engine.fft(input);
+    auto & complex_field = Fix::engine.fft(input);
     using cmap_t = MatrixFieldMap<LocalFieldCollection<Fix::sdim>, Complex,
                                   Fix::mdim, Fix::mdim>;
     cmap_t complex_map(complex_field);
@@ -118,14 +119,14 @@ namespace muSpectre {
 
     /* make sure, the engine has not modified input (which is
        unfortunately const-casted internally, hence this test) */
-    for (auto &&tup : akantu::zip(inmap, refmap)) {
+    for (auto && tup : akantu::zip(inmap, refmap)) {
       Real error{(std::get<0>(tup) - std::get<1>(tup)).norm()};
       BOOST_CHECK_LT(error, tol);
     }
 
     /* make sure that the ifft of fft returns the original*/
     Fix::engine.ifft(result);
-    for (auto &&tup : akantu::zip(resultmap, refmap)) {
+    for (auto && tup : akantu::zip(resultmap, refmap)) {
       Real error{
           (std::get<0>(tup) * Fix::engine.normalisation() - std::get<1>(tup))
               .norm()};

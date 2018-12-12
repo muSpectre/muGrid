@@ -43,27 +43,48 @@ namespace muSpectre {
 
 #ifdef WITH_MPI
 
-  template <typename T> decltype(auto) mpi_type() {}
-  template <> inline decltype(auto) mpi_type<char>() { return MPI_CHAR; }
-  template <> inline decltype(auto)
-  mpi_type<short>() { return MPI_SHORT; }  // NOLINT
-  template <> inline decltype(auto) mpi_type<int>() { return MPI_INT; }
-  template <> inline decltype(auto)
-  mpi_type<long>() { return MPI_LONG; }  // NOLINT
-  template <> inline decltype(auto) mpi_type<unsigned char>() {
+  template <typename T>
+  decltype(auto) mpi_type() {}
+  template <>
+  inline decltype(auto) mpi_type<char>() {
+    return MPI_CHAR;
+  }
+  template <>
+  inline decltype(auto) mpi_type<short>() {  // NOLINT
+    return MPI_SHORT;
+  }
+  template <>
+  inline decltype(auto) mpi_type<int>() {
+    return MPI_INT;
+  }
+  template <>
+  inline decltype(auto) mpi_type<long>() {  // NOLINT
+    return MPI_LONG;
+  }
+  template <>
+  inline decltype(auto) mpi_type<unsigned char>() {
     return MPI_UNSIGNED_CHAR;
   }
-  template <> inline decltype(auto) mpi_type<unsigned short>() {  // NOLINT
+  template <>
+  inline decltype(auto) mpi_type<unsigned short>() {  // NOLINT
     return MPI_UNSIGNED_SHORT;
   }
-  template <> inline decltype(auto) mpi_type<unsigned int>() {
+  template <>
+  inline decltype(auto) mpi_type<unsigned int>() {
     return MPI_UNSIGNED;
   }
-  template <> inline decltype(auto) mpi_type<unsigned long>() {  // NOLINT
+  template <>
+  inline decltype(auto) mpi_type<unsigned long>() {  // NOLINT
     return MPI_UNSIGNED_LONG;
   }
-  template <> inline decltype(auto) mpi_type<float>() { return MPI_FLOAT; }
-  template <> inline decltype(auto) mpi_type<double>() { return MPI_DOUBLE; }
+  template <>
+  inline decltype(auto) mpi_type<float>() {
+    return MPI_FLOAT;
+  }
+  template <>
+  inline decltype(auto) mpi_type<double>() {
+    return MPI_DOUBLE;
+  }
 
   //! lightweight abstraction for the MPI communicator object
   class Communicator {
@@ -91,7 +112,8 @@ namespace muSpectre {
     }
 
     //! sum reduction on scalar types
-    template <typename T> T sum(const T &arg) const {
+    template <typename T>
+    T sum(const T & arg) const {
       if (&comm == MPI_COMM_NULL)
         return arg;
       T res;
@@ -120,7 +142,10 @@ namespace muSpectre {
     int size() const { return 1; }
 
     //! sum reduction on scalar types
-    template <typename T> T sum(const T &arg) const { return arg; }
+    template <typename T>
+    T sum(const T & arg) const {
+      return arg;
+    }
   };
 
 #endif

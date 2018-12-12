@@ -45,7 +45,7 @@ namespace muSpectre {
   class MPIContext {
    public:
     Communicator comm;
-    static MPIContext &get_context() {
+    static MPIContext & get_context() {
       static MPIContext context;
       return context;
     }

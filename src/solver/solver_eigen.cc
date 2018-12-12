@@ -41,13 +41,14 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <class SolverType>
-  SolverEigen<SolverType>::SolverEigen(Cell &cell, Real tol, Uint maxiter,
+  SolverEigen<SolverType>::SolverEigen(Cell & cell, Real tol, Uint maxiter,
                                        bool verbose)
       : Parent(cell, tol, maxiter, verbose), adaptor{cell.get_adaptor()},
         solver{}, result{} {}
 
   /* ---------------------------------------------------------------------- */
-  template <class SolverType> void SolverEigen<SolverType>::initialise() {
+  template <class SolverType>
+  void SolverEigen<SolverType>::initialise() {
     this->solver.setTolerance(this->get_tol());
     this->solver.setMaxIterations(this->get_maxiter());
     this->solver.compute(this->adaptor);
@@ -57,7 +58,7 @@ namespace muSpectre {
   template <class SolverType>
   auto SolverEigen<SolverType>::solve(const ConstVector_ref rhs) -> Vector_map {
     // for crtp
-    auto &this_solver = static_cast<SolverType &>(*this);
+    auto & this_solver = static_cast<SolverType &>(*this);
     this->result = this->solver.solve(rhs);
     this->counter += this->solver.iterations();
 

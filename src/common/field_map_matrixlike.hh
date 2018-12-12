@@ -61,22 +61,26 @@ namespace muSpectre {
      * traits structure to define the name shown when a
      * `muSpectre::MatrixLikeFieldMap` output into an ostream
      */
-    template <Map_t map_type> struct NameWrapper {};
+    template <Map_t map_type>
+    struct NameWrapper {};
 
     /// specialisation for `muSpectre::ArrayFieldMap`
-    template <> struct NameWrapper<Map_t::Array> {
+    template <>
+    struct NameWrapper<Map_t::Array> {
       //! string to use for printing
       static std::string field_info_root() { return "Array"; }
     };
 
     /// specialisation for `muSpectre::MatrixFieldMap`
-    template <> struct NameWrapper<Map_t::Matrix> {
+    template <>
+    struct NameWrapper<Map_t::Matrix> {
       //! string to use for printing
       static std::string field_info_root() { return "Matrix"; }
     };
 
     /// specialisation for `muSpectre::T4MatrixFieldMap`
-    template <> struct NameWrapper<Map_t::T4Matrix> {
+    template <>
+    struct NameWrapper<Map_t::T4Matrix> {
       //! string to use for printing
       static std::string field_info_root() { return "T4Matrix"; }
     };
@@ -158,28 +162,28 @@ namespace muSpectre {
        * type of the field might not be known at compile time.
        */
       template <class FC, typename T2, Dim_t NbC>
-      MatrixLikeFieldMap(TypedSizedFieldBase<FC, T2, NbC> & field) //NOLINT
-        : Parent(field) {}
+      MatrixLikeFieldMap(TypedSizedFieldBase<FC, T2, NbC> & field)  // NOLINT
+          : Parent(field) {}
 
       //! Copy constructor
-      MatrixLikeFieldMap(const MatrixLikeFieldMap &other) = delete;
+      MatrixLikeFieldMap(const MatrixLikeFieldMap & other) = delete;
 
       //! Move constructorxo
-      MatrixLikeFieldMap(MatrixLikeFieldMap &&other) = default;
+      MatrixLikeFieldMap(MatrixLikeFieldMap && other) = default;
 
       //! Destructor
       virtual ~MatrixLikeFieldMap() = default;
 
       //! Copy assignment operator
-      MatrixLikeFieldMap &operator=(const MatrixLikeFieldMap &other) = delete;
+      MatrixLikeFieldMap & operator=(const MatrixLikeFieldMap & other) = delete;
 
       //! Move assignment operator
-      MatrixLikeFieldMap &operator=(MatrixLikeFieldMap &&other) = delete;
+      MatrixLikeFieldMap & operator=(MatrixLikeFieldMap && other) = delete;
 
       //! Assign a matrixlike value to every entry
       template <class Derived>
       inline MatrixLikeFieldMap &
-      operator=(const Eigen::EigenBase<Derived> &val);
+      operator=(const Eigen::EigenBase<Derived> & val);
 
       //! give human-readable field map type
       inline std::string info_string() const final;
@@ -187,12 +191,12 @@ namespace muSpectre {
       //! member access
       inline reference operator[](size_type index);
       //! member access
-      inline reference operator[](const Ccoord &ccoord);
+      inline reference operator[](const Ccoord & ccoord);
 
       //! member access
       inline const_reference operator[](size_type index) const;
       //! member access
-      inline const_reference operator[](const Ccoord &ccoord) const;
+      inline const_reference operator[](const Ccoord & ccoord) const;
 
       //! return an iterator to head of field for ranges
       inline iterator begin() { return std::move(iterator(*this)); }
@@ -236,7 +240,8 @@ namespace muSpectre {
     template <class FieldCollection, class EigenArray, class EigenConstArray,
               class EigenPlain, Map_t map_type, bool ConstField>
     MatrixLikeFieldMap<FieldCollection, EigenArray, EigenConstArray, EigenPlain,
-                       map_type, ConstField>::MatrixLikeFieldMap(Field_c &field)
+                       map_type, ConstField>::MatrixLikeFieldMap(Field_c &
+                                                                     field)
         : Parent(field) {
       this->check_compatibility();
     }
@@ -274,8 +279,8 @@ namespace muSpectre {
                                 EigenPlain, map_type, ConstField>::reference
         MatrixLikeFieldMap<FieldCollection, EigenArray, EigenConstArray,
                            EigenPlain, map_type, ConstField>::
-        operator[](const Ccoord &ccoord) {
-      size_t &&index{this->collection.get_index(ccoord)};
+        operator[](const Ccoord & ccoord) {
+      size_t && index{this->collection.get_index(ccoord)};
       return reference(this->get_ptr_to_entry(index));
     }
 
@@ -299,8 +304,8 @@ namespace muSpectre {
                                 ConstField>::const_reference
         MatrixLikeFieldMap<FieldCollection, EigenArray, EigenConstArray,
                            EigenPlain, map_type, ConstField>::
-        operator[](const Ccoord &ccoord) const {
-      size_t &&index{this->collection.get_index(ccoord)};
+        operator[](const Ccoord & ccoord) const {
+      size_t && index{this->collection.get_index(ccoord)};
       return const_reference(this->get_ptr_to_entry(index));
     }
 
@@ -312,8 +317,8 @@ namespace muSpectre {
                        map_type, ConstField> &
     MatrixLikeFieldMap<FieldCollection, EigenArray, EigenConstArray, EigenPlain,
                        map_type, ConstField>::
-    operator=(const Eigen::EigenBase<Derived> &val) {
-      for (auto &&entry : *this) {
+    operator=(const Eigen::EigenBase<Derived> & val) {
+      for (auto && entry : *this) {
         entry = val;
       }
       return *this;
@@ -327,7 +332,7 @@ namespace muSpectre {
     MatrixLikeFieldMap<FieldCollection, EigenArray, EigenConstArray, EigenPlain,
                        map_type, ConstField>::mean() const {
       T_t mean{T_t::Zero()};
-      for (auto &&val : *this) {
+      for (auto && val : *this) {
         mean += val;
       }
       mean *= 1. / Real(this->size());

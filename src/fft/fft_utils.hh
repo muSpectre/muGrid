@@ -74,7 +74,8 @@ namespace muSpectre {
    * simple class encapsulating the creation, and retrieval of
    * wave vectors
    */
-  template <Dim_t dim> class FFT_freqs {
+  template <Dim_t dim>
+  class FFT_freqs {
    public:
     //! return type for wave vectors
     using Vector = Eigen::Matrix<Real, dim, 1>;
@@ -86,26 +87,26 @@ namespace muSpectre {
         : freqs{fft_freqs(sizes, lengths)} {}
 
     //! Copy constructor
-    FFT_freqs(const FFT_freqs &other) = delete;
+    FFT_freqs(const FFT_freqs & other) = delete;
 
     //! Move constructor
-    FFT_freqs(FFT_freqs &&other) = default;
+    FFT_freqs(FFT_freqs && other) = default;
 
     //! Destructor
     virtual ~FFT_freqs() = default;
 
     //! Copy assignment operator
-    FFT_freqs &operator=(const FFT_freqs &other) = delete;
+    FFT_freqs & operator=(const FFT_freqs & other) = delete;
 
     //! Move assignment operator
-    FFT_freqs &operator=(FFT_freqs &&other) = default;
+    FFT_freqs & operator=(FFT_freqs && other) = default;
 
     //! get unnormalised wave vector (in sampling units)
     inline Vector get_xi(const Ccoord_t<dim> ccoord) const;
 
     //! get normalised wave vector
     inline Vector get_unit_xi(const Ccoord_t<dim> ccoord) const {
-      auto &&xi = this->get_xi(std::move(ccoord));
+      auto && xi = this->get_xi(std::move(ccoord));
       return xi / xi.norm();
     }
 

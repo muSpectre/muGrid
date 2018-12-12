@@ -96,22 +96,22 @@ namespace muSpectre {
     Cell() = default;
 
     //! Copy constructor
-    Cell(const Cell &other) = default;
+    Cell(const Cell & other) = default;
 
     //! Move constructor
-    Cell(Cell &&other) = default;
+    Cell(Cell && other) = default;
 
     //! Destructor
-    virtual ~Cell()  = default;
+    virtual ~Cell() = default;
 
     //! Copy assignment operator
-    Cell& operator=(const Cell &other) = default;
+    Cell & operator=(const Cell & other) = default;
 
     //! Move assignment operator
-    Cell& operator=(Cell &&other) = default;
+    Cell & operator=(Cell && other) = default;
 
     //! for handling double initialisations right
-    bool is_initialised() const {return this->initialised;}
+    bool is_initialised() const { return this->initialised; }
 
     //! returns the number of degrees of freedom in the cell
     virtual Dim_t get_nb_dof() const = 0;
@@ -153,17 +153,16 @@ namespace muSpectre {
      */
     virtual ConstVector_ref get_stress_vector() const = 0;
 
-
     /**
      * evaluates and returns the stress for the currently set strain
      */
     virtual ConstVector_ref evaluate_stress() = 0;
 
     /**
-     * evaluates and returns the stress and stiffness for the currently set strain
+     * evaluates and returns the stress and stiffness for the currently set
+     * strain
      */
     virtual std::array<ConstVector_ref, 2> evaluate_stress_tangent() = 0;
-
 
     /**
      * applies the projection operator in-place on the input vector
@@ -183,9 +182,8 @@ namespace muSpectre {
      * be compatible with scipy and EigenCG etc (At the very least,
      * the copy is only made once)
      */
-    virtual Vector_ref evaluate_projected_directional_stiffness
-      (Eigen::Ref<const Vector_t> delF) = 0;
-
+    virtual Vector_ref evaluate_projected_directional_stiffness(
+        Eigen::Ref<const Vector_t> delF) = 0;
 
     /**
      * returns a ref to a field named 'unique_name" of real values
@@ -239,7 +237,7 @@ namespace muSpectre {
   //! DimS spatial dimension (dimension of problem
   //! DimM material_dimension (dimension of constitutive law)
   template <Dim_t DimS, Dim_t DimM = DimS>
-  class CellBase: public Cell {
+  class CellBase : public Cell {
    public:
     using Parent = Cell;
     using Ccoord = Ccoord_t<DimS>;  //!< cell coordinates type
@@ -261,16 +259,16 @@ namespace muSpectre {
     using Field_t = TypedField<FieldCollection_t, T>;
     //! expected type for strain fields
     using StrainField_t =
-      TensorField<FieldCollection_t, Real, secondOrder, DimM>;
+        TensorField<FieldCollection_t, Real, secondOrder, DimM>;
     //! expected type for stress fields
     using StressField_t =
-      TensorField<FieldCollection_t, Real, secondOrder, DimM>;
+        TensorField<FieldCollection_t, Real, secondOrder, DimM>;
     //! expected type for tangent stiffness fields
     using TangentField_t =
-      TensorField<FieldCollection_t, Real, fourthOrder, DimM>;
+        TensorField<FieldCollection_t, Real, fourthOrder, DimM>;
     //! combined stress and tangent field
     using FullResponse_t =
-      std::tuple<const StressField_t&, const TangentField_t&>;
+        std::tuple<const StressField_t &, const TangentField_t &>;
     //! iterator type over all cell pixel's
     using iterator = typename CcoordOps::Pixels<DimS>::iterator;
 
@@ -301,26 +299,25 @@ namespace muSpectre {
     explicit CellBase(Projection_ptr projection);
 
     //! Copy constructor
-    CellBase(const CellBase &other) = delete;
+    CellBase(const CellBase & other) = delete;
 
     //! Move constructor
-    CellBase(CellBase &&other);
+    CellBase(CellBase && other);
 
     //! Destructor
     virtual ~CellBase() = default;
 
     //! Copy assignment operator
-    CellBase& operator=(const CellBase &other) = delete;
+    CellBase & operator=(const CellBase & other) = delete;
 
     //! Move assignment operator
-    CellBase& operator=(CellBase &&other) = default;
+    CellBase & operator=(CellBase && other) = default;
 
     /**
      * Materials can only be moved. This is to assure exclusive
      * ownership of any material by this cell
      */
     Material_t & add_material(Material_ptr mat);
-
 
     /**
      * returns a writable map onto the strain field of this cell. This
@@ -341,10 +338,10 @@ namespace muSpectre {
     ConstVector_ref evaluate_stress() override;
 
     /**
-     * evaluates and returns the stress and stiffness for the currently set strain
+     * evaluates and returns the stress and stiffness for the currently set
+     * strain
      */
     std::array<ConstVector_ref, 2> evaluate_stress_tangent() override;
-
 
     /**
      * evaluates the directional and projected stiffness (this
@@ -354,11 +351,11 @@ namespace muSpectre {
      * be compatible with scipy and EigenCG etc. (At the very least,
      * the copy is only made once)
      */
-    Vector_ref evaluate_projected_directional_stiffness
-      (Eigen::Ref<const Vector_t> delF) override;
+    Vector_ref evaluate_projected_directional_stiffness(
+        Eigen::Ref<const Vector_t> delF) override;
 
     //! return the template param DimM (required for polymorphic use of `Cell`
-    Dim_t get_material_dim() const final {return DimM;}
+    Dim_t get_material_dim() const final { return DimM; }
 
     /**
      * returns the number of rows and cols for the strain matrix type
@@ -373,13 +370,10 @@ namespace muSpectre {
      */
     void apply_projection(Eigen::Ref<Vector_t> vec) final;
 
-
-
     /**
      * set uniform strain (typically used to initialise problems
      */
     void set_uniform_strain(const Eigen::Ref<const Matrix_t> &) override;
-
 
     /**
      * evaluates all materials
@@ -405,8 +399,8 @@ namespace muSpectre {
      * directional_stiffness and should only be used for debugging or
      * in the python interface
      */
-    Eigen::ArrayXXd directional_stiffness_with_copy
-      (Eigen::Ref<Eigen::ArrayXXd> delF);
+    Eigen::ArrayXXd
+    directional_stiffness_with_copy(Eigen::Ref<Eigen::ArrayXXd> delF);
 
     /**
      * Convenience function circumventing the neeed to use the
@@ -434,9 +428,8 @@ namespace muSpectre {
      * returns a Array ref to a temporary field of real values managed by the
      * cell
      */
-    Array_ref<Real>
-    get_managed_real_array(std::string unique_name,
-                           size_t nb_components) final;
+    Array_ref<Real> get_managed_real_array(std::string unique_name,
+                                           size_t nb_components) final;
 
     /**
      * returns a global field filled from local (internal) fields of
@@ -465,42 +458,47 @@ namespace muSpectre {
     void save_history_variables() final;
 
     iterator begin();  //!< iterator to the first pixel
-    iterator end();  //!< iterator past the last pixel
+    iterator end();    //!< iterator past the last pixel
     //! number of pixels in the cell
-    size_t size() const final {return pixels.size();}
+    size_t size() const final { return pixels.size(); }
 
     //! return the subdomain resolutions of the cell
     const Ccoord & get_subdomain_resolutions() const {
-      return this->subdomain_resolutions;}
+      return this->subdomain_resolutions;
+    }
     //! return the subdomain locations of the cell
     const Ccoord & get_subdomain_locations() const {
-      return this->subdomain_locations;}
+      return this->subdomain_locations;
+    }
     //! return the domain resolutions of the cell
     const Ccoord & get_domain_resolutions() const {
-      return this->domain_resolutions;}
+      return this->domain_resolutions;
+    }
     //! return the sizes of the cell
-    const Rcoord & get_domain_lengths() const {return this->domain_lengths;}
+    const Rcoord & get_domain_lengths() const { return this->domain_lengths; }
 
     /**
      * formulation is hard set by the choice of the projection class
      */
     const Formulation & get_formulation() const final {
-      return this->projection->get_formulation();}
+      return this->projection->get_formulation();
+    }
 
     /**
      * get a reference to the projection object. should only be
      * required for debugging
      */
     Eigen::Map<Eigen::ArrayXXd> get_projection() {
-      return this->projection->get_operator();}
+      return this->projection->get_operator();
+    }
 
     //! returns the spatial size
-    constexpr static Dim_t get_sdim() {return DimS;}
+    constexpr static Dim_t get_sdim() { return DimS; }
 
     //! return a sparse matrix adaptor to the cell
     Adaptor get_adaptor() override;
     //! returns the number of degrees of freedom in the cell
-    Dim_t get_nb_dof() const override {return this->size()*ipow(DimS, 2);};
+    Dim_t get_nb_dof() const override { return this->size() * ipow(DimS, 2); };
 
     //! return the communicator object
     const Communicator & get_communicator() const override {
@@ -512,13 +510,13 @@ namespace muSpectre {
     void check_material_coverage();
 
     const Ccoord & subdomain_resolutions;  //!< the cell's subdomain resolutions
-    const Ccoord & subdomain_locations;  //!< the cell's subdomain resolutions
-    const Ccoord & domain_resolutions;  //!< the cell's domain resolutions
+    const Ccoord & subdomain_locations;    //!< the cell's subdomain resolutions
+    const Ccoord & domain_resolutions;     //!< the cell's domain resolutions
     CcoordOps::Pixels<DimS> pixels;  //!< helper to iterate over the pixels
-    const Rcoord & domain_lengths;  //!< the cell's lengths
+    const Rcoord & domain_lengths;   //!< the cell's lengths
     Collection_ptr fields;  //!< handle for the global fields of the cell
-    StrainField_t & F;  //!< ref to strain field
-    StressField_t & P;  //!< ref to stress field
+    StrainField_t & F;      //!< ref to strain field
+    StressField_t & P;      //!< ref to stress field
     //! Tangent field might not even be required; so this is an
     //! optional ref_wrapper instead of a ref
     optional<std::reference_wrapper<TangentField_t>> K{};
@@ -529,14 +527,13 @@ namespace muSpectre {
    private:
   };
 
-
   /**
    * lightweight resource handle wrapping a `muSpectre::Cell` or
    * a subclass thereof into `Eigen::EigenBase`, so it can be
    * interpreted as a sparse matrix by Eigen solvers
    */
   template <class Cell>
-  class CellAdaptor: public Eigen::EigenBase<CellAdaptor<Cell>> {
+  class CellAdaptor : public Eigen::EigenBase<CellAdaptor<Cell>> {
    public:
     using Scalar = double;      //!< sparse matrix traits
     using RealScalar = double;  //!< sparse matrix traits
@@ -550,47 +547,47 @@ namespace muSpectre {
     };
 
     //! constructor
-    explicit CellAdaptor(Cell & cell): cell{cell} {}
+    explicit CellAdaptor(Cell & cell) : cell{cell} {}
     //! returns the number of logical rows
-    Eigen::Index rows() const {return this->cell.get_nb_dof();}
+    Eigen::Index rows() const { return this->cell.get_nb_dof(); }
     //! returns the number of logical columns
-    Eigen::Index cols() const {return this->rows();}
+    Eigen::Index cols() const { return this->rows(); }
 
     //! implementation of the evaluation
-    template<typename Rhs>
+    template <typename Rhs>
     Eigen::Product<CellAdaptor, Rhs, Eigen::AliasFreeProduct>
-    operator*(const Eigen::MatrixBase<Rhs>& x) const {
-      return Eigen::Product<CellAdaptor, Rhs, Eigen::AliasFreeProduct>
-        (*this, x.derived());
+    operator*(const Eigen::MatrixBase<Rhs> & x) const {
+      return Eigen::Product<CellAdaptor, Rhs, Eigen::AliasFreeProduct>(
+          *this, x.derived());
     }
     Cell & cell;  //!< ref to the cell
   };
 
 }  // namespace muSpectre
 
-
 namespace Eigen {
   namespace internal {
     //! Implementation of `muSpectre::CellAdaptor` * `Eigen::DenseVector`
     //! through a specialization of `Eigen::internal::generic_product_impl`:
-    template<typename Rhs, class CellAdaptor>  // GEMV stands for matrix-vector
-    struct generic_product_impl<CellAdaptor, Rhs, SparseShape,
-                                DenseShape, GemvProduct>
-      : generic_product_impl_base<CellAdaptor, Rhs,
-                                  generic_product_impl<CellAdaptor, Rhs> > {
+    template <typename Rhs, class CellAdaptor>  // GEMV stands for matrix-vector
+    struct generic_product_impl<CellAdaptor, Rhs, SparseShape, DenseShape,
+                                GemvProduct>
+        : generic_product_impl_base<CellAdaptor, Rhs,
+                                    generic_product_impl<CellAdaptor, Rhs>> {
       //! undocumented
       typedef typename Product<CellAdaptor, Rhs>::Scalar Scalar;
 
       //! undocumented
-      template<typename Dest>
-      static void scaleAndAddTo(Dest& dst, const CellAdaptor& lhs,
-                                const Rhs& rhs, const Scalar& /*alpha*/) {
+      template <typename Dest>
+      static void scaleAndAddTo(Dest & dst, const CellAdaptor & lhs,
+                                const Rhs & rhs, const Scalar & /*alpha*/) {
         // This method should implement "dst += alpha * lhs * rhs" inplace,
         // however, for iterative solvers, alpha is always equal to 1, so
         // let's not bother about it.
         // Here we could simply call dst.noalias() += lhs.my_matrix() * rhs,
-        dst.noalias() += const_cast<CellAdaptor&>(lhs).cell.
-          evaluate_projected_directional_stiffness(rhs);
+        dst.noalias() +=
+            const_cast<CellAdaptor &>(lhs)
+                .cell.evaluate_projected_directional_stiffness(rhs);
       }
     };
   }  // namespace internal

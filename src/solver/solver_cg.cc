@@ -41,7 +41,7 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  SolverCG::SolverCG(Cell &cell, Real tol, Uint maxiter, bool verbose)
+  SolverCG::SolverCG(Cell & cell, Real tol, Uint maxiter, bool verbose)
       : Parent(cell, tol, maxiter, verbose), r_k(cell.get_nb_dof()),
         p_k(cell.get_nb_dof()), Ap_k(cell.get_nb_dof()),
         x_k(cell.get_nb_dof()) {}
@@ -49,7 +49,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   auto SolverCG::solve(const ConstVector_ref rhs) -> Vector_map {
     this->x_k.setZero();
-    const Communicator &comm = this->cell.get_communicator();
+    const Communicator & comm = this->cell.get_communicator();
 
     // Following implementation of algorithm 5.2 in Nocedal's
     // Numerical Optimization (p. 112)

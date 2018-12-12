@@ -43,7 +43,8 @@
 
 namespace muSpectre {
 
-  template <class SolverType> class SolverEigen;
+  template <class SolverType>
+  class SolverEigen;
 
   class SolverCGEigen;
 
@@ -57,10 +58,12 @@ namespace muSpectre {
 
   namespace internal {
 
-    template <class Solver> struct Solver_traits {};
+    template <class Solver>
+    struct Solver_traits {};
 
     //! traits for the Eigen conjugate gradient solver
-    template <> struct Solver_traits<SolverCGEigen> {
+    template <>
+    struct Solver_traits<SolverCGEigen> {
       //! Eigen Iterative Solver
       using Solver = Eigen::ConjugateGradient<typename Cell::Adaptor,
                                               Eigen::Lower | Eigen::Upper,
@@ -68,28 +71,32 @@ namespace muSpectre {
     };
 
     //! traits for the Eigen GMRES solver
-    template <> struct Solver_traits<SolverGMRESEigen> {
+    template <>
+    struct Solver_traits<SolverGMRESEigen> {
       //! Eigen Iterative Solver
       using Solver =
           Eigen::GMRES<typename Cell::Adaptor, Eigen::IdentityPreconditioner>;
     };
 
     //! traits for the Eigen BiCGSTAB solver
-    template <> struct Solver_traits<SolverBiCGSTABEigen> {
+    template <>
+    struct Solver_traits<SolverBiCGSTABEigen> {
       //! Eigen Iterative Solver
       using Solver = Eigen::BiCGSTAB<typename Cell::Adaptor,
                                      Eigen::IdentityPreconditioner>;
     };
 
     //! traits for the Eigen DGMRES solver
-    template <> struct Solver_traits<SolverDGMRESEigen> {
+    template <>
+    struct Solver_traits<SolverDGMRESEigen> {
       //! Eigen Iterative Solver
       using Solver =
           Eigen::DGMRES<typename Cell::Adaptor, Eigen::IdentityPreconditioner>;
     };
 
     //! traits for the Eigen MINRES solver
-    template <> struct Solver_traits<SolverMINRESEigen> {
+    template <>
+    struct Solver_traits<SolverMINRESEigen> {
       //! Eigen Iterative Solver
       using Solver =
           Eigen::MINRES<typename Cell::Adaptor, Eigen::Lower | Eigen::Upper,
@@ -101,7 +108,8 @@ namespace muSpectre {
   /**
    * base class for iterative solvers from Eigen
    */
-  template <class SolverType> class SolverEigen : public SolverBase {
+  template <class SolverType>
+  class SolverEigen : public SolverBase {
    public:
     using Parent = SolverBase;  //!< base class
     //! traits obtained from CRTP
@@ -117,22 +125,22 @@ namespace muSpectre {
     SolverEigen() = delete;
 
     //! Constructor with domain resolutions, etc,
-    SolverEigen(Cell &cell, Real tol, Uint maxiter = 0, bool verbose = false);
+    SolverEigen(Cell & cell, Real tol, Uint maxiter = 0, bool verbose = false);
 
     //! Copy constructor
-    SolverEigen(const SolverEigen &other) = delete;
+    SolverEigen(const SolverEigen & other) = delete;
 
     //! Move constructor
-    SolverEigen(SolverEigen &&other) = default;
+    SolverEigen(SolverEigen && other) = default;
 
     //! Destructor
     virtual ~SolverEigen() = default;
 
     //! Copy assignment operator
-    SolverEigen &operator=(const SolverEigen &other) = delete;
+    SolverEigen & operator=(const SolverEigen & other) = delete;
 
     //! Move assignment operator
-    SolverEigen &operator=(SolverEigen &&other) = default;
+    SolverEigen & operator=(SolverEigen && other) = default;
 
     //! Allocate fields used during the solution
     void initialise() final;

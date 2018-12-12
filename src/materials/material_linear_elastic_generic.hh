@@ -47,7 +47,8 @@ namespace muSpectre {
   /**
    * forward declaration
    */
-  template <Dim_t DimS, Dim_t DimM> class MaterialLinearElasticGeneric;
+  template <Dim_t DimS, Dim_t DimM>
+  class MaterialLinearElasticGeneric;
 
   /**
    * traits for use by MaterialMuSpectre for crtp
@@ -100,26 +101,27 @@ namespace muSpectre {
      * @param name unique material name
      * @param C_voigt elastic tensor in Voigt notation
      */
-    MaterialLinearElasticGeneric(const std::string &name,
-                                 const CInput_t &C_voigt);
+    MaterialLinearElasticGeneric(const std::string & name,
+                                 const CInput_t & C_voigt);
 
     //! Copy constructor
-    MaterialLinearElasticGeneric(const MaterialLinearElasticGeneric &other) =
+    MaterialLinearElasticGeneric(const MaterialLinearElasticGeneric & other) =
         delete;
 
     //! Move constructor
-    MaterialLinearElasticGeneric(MaterialLinearElasticGeneric &&other) = delete;
+    MaterialLinearElasticGeneric(MaterialLinearElasticGeneric && other) =
+        delete;
 
     //! Destructor
     virtual ~MaterialLinearElasticGeneric() = default;
 
     //! Copy assignment operator
     MaterialLinearElasticGeneric &
-    operator=(const MaterialLinearElasticGeneric &other) = delete;
+    operator=(const MaterialLinearElasticGeneric & other) = delete;
 
     //! Move assignment operator
     MaterialLinearElasticGeneric &
-    operator=(MaterialLinearElasticGeneric &&other) = delete;
+    operator=(MaterialLinearElasticGeneric && other) = delete;
 
     //! see
     //! http://eigen.tuxfamily.org/dox/group__TopicStructHavingEigenMembers.html
@@ -130,24 +132,25 @@ namespace muSpectre {
      * strain (or Cauchy stress if called with a small strain tensor)
      */
     template <class Derived>
-    inline decltype(auto) evaluate_stress(const Eigen::MatrixBase<Derived> &E);
+    inline decltype(auto) evaluate_stress(const Eigen::MatrixBase<Derived> & E);
 
     /**
      * evaluates both second Piola-Kirchhoff stress and stiffness given
      * the Green-Lagrange strain (or Cauchy stress and stiffness if
      * called with a small strain tensor)
      */
-    template <class s_t> inline decltype(auto) evaluate_stress_tangent(s_t &&E);
+    template <class s_t>
+    inline decltype(auto) evaluate_stress_tangent(s_t && E);
 
     /**
      * return the empty internals tuple
      */
-    std::tuple<> &get_internals() { return this->internal_variables; }
+    std::tuple<> & get_internals() { return this->internal_variables; }
 
     /**
      * return a reference to teh stiffness tensor
      */
-    const T4Mat<Real, DimM> &get_C() const { return this->C; }
+    const T4Mat<Real, DimM> & get_C() const { return this->C; }
 
    protected:
     T4Mat<Real, DimM> C{};
@@ -161,7 +164,7 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   template <class Derived>
   auto MaterialLinearElasticGeneric<DimS, DimM>::evaluate_stress(
-      const Eigen::MatrixBase<Derived> &E) -> decltype(auto) {
+      const Eigen::MatrixBase<Derived> & E) -> decltype(auto) {
     static_assert(Derived::ColsAtCompileTime == DimM, "wrong input size");
     static_assert(Derived::RowsAtCompileTime == DimM, "wrong input size");
     return Matrices::tensmult(this->C, E);
@@ -171,7 +174,7 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   template <class s_t>
   auto
-  MaterialLinearElasticGeneric<DimS, DimM>::evaluate_stress_tangent(s_t &&E)
+  MaterialLinearElasticGeneric<DimS, DimM>::evaluate_stress_tangent(s_t && E)
       -> decltype(auto) {
     using Stress_t = decltype(this->evaluate_stress(std::forward<s_t>(E)));
     using Stiffness_t = Eigen::Map<T4Mat<Real, DimM>>;

@@ -43,7 +43,8 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE(material_linear_elastic_3);
 
-  template <class Mat_t> struct MaterialFixture {
+  template <class Mat_t>
+  struct MaterialFixture {
     using Material_t = Mat_t;
     Material_t mat;
     MaterialFixture() : mat("name") { mat.add_pixel({0}, Young, Poisson); }
@@ -56,8 +57,7 @@ namespace muSpectre {
                        MaterialFixture<MaterialLinearElastic3<twoD, threeD>>,
                        MaterialFixture<MaterialLinearElastic3<threeD, threeD>>>;
 
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_constructor, Fix, mat_list, Fix){
-  };
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_constructor, Fix, mat_list, Fix){};
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_response, Fix, mat_list, Fix) {
     constexpr Dim_t Dim{Fix::Material_t::Parent::Parent::mdim()};

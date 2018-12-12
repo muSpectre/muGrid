@@ -49,7 +49,8 @@ namespace muSpectre {
    * Test fixture for construction of T4Map for the time being, symmetry is not
    * exploited
    */
-  template <typename T, Dim_t Dim> struct T4_fixture {
+  template <typename T, Dim_t Dim>
+  struct T4_fixture {
     T4_fixture() : matrix{}, tensor(matrix.data()) {}
 
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
@@ -69,7 +70,7 @@ namespace muSpectre {
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(write_access_test, F, fix_collection, F) {
-    auto &t4 = F::tensor;
+    auto & t4 = F::tensor;
     constexpr Dim_t dim{F::dim};
     Eigen::TensorFixedSize<Real, Eigen::Sizes<dim, dim, dim, dim>> t4c;
     Eigen::Map<typename F::M4> t4c_map(t4c.data());

@@ -64,22 +64,22 @@ namespace muSpectre {
      * Constructor takes a Cell, tolerance, max number of iterations
      * and verbosity flag as input
      */
-    SolverBase(Cell &cell, Real tol, Uint maxiter, bool verbose = false);
+    SolverBase(Cell & cell, Real tol, Uint maxiter, bool verbose = false);
 
     //! Copy constructor
-    SolverBase(const SolverBase &other) = delete;
+    SolverBase(const SolverBase & other) = delete;
 
     //! Move constructor
-    SolverBase(SolverBase &&other) = default;
+    SolverBase(SolverBase && other) = default;
 
     //! Destructor
     virtual ~SolverBase() = default;
 
     //! Copy assignment operator
-    SolverBase &operator=(const SolverBase &other) = delete;
+    SolverBase & operator=(const SolverBase & other) = delete;
 
     //! Move assignment operator
-    SolverBase &operator=(SolverBase &&other) = default;
+    SolverBase & operator=(SolverBase && other) = default;
 
     //! Allocate fields used during the solution
     virtual void initialise() = 0;
@@ -107,7 +107,7 @@ namespace muSpectre {
     virtual Vector_map solve(const ConstVector_ref rhs) = 0;
 
    protected:
-    Cell &cell;             //!< reference to the problem's cell
+    Cell & cell;            //!< reference to the problem's cell
     Real tol;               //!< convergence tolerance
     Uint maxiter;           //!< maximum allowed number of iterations
     bool verbose;           //!< whether to write information to the stdout

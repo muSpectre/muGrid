@@ -50,14 +50,14 @@ using namespace pybind11::literals;  // NOLINT: recommended usage
  */
 
 template <class Solver>
-void add_iterative_solver_helper(py::module &mod, std::string name) {
+void add_iterative_solver_helper(py::module & mod, std::string name) {
   py::class_<Solver, typename Solver::Parent>(mod, name.c_str())
       .def(py::init<Cell &, Real, Uint, bool>(), "cell"_a, "tol"_a, "maxiter"_a,
            "verbose"_a = false)
       .def("name", &Solver::get_name);
 }
 
-void add_iterative_solver(py::module &mod) {
+void add_iterative_solver(py::module & mod) {
   std::stringstream name{};
   name << "SolverBase";
   py::class_<SolverBase>(mod, name.str().c_str());
@@ -69,14 +69,14 @@ void add_iterative_solver(py::module &mod) {
   add_iterative_solver_helper<SolverMINRESEigen>(mod, "SolverMINRESEigen");
 }
 
-void add_newton_cg_helper(py::module &mod) {
+void add_newton_cg_helper(py::module & mod) {
   const char name[]{"newton_cg"};
   using solver = SolverBase;
   using grad = py::EigenDRef<Eigen::MatrixXd>;
   using grad_vec = LoadSteps_t;
 
   mod.def(name,
-          [](Cell &s, const grad &g, solver &so, Real nt, Real eqt,
+          [](Cell & s, const grad & g, solver & so, Real nt, Real eqt,
              Dim_t verb) -> OptimizeResult {
             Eigen::MatrixXd tmp{g};
             return newton_cg(s, tmp, so, nt, eqt, verb);
@@ -84,7 +84,7 @@ void add_newton_cg_helper(py::module &mod) {
           "cell"_a, "ΔF₀"_a, "solver"_a, "newton_tol"_a, "equil_tol"_a,
           "verbose"_a = 0);
   mod.def(name,
-          [](Cell &s, const grad_vec &g, solver &so, Real nt, Real eqt,
+          [](Cell & s, const grad_vec & g, solver & so, Real nt, Real eqt,
              Dim_t verb) -> std::vector<OptimizeResult> {
             return newton_cg(s, g, so, nt, eqt, verb);
           },
@@ -92,14 +92,14 @@ void add_newton_cg_helper(py::module &mod) {
           "verbose"_a = 0);
 }
 
-void add_de_geus_helper(py::module &mod) {
+void add_de_geus_helper(py::module & mod) {
   const char name[]{"de_geus"};
   using solver = SolverBase;
   using grad = py::EigenDRef<Eigen::MatrixXd>;
   using grad_vec = LoadSteps_t;
 
   mod.def(name,
-          [](Cell &s, const grad &g, solver &so, Real nt, Real eqt,
+          [](Cell & s, const grad & g, solver & so, Real nt, Real eqt,
              Dim_t verb) -> OptimizeResult {
             Eigen::MatrixXd tmp{g};
             return de_geus(s, tmp, so, nt, eqt, verb);
@@ -107,7 +107,7 @@ void add_de_geus_helper(py::module &mod) {
           "cell"_a, "ΔF₀"_a, "solver"_a, "newton_tol"_a, "equilibrium_tol"_a,
           "verbose"_a = 0);
   mod.def(name,
-          [](Cell &s, const grad_vec &g, solver &so, Real nt, Real eqt,
+          [](Cell & s, const grad_vec & g, solver & so, Real nt, Real eqt,
              Dim_t verb) -> std::vector<OptimizeResult> {
             return de_geus(s, g, so, nt, eqt, verb);
           },
@@ -115,12 +115,12 @@ void add_de_geus_helper(py::module &mod) {
           "verbose"_a = 0);
 }
 
-void add_solver_helper(py::module &mod) {
+void add_solver_helper(py::module & mod) {
   add_newton_cg_helper(mod);
   add_de_geus_helper(mod);
 }
 
-void add_solvers(py::module &mod) {
+void add_solvers(py::module & mod) {
   auto solvers{mod.def_submodule("solvers")};
   solvers.doc() = "bindings for solvers";
 

@@ -60,7 +60,7 @@ namespace muSpectre {
 
     using FC_t = typename F::FC_t;
     using TF_t = TensorField<FC_t, Real, order, F::mdim()>;
-    auto &&myfield = make_field<TF_t>("TensorField real 2", F::fc);
+    auto && myfield = make_field<TF_t>("TensorField real 2", F::fc);
 
     using TensorMap = TensorFieldMap<FC_t, Real, order, F::mdim()>;
     using MatrixMap = MatrixFieldMap<FC_t, Real, F::mdim(), F::mdim()>;
@@ -175,7 +175,7 @@ namespace muSpectre {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(init_test_glob, F, mult_collections_t, F) {
     Ccoord_t<F::sdim()> size;
     Ccoord_t<F::sdim()> loc{};
-    for (auto &&s : size) {
+    for (auto && s : size) {
       s = 3;
     }
     BOOST_CHECK_NO_THROW(F::fc.initialise(size, loc));
@@ -185,7 +185,7 @@ namespace muSpectre {
     testGoodies::RandRange<Int> rng;
     for (int i = 0; i < 7; ++i) {
       Ccoord_t<F::sdim()> pixel;
-      for (auto &&s : pixel) {
+      for (auto && s : pixel) {
         s = rng.randval(0, 7);
       }
       F::fc.add_pixel(pixel);
@@ -202,11 +202,11 @@ namespace muSpectre {
     using ftype = internal::TypedSizedFieldBase<decltype(F::fc), Real,
                                                 mdim * mdim * mdim * mdim>;
     using stype = Eigen::Array<Real, mdim * mdim * mdim * mdim, 1>;
-    auto &field = static_cast<ftype &>(F::fc["Tensorfield Real o4"]);
+    auto & field = static_cast<ftype &>(F::fc["Tensorfield Real o4"]);
     field.push_back(stype());
     for (int i = 0; i < nb_pix; ++i) {
       Ccoord_t<F::sdim()> pixel;
-      for (auto &&s : pixel) {
+      for (auto && s : pixel) {
         s = rng.randval(0, 7);
       }
       F::fc.add_pixel(pixel);
@@ -226,17 +226,17 @@ namespace muSpectre {
     TypedFieldMap<FC_t, Real> dyn_map{F::fc["Tensorfield Real o4"]};
     F::fc["Tensorfield Real o4"].set_zero();
 
-    for (auto &&tens : T4map) {
+    for (auto && tens : T4map) {
       BOOST_CHECK_EQUAL(Real(Eigen::Tensor<Real, 0>(tens.abs().sum().eval())()),
                         0);
     }
-    for (auto &&tens : T4map) {
+    for (auto && tens : T4map) {
       tens.setRandom();
     }
 
-    for (auto &&tup : akantu::zip(T4map, dyn_map)) {
-      auto &tens = std::get<0>(tup);
-      auto &dyn = std::get<1>(tup);
+    for (auto && tup : akantu::zip(T4map, dyn_map)) {
+      auto & tens = std::get<0>(tup);
+      auto & dyn = std::get<1>(tup);
       constexpr Dim_t nb_comp{ipow(F::mdim(), order)};
       Eigen::Map<Eigen::Array<Real, nb_comp, 1>> tens_arr(tens.data());
       Real error{(dyn - tens_arr).matrix().norm()};
@@ -255,7 +255,7 @@ namespace muSpectre {
     MSqMap Mmap{F::fc["Tensorfield Real o2"]};
     ASqMap Amap{F::fc["Tensorfield Real o2"]};
     A2Map DynMap{F::fc["Dynamically sized Field"]};
-    auto &fc_ref{F::fc};
+    auto & fc_ref{F::fc};
     BOOST_CHECK_THROW(WrongMap{fc_ref["Dynamically sized Field"]},
                       FieldInterpretationError);
     auto t2_it = T2map.begin();
@@ -264,7 +264,7 @@ namespace muSpectre {
     auto a_it = Amap.begin();
     for (; t2_it != t2_it_end; ++t2_it, ++m_it, ++a_it) {
       t2_it->setRandom();
-      auto &&m = *m_it;
+      auto && m = *m_it;
       bool comp = (m == a_it->matrix());
       BOOST_CHECK(comp);
     }
@@ -290,7 +290,7 @@ namespace muSpectre {
     }
 
     counter = 0;
-    for (const auto &val : s_map) {
+    for (const auto & val : s_map) {
       BOOST_CHECK_EQUAL(counter++, val);
     }
   }
@@ -371,8 +371,8 @@ namespace muSpectre {
     // check access subscripting
     auto T3a = *it3;
     auto T3b = itstart[diff];
-    BOOST_CHECK(static_cast<bool>
-                (Eigen::Tensor<bool, 0>((T3a == T3b).all())()));
+    BOOST_CHECK(
+        static_cast<bool>(Eigen::Tensor<bool, 0>((T3a == T3b).all())()));
 
     // div. comparisons
     BOOST_CHECK_LT(itstart, itend);
@@ -421,8 +421,8 @@ namespace muSpectre {
     for (auto it = T4map.cbegin(); it != T4map.cend(); ++it) {
       // maps to const tensors can't be initialised with a const pointer this
       // sucks
-      auto &&tens = *it;
-      auto &&ptr = tens.data();
+      auto && tens = *it;
+      auto && ptr = tens.data();
 
       static_assert(
           std::is_pointer<std::remove_reference_t<decltype(ptr)>>::value,
@@ -448,8 +448,8 @@ namespace muSpectre {
     for (auto it = Mmap.cbegin(); it != Mmap.cend(); ++it) {
       // maps to const tensors can't be initialised with a const pointer this
       // sucks
-      auto &&mat = *it;
-      auto &&ptr = mat.data();
+      auto && mat = *it;
+      auto && ptr = mat.data();
 
       static_assert(
           std::is_pointer<std::remove_reference_t<decltype(ptr)>>::value,
@@ -473,7 +473,7 @@ namespace muSpectre {
     ScalarMap Smap{F::fc["integer Scalar"]};
 
     for (auto it = Smap.cbegin(); it != Smap.cend(); ++it) {
-      auto &&scal = *it;
+      auto && scal = *it;
       static_assert(
           std::is_const<std::remove_reference_t<decltype(scal)>>::value,
           "referred type should be const");
@@ -566,8 +566,8 @@ namespace muSpectre {
     Tensor4Map proxy_map{proxy};
 
     for (auto tup : akantu::zip(ref_map, proxy_map)) {
-      auto &ref = std::get<0>(tup);
-      auto &prox = std::get<1>(tup);
+      auto & ref = std::get<0>(tup);
+      auto & prox = std::get<1>(tup);
       BOOST_CHECK_EQUAL((ref - prox).norm(), 0);
     }
   }
@@ -587,8 +587,8 @@ namespace muSpectre {
     Tensor4Map ref_map{Fix::t4_field};
     Tensor4Map proxy_map{proxy};
     for (auto tup : akantu::zip(ref_map, proxy_map)) {
-      auto &ref = std::get<0>(tup);
-      auto &prox = std::get<1>(tup);
+      auto & ref = std::get<0>(tup);
+      auto & prox = std::get<1>(tup);
       prox += prox.Identity();
       BOOST_CHECK_EQUAL((ref - prox).norm(), 0);
     }
@@ -598,8 +598,8 @@ namespace muSpectre {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(typed_field_getter, Fix, mult_collections,
                                    Fix) {
     constexpr auto mdim{Fix::mdim()};
-    auto &fc{Fix::fc};
-    auto &field = fc.template get_typed_field<Real>("Tensorfield Real o4");
+    auto & fc{Fix::fc};
+    auto & field = fc.template get_typed_field<Real>("Tensorfield Real o4");
     BOOST_CHECK_EQUAL(field.get_nb_components(), ipow(mdim, fourthOrder));
   }
 
@@ -611,17 +611,17 @@ namespace muSpectre {
     auto m2map{Fix::m2_field.get_map()};
     auto dymap{Fix::dyn_field.get_map()};
 
-    for (auto &&tup :
+    for (auto && tup :
          akantu::zip(scmap.get_collection(), scmap, scmap.enumerate())) {
-      const auto &ccoord_ref = std::get<0>(tup);
-      const auto &val_ref = std::get<1>(tup);
-      const auto &key_val = std::get<2>(tup);
-      const auto &ccoord = std::get<0>(key_val);
-      const auto &val = std::get<1>(key_val);
+      const auto & ccoord_ref = std::get<0>(tup);
+      const auto & val_ref = std::get<1>(tup);
+      const auto & key_val = std::get<2>(tup);
+      const auto & ccoord = std::get<0>(key_val);
+      const auto & val = std::get<1>(key_val);
 
-      for (auto &&ccoords : akantu::zip(ccoord_ref, ccoord)) {
-        const auto &ref{std::get<0>(ccoords)};
-        const auto &val{std::get<1>(ccoords)};
+      for (auto && ccoords : akantu::zip(ccoord_ref, ccoord)) {
+        const auto & ref{std::get<0>(ccoords)};
+        const auto & val{std::get<1>(ccoords)};
         BOOST_CHECK_EQUAL(ref, val);
       }
 
@@ -629,17 +629,17 @@ namespace muSpectre {
       BOOST_CHECK_EQUAL(error, 0);
     }
 
-    for (auto &&tup :
+    for (auto && tup :
          akantu::zip(t4map.get_collection(), t4map, t4map.enumerate())) {
-      const auto &ccoord_ref = std::get<0>(tup);
-      const auto &val_ref = std::get<1>(tup);
-      const auto &key_val = std::get<2>(tup);
-      const auto &ccoord = std::get<0>(key_val);
-      const auto &val = std::get<1>(key_val);
+      const auto & ccoord_ref = std::get<0>(tup);
+      const auto & val_ref = std::get<1>(tup);
+      const auto & key_val = std::get<2>(tup);
+      const auto & ccoord = std::get<0>(key_val);
+      const auto & val = std::get<1>(key_val);
 
-      for (auto &&ccoords : akantu::zip(ccoord_ref, ccoord)) {
-        const auto &ref{std::get<0>(ccoords)};
-        const auto &val{std::get<1>(ccoords)};
+      for (auto && ccoords : akantu::zip(ccoord_ref, ccoord)) {
+        const auto & ref{std::get<0>(ccoords)};
+        const auto & val{std::get<1>(ccoords)};
         BOOST_CHECK_EQUAL(ref, val);
       }
 
@@ -647,17 +647,17 @@ namespace muSpectre {
       BOOST_CHECK_EQUAL(error, 0);
     }
 
-    for (auto &&tup :
+    for (auto && tup :
          akantu::zip(t2map.get_collection(), t2map, t2map.enumerate())) {
-      const auto &ccoord_ref = std::get<0>(tup);
-      const auto &val_ref = std::get<1>(tup);
-      const auto &key_val = std::get<2>(tup);
-      const auto &ccoord = std::get<0>(key_val);
-      const auto &val = std::get<1>(key_val);
+      const auto & ccoord_ref = std::get<0>(tup);
+      const auto & val_ref = std::get<1>(tup);
+      const auto & key_val = std::get<2>(tup);
+      const auto & ccoord = std::get<0>(key_val);
+      const auto & val = std::get<1>(key_val);
 
-      for (auto &&ccoords : akantu::zip(ccoord_ref, ccoord)) {
-        const auto &ref{std::get<0>(ccoords)};
-        const auto &val{std::get<1>(ccoords)};
+      for (auto && ccoords : akantu::zip(ccoord_ref, ccoord)) {
+        const auto & ref{std::get<0>(ccoords)};
+        const auto & val{std::get<1>(ccoords)};
         BOOST_CHECK_EQUAL(ref, val);
       }
 
@@ -665,17 +665,17 @@ namespace muSpectre {
       BOOST_CHECK_EQUAL(error, 0);
     }
 
-    for (auto &&tup :
+    for (auto && tup :
          akantu::zip(m2map.get_collection(), m2map, m2map.enumerate())) {
-      const auto &ccoord_ref = std::get<0>(tup);
-      const auto &val_ref = std::get<1>(tup);
-      const auto &key_val = std::get<2>(tup);
-      const auto &ccoord = std::get<0>(key_val);
-      const auto &val = std::get<1>(key_val);
+      const auto & ccoord_ref = std::get<0>(tup);
+      const auto & val_ref = std::get<1>(tup);
+      const auto & key_val = std::get<2>(tup);
+      const auto & ccoord = std::get<0>(key_val);
+      const auto & val = std::get<1>(key_val);
 
-      for (auto &&ccoords : akantu::zip(ccoord_ref, ccoord)) {
-        const auto &ref{std::get<0>(ccoords)};
-        const auto &val{std::get<1>(ccoords)};
+      for (auto && ccoords : akantu::zip(ccoord_ref, ccoord)) {
+        const auto & ref{std::get<0>(ccoords)};
+        const auto & val{std::get<1>(ccoords)};
         BOOST_CHECK_EQUAL(ref, val);
       }
 
@@ -683,17 +683,17 @@ namespace muSpectre {
       BOOST_CHECK_EQUAL(error, 0);
     }
 
-    for (auto &&tup :
+    for (auto && tup :
          akantu::zip(dymap.get_collection(), dymap, dymap.enumerate())) {
-      const auto &ccoord_ref = std::get<0>(tup);
-      const auto &val_ref = std::get<1>(tup);
-      const auto &key_val = std::get<2>(tup);
-      const auto &ccoord = std::get<0>(key_val);
-      const auto &val = std::get<1>(key_val);
+      const auto & ccoord_ref = std::get<0>(tup);
+      const auto & val_ref = std::get<1>(tup);
+      const auto & key_val = std::get<2>(tup);
+      const auto & ccoord = std::get<0>(key_val);
+      const auto & val = std::get<1>(key_val);
 
-      for (auto &&ccoords : akantu::zip(ccoord_ref, ccoord)) {
-        const auto &ref{std::get<0>(ccoords)};
-        const auto &val{std::get<1>(ccoords)};
+      for (auto && ccoords : akantu::zip(ccoord_ref, ccoord)) {
+        const auto & ref{std::get<0>(ccoords)};
+        const auto & val{std::get<1>(ccoords)};
         BOOST_CHECK_EQUAL(ref, val);
       }
 

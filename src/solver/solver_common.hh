@@ -68,7 +68,8 @@ namespace muSpectre {
   /**
    * Field type that solvers expect gradients to be expressed in
    */
-  template <Dim_t Dim> using Grad_t = Matrices::Tens2_t<Dim>;
+  template <Dim_t Dim>
+  using Grad_t = Matrices::Tens2_t<Dim>;
   /**
    * multiple increments can be submitted at once (useful for
    * path-dependent materials)
@@ -92,7 +93,7 @@ namespace muSpectre {
    * check whether a strain is symmetric, for the purposes of small
    * strain problems
    */
-  bool check_symmetry(const Eigen::Ref<const Eigen::ArrayXXd> &eps,
+  bool check_symmetry(const Eigen::Ref<const Eigen::ArrayXXd> & eps,
                       Real rel_tol = 1e-8);
 
 }  // namespace muSpectre

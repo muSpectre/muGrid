@@ -42,10 +42,11 @@ namespace akantu {
      */
     namespace details {
       //! static for loop
-      template <size_t N> struct Foreach {
+      template <size_t N>
+      struct Foreach {
         //! undocumented
         template <class Tuple>
-        static inline bool not_equal(Tuple &&a, Tuple &&b) {
+        static inline bool not_equal(Tuple && a, Tuple && b) {
           if (std::get<N - 1>(std::forward<Tuple>(a)) ==
               std::get<N - 1>(std::forward<Tuple>(b)))
             return false;
@@ -57,10 +58,11 @@ namespace akantu {
       /* ----------------------------------------------------------------------
        */
       //! static comparison
-      template <> struct Foreach<0> {
+      template <>
+      struct Foreach<0> {
         //! undocumented
         template <class Tuple>
-        static inline bool not_equal(Tuple &&a, Tuple &&b) {
+        static inline bool not_equal(Tuple && a, Tuple && b) {
           return std::get<0>(std::forward<Tuple>(a)) !=
                  std::get<0>(std::forward<Tuple>(b));
         }
@@ -74,7 +76,7 @@ namespace akantu {
 
       //! helper for static for loop
       template <class F, class Tuple, size_t... Is>
-      void foreach_impl(F &&func, Tuple &&tuple,
+      void foreach_impl(F && func, Tuple && tuple,
                         std::index_sequence<Is...> &&) {
         (void)std::initializer_list<int>{
             (std::forward<F>(func)(std::get<Is>(std::forward<Tuple>(tuple))),
@@ -83,7 +85,7 @@ namespace akantu {
 
       //! detail
       template <class F, class Tuple, size_t... Is>
-      decltype(auto) transform_impl(F &&func, Tuple &&tuple,
+      decltype(auto) transform_impl(F && func, Tuple && tuple,
                                     std::index_sequence<Is...> &&) {
         return make_tuple_no_decay(
             std::forward<F>(func)(std::get<Is>(std::forward<Tuple>(tuple)))...);
@@ -93,13 +95,15 @@ namespace akantu {
     /* ------------------------------------------------------------------------
      */
     //! detail
-    template <class Tuple> bool are_not_equal(Tuple &&a, Tuple &&b) {
+    template <class Tuple>
+    bool are_not_equal(Tuple && a, Tuple && b) {
       return details::Foreach<std::tuple_size<std::decay_t<Tuple>>::value>::
           not_equal(std::forward<Tuple>(a), std::forward<Tuple>(b));
     }
 
     //! detail
-    template <class F, class Tuple> void foreach(F &&func, Tuple && tuple) {
+    template <class F, class Tuple>
+    void foreach_(F && func, Tuple && tuple) {
       return details::foreach_impl(
           std::forward<F>(func), std::forward<Tuple>(tuple),
           std::make_index_sequence<
@@ -108,7 +112,7 @@ namespace akantu {
 
     //! detail
     template <class F, class Tuple>
-    decltype(auto) transform(F &&func, Tuple &&tuple) {
+    decltype(auto) transform(F && func, Tuple && tuple) {
       return details::transform_impl(
           std::forward<F>(func), std::forward<Tuple>(tuple),
           std::make_index_sequence<
@@ -120,34 +124,35 @@ namespace akantu {
    */
   namespace iterators {
     //! iterator for emulation of python zip
-    template <class... Iterators> class ZipIterator {
+    template <class... Iterators>
+    class ZipIterator {
      private:
       using tuple_t = std::tuple<Iterators...>;
 
      public:
       //! undocumented
-       ZipIterator(tuple_t iterators)
+      explicit ZipIterator(tuple_t iterators)
           : iterators(std::move(iterators)) {}
 
       //! undocumented
       decltype(auto) operator*() {
-        return tuple::transform([](auto &&it) -> decltype(auto) { return *it; },
-                                iterators);
+        return tuple::transform(
+            [](auto && it) -> decltype(auto) { return *it; }, iterators);
       }
 
       //! undocumented
-      ZipIterator &operator++() {
-        tuple::foreach([](auto &&it) { ++it; }, iterators);
+      ZipIterator & operator++() {
+        tuple::foreach_([](auto && it) { ++it; }, iterators);
         return *this;
       }
 
       //! undocumented
-      bool operator==(const ZipIterator &other) const {
+      bool operator==(const ZipIterator & other) const {
         return not tuple::are_not_equal(iterators, other.iterators);
       }
 
       //! undocumented
-      bool operator!=(const ZipIterator &other) const {
+      bool operator!=(const ZipIterator & other) const {
         return tuple::are_not_equal(iterators, other.iterators);
       }
 
@@ -160,7 +165,7 @@ namespace akantu {
    */
   //! emulates python zip()
   template <class... Iterators>
-  decltype(auto) zip_iterator(std::tuple<Iterators...> &&iterators_tuple) {
+  decltype(auto) zip_iterator(std::tuple<Iterators...> && iterators_tuple) {
     auto zip = iterators::ZipIterator<Iterators...>(
         std::forward<decltype(iterators_tuple)>(iterators_tuple));
     return zip;
@@ -170,39 +175,40 @@ namespace akantu {
    */
   namespace containers {
     //! helper for the emulation of python zip
-    template <class... Containers> class ZipContainer {
+    template <class... Containers>
+    class ZipContainer {
       using containers_t = std::tuple<Containers...>;
 
      public:
       //! undocumented
-       ZipContainer(Containers &&... containers)
+      explicit ZipContainer(Containers &&... containers)
           : containers(std::forward<Containers>(containers)...) {}
 
       //! undocumented
       decltype(auto) begin() const {
         return zip_iterator(
-            tuple::transform([](auto &&c) { return c.begin(); },
+            tuple::transform([](auto && c) { return c.begin(); },
                              std::forward<containers_t>(containers)));
       }
 
       //! undocumented
       decltype(auto) end() const {
         return zip_iterator(
-            tuple::transform([](auto &&c) { return c.end(); },
+            tuple::transform([](auto && c) { return c.end(); },
                              std::forward<containers_t>(containers)));
       }
 
       //! undocumented
       decltype(auto) begin() {
         return zip_iterator(
-            tuple::transform([](auto &&c) { return c.begin(); },
+            tuple::transform([](auto && c) { return c.begin(); },
                              std::forward<containers_t>(containers)));
       }
 
       //! undocumented
       decltype(auto) end() {
         return zip_iterator(
-            tuple::transform([](auto &&c) { return c.end(); },
+            tuple::transform([](auto && c) { return c.end(); },
                              std::forward<containers_t>(containers)));
       }
 
@@ -216,7 +222,8 @@ namespace akantu {
   /**
    * emulates python's zip()
    */
-  template <class... Containers> decltype(auto) zip(Containers &&... conts) {
+  template <class... Containers>
+  decltype(auto) zip(Containers &&... conts) {
     return containers::ZipContainer<Containers...>(
         std::forward<Containers>(conts)...);
   }
@@ -230,7 +237,8 @@ namespace akantu {
     /**
      * emulates python's range iterator
      */
-    template <class T> class ArangeIterator {
+    template <class T>
+    class ArangeIterator {
      public:
       //! undocumented
       using value_type = T;
@@ -247,21 +255,21 @@ namespace akantu {
       constexpr ArangeIterator(const ArangeIterator &) = default;
 
       //! undocumented
-      constexpr ArangeIterator &operator++() {
+      constexpr ArangeIterator & operator++() {
         value += step;
         return *this;
       }
 
       //! undocumented
-      constexpr const T &operator*() const { return value; }
+      constexpr const T & operator*() const { return value; }
 
       //! undocumented
-      constexpr bool operator==(const ArangeIterator &other) const {
+      constexpr bool operator==(const ArangeIterator & other) const {
         return (value == other.value) and (step == other.step);
       }
 
       //! undocumented
-      constexpr bool operator!=(const ArangeIterator &other) const {
+      constexpr bool operator!=(const ArangeIterator & other) const {
         return not operator==(other);
       }
 
@@ -273,7 +281,8 @@ namespace akantu {
 
   namespace containers {
     //! helper class to generate range iterators
-    template <class T> class ArangeContainer {
+    template <class T>
+    class ArangeContainer {
      public:
       //! undocumented
       using iterator = iterators::ArangeIterator<T>;
@@ -285,8 +294,7 @@ namespace akantu {
                      : start + (1 + (stop - start) / step) * step),
             step(step) {}
       //! undocumented
-       constexpr ArangeContainer(T stop)
-          : ArangeContainer(0, stop, 1) {}
+      constexpr ArangeContainer(T stop) : ArangeContainer(0, stop, 1) {}
 
       //! undocumented
       constexpr T operator[](size_t i) {
@@ -313,7 +321,7 @@ namespace akantu {
    */
   template <class T, typename = std::enable_if_t<
                          std::is_integral<std::decay_t<T>>::value>>
-  inline decltype(auto) arange(const T &stop) {
+  inline decltype(auto) arange(const T & stop) {
     return containers::ArangeContainer<T>(stop);
   }
 
@@ -323,7 +331,7 @@ namespace akantu {
   template <class T1, class T2,
             typename = std::enable_if_t<
                 std::is_integral<std::common_type_t<T1, T2>>::value>>
-  inline constexpr decltype(auto) arange(const T1 &start, const T2 &stop) {
+  inline constexpr decltype(auto) arange(const T1 & start, const T2 & stop) {
     return containers::ArangeContainer<std::common_type_t<T1, T2>>(start, stop);
   }
 
@@ -333,8 +341,8 @@ namespace akantu {
   template <class T1, class T2, class T3,
             typename = std::enable_if_t<
                 std::is_integral<std::common_type_t<T1, T2, T3>>::value>>
-  inline constexpr decltype(auto) arange(const T1 &start, const T2 &stop,
-                                         const T3 &step) {
+  inline constexpr decltype(auto) arange(const T1 & start, const T2 & stop,
+                                         const T3 & step) {
     return containers::ArangeContainer<std::common_type_t<T1, T2, T3>>(
         start, stop, step);
   }
@@ -346,7 +354,7 @@ namespace akantu {
    * emulates python's enumerate
    */
   template <class Container>
-  inline constexpr decltype(auto) enumerate(Container &&container,
+  inline constexpr decltype(auto) enumerate(Container && container,
                                             size_t start_ = 0) {
     auto stop = std::forward<Container>(container).size();
     decltype(stop) start = start_;

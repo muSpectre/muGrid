@@ -43,7 +43,8 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE(material_hyper_elasto_plastic_1);
 
-  template <class Mat_t> struct MaterialFixture {
+  template <class Mat_t>
+  struct MaterialFixture {
     using Mat = Mat_t;
     constexpr static Real K{.833};       // bulk modulus
     constexpr static Real mu{.386};      // shear modulus
@@ -69,7 +70,7 @@ namespace muSpectre {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_constructor, Fix, mats, Fix) {
     BOOST_CHECK_EQUAL("Name", Fix::mat.get_name());
-    auto &mat{Fix::mat};
+    auto & mat{Fix::mat};
     auto sdim{Fix::sdim};
     auto mdim{Fix::mdim};
     BOOST_CHECK_EQUAL(sdim, mat.sdim());
@@ -101,10 +102,10 @@ namespace muSpectre {
     coll.add_pixel({0});
     coll.initialise();
 
-    auto &F_{make_statefield<StrainStField_t>("previous gradient", coll)};
-    auto &be_{
+    auto & F_{make_statefield<StrainStField_t>("previous gradient", coll)};
+    auto & be_{
         make_statefield<StrainStField_t>("previous elastic strain", coll)};
-    auto &eps_{make_statefield<FlowStField_t>("plastic flow", coll)};
+    auto & eps_{make_statefield<FlowStField_t>("plastic flow", coll)};
 
     auto F_prev{F_.get_map()};
     F_prev[0].current() = Strain_t::Identity();
@@ -215,10 +216,10 @@ namespace muSpectre {
     coll.add_pixel({0});
     coll.initialise();
 
-    auto &F_{make_statefield<StrainStField_t>("previous gradient", coll)};
-    auto &be_{
+    auto & F_{make_statefield<StrainStField_t>("previous gradient", coll)};
+    auto & be_{
         make_statefield<StrainStField_t>("previous elastic strain", coll)};
-    auto &eps_{make_statefield<FlowStField_t>("plastic flow", coll)};
+    auto & eps_{make_statefield<FlowStField_t>("plastic flow", coll)};
 
     auto F_prev{F_.get_map()};
     F_prev[0].current() = Strain_t::Identity();

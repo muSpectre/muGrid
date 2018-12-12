@@ -42,7 +42,7 @@ namespace muSpectre {
   //----------------------------------------------------------------------------//
   template <class DeprecatedSolverType, Dim_t DimS, Dim_t DimM>
   DeprecatedSolverEigen<DeprecatedSolverType, DimS,
-                        DimM>::DeprecatedSolverEigen(Cell_t &cell, Real tol,
+                        DimM>::DeprecatedSolverEigen(Cell_t & cell, Real tol,
                                                      Uint maxiter, bool verbose)
       : Parent(cell, tol, maxiter, verbose), adaptor{cell.get_adaptor()},
         solver{} {}
@@ -61,7 +61,7 @@ namespace muSpectre {
                                  DimM>::SolvVectorOut
   DeprecatedSolverEigen<DeprecatedSolverType, DimS, DimM>::solve(
       const SolvVectorInC rhs, SolvVectorIn x_0) {
-    auto &this_solver = static_cast<DeprecatedSolverType &>(*this);
+    auto & this_solver = static_cast<DeprecatedSolverType &>(*this);
     SolvVectorOut retval = this->solver.solveWithGuess(rhs, x_0);
     this->counter += this->solver.iterations();
     if (this->solver.info() != Eigen::Success) {

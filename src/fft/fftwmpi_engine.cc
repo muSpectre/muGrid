@@ -37,7 +37,8 @@
 
 namespace muSpectre {
 
-  template <Dim_t Dim> int FFTWMPIEngine<Dim>::nb_engines{0};
+  template <Dim_t Dim>
+  int FFTWMPIEngine<Dim>::nb_engines{0};
 
   template <Dim_t Dim>
   FFTWMPIEngine<Dim>::FFTWMPIEngine(Ccoord resolutions, Dim_t nb_components,
@@ -63,13 +64,13 @@ namespace muSpectre {
     this->fourier_resolutions[0] = res_y;
     this->fourier_locations[0] = loc_y;
 
-    for (auto &n : this->subdomain_resolutions) {
+    for (auto & n : this->subdomain_resolutions) {
       if (n == 0) {
         throw std::runtime_error("FFTW MPI planning returned zero resolution. "
                                  "You may need to run on fewer processes.");
       }
     }
-    for (auto &n : this->fourier_resolutions) {
+    for (auto & n : this->fourier_resolutions) {
       if (n == 0) {
         throw std::runtime_error("FFTW MPI planning returned zero Fourier "
                                  "resolution. You may need to run on fewer "
@@ -77,7 +78,7 @@ namespace muSpectre {
       }
     }
 
-    for (auto &&pixel :
+    for (auto && pixel :
          std::conditional_t<Dim == 2, CcoordOps::Pixels<Dim, 1, 0>,
                             CcoordOps::Pixels<Dim, 1, 0, 2>>(
              this->fourier_resolutions, this->fourier_locations)) {
@@ -128,8 +129,8 @@ namespace muSpectre {
     std::array<ptrdiff_t, Dim> narr;
     std::copy(this->domain_resolutions.begin(), this->domain_resolutions.end(),
               narr.begin());
-    Real *in{this->real_workspace};
-    fftw_complex *out{reinterpret_cast<fftw_complex *>(this->work.data())};
+    Real * in{this->real_workspace};
+    fftw_complex * out{reinterpret_cast<fftw_complex *>(this->work.data())};
     this->plan_fft = fftw_mpi_plan_many_dft_r2c(
         Dim, narr.data(), this->nb_components, FFTW_MPI_DEFAULT_BLOCK,
         FFTW_MPI_DEFAULT_BLOCK, in, out, this->comm.get_mpi_comm(),
@@ -138,8 +139,8 @@ namespace muSpectre {
       throw std::runtime_error("r2c plan failed");
     }
 
-    fftw_complex *i_in = reinterpret_cast<fftw_complex *>(this->work.data());
-    Real *i_out = this->real_workspace;
+    fftw_complex * i_in = reinterpret_cast<fftw_complex *>(this->work.data());
+    Real * i_out = this->real_workspace;
 
     this->plan_ifft = fftw_mpi_plan_many_dft_c2r(
         Dim, narr.data(), this->nb_components, FFTW_MPI_DEFAULT_BLOCK,
@@ -152,7 +153,8 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim> FFTWMPIEngine<Dim>::~FFTWMPIEngine<Dim>() noexcept {
+  template <Dim_t Dim>
+  FFTWMPIEngine<Dim>::~FFTWMPIEngine<Dim>() noexcept {
     if (this->real_workspace != nullptr)
       fftw_free(this->real_workspace);
     if (this->plan_fft != nullptr)
@@ -168,7 +170,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t Dim>
   typename FFTWMPIEngine<Dim>::Workspace_t &
-  FFTWMPIEngine<Dim>::fft(Field_t &field) {
+  FFTWMPIEngine<Dim>::fft(Field_t & field) {
     if (this->plan_fft == nullptr) {
       throw std::runtime_error("fft plan not initialised");
     }
@@ -199,7 +201,8 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim> void FFTWMPIEngine<Dim>::ifft(Field_t &field) const {
+  template <Dim_t Dim>
+  void FFTWMPIEngine<Dim>::ifft(Field_t & field) const {
     if (this->plan_ifft == nullptr) {
       throw std::runtime_error("ifft plan not initialised");
     }

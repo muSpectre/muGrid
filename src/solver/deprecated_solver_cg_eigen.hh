@@ -46,19 +46,25 @@ namespace muSpectre {
   template <class DeprecatedSolverType, Dim_t DimS, Dim_t DimM>
   class DeprecatedSolverEigen;
 
-  template <Dim_t DimS, Dim_t DimM = DimS> class DeprecatedSolverCGEigen;
+  template <Dim_t DimS, Dim_t DimM = DimS>
+  class DeprecatedSolverCGEigen;
 
-  template <Dim_t DimS, Dim_t DimM = DimS> class DeprecatedSolverGMRESEigen;
+  template <Dim_t DimS, Dim_t DimM = DimS>
+  class DeprecatedSolverGMRESEigen;
 
-  template <Dim_t DimS, Dim_t DimM = DimS> class DeprecatedSolverBiCGSTABEigen;
+  template <Dim_t DimS, Dim_t DimM = DimS>
+  class DeprecatedSolverBiCGSTABEigen;
 
-  template <Dim_t DimS, Dim_t DimM = DimS> class DeprecatedSolverDGMRESEigen;
+  template <Dim_t DimS, Dim_t DimM = DimS>
+  class DeprecatedSolverDGMRESEigen;
 
-  template <Dim_t DimS, Dim_t DimM = DimS> class DeprecatedSolverMINRESEigen;
+  template <Dim_t DimS, Dim_t DimM = DimS>
+  class DeprecatedSolverMINRESEigen;
 
   namespace internal {
 
-    template <class DeprecatedSolver> struct DeprecatedSolver_traits {};
+    template <class DeprecatedSolver>
+    struct DeprecatedSolver_traits {};
 
     //! traits for the Eigen conjugate gradient solver
     template <Dim_t DimS, Dim_t DimM>
@@ -142,24 +148,24 @@ namespace muSpectre {
     DeprecatedSolverEigen() = delete;
 
     //! Constructor with domain resolutions, etc,
-    DeprecatedSolverEigen(Cell_t &cell, Real tol, Uint maxiter = 0,
+    DeprecatedSolverEigen(Cell_t & cell, Real tol, Uint maxiter = 0,
                           bool verbose = false);
 
     //! Copy constructor
-    DeprecatedSolverEigen(const DeprecatedSolverEigen &other) = delete;
+    DeprecatedSolverEigen(const DeprecatedSolverEigen & other) = delete;
 
     //! Move constructor
-    DeprecatedSolverEigen(DeprecatedSolverEigen &&other) = default;
+    DeprecatedSolverEigen(DeprecatedSolverEigen && other) = default;
 
     //! Destructor
     virtual ~DeprecatedSolverEigen() = default;
 
     //! Copy assignment operator
     DeprecatedSolverEigen &
-    operator=(const DeprecatedSolverEigen &other) = delete;
+    operator=(const DeprecatedSolverEigen & other) = delete;
 
     //! Move assignment operator
-    DeprecatedSolverEigen &operator=(DeprecatedSolverEigen &&other) = default;
+    DeprecatedSolverEigen & operator=(DeprecatedSolverEigen && other) = default;
 
     //! returns whether the solver has converged
     bool has_converged() const final {
@@ -170,8 +176,7 @@ namespace muSpectre {
     void initialise() final;
 
     //! executes the solver
-    SolvVectorOut solve(const SolvVectorInC rhs,
-                        SolvVectorIn x_0) final;
+    SolvVectorOut solve(const SolvVectorInC rhs, SolvVectorIn x_0) final;
 
    protected:
     //! returns `muSpectre::Tg_req_t::NeedEffect`

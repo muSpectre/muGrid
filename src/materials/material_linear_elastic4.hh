@@ -46,7 +46,8 @@
 
 namespace muSpectre {
 
-  template <Dim_t DimS, Dim_t DimM> class MaterialLinearElastic4;
+  template <Dim_t DimS, Dim_t DimM>
+  class MaterialLinearElastic4;
 
   /**
    * traits for objective linear elasticity with eigenstrain
@@ -118,20 +119,21 @@ namespace muSpectre {
     explicit MaterialLinearElastic4(std::string name);
 
     //! Copy constructor
-    MaterialLinearElastic4(const MaterialLinearElastic4 &other) = delete;
+    MaterialLinearElastic4(const MaterialLinearElastic4 & other) = delete;
 
     //! Move constructor
-    MaterialLinearElastic4(MaterialLinearElastic4 &&other) = delete;
+    MaterialLinearElastic4(MaterialLinearElastic4 && other) = delete;
 
     //! Destructor
     virtual ~MaterialLinearElastic4() = default;
 
     //! Copy assignment operator
     MaterialLinearElastic4 &
-    operator=(const MaterialLinearElastic4 &other) = delete;
+    operator=(const MaterialLinearElastic4 & other) = delete;
 
     //! Move assignment operator
-    MaterialLinearElastic4 &operator=(MaterialLinearElastic4 &&other) = delete;
+    MaterialLinearElastic4 &
+    operator=(MaterialLinearElastic4 && other) = delete;
 
     /**
      * evaluates second Piola-Kirchhoff stress given the Green-Lagrange
@@ -139,8 +141,8 @@ namespace muSpectre {
      * Lame constant (lambda) and the second Lame constant (shear modulus/mu).
      */
     template <class s_t>
-    inline decltype(auto) evaluate_stress(s_t &&E, const Real &lambda,
-                                          const Real &mu);
+    inline decltype(auto) evaluate_stress(s_t && E, const Real & lambda,
+                                          const Real & mu);
 
     /**
      * evaluates both second Piola-Kirchhoff stress and stiffness given
@@ -149,31 +151,31 @@ namespace muSpectre {
      * the second Lame constant (shear modulus/mu).
      */
     template <class s_t>
-    inline decltype(auto) evaluate_stress_tangent(s_t &&E, const Real &lambda,
-                                                  const Real &mu);
+    inline decltype(auto) evaluate_stress_tangent(s_t && E, const Real & lambda,
+                                                  const Real & mu);
 
     /**
      * return the empty internals tuple
      */
-    InternalVariables &get_internals() { return this->internal_variables; }
+    InternalVariables & get_internals() { return this->internal_variables; }
 
     /**
      * overload add_pixel to write into loacal stiffness tensor
      */
-    void add_pixel(const Ccoord_t<DimS> &pixel) final;
+    void add_pixel(const Ccoord_t<DimS> & pixel) final;
 
     /**
      * overload add_pixel to write into local stiffness tensor
      */
-    void add_pixel(const Ccoord_t<DimS> &pixel, const Real &Poisson_ratio,
-                   const Real &Youngs_modulus);
+    void add_pixel(const Ccoord_t<DimS> & pixel, const Real & Poisson_ratio,
+                   const Real & Youngs_modulus);
 
    protected:
     //! storage for first Lame constant 'lambda'
     //! and second Lame constant(shear modulus) 'mu'
     using Field_t = MatrixField<LocalFieldCollection<DimS>, Real, oneD, oneD>;
-    Field_t &lambda_field;
-    Field_t &mu_field;
+    Field_t & lambda_field;
+    Field_t & mu_field;
     //! tuple for iterable eigen_field
     InternalVariables internal_variables;
 
@@ -183,9 +185,9 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   template <class s_t>
-  auto MaterialLinearElastic4<DimS, DimM>::evaluate_stress(s_t &&E,
-                                                           const Real &lambda,
-                                                           const Real &mu)
+  auto MaterialLinearElastic4<DimS, DimM>::evaluate_stress(s_t && E,
+                                                           const Real & lambda,
+                                                           const Real & mu)
       -> decltype(auto) {
     auto C = Hooke::compute_C_T4(lambda, mu);
     return Matrices::tensmult(C, E);
@@ -195,7 +197,7 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   template <class s_t>
   auto MaterialLinearElastic4<DimS, DimM>::evaluate_stress_tangent(
-      s_t &&E, const Real &lambda, const Real &mu) -> decltype(auto) {
+      s_t && E, const Real & lambda, const Real & mu) -> decltype(auto) {
     auto C = Hooke::compute_C_T4(lambda, mu);
     return std::make_tuple(Matrices::tensmult(C, E), C);
   }

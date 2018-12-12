@@ -56,7 +56,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   void MaterialLinearElastic3<DimS, DimM>::add_pixel(
-      const Ccoord_t<DimS> &pixel, const Real &Young, const Real &Poisson) {
+      const Ccoord_t<DimS> & pixel, const Real & Young, const Real & Poisson) {
     this->internal_fields.add_pixel(pixel);
     Real lambda = Hooke::compute_lambda(Young, Poisson);
     Real mu = Hooke::compute_mu(Young, Poisson);

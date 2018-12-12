@@ -68,7 +68,7 @@ class PyProjectionBase : public ProjectionBase<DimS, DimM> {
   //! field type on which projection is applied
   using Field_t = typename Parent::Field_t;
 
-  void apply_projection(Field_t &field) override {
+  void apply_projection(Field_t & field) override {
     PYBIND11_OVERLOAD_PURE(void, Parent, apply_projection, field);
   }
 
@@ -78,7 +78,7 @@ class PyProjectionBase : public ProjectionBase<DimS, DimM> {
 };
 
 template <class Proj, Dim_t DimS, Dim_t DimM = DimS>
-void add_proj_helper(py::module &mod, std::string name_start) {
+void add_proj_helper(py::module & mod, std::string name_start) {
   using Ccoord = Ccoord_t<DimS>;
   using Rcoord = Rcoord_t<DimS>;
   using Field_t = typename Proj::Field_t;
@@ -90,7 +90,7 @@ void add_proj_helper(py::module &mod, std::string name_start) {
 
   py::class_<Proj>(mod, name.str().c_str())
 #ifdef WITH_MPI
-      .def(py::init([](Ccoord res, Rcoord lengths, const std::string &fft,
+      .def(py::init([](Ccoord res, Rcoord lengths, const std::string & fft,
                        size_t comm) {
              if (fft == "fftw") {
                auto engine = std::make_unique<FFTWEngine<DimS>>(
@@ -98,7 +98,7 @@ void add_proj_helper(py::module &mod, std::string name_start) {
                    std::move(Communicator(MPI_Comm(comm))));
                return Proj(std::move(engine), lengths);
 #else
-      .def(py::init([](Ccoord res, Rcoord lengths, const std::string &fft) {
+      .def(py::init([](Ccoord res, Rcoord lengths, const std::string & fft) {
              if (fft == "fftw") {
                auto engine = std::make_unique<FFTWEngine<DimS>>(
                    res, Proj::NbComponents());
@@ -132,7 +132,7 @@ void add_proj_helper(py::module &mod, std::string name_start) {
       .def("initialise", &Proj::initialise, "flags"_a = FFT_PlanFlags::estimate,
            "initialises the fft engine (plan the transform)")
       .def("apply_projection",
-           [](Proj &proj, py::EigenDRef<Eigen::ArrayXXd> v) {
+           [](Proj & proj, py::EigenDRef<Eigen::ArrayXXd> v) {
              typename FFTEngineBase<DimS>::GFieldCollection_t coll{};
              Eigen::Index subdomain_size =
                  CcoordOps::get_size(proj.get_subdomain_resolutions());
@@ -146,8 +146,8 @@ void add_proj_helper(py::module &mod, std::string name_start) {
              }
              coll.initialise(proj.get_subdomain_resolutions(),
                              proj.get_subdomain_locations());
-             Field_t &temp{make_field<Field_t>("temp_field", coll,
-                                               proj.get_nb_components())};
+             Field_t & temp{make_field<Field_t>("temp_field", coll,
+                                                proj.get_nb_components())};
              temp.eigen() = v;
              proj.apply_projection(temp);
              return Eigen::ArrayXXd{temp.eigen()};
@@ -163,7 +163,7 @@ void add_proj_helper(py::module &mod, std::string name_start) {
       .def("get_domain_lengths", &Proj::get_domain_resolutions);
 }
 
-void add_proj_dispatcher(py::module &mod) {
+void add_proj_dispatcher(py::module & mod) {
   add_proj_helper<ProjectionSmallStrain<twoD, twoD>, twoD>(
       mod, "ProjectionSmallStrain");
   add_proj_helper<ProjectionSmallStrain<threeD, threeD>, threeD>(
@@ -180,4 +180,4 @@ void add_proj_dispatcher(py::module &mod) {
       mod, "ProjectionFiniteStrainFast");
 }
 
-void add_projections(py::module &mod) { add_proj_dispatcher(mod); }
+void add_projections(py::module & mod) { add_proj_dispatcher(mod); }

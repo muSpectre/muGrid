@@ -57,9 +57,9 @@ namespace muSpectre {
 
     FFT_freqs<DimS> fft_freqs(this->fft_engine->get_domain_resolutions(),
                               this->domain_lengths);
-    for (auto &&tup : akantu::zip(*this->fft_engine, this->Ghat)) {
-      const auto &ccoord = std::get<0>(tup);
-      auto &G = std::get<1>(tup);
+    for (auto && tup : akantu::zip(*this->fft_engine, this->Ghat)) {
+      const auto & ccoord = std::get<0>(tup);
+      auto & G = std::get<1>(tup);
       auto xi = fft_freqs.get_unit_xi(ccoord);
       auto kron = [](const Dim_t i, const Dim_t j) -> Real {
         return (i == j) ? 1. : 0.;
@@ -68,7 +68,7 @@ namespace muSpectre {
         for (Dim_t j{0}; j < DimS; ++j) {
           for (Dim_t l{0}; l < DimS; ++l) {
             for (Dim_t m{0}; m < DimS; ++m) {
-              Real &g = get(G, i, j, l, m);
+              Real & g = get(G, i, j, l, m);
               g = 0.5 *
                       (xi(i) * kron(j, l) * xi(m) + xi(i) * kron(j, m) * xi(l) +
                        xi(j) * kron(i, l) * xi(m) +

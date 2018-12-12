@@ -50,7 +50,8 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE(material_linear_elastic_2);
 
-  template <class Mat_t> struct MaterialFixture {
+  template <class Mat_t>
+  struct MaterialFixture {
     using Mat = Mat_t;
     constexpr static Real lambda{2}, mu{1.5};
     constexpr static Real young{mu * (3 * lambda + 2 * mu) / (lambda + mu)};
@@ -69,7 +70,7 @@ namespace muSpectre {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_constructor, Fix, mat_list, Fix) {
     BOOST_CHECK_EQUAL("Name", Fix::mat.get_name());
-    auto &mat{Fix::mat};
+    auto & mat{Fix::mat};
     auto sdim{Fix::sdim};
     auto mdim{Fix::mdim};
     BOOST_CHECK_EQUAL(sdim, mat.sdim());
@@ -77,7 +78,7 @@ namespace muSpectre {
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_add_pixel, Fix, mat_list, Fix) {
-    auto &mat{Fix::mat};
+    auto & mat{Fix::mat};
     constexpr Dim_t sdim{Fix::sdim};
     testGoodies::RandRange<size_t> rng;
 
@@ -98,7 +99,7 @@ namespace muSpectre {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_eigenstrain_equivalence, Fix, mat_list,
                                    Fix) {
-    auto &mat{Fix::mat};
+    auto & mat{Fix::mat};
 
     const Dim_t nb_pixel{2};
     constexpr auto cube{CcoordOps::get_cube<Fix::sdim>(nb_pixel)};
@@ -107,11 +108,11 @@ namespace muSpectre {
     using Mat_t = Eigen::Matrix<Real, Fix::mdim, Fix::mdim>;
     using FC_t = GlobalFieldCollection<Fix::sdim>;
     FC_t globalfields;
-    auto &F_f{make_field<typename Fix::Mat::StrainField_t>(
+    auto & F_f{make_field<typename Fix::Mat::StrainField_t>(
         "Transformation Gradient", globalfields)};
-    auto &P1_f = make_field<typename Fix::Mat::StressField_t>(
+    auto & P1_f = make_field<typename Fix::Mat::StressField_t>(
         "Nominal Stress1", globalfields);  // to be computed alone
-    auto &K_f = make_field<typename Fix::Mat::TangentField_t>(
+    auto & K_f = make_field<typename Fix::Mat::TangentField_t>(
         "Tangent Moduli", globalfields);  // to be computed with tangent
     globalfields.initialise(cube, loc);
 
@@ -170,21 +171,21 @@ namespace muSpectre {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_evaluate_law, Fix, mat_fill, Fix) {
     constexpr auto cube{CcoordOps::get_cube<Fix::sdim>(Fix::box_size)};
     constexpr auto loc{CcoordOps::get_cube<Fix::sdim>(0)};
-    auto &mat{Fix::mat};
+    auto & mat{Fix::mat};
 
     using FC_t = GlobalFieldCollection<Fix::sdim>;
     FC_t globalfields;
-    auto &F{make_field<typename Fix::Mat::StrainField_t>(
+    auto & F{make_field<typename Fix::Mat::StrainField_t>(
         "Transformation Gradient", globalfields)};
-    auto &P1 = make_field<typename Fix::Mat::StressField_t>(
+    auto & P1 = make_field<typename Fix::Mat::StressField_t>(
         "Nominal Stress1", globalfields);  // to be computed alone
-    auto &P2 = make_field<typename Fix::Mat::StressField_t>(
+    auto & P2 = make_field<typename Fix::Mat::StressField_t>(
         "Nominal Stress2", globalfields);  // to be computed with tangent
-    auto &K = make_field<typename Fix::Mat::TangentField_t>(
+    auto & K = make_field<typename Fix::Mat::TangentField_t>(
         "Tangent Moduli", globalfields);  // to be computed with tangent
-    auto &Pr = make_field<typename Fix::Mat::StressField_t>(
+    auto & Pr = make_field<typename Fix::Mat::StressField_t>(
         "Nominal Stress reference", globalfields);
-    auto &Kr = make_field<typename Fix::Mat::TangentField_t>(
+    auto & Kr = make_field<typename Fix::Mat::TangentField_t>(
         "Tangent Moduli reference",
         globalfields);  // to be computed with tangent
 

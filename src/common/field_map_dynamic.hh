@@ -98,26 +98,26 @@ namespace muSpectre {
     TypedFieldMap() = delete;
 
     //! Constructor
-    explicit TypedFieldMap(Field_c &field);
+    explicit TypedFieldMap(Field_c & field);
 
     //! Copy constructor
-    TypedFieldMap(const TypedFieldMap &other) = delete;
+    TypedFieldMap(const TypedFieldMap & other) = delete;
 
     //! Move constructor
-    TypedFieldMap(TypedFieldMap &&other) = default;
+    TypedFieldMap(TypedFieldMap && other) = default;
 
     //! Destructor
     virtual ~TypedFieldMap() = default;
 
     //! Copy assignment operator
-    TypedFieldMap &operator=(const TypedFieldMap &other) = delete;
+    TypedFieldMap & operator=(const TypedFieldMap & other) = delete;
 
     //! Assign a matrixlike value to every entry
     template <class Derived>
-    inline TypedFieldMap &operator=(const Eigen::EigenBase<Derived> &val);
+    inline TypedFieldMap & operator=(const Eigen::EigenBase<Derived> & val);
 
     //! Move assignment operator
-    TypedFieldMap &operator=(TypedFieldMap &&other) = default;
+    TypedFieldMap & operator=(TypedFieldMap && other) = default;
 
     //! give human-readable field map type
     inline std::string info_string() const final;
@@ -125,12 +125,12 @@ namespace muSpectre {
     //! member access
     inline reference operator[](size_type index);
     //! member access
-    inline reference operator[](const Ccoord &ccoord);
+    inline reference operator[](const Ccoord & ccoord);
 
     //! member access
     inline const_reference operator[](size_type index) const;
     //! member access
-    inline const_reference operator[](const Ccoord &ccoord) const;
+    inline const_reference operator[](const Ccoord & ccoord) const;
 
     //! return an iterator to first entry of field
     inline iterator begin() { return iterator(*this); }
@@ -168,7 +168,7 @@ namespace muSpectre {
 
   //----------------------------------------------------------------------------//
   template <class FieldCollection, typename T, bool ConstField>
-  TypedFieldMap<FieldCollection, T, ConstField>::TypedFieldMap(Field_c &field)
+  TypedFieldMap<FieldCollection, T, ConstField>::TypedFieldMap(Field_c & field)
       : Parent(field) {
     this->check_compatibility();
   }
@@ -194,7 +194,7 @@ namespace muSpectre {
   //----------------------------------------------------------------------------//
   template <class FieldCollection, typename T, bool ConstField>
   auto TypedFieldMap<FieldCollection, T, ConstField>::
-  operator[](const Ccoord &ccoord) -> reference {
+  operator[](const Ccoord & ccoord) -> reference {
     size_t index{this->collection.get_index(ccoord)};
     return (*this)[index];
   }
@@ -210,7 +210,7 @@ namespace muSpectre {
   //----------------------------------------------------------------------------//
   template <class FieldCollection, typename T, bool ConstField>
   auto TypedFieldMap<FieldCollection, T, ConstField>::
-  operator[](const Ccoord &ccoord) const -> const_reference {
+  operator[](const Ccoord & ccoord) const -> const_reference {
     size_t index{this->collection.get_index(ccoord)};
     return (*this)[index];
   }

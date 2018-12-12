@@ -46,19 +46,23 @@ namespace muSpectre {
 
   namespace testGoodies {
 
-    template <Dim_t Dim> struct dimFixture { constexpr static Dim_t dim{Dim}; };
+    template <Dim_t Dim>
+    struct dimFixture {
+      constexpr static Dim_t dim{Dim};
+    };
 
     using dimlist = boost::mpl::list<dimFixture<oneD>, dimFixture<twoD>,
                                      dimFixture<threeD>>;
 
     /* ---------------------------------------------------------------------- */
-    template <typename T> class RandRange {
+    template <typename T>
+    class RandRange {
      public:
       RandRange() : rd(), gen(rd()) {}
 
       template <typename dummyT = T>
       std::enable_if_t<std::is_floating_point<dummyT>::value, dummyT>
-      randval(T &&lower, T &&upper) {
+      randval(T && lower, T && upper) {
         static_assert(std::is_same<T, dummyT>::value, "SFINAE");
         auto distro = std::uniform_real_distribution<T>(lower, upper);
         return distro(this->gen);
@@ -66,7 +70,7 @@ namespace muSpectre {
 
       template <typename dummyT = T>
       std::enable_if_t<std::is_integral<dummyT>::value, dummyT>
-      randval(T &&lower, T &&upper) {
+      randval(T && lower, T && upper) {
         static_assert(std::is_same<T, dummyT>::value, "SFINAE");
         auto distro = std::uniform_int_distribution<T>(lower, upper);
         return distro(this->gen);
@@ -86,10 +90,10 @@ namespace muSpectre {
      */
     template <Dim_t Dim>
     decltype(auto) objective_hooke_explicit(Real lambda, Real mu,
-                                            const Matrices::Tens2_t<Dim> &F) {
-      using Matrices::tensmult;
-      using Matrices::Tens4_t;
+                                            const Matrices::Tens2_t<Dim> & F) {
       using Matrices::Tens2_t;
+      using Matrices::Tens4_t;
+      using Matrices::tensmult;
 
       using T2 = Tens2_t<Dim>;
       using T4 = Tens4_t<Dim>;

@@ -50,7 +50,8 @@ namespace muSpectre {
    * law; even for e.g. two-dimensional problems the constitutive law could
    * live in three-dimensional space for e.g. plane strain or stress problems)
    */
-  template <Dim_t DimS, Dim_t DimM> class MaterialBase {
+  template <Dim_t DimS, Dim_t DimM>
+  class MaterialBase {
    public:
     //! typedefs for data handled by this interface
     //! global field collection for cell-wide fields, like stress, strain, etc
@@ -79,19 +80,19 @@ namespace muSpectre {
     explicit MaterialBase(std::string name);
 
     //! Copy constructor
-    MaterialBase(const MaterialBase &other) = delete;
+    MaterialBase(const MaterialBase & other) = delete;
 
     //! Move constructor
-    MaterialBase(MaterialBase &&other) = delete;
+    MaterialBase(MaterialBase && other) = delete;
 
     //! Destructor
     virtual ~MaterialBase() = default;
 
     //! Copy assignment operator
-    MaterialBase &operator=(const MaterialBase &other) = delete;
+    MaterialBase & operator=(const MaterialBase & other) = delete;
 
     //! Move assignment operator
-    MaterialBase &operator=(MaterialBase &&other) = delete;
+    MaterialBase & operator=(MaterialBase && other) = delete;
 
     /**
      *  take responsibility for a pixel identified by its cell coordinates
@@ -99,7 +100,7 @@ namespace muSpectre {
      *  (as, e.g. for eigenstrain), we need to pass more parameters. Materials
      *  of this tye need to overload add_pixel
      */
-    virtual void add_pixel(const Ccoord &ccooord);
+    virtual void add_pixel(const Ccoord & ccooord);
 
     //! allocate memory, etc, but also: wipe history variables!
     virtual void initialise() = 0;
@@ -113,14 +114,14 @@ namespace muSpectre {
     virtual void save_history_variables() {}
 
     //! return the material's name
-    const std::string &get_name() const;
+    const std::string & get_name() const;
 
     //! spatial dimension for static inheritance
     constexpr static Dim_t sdim() { return DimS; }
     //! material dimension for static inheritance
     constexpr static Dim_t mdim() { return DimM; }
     //! computes stress
-    virtual void compute_stresses(const StrainField_t &F, StressField_t &P,
+    virtual void compute_stresses(const StrainField_t & F, StressField_t & P,
                                   Formulation form) = 0;
     /**
      * Convenience function to compute stresses, mostly for debugging and
@@ -128,10 +129,10 @@ namespace muSpectre {
      * conversion of the Field_t arguments that can be avoided by using the
      * version with strongly typed field references
      */
-    void compute_stresses(const Field_t &F, Field_t &P, Formulation form);
+    void compute_stresses(const Field_t & F, Field_t & P, Formulation form);
     //! computes stress and tangent moduli
-    virtual void compute_stresses_tangent(const StrainField_t &F,
-                                          StressField_t &P, TangentField_t &K,
+    virtual void compute_stresses_tangent(const StrainField_t & F,
+                                          StressField_t & P, TangentField_t & K,
                                           Formulation form) = 0;
     /**
      * Convenience function to compute stresses and tangent moduli, mostly for
@@ -139,7 +140,7 @@ namespace muSpectre {
      * compatibility-checking and conversion of the Field_t arguments that can
      * be avoided by using the version with strongly typed field references
      */
-    void compute_stresses_tangent(const Field_t &F, Field_t &P, Field_t &K,
+    void compute_stresses_tangent(const Field_t & F, Field_t & P, Field_t & K,
                                   Formulation form);
 
     //! iterator to first pixel handled by this material
@@ -150,15 +151,13 @@ namespace muSpectre {
     inline size_t size() const { return this->internal_fields.size(); }
 
     //! gives access to internal fields
-    inline MFieldCollection_t &get_collection() {
+    inline MFieldCollection_t & get_collection() {
       return this->internal_fields;
     }
 
    protected:
     const std::string name;  //!< material's name (for output and debugging)
     MFieldCollection_t internal_fields{};  //!< storage for internal variables
-
-   private:
   };
 }  // namespace muSpectre
 

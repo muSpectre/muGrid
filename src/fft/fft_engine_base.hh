@@ -45,7 +45,8 @@ namespace muSpectre {
    * Virtual base class for FFT engines. To be implemented by all
    * FFT_engine implementations.
    */
-  template <Dim_t DimS> class FFTEngineBase {
+  template <Dim_t DimS>
+  class FFTEngineBase {
    public:
     constexpr static Dim_t sdim{DimS};  //!< spatial dimension of the cell
     //! cell coordinates type
@@ -74,25 +75,25 @@ namespace muSpectre {
                   Communicator comm = Communicator());
 
     //! Copy constructor
-    FFTEngineBase(const FFTEngineBase &other) = delete;
+    FFTEngineBase(const FFTEngineBase & other) = delete;
 
     //! Move constructor
-    FFTEngineBase(FFTEngineBase &&other) = default;
+    FFTEngineBase(FFTEngineBase && other) = default;
 
     //! Destructor
     virtual ~FFTEngineBase() = default;
 
     //! Copy assignment operator
-    FFTEngineBase &operator=(const FFTEngineBase &other) = delete;
+    FFTEngineBase & operator=(const FFTEngineBase & other) = delete;
 
     //! Move assignment operator
-    FFTEngineBase &operator=(FFTEngineBase &&other) = default;
+    FFTEngineBase & operator=(FFTEngineBase && other) = default;
 
     //! compute the plan, etc
     virtual void initialise(FFT_PlanFlags /*plan_flags*/);
 
     //! forward transform (dummy for interface)
-    virtual Workspace_t &fft(Field_t & /*field*/) = 0;
+    virtual Workspace_t & fft(Field_t & /*field*/) = 0;
 
     //! inverse transform (dummy for interface)
     virtual void ifft(Field_t & /*field*/) const = 0;
@@ -112,35 +113,35 @@ namespace muSpectre {
     size_t workspace_size() const;
 
     //! return the communicator object
-    const Communicator &get_communicator() const { return this->comm; }
+    const Communicator & get_communicator() const { return this->comm; }
 
     //! returns the process-local resolutions of the cell
-    const Ccoord &get_subdomain_resolutions() const {
+    const Ccoord & get_subdomain_resolutions() const {
       return this->subdomain_resolutions;
     }
     //! returns the process-local locations of the cell
-    const Ccoord &get_subdomain_locations() const {
+    const Ccoord & get_subdomain_locations() const {
       return this->subdomain_locations;
     }
     //! returns the process-local resolutions of the cell in Fourier space
-    const Ccoord &get_fourier_resolutions() const {
+    const Ccoord & get_fourier_resolutions() const {
       return this->fourier_resolutions;
     }
     //! returns the process-local locations of the cell in Fourier space
-    const Ccoord &get_fourier_locations() const {
+    const Ccoord & get_fourier_locations() const {
       return this->fourier_locations;
     }
     //! returns the resolutions of the cell
-    const Ccoord &get_domain_resolutions() const {
+    const Ccoord & get_domain_resolutions() const {
       return this->domain_resolutions;
     }
 
     //! only required for testing and debugging
-    LFieldCollection_t &get_field_collection() {
+    LFieldCollection_t & get_field_collection() {
       return this->work_space_container;
     }
     //! only required for testing and debugging
-    Workspace_t &get_work_space() { return this->work; }
+    Workspace_t & get_work_space() { return this->work; }
 
     //! factor by which to multiply projection before inverse transform (this is
     //! typically 1/nb_pixels for so-called unnormalized transforms (see,
@@ -173,7 +174,7 @@ namespace muSpectre {
                                // portion of the Fourier transformed data
     const Ccoord
         domain_resolutions;  //!< resolutions of the full domain of the cell
-    Workspace_t &work;       //!< field to store the Fourier transform of P
+    Workspace_t & work;      //!< field to store the Fourier transform of P
     const Real norm_factor;  //!< normalisation coefficient of fourier transform
     Dim_t nb_components;
 

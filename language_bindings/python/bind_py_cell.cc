@@ -60,7 +60,7 @@ using namespace pybind11::literals;  // NOLINT: recommended usage
  */
 #ifdef WITH_MPI
 template <Dim_t dim, class FFTEngine>
-void add_parallel_cell_factory_helper(py::module &mod, const char *name) {
+void add_parallel_cell_factory_helper(py::module & mod, const char * name) {
   using Ccoord = Ccoord_t<dim>;
   using Rcoord = Rcoord_t<dim>;
 
@@ -79,7 +79,8 @@ void add_parallel_cell_factory_helper(py::module &mod, const char *name) {
 /**
  * the cell factory is only bound for default template parameters
  */
-template <Dim_t dim> void add_cell_factory_helper(py::module &mod) {
+template <Dim_t dim>
+void add_cell_factory_helper(py::module & mod) {
   using Ccoord = Ccoord_t<dim>;
   using Rcoord = Rcoord_t<dim>;
 
@@ -101,7 +102,7 @@ template <Dim_t dim> void add_cell_factory_helper(py::module &mod) {
 #endif
 }
 
-void add_cell_factory(py::module &mod) {
+void add_cell_factory(py::module & mod) {
   add_cell_factory_helper<twoD>(mod);
   add_cell_factory_helper<threeD>(mod);
 }
@@ -109,7 +110,8 @@ void add_cell_factory(py::module &mod) {
 /**
  * CellBase for which the material and spatial dimension are identical
  */
-template <Dim_t dim> void add_cell_base_helper(py::module &mod) {
+template <Dim_t dim>
+void add_cell_base_helper(py::module & mod) {
   std::stringstream name_stream{};
   name_stream << "CellBase" << dim << 'd';
   const std::string name = name_stream.str();
@@ -117,12 +119,12 @@ template <Dim_t dim> void add_cell_base_helper(py::module &mod) {
   py::class_<sys_t, Cell>(mod, name.c_str())
       .def("__len__", &sys_t::size)
       .def("__iter__",
-           [](sys_t &s) { return py::make_iterator(s.begin(), s.end()); })
+           [](sys_t & s) { return py::make_iterator(s.begin(), s.end()); })
       .def("initialise", &sys_t::initialise,
            "flags"_a = FFT_PlanFlags::estimate)
       .def(
           "directional_stiffness",
-          [](sys_t &cell, py::EigenDRef<Eigen::ArrayXXd> &v) {
+          [](sys_t & cell, py::EigenDRef<Eigen::ArrayXXd> & v) {
             if ((size_t(v.cols()) != cell.size() ||
                  size_t(v.rows()) != dim * dim)) {
               std::stringstream err{};
@@ -136,16 +138,16 @@ template <Dim_t dim> void add_cell_base_helper(py::module &mod) {
             const std::string out_name{"temp output for directional stiffness"};
             const std::string in_name{"temp input for directional stiffness"};
             constexpr bool create_tangent{true};
-            auto &K = cell.get_tangent(create_tangent);
-            auto &input = cell.get_managed_T2_field(in_name);
-            auto &output = cell.get_managed_T2_field(out_name);
+            auto & K = cell.get_tangent(create_tangent);
+            auto & input = cell.get_managed_T2_field(in_name);
+            auto & output = cell.get_managed_T2_field(out_name);
             input.eigen() = v;
             cell.directional_stiffness(K, input, output);
             return output.eigen();
           },
           "δF"_a)
       .def("project",
-           [](sys_t &cell, py::EigenDRef<Eigen::ArrayXXd> &v) {
+           [](sys_t & cell, py::EigenDRef<Eigen::ArrayXXd> & v) {
              if ((size_t(v.cols()) != cell.size() ||
                   size_t(v.rows()) != dim * dim)) {
                std::stringstream err{};
@@ -158,19 +160,19 @@ template <Dim_t dim> void add_cell_base_helper(py::module &mod) {
                cell.initialise();
              }
              const std::string in_name{"temp input for projection"};
-             auto &input = cell.get_managed_T2_field(in_name);
+             auto & input = cell.get_managed_T2_field(in_name);
              input.eigen() = v;
              cell.project(input);
              return input.eigen();
            },
            "field"_a)
       .def("get_strain",
-           [](sys_t &s) { return Eigen::ArrayXXd(s.get_strain().eigen()); })
+           [](sys_t & s) { return Eigen::ArrayXXd(s.get_strain().eigen()); })
       .def("get_stress",
-           [](sys_t &s) { return Eigen::ArrayXXd(s.get_stress().eigen()); })
+           [](sys_t & s) { return Eigen::ArrayXXd(s.get_stress().eigen()); })
       .def_property_readonly("size", &sys_t::size)
       .def("evaluate_stress_tangent",
-           [](sys_t &cell, py::EigenDRef<Eigen::ArrayXXd> &v) {
+           [](sys_t & cell, py::EigenDRef<Eigen::ArrayXXd> & v) {
              if ((size_t(v.cols()) != cell.size() ||
                   size_t(v.rows()) != dim * dim)) {
                std::stringstream err{};
@@ -179,7 +181,7 @@ template <Dim_t dim> void add_cell_base_helper(py::module &mod) {
                    << v.cols() << ").";
                throw std::runtime_error(err.str());
              }
-             auto &strain{cell.get_strain()};
+             auto & strain{cell.get_strain()};
              strain.eigen() = v;
              cell.evaluate_stress_tangent(strain);
            },
@@ -191,7 +193,7 @@ template <Dim_t dim> void add_cell_base_helper(py::module &mod) {
       .def("get_domain_lengths", &sys_t::get_domain_resolutions);
 }
 
-void add_cell_base(py::module &mod) {
+void add_cell_base(py::module & mod) {
   py::class_<Cell>(mod, "Cell")
       .def("get_globalised_internal_real_array",
            &Cell::get_globalised_internal_real_array, "unique_name"_a,
@@ -213,7 +215,7 @@ void add_cell_base(py::module &mod) {
   add_cell_base_helper<threeD>(mod);
 }
 
-void add_cell(py::module &mod) {
+void add_cell(py::module & mod) {
   add_cell_factory(mod);
 
   auto cell{mod.def_submodule("cell")};

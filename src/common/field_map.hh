@@ -55,7 +55,8 @@ namespace muSpectre {
    * been an assignment to the underlying eigen array, the
    * `RawFieldMap` might be invalidated!
    */
-  template <class EigenMap> class RawFieldMap {
+  template <class EigenMap>
+  class RawFieldMap {
    public:
     /**
      * determining the constness of the mapped array required in order
@@ -84,12 +85,12 @@ namespace muSpectre {
         : data{vec.data()}, nb_rows{nb_rows}, nb_cols{nb_cols},
           nb_components{nb_rows * nb_cols},
           nb_pixels(vec.size() / nb_components) {
-      if ((nb_rows == Eigen::Dynamic) or(nb_cols == Eigen::Dynamic)) {
+      if ((nb_rows == Eigen::Dynamic) or (nb_cols == Eigen::Dynamic)) {
         throw FieldError(
             "You have to specify the number of rows and columns if you map a "
             "dynamically sized Eigen Map type.");
       }
-      if ((nb_rows < 1) or(nb_cols < 1)) {
+      if ((nb_rows < 1) or (nb_cols < 1)) {
         throw FieldError("Only positive numbers of rows and columns make "
                          "sense");
       }
@@ -119,25 +120,26 @@ namespace muSpectre {
     }
 
     //! Copy constructor
-    RawFieldMap(const RawFieldMap &other) = delete;
+    RawFieldMap(const RawFieldMap & other) = delete;
 
     //! Move constructor
-    RawFieldMap(RawFieldMap &&other) = default;
+    RawFieldMap(RawFieldMap && other) = default;
 
     //! Destructor
     virtual ~RawFieldMap() = default;
 
     //! Copy assignment operator
-    RawFieldMap &operator=(const RawFieldMap &other) = delete;
+    RawFieldMap & operator=(const RawFieldMap & other) = delete;
 
     //! Move assignment operator
-    RawFieldMap &operator=(RawFieldMap &&other) = delete;
+    RawFieldMap & operator=(RawFieldMap && other) = delete;
 
     //! returns number of EigenMaps stored within the array
     size_t size() const { return this->nb_pixels; }
 
     //! forward declaration of iterator type
-    template <bool IsConst> class iterator_t;
+    template <bool IsConst>
+    class iterator_t;
     using iterator = iterator_t<false>;
     using const_iterator = iterator_t<true>;
 
@@ -152,7 +154,7 @@ namespace muSpectre {
     EigenPlain mean() const {
       using T_t = EigenPlain;
       T_t mean(T_t::Zero(this->nb_rows, this->nb_cols));
-      for (auto &&val : *this) {
+      for (auto && val : *this) {
         mean += val;
       }
       mean /= this->size();
@@ -197,22 +199,22 @@ namespace muSpectre {
     iterator_t() = delete;
 
     //! Copy constructor
-    iterator_t(const iterator_t &other) = default;
+    iterator_t(const iterator_t & other) = default;
 
     //! Move constructor
-    iterator_t(iterator_t &&other) = default;
+    iterator_t(iterator_t && other) = default;
 
     //! Destructor
     virtual ~iterator_t() = default;
 
     //! Copy assignment operator
-    iterator_t &operator=(const iterator_t &other) = default;
+    iterator_t & operator=(const iterator_t & other) = default;
 
     //! Move assignment operator
-    iterator_t &operator=(iterator_t &&other) = default;
+    iterator_t & operator=(iterator_t && other) = default;
 
     //! pre-increment
-    inline iterator_t &operator++() {
+    inline iterator_t & operator++() {
       ++this->index;
       return *this;
     }
@@ -224,18 +226,18 @@ namespace muSpectre {
     }
 
     //! inequality
-    inline bool operator!=(const iterator_t &other) const {
+    inline bool operator!=(const iterator_t & other) const {
       return this->index != other.index;
     }
 
     //! equality
-    inline bool operator==(const iterator_t &other) const {
+    inline bool operator==(const iterator_t & other) const {
       return this->index == other.index;
     }
 
    protected:
     //! protected constructor
-    iterator_t(const Parent &map, size_t start)
+    iterator_t(const Parent & map, size_t start)
         : raw_ptr{map.get_data()}, map{map}, index{start} {}
 
     template <bool dummy_non_const = not IsConst>
@@ -246,7 +248,7 @@ namespace muSpectre {
     //! raw data
     T_ptr raw_ptr;
     //! ref to underlying map
-    const Parent &map;
+    const Parent & map;
     //! currently pointed-to element
     size_t index;
 

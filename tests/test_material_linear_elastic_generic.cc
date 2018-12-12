@@ -42,7 +42,8 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE(material_linear_elastic_generic);
 
-  template <Dim_t Dim> struct MatFixture {
+  template <Dim_t Dim>
+  struct MatFixture {
     using Mat_t = MaterialLinearElasticGeneric<Dim, Dim>;
     using T2_t = Eigen::Matrix<Real, Dim, Dim>;
     using T4_t = T4Mat<Real, Dim>;

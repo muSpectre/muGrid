@@ -41,11 +41,16 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   std::ostream & operator<<(std::ostream & os, Formulation f) {
     switch (f) {
-    case Formulation::small_strain:  {os << "small_strain";  break;}
-    case Formulation::finite_strain: {os << "finite_strain"; break;}
+    case Formulation::small_strain: {
+      os << "small_strain";
+      break;
+    }
+    case Formulation::finite_strain: {
+      os << "finite_strain";
+      break;
+    }
     default:
-      throw std::runtime_error
-        ("unknown formulation.");
+      throw std::runtime_error("unknown formulation.");
       break;
     }
     return os;
@@ -54,15 +59,32 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   std::ostream & operator<<(std::ostream & os, StressMeasure s) {
     switch (s) {
-    case StressMeasure::Cauchy:    {os << "Cauchy";    break;}
-    case StressMeasure::PK1:       {os << "PK1";       break;}
-    case StressMeasure::PK2:       {os << "PK2";       break;}
-    case StressMeasure::Kirchhoff: {os << "Kirchhoff"; break;}
-    case StressMeasure::Biot:      {os << "Biot";      break;}
-    case StressMeasure::Mandel:    {os << "Mandel";    break;}
+    case StressMeasure::Cauchy: {
+      os << "Cauchy";
+      break;
+    }
+    case StressMeasure::PK1: {
+      os << "PK1";
+      break;
+    }
+    case StressMeasure::PK2: {
+      os << "PK2";
+      break;
+    }
+    case StressMeasure::Kirchhoff: {
+      os << "Kirchhoff";
+      break;
+    }
+    case StressMeasure::Biot: {
+      os << "Biot";
+      break;
+    }
+    case StressMeasure::Mandel: {
+      os << "Mandel";
+      break;
+    }
     default:
-      throw std::runtime_error
-        ("a stress measure must be missing");
+      throw std::runtime_error("a stress measure must be missing");
       break;
     }
     return os;
@@ -71,34 +93,54 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   std::ostream & operator<<(std::ostream & os, StrainMeasure s) {
     switch (s) {
-    case StrainMeasure::Gradient:      {os << "Gradient"; break;}
-    case StrainMeasure::Infinitesimal: {os << "Infinitesimal"; break;}
-    case StrainMeasure::GreenLagrange: {os << "Green-Lagrange"; break;}
-    case StrainMeasure::Biot:          {os << "Biot"; break;}
-    case StrainMeasure::Log:           {os << "Logarithmic"; break;}
-    case StrainMeasure::Almansi:       {os << "Almansi"; break;}
-    case StrainMeasure::RCauchyGreen:  {os << "Right Cauchy-Green"; break;}
-    case StrainMeasure::LCauchyGreen:  {os << "Left Cauchy-Green"; break;}
+    case StrainMeasure::Gradient: {
+      os << "Gradient";
+      break;
+    }
+    case StrainMeasure::Infinitesimal: {
+      os << "Infinitesimal";
+      break;
+    }
+    case StrainMeasure::GreenLagrange: {
+      os << "Green-Lagrange";
+      break;
+    }
+    case StrainMeasure::Biot: {
+      os << "Biot";
+      break;
+    }
+    case StrainMeasure::Log: {
+      os << "Logarithmic";
+      break;
+    }
+    case StrainMeasure::Almansi: {
+      os << "Almansi";
+      break;
+    }
+    case StrainMeasure::RCauchyGreen: {
+      os << "Right Cauchy-Green";
+      break;
+    }
+    case StrainMeasure::LCauchyGreen: {
+      os << "Left Cauchy-Green";
+      break;
+    }
     default:
-      throw std::runtime_error
-        ("a strain measure must be missing");
+      throw std::runtime_error("a strain measure must be missing");
     }
     return os;
   }
 
   /* ---------------------------------------------------------------------- */
   void banner(std::string name, Uint year, std::string cpy_holder) {
-    std::cout
-      << std::endl
-      << "µSpectre "<< name << std::endl
-      << "Copyright © " << year << "  " << cpy_holder
-      << std::endl
-      << "This program comes with ABSOLUTELY NO WARRANTY."
-      << std::endl
-      << "This is free software, and you are welcome to redistribute it"
-      << std::endl
-      << "under certain conditions, see the license file."
-      << std::endl << std::endl;
+    std::cout << std::endl
+              << "µSpectre " << name << std::endl
+              << "Copyright © " << year << "  " << cpy_holder << std::endl
+              << "This program comes with ABSOLUTELY NO WARRANTY." << std::endl
+              << "This is free software, and you are welcome to redistribute it"
+              << std::endl
+              << "under certain conditions, see the license file." << std::endl
+              << std::endl;
   }
 
 }  // namespace muSpectre

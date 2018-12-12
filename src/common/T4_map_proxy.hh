@@ -48,32 +48,29 @@ namespace muSpectre {
    * simple adapter function to create a matrix that can be mapped as a tensor
    */
   template <typename T, Dim_t Dim>
-  using T4Mat = Eigen::Matrix<T, Dim*Dim, Dim*Dim>;
+  using T4Mat = Eigen::Matrix<T, Dim * Dim, Dim * Dim>;
 
   /**
    * Map onto `muSpectre::T4Mat`
    */
   template <typename T, Dim_t Dim, bool ConstMap = false>
-  using T4MatMap = std::conditional_t<ConstMap,
-                                      Eigen::Map<const T4Mat<T, Dim>>,
+  using T4MatMap = std::conditional_t<ConstMap, Eigen::Map<const T4Mat<T, Dim>>,
                                       Eigen::Map<T4Mat<T, Dim>>>;
 
-
-  template<class Derived>
-  struct DimCounter{};
+  template <class Derived>
+  struct DimCounter {};
 
   template <class Derived>
   struct DimCounter<Eigen::MatrixBase<Derived>> {
    private:
     using Type = Eigen::MatrixBase<Derived>;
     constexpr static Dim_t Rows{Type::RowsAtCompileTime};
+
    public:
-    static_assert(Rows != Eigen::Dynamic,
-                  "matrix type not statically sized");
-    static_assert(Rows == Type::ColsAtCompileTime,
-                  "matrix type not square");
+    static_assert(Rows != Eigen::Dynamic, "matrix type not statically sized");
+    static_assert(Rows == Type::ColsAtCompileTime, "matrix type not square");
     constexpr static Dim_t value{ct_sqrt(Rows)};
-    static_assert(value*value == Rows,
+    static_assert(value * value == Rows,
                   "Only integer numbers of dimensions allowed");
   };
   /**
@@ -81,30 +78,28 @@ namespace muSpectre {
    * by square matrices
    */
   template <typename T4>
-  inline auto get(const Eigen::MatrixBase<T4>& t4,
-                  Dim_t i, Dim_t j, Dim_t k, Dim_t l)
-    -> decltype(auto) {
+  inline auto get(const Eigen::MatrixBase<T4> & t4, Dim_t i, Dim_t j, Dim_t k,
+                  Dim_t l) -> decltype(auto) {
     constexpr Dim_t Dim{DimCounter<Eigen::MatrixBase<T4>>::value};
-    const auto myColStride{
-      (t4.colStride() == 1) ? t4.colStride(): t4.colStride()/Dim};
-    const auto myRowStride{
-      (t4.rowStride() == 1) ? t4.rowStride(): t4.rowStride()/Dim};
+    const auto myColStride{(t4.colStride() == 1) ? t4.colStride()
+                                                 : t4.colStride() / Dim};
+    const auto myRowStride{(t4.rowStride() == 1) ? t4.rowStride()
+                                                 : t4.rowStride() / Dim};
     return t4(i * myRowStride + j * myColStride,
               k * myRowStride + l * myColStride);
   }
 
   template <typename T4>
-  inline auto get(Eigen::MatrixBase<T4>& t4, Dim_t i, Dim_t j, Dim_t k, Dim_t l)
-    -> decltype(t4.coeffRef(i, j)) {
+  inline auto get(Eigen::MatrixBase<T4> & t4, Dim_t i, Dim_t j, Dim_t k,
+                  Dim_t l) -> decltype(t4.coeffRef(i, j)) {
     constexpr Dim_t Dim{DimCounter<Eigen::MatrixBase<T4>>::value};
-    const auto myColStride{
-      (t4.colStride() == 1) ? t4.colStride(): t4.colStride()/Dim};
-    const auto myRowStride{
-      (t4.rowStride() == 1) ? t4.rowStride(): t4.rowStride()/Dim};
+    const auto myColStride{(t4.colStride() == 1) ? t4.colStride()
+                                                 : t4.colStride() / Dim};
+    const auto myRowStride{(t4.rowStride() == 1) ? t4.rowStride()
+                                                 : t4.rowStride() / Dim};
     return t4.coeffRef(i * myRowStride + j * myColStride,
                        k * myRowStride + l * myColStride);
   }
-
 
 }  // namespace muSpectre
 

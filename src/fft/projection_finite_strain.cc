@@ -62,9 +62,9 @@ namespace muSpectre {
     Parent::initialise(flags);
     FFT_freqs<DimS> fft_freqs(this->fft_engine->get_domain_resolutions(),
                               this->domain_lengths);
-    for (auto &&tup : akantu::zip(*this->fft_engine, this->Ghat)) {
-      const auto &ccoord = std::get<0>(tup);
-      auto &G = std::get<1>(tup);
+    for (auto && tup : akantu::zip(*this->fft_engine, this->Ghat)) {
+      const auto & ccoord = std::get<0>(tup);
+      auto & G = std::get<1>(tup);
       auto xi = fft_freqs.get_unit_xi(ccoord);
       //! this is simplifiable using Curnier's Méthodes numériques, 6.69(c)
       G = Matrices::outer_under(Matrices::I2<DimM>(), xi * xi.transpose());

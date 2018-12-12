@@ -63,8 +63,8 @@ int main() {
   //                                                   nu(K_soft, mu_soft))};
   Real ex{1e-5};
   using Mat_t = MaterialLinearElastic1<dim, dim>;
-  auto &hard{Mat_t::make(cell, "hard", 210. * ex, .33)};
-  auto &soft{Mat_t::make(cell, "soft", 70. * ex, .33)};
+  auto & hard{Mat_t::make(cell, "hard", 210. * ex, .33)};
+  auto & soft{Mat_t::make(cell, "soft", 70. * ex, .33)};
 
   for (auto pixel : cell) {
     if ((pixel[0] >= N[0] - incl_size) && (pixel[1] < incl_size) &&

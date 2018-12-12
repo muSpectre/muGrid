@@ -74,24 +74,23 @@ namespace muSpectre {
     ProjectionSmallStrain(FFTEngine_ptr engine, Rcoord lengths);
 
     //! Copy constructor
-    ProjectionSmallStrain(const ProjectionSmallStrain &other) = delete;
+    ProjectionSmallStrain(const ProjectionSmallStrain & other) = delete;
 
     //! Move constructor
-    ProjectionSmallStrain(ProjectionSmallStrain &&other) = default;
+    ProjectionSmallStrain(ProjectionSmallStrain && other) = default;
 
     //! Destructor
     virtual ~ProjectionSmallStrain() = default;
 
     //! Copy assignment operator
     ProjectionSmallStrain &
-    operator=(const ProjectionSmallStrain &other) = delete;
+    operator=(const ProjectionSmallStrain & other) = delete;
 
     //! Move assignment operator
-    ProjectionSmallStrain &operator=(ProjectionSmallStrain &&other) = delete;
+    ProjectionSmallStrain & operator=(ProjectionSmallStrain && other) = delete;
 
     //! initialises the fft engine (plan the transform)
-    void
-    initialise(FFT_PlanFlags flags = FFT_PlanFlags::estimate) final;
+    void initialise(FFT_PlanFlags flags = FFT_PlanFlags::estimate) final;
   };
 
 }  // namespace muSpectre

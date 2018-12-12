@@ -43,7 +43,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  DeprecatedSolverCG<DimS, DimM>::DeprecatedSolverCG(Cell_t &cell, Real tol,
+  DeprecatedSolverCG<DimS, DimM>::DeprecatedSolverCG(Cell_t & cell, Real tol,
                                                      Uint maxiter, bool verbose)
       : Parent(cell, tol, maxiter, verbose), r_k{make_field<Field_t>(
                                                  "residual r_k",
@@ -54,7 +54,8 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void DeprecatedSolverCG<DimS, DimM>::solve(const Field_t &rhs, Field_t &x_f) {
+  void DeprecatedSolverCG<DimS, DimM>::solve(const Field_t & rhs,
+                                             Field_t & x_f) {
     x_f.eigenvec() = this->solve(rhs.eigenvec(), x_f.eigenvec());
   }
 
@@ -63,7 +64,7 @@ namespace muSpectre {
   typename DeprecatedSolverCG<DimS, DimM>::SolvVectorOut
   DeprecatedSolverCG<DimS, DimM>::solve(const SolvVectorInC rhs,
                                         SolvVectorIn x_0) {
-    const Communicator &comm = this->cell.get_communicator();
+    const Communicator & comm = this->cell.get_communicator();
     // Following implementation of algorithm 5.2 in Nocedal's Numerical
     // Optimization (p. 112)
 

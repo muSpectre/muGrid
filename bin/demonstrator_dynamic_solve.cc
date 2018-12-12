@@ -46,7 +46,7 @@
 
 using opt_ptr = std::unique_ptr<cxxopts::Options>;
 
-opt_ptr parse_args(int argc, char **argv) {
+opt_ptr parse_args(int argc, char ** argv) {
   opt_ptr options =
       std::make_unique<cxxopts::Options>(argv[0], "Tests MPI fft scalability");
 
@@ -70,7 +70,7 @@ opt_ptr parse_args(int argc, char **argv) {
     } else if (options->count("positional") > 0) {
       throw cxxopts::OptionException("There are too many positional arguments");
     }
-  } catch (const cxxopts::OptionException &e) {
+  } catch (const cxxopts::OptionException & e) {
     std::cout << "Error parsing options: " << e.what() << std::endl;
     exit(1);
   }
@@ -79,10 +79,10 @@ opt_ptr parse_args(int argc, char **argv) {
 
 using namespace muSpectre;
 
-int main(int argc, char *argv[]) {
+int main(int argc, char * argv[]) {
   banner("demonstrator1", 2018, "Till Junge <till.junge@epfl.ch>");
   auto options{parse_args(argc, argv)};
-  auto &opt{*options};
+  auto & opt{*options};
   const Dim_t size{opt["N0"].as<int>()};
   constexpr Real fsize{1.};
   constexpr Dim_t dim{3};
@@ -100,11 +100,11 @@ int main(int argc, char *argv[]) {
   constexpr Real nu{0.29930675909878679};
 
   using Material_t = MaterialLinearElastic1<dim, dim>;
-  auto &Material_soft{Material_t::make(cell, "soft", E, nu)};
-  auto &Material_hard{Material_t::make(cell, "hard", 10 * E, nu)};
+  auto & Material_soft{Material_t::make(cell, "soft", E, nu)};
+  auto & Material_hard{Material_t::make(cell, "hard", 10 * E, nu)};
 
   int counter{0};
-  for (const auto &&pixel : cell) {
+  for (const auto && pixel : cell) {
     int sum = 0;
     for (Dim_t i = 0; i < dim; ++i) {
       sum += pixel[i] * 2 / resolutions[i];

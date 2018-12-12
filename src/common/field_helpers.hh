@@ -45,11 +45,11 @@ namespace muSpectre {
    * are properly registered and linked to a collection.
    */
   template <class FieldType, class FieldCollection, typename... Args>
-  inline FieldType &make_field(std::string unique_name,
-                               FieldCollection &collection, Args &&... args) {
+  inline FieldType & make_field(std::string unique_name,
+                                FieldCollection & collection, Args &&... args) {
     std::unique_ptr<FieldType> ptr{
         new FieldType(unique_name, collection, args...)};
-    auto &retref{*ptr};
+    auto & retref{*ptr};
     collection.register_field(std::move(ptr));
     return retref;
   }

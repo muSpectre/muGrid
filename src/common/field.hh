@@ -92,27 +92,28 @@ namespace muSpectre {
       using ConstEigenMap_t = Eigen::Map<const EigenRep_t>;
 
       //! constructor
-      TypedSizedFieldBase(std::string unique_name, FieldCollection &collection);
+      TypedSizedFieldBase(std::string unique_name,
+                          FieldCollection & collection);
       virtual ~TypedSizedFieldBase() = default;
 
       //! add a new value at the end of the field
       template <class Derived>
-      inline void push_back(const Eigen::DenseBase<Derived> &value);
+      inline void push_back(const Eigen::DenseBase<Derived> & value);
 
       //! add a new scalar value at the end of the field
       template <bool scalar_store = NbComponents == 1>
-      inline std::enable_if_t<scalar_store> push_back(const T &value);
+      inline std::enable_if_t<scalar_store> push_back(const T & value);
 
       /**
        * returns an upcasted reference to a field, or throws an
        * exception if the field is incompatible
        */
-      static TypedSizedFieldBase &check_ref(Base &other);
+      static TypedSizedFieldBase & check_ref(Base & other);
       /**
        * returns an upcasted reference to a field, or throws an
        * exception if the field is incompatible
        */
-      static const TypedSizedFieldBase &check_ref(const Base &other);
+      static const TypedSizedFieldBase & check_ref(const Base & other);
 
       //! return a map representing the entire field as a single `Eigen::Array`
       inline EigenMap_t eigen();
@@ -127,15 +128,15 @@ namespace muSpectre {
       //! inner product between compatible fields
       template <typename T2>
       inline Real inner_product(
-          const TypedSizedFieldBase<FieldCollection, T2, NbComponents> &other)
+          const TypedSizedFieldBase<FieldCollection, T2, NbComponents> & other)
           const;
 
      protected:
       //! returns a raw pointer to the entry, for `Eigen::Map`
-      inline T *get_ptr_to_entry(const size_t &&index);
+      inline T * get_ptr_to_entry(const size_t && index);
 
       //! returns a raw pointer to the entry, for `Eigen::Map`
-      inline const T *get_ptr_to_entry(const size_t &&index) const;
+      inline const T * get_ptr_to_entry(const size_t && index) const;
     };
 
   }  // namespace internal
@@ -162,19 +163,19 @@ namespace muSpectre {
     using Field_p = typename FieldCollection::Field_p;
     using Scalar = typename Parent::Scalar;  //!< for type checking
     //! Copy constructor
-    TensorField(const TensorField &other) = delete;
+    TensorField(const TensorField & other) = delete;
 
     //! Move constructor
-    TensorField(TensorField &&other) = delete;
+    TensorField(TensorField && other) = delete;
 
     //! Destructor
     virtual ~TensorField() = default;
 
     //! Copy assignment operator
-    TensorField &operator=(const TensorField &other) = delete;
+    TensorField & operator=(const TensorField & other) = delete;
 
     //! Move assignment operator
-    TensorField &operator=(TensorField &&other) = delete;
+    TensorField & operator=(TensorField && other) = delete;
 
     //! return the order of the stored tensor
     inline Dim_t get_order() const;
@@ -183,15 +184,15 @@ namespace muSpectre {
 
     //! factory function
     template <class FieldType, class CollectionType, typename... Args>
-    friend FieldType &make_field(std::string unique_name,
-                                 CollectionType &collection, Args &&... args);
+    friend FieldType & make_field(std::string unique_name,
+                                  CollectionType & collection, Args &&... args);
 
     //! return a reference or throw an exception if `other` is incompatible
-    static TensorField &check_ref(Base &other) {
+    static TensorField & check_ref(Base & other) {
       return static_cast<TensorField &>(Parent::check_ref(other));
     }
     //! return a reference or throw an exception if `other` is incompatible
-    static const TensorField &check_ref(const Base &other) {
+    static const TensorField & check_ref(const Base & other) {
       return static_cast<const TensorField &>(Parent::check_ref(other));
     }
 
@@ -239,11 +240,11 @@ namespace muSpectre {
      * creates a `TensorField` same size and type as this, but all
      * entries are zero. Convenience function
      */
-    inline TensorField &get_zeros_like(std::string unique_name) const;
+    inline TensorField & get_zeros_like(std::string unique_name) const;
 
    protected:
     //! constructor protected!
-    TensorField(std::string unique_name, FieldCollection &collection);
+    TensorField(std::string unique_name, FieldCollection & collection);
 
    private:
   };
@@ -266,19 +267,19 @@ namespace muSpectre {
     //! polymorphic base field ptr to store
     using Field_p = std::unique_ptr<internal::FieldBase<FieldCollection>>;
     //! Copy constructor
-    MatrixField(const MatrixField &other) = delete;
+    MatrixField(const MatrixField & other) = delete;
 
     //! Move constructor
-    MatrixField(MatrixField &&other) = delete;
+    MatrixField(MatrixField && other) = delete;
 
     //! Destructor
     virtual ~MatrixField() = default;
 
     //! Copy assignment operator
-    MatrixField &operator=(const MatrixField &other) = delete;
+    MatrixField & operator=(const MatrixField & other) = delete;
 
     //! Move assignment operator
-    MatrixField &operator=(MatrixField &&other) = delete;
+    MatrixField & operator=(MatrixField && other) = delete;
 
     //! returns the number of rows
     inline Dim_t get_nb_row() const;
@@ -287,15 +288,15 @@ namespace muSpectre {
 
     //! factory function
     template <class FieldType, class CollectionType, typename... Args>
-    friend FieldType &make_field(std::string unique_name,
-                                 CollectionType &collection, Args &&... args);
+    friend FieldType & make_field(std::string unique_name,
+                                  CollectionType & collection, Args &&... args);
 
     //! returns a `MatrixField` reference if `other` is a compatible field
-    static MatrixField &check_ref(Base &other) {
+    static MatrixField & check_ref(Base & other) {
       return static_cast<MatrixField &>(Parent::check_ref(other));
     }
     //! returns a `MatrixField` reference if `other` is a compatible field
-    static const MatrixField &check_ref(const Base &other) {
+    static const MatrixField & check_ref(const Base & other) {
       return static_cast<const MatrixField &>(Parent::check_ref(other));
     }
 
@@ -337,11 +338,11 @@ namespace muSpectre {
      * creates a `MatrixField` same size and type as this, but all
      * entries are zero. Convenience function
      */
-    inline MatrixField &get_zeros_like(std::string unique_name) const;
+    inline MatrixField & get_zeros_like(std::string unique_name) const;
 
    protected:
     //! constructor protected!
-    MatrixField(std::string unique_name, FieldCollection &collection);
+    MatrixField(std::string unique_name, FieldCollection & collection);
 
    private:
   };
@@ -358,7 +359,7 @@ namespace muSpectre {
     /* ---------------------------------------------------------------------- */
     template <class FieldCollection, typename T, Dim_t NbComponents>
     TypedSizedFieldBase<FieldCollection, T, NbComponents>::TypedSizedFieldBase(
-        std::string unique_name, FieldCollection &collection)
+        std::string unique_name, FieldCollection & collection)
         : Parent(unique_name, collection, NbComponents) {
       static_assert(
           (std::is_arithmetic<T>::value || std::is_same<T, Complex>::value),
@@ -371,7 +372,7 @@ namespace muSpectre {
     template <class FieldCollection, typename T, Dim_t NbComponents>
     TypedSizedFieldBase<FieldCollection, T, NbComponents> &
     TypedSizedFieldBase<FieldCollection, T, NbComponents>::check_ref(
-        Base &other) {
+        Base & other) {
       if (typeid(T).hash_code() != other.get_stored_typeid().hash_code()) {
         std::stringstream err_str{};
         err_str << "Cannot create a reference of type '" << typeid(T).name()
@@ -395,7 +396,7 @@ namespace muSpectre {
     template <class FieldCollection, typename T, Dim_t NbComponents>
     const TypedSizedFieldBase<FieldCollection, T, NbComponents> &
     TypedSizedFieldBase<FieldCollection, T, NbComponents>::check_ref(
-        const Base &other) {
+        const Base & other) {
       if (typeid(T).hash_code() != other.get_stored_typeid().hash_code()) {
         std::stringstream err_str{};
         err_str << "Cannot create a reference of type '" << typeid(T).name()
@@ -433,15 +434,15 @@ namespace muSpectre {
     template <class FieldCollection, typename T, Dim_t NbComponents>
     template <typename otherT>
     Real TypedSizedFieldBase<FieldCollection, T, NbComponents>::inner_product(
-        const TypedSizedFieldBase<FieldCollection, otherT, NbComponents> &other)
-        const {
+        const TypedSizedFieldBase<FieldCollection, otherT, NbComponents> &
+            other) const {
       return (this->eigen() * other.eigen()).sum();
     }
 
     /* ---------------------------------------------------------------------- */
     template <class FieldCollection, typename T, Dim_t NbComponents>
-    T *TypedSizedFieldBase<FieldCollection, T, NbComponents>::get_ptr_to_entry(
-        const size_t &&index) {
+    T * TypedSizedFieldBase<FieldCollection, T, NbComponents>::get_ptr_to_entry(
+        const size_t && index) {
       return this->data_ptr + NbComponents * std::move(index);
     }
 
@@ -449,7 +450,7 @@ namespace muSpectre {
     template <class FieldCollection, typename T, Dim_t NbComponents>
     const T *
     TypedSizedFieldBase<FieldCollection, T, NbComponents>::get_ptr_to_entry(
-        const size_t &&index) const {
+        const size_t && index) const {
       return this->data_ptr + NbComponents * std::move(index);
     }
 
@@ -457,7 +458,7 @@ namespace muSpectre {
     template <class FieldCollection, typename T, Dim_t NbComponents>
     template <class Derived>
     void TypedSizedFieldBase<FieldCollection, T, NbComponents>::push_back(
-        const Eigen::DenseBase<Derived> &value) {
+        const Eigen::DenseBase<Derived> & value) {
       static_assert(Derived::SizeAtCompileTime == NbComponents,
                     "You provided an array with the wrong number of entries.");
       static_assert((Derived::RowsAtCompileTime == 1) or
@@ -478,7 +479,7 @@ namespace muSpectre {
     template <bool scalar_store>
     std::enable_if_t<scalar_store>
     TypedSizedFieldBase<FieldCollection, T, NbComponents>::push_back(
-        const T &value) {
+        const T & value) {
       static_assert(scalar_store, "SFINAE");
       this->values.push_back(value);
       ++this->current_size;
@@ -490,7 +491,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <class FieldCollection, typename T, Dim_t order, Dim_t dim>
   TensorField<FieldCollection, T, order, dim>::TensorField(
-      std::string unique_name, FieldCollection &collection)
+      std::string unique_name, FieldCollection & collection)
       : Parent(unique_name, collection) {}
 
   /* ---------------------------------------------------------------------- */
@@ -508,7 +509,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <class FieldCollection, typename T, Dim_t NbRow, Dim_t NbCol>
   MatrixField<FieldCollection, T, NbRow, NbCol>::MatrixField(
-      std::string unique_name, FieldCollection &collection)
+      std::string unique_name, FieldCollection & collection)
       : Parent(unique_name, collection) {}
 
   /* ---------------------------------------------------------------------- */

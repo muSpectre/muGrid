@@ -33,8 +33,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef  TESTS_TEST_FIELD_COLLECTIONS_HH_
-#define  TESTS_TEST_FIELD_COLLECTIONS_HH_
+#ifndef TESTS_TEST_FIELD_COLLECTIONS_HH_
+#define TESTS_TEST_FIELD_COLLECTIONS_HH_
 
 #include <stdexcept>
 #include <boost/mpl/list.hpp>
@@ -74,7 +74,8 @@ namespace muSpectre {
 
   constexpr Dim_t order{4}, matrix_order{2};
   //! Test fixture for multiple fields in the collection
-  template <Dim_t DimS, Dim_t DimM, bool Global> struct FC_multi_fixture {
+  template <Dim_t DimS, Dim_t DimM, bool Global>
+  struct FC_multi_fixture {
     using FC_t = std::conditional_t<Global, GlobalFieldCollection<DimS>,
                                     LocalFieldCollection<DimS>>;
     using T4_t = TensorField<FC_t, Real, order, DimM>;
@@ -97,11 +98,11 @@ namespace muSpectre {
     inline static constexpr Dim_t mdim() { return DimM; }
     inline static constexpr bool global() { return Global; }
     FC_t fc;
-    T4_t &t4_field;
-    T2_t &t2_field;
-    Sc_t &sc_field;
-    M2_t &m2_field;
-    Dyn_t &dyn_field;
+    T4_t & t4_field;
+    T2_t & t2_field;
+    Sc_t & sc_field;
+    M2_t & m2_field;
+    Dyn_t & dyn_field;
   };
 
   using mult_collections = boost::mpl::list<
@@ -115,11 +116,12 @@ namespace muSpectre {
     using Parent = FC_multi_fixture<DimS, DimM, Global>;
     FC_iterator_fixture() : Parent() { this->fill(); }
 
-    template <bool isGlobal = Global> std::enable_if_t<isGlobal> fill() {
+    template <bool isGlobal = Global>
+    std::enable_if_t<isGlobal> fill() {
       static_assert(Global == isGlobal, "You're breaking my SFINAE plan");
       Ccoord_t<Parent::sdim()> size;
       Ccoord_t<Parent::sdim()> loc{};
-      for (auto &&s : size) {
+      for (auto && s : size) {
         s = cube_size();
       }
       this->fc.initialise(size, loc);
@@ -132,7 +134,7 @@ namespace muSpectre {
       this->fc.add_pixel({0, 0});
       for (int i = 0 * dummy; i < sele_size(); ++i) {
         Ccoord_t<Parent::sdim()> pixel;
-        for (auto &&s : pixel) {
+        for (auto && s : pixel) {
           s = rng.randval(0, 7);
         }
         this->fc.add_pixel(pixel);

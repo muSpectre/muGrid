@@ -53,24 +53,24 @@ namespace muSpectre {
         Eigen::Map<Eigen::Matrix<Real, F::Parent::mdim(), F::Parent::mdim()>>>
         raw_map{Mmap.get_field().eigenvec()};
 
-    for (auto &&mat : Mmap) {
+    for (auto && mat : Mmap) {
       mat.setRandom();
     }
 
     for (auto tup : akantu::zip(Mmap, raw_map)) {
-      auto &mat_A = std::get<0>(tup);
-      auto &mat_B = std::get<1>(tup);
+      auto & mat_A = std::get<0>(tup);
+      auto & mat_B = std::get<1>(tup);
 
       BOOST_CHECK_EQUAL((mat_A - mat_B).norm(), 0.);
     }
 
     Mmap.get_field().eigenvec().setZero();
 
-    for (auto &&mat : raw_map) {
+    for (auto && mat : raw_map) {
       mat.setIdentity();
     }
 
-    for (auto &&mat : Mmap) {
+    for (auto && mat : Mmap) {
       BOOST_CHECK_EQUAL((mat - mat.Identity()).norm(), 0.);
     }
   }

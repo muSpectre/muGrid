@@ -41,7 +41,7 @@ namespace muSpectre {
   FFTWEngine<Dim>::FFTWEngine(Ccoord resolutions, Dim_t nb_components,
                               Communicator comm)
       : Parent{resolutions, nb_components, comm} {
-    for (auto &&pixel : CcoordOps::Pixels<Dim>(this->fourier_resolutions)) {
+    for (auto && pixel : CcoordOps::Pixels<Dim>(this->fourier_resolutions)) {
       this->work_space_container.add_pixel(pixel);
     }
   }
@@ -54,23 +54,23 @@ namespace muSpectre {
     }
     Parent::initialise(plan_flags);
 
-    const int &rank = Dim;
+    const int & rank = Dim;
     std::array<int, Dim> narr;
-    const int *const n = &narr[0];
+    const int * const n = &narr[0];
     std::copy(this->subdomain_resolutions.begin(),
               this->subdomain_resolutions.end(), narr.begin());
     int howmany = this->nb_components;
     // temporary buffer for plan
     size_t alloc_size =
         (CcoordOps::get_size(this->subdomain_resolutions) * howmany);
-    Real *r_work_space = fftw_alloc_real(alloc_size);
-    Real *in = r_work_space;
-    const int *const inembed =
+    Real * r_work_space = fftw_alloc_real(alloc_size);
+    Real * in = r_work_space;
+    const int * const inembed =
         nullptr;  // nembed are tricky: they refer to physical layout
     int istride = howmany;
     int idist = 1;
-    fftw_complex *out = reinterpret_cast<fftw_complex *>(this->work.data());
-    const int *const onembed = nullptr;
+    fftw_complex * out = reinterpret_cast<fftw_complex *>(this->work.data());
+    const int * const onembed = nullptr;
     int ostride = howmany;
     int odist = idist;
 
@@ -100,8 +100,8 @@ namespace muSpectre {
       throw std::runtime_error("Plan failed");
     }
 
-    fftw_complex *i_in = reinterpret_cast<fftw_complex *>(this->work.data());
-    Real *i_out = r_work_space;
+    fftw_complex * i_in = reinterpret_cast<fftw_complex *>(this->work.data());
+    Real * i_out = r_work_space;
 
     this->plan_ifft =
         fftw_plan_many_dft_c2r(rank, n, howmany, i_in, inembed, istride, idist,
@@ -115,7 +115,8 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim> FFTWEngine<Dim>::~FFTWEngine<Dim>() noexcept {
+  template <Dim_t Dim>
+  FFTWEngine<Dim>::~FFTWEngine<Dim>() noexcept {
     fftw_destroy_plan(this->plan_fft);
     fftw_destroy_plan(this->plan_ifft);
     // TODO(Till): We cannot run fftw_cleanup since subsequent FFTW calls will
@@ -125,7 +126,8 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t Dim>
-  typename FFTWEngine<Dim>::Workspace_t &FFTWEngine<Dim>::fft(Field_t &field) {
+  typename FFTWEngine<Dim>::Workspace_t &
+  FFTWEngine<Dim>::fft(Field_t & field) {
     if (this->plan_fft == nullptr) {
       throw std::runtime_error("fft plan not initialised");
     }
@@ -138,7 +140,8 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim> void FFTWEngine<Dim>::ifft(Field_t &field) const {
+  template <Dim_t Dim>
+  void FFTWEngine<Dim>::ifft(Field_t & field) const {
     if (this->plan_ifft == nullptr) {
       throw std::runtime_error("ifft plan not initialised");
     }

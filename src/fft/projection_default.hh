@@ -76,22 +76,22 @@ namespace muSpectre {
     ProjectionDefault(FFTEngine_ptr engine, Rcoord lengths, Formulation form);
 
     //! Copy constructor
-    ProjectionDefault(const ProjectionDefault &other) = delete;
+    ProjectionDefault(const ProjectionDefault & other) = delete;
 
     //! Move constructor
-    ProjectionDefault(ProjectionDefault &&other) = default;
+    ProjectionDefault(ProjectionDefault && other) = default;
 
     //! Destructor
     virtual ~ProjectionDefault() = default;
 
     //! Copy assignment operator
-    ProjectionDefault &operator=(const ProjectionDefault &other) = delete;
+    ProjectionDefault & operator=(const ProjectionDefault & other) = delete;
 
     //! Move assignment operator
-    ProjectionDefault &operator=(ProjectionDefault &&other) = delete;
+    ProjectionDefault & operator=(ProjectionDefault && other) = delete;
 
     //! apply the projection operator to a field
-    void apply_projection(Field_t &field) final;
+    void apply_projection(Field_t & field) final;
 
     Eigen::Map<Eigen::ArrayXXd> get_operator() final;
 
@@ -106,8 +106,8 @@ namespace muSpectre {
     constexpr static Dim_t NbComponents() { return ipow(DimM, 2); }
 
    protected:
-    Proj_t &Gfield;  //!< field holding the operator
-    Proj_map Ghat;   //!< iterable version of operator
+    Proj_t & Gfield;  //!< field holding the operator
+    Proj_map Ghat;    //!< iterable version of operator
 
    private:
   };

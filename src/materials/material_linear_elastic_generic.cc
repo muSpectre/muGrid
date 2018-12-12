@@ -40,7 +40,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   MaterialLinearElasticGeneric<DimS, DimM>::MaterialLinearElasticGeneric(
-      const std::string &name, const CInput_t &C_voigt)
+      const std::string & name, const CInput_t & C_voigt)
       : Parent{name} {
     using VC_t = VoigtConversion<DimM>;
     constexpr Dim_t VSize{vsize(DimM)};

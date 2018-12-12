@@ -47,10 +47,10 @@ namespace muSpectre {
   class FieldCollectionError : public std::runtime_error {
    public:
     //! constructor
-    explicit FieldCollectionError(const std::string &what)
+    explicit FieldCollectionError(const std::string & what)
         : std::runtime_error(what) {}
     //! constructor
-     explicit FieldCollectionError(const char *what)
+    explicit FieldCollectionError(const char * what)
         : std::runtime_error(what) {}
   };
 
@@ -60,9 +60,9 @@ namespace muSpectre {
 
    public:
     //! constructor
-     explicit FieldError(const std::string &what) : Parent(what) {}
+    explicit FieldError(const std::string & what) : Parent(what) {}
     //! constructor
-     explicit FieldError(const char *what) : Parent(what) {}
+    explicit FieldError(const char * what) : Parent(what) {}
   };
 
   /**
@@ -72,10 +72,10 @@ namespace muSpectre {
   class FieldInterpretationError : public FieldError {
    public:
     //! constructor
-     explicit FieldInterpretationError(const std::string &what)
+    explicit FieldInterpretationError(const std::string & what)
         : FieldError(what) {}
     //! constructor
-     explicit FieldInterpretationError(const char *what) : FieldError(what) {}
+    explicit FieldInterpretationError(const char * what) : FieldError(what) {}
   };
 
   namespace internal {
@@ -98,46 +98,47 @@ namespace muSpectre {
      * onto for instance Eigen maps and iterating over those is
      * handled by the `FieldMap`.
      */
-    template <class FieldCollection> class FieldBase {
+    template <class FieldCollection>
+    class FieldBase {
      protected:
       //! constructor
       //! unique name (whithin Collection)
       //! number of components
       //! collection to which this field belongs (eg, material, cell)
       FieldBase(std::string unique_name, size_t nb_components,
-                FieldCollection &collection);
+                FieldCollection & collection);
 
      public:
       using collection_t = FieldCollection;  //!< for type checks
 
       //! Copy constructor
-      FieldBase(const FieldBase &other) = delete;
+      FieldBase(const FieldBase & other) = delete;
 
       //! Move constructor
-      FieldBase(FieldBase &&other) = delete;
+      FieldBase(FieldBase && other) = delete;
 
       //! Destructor
       virtual ~FieldBase() = default;
 
       //! Copy assignment operator
-      FieldBase &operator=(const FieldBase &other) = delete;
+      FieldBase & operator=(const FieldBase & other) = delete;
 
       //! Move assignment operator
-      FieldBase &operator=(FieldBase &&other) = delete;
+      FieldBase & operator=(FieldBase && other) = delete;
 
       /* ----------------------------------------------------------------------
        */
       //! Identifying accessors
       //! return field name
-      inline const std::string &get_name() const;
+      inline const std::string & get_name() const;
       //! return field type
       // inline const Field_t & get_type() const;
       //! return my collection (for iterating)
-      inline const FieldCollection &get_collection() const;
+      inline const FieldCollection & get_collection() const;
       //! return number of components (e.g., dimensions) of this field
-      inline const size_t &get_nb_components() const;
+      inline const size_t & get_nb_components() const;
       //! return type_id of stored type
-      virtual const std::type_info &get_stored_typeid() const = 0;
+      virtual const std::type_info & get_stored_typeid() const = 0;
 
       //! number of pixels in the field
       virtual size_t size() const = 0;
@@ -167,7 +168,7 @@ namespace muSpectre {
       const std::string name;      //!< the field's unique name
       const size_t nb_components;  //!< number of components per entry
       //! reference to the collection this field belongs to
-      FieldCollection &collection;
+      FieldCollection & collection;
       size_t pad_size;  //!< size of padding region at end of buffer
 
      private:
@@ -179,13 +180,13 @@ namespace muSpectre {
     template <class FieldCollection>
     FieldBase<FieldCollection>::FieldBase(std::string unique_name,
                                           size_t nb_components_,
-                                          FieldCollection &collection_)
+                                          FieldCollection & collection_)
         : name(unique_name), nb_components(nb_components_),
           collection(collection_), pad_size{0} {}
 
     /* ---------------------------------------------------------------------- */
     template <class FieldCollection>
-    inline const std::string &FieldBase<FieldCollection>::get_name() const {
+    inline const std::string & FieldBase<FieldCollection>::get_name() const {
       return this->name;
     }
 
@@ -198,7 +199,8 @@ namespace muSpectre {
 
     /* ---------------------------------------------------------------------- */
     template <class FieldCollection>
-    inline const size_t &FieldBase<FieldCollection>::get_nb_components() const {
+    inline const size_t &
+    FieldBase<FieldCollection>::get_nb_components() const {
       return this->nb_components;
     }
 

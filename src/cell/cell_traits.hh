@@ -49,13 +49,11 @@ namespace muSpectre {
 namespace Eigen {
   namespace internal {
     using Dim_t = muSpectre::Dim_t;  //!< universal index type
-    using Real =  muSpectre::Real;   //!< universal real value type
-    template<class Cell>
-    struct traits<muSpectre::CellAdaptor<Cell>> :
-      public Eigen::internal::traits<Eigen::SparseMatrix<Real> >
-    {};
+    using Real = muSpectre::Real;    //!< universal real value type
+    template <class Cell>
+    struct traits<muSpectre::CellAdaptor<Cell>>
+        : public Eigen::internal::traits<Eigen::SparseMatrix<Real>> {};
   }  // namespace internal
 }  // namespace Eigen
-
 
 #endif  // SRC_CELL_CELL_TRAITS_HH_

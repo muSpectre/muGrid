@@ -57,7 +57,7 @@ set(CPPLINT_PROJECT_ROOT ${PROJECT_SOURCE_DIR} CACHE STRING "Project ROOT direct
 
 
 # find cpplint.py script
-find_file(CPPLINT name cpplint HINTS $ENV{HOME}.local/bin)
+find_file(CPPLINT name "cpplint.py" PATHS ${PROJECT_SOURCE_DIR}/external)
 if(CPPLINT)
     message(STATUS "cpplint parser: ${CPPLINT}")
 else()
@@ -89,13 +89,13 @@ function(cpplint_add_subdirectory DIR FLAGS)
 
     # perform cpplint check
     add_custom_target(${TARGET_NAME}
-        COMMAND ${CPPLINT} "--extensions=${EXTENSIONS}"
-                           "--root=${CPPLINT_PROJECT_ROOT}"
-                           "${FLAGS}"
-                           ${LIST_OF_FILES}
-        DEPENDS ${LIST_OF_FILES}
-        COMMENT "cpplint: Checking source code style"
-    )
+      COMMAND ${CPPLINT} "--extensions=${EXTENSIONS}"
+      "--root=${CPPLINT_PROJECT_ROOT}"
+      "${FLAGS}"
+      ${LIST_OF_FILES}
+      DEPENDS ${LIST_OF_FILES}
+      COMMENT "cpplint: Checking source code style"
+      )
 
     # run this target when root cpplint.py test is triggered
     add_dependencies(${CPPLINT_TARGET} ${TARGET_NAME})

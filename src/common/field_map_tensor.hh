@@ -105,25 +105,25 @@ namespace muSpectre {
     TensorFieldMap() = delete;
 
     //! constructor
-    explicit TensorFieldMap(Field_c &field);
+    explicit TensorFieldMap(Field_c & field);
 
     //! Copy constructor
-    TensorFieldMap(const TensorFieldMap &other) = delete;
+    TensorFieldMap(const TensorFieldMap & other) = delete;
 
     //! Move constructor
-    TensorFieldMap(TensorFieldMap &&other) = default;
+    TensorFieldMap(TensorFieldMap && other) = default;
 
     //! Destructor
     virtual ~TensorFieldMap() = default;
 
     //! Copy assignment operator
-    TensorFieldMap &operator=(const TensorFieldMap &other) = delete;
+    TensorFieldMap & operator=(const TensorFieldMap & other) = delete;
 
     //! Assign a matrixlike value to every entry
-    inline TensorFieldMap &operator=(const T_t &val);
+    inline TensorFieldMap & operator=(const T_t & val);
 
     //! Move assignment operator
-    TensorFieldMap &operator=(TensorFieldMap &&other) = delete;
+    TensorFieldMap & operator=(TensorFieldMap && other) = delete;
 
     //! give human-readable field map type
     inline std::string info_string() const final;
@@ -131,12 +131,12 @@ namespace muSpectre {
     //! member access
     inline reference operator[](size_type index);
     //! member access
-    inline reference operator[](const Ccoord &ccoord);
+    inline reference operator[](const Ccoord & ccoord);
 
     //! member access
     inline const_reference operator[](size_type index) const;
     //! member access
-    inline const_reference operator[](const Ccoord &ccoord) const;
+    inline const_reference operator[](const Ccoord & ccoord) const;
 
     //! return an iterator to first entry of field
     inline iterator begin() { return iterator(*this); }
@@ -176,7 +176,7 @@ namespace muSpectre {
   template <class FieldCollection, typename T, Dim_t order, Dim_t dim,
             bool ConstField>
   TensorFieldMap<FieldCollection, T, order, dim, ConstField>::TensorFieldMap(
-      Field_c &field)
+      Field_c & field)
       : Parent(field) {
     this->check_compatibility();
   }
@@ -201,7 +201,7 @@ namespace muSpectre {
   typename TensorFieldMap<FieldCollection, T, order, dim, ConstField>::reference
       TensorFieldMap<FieldCollection, T, order, dim, ConstField>::
       operator[](size_type index) {
-    auto &&lambda = [this, &index](auto &&... tens_sizes) {
+    auto && lambda = [this, &index](auto &&... tens_sizes) {
       return reference(this->get_ptr_to_entry(index), tens_sizes...);
     };
     return call_sizes<order, dim>(lambda);
@@ -211,9 +211,9 @@ namespace muSpectre {
             bool ConstField>
   typename TensorFieldMap<FieldCollection, T, order, dim, ConstField>::reference
       TensorFieldMap<FieldCollection, T, order, dim, ConstField>::
-      operator[](const Ccoord &ccoord) {
-    auto &&index = this->collection.get_index(ccoord);
-    auto &&lambda = [this, &index](auto &&... sizes) {
+      operator[](const Ccoord & ccoord) {
+    auto && index = this->collection.get_index(ccoord);
+    auto && lambda = [this, &index](auto &&... sizes) {
       return reference(this->get_ptr_to_entry(index), sizes...);
     };
     return call_sizes<order, dim>(lambda);
@@ -228,7 +228,7 @@ namespace muSpectre {
     // Warning: due to a inconsistency in Eigen's API, tensor maps
     // cannot be constructed from a const ptr, hence this nasty const
     // cast :(
-    auto &&lambda = [this, &index](auto &&... tens_sizes) {
+    auto && lambda = [this, &index](auto &&... tens_sizes) {
       return const_reference(const_cast<T *>(this->get_ptr_to_entry(index)),
                              tens_sizes...);
     };
@@ -240,9 +240,9 @@ namespace muSpectre {
   typename TensorFieldMap<FieldCollection, T, order, dim,
                           ConstField>::const_reference
       TensorFieldMap<FieldCollection, T, order, dim, ConstField>::
-      operator[](const Ccoord &ccoord) const {
-    auto &&index = this->collection.get_index(ccoord);
-    auto &&lambda = [this, &index](auto &&... sizes) {
+      operator[](const Ccoord & ccoord) const {
+    auto && index = this->collection.get_index(ccoord);
+    auto && lambda = [this, &index](auto &&... sizes) {
       return const_reference(const_cast<T *>(this->get_ptr_to_entry(index)),
                              sizes...);
     };
@@ -254,8 +254,8 @@ namespace muSpectre {
             bool ConstField>
   TensorFieldMap<FieldCollection, T, order, dim, ConstField> &
   TensorFieldMap<FieldCollection, T, order, dim, ConstField>::
-  operator=(const T_t &val) {
-    for (auto &&tens : *this) {
+  operator=(const T_t & val) {
+    for (auto && tens : *this) {
       tens = val;
     }
     return *this;
@@ -267,7 +267,7 @@ namespace muSpectre {
   typename TensorFieldMap<FieldCollection, T, order, dim, ConstField>::T_t
   TensorFieldMap<FieldCollection, T, order, dim, ConstField>::mean() const {
     T_t mean{T_t::Zero()};
-    for (auto &&val : *this) {
+    for (auto && val : *this) {
       mean += val;
     }
     mean *= 1. / Real(this->size());
@@ -281,7 +281,7 @@ namespace muSpectre {
   typename TensorFieldMap<FieldCollection, T, order, dim, ConstField>::pointer
   TensorFieldMap<FieldCollection, T, order, dim, ConstField>::ptr_to_val_t(
       size_type index) {
-    auto &&lambda = [this, &index](auto &&... tens_sizes) {
+    auto && lambda = [this, &index](auto &&... tens_sizes) {
       return std::make_unique<value_type>(this->get_ptr_to_entry(index),
                                           tens_sizes...);
     };

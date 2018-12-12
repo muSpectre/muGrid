@@ -87,35 +87,35 @@ namespace muSpectre {
     ScalarFieldMap() = delete;
 
     //! constructor
-    explicit ScalarFieldMap(Field_c &field);
+    explicit ScalarFieldMap(Field_c & field);
 
     //! Copy constructor
-    ScalarFieldMap(const ScalarFieldMap &other) = default;
+    ScalarFieldMap(const ScalarFieldMap & other) = default;
 
     //! Move constructor
-    ScalarFieldMap(ScalarFieldMap &&other) = default;
+    ScalarFieldMap(ScalarFieldMap && other) = default;
 
     //! Destructor
     virtual ~ScalarFieldMap() = default;
 
     //! Copy assignment operator
-    ScalarFieldMap &operator=(const ScalarFieldMap &other) = delete;
+    ScalarFieldMap & operator=(const ScalarFieldMap & other) = delete;
 
     //! Move assignment operator
-    ScalarFieldMap &operator=(ScalarFieldMap &&other) = delete;
+    ScalarFieldMap & operator=(ScalarFieldMap && other) = delete;
 
     //! Assign a value to every entry
-    ScalarFieldMap &operator=(T val);
+    ScalarFieldMap & operator=(T val);
 
     //! give human-readable field map type
     inline std::string info_string() const final;
 
     //! member access
     inline reference operator[](size_type index);
-    inline reference operator[](const Ccoord &ccoord);
+    inline reference operator[](const Ccoord & ccoord);
 
     inline const_reference operator[](size_type index) const;
-    inline const_reference operator[](const Ccoord &ccoord) const;
+    inline const_reference operator[](const Ccoord & ccoord) const;
 
     //! return an iterator to the first pixel of the field
     iterator begin() { return iterator(*this); }
@@ -156,7 +156,8 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <class FieldCollection, typename T, bool ConstField>
-  ScalarFieldMap<FieldCollection, T, ConstField>::ScalarFieldMap(Field_c &field)
+  ScalarFieldMap<FieldCollection, T, ConstField>::ScalarFieldMap(
+      Field_c & field)
       : Parent(field) {
     this->check_compatibility();
   }
@@ -190,8 +191,8 @@ namespace muSpectre {
   template <class FieldCollection, typename T, bool ConstField>
   typename ScalarFieldMap<FieldCollection, T, ConstField>::reference
       ScalarFieldMap<FieldCollection, T, ConstField>::
-      operator[](const Ccoord &ccoord) {
-    auto &&index = this->collection.get_index(std::move(ccoord));
+      operator[](const Ccoord & ccoord) {
+    auto && index = this->collection.get_index(std::move(ccoord));
     return this->get_ptr_to_entry(std::move(index))[0];
   }
 
@@ -209,8 +210,8 @@ namespace muSpectre {
   template <class FieldCollection, typename T, bool ConstField>
   typename ScalarFieldMap<FieldCollection, T, ConstField>::const_reference
       ScalarFieldMap<FieldCollection, T, ConstField>::
-      operator[](const Ccoord &ccoord) const {
-    auto &&index = this->collection.get_index(std::move(ccoord));
+      operator[](const Ccoord & ccoord) const {
+    auto && index = this->collection.get_index(std::move(ccoord));
     return this->get_ptr_to_entry(std::move(index))[0];
   }
 
@@ -219,7 +220,7 @@ namespace muSpectre {
   template <class FieldCollection, typename T, bool ConstField>
   ScalarFieldMap<FieldCollection, T, ConstField> &
   ScalarFieldMap<FieldCollection, T, ConstField>::operator=(T val) {
-    for (auto &scalar : *this) {
+    for (auto & scalar : *this) {
       scalar = val;
     }
     return *this;
@@ -229,7 +230,7 @@ namespace muSpectre {
   template <class FieldCollection, typename T, bool ConstField>
   T ScalarFieldMap<FieldCollection, T, ConstField>::mean() const {
     T mean{0};
-    for (auto &&val : *this) {
+    for (auto && val : *this) {
       mean += val;
     }
     mean /= Real(this->size());

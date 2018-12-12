@@ -76,43 +76,42 @@ namespace muSpectre {
     DeprecatedSolverCG() = delete;
 
     //! Constructor with domain resolutions, etc,
-    DeprecatedSolverCG(Cell_t &cell, Real tol, Uint maxiter = 0,
+    DeprecatedSolverCG(Cell_t & cell, Real tol, Uint maxiter = 0,
                        bool verbose = false);
 
     //! Copy constructor
-    DeprecatedSolverCG(const DeprecatedSolverCG &other) = delete;
+    DeprecatedSolverCG(const DeprecatedSolverCG & other) = delete;
 
     //! Move constructor
-    DeprecatedSolverCG(DeprecatedSolverCG &&other) = default;
+    DeprecatedSolverCG(DeprecatedSolverCG && other) = default;
 
     //! Destructor
     virtual ~DeprecatedSolverCG() = default;
 
     //! Copy assignment operator
-    DeprecatedSolverCG &operator=(const DeprecatedSolverCG &other) = delete;
+    DeprecatedSolverCG & operator=(const DeprecatedSolverCG & other) = delete;
 
     //! Move assignment operator
-    DeprecatedSolverCG &operator=(DeprecatedSolverCG &&other) = default;
+    DeprecatedSolverCG & operator=(DeprecatedSolverCG && other) = default;
 
     bool has_converged() const final { return this->converged; }
 
     //! actual solver
-    void solve(const Field_t &rhs, Field_t &x);
+    void solve(const Field_t & rhs, Field_t & x);
 
     // this simplistic implementation has no initialisation phase so the default
     // is ok
 
-    SolvVectorOut solve(const SolvVectorInC rhs,
-                        SolvVectorIn x_0) final;
+    SolvVectorOut solve(const SolvVectorInC rhs, SolvVectorIn x_0) final;
 
     std::string name() const final { return "CG"; }
 
    protected:
     //! returns `muSpectre::Tg_req_t::NeedEffect`
     Tg_req_t get_tangent_req() const final;
-    Field_t &r_k;           //!< residual
-    Field_t &p_k;           //!< search direction
-    Field_t &Ap_k;          //!< effect of tangent on search direction
+    Field_t & r_k;          //!< residual
+    Field_t & p_k;          //!< search direction
+    Field_t & Ap_k;         //!< effect of tangent on search direction
     bool converged{false};  //!< whether the solver has converged
 
    private:

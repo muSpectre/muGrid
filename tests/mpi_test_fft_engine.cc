@@ -72,7 +72,8 @@ namespace muSpectre {
     Engine engine;
   };
 
-  template <typename Engine> struct FFTW_fixture_python_segfault {
+  template <typename Engine>
+  struct FFTW_fixture_python_segfault {
     constexpr static Dim_t serial_engine{false};
     constexpr static Dim_t dim{twoD};
     constexpr static Dim_t sdim{twoD};
@@ -100,7 +101,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(Constructor_test, Fix, fixlist, Fix) {
-    Communicator &comm = MPIContext::get_context().comm;
+    Communicator & comm = MPIContext::get_context().comm;
     if (Fix::serial_engine && comm.size() > 1) {
       return;
     } else {
@@ -121,11 +122,11 @@ namespace muSpectre {
     constexpr Dim_t order{2};
     using FC_t = GlobalFieldCollection<Fix::sdim>;
     FC_t fc;
-    auto &input{
+    auto & input{
         make_field<TensorField<FC_t, Real, order, Fix::sdim>>("input", fc)};
-    auto &ref{
+    auto & ref{
         make_field<TensorField<FC_t, Real, order, Fix::sdim>>("reference", fc)};
-    auto &result{
+    auto & result{
         make_field<TensorField<FC_t, Real, order, Fix::sdim>>("result", fc)};
 
     fc.initialise(Fix::engine.get_subdomain_resolutions(),
@@ -138,12 +139,12 @@ namespace muSpectre {
     size_t cntr{0};
     for (auto tup : akantu::zip(inmap, refmap)) {
       cntr++;
-      auto &in_{std::get<0>(tup)};
-      auto &ref_{std::get<1>(tup)};
+      auto & in_{std::get<0>(tup)};
+      auto & ref_{std::get<1>(tup)};
       in_.setRandom();
       ref_ = in_;
     }
-    auto &complex_field = Fix::engine.fft(input);
+    auto & complex_field = Fix::engine.fft(input);
     using cmap_t = MatrixFieldMap<LocalFieldCollection<Fix::sdim>, Complex,
                                   Fix::sdim, Fix::sdim>;
     cmap_t complex_map(complex_field);
@@ -156,14 +157,14 @@ namespace muSpectre {
 
     /* make sure, the engine has not modified input (which is
        unfortunately const-casted internally, hence this test) */
-    for (auto &&tup : akantu::zip(inmap, refmap)) {
+    for (auto && tup : akantu::zip(inmap, refmap)) {
       Real error{(std::get<0>(tup) - std::get<1>(tup)).norm()};
       BOOST_CHECK_LT(error, tol);
     }
 
     /* make sure that the ifft of fft returns the original*/
     Fix::engine.ifft(result);
-    for (auto &&tup : akantu::zip(resultmap, refmap)) {
+    for (auto && tup : akantu::zip(resultmap, refmap)) {
       Real error{
           (std::get<0>(tup) * Fix::engine.normalisation() - std::get<1>(tup))
               .norm()};

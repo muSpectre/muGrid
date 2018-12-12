@@ -43,7 +43,7 @@
 namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE(tensor_algebra)
-  auto TerrNorm = [](auto &&t) {
+  auto TerrNorm = [](auto && t) {
     return Eigen::Tensor<Real, 0>(t.abs().sum())();
   };
 
@@ -123,7 +123,7 @@ namespace muSpectre {
     C = Amap;
     D = Bmap;
 
-    auto error = [](const T4 &A, const M4 &B) {
+    auto error = [](const T4 & A, const M4 & B) {
       return (B - Map4(A.data())).norm();
     };
 
@@ -208,9 +208,9 @@ namespace muSpectre {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_tensmult, Fix, testGoodies::dimlist,
                                    Fix) {
-    using Matrices::tensmult;
-    using Matrices::Tens4_t;
     using Matrices::Tens2_t;
+    using Matrices::Tens4_t;
+    using Matrices::tensmult;
 
     constexpr Dim_t dim{Fix::dim};
     using T4 = Tens4_t<dim>;
@@ -229,9 +229,9 @@ namespace muSpectre {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_tracer, Fix, testGoodies::dimlist,
                                    Fix) {
-    using Matrices::tensmult;
-    using Matrices::Tens4_t;
     using Matrices::Tens2_t;
+    using Matrices::Tens4_t;
+    using Matrices::tensmult;
 
     constexpr Dim_t dim{Fix::dim};
     using T2 = Tens2_t<dim>;
@@ -245,9 +245,9 @@ namespace muSpectre {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_identity, Fix, testGoodies::dimlist,
                                    Fix) {
-    using Matrices::tensmult;
-    using Matrices::Tens4_t;
     using Matrices::Tens2_t;
+    using Matrices::Tens4_t;
+    using Matrices::tensmult;
 
     constexpr Dim_t dim{Fix::dim};
     using T2 = Tens2_t<dim>;
@@ -261,9 +261,9 @@ namespace muSpectre {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_transposer, Fix, testGoodies::dimlist,
                                    Fix) {
-    using Matrices::tensmult;
-    using Matrices::Tens4_t;
     using Matrices::Tens2_t;
+    using Matrices::Tens4_t;
+    using Matrices::tensmult;
 
     constexpr Dim_t dim{Fix::dim};
     using T2 = Tens2_t<dim>;
@@ -277,9 +277,9 @@ namespace muSpectre {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_symmetriser, Fix, testGoodies::dimlist,
                                    Fix) {
-    using Matrices::tensmult;
-    using Matrices::Tens4_t;
     using Matrices::Tens2_t;
+    using Matrices::Tens4_t;
+    using Matrices::tensmult;
 
     constexpr Dim_t dim{Fix::dim};
     using T2 = Tens2_t<dim>;

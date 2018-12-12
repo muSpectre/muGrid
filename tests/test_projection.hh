@@ -45,8 +45,10 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS> struct Sizes {};
-  template <> struct Sizes<twoD> {
+  template <Dim_t DimS>
+  struct Sizes {};
+  template <>
+  struct Sizes<twoD> {
     constexpr static Ccoord_t<twoD> get_resolution() {
       return Ccoord_t<twoD>{3, 5};
     }
@@ -54,7 +56,8 @@ namespace muSpectre {
       return Rcoord_t<twoD>{3.4, 5.8};
     }
   };
-  template <> struct Sizes<threeD> {
+  template <>
+  struct Sizes<threeD> {
     constexpr static Ccoord_t<threeD> get_resolution() {
       return Ccoord_t<threeD>{3, 5, 7};
     }
@@ -62,8 +65,10 @@ namespace muSpectre {
       return Rcoord_t<threeD>{3.4, 5.8, 6.7};
     }
   };
-  template <Dim_t DimS> struct Squares {};
-  template <> struct Squares<twoD> {
+  template <Dim_t DimS>
+  struct Squares {};
+  template <>
+  struct Squares<twoD> {
     constexpr static Ccoord_t<twoD> get_resolution() {
       return Ccoord_t<twoD>{5, 5};
     }
@@ -71,7 +76,8 @@ namespace muSpectre {
       return Rcoord_t<twoD>{5, 5};
     }
   };
-  template <> struct Squares<threeD> {
+  template <>
+  struct Squares<threeD> {
     constexpr static Ccoord_t<threeD> get_resolution() {
       return Ccoord_t<threeD>{7, 7, 7};
     }
@@ -95,6 +101,5 @@ namespace muSpectre {
   };
 
 }  // namespace muSpectre
-
 
 #endif  // TESTS_TEST_PROJECTION_HH_

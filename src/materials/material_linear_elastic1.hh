@@ -42,7 +42,8 @@
 #include "materials/materials_toolbox.hh"
 
 namespace muSpectre {
-  template <Dim_t DimS, Dim_t DimM> class MaterialLinearElastic1;
+  template <Dim_t DimS, Dim_t DimM>
+  class MaterialLinearElastic1;
 
   /**
    * traits for objective linear elasticity
@@ -110,41 +111,44 @@ namespace muSpectre {
     MaterialLinearElastic1() = delete;
 
     //! Copy constructor
-    MaterialLinearElastic1(const MaterialLinearElastic1 &other) = delete;
+    MaterialLinearElastic1(const MaterialLinearElastic1 & other) = delete;
 
     //! Construct by name, Young's modulus and Poisson's ratio
     MaterialLinearElastic1(std::string name, Real young, Real poisson);
 
     //! Move constructor
-    MaterialLinearElastic1(MaterialLinearElastic1 &&other) = delete;
+    MaterialLinearElastic1(MaterialLinearElastic1 && other) = delete;
 
     //! Destructor
     virtual ~MaterialLinearElastic1() = default;
 
     //! Copy assignment operator
     MaterialLinearElastic1 &
-    operator=(const MaterialLinearElastic1 &other) = delete;
+    operator=(const MaterialLinearElastic1 & other) = delete;
 
     //! Move assignment operator
-    MaterialLinearElastic1 &operator=(MaterialLinearElastic1 &&other) = delete;
+    MaterialLinearElastic1 &
+    operator=(MaterialLinearElastic1 && other) = delete;
 
     /**
      * evaluates second Piola-Kirchhoff stress given the Green-Lagrange
      * strain (or Cauchy stress if called with a small strain tensor)
      */
-    template <class s_t> inline decltype(auto) evaluate_stress(s_t &&E);
+    template <class s_t>
+    inline decltype(auto) evaluate_stress(s_t && E);
 
     /**
      * evaluates both second Piola-Kirchhoff stress and stiffness given
      * the Green-Lagrange strain (or Cauchy stress and stiffness if
      * called with a small strain tensor)
      */
-    template <class s_t> inline decltype(auto) evaluate_stress_tangent(s_t &&E);
+    template <class s_t>
+    inline decltype(auto) evaluate_stress_tangent(s_t && E);
 
     /**
      * return the empty internals tuple
      */
-    InternalVariables &get_internals() { return this->internal_variables; }
+    InternalVariables & get_internals() { return this->internal_variables; }
 
    protected:
     const Real young;     //!< Young's modulus
@@ -161,7 +165,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   template <class s_t>
-  auto MaterialLinearElastic1<DimS, DimM>::evaluate_stress(s_t &&E)
+  auto MaterialLinearElastic1<DimS, DimM>::evaluate_stress(s_t && E)
       -> decltype(auto) {
     return Hooke::evaluate_stress(this->lambda, this->mu, std::move(E));
   }
@@ -169,7 +173,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   template <class s_t>
-  auto MaterialLinearElastic1<DimS, DimM>::evaluate_stress_tangent(s_t &&E)
+  auto MaterialLinearElastic1<DimS, DimM>::evaluate_stress_tangent(s_t && E)
       -> decltype(auto) {
     using Tangent_t = typename traits::TangentMap_t::reference;
 

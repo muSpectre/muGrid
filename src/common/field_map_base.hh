@@ -56,13 +56,15 @@ namespace muSpectre {
     class TypedSizedFieldBase;
 
     //! little helper to automate creation of const maps without duplication
-    template <class T, bool isConst> struct const_corrector {
+    template <class T, bool isConst>
+    struct const_corrector {
       //! non-const type
       using type = typename T::reference;
     };
 
     //! specialisation for constant case
-    template <class T> struct const_corrector<T, true> {
+    template <class T>
+    struct const_corrector<T, true> {
       //! const type
       using type = typename T::const_reference;
     };
@@ -118,35 +120,35 @@ namespace muSpectre {
       FieldMap() = delete;
 
       //! constructor
-      explicit FieldMap(Field_c &field);
+      explicit FieldMap(Field_c & field);
 
       //! constructor with run-time cost (for python and debugging)
       template <class FC, typename T2, Dim_t NbC>
-      explicit FieldMap(TypedSizedFieldBase<FC, T2, NbC> &field);
+      explicit FieldMap(TypedSizedFieldBase<FC, T2, NbC> & field);
 
       //! Copy constructor
-      FieldMap(const FieldMap &other) = default;
+      FieldMap(const FieldMap & other) = default;
 
       //! Move constructor
-      FieldMap(FieldMap &&other) = default;
+      FieldMap(FieldMap && other) = default;
 
       //! Destructor
       virtual ~FieldMap() = default;
 
       //! Copy assignment operator
-      FieldMap &operator=(const FieldMap &other) = delete;
+      FieldMap & operator=(const FieldMap & other) = delete;
 
       //! Move assignment operator
-      FieldMap &operator=(FieldMap &&other) = delete;
+      FieldMap & operator=(FieldMap && other) = delete;
 
       //! give human-readable field map type
       virtual std::string info_string() const = 0;
 
       //! return field name
-      inline const std::string &get_name() const;
+      inline const std::string & get_name() const;
 
       //! return my collection (for iterating)
-      inline const FieldCollection &get_collection() const;
+      inline const FieldCollection & get_collection() const;
 
       //! member access needs to be implemented by inheriting classes
       // inline value_type operator[](size_t index);
@@ -160,7 +162,8 @@ namespace muSpectre {
       inline size_t size() const;
 
       //! compile-time compatibility check
-      template <class TypedField> struct is_compatible;
+      template <class TypedField>
+      struct is_compatible;
 
       /**
        * iterates over all pixels in the `muSpectre::FieldCollection`
@@ -175,17 +178,18 @@ namespace muSpectre {
        * type of iterator, it dereferences to a tuple of the pixel,
        * and the reference type of iterator
        */
-      template <class Iterator> class enumerator;
+      template <class Iterator>
+      class enumerator;
 
-      TypedField_t &get_field() { return this->field; }
+      TypedField_t & get_field() { return this->field; }
 
      protected:
       //! raw pointer to entry (for Eigen Map)
       inline pointer get_ptr_to_entry(size_t index);
       //! raw pointer to entry (for Eigen Map)
-      inline const T *get_ptr_to_entry(size_t index) const;
-      const FieldCollection &collection;  //!< collection holding Field
-      TypedField_t &field;                //!< mapped Field
+      inline const T * get_ptr_to_entry(size_t index) const;
+      const FieldCollection & collection;  //!< collection holding Field
+      TypedField_t & field;                //!< mapped Field
 
      private:
     };
@@ -233,19 +237,19 @@ namespace muSpectre {
       inline iterator(TypedMap_t & fieldmap, size_t index);
 
       //! Move constructor
-      iterator(iterator &&other) = default;
+      iterator(iterator && other) = default;
 
       //! Destructor
       virtual ~iterator() = default;
 
       //! Copy assignment operator
-      iterator &operator=(const iterator &other) = default;
+      iterator & operator=(const iterator & other) = default;
 
       //! Move assignment operator
-      iterator &operator=(iterator &&other) = default;
+      iterator & operator=(iterator && other) = default;
 
       //! pre-increment
-      inline iterator &operator++();
+      inline iterator & operator++();
       //! post-increment
       inline iterator operator++(int);
       //! dereference
@@ -255,7 +259,7 @@ namespace muSpectre {
       //! member of pointer
       inline pointer operator->();
       //! pre-decrement
-      inline iterator &operator--();
+      inline iterator & operator--();
       //! post-decrement
       inline iterator operator--(int);
       //! access subscripting
@@ -263,31 +267,31 @@ namespace muSpectre {
       //! access subscripting
       inline const_value_type operator[](const difference_type diff) const;
       //! equality
-      inline bool operator==(const iterator &other) const;
+      inline bool operator==(const iterator & other) const;
       //! inequality
-      inline bool operator!=(const iterator &other) const;
+      inline bool operator!=(const iterator & other) const;
       //! div. comparisons
-      inline bool operator<(const iterator &other) const;
+      inline bool operator<(const iterator & other) const;
       //! div. comparisons
-      inline bool operator<=(const iterator &other) const;
+      inline bool operator<=(const iterator & other) const;
       //! div. comparisons
-      inline bool operator>(const iterator &other) const;
+      inline bool operator>(const iterator & other) const;
       //! div. comparisons
-      inline bool operator>=(const iterator &other) const;
+      inline bool operator>=(const iterator & other) const;
       //! additions, subtractions and corresponding assignments
       inline iterator operator+(difference_type diff) const;
       //! additions, subtractions and corresponding assignments
       inline iterator operator-(difference_type diff) const;
       //! additions, subtractions and corresponding assignments
-      inline iterator &operator+=(difference_type diff);
+      inline iterator & operator+=(difference_type diff);
       //! additions, subtractions and corresponding assignments
-      inline iterator &operator-=(difference_type diff);
+      inline iterator & operator-=(difference_type diff);
 
       //! get pixel coordinates
       inline Ccoord get_ccoord() const;
 
       //! ostream operator (mainly for debugging)
-      friend std::ostream &operator<<(std::ostream &os, const iterator &it) {
+      friend std::ostream & operator<<(std::ostream & os, const iterator & it) {
         if (ConstIter) {
           os << "const ";
         }
@@ -298,10 +302,10 @@ namespace muSpectre {
 
      protected:
       //! Copy constructor
-      iterator(const iterator &other) = default;
+      iterator(const iterator & other) = default;
 
-      const FieldCollection &collection;  //!< collection of the field
-      TypedMap_t & fieldmap;                  //!< ref to the field itself
+      const FieldCollection & collection;  //!< collection of the field
+      TypedMap_t & fieldmap;               //!< ref to the field itself
       size_t index;  //!< index of currently pointed-to pixel
 
      private:
@@ -364,32 +368,32 @@ namespace muSpectre {
       iterator() = delete;
 
       //! constructor for begin/end
-      iterator(TypedMap_t & fieldmap, bool begin = true) : it{fieldmap, begin} {
-      }
+      iterator(TypedMap_t & fieldmap, bool begin = true)
+          : it{fieldmap, begin} {}
 
       //! constructor for random access
       iterator(TypedMap_t & fieldmap, size_t index) : it{fieldmap, index} {}
 
       //! constructor from iterator
-      iterator(const SimpleIterator &it) : it{it} {}
+      iterator(const SimpleIterator & it) : it{it} {}
 
       //! Copy constructor
-      iterator(const iterator &other) = default;
+      iterator(const iterator & other) = default;
 
       //! Move constructor
-      iterator(iterator &&other) = default;
+      iterator(iterator && other) = default;
 
       //! Destructor
       virtual ~iterator() = default;
 
       //! Copy assignment operator
-      iterator &operator=(const iterator &other) = default;
+      iterator & operator=(const iterator & other) = default;
 
       //! Move assignment operator
-      iterator &operator=(iterator &&other) = default;
+      iterator & operator=(iterator && other) = default;
 
       //! pre-increment
-      iterator &operator++() {
+      iterator & operator++() {
         ++(this->it);
         return *this;
       }
@@ -410,7 +414,7 @@ namespace muSpectre {
       }
 
       //! pre-decrement
-      iterator &operator--() {
+      iterator & operator--() {
         --(this->it);
         return *this;
       }
@@ -435,32 +439,32 @@ namespace muSpectre {
       }
 
       //! equality
-      bool operator==(const iterator &other) const {
+      bool operator==(const iterator & other) const {
         return this->it == other.it;
       }
 
       //! inequality
-      bool operator!=(const iterator &other) const {
+      bool operator!=(const iterator & other) const {
         return this->it != other.it;
       }
 
       //! div. comparisons
-      bool operator<(const iterator &other) const {
+      bool operator<(const iterator & other) const {
         return this->it < other.it;
       }
 
       //! div. comparisons
-      bool operator<=(const iterator &other) const {
+      bool operator<=(const iterator & other) const {
         return this->it <= other.it;
       }
 
       //! div. comparisons
-      bool operator>(const iterator &other) const {
+      bool operator>(const iterator & other) const {
         return this->it > other.it;
       }
 
       //! div. comparisons
-      bool operator>=(const iterator &other) const {
+      bool operator>=(const iterator & other) const {
         return this->it >= other.it;
       }
 
@@ -475,10 +479,10 @@ namespace muSpectre {
       }
 
       //! additions, subtractions and corresponding assignments
-      iterator &operator+=(difference_type diff) { this->it += diff; }
+      iterator & operator+=(difference_type diff) { this->it += diff; }
 
       //! additions, subtractions and corresponding assignments
-      iterator &operator-=(difference_type diff) { this->it -= diff; }
+      iterator & operator-=(difference_type diff) { this->it -= diff; }
 
      protected:
       SimpleIterator it;
@@ -494,11 +498,10 @@ namespace muSpectre {
     template <class FieldCollection, typename T, Dim_t NbComponents,
               bool ConstField>
     FieldMap<FieldCollection, T, NbComponents, ConstField>::FieldMap(
-        Field_c &field)
+        Field_c & field)
         : collection(field.get_collection()),
           field(static_cast<TypedField_t &>(field)) {
-      static_assert((NbComponents > 0) or
-                    (NbComponents == Eigen::Dynamic),
+      static_assert((NbComponents > 0) or (NbComponents == Eigen::Dynamic),
                     "Only fields with more than 0 components allowed");
     }
 
@@ -507,7 +510,7 @@ namespace muSpectre {
               bool ConstField>
     template <class FC, typename T2, Dim_t NbC>
     FieldMap<FieldCollection, T, NbComponents, ConstField>::FieldMap(
-        TypedSizedFieldBase<FC, T2, NbC> &field)
+        TypedSizedFieldBase<FC, T2, NbC> & field)
         : collection(field.get_collection()),
           field(static_cast<TypedField_t &>(field)) {
       static_assert(
@@ -746,7 +749,7 @@ namespace muSpectre {
     template <class FullyTypedFieldMap, bool ConstIter>
     bool FieldMap<FieldCollection, T, NbComponents,
                   ConstField>::iterator<FullyTypedFieldMap, ConstIter>::
-    operator==(const iterator &other) const {
+    operator==(const iterator & other) const {
       return (this->index == other.index);
     }
 
@@ -757,7 +760,7 @@ namespace muSpectre {
     template <class FullyTypedFieldMap, bool ConstIter>
     bool FieldMap<FieldCollection, T, NbComponents,
                   ConstField>::iterator<FullyTypedFieldMap, ConstIter>::
-    operator!=(const iterator &other) const {
+    operator!=(const iterator & other) const {
       return !(*this == other);
     }
 
@@ -768,7 +771,7 @@ namespace muSpectre {
     template <class FullyTypedFieldMap, bool ConstIter>
     bool FieldMap<FieldCollection, T, NbComponents,
                   ConstField>::iterator<FullyTypedFieldMap, ConstIter>::
-    operator<(const iterator &other) const {
+    operator<(const iterator & other) const {
       return (this->index < other.index);
     }
     template <class FieldCollection, typename T, Dim_t NbComponents,
@@ -776,7 +779,7 @@ namespace muSpectre {
     template <class FullyTypedFieldMap, bool ConstIter>
     bool FieldMap<FieldCollection, T, NbComponents,
                   ConstField>::iterator<FullyTypedFieldMap, ConstIter>::
-    operator<=(const iterator &other) const {
+    operator<=(const iterator & other) const {
       return (this->index <= other.index);
     }
     template <class FieldCollection, typename T, Dim_t NbComponents,
@@ -784,7 +787,7 @@ namespace muSpectre {
     template <class FullyTypedFieldMap, bool ConstIter>
     bool FieldMap<FieldCollection, T, NbComponents,
                   ConstField>::iterator<FullyTypedFieldMap, ConstIter>::
-    operator>(const iterator &other) const {
+    operator>(const iterator & other) const {
       return (this->index > other.index);
     }
     template <class FieldCollection, typename T, Dim_t NbComponents,
@@ -792,7 +795,7 @@ namespace muSpectre {
     template <class FullyTypedFieldMap, bool ConstIter>
     bool FieldMap<FieldCollection, T, NbComponents,
                   ConstField>::iterator<FullyTypedFieldMap, ConstIter>::
-    operator>=(const iterator &other) const {
+    operator>=(const iterator & other) const {
       return (this->index >= other.index);
     }
 
