@@ -82,7 +82,6 @@ namespace muSpectre {
     default:
       throw std::runtime_error
         ("a strain measure must be missing");
-
     }
     return os;
   }
@@ -102,4 +101,4 @@ namespace muSpectre {
       << std::endl << std::endl;
   }
 
-}  // muSpectre
+}  // namespace muSpectre

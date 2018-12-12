@@ -5,7 +5,8 @@
  *
  * @date   11 Dec 2017
  *
- * @brief  test the small utility functions used by the fft engines and projections
+ * @brief  test the small utility functions used by the fft engines and
+ * projections
  *
  * Copyright © 2017 Till Junge
  *
@@ -41,21 +42,21 @@ namespace muSpectre {
   BOOST_AUTO_TEST_SUITE(fft_utils);
 
   BOOST_AUTO_TEST_CASE(fft_freqs_test) {
-    //simply comparing to np.fft.fftfreq(12, 1/12.)
-    const std::valarray<Real> ref{0.,  1.,  2.,  3.,  4.,  5., -6.,
-        -5., -4., -3., -2., -1.};
+    // simply comparing to np.fft.fftfreq(12, 1/12.)
+    const std::valarray<Real> ref{0.,  1.,  2.,  3.,  4.,  5.,
+                                  -6., -5., -4., -3., -2., -1.};
     auto res{fft_freqs(12)};
-    Real error = std::abs(res-ref).sum();
+    Real error = std::abs(res - ref).sum();
     BOOST_CHECK_EQUAL(error, 0.);
   }
 
   BOOST_AUTO_TEST_CASE(fft_freqs_test_length) {
-    //simply comparing to np.fft.fftfreq(10)
-    const std::valarray<Real> ref{ 0. ,  0.1,  0.2,  0.3,  0.4, -0.5,
-        -0.4, -0.3, -0.2, -0.1};
+    // simply comparing to np.fft.fftfreq(10)
+    const std::valarray<Real> ref{0.,   0.1,  0.2,  0.3,  0.4,
+                                  -0.5, -0.4, -0.3, -0.2, -0.1};
 
     auto res{fft_freqs(10, 10.)};
-    Real error = std::abs(res-ref).sum();
+    Real error = std::abs(res - ref).sum();
     BOOST_CHECK_EQUAL(error, 0.);
   }
 
@@ -67,21 +68,21 @@ namespace muSpectre {
     auto xi{freq_struc.get_xi(ccoord1)};
     auto unit_xi{freq_struc.get_unit_xi(ccoord1)};
     typename FFT_freqs<dim>::Vector ref;
-    ref << 2., .3; // from above tests
-    BOOST_CHECK_LT((xi-ref).norm(), tol);
-    BOOST_CHECK_LT(std::abs(xi.dot(unit_xi)-xi.norm()), xi.norm()*tol);
-    BOOST_CHECK_LT(std::abs(unit_xi.norm()-1.), tol);
+    ref << 2., .3;  // from above tests
+    BOOST_CHECK_LT((xi - ref).norm(), tol);
+    BOOST_CHECK_LT(std::abs(xi.dot(unit_xi) - xi.norm()), xi.norm() * tol);
+    BOOST_CHECK_LT(std::abs(unit_xi.norm() - 1.), tol);
 
-    ccoord1={7, 8};
+    ccoord1 = {7, 8};
     xi = freq_struc.get_xi(ccoord1);
     unit_xi = freq_struc.get_unit_xi(ccoord1);
 
     ref << -5., -.2;
-    BOOST_CHECK_LT((xi-ref).norm(), tol);
-    BOOST_CHECK_LT(std::abs(xi.dot(unit_xi)-xi.norm()), xi.norm()*tol);
-    BOOST_CHECK_LT(std::abs(unit_xi.norm()-1.), tol);
+    BOOST_CHECK_LT((xi - ref).norm(), tol);
+    BOOST_CHECK_LT(std::abs(xi.dot(unit_xi) - xi.norm()), xi.norm() * tol);
+    BOOST_CHECK_LT(std::abs(unit_xi.norm() - 1.), tol);
   }
 
   BOOST_AUTO_TEST_SUITE_END();
 
-}  // muSpectre
+}  // namespace muSpectre

@@ -35,8 +35,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef PROJECTION_DEFAULT_H
-#define PROJECTION_DEFAULT_H
+#ifndef SRC_FFT_PROJECTION_DEFAULT_HH_
+#define SRC_FFT_PROJECTION_DEFAULT_HH_
 
 #include "fft/projection_base.hh"
 
@@ -48,15 +48,14 @@ namespace muSpectre {
    * values per k-grid point
    */
   template <Dim_t DimS, Dim_t DimM>
-  class ProjectionDefault: public ProjectionBase<DimS, DimM>
-  {
-  public:
-    using Parent = ProjectionBase<DimS, DimM>; //!< base class
-    using Vector_t = typename Parent::Vector_t; //!< to represent fields
+  class ProjectionDefault : public ProjectionBase<DimS, DimM> {
+   public:
+    using Parent = ProjectionBase<DimS, DimM>;   //!< base class
+    using Vector_t = typename Parent::Vector_t;  //!< to represent fields
     //! polymorphic FFT pointer type
     using FFTEngine_ptr = typename Parent::FFTEngine_ptr;
-    using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
-    using Rcoord = typename Parent::Rcoord; //!< spatial coordinates type
+    using Ccoord = typename Parent::Ccoord;  //!< cell coordinates type
+    using Rcoord = typename Parent::Rcoord;  //!< spatial coordinates type
     //! global field collection
     using GFieldCollection_t = GlobalFieldCollection<DimS>;
     //! local field collection for Fourier-space fields
@@ -68,7 +67,8 @@ namespace muSpectre {
     //! iterable form of the operator
     using Proj_map = T4MatrixFieldMap<LFieldCollection_t, Real, DimM>;
     //! vectorized version of the Fourier-space second-order tensor field
-    using Vector_map = MatrixFieldMap<LFieldCollection_t, Complex, DimM*DimM, 1>;
+    using Vector_map =
+        MatrixFieldMap<LFieldCollection_t, Complex, DimM * DimM, 1>;
     //! Default constructor
     ProjectionDefault() = delete;
 
@@ -85,15 +85,15 @@ namespace muSpectre {
     virtual ~ProjectionDefault() = default;
 
     //! Copy assignment operator
-    ProjectionDefault& operator=(const ProjectionDefault &other) = delete;
+    ProjectionDefault &operator=(const ProjectionDefault &other) = delete;
 
     //! Move assignment operator
-    ProjectionDefault& operator=(ProjectionDefault &&other) = delete;
+    ProjectionDefault &operator=(ProjectionDefault &&other) = delete;
 
     //! apply the projection operator to a field
-    void apply_projection(Field_t & field) override final;
+    void apply_projection(Field_t &field) final;
 
-    Eigen::Map<Eigen::ArrayXXd> get_operator() override final;
+    Eigen::Map<Eigen::ArrayXXd> get_operator() final;
 
     /**
      * returns the number of rows and cols for the strain matrix type
@@ -101,16 +101,17 @@ namespace muSpectre {
      * material_dim matrices, but in symmetriy storage, it is a column
      * vector)
      */
-    std::array<Dim_t, 2> get_strain_shape() const override final;
+    std::array<Dim_t, 2> get_strain_shape() const final;
 
-    constexpr static Dim_t NbComponents() {return ipow(DimM, 2);}
+    constexpr static Dim_t NbComponents() { return ipow(DimM, 2); }
 
-  protected:
-    Proj_t & Gfield; //!< field holding the operator
+   protected:
+    Proj_t &Gfield;  //!< field holding the operator
     Proj_map Ghat;   //!< iterable version of operator
-  private:
+
+   private:
   };
 
-}  // muSpectre
+}  // namespace muSpectre
 
-#endif /* PROJECTION_DEFAULT_H */
+#endif  // SRC_FFT_PROJECTION_DEFAULT_HH_

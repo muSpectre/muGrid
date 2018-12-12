@@ -51,181 +51,169 @@
 #include <sstream>
 #include <memory>
 
-using namespace muSpectre;
-namespace py=pybind11;
-using namespace pybind11::literals;
+using namespace muSpectre;  // NOLINT // TODO(junge): figure this out
+namespace py = pybind11;
+using namespace pybind11::literals;  // NOLINT: recommended usage
 
 /**
  * cell factory for specific FFT engine
  */
 #ifdef WITH_MPI
 template <Dim_t dim, class FFTEngine>
-void add_parallel_cell_factory_helper(py::module & mod,
-                                      const char *name) {
+void add_parallel_cell_factory_helper(py::module &mod, const char *name) {
   using Ccoord = Ccoord_t<dim>;
   using Rcoord = Rcoord_t<dim>;
 
-  mod.def
-    (name,
-     [](Ccoord res, Rcoord lens, Formulation form, size_t comm) {
-       return make_parallel_cell
-         <dim, dim, CellBase<dim, dim>, FFTEngine>
-         (std::move(res), std::move(lens), std::move(form),
-          std::move(Communicator(MPI_Comm(comm))));
-     },
-     "resolutions"_a,
-     "lengths"_a=CcoordOps::get_cube<dim>(1.),
-     "formulation"_a=Formulation::finite_strain,
-     "communicator"_a=size_t(MPI_COMM_SELF));
+  mod.def(name,
+          [](Ccoord res, Rcoord lens, Formulation form, size_t comm) {
+            return make_parallel_cell<dim, dim, CellBase<dim, dim>, FFTEngine>(
+                std::move(res), std::move(lens), std::move(form),
+                std::move(Communicator(MPI_Comm(comm))));
+          },
+          "resolutions"_a, "lengths"_a = CcoordOps::get_cube<dim>(1.),
+          "formulation"_a = Formulation::finite_strain,
+          "communicator"_a = size_t(MPI_COMM_SELF));
 }
 #endif
 
 /**
  * the cell factory is only bound for default template parameters
  */
-template <Dim_t dim>
-void add_cell_factory_helper(py::module & mod) {
+template <Dim_t dim> void add_cell_factory_helper(py::module &mod) {
   using Ccoord = Ccoord_t<dim>;
   using Rcoord = Rcoord_t<dim>;
 
-  mod.def
-    ("CellFactory",
-     [](Ccoord res, Rcoord lens, Formulation form) {
-       return make_cell(std::move(res), std::move(lens), std::move(form));
-     },
-     "resolutions"_a,
-     "lengths"_a=CcoordOps::get_cube<dim>(1.),
-     "formulation"_a=Formulation::finite_strain);
+  mod.def("CellFactory",
+          [](Ccoord res, Rcoord lens, Formulation form) {
+            return make_cell(std::move(res), std::move(lens), std::move(form));
+          },
+          "resolutions"_a, "lengths"_a = CcoordOps::get_cube<dim>(1.),
+          "formulation"_a = Formulation::finite_strain);
 
 #ifdef WITH_FFTWMPI
   add_parallel_cell_factory_helper<dim, FFTWMPIEngine<dim>>(
-    mod, "FFTWMPICellFactory");
+      mod, "FFTWMPICellFactory");
 #endif
 
 #ifdef WITH_PFFT
-  add_parallel_cell_factory_helper<dim, PFFTEngine<dim>>(
-    mod, "PFFTCellFactory");
+  add_parallel_cell_factory_helper<dim, PFFTEngine<dim>>(mod,
+                                                         "PFFTCellFactory");
 #endif
 }
 
-void add_cell_factory(py::module & mod) {
-  add_cell_factory_helper<twoD  >(mod);
+void add_cell_factory(py::module &mod) {
+  add_cell_factory_helper<twoD>(mod);
   add_cell_factory_helper<threeD>(mod);
 }
 
 /**
  * CellBase for which the material and spatial dimension are identical
  */
-template <Dim_t dim>
-void add_cell_base_helper(py::module & mod) {
+template <Dim_t dim> void add_cell_base_helper(py::module &mod) {
   std::stringstream name_stream{};
   name_stream << "CellBase" << dim << 'd';
   const std::string name = name_stream.str();
   using sys_t = CellBase<dim, dim>;
   py::class_<sys_t, Cell>(mod, name.c_str())
-    .def("__len__", &sys_t::size)
-    .def("__iter__", [](sys_t & s) {
-        return py::make_iterator(s.begin(), s.end());
-      })
-    .def("initialise", &sys_t::initialise, "flags"_a=FFT_PlanFlags::estimate)
-    .def("directional_stiffness",
-         [](sys_t& cell, py::EigenDRef<Eigen::ArrayXXd>& v) {
-           if ((size_t(v.cols()) != cell.size() ||
-                size_t(v.rows()) != dim*dim)) {
-             std::stringstream err{};
-             err << "need array of shape (" << dim*dim << ", "
-                 << cell.size() << ") but got (" << v.rows() << ", "
-                 << v.cols() << ").";
-             throw std::runtime_error(err.str());
-           }
-           if (!cell.is_initialised()) {
-             cell.initialise();
-           }
-           const std::string out_name{"temp output for directional stiffness"};
-           const std::string in_name{"temp input for directional stiffness"};
-           constexpr bool create_tangent{true};
-           auto & K = cell.get_tangent(create_tangent);
-           auto & input = cell.get_managed_T2_field(in_name);
-           auto & output = cell.get_managed_T2_field(out_name);
-           input.eigen() = v;
-           cell.directional_stiffness(K, input, output);
-           return output.eigen();
-         },
-         "δF"_a)
-    .def("project",
-         [](sys_t& cell, py::EigenDRef<Eigen::ArrayXXd>& v) {
-           if ((size_t(v.cols()) != cell.size() ||
-                size_t(v.rows()) != dim*dim)) {
-             std::stringstream err{};
-             err << "need array of shape (" << dim*dim << ", "
-                 << cell.size() << ") but got (" << v.rows() << ", "
-                 << v.cols() << ").";
-             throw std::runtime_error(err.str());
-           }
-           if (!cell.is_initialised()) {
-             cell.initialise();
-           }
-           const std::string in_name{"temp input for projection"};
-           auto & input = cell.get_managed_T2_field(in_name);
-           input.eigen() = v;
-           cell.project(input);
-           return input.eigen();
-         },
-         "field"_a)
-    .def("get_strain",[](sys_t & s) {
-        return Eigen::ArrayXXd(s.get_strain().eigen());
-      })
-    .def("get_stress",[](sys_t & s) {
-        return Eigen::ArrayXXd(s.get_stress().eigen());
-      })
-    .def_property_readonly("size", &sys_t::size)
-    .def("evaluate_stress_tangent",
-         [](sys_t& cell, py::EigenDRef<Eigen::ArrayXXd>& v ) {
-           if ((size_t(v.cols()) != cell.size() ||
-                size_t(v.rows()) != dim*dim)) {
-             std::stringstream err{};
-             err << "need array of shape (" << dim*dim << ", "
-                 << cell.size() << ") but got (" << v.rows() << ", "
-                 << v.cols() << ").";
-             throw std::runtime_error(err.str());
-           }
-           auto & strain{cell.get_strain()};
-           strain.eigen() = v;
-           cell.evaluate_stress_tangent(strain);
-         },
-         "strain"_a)
-    .def("get_projection",
-         &sys_t::get_projection)
-    .def("get_subdomain_resolutions", &sys_t::get_subdomain_resolutions)
-    .def("get_subdomain_locations", &sys_t::get_subdomain_locations)
-    .def("get_domain_resolutions", &sys_t::get_domain_resolutions)
-    .def("get_domain_lengths", &sys_t::get_domain_resolutions);
+      .def("__len__", &sys_t::size)
+      .def("__iter__",
+           [](sys_t &s) { return py::make_iterator(s.begin(), s.end()); })
+      .def("initialise", &sys_t::initialise,
+           "flags"_a = FFT_PlanFlags::estimate)
+      .def(
+          "directional_stiffness",
+          [](sys_t &cell, py::EigenDRef<Eigen::ArrayXXd> &v) {
+            if ((size_t(v.cols()) != cell.size() ||
+                 size_t(v.rows()) != dim * dim)) {
+              std::stringstream err{};
+              err << "need array of shape (" << dim * dim << ", " << cell.size()
+                  << ") but got (" << v.rows() << ", " << v.cols() << ").";
+              throw std::runtime_error(err.str());
+            }
+            if (!cell.is_initialised()) {
+              cell.initialise();
+            }
+            const std::string out_name{"temp output for directional stiffness"};
+            const std::string in_name{"temp input for directional stiffness"};
+            constexpr bool create_tangent{true};
+            auto &K = cell.get_tangent(create_tangent);
+            auto &input = cell.get_managed_T2_field(in_name);
+            auto &output = cell.get_managed_T2_field(out_name);
+            input.eigen() = v;
+            cell.directional_stiffness(K, input, output);
+            return output.eigen();
+          },
+          "δF"_a)
+      .def("project",
+           [](sys_t &cell, py::EigenDRef<Eigen::ArrayXXd> &v) {
+             if ((size_t(v.cols()) != cell.size() ||
+                  size_t(v.rows()) != dim * dim)) {
+               std::stringstream err{};
+               err << "need array of shape (" << dim * dim << ", "
+                   << cell.size() << ") but got (" << v.rows() << ", "
+                   << v.cols() << ").";
+               throw std::runtime_error(err.str());
+             }
+             if (!cell.is_initialised()) {
+               cell.initialise();
+             }
+             const std::string in_name{"temp input for projection"};
+             auto &input = cell.get_managed_T2_field(in_name);
+             input.eigen() = v;
+             cell.project(input);
+             return input.eigen();
+           },
+           "field"_a)
+      .def("get_strain",
+           [](sys_t &s) { return Eigen::ArrayXXd(s.get_strain().eigen()); })
+      .def("get_stress",
+           [](sys_t &s) { return Eigen::ArrayXXd(s.get_stress().eigen()); })
+      .def_property_readonly("size", &sys_t::size)
+      .def("evaluate_stress_tangent",
+           [](sys_t &cell, py::EigenDRef<Eigen::ArrayXXd> &v) {
+             if ((size_t(v.cols()) != cell.size() ||
+                  size_t(v.rows()) != dim * dim)) {
+               std::stringstream err{};
+               err << "need array of shape (" << dim * dim << ", "
+                   << cell.size() << ") but got (" << v.rows() << ", "
+                   << v.cols() << ").";
+               throw std::runtime_error(err.str());
+             }
+             auto &strain{cell.get_strain()};
+             strain.eigen() = v;
+             cell.evaluate_stress_tangent(strain);
+           },
+           "strain"_a)
+      .def("get_projection", &sys_t::get_projection)
+      .def("get_subdomain_resolutions", &sys_t::get_subdomain_resolutions)
+      .def("get_subdomain_locations", &sys_t::get_subdomain_locations)
+      .def("get_domain_resolutions", &sys_t::get_domain_resolutions)
+      .def("get_domain_lengths", &sys_t::get_domain_resolutions);
 }
 
-void add_cell_base(py::module & mod) {
+void add_cell_base(py::module &mod) {
   py::class_<Cell>(mod, "Cell")
-    .def("get_globalised_internal_real_array",
-         &Cell::get_globalised_internal_real_array,
-         "unique_name"_a,
-         "Convenience function to copy local (internal) fields of "
-         "materials into a global field. At least one of the materials in "
-         "the cell needs to contain an internal field named "
-         "`unique_name`. If multiple materials contain such a field, they "
-         "all need to be of same scalar type and same number of "
-         "components. This does not work for split pixel cells or "
-         "laminate pixel cells, as they can have multiple entries for the "
-         "same pixel. Pixels for which no field named `unique_name` "
-         "exists get an array of zeros."
-         "\n"
-         "Parameters:\n"
-         "unique_name: fieldname to fill the global field with. At "
-         "least one material must have such a field, or an "
-         "Exception is raised.");
-  add_cell_base_helper<twoD>  (mod);
+      .def("get_globalised_internal_real_array",
+           &Cell::get_globalised_internal_real_array, "unique_name"_a,
+           "Convenience function to copy local (internal) fields of "
+           "materials into a global field. At least one of the materials in "
+           "the cell needs to contain an internal field named "
+           "`unique_name`. If multiple materials contain such a field, they "
+           "all need to be of same scalar type and same number of "
+           "components. This does not work for split pixel cells or "
+           "laminate pixel cells, as they can have multiple entries for the "
+           "same pixel. Pixels for which no field named `unique_name` "
+           "exists get an array of zeros."
+           "\n"
+           "Parameters:\n"
+           "unique_name: fieldname to fill the global field with. At "
+           "least one material must have such a field, or an "
+           "Exception is raised.");
+  add_cell_base_helper<twoD>(mod);
   add_cell_base_helper<threeD>(mod);
 }
 
-void add_cell(py::module & mod) {
+void add_cell(py::module &mod) {
   add_cell_factory(mod);
 
   auto cell{mod.def_submodule("cell")};

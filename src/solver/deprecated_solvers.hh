@@ -32,8 +32,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef DEPRECATED_SOLVERS_H
-#define DEPRECATED_SOLVERS_H
+#ifndef SRC_SOLVER_DEPRECATED_SOLVERS_HH_
+#define SRC_SOLVER_DEPRECATED_SOLVERS_HH_
 
 #include "solver/solver_common.hh"
 #include "solver/deprecated_solver_base.hh"
@@ -50,29 +50,25 @@ namespace muSpectre {
    * Uses the Newton-conjugate Gradient method to find the static
    * equilibrium of a cell given a series of mean applied strains
    */
-  template <Dim_t DimS, Dim_t DimM=DimS>
+  template <Dim_t DimS, Dim_t DimM = DimS>
   std::vector<OptimizeResult>
-  deprecated_newton_cg (CellBase<DimS, DimM> & cell,
-                        const GradIncrements<DimM> & delF0,
-                        DeprecatedSolverBase<DimS, DimM> & solver,
-                        Real newton_tol,
-                        Real equil_tol,
-                        Dim_t verbose = 0);
+  deprecated_newton_cg(CellBase<DimS, DimM> &cell,
+                       const GradIncrements<DimM> &delF0,
+                       DeprecatedSolverBase<DimS, DimM> &solver,
+                       Real newton_tol, Real equil_tol, Dim_t verbose = 0);
 
   /* ---------------------------------------------------------------------- */
   /**
    * Uses the Newton-conjugate Gradient method to find the static
    * equilibrium of a cell given a mean applied strain
    */
-  template <Dim_t DimS, Dim_t DimM=DimS>
+  template <Dim_t DimS, Dim_t DimM = DimS>
   inline OptimizeResult
-  deprecated_newton_cg (CellBase<DimS, DimM> & cell, const Grad_t<DimM> & delF0,
-                        DeprecatedSolverBase<DimS, DimM> & solver,
-                        Real newton_tol,
-                        Real equil_tol,
-                        Dim_t verbose = 0){
-    return deprecated_newton_cg(cell, GradIncrements<DimM>{delF0},
-                                solver, newton_tol, equil_tol, verbose)[0];
+  deprecated_newton_cg(CellBase<DimS, DimM> &cell, const Grad_t<DimM> &delF0,
+                       DeprecatedSolverBase<DimS, DimM> &solver,
+                       Real newton_tol, Real equil_tol, Dim_t verbose = 0) {
+    return deprecated_newton_cg(cell, GradIncrements<DimM>{delF0}, solver,
+                                newton_tol, equil_tol, verbose)[0];
   }
 
   /* ---------------------------------------------------------------------- */
@@ -80,32 +76,27 @@ namespace muSpectre {
    * Uses the method proposed by de Geus method to find the static
    * equilibrium of a cell given a series of mean applied strains
    */
-  template <Dim_t DimS, Dim_t DimM=DimS>
+  template <Dim_t DimS, Dim_t DimM = DimS>
   std::vector<OptimizeResult>
-  deprecated_de_geus (CellBase<DimS, DimM> & cell,
-                      const GradIncrements<DimM> & delF0,
-                      DeprecatedSolverBase<DimS, DimM> & solver,
-                      Real newton_tol,
-                      Real equil_tol,
-                      Dim_t verbose = 0);
+  deprecated_de_geus(CellBase<DimS, DimM> &cell,
+                     const GradIncrements<DimM> &delF0,
+                     DeprecatedSolverBase<DimS, DimM> &solver, Real newton_tol,
+                     Real equil_tol, Dim_t verbose = 0);
 
   /* ---------------------------------------------------------------------- */
   /**
    * Uses the method proposed by de Geus method to find the static
    * equilibrium of a cell given a mean applied strain
    */
-  template <Dim_t DimS, Dim_t DimM=DimS>
+  template <Dim_t DimS, Dim_t DimM = DimS>
   OptimizeResult
-  deprecated_de_geus (CellBase<DimS, DimM> & cell, const Grad_t<DimM> & delF0,
-                      DeprecatedSolverBase<DimS, DimM> & solver,
-                      Real newton_tol,
-                      Real equil_tol,
-                      Dim_t verbose = 0){
-    return deprecated_de_geus(cell, GradIncrements<DimM>{delF0},
-                              solver, newton_tol, equil_tol, verbose)[0];
+  deprecated_de_geus(CellBase<DimS, DimM> &cell, const Grad_t<DimM> &delF0,
+                     DeprecatedSolverBase<DimS, DimM> &solver, Real newton_tol,
+                     Real equil_tol, Dim_t verbose = 0) {
+    return deprecated_de_geus(cell, GradIncrements<DimM>{delF0}, solver,
+                              newton_tol, equil_tol, verbose)[0];
   }
 
+}  // namespace muSpectre
 
-}  // muSpectre
-
-#endif /* DEPRECATED_SOLVERS_H */
+#endif  // SRC_SOLVER_DEPRECATED_SOLVERS_HH_

@@ -32,8 +32,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef SOLVER_COMMON_H
-#define SOLVER_COMMON_H
+#ifndef SRC_SOLVER_SOLVER_COMMON_HH_
+#define SRC_SOLVER_SOLVER_COMMON_HH_
 
 #include "common/common.hh"
 #include "common/tensor_algebra.hh"
@@ -47,8 +47,7 @@ namespace muSpectre {
   /**
    * emulates scipy.optimize.OptimizeResult
    */
-  struct OptimizeResult
-  {
+  struct OptimizeResult {
     //! Strain ε or Gradient F at solution
     Eigen::ArrayXXd grad;
     //! Cauchy stress σ or first Piola-Kirchhoff stress P at solution
@@ -69,24 +68,22 @@ namespace muSpectre {
   /**
    * Field type that solvers expect gradients to be expressed in
    */
-  template <Dim_t Dim>
-  using Grad_t = Matrices::Tens2_t<Dim>;
+  template <Dim_t Dim> using Grad_t = Matrices::Tens2_t<Dim>;
   /**
    * multiple increments can be submitted at once (useful for
    * path-dependent materials)
    */
   template <Dim_t Dim>
-  using GradIncrements = std::vector<Grad_t<Dim>,
-                                     Eigen::aligned_allocator<Grad_t<Dim>>>;
-
+  using GradIncrements =
+      std::vector<Grad_t<Dim>, Eigen::aligned_allocator<Grad_t<Dim>>>;
 
   /* ---------------------------------------------------------------------- */
-  class SolverError: public std::runtime_error {
+  class SolverError : public std::runtime_error {
     using runtime_error::runtime_error;
   };
 
   /* ---------------------------------------------------------------------- */
-  class ConvergenceError: public SolverError {
+  class ConvergenceError : public SolverError {
     using SolverError::SolverError;
   };
 
@@ -95,10 +92,9 @@ namespace muSpectre {
    * check whether a strain is symmetric, for the purposes of small
    * strain problems
    */
-  bool check_symmetry(const Eigen::Ref<const Eigen::ArrayXXd>& eps,
+  bool check_symmetry(const Eigen::Ref<const Eigen::ArrayXXd> &eps,
                       Real rel_tol = 1e-8);
 
-}  // muSpectre
+}  // namespace muSpectre
 
-
-#endif /* SOLVER_COMMON_H */
+#endif  // SRC_SOLVER_SOLVER_COMMON_HH_

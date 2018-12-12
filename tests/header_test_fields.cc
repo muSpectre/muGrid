@@ -45,41 +45,40 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE(field_test);
 
-  template <bool Global>
-  struct FieldFixture
-  {
+  template <bool Global> struct FieldFixture {
     constexpr static bool IsGlobal{Global};
     constexpr static Dim_t Order{secondOrder};
     constexpr static Dim_t SDim{twoD};
     constexpr static Dim_t MDim{threeD};
     constexpr static Dim_t NbComponents{ipow(MDim, Order)};
-    using FieldColl_t = std::conditional_t<Global,
-                                           GlobalFieldCollection<SDim>,
+    using FieldColl_t = std::conditional_t<Global, GlobalFieldCollection<SDim>,
                                            LocalFieldCollection<SDim>>;
     using TField_t = TensorField<FieldColl_t, Real, Order, MDim>;
     using MField_t = MatrixField<FieldColl_t, Real, SDim, MDim>;
     using DField_t = TypedField<FieldColl_t, Real>;
 
     FieldFixture()
-      : tensor_field{make_field<TField_t>("TensorField", this->fc)},
-        matrix_field{make_field<MField_t>("MatrixField", this->fc)},
-        dynamic_field1{
-          make_field<DField_t>("Dynamically sized field with correct number of"
-                               " components", this->fc, ipow(MDim, Order))},
-        dynamic_field2{
-          make_field<DField_t>("Dynamically sized field with incorrect number"
-                               " of components", this->fc, NbComponents+1)}
-    {}
+        : tensor_field{make_field<TField_t>("TensorField", this->fc)},
+          matrix_field{make_field<MField_t>("MatrixField", this->fc)},
+          dynamic_field1{make_field<DField_t>(
+              "Dynamically sized field with correct number of"
+              " components",
+              this->fc, ipow(MDim, Order))},
+          dynamic_field2{make_field<DField_t>(
+              "Dynamically sized field with incorrect number"
+              " of components",
+              this->fc, NbComponents + 1)} {}
     ~FieldFixture() = default;
 
     FieldColl_t fc{};
-    TField_t & tensor_field;
-    MField_t & matrix_field;
-    DField_t & dynamic_field1;
-    DField_t & dynamic_field2;
+    TField_t &tensor_field;
+    MField_t &matrix_field;
+    DField_t &dynamic_field1;
+    DField_t &dynamic_field2;
   };
 
-  using field_fixtures = boost::mpl::list<FieldFixture<true>, FieldFixture<false>>;
+  using field_fixtures =
+      boost::mpl::list<FieldFixture<true>, FieldFixture<false>>;
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE(size_check_global, FieldFixture<true>) {
@@ -94,7 +93,7 @@ namespace muSpectre {
     fc.initialise(sizes, {});
 
     auto nb_pixels{CcoordOps::get_size(sizes)};
-    BOOST_CHECK_EQUAL(tensor_field.size(),   nb_pixels);
+    BOOST_CHECK_EQUAL(tensor_field.size(), nb_pixels);
     BOOST_CHECK_EQUAL(dynamic_field1.size(), nb_pixels);
     BOOST_CHECK_EQUAL(dynamic_field2.size(), nb_pixels);
 
@@ -104,7 +103,7 @@ namespace muSpectre {
     dynamic_field2.set_pad_size(pad_size);
 
     // check that setting pad size won't change logical size
-    BOOST_CHECK_EQUAL(tensor_field.size(),   nb_pixels);
+    BOOST_CHECK_EQUAL(tensor_field.size(), nb_pixels);
     BOOST_CHECK_EQUAL(dynamic_field1.size(), nb_pixels);
     BOOST_CHECK_EQUAL(dynamic_field2.size(), nb_pixels);
   }
@@ -121,9 +120,9 @@ namespace muSpectre {
 
     Eigen::Array<Real, NbComponents, 1> new_elem;
     Eigen::Array<Real, 1, NbComponents> wrong_elem;
-    for (Dim_t i{0}; i<NbComponents; ++i) {
+    for (Dim_t i{0}; i < NbComponents; ++i) {
       new_elem(i) = i;
-      wrong_elem(i) = .1*i;
+      wrong_elem(i) = .1 * i;
     }
 
     for (Dim_t i{0}; i < nb_pixels; ++i) {
@@ -132,7 +131,7 @@ namespace muSpectre {
       BOOST_CHECK_THROW(dynamic_field1.push_back(wrong_elem), FieldError);
       BOOST_CHECK_THROW(dynamic_field2.push_back(new_elem), FieldError);
     }
-    BOOST_CHECK_EQUAL(tensor_field.size(),   nb_pixels);
+    BOOST_CHECK_EQUAL(tensor_field.size(), nb_pixels);
     BOOST_CHECK_EQUAL(dynamic_field1.size(), nb_pixels);
     BOOST_CHECK_EQUAL(dynamic_field2.size(), 0);
 
@@ -142,11 +141,11 @@ namespace muSpectre {
 
     fc.initialise();
 
-    BOOST_CHECK_EQUAL(tensor_field.size(),   nb_pixels);
+    BOOST_CHECK_EQUAL(tensor_field.size(), nb_pixels);
     BOOST_CHECK_EQUAL(dynamic_field1.size(), nb_pixels);
     BOOST_CHECK_EQUAL(dynamic_field2.size(), nb_pixels);
 
-    BOOST_CHECK_EQUAL(tensor_field.get_pad_size(),   0);
+    BOOST_CHECK_EQUAL(tensor_field.get_pad_size(), 0);
     BOOST_CHECK_EQUAL(dynamic_field1.get_pad_size(), 0);
     BOOST_CHECK_EQUAL(dynamic_field2.get_pad_size(), 0);
 
@@ -155,12 +154,12 @@ namespace muSpectre {
     dynamic_field1.set_pad_size(pad_size);
     dynamic_field2.set_pad_size(pad_size);
 
-    BOOST_CHECK_EQUAL(tensor_field.get_pad_size(),   pad_size);
+    BOOST_CHECK_EQUAL(tensor_field.get_pad_size(), pad_size);
     BOOST_CHECK_EQUAL(dynamic_field1.get_pad_size(), pad_size);
     BOOST_CHECK_EQUAL(dynamic_field2.get_pad_size(), pad_size);
 
     // check that setting pad size won't change logical size
-    BOOST_CHECK_EQUAL(tensor_field.size(),   nb_pixels);
+    BOOST_CHECK_EQUAL(tensor_field.size(), nb_pixels);
     BOOST_CHECK_EQUAL(dynamic_field1.size(), nb_pixels);
     BOOST_CHECK_EQUAL(dynamic_field2.size(), nb_pixels);
   }
@@ -173,7 +172,7 @@ namespace muSpectre {
     FC_t fc;
 
     using TF_t = TensorField<FC_t, Real, order, mdim>;
-    auto & field{make_field<TF_t>("TensorField 1", fc)};
+    auto &field{make_field<TF_t>("TensorField 1", fc)};
 
     // check that fields are initialised with empty vector
     BOOST_CHECK_EQUAL(field.size(), 0);
@@ -196,30 +195,32 @@ namespace muSpectre {
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(get_zeros_like, Fix, field_fixtures, Fix) {
-    auto & t_clone{Fix::tensor_field.get_zeros_like("tensor clone")};
-    static_assert(std::is_same<
-                  std::remove_reference_t<decltype(t_clone)>,
-                  typename Fix::TField_t>::value, "wrong overloaded function");
+    auto &t_clone{Fix::tensor_field.get_zeros_like("tensor clone")};
+    static_assert(std::is_same<std::remove_reference_t<decltype(t_clone)>,
+                               typename Fix::TField_t>::value,
+                  "wrong overloaded function");
 
-    auto & m_clone{Fix::matrix_field.get_zeros_like("matrix clone")};
-    static_assert(std::is_same<
-                  std::remove_reference_t<decltype(m_clone)>,
-                  typename Fix::MField_t>::value, "wrong overloaded function");
+    auto &m_clone{Fix::matrix_field.get_zeros_like("matrix clone")};
+    static_assert(std::is_same<std::remove_reference_t<decltype(m_clone)>,
+                               typename Fix::MField_t>::value,
+                  "wrong overloaded function");
     using FieldColl_t = typename Fix::FieldColl_t;
     using T = typename Fix::TField_t::Scalar;
-    TypedField<FieldColl_t, T> & t_ref{t_clone};
+    TypedField<FieldColl_t, T> &t_ref{t_clone};
 
-    auto & typed_clone{t_ref.get_zeros_like("dynamically sized clone")};
-    static_assert(std::is_same<
-                  std::remove_reference_t<decltype(typed_clone)>,
-                  TypedField<FieldColl_t, T>>::value,
+    auto &typed_clone{t_ref.get_zeros_like("dynamically sized clone")};
+    static_assert(std::is_same<std::remove_reference_t<decltype(typed_clone)>,
+                               TypedField<FieldColl_t, T>>::value,
                   "Field type incorrectly deduced");
-    BOOST_CHECK_EQUAL(typed_clone.get_nb_components(), t_clone.get_nb_components());
+    BOOST_CHECK_EQUAL(typed_clone.get_nb_components(),
+                      t_clone.get_nb_components());
 
-    auto & dyn_clone{Fix::dynamic_field1.get_zeros_like("dynamic clone")};
-    static_assert(std::is_same<decltype(dyn_clone), decltype(typed_clone)>::value,
-                  "mismatch");
-    BOOST_CHECK_EQUAL(typed_clone.get_nb_components(), dyn_clone.get_nb_components());
+    auto &dyn_clone{Fix::dynamic_field1.get_zeros_like("dynamic clone")};
+    static_assert(
+        std::is_same<decltype(dyn_clone), decltype(typed_clone)>::value,
+        "mismatch");
+    BOOST_CHECK_EQUAL(typed_clone.get_nb_components(),
+                      dyn_clone.get_nb_components());
   }
 
   /* ---------------------------------------------------------------------- */
@@ -229,34 +230,34 @@ namespace muSpectre {
     constexpr Dim_t len{2};
     constexpr auto sizes{CcoordOps::get_cube<FieldFixture<true>::SDim>(len)};
 
-    global.fc.initialise(sizes,{});
+    global.fc.initialise(sizes, {});
 
     local.fc.add_pixel({1, 1});
     local.fc.add_pixel({0, 1});
     local.fc.initialise();
 
     // fill the local matrix field and then transfer it to the global field
-    for (auto mat: local.matrix_field.get_map()) {
+    for (auto mat : local.matrix_field.get_map()) {
       mat.setRandom();
     }
     global.matrix_field.fill_from_local(local.matrix_field);
 
-    for (const auto & ccoord: local.fc) {
-      const auto & a{local.matrix_field.get_map()[ccoord]};
-      const auto & b{global.matrix_field.get_map()[ccoord]};
-      const Real error{(a -b).norm()};
+    for (const auto &ccoord : local.fc) {
+      const auto &a{local.matrix_field.get_map()[ccoord]};
+      const auto &b{global.matrix_field.get_map()[ccoord]};
+      const Real error{(a - b).norm()};
       BOOST_CHECK_EQUAL(error, 0.);
     }
 
     // fill the global tensor field and then transfer it to the global field
-    for (auto mat: global.tensor_field.get_map()) {
+    for (auto mat : global.tensor_field.get_map()) {
       mat.setRandom();
     }
     local.tensor_field.fill_from_global(global.tensor_field);
-    for (const auto & ccoord: local.fc) {
-      const auto & a{local.matrix_field.get_map()[ccoord]};
-      const auto & b{global.matrix_field.get_map()[ccoord]};
-      const Real error{(a -b).norm()};
+    for (const auto &ccoord : local.fc) {
+      const auto &a{local.matrix_field.get_map()[ccoord]};
+      const auto &b{global.matrix_field.get_map()[ccoord]};
+      const Real error{(a - b).norm()};
       BOOST_CHECK_EQUAL(error, 0.);
     }
 
@@ -268,4 +269,4 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE_END();
 
-}  // muSpectre
+}  // namespace muSpectre

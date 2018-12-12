@@ -47,116 +47,106 @@
 #include <sstream>
 #include <string>
 
-using namespace muSpectre;
+using namespace muSpectre;  // NOLINT // TODO(junge): figure this out
 namespace py = pybind11;
-using namespace pybind11::literals;
+using namespace pybind11::literals;  // NOLINT: recommended usage
 
 /**
  * python binding for the optionally objective form of Hooke's law
  */
-template <Dim_t dim>
-void add_material_linear_elastic1_helper(py::module & mod) {
+template <Dim_t dim> void add_material_linear_elastic1_helper(py::module &mod) {
   std::stringstream name_stream{};
   name_stream << "MaterialLinearElastic1_" << dim << 'd';
-  const auto name {name_stream.str()};
+  const auto name{name_stream.str()};
 
   using Mat_t = MaterialLinearElastic1<dim, dim>;
   using Sys_t = CellBase<dim, dim>;
   py::class_<Mat_t, MaterialBase<dim, dim>>(mod, name.c_str())
-     .def_static("make",
-                [](Sys_t & sys, std::string n, Real e, Real p) -> Mat_t & {
-                  return Mat_t::make(sys, n, e, p);
-                },
-                "cell"_a, "name"_a, "Young"_a, "Poisson"_a,
-                py::return_value_policy::reference, py::keep_alive<1, 0>())
-    .def("add_pixel",
-         [] (Mat_t & mat, Ccoord_t<dim> pix) {
-           mat.add_pixel(pix);},
-         "pixel"_a)
-    .def("size", &Mat_t::size);
+      .def_static("make",
+                  [](Sys_t &sys, std::string n, Real e, Real p) -> Mat_t & {
+                    return Mat_t::make(sys, n, e, p);
+                  },
+                  "cell"_a, "name"_a, "Young"_a, "Poisson"_a,
+                  py::return_value_policy::reference, py::keep_alive<1, 0>())
+      .def("add_pixel",
+           [](Mat_t &mat, Ccoord_t<dim> pix) { mat.add_pixel(pix); }, "pixel"_a)
+      .def("size", &Mat_t::size);
 }
 
-template <Dim_t dim>
-void add_material_linear_elastic2_helper(py::module & mod) {
+template <Dim_t dim> void add_material_linear_elastic2_helper(py::module &mod) {
   std::stringstream name_stream{};
   name_stream << "MaterialLinearElastic2_" << dim << 'd';
-  const auto name {name_stream.str()};
+  const auto name{name_stream.str()};
 
   using Mat_t = MaterialLinearElastic2<dim, dim>;
   using Sys_t = CellBase<dim, dim>;
 
   py::class_<Mat_t, MaterialBase<dim, dim>>(mod, name.c_str())
-     .def_static("make",
-                [](Sys_t & sys, std::string n, Real e, Real p) -> Mat_t & {
-                  return Mat_t::make(sys, n, e, p);
-                },
-                "cell"_a, "name"_a, "Young"_a, "Poisson"_a,
-                py::return_value_policy::reference, py::keep_alive<1, 0>())
-    .def("add_pixel",
-         [] (Mat_t & mat, Ccoord_t<dim> pix, py::EigenDRef<Eigen::ArrayXXd>& eig) {
-           Eigen::Matrix<Real, dim, dim> eig_strain{eig};
-           mat.add_pixel(pix, eig_strain);},
-         "pixel"_a,
-         "eigenstrain"_a)
-    .def("size", &Mat_t::size);
+      .def_static("make",
+                  [](Sys_t &sys, std::string n, Real e, Real p) -> Mat_t & {
+                    return Mat_t::make(sys, n, e, p);
+                  },
+                  "cell"_a, "name"_a, "Young"_a, "Poisson"_a,
+                  py::return_value_policy::reference, py::keep_alive<1, 0>())
+      .def("add_pixel",
+           [](Mat_t &mat, Ccoord_t<dim> pix,
+              py::EigenDRef<Eigen::ArrayXXd> &eig) {
+             Eigen::Matrix<Real, dim, dim> eig_strain{eig};
+             mat.add_pixel(pix, eig_strain);
+           },
+           "pixel"_a, "eigenstrain"_a)
+      .def("size", &Mat_t::size);
 }
 
-
-template <Dim_t dim>
-void add_material_linear_elastic3_helper(py::module & mod) {
+template <Dim_t dim> void add_material_linear_elastic3_helper(py::module &mod) {
   std::stringstream name_stream{};
   name_stream << "MaterialLinearElastic3_" << dim << 'd';
-  const auto name {name_stream.str()};
+  const auto name{name_stream.str()};
 
   using Mat_t = MaterialLinearElastic3<dim, dim>;
   using Sys_t = CellBase<dim, dim>;
 
   py::class_<Mat_t, MaterialBase<dim, dim>>(mod, name.c_str())
-    .def(py::init<std::string>(), "name"_a)
-    .def_static("make",
-                [](Sys_t & sys, std::string n) -> Mat_t & {
-                  return Mat_t::make(sys, n);
-                },
-                "cell"_a, "name"_a,
-                py::return_value_policy::reference, py::keep_alive<1, 0>())
-    .def("add_pixel",
-         [] (Mat_t & mat, Ccoord_t<dim> pix, Real Young, Real Poisson) {
-	   mat.add_pixel(pix, Young, Poisson);},
-         "pixel"_a,
-         "Young"_a,
-	 "Poisson"_a)
-    .def("size", &Mat_t::size);
+      .def(py::init<std::string>(), "name"_a)
+      .def_static("make",
+                  [](Sys_t &sys, std::string n) -> Mat_t & {
+                    return Mat_t::make(sys, n);
+                  },
+                  "cell"_a, "name"_a, py::return_value_policy::reference,
+                  py::keep_alive<1, 0>())
+      .def("add_pixel",
+           [](Mat_t &mat, Ccoord_t<dim> pix, Real Young, Real Poisson) {
+             mat.add_pixel(pix, Young, Poisson);
+           },
+           "pixel"_a, "Young"_a, "Poisson"_a)
+      .def("size", &Mat_t::size);
 }
 
-template <Dim_t dim>
-void add_material_linear_elastic4_helper(py::module & mod) {
+template <Dim_t dim> void add_material_linear_elastic4_helper(py::module &mod) {
   std::stringstream name_stream{};
   name_stream << "MaterialLinearElastic4_" << dim << 'd';
-  const auto name {name_stream.str()};
+  const auto name{name_stream.str()};
 
   using Mat_t = MaterialLinearElastic4<dim, dim>;
   using Sys_t = CellBase<dim, dim>;
 
   py::class_<Mat_t, MaterialBase<dim, dim>>(mod, name.c_str())
-    .def(py::init<std::string>(), "name"_a)
-    .def_static("make",
-                [](Sys_t & sys, std::string n) -> Mat_t & {
-                  return Mat_t::make(sys, n);
-                },
-                "cell"_a, "name"_a,
-                py::return_value_policy::reference, py::keep_alive<1, 0>())
-    .def("add_pixel",
-         [] (Mat_t & mat, Ccoord_t<dim> pix, Real Young, Real Poisson) {
-	   mat.add_pixel(pix, Young, Poisson);},
-         "pixel"_a,
-         "Young"_a,
-	 "Poisson"_a)
-    .def("size", &Mat_t::size);
+      .def(py::init<std::string>(), "name"_a)
+      .def_static("make",
+                  [](Sys_t &sys, std::string n) -> Mat_t & {
+                    return Mat_t::make(sys, n);
+                  },
+                  "cell"_a, "name"_a, py::return_value_policy::reference,
+                  py::keep_alive<1, 0>())
+      .def("add_pixel",
+           [](Mat_t &mat, Ccoord_t<dim> pix, Real Young, Real Poisson) {
+             mat.add_pixel(pix, Young, Poisson);
+           },
+           "pixel"_a, "Young"_a, "Poisson"_a)
+      .def("size", &Mat_t::size);
 }
 
-
-template <Dim_t dim>
-void add_material_helper(py::module & mod) {
+template <Dim_t dim> void add_material_helper(py::module &mod) {
   std::stringstream name_stream{};
   name_stream << "Material_" << dim << 'd';
   const std::string name{name_stream.str()};
@@ -164,14 +154,14 @@ void add_material_helper(py::module & mod) {
   using FC_t = LocalFieldCollection<dim>;
   using FCBase_t = FieldCollectionBase<dim, FC_t>;
 
-  py::class_<Mat_t>(mod, name.c_str()).
-    def_property_readonly
-    ("collection",
-     [](Mat_t & material) -> FCBase_t &{
-      return material.get_collection();},
-     "returns the field collection containing internal "
-     "fields of this material",
-     py::return_value_policy::reference_internal);
+  py::class_<Mat_t>(mod, name.c_str())
+      .def_property_readonly("collection",
+                             [](Mat_t &material) -> FCBase_t & {
+                               return material.get_collection();
+                             },
+                             "returns the field collection containing internal "
+                             "fields of this material",
+                             py::return_value_policy::reference_internal);
 
   add_material_linear_elastic1_helper<dim>(mod);
   add_material_linear_elastic2_helper<dim>(mod);
@@ -179,9 +169,9 @@ void add_material_helper(py::module & mod) {
   add_material_linear_elastic4_helper<dim>(mod);
 }
 
-void add_material(py::module & mod) {
+void add_material(py::module &mod) {
   auto material{mod.def_submodule("material")};
   material.doc() = "bindings for constitutive laws";
-  add_material_helper<twoD  >(material);
+  add_material_helper<twoD>(material);
   add_material_helper<threeD>(material);
 }

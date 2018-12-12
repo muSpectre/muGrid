@@ -32,8 +32,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef SOLVER_EIGEN_H
-#define SOLVER_EIGEN_H
+#ifndef SRC_SOLVER_SOLVER_EIGEN_HH_
+#define SRC_SOLVER_SOLVER_EIGEN_HH_
 
 #include "solver/solver_base.hh"
 #include "cell/cell_base.hh"
@@ -43,8 +43,7 @@
 
 namespace muSpectre {
 
-  template <class SolverType>
-  class SolverEigen;
+  template <class SolverType> class SolverEigen;
 
   class SolverCGEigen;
 
@@ -58,67 +57,53 @@ namespace muSpectre {
 
   namespace internal {
 
-    template <class Solver>
-    struct Solver_traits {
-    };
+    template <class Solver> struct Solver_traits {};
 
     //! traits for the Eigen conjugate gradient solver
-    template<>
-    struct Solver_traits<SolverCGEigen> {
+    template <> struct Solver_traits<SolverCGEigen> {
       //! Eigen Iterative Solver
-      using Solver =
-        Eigen::ConjugateGradient<typename Cell::Adaptor,
-                                 Eigen::Lower|Eigen::Upper,
-                                 Eigen::IdentityPreconditioner>;
+      using Solver = Eigen::ConjugateGradient<typename Cell::Adaptor,
+                                              Eigen::Lower | Eigen::Upper,
+                                              Eigen::IdentityPreconditioner>;
     };
 
     //! traits for the Eigen GMRES solver
-    template<>
-    struct Solver_traits<SolverGMRESEigen> {
+    template <> struct Solver_traits<SolverGMRESEigen> {
       //! Eigen Iterative Solver
       using Solver =
-        Eigen::GMRES<typename Cell::Adaptor,
-                     Eigen::IdentityPreconditioner>;
+          Eigen::GMRES<typename Cell::Adaptor, Eigen::IdentityPreconditioner>;
     };
 
     //! traits for the Eigen BiCGSTAB solver
-    template<>
-    struct Solver_traits<SolverBiCGSTABEigen> {
+    template <> struct Solver_traits<SolverBiCGSTABEigen> {
       //! Eigen Iterative Solver
-      using Solver =
-        Eigen::BiCGSTAB<typename Cell::Adaptor,
-                        Eigen::IdentityPreconditioner>;
+      using Solver = Eigen::BiCGSTAB<typename Cell::Adaptor,
+                                     Eigen::IdentityPreconditioner>;
     };
 
     //! traits for the Eigen DGMRES solver
-    template<>
-    struct Solver_traits<SolverDGMRESEigen> {
+    template <> struct Solver_traits<SolverDGMRESEigen> {
       //! Eigen Iterative Solver
       using Solver =
-        Eigen::DGMRES<typename Cell::Adaptor,
-                      Eigen::IdentityPreconditioner>;
+          Eigen::DGMRES<typename Cell::Adaptor, Eigen::IdentityPreconditioner>;
     };
 
     //! traits for the Eigen MINRES solver
-    template<>
-    struct Solver_traits<SolverMINRESEigen> {
+    template <> struct Solver_traits<SolverMINRESEigen> {
       //! Eigen Iterative Solver
       using Solver =
-        Eigen::MINRES<typename Cell::Adaptor,
-                      Eigen::Lower|Eigen::Upper,
-                      Eigen::IdentityPreconditioner>;
+          Eigen::MINRES<typename Cell::Adaptor, Eigen::Lower | Eigen::Upper,
+                        Eigen::IdentityPreconditioner>;
     };
 
-  }  // internal
+  }  // namespace internal
 
   /**
    * base class for iterative solvers from Eigen
    */
-  template <class SolverType>
-  class SolverEigen: public SolverBase
-  {
-  public:
-    using Parent = SolverBase; //!< base class
+  template <class SolverType> class SolverEigen : public SolverBase {
+   public:
+    using Parent = SolverBase;  //!< base class
     //! traits obtained from CRTP
     using Solver = typename internal::Solver_traits<SolverType>::Solver;
     //! Input vectors for solver
@@ -132,7 +117,7 @@ namespace muSpectre {
     SolverEigen() = delete;
 
     //! Constructor with domain resolutions, etc,
-    SolverEigen(Cell& cell, Real tol, Uint maxiter=0, bool verbose =false);
+    SolverEigen(Cell &cell, Real tol, Uint maxiter = 0, bool verbose = false);
 
     //! Copy constructor
     SolverEigen(const SolverEigen &other) = delete;
@@ -144,77 +129,71 @@ namespace muSpectre {
     virtual ~SolverEigen() = default;
 
     //! Copy assignment operator
-    SolverEigen& operator=(const SolverEigen &other) = delete;
+    SolverEigen &operator=(const SolverEigen &other) = delete;
 
     //! Move assignment operator
-    SolverEigen& operator=(SolverEigen &&other) = default;
+    SolverEigen &operator=(SolverEigen &&other) = default;
 
     //! Allocate fields used during the solution
-    void initialise() override final;
+    void initialise() final;
 
     //! executes the solver
-    Vector_map solve(const ConstVector_ref rhs) override final;
+    Vector_map solve(const ConstVector_ref rhs) final;
 
-
-  protected:
-    Cell::Adaptor adaptor; //!< cell handle
-    Solver solver; //!< Eigen's Iterative solver
-    Vector_t result; //!< storage for result
+   protected:
+    Cell::Adaptor adaptor;  //!< cell handle
+    Solver solver;          //!< Eigen's Iterative solver
+    Vector_t result;        //!< storage for result
   };
 
   /**
    * Binding to Eigen's conjugate gradient solver
    */
-  class SolverCGEigen:
-    public SolverEigen<SolverCGEigen> {
-  public:
+  class SolverCGEigen : public SolverEigen<SolverCGEigen> {
+   public:
     using SolverEigen<SolverCGEigen>::SolverEigen;
-    std::string get_name() const override final {return "CG";}
+    std::string get_name() const final { return "CG"; }
   };
 
   /**
    * Binding to Eigen's GMRES solver
    */
-  class SolverGMRESEigen:
-    public SolverEigen<SolverGMRESEigen> {
-  public:
+  class SolverGMRESEigen : public SolverEigen<SolverGMRESEigen> {
+   public:
     using SolverEigen<SolverGMRESEigen>::SolverEigen;
-    std::string get_name() const override final {return "GMRES";}
+    std::string get_name() const final { return "GMRES"; }
   };
 
   /**
    * Binding to Eigen's BiCGSTAB solver
    */
-  class SolverBiCGSTABEigen:
-    public SolverEigen<SolverBiCGSTABEigen> {
-  public:
+  class SolverBiCGSTABEigen : public SolverEigen<SolverBiCGSTABEigen> {
+   public:
     using SolverEigen<SolverBiCGSTABEigen>::SolverEigen;
     //! Solver's name
-    std::string get_name() const override final {return "BiCGSTAB";}
+    std::string get_name() const final { return "BiCGSTAB"; }
   };
 
   /**
    * Binding to Eigen's DGMRES solver
    */
-  class SolverDGMRESEigen:
-    public SolverEigen<SolverDGMRESEigen> {
-  public:
+  class SolverDGMRESEigen : public SolverEigen<SolverDGMRESEigen> {
+   public:
     using SolverEigen<SolverDGMRESEigen>::SolverEigen;
     //! Solver's name
-    std::string get_name() const override final {return "DGMRES";}
+    std::string get_name() const final { return "DGMRES"; }
   };
 
   /**
    * Binding to Eigen's MINRES solver
    */
-  class SolverMINRESEigen:
-    public SolverEigen<SolverMINRESEigen> {
-  public:
+  class SolverMINRESEigen : public SolverEigen<SolverMINRESEigen> {
+   public:
     using SolverEigen<SolverMINRESEigen>::SolverEigen;
     //! Solver's name
-    std::string get_name() const override final {return "MINRES";}
+    std::string get_name() const final { return "MINRES"; }
   };
 
-}  // muSpectre
+}  // namespace muSpectre
 
-#endif /* SOLVER_EIGEN_H */
+#endif  // SRC_SOLVER_SOLVER_EIGEN_HH_

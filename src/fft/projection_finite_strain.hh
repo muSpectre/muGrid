@@ -33,9 +33,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-
-#ifndef PROJECTION_FINITE_STRAIN_H
-#define PROJECTION_FINITE_STRAIN_H
+#ifndef SRC_FFT_PROJECTION_FINITE_STRAIN_HH_
+#define SRC_FFT_PROJECTION_FINITE_STRAIN_HH_
 
 #include "fft/projection_default.hh"
 #include "common/common.hh"
@@ -50,20 +49,20 @@ namespace muSpectre {
    * al. (https://doi.org/10.1016/j.cma.2016.12.032) for derivation
    */
   template <Dim_t DimS, Dim_t DimM>
-  class ProjectionFiniteStrain: public ProjectionDefault<DimS, DimM>
-  {
-  public:
-    using Parent = ProjectionDefault<DimS, DimM>; //!< base class
+  class ProjectionFiniteStrain : public ProjectionDefault<DimS, DimM> {
+   public:
+    using Parent = ProjectionDefault<DimS, DimM>;  //!< base class
     //! polymorphic pointer to FFT engines
     using FFTEngine_ptr = typename Parent::FFTEngine_ptr;
-    using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
-    using Rcoord = typename Parent::Rcoord; //!< spatial coordinates type
+    using Ccoord = typename Parent::Ccoord;  //!< cell coordinates type
+    using Rcoord = typename Parent::Rcoord;  //!< spatial coordinates type
     //! local field collection (for Fourier-space representations)
     using LFieldCollection_t = LocalFieldCollection<DimS>;
     //! iterable operator
     using Proj_map = T4MatrixFieldMap<LFieldCollection_t, Real, DimM>;
     //! iterable vectorised version of the Fourier-space tensor field
-    using Vector_map = MatrixFieldMap<LFieldCollection_t, Complex, DimM*DimM, 1>;
+    using Vector_map =
+        MatrixFieldMap<LFieldCollection_t, Complex, DimM * DimM, 1>;
 
     //! Default constructor
     ProjectionFiniteStrain() = delete;
@@ -81,18 +80,17 @@ namespace muSpectre {
     virtual ~ProjectionFiniteStrain() = default;
 
     //! Copy assignment operator
-    ProjectionFiniteStrain& operator=(const ProjectionFiniteStrain &other) = delete;
+    ProjectionFiniteStrain &
+    operator=(const ProjectionFiniteStrain &other) = delete;
 
     //! Move assignment operator
-    ProjectionFiniteStrain& operator=(ProjectionFiniteStrain &&other) = default;
+    ProjectionFiniteStrain &operator=(ProjectionFiniteStrain &&other) = default;
 
     //! initialises the fft engine (plan the transform)
-    virtual void initialise(FFT_PlanFlags flags = FFT_PlanFlags::estimate) override final;
-
-  protected:
-  private:
+     void
+    initialise(FFT_PlanFlags flags = FFT_PlanFlags::estimate) final;
   };
 
-}  // muSpectre
+}  // namespace muSpectre
 
-#endif /* PROJECTION_FINITE_STRAIN_H */
+#endif  // SRC_FFT_PROJECTION_FINITE_STRAIN_HH_

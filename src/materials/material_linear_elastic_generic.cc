@@ -39,18 +39,15 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  MaterialLinearElasticGeneric<DimS, DimM>::
-  MaterialLinearElasticGeneric(const std::string & name,
-                               const CInput_t& C_voigt):
-    Parent{name}
-  {
+  MaterialLinearElasticGeneric<DimS, DimM>::MaterialLinearElasticGeneric(
+      const std::string &name, const CInput_t &C_voigt)
+      : Parent{name} {
     using VC_t = VoigtConversion<DimM>;
     constexpr Dim_t VSize{vsize(DimM)};
-    if (not (C_voigt.rows() == VSize) or
-        not (C_voigt.cols() == VSize)) {
+    if (not(C_voigt.rows() == VSize) or not(C_voigt.cols() == VSize)) {
       std::stringstream err_str{};
-      err_str << "The stiffness tensor should be input as a " << VSize
-              << " × " << VSize << " Matrix in Voigt notation. You supplied"
+      err_str << "The stiffness tensor should be input as a " << VSize << " × "
+              << VSize << " Matrix in Voigt notation. You supplied"
               << " a " << C_voigt.rows() << " × " << C_voigt.cols()
               << " matrix";
     }
@@ -59,16 +56,16 @@ namespace muSpectre {
       for (int j{0}; j < DimM; ++j) {
         for (int k{0}; k < DimM; ++k) {
           for (int l{0}; l < DimM; ++l) {
-            get(this->C, i,j,k,l) = C_voigt(VC_t::sym_mat(i,j), VC_t::sym_mat(k,l));
+            get(this->C, i, j, k, l) =
+                C_voigt(VC_t::sym_mat(i, j), VC_t::sym_mat(k, l));
           }
         }
       }
     }
-
   }
 
   template class MaterialLinearElasticGeneric<twoD, twoD>;
   template class MaterialLinearElasticGeneric<twoD, threeD>;
   template class MaterialLinearElasticGeneric<threeD, threeD>;
 
-}  // muSpectre
+}  // namespace muSpectre

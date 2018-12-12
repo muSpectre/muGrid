@@ -39,65 +39,59 @@
 #include "common/T4_map_proxy.hh"
 #include "cmath"
 
-
 namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE(material_linear_elastic_4);
 
-
-  template <class Mat_t>
-  struct MaterialFixture {
+  template <class Mat_t> struct MaterialFixture {
     using Material_t = Mat_t;
     Material_t mat;
-    MaterialFixture():mat("name"){
+    MaterialFixture() : mat("name") {
       mat.add_pixel({0}, Youngs_modulus, Poisson_ratio);
     }
     Real Youngs_modulus{10};
     Real Poisson_ratio{0.3};
   };
 
-  using mat_list = boost::mpl::list<
-    MaterialFixture<MaterialLinearElastic4<twoD, twoD>>,
-    MaterialFixture<MaterialLinearElastic4<twoD, threeD>>,
-    MaterialFixture<MaterialLinearElastic4<threeD, threeD>>
-    >;
+  using mat_list =
+      boost::mpl::list<MaterialFixture<MaterialLinearElastic4<twoD, twoD>>,
+                       MaterialFixture<MaterialLinearElastic4<twoD, threeD>>,
+                       MaterialFixture<MaterialLinearElastic4<threeD, threeD>>>;
 
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_constructor, Fix, mat_list, Fix) {
-
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_constructor, Fix, mat_list, Fix){
   };
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_response, Fix, mat_list, Fix) {
     constexpr Dim_t Dim{Fix::Material_t::Parent::Parent::mdim()};
     Eigen::Matrix<Real, Dim, Dim> E;
     E.setZero();
-    E(0,0) = 0.001;
-    E(1,0) = E(0,1) = 0.005;
+    E(0, 0) = 0.001;
+    E(1, 0) = E(0, 1) = 0.005;
 
-    using Hooke = MatTB::
-      Hooke<Dim, Eigen::Matrix<Real, Dim, Dim>, T4Mat<Real, Dim> >;
-    Real lambda = Hooke::
-      compute_lambda(Fix::Youngs_modulus, Fix::Poisson_ratio);
-    Real mu     = Hooke::
-      compute_mu(Fix::Youngs_modulus, Fix::Poisson_ratio);
+    using Hooke =
+        MatTB::Hooke<Dim, Eigen::Matrix<Real, Dim, Dim>, T4Mat<Real, Dim>>;
+    Real lambda =
+        Hooke::compute_lambda(Fix::Youngs_modulus, Fix::Poisson_ratio);
+    Real mu = Hooke::compute_mu(Fix::Youngs_modulus, Fix::Poisson_ratio);
 
-    Eigen::Matrix<Real, Dim, Dim> stress = Fix::mat.
-      evaluate_stress(E, lambda, mu);
+    Eigen::Matrix<Real, Dim, Dim> stress =
+        Fix::mat.evaluate_stress(E, lambda, mu);
 
-    Real sigma00 = lambda*E(0,0) + 2*mu*E(0,0);
-    Real sigma01 = 2*mu*E(0,1);
-    Real sigma11 = lambda*E(0,0);
-    BOOST_CHECK_LT( std::abs(stress(0,0)- sigma00), tol);
-    BOOST_CHECK_LT( std::abs(stress(0,1)- sigma01), tol);
-    BOOST_CHECK_LT( std::abs(stress(1,0)- sigma01), tol);
-    BOOST_CHECK_LT( std::abs(stress(1,1)- sigma11), tol);
-    if (Dim == threeD){
-      for (int i=0; i<Dim-1 ; ++i){
-        BOOST_CHECK_LT( std::abs(stress(2,i)), tol );
-        BOOST_CHECK_LT( std::abs(stress(i,2)), tol );
+    Real sigma00 = lambda * E(0, 0) + 2 * mu * E(0, 0);
+    Real sigma01 = 2 * mu * E(0, 1);
+    Real sigma11 = lambda * E(0, 0);
+    BOOST_CHECK_LT(std::abs(stress(0, 0) - sigma00), tol);
+    BOOST_CHECK_LT(std::abs(stress(0, 1) - sigma01), tol);
+    BOOST_CHECK_LT(std::abs(stress(1, 0) - sigma01), tol);
+    BOOST_CHECK_LT(std::abs(stress(1, 1) - sigma11), tol);
+    if (Dim == threeD) {
+      for (int i = 0; i < Dim - 1; ++i) {
+        BOOST_CHECK_LT(std::abs(stress(2, i)), tol);
+        BOOST_CHECK_LT(std::abs(stress(i, 2)), tol);
       }
-      BOOST_CHECK_LT( std::abs(stress(2,2) - sigma11), tol );
+      BOOST_CHECK_LT(std::abs(stress(2, 2) - sigma11), tol);
     }
   };
 
   BOOST_AUTO_TEST_SUITE_END();
-}  // muSpectre
+}  // namespace muSpectre

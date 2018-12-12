@@ -32,7 +32,6 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-
 #include "common/field_map_tensor.hh"
 #include "common/field_map_matrixlike.hh"
 #include "common/field_map_scalar.hh"
@@ -41,8 +40,8 @@
 #include <stdexcept>
 #include <type_traits>
 
-#ifndef FIELD_MAP_H
-#define FIELD_MAP_H
+#ifndef SRC_COMMON_FIELD_MAP_HH_
+#define SRC_COMMON_FIELD_MAP_HH_
 
 namespace muSpectre {
 
@@ -56,27 +55,21 @@ namespace muSpectre {
    * been an assignment to the underlying eigen array, the
    * `RawFieldMap` might be invalidated!
    */
-  template <class EigenMap>
-  class RawFieldMap
-  {
-  public:
+  template <class EigenMap> class RawFieldMap {
+   public:
     /**
      * determining the constness of the mapped array required in order
      * to formulate the constructors const-correctly
      */
-    constexpr static bool IsConst{
-      std::is_const<
+    constexpr static bool IsConst{std::is_const<
         std::remove_pointer_t<typename EigenMap::PointerArgType>>::value};
     //! short-hand for the basic scalar type
     using T = typename EigenMap::Scalar;
     //! raw pointer type to store
-    using T_ptr = std::conditional_t<IsConst,
-                                     const T*,
-                                     T*>;
+    using T_ptr = std::conditional_t<IsConst, const T *, T *>;
     //! input array (~field) type to be mapped
-    using FieldVec_t = std::conditional_t<IsConst,
-                                          const Eigen::VectorXd,
-                                          Eigen::VectorXd>;
+    using FieldVec_t =
+        std::conditional_t<IsConst, const Eigen::VectorXd, Eigen::VectorXd>;
 
     //! Plain mapped Eigen type
     using EigenPlain = typename EigenMap::PlainObject;
@@ -86,21 +79,17 @@ namespace muSpectre {
 
     //! constructor from a *contiguous* array
     RawFieldMap(Eigen::Map<FieldVec_t> vec,
-                Dim_t nb_rows=EigenMap::RowsAtCompileTime,
-                Dim_t nb_cols=EigenMap::ColsAtCompileTime):
-      data{vec.data()},
-      nb_rows{nb_rows},
-      nb_cols{nb_cols},
-      nb_components{nb_rows * nb_cols},
-      nb_pixels(vec.size()/nb_components)
-    {
-      if ((nb_rows == Eigen::Dynamic) or
-          (nb_cols == Eigen::Dynamic)) {
-        throw FieldError
-          ("You have to specify the number of rows and columns if you map a "
-           "dynamically sized Eigen Map type.");
+                Dim_t nb_rows = EigenMap::RowsAtCompileTime,
+                Dim_t nb_cols = EigenMap::ColsAtCompileTime)
+        : data{vec.data()}, nb_rows{nb_rows}, nb_cols{nb_cols},
+          nb_components{nb_rows * nb_cols},
+          nb_pixels(vec.size() / nb_components) {
+      if ((nb_rows == Eigen::Dynamic) or(nb_cols == Eigen::Dynamic)) {
+        throw FieldError(
+            "You have to specify the number of rows and columns if you map a "
+            "dynamically sized Eigen Map type.");
       }
-      if ((nb_rows < 1) or (nb_cols < 1)) {
+      if ((nb_rows < 1) or(nb_cols < 1)) {
         throw FieldError("Only positive numbers of rows and columns make "
                          "sense");
       }
@@ -115,14 +104,11 @@ namespace muSpectre {
 
     //! constructor from a *contiguous* array
     RawFieldMap(Eigen::Ref<FieldVec_t> vec,
-                Dim_t nb_rows=EigenMap::RowsAtCompileTime,
-                Dim_t nb_cols=EigenMap::ColsAtCompileTime):
-      data{vec.data()},
-      nb_rows{nb_rows},
-      nb_cols{nb_cols},
-      nb_components{nb_rows * nb_cols},
-      nb_pixels(vec.size()/nb_components)
-    {
+                Dim_t nb_rows = EigenMap::RowsAtCompileTime,
+                Dim_t nb_cols = EigenMap::ColsAtCompileTime)
+        : data{vec.data()}, nb_rows{nb_rows}, nb_cols{nb_cols},
+          nb_components{nb_rows * nb_cols},
+          nb_pixels(vec.size() / nb_components) {
       if (vec.size() % this->nb_components != 0) {
         std::stringstream err{};
         err << "The vector size of " << vec.size()
@@ -142,43 +128,40 @@ namespace muSpectre {
     virtual ~RawFieldMap() = default;
 
     //! Copy assignment operator
-    RawFieldMap& operator=(const RawFieldMap &other) = delete;
+    RawFieldMap &operator=(const RawFieldMap &other) = delete;
 
     //! Move assignment operator
-    RawFieldMap& operator=(RawFieldMap &&other) = delete;
+    RawFieldMap &operator=(RawFieldMap &&other) = delete;
 
     //! returns number of EigenMaps stored within the array
-    size_t size() const {return this->nb_pixels;}
+    size_t size() const { return this->nb_pixels; }
 
     //! forward declaration of iterator type
-    template <bool IsConst>
-    class iterator_t;
+    template <bool IsConst> class iterator_t;
     using iterator = iterator_t<false>;
     using const_iterator = iterator_t<true>;
 
     //! returns an iterator to the first element
-    iterator begin() { return iterator{*this, 0};}
-    const_iterator begin() const {
-      return const_iterator{*this, 0};}
+    iterator begin() { return iterator{*this, 0}; }
+    const_iterator begin() const { return const_iterator{*this, 0}; }
     //! returns an iterator past the last element
-    iterator end() {return iterator{*this, this->size()};}
-    const_iterator end() const {
-      return const_iterator{*this, this->size()};}
+    iterator end() { return iterator{*this, this->size()}; }
+    const_iterator end() const { return const_iterator{*this, this->size()}; }
 
     //! evaluates the average of the field
-    EigenPlain mean () const {
+    EigenPlain mean() const {
       using T_t = EigenPlain;
       T_t mean(T_t::Zero(this->nb_rows, this->nb_cols));
-      for (auto && val: *this) {
+      for (auto &&val : *this) {
         mean += val;
       }
       mean /= this->size();
       return mean;
     }
 
-  protected:
-    inline T_ptr get_data() {return data;}
-    inline const T_ptr get_data() const {return data;}
+   protected:
+    inline T_ptr get_data() { return data; }
+    inline const T_ptr get_data() const { return data; }
     //! raw data pointer (ugly, I know)
     T_ptr data;
     const Dim_t nb_rows;
@@ -186,7 +169,8 @@ namespace muSpectre {
     const Dim_t nb_components;
     //! number of EigenMaps stored within the array
     size_t nb_pixels;
-  private:
+
+   private:
   };
 
   /**
@@ -194,22 +178,18 @@ namespace muSpectre {
    */
   template <class EigenMap>
   template <bool IsConst>
-  class RawFieldMap<EigenMap>::iterator_t
-  {
-  public:
+  class RawFieldMap<EigenMap>::iterator_t {
+   public:
     //! short hand for the raw field map's type
     using Parent = RawFieldMap<EigenMap>;
 
     //! the  map needs to be friend in order to access the protected constructor
     friend Parent;
     //! stl compliance
-    using value_type = std::conditional_t
-      <IsConst,
-       Eigen::Map<const typename EigenMap::PlainObject>,
-       EigenMap>;
-    using T_ptr = std::conditional_t<IsConst,
-                                     const Parent::T_ptr,
-                                     Parent::T_ptr>;
+    using value_type = std::conditional_t<
+        IsConst, Eigen::Map<const typename EigenMap::PlainObject>, EigenMap>;
+    using T_ptr =
+        std::conditional_t<IsConst, const Parent::T_ptr, Parent::T_ptr>;
     //! stl compliance
     using iterator_category = std::forward_iterator_tag;
 
@@ -226,53 +206,52 @@ namespace muSpectre {
     virtual ~iterator_t() = default;
 
     //! Copy assignment operator
-    iterator_t& operator=(const iterator_t &other) = default;
+    iterator_t &operator=(const iterator_t &other) = default;
 
     //! Move assignment operator
-    iterator_t& operator=(iterator_t &&other) = default;
+    iterator_t &operator=(iterator_t &&other) = default;
 
     //! pre-increment
-    inline iterator_t & operator++() {
+    inline iterator_t &operator++() {
       ++this->index;
       return *this;
     }
 
     //! dereference
-    inline value_type operator *() {
-      return value_type(raw_ptr + this->map.nb_components*index,
+    inline value_type operator*() {
+      return value_type(raw_ptr + this->map.nb_components * index,
                         this->map.nb_rows, this->map.nb_cols);
     }
 
     //! inequality
-    inline bool operator != (const iterator_t & other) const {
+    inline bool operator!=(const iterator_t &other) const {
       return this->index != other.index;
     }
 
     //! equality
-    inline bool operator == (const iterator_t & other) const {
+    inline bool operator==(const iterator_t &other) const {
       return this->index == other.index;
     }
 
-  protected:
+   protected:
     //! protected constructor
-    iterator_t (const Parent& map,
-                size_t start):
-      raw_ptr{map.get_data()}, map{map}, index{start} { }
+    iterator_t(const Parent &map, size_t start)
+        : raw_ptr{map.get_data()}, map{map}, index{start} {}
 
     template <bool dummy_non_const = not IsConst>
-    iterator_t (std::enable_if_t<dummy_non_const, Parent&> map,
-                size_t start):
-      raw_ptr{map.data}, map{map}, index{start} {
-        static_assert(dummy_non_const == not IsConst, "SFINAE");}
+    iterator_t(std::enable_if_t<dummy_non_const, Parent &> map, size_t start)
+        : raw_ptr{map.data}, map{map}, index{start} {
+      static_assert(dummy_non_const == not IsConst, "SFINAE");
+    }
     //! raw data
     T_ptr raw_ptr;
     //! ref to underlying map
-    const Parent & map;
+    const Parent &map;
     //! currently pointed-to element
     size_t index;
-  private:
+
+   private:
   };
-}  // muSpectre
+}  // namespace muSpectre
 
-
-#endif /* FIELD_MAP_H */
+#endif  // SRC_COMMON_FIELD_MAP_HH_

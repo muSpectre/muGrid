@@ -5,7 +5,7 @@
  *
  * @date   30 Aug 2018
  *
- * @brief  helper functions that needed to be sequestered to avoid circular 
+ * @brief  helper functions that needed to be sequestered to avoid circular
  *         inclusions
  *
  * Copyright © 2018 Till Junge
@@ -33,8 +33,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef FIELD_HELPERS_H
-#define FIELD_HELPERS_H
+#ifndef SRC_COMMON_FIELD_HELPERS_HH_
+#define SRC_COMMON_FIELD_HELPERS_HH_
 
 #include <memory>
 
@@ -45,19 +45,15 @@ namespace muSpectre {
    * are properly registered and linked to a collection.
    */
   template <class FieldType, class FieldCollection, typename... Args>
-  inline FieldType &
-  make_field(std::string unique_name,
-             FieldCollection & collection,
-             Args&&... args) {
+  inline FieldType &make_field(std::string unique_name,
+                               FieldCollection &collection, Args &&... args) {
     std::unique_ptr<FieldType> ptr{
-      new FieldType(unique_name, collection, args...)};
-    auto& retref{*ptr};
+        new FieldType(unique_name, collection, args...)};
+    auto &retref{*ptr};
     collection.register_field(std::move(ptr));
     return retref;
   }
 
+}  // namespace muSpectre
 
-
-}  // muSpectre
-
-#endif /* FIELD_HELPERS_H */
+#endif  // SRC_COMMON_FIELD_HELPERS_HH_

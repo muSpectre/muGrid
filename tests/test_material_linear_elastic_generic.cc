@@ -38,38 +38,33 @@
 
 #include <boost/mpl/list.hpp>
 
-
 namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE(material_linear_elastic_generic);
 
-  template <Dim_t Dim>
-  struct MatFixture
-  {
+  template <Dim_t Dim> struct MatFixture {
     using Mat_t = MaterialLinearElasticGeneric<Dim, Dim>;
     using T2_t = Eigen::Matrix<Real, Dim, Dim>;
     using T4_t = T4Mat<Real, Dim>;
     using V_t = Eigen::Matrix<Real, vsize(Dim), vsize(Dim)>;
     constexpr static Real lambda{2}, mu{1.5};
-    constexpr static Real get_lambda() {return lambda;}
-    constexpr static Real get_mu() {return mu;}
-    constexpr static Real young{mu*(3*lambda + 2*mu)/(lambda + mu)};
-    constexpr static Real poisson{lambda/(2*(lambda + mu))};
+    constexpr static Real get_lambda() { return lambda; }
+    constexpr static Real get_mu() { return mu; }
+    constexpr static Real young{mu * (3 * lambda + 2 * mu) / (lambda + mu)};
+    constexpr static Real poisson{lambda / (2 * (lambda + mu))};
     using Hooke = MatTB::Hooke<Dim, T2_t, T4_t>;
 
-    MatFixture():
-      C_voigt{get_C_voigt()},
-      mat("material", this->C_voigt)
-    {}
+    MatFixture() : C_voigt{get_C_voigt()}, mat("material", this->C_voigt) {}
 
     static V_t get_C_voigt() {
       V_t C{};
       C.setZero();
       C.template topLeftCorner<Dim, Dim>().setConstant(get_lambda());
-      C.template topLeftCorner<Dim, Dim>() += 2*get_mu()*T2_t::Identity();
-      constexpr Dim_t Rest{vsize(Dim)-Dim};
+      C.template topLeftCorner<Dim, Dim>() += 2 * get_mu() * T2_t::Identity();
+      constexpr Dim_t Rest{vsize(Dim) - Dim};
       using Rest_t = Eigen::Matrix<Real, Rest, Rest>;
-      C.template bottomRightCorner<Rest, Rest>() += get_mu()*Rest_t::Identity();
+      C.template bottomRightCorner<Rest, Rest>() +=
+          get_mu() * Rest_t::Identity();
       return C;
     }
 
@@ -77,16 +72,16 @@ namespace muSpectre {
     Mat_t mat;
   };
 
-  using mats = boost::mpl::list <MatFixture<  twoD>,
-                                 MatFixture<threeD>>;
+  using mats = boost::mpl::list<MatFixture<twoD>, MatFixture<threeD>>;
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(C_test, Fix, mats, Fix) {
-    const auto ref_C{Fix::Hooke::compute_C_T4(Fix::get_lambda(), Fix::get_mu())};
+    const auto ref_C{
+        Fix::Hooke::compute_C_T4(Fix::get_lambda(), Fix::get_mu())};
 
-    Real error{(ref_C-Fix::mat.get_C()).norm()};
+    Real error{(ref_C - Fix::mat.get_C()).norm()};
     BOOST_CHECK_LT(error, tol);
 
-    if (not (error < tol)) {
+    if (not(error < tol)) {
       std::cout << "ref:" << std::endl << ref_C << std::endl;
       std::cout << "new:" << std::endl << Fix::mat.get_C() << std::endl;
     }
@@ -94,4 +89,4 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE_END();
 
-}  // muSpectre
+}  // namespace muSpectre

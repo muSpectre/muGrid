@@ -35,8 +35,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef PROJECTION_SMALL_STRAIN_H
-#define PROJECTION_SMALL_STRAIN_H
+#ifndef SRC_FFT_PROJECTION_SMALL_STRAIN_HH_
+#define SRC_FFT_PROJECTION_SMALL_STRAIN_HH_
 
 #include "fft/projection_default.hh"
 
@@ -50,14 +50,13 @@ namespace muSpectre {
    * :903–926)
    */
   template <Dim_t DimS, Dim_t DimM>
-  class ProjectionSmallStrain: public ProjectionDefault<DimS, DimM>
-  {
-  public:
-    using Parent = ProjectionDefault<DimS, DimM>; //!< base class
+  class ProjectionSmallStrain : public ProjectionDefault<DimS, DimM> {
+   public:
+    using Parent = ProjectionDefault<DimS, DimM>;  //!< base class
     //! polymorphic pointer to FFT engines
     using FFTEngine_ptr = typename Parent::FFTEngine_ptr;
-    using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
-    using Rcoord = typename Parent::Rcoord; //!< spatial coordinates type
+    using Ccoord = typename Parent::Ccoord;  //!< cell coordinates type
+    using Rcoord = typename Parent::Rcoord;  //!< spatial coordinates type
     //! local field collection (for Fourier-space representations)
     using LFieldCollection_t = LocalFieldCollection<DimS>;
     //! Fourier-space field containing the projection operator itself
@@ -65,7 +64,8 @@ namespace muSpectre {
     //! iterable operator
     using Proj_map = T4MatrixFieldMap<LFieldCollection_t, Real, DimM>;
     //! iterable vectorised version of the Fourier-space tensor field
-    using Vector_map = MatrixFieldMap<LFieldCollection_t, Complex, DimM*DimM, 1>;
+    using Vector_map =
+        MatrixFieldMap<LFieldCollection_t, Complex, DimM * DimM, 1>;
 
     //! Default constructor
     ProjectionSmallStrain() = delete;
@@ -83,19 +83,17 @@ namespace muSpectre {
     virtual ~ProjectionSmallStrain() = default;
 
     //! Copy assignment operator
-    ProjectionSmallStrain& operator=(const ProjectionSmallStrain &other) = delete;
+    ProjectionSmallStrain &
+    operator=(const ProjectionSmallStrain &other) = delete;
 
     //! Move assignment operator
-    ProjectionSmallStrain& operator=(ProjectionSmallStrain &&other) = delete;
+    ProjectionSmallStrain &operator=(ProjectionSmallStrain &&other) = delete;
 
     //! initialises the fft engine (plan the transform)
-    virtual void initialise(FFT_PlanFlags flags = FFT_PlanFlags::estimate) override final;
-
-  protected:
-  private:
+    void
+    initialise(FFT_PlanFlags flags = FFT_PlanFlags::estimate) final;
   };
 
+}  // namespace muSpectre
 
-}  // muSpectre
-
-#endif /* PROJECTION_SMALL_STRAIN_H */
+#endif  // SRC_FFT_PROJECTION_SMALL_STRAIN_HH_

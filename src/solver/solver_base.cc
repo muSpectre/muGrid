@@ -37,14 +37,11 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  SolverBase::SolverBase(Cell & cell, Real tol, Uint maxiter, bool verbose):
-    cell(cell), tol{tol}, maxiter{maxiter}, verbose{verbose}
-  {}
+  SolverBase::SolverBase(Cell &cell, Real tol, Uint maxiter, bool verbose)
+      : cell(cell), tol{tol}, maxiter{maxiter}, verbose{verbose} {}
 
   /* ---------------------------------------------------------------------- */
-  bool SolverBase::has_converged() const {
-    return this->converged;
-  }
+  bool SolverBase::has_converged() const { return this->converged; }
 
   /* ---------------------------------------------------------------------- */
   void SolverBase::reset_counter() {
@@ -53,18 +50,12 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  Uint SolverBase::get_counter() const {
-    return this->counter;
-  }
+  Uint SolverBase::get_counter() const { return this->counter; }
 
   /* ---------------------------------------------------------------------- */
-  Real SolverBase::get_tol() const {
-    return this->tol;
-  }
+  Real SolverBase::get_tol() const { return this->tol; }
 
   /* ---------------------------------------------------------------------- */
-  Uint SolverBase::get_maxiter() const {
-    return this->maxiter;
-  }
+  Uint SolverBase::get_maxiter() const { return this->maxiter; }
 
-}  // muSpectre
+}  // namespace muSpectre

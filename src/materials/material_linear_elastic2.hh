@@ -34,8 +34,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef MATERIAL_LINEAR_ELASTIC_EIGENSTRAIN_H
-#define MATERIAL_LINEAR_ELASTIC_EIGENSTRAIN_H
+#ifndef SRC_MATERIALS_MATERIAL_LINEAR_ELASTIC2_HH_
+#define SRC_MATERIALS_MATERIAL_LINEAR_ELASTIC2_HH_
 
 #include "materials/material_linear_elastic1.hh"
 #include "common/field.hh"
@@ -44,21 +44,20 @@
 
 namespace muSpectre {
 
-  template <Dim_t DimS, Dim_t DimM>
-  class MaterialLinearElastic2;
+  template <Dim_t DimS, Dim_t DimM> class MaterialLinearElastic2;
 
   /**
    * traits for objective linear elasticity with eigenstrain
    */
   template <Dim_t DimS, Dim_t DimM>
-  struct MaterialMuSpectre_traits<MaterialLinearElastic2<DimS, DimM>>
-  {
+  struct MaterialMuSpectre_traits<MaterialLinearElastic2<DimS, DimM>> {
     //! global field collection
-    using GFieldCollection_t = typename
-      MaterialBase<DimS, DimM>::GFieldCollection_t;
+    using GFieldCollection_t =
+        typename MaterialBase<DimS, DimM>::GFieldCollection_t;
 
     //! expected map type for strain fields
-    using StrainMap_t = MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM, true>;
+    using StrainMap_t =
+        MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM, true>;
     //! expected map type for stress fields
     using StressMap_t = MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
     //! expected map type for tangent stiffness fields
@@ -75,24 +74,22 @@ namespace muSpectre {
     using LStrainMap_t = MatrixFieldMap<LFieldColl_t, Real, DimM, DimM, true>;
     //! elasticity with eigenstrain
     using InternalVariables = std::tuple<LStrainMap_t>;
-
   };
 
   /**
    * implements objective linear elasticity with an eigenstrain per pixel
    */
   template <Dim_t DimS, Dim_t DimM>
-  class MaterialLinearElastic2:
-    public MaterialMuSpectre<MaterialLinearElastic2<DimS, DimM>, DimS, DimM>
-  {
-  public:
-
+  class MaterialLinearElastic2
+      : public MaterialMuSpectre<MaterialLinearElastic2<DimS, DimM>, DimS,
+                                 DimM> {
+   public:
     //! base class
     using Parent = MaterialMuSpectre<MaterialLinearElastic2, DimS, DimM>;
 
     //! type for stiffness tensor construction
-    using Stiffness_t = Eigen::TensorFixedSize
-      <Real, Eigen::Sizes<DimM, DimM, DimM, DimM>>;
+    using Stiffness_t =
+        Eigen::TensorFixedSize<Real, Eigen::Sizes<DimM, DimM, DimM, DimM>>;
 
     //! traits of this material
     using traits = MaterialMuSpectre_traits<MaterialLinearElastic2>;
@@ -101,10 +98,9 @@ namespace muSpectre {
     using InternalVariables = typename traits::InternalVariables;
 
     //! Hooke's law implementation
-    using Hooke = typename
-      MatTB::Hooke<DimM,
-                   typename traits::StrainMap_t::reference,
-                   typename traits::TangentMap_t::reference>;
+    using Hooke =
+        typename MatTB::Hooke<DimM, typename traits::StrainMap_t::reference,
+                              typename traits::TangentMap_t::reference>;
 
     //! reference to any type that casts to a matrix
     using StrainTensor = Eigen::Ref<Eigen::Matrix<Real, DimM, DimM>>;
@@ -113,7 +109,6 @@ namespace muSpectre {
 
     //! Construct by name, Young's modulus and Poisson's ratio
     MaterialLinearElastic2(std::string name, Real young, Real poisson);
-
 
     //! Copy constructor
     MaterialLinearElastic2(const MaterialLinearElastic2 &other) = delete;
@@ -125,17 +120,18 @@ namespace muSpectre {
     virtual ~MaterialLinearElastic2() = default;
 
     //! Copy assignment operator
-    MaterialLinearElastic2& operator=(const MaterialLinearElastic2 &other) = delete;
+    MaterialLinearElastic2 &
+    operator=(const MaterialLinearElastic2 &other) = delete;
 
     //! Move assignment operator
-    MaterialLinearElastic2& operator=(MaterialLinearElastic2 &&other) = delete;
+    MaterialLinearElastic2 &operator=(MaterialLinearElastic2 &&other) = delete;
 
     /**
      * evaluates second Piola-Kirchhoff stress given the Green-Lagrange
      * strain (or Cauchy stress if called with a small strain tensor)
      */
     template <class s_t, class eigen_s_t>
-    inline decltype(auto) evaluate_stress(s_t && E, eigen_s_t && E_eig);
+    inline decltype(auto) evaluate_stress(s_t &&E, eigen_s_t &&E_eig);
 
     /**
      * evaluates both second Piola-Kirchhoff stress and stiffness given
@@ -143,64 +139,63 @@ namespace muSpectre {
      * called with a small strain tensor)
      */
     template <class s_t, class eigen_s_t>
-    inline decltype(auto)
-    evaluate_stress_tangent(s_t &&  E, eigen_s_t && E_eig);
+    inline decltype(auto) evaluate_stress_tangent(s_t &&E, eigen_s_t &&E_eig);
 
     /**
      * return the internals tuple
      */
-    InternalVariables & get_internals() {
-      return this->internal_variables;};
+    InternalVariables &get_internals() { return this->internal_variables; }
 
     /**
      * overload add_pixel to write into eigenstrain
      */
-    void add_pixel(const Ccoord_t<DimS> & pixel) override final;
+    void add_pixel(const Ccoord_t<DimS> &pixel) final;
 
     /**
      * overload add_pixel to write into eigenstrain
      */
-    void add_pixel(const Ccoord_t<DimS> & pixel,
-                   const StrainTensor & E_eig);
+    void add_pixel(const Ccoord_t<DimS> &pixel, const StrainTensor &E_eig);
 
-  protected:
+   protected:
     //! linear material without eigenstrain used to compute response
     MaterialLinearElastic1<DimS, DimM> material;
     //! storage for eigenstrain
     using Field_t =
-      TensorField<LocalFieldCollection<DimS>, Real, secondOrder, DimM>;
-    Field_t & eigen_field; //!< field holding the eigen strain per pixel
+        TensorField<LocalFieldCollection<DimS>, Real, secondOrder, DimM>;
+    Field_t &eigen_field;  //!< field holding the eigen strain per pixel
     //! tuple for iterable eigen_field
     InternalVariables internal_variables;
-  private:
+
+   private:
   };
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   template <class s_t, class eigen_s_t>
-  auto
-  MaterialLinearElastic2<DimS, DimM>::
-  evaluate_stress(s_t && E, eigen_s_t && E_eig) -> decltype(auto) {
-    return this->material.evaluate_stress(E-E_eig);
+  auto MaterialLinearElastic2<DimS, DimM>::evaluate_stress(s_t &&E,
+                                                           eigen_s_t &&E_eig)
+      -> decltype(auto) {
+    return this->material.evaluate_stress(E - E_eig);
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   template <class s_t, class eigen_s_t>
-  auto
-  MaterialLinearElastic2<DimS, DimM>::
-  evaluate_stress_tangent(s_t && E, eigen_s_t && E_eig) -> decltype(auto) {
+  auto MaterialLinearElastic2<DimS, DimM>::evaluate_stress_tangent(
+      s_t &&E, eigen_s_t &&E_eig) -> decltype(auto) {
     // using mat = Eigen::Matrix<Real, DimM, DimM>;
     // mat ecopy{E};
     // mat eig_copy{E_eig};
     // mat ediff{ecopy-eig_copy};
-    // std::cout << "eidff - (E-E_eig)" << std::endl << ediff-(E-E_eig) << std::endl;
-    // std::cout << "P1 <internal>" << std::endl << mat{std::get<0>(this->material.evaluate_stress_tangent(E-E_eig))} << "</internal>" << std::endl;
-    // std::cout << "P2" << std::endl << mat{std::get<0>(this->material.evaluate_stress_tangent(std::move(ediff)))} << std::endl;
-    return this->material.evaluate_stress_tangent(E-E_eig);
+    // std::cout << "eidff - (E-E_eig)" << std::endl << ediff-(E-E_eig) <<
+    // std::endl; std::cout << "P1 <internal>" << std::endl <<
+    // mat{std::get<0>(this->material.evaluate_stress_tangent(E-E_eig))} <<
+    // "</internal>" << std::endl; std::cout << "P2" << std::endl <<
+    // mat{std::get<0>(this->material.evaluate_stress_tangent(std::move(ediff)))}
+    // << std::endl;
+    return this->material.evaluate_stress_tangent(E - E_eig);
   }
 
+}  // namespace muSpectre
 
-}  // muSpectre
-
-#endif /* MATERIAL_LINEAR_ELASTIC_EIGENSTRAIN_H */
+#endif  // SRC_MATERIALS_MATERIAL_LINEAR_ELASTIC2_HH_

@@ -38,16 +38,14 @@ namespace muSpectre {
 
   //----------------------------------------------------------------------------//
   template <Dim_t DimS, Dim_t DimM>
-  MaterialBase<DimS, DimM>::MaterialBase(std::string name)
-    :name(name) {
-    static_assert((DimM == oneD)||
-                  (DimM == twoD)||
-                  (DimM == threeD), "only 1, 2, or threeD supported");
+  MaterialBase<DimS, DimM>::MaterialBase(std::string name) : name(name) {
+    static_assert((DimM == oneD) || (DimM == twoD) || (DimM == threeD),
+                  "only 1, 2, or threeD supported");
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  const std::string & MaterialBase<DimS, DimM>::get_name() const {
+  const std::string &MaterialBase<DimS, DimM>::get_name() const {
     return this->name;
   }
 
@@ -59,28 +57,25 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void MaterialBase<DimS, DimM>::compute_stresses(const Field_t & F,
-                                                  Field_t & P,
+  void MaterialBase<DimS, DimM>::compute_stresses(const Field_t &F, Field_t &P,
                                                   Formulation form) {
     this->compute_stresses(StrainField_t::check_ref(F),
-                           StressField_t::check_ref(P),
-                           form);
+                           StressField_t::check_ref(P), form);
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void MaterialBase<DimS, DimM>::compute_stresses_tangent(const Field_t & F,
-                                                          Field_t & P,
-                                                          Field_t & K,
+  void MaterialBase<DimS, DimM>::compute_stresses_tangent(const Field_t &F,
+                                                          Field_t &P,
+                                                          Field_t &K,
                                                           Formulation form) {
     this->compute_stresses_tangent(StrainField_t::check_ref(F),
                                    StressField_t::check_ref(P),
-                                   TangentField_t::check_ref(K),
-                                   form);
+                                   TangentField_t::check_ref(K), form);
   }
 
   template class MaterialBase<2, 2>;
   template class MaterialBase<2, 3>;
   template class MaterialBase<3, 3>;
 
-}  // muSpectre
+}  // namespace muSpectre

@@ -34,8 +34,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef DEPRECATED_SOLVER_CG_H
-#define DEPRECATED_SOLVER_CG_H
+#ifndef SRC_SOLVER_DEPRECATED_SOLVER_CG_HH_
+#define SRC_SOLVER_DEPRECATED_SOLVER_CG_HH_
 
 #include "solver/deprecated_solver_base.hh"
 #include "common/communicator.hh"
@@ -52,24 +52,23 @@ namespace muSpectre {
    * production runs, it is probably better to use
    * `muSpectre::DeprecatedSolverCGEigen`.
    */
-  template <Dim_t DimS, Dim_t DimM=DimS>
-  class DeprecatedSolverCG: public DeprecatedSolverBase<DimS, DimM>
-  {
-  public:
-    using Parent = DeprecatedSolverBase<DimS, DimM>; //!< base class
+  template <Dim_t DimS, Dim_t DimM = DimS>
+  class DeprecatedSolverCG : public DeprecatedSolverBase<DimS, DimM> {
+   public:
+    using Parent = DeprecatedSolverBase<DimS, DimM>;  //!< base class
     //! Input vector for solvers
     using SolvVectorIn = typename Parent::SolvVectorIn;
     //! Input vector for solvers
     using SolvVectorInC = typename Parent::SolvVectorInC;
     //! Output vector for solvers
     using SolvVectorOut = typename Parent::SolvVectorOut;
-    using Cell_t = typename Parent::Cell_t; //!< cell type
-    using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
+    using Cell_t = typename Parent::Cell_t;  //!< cell type
+    using Ccoord = typename Parent::Ccoord;  //!< cell coordinates type
     //! kind of tangent that is required
     using Tg_req_t = typename Parent::TangentRequirement;
     //! cg only needs to handle fields that look like strain and stress
-    using Field_t = TensorField<
-      typename Parent::Collection_t, Real, secondOrder, DimM>;
+    using Field_t =
+        TensorField<typename Parent::Collection_t, Real, secondOrder, DimM>;
 
     //! conjugate gradient needs directional stiffness
     constexpr static Tg_req_t tangent_requirement{Tg_req_t::NeedEffect};
@@ -77,7 +76,8 @@ namespace muSpectre {
     DeprecatedSolverCG() = delete;
 
     //! Constructor with domain resolutions, etc,
-    DeprecatedSolverCG(Cell_t& cell, Real tol, Uint maxiter=0, bool verbose=false);
+    DeprecatedSolverCG(Cell_t &cell, Real tol, Uint maxiter = 0,
+                       bool verbose = false);
 
     //! Copy constructor
     DeprecatedSolverCG(const DeprecatedSolverCG &other) = delete;
@@ -89,33 +89,35 @@ namespace muSpectre {
     virtual ~DeprecatedSolverCG() = default;
 
     //! Copy assignment operator
-    DeprecatedSolverCG& operator=(const DeprecatedSolverCG &other) = delete;
+    DeprecatedSolverCG &operator=(const DeprecatedSolverCG &other) = delete;
 
     //! Move assignment operator
-    DeprecatedSolverCG& operator=(DeprecatedSolverCG &&other) = default;
+    DeprecatedSolverCG &operator=(DeprecatedSolverCG &&other) = default;
 
-    bool has_converged() const override final {return this->converged;}
+    bool has_converged() const final { return this->converged; }
 
     //! actual solver
-    void solve(const Field_t & rhs,
-               Field_t & x);
+    void solve(const Field_t &rhs, Field_t &x);
 
-    // this simplistic implementation has no initialisation phase so the default is ok
+    // this simplistic implementation has no initialisation phase so the default
+    // is ok
 
-    SolvVectorOut solve(const SolvVectorInC rhs, SolvVectorIn x_0) override final;
+    SolvVectorOut solve(const SolvVectorInC rhs,
+                        SolvVectorIn x_0) final;
 
-    std::string name() const override final {return "CG";}
+    std::string name() const final { return "CG"; }
 
-  protected:
+   protected:
     //! returns `muSpectre::Tg_req_t::NeedEffect`
-    Tg_req_t get_tangent_req() const override final;
-    Field_t & r_k;  //!< residual
-    Field_t & p_k;  //!< search direction
-    Field_t & Ap_k; //!< effect of tangent on search direction
-    bool converged{false}; //!< whether the solver has converged
-  private:
+    Tg_req_t get_tangent_req() const final;
+    Field_t &r_k;           //!< residual
+    Field_t &p_k;           //!< search direction
+    Field_t &Ap_k;          //!< effect of tangent on search direction
+    bool converged{false};  //!< whether the solver has converged
+
+   private:
   };
 
-}  // muSpectre
+}  // namespace muSpectre
 
-#endif /* DEPRECATED_SOLVER_CG_H */
+#endif  // SRC_SOLVER_DEPRECATED_SOLVER_CG_HH_

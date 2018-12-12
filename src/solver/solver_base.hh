@@ -32,8 +32,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef SOLVER_BASE_H
-#define SOLVER_BASE_H
+#ifndef SRC_SOLVER_SOLVER_BASE_HH_
+#define SRC_SOLVER_SOLVER_BASE_HH_
 
 #include "solver/solver_common.hh"
 #include "cell/cell_base.hh"
@@ -46,10 +46,8 @@ namespace muSpectre {
    * Virtual base class for solvers. An implementation of this interface
    * can be used with the solution strategies in solvers.hh
    */
-  class SolverBase
-  {
-  public:
-
+  class SolverBase {
+   public:
     //! underlying vector type
     using Vector_t = Eigen::Matrix<Real, Eigen::Dynamic, 1>;
     //! Input vector for solvers
@@ -66,7 +64,7 @@ namespace muSpectre {
      * Constructor takes a Cell, tolerance, max number of iterations
      * and verbosity flag as input
      */
-    SolverBase(Cell & cell, Real tol, Uint maxiter, bool verbose=false);
+    SolverBase(Cell &cell, Real tol, Uint maxiter, bool verbose = false);
 
     //! Copy constructor
     SolverBase(const SolverBase &other) = delete;
@@ -78,16 +76,16 @@ namespace muSpectre {
     virtual ~SolverBase() = default;
 
     //! Copy assignment operator
-    SolverBase& operator=(const SolverBase &other) = delete;
+    SolverBase &operator=(const SolverBase &other) = delete;
 
     //! Move assignment operator
-    SolverBase& operator=(SolverBase &&other) = default;
+    SolverBase &operator=(SolverBase &&other) = default;
 
     //! Allocate fields used during the solution
     virtual void initialise() = 0;
 
     //! returns whether the solver has converged
-    bool has_converged() const ;
+    bool has_converged() const;
 
     //! reset the iteration counter to zero
     void reset_counter();
@@ -108,18 +106,17 @@ namespace muSpectre {
     //! run the solve operation
     virtual Vector_map solve(const ConstVector_ref rhs) = 0;
 
-  protected:
-    Cell & cell;           //!< reference to the problem's cell
-    Real tol;              //!< convergence tolerance
-    Uint maxiter;          //!< maximum allowed number of iterations
-    bool verbose;          //!< whether to write information to the stdout
-    Uint counter{0};       //!< iteration counter
-    bool converged{false}; //!< whether the solver has converged
+   protected:
+    Cell &cell;             //!< reference to the problem's cell
+    Real tol;               //!< convergence tolerance
+    Uint maxiter;           //!< maximum allowed number of iterations
+    bool verbose;           //!< whether to write information to the stdout
+    Uint counter{0};        //!< iteration counter
+    bool converged{false};  //!< whether the solver has converged
 
-  private:
+   private:
   };
 
+}  // namespace muSpectre
 
-}  // muSpectre
-
-#endif /* SOLVER_BASE_H */
+#endif  // SRC_SOLVER_SOLVER_BASE_HH_

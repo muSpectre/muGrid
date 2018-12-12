@@ -32,18 +32,18 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef BIND_PY_DECLARATIONS_H
-#define BIND_PY_DECLARATIONS_H
+#ifndef LANGUAGE_BINDINGS_PYTHON_BIND_PY_DECLARATIONS_HH_
+#define LANGUAGE_BINDINGS_PYTHON_BIND_PY_DECLARATIONS_HH_
 
 #include <pybind11/pybind11.h>
 namespace py = pybind11;
 
-void add_common(py::module & mod);
-void add_cell(py::module & mod);
-void add_material(py::module & mod);
-void add_solvers(py::module & mod);
-void add_fft_engines(py::module & mod);
-void add_projections(py::module & submodule);
-void add_field_collections(py::module & submodule);
+void add_common(py::module &mod);
+void add_cell(py::module &mod);
+void add_material(py::module &mod);
+void add_solvers(py::module &mod);
+void add_fft_engines(py::module &mod);
+void add_projections(py::module &submodule);
+void add_field_collections(py::module &submodule);
 
-#endif /* BIND_PY_DECLARATIONS_H */
+#endif  // LANGUAGE_BINDINGS_PYTHON_BIND_PY_DECLARATIONS_HH_

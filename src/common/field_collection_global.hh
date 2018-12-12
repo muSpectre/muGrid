@@ -32,42 +32,38 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
+#ifndef SRC_COMMON_FIELD_COLLECTION_GLOBAL_HH_
+#define SRC_COMMON_FIELD_COLLECTION_GLOBAL_HH_
 
-#ifndef FIELD_COLLECTION_GLOBAL_H
-#define FIELD_COLLECTION_GLOBAL_H
-
-#include "common/field_collection_base.hh"
 #include "common/ccoord_operations.hh"
-
+#include "common/field_collection_base.hh"
 
 namespace muSpectre {
 
   /**
    * forward declaration
    */
-  template <Dim_t DimS>
-  class LocalFieldCollection;
+  template <Dim_t DimS> class LocalFieldCollection;
 
   /** `GlobalFieldCollection` derives from `FieldCollectionBase` and stores
-    * global fields that live throughout the whole computational domain, i.e.
-    * are defined for each pixel.
-    */
+   * global fields that live throughout the whole computational domain, i.e.
+   * are defined for each pixel.
+   */
   template <Dim_t DimS>
-  class GlobalFieldCollection:
-    public FieldCollectionBase<DimS, GlobalFieldCollection<DimS>>
-  {
-  public:
+  class GlobalFieldCollection
+      : public FieldCollectionBase<DimS, GlobalFieldCollection<DimS>> {
+   public:
     //! for compile time check
     constexpr static bool Global{true};
 
-    using Parent = FieldCollectionBase
-      <DimS, GlobalFieldCollection<DimS>>; //!< base class
+    using Parent =
+        FieldCollectionBase<DimS, GlobalFieldCollection<DimS>>;  //!< base class
     //! helpful for functions that fill global fields from local fields
     using LocalFieldCollection_t = LocalFieldCollection<DimS>;
     //! helpful for functions that fill global fields from local fields
     using GlobalFieldCollection_t = GlobalFieldCollection<DimS>;
-    using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
-    using Field_p = typename Parent::Field_p; //!< spatial coordinates type
+    using Ccoord = typename Parent::Ccoord;    //!< cell coordinates type
+    using Field_p = typename Parent::Field_p;  //!< spatial coordinates type
     //! iterator over all pixels contained it the collection
     using iterator = typename CcoordOps::Pixels<DimS>::iterator;
     //! Default constructor
@@ -77,19 +73,17 @@ namespace muSpectre {
     GlobalFieldCollection(const GlobalFieldCollection &other) = delete;
 
     //! Move constructor
-    GlobalFieldCollection
-      (GlobalFieldCollection &&other) = default;
+    GlobalFieldCollection(GlobalFieldCollection &&other) = default;
 
     //! Destructor
-    virtual ~GlobalFieldCollection()  = default;
+    virtual ~GlobalFieldCollection() = default;
 
     //! Copy assignment operator
-    GlobalFieldCollection&
+    GlobalFieldCollection &
     operator=(const GlobalFieldCollection &other) = delete;
 
     //! Move assignment operator
-    GlobalFieldCollection&
-    operator=(GlobalFieldCollection &&other) = default;
+    GlobalFieldCollection &operator=(GlobalFieldCollection &&other) = default;
 
     /** allocate memory, etc. At this point, the collection is
         informed aboud the size and shape of the domain (through the
@@ -104,43 +98,40 @@ namespace muSpectre {
     inline void initialise(Ccoord sizes, Ccoord locations);
 
     //! return subdomain resolutions
-    inline const Ccoord & get_sizes() const;
+    inline const Ccoord &get_sizes() const;
     //! return subdomain locations
-    inline const Ccoord & get_locations() const;
+    inline const Ccoord &get_locations() const;
 
     //! returns the linear index corresponding to cell coordinates
     template <class CcoordRef>
-    inline size_t get_index(CcoordRef && ccoord) const;
+    inline size_t get_index(CcoordRef &&ccoord) const;
     //! returns the cell coordinates corresponding to a linear index
     inline Ccoord get_ccoord(size_t index) const;
 
-    inline iterator begin() const; //!< returns iterator to first pixel
-    inline iterator end() const; //!< returns iterator past the last pixel
+    inline iterator begin() const;  //!< returns iterator to first pixel
+    inline iterator end() const;    //!< returns iterator past the last pixel
 
     //! return spatial dimension (template parameter)
-    static constexpr inline Dim_t spatial_dim() {return DimS;}
+    static constexpr inline Dim_t spatial_dim() { return DimS; }
 
     //! return globalness at compile time
-    static constexpr inline bool is_global() {return Global;}
-  protected:
+    static constexpr inline bool is_global() { return Global; }
+
+   protected:
     //! number of discretisation cells in each of the DimS spatial directions
     Ccoord sizes{};
     Ccoord locations{};
-    CcoordOps::Pixels<DimS> pixels{}; //!< helper to iterate over the grid
-  private:
+    CcoordOps::Pixels<DimS> pixels{};  //!< helper to iterate over the grid
+   private:
   };
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS>
-  GlobalFieldCollection<DimS>::GlobalFieldCollection()
-    :Parent()
-  {}
-
+  GlobalFieldCollection<DimS>::GlobalFieldCollection() : Parent() {}
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS>
-  void GlobalFieldCollection<DimS>::
-  initialise(Ccoord sizes, Ccoord locations) {
+  void GlobalFieldCollection<DimS>::initialise(Ccoord sizes, Ccoord locations) {
     if (this->is_initialised) {
       throw std::runtime_error("double initialisation");
     }
@@ -149,21 +140,20 @@ namespace muSpectre {
     this->sizes = sizes;
     this->locations = locations;
 
-    std::for_each(std::begin(this->fields), std::end(this->fields),
-                  [this](auto && item) {
-                    auto && field = *item.second;
-                    const auto field_size = field.size();
-                    if (field_size == 0) {
-                      field.resize(this->size());
-                    } else if (field_size != this->size()) {
-                      std::stringstream err_stream;
-                      err_stream << "Field '" << field.get_name()
-                                 << "' contains " << field_size
-                                 << " entries, but the field collection "
-                                 << "has " << this->size() << " pixels";
-                      throw FieldCollectionError(err_stream.str());
-                    }
-                  });
+    std::for_each(
+        std::begin(this->fields), std::end(this->fields), [this](auto &&item) {
+          auto &&field = *item.second;
+          const auto field_size = field.size();
+          if (field_size == 0) {
+            field.resize(this->size());
+          } else if (field_size != this->size()) {
+            std::stringstream err_stream;
+            err_stream << "Field '" << field.get_name() << "' contains "
+                       << field_size << " entries, but the field collection "
+                       << "has " << this->size() << " pixels";
+            throw FieldCollectionError(err_stream.str());
+          }
+        });
     this->is_initialised = true;
   }
 
@@ -192,7 +182,6 @@ namespace muSpectre {
                                  std::move(index));
   }
 
-
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS>
   typename GlobalFieldCollection<DimS>::iterator
@@ -206,22 +195,19 @@ namespace muSpectre {
   GlobalFieldCollection<DimS>::end() const {
     return this->pixels.end();
   }
-  //----------------------------------------------------------------------------//
+  //-------------------------------------------------------------------------//
   //! returns the linear index corresponding to cell coordinates
   template <Dim_t DimS>
   template <class CcoordRef>
-  size_t
-  GlobalFieldCollection<DimS>::get_index(CcoordRef && ccoord) const {
-    static_assert(std::is_same<
-                    Ccoord,
-                    std::remove_const_t<
-                      std::remove_reference_t<CcoordRef>>>::value,
-                  "can only be called with values or references of Ccoord");
-    return CcoordOps::get_index(this->get_sizes(),
-                                this->get_locations(),
+  size_t GlobalFieldCollection<DimS>::get_index(CcoordRef &&ccoord) const {
+    static_assert(
+        std::is_same<Ccoord, std::remove_const_t<
+                                 std::remove_reference_t<CcoordRef>>>::value,
+        "can only be called with values or references of Ccoord");
+    return CcoordOps::get_index(this->get_sizes(), this->get_locations(),
                                 std::forward<CcoordRef>(ccoord));
   }
 
-}  // muSpectre
+}  // namespace muSpectre
 
-#endif /* FIELD_COLLECTION_GLOBAL_H */
+#endif  // SRC_COMMON_FIELD_COLLECTION_GLOBAL_HH_

@@ -68,6 +68,7 @@ if(${MPI_PARALLEL})
 endif(${MPI_PARALLEL})
 
 include(muspectreTools)
+include(cpplint)
 
 string( TOLOWER "${CMAKE_BUILD_TYPE}" build_type )
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
@@ -238,3 +239,9 @@ if(${MAKE_BENCHMARKS})
     target_link_libraries(${benchmark_name} ${BOOST_LIBRARIES} muSpectre)
   endforeach(benchmark ${benchmark})
 endif(${MAKE_BENCHMARKS})
+
+
+cpplint_add_subdirectory("${CMAKE_SOURCE_DIR}/src" "")
+cpplint_add_subdirectory("${CMAKE_SOURCE_DIR}/tests" "")
+cpplint_add_subdirectory("${CMAKE_SOURCE_DIR}/language_bindings" "")
+cpplint_add_subdirectory("${CMAKE_SOURCE_DIR}/bin" "--filter=-build/namespaces")

@@ -61,20 +61,21 @@ namespace muSpectre {
     constexpr Ccoord_t<dim> resolutions{5, 5, 5};
     constexpr Rcoord_t<dim> lengths{5, 5, 5};
     auto fft_ptr{std::make_unique<FFTWEngine<dim>>(resolutions, ipow(dim, 2))};
-    auto proj_ptr{std::make_unique<ProjectionFiniteStrainFast<dim, dim>>(std::move(fft_ptr), lengths)};
+    auto proj_ptr{std::make_unique<ProjectionFiniteStrainFast<dim, dim>>(
+        std::move(fft_ptr), lengths)};
     CellBase<dim, dim> sys(std::move(proj_ptr));
 
     using Mat_t = MaterialLinearElastic1<dim, dim>;
-    //const Real Young{210e9}, Poisson{.33};
+    // const Real Young{210e9}, Poisson{.33};
     const Real Young{1.0030648180242636}, Poisson{0.29930675909878679};
     // const Real lambda{Young*Poisson/((1+Poisson)*(1-2*Poisson))};
     // const Real mu{Young/(2*(1+Poisson))};
 
-    auto& Material_hard = Mat_t::make(sys, "hard", 10*Young, Poisson);
-    auto& Material_soft = Mat_t::make(sys, "soft",    Young, Poisson);
+    auto &Material_hard = Mat_t::make(sys, "hard", 10 * Young, Poisson);
+    auto &Material_soft = Mat_t::make(sys, "soft", Young, Poisson);
 
-    for (auto && tup: akantu::enumerate(sys)) {
-      auto && pixel = std::get<1>(tup);
+    for (auto &&tup : akantu::enumerate(sys)) {
+      auto &&pixel = std::get<1>(tup);
       if (std::get<0>(tup) == 0) {
         Material_hard.add_pixel(pixel);
       } else {
@@ -86,16 +87,22 @@ namespace muSpectre {
     Grad_t<dim> delF0;
     delF0 << 0, 1., 0, 0, 0, 0, 0, 0, 0;
     constexpr Real cg_tol{1e-8}, newton_tol{1e-5};
-    constexpr Uint maxiter{CcoordOps::get_size(resolutions)*ipow(dim, secondOrder)*10};
+    constexpr Uint maxiter{CcoordOps::get_size(resolutions) *
+                           ipow(dim, secondOrder) * 10};
     constexpr bool verbose{false};
 
-    GradIncrements<dim> grads; grads.push_back(delF0);
-    DeprecatedSolverCG<dim> cg{sys, cg_tol, maxiter, bool(verbose)};
-    Eigen::ArrayXXd res1{deprecated_de_geus(sys, grads, cg, newton_tol, verbose)[0].grad};
+    GradIncrements<dim> grads;
+    grads.push_back(delF0);
+    DeprecatedSolverCG<dim> cg{sys, cg_tol, maxiter,
+                               static_cast<bool>(verbose)};
+    Eigen::ArrayXXd res1{
+        deprecated_de_geus(sys, grads, cg, newton_tol, verbose)[0].grad};
 
-    DeprecatedSolverCG<dim> cg2{sys, cg_tol, maxiter, bool(verbose)};
-    Eigen::ArrayXXd res2{deprecated_newton_cg(sys, grads, cg2, newton_tol, verbose)[0].grad};
-    BOOST_CHECK_LE(abs(res1-res2).mean(), cg_tol);
+    DeprecatedSolverCG<dim> cg2{sys, cg_tol, maxiter,
+                                static_cast<bool>(verbose)};
+    Eigen::ArrayXXd res2{
+        deprecated_newton_cg(sys, grads, cg2, newton_tol, verbose)[0].grad};
+    BOOST_CHECK_LE(abs(res1 - res2).mean(), cg_tol);
   }
 
   BOOST_AUTO_TEST_CASE(small_strain_patch_test) {
@@ -117,10 +124,11 @@ namespace muSpectre {
 
     using Mat_t = MaterialLinearElastic1<dim, dim>;
     constexpr Real Young{2.}, Poisson{.33};
-    auto material_hard{std::make_unique<Mat_t>("hard", contrast*Young, Poisson)};
-    auto material_soft{std::make_unique<Mat_t>("soft",          Young, Poisson)};
+    auto material_hard{
+        std::make_unique<Mat_t>("hard", contrast * Young, Poisson)};
+    auto material_soft{std::make_unique<Mat_t>("soft", Young, Poisson)};
 
-    for (const auto & pixel: sys) {
+    for (const auto &pixel : sys) {
       if (pixel[0] < Dim_t(nb_lays)) {
         material_hard->add_pixel(pixel);
       } else {
@@ -134,16 +142,18 @@ namespace muSpectre {
 
     Grad_t<dim> delEps0{Grad_t<dim>::Zero()};
     constexpr Real eps0 = 1.;
-    //delEps0(0, 1) = delEps0(1, 0) = eps0;
+    // delEps0(0, 1) = delEps0(1, 0) = eps0;
     delEps0(0, 0) = eps0;
 
     constexpr Real cg_tol{1e-8}, newton_tol{1e-5}, equil_tol{1e-10};
-    constexpr Uint maxiter{dim*10};
+    constexpr Uint maxiter{dim * 10};
     constexpr Dim_t verbose{0};
 
-    DeprecatedSolverCGEigen<dim> cg{sys, cg_tol, maxiter, bool(verbose)};
-    auto result = deprecated_newton_cg(sys, delEps0, cg, newton_tol,//de_geus(sys, delEps0, cg, newton_tol,
-                          equil_tol, verbose);
+    DeprecatedSolverCGEigen<dim> cg{sys, cg_tol, maxiter,
+                                    static_cast<bool>(verbose)};
+    auto result = deprecated_newton_cg(
+        sys, delEps0, cg, newton_tol,  // de_geus(sys, delEps0, cg, newton_tol,
+        equil_tol, verbose);
     if (verbose) {
       std::cout << "result:" << std::endl << result.grad << std::endl;
       std::cout << "mean strain = " << std::endl
@@ -163,60 +173,61 @@ namespace muSpectre {
      *  => εₕ = 1/k εₛ
      *  => ε / (1/k Nₕ/Nₜₒₜ + (Nₜₒₜ-Nₕ)/Nₜₒₜ) = εₛ
      */
-    constexpr Real factor{1/contrast * Real(nb_lays)/resolutions[0]
-        + 1.-nb_lays/Real(resolutions[0])};
-    constexpr Real eps_soft{eps0/factor};
-    constexpr Real eps_hard{eps_soft/contrast};
+    constexpr Real factor{1 / contrast * Real(nb_lays) / resolutions[0] + 1. -
+                          nb_lays / Real(resolutions[0])};
+    constexpr Real eps_soft{eps0 / factor};
+    constexpr Real eps_hard{eps_soft / contrast};
     if (verbose) {
       std::cout << "εₕ = " << eps_hard << ", εₛ = " << eps_soft << std::endl;
       std::cout << "ε = εₕ Nₕ/Nₜₒₜ + εₛ (Nₜₒₜ-Nₕ)/Nₜₒₜ" << std::endl;
     }
-    Grad_t<dim> Eps_hard; Eps_hard << eps_hard, 0, 0, 0;
-    Grad_t<dim> Eps_soft; Eps_soft << eps_soft, 0, 0, 0;
+    Grad_t<dim> Eps_hard;
+    Eps_hard << eps_hard, 0, 0, 0;
+    Grad_t<dim> Eps_soft;
+    Eps_soft << eps_soft, 0, 0, 0;
 
     // verify uniaxial tension patch test
-    for (const auto & pixel: sys) {
+    for (const auto &pixel : sys) {
       if (pixel[0] < Dim_t(nb_lays)) {
-        BOOST_CHECK_LE((Eps_hard-sys.get_strain().get_map()[pixel]).norm(), tol);
+        BOOST_CHECK_LE((Eps_hard - sys.get_strain().get_map()[pixel]).norm(),
+                       tol);
       } else {
-        BOOST_CHECK_LE((Eps_soft-sys.get_strain().get_map()[pixel]).norm(), tol);
+        BOOST_CHECK_LE((Eps_soft - sys.get_strain().get_map()[pixel]).norm(),
+                       tol);
       }
     }
 
     delEps0 = Grad_t<dim>::Zero();
     delEps0(0, 1) = delEps0(1, 0) = eps0;
 
-    DeprecatedSolverCG<dim> cg2{sys, cg_tol, maxiter, bool(verbose)};
-    result = deprecated_newton_cg(sys, delEps0, cg2, newton_tol,
-                       equil_tol, verbose);
+    DeprecatedSolverCG<dim> cg2{sys, cg_tol, maxiter,
+                                static_cast<bool>(verbose)};
+    result =
+        deprecated_newton_cg(sys, delEps0, cg2, newton_tol, equil_tol, verbose);
     Eps_hard << 0, eps_hard, eps_hard, 0;
     Eps_soft << 0, eps_soft, eps_soft, 0;
 
     // verify pure shear patch test
-    for (const auto & pixel: sys) {
+    for (const auto &pixel : sys) {
       if (pixel[0] < Dim_t(nb_lays)) {
-        BOOST_CHECK_LE((Eps_hard-sys.get_strain().get_map()[pixel]).norm(), tol);
+        BOOST_CHECK_LE((Eps_hard - sys.get_strain().get_map()[pixel]).norm(),
+                       tol);
       } else {
-        BOOST_CHECK_LE((Eps_soft-sys.get_strain().get_map()[pixel]).norm(), tol);
+        BOOST_CHECK_LE((Eps_soft - sys.get_strain().get_map()[pixel]).norm(),
+                       tol);
       }
     }
   }
 
+  template <class SolverType> struct SolverFixture { using type = SolverType; };
 
-  template <class SolverType>
-  struct SolverFixture {
-    using type = SolverType;
-  };
+  using SolverList = boost::mpl::list<
+      SolverFixture<SolverCG>, SolverFixture<SolverCGEigen>,
+      SolverFixture<SolverGMRESEigen>, SolverFixture<SolverDGMRESEigen>,
+      SolverFixture<SolverBiCGSTABEigen>, SolverFixture<SolverMINRESEigen>>;
 
-  using SolverList = boost::mpl::list<SolverFixture<SolverCG>,
-                                      SolverFixture<SolverCGEigen>,
-                                      SolverFixture<SolverGMRESEigen>,
-                                      SolverFixture<SolverDGMRESEigen>,
-                                      SolverFixture<SolverBiCGSTABEigen>,
-                                      SolverFixture<SolverMINRESEigen>>;
-
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(small_strain_patch_dynamic_solver,
-                                   Fix, SolverList, Fix) {
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(small_strain_patch_dynamic_solver, Fix,
+                                   SolverList, Fix) {
     //  BOOST_AUTO_TEST_CASE(small_strain_patch_test_dynamic_solver) {
     constexpr Dim_t dim{twoD};
     using Ccoord = Ccoord_t<dim>;
@@ -236,10 +247,11 @@ namespace muSpectre {
 
     using Mat_t = MaterialLinearElastic1<dim, dim>;
     constexpr Real Young{2.}, Poisson{.33};
-    auto material_hard{std::make_unique<Mat_t>("hard", contrast*Young, Poisson)};
-    auto material_soft{std::make_unique<Mat_t>("soft",          Young, Poisson)};
+    auto material_hard{
+        std::make_unique<Mat_t>("hard", contrast * Young, Poisson)};
+    auto material_soft{std::make_unique<Mat_t>("soft", Young, Poisson)};
 
-    for (const auto & pixel: sys) {
+    for (const auto &pixel : sys) {
       if (pixel[0] < Dim_t(nb_lays)) {
         material_hard->add_pixel(pixel);
       } else {
@@ -253,17 +265,16 @@ namespace muSpectre {
 
     Grad_t<dim> delEps0{Grad_t<dim>::Zero()};
     constexpr Real eps0 = 1.;
-    //delEps0(0, 1) = delEps0(1, 0) = eps0;
+    // delEps0(0, 1) = delEps0(1, 0) = eps0;
     delEps0(0, 0) = eps0;
 
     constexpr Real cg_tol{1e-8}, newton_tol{1e-5}, equil_tol{1e-10};
-    constexpr Uint maxiter{dim*10};
+    constexpr Uint maxiter{dim * 10};
     constexpr Dim_t verbose{0};
 
     using Solver_t = typename Fix::type;
-    Solver_t cg{sys, cg_tol, maxiter, bool(verbose)};
-    auto result = newton_cg(sys, delEps0, cg, newton_tol,
-                                equil_tol, verbose);
+    Solver_t cg{sys, cg_tol, maxiter, static_cast<bool>(verbose)};
+    auto result = newton_cg(sys, delEps0, cg, newton_tol, equil_tol, verbose);
     if (verbose) {
       std::cout << "result:" << std::endl << result.grad << std::endl;
       std::cout << "mean strain = " << std::endl
@@ -283,41 +294,46 @@ namespace muSpectre {
      *  => εₕ = 1/k εₛ
      *  => ε / (1/k Nₕ/Nₜₒₜ + (Nₜₒₜ-Nₕ)/Nₜₒₜ) = εₛ
      */
-    constexpr Real factor{1/contrast * Real(nb_lays)/resolutions[0]
-        + 1.-nb_lays/Real(resolutions[0])};
-    constexpr Real eps_soft{eps0/factor};
-    constexpr Real eps_hard{eps_soft/contrast};
+    constexpr Real factor{1 / contrast * Real(nb_lays) / resolutions[0] + 1. -
+                          nb_lays / Real(resolutions[0])};
+    constexpr Real eps_soft{eps0 / factor};
+    constexpr Real eps_hard{eps_soft / contrast};
     if (verbose) {
       std::cout << "εₕ = " << eps_hard << ", εₛ = " << eps_soft << std::endl;
       std::cout << "ε = εₕ Nₕ/Nₜₒₜ + εₛ (Nₜₒₜ-Nₕ)/Nₜₒₜ" << std::endl;
     }
-    Grad_t<dim> Eps_hard; Eps_hard << eps_hard, 0, 0, 0;
-    Grad_t<dim> Eps_soft; Eps_soft << eps_soft, 0, 0, 0;
+    Grad_t<dim> Eps_hard;
+    Eps_hard << eps_hard, 0, 0, 0;
+    Grad_t<dim> Eps_soft;
+    Eps_soft << eps_soft, 0, 0, 0;
 
     // verify uniaxial tension patch test
-    for (const auto & pixel: sys) {
+    for (const auto &pixel : sys) {
       if (pixel[0] < Dim_t(nb_lays)) {
-        BOOST_CHECK_LE((Eps_hard-sys.get_strain().get_map()[pixel]).norm(), tol);
+        BOOST_CHECK_LE((Eps_hard - sys.get_strain().get_map()[pixel]).norm(),
+                       tol);
       } else {
-        BOOST_CHECK_LE((Eps_soft-sys.get_strain().get_map()[pixel]).norm(), tol);
+        BOOST_CHECK_LE((Eps_soft - sys.get_strain().get_map()[pixel]).norm(),
+                       tol);
       }
     }
 
     delEps0 = Grad_t<dim>::Zero();
     delEps0(0, 1) = delEps0(1, 0) = eps0;
 
-    Solver_t cg2{sys, cg_tol, maxiter, bool(verbose)};
-    result = de_geus(sys, delEps0, cg2, newton_tol,
-                         equil_tol, verbose);
+    Solver_t cg2{sys, cg_tol, maxiter, static_cast<bool>(verbose)};
+    result = de_geus(sys, delEps0, cg2, newton_tol, equil_tol, verbose);
     Eps_hard << 0, eps_hard, eps_hard, 0;
     Eps_soft << 0, eps_soft, eps_soft, 0;
 
     // verify pure shear patch test
-    for (const auto & pixel: sys) {
+    for (const auto &pixel : sys) {
       if (pixel[0] < Dim_t(nb_lays)) {
-        BOOST_CHECK_LE((Eps_hard-sys.get_strain().get_map()[pixel]).norm(), tol);
+        BOOST_CHECK_LE((Eps_hard - sys.get_strain().get_map()[pixel]).norm(),
+                       tol);
       } else {
-        BOOST_CHECK_LE((Eps_soft-sys.get_strain().get_map()[pixel]).norm(), tol);
+        BOOST_CHECK_LE((Eps_soft - sys.get_strain().get_map()[pixel]).norm(),
+                       tol);
       }
     }
   }
@@ -341,10 +357,11 @@ namespace muSpectre {
 
     using Mat_t = MaterialLinearElastic1<dim, dim>;
     constexpr Real Young{2.}, Poisson{.33};
-    auto material_hard{std::make_unique<Mat_t>("hard", contrast*Young, Poisson)};
-    auto material_soft{std::make_unique<Mat_t>("soft",          Young, Poisson)};
+    auto material_hard{
+        std::make_unique<Mat_t>("hard", contrast * Young, Poisson)};
+    auto material_soft{std::make_unique<Mat_t>("soft", Young, Poisson)};
 
-    for (const auto & pixel: sys) {
+    for (const auto &pixel : sys) {
       if (pixel[0] < Dim_t(nb_lays)) {
         material_hard->add_pixel(pixel);
       } else {
@@ -357,20 +374,21 @@ namespace muSpectre {
 
     Grad_t<dim> delEps0{Grad_t<dim>::Zero()};
     constexpr Real eps0 = 1.;
-    //delEps0(0, 1) = delEps0(1, 0) = eps0;
+    // delEps0(0, 1) = delEps0(1, 0) = eps0;
     delEps0(0, 0) = eps0;
 
     constexpr Real cg_tol{1e-8};
-    constexpr Uint maxiter{dim*10};
+    constexpr Uint maxiter{dim * 10};
     constexpr Dim_t verbose{0};
 
-    DeprecatedSolverCGEigen<dim> cg{sys, cg_tol, maxiter, bool(verbose)};
+    DeprecatedSolverCGEigen<dim> cg{sys, cg_tol, maxiter,
+                                    static_cast<bool>(verbose)};
     auto F = sys.get_strain_vector();
     F.setZero();
     sys.evaluate_stress_tangent();
     Eigen::VectorXd DelF(sys.get_nb_dof());
     using RMap_t = RawFieldMap<Eigen::Map<Grad_t<dim>>>;
-    for (auto tmp: RMap_t(DelF)) {
+    for (auto tmp : RMap_t(DelF)) {
       tmp = delEps0;
     }
     Eigen::VectorXd rhs = -sys.evaluate_projected_directional_stiffness(DelF);
@@ -399,33 +417,38 @@ namespace muSpectre {
      *  => εₕ = 1/k εₛ
      *  => ε / (1/k Nₕ/Nₜₒₜ + (Nₜₒₜ-Nₕ)/Nₜₒₜ) = εₛ
      */
-    constexpr Real factor{1/contrast * Real(nb_lays)/resolutions[0]
-        + 1.-nb_lays/Real(resolutions[0])};
-    constexpr Real eps_soft{eps0/factor};
-    constexpr Real eps_hard{eps_soft/contrast};
+    constexpr Real factor{1 / contrast * Real(nb_lays) / resolutions[0] + 1. -
+                          nb_lays / Real(resolutions[0])};
+    constexpr Real eps_soft{eps0 / factor};
+    constexpr Real eps_hard{eps_soft / contrast};
     if (verbose) {
       std::cout << "εₕ = " << eps_hard << ", εₛ = " << eps_soft << std::endl;
       std::cout << "ε = εₕ Nₕ/Nₜₒₜ + εₛ (Nₜₒₜ-Nₕ)/Nₜₒₜ" << std::endl;
     }
-    Grad_t<dim> Eps_hard; Eps_hard << eps_hard, 0, 0, 0;
-    Grad_t<dim> Eps_soft; Eps_soft << eps_soft, 0, 0, 0;
+    Grad_t<dim> Eps_hard;
+    Eps_hard << eps_hard, 0, 0, 0;
+    Grad_t<dim> Eps_soft;
+    Eps_soft << eps_soft, 0, 0, 0;
 
     // verify uniaxial tension patch test
-    for (const auto & pixel: sys) {
+    for (const auto &pixel : sys) {
       if (pixel[0] < Dim_t(nb_lays)) {
-        BOOST_CHECK_LE((Eps_hard-sys.get_strain().get_map()[pixel]).norm(), tol);
+        BOOST_CHECK_LE((Eps_hard - sys.get_strain().get_map()[pixel]).norm(),
+                       tol);
       } else {
-        BOOST_CHECK_LE((Eps_soft-sys.get_strain().get_map()[pixel]).norm(), tol);
+        BOOST_CHECK_LE((Eps_soft - sys.get_strain().get_map()[pixel]).norm(),
+                       tol);
       }
     }
 
     delEps0.setZero();
     delEps0(0, 1) = delEps0(1, 0) = eps0;
 
-    DeprecatedSolverCG<dim> cg2{sys, cg_tol, maxiter, bool(verbose)};
+    DeprecatedSolverCG<dim> cg2{sys, cg_tol, maxiter,
+                                static_cast<bool>(verbose)};
     F.setZero();
     sys.evaluate_stress_tangent();
-    for (auto tmp: RMap_t(DelF)) {
+    for (auto tmp : RMap_t(DelF)) {
       tmp = delEps0;
     }
     rhs = -sys.evaluate_projected_directional_stiffness(DelF);
@@ -439,15 +462,17 @@ namespace muSpectre {
     Eps_soft << 0, eps_soft, eps_soft, 0;
 
     // verify pure shear patch test
-    for (const auto & pixel: sys) {
+    for (const auto &pixel : sys) {
       if (pixel[0] < Dim_t(nb_lays)) {
-        BOOST_CHECK_LE((Eps_hard-sys.get_strain().get_map()[pixel]).norm(), tol);
+        BOOST_CHECK_LE((Eps_hard - sys.get_strain().get_map()[pixel]).norm(),
+                       tol);
       } else {
-        BOOST_CHECK_LE((Eps_soft-sys.get_strain().get_map()[pixel]).norm(), tol);
+        BOOST_CHECK_LE((Eps_soft - sys.get_strain().get_map()[pixel]).norm(),
+                       tol);
       }
     }
   }
 
   BOOST_AUTO_TEST_SUITE_END();
 
-}  // muSpectre
+}  // namespace muSpectre

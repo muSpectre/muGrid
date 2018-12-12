@@ -1,5 +1,5 @@
 /**
-* @file   demonstrator1.cc
+ * @file   demonstrator1.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
@@ -45,8 +45,7 @@
 
 using namespace muSpectre;
 
-int main()
-{
+int main() {
   banner("demonstrator1", 2018, "Till Junge <till.junge@epfl.ch>");
   constexpr Dim_t dim{2};
 
@@ -61,11 +60,11 @@ int main()
   constexpr Real nu{0.29930675909878679};
 
   using Material_t = MaterialLinearElastic1<dim, dim>;
-  auto & soft{Material_t::make(cell, "soft",    E, nu)};
-  auto & hard{Material_t::make(cell, "hard", 10*E, nu)};
+  auto &soft{Material_t::make(cell, "soft", E, nu)};
+  auto &hard{Material_t::make(cell, "hard", 10 * E, nu)};
 
   int counter{0};
-  for (const auto && pixel:cell) {
+  for (const auto &&pixel : cell) {
     if (counter < 3) {
       hard.add_pixel(pixel);
       counter++;
@@ -84,12 +83,13 @@ int main()
 
   Eigen::MatrixXd DeltaF{Eigen::MatrixXd::Zero(dim, dim)};
   DeltaF(0, 1) = .1;
-  Dim_t verbose {1};
+  Dim_t verbose{1};
 
   auto start = std::chrono::high_resolution_clock::now();
-  SolverCG cg{cell, cg_tol, maxiter, bool(verbose)};
+  SolverCG cg{cell, cg_tol, maxiter, static_cast<bool>(verbose)};
   auto res = de_geus(cell, DeltaF, cg, newton_tol, verbose);
-  std::chrono::duration<Real> dur = std::chrono::high_resolution_clock::now() - start;
+  std::chrono::duration<Real> dur =
+      std::chrono::high_resolution_clock::now() - start;
   std::cout << "Resolution time = " << dur.count() << "s" << std::endl;
 
   std::cout << res.grad.transpose() << std::endl;

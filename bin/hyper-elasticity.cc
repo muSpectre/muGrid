@@ -1,5 +1,5 @@
 /**
-* @file   hyper-elasticity.cc
+ * @file   hyper-elasticity.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -32,7 +32,6 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-
 #include "cell/cell_factory.hh"
 #include "materials/material_linear_elastic1.hh"
 #include "solver/solvers.hh"
@@ -43,9 +42,7 @@
 
 using namespace muSpectre;
 
-
-int main()
-{
+int main() {
   constexpr Dim_t dim{3};
   constexpr Ccoord_t<dim> N{CcoordOps::get_cube<dim>(11)};
   constexpr Rcoord_t<dim> lens{CcoordOps::get_cube<dim>(1.)};
@@ -66,15 +63,12 @@ int main()
   //                                                   nu(K_soft, mu_soft))};
   Real ex{1e-5};
   using Mat_t = MaterialLinearElastic1<dim, dim>;
-  auto & hard{Mat_t::make(cell, "hard",
-                          210.*ex, .33)};
-  auto & soft{Mat_t::make(cell, "soft",
-                          70.*ex, .33)};
+  auto &hard{Mat_t::make(cell, "hard", 210. * ex, .33)};
+  auto &soft{Mat_t::make(cell, "soft", 70. * ex, .33)};
 
-  for (auto pixel: cell) {
-    if ((pixel[0] >= N[0]-incl_size) &&
-        (pixel[1] < incl_size) &&
-        (pixel[2] >= N[2]-incl_size)) {
+  for (auto pixel : cell) {
+    if ((pixel[0] >= N[0] - incl_size) && (pixel[1] < incl_size) &&
+        (pixel[2] >= N[2] - incl_size)) {
       hard.add_pixel(pixel);
     } else {
       soft.add_pixel(pixel);
@@ -92,6 +86,6 @@ int main()
   auto optimize_res = de_geus(cell, dF_bar, cg, newton_tol, verbose);
 
   std::cout << "nb_cg: " << optimize_res.nb_fev << std::endl;
-  std::cout << optimize_res.grad.transpose().block(0,0,10,9) << std::endl;
+  std::cout << optimize_res.grad.transpose().block(0, 0, 10, 9) << std::endl;
   return 0;
 }

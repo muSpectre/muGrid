@@ -36,26 +36,26 @@
 
 #include <Eigen/IterativeLinearSolvers>
 
-#ifndef CELL_TRAITS_H
-#define CELL_TRAITS_H
+#ifndef SRC_CELL_CELL_TRAITS_HH_
+#define SRC_CELL_CELL_TRAITS_HH_
 
 namespace muSpectre {
 
   template <class Cell>
   class CellAdaptor;
 
-}  // muSpectre
+}  // namespace muSpectre
 
 namespace Eigen {
   namespace internal {
-    using Dim_t = muSpectre::Dim_t; //!< universal index type
-    using Real =  muSpectre::Real;  //!< universal real value type
+    using Dim_t = muSpectre::Dim_t;  //!< universal index type
+    using Real =  muSpectre::Real;   //!< universal real value type
     template<class Cell>
     struct traits<muSpectre::CellAdaptor<Cell>> :
       public Eigen::internal::traits<Eigen::SparseMatrix<Real> >
     {};
-  }  // internal
-}  // Eigen
+  }  // namespace internal
+}  // namespace Eigen
 
 
-#endif /* CELL_TRAITS_H */
+#endif  // SRC_CELL_CELL_TRAITS_HH_

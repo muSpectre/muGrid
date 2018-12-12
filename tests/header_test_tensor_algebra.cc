@@ -40,38 +40,37 @@
 #include "tests.hh"
 #include "tests/test_goodies.hh"
 
-
 namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE(tensor_algebra)
-  auto TerrNorm = [](auto && t){
+  auto TerrNorm = [](auto &&t) {
     return Eigen::Tensor<Real, 0>(t.abs().sum())();
   };
 
   /* ---------------------------------------------------------------------- */
   BOOST_AUTO_TEST_CASE(tensor_outer_product_test) {
     constexpr Dim_t dim{2};
-    Eigen::TensorFixedSize<Real, Eigen::Sizes<dim,dim>> A, B;
+    Eigen::TensorFixedSize<Real, Eigen::Sizes<dim, dim>> A, B;
     // use prime numbers so that every multiple is uniquely identifiable
-    A.setValues({{1, 2}, {3 ,7}});
-    B.setValues({{11, 13}, {17 ,19}});
+    A.setValues({{1, 2}, {3, 7}});
+    B.setValues({{11, 13}, {17, 19}});
 
-    Eigen::TensorFixedSize<Real, Eigen::Sizes<dim, dim, dim, dim>> Res1, Res2, Res3;
+    Eigen::TensorFixedSize<Real, Eigen::Sizes<dim, dim, dim, dim>> Res1, Res2,
+        Res3;
 
     for (Dim_t i = 0; i < dim; ++i) {
       for (Dim_t j = 0; j < dim; ++j) {
         for (Dim_t k = 0; k < dim; ++k) {
           for (Dim_t l = 0; l < dim; ++l) {
-            Res1(i, j, k, l) = A(i, j)*B(k, l);
-            Res2(i, j, k, l) = A(i, k)*B(j, l);
-            Res3(i, j, k, l) = A(i, l)*B(j, k);
+            Res1(i, j, k, l) = A(i, j) * B(k, l);
+            Res2(i, j, k, l) = A(i, k) * B(j, l);
+            Res3(i, j, k, l) = A(i, l) * B(j, k);
           }
         }
       }
     }
 
-
-    Real error = TerrNorm(Res1 - Tensors::outer<dim>(A,B));
+    Real error = TerrNorm(Res1 - Tensors::outer<dim>(A, B));
     BOOST_CHECK_LT(error, tol);
 
     error = TerrNorm(Res2 - Tensors::outer_under<dim>(A, B));
@@ -79,22 +78,19 @@ namespace muSpectre {
 
     error = TerrNorm(Res3 - Tensors::outer_over<dim>(A, B));
     if (error > tol) {
-      std::cout << "reference:" << std::endl
-                << Res3 << std::endl;
+      std::cout << "reference:" << std::endl << Res3 << std::endl;
       std::cout << "result:" << std::endl
                 << Tensors::outer_over<dim>(A, B) << std::endl;
-      std::cout << "A:" << std::endl
-                << A << std::endl;
-      std::cout << "B" << std::endl
-                << B << std::endl;
+      std::cout << "A:" << std::endl << A << std::endl;
+      std::cout << "B" << std::endl << B << std::endl;
       decltype(Res3) tmp = Tensors::outer_over<dim>(A, B);
       for (Dim_t i = 0; i < dim; ++i) {
         for (Dim_t j = 0; j < dim; ++j) {
           for (Dim_t k = 0; k < dim; ++k) {
             for (Dim_t l = 0; l < dim; ++l) {
               std::cout << "for (" << i << ", " << j << ", " << k << ", " << l
-                        << "), ref: " << std::setw(3)<< Res3(i,j,k,l)
-                        << ", res: " <<  std::setw(3)<< tmp(i,j,k,l)
+                        << "), ref: " << std::setw(3) << Res3(i, j, k, l)
+                        << ", res: " << std::setw(3) << tmp(i, j, k, l)
                         << std::endl;
             }
           }
@@ -107,8 +103,8 @@ namespace muSpectre {
     BOOST_CHECK_GT(error, tol);
   };
 
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(outer_products, Fix,
-                                   testGoodies::dimlist, Fix) {
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(outer_products, Fix, testGoodies::dimlist,
+                                   Fix) {
     constexpr auto dim{Fix::dim};
     using T2 = Tensors::Tens2_t<dim>;
     using M2 = Matrices::Tens2_t<dim>;
@@ -127,7 +123,9 @@ namespace muSpectre {
     C = Amap;
     D = Bmap;
 
-    auto error =[](const T4& A, const M4& B) {return (B - Map4(A.data())).norm();};
+    auto error = [](const T4 &A, const M4 &B) {
+      return (B - Map4(A.data())).norm();
+    };
 
     // Check outer product
     RT = Tensors::outer<dim>(A, B);
@@ -143,20 +141,18 @@ namespace muSpectre {
     RT = Tensors::outer_over<dim>(A, B);
     RM = Matrices::outer_over(C, D);
     BOOST_CHECK_LT(error(RT, RM), tol);
-
   }
 
   BOOST_AUTO_TEST_CASE(tensor_multiplication) {
     constexpr Dim_t dim{2};
     using Strain_t = Eigen::TensorFixedSize<Real, Eigen::Sizes<dim, dim>>;
     Strain_t A, B;
-    A.setValues({{1, 2}, {3 ,7}});
-    B.setValues({{11, 13}, {17 ,19}});
-    Strain_t FF1 = A*B; // element-wise multiplication
-    std::array<Eigen::IndexPair<int>, 1> prod_dims
-    {   Eigen::IndexPair<int>{1, 0}};
+    A.setValues({{1, 2}, {3, 7}});
+    B.setValues({{11, 13}, {17, 19}});
+    Strain_t FF1 = A * B;  // element-wise multiplication
+    std::array<Eigen::IndexPair<int>, 1> prod_dims{Eigen::IndexPair<int>{1, 0}};
 
-    Strain_t FF2 = A.contract(B, prod_dims); // correct option 1
+    Strain_t FF2 = A.contract(B, prod_dims);  // correct option 1
     Strain_t FF3;
     using Mat_t = Eigen::Map<Eigen::Matrix<Real, dim, dim>>;
     // following only works for evaluated tensors (which already have data())
@@ -166,70 +162,60 @@ namespace muSpectre {
     for (Dim_t i = 0; i < dim; ++i) {
       for (Dim_t j = 0; j < dim; ++j) {
         for (Dim_t a = 0; a < dim; ++a) {
-          ref(i,j) += A(i, a) * B(a, j);
+          ref(i, j) += A(i, a) * B(a, j);
         }
       }
     }
 
-
-    using Strain_tw = Eigen::TensorFixedSize<Real, Eigen::Sizes<dim+1, dim+1>>;
+    using Strain_tw =
+        Eigen::TensorFixedSize<Real, Eigen::Sizes<dim + 1, dim + 1>>;
     Strain_tw C;
     C.setConstant(100);
-    //static_assert(!std::is_convertible<Strain_t, Strain_tw>::value,
+    // static_assert(!std::is_convertible<Strain_t, Strain_tw>::value,
     //              "Tensors not size-protected");
     if (std::is_convertible<Strain_t, Strain_tw>::value) {
-      //std::cout << "this is not good, should I abandon Tensors?";
+      // std::cout << "this is not good, should I abandon Tensors?";
     }
     // this test seems useless. I use to detect if Eigen changed the
     // default tensor product
-    Real error = TerrNorm(FF1-ref);
+    Real error = TerrNorm(FF1 - ref);
     if (error < tol) {
-      std::cout << "A =" << std::endl
-                << A << std::endl;
-      std::cout << "B =" << std::endl
-                << B << std::endl;
-      std::cout << "FF1 =" << std::endl
-                << FF1 << std::endl;
-      std::cout << "ref =" << std::endl
-                << ref << std::endl;
+      std::cout << "A =" << std::endl << A << std::endl;
+      std::cout << "B =" << std::endl << B << std::endl;
+      std::cout << "FF1 =" << std::endl << FF1 << std::endl;
+      std::cout << "ref =" << std::endl << ref << std::endl;
     }
     BOOST_CHECK_GT(error, tol);
 
-    error = TerrNorm(FF2-ref);
+    error = TerrNorm(FF2 - ref);
     if (error > tol) {
-      std::cout << "A =" << std::endl
-                << A << std::endl;
-      std::cout << "B =" << std::endl
-                << B << std::endl;
-      std::cout << "FF2 =" << std::endl
-                << FF2 << std::endl;
-      std::cout << "ref =" << std::endl
-                << ref << std::endl;
+      std::cout << "A =" << std::endl << A << std::endl;
+      std::cout << "B =" << std::endl << B << std::endl;
+      std::cout << "FF2 =" << std::endl << FF2 << std::endl;
+      std::cout << "ref =" << std::endl << ref << std::endl;
     }
     BOOST_CHECK_LT(error, tol);
 
-    error = TerrNorm(FF3-ref);
+    error = TerrNorm(FF3 - ref);
     if (error > tol) {
-      std::cout << "A =" << std::endl
-                << A << std::endl;
-      std::cout << "B =" << std::endl
-                << B << std::endl;
-      std::cout << "FF3 =" << std::endl
-                << FF3 << std::endl;
-      std::cout << "ref =" << std::endl
-                << ref << std::endl;
+      std::cout << "A =" << std::endl << A << std::endl;
+      std::cout << "B =" << std::endl << B << std::endl;
+      std::cout << "FF3 =" << std::endl << FF3 << std::endl;
+      std::cout << "ref =" << std::endl << ref << std::endl;
     }
     BOOST_CHECK_LT(error, tol);
-
   }
 
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_tensmult, Fix,
-                                   testGoodies::dimlist, Fix) {
-    using namespace Matrices;
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_tensmult, Fix, testGoodies::dimlist,
+                                   Fix) {
+    using Matrices::tensmult;
+    using Matrices::Tens4_t;
+    using Matrices::Tens2_t;
+
     constexpr Dim_t dim{Fix::dim};
     using T4 = Tens4_t<dim>;
     using T2 = Tens2_t<dim>;
-    using V2 = Eigen::Matrix<Real, dim*dim, 1>;
+    using V2 = Eigen::Matrix<Real, dim * dim, 1>;
     T4 C;
     C.setRandom();
     T2 E;
@@ -237,63 +223,74 @@ namespace muSpectre {
     Eigen::Map<const V2> Ev(E.data());
     T2 R = tensmult(C, E);
 
-    auto error = (Eigen::Map<const V2>(R.data())-C*Ev).norm();
+    auto error = (Eigen::Map<const V2>(R.data()) - C * Ev).norm();
     BOOST_CHECK_LT(error, tol);
   }
 
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_tracer, Fix,
-                                   testGoodies::dimlist, Fix) {
-    using namespace Matrices;
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_tracer, Fix, testGoodies::dimlist,
+                                   Fix) {
+    using Matrices::tensmult;
+    using Matrices::Tens4_t;
+    using Matrices::Tens2_t;
+
     constexpr Dim_t dim{Fix::dim};
     using T2 = Tens2_t<dim>;
-    auto tracer = Itrac<dim>();
+    auto tracer = Matrices::Itrac<dim>();
     T2 F;
     F.setRandom();
     auto Ftrac = tensmult(tracer, F);
-    auto error = (Ftrac-F.trace()*F.Identity()).norm();
+    auto error = (Ftrac - F.trace() * F.Identity()).norm();
     BOOST_CHECK_LT(error, tol);
   }
 
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_identity, Fix, testGoodies::dimlist,
+                                   Fix) {
+    using Matrices::tensmult;
+    using Matrices::Tens4_t;
+    using Matrices::Tens2_t;
 
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_identity, Fix,
-                                   testGoodies::dimlist, Fix) {
-    using namespace Matrices;
     constexpr Dim_t dim{Fix::dim};
     using T2 = Tens2_t<dim>;
-    auto ident = Iiden<dim>();
+    auto ident = Matrices::Iiden<dim>();
     T2 F;
     F.setRandom();
     auto Fiden = tensmult(ident, F);
-    auto error = (Fiden-F).norm();
+    auto error = (Fiden - F).norm();
     BOOST_CHECK_LT(error, tol);
   }
 
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_transposer, Fix,
-                                   testGoodies::dimlist, Fix) {
-    using namespace Matrices;
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_transposer, Fix, testGoodies::dimlist,
+                                   Fix) {
+    using Matrices::tensmult;
+    using Matrices::Tens4_t;
+    using Matrices::Tens2_t;
+
     constexpr Dim_t dim{Fix::dim};
     using T2 = Tens2_t<dim>;
-    auto trnst = Itrns<dim>();
+    auto trnst = Matrices::Itrns<dim>();
     T2 F;
     F.setRandom();
     auto Ftrns = tensmult(trnst, F);
-    auto error = (Ftrns-F.transpose()).norm();
+    auto error = (Ftrns - F.transpose()).norm();
     BOOST_CHECK_LT(error, tol);
   }
 
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_symmetriser, Fix,
-                                   testGoodies::dimlist, Fix) {
-    using namespace Matrices;
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_symmetriser, Fix, testGoodies::dimlist,
+                                   Fix) {
+    using Matrices::tensmult;
+    using Matrices::Tens4_t;
+    using Matrices::Tens2_t;
+
     constexpr Dim_t dim{Fix::dim};
     using T2 = Tens2_t<dim>;
-    auto symmt = Isymm<dim>();
+    auto symmt = Matrices::Isymm<dim>();
     T2 F;
     F.setRandom();
     auto Fsymm = tensmult(symmt, F);
-    auto error = (Fsymm-.5*(F+F.transpose())).norm();
+    auto error = (Fsymm - .5 * (F + F.transpose())).norm();
     BOOST_CHECK_LT(error, tol);
   }
 
   BOOST_AUTO_TEST_SUITE_END();
 
-}  // muSpectre
+}  // namespace muSpectre

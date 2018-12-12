@@ -41,7 +41,6 @@
 #include "tests.hh"
 #include "common/T4_map_proxy.hh"
 
-
 namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE(T4map_tests);
@@ -50,10 +49,8 @@ namespace muSpectre {
    * Test fixture for construction of T4Map for the time being, symmetry is not
    * exploited
    */
-  template<typename T, Dim_t Dim>
-  struct T4_fixture
-  {
-    T4_fixture():matrix{}, tensor(matrix.data()){}
+  template <typename T, Dim_t Dim> struct T4_fixture {
+    T4_fixture() : matrix{}, tensor(matrix.data()) {}
 
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
     using M4 = T4Mat<T, Dim>;
@@ -63,15 +60,16 @@ namespace muSpectre {
     T4 tensor;
   };
 
-  using fix_collection = boost::mpl::list<T4_fixture<Real, twoD>,
-                                          T4_fixture<Real, threeD>>;
+  using fix_collection =
+      boost::mpl::list<T4_fixture<Real, twoD>, T4_fixture<Real, threeD>>;
 
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(Simple_construction_test, F, fix_collection, F) {
-    BOOST_CHECK_EQUAL(F::tensor.cols(), F::dim*F::dim);
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(Simple_construction_test, F, fix_collection,
+                                   F) {
+    BOOST_CHECK_EQUAL(F::tensor.cols(), F::dim * F::dim);
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(write_access_test, F, fix_collection, F) {
-    auto & t4 = F::tensor;
+    auto &t4 = F::tensor;
     constexpr Dim_t dim{F::dim};
     Eigen::TensorFixedSize<Real, Eigen::Sizes<dim, dim, dim, dim>> t4c;
     Eigen::Map<typename F::M4> t4c_map(t4c.data());
@@ -79,13 +77,15 @@ namespace muSpectre {
       for (Dim_t j = 0; j < F::dim; ++j) {
         for (Dim_t k = 0; k < F::dim; ++k) {
           for (Dim_t l = 0; l < F::dim; ++l) {
-            get(t4,i,j,k,l) = 1000*(i+1) + 100*(j+1) + 10*(k+1) + l+1;
-            t4c(i,j,k,l) = 1000*(i+1) + 100*(j+1) + 10*(k+1) + l+1;
+            get(t4, i, j, k, l) =
+                1000 * (i + 1) + 100 * (j + 1) + 10 * (k + 1) + l + 1;
+            t4c(i, j, k, l) =
+                1000 * (i + 1) + 100 * (j + 1) + 10 * (k + 1) + l + 1;
           }
         }
       }
     }
-    for (Dim_t i = 0; i < ipow(dim,4); ++i) {
+    for (Dim_t i = 0; i < ipow(dim, 4); ++i) {
       BOOST_CHECK_EQUAL(F::matrix.data()[i], t4c.data()[i]);
     }
   }
@@ -94,7 +94,7 @@ namespace muSpectre {
     decltype(F::matrix) matrix;
     matrix.setRandom();
     F::tensor = matrix;
-    for (Dim_t i = 0; i < ipow(F::dim,4); ++i) {
+    for (Dim_t i = 0; i < ipow(F::dim, 4); ++i) {
       BOOST_CHECK_EQUAL(F::matrix.data()[i], matrix.data()[i]);
     }
   }
@@ -102,8 +102,8 @@ namespace muSpectre {
   BOOST_AUTO_TEST_CASE(Return_ref_from_const_test) {
     constexpr Dim_t dim{2};
     using T = int;
-    using M4 = Eigen::Matrix<T, dim*dim, dim*dim>;
-    using M4c = const Eigen::Matrix<T, dim*dim, dim*dim>;
+    using M4 = Eigen::Matrix<T, dim * dim, dim * dim>;
+    using M4c = const Eigen::Matrix<T, dim * dim, dim * dim>;
     using T4 = T4MatMap<T, dim>;
     using T4c = T4MatMap<T, dim, true>;
 
@@ -113,11 +113,11 @@ namespace muSpectre {
     T4 tensor{mat.data()};
     T4c ctensor{mat.data()};
 
-    T a = get(tensor,0,0,0,1);
-    T b = get(ctensor,0,0,0,1);
+    T a = get(tensor, 0, 0, 0, 1);
+    T b = get(ctensor, 0, 0, 0, 1);
     BOOST_CHECK_EQUAL(a, b);
   }
 
   BOOST_AUTO_TEST_SUITE_END();
 
-}  // muSpectre
+}  // namespace muSpectre

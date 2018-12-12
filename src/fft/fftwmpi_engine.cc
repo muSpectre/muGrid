@@ -32,35 +32,30 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include "common/ccoord_operations.hh"
 #include "fft/fftwmpi_engine.hh"
+#include "common/ccoord_operations.hh"
 
 namespace muSpectre {
 
-  template <Dim_t Dim>
-  int FFTWMPIEngine<Dim>::nb_engines{0};
+  template <Dim_t Dim> int FFTWMPIEngine<Dim>::nb_engines{0};
 
   template <Dim_t Dim>
-  FFTWMPIEngine<Dim>::FFTWMPIEngine(Ccoord resolutions,
-                                    Dim_t nb_components,
+  FFTWMPIEngine<Dim>::FFTWMPIEngine(Ccoord resolutions, Dim_t nb_components,
                                     Communicator comm)
-    :Parent{resolutions, nb_components, comm}
-  {
-    if (!this->nb_engines) fftw_mpi_init();
+      : Parent{resolutions, nb_components, comm} {
+    if (!this->nb_engines)
+      fftw_mpi_init();
     this->nb_engines++;
 
     std::array<ptrdiff_t, Dim> narr;
     std::copy(this->domain_resolutions.begin(), this->domain_resolutions.end(),
               narr.begin());
-    narr[Dim-1] = this->domain_resolutions[Dim-1]/2+1;
+    narr[Dim - 1] = this->domain_resolutions[Dim - 1] / 2 + 1;
     ptrdiff_t res_x, loc_x, res_y, loc_y;
-    this->workspace_size =
-      fftw_mpi_local_size_many_transposed(Dim, narr.data(),
-                                          this->nb_components,
-                                          FFTW_MPI_DEFAULT_BLOCK,
-                                          FFTW_MPI_DEFAULT_BLOCK,
-                                          this->comm.get_mpi_comm(),
-                                          &res_x, &loc_x, &res_y, &loc_y);
+    this->workspace_size = fftw_mpi_local_size_many_transposed(
+        Dim, narr.data(), this->nb_components, FFTW_MPI_DEFAULT_BLOCK,
+        FFTW_MPI_DEFAULT_BLOCK, this->comm.get_mpi_comm(), &res_x, &loc_x,
+        &res_y, &loc_y);
     this->fourier_resolutions[1] = this->fourier_resolutions[0];
     this->fourier_locations[1] = this->fourier_locations[0];
     this->subdomain_resolutions[0] = res_x;
@@ -68,13 +63,13 @@ namespace muSpectre {
     this->fourier_resolutions[0] = res_y;
     this->fourier_locations[0] = loc_y;
 
-    for (auto & n: this->subdomain_resolutions) {
+    for (auto &n : this->subdomain_resolutions) {
       if (n == 0) {
         throw std::runtime_error("FFTW MPI planning returned zero resolution. "
                                  "You may need to run on fewer processes.");
       }
     }
-    for (auto & n: this->fourier_resolutions) {
+    for (auto &n : this->fourier_resolutions) {
       if (n == 0) {
         throw std::runtime_error("FFTW MPI planning returned zero Fourier "
                                  "resolution. You may need to run on fewer "
@@ -82,16 +77,13 @@ namespace muSpectre {
       }
     }
 
-    for (auto && pixel:
-         std::conditional_t<
-           Dim==2,
-           CcoordOps::Pixels<Dim, 1, 0>,
-           CcoordOps::Pixels<Dim, 1, 0, 2>
-         >(this->fourier_resolutions, this->fourier_locations)) {
-           this->work_space_container.add_pixel(pixel);
+    for (auto &&pixel :
+         std::conditional_t<Dim == 2, CcoordOps::Pixels<Dim, 1, 0>,
+                            CcoordOps::Pixels<Dim, 1, 0, 2>>(
+             this->fourier_resolutions, this->fourier_locations)) {
+      this->work_space_container.add_pixel(pixel);
     }
   }
-
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t Dim>
@@ -104,13 +96,14 @@ namespace muSpectre {
     // work space has been initialized
     Parent::initialise(plan_flags);
 
-    this->real_workspace = fftw_alloc_real(2*this->workspace_size);
+    this->real_workspace = fftw_alloc_real(2 * this->workspace_size);
     // We need to check whether the workspace provided by our field is large
     // enough. MPI parallel FFTW may request a workspace size larger than the
     // nominal size of the complex buffer.
-    if (long(this->work.size()*this->nb_components) < this->workspace_size) {
+    if (static_cast<int>(this->work.size() * this->nb_components) <
+        this->workspace_size) {
       this->work.set_pad_size(this->workspace_size -
-                              this->nb_components*this->work.size());
+                              this->nb_components * this->work.size());
     }
 
     unsigned int flags;
@@ -135,23 +128,23 @@ namespace muSpectre {
     std::array<ptrdiff_t, Dim> narr;
     std::copy(this->domain_resolutions.begin(), this->domain_resolutions.end(),
               narr.begin());
-    Real * in{this->real_workspace};
-    fftw_complex * out{reinterpret_cast<fftw_complex*>(this->work.data())};
+    Real *in{this->real_workspace};
+    fftw_complex *out{reinterpret_cast<fftw_complex *>(this->work.data())};
     this->plan_fft = fftw_mpi_plan_many_dft_r2c(
-      Dim, narr.data(), this->nb_components, FFTW_MPI_DEFAULT_BLOCK,
-      FFTW_MPI_DEFAULT_BLOCK, in, out, this->comm.get_mpi_comm(),
-      FFTW_MPI_TRANSPOSED_OUT | flags);
+        Dim, narr.data(), this->nb_components, FFTW_MPI_DEFAULT_BLOCK,
+        FFTW_MPI_DEFAULT_BLOCK, in, out, this->comm.get_mpi_comm(),
+        FFTW_MPI_TRANSPOSED_OUT | flags);
     if (this->plan_fft == nullptr) {
       throw std::runtime_error("r2c plan failed");
     }
 
-    fftw_complex * i_in = reinterpret_cast<fftw_complex*>(this->work.data());
-    Real * i_out = this->real_workspace;
+    fftw_complex *i_in = reinterpret_cast<fftw_complex *>(this->work.data());
+    Real *i_out = this->real_workspace;
 
     this->plan_ifft = fftw_mpi_plan_many_dft_c2r(
-      Dim, narr.data(), this->nb_components, FFTW_MPI_DEFAULT_BLOCK,
-      FFTW_MPI_DEFAULT_BLOCK, i_in, i_out, this->comm.get_mpi_comm(),
-      FFTW_MPI_TRANSPOSED_IN | flags);
+        Dim, narr.data(), this->nb_components, FFTW_MPI_DEFAULT_BLOCK,
+        FFTW_MPI_DEFAULT_BLOCK, i_in, i_out, this->comm.get_mpi_comm(),
+        FFTW_MPI_TRANSPOSED_IN | flags);
     if (this->plan_ifft == nullptr) {
       throw std::runtime_error("c2r plan failed");
     }
@@ -159,21 +152,23 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim>
-  FFTWMPIEngine<Dim>::~FFTWMPIEngine<Dim>() noexcept {
-    if (this->real_workspace != nullptr) fftw_free(this->real_workspace);
-    if (this->plan_fft != nullptr) fftw_destroy_plan(this->plan_fft);
-    if (this->plan_ifft != nullptr) fftw_destroy_plan(this->plan_ifft);
-    // TODO: We cannot run fftw_mpi_cleanup since also calls fftw_cleanup
+  template <Dim_t Dim> FFTWMPIEngine<Dim>::~FFTWMPIEngine<Dim>() noexcept {
+    if (this->real_workspace != nullptr)
+      fftw_free(this->real_workspace);
+    if (this->plan_fft != nullptr)
+      fftw_destroy_plan(this->plan_fft);
+    if (this->plan_ifft != nullptr)
+      fftw_destroy_plan(this->plan_ifft);
+    // TODO(junge): We cannot run fftw_mpi_cleanup since also calls fftw_cleanup
     // and any running FFTWEngine will fail afterwards.
-    //this->nb_engines--;
-    //if (!this->nb_engines) fftw_mpi_cleanup();
+    // this->nb_engines--;
+    // if (!this->nb_engines) fftw_mpi_cleanup();
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t Dim>
   typename FFTWMPIEngine<Dim>::Workspace_t &
-  FFTWMPIEngine<Dim>::fft (Field_t & field) {
+  FFTWMPIEngine<Dim>::fft(Field_t &field) {
     if (this->plan_fft == nullptr) {
       throw std::runtime_error("fft plan not initialised");
     }
@@ -183,30 +178,28 @@ namespace muSpectre {
     // Copy non-padded field to padded real_workspace.
     // Transposed output of M x N x L transform for >= 3 dimensions is padded
     // M x N x 2*(L/2+1).
-    ptrdiff_t fstride = (this->nb_components*
-                         this->subdomain_resolutions[Dim-1]);
-    ptrdiff_t wstride = (this->nb_components*2*
-                         (this->subdomain_resolutions[Dim-1]/2+1));
-    ptrdiff_t n = field.size()/this->subdomain_resolutions[Dim-1];
+    ptrdiff_t fstride =
+        (this->nb_components * this->subdomain_resolutions[Dim - 1]);
+    ptrdiff_t wstride = (this->nb_components * 2 *
+                         (this->subdomain_resolutions[Dim - 1] / 2 + 1));
+    ptrdiff_t n = field.size() / this->subdomain_resolutions[Dim - 1];
 
     auto fdata = field.data();
     auto wdata = this->real_workspace;
     for (int i = 0; i < n; i++) {
-      std::copy(fdata, fdata+fstride, wdata);
+      std::copy(fdata, fdata + fstride, wdata);
       fdata += fstride;
       wdata += wstride;
     }
     // Compute FFT
     fftw_mpi_execute_dft_r2c(
-      this->plan_fft, this->real_workspace,
-      reinterpret_cast<fftw_complex*>(this->work.data()));
+        this->plan_fft, this->real_workspace,
+        reinterpret_cast<fftw_complex *>(this->work.data()));
     return this->work;
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim>
-  void
-  FFTWMPIEngine<Dim>::ifft (Field_t & field) const {
+  template <Dim_t Dim> void FFTWMPIEngine<Dim>::ifft(Field_t &field) const {
     if (this->plan_ifft == nullptr) {
       throw std::runtime_error("ifft plan not initialised");
     }
@@ -215,23 +208,21 @@ namespace muSpectre {
     }
     // Compute inverse FFT
     fftw_mpi_execute_dft_c2r(
-      this->plan_ifft, reinterpret_cast<fftw_complex*>(this->work.data()),
-      this->real_workspace);
+        this->plan_ifft, reinterpret_cast<fftw_complex *>(this->work.data()),
+        this->real_workspace);
     // Copy non-padded field to padded real_workspace.
     // Transposed output of M x N x L transform for >= 3 dimensions is padded
     // M x N x 2*(L/2+1).
-    ptrdiff_t fstride{
-      this->nb_components*this->subdomain_resolutions[Dim-1]
-    };
-    ptrdiff_t wstride{
-      this->nb_components*2*(this->subdomain_resolutions[Dim-1]/2+1)
-    };
-    ptrdiff_t n(field.size()/this->subdomain_resolutions[Dim-1]);
+    ptrdiff_t fstride{this->nb_components *
+                      this->subdomain_resolutions[Dim - 1]};
+    ptrdiff_t wstride{this->nb_components * 2 *
+                      (this->subdomain_resolutions[Dim - 1] / 2 + 1)};
+    ptrdiff_t n(field.size() / this->subdomain_resolutions[Dim - 1]);
 
     auto fdata{field.data()};
     auto wdata{this->real_workspace};
     for (int i = 0; i < n; i++) {
-      std::copy(wdata, wdata+fstride, fdata);
+      std::copy(wdata, wdata + fstride, fdata);
       fdata += fstride;
       wdata += wstride;
     }
@@ -239,4 +230,4 @@ namespace muSpectre {
 
   template class FFTWMPIEngine<twoD>;
   template class FFTWMPIEngine<threeD>;
-}  // muSpectre
+}  // namespace muSpectre

@@ -39,14 +39,13 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  ProjectionSmallStrain<DimS, DimM>::
-  ProjectionSmallStrain(FFTEngine_ptr engine, Rcoord lengths)
-    : Parent{std::move(engine), lengths, Formulation::small_strain}
-  {
-    for (auto res: this->fft_engine->get_domain_resolutions()) {
+  ProjectionSmallStrain<DimS, DimM>::ProjectionSmallStrain(FFTEngine_ptr engine,
+                                                           Rcoord lengths)
+      : Parent{std::move(engine), lengths, Formulation::small_strain} {
+    for (auto res : this->fft_engine->get_domain_resolutions()) {
       if (res % 2 == 0) {
-      	throw ProjectionError
-	  ("Only an odd number of gridpoints in each direction is supported");
+        throw ProjectionError(
+            "Only an odd number of gridpoints in each direction is supported");
       }
     }
   }
@@ -58,23 +57,23 @@ namespace muSpectre {
 
     FFT_freqs<DimS> fft_freqs(this->fft_engine->get_domain_resolutions(),
                               this->domain_lengths);
-    for (auto && tup: akantu::zip(*this->fft_engine, this->Ghat)) {
-      const auto & ccoord = std::get<0> (tup);
-      auto & G = std::get<1>(tup);
+    for (auto &&tup : akantu::zip(*this->fft_engine, this->Ghat)) {
+      const auto &ccoord = std::get<0>(tup);
+      auto &G = std::get<1>(tup);
       auto xi = fft_freqs.get_unit_xi(ccoord);
-      auto kron = [](const Dim_t i, const Dim_t j) -> Real{
-        return (i==j) ? 1. : 0.;
+      auto kron = [](const Dim_t i, const Dim_t j) -> Real {
+        return (i == j) ? 1. : 0.;
       };
       for (Dim_t i{0}; i < DimS; ++i) {
         for (Dim_t j{0}; j < DimS; ++j) {
           for (Dim_t l{0}; l < DimS; ++l) {
-            for (Dim_t m{0}; m < DimS; ++m ) {
-              Real & g = get(G, i, j, l, m);
-              g = 0.5* (xi(i) * kron(j, l) * xi(m) +
-                        xi(i) * kron(j, m) * xi(l) +
-                        xi(j) * kron(i, l) * xi(m) +
-                        xi(j) * kron(i, m) * xi(l)) -
-                xi(i)*xi(j)*xi(l)*xi(m);
+            for (Dim_t m{0}; m < DimS; ++m) {
+              Real &g = get(G, i, j, l, m);
+              g = 0.5 *
+                      (xi(i) * kron(j, l) * xi(m) + xi(i) * kron(j, m) * xi(l) +
+                       xi(j) * kron(i, l) * xi(m) +
+                       xi(j) * kron(i, m) * xi(l)) -
+                  xi(i) * xi(j) * xi(l) * xi(m);
             }
           }
         }
@@ -85,6 +84,6 @@ namespace muSpectre {
     }
   }
 
-  template class ProjectionSmallStrain<twoD,   twoD>;
+  template class ProjectionSmallStrain<twoD, twoD>;
   template class ProjectionSmallStrain<threeD, threeD>;
-}  // muSpectre
+}  // namespace muSpectre

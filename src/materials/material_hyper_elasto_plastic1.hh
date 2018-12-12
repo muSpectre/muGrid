@@ -34,10 +34,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-
-
-#ifndef MATERIAL_HYPER_ELASTO_PLASTIC1_H
-#define MATERIAL_HYPER_ELASTO_PLASTIC1_H
+#ifndef SRC_MATERIALS_MATERIAL_HYPER_ELASTO_PLASTIC1_HH_
+#define SRC_MATERIALS_MATERIAL_HYPER_ELASTO_PLASTIC1_HH_
 
 #include "materials/material_muSpectre_base.hh"
 #include "materials/materials_toolbox.hh"
@@ -48,8 +46,7 @@
 
 namespace muSpectre {
 
-  template <Dim_t DimS, Dim_t DimM>
-  class MaterialHyperElastoPlastic1;
+  template <Dim_t DimS, Dim_t DimM> class MaterialHyperElastoPlastic1;
 
   /**
    * traits for hyper-elastoplastic material
@@ -57,12 +54,12 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   struct MaterialMuSpectre_traits<MaterialHyperElastoPlastic1<DimS, DimM>> {
     //! global field collection
-    using GFieldCollection_t = typename
-      MaterialBase<DimS, DimM>::GFieldCollection_t;
+    using GFieldCollection_t =
+        typename MaterialBase<DimS, DimM>::GFieldCollection_t;
 
     //! expected map type for strain fields
     using StrainMap_t =
-      MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM, true>;
+        MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM, true>;
     //! expected map type for stress fields
     using StressMap_t = MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
     //! expected map type for tangent stiffness fields
@@ -82,31 +79,28 @@ namespace muSpectre {
      * storage type for for previous gradient Fᵗ and elastic left
      * Cauchy-Green deformation tensor bₑᵗ
      */
-    using LStrainMap_t = StateFieldMap<
-      MatrixFieldMap<LFieldColl_t, Real, DimM, DimM, false>>;
+    using LStrainMap_t =
+        StateFieldMap<MatrixFieldMap<LFieldColl_t, Real, DimM, DimM, false>>;
     /**
      * format in which to receive internals (previous gradient Fᵗ,
      * previous elastic lef Cauchy-Green deformation tensor bₑᵗ, and
      * the plastic flow measure εₚ
      */
-    using InternalVariables = std::tuple<LStrainMap_t, LStrainMap_t,
-                                         LScalarMap_t>;
-
+    using InternalVariables =
+        std::tuple<LStrainMap_t, LStrainMap_t, LScalarMap_t>;
   };
-
 
   /**
    * Material implementation for hyper-elastoplastic constitutive law
    */
-  template <Dim_t DimS, Dim_t DimM=DimS>
-  class MaterialHyperElastoPlastic1: public
-    MaterialMuSpectre<MaterialHyperElastoPlastic1<DimS, DimM>, DimS, DimM>
-  {
-  public:
-
+  template <Dim_t DimS, Dim_t DimM = DimS>
+  class MaterialHyperElastoPlastic1
+      : public MaterialMuSpectre<MaterialHyperElastoPlastic1<DimS, DimM>, DimS,
+                                 DimM> {
+   public:
     //! base class
-    using Parent = MaterialMuSpectre
-      <MaterialHyperElastoPlastic1<DimS, DimM>, DimS, DimM>;
+    using Parent =
+        MaterialMuSpectre<MaterialHyperElastoPlastic1<DimS, DimM>, DimS, DimM>;
 
     /**
      * type used to determine whether the
@@ -119,10 +113,9 @@ namespace muSpectre {
     using traits = MaterialMuSpectre_traits<MaterialHyperElastoPlastic1>;
 
     //! Hooke's law implementation
-    using Hooke = typename
-      MatTB::Hooke<DimM,
-                   typename traits::StrainMap_t::reference,
-                   typename traits::TangentMap_t::reference>;
+    using Hooke =
+        typename MatTB::Hooke<DimM, typename traits::StrainMap_t::reference,
+                              typename traits::TangentMap_t::reference>;
 
     //! type in which the previous strain state is referenced
     using StrainStRef_t = typename traits::LStrainMap_t::reference;
@@ -137,7 +130,8 @@ namespace muSpectre {
                                 Real tau_y0, Real H);
 
     //! Copy constructor
-    MaterialHyperElastoPlastic1(const MaterialHyperElastoPlastic1 &other) = delete;
+    MaterialHyperElastoPlastic1(const MaterialHyperElastoPlastic1 &other) =
+        delete;
 
     //! Move constructor
     MaterialHyperElastoPlastic1(MaterialHyperElastoPlastic1 &&other) = delete;
@@ -146,10 +140,12 @@ namespace muSpectre {
     virtual ~MaterialHyperElastoPlastic1() = default;
 
     //! Copy assignment operator
-    MaterialHyperElastoPlastic1& operator=(const MaterialHyperElastoPlastic1 &other) = delete;
+    MaterialHyperElastoPlastic1 &
+    operator=(const MaterialHyperElastoPlastic1 &other) = delete;
 
     //! Move assignment operator
-    MaterialHyperElastoPlastic1& operator=(MaterialHyperElastoPlastic1 &&other) = delete;
+    MaterialHyperElastoPlastic1 &
+    operator=(MaterialHyperElastoPlastic1 &&other) = delete;
 
     /**
      * evaluates Kirchhoff stress given the current placement gradient
@@ -157,159 +153,153 @@ namespace muSpectre {
      * εₚ
      */
     template <class grad_t>
-    inline decltype(auto) evaluate_stress(grad_t && F, StrainStRef_t F_prev,
+    inline decltype(auto) evaluate_stress(grad_t &&F, StrainStRef_t F_prev,
                                           StrainStRef_t be_prev,
                                           FlowStRef_t plast_flow);
 
     /**
-     * evaluates Kirchhoff stress and stiffness given the current placement gradient
-     * Fₜ, the previous Gradient Fₜ₋₁ and the cumulated plastic flow
-     * εₚ
+     * evaluates Kirchhoff stress and stiffness given the current placement
+     * gradient Fₜ, the previous Gradient Fₜ₋₁ and the cumulated plastic flow εₚ
      */
     template <class grad_t>
-    inline decltype(auto) evaluate_stress_tangent(grad_t && F, StrainStRef_t F_prev,
-                                                  StrainStRef_t be_prev,
-                                                  FlowStRef_t plast_flow);
+    inline decltype(auto)
+    evaluate_stress_tangent(grad_t &&F, StrainStRef_t F_prev,
+                            StrainStRef_t be_prev, FlowStRef_t plast_flow);
 
     /**
      * The statefields need to be cycled at the end of each load increment
      */
-    virtual void save_history_variables() override;
+    void save_history_variables() override;
 
     /**
      * set the previous gradients to identity
      */
-    virtual void initialise() override final;
+    void initialise() final;
 
     /**
      * return the internals tuple
      */
-    typename traits::InternalVariables & get_internals() {
-      return this->internal_variables;};
+    typename traits::InternalVariables &get_internals() {
+      return this->internal_variables;
+    }
 
-
-  protected:
-
+   protected:
     /**
      * worker function computing stresses and internal variables
      */
     template <class grad_t>
-    inline decltype(auto) stress_n_internals_worker(grad_t && F,
-                                                    StrainStRef_t& F_prev,
-                                                    StrainStRef_t& be_prev,
-                                                    FlowStRef_t& plast_flow);
+    inline decltype(auto)
+    stress_n_internals_worker(grad_t &&F, StrainStRef_t &F_prev,
+                              StrainStRef_t &be_prev, FlowStRef_t &plast_flow);
     //! Local FieldCollection type for field storage
     using LColl_t = LocalFieldCollection<DimS>;
     //! storage for cumulated plastic flow εₚ
-    StateField<ScalarField<LColl_t, Real>> & plast_flow_field;
+    StateField<ScalarField<LColl_t, Real>> &plast_flow_field;
 
     //! storage for previous gradient Fᵗ
-    StateField<TensorField<LColl_t, Real, secondOrder, DimM>> & F_prev_field;
+    StateField<TensorField<LColl_t, Real, secondOrder, DimM>> &F_prev_field;
 
     //! storage for elastic left Cauchy-Green deformation tensor bₑᵗ
-    StateField<TensorField<LColl_t, Real, secondOrder, DimM>> & be_prev_field;
+    StateField<TensorField<LColl_t, Real, secondOrder, DimM>> &be_prev_field;
 
     // material properties
-    const Real young;          //!< Young's modulus
-    const Real poisson;        //!< Poisson's ratio
-    const Real lambda;         //!< first Lamé constant
-    const Real mu;             //!< second Lamé constant (shear modulus)
-    const Real K;              //!< Bulk modulus
-    const Real tau_y0;         //!< initial yield stress
-    const Real H;              //!< hardening modulus
-    const T4Mat<Real, DimM> C; //!< stiffness tensor
+    const Real young;           //!< Young's modulus
+    const Real poisson;         //!< Poisson's ratio
+    const Real lambda;          //!< first Lamé constant
+    const Real mu;              //!< second Lamé constant (shear modulus)
+    const Real K;               //!< Bulk modulus
+    const Real tau_y0;          //!< initial yield stress
+    const Real H;               //!< hardening modulus
+    const T4Mat<Real, DimM> C;  //!< stiffness tensor
 
     //! Field maps and state field maps over internal fields
     typename traits::InternalVariables internal_variables;
-  private:
+
+   private:
   };
 
-  //----------------------------------------------------------------------------//
+  //--------------------------------------------------------------------------//
   template <Dim_t DimS, Dim_t DimM>
   template <class grad_t>
-  auto
-  MaterialHyperElastoPlastic1<DimS, DimM>::
-  stress_n_internals_worker(grad_t && F, StrainStRef_t& F_prev,
-                            StrainStRef_t& be_prev, FlowStRef_t& eps_p)
-    -> decltype(auto) {
-
+  auto MaterialHyperElastoPlastic1<DimS, DimM>::stress_n_internals_worker(
+      grad_t &&F, StrainStRef_t &F_prev, StrainStRef_t &be_prev,
+      FlowStRef_t &eps_p) -> decltype(auto) {
     // the notation in this function follows Geers 2003
     // (https://doi.org/10.1016/j.cma.2003.07.014).
 
     // computation of trial state
     using Mat_t = Eigen::Matrix<Real, DimM, DimM>;
-    auto && f{F*F_prev.old().inverse()};
-    Mat_t be_star{f*be_prev.old()*f.transpose()};
+    auto &&f{F * F_prev.old().inverse()};
+    Mat_t be_star{f * be_prev.old() * f.transpose()};
     Mat_t ln_be_star{logm(std::move(be_star))};
-    Mat_t tau_star{.5*Hooke::evaluate_stress(this->lambda, this->mu, ln_be_star)};
+    Mat_t tau_star{.5 *
+                   Hooke::evaluate_stress(this->lambda, this->mu, ln_be_star)};
     // deviatoric part of Kirchhoff stress
-    Mat_t tau_d_star{tau_star - tau_star.trace()/DimM*tau_star.Identity()};
-    auto && tau_eq_star{std::sqrt(3*.5*(tau_d_star.array()*
-                                     tau_d_star.transpose().array()).sum())};
-    Mat_t N_star{3*.5*tau_d_star/tau_eq_star};
+    Mat_t tau_d_star{tau_star - tau_star.trace() / DimM * tau_star.Identity()};
+    auto &&tau_eq_star{std::sqrt(
+        3 * .5 * (tau_d_star.array() * tau_d_star.transpose().array()).sum())};
+    Mat_t N_star{3 * .5 * tau_d_star / tau_eq_star};
     // this is eq (27), and the std::min enforces the Kuhn-Tucker relation (16)
-    Real phi_star{std::max(tau_eq_star - this->tau_y0 - this->H * eps_p.old(), 0.)};
+    Real phi_star{
+        std::max(tau_eq_star - this->tau_y0 - this->H * eps_p.old(), 0.)};
 
     // return mapping
-    Real Del_gamma{phi_star/(this->H + 3 * this->mu)};
-    auto && tau{tau_star - 2*Del_gamma*this->mu*N_star};
-    /////auto && tau_eq{tau_eq_star - 3*this->mu*Del_gamma};
+    Real Del_gamma{phi_star / (this->H + 3 * this->mu)};
+    auto &&tau{tau_star - 2 * Del_gamma * this->mu * N_star};
+
 
     // update the previous values to the new ones
     F_prev.current() = F;
-    ln_be_star -= 2*Del_gamma*N_star;
+    ln_be_star -= 2 * Del_gamma * N_star;
     be_prev.current() = expm(std::move(ln_be_star));
     eps_p.current() += Del_gamma;
 
-
     // transmit info whether this is a plastic step or not
     bool is_plastic{phi_star > 0};
-    return std::tuple<Mat_t, Real, Real, Mat_t, bool>
-      (std::move(tau), std::move(tau_eq_star),
-       std::move(Del_gamma), std::move(N_star),
-       std::move(is_plastic));
+    return std::tuple<Mat_t, Real, Real, Mat_t, bool>(
+        std::move(tau), std::move(tau_eq_star), std::move(Del_gamma),
+        std::move(N_star), std::move(is_plastic));
   }
   //----------------------------------------------------------------------------//
   template <Dim_t DimS, Dim_t DimM>
   template <class grad_t>
-  auto
-  MaterialHyperElastoPlastic1<DimS, DimM>::
-  evaluate_stress(grad_t && F, StrainStRef_t F_prev, StrainStRef_t be_prev,
-                  FlowStRef_t eps_p) -> decltype(auto) {
-    auto retval(std::move(std::get<0>(this->stress_n_internals_worker
-                                                                 (std::forward<grad_t>(F), F_prev, be_prev, eps_p))));
+  auto MaterialHyperElastoPlastic1<DimS, DimM>::evaluate_stress(
+      grad_t &&F, StrainStRef_t F_prev, StrainStRef_t be_prev,
+      FlowStRef_t eps_p) -> decltype(auto) {
+    auto retval(std::move(std::get<0>(this->stress_n_internals_worker(
+        std::forward<grad_t>(F), F_prev, be_prev, eps_p))));
     return retval;
   }
   //----------------------------------------------------------------------------//
   template <Dim_t DimS, Dim_t DimM>
   template <class grad_t>
-  auto
-  MaterialHyperElastoPlastic1<DimS, DimM>::
-  evaluate_stress_tangent(grad_t && F, StrainStRef_t F_prev, StrainStRef_t be_prev,
-                          FlowStRef_t eps_p) -> decltype(auto) {
+  auto MaterialHyperElastoPlastic1<DimS, DimM>::evaluate_stress_tangent(
+      grad_t &&F, StrainStRef_t F_prev, StrainStRef_t be_prev,
+      FlowStRef_t eps_p) -> decltype(auto) {
     //! after the stress computation, all internals are up to date
-    auto && vals{this->stress_n_internals_worker
-        (std::forward<grad_t>(F), F_prev, be_prev, eps_p)};
-    auto && tau        {std::get<0>(vals)};
-    auto && tau_eq_star{std::get<1>(vals)};
-    auto && Del_gamma  {std::get<2>(vals)};
-    auto && N_star     {std::get<3>(vals)};
-    auto && is_plastic {std::get<4>(vals)};
+    auto &&vals{this->stress_n_internals_worker(std::forward<grad_t>(F), F_prev,
+                                                be_prev, eps_p)};
+    auto &&tau{std::get<0>(vals)};
+    auto &&tau_eq_star{std::get<1>(vals)};
+    auto &&Del_gamma{std::get<2>(vals)};
+    auto &&N_star{std::get<3>(vals)};
+    auto &&is_plastic{std::get<4>(vals)};
 
     if (is_plastic) {
-      auto && a0 = Del_gamma*this->mu/tau_eq_star;
-      auto && a1 = this->mu/(this->H + 3*this->mu);
-      return std::make_tuple(std::move(tau), T4Mat<Real, DimM>{
-        ((this->K/2. - this->mu/3 + a0*this->mu)*Matrices::Itrac<DimM>() +
-         (1 - 3*a0) * this->mu*Matrices::Isymm<DimM>() +
-         2*this->mu * (a0 - a1)*Matrices::outer(N_star, N_star))});
+      auto &&a0 = Del_gamma * this->mu / tau_eq_star;
+      auto &&a1 = this->mu / (this->H + 3 * this->mu);
+      return std::make_tuple(
+          std::move(tau),
+          T4Mat<Real, DimM>{
+              ((this->K / 2. - this->mu / 3 + a0 * this->mu) *
+                   Matrices::Itrac<DimM>() +
+               (1 - 3 * a0) * this->mu * Matrices::Isymm<DimM>() +
+               2 * this->mu * (a0 - a1) * Matrices::outer(N_star, N_star))});
     } else {
       return std::make_tuple(std::move(tau), T4Mat<Real, DimM>{this->C});
     }
   }
 
+}  // namespace muSpectre
 
-
-}  // muSpectre
-
-#endif /* MATERIAL_HYPER_ELASTO_PLASTIC1_H */
+#endif  // SRC_MATERIALS_MATERIAL_HYPER_ELASTO_PLASTIC1_HH_

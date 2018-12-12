@@ -1,5 +1,5 @@
 /**
-* @file   small_case.cc
+ * @file   small_case.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -41,31 +41,25 @@
 
 #include <iostream>
 
-
 using namespace muSpectre;
 
-
-int main()
-{
+int main() {
   constexpr Dim_t dim{twoD};
 
   Ccoord_t<dim> resolution{11, 11};
 
-  Rcoord_t<dim> lengths{CcoordOps::get_cube<dim>(11.)};//{5.2e-9, 8.3e-9, 8.3e-9};
+  Rcoord_t<dim> lengths{
+      CcoordOps::get_cube<dim>(11.)};  // {5.2e-9, 8.3e-9, 8.3e-9};
   Formulation form{Formulation::finite_strain};
 
-  auto rve{make_cell(resolution,
-                     lengths,
-                     form)};
+  auto rve{make_cell(resolution, lengths, form)};
 
-  auto & hard{MaterialLinearElastic1<dim, dim>::make
-      (rve, "hard", 210., .33)};
-  auto & soft{MaterialLinearElastic1<dim, dim>::make
-      (rve, "soft",  70., .33)};
+  auto &hard{MaterialLinearElastic1<dim, dim>::make(rve, "hard", 210., .33)};
+  auto &soft{MaterialLinearElastic1<dim, dim>::make(rve, "soft", 70., .33)};
 
-  for (auto && tup: akantu::enumerate(rve)) {
-    auto & i = std::get<0>(tup);
-    auto & pixel = std::get<1>(tup);
+  for (auto &&tup : akantu::enumerate(rve)) {
+    auto &i = std::get<0>(tup);
+    auto &pixel = std::get<1>(tup);
     if (i < 3) {
       hard.add_pixel(pixel);
     } else {
@@ -77,13 +71,12 @@ int main()
 
   Real tol{1e-6};
   Eigen::MatrixXd Del0{};
-  Del0 <<  0, .1,
-           0,  0;
+  Del0 << 0, .1, 0, 0;
 
   Uint maxiter{31};
   Dim_t verbose{3};
 
-  SolverCG cg{rve, tol, maxiter, bool(verbose)};
+  SolverCG cg{rve, tol, maxiter, static_cast<bool>(verbose)};
   auto res = de_geus(rve, Del0, cg, tol, verbose);
   std::cout << res.grad.transpose() << std::endl;
   return 0;

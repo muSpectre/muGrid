@@ -34,7 +34,6 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-
 #include <iostream>
 #include <memory>
 #include <chrono>
@@ -48,51 +47,48 @@
 #include "solver/solver_cg.hh"
 using opt_ptr = std::unique_ptr<cxxopts::Options>;
 
-
 opt_ptr parse_args(int argc, char **argv) {
   opt_ptr options =
-    std::make_unique<cxxopts::Options>(argv[0],  "Tests MPI fft scalability");
+      std::make_unique<cxxopts::Options>(argv[0], "Tests MPI fft scalability");
 
   try {
-    options->add_options()
-      ("0,N0", "number of rows", cxxopts::value<int>(), "N0")
-      ("h,help", "print help")
-      ("positional",
-       "Positional arguments: these are the arguments that are entered "
-       "without an option", cxxopts::value<std::vector<std::string>>());
+    options->add_options()("0,N0", "number of rows", cxxopts::value<int>(),
+                           "N0")("h,help", "print help")(
+        "positional",
+        "Positional arguments: these are the arguments that are entered "
+        "without an option",
+        cxxopts::value<std::vector<std::string>>());
     options->parse_positional(std::vector<std::string>{"N0", "positional"});
     options->parse(argc, argv);
     if (options->count("help")) {
       std::cout << options->help({"", "Group"}) << std::endl;
       exit(0);
     }
-    if (options->count("N0") != 1 ) {
+    if (options->count("N0") != 1) {
       throw cxxopts::OptionException("Parameter N0 missing");
-    } else if ((*options)["N0"].as<int>()%2 != 1) {
+    } else if ((*options)["N0"].as<int>() % 2 != 1) {
       throw cxxopts::OptionException("N0 must be odd");
     } else if (options->count("positional") > 0) {
       throw cxxopts::OptionException("There are too many positional arguments");
     }
-  } catch (const cxxopts::OptionException & e) {
+  } catch (const cxxopts::OptionException &e) {
     std::cout << "Error parsing options: " << e.what() << std::endl;
     exit(1);
   }
   return options;
 }
 
-
 using namespace muSpectre;
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
   banner("demonstrator mpi", 2018, "Till Junge <till.junge@epfl.ch>");
   auto options{parse_args(argc, argv)};
-  auto & opt{*options};
+  auto &opt{*options};
   const Dim_t size{opt["N0"].as<int>()};
   constexpr Real fsize{1.};
   constexpr Dim_t dim{3};
-  const Dim_t nb_dofs{ipow(size, dim)*ipow(dim, 2)};
-  std::cout << "Number of dofs: " <<  nb_dofs << std::endl;
+  const Dim_t nb_dofs{ipow(size, dim) * ipow(dim, 2)};
+  std::cout << "Number of dofs: " << nb_dofs << std::endl;
 
   constexpr Formulation form{Formulation::finite_strain};
 
@@ -109,20 +105,19 @@ int main(int argc, char *argv[])
     constexpr Real nu{0.29930675909878679};
 
     using Material_t = MaterialLinearElastic1<dim, dim>;
-    auto Material_soft{std::make_unique<Material_t>("soft",    E, nu)};
-    auto Material_hard{std::make_unique<Material_t>("hard", 10*E, nu)};
+    auto Material_soft{std::make_unique<Material_t>("soft", E, nu)};
+    auto Material_hard{std::make_unique<Material_t>("hard", 10 * E, nu)};
 
     int counter{0};
-    for (const auto && pixel:cell) {
-
+    for (const auto &&pixel : cell) {
       int sum = 0;
       for (Dim_t i = 0; i < dim; ++i) {
-        sum  += pixel[i]*2 / resolutions[i];
+        sum += pixel[i] * 2 / resolutions[i];
       }
 
       if (sum == 0) {
         Material_hard->add_pixel(pixel);
-        counter ++;
+        counter++;
       } else {
         Material_soft->add_pixel(pixel);
       }
@@ -142,13 +137,14 @@ int main(int argc, char *argv[])
 
     Eigen::MatrixXd DeltaF{Eigen::MatrixXd::Zero(dim, dim)};
     DeltaF(0, 1) = .1;
-    Dim_t verbose {1};
+    Dim_t verbose{1};
 
     auto start = std::chrono::high_resolution_clock::now();
     LoadSteps_t grads{DeltaF};
-    SolverCG cg{cell, cg_tol, maxiter, bool(verbose)};
+    SolverCG cg{cell, cg_tol, maxiter, static_cast<bool>(verbose)};
     de_geus(cell, grads, cg, newton_tol, verbose);
-    std::chrono::duration<Real> dur = std::chrono::high_resolution_clock::now() - start;
+    std::chrono::duration<Real> dur =
+        std::chrono::high_resolution_clock::now() - start;
     if (comm.rank() == 0) {
       std::cout << "Resolution time = " << dur.count() << "s" << std::endl;
     }

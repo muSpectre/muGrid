@@ -41,17 +41,15 @@ namespace muSpectre {
 
   //----------------------------------------------------------------------------//
   template <class DeprecatedSolverType, Dim_t DimS, Dim_t DimM>
-  DeprecatedSolverEigen<DeprecatedSolverType, DimS, DimM>::DeprecatedSolverEigen(Cell_t& cell, Real tol, Uint maxiter,
-                                                   bool verbose)
-    :Parent(cell, tol, maxiter, verbose),
-     adaptor{cell.get_adaptor()},
-     solver{}
-  {}
+  DeprecatedSolverEigen<DeprecatedSolverType, DimS,
+                        DimM>::DeprecatedSolverEigen(Cell_t &cell, Real tol,
+                                                     Uint maxiter, bool verbose)
+      : Parent(cell, tol, maxiter, verbose), adaptor{cell.get_adaptor()},
+        solver{} {}
 
   //----------------------------------------------------------------------------//
   template <class DeprecatedSolverType, Dim_t DimS, Dim_t DimM>
-  void
-  DeprecatedSolverEigen<DeprecatedSolverType, DimS, DimM>::initialise() {
+  void DeprecatedSolverEigen<DeprecatedSolverType, DimS, DimM>::initialise() {
     this->solver.setTolerance(this->tol);
     this->solver.setMaxIterations(this->maxiter);
     this->solver.compute(this->adaptor);
@@ -59,25 +57,26 @@ namespace muSpectre {
 
   //----------------------------------------------------------------------------//
   template <class DeprecatedSolverType, Dim_t DimS, Dim_t DimM>
-  typename DeprecatedSolverEigen<DeprecatedSolverType, DimS, DimM>::SolvVectorOut
-  DeprecatedSolverEigen<DeprecatedSolverType, DimS, DimM>::solve(const SolvVectorInC rhs, SolvVectorIn x_0) {
-    auto & this_solver = static_cast<DeprecatedSolverType&> (*this);
+  typename DeprecatedSolverEigen<DeprecatedSolverType, DimS,
+                                 DimM>::SolvVectorOut
+  DeprecatedSolverEigen<DeprecatedSolverType, DimS, DimM>::solve(
+      const SolvVectorInC rhs, SolvVectorIn x_0) {
+    auto &this_solver = static_cast<DeprecatedSolverType &>(*this);
     SolvVectorOut retval = this->solver.solveWithGuess(rhs, x_0);
     this->counter += this->solver.iterations();
     if (this->solver.info() != Eigen::Success) {
-      std::stringstream err {};
+      std::stringstream err{};
       err << this_solver.name() << " has not converged,"
           << " After " << this->solver.iterations() << " steps, the solver "
-          << " FAILED with  |r|/|b| = "
-          << std::setw(15) << this->solver.error()
+          << " FAILED with  |r|/|b| = " << std::setw(15) << this->solver.error()
           << ", cg_tol = " << this->tol << std::endl;
       throw ConvergenceError(err.str());
     }
     if (this->verbose) {
       std::cout << " After " << this->solver.iterations() << " "
-                << this_solver.name() << " steps, |r|/|b| = "
-                << std::setw(15) << this->solver.error()
-                << ", cg_tol = " << this->tol << std::endl;
+                << this_solver.name() << " steps, |r|/|b| = " << std::setw(15)
+                << this->solver.error() << ", cg_tol = " << this->tol
+                << std::endl;
     }
     return retval;
   }
@@ -85,33 +84,44 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <class DeprecatedSolverType, Dim_t DimS, Dim_t DimM>
   typename DeprecatedSolverEigen<DeprecatedSolverType, DimS, DimM>::Tg_req_t
-  DeprecatedSolverEigen<DeprecatedSolverType, DimS, DimM>::get_tangent_req() const {
+  DeprecatedSolverEigen<DeprecatedSolverType, DimS, DimM>::get_tangent_req()
+      const {
     return tangent_requirement;
   }
 
-  template class DeprecatedSolverEigen<DeprecatedSolverCGEigen<twoD, twoD>, twoD, twoD>;
-  template class DeprecatedSolverEigen<DeprecatedSolverCGEigen<threeD, threeD>, threeD, threeD>;
+  template class DeprecatedSolverEigen<DeprecatedSolverCGEigen<twoD, twoD>,
+                                       twoD, twoD>;
+  template class DeprecatedSolverEigen<DeprecatedSolverCGEigen<threeD, threeD>,
+                                       threeD, threeD>;
   template class DeprecatedSolverCGEigen<twoD, twoD>;
   template class DeprecatedSolverCGEigen<threeD, threeD>;
 
-  template class DeprecatedSolverEigen<DeprecatedSolverGMRESEigen<twoD, twoD>, twoD, twoD>;
-  template class DeprecatedSolverEigen<DeprecatedSolverGMRESEigen<threeD, threeD>, threeD, threeD>;
+  template class DeprecatedSolverEigen<DeprecatedSolverGMRESEigen<twoD, twoD>,
+                                       twoD, twoD>;
+  template class DeprecatedSolverEigen<
+      DeprecatedSolverGMRESEigen<threeD, threeD>, threeD, threeD>;
   template class DeprecatedSolverGMRESEigen<twoD, twoD>;
   template class DeprecatedSolverGMRESEigen<threeD, threeD>;
 
-  template class DeprecatedSolverEigen<DeprecatedSolverBiCGSTABEigen<twoD, twoD>, twoD, twoD>;
-  template class DeprecatedSolverEigen<DeprecatedSolverBiCGSTABEigen<threeD, threeD>, threeD, threeD>;
+  template class DeprecatedSolverEigen<
+      DeprecatedSolverBiCGSTABEigen<twoD, twoD>, twoD, twoD>;
+  template class DeprecatedSolverEigen<
+      DeprecatedSolverBiCGSTABEigen<threeD, threeD>, threeD, threeD>;
   template class DeprecatedSolverBiCGSTABEigen<twoD, twoD>;
   template class DeprecatedSolverBiCGSTABEigen<threeD, threeD>;
 
-  template class DeprecatedSolverEigen<DeprecatedSolverDGMRESEigen<twoD, twoD>, twoD, twoD>;
-  template class DeprecatedSolverEigen<DeprecatedSolverDGMRESEigen<threeD, threeD>, threeD, threeD>;
+  template class DeprecatedSolverEigen<DeprecatedSolverDGMRESEigen<twoD, twoD>,
+                                       twoD, twoD>;
+  template class DeprecatedSolverEigen<
+      DeprecatedSolverDGMRESEigen<threeD, threeD>, threeD, threeD>;
   template class DeprecatedSolverDGMRESEigen<twoD, twoD>;
   template class DeprecatedSolverDGMRESEigen<threeD, threeD>;
 
-  template class DeprecatedSolverEigen<DeprecatedSolverMINRESEigen<twoD, twoD>, twoD, twoD>;
-  template class DeprecatedSolverEigen<DeprecatedSolverMINRESEigen<threeD, threeD>, threeD, threeD>;
+  template class DeprecatedSolverEigen<DeprecatedSolverMINRESEigen<twoD, twoD>,
+                                       twoD, twoD>;
+  template class DeprecatedSolverEigen<
+      DeprecatedSolverMINRESEigen<threeD, threeD>, threeD, threeD>;
   template class DeprecatedSolverMINRESEigen<twoD, twoD>;
   template class DeprecatedSolverMINRESEigen<threeD, threeD>;
 
-} // muSpectre
+}  // namespace muSpectre

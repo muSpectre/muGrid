@@ -32,15 +32,15 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef FFT_UTILS_H
-#define FFT_UTILS_H
+#ifndef SRC_FFT_FFT_UTILS_HH_
+#define SRC_FFT_FFT_UTILS_HH_
 
 #include "common/common.hh"
 
 #include <Eigen/Dense>
 
-#include <valarray>
 #include <array>
+#include <valarray>
 
 namespace muSpectre {
 
@@ -61,8 +61,8 @@ namespace muSpectre {
    * Get fft_freqs for a grid
    */
   template <size_t dim>
-  inline std::array<std::valarray<Real>, dim> fft_freqs(Ccoord_t<dim> sizes,
-                                                 std::array<Real, dim> lengths) {
+  inline std::array<std::valarray<Real>, dim>
+  fft_freqs(Ccoord_t<dim> sizes, std::array<Real, dim> lengths) {
     std::array<std::valarray<Real>, dim> retval{};
     for (size_t i = 0; i < dim; ++i) {
       retval[i] = std::move(fft_freqs(sizes[i], lengths[i]));
@@ -74,10 +74,8 @@ namespace muSpectre {
    * simple class encapsulating the creation, and retrieval of
    * wave vectors
    */
-  template <Dim_t dim>
-  class FFT_freqs
-  {
-  public:
+  template <Dim_t dim> class FFT_freqs {
+   public:
     //! return type for wave vectors
     using Vector = Eigen::Matrix<Real, dim, 1>;
     //! Default constructor
@@ -85,38 +83,38 @@ namespace muSpectre {
 
     //! constructor with problem sizes
     FFT_freqs(Ccoord_t<dim> sizes, std::array<Real, dim> lengths)
-      : freqs{fft_freqs(sizes, lengths)} {}
+        : freqs{fft_freqs(sizes, lengths)} {}
 
     //! Copy constructor
     FFT_freqs(const FFT_freqs &other) = delete;
 
     //! Move constructor
-    FFT_freqs(FFT_freqs &&other)  = default;
+    FFT_freqs(FFT_freqs &&other) = default;
 
     //! Destructor
     virtual ~FFT_freqs() = default;
 
     //! Copy assignment operator
-    FFT_freqs& operator=(const FFT_freqs &other) = delete;
+    FFT_freqs &operator=(const FFT_freqs &other) = delete;
 
     //! Move assignment operator
-    FFT_freqs& operator=(FFT_freqs &&other) = default;
+    FFT_freqs &operator=(FFT_freqs &&other) = default;
 
     //! get unnormalised wave vector (in sampling units)
     inline Vector get_xi(const Ccoord_t<dim> ccoord) const;
 
     //! get normalised wave vector
-    inline Vector get_unit_xi(const Ccoord_t<dim> ccoord) const{
-      auto && xi = this->get_xi(std::move(ccoord));
-      return xi/xi.norm();
+    inline Vector get_unit_xi(const Ccoord_t<dim> ccoord) const {
+      auto &&xi = this->get_xi(std::move(ccoord));
+      return xi / xi.norm();
     }
 
-  protected:
+   protected:
     //! container for frequencies ordered by spatial dimension
     const std::array<std::valarray<Real>, dim> freqs;
-  private:
-  };
 
+   private:
+  };
 
   template <Dim_t dim>
   typename FFT_freqs<dim>::Vector
@@ -127,6 +125,6 @@ namespace muSpectre {
     }
     return retval;
   }
-}  // muSpectre
+}  // namespace muSpectre
 
-#endif /* FFT_UTILS_H */
+#endif  // SRC_FFT_FFT_UTILS_HH_

@@ -5,8 +5,8 @@
  *
  * @date   20 Sep 2017
  *
- * @brief  Test the FieldCollection classes which provide fast optimized iterators
- *         over run-time typed fields
+ * @brief  Test the FieldCollection classes which provide fast optimized
+ * iterators over run-time typed fields
  *
  * Copyright © 2017 Till Junge
  *
@@ -49,10 +49,10 @@ namespace muSpectre {
     BOOST_CHECK_EQUAL(fc.get_spatial_dim(), sdim);
   }
 
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(Simple_construction_test, F, test_collections, F) {
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(Simple_construction_test, F,
+                                   test_collections, F) {
     BOOST_CHECK_EQUAL(F::FC_t::spatial_dim(), F::sdim());
     BOOST_CHECK_EQUAL(F::fc.get_spatial_dim(), F::sdim());
-
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(get_field2_test, F, test_collections, F) {
@@ -60,35 +60,34 @@ namespace muSpectre {
 
     using FC_t = typename F::FC_t;
     using TF_t = TensorField<FC_t, Real, order, F::mdim()>;
-    auto && myfield = make_field<TF_t>("TensorField real 2", F::fc);
+    auto &&myfield = make_field<TF_t>("TensorField real 2", F::fc);
 
-    using TensorMap = TensorFieldMap<FC_t, Real, order,F::mdim()>;
+    using TensorMap = TensorFieldMap<FC_t, Real, order, F::mdim()>;
     using MatrixMap = MatrixFieldMap<FC_t, Real, F::mdim(), F::mdim()>;
     using ArrayMap = ArrayFieldMap<FC_t, Real, F::mdim(), F::mdim()>;
 
     TensorMap TFM(myfield);
     MatrixMap MFM(myfield);
-    ArrayMap  AFM(myfield);
+    ArrayMap AFM(myfield);
 
-    BOOST_CHECK_EQUAL(TFM.info_string(),
-                      "Tensor(d, "+ std::to_string(order) +
-                      "_o, " + std::to_string(F::mdim()) + "_d)");
-    BOOST_CHECK_EQUAL(MFM.info_string(),
-                      "Matrix(d, "+ std::to_string(F::mdim()) +
-                      "x" + std::to_string(F::mdim()) + ")");
-    BOOST_CHECK_EQUAL(AFM.info_string(),
-                      "Array(d, "+ std::to_string(F::mdim()) +
-                      "x" + std::to_string(F::mdim()) + ")");
-
+    BOOST_CHECK_EQUAL(TFM.info_string(), "Tensor(d, " + std::to_string(order) +
+                                             "_o, " +
+                                             std::to_string(F::mdim()) + "_d)");
+    BOOST_CHECK_EQUAL(MFM.info_string(), "Matrix(d, " +
+                                             std::to_string(F::mdim()) + "x" +
+                                             std::to_string(F::mdim()) + ")");
+    BOOST_CHECK_EQUAL(AFM.info_string(), "Array(d, " +
+                                             std::to_string(F::mdim()) + "x" +
+                                             std::to_string(F::mdim()) + ")");
   }
-
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(multi_field_test, F, mult_collections, F) {
     using FC_t = typename F::FC_t;
     // possible maptypes for Real tensor fields
     using T_type = Real;
     using T_TFM1_t = TensorFieldMap<FC_t, T_type, order, F::mdim()>;
-    using T_TFM2_t = TensorFieldMap<FC_t, T_type, 2, F::mdim()*F::mdim()>; //! dangerous
+    using T_TFM2_t =
+        TensorFieldMap<FC_t, T_type, 2, F::mdim() * F::mdim()>;  //! dangerous
     using T4_Map_t = T4MatrixFieldMap<FC_t, Real, F::mdim()>;
 
     // impossible maptypes for Real tensor fields
@@ -162,7 +161,6 @@ namespace muSpectre {
     BOOST_CHECK_THROW(M_MFMw2_t(F::fc.at(M_name)), FieldInterpretationError);
     BOOST_CHECK_THROW(M_MFMw3_t(F::fc.at(M_name)), FieldInterpretationError);
     BOOST_CHECK_THROW(M_SFM_t(F::fc.at(M_name_w)), std::out_of_range);
-
   }
 
   /* ---------------------------------------------------------------------- */
@@ -174,11 +172,10 @@ namespace muSpectre {
                                               FC_multi_fixture<2, 3, false>,
                                               FC_multi_fixture<3, 3, false>>;
 
-
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(init_test_glob, F, mult_collections_t, F) {
     Ccoord_t<F::sdim()> size;
     Ccoord_t<F::sdim()> loc{};
-    for (auto && s: size) {
+    for (auto &&s : size) {
       s = 3;
     }
     BOOST_CHECK_NO_THROW(F::fc.initialise(size, loc));
@@ -188,7 +185,7 @@ namespace muSpectre {
     testGoodies::RandRange<Int> rng;
     for (int i = 0; i < 7; ++i) {
       Ccoord_t<F::sdim()> pixel;
-      for (auto && s: pixel) {
+      for (auto &&s : pixel) {
         s = rng.randval(0, 7);
       }
       F::fc.add_pixel(pixel);
@@ -202,25 +199,24 @@ namespace muSpectre {
     constexpr auto mdim{F::mdim()};
     constexpr int nb_pix{7};
     testGoodies::RandRange<Int> rng{};
-    using ftype = internal::TypedSizedFieldBase<
-      decltype(F::fc), Real,  mdim*mdim*mdim*mdim>;
-    using stype = Eigen::Array<Real, mdim*mdim*mdim*mdim, 1>;
-    auto & field = static_cast<ftype&>(F::fc["Tensorfield Real o4"]);
+    using ftype = internal::TypedSizedFieldBase<decltype(F::fc), Real,
+                                                mdim * mdim * mdim * mdim>;
+    using stype = Eigen::Array<Real, mdim * mdim * mdim * mdim, 1>;
+    auto &field = static_cast<ftype &>(F::fc["Tensorfield Real o4"]);
     field.push_back(stype());
     for (int i = 0; i < nb_pix; ++i) {
       Ccoord_t<F::sdim()> pixel;
-      for (auto && s: pixel) {
+      for (auto &&s : pixel) {
         s = rng.randval(0, 7);
       }
       F::fc.add_pixel(pixel);
     }
 
     BOOST_CHECK_THROW(F::fc.initialise(), FieldCollectionError);
-    for (int i = 0; i < nb_pix-1; ++i) {
+    for (int i = 0; i < nb_pix - 1; ++i) {
       field.push_back(stype());
     }
     BOOST_CHECK_NO_THROW(F::fc.initialise());
-
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(iter_field_test, F, iter_collections, F) {
@@ -230,32 +226,36 @@ namespace muSpectre {
     TypedFieldMap<FC_t, Real> dyn_map{F::fc["Tensorfield Real o4"]};
     F::fc["Tensorfield Real o4"].set_zero();
 
-    for (auto && tens:T4map) {
-      BOOST_CHECK_EQUAL(Real(Eigen::Tensor<Real, 0>(tens.abs().sum().eval())()), 0);
+    for (auto &&tens : T4map) {
+      BOOST_CHECK_EQUAL(Real(Eigen::Tensor<Real, 0>(tens.abs().sum().eval())()),
+                        0);
     }
-    for (auto && tens: T4map) {
+    for (auto &&tens : T4map) {
       tens.setRandom();
     }
 
-    for (auto && tup: akantu::zip(T4map, dyn_map) ) {
-      auto & tens = std::get<0>(tup);
-      auto & dyn = std::get<1>(tup);
+    for (auto &&tup : akantu::zip(T4map, dyn_map)) {
+      auto &tens = std::get<0>(tup);
+      auto &dyn = std::get<1>(tup);
       constexpr Dim_t nb_comp{ipow(F::mdim(), order)};
       Eigen::Map<Eigen::Array<Real, nb_comp, 1>> tens_arr(tens.data());
-      Real error{(dyn-tens_arr).matrix().norm()};
+      Real error{(dyn - tens_arr).matrix().norm()};
       BOOST_CHECK_EQUAL(error, 0);
     }
 
-    using Tensor2Map = TensorFieldMap<FC_t, Real, matrix_order, F::Parent::mdim()>;
-    using MSqMap = MatrixFieldMap<FC_t, Real, F::Parent::mdim(), F::Parent::mdim()>;
-    using ASqMap =  ArrayFieldMap<FC_t, Real, F::Parent::mdim(), F::Parent::mdim()>;
+    using Tensor2Map =
+        TensorFieldMap<FC_t, Real, matrix_order, F::Parent::mdim()>;
+    using MSqMap =
+        MatrixFieldMap<FC_t, Real, F::Parent::mdim(), F::Parent::mdim()>;
+    using ASqMap =
+        ArrayFieldMap<FC_t, Real, F::Parent::mdim(), F::Parent::mdim()>;
     using A2Map = ArrayFieldMap<FC_t, Real, 3, 4>;
     using WrongMap = ArrayFieldMap<FC_t, Real, 7, 4>;
     Tensor2Map T2map{F::fc["Tensorfield Real o2"]};
     MSqMap Mmap{F::fc["Tensorfield Real o2"]};
     ASqMap Amap{F::fc["Tensorfield Real o2"]};
     A2Map DynMap{F::fc["Dynamically sized Field"]};
-    auto & fc_ref{F::fc};
+    auto &fc_ref{F::fc};
     BOOST_CHECK_THROW(WrongMap{fc_ref["Dynamically sized Field"]},
                       FieldInterpretationError);
     auto t2_it = T2map.begin();
@@ -264,25 +264,24 @@ namespace muSpectre {
     auto a_it = Amap.begin();
     for (; t2_it != t2_it_end; ++t2_it, ++m_it, ++a_it) {
       t2_it->setRandom();
-      auto && m = *m_it;
+      auto &&m = *m_it;
       bool comp = (m == a_it->matrix());
       BOOST_CHECK(comp);
     }
 
     size_t counter{0};
-    for (auto val: DynMap) {
+    for (auto val : DynMap) {
       ++counter;
-      val += val.Ones()*counter;
+      val += val.Ones() * counter;
     }
 
     counter = 0;
-    for (auto val: DynMap) {
+    for (auto val : DynMap) {
       ++counter;
-      val -= val.Ones()*counter;
-      auto error {val.matrix().norm()};
+      val -= val.Ones() * counter;
+      auto error{val.matrix().norm()};
       BOOST_CHECK_LT(error, tol);
     }
-
 
     using ScalarMap = ScalarFieldMap<FC_t, Int>;
     ScalarMap s_map{F::fc["integer Scalar"]};
@@ -291,13 +290,13 @@ namespace muSpectre {
     }
 
     counter = 0;
-    for (const auto& val: s_map) {
+    for (const auto &val : s_map) {
       BOOST_CHECK_EQUAL(counter++, val);
     }
-
   }
 
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(ccoord_indexing_test, F, glob_iter_colls, F) {
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(ccoord_indexing_test, F, glob_iter_colls,
+                                   F) {
     using FC_t = typename F::Parent::FC_t;
     using ScalarMap = ScalarFieldMap<FC_t, Int>;
     ScalarMap s_map{F::fc["integer Scalar"]};
@@ -305,27 +304,27 @@ namespace muSpectre {
       s_map[i] = i;
     }
 
-
     for (size_t i = 0; i < CcoordOps::get_size(F::fc.get_sizes()); ++i) {
-      BOOST_CHECK_EQUAL(CcoordOps::get_index(F::fc.get_sizes(),
-                                             F::fc.get_locations(),
-                                             CcoordOps::get_ccoord
-                                             (F::fc.get_sizes(),
-                                              F::fc.get_locations(),
-                                              i)), i);
+      BOOST_CHECK_EQUAL(
+          CcoordOps::get_index(F::fc.get_sizes(), F::fc.get_locations(),
+                               CcoordOps::get_ccoord(F::fc.get_sizes(),
+                                                     F::fc.get_locations(), i)),
+          i);
     }
   }
 
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(iterator_methods_test, F, iter_collections, F) {
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(iterator_methods_test, F, iter_collections,
+                                   F) {
     using FC_t = typename F::Parent::FC_t;
     using Tensor4Map = TensorFieldMap<FC_t, Real, order, F::Parent::mdim()>;
     Tensor4Map T4map{F::fc["Tensorfield Real o4"]};
     using it_t = typename Tensor4Map::iterator;
-    std::ptrdiff_t diff{3}; // arbitrary, as long as it is smaller than the container size
+    std::ptrdiff_t diff{
+        3};  // arbitrary, as long as it is smaller than the container size
 
     // check constructors
-    auto itstart = T4map.begin(); // standard way of obtaining iterator
-    auto itend = T4map.end(); // ditto
+    auto itstart = T4map.begin();  // standard way of obtaining iterator
+    auto itend = T4map.end();      // ditto
 
     it_t it1{T4map};
     it_t it2{T4map, false};
@@ -338,43 +337,42 @@ namespace muSpectre {
     // check ostream operator
     std::stringstream response;
     response << it3;
-    BOOST_CHECK_EQUAL
-      (response.str(),
-       std::string
-       ("iterator on field 'Tensorfield Real o4', entry ") +
-       std::to_string(diff));
+    BOOST_CHECK_EQUAL(
+        response.str(),
+        std::string("iterator on field 'Tensorfield Real o4', entry ") +
+            std::to_string(diff));
 
     // check move and assigment constructor (and operator+)
     it_t it_repl{T4map};
     it_t itmove = std::move(T4map.begin());
-    it_t it4 = it1+diff;
-    it_t it7 = it4 -diff;
-    //BOOST_CHECK_EQUAL(itcopy, it1);
+    it_t it4 = it1 + diff;
+    it_t it7 = it4 - diff;
+    // BOOST_CHECK_EQUAL(itcopy, it1);
     BOOST_CHECK_EQUAL(itmove, it1);
     BOOST_CHECK_EQUAL(it4, it3);
     BOOST_CHECK_EQUAL(it7, it1);
 
     // check increments/decrements
-    BOOST_CHECK_EQUAL(it1++, it_repl);    // post-increment
-    BOOST_CHECK_EQUAL(it1, it_repl+1);
-    BOOST_CHECK_EQUAL(--it1, it_repl);    // pre -decrement
-    BOOST_CHECK_EQUAL(++it1, it_repl+1);  // pre -increment
-    BOOST_CHECK_EQUAL(it1--, it_repl+1);  // post-decrement
+    BOOST_CHECK_EQUAL(it1++, it_repl);  // post-increment
+    BOOST_CHECK_EQUAL(it1, it_repl + 1);
+    BOOST_CHECK_EQUAL(--it1, it_repl);      // pre -decrement
+    BOOST_CHECK_EQUAL(++it1, it_repl + 1);  // pre -increment
+    BOOST_CHECK_EQUAL(it1--, it_repl + 1);  // post-decrement
     BOOST_CHECK_EQUAL(it1, it_repl);
-
 
     // dereference and member-of-pointer check
     Eigen::Tensor<Real, 4> Tens = *it1;
     Eigen::Tensor<Real, 4> Tens2 = *itstart;
-    Eigen::Tensor<bool, 0> check = (Tens==Tens2).all();
-    BOOST_CHECK_EQUAL(bool(check()), true);
+    Eigen::Tensor<bool, 0> check = (Tens == Tens2).all();
+    BOOST_CHECK_EQUAL(static_cast<bool>(check()), true);
 
     BOOST_CHECK_NO_THROW(itstart->setZero());
 
-    //check access subscripting
+    // check access subscripting
     auto T3a = *it3;
     auto T3b = itstart[diff];
-    BOOST_CHECK(bool(Eigen::Tensor<bool, 0>((T3a==T3b).all())()));
+    BOOST_CHECK(static_cast<bool>
+                (Eigen::Tensor<bool, 0>((T3a == T3b).all())()));
 
     // div. comparisons
     BOOST_CHECK_LT(itstart, itend);
@@ -386,43 +384,51 @@ namespace muSpectre {
     BOOST_CHECK(!(itend <= itstart));
 
     BOOST_CHECK_GT(itend, itstart);
-    BOOST_CHECK(!(itend>itend));
-    BOOST_CHECK(!(itstart>itend));
+    BOOST_CHECK(!(itend > itend));
+    BOOST_CHECK(!(itstart > itend));
 
     BOOST_CHECK_GE(itend, itstart);
     BOOST_CHECK_GE(itend, itend);
     BOOST_CHECK(!(itstart >= itend));
 
     // check assignment increment/decrement
-    BOOST_CHECK_EQUAL(it1+=diff, it3);
-    BOOST_CHECK_EQUAL(it1-=diff, itstart);
+    BOOST_CHECK_EQUAL(it1 += diff, it3);
+    BOOST_CHECK_EQUAL(it1 -= diff, itstart);
 
     // check cell coordinates
     using Ccoord = Ccoord_t<F::sdim()>;
     Ccoord a{itstart.get_ccoord()};
     Ccoord b{0};
 
-    // Weirdly, boost::has_left_shift<std::ostream, T>::value is false for Ccoords, even though the operator is implemented :(
-    //BOOST_CHECK_EQUAL(a, b);
-    bool check2 = (a==b);
+    // Weirdly, boost::has_left_shift<std::ostream, T>::value is false for
+    // Ccoords, even though the operator is implemented :(
+    // BOOST_CHECK_EQUAL(a, b);
+    bool check2 = (a == b);
     BOOST_CHECK(check2);
   }
 
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(const_tensor_iter_test, F, iter_collections, F) {
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(const_tensor_iter_test, F, iter_collections,
+                                   F) {
     using FC_t = typename F::Parent::FC_t;
     using Tensor4Map = TensorFieldMap<FC_t, Real, order, F::Parent::mdim()>;
     Tensor4Map T4map{F::fc["Tensorfield Real o4"]};
 
     using T_t = typename Tensor4Map::T_t;
-    Eigen::TensorMap<const T_t> Tens2(T4map[0].data(), F::Parent::sdim(), F::Parent::sdim(), F::Parent::sdim(), F::Parent::sdim());
+    Eigen::TensorMap<const T_t> Tens2(T4map[0].data(), F::Parent::sdim(),
+                                      F::Parent::sdim(), F::Parent::sdim(),
+                                      F::Parent::sdim());
 
     for (auto it = T4map.cbegin(); it != T4map.cend(); ++it) {
-      // maps to const tensors can't be initialised with a const pointer this sucks
-      auto&&  tens = *it;
-      auto&&  ptr = tens.data();
+      // maps to const tensors can't be initialised with a const pointer this
+      // sucks
+      auto &&tens = *it;
+      auto &&ptr = tens.data();
 
-      static_assert(std::is_pointer<std::remove_reference_t<decltype(ptr)>>::value, "should be getting a pointer");
-      //static_assert(std::is_const<std::remove_pointer_t<decltype(ptr)>>::value, "should be const");
+      static_assert(
+          std::is_pointer<std::remove_reference_t<decltype(ptr)>>::value,
+          "should be getting a pointer");
+      // static_assert(std::is_const<std::remove_pointer_t<decltype(ptr)>>::value,
+      // "should be const");
 
       // If Tensor were written well, above static_assert should pass, and the
       // following check shouldn't. If it get triggered, it means that a newer
@@ -430,22 +436,26 @@ namespace muSpectre {
       // TensorMap<const Tensor<...>. This means that const-correct field maps
       // are then also possible for tensors
       BOOST_CHECK(!std::is_const<std::remove_pointer_t<decltype(ptr)>>::value);
-
     }
   }
 
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(const_matrix_iter_test, F, iter_collections, F) {
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(const_matrix_iter_test, F, iter_collections,
+                                   F) {
     using FC_t = typename F::Parent::FC_t;
     using MatrixMap = MatrixFieldMap<FC_t, Complex, F::sdim(), F::mdim()>;
     MatrixMap Mmap{F::fc["Matrixfield Complex sdim x mdim"]};
 
     for (auto it = Mmap.cbegin(); it != Mmap.cend(); ++it) {
-      // maps to const tensors can't be initialised with a const pointer this sucks
-      auto&&  mat = *it;
-      auto&&  ptr = mat.data();
+      // maps to const tensors can't be initialised with a const pointer this
+      // sucks
+      auto &&mat = *it;
+      auto &&ptr = mat.data();
 
-      static_assert(std::is_pointer<std::remove_reference_t<decltype(ptr)>>::value, "should be getting a pointer");
-      //static_assert(std::is_const<std::remove_pointer_t<decltype(ptr)>>::value, "should be const");
+      static_assert(
+          std::is_pointer<std::remove_reference_t<decltype(ptr)>>::value,
+          "should be getting a pointer");
+      // static_assert(std::is_const<std::remove_pointer_t<decltype(ptr)>>::value,
+      // "should be const");
 
       // If Matrix were written well, above static_assert should pass, and the
       // following check shouldn't. If it get triggered, it means that a newer
@@ -453,26 +463,27 @@ namespace muSpectre {
       // MatrixMap<const Matrix<...>. This means that const-correct field maps
       // are then also possible for matrices
       BOOST_CHECK(!std::is_const<std::remove_pointer_t<decltype(ptr)>>::value);
-
     }
   }
 
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(const_scalar_iter_test, F, iter_collections, F) {
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(const_scalar_iter_test, F, iter_collections,
+                                   F) {
     using FC_t = typename F::Parent::FC_t;
     using ScalarMap = ScalarFieldMap<FC_t, Int>;
     ScalarMap Smap{F::fc["integer Scalar"]};
 
     for (auto it = Smap.cbegin(); it != Smap.cend(); ++it) {
-      auto&& scal = *it;
-      static_assert(std::is_const<std::remove_reference_t<decltype(scal)>>::value,
-                    "referred type should be const");
+      auto &&scal = *it;
+      static_assert(
+          std::is_const<std::remove_reference_t<decltype(scal)>>::value,
+          "referred type should be const");
       static_assert(std::is_lvalue_reference<decltype(scal)>::value,
                     "Should have returned an lvalue ref");
-
     }
   }
   /* ---------------------------------------------------------------------- */
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(assignment_test, Fix, iter_collections, Fix) {
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(assignment_test, Fix, iter_collections,
+                                   Fix) {
     auto t4map{Fix::t4_field.get_map()};
     auto t2map{Fix::t2_field.get_map()};
     auto scmap{Fix::sc_field.get_map()};
@@ -497,10 +508,13 @@ namespace muSpectre {
     const size_t nb_pts{Fix::fc.size()};
 
     testGoodies::RandRange<size_t> rnd{};
-    BOOST_CHECK_EQUAL((t4map[rnd.randval(0, nb_pts-1)] - t4map_val).norm(), 0.);
-    BOOST_CHECK_EQUAL((t2map[rnd.randval(0, nb_pts-1)] - t2map_val).norm(), 0.);
-    BOOST_CHECK_EQUAL((scmap[rnd.randval(0, nb_pts-1)] - scmap_val),        0.);
-    BOOST_CHECK_EQUAL((m2map[rnd.randval(0, nb_pts-1)] - m2map_val).norm(), 0.);
+    BOOST_CHECK_EQUAL((t4map[rnd.randval(0, nb_pts - 1)] - t4map_val).norm(),
+                      0.);
+    BOOST_CHECK_EQUAL((t2map[rnd.randval(0, nb_pts - 1)] - t2map_val).norm(),
+                      0.);
+    BOOST_CHECK_EQUAL((scmap[rnd.randval(0, nb_pts - 1)] - scmap_val), 0.);
+    BOOST_CHECK_EQUAL((m2map[rnd.randval(0, nb_pts - 1)] - m2map_val).norm(),
+                      0.);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -514,11 +528,11 @@ namespace muSpectre {
     using T2_t = typename Eigen::Matrix<Real, Fix::mdim(), Fix::mdim()>;
     T2_t test_mat;
     test_mat.setRandom();
-    Eigen::Map<Eigen::Array<Real, ipow(Fix::mdim(), 2), 1>> test_map(test_mat.data());
+    Eigen::Map<Eigen::Array<Real, ipow(Fix::mdim(), 2), 1>> test_map(
+        test_mat.data());
     t2eigen.col(0) = test_map;
 
     BOOST_CHECK_EQUAL((Fix::t2_field.get_map()[0] - test_mat).norm(), 0.);
-
   }
 
   /* ---------------------------------------------------------------------- */
@@ -529,63 +543,63 @@ namespace muSpectre {
     using FieldProxy_t = TypedField<typename Fix::FC_t, Real>;
 
     //! create a field proxy
-    FieldProxy_t proxy("proxy to 'Tensorfield Real o4'",
-                       Fix::fc, t4values,
+    FieldProxy_t proxy("proxy to 'Tensorfield Real o4'", Fix::fc, t4values,
                        Fix::t4_field.get_nb_components());
 
     Eigen::VectorXd wrong_size_not_multiple{
-      Eigen::VectorXd::Zero(t4values.size()+1)};
+        Eigen::VectorXd::Zero(t4values.size() + 1)};
     BOOST_CHECK_THROW(FieldProxy_t("size not a multiple of nb_components",
                                    Fix::fc, wrong_size_not_multiple,
                                    Fix::t4_field.get_nb_components()),
                       FieldError);
 
-    Eigen::VectorXd wrong_size_but_multiple{
-      Eigen::VectorXd::Zero(t4values.size()+
-                            Fix::t4_field.get_nb_components())};
+    Eigen::VectorXd wrong_size_but_multiple{Eigen::VectorXd::Zero(
+        t4values.size() + Fix::t4_field.get_nb_components())};
     BOOST_CHECK_THROW(FieldProxy_t("size wrong multiple of nb_components",
                                    Fix::fc, wrong_size_but_multiple,
                                    Fix::t4_field.get_nb_components()),
                       FieldError);
 
-    using Tensor4Map = T4MatrixFieldMap<typename Fix::FC_t, Real, Fix::Parent::mdim()>;
+    using Tensor4Map =
+        T4MatrixFieldMap<typename Fix::FC_t, Real, Fix::Parent::mdim()>;
     Tensor4Map ref_map{Fix::t4_field};
     Tensor4Map proxy_map{proxy};
 
-    for (auto tup: akantu::zip(ref_map, proxy_map)) {
-      auto & ref = std::get<0>(tup);
-      auto & prox = std::get<1>(tup);
-      BOOST_CHECK_EQUAL((ref-prox).norm(), 0);
+    for (auto tup : akantu::zip(ref_map, proxy_map)) {
+      auto &ref = std::get<0>(tup);
+      auto &prox = std::get<1>(tup);
+      BOOST_CHECK_EQUAL((ref - prox).norm(), 0);
     }
   }
 
   /* ---------------------------------------------------------------------- */
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(field_proxy_of_existing_field, Fix, iter_collections, Fix ) {
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(field_proxy_of_existing_field, Fix,
+                                   iter_collections, Fix) {
     Eigen::Ref<Eigen::VectorXd> t4values{Fix::t4_field.eigenvec()};
     using FieldProxy_t = TypedField<typename Fix::FC_t, Real>;
 
     //! create a field proxy
-    FieldProxy_t proxy("proxy to 'Tensorfield Real o4'",
-                       Fix::fc, t4values,
+    FieldProxy_t proxy("proxy to 'Tensorfield Real o4'", Fix::fc, t4values,
                        Fix::t4_field.get_nb_components());
 
-    using Tensor4Map = T4MatrixFieldMap<typename Fix::FC_t, Real, Fix::Parent::mdim()>;
+    using Tensor4Map =
+        T4MatrixFieldMap<typename Fix::FC_t, Real, Fix::Parent::mdim()>;
     Tensor4Map ref_map{Fix::t4_field};
     Tensor4Map proxy_map{proxy};
-    for (auto tup: akantu::zip(ref_map, proxy_map)) {
-      auto & ref = std::get<0>(tup);
-      auto & prox = std::get<1>(tup);
+    for (auto tup : akantu::zip(ref_map, proxy_map)) {
+      auto &ref = std::get<0>(tup);
+      auto &prox = std::get<1>(tup);
       prox += prox.Identity();
-      BOOST_CHECK_EQUAL((ref-prox).norm(), 0);
+      BOOST_CHECK_EQUAL((ref - prox).norm(), 0);
     }
   }
 
   /* ---------------------------------------------------------------------- */
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(typed_field_getter, Fix,
-                                   mult_collections, Fix) {
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(typed_field_getter, Fix, mult_collections,
+                                   Fix) {
     constexpr auto mdim{Fix::mdim()};
-    auto & fc{Fix::fc};
-    auto & field = fc.template get_typed_field<Real>("Tensorfield Real o4");
+    auto &fc{Fix::fc};
+    auto &field = fc.template get_typed_field<Real>("Tensorfield Real o4");
     BOOST_CHECK_EQUAL(field.get_nb_components(), ipow(mdim, fourthOrder));
   }
 
@@ -597,104 +611,97 @@ namespace muSpectre {
     auto m2map{Fix::m2_field.get_map()};
     auto dymap{Fix::dyn_field.get_map()};
 
-    for (auto && tup: akantu::zip(scmap.get_collection(), scmap,
-                                  scmap.enumerate())) {
+    for (auto &&tup :
+         akantu::zip(scmap.get_collection(), scmap, scmap.enumerate())) {
+      const auto &ccoord_ref = std::get<0>(tup);
+      const auto &val_ref = std::get<1>(tup);
+      const auto &key_val = std::get<2>(tup);
+      const auto &ccoord = std::get<0>(key_val);
+      const auto &val = std::get<1>(key_val);
 
-      const auto & ccoord_ref = std::get<0>(tup);
-      const auto & val_ref = std::get<1>(tup);
-      const auto & key_val = std::get<2>(tup);
-      const auto & ccoord = std::get<0>(key_val);
-      const auto & val = std::get<1>(key_val);
-
-      for (auto && ccoords: akantu::zip(ccoord_ref, ccoord)) {
-        const auto & ref{std::get<0>(ccoords)};
-        const auto & val{std::get<1>(ccoords)};
+      for (auto &&ccoords : akantu::zip(ccoord_ref, ccoord)) {
+        const auto &ref{std::get<0>(ccoords)};
+        const auto &val{std::get<1>(ccoords)};
         BOOST_CHECK_EQUAL(ref, val);
       }
 
-      const auto error{std::abs(val-val_ref)};
+      const auto error{std::abs(val - val_ref)};
       BOOST_CHECK_EQUAL(error, 0);
     }
 
-  for (auto && tup: akantu::zip(t4map.get_collection(), t4map,
-                                  t4map.enumerate())) {
+    for (auto &&tup :
+         akantu::zip(t4map.get_collection(), t4map, t4map.enumerate())) {
+      const auto &ccoord_ref = std::get<0>(tup);
+      const auto &val_ref = std::get<1>(tup);
+      const auto &key_val = std::get<2>(tup);
+      const auto &ccoord = std::get<0>(key_val);
+      const auto &val = std::get<1>(key_val);
 
-      const auto & ccoord_ref = std::get<0>(tup);
-      const auto & val_ref = std::get<1>(tup);
-      const auto & key_val = std::get<2>(tup);
-      const auto & ccoord = std::get<0>(key_val);
-      const auto & val = std::get<1>(key_val);
-
-      for (auto && ccoords: akantu::zip(ccoord_ref, ccoord)) {
-        const auto & ref{std::get<0>(ccoords)};
-        const auto & val{std::get<1>(ccoords)};
+      for (auto &&ccoords : akantu::zip(ccoord_ref, ccoord)) {
+        const auto &ref{std::get<0>(ccoords)};
+        const auto &val{std::get<1>(ccoords)};
         BOOST_CHECK_EQUAL(ref, val);
       }
 
-      const auto error{(val-val_ref).norm()};
+      const auto error{(val - val_ref).norm()};
       BOOST_CHECK_EQUAL(error, 0);
     }
 
-  for (auto && tup: akantu::zip(t2map.get_collection(), t2map,
-                                  t2map.enumerate())) {
+    for (auto &&tup :
+         akantu::zip(t2map.get_collection(), t2map, t2map.enumerate())) {
+      const auto &ccoord_ref = std::get<0>(tup);
+      const auto &val_ref = std::get<1>(tup);
+      const auto &key_val = std::get<2>(tup);
+      const auto &ccoord = std::get<0>(key_val);
+      const auto &val = std::get<1>(key_val);
 
-      const auto & ccoord_ref = std::get<0>(tup);
-      const auto & val_ref = std::get<1>(tup);
-      const auto & key_val = std::get<2>(tup);
-      const auto & ccoord = std::get<0>(key_val);
-      const auto & val = std::get<1>(key_val);
-
-      for (auto && ccoords: akantu::zip(ccoord_ref, ccoord)) {
-        const auto & ref{std::get<0>(ccoords)};
-        const auto & val{std::get<1>(ccoords)};
+      for (auto &&ccoords : akantu::zip(ccoord_ref, ccoord)) {
+        const auto &ref{std::get<0>(ccoords)};
+        const auto &val{std::get<1>(ccoords)};
         BOOST_CHECK_EQUAL(ref, val);
       }
 
-      const auto error{(val-val_ref).norm()};
+      const auto error{(val - val_ref).norm()};
       BOOST_CHECK_EQUAL(error, 0);
     }
 
-  for (auto && tup: akantu::zip(m2map.get_collection(), m2map,
-                                  m2map.enumerate())) {
+    for (auto &&tup :
+         akantu::zip(m2map.get_collection(), m2map, m2map.enumerate())) {
+      const auto &ccoord_ref = std::get<0>(tup);
+      const auto &val_ref = std::get<1>(tup);
+      const auto &key_val = std::get<2>(tup);
+      const auto &ccoord = std::get<0>(key_val);
+      const auto &val = std::get<1>(key_val);
 
-      const auto & ccoord_ref = std::get<0>(tup);
-      const auto & val_ref = std::get<1>(tup);
-      const auto & key_val = std::get<2>(tup);
-      const auto & ccoord = std::get<0>(key_val);
-      const auto & val = std::get<1>(key_val);
-
-      for (auto && ccoords: akantu::zip(ccoord_ref, ccoord)) {
-        const auto & ref{std::get<0>(ccoords)};
-        const auto & val{std::get<1>(ccoords)};
+      for (auto &&ccoords : akantu::zip(ccoord_ref, ccoord)) {
+        const auto &ref{std::get<0>(ccoords)};
+        const auto &val{std::get<1>(ccoords)};
         BOOST_CHECK_EQUAL(ref, val);
       }
 
-      const auto error{(val-val_ref).norm()};
+      const auto error{(val - val_ref).norm()};
       BOOST_CHECK_EQUAL(error, 0);
     }
 
-  for (auto && tup: akantu::zip(dymap.get_collection(), dymap,
-                                  dymap.enumerate())) {
+    for (auto &&tup :
+         akantu::zip(dymap.get_collection(), dymap, dymap.enumerate())) {
+      const auto &ccoord_ref = std::get<0>(tup);
+      const auto &val_ref = std::get<1>(tup);
+      const auto &key_val = std::get<2>(tup);
+      const auto &ccoord = std::get<0>(key_val);
+      const auto &val = std::get<1>(key_val);
 
-      const auto & ccoord_ref = std::get<0>(tup);
-      const auto & val_ref = std::get<1>(tup);
-      const auto & key_val = std::get<2>(tup);
-      const auto & ccoord = std::get<0>(key_val);
-      const auto & val = std::get<1>(key_val);
-
-      for (auto && ccoords: akantu::zip(ccoord_ref, ccoord)) {
-        const auto & ref{std::get<0>(ccoords)};
-        const auto & val{std::get<1>(ccoords)};
+      for (auto &&ccoords : akantu::zip(ccoord_ref, ccoord)) {
+        const auto &ref{std::get<0>(ccoords)};
+        const auto &val{std::get<1>(ccoords)};
         BOOST_CHECK_EQUAL(ref, val);
       }
 
-      const auto error{(val-val_ref).matrix().norm()};
+      const auto error{(val - val_ref).matrix().norm()};
       BOOST_CHECK_EQUAL(error, 0);
     }
   }
 
-
-
   BOOST_AUTO_TEST_SUITE_END();
 
-}  // muSpectre
+}  // namespace muSpectre

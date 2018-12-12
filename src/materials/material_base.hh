@@ -32,8 +32,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef MATERIAL_BASE_H
-#define MATERIAL_BASE_H
+#ifndef SRC_MATERIALS_MATERIAL_BASE_HH_
+#define SRC_MATERIALS_MATERIAL_BASE_HH_
 
 #include "common/common.hh"
 #include "common/field.hh"
@@ -50,10 +50,8 @@ namespace muSpectre {
    * law; even for e.g. two-dimensional problems the constitutive law could
    * live in three-dimensional space for e.g. plane strain or stress problems)
    */
-  template<Dim_t DimS, Dim_t DimM>
-  class MaterialBase
-  {
-  public:
+  template <Dim_t DimS, Dim_t DimM> class MaterialBase {
+   public:
     //! typedefs for data handled by this interface
     //! global field collection for cell-wide fields, like stress, strain, etc
     using GFieldCollection_t = GlobalFieldCollection<DimS>;
@@ -62,21 +60,23 @@ namespace muSpectre {
     //! pixels the material is responsible for
     using MFieldCollection_t = LocalFieldCollection<DimS>;
 
-    using iterator = typename MFieldCollection_t::iterator; //!< pixel iterator
+    using iterator = typename MFieldCollection_t::iterator;  //!< pixel iterator
     //! polymorphic base class for fields only to be used for debugging
     using Field_t = internal::FieldBase<GFieldCollection_t>;
     //! Full type for stress fields
-    using StressField_t = TensorField<GFieldCollection_t, Real, secondOrder, DimM>;
+    using StressField_t =
+        TensorField<GFieldCollection_t, Real, secondOrder, DimM>;
     //! Full type for strain fields
     using StrainField_t = StressField_t;
     //! Full type for tangent stiffness fields fields
-    using TangentField_t = TensorField<GFieldCollection_t, Real, fourthOrder, DimM>;
-    using Ccoord = Ccoord_t<DimS>; //!< cell coordinates type
+    using TangentField_t =
+        TensorField<GFieldCollection_t, Real, fourthOrder, DimM>;
+    using Ccoord = Ccoord_t<DimS>;  //!< cell coordinates type
     //! Default constructor
     MaterialBase() = delete;
 
     //! Construct by name
-    MaterialBase(std::string name);
+    explicit MaterialBase(std::string name);
 
     //! Copy constructor
     MaterialBase(const MaterialBase &other) = delete;
@@ -88,11 +88,10 @@ namespace muSpectre {
     virtual ~MaterialBase() = default;
 
     //! Copy assignment operator
-    MaterialBase& operator=(const MaterialBase &other) = delete;
+    MaterialBase &operator=(const MaterialBase &other) = delete;
 
     //! Move assignment operator
-    MaterialBase& operator=(MaterialBase &&other) = delete;
-
+    MaterialBase &operator=(MaterialBase &&other) = delete;
 
     /**
      *  take responsibility for a pixel identified by its cell coordinates
@@ -100,7 +99,7 @@ namespace muSpectre {
      *  (as, e.g. for eigenstrain), we need to pass more parameters. Materials
      *  of this tye need to overload add_pixel
      */
-    virtual void add_pixel(const Ccoord & ccooord);
+    virtual void add_pixel(const Ccoord &ccooord);
 
     //! allocate memory, etc, but also: wipe history variables!
     virtual void initialise() = 0;
@@ -111,18 +110,17 @@ namespace muSpectre {
      * base implementation does nothing, but materials with history
      * variables need to implement this
      */
-    virtual void save_history_variables() {};
+    virtual void save_history_variables() {}
 
     //! return the material's name
-    const std::string & get_name() const;
+    const std::string &get_name() const;
 
     //! spatial dimension for static inheritance
-    constexpr static Dim_t sdim() {return DimS;}
+    constexpr static Dim_t sdim() { return DimS; }
     //! material dimension for static inheritance
-    constexpr static Dim_t mdim() {return DimM;}
+    constexpr static Dim_t mdim() { return DimM; }
     //! computes stress
-    virtual void compute_stresses(const StrainField_t & F,
-                                  StressField_t & P,
+    virtual void compute_stresses(const StrainField_t &F, StressField_t &P,
                                   Formulation form) = 0;
     /**
      * Convenience function to compute stresses, mostly for debugging and
@@ -130,13 +128,10 @@ namespace muSpectre {
      * conversion of the Field_t arguments that can be avoided by using the
      * version with strongly typed field references
      */
-    void compute_stresses(const Field_t & F,
-                          Field_t & P,
-                          Formulation form);
+    void compute_stresses(const Field_t &F, Field_t &P, Formulation form);
     //! computes stress and tangent moduli
-    virtual void compute_stresses_tangent(const StrainField_t & F,
-                                          StressField_t & P,
-                                          TangentField_t & K,
+    virtual void compute_stresses_tangent(const StrainField_t &F,
+                                          StressField_t &P, TangentField_t &K,
                                           Formulation form) = 0;
     /**
      * Convenience function to compute stresses and tangent moduli, mostly for
@@ -144,28 +139,27 @@ namespace muSpectre {
      * compatibility-checking and conversion of the Field_t arguments that can
      * be avoided by using the version with strongly typed field references
      */
-    void compute_stresses_tangent(const Field_t & F,
-                                  Field_t & P,
-                                  Field_t & K,
+    void compute_stresses_tangent(const Field_t &F, Field_t &P, Field_t &K,
                                   Formulation form);
 
     //! iterator to first pixel handled by this material
-    inline iterator begin() {return this->internal_fields.begin();}
+    inline iterator begin() { return this->internal_fields.begin(); }
     //! iterator past the last pixel handled by this material
-    inline iterator end()  {return this->internal_fields.end();}
+    inline iterator end() { return this->internal_fields.end(); }
     //! number of pixels assigned to this material
-    inline size_t size() const {return this->internal_fields.size();}
+    inline size_t size() const { return this->internal_fields.size(); }
 
     //! gives access to internal fields
-    inline MFieldCollection_t& get_collection() {return this->internal_fields;}
-  protected:
+    inline MFieldCollection_t &get_collection() {
+      return this->internal_fields;
+    }
 
-    const std::string name; //!< material's name (for output and debugging)
-    MFieldCollection_t internal_fields{};//!< storage for internal variables
+   protected:
+    const std::string name;  //!< material's name (for output and debugging)
+    MFieldCollection_t internal_fields{};  //!< storage for internal variables
 
-
-  private:
+   private:
   };
-}  // muSpectre
+}  // namespace muSpectre
 
-#endif /* MATERIAL_BASE_H */
+#endif  // SRC_MATERIALS_MATERIAL_BASE_HH_

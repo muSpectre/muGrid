@@ -33,10 +33,10 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef FIELD_COLLECTION_H
-#define FIELD_COLLECTION_H
+#ifndef SRC_COMMON_FIELD_COLLECTION_HH_
+#define SRC_COMMON_FIELD_COLLECTION_HH_
 
 #include "common/field_collection_global.hh"
 #include "common/field_collection_local.hh"
 
-#endif /* FIELD_COLLECTION_H */
+#endif  // SRC_COMMON_FIELD_COLLECTION_HH_

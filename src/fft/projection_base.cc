@@ -34,7 +34,6 @@
 
 #include "fft/projection_base.hh"
 
-
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
@@ -42,9 +41,9 @@ namespace muSpectre {
   ProjectionBase<DimS, DimM>::ProjectionBase(FFTEngine_ptr engine,
                                              Rcoord domain_lengths,
                                              Formulation form)
-    : fft_engine{std::move(engine)}, domain_lengths{domain_lengths}, form{form},
-      projection_container{this->fft_engine->get_field_collection()}
-  {
+      : fft_engine{std::move(engine)}, domain_lengths{domain_lengths},
+        form{form}, projection_container{
+                        this->fft_engine->get_field_collection()} {
     static_assert((DimS == FFTEngine::sdim),
                   "spatial dimensions are incompatible");
     if (this->get_nb_components() != fft_engine->get_nb_components()) {
@@ -54,12 +53,11 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void ProjectionBase<DimS, DimM>::
-  initialise(FFT_PlanFlags flags) {
+  void ProjectionBase<DimS, DimM>::initialise(FFT_PlanFlags flags) {
     fft_engine->initialise(flags);
   }
 
-  template class ProjectionBase<twoD,   twoD>;
-  template class ProjectionBase<twoD,   threeD>;
+  template class ProjectionBase<twoD, twoD>;
+  template class ProjectionBase<twoD, threeD>;
   template class ProjectionBase<threeD, threeD>;
-}  // muSpectre
+}  // namespace muSpectre

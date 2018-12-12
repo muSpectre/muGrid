@@ -5,7 +5,7 @@
  *
  * @date   07 Mar 2018
  *
- * @brief  abstraction layer for the distributed memory communicator object 
+ * @brief  abstraction layer for the distributed memory communicator object
  *
  * Copyright © 2017 Till Junge
  *
@@ -32,8 +32,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef COMMUNICATOR_H
-#define COMMUNICATOR_H
+#ifndef SRC_COMMON_COMMUNICATOR_HH_
+#define SRC_COMMON_COMMUNICATOR_HH_
 
 #ifdef WITH_MPI
 #include <mpi.h>
@@ -43,36 +43,39 @@ namespace muSpectre {
 
 #ifdef WITH_MPI
 
-  template<typename T> decltype(auto) mpi_type() { };
-  template<> inline decltype(auto) mpi_type<char>() { return MPI_CHAR; }
-  template<> inline decltype(auto) mpi_type<short>() { return MPI_SHORT; }
-  template<> inline decltype(auto) mpi_type<int>() { return MPI_INT; }
-  template<> inline decltype(auto) mpi_type<long>() { return MPI_LONG; }
-  template<> inline decltype(auto) mpi_type<unsigned char>() {
+  template <typename T> decltype(auto) mpi_type() {}
+  template <> inline decltype(auto) mpi_type<char>() { return MPI_CHAR; }
+  template <> inline decltype(auto)
+  mpi_type<short>() { return MPI_SHORT; }  // NOLINT
+  template <> inline decltype(auto) mpi_type<int>() { return MPI_INT; }
+  template <> inline decltype(auto)
+  mpi_type<long>() { return MPI_LONG; }  // NOLINT
+  template <> inline decltype(auto) mpi_type<unsigned char>() {
     return MPI_UNSIGNED_CHAR;
   }
-  template<> inline decltype(auto) mpi_type<unsigned short>() {
+  template <> inline decltype(auto) mpi_type<unsigned short>() {  // NOLINT
     return MPI_UNSIGNED_SHORT;
   }
-  template<> inline decltype(auto) mpi_type<unsigned int>() {
+  template <> inline decltype(auto) mpi_type<unsigned int>() {
     return MPI_UNSIGNED;
   }
-  template<> inline decltype(auto) mpi_type<unsigned long>() {
+  template <> inline decltype(auto) mpi_type<unsigned long>() {  // NOLINT
     return MPI_UNSIGNED_LONG;
   }
-  template<> inline decltype(auto) mpi_type<float>() { return MPI_FLOAT; }
-  template<> inline decltype(auto) mpi_type<double>() { return MPI_DOUBLE; }
+  template <> inline decltype(auto) mpi_type<float>() { return MPI_FLOAT; }
+  template <> inline decltype(auto) mpi_type<double>() { return MPI_DOUBLE; }
 
   //! lightweight abstraction for the MPI communicator object
   class Communicator {
-  public:
-    using MPI_Comm_ref = std::remove_pointer_t<MPI_Comm>&;
-    Communicator(MPI_Comm comm=MPI_COMM_NULL): comm{*comm} {};
-    ~Communicator() {};
+   public:
+    using MPI_Comm_ref = std::remove_pointer_t<MPI_Comm> &;
+    explicit Communicator(MPI_Comm comm = MPI_COMM_NULL) : comm{*comm} {};
+    ~Communicator() {}
 
     //! get rank of present process
     int rank() const {
-      if (&comm == MPI_COMM_NULL) return 0;
+      if (&comm == MPI_COMM_NULL)
+        return 0;
       int res;
       MPI_Comm_rank(&this->comm, &res);
       return res;
@@ -80,16 +83,17 @@ namespace muSpectre {
 
     //! get total number of processes
     int size() const {
-      if (&comm == MPI_COMM_NULL) return 1;
+      if (&comm == MPI_COMM_NULL)
+        return 1;
       int res;
       MPI_Comm_size(&this->comm, &res);
       return res;
     }
 
     //! sum reduction on scalar types
-    template<typename T>
-    T sum(const T &arg) const {
-      if (&comm == MPI_COMM_NULL) return arg;
+    template <typename T> T sum(const T &arg) const {
+      if (&comm == MPI_COMM_NULL)
+        return arg;
       T res;
       MPI_Allreduce(&arg, &res, 1, mpi_type<T>(), MPI_SUM, &this->comm);
       return res;
@@ -97,7 +101,7 @@ namespace muSpectre {
 
     MPI_Comm get_mpi_comm() { return &this->comm; }
 
-  private:
+   private:
     MPI_Comm_ref comm;
   };
 
@@ -105,27 +109,22 @@ namespace muSpectre {
 
   //! stub communicator object that doesn't communicate anything
   class Communicator {
-  public:
-    Communicator() {};
-    ~Communicator() {};
+   public:
+    Communicator() {}
+    ~Communicator() {}
 
     //! get rank of present process
-    int rank() const {
-      return 0;
-    }
+    int rank() const { return 0; }
 
     //! get total number of processes
-    int size() const {
-      return 1;
-    }
+    int size() const { return 1; }
 
     //! sum reduction on scalar types
-    template<typename T>
-    T sum(const T &arg) const { return arg; }
+    template <typename T> T sum(const T &arg) const { return arg; }
   };
 
 #endif
 
-}
+}  // namespace muSpectre
 
-#endif /* COMMUNICATOR_H */
+#endif  // SRC_COMMON_COMMUNICATOR_HH_

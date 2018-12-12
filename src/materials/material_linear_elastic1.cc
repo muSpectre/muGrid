@@ -39,16 +39,15 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   MaterialLinearElastic1<DimS, DimM>::MaterialLinearElastic1(std::string name,
-                                                           Real young,
-                                                           Real poisson)
-    :Parent(name), young{young}, poisson{poisson},
-     lambda{Hooke::compute_lambda(young, poisson)},
-     mu{Hooke::compute_mu(young, poisson)},
-     C{Hooke::compute_C(lambda, mu)}
-  {}
+                                                             Real young,
+                                                             Real poisson)
+      : Parent(name), young{young}, poisson{poisson},
+        lambda{Hooke::compute_lambda(young, poisson)},
+        mu{Hooke::compute_mu(young, poisson)}, C{Hooke::compute_C(lambda, mu)} {
+  }
 
   template class MaterialLinearElastic1<twoD, twoD>;
   template class MaterialLinearElastic1<twoD, threeD>;
   template class MaterialLinearElastic1<threeD, threeD>;
 
-}  // muSpectre
+}  // namespace muSpectre

@@ -32,12 +32,12 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef PROJECTION_BASE_H
-#define PROJECTION_BASE_H
+#ifndef SRC_FFT_PROJECTION_BASE_HH_
+#define SRC_FFT_PROJECTION_BASE_HH_
 
 #include "common/common.hh"
-#include "common/field_collection.hh"
 #include "common/field.hh"
+#include "common/field_collection.hh"
 #include "fft/fft_engine_base.hh"
 
 #include <memory>
@@ -47,27 +47,22 @@ namespace muSpectre {
   /**
    * base class for projection related exceptions
    */
-  class ProjectionError: public std::runtime_error {
-  public:
+  class ProjectionError : public std::runtime_error {
+   public:
     //! constructor
-    explicit ProjectionError(const std::string& what)
-      :std::runtime_error(what){}
+    explicit ProjectionError(const std::string &what)
+        : std::runtime_error(what) {}
     //! constructor
-    explicit ProjectionError(const char * what)
-      :std::runtime_error(what){}
+    explicit ProjectionError(const char *what) : std::runtime_error(what) {}
   };
 
-  template<class Projection>
-  struct Projection_traits {
-  };
+  template <class Projection> struct Projection_traits {};
 
   /**
    * defines the interface which must be implemented by projection operators
    */
-  template <Dim_t DimS, Dim_t DimM>
-  class ProjectionBase
-  {
-  public:
+  template <Dim_t DimS, Dim_t DimM> class ProjectionBase {
+   public:
     //! Eigen type to replace fields
     using Vector_t = Eigen::Matrix<Real, Eigen::Dynamic, 1>;
     //! type of fft_engine used
@@ -96,7 +91,8 @@ namespace muSpectre {
     ProjectionBase() = delete;
 
     //! Constructor with cell sizes
-    ProjectionBase(FFTEngine_ptr engine, Rcoord domain_lengths, Formulation form);
+    ProjectionBase(FFTEngine_ptr engine, Rcoord domain_lengths,
+                   Formulation form);
 
     //! Copy constructor
     ProjectionBase(const ProjectionBase &other) = delete;
@@ -108,35 +104,38 @@ namespace muSpectre {
     virtual ~ProjectionBase() = default;
 
     //! Copy assignment operator
-    ProjectionBase& operator=(const ProjectionBase &other) = delete;
+    ProjectionBase &operator=(const ProjectionBase &other) = delete;
 
     //! Move assignment operator
-    ProjectionBase& operator=(ProjectionBase &&other) = default;
+    ProjectionBase &operator=(ProjectionBase &&other) = default;
 
     //! initialises the fft engine (plan the transform)
     virtual void initialise(FFT_PlanFlags flags = FFT_PlanFlags::estimate);
 
     //! apply the projection operator to a field
-    virtual void apply_projection(Field_t & field) = 0;
+    virtual void apply_projection(Field_t &field) = 0;
 
     //! returns the process-local resolutions of the cell
-    const Ccoord & get_subdomain_resolutions() const {
-      return this->fft_engine->get_subdomain_resolutions();}
+    const Ccoord &get_subdomain_resolutions() const {
+      return this->fft_engine->get_subdomain_resolutions();
+    }
     //! returns the process-local locations of the cell
-    const Ccoord & get_subdomain_locations() const {
-      return this->fft_engine->get_subdomain_locations();}
+    const Ccoord &get_subdomain_locations() const {
+      return this->fft_engine->get_subdomain_locations();
+    }
     //! returns the resolutions of the cell
-    const Ccoord & get_domain_resolutions() const {
-      return this->fft_engine->get_domain_resolutions();}
+    const Ccoord &get_domain_resolutions() const {
+      return this->fft_engine->get_domain_resolutions();
+    }
     //! returns the physical sizes of the cell
-    const Rcoord & get_domain_lengths() const {return this->domain_lengths;}
+    const Rcoord &get_domain_lengths() const { return this->domain_lengths; }
 
     /**
      * return the `muSpectre::Formulation` that is used in solving
      * this cell. This allows tho check whether a projection is
      * compatible with the chosen formulation
      */
-    const Formulation & get_formulation() const {return this->form;}
+    const Formulation &get_formulation() const { return this->form; }
 
     //! return the raw projection operator. This is mainly intended
     //! for maintenance and debugging and should never be required in
@@ -144,7 +143,7 @@ namespace muSpectre {
     virtual Eigen::Map<Eigen::ArrayXXd> get_operator() = 0;
 
     //! return the communicator object
-    const Communicator & get_communicator() const {
+    const Communicator &get_communicator() const {
       return this->fft_engine->get_communicator();
     }
 
@@ -157,14 +156,12 @@ namespace muSpectre {
     virtual std::array<Dim_t, 2> get_strain_shape() const = 0;
 
     //! get number of components to project per pixel
-    virtual Dim_t get_nb_components() const {
-      return DimM*DimM;}
+    virtual Dim_t get_nb_components() const { return DimM * DimM; }
 
-
-  protected:
+   protected:
     //! handle on the fft_engine used
     FFTEngine_ptr fft_engine;
-    const Rcoord domain_lengths; //!< physical sizes of the cell
+    const Rcoord domain_lengths;  //!< physical sizes of the cell
     /**
      * formulation this projection can be applied to (determines
      * whether the projection enforces gradients, small strain tensor
@@ -179,13 +176,11 @@ namespace muSpectre {
      * http://www.fftw.org/fftw3_doc/Multi_002dDimensional-DFTs-of-Real-Data.html#Multi_002dDimensional-DFTs-of-Real-Data
      * for an example
      */
-    LFieldCollection_t & projection_container{};
+    LFieldCollection_t &projection_container{};
 
-  private:
+   private:
   };
 
-}  // muSpectre
+}  // namespace muSpectre
 
-
-
-#endif /* PROJECTION_BASE_H */
+#endif  // SRC_FFT_PROJECTION_BASE_HH_

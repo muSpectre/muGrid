@@ -40,31 +40,29 @@
 namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  ProjectionFiniteStrainFast<DimS, DimM>::
-  ProjectionFiniteStrainFast(FFTEngine_ptr engine, Rcoord lengths)
-    :Parent{std::move(engine), lengths, Formulation::finite_strain},
-     xiField{make_field<Proj_t>("Projection Operator",
-                                this->projection_container)},
-     xis(xiField)
-  {
-    for (auto res: this->fft_engine->get_domain_resolutions()) {
+  ProjectionFiniteStrainFast<DimS, DimM>::ProjectionFiniteStrainFast(
+      FFTEngine_ptr engine, Rcoord lengths)
+      : Parent{std::move(engine), lengths, Formulation::finite_strain},
+        xiField{make_field<Proj_t>("Projection Operator",
+                                   this->projection_container)},
+        xis(xiField) {
+    for (auto res : this->fft_engine->get_domain_resolutions()) {
       if (res % 2 == 0) {
-      	throw ProjectionError
-	  ("Only an odd number of gridpoints in each direction is supported");
+        throw ProjectionError(
+            "Only an odd number of gridpoints in each direction is supported");
       }
     }
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void ProjectionFiniteStrainFast<DimS, DimM>::
-  initialise(FFT_PlanFlags flags) {
+  void ProjectionFiniteStrainFast<DimS, DimM>::initialise(FFT_PlanFlags flags) {
     Parent::initialise(flags);
     FFT_freqs<DimS> fft_freqs(this->fft_engine->get_domain_resolutions(),
                               this->domain_lengths);
-    for (auto && tup: akantu::zip(*this->fft_engine, this->xis)) {
-      const auto & ccoord = std::get<0> (tup);
-      auto & xi = std::get<1>(tup);
+    for (auto &&tup : akantu::zip(*this->fft_engine, this->xis)) {
+      const auto &ccoord = std::get<0>(tup);
+      auto &xi = std::get<1>(tup);
       xi = fft_freqs.get_unit_xi(ccoord);
     }
     if (this->get_subdomain_locations() == Ccoord{}) {
@@ -72,36 +70,35 @@ namespace muSpectre {
     }
   }
 
-
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void ProjectionFiniteStrainFast<DimS, DimM>::apply_projection(Field_t & field) {
+  void
+  ProjectionFiniteStrainFast<DimS, DimM>::apply_projection(Field_t &field) {
     Grad_map field_map{this->fft_engine->fft(field)};
     Real factor = this->fft_engine->normalisation();
-    for (auto && tup: akantu::zip(this->xis, field_map)) {
-      auto & xi{std::get<0>(tup)};
-      auto & f{std::get<1>(tup)};
-      f = factor * ((f*xi).eval()*xi.transpose());
+    for (auto &&tup : akantu::zip(this->xis, field_map)) {
+      auto &xi{std::get<0>(tup)};
+      auto &f{std::get<1>(tup)};
+      f = factor * ((f * xi).eval() * xi.transpose());
     }
     this->fft_engine->ifft(field);
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  Eigen::Map<Eigen::ArrayXXd> ProjectionFiniteStrainFast<DimS, DimM>::
-  get_operator() {
+  Eigen::Map<Eigen::ArrayXXd>
+  ProjectionFiniteStrainFast<DimS, DimM>::get_operator() {
     return this->xiField.dyn_eigen();
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  std::array<Dim_t, 2> ProjectionFiniteStrainFast<DimS, DimM>::
-  get_strain_shape() const {
+  std::array<Dim_t, 2>
+  ProjectionFiniteStrainFast<DimS, DimM>::get_strain_shape() const {
     return std::array<Dim_t, 2>{DimM, DimM};
   }
 
   /* ---------------------------------------------------------------------- */
-  template class ProjectionFiniteStrainFast<twoD,   twoD>;
+  template class ProjectionFiniteStrainFast<twoD, twoD>;
   template class ProjectionFiniteStrainFast<threeD, threeD>;
-}  // muSpectre
-
+}  // namespace muSpectre

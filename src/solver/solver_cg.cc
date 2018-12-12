@@ -38,29 +38,25 @@
 #include <iomanip>
 #include <sstream>
 
-
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  SolverCG::SolverCG(Cell & cell, Real tol, Uint maxiter, bool verbose):
-    Parent(cell, tol, maxiter, verbose),
-    r_k(cell.get_nb_dof()),
-    p_k(cell.get_nb_dof()),
-    Ap_k(cell.get_nb_dof()),
-    x_k(cell.get_nb_dof())
-  {}
+  SolverCG::SolverCG(Cell &cell, Real tol, Uint maxiter, bool verbose)
+      : Parent(cell, tol, maxiter, verbose), r_k(cell.get_nb_dof()),
+        p_k(cell.get_nb_dof()), Ap_k(cell.get_nb_dof()),
+        x_k(cell.get_nb_dof()) {}
 
   /* ---------------------------------------------------------------------- */
   auto SolverCG::solve(const ConstVector_ref rhs) -> Vector_map {
     this->x_k.setZero();
-    const Communicator & comm = this->cell.get_communicator();
+    const Communicator &comm = this->cell.get_communicator();
 
     // Following implementation of algorithm 5.2 in Nocedal's
     // Numerical Optimization (p. 112)
 
-    //initialisation of algorithm
-    this->r_k = (this->cell.evaluate_projected_directional_stiffness(this->x_k)
-                 - rhs);
+    // initialisation of algorithm
+    this->r_k =
+        (this->cell.evaluate_projected_directional_stiffness(this->x_k) - rhs);
     this->p_k = -this->r_k;
     this->converged = false;
 
@@ -68,32 +64,33 @@ namespace muSpectre {
     Real rhs_norm2 = comm.sum(rhs.squaredNorm());
     Real tol2 = ipow(this->tol, 2) * rhs_norm2;
 
-    size_t count_width{}; // for output formatting in verbose case
+    size_t count_width{};  // for output formatting in verbose case
     if (this->verbose) {
-      count_width = size_t(std::log10(this->maxiter))+1;
+      count_width = size_t(std::log10(this->maxiter)) + 1;
     }
 
-    for (Uint i = 0;
-         i < this->maxiter && (rdr > tol2 || i == 0);
+    for (Uint i = 0; i < this->maxiter && (rdr > tol2 || i == 0);
          ++i, ++this->counter) {
-      this->Ap_k = this->cell.evaluate_projected_directional_stiffness(this->p_k);
+      this->Ap_k =
+          this->cell.evaluate_projected_directional_stiffness(this->p_k);
 
-      Real alpha = rdr/comm.sum(this->p_k.dot(this->Ap_k));
+      Real alpha = rdr / comm.sum(this->p_k.dot(this->Ap_k));
 
       this->x_k += alpha * this->p_k;
       this->r_k += alpha * this->Ap_k;
 
       Real new_rdr = comm.sum(this->r_k.dot(this->r_k));
-      Real beta = new_rdr/rdr;
+      Real beta = new_rdr / rdr;
       rdr = new_rdr;
 
       if (this->verbose && comm.rank() == 0) {
         std::cout << "  at CG step " << std::setw(count_width) << i
-                  << ": |r|/|b| = " << std::setw(15) << std::sqrt(rdr/rhs_norm2)
-                  << ", cg_tol = " << this->tol << std::endl;
+                  << ": |r|/|b| = " << std::setw(15)
+                  << std::sqrt(rdr / rhs_norm2) << ", cg_tol = " << this->tol
+                  << std::endl;
       }
 
-      this->p_k = - this->r_k + beta * this->p_k;
+      this->p_k = -this->r_k + beta * this->p_k;
     }
 
     if (rdr < tol2) {
@@ -101,14 +98,13 @@ namespace muSpectre {
     } else {
       std::stringstream err{};
       err << " After " << this->counter << " steps, the solver "
-          << " FAILED with  |r|/|b| = "
-          << std::setw(15) << std::sqrt(rdr/rhs_norm2)
-          << ", cg_tol = " << this->tol << std::endl;
-      throw ConvergenceError("Conjugate gradient has not converged." + err.str());
+          << " FAILED with  |r|/|b| = " << std::setw(15)
+          << std::sqrt(rdr / rhs_norm2) << ", cg_tol = " << this->tol
+          << std::endl;
+      throw ConvergenceError("Conjugate gradient has not converged." +
+                             err.str());
     }
     return Vector_map(this->x_k.data(), this->x_k.size());
   }
 
-
-
-}  // muSpectre
+}  // namespace muSpectre

@@ -39,7 +39,6 @@
 #include "tests/test_goodies.hh"
 #include "tests.hh"
 
-
 namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE(ccoords_operations);
@@ -74,19 +73,18 @@ namespace muSpectre {
                                   herm.begin(), herm.end());
   }
 
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_size, Fix, testGoodies::dimlist,
-                                   Fix) {
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_size, Fix, testGoodies::dimlist, Fix) {
     constexpr auto dim{Fix::dim};
     using Ccoord = Ccoord_t<dim>;
     constexpr Dim_t size{5};
 
     constexpr Ccoord cube = CcoordOps::get_cube<dim>(size);
 
-    BOOST_CHECK_EQUAL(CcoordOps::get_size(cube),
-                      ipow(size, dim));
+    BOOST_CHECK_EQUAL(CcoordOps::get_size(cube), ipow(size, dim));
   }
 
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_stride_size, Fix, testGoodies::dimlist, Fix) {
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_stride_size, Fix, testGoodies::dimlist,
+                                   Fix) {
     constexpr auto dim{Fix::dim};
     using Ccoord = Ccoord_t<dim>;
     constexpr Dim_t size{5};
@@ -97,7 +95,6 @@ namespace muSpectre {
     BOOST_CHECK_EQUAL(CcoordOps::get_size_from_strides(cube, stride),
                       ipow(size, dim));
   }
-
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_index, Fix, testGoodies::dimlist, Fix) {
     constexpr auto dim{Fix::dim};
@@ -114,12 +111,11 @@ namespace muSpectre {
 
     const size_t nb_pix{CcoordOps::get_size(sizes)};
 
-    for (size_t i {0}; i < nb_pix ; ++i) {
-      BOOST_CHECK_EQUAL(i,
-                        CcoordOps::get_index_from_strides
-                        (stride, CcoordOps::get_ccoord(sizes, locations, i)));
+    for (size_t i{0}; i < nb_pix; ++i) {
+      BOOST_CHECK_EQUAL(
+          i, CcoordOps::get_index_from_strides(
+                 stride, CcoordOps::get_ccoord(sizes, locations, i)));
     }
-
   }
 
   BOOST_AUTO_TEST_CASE(vector_test) {
@@ -128,33 +124,34 @@ namespace muSpectre {
     constexpr Rcoord_t<threeD> s3{1.3, 2.8, 5.7};
     constexpr Rcoord_t<twoD> s2{s3[0], s3[1]};
 
-    Eigen::Matrix<Real, twoD, 1> v2; v2 << s3[0], s3[1]; 
-    Eigen::Matrix<Real, threeD, 1> v3; v3 << s3[0], s3[1], s3[2];
+    Eigen::Matrix<Real, twoD, 1> v2;
+    v2 << s3[0], s3[1];
+    Eigen::Matrix<Real, threeD, 1> v3;
+    v3 << s3[0], s3[1], s3[2];
 
     auto vec2{CcoordOps::get_vector(c2, v2(1))};
     auto vec3{CcoordOps::get_vector(c3, v3(1))};
 
     for (Dim_t i = 0; i < twoD; ++i) {
-      BOOST_CHECK_EQUAL(c2[i]*v2(1), vec2[i]);
+      BOOST_CHECK_EQUAL(c2[i] * v2(1), vec2[i]);
     }
     for (Dim_t i = 0; i < threeD; ++i) {
-      BOOST_CHECK_EQUAL(c3[i]*v3(1), vec3[i]);
+      BOOST_CHECK_EQUAL(c3[i] * v3(1), vec3[i]);
     }
 
     vec2 = CcoordOps::get_vector(c2, v2);
     vec3 = CcoordOps::get_vector(c3, v3);
 
     for (Dim_t i = 0; i < twoD; ++i) {
-      BOOST_CHECK_EQUAL(c2[i]*v2(i), vec2[i]);
+      BOOST_CHECK_EQUAL(c2[i] * v2(i), vec2[i]);
       BOOST_CHECK_EQUAL(vec2[i], CcoordOps::get_vector(c2, s2)[i]);
     }
     for (Dim_t i = 0; i < threeD; ++i) {
-      BOOST_CHECK_EQUAL(c3[i]*v3(i), vec3[i]);
+      BOOST_CHECK_EQUAL(c3[i] * v3(i), vec3[i]);
       BOOST_CHECK_EQUAL(vec3[i], CcoordOps::get_vector(c3, s3)[i]);
     }
-
   }
 
   BOOST_AUTO_TEST_SUITE_END();
 
-}  // muSpectre
+}  // namespace muSpectre

@@ -55,38 +55,32 @@ namespace muSpectre {
 
   using fixlist = boost::mpl::list<
 #ifdef WITH_FFTWMPI
-    ProjectionFixture<twoD, twoD, Squares<twoD>,
-                      ProjectionSmallStrain<twoD, twoD>,
-                      FFTWMPIEngine<twoD>>,
-    ProjectionFixture<threeD, threeD, Squares<threeD>,
-                      ProjectionSmallStrain<threeD, threeD>,
-                      FFTWMPIEngine<threeD>>,
-    ProjectionFixture<twoD, twoD, Sizes<twoD>,
-                      ProjectionSmallStrain<twoD, twoD>,
-                      FFTWMPIEngine<twoD>>,
-    ProjectionFixture<threeD, threeD, Sizes<threeD>,
-                      ProjectionSmallStrain<threeD, threeD>,
-                      FFTWMPIEngine<threeD>>,
+      ProjectionFixture<twoD, twoD, Squares<twoD>,
+                        ProjectionSmallStrain<twoD, twoD>, FFTWMPIEngine<twoD>>,
+      ProjectionFixture<threeD, threeD, Squares<threeD>,
+                        ProjectionSmallStrain<threeD, threeD>,
+                        FFTWMPIEngine<threeD>>,
+      ProjectionFixture<twoD, twoD, Sizes<twoD>,
+                        ProjectionSmallStrain<twoD, twoD>, FFTWMPIEngine<twoD>>,
+      ProjectionFixture<threeD, threeD, Sizes<threeD>,
+                        ProjectionSmallStrain<threeD, threeD>,
+                        FFTWMPIEngine<threeD>>,
 #endif
 #ifdef WITH_PFFT
-    ProjectionFixture<twoD, twoD, Squares<twoD>,
-                      ProjectionSmallStrain<twoD, twoD>,
-                      PFFTEngine<twoD>>,
-    ProjectionFixture<threeD, threeD, Squares<threeD>,
-                      ProjectionSmallStrain<threeD, threeD>,
-                      PFFTEngine<threeD>>,
-    ProjectionFixture<twoD, twoD, Sizes<twoD>,
-                      ProjectionSmallStrain<twoD, twoD>,
-                      PFFTEngine<twoD>>,
-    ProjectionFixture<threeD, threeD, Sizes<threeD>,
-                      ProjectionSmallStrain<threeD, threeD>,
-                      PFFTEngine<threeD>>,
+      ProjectionFixture<twoD, twoD, Squares<twoD>,
+                        ProjectionSmallStrain<twoD, twoD>, PFFTEngine<twoD>>,
+      ProjectionFixture<threeD, threeD, Squares<threeD>,
+                        ProjectionSmallStrain<threeD, threeD>,
+                        PFFTEngine<threeD>>,
+      ProjectionFixture<twoD, twoD, Sizes<twoD>,
+                        ProjectionSmallStrain<twoD, twoD>, PFFTEngine<twoD>>,
+      ProjectionFixture<threeD, threeD, Sizes<threeD>,
+                        ProjectionSmallStrain<threeD, threeD>,
+                        PFFTEngine<threeD>>,
 #endif
-    ProjectionFixture<twoD, twoD, Squares<twoD>,
-                      ProjectionSmallStrain<twoD, twoD>,
-                      FFTWEngine<twoD>,
-                      false>
-  >;
+      ProjectionFixture<twoD, twoD, Squares<twoD>,
+                        ProjectionSmallStrain<twoD, twoD>, FFTWEngine<twoD>,
+                        false>>;
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(constructor_test, fix, fixlist, fix) {
@@ -96,15 +90,16 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(Gradient_preservation_test,
-                                   fix, fixlist, fix) {
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(Gradient_preservation_test, fix, fixlist,
+                                   fix) {
     if (!fix::is_parallel || fix::projector.get_communicator().size() > 1) {
       return;
     }
     // create a gradient field with a zero mean gradient and verify
     // that the projection preserves it
     constexpr Dim_t dim{fix::sdim}, sdim{fix::sdim}, mdim{fix::mdim};
-    static_assert(dim == fix::mdim,
+    static_assert(
+        dim == fix::mdim,
         "These tests assume that the material and spatial dimension are "
         "identical");
     using Fields = GlobalFieldCollection<sdim>;
@@ -113,8 +108,8 @@ namespace muSpectre {
     using Vector = Eigen::Matrix<Real, dim, 1>;
 
     Fields fields{};
-    FieldT & f_grad{make_field<FieldT>("strain", fields)};
-    FieldT & f_var{make_field<FieldT>("working field", fields)};
+    FieldT &f_grad{make_field<FieldT>("strain", fields)};
+    FieldT &f_var{make_field<FieldT>("working field", fields)};
 
     FieldMap grad(f_grad);
     FieldMap var(f_var);
@@ -126,21 +121,22 @@ namespace muSpectre {
     for (Dim_t i = 0; i < dim; ++i) {
       // the wave vector has to be such that it leads to an integer
       // number of periods in each length of the domain
-      k(i) = (i+1)*2*pi/fix::projector.get_domain_lengths()[i];
+      k(i) = (i + 1) * 2 * pi / fix::projector.get_domain_lengths()[i];
     }
 
-    for (auto && tup: akantu::zip(fields, grad, var)) {
-      auto & ccoord = std::get<0>(tup);
-      auto & g = std::get<1>(tup);
-      auto & v = std::get<2>(tup);
-      Vector vec = CcoordOps::get_vector(ccoord,
-                                         fix::projector.get_domain_lengths()/
-                                         fix::projector.get_domain_resolutions());
+    for (auto &&tup : akantu::zip(fields, grad, var)) {
+      auto &ccoord = std::get<0>(tup);
+      auto &g = std::get<1>(tup);
+      auto &v = std::get<2>(tup);
+      Vector vec = CcoordOps::get_vector(
+          ccoord, fix::projector.get_domain_lengths() /
+                      fix::projector.get_domain_resolutions());
       g.row(0) << k.transpose() * cos(k.dot(vec));
 
       // We need to add I to the term, because this field has a net
       // zero gradient, which leads to a net -I strain
-      g = 0.5*((g-g.Identity()).transpose() + (g-g.Identity())).eval()+g.Identity();
+      g = 0.5 * ((g - g.Identity()).transpose() + (g - g.Identity())).eval() +
+          g.Identity();
       v = g;
     }
 
@@ -148,20 +144,24 @@ namespace muSpectre {
     fix::projector.apply_projection(f_var);
 
     constexpr bool verbose{false};
-    for (auto && tup: akantu::zip(fields, grad, var)) {
-      auto & ccoord = std::get<0>(tup);
-      auto & g = std::get<1>(tup);
-      auto & v = std::get<2>(tup);
-      Vector vec = CcoordOps::get_vector(ccoord,
-                                         fix::projector.get_domain_lengths()/
-                                         fix::projector.get_domain_resolutions());
-      Real error = (g-v).norm();
+    for (auto &&tup : akantu::zip(fields, grad, var)) {
+      auto &ccoord = std::get<0>(tup);
+      auto &g = std::get<1>(tup);
+      auto &v = std::get<2>(tup);
+      Vector vec = CcoordOps::get_vector(
+          ccoord, fix::projector.get_domain_lengths() /
+                      fix::projector.get_domain_resolutions());
+      Real error = (g - v).norm();
       BOOST_CHECK_LT(error, tol);
-      if ((error >=tol) || verbose) {
-        std::cout << std::endl << "grad_ref :"  << std::endl << g << std::endl;
+      if ((error >= tol) || verbose) {
+        std::cout << std::endl << "grad_ref :" << std::endl << g << std::endl;
         std::cout << std::endl << "grad_proj :" << std::endl << v << std::endl;
-        std::cout << std::endl << "ccoord :"    << std::endl << ccoord << std::endl;
-        std::cout << std::endl << "vector :"    << std::endl << vec.transpose() << std::endl;
+        std::cout << std::endl
+                  << "ccoord :" << std::endl
+                  << ccoord << std::endl;
+        std::cout << std::endl
+                  << "vector :" << std::endl
+                  << vec.transpose() << std::endl;
         std::cout << "means:" << std::endl
                   << "<strain>:" << std::endl
                   << grad.mean() << std::endl
@@ -173,5 +173,4 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE_END();
 
-}  // muSpectre
-
+}  // namespace muSpectre

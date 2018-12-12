@@ -34,26 +34,24 @@
 
 #include "fft/fft_utils.hh"
 
-
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   std::valarray<Real> fft_freqs(size_t nb_samples) {
     std::valarray<Real> retval(nb_samples);
-    Int N = (nb_samples-1)/2 + 1; // needs to be signed int for neg freqs
+    Int N = (nb_samples - 1) / 2 + 1;  // needs to be signed int for neg freqs
     for (Int i = 0; i < N; ++i) {
       retval[i] = i;
     }
     for (Int i = N; i < Int(nb_samples); ++i) {
-      retval[i] = -Int(nb_samples)/2+i-N;
+      retval[i] = -Int(nb_samples) / 2 + i - N;
     }
     return retval;
   }
 
   /* ---------------------------------------------------------------------- */
   std::valarray<Real> fft_freqs(size_t nb_samples, Real length) {
-    return fft_freqs(nb_samples)/length;
+    return fft_freqs(nb_samples) / length;
   }
 
-
-}  // muSpectre
+}  // namespace muSpectre

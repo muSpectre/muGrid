@@ -34,8 +34,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef SOLVER_CG_H
-#define SOLVER_CG_H
+#ifndef SRC_SOLVER_SOLVER_CG_HH_
+#define SRC_SOLVER_SOLVER_CG_HH_
 
 #include "solver/solver_base.hh"
 
@@ -48,10 +48,9 @@ namespace muSpectre {
    * production runs, it is probably better to use
    * `muSpectre::SolverCGEigen`.
    */
-  class SolverCG: public SolverBase
-  {
-  public:
-    using Parent = SolverBase; //!< standard short-hand for base class
+  class SolverCG : public SolverBase {
+   public:
+    using Parent = SolverBase;  //!< standard short-hand for base class
     //! for storage of fields
     using Vector_t = Parent::Vector_t;
     //! Input vector for solvers
@@ -71,7 +70,7 @@ namespace muSpectre {
      * Constructor takes a Cell, tolerance, max number of iterations
      * and verbosity flag as input
      */
-    SolverCG(Cell & cell, Real tol, Uint maxiter, bool verbose=false);
+    SolverCG(Cell &cell, Real tol, Uint maxiter, bool verbose = false);
 
     //! Move constructor
     SolverCG(SolverCG &&other) = default;
@@ -80,31 +79,29 @@ namespace muSpectre {
     virtual ~SolverCG() = default;
 
     //! Copy assignment operator
-    SolverCG& operator=(const SolverCG &other) = delete;
+    SolverCG &operator=(const SolverCG &other) = delete;
 
     //! Move assignment operator
-    SolverCG& operator=(SolverCG &&other) = default;
+    SolverCG &operator=(SolverCG &&other) = default;
 
     //! initialisation does not need to do anything in this case
-    void initialise() override final {};
+    void initialise() final{};
 
     //! returns the solver's name
-    std::string get_name() const override final {return "CG";}
+    std::string get_name() const final { return "CG"; }
 
     //! the actual solver
-    Vector_map solve(const ConstVector_ref rhs) override final;
+    Vector_map solve(const ConstVector_ref rhs) final;
 
-    
+   protected:
+    Vector_t r_k;   //!< residual
+    Vector_t p_k;   //!< search direction
+    Vector_t Ap_k;  //!< directional stiffness
+    Vector_t x_k;   //!< current solution
 
-
-  protected:
-    Vector_t r_k;  //!< residual
-    Vector_t p_k;  //!< search direction
-    Vector_t Ap_k; //!< directional stiffness
-    Vector_t x_k;  //!< current solution
-  private:
+   private:
   };
 
-}  // muSpectre
+}  // namespace muSpectre
 
-#endif /* SOLVER_CG_H */
+#endif  // SRC_SOLVER_SOLVER_CG_HH_

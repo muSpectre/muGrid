@@ -37,22 +37,17 @@
 #include <iomanip>
 #include <sstream>
 
-
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <class SolverType>
-  SolverEigen<SolverType>::SolverEigen(Cell& cell, Real tol,
-                                             Uint maxiter, bool verbose):
-    Parent(cell, tol, maxiter, verbose),
-    adaptor{cell.get_adaptor()},
-    solver{},
-    result{}
-  {}
+  SolverEigen<SolverType>::SolverEigen(Cell &cell, Real tol, Uint maxiter,
+                                       bool verbose)
+      : Parent(cell, tol, maxiter, verbose), adaptor{cell.get_adaptor()},
+        solver{}, result{} {}
 
   /* ---------------------------------------------------------------------- */
-  template <class SolverType>
-  void SolverEigen<SolverType>::initialise() {
+  template <class SolverType> void SolverEigen<SolverType>::initialise() {
     this->solver.setTolerance(this->get_tol());
     this->solver.setMaxIterations(this->get_maxiter());
     this->solver.compute(this->adaptor);
@@ -60,33 +55,29 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <class SolverType>
-  auto SolverEigen<SolverType>::solve(const ConstVector_ref rhs)
-    -> Vector_map {
+  auto SolverEigen<SolverType>::solve(const ConstVector_ref rhs) -> Vector_map {
     // for crtp
-    auto & this_solver = static_cast<SolverType&> (*this);
+    auto &this_solver = static_cast<SolverType &>(*this);
     this->result = this->solver.solve(rhs);
     this->counter += this->solver.iterations();
 
     if (this->solver.info() != Eigen::Success) {
-            std::stringstream err {};
+      std::stringstream err{};
       err << this_solver.get_name() << " has not converged,"
           << " After " << this->solver.iterations() << " steps, the solver "
-          << " FAILED with  |r|/|b| = "
-          << std::setw(15) << this->solver.error()
+          << " FAILED with  |r|/|b| = " << std::setw(15) << this->solver.error()
           << ", cg_tol = " << this->tol << std::endl;
       throw ConvergenceError(err.str());
     }
 
     if (this->verbose) {
       std::cout << " After " << this->solver.iterations() << " "
-                << this_solver.get_name() << " steps, |r|/|b| = "
-                << std::setw(15) << this->solver.error()
+                << this_solver.get_name()
+                << " steps, |r|/|b| = " << std::setw(15) << this->solver.error()
                 << ", cg_tol = " << this->tol << std::endl;
-
     }
     return Vector_map(this->result.data(), this->result.size());
   }
-
 
   /* ---------------------------------------------------------------------- */
   template class SolverEigen<SolverCGEigen>;
@@ -95,4 +86,4 @@ namespace muSpectre {
   template class SolverEigen<SolverDGMRESEigen>;
   template class SolverEigen<SolverMINRESEigen>;
 
-}  // muSpectre
+}  // namespace muSpectre

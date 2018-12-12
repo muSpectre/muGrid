@@ -38,17 +38,15 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t Dim>
-  FFTEngineBase<Dim>::FFTEngineBase(Ccoord resolutions,
-                                    Dim_t nb_components,
+  FFTEngineBase<Dim>::FFTEngineBase(Ccoord resolutions, Dim_t nb_components,
                                     Communicator comm)
-    :comm{comm}, subdomain_resolutions{resolutions}, subdomain_locations{},
-     fourier_resolutions{CcoordOps::get_hermitian_sizes(resolutions)},
-     fourier_locations{}, domain_resolutions{resolutions},
-     work{make_field<Workspace_t>
-         ("work space", work_space_container, nb_components)},
-     norm_factor{1./CcoordOps::get_size(domain_resolutions)},
-     nb_components{nb_components}
-  {}
+      : comm{comm}, subdomain_resolutions{resolutions}, subdomain_locations{},
+        fourier_resolutions{CcoordOps::get_hermitian_sizes(resolutions)},
+        fourier_locations{}, domain_resolutions{resolutions},
+        work{make_field<Workspace_t>("work space", work_space_container,
+                                     nb_components)},
+        norm_factor{1. / CcoordOps::get_size(domain_resolutions)},
+        nb_components{nb_components} {}
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t Dim>
@@ -57,18 +55,16 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim>
-  size_t FFTEngineBase<Dim>::size() const {
+  template <Dim_t Dim> size_t FFTEngineBase<Dim>::size() const {
     return CcoordOps::get_size(this->subdomain_resolutions);
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim>
-  size_t FFTEngineBase<Dim>::workspace_size() const {
+  template <Dim_t Dim> size_t FFTEngineBase<Dim>::workspace_size() const {
     return this->work_space_container.size();
   }
 
   template class FFTEngineBase<twoD>;
   template class FFTEngineBase<threeD>;
 
-}  // muSpectre
+}  // namespace muSpectre

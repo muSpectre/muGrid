@@ -34,7 +34,6 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-
 #include "test_field_collections.hh"
 #include "common/field_map.hh"
 
@@ -44,35 +43,36 @@ namespace muSpectre {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(iter_field_test, F, iter_collections, F) {
     using FC_t = typename F::Parent::FC_t;
-    using MSqMap = MatrixFieldMap<FC_t, Real, F::Parent::mdim(), F::Parent::mdim()>;
+    using MSqMap =
+        MatrixFieldMap<FC_t, Real, F::Parent::mdim(), F::Parent::mdim()>;
     MSqMap Mmap{F::fc["Tensorfield Real o2"]};
     auto m_it = Mmap.begin();
     auto m_it_end = Mmap.end();
 
-    RawFieldMap<Eigen::Map<Eigen::Matrix<Real, F::Parent::mdim(), F::Parent::mdim()>>>
-      raw_map{Mmap.get_field().eigenvec()};
+    RawFieldMap<
+        Eigen::Map<Eigen::Matrix<Real, F::Parent::mdim(), F::Parent::mdim()>>>
+        raw_map{Mmap.get_field().eigenvec()};
 
-    for (auto && mat: Mmap) {
+    for (auto &&mat : Mmap) {
       mat.setRandom();
     }
 
-    for (auto tup: akantu::zip(Mmap, raw_map)) {
-      auto & mat_A = std::get<0>(tup);
-      auto & mat_B = std::get<1>(tup);
+    for (auto tup : akantu::zip(Mmap, raw_map)) {
+      auto &mat_A = std::get<0>(tup);
+      auto &mat_B = std::get<1>(tup);
 
-      BOOST_CHECK_EQUAL((mat_A-mat_B).norm(), 0.);
+      BOOST_CHECK_EQUAL((mat_A - mat_B).norm(), 0.);
     }
 
     Mmap.get_field().eigenvec().setZero();
 
-    for (auto && mat: raw_map) {
+    for (auto &&mat : raw_map) {
       mat.setIdentity();
     }
 
-    for (auto && mat: Mmap) {
-      BOOST_CHECK_EQUAL((mat-mat.Identity()).norm(), 0.);
+    for (auto &&mat : Mmap) {
+      BOOST_CHECK_EQUAL((mat - mat.Identity()).norm(), 0.);
     }
-
   }
 
   BOOST_AUTO_TEST_CASE(Const_correctness_test) {
@@ -92,9 +92,9 @@ namespace muSpectre {
   BOOST_AUTO_TEST_CASE(incompatible_size_check) {
     Eigen::VectorXd vec1(11);
     using RawFieldMap_t = RawFieldMap<Eigen::Map<Eigen::Vector3d>>;
-    BOOST_CHECK_THROW(RawFieldMap_t {vec1}, std::runtime_error);
+    BOOST_CHECK_THROW(RawFieldMap_t{vec1}, std::runtime_error);
   }
 
   BOOST_AUTO_TEST_SUITE_END();
 
-}  // muSpectre
+}  // namespace muSpectre

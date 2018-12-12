@@ -42,16 +42,13 @@ namespace muSpectre {
   BOOST_AUTO_TEST_CASE(exponential_test) {
     using Mat_t = Eigen::Matrix<Real, threeD, threeD>;
     Mat_t input{};
-    input <<      0, .25*pi, 0,
-             .25*pi,      0, 0,
-                  0,      0, 1;
+    input << 0, .25 * pi, 0, .25 * pi, 0, 0, 0, 0, 1;
     Mat_t output{};
 
-    output << 1.32460909, 0.86867096, 0,
-              0.86867096, 1.32460909, 0,
-                       0,          0, 2.71828183;
+    output << 1.32460909, 0.86867096, 0, 0.86867096, 1.32460909, 0, 0, 0,
+        2.71828183;
     auto my_output{expm(input)};
-    Real error{(my_output-output).norm()};
+    Real error{(my_output - output).norm()};
 
     BOOST_CHECK_LT(error, 1e-8);
     if (error >= 1e-8) {
@@ -63,4 +60,4 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE_END();
 
-}  // muSpectre
+}  // namespace muSpectre

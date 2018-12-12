@@ -34,8 +34,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef FIELD_MAP_DYNAMIC_H
-#define FIELD_MAP_DYNAMIC_H
+#ifndef SRC_COMMON_FIELD_MAP_DYNAMIC_HH_
+#define SRC_COMMON_FIELD_MAP_DYNAMIC_HH_
 
 #include "common/field_map_base.hh"
 
@@ -47,63 +47,61 @@ namespace muSpectre {
    * 1>`. This is significantly slower than the statically sized field
    * maps and should only be used in non-critical contexts.
    */
-  template <class FieldCollection, typename T, bool ConstField=false>
-  class TypedFieldMap: public internal::FieldMap<FieldCollection, T,
-                                                 Eigen::Dynamic, ConstField>
-  {
-  public:
+  template <class FieldCollection, typename T, bool ConstField = false>
+  class TypedFieldMap : public internal::FieldMap<FieldCollection, T,
+                                                  Eigen::Dynamic, ConstField> {
+   public:
     //! base class
-    using Parent = internal::FieldMap<FieldCollection, T,
-                                      Eigen::Dynamic, ConstField>;
+    using Parent =
+        internal::FieldMap<FieldCollection, T, Eigen::Dynamic, ConstField>;
     //! sister class with all params equal, but ConstField guaranteed true
     using ConstMap = TypedFieldMap<FieldCollection, T, true>;
     //! cell coordinates type
     using Ccoord = Ccoord_t<FieldCollection::spatial_dim()>;
     //! plain Eigen type
     using Arr_t = Eigen::Array<T, Eigen::Dynamic, 1>;
-    using value_type = Eigen::Map<Arr_t>; //!< stl conformance
-    using const_reference = Eigen::Map<const Arr_t>; //!< stl conformance
+    using value_type = Eigen::Map<Arr_t>;             //!< stl conformance
+    using const_reference = Eigen::Map<const Arr_t>;  //!< stl conformance
     //! stl conformance
-    using reference = std::conditional_t<ConstField,
-                                         const_reference,
-                                         value_type>; // since it's a resource handle
-    using size_type = typename Parent::size_type; //!< stl conformance
-    using pointer = std::unique_ptr<value_type>; //!< stl conformance
+    using reference =
+        std::conditional_t<ConstField, const_reference,
+                           value_type>;  // since it's a resource handle
+    using size_type = typename Parent::size_type;  //!< stl conformance
+    using pointer = std::unique_ptr<value_type>;   //!< stl conformance
 
     //! polymorphic base field type (for debug and python)
     using Field = typename Parent::Field;
     //! polymorphic base field type (for debug and python)
     using Field_c = typename Parent::Field_c;
     //! stl conformance
-    using const_iterator = typename Parent::template iterator<TypedFieldMap, true>;
+    using const_iterator =
+        typename Parent::template iterator<TypedFieldMap, true>;
     //! stl conformance
-    using iterator = std::conditional_t<
-      ConstField,
-      const_iterator,
-      typename Parent::template iterator<TypedFieldMap>>;
+    using iterator =
+        std::conditional_t<ConstField, const_iterator,
+                           typename Parent::template iterator<TypedFieldMap>>;
     //! stl conformance
     using reverse_iterator = std::reverse_iterator<iterator>;
     //! stl conformance
     using const_reverse_iterator = std::reverse_iterator<const_iterator>;
     //! enumerator over a constant scalar field
-    using const_enumerator = typename Parent::template enumerator<const_iterator>;
+    using const_enumerator =
+        typename Parent::template enumerator<const_iterator>;
     //! enumerator over a scalar field
-    using enumerator = std::conditional_t<
-      ConstField,
-      const_enumerator,
-      typename Parent::template enumerator<iterator>>;
+    using enumerator =
+        std::conditional_t<ConstField, const_enumerator,
+                           typename Parent::template enumerator<iterator>>;
     //! give access to the protected fields
     friend iterator;
-
 
     //! Default constructor
     TypedFieldMap() = delete;
 
     //! Constructor
-    TypedFieldMap(Field_c & field);
+    explicit TypedFieldMap(Field_c &field);
 
     //! Copy constructor
-    TypedFieldMap(const TypedFieldMap & other) = delete;
+    TypedFieldMap(const TypedFieldMap &other) = delete;
 
     //! Move constructor
     TypedFieldMap(TypedFieldMap &&other) = default;
@@ -112,78 +110,76 @@ namespace muSpectre {
     virtual ~TypedFieldMap() = default;
 
     //! Copy assignment operator
-    TypedFieldMap& operator=(const TypedFieldMap &other) = delete;
+    TypedFieldMap &operator=(const TypedFieldMap &other) = delete;
 
     //! Assign a matrixlike value to every entry
     template <class Derived>
-    inline TypedFieldMap & operator=(const Eigen::EigenBase<Derived> & val);
+    inline TypedFieldMap &operator=(const Eigen::EigenBase<Derived> &val);
 
     //! Move assignment operator
-    TypedFieldMap& operator=(TypedFieldMap &&other) = default;
+    TypedFieldMap &operator=(TypedFieldMap &&other) = default;
 
     //! give human-readable field map type
-    inline std::string info_string() const override final;
+    inline std::string info_string() const final;
 
     //! member access
     inline reference operator[](size_type index);
     //! member access
-    inline reference operator[](const Ccoord & ccoord);
+    inline reference operator[](const Ccoord &ccoord);
 
     //! member access
     inline const_reference operator[](size_type index) const;
     //! member access
-    inline const_reference operator[](const Ccoord& ccoord) const;
+    inline const_reference operator[](const Ccoord &ccoord) const;
 
     //! return an iterator to first entry of field
-    inline iterator begin(){return iterator(*this);}
+    inline iterator begin() { return iterator(*this); }
     //! return an iterator to first entry of field
-    inline const_iterator cbegin() const {return const_iterator(*this);}
+    inline const_iterator cbegin() const { return const_iterator(*this); }
     //! return an iterator to first entry of field
-    inline const_iterator begin() const {return this->cbegin();}
+    inline const_iterator begin() const { return this->cbegin(); }
     //! return an iterator past the last entry of field
-    inline iterator end(){return iterator(*this, false);}
+    inline iterator end() { return iterator(*this, false); }
     //! return an iterator past the last entry of field
-    inline const_iterator cend() const {return const_iterator(*this, false);}
+    inline const_iterator cend() const { return const_iterator(*this, false); }
     //! return an iterator past the last entry of field
-    inline const_iterator end() const {return this->cend();}
+    inline const_iterator end() const { return this->cend(); }
 
     /**
      * return an iterable proxy to this field that can be iterated
      * in Ccoord-value tuples
      */
-    enumerator enumerate() {return enumerator(*this);}
+    enumerator enumerate() { return enumerator(*this); }
     /**
      * return an iterable proxy to this field that can be iterated
      * in Ccoord-value tuples
      */
-    const_enumerator enumerate() const {return const_enumerator(*this);}
+    const_enumerator enumerate() const { return const_enumerator(*this); }
 
     //! evaluate the average of the field
     inline Arr_t mean() const;
 
-  protected:
+   protected:
     //! for sad, legacy iterator use
     inline pointer ptr_to_val_t(size_type index);
-  private:
+
+   private:
   };
 
   //----------------------------------------------------------------------------//
   template <class FieldCollection, typename T, bool ConstField>
-  TypedFieldMap<FieldCollection, T, ConstField>::
-  TypedFieldMap(Field_c & field):
-    Parent(field) {
+  TypedFieldMap<FieldCollection, T, ConstField>::TypedFieldMap(Field_c &field)
+      : Parent(field) {
     this->check_compatibility();
   }
 
-
   //----------------------------------------------------------------------------//
   template <class FieldCollection, typename T, bool ConstField>
-  std::string TypedFieldMap<FieldCollection, T, ConstField>::
-  info_string() const {
-        std::stringstream info;
-        info << "Dynamic(" << typeid(T).name() << ", "
-             << this->field.get_nb_components()
-             << ")";
+  std::string
+  TypedFieldMap<FieldCollection, T, ConstField>::info_string() const {
+    std::stringstream info;
+    info << "Dynamic(" << typeid(T).name() << ", "
+         << this->field.get_nb_components() << ")";
     return info.str();
   }
 
@@ -192,13 +188,13 @@ namespace muSpectre {
   auto TypedFieldMap<FieldCollection, T, ConstField>::
   operator[](size_type index) -> reference {
     return reference{this->get_ptr_to_entry(index),
-        Dim_t(this->field.get_nb_components())};
+                     Dim_t(this->field.get_nb_components())};
   }
 
   //----------------------------------------------------------------------------//
   template <class FieldCollection, typename T, bool ConstField>
   auto TypedFieldMap<FieldCollection, T, ConstField>::
-  operator[](const Ccoord & ccoord) -> reference {
+  operator[](const Ccoord &ccoord) -> reference {
     size_t index{this->collection.get_index(ccoord)};
     return (*this)[index];
   }
@@ -208,17 +204,17 @@ namespace muSpectre {
   auto TypedFieldMap<FieldCollection, T, ConstField>::
   operator[](size_type index) const -> const_reference {
     return const_reference{this->get_ptr_to_entry(index),
-        Dim_t(this->field.get_nb_components())};
+                           Dim_t(this->field.get_nb_components())};
   }
 
   //----------------------------------------------------------------------------//
   template <class FieldCollection, typename T, bool ConstField>
   auto TypedFieldMap<FieldCollection, T, ConstField>::
-  operator[](const Ccoord & ccoord) const -> const_reference {
+  operator[](const Ccoord &ccoord) const -> const_reference {
     size_t index{this->collection.get_index(ccoord)};
     return (*this)[index];
   }
 
-}  // muSpectre
+}  // namespace muSpectre
 
-#endif /* FIELD_MAP_DYNAMIC_H */
+#endif  // SRC_COMMON_FIELD_MAP_DYNAMIC_HH_

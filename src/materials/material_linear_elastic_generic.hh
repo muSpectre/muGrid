@@ -34,8 +34,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef MATERIAL_LINEAR_ELASTIC_GENERIC_H
-#define MATERIAL_LINEAR_ELASTIC_GENERIC_H
+#ifndef SRC_MATERIALS_MATERIAL_LINEAR_ELASTIC_GENERIC_HH_
+#define SRC_MATERIALS_MATERIAL_LINEAR_ELASTIC_GENERIC_HH_
 
 #include "common/common.hh"
 #include "common/T4_map_proxy.hh"
@@ -47,21 +47,20 @@ namespace muSpectre {
   /**
    * forward declaration
    */
-  template <Dim_t DimS, Dim_t DimM>
-  class MaterialLinearElasticGeneric;
+  template <Dim_t DimS, Dim_t DimM> class MaterialLinearElasticGeneric;
 
   /**
    * traits for use by MaterialMuSpectre for crtp
    */
   template <Dim_t DimS, Dim_t DimM>
   struct MaterialMuSpectre_traits<MaterialLinearElasticGeneric<DimS, DimM>> {
-
     //! global field collection
-    using GFieldCollection_t = typename
-      MaterialBase<DimS, DimM>::GFieldCollection_t;
+    using GFieldCollection_t =
+        typename MaterialBase<DimS, DimM>::GFieldCollection_t;
 
     //! expected map type for strain fields
-    using StrainMap_t = MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM, true>;
+    using StrainMap_t =
+        MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM, true>;
     //! expected map type for stress fields
     using StressMap_t = MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
     //! expected map type for tangent stiffness fields
@@ -76,24 +75,22 @@ namespace muSpectre {
     using InternalVariables = std::tuple<>;
   };
 
-
   /**
    * Linear elastic law defined by a full stiffness tensor. Very
    * generic, but not most efficient
    */
   template <Dim_t DimS, Dim_t DimM>
-  class MaterialLinearElasticGeneric:
-    public MaterialMuSpectre<
-    MaterialLinearElasticGeneric<DimS, DimM>, DimS, DimM>
-  {
-  public:
+  class MaterialLinearElasticGeneric
+      : public MaterialMuSpectre<MaterialLinearElasticGeneric<DimS, DimM>, DimS,
+                                 DimM> {
+   public:
     //! parent type
-    using Parent = MaterialMuSpectre<
-    MaterialLinearElasticGeneric<DimS, DimM>, DimS, DimM>;
+    using Parent =
+        MaterialMuSpectre<MaterialLinearElasticGeneric<DimS, DimM>, DimS, DimM>;
     //! generic input tolerant to python input
-    using CInput_t = Eigen::Ref
-      <Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>, 0,
-       Eigen::Stride<Eigen::Dynamic, Eigen::Dynamic>>;
+    using CInput_t =
+        Eigen::Ref<Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>, 0,
+                   Eigen::Stride<Eigen::Dynamic, Eigen::Dynamic>>;
     //! Default constructor
     MaterialLinearElasticGeneric() = delete;
 
@@ -103,11 +100,12 @@ namespace muSpectre {
      * @param name unique material name
      * @param C_voigt elastic tensor in Voigt notation
      */
-    MaterialLinearElasticGeneric(const std::string & name,
-                                 const CInput_t& C_voigt);
+    MaterialLinearElasticGeneric(const std::string &name,
+                                 const CInput_t &C_voigt);
 
     //! Copy constructor
-    MaterialLinearElasticGeneric(const MaterialLinearElasticGeneric &other) = delete;
+    MaterialLinearElasticGeneric(const MaterialLinearElasticGeneric &other) =
+        delete;
 
     //! Move constructor
     MaterialLinearElasticGeneric(MaterialLinearElasticGeneric &&other) = delete;
@@ -116,61 +114,56 @@ namespace muSpectre {
     virtual ~MaterialLinearElasticGeneric() = default;
 
     //! Copy assignment operator
-    MaterialLinearElasticGeneric&
+    MaterialLinearElasticGeneric &
     operator=(const MaterialLinearElasticGeneric &other) = delete;
 
     //! Move assignment operator
-    MaterialLinearElasticGeneric&
+    MaterialLinearElasticGeneric &
     operator=(MaterialLinearElasticGeneric &&other) = delete;
 
-    //! see http://eigen.tuxfamily.org/dox/group__TopicStructHavingEigenMembers.html
+    //! see
+    //! http://eigen.tuxfamily.org/dox/group__TopicStructHavingEigenMembers.html
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
-        /**
+    /**
      * evaluates second Piola-Kirchhoff stress given the Green-Lagrange
      * strain (or Cauchy stress if called with a small strain tensor)
      */
     template <class Derived>
-    inline decltype(auto)
-    evaluate_stress(const Eigen::MatrixBase<Derived> & E);
+    inline decltype(auto) evaluate_stress(const Eigen::MatrixBase<Derived> &E);
 
     /**
      * evaluates both second Piola-Kirchhoff stress and stiffness given
      * the Green-Lagrange strain (or Cauchy stress and stiffness if
      * called with a small strain tensor)
      */
-    template <class s_t>
-    inline decltype(auto) evaluate_stress_tangent(s_t &&  E);
+    template <class s_t> inline decltype(auto) evaluate_stress_tangent(s_t &&E);
 
     /**
      * return the empty internals tuple
      */
-    std::tuple<> & get_internals() {
-      return this->internal_variables;};
+    std::tuple<> &get_internals() { return this->internal_variables; }
 
     /**
      * return a reference to teh stiffness tensor
      */
-    const T4Mat<Real, DimM>& get_C() const {return this->C;}
+    const T4Mat<Real, DimM> &get_C() const { return this->C; }
 
-  protected:
+   protected:
     T4Mat<Real, DimM> C{};
     //! empty tuple
     std::tuple<> internal_variables{};
-  private:
+
+   private:
   };
 
-   /* ---------------------------------------------------------------------- */
+  /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   template <class Derived>
-  auto
-  MaterialLinearElasticGeneric<DimS, DimM>::
-  evaluate_stress(const Eigen::MatrixBase<Derived> & E)
-    -> decltype(auto) {
-    static_assert(Derived::ColsAtCompileTime == DimM,
-                  "wrong input size");
-    static_assert(Derived::RowsAtCompileTime == DimM,
-                  "wrong input size");
+  auto MaterialLinearElasticGeneric<DimS, DimM>::evaluate_stress(
+      const Eigen::MatrixBase<Derived> &E) -> decltype(auto) {
+    static_assert(Derived::ColsAtCompileTime == DimM, "wrong input size");
+    static_assert(Derived::RowsAtCompileTime == DimM, "wrong input size");
     return Matrices::tensmult(this->C, E);
   }
 
@@ -178,14 +171,14 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   template <class s_t>
   auto
-  MaterialLinearElasticGeneric<DimS, DimM>::evaluate_stress_tangent(s_t && E)
-    -> decltype(auto) {
+  MaterialLinearElasticGeneric<DimS, DimM>::evaluate_stress_tangent(s_t &&E)
+      -> decltype(auto) {
     using Stress_t = decltype(this->evaluate_stress(std::forward<s_t>(E)));
     using Stiffness_t = Eigen::Map<T4Mat<Real, DimM>>;
     using Ret_t = std::tuple<Stress_t, Stiffness_t>;
     return Ret_t{this->evaluate_stress(std::forward<s_t>(E)),
-        Stiffness_t(this->C.data())};
+                 Stiffness_t(this->C.data())};
   }
-}  // muSpectre
+}  // namespace muSpectre
 
-#endif /* MATERIAL_LINEAR_ELASTIC_GENERIC_H */
+#endif  // SRC_MATERIALS_MATERIAL_LINEAR_ELASTIC_GENERIC_HH_

@@ -32,8 +32,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef PROJECTION_FINITE_STRAIN_FAST_H
-#define PROJECTION_FINITE_STRAIN_FAST_H
+#ifndef SRC_FFT_PROJECTION_FINITE_STRAIN_FAST_HH_
+#define SRC_FFT_PROJECTION_FINITE_STRAIN_FAST_HH_
 
 #include "fft/projection_base.hh"
 #include "common/common.hh"
@@ -49,14 +49,13 @@ namespace muSpectre {
    * I'd be interested to hear it).
    */
   template <Dim_t DimS, Dim_t DimM>
-  class ProjectionFiniteStrainFast: public ProjectionBase<DimS, DimM>
-  {
-  public:
-    using Parent = ProjectionBase<DimS, DimM>; //!< base class
+  class ProjectionFiniteStrainFast : public ProjectionBase<DimS, DimM> {
+   public:
+    using Parent = ProjectionBase<DimS, DimM>;  //!< base class
     //! polymorphic pointer to FFT engines
     using FFTEngine_ptr = typename Parent::FFTEngine_ptr;
-    using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
-    using Rcoord = typename Parent::Rcoord; //!< spatial coordinates type
+    using Ccoord = typename Parent::Ccoord;  //!< cell coordinates type
+    using Rcoord = typename Parent::Rcoord;  //!< spatial coordinates type
     //! global field collection (for real-space representations)
     using GFieldCollection_t = GlobalFieldCollection<DimS>;
     //! local field collection (for Fourier-space representations)
@@ -70,8 +69,6 @@ namespace muSpectre {
     //! iterable Fourier-space second-order tensor field
     using Grad_map = MatrixFieldMap<LFieldCollection_t, Complex, DimM, DimM>;
 
-
-
     //! Default constructor
     ProjectionFiniteStrainFast() = delete;
 
@@ -79,7 +76,8 @@ namespace muSpectre {
     ProjectionFiniteStrainFast(FFTEngine_ptr engine, Rcoord lengths);
 
     //! Copy constructor
-    ProjectionFiniteStrainFast(const ProjectionFiniteStrainFast &other) = delete;
+    ProjectionFiniteStrainFast(const ProjectionFiniteStrainFast &other) =
+        delete;
 
     //! Move constructor
     ProjectionFiniteStrainFast(ProjectionFiniteStrainFast &&other) = default;
@@ -88,18 +86,21 @@ namespace muSpectre {
     virtual ~ProjectionFiniteStrainFast() = default;
 
     //! Copy assignment operator
-    ProjectionFiniteStrainFast& operator=(const ProjectionFiniteStrainFast &other) = delete;
+    ProjectionFiniteStrainFast &
+    operator=(const ProjectionFiniteStrainFast &other) = delete;
 
     //! Move assignment operator
-    ProjectionFiniteStrainFast& operator=(ProjectionFiniteStrainFast &&other) = default;
+    ProjectionFiniteStrainFast &
+    operator=(ProjectionFiniteStrainFast &&other) = default;
 
     //! initialises the fft engine (plan the transform)
-    virtual void initialise(FFT_PlanFlags flags = FFT_PlanFlags::estimate) override final;
+    void
+    initialise(FFT_PlanFlags flags = FFT_PlanFlags::estimate) final;
 
     //! apply the projection operator to a field
-    void apply_projection(Field_t & field) override final;
+    void apply_projection(Field_t &field) final;
 
-    Eigen::Map<Eigen::ArrayXXd> get_operator() override final;
+    Eigen::Map<Eigen::ArrayXXd> get_operator() final;
 
     /**
      * returns the number of rows and cols for the strain matrix type
@@ -107,16 +108,17 @@ namespace muSpectre {
      * material_dim matrices, but in symmetriy storage, it is a column
      * vector)
      */
-    std::array<Dim_t, 2> get_strain_shape() const override final;
+    std::array<Dim_t, 2> get_strain_shape() const final;
 
-    constexpr static Dim_t NbComponents(){return ipow(DimM, 2);}
+    constexpr static Dim_t NbComponents() { return ipow(DimM, 2); }
 
-  protected:
-    Proj_t & xiField; //!< field of normalised wave vectors
+   protected:
+    Proj_t &xiField;  //!< field of normalised wave vectors
     Proj_map xis;     //!< iterable normalised wave vectors
-  private:
+
+   private:
   };
 
-}  // muSpectre
+}  // namespace muSpectre
 
-#endif /* PROJECTION_FINITE_STRAIN_FAST_H */
+#endif  // SRC_FFT_PROJECTION_FINITE_STRAIN_FAST_HH_

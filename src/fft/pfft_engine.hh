@@ -32,8 +32,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef PFFT_ENGINE_H
-#define PFFT_ENGINE_H
+#ifndef SRC_FFT_PFFT_ENGINE_HH_
+#define SRC_FFT_PFFT_ENGINE_HH_
 
 #include "common/communicator.hh"
 
@@ -47,12 +47,10 @@ namespace muSpectre {
    * implements the `muSpectre::FFTEngineBase` interface using the
    * FFTW library
    */
-  template <Dim_t DimS>
-  class PFFTEngine: public FFTEngineBase<DimS>
-  {
-  public:
-    using Parent = FFTEngineBase<DimS>; //!< base class
-    using Ccoord = typename Parent::Ccoord; //!< cell coordinates type
+  template <Dim_t DimS> class PFFTEngine : public FFTEngineBase<DimS> {
+   public:
+    using Parent = FFTEngineBase<DimS>;      //!< base class
+    using Ccoord = typename Parent::Ccoord;  //!< cell coordinates type
     //! field for Fourier transform of second-order tensor
     using Workspace_t = typename Parent::Workspace_t;
     //! real-valued second-order tensor
@@ -62,7 +60,7 @@ namespace muSpectre {
 
     //! Constructor with system resolutions
     PFFTEngine(Ccoord resolutions, Dim_t nb_components,
-               Communicator comm=Communicator());
+               Communicator comm = Communicator());
 
     //! Copy constructor
     PFFTEngine(const PFFTEngine &other) = delete;
@@ -74,31 +72,35 @@ namespace muSpectre {
     virtual ~PFFTEngine() noexcept;
 
     //! Copy assignment operator
-    PFFTEngine& operator=(const PFFTEngine &other) = delete;
+    PFFTEngine &operator=(const PFFTEngine &other) = delete;
 
     //! Move assignment operator
-    PFFTEngine& operator=(PFFTEngine &&other) = default;
+    PFFTEngine &operator=(PFFTEngine &&other) = default;
 
     // compute the plan, etc
-    virtual void initialise(FFT_PlanFlags plan_flags) override;
+    void initialise(FFT_PlanFlags plan_flags) override;
 
     //! forward transform
-    virtual Workspace_t & fft(Field_t & field) override;
+    Workspace_t &fft(Field_t &field) override;
 
     //! inverse transform
-    virtual void ifft(Field_t & field) const override;
+    void ifft(Field_t &field) const override;
 
-  protected:
-    MPI_Comm mpi_comm; //! < MPI communicator
-    static int nb_engines; //!< number of times this engine has been instatiated
-    pfft_plan plan_fft{}; //!< holds the plan for forward fourier transform
-    pfft_plan plan_ifft{}; //!< holds the plan for inverse fourier transform
-    ptrdiff_t workspace_size{}; //!< size of workspace buffer returned by planner
-    Real *real_workspace{}; //!< temporary real workspace that is correctly padded
-    bool initialised{false}; //!< to prevent double initialisation
-  private:
+   protected:
+    MPI_Comm mpi_comm;  //! < MPI communicator
+    static int
+        nb_engines;        //!< number of times this engine has been instatiated
+    pfft_plan plan_fft{};  //!< holds the plan for forward fourier transform
+    pfft_plan plan_ifft{};  //!< holds the plan for inverse fourier transform
+    ptrdiff_t
+        workspace_size{};     //!< size of workspace buffer returned by planner
+    Real *real_workspace{};   //!< temporary real workspace that is correctly
+                              //!< padded
+    bool initialised{false};  //!< to prevent double initialisation
+
+   private:
   };
 
-}  // muSpectre
+}  // namespace muSpectre
 
-#endif /* PFFT_ENGINE_H */
+#endif  // SRC_FFT_PFFT_ENGINE_HH_

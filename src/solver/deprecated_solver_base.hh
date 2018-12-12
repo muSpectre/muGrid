@@ -32,8 +32,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef DEPRECATED_SOLVER_BASE_H
-#define DEPRECATED_SOLVER_BASE_H
+#ifndef SRC_SOLVER_DEPRECATED_SOLVER_BASE_HH_
+#define SRC_SOLVER_DEPRECATED_SOLVER_BASE_HH_
 
 #include "solver/solver_common.hh"
 #include "common/common.hh"
@@ -47,18 +47,17 @@
 namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   /**
-   * Virtual base class for solvers. Any implementation of this interface can be used with the solver functions prototyped in solvers.hh
+   * Virtual base class for solvers. Any implementation of this interface can be
+   * used with the solver functions prototyped in solvers.hh
    */
-  template <Dim_t DimS, Dim_t DimM=DimS>
-  class DeprecatedSolverBase
-  {
-  public:
+  template <Dim_t DimS, Dim_t DimM = DimS> class DeprecatedSolverBase {
+   public:
     /**
      * Enum to describe in what kind the solver relies tangent stiffnesses
      */
-    enum class TangentRequirement{NoNeed, NeedEffect, NeedTangents};
-    using Cell_t = CellBase<DimS, DimM>; //!< Cell type
-    using Ccoord = Ccoord_t<DimS>; //!< cell coordinates type
+    enum class TangentRequirement { NoNeed, NeedEffect, NeedTangents };
+    using Cell_t = CellBase<DimS, DimM>;  //!< Cell type
+    using Ccoord = Ccoord_t<DimS>;        //!< cell coordinates type
     //! Field collection to store temporary fields in
     using Collection_t = GlobalFieldCollection<DimS>;
     //! Input vector for solvers
@@ -68,12 +67,12 @@ namespace muSpectre {
     //! Output vector for solvers
     using SolvVectorOut = Eigen::VectorXd;
 
-
     //! Default constructor
     DeprecatedSolverBase() = delete;
 
     //! Constructor with domain resolutions
-    DeprecatedSolverBase(Cell_t & cell, Real tol, Uint maxiter=0, bool verbose =false);
+    DeprecatedSolverBase(Cell_t &cell, Real tol, Uint maxiter = 0,
+                         bool verbose = false);
 
     //! Copy constructor
     DeprecatedSolverBase(const DeprecatedSolverBase &other) = delete;
@@ -85,10 +84,10 @@ namespace muSpectre {
     virtual ~DeprecatedSolverBase() = default;
 
     //! Copy assignment operator
-    DeprecatedSolverBase& operator=(const DeprecatedSolverBase &other) = delete;
+    DeprecatedSolverBase &operator=(const DeprecatedSolverBase &other) = delete;
 
     //! Move assignment operator
-    DeprecatedSolverBase& operator=(DeprecatedSolverBase &&other) = default;
+    DeprecatedSolverBase &operator=(DeprecatedSolverBase &&other) = default;
 
     //! Allocate fields used during the solution
     virtual void initialise() {
@@ -98,15 +97,18 @@ namespace muSpectre {
 
     //! determine whether this solver requires full tangent stiffnesses
     bool need_tangents() const {
-      return (this->get_tangent_req() == TangentRequirement::NeedTangents);}
+      return (this->get_tangent_req() == TangentRequirement::NeedTangents);
+    }
 
     //! determine whether this solver requires evaluation of directional tangent
     bool need_effect() const {
-      return (this->get_tangent_req() == TangentRequirement::NeedEffect);}
+      return (this->get_tangent_req() == TangentRequirement::NeedEffect);
+    }
 
     //! determine whether this solver has no need for tangents
     bool no_need_tangent() const {
-      return (this->get_tangent_req() == TangentRequirement::NoNeed);}
+      return (this->get_tangent_req() == TangentRequirement::NoNeed);
+    }
 
     //! returns whether the solver has converged
     virtual bool has_converged() const = 0;
@@ -122,34 +124,35 @@ namespace muSpectre {
     virtual SolvVectorOut solve(const SolvVectorInC rhs, SolvVectorIn x_0) = 0;
 
     //! return a reference to the cell
-    Cell_t & get_cell() {return cell;}
+    Cell_t &get_cell() { return cell; }
 
     //! read the current maximum number of iterations setting
-    Uint get_maxiter() const {return this->maxiter;}
+    Uint get_maxiter() const { return this->maxiter; }
     //! set the maximum number of iterations
-    void set_maxiter(Uint val) {this->maxiter = val;}
+    void set_maxiter(Uint val) { this->maxiter = val; }
 
     //! read the current tolerance setting
-    Real get_tol() const {return this->tol;}
+    Real get_tol() const { return this->tol; }
     //! set the torelance setting
-    void set_tol(Real val) {this->tol = val;}
+    void set_tol(Real val) { this->tol = val; }
 
     //! returns the name of the solver
     virtual std::string name() const = 0;
 
-  protected:
+   protected:
     //! returns the tangent requirements of this solver
     virtual TangentRequirement get_tangent_req() const = 0;
-    Cell_t & cell; //!< reference to the cell
-    Real tol;    //!< convergence tolerance
-    Uint maxiter;//!< maximum number of iterations
-    bool verbose;//!< whether or not to write information to the std output
-    Uint counter{0}; //!< iteration counter
+    Cell_t &cell;     //!< reference to the cell
+    Real tol;         //!< convergence tolerance
+    Uint maxiter;     //!< maximum number of iterations
+    bool verbose;     //!< whether or not to write information to the std output
+    Uint counter{0};  //!< iteration counter
     //! storage for internal fields to avoid reallocations between calls
     Collection_t collection{};
-  private:
+
+   private:
   };
 
-}  // muSpectre
+}  // namespace muSpectre
 
-#endif /* DEPRECATED_SOLVER_BASE_H */
+#endif  // SRC_SOLVER_DEPRECATED_SOLVER_BASE_HH_

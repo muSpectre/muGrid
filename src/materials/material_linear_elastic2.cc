@@ -38,28 +38,28 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  MaterialLinearElastic2<DimS, DimM>::
-  MaterialLinearElastic2(std::string name, Real young, Real poisson)
-    :Parent{name}, material{name, young, poisson},
-     eigen_field{make_field<Field_t>("Eigenstrain", this->internal_fields)},
-     internal_variables(eigen_field.get_const_map())
-    {}
+  MaterialLinearElastic2<DimS, DimM>::MaterialLinearElastic2(std::string name,
+                                                             Real young,
+                                                             Real poisson)
+      : Parent{name}, material{name, young, poisson},
+        eigen_field{make_field<Field_t>("Eigenstrain", this->internal_fields)},
+        internal_variables(eigen_field.get_const_map()) {}
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void MaterialLinearElastic2<DimS, DimM>::
-  add_pixel(const Ccoord_t<DimS> & /*pixel*/) {
-    throw std::runtime_error
-      ("this material needs pixels with and eigenstrain");
+  void MaterialLinearElastic2<DimS, DimM>::add_pixel(
+      const Ccoord_t<DimS> & /*pixel*/) {
+    throw std::runtime_error("this material needs pixels with and eigenstrain");
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void MaterialLinearElastic2<DimS, DimM>::
-  add_pixel(const Ccoord_t<DimS> & pixel,
-            const StrainTensor & E_eig) {
+  void
+  MaterialLinearElastic2<DimS, DimM>::add_pixel(const Ccoord_t<DimS> &pixel,
+                                                const StrainTensor &E_eig) {
     this->internal_fields.add_pixel(pixel);
-    Eigen::Map<const Eigen::Array<Real, DimM*DimM, 1>> strain_array(E_eig.data());
+    Eigen::Map<const Eigen::Array<Real, DimM * DimM, 1>> strain_array(
+        E_eig.data());
     this->eigen_field.push_back(strain_array);
   }
 
@@ -67,4 +67,4 @@ namespace muSpectre {
   template class MaterialLinearElastic2<twoD, threeD>;
   template class MaterialLinearElastic2<threeD, threeD>;
 
-}  // muSpectre
+}  // namespace muSpectre

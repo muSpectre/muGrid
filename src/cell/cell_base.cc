@@ -58,7 +58,8 @@ namespace muSpectre {
      projection{std::move(projection_)}
   {
     // resize all global fields (strain, stress, etc)
-    this->fields->initialise(this->subdomain_resolutions, this->subdomain_locations);
+    this->fields->initialise(this->subdomain_resolutions,
+                             this->subdomain_locations);
   }
 
   /**
@@ -78,7 +79,7 @@ namespace muSpectre {
     fields{std::move(other.fields)},
     F{other.F},
     P{other.P},
-    K{other.K}, // this seems to segfault under clang if it's not a move
+    K{other.K},  // this seems to segfault under clang if it's not a move
     materials{std::move(other.materials)},
     projection{std::move(other.projection)}
   { }
@@ -117,7 +118,7 @@ namespace muSpectre {
     if (not this->initialised) {
       this->initialise();
     }
-    for (auto & mat: this->materials) {
+    for (auto & mat : this->materials) {
       mat->compute_stresses(this->F, this->P, this->get_formulation());
     }
 
@@ -135,14 +136,13 @@ namespace muSpectre {
     constexpr bool create_tangent{true};
     this->get_tangent(create_tangent);
 
-    for (auto & mat: this->materials) {
+    for (auto & mat : this->materials) {
       mat->compute_stresses_tangent(this->F, this->P, this->K.value(),
                                     this->get_formulation());
     }
     const TangentField_t & k = this->K.value();
     return std::array<ConstVector_ref, 2>{
       this->P.const_eigenvec(), k.const_eigenvec()};
-
   }
 
   /* ---------------------------------------------------------------------- */
@@ -177,7 +177,8 @@ namespace muSpectre {
 
     auto Kmap{this->K.value().get().get_map()};
     auto delPmap{delP.get_map()};
-    MatrixFieldMap<FieldCollection_t, Real, DimM, DimM, true> delFmap(delF_field);
+    MatrixFieldMap<FieldCollection_t, Real, DimM, DimM, true>
+      delFmap(delF_field);
 
     for (auto && tup:
            akantu::zip(Kmap, delFmap, delPmap)) {
@@ -188,7 +189,6 @@ namespace muSpectre {
     }
 
     return Vector_ref(this->project(delP).data(), this->get_nb_dof());
-
   }
 
   /* ---------------------------------------------------------------------- */
@@ -221,7 +221,7 @@ namespace muSpectre {
     constexpr bool create_tangent{true};
     this->get_tangent(create_tangent);
 
-    for (auto & mat: this->materials) {
+    for (auto & mat : this->materials) {
       mat->compute_stresses_tangent(grad, this->P, this->K.value(),
                                     this->get_formulation());
     }
@@ -235,7 +235,7 @@ namespace muSpectre {
                                               const StrainField_t &delF,
                                               StressField_t &delP) {
     for (auto && tup:
-           akantu::zip(K.get_map(), delF.get_map(), delP.get_map())){
+           akantu::zip(K.get_map(), delF.get_map(), delP.get_map())) {
       auto & k = std::get<0>(tup);
       auto & df = std::get<1>(tup);
       auto & dp = std::get<2>(tup);
@@ -247,7 +247,8 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   typename CellBase<DimS, DimM>::Vector_ref
-  CellBase<DimS, DimM>::directional_stiffness_vec(const Eigen::Ref<const Vector_t> &delF) {
+  CellBase<DimS, DimM>::
+  directional_stiffness_vec(const Eigen::Ref<const Vector_t> &delF) {
     if (!this->K) {
       throw std::runtime_error
         ("currently only implemented for cases where a stiffness matrix "
@@ -269,7 +270,6 @@ namespace muSpectre {
 
     this->directional_stiffness(this->K.value(), in_tempref, out_tempref);
     return Vector_ref(out_tempref.data(), this->get_nb_dof());
-
   }
 
   /* ---------------------------------------------------------------------- */
@@ -324,7 +324,8 @@ namespace muSpectre {
   CellBase<DimS, DimM>::get_tangent(bool create) {
     if (!this->K) {
       if (create) {
-        this->K = make_field<TangentField_t>("Tangent Stiffness", *this->fields);
+        this->K =
+          make_field<TangentField_t>("Tangent Stiffness", *this->fields);
       } else {
         throw std::runtime_error
           ("K does not exist");
@@ -358,7 +359,8 @@ namespace muSpectre {
       if (ret_ref.get_nb_components() != nb_components) {
         std::stringstream err{};
         err << "Field '" << unique_name << "' already exists and it has "
-            << ret_ref.get_nb_components() << " components. You asked for a field "
+            << ret_ref.get_nb_components()
+            << " components. You asked for a field "
             << "with " << nb_components << "components.";
         throw std::runtime_error(err.str());
       }
@@ -370,14 +372,13 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   auto CellBase<DimS, DimM>::
   get_globalised_internal_real_field(const std::string & unique_name)
-    -> Field_t<Real> &
-  {
+    -> Field_t<Real> & {
     using LField_t = typename Field_t<Real>::LocalField_t;
     // start by checking that the field exists at least once, and that
     // it always has th same number of components
     std::set<Dim_t> nb_component_categories{};
     std::vector<std::reference_wrapper<LField_t>> local_fields;
-    for (auto & mat: this->materials) {
+    for (auto & mat : this->materials) {
       auto & coll = mat->get_collection();
       if (coll.check_field_exists(unique_name)) {
         auto & field{LField_t::check_ref(coll[unique_name])};
@@ -391,9 +392,9 @@ namespace muSpectre {
       if (nb_match > 1) {
         err_str << "The fields named '" << unique_name << "' do not have the "
                 << "same number of components in every material, which is a "
-                << "requirement for globalising them! The following values were "
-                << "found by material:" << std::endl;
-        for (auto & mat: this->materials) {
+                << "requirement for globalising them! The following values "
+                << "were found by material:" << std::endl;
+        for (auto & mat : this->materials) {
           auto & coll = mat->get_collection();
           if (coll.check_field_exists(unique_name)) {
             auto & field{LField_t::check_ref(coll[unique_name])};
@@ -414,7 +415,7 @@ namespace muSpectre {
     field.set_zero();
 
     // fill it with local internal values
-    for (auto & local_field: local_fields) {
+    for (auto & local_field : local_fields) {
       field.fill_from_local(local_field);
     }
     return field;
@@ -424,8 +425,7 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   auto CellBase<DimS, DimM>::get_managed_real_array(std::string unique_name,
                                                     size_t nb_components)
-    -> Array_ref<Real>
-  {
+    -> Array_ref<Real> {
     auto & field{this->get_managed_real_field(unique_name, nb_components)};
     return Array_ref<Real>
       {field.data(), Dim_t(nb_components), Dim_t(field.size())};
@@ -434,7 +434,8 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   auto CellBase<DimS, DimM>::
-  get_globalised_internal_real_array(const std::string & unique_name) -> Array_ref<Real> {
+  get_globalised_internal_real_array(const std::string & unique_name)
+    -> Array_ref<Real> {
     auto & field{this->get_globalised_internal_real_field(unique_name)};
     return Array_ref<Real>
       {field.data(), Dim_t(field.get_nb_components()), Dim_t(field.size())};
@@ -445,7 +446,7 @@ namespace muSpectre {
   void CellBase<DimS, DimM>::initialise(FFT_PlanFlags flags) {
     // check that all pixels have been assigned exactly one material
     this->check_material_coverage();
-    for (auto && mat: this->materials) {
+    for (auto && mat : this->materials) {
       mat->initialise();
     }
     // initialise the projection and compute the fft plan
@@ -456,7 +457,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   void CellBase<DimS, DimM>::save_history_variables() {
-    for (auto && mat: this->materials) {
+    for (auto && mat : this->materials) {
       mat->save_history_variables();
     }
   }
@@ -486,8 +487,8 @@ namespace muSpectre {
   void CellBase<DimS, DimM>::check_material_coverage() {
     auto nb_pixels = CcoordOps::get_size(this->subdomain_resolutions);
     std::vector<MaterialBase<DimS, DimM>*> assignments(nb_pixels, nullptr);
-    for (auto & mat: this->materials) {
-      for (auto & pixel: *mat) {
+    for (auto & mat : this->materials) {
+      for (auto & pixel : *mat) {
         auto index = CcoordOps::get_index(this->subdomain_resolutions,
                                           this->subdomain_locations,
                                           pixel);
@@ -517,7 +518,7 @@ namespace muSpectre {
     if (unassigned_pixels.size() != 0) {
       std::stringstream err {};
       err << "The following pixels have were not assigned a material: ";
-      for (auto & pixel: unassigned_pixels) {
+      for (auto & pixel : unassigned_pixels) {
         err << pixel << ", ";
       }
       err << "and that cannot be handled";
@@ -528,4 +529,4 @@ namespace muSpectre {
   template class CellBase<twoD, twoD>;
   template class CellBase<threeD, threeD>;
 
-}  // muSpectre
+}  // namespace muSpectre

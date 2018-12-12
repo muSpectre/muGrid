@@ -5,8 +5,9 @@
  *
  * @date   20 Feb 2018
  *
- * @brief  implementation for linear elastic material with distribution of stiffness properties.
- *        Uses the MaterialMuSpectre facilities to keep it simple.
+ * @brief  implementation for linear elastic material with distribution of
+ * stiffness properties. Uses the MaterialMuSpectre facilities to keep it
+ * simple.
  *
  * Copyright © 2018 Till Junge
  *
@@ -39,31 +40,29 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  MaterialLinearElastic3<DimS, DimM>::
-  MaterialLinearElastic3(std::string name)
-    :Parent{name},
-     C_field{make_field<Field_t>("local stiffness tensor", this->internal_fields)},
-     internal_variables(C_field.get_const_map())
-    {}
+  MaterialLinearElastic3<DimS, DimM>::MaterialLinearElastic3(std::string name)
+      : Parent{name}, C_field{make_field<Field_t>("local stiffness tensor",
+                                                  this->internal_fields)},
+        internal_variables(C_field.get_const_map()) {}
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void MaterialLinearElastic3<DimS, DimM>::
-  add_pixel(const Ccoord_t<DimS> & /*pixel*/) {
-    throw std::runtime_error
-      ("this material needs pixels with Youngs modulus and Poisson ratio.");
+  void MaterialLinearElastic3<DimS, DimM>::add_pixel(
+      const Ccoord_t<DimS> & /*pixel*/) {
+    throw std::runtime_error(
+        "this material needs pixels with Youngs modulus and Poisson ratio.");
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void MaterialLinearElastic3<DimS, DimM>::
-  add_pixel(const Ccoord_t<DimS> & pixel,
-            const Real & Young, const Real & Poisson) {
+  void MaterialLinearElastic3<DimS, DimM>::add_pixel(
+      const Ccoord_t<DimS> &pixel, const Real &Young, const Real &Poisson) {
     this->internal_fields.add_pixel(pixel);
     Real lambda = Hooke::compute_lambda(Young, Poisson);
-    Real mu     = Hooke::compute_mu(Young, Poisson);
+    Real mu = Hooke::compute_mu(Young, Poisson);
     auto C_tensor = Hooke::compute_C(lambda, mu);
-    Eigen::Map<const Eigen::Array<Real, DimM*DimM*DimM*DimM, 1>> C(C_tensor.data());
+    Eigen::Map<const Eigen::Array<Real, DimM * DimM * DimM * DimM, 1>> C(
+        C_tensor.data());
     this->C_field.push_back(C);
   }
 
@@ -71,4 +70,4 @@ namespace muSpectre {
   template class MaterialLinearElastic3<twoD, threeD>;
   template class MaterialLinearElastic3<threeD, threeD>;
 
-}  // muSpectre
+}  // namespace muSpectre

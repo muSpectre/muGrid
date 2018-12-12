@@ -32,8 +32,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef MPI_CONTEXT_H
-#define MPI_CONTEXT_H
+#ifndef TESTS_MPI_CONTEXT_HH_
+#define TESTS_MPI_CONTEXT_HH_
 
 #include "common/communicator.hh"
 
@@ -43,15 +43,15 @@ namespace muSpectre {
    * MPI context singleton. Initialize MPI once when needed.
    */
   class MPIContext {
-  public:
+   public:
     Communicator comm;
     static MPIContext &get_context() {
       static MPIContext context;
       return context;
     }
 
-  private:
-    MPIContext(): comm(Communicator(MPI_COMM_WORLD)) {
+   private:
+    MPIContext() : comm(Communicator(MPI_COMM_WORLD)) {
       MPI_Init(&boost::unit_test::framework::master_test_suite().argc,
                &boost::unit_test::framework::master_test_suite().argv);
     }
@@ -60,11 +60,12 @@ namespace muSpectre {
       MPI_Barrier(comm.get_mpi_comm());
       MPI_Finalize();
     }
-  public:
-    MPIContext(MPIContext const&) = delete;
-    void operator=(MPIContext const&) = delete;
+
+   public:
+    MPIContext(MPIContext const &) = delete;
+    void operator=(MPIContext const &) = delete;
   };
 
-}
+}  // namespace muSpectre
 
-#endif /* MPI_CONTEXT_H */
+#endif  // TESTS_MPI_CONTEXT_HH_

@@ -39,58 +39,64 @@
 #include <boost/mpl/list.hpp>
 #include <Eigen/Dense>
 
+#ifndef TESTS_MPI_TEST_PROJECTION_HH_
+#define TESTS_MPI_TEST_PROJECTION_HH_
+
+
 namespace muSpectre {
 
-    /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
-  struct Sizes {
-  };
-  template<>
-  struct Sizes<twoD> {
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS> struct Sizes {};
+  template <> struct Sizes<twoD> {
     constexpr static Ccoord_t<twoD> get_resolution() {
-      return Ccoord_t<twoD>{3, 5};}
+      return Ccoord_t<twoD>{3, 5};
+    }
     constexpr static Rcoord_t<twoD> get_lengths() {
-      return Rcoord_t<twoD>{3.4, 5.8};}
+      return Rcoord_t<twoD>{3.4, 5.8};
+    }
   };
-  template<>
-  struct Sizes<threeD> {
+  template <> struct Sizes<threeD> {
     constexpr static Ccoord_t<threeD> get_resolution() {
-      return Ccoord_t<threeD>{3, 5, 7};}
+      return Ccoord_t<threeD>{3, 5, 7};
+    }
     constexpr static Rcoord_t<threeD> get_lengths() {
-      return Rcoord_t<threeD>{3.4, 5.8, 6.7};}
+      return Rcoord_t<threeD>{3.4, 5.8, 6.7};
+    }
   };
-  template <Dim_t DimS>
-  struct Squares {
-  };
-  template<>
-  struct Squares<twoD> {
+  template <Dim_t DimS> struct Squares {};
+  template <> struct Squares<twoD> {
     constexpr static Ccoord_t<twoD> get_resolution() {
-      return Ccoord_t<twoD>{5, 5};}
+      return Ccoord_t<twoD>{5, 5};
+    }
     constexpr static Rcoord_t<twoD> get_lengths() {
-      return Rcoord_t<twoD>{5, 5};}
+      return Rcoord_t<twoD>{5, 5};
+    }
   };
-  template<>
-  struct Squares<threeD> {
+  template <> struct Squares<threeD> {
     constexpr static Ccoord_t<threeD> get_resolution() {
-      return Ccoord_t<threeD>{7, 7, 7};}
+      return Ccoord_t<threeD>{7, 7, 7};
+    }
     constexpr static Rcoord_t<threeD> get_lengths() {
-      return Rcoord_t<threeD>{7, 7, 7};}
+      return Rcoord_t<threeD>{7, 7, 7};
+    }
   };
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM, class SizeGiver, class Proj, class Engine,
-            bool parallel=true>
+            bool parallel = true>
   struct ProjectionFixture {
     using Parent = Proj;
     constexpr static Dim_t sdim{DimS};
     constexpr static Dim_t mdim{DimM};
     constexpr static bool is_parallel{parallel};
     ProjectionFixture()
-      :projector(std::make_unique<Engine>(SizeGiver::get_resolution(),
-                                          ipow(mdim, 2),
-                                          MPIContext::get_context().comm),
-                 SizeGiver::get_lengths()){}
+        : projector(std::make_unique<Engine>(SizeGiver::get_resolution(),
+                                             ipow(mdim, 2),
+                                             MPIContext::get_context().comm),
+                    SizeGiver::get_lengths()) {}
     Parent projector;
   };
 
-}  // muSpectre
+}  // namespace muSpectre
+
+#endif  // TESTS_MPI_TEST_PROJECTION_HH_

@@ -32,137 +32,137 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-
-#ifndef UTILITIES_H
-#define UTILITIES_H
+#ifndef SRC_COMMON_UTILITIES_HH_
+#define SRC_COMMON_UTILITIES_HH_
 
 #include <tuple>
 
 #ifdef NO_EXPERIMENTAL
-#  include <boost/optional.hpp>
+#include <boost/optional.hpp>
 #else
-#  include <experimental/optional>
+#include <experimental/optional>
 #endif
 
 namespace std_replacement {
 
   namespace detail {
-    template <class T>
-    struct is_reference_wrapper : std::false_type {};
+    template <class T> struct is_reference_wrapper : std::false_type {};
     template <class U>
     struct is_reference_wrapper<std::reference_wrapper<U>> : std::true_type {};
 
     //! from cppreference
     template <class Base, class T, class Derived, class... Args>
-    auto INVOKE(T Base::*pmf, Derived&& ref, Args&&... args)
-      noexcept(noexcept((std::forward<Derived>(ref).*pmf)(std::forward<Args>(args)...)))
-      -> std::enable_if_t<std::is_function<T>::value &&
-                          std::is_base_of<Base, std::decay_t<Derived>>::value,
-                          decltype((std::forward<Derived>(ref).*pmf)(std::forward<Args>(args)...))>
-    {
+    auto INVOKE(T Base::*pmf, Derived &&ref, Args &&... args) noexcept(noexcept(
+        (std::forward<Derived>(ref).*pmf)(std::forward<Args>(args)...)))
+        -> std::enable_if_t<
+            std::is_function<T>::value &&
+                std::is_base_of<Base, std::decay_t<Derived>>::value,
+            decltype((std::forward<Derived>(ref).*
+                      pmf)(std::forward<Args>(args)...))> {
       return (std::forward<Derived>(ref).*pmf)(std::forward<Args>(args)...);
     }
 
     //! from cppreference
     template <class Base, class T, class RefWrap, class... Args>
-    auto INVOKE(T Base::*pmf, RefWrap&& ref, Args&&... args)
-      noexcept(noexcept((ref.get().*pmf)(std::forward<Args>(args)...)))
-      -> std::enable_if_t<std::is_function<T>::value &&
-                          is_reference_wrapper<std::decay_t<RefWrap>>::value,
-                          decltype((ref.get().*pmf)(std::forward<Args>(args)...))>
-
-    {
+    auto INVOKE(T Base::*pmf, RefWrap &&ref, Args &&... args) noexcept(
+        noexcept((ref.get().*pmf)(std::forward<Args>(args)...)))
+        -> std::enable_if_t<
+            std::is_function<T>::value &&
+                is_reference_wrapper<std::decay_t<RefWrap>>::value,
+            decltype((ref.get().*pmf)(std::forward<Args>(args)...))> {
       return (ref.get().*pmf)(std::forward<Args>(args)...);
     }
 
     //! from cppreference
     template <class Base, class T, class Pointer, class... Args>
-    auto INVOKE(T Base::*pmf, Pointer&& ptr, Args&&... args)
-      noexcept(noexcept(((*std::forward<Pointer>(ptr)).*pmf)(std::forward<Args>(args)...)))
-      -> std::enable_if_t<std::is_function<T>::value &&
-                          !is_reference_wrapper<std::decay_t<Pointer>>::value &&
-                          !std::is_base_of<Base, std::decay_t<Pointer>>::value,
-                          decltype(((*std::forward<Pointer>(ptr)).*pmf)(std::forward<Args>(args)...))>
-    {
+    auto INVOKE(T Base::*pmf, Pointer &&ptr, Args &&... args) noexcept(noexcept(
+        ((*std::forward<Pointer>(ptr)).*pmf)(std::forward<Args>(args)...)))
+        -> std::enable_if_t<
+            std::is_function<T>::value &&
+                !is_reference_wrapper<std::decay_t<Pointer>>::value &&
+                !std::is_base_of<Base, std::decay_t<Pointer>>::value,
+            decltype(((*std::forward<Pointer>(ptr)).*
+                      pmf)(std::forward<Args>(args)...))> {
       return ((*std::forward<Pointer>(ptr)).*pmf)(std::forward<Args>(args)...);
     }
 
     //! from cppreference
     template <class Base, class T, class Derived>
-    auto INVOKE(T Base::*pmd, Derived&& ref)
-      noexcept(noexcept(std::forward<Derived>(ref).*pmd))
-      -> std::enable_if_t<!std::is_function<T>::value &&
-                          std::is_base_of<Base, std::decay_t<Derived>>::value,
-                          decltype(std::forward<Derived>(ref).*pmd)>
-    {
+    auto
+    INVOKE(T Base::*pmd,
+           Derived &&ref) noexcept(noexcept(std::forward<Derived>(ref).*pmd))
+        -> std::enable_if_t<
+            !std::is_function<T>::value &&
+                std::is_base_of<Base, std::decay_t<Derived>>::value,
+            decltype(std::forward<Derived>(ref).*pmd)> {
       return std::forward<Derived>(ref).*pmd;
     }
 
     //! from cppreference
     template <class Base, class T, class RefWrap>
-    auto INVOKE(T Base::*pmd, RefWrap&& ref)
-      noexcept(noexcept(ref.get().*pmd))
-      -> std::enable_if_t<!std::is_function<T>::value &&
-                          is_reference_wrapper<std::decay_t<RefWrap>>::value,
-                          decltype(ref.get().*pmd)>
-    {
+    auto INVOKE(T Base::*pmd, RefWrap &&ref) noexcept(noexcept(ref.get().*pmd))
+        -> std::enable_if_t<
+            !std::is_function<T>::value &&
+                is_reference_wrapper<std::decay_t<RefWrap>>::value,
+            decltype(ref.get().*pmd)> {
       return ref.get().*pmd;
     }
 
     //! from cppreference
     template <class Base, class T, class Pointer>
-    auto INVOKE(T Base::*pmd, Pointer&& ptr)
-      noexcept(noexcept((*std::forward<Pointer>(ptr)).*pmd))
-      -> std::enable_if_t<!std::is_function<T>::value &&
-                          !is_reference_wrapper<std::decay_t<Pointer>>::value &&
-                          !std::is_base_of<Base, std::decay_t<Pointer>>::value,
-                          decltype((*std::forward<Pointer>(ptr)).*pmd)>
-    {
+    auto
+    INVOKE(T Base::*pmd,
+           Pointer &&ptr) noexcept(noexcept((*std::forward<Pointer>(ptr)).*pmd))
+        -> std::enable_if_t<
+            !std::is_function<T>::value &&
+                !is_reference_wrapper<std::decay_t<Pointer>>::value &&
+                !std::is_base_of<Base, std::decay_t<Pointer>>::value,
+            decltype((*std::forward<Pointer>(ptr)).*pmd)> {
       return (*std::forward<Pointer>(ptr)).*pmd;
     }
 
     //! from cppreference
     template <class F, class... Args>
-    auto INVOKE(F&& f, Args&&... args)
-      noexcept(noexcept(std::forward<F>(f)(std::forward<Args>(args)...)))
-      -> std::enable_if_t<!std::is_member_pointer<std::decay_t<F>>::value,
-                          decltype(std::forward<F>(f)(std::forward<Args>(args)...))>
-    {
+    auto INVOKE(F &&f, Args &&... args) noexcept(
+        noexcept(std::forward<F>(f)(std::forward<Args>(args)...)))
+        -> std::enable_if_t<
+            !std::is_member_pointer<std::decay_t<F>>::value,
+            decltype(std::forward<F>(f)(std::forward<Args>(args)...))> {
       return std::forward<F>(f)(std::forward<Args>(args)...);
     }
-  } // namespace detail
+  }  // namespace detail
 
   //! from cppreference
-  template< class F, class... ArgTypes >
-  auto invoke(F&& f, ArgTypes&&... args)
-  // exception specification for QoI
-    noexcept(noexcept(detail::INVOKE(std::forward<F>(f), std::forward<ArgTypes>(args)...)))
-    -> decltype(detail::INVOKE(std::forward<F>(f), std::forward<ArgTypes>(args)...))
-  {
+  template <class F, class... ArgTypes>
+  auto invoke(F &&f, ArgTypes &&... args)
+      // exception specification for QoI
+      noexcept(noexcept(detail::INVOKE(std::forward<F>(f),
+                                       std::forward<ArgTypes>(args)...)))
+          -> decltype(detail::INVOKE(std::forward<F>(f),
+                                     std::forward<ArgTypes>(args)...)) {
     return detail::INVOKE(std::forward<F>(f), std::forward<ArgTypes>(args)...);
   }
 
   namespace detail {
     //! from cppreference
     template <class F, class Tuple, std::size_t... I>
-    constexpr decltype(auto) apply_impl(F &&f, Tuple &&t, std::index_sequence<I...>)
-    {
-      return std_replacement::invoke(std::forward<F>(f), std::get<I>(std::forward<Tuple>(t))...);
+    constexpr decltype(auto) apply_impl(F &&f, Tuple &&t,
+                                        std::index_sequence<I...>) {
+      return std_replacement::invoke(std::forward<F>(f),
+                                     std::get<I>(std::forward<Tuple>(t))...);
     }
   }  // namespace detail
 
   //! from cppreference
   template <class F, class Tuple>
-  constexpr decltype(auto) apply(F &&f, Tuple &&t)
-  {
-    return detail::apply_impl
-      (std::forward<F>(f), std::forward<Tuple>(t),
-       std::make_index_sequence<std::tuple_size<std::decay_t<Tuple>>::value>{});
+  constexpr decltype(auto) apply(F &&f, Tuple &&t) {
+    return detail::apply_impl(
+        std::forward<F>(f), std::forward<Tuple>(t),
+        std::make_index_sequence<
+            std::tuple_size<std::decay_t<Tuple>>::value>{});
   }
 
-
-} //namespace std_replacement
-
+}  // namespace std_replacement
 
 namespace muSpectre {
 
@@ -175,14 +175,14 @@ namespace muSpectre {
     template <size_t size, typename T, typename... tail>
     struct tuple_array_helper {
       //! underlying tuple
-      using type = typename tuple_array_helper<size-1, T, T, tail...>::type;
+      using type = typename tuple_array_helper<size - 1, T, T, tail...>::type;
     };
 
     /**
      * helper struct template to compute the type of a tuple with a
      * given number of entries of the same type
      */
-    template< typename T, typename... tail>
+    template <typename T, typename... tail>
     struct tuple_array_helper<0, T, tail...> {
       //! underlying tuple
       using type = std::tuple<tail...>;
@@ -193,24 +193,26 @@ namespace muSpectre {
      * tuples. RecursionLevel indicates how much more we can recurse
      * down
      */
-    template <class TupArr, size_t Index=0, size_t RecursionLevel=TupArr::Size-1>
+    template <class TupArr, size_t Index = 0,
+              size_t RecursionLevel = TupArr::Size - 1>
     struct Accessor {
       using Stored_t = typename TupArr::Stored_t;
 
-      inline static Stored_t
-      get(const size_t & index, TupArr & container) {
+      inline static Stored_t get(const size_t &index, TupArr &container) {
         if (index == Index) {
           return std::get<Index>(container);
         } else {
-          return Accessor<TupArr, Index+1, RecursionLevel-1>::get(index, container);
+          return Accessor<TupArr, Index + 1, RecursionLevel - 1>::get(
+              index, container);
         }
       }
-      inline static const Stored_t
-      get(const size_t & index, const TupArr & container) {
+      inline static const Stored_t get(const size_t &index,
+                                       const TupArr &container) {
         if (index == Index) {
           return std::get<Index>(container);
         } else {
-          return Accessor<TupArr, Index+1, RecursionLevel-1>::get(index, container);
+          return Accessor<TupArr, Index + 1, RecursionLevel - 1>::get(
+              index, container);
         }
       }
     };
@@ -218,12 +220,10 @@ namespace muSpectre {
     /**
      * specialisation for recursion end
      */
-    template <class TupArr, size_t Index>
-    struct Accessor<TupArr, Index, 0> {
+    template <class TupArr, size_t Index> struct Accessor<TupArr, Index, 0> {
       using Stored_t = typename TupArr::Stored_t;
 
-      inline static Stored_t
-      get(const size_t & index, TupArr & container) {
+      inline static Stored_t get(const size_t &index, TupArr &container) {
         if (index == Index) {
           return std::get<Index>(container);
         } else {
@@ -233,8 +233,8 @@ namespace muSpectre {
         }
       }
 
-      inline static const Stored_t
-      get(const size_t & index, const TupArr & container) {
+      inline static const Stored_t get(const size_t &index,
+                                       const TupArr &container) {
         if (index == Index) {
           return std::get<Index>(container);
         } else {
@@ -248,32 +248,32 @@ namespace muSpectre {
     /**
      * helper struct that provides the tuple_array.
      */
-    template <typename T, size_t size>
-    struct tuple_array_provider {
+    template <typename T, size_t size> struct tuple_array_provider {
       //! tuple type that can be used (almost) like an `std::array`
-      class type: public tuple_array_helper<size, T>::type {
-      public:
+      class type : public tuple_array_helper<size, T>::type {
+       public:
         //! short-hand
         using Parent = typename tuple_array_helper<size, T>::type;
         using Stored_t = T;
         constexpr static size_t Size{size};
 
         //! constructor
-        inline type(Parent && parent):Parent{parent}{};
+         explicit inline type(Parent &&parent) : Parent{parent} {}
 
         //! element access
-        T operator[] (const size_t & index) {
+        T operator[](const size_t &index) {
           return Accessor<type>::get(index, *this);
         }
 
         //! element access
-        const T operator[](const size_t & index) const  {
+        const T operator[](const size_t &index) const {
           return Accessor<type>::get(index, *this);
         }
-      protected:
+
+       protected:
       };
     };
-  }  // internal
+  }  // namespace internal
 
   /**
    * This is a convenience structure to create a tuple of `nb_elem`
@@ -301,6 +301,6 @@ namespace muSpectre {
   using optional = typename std::experimental::optional<T>;
 #endif
 
-}  // muSpectre
+}  // namespace muSpectre
 
-#endif /* UTILITIES_H */
+#endif  // SRC_COMMON_UTILITIES_HH_

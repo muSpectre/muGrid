@@ -33,11 +33,11 @@
  */
 
 #include "fft/projection_finite_strain.hh"
-#include "fft/fftw_engine.hh"
-#include "fft/fft_utils.hh"
 #include "common/field_map.hh"
-#include "common/tensor_algebra.hh"
 #include "common/iterators.hh"
+#include "common/tensor_algebra.hh"
+#include "fft/fft_utils.hh"
+#include "fft/fftw_engine.hh"
 
 #include "Eigen/Dense"
 
@@ -45,31 +45,29 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  ProjectionFiniteStrain<DimS, DimM>::
-  ProjectionFiniteStrain(FFTEngine_ptr engine, Rcoord lengths)
-    :Parent{std::move(engine), lengths, Formulation::finite_strain}
-  {
-    for (auto res: this->fft_engine->get_domain_resolutions()) {
+  ProjectionFiniteStrain<DimS, DimM>::ProjectionFiniteStrain(
+      FFTEngine_ptr engine, Rcoord lengths)
+      : Parent{std::move(engine), lengths, Formulation::finite_strain} {
+    for (auto res : this->fft_engine->get_domain_resolutions()) {
       if (res % 2 == 0) {
-      	throw ProjectionError
-	  ("Only an odd number of gridpoints in each direction is supported");
+        throw ProjectionError(
+            "Only an odd number of gridpoints in each direction is supported");
       }
     }
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void ProjectionFiniteStrain<DimS, DimM>::
-  initialise(FFT_PlanFlags flags) {
+  void ProjectionFiniteStrain<DimS, DimM>::initialise(FFT_PlanFlags flags) {
     Parent::initialise(flags);
     FFT_freqs<DimS> fft_freqs(this->fft_engine->get_domain_resolutions(),
                               this->domain_lengths);
-    for (auto && tup: akantu::zip(*this->fft_engine, this->Ghat)) {
-      const auto & ccoord = std::get<0> (tup);
-      auto & G = std::get<1>(tup);
+    for (auto &&tup : akantu::zip(*this->fft_engine, this->Ghat)) {
+      const auto &ccoord = std::get<0>(tup);
+      auto &G = std::get<1>(tup);
       auto xi = fft_freqs.get_unit_xi(ccoord);
       //! this is simplifiable using Curnier's Méthodes numériques, 6.69(c)
-      G = Matrices::outer_under(Matrices::I2<DimM>(), xi*xi.transpose());
+      G = Matrices::outer_under(Matrices::I2<DimM>(), xi * xi.transpose());
       // The commented block below corresponds to the original
       // definition of the operator in de Geus et
       // al. (https://doi.org/10.1016/j.cma.2016.12.032). However,
@@ -94,6 +92,6 @@ namespace muSpectre {
     }
   }
 
-  template class ProjectionFiniteStrain<twoD,   twoD>;
+  template class ProjectionFiniteStrain<twoD, twoD>;
   template class ProjectionFiniteStrain<threeD, threeD>;
-}  // muSpectre
+}  // namespace muSpectre

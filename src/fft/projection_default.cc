@@ -35,7 +35,6 @@
 #include "fft/projection_default.hh"
 #include "fft/fft_engine_base.hh"
 
-
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
@@ -43,21 +42,20 @@ namespace muSpectre {
   ProjectionDefault<DimS, DimM>::ProjectionDefault(FFTEngine_ptr engine,
                                                    Rcoord lengths,
                                                    Formulation form)
-    :Parent{std::move(engine), lengths, form},
-     Gfield{make_field<Proj_t>("Projection Operator",
-                               this->projection_container)},
-     Ghat{Gfield}
-  {}
+      : Parent{std::move(engine), lengths, form},
+        Gfield{make_field<Proj_t>("Projection Operator",
+                                  this->projection_container)},
+        Ghat{Gfield} {}
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void ProjectionDefault<DimS, DimM>::apply_projection(Field_t & field) {
+  void ProjectionDefault<DimS, DimM>::apply_projection(Field_t &field) {
     Vector_map field_map{this->fft_engine->fft(field)};
     Real factor = this->fft_engine->normalisation();
-    for (auto && tup: akantu::zip(this->Ghat, field_map)) {
-      auto & G{std::get<0>(tup)};
-      auto & f{std::get<1>(tup)};
-      f = factor * (G*f).eval();
+    for (auto &&tup : akantu::zip(this->Ghat, field_map)) {
+      auto &G{std::get<0>(tup)};
+      auto &f{std::get<1>(tup)};
+      f = factor * (G * f).eval();
     }
     this->fft_engine->ifft(field);
   }
@@ -75,6 +73,6 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template class ProjectionDefault<twoD,   twoD>;
+  template class ProjectionDefault<twoD, twoD>;
   template class ProjectionDefault<threeD, threeD>;
-}  // muSpectre
+}  // namespace muSpectre

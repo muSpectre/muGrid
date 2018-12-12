@@ -32,21 +32,20 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include "common/ccoord_operations.hh"
 #include "fft/pfft_engine.hh"
+#include "common/ccoord_operations.hh"
 
 namespace muSpectre {
 
-  template <Dim_t DimsS>
-  int PFFTEngine<DimsS>::nb_engines{0};
+  template <Dim_t DimsS> int PFFTEngine<DimsS>::nb_engines{0};
 
   template <Dim_t DimS>
-  PFFTEngine<DimS>::PFFTEngine(Ccoord resolutions,
-                               Dim_t nb_components,
+  PFFTEngine<DimS>::PFFTEngine(Ccoord resolutions, Dim_t nb_components,
                                Communicator comm)
-    :Parent{resolutions, nb_components, comm}, mpi_comm{comm.get_mpi_comm()}
-  {
-    if (!this->nb_engines) pfft_init();
+      : Parent{resolutions, nb_components, comm}, mpi_comm{
+                                                      comm.get_mpi_comm()} {
+    if (!this->nb_engines)
+      pfft_init();
     this->nb_engines++;
 
     int size{comm.size()};
@@ -56,18 +55,19 @@ namespace muSpectre {
     // presently uses slab decompositions, the TODOs are what needs to be done
     // to get stripe decomposition to work - but it does not work yet. Slab
     // vs stripe decomposition may have an impact on how the code scales.
-    // TODO: Enable this to enable 2d process mesh. This does not pass tests.
-    //if (DimS > 2) {
+    // TODO(pastewka): Enable this to enable 2d process mesh. This does not pass
+    // tests.
+    // if (DimS > 2) {
     if (false) {
-      dim_y = int(sqrt(size));
-      while ((size/dim_y)*dim_y != size)  dim_y--;
-      dim_x = size/dim_y;
+      dim_y = static_cast<int>(sqrt(size));
+      while ((size / dim_y) * dim_y != size)
+        dim_y--;
+      dim_x = size / dim_y;
     }
 
-    // TODO: Enable this to enable 2d process mesh. This does not pass tests.
-    //if (DimS > 2) {
+    // TODO(pastewka): Enable this to enable 2d process mesh. This does not pass
+    // tests.  if (DimS > 2) {
     if (false) {
-
       if (pfft_create_procmesh_2d(this->comm.get_mpi_comm(), dim_x, dim_y,
                                   &this->mpi_comm)) {
         throw std::runtime_error("Failed to create 2d PFFT process mesh.");
@@ -78,31 +78,28 @@ namespace muSpectre {
     std::copy(this->domain_resolutions.begin(), this->domain_resolutions.end(),
               narr.begin());
     ptrdiff_t res[DimS], loc[DimS], fres[DimS], floc[DimS];
-    this->workspace_size =
-      pfft_local_size_many_dft_r2c(DimS, narr.data(), narr.data(), narr.data(),
-                                   this->nb_components,
-                                   PFFT_DEFAULT_BLOCKS, PFFT_DEFAULT_BLOCKS,
-                                   this->mpi_comm,
-                                   PFFT_TRANSPOSED_OUT,
-                                   res, loc, fres, floc);
-    std::copy(res, res+DimS, this->subdomain_resolutions.begin());
-    std::copy(loc, loc+DimS, this->subdomain_locations.begin());
-    std::copy(fres, fres+DimS, this->fourier_resolutions.begin());
-    std::copy(floc, floc+DimS, this->fourier_locations.begin());
-    // TODO: Enable this to enable 2d process mesh. This does not pass tests.
-    //for (int i = 0; i < DimS-1; ++i) {
+    this->workspace_size = pfft_local_size_many_dft_r2c(
+        DimS, narr.data(), narr.data(), narr.data(), this->nb_components,
+        PFFT_DEFAULT_BLOCKS, PFFT_DEFAULT_BLOCKS, this->mpi_comm,
+        PFFT_TRANSPOSED_OUT, res, loc, fres, floc);
+    std::copy(res, res + DimS, this->subdomain_resolutions.begin());
+    std::copy(loc, loc + DimS, this->subdomain_locations.begin());
+    std::copy(fres, fres + DimS, this->fourier_resolutions.begin());
+    std::copy(floc, floc + DimS, this->fourier_locations.begin());
+    // TODO(pastewka): Enable this to enable 2d process mesh. This does not pass
+    // tests.  for (int i = 0; i < DimS-1; ++i) {
     for (int i = 0; i < 1; ++i) {
-      std::swap(this->fourier_resolutions[i], this->fourier_resolutions[i+1]);
-      std::swap(this->fourier_locations[i], this->fourier_locations[i+1]);
+      std::swap(this->fourier_resolutions[i], this->fourier_resolutions[i + 1]);
+      std::swap(this->fourier_locations[i], this->fourier_locations[i + 1]);
     }
-    
-    for (auto & n: this->subdomain_resolutions) {
+
+    for (auto &n : this->subdomain_resolutions) {
       if (n == 0) {
         throw std::runtime_error("PFFT planning returned zero resolution. "
                                  "You may need to run on fewer processes.");
       }
     }
-    for (auto & n: this->fourier_resolutions) {
+    for (auto &n : this->fourier_resolutions) {
       if (n == 0) {
         throw std::runtime_error("PFFT planning returned zero Fourier "
                                  "resolution. You may need to run on fewer "
@@ -110,19 +107,16 @@ namespace muSpectre {
       }
     }
 
-    for (auto && pixel:
-         std::conditional_t<
-         DimS==2,
-         CcoordOps::Pixels<DimS, 1, 0>,
-         // TODO: This should be the correct order of dimension for a 2d
-         // process mesh, but tests don't pass.
-         //CcoordOps::Pixels<DimS, 1, 2, 0>
-         CcoordOps::Pixels<DimS, 1, 0, 2>
-         >(this->fourier_resolutions, this->fourier_locations)) {
+    for (auto &&pixel :
+         std::conditional_t<DimS == 2, CcoordOps::Pixels<DimS, 1, 0>,
+                            // TODO(pastewka): This should be the correct order
+                            // of dimension for a 2d process mesh, but tests
+                            // don't pass.  CcoordOps::Pixels<DimS, 1, 2, 0>
+                            CcoordOps::Pixels<DimS, 1, 0, 2>>(
+             this->fourier_resolutions, this->fourier_locations)) {
       this->work_space_container.add_pixel(pixel);
     }
   }
-
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS>
@@ -135,13 +129,14 @@ namespace muSpectre {
     // work space has been initialized
     Parent::initialise(plan_flags);
 
-    this->real_workspace = pfft_alloc_real(2*this->workspace_size);
+    this->real_workspace = pfft_alloc_real(2 * this->workspace_size);
     // We need to check whether the workspace provided by our field is large
     // enough. PFFT may request a workspace size larger than the nominal size
     // of the complex buffer.
-    if (long(this->work.size()*this->nb_components) < this->workspace_size) {
+    if (static_cast<int>(this->work.size() * this->nb_components) <
+        this->workspace_size) {
       this->work.set_pad_size(this->workspace_size -
-                              this->nb_components*this->work.size());
+                              this->nb_components * this->work.size());
     }
 
     unsigned int flags;
@@ -166,31 +161,23 @@ namespace muSpectre {
     std::array<ptrdiff_t, DimS> narr;
     std::copy(this->domain_resolutions.begin(), this->domain_resolutions.end(),
               narr.begin());
-    Real * in{this->real_workspace};
-    pfft_complex * out{reinterpret_cast<pfft_complex*>(this->work.data())};
-    this->plan_fft = pfft_plan_many_dft_r2c(DimS, narr.data(), narr.data(),
-                                            narr.data(), this->nb_components,
-                                            PFFT_DEFAULT_BLOCKS,
-                                            PFFT_DEFAULT_BLOCKS,
-                                            in, out, this->mpi_comm,
-                                            PFFT_FORWARD,
-                                            PFFT_TRANSPOSED_OUT | flags);
+    Real *in{this->real_workspace};
+    pfft_complex *out{reinterpret_cast<pfft_complex *>(this->work.data())};
+    this->plan_fft = pfft_plan_many_dft_r2c(
+        DimS, narr.data(), narr.data(), narr.data(), this->nb_components,
+        PFFT_DEFAULT_BLOCKS, PFFT_DEFAULT_BLOCKS, in, out, this->mpi_comm,
+        PFFT_FORWARD, PFFT_TRANSPOSED_OUT | flags);
     if (this->plan_fft == nullptr) {
       throw std::runtime_error("r2c plan failed");
     }
 
-    pfft_complex * i_in{reinterpret_cast<pfft_complex*>(this->work.data())};
-    Real * i_out{this->real_workspace};
+    pfft_complex *i_in{reinterpret_cast<pfft_complex *>(this->work.data())};
+    Real *i_out{this->real_workspace};
 
-    this->plan_ifft = pfft_plan_many_dft_c2r(DimS, narr.data(), narr.data(),
-                                             narr.data(),
-                                             this->nb_components,
-                                             PFFT_DEFAULT_BLOCKS,
-                                             PFFT_DEFAULT_BLOCKS,
-                                             i_in, i_out,
-                                             this->mpi_comm,
-                                             PFFT_BACKWARD,
-                                             PFFT_TRANSPOSED_IN | flags);
+    this->plan_ifft = pfft_plan_many_dft_c2r(
+        DimS, narr.data(), narr.data(), narr.data(), this->nb_components,
+        PFFT_DEFAULT_BLOCKS, PFFT_DEFAULT_BLOCKS, i_in, i_out, this->mpi_comm,
+        PFFT_BACKWARD, PFFT_TRANSPOSED_IN | flags);
     if (this->plan_ifft == nullptr) {
       throw std::runtime_error("c2r plan failed");
     }
@@ -198,58 +185,57 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
-  PFFTEngine<DimS>::~PFFTEngine<DimS>() noexcept {
-    if (this->real_workspace != nullptr) pfft_free(this->real_workspace);
-    if (this->plan_fft != nullptr) pfft_destroy_plan(this->plan_fft);
-    if (this->plan_ifft != nullptr) pfft_destroy_plan(this->plan_ifft);
+  template <Dim_t DimS> PFFTEngine<DimS>::~PFFTEngine<DimS>() noexcept {
+    if (this->real_workspace != nullptr)
+      pfft_free(this->real_workspace);
+    if (this->plan_fft != nullptr)
+      pfft_destroy_plan(this->plan_fft);
+    if (this->plan_ifft != nullptr)
+      pfft_destroy_plan(this->plan_ifft);
     if (this->mpi_comm != this->comm.get_mpi_comm()) {
       MPI_Comm_free(&this->mpi_comm);
     }
-    // TODO: We cannot run fftw_mpi_cleanup since also calls fftw_cleanup
+    // TODO(Till): We cannot run fftw_mpi_cleanup since also calls fftw_cleanup
     // and any running FFTWEngine will fail afterwards.
-    //this->nb_engines--;
-    //if (!this->nb_engines) pfft_cleanup();
+    // this->nb_engines--;
+    // if (!this->nb_engines) pfft_cleanup();
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS>
   typename PFFTEngine<DimS>::Workspace_t &
-  PFFTEngine<DimS>::fft (Field_t & field) {
+  PFFTEngine<DimS>::fft(Field_t &field) {
     if (!this->plan_fft) {
-        throw std::runtime_error("fft plan not allocated");
+      throw std::runtime_error("fft plan not allocated");
     }
     if (field.size() != CcoordOps::get_size(this->subdomain_resolutions)) {
       throw std::runtime_error("size mismatch");
     }
     // Copy field data to workspace buffer. This is necessary because workspace
     // buffer is larger than field buffer.
-    std::copy(field.data(), field.data()+this->nb_components*field.size(),
+    std::copy(field.data(), field.data() + this->nb_components * field.size(),
               this->real_workspace);
-    pfft_execute_dft_r2c(
-      this->plan_fft, this->real_workspace,
-      reinterpret_cast<pfft_complex*>(this->work.data()));
+    pfft_execute_dft_r2c(this->plan_fft, this->real_workspace,
+                         reinterpret_cast<pfft_complex *>(this->work.data()));
     return this->work;
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
-  void
-  PFFTEngine<DimS>::ifft (Field_t & field) const {
+  template <Dim_t DimS> void PFFTEngine<DimS>::ifft(Field_t &field) const {
     if (!this->plan_ifft) {
-        throw std::runtime_error("ifft plan not allocated");
+      throw std::runtime_error("ifft plan not allocated");
     }
     if (field.size() != CcoordOps::get_size(this->subdomain_resolutions)) {
       throw std::runtime_error("size mismatch");
     }
-    pfft_execute_dft_c2r(
-      this->plan_ifft, reinterpret_cast<pfft_complex*>(this->work.data()),
-      this->real_workspace);
+    pfft_execute_dft_c2r(this->plan_ifft,
+                         reinterpret_cast<pfft_complex *>(this->work.data()),
+                         this->real_workspace);
     std::copy(this->real_workspace,
-              this->real_workspace+this->nb_components*field.size(),
+              this->real_workspace + this->nb_components * field.size(),
               field.data());
   }
 
   template class PFFTEngine<twoD>;
   template class PFFTEngine<threeD>;
-}  // muSpectre
+}  // namespace muSpectre

@@ -40,16 +40,14 @@
 #include <iostream>
 #include <memory>
 
-
 namespace muSpectre {
 
-  //----------------------------------------------------------------------------//
+  //--------------------------------------------------------------------------//
   template <Dim_t DimS, Dim_t DimM>
-  DeprecatedSolverBase<DimS, DimM>::DeprecatedSolverBase(Cell_t & cell, Real tol, Uint maxiter,
-                                     bool verbose )
-    : cell{cell}, tol{tol}, maxiter{maxiter}, verbose{verbose}
-  {}
-
+  DeprecatedSolverBase<DimS, DimM>::DeprecatedSolverBase(Cell_t &cell, Real tol,
+                                                         Uint maxiter,
+                                                         bool verbose)
+      : cell{cell}, tol{tol}, maxiter{maxiter}, verbose{verbose} {}
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
@@ -64,7 +62,7 @@ namespace muSpectre {
   }
 
   template class DeprecatedSolverBase<twoD, twoD>;
-  //template class DeprecatedSolverBase<twoD, threeD>;
+  // template class DeprecatedSolverBase<twoD, threeD>;
   template class DeprecatedSolverBase<threeD, threeD>;
 
-}  // muSpectre
+}  // namespace muSpectre
