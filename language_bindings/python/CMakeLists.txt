@@ -50,6 +50,7 @@ set (PY_BINDING_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_common.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_cell.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_linear_elastic_generic.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_solvers.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_fftengine.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_projections.cc

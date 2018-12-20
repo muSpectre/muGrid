@@ -51,6 +51,10 @@ using namespace muSpectre;  // NOLINT // TODO(junge): figure this out
 namespace py = pybind11;
 using namespace pybind11::literals;  // NOLINT: recommended usage
 
+/* ---------------------------------------------------------------------- */
+template <Dim_t Dim>
+void add_material_linear_elastic_generic_helper(py::module & mod);
+
 /**
  * python binding for the optionally objective form of Hooke's law
  */
@@ -173,6 +177,7 @@ void add_material_helper(py::module & mod) {
   add_material_linear_elastic2_helper<dim>(mod);
   add_material_linear_elastic3_helper<dim>(mod);
   add_material_linear_elastic4_helper<dim>(mod);
+  add_material_linear_elastic_generic_helper<dim>(mod);
 }
 
 void add_material(py::module & mod) {
