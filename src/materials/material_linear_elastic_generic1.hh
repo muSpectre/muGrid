@@ -1,5 +1,5 @@
 /**
- * @file   material_linear_elastic_generic.hh
+ * @file   material_linear_elastic_generic1.hh
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
@@ -34,8 +34,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef SRC_MATERIALS_MATERIAL_LINEAR_ELASTIC_GENERIC_HH_
-#define SRC_MATERIALS_MATERIAL_LINEAR_ELASTIC_GENERIC_HH_
+#ifndef SRC_MATERIALS_MATERIAL_LINEAR_ELASTIC_GENERIC1_HH_
+#define SRC_MATERIALS_MATERIAL_LINEAR_ELASTIC_GENERIC1_HH_
 
 #include "common/common.hh"
 #include "common/T4_map_proxy.hh"
@@ -48,13 +48,13 @@ namespace muSpectre {
    * forward declaration
    */
   template <Dim_t DimS, Dim_t DimM>
-  class MaterialLinearElasticGeneric;
+  class MaterialLinearElasticGeneric1;
 
   /**
    * traits for use by MaterialMuSpectre for crtp
    */
   template <Dim_t DimS, Dim_t DimM>
-  struct MaterialMuSpectre_traits<MaterialLinearElasticGeneric<DimS, DimM>> {
+  struct MaterialMuSpectre_traits<MaterialLinearElasticGeneric1<DimS, DimM>> {
     //! global field collection
     using GFieldCollection_t =
         typename MaterialBase<DimS, DimM>::GFieldCollection_t;
@@ -81,19 +81,19 @@ namespace muSpectre {
    * generic, but not most efficient
    */
   template <Dim_t DimS, Dim_t DimM>
-  class MaterialLinearElasticGeneric
-      : public MaterialMuSpectre<MaterialLinearElasticGeneric<DimS, DimM>, DimS,
-                                 DimM> {
+  class MaterialLinearElasticGeneric1
+      : public MaterialMuSpectre<MaterialLinearElasticGeneric1<DimS, DimM>,
+                                 DimS, DimM> {
    public:
     //! parent type
-    using Parent =
-        MaterialMuSpectre<MaterialLinearElasticGeneric<DimS, DimM>, DimS, DimM>;
+    using Parent = MaterialMuSpectre<MaterialLinearElasticGeneric1<DimS, DimM>,
+                                     DimS, DimM>;
     //! generic input tolerant to python input
     using CInput_t =
         Eigen::Ref<Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>, 0,
                    Eigen::Stride<Eigen::Dynamic, Eigen::Dynamic>>;
     //! Default constructor
-    MaterialLinearElasticGeneric() = delete;
+    MaterialLinearElasticGeneric1() = delete;
 
     /**
      * Constructor by name and stiffness tensor.
@@ -101,27 +101,27 @@ namespace muSpectre {
      * @param name unique material name
      * @param C_voigt elastic tensor in Voigt notation
      */
-    MaterialLinearElasticGeneric(const std::string & name,
-                                 const CInput_t & C_voigt);
+    MaterialLinearElasticGeneric1(const std::string & name,
+                                  const CInput_t & C_voigt);
 
     //! Copy constructor
-    MaterialLinearElasticGeneric(const MaterialLinearElasticGeneric & other) =
+    MaterialLinearElasticGeneric1(const MaterialLinearElasticGeneric1 & other) =
         delete;
 
     //! Move constructor
-    MaterialLinearElasticGeneric(MaterialLinearElasticGeneric && other) =
+    MaterialLinearElasticGeneric1(MaterialLinearElasticGeneric1 && other) =
         delete;
 
     //! Destructor
-    virtual ~MaterialLinearElasticGeneric() = default;
+    virtual ~MaterialLinearElasticGeneric1() = default;
 
     //! Copy assignment operator
-    MaterialLinearElasticGeneric &
-    operator=(const MaterialLinearElasticGeneric & other) = delete;
+    MaterialLinearElasticGeneric1 &
+    operator=(const MaterialLinearElasticGeneric1 & other) = delete;
 
     //! Move assignment operator
-    MaterialLinearElasticGeneric &
-    operator=(MaterialLinearElasticGeneric && other) = delete;
+    MaterialLinearElasticGeneric1 &
+    operator=(MaterialLinearElasticGeneric1 && other) = delete;
 
     //! see
     //! http://eigen.tuxfamily.org/dox/group__TopicStructHavingEigenMembers.html
@@ -139,8 +139,9 @@ namespace muSpectre {
      * the Green-Lagrange strain (or Cauchy stress and stiffness if
      * called with a small strain tensor)
      */
-    template <class s_t>
-    inline decltype(auto) evaluate_stress_tangent(s_t && E);
+    template <class Derived>
+    inline decltype(auto)
+    evaluate_stress_tangent(const Eigen::MatrixBase<Derived> & E);
 
     /**
      * return the empty internals tuple
@@ -148,22 +149,20 @@ namespace muSpectre {
     std::tuple<> & get_internals() { return this->internal_variables; }
 
     /**
-     * return a reference to teh stiffness tensor
+     * return a reference to the stiffness tensor
      */
     const T4Mat<Real, DimM> & get_C() const { return this->C; }
 
    protected:
-    T4Mat<Real, DimM> C{};
+    T4Mat<Real, DimM> C{};  //! stiffness tensor
     //! empty tuple
     std::tuple<> internal_variables{};
-
-   private:
   };
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   template <class Derived>
-  auto MaterialLinearElasticGeneric<DimS, DimM>::evaluate_stress(
+  auto MaterialLinearElasticGeneric1<DimS, DimM>::evaluate_stress(
       const Eigen::MatrixBase<Derived> & E) -> decltype(auto) {
     static_assert(Derived::ColsAtCompileTime == DimM, "wrong input size");
     static_assert(Derived::RowsAtCompileTime == DimM, "wrong input size");
@@ -172,16 +171,15 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  template <class s_t>
-  auto
-  MaterialLinearElasticGeneric<DimS, DimM>::evaluate_stress_tangent(s_t && E)
-      -> decltype(auto) {
-    using Stress_t = decltype(this->evaluate_stress(std::forward<s_t>(E)));
+  template <class Derived>
+  auto MaterialLinearElasticGeneric1<DimS, DimM>::evaluate_stress_tangent(
+      const Eigen::MatrixBase<Derived> & E) -> decltype(auto) {
+    using Stress_t = decltype(this->evaluate_stress(E));
     using Stiffness_t = Eigen::Map<T4Mat<Real, DimM>>;
     using Ret_t = std::tuple<Stress_t, Stiffness_t>;
-    return Ret_t{this->evaluate_stress(std::forward<s_t>(E)),
+    return Ret_t{this->evaluate_stress(E),
                  Stiffness_t(this->C.data())};
   }
 }  // namespace muSpectre
 
-#endif  // SRC_MATERIALS_MATERIAL_LINEAR_ELASTIC_GENERIC_HH_
+#endif  // SRC_MATERIALS_MATERIAL_LINEAR_ELASTIC_GENERIC1_HH_

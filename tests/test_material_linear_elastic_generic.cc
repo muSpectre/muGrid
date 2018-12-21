@@ -33,7 +33,7 @@
  */
 
 #include "tests.hh"
-#include "materials/material_linear_elastic_generic.cc"
+#include "materials/material_linear_elastic_generic1.hh"
 #include "materials/materials_toolbox.hh"
 
 #include <boost/mpl/list.hpp>
@@ -44,7 +44,7 @@ namespace muSpectre {
 
   template <Dim_t Dim>
   struct MatFixture {
-    using Mat_t = MaterialLinearElasticGeneric<Dim, Dim>;
+    using Mat_t = MaterialLinearElasticGeneric1<Dim, Dim>;
     using T2_t = Eigen::Matrix<Real, Dim, Dim>;
     using T4_t = T4Mat<Real, Dim>;
     using V_t = Eigen::Matrix<Real, vsize(Dim), vsize(Dim)>;

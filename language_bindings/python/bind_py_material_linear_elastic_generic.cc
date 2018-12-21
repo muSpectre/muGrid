@@ -33,13 +33,13 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include "materials/material_linear_elastic_generic.hh"
+#include "materials/material_linear_elastic_generic1.hh"
+#include "materials/material_linear_elastic_generic2.hh"
 #include "cell/cell_base.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/eigen.h>
-
 
 #include <sstream>
 #include <string>
@@ -52,35 +52,83 @@ using namespace pybind11::literals;  // NOLINT: recommended usage
  * python binding for the generic linear elastic material
  */
 template <Dim_t Dim>
-void add_material_linear_elastic_generic_helper(py::module & mod) {
-std::stringstream name_stream{};
-name_stream << "MaterialLinearElasticGeneric_" << Dim << "d";
-const auto name{name_stream.str()};
+void add_material_linear_elastic_generic1_helper(py::module & mod) {
+  std::stringstream name_stream{};
+  name_stream << "MaterialLinearElasticGeneric1_" << Dim << "d";
+  const auto name{name_stream.str()};
 
-using Mat_t = MaterialLinearElasticGeneric<Dim, Dim>;
-using Cell_t = CellBase<Dim, Dim>;
+  using Mat_t = MaterialLinearElasticGeneric1<Dim, Dim>;
+  using Cell_t = CellBase<Dim, Dim>;
 
-py::class_<Mat_t, MaterialBase<Dim, Dim>>(mod, name.c_str())
-    .def_static("make",
-                [](Cell_t & cell, std::string name,
-                   const py::EigenDRef<
-                       Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>> &
-                       elastic_tensor) -> Mat_t & {
-                  return Mat_t::make(cell, name, elastic_tensor);
-                },
-                "cell"_a, "name"_a, "elastic_tensor"_a,
-                py::return_value_policy::reference, py::keep_alive<1, 0>(),
-                "Factory function returning a MaterialLinearElastic instance. "
-                "The elastic tensor has to be specified in Voigt notation.")
-    .def("add_pixel",
-         [](Mat_t & mat, Ccoord_t<Dim> pix) { mat.add_pixel(pix); }, "pixel"_a,
-         "Register a new pixel to this material. subsequent evaluations of the "
-         "stress and tangent in the cell will use this constitutive law for "
-         "this "
-         "particular pixel")
-    .def("size", &Mat_t::size);
+  py::class_<Mat_t, MaterialBase<Dim, Dim>>(mod, name.c_str())
+      .def_static(
+          "make",
+          [](Cell_t & cell, std::string name,
+             const py::EigenDRef<
+                 Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>> &
+                 elastic_tensor) -> Mat_t & {
+            return Mat_t::make(cell, name, elastic_tensor);
+          },
+          "cell"_a, "name"_a, "elastic_tensor"_a,
+          py::return_value_policy::reference, py::keep_alive<1, 0>(),
+          "Factory function returning a MaterialLinearElastic instance. "
+          "The elastic tensor has to be specified in Voigt notation.")
+      .def("add_pixel",
+           [](Mat_t & mat, Ccoord_t<Dim> pix) { mat.add_pixel(pix); },
+           "pixel"_a,
+           "Register a new pixel to this material. subsequent evaluations of "
+           "the "
+           "stress and tangent in the cell will use this constitutive law for "
+           "this "
+           "particular pixel")
+      .def("size", &Mat_t::size);
 }
 
+/**
+ * python binding for the generic linear elastic material with eigenstcain
+ */
+template <Dim_t Dim>
+void add_material_linear_elastic_generic2_helper(py::module & mod) {
+  std::stringstream name_stream{};
+  name_stream << "MaterialLinearElasticGeneric2_" << Dim << "d";
+  const auto name{name_stream.str()};
 
-template void add_material_linear_elastic_generic_helper<twoD>(py::module &);
-template void add_material_linear_elastic_generic_helper<threeD>(py::module &);
+  using Mat_t = MaterialLinearElasticGeneric2<Dim, Dim>;
+  using Cell_t = CellBase<Dim, Dim>;
+
+  py::class_<Mat_t, MaterialBase<Dim, Dim>>(mod, name.c_str())
+      .def_static(
+          "make",
+          [](Cell_t & cell, std::string name,
+             const py::EigenDRef<
+                 Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>> &
+                 elastic_tensor) -> Mat_t & {
+            return Mat_t::make(cell, name, elastic_tensor);
+          },
+          "cell"_a, "name"_a, "elastic_tensor"_a,
+          py::return_value_policy::reference, py::keep_alive<1, 0>(),
+          "Factory function returning a MaterialLinearElastic instance. "
+          "The elastic tensor has to be specified in Voigt notation.")
+      .def("add_pixel",
+           [](Mat_t & mat, Ccoord_t<Dim> pix) { mat.add_pixel(pix); },
+           "pixel"_a,
+           "Register a new pixel to this material. Subsequent evaluations of "
+           "the stress and tangent in the cell will use this constitutive law "
+           "for this particular pixel")
+      .def("add_pixel",
+           [](Mat_t & mat, Ccoord_t<Dim> pix,
+              py::EigenDRef<Eigen::ArrayXXd> & eig) {
+             Eigen::Matrix<Real, Dim, Dim> eig_strain{eig};
+             mat.add_pixel(pix, eig_strain);
+           },
+           "pixel"_a, "eigenstrain"_a,
+           "Register a new pixel to this material and assign the eigenstrain. "
+           "Subsequent Evaluations of the stress and tangent in the cell will "
+           "use this constitutive law for this particular pixel")
+      .def("size", &Mat_t::size);
+}
+
+template void add_material_linear_elastic_generic1_helper<twoD>(py::module &);
+template void add_material_linear_elastic_generic1_helper<threeD>(py::module &);
+template void add_material_linear_elastic_generic2_helper<twoD>(py::module &);
+template void add_material_linear_elastic_generic2_helper<threeD>(py::module &);

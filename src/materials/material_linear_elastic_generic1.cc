@@ -1,5 +1,5 @@
 /**
- * @file   material_linear_elastic_generic.cc
+ * @file   material_linear_elastic_generic1.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
@@ -32,14 +32,14 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include "materials/material_linear_elastic_generic.hh"
+#include "materials/material_linear_elastic_generic1.hh"
 #include "common/voigt_conversion.hh"
 
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  MaterialLinearElasticGeneric<DimS, DimM>::MaterialLinearElasticGeneric(
+  MaterialLinearElasticGeneric1<DimS, DimM>::MaterialLinearElasticGeneric1(
       const std::string & name, const CInput_t & C_voigt)
       : Parent{name} {
     using VC_t = VoigtConversion<DimM>;
@@ -64,8 +64,8 @@ namespace muSpectre {
     }
   }
 
-  template class MaterialLinearElasticGeneric<twoD, twoD>;
-  template class MaterialLinearElasticGeneric<twoD, threeD>;
-  template class MaterialLinearElasticGeneric<threeD, threeD>;
+  template class MaterialLinearElasticGeneric1<twoD, twoD>;
+  template class MaterialLinearElasticGeneric1<twoD, threeD>;
+  template class MaterialLinearElasticGeneric1<threeD, threeD>;
 
 }  // namespace muSpectre

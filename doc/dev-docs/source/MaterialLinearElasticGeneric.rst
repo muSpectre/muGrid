@@ -1,14 +1,16 @@
 Generic Linear Elastic Material
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The generic linear elastic material is implemented in the class :cpp:class:`muSpectre::MaterialLinearElasticGeneric`, and is defined solely by the elastic stiffness tensor :math:`\mathbb{C}`, which has to be specified in `Voigt notation <https://en.wikipedia.org/wiki/Voigt_notation>`_. The constitutive relation between the Cauchy stress :math:`\boldsymbol{\sigma}` and the small strain tensor :math:`\boldsymbol{\varepsilon}` is given by
+The generic linear elastic material is implemented in the classes :cpp:class:`muSpectre::MaterialLinearElasticGeneric1` and :cpp:class:`muSpectre::MaterialLinearElasticGeneric2`, and is defined solely by the elastic stiffness tensor :math:`\mathbb{C}`, which has to be specified in `Voigt notation <https://en.wikipedia.org/wiki/Voigt_notation>`_. In the case of :cpp:class:`muSpectre::MaterialLinearElasticGeneric2`, additionally, a per-pixel eigenstrain :math:`\bar{\boldsymbol{\varepsilon}}` can be supplied. The constitutive relation between the Cauchy stress :math:`\boldsymbol{\sigma}` and the small strain tensor :math:`\boldsymbol{\varepsilon}` is given by
 
 .. math::
    :nowrap:
 
    \begin{align}
    \boldsymbol{\sigma} &= \mathbb{C}:\boldsymbol{\varepsilon}\\
-   \sigma_{ij} &= C_{ijkl}\,\varepsilon_{kl}
+   \sigma_{ij} &= C_{ijkl}\,\varepsilon_{kl}, \quad\mbox{for the simple version, and}\\
+   \boldsymbol{\sigma} &= \mathbb{C}:\left(\boldsymbol{\varepsilon}-\bar{\boldsymbol{\varepsilon}}\right)\\
+   \sigma_{ij} &= C_{ijkl}\,\left(\varepsilon_{kl} - \bar\varepsilon_{kl}\right) \quad\mbox{ for the version with eigenstrain}
    \end{align}
 
 This implementation is convenient, as it covers all possible linear elastic behaviours, but it is by far not as efficient as :cpp:class:`muSpectre::MaterialLinearElastic1` for isotropic linear elasticity.
@@ -26,6 +28,13 @@ The following snippet shows how to use this law in python to implement isotropic
                  [           0,            0,            0,  0, mu,  0],
                  [           0,            0,            0,  0,  0, mu]])
 
-   mat = muSpectre.material.MaterialLinearElasticGeneric_3d.make(
+   eigenstrain = np.array([[  0, .01],
+                           [.01,   0]])
+
+   mat1 = muSpectre.material.MaterialLinearElasticGeneric1_3d.make(
        cell, "material", C)
+   mat1.add_pixel(pixel)
+   mat2 = muSpectre.material.MaterialLinearElasticGeneric2_3d.make(
+       cell, "material", C)
+   mat2.add_pixel(pixel, eigenstrain)
 
