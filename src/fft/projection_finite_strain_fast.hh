@@ -114,8 +114,6 @@ namespace muSpectre {
    protected:
     Proj_t & xiField;  //!< field of normalised wave vectors
     Proj_map xis;      //!< iterable normalised wave vectors
-
-   private:
   };
 
 }  // namespace muSpectre

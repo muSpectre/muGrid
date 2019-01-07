@@ -39,6 +39,7 @@
 
 #include "common/common.hh"
 #include "tests.hh"
+#include "test_goodies.hh"
 #include "common/T4_map_proxy.hh"
 
 namespace muSpectre {
@@ -88,6 +89,82 @@ namespace muSpectre {
     }
     for (Dim_t i = 0; i < ipow(dim, 4); ++i) {
       BOOST_CHECK_EQUAL(F::matrix.data()[i], t4c.data()[i]);
+    }
+  }
+
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(numpy_compatibility, F, fix_collection, F) {
+    auto & t4 = F::tensor;
+    typename F::M4 numpy_ref{};
+    if (F::dim == twoD) {
+      numpy_ref << 1111., 1112., 1121., 1122., 1211., 1212., 1221., 1222.,
+          2111., 2112., 2121., 2122., 2211., 2212., 2221., 2222.;
+    } else {
+      numpy_ref << 1111., 1112., 1113., 1121., 1122., 1123., 1131., 1132.,
+          1133., 1211., 1212., 1213., 1221., 1222., 1223., 1231., 1232., 1233.,
+          1311., 1312., 1313., 1321., 1322., 1323., 1331., 1332., 1333., 2111.,
+          2112., 2113., 2121., 2122., 2123., 2131., 2132., 2133., 2211., 2212.,
+          2213., 2221., 2222., 2223., 2231., 2232., 2233., 2311., 2312., 2313.,
+          2321., 2322., 2323., 2331., 2332., 2333., 3111., 3112., 3113., 3121.,
+          3122., 3123., 3131., 3132., 3133., 3211., 3212., 3213., 3221., 3222.,
+          3223., 3231., 3232., 3233., 3311., 3312., 3313., 3321., 3322., 3323.,
+          3331., 3332., 3333.;
+    }
+    for (Dim_t i = 0; i < F::dim; ++i) {
+      for (Dim_t j = 0; j < F::dim; ++j) {
+        for (Dim_t k = 0; k < F::dim; ++k) {
+          for (Dim_t l = 0; l < F::dim; ++l) {
+            get(t4, i, j, k, l) =
+                1000 * (i + 1) + 100 * (j + 1) + 10 * (k + 1) + l + 1;
+          }
+        }
+      }
+    }
+
+    Real error{(t4 - testGoodies::from_numpy(numpy_ref)).norm()};
+    BOOST_CHECK_EQUAL(error, 0);
+    if (error != 0) {
+      std::cout << "T4:" << std::endl << t4 << std::endl;
+      std::cout << "reshuffled np:" << std::endl
+                << testGoodies::from_numpy(numpy_ref) << std::endl;
+      std::cout << "original np:" << std::endl << numpy_ref << std::endl;
+    }
+  }
+
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(numpy_right_trans, F, fix_collection, F) {
+    auto & t4 = F::tensor;
+    typename F::M4 numpy_ref{};
+    if (F::dim == twoD) {
+      numpy_ref << 1111., 1121., 1112., 1122., 1211., 1221., 1212., 1222.,
+          2111., 2121., 2112., 2122., 2211., 2221., 2212., 2222.;
+    } else {
+      numpy_ref << 1111., 1121., 1131., 1112., 1122., 1132., 1113., 1123.,
+          1133., 1211., 1221., 1231., 1212., 1222., 1232., 1213., 1223., 1233.,
+          1311., 1321., 1331., 1312., 1322., 1332., 1313., 1323., 1333., 2111.,
+          2121., 2131., 2112., 2122., 2132., 2113., 2123., 2133., 2211., 2221.,
+          2231., 2212., 2222., 2232., 2213., 2223., 2233., 2311., 2321., 2331.,
+          2312., 2322., 2332., 2313., 2323., 2333., 3111., 3121., 3131., 3112.,
+          3122., 3132., 3113., 3123., 3133., 3211., 3221., 3231., 3212., 3222.,
+          3232., 3213., 3223., 3233., 3311., 3321., 3331., 3312., 3322., 3332.,
+          3313., 3323., 3333.;
+    }
+    for (Dim_t i = 0; i < F::dim; ++i) {
+      for (Dim_t j = 0; j < F::dim; ++j) {
+        for (Dim_t k = 0; k < F::dim; ++k) {
+          for (Dim_t l = 0; l < F::dim; ++l) {
+            get(t4, i, j, k, l) =
+                1000 * (i + 1) + 100 * (j + 1) + 10 * (k + 1) + l + 1;
+          }
+        }
+      }
+    }
+
+    Real error{(t4 - testGoodies::right_transpose(numpy_ref)).norm()};
+    BOOST_CHECK_EQUAL(error, 0);
+    if (error != 0) {
+      std::cout << "T4:" << std::endl << t4 << std::endl;
+      std::cout << "reshuffled np:" << std::endl
+                << testGoodies::from_numpy(numpy_ref) << std::endl;
+      std::cout << "original np:" << std::endl << numpy_ref << std::endl;
     }
   }
 

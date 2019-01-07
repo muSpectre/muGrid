@@ -294,7 +294,8 @@ namespace akantu {
                      : start + (1 + (stop - start) / step) * step),
             step(step) {}
       //! undocumented
-      constexpr ArangeContainer(T stop) : ArangeContainer(0, stop, 1) {}
+      explicit constexpr ArangeContainer(T stop)
+          : ArangeContainer(0, stop, 1) {}
 
       //! undocumented
       constexpr T operator[](size_t i) {

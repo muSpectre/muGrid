@@ -170,8 +170,6 @@ namespace muSpectre {
       //! reference to the collection this field belongs to
       FieldCollection & collection;
       size_t pad_size;  //!< size of padding region at end of buffer
-
-     private:
     };
 
     /* ---------------------------------------------------------------------- */

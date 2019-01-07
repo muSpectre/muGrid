@@ -75,6 +75,32 @@ namespace muSpectre {
                                    TangentField_t::check_ref(K), form);
   }
 
+  //----------------------------------------------------------------------------//
+  template <Dim_t DimS, Dim_t DimM>
+  auto MaterialBase<DimS, DimM>::get_real_field(std::string field_name)
+      -> EigenMap {
+    if (not this->internal_fields.check_field_exists(field_name)) {
+      std::stringstream err{};
+      err << "Field '" << field_name << "' does not exist in material '"
+          << this->name << "'.";
+      throw FieldCollectionError(err.str());
+    }
+    auto & field{this->internal_fields[field_name]};
+    if (field.get_stored_typeid().hash_code() != typeid(Real).hash_code()) {
+      std::stringstream err{};
+      err << "Field '" << field_name << "' is not real-valued";
+      throw FieldCollectionError(err.str());
+    }
+
+    return static_cast<TypedField<MFieldCollection_t, Real> &>(field).eigen();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  std::vector<std::string> MaterialBase<DimS, DimM>::list_fields() const {
+    return this->internal_fields.list_fields();
+  }
+
   template class MaterialBase<2, 2>;
   template class MaterialBase<2, 3>;
   template class MaterialBase<3, 3>;

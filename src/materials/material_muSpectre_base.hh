@@ -629,8 +629,6 @@ namespace muSpectre {
       //! map onto the global stress field and possibly tangent stiffness
       StressMapTup stress_map;
       size_t index;  //!< index or pixel currently referred to
-
-     private:
     };
 
     //! returns iterator to first pixel if this material

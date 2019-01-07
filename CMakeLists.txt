@@ -100,9 +100,9 @@ if(${CMAKE_COMPILER_IS_GNUCC})
   endif()
 endif()
 
-
 add_external_package(Eigen3 VERSION 3.3.0 CONFIG)
 add_external_package(pybind11 VERSION 2.2 CONFIG)
+find_package(PythonLibsNew ${MUSPECTRE_PYTHON_MAJOR_VERSION} MODULE REQUIRED)
 
 include_directories(
   ${CMAKE_SOURCE_DIR}/src
@@ -127,6 +127,10 @@ if (${MAKE_TESTS})
 
   muSpectre_add_test(main_test_suite TYPE BOOST main_test_suite --report_level=detailed)
 
+  add_executable(mattb_test tests/main_test_suite tests/test_materials_toolbox.cc)
+  target_link_libraries(mattb_test ${Boost_LIBRARIES} muSpectre)
+  muSpectre_add_test(mattb_test TYPE BOOST mattb_test --report_level=detailed)
+
   # build header tests
   file( GLOB HEADER_TEST_SRCS "${CMAKE_SOURCE_DIR}/tests/header_test_*.cc")
   foreach(header_test ${HEADER_TEST_SRCS})
@@ -144,6 +148,29 @@ if (${MAKE_TESTS})
   add_dependencies(header_tests ${header_tests})
 
   ##############################################################################
+  # build py_comparison tests
+  file (GLOB PY_COMP_TEST_SRCS "${CMAKE_SOURCE_DIR}/tests/py_comparison_*.cc")
+
+  find_package(PythonInterp ${MUSPECTRE_PYTHON_MAJOR_VERSION} REQUIRED)
+  foreach(py_comp_test ${PY_COMP_TEST_SRCS})
+    get_filename_component(py_comp_test_fname ${py_comp_test} NAME_WE)
+
+    string (SUBSTRING ${py_comp_test_fname} 19 -1 py_comp_test_name)
+
+    pybind11_add_module(${py_comp_test_name} ${py_comp_test})
+    target_include_directories(${py_comp_test_name} PUBLIC
+      ${PYTHON_INCLUDE_DIRS})
+    target_link_libraries(${py_comp_test_name} PRIVATE muSpectre)
+    configure_file(
+      tests/${py_comp_test_fname}.py
+      "${CMAKE_BINARY_DIR}/${py_comp_test_fname}.py"
+      COPYONLY)
+    muSpectre_add_test(${py_comp_test_fname}
+      TYPE PYTHON ${py_comp_test_fname}.py)
+
+  endforeach(py_comp_test ${PY_COMP_TEST_SRCS})
+
+  ##############################################################################
   # copy python test
   file( GLOB PY_TEST_SRCS "${CMAKE_SOURCE_DIR}/tests/python_*.py")
 
@@ -154,7 +181,6 @@ if (${MAKE_TESTS})
       "${CMAKE_BINARY_DIR}/${pytest_name}"
       COPYONLY)
   endforeach(pytest ${PY_TEST_SRCS})
-  find_package(PythonInterp ${MUSPECTRE_PYTHON_MAJOR_VERSION} REQUIRED)
   muSpectre_add_test(python_binding_test  TYPE PYTHON python_binding_tests.py)
 
   if(${MPI_PARALLEL})
@@ -217,7 +243,7 @@ if (${MAKE_EXAMPLES})
     target_link_libraries(${binaryname} ${Boost_LIBRARIES} muSpectre)
   endforeach(binaryfile ${binaries})
 
-  #or copy them
+  # or copy them
   file (GLOB pybins "${CMAKE_SOURCE_DIR}/bin/*.py")
   foreach(pybin ${pybins})
 
@@ -227,7 +253,22 @@ if (${MAKE_EXAMPLES})
       "${CMAKE_BINARY_DIR}/${binaryname}.py"
       COPYONLY)
   endforeach(pybin ${pybins})
+
+  # additional files to copy
+  set (FILES_FOR_COPY
+    ${CMAKE_SOURCE_DIR}/bin/odd_image.npz)
+
+  foreach(FILE_FOR_COPY ${FILES_FOR_COPY})
+
+    get_filename_component(binaryname  ${FILE_FOR_COPY} NAME)
+    configure_file(
+      ${FILE_FOR_COPY}
+      "${CMAKE_BINARY_DIR}/${binaryname}"
+      COPYONLY)
+  endforeach(FILE_FOR_COPY ${FILES_FOR_COPY})
+
 endif (${MAKE_EXAMPLES})
+
 
 ################################################################################
 # compile benchmarks

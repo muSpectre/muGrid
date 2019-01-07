@@ -203,235 +203,6 @@ namespace muSpectre {
       return internal::ConvertStrain<In, Out>::compute(std::move(strain));
     }
 
-    /* ---------------------------------------------------------------------- */
-    namespace internal {
-
-      /** Structure for functions returning PK1 stress from other stress
-       *measures
-       **/
-      template <Dim_t Dim, StressMeasure StressM, StrainMeasure StrainM>
-      struct PK1_stress {
-        //! returns the converted stress
-        template <class Strain_t, class Stress_t>
-        inline static decltype(auto) compute(Strain_t && /*strain*/,
-                                             Stress_t && /*stress*/) {
-          // the following test always fails to generate a compile-time error
-          static_assert((StressM == StressMeasure::Cauchy) &&
-                            (StressM == StressMeasure::PK1),
-                        "The requested Stress conversion is not implemented. "
-                        "You either made a programming mistake or need to "
-                        "implement it as a specialisation of this function. "
-                        "See PK2stress<PK1,T1, T2> for an example.");
-        }
-
-        //! returns the converted stress and stiffness
-        template <class Strain_t, class Stress_t, class Tangent_t>
-        inline static decltype(auto) compute(Strain_t && /*strain*/,
-                                             Stress_t && /*stress*/,
-                                             Tangent_t && /*stiffness*/) {
-          // the following test always fails to generate a compile-time error
-          static_assert((StressM == StressMeasure::Cauchy) &&
-                            (StressM == StressMeasure::PK1),
-                        "The requested Stress conversion is not implemented. "
-                        "You either made a programming mistake or need to "
-                        "implement it as a specialisation of this function. "
-                        "See PK2stress<PK1,T1, T2> for an example.");
-        }
-      };
-
-      /* ----------------------------------------------------------------------
-       */
-      /** Specialisation for the transparent case, where we already
-          have PK1 stress
-       **/
-      template <Dim_t Dim, StrainMeasure StrainM>
-      struct PK1_stress<Dim, StressMeasure::PK1, StrainM>
-          : public PK1_stress<Dim, StressMeasure::no_stress_,
-                              StrainMeasure::no_strain_> {
-        //! returns the converted stress
-        template <class Strain_t, class Stress_t>
-        inline static decltype(auto) compute(Strain_t && /*dummy*/,
-                                             Stress_t && P) {
-          return std::forward<Stress_t>(P);
-        }
-      };
-
-      /* ----------------------------------------------------------------------
-       */
-      /** Specialisation for the transparent case, where we already have PK1
-          stress *and* stiffness is given with respect to the transformation
-          gradient
-       **/
-      template <Dim_t Dim>
-      struct PK1_stress<Dim, StressMeasure::PK1, StrainMeasure::Gradient>
-          : public PK1_stress<Dim, StressMeasure::PK1,
-                              StrainMeasure::no_strain_> {
-        //! base class
-        using Parent =
-            PK1_stress<Dim, StressMeasure::PK1, StrainMeasure::no_strain_>;
-        using Parent::compute;
-
-        //! returns the converted stress and stiffness
-        template <class Strain_t, class Stress_t, class Tangent_t>
-        inline static decltype(auto) compute(Strain_t && /*dummy*/,
-                                             Stress_t && P, Tangent_t && K) {
-          return std::make_tuple(std::forward<Stress_t>(P),
-                                 std::forward<Tangent_t>(K));
-        }
-      };
-
-      /* ----------------------------------------------------------------------
-       */
-      /**
-       * Specialisation for the case where we get material stress (PK2)
-       */
-      template <Dim_t Dim, StrainMeasure StrainM>
-      struct PK1_stress<Dim, StressMeasure::PK2, StrainM>
-          : public PK1_stress<Dim, StressMeasure::no_stress_,
-                              StrainMeasure::no_strain_> {
-        //! returns the converted stress
-        template <class Strain_t, class Stress_t>
-        inline static decltype(auto) compute(Strain_t && F, Stress_t && S) {
-          return F * S;
-        }
-      };
-
-      /* ----------------------------------------------------------------------
-       */
-      /**
-       * Specialisation for the case where we get material stress (PK2) derived
-       * with respect to Green-Lagrange strain
-       */
-      template <Dim_t Dim>
-      struct PK1_stress<Dim, StressMeasure::PK2, StrainMeasure::GreenLagrange>
-          : public PK1_stress<Dim, StressMeasure::PK2,
-                              StrainMeasure::no_strain_> {
-        //! base class
-        using Parent =
-            PK1_stress<Dim, StressMeasure::PK2, StrainMeasure::no_strain_>;
-        using Parent::compute;
-
-        //! returns the converted stress and stiffness
-        template <class Strain_t, class Stress_t, class Tangent_t>
-        inline static decltype(auto) compute(Strain_t && F, Stress_t && S,
-                                             Tangent_t && C) {
-          using T4 = typename std::remove_reference_t<Tangent_t>::PlainObject;
-          using Tmap = T4MatMap<Real, Dim>;
-          T4 K;
-          Tmap Kmap{K.data()};
-          K.setZero();
-
-          for (int i = 0; i < Dim; ++i) {
-            for (int m = 0; m < Dim; ++m) {
-              for (int n = 0; n < Dim; ++n) {
-                get(Kmap, i, m, i, n) += S(m, n);
-                for (int j = 0; j < Dim; ++j) {
-                  for (int r = 0; r < Dim; ++r) {
-                    for (int s = 0; s < Dim; ++s) {
-                      get(Kmap, i, m, j, n) +=
-                          F(i, r) * get(C, r, m, n, s) * (F(j, s));
-                    }
-                  }
-                }
-              }
-            }
-          }
-          auto && P =
-              compute(std::forward<Strain_t>(F), std::forward<Stress_t>(S));
-          return std::make_tuple(std::move(P), std::move(K));
-        }
-      };
-
-      /* ----------------------------------------------------------------------
-       */
-      /**
-       * Specialisation for the case where we get Kirchhoff stress (τ)
-       */
-      template <Dim_t Dim, StrainMeasure StrainM>
-      struct PK1_stress<Dim, StressMeasure::Kirchhoff, StrainM>
-          : public PK1_stress<Dim, StressMeasure::no_stress_,
-                              StrainMeasure::no_strain_> {
-        //! returns the converted stress
-        template <class Strain_t, class Stress_t>
-        inline static decltype(auto) compute(Strain_t && F, Stress_t && tau) {
-          return tau * F.inverse().transpose();
-        }
-      };
-
-      /* ----------------------------------------------------------------------
-       */
-      /**
-       * Specialisation for the case where we get Kirchhoff stress (τ) derived
-       * with respect to Gradient
-       */
-      template <Dim_t Dim>
-      struct PK1_stress<Dim, StressMeasure::Kirchhoff, StrainMeasure::Gradient>
-          : public PK1_stress<Dim, StressMeasure::Kirchhoff,
-                              StrainMeasure::no_strain_> {
-        //! short-hand
-        using Parent = PK1_stress<Dim, StressMeasure::Kirchhoff,
-                                  StrainMeasure::no_strain_>;
-        using Parent::compute;
-
-        //! returns the converted stress and stiffness
-        template <class Strain_t, class Stress_t, class Tangent_t>
-        inline static decltype(auto) compute(Strain_t && F, Stress_t && tau,
-                                             Tangent_t && C) {
-          using T4 = typename std::remove_reference_t<Tangent_t>::PlainObject;
-          using Tmap = T4MatMap<Real, Dim>;
-          T4 K;
-          Tmap Kmap{K.data()};
-          K.setZero();
-          auto && F_inv{F.inverse()};
-          for (int i = 0; i < Dim; ++i) {
-            for (int m = 0; m < Dim; ++m) {
-              for (int n = 0; n < Dim; ++n) {
-                for (int j = 0; j < Dim; ++j) {
-                  for (int r = 0; r < Dim; ++r) {
-                    for (int s = 0; s < Dim; ++s) {
-                      get(Kmap, i, m, j, n) += F_inv(i, r) * get(C, r, m, n, s);
-                    }
-                  }
-                }
-              }
-            }
-          }
-          auto && P = tau * F_inv.transpose();
-          return std::make_tuple(std::move(P), std::move(K));
-        }
-      };
-
-    }  // namespace internal
-
-    /* ---------------------------------------------------------------------- */
-    //! set of functions returning an expression for PK2 stress based on
-    template <StressMeasure StressM, StrainMeasure StrainM, class Stress_t,
-              class Strain_t>
-    decltype(auto) PK1_stress(Strain_t && strain, Stress_t && stress) {
-      constexpr Dim_t dim{EigenCheck::tensor_dim<Strain_t>::value};
-      static_assert((dim == EigenCheck::tensor_dim<Stress_t>::value),
-                    "Stress and strain tensors have differing dimensions");
-      return internal::PK1_stress<dim, StressM, StrainM>::compute(
-          std::forward<Strain_t>(strain), std::forward<Stress_t>(stress));
-    }
-
-    /* ---------------------------------------------------------------------- */
-    //! set of functions returning an expression for PK2 stress based on
-    template <StressMeasure StressM, StrainMeasure StrainM, class Stress_t,
-              class Strain_t, class Tangent_t>
-    decltype(auto) PK1_stress(Strain_t && strain, Stress_t && stress,
-                              Tangent_t && tangent) {
-      constexpr Dim_t dim{EigenCheck::tensor_dim<Strain_t>::value};
-      static_assert((dim == EigenCheck::tensor_dim<Stress_t>::value),
-                    "Stress and strain tensors have differing dimensions");
-      static_assert((dim == EigenCheck::tensor_4_dim<Tangent_t>::value),
-                    "Stress and tangent tensors have differing dimensions");
-
-      return internal::PK1_stress<dim, StressM, StrainM>::compute(
-          std::forward<Strain_t>(strain), std::forward<Stress_t>(stress),
-          std::forward<Tangent_t>(tangent));
-    }
-
     namespace internal {
 
       //! Base template for elastic modulus conversion
@@ -448,7 +219,7 @@ namespace muSpectre {
               "it here below as a specialisation of this function "
               "template. Check "
               "https://en.wikipedia.org/wiki/Lam%C3%A9_parameters for "
-              "// TODO: he formula.");
+              "the formula.");
           return 0;
         }
       };
@@ -547,6 +318,18 @@ namespace muSpectre {
         inline constexpr static Real compute(const Real & lambda,
                                              const Real & G) {
           return G * (3 * lambda + 2 * G) / (lambda + G);
+        }
+      };
+
+      /**
+       * Specialisation λ(K, µ)
+       */
+      template <>
+      struct Converter<ElasticModulus::lambda, ElasticModulus::Bulk,
+                       ElasticModulus::Shear> {
+        //! wrapped function (raison d'être)
+        inline constexpr static Real compute(const Real & K, const Real & mu) {
+          return K - 2. * mu / 3.;
         }
       };
 
@@ -665,6 +448,127 @@ namespace muSpectre {
             std::move(evaluate_stress(lambda, mu, std::move(E))), std::move(C));
       }
     };
+
+    namespace internal {
+
+      /* ----------------------------------------------------------------------
+       */
+      template <Dim_t Dim, FiniteDiff FinDif>
+      struct NumericalTangentHelper {
+        using T4_t = T4Mat<Real, Dim>;
+        using T2_t = Eigen::Matrix<Real, Dim, Dim>;
+        using T2_vec = Eigen::Map<Eigen::Matrix<Real, Dim * Dim, 1>>;
+
+        template <class FunType, class Derived>
+        static inline T4_t compute(FunType && fun,
+                                   const Eigen::MatrixBase<Derived> & strain,
+                                   Real delta);
+      };
+
+      /* ----------------------------------------------------------------------
+       */
+      template <Dim_t Dim, FiniteDiff FinDif>
+      template <class FunType, class Derived>
+      auto NumericalTangentHelper<Dim, FinDif>::compute(
+          FunType && fun, const Eigen::MatrixBase<Derived> & strain, Real delta)
+          -> T4_t {
+        static_assert((FinDif == FiniteDiff::forward) or
+                          (FinDif == FiniteDiff::backward),
+                      "Not implemented");
+        T4_t tangent{T4_t::Zero()};
+
+        const T2_t fun_val{fun(strain)};
+        for (Dim_t i{}; i < Dim * Dim; ++i) {
+          T2_t strain2{strain};
+          T2_vec strain_vec{strain2.data()};
+          switch (FinDif) {
+          case FiniteDiff::forward: {
+            strain_vec(i) += delta;
+
+            T2_t del_f_del{(fun(strain2) - fun_val) / delta};
+
+            tangent.col(i) = T2_vec(del_f_del.data());
+            break;
+          }
+          case FiniteDiff::backward: {
+            strain_vec(i) -= delta;
+
+            T2_t del_f_del{(fun_val - fun(strain2)) / delta};
+
+            tangent.col(i) = T2_vec(del_f_del.data());
+            break;
+          }
+          }
+          static_assert(Int(decltype(tangent.col(i))::SizeAtCompileTime) ==
+                            Int(T2_t::SizeAtCompileTime),
+                        "wrong column size");
+        }
+        return tangent;
+      }
+
+      /* ----------------------------------------------------------------------
+       */
+      template <Dim_t Dim>
+      struct NumericalTangentHelper<Dim, FiniteDiff::centred> {
+        using T4_t = T4Mat<Real, Dim>;
+        using T2_t = Eigen::Matrix<Real, Dim, Dim>;
+        using T2_vec = Eigen::Map<Eigen::Matrix<Real, Dim * Dim, 1>>;
+
+        template <class FunType, class Derived>
+        static inline T4_t compute(FunType && fun,
+                                   const Eigen::MatrixBase<Derived> & strain,
+                                   Real delta) {
+          T4_t tangent{T4_t::Zero()};
+
+          for (Dim_t i{}; i < Dim * Dim; ++i) {
+            T2_t strain1{strain};
+            T2_t strain2{strain};
+            T2_vec strain1_vec{strain1.data()};
+            T2_vec strain2_vec{strain2.data()};
+            strain1_vec(i) += delta;
+            strain2_vec(i) -= delta;
+
+            T2_t del_f_del{(fun(strain1).eval() - fun(strain2).eval()) /
+                           (2 * delta)};
+
+            tangent.col(i) = T2_vec(del_f_del.data());
+            static_assert(Int(decltype(tangent.col(i))::SizeAtCompileTime) ==
+                              Int(T2_t::SizeAtCompileTime),
+                          "wrong column size");
+          }
+          return tangent;
+        }
+      };
+
+    }  // namespace internal
+    /**
+     * Helper function to numerically determine tangent, intended for
+     * testing, rather than as a replacement for analytical tangents
+     */
+    template <Dim_t Dim, FiniteDiff FinDif = FiniteDiff::centred, class FunType,
+              class Derived>
+    inline T4Mat<Real, Dim> compute_numerical_tangent(
+        FunType && fun, const Eigen::MatrixBase<Derived> & strain, Real delta) {
+      static_assert(Derived::RowsAtCompileTime == Dim,
+                    "can't handle dynamic matrix");
+      static_assert(Derived::ColsAtCompileTime == Dim,
+                    "can't handle dynamic matrix");
+
+      using T2_t = Eigen::Matrix<Real, Dim, Dim>;
+      using T2_vec = Eigen::Map<Eigen::Matrix<Real, Dim * Dim, 1>>;
+
+      static_assert(
+          std::is_convertible<FunType, std::function<T2_t(T2_t)>>::value,
+          "Function argument 'fun' needs to be a function taking "
+          "one second-rank tensor as input and returning a "
+          "second-rank tensor");
+
+      static_assert(Dim_t(T2_t::SizeAtCompileTime) ==
+                        Dim_t(T2_vec::SizeAtCompileTime),
+                    "wrong map size");
+      return internal::NumericalTangentHelper<Dim, FinDif>::compute(
+          std::forward<FunType>(fun), strain, delta);
+    }
 
   }  // namespace MatTB
 

@@ -199,7 +199,39 @@ namespace muSpectre {
                     "matrix");
     };
 
-  };  // namespace EigenCheck
+    namespace internal {
+      template <Dim_t dim, Dim_t nb_row, Dim_t nb_col>
+      constexpr inline Dim_t get_rank() {
+        constexpr bool is_vec{(nb_row == dim) and (nb_col == 1)};
+        constexpr bool is_mat{(nb_row == dim) and (nb_col == nb_row)};
+        constexpr bool is_ten{(nb_row == dim * dim) and (nb_col == dim * dim)};
+        static_assert(is_vec or is_mat or is_ten,
+                      "can't understand the data type as a first-, second-, or "
+                      "fourth-order tensor");
+        if (is_vec) {
+          return firstOrder;
+        } else if (is_mat) {
+          return secondOrder;
+        } else if (is_ten) {
+          return fourthOrder;
+        }
+      }
+
+    }  // namespace internal
+
+    /**
+     * computes the rank of a tensor given the spatial dimension
+     */
+    template <class Derived, Dim_t Dim>
+    struct tensor_rank {
+      using T = std::remove_reference_t<Derived>;
+      static_assert(is_matrix<T>::value,
+                    "The type of t is not understood as an Eigen::Matrix");
+      static constexpr Dim_t value{internal::get_rank<Dim, T::RowsAtCompileTime,
+                                                      T::ColsAtCompileTime>()};
+    };
+
+  }  // namespace EigenCheck
 
   namespace log_comp {
     //! Matrix type used for logarithm evaluation
@@ -328,21 +360,89 @@ namespace muSpectre {
   }
 
   /**
-   * compute the matrix exponential. This may not be the most
-   * efficient way to do this
+   * compute the spectral decomposition
    */
-  template <Dim_t dim>
-  inline decltype(auto) expm(const log_comp::Mat_t<dim> & mat) {
+
+  template <class Derived>
+  inline decltype(auto)
+  spectral_decomposition(const Eigen::MatrixBase<Derived> & mat) {
+    static_assert(Derived::SizeAtCompileTime != Eigen::Dynamic,
+                  "works only for static matrices");
+    static_assert(Derived::RowsAtCompileTime == Derived::ColsAtCompileTime,
+                  "works only for square matrices");
+    constexpr Dim_t dim{Derived::RowsAtCompileTime};
+
     using Mat = log_comp::Mat_t<dim>;
     Eigen::SelfAdjointEigenSolver<Mat> Solver{};
     Solver.computeDirect(mat, Eigen::ComputeEigenvectors);
+    return Solver;
+  }
+
+  /**
+   * compute the matrix log. This may not be the most
+   * efficient way to do this
+   */
+  template <Dim_t Dim>
+  using Decomp_t = Eigen::SelfAdjointEigenSolver<Eigen::Matrix<Real, Dim, Dim>>;
+
+  template <Dim_t Dim>
+  inline decltype(auto) logm_alt(const Decomp_t<Dim> & spectral_decomp) {
+    using Mat = log_comp::Mat_t<Dim>;
+
     Mat retval{Mat::Zero()};
-    for (Dim_t i = 0; i < dim; ++i) {
-      const Real & val = Solver.eigenvalues()(i);
-      auto & vec = Solver.eigenvectors().col(i);
+    for (Dim_t i = 0; i < Dim; ++i) {
+      const Real & val = spectral_decomp.eigenvalues()(i);
+      auto & vec = spectral_decomp.eigenvectors().col(i);
+      retval += std::log(val) * vec * vec.transpose();
+    }
+    return retval;
+  }
+
+  template <class Derived>
+  inline decltype(auto) logm_alt(const Eigen::MatrixBase<Derived> & mat) {
+    static_assert(Derived::SizeAtCompileTime != Eigen::Dynamic,
+                  "works only for static matrices");
+    static_assert(Derived::RowsAtCompileTime == Derived::ColsAtCompileTime,
+                  "works only for square matrices");
+    constexpr Dim_t dim{Derived::RowsAtCompileTime};
+    using Mat = log_comp::Mat_t<dim>;
+    using Decomp_t = Eigen::SelfAdjointEigenSolver<Mat>;
+
+    Decomp_t decomp{spectral_decomposition(mat)};
+
+    return logm_alt(decomp);
+  }
+
+  /**
+   * compute the matrix exponential. This may not be the most
+   * efficient way to do this
+   */
+  template <Dim_t Dim>
+  inline decltype(auto) expm(const Decomp_t<Dim> & spectral_decomp) {
+    using Mat = log_comp::Mat_t<Dim>;
+
+    Mat retval{Mat::Zero()};
+    for (Dim_t i = 0; i < Dim; ++i) {
+      const Real & val = spectral_decomp.eigenvalues()(i);
+      auto & vec = spectral_decomp.eigenvectors().col(i);
       retval += std::exp(val) * vec * vec.transpose();
     }
     return retval;
+  }
+
+  template <class Derived>
+  inline decltype(auto) expm(const Eigen::MatrixBase<Derived> & mat) {
+    static_assert(Derived::SizeAtCompileTime != Eigen::Dynamic,
+                  "works only for static matrices");
+    static_assert(Derived::RowsAtCompileTime == Derived::ColsAtCompileTime,
+                  "works only for square matrices");
+    constexpr Dim_t Dim{Derived::RowsAtCompileTime};
+    using Mat = log_comp::Mat_t<Dim>;
+    using Decomp_t = Eigen::SelfAdjointEigenSolver<Mat>;
+
+    Decomp_t decomp{spectral_decomposition(mat)};
+
+    return expm(decomp);
   }
 
 }  // namespace muSpectre

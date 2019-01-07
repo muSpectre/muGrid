@@ -36,7 +36,6 @@
 #ifndef SRC_COMMON_FIELD_MAP_BASE_HH_
 #define SRC_COMMON_FIELD_MAP_BASE_HH_
 
-#include "common/common.hh"
 #include "common/field.hh"
 #include "field_collection_base.hh"
 
@@ -190,8 +189,6 @@ namespace muSpectre {
       inline const T * get_ptr_to_entry(size_t index) const;
       const FieldCollection & collection;  //!< collection holding Field
       TypedField_t & field;                //!< mapped Field
-
-     private:
     };
 
     /**
@@ -307,8 +304,6 @@ namespace muSpectre {
       const FieldCollection & collection;  //!< collection of the field
       TypedMap_t & fieldmap;               //!< ref to the field itself
       size_t index;  //!< index of currently pointed-to pixel
-
-     private:
     };
 
     /* ---------------------------------------------------------------------- */

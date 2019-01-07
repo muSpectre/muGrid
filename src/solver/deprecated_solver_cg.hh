@@ -113,8 +113,6 @@ namespace muSpectre {
     Field_t & p_k;          //!< search direction
     Field_t & Ap_k;         //!< effect of tangent on search direction
     bool converged{false};  //!< whether the solver has converged
-
-   private:
   };
 
 }  // namespace muSpectre

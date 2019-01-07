@@ -36,9 +36,6 @@
 
 #include <pybind11/pybind11.h>
 
-using namespace pybind11::literals;  // NOLINT: recommended use
-namespace py = pybind11;
-
 PYBIND11_MODULE(_muSpectre, mod) {
   mod.doc() = "Python bindings to the µSpectre library";
 

@@ -168,8 +168,16 @@ namespace muSpectre {
     //! check whether a field is present
     bool check_field_exists(const std::string & unique_name);
 
+    //! check whether a field is present
+    bool check_statefield_exists(const std::string & unique_prefix);
+
     //! check whether the collection is initialised
     bool initialised() const { return this->is_initialised; }
+
+    /**
+     * list the names of all fields
+     */
+    std::vector<std::string> list_fields() const;
 
    protected:
     std::map<const std::string, Field_p> fields{};  //!< contains the field ptrs
@@ -179,8 +187,6 @@ namespace muSpectre {
     const Uint id;               //!< unique identifier
     static Uint counter;         //!< used to assign unique identifiers
     size_t size_{0};  //!< holds the number of pixels after initialisation
-
-   private:
   };
 
   /* ---------------------------------------------------------------------- */
@@ -196,9 +202,7 @@ namespace muSpectre {
   template <Dim_t DimS, class FieldCollectionDerived>
   void FieldCollectionBase<DimS, FieldCollectionDerived>::register_field(
       Field_p && field) {
-    auto && search_it = this->fields.find(field->get_name());
-    auto && does_exist = search_it != this->fields.end();
-    if (does_exist) {
+    if (this->check_field_exists(field->get_name())) {
       std::stringstream err_str;
       err_str << "a field named '" << field->get_name()
               << "' is already registered in this field collection. "
@@ -273,6 +277,14 @@ namespace muSpectre {
     return this->fields.find(unique_name) != this->fields.end();
   }
 
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, class FieldCollectionDerived>
+  bool
+  FieldCollectionBase<DimS, FieldCollectionDerived>::check_statefield_exists(
+      const std::string & unique_prefix) {
+    return this->statefields.find(unique_prefix) != this->statefields.end();
+  }
+
   //! retrieve typed field by unique_name
   template <Dim_t DimS, class FieldCollectionDerived>
   template <typename T>
@@ -306,6 +318,17 @@ namespace muSpectre {
       throw FieldCollectionError(err.str());
     }
     return static_cast<TypedStateField_t<T> &>(unqualified_statefield);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, class FieldCollectionDerived>
+  std::vector<std::string>
+  FieldCollectionBase<DimS, FieldCollectionDerived>::list_fields() const {
+    std::vector<std::string> ret_val{};
+    for (auto & key_val : this->fields) {
+      ret_val.push_back(key_val.first);
+    }
+    return ret_val;
   }
 
   /* ---------------------------------------------------------------------- */

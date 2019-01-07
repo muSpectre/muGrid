@@ -38,6 +38,7 @@
 #define SRC_MATERIALS_MATERIAL_LINEAR_ELASTIC_GENERIC1_HH_
 
 #include "common/common.hh"
+#include "materials/stress_transformations_PK2.hh"
 #include "common/T4_map_proxy.hh"
 #include "materials/material_muSpectre_base.hh"
 #include "common/tensor_algebra.hh"

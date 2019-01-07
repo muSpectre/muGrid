@@ -46,5 +46,3 @@ set (materials_SRC
   )
 
 target_sources(muSpectre PRIVATE ${materials_SRC})
-
-

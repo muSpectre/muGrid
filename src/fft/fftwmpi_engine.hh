@@ -95,8 +95,6 @@ namespace muSpectre {
     Real * real_workspace{};  //!< temporary real workspace that is correctly
                               //!< padded
     bool initialised{false};  //!< to prevent double initialisation
-
-   private:
   };
 
 }  // namespace muSpectre

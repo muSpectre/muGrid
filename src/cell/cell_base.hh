@@ -170,6 +170,15 @@ namespace muSpectre {
     virtual void apply_projection(Eigen::Ref<Vector_t> vec) = 0;
 
     /**
+     * evaluates the projection of the input field (this corresponds
+     * to G:P in de Geus 2017,
+     * http://dx.doi.org/10.1016/j.cma.2016.12.032). The first time,
+     * this allocates the memory for the return value, and reuses it
+     * on subsequent calls
+     */
+    virtual Vector_ref evaluate_projection(Eigen::Ref<const Vector_t> P) = 0;
+
+    /**
      * freezes all the history variables of the materials
      */
     virtual void save_history_variables() = 0;
@@ -220,6 +229,43 @@ namespace muSpectre {
      */
     virtual Array_ref<Real>
     get_globalised_internal_real_array(const std::string & unique_name) = 0;
+
+    /**
+     * Convenience function to copy local (internal) state fields
+     * (current state) of materials into a global field. At least one
+     * of the materials in the cell needs to contain an internal field
+     * named `unique_name`. If multiple materials contain such a
+     * field, they all need to be of same scalar type and same number
+     * of components. This does not work for split pixel cells or
+     * laminate pixel cells, as they can have multiple entries for the
+     * same pixel. Pixels for which no field named `unique_name`
+     * exists get an array of zeros.
+     *
+     * @param unique_name fieldname to fill the global field with. At
+     * least one material must have such a field, or a
+     * `std::runtime_error` is thrown
+     */
+    virtual Array_ref<Real>
+    get_globalised_current_real_array(const std::string & unique_name) = 0;
+
+    /**
+     * Convenience function to copy local (internal) state fields
+     * (old state) of materials into a global field. At least one
+     * of the materials in the cell needs to contain an internal field
+     * named `unique_name`. If multiple materials contain such a
+     * field, they all need to be of same scalar type and same number
+     * of components. This does not work for split pixel cells or
+     * laminate pixel cells, as they can have multiple entries for the
+     * same pixel. Pixels for which no field named `unique_name`
+     * exists get an array of zeros.
+     *
+     * @param unique_name fieldname to fill the global field with. At
+     * least one material must have such a field, or a
+     * `std::runtime_error` is thrown
+     */
+    virtual Array_ref<Real>
+    get_globalised_old_real_array(const std::string & unique_name,
+                                  int nb_steps_ago = 1) = 0;
 
     /**
      * set uniform strain (typically used to initialise problems
@@ -344,6 +390,16 @@ namespace muSpectre {
     std::array<ConstVector_ref, 2> evaluate_stress_tangent() override;
 
     /**
+     * evaluates the projection of the input field (this corresponds
+     * do G:P in de Geus 2017,
+     * http://dx.doi.org/10.1016/j.cma.2016.12.032). The first time,
+     * this allocates the memory for the return value, and reuses it
+     * on subsequent calls
+     */
+    Vector_ref
+    evaluate_projection(Eigen::Ref<const Vector_t> P) override;
+
+    /**
      * evaluates the directional and projected stiffness (this
      * corresponds to G:K:δF in de Geus 2017,
      * http://dx.doi.org/10.1016/j.cma.2016.12.032). It seems that
@@ -433,15 +489,39 @@ namespace muSpectre {
 
     /**
      * returns a global field filled from local (internal) fields of
-     * the materials. see `Cell::get_globalised_internal_array` for
+     * the materials. see `Cell::get_globalised_internal_real_array` for
      * details.
      */
     Field_t<Real> &
     get_globalised_internal_real_field(const std::string & unique_name);
 
-    //! see `Cell::get_globalised_internal_array` for details
+    /**
+     * returns a global field filled from local (internal) statefields of
+     * the materials. see `Cell::get_globalised_current_real_array` for
+     * details.
+     */
+    Field_t<Real> &
+    get_globalised_current_real_field(const std::string & unique_name);
+
+    /**
+     * returns a global field filled from local (internal) statefields of
+     * the materials. see `Cell::get_globalised_old_real_array` for
+     * details.
+     */
+    Field_t<Real> &
+    get_globalised_old_real_field(const std::string & unique_name,
+                                  int nb_steps_ago = 1);
+
+    //! see `Cell::get_globalised_internal_real_array` for details
+    Array_ref<Real> get_globalised_internal_real_array(
+        const std::string & unique_name) final;
+    //! see `Cell::get_globalised_current_reald_array` for details
+    Array_ref<Real> get_globalised_current_real_array(
+        const std::string & unique_name) final;
+    //! see `Cell::get_globalised_old_real_array` for details
     Array_ref<Real>
-    get_globalised_internal_real_array(const std::string & unique_name) final;
+    get_globalised_old_real_array(const std::string & unique_name,
+                                  int nb_steps_ago = 1) final;
 
     /**
      * general initialisation; initialises the projection and
@@ -506,6 +586,9 @@ namespace muSpectre {
     }
 
    protected:
+    template <typename T, bool IsStateField>
+    Field_t<T> & globalised_field_helper(const std::string & unique_name,
+                                         int nb_steps_ago);
     //! make sure that every pixel is assigned to one and only one material
     void check_material_coverage();
 

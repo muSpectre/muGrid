@@ -281,6 +281,99 @@ namespace muSpectre {
       return 0.5 * (outer_under(I, I) + outer_over(I, I));
     }
 
+    namespace internal {
+
+      /* ----------------------------------------------------------------------
+       */
+      template <Dim_t Dim, Dim_t Rank1, Dim_t Rank2>
+      struct Dotter {};
+
+      /* ----------------------------------------------------------------------
+       */
+      template <Dim_t Dim>
+      struct Dotter<Dim, secondOrder, fourthOrder> {
+        template <class T1, class T2>
+        static constexpr decltype(auto) dot(T1 && t1, T2 && t2) {
+          using T4_t = T4Mat<typename std::remove_reference_t<T1>::Scalar, Dim>;
+          T4_t ret_val{T4_t::Zero()};
+          for (Int i = 0; i < Dim; ++i) {
+            for (Int a = 0; a < Dim; ++a) {
+              for (Int j = 0; j < Dim; ++j) {
+                for (Int k = 0; k < Dim; ++k) {
+                  for (Int l = 0; l < Dim; ++l) {
+                    get(ret_val, i, j, k, l) += t1(i, a) * get(t2, a, j, k, l);
+                  }
+                }
+              }
+            }
+          }
+          return ret_val;
+        }
+      };
+
+      /* ----------------------------------------------------------------------
+       */
+      template <Dim_t Dim>
+      struct Dotter<Dim, fourthOrder, secondOrder> {
+        template <class T4, class T2>
+        static constexpr decltype(auto) dot(T4 && t4, T2 && t2) {
+          using T4_t = T4Mat<typename std::remove_reference_t<T4>::Scalar, Dim>;
+          T4_t ret_val{T4_t::Zero()};
+          for (Int i = 0; i < Dim; ++i) {
+            for (Int j = 0; j < Dim; ++j) {
+              for (Int k = 0; k < Dim; ++k) {
+                for (Int a = 0; a < Dim; ++a) {
+                  for (Int l = 0; l < Dim; ++l) {
+                    get(ret_val, i, j, k, l) += get(t4, i, j, k, a) * t2(a, l);
+                  }
+                }
+              }
+            }
+          }
+          return ret_val;
+        }
+      };
+
+      /* ----------------------------------------------------------------------
+       */
+      template <Dim_t Dim>
+      struct Dotter<Dim, fourthOrder, fourthOrder> {
+        template <class T1, class T2>
+        static constexpr decltype(auto) ddot(T1 && t1, T2 && t2) {
+          return t1 * t2;
+        }
+      };
+
+      /* ----------------------------------------------------------------------
+       */
+      template <Dim_t Dim>
+      struct Dotter<Dim, secondOrder, secondOrder> {
+        template <class T1, class T2>
+        static constexpr decltype(auto) ddot(T1 && t1, T2 && t2) {
+          return (t1 * t2.transpose()).trace();
+        }
+      };
+
+    }  // namespace internal
+
+    /* ---------------------------------------------------------------------- */
+    template <Dim_t Dim, class T1, class T2>
+    decltype(auto) dot(T1 && t1, T2 && t2) {
+      constexpr Dim_t rank1{EigenCheck::tensor_rank<T1, Dim>::value};
+      constexpr Dim_t rank2{EigenCheck::tensor_rank<T2, Dim>::value};
+      return internal::Dotter<Dim, rank1, rank2>::dot(std::forward<T1>(t1),
+                                                      std::forward<T2>(t2));
+    }
+
+    /* ---------------------------------------------------------------------- */
+    template <Dim_t Dim, class T1, class T2>
+    decltype(auto) ddot(T1 && t1, T2 && t2) {
+      constexpr Dim_t rank1{EigenCheck::tensor_rank<T1, Dim>::value};
+      constexpr Dim_t rank2{EigenCheck::tensor_rank<T2, Dim>::value};
+      return internal::Dotter<Dim, rank1, rank2>::ddot(std::forward<T1>(t1),
+                                                       std::forward<T2>(t2));
+    }
+
   }  // namespace Matrices
 }  // namespace muSpectre
 

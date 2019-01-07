@@ -40,32 +40,38 @@
 
 #include <sstream>
 
-using namespace muSpectre;  // NOLINT // TODO(junge): figure this out
+using muSpectre::Dim_t;
+using muSpectre::Real;
+using muSpectre::StressMeasure;
+using muSpectre::StrainMeasure;
+using muSpectre::Formulation;
+using pybind11::literals::operator""_a;
+
 namespace py = pybind11;
-using namespace pybind11::literals;  // NOLINT: recommended usage
 
 template <Dim_t dim, typename T>
 void add_get_cube_helper(py::module & mod) {
   std::stringstream name{};
   name << "get_" << dim << "d_cube";
-  mod.def(name.str().c_str(), &CcoordOps::get_cube<dim, T>, "size"_a,
+  mod.def(name.str().c_str(), &muSpectre::CcoordOps::get_cube<dim, T>, "size"_a,
           "return a Ccoord with the value 'size' repeated in each dimension");
 }
 
 template <Dim_t dim>
 void add_get_hermitian_helper(py::module & mod) {
-  mod.def("get_hermitian_sizes", &CcoordOps::get_hermitian_sizes<dim>,
-          "full_sizes"_a,
+  mod.def("get_hermitian_sizes",
+          &muSpectre::CcoordOps::get_hermitian_sizes<dim>, "full_sizes"_a,
           "return the hermitian sizes corresponding to the true sizes");
 }
 
 template <Dim_t dim>
 void add_get_ccoord_helper(py::module & mod) {
-  using Ccoord = Ccoord_t<dim>;
+  using Ccoord = muSpectre::Ccoord_t<dim>;
   mod.def(
       "get_domain_ccoord",
       [](Ccoord resolutions, Dim_t index) {
-        return CcoordOps::get_ccoord<dim>(resolutions, Ccoord{}, index);
+        return muSpectre::CcoordOps::get_ccoord<dim>(resolutions, Ccoord{},
+                                                     index);
       },
       "resolutions"_a, "i"_a,
       "return the cell coordinate corresponding to the i'th cell in a grid of "
@@ -73,24 +79,25 @@ void add_get_ccoord_helper(py::module & mod) {
 }
 
 void add_get_cube(py::module & mod) {
-  add_get_cube_helper<twoD, Dim_t>(mod);
-  add_get_cube_helper<twoD, Real>(mod);
-  add_get_cube_helper<threeD, Dim_t>(mod);
-  add_get_cube_helper<threeD, Real>(mod);
+  add_get_cube_helper<muSpectre::twoD, Dim_t>(mod);
+  add_get_cube_helper<muSpectre::twoD, Real>(mod);
+  add_get_cube_helper<muSpectre::threeD, Dim_t>(mod);
+  add_get_cube_helper<muSpectre::threeD, Real>(mod);
 
-  add_get_hermitian_helper<twoD>(mod);
-  add_get_hermitian_helper<threeD>(mod);
+  add_get_hermitian_helper<muSpectre::twoD>(mod);
+  add_get_hermitian_helper<muSpectre::threeD>(mod);
 
-  add_get_ccoord_helper<twoD>(mod);
-  add_get_ccoord_helper<threeD>(mod);
+  add_get_ccoord_helper<muSpectre::twoD>(mod);
+  add_get_ccoord_helper<muSpectre::threeD>(mod);
 }
 
 template <Dim_t dim>
 void add_get_index_helper(py::module & mod) {
-  using Ccoord = Ccoord_t<dim>;
+  using Ccoord = muSpectre::Ccoord_t<dim>;
   mod.def("get_domain_index",
           [](Ccoord sizes, Ccoord ccoord) {
-            return CcoordOps::get_index<dim>(sizes, Ccoord{}, ccoord);
+            return muSpectre::CcoordOps::get_index<dim>(sizes, Ccoord{},
+                                                        ccoord);
           },
           "sizes"_a, "ccoord"_a,
           "return the linear index corresponding to grid point 'ccoord' in a "
@@ -98,22 +105,22 @@ void add_get_index_helper(py::module & mod) {
 }
 
 void add_get_index(py::module & mod) {
-  add_get_index_helper<twoD>(mod);
-  add_get_index_helper<threeD>(mod);
+  add_get_index_helper<muSpectre::twoD>(mod);
+  add_get_index_helper<muSpectre::threeD>(mod);
 }
 
 template <Dim_t dim>
 void add_Pixels_helper(py::module & mod) {
   std::stringstream name{};
   name << "Pixels" << dim << "d";
-  using Ccoord = Ccoord_t<dim>;
-  py::class_<CcoordOps::Pixels<dim>> Pixels(mod, name.str().c_str());
+  using Ccoord = muSpectre::Ccoord_t<dim>;
+  py::class_<muSpectre::CcoordOps::Pixels<dim>> Pixels(mod, name.str().c_str());
   Pixels.def(py::init<Ccoord>());
 }
 
 void add_Pixels(py::module & mod) {
-  add_Pixels_helper<twoD>(mod);
-  add_Pixels_helper<threeD>(mod);
+  add_Pixels_helper<muSpectre::twoD>(mod);
+  add_Pixels_helper<muSpectre::threeD>(mod);
 }
 
 void add_common(py::module & mod) {
@@ -141,12 +148,13 @@ void add_common(py::module & mod) {
       .value("LCauchyGreen", StrainMeasure::LCauchyGreen)
       .value("no_strain_", StrainMeasure::no_strain_);
 
-  py::enum_<FFT_PlanFlags>(mod, "FFT_PlanFlags")
-      .value("estimate", FFT_PlanFlags::estimate)
-      .value("measure", FFT_PlanFlags::measure)
-      .value("patient", FFT_PlanFlags::patient);
+  py::enum_<muSpectre::FFT_PlanFlags>(mod, "FFT_PlanFlags")
+      .value("estimate", muSpectre::FFT_PlanFlags::estimate)
+      .value("measure", muSpectre::FFT_PlanFlags::measure)
+      .value("patient", muSpectre::FFT_PlanFlags::patient);
 
-  mod.def("banner", &banner, "name"_a, "year"_a, "copyright_holder"_a);
+  mod.def("banner", &muSpectre::banner, "name"_a, "year"_a,
+          "copyright_holder"_a);
 
   add_get_cube(mod);
 

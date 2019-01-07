@@ -46,14 +46,18 @@
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <pybind11/stl_bind.h>
 #include "pybind11/eigen.h"
 
 #include <sstream>
 #include <memory>
 
-using namespace muSpectre;  // NOLINT // TODO(junge): figure this out
+using muSpectre::Ccoord_t;
+using muSpectre::Dim_t;
+using muSpectre::Formulation;
+using muSpectre::Rcoord_t;
+using pybind11::literals::operator""_a;
 namespace py = pybind11;
-using namespace pybind11::literals;  // NOLINT: recommended usage
 
 /**
  * cell factory for specific FFT engine
@@ -88,7 +92,8 @@ void add_cell_factory_helper(py::module & mod) {
           [](Ccoord res, Rcoord lens, Formulation form) {
             return make_cell(std::move(res), std::move(lens), std::move(form));
           },
-          "resolutions"_a, "lengths"_a = CcoordOps::get_cube<dim>(1.),
+          "resolutions"_a,
+          "lengths"_a = muSpectre::CcoordOps::get_cube<dim>(1.),
           "formulation"_a = Formulation::finite_strain);
 
 #ifdef WITH_FFTWMPI
@@ -103,8 +108,8 @@ void add_cell_factory_helper(py::module & mod) {
 }
 
 void add_cell_factory(py::module & mod) {
-  add_cell_factory_helper<twoD>(mod);
-  add_cell_factory_helper<threeD>(mod);
+  add_cell_factory_helper<muSpectre::twoD>(mod);
+  add_cell_factory_helper<muSpectre::threeD>(mod);
 }
 
 /**
@@ -115,13 +120,13 @@ void add_cell_base_helper(py::module & mod) {
   std::stringstream name_stream{};
   name_stream << "CellBase" << dim << 'd';
   const std::string name = name_stream.str();
-  using sys_t = CellBase<dim, dim>;
-  py::class_<sys_t, Cell>(mod, name.c_str())
+  using sys_t = muSpectre::CellBase<dim, dim>;
+  py::class_<sys_t, muSpectre::Cell>(mod, name.c_str())
       .def("__len__", &sys_t::size)
       .def("__iter__",
            [](sys_t & s) { return py::make_iterator(s.begin(), s.end()); })
       .def("initialise", &sys_t::initialise,
-           "flags"_a = FFT_PlanFlags::estimate)
+           "flags"_a = muSpectre::FFT_PlanFlags::estimate)
       .def(
           "directional_stiffness",
           [](sys_t & cell, py::EigenDRef<Eigen::ArrayXXd> & v) {
@@ -166,8 +171,8 @@ void add_cell_base_helper(py::module & mod) {
              return input.eigen();
            },
            "field"_a)
-      .def("get_strain",
-           [](sys_t & s) { return Eigen::ArrayXXd(s.get_strain().eigen()); })
+      .def("get_strain", [](sys_t & s) { return s.get_strain().eigen(); },
+           py::return_value_policy::reference_internal)
       .def("get_stress",
            [](sys_t & s) { return Eigen::ArrayXXd(s.get_stress().eigen()); })
       .def_property_readonly("size", &sys_t::size)
@@ -183,20 +188,45 @@ void add_cell_base_helper(py::module & mod) {
              }
              auto & strain{cell.get_strain()};
              strain.eigen() = v;
-             cell.evaluate_stress_tangent(strain);
+             auto stress_tgt{cell.evaluate_stress_tangent(strain)};
+             return std::tuple<Eigen::ArrayXXd, Eigen::ArrayXXd>(
+                 std::get<0>(stress_tgt).eigen(),
+                 std::get<1>(stress_tgt).eigen());
            },
            "strain"_a)
+      .def("evaluate_stress",
+           [](sys_t & cell, py::EigenDRef<Eigen::ArrayXXd> & v) {
+             if ((size_t(v.cols()) != cell.size() ||
+                  size_t(v.rows()) != dim * dim)) {
+               std::stringstream err{};
+               err << "need array of shape (" << dim * dim << ", "
+                   << cell.size() << ") but got (" << v.rows() << ", "
+                   << v.cols() << ").";
+               throw std::runtime_error(err.str());
+             }
+             auto & strain{cell.get_strain()};
+             strain.eigen() = v;
+             return cell.evaluate_stress();
+           },
+           "strain"_a, py::return_value_policy::reference_internal)
       .def("get_projection", &sys_t::get_projection)
       .def("get_subdomain_resolutions", &sys_t::get_subdomain_resolutions)
       .def("get_subdomain_locations", &sys_t::get_subdomain_locations)
       .def("get_domain_resolutions", &sys_t::get_domain_resolutions)
-      .def("get_domain_lengths", &sys_t::get_domain_resolutions);
+      .def("get_domain_lengths", &sys_t::get_domain_resolutions)
+      .def("set_uniform_strain",
+           [](sys_t & cell, py::EigenDRef<Eigen::ArrayXXd> & v) -> void {
+             cell.set_uniform_strain(v);
+           },
+           "strain"_a)
+      .def("save_history_variables", &sys_t::save_history_variables);
 }
 
 void add_cell_base(py::module & mod) {
-  py::class_<Cell>(mod, "Cell")
+  py::class_<muSpectre::Cell>(mod, "Cell")
       .def("get_globalised_internal_real_array",
-           &Cell::get_globalised_internal_real_array, "unique_name"_a,
+           &muSpectre::Cell::get_globalised_internal_real_array,
+           "unique_name"_a,
            "Convenience function to copy local (internal) fields of "
            "materials into a global field. At least one of the materials in "
            "the cell needs to contain an internal field named "
@@ -210,9 +240,17 @@ void add_cell_base(py::module & mod) {
            "Parameters:\n"
            "unique_name: fieldname to fill the global field with. At "
            "least one material must have such a field, or an "
-           "Exception is raised.");
-  add_cell_base_helper<twoD>(mod);
-  add_cell_base_helper<threeD>(mod);
+           "Exception is raised.")
+      .def("get_globalised_current_real_array",
+           &muSpectre::Cell::get_globalised_current_real_array, "unique_name"_a)
+      .def("get_globalised_old_real_array",
+           &muSpectre::Cell::get_globalised_old_real_array, "unique_name"_a,
+           "nb_steps_ago"_a = 1)
+      .def("get_managed_real_array", &muSpectre::Cell::get_managed_real_array,
+           "unique_name"_a, "nb_components"_a,
+           "returns a field or nb_components real numbers per pixel");
+  add_cell_base_helper<muSpectre::twoD>(mod);
+  add_cell_base_helper<muSpectre::threeD>(mod);
 }
 
 void add_cell(py::module & mod) {

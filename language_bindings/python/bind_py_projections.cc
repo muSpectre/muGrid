@@ -51,9 +51,10 @@
 #include <sstream>
 #include <memory>
 
-using namespace muSpectre;  // NOLINT // TODO(junge): figure this out
+using muSpectre::Dim_t;
+using muSpectre::ProjectionBase;
+using pybind11::literals::operator""_a;
 namespace py = pybind11;
-using namespace pybind11::literals;  // NOLINT: recommended usage
 
 /**
  * "Trampoline" class for handling the pure virtual methods, see
@@ -79,8 +80,8 @@ class PyProjectionBase : public ProjectionBase<DimS, DimM> {
 
 template <class Proj, Dim_t DimS, Dim_t DimM = DimS>
 void add_proj_helper(py::module & mod, std::string name_start) {
-  using Ccoord = Ccoord_t<DimS>;
-  using Rcoord = Rcoord_t<DimS>;
+  using Ccoord = muSpectre::Ccoord_t<DimS>;
+  using Rcoord = muSpectre::Rcoord_t<DimS>;
   using Field_t = typename Proj::Field_t;
 
   static_assert(DimS == DimM, "currently only for DimS==DimM");
@@ -100,7 +101,7 @@ void add_proj_helper(py::module & mod, std::string name_start) {
 #else
       .def(py::init([](Ccoord res, Rcoord lengths, const std::string & fft) {
              if (fft == "fftw") {
-               auto engine = std::make_unique<FFTWEngine<DimS>>(
+               auto engine = std::make_unique<muSpectre::FFTWEngine<DimS>>(
                    res, Proj::NbComponents());
                return Proj(std::move(engine), lengths);
 #endif
@@ -129,13 +130,14 @@ void add_proj_helper(py::module & mod, std::string name_start) {
 #else
            "fft"_a = "fftw")
 #endif
-      .def("initialise", &Proj::initialise, "flags"_a = FFT_PlanFlags::estimate,
+      .def("initialise", &Proj::initialise,
+           "flags"_a = muSpectre::FFT_PlanFlags::estimate,
            "initialises the fft engine (plan the transform)")
       .def("apply_projection",
            [](Proj & proj, py::EigenDRef<Eigen::ArrayXXd> v) {
-             typename FFTEngineBase<DimS>::GFieldCollection_t coll{};
-             Eigen::Index subdomain_size =
-                 CcoordOps::get_size(proj.get_subdomain_resolutions());
+             typename muSpectre::FFTEngineBase<DimS>::GFieldCollection_t coll{};
+             Eigen::Index subdomain_size = muSpectre::CcoordOps::get_size(
+                 proj.get_subdomain_resolutions());
              if (v.rows() != DimS * DimM || v.cols() != subdomain_size) {
                throw std::runtime_error("Expected input array of shape (" +
                                         std::to_string(DimS * DimM) + ", " +
@@ -146,8 +148,8 @@ void add_proj_helper(py::module & mod, std::string name_start) {
              }
              coll.initialise(proj.get_subdomain_resolutions(),
                              proj.get_subdomain_locations());
-             Field_t & temp{make_field<Field_t>("temp_field", coll,
-                                                proj.get_nb_components())};
+             Field_t & temp{muSpectre::make_field<Field_t>(
+                 "temp_field", coll, proj.get_nb_components())};
              temp.eigen() = v;
              proj.apply_projection(temp);
              return Eigen::ArrayXXd{temp.eigen()};
@@ -164,20 +166,26 @@ void add_proj_helper(py::module & mod, std::string name_start) {
 }
 
 void add_proj_dispatcher(py::module & mod) {
-  add_proj_helper<ProjectionSmallStrain<twoD, twoD>, twoD>(
-      mod, "ProjectionSmallStrain");
-  add_proj_helper<ProjectionSmallStrain<threeD, threeD>, threeD>(
-      mod, "ProjectionSmallStrain");
+  add_proj_helper<
+      muSpectre::ProjectionSmallStrain<muSpectre::twoD, muSpectre::twoD>,
+      muSpectre::twoD>(mod, "ProjectionSmallStrain");
+  add_proj_helper<
+      muSpectre::ProjectionSmallStrain<muSpectre::threeD, muSpectre::threeD>,
+      muSpectre::threeD>(mod, "ProjectionSmallStrain");
 
-  add_proj_helper<ProjectionFiniteStrain<twoD, twoD>, twoD>(
-      mod, "ProjectionFiniteStrain");
-  add_proj_helper<ProjectionFiniteStrain<threeD, threeD>, threeD>(
-      mod, "ProjectionFiniteStrain");
+  add_proj_helper<
+      muSpectre::ProjectionFiniteStrain<muSpectre::twoD, muSpectre::twoD>,
+      muSpectre::twoD>(mod, "ProjectionFiniteStrain");
+  add_proj_helper<
+      muSpectre::ProjectionFiniteStrain<muSpectre::threeD, muSpectre::threeD>,
+      muSpectre::threeD>(mod, "ProjectionFiniteStrain");
 
-  add_proj_helper<ProjectionFiniteStrainFast<twoD, twoD>, twoD>(
-      mod, "ProjectionFiniteStrainFast");
-  add_proj_helper<ProjectionFiniteStrainFast<threeD, threeD>, threeD>(
-      mod, "ProjectionFiniteStrainFast");
+  add_proj_helper<
+      muSpectre::ProjectionFiniteStrainFast<muSpectre::twoD, muSpectre::twoD>,
+      muSpectre::twoD>(mod, "ProjectionFiniteStrainFast");
+  add_proj_helper<muSpectre::ProjectionFiniteStrainFast<muSpectre::threeD,
+                                                        muSpectre::threeD>,
+                  muSpectre::threeD>(mod, "ProjectionFiniteStrainFast");
 }
 
 void add_projections(py::module & mod) { add_proj_dispatcher(mod); }

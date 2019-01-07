@@ -61,8 +61,8 @@ class FieldCollection_Check(unittest.TestCase):
             self.mat.add_pixel(pixel, i/self.cell.size*eigen_strain)
 
         self.cell.initialise()
-        dir(µ.material.Material_2d)
-        self.assertTrue(isinstance(self.mat, µ.material.Material_2d))
+        dir(µ.material.MaterialBase_2d)
+        self.assertTrue(isinstance(self.mat, µ.material.MaterialBase_2d))
         collection = self.mat.collection
         field_name = collection.field_names[0]
         self.assertRaises(Exception, collection.get_complex_field, field_name)

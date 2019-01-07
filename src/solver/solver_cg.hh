@@ -98,8 +98,6 @@ namespace muSpectre {
     Vector_t p_k;   //!< search direction
     Vector_t Ap_k;  //!< directional stiffness
     Vector_t x_k;   //!< current solution
-
-   private:
   };
 
 }  // namespace muSpectre

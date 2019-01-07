@@ -35,9 +35,11 @@
 
 #include "boost/mpl/list.hpp"
 
+#include "materials/stress_transformations_Kirchhoff.hh"
 #include "materials/material_hyper_elasto_plastic1.hh"
 #include "materials/materials_toolbox.hh"
 #include "tests.hh"
+#include "test_goodies.hh"
 
 namespace muSpectre {
 
@@ -128,14 +130,14 @@ namespace muSpectre {
       tau_ref << 1.92999522e-11, 3.86000000e-06, 0.00000000e+00, 3.86000000e-06,
           -1.93000510e-11, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
           -2.95741950e-17;
-      Real error{(tau_ref - stress).norm()};
+      Real error{(tau_ref - stress).norm() / tau_ref.norm()};
       BOOST_CHECK_LT(error, hi_tol);
 
       Strain_t be_ref{};
       be_ref << 1.00000000e+00, 1.00000000e-05, 0.00000000e+00, 1.00000000e-05,
           1.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
           1.00000000e+00;
-      error = (be_ref - be_prev[0].current()).norm();
+      error = (be_ref - be_prev[0].current()).norm() / be_ref.norm();
       BOOST_CHECK_LT(error, hi_tol);
 
       Real ep_ref{0};
@@ -162,17 +164,17 @@ namespace muSpectre {
       tau_ref << 1.98151335e-04, 1.98151335e-03, 0.00000000e+00, 1.98151335e-03,
           -1.98151335e-04, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
           1.60615155e-16;
-      Real error{(tau_ref - stress).norm()};
+      Real error{(tau_ref - stress).norm() / tau_ref.norm()};
       BOOST_CHECK_LT(error, hi_tol);
 
       Strain_t be_ref{};
       be_ref << 1.00052666, 0.00513348, 0., 0.00513348, 0.99949996, 0., 0., 0.,
           1.;
-      error = (be_ref - be_prev[0].current()).norm();
+      error = (be_ref - be_prev[0].current()).norm() / be_ref.norm();
       BOOST_CHECK_LT(error, hi_tol);
 
       Real ep_ref{0.11229988};
-      error = ep_ref - eps_prev[0].current();
+      error = (ep_ref - eps_prev[0].current()) / ep_ref;
       BOOST_CHECK_LT(error, hi_tol);
     }
     if (verbose) {
@@ -195,7 +197,7 @@ namespace muSpectre {
     // elasto-plasticity.py) for the 3d case only
 
     // need higher tol because of printout precision of reference solutions
-    constexpr Real hi_tol{1e-8};
+    constexpr Real hi_tol{2e-7};
     constexpr Dim_t mdim{Fix::mdim}, sdim{Fix::sdim};
     constexpr bool has_precomputed_values{(mdim == sdim) && (mdim == threeD)};
     constexpr bool verbose{has_precomputed_values && false};
@@ -236,6 +238,7 @@ namespace muSpectre {
     eps_.cycle();
     Strain_t stress{};
     Stiffness_t stiffness{};
+
     std::tie(stress, stiffness) =
         Fix::mat.evaluate_stress_tangent(F, F_prev[0], be_prev[0], eps_prev[0]);
 
@@ -244,30 +247,50 @@ namespace muSpectre {
       tau_ref << 1.92999522e-11, 3.86000000e-06, 0.00000000e+00, 3.86000000e-06,
           -1.93000510e-11, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
           -2.95741950e-17;
-      Real error{(tau_ref - stress).norm()};
+      Real error{(tau_ref - stress).norm() / tau_ref.norm()};
       BOOST_CHECK_LT(error, hi_tol);
 
       Strain_t be_ref{};
       be_ref << 1.00000000e+00, 1.00000000e-05, 0.00000000e+00, 1.00000000e-05,
           1.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
           1.00000000e+00;
-      error = (be_ref - be_prev[0].current()).norm();
+      error = (be_ref - be_prev[0].current()).norm() / be_ref.norm();
       BOOST_CHECK_LT(error, hi_tol);
 
       Real ep_ref{0};
       error = ep_ref - eps_prev[0].current();
       BOOST_CHECK_LT(error, hi_tol);
 
-      Stiffness_t C4_ref{};
-      C4_ref << 0.67383333, 0., 0., 0., 0.28783333, 0., 0., 0., 0.28783333, 0.,
-          0.193, 0., 0.193, 0., 0., 0., 0., 0., 0., 0., 0.193, 0., 0., 0.,
-          0.193, 0., 0., 0., 0.193, 0., 0.193, 0., 0., 0., 0., 0., 0.28783333,
-          0., 0., 0., 0.67383333, 0., 0., 0., 0.28783333, 0., 0., 0., 0., 0.,
-          0.193, 0., 0.193, 0., 0., 0., 0.193, 0., 0., 0., 0.193, 0., 0., 0.,
-          0., 0., 0., 0., 0.193, 0., 0.193, 0., 0.28783333, 0., 0., 0.,
-          0.28783333, 0., 0., 0., 0.67383333;
-      error = (C4_ref - stiffness).norm();
+      Stiffness_t temp;
+      temp << 1.34766667e+00, 3.86000000e-06, 0.00000000e+00, -3.86000000e-06,
+          5.75666667e-01, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
+          5.75666667e-01, -3.61540123e-17, 3.86000000e-01, 0.00000000e+00,
+          3.86000000e-01, 7.12911684e-17, 0.00000000e+00, 0.00000000e+00,
+          0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
+          3.86000000e-01, 0.00000000e+00, 0.00000000e+00, -1.93000000e-06,
+          3.86000000e-01, 1.93000000e-06, 0.00000000e+00, -3.61540123e-17,
+          3.86000000e-01, 0.00000000e+00, 3.86000000e-01, 7.12911684e-17,
+          0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
+          5.75666667e-01, -3.86000000e-06, 0.00000000e+00, 3.86000000e-06,
+          1.34766667e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
+          5.75666667e-01, 0.00000000e+00, 0.00000000e+00, -1.93000000e-06,
+          0.00000000e+00, 0.00000000e+00, 3.86000000e-01, 1.93000000e-06,
+          3.86000000e-01, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
+          3.86000000e-01, 0.00000000e+00, 0.00000000e+00, -1.93000000e-06,
+          3.86000000e-01, 1.93000000e-06, 0.00000000e+00, 0.00000000e+00,
+          0.00000000e+00, -1.93000000e-06, 0.00000000e+00, 0.00000000e+00,
+          3.86000000e-01, 1.93000000e-06, 3.86000000e-01, 0.00000000e+00,
+          5.75666667e-01, 2.61999996e-17, 0.00000000e+00, 2.61999996e-17,
+          5.75666667e-01, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
+          1.34766667e+00;
+      Stiffness_t K4b_ref{testGoodies::from_numpy(temp)};
+
+      error = (K4b_ref - stiffness).norm() / K4b_ref.norm();
       BOOST_CHECK_LT(error, hi_tol);
+      if (not(error < hi_tol)) {
+        std::cout << "stiffness reference:\n" << K4b_ref << std::endl;
+        std::cout << "stiffness computed:\n" << stiffness << std::endl;
+      }
     }
     if (verbose) {
       std::cout << "C₄  =" << std::endl << stiffness << std::endl;
@@ -286,49 +309,116 @@ namespace muSpectre {
       tau_ref << 1.98151335e-04, 1.98151335e-03, 0.00000000e+00, 1.98151335e-03,
           -1.98151335e-04, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
           1.60615155e-16;
-      Real error{(tau_ref - stress).norm()};
+      Real error{(tau_ref - stress).norm() / tau_ref.norm()};
       BOOST_CHECK_LT(error, hi_tol);
 
       Strain_t be_ref{};
       be_ref << 1.00052666, 0.00513348, 0., 0.00513348, 0.99949996, 0., 0., 0.,
           1.;
-      error = (be_ref - be_prev[0].current()).norm();
+      error = (be_ref - be_prev[0].current()).norm() / be_ref.norm();
       BOOST_CHECK_LT(error, hi_tol);
 
       Real ep_ref{0.11229988};
-      error = ep_ref - eps_prev[0].current();
+      error = (ep_ref - eps_prev[0].current()) / ep_ref;
       BOOST_CHECK_LT(error, hi_tol);
 
-      Stiffness_t C4_ref{};
-      C4_ref << +4.23106224e-01, -4.27959704e-04, 0.00000000e+00,
-          -4.27959704e-04, 4.13218286e-01, 0.00000000e+00, 0.00000000e+00,
-          0.00000000e+00, 4.13175490e-01, -4.27959704e-04, 7.07167743e-04,
-          0.00000000e+00, 7.07167743e-04, 4.27959704e-04, 0.00000000e+00,
-          0.00000000e+00, 0.00000000e+00, 2.79121029e-18, +0.00000000e+00,
-          0.00000000e+00, 4.98676478e-03, 0.00000000e+00, 0.00000000e+00,
-          0.00000000e+00, 4.98676478e-03, 0.00000000e+00, 0.00000000e+00,
-          -4.27959704e-04, 7.07167743e-04, 0.00000000e+00, 7.07167743e-04,
-          4.27959704e-04, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-          2.79121029e-18, +4.13218286e-01, 4.27959704e-04, 0.00000000e+00,
-          4.27959704e-04, 4.23106224e-01, 0.00000000e+00, 0.00000000e+00,
-          0.00000000e+00, 4.13175490e-01, +0.00000000e+00, 0.00000000e+00,
-          0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 4.98676478e-03,
-          0.00000000e+00, 4.98676478e-03, 0.00000000e+00, +0.00000000e+00,
-          0.00000000e+00, 4.98676478e-03, 0.00000000e+00, 0.00000000e+00,
-          0.00000000e+00, 4.98676478e-03, 0.00000000e+00, 0.00000000e+00,
-          +0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-          0.00000000e+00, 4.98676478e-03, 0.00000000e+00, 4.98676478e-03,
-          0.00000000e+00, +4.13175490e-01, 2.79121029e-18, 0.00000000e+00,
-          2.79121029e-18, 4.13175490e-01, 0.00000000e+00, 0.00000000e+00,
-          0.00000000e+00, 4.23149020e-01;
-      error = (C4_ref - stiffness).norm();
+      Stiffness_t temp{};
+      temp << 8.46343327e-01, 1.11250597e-03, 0.00000000e+00, -2.85052074e-03,
+          8.26305692e-01, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
+          8.26350980e-01, -8.69007382e-04, 1.21749295e-03, 0.00000000e+00,
+          1.61379562e-03, 8.69007382e-04, 0.00000000e+00, 0.00000000e+00,
+          0.00000000e+00, 5.58242059e-18, 0.00000000e+00, 0.00000000e+00,
+          9.90756677e-03, 0.00000000e+00, 0.00000000e+00, -9.90756677e-04,
+          1.01057181e-02, 9.90756677e-04, 0.00000000e+00, -8.69007382e-04,
+          1.21749295e-03, 0.00000000e+00, 1.61379562e-03, 8.69007382e-04,
+          0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 5.58242059e-18,
+          8.26305692e-01, -1.11250597e-03, 0.00000000e+00, 2.85052074e-03,
+          8.46343327e-01, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
+          8.26350980e-01, 0.00000000e+00, 0.00000000e+00, -9.90756677e-04,
+          0.00000000e+00, 0.00000000e+00, 1.01057181e-02, 9.90756677e-04,
+          9.90756677e-03, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
+          9.90756677e-03, 0.00000000e+00, 0.00000000e+00, -9.90756677e-04,
+          1.01057181e-02, 9.90756677e-04, 0.00000000e+00, 0.00000000e+00,
+          0.00000000e+00, -9.90756677e-04, 0.00000000e+00, 0.00000000e+00,
+          1.01057181e-02, 9.90756677e-04, 9.90756677e-03, 0.00000000e+00,
+          8.26350980e-01, 0.00000000e+00, 0.00000000e+00, 1.38777878e-17,
+          8.26350980e-01, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
+          8.46298039e-01;
+
+      Stiffness_t K4b_ref{testGoodies::from_numpy(temp)};
+      error = (K4b_ref - stiffness).norm() / K4b_ref.norm();
+
+      error = (K4b_ref - stiffness).norm() / K4b_ref.norm();
       BOOST_CHECK_LT(error, hi_tol);
+      if (not(error < hi_tol)) {
+        std::cout << "stiffness reference:\n" << K4b_ref << std::endl;
+        std::cout << "stiffness computed:\n" << stiffness << std::endl;
+      }
+
+      // check also whether pull_back is correct
+
+      Stiffness_t intermediate{stiffness};
+      Stiffness_t zero_mediate{Stiffness_t::Zero()};
+      for (int i{0}; i < mdim; ++i) {
+        for (int j{0}; j < mdim; ++j) {
+          for (int m{0}; m < mdim; ++m) {
+            const auto & k{i};
+            const auto & l{j};
+            // k,m inverted for right transpose
+            get(zero_mediate, i, j, k, m) -= stress(l, m);
+            get(intermediate, i, j, k, m) -= stress(l, m);
+          }
+        }
+      }
+
+      temp << 8.46145176e-01, -8.69007382e-04, 0.00000000e+00, -2.85052074e-03,
+          8.26305692e-01, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
+          8.26350980e-01, -2.85052074e-03, 1.41564428e-03, 0.00000000e+00,
+          1.61379562e-03, 8.69007382e-04, 0.00000000e+00, 0.00000000e+00,
+          0.00000000e+00, 5.58242059e-18, 0.00000000e+00, 0.00000000e+00,
+          9.90756677e-03, 0.00000000e+00, 0.00000000e+00, -9.90756677e-04,
+          1.01057181e-02, 9.90756677e-04, 0.00000000e+00, -8.69007382e-04,
+          1.21749295e-03, 0.00000000e+00, 1.41564428e-03, -1.11250597e-03,
+          0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 5.58242059e-18,
+          8.26305692e-01, -1.11250597e-03, 0.00000000e+00, 8.69007382e-04,
+          8.46541479e-01, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
+          8.26350980e-01, 0.00000000e+00, 0.00000000e+00, -9.90756677e-04,
+          0.00000000e+00, 0.00000000e+00, 1.01057181e-02, 9.90756677e-04,
+          9.90756677e-03, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
+          9.90756677e-03, 0.00000000e+00, 0.00000000e+00, -9.90756677e-04,
+          9.90756677e-03, -9.90756677e-04, 0.00000000e+00, 0.00000000e+00,
+          0.00000000e+00, -9.90756677e-04, 0.00000000e+00, 0.00000000e+00,
+          1.01057181e-02, -9.90756677e-04, 1.01057181e-02, 0.00000000e+00,
+          8.26350980e-01, 0.00000000e+00, 0.00000000e+00, 1.38777878e-17,
+          8.26350980e-01, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
+          8.46298039e-01;
+
+      Stiffness_t K4c_ref{testGoodies::from_numpy(temp)};
+      error = (K4b_ref + zero_mediate - K4c_ref).norm() / zero_mediate.norm();
+      BOOST_CHECK_LT(error, hi_tol);  // rel error on small difference between
+                                      // inexacly read doubles
+      if (not(error < hi_tol)) {
+        std::cout << "decrement reference:\n" << K4c_ref - K4b_ref << std::endl;
+        std::cout << "zero_mediate computed:\n" << zero_mediate << std::endl;
+      }
+
+      error = (K4c_ref - intermediate).norm() / K4c_ref.norm();
+      BOOST_CHECK_LT(error, hi_tol);
+      if (not(error < hi_tol)) {
+        std::cout << "stiffness reference:\n" << K4c_ref << std::endl;
+        std::cout << "stiffness computed:\n" << intermediate << std::endl;
+        std::cout << "zero-mediate computed:\n" << zero_mediate << std::endl;
+        std::cout << "difference:\n" << K4c_ref - intermediate << std::endl;
+      }
     }
     if (verbose) {
       std::cout << "Post Cycle" << std::endl;
       std::cout << "C₄  =" << std::endl << stiffness << std::endl;
     }
   }
+
+  /* ---------------------------------------------------------------------- */
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(stress_strain_test, Fix, mats, Fix) {}
 
   BOOST_AUTO_TEST_SUITE_END();
 

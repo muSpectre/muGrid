@@ -48,6 +48,11 @@ from python_material_linear_elastic_generic1_test import MaterialLinearElasticGe
 from python_material_linear_elastic_generic2_test import MaterialLinearElasticGeneric2_Check
 from python_field_tests import FieldCollection_Check
 
+from python_exact_reference_elastic_test import LinearElastic_Check
+
+from python_field_tests import FieldCollection_Check
+
+
 class CellCheck(unittest.TestCase):
     def test_Construction(self):
         """
@@ -60,7 +65,8 @@ class CellCheck(unittest.TestCase):
             sys = µ.Cell(resolution,
                          lengths,
                          formulation)
-            mat = µ.material.MaterialLinearElastic1_2d.make(sys, "material", 210e9, .33)
+            mat = µ.material.MaterialLinearElastic1_2d.make(sys, "material",
+                                                            210e9, .33)
 
         except Exception as err:
             print(err)

@@ -46,9 +46,9 @@
 #ifndef SRC_COMMON_STATEFIELD_HH_
 #define SRC_COMMON_STATEFIELD_HH_
 
-#include "common/field.hh"
 #include "common/field_helpers.hh"
-#include "common/utilities.hh"
+#include "common/field.hh"
+#include "common/ref_array.hh"
 
 #include <array>
 #include <sstream>
@@ -125,6 +125,19 @@ namespace muSpectre {
     virtual const TypedField_t &
     get_old_field(size_t nb_steps_ago = 1) const = 0;
 
+    //! returns a `StateField` reference if `other is a compatible state field
+    inline static TypedStateField & check_ref(Parent & other) {
+      // the following triggers and exception if the fields are incompatible
+      if (typeid(T).hash_code() != other.get_stored_typeid().hash_code()) {
+        std::stringstream err_str{};
+        err_str << "Cannot create a rerference of requested type "
+                << "for statefield '" << other.get_prefix() << "' of type '"
+                << other.get_stored_typeid().name() << "'";
+        throw std::runtime_error(err_str.str());
+      }
+      return static_cast<TypedStateField &>(other);
+    }
+
     //! return type_id of stored type
     const std::type_info & get_stored_typeid() const final {
       return typeid(T);
@@ -176,7 +189,7 @@ namespace muSpectre {
         name_stream << prefix << ", sub_field index " << i;
         return make_field<Field>(name_stream.str(), collection);
       }};
-      return std::tie(get_field(I)...);
+      return RefArray<Field, size>(get_field(I)...);
     }
 
     /* ---------------------------------------------------------------------- */
@@ -207,7 +220,7 @@ namespace muSpectre {
      * storage of field refs (can't be a `std::array`, because arrays
      * of refs are explicitely forbidden
      */
-    using Fields_t = tuple_array<Field_t &, nb_memory + 1>;
+    using Fields_t = RefArray<Field_t, nb_memory + 1>;
     //! Typed field
     using TypedField_t = TypedField<FieldCollection_t, Scalar>;
 
@@ -280,7 +293,7 @@ namespace muSpectre {
      * memory (nb_memory).
      */
     inline decltype(auto) get_map() {
-      using FieldMap = decltype(std::get<0>(this->fields).get_map());
+      using FieldMap = decltype(this->fields[0].get_map());
       return StateFieldMap<FieldMap, nb_memory>(*this);
     }
 
@@ -292,7 +305,7 @@ namespace muSpectre {
      * memory (nb_memory).
      */
     inline decltype(auto) get_const_map() {
-      using FieldMap = decltype(std::get<0>(this->fields).get_const_map());
+      using FieldMap = decltype(this->fields[0].get_const_map());
       return StateFieldMap<FieldMap, nb_memory>(*this);
     }
 
@@ -331,7 +344,7 @@ namespace muSpectre {
     template <class FieldMap, size_t size, class Fields, size_t... I>
     inline decltype(auto) build_maps_helper(Fields & fields,
                                             std::index_sequence<I...>) {
-      return std::array<FieldMap, size>{FieldMap(std::get<I>(fields))...};
+      return std::array<FieldMap, size>{FieldMap(fields[I])...};
     }
 
   }  // namespace internal
@@ -561,28 +574,25 @@ namespace muSpectre {
    protected:
     size_t index;         //!< current pixel this iterator refers to
     StateFieldMap & map;  //!< map over with `this` iterates
-
-   private:
   };
 
   namespace internal {
 
     //! FieldMap is an `Eigen::Map` or `Eigen::TensorMap` here
-    template <class FieldMap, size_t size, size_t... I, class iterator,
-              class maps_t, class indices_t>
-    inline decltype(auto) build_old_vals_helper(iterator & it, maps_t & maps,
-                                                indices_t & indices,
-                                                std::index_sequence<I...>) {
-      return tuple_array<FieldMap, size>(
-          std::forward_as_tuple(maps[indices[I + 1]][it.get_index()]...));
+    template <class Array, size_t... I, class iterator, class maps_t,
+              class indices_t>
+    inline Array build_old_vals_helper(iterator & it, maps_t & maps,
+                                       indices_t & indices,
+                                       std::index_sequence<I...>) {
+      return Array{maps[indices[I + 1]][it.get_index()]...};
     }
 
-    template <class FieldMap, size_t size, class iterator, class maps_t,
+    template <class Array, size_t size, class iterator, class maps_t,
               class indices_t>
-    inline decltype(auto) build_old_vals(iterator & it, maps_t & maps,
-                                         indices_t & indices) {
-      return tuple_array<FieldMap, size>{build_old_vals_helper<FieldMap, size>(
-          it, maps, indices, std::make_index_sequence<size>{})};
+    inline Array build_old_vals(iterator & it, maps_t & maps,
+                                indices_t & indices) {
+      return build_old_vals_helper<Array>(it, maps, indices,
+                                          std::make_index_sequence<size>{});
     }
 
   }  // namespace internal
@@ -604,6 +614,15 @@ namespace muSpectre {
     //! short-hand
     using ConstMap = typename FieldMap::const_reference;
 
+    /**
+     * storage type differs depending on whether Map is a Reference type (in the
+     * C++ sense) or not, because arrays of references are forbidden
+     */
+    using Array_t = std::conditional_t<
+        std::is_reference<ConstMap>::value,
+        RefArray<std::remove_reference_t<ConstMap>, nb_memory>,
+        std::array<ConstMap, nb_memory>>;
+
     //! Default constructor
     StateWrapper() = delete;
 
@@ -618,7 +637,7 @@ namespace muSpectre {
         : it{it},
           current_val{
               it.map.maps[it.map.statefield.get_indices()[0]][it.index]},
-          old_vals(internal::build_old_vals<ConstMap, nb_memory>(
+          old_vals(internal::build_old_vals<Array_t, nb_memory>(
               it, it.map.const_maps, it.map.statefield.get_indices())) {}
 
     //! Destructor
@@ -641,18 +660,16 @@ namespace muSpectre {
       static_assert(nb_steps_ago > 0,
                     "Did you mean to access the current value? If so, use "
                     "current()");
-      return std::get<nb_steps_ago - 1>(this->old_vals);
+      return this->old_vals[nb_steps_ago - 1];
     }
 
     //! read the coordinates of the current pixel
     inline Ccoord get_ccoord() const { return this->it.get_ccoord(); }
 
    protected:
-    iterator & it;    //!< ref to the iterator that dereferences to `this`
-    Map current_val;  //!< current value
-    tuple_array<ConstMap, nb_memory> old_vals;  //!< all stored old values
-
-   private:
+    iterator & it;     //!< ref to the iterator that dereferences to `this`
+    Map current_val;   //!< current value
+    Array_t old_vals;  //!< all stored old values
   };
 }  // namespace muSpectre
 

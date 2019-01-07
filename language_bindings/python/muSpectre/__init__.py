@@ -42,7 +42,8 @@ except ImportError:
 
 import _muSpectre
 from _muSpectre import (Formulation, get_domain_ccoord, get_domain_index,
-                        get_hermitian_sizes, material, solvers)
+                        get_hermitian_sizes, material, solvers,
+                        FFT_PlanFlags)
 import muSpectre.fft
 
 _factories = {'fftw': ('CellFactory', False),

@@ -135,6 +135,92 @@ namespace muSpectre {
       return std::make_tuple(P, K);
     }
 
+    /**
+     * takes a 4th-rank tensor and returns a copy with the last two
+     * dimensions switched. This is particularly useful to check for
+     * identity between a stiffness tensors computed the regular way
+     * and the Geers way. For testing, not efficient.
+     */
+    template <class Derived>
+    inline auto right_transpose(const Eigen::MatrixBase<Derived> & t4)
+        -> Eigen::Matrix<typename Derived::Scalar, Derived::RowsAtCompileTime,
+                         Derived::ColsAtCompileTime> {
+      constexpr Dim_t Rows{Derived::RowsAtCompileTime};
+      constexpr Dim_t Cols{Derived::ColsAtCompileTime};
+      constexpr Dim_t DimSq{Rows};
+      using T = typename Derived::Scalar;
+      static_assert(Rows == Cols, "only square problems");
+      constexpr Dim_t Dim{ct_sqrt(DimSq)};
+      static_assert((Dim == twoD) or (Dim == threeD),
+                    "only two- and three-dimensional problems");
+      static_assert(ipow(Dim, 2) == DimSq,
+                    "The array is not a valid fourth order tensor");
+      T4Mat<T, Dim> retval{T4Mat<T, Dim>::Zero()};
+
+      /**
+       * Note: this looks like it's doing a left transpose, but in
+       * reality, np is rowmajor in all directions, so from numpy to
+       * eigen, we need to transpose left, center, and
+       * right. Therefore, if we want to right-transpose, then we need
+       * to transpose once left, once center, and *twice* right, which
+       * is equal to just left and center transpose. Center-transpose
+       * happens automatically when eigen parses the input (which is
+       * naturally written in rowmajor but interpreted into colmajor),
+       * so all that's left to do is (ironically) the subsequent
+       * left-transpose
+       */
+      for (int i{0}; i < Dim; ++i) {
+        for (int j{0}; j < Dim; ++j) {
+          for (int k{0}; k < Dim; ++k) {
+            for (int l{0}; l < Dim; ++l) {
+              get(retval, i, j, k, l) = get(t4, j, i, k, l);
+            }
+          }
+        }
+      }
+      return retval;
+    }
+
+    /**
+     * recomputes a colmajor representation of a fourth-rank rowmajor
+     * tensor. this is useful when comparing to reference results
+     * computed in numpy
+     */
+    template <class Derived>
+    inline auto from_numpy(const Eigen::MatrixBase<Derived> & t4_np)
+        -> Eigen::Matrix<typename Derived::Scalar, Derived::RowsAtCompileTime,
+                         Derived::ColsAtCompileTime> {
+      constexpr Dim_t Rows{Derived::RowsAtCompileTime};
+      constexpr Dim_t Cols{Derived::ColsAtCompileTime};
+      constexpr Dim_t DimSq{Rows};
+      using T = typename Derived::Scalar;
+      static_assert(Rows == Cols, "only square problems");
+      constexpr Dim_t Dim{ct_sqrt(DimSq)};
+      static_assert((Dim == twoD) or (Dim == threeD),
+                    "only two- and three-dimensional problems");
+      static_assert(ipow(Dim, 2) == DimSq,
+                    "The array is not a valid fourth order tensor");
+      T4Mat<T, Dim> retval{T4Mat<T, Dim>::Zero()};
+      T4Mat<T, Dim> intermediate{T4Mat<T, Dim>::Zero()};
+      // transpose rows
+      for (int row{0}; row < DimSq; ++row) {
+        for (int i{0}; i < Dim; ++i) {
+          for (int j{0}; j < Dim; ++j) {
+            intermediate(row, i + Dim * j) = t4_np(row, i * Dim + j);
+          }
+        }
+      }
+      // transpose columns
+      for (int col{0}; col < DimSq; ++col) {
+        for (int i{0}; i < Dim; ++i) {
+          for (int j{0}; j < Dim; ++j) {
+            retval(i + Dim * j, col) = intermediate(i * Dim + j, col);
+          }
+        }
+      }
+      return retval;
+    }
+
   }  // namespace testGoodies
 
 }  // namespace muSpectre

@@ -58,6 +58,75 @@ namespace muSpectre {
     }
   }
 
+  BOOST_AUTO_TEST_CASE(log_m_test) {
+    using Mat_t = Eigen::Matrix<Real, threeD, threeD>;
+    Mat_t input{};
+    constexpr Real log_tol{1e-8};
+    input << 1.32460909, 0.86867096, 0, 0.86867096, 1.32460909, 0, 0, 0,
+        2.71828183;
+    Mat_t output{};
+
+    output << 0, .25 * pi, 0, .25 * pi, 0, 0, 0, 0, 1;
+    auto my_output{logm(input)};
+    Real error{(my_output - output).norm() / output.norm()};
+
+    BOOST_CHECK_LT(error, log_tol);
+    if (error >= log_tol) {
+      std::cout << "input:" << std::endl << input << std::endl;
+      std::cout << "output:" << std::endl << output << std::endl;
+      std::cout << "my_output:" << std::endl << my_output << std::endl;
+    }
+
+    input << 1.0001000000000002, 0.010000000000000116, 0, 0.010000000000000061,
+        1.0000000000000002, 0, 0, 0, 1;
+
+    // from scipy.linalg.logm
+    output << 4.99991667e-05, 9.99983334e-03, 0.00000000e+00, 9.99983334e-03,
+        -4.99991667e-05, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
+        0.00000000e+00;
+
+    my_output = logm(input);
+    error = (my_output - output).norm() / output.norm();
+
+    BOOST_CHECK_LT(error, log_tol);
+    if (error >= log_tol) {
+      std::cout << "input:" << std::endl << input << std::endl;
+      std::cout << "output:" << std::endl << output << std::endl;
+      std::cout << "my_output:" << std::endl << my_output << std::endl;
+    }
+
+    input << 1.0001000000000002, 0.010000000000000116, 0, 0.010000000000000061,
+        1.0000000000000002, 0, 0, 0, 1;
+    input = input.transpose().eval();
+
+    // from scipy.linalg.logm
+    output << 4.99991667e-05, 9.99983334e-03, 0.00000000e+00, 9.99983334e-03,
+        -4.99991667e-05, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
+        0.00000000e+00;
+
+    my_output = logm(input);
+
+    error = (my_output - output).norm() / output.norm();
+
+    BOOST_CHECK_LT(error, log_tol);
+    if (error >= log_tol) {
+      std::cout << "input:" << std::endl << input << std::endl;
+      std::cout << "output:" << std::endl << output << std::endl;
+      std::cout << "my_output:" << std::endl << my_output << std::endl;
+    }
+
+    Mat_t my_output_alt{logm_alt(input)};
+
+    error = (my_output_alt - output).norm() / output.norm();
+
+    BOOST_CHECK_LT(error, log_tol);
+    if (error >= log_tol) {
+      std::cout << "input:" << std::endl << input << std::endl;
+      std::cout << "output:" << std::endl << output << std::endl;
+      std::cout << "my_output:" << std::endl << my_output_alt << std::endl;
+    }
+  }
+
   BOOST_AUTO_TEST_SUITE_END();
 
 }  // namespace muSpectre

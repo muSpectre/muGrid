@@ -150,6 +150,19 @@ namespace muSpectre {
     //! number of pixels assigned to this material
     inline size_t size() const { return this->internal_fields.size(); }
 
+    //! type to return real-valued fields in
+    using EigenMap =
+        Eigen::Map<Eigen::Array<Real, Eigen::Dynamic, Eigen::Dynamic>>;
+    /**
+     * return an internal field identified by its name as an Eigen Array
+     */
+    EigenMap get_real_field(std::string field_name);
+
+    /**
+     * list the names of all internal fields
+     */
+    std::vector<std::string> list_fields() const;
+
     //! gives access to internal fields
     inline MFieldCollection_t & get_collection() {
       return this->internal_fields;

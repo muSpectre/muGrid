@@ -36,9 +36,15 @@
 
 #include "tests.hh"
 #include "materials/materials_toolbox.hh"
+#include "materials/stress_transformations_default_case.hh"
+#include "materials/stress_transformations_PK1_impl.hh"
+#include "materials/stress_transformations_PK2_impl.hh"
+#include "materials/stress_transformations.hh"
 #include "common/T4_map_proxy.hh"
 #include "common/tensor_algebra.hh"
 #include "tests/test_goodies.hh"
+
+#include <boost/mpl/list.hpp>
 
 namespace muSpectre {
 
@@ -272,6 +278,92 @@ namespace muSpectre {
     comp = convert_elastic_modulus<ElasticModulus::Shear, ElasticModulus::Bulk,
                                    ElasticModulus::Shear>(K, mu);
     BOOST_CHECK_EQUAL(mu, comp);
+
+    // check alternative calculation of computed values
+
+    comp = convert_elastic_modulus<ElasticModulus::lambda,
+                                   ElasticModulus::K,  // alternative for "Bulk"
+                                   ElasticModulus::mu>(
+        K, mu);  // alternative for "Shear"
+    BOOST_CHECK_LE(std::abs((comp - lambda) / lambda), tol);
+  }
+
+  template <FiniteDiff FinDiff>
+  struct FiniteDifferencesHolder {
+    constexpr static FiniteDiff value{FinDiff};
+  };
+
+  using FinDiffList =
+      boost::mpl::list<FiniteDifferencesHolder<FiniteDiff::forward>,
+                       FiniteDifferencesHolder<FiniteDiff::backward>,
+                       FiniteDifferencesHolder<FiniteDiff::centred>>;
+
+  /* ---------------------------------------------------------------------- */
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(numerical_tangent_test, Fix, FinDiffList,
+                                   Fix) {
+    constexpr Dim_t Dim{twoD};
+    using T4_t = T4Mat<Real, Dim>;
+    using T2_t = Eigen::Matrix<Real, Dim, Dim>;
+
+    bool verbose{false};
+
+    T4_t Q{};
+    Q << 1., 2., 0., 0., 0., 1.66666667, 0., 0., 0., 0., 2.33333333, 0., 0., 0.,
+        0., 3.;
+    if (verbose) {
+      std::cout << Q << std::endl << std::endl;
+    }
+
+    T2_t B{};
+    B << 2., 3.33333333, 2.66666667, 4.;
+    if (verbose) {
+      std::cout << B << std::endl << std::endl;
+    }
+
+    auto fun = [&](const T2_t & x) -> T2_t {
+      using cmap_t = Eigen::Map<const Eigen::Matrix<Real, Dim * Dim, 1>>;
+      using map_t = Eigen::Map<Eigen::Matrix<Real, Dim * Dim, 1>>;
+      cmap_t x_vec{x.data()};
+      T2_t ret_val{};
+      map_t(ret_val.data()) = Q * x_vec + cmap_t(B.data());
+      return ret_val;
+    };
+
+    T2_t temp_res = fun(T2_t::Ones());
+    if (verbose) {
+      std::cout << temp_res << std::endl << std::endl;
+    }
+
+    T4_t numerical_tangent{MatTB::compute_numerical_tangent<Dim, Fix::value>(
+        fun, T2_t::Ones(), 1e-2)};
+
+    if (verbose) {
+      std::cout << numerical_tangent << std::endl << std::endl;
+    }
+
+    Real error{(numerical_tangent - Q).norm() / Q.norm()};
+
+    BOOST_CHECK_LT(error, tol);
+    if (not(error < tol)) {
+      switch (Fix::value) {
+      case FiniteDiff::backward: {
+        std::cout << "backward difference: " << std::endl;
+        break;
+      }
+      case FiniteDiff::forward: {
+        std::cout << "forward difference: " << std::endl;
+        break;
+      }
+      case FiniteDiff::centred: {
+        std::cout << "centered difference: " << std::endl;
+        break;
+      }
+      }
+
+      std::cout << "error = " << error << std::endl;
+      std::cout << "numerical tangent:\n" << numerical_tangent << std::endl;
+      std::cout << "reference:\n" << Q << std::endl;
+    }
   }
 
   BOOST_AUTO_TEST_SUITE_END();

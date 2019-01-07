@@ -45,9 +45,11 @@
 #include <pybind11/stl.h>
 #include <pybind11/eigen.h>
 
-using namespace muSpectre;  // NOLINT // TODO(junge): figure this out
+using muSpectre::Ccoord_t;
+using muSpectre::Complex;
+using muSpectre::Dim_t;
+using pybind11::literals::operator""_a;
 namespace py = pybind11;
-using namespace pybind11::literals;  // NOLINT: recommended usage
 
 template <class Engine, Dim_t dim>
 void add_engine_helper(py::module & mod, std::string name) {
@@ -71,8 +73,8 @@ void add_engine_helper(py::module & mod, std::string name) {
              Coll_t coll{};
              coll.initialise(eng.get_subdomain_resolutions(),
                              eng.get_subdomain_locations());
-             Field_t & temp{make_field<Field_t>("temp_field", coll,
-                                                eng.get_nb_components())};
+             Field_t & temp{muSpectre::make_field<Field_t>(
+                 "temp_field", coll, eng.get_nb_components())};
              temp.eigen() = v;
              return ArrayXXc{eng.fft(temp).eigen()};
            },
@@ -84,15 +86,15 @@ void add_engine_helper(py::module & mod, std::string name) {
              Coll_t coll{};
              coll.initialise(eng.get_subdomain_resolutions(),
                              eng.get_subdomain_locations());
-             Field_t & temp{make_field<Field_t>("temp_field", coll,
-                                                eng.get_nb_components())};
+             Field_t & temp{muSpectre::make_field<Field_t>(
+                 "temp_field", coll, eng.get_nb_components())};
              eng.get_work_space().eigen() = v;
              eng.ifft(temp);
              return Eigen::ArrayXXd{temp.eigen()};
            },
            "array"_a)
       .def("initialise", &Engine::initialise,
-           "flags"_a = FFT_PlanFlags::estimate)
+           "flags"_a = muSpectre::FFT_PlanFlags::estimate)
       .def("normalisation", &Engine::normalisation)
       .def("get_subdomain_resolutions", &Engine::get_subdomain_resolutions)
       .def("get_subdomain_locations", &Engine::get_subdomain_locations)
@@ -104,8 +106,10 @@ void add_engine_helper(py::module & mod, std::string name) {
 void add_fft_engines(py::module & mod) {
   auto fft{mod.def_submodule("fft")};
   fft.doc() = "bindings for µSpectre's fft engines";
-  add_engine_helper<FFTWEngine<twoD>, twoD>(fft, "FFTW_2d");
-  add_engine_helper<FFTWEngine<threeD>, threeD>(fft, "FFTW_3d");
+  add_engine_helper<muSpectre::FFTWEngine<muSpectre::twoD>, muSpectre::twoD>(
+      fft, "FFTW_2d");
+  add_engine_helper<muSpectre::FFTWEngine<muSpectre::threeD>,
+                    muSpectre::threeD>(fft, "FFTW_3d");
 #ifdef WITH_FFTWMPI
   add_engine_helper<FFTWMPIEngine<twoD>, twoD>(fft, "FFTWMPI_2d");
   add_engine_helper<FFTWMPIEngine<threeD>, threeD>(fft, "FFTWMPI_3d");

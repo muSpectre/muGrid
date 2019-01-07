@@ -108,8 +108,6 @@ namespace muSpectre {
    protected:
     Proj_t & Gfield;  //!< field holding the operator
     Proj_map Ghat;    //!< iterable version of operator
-
-   private:
   };
 
 }  // namespace muSpectre
