@@ -55,7 +55,8 @@ void add_material_linear_elastic2_helper(py::module & mod) {
   using Mat_t = muSpectre::MaterialLinearElastic2<dim, dim>;
   using Sys_t = muSpectre::CellBase<dim, dim>;
 
-  py::class_<Mat_t, muSpectre::MaterialBase<dim, dim>>(mod, name.c_str())
+  py::class_<Mat_t, muSpectre::MaterialBase<dim, dim>, std::shared_ptr<Mat_t>>(
+      mod, name.c_str())
       .def_static("make",
                   [](Sys_t & sys, std::string n, Real e, Real p) -> Mat_t & {
                     return Mat_t::make(sys, n, e, p);
@@ -68,7 +69,12 @@ void add_material_linear_elastic2_helper(py::module & mod) {
              Eigen::Matrix<Real, dim, dim> eig_strain{eig};
              mat.add_pixel(pix, eig_strain);
            },
-           "pixel"_a, "eigenstrain"_a);
+           "pixel"_a, "eigenstrain"_a)
+      .def_static("make_evaluator",
+                  [](Real e, Real p) {
+                    return Mat_t::make_evaluator(e, p);
+                  },
+                  "Young"_a, "Poisson"_a);
 }
 
 template void

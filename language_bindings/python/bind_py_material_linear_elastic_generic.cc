@@ -60,7 +60,8 @@ void add_material_linear_elastic_generic1_helper(py::module & mod) {
   using Mat_t = MaterialLinearElasticGeneric1<Dim, Dim>;
   using Cell_t = CellBase<Dim, Dim>;
 
-  py::class_<Mat_t, MaterialBase<Dim, Dim>>(mod, name.c_str())
+  py::class_<Mat_t, MaterialBase<Dim, Dim>, std::shared_ptr<Mat_t>>(
+      mod, name.c_str())
       .def_static(
           "make",
           [](Cell_t & cell, std::string name,
@@ -81,7 +82,14 @@ void add_material_linear_elastic_generic1_helper(py::module & mod) {
            "stress and tangent in the cell will use this constitutive law for "
            "this "
            "particular pixel")
-      .def("size", &Mat_t::size);
+      .def("size", &Mat_t::size)
+      .def_static("make_evaluator",
+                  [](const py::EigenDRef<
+                      Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>> &
+                         elastic_tensor) {
+                    return Mat_t::make_evaluator(elastic_tensor);
+                  },
+                  "elastic_tensor"_a);
 }
 
 /**
@@ -96,7 +104,8 @@ void add_material_linear_elastic_generic2_helper(py::module & mod) {
   using Mat_t = MaterialLinearElasticGeneric2<Dim, Dim>;
   using Cell_t = CellBase<Dim, Dim>;
 
-  py::class_<Mat_t, MaterialBase<Dim, Dim>>(mod, name.c_str())
+  py::class_<Mat_t, MaterialBase<Dim, Dim>, std::shared_ptr<Mat_t>>(
+      mod, name.c_str())
       .def_static(
           "make",
           [](Cell_t & cell, std::string name,
@@ -125,7 +134,14 @@ void add_material_linear_elastic_generic2_helper(py::module & mod) {
            "Register a new pixel to this material and assign the eigenstrain. "
            "Subsequent Evaluations of the stress and tangent in the cell will "
            "use this constitutive law for this particular pixel")
-      .def("size", &Mat_t::size);
+      .def("size", &Mat_t::size)
+      .def_static("make_evaluator",
+                  [](const py::EigenDRef<
+                      Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>> &
+                         elastic_tensor) {
+                    return Mat_t::make_evaluator(elastic_tensor);
+                  },
+                  "elastic_tensor"_a);
 }
 
 template void add_material_linear_elastic_generic1_helper<twoD>(py::module &);

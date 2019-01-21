@@ -178,13 +178,6 @@ namespace muSpectre {
       -> decltype(auto) {
     using Tangent_t = typename traits::TangentMap_t::reference;
 
-    // using mat = Eigen::Matrix<Real, DimM, DimM>;
-    // mat ecopy{E};
-    // std::cout << "E" << std::endl << ecopy << std::endl;
-    // std::cout << "P1" << std::endl << mat{
-    //   std::get<0>(Hooke::evaluate_stress(this->lambda, this->mu,
-    //                                      Tangent_t(const_cast<double*>(this->C.data())),
-    //                                      std::move(E)))} << std::endl;
     return Hooke::evaluate_stress(
         this->lambda, this->mu, Tangent_t(const_cast<double *>(this->C.data())),
         std::move(E));

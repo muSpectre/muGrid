@@ -34,6 +34,8 @@
 
 #include "common/common.hh"
 #include "materials/material_base.hh"
+#include "materials/material_evaluator.hh"
+
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/eigen.h>
@@ -42,6 +44,7 @@
 #include <string>
 
 using muSpectre::Dim_t;
+using muSpectre::Real;
 using pybind11::literals::operator""_a;
 namespace py = pybind11;
 
@@ -55,13 +58,13 @@ void add_material_linear_elastic_generic2_helper(py::module & mod);
 /**
  * python binding for the optionally objective form of Hooke's law
  */
-template <Dim_t dim>
+template <Dim_t Dim>
 void add_material_linear_elastic1_helper(py::module & mod);
-template <Dim_t dim>
+template <Dim_t Dim>
 void add_material_linear_elastic2_helper(py::module & mod);
-template <Dim_t dim>
+template <Dim_t Dim>
 void add_material_linear_elastic3_helper(py::module & mod);
-template <Dim_t dim>
+template <Dim_t Dim>
 void add_material_linear_elastic4_helper(py::module & mod);
 template <Dim_t Dim>
 void add_material_hyper_elasto_plastic1_helper(py::module & mod);
@@ -112,17 +115,90 @@ class PyMaterialBase : public muSpectre::MaterialBase<Dim, Dim> {
   }
 };
 
-template <Dim_t dim>
+template <Dim_t Dim>
+void add_material_evaluator(py::module & mod) {
+  std::stringstream name_stream{};
+  name_stream << "MaterialEvaluator_" << Dim << "d";
+  std::string name{name_stream.str()};
+
+  using MatEval_t = muSpectre::MaterialEvaluator<Dim>;
+  py::class_<MatEval_t>(mod, name.c_str())
+      .def(py::init<std::shared_ptr<muSpectre::MaterialBase<Dim, Dim>>>())
+      .def("save_history_variables", &MatEval_t::save_history_variables,
+           "for materials with state variables")
+      .def("evaluate_stress",
+           [](MatEval_t & mateval, py::EigenDRef<Eigen::MatrixXd> & grad,
+              muSpectre::Formulation form) {
+             if ((grad.cols() != Dim) or (grad.rows() != Dim)) {
+               std::stringstream err{};
+               err << "need matrix of shape (" << Dim << "×" << Dim
+                   << ") but got (" << grad.rows() << "×"
+                   << grad.cols() << ").";
+               throw std::runtime_error(err.str());
+             }
+             return mateval.evaluate_stress(grad, form);
+           },
+           "strain"_a, "formulation"_a,
+           "Evaluates stress for a given strain and formulation "
+           "(Piola-Kirchhoff 1 stress as a function of the placement gradient "
+           "P = P(F) for formulation=Formulation.finite_strain and Cauchy "
+           "stress as a function of the infinitesimal strain tensor σ = σ(ε) "
+           "for formulation=Formulation.small_strain)")
+      .def("evaluate_stress_tangent",
+           [](MatEval_t & mateval, py::EigenDRef<Eigen::MatrixXd> & grad,
+              muSpectre::Formulation form) {
+             if ((grad.cols() != Dim) or (grad.rows() != Dim)) {
+               std::stringstream err{};
+               err << "need matrix of shape (" << Dim << "×" << Dim
+                   << ") but got (" << grad.rows() << "×"
+                   << grad.cols() << ").";
+               throw std::runtime_error(err.str());
+             }
+             return mateval.evaluate_stress_tangent(grad, form);
+           },
+           "strain"_a, "formulation"_a,
+           "Evaluates stress and tangent moduli for a given strain and "
+           "formulation (Piola-Kirchhoff 1 stress as a function of the "
+           "placement gradient P = P(F) for "
+           "formulation=Formulation.finite_strain and Cauchy stress as a "
+           "function of the infinitesimal strain tensor σ = σ(ε) for "
+           "formulation=Formulation.small_strain). The tangent moduli are K = "
+           "∂P/∂F for formulation=Formulation.finite_strain and C = ∂σ/∂ε for "
+           "formulation=Formulation.small_strain.")
+      .def("estimate_tangent",
+           [](MatEval_t & evaluator, py::EigenDRef<Eigen::MatrixXd> & grad,
+              muSpectre::Formulation form, const Real step,
+              const muSpectre::FiniteDiff diff_type) {
+             if ((grad.cols() != Dim) or (grad.rows() != Dim)) {
+               std::stringstream err{};
+               err << "need matrix of shape (" << Dim << "×" << Dim
+                   << ") but got (" << grad.rows() << "×"
+                   << grad.cols() << ").";
+               throw std::runtime_error(err.str());
+             }
+             return evaluator.estimate_tangent(grad, form, step, diff_type);
+           },
+           "strain"_a, "formulation"_a, "Delta_x"_a,
+           "difference_type"_a = muSpectre::FiniteDiff::centred,
+           "Numerical estimate of the tangent modulus using finite "
+           "differences. The finite difference scheme as well as the finite "
+           "step size can be chosen. If there are no special circumstances, "
+           "the default scheme of centred finite differences yields the most "
+           "accurate results at an increased computational cost.");
+}
+
+template <Dim_t Dim>
 void add_material_helper(py::module & mod) {
   std::stringstream name_stream{};
-  name_stream << "MaterialBase_" << dim << "d";
+  name_stream << "MaterialBase_" << Dim << "d";
   std::string name{name_stream.str()};
-  using Material = muSpectre::MaterialBase<dim, dim>;
-  using MaterialTrampoline = PyMaterialBase<dim>;
-  using FC_t = muSpectre::LocalFieldCollection<dim>;
-  using FCBase_t = muSpectre::FieldCollectionBase<dim, FC_t>;
+  using Material = muSpectre::MaterialBase<Dim, Dim>;
+  using MaterialTrampoline = PyMaterialBase<Dim>;
+  using FC_t = muSpectre::LocalFieldCollection<Dim>;
+  using FCBase_t = muSpectre::FieldCollectionBase<Dim, FC_t>;
 
-  py::class_<Material, MaterialTrampoline /* <--- trampoline*/>(mod,
+  py::class_<Material, MaterialTrampoline /* <--- trampoline*/,
+             std::shared_ptr<Material>>(mod,
                                                                 name.c_str())
       .def(py::init<std::string>())
       .def("save_history_variables", &Material::save_history_variables)
@@ -131,7 +207,7 @@ void add_material_helper(py::module & mod) {
            py::return_value_policy::reference_internal)
       .def("size", &Material::size)
       .def("add_pixel",
-           [](Material & mat, muSpectre::Ccoord_t<dim> pix) {
+           [](Material & mat, muSpectre::Ccoord_t<Dim> pix) {
              mat.add_pixel(pix);
            },
            "pixel"_a)
@@ -142,13 +218,15 @@ void add_material_helper(py::module & mod) {
                              "returns the field collection containing internal "
                              "fields of this material");
 
-  add_material_linear_elastic1_helper<dim>(mod);
-  add_material_linear_elastic2_helper<dim>(mod);
-  add_material_linear_elastic3_helper<dim>(mod);
-  add_material_linear_elastic4_helper<dim>(mod);
-  add_material_hyper_elasto_plastic1_helper<dim>(mod);
-  add_material_linear_elastic_generic1_helper<dim>(mod);
-  add_material_linear_elastic_generic2_helper<dim>(mod);
+  add_material_linear_elastic1_helper<Dim>(mod);
+  add_material_linear_elastic2_helper<Dim>(mod);
+  add_material_linear_elastic3_helper<Dim>(mod);
+  add_material_linear_elastic4_helper<Dim>(mod);
+  add_material_hyper_elasto_plastic1_helper<Dim>(mod);
+  add_material_linear_elastic_generic1_helper<Dim>(mod);
+  add_material_linear_elastic_generic2_helper<Dim>(mod);
+
+  add_material_evaluator<Dim>(mod);
 }
 
 void add_material(py::module & mod) {

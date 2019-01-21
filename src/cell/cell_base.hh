@@ -56,8 +56,7 @@ namespace muSpectre {
    * allow the system to be used like a sparse matrix in
    * conjugate-gradient-type solvers
    */
-  template <class Cell>
-  class CellAdaptor;
+  template <class Cell> class CellAdaptor;
 
   /**
    * Base class for cells that is not templated and therefore can be
@@ -83,8 +82,7 @@ namespace muSpectre {
     using Array_t = Eigen::Array<T, Eigen::Dynamic, Eigen::Dynamic>;
 
     //! ref to dynamic generic array
-    template <typename T>
-    using Array_ref = Eigen::Map<Array_t<T>>;
+    template <typename T> using Array_ref = Eigen::Map<Array_t<T>>;
 
     //! ref to constant vector
     using ConstVector_ref = Eigen::Map<const Vector_t>;
@@ -259,9 +257,11 @@ namespace muSpectre {
      * same pixel. Pixels for which no field named `unique_name`
      * exists get an array of zeros.
      *
-     * @param unique_name fieldname to fill the global field with. At
-     * least one material must have such a field, or a
-     * `std::runtime_error` is thrown
+     * @param unique_name fieldname to fill the global field with. At least one
+     * material must have such a field, or a `std::runtime_error` is thrown
+     * @param nb_steps_ago for history variables which remember more than a
+     * single previous value, `nb_steps_ago` can be used to specify which old
+     * value to access.
      */
     virtual Array_ref<Real>
     get_globalised_old_real_array(const std::string & unique_name,
@@ -301,8 +301,7 @@ namespace muSpectre {
     //! projections handled through `std::unique_ptr`s
     using Projection_ptr = std::unique_ptr<Projection_t>;
     //! dynamic global fields
-    template <typename T>
-    using Field_t = TypedField<FieldCollection_t, T>;
+    template <typename T> using Field_t = TypedField<FieldCollection_t, T>;
     //! expected type for strain fields
     using StrainField_t =
         TensorField<FieldCollection_t, Real, secondOrder, DimM>;
@@ -328,12 +327,10 @@ namespace muSpectre {
     using Vector_ref = typename Parent::Vector_ref;
 
     //! dynamic array type for interactions with numpy/scipy/solvers, etc.
-    template <typename T>
-    using Array_t = typename Parent::Array_t<T>;
+    template <typename T> using Array_t = typename Parent::Array_t<T>;
 
     //! dynamic array type for interactions with numpy/scipy/solvers, etc.
-    template <typename T>
-    using Array_ref = typename Parent::Array_ref<T>;
+    template <typename T> using Array_ref = typename Parent::Array_ref<T>;
 
     //! sparse matrix emulation
     using Adaptor = Parent::Adaptor;

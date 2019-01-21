@@ -43,6 +43,7 @@
 #include "common/common.hh"
 #include "materials/material_base.hh"
 #include "materials/materials_toolbox.hh"
+#include "materials/material_evaluator.hh"
 #include "common/field_collection.hh"
 #include "common/field.hh"
 #include "common//utilities.hh"
@@ -132,6 +133,15 @@ namespace muSpectre {
     template <class... ConstructorArgs>
     static Material & make(CellBase<DimS, DimM> & cell,
                            ConstructorArgs &&... args);
+    /** Factory
+     * takes all arguments after the name of the underlying
+     * Material's constructor. E.g., if the underlying material is a
+     * `muSpectre::MaterialLinearElastic1<threeD>`, these would be Young's
+     * modulus and Poisson's ratio.
+     */
+    template <class... ConstructorArgs>
+    static std::tuple<std::shared_ptr<Material>, MaterialEvaluator<DimM>>
+    make_evaluator(ConstructorArgs &&... args);
 
     //! Copy assignment operator
     MaterialMuSpectre & operator=(const MaterialMuSpectre & other) = delete;
@@ -222,6 +232,18 @@ namespace muSpectre {
     auto & mat_ref = *mat;
     cell.add_material(std::move(mat));
     return mat_ref;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <class Material, Dim_t DimS, Dim_t DimM>
+  template <class... ConstructorArgs>
+  std::tuple<std::shared_ptr<Material>, MaterialEvaluator<DimM>>
+  MaterialMuSpectre<Material, DimS, DimM>::make_evaluator(
+      ConstructorArgs &&... args) {
+    auto mat = std::make_shared<Material>("name", args...);
+    using Ret_t =
+        std::tuple<std::shared_ptr<Material>, MaterialEvaluator<DimM>>;
+    return Ret_t(mat, MaterialEvaluator<DimM>{mat});
   }
 
   /* ---------------------------------------------------------------------- */

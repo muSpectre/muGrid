@@ -31,27 +31,63 @@ implementation of :cpp:class:`muSpectre::MaterialLinearElastic2`.
 The :cpp:class:`muSpectre::MaterialMuSpectre` class
 ***************************************************
 
-The class :cpp:class:`muSpectre::MaterialMuSpectre` is defined in ``material_muSpectre_base.hh`` and takes three template parameters;
+The class :cpp:class:`muSpectre::MaterialMuSpectre` is defined in
+``material_muSpectre_base.hh`` and takes three template parameters;
 
-#. ``class Material`` is a `CRTP <https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern>`_ and names the material inheriting from it. The reason for this construction is that we want to avoid virtual method calls from :cpp:class:`muSpectre::MaterialMuSpectre` to its derived classes. Rather, we want :cpp:class:`muSpectre::MaterialMuSpectre` to be able to call methods of the inheriting class directly without runtime overhead.
-#. ``Dim_t DimS`` defines the number of spatial dimensions of the problem, i.e., whether we are dealing with a two- or three-dimensional grid of pixels/voxels.
-#. ``Dim_t DimM`` defines the number of dimensions of our material description. This value will typically be the same as ``DimS``, but in cases like generalised plane strain, we can for instance have a three three-dimensional material response in a two-dimensional pixel grid.
+#. ``class Material`` is a `CRTP
+   <https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern>`_ and
+   names the material inheriting from it. The reason for this construction is
+   that we want to avoid virtual method calls from
+   :cpp:class:`muSpectre::MaterialMuSpectre` to its derived classes. Rather, we
+   want :cpp:class:`muSpectre::MaterialMuSpectre` to be able to call methods of
+   the inheriting class directly without runtime overhead.
+#. ``Dim_t DimS`` defines the number of spatial dimensions of the problem, i.e.,
+   whether we are dealing with a two- or three-dimensional grid of
+   pixels/voxels.
+#. ``Dim_t DimM`` defines the number of dimensions of our material
+   description. This value will typically be the same as ``DimS``, but in cases
+   like generalised plane strain, we can for instance have a three
+   three-dimensional material response in a two-dimensional pixel grid.
 
 The main job of :cpp:class:`muSpectre::MaterialMuSpectre` is to
 
-#. loop over all pixels to which this material has been assigned, transform the global gradient :math:`\mathbf{F}` (or small strain tensor :math:`\boldsymbol\varepsilon`) into the new material's required strain measure (e.g., the Green-Lagrange strain tensor :math:`\mathbf{E}`),
-#. for each pixel evaluate the constitutive law by calling its ``evaluate_stress`` (computes the stress response) or ``evaluate_stress_tangent`` (computes both stress and consistent tangent) method with the local strain and internal variables, and finally
-#. transform the stress (and possibly tangent) response from the material's stress measure into first Piola-Kirchhoff stress :math:`\mathbf{P}` (or Cauchy stress :math:`\boldsymbol\sigma` in small strain).
+#. loop over all pixels to which this material has been assigned, transform the
+   global gradient :math:`\mathbf{F}` (or small strain tensor
+   :math:`\boldsymbol\varepsilon`) into the new material's required strain
+   measure (e.g., the Green-Lagrange strain tensor :math:`\mathbf{E}`),
+#. for each pixel evaluate the constitutive law by calling its
+   ``evaluate_stress`` (computes the stress response) or
+   ``evaluate_stress_tangent`` (computes both stress and consistent tangent)
+   method with the local strain and internal variables, and finally
+#. transform the stress (and possibly tangent) response from the material's
+   stress measure into first Piola-Kirchhoff stress :math:`\mathbf{P}` (or
+   Cauchy stress :math:`\boldsymbol\sigma` in small strain).
 
-In order to use these facilities, the new material needs to inherit from :cpp:class:`muSpectre::MaterialMuSpectre` (where we calculation of the response) and specialise the type :cpp:class:`muSpectre::MaterialMuSpectre_traits` (where we tell :cpp:class:`muSpectre::MaterialMuSpectre` how to use the new material). These two steps are described here for our example material.
+In order to use these facilities, the new material needs to inherit from
+:cpp:class:`muSpectre::MaterialMuSpectre` (where we calculation of the response)
+and specialise the type :cpp:class:`muSpectre::MaterialMuSpectre_traits` (where
+we tell :cpp:class:`muSpectre::MaterialMuSpectre` how to use the new
+material). These two steps are described here for our example material.
 
 Specialising the :cpp:class:`muSpectre::MaterialMuSpectre_traits` structure
-***************************************************************************
-This structure is templated by the new material (in this case :cpp:class:`MaterialTutorial`) and needs to specify
+*************************************************************************** This
+structure is templated by the new material (in this case
+:cpp:class:`MaterialTutorial`) and needs to specify
 
-#. the types used to communicate per-pixel strains, stresses and stiffness tensors to the material (i.e., whether you want to get maps to `Eigen` matrices or raw pointers, or ...). Here we will use the convenient :cpp:type:`muSpectre::MatrixFieldMap` for strains and stresses, and :cpp:type:`muSpectre::T4MatrixFieldMap` for the stiffness. Look through the classes deriving from :cpp:type:`muSpectre::FieldMap` for all available options.
-#. the strain measure that is expected (e.g., gradient, Green-Lagrange strain, left Cauchy-Green strain, etc.). Here we will use Green-Lagrange strain. The options are defined by the enum :cpp:enum:`muSpectre::StrainMeasure`.
-#. the stress measure that is computed by the law (e.g., Cauchy, first Piola-Kirchhoff, etc,). Here, it will be first Piola-Kirchhoff stress. The available options are defined by the enum :cpp:enum:`muSpectre::StressMeasure`.
+#. the types used to communicate per-pixel strains, stresses and stiffness
+   tensors to the material (i.e., whether you want to get maps to `Eigen`
+   matrices or raw pointers, or ...). Here we will use the convenient
+   :cpp:type:`muSpectre::MatrixFieldMap` for strains and stresses, and
+   :cpp:type:`muSpectre::T4MatrixFieldMap` for the stiffness. Look through the
+   classes deriving from :cpp:type:`muSpectre::FieldMap` for all available
+   options.
+#. the strain measure that is expected (e.g., gradient, Green-Lagrange strain,
+   left Cauchy-Green strain, etc.). Here we will use Green-Lagrange strain. The
+   options are defined by the enum :cpp:enum:`muSpectre::StrainMeasure`.
+#. the stress measure that is computed by the law (e.g., Cauchy, first
+   Piola-Kirchhoff, etc,). Here, it will be first Piola-Kirchhoff stress. The
+   available options are defined by the enum
+   :cpp:enum:`muSpectre::StressMeasure`.
 
 Our traits look like this (assuming we are in the namespace ``muSpectre``::
 
@@ -86,7 +122,9 @@ Our traits look like this (assuming we are in the namespace ``muSpectre``::
 Implementing the new material
 *****************************
 
-The new law needs to implement the methods ``add_pixel``, ``get_internals``, ``evaluate_stress``, and ``evaluate_stress_tangent``. Below is a commented example header::
+The new law needs to implement the methods ``add_pixel``, ``get_internals``,
+``evaluate_stress``, and ``evaluate_stress_tangent``. Below is a commented
+example header::
 
   template <Dim_t DimS, Dim_t DimM>
   class MaterialTutorial:
@@ -172,7 +210,11 @@ A possible implementation for the constructor would be::
     }
   }
 
-as an exercise, you could check how :cpp:class:`muSpectre::MaterialLinearElastic1` uses *µ*\Spectre**'s materials toolbox (in namespace ``MatTB``) to compute :math:`\mathbb C` in a much more convenient fashion. The evaluation of the stress could be (here, we make use of the ``Matrices`` namespace that defines common tensor algebra operations)::
+as an exercise, you could check how
+:cpp:class:`muSpectre::MaterialLinearElastic1` uses *µ*\Spectre**'s materials
+toolbox (in namespace ``MatTB``) to compute :math:`\mathbb C` in a much more
+convenient fashion. The evaluation of the stress could be (here, we make use of
+the ``Matrices`` namespace that defines common tensor algebra operations)::
 
   template <Dim_t DimS, Dim_t DimM>
   template <class s_t, class eigen_s_t>
@@ -203,4 +245,6 @@ The remaining two methods are straight-forward::
   }
 
 
-Note that the methods ``evaluate_stress`` and ``evaluate_stress_tangent`` need to be in the header, as both their input parameter types and output type depend on the compile-time context.
+Note that the methods ``evaluate_stress`` and ``evaluate_stress_tangent`` need
+to be in the header, as both their input parameter types and output type depend
+on the compile-time context.

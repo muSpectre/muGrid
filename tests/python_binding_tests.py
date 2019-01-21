@@ -52,6 +52,7 @@ from python_exact_reference_elastic_test import LinearElastic_Check
 
 from python_field_tests import FieldCollection_Check
 
+from python_material_evaluator_test import MaterialEvaluator_Check
 
 class CellCheck(unittest.TestCase):
     def test_Construction(self):

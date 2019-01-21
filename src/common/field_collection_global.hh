@@ -121,6 +121,8 @@ namespace muSpectre {
    protected:
     //! number of discretisation cells in each of the DimS spatial directions
     Ccoord sizes{};
+    //! subdomain locations (i.e. coordinates of hind bottom left corner of this
+    //! subdomain)
     Ccoord locations{};
     CcoordOps::Pixels<DimS> pixels{};  //!< helper to iterate over the grid
    private:

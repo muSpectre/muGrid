@@ -47,6 +47,7 @@ sys.path.insert(0, os.path.join(os.getcwd(), "language_bindings/python/Debug"))
 
 try:
     import muSpectre as µ
+    import muSpectre
 except ImportError as err:
     print(err)
     sys.exit(-1)

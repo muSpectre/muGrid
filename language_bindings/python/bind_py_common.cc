@@ -153,6 +153,16 @@ void add_common(py::module & mod) {
       .value("measure", muSpectre::FFT_PlanFlags::measure)
       .value("patient", muSpectre::FFT_PlanFlags::patient);
 
+  py::enum_<muSpectre::FiniteDiff>(
+      mod, "FiniteDiff",
+      "Distinguishes between different options of numerical differentiation;\n "
+      "  1) 'forward' finite differences: ∂f/∂x ≈ (f(x+Δx) - f(x))/Δx\n   2) "
+      "'backward' finite differences: ∂f/∂x ≈ (f(x) - f(x-Δx))/Δx\n   3) "
+      "'centred' finite differences: ∂f/∂x ≈ (f(x+Δx) - f(x-Δx))/2Δx")
+      .value("forward", muSpectre::FiniteDiff::forward)
+      .value("backward", muSpectre::FiniteDiff::backward)
+      .value("centred", muSpectre::FiniteDiff::centred);
+
   mod.def("banner", &muSpectre::banner, "name"_a, "year"_a,
           "copyright_holder"_a);
 

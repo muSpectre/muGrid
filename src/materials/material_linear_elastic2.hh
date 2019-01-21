@@ -104,7 +104,7 @@ namespace muSpectre {
                               typename traits::TangentMap_t::reference>;
 
     //! reference to any type that casts to a matrix
-    using StrainTensor = Eigen::Ref<Eigen::Matrix<Real, DimM, DimM>>;
+    using StrainTensor = Eigen::Ref<const Eigen::Matrix<Real, DimM, DimM>>;
     //! Default constructor
     MaterialLinearElastic2() = delete;
 

@@ -24,5 +24,6 @@ ALIASES               += "endrst=\endverbatim"
 QUIET                  = YES
 WARNINGS               = YES
 WARN_IF_UNDOCUMENTED   = YES
+SHOW_NAMESPACES        = NO
 
 EXCLUDE_PATTERNS       = */CMakeLists.txt

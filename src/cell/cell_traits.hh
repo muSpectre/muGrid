@@ -41,8 +41,7 @@
 
 namespace muSpectre {
 
-  template <class Cell>
-  class CellAdaptor;
+  template <class Cell> class CellAdaptor;
 
 }  // namespace muSpectre
 
