@@ -63,6 +63,8 @@ namespace muSpectre {
     Uint nb_it;
     //! number of cell evaluations
     Uint nb_fev;
+    //! continuum mechanic flag
+    Formulation formulation;
   };
 
   /**

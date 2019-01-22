@@ -138,7 +138,8 @@ void add_solvers(py::module & mod) {
       .def_readwrite("status", &OptimizeResult::status)
       .def_readwrite("message", &OptimizeResult::message)
       .def_readwrite("nb_it", &OptimizeResult::nb_it)
-      .def_readwrite("nb_fev", &OptimizeResult::nb_fev);
+      .def_readwrite("nb_fev", &OptimizeResult::nb_fev)
+      .def_readwrite("formulation", &OptimizeResult::formulation);
 
   add_iterative_solver(solvers);
 

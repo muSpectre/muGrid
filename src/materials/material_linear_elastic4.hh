@@ -167,8 +167,8 @@ namespace muSpectre {
     /**
      * overload add_pixel to write into local stiffness tensor
      */
-    void add_pixel(const Ccoord_t<DimS> & pixel, const Real & Poisson_ratio,
-                   const Real & Youngs_modulus);
+    void add_pixel(const Ccoord_t<DimS> & pixel,
+                   const Real & Youngs_modulus, const Real & Poisson_ratio);
 
    protected:
     //! storage for first Lame constant 'lambda'
@@ -198,8 +198,9 @@ namespace muSpectre {
   template <class s_t>
   auto MaterialLinearElastic4<DimS, DimM>::evaluate_stress_tangent(
       s_t && E, const Real & lambda, const Real & mu) -> decltype(auto) {
-    auto C = Hooke::compute_C_T4(lambda, mu);
-    return std::make_tuple(Matrices::tensmult(C, E), C);
+    T4Mat<Real, DimM> C = Hooke::compute_C_T4(lambda, mu);
+    return std::make_tuple(
+        this->evaluate_stress(std::forward<s_t>(E), lambda, mu), C);
   }
 
 }  // namespace muSpectre

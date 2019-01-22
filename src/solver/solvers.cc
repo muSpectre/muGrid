@@ -240,9 +240,10 @@ namespace muSpectre {
       previous_macro_strain = macro_strain;
 
       // store results
-      ret_val.emplace_back(OptimizeResult{
-          F, cell.get_stress_vector(), convergence_test(),
-          Int(convergence_test()), message, newt_iter, solver.get_counter()});
+      ret_val.emplace_back(
+          OptimizeResult{F, cell.get_stress_vector(), convergence_test(),
+                         Int(convergence_test()), message, newt_iter,
+                         solver.get_counter(), form});
 
       // store history variables for next load increment
       cell.save_history_variables();
@@ -467,9 +468,10 @@ namespace muSpectre {
       previous_macro_strain = macro_strain;
 
       // store results
-      ret_val.emplace_back(OptimizeResult{
-          F, cell.get_stress_vector(), convergence_test(),
-          Int(convergence_test()), message, newt_iter, solver.get_counter()});
+      ret_val.emplace_back(
+          OptimizeResult{F, cell.get_stress_vector(), convergence_test(),
+                         Int(convergence_test()), message, newt_iter,
+                         solver.get_counter(), form});
 
       // store history variables for next load increment
       cell.save_history_variables();

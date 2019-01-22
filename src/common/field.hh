@@ -343,8 +343,6 @@ namespace muSpectre {
    protected:
     //! constructor protected!
     MatrixField(std::string unique_name, FieldCollection & collection);
-
-   private:
   };
 
   /* ---------------------------------------------------------------------- */

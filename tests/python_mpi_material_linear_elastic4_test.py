@@ -74,22 +74,22 @@ def build_test_classes(fft):
 
             for i, pixel in enumerate(self.sys):
                 self.mat.add_pixel(pixel, Youngs_modulus, Poisson_ratio)
-    
+
             self.sys.initialise()
             tol = 1e-6
             Del0 = np.array([[0, 0.025],
                              [0.025,  0]])
             maxiter = 100
             verbose = 1
-    
+
             solver=µ.solvers.SolverCG(self.sys, tol, maxiter, verbose)
             r = µ.solvers.newton_cg(self.sys, Del0,
                                     solver, tol, tol, verbose)
-    
+
             #compare the computed stress with the trivial by hand computed stress
             mu = (Youngs_modulus/(2*(1+Poisson_ratio)))
             stress = 2*mu*Del0
-    
+
             self.assertLess(np.linalg.norm(r.stress-stress.reshape(-1,1)), 1e-8)
 
     return MaterialLinearElastic4_Check

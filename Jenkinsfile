@@ -142,7 +142,7 @@ pipeline {
             trigger_readthedocs()
         }
 
-	    failure {
+	    unsuccessful {
             send_fail_pass('fail')
         }
     }

@@ -51,6 +51,8 @@ from python_field_tests import FieldCollection_Check
 from python_exact_reference_elastic_test import LinearElastic_Check
 
 from python_field_tests import FieldCollection_Check
+from python_muSpectre_gradient_integration_test import \
+    MuSpectre_gradient_integration_Check
 
 from python_material_evaluator_test import MaterialEvaluator_Check
 
@@ -155,6 +157,14 @@ class EigenStrainCheck(unittest.TestCase):
                 self.mat3.add_pixel(pixel, np.ones((2,2)))
         glo_eigenstrain = self.cell2.get_globalised_internal_real_array("Eigenstrain")
         error = np.linalg.norm(glo_eigenstrain-1)
+        self.assertEqual(error, 0)
+
+    def test_globalisation(self):
+        for pixel in self.cell2:
+            self.mat2.add_pixel(pixel, np.random.rand(2,2))
+        loc_eigenstrain = self.mat2.collection.get_real_field("Eigenstrain").array
+        glo_eigenstrain = self.cell2.get_globalised_internal_real_array("Eigenstrain")
+        error = np.linalg.norm(loc_eigenstrain-glo_eigenstrain)
         self.assertEqual(error, 0)
 
     def test_solve(self):

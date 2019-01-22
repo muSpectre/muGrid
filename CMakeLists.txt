@@ -101,6 +101,7 @@ if(${CMAKE_COMPILER_IS_GNUCC})
 endif()
 
 add_external_package(Eigen3 VERSION 3.3.0 CONFIG)
+
 add_external_package(pybind11 VERSION 2.2 CONFIG)
 find_package(PythonLibsNew ${MUSPECTRE_PYTHON_MAJOR_VERSION} MODULE REQUIRED)
 
@@ -112,7 +113,6 @@ include_directories(
 if(APPLE)
   include_directories(${CMAKE_INSTALL_PREFIX}/include ${Boost_INCLUDE_DIRS})
 endif()
-
 
 #build tests (these are before we add -Werror to the compile options)
 if (${MAKE_TESTS})

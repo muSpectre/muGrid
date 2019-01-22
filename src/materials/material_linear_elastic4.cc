@@ -52,10 +52,10 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void MaterialLinearElastic4<DimS, DimM>::add_pixel(
-      const Ccoord_t<DimS> & /*pixel*/) {
-    throw std::runtime_error(
-        "this material needs pixels with Youngs modulus and Poisson ratio.");
+  void MaterialLinearElastic4<DimS, DimM>::
+  add_pixel(const Ccoord_t<DimS> & /*pixel*/) {
+    throw std::runtime_error
+      ("This material needs pixels with Youngs modulus and Poisson ratio.");
   }
 
   /* ---------------------------------------------------------------------- */

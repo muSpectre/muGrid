@@ -201,7 +201,7 @@ namespace muSpectre {
 
       ret_val.push_back(OptimizeResult{
           F.eigen(), cell.get_stress().eigen(), has_converged,
-          Int(has_converged), message, newt_iter, solver.get_counter()});
+          Int(has_converged), message, newt_iter, solver.get_counter(), form});
 
       // store history variables here
       cell.save_history_variables();
@@ -368,9 +368,10 @@ namespace muSpectre {
       // update previous gradient
       previous_grad = delF;
 
-      ret_val.push_back(OptimizeResult{
-          F.eigen(), cell.get_stress().eigen(), convergence_test(),
-          Int(convergence_test()), message, newt_iter, solver.get_counter()});
+      ret_val.push_back(OptimizeResult{F.eigen(), cell.get_stress().eigen(),
+                                       convergence_test(),
+                                       Int(convergence_test()), message,
+                                       newt_iter, solver.get_counter(), form});
 
       // store history variables for next load increment
       cell.save_history_variables();

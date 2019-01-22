@@ -45,6 +45,7 @@ from _muSpectre import (Formulation, get_domain_ccoord, get_domain_index,
                         get_hermitian_sizes, material, solvers,
                         FFT_PlanFlags, FiniteDiff)
 import muSpectre.fft
+import muSpectre.gradient_integration
 
 _factories = {'fftw': ('CellFactory', False),
               'fftwmpi': ('FFTWMPICellFactory', True),
