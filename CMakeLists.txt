@@ -47,31 +47,28 @@ set(MUSPECTRE_PYTHON_MAJOR_VERSION 3)
 add_compile_options(-Wall -Wextra -Weffc++)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
-set(MAKE_DOC_TARGET "OFF" CACHE BOOL "If on, a target dev_doc (which builds the documentation) is added")
-set(MAKE_TESTS "ON" CACHE BOOL "If on, several ctest targets will be built automatically")
-set(MAKE_EXAMPLES "ON" CACHE BOOL "If on, the executables in the bin folder will be compiled")
-set(MAKE_BENCHMARKS "ON" CACHE BOOL "If on, the benchmarks will be compiled")
-set(MPI_PARALLEL "OFF" CACHE BOOL "If on, MPI-parallel solvers become available")
-set(RUNNING_IN_CI "OFF" CACHE INTERNAL "changes output format for tests")
+set(MUSPECTRE_MAKE_DOC_TARGET "OFF" CACHE BOOL "If on, a target dev_doc (which builds the documentation) is added")
+set(MUSPECTRE_MAKE_TESTS "ON" CACHE BOOL "If on, several ctest targets will be built automatically")
+set(MUSPECTRE_MAKE_EXAMPLES "ON" CACHE BOOL "If on, the executables in the bin folder will be compiled")
+set(MUSPECTRE_MAKE_BENCHMARKS "ON" CACHE BOOL "If on, the benchmarks will be compiled")
+set(MUSPECTRE_MPI_PARALLEL "OFF" CACHE BOOL "If on, MPI-parallel solvers become available")
+set(MUSPECTRE_RUNNING_IN_CI "OFF" CACHE INTERNAL "changes output format for tests")
 
-if(${MAKE_TESTS})
+if(${MUSPECTRE_MAKE_TESTS})
   enable_testing()
   find_package(Boost COMPONENTS unit_test_framework REQUIRED)
-endif(${MAKE_TESTS})
+endif()
 
-if(${MPI_PARALLEL})
+if(${MUSPECTRE_MPI_PARALLEL})
   add_definitions(-DWITH_MPI)
-  find_package(MPI)
-  if (NOT ${MPI_FOUND})
-    message(SEND_ERROR "You chose MPI but CMake cannot find the MPI package")
-  endif(NOT ${MPI_FOUND})
-endif(${MPI_PARALLEL})
+  find_package(MPI REQUIRED)
+endif()
 
 include(muspectreTools)
 include(cpplint)
 
-string( TOLOWER "${CMAKE_BUILD_TYPE}" build_type )
-if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
+string(TOLOWER "${CMAKE_BUILD_TYPE}" build_type )
+if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
   # using Clang
   add_compile_options(-Wno-missing-braces)
   if ("debug" STREQUAL "${build_type}")
@@ -85,7 +82,7 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     add_compile_options(-march=native)
   endif()
   if ("debug" STREQUAL "${build_type}" )
-    add_compile_options(-O0)
+    add_compile_options(-O0 -g3 -ggdb3)
   endif()
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
   # using Intel C++
@@ -115,15 +112,14 @@ if(APPLE)
 endif()
 
 #build tests (these are before we add -Werror to the compile options)
-if (${MAKE_TESTS})
+if (${MUSPECTRE_MAKE_TESTS})
   ##############################################################################
 
   # build library tests
-  file( GLOB TEST_SRCS "${CMAKE_SOURCE_DIR}/tests/test_*.cc")
+  file(GLOB TEST_SRCS "${CMAKE_SOURCE_DIR}/tests/test_*.cc")
 
   add_executable(main_test_suite tests/main_test_suite.cc ${TEST_SRCS})
   target_link_libraries(main_test_suite ${Boost_LIBRARIES} muSpectre)
-
 
   muSpectre_add_test(main_test_suite TYPE BOOST main_test_suite --report_level=detailed)
 
@@ -149,7 +145,7 @@ if (${MAKE_TESTS})
 
   ##############################################################################
   # build py_comparison tests
-  file (GLOB PY_COMP_TEST_SRCS "${CMAKE_SOURCE_DIR}/tests/py_comparison_*.cc")
+  file(GLOB PY_COMP_TEST_SRCS "${CMAKE_SOURCE_DIR}/tests/py_comparison_*.cc")
 
   find_package(PythonInterp ${MUSPECTRE_PYTHON_MAJOR_VERSION} REQUIRED)
   foreach(py_comp_test ${PY_COMP_TEST_SRCS})
@@ -167,12 +163,11 @@ if (${MAKE_TESTS})
       COPYONLY)
     muSpectre_add_test(${py_comp_test_fname}
       TYPE PYTHON ${py_comp_test_fname}.py)
-
   endforeach(py_comp_test ${PY_COMP_TEST_SRCS})
 
   ##############################################################################
   # copy python test
-  file( GLOB PY_TEST_SRCS "${CMAKE_SOURCE_DIR}/tests/python_*.py")
+  file(GLOB PY_TEST_SRCS "${CMAKE_SOURCE_DIR}/tests/python_*.py")
 
   foreach(pytest ${PY_TEST_SRCS})
     get_filename_component(pytest_name ${pytest} NAME)
@@ -183,7 +178,7 @@ if (${MAKE_TESTS})
   endforeach(pytest ${PY_TEST_SRCS})
   muSpectre_add_test(python_binding_test  TYPE PYTHON python_binding_tests.py)
 
-  if(${MPI_PARALLEL})
+  if(${MUSPECTRE_MPI_PARALLEL})
     ############################################################################
     # add MPI tests
     file( GLOB TEST_SRCS "${CMAKE_SOURCE_DIR}/tests/mpi_test_*.cc")
@@ -200,27 +195,21 @@ if (${MAKE_TESTS})
       python_mpi_binding_tests.py)
     muSpectre_add_test(python_mpi_binding_test2 TYPE PYTHON MPI_NB_PROCS 2
       python_mpi_binding_tests.py)
-  endif(${MPI_PARALLEL})
-endif(${MAKE_TESTS})
-
-################################################################################
-# compile the library
-add_compile_options( -Werror)
-add_subdirectory(
-  ${CMAKE_SOURCE_DIR}/src/
-  )
-add_subdirectory(
-  ${CMAKE_SOURCE_DIR}/language_bindings/
-  )
-
-if (${MAKE_DOC_TARGET})
-  add_subdirectory(
-    ${CMAKE_SOURCE_DIR}/doc/
-    )
+  endif()
 endif()
 
 ################################################################################
-if (${MAKE_EXAMPLES})
+# compile the library
+add_compile_options(-Werror)
+add_subdirectory(${CMAKE_SOURCE_DIR}/src)
+add_subdirectory(${CMAKE_SOURCE_DIR}/language_bindings)
+
+if (${MUSPECTRE_MAKE_DOC_TARGET})
+  add_subdirectory(${CMAKE_SOURCE_DIR}/doc)
+endif()
+
+################################################################################
+if(${MUSPECTRE_MAKE_EXAMPLES})
   #compile executables
 
   set(binaries
@@ -228,14 +217,15 @@ if (${MAKE_EXAMPLES})
     ${CMAKE_SOURCE_DIR}/bin/demonstrator_dynamic_solve.cc
     ${CMAKE_SOURCE_DIR}/bin/demonstrator2.cc
     ${CMAKE_SOURCE_DIR}/bin/hyper-elasticity.cc
-    ${CMAKE_SOURCE_DIR}/bin/small_case.cc)
+    ${CMAKE_SOURCE_DIR}/bin/small_case.cc
+    )
 
-  if (${MPI_PARALLEL})
+  if(${MUSPECTRE_MPI_PARALLEL})
     set (binaries
       ${binaries}
       ${CMAKE_SOURCE_DIR}/bin/demonstrator_mpi.cc
       )
-  endif (${MPI_PARALLEL})
+  endif()
 
   foreach(binaryfile ${binaries})
     get_filename_component(binaryname  ${binaryfile} NAME_WE)
@@ -244,9 +234,8 @@ if (${MAKE_EXAMPLES})
   endforeach(binaryfile ${binaries})
 
   # or copy them
-  file (GLOB pybins "${CMAKE_SOURCE_DIR}/bin/*.py")
+  file(GLOB pybins "${CMAKE_SOURCE_DIR}/bin/*.py")
   foreach(pybin ${pybins})
-
     get_filename_component(binaryname  ${pybin} NAME_WE)
     configure_file(
       ${pybin}
@@ -259,28 +248,25 @@ if (${MAKE_EXAMPLES})
     ${CMAKE_SOURCE_DIR}/bin/odd_image.npz)
 
   foreach(FILE_FOR_COPY ${FILES_FOR_COPY})
-
     get_filename_component(binaryname  ${FILE_FOR_COPY} NAME)
     configure_file(
       ${FILE_FOR_COPY}
       "${CMAKE_BINARY_DIR}/${binaryname}"
       COPYONLY)
   endforeach(FILE_FOR_COPY ${FILES_FOR_COPY})
-
-endif (${MAKE_EXAMPLES})
+endif()
 
 
 ################################################################################
 # compile benchmarks
-if(${MAKE_BENCHMARKS})
+if(${MUSPECTRE_MAKE_BENCHMARKS})
   file(GLOB benchmarks "${CMAKE_SOURCE_DIR}/benchmarks/benchmark*cc")
   foreach(benchmark ${benchmarks})
     get_filename_component(benchmark_name ${benchmark} NAME_WE)
     add_executable(${benchmark_name} ${benchmark})
     target_link_libraries(${benchmark_name} ${BOOST_LIBRARIES} muSpectre)
   endforeach(benchmark ${benchmark})
-endif(${MAKE_BENCHMARKS})
-
+endif()
 
 cpplint_add_subdirectory("${CMAKE_SOURCE_DIR}/src" "")
 cpplint_add_subdirectory("${CMAKE_SOURCE_DIR}/tests" "")

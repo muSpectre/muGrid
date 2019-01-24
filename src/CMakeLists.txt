@@ -33,8 +33,12 @@
 # covered by the terms of those libraries' licenses, the licensors of this
 # Program grant you additional permission to convey the resulting work.
 # =============================================================================
+add_subdirectory(libgrid)
+add_subdirectory(libfft)
 
-add_library(muSpectre "")
+add_library(muSpectre)
+target_link_libraries(muSpectre PUBLIC muSpectre::muFFT muSpectre::muGrid)
+
 set("PRIVATE_MUSPECTRE_LIBS" "")
 
 add_subdirectory(common)
@@ -44,14 +48,10 @@ add_subdirectory(cell)
 add_subdirectory(solver)
 
 
-if (${MPI_PARALLEL})
+if(${MUSPECTRE_MPI_PARALLEL})
   target_link_libraries(muSpectre PUBLIC ${MPI_LIBRARIES})
   target_include_directories(muSpectre SYSTEM PUBLIC ${MPI_C_INCLUDE_PATH})
-endif(${MPI_PARALLEL})
-
-
-find_package(FFTW REQUIRED)
-
+endif()
 
 # The following checks whether std::optional exists and replaces it by
 # boost::optional if necessary
@@ -63,7 +63,6 @@ std::experimental::optional<double> A{};
 }"
     HAS_STD_OPTIONAL)
 
-add_definitions(-DBAR)
 if( NOT HAS_STD_OPTIONAL)
   add_definitions(-DNO_EXPERIMENTAL)
 endif()
