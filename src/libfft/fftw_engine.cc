@@ -32,7 +32,7 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include "fft/fftw_engine.hh"
+#include "projection/fftw_engine.hh"
 #include "common/ccoord_operations.hh"
 
 namespace muSpectre {

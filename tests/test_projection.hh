@@ -34,7 +34,7 @@
  */
 
 #include "tests.hh"
-#include "fft/fftw_engine.hh"
+#include "projection/fftw_engine.hh"
 
 #include <boost/mpl/list.hpp>
 #include <Eigen/Dense>

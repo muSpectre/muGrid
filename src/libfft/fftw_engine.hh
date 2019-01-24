@@ -1,11 +1,11 @@
 /**
- * @file   pfft_engine.hh
+ * @file   fftw_engine.hh
  *
- * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
+ * @author Till Junge <till.junge@altermail.ch>
  *
- * @date   06 Mar 2017
+ * @date   03 Dec 2017
  *
- * @brief  FFT engine using MPI-parallel PFFT
+ * @brief  FFT engine using FFTW
  *
  * Copyright © 2017 Till Junge
  *
@@ -32,51 +32,49 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef SRC_FFT_PFFT_ENGINE_HH_
-#define SRC_FFT_PFFT_ENGINE_HH_
+#ifndef SRC_PROJECTION_FFTW_ENGINE_HH_
+#define SRC_PROJECTION_FFTW_ENGINE_HH_
 
-#include "common/communicator.hh"
+#include "projection/fft_engine_base.hh"
 
-#include "fft/fft_engine_base.hh"
-
-#include <pfft.h>
+#include <fftw3.h>
 
 namespace muSpectre {
 
   /**
-   * implements the `muSpectre::FFTEngineBase` interface using the
+   * implements the `muSpectre::FftEngine_Base` interface using the
    * FFTW library
    */
-  template <Dim_t DimS>
-  class PFFTEngine : public FFTEngineBase<DimS> {
+  template <Dim_t Dim>
+  class FFTWEngine : public FFTEngineBase<Dim> {
    public:
-    using Parent = FFTEngineBase<DimS>;      //!< base class
+    using Parent = FFTEngineBase<Dim>;       //!< base class
     using Ccoord = typename Parent::Ccoord;  //!< cell coordinates type
     //! field for Fourier transform of second-order tensor
     using Workspace_t = typename Parent::Workspace_t;
     //! real-valued second-order tensor
     using Field_t = typename Parent::Field_t;
     //! Default constructor
-    PFFTEngine() = delete;
+    FFTWEngine() = delete;
 
-    //! Constructor with system resolutions
-    PFFTEngine(Ccoord resolutions, Dim_t nb_components,
+    //! Constructor with cell resolutions
+    FFTWEngine(Ccoord resolutions, Dim_t nb_components,
                Communicator comm = Communicator());
 
     //! Copy constructor
-    PFFTEngine(const PFFTEngine & other) = delete;
+    FFTWEngine(const FFTWEngine & other) = delete;
 
     //! Move constructor
-    PFFTEngine(PFFTEngine && other) = default;
+    FFTWEngine(FFTWEngine && other) = default;
 
     //! Destructor
-    virtual ~PFFTEngine() noexcept;
+    virtual ~FFTWEngine() noexcept;
 
     //! Copy assignment operator
-    PFFTEngine & operator=(const PFFTEngine & other) = delete;
+    FFTWEngine & operator=(const FFTWEngine & other) = delete;
 
     //! Move assignment operator
-    PFFTEngine & operator=(PFFTEngine && other) = default;
+    FFTWEngine & operator=(FFTWEngine && other) = default;
 
     // compute the plan, etc
     void initialise(FFT_PlanFlags plan_flags) override;
@@ -88,18 +86,11 @@ namespace muSpectre {
     void ifft(Field_t & field) const override;
 
    protected:
-    MPI_Comm mpi_comm;  //! < MPI communicator
-    static int
-        nb_engines;        //!< number of times this engine has been instatiated
-    pfft_plan plan_fft{};  //!< holds the plan for forward fourier transform
-    pfft_plan plan_ifft{};  //!< holds the plan for inverse fourier transform
-    ptrdiff_t
-        workspace_size{};     //!< size of workspace buffer returned by planner
-    Real * real_workspace{};  //!< temporary real workspace that is correctly
-                              //!< padded
+    fftw_plan plan_fft{};     //!< holds the plan for forward fourier transform
+    fftw_plan plan_ifft{};    //!< holds the plan for inverse fourier transform
     bool initialised{false};  //!< to prevent double initialisation
   };
 
 }  // namespace muSpectre
 
-#endif  // SRC_FFT_PFFT_ENGINE_HH_
+#endif  // SRC_PROJECTION_FFTW_ENGINE_HH_

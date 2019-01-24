@@ -32,8 +32,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include "fft/projection_finite_strain_fast.hh"
-#include "fft/fft_utils.hh"
+#include "projection/projection_finite_strain_fast.hh"
+#include "projection/fft_utils.hh"
 #include "common/tensor_algebra.hh"
 #include "common/iterators.hh"
 

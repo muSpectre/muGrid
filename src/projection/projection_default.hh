@@ -35,10 +35,10 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef SRC_FFT_PROJECTION_DEFAULT_HH_
-#define SRC_FFT_PROJECTION_DEFAULT_HH_
+#ifndef SRC_PROJECTION_PROJECTION_DEFAULT_HH_
+#define SRC_PROJECTION_PROJECTION_DEFAULT_HH_
 
-#include "fft/projection_base.hh"
+#include "projection/projection_base.hh"
 
 namespace muSpectre {
 
@@ -112,4 +112,4 @@ namespace muSpectre {
 
 }  // namespace muSpectre
 
-#endif  // SRC_FFT_PROJECTION_DEFAULT_HH_
+#endif  // SRC_PROJECTION_PROJECTION_DEFAULT_HH_

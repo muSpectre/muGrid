@@ -35,7 +35,7 @@
 #include <boost/mpl/list.hpp>
 
 #include "tests.hh"
-#include "fft/fftw_engine.hh"
+#include "projection/fftw_engine.hh"
 #include "common/ccoord_operations.hh"
 #include "common/field_collection.hh"
 #include "common/field_map.hh"

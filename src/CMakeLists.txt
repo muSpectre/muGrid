@@ -39,7 +39,7 @@ set("PRIVATE_MUSPECTRE_LIBS" "")
 
 add_subdirectory(common)
 add_subdirectory(materials)
-add_subdirectory(fft)
+add_subdirectory(projection)
 add_subdirectory(cell)
 add_subdirectory(solver)
 

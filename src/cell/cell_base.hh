@@ -41,7 +41,7 @@
 #include "common/field.hh"
 #include "common/utilities.hh"
 #include "materials/material_base.hh"
-#include "fft/projection_base.hh"
+#include "projection/projection_base.hh"
 #include "cell/cell_traits.hh"
 
 #include <vector>

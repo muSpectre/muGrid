@@ -32,8 +32,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include "fft/projection_default.hh"
-#include "fft/fft_engine_base.hh"
+#include "projection/projection_default.hh"
+#include "projection/fft_engine_base.hh"
 
 namespace muSpectre {
 

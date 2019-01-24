@@ -1,11 +1,11 @@
 /**
- * @file   fft_engine_base.cc
+ * @file   fft_utils.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
- * @date   03 Dec 2017
+ * @date   11 Dec 2017
  *
- * @brief  implementation for FFT engine base class
+ * @brief  implementation of fft utilities
  *
  * Copyright © 2017 Till Junge
  *
@@ -32,41 +32,26 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include "fft/fft_engine_base.hh"
+#include "projection/fft_utils.hh"
 
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim>
-  FFTEngineBase<Dim>::FFTEngineBase(Ccoord resolutions, Dim_t nb_components,
-                                    Communicator comm)
-      : comm{comm}, subdomain_resolutions{resolutions}, subdomain_locations{},
-        fourier_resolutions{CcoordOps::get_hermitian_sizes(resolutions)},
-        fourier_locations{}, domain_resolutions{resolutions},
-        work{make_field<Workspace_t>("work space", work_space_container,
-                                     nb_components)},
-        norm_factor{1. / CcoordOps::get_size(domain_resolutions)},
-        nb_components{nb_components} {}
-
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim>
-  void FFTEngineBase<Dim>::initialise(FFT_PlanFlags /*plan_flags*/) {
-    this->work_space_container.initialise();
+  std::valarray<Real> fft_freqs(size_t nb_samples) {
+    std::valarray<Real> retval(nb_samples);
+    Int N = (nb_samples - 1) / 2 + 1;  // needs to be signed int for neg freqs
+    for (Int i = 0; i < N; ++i) {
+      retval[i] = i;
+    }
+    for (Int i = N; i < Int(nb_samples); ++i) {
+      retval[i] = -Int(nb_samples) / 2 + i - N;
+    }
+    return retval;
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim>
-  size_t FFTEngineBase<Dim>::size() const {
-    return CcoordOps::get_size(this->subdomain_resolutions);
+  std::valarray<Real> fft_freqs(size_t nb_samples, Real length) {
+    return fft_freqs(nb_samples) / length;
   }
-
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim>
-  size_t FFTEngineBase<Dim>::workspace_size() const {
-    return this->work_space_container.size();
-  }
-
-  template class FFTEngineBase<twoD>;
-  template class FFTEngineBase<threeD>;
 
 }  // namespace muSpectre

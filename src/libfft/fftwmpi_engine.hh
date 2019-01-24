@@ -32,8 +32,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef SRC_FFT_FFTWMPI_ENGINE_HH_
-#define SRC_FFT_FFTWMPI_ENGINE_HH_
+#ifndef SRC_PROJECTION_FFTWMPI_ENGINE_HH_
+#define SRC_PROJECTION_FFTWMPI_ENGINE_HH_
 
 #include "fft/fft_engine_base.hh"
 
@@ -99,4 +99,4 @@ namespace muSpectre {
 
 }  // namespace muSpectre
 
-#endif  // SRC_FFT_FFTWMPI_ENGINE_HH_
+#endif  // SRC_PROJECTION_FFTWMPI_ENGINE_HH_

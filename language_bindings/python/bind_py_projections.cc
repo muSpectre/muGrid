@@ -32,16 +32,16 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include "fft/projection_small_strain.hh"
-#include "fft/projection_finite_strain.hh"
-#include "fft/projection_finite_strain_fast.hh"
+#include "projection/projection_small_strain.hh"
+#include "projection/projection_finite_strain.hh"
+#include "projection/projection_finite_strain_fast.hh"
 
-#include "fft/fftw_engine.hh"
+#include "projection/fftw_engine.hh"
 #ifdef WITH_FFTWMPI
-#include "fft/fftwmpi_engine.hh"
+#include "projection/fftwmpi_engine.hh"
 #endif
 #ifdef WITH_PFFT
-#include "fft/pfft_engine.hh"
+#include "projection/pfft_engine.hh"
 #endif
 
 #include <pybind11/pybind11.h>

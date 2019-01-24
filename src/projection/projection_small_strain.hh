@@ -1,14 +1,16 @@
 /**
- * @file   projection_finite_strain.hh
+ * @file   projection_small_strain.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
- * @date   05 Dec 2017
+ * @date   14 Jan 2018
  *
- * @brief  Class for standard finite-strain gradient projections see de Geus et
- *         al. (https://doi.org/10.1016/j.cma.2016.12.032) for derivation
+ * @brief  Small strain projection operator as defined in Appendix A1 of
+ *         DOI: 10.1002/nme.5481 ("A finite element perspective on nonlinear
+ *         FFT-based micromechanical simulations", Int. J. Numer. Meth. Engng
+ *         2017; 111 :903–926)
  *
- * Copyright © 2017 Till Junge
+ * Copyright © 2018 Till Junge
  *
  * µSpectre is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
@@ -33,23 +35,22 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef SRC_FFT_PROJECTION_FINITE_STRAIN_HH_
-#define SRC_FFT_PROJECTION_FINITE_STRAIN_HH_
+#ifndef SRC_PROJECTION_PROJECTION_SMALL_STRAIN_HH_
+#define SRC_PROJECTION_PROJECTION_SMALL_STRAIN_HH_
 
-#include "fft/projection_default.hh"
-#include "common/common.hh"
-#include "common/field_collection.hh"
-#include "common/field_map.hh"
+#include "projection/projection_default.hh"
 
 namespace muSpectre {
 
   /**
-   * Implements the finite strain gradient projection operator as
-   * defined in de Geus et
-   * al. (https://doi.org/10.1016/j.cma.2016.12.032) for derivation
+   * Implements the small strain projection operator as defined in
+   * Appendix A1 of DOI: 10.1002/nme.5481 ("A finite element
+   * perspective on nonlinear FFT-based micromechanical
+   * simulations", Int. J. Numer. Meth. Engng 2017; 111
+   * :903–926)
    */
   template <Dim_t DimS, Dim_t DimM>
-  class ProjectionFiniteStrain : public ProjectionDefault<DimS, DimM> {
+  class ProjectionSmallStrain : public ProjectionDefault<DimS, DimM> {
    public:
     using Parent = ProjectionDefault<DimS, DimM>;  //!< base class
     //! polymorphic pointer to FFT engines
@@ -58,6 +59,8 @@ namespace muSpectre {
     using Rcoord = typename Parent::Rcoord;  //!< spatial coordinates type
     //! local field collection (for Fourier-space representations)
     using LFieldCollection_t = LocalFieldCollection<DimS>;
+    //! Fourier-space field containing the projection operator itself
+    using Proj_t = TensorField<LFieldCollection_t, Real, fourthOrder, DimM>;
     //! iterable operator
     using Proj_map = T4MatrixFieldMap<LFieldCollection_t, Real, DimM>;
     //! iterable vectorised version of the Fourier-space tensor field
@@ -65,27 +68,26 @@ namespace muSpectre {
         MatrixFieldMap<LFieldCollection_t, Complex, DimM * DimM, 1>;
 
     //! Default constructor
-    ProjectionFiniteStrain() = delete;
+    ProjectionSmallStrain() = delete;
 
     //! Constructor with fft_engine
-    ProjectionFiniteStrain(FFTEngine_ptr engine, Rcoord lengths);
+    ProjectionSmallStrain(FFTEngine_ptr engine, Rcoord lengths);
 
     //! Copy constructor
-    ProjectionFiniteStrain(const ProjectionFiniteStrain & other) = delete;
+    ProjectionSmallStrain(const ProjectionSmallStrain & other) = delete;
 
     //! Move constructor
-    ProjectionFiniteStrain(ProjectionFiniteStrain && other) = default;
+    ProjectionSmallStrain(ProjectionSmallStrain && other) = default;
 
     //! Destructor
-    virtual ~ProjectionFiniteStrain() = default;
+    virtual ~ProjectionSmallStrain() = default;
 
     //! Copy assignment operator
-    ProjectionFiniteStrain &
-    operator=(const ProjectionFiniteStrain & other) = delete;
+    ProjectionSmallStrain &
+    operator=(const ProjectionSmallStrain & other) = delete;
 
     //! Move assignment operator
-    ProjectionFiniteStrain &
-    operator=(ProjectionFiniteStrain && other) = default;
+    ProjectionSmallStrain & operator=(ProjectionSmallStrain && other) = delete;
 
     //! initialises the fft engine (plan the transform)
     void initialise(FFT_PlanFlags flags = FFT_PlanFlags::estimate) final;
@@ -93,4 +95,4 @@ namespace muSpectre {
 
 }  // namespace muSpectre
 
-#endif  // SRC_FFT_PROJECTION_FINITE_STRAIN_HH_
+#endif  // SRC_PROJECTION_PROJECTION_SMALL_STRAIN_HH_

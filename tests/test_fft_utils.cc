@@ -35,7 +35,7 @@
 #include <boost/mpl/list.hpp>
 
 #include "tests.hh"
-#include "fft/fft_utils.hh"
+#include "projection/fft_utils.hh"
 
 namespace muSpectre {
 

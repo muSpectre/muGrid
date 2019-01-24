@@ -1,13 +1,13 @@
 /**
- * @file   projection_small_strain.cc
+ * @file   projection_finite_strain.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
- * @date   14 Jan 2018
+ * @date   05 Dec 2017
  *
- * @brief  Implementation for ProjectionSmallStrain
+ * @brief  implementation of standard finite strain projection operator
  *
- * Copyright © 2018 Till Junge
+ * Copyright © 2017 Till Junge
  *
  * µSpectre is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
@@ -32,16 +32,22 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include "fft/projection_small_strain.hh"
-#include "fft/fft_utils.hh"
+#include "projection/projection_finite_strain.hh"
+#include "common/field_map.hh"
+#include "common/iterators.hh"
+#include "common/tensor_algebra.hh"
+#include "projection/fft_utils.hh"
+#include "projection/fftw_engine.hh"
+
+#include "Eigen/Dense"
 
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  ProjectionSmallStrain<DimS, DimM>::ProjectionSmallStrain(FFTEngine_ptr engine,
-                                                           Rcoord lengths)
-      : Parent{std::move(engine), lengths, Formulation::small_strain} {
+  ProjectionFiniteStrain<DimS, DimM>::ProjectionFiniteStrain(
+      FFTEngine_ptr engine, Rcoord lengths)
+      : Parent{std::move(engine), lengths, Formulation::finite_strain} {
     for (auto res : this->fft_engine->get_domain_resolutions()) {
       if (res % 2 == 0) {
         throw ProjectionError(
@@ -52,38 +58,40 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void ProjectionSmallStrain<DimS, DimM>::initialise(FFT_PlanFlags flags) {
+  void ProjectionFiniteStrain<DimS, DimM>::initialise(FFT_PlanFlags flags) {
     Parent::initialise(flags);
-
     FFT_freqs<DimS> fft_freqs(this->fft_engine->get_domain_resolutions(),
                               this->domain_lengths);
     for (auto && tup : akantu::zip(*this->fft_engine, this->Ghat)) {
       const auto & ccoord = std::get<0>(tup);
       auto & G = std::get<1>(tup);
       auto xi = fft_freqs.get_unit_xi(ccoord);
-      auto kron = [](const Dim_t i, const Dim_t j) -> Real {
-        return (i == j) ? 1. : 0.;
-      };
-      for (Dim_t i{0}; i < DimS; ++i) {
-        for (Dim_t j{0}; j < DimS; ++j) {
-          for (Dim_t l{0}; l < DimS; ++l) {
-            for (Dim_t m{0}; m < DimS; ++m) {
-              Real & g = get(G, i, j, l, m);
-              g = 0.5 *
-                      (xi(i) * kron(j, l) * xi(m) + xi(i) * kron(j, m) * xi(l) +
-                       xi(j) * kron(i, l) * xi(m) +
-                       xi(j) * kron(i, m) * xi(l)) -
-                  xi(i) * xi(j) * xi(l) * xi(m);
-            }
-          }
-        }
-      }
+      //! this is simplifiable using Curnier's Méthodes numériques, 6.69(c)
+      G = Matrices::outer_under(Matrices::I2<DimM>(), xi * xi.transpose());
+      // The commented block below corresponds to the original
+      // definition of the operator in de Geus et
+      // al. (https://doi.org/10.1016/j.cma.2016.12.032). However,
+      // they use a bizarre definition of the double contraction
+      // between fourth-order and second-order tensors that has a
+      // built-in transpose operation (i.e., C = A:B <-> AᵢⱼₖₗBₗₖ =
+      // Cᵢⱼ , note the inverted ₗₖ instead of ₖₗ), here, we define
+      // the double contraction without the transposition. As a
+      // result, the Projection operator produces the transpose of de
+      // Geus's
+
+      // for (Dim_t im = 0; im < DimS; ++im) {
+      //   for (Dim_t j = 0; j < DimS; ++j) {
+      //     for (Dim_t l = 0; l < DimS; ++l) {
+      //       get(G, im, j, l, im) = xi(j)*xi(l);
+      //     }
+      //   }
+      // }
     }
     if (this->get_subdomain_locations() == Ccoord{}) {
       this->Ghat[0].setZero();
     }
   }
 
-  template class ProjectionSmallStrain<twoD, twoD>;
-  template class ProjectionSmallStrain<threeD, threeD>;
+  template class ProjectionFiniteStrain<twoD, twoD>;
+  template class ProjectionFiniteStrain<threeD, threeD>;
 }  // namespace muSpectre

@@ -39,12 +39,12 @@
 
 #include "tests.hh"
 #include "mpi_context.hh"
-#include "fft/fftw_engine.hh"
+#include "projection/fftw_engine.hh"
 #ifdef WITH_FFTWMPI
-#include "fft/fftwmpi_engine.hh"
+#include "projection/fftwmpi_engine.hh"
 #endif
 #ifdef WITH_PFFT
-#include "fft/pfft_engine.hh"
+#include "projection/pfft_engine.hh"
 #endif
 
 #include "common/ccoord_operations.hh"

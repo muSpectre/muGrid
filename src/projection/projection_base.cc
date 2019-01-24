@@ -1,11 +1,11 @@
 /**
- * @file   fft_utils.cc
+ * @file   projection_base.cc
  *
- * @author Till Junge <till.junge@altermail.ch>
+ * @author Till Junge <till.junge@epfl.ch>
  *
- * @date   11 Dec 2017
+ * @date   06 Dec 2017
  *
- * @brief  implementation of fft utilities
+ * @brief  implementation of base class for projections
  *
  * Copyright © 2017 Till Junge
  *
@@ -32,26 +32,32 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include "fft/fft_utils.hh"
+#include "projection/projection_base.hh"
 
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  std::valarray<Real> fft_freqs(size_t nb_samples) {
-    std::valarray<Real> retval(nb_samples);
-    Int N = (nb_samples - 1) / 2 + 1;  // needs to be signed int for neg freqs
-    for (Int i = 0; i < N; ++i) {
-      retval[i] = i;
+  template <Dim_t DimS, Dim_t DimM>
+  ProjectionBase<DimS, DimM>::ProjectionBase(FFTEngine_ptr engine,
+                                             Rcoord domain_lengths,
+                                             Formulation form)
+      : fft_engine{std::move(engine)}, domain_lengths{domain_lengths},
+        form{form}, projection_container{
+                        this->fft_engine->get_field_collection()} {
+    static_assert((DimS == FFTEngine::sdim),
+                  "spatial dimensions are incompatible");
+    if (this->get_nb_components() != fft_engine->get_nb_components()) {
+      throw ProjectionError("Incompatible number of components per pixel");
     }
-    for (Int i = N; i < Int(nb_samples); ++i) {
-      retval[i] = -Int(nb_samples) / 2 + i - N;
-    }
-    return retval;
   }
 
   /* ---------------------------------------------------------------------- */
-  std::valarray<Real> fft_freqs(size_t nb_samples, Real length) {
-    return fft_freqs(nb_samples) / length;
+  template <Dim_t DimS, Dim_t DimM>
+  void ProjectionBase<DimS, DimM>::initialise(FFT_PlanFlags flags) {
+    fft_engine->initialise(flags);
   }
 
+  template class ProjectionBase<twoD, twoD>;
+  template class ProjectionBase<twoD, threeD>;
+  template class ProjectionBase<threeD, threeD>;
 }  // namespace muSpectre

@@ -31,9 +31,9 @@
  * covered by the terms of those libraries' licenses, the licensors of this
  * Program grant you additional permission to convey the resulting work.
  */
-#include "fft/projection_finite_strain.hh"
-#include "fft/projection_finite_strain_fast.hh"
-#include "fft/fft_utils.hh"
+#include "projection/projection_finite_strain.hh"
+#include "projection/projection_finite_strain_fast.hh"
+#include "projection/fft_utils.hh"
 #include "test_projection.hh"
 
 #include <Eigen/Dense>

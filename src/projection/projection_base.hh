@@ -32,13 +32,13 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef SRC_FFT_PROJECTION_BASE_HH_
-#define SRC_FFT_PROJECTION_BASE_HH_
+#ifndef SRC_PROJECTION_PROJECTION_BASE_HH_
+#define SRC_PROJECTION_PROJECTION_BASE_HH_
 
 #include "common/common.hh"
 #include "common/field.hh"
 #include "common/field_collection.hh"
-#include "fft/fft_engine_base.hh"
+#include "projection/fft_engine_base.hh"
 
 #include <memory>
 
@@ -185,4 +185,4 @@ namespace muSpectre {
 
 }  // namespace muSpectre
 
-#endif  // SRC_FFT_PROJECTION_BASE_HH_
+#endif  // SRC_PROJECTION_PROJECTION_BASE_HH_

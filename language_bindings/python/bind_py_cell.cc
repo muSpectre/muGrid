@@ -38,10 +38,10 @@
 #include "cell/cell_base.hh"
 
 #ifdef WITH_FFTWMPI
-#include "fft/fftwmpi_engine.hh"
+#include "projection/fftwmpi_engine.hh"
 #endif
 #ifdef WITH_PFFT
-#include "fft/pfft_engine.hh"
+#include "projection/pfft_engine.hh"
 #endif
 
 #include <pybind11/pybind11.h>

@@ -32,12 +32,12 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include "fft/fftw_engine.hh"
+#include "projection/fftw_engine.hh"
 #ifdef WITH_FFTWMPI
-#include "fft/fftwmpi_engine.hh"
+#include "projection/fftwmpi_engine.hh"
 #endif
 #ifdef WITH_PFFT
-#include "fft/pfft_engine.hh"
+#include "projection/pfft_engine.hh"
 #endif
 #include "bind_py_declarations.hh"
 

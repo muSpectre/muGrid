@@ -32,9 +32,9 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include "fft/projection_small_strain.hh"
+#include "projection/projection_small_strain.hh"
 #include "test_projection.hh"
-#include "fft/fft_utils.hh"
+#include "projection/fft_utils.hh"
 
 #include <Eigen/Dense>
 

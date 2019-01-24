@@ -32,8 +32,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef SRC_FFT_FFT_ENGINE_BASE_HH_
-#define SRC_FFT_FFT_ENGINE_BASE_HH_
+#ifndef SRC_PROJECTION_FFT_ENGINE_BASE_HH_
+#define SRC_PROJECTION_FFT_ENGINE_BASE_HH_
 
 #include "common/common.hh"
 #include "common/communicator.hh"
@@ -183,4 +183,4 @@ namespace muSpectre {
 
 }  // namespace muSpectre
 
-#endif  // SRC_FFT_FFT_ENGINE_BASE_HH_
+#endif  // SRC_PROJECTION_FFT_ENGINE_BASE_HH_

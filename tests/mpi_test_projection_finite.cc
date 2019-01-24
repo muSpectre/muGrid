@@ -35,17 +35,17 @@
 #define BOOST_MPL_CFG_NO_PREPROCESSED_HEADERS
 #define BOOST_MPL_LIMIT_LIST_SIZE 50
 
-#include "fft/projection_finite_strain.hh"
-#include "fft/projection_finite_strain_fast.hh"
-#include "fft/fft_utils.hh"
+#include "projection/projection_finite_strain.hh"
+#include "projection/projection_finite_strain_fast.hh"
+#include "projection/fft_utils.hh"
 #include "mpi_test_projection.hh"
 
-#include "fft/fftw_engine.hh"
+#include "projection/fftw_engine.hh"
 #ifdef WITH_FFTWMPI
-#include "fft/fftwmpi_engine.hh"
+#include "projection/fftwmpi_engine.hh"
 #endif
 #ifdef WITH_PFFT
-#include "fft/pfft_engine.hh"
+#include "projection/pfft_engine.hh"
 #endif
 
 #include <Eigen/Dense>

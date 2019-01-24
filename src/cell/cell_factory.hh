@@ -38,13 +38,13 @@
 #include "common/common.hh"
 #include "common/ccoord_operations.hh"
 #include "cell/cell_base.hh"
-#include "fft/projection_finite_strain_fast.hh"
-#include "fft/projection_small_strain.hh"
-#include "fft/fftw_engine.hh"
+#include "projection/projection_finite_strain_fast.hh"
+#include "projection/projection_small_strain.hh"
+#include "projection/fftw_engine.hh"
 
 #ifdef WITH_MPI
 #include "common/communicator.hh"
-#include "fft/fftwmpi_engine.hh"
+#include "projection/fftwmpi_engine.hh"
 #endif
 
 #include <memory>
