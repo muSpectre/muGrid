@@ -32,8 +32,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef SRC_COMMON_UTILITIES_HH_
-#define SRC_COMMON_UTILITIES_HH_
+#ifndef SRC_MUGRID_CPP_COMPLIANCE_HH_
+#define SRC_MUGRID_CPP_COMPLIANCE_HH_
 
 #include <tuple>
 
@@ -166,20 +166,25 @@ namespace std_replacement {
 
 }  // namespace std_replacement
 
-namespace muSpectre {
+namespace muGrid {
 
+#if __cplusplus < 201703L
   using std_replacement::apply;
-
   /**
    * emulation `std::optional` (a C++17 feature)
    */
   template <class T>
-#ifdef NO_EXPERIMENTAL
+#  ifdef NO_EXPERIMENTAL
   using optional = typename boost::optional<T>;
-#else
+#  else
   using optional = typename std::experimental::optional<T>;
+#  endif
+
+#else
+  using std::apply;
+  using std::optional;
 #endif
 
-}  // namespace muSpectre
+}  // namespace muGrid
 
-#endif  // SRC_COMMON_UTILITIES_HH_
+#endif  // SRC_MUGRID_CPP_COMPLIANCE_HH_
