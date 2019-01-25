@@ -96,7 +96,7 @@ C++ Usage Example
 
    #include"materials/material_linear_elastic2.hh"
    #include "materials/material_evaluator.hh"
-   #include "common/T4_map_proxy.hh"
+   #include <libmugrid/T4_map_proxy.hh>
 
    #include "Eigen/Dense"
 

@@ -23,7 +23,7 @@
  * You should  have received  a copy  of the GNU  Lesser General  Public License
  * along with Akantu. If not, see <http://www.gnu.org/licenses/>.
  *
- * Above block was left intact as in akantu. µSpectre exercises the
+ * Above block was left intact as in akantu. µGrid exercises the
  * right to redistribute and modify the code below
  *
  */

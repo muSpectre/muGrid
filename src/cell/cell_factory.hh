@@ -35,12 +35,12 @@
 #ifndef SRC_CELL_CELL_FACTORY_HH_
 #define SRC_CELL_CELL_FACTORY_HH_
 
-#include "common/common.hh"
-#include "common/ccoord_operations.hh"
+#include "common/muSpectre_common.hh"
 #include "cell/cell_base.hh"
 #include "projection/projection_finite_strain_fast.hh"
 #include "projection/projection_small_strain.hh"
-#include "projection/fftw_engine.hh"
+#include <libmugrid/ccoord_operations.hh>
+#include <libmufft/fftw_engine.hh>
 
 #ifdef WITH_MPI
 #include "common/communicator.hh"
@@ -55,7 +55,8 @@ namespace muSpectre {
    * Create a unique ptr to a Projection operator (with appropriate
    * FFT_engine) to be used in a cell constructor
    */
-  template <Dim_t DimS, Dim_t DimM, typename FFTEngine = FFTWEngine<DimS>>
+  template <Dim_t DimS, Dim_t DimM,
+            typename FFTEngine = muFFT::FFTWEngine<DimS>>
   inline std::unique_ptr<ProjectionBase<DimS, DimM>>
   cell_input(Ccoord_t<DimS> resolutions, Rcoord_t<DimS> lengths,
              Formulation form) {
@@ -85,7 +86,7 @@ namespace muSpectre {
    */
   template <size_t DimS, size_t DimM = DimS,
             typename Cell = CellBase<DimS, DimM>,
-            typename FFTEngine = FFTWEngine<DimS>>
+            typename FFTEngine = muFFT::FFTWEngine<DimS>>
   inline Cell make_cell(Ccoord_t<DimS> resolutions, Rcoord_t<DimS> lengths,
                         Formulation form) {
     auto && input =

@@ -28,9 +28,8 @@
 #ifndef SRC_MATERIALS_STRESS_TRANSFORMATIONS_PK1_IMPL_HH_
 #define SRC_MATERIALS_STRESS_TRANSFORMATIONS_PK1_IMPL_HH_
 
-#include "common/common.hh"
-#include "common/tensor_algebra.hh"
-#include "common/T4_map_proxy.hh"
+#include "common/muSpectre_common.hh"
+#include <libmugrid/T4_map_proxy.hh>
 
 namespace muSpectre {
 

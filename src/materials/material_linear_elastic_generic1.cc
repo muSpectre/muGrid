@@ -42,6 +42,7 @@ namespace muSpectre {
   MaterialLinearElasticGeneric1<DimS, DimM>::MaterialLinearElasticGeneric1(
       const std::string & name, const CInput_t & C_voigt)
       : Parent{name} {
+    using muGrid::get;
     using VC_t = VoigtConversion<DimM>;
     constexpr Dim_t VSize{vsize(DimM)};
     if (not(C_voigt.rows() == VSize) or not(C_voigt.cols() == VSize)) {

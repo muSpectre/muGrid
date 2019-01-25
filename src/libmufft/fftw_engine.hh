@@ -9,18 +9,18 @@
  *
  * Copyright © 2017 Till Junge
  *
- * µSpectre is free software; you can redistribute it and/or
+ * µFFT is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
  * published by the Free Software Foundation, either version 3, or (at
  * your option) any later version.
  *
- * µSpectre is distributed in the hope that it will be useful, but
+ * µFFT is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
- * along with µSpectre; see the file COPYING. If not, write to the
+ * along with µFFT; see the file COPYING. If not, write to the
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
  * * Boston, MA 02111-1307, USA.
  *
@@ -35,14 +35,14 @@
 #ifndef SRC_PROJECTION_FFTW_ENGINE_HH_
 #define SRC_PROJECTION_FFTW_ENGINE_HH_
 
-#include "projection/fft_engine_base.hh"
+#include "fft_engine_base.hh"
 
 #include <fftw3.h>
 
-namespace muSpectre {
+namespace muFFT {
 
   /**
-   * implements the `muSpectre::FftEngine_Base` interface using the
+   * implements the `muFFT::FftEngine_Base` interface using the
    * FFTW library
    */
   template <Dim_t Dim>
@@ -91,6 +91,6 @@ namespace muSpectre {
     bool initialised{false};  //!< to prevent double initialisation
   };
 
-}  // namespace muSpectre
+}  // namespace muFFT
 
 #endif  // SRC_PROJECTION_FFTW_ENGINE_HH_

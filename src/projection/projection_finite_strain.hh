@@ -37,9 +37,9 @@
 #define SRC_PROJECTION_PROJECTION_FINITE_STRAIN_HH_
 
 #include "projection/projection_default.hh"
-#include "common/common.hh"
-#include "common/field_collection.hh"
-#include "common/field_map.hh"
+#include "common/muSpectre_common.hh"
+#include <libmugrid/field_collection.hh>
+#include <libmugrid/field_map.hh>
 
 namespace muSpectre {
 
@@ -57,12 +57,12 @@ namespace muSpectre {
     using Ccoord = typename Parent::Ccoord;  //!< cell coordinates type
     using Rcoord = typename Parent::Rcoord;  //!< spatial coordinates type
     //! local field collection (for Fourier-space representations)
-    using LFieldCollection_t = LocalFieldCollection<DimS>;
+    using LFieldCollection_t = muGrid::LocalFieldCollection<DimS>;
     //! iterable operator
-    using Proj_map = T4MatrixFieldMap<LFieldCollection_t, Real, DimM>;
+    using Proj_map = muGrid::T4MatrixFieldMap<LFieldCollection_t, Real, DimM>;
     //! iterable vectorised version of the Fourier-space tensor field
     using Vector_map =
-        MatrixFieldMap<LFieldCollection_t, Complex, DimM * DimM, 1>;
+        muGrid::MatrixFieldMap<LFieldCollection_t, Complex, DimM * DimM, 1>;
 
     //! Default constructor
     ProjectionFiniteStrain() = delete;
@@ -88,7 +88,7 @@ namespace muSpectre {
     operator=(ProjectionFiniteStrain && other) = default;
 
     //! initialises the fft engine (plan the transform)
-    void initialise(FFT_PlanFlags flags = FFT_PlanFlags::estimate) final;
+    void initialise(muFFT::FFT_PlanFlags flags = muFFT::FFT_PlanFlags::estimate) final;
   };
 
 }  // namespace muSpectre

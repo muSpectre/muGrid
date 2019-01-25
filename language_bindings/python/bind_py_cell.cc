@@ -32,8 +32,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include "common/common.hh"
-#include "common/ccoord_operations.hh"
+#include "common/muSpectre_common.hh"
+#include <libmugrid/ccoord_operations.hh>
 #include "cell/cell_factory.hh"
 #include "cell/cell_base.hh"
 

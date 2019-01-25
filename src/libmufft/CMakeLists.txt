@@ -5,7 +5,7 @@
 #
 # @date   24 Jan 2019
 #
-# @brief  Configuration for libmuSpectre
+# @brief  Configuration for libmuFFT
 #
 # @section LICENSE
 #
@@ -78,12 +78,12 @@ endif()
 
 target_sources(muFFT PRIVATE ${mufft_SRCS})
 target_link_libraries(muFFT
-  PRIVATE fftw
+  PRIVATE ${FFTW_LIBRARIES}
   PUBLIC muSpectre::muGrid)
 
 # defining exported include directories
 target_include_directories(muFFT
-  PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/muFFT>
+  PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libmufft>
   INTERFACE $<INSTALL_INTERFACE:include/>
   )
 # small trick for build includes in public

@@ -53,7 +53,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void ProjectionBase<DimS, DimM>::initialise(FFT_PlanFlags flags) {
+  void ProjectionBase<DimS, DimM>::initialise(muFFT::FFT_PlanFlags flags) {
     fft_engine->initialise(flags);
   }
 

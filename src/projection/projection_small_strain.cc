@@ -33,7 +33,7 @@
  */
 
 #include "projection/projection_small_strain.hh"
-#include "projection/fft_utils.hh"
+#include <libmufft/fft_utils.hh>
 
 namespace muSpectre {
 
@@ -52,10 +52,11 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void ProjectionSmallStrain<DimS, DimM>::initialise(FFT_PlanFlags flags) {
+  void ProjectionSmallStrain<DimS, DimM>::initialise(muFFT::FFT_PlanFlags flags) {
+    using muGrid::get;
     Parent::initialise(flags);
-
-    FFT_freqs<DimS> fft_freqs(this->fft_engine->get_domain_resolutions(),
+    
+    muFFT::FFT_freqs<DimS> fft_freqs(this->fft_engine->get_domain_resolutions(),
                               this->domain_lengths);
     for (auto && tup : akantu::zip(*this->fft_engine, this->Ghat)) {
       const auto & ccoord = std::get<0>(tup);

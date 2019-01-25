@@ -9,18 +9,18 @@
  *
  * Copyright © 2018 Till Junge
  *
- * µSpectre is free software; you can redistribute it and/or
+ * µGrid is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
  * published by the Free Software Foundation, either version 3, or (at
  * your option) any later version.
  *
- * µSpectre is distributed in the hope that it will be useful, but
+ * µGrid is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
- * along with µSpectre; see the file COPYING. If not, write to the
+ * along with µGrid; see the file COPYING. If not, write to the
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
  * * Boston, MA 02111-1307, USA.
  *
@@ -38,7 +38,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace muSpectre {
+namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   /**
@@ -89,7 +89,7 @@ namespace muSpectre {
      * for storage of polymorphic pointers to fully typed and sized
      * fields. `FieldBase` (and its children) are templated with a
      * specific `FieldCollection` (derived from
-     * `muSpectre::FieldCollectionBase`). A `FieldCollection` stores
+     * `muGrid::FieldCollectionBase`). A `FieldCollection` stores
      * multiple fields that all apply to the same set of
      * pixels. Addressing and managing the data for all pixels is
      * handled by the `FieldCollection`.  Note that `FieldBase` does
@@ -204,6 +204,6 @@ namespace muSpectre {
 
   }  // namespace internal
 
-}  // namespace muSpectre
+}  // namespace muGrid
 
 #endif  // SRC_COMMON_FIELD_BASE_HH_

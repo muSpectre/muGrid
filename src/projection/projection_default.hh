@@ -57,18 +57,18 @@ namespace muSpectre {
     using Ccoord = typename Parent::Ccoord;  //!< cell coordinates type
     using Rcoord = typename Parent::Rcoord;  //!< spatial coordinates type
     //! global field collection
-    using GFieldCollection_t = GlobalFieldCollection<DimS>;
+    using GFieldCollection_t = muGrid::GlobalFieldCollection<DimS>;
     //! local field collection for Fourier-space fields
-    using LFieldCollection_t = LocalFieldCollection<DimS>;
+    using LFieldCollection_t = muGrid::LocalFieldCollection<DimS>;
     //! Real space second order tensor fields (to be projected)
-    using Field_t = TypedField<GFieldCollection_t, Real>;
+    using Field_t = muGrid::TypedField<GFieldCollection_t, Real>;
     //! Fourier-space field containing the projection operator itself
-    using Proj_t = TensorField<LFieldCollection_t, Real, fourthOrder, DimM>;
+    using Proj_t = muGrid::TensorField<LFieldCollection_t, Real, fourthOrder, DimM>;
     //! iterable form of the operator
-    using Proj_map = T4MatrixFieldMap<LFieldCollection_t, Real, DimM>;
+    using Proj_map = muGrid::T4MatrixFieldMap<LFieldCollection_t, Real, DimM>;
     //! vectorized version of the Fourier-space second-order tensor field
     using Vector_map =
-        MatrixFieldMap<LFieldCollection_t, Complex, DimM * DimM, 1>;
+        muGrid::MatrixFieldMap<LFieldCollection_t, Complex, DimM * DimM, 1>;
     //! Default constructor
     ProjectionDefault() = delete;
 
@@ -103,7 +103,7 @@ namespace muSpectre {
      */
     std::array<Dim_t, 2> get_strain_shape() const final;
 
-    constexpr static Dim_t NbComponents() { return ipow(DimM, 2); }
+    constexpr static Dim_t NbComponents() { return muGrid::ipow(DimM, 2); }
 
    protected:
     Proj_t & Gfield;  //!< field holding the operator

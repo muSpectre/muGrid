@@ -39,8 +39,8 @@
 #define SRC_MATERIALS_MATERIAL_LINEAR_ELASTIC4_HH_
 
 #include "materials/material_linear_elastic1.hh"
-#include "common/field.hh"
-#include "common/tensor_algebra.hh"
+
+#include <libmugrid/field.hh>
 
 #include <Eigen/Dense>
 
@@ -60,11 +60,13 @@ namespace muSpectre {
 
     //! expected map type for strain fields
     using StrainMap_t =
-        MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM, true>;
+        muGrid::MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM, true>;
     //! expected map type for stress fields
-    using StressMap_t = MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
+    using StressMap_t =
+        muGrid::MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
     //! expected map type for tangent stiffness fields
-    using TangentMap_t = T4MatrixFieldMap<GFieldCollection_t, Real, DimM>;
+    using TangentMap_t =
+        muGrid::T4MatrixFieldMap<GFieldCollection_t, Real, DimM>;
 
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
@@ -72,9 +74,9 @@ namespace muSpectre {
     constexpr static auto stress_measure{StressMeasure::PK2};
 
     //! local field_collections used for internals
-    using LFieldColl_t = LocalFieldCollection<DimS>;
+    using LFieldColl_t = muGrid::LocalFieldCollection<DimS>;
     //! local Lame constant type
-    using LLameConstantMap_t = ScalarFieldMap<LFieldColl_t, Real, true>;
+    using LLameConstantMap_t = muGrid::ScalarFieldMap<LFieldColl_t, Real, true>;
     //! elasticity without internal variables
     using InternalVariables =
         std::tuple<LLameConstantMap_t, LLameConstantMap_t>;
@@ -167,13 +169,13 @@ namespace muSpectre {
     /**
      * overload add_pixel to write into local stiffness tensor
      */
-    void add_pixel(const Ccoord_t<DimS> & pixel,
-                   const Real & Youngs_modulus, const Real & Poisson_ratio);
+    void add_pixel(const Ccoord_t<DimS> & pixel, const Real & Youngs_modulus,
+                   const Real & Poisson_ratio);
 
    protected:
     //! storage for first Lame constant 'lambda'
     //! and second Lame constant(shear modulus) 'mu'
-    using Field_t = MatrixField<LocalFieldCollection<DimS>, Real, oneD, oneD>;
+    using Field_t = muGrid::MatrixField<muGrid::LocalFieldCollection<DimS>, Real, oneD, oneD>;
     Field_t & lambda_field;
     Field_t & mu_field;
     //! tuple for iterable eigen_field
@@ -198,7 +200,7 @@ namespace muSpectre {
   template <class s_t>
   auto MaterialLinearElastic4<DimS, DimM>::evaluate_stress_tangent(
       s_t && E, const Real & lambda, const Real & mu) -> decltype(auto) {
-    T4Mat<Real, DimM> C = Hooke::compute_C_T4(lambda, mu);
+    muGrid::T4Mat<Real, DimM> C = Hooke::compute_C_T4(lambda, mu);
     return std::make_tuple(
         this->evaluate_stress(std::forward<s_t>(E), lambda, mu), C);
   }

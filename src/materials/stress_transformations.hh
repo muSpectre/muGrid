@@ -25,6 +25,9 @@
  * Boston, MA 02111-1307, USA.
  */
 
+#include "common/muSpectre_common.hh"
+#include <libmugrid/eigen_tools.hh>
+
 #ifndef SRC_MATERIALS_STRESS_TRANSFORMATIONS_HH_
 #define SRC_MATERIALS_STRESS_TRANSFORMATIONS_HH_
 
@@ -37,8 +40,8 @@ namespace muSpectre {
     template <StressMeasure StressM, StrainMeasure StrainM, class Stress_t,
               class Strain_t>
     decltype(auto) PK1_stress(Strain_t && strain, Stress_t && stress) {
-      constexpr Dim_t dim{EigenCheck::tensor_dim<Strain_t>::value};
-      static_assert((dim == EigenCheck::tensor_dim<Stress_t>::value),
+      constexpr Dim_t dim{muGrid::EigenCheck::tensor_dim<Strain_t>::value};
+      static_assert((dim == muGrid::EigenCheck::tensor_dim<Stress_t>::value),
                     "Stress and strain tensors have differing dimensions");
       return internal::PK1_stress<dim, StressM, StrainM>::compute(
           std::forward<Strain_t>(strain), std::forward<Stress_t>(stress));
@@ -50,10 +53,10 @@ namespace muSpectre {
               class Strain_t, class Tangent_t>
     decltype(auto) PK1_stress(Strain_t && strain, Stress_t && stress,
                               Tangent_t && tangent) {
-      constexpr Dim_t dim{EigenCheck::tensor_dim<Strain_t>::value};
-      static_assert((dim == EigenCheck::tensor_dim<Stress_t>::value),
+      constexpr Dim_t dim{muGrid::EigenCheck::tensor_dim<Strain_t>::value};
+      static_assert((dim == muGrid::EigenCheck::tensor_dim<Stress_t>::value),
                     "Stress and strain tensors have differing dimensions");
-      static_assert((dim == EigenCheck::tensor_4_dim<Tangent_t>::value),
+      static_assert((dim == muGrid::EigenCheck::tensor_4_dim<Tangent_t>::value),
                     "Stress and tangent tensors have differing dimensions");
 
       return internal::PK1_stress<dim, StressM, StrainM>::compute(

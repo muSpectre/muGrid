@@ -32,7 +32,7 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include "common/common.hh"
+#include "common/muSpectre_common.hh"
 #include "materials/material_base.hh"
 #include "materials/material_evaluator.hh"
 

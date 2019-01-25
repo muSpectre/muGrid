@@ -25,10 +25,11 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include "common/common.hh"
-#include "common/T4_map_proxy.hh"
+#include "common/muSpectre_common.hh"
 #include "materials/stress_transformations_Kirchhoff.hh"
 #include "materials/material_hyper_elasto_plastic1.hh"
+
+#include <libmugrid/T4_map_proxy.hh>
 
 namespace muSpectre {
 
@@ -37,14 +38,14 @@ namespace muSpectre {
   MaterialHyperElastoPlastic1<DimS, DimM>::MaterialHyperElastoPlastic1(
       std::string name, Real young, Real poisson, Real tau_y0, Real H)
       : Parent{name},
-        plast_flow_field{
-            make_statefield<StateField<ScalarField<LColl_t, Real>>>(
-                "cumulated plastic flow εₚ", this->internal_fields)},
-        F_prev_field{make_statefield<
-            StateField<TensorField<LColl_t, Real, secondOrder, DimM>>>(
+        plast_flow_field{muGrid::make_statefield<
+            muGrid::StateField<muGrid::ScalarField<LColl_t, Real>>>(
+            "cumulated plastic flow εₚ", this->internal_fields)},
+        F_prev_field{muGrid::make_statefield<muGrid::StateField<
+            muGrid::TensorField<LColl_t, Real, secondOrder, DimM>>>(
             "Previous placement gradient Fᵗ", this->internal_fields)},
-        be_prev_field{make_statefield<
-            StateField<TensorField<LColl_t, Real, secondOrder, DimM>>>(
+        be_prev_field{muGrid::make_statefield<muGrid::StateField<
+            muGrid::TensorField<LColl_t, Real, secondOrder, DimM>>>(
             "Previous left Cauchy-Green deformation bₑᵗ",
             this->internal_fields)},
         young{young}, poisson{poisson}, lambda{Hooke::compute_lambda(young,
@@ -88,8 +89,9 @@ namespace muSpectre {
     Mat_t f{F * F_prev.old().inverse()};
     // trial elastic left Cauchy–Green deformation tensor
     Mat_t be_star{f * be_prev.old() * f.transpose()};
-    const Decomp_t<DimM> spectral_decomp{spectral_decomposition(be_star)};
-    Mat_t ln_be_star{logm_alt(spectral_decomp)};
+    const muGrid::Decomp_t<DimM> spectral_decomp{
+        muGrid::spectral_decomposition(be_star)};
+    Mat_t ln_be_star{muGrid::logm_alt(spectral_decomp)};
     Mat_t tau_star{.5 *
                    Hooke::evaluate_stress(this->lambda, this->mu, ln_be_star)};
     // deviatoric part of Kirchhoff stress
@@ -110,7 +112,7 @@ namespace muSpectre {
 
     // update the previous values to the new ones
     F_prev.current() = F;
-    be_prev.current() = expm(ln_be_star - 2 * Del_gamma * N_star);
+    be_prev.current() = muGrid::expm(ln_be_star - 2 * Del_gamma * N_star);
     eps_p.current() = eps_p.old() + Del_gamma;
 
     // transmit info whether this is a plastic step or not
@@ -148,12 +150,12 @@ namespace muSpectre {
     auto & spec_decomp{std::get<5>(vals)};
     using Mat_t = Eigen::Matrix<Real, DimM, DimM>;
     using Vec_t = Eigen::Matrix<Real, DimM, 1>;
-    using T4_t = T4Mat<Real, DimM>;
+    using T4_t = muGrid::T4Mat<Real, DimM>;
 
     auto compute_C4ep = [&]() {
       auto && a0 = Del_gamma * this->mu / tau_eq_star;
       auto && a1 = this->mu / (this->H + 3 * this->mu);
-      return T4Mat<Real, DimM>{
+      return muGrid::T4Mat<Real, DimM>{
           ((this->K / 2. - this->mu / 3 + a0 * this->mu) *
                Matrices::Itrac<DimM>() +
            (1 - 3 * a0) * this->mu * Matrices::Isymm<DimM>() +

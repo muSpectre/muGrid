@@ -10,18 +10,18 @@
  *
  * Copyright © 2017 Till Junge
  *
- * µSpectre is free software; you can redistribute it and/or
+ * µGrid is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
  * published by the Free Software Foundation, either version 3, or (at
  * your option) any later version.
  *
- * µSpectre is distributed in the hope that it will be useful, but
+ * µGrid is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
- * along with µSpectre; see the file COPYING. If not, write to the
+ * along with µGrid; see the file COPYING. If not, write to the
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
  * * Boston, MA 02111-1307, USA.
  *
@@ -36,16 +36,16 @@
 #ifndef SRC_COMMON_TENSOR_ALGEBRA_HH_
 #define SRC_COMMON_TENSOR_ALGEBRA_HH_
 
-#include "common/T4_map_proxy.hh"
-#include "common/common.hh"
-#include "common/eigen_tools.hh"
+#include "grid_common.hh"
+#include "T4_map_proxy.hh"
+#include "eigen_tools.hh"
 
 #include <Eigen/Dense>
 #include <unsupported/Eigen/CXX11/Tensor>
 
 #include <type_traits>
 
-namespace muSpectre {
+namespace muGrid {
 
   namespace Tensors {
 
@@ -156,7 +156,6 @@ namespace muSpectre {
       constexpr Dim_t dim{EigenCheck::tensor_dim<T1>::value};
       static_assert((dim == EigenCheck::tensor_dim<T2>::value),
                     "A and B do not have the same dimension");
-
       Tens4_t<dim> product;
 
       for (Dim_t i = 0; i < dim; ++i) {
@@ -183,7 +182,6 @@ namespace muSpectre {
       constexpr Dim_t dim{EigenCheck::tensor_dim<T1>::value};
       static_assert((dim == EigenCheck::tensor_dim<T2>::value),
                     "A and B do not have the same dimension");
-
       Tens4_t<dim> product;
 
       for (Dim_t i = 0; i < dim; ++i) {
@@ -210,7 +208,6 @@ namespace muSpectre {
       constexpr Dim_t dim{EigenCheck::tensor_dim<T1>::value};
       static_assert((dim == EigenCheck::tensor_dim<T2>::value),
                     "A and B do not have the same dimension");
-
       Tens4_t<dim> product;
 
       for (Dim_t i = 0; i < dim; ++i) {
@@ -238,6 +235,7 @@ namespace muSpectre {
                     "A and B not compatible");
       static_assert(T4::RowsAtCompileTime == T4::ColsAtCompileTime,
                     "A is not square");
+
       Tens2_t<dim> result;
       result.setZero();
 
@@ -359,8 +357,9 @@ namespace muSpectre {
     /* ---------------------------------------------------------------------- */
     template <Dim_t Dim, class T1, class T2>
     decltype(auto) dot(T1 && t1, T2 && t2) {
-      constexpr Dim_t rank1{EigenCheck::tensor_rank<T1, Dim>::value};
-      constexpr Dim_t rank2{EigenCheck::tensor_rank<T2, Dim>::value};
+      using EigenCheck::tensor_rank;
+      constexpr Dim_t rank1{tensor_rank<T1, Dim>::value};
+      constexpr Dim_t rank2{tensor_rank<T2, Dim>::value};
       return internal::Dotter<Dim, rank1, rank2>::dot(std::forward<T1>(t1),
                                                       std::forward<T2>(t2));
     }
@@ -368,13 +367,14 @@ namespace muSpectre {
     /* ---------------------------------------------------------------------- */
     template <Dim_t Dim, class T1, class T2>
     decltype(auto) ddot(T1 && t1, T2 && t2) {
-      constexpr Dim_t rank1{EigenCheck::tensor_rank<T1, Dim>::value};
-      constexpr Dim_t rank2{EigenCheck::tensor_rank<T2, Dim>::value};
+      using EigenCheck::tensor_rank;
+      constexpr Dim_t rank1{tensor_rank<T1, Dim>::value};
+      constexpr Dim_t rank2{tensor_rank<T2, Dim>::value};
       return internal::Dotter<Dim, rank1, rank2>::ddot(std::forward<T1>(t1),
                                                        std::forward<T2>(t2));
     }
 
   }  // namespace Matrices
-}  // namespace muSpectre
+}  // namespace muGrid
 
 #endif  // SRC_COMMON_TENSOR_ALGEBRA_HH_

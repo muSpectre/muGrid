@@ -36,7 +36,7 @@
 #ifndef SRC_COMMON_VOIGT_CONVERSION_HH_
 #define SRC_COMMON_VOIGT_CONVERSION_HH_
 
-#include "common/common.hh"
+#include "common/muSpectre_common.hh"
 
 #include <Eigen/Dense>
 #include <unsupported/Eigen/CXX11/Tensor>

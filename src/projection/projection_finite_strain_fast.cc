@@ -33,9 +33,9 @@
  */
 
 #include "projection/projection_finite_strain_fast.hh"
-#include "projection/fft_utils.hh"
-#include "common/tensor_algebra.hh"
-#include "common/iterators.hh"
+
+#include <libmufft/fft_utils.hh>
+#include <libmugrid/iterators.hh>
 
 namespace muSpectre {
   /* ---------------------------------------------------------------------- */
@@ -43,7 +43,7 @@ namespace muSpectre {
   ProjectionFiniteStrainFast<DimS, DimM>::ProjectionFiniteStrainFast(
       FFTEngine_ptr engine, Rcoord lengths)
       : Parent{std::move(engine), lengths, Formulation::finite_strain},
-        xiField{make_field<Proj_t>("Projection Operator",
+        xiField{muGrid::make_field<Proj_t>("Projection Operator",
                                    this->projection_container)},
         xis(xiField) {
     for (auto res : this->fft_engine->get_domain_resolutions()) {
@@ -56,9 +56,9 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void ProjectionFiniteStrainFast<DimS, DimM>::initialise(FFT_PlanFlags flags) {
+  void ProjectionFiniteStrainFast<DimS, DimM>::initialise(muFFT::FFT_PlanFlags flags) {
     Parent::initialise(flags);
-    FFT_freqs<DimS> fft_freqs(this->fft_engine->get_domain_resolutions(),
+    muFFT::FFT_freqs<DimS> fft_freqs(this->fft_engine->get_domain_resolutions(),
                               this->domain_lengths);
     for (auto && tup : akantu::zip(*this->fft_engine, this->xis)) {
       const auto & ccoord = std::get<0>(tup);

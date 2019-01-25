@@ -36,9 +36,9 @@
 #define SRC_PROJECTION_PROJECTION_FINITE_STRAIN_FAST_HH_
 
 #include "projection/projection_base.hh"
-#include "common/common.hh"
-#include "common/field_collection.hh"
-#include "common/field_map.hh"
+#include "common/muSpectre_common.hh"
+#include <libmugrid/field_collection.hh>
+#include <libmugrid/field_map.hh>
 
 namespace muSpectre {
 
@@ -57,17 +57,19 @@ namespace muSpectre {
     using Ccoord = typename Parent::Ccoord;  //!< cell coordinates type
     using Rcoord = typename Parent::Rcoord;  //!< spatial coordinates type
     //! global field collection (for real-space representations)
-    using GFieldCollection_t = GlobalFieldCollection<DimS>;
+    using GFieldCollection_t = muGrid::GlobalFieldCollection<DimS>;
     //! local field collection (for Fourier-space representations)
-    using LFieldCollection_t = LocalFieldCollection<DimS>;
+    using LFieldCollection_t = muGrid::LocalFieldCollection<DimS>;
     //! Real space second order tensor fields (to be projected)
-    using Field_t = TypedField<GFieldCollection_t, Real>;
+    using Field_t = muGrid::TypedField<GFieldCollection_t, Real>;
     //! Fourier-space field containing the projection operator itself
-    using Proj_t = TensorField<LFieldCollection_t, Real, firstOrder, DimM>;
+    using Proj_t =
+        muGrid::TensorField<LFieldCollection_t, Real, firstOrder, DimM>;
     //! iterable form of the operator
-    using Proj_map = MatrixFieldMap<LFieldCollection_t, Real, DimM, 1>;
+    using Proj_map = muGrid::MatrixFieldMap<LFieldCollection_t, Real, DimM, 1>;
     //! iterable Fourier-space second-order tensor field
-    using Grad_map = MatrixFieldMap<LFieldCollection_t, Complex, DimM, DimM>;
+    using Grad_map =
+        muGrid::MatrixFieldMap<LFieldCollection_t, Complex, DimM, DimM>;
 
     //! Default constructor
     ProjectionFiniteStrainFast() = delete;
@@ -94,7 +96,8 @@ namespace muSpectre {
     operator=(ProjectionFiniteStrainFast && other) = default;
 
     //! initialises the fft engine (plan the transform)
-    void initialise(FFT_PlanFlags flags = FFT_PlanFlags::estimate) final;
+    void initialise(
+        muFFT::FFT_PlanFlags flags = muFFT::FFT_PlanFlags::estimate) final;
 
     //! apply the projection operator to a field
     void apply_projection(Field_t & field) final;
@@ -109,7 +112,7 @@ namespace muSpectre {
      */
     std::array<Dim_t, 2> get_strain_shape() const final;
 
-    constexpr static Dim_t NbComponents() { return ipow(DimM, 2); }
+    constexpr static Dim_t NbComponents() { return muGrid::ipow(DimM, 2); }
 
    protected:
     Proj_t & xiField;  //!< field of normalised wave vectors

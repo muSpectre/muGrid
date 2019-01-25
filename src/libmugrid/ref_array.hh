@@ -9,12 +9,12 @@
  *
  * Copyright © 2018 Till Junge
  *
- * µSpectre is free software; you can redistribute it and/or
+ * µGrid is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
  * published by the Free Software Foundation, either version 3, or (at
  * your option) any later version.
  *
- * µSpectre is distributed in the hope that it will be useful, but
+ * µGrid is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * General Public License for more details.
@@ -37,9 +37,9 @@
 
 #include <array>
 #include <initializer_list>
-#include "common/iterators.hh"
+#include "iterators.hh"
 
-namespace muSpectre {
+namespace muGrid {
   namespace internal {
 
     template <typename T, typename FirstVal, typename... RestVals>
@@ -95,6 +95,6 @@ namespace muSpectre {
    private:
   };
 
-}  // namespace muSpectre
+}  // namespace muGrid
 
 #endif  // SRC_COMMON_REF_ARRAY_HH_

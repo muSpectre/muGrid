@@ -9,18 +9,18 @@
  *
  * Copyright © 2017 Till Junge
  *
- * µSpectre is free software; you can redistribute it and/or
+ * µGrid is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
  * published by the Free Software Foundation, either version 3, or (at
  * your option) any later version.
  *
- * µSpectre is distributed in the hope that it will be useful, but
+ * µGrid is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
- * along with µSpectre; see the file COPYING. If not, write to the
+ * along with µGrid; see the file COPYING. If not, write to the
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
  * * Boston, MA 02111-1307, USA.
  *
@@ -35,8 +35,8 @@
 #ifndef SRC_COMMON_FIELD_HH_
 #define SRC_COMMON_FIELD_HH_
 
-#include "common/T4_map_proxy.hh"
-#include "common/field_typed.hh"
+#include "T4_map_proxy.hh"
+#include "field_typed.hh"
 
 #include <Eigen/Dense>
 
@@ -49,7 +49,7 @@
 #include <utility>
 #include <vector>
 
-namespace muSpectre {
+namespace muGrid {
 
   namespace internal {
 
@@ -144,7 +144,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   /**
    * The `TensorField` is a subclass of
-   * `muSpectre::internal::TypedSizedFieldBase` that represents tensorial
+   * `muGrid::internal::TypedSizedFieldBase` that represents tensorial
    * fields, i.e. arbitrary-dimensional arrays with identical number of
    * rows/columns (that typically correspond to the spatial cartesian
    * dimensions). It is defined by the stored scalar type @a T, the tensorial
@@ -251,7 +251,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   /**
-   * The `MatrixField` is subclass of `muSpectre::internal::TypedSizedFieldBase`
+   * The `MatrixField` is subclass of `muGrid::internal::TypedSizedFieldBase`
    * that represents matrix fields, i.e. a two dimensional arrays, defined by
    * the stored scalar type @a T and the number of rows @a NbRow and columns
    * @a NbCol of the matrix.
@@ -522,18 +522,18 @@ namespace muSpectre {
     return NbRow;
   }
 
-}  // namespace muSpectre
+}  // namespace muGrid
 
-#include "common/field_map.hh"
+#include "field_map.hh"
 
-namespace muSpectre {
+namespace muGrid {
 
   namespace internal {
 
     /* ---------------------------------------------------------------------- */
     /**
      * defines the default mapped type obtained when calling
-     * `muSpectre::TensorField::get_map()`
+     * `muGrid::TensorField::get_map()`
      */
     template <class FieldCollection, typename T, size_t order, Dim_t dim,
               bool ConstMap>
@@ -563,7 +563,7 @@ namespace muSpectre {
     /* ---------------------------------------------------------------------- */
     /**
      * defines the default mapped type obtained when calling
-     * `muSpectre::MatrixField::get_map()`
+     * `muGrid::MatrixField::get_map()`
      */
     template <class FieldCollection, typename T, Dim_t NbRow, Dim_t NbCol,
               bool ConstMap>
@@ -661,6 +661,6 @@ namespace muSpectre {
     return make_field<MatrixField>(unique_name, this->collection);
   }
 
-}  // namespace muSpectre
+}  // namespace muGrid
 
 #endif  // SRC_COMMON_FIELD_HH_

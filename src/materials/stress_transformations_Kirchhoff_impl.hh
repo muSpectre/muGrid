@@ -69,7 +69,8 @@ namespace muSpectre {
         template <class Strain_t, class Stress_t, class Tangent_t>
         inline static decltype(auto) compute(Strain_t && F, Stress_t && tau,
                                              Tangent_t && C) {
-          using T4_t = T4Mat<Real, Dim>;
+          using muGrid::get;
+          using T4_t = muGrid::T4Mat<Real, Dim>;
           using Mat_t = Eigen::Matrix<Real, Dim, Dim>;
           Mat_t F_inv{F.inverse()};
           T4_t increment{T4_t::Zero()};

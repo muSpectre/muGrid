@@ -9,18 +9,18 @@
  *
  * Copyright © 2017 Till Junge
  *
- * µSpectre is free software; you can redistribute it and/or
+ * µGrid is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
  * published by the Free Software Foundation, either version 3, or (at
  * your option) any later version.
  *
- * µSpectre is distributed in the hope that it will be useful, but
+ * µGrid is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
- * along with µSpectre; see the file COPYING. If not, write to the
+ * along with µGrid; see the file COPYING. If not, write to the
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
  * * Boston, MA 02111-1307, USA.
  *
@@ -35,14 +35,14 @@
 #ifndef SRC_COMMON_FIELD_COLLECTION_BASE_HH_
 #define SRC_COMMON_FIELD_COLLECTION_BASE_HH_
 
-#include "common/common.hh"
-#include "common/field.hh"
-#include "common/statefield.hh"
+#include "grid_common.hh"
+#include "field.hh"
+#include "statefield.hh"
 
 #include <map>
 #include <vector>
 
-namespace muSpectre {
+namespace muGrid {
   /* ---------------------------------------------------------------------- */
   /** `FieldCollectionBase` is the base class for collections of fields. All
    * fields in a field collection have the same number of pixels. The field
@@ -377,6 +377,6 @@ namespace muSpectre {
     return typed_field.get_old_field(nb_steps_ago);
   }
 
-}  // namespace muSpectre
+}  // namespace muGrid
 
 #endif  // SRC_COMMON_FIELD_COLLECTION_BASE_HH_

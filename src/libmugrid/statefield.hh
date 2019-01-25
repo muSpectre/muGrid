@@ -16,22 +16,22 @@
  * to/modified), and efficiently (i.e., no need to copy values from
  * new to old, we just cycle the labels). This file implements the
  * state field as well as state maps using the Field, FieldCollection
- * and FieldMap abstractions of µSpectre
+ * and FieldMap abstractions of µGrid
  *
  * Copyright © 2018 Till Junge
  *
- * µSpectre is free software; you can redistribute it and/or
+ * µGrid is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
  * published by the Free Software Foundation, either version 3, or (at
  * your option) any later version.
  *
- * µSpectre is distributed in the hope that it will be useful, but
+ * µGrid is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
- * along with µSpectre; see the file COPYING. If not, write to the
+ * along with µGrid; see the file COPYING. If not, write to the
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
  * * Boston, MA 02111-1307, USA.
  *
@@ -46,15 +46,15 @@
 #ifndef SRC_COMMON_STATEFIELD_HH_
 #define SRC_COMMON_STATEFIELD_HH_
 
-#include "common/field_helpers.hh"
-#include "common/field.hh"
-#include "common/ref_array.hh"
+#include "field_helpers.hh"
+#include "field.hh"
+#include "ref_array.hh"
 
 #include <array>
 #include <sstream>
 #include <string>
 
-namespace muSpectre {
+namespace muGrid {
 
   /**
    * Forward-declaration
@@ -367,7 +367,7 @@ namespace muSpectre {
   class StateFieldMap {
    public:
     /**
-     * iterates over all pixels in the `muSpectre::FieldCollection` and
+     * iterates over all pixels in the `muGrid::FieldCollection` and
      * dereferences to a proxy giving access to the appropriate iterates
      * of the underlying `FieldMap` type.
      */
@@ -671,6 +671,6 @@ namespace muSpectre {
     Map current_val;   //!< current value
     Array_t old_vals;  //!< all stored old values
   };
-}  // namespace muSpectre
+}  // namespace muGrid
 
 #endif  // SRC_COMMON_STATEFIELD_HH_

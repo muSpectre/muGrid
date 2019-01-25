@@ -38,6 +38,7 @@
 #include "solver/deprecated_solver_base.hh"
 
 #include <Eigen/IterativeLinearSolvers>
+#include <iostream>  // needed for the IterativeSolvers...
 #include <unsupported/Eigen/IterativeSolvers>
 
 #include <type_traits>

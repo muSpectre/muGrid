@@ -34,16 +34,18 @@
 
 #include <iostream>
 
-#include "common/common.hh"
-#include "common/ccoord_operations.hh"
+#include <libmugrid/ccoord_operations.hh>
 #include "tests/test_goodies.hh"
 #include "tests.hh"
 
-namespace muSpectre {
+using namespace muSpectre;
+
+namespace muGrid {
 
   BOOST_AUTO_TEST_SUITE(ccoords_operations);
 
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_cube, Fix, testGoodies::dimlist, Fix) {
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_cube, Fix,
+                                   testGoodies::dimlist, Fix) {
     constexpr auto dim{Fix::dim};
     using Ccoord = Ccoord_t<dim>;
     constexpr Dim_t size{5};
@@ -154,4 +156,4 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE_END();
 
-}  // namespace muSpectre
+}  // namespace muGrid

@@ -32,12 +32,12 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include "common/common.hh"
-#include "common/iterators.hh"
+#include "common/muSpectre_common.hh"
 #include "cell/cell_factory.hh"
 #include "materials/material_linear_elastic1.hh"
 #include "solver/solvers.hh"
 #include "solver/solver_cg.hh"
+#include <libmugrid/iterators.hh>
 
 #include <iostream>
 
@@ -49,7 +49,7 @@ int main() {
   Ccoord_t<dim> resolution{11, 11};
 
   Rcoord_t<dim> lengths{
-      CcoordOps::get_cube<dim>(11.)};  // {5.2e-9, 8.3e-9, 8.3e-9};
+    muGrid::CcoordOps::get_cube<dim>(11.)};  // {5.2e-9, 8.3e-9, 8.3e-9};
   Formulation form{Formulation::finite_strain};
 
   auto rve{make_cell(resolution, lengths, form)};

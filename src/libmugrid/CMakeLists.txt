@@ -5,7 +5,7 @@
 #
 # @date   24 Jan 2019
 #
-# @brief  Configuration for libmuSpectre
+# @brief  Configuration for libmuGrid
 #
 # @section LICENSE
 #
@@ -57,6 +57,9 @@ set(mugrid_HDRS
   grid_common.hh
   iterators.hh
   statefield.hh
+  eigen_tools.hh
+  T4_map_proxy.hh
+  tensor_algebra.hh
   )
 
 add_library(muGrid INTERFACE)

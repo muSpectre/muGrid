@@ -58,14 +58,15 @@ namespace muSpectre {
     using Ccoord = typename Parent::Ccoord;  //!< cell coordinates type
     using Rcoord = typename Parent::Rcoord;  //!< spatial coordinates type
     //! local field collection (for Fourier-space representations)
-    using LFieldCollection_t = LocalFieldCollection<DimS>;
+    using LFieldCollection_t = muGrid::LocalFieldCollection<DimS>;
     //! Fourier-space field containing the projection operator itself
-    using Proj_t = TensorField<LFieldCollection_t, Real, fourthOrder, DimM>;
+    using Proj_t =
+        muGrid::TensorField<LFieldCollection_t, Real, fourthOrder, DimM>;
     //! iterable operator
-    using Proj_map = T4MatrixFieldMap<LFieldCollection_t, Real, DimM>;
+    using Proj_map = muGrid::T4MatrixFieldMap<LFieldCollection_t, Real, DimM>;
     //! iterable vectorised version of the Fourier-space tensor field
     using Vector_map =
-        MatrixFieldMap<LFieldCollection_t, Complex, DimM * DimM, 1>;
+        muGrid::MatrixFieldMap<LFieldCollection_t, Complex, DimM * DimM, 1>;
 
     //! Default constructor
     ProjectionSmallStrain() = delete;
@@ -90,7 +91,7 @@ namespace muSpectre {
     ProjectionSmallStrain & operator=(ProjectionSmallStrain && other) = delete;
 
     //! initialises the fft engine (plan the transform)
-    void initialise(FFT_PlanFlags flags = FFT_PlanFlags::estimate) final;
+    void initialise(muFFT::FFT_PlanFlags flags = muFFT::FFT_PlanFlags::estimate) final;
   };
 
 }  // namespace muSpectre

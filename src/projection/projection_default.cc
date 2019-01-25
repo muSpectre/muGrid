@@ -33,7 +33,7 @@
  */
 
 #include "projection/projection_default.hh"
-#include "projection/fft_engine_base.hh"
+#include <libmufft/fft_engine_base.hh>
 
 namespace muSpectre {
 
@@ -43,8 +43,8 @@ namespace muSpectre {
                                                    Rcoord lengths,
                                                    Formulation form)
       : Parent{std::move(engine), lengths, form},
-        Gfield{make_field<Proj_t>("Projection Operator",
-                                  this->projection_container)},
+        Gfield{muGrid::make_field<Proj_t>("Projection Operator",
+                                          this->projection_container)},
         Ghat{Gfield} {}
 
   /* ---------------------------------------------------------------------- */

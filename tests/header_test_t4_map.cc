@@ -37,12 +37,11 @@
 #include <unsupported/Eigen/CXX11/Tensor>
 #include <boost/mpl/list.hpp>
 
-#include "common/common.hh"
 #include "tests.hh"
 #include "test_goodies.hh"
-#include "common/T4_map_proxy.hh"
+#include <libmugrid/T4_map_proxy.hh>
 
-namespace muSpectre {
+namespace muGrid {
 
   BOOST_AUTO_TEST_SUITE(T4map_tests);
 

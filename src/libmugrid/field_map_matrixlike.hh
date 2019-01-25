@@ -9,18 +9,18 @@
  *
  * Copyright © 2017 Till Junge
  *
- * µSpectre is free software; you can redistribute it and/or
+ * µGrid is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
  * published by the Free Software Foundation, either version 3, or (at
  * your option) any later version.
  *
- * µSpectre is distributed in the hope that it will be useful, but
+ * µGrid is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
- * along with µSpectre; see the file COPYING. If not, write to the
+ * along with µGrid; see the file COPYING. If not, write to the
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
  * * Boston, MA 02111-1307, USA.
  *
@@ -35,21 +35,21 @@
 #ifndef SRC_COMMON_FIELD_MAP_MATRIXLIKE_HH_
 #define SRC_COMMON_FIELD_MAP_MATRIXLIKE_HH_
 
-#include "common/T4_map_proxy.hh"
-#include "common/field_map_base.hh"
+#include "T4_map_proxy.hh"
+#include "field_map_base.hh"
 
 #include <Eigen/Dense>
 
 #include <memory>
 
-namespace muSpectre {
+namespace muGrid {
 
   namespace internal {
 
     /* ---------------------------------------------------------------------- */
     /**
      * lists all matrix-like types consideres by
-     * `muSpectre::internal::MatrixLikeFieldMap`
+     * `muGrid::internal::MatrixLikeFieldMap`
      */
     enum class Map_t {
       Matrix,   //!< for wrapping `Eigen::Matrix`
@@ -59,26 +59,26 @@ namespace muSpectre {
 
     /**
      * traits structure to define the name shown when a
-     * `muSpectre::MatrixLikeFieldMap` output into an ostream
+     * `muGrid::MatrixLikeFieldMap` output into an ostream
      */
     template <Map_t map_type>
     struct NameWrapper {};
 
-    /// specialisation for `muSpectre::ArrayFieldMap`
+    /// specialisation for `muGrid::ArrayFieldMap`
     template <>
     struct NameWrapper<Map_t::Array> {
       //! string to use for printing
       static std::string field_info_root() { return "Array"; }
     };
 
-    /// specialisation for `muSpectre::MatrixFieldMap`
+    /// specialisation for `muGrid::MatrixFieldMap`
     template <>
     struct NameWrapper<Map_t::Matrix> {
       //! string to use for printing
       static std::string field_info_root() { return "Matrix"; }
     };
 
-    /// specialisation for `muSpectre::T4MatrixFieldMap`
+    /// specialisation for `muGrid::T4MatrixFieldMap`
     template <>
     struct NameWrapper<Map_t::T4Matrix> {
       //! string to use for printing
@@ -92,11 +92,11 @@ namespace muSpectre {
      *
      * It should never be necessary to call directly any of the
      * constructors if this class, but rather use the template aliases:
-     * - `muSpectre::ArrayFieldMap`: iterate in the form of `Eigen::Array<...>`.
-     * - `muSpectre::MatrixFieldMap`: iterate in the form of
+     * - `muGrid::ArrayFieldMap`: iterate in the form of `Eigen::Array<...>`.
+     * - `muGrid::MatrixFieldMap`: iterate in the form of
      * `Eigen::Matrix<...>`.
-     * - `muSpectre::T4MatrixFieldMap`: iterate in the form of
-     * `muSpectre::T4MatMap`.
+     * - `muGrid::T4MatrixFieldMap`: iterate in the form of
+     * `muGrid::T4MatMap`.
      */
     template <class FieldCollection, class EigenArray, class EigenConstArray,
               class EigenPlain, Map_t map_type, bool ConstField>
@@ -378,6 +378,6 @@ namespace muSpectre {
       Eigen::Map<const Eigen::Array<T, NbRows, NbCols>>,
       Eigen::Array<T, NbRows, NbCols>, internal::Map_t::Array, ConstField>;
 
-}  // namespace muSpectre
+}  // namespace muGrid
 
 #endif  // SRC_COMMON_FIELD_MAP_MATRIXLIKE_HH_

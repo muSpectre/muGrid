@@ -38,8 +38,8 @@
 #define SRC_SOLVER_DEPRECATED_SOLVER_CG_HH_
 
 #include "solver/deprecated_solver_base.hh"
-#include "common/communicator.hh"
-#include "common/field.hh"
+#include <libmufft/communicator.hh>
+#include <libmugrid/field.hh>
 
 #include <functional>
 
@@ -68,7 +68,7 @@ namespace muSpectre {
     using Tg_req_t = typename Parent::TangentRequirement;
     //! cg only needs to handle fields that look like strain and stress
     using Field_t =
-        TensorField<typename Parent::Collection_t, Real, secondOrder, DimM>;
+        muGrid::TensorField<typename Parent::Collection_t, Real, secondOrder, DimM>;
 
     //! conjugate gradient needs directional stiffness
     constexpr static Tg_req_t tangent_requirement{Tg_req_t::NeedEffect};

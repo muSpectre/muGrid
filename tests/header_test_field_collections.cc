@@ -34,9 +34,9 @@
  */
 
 #include "test_field_collections.hh"
-#include "common/field_map_dynamic.hh"
+#include <libmugrid/field_map_dynamic.hh>
 
-namespace muSpectre {
+namespace muGrid {
 
   BOOST_AUTO_TEST_SUITE(field_collection_tests);
 
@@ -86,8 +86,8 @@ namespace muSpectre {
     // possible maptypes for Real tensor fields
     using T_type = Real;
     using T_TFM1_t = TensorFieldMap<FC_t, T_type, order, F::mdim()>;
-    using T_TFM2_t =
-        TensorFieldMap<FC_t, T_type, 2, F::mdim() * F::mdim()>;  //! dangerous
+    using T_TFM2_t = TensorFieldMap<FC_t, T_type, 2,
+                                    F::mdim() * F::mdim()>;  //! dangerous
     using T4_Map_t = T4MatrixFieldMap<FC_t, Real, F::mdim()>;
 
     // impossible maptypes for Real tensor fields
@@ -280,7 +280,7 @@ namespace muSpectre {
       ++counter;
       val -= val.Ones() * counter;
       auto error{val.matrix().norm()};
-      BOOST_CHECK_LT(error, tol);
+      BOOST_CHECK_LT(error, muSpectre::tol);
     }
 
     using ScalarMap = ScalarFieldMap<FC_t, Int>;
@@ -704,4 +704,4 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE_END();
 
-}  // namespace muSpectre
+}  // namespace muGrid

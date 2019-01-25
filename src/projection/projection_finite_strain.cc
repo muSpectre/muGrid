@@ -33,11 +33,11 @@
  */
 
 #include "projection/projection_finite_strain.hh"
-#include "common/field_map.hh"
-#include "common/iterators.hh"
-#include "common/tensor_algebra.hh"
-#include "projection/fft_utils.hh"
-#include "projection/fftw_engine.hh"
+
+#include <libmugrid/field_map.hh>
+#include <libmugrid/iterators.hh>
+#include <libmufft/fft_utils.hh>
+#include <libmufft/fftw_engine.hh>
 
 #include "Eigen/Dense"
 
@@ -58,9 +58,9 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void ProjectionFiniteStrain<DimS, DimM>::initialise(FFT_PlanFlags flags) {
+  void ProjectionFiniteStrain<DimS, DimM>::initialise(muFFT::FFT_PlanFlags flags) {
     Parent::initialise(flags);
-    FFT_freqs<DimS> fft_freqs(this->fft_engine->get_domain_resolutions(),
+    muFFT::FFT_freqs<DimS> fft_freqs(this->fft_engine->get_domain_resolutions(),
                               this->domain_lengths);
     for (auto && tup : akantu::zip(*this->fft_engine, this->Ghat)) {
       const auto & ccoord = std::get<0>(tup);

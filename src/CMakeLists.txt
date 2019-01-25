@@ -33,8 +33,8 @@
 # covered by the terms of those libraries' licenses, the licensors of this
 # Program grant you additional permission to convey the resulting work.
 # =============================================================================
-add_subdirectory(libgrid)
-add_subdirectory(libfft)
+add_subdirectory(libmugrid)
+add_subdirectory(libmufft)
 
 add_library(muSpectre)
 target_link_libraries(muSpectre PUBLIC muSpectre::muFFT muSpectre::muGrid)
@@ -74,8 +74,7 @@ list(APPEND muSpectre_SRC ${_headers})
 set(muSpectre_INCLUDES ${FFTW_INCLUDES})
 target_include_directories(muSpectre INTERFACE ${muSpectre_INCLUDES})
 
-target_link_libraries(muSpectre PRIVATE ${FFTW_LIBRARIES} ${PRIVATE_MUSPECTRE_LIBS})
-
+target_link_libraries(muSpectre PRIVATE ${PRIVATE_MUSPECTRE_LIBS})
 target_link_libraries(muSpectre PUBLIC Eigen3::Eigen)
 
 set_property(TARGET muSpectre PROPERTY PUBLIC_HEADER ${_headers})

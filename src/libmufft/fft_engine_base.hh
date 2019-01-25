@@ -9,18 +9,18 @@
  *
  * Copyright © 2017 Till Junge
  *
- * µSpectre is free software; you can redistribute it and/or
+ * µFFT is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
  * published by the Free Software Foundation, either version 3, or (at
  * your option) any later version.
  *
- * µSpectre is distributed in the hope that it will be useful, but
+ * µFFT is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
- * along with µSpectre; see the file COPYING. If not, write to the
+ * along with µFFT; see the file COPYING. If not, write to the
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
  * * Boston, MA 02111-1307, USA.
  *
@@ -35,11 +35,11 @@
 #ifndef SRC_PROJECTION_FFT_ENGINE_BASE_HH_
 #define SRC_PROJECTION_FFT_ENGINE_BASE_HH_
 
-#include "common/common.hh"
-#include "common/communicator.hh"
-#include "common/field_collection.hh"
+#include "mufft_common.hh"
+#include "communicator.hh"
+#include <libmugrid//field_collection.hh>
 
-namespace muSpectre {
+namespace muFFT {
 
   /**
    * Virtual base class for FFT engines. To be implemented by all
@@ -52,16 +52,16 @@ namespace muSpectre {
     //! cell coordinates type
     using Ccoord = Ccoord_t<DimS>;
     //! global FieldCollection
-    using GFieldCollection_t = GlobalFieldCollection<DimS>;
+    using GFieldCollection_t = muGrid::GlobalFieldCollection<DimS>;
     //! local FieldCollection (for Fourier-space pixels)
-    using LFieldCollection_t = LocalFieldCollection<DimS>;
+    using LFieldCollection_t = muGrid::LocalFieldCollection<DimS>;
     //! Field type on which to apply the projection
-    using Field_t = TypedField<GFieldCollection_t, Real>;
+    using Field_t = muGrid::TypedField<GFieldCollection_t, Real>;
     /**
      * Field type holding a Fourier-space representation of a
      * real-valued second-order tensor field
      */
-    using Workspace_t = TypedField<LFieldCollection_t, Complex>;
+    using Workspace_t = muGrid::TypedField<LFieldCollection_t, Complex>;
     /**
      * iterator over Fourier-space discretisation point
      */
@@ -181,6 +181,6 @@ namespace muSpectre {
    private:
   };
 
-}  // namespace muSpectre
+}  // namespace muFFT
 
 #endif  // SRC_PROJECTION_FFT_ENGINE_BASE_HH_

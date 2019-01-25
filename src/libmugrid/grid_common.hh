@@ -32,6 +32,10 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
+#include <array>
+#include <cmath>
+#include <complex>
+#include <type_traits>
 
 #ifndef SRC_MUGRID_GRID_COMMON_HH_
 #define SRC_MUGRID_GRID_COMMON_HH_
@@ -40,7 +44,7 @@ namespace muGrid {
 
   /**
    * Eigen uses signed integers for dimensions. For consistency,
-   µSpectre uses them througout the code. needs to represent -1 for
+   µGrid uses them througout the code. needs to represent -1 for
    eigen
    */
   using Dim_t = int;
@@ -69,7 +73,7 @@ namespace muGrid {
   using Rcoord_t = std::array<Real, dim>;
 
   /**
-   * Allows inserting `muSpectre::Ccoord_t` and `muSpectre::Rcoord_t`
+   * Allows inserting `muGrid::Ccoord_t` and `muGrid::Rcoord_t`
    * into `std::ostream`s
    */
   template <typename T, size_t dim>
@@ -115,7 +119,9 @@ namespace muGrid {
       retval *= base;
     }
     return retval;
+  }
+}  // muGrid
 
-  }  // muGrid
+#include "cpp_compliance.hh"
 
 #endif  // SRC_MUGRID_GRID_COMMON_HH_

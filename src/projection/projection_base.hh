@@ -35,10 +35,10 @@
 #ifndef SRC_PROJECTION_PROJECTION_BASE_HH_
 #define SRC_PROJECTION_PROJECTION_BASE_HH_
 
-#include "common/common.hh"
-#include "common/field.hh"
-#include "common/field_collection.hh"
-#include "projection/fft_engine_base.hh"
+#include "common/muSpectre_common.hh"
+#include <libmugrid/field.hh>
+#include <libmugrid/field_collection.hh>
+#include <libmufft/fft_engine_base.hh>
 
 #include <memory>
 
@@ -68,7 +68,7 @@ namespace muSpectre {
     //! Eigen type to replace fields
     using Vector_t = Eigen::Matrix<Real, Eigen::Dynamic, 1>;
     //! type of fft_engine used
-    using FFTEngine = FFTEngineBase<DimS>;
+    using FFTEngine = muFFT::FFTEngineBase<DimS>;
     //! reference to fft engine is safely managed through a `std::unique_ptr`
     using FFTEngine_ptr = std::unique_ptr<FFTEngine>;
     //! cell coordinates type
@@ -80,7 +80,7 @@ namespace muSpectre {
     //! local FieldCollection (for Fourier-space pixels)
     using LFieldCollection_t = typename FFTEngine::LFieldCollection_t;
     //! Field type on which to apply the projection
-    using Field_t = TypedField<GFieldCollection_t, Real>;
+    using Field_t = muGrid::TypedField<GFieldCollection_t, Real>;
     /**
      * iterator over all pixels. This is taken from the FFT engine,
      * because depending on the real-to-complex FFT employed, only
@@ -112,7 +112,7 @@ namespace muSpectre {
     ProjectionBase & operator=(ProjectionBase && other) = default;
 
     //! initialises the fft engine (plan the transform)
-    virtual void initialise(FFT_PlanFlags flags = FFT_PlanFlags::estimate);
+    virtual void initialise(muFFT::FFT_PlanFlags flags = muFFT::FFT_PlanFlags::estimate);
 
     //! apply the projection operator to a field
     virtual void apply_projection(Field_t & field) = 0;
@@ -145,7 +145,7 @@ namespace muSpectre {
     virtual Eigen::Map<Eigen::ArrayXXd> get_operator() = 0;
 
     //! return the communicator object
-    const Communicator & get_communicator() const {
+    const auto & get_communicator() const {
       return this->fft_engine->get_communicator();
     }
 

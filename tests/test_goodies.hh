@@ -35,17 +35,17 @@
 #ifndef TESTS_TEST_GOODIES_HH_
 #define TESTS_TEST_GOODIES_HH_
 
-#include "common/tensor_algebra.hh"
-
+#include <libmugrid/grid_common.hh>
+#include <libmugrid/tensor_algebra.hh>
 #include <boost/mpl/list.hpp>
 
 #include <random>
 #include <type_traits>
 
-namespace muSpectre {
+namespace muGrid {
 
   namespace testGoodies {
-
+  
     template <Dim_t Dim>
     struct dimFixture {
       constexpr static Dim_t dim{Dim};
@@ -145,17 +145,18 @@ namespace muSpectre {
     inline auto right_transpose(const Eigen::MatrixBase<Derived> & t4)
         -> Eigen::Matrix<typename Derived::Scalar, Derived::RowsAtCompileTime,
                          Derived::ColsAtCompileTime> {
+      using muGrid::get;
       constexpr Dim_t Rows{Derived::RowsAtCompileTime};
       constexpr Dim_t Cols{Derived::ColsAtCompileTime};
       constexpr Dim_t DimSq{Rows};
       using T = typename Derived::Scalar;
       static_assert(Rows == Cols, "only square problems");
-      constexpr Dim_t Dim{ct_sqrt(DimSq)};
+      constexpr Dim_t Dim{muGrid::ct_sqrt(DimSq)};
       static_assert((Dim == twoD) or (Dim == threeD),
                     "only two- and three-dimensional problems");
-      static_assert(ipow(Dim, 2) == DimSq,
+      static_assert(muGrid::ipow(Dim, 2) == DimSq,
                     "The array is not a valid fourth order tensor");
-      T4Mat<T, Dim> retval{T4Mat<T, Dim>::Zero()};
+      auto retval{muGrid::T4Mat<T, Dim>::Zero()};
 
       /**
        * Note: this looks like it's doing a left transpose, but in
@@ -195,13 +196,13 @@ namespace muSpectre {
       constexpr Dim_t DimSq{Rows};
       using T = typename Derived::Scalar;
       static_assert(Rows == Cols, "only square problems");
-      constexpr Dim_t Dim{ct_sqrt(DimSq)};
+      constexpr Dim_t Dim{muGrid::ct_sqrt(DimSq)};
       static_assert((Dim == twoD) or (Dim == threeD),
                     "only two- and three-dimensional problems");
-      static_assert(ipow(Dim, 2) == DimSq,
+      static_assert(muGrid::ipow(Dim, 2) == DimSq,
                     "The array is not a valid fourth order tensor");
-      T4Mat<T, Dim> retval{T4Mat<T, Dim>::Zero()};
-      T4Mat<T, Dim> intermediate{T4Mat<T, Dim>::Zero()};
+      auto retval{muGrid::T4Mat<T, Dim>::Zero()};
+      auto intermediate{muGrid::T4Mat<T, Dim>::Zero()};
       // transpose rows
       for (int row{0}; row < DimSq; ++row) {
         for (int i{0}; i < Dim; ++i) {
@@ -223,6 +224,6 @@ namespace muSpectre {
 
   }  // namespace testGoodies
 
-}  // namespace muSpectre
+}  // namespace muGrid
 
 #endif  // TESTS_TEST_GOODIES_HH_

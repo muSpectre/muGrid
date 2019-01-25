@@ -9,18 +9,18 @@
  *
  * Copyright © 2017 Till Junge
  *
- * µSpectre is free software; you can redistribute it and/or
+ * µFFT is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
  * published by the Free Software Foundation, either version 3, or (at
  * your option) any later version.
  *
- * µSpectre is distributed in the hope that it will be useful, but
+ * µFFT is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
- * along with µSpectre; see the file COPYING. If not, write to the
+ * along with µFFT; see the file COPYING. If not, write to the
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
  * * Boston, MA 02111-1307, USA.
  *
@@ -32,16 +32,17 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include "projection/fftw_engine.hh"
-#include "common/ccoord_operations.hh"
+#include "fftw_engine.hh"
+#include <libmugrid/ccoord_operations.hh>
 
-namespace muSpectre {
+namespace muFFT {
 
   template <Dim_t Dim>
   FFTWEngine<Dim>::FFTWEngine(Ccoord resolutions, Dim_t nb_components,
                               Communicator comm)
       : Parent{resolutions, nb_components, comm} {
-    for (auto && pixel : CcoordOps::Pixels<Dim>(this->fourier_resolutions)) {
+    for (auto && pixel :
+         muGrid::CcoordOps::Pixels<Dim>(this->fourier_resolutions)) {
       this->work_space_container.add_pixel(pixel);
     }
   }
@@ -62,7 +63,7 @@ namespace muSpectre {
     int howmany = this->nb_components;
     // temporary buffer for plan
     size_t alloc_size =
-        (CcoordOps::get_size(this->subdomain_resolutions) * howmany);
+        (muGrid::CcoordOps::get_size(this->subdomain_resolutions) * howmany);
     Real * r_work_space = fftw_alloc_real(alloc_size);
     Real * in = r_work_space;
     const int * const inembed =
@@ -131,7 +132,8 @@ namespace muSpectre {
     if (this->plan_fft == nullptr) {
       throw std::runtime_error("fft plan not initialised");
     }
-    if (field.size() != CcoordOps::get_size(this->subdomain_resolutions)) {
+    if (field.size() !=
+        muGrid::CcoordOps::get_size(this->subdomain_resolutions)) {
       throw std::runtime_error("size mismatch");
     }
     fftw_execute_dft_r2c(this->plan_fft, field.data(),
@@ -145,7 +147,8 @@ namespace muSpectre {
     if (this->plan_ifft == nullptr) {
       throw std::runtime_error("ifft plan not initialised");
     }
-    if (field.size() != CcoordOps::get_size(this->subdomain_resolutions)) {
+    if (field.size() !=
+        muGrid::CcoordOps::get_size(this->subdomain_resolutions)) {
       throw std::runtime_error("size mismatch");
     }
     fftw_execute_dft_c2r(this->plan_ifft,
@@ -153,6 +156,6 @@ namespace muSpectre {
                          field.data());
   }
 
-  template class FFTWEngine<twoD>;
-  template class FFTWEngine<threeD>;
-}  // namespace muSpectre
+  template class FFTWEngine<muGrid::twoD>;
+  template class FFTWEngine<muGrid::threeD>;
+}  // namespace muFFT

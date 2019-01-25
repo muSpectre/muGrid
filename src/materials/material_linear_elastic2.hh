@@ -38,7 +38,8 @@
 #define SRC_MATERIALS_MATERIAL_LINEAR_ELASTIC2_HH_
 
 #include "materials/material_linear_elastic1.hh"
-#include "common/field.hh"
+
+#include <libmugrid/field.hh>
 
 #include <Eigen/Dense>
 
@@ -58,11 +59,13 @@ namespace muSpectre {
 
     //! expected map type for strain fields
     using StrainMap_t =
-        MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM, true>;
+        muGrid::MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM, true>;
     //! expected map type for stress fields
-    using StressMap_t = MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
+    using StressMap_t =
+        muGrid::MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
     //! expected map type for tangent stiffness fields
-    using TangentMap_t = T4MatrixFieldMap<GFieldCollection_t, Real, DimM>;
+    using TangentMap_t =
+        muGrid::T4MatrixFieldMap<GFieldCollection_t, Real, DimM>;
 
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
@@ -70,9 +73,10 @@ namespace muSpectre {
     constexpr static auto stress_measure{StressMeasure::PK2};
 
     //! local field_collections used for internals
-    using LFieldColl_t = LocalFieldCollection<DimS>;
+    using LFieldColl_t = muGrid::LocalFieldCollection<DimS>;
     //! local strain type
-    using LStrainMap_t = MatrixFieldMap<LFieldColl_t, Real, DimM, DimM, true>;
+    using LStrainMap_t =
+        muGrid::MatrixFieldMap<LFieldColl_t, Real, DimM, DimM, true>;
     //! elasticity with eigenstrain
     using InternalVariables = std::tuple<LStrainMap_t>;
   };
@@ -162,8 +166,8 @@ namespace muSpectre {
     //! linear material without eigenstrain used to compute response
     MaterialLinearElastic1<DimS, DimM> material;
     //! storage for eigenstrain
-    using Field_t =
-        TensorField<LocalFieldCollection<DimS>, Real, secondOrder, DimM>;
+    using Field_t = muGrid::TensorField<muGrid::LocalFieldCollection<DimS>,
+                                        Real, secondOrder, DimM>;
     Field_t & eigen_field;  //!< field holding the eigen strain per pixel
     //! tuple for iterable eigen_field
     InternalVariables internal_variables;

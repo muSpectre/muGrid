@@ -72,7 +72,9 @@ namespace muSpectre {
         inline static decltype(auto) compute(Strain_t && F, Stress_t && S,
                                              Tangent_t && C) {
           using T4 = typename std::remove_reference_t<Tangent_t>::PlainObject;
-          using Tmap = T4MatMap<Real, Dim>;
+          using Tmap = muGrid::T4MatMap<Real, Dim>;
+          using muGrid::get;
+          
           T4 K;
           Tmap Kmap{K.data()};
           K.setZero();
@@ -119,7 +121,7 @@ namespace muSpectre {
         inline static decltype(auto) compute(Strain_t && F, Stress_t && S,
                                              Tangent_t && C) {
           using T4 = typename std::remove_reference_t<Tangent_t>::PlainObject;
-          using Tmap = T4MatMap<Real, Dim>;
+          using Tmap = muGrid::T4MatMap<Real, Dim>;
           T4 K;
           Tmap Kmap{K.data()};
           K.setZero();

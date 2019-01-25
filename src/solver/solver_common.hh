@@ -35,8 +35,7 @@
 #ifndef SRC_SOLVER_SOLVER_COMMON_HH_
 #define SRC_SOLVER_SOLVER_COMMON_HH_
 
-#include "common/common.hh"
-#include "common/tensor_algebra.hh"
+#include "common/muSpectre_common.hh"
 
 #include <Eigen/Dense>
 

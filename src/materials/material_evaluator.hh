@@ -35,11 +35,12 @@
 #ifndef SRC_MATERIALS_MATERIAL_EVALUATOR_HH_
 #define SRC_MATERIALS_MATERIAL_EVALUATOR_HH_
 
-#include "common/common.hh"
-#include "common/T4_map_proxy.hh"
-#include "common/ccoord_operations.hh"
+#include "common/muSpectre_common.hh"
 #include "materials/materials_toolbox.hh"
-#include "common/field.hh"
+
+#include <libmugrid/T4_map_proxy.hh>
+#include <libmugrid/ccoord_operations.hh>
+#include <libmugrid/field.hh>
 
 #include <exception>
 #include <memory>
@@ -57,17 +58,17 @@ namespace muSpectre {
   class MaterialEvaluator {
    public:
     using T2_t = Eigen::Matrix<Real, DimM, DimM>;
-    using T4_t = T4Mat<Real, DimM>;
+    using T4_t = muGrid::T4Mat<Real, DimM>;
 
     using T2_map = Eigen::Map<T2_t>;
-    using T4_map = T4MatMap<Real, DimM>;
+    using T4_map = muGrid::T4MatMap<Real, DimM>;
 
     using T2_const_map = Eigen::Map<const T2_t>;
-    using T4_const_map = T4MatMap<Real, DimM, true>;
+    using T4_const_map = muGrid::T4MatMap<Real, DimM, true>;
 
-    using FieldColl_t = GlobalFieldCollection<DimM>;
-    using T2Field_t = TensorField<FieldColl_t, Real, secondOrder, DimM>;
-    using T4Field_t = TensorField<FieldColl_t, Real, fourthOrder, DimM>;
+    using FieldColl_t = muGrid::GlobalFieldCollection<DimM>;
+    using T2Field_t = muGrid::TensorField<FieldColl_t, Real, secondOrder, DimM>;
+    using T4Field_t = muGrid::TensorField<FieldColl_t, Real, fourthOrder, DimM>;
 
     //! Default constructor
     MaterialEvaluator() = delete;
@@ -79,10 +80,10 @@ namespace muSpectre {
         std::shared_ptr<MaterialBase<DimM, DimM>> material)
         : material{material},
           collection{std::make_unique<FieldColl_t>()},
-          strain{make_field<T2Field_t>("gradient", *this->collection)},
-          stress{make_field<T2Field_t>("stress", *this->collection)},
-          tangent{make_field<T4Field_t>("tangent", *this->collection)} {
-      this->collection->initialise(CcoordOps::get_cube<DimM>(1), {0});
+          strain{muGrid::make_field<T2Field_t>("gradient", *this->collection)},
+          stress{muGrid::make_field<T2Field_t>("stress", *this->collection)},
+          tangent{muGrid::make_field<T4Field_t>("tangent", *this->collection)} {
+      this->collection->initialise(muGrid::CcoordOps::get_cube<DimM>(1), {0});
     }
 
     //! Copy constructor

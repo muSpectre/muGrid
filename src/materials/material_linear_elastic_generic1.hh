@@ -37,11 +37,11 @@
 #ifndef SRC_MATERIALS_MATERIAL_LINEAR_ELASTIC_GENERIC1_HH_
 #define SRC_MATERIALS_MATERIAL_LINEAR_ELASTIC_GENERIC1_HH_
 
-#include "common/common.hh"
+#include "common/muSpectre_common.hh"
 #include "materials/stress_transformations_PK2.hh"
-#include "common/T4_map_proxy.hh"
 #include "materials/material_muSpectre_base.hh"
-#include "common/tensor_algebra.hh"
+
+#include <libmugrid/T4_map_proxy.hh>
 
 namespace muSpectre {
 
@@ -62,11 +62,13 @@ namespace muSpectre {
 
     //! expected map type for strain fields
     using StrainMap_t =
-        MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM, true>;
+        muGrid::MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM, true>;
     //! expected map type for stress fields
-    using StressMap_t = MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
+    using StressMap_t =
+        muGrid::MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
     //! expected map type for tangent stiffness fields
-    using TangentMap_t = T4MatrixFieldMap<GFieldCollection_t, Real, DimM>;
+    using TangentMap_t =
+        muGrid::T4MatrixFieldMap<GFieldCollection_t, Real, DimM>;
 
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
@@ -152,10 +154,10 @@ namespace muSpectre {
     /**
      * return a reference to the stiffness tensor
      */
-    const T4Mat<Real, DimM> & get_C() const { return this->C; }
+    const muGrid::T4Mat<Real, DimM> & get_C() const { return this->C; }
 
    protected:
-    T4Mat<Real, DimM> C{};  //! stiffness tensor
+    muGrid::T4Mat<Real, DimM> C{};  //! stiffness tensor
     //! empty tuple
     std::tuple<> internal_variables{};
   };
@@ -176,10 +178,9 @@ namespace muSpectre {
   auto MaterialLinearElasticGeneric1<DimS, DimM>::evaluate_stress_tangent(
       const Eigen::MatrixBase<Derived> & E) -> decltype(auto) {
     using Stress_t = decltype(this->evaluate_stress(E));
-    using Stiffness_t = Eigen::Map<T4Mat<Real, DimM>>;
+    using Stiffness_t = Eigen::Map<muGrid::T4Mat<Real, DimM>>;
     using Ret_t = std::tuple<Stress_t, Stiffness_t>;
-    return Ret_t{this->evaluate_stress(E),
-                 Stiffness_t(this->C.data())};
+    return Ret_t{this->evaluate_stress(E), Stiffness_t(this->C.data())};
   }
 }  // namespace muSpectre
 

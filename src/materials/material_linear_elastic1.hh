@@ -37,7 +37,7 @@
 #ifndef SRC_MATERIALS_MATERIAL_LINEAR_ELASTIC1_HH_
 #define SRC_MATERIALS_MATERIAL_LINEAR_ELASTIC1_HH_
 
-#include "common/common.hh"
+#include "common/muSpectre_common.hh"
 #include "materials/stress_transformations_PK2.hh"
 #include "materials/material_muSpectre_base.hh"
 #include "materials/materials_toolbox.hh"
@@ -59,11 +59,13 @@ namespace muSpectre {
 
     //! expected map type for strain fields
     using StrainMap_t =
-        MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM, true>;
+        muGrid::MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM, true>;
     //! expected map type for stress fields
-    using StressMap_t = MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
+    using StressMap_t =
+        muGrid::MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
     //! expected map type for tangent stiffness fields
-    using TangentMap_t = T4MatrixFieldMap<GFieldCollection_t, Real, DimM>;
+    using TangentMap_t =
+        muGrid::T4MatrixFieldMap<GFieldCollection_t, Real, DimM>;
 
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::GreenLagrange};

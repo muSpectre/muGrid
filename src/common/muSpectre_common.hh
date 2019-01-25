@@ -34,15 +34,12 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include "libgrid/grid_common.hh"
-#include "libfft/mufft_common.hh"
+#include <libmugrid/grid_common.hh>
+#include <libmugrid/tensor_algebra.hh>
 
-#include <array>
-#include <cmath>
-#include <complex>
-#include <iostream>
+#include <libmufft/mufft_common.hh>
+
 #include <string>
-#include <type_traits>
 
 #ifndef SRC_COMMON_COMMON_HH_
 #define SRC_COMMON_COMMON_HH_
@@ -56,8 +53,22 @@ namespace muSpectre {
   using muGrid::Real;
   using muGrid::Uint;
 
+  using muGrid::oneD;
+  using muGrid::threeD;
+  using muGrid::twoD;
+
+  using muGrid::firstOrder;
+  using muGrid::fourthOrder;
+  using muGrid::secondOrder;
+
   using muGrid::Ccoord_t;
   using muGrid::Rcoord_t;
+
+  using muGrid::apply;
+  using muGrid::optional;
+
+  namespace Tensors = ::muGrid::Tensors;
+  namespace Matrices = ::muGrid::Matrices;
 
   /**
    * Copyright banner to be printed to the terminal by executables
@@ -100,8 +111,8 @@ namespace muSpectre {
       return vsize(dim);
       break;
     }
-    default:<
-      return ipow(dim, 2);
+    default:
+      return muGrid::ipow(dim, 2);
       break;
     }
   }

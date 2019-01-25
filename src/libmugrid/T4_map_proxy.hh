@@ -9,18 +9,18 @@
  *
  * Copyright © 2017 Till Junge
  *
- * µSpectre is free software; you can redistribute it and/or
+ * µGrid is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
  * published by the Free Software Foundation, either version 3, or (at
  * your option) any later version.
  *
- * µSpectre is distributed in the hope that it will be useful, but
+ * µGrid is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
- * along with µSpectre; see the file COPYING. If not, write to the
+ * along with µGrid; see the file COPYING. If not, write to the
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
  * * Boston, MA 02111-1307, USA.
  *
@@ -35,14 +35,14 @@
 #ifndef SRC_COMMON_T4_MAP_PROXY_HH_
 #define SRC_COMMON_T4_MAP_PROXY_HH_
 
-#include "common/eigen_tools.hh"
+#include "eigen_tools.hh"
 
 #include <Eigen/Dense>
 #include <Eigen/src/Core/util/Constants.h>
 
 #include <type_traits>
 
-namespace muSpectre {
+namespace muGrid {
 
   /**
    * simple adapter function to create a matrix that can be mapped as a tensor
@@ -51,7 +51,7 @@ namespace muSpectre {
   using T4Mat = Eigen::Matrix<T, Dim * Dim, Dim * Dim>;
 
   /**
-   * Map onto `muSpectre::T4Mat`
+   * Map onto `muGrid::T4Mat`
    */
   template <typename T, Dim_t Dim, bool ConstMap = false>
   using T4MatMap = std::conditional_t<ConstMap, Eigen::Map<const T4Mat<T, Dim>>,
@@ -101,6 +101,6 @@ namespace muSpectre {
                        k * myRowStride + l * myColStride);
   }
 
-}  // namespace muSpectre
+}  // namespace muGrid
 
 #endif  // SRC_COMMON_T4_MAP_PROXY_HH_

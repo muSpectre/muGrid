@@ -43,15 +43,14 @@
 #include <sstream>
 #include <string>
 
-#include "common/common.hh"
-#include "common/ccoord_operations.hh"
 #include "tests/test_goodies.hh"
 #include "tests.hh"
-#include "common/field_collection.hh"
-#include "common/field.hh"
-#include "common/field_map.hh"
+#include <libmugrid/ccoord_operations.hh>
+#include <libmugrid/field_collection.hh>
+#include <libmugrid/field.hh>
+#include <libmugrid/field_map.hh>
 
-namespace muSpectre {
+namespace muGrid {
 
   //! Test fixture for simple tests on single field in collection
   template <Dim_t DimS, Dim_t DimM, bool Global>
@@ -156,6 +155,6 @@ namespace muSpectre {
                                            FC_iterator_fixture<2, 3, true>,
                                            FC_iterator_fixture<3, 3, true>>;
 
-}  // namespace muSpectre
+}  // namespace muGrid
 
 #endif  // TESTS_TEST_FIELD_COLLECTIONS_HH_

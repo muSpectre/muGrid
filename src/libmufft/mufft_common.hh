@@ -32,15 +32,28 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
+#include <libmugrid/grid_common.hh>
+
 #ifndef SRC_LIBFFT_MUFFT_COMMON_HH_
 #define SRC_LIBFFT_MUFFT_COMMON_HH_
 
 namespace muFFT {
+  using muGrid::Dim_t;
+
+  using muGrid::Complex;
+  using muGrid::Int;
+  using muGrid::Real;
+  using muGrid::Uint;
+
+  using muGrid::Ccoord_t;
+  using muGrid::Rcoord_t;
+
+  using muGrid::optional;
 
   /**
    * Planner flags for FFT (follows FFTW, hopefully this choice will
    * be compatible with alternative FFT implementations)
-   * @enum muSpectre::FFT_PlanFlags
+   * @enum muFFT::FFT_PlanFlags
    */
   enum class FFT_PlanFlags {
     estimate,  //!< cheapest plan for slowest execution
@@ -48,6 +61,6 @@ namespace muFFT {
     patient    //!< very expensive plan for fastest execution
   };
 
-}  // muFFT
+}  // namespace muFFT
 
 #endif  // SRC_LIBFFT_MUFFT_COMMON_HH_

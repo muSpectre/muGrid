@@ -83,16 +83,16 @@ namespace muSpectre {
       std::stringstream err{};
       err << "Field '" << field_name << "' does not exist in material '"
           << this->name << "'.";
-      throw FieldCollectionError(err.str());
+      throw muGrid::FieldCollectionError(err.str());
     }
     auto & field{this->internal_fields[field_name]};
     if (field.get_stored_typeid().hash_code() != typeid(Real).hash_code()) {
       std::stringstream err{};
       err << "Field '" << field_name << "' is not real-valued";
-      throw FieldCollectionError(err.str());
+      throw muGrid::FieldCollectionError(err.str());
     }
 
-    return static_cast<TypedField<MFieldCollection_t, Real> &>(field).eigen();
+    return static_cast<muGrid::TypedField<MFieldCollection_t, Real> &>(field).eigen();
   }
 
   /* ---------------------------------------------------------------------- */

@@ -40,11 +40,11 @@
 #include "materials/stress_transformations_PK1_impl.hh"
 #include "materials/stress_transformations_PK2_impl.hh"
 #include "materials/stress_transformations.hh"
-#include "common/T4_map_proxy.hh"
-#include "common/tensor_algebra.hh"
 #include "tests/test_goodies.hh"
-
+#include <libmugrid/T4_map_proxy.hh>
 #include <boost/mpl/list.hpp>
+
+using namespace muGrid;
 
 namespace muSpectre {
 

@@ -168,7 +168,7 @@ All of a project's header files should be listed as descendants of the project's
 
 .. code-block:: c++
 
-   #include "common/ccoord_operations.hh"
+   #include <libmugrid/ccoord_operations.hh>
 
 Use the following order for includes to avoid hidden dependencies:
  #. *µ*\Spectre headers

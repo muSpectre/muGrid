@@ -34,8 +34,8 @@
 
 #include "solver/deprecated_solver_base.hh"
 #include "solver/deprecated_solver_cg.hh"
-#include "common/field.hh"
-#include "common/iterators.hh"
+#include <libmugrid/field.hh>
+#include <libmugrid/iterators.hh>
 
 #include <iostream>
 #include <memory>
