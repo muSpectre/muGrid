@@ -166,7 +166,7 @@ endfunction()
 function(mark_as_advanced_prefix prefix)
   get_property(_list DIRECTORY PROPERTY VARIABLES)
   foreach(_var ${_list})
-    if(${_var} MATCHES "^${prefix}.*")
+    if("${_var}" MATCHES "^${prefix}")
       mark_as_advanced(${_var})
     endif()
   endforeach()
@@ -205,6 +205,9 @@ function(add_external_package package)
   if(NOT _aep_args_IGNORE_SYSTEM)
     find_package(${package} ${_${package}_version} ${_required} ${_aep_UNPARSED_ARGUMENTS} QUIET)
     if(${package}_FOUND AND NOT ${package}_FOUND_EXTERNAL)
+      string(TOUPPER ${package} u_package)
+      mark_as_advanced_prefix(${package})
+      mark_as_advanced_prefix(${u_package})
       return()
     endif()
   endif()
@@ -214,19 +217,65 @@ function(add_external_package package)
   if(EXISTS ${_cmake_includes}/${package}.cmake)
     include(${_cmake_includes}/${package}.cmake)
   endif()
+  
+  string(TOUPPER ${package} u_package)
+  mark_as_advanced_prefix(${package})
+  mark_as_advanced_prefix(${u_package})
 endfunction()
 
+# ------------------------------------------------------------------------------
+function(muSpectre_set_global_compile_options)
+  add_compile_options(-Wall -Wextra -Weffc++)
 
+  string(TOLOWER "${CMAKE_BUILD_TYPE}" build_type )
+  if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+    # using Clang
+    add_compile_options(-Wno-missing-braces)
+    if ("debug" STREQUAL "${build_type}")
+      add_compile_options(-O0)
+    endif()
+  elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    # using GCC
+    add_compile_options(-Wno-non-virtual-dtor)
+    add_compile_options(-march=native)
+    if (("relwithdebinfo" STREQUAL "${build_type}") OR ("release" STREQUAL "${build_type}" ))
+      add_compile_options(-march=native)
+    endif()
+    if ("debug" STREQUAL "${build_type}" )
+      add_compile_options(-O0 -g3 -ggdb3)
+    endif()
+  elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
+    # using Intel C++
+  elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+    # using Visual Studio C++
+  endif()
+endfunction()
+
+# ------------------------------------------------------------------------------
+function(muSpectre_move_to_project target)
+  get_property(_output_name TARGET ${target} PROPERTY OUTPUT_NAME)
+  get_filename_component(_output_name_exe "${_output_name}" NAME)
+  file(RELATIVE_PATH _output_name
+    ${CMAKE_CURRENT_BINARY_DIR} "${PROJECT_BINARY_DIR}/${target}")
+  set_property(TARGET ${target}
+    PROPERTY OUTPUT_NAME "${_output_name}")
+endfunction()
+
+# ------------------------------------------------------------------------------
 function(muSpectre_add_test test_name)
   include(CMakeParseArguments)
 
   set(_mat_flags
+    HEADER_ONLY
     )
   set(_mat_one_variables
     TYPE
     MPI_NB_PROCS
+    TARGET
     )
-  set(_mat_multi_variables)
+  set(_mat_multi_variables
+    SOURCES
+    )
 
   cmake_parse_arguments(_mat_args
     "${_mat_flags}"
@@ -241,10 +290,42 @@ function(muSpectre_add_test test_name)
     message (SEND_ERROR "Can only handle types 'BOOST' and 'PYTHON'")
   endif ("${_mat_args_TYPE}" STREQUAL "BOOST")
 
-  set(_exe ${_mat_args_UNPARSED_ARGUMENTS})
+  if ("${_mat_args_TYPE}" STREQUAL "BOOST")
+    if(DEFINED _mat_args_TARGET)
+      set(target_test_name ${_mat_args_TARGET})
+    else()
+      set(target_test_name ${test_name})
+    endif()
+
+    if(NOT TARGET ${target_test_name})
+      add_executable(${target_test_name} ${_mat_args_SOURCES})
+
+      muSpectre_move_to_project(${target_test_name})
+
+      target_link_libraries(${target_test_name}
+	PRIVATE ${Boost_LIBRARIES} cxxopts)
+
+      if(NOT _mat_HEADER_ONLY)
+	target_link_libraries(${target_test_name}
+	  PRIVATE muSpectre::muSpectre)
+      else()
+	get_target_property(_features muSpectre::muSpectre INTERFACE_COMPILE_FEATURES)
+	target_compile_features(${target_test_name}
+	  PRIVATE ${_features})
+      endif()
+    endif()
+  endif()
+
+  if ("${_mat_args_TYPE}" STREQUAL "BOOST")
+    set(_exe $<TARGET_FILE:${target_test_name}> ${_mat_args_UNPARSED_ARGUMENTS})
+  else()
+    set(_exe ${_mat_args_UNPARSED_ARGUMENTS})
+  endif()
+  
+  
   if (${MUSPECTRE_RUNNING_IN_CI})
     if ("${_mat_args_TYPE}" STREQUAL "BOOST")
-      LIST(APPEND _exe "--logger=JUNIT,all,test_results_${test_name}.xml")
+      list(APPEND _exe "--logger=JUNIT,all,test_results_${test_name}.xml")
     elseif("${_mat_args_TYPE}" STREQUAL "PYTHON")
       set(_exe ${PYTHON_EXECUTABLE} -m pytest --junitxml test_results_${test_name}.xml ${_exe})
     endif ("${_mat_args_TYPE}" STREQUAL "BOOST")
@@ -258,5 +339,8 @@ function(muSpectre_add_test test_name)
     set(_exe ${MPIEXEC_EXECUTABLE} ${MPIEXEC_PREFLAGS} ${MPIEXEC_NUMPROC_FLAG} ${_mat_args_MPI_NB_PROCS} ${_exe})
   endif(${_mat_args_MPI_NB_PROCS})
 
-  add_test(${test_name} ${_exe})
+  add_test(
+    NAME ${test_name}
+    COMMAND ${_exe}
+    WORKING_DIRECTORY ${PROJECT_BINARY_DIR})
 endfunction()

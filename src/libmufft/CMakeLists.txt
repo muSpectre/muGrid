@@ -48,9 +48,8 @@ set(fft_engine_PFFT_SRCS
   pfft_engine.cc
   )
 
-find_package(FFTW REQUIRED)
-target_link_libraries(muFFT PUBLIC ${FFTW_LIBRARIES})
-target_include_directories(muFFT PUBLIC ${FFTW_INCLUDES})
+find_package(FFTW3 COMPONENTS double REQUIRED)
+target_link_libraries(muFFT PUBLIC fftw3::double)
       
 if(${MUSPECTRE_MPI_PARALLEL})
   find_package(MPI REQUIRED)
@@ -59,21 +58,22 @@ if(${MUSPECTRE_MPI_PARALLEL})
   target_include_directories(muFFT SYSTEM PUBLIC ${MPI_C_INCLUDE_PATH})
   target_compile_definitions(muFFT PUBLIC -DWITH_MPI)
 
-  set(MUFFT_USE_FFTWMPI "ON" CACHE BOOL "If on, the mpi-parallel FFTW engine is built")
-  set(MUFFT_USE_PFFT "OFF" CACHE BOOL "If on, the mpi-parallel PFFT engine is built")
+  set(MUFFT_USE_FFTWMPI "If on, the mpi-parallel FFTW engine is built" ON)
+  set(MUFFT_USE_PFFT "If on, the mpi-parallel PFFT engine is built" OFF)
 
   set(_using_mpi FALSE)
   foreach (_fft FFTWMPI PFFT)
     if (${MUFFT_USE_${_fft}})
-      find_package(${_fft} REQUIRED)
-
-      if(NOT ${${_fft}_FOUND})
-	message(SEND_ERROR "You chose ${_fft} but CMake cannot find it")
+      if("${_fft}" STREQUAL "FFTWMPI")
+	find_package(FFTW3 COMPONENTS double mpi REQUIRED)
+	target_link_libraries(muFFT PUBLIC fftw3::double::mpi)
+      else()
+	find_package(${_fft} REQUIRED)
+	# TODO this private should perhaps become private
+	target_link_libraries(muFFT PUBLIC ${${_fft}_LIBRARIES})
+	target_include_directories(muFFT PUBLIC ${${_fft}_INCLUDES})
       endif()
 
-      # TODO this private should perhaps become private
-      target_link_libraries(muFFT PUBLIC ${${_fft}_LIBRARIES})
-      target_include_directories(muFFT PUBLIC ${${_fft}_INCLUDES})
       target_compile_definitions(muFFT PUBLIC -DWITH_${_fft})
       
       list(APPEND mufft_SRCS ${fft_engine_${_fft}_SRCS})
@@ -91,7 +91,6 @@ target_link_libraries(muFFT PUBLIC muSpectre::muGrid)
 
 # defining exported include directories
 target_include_directories(muFFT
-  PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libmufft>
   INTERFACE $<INSTALL_INTERFACE:include/>
   )
 

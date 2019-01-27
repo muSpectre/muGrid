@@ -33,8 +33,18 @@
 # covered by the terms of those libraries' licenses, the licensors of this
 # Program grant you additional permission to convey the resulting work.
 # =============================================================================
+option(MUSPECTRE_MUGRID_ONLY "Only setup muGrid" OFF)
 add_subdirectory(libmugrid)
+
+if(MUSPECTRE_MUGRID_ONLY)
+  return()
+endif()
+option(MUSPECTRE_MUFFT_ONLY "Compile only muFFT" OFF)
 add_subdirectory(libmufft)
+
+if(MUSPECTRE_MUFFT_ONLY OR MUSPECTRE_MUGRID_ONLY)
+  return()
+endif()
 
 add_library(muSpectre)
 
@@ -58,6 +68,13 @@ if(NOT HAS_STD_OPTIONAL)
   target_compile_definitions(muSpectre PUBLIC -DNO_EXPERIMENTAL)
 endif()
 
+# Do not trust old gcc. the std::optional has memory bugs
+if(${CMAKE_COMPILER_IS_GNUCC})
+  if(${CMAKE_CXX_COMPILER_VERSION} VERSION_LESS 6.0.0)
+    add_definitions(-DNO_EXPERIMENTAL)
+  endif()
+endif()
+
 file(GLOB_RECURSE _headers RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "*.hh")
 list(APPEND muSpectre_SRC ${_headers})
 
@@ -68,6 +85,19 @@ target_link_libraries(muSpectre PUBLIC muSpectre::muFFT muSpectre::muGrid)
 
 set_property(TARGET muSpectre PROPERTY PUBLIC_HEADER ${_headers})
 
+# defining exported include directories
+target_include_directories(muSpectre
+  PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>
+  INTERFACE $<INSTALL_INTERFACE:include/libmuspectre>
+  )
+
+# small trick for build includes in public
+set_property(TARGET muSpectre APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>)
+
+
+add_library(muSpectre::muSpectre ALIAS muSpectre)
+
 install(TARGETS muSpectre
   LIBRARY DESTINATION lib
-  PUBLIC_HEADER DESTINATION include)
+  PUBLIC_HEADER DESTINATION include/libmuspectre)

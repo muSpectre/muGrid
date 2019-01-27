@@ -34,161 +34,48 @@
 # Program grant you additional permission to convey the resulting work.
 # =============================================================================
 
-cmake_minimum_required(VERSION 3.0.0)
+cmake_minimum_required(VERSION 3.5.0)
 
-project(µSpectre)
+project(muSpectre)
 
+# ------------------------------------------------------------------------------
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(BUILD_SHARED_LIBS ON)
 set(MUSPECTRE_PYTHON_MAJOR_VERSION 3)
-
-add_compile_options(-Wall -Wextra -Weffc++)
-
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
-set(MUSPECTRE_MAKE_DOC_TARGET "OFF" CACHE BOOL "If on, a target dev_doc (which builds the documentation) is added")
-set(MUSPECTRE_MAKE_TESTS "ON" CACHE BOOL "If on, several ctest targets will be built automatically")
-set(MUSPECTRE_MAKE_EXAMPLES "ON" CACHE BOOL "If on, the executables in the bin folder will be compiled")
-set(MUSPECTRE_MAKE_BENCHMARKS "ON" CACHE BOOL "If on, the benchmarks will be compiled")
-set(MUSPECTRE_MPI_PARALLEL "OFF" CACHE BOOL "If on, MPI-parallel solvers become available")
+
+# ------------------------------------------------------------------------------
+option(MUSPECTRE_MAKE_DOC_TARGET "If on, a target dev_doc (which builds the documentation) is added" OFF)
+option(MUSPECTRE_MAKE_TESTS "If on, several ctest targets will be built automatically" ON)
+option(MUSPECTRE_MAKE_EXAMPLES "If on, the executables in the bin folder will be compiled" ON)
+option(MUSPECTRE_MAKE_BENCHMARKS "If on, the benchmarks will be compiled" ON)
+option(MUSPECTRE_MPI_PARALLEL "If on, MPI-parallel solvers become available" OFF)
 set(MUSPECTRE_RUNNING_IN_CI "OFF" CACHE INTERNAL "changes output format for tests")
 
-if(${MUSPECTRE_MAKE_TESTS})
-  enable_testing()
-  find_package(Boost COMPONENTS unit_test_framework REQUIRED)
-endif()
-
+# ------------------------------------------------------------------------------
 include(muspectreTools)
 include(cpplint)
+mark_as_advanced_prefix(CPPLINT)
 
-string(TOLOWER "${CMAKE_BUILD_TYPE}" build_type )
-if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
-  # using Clang
-  add_compile_options(-Wno-missing-braces)
-  if ("debug" STREQUAL "${build_type}")
-    add_compile_options(-O0)
-  endif()
-elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-  # using GCC
-  add_compile_options(-Wno-non-virtual-dtor)
-  add_compile_options(-march=native)
-  if (("relwithdebinfo" STREQUAL "${build_type}") OR ("release" STREQUAL "${build_type}" ))
-    add_compile_options(-march=native)
-  endif()
-  if ("debug" STREQUAL "${build_type}" )
-    add_compile_options(-O0 -g3 -ggdb3)
-  endif()
-elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
-  # using Intel C++
-elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
-  # using Visual Studio C++
-endif()
+muSpectre_set_global_compile_options()
 
-# Do not trust old gcc. the std::optional has memory bugs
-if(${CMAKE_COMPILER_IS_GNUCC})
-  if(${CMAKE_CXX_COMPILER_VERSION} VERSION_LESS 6.0.0)
-    add_definitions(-DNO_EXPERIMENTAL)
-  endif()
-endif()
-
+# ------------------------------------------------------------------------------
 add_external_package(Eigen3 VERSION 3.3.0 CONFIG)
-
 add_external_package(pybind11 VERSION 2.2 CONFIG)
 find_package(PythonLibsNew ${MUSPECTRE_PYTHON_MAJOR_VERSION} MODULE REQUIRED)
 
-include_directories(
-  ${CMAKE_SOURCE_DIR}/src
-  ${CMAKE_SOURCE_DIR}
-  )
+add_subdirectory(external)
 
+# ------------------------------------------------------------------------------
 if(APPLE)
-  include_directories(${CMAKE_INSTALL_PREFIX}/include ${Boost_INCLUDE_DIRS})
+  include_directories(
+    ${CMAKE_INSTALL_PREFIX}/include
+    ${Boost_INCLUDE_DIRS})
 endif()
 
-#build tests (these are before we add -Werror to the compile options)
 if (${MUSPECTRE_MAKE_TESTS})
-  ##############################################################################
-
-  # build library tests
-  file(GLOB TEST_SRCS "${CMAKE_SOURCE_DIR}/tests/test_*.cc")
-
-  add_executable(main_test_suite tests/main_test_suite.cc ${TEST_SRCS})
-  target_link_libraries(main_test_suite ${Boost_LIBRARIES} muSpectre)
-
-  muSpectre_add_test(main_test_suite TYPE BOOST main_test_suite --report_level=detailed)
-
-  add_executable(mattb_test tests/main_test_suite tests/test_materials_toolbox.cc)
-  target_link_libraries(mattb_test ${Boost_LIBRARIES} muSpectre)
-  muSpectre_add_test(mattb_test TYPE BOOST mattb_test --report_level=detailed)
-
-  # build header tests
-  file( GLOB HEADER_TEST_SRCS "${CMAKE_SOURCE_DIR}/tests/header_test_*.cc")
-  foreach(header_test ${HEADER_TEST_SRCS})
-    get_filename_component(header_test_name ${header_test} NAME_WE)
-    string(SUBSTRING ${header_test_name} 12 -1 test_name)
-    list(APPEND header_tests ${test_name})
-    add_executable(${test_name} tests/main_test_suite.cc ${header_test})
-    target_link_libraries(${test_name} ${Boost_LIBRARIES} Eigen3::Eigen)
-    target_include_directories(${test_name} INTERFACE ${muSpectre_INCLUDES})
-    muSpectre_add_test(${test_name} TYPE BOOST ${test_name}
-      --report_level=detailed)
-  endforeach(header_test ${HEADER_TEST_SRCS})
-
-  add_custom_target(header_tests)
-  add_dependencies(header_tests ${header_tests})
-
-  ##############################################################################
-  # build py_comparison tests
-  file(GLOB PY_COMP_TEST_SRCS "${CMAKE_SOURCE_DIR}/tests/py_comparison_*.cc")
-
-  find_package(PythonInterp ${MUSPECTRE_PYTHON_MAJOR_VERSION} REQUIRED)
-  foreach(py_comp_test ${PY_COMP_TEST_SRCS})
-    get_filename_component(py_comp_test_fname ${py_comp_test} NAME_WE)
-
-    string (SUBSTRING ${py_comp_test_fname} 19 -1 py_comp_test_name)
-
-    pybind11_add_module(${py_comp_test_name} ${py_comp_test})
-    target_include_directories(${py_comp_test_name} PUBLIC
-      ${PYTHON_INCLUDE_DIRS})
-    target_link_libraries(${py_comp_test_name} PRIVATE muSpectre)
-    configure_file(
-      tests/${py_comp_test_fname}.py
-      "${CMAKE_BINARY_DIR}/${py_comp_test_fname}.py"
-      COPYONLY)
-    muSpectre_add_test(${py_comp_test_fname}
-      TYPE PYTHON ${py_comp_test_fname}.py)
-  endforeach(py_comp_test ${PY_COMP_TEST_SRCS})
-
-  ##############################################################################
-  # copy python test
-  file(GLOB PY_TEST_SRCS "${CMAKE_SOURCE_DIR}/tests/python_*.py")
-
-  foreach(pytest ${PY_TEST_SRCS})
-    get_filename_component(pytest_name ${pytest} NAME)
-    configure_file(
-      ${pytest}
-      "${CMAKE_BINARY_DIR}/${pytest_name}"
-      COPYONLY)
-  endforeach(pytest ${PY_TEST_SRCS})
-  muSpectre_add_test(python_binding_test  TYPE PYTHON python_binding_tests.py)
-
-  if(${MUSPECTRE_MPI_PARALLEL})
-    ############################################################################
-    # add MPI tests
-    file( GLOB TEST_SRCS "${CMAKE_SOURCE_DIR}/tests/mpi_test_*.cc")
-
-    add_executable(mpi_main_test_suite tests/mpi_main_test_suite.cc ${TEST_SRCS})
-    target_link_libraries(mpi_main_test_suite ${Boost_LIBRARIES} muSpectre)
-
-    muSpectre_add_test(mpi_main_test_suite1 TYPE BOOST MPI_NB_PROCS 1
-      mpi_main_test_suite --report_level=detailed)
-    muSpectre_add_test(mpi_main_test_suite2 TYPE BOOST MPI_NB_PROCS 2
-      mpi_main_test_suite --report_level=detailed)
-
-    muSpectre_add_test(python_mpi_binding_test1 TYPE PYTHON MPI_NB_PROCS 1
-      python_mpi_binding_tests.py)
-    muSpectre_add_test(python_mpi_binding_test2 TYPE PYTHON MPI_NB_PROCS 2
-      python_mpi_binding_tests.py)
-  endif()
+  enable_testing()
+  add_subdirectory(tests)
 endif()
 
 ################################################################################
@@ -203,50 +90,7 @@ endif()
 
 ################################################################################
 if(${MUSPECTRE_MAKE_EXAMPLES})
-  #compile executables
-
-  set(binaries
-    ${CMAKE_SOURCE_DIR}/bin/demonstrator1.cc
-    ${CMAKE_SOURCE_DIR}/bin/demonstrator_dynamic_solve.cc
-    ${CMAKE_SOURCE_DIR}/bin/demonstrator2.cc
-    ${CMAKE_SOURCE_DIR}/bin/hyper-elasticity.cc
-    ${CMAKE_SOURCE_DIR}/bin/small_case.cc
-    )
-
-  if(${MUSPECTRE_MPI_PARALLEL})
-    set (binaries
-      ${binaries}
-      ${CMAKE_SOURCE_DIR}/bin/demonstrator_mpi.cc
-      )
-  endif()
-
-  foreach(binaryfile ${binaries})
-    get_filename_component(binaryname  ${binaryfile} NAME_WE)
-    add_executable(${binaryname} ${binaryfile})
-    target_link_libraries(${binaryname} ${Boost_LIBRARIES} muSpectre)
-  endforeach(binaryfile ${binaries})
-
-  # or copy them
-  file(GLOB pybins "${CMAKE_SOURCE_DIR}/bin/*.py")
-  foreach(pybin ${pybins})
-    get_filename_component(binaryname  ${pybin} NAME_WE)
-    configure_file(
-      ${pybin}
-      "${CMAKE_BINARY_DIR}/${binaryname}.py"
-      COPYONLY)
-  endforeach(pybin ${pybins})
-
-  # additional files to copy
-  set (FILES_FOR_COPY
-    ${CMAKE_SOURCE_DIR}/bin/odd_image.npz)
-
-  foreach(FILE_FOR_COPY ${FILES_FOR_COPY})
-    get_filename_component(binaryname  ${FILE_FOR_COPY} NAME)
-    configure_file(
-      ${FILE_FOR_COPY}
-      "${CMAKE_BINARY_DIR}/${binaryname}"
-      COPYONLY)
-  endforeach(FILE_FOR_COPY ${FILES_FOR_COPY})
+  add_subdirectory(${CMAKE_SOURCE_DIR}/bin)
 endif()
 
 
