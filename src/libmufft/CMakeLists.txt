@@ -58,8 +58,8 @@ if(${MUSPECTRE_MPI_PARALLEL})
   target_include_directories(muFFT SYSTEM PUBLIC ${MPI_C_INCLUDE_PATH})
   target_compile_definitions(muFFT PUBLIC -DWITH_MPI)
 
-  set(MUFFT_USE_FFTWMPI "If on, the mpi-parallel FFTW engine is built" ON)
-  set(MUFFT_USE_PFFT "If on, the mpi-parallel PFFT engine is built" OFF)
+  option(MUFFT_USE_FFTWMPI "If on, the mpi-parallel FFTW engine is built" ON)
+  option(MUFFT_USE_PFFT "If on, the mpi-parallel PFFT engine is built" OFF)
 
   set(_using_mpi FALSE)
   foreach (_fft FFTWMPI PFFT)
