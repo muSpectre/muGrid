@@ -37,15 +37,15 @@
 #include "common/geometry.hh"
 #include "tests.hh"
 #include "test_goodies.hh"
-#include "common/T4_map_proxy.hh"
+#include <libmugrid/T4_map_proxy.hh>
 
 #include <Eigen/Dense>
 #include <boost/mpl/list.hpp>
 
 #include <cmath>
+#include <iostream>
 
 namespace muSpectre {
-
   BOOST_AUTO_TEST_SUITE(geometry);
 
   /* ---------------------------------------------------------------------- */
@@ -54,15 +54,15 @@ namespace muSpectre {
     static constexpr Dim_t Dim{Dim_};
     using Vec_t = Eigen::Matrix<Real, Dim, 1>;
     using Mat_t = Eigen::Matrix<Real, Dim, Dim>;
-    using Ten_t = T4Mat<Real, Dim>;
+    using Ten_t = muGrid::T4Mat<Real, Dim>;
     using Angles_t = Eigen::Matrix<Real, (Dim == threeD ? 3 : 1), 1>;
     using Rot_t = Rotator<Dim, Rot>;
     static constexpr RotationOrder EulerOrder{Rot};
     static constexpr Dim_t get_Dim() { return Dim_; }
     RotationFixture() : rotator{euler} {}
 
-    testGoodies::RandRange<Real> rr{};
-    Angles_t euler{2 * pi * Angles_t::Random()};
+    muGrid::testGoodies::RandRange<Real> rr{};
+    Angles_t euler{2 * muGrid::pi * Angles_t::Random()};
     Vec_t v{Vec_t::Random()};
     Mat_t m{Mat_t::Random()};
     Ten_t t{Ten_t::Random()};
@@ -98,9 +98,9 @@ namespace muSpectre {
               for (int n = 0; n < Dim; ++n) {
                 for (int o = 0; o < Dim; ++o) {
                   for (int p = 0; p < Dim; ++p) {
-                    get(t_ref, a, b, o, p) += R(a, i) * R(b, l) *
-                                              get(t, i, l, m, n) * R(o, m) *
-                                              R(p, n);
+                    muGrid::get(t_ref, a, b, o, p) +=
+                        R(a, i) * R(b, l) * muGrid::get(t, i, l, m, n) *
+                        R(o, m) * R(p, n);
                   }
                 }
               }

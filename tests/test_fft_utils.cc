@@ -35,9 +35,9 @@
 #include <boost/mpl/list.hpp>
 
 #include "tests.hh"
-#include "projection/fft_utils.hh"
+#include <libmufft/fft_utils.hh>
 
-namespace muSpectre {
+namespace muFFT {
 
   BOOST_AUTO_TEST_SUITE(fft_utils);
 
@@ -69,20 +69,22 @@ namespace muSpectre {
     auto unit_xi{freq_struc.get_unit_xi(ccoord1)};
     typename FFT_freqs<dim>::Vector ref;
     ref << 2., .3;  // from above tests
-    BOOST_CHECK_LT((xi - ref).norm(), tol);
-    BOOST_CHECK_LT(std::abs(xi.dot(unit_xi) - xi.norm()), xi.norm() * tol);
-    BOOST_CHECK_LT(std::abs(unit_xi.norm() - 1.), tol);
+    BOOST_CHECK_LT((xi - ref).norm(), muSpectre::tol);
+    BOOST_CHECK_LT(std::abs(xi.dot(unit_xi) - xi.norm()),
+                   xi.norm() * muSpectre::tol);
+    BOOST_CHECK_LT(std::abs(unit_xi.norm() - 1.), muSpectre::tol);
 
     ccoord1 = {7, 8};
     xi = freq_struc.get_xi(ccoord1);
     unit_xi = freq_struc.get_unit_xi(ccoord1);
 
     ref << -5., -.2;
-    BOOST_CHECK_LT((xi - ref).norm(), tol);
-    BOOST_CHECK_LT(std::abs(xi.dot(unit_xi) - xi.norm()), xi.norm() * tol);
-    BOOST_CHECK_LT(std::abs(unit_xi.norm() - 1.), tol);
+    BOOST_CHECK_LT((xi - ref).norm(), muSpectre::tol);
+    BOOST_CHECK_LT(std::abs(xi.dot(unit_xi) - xi.norm()),
+                   xi.norm() * muSpectre::tol);
+    BOOST_CHECK_LT(std::abs(unit_xi.norm() - 1.), muSpectre::tol);
   }
 
   BOOST_AUTO_TEST_SUITE_END();
 
-}  // namespace muSpectre
+}  // namespace muFFT

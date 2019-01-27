@@ -41,7 +41,8 @@ namespace muSpectre {
   MaterialLinearElasticGeneric2<DimS, DimM>::MaterialLinearElasticGeneric2(
       const std::string & name, const CInput_t & C_voigt)
       : Parent{name}, worker{name, C_voigt},
-        eigen_field{muGrid::make_field<Field_t>("Eigenstrain", this->internal_fields)},
+        eigen_field{
+            muGrid::make_field<Field_t>("Eigenstrain", this->internal_fields)},
         internal_variables(eigen_field.get_const_map()) {}
 
   /* ---------------------------------------------------------------------- */

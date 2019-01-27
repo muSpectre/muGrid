@@ -32,9 +32,9 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include "projection/projection_small_strain.hh"
 #include "test_projection.hh"
-#include "projection/fft_utils.hh"
+#include "projection/projection_small_strain.hh"
+#include <libmufft/fft_utils.hh>
 
 #include <Eigen/Dense>
 
@@ -54,7 +54,8 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(constructor_test, fix, fixlist, fix) {
-    BOOST_CHECK_NO_THROW(fix::projector.initialise(FFT_PlanFlags::estimate));
+    BOOST_CHECK_NO_THROW(
+        fix::projector.initialise(muFFT::FFT_PlanFlags::estimate));
   }
 
   /* ---------------------------------------------------------------------- */
@@ -67,35 +68,36 @@ namespace muSpectre {
         dim == fix::mdim,
         "These tests assume that the material and spatial dimension are "
         "identical");
-    using Fields = GlobalFieldCollection<sdim>;
-    using FieldT = TensorField<Fields, Real, secondOrder, mdim>;
-    using FieldMap = MatrixFieldMap<Fields, Real, mdim, mdim>;
+    using Fields = muGrid::GlobalFieldCollection<sdim>;
+    using FieldT = muGrid::TensorField<Fields, Real, secondOrder, mdim>;
+    using FieldMap = muGrid::MatrixFieldMap<Fields, Real, mdim, mdim>;
     using Vector = Eigen::Matrix<Real, dim, 1>;
 
     Fields fields{};
-    FieldT & f_grad{make_field<FieldT>("strain", fields)};
-    FieldT & f_var{make_field<FieldT>("working field", fields)};
+    FieldT & f_grad{muGrid::make_field<FieldT>("strain", fields)};
+    FieldT & f_var{muGrid::make_field<FieldT>("working field", fields)};
 
     FieldMap grad(f_grad);
     FieldMap var(f_var);
 
     fields.initialise(fix::projector.get_subdomain_resolutions(),
                       fix::projector.get_subdomain_locations());
-    FFT_freqs<dim> freqs{fix::projector.get_domain_resolutions(),
-                         fix::projector.get_domain_lengths()};
+    muFFT::FFT_freqs<dim> freqs{fix::projector.get_domain_resolutions(),
+                                fix::projector.get_domain_lengths()};
 
     Vector k;
     for (Dim_t i = 0; i < dim; ++i) {
       // the wave vector has to be such that it leads to an integer
       // number of periods in each length of the domain
-      k(i) = (i + 1) * 2 * pi / fix::projector.get_domain_lengths()[i];
+      k(i) = (i + 1) * 2 * muGrid::pi / fix::projector.get_domain_lengths()[i];
     }
 
+    using muGrid::operator/;
     for (auto && tup : akantu::zip(fields, grad, var)) {
       auto & ccoord = std::get<0>(tup);
       auto & g = std::get<1>(tup);
       auto & v = std::get<2>(tup);
-      Vector vec = CcoordOps::get_vector(
+      Vector vec = muGrid::CcoordOps::get_vector(
           ccoord, fix::projector.get_domain_lengths() /
                       fix::projector.get_domain_resolutions());
       g.row(0) << k.transpose() * cos(k.dot(vec));
@@ -107,15 +109,16 @@ namespace muSpectre {
       v = g;
     }
 
-    fix::projector.initialise(FFT_PlanFlags::estimate);
+    fix::projector.initialise(muFFT::FFT_PlanFlags::estimate);
     fix::projector.apply_projection(f_var);
 
+    using muGrid::operator/;
     constexpr bool verbose{false};
     for (auto && tup : akantu::zip(fields, grad, var)) {
       auto & ccoord = std::get<0>(tup);
       auto & g = std::get<1>(tup);
       auto & v = std::get<2>(tup);
-      Vector vec = CcoordOps::get_vector(
+      Vector vec = muGrid::CcoordOps::get_vector(
           ccoord, fix::projector.get_domain_lengths() /
                       fix::projector.get_domain_resolutions());
       Real error = (g - v).norm();
@@ -123,9 +126,8 @@ namespace muSpectre {
       if ((error >= tol) || verbose) {
         std::cout << std::endl << "grad_ref :" << std::endl << g << std::endl;
         std::cout << std::endl << "grad_proj :" << std::endl << v << std::endl;
-        std::cout << std::endl
-                  << "ccoord :" << std::endl
-                  << ccoord << std::endl;
+        std::cout << std::endl << "ccoord :" << std::endl;
+        muGrid::operator<<(std::cout, ccoord) << std::endl;
         std::cout << std::endl
                   << "vector :" << std::endl
                   << vec.transpose() << std::endl;

@@ -92,9 +92,10 @@ namespace muSpectre {
     using traits =
         MaterialMuSpectre_traits<MaterialHyperElastoPlastic1<sdim, mdim>>;
     using LColl_t = typename traits::LFieldColl_t;
-    using StrainStField_t =
-        StateField<TensorField<LColl_t, Real, secondOrder, mdim>>;
-    using FlowStField_t = StateField<ScalarField<LColl_t, Real>>;
+    using StrainStField_t = muGrid::StateField<
+        muGrid::TensorField<LColl_t, Real, secondOrder, mdim>>;
+    using FlowStField_t =
+        muGrid::StateField<muGrid::ScalarField<LColl_t, Real>>;
 
     // using StrainStRef_t = typename traits::LStrainMap_t::reference;
     // using ScalarStRef_t = typename traits::LScalarMap_t::reference;
@@ -104,10 +105,11 @@ namespace muSpectre {
     coll.add_pixel({0});
     coll.initialise();
 
-    auto & F_{make_statefield<StrainStField_t>("previous gradient", coll)};
-    auto & be_{
-        make_statefield<StrainStField_t>("previous elastic strain", coll)};
-    auto & eps_{make_statefield<FlowStField_t>("plastic flow", coll)};
+    auto & F_{
+        muGrid::make_statefield<StrainStField_t>("previous gradient", coll)};
+    auto & be_{muGrid::make_statefield<StrainStField_t>(
+        "previous elastic strain", coll)};
+    auto & eps_{muGrid::make_statefield<FlowStField_t>("plastic flow", coll)};
 
     auto F_prev{F_.get_map()};
     F_prev[0].current() = Strain_t::Identity();
@@ -202,13 +204,14 @@ namespace muSpectre {
     constexpr bool has_precomputed_values{(mdim == sdim) && (mdim == threeD)};
     constexpr bool verbose{has_precomputed_values && false};
     using Strain_t = Eigen::Matrix<Real, mdim, mdim>;
-    using Stiffness_t = T4Mat<Real, mdim>;
+    using Stiffness_t = muGrid::T4Mat<Real, mdim>;
     using traits =
         MaterialMuSpectre_traits<MaterialHyperElastoPlastic1<sdim, mdim>>;
     using LColl_t = typename traits::LFieldColl_t;
-    using StrainStField_t =
-        StateField<TensorField<LColl_t, Real, secondOrder, mdim>>;
-    using FlowStField_t = StateField<ScalarField<LColl_t, Real>>;
+    using StrainStField_t = muGrid::StateField<
+        muGrid::TensorField<LColl_t, Real, secondOrder, mdim>>;
+    using FlowStField_t =
+        muGrid::StateField<muGrid::ScalarField<LColl_t, Real>>;
 
     // using StrainStRef_t = typename traits::LStrainMap_t::reference;
     // using ScalarStRef_t = typename traits::LScalarMap_t::reference;
@@ -218,10 +221,11 @@ namespace muSpectre {
     coll.add_pixel({0});
     coll.initialise();
 
-    auto & F_{make_statefield<StrainStField_t>("previous gradient", coll)};
-    auto & be_{
-        make_statefield<StrainStField_t>("previous elastic strain", coll)};
-    auto & eps_{make_statefield<FlowStField_t>("plastic flow", coll)};
+    auto & F_{
+        muGrid::make_statefield<StrainStField_t>("previous gradient", coll)};
+    auto & be_{muGrid::make_statefield<StrainStField_t>(
+        "previous elastic strain", coll)};
+    auto & eps_{muGrid::make_statefield<FlowStField_t>("plastic flow", coll)};
 
     auto F_prev{F_.get_map()};
     F_prev[0].current() = Strain_t::Identity();
@@ -283,7 +287,7 @@ namespace muSpectre {
           5.75666667e-01, 2.61999996e-17, 0.00000000e+00, 2.61999996e-17,
           5.75666667e-01, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
           1.34766667e+00;
-      Stiffness_t K4b_ref{testGoodies::from_numpy(temp)};
+      Stiffness_t K4b_ref{muGrid::testGoodies::from_numpy(temp)};
 
       error = (K4b_ref - stiffness).norm() / K4b_ref.norm();
       BOOST_CHECK_LT(error, hi_tol);
@@ -345,7 +349,7 @@ namespace muSpectre {
           8.26350980e-01, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
           8.46298039e-01;
 
-      Stiffness_t K4b_ref{testGoodies::from_numpy(temp)};
+      Stiffness_t K4b_ref{muGrid::testGoodies::from_numpy(temp)};
       error = (K4b_ref - stiffness).norm() / K4b_ref.norm();
 
       error = (K4b_ref - stiffness).norm() / K4b_ref.norm();
@@ -365,8 +369,8 @@ namespace muSpectre {
             const auto & k{i};
             const auto & l{j};
             // k,m inverted for right transpose
-            get(zero_mediate, i, j, k, m) -= stress(l, m);
-            get(intermediate, i, j, k, m) -= stress(l, m);
+            muGrid::get(zero_mediate, i, j, k, m) -= stress(l, m);
+            muGrid::get(intermediate, i, j, k, m) -= stress(l, m);
           }
         }
       }
@@ -393,7 +397,7 @@ namespace muSpectre {
           8.26350980e-01, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
           8.46298039e-01;
 
-      Stiffness_t K4c_ref{testGoodies::from_numpy(temp)};
+      Stiffness_t K4c_ref{muGrid::testGoodies::from_numpy(temp)};
       error = (K4b_ref + zero_mediate - K4c_ref).norm() / zero_mediate.norm();
       BOOST_CHECK_LT(error, hi_tol);  // rel error on small difference between
                                       // inexacly read doubles

@@ -26,7 +26,7 @@
  */
 
 #include "common/muSpectre_common.hh"
-#include "common/tensor_algebra.hh"
+#include <libmugrid/tensor_algebra.hh>
 #include <libmugrid/eigen_tools.hh>
 
 #include <Eigen/Dense>
@@ -225,7 +225,7 @@ namespace muSpectre {
     struct RotationHelper<fourthOrder> {
       template <class In_t, class Rot_t>
       inline static decltype(auto) rotate(In_t && input, Rot_t && R) {
-        constexpr Dim_t Dim{EigenCheck::tensor_dim<Rot_t>::value};
+        constexpr Dim_t Dim{muGrid::EigenCheck::tensor_dim<Rot_t>::value};
         auto && rotator_forward{
             Matrices::outer_under(R.transpose(), R.transpose())};
         auto && rotator_back = Matrices::outer_under(R, R);
@@ -233,7 +233,7 @@ namespace muSpectre {
         // Clarification. When I return this value as an
         // expression, clang segfaults or returns an uninitialised
         // tensor, hence the explicit cast into a T4Mat.
-        return T4Mat<Real, Dim>(rotator_back * input * rotator_forward);
+        return muGrid::T4Mat<Real, Dim>(rotator_back * input * rotator_forward);
       }
     };
   }  // namespace internal
@@ -242,7 +242,8 @@ namespace muSpectre {
   template <Dim_t Dim, RotationOrder Order>
   template <class In_t>
   auto Rotator<Dim, Order>::rotate(In_t && input) -> decltype(auto) {
-    constexpr Dim_t tensor_rank{EigenCheck::tensor_rank<In_t, Dim>::value};
+    constexpr Dim_t tensor_rank{
+        muGrid::EigenCheck::tensor_rank<In_t, Dim>::value};
 
     return internal::RotationHelper<tensor_rank>::rotate(
         std::forward<In_t>(input), this->rot_mat);
@@ -252,7 +253,8 @@ namespace muSpectre {
   template <Dim_t Dim, RotationOrder Order>
   template <class In_t>
   auto Rotator<Dim, Order>::rotate_back(In_t && input) -> decltype(auto) {
-    constexpr Dim_t tensor_rank{EigenCheck::tensor_rank<In_t, Dim>::value};
+    constexpr Dim_t tensor_rank{
+        muGrid::EigenCheck::tensor_rank<In_t, Dim>::value};
 
     return internal::RotationHelper<tensor_rank>::rotate(
         std::forward<In_t>(input), this->rot_mat.transpose());

@@ -35,11 +35,11 @@
 
 #include "test_field_collections.hh"
 #include "tests/test_goodies.hh"
-#include "common/tensor_algebra.hh"
+#include <libmugrid/tensor_algebra.hh>
 
 #include <Eigen/Dense>
 
-namespace muSpectre {
+namespace muGrid {
 
   BOOST_AUTO_TEST_SUITE(field_collection_tests);
 
@@ -160,4 +160,4 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE_END();
 
-}  // namespace muSpectre
+}  // namespace muGrid

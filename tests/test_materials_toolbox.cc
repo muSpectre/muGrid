@@ -44,14 +44,12 @@
 #include <libmugrid/T4_map_proxy.hh>
 #include <boost/mpl/list.hpp>
 
-using namespace muGrid;
-
 namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE(materials_toolbox)
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_strain_conversion, Fix,
-                                   testGoodies::dimlist, Fix) {
+                                   muGrid::testGoodies::dimlist, Fix) {
     constexpr Dim_t dim{Fix::dim};
     using T2 = Eigen::Matrix<Real, dim, dim>;
 
@@ -108,9 +106,9 @@ namespace muSpectre {
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(dumb_tensor_mult_test, Fix,
-                                   testGoodies::dimlist, Fix) {
+                                   muGrid::testGoodies::dimlist, Fix) {
     constexpr Dim_t dim{Fix::dim};
-    using T4 = T4Mat<Real, dim>;
+    using T4 = muGrid::T4Mat<Real, dim>;
     T4 A, B, R1, R2;
     A.setRandom();
     B.setRandom();
@@ -122,7 +120,8 @@ namespace muSpectre {
           for (Dim_t b = 0; b < dim; ++b) {
             for (Dim_t k = 0; k < dim; ++k) {
               for (Dim_t l = 0; l < dim; ++l) {
-                get(R2, i, j, k, l) += get(A, i, j, a, b) * get(B, a, b, k, l);
+                muGrid::get(R2, i, j, k, l) +=
+                    muGrid::get(A, i, j, a, b) * muGrid::get(B, a, b, k, l);
               }
             }
           }
@@ -133,16 +132,16 @@ namespace muSpectre {
     BOOST_CHECK_LT(error, tol);
   }
 
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_PK1_stress, Fix, testGoodies::dimlist,
-                                   Fix) {
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_PK1_stress, Fix,
+                                   muGrid::testGoodies::dimlist, Fix) {
     using Matrices::Tens2_t;
     using Matrices::Tens4_t;
     using Matrices::tensmult;
 
     constexpr Dim_t dim{Fix::dim};
     using T2 = Eigen::Matrix<Real, dim, dim>;
-    using T4 = T4Mat<Real, dim>;
-    testGoodies::RandRange<Real> rng;
+    using T4 = muGrid::T4Mat<Real, dim>;
+    muGrid::testGoodies::RandRange<Real> rng;
     T2 F = T2::Identity() * 2;
     // F.setRandom();
     T2 E_tb = MatTB::convert_strain<StrainMeasure::Gradient,
@@ -174,7 +173,7 @@ namespace muSpectre {
       for (Dim_t j = 0; j < dim; ++j) {
         for (Dim_t m = 0; m < dim; ++m) {
           for (Dim_t n = 0; n < dim; ++n) {
-            get(Kref, i, m, j, n) =
+            muGrid::get(Kref, i, m, j, n) =
                 (lambda * ((Fkrkr - dim) / 2 * I(i, j) * I(m, n) +
                            F(i, m) * F(j, n)) +
                  mu * (I(i, j) * Fkmkn(m, n) + Fisjs(i, j) * I(m, n) -
@@ -216,7 +215,8 @@ namespace muSpectre {
 
     T2 P_g;
     T4 K_g;
-    std::tie(P_g, K_g) = testGoodies::objective_hooke_explicit(lambda, mu, F);
+    std::tie(P_g, K_g) =
+        muGrid::testGoodies::objective_hooke_explicit(lambda, mu, F);
 
     error = (P_g - Pref).norm();
     BOOST_CHECK_LT(error, tol);
@@ -302,7 +302,7 @@ namespace muSpectre {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(numerical_tangent_test, Fix, FinDiffList,
                                    Fix) {
     constexpr Dim_t Dim{twoD};
-    using T4_t = T4Mat<Real, Dim>;
+    using T4_t = muGrid::T4Mat<Real, Dim>;
     using T2_t = Eigen::Matrix<Real, Dim, Dim>;
 
     bool verbose{false};

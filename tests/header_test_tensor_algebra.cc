@@ -36,12 +36,13 @@
 
 #include <unsupported/Eigen/CXX11/Tensor>
 
-#include "common/tensor_algebra.hh"
 #include "tests.hh"
 #include "tests/test_goodies.hh"
+#include <libmugrid/tensor_algebra.hh>
+#include <iostream>
 
-namespace muSpectre {
-
+namespace muGrid {
+  using muSpectre::tol;
   BOOST_AUTO_TEST_SUITE(tensor_algebra)
   auto TerrNorm = [](auto && t) {
     return Eigen::Tensor<Real, 0>(t.abs().sum())();
@@ -293,4 +294,4 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE_END();
 
-}  // namespace muSpectre
+}  // namespace muGrid

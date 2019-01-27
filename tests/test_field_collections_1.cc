@@ -34,7 +34,7 @@
  */
 
 #include "test_field_collections.hh"
-namespace muSpectre {
+namespace muGrid {
 
   BOOST_AUTO_TEST_SUITE(field_collection_tests);
 
@@ -219,4 +219,4 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE_END();
 
-}  // namespace muSpectre
+}  // namespace muGrid

@@ -32,10 +32,11 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include "common/eigen_tools.hh"
 #include "tests.hh"
+#include <libmugrid/eigen_tools.hh>
+#include <iostream>
 
-namespace muSpectre {
+namespace muGrid {
 
   BOOST_AUTO_TEST_SUITE(eigen_tools);
 
@@ -129,4 +130,4 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE_END();
 
-}  // namespace muSpectre
+}  // namespace muGrid

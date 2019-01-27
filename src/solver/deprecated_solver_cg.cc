@@ -49,9 +49,10 @@ namespace muSpectre {
       : Parent(cell, tol, maxiter, verbose), r_k{muGrid::make_field<Field_t>(
                                                  "residual r_k",
                                                  this->collection)},
-        p_k{muGrid::make_field<Field_t>("search direction r_k", this->collection)},
-        Ap_k{muGrid::make_field<Field_t>("Effect of tangent A*p_k", this->collection)} {
-  }
+        p_k{muGrid::make_field<Field_t>("search direction r_k",
+                                        this->collection)},
+        Ap_k{muGrid::make_field<Field_t>("Effect of tangent A*p_k",
+                                         this->collection)} {}
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>

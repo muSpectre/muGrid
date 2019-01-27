@@ -77,6 +77,8 @@ opt_ptr parse_args(int argc, char ** argv) {
   return options;
 }
 
+using namespace muFFT;
+using namespace muGrid;
 using namespace muSpectre;
 
 int main(int argc, char * argv[]) {

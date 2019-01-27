@@ -53,25 +53,24 @@ template <Dim_t dim, typename T>
 void add_get_cube_helper(py::module & mod) {
   std::stringstream name{};
   name << "get_" << dim << "d_cube";
-  mod.def(name.str().c_str(), &muSpectre::CcoordOps::get_cube<dim, T>, "size"_a,
+  mod.def(name.str().c_str(), &muGrid::CcoordOps::get_cube<dim, T>, "size"_a,
           "return a Ccoord with the value 'size' repeated in each dimension");
 }
 
 template <Dim_t dim>
 void add_get_hermitian_helper(py::module & mod) {
-  mod.def("get_hermitian_sizes",
-          &muSpectre::CcoordOps::get_hermitian_sizes<dim>, "full_sizes"_a,
+  mod.def("get_hermitian_sizes", &muGrid::CcoordOps::get_hermitian_sizes<dim>,
+          "full_sizes"_a,
           "return the hermitian sizes corresponding to the true sizes");
 }
 
 template <Dim_t dim>
 void add_get_ccoord_helper(py::module & mod) {
-  using Ccoord = muSpectre::Ccoord_t<dim>;
+  using Ccoord = muGrid::Ccoord_t<dim>;
   mod.def(
       "get_domain_ccoord",
       [](Ccoord resolutions, Dim_t index) {
-        return muSpectre::CcoordOps::get_ccoord<dim>(resolutions, Ccoord{},
-                                                     index);
+        return muGrid::CcoordOps::get_ccoord<dim>(resolutions, Ccoord{}, index);
       },
       "resolutions"_a, "i"_a,
       "return the cell coordinate corresponding to the i'th cell in a grid of "
@@ -93,11 +92,10 @@ void add_get_cube(py::module & mod) {
 
 template <Dim_t dim>
 void add_get_index_helper(py::module & mod) {
-  using Ccoord = muSpectre::Ccoord_t<dim>;
+  using Ccoord = muGrid::Ccoord_t<dim>;
   mod.def("get_domain_index",
           [](Ccoord sizes, Ccoord ccoord) {
-            return muSpectre::CcoordOps::get_index<dim>(sizes, Ccoord{},
-                                                        ccoord);
+            return muGrid::CcoordOps::get_index<dim>(sizes, Ccoord{}, ccoord);
           },
           "sizes"_a, "ccoord"_a,
           "return the linear index corresponding to grid point 'ccoord' in a "
@@ -113,14 +111,14 @@ template <Dim_t dim>
 void add_Pixels_helper(py::module & mod) {
   std::stringstream name{};
   name << "Pixels" << dim << "d";
-  using Ccoord = muSpectre::Ccoord_t<dim>;
-  py::class_<muSpectre::CcoordOps::Pixels<dim>> Pixels(mod, name.str().c_str());
+  using Ccoord = muGrid::Ccoord_t<dim>;
+  py::class_<muGrid::CcoordOps::Pixels<dim>> Pixels(mod, name.str().c_str());
   Pixels.def(py::init<Ccoord>());
 }
 
 void add_Pixels(py::module & mod) {
-  add_Pixels_helper<muSpectre::twoD>(mod);
-  add_Pixels_helper<muSpectre::threeD>(mod);
+  add_Pixels_helper<muGrid::twoD>(mod);
+  add_Pixels_helper<muGrid::threeD>(mod);
 }
 
 void add_common(py::module & mod) {
@@ -148,10 +146,10 @@ void add_common(py::module & mod) {
       .value("LCauchyGreen", StrainMeasure::LCauchyGreen)
       .value("no_strain_", StrainMeasure::no_strain_);
 
-  py::enum_<muSpectre::FFT_PlanFlags>(mod, "FFT_PlanFlags")
-      .value("estimate", muSpectre::FFT_PlanFlags::estimate)
-      .value("measure", muSpectre::FFT_PlanFlags::measure)
-      .value("patient", muSpectre::FFT_PlanFlags::patient);
+  py::enum_<muFFT::FFT_PlanFlags>(mod, "FFT_PlanFlags")
+      .value("estimate", muFFT::FFT_PlanFlags::estimate)
+      .value("measure", muFFT::FFT_PlanFlags::measure)
+      .value("patient", muFFT::FFT_PlanFlags::patient);
 
   py::enum_<muSpectre::FiniteDiff>(
       mod, "FiniteDiff",

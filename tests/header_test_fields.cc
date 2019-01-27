@@ -33,15 +33,15 @@
  */
 
 #include "tests.hh"
-#include "common/field_collection.hh"
-#include "common/field.hh"
-#include "common/ccoord_operations.hh"
+#include <libmugrid/field_collection.hh>
+#include <libmugrid/field.hh>
+#include <libmugrid/ccoord_operations.hh>
 
 #include <boost/mpl/list.hpp>
 
 #include <type_traits>
 
-namespace muSpectre {
+namespace muGrid {
 
   BOOST_AUTO_TEST_SUITE(field_test);
 
@@ -270,4 +270,4 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE_END();
 
-}  // namespace muSpectre
+}  // namespace muGrid

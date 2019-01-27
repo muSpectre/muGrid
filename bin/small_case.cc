@@ -49,7 +49,7 @@ int main() {
   Ccoord_t<dim> resolution{11, 11};
 
   Rcoord_t<dim> lengths{
-    muGrid::CcoordOps::get_cube<dim>(11.)};  // {5.2e-9, 8.3e-9, 8.3e-9};
+      muGrid::CcoordOps::get_cube<dim>(11.)};  // {5.2e-9, 8.3e-9, 8.3e-9};
   Formulation form{Formulation::finite_strain};
 
   auto rve{make_cell(resolution, lengths, form)};

@@ -36,12 +36,12 @@
 #include "projection/projection_finite_strain.hh"
 #include "projection/projection_finite_strain_fast.hh"
 
-#include "projection/fftw_engine.hh"
+#include <libmufft/fftw_engine.hh>
 #ifdef WITH_FFTWMPI
-#include "projection/fftwmpi_engine.hh"
+#include <libmufft/fftwmpi_engine.hh>
 #endif
 #ifdef WITH_PFFT
-#include "projection/pfft_engine.hh"
+#include <libmufft/pfft_engine.hh>
 #endif
 
 #include <pybind11/pybind11.h>
@@ -51,7 +51,7 @@
 #include <sstream>
 #include <memory>
 
-using muSpectre::Dim_t;
+using muGrid::Dim_t;
 using muSpectre::ProjectionBase;
 using pybind11::literals::operator""_a;
 namespace py = pybind11;
@@ -80,8 +80,8 @@ class PyProjectionBase : public ProjectionBase<DimS, DimM> {
 
 template <class Proj, Dim_t DimS, Dim_t DimM = DimS>
 void add_proj_helper(py::module & mod, std::string name_start) {
-  using Ccoord = muSpectre::Ccoord_t<DimS>;
-  using Rcoord = muSpectre::Rcoord_t<DimS>;
+  using Ccoord = muGrid::Ccoord_t<DimS>;
+  using Rcoord = muGrid::Rcoord_t<DimS>;
   using Field_t = typename Proj::Field_t;
 
   static_assert(DimS == DimM, "currently only for DimS==DimM");
@@ -94,27 +94,27 @@ void add_proj_helper(py::module & mod, std::string name_start) {
       .def(py::init([](Ccoord res, Rcoord lengths, const std::string & fft,
                        size_t comm) {
              if (fft == "fftw") {
-               auto engine = std::make_unique<FFTWEngine<DimS>>(
+               auto engine = std::make_unique<muFFT::FFTWEngine<DimS>>(
                    res, Proj::NbComponents(),
                    std::move(Communicator(MPI_Comm(comm))));
                return Proj(std::move(engine), lengths);
 #else
       .def(py::init([](Ccoord res, Rcoord lengths, const std::string & fft) {
              if (fft == "fftw") {
-               auto engine = std::make_unique<muSpectre::FFTWEngine<DimS>>(
+               auto engine = std::make_unique<muFFT::FFTWEngine<DimS>>(
                    res, Proj::NbComponents());
                return Proj(std::move(engine), lengths);
 #endif
 #ifdef WITH_FFTWMPI
              } else if (fft == "fftwmpi") {
-               auto engine = std::make_unique<FFTWMPIEngine<DimS>>(
+               auto engine = std::make_unique<muFFT::FFTWMPIEngine<DimS>>(
                    res, Proj::NbComponents(),
                    std::move(Communicator(MPI_Comm(comm))));
                return Proj(std::move(engine), lengths);
 #endif
 #ifdef WITH_PFFT
              } else if (fft == "pfft") {
-               auto engine = std::make_unique<PFFTEngine<DimS>>(
+               auto engine = std::make_unique<muFFT::PFFTEngine<DimS>>(
                    res, Proj::NbComponents(),
                    std::move(Communicator(MPI_Comm(comm))));
                return Proj(std::move(engine), lengths);
@@ -131,13 +131,13 @@ void add_proj_helper(py::module & mod, std::string name_start) {
            "fft"_a = "fftw")
 #endif
       .def("initialise", &Proj::initialise,
-           "flags"_a = muSpectre::FFT_PlanFlags::estimate,
+           "flags"_a = muFFT::FFT_PlanFlags::estimate,
            "initialises the fft engine (plan the transform)")
       .def("apply_projection",
            [](Proj & proj, py::EigenDRef<Eigen::ArrayXXd> v) {
-             typename muSpectre::FFTEngineBase<DimS>::GFieldCollection_t coll{};
-             Eigen::Index subdomain_size = muSpectre::CcoordOps::get_size(
-                 proj.get_subdomain_resolutions());
+             typename muFFT::FFTEngineBase<DimS>::GFieldCollection_t coll{};
+             Eigen::Index subdomain_size =
+                 muGrid::CcoordOps::get_size(proj.get_subdomain_resolutions());
              if (v.rows() != DimS * DimM || v.cols() != subdomain_size) {
                throw std::runtime_error("Expected input array of shape (" +
                                         std::to_string(DimS * DimM) + ", " +
@@ -148,7 +148,7 @@ void add_proj_helper(py::module & mod, std::string name_start) {
              }
              coll.initialise(proj.get_subdomain_resolutions(),
                              proj.get_subdomain_locations());
-             Field_t & temp{muSpectre::make_field<Field_t>(
+             Field_t & temp{muGrid::make_field<Field_t>(
                  "temp_field", coll, proj.get_nb_components())};
              temp.eigen() = v;
              proj.apply_projection(temp);
@@ -166,26 +166,24 @@ void add_proj_helper(py::module & mod, std::string name_start) {
 }
 
 void add_proj_dispatcher(py::module & mod) {
+  add_proj_helper<muSpectre::ProjectionSmallStrain<muGrid::twoD, muGrid::twoD>,
+                  muGrid::twoD>(mod, "ProjectionSmallStrain");
   add_proj_helper<
-      muSpectre::ProjectionSmallStrain<muSpectre::twoD, muSpectre::twoD>,
-      muSpectre::twoD>(mod, "ProjectionSmallStrain");
+      muSpectre::ProjectionSmallStrain<muGrid::threeD, muGrid::threeD>,
+      muGrid::threeD>(mod, "ProjectionSmallStrain");
+
+  add_proj_helper<muSpectre::ProjectionFiniteStrain<muGrid::twoD, muGrid::twoD>,
+                  muGrid::twoD>(mod, "ProjectionFiniteStrain");
   add_proj_helper<
-      muSpectre::ProjectionSmallStrain<muSpectre::threeD, muSpectre::threeD>,
-      muSpectre::threeD>(mod, "ProjectionSmallStrain");
+      muSpectre::ProjectionFiniteStrain<muGrid::threeD, muGrid::threeD>,
+      muGrid::threeD>(mod, "ProjectionFiniteStrain");
 
   add_proj_helper<
-      muSpectre::ProjectionFiniteStrain<muSpectre::twoD, muSpectre::twoD>,
-      muSpectre::twoD>(mod, "ProjectionFiniteStrain");
+      muSpectre::ProjectionFiniteStrainFast<muGrid::twoD, muGrid::twoD>,
+      muGrid::twoD>(mod, "ProjectionFiniteStrainFast");
   add_proj_helper<
-      muSpectre::ProjectionFiniteStrain<muSpectre::threeD, muSpectre::threeD>,
-      muSpectre::threeD>(mod, "ProjectionFiniteStrain");
-
-  add_proj_helper<
-      muSpectre::ProjectionFiniteStrainFast<muSpectre::twoD, muSpectre::twoD>,
-      muSpectre::twoD>(mod, "ProjectionFiniteStrainFast");
-  add_proj_helper<muSpectre::ProjectionFiniteStrainFast<muSpectre::threeD,
-                                                        muSpectre::threeD>,
-                  muSpectre::threeD>(mod, "ProjectionFiniteStrainFast");
+      muSpectre::ProjectionFiniteStrainFast<muGrid::threeD, muGrid::threeD>,
+      muGrid::threeD>(mod, "ProjectionFiniteStrainFast");
 }
 
 void add_projections(py::module & mod) { add_proj_dispatcher(mod); }

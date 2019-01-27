@@ -34,9 +34,11 @@
  */
 
 #include "test_field_collections.hh"
-#include "common/field_map_dynamic.hh"
+#include <libmugrid/field_map_dynamic.hh>
 
-namespace muSpectre {
+namespace muGrid {
+  using muSpectre::tol;
+
   BOOST_AUTO_TEST_SUITE(field_collection_tests);
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(iter_field_test, F, iter_collections, F) {
@@ -305,4 +307,4 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE_END();
 
-}  // namespace muSpectre
+}  // namespace muGrid

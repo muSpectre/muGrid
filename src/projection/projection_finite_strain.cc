@@ -58,10 +58,11 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void ProjectionFiniteStrain<DimS, DimM>::initialise(muFFT::FFT_PlanFlags flags) {
+  void
+  ProjectionFiniteStrain<DimS, DimM>::initialise(muFFT::FFT_PlanFlags flags) {
     Parent::initialise(flags);
     muFFT::FFT_freqs<DimS> fft_freqs(this->fft_engine->get_domain_resolutions(),
-                              this->domain_lengths);
+                                     this->domain_lengths);
     for (auto && tup : akantu::zip(*this->fft_engine, this->Ghat)) {
       const auto & ccoord = std::get<0>(tup);
       auto & G = std::get<1>(tup);

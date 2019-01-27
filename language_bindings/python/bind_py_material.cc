@@ -194,23 +194,21 @@ void add_material_helper(py::module & mod) {
   std::string name{name_stream.str()};
   using Material = muSpectre::MaterialBase<Dim, Dim>;
   using MaterialTrampoline = PyMaterialBase<Dim>;
-  using FC_t = muSpectre::LocalFieldCollection<Dim>;
-  using FCBase_t = muSpectre::FieldCollectionBase<Dim, FC_t>;
+  using FC_t = muGrid::LocalFieldCollection<Dim>;
+  using FCBase_t = muGrid::FieldCollectionBase<Dim, FC_t>;
 
   py::class_<Material, MaterialTrampoline /* <--- trampoline*/,
-             std::shared_ptr<Material>>(mod,
-                                                                name.c_str())
+             std::shared_ptr<Material>>(mod, name.c_str())
       .def(py::init<std::string>())
       .def("save_history_variables", &Material::save_history_variables)
       .def("list_fields", &Material::list_fields)
       .def("get_real_field", &Material::get_real_field, "field_name"_a,
            py::return_value_policy::reference_internal)
       .def("size", &Material::size)
-      .def("add_pixel",
-           [](Material & mat, muSpectre::Ccoord_t<Dim> pix) {
-             mat.add_pixel(pix);
-           },
-           "pixel"_a)
+      .def(
+          "add_pixel",
+          [](Material & mat, muGrid::Ccoord_t<Dim> pix) { mat.add_pixel(pix); },
+          "pixel"_a)
       .def_property_readonly("collection",
                              [](Material & material) -> FCBase_t & {
                                return material.get_collection();
@@ -232,6 +230,6 @@ void add_material_helper(py::module & mod) {
 void add_material(py::module & mod) {
   auto material{mod.def_submodule("material")};
   material.doc() = "bindings for constitutive laws";
-  add_material_helper<muSpectre::twoD>(material);
-  add_material_helper<muSpectre::threeD>(material);
+  add_material_helper<muGrid::twoD>(material);
+  add_material_helper<muGrid::threeD>(material);
 }

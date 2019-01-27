@@ -35,9 +35,9 @@
  */
 
 #include "test_field_collections.hh"
-#include "common/field_map.hh"
+#include <libmugrid/field_map.hh>
 
-namespace muSpectre {
+namespace muGrid {
 
   BOOST_AUTO_TEST_SUITE(raw_field_map_tests);
 
@@ -97,4 +97,4 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE_END();
 
-}  // namespace muSpectre
+}  // namespace muGrid

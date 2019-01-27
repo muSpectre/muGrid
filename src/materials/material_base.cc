@@ -92,7 +92,8 @@ namespace muSpectre {
       throw muGrid::FieldCollectionError(err.str());
     }
 
-    return static_cast<muGrid::TypedField<MFieldCollection_t, Real> &>(field).eigen();
+    return static_cast<muGrid::TypedField<MFieldCollection_t, Real> &>(field)
+        .eigen();
   }
 
   /* ---------------------------------------------------------------------- */

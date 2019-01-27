@@ -32,10 +32,11 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include "common/ref_array.hh"
 #include "tests.hh"
 
-namespace muSpectre {
+#include <libmugrid/ref_array.hh>
+
+namespace muGrid {
 
   BOOST_AUTO_TEST_SUITE(RefArray_tests);
 
@@ -49,4 +50,4 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE_END();
 
-}  // namespace muSpectre
+}  // namespace muGrid

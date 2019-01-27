@@ -35,13 +35,15 @@
 #include <boost/mpl/list.hpp>
 
 #include "tests.hh"
-#include "projection/fftw_engine.hh"
-#include "common/ccoord_operations.hh"
-#include "common/field_collection.hh"
-#include "common/field_map.hh"
-#include "common/iterators.hh"
+#include <libmufft/fftw_engine.hh>
+#include <libmugrid/ccoord_operations.hh>
+#include <libmugrid/field_collection.hh>
+#include <libmugrid/field_map.hh>
+#include <libmugrid/iterators.hh>
+#include <iostream>
 
-namespace muSpectre {
+namespace muFFT {
+  using muSpectre::tol;
 
   BOOST_AUTO_TEST_SUITE(fftw_engine);
 
@@ -53,10 +55,10 @@ namespace muSpectre {
     constexpr static Dim_t sdim{DimS};
     constexpr static Dim_t mdim{DimM};
     constexpr static Ccoord_t<sdim> res() {
-      return CcoordOps::get_cube<DimS>(box_resolution);
+      return muGrid::CcoordOps::get_cube<DimS>(box_resolution);
     }
     constexpr static Ccoord_t<sdim> loc() {
-      return CcoordOps::get_cube<DimS>(0);
+      return muGrid::CcoordOps::get_cube<DimS>(0);
     }
     FFTW_fixture() : engine(res(), DimM * DimM) {}
     FFTWEngine<DimS> engine;
@@ -81,24 +83,28 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(Constructor_test, Fix, fixlist, Fix) {
     BOOST_CHECK_NO_THROW(Fix::engine.initialise(FFT_PlanFlags::estimate));
-    BOOST_CHECK_EQUAL(Fix::engine.size(), CcoordOps::get_size(Fix::res()));
+    BOOST_CHECK_EQUAL(Fix::engine.size(),
+                      muGrid::CcoordOps::get_size(Fix::res()));
   }
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(fft_test, Fix, fixlist, Fix) {
     Fix::engine.initialise(FFT_PlanFlags::estimate);
     constexpr Dim_t order{2};
-    using FC_t = GlobalFieldCollection<Fix::sdim>;
+    using FC_t = muGrid::GlobalFieldCollection<Fix::sdim>;
     FC_t fc;
     auto & input{
-        make_field<TensorField<FC_t, Real, order, Fix::mdim>>("input", fc)};
+        muGrid::make_field<muGrid::TensorField<FC_t, Real, order, Fix::mdim>>(
+            "input", fc)};
     auto & ref{
-        make_field<TensorField<FC_t, Real, order, Fix::mdim>>("reference", fc)};
+        muGrid::make_field<muGrid::TensorField<FC_t, Real, order, Fix::mdim>>(
+            "reference", fc)};
     auto & result{
-        make_field<TensorField<FC_t, Real, order, Fix::mdim>>("result", fc)};
+        muGrid::make_field<muGrid::TensorField<FC_t, Real, order, Fix::mdim>>(
+            "result", fc)};
     fc.initialise(Fix::res(), Fix::loc());
 
-    using map_t = MatrixFieldMap<FC_t, Real, Fix::mdim, Fix::mdim>;
+    using map_t = muGrid::MatrixFieldMap<FC_t, Real, Fix::mdim, Fix::mdim>;
     map_t inmap{input};
     auto refmap{map_t{ref}};
     auto resultmap{map_t{result}};
@@ -111,8 +117,9 @@ namespace muSpectre {
       ref_ = in_;
     }
     auto & complex_field = Fix::engine.fft(input);
-    using cmap_t = MatrixFieldMap<LocalFieldCollection<Fix::sdim>, Complex,
-                                  Fix::mdim, Fix::mdim>;
+    using cmap_t =
+        muGrid::MatrixFieldMap<muGrid::LocalFieldCollection<Fix::sdim>, Complex,
+                               Fix::mdim, Fix::mdim>;
     cmap_t complex_map(complex_field);
     Real error = complex_map[0].imag().norm();
     BOOST_CHECK_LT(error, tol);
@@ -141,4 +148,4 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE_END();
 
-}  // namespace muSpectre
+}  // namespace muFFT

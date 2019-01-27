@@ -36,10 +36,9 @@
 #include <Eigen/Dense>
 #include <unsupported/Eigen/CXX11/Tensor>
 #include <boost/mpl/list.hpp>
-
+#include <libmugrid/T4_map_proxy.hh>
 #include "tests.hh"
 #include "test_goodies.hh"
-#include <libmugrid/T4_map_proxy.hh>
 
 namespace muGrid {
 
@@ -197,4 +196,4 @@ namespace muGrid {
 
   BOOST_AUTO_TEST_SUITE_END();
 
-}  // namespace muSpectre
+}  // namespace muGrid
