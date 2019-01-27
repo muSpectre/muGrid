@@ -193,7 +193,8 @@ namespace muSpectre {
     }
 
     //! getter for internal variable field εₚ
-    muGrid::StateField<muGrid::ScalarField<LColl_t, Real>> & get_plast_flow_field() {
+    muGrid::StateField<muGrid::ScalarField<LColl_t, Real>> &
+    get_plast_flow_field() {
       return this->plast_flow_field;
     }
 
@@ -219,7 +220,8 @@ namespace muSpectre {
     /**
      * worker function computing stresses and internal variables
      */
-    using Worker_t = std::tuple<T2_t, Real, Real, T2_t, bool, muGrid::Decomp_t<DimM>>;
+    using Worker_t =
+        std::tuple<T2_t, Real, Real, T2_t, bool, muGrid::Decomp_t<DimM>>;
     Worker_t stress_n_internals_worker(const T2_t & F, StrainStRef_t & F_prev,
                                        StrainStRef_t & be_prev,
                                        FlowStRef_t & plast_flow);
@@ -227,19 +229,21 @@ namespace muSpectre {
     muGrid::StateField<muGrid::ScalarField<LColl_t, Real>> & plast_flow_field;
 
     //! storage for previous gradient Fᵗ
-    muGrid::StateField<muGrid::TensorField<LColl_t, Real, secondOrder, DimM>> & F_prev_field;
+    muGrid::StateField<muGrid::TensorField<LColl_t, Real, secondOrder, DimM>> &
+        F_prev_field;
 
     //! storage for elastic left Cauchy-Green deformation tensor bₑᵗ
-    muGrid::StateField<muGrid::TensorField<LColl_t, Real, secondOrder, DimM>> & be_prev_field;
+    muGrid::StateField<muGrid::TensorField<LColl_t, Real, secondOrder, DimM>> &
+        be_prev_field;
 
     // material properties
-    const Real young;           //!< Young's modulus
-    const Real poisson;         //!< Poisson's ratio
-    const Real lambda;          //!< first Lamé constant
-    const Real mu;              //!< second Lamé constant (shear modulus)
-    const Real K;               //!< Bulk modulus
-    const Real tau_y0;          //!< initial yield stress
-    const Real H;               //!< hardening modulus
+    const Real young;    //!< Young's modulus
+    const Real poisson;  //!< Poisson's ratio
+    const Real lambda;   //!< first Lamé constant
+    const Real mu;       //!< second Lamé constant (shear modulus)
+    const Real K;        //!< Bulk modulus
+    const Real tau_y0;   //!< initial yield stress
+    const Real H;        //!< hardening modulus
     const muGrid::T4Mat<Real, DimM> C;  //!< stiffness tensor
 
     //! Field maps and state field maps over internal fields

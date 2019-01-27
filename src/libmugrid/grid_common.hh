@@ -37,8 +37,8 @@
 #include <complex>
 #include <type_traits>
 
-#ifndef SRC_MUGRID_GRID_COMMON_HH_
-#define SRC_MUGRID_GRID_COMMON_HH_
+#ifndef SRC_LIBMUGRID_GRID_COMMON_HH_
+#define SRC_LIBMUGRID_GRID_COMMON_HH_
 
 namespace muGrid {
 
@@ -120,8 +120,8 @@ namespace muGrid {
     }
     return retval;
   }
-}  // muGrid
+}  // namespace muGrid
 
 #include "cpp_compliance.hh"
 
-#endif  // SRC_MUGRID_GRID_COMMON_HH_
+#endif  // SRC_LIBMUGRID_GRID_COMMON_HH_

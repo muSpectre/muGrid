@@ -33,8 +33,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef SRC_COMMON_FIELD_MAP_BASE_HH_
-#define SRC_COMMON_FIELD_MAP_BASE_HH_
+#ifndef SRC_LIBMUGRID_FIELD_MAP_BASE_HH_
+#define SRC_LIBMUGRID_FIELD_MAP_BASE_HH_
 
 #include "field.hh"
 #include "field_collection_base.hh"
@@ -883,4 +883,4 @@ namespace muGrid {
 
 }  // namespace muGrid
 
-#endif  // SRC_COMMON_FIELD_MAP_BASE_HH_
+#endif  // SRC_LIBMUGRID_FIELD_MAP_BASE_HH_

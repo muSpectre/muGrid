@@ -57,11 +57,6 @@ if(${MUSPECTRE_MAKE_TESTS})
   find_package(Boost COMPONENTS unit_test_framework REQUIRED)
 endif()
 
-if(${MUSPECTRE_MPI_PARALLEL})
-  add_definitions(-DWITH_MPI)
-  find_package(MPI REQUIRED)
-endif()
-
 include(muspectreTools)
 include(cpplint)
 

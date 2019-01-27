@@ -32,8 +32,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef SRC_COMMON_FIELD_BASE_HH_
-#define SRC_COMMON_FIELD_BASE_HH_
+#ifndef SRC_LIBMUGRID_FIELD_BASE_HH_
+#define SRC_LIBMUGRID_FIELD_BASE_HH_
 
 #include <stdexcept>
 #include <string>
@@ -206,4 +206,4 @@ namespace muGrid {
 
 }  // namespace muGrid
 
-#endif  // SRC_COMMON_FIELD_BASE_HH_
+#endif  // SRC_LIBMUGRID_FIELD_BASE_HH_

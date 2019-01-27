@@ -32,8 +32,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef SRC_COMMON_FIELD_COLLECTION_LOCAL_HH_
-#define SRC_COMMON_FIELD_COLLECTION_LOCAL_HH_
+#ifndef SRC_LIBMUGRID_FIELD_COLLECTION_LOCAL_HH_
+#define SRC_LIBMUGRID_FIELD_COLLECTION_LOCAL_HH_
 
 #include "field_collection_base.hh"
 
@@ -196,4 +196,4 @@ namespace muGrid {
 
 }  // namespace muGrid
 
-#endif  // SRC_COMMON_FIELD_COLLECTION_LOCAL_HH_
+#endif  // SRC_LIBMUGRID_FIELD_COLLECTION_LOCAL_HH_

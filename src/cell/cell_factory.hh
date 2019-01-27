@@ -43,8 +43,8 @@
 #include <libmufft/fftw_engine.hh>
 
 #ifdef WITH_MPI
-#include "common/communicator.hh"
-#include "projection/fftwmpi_engine.hh"
+#include <libmufft/communicator.hh>
+#include <libmufft/fftwmpi_engine.hh>
 #endif
 
 #include <memory>
@@ -101,10 +101,11 @@ namespace muSpectre {
    * Create a unique ptr to a parallel Projection operator (with appropriate
    * FFT_engine) to be used in a cell constructor
    */
-  template <Dim_t DimS, Dim_t DimM, typename FFTEngine = FFTWMPIEngine<DimS>>
+  template <Dim_t DimS, Dim_t DimM,
+            typename FFTEngine = muFFT::FFTWMPIEngine<DimS>>
   inline std::unique_ptr<ProjectionBase<DimS, DimM>>
   parallel_cell_input(Ccoord_t<DimS> resolutions, Rcoord_t<DimS> lengths,
-                      Formulation form, const Communicator & comm) {
+                      Formulation form, const muFFT::Communicator & comm) {
     auto fft_ptr{std::make_unique<FFTEngine>(
         resolutions, dof_for_formulation(form, DimM), comm)};
     switch (form) {
@@ -131,10 +132,10 @@ namespace muSpectre {
    */
   template <size_t DimS, size_t DimM = DimS,
             typename Cell = CellBase<DimS, DimM>,
-            typename FFTEngine = FFTWMPIEngine<DimS>>
+            typename FFTEngine = muFFT::FFTWMPIEngine<DimS>>
   inline Cell make_parallel_cell(Ccoord_t<DimS> resolutions,
                                  Rcoord_t<DimS> lengths, Formulation form,
-                                 const Communicator & comm) {
+                                 const muFFT::Communicator & comm) {
     auto && input = parallel_cell_input<DimS, DimM, FFTEngine>(
         resolutions, lengths, form, comm);
     auto cell{Cell{std::move(input)}};

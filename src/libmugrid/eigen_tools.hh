@@ -32,8 +32,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef SRC_COMMON_EIGEN_TOOLS_HH_
-#define SRC_COMMON_EIGEN_TOOLS_HH_
+#ifndef SRC_LIBMUGRID_EIGEN_TOOLS_HH_
+#define SRC_LIBMUGRID_EIGEN_TOOLS_HH_
 
 #include "grid_common.hh"
 
@@ -447,4 +447,4 @@ namespace muGrid {
 
 }  // namespace muGrid
 
-#endif  // SRC_COMMON_EIGEN_TOOLS_HH_
+#endif  // SRC_LIBMUGRID_EIGEN_TOOLS_HH_

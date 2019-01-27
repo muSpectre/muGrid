@@ -37,19 +37,20 @@
 #include "solver/deprecated_solvers.hh"
 #include "solver/deprecated_solver_cg.hh"
 #include "solver/deprecated_solver_cg_eigen.hh"
-#include "projection/fftwmpi_engine.hh"
 #include "projection/projection_finite_strain_fast.hh"
 #include "materials/material_linear_elastic1.hh"
-#include "common/iterators.hh"
-#include "common/ccoord_operations.hh"
 #include "cell/cell_factory.hh"
+
+#include <libmugrid/iterators.hh>
+#include <libmugrid/ccoord_operations.hh>
+#include <libmufft/fftwmpi_engine.hh>
 
 namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE(newton_cg_tests);
 
   BOOST_AUTO_TEST_CASE(manual_construction_test) {
-    const Communicator & comm = MPIContext::get_context().comm;
+    const auto & comm = muFFT::MPIContext::get_context().comm;
 
     // constexpr Dim_t dim{twoD};
     constexpr Dim_t dim{threeD};
@@ -58,8 +59,8 @@ namespace muSpectre {
     // constexpr Rcoord_t<dim> lengths{2.3, 2.7};
     constexpr Ccoord_t<dim> resolutions{5, 5, 5};
     constexpr Rcoord_t<dim> lengths{5, 5, 5};
-    auto fft_ptr{
-        std::make_unique<FFTWMPIEngine<dim>>(resolutions, dim * dim, comm)};
+    auto fft_ptr{std::make_unique<muFFT::FFTWMPIEngine<dim>>(resolutions,
+                                                             dim * dim, comm)};
     auto proj_ptr{std::make_unique<ProjectionFiniteStrainFast<dim, dim>>(
         std::move(fft_ptr), lengths)};
     CellBase<dim, dim> sys(std::move(proj_ptr));
@@ -87,8 +88,8 @@ namespace muSpectre {
     Grad_t<dim> delF0;
     delF0 << 0, 1., 0, 0, 0, 0, 0, 0, 0;
     constexpr Real cg_tol{1e-8}, newton_tol{1e-5};
-    constexpr Uint maxiter{CcoordOps::get_size(resolutions) *
-                           ipow(dim, secondOrder) * 10};
+    constexpr Uint maxiter{muGrid::CcoordOps::get_size(resolutions) *
+                           muGrid::ipow(dim, secondOrder) * 10};
     constexpr bool verbose{false};
 
     GradIncrements<dim> grads;
@@ -106,12 +107,12 @@ namespace muSpectre {
   }
 
   BOOST_AUTO_TEST_CASE(small_strain_patch_test) {
-    const Communicator & comm = MPIContext::get_context().comm;
+    const auto & comm = muFFT::MPIContext::get_context().comm;
     constexpr Dim_t dim{twoD};
     using Ccoord = Ccoord_t<dim>;
     using Rcoord = Rcoord_t<dim>;
-    constexpr Ccoord resolutions{CcoordOps::get_cube<dim>(3)};
-    constexpr Rcoord lengths{CcoordOps::get_cube<dim>(1.)};
+    constexpr Ccoord resolutions{muGrid::CcoordOps::get_cube<dim>(3)};
+    constexpr Rcoord lengths{muGrid::CcoordOps::get_cube<dim>(1.)};
     constexpr Formulation form{Formulation::small_strain};
 
     // number of layers in the hard material

@@ -32,12 +32,12 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef SRC_PROJECTION_FFT_ENGINE_BASE_HH_
-#define SRC_PROJECTION_FFT_ENGINE_BASE_HH_
+#ifndef SRC_LIBMUFFT_FFT_ENGINE_BASE_HH_
+#define SRC_LIBMUFFT_FFT_ENGINE_BASE_HH_
 
 #include "mufft_common.hh"
 #include "communicator.hh"
-#include <libmugrid//field_collection.hh>
+#include <libmugrid/field_collection.hh>
 
 namespace muFFT {
 
@@ -183,4 +183,4 @@ namespace muFFT {
 
 }  // namespace muFFT
 
-#endif  // SRC_PROJECTION_FFT_ENGINE_BASE_HH_
+#endif  // SRC_LIBMUFFT_FFT_ENGINE_BASE_HH_

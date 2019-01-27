@@ -32,8 +32,8 @@
 #include <utility>
 /* -------------------------------------------------------------------------- */
 
-#ifndef SRC_COMMON_ITERATORS_HH_
-#define SRC_COMMON_ITERATORS_HH_
+#ifndef SRC_LIBMUGRID_ITERATORS_HH_
+#define SRC_LIBMUGRID_ITERATORS_HH_
 
 namespace akantu {
 
@@ -364,4 +364,4 @@ namespace akantu {
 
 }  // namespace akantu
 
-#endif  // SRC_COMMON_ITERATORS_HH_
+#endif  // SRC_LIBMUGRID_ITERATORS_HH_

@@ -37,21 +37,12 @@ add_subdirectory(libmugrid)
 add_subdirectory(libmufft)
 
 add_library(muSpectre)
-target_link_libraries(muSpectre PUBLIC muSpectre::muFFT muSpectre::muGrid)
-
-set("PRIVATE_MUSPECTRE_LIBS" "")
 
 add_subdirectory(common)
 add_subdirectory(materials)
 add_subdirectory(projection)
 add_subdirectory(cell)
 add_subdirectory(solver)
-
-
-if(${MUSPECTRE_MPI_PARALLEL})
-  target_link_libraries(muSpectre PUBLIC ${MPI_LIBRARIES})
-  target_include_directories(muSpectre SYSTEM PUBLIC ${MPI_C_INCLUDE_PATH})
-endif()
 
 # The following checks whether std::optional exists and replaces it by
 # boost::optional if necessary
@@ -63,22 +54,20 @@ std::experimental::optional<double> A{};
 }"
     HAS_STD_OPTIONAL)
 
-if( NOT HAS_STD_OPTIONAL)
-  add_definitions(-DNO_EXPERIMENTAL)
+if(NOT HAS_STD_OPTIONAL)
+  target_compile_definitions(muSpectre PUBLIC -DNO_EXPERIMENTAL)
 endif()
 
 file(GLOB_RECURSE _headers RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "*.hh")
-
 list(APPEND muSpectre_SRC ${_headers})
 
-set(muSpectre_INCLUDES ${FFTW_INCLUDES})
 target_include_directories(muSpectre INTERFACE ${muSpectre_INCLUDES})
 
-target_link_libraries(muSpectre PRIVATE ${PRIVATE_MUSPECTRE_LIBS})
 target_link_libraries(muSpectre PUBLIC Eigen3::Eigen)
+target_link_libraries(muSpectre PUBLIC muSpectre::muFFT muSpectre::muGrid)
 
 set_property(TARGET muSpectre PROPERTY PUBLIC_HEADER ${_headers})
 
 install(TARGETS muSpectre
-        LIBRARY DESTINATION lib
-        PUBLIC_HEADER DESTINATION include)
+  LIBRARY DESTINATION lib
+  PUBLIC_HEADER DESTINATION include)

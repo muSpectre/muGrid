@@ -79,8 +79,8 @@ namespace muFFT {
     }
 
     for (auto && pixel :
-         std::conditional_t<Dim == 2, CcoordOps::Pixels<Dim, 1, 0>,
-                            CcoordOps::Pixels<Dim, 1, 0, 2>>(
+         std::conditional_t<Dim == 2, muGrid::CcoordOps::Pixels<Dim, 1, 0>,
+                            muGrid::CcoordOps::Pixels<Dim, 1, 0, 2>>(
              this->fourier_resolutions, this->fourier_locations)) {
       this->work_space_container.add_pixel(pixel);
     }
@@ -174,7 +174,8 @@ namespace muFFT {
     if (this->plan_fft == nullptr) {
       throw std::runtime_error("fft plan not initialised");
     }
-    if (field.size() != CcoordOps::get_size(this->subdomain_resolutions)) {
+    if (field.size() !=
+        muGrid::CcoordOps::get_size(this->subdomain_resolutions)) {
       throw std::runtime_error("size mismatch");
     }
     // Copy non-padded field to padded real_workspace.
@@ -206,7 +207,8 @@ namespace muFFT {
     if (this->plan_ifft == nullptr) {
       throw std::runtime_error("ifft plan not initialised");
     }
-    if (field.size() != CcoordOps::get_size(this->subdomain_resolutions)) {
+    if (field.size() !=
+        muGrid::CcoordOps::get_size(this->subdomain_resolutions)) {
       throw std::runtime_error("size mismatch");
     }
     // Compute inverse FFT

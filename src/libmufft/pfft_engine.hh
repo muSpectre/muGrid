@@ -32,8 +32,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef SRC_PROJECTION_PFFT_ENGINE_HH_
-#define SRC_PROJECTION_PFFT_ENGINE_HH_
+#ifndef SRC_LIBMUFFT_PFFT_ENGINE_HH_
+#define SRC_LIBMUFFT_PFFT_ENGINE_HH_
 
 #include "communicator.hh"
 #include "fft_engine_base.hh"
@@ -101,4 +101,4 @@ namespace muFFT {
 
 }  // namespace muFFT
 
-#endif  // SRC_PROJECTION_PFFT_ENGINE_HH_
+#endif  // SRC_LIBMUFFT_PFFT_ENGINE_HH_

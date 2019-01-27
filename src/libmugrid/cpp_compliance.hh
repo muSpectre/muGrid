@@ -32,8 +32,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef SRC_MUGRID_CPP_COMPLIANCE_HH_
-#define SRC_MUGRID_CPP_COMPLIANCE_HH_
+#ifndef SRC_LIBMUGRID_CPP_COMPLIANCE_HH_
+#define SRC_LIBMUGRID_CPP_COMPLIANCE_HH_
 
 #include <tuple>
 
@@ -174,11 +174,11 @@ namespace muGrid {
    * emulation `std::optional` (a C++17 feature)
    */
   template <class T>
-#  ifdef NO_EXPERIMENTAL
+#ifdef NO_EXPERIMENTAL
   using optional = typename boost::optional<T>;
-#  else
+#else
   using optional = typename std::experimental::optional<T>;
-#  endif
+#endif
 
 #else
   using std::apply;
@@ -187,4 +187,4 @@ namespace muGrid {
 
 }  // namespace muGrid
 
-#endif  // SRC_MUGRID_CPP_COMPLIANCE_HH_
+#endif  // SRC_LIBMUGRID_CPP_COMPLIANCE_HH_

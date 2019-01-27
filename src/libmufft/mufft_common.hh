@@ -34,8 +34,8 @@
 
 #include <libmugrid/grid_common.hh>
 
-#ifndef SRC_LIBFFT_MUFFT_COMMON_HH_
-#define SRC_LIBFFT_MUFFT_COMMON_HH_
+#ifndef SRC_LIBMUFFT_MUFFT_COMMON_HH_
+#define SRC_LIBMUFFT_MUFFT_COMMON_HH_
 
 namespace muFFT {
   using muGrid::Dim_t;
@@ -67,4 +67,4 @@ namespace muFFT {
 
 }  // namespace muFFT
 
-#endif  // SRC_LIBFFT_MUFFT_COMMON_HH_
+#endif  // SRC_LIBMUFFT_MUFFT_COMMON_HH_

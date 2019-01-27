@@ -32,8 +32,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef SRC_COMMON_FIELD_MAP_TENSOR_HH_
-#define SRC_COMMON_FIELD_MAP_TENSOR_HH_
+#ifndef SRC_LIBMUGRID_FIELD_MAP_TENSOR_HH_
+#define SRC_LIBMUGRID_FIELD_MAP_TENSOR_HH_
 
 #include "eigen_tools.hh"
 #include "field_map_base.hh"
@@ -290,4 +290,4 @@ namespace muGrid {
 
 }  // namespace muGrid
 
-#endif  // SRC_COMMON_FIELD_MAP_TENSOR_HH_
+#endif  // SRC_LIBMUGRID_FIELD_MAP_TENSOR_HH_

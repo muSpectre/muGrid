@@ -35,8 +35,6 @@ cmake_minimum_required(VERSION 3.5)
 
 add_library(muFFT)
 
-find_package(FFTW REQUIRED)
-
 set(mufft_SRCS
   fft_utils.cc
   fft_engine_base.cc
@@ -50,22 +48,34 @@ set(fft_engine_PFFT_SRCS
   pfft_engine.cc
   )
 
-################################################################################
+find_package(FFTW REQUIRED)
+target_link_libraries(muFFT PUBLIC ${FFTW_LIBRARIES})
+target_include_directories(muFFT PUBLIC ${FFTW_INCLUDES})
+      
 if(${MUSPECTRE_MPI_PARALLEL})
+  find_package(MPI REQUIRED)
+
+  target_link_libraries(muFFT PUBLIC ${MPI_LIBRARIES})
+  target_include_directories(muFFT SYSTEM PUBLIC ${MPI_C_INCLUDE_PATH})
+  target_compile_definitions(muFFT PUBLIC -DWITH_MPI)
+
   set(MUFFT_USE_FFTWMPI "ON" CACHE BOOL "If on, the mpi-parallel FFTW engine is built")
   set(MUFFT_USE_PFFT "OFF" CACHE BOOL "If on, the mpi-parallel PFFT engine is built")
 
   set(_using_mpi FALSE)
   foreach (_fft FFTWMPI PFFT)
     if (${MUFFT_USE_${_fft}})
-      find_package(${_fft})
+      find_package(${_fft} REQUIRED)
 
       if(NOT ${${_fft}_FOUND})
 	message(SEND_ERROR "You chose ${_fft} but CMake cannot find it")
       endif()
 
-      target_include_directories(muFFT PRIVATE ${${_fft}_INCLUDES})
-      add_definitions(-DWITH_${_fft})
+      # TODO this private should perhaps become private
+      target_link_libraries(muFFT PUBLIC ${${_fft}_LIBRARIES})
+      target_include_directories(muFFT PUBLIC ${${_fft}_INCLUDES})
+      target_compile_definitions(muFFT PUBLIC -DWITH_${_fft})
+      
       list(APPEND mufft_SRCS ${fft_engine_${_fft}_SRCS})
       set(_using_mpi TRUE)
     endif()
@@ -77,15 +87,14 @@ if(${MUSPECTRE_MPI_PARALLEL})
 endif()
 
 target_sources(muFFT PRIVATE ${mufft_SRCS})
-target_link_libraries(muFFT
-  PRIVATE ${FFTW_LIBRARIES}
-  PUBLIC muSpectre::muGrid)
+target_link_libraries(muFFT PUBLIC muSpectre::muGrid)
 
 # defining exported include directories
 target_include_directories(muFFT
   PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libmufft>
   INTERFACE $<INSTALL_INTERFACE:include/>
   )
+
 # small trick for build includes in public
 set_property(TARGET muFFT APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>)

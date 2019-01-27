@@ -67,8 +67,8 @@ namespace muSpectre {
     //! kind of tangent that is required
     using Tg_req_t = typename Parent::TangentRequirement;
     //! cg only needs to handle fields that look like strain and stress
-    using Field_t =
-        muGrid::TensorField<typename Parent::Collection_t, Real, secondOrder, DimM>;
+    using Field_t = muGrid::TensorField<typename Parent::Collection_t, Real,
+                                        secondOrder, DimM>;
 
     //! conjugate gradient needs directional stiffness
     constexpr static Tg_req_t tangent_requirement{Tg_req_t::NeedEffect};

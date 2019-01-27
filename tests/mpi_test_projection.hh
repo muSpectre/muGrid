@@ -42,7 +42,7 @@
 #ifndef TESTS_MPI_TEST_PROJECTION_HH_
 #define TESTS_MPI_TEST_PROJECTION_HH_
 
-namespace muSpectre {
+namespace muFFT {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS>
@@ -96,12 +96,12 @@ namespace muSpectre {
     constexpr static bool is_parallel{parallel};
     ProjectionFixture()
         : projector(std::make_unique<Engine>(SizeGiver::get_resolution(),
-                                             ipow(mdim, 2),
+                                             muGrid::ipow(mdim, 2),
                                              MPIContext::get_context().comm),
                     SizeGiver::get_lengths()) {}
     Parent projector;
   };
 
-}  // namespace muSpectre
+}  // namespace muFFT
 
 #endif  // TESTS_MPI_TEST_PROJECTION_HH_

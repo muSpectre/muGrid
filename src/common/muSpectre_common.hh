@@ -41,8 +41,8 @@
 
 #include <string>
 
-#ifndef SRC_COMMON_COMMON_HH_
-#define SRC_COMMON_COMMON_HH_
+#ifndef SRC_COMMON_MUSPECTRE_COMMON_HH_
+#define SRC_COMMON_MUSPECTRE_COMMON_HH_
 
 namespace muSpectre {
 
@@ -249,4 +249,4 @@ namespace muSpectre {
 
 }  // namespace muSpectre
 
-#endif  // SRC_COMMON_COMMON_HH_
+#endif  // SRC_COMMON_MUSPECTRE_COMMON_HH_

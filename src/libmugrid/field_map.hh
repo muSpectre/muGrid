@@ -40,8 +40,8 @@
 #include <stdexcept>
 #include <type_traits>
 
-#ifndef SRC_COMMON_FIELD_MAP_HH_
-#define SRC_COMMON_FIELD_MAP_HH_
+#ifndef SRC_LIBMUGRID_FIELD_MAP_HH_
+#define SRC_LIBMUGRID_FIELD_MAP_HH_
 
 namespace muGrid {
 
@@ -256,4 +256,4 @@ namespace muGrid {
   };
 }  // namespace muGrid
 
-#endif  // SRC_COMMON_FIELD_MAP_HH_
+#endif  // SRC_LIBMUGRID_FIELD_MAP_HH_

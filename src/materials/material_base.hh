@@ -66,13 +66,13 @@ namespace muSpectre {
     //! polymorphic base class for fields only to be used for debugging
     using Field_t = muGrid::internal::FieldBase<GFieldCollection_t>;
     //! Full type for stress fields
-    using StressField_t =
-        muGrid::TensorField<GFieldCollection_t, Real, muGrid::secondOrder, DimM>;
+    using StressField_t = muGrid::TensorField<GFieldCollection_t, Real,
+                                              muGrid::secondOrder, DimM>;
     //! Full type for strain fields
     using StrainField_t = StressField_t;
     //! Full type for tangent stiffness fields fields
-    using TangentField_t =
-        muGrid::TensorField<GFieldCollection_t, Real, muGrid::fourthOrder, DimM>;
+    using TangentField_t = muGrid::TensorField<GFieldCollection_t, Real,
+                                               muGrid::fourthOrder, DimM>;
     using Ccoord = Ccoord_t<DimS>;  //!< cell coordinates type
     //! Default constructor
     MaterialBase() = delete;

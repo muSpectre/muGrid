@@ -59,9 +59,11 @@ namespace muSpectre {
     using StrainMap_t =
         muGrid::MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM, true>;
     //! expected map type for stress fields
-    using StressMap_t = muGrid::MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
+    using StressMap_t =
+        muGrid::MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
     //! expected map type for tangent stiffness fields
-    using TangentMap_t = muGrid::T4MatrixFieldMap<GFieldCollection_t, Real, DimM>;
+    using TangentMap_t =
+        muGrid::T4MatrixFieldMap<GFieldCollection_t, Real, DimM>;
 
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
@@ -71,7 +73,8 @@ namespace muSpectre {
     //! local field_collections used for internals
     using LFieldColl_t = muGrid::LocalFieldCollection<DimS>;
     //! local strain type
-    using LStrainMap_t = muGrid::MatrixFieldMap<LFieldColl_t, Real, DimM, DimM, true>;
+    using LStrainMap_t =
+        muGrid::MatrixFieldMap<LFieldColl_t, Real, DimM, DimM, true>;
     //! elasticity with eigenstrain
     using InternalVariables = std::tuple<LStrainMap_t>;
   };
@@ -158,7 +161,9 @@ namespace muSpectre {
     /**
      * return a reference to the stiffness tensor
      */
-    const muGrid::T4Mat<Real, DimM> & get_C() const { return this->worker.get_C(); }
+    const muGrid::T4Mat<Real, DimM> & get_C() const {
+      return this->worker.get_C();
+    }
 
     /**
      * overload add_pixel to write into eigenstrain
@@ -173,8 +178,8 @@ namespace muSpectre {
    protected:
     Law_t worker;  //! underlying law to be evaluated
     //! storage for eigenstrain
-    using Field_t =
-        muGrid::TensorField<muGrid::LocalFieldCollection<DimS>, Real, secondOrder, DimM>;
+    using Field_t = muGrid::TensorField<muGrid::LocalFieldCollection<DimS>,
+                                        Real, secondOrder, DimM>;
     Field_t & eigen_field;  //!< field holding the eigen strain per pixel
     InternalVariables_t internal_variables;
   };

@@ -60,7 +60,7 @@ void add_engine_helper(py::module & mod, std::string name) {
 #ifdef WITH_MPI
       .def(py::init([](Ccoord res, Dim_t nb_components, size_t comm) {
              return new Engine(res, nb_components,
-                               std::move(Communicator(MPI_Comm(comm))));
+                               std::move(muFFT::Communicator(MPI_Comm(comm))));
            }),
            "resolutions"_a, "nb_components"_a,
            "communicator"_a = size_t(MPI_COMM_SELF))

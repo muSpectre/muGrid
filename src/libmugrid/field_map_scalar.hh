@@ -32,8 +32,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef SRC_COMMON_FIELD_MAP_SCALAR_HH_
-#define SRC_COMMON_FIELD_MAP_SCALAR_HH_
+#ifndef SRC_LIBMUGRID_FIELD_MAP_SCALAR_HH_
+#define SRC_LIBMUGRID_FIELD_MAP_SCALAR_HH_
 
 #include "field_map_base.hh"
 
@@ -239,4 +239,4 @@ namespace muGrid {
 
 }  // namespace muGrid
 
-#endif  // SRC_COMMON_FIELD_MAP_SCALAR_HH_
+#endif  // SRC_LIBMUGRID_FIELD_MAP_SCALAR_HH_

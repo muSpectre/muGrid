@@ -175,7 +175,8 @@ namespace muSpectre {
    protected:
     //! storage for first Lame constant 'lambda'
     //! and second Lame constant(shear modulus) 'mu'
-    using Field_t = muGrid::MatrixField<muGrid::LocalFieldCollection<DimS>, Real, oneD, oneD>;
+    using Field_t = muGrid::MatrixField<muGrid::LocalFieldCollection<DimS>,
+                                        Real, oneD, oneD>;
     Field_t & lambda_field;
     Field_t & mu_field;
     //! tuple for iterable eigen_field

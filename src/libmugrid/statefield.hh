@@ -43,8 +43,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef SRC_COMMON_STATEFIELD_HH_
-#define SRC_COMMON_STATEFIELD_HH_
+#ifndef SRC_LIBMUGRID_STATEFIELD_HH_
+#define SRC_LIBMUGRID_STATEFIELD_HH_
 
 #include "field_helpers.hh"
 #include "field.hh"
@@ -673,4 +673,4 @@ namespace muGrid {
   };
 }  // namespace muGrid
 
-#endif  // SRC_COMMON_STATEFIELD_HH_
+#endif  // SRC_LIBMUGRID_STATEFIELD_HH_

@@ -63,7 +63,8 @@ namespace muSpectre {
     //! Real space second order tensor fields (to be projected)
     using Field_t = muGrid::TypedField<GFieldCollection_t, Real>;
     //! Fourier-space field containing the projection operator itself
-    using Proj_t = muGrid::TensorField<LFieldCollection_t, Real, fourthOrder, DimM>;
+    using Proj_t =
+        muGrid::TensorField<LFieldCollection_t, Real, fourthOrder, DimM>;
     //! iterable form of the operator
     using Proj_map = muGrid::T4MatrixFieldMap<LFieldCollection_t, Real, DimM>;
     //! vectorized version of the Fourier-space second-order tensor field

@@ -32,8 +32,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef SRC_COMMON_FIELD_HH_
-#define SRC_COMMON_FIELD_HH_
+#ifndef SRC_LIBMUGRID_FIELD_HH_
+#define SRC_LIBMUGRID_FIELD_HH_
 
 #include "T4_map_proxy.hh"
 #include "field_typed.hh"
@@ -663,4 +663,4 @@ namespace muGrid {
 
 }  // namespace muGrid
 
-#endif  // SRC_COMMON_FIELD_HH_
+#endif  // SRC_LIBMUGRID_FIELD_HH_

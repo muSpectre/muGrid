@@ -32,8 +32,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef SRC_COMMON_COMMUNICATOR_HH_
-#define SRC_COMMON_COMMUNICATOR_HH_
+#ifndef SRC_LIBMUFFT_COMMUNICATOR_HH_
+#define SRC_LIBMUFFT_COMMUNICATOR_HH_
 
 #ifdef WITH_MPI
 #include <mpi.h>
@@ -152,4 +152,4 @@ namespace muFFT {
 
 }  // namespace muFFT
 
-#endif  // SRC_COMMON_COMMUNICATOR_HH_
+#endif  // SRC_LIBMUFFT_COMMUNICATOR_HH_

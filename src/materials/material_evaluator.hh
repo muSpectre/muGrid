@@ -78,8 +78,7 @@ namespace muSpectre {
      */
     explicit MaterialEvaluator(
         std::shared_ptr<MaterialBase<DimM, DimM>> material)
-        : material{material},
-          collection{std::make_unique<FieldColl_t>()},
+        : material{material}, collection{std::make_unique<FieldColl_t>()},
           strain{muGrid::make_field<T2Field_t>("gradient", *this->collection)},
           stress{muGrid::make_field<T2Field_t>("stress", *this->collection)},
           tangent{muGrid::make_field<T4Field_t>("tangent", *this->collection)} {
@@ -151,8 +150,9 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimM>
-  auto MaterialEvaluator<DimM>::evaluate_stress(
-      const Eigen::Ref<const T2_t> & grad, const Formulation & form)
+  auto
+  MaterialEvaluator<DimM>::evaluate_stress(const Eigen::Ref<const T2_t> & grad,
+                                           const Formulation & form)
       -> T2_const_map {
     this->check_init();
     this->strain.get_map()[0] = grad;
@@ -168,7 +168,7 @@ namespace muSpectre {
     this->check_init();
     this->strain.get_map()[0] = grad;
     this->material->compute_stresses_tangent(this->strain, this->stress,
-                                            this->tangent, form);
+                                             this->tangent, form);
     return std::make_tuple(T2_const_map(this->stress.get_map()[0].data()),
                            T4_const_map(this->tangent.get_map()[0].data()));
   }

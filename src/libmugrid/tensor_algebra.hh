@@ -33,8 +33,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef SRC_COMMON_TENSOR_ALGEBRA_HH_
-#define SRC_COMMON_TENSOR_ALGEBRA_HH_
+#ifndef SRC_LIBMUGRID_TENSOR_ALGEBRA_HH_
+#define SRC_LIBMUGRID_TENSOR_ALGEBRA_HH_
 
 #include "grid_common.hh"
 #include "T4_map_proxy.hh"
@@ -377,4 +377,4 @@ namespace muGrid {
   }  // namespace Matrices
 }  // namespace muGrid
 
-#endif  // SRC_COMMON_TENSOR_ALGEBRA_HH_
+#endif  // SRC_LIBMUGRID_TENSOR_ALGEBRA_HH_

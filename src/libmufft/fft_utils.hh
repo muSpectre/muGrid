@@ -32,8 +32,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef SRC_PROJECTION_FFT_UTILS_HH_
-#define SRC_PROJECTION_FFT_UTILS_HH_
+#ifndef SRC_LIBMUFFT_FFT_UTILS_HH_
+#define SRC_LIBMUFFT_FFT_UTILS_HH_
 
 #include "mufft_common.hh"
 
@@ -128,4 +128,4 @@ namespace muFFT {
   }
 }  // namespace muFFT
 
-#endif  // SRC_PROJECTION_FFT_UTILS_HH_
+#endif  // SRC_LIBMUFFT_FFT_UTILS_HH_

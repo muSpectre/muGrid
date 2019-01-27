@@ -33,21 +33,21 @@
  */
 
 #include "common/muSpectre_common.hh"
-#include <libmugrid/ccoord_operations.hh>
 #include "cell/cell_factory.hh"
 #include "cell/cell_base.hh"
 
+#include <libmugrid/ccoord_operations.hh>
 #ifdef WITH_FFTWMPI
-#include "projection/fftwmpi_engine.hh"
+#include <libmufft/fftwmpi_engine.hh>
 #endif
 #ifdef WITH_PFFT
-#include "projection/pfft_engine.hh"
+#include <libmufft/pfft_engine.hh>
 #endif
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/stl_bind.h>
-#include "pybind11/eigen.h"
+#include <pybind11/eigen.h>
 
 #include <sstream>
 #include <memory>
@@ -70,11 +70,12 @@ void add_parallel_cell_factory_helper(py::module & mod, const char * name) {
 
   mod.def(name,
           [](Ccoord res, Rcoord lens, Formulation form, size_t comm) {
-            return make_parallel_cell<dim, dim, CellBase<dim, dim>, FFTEngine>(
+            return muSpectre::make_parallel_cell<
+                dim, dim, muSpectre::CellBase<dim, dim>, FFTEngine>(
                 std::move(res), std::move(lens), std::move(form),
-                std::move(Communicator(MPI_Comm(comm))));
+                std::move(muFFT::Communicator(MPI_Comm(comm))));
           },
-          "resolutions"_a, "lengths"_a = CcoordOps::get_cube<dim>(1.),
+          "resolutions"_a, "lengths"_a = muGrid::CcoordOps::get_cube<dim>(1.),
           "formulation"_a = Formulation::finite_strain,
           "communicator"_a = size_t(MPI_COMM_SELF));
 }

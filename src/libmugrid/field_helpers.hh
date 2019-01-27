@@ -33,8 +33,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef SRC_COMMON_FIELD_HELPERS_HH_
-#define SRC_COMMON_FIELD_HELPERS_HH_
+#ifndef SRC_LIBMUGRID_FIELD_HELPERS_HH_
+#define SRC_LIBMUGRID_FIELD_HELPERS_HH_
 
 #include <memory>
 
@@ -56,4 +56,4 @@ namespace muGrid {
 
 }  // namespace muGrid
 
-#endif  // SRC_COMMON_FIELD_HELPERS_HH_
+#endif  // SRC_LIBMUGRID_FIELD_HELPERS_HH_

@@ -32,8 +32,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef SRC_COMMON_REF_ARRAY_HH_
-#define SRC_COMMON_REF_ARRAY_HH_
+#ifndef SRC_LIBMUGRID_REF_ARRAY_HH_
+#define SRC_LIBMUGRID_REF_ARRAY_HH_
 
 #include <array>
 #include <initializer_list>
@@ -97,4 +97,4 @@ namespace muGrid {
 
 }  // namespace muGrid
 
-#endif  // SRC_COMMON_REF_ARRAY_HH_
+#endif  // SRC_LIBMUGRID_REF_ARRAY_HH_

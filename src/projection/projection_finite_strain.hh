@@ -88,7 +88,8 @@ namespace muSpectre {
     operator=(ProjectionFiniteStrain && other) = default;
 
     //! initialises the fft engine (plan the transform)
-    void initialise(muFFT::FFT_PlanFlags flags = muFFT::FFT_PlanFlags::estimate) final;
+    void initialise(
+        muFFT::FFT_PlanFlags flags = muFFT::FFT_PlanFlags::estimate) final;
   };
 
 }  // namespace muSpectre

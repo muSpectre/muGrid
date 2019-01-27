@@ -109,11 +109,11 @@ namespace muFFT {
     }
 
     for (auto && pixel :
-         std::conditional_t<DimS == 2, CcoordOps::Pixels<DimS, 1, 0>,
+         std::conditional_t<DimS == 2, muGrid::CcoordOps::Pixels<DimS, 1, 0>,
                             // TODO(pastewka): This should be the correct order
                             // of dimension for a 2d process mesh, but tests
                             // don't pass.  CcoordOps::Pixels<DimS, 1, 2, 0>
-                            CcoordOps::Pixels<DimS, 1, 0, 2>>(
+                            muGrid::CcoordOps::Pixels<DimS, 1, 0, 2>>(
              this->fourier_resolutions, this->fourier_locations)) {
       this->work_space_container.add_pixel(pixel);
     }
@@ -210,7 +210,8 @@ namespace muFFT {
     if (!this->plan_fft) {
       throw std::runtime_error("fft plan not allocated");
     }
-    if (field.size() != CcoordOps::get_size(this->subdomain_resolutions)) {
+    if (field.size() !=
+        muGrid::CcoordOps::get_size(this->subdomain_resolutions)) {
       throw std::runtime_error("size mismatch");
     }
     // Copy field data to workspace buffer. This is necessary because workspace
@@ -228,7 +229,8 @@ namespace muFFT {
     if (!this->plan_ifft) {
       throw std::runtime_error("ifft plan not allocated");
     }
-    if (field.size() != CcoordOps::get_size(this->subdomain_resolutions)) {
+    if (field.size() !=
+        muGrid::CcoordOps::get_size(this->subdomain_resolutions)) {
       throw std::runtime_error("size mismatch");
     }
     pfft_execute_dft_c2r(this->plan_ifft,

@@ -74,7 +74,7 @@ namespace muSpectre {
           using T4 = typename std::remove_reference_t<Tangent_t>::PlainObject;
           using Tmap = muGrid::T4MatMap<Real, Dim>;
           using muGrid::get;
-          
+
           T4 K;
           Tmap Kmap{K.data()};
           K.setZero();

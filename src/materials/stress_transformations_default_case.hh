@@ -39,7 +39,7 @@ namespace muSpectre {
     namespace internal {
 
       /** Structure for functions returning PK1 stress from other stress
-        *measures
+       *measures
        **/
       template <Dim_t Dim, StressMeasure StressM, StrainMeasure StrainM>
       struct PK1_stress {

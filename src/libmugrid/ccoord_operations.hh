@@ -42,8 +42,8 @@
 #include "grid_common.hh"
 #include "iterators.hh"
 
-#ifndef SRC_COMMON_CCOORD_OPERATIONS_HH_
-#define SRC_COMMON_CCOORD_OPERATIONS_HH_
+#ifndef SRC_LIBMUGRID_CCOORD_OPERATIONS_HH_
+#define SRC_LIBMUGRID_CCOORD_OPERATIONS_HH_
 
 namespace muGrid {
 
@@ -330,4 +330,4 @@ namespace muGrid {
 
 }  // namespace muGrid
 
-#endif  // SRC_COMMON_CCOORD_OPERATIONS_HH_
+#endif  // SRC_LIBMUGRID_CCOORD_OPERATIONS_HH_

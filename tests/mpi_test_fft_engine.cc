@@ -39,20 +39,21 @@
 
 #include "tests.hh"
 #include "mpi_context.hh"
-#include "projection/fftw_engine.hh"
+#include <libmufft/fftw_engine.hh>
 #ifdef WITH_FFTWMPI
-#include "projection/fftwmpi_engine.hh"
+#include <libmufft/fftwmpi_engine.hh>
 #endif
 #ifdef WITH_PFFT
-#include "projection/pfft_engine.hh"
+#include <libmufft/pfft_engine.hh>
 #endif
 
-#include "common/ccoord_operations.hh"
-#include "common/field_collection.hh"
-#include "common/field_map.hh"
-#include "common/iterators.hh"
+#include <libmugrid/ccoord_operations.hh>
+#include <libmugrid/field_collection.hh>
+#include <libmugrid/field_map.hh>
+#include <libmugrid/iterators.hh>
 
-namespace muSpectre {
+namespace muFFT {
+  using muSpectre::tol;
 
   BOOST_AUTO_TEST_SUITE(mpi_fft_engine);
 
@@ -65,7 +66,7 @@ namespace muSpectre {
     constexpr static Dim_t sdim{Engine::sdim};
     constexpr static Dim_t nb_components{sdim * sdim};
     constexpr static Ccoord_t<sdim> res() {
-      return CcoordOps::get_cube<sdim>(box_resolution);
+      return muGrid::CcoordOps::get_cube<sdim>(box_resolution);
     }
     FFTW_fixture()
         : engine(res(), nb_components, MPIContext::get_context().comm) {}
@@ -78,9 +79,10 @@ namespace muSpectre {
     constexpr static Dim_t dim{twoD};
     constexpr static Dim_t sdim{twoD};
     constexpr static Dim_t mdim{twoD};
+    constexpr static Dim_t nb_components{sdim * sdim};
     constexpr static Ccoord_t<sdim> res() { return {6, 4}; }
     FFTW_fixture_python_segfault()
-        : engine{res(), MPIContext::get_context().comm} {}
+        : engine{res(), nb_components, MPIContext::get_context().comm} {}
     Engine engine;
   };
 
@@ -108,7 +110,7 @@ namespace muSpectre {
       BOOST_CHECK_NO_THROW(Fix::engine.initialise(FFT_PlanFlags::estimate));
     }
     BOOST_CHECK_EQUAL(comm.sum(Fix::engine.size()),
-                      CcoordOps::get_size(Fix::res()));
+                      muGrid::CcoordOps::get_size(Fix::res()));
   }
 
   /* ---------------------------------------------------------------------- */
@@ -120,19 +122,22 @@ namespace muSpectre {
       Fix::engine.initialise(FFT_PlanFlags::estimate);
     }
     constexpr Dim_t order{2};
-    using FC_t = GlobalFieldCollection<Fix::sdim>;
+    using FC_t = muGrid::GlobalFieldCollection<Fix::sdim>;
     FC_t fc;
     auto & input{
-        make_field<TensorField<FC_t, Real, order, Fix::sdim>>("input", fc)};
+        muGrid::make_field<muGrid::TensorField<FC_t, Real, order, Fix::sdim>>(
+            "input", fc)};
     auto & ref{
-        make_field<TensorField<FC_t, Real, order, Fix::sdim>>("reference", fc)};
+        muGrid::make_field<muGrid::TensorField<FC_t, Real, order, Fix::sdim>>(
+            "reference", fc)};
     auto & result{
-        make_field<TensorField<FC_t, Real, order, Fix::sdim>>("result", fc)};
+        muGrid::make_field<muGrid::TensorField<FC_t, Real, order, Fix::sdim>>(
+            "result", fc)};
 
     fc.initialise(Fix::engine.get_subdomain_resolutions(),
                   Fix::engine.get_subdomain_locations());
 
-    using map_t = MatrixFieldMap<FC_t, Real, Fix::sdim, Fix::sdim>;
+    using map_t = muGrid::MatrixFieldMap<FC_t, Real, Fix::sdim, Fix::sdim>;
     map_t inmap{input};
     auto refmap{map_t{ref}};
     auto resultmap{map_t{result}};
@@ -145,11 +150,12 @@ namespace muSpectre {
       ref_ = in_;
     }
     auto & complex_field = Fix::engine.fft(input);
-    using cmap_t = MatrixFieldMap<LocalFieldCollection<Fix::sdim>, Complex,
-                                  Fix::sdim, Fix::sdim>;
+    using cmap_t =
+        muGrid::MatrixFieldMap<muGrid::LocalFieldCollection<Fix::sdim>, Complex,
+                               Fix::sdim, Fix::sdim>;
     cmap_t complex_map(complex_field);
     if (Fix::engine.get_subdomain_locations() ==
-        CcoordOps::get_cube<Fix::sdim>(0)) {
+        muGrid::CcoordOps::get_cube<Fix::sdim>(0)) {
       // Check that 0,0 location has no imaginary part.
       Real error = complex_map[0].imag().norm();
       BOOST_CHECK_LT(error, tol);
@@ -179,4 +185,4 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE_END();
 
-}  // namespace muSpectre
+}  // namespace muFFT
