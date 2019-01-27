@@ -39,6 +39,7 @@ add_subdirectory(libmugrid)
 if(MUSPECTRE_MUGRID_ONLY)
   return()
 endif()
+
 option(MUSPECTRE_MUFFT_ONLY "Compile only muFFT" OFF)
 add_subdirectory(libmufft)
 
@@ -46,7 +47,7 @@ if(MUSPECTRE_MUFFT_ONLY OR MUSPECTRE_MUGRID_ONLY)
   return()
 endif()
 
-add_library(muSpectre)
+add_library(muSpectre "")
 
 add_subdirectory(common)
 add_subdirectory(materials)

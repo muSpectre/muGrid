@@ -34,32 +34,28 @@
 project(muGrid)
 cmake_minimum_required(VERSION 3.5)
 
-if(POLICY CMP0076)
-  cmake_policy(SET CMP0076 NEW)
-endif()
-
 set(mugrid_HDRS
-  ccoord_operations.hh
-  field_base.hh
-  field_collection_base.hh
-  field_collection_global.hh
-  field_collection.hh
-  field_collection_local.hh
-  field_helpers.hh
-  field.hh
-  field_map_base.hh
-  field_map_dynamic.hh
-  field_map.hh
-  field_map_matrixlike.hh
-  field_map_scalar.hh
-  field_map_tensor.hh
-  field_typed.hh
-  grid_common.hh
-  iterators.hh
-  statefield.hh
-  eigen_tools.hh
-  T4_map_proxy.hh
-  tensor_algebra.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/ccoord_operations.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/field_base.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/field_collection_base.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/field_collection_global.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/field_collection.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/field_collection_local.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/field_helpers.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/field.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/field_map_base.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/field_map_dynamic.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/field_map.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/field_map_matrixlike.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/field_map_scalar.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/field_map_tensor.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/field_typed.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/grid_common.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/iterators.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/statefield.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/eigen_tools.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/T4_map_proxy.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/tensor_algebra.hh
   )
 
 add_library(muGrid INTERFACE)

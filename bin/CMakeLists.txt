@@ -75,7 +75,7 @@ set(FILES_FOR_COPY
 foreach(file_for_copy ${FILES_FOR_COPY})
   get_filename_component(binaryname  ${file_for_copy} NAME)
   configure_file(
-    ${FILE_FOR_COPY}
-    "${CMAKE_BINARY_DIR}/${binaryname}"
+    ${file_for_copy}
+    "${PROJECT_BINARY_DIR}/${binaryname}"
     COPYONLY)
 endforeach()

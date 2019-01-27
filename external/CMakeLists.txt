@@ -3,7 +3,7 @@ if(POLICY CMP0076)
 endif()
 
 add_library(cxxopts INTERFACE)
-target_sources(cxxopts INTERFACE cxxopts.hpp)
+target_sources(cxxopts INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/cxxopts.hpp)
 set_property(TARGET cxxopts APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>)
 

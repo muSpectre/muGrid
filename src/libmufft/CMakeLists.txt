@@ -33,7 +33,7 @@
 project(muFFT)
 cmake_minimum_required(VERSION 3.5)
 
-add_library(muFFT)
+add_library(muFFT "")
 
 set(mufft_SRCS
   fft_utils.cc
