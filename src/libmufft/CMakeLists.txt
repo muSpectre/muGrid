@@ -87,7 +87,7 @@ if(${MUSPECTRE_MPI_PARALLEL})
 endif()
 
 target_sources(muFFT PRIVATE ${mufft_SRCS})
-target_link_libraries(muFFT PUBLIC muSpectre::muGrid)
+target_link_libraries(muFFT PUBLIC ${MUFFT_NAMESPACE}muGrid)
 
 # defining exported include directories
 target_include_directories(muFFT
@@ -98,8 +98,35 @@ target_include_directories(muFFT
 set_property(TARGET muFFT APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>)
 
-add_library(muSpectre::muFFT ALIAS muFFT)
 
-# set_target_properties(muFFT PROPERTIES
-#   CXX_STANDARD 14
-#   CXX_STANDARD_REQUIRED TRUE)
+if(MUFFT_NAMESPACE)
+  add_library(${MUFFT_NAMESPACE}muFFT ALIAS muFFT)
+endif()
+
+# ------------------------------------------------------------------------------
+if(NOT MUFFT_TARGETS_EXPORT)
+  set(MUFFT_TARGETS_EXPORT muFFTTargets)
+endif()
+
+install(TARGETS muFFT
+  EXPORT ${MUFFT_TARGETS_EXPORT}
+  LIBRARY
+    DESTINATION lib
+  PUBLIC_HEADER
+    DESTINATION include/libmufft)
+
+if("${MUFFT_TARGETS_EXPORT}" STREQUAL "muFFTTargets")
+  if(MUFFT_NAMESPACE)
+    set(_namespace NAMESPACE ${MUFFT_NAMESPACE})
+  endif()
+  
+  install(EXPORT ${MUFFT_TARGETS_EXPORT}
+    ${_namespace}
+    DESTINATION share/cmake/${PROJECT_NAME}
+    COMPONENT dev)
+
+  #Export for build tree
+  export(EXPORT ${MUFFT_TARGETS_EXPORT}
+    ${_namespace}
+    FILE "${CMAKE_BINARY_DIR}/${MUFFT_TARGETS_EXPORT}.cmake")
+endif()

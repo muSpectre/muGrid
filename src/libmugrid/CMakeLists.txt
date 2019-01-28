@@ -34,32 +34,36 @@
 project(muGrid)
 cmake_minimum_required(VERSION 3.5)
 
+if(POLICY CMP0076)
+  cmake_policy(SET CMP0076 NEW)
+endif()
+
 set(mugrid_HDRS
-  ${CMAKE_CURRENT_SOURCE_DIR}/ccoord_operations.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/field_base.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/field_collection_base.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/field_collection_global.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/field_collection.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/field_collection_local.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/field_helpers.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/field.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/field_map_base.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/field_map_dynamic.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/field_map.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/field_map_matrixlike.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/field_map_scalar.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/field_map_tensor.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/field_typed.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/grid_common.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/iterators.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/statefield.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/eigen_tools.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/T4_map_proxy.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/tensor_algebra.hh
+  ccoord_operations.hh
+  field_base.hh
+  field_collection_base.hh
+  field_collection_global.hh
+  field_collection.hh
+  field_collection_local.hh
+  field_helpers.hh
+  field.hh
+  field_map_base.hh
+  field_map_dynamic.hh
+  field_map.hh
+  field_map_matrixlike.hh
+  field_map_scalar.hh
+  field_map_tensor.hh
+  field_typed.hh
+  grid_common.hh
+  iterators.hh
+  statefield.hh
+  eigen_tools.hh
+  T4_map_proxy.hh
+  tensor_algebra.hh
   )
 
 add_library(muGrid INTERFACE)
-target_sources(muGrid INTERFACE ${mugrid_HDRS})
+#target_sources(muGrid INTERFACE ${mugrid_HDRS})
 
 # defining external dependencies
 target_link_libraries(muGrid INTERFACE Eigen3::Eigen)
@@ -75,4 +79,34 @@ set_property(TARGET muGrid APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES
 target_compile_features(muGrid INTERFACE
   cxx_auto_type cxx_constexpr cxx_decltype cxx_decltype_auto)
 
-add_library(muSpectre::muGrid ALIAS muGrid)
+if(MUGRID_NAMESPACE)
+  add_library(${MUGRID_NAMESPACE}muGrid ALIAS muGrid)
+endif()
+
+# ------------------------------------------------------------------------------
+if(NOT MUGRID_TARGETS_EXPORT)
+  set(MUGRID_TARGETS_EXPORT muGridTargets)
+endif()
+
+install(TARGETS muGrid
+  EXPORT ${MUGRID_TARGETS_EXPORT}
+  INCLUDES
+    DESTINATION include/libmugrid)
+
+install(FILES ${mugrid_HDRS} DESTINATION include/libmugrid)
+
+if("${MUGRID_TARGETS_EXPORT}" STREQUAL "muGridTargets")
+  if(MUGRID_NAMESPACE)
+    set(_namespace NAMESPACE ${MUGRID_NAMESPACE})
+  endif()
+  
+  install(EXPORT ${MUGRID_TARGETS_EXPORT}
+    ${_namespace}
+    DESTINATION share/cmake/${PROJECT_NAME}
+    COMPONENT dev)
+
+  #Export for build tree
+  export(EXPORT ${MUGRID_TARGETS_EXPORT}
+    ${_namespace}
+    FILE "${CMAKE_BINARY_DIR}/${MUGRID_TARGETS_EXPORT}.cmake")
+endif()

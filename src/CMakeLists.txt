@@ -33,17 +33,26 @@
 # covered by the terms of those libraries' licenses, the licensors of this
 # Program grant you additional permission to convey the resulting work.
 # =============================================================================
-option(MUSPECTRE_MUGRID_ONLY "Only setup muGrid" OFF)
+
+if(MUSPECTRE_MUFFT_ONLY)
+  set(MUGRID_NAMESPACE "muFFT::")
+  set(MUGRID_TARGETS_EXPORT muFFTTargets)
+elseif(NOT MUSPECTRE_MUGRID_ONLY)
+  set(MUGRID_NAMESPACE "muSpectre::")
+  set(MUGRID_TARGETS_EXPORT muSpectreTargets)
+endif()
+
 add_subdirectory(libmugrid)
 
 if(MUSPECTRE_MUGRID_ONLY)
   return()
 endif()
 
-option(MUSPECTRE_MUFFT_ONLY "Compile only muFFT" OFF)
+set(MUFFT_NAMESPACE ${MUGRID_NAMESPACE})
+set(MUFFT_TARGETS_EXPORT ${MUGRID_TARGETS_EXPORT})
 add_subdirectory(libmufft)
 
-if(MUSPECTRE_MUFFT_ONLY OR MUSPECTRE_MUGRID_ONLY)
+if(MUSPECTRE_MUFFT_ONLY)
   return()
 endif()
 
@@ -99,6 +108,24 @@ set_property(TARGET muSpectre APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES
 
 add_library(muSpectre::muSpectre ALIAS muSpectre)
 
+# ------------------------------------------------------------------------------
+if(NOT MUSPECTRE_TARGETS_EXPORT)
+  set(MUSPECTRE_TARGETS_EXPORT muSpectreTargets)
+endif()
+
 install(TARGETS muSpectre
+  EXPORT ${MUSPECTRE_TARGETS_EXPORT}
   LIBRARY DESTINATION lib
   PUBLIC_HEADER DESTINATION include/libmuspectre)
+
+if("${MUSPECTRE_TARGETS_EXPORT}" STREQUAL "muSpectreTargets")
+  install(EXPORT ${MUSPECTRE_TARGETS_EXPORT}
+    NAMESPACE "muSpectre::"
+    DESTINATION share/cmake/${PROJECT_NAME}
+    COMPONENT dev)
+
+  #Export for build tree
+  export(EXPORT ${MUSPECTRE_TARGETS_EXPORT}
+    NAMESPACE "muSpectre::"
+    FILE "${CMAKE_BINARY_DIR}/${MUSPECTRE_TARGETS_EXPORT}.cmake")
+endif()
