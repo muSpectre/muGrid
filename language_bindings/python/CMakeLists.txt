@@ -84,10 +84,14 @@ set_target_properties(pyMuSpectreLib PROPERTIES OUTPUT_NAME _muSpectre)
 
 target_include_directories(pyMuSpectreLib PUBLIC ${PYTHON_INCLUDE_DIRS})
 
-add_custom_target(pyMuSpectre ALL SOURCES muSpectre/__init__.py muSpectre/fft.py muSpectre/tools.py)
+add_custom_target(pyMuSpectre ALL SOURCES
+  muSpectre/__init__.py
+  muSpectre/fft.py)
 add_custom_command(TARGET pyMuSpectre POST_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_directory
-                       ${CMAKE_SOURCE_DIR}/language_bindings/python/muSpectre $<TARGET_FILE_DIR:pyMuSpectreLib>/muSpectre)
+                   ${CMAKE_SOURCE_DIR}/language_bindings/python/muSpectre
+                   $<TARGET_FILE_DIR:pyMuSpectreLib>/muSpectre)
 
 install(TARGETS pyMuSpectreLib LIBRARY DESTINATION ${PYTHON_USER_SITE})
-install(FILES muSpectre/__init__.py muSpectre/fft.py DESTINATION ${PYTHON_USER_SITE}/muSpectre)
+install(FILES muSpectre/__init__.py muSpectre/fft.py DESTINATION
+  ${PYTHON_USER_SITE}/muSpectre)
