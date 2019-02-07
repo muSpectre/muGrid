@@ -31,19 +31,19 @@
  * covered by the terms of those libraries' licenses, the licensors of this
  * Program grant you additional permission to convey the resulting work.
  */
+#include <libmugrid/grid_common.hh>
 
-#include "libmugrid/tests.hh"
-
-#include <common/muSpectre_common.hh>
 #include <boost/test/unit_test.hpp>
 #include <boost/mpl/list.hpp>
 
-#ifndef TESTS_TESTS_HH_
-#define TESTS_TESTS_HH_
+#ifndef TESTS_LIBMUGRID_TESTS_HH_
+#define TESTS_LIBMUGRID_TESTS_HH_
 
-namespace muSpectre {
-  using muGrid::tol;
+namespace muGrid {
+
+  constexpr Real tol = 1e-14 * 100;       // it's in percent
   constexpr Real finite_diff_tol = 1e-7;  // it's in percent
-}  // namespace muSpectre
 
-#endif  // TESTS_TESTS_HH_
+}  // namespace muGrid
+
+#endif  // TESTS_LIBMUGRID_TESTS_HH_

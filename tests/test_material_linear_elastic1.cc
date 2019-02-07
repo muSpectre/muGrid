@@ -33,17 +33,19 @@
  * covered by the terms of those libraries' licenses, the licensors of this
  * Program grant you additional permission to convey the resulting work.
  */
-#include <type_traits>
 
+#include "tests.hh"
+#include "libmugrid/test_goodies.hh"
+
+#include <libmugrid/field_collection.hh>
+#include <libmugrid/iterators.hh>
+#include <materials/material_linear_elastic1.hh>
+#include <materials/material_linear_elastic2.hh>
+
+#include <type_traits>
 #include <boost/mpl/list.hpp>
 #include <boost/range/combine.hpp>
 
-#include "materials/material_linear_elastic1.hh"
-#include "materials/material_linear_elastic2.hh"
-#include "tests.hh"
-#include "tests/test_goodies.hh"
-#include <libmugrid/field_collection.hh>
-#include <libmugrid/iterators.hh>
 
 namespace muSpectre {
 

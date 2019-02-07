@@ -33,19 +33,18 @@
  * covered by the terms of those libraries' licenses, the licensors of this
  * Program grant you additional permission to convey the resulting work.
  */
+#include "tests.hh"
 
 #include <libmugrid/field.hh>
 #include <libmugrid/field_collection.hh>
 #include <libmugrid/statefield.hh>
 #include <libmugrid/ccoord_operations.hh>
-#include "tests.hh"
 
 #include <boost/mpl/list.hpp>
 #include <type_traits>
 #include <iostream>
 
 namespace muGrid {
-  using muSpectre::tol;
 
   template <Dim_t DimS, Dim_t DimM, bool Global>
   struct SF_Fixture {

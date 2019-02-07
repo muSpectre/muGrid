@@ -32,19 +32,18 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include <boost/mpl/list.hpp>
-
 #include "tests.hh"
+
 #include <libmufft/fftw_engine.hh>
 #include <libmugrid/ccoord_operations.hh>
 #include <libmugrid/field_collection.hh>
 #include <libmugrid/field_map.hh>
 #include <libmugrid/iterators.hh>
+
+#include <boost/mpl/list.hpp>
 #include <iostream>
 
 namespace muFFT {
-  using muSpectre::tol;
-
   BOOST_AUTO_TEST_SUITE(fftw_engine);
 
   /* ---------------------------------------------------------------------- */

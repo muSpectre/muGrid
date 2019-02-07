@@ -35,11 +35,10 @@
 #include <iostream>
 
 #include <libmugrid/ccoord_operations.hh>
-#include "tests/test_goodies.hh"
+#include "test_goodies.hh"
 #include "tests.hh"
 
 namespace muGrid {
-  using muSpectre::tol;
   BOOST_AUTO_TEST_SUITE(ccoords_operations);
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_cube, Fix, testGoodies::dimlist, Fix) {

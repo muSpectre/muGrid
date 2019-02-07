@@ -1,11 +1,12 @@
 /**
- * @file   tests.hh
+ * @file   main_test_suite.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
- * @date   10 May 2017
+ * @date   01 May 2017
  *
- * @brief  common defs for tests
+ * @brief  Main test suite. Running this suite tests all available tests for
+ *         µSpectre
  *
  * Copyright © 2017 Till Junge
  *
@@ -31,19 +32,8 @@
  * covered by the terms of those libraries' licenses, the licensors of this
  * Program grant you additional permission to convey the resulting work.
  */
+#define BOOST_TEST_MODULE base_test test
+#define BOOST_TEST_MAIN
+#define BOOST_TEST_DYN_LINK
 
-#include "libmugrid/tests.hh"
-
-#include <common/muSpectre_common.hh>
 #include <boost/test/unit_test.hpp>
-#include <boost/mpl/list.hpp>
-
-#ifndef TESTS_TESTS_HH_
-#define TESTS_TESTS_HH_
-
-namespace muSpectre {
-  using muGrid::tol;
-  constexpr Real finite_diff_tol = 1e-7;  // it's in percent
-}  // namespace muSpectre
-
-#endif  // TESTS_TESTS_HH_

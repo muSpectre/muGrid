@@ -34,25 +34,16 @@
 # Program grant you additional permission to convey the resulting work.
 # =============================================================================
 
-if(MUSPECTRE_MUFFT_ONLY)
-  set(MUGRID_NAMESPACE "muFFT::")
-  set(MUGRID_TARGETS_EXPORT muFFTTargets)
-elseif(NOT MUSPECTRE_MUGRID_ONLY)
-  set(MUGRID_NAMESPACE "muSpectre::")
-  set(MUGRID_TARGETS_EXPORT muSpectreTargets)
-endif()
 
 add_subdirectory(libmugrid)
 
-if(MUSPECTRE_MUGRID_ONLY)
+if(MUCHOICE MATCHES "muGrid")
   return()
 endif()
 
-set(MUFFT_NAMESPACE ${MUGRID_NAMESPACE})
-set(MUFFT_TARGETS_EXPORT ${MUGRID_TARGETS_EXPORT})
 add_subdirectory(libmufft)
 
-if(MUSPECTRE_MUFFT_ONLY)
+if(MUCHOICE MATCHES "muFFT")
   return()
 endif()
 
@@ -91,7 +82,7 @@ list(APPEND muSpectre_SRC ${_headers})
 target_include_directories(muSpectre INTERFACE ${muSpectre_INCLUDES})
 
 target_link_libraries(muSpectre PUBLIC Eigen3::Eigen)
-target_link_libraries(muSpectre PUBLIC muSpectre::muFFT muSpectre::muGrid)
+target_link_libraries(muSpectre PUBLIC ${MUFFT_NAMESPACE}muFFT ${MUGIRD_NAMESPACE}muGrid)
 
 set_property(TARGET muSpectre PROPERTY PUBLIC_HEADER ${_headers})
 
@@ -106,7 +97,7 @@ set_property(TARGET muSpectre APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>)
 
 
-add_library(muSpectre::muSpectre ALIAS muSpectre)
+add_library(${MUSPECTRE_NAMESPACE}muSpectre ALIAS muSpectre)
 
 # ------------------------------------------------------------------------------
 if(NOT MUSPECTRE_TARGETS_EXPORT)
@@ -120,12 +111,12 @@ install(TARGETS muSpectre
 
 if("${MUSPECTRE_TARGETS_EXPORT}" STREQUAL "muSpectreTargets")
   install(EXPORT ${MUSPECTRE_TARGETS_EXPORT}
-    NAMESPACE "muSpectre::"
+    NAMESPACE "${MUSPECTRE_NAMESPACE}"
     DESTINATION share/cmake/${PROJECT_NAME}
     COMPONENT dev)
 
   #Export for build tree
   export(EXPORT ${MUSPECTRE_TARGETS_EXPORT}
-    NAMESPACE "muSpectre::"
+    NAMESPACE "${MUSPECTRE_NAMESPACE}"
     FILE "${CMAKE_BINARY_DIR}/${MUSPECTRE_TARGETS_EXPORT}.cmake")
 endif()

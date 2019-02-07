@@ -32,17 +32,18 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include <Eigen/Dense>
-
 #include "tests.hh"
-#include "materials/materials_toolbox.hh"
-#include "materials/stress_transformations_default_case.hh"
-#include "materials/stress_transformations_PK1_impl.hh"
-#include "materials/stress_transformations_PK2_impl.hh"
-#include "materials/stress_transformations.hh"
-#include "tests/test_goodies.hh"
+#include "libmugrid/test_goodies.hh"
+
 #include <libmugrid/T4_map_proxy.hh>
+#include <materials/materials_toolbox.hh>
+#include <materials/stress_transformations_default_case.hh>
+#include <materials/stress_transformations_PK1_impl.hh>
+#include <materials/stress_transformations_PK2_impl.hh>
+#include <materials/stress_transformations.hh>
+
 #include <boost/mpl/list.hpp>
+#include <Eigen/Dense>
 
 namespace muSpectre {
 

@@ -33,13 +33,14 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include "boost/mpl/list.hpp"
-
-#include "materials/stress_transformations_Kirchhoff.hh"
-#include "materials/material_hyper_elasto_plastic1.hh"
-#include "materials/materials_toolbox.hh"
 #include "tests.hh"
-#include "test_goodies.hh"
+#include "libmugrid/test_goodies.hh"
+
+#include <materials/stress_transformations_Kirchhoff.hh>
+#include <materials/material_hyper_elasto_plastic1.hh>
+#include <materials/materials_toolbox.hh>
+
+#include <boost/mpl/list.hpp>
 
 namespace muSpectre {
 

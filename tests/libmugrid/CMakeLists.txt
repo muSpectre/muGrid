@@ -33,49 +33,24 @@
 # covered by the terms of those libraries' licenses, the licensors of this
 # Program grant you additional permission to convey the resulting work.
 # =============================================================================
+set(mugrid_tests)
+macro(muGrid_add_test)
+  muTools_add_test(${ARGN} LINK_LIBRARIES ${MUGRID_NAMESPACE}muGrid TEST_LIST mugrid_tests)
+endmacro()
 
-#compile executables
+file(GLOB HEADER_TEST_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/header*.cc")
+foreach(header_test ${HEADER_TEST_SRCS})
+  get_test_name(test_name ${header_test} ".*_test")
 
-set(binaries
-  demonstrator1.cc
-  demonstrator_dynamic_solve.cc
-  demonstrator2.cc
-  hyper-elasticity.cc
-  small_case.cc
-  )
+  muGrid_add_test(${test_name}
+    SOURCES main_test_suite.cc ${header_test}
+    TYPE BOOST --report_level=detailed)
+endforeach(header_test ${HEADER_TEST_SRCS})
 
-if(${MUSPECTRE_MPI_PARALLEL})
-  list(APPEND binaries
-    demonstrator_mpi.cc
-    )
-endif()
+# build library tests
+file(GLOB TEST_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/test_*.cc")
+muGrid_add_test(main_mugrid_test_suite
+  SOURCES main_test_suite.cc ${TEST_SRCS}
+  TYPE BOOST --report_level=detailed)
 
-foreach(binaryfile ${binaries})
-  get_filename_component(binaryname  ${binaryfile} NAME_WE)
-  add_executable(${binaryname} ${binaryfile})
-  target_link_libraries(${binaryname} PRIVATE ${MUSPECTRE_NAMESPACE}muSpectre cxxopts)
-
-  muTools_move_to_project(${binaryname})
-endforeach()
-
-# or copy them
-file(GLOB pybins "${CMAKE_SOURCE_DIR}/bin/*.py")
-foreach(pybin ${pybins})
-  get_filename_component(binaryname  ${pybin} NAME_WE)
-  configure_file(
-    ${pybin}
-    "${CMAKE_BINARY_DIR}/${binaryname}.py"
-    COPYONLY)
-endforeach()
-
-# additional files to copy
-set(FILES_FOR_COPY
-  ${CMAKE_CURRENT_SOURCE_DIR}/odd_image.npz)
-
-foreach(file_for_copy ${FILES_FOR_COPY})
-  get_filename_component(binaryname  ${file_for_copy} NAME)
-  configure_file(
-    ${file_for_copy}
-    "${PROJECT_BINARY_DIR}/${binaryname}"
-    COPYONLY)
-endforeach()
+add_custom_target(test_mugrid DEPENDS ${mugrid_tests})

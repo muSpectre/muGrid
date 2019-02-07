@@ -34,10 +34,11 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include "common/geometry.hh"
 #include "tests.hh"
-#include "test_goodies.hh"
+#include "libmugrid/test_goodies.hh"
+
 #include <libmugrid/T4_map_proxy.hh>
+#include <common/geometry.hh>
 
 #include <Eigen/Dense>
 #include <boost/mpl/list.hpp>

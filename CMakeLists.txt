@@ -50,9 +50,21 @@ option(MUSPECTRE_MAKE_TESTS "If on, several ctest targets will be built automati
 option(MUSPECTRE_MAKE_EXAMPLES "If on, the executables in the bin folder will be compiled" ON)
 option(MUSPECTRE_MAKE_BENCHMARKS "If on, the benchmarks will be compiled" ON)
 option(MUSPECTRE_MPI_PARALLEL "If on, MPI-parallel solvers become available" OFF)
-option(MUSPECTRE_MUGRID_ONLY "Only setup muGrid" OFF)
-option(MUSPECTRE_MUFFT_ONLY "Compile only muFFT" OFF)
+set(MUCHOICE "muSpectre" CACHE STRING "Which µLevel is required")
+set_property(CACHE MUCHOICE PROPERTY STRINGS
+  "muGrid"
+  "muFFT"
+  "muSpectre"
+  )
+
 set(MUSPECTRE_RUNNING_IN_CI "OFF" CACHE INTERNAL "changes output format for tests")
+
+set(MUSPECTRE_NAMESPACE "${MUCHOICE}::")
+set(MUSPECTE_TARGETS_EXPORT ${MUCHOICE}Targets)
+set(MUGRID_NAMESPACE ${MUSPECTRE_NAMESPCE})
+set(MUGRID_TARGETS_EXPORT ${MUSPECTRE_TARGETS_EXPORT})
+set(MUFFT_NAMESPACE ${MUGRID_NAMESPACE})
+set(MUFFT_TARGETS_EXPORT ${MUGRID_TARGETS_EXPORT})
 
 if(MUSPECTRE_MUFFT_ONLY OR MUSPECTRE_MUGRID_ONLY)
   set(MUSPECTRE_MAKE_TESTS OFF CACHE BOOL "" FORCE)
@@ -61,6 +73,7 @@ endif()
 
 # ------------------------------------------------------------------------------
 include(muspectreTools)
+include(muTools)
 include(cpplint)
 mark_as_advanced_prefix(CPPLINT)
 
@@ -89,7 +102,7 @@ endif()
 # compile the library
 add_compile_options(-Werror)
 add_subdirectory(${CMAKE_SOURCE_DIR}/src)
-if(NOT MUSPECTRE_MUFFT_ONLY AND NOT MUSPECTRE_MUGRID_ONLY)
+if(MUCHOICE MATCHES "muSpectre")
   add_subdirectory(${CMAKE_SOURCE_DIR}/language_bindings)
 endif()
 
@@ -98,10 +111,9 @@ if (${MUSPECTRE_MAKE_DOC_TARGET})
 endif()
 
 ################################################################################
-if(${MUSPECTRE_MAKE_EXAMPLES})
+if(${MUSPECTRE_MAKE_EXAMPLES} AND ${MUCHOICE} MATCHES "muSpectre")
   add_subdirectory(${CMAKE_SOURCE_DIR}/bin)
 endif()
-
 
 ################################################################################
 # compile benchmarks
@@ -114,9 +126,9 @@ if(${MUSPECTRE_MAKE_BENCHMARKS})
   endforeach(benchmark ${benchmark})
 endif()
 
-if(MUSPECTRE_MUGRID_ONLY AND NOT MUSPECTRE_MUFFT_ONLY)
+if(MUCHOICE MATCHES "muGrid")
   cpplint_add_subdirectory("${CMAKE_SOURCE_DIR}/src/libmugrid" "")
-elseif(MUSPECTRE_MUFFT_ONLY)
+elseif(MUCHOICE MATCHES "muFFT")
   cpplint_add_subdirectory("${CMAKE_SOURCE_DIR}/src/libmugrid" "")
   cpplint_add_subdirectory("${CMAKE_SOURCE_DIR}/src/libmufft" "")
 else()

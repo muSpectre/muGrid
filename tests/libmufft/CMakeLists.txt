@@ -33,63 +33,17 @@
 # covered by the terms of those libraries' licenses, the licensors of this
 # Program grant you additional permission to convey the resulting work.
 # =============================================================================
+set(mufft_tests)
 
-find_package(Boost COMPONENTS unit_test_framework REQUIRED)
-
-function(get_test_name test_name test_fname prefix) 
-  get_filename_component(test_fname_we ${test_fname} NAME_WE)
-  string(REGEX REPLACE "(${prefix}_?)(.*)" "\\2" _test_name "${test_fname_we}")
-  set(${test_name} ${_test_name} PARENT_SCOPE)
-endfunction()
-
-add_subdirectory(libmugrid)
-if(MUCHOICE MATCHES "muGrid")
-  return()
-endif()
-
-add_subdirectory(libmufft)
-if(MUCHOICE MATCHES "muFFT")
-  return()
-endif()
-
-set(muspectre_tests)
-
-macro(muSpectre_add_test)
-  muTools_add_test(${ARGN} LINK_LIBRARIES ${MUSPECTRE_NAMESPACE}muSpectre TEST_LIST muspectre_tests)
+macro(muFFT_add_test)
+  muTools_add_test(${ARGN} LINK_LIBRARIES ${MUFFT_NAMESPACE}muFFT TEST_LIST mufft_tests)
 endmacro()
-
 
 # build library tests
 file(GLOB TEST_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/test_*.cc")
-muSpectre_add_test(main_test_suite
+muFFT_add_test(main_mufft_test_suite
   SOURCES main_test_suite.cc ${TEST_SRCS}
   TYPE BOOST --report_level=detailed)
-
-muSpectre_add_test(mattb_test
-  SOURCES main_test_suite.cc test_materials_toolbox.cc
-  TYPE BOOST --report_level=detailed)
-
-##############################################################################
-# build py_comparison tests
-file(GLOB PY_COMP_TEST_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/py_comparison_*.cc")
-find_package(PythonInterp ${MUSPECTRE_PYTHON_MAJOR_VERSION} REQUIRED)
-foreach(py_comp_test ${PY_COMP_TEST_SRCS})
-  get_test_name(py_comp_test_name ${py_comp_test} "py_comparison_test") 
-  set(py_comp_test_fname "py_comparison_test_${py_comp_test_name}")
-
-  pybind11_add_module(${py_comp_test_name} ${py_comp_test})
-  target_link_libraries(${py_comp_test_name} PRIVATE muSpectre::muSpectre)
-    
-  configure_file(
-    "${py_comp_test_fname}.py"
-    "${CMAKE_CURRENT_BINARY_DIR}/${py_comp_test_fname}.py"
-    COPYONLY)
-  muSpectre_add_test(${py_comp_test_fname}
-    TYPE PYTHON "${py_comp_test_fname}.py")
-endforeach(py_comp_test ${PY_COMP_TEST_SRCS})
-
-##############################################################################
-# copy python test
 
 file(GLOB PY_TEST_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/python_*.py")
 foreach(pytest ${PY_TEST_SRCS})
@@ -99,24 +53,24 @@ foreach(pytest ${PY_TEST_SRCS})
     "${CMAKE_CURRENT_BINARY_DIR}/${pytest_name}"
     COPYONLY)
 endforeach(pytest ${PY_TEST_SRCS})
-muSpectre_add_test(python_binding_test TYPE PYTHON python_binding_tests.py)
+muFFT_add_test(mufft_python_binding_test TYPE PYTHON python_binding_tests.py)
 
 if(${MUSPECTRE_MPI_PARALLEL})
   # add MPI tests
   file(GLOB TEST_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/mpi_test_*.cc")
 
-  muSpectre_add_test(mpi_main_test_suite1
+  muFFT_add_test(mufft_mpi_main_test_suite1
     SOURCES mpi_main_test_suite.cc ${TEST_SRCS}
     TARGET mpi_main_test_suite
     TYPE BOOST MPI_NB_PROCS 1 --report_level=detailed)
-  muSpectre_add_test(mpi_main_test_suite2
+  muFFT_add_test(mufft_mpi_main_test_suite2
     TARGET mpi_main_test_suite
     TYPE BOOST MPI_NB_PROCS 2 --report_level=detailed)
 
-  muSpectre_add_test(python_mpi_binding_test1 TYPE PYTHON MPI_NB_PROCS 1
+  muFFT_add_test(mufft_python_mpi_binding_test1 TYPE PYTHON MPI_NB_PROCS 1
     python_mpi_binding_tests.py)
-  muSpectre_add_test(python_mpi_binding_test2 TYPE PYTHON MPI_NB_PROCS 2
+  muFFT_add_test(mufft_python_mpi_binding_test2 TYPE PYTHON MPI_NB_PROCS 2
     python_mpi_binding_tests.py)
 endif()
 
-add_custom_target(test_muspectre DEPENDS ${muspectre_tests})
+add_custom_target(test_mufft DEPENDS ${mufft_tests})

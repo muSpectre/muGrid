@@ -34,7 +34,8 @@
  */
 
 #include "test_field_collections.hh"
-#include "tests/test_goodies.hh"
+#include "test_goodies.hh"
+
 #include <libmugrid/tensor_algebra.hh>
 
 #include <Eigen/Dense>

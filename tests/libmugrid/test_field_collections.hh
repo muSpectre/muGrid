@@ -33,8 +33,16 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef TESTS_TEST_FIELD_COLLECTIONS_HH_
-#define TESTS_TEST_FIELD_COLLECTIONS_HH_
+#ifndef TESTS_LIBMUGRID_TEST_FIELD_COLLECTIONS_HH_
+#define TESTS_LIBMUGRID_TEST_FIELD_COLLECTIONS_HH_
+
+#include "test_goodies.hh"
+#include "tests.hh"
+
+#include <libmugrid/ccoord_operations.hh>
+#include <libmugrid/field_collection.hh>
+#include <libmugrid/field.hh>
+#include <libmugrid/field_map.hh>
 
 #include <stdexcept>
 #include <boost/mpl/list.hpp>
@@ -42,13 +50,6 @@
 #include <type_traits>
 #include <sstream>
 #include <string>
-
-#include "tests/test_goodies.hh"
-#include "tests.hh"
-#include <libmugrid/ccoord_operations.hh>
-#include <libmugrid/field_collection.hh>
-#include <libmugrid/field.hh>
-#include <libmugrid/field_map.hh>
 
 namespace muGrid {
 
@@ -157,4 +158,4 @@ namespace muGrid {
 
 }  // namespace muGrid
 
-#endif  // TESTS_TEST_FIELD_COLLECTIONS_HH_
+#endif  // TESTS_LIBMUGRID_TEST_FIELD_COLLECTIONS_HH_

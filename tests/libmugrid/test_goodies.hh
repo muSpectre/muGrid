@@ -32,8 +32,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef TESTS_TEST_GOODIES_HH_
-#define TESTS_TEST_GOODIES_HH_
+#ifndef TESTS_LIBMUGRID_TEST_GOODIES_HH_
+#define TESTS_LIBMUGRID_TEST_GOODIES_HH_
 
 #include <libmugrid/grid_common.hh>
 #include <libmugrid/tensor_algebra.hh>
@@ -225,4 +225,4 @@ namespace muGrid {
 
 }  // namespace muGrid
 
-#endif  // TESTS_TEST_GOODIES_HH_
+#endif  // TESTS_LIBMUGRID_TEST_GOODIES_HH_

@@ -36,11 +36,12 @@
 #include <Eigen/Dense>
 
 #include "tests.hh"
+#include "libmugrid/test_goodies.hh"
+
 #include <libmugrid/iterators.hh>
 #include <libmugrid/field_map.hh>
-#include "tests/test_goodies.hh"
-#include "cell/cell_factory.hh"
-#include "materials/material_linear_elastic1.hh"
+#include <cell/cell_factory.hh>
+#include <materials/material_linear_elastic1.hh>
 
 namespace muSpectre {
   using muGrid::make_field;

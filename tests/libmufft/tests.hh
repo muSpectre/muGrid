@@ -32,18 +32,18 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include "libmugrid/tests.hh"
+#include "../libmugrid/tests.hh"
 
-#include <common/muSpectre_common.hh>
+#include <libmufft/mufft_common.hh>
+
 #include <boost/test/unit_test.hpp>
 #include <boost/mpl/list.hpp>
 
-#ifndef TESTS_TESTS_HH_
-#define TESTS_TESTS_HH_
+#ifndef TESTS_LIBMUFFT_TESTS_HH_
+#define TESTS_LIBMUFFT_TESTS_HH_
 
-namespace muSpectre {
+namespace muFFT {
   using muGrid::tol;
-  constexpr Real finite_diff_tol = 1e-7;  // it's in percent
-}  // namespace muSpectre
+}  // namespace muFFT
 
-#endif  // TESTS_TESTS_HH_
+#endif  // TESTS_LIBMUFFT_TESTS_HH_

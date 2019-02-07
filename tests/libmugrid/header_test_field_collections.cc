@@ -280,7 +280,7 @@ namespace muGrid {
       ++counter;
       val -= val.Ones() * counter;
       auto error{val.matrix().norm()};
-      BOOST_CHECK_LT(error, muSpectre::tol);
+      BOOST_CHECK_LT(error, tol);
     }
 
     using ScalarMap = ScalarFieldMap<FC_t, Int>;
