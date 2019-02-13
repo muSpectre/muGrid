@@ -37,6 +37,7 @@ Program grant you additional permission to convey the resulting work.
 
 import numpy as np
 import sys
+from . import Formulation
 
 def compute_wave_vectors(lengths, resolutions):
     """Computes the wave vectors for a dim-dimensional rectangular or
@@ -314,8 +315,8 @@ def compute_placement(result, lengths, resolutions, order=0, formulation=None):
     order       -- (default 0) integration order. 0 stands for exact integration
     formulation -- (default None) the formulation is derived from the
                    OptimiseResult argument. If this is not possible you have to
-                   fix the formulation to either "small_strain" or
-                   "finite_strain". (dtype = str)
+                   fix the formulation to either Formulation.small_strain or
+                   Formulation.finite_strain.
     Returns:
     (placement, x_n) tuple of ndarrays containing the placement and the
                      corresponding original positions
@@ -338,7 +339,7 @@ def compute_placement(result, lengths, resolutions, order=0, formulation=None):
         form = formulation
         grad = reshape_gradient(result, resolutions.tolist())
     else:
-        form = str(result.formulation)[12:]
+        form = result.formulation
         if form != formulation and formulation != None:
             #exit the program, if the formulation is ambiguous!
             raise ValueError('\nThe given formulation "{}" differs from the '
@@ -347,10 +348,10 @@ def compute_placement(result, lengths, resolutions, order=0, formulation=None):
         grad = reshape_gradient(result.grad, resolutions.tolist())
 
     #reshape the gradient depending on the formulation
-    if form == "small_strain" or form == "small_strain_sym":
+    if form == Formulation.small_strain:
         raise NotImplementedError('\nIntegration of small strains'
                                   'is not implemented yet!')
-    elif form == "finite_strain":
+    elif form == Formulation.finite_strain:
         grad = grad
     else:
         raise ValueError('\nThe formulation: "{}" is unknown!'
