@@ -36,7 +36,7 @@
 
 find_package(Boost COMPONENTS unit_test_framework REQUIRED)
 
-function(get_test_name test_name test_fname prefix) 
+function(get_test_name test_name test_fname prefix)
   get_filename_component(test_fname_we ${test_fname} NAME_WE)
   string(REGEX REPLACE "(${prefix}_?)(.*)" "\\2" _test_name "${test_fname_we}")
   set(${test_name} ${_test_name} PARENT_SCOPE)
@@ -74,12 +74,12 @@ muSpectre_add_test(mattb_test
 file(GLOB PY_COMP_TEST_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/py_comparison_*.cc")
 find_package(PythonInterp ${MUSPECTRE_PYTHON_MAJOR_VERSION} REQUIRED)
 foreach(py_comp_test ${PY_COMP_TEST_SRCS})
-  get_test_name(py_comp_test_name ${py_comp_test} "py_comparison_test") 
+  get_test_name(py_comp_test_name ${py_comp_test} "py_comparison_test")
   set(py_comp_test_fname "py_comparison_test_${py_comp_test_name}")
 
   pybind11_add_module(${py_comp_test_name} ${py_comp_test})
   target_link_libraries(${py_comp_test_name} PRIVATE muSpectre::muSpectre)
-    
+
   configure_file(
     "${py_comp_test_fname}.py"
     "${CMAKE_CURRENT_BINARY_DIR}/${py_comp_test_fname}.py"

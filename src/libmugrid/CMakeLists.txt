@@ -99,7 +99,7 @@ if("${MUGRID_TARGETS_EXPORT}" STREQUAL "muGridTargets")
   if(MUGRID_NAMESPACE)
     set(_namespace NAMESPACE ${MUGRID_NAMESPACE})
   endif()
-  
+
   install(EXPORT ${MUGRID_TARGETS_EXPORT}
     ${_namespace}
     DESTINATION share/cmake/${PROJECT_NAME}

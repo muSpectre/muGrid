@@ -53,7 +53,7 @@
 #include <libmugrid/iterators.hh>
 
 namespace muFFT {
-  using muSpectre::tol;
+  using muFFT::tol;
 
   BOOST_AUTO_TEST_SUITE(mpi_fft_engine);
 

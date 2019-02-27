@@ -34,6 +34,9 @@
 # Program grant you additional permission to convey the resulting work.
 # =============================================================================
 
+set(MUSPECTRE_TARGETS_EXPORT "${MUCHOICE}Targets")
+set(MUFFT_TARGETS_EXPORT "${MUSPECTRE_TARGETS_EXPORT}")
+set(MUGRID_TARGETS_EXPORT "${MUSPECTRE_TARGETS_EXPORT}")
 
 add_subdirectory(libmugrid)
 

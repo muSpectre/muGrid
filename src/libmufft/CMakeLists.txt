@@ -50,7 +50,7 @@ set(fft_engine_PFFT_SRCS
 
 find_package(FFTW3 COMPONENTS double REQUIRED)
 target_link_libraries(muFFT PUBLIC fftw3::double)
-      
+
 if(${MUSPECTRE_MPI_PARALLEL})
   find_package(MPI REQUIRED)
 
@@ -65,17 +65,17 @@ if(${MUSPECTRE_MPI_PARALLEL})
   foreach (_fft FFTWMPI PFFT)
     if (${MUFFT_USE_${_fft}})
       if("${_fft}" STREQUAL "FFTWMPI")
-	find_package(FFTW3 COMPONENTS double mpi REQUIRED)
-	target_link_libraries(muFFT PUBLIC fftw3::double::mpi)
+        find_package(FFTW3 COMPONENTS double mpi REQUIRED)
+        target_link_libraries(muFFT PUBLIC fftw3::double::mpi)
       else()
-	find_package(${_fft} REQUIRED)
-	# TODO this private should perhaps become private
-	target_link_libraries(muFFT PUBLIC ${${_fft}_LIBRARIES})
-	target_include_directories(muFFT PUBLIC ${${_fft}_INCLUDES})
+        find_package(${_fft} REQUIRED)
+        # TODO this private should perhaps become private
+        target_link_libraries(muFFT PUBLIC ${${_fft}_LIBRARIES})
+        target_include_directories(muFFT PUBLIC ${${_fft}_INCLUDES})
       endif()
 
       target_compile_definitions(muFFT PUBLIC -DWITH_${_fft})
-      
+
       list(APPEND mufft_SRCS ${fft_engine_${_fft}_SRCS})
       set(_using_mpi TRUE)
     endif()
@@ -118,8 +118,10 @@ install(TARGETS muFFT
 if("${MUFFT_TARGETS_EXPORT}" STREQUAL "muFFTTargets")
   if(MUFFT_NAMESPACE)
     set(_namespace NAMESPACE ${MUFFT_NAMESPACE})
+  else()
+    unset(_namespace)
   endif()
-  
+
   install(EXPORT ${MUFFT_TARGETS_EXPORT}
     ${_namespace}
     DESTINATION share/cmake/${PROJECT_NAME}
