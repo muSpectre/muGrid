@@ -37,6 +37,7 @@ build:ubuntu16.04_gcc:
     - cd build
     - ls -a
     - ctest --output-on-failure
+    - make test
     - ls -ltr
     - ls Testing
   artifacts:
