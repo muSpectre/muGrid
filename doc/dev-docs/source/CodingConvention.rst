@@ -85,7 +85,7 @@ Avoid surprising or dangerous constructs
     C++ has features that are more surprising or dangerous than one might think at a glance. Some style guide restrictions are in place to prevent falling into these pitfalls. There is a high bar for style guide waivers on such restrictions, because waiving such rules often directly risks compromising program correctness.
 
 Avoid constructs that our average C++ programmer would find tricky or hard to maintain in the constitutive laws and solvers
-    C++ has features that may not be generally appropriate because of the complexity they introduce to the code. In the core library, where we make heavy use of template metaprogramming and expression templates for efficiency, it totally fine to use trickier language constructs, because any benefits of more complex implementation are multiplied widely by usage, and the cost in understanding the complexity does not need to be paid by the average contributor who writes a new material or solver. When in doubt, waivers to rules of this type can be sought by asking on the `discussion forum <https://c4science.ch/Z81>`_.
+    C++ has features that may not be generally appropriate because of the complexity they introduce to the code. In the core library, where we make heavy use of template metaprogramming and expression templates for efficiency, it is totally fine to use trickier language constructs, because any benefits of more complex implementation are multiplied widely by usage, and the cost in understanding the complexity does not need to be paid by the average contributor who writes a new material or solver. When in doubt, waivers to rules of this type can be sought by starting an  `issue <https://gitlab.com/tjunge/muspectre/issues>`_.
 
 Concede to optimisation when necessary
     Performance is the overwhelming priority in the **core library** (i.e., data structures and low level algorithms that the typical user relies on often, but rarely uses directly). If performance optimisation is in conflict with other principles in this document, optimise. 
@@ -601,7 +601,7 @@ Definition:
     - List initialisation can suffer from the same problems if the destination type is implicit, particularly if the list has only a single element.
 
   Decision:
-    Type conversion operators, and constructors that are callable with a single argument, must be marked ``explicit`` in the class definition. As an exception, copy and move constructors should not be ``explicit``, since they do not perform type conversion. Implicit conversions can sometimes be necessary and appropriate for types that are designed to transparently wrap other types. In that case, contact the `discussion forum <https://c4science.ch/Z81>`_.
+    Type conversion operators, and constructors that are callable with a single argument, must be marked ``explicit`` in the class definition. As an exception, copy and move constructors should not be ``explicit``, since they do not perform type conversion. Implicit conversions can sometimes be necessary and appropriate for types that are designed to transparently wrap other types. In that case, raise an `issue <https://gitlab.com/tjunge/muspectre/issues>>`_.
 
     Constructors that cannot be called with a single argument may omit ``explicit``. Constructors that take a single ``std::initialiser_list`` parameter should also omit ``explicit``, in order to support copy-initialisation (e.g. ``MyType m{1, 2};``).
 
@@ -1434,7 +1434,7 @@ The problems introduced by macros are especially severe when they are used to de
 
 Luckily, macros are not nearly as necessary in C++ as they are in C. Instead of using a macro to inline performance-critical code, use an inline function. Instead of using a macro to store a constant, use a ``const`` or ``constexpr`` variable. Instead of using a macro to "abbreviate" a long variable name, use a reference. Instead of using a macro to conditionally compile code ... well, don't do that at all (except, of course, for the ``#define`` guards to prevent double inclusion of header files, and packages such as MPI). It makes testing much more difficult.
 
-Macros can do things these other techniques cannot, and you do see them in the code base, especially in the lower-level libraries. And some of their special features (like stringifying, concatenation, and so forth) are not available through the language proper. But before using a macro, consider carefully whether there's a non-macro way to achieve the same result. If you need to use a macro to define an interface, contact the `discussion forum <https://c4science.ch/Z81>`_.
+Macros can do things these other techniques cannot, and you do see them in the code base, especially in the lower-level libraries. And some of their special features (like stringifying, concatenation, and so forth) are not available through the language proper. But before using a macro, consider carefully whether there's a non-macro way to achieve the same result. If you need to use a macro to define an interface, discuss it with the community in an `issue <https://gitlab.com/tjunge/muspectre/issues>`>`_.
 
 The following usage pattern will avoid many problems with macros; if you use macros, follow it whenever possible:
 
