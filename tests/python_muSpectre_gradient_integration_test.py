@@ -656,6 +656,6 @@ class MuSpectre_gradient_integration_Check(unittest.TestCase):
         for r in [result, result.grad]:
             #check input of result=OptimiseResult and result=np.ndarray
             placement, x = µ.gradient_integration.compute_placement(
-                r, lens, res, order=0, formulation='finite_strain')
+                r, lens, res, order=0, formulation=µ.Formulation.finite_strain)
             self.assertLess(np.linalg.norm(placement_ana - placement), 1e-12)
             self.assertTrue((x_n == x).all())

@@ -84,7 +84,8 @@ set_target_properties(pyMuSpectreLib PROPERTIES OUTPUT_NAME _muSpectre)
 
 target_include_directories(pyMuSpectreLib PUBLIC ${PYTHON_INCLUDE_DIRS})
 
-add_custom_target(pyMuSpectre ALL SOURCES muSpectre/__init__.py
+add_custom_target(pyMuSpectre ALL SOURCES
+  muSpectre/__init__.py
   muSpectre/fft.py)
 add_custom_command(TARGET pyMuSpectre POST_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_directory
