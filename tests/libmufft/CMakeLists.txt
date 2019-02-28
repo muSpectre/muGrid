@@ -53,7 +53,8 @@ foreach(pytest ${PY_TEST_SRCS})
     "${CMAKE_CURRENT_BINARY_DIR}/${pytest_name}"
     COPYONLY)
 endforeach(pytest ${PY_TEST_SRCS})
-muFFT_add_test(mufft_python_binding_test TYPE PYTHON python_binding_tests.py)
+muFFT_add_test(mufft_python_binding_test TYPE
+  PYTHON "${CMAKE_CURRENT_BINARY_DIR}/python_binding_tests.py")
 
 if(${MUSPECTRE_MPI_PARALLEL})
   # add MPI tests

@@ -105,23 +105,23 @@ function(muTools_add_test test_name)
     if(NOT TARGET ${target_test_name})
       add_executable(${target_test_name} ${_mat_args_SOURCES})
       if(_mat_args_TEST_LIST)
-	set(_tmp ${${_mat_args_TEST_LIST}})
-	list(APPEND _tmp ${target_test_name})
-	set(${_mat_args_TEST_LIST} ${_tmp} PARENT_SCOPE)
+    set(_tmp ${${_mat_args_TEST_LIST}})
+    list(APPEND _tmp ${target_test_name})
+    set(${_mat_args_TEST_LIST} ${_tmp} PARENT_SCOPE)
       endif()
-      # muTools_move_to_project(${target_test_name})
+      muTools_move_to_project(${target_test_name})
 
       target_link_libraries(${target_test_name}
-	PRIVATE ${Boost_LIBRARIES} cxxopts ${_mat_args_LINK_LIBRARIES})
-      
+    PRIVATE ${Boost_LIBRARIES} cxxopts ${_mat_args_LINK_LIBRARIES})
+
       if(_mat_HEADER_ONLY)
-	foreach(_target ${_mat_args_LINK_LIBRARIES})
-	  if(TARGET ${_target})
-	    get_target_property(_features ${_target} INTERFACE_COMPILE_FEATURES)
-	    target_compile_features(${target_test_name}
-	      PRIVATE ${_features})
-	  endif()
-	endforeach()
+    foreach(_target ${_mat_args_LINK_LIBRARIES})
+      if(TARGET ${_target})
+        get_target_property(_features ${_target} INTERFACE_COMPILE_FEATURES)
+        target_compile_features(${target_test_name}
+          PRIVATE ${_features})
+      endif()
+    endforeach()
       endif()
     endif()
   endif()
@@ -131,8 +131,8 @@ function(muTools_add_test test_name)
   else()
     set(_exe ${_mat_args_UNPARSED_ARGUMENTS})
   endif()
-  
-  
+
+
   if (${MUSPECTRE_RUNNING_IN_CI})
     if ("${_mat_args_TYPE}" STREQUAL "BOOST")
       list(APPEND _exe "--logger=JUNIT,all,test_results_${test_name}.xml")
@@ -152,5 +152,5 @@ function(muTools_add_test test_name)
   add_test(
     NAME ${test_name}
     COMMAND ${_exe}
-    WORKING_DIRECTORY ${PROJECT_BINARY_DIR})
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 endfunction()

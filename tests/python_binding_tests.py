@@ -40,8 +40,6 @@ import numpy as np
 
 from python_test_imports import µ
 
-from python_fft_tests import FFT_Check
-from python_projection_tests import *
 from python_material_linear_elastic3_test import MaterialLinearElastic3_Check
 from python_material_linear_elastic4_test import MaterialLinearElastic4_Check
 from python_material_linear_elastic_generic1_test import MaterialLinearElasticGeneric1_Check

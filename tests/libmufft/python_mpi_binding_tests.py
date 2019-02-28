@@ -1,20 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
-file   python_test_imports.py
+@file   python_mpi_binding_tests.py
 
-@author Till Junge <till.junge@altermail.ch>
+@author Till Junge <till.junge@epfl.ch>
 
-@date   18 Jan 2018
+@date   28 Feb 2019
 
-@brief  prepares sys.path to load muSpectre
+@brief  Unit tests for python bindings with MPI support
 
-@section LICENSE
-
-Copyright © 2018 Till Junge
+Copyright © 2019 Till Junge
 
 µSpectre is free software; you can redistribute it and/or
-modify it under the terms of the GNU Lesser General Public License as
+modify it under the terms of the GNU General Lesser Public License as
 published by the Free Software Foundation, either version 3, or (at
 your option) any later version.
 
@@ -36,22 +34,12 @@ covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
 
-import sys
-import os
+import unittest
+import numpy as np
 
-project_home = os.path.join(os.getcwd(), '../..')
+from python_test_imports import µ
 
-# Default path of the library
-sys.path.insert(0, os.path.join(project_home,
-                                "language_bindings/python"))
+from python_mpi_projection_tests import *
 
-# Path of the library when compiling with Xcode
-sys.path.insert(0, os.path.join(project_home,
-                                "language_bindings/python/Debug"))
-
-try:
-    import muSpectre as µ
-    import muSpectre
-except ImportError as err:
-    print(err)
-    sys.exit(-1)
+if __name__ == '__main__':
+    unittest.main()

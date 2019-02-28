@@ -8,8 +8,6 @@ file   python_mpi_binding_tests.py
 
 @brief  Unit tests for python bindings with MPI support
 
-@section LICENCE
-
 Copyright © 2018 Till Junge
 
 µSpectre is free software; you can redistribute it and/or
@@ -40,7 +38,6 @@ import numpy as np
 
 from python_test_imports import µ
 
-from python_mpi_projection_tests import *
 from python_mpi_material_linear_elastic4_test import *
 
 if __name__ == '__main__':
