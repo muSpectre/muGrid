@@ -174,7 +174,7 @@ def get_integrator(x, freqs, order=0):
                 denom[tuple([np.s_[:]]*i + [n//2] + [np.s_[:]]*(dim-1-i))] = 1.
         return denom[..., np.newaxis]
     if order == 0:
-        freqs_norm_square = np.einsum("...i, ...i -> ...", freqs, freqs)
+        freqs_norm_square = np.einsum("...i,...i ->...", freqs, freqs)
         freqs_norm_square.reshape(-1)[0] = 1.
         integrator = 1j * freqs/freqs_norm_square[...,np.newaxis]
     # Higher order corrections after:
@@ -224,10 +224,10 @@ def integrate_tensor_2(grad, x, freqs, staggered_grid=False, order=0):
 
     axes = range(dim)
     grad_k = np.fft.fftn(grad, axes=axes)
-    f_k = np.einsum("...j, ...ij -> ...i", integrator, grad_k)
+    f_k = np.einsum("...j,...ij ->...i", integrator, grad_k)
     normalisation = np.prod(grad.shape[:dim])
     grad_k_0 = grad_k[tuple((0 for _ in range(dim)))].real/normalisation
-    homogeneous = np.einsum("ij, ...j -> ...i",
+    homogeneous = np.einsum("ij,...j ->...i",
                             grad_k_0, x)
     if not staggered_grid:
         fluctuation = -np.fft.ifftn(f_k, axes=axes).real
@@ -275,9 +275,9 @@ def integrate_vector(df, x, freqs, staggered_grid=False, order=0):
 
     axes = range(dim)
     df_k = np.fft.fftn(df, axes=axes)
-    f_k = np.einsum("...i, ...i -> ...", df_k, integrator)
+    f_k = np.einsum("...i,...i ->...", df_k, integrator)
     df_k_0 = df_k[tuple((0 for _ in range(dim)))].real
-    homogeneous = np.einsum("i, ...i -> ...", df_k_0, x/np.prod(shape))
+    homogeneous = np.einsum("i,...i ->...", df_k_0, x/np.prod(shape))
 
     if not staggered_grid:
         fluctuation = -np.fft.ifftn(f_k, axes=axes).real
