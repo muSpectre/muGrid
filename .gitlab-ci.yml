@@ -7,7 +7,7 @@
     - echo "grep -c ^processor /proc/cpuinfo"
     - grep -c ^processor /proc/cpuinfo
     - cd build
-    - cmake -DCMAKE_BUILD_TYPE:STRING=Release -DRUNNING_IN_CI=ON .. || true
+    - cmake -DCMAKE_BUILD_TYPE:STRING=Release -DRUNNING_IN_CI=ON ..
     - make
   artifacts:
     paths:

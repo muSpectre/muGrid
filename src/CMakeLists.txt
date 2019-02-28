@@ -85,7 +85,8 @@ list(APPEND muSpectre_SRC ${_headers})
 target_include_directories(muSpectre INTERFACE ${muSpectre_INCLUDES})
 
 target_link_libraries(muSpectre PUBLIC Eigen3::Eigen)
-target_link_libraries(muSpectre PUBLIC ${MUFFT_NAMESPACE}muFFT ${MUGIRD_NAMESPACE}muGrid)
+target_link_libraries(muSpectre PUBLIC
+  ${MUFFT_NAMESPACE}muFFT ${MUGRID_NAMESPACE}muGrid)
 
 set_property(TARGET muSpectre PROPERTY PUBLIC_HEADER ${_headers})
 
@@ -103,23 +104,23 @@ set_property(TARGET muSpectre APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES
 add_library(${MUSPECTRE_NAMESPACE}muSpectre ALIAS muSpectre)
 
 # ------------------------------------------------------------------------------
-if(NOT MUSPECTRE_TARGETS_EXPORT)
-  set(MUSPECTRE_TARGETS_EXPORT muSpectreTargets)
-endif()
+# if(NOT MUSPECTRE_TARGETS_EXPORT)
+#   set(MUSPECTRE_TARGETS_EXPORT muSpectreTargets)
+# endif()
 
-install(TARGETS muSpectre
-  EXPORT ${MUSPECTRE_TARGETS_EXPORT}
-  LIBRARY DESTINATION lib
-  PUBLIC_HEADER DESTINATION include/libmuspectre)
+# install(TARGETS muSpectre
+#   EXPORT ${MUSPECTRE_TARGETS_EXPORT}
+#   LIBRARY DESTINATION lib
+#   PUBLIC_HEADER DESTINATION include/libmuspectre)
 
-if("${MUSPECTRE_TARGETS_EXPORT}" STREQUAL "muSpectreTargets")
-  install(EXPORT ${MUSPECTRE_TARGETS_EXPORT}
-    NAMESPACE "${MUSPECTRE_NAMESPACE}"
-    DESTINATION share/cmake/${PROJECT_NAME}
-    COMPONENT dev)
+# if("${MUSPECTRE_TARGETS_EXPORT}" STREQUAL "muSpectreTargets")
+#   install(EXPORT ${MUSPECTRE_TARGETS_EXPORT}
+#     NAMESPACE "${MUSPECTRE_NAMESPACE}"
+#     DESTINATION share/cmake/${PROJECT_NAME}
+#     COMPONENT dev)
 
-  #Export for build tree
-  export(EXPORT ${MUSPECTRE_TARGETS_EXPORT}
-    NAMESPACE "${MUSPECTRE_NAMESPACE}"
-    FILE "${CMAKE_BINARY_DIR}/${MUSPECTRE_TARGETS_EXPORT}.cmake")
-endif()
+#   #Export for build tree
+#   export(EXPORT ${MUSPECTRE_TARGETS_EXPORT}
+#     NAMESPACE "${MUSPECTRE_NAMESPACE}"
+#     FILE "${CMAKE_BINARY_DIR}/${MUSPECTRE_TARGETS_EXPORT}.cmake")
+# endif()
