@@ -33,10 +33,11 @@
  */
 
 #include "solver/solver_cg.hh"
-#include "common/communicator.hh"
+#include <libmufft/communicator.hh>
 
 #include <iomanip>
 #include <sstream>
+#include <iostream>
 
 namespace muSpectre {
 
@@ -49,7 +50,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   auto SolverCG::solve(const ConstVector_ref rhs) -> Vector_map {
     this->x_k.setZero();
-    const Communicator & comm = this->cell.get_communicator();
+    const auto & comm = this->cell.get_communicator();
 
     // Following implementation of algorithm 5.2 in Nocedal's
     // Numerical Optimization (p. 112)
@@ -62,7 +63,7 @@ namespace muSpectre {
 
     Real rdr = comm.sum(this->r_k.dot(this->r_k));
     Real rhs_norm2 = comm.sum(rhs.squaredNorm());
-    Real tol2 = ipow(this->tol, 2) * rhs_norm2;
+    Real tol2 = muGrid::ipow(this->tol, 2) * rhs_norm2;
 
     size_t count_width{};  // for output formatting in verbose case
     if (this->verbose) {

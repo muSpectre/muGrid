@@ -35,9 +35,9 @@
 #ifndef TESTS_MPI_CONTEXT_HH_
 #define TESTS_MPI_CONTEXT_HH_
 
-#include "common/communicator.hh"
+#include <libmufft/communicator.hh>
 
-namespace muSpectre {
+namespace muFFT {
 
   /*!
    * MPI context singleton. Initialize MPI once when needed.
@@ -66,6 +66,6 @@ namespace muSpectre {
     void operator=(MPIContext const &) = delete;
   };
 
-}  // namespace muSpectre
+}  // namespace muFFT
 
 #endif  // TESTS_MPI_CONTEXT_HH_

@@ -37,8 +37,8 @@
 #define SRC_MATERIALS_MATERIAL_LINEAR_ELASTIC3_HH_
 
 #include "materials/material_linear_elastic1.hh"
-#include "common/field.hh"
-#include "common/tensor_algebra.hh"
+
+#include <libmugrid/field.hh>
 
 #include <Eigen/Dense>
 
@@ -58,11 +58,13 @@ namespace muSpectre {
 
     //! expected map type for strain fields
     using StrainMap_t =
-        MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM, true>;
+        muGrid::MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM, true>;
     //! expected map type for stress fields
-    using StressMap_t = MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
+    using StressMap_t =
+        muGrid::MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
     //! expected map type for tangent stiffness fields
-    using TangentMap_t = T4MatrixFieldMap<GFieldCollection_t, Real, DimM>;
+    using TangentMap_t =
+        muGrid::T4MatrixFieldMap<GFieldCollection_t, Real, DimM>;
 
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
@@ -70,9 +72,10 @@ namespace muSpectre {
     constexpr static auto stress_measure{StressMeasure::PK2};
 
     //! local field_collections used for internals
-    using LFieldColl_t = LocalFieldCollection<DimS>;
+    using LFieldColl_t = muGrid::LocalFieldCollection<DimS>;
     //! local stiffness tensor type
-    using LStiffnessMap_t = T4MatrixFieldMap<LFieldColl_t, Real, DimM, true>;
+    using LStiffnessMap_t =
+        muGrid::T4MatrixFieldMap<LFieldColl_t, Real, DimM, true>;
     //! elasticity without internal variables
     using InternalVariables = std::tuple<LStiffnessMap_t>;
   };
@@ -166,8 +169,8 @@ namespace muSpectre {
 
    protected:
     //! storage for stiffness tensor
-    using Field_t =
-        TensorField<LocalFieldCollection<DimS>, Real, fourthOrder, DimM>;
+    using Field_t = muGrid::TensorField<muGrid::LocalFieldCollection<DimS>,
+                                        Real, fourthOrder, DimM>;
     Field_t & C_field;  //!< field of stiffness tensors
     //! tuple for iterable eigen_field
     InternalVariables internal_variables;

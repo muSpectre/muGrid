@@ -46,7 +46,7 @@ namespace muSpectre {
   struct MatFixture {
     using Mat_t = MaterialLinearElasticGeneric1<Dim, Dim>;
     using T2_t = Eigen::Matrix<Real, Dim, Dim>;
-    using T4_t = T4Mat<Real, Dim>;
+    using T4_t = muGrid::T4Mat<Real, Dim>;
     using V_t = Eigen::Matrix<Real, vsize(Dim), vsize(Dim)>;
     constexpr static Real lambda{2}, mu{1.5};
     constexpr static Real get_lambda() { return lambda; }

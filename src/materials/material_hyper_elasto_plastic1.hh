@@ -39,8 +39,9 @@
 
 #include "materials/material_muSpectre_base.hh"
 #include "materials/materials_toolbox.hh"
-#include "common/eigen_tools.hh"
-#include "common/statefield.hh"
+
+#include <libmugrid/eigen_tools.hh>
+#include <libmugrid/statefield.hh>
 
 #include <algorithm>
 
@@ -60,11 +61,13 @@ namespace muSpectre {
 
     //! expected map type for strain fields
     using StrainMap_t =
-        MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM, true>;
+        muGrid::MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM, true>;
     //! expected map type for stress fields
-    using StressMap_t = MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
+    using StressMap_t =
+        muGrid::MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
     //! expected map type for tangent stiffness fields
-    using TangentMap_t = T4MatrixFieldMap<GFieldCollection_t, Real, DimM>;
+    using TangentMap_t =
+        muGrid::T4MatrixFieldMap<GFieldCollection_t, Real, DimM>;
 
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::Gradient};
@@ -72,16 +75,17 @@ namespace muSpectre {
     constexpr static auto stress_measure{StressMeasure::Kirchhoff};
 
     //! local field collection used for internals
-    using LFieldColl_t = LocalFieldCollection<DimS>;
+    using LFieldColl_t = muGrid::LocalFieldCollection<DimS>;
 
     //! storage type for plastic flow measure (εₚ in the papers)
-    using LScalarMap_t = StateFieldMap<ScalarFieldMap<LFieldColl_t, Real>>;
+    using LScalarMap_t =
+        muGrid::StateFieldMap<muGrid::ScalarFieldMap<LFieldColl_t, Real>>;
     /**
      * storage type for for previous gradient Fᵗ and elastic left
      * Cauchy-Green deformation tensor bₑᵗ
      */
-    using LStrainMap_t =
-        StateFieldMap<MatrixFieldMap<LFieldColl_t, Real, DimM, DimM, false>>;
+    using LStrainMap_t = muGrid::StateFieldMap<
+        muGrid::MatrixFieldMap<LFieldColl_t, Real, DimM, DimM, false>>;
     /**
      * format in which to receive internals (previous gradient Fᵗ,
      * previous elastic lef Cauchy-Green deformation tensor bₑᵗ, and
@@ -105,7 +109,7 @@ namespace muSpectre {
     using Parent =
         MaterialMuSpectre<MaterialHyperElastoPlastic1<DimS, DimM>, DimS, DimM>;
     using T2_t = Eigen::Matrix<Real, DimM, DimM>;
-    using T4_t = T4Mat<Real, DimM>;
+    using T4_t = muGrid::T4Mat<Real, DimM>;
 
     /**
      * type used to determine whether the
@@ -128,7 +132,7 @@ namespace muSpectre {
     using FlowStRef_t = typename traits::LScalarMap_t::reference;
 
     //! Local FieldCollection type for field storage
-    using LColl_t = LocalFieldCollection<DimS>;
+    using LColl_t = muGrid::LocalFieldCollection<DimS>;
 
     //! Default constructor
     MaterialHyperElastoPlastic1() = delete;
@@ -189,18 +193,19 @@ namespace muSpectre {
     }
 
     //! getter for internal variable field εₚ
-    StateField<ScalarField<LColl_t, Real>> & get_plast_flow_field() {
+    muGrid::StateField<muGrid::ScalarField<LColl_t, Real>> &
+    get_plast_flow_field() {
       return this->plast_flow_field;
     }
 
     //! getter for previous gradient field Fᵗ
-    StateField<TensorField<LColl_t, Real, secondOrder, DimM>> &
+    muGrid::StateField<muGrid::TensorField<LColl_t, Real, secondOrder, DimM>> &
     get_F_prev_field() {
       return this->F_prev_field;
     }
 
     //! getterfor elastic left Cauchy-Green deformation tensor bₑᵗ
-    StateField<TensorField<LColl_t, Real, secondOrder, DimM>> &
+    muGrid::StateField<muGrid::TensorField<LColl_t, Real, secondOrder, DimM>> &
     get_be_prev_field() {
       return this->be_prev_field;
     }
@@ -215,28 +220,31 @@ namespace muSpectre {
     /**
      * worker function computing stresses and internal variables
      */
-    using Worker_t = std::tuple<T2_t, Real, Real, T2_t, bool, Decomp_t<DimM>>;
+    using Worker_t =
+        std::tuple<T2_t, Real, Real, T2_t, bool, muGrid::Decomp_t<DimM>>;
     Worker_t stress_n_internals_worker(const T2_t & F, StrainStRef_t & F_prev,
                                        StrainStRef_t & be_prev,
                                        FlowStRef_t & plast_flow);
     //! storage for cumulated plastic flow εₚ
-    StateField<ScalarField<LColl_t, Real>> & plast_flow_field;
+    muGrid::StateField<muGrid::ScalarField<LColl_t, Real>> & plast_flow_field;
 
     //! storage for previous gradient Fᵗ
-    StateField<TensorField<LColl_t, Real, secondOrder, DimM>> & F_prev_field;
+    muGrid::StateField<muGrid::TensorField<LColl_t, Real, secondOrder, DimM>> &
+        F_prev_field;
 
     //! storage for elastic left Cauchy-Green deformation tensor bₑᵗ
-    StateField<TensorField<LColl_t, Real, secondOrder, DimM>> & be_prev_field;
+    muGrid::StateField<muGrid::TensorField<LColl_t, Real, secondOrder, DimM>> &
+        be_prev_field;
 
     // material properties
-    const Real young;           //!< Young's modulus
-    const Real poisson;         //!< Poisson's ratio
-    const Real lambda;          //!< first Lamé constant
-    const Real mu;              //!< second Lamé constant (shear modulus)
-    const Real K;               //!< Bulk modulus
-    const Real tau_y0;          //!< initial yield stress
-    const Real H;               //!< hardening modulus
-    const T4Mat<Real, DimM> C;  //!< stiffness tensor
+    const Real young;    //!< Young's modulus
+    const Real poisson;  //!< Poisson's ratio
+    const Real lambda;   //!< first Lamé constant
+    const Real mu;       //!< second Lamé constant (shear modulus)
+    const Real K;        //!< Bulk modulus
+    const Real tau_y0;   //!< initial yield stress
+    const Real H;        //!< hardening modulus
+    const muGrid::T4Mat<Real, DimM> C;  //!< stiffness tensor
 
     //! Field maps and state field maps over internal fields
     typename traits::InternalVariables internal_variables;

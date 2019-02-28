@@ -28,8 +28,9 @@
 #ifndef SRC_MATERIALS_STRESS_TRANSFORMATIONS_DEFAULT_CASE_HH_
 #define SRC_MATERIALS_STRESS_TRANSFORMATIONS_DEFAULT_CASE_HH_
 
-#include "common/common.hh"
-#include "common/T4_map_proxy.hh"
+#include "common/muSpectre_common.hh"
+
+#include <libmugrid/T4_map_proxy.hh>
 
 namespace muSpectre {
 
@@ -38,7 +39,7 @@ namespace muSpectre {
     namespace internal {
 
       /** Structure for functions returning PK1 stress from other stress
-        *measures
+       *measures
        **/
       template <Dim_t Dim, StressMeasure StressM, StrainMeasure StrainM>
       struct PK1_stress {

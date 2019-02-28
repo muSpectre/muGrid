@@ -34,12 +34,13 @@
 
 #include "solver/deprecated_solvers.hh"
 #include "solver/deprecated_solver_cg.hh"
-#include "common/iterators.hh"
+#include <libmugrid/iterators.hh>
 
 #include <Eigen/IterativeLinearSolvers>
 
 #include <iomanip>
 #include <cmath>
+#include <iostream>
 
 namespace muSpectre {
 
@@ -50,19 +51,19 @@ namespace muSpectre {
                      DeprecatedSolverBase<DimS, DimM> & solver, Real newton_tol,
                      Real equil_tol, Dim_t verbose) {
     using Field_t = typename MaterialBase<DimS, DimM>::StrainField_t;
-    const Communicator & comm = cell.get_communicator();
-    auto solver_fields{std::make_unique<GlobalFieldCollection<DimS>>()};
+    const auto & comm = cell.get_communicator();
+    auto solver_fields{std::make_unique<muGrid::GlobalFieldCollection<DimS>>()};
     solver_fields->initialise(cell.get_subdomain_resolutions(),
                               cell.get_subdomain_locations());
 
     // Corresponds to symbol δF or δε
-    auto & incrF{make_field<Field_t>("δF", *solver_fields)};
+    auto & incrF{muGrid::make_field<Field_t>("δF", *solver_fields)};
 
     // Corresponds to symbol ΔF or Δε
-    auto & DeltaF{make_field<Field_t>("ΔF", *solver_fields)};
+    auto & DeltaF{muGrid::make_field<Field_t>("ΔF", *solver_fields)};
 
     // field to store the rhs for cg calculations
-    auto & rhs{make_field<Field_t>("rhs", *solver_fields)};
+    auto & rhs{muGrid::make_field<Field_t>("rhs", *solver_fields)};
 
     solver.initialise();
 
@@ -232,16 +233,16 @@ namespace muSpectre {
                        DeprecatedSolverBase<DimS, DimM> & solver,
                        Real newton_tol, Real equil_tol, Dim_t verbose) {
     using Field_t = typename MaterialBase<DimS, DimM>::StrainField_t;
-    const Communicator & comm = cell.get_communicator();
-    auto solver_fields{std::make_unique<GlobalFieldCollection<DimS>>()};
+    const auto & comm = cell.get_communicator();
+    auto solver_fields{std::make_unique<muGrid::GlobalFieldCollection<DimS>>()};
     solver_fields->initialise(cell.get_subdomain_resolutions(),
                               cell.get_subdomain_locations());
 
     // Corresponds to symbol δF or δε
-    auto & incrF{make_field<Field_t>("δF", *solver_fields)};
+    auto & incrF{muGrid::make_field<Field_t>("δF", *solver_fields)};
 
     // field to store the rhs for cg calculations
-    auto & rhs{make_field<Field_t>("rhs", *solver_fields)};
+    auto & rhs{muGrid::make_field<Field_t>("rhs", *solver_fields)};
 
     solver.initialise();
 

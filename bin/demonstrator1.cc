@@ -37,8 +37,8 @@
 #include <chrono>
 #include "external/cxxopts.hpp"
 
-#include "common/common.hh"
-#include "common/ccoord_operations.hh"
+#include "common/muSpectre_common.hh"
+#include <libmugrid/ccoord_operations.hh>
 #include "cell/cell_factory.hh"
 #include "materials/material_linear_elastic1.hh"
 #include "solver/deprecated_solvers.hh"
@@ -77,6 +77,8 @@ opt_ptr parse_args(int argc, char ** argv) {
   return options;
 }
 
+using namespace muFFT;
+using namespace muGrid;
 using namespace muSpectre;
 
 int main(int argc, char * argv[]) {

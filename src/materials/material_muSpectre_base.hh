@@ -40,13 +40,13 @@
 #ifndef SRC_MATERIALS_MATERIAL_MUSPECTRE_BASE_HH_
 #define SRC_MATERIALS_MATERIAL_MUSPECTRE_BASE_HH_
 
-#include "common/common.hh"
+#include "common/muSpectre_common.hh"
 #include "materials/material_base.hh"
 #include "materials/materials_toolbox.hh"
 #include "materials/material_evaluator.hh"
-#include "common/field_collection.hh"
-#include "common/field.hh"
-#include "common//utilities.hh"
+
+#include <libmugrid/field_collection.hh>
+#include <libmugrid/field.hh>
 
 #include <tuple>
 #include <type_traits>
@@ -473,7 +473,7 @@ namespace muSpectre {
             return this_mat.evaluate_stress(std::move(strain), internals...);
           },
           internal_variables);
-      auto & P = get<0>(Stresses);
+      auto & P = std::get<0>(Stresses);
       P = MatTB::PK1_stress<traits::stress_measure, traits::strain_measure>(
           F, stress);
     };

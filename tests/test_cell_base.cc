@@ -36,14 +36,16 @@
 #include <Eigen/Dense>
 
 #include "tests.hh"
-#include "common/common.hh"
-#include "common/iterators.hh"
-#include "common/field_map.hh"
-#include "tests/test_goodies.hh"
-#include "cell/cell_factory.hh"
-#include "materials/material_linear_elastic1.hh"
+#include "libmugrid/test_goodies.hh"
+
+#include <libmugrid/iterators.hh>
+#include <libmugrid/field_map.hh>
+#include <cell/cell_factory.hh>
+#include <materials/material_linear_elastic1.hh>
 
 namespace muSpectre {
+  using muGrid::make_field;
+  using muGrid::TypedField;
 
   BOOST_AUTO_TEST_SUITE(cell_base);
   template <Dim_t DimS>
@@ -92,7 +94,8 @@ namespace muSpectre {
     Ccoord_t<dim> resolutions{3, 3};
     Rcoord_t<dim> lengths{2.3, 2.7};
     Formulation form{Formulation::finite_strain};
-    auto fft_ptr{std::make_unique<FFTWEngine<dim>>(resolutions, dim * dim)};
+    auto fft_ptr{
+        std::make_unique<muFFT::FFTWEngine<dim>>(resolutions, dim * dim)};
     auto proj_ptr{std::make_unique<ProjectionFiniteStrainFast<dim, dim>>(
         std::move(fft_ptr), lengths)};
     CellBase<dim, dim> sys{std::move(proj_ptr)};
@@ -152,8 +155,8 @@ namespace muSpectre {
     auto stress{std::get<0>(res_tup).get_map()};
     auto tangent{std::get<1>(res_tup).get_map()};
 
-    auto tup =
-        testGoodies::objective_hooke_explicit(lambda, mu, Matrices::I2<dim>());
+    auto tup = muGrid::testGoodies::objective_hooke_explicit(
+        lambda, mu, Matrices::I2<dim>());
     auto P_ref = std::get<0>(tup);
     for (auto mat : stress) {
       Real norm = (mat - P_ref).norm();

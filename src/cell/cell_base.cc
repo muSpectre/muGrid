@@ -33,9 +33,9 @@
  */
 
 #include "cell/cell_base.hh"
-#include "common/ccoord_operations.hh"
-#include "common/iterators.hh"
-#include "common/tensor_algebra.hh"
+
+#include <libmugrid/ccoord_operations.hh>
+#include <libmugrid/iterators.hh>
 
 #include <sstream>
 #include <algorithm>
@@ -53,8 +53,9 @@ namespace muSpectre {
         pixels(subdomain_resolutions, subdomain_locations),
         domain_lengths{projection_->get_domain_lengths()},
         fields{std::make_unique<FieldCollection_t>()},
-        F{make_field<StrainField_t>("Gradient", *this->fields)},
-        P{make_field<StressField_t>("Piola-Kirchhoff-1", *this->fields)},
+        F{muGrid::make_field<StrainField_t>("Gradient", *this->fields)},
+        P{muGrid::make_field<StressField_t>("Piola-Kirchhoff-1",
+                                            *this->fields)},
         projection{std::move(projection_)} {
     // resize all global fields (strain, stress, etc)
     this->fields->initialise(this->subdomain_resolutions,
@@ -149,7 +150,7 @@ namespace muSpectre {
       Eigen::Ref<const Vector_t> delF) -> Vector_ref {
     // the following const_cast should be safe, as long as the
     // constructed delF_field is const itself
-    const TypedField<FieldCollection_t, Real> delF_field(
+    const muGrid::TypedField<FieldCollection_t, Real> delF_field(
         "Proxied raw memory for strain increment", *this->fields,
         Eigen::Map<Vector_t>(const_cast<Real *>(delF.data()), delF.size()),
         this->F.get_nb_components());
@@ -162,7 +163,8 @@ namespace muSpectre {
 
     if (delF.size() != this->get_nb_dof()) {
       std::stringstream err{};
-      err << "input should be of size ndof = ¶(" << this->subdomain_resolutions
+      err << "input should be of size ndof = ¶(";
+      muGrid::operator<<(err, this->subdomain_resolutions)
           << ") × " << DimS << "² = " << this->get_nb_dof() << " but I got "
           << delF.size();
       throw std::runtime_error(err.str());
@@ -173,7 +175,7 @@ namespace muSpectre {
 
     auto Kmap{this->K.value().get().get_map()};
     auto delPmap{delP.get_map()};
-    MatrixFieldMap<FieldCollection_t, Real, DimM, DimM, true> delFmap(
+    muGrid::MatrixFieldMap<FieldCollection_t, Real, DimM, DimM, true> delFmap(
         delF_field);
 
     for (auto && tup : akantu::zip(Kmap, delFmap, delPmap)) {
@@ -196,6 +198,7 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   auto CellBase<DimS, DimM>::evaluate_projection(Eigen::Ref<const Vector_t> P)
       -> Vector_ref {
+    using muGrid::operator<<;
     if (P.size() != this->get_nb_dof()) {
       std::stringstream err{};
       err << "input should be of size ndof = ¶(" << this->subdomain_resolutions
@@ -214,9 +217,9 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   void CellBase<DimS, DimM>::apply_projection(Eigen::Ref<Vector_t> vec) {
-    TypedField<FieldCollection_t, Real> field("Proxy for projection",
-                                              *this->fields, vec,
-                                              this->F.get_nb_components());
+    muGrid::TypedField<FieldCollection_t, Real> field(
+        "Proxy for projection", *this->fields, vec,
+        this->F.get_nb_components());
     this->projection->apply_projection(field);
   }
 
@@ -269,7 +272,8 @@ namespace muSpectre {
     }
     if (delF.size() != this->get_nb_dof()) {
       std::stringstream err{};
-      err << "input should be of size ndof = ¶(" << this->subdomain_resolutions
+      err << "input should be of size ndof = ¶(";
+      muGrid::operator<<(err, this->subdomain_resolutions)
           << ") × " << DimS << "² = " << this->get_nb_dof() << " but I got "
           << delF.size();
       throw std::runtime_error(err.str());
@@ -335,8 +339,8 @@ namespace muSpectre {
   CellBase<DimS, DimM>::get_tangent(bool create) {
     if (!this->K) {
       if (create) {
-        this->K =
-            make_field<TangentField_t>("Tangent Stiffness", *this->fields);
+        this->K = muGrid::make_field<TangentField_t>("Tangent Stiffness",
+                                                     *this->fields);
       } else {
         throw std::runtime_error("K does not exist");
       }
@@ -349,7 +353,7 @@ namespace muSpectre {
   typename CellBase<DimS, DimM>::StrainField_t &
   CellBase<DimS, DimM>::get_managed_T2_field(std::string unique_name) {
     if (!this->fields->check_field_exists(unique_name)) {
-      return make_field<StressField_t>(unique_name, *this->fields);
+      return muGrid::make_field<StressField_t>(unique_name, *this->fields);
     } else {
       return static_cast<StressField_t &>(this->fields->at(unique_name));
     }
@@ -361,8 +365,8 @@ namespace muSpectre {
                                                     size_t nb_components)
       -> Field_t<Real> & {
     if (!this->fields->check_field_exists(unique_name)) {
-      return make_field<Field_t<Real>>(unique_name, *this->fields,
-                                       nb_components);
+      return muGrid::make_field<Field_t<Real>>(unique_name, *this->fields,
+                                               nb_components);
     } else {
       auto & ret_ref{Field_t<Real>::check_ref(this->fields->at(unique_name))};
       if (ret_ref.get_nb_components() != nb_components) {
@@ -394,11 +398,11 @@ namespace muSpectre {
         return coll.check_field_exists(unique_name);
       }
     }};
-    auto get = [&unique_name, &nb_steps_ago ](
-        auto & coll) -> const typename LField_t::Base & {
+    auto get = [&unique_name, &
+                nb_steps_ago ](auto & coll) -> const typename LField_t::Base & {
       if (IsStateField) {
         using Coll_t = typename Material_t::MFieldCollection_t;
-        using TypedStateField_t = TypedStateField<Coll_t, T>;
+        using TypedStateField_t = muGrid::TypedStateField<Coll_t, T>;
         auto & statefield{coll.get_statefield(unique_name)};
         auto & typed_statefield{TypedStateField_t::check_ref(statefield)};
         const typename LField_t::Base & f1{
@@ -523,7 +527,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void CellBase<DimS, DimM>::initialise(FFT_PlanFlags flags) {
+  void CellBase<DimS, DimM>::initialise(muFFT::FFT_PlanFlags flags) {
     // check that all pixels have been assigned exactly one material
     this->check_material_coverage();
     for (auto && mat : this->materials) {
@@ -563,17 +567,18 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   void CellBase<DimS, DimM>::check_material_coverage() {
-    auto nb_pixels = CcoordOps::get_size(this->subdomain_resolutions);
+    auto nb_pixels = muGrid::CcoordOps::get_size(this->subdomain_resolutions);
     std::vector<MaterialBase<DimS, DimM> *> assignments(nb_pixels, nullptr);
     for (auto & mat : this->materials) {
       for (auto & pixel : *mat) {
-        auto index = CcoordOps::get_index(this->subdomain_resolutions,
-                                          this->subdomain_locations, pixel);
+        auto index = muGrid::CcoordOps::get_index(
+            this->subdomain_resolutions, this->subdomain_locations, pixel);
         auto & assignment{assignments.at(index)};
         if (assignment != nullptr) {
           std::stringstream err{};
-          err << "Pixel " << pixel << "is already assigned to material '"
-              << assignment->get_name()
+          err << "Pixel ";
+          muGrid::operator<<(err, pixel)
+              << "is already assigned to material '" << assignment->get_name()
               << "' and cannot be reassigned to material '" << mat->get_name();
           throw std::runtime_error(err.str());
         } else {
@@ -586,7 +591,7 @@ namespace muSpectre {
     std::vector<Ccoord> unassigned_pixels;
     for (size_t i = 0; i < assignments.size(); ++i) {
       if (assignments[i] == nullptr) {
-        unassigned_pixels.push_back(CcoordOps::get_ccoord(
+        unassigned_pixels.push_back(muGrid::CcoordOps::get_ccoord(
             this->subdomain_resolutions, this->subdomain_locations, i));
       }
     }
@@ -595,7 +600,7 @@ namespace muSpectre {
       std::stringstream err{};
       err << "The following pixels have were not assigned a material: ";
       for (auto & pixel : unassigned_pixels) {
-        err << pixel << ", ";
+        muGrid::operator<<(err, pixel) << ", ";
       }
       err << "and that cannot be handled";
       throw std::runtime_error(err.str());

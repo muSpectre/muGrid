@@ -35,10 +35,11 @@
 #ifndef SRC_MATERIALS_MATERIALS_TOOLBOX_HH_
 #define SRC_MATERIALS_MATERIALS_TOOLBOX_HH_
 
-#include "common/common.hh"
-#include "common/tensor_algebra.hh"
-#include "common/eigen_tools.hh"
-#include "common/T4_map_proxy.hh"
+#include "common/muSpectre_common.hh"
+
+#include <libmugrid/eigen_tools.hh>
+#include <libmugrid/T4_map_proxy.hh>
+#include <libmugrid/tensor_algebra.hh>
 
 #include <Eigen/Dense>
 #include <unsupported/Eigen/MatrixFunctions>
@@ -187,8 +188,9 @@ namespace muSpectre {
         //! returns the converted strain
         template <class Strain_t>
         inline static decltype(auto) compute(Strain_t && F) {
-          constexpr Dim_t dim{EigenCheck::tensor_dim<Strain_t>::value};
-          return (.5 * logm(Eigen::Matrix<Real, dim, dim>{F.transpose() * F}))
+          constexpr Dim_t dim{muGrid::EigenCheck::tensor_dim<Strain_t>::value};
+          return (.5 * muGrid::logm(
+                           Eigen::Matrix<Real, dim, dim>{F.transpose() * F}))
               .eval();
         }
       };
@@ -337,8 +339,7 @@ namespace muSpectre {
        * Specialisation K(λ, µ)
        */
       template <>
-      struct Converter<ElasticModulus::Bulk,
-                       ElasticModulus::lambda,
+      struct Converter<ElasticModulus::Bulk, ElasticModulus::lambda,
                        ElasticModulus::Shear> {
         //! wrapped function (raison d'être)
         inline constexpr static Real compute(const Real & lambda,
@@ -429,8 +430,8 @@ namespace muSpectre {
        * @param lambda: Lamé's first constant
        * @param mu: Lamé's second constant (i.e., shear modulus)
        */
-      inline static T4Mat<Real, Dim> compute_C_T4(const Real & lambda,
-                                                  const Real & mu) {
+      inline static muGrid::T4Mat<Real, Dim> compute_C_T4(const Real & lambda,
+                                                          const Real & mu) {
         return lambda * Matrices::Itrac<Dim>() +
                2 * mu * Matrices::Isymm<Dim>();
       }
@@ -469,7 +470,7 @@ namespace muSpectre {
        */
       template <Dim_t Dim, FiniteDiff FinDif>
       struct NumericalTangentHelper {
-        using T4_t = T4Mat<Real, Dim>;
+        using T4_t = muGrid::T4Mat<Real, Dim>;
         using T2_t = Eigen::Matrix<Real, Dim, Dim>;
         using T2_vec = Eigen::Map<Eigen::Matrix<Real, Dim * Dim, 1>>;
 
@@ -524,7 +525,7 @@ namespace muSpectre {
        */
       template <Dim_t Dim>
       struct NumericalTangentHelper<Dim, FiniteDiff::centred> {
-        using T4_t = T4Mat<Real, Dim>;
+        using T4_t = muGrid::T4Mat<Real, Dim>;
         using T2_t = Eigen::Matrix<Real, Dim, Dim>;
         using T2_vec = Eigen::Map<Eigen::Matrix<Real, Dim * Dim, 1>>;
 
@@ -561,7 +562,7 @@ namespace muSpectre {
      */
     template <Dim_t Dim, FiniteDiff FinDif = FiniteDiff::centred, class FunType,
               class Derived>
-    inline T4Mat<Real, Dim> compute_numerical_tangent(
+    inline muGrid::T4Mat<Real, Dim> compute_numerical_tangent(
         FunType && fun, const Eigen::MatrixBase<Derived> & strain, Real delta) {
       static_assert(Derived::RowsAtCompileTime == Dim,
                     "can't handle dynamic matrix");

@@ -32,22 +32,23 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include "fft/fftw_engine.hh"
+#include "bind_py_declarations.hh"
+
+#include <libmufft/fftw_engine.hh>
 #ifdef WITH_FFTWMPI
-#include "fft/fftwmpi_engine.hh"
+#include <libmufft/fftwmpi_engine.hh>
 #endif
 #ifdef WITH_PFFT
-#include "fft/pfft_engine.hh"
+#include <libmufft/pfft_engine.hh>
 #endif
-#include "bind_py_declarations.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/eigen.h>
 
-using muSpectre::Ccoord_t;
-using muSpectre::Complex;
-using muSpectre::Dim_t;
+using muGrid::Ccoord_t;
+using muGrid::Complex;
+using muGrid::Dim_t;
 using pybind11::literals::operator""_a;
 namespace py = pybind11;
 
@@ -59,7 +60,7 @@ void add_engine_helper(py::module & mod, std::string name) {
 #ifdef WITH_MPI
       .def(py::init([](Ccoord res, Dim_t nb_components, size_t comm) {
              return new Engine(res, nb_components,
-                               std::move(Communicator(MPI_Comm(comm))));
+                               std::move(muFFT::Communicator(MPI_Comm(comm))));
            }),
            "resolutions"_a, "nb_components"_a,
            "communicator"_a = size_t(MPI_COMM_SELF))
@@ -73,7 +74,7 @@ void add_engine_helper(py::module & mod, std::string name) {
              Coll_t coll{};
              coll.initialise(eng.get_subdomain_resolutions(),
                              eng.get_subdomain_locations());
-             Field_t & temp{muSpectre::make_field<Field_t>(
+             Field_t & temp{muGrid::make_field<Field_t>(
                  "temp_field", coll, eng.get_nb_components())};
              temp.eigen() = v;
              return ArrayXXc{eng.fft(temp).eigen()};
@@ -86,7 +87,7 @@ void add_engine_helper(py::module & mod, std::string name) {
              Coll_t coll{};
              coll.initialise(eng.get_subdomain_resolutions(),
                              eng.get_subdomain_locations());
-             Field_t & temp{muSpectre::make_field<Field_t>(
+             Field_t & temp{muGrid::make_field<Field_t>(
                  "temp_field", coll, eng.get_nb_components())};
              eng.get_work_space().eigen() = v;
              eng.ifft(temp);
@@ -94,7 +95,7 @@ void add_engine_helper(py::module & mod, std::string name) {
            },
            "array"_a)
       .def("initialise", &Engine::initialise,
-           "flags"_a = muSpectre::FFT_PlanFlags::estimate)
+           "flags"_a = muFFT::FFT_PlanFlags::estimate)
       .def("normalisation", &Engine::normalisation)
       .def("get_subdomain_resolutions", &Engine::get_subdomain_resolutions)
       .def("get_subdomain_locations", &Engine::get_subdomain_locations)
@@ -106,17 +107,21 @@ void add_engine_helper(py::module & mod, std::string name) {
 void add_fft_engines(py::module & mod) {
   auto fft{mod.def_submodule("fft")};
   fft.doc() = "bindings for µSpectre's fft engines";
-  add_engine_helper<muSpectre::FFTWEngine<muSpectre::twoD>, muSpectre::twoD>(
-      fft, "FFTW_2d");
-  add_engine_helper<muSpectre::FFTWEngine<muSpectre::threeD>,
-                    muSpectre::threeD>(fft, "FFTW_3d");
+  add_engine_helper<muFFT::FFTWEngine<muGrid::twoD>, muGrid::twoD>(fft,
+                                                                   "FFTW_2d");
+  add_engine_helper<muFFT::FFTWEngine<muGrid::threeD>, muGrid::threeD>(
+      fft, "FFTW_3d");
 #ifdef WITH_FFTWMPI
-  add_engine_helper<FFTWMPIEngine<twoD>, twoD>(fft, "FFTWMPI_2d");
-  add_engine_helper<FFTWMPIEngine<threeD>, threeD>(fft, "FFTWMPI_3d");
+  add_engine_helper<muFFT::FFTWMPIEngine<muGrid::twoD>, muGrid::twoD>(
+      fft, "FFTWMPI_2d");
+  add_engine_helper<muFFT::FFTWMPIEngine<muGrid::threeD>, muGrid::threeD>(
+      fft, "FFTWMPI_3d");
 #endif
 #ifdef WITH_PFFT
-  add_engine_helper<PFFTEngine<twoD>, twoD>(fft, "PFFT_2d");
-  add_engine_helper<PFFTEngine<threeD>, threeD>(fft, "PFFT_3d");
+  add_engine_helper<muFFT::PFFTEngine<muGrid::twoD>, muGrid::twoD>(fft,
+                                                                   "PFFT_2d");
+  add_engine_helper<muFFT::PFFTEngine<muGrid::threeD>, muGrid::threeD>(
+      fft, "PFFT_3d");
 #endif
   add_projections(fft);
 }

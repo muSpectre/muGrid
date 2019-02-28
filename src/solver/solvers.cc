@@ -33,11 +33,13 @@
  */
 
 #include "solver/solvers.hh"
-#include "common/iterators.hh"
+
+#include <libmugrid/iterators.hh>
 
 #include <Eigen/Dense>
 
 #include <iomanip>
+#include <iostream>
 
 namespace muSpectre {
 
@@ -49,7 +51,7 @@ namespace muSpectre {
                                         const LoadSteps_t & load_steps,
                                         SolverBase & solver, Real newton_tol,
                                         Real equil_tol, Dim_t verbose) {
-    const Communicator & comm = cell.get_communicator();
+    const auto & comm = cell.get_communicator();
 
     using Vector_t = Eigen::Matrix<Real, Eigen::Dynamic, 1>;
     using Matrix_t = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
@@ -151,7 +153,7 @@ namespace muSpectre {
         std::cout << "at Load step " << std::setw(count_width)
                   << strain_step + 1 << std::endl;
       }
-      using StrainMap_t = RawFieldMap<Eigen::Map<Eigen::MatrixXd>>;
+      using StrainMap_t = muGrid::RawFieldMap<Eigen::Map<Eigen::MatrixXd>>;
       for (auto && strain : StrainMap_t(F, shape[0], shape[1])) {
         strain += macro_strain - previous_macro_strain;
       }
@@ -257,7 +259,7 @@ namespace muSpectre {
                                       const LoadSteps_t & load_steps,
                                       SolverBase & solver, Real newton_tol,
                                       Real equil_tol, Dim_t verbose) {
-    const Communicator & comm = cell.get_communicator();
+    const auto & comm = cell.get_communicator();
 
     using Vector_t = Eigen::Matrix<Real, Eigen::Dynamic, 1>;
     using Matrix_t = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
@@ -361,7 +363,7 @@ namespace muSpectre {
     for (const auto & tup : akantu::enumerate(load_steps)) {
       const auto & strain_step{std::get<0>(tup)};
       const auto & macro_strain{std::get<1>(tup)};
-      using StrainMap_t = RawFieldMap<Eigen::Map<Eigen::MatrixXd>>;
+      using StrainMap_t = muGrid::RawFieldMap<Eigen::Map<Eigen::MatrixXd>>;
       if ((verbose > 0) and (comm.rank() == 0)) {
         std::cout << "at Load step " << std::setw(count_width)
                   << strain_step + 1 << ", " << strain_symb << " =" << std::endl

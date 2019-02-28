@@ -34,24 +34,29 @@
 # Program grant you additional permission to convey the resulting work.
 # =============================================================================
 
+set(MUSPECTRE_TARGETS_EXPORT "${MUCHOICE}Targets")
+set(MUFFT_TARGETS_EXPORT "${MUSPECTRE_TARGETS_EXPORT}")
+set(MUGRID_TARGETS_EXPORT "${MUSPECTRE_TARGETS_EXPORT}")
+
+add_subdirectory(libmugrid)
+
+if(MUCHOICE MATCHES "muGrid")
+  return()
+endif()
+
+add_subdirectory(libmufft)
+
+if(MUCHOICE MATCHES "muFFT")
+  return()
+endif()
+
 add_library(muSpectre "")
-set("PRIVATE_MUSPECTRE_LIBS" "")
 
 add_subdirectory(common)
 add_subdirectory(materials)
-add_subdirectory(fft)
+add_subdirectory(projection)
 add_subdirectory(cell)
 add_subdirectory(solver)
-
-
-if (${MPI_PARALLEL})
-  target_link_libraries(muSpectre PUBLIC ${MPI_LIBRARIES})
-  target_include_directories(muSpectre SYSTEM PUBLIC ${MPI_C_INCLUDE_PATH})
-endif(${MPI_PARALLEL})
-
-
-find_package(FFTW REQUIRED)
-
 
 # The following checks whether std::optional exists and replaces it by
 # boost::optional if necessary
@@ -63,24 +68,59 @@ std::experimental::optional<double> A{};
 }"
     HAS_STD_OPTIONAL)
 
-add_definitions(-DBAR)
-if( NOT HAS_STD_OPTIONAL)
-  add_definitions(-DNO_EXPERIMENTAL)
+if(NOT HAS_STD_OPTIONAL)
+  target_compile_definitions(muSpectre PUBLIC -DNO_EXPERIMENTAL)
+endif()
+
+# Do not trust old gcc. the std::optional has memory bugs
+if(${CMAKE_COMPILER_IS_GNUCC})
+  if(${CMAKE_CXX_COMPILER_VERSION} VERSION_LESS 6.0.0)
+    add_definitions(-DNO_EXPERIMENTAL)
+  endif()
 endif()
 
 file(GLOB_RECURSE _headers RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "*.hh")
-
 list(APPEND muSpectre_SRC ${_headers})
 
-set(muSpectre_INCLUDES ${FFTW_INCLUDES})
 target_include_directories(muSpectre INTERFACE ${muSpectre_INCLUDES})
 
-target_link_libraries(muSpectre PRIVATE ${FFTW_LIBRARIES} ${PRIVATE_MUSPECTRE_LIBS})
-
 target_link_libraries(muSpectre PUBLIC Eigen3::Eigen)
+target_link_libraries(muSpectre PUBLIC
+  ${MUFFT_NAMESPACE}muFFT ${MUGRID_NAMESPACE}muGrid)
 
 set_property(TARGET muSpectre PROPERTY PUBLIC_HEADER ${_headers})
 
-install(TARGETS muSpectre
-        LIBRARY DESTINATION lib
-        PUBLIC_HEADER DESTINATION include)
+# defining exported include directories
+target_include_directories(muSpectre
+  PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>
+  INTERFACE $<INSTALL_INTERFACE:include/libmuspectre>
+  )
+
+# small trick for build includes in public
+set_property(TARGET muSpectre APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>)
+
+
+add_library(${MUSPECTRE_NAMESPACE}muSpectre ALIAS muSpectre)
+
+# ------------------------------------------------------------------------------
+# if(NOT MUSPECTRE_TARGETS_EXPORT)
+#   set(MUSPECTRE_TARGETS_EXPORT muSpectreTargets)
+# endif()
+
+# install(TARGETS muSpectre
+#   EXPORT ${MUSPECTRE_TARGETS_EXPORT}
+#   LIBRARY DESTINATION lib
+#   PUBLIC_HEADER DESTINATION include/libmuspectre)
+
+# if("${MUSPECTRE_TARGETS_EXPORT}" STREQUAL "muSpectreTargets")
+#   install(EXPORT ${MUSPECTRE_TARGETS_EXPORT}
+#     NAMESPACE "${MUSPECTRE_NAMESPACE}"
+#     DESTINATION share/cmake/${PROJECT_NAME}
+#     COMPONENT dev)
+
+#   #Export for build tree
+#   export(EXPORT ${MUSPECTRE_TARGETS_EXPORT}
+#     NAMESPACE "${MUSPECTRE_NAMESPACE}"
+#     FILE "${CMAKE_BINARY_DIR}/${MUSPECTRE_TARGETS_EXPORT}.cmake")
+# endif()

@@ -1,0 +1,73 @@
+.builds:
+  stage: build
+  allow_failure: true
+  script:
+    - echo "free -h"
+    - free -h
+    - echo "grep -c ^processor /proc/cpuinfo"
+    - grep -c ^processor /proc/cpuinfo
+    - cd build
+    - cmake -DCMAKE_BUILD_TYPE:STRING=Release -DMUSPECTRE_RUNNING_IN_CI=ON ..
+    - make
+  artifacts:
+    paths:
+      - build
+    expire_in: 1 day
+
+build:testing_gcc:
+  extends: .builds
+  image: registry.gitlab.com/tjunge/muspectre:debian_testing
+
+build:testing_clang:
+  extends: .builds
+  image: registry.gitlab.com/tjunge/muspectre:debian_testing
+
+build:stable_gcc:
+  extends: .builds
+  image: registry.gitlab.com/tjunge/muspectre:debian_stable
+
+build:ubuntu16.04_gcc:
+  extends: .builds
+  image: registry.gitlab.com/tjunge/muspectre:ubuntu16.04
+
+.tests:
+  stage: test
+  script:
+    - ls
+    - cd build
+    - ls -a
+    - ctest --output-on-failure
+    - make test
+    - ls -ltr
+    - ls Testing
+  artifacts:
+    when: on_failure
+    paths:
+      - build/test_results*.xml
+    reports:
+      junit:
+      - build/test_results*.xml
+
+test:testing_gcc:
+  image: registry.gitlab.com/tjunge/muspectre:debian_testing
+  extends: .tests
+  dependencies:
+    - build:testing_gcc
+
+test:testing_clang:
+  image: registry.gitlab.com/tjunge/muspectre:debian_testing
+  extends: .tests
+  dependencies:
+    - build:testing_clang
+
+test:stable_gcc:
+  image: registry.gitlab.com/tjunge/muspectre:debian_stable
+  extends: .tests
+  dependencies:
+    - build:stable_gcc
+
+test:ubuntu16.04_gcc:
+  image: registry.gitlab.com/tjunge/muspectre:ubuntu16.04
+  extends: .tests
+  dependencies:
+    - build:ubuntu16.04_gcc

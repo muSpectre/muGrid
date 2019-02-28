@@ -33,9 +33,10 @@
  */
 
 #include "tests.hh"
-#include "common/T4_map_proxy.hh"
 #include "materials/material_linear_elastic2.hh"
 #include "materials/material_evaluator.hh"
+
+#include <libmugrid/T4_map_proxy.hh>
 
 #include "Eigen/Dense"
 
@@ -55,7 +56,7 @@ namespace muSpectre {
     auto & evaluator = std::get<1>(mat_eval);
 
     using T2_t = Eigen::Matrix<Real, twoD, twoD>;
-    using T4_t = T4Mat<Real, twoD>;
+    using T4_t = muGrid::T4Mat<Real, twoD>;
     const T2_t F{(T2_t::Random() - (T2_t::Ones() * .5)) * 1e-4 +
                  T2_t::Identity()};
     const T2_t eps{
@@ -98,9 +99,9 @@ namespace muSpectre {
     T4_t C, K;
 
     std::tie(sigma2, C) =
-      evaluator.evaluate_stress_tangent(eps, Formulation::small_strain);
+        evaluator.evaluate_stress_tangent(eps, Formulation::small_strain);
     std::tie(P2, K) =
-      evaluator.evaluate_stress_tangent(F, Formulation::finite_strain);
+        evaluator.evaluate_stress_tangent(F, Formulation::finite_strain);
 
     error = error_comp(sigma2, sigma);
     BOOST_CHECK_LE(error, tol);
@@ -117,7 +118,6 @@ namespace muSpectre {
       std::cout << "C =" << std::endl << C << std::endl;
     }
     BOOST_CHECK_LE(error, small_strain_tol);
-
 
     mat.add_pixel({1});
     /*
@@ -139,9 +139,8 @@ namespace muSpectre {
     auto & mat{*std::get<0>(mat_eval)};
     auto & evaluator{std::get<1>(mat_eval)};
 
-
     using T2_t = Eigen::Matrix<Real, twoD, twoD>;
-    using T4_t = T4Mat<Real, twoD>;
+    using T4_t = muGrid::T4Mat<Real, twoD>;
     const T2_t F{(T2_t::Random() - (T2_t::Ones() * .5)) * 1e-4 +
                  T2_t::Identity()};
     const T2_t eps{
@@ -183,9 +182,9 @@ namespace muSpectre {
     T4_t C, K;
 
     std::tie(sigma2, C) =
-      evaluator.evaluate_stress_tangent(eps, Formulation::small_strain);
+        evaluator.evaluate_stress_tangent(eps, Formulation::small_strain);
     std::tie(P2, K) =
-      evaluator.evaluate_stress_tangent(F, Formulation::finite_strain);
+        evaluator.evaluate_stress_tangent(F, Formulation::finite_strain);
 
     error = error_comp(sigma2, sigma);
     BOOST_CHECK_LE(error, tol);
@@ -216,7 +215,7 @@ namespace muSpectre {
     auto & evaluator = std::get<1>(mat_eval);
 
     using T2_t = Eigen::Matrix<Real, twoD, twoD>;
-    using T4_t = T4Mat<Real, twoD>;
+    using T4_t = muGrid::T4Mat<Real, twoD>;
     const T2_t F{(T2_t::Random() - (T2_t::Ones() * .5)) * 1e-4 +
                  T2_t::Identity()};
     const T2_t eps{
@@ -231,23 +230,23 @@ namespace muSpectre {
     T4_t C, K;
 
     std::tie(sigma, C) =
-      evaluator.evaluate_stress_tangent(eps, Formulation::small_strain);
+        evaluator.evaluate_stress_tangent(eps, Formulation::small_strain);
     std::tie(P, K) =
-      evaluator.evaluate_stress_tangent(F, Formulation::finite_strain);
+        evaluator.evaluate_stress_tangent(F, Formulation::finite_strain);
 
     constexpr Real linear_step{1.};
     constexpr Real nonlin_step{1.e-6};
     T4_t C_estim{evaluator.estimate_tangent(eps, Formulation::small_strain,
                                             linear_step)};
-    T4_t K_estim{evaluator.estimate_tangent(F, Formulation::finite_strain,
-                                            nonlin_step)};
+    T4_t K_estim{
+        evaluator.estimate_tangent(F, Formulation::finite_strain, nonlin_step)};
 
     auto error_comp{[](const auto & a, const auto & b) {
       return (a - b).norm() / (a + b).norm();
     }};
 
     constexpr Real finite_diff_tol{1e-9};
-    Real error {error_comp(K, K_estim)};
+    Real error{error_comp(K, K_estim)};
     if (not(error <= finite_diff_tol)) {
       std::cout << "K =" << std::endl << K << std::endl;
       std::cout << "K_estim =" << std::endl << K_estim << std::endl;
@@ -281,7 +280,7 @@ namespace muSpectre {
       std::cout << "C_estim =" << std::endl << C_estim << std::endl;
     }
     BOOST_CHECK_LE(error, tol);
-}
+  }
 
   BOOST_AUTO_TEST_SUITE_END();
 

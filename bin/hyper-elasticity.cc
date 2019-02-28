@@ -41,6 +41,7 @@
 #include <iomanip>
 
 using namespace muSpectre;
+using namespace muGrid;
 
 int main() {
   constexpr Dim_t dim{3};

@@ -42,20 +42,20 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   MaterialLinearElastic4<DimS, DimM>::MaterialLinearElastic4(std::string name)
-      : Parent{name}, lambda_field{make_field<Field_t>(
+      : Parent{name}, lambda_field{muGrid::make_field<Field_t>(
                           "local first Lame constant", this->internal_fields)},
-        mu_field{
-            make_field<Field_t>("local second Lame constant(shear modulus)",
-                                this->internal_fields)},
+        mu_field{muGrid::make_field<Field_t>(
+            "local second Lame constant(shear modulus)",
+            this->internal_fields)},
         internal_variables{lambda_field.get_const_map(),
                            mu_field.get_const_map()} {}
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void MaterialLinearElastic4<DimS, DimM>::
-  add_pixel(const Ccoord_t<DimS> & /*pixel*/) {
-    throw std::runtime_error
-      ("This material needs pixels with Youngs modulus and Poisson ratio.");
+  void MaterialLinearElastic4<DimS, DimM>::add_pixel(
+      const Ccoord_t<DimS> & /*pixel*/) {
+    throw std::runtime_error(
+        "This material needs pixels with Youngs modulus and Poisson ratio.");
   }
 
   /* ---------------------------------------------------------------------- */

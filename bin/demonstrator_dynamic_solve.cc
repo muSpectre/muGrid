@@ -37,12 +37,13 @@
 #include <chrono>
 #include "external/cxxopts.hpp"
 
-#include "common/common.hh"
-#include "common/ccoord_operations.hh"
+#include "common/muSpectre_common.hh"
 #include "cell/cell_factory.hh"
 #include "materials/material_linear_elastic1.hh"
 #include "solver/solvers.hh"
 #include "solver/solver_cg.hh"
+
+#include <libmugrid/ccoord_operations.hh>
 
 using opt_ptr = std::unique_ptr<cxxopts::Options>;
 
@@ -78,6 +79,8 @@ opt_ptr parse_args(int argc, char ** argv) {
 }
 
 using namespace muSpectre;
+using namespace muGrid;
+using namespace muFFT;
 
 int main(int argc, char * argv[]) {
   banner("demonstrator1", 2018, "Till Junge <till.junge@epfl.ch>");

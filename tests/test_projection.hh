@@ -34,10 +34,11 @@
  */
 
 #include "tests.hh"
-#include "fft/fftw_engine.hh"
+#include <libmufft/fftw_engine.hh>
 
 #include <boost/mpl/list.hpp>
 #include <Eigen/Dense>
+#include <iostream>
 
 #ifndef TESTS_TEST_PROJECTION_HH_
 #define TESTS_TEST_PROJECTION_HH_
@@ -89,7 +90,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM, class SizeGiver, class Proj>
   struct ProjectionFixture {
-    using Engine = FFTWEngine<DimS>;
+    using Engine = muFFT::FFTWEngine<DimS>;
     using Parent = Proj;
     constexpr static Dim_t sdim{DimS};
     constexpr static Dim_t mdim{DimM};

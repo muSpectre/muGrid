@@ -42,7 +42,8 @@ namespace muSpectre {
                                                              Real young,
                                                              Real poisson)
       : Parent{name}, material{name, young, poisson},
-        eigen_field{make_field<Field_t>("Eigenstrain", this->internal_fields)},
+        eigen_field{
+            muGrid::make_field<Field_t>("Eigenstrain", this->internal_fields)},
         internal_variables(eigen_field.get_const_map()) {}
 
   /* ---------------------------------------------------------------------- */

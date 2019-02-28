@@ -36,13 +36,13 @@
 #ifndef SRC_CELL_CELL_BASE_HH_
 #define SRC_CELL_CELL_BASE_HH_
 
-#include "common/common.hh"
-#include "common/ccoord_operations.hh"
-#include "common/field.hh"
-#include "common/utilities.hh"
+#include "common/muSpectre_common.hh"
 #include "materials/material_base.hh"
-#include "fft/projection_base.hh"
+#include "projection/projection_base.hh"
 #include "cell/cell_traits.hh"
+
+#include <libmugrid/ccoord_operations.hh>
+#include <libmugrid/field.hh>
 
 #include <vector>
 #include <memory>
@@ -56,7 +56,8 @@ namespace muSpectre {
    * allow the system to be used like a sparse matrix in
    * conjugate-gradient-type solvers
    */
-  template <class Cell> class CellAdaptor;
+  template <class Cell>
+  class CellAdaptor;
 
   /**
    * Base class for cells that is not templated and therefore can be
@@ -82,7 +83,8 @@ namespace muSpectre {
     using Array_t = Eigen::Array<T, Eigen::Dynamic, Eigen::Dynamic>;
 
     //! ref to dynamic generic array
-    template <typename T> using Array_ref = Eigen::Map<Array_t<T>>;
+    template <typename T>
+    using Array_ref = Eigen::Map<Array_t<T>>;
 
     //! ref to constant vector
     using ConstVector_ref = Eigen::Map<const Vector_t>;
@@ -118,7 +120,7 @@ namespace muSpectre {
     virtual size_t size() const = 0;
 
     //! return the communicator object
-    virtual const Communicator & get_communicator() const = 0;
+    virtual const muFFT::Communicator & get_communicator() const = 0;
 
     /**
      * formulation is hard set by the choice of the projection class
@@ -289,7 +291,7 @@ namespace muSpectre {
     using Ccoord = Ccoord_t<DimS>;  //!< cell coordinates type
     using Rcoord = Rcoord_t<DimS>;  //!< physical coordinates type
     //! global field collection
-    using FieldCollection_t = GlobalFieldCollection<DimS>;
+    using FieldCollection_t = muGrid::GlobalFieldCollection<DimS>;
     //! the collection is handled in a `std::unique_ptr`
     using Collection_ptr = std::unique_ptr<FieldCollection_t>;
     //! polymorphic base material type
@@ -301,21 +303,22 @@ namespace muSpectre {
     //! projections handled through `std::unique_ptr`s
     using Projection_ptr = std::unique_ptr<Projection_t>;
     //! dynamic global fields
-    template <typename T> using Field_t = TypedField<FieldCollection_t, T>;
+    template <typename T>
+    using Field_t = muGrid::TypedField<FieldCollection_t, T>;
     //! expected type for strain fields
     using StrainField_t =
-        TensorField<FieldCollection_t, Real, secondOrder, DimM>;
+        muGrid::TensorField<FieldCollection_t, Real, secondOrder, DimM>;
     //! expected type for stress fields
     using StressField_t =
-        TensorField<FieldCollection_t, Real, secondOrder, DimM>;
+        muGrid::TensorField<FieldCollection_t, Real, secondOrder, DimM>;
     //! expected type for tangent stiffness fields
     using TangentField_t =
-        TensorField<FieldCollection_t, Real, fourthOrder, DimM>;
+        muGrid::TensorField<FieldCollection_t, Real, fourthOrder, DimM>;
     //! combined stress and tangent field
     using FullResponse_t =
         std::tuple<const StressField_t &, const TangentField_t &>;
     //! iterator type over all cell pixel's
-    using iterator = typename CcoordOps::Pixels<DimS>::iterator;
+    using iterator = typename muGrid::CcoordOps::Pixels<DimS>::iterator;
 
     //! dynamic vector type for interactions with numpy/scipy/solvers etc.
     using Vector_t = typename Parent::Vector_t;
@@ -327,10 +330,12 @@ namespace muSpectre {
     using Vector_ref = typename Parent::Vector_ref;
 
     //! dynamic array type for interactions with numpy/scipy/solvers, etc.
-    template <typename T> using Array_t = typename Parent::Array_t<T>;
+    template <typename T>
+    using Array_t = typename Parent::Array_t<T>;
 
     //! dynamic array type for interactions with numpy/scipy/solvers, etc.
-    template <typename T> using Array_ref = typename Parent::Array_ref<T>;
+    template <typename T>
+    using Array_ref = typename Parent::Array_ref<T>;
 
     //! sparse matrix emulation
     using Adaptor = Parent::Adaptor;
@@ -393,8 +398,7 @@ namespace muSpectre {
      * this allocates the memory for the return value, and reuses it
      * on subsequent calls
      */
-    Vector_ref
-    evaluate_projection(Eigen::Ref<const Vector_t> P) override;
+    Vector_ref evaluate_projection(Eigen::Ref<const Vector_t> P) override;
 
     /**
      * evaluates the directional and projected stiffness (this
@@ -510,11 +514,11 @@ namespace muSpectre {
                                   int nb_steps_ago = 1);
 
     //! see `Cell::get_globalised_internal_real_array` for details
-    Array_ref<Real> get_globalised_internal_real_array(
-        const std::string & unique_name) final;
+    Array_ref<Real>
+    get_globalised_internal_real_array(const std::string & unique_name) final;
     //! see `Cell::get_globalised_current_reald_array` for details
-    Array_ref<Real> get_globalised_current_real_array(
-        const std::string & unique_name) final;
+    Array_ref<Real>
+    get_globalised_current_real_array(const std::string & unique_name) final;
     //! see `Cell::get_globalised_old_real_array` for details
     Array_ref<Real>
     get_globalised_old_real_array(const std::string & unique_name,
@@ -525,7 +529,8 @@ namespace muSpectre {
      * fft_engine (i.e. infrastructure) but not the materials. These
      * need to be initialised separately
      */
-    void initialise(FFT_PlanFlags flags = FFT_PlanFlags::estimate);
+    void
+    initialise(muFFT::FFT_PlanFlags flags = muFFT::FFT_PlanFlags::estimate);
 
     /**
      * for materials with state variables, these typically need to be
@@ -575,10 +580,12 @@ namespace muSpectre {
     //! return a sparse matrix adaptor to the cell
     Adaptor get_adaptor() override;
     //! returns the number of degrees of freedom in the cell
-    Dim_t get_nb_dof() const override { return this->size() * ipow(DimS, 2); };
+    Dim_t get_nb_dof() const override {
+      return this->size() * muGrid::ipow(DimS, 2);
+    };
 
     //! return the communicator object
-    const Communicator & get_communicator() const override {
+    const muFFT::Communicator & get_communicator() const override {
       return this->projection->get_communicator();
     }
 
@@ -592,8 +599,9 @@ namespace muSpectre {
     const Ccoord & subdomain_resolutions;  //!< the cell's subdomain resolutions
     const Ccoord & subdomain_locations;    //!< the cell's subdomain resolutions
     const Ccoord & domain_resolutions;     //!< the cell's domain resolutions
-    CcoordOps::Pixels<DimS> pixels;  //!< helper to iterate over the pixels
-    const Rcoord & domain_lengths;   //!< the cell's lengths
+    muGrid::CcoordOps::Pixels<DimS>
+        pixels;                     //!< helper to iterate over the pixels
+    const Rcoord & domain_lengths;  //!< the cell's lengths
     Collection_ptr fields;  //!< handle for the global fields of the cell
     StrainField_t & F;      //!< ref to strain field
     StressField_t & P;      //!< ref to stress field

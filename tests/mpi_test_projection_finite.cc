@@ -35,22 +35,25 @@
 #define BOOST_MPL_CFG_NO_PREPROCESSED_HEADERS
 #define BOOST_MPL_LIMIT_LIST_SIZE 50
 
-#include "fft/projection_finite_strain.hh"
-#include "fft/projection_finite_strain_fast.hh"
-#include "fft/fft_utils.hh"
+#include "projection/projection_finite_strain.hh"
+#include "projection/projection_finite_strain_fast.hh"
 #include "mpi_test_projection.hh"
 
-#include "fft/fftw_engine.hh"
+#include <libmufft/fft_utils.hh>
+#include <libmufft/fftw_engine.hh>
 #ifdef WITH_FFTWMPI
-#include "fft/fftwmpi_engine.hh"
+#include <libmufft/fftwmpi_engine.hh>
 #endif
 #ifdef WITH_PFFT
-#include "fft/pfft_engine.hh"
+#include <libmufft/pfft_engine.hh>
 #endif
 
 #include <Eigen/Dense>
 
-namespace muSpectre {
+namespace muFFT {
+  using muSpectre::ProjectionFiniteStrain;
+  using muSpectre::ProjectionFiniteStrainFast;
+  using muSpectre::tol;
 
   BOOST_AUTO_TEST_SUITE(mpi_projection_finite_strain);
 
@@ -132,14 +135,14 @@ namespace muSpectre {
         dim == fix::mdim,
         "These tests assume that the material and spatial dimension are "
         "identical");
-    using Fields = GlobalFieldCollection<sdim>;
-    using FieldT = TensorField<Fields, Real, secondOrder, mdim>;
-    using FieldMap = MatrixFieldMap<Fields, Real, mdim, mdim>;
+    using Fields = muGrid::GlobalFieldCollection<sdim>;
+    using FieldT = muGrid::TensorField<Fields, Real, muGrid::secondOrder, mdim>;
+    using FieldMap = muGrid::MatrixFieldMap<Fields, Real, mdim, mdim>;
     using Vector = Eigen::Matrix<Real, dim, 1>;
 
     Fields fields{};
-    FieldT & f_grad{make_field<FieldT>("gradient", fields)};
-    FieldT & f_var{make_field<FieldT>("working field", fields)};
+    FieldT & f_grad{muGrid::make_field<FieldT>("gradient", fields)};
+    FieldT & f_var{muGrid::make_field<FieldT>("working field", fields)};
 
     FieldMap grad(f_grad);
     FieldMap var(f_var);
@@ -150,14 +153,15 @@ namespace muSpectre {
     for (Dim_t i = 0; i < dim; ++i) {
       // the wave vector has to be such that it leads to an integer
       // number of periods in each length of the domain
-      k(i) = (i + 1) * 2 * pi / fix::projector.get_domain_lengths()[i];
+      k(i) = (i + 1) * 2 * muGrid::pi / fix::projector.get_domain_lengths()[i];
     }
 
+    using muGrid::operator/;
     for (auto && tup : akantu::zip(fields, grad, var)) {
       auto & ccoord = std::get<0>(tup);
       auto & g = std::get<1>(tup);
       auto & v = std::get<2>(tup);
-      Vector vec = CcoordOps::get_vector(
+      Vector vec = muGrid::CcoordOps::get_vector(
           ccoord, fix::projector.get_domain_lengths() /
                       fix::projector.get_domain_resolutions());
       g.row(0) = k.transpose() * cos(k.dot(vec));
@@ -167,6 +171,7 @@ namespace muSpectre {
     fix::projector.initialise(FFT_PlanFlags::estimate);
     fix::projector.apply_projection(f_var);
 
+    using muGrid::operator<<;
     for (auto && tup : akantu::zip(fields, grad, var)) {
       auto & ccoord = std::get<0>(tup);
       auto & g = std::get<1>(tup);
@@ -174,7 +179,7 @@ namespace muSpectre {
       Real error = (g - v).norm();
       BOOST_CHECK_LT(error, tol);
       if (error >= tol) {
-        Vector vec = CcoordOps::get_vector(
+        Vector vec = muGrid::CcoordOps::get_vector(
             ccoord, fix::projector.get_domain_lengths() /
                         fix::projector.get_domain_resolutions());
         std::cout << std::endl << "grad_ref :" << std::endl << g << std::endl;
@@ -191,4 +196,4 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE_END();
 
-}  // namespace muSpectre
+}  // namespace muFFT

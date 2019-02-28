@@ -38,6 +38,7 @@
 #include <iomanip>
 #include <cmath>
 #include <sstream>
+#include <iostream>
 
 namespace muSpectre {
 
@@ -45,12 +46,13 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   DeprecatedSolverCG<DimS, DimM>::DeprecatedSolverCG(Cell_t & cell, Real tol,
                                                      Uint maxiter, bool verbose)
-      : Parent(cell, tol, maxiter, verbose), r_k{make_field<Field_t>(
+      : Parent(cell, tol, maxiter, verbose), r_k{muGrid::make_field<Field_t>(
                                                  "residual r_k",
                                                  this->collection)},
-        p_k{make_field<Field_t>("search direction r_k", this->collection)},
-        Ap_k{make_field<Field_t>("Effect of tangent A*p_k", this->collection)} {
-  }
+        p_k{muGrid::make_field<Field_t>("search direction r_k",
+                                        this->collection)},
+        Ap_k{muGrid::make_field<Field_t>("Effect of tangent A*p_k",
+                                         this->collection)} {}
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
@@ -64,7 +66,7 @@ namespace muSpectre {
   typename DeprecatedSolverCG<DimS, DimM>::SolvVectorOut
   DeprecatedSolverCG<DimS, DimM>::solve(const SolvVectorInC rhs,
                                         SolvVectorIn x_0) {
-    const Communicator & comm = this->cell.get_communicator();
+    const muFFT::Communicator & comm = this->cell.get_communicator();
     // Following implementation of algorithm 5.2 in Nocedal's Numerical
     // Optimization (p. 112)
 
@@ -82,7 +84,7 @@ namespace muSpectre {
     this->converged = false;
     Real rdr = comm.sum((r * r).sum());
     Real rhs_norm2 = comm.sum(rhs.squaredNorm());
-    Real tol2 = ipow(this->tol, 2) * rhs_norm2;
+    Real tol2 = muGrid::ipow(this->tol, 2) * rhs_norm2;
 
     size_t count_width{};  // for output formatting in verbose case
     if (this->verbose) {

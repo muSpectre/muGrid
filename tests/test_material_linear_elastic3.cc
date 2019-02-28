@@ -36,8 +36,8 @@
 #include "tests.hh"
 #include "materials/material_linear_elastic3.hh"
 #include "materials/materials_toolbox.hh"
-#include "common/T4_map_proxy.hh"
-#include "cmath"
+#include <libmugrid/T4_map_proxy.hh>
+#include <cmath>
 
 namespace muSpectre {
 
@@ -65,12 +65,12 @@ namespace muSpectre {
     E.setZero();
     E(0, 0) = 0.001;
     E(1, 0) = E(0, 1) = 0.005;
-    using Hooke =
-        MatTB::Hooke<Dim, Eigen::Matrix<Real, Dim, Dim>, T4Mat<Real, Dim>>;
+    using Hooke = MatTB::Hooke<Dim, Eigen::Matrix<Real, Dim, Dim>,
+                               muGrid::T4Mat<Real, Dim>>;
     Real lambda = Hooke::compute_lambda(Fix::Young, Fix::Poisson);
     Real mu = Hooke::compute_mu(Fix::Young, Fix::Poisson);
     auto C = Hooke::compute_C(lambda, mu);
-    T4MatMap<Real, Dim> Cmap{C.data()};
+    muGrid::T4MatMap<Real, Dim> Cmap{C.data()};
     Eigen::Matrix<Real, Dim, Dim> stress = Fix::mat.evaluate_stress(E, Cmap);
     Real sigma00 = lambda * E(0, 0) + 2 * mu * E(0, 0);
     Real sigma01 = 2 * mu * E(0, 1);

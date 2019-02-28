@@ -39,6 +39,7 @@
 #include "cell/cell_base.hh"
 
 #include <Eigen/IterativeLinearSolvers>
+#include <iostream>
 #include <unsupported/Eigen/IterativeSolvers>
 
 namespace muSpectre {

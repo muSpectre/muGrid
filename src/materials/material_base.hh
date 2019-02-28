@@ -35,9 +35,10 @@
 #ifndef SRC_MATERIALS_MATERIAL_BASE_HH_
 #define SRC_MATERIALS_MATERIAL_BASE_HH_
 
-#include "common/common.hh"
-#include "common/field.hh"
-#include "common/field_collection.hh"
+#include "common/muSpectre_common.hh"
+
+#include <libmugrid/field.hh>
+#include <libmugrid/field_collection.hh>
 
 #include <string>
 
@@ -55,23 +56,23 @@ namespace muSpectre {
    public:
     //! typedefs for data handled by this interface
     //! global field collection for cell-wide fields, like stress, strain, etc
-    using GFieldCollection_t = GlobalFieldCollection<DimS>;
+    using GFieldCollection_t = muGrid::GlobalFieldCollection<DimS>;
     //! field collection for internal variables, such as eigen-strains,
     //! plastic strains, damage variables, etc, but also for managing which
     //! pixels the material is responsible for
-    using MFieldCollection_t = LocalFieldCollection<DimS>;
+    using MFieldCollection_t = muGrid::LocalFieldCollection<DimS>;
 
     using iterator = typename MFieldCollection_t::iterator;  //!< pixel iterator
     //! polymorphic base class for fields only to be used for debugging
-    using Field_t = internal::FieldBase<GFieldCollection_t>;
+    using Field_t = muGrid::internal::FieldBase<GFieldCollection_t>;
     //! Full type for stress fields
-    using StressField_t =
-        TensorField<GFieldCollection_t, Real, secondOrder, DimM>;
+    using StressField_t = muGrid::TensorField<GFieldCollection_t, Real,
+                                              muGrid::secondOrder, DimM>;
     //! Full type for strain fields
     using StrainField_t = StressField_t;
     //! Full type for tangent stiffness fields fields
-    using TangentField_t =
-        TensorField<GFieldCollection_t, Real, fourthOrder, DimM>;
+    using TangentField_t = muGrid::TensorField<GFieldCollection_t, Real,
+                                               muGrid::fourthOrder, DimM>;
     using Ccoord = Ccoord_t<DimS>;  //!< cell coordinates type
     //! Default constructor
     MaterialBase() = delete;

@@ -32,7 +32,7 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include "common/common.hh"
+#include "common/muSpectre_common.hh"
 
 #include <Eigen/IterativeLinearSolvers>
 
@@ -41,7 +41,8 @@
 
 namespace muSpectre {
 
-  template <class Cell> class CellAdaptor;
+  template <class Cell>
+  class CellAdaptor;
 
 }  // namespace muSpectre
 

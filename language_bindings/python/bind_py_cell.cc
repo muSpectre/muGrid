@@ -32,22 +32,22 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include "common/common.hh"
-#include "common/ccoord_operations.hh"
+#include "common/muSpectre_common.hh"
 #include "cell/cell_factory.hh"
 #include "cell/cell_base.hh"
 
+#include <libmugrid/ccoord_operations.hh>
 #ifdef WITH_FFTWMPI
-#include "fft/fftwmpi_engine.hh"
+#include <libmufft/fftwmpi_engine.hh>
 #endif
 #ifdef WITH_PFFT
-#include "fft/pfft_engine.hh"
+#include <libmufft/pfft_engine.hh>
 #endif
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/stl_bind.h>
-#include "pybind11/eigen.h"
+#include <pybind11/eigen.h>
 
 #include <sstream>
 #include <memory>
@@ -70,11 +70,12 @@ void add_parallel_cell_factory_helper(py::module & mod, const char * name) {
 
   mod.def(name,
           [](Ccoord res, Rcoord lens, Formulation form, size_t comm) {
-            return make_parallel_cell<dim, dim, CellBase<dim, dim>, FFTEngine>(
+            return muSpectre::make_parallel_cell<
+                dim, dim, muSpectre::CellBase<dim, dim>, FFTEngine>(
                 std::move(res), std::move(lens), std::move(form),
-                std::move(Communicator(MPI_Comm(comm))));
+                std::move(muFFT::Communicator(MPI_Comm(comm))));
           },
-          "resolutions"_a, "lengths"_a = CcoordOps::get_cube<dim>(1.),
+          "resolutions"_a, "lengths"_a = muGrid::CcoordOps::get_cube<dim>(1.),
           "formulation"_a = Formulation::finite_strain,
           "communicator"_a = size_t(MPI_COMM_SELF));
 }
@@ -92,24 +93,23 @@ void add_cell_factory_helper(py::module & mod) {
           [](Ccoord res, Rcoord lens, Formulation form) {
             return make_cell(std::move(res), std::move(lens), std::move(form));
           },
-          "resolutions"_a,
-          "lengths"_a = muSpectre::CcoordOps::get_cube<dim>(1.),
+          "resolutions"_a, "lengths"_a = muGrid::CcoordOps::get_cube<dim>(1.),
           "formulation"_a = Formulation::finite_strain);
 
 #ifdef WITH_FFTWMPI
-  add_parallel_cell_factory_helper<dim, FFTWMPIEngine<dim>>(
+  add_parallel_cell_factory_helper<dim, muFFT::FFTWMPIEngine<dim>>(
       mod, "FFTWMPICellFactory");
 #endif
 
 #ifdef WITH_PFFT
-  add_parallel_cell_factory_helper<dim, PFFTEngine<dim>>(mod,
-                                                         "PFFTCellFactory");
+  add_parallel_cell_factory_helper<dim, muFFT::PFFTEngine<dim>>(
+      mod, "PFFTCellFactory");
 #endif
 }
 
 void add_cell_factory(py::module & mod) {
-  add_cell_factory_helper<muSpectre::twoD>(mod);
-  add_cell_factory_helper<muSpectre::threeD>(mod);
+  add_cell_factory_helper<muGrid::twoD>(mod);
+  add_cell_factory_helper<muGrid::threeD>(mod);
 }
 
 /**
@@ -126,7 +126,7 @@ void add_cell_base_helper(py::module & mod) {
       .def("__iter__",
            [](sys_t & s) { return py::make_iterator(s.begin(), s.end()); })
       .def("initialise", &sys_t::initialise,
-           "flags"_a = muSpectre::FFT_PlanFlags::estimate)
+           "flags"_a = muFFT::FFT_PlanFlags::estimate)
       .def(
           "directional_stiffness",
           [](sys_t & cell, py::EigenDRef<Eigen::ArrayXXd> & v) {

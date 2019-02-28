@@ -34,17 +34,20 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include <iostream>
-#include <memory>
-#include <chrono>
 #include "external/cxxopts.hpp"
 
-#include "common/common.hh"
-#include "common/ccoord_operations.hh"
+#include "common/muSpectre_common.hh"
 #include "cell/cell_factory.hh"
 #include "materials/material_linear_elastic1.hh"
 #include "solver/solvers.hh"
 #include "solver/solver_cg.hh"
+
+#include <libmugrid/ccoord_operations.hh>
+
+#include <iostream>
+#include <memory>
+#include <chrono>
+
 using opt_ptr = std::unique_ptr<cxxopts::Options>;
 
 opt_ptr parse_args(int argc, char ** argv) {
@@ -87,16 +90,16 @@ int main(int argc, char * argv[]) {
   const Dim_t size{opt["N0"].as<int>()};
   constexpr Real fsize{1.};
   constexpr Dim_t dim{3};
-  const Dim_t nb_dofs{ipow(size, dim) * ipow(dim, 2)};
+  const Dim_t nb_dofs{muGrid::ipow(size, dim) * muGrid::ipow(dim, 2)};
   std::cout << "Number of dofs: " << nb_dofs << std::endl;
 
   constexpr Formulation form{Formulation::finite_strain};
 
-  const Rcoord_t<dim> lengths{CcoordOps::get_cube<dim>(fsize)};
-  const Ccoord_t<dim> resolutions{CcoordOps::get_cube<dim>(size)};
+  const Rcoord_t<dim> lengths{muGrid::CcoordOps::get_cube<dim>(fsize)};
+  const Ccoord_t<dim> resolutions{muGrid::CcoordOps::get_cube<dim>(size)};
 
   {
-    Communicator comm{MPI_COMM_WORLD};
+    muFFT::Communicator comm{MPI_COMM_WORLD};
     MPI_Init(&argc, &argv);
 
     auto cell{make_parallel_cell<dim, dim>(resolutions, lengths, form, comm)};
@@ -129,7 +132,7 @@ int main(int argc, char * argv[]) {
 
     cell.add_material(std::move(Material_soft));
     cell.add_material(std::move(Material_hard));
-    cell.initialise(FFT_PlanFlags::measure);
+    cell.initialise(muFFT::FFT_PlanFlags::measure);
 
     constexpr Real newton_tol{1e-4};
     constexpr Real cg_tol{1e-7};

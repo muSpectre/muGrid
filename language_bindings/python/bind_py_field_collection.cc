@@ -34,9 +34,9 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include "common/common.hh"
-#include "common/field.hh"
-#include "common/field_collection.hh"
+#include "common/muSpectre_common.hh"
+#include <libmugrid/field.hh>
+#include <libmugrid/field_collection.hh>
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -60,7 +60,7 @@ void add_field_collection(py::module & mod) {
   name_stream << "_" << (FieldCollectionDerived::Global ? "Global" : "Local")
               << "FieldCollection_" << Dim << 'd';
   const auto name{name_stream.str()};
-  using FC_t = muSpectre::FieldCollectionBase<Dim, FieldCollectionDerived>;
+  using FC_t = muGrid::FieldCollectionBase<Dim, FieldCollectionDerived>;
   py::class_<FC_t>(mod, name.c_str())
       .def("get_real_field",
            [](FC_t & field_collection, std::string unique_name) ->
@@ -166,7 +166,7 @@ namespace internal_fill {
 }  // namespace internal_fill
 template <typename T, class FieldCollection>
 void add_field(py::module & mod, std::string dtype_name) {
-  using Field_t = muSpectre::TypedField<FieldCollection, T>;
+  using Field_t = muGrid::TypedField<FieldCollection, T>;
   std::stringstream name_stream{};
   name_stream << (FieldCollection::Global ? "Global" : "Local") << "Field"
               << dtype_name << "_" << FieldCollection::spatial_dim();
@@ -197,7 +197,7 @@ void add_field_helper(py::module & mod) {
   name_stream << (FieldCollection::Global ? "Global" : "Local") << "Field"
               << "_" << Dim;
   std::string name{name_stream.str()};
-  using Field_t = muSpectre::internal::FieldBase<FieldCollection>;
+  using Field_t = muGrid::internal::FieldBase<FieldCollection>;
   py::class_<Field_t>(mod, name.c_str())
       .def_property_readonly("name", &Field_t::get_name, "field name")
       .def_property_readonly("collection", &Field_t::get_collection,
@@ -220,7 +220,7 @@ void add_field_helper(py::module & mod) {
 
 template <typename T, class FieldCollection>
 void add_statefield(py::module & mod, std::string dtype_name) {
-  using StateField_t = muSpectre::TypedStateField<FieldCollection, T>;
+  using StateField_t = muGrid::TypedStateField<FieldCollection, T>;
   std::stringstream name_stream{};
   name_stream << (FieldCollection::Global ? "Global" : "Local") << "StateField"
               << dtype_name << "_" << FieldCollection::spatial_dim();
@@ -239,7 +239,7 @@ void add_statefield_helper(py::module & mod) {
   name_stream << (FieldCollection::Global ? "Global" : "Local") << "StateField"
               << "_" << Dim;
   std::string name{name_stream.str()};
-  using StateField_t = muSpectre::StateFieldBase<FieldCollection>;
+  using StateField_t = muGrid::StateFieldBase<FieldCollection>;
   py::class_<StateField_t>(mod, name.c_str())
       .def_property_readonly("prefix", &StateField_t::get_prefix,
                              "state field prefix")
@@ -260,17 +260,17 @@ void add_statefield_helper(py::module & mod) {
 
 template <Dim_t Dim>
 void add_field_collection_helper(py::module & mod) {
-  add_field_helper<Dim, muSpectre::GlobalFieldCollection<Dim>>(mod);
-  add_field_helper<Dim, muSpectre::LocalFieldCollection<Dim>>(mod);
+  add_field_helper<Dim, muGrid::GlobalFieldCollection<Dim>>(mod);
+  add_field_helper<Dim, muGrid::LocalFieldCollection<Dim>>(mod);
 
-  add_statefield_helper<Dim, muSpectre::GlobalFieldCollection<Dim>>(mod);
-  add_statefield_helper<Dim, muSpectre::LocalFieldCollection<Dim>>(mod);
+  add_statefield_helper<Dim, muGrid::GlobalFieldCollection<Dim>>(mod);
+  add_statefield_helper<Dim, muGrid::LocalFieldCollection<Dim>>(mod);
 
-  add_field_collection<Dim, muSpectre::GlobalFieldCollection<Dim>>(mod);
-  add_field_collection<Dim, muSpectre::LocalFieldCollection<Dim>>(mod);
+  add_field_collection<Dim, muGrid::GlobalFieldCollection<Dim>>(mod);
+  add_field_collection<Dim, muGrid::LocalFieldCollection<Dim>>(mod);
 }
 
 void add_field_collections(py::module & mod) {
-  add_field_collection_helper<muSpectre::twoD>(mod);
-  add_field_collection_helper<muSpectre::threeD>(mod);
+  add_field_collection_helper<muGrid::twoD>(mod);
+  add_field_collection_helper<muGrid::threeD>(mod);
 }

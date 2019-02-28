@@ -32,9 +32,10 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include "common/common.hh"
+#include "common/muSpectre_common.hh"
 
 #include <stdexcept>
+#include <iostream>
 
 namespace muSpectre {
 

@@ -36,9 +36,8 @@
 #define SRC_SOLVER_DEPRECATED_SOLVER_BASE_HH_
 
 #include "solver/solver_common.hh"
-#include "common/common.hh"
+#include "common/muSpectre_common.hh"
 #include "cell/cell_base.hh"
-#include "common/tensor_algebra.hh"
 
 #include <Eigen/Dense>
 
@@ -60,7 +59,7 @@ namespace muSpectre {
     using Cell_t = CellBase<DimS, DimM>;  //!< Cell type
     using Ccoord = Ccoord_t<DimS>;        //!< cell coordinates type
     //! Field collection to store temporary fields in
-    using Collection_t = GlobalFieldCollection<DimS>;
+    using Collection_t = muGrid::GlobalFieldCollection<DimS>;
     //! Input vector for solvers
     using SolvVectorIn = Eigen::Ref<Eigen::VectorXd>;
     //! Input vector for solvers

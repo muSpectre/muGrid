@@ -25,7 +25,7 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include "common/common.hh"
+#include "common/muSpectre_common.hh"
 #include "materials/stress_transformations_Kirchhoff.hh"
 #include "materials/material_hyper_elasto_plastic1.hh"
 #include "cell/cell_base.hh"

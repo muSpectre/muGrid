@@ -155,7 +155,7 @@ def configure(container_name) {
         sh """
 mkdir -p ${BUILD_DIR}_${CXX_COMPILER}
 cd ${BUILD_DIR}_${CXX_COMPILER}
-CXX=${CXX_COMPILER} cmake -DCMAKE_BUILD_TYPE:STRING=Release -DRUNNING_IN_CI=ON ..
+CXX=${CXX_COMPILER} cmake -DCMAKE_BUILD_TYPE:STRING=Release -DMUSPECTRE_RUNNING_IN_CI=ON ..
 """
     }
 }

@@ -41,8 +41,8 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   MaterialLinearElastic3<DimS, DimM>::MaterialLinearElastic3(std::string name)
-      : Parent{name}, C_field{make_field<Field_t>("local stiffness tensor",
-                                                  this->internal_fields)},
+      : Parent{name}, C_field{muGrid::make_field<Field_t>(
+                          "local stiffness tensor", this->internal_fields)},
         internal_variables(C_field.get_const_map()) {}
 
   /* ---------------------------------------------------------------------- */
