@@ -48,6 +48,7 @@ if read_the_docs_build:
 else:
     muspectre_path = "@CMAKE_CURRENT_BINARY_DIR@"
     os.makedirs("@CMAKE_CURRENT_BINARY_DIR@/_static", exist_ok=True)
+
 print("muspectre_path = '{}'".format(muspectre_path))
 subprocess.call('ls; pwd', shell=True)
 subprocess.call("cd {} && doxygen".format(muspectre_path), shell=True)
@@ -221,6 +222,3 @@ epub_exclude_files = ['search.html']
 intersphinx_mapping = {'https://docs.python.org/': None}
 primary_domain = 'cpp'
 highlight_language = 'cpp'
-
-
-
