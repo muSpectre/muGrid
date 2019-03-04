@@ -41,12 +41,16 @@ build:ubuntu16.04_gcc:
     - ls -ltr
     - ls Testing
   artifacts:
-    when: on_failure
+    when: always
     paths:
-      - build/test_results*.xml
+      - build/tests/test_results*.xml
+      - build/tests/libmufft/test_results*.xml
+      - build/tests/libmugrid/test_results*.xml
     reports:
       junit:
-      - build/test_results*.xml
+      - build/tests/test_results*.xml
+      - build/tests/libmufft/test_results*.xml
+      - build/tests/libmugrid/test_results*.xml
 
 test:testing_gcc:
   image: registry.gitlab.com/tjunge/muspectre:debian_testing
