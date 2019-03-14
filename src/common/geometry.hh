@@ -233,7 +233,7 @@ namespace muSpectre {
         // Clarification. When I return this value as an
         // expression, clang segfaults or returns an uninitialised
         // tensor, hence the explicit cast into a T4Mat.
-        return muGrid::T4Mat<Real, Dim>(rotator_back * input * rotator_forward);
+        return T4Mat<Real, Dim>(rotator_back * input * rotator_forward);
       }
     };
   }  // namespace internal

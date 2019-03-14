@@ -96,11 +96,10 @@ namespace muSpectre {
     using NeedTangent = typename Parent::NeedTangent;
     //! global field collection
 
-    using Stiffness_t =
-        Eigen::TensorFixedSize<Real, Eigen::Sizes<DimM, DimM, DimM, DimM>>;
+    using Stiffness_t = T4Mat<Real, DimM>;
 
-    //! traits of this material
-    using traits = MaterialMuSpectre_traits<MaterialLinearElastic1>;
+        //! traits of this material
+        using traits = MaterialMuSpectre_traits<MaterialLinearElastic1>;
 
     //! this law does not have any internal variables
     using InternalVariables = typename traits::InternalVariables;
@@ -158,7 +157,22 @@ namespace muSpectre {
     const Real poisson;   //!< Poisson's ratio
     const Real lambda;    //!< first Lamé constant
     const Real mu;        //!< second Lamé constant (shear modulus)
-    const Stiffness_t C;  //!< stiffness tensor
+
+    // Here, the stiffness tensor is encapsulated into a unique ptr because of
+    // this bug:
+    // https://eigen.tuxfamily.narkive.com/maHiFSha/fixed-size-vectorizable-members-and-std-make-shared
+    // . The problem is that `std::make_shared` uses the global `::new` to
+    // allocate `void *` rather than using the the object's `new` operator, and
+    // therefore ignores the solution proposed by eigen (documented here
+    // http://eigen.tuxfamily.org/dox-devel/group__TopicStructHavingEigenMembers.html).
+    // Offloading the offending object into a heap-allocated structure who's
+    // construction we control fixes this problem temporarily, until we can use
+    // C++17 and guarantee alignment. This comes at the cost of a heap
+    // allocation, which is not an issue here, as this happens only once per
+    // material and run.
+    std::unique_ptr<const Stiffness_t> C_holder;  //!< stiffness tensor
+    const Stiffness_t & C;                        //! ref to stiffness tensor
+
     //! empty tuple
     InternalVariables internal_variables{};
 

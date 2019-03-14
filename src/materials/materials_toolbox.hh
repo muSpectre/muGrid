@@ -430,8 +430,8 @@ namespace muSpectre {
        * @param lambda: Lamé's first constant
        * @param mu: Lamé's second constant (i.e., shear modulus)
        */
-      inline static muGrid::T4Mat<Real, Dim> compute_C_T4(const Real & lambda,
-                                                          const Real & mu) {
+      inline static T4Mat<Real, Dim> compute_C_T4(const Real & lambda,
+                                                  const Real & mu) {
         return lambda * Matrices::Itrac<Dim>() +
                2 * mu * Matrices::Isymm<Dim>();
       }
