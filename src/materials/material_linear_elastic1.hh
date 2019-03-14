@@ -98,8 +98,8 @@ namespace muSpectre {
 
     using Stiffness_t = T4Mat<Real, DimM>;
 
-        //! traits of this material
-        using traits = MaterialMuSpectre_traits<MaterialLinearElastic1>;
+    //! traits of this material
+    using traits = MaterialMuSpectre_traits<MaterialLinearElastic1>;
 
     //! this law does not have any internal variables
     using InternalVariables = typename traits::InternalVariables;

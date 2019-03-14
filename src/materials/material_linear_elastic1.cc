@@ -44,7 +44,8 @@ namespace muSpectre {
       : Parent(name), young{young}, poisson{poisson},
         lambda{Hooke::compute_lambda(young, poisson)}, mu{Hooke::compute_mu(
                                                            young, poisson)},
-        C_holder{new Stiffness_t{Hooke::compute_C_T4(lambda, mu)}},
+        C_holder{
+            std::make_unique<Stiffness_t>(Hooke::compute_C_T4(lambda, mu))},
         C{*C_holder} {}
 
   template class MaterialLinearElastic1<twoD, twoD>;

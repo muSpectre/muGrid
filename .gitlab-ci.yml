@@ -16,19 +16,19 @@
 
 build:testing_gcc:
   extends: .builds
-  image: registry.gitlab.com/tjunge/muspectre:debian_testing
+  image: registry.gitlab.com/muspectre/muspectre:debian_testing
 
 build:testing_clang:
   extends: .builds
-  image: registry.gitlab.com/tjunge/muspectre:debian_testing
+  image: registry.gitlab.com/muspectre/muspectre:debian_testing
 
 build:stable_gcc:
   extends: .builds
-  image: registry.gitlab.com/tjunge/muspectre:debian_stable
+  image: registry.gitlab.com/muspectre/muspectre:debian_stable
 
 build:ubuntu16.04_gcc:
   extends: .builds
-  image: registry.gitlab.com/tjunge/muspectre:ubuntu16.04
+  image: registry.gitlab.com/muspectre/muspectre:ubuntu16.04
 
 .tests:
   stage: test
@@ -53,25 +53,25 @@ build:ubuntu16.04_gcc:
       - build/tests/libmugrid/test_results*.xml
 
 test:testing_gcc:
-  image: registry.gitlab.com/tjunge/muspectre:debian_testing
+  image: registry.gitlab.com/muspectre/muspectre:debian_testing
   extends: .tests
   dependencies:
     - build:testing_gcc
 
 test:testing_clang:
-  image: registry.gitlab.com/tjunge/muspectre:debian_testing
+  image: registry.gitlab.com/muspectre/muspectre:debian_testing
   extends: .tests
   dependencies:
     - build:testing_clang
 
 test:stable_gcc:
-  image: registry.gitlab.com/tjunge/muspectre:debian_stable
+  image: registry.gitlab.com/muspectre/muspectre:debian_stable
   extends: .tests
   dependencies:
     - build:stable_gcc
 
 test:ubuntu16.04_gcc:
-  image: registry.gitlab.com/tjunge/muspectre:ubuntu16.04
+  image: registry.gitlab.com/muspectre/muspectre:ubuntu16.04
   extends: .tests
   dependencies:
     - build:ubuntu16.04_gcc
