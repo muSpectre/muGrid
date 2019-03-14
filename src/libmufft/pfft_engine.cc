@@ -43,8 +43,9 @@ namespace muFFT {
   template <Dim_t DimS>
   PFFTEngine<DimS>::PFFTEngine(Ccoord resolutions, Dim_t nb_components,
                                Communicator comm)
-      : Parent{resolutions, nb_components, comm}, mpi_comm{
-                                                      comm.get_mpi_comm()} {
+      : Parent{resolutions, nb_components, comm},
+        mpi_comm{comm.get_mpi_comm()}, plan_fft{nullptr},
+        plan_ifft{nullptr}, real_workspace{nullptr} {
     if (!this->nb_engines)
       pfft_init();
     this->nb_engines++;

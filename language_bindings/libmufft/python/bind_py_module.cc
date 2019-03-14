@@ -1,11 +1,11 @@
 /**
- * @file   bind_py_common.hh
+ * @file   bind_py_module.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   12 Jan 2018
  *
- * @brief  header for python bindings for the common part of µSpectre
+ * @brief  Python bindings for µSpectre
  *
  * Copyright © 2018 Till Junge
  *
@@ -32,17 +32,13 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef LANGUAGE_BINDINGS_PYTHON_BIND_PY_DECLARATIONS_HH_
-#define LANGUAGE_BINDINGS_PYTHON_BIND_PY_DECLARATIONS_HH_
+#include "bind_py_declarations.hh"
 
 #include <pybind11/pybind11.h>
-namespace py = pybind11;
 
-void add_common(py::module & mod);
-void add_cell(py::module & mod);
-void add_material(py::module & mod);
-void add_solvers(py::module & mod);
-void add_projections(py::module & submodule);
-void add_field_collections(py::module & submodule);
+PYBIND11_MODULE(_muFFT, mod) {
+  mod.doc() = "Python bindings to the µFFT library";
 
-#endif  // LANGUAGE_BINDINGS_PYTHON_BIND_PY_DECLARATIONS_HH_
+  add_common(mod);
+  add_fft_engines(mod);
+}

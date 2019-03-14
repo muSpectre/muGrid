@@ -52,9 +52,9 @@ using muGrid::Dim_t;
 using pybind11::literals::operator""_a;
 namespace py = pybind11;
 
-template <class Engine, Dim_t dim>
+template <class Engine>
 void add_engine_helper(py::module & mod, std::string name) {
-  using Ccoord = Ccoord_t<dim>;
+  using Ccoord = typename Engine::Ccoord;
   using ArrayXXc = Eigen::Array<Complex, Eigen::Dynamic, Eigen::Dynamic>;
   py::class_<Engine>(mod, name.c_str())
 #ifdef WITH_MPI
@@ -68,32 +68,51 @@ void add_engine_helper(py::module & mod, std::string name) {
       .def(py::init<Ccoord, Dim_t>())
 #endif
       .def("fft",
-           [](Engine & eng, py::EigenDRef<Eigen::ArrayXXd> v) {
+           [](Engine & eng,
+              Eigen::Ref<typename Engine::Field_t::EigenRep_t> v) {
              using Coll_t = typename Engine::GFieldCollection_t;
              using Field_t = typename Engine::Field_t;
              Coll_t coll{};
              coll.initialise(eng.get_subdomain_resolutions(),
                              eng.get_subdomain_locations());
-             Field_t & temp{muGrid::make_field<Field_t>(
-                 "temp_field", coll, eng.get_nb_components())};
-             temp.eigen() = v;
-             return ArrayXXc{eng.fft(temp).eigen()};
+             // Do not make a copy, just wrap the Eigen array into a field that
+             // does not manage its own data.
+             Field_t & proxy{muGrid::make_field<Field_t>(
+                 "proxy_field", coll, v, eng.get_nb_components())};
+             // We need to tie the lifetime of the return value to the lifetime
+             // of the engine object, because we are returning the internal work
+             // space buffer that is managed by the engine;
+             // see return_value_policy below.
+             return eng.fft(proxy).eigen();
            },
-           "array"_a)
+           "array"_a,
+           py::return_value_policy::reference_internal)
       .def("ifft",
            [](Engine & eng, py::EigenDRef<ArrayXXc> v) {
              using Coll_t = typename Engine::GFieldCollection_t;
              using Field_t = typename Engine::Field_t;
+             // Create an Eigen array that will hold the result of the inverse
+             // FFT. We don't want the storage managed by a field because we
+             // want to transfer possession of storage to Python without a copy
+             // operation.
+             typename Field_t::EigenRep_t res{eng.get_nb_components(),
+                                              eng.size()};
              Coll_t coll{};
              coll.initialise(eng.get_subdomain_resolutions(),
                              eng.get_subdomain_locations());
-             Field_t & temp{muGrid::make_field<Field_t>(
-                 "temp_field", coll, eng.get_nb_components())};
+             // Wrap the Eigen array into a proxy field that does not manage
+             // its own data.
+             Field_t & proxy{muGrid::make_field<Field_t>(
+                 "proxy_field", coll, res, eng.get_nb_components())};
              eng.get_work_space().eigen() = v;
-             eng.ifft(temp);
-             return Eigen::ArrayXXd{temp.eigen()};
+             eng.ifft(proxy);
+             // We can safely transfer possession to Python since the Eigen
+             // array is not tied to the engine object;
+             // see return_value_policy below.
+             return res;
            },
-           "array"_a)
+           "array"_a,
+           py::return_value_policy::move)
       .def("initialise", &Engine::initialise,
            "flags"_a = muFFT::FFT_PlanFlags::estimate)
       .def("normalisation", &Engine::normalisation)
@@ -104,24 +123,15 @@ void add_engine_helper(py::module & mod, std::string name) {
       .def("get_domain_resolutions", &Engine::get_domain_resolutions);
 }
 
-void add_fft_engines(py::module & mod) {
-  auto fft{mod.def_submodule("fft")};
-  fft.doc() = "bindings for µSpectre's fft engines";
-  add_engine_helper<muFFT::FFTWEngine<muGrid::twoD>, muGrid::twoD>(fft,
-                                                                   "FFTW_2d");
-  add_engine_helper<muFFT::FFTWEngine<muGrid::threeD>, muGrid::threeD>(
-      fft, "FFTW_3d");
+void add_fft_engines(py::module & fft) {
+  add_engine_helper<muFFT::FFTWEngine<muGrid::twoD>>(fft, "FFTW_2d");
+  add_engine_helper<muFFT::FFTWEngine<muGrid::threeD>>(fft, "FFTW_3d");
 #ifdef WITH_FFTWMPI
-  add_engine_helper<muFFT::FFTWMPIEngine<muGrid::twoD>, muGrid::twoD>(
-      fft, "FFTWMPI_2d");
-  add_engine_helper<muFFT::FFTWMPIEngine<muGrid::threeD>, muGrid::threeD>(
-      fft, "FFTWMPI_3d");
+  add_engine_helper<muFFT::FFTWMPIEngine<muGrid::twoD>>(fft, "FFTWMPI_2d");
+  add_engine_helper<muFFT::FFTWMPIEngine<muGrid::threeD>>(fft, "FFTWMPI_3d");
 #endif
 #ifdef WITH_PFFT
-  add_engine_helper<muFFT::PFFTEngine<muGrid::twoD>, muGrid::twoD>(fft,
-                                                                   "PFFT_2d");
-  add_engine_helper<muFFT::PFFTEngine<muGrid::threeD>, muGrid::threeD>(
-      fft, "PFFT_3d");
+  add_engine_helper<muFFT::PFFTEngine<muGrid::twoD>>(fft, "PFFT_2d");
+  add_engine_helper<muFFT::PFFTEngine<muGrid::threeD>>(fft, "PFFT_3d");
 #endif
-  add_projections(fft);
 }

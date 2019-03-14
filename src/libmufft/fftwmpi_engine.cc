@@ -43,7 +43,8 @@ namespace muFFT {
   template <Dim_t Dim>
   FFTWMPIEngine<Dim>::FFTWMPIEngine(Ccoord resolutions, Dim_t nb_components,
                                     Communicator comm)
-      : Parent{resolutions, nb_components, comm} {
+      : Parent{resolutions, nb_components, comm}, plan_fft{nullptr},
+        plan_ifft{nullptr}, real_workspace{nullptr} {
     if (!this->nb_engines)
       fftw_mpi_init();
     this->nb_engines++;

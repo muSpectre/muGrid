@@ -39,7 +39,7 @@ Program grant you additional permission to convey the resulting work.
 import unittest
 import numpy as np
 
-from python_test_imports import µ
+from python_test_imports import muFFT, µ
 
 try:
     from mpi4py import MPI
@@ -60,7 +60,7 @@ class FFT_Check(unittest.TestCase):
     def test_forward_transform(self):
         for engine_str, transposed in self.engines:
             try:
-                engine = µ.fft.FFT(self.resolution, self.dim**2, fft=engine_str)
+                engine = muFFT.FFT(self.resolution, self.dim**2, fft=engine_str)
             except KeyError:
                 # This FFT engine has not been compiled into the code. Skip
                 # test.
@@ -70,7 +70,15 @@ class FFT_Check(unittest.TestCase):
             out_ref = np.fft.rfftn(in_arr, axes=(0, 1))
             if transposed:
                 out_ref = out_ref.swapaxes(0, 1)
+
+            # Test two-dimensional array input
             out_msp = engine.fft(in_arr.reshape(-1, self.dim**2).T).T
+            err = np.linalg.norm(out_ref -
+                                 out_msp.reshape(out_ref.shape))
+            self.assertTrue(err < self.tol)
+
+            # Separately test input as fully flattened array
+            out_msp = engine.fft(in_arr.reshape(-1)).T
             err = np.linalg.norm(out_ref -
                                  out_msp.reshape(out_ref.shape))
             self.assertTrue(err < self.tol)
@@ -78,7 +86,7 @@ class FFT_Check(unittest.TestCase):
     def test_reverse_transform(self):
         for engine_str, transposed in self.engines:
             try:
-                engine = µ.fft.FFT(self.resolution, self.dim**2, fft=engine_str)
+                engine = muFFT.FFT(self.resolution, self.dim**2, fft=engine_str)
             except KeyError:
                 # This FFT engine has not been compiled into the code. Skip
                 # test.

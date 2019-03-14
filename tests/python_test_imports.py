@@ -41,12 +41,15 @@ import os
 
 # Default path of the library
 sys.path.insert(0, os.path.join(os.getcwd(), "../language_bindings/python"))
+sys.path.insert(0, os.path.join(os.getcwd(), "../language_bindings/libmufft/python"))
 print("current working directory: '{}'".format(os.getcwd()))
 
 # Path of the library when compiling with Xcode
 sys.path.insert(0, os.path.join(os.getcwd(), "../language_bindings/python/Debug"))
+sys.path.insert(0, os.path.join(os.getcwd(), "../language_bindings/libmufft/python"))
 
 try:
+    import muFFT
     import muSpectre as µ
     import muSpectre
 except ImportError as err:

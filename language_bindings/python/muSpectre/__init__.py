@@ -40,17 +40,22 @@ try:
 except ImportError:
     MPI = None
 
+import _muFFT
+from _muFFT import (get_domain_ccoord, get_domain_index, get_hermitian_sizes,
+                    FFT_PlanFlags)
+
 import _muSpectre
-from _muSpectre import (Formulation, get_domain_ccoord, get_domain_index,
-                        get_hermitian_sizes, material, solvers,
-                        FFT_PlanFlags, FiniteDiff)
-import muSpectre.fft
+from _muSpectre import Formulation, material, solvers, FiniteDiff
+
 import muSpectre.gradient_integration
 
 _factories = {'fftw': ('CellFactory', False),
               'fftwmpi': ('FFTWMPICellFactory', True),
               'pfft': ('PFFTCellFactory', True),
               'p3dfft': ('P3DFFTCellFactory', True)}
+
+_projections = {_muSpectre.Formulation.finite_strain: 'FiniteStrainFast',
+                _muSpectre.Formulation.small_strain: 'SmallStrain'}
 
 
 def Cell(resolutions, lengths, formulation=Formulation.finite_strain,
@@ -81,6 +86,8 @@ def Cell(resolutions, lengths, formulation=Formulation.finite_strain,
     cell: object
         Return a muSpectre Cell object.
     """
+    resolutions = list(resolutions)
+    lengths = list(lengths)
     try:
         factory_name, is_parallel = _factories[fft]
     except KeyError:
@@ -103,3 +110,41 @@ def Cell(resolutions, lengths, formulation=Formulation.finite_strain,
             raise ValueError("FFT engine '{}' does not support parallel "
                              "execution.".format(fft))
         return factory(resolutions, lengths, formulation)
+
+
+def Projection(resolutions, lengths,
+               formulation=_muSpectre.Formulation.finite_strain,
+               fft='fftw', communicator=None):
+    """
+    Instantiate a muSpectre Projection class.
+
+    Parameters
+    ----------
+    resolutions: list
+        Grid resolutions in the Cartesian directions.
+    formulation: muSpectre.Formulation
+        Determines whether to use finite or small strain formulation.
+    fft: string
+        FFT engine to use. Options are 'fftw', 'fftwmpi', 'pfft' and 'p3dfft'.
+        Default is 'fftw'.
+    communicator: mpi4py communicator
+        mpi4py communicator object passed to parallel FFT engines. Note that
+        the default 'fftw' engine does not support parallel execution.
+
+
+    Returns
+    -------
+    cell: object
+        Return a muSpectre Cell object.
+    """
+    factory_name = 'Projection{}_{}d'.format(_projections[formulation],
+                                             len(resolutions))
+    try:
+        factory = _muSpectre.__dict__[factory_name]
+    except KeyError:
+        raise KeyError("Projection engine '{}' has not been compiled into the "
+                       "muSpectre library.".format(factory_name))
+    if communicator is None:
+        communicator = MPI.COMM_SELF
+    return factory(resolutions, lengths, fft,
+                   MPI._handleof(communicator))

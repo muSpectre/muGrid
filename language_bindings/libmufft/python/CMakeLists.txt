@@ -48,42 +48,38 @@ string(REGEX REPLACE "\n" "" PYTHON_USER_SITE ${PYTHON_USER_SITE})
 set (PY_BINDING_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_module.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_common.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_cell.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_linear_elastic1.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_linear_elastic2.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_linear_elastic3.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_linear_elastic4.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_hyper_elasto_plastic1.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_linear_elastic_generic.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_solvers.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_projections.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_field_collection.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_fftengine.cc
   )
 
-find_package(PythonLibsNew ${MUSPECTRE_PYTHON_MAJOR_VERSION} MODULE REQUIRED)
+if (${USE_FFTWMPI})
+  add_definitions(-DWITH_FFTWMPI)
+endif(${USE_FFTWMPI})
+
+if (${USE_PFFT})
+  add_definitions(-DWITH_PFFT)
+endif(${USE_PFFT})
+
+find_package(PythonLibsNew ${MUFFT_PYTHON_MAJOR_VERSION} MODULE REQUIRED)
 
 # On OS X, add -Wno-deprecated-declarations
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   add_compile_options(-Wno-deprecated-declarations)
 ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
-pybind11_add_module(pyMuSpectreLib ${PY_BINDING_SRCS})
-target_link_libraries(pyMuSpectreLib PRIVATE muSpectre)
-# Want to rename the output, so that the python module is called muSpectre
-set_target_properties(pyMuSpectreLib PROPERTIES OUTPUT_NAME _muSpectre)
+pybind11_add_module(pyMuFFTLib ${PY_BINDING_SRCS})
+target_link_libraries(pyMuFFTLib PRIVATE muFFT)
+# Want to rename the output, so that the python module is called muFFT
+set_target_properties(pyMuFFTLib PROPERTIES OUTPUT_NAME _muFFT)
 
-target_include_directories(pyMuSpectreLib PUBLIC ${PYTHON_INCLUDE_DIRS})
+target_include_directories(pyMuFFTLib PUBLIC ${PYTHON_INCLUDE_DIRS})
 
-add_custom_target(pyMuSpectre ALL SOURCES
-  muSpectre/__init__.py
-  muSpectre/gradient_integration.py
-  muSpectre/vtk_export.py)
-add_custom_command(TARGET pyMuSpectre POST_BUILD
+add_custom_target(pyMuFFT ALL SOURCES
+  muFFT/__init__.py)
+add_custom_command(TARGET pyMuFFT POST_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_directory
-                   ${CMAKE_SOURCE_DIR}/language_bindings/python/muSpectre
-                   $<TARGET_FILE_DIR:pyMuSpectreLib>/muSpectre)
+                   ${CMAKE_SOURCE_DIR}/language_bindings/libmufft/python/muFFT
+                   $<TARGET_FILE_DIR:pyMuFFTLib>/muFFT)
 
-install(TARGETS pyMuSpectreLib LIBRARY DESTINATION ${PYTHON_USER_SITE})
-install(FILES muSpectre/__init__.py muSpectre/gradient_integration.py
-  muSpectre/vtk_export.py DESTINATION ${PYTHON_USER_SITE}/muSpectre)
+install(TARGETS pyMuFFTLib LIBRARY DESTINATION ${PYTHON_USER_SITE})
+install(FILES muFFT/__init__.py DESTINATION
+  ${PYTHON_USER_SITE}/muFFT)

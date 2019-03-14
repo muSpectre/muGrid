@@ -40,6 +40,7 @@
 #include "field_helpers.hh"
 
 #include <sstream>
+#include <iostream>
 
 namespace muGrid {
 
@@ -126,8 +127,7 @@ namespace muGrid {
      * should only be used for transient temporaries
      */
     TypedField(std::string unique_name, FieldCollection & collection,
-               Eigen::Ref<Eigen::Matrix<Real, Eigen::Dynamic, 1>> vec,
-               size_t nb_components);
+               Eigen::Ref<EigenRep_t> vec, size_t nb_components);
 
     //! Copy constructor
     TypedField(const TypedField & other) = delete;
@@ -245,7 +245,7 @@ namespace muGrid {
      * an unregistered typed field can be mapped onto an array of
      * existing values
      */
-    optional<Eigen::Ref<Eigen::Matrix<Real, Eigen::Dynamic, 1>>> alt_values{};
+    optional<Eigen::Ref<EigenRep_t>> alt_values{};
 
     /**
      * maintains a tally of the current size, as it cannot be reliably
@@ -291,20 +291,32 @@ namespace muGrid {
   template <class FieldCollection, typename T>
   TypedField<FieldCollection, T>::TypedField(
       std::string unique_name, FieldCollection & collection,
-      Eigen::Ref<Eigen::Matrix<Real, Eigen::Dynamic, 1>> vec,
-      size_t nb_components)
+      Eigen::Ref<EigenRep_t> vec, size_t nb_components)
       : Parent(unique_name, nb_components, collection), alt_values{vec},
         current_size{vec.size() / nb_components}, data_ptr{vec.data()} {
-    if (vec.size() % nb_components) {
-      std::stringstream err{};
-      err << "The vector you supplied has a size of " << vec.size()
-          << ", which is not a multiple of the number of components ("
-          << nb_components << ")";
-      throw FieldError(err.str());
+    if (vec.cols() == 1) {
+      // input array represents a vector
+      if (vec.size() % nb_components) {
+        std::stringstream err{};
+        err << "The vector you supplied has a size of " << vec.size()
+            << ", which is not a multiple of the number of components ("
+            << nb_components << ").";
+        throw FieldError(err.str());
+      }
+    } else {
+      // two-dimensional input array has components as columns
+      if (size_t(vec.rows()) != nb_components) {
+        std::stringstream err{};
+        err << "The matrix you supplied has shape " << vec.rows() << " x "
+            << vec.cols() << ", but if the number of columns is not 1, then "
+            << "the number of rows must equal the number of components ("
+            << nb_components << ").";
+        throw FieldError(err.str());
+      }
     }
     if (current_size != collection.size()) {
       std::stringstream err{};
-      err << "The vector you supplied has the size for " << current_size
+      err << "The vector or matrix you supplied has size for " << current_size
           << " pixels with " << nb_components << "components each, but the "
           << "field collection has " << collection.size() << " pixels.";
       throw FieldError(err.str());
@@ -431,12 +443,14 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   template <class FieldCollection, typename T>
   void TypedField<FieldCollection, T>::resize(size_t size) {
-    if (this->alt_values) {
-      throw FieldError("Field proxies can't resize.");
+    if (this->current_size != size) {
+      if (this->alt_values) {
+        throw FieldError("Field proxies can't resize.");
+      }
+      this->current_size = size;
+      this->values.resize(size * this->get_nb_components() + this->pad_size);
+      this->data_ptr = &this->values.front();
     }
-    this->current_size = size;
-    this->values.resize(size * this->get_nb_components() + this->pad_size);
-    this->data_ptr = &this->values.front();
   }
 
   /* ---------------------------------------------------------------------- */
@@ -510,7 +524,7 @@ namespace muGrid {
     if (value.cols() != 1) {
       std::stringstream err{};
       err << "Expected a column vector, but received and array with "
-          << value.cols() << " colums.";
+          << value.cols() << " columns.";
       throw FieldError(err.str());
     }
     if (value.rows() != static_cast<Int>(this->get_nb_components())) {

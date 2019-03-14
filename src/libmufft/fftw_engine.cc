@@ -40,7 +40,8 @@ namespace muFFT {
   template <Dim_t Dim>
   FFTWEngine<Dim>::FFTWEngine(Ccoord resolutions, Dim_t nb_components,
                               Communicator comm)
-      : Parent{resolutions, nb_components, comm} {
+      : Parent{resolutions, nb_components, comm}, plan_fft{nullptr},
+        plan_ifft{nullptr} {
     for (auto && pixel :
          muGrid::CcoordOps::Pixels<Dim>(this->fourier_resolutions)) {
       this->work_space_container.add_pixel(pixel);
@@ -118,8 +119,10 @@ namespace muFFT {
   /* ---------------------------------------------------------------------- */
   template <Dim_t Dim>
   FFTWEngine<Dim>::~FFTWEngine<Dim>() noexcept {
-    fftw_destroy_plan(this->plan_fft);
-    fftw_destroy_plan(this->plan_ifft);
+    if (this->plan_fft != nullptr)
+      fftw_destroy_plan(this->plan_fft);
+    if (this->plan_ifft != nullptr)
+      fftw_destroy_plan(this->plan_ifft);
     // TODO(Till): We cannot run fftw_cleanup since subsequent FFTW calls will
     // fail but multiple FFT engines can be active at the same time.
     // fftw_cleanup();

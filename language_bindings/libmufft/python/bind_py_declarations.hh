@@ -1,5 +1,5 @@
 /**
- * @file   bind_py_common.hh
+ * @file   bind_py_declarations.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -32,17 +32,13 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef LANGUAGE_BINDINGS_PYTHON_BIND_PY_DECLARATIONS_HH_
-#define LANGUAGE_BINDINGS_PYTHON_BIND_PY_DECLARATIONS_HH_
+#ifndef LANGUAGE_BINDINGS_LIBMUFFT_PYTHON_BIND_PY_DECLARATIONS_HH_
+#define LANGUAGE_BINDINGS_LIBMUFFT_PYTHON_BIND_PY_DECLARATIONS_HH_
 
 #include <pybind11/pybind11.h>
 namespace py = pybind11;
 
 void add_common(py::module & mod);
-void add_cell(py::module & mod);
-void add_material(py::module & mod);
-void add_solvers(py::module & mod);
-void add_projections(py::module & submodule);
-void add_field_collections(py::module & submodule);
+void add_fft_engines(py::module & mod);
 
-#endif  // LANGUAGE_BINDINGS_PYTHON_BIND_PY_DECLARATIONS_HH_
+#endif  // LANGUAGE_BINDINGS_LIBMUFFT_PYTHON_BIND_PY_DECLARATIONS_HH_

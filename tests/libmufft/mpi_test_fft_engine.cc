@@ -175,11 +175,13 @@ namespace muFFT {
           (std::get<0>(tup) * Fix::engine.normalisation() - std::get<1>(tup))
               .norm()};
       BOOST_CHECK_LT(error, tol);
+      /*
       if (error > tol) {
         std::cout << std::get<0>(tup).array() / std::get<1>(tup).array()
                   << std::endl
                   << std::endl;
       }
+      */
     }
   }
 

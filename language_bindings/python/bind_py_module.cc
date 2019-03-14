@@ -43,6 +43,6 @@ PYBIND11_MODULE(_muSpectre, mod) {
   add_cell(mod);
   add_material(mod);
   add_solvers(mod);
-  add_fft_engines(mod);
   add_field_collections(mod);
+  add_projections(mod);
 }

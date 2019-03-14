@@ -33,7 +33,6 @@
  */
 
 #include "common/muSpectre_common.hh"
-#include <libmugrid/ccoord_operations.hh>
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -48,78 +47,6 @@ using muSpectre::Formulation;
 using pybind11::literals::operator""_a;
 
 namespace py = pybind11;
-
-template <Dim_t dim, typename T>
-void add_get_cube_helper(py::module & mod) {
-  std::stringstream name{};
-  name << "get_" << dim << "d_cube";
-  mod.def(name.str().c_str(), &muGrid::CcoordOps::get_cube<dim, T>, "size"_a,
-          "return a Ccoord with the value 'size' repeated in each dimension");
-}
-
-template <Dim_t dim>
-void add_get_hermitian_helper(py::module & mod) {
-  mod.def("get_hermitian_sizes", &muGrid::CcoordOps::get_hermitian_sizes<dim>,
-          "full_sizes"_a,
-          "return the hermitian sizes corresponding to the true sizes");
-}
-
-template <Dim_t dim>
-void add_get_ccoord_helper(py::module & mod) {
-  using Ccoord = muGrid::Ccoord_t<dim>;
-  mod.def(
-      "get_domain_ccoord",
-      [](Ccoord resolutions, Dim_t index) {
-        return muGrid::CcoordOps::get_ccoord<dim>(resolutions, Ccoord{}, index);
-      },
-      "resolutions"_a, "i"_a,
-      "return the cell coordinate corresponding to the i'th cell in a grid of "
-      "shape resolutions");
-}
-
-void add_get_cube(py::module & mod) {
-  add_get_cube_helper<muSpectre::twoD, Dim_t>(mod);
-  add_get_cube_helper<muSpectre::twoD, Real>(mod);
-  add_get_cube_helper<muSpectre::threeD, Dim_t>(mod);
-  add_get_cube_helper<muSpectre::threeD, Real>(mod);
-
-  add_get_hermitian_helper<muSpectre::twoD>(mod);
-  add_get_hermitian_helper<muSpectre::threeD>(mod);
-
-  add_get_ccoord_helper<muSpectre::twoD>(mod);
-  add_get_ccoord_helper<muSpectre::threeD>(mod);
-}
-
-template <Dim_t dim>
-void add_get_index_helper(py::module & mod) {
-  using Ccoord = muGrid::Ccoord_t<dim>;
-  mod.def("get_domain_index",
-          [](Ccoord sizes, Ccoord ccoord) {
-            return muGrid::CcoordOps::get_index<dim>(sizes, Ccoord{}, ccoord);
-          },
-          "sizes"_a, "ccoord"_a,
-          "return the linear index corresponding to grid point 'ccoord' in a "
-          "grid of size 'sizes'");
-}
-
-void add_get_index(py::module & mod) {
-  add_get_index_helper<muSpectre::twoD>(mod);
-  add_get_index_helper<muSpectre::threeD>(mod);
-}
-
-template <Dim_t dim>
-void add_Pixels_helper(py::module & mod) {
-  std::stringstream name{};
-  name << "Pixels" << dim << "d";
-  using Ccoord = muGrid::Ccoord_t<dim>;
-  py::class_<muGrid::CcoordOps::Pixels<dim>> Pixels(mod, name.str().c_str());
-  Pixels.def(py::init<Ccoord>());
-}
-
-void add_Pixels(py::module & mod) {
-  add_Pixels_helper<muGrid::twoD>(mod);
-  add_Pixels_helper<muGrid::threeD>(mod);
-}
 
 void add_common(py::module & mod) {
   py::enum_<Formulation>(mod, "Formulation")
@@ -146,11 +73,6 @@ void add_common(py::module & mod) {
       .value("LCauchyGreen", StrainMeasure::LCauchyGreen)
       .value("no_strain_", StrainMeasure::no_strain_);
 
-  py::enum_<muFFT::FFT_PlanFlags>(mod, "FFT_PlanFlags")
-      .value("estimate", muFFT::FFT_PlanFlags::estimate)
-      .value("measure", muFFT::FFT_PlanFlags::measure)
-      .value("patient", muFFT::FFT_PlanFlags::patient);
-
   py::enum_<muSpectre::FiniteDiff>(
       mod, "FiniteDiff",
       "Distinguishes between different options of numerical differentiation;\n "
@@ -163,10 +85,4 @@ void add_common(py::module & mod) {
 
   mod.def("banner", &muSpectre::banner, "name"_a, "year"_a,
           "copyright_holder"_a);
-
-  add_get_cube(mod);
-
-  add_Pixels(mod);
-
-  add_get_index(mod);
 }

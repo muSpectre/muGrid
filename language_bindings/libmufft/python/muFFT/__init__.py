@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
-@file   fft.py
+@file   __init__.py
 
-@author Till Junge <till.junge@epfl.ch>
+@author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
 
-@date   27 Mar 2018
+@date   21 Mar 2018
 
-@brief  Wrapper for µSpectre's FFT engines
+@brief  Main entry point for muFFT Python module
 
 Copyright © 2018 Till Junge
 
@@ -34,35 +34,38 @@ covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
 
+
 try:
     from mpi4py import MPI
 except ImportError:
     MPI = None
 
-import _muSpectre
+import _muFFT
+from _muFFT import FFT_PlanFlags
 
 # This is a list of FFT engines that are potentially available.
+#              |------------------------------- Identifier for 'FFT' factory
+#              |        |---------------------- Name of class for 
+#              |        |          |----------- Name class for 3D grids
+#              v        v          v         v- Supports MPI parallel calcs
 _factories = {'fftw': ('FFTW_2d', 'FFTW_3d', False),
               'fftwmpi': ('FFTWMPI_2d', 'FFTWMPI_3d', True),
               'pfft': ('PFFT_2d', 'PFFT_3d', True),
               'p3dfft': ('P3DFFT_2d', 'P3DFFT_3d', True)}
-
-_projections = {_muSpectre.Formulation.finite_strain: 'FiniteStrainFast',
-                _muSpectre.Formulation.small_strain: 'SmallStrain'}
 
 
 # Detect FFT engines. This is a convenience dictionary that allows enumeration
 # of all engines that have been compiled into the library.
 fft_engines = []
 for fft, (factory_name_2d, factory_name_3d, is_parallel) in _factories.items():
-    if factory_name_2d in _muSpectre.fft.__dict__ and \
-        factory_name_3d in _muSpectre.fft.__dict__:
+    if factory_name_2d in _muFFT.__dict__ and \
+        factory_name_3d in _muFFT.__dict__:
         fft_engines += [(fft, is_parallel)]
 
 
 def FFT(resolutions, nb_components, fft='fftw', communicator=None):
     """
-    Instantiate a muSpectre FFT class.
+    Instantiate a muFFT FFT class.
 
     Parameters
     ----------
@@ -83,6 +86,7 @@ def FFT(resolutions, nb_components, fft='fftw', communicator=None):
     cell: object
         Return a muSpectre Cell object.
     """
+    resolutions = list(resolutions)
     try:
         factory_name_2d, factory_name_3d, is_parallel = _factories[fft]
     except KeyError:
@@ -95,10 +99,10 @@ def FFT(resolutions, nb_components, fft='fftw', communicator=None):
         raise ValueError('{}-d transforms are not supported'
                          .format(len(resolutions)))
     try:
-        factory = _muSpectre.fft.__dict__[factory_name]
+        factory = _muFFT.__dict__[factory_name]
     except KeyError:
         raise KeyError("FFT engine '{}' has not been compiled into the "
-                       "muSpectre library.".format(factory_name))
+                       "muFFT library.".format(factory_name))
     if is_parallel:
         if MPI is None:
             raise RuntimeError('Parallel solver requested but mpi4py could'
@@ -111,41 +115,3 @@ def FFT(resolutions, nb_components, fft='fftw', communicator=None):
             raise ValueError("FFT engine '{}' does not support parallel "
                              "execution.".format(fft))
         return factory(resolutions, nb_components)
-
-
-def Projection(resolutions, lengths,
-               formulation=_muSpectre.Formulation.finite_strain,
-               fft='fftw', communicator=None):
-    """
-    Instantiate a muSpectre Projection class.
-
-    Parameters
-    ----------
-    resolutions: list
-        Grid resolutions in the Cartesian directions.
-    formulation: muSpectre.Formulation
-        Determines whether to use finite or small strain formulation.
-    fft: string
-        FFT engine to use. Options are 'fftw', 'fftwmpi', 'pfft' and 'p3dfft'.
-        Default is 'fftw'.
-    communicator: mpi4py communicator
-        mpi4py communicator object passed to parallel FFT engines. Note that
-        the default 'fftw' engine does not support parallel execution.
-
-
-    Returns
-    -------
-    cell: object
-        Return a muSpectre Cell object.
-    """
-    factory_name = 'Projection{}_{}d'.format(_projections[formulation],
-                                             len(resolutions))
-    try:
-        factory = _muSpectre.fft.__dict__[factory_name]
-    except KeyError:
-        raise KeyError("Projection engine '{}' has not been compiled into the "
-                       "muSpectre library.".format(factory_name))
-    if communicator is None:
-        communicator = MPI.COMM_SELF
-    return factory(resolutions, lengths, fft,
-                   MPI._handleof(communicator))

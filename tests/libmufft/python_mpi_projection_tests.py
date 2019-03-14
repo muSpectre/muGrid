@@ -45,8 +45,9 @@ from mpi4py import MPI
 from python_test_imports import µ
 from python_goose_ref import (SmallStrainProjectionGooseFFT,
                               FiniteStrainProjectionGooseFFT)
+from muFFT import fft_engines
 from muSpectre import Formulation
-from muSpectre.fft import Projection, fft_engines
+from muSpectre import Projection
 
 
 def build_test_classes(formulation, RefProjection, fft):

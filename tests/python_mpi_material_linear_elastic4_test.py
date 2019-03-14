@@ -44,7 +44,7 @@ except ImportError:
 import unittest
 import numpy as np
 
-from python_test_imports import µ
+from python_test_imports import muFFT, µ
 
 
 def build_test_classes(fft):
@@ -95,7 +95,7 @@ def build_test_classes(fft):
     return MaterialLinearElastic4_Check
 
 linear_elastic4 = {}
-for fft, is_parallel in µ.fft.fft_engines:
+for fft, is_parallel in muFFT.fft_engines:
     if is_parallel:
         linear_elastic4[fft] = build_test_classes(fft)
 
