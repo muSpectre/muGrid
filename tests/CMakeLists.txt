@@ -120,3 +120,6 @@ if(${MUSPECTRE_MPI_PARALLEL})
 endif()
 
 add_custom_target(test_muspectre DEPENDS ${muspectre_tests})
+
+
+add_subdirectory(lint)
