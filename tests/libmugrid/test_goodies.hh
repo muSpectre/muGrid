@@ -221,6 +221,45 @@ namespace muGrid {
       return retval;
     }
 
+    /* ---------------------------------------------------------------------- */
+    /**
+     * relative error measure for scalar values which can safely be compared to
+     * machine precision.
+     */
+    template <typename T, bool IsArithmetic = std::is_arithmetic<T>::value>
+    std::enable_if_t<IsArithmetic, T> rel_error(const T & a, const T & b) {
+      static_assert(IsArithmetic == std::is_arithmetic<T>::value,
+                    "IsArithmetic is a SFINAE parameter, do not set manually");
+      Real comp(std::abs(a) + std::abs(b));
+      if (comp == 0.) {
+        return std::abs(a-b);
+      }
+      return std::abs(a-b)/comp;
+    }
+
+    /**
+     * relative error measure for matrices which can safely be compared to
+     * machine precision.
+     */
+    template <typename DerivedA, typename DerivedB>
+    Real rel_error(const Eigen::MatrixBase<DerivedA> & a,
+                   const Eigen::MatrixBase<DerivedB> & b) {
+      Real comp(a.norm() + b.norm());
+      if (comp == 0.) {
+        return (a-b).norm();
+      }
+      return (a-b).norm()/comp;
+    }
+
+    /**
+     * relative error measure for arrays which can safely be compared to
+     * machine precision.
+     */
+    template <typename DerivedA, typename DerivedB>
+    Real rel_error(const Eigen::ArrayBase<DerivedA> & a,
+                   const Eigen::ArrayBase<DerivedB> & b) {
+      return rel_error(a.matrix(), b.matrix());
+    }
   }  // namespace testGoodies
 
 }  // namespace muGrid

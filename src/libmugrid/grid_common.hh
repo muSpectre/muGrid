@@ -43,9 +43,8 @@
 namespace muGrid {
 
   /**
-   * Eigen uses signed integers for dimensions. For consistency,
-   µGrid uses them througout the code. needs to represent -1 for
-   eigen
+   * Eigen uses signed integers for dimensions. For consistency, µGrid uses them
+   * througout the code. needs to represent -1 for eigen
    */
   using Dim_t = int;
 
@@ -56,21 +55,23 @@ namespace muGrid {
   constexpr Dim_t secondOrder{2};  //!< constant second-order tensors
   constexpr Dim_t fourthOrder{4};  //!< constant fourth-order tensors
 
+  //! \addtogroup Scalars Scalar types used for mathematical calculations hello
   //@{
-  //! @anchor scalars
-  //! Scalar types used for mathematical calculations
   using Uint = unsigned int;
   using Int = int;
   using Real = double;
   using Complex = std::complex<Real>;
   //@}
 
+  //! \addtogroup Coordinates Coordinate types
+  //@{
   //! Ccoord_t are cell coordinates, i.e. integer coordinates
   template <Dim_t dim>
   using Ccoord_t = std::array<Dim_t, dim>;
   //! Real space coordinates
   template <Dim_t dim>
   using Rcoord_t = std::array<Real, dim>;
+  //@}
 
   /**
    * Allows inserting `muGrid::Ccoord_t` and `muGrid::Rcoord_t`

@@ -68,6 +68,7 @@ namespace muGrid {
   template <class FieldCollection>
   class StateFieldBase {
    public:
+    using collection_t = FieldCollection;
     //! get naming prefix
     const std::string & get_prefix() const { return this->prefix; }
 
@@ -153,28 +154,30 @@ namespace muGrid {
   };
 
   /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, size_t nb_memory, typename T>
+  template <class FieldCollection, size_t NbMemory, typename T>
   class TypedSizedStateField : public TypedStateField<FieldCollection, T> {
    public:
     //! Parent class
     using Parent = TypedStateField<FieldCollection, T>;
     //! the current (historically accurate) ordering of the fields
-    using index_t = std::array<size_t, nb_memory + 1>;
+    using index_t = std::array<size_t, NbMemory + 1>;
     //! get the current ordering of the fields
     inline const index_t & get_indices() const { return this->indices; }
     //! destructor
     virtual ~TypedSizedStateField() = default;
 
+    constexpr static size_t nb_memory() {return NbMemory;}
+
    protected:
     //! constructor
     TypedSizedStateField(std::string unique_prefix,
                          const FieldCollection & collection, index_t indices)
-        : Parent{unique_prefix, collection, nb_memory}, indices{indices} {};
+        : Parent{unique_prefix, collection, NbMemory}, indices{indices} {};
     index_t indices;  ///< these are cycled through
   };
 
   //! early declaration
-  template <class FieldMap, size_t nb_memory>
+  template <class FieldMap, size_t NbMemory>
   class StateFieldMap;
 
   namespace internal {
@@ -202,25 +205,25 @@ namespace muGrid {
 
   /**
    * A statefield is an abstraction around a Field that can hold a
-   * current and `nb_memory` previous values. There are useful for
+   * current and `NbMemory` previous values. There are useful for
    * history variables, for instance.
    */
-  template <class Field_t, size_t nb_memory = 1>
+  template <class Field_t, size_t NbMemory = 1>
   class StateField
       : public TypedSizedStateField<typename Field_t::Base::collection_t,
-                                    nb_memory, typename Field_t::Scalar> {
+                                    NbMemory, typename Field_t::Scalar> {
    public:
     //! the underlying field's collection type
     using FieldCollection_t = typename Field_t::Base::collection_t;
     //! base type for fields
     using Scalar = typename Field_t::Scalar;
     //! Base class for all state fields of same memory
-    using Base = TypedSizedStateField<FieldCollection_t, nb_memory, Scalar>;
+    using Base = TypedSizedStateField<FieldCollection_t, NbMemory, Scalar>;
     /**
      * storage of field refs (can't be a `std::array`, because arrays
      * of refs are explicitely forbidden
      */
-    using Fields_t = RefArray<Field_t, nb_memory + 1>;
+    using Fields_t = RefArray<Field_t, NbMemory + 1>;
     //! Typed field
     using TypedField_t = TypedField<FieldCollection_t, Scalar>;
 
@@ -248,7 +251,7 @@ namespace muGrid {
     //! get (constant) previous field
     template <size_t nb_steps_ago = 1>
     inline const Field_t & old() {
-      static_assert(nb_steps_ago <= nb_memory,
+      static_assert(nb_steps_ago <= NbMemory,
                     "you can't go that far inte the past");
       static_assert(nb_steps_ago > 0, "Did you mean to call current()?");
       return this->fields[this->indices.at(nb_steps_ago)];
@@ -290,11 +293,11 @@ namespace muGrid {
      * appropriate dimensions mapped to this field. You can also
      * create other types of maps, as long as they have the right
      * fundamental type (T), the correct size (nbComponents), and
-     * memory (nb_memory).
+     * memory (NbMemory).
      */
     inline decltype(auto) get_map() {
       using FieldMap = decltype(this->fields[0].get_map());
-      return StateFieldMap<FieldMap, nb_memory>(*this);
+      return StateFieldMap<FieldMap, NbMemory>{*this};
     }
 
     /**
@@ -302,11 +305,11 @@ namespace muGrid {
      * appropriate dimensions mapped to this field. You can also
      * create other types of maps, as long as they have the right
      * fundamental type (T), the correct size (nbComponents), and
-     * memory (nb_memory).
+     * memory (NbMemory).
      */
     inline decltype(auto) get_const_map() {
       using FieldMap = decltype(this->fields[0].get_const_map());
-      return StateFieldMap<FieldMap, nb_memory>(*this);
+      return StateFieldMap<FieldMap, NbMemory>{*this};
     }
 
     /**
@@ -315,7 +318,7 @@ namespace muGrid {
      */
     inline void cycle() final {
       for (auto & val : this->indices) {
-        val = (val + 1) % (nb_memory + 1);
+        val = (val + 1) % (NbMemory + 1);
       }
     }
 
@@ -329,14 +332,13 @@ namespace muGrid {
     inline StateField(const std::string & unique_prefix,
                       FieldCollection_t & collection)
         : Base{unique_prefix, collection,
-               internal::build_indices<nb_memory + 1>(
-                   std::make_index_sequence<nb_memory + 1>{})},
-          fields{internal::build_fields_helper<Field_t, nb_memory + 1>(
+               internal::build_indices<NbMemory + 1>(
+                   std::make_index_sequence<NbMemory + 1>{})},
+          fields{internal::build_fields_helper<Field_t, NbMemory + 1>(
               unique_prefix, collection,
-              std::make_index_sequence<nb_memory + 1>{})} {}
+              std::make_index_sequence<NbMemory + 1>{})} {}
 
     Fields_t fields;  //!< container for the states
-   private:
   };
 
   namespace internal {
@@ -363,7 +365,7 @@ namespace muGrid {
   /**
    * extends the StateField <-> Field equivalence to StateFieldMap <-> FieldMap
    */
-  template <class FieldMap, size_t nb_memory = 1>
+  template <class FieldMap, size_t NbMemory = 1>
   class StateFieldMap {
    public:
     /**
@@ -387,7 +389,7 @@ namespace muGrid {
     using Scalar = typename FieldMap::Scalar;
     //! base class (must be at least sized)
     using TypedSizedStateField_t =
-        TypedSizedStateField<FieldCollection_t, nb_memory, Scalar>;
+        TypedSizedStateField<FieldCollection_t, NbMemory, Scalar>;
     //! for traits access
     using FieldMap_t = FieldMap;
     //! for traits access
@@ -397,19 +399,18 @@ namespace muGrid {
     StateFieldMap() = delete;
 
     //! constructor using a StateField
-    template <class StateField>
+    template <class StateField,
+              typename std::enable_if_t<
+                  std::is_base_of<TypedSizedStateField_t, StateField>::value,
+                  bool> = false>
     explicit StateFieldMap(StateField & statefield)
         : collection{statefield.get_collection()}, statefield{statefield},
-          maps{internal::build_maps_helper<FieldMap, nb_memory + 1>(
+          maps{internal::build_maps_helper<FieldMap, NbMemory + 1>(
               statefield.get_fields(),
-              std::make_index_sequence<nb_memory + 1>{})},
-          const_maps{
-              internal::build_maps_helper<ConstFieldMap_t, nb_memory + 1>(
-                  statefield.get_fields(),
-                  std::make_index_sequence<nb_memory + 1>{})} {
-      static_assert(std::is_base_of<TypedSizedStateField_t, StateField>::value,
-                    "Not the right type of StateField ref");
-    }
+              std::make_index_sequence<NbMemory + 1>{})},
+          const_maps{internal::build_maps_helper<ConstFieldMap_t, NbMemory + 1>(
+              statefield.get_fields(),
+              std::make_index_sequence<NbMemory + 1>{})} {}
 
     //! Copy constructor
     StateFieldMap(const StateFieldMap & other) = delete;
@@ -445,10 +446,10 @@ namespace muGrid {
    protected:
     const FieldCollection_t & collection;  //!< collection holding the field
     TypedSizedStateField_t & statefield;   //!< ref to the field itself
-    std::array<FieldMap, nb_memory + 1>
+    std::array<FieldMap, NbMemory + 1>
         maps;  //!< refs to the addressable maps;
     //! const refs to the addressable maps;
-    std::array<ConstFieldMap_t, nb_memory + 1> const_maps;
+    std::array<ConstFieldMap_t, NbMemory + 1> const_maps;
 
    private:
   };
@@ -456,8 +457,8 @@ namespace muGrid {
   /**
    * Iterator class used by the `StateFieldMap`
    */
-  template <class FieldMap, size_t nb_memory>
-  class StateFieldMap<FieldMap, nb_memory>::iterator {
+  template <class FieldMap, size_t NbMemory>
+  class StateFieldMap<FieldMap, NbMemory>::iterator {
    public:
     class StateWrapper;
 
@@ -602,8 +603,8 @@ namespace muGrid {
    * values of a field at a given pixel identified by an iterator
    * pointing to it
    */
-  template <class FieldMap, size_t nb_memory>
-  class StateFieldMap<FieldMap, nb_memory>::iterator::StateWrapper {
+  template <class FieldMap, size_t NbMemory>
+  class StateFieldMap<FieldMap, NbMemory>::iterator::StateWrapper {
    public:
     //! short-hand
     using iterator = typename StateFieldMap::iterator;
@@ -620,8 +621,8 @@ namespace muGrid {
      */
     using Array_t = std::conditional_t<
         std::is_reference<ConstMap>::value,
-        RefArray<std::remove_reference_t<ConstMap>, nb_memory>,
-        std::array<ConstMap, nb_memory>>;
+        RefArray<std::remove_reference_t<ConstMap>, NbMemory>,
+        std::array<ConstMap, NbMemory>>;
 
     //! Default constructor
     StateWrapper() = delete;
@@ -637,7 +638,7 @@ namespace muGrid {
         : it{it},
           current_val{
               it.map.maps[it.map.statefield.get_indices()[0]][it.index]},
-          old_vals(internal::build_old_vals<Array_t, nb_memory>(
+          old_vals(internal::build_old_vals<Array_t, NbMemory>(
               it, it.map.const_maps, it.map.statefield.get_indices())) {}
 
     //! Destructor
@@ -655,7 +656,7 @@ namespace muGrid {
     //! recurnts reference the the value that was current `nb_steps_ago` ago
     template <size_t nb_steps_ago = 1>
     inline const ConstMap & old() const {
-      static_assert(nb_steps_ago <= nb_memory,
+      static_assert(nb_steps_ago <= NbMemory,
                     "You have not stored that time step");
       static_assert(nb_steps_ago > 0,
                     "Did you mean to access the current value? If so, use "

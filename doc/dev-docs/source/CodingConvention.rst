@@ -601,7 +601,7 @@ Definition:
     - List initialisation can suffer from the same problems if the destination type is implicit, particularly if the list has only a single element.
 
   Decision:
-    Type conversion operators, and constructors that are callable with a single argument, must be marked ``explicit`` in the class definition. As an exception, copy and move constructors should not be ``explicit``, since they do not perform type conversion. Implicit conversions can sometimes be necessary and appropriate for types that are designed to transparently wrap other types. In that case, raise an `issue <https://gitlab.com/muspectre/muspectre/issues>>`_.
+    Type conversion operators, and constructors that are callable with a single argument, must be marked ``explicit`` in the class definition. As an exception, copy and move constructors should not be ``explicit``, since they do not perform type conversion. Implicit conversions can sometimes be necessary and appropriate for types that are designed to transparently wrap other types. In that case, raise an `issue <https://gitlab.com/muspectre/muspectre/issues>`_.
 
     Constructors that cannot be called with a single argument may omit ``explicit``. Constructors that take a single ``std::initialiser_list`` parameter should also omit ``explicit``, in order to support copy-initialisation (e.g. ``MyType m{1, 2};``).
 

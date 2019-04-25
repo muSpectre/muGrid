@@ -17,7 +17,7 @@ or if you prefer identifying yourself using a public ssh-key, run
    $ git clone git@gitlab.com:muspectre/muspectre.git
 
 The latter option requires you to have a user account on gitlab (`create
-<https://gitlab.com/users/sign_in#register-pane`_).
+<https://gitlab.com/users/sign_in#register-pane>`_).
 
 
 .. _gitlab: https://gitlab.com

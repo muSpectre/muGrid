@@ -73,19 +73,19 @@ namespace muGrid {
     //! Default constructor
     FieldCollectionBase();
 
-    //! Copy constructor
+    //! Deleted copy constructor
     FieldCollectionBase(const FieldCollectionBase & other) = delete;
 
-    //! Move constructor
+    //! Deleted move constructor
     FieldCollectionBase(FieldCollectionBase && other) = delete;
 
-    //! Destructor
+    //! Default destructor
     virtual ~FieldCollectionBase() = default;
 
-    //! Copy assignment operator
+    //! Deleted copy assignment operator
     FieldCollectionBase & operator=(const FieldCollectionBase & other) = delete;
 
-    //! Move assignment operator
+    //! Deleted move assignment operator
     FieldCollectionBase & operator=(FieldCollectionBase && other) = delete;
 
     //! Register a new field (fields need to be in heap, so I want to keep them

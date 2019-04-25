@@ -1,5 +1,5 @@
 /**
- * @file   common.hh
+ * @file   muSpectre_common.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *

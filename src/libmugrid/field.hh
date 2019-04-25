@@ -346,7 +346,7 @@ namespace muGrid {
   };
 
   /* ---------------------------------------------------------------------- */
-  //! convenience alias (
+  //! convenience alias
   template <class FieldCollection, typename T>
   using ScalarField = MatrixField<FieldCollection, T, 1, 1>;
   /* ---------------------------------------------------------------------- */

@@ -37,17 +37,11 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   MaterialHyperElastoPlastic1<DimS, DimM>::MaterialHyperElastoPlastic1(
       std::string name, Real young, Real poisson, Real tau_y0, Real H)
-      : Parent{name},
-        plast_flow_field{muGrid::make_statefield<
-            muGrid::StateField<muGrid::ScalarField<LColl_t, Real>>>(
-            "cumulated plastic flow εₚ", this->internal_fields)},
-        F_prev_field{muGrid::make_statefield<muGrid::StateField<
-            muGrid::TensorField<LColl_t, Real, secondOrder, DimM>>>(
-            "Previous placement gradient Fᵗ", this->internal_fields)},
-        be_prev_field{muGrid::make_statefield<muGrid::StateField<
-            muGrid::TensorField<LColl_t, Real, secondOrder, DimM>>>(
-            "Previous left Cauchy-Green deformation bₑᵗ",
-            this->internal_fields)},
+      : Parent{name}, plast_flow_field{this->internal_fields,
+                                       "cumulated plastic flow εₚ"},
+        F_prev_field{this->internal_fields, "Previous placement gradient Fᵗ"},
+        be_prev_field{this->internal_fields,
+                      "Previous left Cauchy-Green deformation bₑᵗ"},
         young{young}, poisson{poisson}, lambda{Hooke::compute_lambda(young,
                                                                      poisson)},
         mu{Hooke::compute_mu(young, poisson)},
@@ -55,15 +49,16 @@ namespace muSpectre {
         // the factor .5 comes from equation (18) in Geers 2003
         // (https://doi.org/10.1016/j.cma.2003.07.014)
         C{0.5 * Hooke::compute_C_T4(lambda, mu)},
-        internal_variables{F_prev_field.get_map(), be_prev_field.get_map(),
-                           plast_flow_field.get_map()} {}
+        internal_variables(F_prev_field.get_field().get_map(),
+                           be_prev_field.get_field().get_map(),
+                           plast_flow_field.get_field().get_map()) {}
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   void MaterialHyperElastoPlastic1<DimS, DimM>::save_history_variables() {
-    this->plast_flow_field.cycle();
-    this->F_prev_field.cycle();
-    this->be_prev_field.cycle();
+    this->plast_flow_field.get_field().cycle();
+    this->F_prev_field.get_field().cycle();
+    this->be_prev_field.get_field().cycle();
   }
 
   /* ---------------------------------------------------------------------- */

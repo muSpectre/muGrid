@@ -87,7 +87,7 @@ namespace muGrid {
               bool ConstField>
     class FieldMap {
       static_assert((NbComponents != 0),
-                    "Fields with now components make no sense.");
+                    "Fields without components make no sense.");
       /*
        * Eigen::Dynamic is equal to -1, and is a legal value, hence
        * the following peculiar check

@@ -20,7 +20,7 @@ make *µ*\Spectre eminently modifiable for developers by developing it in the op
 Furthermore, this project places great importance on truly reproducible and verifiable science with a credible open data strategy in the firm belief that these qualifiers help to reach and guarantee a high level of scientific quality, difficult to reach otherwise, and to attract outside collaborations and contributions that help boost the scientific output beyond what can be achieved by a single team.
 
 
-.. _`Moulinec and Suquet` : 
+.. _`Moulinec and_Suquet` :
 
 `H. Moulinec and P. Suquet <https://doi.org/10.1016/S0045-7825(97)00218-1>`_. A numerical method for computing the overall response of nonlinear composites with complex microstructure. *Computer Methods in Applied Mechanics and Engineering*, 157(1):69–94, 1998. doi: 10.1016/S0045-7825(97) 00218-1.
 

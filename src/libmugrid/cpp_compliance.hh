@@ -1,5 +1,5 @@
 /**
- * @file   utilities.hh
+ * @file   cpp_compliance.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *

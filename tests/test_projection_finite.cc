@@ -111,16 +111,21 @@ namespace muSpectre {
     }
 
     using muGrid::operator/;
+    // start_field_iteration_snippet
     for (auto && tup : akantu::zip(fields, grad, var)) {
-      auto & ccoord = std::get<0>(tup);
-      auto & g = std::get<1>(tup);
-      auto & v = std::get<2>(tup);
+      auto & ccoord = std::get<0>(tup);  // iterate from fields
+      auto & g = std::get<1>(tup);       // iterate from grad
+      auto & v = std::get<2>(tup);       // iterate from var
+
+      // use iterate in arbitrary expressions
       Vector vec = muGrid::CcoordOps::get_vector(
           ccoord, fix::projector.get_domain_lengths() /
                       fix::projector.get_domain_resolutions());
+      // do efficient linear algebra on iterates
       g.row(0) = k.transpose() * cos(k.dot(vec));
       v.row(0) = g.row(0);
     }
+    // end_field_iteration_snippet
 
     fix::projector.initialise(muFFT::FFT_PlanFlags::estimate);
     fix::projector.apply_projection(f_var);

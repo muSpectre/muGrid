@@ -41,7 +41,7 @@
 #include "materials/materials_toolbox.hh"
 
 #include <libmugrid/eigen_tools.hh>
-#include <libmugrid/statefield.hh>
+#include <libmugrid/mapped_field.hh>
 
 #include <algorithm>
 
@@ -195,19 +195,19 @@ namespace muSpectre {
     //! getter for internal variable field εₚ
     muGrid::StateField<muGrid::ScalarField<LColl_t, Real>> &
     get_plast_flow_field() {
-      return this->plast_flow_field;
+      return this->plast_flow_field.get_field();
     }
 
     //! getter for previous gradient field Fᵗ
     muGrid::StateField<muGrid::TensorField<LColl_t, Real, secondOrder, DimM>> &
     get_F_prev_field() {
-      return this->F_prev_field;
+      return this->F_prev_field.get_field();
     }
 
     //! getterfor elastic left Cauchy-Green deformation tensor bₑᵗ
     muGrid::StateField<muGrid::TensorField<LColl_t, Real, secondOrder, DimM>> &
     get_be_prev_field() {
-      return this->be_prev_field;
+      return this->be_prev_field.get_field();
     }
 
     /**
@@ -226,15 +226,12 @@ namespace muSpectre {
                                        StrainStRef_t & be_prev,
                                        FlowStRef_t & plast_flow);
     //! storage for cumulated plastic flow εₚ
-    muGrid::StateField<muGrid::ScalarField<LColl_t, Real>> & plast_flow_field;
-
+    muGrid::MappedScalarStateField<Real, DimS> plast_flow_field;
     //! storage for previous gradient Fᵗ
-    muGrid::StateField<muGrid::TensorField<LColl_t, Real, secondOrder, DimM>> &
-        F_prev_field;
+    muGrid::MappedT2StateField<Real, DimS, DimM> F_prev_field;
 
     //! storage for elastic left Cauchy-Green deformation tensor bₑᵗ
-    muGrid::StateField<muGrid::TensorField<LColl_t, Real, secondOrder, DimM>> &
-        be_prev_field;
+    muGrid::MappedT2StateField<Real, DimS, DimM> be_prev_field;
 
     // material properties
     const Real young;    //!< Young's modulus
