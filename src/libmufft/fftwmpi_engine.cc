@@ -58,6 +58,9 @@ namespace muFFT {
         Dim, narr.data(), this->nb_components, FFTW_MPI_DEFAULT_BLOCK,
         FFTW_MPI_DEFAULT_BLOCK, this->comm.get_mpi_comm(), &res_x, &loc_x,
         &res_y, &loc_y);
+    // A factor of two is required because we are using the c2r/r2c DFTs.
+    // See: http://www.fftw.org/fftw3_doc/Multi_002ddimensional-MPI-DFTs-of-Real-Data.html
+    this->workspace_size *= 2;
     this->fourier_resolutions[1] = this->fourier_resolutions[0];
     this->fourier_locations[1] = this->fourier_locations[0];
     this->subdomain_resolutions[0] = res_x;
@@ -98,7 +101,7 @@ namespace muFFT {
     // work space has been initialized
     Parent::initialise(plan_flags);
 
-    this->real_workspace = fftw_alloc_real(2 * this->workspace_size);
+    this->real_workspace = fftw_alloc_real(this->workspace_size);
     // We need to check whether the workspace provided by our field is large
     // enough. MPI parallel FFTW may request a workspace size larger than the
     // nominal size of the complex buffer.

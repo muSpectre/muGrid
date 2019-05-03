@@ -143,6 +143,9 @@ namespace muGrid {
       //! number of pixels in the field
       virtual size_t size() const = 0;
 
+      //! size of the internal buffer including the pad region
+      virtual size_t buffer_size() const = 0;
+
       //! add a pad region to the end of the field buffer; required for
       //! using this as e.g. an FFT workspace
       virtual void set_pad_size(size_t pad_size_) = 0;

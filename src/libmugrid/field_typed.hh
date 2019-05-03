@@ -152,7 +152,11 @@ namespace muGrid {
     //! safe reference cast
     static const TypedField & check_ref(const Base & other);
 
+    //! number of pixels in the field
     size_t size() const final;
+
+    //! size of the internal buffer including the pad region
+    size_t buffer_size() const final;
 
     //! add a pad region to the end of the field buffer; required for
     //! using this as e.g. an FFT workspace
@@ -441,13 +445,18 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   template <class FieldCollection, typename T>
   void TypedField<FieldCollection, T>::resize(size_t size) {
-    if (this->current_size != size) {
-      if (this->alt_values) {
+    if (this->alt_values) {
+      if (static_cast<size_t>(this->alt_values->size())
+          != size * this->get_nb_components() + this->pad_size) {
         throw FieldError("Field proxies can't resize.");
       }
-      this->current_size = size;
-      this->values.resize(size * this->get_nb_components() + this->pad_size);
-      this->data_ptr = &this->values.front();
+    } else {
+      if (this->values.size() != size * this->get_nb_components()
+          + this->pad_size) {
+        this->current_size = size;
+        this->values.resize(size * this->get_nb_components() + this->pad_size);
+        this->data_ptr = &this->values.front();
+      }
     }
   }
 
@@ -486,6 +495,12 @@ namespace muGrid {
   template <class FieldCollection, typename T>
   size_t TypedField<FieldCollection, T>::size() const {
     return this->current_size;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <class FieldCollection, typename T>
+  size_t TypedField<FieldCollection, T>::buffer_size() const {
+    return this->values.size();
   }
 
   /* ---------------------------------------------------------------------- */
