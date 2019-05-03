@@ -44,7 +44,7 @@ namespace muSpectre {
       : Parent{name}, material{name, young, poisson},
         eigen_field{
             muGrid::make_field<Field_t>("Eigenstrain", this->internal_fields)},
-        internal_variables(eigen_field.get_const_map()) {}
+        eigen_map{eigen_field.get_map()} {}
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>

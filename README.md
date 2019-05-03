@@ -33,7 +33,7 @@ and CMake version 3.5.0 or higher.
 
 ### Compilation
 
-  1. git clone https://gitlab.com/tjunge/muspectre.git
+  1. git clone https://gitlab.com/muspectre/muspectre.git
   2. cd build
   3. cmake -DCMAKE_BUILD_TYPE=Release ..
   4. make

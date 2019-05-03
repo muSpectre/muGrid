@@ -269,8 +269,6 @@ namespace muGrid {
      * super annoying memory bugs.
      */
     T * data_ptr{};
-
-   private:
   };
 }  // namespace muGrid
 

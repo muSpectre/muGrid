@@ -177,8 +177,6 @@ namespace muFFT {
     Workspace_t & work;      //!< field to store the Fourier transform of P
     const Real norm_factor;  //!< normalisation coefficient of fourier transform
     Dim_t nb_components;
-
-   private:
   };
 
 }  // namespace muFFT

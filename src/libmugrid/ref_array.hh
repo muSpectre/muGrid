@@ -91,8 +91,6 @@ namespace muGrid {
 
    protected:
     std::array<T *, N> values{};
-
-   private:
   };
 
 }  // namespace muGrid

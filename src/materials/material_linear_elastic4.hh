@@ -39,8 +39,8 @@
 #define SRC_MATERIALS_MATERIAL_LINEAR_ELASTIC4_HH_
 
 #include "materials/material_linear_elastic1.hh"
+#include "libmugrid/mapped_field.hh"
 
-#include <libmugrid/field.hh>
 
 #include <Eigen/Dense>
 
@@ -72,14 +72,6 @@ namespace muSpectre {
     constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
     //! declare what type of stress measure your law yields as output
     constexpr static auto stress_measure{StressMeasure::PK2};
-
-    //! local field_collections used for internals
-    using LFieldColl_t = muGrid::LocalFieldCollection<DimS>;
-    //! local Lame constant type
-    using LLameConstantMap_t = muGrid::ScalarFieldMap<LFieldColl_t, Real, true>;
-    //! elasticity without internal variables
-    using InternalVariables =
-        std::tuple<LLameConstantMap_t, LLameConstantMap_t>;
   };
 
   /**
@@ -106,8 +98,8 @@ namespace muSpectre {
     //! traits of this material
     using traits = MaterialMuSpectre_traits<MaterialLinearElastic4>;
 
-    //! Type of container used for storing eigenstrain
-    using InternalVariables = typename traits::InternalVariables;
+    //! storage type for Lamé constants
+    using Field_t = muGrid::MappedScalarField<Real, DimS, true>;
 
     //! Hooke's law implementation
     using Hooke =
@@ -142,9 +134,21 @@ namespace muSpectre {
      * strain (or Cauchy stress if called with a small strain tensor), the first
      * Lame constant (lambda) and the second Lame constant (shear modulus/mu).
      */
-    template <class s_t>
-    inline decltype(auto) evaluate_stress(s_t && E, const Real & lambda,
-                                          const Real & mu);
+    template <class Derived>
+    inline decltype(auto) evaluate_stress(const Eigen::MatrixBase<Derived> & E,
+                                          const Real & lambda, const Real & mu);
+    /**
+     * evaluates second Piola-Kirchhoff stress given the Green-Lagrange
+     * strain (or Cauchy stress if called with a small strain tensor), and the
+     * local pixel id.
+     */
+    template <class Derived>
+    inline decltype(auto) evaluate_stress(const Eigen::MatrixBase<Derived> & E,
+                                          const size_t & pixel_index) {
+      auto && lambda{this->lambda_field[pixel_index]};
+      auto && mu{this->mu_field[pixel_index]};
+      return this->evaluate_stress(E, lambda, mu);
+    }
 
     /**
      * evaluates both second Piola-Kirchhoff stress and stiffness given
@@ -152,14 +156,25 @@ namespace muSpectre {
      * called with a small strain tensor), the first Lame constant (lambda) and
      * the second Lame constant (shear modulus/mu).
      */
-    template <class s_t>
-    inline decltype(auto) evaluate_stress_tangent(s_t && E, const Real & lambda,
-                                                  const Real & mu);
+    template <class Derived>
+    inline decltype(auto)
+    evaluate_stress_tangent(const Eigen::MatrixBase<Derived> & E,
+                            const Real & lambda, const Real & mu);
 
     /**
-     * return the empty internals tuple
+     * evaluates both second Piola-Kirchhoff stress and stiffness given
+     * the Green-Lagrange strain (or Cauchy stress and tangent moduli if
+     * called with a small strain tensor), and the local pixel id.
      */
-    InternalVariables & get_internals() { return this->internal_variables; }
+
+    template <class Derived>
+    inline decltype(auto)
+    evaluate_stress_tangent(const Eigen::MatrixBase<Derived> & E,
+                            const size_t & pixel_index) {
+      auto && lambda{this->lambda_field[pixel_index]};
+      auto && mu{this->mu_field[pixel_index]};
+      return this->evaluate_stress_tangent(E, lambda, mu);
+    }
 
     /**
      * overload add_pixel to write into loacal stiffness tensor
@@ -173,37 +188,31 @@ namespace muSpectre {
                    const Real & Poisson_ratio);
 
    protected:
-    //! storage for first Lame constant 'lambda'
-    //! and second Lame constant(shear modulus) 'mu'
-    using Field_t = muGrid::MatrixField<muGrid::LocalFieldCollection<DimS>,
-                                        Real, oneD, oneD>;
-    Field_t & lambda_field;
-    Field_t & mu_field;
-    //! tuple for iterable eigen_field
-    InternalVariables internal_variables;
-
-   private:
+    //! storage for first Lamé constant λ
+    Field_t lambda_field;
+    //! storage for secont Lamé constant (shear modulus) μ
+    Field_t mu_field;
   };
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  template <class s_t>
-  auto MaterialLinearElastic4<DimS, DimM>::evaluate_stress(s_t && E,
-                                                           const Real & lambda,
-                                                           const Real & mu)
-      -> decltype(auto) {
+  template <class Derived>
+  auto MaterialLinearElastic4<DimS, DimM>::evaluate_stress(
+      const Eigen::MatrixBase<Derived> & E, const Real & lambda,
+      const Real & mu) -> decltype(auto) {
     auto C = Hooke::compute_C_T4(lambda, mu);
     return Matrices::tensmult(C, E);
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  template <class s_t>
+  template <class Derived>
   auto MaterialLinearElastic4<DimS, DimM>::evaluate_stress_tangent(
-      s_t && E, const Real & lambda, const Real & mu) -> decltype(auto) {
+      const Eigen::MatrixBase<Derived> & E, const Real & lambda,
+      const Real & mu) -> decltype(auto) {
     muGrid::T4Mat<Real, DimM> C = Hooke::compute_C_T4(lambda, mu);
     return std::make_tuple(
-        this->evaluate_stress(std::forward<s_t>(E), lambda, mu), C);
+        this->evaluate_stress(E, lambda, mu), C);
   }
 
 }  // namespace muSpectre

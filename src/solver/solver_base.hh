@@ -113,8 +113,6 @@ namespace muSpectre {
     bool verbose;           //!< whether to write information to the stdout
     Uint counter{0};        //!< iteration counter
     bool converged{false};  //!< whether the solver has converged
-
-   private:
   };
 
 }  // namespace muSpectre

@@ -80,8 +80,6 @@ namespace muSpectre {
    *                     small-strain computations and into first
    *                     Piola-Kirchhoff stress `muspectre::StressMeasure::PK1`
    *                     in finite-strain computations
-   * - `InternalVariables`: a tuple of `muSpectre::FieldMap`s containing
-   *                        internal variables
    */
   template <class Material>
   struct MaterialMuSpectre_traits {};
@@ -183,16 +181,7 @@ namespace muSpectre {
     template <NeedTangent need_tgt = NeedTangent::no>
     class iterable_proxy;
 
-    /**
-     * inheriting classes with internal variables need to overload this function
-     */
-    typename traits::InternalVariables & get_internals() {
-      return static_cast<Material &>(*this).get_internals();
-    }
-
     bool is_initialised{false};  //!< to handle double initialisation right
-
-   private:
   };
 
   /* ---------------------------------------------------------------------- */
@@ -314,7 +303,7 @@ namespace muSpectre {
                                   typename traits::TangentMap_t::reference>;
     auto constitutive_law_small_strain = [this](Strains_t Strains,
                                                 Stresses_t Stresses,
-                                                auto && internal_variables) {
+                                                const size_t & pixel_index) {
       constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
       constexpr StrainMeasure expected_strain_m{
           get_formulation_strain_type(Form, traits::strain_measure)};
@@ -327,17 +316,13 @@ namespace muSpectre {
           MatTB::convert_strain<stored_strain_m, expected_strain_m>(F);
       // return value contains a tuple of rvalue_refs to both stress and tangent
       // moduli
-      Stresses = apply(
-          [&strain, &this_mat](auto &&... internals) {
-            return this_mat.evaluate_stress_tangent(std::move(strain),
-                                                    internals...);
-          },
-          internal_variables);
+      Stresses =
+          this_mat.evaluate_stress_tangent(std::move(strain), pixel_index);
     };
 
     auto constitutive_law_finite_strain = [this](Strains_t Strains,
                                                  Stresses_t Stresses,
-                                                 auto && internal_variables) {
+                                                 const size_t & pixel_index) {
       constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
       constexpr StrainMeasure expected_strain_m{
           get_formulation_strain_type(Form, traits::strain_measure)};
@@ -347,20 +332,10 @@ namespace muSpectre {
       auto & grad = std::get<0>(Strains);
       auto && strain =
           MatTB::convert_strain<stored_strain_m, expected_strain_m>(grad);
-      // TODO(junge): Figure this out: I can't std::move(internals...),
-      // because if there are no internals, compilation fails with "no
-      // matching function for call to ‘move()’'. These are tuples of
-      // lvalue references, so it shouldn't be too bad, but still
-      // irksome.
-
       // return value contains a tuple of rvalue_refs to both stress
       // and tangent moduli
-      auto stress_tgt = apply(
-          [&strain, &this_mat](auto &&... internals) {
-            return this_mat.evaluate_stress_tangent(std::move(strain),
-                                                    internals...);
-          },
-          internal_variables);
+      auto stress_tgt = this_mat.evaluate_stress_tangent(std::move(strain),
+                                                         pixel_index);
       auto & stress = std::get<0>(stress_tgt);
       auto & tangent = std::get<1>(stress_tgt);
       Stresses =
@@ -417,16 +392,13 @@ namespace muSpectre {
 
        F contains the transformation gradient for finite strain calculations and
        the infinitesimal strain tensor in small strain problems
-
-       The internal_variables tuple contains whatever internal variables
-       Material declared (e.g., eigenstrain, strain rate, etc.)
     */
 
     using Strains_t = std::tuple<typename traits::StrainMap_t::reference>;
     using Stresses_t = std::tuple<typename traits::StressMap_t::reference>;
     auto constitutive_law_small_strain = [this](Strains_t Strains,
                                                 Stresses_t Stresses,
-                                                auto && internal_variables) {
+                                                const size_t & pixel_index) {
       constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
       constexpr StrainMeasure expected_strain_m{
           get_formulation_strain_type(Form, traits::strain_measure)};
@@ -440,16 +412,12 @@ namespace muSpectre {
       // return value contains a tuple of rvalue_refs to both stress and tangent
       // moduli
       auto & sigma = std::get<0>(Stresses);
-      sigma = apply(
-          [&strain, &this_mat](auto &&... internals) {
-            return this_mat.evaluate_stress(std::move(strain), internals...);
-          },
-          internal_variables);
+      sigma = this_mat.evaluate_stress(std::move(strain), pixel_index);
     };
 
     auto constitutive_law_finite_strain = [this](Strains_t Strains,
                                                  Stresses_t && Stresses,
-                                                 auto && internal_variables) {
+                                                 const size_t & pixel_index) {
       constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
       constexpr StrainMeasure expected_strain_m{
           get_formulation_strain_type(Form, traits::strain_measure)};
@@ -460,19 +428,9 @@ namespace muSpectre {
       auto && strain =
           MatTB::convert_strain<stored_strain_m, expected_strain_m>(F);
 
-      // TODO(junge): Figure this out: I can't std::move(internals...),
-      // because if there are no internals, compilation fails with "no
-      // matching function for call to ‘move()’'. These are tuples of
-      // lvalue references, so it shouldn't be too bad, but still
-      // irksome.
-
       // return value contains a tuple of rvalue_refs to both stress
       // and tangent moduli
-      auto && stress = apply(
-          [&strain, &this_mat](auto &&... internals) {
-            return this_mat.evaluate_stress(std::move(strain), internals...);
-          },
-          internal_variables);
+      auto && stress = this_mat.evaluate_stress(std::move(strain), pixel_index);
       auto & P = std::get<0>(Stresses);
       P = MatTB::PK1_stress<traits::stress_measure, traits::strain_measure>(
           F, stress);
@@ -539,7 +497,7 @@ namespace muSpectre {
                    StressField_t & P,
                    std::enable_if_t<DoNeedTgt, TangentField_t> & K)
         : material{mat}, strain_field{F},
-          stress_tup{P, K}, internals{material.get_internals()} {};
+          stress_tup{P, K} {};
 
     /** Iterator uses the material's internal variables field
         collection to iterate selectively over the global fields
@@ -550,7 +508,7 @@ namespace muSpectre {
     iterable_proxy(MaterialMuSpectre & mat, const StrainField_t & F,
                    std::enable_if_t<DontNeedTgt, StressField_t> & P)
         : material{mat}, strain_field{F},
-          stress_tup{P}, internals{material.get_internals()} {};
+          stress_tup{P} {};
 
     //! Expected type for strain fields
     using StrainMap_t = typename traits::StrainMap_t;
@@ -565,8 +523,6 @@ namespace muSpectre {
     //! expected type for tangent stiffness values
     using Tangent_t = typename traits::TangentMap_t::reference;
 
-    //! tuple of intervnal variables, depends on the material
-    using InternalVariables = typename traits::InternalVariables;
     //! tuple containing a stress and possibly a tangent stiffness field
     using StressFieldTup =
         std::conditional_t<(NeedTgt == NeedTangent::yes),
@@ -604,11 +560,10 @@ namespace muSpectre {
      */
     class iterator {
      public:
-      //! type to refer to internal variables owned by a CRTP material
-      using InternalReferences = MatTB::ReferenceTuple_t<InternalVariables>;
-      //! return type to be unpacked per pixel my the constitutive law
+      //! return type contains a tuple of strain and possibly strain rate,
+      //! stress and possibly stiffness, and a refererence to the pixel index
       using value_type =
-          std::tuple<std::tuple<Strain_t>, Stress_tTup, InternalReferences>;
+          std::tuple<std::tuple<Strain_t>, Stress_tTup, const size_t &>;
       using iterator_category = std::forward_iterator_tag;  //!< stl conformance
 
       //! Default constructor
@@ -663,10 +618,6 @@ namespace muSpectre {
     const StrainField_t & strain_field;  //!< cell's global strain field
     //! references to the global stress field and perhaps tangent stiffness
     StressFieldTup stress_tup;
-    //! references to the internal variables
-    InternalVariables & internals;
-
-   private:
   };
 
   /* ---------------------------------------------------------------------- */
@@ -705,15 +656,7 @@ namespace muSpectre {
           return std::make_tuple(stress_tgt[pixel]...);
         },
         this->stress_map);
-    auto && internal = this->it.material.get_internals();
-    const auto id{this->index};
-    auto && internals = apply(
-        [id](auto &&... internals_) {
-          return InternalReferences{internals_[id]...};
-        },
-        internal);
-    return std::make_tuple(std::move(strain), std::move(stresses),
-                           std::move(internals));
+    return value_type(std::move(strain), std::move(stresses), this->index);
   }
 
 }  // namespace muSpectre

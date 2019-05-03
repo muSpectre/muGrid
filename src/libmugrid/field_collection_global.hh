@@ -125,7 +125,6 @@ namespace muGrid {
     //! subdomain)
     Ccoord locations{};
     CcoordOps::Pixels<DimS> pixels{};  //!< helper to iterate over the grid
-   private:
   };
 
   /* ---------------------------------------------------------------------- */

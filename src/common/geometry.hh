@@ -136,8 +136,6 @@ namespace muSpectre {
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
     Angles_t angles;
     RotMat_t rot_mat;
-
-   private:
   };
 
   namespace internal {

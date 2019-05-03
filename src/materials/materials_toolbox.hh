@@ -77,33 +77,6 @@ namespace muSpectre {
       no    //!< compute only stress
     };
 
-    /**
-     * struct used to determine the exact type of a tuple of references obtained
-     * when a bunch of iterators over fiel_maps are dereferenced and their
-     * results are concatenated into a tuple
-     */
-    template <class... T>
-    struct ReferenceTuple {
-      //! use this type
-      using type = std::tuple<typename T::reference...>;
-    };
-
-    /**
-     * specialisation for tuples
-     */
-    // template <>
-    template <class... T>
-    struct ReferenceTuple<std::tuple<T...>> {
-      //! use this type
-      using type = typename ReferenceTuple<T...>::type;
-    };
-
-    /**
-     * helper type for ReferenceTuple
-     */
-    template <class... T>
-    using ReferenceTuple_t = typename ReferenceTuple<T...>::type;
-
     /* ---------------------------------------------------------------------- */
     namespace internal {
 

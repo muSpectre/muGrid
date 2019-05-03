@@ -69,9 +69,7 @@ namespace muSpectre {
                                muGrid::T4Mat<Real, Dim>>;
     Real lambda = Hooke::compute_lambda(Fix::Young, Fix::Poisson);
     Real mu = Hooke::compute_mu(Fix::Young, Fix::Poisson);
-    auto C = Hooke::compute_C(lambda, mu);
-    muGrid::T4MatMap<Real, Dim> Cmap{C.data()};
-    Eigen::Matrix<Real, Dim, Dim> stress = Fix::mat.evaluate_stress(E, Cmap);
+    Eigen::Matrix<Real, Dim, Dim> stress = Fix::mat.evaluate_stress(E, 0);
     Real sigma00 = lambda * E(0, 0) + 2 * mu * E(0, 0);
     Real sigma01 = 2 * mu * E(0, 1);
     Real sigma11 = lambda * E(0, 0);

@@ -42,13 +42,10 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   MaterialLinearElastic4<DimS, DimM>::MaterialLinearElastic4(std::string name)
-      : Parent{name}, lambda_field{muGrid::make_field<Field_t>(
-                          "local first Lame constant", this->internal_fields)},
-        mu_field{muGrid::make_field<Field_t>(
-            "local second Lame constant(shear modulus)",
-            this->internal_fields)},
-        internal_variables{lambda_field.get_const_map(),
-                           mu_field.get_const_map()} {}
+      : Parent{name},
+        lambda_field{this->internal_fields, "local first Lame constant"},
+        mu_field(this->internal_fields,
+                 "local second Lame constant(shear modulus)") {}
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
@@ -68,8 +65,8 @@ namespace muSpectre {
     // store the first(lambda) and second(mu) Lame constant in the field
     Real lambda = Hooke::compute_lambda(Young_modulus, Poisson_ratio);
     Real mu = Hooke::compute_mu(Young_modulus, Poisson_ratio);
-    this->lambda_field.push_back(lambda);
-    this->mu_field.push_back(mu);
+    this->lambda_field.get_field().push_back(lambda);
+    this->mu_field.get_field().push_back(mu);
   }
 
   template class MaterialLinearElastic4<twoD, twoD>;

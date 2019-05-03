@@ -74,9 +74,6 @@ namespace muSpectre {
     constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
     //! declare what type of stress measure your law yields as output
     constexpr static auto stress_measure{StressMeasure::PK2};
-
-    //! elasticity without internal variables
-    using InternalVariables = std::tuple<>;
   };
 
   /**
@@ -132,19 +129,22 @@ namespace muSpectre {
 
     /**
      * evaluates second Piola-Kirchhoff stress given the Green-Lagrange
-     * strain (or Cauchy stress if called with a small strain tensor)
+     * strain (or Cauchy stress if called with a small strain tensor). Note: the
+     * pixel index is ignored.
      */
     template <class Derived>
-    inline decltype(auto) evaluate_stress(const Eigen::MatrixBase<Derived> & E);
+    inline decltype(auto) evaluate_stress(const Eigen::MatrixBase<Derived> & E,
+                                          const size_t & pixel_index = 0);
 
     /**
      * evaluates both second Piola-Kirchhoff stress and stiffness given
      * the Green-Lagrange strain (or Cauchy stress and stiffness if
-     * called with a small strain tensor)
+     * called with a small strain tensor). Note: the pixel index is ignored.
      */
     template <class Derived>
     inline decltype(auto)
-    evaluate_stress_tangent(const Eigen::MatrixBase<Derived> & E);
+    evaluate_stress_tangent(const Eigen::MatrixBase<Derived> & E,
+                            const size_t & pixel_index = 0);
 
     /**
      * return the empty internals tuple
@@ -166,7 +166,8 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   template <class Derived>
   auto MaterialLinearElasticGeneric1<DimS, DimM>::evaluate_stress(
-      const Eigen::MatrixBase<Derived> & E) -> decltype(auto) {
+      const Eigen::MatrixBase<Derived> & E, const size_t & /*pixel_index*/)
+      -> decltype(auto) {
     static_assert(Derived::ColsAtCompileTime == DimM, "wrong input size");
     static_assert(Derived::RowsAtCompileTime == DimM, "wrong input size");
     return Matrices::tensmult(this->C, E);
@@ -176,11 +177,13 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   template <class Derived>
   auto MaterialLinearElasticGeneric1<DimS, DimM>::evaluate_stress_tangent(
-      const Eigen::MatrixBase<Derived> & E) -> decltype(auto) {
+      const Eigen::MatrixBase<Derived> & E, const size_t & /*pixel_index*/)
+      -> decltype(auto) {
     using Stress_t = decltype(this->evaluate_stress(E));
     using Stiffness_t = Eigen::Map<muGrid::T4Mat<Real, DimM>>;
     using Ret_t = std::tuple<Stress_t, Stiffness_t>;
-    return Ret_t{this->evaluate_stress(E), Stiffness_t(this->C.data())};
+    return Ret_t{this->evaluate_stress(E),
+                 Stiffness_t(this->C.data())};
   }
 }  // namespace muSpectre
 

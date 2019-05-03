@@ -14,7 +14,7 @@ At the lowest level, the header-only library *µ*\Grid, contains a set of tools 
 
 On top of *µ*\Grid the library *µ*\FFT provides an uniform interface for multiple FFT implementations.
 
-And finally *µ*\Spectre itself makes use of the two lower-level libraries and defines all the abstractions and classes do define material behaviours and to solve mechanics problems.
+And finally *µ*\Spectre itself makes use of the two lower-level libraries and defines all the abstractions and classes to define material behaviours and to solve mechanics problems.
 
 
 .. toctree::

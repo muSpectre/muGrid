@@ -71,9 +71,6 @@ namespace muSpectre {
     constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
     //! declare what type of stress measure your law yields as output
     constexpr static auto stress_measure{StressMeasure::PK2};
-
-    //! elasticity without internal variables
-    using InternalVariables = std::tuple<>;
   };
 
   //! DimS spatial dimension (dimension of problem
@@ -88,21 +85,11 @@ namespace muSpectre {
    public:
     //! base class
     using Parent = MaterialMuSpectre<MaterialLinearElastic1, DimS, DimM>;
-    /**
-     * type used to determine whether the
-     * `muSpectre::MaterialMuSpectre::iterable_proxy` evaluate only
-     * stresses or also tangent stiffnesses
-     */
-    using NeedTangent = typename Parent::NeedTangent;
-    //! global field collection
 
     using Stiffness_t = T4Mat<Real, DimM>;
 
     //! traits of this material
     using traits = MaterialMuSpectre_traits<MaterialLinearElastic1>;
-
-    //! this law does not have any internal variables
-    using InternalVariables = typename traits::InternalVariables;
 
     //! Hooke's law implementation
     using Hooke =
@@ -137,7 +124,8 @@ namespace muSpectre {
      * strain (or Cauchy stress if called with a small strain tensor)
      */
     template <class s_t>
-    inline decltype(auto) evaluate_stress(s_t && E);
+    inline decltype(auto) evaluate_stress(s_t && E,
+                                          const size_t & /*pixel_index*/);
 
     /**
      * evaluates both second Piola-Kirchhoff stress and stiffness given
@@ -145,12 +133,8 @@ namespace muSpectre {
      * called with a small strain tensor)
      */
     template <class s_t>
-    inline decltype(auto) evaluate_stress_tangent(s_t && E);
-
-    /**
-     * return the empty internals tuple
-     */
-    InternalVariables & get_internals() { return this->internal_variables; }
+    inline decltype(auto)
+    evaluate_stress_tangent(s_t && E, const size_t & /*pixel_index*/);
 
    protected:
     const Real young;     //!< Young's modulus
@@ -172,17 +156,14 @@ namespace muSpectre {
     // material and run.
     std::unique_ptr<const Stiffness_t> C_holder;  //!< stiffness tensor
     const Stiffness_t & C;                        //! ref to stiffness tensor
-
-    //! empty tuple
-    InternalVariables internal_variables{};
-
-   private:
   };
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   template <class s_t>
-  auto MaterialLinearElastic1<DimS, DimM>::evaluate_stress(s_t && E)
+  auto MaterialLinearElastic1<DimS, DimM>::evaluate_stress(s_t && E,
+                                                           const size_t &
+                                                           /*pixel_index*/)
       -> decltype(auto) {
     return Hooke::evaluate_stress(this->lambda, this->mu, std::move(E));
   }
@@ -190,8 +171,8 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   template <class s_t>
-  auto MaterialLinearElastic1<DimS, DimM>::evaluate_stress_tangent(s_t && E)
-      -> decltype(auto) {
+  auto MaterialLinearElastic1<DimS, DimM>::evaluate_stress_tangent(
+      s_t && E, const size_t & /*pixel_index*/) -> decltype(auto) {
     using Tangent_t = typename traits::TangentMap_t::reference;
 
     return Hooke::evaluate_stress(

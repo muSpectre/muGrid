@@ -233,7 +233,6 @@ namespace muGrid {
       static const std::string field_info_root() {
         return NameWrapper<map_type>::field_info_root();
       }  //!< for printing and debug
-     private:
     };
 
     /* ---------------------------------------------------------------------- */

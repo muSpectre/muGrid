@@ -150,8 +150,6 @@ namespace muSpectre {
     Uint counter{0};  //!< iteration counter
     //! storage for internal fields to avoid reallocations between calls
     Collection_t collection{};
-
-   private:
   };
 
 }  // namespace muSpectre

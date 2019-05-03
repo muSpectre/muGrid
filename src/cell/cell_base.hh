@@ -279,9 +279,8 @@ namespace muSpectre {
 
    protected:
     bool initialised{false};  //!< to handle double initialisation right
-
-   private:
   };
+
   //! DimS spatial dimension (dimension of problem
   //! DimM material_dimension (dimension of constitutive law)
   template <Dim_t DimS, Dim_t DimM = DimS>
@@ -611,8 +610,6 @@ namespace muSpectre {
     //! container of the materials present in the cell
     std::vector<Material_ptr> materials{};
     Projection_ptr projection;  //!< handle for the projection operator
-
-   private:
   };
 
   /**

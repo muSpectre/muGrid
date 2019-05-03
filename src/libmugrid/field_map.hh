@@ -171,8 +171,6 @@ namespace muGrid {
     const Dim_t nb_components;
     //! number of EigenMaps stored within the array
     size_t nb_pixels;
-
-   private:
   };
 
   /**
@@ -251,8 +249,6 @@ namespace muGrid {
     const Parent & map;
     //! currently pointed-to element
     size_t index;
-
-   private:
   };
 }  // namespace muGrid
 

@@ -245,8 +245,6 @@ namespace muGrid {
    protected:
     //! constructor protected!
     TensorField(std::string unique_name, FieldCollection & collection);
-
-   private:
   };
 
   /* ---------------------------------------------------------------------- */

@@ -41,9 +41,8 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   MaterialLinearElastic3<DimS, DimM>::MaterialLinearElastic3(std::string name)
-      : Parent{name}, C_field{muGrid::make_field<Field_t>(
-                          "local stiffness tensor", this->internal_fields)},
-        internal_variables(C_field.get_const_map()) {}
+      : Parent{name}, C_field{this->internal_fields, "local stiffness tensor"} {
+  }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
@@ -63,7 +62,7 @@ namespace muSpectre {
     auto C_tensor = Hooke::compute_C(lambda, mu);
     Eigen::Map<const Eigen::Array<Real, DimM * DimM * DimM * DimM, 1>> C(
         C_tensor.data());
-    this->C_field.push_back(C);
+    this->C_field.get_field().push_back(C);
   }
 
   template class MaterialLinearElastic3<twoD, twoD>;

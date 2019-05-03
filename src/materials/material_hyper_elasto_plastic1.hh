@@ -86,13 +86,6 @@ namespace muSpectre {
      */
     using LStrainMap_t = muGrid::StateFieldMap<
         muGrid::MatrixFieldMap<LFieldColl_t, Real, DimM, DimM, false>>;
-    /**
-     * format in which to receive internals (previous gradient Fᵗ,
-     * previous elastic lef Cauchy-Green deformation tensor bₑᵗ, and
-     * the plastic flow measure εₚ
-     */
-    using InternalVariables =
-        std::tuple<LStrainMap_t, LStrainMap_t, LScalarMap_t>;
   };
 
   /**
@@ -167,13 +160,34 @@ namespace muSpectre {
     T2_t evaluate_stress(const T2_t & F, StrainStRef_t F_prev,
                          StrainStRef_t be_prev, FlowStRef_t plast_flow);
     /**
-     * evaluates Kirchhoff stress and stiffness given the current placement
+     * evaluates Kirchhoff stress given the local placement gradient and pixel
+     * id.
+     */
+    T2_t evaluate_stress(const T2_t & F, const size_t & pixel_index) {
+      auto && F_prev{this->F_prev_field[pixel_index]};
+      auto && be_prev{this->be_prev_field[pixel_index]};
+      auto && plast_flow{this->plast_flow_field[pixel_index]};
+      return this->evaluate_stress(F, F_prev, be_prev, plast_flow);
+    }
+    /**
+     * evaluates Kirchhoff stress and tangent moduli given the current placement
      * gradient Fₜ, the previous Gradient Fₜ₋₁ and the cumulated plastic flow εₚ
      */
     std::tuple<T2_t, T4_t> evaluate_stress_tangent(const T2_t & F,
                                                    StrainStRef_t F_prev,
                                                    StrainStRef_t be_prev,
                                                    FlowStRef_t plast_flow);
+    /**
+     * evaluates Kirchhoff stressstiffness and tangent moduli given the local
+     * placement gradient and pixel id.
+     */
+    std::tuple<T2_t, T4_t> evaluate_stress_tangent(const T2_t & F,
+                                                   const size_t & pixel_index) {
+      auto && F_prev{this->F_prev_field[pixel_index]};
+      auto && be_prev{this->be_prev_field[pixel_index]};
+      auto && plast_flow{this->plast_flow_field[pixel_index]};
+      return this->evaluate_stress_tangent(F, F_prev, be_prev, plast_flow);
+    }
 
     /**
      * The statefields need to be cycled at the end of each load increment
@@ -184,13 +198,6 @@ namespace muSpectre {
      * set the previous gradients to identity
      */
     void initialise() final;
-
-    /**
-     * return the internals tuple
-     */
-    typename traits::InternalVariables & get_internals() {
-      return this->internal_variables;
-    }
 
     //! getter for internal variable field εₚ
     muGrid::StateField<muGrid::ScalarField<LColl_t, Real>> &
@@ -242,9 +249,6 @@ namespace muSpectre {
     const Real tau_y0;   //!< initial yield stress
     const Real H;        //!< hardening modulus
     const muGrid::T4Mat<Real, DimM> C;  //!< stiffness tensor
-
-    //! Field maps and state field maps over internal fields
-    typename traits::InternalVariables internal_variables;
   };
 
 }  // namespace muSpectre

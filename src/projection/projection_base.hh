@@ -180,8 +180,6 @@ namespace muSpectre {
      * for an example
      */
     LFieldCollection_t & projection_container{};
-
-   private:
   };
 
 }  // namespace muSpectre

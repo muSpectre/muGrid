@@ -150,8 +150,6 @@ namespace muGrid {
 
     //! type identifier for printing and debugging
     static const std::string field_info_root;
-
-   private:
   };
 
   /* ---------------------------------------------------------------------- */

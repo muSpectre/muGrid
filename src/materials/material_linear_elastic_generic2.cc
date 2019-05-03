@@ -40,10 +40,8 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   MaterialLinearElasticGeneric2<DimS, DimM>::MaterialLinearElasticGeneric2(
       const std::string & name, const CInput_t & C_voigt)
-      : Parent{name}, worker{name, C_voigt},
-        eigen_field{
-            muGrid::make_field<Field_t>("Eigenstrain", this->internal_fields)},
-        internal_variables(eigen_field.get_const_map()) {}
+      : Parent{name}, worker{name, C_voigt}, eigen_field{this->internal_fields,
+                                                         "Eigenstrain"} {}
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
@@ -59,7 +57,7 @@ namespace muSpectre {
     this->internal_fields.add_pixel(pixel);
     Eigen::Map<const Eigen::Array<Real, DimM * DimM, 1>> strain_array(
         E_eig.data());
-    this->eigen_field.push_back(strain_array);
+    this->eigen_field.get_field().push_back(strain_array);
   }
 
   template class MaterialLinearElasticGeneric2<twoD, twoD>;

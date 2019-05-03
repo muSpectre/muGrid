@@ -481,8 +481,6 @@ namespace muGrid {
 
      protected:
       SimpleIterator it;
-
-     private:
     };
 
   }  // namespace internal

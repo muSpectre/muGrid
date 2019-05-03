@@ -450,8 +450,6 @@ namespace muGrid {
         maps;  //!< refs to the addressable maps;
     //! const refs to the addressable maps;
     std::array<ConstFieldMap_t, NbMemory + 1> const_maps;
-
-   private:
   };
 
   /**

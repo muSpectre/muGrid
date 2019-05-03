@@ -130,8 +130,6 @@ namespace muGrid {
     ccoords_container ccoords{};
     //! container of indices for non-global collections (slow!)
     std::map<Ccoord, size_t> indices{};
-
-   private:
   };
 
   /* ---------------------------------------------------------------------- */

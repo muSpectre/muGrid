@@ -113,8 +113,6 @@ namespace muFFT {
    protected:
     //! container for frequencies ordered by spatial dimension
     const std::array<std::valarray<Real>, dim> freqs;
-
-   private:
   };
 
   template <Dim_t dim>

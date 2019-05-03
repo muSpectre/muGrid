@@ -168,8 +168,6 @@ namespace muGrid {
    protected:
     //! for sad, legacy iterator use
     inline pointer ptr_to_val_t(size_type index);
-
-   private:
   };
 
   /* ---------------------------------------------------------------------- */

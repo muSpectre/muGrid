@@ -44,7 +44,7 @@ namespace muGrid {
 
   /**
    * Eigen uses signed integers for dimensions. For consistency, µGrid uses them
-   * througout the code. needs to represent -1 for eigen
+   * througout the code. Needs to represent -1 for Eigen
    */
   using Dim_t = int;
 
@@ -55,7 +55,7 @@ namespace muGrid {
   constexpr Dim_t secondOrder{2};  //!< constant second-order tensors
   constexpr Dim_t fourthOrder{4};  //!< constant fourth-order tensors
 
-  //! \addtogroup Scalars Scalar types used for mathematical calculations hello
+  //! \addtogroup Scalars Scalar types used for mathematical calculations
   //@{
   using Uint = unsigned int;
   using Int = int;

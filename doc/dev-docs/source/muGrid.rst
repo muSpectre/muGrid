@@ -80,7 +80,7 @@ around, *µ*\Grid splits the concept of a field into three components:
 
 * representation
 
-  Meaning how to interpret the data at a given pixel/voxel (i.e., is in a
+  Meaning how to interpret the data at a given pixel/voxel (i.e., is it a
   vector, a matrix, ...). This will also determine which mathematical operations
   can be performed on per-pixel/voxel data. The representation allows also to
   iterate over a field pixel/voxel by pixel/voxel.
@@ -89,6 +89,142 @@ around, *µ*\Grid splits the concept of a field into three components:
   represented by a child class of :cpp:class:`FieldMap\<FieldCollection_t,
   Scalar_t, NbComponents[, IsConst]><muGrid::internal::FieldMap>`, see
   :ref:`field_map`.
+
+* per-pixel/voxel access/iteration
+
+  Given a pixel/voxel coordinate or index, the position of the associated
+  pixel/voxel data is a function of the type of field (global or local). Since
+  the determination procedure is identical for every field defined on the same
+  domain, this ability (and the associated overhead) can be centralised into a
+  manager of field collections.
+
+  *µ*\Grid's abstraction for field access and management is the **field
+  collection** represented by the two classes
+  :cpp:class:`LocalFieldCollection\<Dim><muGrid::LocalFieldCollection>` and
+  :cpp:class:`GlobalFieldCollection\<Dim><muGrid::GlobalFieldCollection>`, see
+  :ref:`field_collection`.
+
+.. _fields:
+
+Fields
+``````
+
+Fields are where the data is stored, so they are mainly distinguished by the
+scalar type they store (``Int``, ``Real`` or ``Complex``), and the number of
+components (statically fixed size, or dynamic size).
+
+The most commonly used fields are the statically sized ones,
+:cpp:class:`TensorField<muGrid::TensorField>`,
+:cpp:class:`MatrixField<muGrid::MatrixField>`, and the
+:cpp:type:`ScalarField<muGrid::ScalarField>` (which is really just a 1×1 matrix
+field).
+
+Less commonly, we use the dynamically sized
+:cpp:class:`TypedField<muGrid::TypedField>`, but more on this later.
+
+Fields have a protected constructor, which means that you cannot directly build
+a field object, instead you have to go through the factory function
+:cpp:func:`make_field\<Field_t>(name, collection)<muGrid::make_field>` (or
+:cpp:func:`make_statefield\<Field_t>(name, collection)<muGrid::make_statefield>`
+if you're building a statefield, see :ref:`state_field`) to create them and you only
+receive a reference to the built field. The field itself is stored in a
+:cpp:class:`std::unique_ptr` which is registered in and managed by a :ref:`field
+collection<field_collection>`. This mechanism is meant to ensure that fields are
+not copied around or free'd so that :ref:`field maps<field_map>` always remain
+valid and unambiguously linked to a field.
+
+Fields give access to their bulk memory in form of an
+:cpp:class:`Eigen:Map`. This is useful for instance for accessing the global
+strain, stress, and tangent moduli fields in the solver.
+
+Example: Using fields as global arrays:
+.......................................
+The following is a code example from the standard :ref:`Cell<muSpectre::CellBase>`:
+
+.. code-block:: c++
+   :linenos:
+
+   template <Dim_t DimS, Dim_t DimM>
+   auto CellBase<DimS, DimM>::get_strain_vector() -> Vector_ref {
+     return this->get_strain().eigenvec();
+   }
+
+The return value of :cpp:function:`Cell::get_strain_vector()<muSpectre::CellBase::get_strain_vector>` is an :cpp:class:`Eigen::Map` onto a matrix of shape 1×N.
+
+If you wish to handle field data on a per-pixel/voxel basis, the mechanism for
+that is the field map and is described in :ref:`field_map`.
+
+.. _field_map:
+
+Field Maps
+``````````
+
+Field maps are light-weight resource handles (meaning they can be created and
+destroyed cheaply) that are iterable and provide direct per-pixel/voxel access
+to the data stored in the mapped field.
+
+The choice of field map defines the type of reference you obtain when
+dereferencing an iterator or using the direct random acccess operator ``[]``.
+
+Typically used field maps include:
+
+  - :cpp:class:`ScalarFieldMap<muGrid::ScalarFieldMap>`,
+  - :cpp:class:`ArrayFieldMap<muGrid::ArrayFieldMap>`,
+  - :cpp:class:`MatrixFieldMap<muGrid::MatrixFieldMap>`, and the
+  - :cpp:type:`T4MatrixFieldMap<muGrid::T4MatrixFieldMap>`.
+
+All of these are fixed size (meaning their size is set at compile time) and
+therefore support fast linear algebra on the iterates. There is also a
+dynamically sized field map type, the
+:cpp:class:`TypedFieldMap<muGrid::TypedFieldMap>` which is useful for debugging
+and python bindings. It supports all the features of the fixed-size maps, but
+linear algebra on the iterates will be slow because it cannot be effectively
+vectorised.
+
+Example 1: Iterating over fields and do math on the iterates:
+..............................................................
+
+The following is a code example from the tests of the finite-strain projection
+operator defined by `T.W.J. de Geus, J. Vondřejc, J. Zeman, R.H.J. Peerlings,
+M.G.D. Geers <https://doi.org/10.1016/j.cma.2016.12.032>`_.
+
+.. literalinclude:: ../../../tests/test_projection_finite.cc
+   :language: c++
+   :linenos:
+   :start-after: start_field_iteration_snippet
+   :end-before: end_field_iteration_snippet
+   :dedent: 4
+
+.. _field_collection:
+
+Field Collections
+`````````````````
+
+Field collections come in two flavours;
+:cpp:class:`LocalFieldCollection\<Dim><muGrid::LocalFieldCollection>` and
+:cpp:class:`GlobalFieldCollection\<Dim><muGrid::GlobalFieldCollection>` and are
+templated by the spatial dimension of the problem. They adhere to the interface
+defined by their common base class,
+:cpp:class:`FieldCollectionBase<muGrid::FieldCollectionBase>`. Both types are
+iterable (the iterates are the coordinates of the pixels/voxels for which the
+fields of the collection are defiened.
+
+Global field collections need to be given the problem resolutions (i.e. the size
+of the grid) at initialisation, while local collections need to be filled with
+pixels/voxels through repeated calls to
+:cpp:func:`add_pixel(pixel)<muGrid::LocalFieldCollection::add_pixel>`. At
+initialisation, they derive their size from the number of pixels that have been
+added.
+
+Fields (State Fields) are identified by their unique name (prefix) and can be retrieved in multiple ways:
+
+.. doxygenfunction:: muGrid::FieldCollectionBase::operator[]
+.. doxygenfunction:: muGrid::FieldCollectionBase::at
+.. doxygenfunction:: muGrid::FieldCollectionBase::get_typed_field(std::string)
+.. doxygenfunction:: muGrid::FieldCollectionBase::get_statefield(std::string)
+.. doxygenfunction:: muGrid::FieldCollectionBase::get_typed_statefield(std::string)
+
+.. _state_field:
 
 * per-pixel/voxel access/iteration
 
@@ -136,6 +272,9 @@ valid and unambiguously linked to a field.
 Fields give access to their bulk memory in form of an
 :cpp:class:`Eigen:Map`. This is useful for instance for accessing the global
 strain, stress, and tangent moduli fields in the solver.
+
+If you wish to handle field data on a per-pixel/voxel basis, the mechanism for
+that is the field map and is described in :ref:`field_map`.
 
 Example: Using fields as global arrays:
 .......................................

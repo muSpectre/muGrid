@@ -18,5 +18,5 @@ cd -
 
 cd ubuntu:18.04/
 docker build -t registry.gitlab.com/muspectre/muspectre:ubuntu18.04 .
-docker push registry.gitlab.com/muspectre/muspectre:ubuntu16.04
+docker push registry.gitlab.com/muspectre/muspectre:ubuntu18.04
 cd -
