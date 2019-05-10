@@ -41,7 +41,8 @@ except ImportError:
     MPI = None
 
 import _muFFT
-from _muFFT import FFT_PlanFlags
+from _muFFT import (get_domain_ccoord, get_domain_index, get_hermitian_sizes,
+                    FFT_PlanFlags)
 
 # This is a list of FFT engines that are potentially available.
 #              |------------------------------- Identifier for 'FFT' factory

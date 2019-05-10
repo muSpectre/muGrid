@@ -37,9 +37,7 @@ Program grant you additional permission to convey the resulting work.
 import unittest
 import numpy as np
 
-from python_test_imports import µ
-
-from python_mpi_projection_tests import *
+from python_test_imports import muFFT
 
 if __name__ == '__main__':
     unittest.main()

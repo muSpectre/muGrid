@@ -40,5 +40,7 @@ from python_test_imports import µ
 
 from python_mpi_material_linear_elastic4_test import *
 
+from python_mpi_projection_tests import *
+
 if __name__ == '__main__':
     unittest.main()

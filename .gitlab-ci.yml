@@ -14,9 +14,27 @@
       - build
     expire_in: 1 day
 
-build:testing_gcc:
+build:testing_gcc_mpi:
   extends: .builds
   image: registry.gitlab.com/muspectre/muspectre:debian_testing
+  script:
+    - echo "free -h"
+    - free -h
+    - echo "grep -c ^processor /proc/cpuinfo"
+    - grep -c ^processor /proc/cpuinfo
+    - cd build
+    - cmake -DCMAKE_BUILD_TYPE:STRING=Release -DMUSPECTRE_MPI_PARALLEL=ON -DMPIEXEC_MAX_NUMPROCS=2 -DMPIEXEC_PREFLAGS="--oversubscribe;--allow-run-as-root" -DMUSPECTRE_RUNNING_IN_CI=ON ..
+    - make
+
+build:testing_gcc_setuptools:
+  extends: .builds
+  image: registry.gitlab.com/muspectre/muspectre:debian_testing
+  script:
+    - echo "free -h"
+    - free -h
+    - echo "grep -c ^processor /proc/cpuinfo"
+    - grep -c ^processor /proc/cpuinfo
+    - python3 setup.py build
 
 build:testing_clang:
   extends: .builds
@@ -60,11 +78,21 @@ build:ubuntu16.04_gcc:
       - build/tests/libmufft/test_results*.xml
       - build/tests/libmugrid/test_results*.xml
 
-test:testing_gcc:
+test:testing_gcc_mpi:
   image: registry.gitlab.com/muspectre/muspectre:debian_testing
   extends: .tests
   dependencies:
-    - build:testing_gcc
+    - build:testing_gcc_mpi
+
+test:testing_gcc_setuptools:
+  image: registry.gitlab.com/muspectre/muspectre:debian_testing
+  extends: .tests
+  dependencies:
+    - build:testing_gcc_setuptools
+  script:
+    - python3 setup.py install --user
+    - cd tests/libmufft
+    - python3 python_binding_tests.py
 
 test:testing_clang:
   image: registry.gitlab.com/muspectre/muspectre:debian_testing

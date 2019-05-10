@@ -55,8 +55,6 @@ sys.path.insert(0, os.path.join(project_home,
 
 try:
     import muFFT
-    import muSpectre as µ
-    import muSpectre
 except ImportError as err:
     print(err)
     sys.exit(-1)

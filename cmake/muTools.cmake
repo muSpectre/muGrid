@@ -133,7 +133,7 @@ function(muTools_add_test test_name)
   endif()
 
 
-  if (${MUSPECTRE_RUNNING_IN_CI})
+  if (${MUSPECTRE_RUNNING_IN_CI} AND NOT ${_mat_args_MPI_NB_PROCS})
     if ("${_mat_args_TYPE}" STREQUAL "BOOST")
       list(APPEND _exe "--logger=JUNIT,all,test_results_${test_name}.xml")
     elseif("${_mat_args_TYPE}" STREQUAL "PYTHON")
@@ -143,10 +143,11 @@ function(muTools_add_test test_name)
     if("${_mat_args_TYPE}" STREQUAL "PYTHON")
       set(_exe ${PYTHON_EXECUTABLE} ${_exe})
     endif ("${_mat_args_TYPE}" STREQUAL "PYTHON")
-  endif (${MUSPECTRE_RUNNING_IN_CI})
+  endif (${MUSPECTRE_RUNNING_IN_CI} AND NOT ${_mat_args_MPI_NB_PROCS})
 
   if(${_mat_args_MPI_NB_PROCS})
-    set(_exe ${MPIEXEC_EXECUTABLE} ${MPIEXEC_PREFLAGS} ${MPIEXEC_NUMPROC_FLAG} ${_mat_args_MPI_NB_PROCS} ${_exe})
+    find_package(MPI REQUIRED)
+    set(_exe ${MPIEXEC_EXECUTABLE} ${MPIEXEC_PREFLAGS} ${MPIEXEC_NUMPROC_FLAG} ${_mat_args_MPI_NB_PROCS} ${MPIEXEC_POSTFLAGS} ${_exe})
   endif(${_mat_args_MPI_NB_PROCS})
 
   add_test(

@@ -39,7 +39,7 @@ Program grant you additional permission to convey the resulting work.
 import unittest
 import numpy as np
 
-from python_test_imports import muFFT, µ
+from python_test_imports import muFFT
 
 try:
     from mpi4py import MPI
@@ -93,7 +93,7 @@ class FFT_Check(unittest.TestCase):
                 continue
             engine.initialise()
 
-            complex_res = µ.get_hermitian_sizes(self.resolution)
+            complex_res = muFFT.get_hermitian_sizes(self.resolution)
             in_arr = np.zeros([*complex_res, self.dim, self.dim],
                               dtype=complex)
             in_arr.real = np.random.random(in_arr.shape)
