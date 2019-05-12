@@ -58,9 +58,9 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM,
             typename FFTEngine = muFFT::FFTWEngine<DimS>>
   inline std::unique_ptr<ProjectionBase<DimS, DimM>>
-  cell_input(Ccoord_t<DimS> resolutions, Rcoord_t<DimS> lengths,
+  cell_input(Ccoord_t<DimS> nb_grid_pts, Rcoord_t<DimS> lengths,
              Formulation form) {
-    auto fft_ptr{std::make_unique<FFTEngine>(resolutions,
+    auto fft_ptr{std::make_unique<FFTEngine>(nb_grid_pts,
                                              dof_for_formulation(form, DimS))};
     switch (form) {
     case Formulation::finite_strain: {
@@ -87,10 +87,10 @@ namespace muSpectre {
   template <size_t DimS, size_t DimM = DimS,
             typename Cell = CellBase<DimS, DimM>,
             typename FFTEngine = muFFT::FFTWEngine<DimS>>
-  inline Cell make_cell(Ccoord_t<DimS> resolutions, Rcoord_t<DimS> lengths,
+  inline Cell make_cell(Ccoord_t<DimS> nb_grid_pts, Rcoord_t<DimS> lengths,
                         Formulation form) {
     auto && input =
-        cell_input<DimS, DimM, FFTEngine>(resolutions, lengths, form);
+        cell_input<DimS, DimM, FFTEngine>(nb_grid_pts, lengths, form);
     auto cell{Cell{std::move(input)}};
     return cell;
   }
@@ -104,10 +104,10 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM,
             typename FFTEngine = muFFT::FFTWMPIEngine<DimS>>
   inline std::unique_ptr<ProjectionBase<DimS, DimM>>
-  parallel_cell_input(Ccoord_t<DimS> resolutions, Rcoord_t<DimS> lengths,
+  parallel_cell_input(Ccoord_t<DimS> nb_grid_pts, Rcoord_t<DimS> lengths,
                       Formulation form, const muFFT::Communicator & comm) {
     auto fft_ptr{std::make_unique<FFTEngine>(
-        resolutions, dof_for_formulation(form, DimM), comm)};
+        nb_grid_pts, dof_for_formulation(form, DimM), comm)};
     switch (form) {
     case Formulation::finite_strain: {
       using Projection = ProjectionFiniteStrainFast<DimS, DimM>;
@@ -133,11 +133,11 @@ namespace muSpectre {
   template <size_t DimS, size_t DimM = DimS,
             typename Cell = CellBase<DimS, DimM>,
             typename FFTEngine = muFFT::FFTWMPIEngine<DimS>>
-  inline Cell make_parallel_cell(Ccoord_t<DimS> resolutions,
+  inline Cell make_parallel_cell(Ccoord_t<DimS> nb_grid_pts,
                                  Rcoord_t<DimS> lengths, Formulation form,
                                  const muFFT::Communicator & comm) {
     auto && input = parallel_cell_input<DimS, DimM, FFTEngine>(
-        resolutions, lengths, form, comm);
+        nb_grid_pts, lengths, form, comm);
     auto cell{Cell{std::move(input)}};
     return cell;
   }

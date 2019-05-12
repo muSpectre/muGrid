@@ -50,7 +50,7 @@ namespace muSpectre {
   struct Sizes {};
   template <>
   struct Sizes<twoD> {
-    constexpr static Ccoord_t<twoD> get_resolution() {
+    constexpr static Ccoord_t<twoD> get_nb_grid_pts() {
       return Ccoord_t<twoD>{3, 5};
     }
     constexpr static Rcoord_t<twoD> get_lengths() {
@@ -59,7 +59,7 @@ namespace muSpectre {
   };
   template <>
   struct Sizes<threeD> {
-    constexpr static Ccoord_t<threeD> get_resolution() {
+    constexpr static Ccoord_t<threeD> get_nb_grid_pts() {
       return Ccoord_t<threeD>{3, 5, 7};
     }
     constexpr static Rcoord_t<threeD> get_lengths() {
@@ -70,7 +70,7 @@ namespace muSpectre {
   struct Squares {};
   template <>
   struct Squares<twoD> {
-    constexpr static Ccoord_t<twoD> get_resolution() {
+    constexpr static Ccoord_t<twoD> get_nb_grid_pts() {
       return Ccoord_t<twoD>{5, 5};
     }
     constexpr static Rcoord_t<twoD> get_lengths() {
@@ -79,7 +79,7 @@ namespace muSpectre {
   };
   template <>
   struct Squares<threeD> {
-    constexpr static Ccoord_t<threeD> get_resolution() {
+    constexpr static Ccoord_t<threeD> get_nb_grid_pts() {
       return Ccoord_t<threeD>{7, 7, 7};
     }
     constexpr static Rcoord_t<threeD> get_lengths() {
@@ -95,7 +95,7 @@ namespace muSpectre {
     constexpr static Dim_t sdim{DimS};
     constexpr static Dim_t mdim{DimM};
     ProjectionFixture()
-        : projector(std::make_unique<Engine>(SizeGiver::get_resolution(),
+        : projector(std::make_unique<Engine>(SizeGiver::get_nb_grid_pts(),
                                              mdim * mdim),
                     SizeGiver::get_lengths()) {}
     Parent projector;

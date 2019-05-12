@@ -43,9 +43,9 @@ sys.path.append(os.path.join(os.getcwd(), "language_bindings/python"))
 import muSpectre as µ
 
 
-resolution = [3, 3]
-center = np.array([r//2 for r in resolution])
-incl = resolution[0]//5
+nb_grid_pts = [3, 3]
+center = np.array([r//2 for r in nb_grid_pts])
+incl = nb_grid_pts[0]//5
 
 lengths = [7., 5.]
 formulation = µ.Formulation.finite_strain
@@ -56,7 +56,7 @@ H = .004
 tauy0 = .006
 Young = 9*K*mu/(3*K + mu)
 Poisson = (3*K-2*mu)/(2*(3*K+mu))
-rve = µ.Cell(resolution, lengths, formulation)
+rve = µ.Cell(nb_grid_pts, lengths, formulation)
 hard = µ.material.MaterialHyperElastoPlastic1_2d.make(
     rve, "hard", Young, Poisson, 2*tauy0, h=2*H)
 soft = µ.material.MaterialHyperElastoPlastic1_2d.make(

@@ -54,9 +54,9 @@ int main() {
   constexpr Formulation form{Formulation::finite_strain};
 
   const Rcoord_t<dim> lengths{5.2, 8.3};
-  const Ccoord_t<dim> resolutions{5, 7};
+  const Ccoord_t<dim> nb_grid_pts{5, 7};
 
-  auto cell{make_cell<dim, dim>(resolutions, lengths, form)};
+  auto cell{make_cell<dim, dim>(nb_grid_pts, lengths, form)};
 
   constexpr Real E{1.0030648180242636};
   constexpr Real nu{0.29930675909878679};

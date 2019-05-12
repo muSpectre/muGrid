@@ -45,7 +45,7 @@ from python_test_imports import µ
 class MuSpectre_vtk_export_Check(unittest.TestCase):
     def setUp(self):
         self.lengths    = np.array([1.1, 2.2, 3])
-        self.resolution = np.array([3, 5, 7])
+        self.nb_grid_pts = np.array([3, 5, 7])
     def test_vtk_export(self):
         """
         Check the possibility to write scalar-, vector- and second rank tensor-
@@ -57,7 +57,7 @@ class MuSpectre_vtk_export_Check(unittest.TestCase):
         for dim in [2,3]:
             #test if files are written for 2D and 3D
             lens = self.lengths[:dim]
-            res  = self.resolution[:dim]
+            res  = self.nb_grid_pts[:dim]
             F = grad[:dim, :dim].reshape((1,)*dim + (dim,)*2)
             x_n, x_c = µ.gradient_integration.compute_grid(lens, res)
             freqs = µ.gradient_integration.compute_wave_vectors(lens, res)

@@ -47,14 +47,14 @@ namespace muFFT {
   BOOST_AUTO_TEST_SUITE(fftw_engine);
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM, Dim_t resolution>
+  template <Dim_t DimS, Dim_t DimM, Dim_t NbGridPts>
   struct FFTW_fixture {
-    constexpr static Dim_t box_resolution{resolution};
-    constexpr static Real box_length{4.5};
+    constexpr static Dim_t BoxNbGridPts{NbGridPts};
+    constexpr static Real Boxlength{4.5};
     constexpr static Dim_t sdim{DimS};
     constexpr static Dim_t mdim{DimM};
     constexpr static Ccoord_t<sdim> res() {
-      return muGrid::CcoordOps::get_cube<DimS>(box_resolution);
+      return muGrid::CcoordOps::get_cube<DimS>(BoxNbGridPts);
     }
     constexpr static Ccoord_t<sdim> loc() {
       return muGrid::CcoordOps::get_cube<DimS>(0);

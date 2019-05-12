@@ -75,7 +75,7 @@ namespace muSpectre {
     //! Default constructor
     DeprecatedSolverCG() = delete;
 
-    //! Constructor with domain resolutions, etc,
+    //! Constructor with cell and solver parameters.
     DeprecatedSolverCG(Cell_t & cell, Real tol, Uint maxiter = 0,
                        bool verbose = false);
 

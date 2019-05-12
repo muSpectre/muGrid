@@ -98,8 +98,8 @@ namespace muGrid {
      **/
     inline void initialise(Ccoord sizes, Ccoord locations);
 
-    //! return subdomain resolutions
-    inline const Ccoord & get_sizes() const;
+    //! return the number of grid points in each direction for this domain
+    inline const Ccoord & get_nb_grid_pts() const;
     //! return subdomain locations
     inline const Ccoord & get_locations() const;
 
@@ -160,10 +160,9 @@ namespace muGrid {
   }
 
   //----------------------------------------------------------------------------//
-  //! return subdomain resolutions
   template <Dim_t DimS>
   const typename GlobalFieldCollection<DimS>::Ccoord &
-  GlobalFieldCollection<DimS>::get_sizes() const {
+  GlobalFieldCollection<DimS>::get_nb_grid_pts() const {
     return this->sizes;
   }
 
@@ -180,7 +179,7 @@ namespace muGrid {
   template <Dim_t DimS>
   typename GlobalFieldCollection<DimS>::Ccoord
   GlobalFieldCollection<DimS>::get_ccoord(size_t index) const {
-    return CcoordOps::get_ccoord(this->get_sizes(), this->get_locations(),
+    return CcoordOps::get_ccoord(this->get_nb_grid_pts(), this->get_locations(),
                                  std::move(index));
   }
 
@@ -206,7 +205,7 @@ namespace muGrid {
         std::is_same<Ccoord, std::remove_const_t<
                                  std::remove_reference_t<CcoordRef>>>::value,
         "can only be called with values or references of Ccoord");
-    return CcoordOps::get_index(this->get_sizes(), this->get_locations(),
+    return CcoordOps::get_index(this->get_nb_grid_pts(), this->get_locations(),
                                 std::forward<CcoordRef>(ccoord));
   }
 

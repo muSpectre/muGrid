@@ -64,12 +64,12 @@ void add_get_ccoord_helper(py::module & mod) {
   using Ccoord = muGrid::Ccoord_t<dim>;
   mod.def(
       "get_domain_ccoord",
-      [](Ccoord resolutions, muGrid::Dim_t index) {
-        return muGrid::CcoordOps::get_ccoord<dim>(resolutions, Ccoord{}, index);
+      [](Ccoord nb_grid_pts, muGrid::Dim_t index) {
+        return muGrid::CcoordOps::get_ccoord<dim>(nb_grid_pts, Ccoord{}, index);
       },
-      "resolutions"_a, "i"_a,
+      "nb_grid_pts"_a, "i"_a,
       "return the cell coordinate corresponding to the i'th cell in a grid of "
-      "shape resolutions");
+      "shape nb_grid_pts");
 }
 
 void add_get_cube(py::module & mod) {

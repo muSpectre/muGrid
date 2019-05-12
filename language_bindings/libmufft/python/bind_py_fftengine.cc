@@ -62,7 +62,7 @@ void add_engine_helper(py::module & mod, std::string name) {
              return new Engine(res, nb_components,
                                std::move(muFFT::Communicator(MPI_Comm(comm))));
            }),
-           "resolutions"_a, "nb_components"_a,
+           "nb_grid_pts"_a, "nb_components"_a,
            "communicator"_a = size_t(MPI_COMM_SELF))
 #else
       .def(py::init<Ccoord, Dim_t>())
@@ -73,7 +73,7 @@ void add_engine_helper(py::module & mod, std::string name) {
              using Coll_t = typename Engine::GFieldCollection_t;
              using Field_t = typename Engine::Field_t;
              Coll_t coll{};
-             coll.initialise(eng.get_subdomain_resolutions(),
+             coll.initialise(eng.get_nb_subdomain_grid_pts(),
                              eng.get_subdomain_locations());
              // Do not make a copy, just wrap the Eigen array into a field that
              // does not manage its own data.
@@ -98,7 +98,7 @@ void add_engine_helper(py::module & mod, std::string name) {
              typename Field_t::EigenRep_t res{eng.get_nb_components(),
                                               eng.size()};
              Coll_t coll{};
-             coll.initialise(eng.get_subdomain_resolutions(),
+             coll.initialise(eng.get_nb_subdomain_grid_pts(),
                              eng.get_subdomain_locations());
              // Wrap the Eigen array into a proxy field that does not manage
              // its own data.
@@ -116,11 +116,11 @@ void add_engine_helper(py::module & mod, std::string name) {
       .def("initialise", &Engine::initialise,
            "flags"_a = muFFT::FFT_PlanFlags::estimate)
       .def("normalisation", &Engine::normalisation)
-      .def("get_subdomain_resolutions", &Engine::get_subdomain_resolutions)
+      .def("get_nb_subdomain_grid_pts", &Engine::get_nb_subdomain_grid_pts)
       .def("get_subdomain_locations", &Engine::get_subdomain_locations)
-      .def("get_fourier_resolutions", &Engine::get_fourier_resolutions)
+      .def("get_nb_fourier_grid_pts", &Engine::get_nb_fourier_grid_pts)
       .def("get_fourier_locations", &Engine::get_fourier_locations)
-      .def("get_domain_resolutions", &Engine::get_domain_resolutions);
+      .def("get_nb_domain_grid_pts", &Engine::get_nb_domain_grid_pts);
 }
 
 void add_fft_engines(py::module & fft) {

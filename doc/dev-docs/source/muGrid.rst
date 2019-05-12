@@ -28,7 +28,7 @@ The types :cpp:type:`muGrid::Rcoord_t` and :cpp:type:`muGrid::Ccoord_t`  are use
 .. doxygengroup:: Coordinates
    :members:
 
-These types are also used to define resolutions or spatial lengths for computational domains.
+These types are also used to define nb_grid_pts or spatial lengths for computational domains.
 
 
 Field Data Types
@@ -209,7 +209,7 @@ defined by their common base class,
 iterable (the iterates are the coordinates of the pixels/voxels for which the
 fields of the collection are defiened.
 
-Global field collections need to be given the problem resolutions (i.e. the size
+Global field collections need to be given the problem nb_grid_pts (i.e. the size
 of the grid) at initialisation, while local collections need to be filled with
 pixels/voxels through repeated calls to
 :cpp:func:`add_pixel(pixel)<muGrid::LocalFieldCollection::add_pixel>`. At
@@ -348,7 +348,7 @@ defined by their common base class,
 iterable (the iterates are the coordinates of the pixels/voxels for which the
 fields of the collection are defiened.
 
-Global field collections need to be given the problem resolutions (i.e. the size
+Global field collections need to be given the problem nb_grid_pts (i.e. the size
 of the grid) at initialisation, while local collections need to be filled with
 pixels/voxels through repeated calls to
 :cpp:func:`add_pixel(pixel)<muGrid::LocalFieldCollection::add_pixel>`. At

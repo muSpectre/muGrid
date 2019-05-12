@@ -52,16 +52,16 @@ def build_test_classes(Projection, RefProjection, name):
 
         def setUp(self):
             self.ref = RefProjection
-            self.resolution = self.ref.resolution
+            self.nb_grid_pts = self.ref.nb_grid_pts
             self.ndim = self.ref.ndim
-            self.shape = list((self.resolution for _ in range(self.ndim)))
+            self.shape = list((self.nb_grid_pts for _ in range(self.ndim)))
             self.projection = Projection(self.shape, self.shape)
             self.projection.initialise()
             self.tol = 1e-12*np.prod(self.shape)
 
         def test_CompareGhat4(self):
             # refG is rowmajor and the dims are i,j,k,l,x,y(,z)
-            # reshape refG so they are n² × n² × ¶(resolution)
+            # reshape refG so they are n² × n² × ¶(nb_grid_pts)
             refG = self.ref.Ghat4.reshape(
                 self.ndim**2, self.ndim**2, np.prod(self.shape))
             # mspG is colmajor (not sure what that's worth, though) with dims
@@ -107,14 +107,14 @@ def build_test_classes(Projection, RefProjection, name):
             strain_g = strain.copy()
             b_g = self.ref.G(strain_g).reshape(strain_g.shape)
             strain_µ = np.zeros((*self.shape, self.ndim, self.ndim))
-            for ijk in itertools.product(range(self.resolution), repeat=self.ndim):
+            for ijk in itertools.product(range(self.nb_grid_pts), repeat=self.ndim):
                 index_µ = tuple((*ijk, slice(None), slice(None)))
                 index_g = tuple((slice(None), slice(None), *ijk))
                 strain_µ[index_µ] = strain_g[index_g].T
 
             b_µ = self.projection.apply_projection(strain_µ.reshape(
                 np.prod(self.shape), self.ndim**2).T).T.reshape(strain_µ.shape)
-            for ijk in itertools.product(range(self.resolution), repeat=self.ndim):
+            for ijk in itertools.product(range(self.nb_grid_pts), repeat=self.ndim):
                 index_µ = tuple((*ijk, slice(None), slice(None)))
                 index_g = tuple((slice(None), slice(None), *ijk))
                 b_µ_sl = b_µ[index_µ].T

@@ -46,13 +46,13 @@ using namespace muSpectre;
 int main() {
   constexpr Dim_t dim{twoD};
 
-  Ccoord_t<dim> resolution{11, 11};
+  Ccoord_t<dim> nb_grid_pts{11, 11};
 
   Rcoord_t<dim> lengths{
       muGrid::CcoordOps::get_cube<dim>(11.)};  // {5.2e-9, 8.3e-9, 8.3e-9};
   Formulation form{Formulation::finite_strain};
 
-  auto rve{make_cell(resolution, lengths, form)};
+  auto rve{make_cell(nb_grid_pts, lengths, form)};
 
   auto & hard{MaterialLinearElastic1<dim, dim>::make(rve, "hard", 210., .33)};
   auto & soft{MaterialLinearElastic1<dim, dim>::make(rve, "soft", 70., .33)};

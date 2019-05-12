@@ -147,7 +147,7 @@ namespace muFFT {
     FieldMap grad(f_grad);
     FieldMap var(f_var);
 
-    fields.initialise(fix::projector.get_subdomain_resolutions(),
+    fields.initialise(fix::projector.get_nb_subdomain_grid_pts(),
                       fix::projector.get_subdomain_locations());
     Vector k;
     for (Dim_t i = 0; i < dim; ++i) {
@@ -163,7 +163,7 @@ namespace muFFT {
       auto & v = std::get<2>(tup);
       Vector vec = muGrid::CcoordOps::get_vector(
           ccoord, fix::projector.get_domain_lengths() /
-                      fix::projector.get_domain_resolutions());
+                      fix::projector.get_nb_domain_grid_pts());
       g.row(0) = k.transpose() * cos(k.dot(vec));
       v.row(0) = g.row(0);
     }
@@ -181,7 +181,7 @@ namespace muFFT {
       if (error >= tol) {
         Vector vec = muGrid::CcoordOps::get_vector(
             ccoord, fix::projector.get_domain_lengths() /
-                        fix::projector.get_domain_resolutions());
+                        fix::projector.get_nb_domain_grid_pts());
         std::cout << std::endl << "grad_ref :" << std::endl << g << std::endl;
         std::cout << std::endl << "grad_proj :" << std::endl << v << std::endl;
         std::cout << std::endl

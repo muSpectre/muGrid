@@ -53,7 +53,7 @@ namespace muSpectre {
   template <>
   struct Sizes<twoD> {
     constexpr static Dim_t sdim{twoD};
-    constexpr static Ccoord_t<sdim> get_resolution() {
+    constexpr static Ccoord_t<sdim> get_nb_grid_pts() {
       return Ccoord_t<sdim>{3, 5};
     }
     constexpr static Rcoord_t<sdim> get_lengths() {
@@ -63,7 +63,7 @@ namespace muSpectre {
   template <>
   struct Sizes<threeD> {
     constexpr static Dim_t sdim{threeD};
-    constexpr static Ccoord_t<sdim> get_resolution() {
+    constexpr static Ccoord_t<sdim> get_nb_grid_pts() {
       return Ccoord_t<sdim>{3, 5, 7};
     }
     constexpr static Rcoord_t<sdim> get_lengths() {
@@ -78,7 +78,7 @@ namespace muSpectre {
     constexpr static Formulation formulation{form};
     CellBaseFixture()
         : CellBase<DimS, DimM>{std::move(
-              cell_input<DimS, DimM>(Sizes<DimS>::get_resolution(),
+              cell_input<DimS, DimM>(Sizes<DimS>::get_nb_grid_pts(),
                                      Sizes<DimS>::get_lengths(), form))} {}
   };
 
@@ -91,16 +91,16 @@ namespace muSpectre {
   BOOST_AUTO_TEST_CASE(manual_construction) {
     constexpr Dim_t dim{twoD};
 
-    Ccoord_t<dim> resolutions{3, 3};
+    Ccoord_t<dim> nb_grid_pts{3, 3};
     Rcoord_t<dim> lengths{2.3, 2.7};
     Formulation form{Formulation::finite_strain};
     auto fft_ptr{
-        std::make_unique<muFFT::FFTWEngine<dim>>(resolutions, dim * dim)};
+        std::make_unique<muFFT::FFTWEngine<dim>>(nb_grid_pts, dim * dim)};
     auto proj_ptr{std::make_unique<ProjectionFiniteStrainFast<dim, dim>>(
         std::move(fft_ptr), lengths)};
     CellBase<dim, dim> sys{std::move(proj_ptr)};
 
-    auto sys2{make_cell<dim, dim>(resolutions, lengths, form)};
+    auto sys2{make_cell<dim, dim>(nb_grid_pts, lengths, form)};
     auto sys2b{std::move(sys2)};
     BOOST_CHECK_EQUAL(sys2b.size(), sys.size());
   }

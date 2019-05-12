@@ -50,9 +50,9 @@ import muSpectre.vtk_export as vt_ex
 ### Input parameters ###
 #----------------------#
 #general
-resolutions = [71, 71, 3]
+nb_grid_pts = [71, 71, 3]
 lengths     = [1.0, 1.0, 0.2]
-Nx, Ny, Nz  = resolutions
+Nx, Ny, Nz  = nb_grid_pts
 formulation = µ.Formulation.finite_strain
 Young   = [10, 20]   #Youngs modulus for each phase
 Poisson = [0.3, 0.4] #Poissons ratio for each phase
@@ -81,14 +81,14 @@ xy_bump = np.ones((l,h,Nz)) #grid representing bumpx
 for i, threshold in enumerate(np.round(p_y)):
     xy_bump[i,int(threshold):,:] = 0
 
-phase = np.zeros(resolutions, dtype=int) #0 for surrounding matrix
+phase = np.zeros(nb_grid_pts, dtype=int) #0 for surrounding matrix
 phase[:, low_y:high_y, :] = 1
 phase[left_x:right_x, high_y:high_y+h, :] = xy_bump
 
 
 ### Run muSpectre ###
 #-------------------#
-cell = µ.Cell(resolutions,
+cell = µ.Cell(nb_grid_pts,
               lengths,
               formulation)
 mat = µ.material.MaterialLinearElastic4_3d.make(cell, "material")
@@ -121,17 +121,17 @@ print('formulation:        ', result.formulation)
 ### Visualisation ###
 #-------------------#
 #integration of the deformation gradient field
-placement_n, x = gi.compute_placement(result, lengths, resolutions, order = 0)
+placement_n, x = gi.compute_placement(result, lengths, nb_grid_pts, order = 0)
 
 ### some fields which can be added to the visualisation
 #2-tensor field containing the first Piola Kirchhoff stress
-PK1 = gi.reshape_gradient(result.stress, resolutions)
+PK1 = gi.reshape_gradient(result.stress, nb_grid_pts)
 #scalar field containing the distance to the origin O
 distance_O = np.linalg.norm(placement_n, axis=-1)
 
 #random fields
 center_shape = tuple(np.array(x.shape[:-1])-1)#shape of the center point grid
-dim = len(resolutions)
+dim = len(nb_grid_pts)
 scalar_c  = np.random.random(center_shape)
 vector_c  = np.random.random(center_shape + (dim,))
 tensor2_c = np.random.random(center_shape + (dim,dim))

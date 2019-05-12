@@ -70,7 +70,7 @@ namespace muSpectre {
     //! Default constructor
     DeprecatedSolverBase() = delete;
 
-    //! Constructor with domain resolutions
+    //! Constructor with domain cell and solver parameters
     DeprecatedSolverBase(Cell_t & cell, Real tol, Uint maxiter = 0,
                          bool verbose = false);
 
@@ -92,7 +92,7 @@ namespace muSpectre {
 
     //! Allocate fields used during the solution
     virtual void initialise() {
-      this->collection.initialise(this->cell.get_subdomain_resolutions(),
+      this->collection.initialise(this->cell.get_nb_subdomain_grid_pts(),
                                   this->cell.get_subdomain_locations());
     }
 

@@ -58,8 +58,11 @@ namespace muFFT {
     //! Default constructor
     PFFTEngine() = delete;
 
-    //! Constructor with system resolutions
-    PFFTEngine(Ccoord resolutions, Dim_t nb_components,
+    /**
+     * Constructor with the domain's number of grid points in each direciton,
+     * the number of components to transform, and the communicator
+     */
+    PFFTEngine(Ccoord nb_grid_pts, Dim_t nb_components,
                Communicator comm = Communicator());
 
     //! Copy constructor

@@ -43,14 +43,14 @@ sys.path.append(os.path.join(os.getcwd(), "language_bindings/python"))
 import muSpectre as µ
 
 
-resolution = [51, 51]
-center = np.array([r//2 for r in resolution])
-incl = resolution[0]//5
+nb_grid_pts = [51, 51]
+center = np.array([r//2 for r in nb_grid_pts])
+incl = nb_grid_pts[0]//5
 
 lengths = [7., 5.]
 formulation = µ.Formulation.small_strain
 
-rve = µ.Cell(resolution, lengths, formulation)
+rve = µ.Cell(nb_grid_pts, lengths, formulation)
 hard = µ.material.MaterialLinearElastic1_2d.make(
     rve, "hard", 10e9, .33)
 soft = µ.material.MaterialLinearElastic1_2d.make(
@@ -98,19 +98,19 @@ for solvclass in (µ.solvers.SolverCG,
 
 # print(r.grad.T[:3])
 # print(r.stress.T[:3])
-# 
+#
 # print(r.grad.T.shape)
 # import matplotlib.pyplot as plt
-# stress = r.stress.T.reshape(*resolution, 2, 2)
+# stress = r.stress.T.reshape(*nb_grid_pts, 2, 2)
 # def comp_von_mises(arr):
-#     out_arr = np.zeros(resolution)
+#     out_arr = np.zeros(nb_grid_pts)
 #     s11 = arr[:,:,0,0]
 #     s22 = arr[:,:,1,1]
 #     s21_2 = arr[:,:,0,1]*arr[:,:,1,0]
-# 
+#
 #     out_arr[:] = np.sqrt(.5*((s11-s22)**2) + s11**2 + s22**2 + 6*s21_2)
 #     return out_arr
-# 
+#
 # von_mises = comp_von_mises(stress)
 # plt.pcolormesh(von_mises)
 # plt.colorbar()

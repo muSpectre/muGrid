@@ -58,15 +58,15 @@ namespace muFFT {
   BOOST_AUTO_TEST_SUITE(mpi_fft_engine);
 
   /* ---------------------------------------------------------------------- */
-  template <typename Engine, Dim_t resolution, bool serial = false>
+  template <typename Engine, Dim_t NbGridPts, bool serial = false>
   struct FFTW_fixture {
-    constexpr static Dim_t box_resolution{resolution};
+    constexpr static Dim_t BoxNbGridPts{NbGridPts};
     constexpr static Dim_t serial_engine{serial};
-    constexpr static Real box_length{4.5};
+    constexpr static Real BoxLength{4.5};
     constexpr static Dim_t sdim{Engine::sdim};
     constexpr static Dim_t nb_components{sdim * sdim};
     constexpr static Ccoord_t<sdim> res() {
-      return muGrid::CcoordOps::get_cube<sdim>(box_resolution);
+      return muGrid::CcoordOps::get_cube<sdim>(BoxNbGridPts);
     }
     FFTW_fixture()
         : engine(res(), nb_components, MPIContext::get_context().comm) {}
@@ -134,7 +134,7 @@ namespace muFFT {
         muGrid::make_field<muGrid::TensorField<FC_t, Real, order, Fix::sdim>>(
             "result", fc)};
 
-    fc.initialise(Fix::engine.get_subdomain_resolutions(),
+    fc.initialise(Fix::engine.get_nb_subdomain_grid_pts(),
                   Fix::engine.get_subdomain_locations());
 
     using map_t = muGrid::MatrixFieldMap<FC_t, Real, Fix::sdim, Fix::sdim>;

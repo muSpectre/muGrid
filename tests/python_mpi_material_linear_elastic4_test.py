@@ -57,10 +57,10 @@ def build_test_classes(fft):
         symmetric strains).
         """
         def setUp(self):
-            self.resolution = [7,7]
+            self.nb_grid_pts = [7,7]
             self.lengths = [2.3, 3.9]
             self.formulation = µ.Formulation.small_strain
-            self.sys = µ.Cell(self.resolution,
+            self.sys = µ.Cell(self.nb_grid_pts,
                               self.lengths,
                               self.formulation,
                               fft=fft,

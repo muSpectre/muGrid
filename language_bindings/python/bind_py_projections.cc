@@ -124,7 +124,7 @@ void add_proj_helper(py::module & mod, std::string name_start) {
                                         "' specified.");
              }
            }),
-           "resolutions"_a, "lengths"_a,
+           "nb_grid_pts"_a, "lengths"_a,
 #ifdef WITH_MPI
            "fft"_a = "fftw", "communicator"_a = size_t(MPI_COMM_SELF))
 #else
@@ -137,7 +137,7 @@ void add_proj_helper(py::module & mod, std::string name_start) {
            [](Proj & proj, py::EigenDRef<Eigen::ArrayXXd> v) {
              typename muFFT::FFTEngineBase<DimS>::GFieldCollection_t coll{};
              Eigen::Index subdomain_size =
-                 muGrid::CcoordOps::get_size(proj.get_subdomain_resolutions());
+                 muGrid::CcoordOps::get_size(proj.get_nb_subdomain_grid_pts());
              if (v.rows() != DimS * DimM || v.cols() != subdomain_size) {
                throw std::runtime_error("Expected input array of shape (" +
                                         std::to_string(DimS * DimM) + ", " +
@@ -146,7 +146,7 @@ void add_proj_helper(py::module & mod, std::string name_start) {
                                         std::to_string(v.rows()) + ", " +
                                         std::to_string(v.cols()) + ").");
              }
-             coll.initialise(proj.get_subdomain_resolutions(),
+             coll.initialise(proj.get_nb_subdomain_grid_pts(),
                              proj.get_subdomain_locations());
              Field_t & temp{muGrid::make_field<Field_t>(
                  "temp_field", coll, proj.get_nb_components())};
@@ -159,10 +159,10 @@ void add_proj_helper(py::module & mod, std::string name_start) {
           "get_formulation", &Proj::get_formulation,
           "return a Formulation enum indicating whether the projection is small"
           " or finite strain")
-      .def("get_subdomain_resolutions", &Proj::get_subdomain_resolutions)
+      .def("get_nb_subdomain_grid_pts", &Proj::get_nb_subdomain_grid_pts)
       .def("get_subdomain_locations", &Proj::get_subdomain_locations)
-      .def("get_domain_resolutions", &Proj::get_domain_resolutions)
-      .def("get_domain_lengths", &Proj::get_domain_resolutions);
+      .def("get_nb_domain_grid_pts", &Proj::get_nb_domain_grid_pts)
+      .def("get_domain_lengths", &Proj::get_nb_domain_grid_pts);
 }
 
 void add_proj_dispatcher(py::module & mod) {

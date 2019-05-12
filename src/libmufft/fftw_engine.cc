@@ -38,12 +38,12 @@
 namespace muFFT {
 
   template <Dim_t Dim>
-  FFTWEngine<Dim>::FFTWEngine(Ccoord resolutions, Dim_t nb_components,
+  FFTWEngine<Dim>::FFTWEngine(Ccoord nb_grid_pts, Dim_t nb_components,
                               Communicator comm)
-      : Parent{resolutions, nb_components, comm}, plan_fft{nullptr},
+      : Parent{nb_grid_pts, nb_components, comm}, plan_fft{nullptr},
         plan_ifft{nullptr} {
     for (auto && pixel :
-         muGrid::CcoordOps::Pixels<Dim>(this->fourier_resolutions)) {
+         muGrid::CcoordOps::Pixels<Dim>(this->nb_fourier_grid_pts)) {
       this->work_space_container.add_pixel(pixel);
     }
   }
@@ -59,12 +59,12 @@ namespace muFFT {
     const int & rank = Dim;
     std::array<int, Dim> narr;
     const int * const n = &narr[0];
-    std::copy(this->subdomain_resolutions.begin(),
-              this->subdomain_resolutions.end(), narr.begin());
+    std::copy(this->nb_subdomain_grid_pts.begin(),
+              this->nb_subdomain_grid_pts.end(), narr.begin());
     int howmany = this->nb_components;
     // temporary buffer for plan
     size_t alloc_size =
-        (muGrid::CcoordOps::get_size(this->subdomain_resolutions) * howmany);
+        (muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts) * howmany);
     Real * r_work_space = fftw_alloc_real(alloc_size);
     Real * in = r_work_space;
     const int * const inembed =
@@ -136,7 +136,7 @@ namespace muFFT {
       throw std::runtime_error("fft plan not initialised");
     }
     if (field.size() !=
-        muGrid::CcoordOps::get_size(this->subdomain_resolutions)) {
+        muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)) {
       throw std::runtime_error("size mismatch");
     }
     fftw_execute_dft_r2c(this->plan_fft, field.data(),
@@ -151,7 +151,7 @@ namespace muFFT {
       throw std::runtime_error("ifft plan not initialised");
     }
     if (field.size() !=
-        muGrid::CcoordOps::get_size(this->subdomain_resolutions)) {
+        muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)) {
       throw std::runtime_error("size mismatch");
     }
     fftw_execute_dft_c2r(this->plan_ifft,

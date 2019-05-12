@@ -80,9 +80,9 @@ namespace muSpectre {
     FieldMap grad(f_grad);
     FieldMap var(f_var);
 
-    fields.initialise(fix::projector.get_subdomain_resolutions(),
+    fields.initialise(fix::projector.get_nb_subdomain_grid_pts(),
                       fix::projector.get_subdomain_locations());
-    muFFT::FFT_freqs<dim> freqs{fix::projector.get_domain_resolutions(),
+    muFFT::FFT_freqs<dim> freqs{fix::projector.get_nb_domain_grid_pts(),
                                 fix::projector.get_domain_lengths()};
 
     Vector k;
@@ -99,7 +99,7 @@ namespace muSpectre {
       auto & v = std::get<2>(tup);
       Vector vec = muGrid::CcoordOps::get_vector(
           ccoord, fix::projector.get_domain_lengths() /
-                      fix::projector.get_domain_resolutions());
+                      fix::projector.get_nb_domain_grid_pts());
       g.row(0) << k.transpose() * cos(k.dot(vec));
 
       // We need to add I to the term, because this field has a net
@@ -120,7 +120,7 @@ namespace muSpectre {
       auto & v = std::get<2>(tup);
       Vector vec = muGrid::CcoordOps::get_vector(
           ccoord, fix::projector.get_domain_lengths() /
-                      fix::projector.get_domain_resolutions());
+                      fix::projector.get_nb_domain_grid_pts());
       Real error = (g - v).norm();
       BOOST_CHECK_LT(error, tol);
       if ((error >= tol) || verbose) {

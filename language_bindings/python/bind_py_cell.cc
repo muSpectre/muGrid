@@ -75,7 +75,7 @@ void add_parallel_cell_factory_helper(py::module & mod, const char * name) {
                 std::move(res), std::move(lens), std::move(form),
                 std::move(muFFT::Communicator(MPI_Comm(comm))));
           },
-          "resolutions"_a, "lengths"_a = muGrid::CcoordOps::get_cube<dim>(1.),
+          "nb_grid_pts"_a, "lengths"_a = muGrid::CcoordOps::get_cube<dim>(1.),
           "formulation"_a = Formulation::finite_strain,
           "communicator"_a = size_t(MPI_COMM_SELF));
 }
@@ -93,7 +93,7 @@ void add_cell_factory_helper(py::module & mod) {
           [](Ccoord res, Rcoord lens, Formulation form) {
             return make_cell(std::move(res), std::move(lens), std::move(form));
           },
-          "resolutions"_a, "lengths"_a = muGrid::CcoordOps::get_cube<dim>(1.),
+          "nb_grid_pts"_a, "lengths"_a = muGrid::CcoordOps::get_cube<dim>(1.),
           "formulation"_a = Formulation::finite_strain);
 
 #ifdef WITH_FFTWMPI
@@ -210,10 +210,10 @@ void add_cell_base_helper(py::module & mod) {
            },
            "strain"_a, py::return_value_policy::reference_internal)
       .def("get_projection", &sys_t::get_projection)
-      .def("get_subdomain_resolutions", &sys_t::get_subdomain_resolutions)
+      .def("get_nb_subdomain_grid_pts", &sys_t::get_nb_subdomain_grid_pts)
       .def("get_subdomain_locations", &sys_t::get_subdomain_locations)
-      .def("get_domain_resolutions", &sys_t::get_domain_resolutions)
-      .def("get_domain_lengths", &sys_t::get_domain_resolutions)
+      .def("get_nb_domain_grid_pts", &sys_t::get_nb_domain_grid_pts)
+      .def("get_domain_lengths", &sys_t::get_nb_domain_grid_pts)
       .def("set_uniform_strain",
            [](sys_t & cell, py::EigenDRef<Eigen::ArrayXXd> & v) -> void {
              cell.set_uniform_strain(v);

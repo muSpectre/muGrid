@@ -41,9 +41,9 @@ namespace muFFT {
   int PFFTEngine<DimsS>::nb_engines{0};
 
   template <Dim_t DimS>
-  PFFTEngine<DimS>::PFFTEngine(Ccoord resolutions, Dim_t nb_components,
+  PFFTEngine<DimS>::PFFTEngine(Ccoord nb_grid_pts, Dim_t nb_components,
                                Communicator comm)
-      : Parent{resolutions, nb_components, comm},
+      : Parent{nb_grid_pts, nb_components, comm},
         mpi_comm{comm.get_mpi_comm()}, plan_fft{nullptr},
         plan_ifft{nullptr}, real_workspace{nullptr} {
     if (!this->nb_engines)
@@ -77,34 +77,34 @@ namespace muFFT {
     }
 
     std::array<ptrdiff_t, DimS> narr;
-    std::copy(this->domain_resolutions.begin(), this->domain_resolutions.end(),
+    std::copy(this->nb_domain_grid_pts.begin(), this->nb_domain_grid_pts.end(),
               narr.begin());
     ptrdiff_t res[DimS], loc[DimS], fres[DimS], floc[DimS];
     this->workspace_size = pfft_local_size_many_dft_r2c(
         DimS, narr.data(), narr.data(), narr.data(), this->nb_components,
         PFFT_DEFAULT_BLOCKS, PFFT_DEFAULT_BLOCKS, this->mpi_comm,
         PFFT_TRANSPOSED_OUT, res, loc, fres, floc);
-    std::copy(res, res + DimS, this->subdomain_resolutions.begin());
+    std::copy(res, res + DimS, this->nb_subdomain_grid_pts.begin());
     std::copy(loc, loc + DimS, this->subdomain_locations.begin());
-    std::copy(fres, fres + DimS, this->fourier_resolutions.begin());
+    std::copy(fres, fres + DimS, this->nb_fourier_grid_pts.begin());
     std::copy(floc, floc + DimS, this->fourier_locations.begin());
     // TODO(pastewka): Enable this to enable 2d process mesh. This does not pass
     // tests.  for (int i = 0; i < DimS-1; ++i) {
     for (int i = 0; i < 1; ++i) {
-      std::swap(this->fourier_resolutions[i], this->fourier_resolutions[i + 1]);
+      std::swap(this->nb_fourier_grid_pts[i], this->nb_fourier_grid_pts[i + 1]);
       std::swap(this->fourier_locations[i], this->fourier_locations[i + 1]);
     }
 
-    for (auto & n : this->subdomain_resolutions) {
+    for (auto & n : this->nb_subdomain_grid_pts) {
       if (n == 0) {
-        throw std::runtime_error("PFFT planning returned zero resolution. "
+        throw std::runtime_error("PFFT planning returned zero grid points. "
                                  "You may need to run on fewer processes.");
       }
     }
-    for (auto & n : this->fourier_resolutions) {
+    for (auto & n : this->nb_fourier_grid_pts) {
       if (n == 0) {
         throw std::runtime_error("PFFT planning returned zero Fourier "
-                                 "resolution. You may need to run on fewer "
+                                 "grid_points. You may need to run on fewer "
                                  "processes.");
       }
     }
@@ -115,7 +115,7 @@ namespace muFFT {
                             // of dimension for a 2d process mesh, but tests
                             // don't pass.  CcoordOps::Pixels<DimS, 1, 2, 0>
                             muGrid::CcoordOps::Pixels<DimS, 1, 0, 2>>(
-             this->fourier_resolutions, this->fourier_locations)) {
+             this->nb_fourier_grid_pts, this->fourier_locations)) {
       this->work_space_container.add_pixel(pixel);
     }
   }
@@ -127,14 +127,18 @@ namespace muFFT {
       throw std::runtime_error("double initialisation, will leak memory");
     }
 
-    // Initialize parent after local resolutions have been determined and
-    // work space has been initialized
+    /*
+     * Initialize parent after the local number of grid points in each direction
+     * have been determined and work space has been initialized
+     */
     Parent::initialise(plan_flags);
 
     this->real_workspace = pfft_alloc_real(2 * this->workspace_size);
-    // We need to check whether the workspace provided by our field is large
-    // enough. PFFT may request a workspace size larger than the nominal size
-    // of the complex buffer.
+    /*
+     * We need to check whether the workspace provided by our field is large
+     * enough. PFFT may request a workspace size larger than the nominal size of
+     * the complex buffer.
+     */
     if (static_cast<int>(this->work.size() * this->nb_components) <
         this->workspace_size) {
       this->work.set_pad_size(this->workspace_size -
@@ -161,7 +165,7 @@ namespace muFFT {
     }
 
     std::array<ptrdiff_t, DimS> narr;
-    std::copy(this->domain_resolutions.begin(), this->domain_resolutions.end(),
+    std::copy(this->nb_domain_grid_pts.begin(), this->nb_domain_grid_pts.end(),
               narr.begin());
     Real * in{this->real_workspace};
     pfft_complex * out{reinterpret_cast<pfft_complex *>(this->work.data())};
@@ -212,7 +216,7 @@ namespace muFFT {
       throw std::runtime_error("fft plan not allocated");
     }
     if (field.size() !=
-        muGrid::CcoordOps::get_size(this->subdomain_resolutions)) {
+        muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)) {
       throw std::runtime_error("size mismatch");
     }
     // Copy field data to workspace buffer. This is necessary because workspace
@@ -231,7 +235,7 @@ namespace muFFT {
       throw std::runtime_error("ifft plan not allocated");
     }
     if (field.size() !=
-        muGrid::CcoordOps::get_size(this->subdomain_resolutions)) {
+        muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)) {
       throw std::runtime_error("size mismatch");
     }
     pfft_execute_dft_c2r(this->plan_ifft,

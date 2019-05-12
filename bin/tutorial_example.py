@@ -5,15 +5,15 @@ import muSpectre as msp
 import matplotlib.pyplot as plt
 
 
-## currently, muSpectre is restricted to odd-numbered resolutions for
-## reasons explained in T.W.J. de Geus, J. Vondřejc, J. Zeman,
+## currently, muSpectre is restricted to odd numbers of grid points in each
+## direction for reasons explained in T.W.J. de Geus, J. Vondřejc, J. Zeman,
 ## R.H.J. Peerlings, M.G.D. Geers, Finite strain FFT-based non-linear
 ## solvers made simple, Computer Methods in Applied Mechanics and
 ## Engineering, Volume 318, 2017
 ## https://doi.org/10.1016/j.cma.2016.12.032
-resolution = [51, 51]
-center = np.array([r//2 for r in resolution])
-incl = resolution[0]//5
+nb_grid_pts = [51, 51]
+center = np.array([r//2 for r in nb_grid_pts])
+incl = nb_grid_pts[0]//5
 
 
 ## Domain dimensions
@@ -22,7 +22,7 @@ lengths = [7., 5.]
 formulation = msp.Formulation.small_strain
 
 ## build a computational domain
-rve = msp.Cell(resolution, lengths, formulation)
+rve = msp.Cell(nb_grid_pts, lengths, formulation)
 
 ## define the material properties of the matrix and inclusion
 hard = msp.material.MaterialLinearElastic1_2d.make(
@@ -73,8 +73,8 @@ print(result)
 ## visualise e.g., stress in y-direction
 stress = result.stress
 ## stress is stored in a flatten stress tensor per pixel, i.e., a
-## dim^2 × prod(resolution_i) array, so it needs to be reshaped
-stress = stress.T.reshape(*resolution, 2, 2)
+## dim^2 × prod(nb_grid_pts_i) array, so it needs to be reshaped
+stress = stress.T.reshape(*nb_grid_pts, 2, 2)
 
 plt.pcolormesh(stress[:, :, 1, 1])
 plt.colorbar()

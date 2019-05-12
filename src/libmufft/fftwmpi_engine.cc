@@ -41,18 +41,18 @@ namespace muFFT {
   int FFTWMPIEngine<Dim>::nb_engines{0};
 
   template <Dim_t Dim>
-  FFTWMPIEngine<Dim>::FFTWMPIEngine(Ccoord resolutions, Dim_t nb_components,
+  FFTWMPIEngine<Dim>::FFTWMPIEngine(Ccoord nb_grid_pts, Dim_t nb_components,
                                     Communicator comm)
-      : Parent{resolutions, nb_components, comm}, plan_fft{nullptr},
+      : Parent{nb_grid_pts, nb_components, comm}, plan_fft{nullptr},
         plan_ifft{nullptr}, real_workspace{nullptr} {
     if (!this->nb_engines)
       fftw_mpi_init();
     this->nb_engines++;
 
     std::array<ptrdiff_t, Dim> narr;
-    std::copy(this->domain_resolutions.begin(), this->domain_resolutions.end(),
+    std::copy(this->nb_domain_grid_pts.begin(), this->nb_domain_grid_pts.end(),
               narr.begin());
-    narr[Dim - 1] = this->domain_resolutions[Dim - 1] / 2 + 1;
+    narr[Dim - 1] = this->nb_domain_grid_pts[Dim - 1] / 2 + 1;
     ptrdiff_t res_x, loc_x, res_y, loc_y;
     this->workspace_size = fftw_mpi_local_size_many_transposed(
         Dim, narr.data(), this->nb_components, FFTW_MPI_DEFAULT_BLOCK,
@@ -61,23 +61,23 @@ namespace muFFT {
     // A factor of two is required because we are using the c2r/r2c DFTs.
     // See: http://www.fftw.org/fftw3_doc/Multi_002ddimensional-MPI-DFTs-of-Real-Data.html
     this->workspace_size *= 2;
-    this->fourier_resolutions[1] = this->fourier_resolutions[0];
+    this->nb_fourier_grid_pts[1] = this->nb_fourier_grid_pts[0];
     this->fourier_locations[1] = this->fourier_locations[0];
-    this->subdomain_resolutions[0] = res_x;
+    this->nb_subdomain_grid_pts[0] = res_x;
     this->subdomain_locations[0] = loc_x;
-    this->fourier_resolutions[0] = res_y;
+    this->nb_fourier_grid_pts[0] = res_y;
     this->fourier_locations[0] = loc_y;
 
-    for (auto & n : this->subdomain_resolutions) {
+    for (auto & n : this->nb_subdomain_grid_pts) {
       if (n == 0) {
-        throw std::runtime_error("FFTW MPI planning returned zero resolution. "
+        throw std::runtime_error("FFTW MPI planning returned zero grid points. "
                                  "You may need to run on fewer processes.");
       }
     }
-    for (auto & n : this->fourier_resolutions) {
+    for (auto & n : this->nb_fourier_grid_pts) {
       if (n == 0) {
         throw std::runtime_error("FFTW MPI planning returned zero Fourier "
-                                 "resolution. You may need to run on fewer "
+                                 "grid points. You may need to run on fewer "
                                  "processes.");
       }
     }
@@ -85,7 +85,7 @@ namespace muFFT {
     for (auto && pixel :
          std::conditional_t<Dim == 2, muGrid::CcoordOps::Pixels<Dim, 1, 0>,
                             muGrid::CcoordOps::Pixels<Dim, 1, 0, 2>>(
-             this->fourier_resolutions, this->fourier_locations)) {
+             this->nb_fourier_grid_pts, this->fourier_locations)) {
       this->work_space_container.add_pixel(pixel);
     }
   }
@@ -97,14 +97,18 @@ namespace muFFT {
       throw std::runtime_error("double initialisation, will leak memory");
     }
 
-    // Initialize parent after local resolutions have been determined and
-    // work space has been initialized
+    /*
+     * Initialize parent after the local number of grid points in each direction
+     * have been determined and work space has been initialized
+     */
     Parent::initialise(plan_flags);
 
     this->real_workspace = fftw_alloc_real(this->workspace_size);
-    // We need to check whether the workspace provided by our field is large
-    // enough. MPI parallel FFTW may request a workspace size larger than the
-    // nominal size of the complex buffer.
+    /*
+     * We need to check whether the workspace provided by our field is large
+     * enough. MPI parallel FFTW may request a workspace size larger than the
+     * nominal size of the complex buffer.
+     */
     if (static_cast<int>(this->work.size() * this->nb_components) <
         this->workspace_size) {
       this->work.set_pad_size(this->workspace_size -
@@ -131,7 +135,7 @@ namespace muFFT {
     }
 
     std::array<ptrdiff_t, Dim> narr;
-    std::copy(this->domain_resolutions.begin(), this->domain_resolutions.end(),
+    std::copy(this->nb_domain_grid_pts.begin(), this->nb_domain_grid_pts.end(),
               narr.begin());
     Real * in{this->real_workspace};
     fftw_complex * out{reinterpret_cast<fftw_complex *>(this->work.data())};
@@ -179,17 +183,17 @@ namespace muFFT {
       throw std::runtime_error("fft plan not initialised");
     }
     if (field.size() !=
-        muGrid::CcoordOps::get_size(this->subdomain_resolutions)) {
+        muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)) {
       throw std::runtime_error("size mismatch");
     }
     // Copy non-padded field to padded real_workspace.
     // Transposed output of M x N x L transform for >= 3 dimensions is padded
     // M x N x 2*(L/2+1).
     ptrdiff_t fstride =
-        (this->nb_components * this->subdomain_resolutions[Dim - 1]);
+        (this->nb_components * this->nb_subdomain_grid_pts[Dim - 1]);
     ptrdiff_t wstride = (this->nb_components * 2 *
-                         (this->subdomain_resolutions[Dim - 1] / 2 + 1));
-    ptrdiff_t n = field.size() / this->subdomain_resolutions[Dim - 1];
+                         (this->nb_subdomain_grid_pts[Dim - 1] / 2 + 1));
+    ptrdiff_t n = field.size() / this->nb_subdomain_grid_pts[Dim - 1];
 
     auto fdata = field.data();
     auto wdata = this->real_workspace;
@@ -212,7 +216,7 @@ namespace muFFT {
       throw std::runtime_error("ifft plan not initialised");
     }
     if (field.size() !=
-        muGrid::CcoordOps::get_size(this->subdomain_resolutions)) {
+        muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)) {
       throw std::runtime_error("size mismatch");
     }
     // Compute inverse FFT
@@ -223,10 +227,10 @@ namespace muFFT {
     // Transposed output of M x N x L transform for >= 3 dimensions is padded
     // M x N x 2*(L/2+1).
     ptrdiff_t fstride{this->nb_components *
-                      this->subdomain_resolutions[Dim - 1]};
+                      this->nb_subdomain_grid_pts[Dim - 1]};
     ptrdiff_t wstride{this->nb_components * 2 *
-                      (this->subdomain_resolutions[Dim - 1] / 2 + 1)};
-    ptrdiff_t n(field.size() / this->subdomain_resolutions[Dim - 1]);
+                      (this->nb_subdomain_grid_pts[Dim - 1] / 2 + 1)};
+    ptrdiff_t n(field.size() / this->nb_subdomain_grid_pts[Dim - 1]);
 
     auto fdata{field.data()};
     auto wdata{this->real_workspace};

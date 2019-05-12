@@ -39,10 +39,10 @@ import numpy as np
 import sys
 from . import Formulation
 
-def compute_wave_vectors(lengths, resolutions):
+def compute_wave_vectors(lengths, nb_grid_pts):
     """Computes the wave vectors for a dim-dimensional rectangular or
     cubic (or hypercubic) grid as a function of the edge lengths and
-    resolutions.
+    number of grid points.
 
     Note: the norm of the wave vectors corresponds to the angular
     velocity, not the frequency.
@@ -50,69 +50,69 @@ def compute_wave_vectors(lengths, resolutions):
     Keyword Arguments:
     lengths     -- np.ndarray of length dim with the edge lengths in each
                    spatial dimension (dtype = float)
-    resolutions -- np.ndarray of length dim with the resolutions in each
+    nb_grid_pts -- np.ndarray of length dim with the nb_grid_pts in each
                    spatial dimension (dtype = int)
 
     Returns:
-    np.ndarary of shape resolutions + [dim]. The wave vector for a
+    np.ndarary of shape nb_grid_pts + [dim]. The wave vector for a
     given pixel/voxel is given in the last dimension
 
     """
     return np.moveaxis(np.meshgrid(
-        *[2*np.pi*np.fft.fftfreq(r, l/r) for l,r in zip(lengths, resolutions)],
+        *[2*np.pi*np.fft.fftfreq(r, l/r) for l,r in zip(lengths, nb_grid_pts)],
         indexing="ij"), 0, -1)
 
-def compute_grid(lengths, resolutions):
+def compute_grid(lengths, nb_grid_pts):
     """For a dim-dimensional pixel/voxel grid, computes the pixel/voxel
     centre and corner positions as a function of the grid's edge
-    lengths and resolutions
+    lengths and number of grid points
 
     Keyword Arguments:
     lengths     -- np.ndarray of length dim with the edge lengths in each
                    spatial dimension (dtype = float)
-    resolutions -- np.ndarray of length dim with the resolutions in each
+    nb_grid_pts -- np.ndarray of length dim with the nb_grid_pts in each
                    spatial dimension (dtype = int)
     Returns:
     tuple((x_n, x_c)) two ndarrays with nodal/corner positions and
     centre positions respectively. x_n has one more entry in every
-    direction than the resolution of the grid (added points correspond
-    to the periodic repetitions)
+    direction than the number of grid points of the grid (added points
+    correspond to the periodic repetitions)
 
     """
     x_n = np.moveaxis(np.meshgrid(
-        *[np.linspace(0, l, r+1) for l,r in zip(lengths, resolutions)],
+        *[np.linspace(0, l, r+1) for l,r in zip(lengths, nb_grid_pts)],
         indexing="ij"), 0 ,-1)
-    dx = lengths/resolutions
+    dx = lengths/nb_grid_pts
 
     x_c = np.moveaxis(np.meshgrid(
         *[np.linspace(0, l, r, endpoint=False) for l,r in
-          zip(lengths, resolutions)],
+          zip(lengths, nb_grid_pts)],
         indexing="ij"), 0, -1) + .5*dx
 
     return x_n, x_c
 
-def reshape_gradient(F, resolutions):
+def reshape_gradient(F, nb_grid_pts):
     """reshapes a flattened second-rank tensor into a multidimensional array of
-    shape resolutions + [dim, dim].
+    shape nb_grid_pts + [dim, dim].
 
     Note: this reshape entails a copy, because of the column-major to
     row-major transposition between Eigen and numpy
 
     Keyword Arguments:
     F           -- flattenen array of gradients as in OptimizeResult
-    resolutions -- np.ndarray of length dim with the resolutions in each
+    nb_grid_pts -- np.ndarray of length dim with the nb_grid_pts in each
                    spatial dimension (dtype = int)
 
     Returns:
     np.ndarray
     """
 
-    dim = len(resolutions)
-    if not isinstance(resolutions, list):
-        raise Exception("resolutions needs to be in list form, "+
+    dim = len(nb_grid_pts)
+    if not isinstance(nb_grid_pts, list):
+        raise Exception("nb_grid_pts needs to be in list form, "+
                         "for concatenation")
-    expected_input_shape = [np.prod(resolutions) * dim**2]
-    output_shape = resolutions + [dim, dim]
+    expected_input_shape = [np.prod(nb_grid_pts) * dim**2]
+    output_shape = nb_grid_pts + [dim, dim]
     if not ((F.shape[0] == expected_input_shape[0]) and
             (F.size == expected_input_shape[0])):
         raise Exception("expected gradient of shape {}, got {}".format(
@@ -151,12 +151,12 @@ def complement_periodically(array, dim):
 def get_integrator(x, freqs, order=0):
     """returns the discrete Fourier-space integration operator as a
     function of the position grid (used to determine the spatial
-    dimension and resolution), the wave vectors, and the integration
+    dimension and number of grid points), the wave vectors, and the integration
     order
 
     Keyword Arguments:
     x     -- np.ndarray of pixel/voxel centre positons in shape
-             resolution + [dim]
+             nb_grid_pts_per_dim + [dim]
     freqs -- wave vectors as computed by compute_wave_vectors
     order -- (default 0) integration order. 0 stands for exact integration
 
@@ -204,12 +204,13 @@ def integrate_tensor_2(grad, x, freqs, staggered_grid=False, order=0):
     pixel/voxel corners (staggered grid).
 
     Keyword Arguments:
-    grad           -- np.ndarray of shape resolution + [dim, dim] containing the
-                      second-rank gradient to be integrated
-    x              -- np.ndarray of shape resolution + [dim] (or augmented
-                      resolution + [dim]) containing the pixel/voxel centre
-                      positions (for un-staggered grid integration) or the pixel
-                      /voxel corner positions (for staggered grid integration)
+    grad           -- np.ndarray of shape nb_grid_pts_per_dim + [dim, dim]
+                      containing the second-rank gradient to be integrated
+    x              -- np.ndarray of shape nb_grid_pts_per_dim + [dim] (or
+                      augmented nb_grid_pts_per_dim + [dim]) containing the
+                      pixel/voxel centre positions (for un-staggered grid
+                      integration) or the pixel/voxel corner positions (for
+                      staggered grid integration)
     freqs          -- wave vectors as computed by compute_wave_vectors
     staggered_grid -- (default False) if set to True, the integration is
                       performed on the pixel/voxel corners, rather than the
@@ -256,12 +257,13 @@ def integrate_vector(df, x, freqs, staggered_grid=False, order=0):
     pixel/voxel corners (staggered_grid)
 
     Keyword Arguments:
-    df             -- np.ndarray of shape resolution + [dim] containing the
-                      first-rank tensor gradient to be integrated
-    x              -- np.ndarray of shape resolution + [dim] (or augmented
-                      resolution + [dim]) containing the pixel/voxel centre
-                      positions (for un-staggered grid integration) or the pixel
-                      /voxel corner positions (for staggered grid integration)
+    df             -- np.ndarray of shape nb_grid_pts_per_dim + [dim] containing
+                      the first-rank tensor gradient to be integrated
+    x              -- np.ndarray of shape nb_grid_pts_per_dim + [dim] (or
+                      augmented nb_grid_pts_per_dim + [dim]) containing the
+                      pixel/voxel centre positions (for un-staggered grid
+                      integration) or the pixel/voxel corner positions (for
+                      staggered grid integration)
     freqs          -- wave vectors as computed by compute_wave_vectors
     staggered_grid -- (default False) if set to True, the integration is
                       performed on the pixel/voxel corners, rather than the
@@ -299,10 +301,10 @@ def integrate_vector(df, x, freqs, staggered_grid=False, order=0):
     return fluctuation + homogeneous
 
 
-def compute_placement(result, lengths, resolutions, order=0, formulation=None):
+def compute_placement(result, lengths, nb_grid_pts, order=0, formulation=None):
     """computes the placement (the sum of original position and
     displacement) as a function of a OptimizeResult, domain edge
-    lengths, domain discretisation resolutions, the chosen
+    lengths, domain discretisation nb_grid_pts, the chosen
     integration order and the continuum mechanics description(small or finite
     strain description)
 
@@ -310,7 +312,7 @@ def compute_placement(result, lengths, resolutions, order=0, formulation=None):
     result      -- OptimiseResult, or just the grad field of an OptimizeResult
     lengths     -- np.ndarray of length dim with the edge lengths in each
                    spatial dimension (dtype = float)
-    resolutions -- np.ndarray of length dim with the resolutions in each
+    nb_grid_pts -- np.ndarray of length dim with the nb_grid_pts in each
                    spatial dimension (dtype = int)
     order       -- (default 0) integration order. 0 stands for exact integration
     formulation -- (default None) the formulation is derived from the
@@ -324,7 +326,7 @@ def compute_placement(result, lengths, resolutions, order=0, formulation=None):
     """
 
     lengths = np.array(lengths)
-    resolutions = np.array(resolutions)
+    nb_grid_pts = np.array(nb_grid_pts)
 
     #Check whether result is a np.array or an OptimiseResult object
     if isinstance(result, np.ndarray):
@@ -337,7 +339,7 @@ def compute_placement(result, lengths, resolutions, order=0, formulation=None):
                 'Otherwise you can give a result=OptimiseResult object, which '
                 'tells me the formulation.')
         form = formulation
-        grad = reshape_gradient(result, resolutions.tolist())
+        grad = reshape_gradient(result, nb_grid_pts.tolist())
     else:
         form = result.formulation
         if form != formulation and formulation != None:
@@ -345,7 +347,7 @@ def compute_placement(result, lengths, resolutions, order=0, formulation=None):
             raise ValueError('\nThe given formulation "{}" differs from the '
                              'one saved in your result "{}"!'
                              .format(formulation, form))
-        grad = reshape_gradient(result.grad, resolutions.tolist())
+        grad = reshape_gradient(result.grad, nb_grid_pts.tolist())
 
     #reshape the gradient depending on the formulation
     if form == Formulation.small_strain:
@@ -358,8 +360,8 @@ def compute_placement(result, lengths, resolutions, order=0, formulation=None):
                          .format(formulation))
 
     #compute the placement by integrating
-    x_n, x_c = compute_grid(lengths, resolutions)
-    freqs = compute_wave_vectors(lengths, resolutions)
+    x_n, x_c = compute_grid(lengths, nb_grid_pts)
+    freqs = compute_wave_vectors(lengths, nb_grid_pts)
     placement = integrate_tensor_2(grad, x_n, freqs,
                                    staggered_grid=True, order=order)
 

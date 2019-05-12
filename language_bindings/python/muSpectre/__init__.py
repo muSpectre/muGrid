@@ -58,15 +58,15 @@ _projections = {_muSpectre.Formulation.finite_strain: 'FiniteStrainFast',
                 _muSpectre.Formulation.small_strain: 'SmallStrain'}
 
 
-def Cell(resolutions, lengths, formulation=Formulation.finite_strain,
+def Cell(nb_grid_pts, lengths, formulation=Formulation.finite_strain,
          fft='fftw', communicator=None):
     """
     Instantiate a muSpectre Cell class.
 
     Parameters
     ----------
-    resolutions: list
-        Grid resolutions in the Cartesian directions.
+    nb_grid_pts: list
+        Grid nb_grid_pts in the Cartesian directions.
     lengths: list
         Physical size of the cell in the Cartesian directions.
     formulation: Formulation
@@ -86,7 +86,7 @@ def Cell(resolutions, lengths, formulation=Formulation.finite_strain,
     cell: object
         Return a muSpectre Cell object.
     """
-    resolutions = list(resolutions)
+    nb_grid_pts = list(nb_grid_pts)
     lengths = list(lengths)
     try:
         factory_name, is_parallel = _factories[fft]
@@ -103,16 +103,16 @@ def Cell(resolutions, lengths, formulation=Formulation.finite_strain,
                                ' not be imported.')
         if communicator is None:
             communicator = MPI.COMM_SELF
-        return factory(resolutions, lengths, formulation,
+        return factory(nb_grid_pts, lengths, formulation,
                        MPI._handleof(communicator))
     else:
         if communicator is not None:
             raise ValueError("FFT engine '{}' does not support parallel "
                              "execution.".format(fft))
-        return factory(resolutions, lengths, formulation)
+        return factory(nb_grid_pts, lengths, formulation)
 
 
-def Projection(resolutions, lengths,
+def Projection(nb_grid_pts, lengths,
                formulation=_muSpectre.Formulation.finite_strain,
                fft='fftw', communicator=None):
     """
@@ -120,8 +120,8 @@ def Projection(resolutions, lengths,
 
     Parameters
     ----------
-    resolutions: list
-        Grid resolutions in the Cartesian directions.
+    nb_grid_pts: list
+        Grid nb_grid_pts in the Cartesian directions.
     formulation: muSpectre.Formulation
         Determines whether to use finite or small strain formulation.
     fft: string
@@ -138,7 +138,7 @@ def Projection(resolutions, lengths,
         Return a muSpectre Cell object.
     """
     factory_name = 'Projection{}_{}d'.format(_projections[formulation],
-                                             len(resolutions))
+                                             len(nb_grid_pts))
     try:
         factory = _muSpectre.__dict__[factory_name]
     except KeyError:
@@ -146,5 +146,5 @@ def Projection(resolutions, lengths,
                        "muSpectre library.".format(factory_name))
     if communicator is None:
         communicator = MPI.COMM_SELF
-    return factory(resolutions, lengths, fft,
+    return factory(nb_grid_pts, lengths, fft,
                    MPI._handleof(communicator))

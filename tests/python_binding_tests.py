@@ -62,11 +62,11 @@ class CellCheck(unittest.TestCase):
         """
         Simple check for cell constructors
         """
-        resolution = [5,7]
+        nb_grid_pts = [5,7]
         lengths = [5.2, 8.3]
         formulation = µ.Formulation.small_strain
         try:
-            sys = µ.Cell(resolution,
+            sys = µ.Cell(nb_grid_pts,
                          lengths,
                          formulation)
             mat = µ.material.MaterialLinearElastic1_2d.make(sys, "material",
@@ -78,10 +78,10 @@ class CellCheck(unittest.TestCase):
 
 class MaterialLinearElastic1_2dCheck(unittest.TestCase):
     def setUp(self):
-        self.resolution = [5,7]
+        self.nb_grid_pts = [5,7]
         self.lengths = [5.2, 8.3]
         self.formulation = µ.Formulation.small_strain
-        self.sys = µ.Cell(self.resolution,
+        self.sys = µ.Cell(self.nb_grid_pts,
                           self.lengths,
                           self.formulation)
         self.mat = µ.material.MaterialLinearElastic1_2d.make(
@@ -93,10 +93,10 @@ class MaterialLinearElastic1_2dCheck(unittest.TestCase):
 
 class SolverCheck(unittest.TestCase):
     def setUp(self):
-        self.resolution = [3, 3]#[5,7]
+        self.nb_grid_pts = [3, 3]#[5,7]
         self.lengths = [3., 3.]#[5.2, 8.3]
         self.formulation = µ.Formulation.finite_strain
-        self.sys = µ.Cell(self.resolution,
+        self.sys = µ.Cell(self.nb_grid_pts,
                           self.lengths,
                           self.formulation)
         self.hard = µ.material.MaterialLinearElastic1_2d.make(
@@ -126,13 +126,13 @@ class SolverCheck(unittest.TestCase):
 
 class EigenStrainCheck(unittest.TestCase):
     def setUp(self):
-        self.resolution = [3, 3]#[5,7]
+        self.nb_grid_pts = [3, 3]#[5,7]
         self.lengths = [3., 3.]#[5.2, 8.3]
         self.formulation = µ.Formulation.small_strain
-        self.cell1 = µ.Cell(self.resolution,
+        self.cell1 = µ.Cell(self.nb_grid_pts,
                             self.lengths,
                             self.formulation)
-        self.cell2 = µ.Cell(self.resolution,
+        self.cell2 = µ.Cell(self.nb_grid_pts,
                             self.lengths,
                             self.formulation)
         self.mat1 = µ.material.MaterialLinearElastic1_2d.make(

@@ -118,17 +118,20 @@ namespace muSpectre {
     //! apply the projection operator to a field
     virtual void apply_projection(Field_t & field) = 0;
 
-    //! returns the process-local resolutions of the cell
-    const Ccoord & get_subdomain_resolutions() const {
-      return this->fft_engine->get_subdomain_resolutions();
+    /**
+     * returns the process-local number of grid points in each direction of the
+     * cell
+     */
+    const Ccoord & get_nb_subdomain_grid_pts() const {
+      return this->fft_engine->get_nb_subdomain_grid_pts();
     }
     //! returns the process-local locations of the cell
     const Ccoord & get_subdomain_locations() const {
       return this->fft_engine->get_subdomain_locations();
     }
-    //! returns the resolutions of the cell
-    const Ccoord & get_domain_resolutions() const {
-      return this->fft_engine->get_domain_resolutions();
+    //! returns the global number of grid points in each direction of the cell
+    const Ccoord & get_nb_domain_grid_pts() const {
+      return this->fft_engine->get_nb_domain_grid_pts();
     }
     //! returns the physical sizes of the cell
     const Rcoord & get_domain_lengths() const { return this->domain_lengths; }

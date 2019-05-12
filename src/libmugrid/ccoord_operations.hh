@@ -91,7 +91,7 @@ namespace muGrid {
     }  // namespace internal
 
     //-----------------------------------------------------------------------//
-    //! returns a grid of equal resolutions in each direction
+    //! returns a grid of equal number of grid points in each direction
     template <size_t dim, typename T>
     constexpr std::array<T, dim> get_cube(T size) {
       return internal::cube_fun<dim>(size, std::make_index_sequence<dim>{});
@@ -152,15 +152,15 @@ namespace muGrid {
     //----------------------------------------------------------------------------//
     //! get the i-th pixel in a grid of size sizes
     template <size_t dim>
-    constexpr Ccoord_t<dim> get_ccoord(const Ccoord_t<dim> & resolutions,
+    constexpr Ccoord_t<dim> get_ccoord(const Ccoord_t<dim> & nb_grid_pts,
                                        const Ccoord_t<dim> & locations,
                                        Dim_t index) {
       Ccoord_t<dim> retval{{0}};
       Dim_t factor{1};
       for (Dim_t i = dim - 1; i >= 0; --i) {
-        retval[i] = index / factor % resolutions[i] + locations[i];
+        retval[i] = index / factor % nb_grid_pts[i] + locations[i];
         if (i != 0) {
-          factor *= resolutions[i];
+          factor *= nb_grid_pts[i];
         }
       }
       return retval;
@@ -169,10 +169,10 @@ namespace muGrid {
     //----------------------------------------------------------------------------//
     //! get the i-th pixel in a grid of size sizes
     template <size_t dim, size_t... I>
-    constexpr Ccoord_t<dim> get_ccoord(const Ccoord_t<dim> & resolutions,
+    constexpr Ccoord_t<dim> get_ccoord(const Ccoord_t<dim> & nb_grid_pts,
                                        const Ccoord_t<dim> & locations,
                                        Dim_t index, std::index_sequence<I...>) {
-      Ccoord_t<dim> ccoord{get_ccoord<dim>(resolutions, locations, index)};
+      Ccoord_t<dim> ccoord{get_ccoord<dim>(nb_grid_pts, locations, index)};
       return Ccoord_t<dim>({ccoord[I]...});
     }
 
@@ -239,9 +239,9 @@ namespace muGrid {
     class Pixels {
      public:
       //! constructor
-      Pixels(const Ccoord_t<dim> & resolutions = Ccoord_t<dim>{},
+      Pixels(const Ccoord_t<dim> & nb_grid_pts = Ccoord_t<dim>{},
              const Ccoord_t<dim> & locations = Ccoord_t<dim>{})
-          : resolutions{resolutions}, locations{locations} {};
+          : nb_grid_pts{nb_grid_pts}, locations{locations} {};
       //! copy constructor
       Pixels(const Pixels & other) = default;
       //! assignment operator
@@ -282,23 +282,23 @@ namespace muGrid {
       //! stl conformance
       inline iterator end() const { return iterator(*this, false); }
       //! stl conformance
-      inline size_t size() const { return get_size(this->resolutions); }
+      inline size_t size() const { return get_size(this->nb_grid_pts); }
 
      protected:
-      Ccoord_t<dim> resolutions;  //!< resolutions of this domain
+      Ccoord_t<dim> nb_grid_pts;  //!< nb_grid_pts of this domain
       Ccoord_t<dim> locations;    //!< locations of this domain
     };
 
     /* ---------------------------------------------------------------------- */
     template <size_t dim, int... dmap>
     Pixels<dim, dmap...>::iterator::iterator(const Pixels & pixels, bool begin)
-        : pixels{pixels}, index{begin ? 0 : get_size(pixels.resolutions)} {}
+        : pixels{pixels}, index{begin ? 0 : get_size(pixels.nb_grid_pts)} {}
 
     /* ---------------------------------------------------------------------- */
     template <size_t dim, int... dmap>
     typename Pixels<dim, dmap...>::iterator::value_type
         Pixels<dim, dmap...>::iterator::operator*() const {
-      return get_ccoord(pixels.resolutions, pixels.locations, this->index,
+      return get_ccoord(pixels.nb_grid_pts, pixels.locations, this->index,
                         std::conditional_t<sizeof...(dmap) == 0,
                                            std::make_index_sequence<dim>,
                                            std::index_sequence<dmap...>>{});

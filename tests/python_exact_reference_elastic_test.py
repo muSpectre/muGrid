@@ -261,21 +261,21 @@ class LinearElastic_Check(unittest.TestCase):
 
     def setUp(self):
         #---------------------------- µSpectre init -----------------------------------
-        resolution = list(phase.shape)
-        dim = len(resolution)
+        nb_grid_pts = list(phase.shape)
+        dim = len(nb_grid_pts)
         self.dim=dim
 
-        center = np.array([r//2 for r in resolution])
-        incl = resolution[0]//5
+        center = np.array([r//2 for r in nb_grid_pts])
+        incl = nb_grid_pts[0]//5
 
 
         ## Domain dimensions
-        lengths = [float(r) for r in resolution]
+        lengths = [float(r) for r in nb_grid_pts]
         ## formulation (small_strain or finite_strain)
         formulation = µ.Formulation.finite_strain
 
         ## build a computational domain
-        self.rve = µ.Cell(resolution, lengths, formulation)
+        self.rve = µ.Cell(nb_grid_pts, lengths, formulation)
         def get_E_nu(bulk, shear):
             Young = 9*bulk*shear/(3*bulk + shear)
             Poisson = Young/(2*shear) - 1

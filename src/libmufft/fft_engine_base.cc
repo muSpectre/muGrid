@@ -38,15 +38,15 @@ namespace muFFT {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t Dim>
-  FFTEngineBase<Dim>::FFTEngineBase(Ccoord resolutions, Dim_t nb_components,
+  FFTEngineBase<Dim>::FFTEngineBase(Ccoord nb_grid_pts, Dim_t nb_components,
                                     Communicator comm)
-      : comm{comm}, subdomain_resolutions{resolutions}, subdomain_locations{},
-        fourier_resolutions{
-            muGrid::CcoordOps::get_hermitian_sizes(resolutions)},
-        fourier_locations{}, domain_resolutions{resolutions},
+      : comm{comm}, nb_subdomain_grid_pts{nb_grid_pts}, subdomain_locations{},
+        nb_fourier_grid_pts{
+            muGrid::CcoordOps::get_hermitian_sizes(nb_grid_pts)},
+        fourier_locations{}, nb_domain_grid_pts{nb_grid_pts},
         work{muGrid::make_field<Workspace_t>("work space", work_space_container,
                                              nb_components)},
-        norm_factor{1. / muGrid::CcoordOps::get_size(domain_resolutions)},
+        norm_factor{1. / muGrid::CcoordOps::get_size(nb_domain_grid_pts)},
         nb_components{nb_components} {}
 
   /* ---------------------------------------------------------------------- */
@@ -58,7 +58,7 @@ namespace muFFT {
   /* ---------------------------------------------------------------------- */
   template <Dim_t Dim>
   size_t FFTEngineBase<Dim>::size() const {
-    return muGrid::CcoordOps::get_size(this->subdomain_resolutions);
+    return muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts);
   }
 
   /* ---------------------------------------------------------------------- */

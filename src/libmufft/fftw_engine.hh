@@ -57,8 +57,11 @@ namespace muFFT {
     //! Default constructor
     FFTWEngine() = delete;
 
-    //! Constructor with cell resolutions
-    FFTWEngine(Ccoord resolutions, Dim_t nb_components,
+    /**
+     * Constructor with the domain's number of grid points in each direciton,
+     * the number of components to transform, and the communicator
+     */
+    FFTWEngine(Ccoord nb_grid_pts, Dim_t nb_components,
                Communicator comm = Communicator());
 
     //! Copy constructor

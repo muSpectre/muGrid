@@ -42,7 +42,7 @@ namespace muSpectre {
   ProjectionSmallStrain<DimS, DimM>::ProjectionSmallStrain(FFTEngine_ptr engine,
                                                            Rcoord lengths)
       : Parent{std::move(engine), lengths, Formulation::small_strain} {
-    for (auto res : this->fft_engine->get_domain_resolutions()) {
+    for (auto res : this->fft_engine->get_nb_domain_grid_pts()) {
       if (res % 2 == 0) {
         throw ProjectionError(
             "Only an odd number of gridpoints in each direction is supported");
@@ -57,7 +57,7 @@ namespace muSpectre {
     using muGrid::get;
     Parent::initialise(flags);
 
-    muFFT::FFT_freqs<DimS> fft_freqs(this->fft_engine->get_domain_resolutions(),
+    muFFT::FFT_freqs<DimS> fft_freqs(this->fft_engine->get_nb_domain_grid_pts(),
                                      this->domain_lengths);
     for (auto && tup : akantu::zip(*this->fft_engine, this->Ghat)) {
       const auto & ccoord = std::get<0>(tup);

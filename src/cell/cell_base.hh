@@ -342,7 +342,7 @@ namespace muSpectre {
     //! Default constructor
     CellBase() = delete;
 
-    //! constructor using sizes and resolution
+    //! constructor using underlying projection
     explicit CellBase(Projection_ptr projection);
 
     //! Copy constructor
@@ -543,17 +543,17 @@ namespace muSpectre {
     //! number of pixels in the cell
     size_t size() const final { return pixels.size(); }
 
-    //! return the subdomain resolutions of the cell
-    const Ccoord & get_subdomain_resolutions() const {
-      return this->subdomain_resolutions;
+    //! return the subdomain nb_grid_pts of the cell
+    const Ccoord & get_nb_subdomain_grid_pts() const {
+      return this->nb_subdomain_grid_pts;
     }
     //! return the subdomain locations of the cell
     const Ccoord & get_subdomain_locations() const {
       return this->subdomain_locations;
     }
-    //! return the domain resolutions of the cell
-    const Ccoord & get_domain_resolutions() const {
-      return this->domain_resolutions;
+    //! return the domain nb_grid_pts of the cell
+    const Ccoord & get_nb_domain_grid_pts() const {
+      return this->nb_domain_grid_pts;
     }
     //! return the sizes of the cell
     const Rcoord & get_domain_lengths() const { return this->domain_lengths; }
@@ -595,9 +595,10 @@ namespace muSpectre {
     //! make sure that every pixel is assigned to one and only one material
     void check_material_coverage();
 
-    const Ccoord & subdomain_resolutions;  //!< the cell's subdomain resolutions
-    const Ccoord & subdomain_locations;    //!< the cell's subdomain resolutions
-    const Ccoord & domain_resolutions;     //!< the cell's domain resolutions
+    const Ccoord & nb_subdomain_grid_pts;  //!< the cell's subdomain nb_grid_pts
+    const Ccoord &
+        subdomain_locations;  //!< subdomain's bottom-left-lower pixel
+    const Ccoord & nb_domain_grid_pts;     //!< the cell's domain nb_grid_pts
     muGrid::CcoordOps::Pixels<DimS>
         pixels;                     //!< helper to iterate over the pixels
     const Rcoord & domain_lengths;  //!< the cell's lengths

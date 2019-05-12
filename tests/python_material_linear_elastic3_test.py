@@ -49,10 +49,10 @@ class MaterialLinearElastic3_Check(unittest.TestCase):
     (Hooke law for small symmetric strains).
     """
     def setUp(self):
-        self.resolution = [5,5]
+        self.nb_grid_pts = [5,5]
         self.lengths = [2.5, 3.1]
         self.formulation = µ.Formulation.small_strain
-        self.sys = µ.Cell(self.resolution,
+        self.sys = µ.Cell(self.nb_grid_pts,
                           self.lengths,
                           self.formulation)
         self.dim = len(self.lengths)

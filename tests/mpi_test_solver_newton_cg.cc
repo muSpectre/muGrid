@@ -55,11 +55,11 @@ namespace muSpectre {
     // constexpr Dim_t dim{twoD};
     constexpr Dim_t dim{threeD};
 
-    // constexpr Ccoord_t<dim> resolutions{3, 3};
+    // constexpr Ccoord_t<dim> nb_grid_pts{3, 3};
     // constexpr Rcoord_t<dim> lengths{2.3, 2.7};
-    constexpr Ccoord_t<dim> resolutions{5, 5, 5};
+    constexpr Ccoord_t<dim> nb_grid_pts{5, 5, 5};
     constexpr Rcoord_t<dim> lengths{5, 5, 5};
-    auto fft_ptr{std::make_unique<muFFT::FFTWMPIEngine<dim>>(resolutions,
+    auto fft_ptr{std::make_unique<muFFT::FFTWMPIEngine<dim>>(nb_grid_pts,
                                                              dim * dim, comm)};
     auto proj_ptr{std::make_unique<ProjectionFiniteStrainFast<dim, dim>>(
         std::move(fft_ptr), lengths)};
@@ -88,7 +88,7 @@ namespace muSpectre {
     Grad_t<dim> delF0;
     delF0 << 0, 1., 0, 0, 0, 0, 0, 0, 0;
     constexpr Real cg_tol{1e-8}, newton_tol{1e-5};
-    constexpr Uint maxiter{muGrid::CcoordOps::get_size(resolutions) *
+    constexpr Uint maxiter{muGrid::CcoordOps::get_size(nb_grid_pts) *
                            muGrid::ipow(dim, secondOrder) * 10};
     constexpr bool verbose{false};
 
@@ -111,18 +111,18 @@ namespace muSpectre {
     constexpr Dim_t dim{twoD};
     using Ccoord = Ccoord_t<dim>;
     using Rcoord = Rcoord_t<dim>;
-    constexpr Ccoord resolutions{muGrid::CcoordOps::get_cube<dim>(3)};
+    constexpr Ccoord nb_grid_pts{muGrid::CcoordOps::get_cube<dim>(3)};
     constexpr Rcoord lengths{muGrid::CcoordOps::get_cube<dim>(1.)};
     constexpr Formulation form{Formulation::small_strain};
 
     // number of layers in the hard material
     constexpr Uint nb_lays{1};
     constexpr Real contrast{2};
-    static_assert(nb_lays < resolutions[0],
+    static_assert(nb_lays < nb_grid_pts[0],
                   "the number or layers in the hard material must be smaller "
                   "than the total number of layers in dimension 0");
 
-    auto sys{make_parallel_cell(resolutions, lengths, form, comm)};
+    auto sys{make_parallel_cell(nb_grid_pts, lengths, form, comm)};
 
     using Mat_t = MaterialLinearElastic1<dim, dim>;
     constexpr Real Young{2.}, Poisson{.33};
@@ -163,7 +163,7 @@ namespace muSpectre {
 
     /**
      *  verification of resultant strains: subscript ₕ for hard and ₛ
-     *  for soft, Nₕ is nb_lays and Nₜₒₜ is resolutions, k is contrast
+     *  for soft, Nₕ is nb_lays and Nₜₒₜ is nb_grid_pts, k is contrast
      *
      *     Δl = εl = Δlₕ + Δlₛ = εₕlₕ+εₛlₛ
      *  => ε = εₕ Nₕ/Nₜₒₜ + εₛ (Nₜₒₜ-Nₕ)/Nₜₒₜ
@@ -174,8 +174,8 @@ namespace muSpectre {
      *  => εₕ = 1/k εₛ
      *  => ε / (1/k Nₕ/Nₜₒₜ + (Nₜₒₜ-Nₕ)/Nₜₒₜ) = εₛ
      */
-    constexpr Real factor{1 / contrast * Real(nb_lays) / resolutions[0] + 1. -
-                          nb_lays / Real(resolutions[0])};
+    constexpr Real factor{1 / contrast * Real(nb_lays) / nb_grid_pts[0] + 1. -
+                          nb_lays / Real(nb_grid_pts[0])};
     constexpr Real eps_soft{eps0 / factor};
     constexpr Real eps_hard{eps_soft / contrast};
     if (verbose) {

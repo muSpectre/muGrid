@@ -2372,7 +2372,7 @@ In comments and human-readable names in strings, non-ASCII characters should be 
 
     /**
       *  verification of resultant strains: subscript ₕ for hard and ₛ
-      *  for soft, Nₕ is nb_lays and Nₜₒₜ is resolutions, k is contrast
+      *  for soft, Nₕ is nb_lays and Nₜₒₜ is nb_grid_pts, k is contrast
       *
       *     Δl = εl = Δlₕ + Δlₛ = εₕlₕ+εₛlₛ
       *  => ε = εₕ Nₕ/Nₜₒₜ + εₛ (Nₜₒₜ-Nₕ)/Nₜₒₜ
@@ -2383,8 +2383,8 @@ In comments and human-readable names in strings, non-ASCII characters should be 
       *  => εₕ = 1/k εₛ
       *  => ε / (1/k Nₕ/Nₜₒₜ + (Nₜₒₜ-Nₕ)/Nₜₒₜ) = εₛ
       */
-   constexpr Real factor{1/contrast * Real(nb_lays)/resolutions[0]
-       + 1.-nb_lays/Real(resolutions[0])};
+   constexpr Real factor{1/contrast * Real(nb_lays)/nb_grid_pts[0]
+       + 1.-nb_lays/Real(nb_grid_pts[0])};
 
 .. code-block:: c++
 

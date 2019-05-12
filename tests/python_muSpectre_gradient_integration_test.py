@@ -129,8 +129,8 @@ def central_diff_derivative(data, d, order, rank=1):
     errors in the derivative at the vicinity close to the discontinuity.
 
     Keyword Arguments:
-    data  -- np.ndarray of shape=(resolution, dim*rank) function values on an
-             equally spaced grid, with grid spacing 'd' (dtype = float)
+    data  -- np.ndarray of shape=(nb_grid_pts_per_dim, dim*rank) function values
+             on an equally spaced grid, with grid spacing 'd' (dtype = float)
     d     -- scalar or np.array of grid spacing in each direction. Scalar is
              interpreted as equal spacing in each direction (dtype = float)
     order -- int >= 1, gives the accuracy order of the central difference
@@ -138,8 +138,8 @@ def central_diff_derivative(data, d, order, rank=1):
     rank  -- int, rank of the data tensor
 
     Returns:
-    deriv: np.ndarray of shape=(resolution, dim, dim) central difference
-           derivative of given order (dtype = float)
+    deriv: np.ndarray of shape=(nb_grid_pts_per_dim, dim, dim) central
+           difference derivative of given order (dtype = float)
     """
     dim = len(data.shape)-rank
     weights = sm.central_diff_weights(2*order + 1)
@@ -158,7 +158,7 @@ class MuSpectre_gradient_integration_Check(unittest.TestCase):
 
     def setUp(self):
         self.lengths    = np.array([2.4, 3.7, 4.1])
-        self.resolution = np.array([5, 3, 5])
+        self.nb_grid_pts = np.array([5, 3, 5])
 
         self.norm_tol = 1e-8
 
@@ -167,7 +167,7 @@ class MuSpectre_gradient_integration_Check(unittest.TestCase):
         Test of the central difference approximation by central_diff_derivative
         of the first derivative of a function on a grid.
         """
-        res  = self.resolution * 15
+        res  = self.nb_grid_pts * 15
         lens = self.lengths
         for j in range(1, len(res)):
             d, dim, x_n, x_c, deriv, f_n, f_c, freqs = init_X_F_Chi(lens[:j],
@@ -206,10 +206,11 @@ class MuSpectre_gradient_integration_Check(unittest.TestCase):
     def test_compute_grid(self):
         """
         Test the function compute_grid which creates an orthogonal
-        equally spaced grid of the given resolution and lengths.
+        equally spaced grid of the given number of grid points in each dimension
+        and the corresponding  lengths.
         """
         lens = self.lengths
-        res  = self.resolution
+        res  = self.nb_grid_pts
         d    = np.array(lens)/np.array(res)
         grid_n = np.zeros(tuple(res+1) + (len(res),))
         Nx, Ny, Nz = res+1
@@ -225,10 +226,10 @@ class MuSpectre_gradient_integration_Check(unittest.TestCase):
     def test_reshape_gradient(self):
         """
         Test if reshape gradient transforms a flattend second order tensor in
-        the right way to a shape resolution + [dim, dim].
+        the right way to a shape nb_grid_pts + [dim, dim].
         """
         lens = list(self.lengths)
-        res  = list(self.resolution)
+        res  = list(self.nb_grid_pts)
         tol  = 1e-5
         formulation = µ.Formulation.finite_strain
         DelF = np.array([[0   , 0.01, 0.02],
@@ -481,7 +482,7 @@ class MuSpectre_gradient_integration_Check(unittest.TestCase):
         #   shear of a two dimensional material with two different Young moduli.
         order_all = [0]+order #orders for which the test is run
         #initialize material structure
-        res  = [ 9, 21] #resolution
+        res  = [ 9, 21] #nb_grid_pts
         lens = [ 9, 21] #lengths
         d, dim, x_n, x_c, _, _, _, freqs = init_X_F_Chi(lens, res)
         formulation = µ.Formulation.finite_strain
@@ -631,7 +632,7 @@ class MuSpectre_gradient_integration_Check(unittest.TestCase):
     def test_compute_placement(self):
         """Test the computation of placements and the original positions."""
         ### shear of a homogeneous material ###
-        res   = [ 3, 11] #resolution
+        res   = [ 3, 11] #nb_grid_pts
         lens  = [10, 10] #lengths
         dim   = len(res) #dimension
         x_n=µ.gradient_integration.compute_grid(np.array(lens),np.array(res))[0]

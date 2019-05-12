@@ -70,8 +70,11 @@ namespace muFFT {
     //! Default constructor
     FFTEngineBase() = delete;
 
-    //! Constructor with cell resolutions
-    FFTEngineBase(Ccoord resolutions, Dim_t nb_components,
+    /**
+     * Constructor with the domain's number of grid points in each direciton,
+     * the number of components to transform, and the communicator
+     */
+    FFTEngineBase(Ccoord nb_grid_pts, Dim_t nb_components,
                   Communicator comm = Communicator());
 
     //! Copy constructor
@@ -115,25 +118,31 @@ namespace muFFT {
     //! return the communicator object
     const Communicator & get_communicator() const { return this->comm; }
 
-    //! returns the process-local resolutions of the cell
-    const Ccoord & get_subdomain_resolutions() const {
-      return this->subdomain_resolutions;
+    /**
+     * returns the process-local number of grid points in each direction of the
+     * cell
+     */
+    const Ccoord & get_nb_subdomain_grid_pts() const {
+      return this->nb_subdomain_grid_pts;
     }
     //! returns the process-local locations of the cell
     const Ccoord & get_subdomain_locations() const {
       return this->subdomain_locations;
     }
-    //! returns the process-local resolutions of the cell in Fourier space
-    const Ccoord & get_fourier_resolutions() const {
-      return this->fourier_resolutions;
+    /**
+     * returns the process-local number of grid points in each direction of the
+     * cell in Fourier space
+     */
+    const Ccoord & get_nb_fourier_grid_pts() const {
+      return this->nb_fourier_grid_pts;
     }
     //! returns the process-local locations of the cell in Fourier space
     const Ccoord & get_fourier_locations() const {
       return this->fourier_locations;
     }
-    //! returns the resolutions of the cell
-    const Ccoord & get_domain_resolutions() const {
-      return this->domain_resolutions;
+    //! returns the number of grid points in each direction of the cell
+    const Ccoord & get_nb_domain_grid_pts() const {
+      return this->nb_domain_grid_pts;
     }
 
     //! only required for testing and debugging
@@ -163,17 +172,17 @@ namespace muFFT {
      */
     Communicator comm;  //!< communicator
     LFieldCollection_t work_space_container{};
-    Ccoord subdomain_resolutions;  //!< resolutions of the process-local
+    Ccoord nb_subdomain_grid_pts;  //!< nb_grid_pts of the process-local
                                    //!< (subdomain) portion of the cell
     Ccoord subdomain_locations;  // !< location of the process-local (subdomain)
                                  // portion of the cell
     Ccoord
-        fourier_resolutions;   //!< resolutions of the process-local (subdomain)
+        nb_fourier_grid_pts;   //!< nb_grid_pts of the process-local (subdomain)
                                //!< portion of the Fourier transformed data
     Ccoord fourier_locations;  // !< location of the process-local (subdomain)
                                // portion of the Fourier transformed data
     const Ccoord
-        domain_resolutions;  //!< resolutions of the full domain of the cell
+        nb_domain_grid_pts;  //!< nb_grid_pts of the full domain of the cell
     Workspace_t & work;      //!< field to store the Fourier transform of P
     const Real norm_factor;  //!< normalisation coefficient of fourier transform
     Dim_t nb_components;

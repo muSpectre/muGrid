@@ -45,9 +45,9 @@ import muSpectre as µ
 # set up of the microstructure (omit the slice operator at the end to
 # run the full problem)
 phase  = np.load('odd_image.npz')['phase'][:41, :41]
-resolution = list(phase.shape)
-dim = len(resolution)
-lengths = resolution
+nb_grid_pts = list(phase.shape)
+dim = len(nb_grid_pts)
+lengths = nb_grid_pts
 formulation = µ.Formulation.finite_strain
 
 # choose material (constitutive) model
@@ -64,7 +64,7 @@ Young = (9 * K * mu) / (3 * K + mu)
 Poisson = (3 * K - 2 * mu) / (2 * (3 * K + mu))
 
 # set up system
-rve = µ.Cell(resolution, lengths, formulation, fft='fftwmpi',
+rve = µ.Cell(nb_grid_pts, lengths, formulation, fft='fftwmpi',
              communicator=MPI.COMM_WORLD)
 hard = Mat.make(rve, "hard", Young, Poisson, tauy0_hard, H_hard)
 soft = Mat.make(rve, "soft", Young, Poisson, tauy0_soft, H_soft)

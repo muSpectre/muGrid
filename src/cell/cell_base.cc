@@ -47,10 +47,10 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   CellBase<DimS, DimM>::CellBase(Projection_ptr projection_)
-      : subdomain_resolutions{projection_->get_subdomain_resolutions()},
+      : nb_subdomain_grid_pts{projection_->get_nb_subdomain_grid_pts()},
         subdomain_locations{projection_->get_subdomain_locations()},
-        domain_resolutions{projection_->get_domain_resolutions()},
-        pixels(subdomain_resolutions, subdomain_locations),
+        nb_domain_grid_pts{projection_->get_nb_domain_grid_pts()},
+        pixels(nb_subdomain_grid_pts, subdomain_locations),
         domain_lengths{projection_->get_domain_lengths()},
         fields{std::make_unique<FieldCollection_t>()},
         F{muGrid::make_field<StrainField_t>("Gradient", *this->fields)},
@@ -58,7 +58,7 @@ namespace muSpectre {
                                             *this->fields)},
         projection{std::move(projection_)} {
     // resize all global fields (strain, stress, etc)
-    this->fields->initialise(this->subdomain_resolutions,
+    this->fields->initialise(this->nb_subdomain_grid_pts,
                              this->subdomain_locations);
   }
 
@@ -71,9 +71,9 @@ namespace muSpectre {
    */
   template <Dim_t DimS, Dim_t DimM>
   CellBase<DimS, DimM>::CellBase(CellBase && other)
-      : subdomain_resolutions{std::move(other.subdomain_resolutions)},
+      : nb_subdomain_grid_pts{std::move(other.nb_subdomain_grid_pts)},
         subdomain_locations{std::move(other.subdomain_locations)},
-        domain_resolutions{std::move(other.domain_resolutions)},
+        nb_domain_grid_pts{std::move(other.nb_domain_grid_pts)},
         pixels{std::move(other.pixels)}, domain_lengths{std::move(
                                              other.domain_lengths)},
         fields{std::move(other.fields)}, F{other.F}, P{other.P},
@@ -164,7 +164,7 @@ namespace muSpectre {
     if (delF.size() != this->get_nb_dof()) {
       std::stringstream err{};
       err << "input should be of size ndof = ¶(";
-      muGrid::operator<<(err, this->subdomain_resolutions)
+      muGrid::operator<<(err, this->nb_subdomain_grid_pts)
           << ") × " << DimS << "² = " << this->get_nb_dof() << " but I got "
           << delF.size();
       throw std::runtime_error(err.str());
@@ -201,7 +201,7 @@ namespace muSpectre {
     using muGrid::operator<<;
     if (P.size() != this->get_nb_dof()) {
       std::stringstream err{};
-      err << "input should be of size ndof = ¶(" << this->subdomain_resolutions
+      err << "input should be of size ndof = ¶(" << this->nb_subdomain_grid_pts
           << ") × " << DimS << "² = " << this->get_nb_dof() << " but I got "
           << P.size();
       throw std::runtime_error(err.str());
@@ -273,7 +273,7 @@ namespace muSpectre {
     if (delF.size() != this->get_nb_dof()) {
       std::stringstream err{};
       err << "input should be of size ndof = ¶(";
-      muGrid::operator<<(err, this->subdomain_resolutions)
+      muGrid::operator<<(err, this->nb_subdomain_grid_pts)
           << ") × " << DimS << "² = " << this->get_nb_dof() << " but I got "
           << delF.size();
       throw std::runtime_error(err.str());
@@ -567,12 +567,12 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   void CellBase<DimS, DimM>::check_material_coverage() {
-    auto nb_pixels = muGrid::CcoordOps::get_size(this->subdomain_resolutions);
+    auto nb_pixels = muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts);
     std::vector<MaterialBase<DimS, DimM> *> assignments(nb_pixels, nullptr);
     for (auto & mat : this->materials) {
       for (auto & pixel : *mat) {
         auto index = muGrid::CcoordOps::get_index(
-            this->subdomain_resolutions, this->subdomain_locations, pixel);
+            this->nb_subdomain_grid_pts, this->subdomain_locations, pixel);
         auto & assignment{assignments.at(index)};
         if (assignment != nullptr) {
           std::stringstream err{};
@@ -592,7 +592,7 @@ namespace muSpectre {
     for (size_t i = 0; i < assignments.size(); ++i) {
       if (assignments[i] == nullptr) {
         unassigned_pixels.push_back(muGrid::CcoordOps::get_ccoord(
-            this->subdomain_resolutions, this->subdomain_locations, i));
+            this->nb_subdomain_grid_pts, this->subdomain_locations, i));
       }
     }
 

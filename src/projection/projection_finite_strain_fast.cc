@@ -46,7 +46,7 @@ namespace muSpectre {
         xiField{muGrid::make_field<Proj_t>("Projection Operator",
                                            this->projection_container)},
         xis(xiField) {
-    for (auto res : this->fft_engine->get_domain_resolutions()) {
+    for (auto res : this->fft_engine->get_nb_domain_grid_pts()) {
       if (res % 2 == 0) {
         throw ProjectionError(
             "Only an odd number of gridpoints in each direction is supported");
@@ -59,7 +59,7 @@ namespace muSpectre {
   void ProjectionFiniteStrainFast<DimS, DimM>::initialise(
       muFFT::FFT_PlanFlags flags) {
     Parent::initialise(flags);
-    muFFT::FFT_freqs<DimS> fft_freqs(this->fft_engine->get_domain_resolutions(),
+    muFFT::FFT_freqs<DimS> fft_freqs(this->fft_engine->get_nb_domain_grid_pts(),
                                      this->domain_lengths);
     for (auto && tup : akantu::zip(*this->fft_engine, this->xis)) {
       const auto & ccoord = std::get<0>(tup);

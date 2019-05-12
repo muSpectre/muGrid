@@ -99,9 +99,9 @@ namespace muSpectre {
     FieldMap grad(f_grad);
     FieldMap var(f_var);
 
-    fields.initialise(fix::projector.get_subdomain_resolutions(),
+    fields.initialise(fix::projector.get_nb_subdomain_grid_pts(),
                       fix::projector.get_subdomain_locations());
-    muFFT::FFT_freqs<dim> freqs{fix::projector.get_domain_resolutions(),
+    muFFT::FFT_freqs<dim> freqs{fix::projector.get_nb_domain_grid_pts(),
                                 fix::projector.get_domain_lengths()};
     Vector k;
     for (Dim_t i = 0; i < dim; ++i) {
@@ -120,7 +120,7 @@ namespace muSpectre {
       // use iterate in arbitrary expressions
       Vector vec = muGrid::CcoordOps::get_vector(
           ccoord, fix::projector.get_domain_lengths() /
-                      fix::projector.get_domain_resolutions());
+                      fix::projector.get_nb_domain_grid_pts());
       // do efficient linear algebra on iterates
       g.row(0) = k.transpose() * cos(k.dot(vec));
       v.row(0) = g.row(0);
@@ -136,7 +136,7 @@ namespace muSpectre {
       auto & v = std::get<2>(tup);
       Vector vec = muGrid::CcoordOps::get_vector(
           ccoord, fix::projector.get_domain_lengths() /
-                      fix::projector.get_domain_resolutions());
+                      fix::projector.get_nb_domain_grid_pts());
       Real error = (g - v).norm();
       BOOST_CHECK_LT(error, tol);
       if (error >= tol) {

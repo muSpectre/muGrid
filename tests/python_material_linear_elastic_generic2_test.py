@@ -41,13 +41,13 @@ import numpy as np
 from python_test_imports import µ
 class MaterialLinearElasticGeneric2_Check(unittest.TestCase):
     def setUp(self):
-        self.resolution = [3, 3]#[5,7]
+        self.nb_grid_pts = [3, 3]#[5,7]
         self.lengths = [3., 3.]#[5.2, 8.3]
         self.formulation = µ.Formulation.small_strain
-        self.cell1 = µ.Cell(self.resolution,
+        self.cell1 = µ.Cell(self.nb_grid_pts,
                             self.lengths,
                             self.formulation)
-        self.cell2 = µ.Cell(self.resolution,
+        self.cell2 = µ.Cell(self.nb_grid_pts,
                             self.lengths,
                             self.formulation)
         E, nu =  210e9, .33

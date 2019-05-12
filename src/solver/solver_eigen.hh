@@ -125,7 +125,7 @@ namespace muSpectre {
     //! Default constructor
     SolverEigen() = delete;
 
-    //! Constructor with domain resolutions, etc,
+    //! Constructor with cell and solver parameters.
     SolverEigen(Cell & cell, Real tol, Uint maxiter = 0, bool verbose = false);
 
     //! Copy constructor

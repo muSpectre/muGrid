@@ -53,7 +53,7 @@ namespace muSpectre {
     using Field_t = typename MaterialBase<DimS, DimM>::StrainField_t;
     const auto & comm = cell.get_communicator();
     auto solver_fields{std::make_unique<muGrid::GlobalFieldCollection<DimS>>()};
-    solver_fields->initialise(cell.get_subdomain_resolutions(),
+    solver_fields->initialise(cell.get_nb_subdomain_grid_pts(),
                               cell.get_subdomain_locations());
 
     // Corresponds to symbol δF or δε
@@ -235,7 +235,7 @@ namespace muSpectre {
     using Field_t = typename MaterialBase<DimS, DimM>::StrainField_t;
     const auto & comm = cell.get_communicator();
     auto solver_fields{std::make_unique<muGrid::GlobalFieldCollection<DimS>>()};
-    solver_fields->initialise(cell.get_subdomain_resolutions(),
+    solver_fields->initialise(cell.get_nb_subdomain_grid_pts(),
                               cell.get_subdomain_locations());
 
     // Corresponds to symbol δF or δε

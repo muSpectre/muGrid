@@ -148,7 +148,7 @@ namespace muSpectre {
     //! Default constructor
     DeprecatedSolverEigen() = delete;
 
-    //! Constructor with domain resolutions, etc,
+    //! Constructor with cell and solver parameters.
     DeprecatedSolverEigen(Cell_t & cell, Real tol, Uint maxiter = 0,
                           bool verbose = false);
 

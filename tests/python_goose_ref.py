@@ -46,21 +46,21 @@ import itertools
 def get_bulk_shear(E, nu):
     return E/(3*(1-2*nu)), E/(2*(1+nu))
 class ProjectionGooseFFT(object):
-    def __init__(self, ndim, resolution, incl_size, E, nu, contrast):
+    def __init__(self, ndim, nb_grid_pts, incl_size, E, nu, contrast):
         """
         wraps the GooseFFT hyper-elasticity script into a more user-friendly
         class
 
         Keyword Arguments:
-        ndim       -- number of dimensions of the problem, should be 2 or 3
-        resolution -- pixel resolution, integer
-        incl_size  -- edge length of cubic hard inclusion in pixels
-        E          -- Young's modulus of soft phase
-        nu         -- Poisson's ratio
-        constrast  -- ratio between hard and soft Young's modulus
+        ndim        -- number of dimensions of the problem, should be 2 or 3
+        nb_grid_pts -- number of grid_points, integer
+        incl_size   -- edge length of cubic hard inclusion in pixels
+        E           -- Young's modulus of soft phase
+        nu          -- Poisson's ratio
+        constrast   -- ratio between hard and soft Young's modulus
         """
         self.ndim = ndim
-        self.resolution = resolution
+        self.nb_grid_pts = nb_grid_pts
         self.incl_size = incl_size
         self.E = E
         self.nu = nu
@@ -80,7 +80,7 @@ class ProjectionGooseFFT(object):
         dyad22 = lambda A2,B2: np.einsum('ij...  ,kl...  ->ijkl...',A2,B2)
         i      = np.eye(ndim)
         # identity tensors                                   [grid of tensors]
-        shape = tuple((self.resolution for _ in range(ndim)))
+        shape = tuple((self.nb_grid_pts for _ in range(ndim)))
         oneblock = np.ones(shape)
         def expand(arr):
             new_shape = (np.prod(arr.shape), np.prod(shape))
@@ -97,7 +97,7 @@ class ProjectionGooseFFT(object):
         # NB can be vectorized (faster, less readable), see: "elasto-plasticity.py"
         # - support function / look-up list / zero initialize
         delta  = lambda i,j: np.float(i==j)            # Dirac delta function
-        N = self.resolution
+        N = self.nb_grid_pts
         freq   = np.fft.fftfreq(N, 1/N)        # coordinate axis -> freq. axis
         Ghat4  = np.zeros([ndim,ndim,ndim,ndim,*shape]) # zero initialize
         # - compute
@@ -150,8 +150,8 @@ class ProjectionGooseFFT(object):
         self.G_K_deps = G_K_deps
 
 class FiniteStrainProjectionGooseFFT(ProjectionGooseFFT):
-    def __init__(self, ndim, resolution, incl_size, E, nu, contrast):
-        super().__init__(ndim, resolution, incl_size, E, nu, contrast)
+    def __init__(self, ndim, nb_grid_pts, incl_size, E, nu, contrast):
+        super().__init__(ndim, nb_grid_pts, incl_size, E, nu, contrast)
 
     def comp_ghat(self, q):
         temp = np.zeros((self.ndim, self.ndim, self.ndim, self.ndim))
@@ -163,7 +163,7 @@ class FiniteStrainProjectionGooseFFT(ProjectionGooseFFT):
 
     def run(self):
         ndim = self.ndim
-        shape = tuple((self.resolution for _ in range(ndim)))
+        shape = tuple((self.nb_grid_pts for _ in range(ndim)))
         # ----------------------------- NEWTON ITERATIONS -----------------------------
 
         # initialize deformation gradient, and stress/stiffness       [grid of tensors]
@@ -204,8 +204,8 @@ class FiniteStrainProjectionGooseFFT(ProjectionGooseFFT):
         print("nb_cg: {0}".format(acc.counter))
 
 class SmallStrainProjectionGooseFFT(ProjectionGooseFFT):
-    def __init__(self, ndim, resolution, incl_size, E, nu, contrast):
-        super().__init__(ndim, resolution, incl_size, E, nu, contrast)
+    def __init__(self, ndim, nb_grid_pts, incl_size, E, nu, contrast):
+        super().__init__(ndim, nb_grid_pts, incl_size, E, nu, contrast)
 
     def comp_ghat(self, q):
         temp = np.zeros((self.ndim, self.ndim, self.ndim, self.ndim))
@@ -222,7 +222,7 @@ class SmallStrainProjectionGooseFFT(ProjectionGooseFFT):
 
     def run(self):
         ndim = self.ndim
-        shape = tuple((self.resolution for _ in range(ndim)))
+        shape = tuple((self.nb_grid_pts for _ in range(ndim)))
         # ----------------------------- NEWTON ITERATIONS -----------------------------
 
         # initialize stress and strain tensor              [grid of tensors]

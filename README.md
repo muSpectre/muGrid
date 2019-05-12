@@ -55,15 +55,15 @@ Python interface
     import muSpectre as µ
 
     # setting the geometry
-    resolution = [51, 51]
-    center = np.array([r//2 for r in resolution])
-    incl = resolution[0]//5
+    nb_grid_pts = [51, 51]
+    center = np.array([r//2 for r in nb_grid_pts])
+    incl = nb_grid_pts[0]//5
 
     lengths = [7., 5.]
     formulation = µ.Formulation.small_strain
 
     # creating the periodic cell
-    rve = µ.SystemFactory(resolution,
+    rve = µ.SystemFactory(nb_grid_pts,
                           lengths,
                           formulation)
     hard = µ.material.MaterialLinearElastic1_2d.make(

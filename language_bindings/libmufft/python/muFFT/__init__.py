@@ -68,7 +68,7 @@ fft_engines = _find_fft_engines()
 
 
 class FFT(object):
-    def __init__(self, resolutions, nb_components=1, fft='fftw',
+    def __init__(self, nb_grid_pts, nb_components=1, fft='fftw',
                  communicator=None):
         """
         The FFT class handles forward and inverse transforms and instantiates
@@ -80,8 +80,8 @@ class FFT(object):
     
         Parameters
         ----------
-        resolutions: list
-            Grid resolutions in the Cartesian directions.
+        nb_grid_pts: list
+            Grid nb_grid_pts in the Cartesian directions.
         nb_components: int
             Number of degrees of freedom per pixel in the transform. Default: 1
         fft: string
@@ -92,12 +92,12 @@ class FFT(object):
             the default 'fftw' engine does not support parallel execution.
             Default: None
         """
-        self.dim = len(resolutions)
-        self.resolutions = resolutions
+        self.dim = len(nb_grid_pts)
+        self.nb_grid_pts = nb_grid_pts
         self.nb_components = nb_components
         self.communicator = communicator
 
-        resolutions = list(resolutions)
+        nb_grid_pts = list(nb_grid_pts)
         try:
             factory_name_2d, factory_name_3d, is_parallel = _factories[fft]
         except KeyError:
@@ -120,13 +120,13 @@ class FFT(object):
                                    ' not be imported.')
             if communicator is None:
                 communicator = MPI.COMM_SELF
-            self.engine = factory(resolutions, nb_components,
+            self.engine = factory(nb_grid_pts, nb_components,
                                   MPI._handleof(communicator))
         else:
             if communicator is not None and communicator.Get_size() > 1:
                 raise ValueError("FFT engine '{}' does not support parallel "
                                  "execution.".format(fft))
-            self.engine = factory(resolutions, nb_components)
+            self.engine = factory(nb_grid_pts, nb_components)
 
         self.engine.initialise()
 
@@ -139,7 +139,7 @@ class FFT(object):
         data: array
             Array containing the data for the transform. For MPI parallel
             calculations, the array carries only the local subdomain of the
-            data. The shape has to equal `subdomain_resolutions` with additional
+            data. The shape has to equal `nb_subdomain_grid_pts` with additional
             components contained in the fast indices. The shape of the component
             is arbitrary but the total number of data points must match
             `nb_components` specified upon instantiation.
@@ -149,17 +149,17 @@ class FFT(object):
         out_data: array
             Fourier transformed data. For MPI parallel calculations, the array
             carries only the local subdomain of the data. The shape equals
-            `fourier_resolutions` plus components.
+            `nb_fourier_grid_pts` plus components.
         """
         field_shape = data.shape[:self.dim]
         component_shape = data.shape[self.dim:]
-        if field_shape != self.subdomain_resolutions:
+        if field_shape != self.nb_subdomain_grid_pts:
             raise ValueError('Forward transform received a field with '
-                             'resolution {}, but FFT has been planned for a '
-                             'field with resolution {}'.format(field_shape,
-                                self.subdomain_resolutions))
+                             '{} grid points, but FFT has been planned for a '
+                             'field with {} grid points'.format(field_shape,
+                                self.nb_subdomain_grid_pts))
         out_data = self.engine.fft(data.reshape(-1, self.nb_components).T)
-        new_shape = self.fourier_resolutions + component_shape
+        new_shape = self.nb_fourier_grid_pts + component_shape
         return out_data.T.reshape(new_shape)
 
     def ifft(self, data):
@@ -171,7 +171,7 @@ class FFT(object):
         data: array
             Array containing the data for the transform. For MPI parallel
             calculations, the array carries only the local subdomain of the
-            data. The shape has to equal `fourier_resolutions` with additional
+            data. The shape has to equal `nb_fourier_grid_pts` with additional
             components contained in the fast indices. The shape of the component
             is arbitrary but the total number of data points must match
             `nb_components` specified upon instantiation.
@@ -181,54 +181,54 @@ class FFT(object):
         out_data: array
             Fourier transformed data. For MPI parallel calculations, the array
             carries only the local subdomain of the data. The shape equals
-            `subdomain_resolutions` plus components.
+            `nb_subdomain_grid_pts` plus components.
         """
         field_shape = data.shape[:self.dim]
         component_shape = data.shape[self.dim:]
-        if field_shape != self.fourier_resolutions:
+        if field_shape != self.nb_fourier_grid_pts:
             raise ValueError('Inverse transform received a field with '
-                             'resolution {}, but FFT has been planned for a '
-                             'field with resolution {}'.format(field_shape,
-                                self.fourier_resolutions))
+                             '{} grid points, but FFT has been planned for a '
+                             'field with {} grid points'.format(field_shape,
+                                self.nb_fourier_grid_pts))
         out_data = self.engine.ifft(data.reshape(-1, self.nb_components).T)
-        new_shape = self.subdomain_resolutions + component_shape
+        new_shape = self.nb_subdomain_grid_pts + component_shape
         return out_data.T.reshape(new_shape)
 
     @property
-    def domain_resolutions(self):
-        return tuple(self.engine.get_domain_resolutions())
+    def nb_domain_grid_pts(self):
+        return tuple(self.engine.get_nb_domain_grid_pts())
 
     @property
     def fourier_locations(self):
         return tuple(self.engine.get_fourier_locations())
 
     @property
-    def fourier_resolutions(self):
-        return tuple(self.engine.get_fourier_resolutions())
+    def nb_fourier_grid_pts(self):
+        return tuple(self.engine.get_nb_fourier_grid_pts())
 
     @property
     def subdomain_locations(self):
         return tuple(self.engine.get_subdomain_locations())
 
     @property
-    def subdomain_resolutions(self):
-        return tuple(self.engine.get_subdomain_resolutions())
+    def nb_subdomain_grid_pts(self):
+        return tuple(self.engine.get_nb_subdomain_grid_pts())
 
     @property
     def fourier_slices(self):
         return tuple((slice(start, start + length)
                       for start, length in zip(self.fourier_locations,
-                                               self.fourier_resolutions)))
+                                               self.nb_fourier_grid_pts)))
 
     @property
     def subdomain_slices(self):
         return tuple((slice(start, start + length)
                       for start, length in zip(self.subdomain_locations,
-                                               self.subdomain_resolutions)))
+                                               self.nb_subdomain_grid_pts)))
 
     @property
     def normalisation(self):
         """
-        1 / prod(self.resolutions)
+        1 / prod(self.nb_grid_pts)
         """
         return self.engine.normalisation()

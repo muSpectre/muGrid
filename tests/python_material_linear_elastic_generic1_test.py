@@ -42,11 +42,11 @@ from python_test_imports import µ
 
 class MaterialLinearElasticGeneric1_Check(unittest.TestCase):
     def setUp(self):
-        self.resolution = [5,7,5]
-        self.dim = len(self.resolution)
+        self.nb_grid_pts = [5,7,5]
+        self.dim = len(self.nb_grid_pts)
         self.lengths = [5.2, 8.3, 2.7]
         self.formulation = µ.Formulation.small_strain
-        self.cell1 = µ.Cell(self.resolution,
+        self.cell1 = µ.Cell(self.nb_grid_pts,
                             self.lengths,
                             self.formulation)
         self.Young = 210e9
@@ -66,7 +66,7 @@ class MaterialLinearElasticGeneric1_Check(unittest.TestCase):
                       [           0,            0,            0,  0, mu,  0],
                       [           0,            0,            0,  0,  0, mu]])
 
-        self.cell2 = µ.Cell(self.resolution,
+        self.cell2 = µ.Cell(self.nb_grid_pts,
                             self.lengths,
                             self.formulation)
         self.mat2 = µ.material.MaterialLinearElasticGeneric1_3d.make(

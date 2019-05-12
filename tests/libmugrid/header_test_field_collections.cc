@@ -304,10 +304,10 @@ namespace muGrid {
       s_map[i] = i;
     }
 
-    for (size_t i = 0; i < CcoordOps::get_size(F::fc.get_sizes()); ++i) {
+    for (size_t i = 0; i < CcoordOps::get_size(F::fc.get_nb_grid_pts()); ++i) {
       BOOST_CHECK_EQUAL(
-          CcoordOps::get_index(F::fc.get_sizes(), F::fc.get_locations(),
-                               CcoordOps::get_ccoord(F::fc.get_sizes(),
+          CcoordOps::get_index(F::fc.get_nb_grid_pts(), F::fc.get_locations(),
+                               CcoordOps::get_ccoord(F::fc.get_nb_grid_pts(),
                                                      F::fc.get_locations(), i)),
           i);
     }

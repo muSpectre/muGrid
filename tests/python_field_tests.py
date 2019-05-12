@@ -44,10 +44,10 @@ class FieldCollection_Check(unittest.TestCase):
 
     """
     def setUp(self):
-        self.resolution = [3, 3]
+        self.nb_grid_pts = [3, 3]
         self.lengths = [1.58, 5.87]
         self.formulation = µ.Formulation.finite_strain
-        self.cell = µ.Cell(self.resolution,
+        self.cell = µ.Cell(self.nb_grid_pts,
                            self.lengths,
                            self.formulation)
         self.dim = len(self.lengths)

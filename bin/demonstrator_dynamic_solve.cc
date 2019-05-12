@@ -95,9 +95,9 @@ int main(int argc, char * argv[]) {
   constexpr Formulation form{Formulation::finite_strain};
 
   const Rcoord_t<dim> lengths{CcoordOps::get_cube<dim>(fsize)};
-  const Ccoord_t<dim> resolutions{CcoordOps::get_cube<dim>(size)};
+  const Ccoord_t<dim> nb_grid_pts{CcoordOps::get_cube<dim>(size)};
 
-  auto cell{make_cell<dim, dim>(resolutions, lengths, form)};
+  auto cell{make_cell<dim, dim>(nb_grid_pts, lengths, form)};
 
   constexpr Real E{1.0030648180242636};
   constexpr Real nu{0.29930675909878679};
@@ -110,7 +110,7 @@ int main(int argc, char * argv[]) {
   for (const auto && pixel : cell) {
     int sum = 0;
     for (Dim_t i = 0; i < dim; ++i) {
-      sum += pixel[i] * 2 / resolutions[i];
+      sum += pixel[i] * 2 / nb_grid_pts[i];
     }
 
     if (sum == 0) {

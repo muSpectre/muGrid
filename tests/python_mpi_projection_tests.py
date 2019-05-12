@@ -57,9 +57,9 @@ def build_test_classes(formulation, RefProjection, fft):
 
         def setUp(self):
             self.ref = RefProjection
-            self.resolution = self.ref.resolution
+            self.nb_grid_pts = self.ref.nb_grid_pts
             self.ndim = self.ref.ndim
-            self.shape = list((self.resolution for _ in range(self.ndim)))
+            self.shape = list((self.nb_grid_pts for _ in range(self.ndim)))
             self.projection = Projection(self.shape, self.shape, formulation,
                                          fft, MPI.COMM_WORLD)
             self.projection.initialise()
@@ -76,11 +76,11 @@ def build_test_classes(formulation, RefProjection, fft):
             strain_g = strain.copy()
             b_g = self.ref.G(strain_g).reshape(strain_g.shape)
             strain_µ = np.zeros((*self.shape, self.ndim, self.ndim))
-            for ijk in itertools.product(range(self.resolution), repeat=self.ndim):
+            for ijk in itertools.product(range(self.nb_grid_pts), repeat=self.ndim):
                 index_µ = tuple((*ijk, slice(None), slice(None)))
                 index_g = tuple((slice(None), slice(None), *ijk))
                 strain_µ[index_µ] = strain_g[index_g].T
-            res = self.projection.get_subdomain_resolutions()
+            res = self.projection.get_nb_subdomain_grid_pts()
             loc = self.projection.get_subdomain_locations()
             if self.ref.ndim == 2:
                 resx, resy = res

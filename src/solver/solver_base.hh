@@ -97,7 +97,7 @@ namespace muSpectre {
     //! returns the max number of iterations
     Uint get_maxiter() const;
 
-    //! returns the resolution tolerance
+    //! returns the solving tolerance
     Real get_tol() const;
 
     //! returns the solver's name (i.e. 'CG', 'GMRES', etc)

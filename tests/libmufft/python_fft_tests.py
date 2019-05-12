@@ -44,11 +44,11 @@ from python_test_imports import muFFT
 
 class FFT_Check(unittest.TestCase):
     def setUp(self):
-        self.resolution = [6, 4]
+        self.nb_grid_pts = [6, 4]
         self.dimx = 2
         self.dimy = 3
 
-        self.tol = 1e-14 * np.prod(self.resolution)
+        self.tol = 1e-14 * np.prod(self.nb_grid_pts)
 
         try:
             from mpi4py import MPI
@@ -64,7 +64,7 @@ class FFT_Check(unittest.TestCase):
     def test_forward_transform(self):
         for engine_str, transposed in self.engines:
             try:
-                engine = muFFT.FFT(self.resolution, self.dimx * self.dimy,
+                engine = muFFT.FFT(self.nb_grid_pts, self.dimx * self.dimy,
                                    fft=engine_str,
                                    communicator=self.communicator)
             except KeyError:
@@ -73,7 +73,7 @@ class FFT_Check(unittest.TestCase):
                 continue
             np.random.seed(1)
             global_in_arr = np.random.random(
-                [*self.resolution, self.dimx, self.dimy])
+                [*self.nb_grid_pts, self.dimx, self.dimy])
             global_out_ref = np.fft.rfftn(global_in_arr, axes=(0, 1))
             if transposed:
                 global_out_ref = global_out_ref.swapaxes(0, 1)
@@ -99,7 +99,7 @@ class FFT_Check(unittest.TestCase):
     def test_reverse_transform(self):
         for engine_str, transposed in self.engines:
             try:
-                engine = muFFT.FFT(self.resolution, self.dimx * self.dimy,
+                engine = muFFT.FFT(self.nb_grid_pts, self.dimx * self.dimy,
                                    fft=engine_str,
                                    communicator=self.communicator)
             except KeyError:
@@ -107,7 +107,7 @@ class FFT_Check(unittest.TestCase):
                 # test.
                 continue
 
-            complex_res = muFFT.get_hermitian_sizes(self.resolution)
+            complex_res = muFFT.get_hermitian_sizes(self.nb_grid_pts)
             global_in_arr = np.zeros([*complex_res, self.dimx, self.dimy],
                                      dtype=complex)
             np.random.seed(1)
@@ -135,7 +135,7 @@ class FFT_Check(unittest.TestCase):
     def test_nb_components1_forward_transform(self):
         for engine_str, transposed in self.engines:
             try:
-                engine = muFFT.FFT(self.resolution,
+                engine = muFFT.FFT(self.nb_grid_pts,
                                    fft=engine_str,
                                    communicator=self.communicator)
             except KeyError:
@@ -144,7 +144,7 @@ class FFT_Check(unittest.TestCase):
                 continue
 
             np.random.seed(1)
-            global_in_arr = np.random.random(self.resolution)
+            global_in_arr = np.random.random(self.nb_grid_pts)
             global_out_ref = np.fft.rfftn(global_in_arr,axes=(0, 1))
             if transposed:
                 global_out_ref = global_out_ref.swapaxes(0, 1)
@@ -153,9 +153,9 @@ class FFT_Check(unittest.TestCase):
 
             # Separately test convenience interface
             out_msp = engine.fft(in_arr)
-            assert out_msp.shape == engine.fourier_resolutions, \
+            assert out_msp.shape == engine.nb_fourier_grid_pts, \
                 "{} not equal to {}".format(out_msp.shape,
-                                            engine.fourier_resolutions)
+                                            engine.nb_fourier_grid_pts)
 
     def test_nb_components1_reverse_transform(self):
         """
@@ -163,7 +163,7 @@ class FFT_Check(unittest.TestCase):
         """
         for engine_str, transposed in self.engines:
             try:
-                engine = muFFT.FFT(self.resolution,
+                engine = muFFT.FFT(self.nb_grid_pts,
                                    fft=engine_str,
                                    communicator=self.communicator)
             except KeyError:
@@ -171,7 +171,7 @@ class FFT_Check(unittest.TestCase):
                 # test.
                 continue
 
-            complex_res = muFFT.get_hermitian_sizes(self.resolution)
+            complex_res = muFFT.get_hermitian_sizes(self.nb_grid_pts)
             global_in_arr = np.zeros(complex_res,
                                      dtype=complex)
             np.random.seed(1)
@@ -183,9 +183,9 @@ class FFT_Check(unittest.TestCase):
             in_arr = global_in_arr[engine.fourier_slices]
 
             out_msp = engine.ifft(in_arr)
-            assert out_msp.shape==engine.subdomain_resolutions, \
+            assert out_msp.shape==engine.nb_subdomain_grid_pts, \
                 "{} not equal to {}".format(out_msp.shape,
-                                            engine.subdomain_resolutions)
+                                            engine.nb_subdomain_grid_pts)
 
 
 
