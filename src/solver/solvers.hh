@@ -48,7 +48,11 @@ namespace muSpectre {
 
   /**
    * Uses the Newton-conjugate Gradient method to find the static
-   * equilibrium of a cell given a series of mean applied strains
+   * equilibrium of a cell given a series of mean applied strain steps.
+   * Each strain step is added to the previous macroscopic strain of
+   * the cell. The initial macroscopic strain state depends on the formulation
+   * (zero strain tensor for Formulation::small_strain, identity placement
+   * gradient tensor for Formulation::finite_strain).
    */
   std::vector<OptimizeResult> newton_cg(Cell & cell,
                                         const LoadSteps_t & load_steps,
@@ -57,7 +61,7 @@ namespace muSpectre {
 
   /**
    * Uses the Newton-conjugate Gradient method to find the static
-   * equilibrium of a cell given a mean applied strain
+   * equilibrium of a cell given a mean applied strain.
    */
   inline OptimizeResult newton_cg(Cell & cell,
                                   const Eigen::Ref<Eigen::MatrixXd> load_step,
@@ -71,7 +75,11 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   /**
    * Uses the method proposed by de Geus method to find the static
-   * equilibrium of a cell given a series of mean applied strains
+   * equilibrium of a cell given a series of mean applied strain steps.
+   * Each strain step is added to the previous macroscopic strain of
+   * the cell. The initial macroscopic strain state depends on the formulation
+   * (zero strain tensor for Formulation::small_strain, identity placement
+   * gradient tensor for Formulation::finite_strain).
    */
   std::vector<OptimizeResult> de_geus(Cell & cell,
                                       const LoadSteps_t & load_steps,
@@ -81,7 +89,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   /**
    * Uses the method proposed by de Geus method to find the static
-   * equilibrium of a cell given a mean applied strain
+   * equilibrium of a cell given a mean applied strain.
    */
   inline OptimizeResult de_geus(Cell & cell,
                                 const Eigen::Ref<Eigen::MatrixXd> load_step,
