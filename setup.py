@@ -182,7 +182,7 @@ ext_modules = [
         include_dirs=include_dirs,
         libraries=libraries,
         library_dirs=library_dirs,
-        language='c++'
+        language='c++',
     ),
 ]
 
@@ -236,6 +236,8 @@ class BuildExt(build_ext):
                 opts.append('-fvisibility=hidden')
         elif ct == 'msvc':
             opts.append('/DVERSION_INFO=\\"%s\\"' % self.distribution.get_version())
+        opts.append('-Werror')
+        opts.append('-Wno-deprecated-declarations')
         for ext in self.extensions:
             ext.extra_compile_args = opts
         build_ext.build_extensions(self)
