@@ -69,7 +69,20 @@ void add_parallel_cell_factory_helper(py::module & mod, const char * name) {
   using Rcoord = Rcoord_t<dim>;
 
   mod.def(name,
+          [](Ccoord res, Rcoord lens, Formulation form,
+             muFFT::Communicator & comm) {
+            // Initialize with muFFT Communicator object
+            return muSpectre::make_parallel_cell<
+                dim, dim, muSpectre::CellBase<dim, dim>, FFTEngine>(
+                std::move(res), std::move(lens), std::move(form),
+                std::move(comm));
+          },
+          "nb_grid_pts"_a, "lengths"_a = muGrid::CcoordOps::get_cube<dim>(1.),
+          "formulation"_a = Formulation::finite_strain,
+          "communicator"_a = muFFT::Communicator(MPI_COMM_SELF));
+  mod.def(name,
           [](Ccoord res, Rcoord lens, Formulation form, size_t comm) {
+            // Initialize with bare MPI handle
             return muSpectre::make_parallel_cell<
                 dim, dim, muSpectre::CellBase<dim, dim>, FFTEngine>(
                 std::move(res), std::move(lens), std::move(form),

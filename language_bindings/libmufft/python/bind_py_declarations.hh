@@ -39,6 +39,7 @@
 namespace py = pybind11;
 
 void add_common(py::module & mod);
+void add_communicator(py::module & mod);
 void add_fft_engines(py::module & mod);
 
 #endif  // LANGUAGE_BINDINGS_LIBMUFFT_PYTHON_BIND_PY_DECLARATIONS_HH_

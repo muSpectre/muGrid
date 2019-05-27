@@ -41,6 +41,7 @@ import numpy as np
 from python_test_imports import muFFT
 
 from python_fft_tests import FFT_Check
+from python_communicator_tests import Communicator_Check
 
 if __name__ == '__main__':
     unittest.main()

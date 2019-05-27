@@ -44,6 +44,8 @@ import _muFFT
 from _muFFT import (get_domain_ccoord, get_domain_index, get_hermitian_sizes,
                     FFT_PlanFlags)
 
+has_mpi = _muFFT.Communicator.has_mpi
+
 # This is a list of FFT engines that are potentially available.
 #              |------------------------------- Identifier for 'FFT' class
 #              |        |---------------------- Name of 2D engine class 
@@ -67,6 +69,27 @@ def _find_fft_engines():
 fft_engines = _find_fft_engines()
 
 
+def Communicator(communicator=None):
+    """
+    Factory function for the communicator class.
+
+    Parameters
+    ----------
+    communicator: mpi4py or muFFT communicator object
+        The bare MPI communicator. (Default: _muFFT.Communicator())
+    """
+    if communicator is None:
+        communicator = _muFFT.Communicator()
+
+    if isinstance(communicator, _muFFT.Communicator):
+        return communicator
+
+    if _muFFT.Communicator.has_mpi:
+            return _muFFT.Communicator(MPI._handleof(communicator))
+    else:
+        raise RuntimeError('muFFT was compiled without MPI support.')
+
+
 class FFT(object):
     def __init__(self, nb_grid_pts, nb_components=1, fft='fftw',
                  communicator=None):
@@ -87,47 +110,35 @@ class FFT(object):
         fft: string
             FFT engine to use. Options are 'fftw', 'fftwmpi', 'pfft' and 'p3dfft'.
             Default: 'fftw'.
-        communicator: mpi4py communicator
-            mpi4py communicator object passed to parallel FFT engines. Note that
+        communicator: mpi4py or muFFT communicator
+            communicator object passed to parallel FFT engines. Note that
             the default 'fftw' engine does not support parallel execution.
             Default: None
         """
-        self.dim = len(nb_grid_pts)
-        self.nb_grid_pts = nb_grid_pts
-        self.nb_components = nb_components
-        self.communicator = communicator
+        communicator = Communicator(communicator)
+
+        self._dim = len(nb_grid_pts)
+        self._nb_grid_pts = nb_grid_pts
+        self._nb_components = nb_components
 
         nb_grid_pts = list(nb_grid_pts)
         try:
             factory_name_2d, factory_name_3d, is_parallel = _factories[fft]
         except KeyError:
             raise KeyError("Unknown FFT engine '{}'.".format(fft))
-        if self.dim == 2:
+        if self._dim == 2:
             factory_name = factory_name_2d
-        elif self.dim == 3:
+        elif self._dim == 3:
             factory_name = factory_name_3d
         else:
             raise ValueError('{}-d transforms are not supported'
-                             .format(self.dim))
+                             .format(self._dim))
         try:
             factory = _muFFT.__dict__[factory_name]
         except KeyError:
             raise KeyError("FFT engine '{}' has not been compiled into the "
                            "muFFT library.".format(factory_name))
-        if is_parallel:
-            if MPI is None:
-                raise RuntimeError('Parallel engine requested but mpi4py could'
-                                   ' not be imported.')
-            if communicator is None:
-                communicator = MPI.COMM_SELF
-            self.engine = factory(nb_grid_pts, nb_components,
-                                  MPI._handleof(communicator))
-        else:
-            if communicator is not None and communicator.Get_size() > 1:
-                raise ValueError("FFT engine '{}' does not support parallel "
-                                 "execution.".format(fft))
-            self.engine = factory(nb_grid_pts, nb_components)
-
+        self.engine = factory(nb_grid_pts, nb_components, communicator)
         self.engine.initialise()
 
     def fft(self, data):
@@ -151,14 +162,14 @@ class FFT(object):
             carries only the local subdomain of the data. The shape equals
             `nb_fourier_grid_pts` plus components.
         """
-        field_shape = data.shape[:self.dim]
-        component_shape = data.shape[self.dim:]
+        field_shape = data.shape[:self._dim]
+        component_shape = data.shape[self._dim:]
         if field_shape != self.nb_subdomain_grid_pts:
             raise ValueError('Forward transform received a field with '
                              '{} grid points, but FFT has been planned for a '
                              'field with {} grid points'.format(field_shape,
                                 self.nb_subdomain_grid_pts))
-        out_data = self.engine.fft(data.reshape(-1, self.nb_components).T)
+        out_data = self.engine.fft(data.reshape(-1, self._nb_components).T)
         new_shape = self.nb_fourier_grid_pts + component_shape
         return out_data.T.reshape(new_shape)
 
@@ -183,14 +194,14 @@ class FFT(object):
             carries only the local subdomain of the data. The shape equals
             `nb_subdomain_grid_pts` plus components.
         """
-        field_shape = data.shape[:self.dim]
-        component_shape = data.shape[self.dim:]
+        field_shape = data.shape[:self._dim]
+        component_shape = data.shape[self._dim:]
         if field_shape != self.nb_fourier_grid_pts:
             raise ValueError('Inverse transform received a field with '
                              '{} grid points, but FFT has been planned for a '
                              'field with {} grid points'.format(field_shape,
                                 self.nb_fourier_grid_pts))
-        out_data = self.engine.ifft(data.reshape(-1, self.nb_components).T)
+        out_data = self.engine.ifft(data.reshape(-1, self._nb_components).T)
         new_shape = self.nb_subdomain_grid_pts + component_shape
         return out_data.T.reshape(new_shape)
 
@@ -229,6 +240,11 @@ class FFT(object):
     @property
     def normalisation(self):
         """
-        1 / prod(self.nb_grid_pts)
+        1 / prod(self._nb_grid_pts)
         """
         return self.engine.normalisation()
+
+    @property
+    def communicator(self):
+        return self.engine.get_communicator()
+    

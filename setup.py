@@ -141,6 +141,7 @@ print('=== DETECTING FFT LIBRARIES ===')
 
 sources = ['language_bindings/libmufft/python/bind_py_module.cc',
            'language_bindings/libmufft/python/bind_py_common.cc',
+           'language_bindings/libmufft/python/bind_py_communicator.cc',
            'language_bindings/libmufft/python/bind_py_fftengine.cc',
            'src/libmufft/fft_engine_base.cc',
            'src/libmufft/fft_utils.cc']

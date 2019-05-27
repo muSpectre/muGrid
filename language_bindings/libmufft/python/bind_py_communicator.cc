@@ -1,11 +1,11 @@
 /**
- * @file   bind_py_module.cc
+ * @file   bind_py_fftengine.cc
  *
- * @author Till Junge <till.junge@epfl.ch>
+ * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
- * @date   12 Jan 2018
+ * @date   22 May 2019
  *
- * @brief  Python bindings for µSpectre
+ * @brief  Python bindings for the FFT engines
  *
  * Copyright © 2018 Till Junge
  *
@@ -34,12 +34,34 @@
 
 #include "bind_py_declarations.hh"
 
+#include <libmufft/communicator.hh>
+
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/eigen.h>
 
-PYBIND11_MODULE(_muFFT, mod) {
-  mod.doc() = "Python bindings to the µFFT library";
+using pybind11::literals::operator""_a;
+namespace py = pybind11;
 
-  add_common(mod);
-  add_communicator(mod);
-  add_fft_engines(mod);
+void add_communicator(py::module & mod) {
+  py::class_<muFFT::Communicator>(mod, "Communicator")
+#ifdef WITH_MPI
+      .def(py::init([](size_t comm) {
+             return new muFFT::Communicator(MPI_Comm(comm));
+           }),
+           "communicator"_a = size_t(MPI_COMM_SELF))
+      .def_property_readonly("mpi_comm", [](muFFT::Communicator & comm) {
+        return size_t(comm.get_mpi_comm());
+      })
+#else
+      .def(py::init())
+#endif
+      .def_property_readonly_static("has_mpi",
+                                    [](py::object) {
+                                      return muFFT::Communicator::has_mpi();
+                                    })
+      .def_property_readonly("rank", &muFFT::Communicator::rank)
+      .def_property_readonly("size", &muFFT::Communicator::size)
+      .def("sum", &muFFT::Communicator::sum<int>)
+      .def("sum", &muFFT::Communicator::sum<double>);
 }

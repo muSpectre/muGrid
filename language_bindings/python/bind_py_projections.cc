@@ -84,6 +84,31 @@ void add_proj_helper(py::module & mod, std::string name_start) {
   using Rcoord = muGrid::Rcoord_t<DimS>;
   using Field_t = typename Proj::Field_t;
 
+#ifdef WITH_MPI
+  auto make_proj = [](Ccoord res, Rcoord lengths, const std::string & fft,
+                      const muFFT::Communicator & comm) {
+    if (fft == "fftw") {
+      auto engine = std::make_unique<muFFT::FFTWEngine<DimS>>(
+          res, Proj::NbComponents(), comm);
+      return Proj(std::move(engine), lengths);
+#ifdef WITH_FFTWMPI
+    } else if (fft == "fftwmpi") {
+      auto engine = std::make_unique<muFFT::FFTWMPIEngine<DimS>>(
+          res, Proj::NbComponents(), comm);
+      return Proj(std::move(engine), lengths);
+#endif
+#ifdef WITH_PFFT
+    } else if (fft == "pfft") {
+      auto engine = std::make_unique<muFFT::PFFTEngine<DimS>>(
+          res, Proj::NbComponents(), comm);
+      return Proj(std::move(engine), lengths);
+#endif
+    } else {
+      throw std::runtime_error("Unknown FFT engine '" + fft + "' specified.");
+    }
+  };
+#endif
+
   static_assert(DimS == DimM, "currently only for DimS==DimM");
 
   std::stringstream name{};
@@ -91,43 +116,28 @@ void add_proj_helper(py::module & mod, std::string name_start) {
 
   py::class_<Proj>(mod, name.str().c_str())
 #ifdef WITH_MPI
-      .def(py::init([](Ccoord res, Rcoord lengths, const std::string & fft,
-                       size_t comm) {
-             if (fft == "fftw") {
-               auto engine = std::make_unique<muFFT::FFTWEngine<DimS>>(
-                   res, Proj::NbComponents(),
-                   std::move(muFFT::Communicator(MPI_Comm(comm))));
-               return Proj(std::move(engine), lengths);
+      .def(py::init(make_proj),
+           "nb_grid_pts"_a, "lengths"_a, "fft"_a = "fftw",
+           "communicator"_a = muFFT::Communicator(MPI_COMM_SELF))
+      .def(py::init([make_proj](Ccoord res, Rcoord lengths,
+                                const std::string & fft, size_t comm) {
+             return make_proj(res, lengths, fft,
+                              std::move(muFFT::Communicator(MPI_Comm(comm))));
+           }),
+           "nb_grid_pts"_a, "lengths"_a, "fft"_a = "fftw",
+           "communicator"_a = size_t(MPI_COMM_SELF))
 #else
       .def(py::init([](Ccoord res, Rcoord lengths, const std::string & fft) {
              if (fft == "fftw") {
                auto engine = std::make_unique<muFFT::FFTWEngine<DimS>>(
                    res, Proj::NbComponents());
                return Proj(std::move(engine), lengths);
-#endif
-#ifdef WITH_FFTWMPI
-             } else if (fft == "fftwmpi") {
-               auto engine = std::make_unique<muFFT::FFTWMPIEngine<DimS>>(
-                   res, Proj::NbComponents(),
-                   std::move(muFFT::Communicator(MPI_Comm(comm))));
-               return Proj(std::move(engine), lengths);
-#endif
-#ifdef WITH_PFFT
-             } else if (fft == "pfft") {
-               auto engine = std::make_unique<muFFT::PFFTEngine<DimS>>(
-                   res, Proj::NbComponents(),
-                   std::move(muFFT::Communicator(MPI_Comm(comm))));
-               return Proj(std::move(engine), lengths);
-#endif
              } else {
                throw std::runtime_error("Unknown FFT engine '" + fft +
                                         "' specified.");
              }
            }),
            "nb_grid_pts"_a, "lengths"_a,
-#ifdef WITH_MPI
-           "fft"_a = "fftw", "communicator"_a = size_t(MPI_COMM_SELF))
-#else
            "fft"_a = "fftw")
 #endif
       .def("initialise", &Proj::initialise,

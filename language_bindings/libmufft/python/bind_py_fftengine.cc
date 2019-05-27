@@ -57,15 +57,21 @@ void add_engine_helper(py::module & mod, std::string name) {
   using Ccoord = typename Engine::Ccoord;
   using ArrayXXc = Eigen::Array<Complex, Eigen::Dynamic, Eigen::Dynamic>;
   py::class_<Engine>(mod, name.c_str())
+      .def(py::init([](Ccoord res, Dim_t nb_components,
+                       muFFT::Communicator & comm) {
+             // Initialize with muFFT Communicator object
+             return new Engine(res, nb_components, comm);
+           }),
+           "nb_grid_pts"_a, "nb_components"_a,
+           "communicator"_a = muFFT::Communicator())
 #ifdef WITH_MPI
       .def(py::init([](Ccoord res, Dim_t nb_components, size_t comm) {
+             // Initialize with bare MPI handle
              return new Engine(res, nb_components,
                                std::move(muFFT::Communicator(MPI_Comm(comm))));
            }),
            "nb_grid_pts"_a, "nb_components"_a,
            "communicator"_a = size_t(MPI_COMM_SELF))
-#else
-      .def(py::init<Ccoord, Dim_t>())
 #endif
       .def("fft",
            [](Engine & eng,
@@ -116,6 +122,7 @@ void add_engine_helper(py::module & mod, std::string name) {
       .def("initialise", &Engine::initialise,
            "flags"_a = muFFT::FFT_PlanFlags::estimate)
       .def("normalisation", &Engine::normalisation)
+      .def("get_communicator", &Engine::get_communicator)
       .def("get_nb_subdomain_grid_pts", &Engine::get_nb_subdomain_grid_pts)
       .def("get_subdomain_locations", &Engine::get_subdomain_locations)
       .def("get_nb_fourier_grid_pts", &Engine::get_nb_fourier_grid_pts)

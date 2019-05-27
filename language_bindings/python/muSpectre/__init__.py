@@ -47,6 +47,7 @@ from _muFFT import (get_domain_ccoord, get_domain_index, get_hermitian_sizes,
 import _muSpectre
 from _muSpectre import Formulation, material, solvers, FiniteDiff
 
+from muFFT import Communicator
 import muSpectre.gradient_integration
 
 _factories = {'fftw': ('CellFactory', False),
@@ -76,8 +77,8 @@ def Cell(nb_grid_pts, lengths, formulation=Formulation.finite_strain,
     fft: string
         FFT engine to use. Options are 'fftw', 'fftwmpi', 'pfft' and 'p3dfft'.
         Default is 'fftw'.
-    communicator: mpi4py communicator
-        mpi4py communicator object passed to parallel FFT engines. Note that
+    communicator: mpi4py or muFFT communicator
+        communicator object passed to parallel FFT engines. Note that
         the default 'fftw' engine does not support parallel execution.
 
 
@@ -86,6 +87,8 @@ def Cell(nb_grid_pts, lengths, formulation=Formulation.finite_strain,
     cell: object
         Return a muSpectre Cell object.
     """
+    communicator = Communicator(communicator)
+
     nb_grid_pts = list(nb_grid_pts)
     lengths = list(lengths)
     try:
@@ -97,19 +100,10 @@ def Cell(nb_grid_pts, lengths, formulation=Formulation.finite_strain,
     except KeyError:
         raise KeyError("FFT engine '{}' has not been compiled into the "
                        "muSpectre library.".format(fft))
-    if is_parallel:
-        if MPI is None:
-            raise RuntimeError('Parallel solver requested but mpi4py could'
-                               ' not be imported.')
-        if communicator is None:
-            communicator = MPI.COMM_SELF
-        return factory(nb_grid_pts, lengths, formulation,
-                       MPI._handleof(communicator))
-    else:
-        if communicator is not None:
-            raise ValueError("FFT engine '{}' does not support parallel "
-                             "execution.".format(fft))
+    if communicator.size == 1:
         return factory(nb_grid_pts, lengths, formulation)
+    else:
+        return factory(nb_grid_pts, lengths, formulation, communicator)
 
 
 def Projection(nb_grid_pts, lengths,
@@ -127,8 +121,8 @@ def Projection(nb_grid_pts, lengths,
     fft: string
         FFT engine to use. Options are 'fftw', 'fftwmpi', 'pfft' and 'p3dfft'.
         Default is 'fftw'.
-    communicator: mpi4py communicator
-        mpi4py communicator object passed to parallel FFT engines. Note that
+    communicator: mpi4py or muFFT communicator
+        communicator object passed to parallel FFT engines. Note that
         the default 'fftw' engine does not support parallel execution.
 
 
@@ -137,6 +131,8 @@ def Projection(nb_grid_pts, lengths,
     cell: object
         Return a muSpectre Cell object.
     """
+    communicator = Communicator(communicator)
+
     factory_name = 'Projection{}_{}d'.format(_projections[formulation],
                                              len(nb_grid_pts))
     try:
@@ -144,7 +140,4 @@ def Projection(nb_grid_pts, lengths,
     except KeyError:
         raise KeyError("Projection engine '{}' has not been compiled into the "
                        "muSpectre library.".format(factory_name))
-    if communicator is None:
-        communicator = MPI.COMM_SELF
-    return factory(nb_grid_pts, lengths, fft,
-                   MPI._handleof(communicator))
+    return factory(nb_grid_pts, lengths, fft, communicator)

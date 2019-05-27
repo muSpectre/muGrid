@@ -95,6 +95,11 @@ namespace muFFT {
 
     //! get rank of present process
     int rank() const {
+      // This is necessary here and below to be able to use the communicator
+      // without a previous call to MPI_Init. This happens if you want to use
+      // a version compiled with MPI for serial calculations.
+      // Note that the difference between MPI_COMM_NULL and MPI_COMM_SELF is
+      // that the latter actually executes the library function.
       if (&comm == MPI_COMM_NULL)
         return 0;
       int res;
@@ -123,6 +128,8 @@ namespace muFFT {
 
     MPI_Comm get_mpi_comm() { return &this->comm; }
 
+    static bool has_mpi() { return true; }
+
    private:
     MPI_Comm_ref comm;
   };
@@ -146,6 +153,8 @@ namespace muFFT {
     T sum(const T & arg) const {
       return arg;
     }
+
+    static bool has_mpi() { return false; }
   };
 
 #endif

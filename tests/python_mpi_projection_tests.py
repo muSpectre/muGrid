@@ -45,7 +45,7 @@ from mpi4py import MPI
 from python_test_imports import µ
 from python_goose_ref import (SmallStrainProjectionGooseFFT,
                               FiniteStrainProjectionGooseFFT)
-from muFFT import fft_engines
+from muFFT import fft_engines, Communicator
 from muSpectre import Formulation
 from muSpectre import Projection
 
@@ -64,6 +64,13 @@ def build_test_classes(formulation, RefProjection, fft):
                                          fft, MPI.COMM_WORLD)
             self.projection.initialise()
             self.tol = 1e-12 * np.prod(self.shape)
+
+        def test_constructor(self):
+            """Check that engines can be initialized with either bare MPI
+            communicator or muFFT communicators"""
+            projection = Projection(self.shape, self.shape, formulation,
+                                    fft, Communicator(MPI.COMM_WORLD))
+
 
         def test_projection_result(self):
             # create a bogus strain field in GooseFFT format

@@ -50,16 +50,35 @@ class FFT_Check(unittest.TestCase):
 
         self.tol = 1e-14 * np.prod(self.nb_grid_pts)
 
-        try:
+        if muFFT.has_mpi:
             from mpi4py import MPI
             self.communicator = MPI.COMM_WORLD
-        except ImportError:
+        else:
             self.communicator = None
 
         self.engines = [('fftwmpi', True),
                         ('pfft', True)]
         if self.communicator is None or self.communicator.Get_size() == 1:
             self.engines += [('fftw', False)]
+
+    def test_constructor(self):
+        """Check that engines can be initialized with either bare MPI
+        communicator or muFFT communicators"""
+        for engine_str, transposed in self.engines:
+            try:
+                engine = muFFT.FFT(self.nb_grid_pts, self.dimx * self.dimy,
+                                   fft=engine_str,
+                                   communicator=self.communicator)
+            except KeyError:
+                # This FFT engine has not been compiled into the code. Skip
+                # test.
+                continue
+
+            engine = muFFT.FFT(self.nb_grid_pts, self.dimx * self.dimy,
+                               fft=engine_str,
+                               communicator=muFFT.Communicator(
+                                   self.communicator)
+                               )
 
     def test_forward_transform(self):
         for engine_str, transposed in self.engines:
@@ -71,6 +90,7 @@ class FFT_Check(unittest.TestCase):
                 # This FFT engine has not been compiled into the code. Skip
                 # test.
                 continue
+
             np.random.seed(1)
             global_in_arr = np.random.random(
                 [*self.nb_grid_pts, self.dimx, self.dimy])
@@ -187,7 +207,20 @@ class FFT_Check(unittest.TestCase):
                 "{} not equal to {}".format(out_msp.shape,
                                             engine.nb_subdomain_grid_pts)
 
+    def test_communicator(self):
+        for engine_str, transposed in self.engines:
+            try:
+                engine = muFFT.FFT(self.nb_grid_pts,
+                                   fft=engine_str,
+                                   communicator=self.communicator)
+            except KeyError:
+                # This FFT engine has not been compiled into the code. Skip
+                # test.
+                continue
 
+            comm = engine.engine.get_communicator()
+            self.assertEqual(comm.sum(comm.rank+4),
+                             comm.size*(comm.size+1)/2 + 3*comm.size)
 
 
 if __name__ == '__main__':
