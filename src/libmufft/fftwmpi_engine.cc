@@ -144,7 +144,11 @@ namespace muFFT {
         FFTW_MPI_DEFAULT_BLOCK, in, out, this->comm.get_mpi_comm(),
         FFTW_MPI_TRANSPOSED_OUT | flags);
     if (this->plan_fft == nullptr) {
-      throw std::runtime_error("r2c plan failed");
+      if (Dim == 1)
+        throw std::runtime_error("r2c plan failed; MPI parallel FFTW does not "
+                                 "support 1D r2c FFTs");
+      else
+        throw std::runtime_error("r2c plan failed");
     }
 
     fftw_complex * i_in = reinterpret_cast<fftw_complex *>(this->work.data());
@@ -155,7 +159,11 @@ namespace muFFT {
         FFTW_MPI_DEFAULT_BLOCK, i_in, i_out, this->comm.get_mpi_comm(),
         FFTW_MPI_TRANSPOSED_IN | flags);
     if (this->plan_ifft == nullptr) {
-      throw std::runtime_error("c2r plan failed");
+      if (Dim == 1)
+        throw std::runtime_error("c2r plan failed; MPI parallel FFTW does not "
+                                 "support 1D c2r FFTs");
+      else
+        throw std::runtime_error("c2r plan failed");
     }
     this->initialised = true;
   }
@@ -241,6 +249,7 @@ namespace muFFT {
     }
   }
 
+  template class FFTWMPIEngine<oneD>;
   template class FFTWMPIEngine<twoD>;
   template class FFTWMPIEngine<threeD>;
 }  // namespace muFFT

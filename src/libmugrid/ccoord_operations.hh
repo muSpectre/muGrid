@@ -149,7 +149,7 @@ namespace muGrid {
                                             std::make_index_sequence<dim>{});
     }
 
-    //----------------------------------------------------------------------------//
+    //------------------------------------------------------------------------//
     //! get the i-th pixel in a grid of size sizes
     template <size_t dim>
     constexpr Ccoord_t<dim> get_ccoord(const Ccoord_t<dim> & nb_grid_pts,
@@ -166,7 +166,7 @@ namespace muGrid {
       return retval;
     }
 
-    //----------------------------------------------------------------------------//
+    //------------------------------------------------------------------------//
     //! get the i-th pixel in a grid of size sizes
     template <size_t dim, size_t... I>
     constexpr Ccoord_t<dim> get_ccoord(const Ccoord_t<dim> & nb_grid_pts,
@@ -176,7 +176,17 @@ namespace muGrid {
       return Ccoord_t<dim>({ccoord[I]...});
     }
 
-    //-----------------------------------------------------------------------//
+    //------------------------------------------------------------------------//
+    //! get the i-th pixel in a grid of size sizes - specialization for one
+    //! dimension
+    template <size_t... I>
+    constexpr Ccoord_t<1> get_ccoord(const Ccoord_t<1> & nb_grid_pts,
+                                     const Ccoord_t<1> & locations,
+                                     Dim_t index, std::index_sequence<I...>) {
+      return Ccoord_t<1>({get_ccoord<1>(nb_grid_pts, locations, index)});
+    }
+
+    //------------------------------------------------------------------------//
     //! get the linear index of a pixel in a given grid
     template <size_t dim>
     constexpr Dim_t get_index(const Ccoord_t<dim> & sizes,

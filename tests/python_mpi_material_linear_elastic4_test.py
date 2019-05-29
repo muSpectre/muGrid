@@ -82,7 +82,7 @@ def build_test_classes(fft):
             maxiter = 100
             verbose = 1
 
-            solver=µ.solvers.SolverCG(self.sys, tol, maxiter, verbose)
+            solver = µ.solvers.SolverCG(self.sys, tol, maxiter, verbose)
             r = µ.solvers.newton_cg(self.sys, Del0,
                                     solver, tol, tol, verbose)
 
@@ -95,7 +95,7 @@ def build_test_classes(fft):
     return MaterialLinearElastic4_Check
 
 linear_elastic4 = {}
-for fft, is_parallel in muFFT.fft_engines:
+for fft, is_transposed, is_parallel in muFFT.fft_engines:
     if is_parallel:
         linear_elastic4[fft] = build_test_classes(fft)
 

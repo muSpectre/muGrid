@@ -159,6 +159,7 @@ namespace muFFT {
                          field.data());
   }
 
+  template class FFTWEngine<muGrid::oneD>;
   template class FFTWEngine<muGrid::twoD>;
   template class FFTWEngine<muGrid::threeD>;
 }  // namespace muFFT

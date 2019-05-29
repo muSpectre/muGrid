@@ -48,23 +48,27 @@ has_mpi = _muFFT.Communicator.has_mpi
 
 # This is a list of FFT engines that are potentially available.
 #              |------------------------------- Identifier for 'FFT' class
-#              |        |---------------------- Name of 2D engine class 
-#              |        |          |----------- Name of 3D engine class
-#              v        v          v         v- Supports MPI parallel calcs
-_factories = {'fftw': ('FFTW_2d', 'FFTW_3d', False),
-              'fftwmpi': ('FFTWMPI_2d', 'FFTWMPI_3d', True),
-              'pfft': ('PFFT_2d', 'PFFT_3d', True),
-              'p3dfft': ('P3DFFT_2d', 'P3DFFT_3d', True)}
+#              |        |---------------------- Name of 1D engine class 
+#              |        |          |----------- Name of 2D engine class
+#              v        v          v         v- Name of 3D engine class
+#                                   MPI parallel calcs --------|
+#                                    Transposed output -v      v
+_factories = {'fftw': ('FFTW_1d', 'FFTW_2d', 'FFTW_3d', False, False),
+              'fftwmpi': ('FFTWMPI_1d', 'FFTWMPI_2d', 'FFTWMPI_3d', True, True),
+              'pfft': ('PFFT_1d', 'PFFT_2d', 'PFFT_3d', True, True),
+              'p3dfft': ('P3DFFT_1d', 'P3DFFT_2d', 'P3DFFT_3d', True, True)}
 
 
 # Detect FFT engines. This is a convenience dictionary that allows enumeration
 # of all engines that have been compiled into the library.
 def _find_fft_engines():
     fft_engines = []
-    for fft, (factory_name_2d, factory_name_3d, is_parallel) in _factories.items():
-        if factory_name_2d in _muFFT.__dict__ and \
+    for fft, (factory_name_1d, factory_name_2d, factory_name_3d, \
+        is_transposed, is_parallel) in _factories.items():
+        if factory_name_1d in _muFFT.__dict__ and \
+            factory_name_2d in _muFFT.__dict__ and \
             factory_name_3d in _muFFT.__dict__:
-            fft_engines += [(fft, is_parallel)]
+            fft_engines += [(fft, is_transposed, is_parallel)]
     return fft_engines
 fft_engines = _find_fft_engines()
 
@@ -115,6 +119,9 @@ class FFT(object):
             the default 'fftw' engine does not support parallel execution.
             Default: None
         """
+        fft = 'fftw' if fft == 'serial' else fft
+        fft = 'fftwmpi' if fft == 'mpi' else fft
+
         communicator = Communicator(communicator)
 
         self._dim = len(nb_grid_pts)
@@ -123,10 +130,13 @@ class FFT(object):
 
         nb_grid_pts = list(nb_grid_pts)
         try:
-            factory_name_2d, factory_name_3d, is_parallel = _factories[fft]
+            factory_name_1d, factory_name_2d, factory_name_3d, is_transposed, \
+                is_parallel = _factories[fft]
         except KeyError:
             raise KeyError("Unknown FFT engine '{}'.".format(fft))
-        if self._dim == 2:
+        if self._dim == 1:
+            factory_name = factory_name_1d
+        elif self._dim == 2:
             factory_name = factory_name_2d
         elif self._dim == 3:
             factory_name = factory_name_3d
@@ -140,6 +150,9 @@ class FFT(object):
                            "muFFT library.".format(factory_name))
         self.engine = factory(nb_grid_pts, nb_components, communicator)
         self.engine.initialise()
+        # Is the output from the pybind11 wrapper transposed? This happens
+        # because it eliminates a communication step in MPI parallel transforms.
+        self._is_transposed = is_transposed
 
     def fft(self, data):
         """
@@ -170,8 +183,12 @@ class FFT(object):
                              'field with {} grid points'.format(field_shape,
                                 self.nb_subdomain_grid_pts))
         out_data = self.engine.fft(data.reshape(-1, self._nb_components).T)
-        new_shape = self.nb_fourier_grid_pts + component_shape
-        return out_data.T.reshape(new_shape)
+        new_shape = tuple(self.engine.get_nb_fourier_grid_pts()) \
+            + component_shape
+        out_data = out_data.T.reshape(new_shape)
+        if self._is_transposed:
+            return out_data.swapaxes(0, 1)
+        return out_data
 
     def ifft(self, data):
         """
@@ -194,13 +211,15 @@ class FFT(object):
             carries only the local subdomain of the data. The shape equals
             `nb_subdomain_grid_pts` plus components.
         """
+        if self._is_transposed:
+            data = data.swapaxes(0, 1)
         field_shape = data.shape[:self._dim]
         component_shape = data.shape[self._dim:]
-        if field_shape != self.nb_fourier_grid_pts:
+        if field_shape != tuple(self.engine.get_nb_fourier_grid_pts()):
             raise ValueError('Inverse transform received a field with '
                              '{} grid points, but FFT has been planned for a '
                              'field with {} grid points'.format(field_shape,
-                                self.nb_fourier_grid_pts))
+                                tuple(self.engine.get_nb_fourier_grid_pts())))
         out_data = self.engine.ifft(data.reshape(-1, self._nb_components).T)
         new_shape = self.nb_subdomain_grid_pts + component_shape
         return out_data.T.reshape(new_shape)
@@ -211,11 +230,27 @@ class FFT(object):
 
     @property
     def fourier_locations(self):
-        return tuple(self.engine.get_fourier_locations())
+        fourier_locations = self.engine.get_fourier_locations()
+        if self._is_transposed:
+            if self._dim == 2:
+                loc0, loc1 = fourier_locations
+                return loc1, loc0
+            elif self._dim == 3:
+                loc0, loc1, loc2 = fourier_locations
+                return loc1, loc0, loc2
+        return tuple(fourier_locations)
 
     @property
     def nb_fourier_grid_pts(self):
-        return tuple(self.engine.get_nb_fourier_grid_pts())
+        nb_fourier_grid_pts = self.engine.get_nb_fourier_grid_pts()
+        if self._is_transposed:
+            if self._dim == 2:
+                n0, n1 = nb_fourier_grid_pts
+                return n1, n0
+            elif self._dim == 3:
+                n0, n1, n2 = nb_fourier_grid_pts
+                return n1, n0, n2
+        return tuple(nb_fourier_grid_pts)
 
     @property
     def subdomain_locations(self):
@@ -243,6 +278,13 @@ class FFT(object):
         1 / prod(self._nb_grid_pts)
         """
         return self.engine.normalisation()
+
+    @property
+    def is_transposed(self):
+        """
+        Return if internal storage order is transposed.
+        """
+        return self._is_transposed
 
     @property
     def communicator(self):

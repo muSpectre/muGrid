@@ -246,6 +246,7 @@ namespace muFFT {
               field.data());
   }
 
+  template class PFFTEngine<oneD>;
   template class PFFTEngine<twoD>;
   template class PFFTEngine<threeD>;
 }  // namespace muFFT

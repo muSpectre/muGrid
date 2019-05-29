@@ -73,14 +73,18 @@ void add_get_ccoord_helper(py::module & mod) {
 }
 
 void add_get_cube(py::module & mod) {
+  add_get_cube_helper<muGrid::oneD, muGrid::Dim_t>(mod);
+  add_get_cube_helper<muGrid::oneD, muGrid::Real>(mod);
   add_get_cube_helper<muGrid::twoD, muGrid::Dim_t>(mod);
   add_get_cube_helper<muGrid::twoD, muGrid::Real>(mod);
   add_get_cube_helper<muGrid::threeD, muGrid::Dim_t>(mod);
   add_get_cube_helper<muGrid::threeD, muGrid::Real>(mod);
 
+  add_get_hermitian_helper<muGrid::oneD>(mod);
   add_get_hermitian_helper<muGrid::twoD>(mod);
   add_get_hermitian_helper<muGrid::threeD>(mod);
 
+  add_get_ccoord_helper<muGrid::oneD>(mod);
   add_get_ccoord_helper<muGrid::twoD>(mod);
   add_get_ccoord_helper<muGrid::threeD>(mod);
 }
@@ -98,6 +102,7 @@ void add_get_index_helper(py::module & mod) {
 }
 
 void add_get_index(py::module & mod) {
+  add_get_index_helper<muGrid::oneD>(mod);
   add_get_index_helper<muGrid::twoD>(mod);
   add_get_index_helper<muGrid::threeD>(mod);
 }
@@ -112,6 +117,7 @@ void add_Pixels_helper(py::module & mod) {
 }
 
 void add_Pixels(py::module & mod) {
+  add_Pixels_helper<muGrid::oneD>(mod);
   add_Pixels_helper<muGrid::twoD>(mod);
   add_Pixels_helper<muGrid::threeD>(mod);
 }

@@ -67,6 +67,7 @@ namespace muFFT {
     return this->work_space_container.size();
   }
 
+  template class FFTEngineBase<muGrid::oneD>;
   template class FFTEngineBase<muGrid::twoD>;
   template class FFTEngineBase<muGrid::threeD>;
 

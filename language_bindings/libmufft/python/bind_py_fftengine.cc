@@ -131,13 +131,16 @@ void add_engine_helper(py::module & mod, std::string name) {
 }
 
 void add_fft_engines(py::module & fft) {
+  add_engine_helper<muFFT::FFTWEngine<muGrid::oneD>>(fft, "FFTW_1d");
   add_engine_helper<muFFT::FFTWEngine<muGrid::twoD>>(fft, "FFTW_2d");
   add_engine_helper<muFFT::FFTWEngine<muGrid::threeD>>(fft, "FFTW_3d");
 #ifdef WITH_FFTWMPI
+  add_engine_helper<muFFT::FFTWMPIEngine<muGrid::oneD>>(fft, "FFTWMPI_1d");
   add_engine_helper<muFFT::FFTWMPIEngine<muGrid::twoD>>(fft, "FFTWMPI_2d");
   add_engine_helper<muFFT::FFTWMPIEngine<muGrid::threeD>>(fft, "FFTWMPI_3d");
 #endif
 #ifdef WITH_PFFT
+  add_engine_helper<muFFT::PFFTEngine<muGrid::oneD>>(fft, "PFFT_1d");
   add_engine_helper<muFFT::PFFTEngine<muGrid::twoD>>(fft, "PFFT_2d");
   add_engine_helper<muFFT::PFFTEngine<muGrid::threeD>>(fft, "PFFT_3d");
 #endif
