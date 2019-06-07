@@ -49,6 +49,11 @@ namespace muSpectre {
             std::make_unique<Stiffness_t>(Hooke::compute_C_T4(lambda, mu))},
         C{*C_holder} {}
 
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimM>
+  auto MaterialLinearElastic1<DimM>::get_C() const -> const Stiffness_t& {
+    return this->C;
+  }
   template class MaterialLinearElastic1<twoD>;
   template class MaterialLinearElastic1<threeD>;
 

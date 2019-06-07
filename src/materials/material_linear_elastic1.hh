@@ -132,6 +132,8 @@ namespace muSpectre {
     evaluate_stress_tangent(const Eigen::MatrixBase<Derived> & E,
                             const size_t & /*quad_pt_index*/);
 
+    const Stiffness_t & get_C() const;
+
    protected:
     const Real young;    //!< Young's modulus
     const Real poisson;  //!< Poisson's ratio

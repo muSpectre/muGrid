@@ -46,6 +46,8 @@ using muSpectre::Formulation;
 using muSpectre::Real;
 using muSpectre::StrainMeasure;
 using muSpectre::StressMeasure;
+using muSpectre::Formulation;
+using muSpectre::StoreNativeStress;
 using pybind11::literals::operator""_a;
 
 namespace py = pybind11;
@@ -64,6 +66,10 @@ void add_common(py::module & mod) {
       .value("laminate", muSpectre::SplitCell::laminate)
       .value("split", muSpectre::SplitCell::simple)
       .value("non_split", muSpectre::SplitCell::no);
+
+  py::enum_<StoreNativeStress>(mod, "StoreNativeStress")
+      .value("yes", StoreNativeStress::yes)
+      .value("no", StoreNativeStress::no);
 
   py::enum_<StressMeasure>(mod, "StressMeasure")
       .value("Cauchy", StressMeasure::Cauchy)

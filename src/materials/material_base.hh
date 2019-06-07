@@ -42,6 +42,7 @@
 #include <libmugrid/field_collection_local.hh>
 #include <libmugrid/field_typed.hh>
 #include <libmugrid/mapped_field.hh>
+#include <libmugrid/optional_mapped_field.hh>
 
 #include <string>
 #include <tuple>
@@ -127,24 +128,32 @@ namespace muSpectre {
     //! material dimension for  inheritance
     Dim_t get_material_dimension() { return this->material_dimension; }
     //! computes stress
-    virtual void compute_stresses(const muGrid::RealField & F,
-                                  muGrid::RealField & P,
-                                  const Formulation & form,
-                                  SplitCell is_cell_split = SplitCell::no) = 0;
+    virtual void
+    compute_stresses(const muGrid::RealField & F, muGrid::RealField & P,
+                     const Formulation & form,
+                     const SplitCell & is_cell_split = SplitCell::no,
+                     const StoreNativeStress & store_native_stress =
+                         StoreNativeStress::no) = 0;
+
     /**
      * Convenience function to compute stresses, mostly for debugging and
      * testing. Has runtime-cost associated with compatibility-checking and
      * conversion of the Field_t arguments that can be avoided by using the
      * version with strongly typed field references
      */
-    void compute_stresses(const muGrid::Field & F, muGrid::Field & P,
-                          const Formulation & form,
-                          SplitCell is_cell_split = SplitCell::no);
+    void compute_stresses(
+        const muGrid::Field & F, muGrid::Field & P, const Formulation & form,
+        const SplitCell & is_cell_split = SplitCell::no,
+        const StoreNativeStress & store_native_stress = StoreNativeStress::no);
+
     //! computes stress and tangent moduli
     virtual void
     compute_stresses_tangent(const muGrid::RealField & F, muGrid::RealField & P,
                              muGrid::RealField & K, const Formulation & form,
-                             SplitCell is_cell_split = SplitCell::no) = 0;
+                             const SplitCell & is_cell_split = SplitCell::no,
+                             const StoreNativeStress & store_native_stress =
+                                 StoreNativeStress::no) = 0;
+
     /**
      * Convenience function to compute stresses and tangent moduli, mostly for
      * debugging and testing. Has runtime-cost associated with
@@ -152,9 +161,11 @@ namespace muSpectre {
      * be avoided by using the version with strongly typed field references
      */
 
-    void compute_stresses_tangent(const muGrid::Field & F, muGrid::Field & P,
-                                  muGrid::Field & K, Formulation form,
-                                  SplitCell is_cell_split = SplitCell::no);
+    void compute_stresses_tangent(
+        const muGrid::Field & F, muGrid::Field & P, muGrid::Field & K,
+        const Formulation & form,
+        const SplitCell & is_cell_split = SplitCell::no,
+        const StoreNativeStress & store_native_stress = StoreNativeStress::no);
 
     // this function return the ratio of which the
     // input pixel is consisted of this material
@@ -185,9 +196,7 @@ namespace muSpectre {
 
     //! gives access to internal fields
     // TODO(junge): rename get_collection to get_fields
-    inline muGrid::LocalFieldCollection & get_collection() {
-      return this->internal_fields;
-    }
+    muGrid::LocalFieldCollection & get_collection();
 
     using DynMatrix_t = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
 
@@ -200,6 +209,15 @@ namespace muSpectre {
     constitutive_law_dynamic(const Eigen::Ref<const DynMatrix_t> & strain,
                              const size_t & quad_pt_index,
                              const Formulation & form) = 0;
+
+    //! returns whether or not a field with native stress has been stored
+    virtual bool has_native_stress() const;
+
+    /**
+     * returns the stored native stress field. Throws a runtime error if native
+     * stress has not been stored
+     */
+    virtual muGrid::RealField & get_native_stress();
 
    protected:
     const std::string name;  //!< material's name (for output and debugging)

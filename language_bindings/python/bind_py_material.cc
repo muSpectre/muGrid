@@ -102,25 +102,28 @@ class PyMaterialBase : public muSpectre::MaterialBase {
         initialise);  // Name of function in C++ (must match Python name)
   }
 
-  void compute_stresses(const muGrid::RealField & F, muGrid::RealField & P,
-                        const muSpectre::Formulation & form,
-                        muSpectre::SplitCell is_cell_split) override {
+  void compute_stresses(
+      const muGrid::RealField & F, muGrid::RealField & P,
+      const muSpectre::Formulation & form,
+      const muSpectre::SplitCell & is_cell_split,
+      const muSpectre::StoreNativeStress & store_native_stress) override {
     PYBIND11_OVERLOAD_PURE(
         void,              // Return type
         Parent,            // Parent class
         compute_stresses,  // Name of function in C++ (must match Python name)
-        F, P, form, is_cell_split);
+        F, P, form, is_cell_split, store_native_stress);
   }
 
-  void compute_stresses_tangent(const muGrid::RealField & F,
-                                muGrid::RealField & P, muGrid::RealField & K,
-                                const muSpectre::Formulation & form,
-                                muSpectre::SplitCell is_cell_split) override {
+  void compute_stresses_tangent(
+      const muGrid::RealField & F, muGrid::RealField & P, muGrid::RealField & K,
+      const muSpectre::Formulation & form,
+      const muSpectre::SplitCell & is_cell_split,
+      const muSpectre::StoreNativeStress & store_native_stress) override {
     PYBIND11_OVERLOAD_PURE(
-        void,             /* Return type */
-        Parent,           /* Parent class */
-        compute_stresses, /* Name of function in C++ (must match Python name) */
-        F, P, K, form, is_cell_split);
+        void,              // Return type
+        Parent,            // Parent class
+        compute_stresses,  // Name of function in C++ (must match Python name)
+        F, P, K, form, is_cell_split, store_native_stress);
   }
 
   using DynMatrix_t = typename Parent::DynMatrix_t;

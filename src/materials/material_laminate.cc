@@ -103,10 +103,14 @@ namespace muSpectre {
   /* ----------------------------------------------------------------------
    */
   template <Dim_t DimM>
-  void MaterialLaminate<DimM>::compute_stresses(const RealField & F,
-                                                RealField & P,
-                                                const Formulation & form,
-                                                SplitCell is_cell_split) {
+  void MaterialLaminate<DimM>::compute_stresses(
+      const RealField & F, RealField & P, const Formulation & form,
+      const SplitCell & is_cell_split,
+      const StoreNativeStress & store_native_stress) {
+    if (store_native_stress != StoreNativeStress::no) {
+      throw std::runtime_error(
+          "native stress is not defined for laminate materials");
+    }
     switch (form) {
     case Formulation::finite_strain: {
       switch (is_cell_split) {
@@ -155,7 +159,12 @@ namespace muSpectre {
   template <Dim_t DimM>
   void MaterialLaminate<DimM>::compute_stresses_tangent(
       const RealField & F, RealField & P, RealField & K,
-      const Formulation & form, SplitCell is_cell_split) {
+      const Formulation & form, const SplitCell & is_cell_split,
+      const StoreNativeStress & store_native_stress) {
+    if (store_native_stress != StoreNativeStress::no) {
+      throw std::runtime_error(
+          "native stress is not defined for laminate materials");
+    }
     switch (form) {
     case Formulation::finite_strain: {
       switch (is_cell_split) {

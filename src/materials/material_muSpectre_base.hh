@@ -128,8 +128,8 @@ namespace muSpectre {
 
     //! Factory. The ConstructorArgs refer the arguments after `name`
     template <class... ConstructorArgs>
-    static Material & make(Cell & cell, const std::string & name,
-                           ConstructorArgs &&... args);
+    inline static Material & make(Cell & cell, const std::string & name,
+                                  ConstructorArgs &&... args);
     /** Factory
      * takes all arguments after the name of the underlying
      * Material's constructor. E.g., if the underlying material is a
@@ -137,7 +137,7 @@ namespace muSpectre {
      * modulus and Poisson's ratio.
      */
     template <class... ConstructorArgs>
-    static std::tuple<std::shared_ptr<Material>, MaterialEvaluator<DimM>>
+    inline static std::tuple<std::shared_ptr<Material>, MaterialEvaluator<DimM>>
     make_evaluator(ConstructorArgs &&... args);
 
     //! Copy assignment operator
@@ -148,52 +148,87 @@ namespace muSpectre {
 
     // this fucntion is speicalized to assign partial material to a pixel
     template <class... InternalArgs>
-    void add_pixel_split(const size_t & pixel_id, Real ratio,
-                         InternalArgs... args);
+    inline void add_pixel_split(const size_t & pixel_id, Real ratio,
+                                InternalArgs... args);
 
     // add pixels intersecting to material to the material
-    void add_split_pixels_precipitate(
+    inline void add_split_pixels_precipitate(
         const std::vector<size_t> & intersected_pixel_ids,
         const std::vector<Real> & intersection_ratios);
 
     //! computes stress
     using Parent::compute_stresses;
     using Parent::compute_stresses_tangent;
+
     //! computes stress
-    void compute_stresses(const muGrid::RealField & F, muGrid::RealField & P,
-                          const Formulation & form,
-                          SplitCell is_cell_split = SplitCell::no) final;
+    inline void
+    compute_stresses(const muGrid::RealField & F, muGrid::RealField & P,
+                     const Formulation & form,
+                     const SplitCell & is_cell_split = SplitCell::no,
+                     const StoreNativeStress & store_native_stress =
+                         StoreNativeStress::no) final;
+
     //! computes stress and tangent modulus
-    void
+    inline void
     compute_stresses_tangent(const muGrid::RealField & F, muGrid::RealField & P,
                              muGrid::RealField & K, const Formulation & form,
-                             SplitCell is_cell_split = SplitCell::no) final;
+                             const SplitCell & is_cell_split = SplitCell::no,
+                             const StoreNativeStress & store_native_stress =
+                                 StoreNativeStress::no) final;
 
     //! return the material dimension at compile time
     constexpr static Dim_t MaterialDimension() { return DimM; }
 
-    std::tuple<DynMatrix_t, DynMatrix_t>
+    inline std::tuple<DynMatrix_t, DynMatrix_t>
     constitutive_law_dynamic(const Eigen::Ref<const DynMatrix_t> & strain,
                              const size_t & pixel_index,
                              const Formulation & form) final;
+    //! returns whether or not a field with native stress has been stored
+    inline bool has_native_stress() const final;
+
+    /**
+     * returns the stored native stress field. Throws a runtime error if native
+     * stress has not been stored
+     */
+    inline muGrid::RealField & get_native_stress() final;
+
+    /**
+     * returns a map on stored native stress field. Throws a runtime error if
+     * native stress has not been stored
+     */
+    inline muGrid::MappedT2Field<Real, Mapping::Mut, DimM> &
+    get_mapped_native_stress();
 
    protected:
-    //! computes stress with the formulation available at compile time
+    //! dispatches the correct compute_stresses worker
+    template <Formulation Form, SplitCell IsSplit, class... Args>
+    inline void
+    compute_stresses_dispatch1(const StoreNativeStress store_native_stress,
+                               Args &&... args);
+
+    //! computes stress with the formulation available at compile time as well
+    //! as the info whether to store native stresses
     //! __attribute__ required by g++-6 and g++-7 because of this bug:
     //! https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80947
-    template <Formulation Form, SplitCell is_cell_split = SplitCell::no>
+    template <Formulation Form, SplitCell is_cell_split,
+              StoreNativeStress DoStoreNative>
     inline void compute_stresses_worker(const muGrid::RealField & F,
                                         muGrid::RealField & P)
         __attribute__((visibility("default")));
 
-    //! computes stress with the formulation available at compile time
+    //! computes stress with the formulation available at compile time as well
+    //! as the info whether to store native stresses
     //! __attribute__ required by g++-6 and g++-7 because of this bug:
     //! https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80947
-    template <Formulation Form, SplitCell is_cell_split = SplitCell::no>
+    template <Formulation Form, SplitCell is_cell_split,
+              StoreNativeStress DoStoreNative>
     inline void compute_stresses_worker(const muGrid::RealField & F,
                                         muGrid::RealField & P,
                                         muGrid::RealField & K)
         __attribute__((visibility("default")));
+
+    muGrid::OptionalMappedField<muGrid::MappedT2Field<Real, Mapping::Mut, DimM>>
+        native_stress;
   };
 
   /* ---------------------------------------------------------------------- */
@@ -201,7 +236,8 @@ namespace muSpectre {
   MaterialMuSpectre<Material, DimM>::MaterialMuSpectre(
       const std::string & name, const Dim_t & spatial_dimension,
       const Dim_t & nb_quad_pts)
-      : Parent(name, spatial_dimension, DimM, nb_quad_pts) {
+      : Parent(name, spatial_dimension, DimM, nb_quad_pts),
+        native_stress{this->internal_fields, "native_stress"} {
     static_assert(
         std::is_same<typename traits::StressMap_t::Scalar, Real>::value,
         "The stress map needs to be of type Real");
@@ -268,21 +304,72 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <class Material, Dim_t DimM>
+  bool MaterialMuSpectre<Material, DimM>::has_native_stress() const {
+    return this->native_stress.has_value();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <class Material, Dim_t DimM>
+  muGrid::RealField & MaterialMuSpectre<Material, DimM>::get_native_stress() {
+    if (not this->native_stress.has_value()) {
+      throw std::runtime_error("native stress has not been evaluated");
+    }
+    return this->native_stress.get().get_field();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <class Material, Dim_t DimM>
+  auto MaterialMuSpectre<Material, DimM>::get_mapped_native_stress()
+      -> muGrid::MappedT2Field<Real, Mapping::Mut, DimM> & {
+    if (not this->native_stress.has_value()) {
+      throw std::runtime_error("native stress has not been evaluated");
+    }
+    return this->native_stress.get();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <class Material, Dim_t DimM>
+  template <Formulation Form, SplitCell IsSplit, class... Args>
+  void MaterialMuSpectre<Material, DimM>::compute_stresses_dispatch1(
+      const StoreNativeStress store_native_stress, Args &&... args) {
+    switch (store_native_stress) {
+    case StoreNativeStress::yes: {
+      this->template compute_stresses_worker<Form, IsSplit,
+                                             StoreNativeStress::yes>(
+          std::forward<Args>(args)...);
+      break;
+    }
+    case StoreNativeStress::no: {
+      this->template compute_stresses_worker<Form, IsSplit,
+                                             StoreNativeStress::no>(
+          std::forward<Args>(args)...);
+      break;
+    }
+    default:
+      throw std::runtime_error("Unknown value for store native stress");
+      break;
+    }
+  }
+
+  template <class Material, Dim_t DimM>
   void MaterialMuSpectre<Material, DimM>::compute_stresses(
       const muGrid::RealField & F, muGrid::RealField & P,
-      const Formulation & form, SplitCell is_cell_split) {
+      const Formulation & form, const SplitCell & is_cell_split,
+      const StoreNativeStress & store_native_stress) {
     switch (form) {
     case Formulation::finite_strain: {
       switch (is_cell_split) {
       case (SplitCell::no):
       case (SplitCell::laminate): {
-        this->compute_stresses_worker<Formulation::finite_strain,
-                                      SplitCell::no>(F, P);
+        this->compute_stresses_dispatch1<Formulation::finite_strain,
+                                         SplitCell::no>(store_native_stress, F,
+                                                        P);
         break;
       }
       case (SplitCell::simple): {
-        this->compute_stresses_worker<Formulation::finite_strain,
-                                      SplitCell::simple>(F, P);
+        this->compute_stresses_dispatch1<Formulation::finite_strain,
+                                         SplitCell::simple>(store_native_stress,
+                                                            F, P);
         break;
       }
       default:
@@ -293,14 +380,17 @@ namespace muSpectre {
     case Formulation::small_strain: {
       switch (is_cell_split) {
       case (SplitCell::no):
+        // fall-through; laminate and whole pixels treated same at this point
       case (SplitCell::laminate): {
-        this->compute_stresses_worker<Formulation::small_strain, SplitCell::no>(
-            F, P);
+        this->compute_stresses_dispatch1<Formulation::small_strain,
+                                         SplitCell::no>(store_native_stress, F,
+                                                        P);
         break;
       }
       case (SplitCell::simple): {
-        this->compute_stresses_worker<Formulation::small_strain,
-                                      SplitCell::simple>(F, P);
+        this->compute_stresses_dispatch1<Formulation::small_strain,
+                                         SplitCell::simple>(store_native_stress,
+                                                            F, P);
         break;
       }
       default:
@@ -318,19 +408,22 @@ namespace muSpectre {
   template <class Material, Dim_t DimM>
   void MaterialMuSpectre<Material, DimM>::compute_stresses_tangent(
       const muGrid::RealField & F, muGrid::RealField & P, muGrid::RealField & K,
-      const Formulation & form, SplitCell is_cell_split) {
+      const Formulation & form, const SplitCell & is_cell_split,
+      const StoreNativeStress & store_native_stress) {
     switch (form) {
     case Formulation::finite_strain: {
       switch (is_cell_split) {
       case (SplitCell::no):
       case (SplitCell::laminate): {
-        this->compute_stresses_worker<Formulation::finite_strain,
-                                      SplitCell::no>(F, P, K);
+        this->compute_stresses_dispatch1<Formulation::finite_strain,
+                                         SplitCell::no>(store_native_stress, F,
+                                                        P, K);
         break;
       }
       case (SplitCell::simple): {
-        this->compute_stresses_worker<Formulation::finite_strain,
-                                      SplitCell::simple>(F, P, K);
+        this->compute_stresses_dispatch1<Formulation::finite_strain,
+                                         SplitCell::simple>(store_native_stress,
+                                                            F, P, K);
         break;
       }
       default:
@@ -342,13 +435,15 @@ namespace muSpectre {
       switch (is_cell_split) {
       case (SplitCell::no):
       case (SplitCell::laminate): {
-        this->compute_stresses_worker<Formulation::small_strain, SplitCell::no>(
-            F, P, K);
+        this->compute_stresses_dispatch1<Formulation::small_strain,
+                                         SplitCell::no>(store_native_stress, F,
+                                                        P, K);
         break;
       }
       case (SplitCell::simple): {
-        this->compute_stresses_worker<Formulation::small_strain,
-                                      SplitCell::simple>(F, P, K);
+        this->compute_stresses_dispatch1<Formulation::small_strain,
+                                         SplitCell::simple>(store_native_stress,
+                                                            F, P, K);
         break;
       }
       default:
@@ -364,7 +459,8 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <class Material, Dim_t DimM>
-  template <Formulation Form, SplitCell IsCellSplit>
+  template <Formulation Form, SplitCell IsCellSplit,
+            StoreNativeStress DoStoreNative>
   void MaterialMuSpectre<Material, DimM>::compute_stresses_worker(
       const muGrid::RealField & F, muGrid::RealField & P,
       muGrid::RealField & K) {
@@ -386,51 +482,107 @@ namespace muSpectre {
 
     iterable_proxy_t fields(*this, F, P, K);
 
-    for (auto && arglist : fields) {
-      /**
-       * arglist is a tuple of three tuples containing only Lvalue
-       * references (see value_tye in the class definition of
-       * iterable_proxy::iterator). Tuples contain strains, stresses
-       * and internal variables, respectively,
-       */
+    switch (DoStoreNative) {
+    case StoreNativeStress::no: {
+      for (auto && arglist : fields) {
+        /**
+         * arglist is a tuple of three tuples containing only Lvalue
+         * references (see value_tye in the class definition of
+         * iterable_proxy::iterator). Tuples contain strains, stresses
+         * and internal variables, respectively,
+         */
 
-      static_assert(std::is_same<typename traits::StrainMap_t::reference,
-                                 std::remove_reference_t<decltype(std::get<0>(
-                                     std::get<0>(arglist)))>>::value,
-                    "Type mismatch for strain reference, check iterator "
-                    "value_type");
-      static_assert(std::is_same<typename traits::StressMap_t::reference,
-                                 std::remove_reference_t<decltype(std::get<0>(
-                                     std::get<1>(arglist)))>>::value,
-                    "Type mismatch for stress reference, check iterator"
-                    "value_type");
-      static_assert(std::is_same<typename traits::TangentMap_t::reference,
-                                 std::remove_reference_t<decltype(std::get<1>(
-                                     std::get<1>(arglist)))>>::value,
-                    "Type mismatch for tangent reference, check iterator"
-                    "value_type");
-      static_assert(
-          std::is_same<Real, std::remove_reference_t<decltype(
-                                 std::get<3>(arglist))>>::value,
-          "Type mismatch for ratio reference, expected a real number");
-      auto && strain{std::get<0>(arglist)};
-      auto && stress_stiffness{std::get<1>(arglist)};
-      auto && quad_pt_id{std::get<2>(arglist)};
+        static_assert(std::is_same<typename traits::StrainMap_t::reference,
+                                   std::remove_reference_t<decltype(std::get<0>(
+                                       std::get<0>(arglist)))>>::value,
+                      "Type mismatch for strain reference, check iterator "
+                      "value_type");
+        static_assert(std::is_same<typename traits::StressMap_t::reference,
+                                   std::remove_reference_t<decltype(std::get<0>(
+                                       std::get<1>(arglist)))>>::value,
+                      "Type mismatch for stress reference, check iterator"
+                      "value_type");
+        static_assert(std::is_same<typename traits::TangentMap_t::reference,
+                                   std::remove_reference_t<decltype(std::get<1>(
+                                       std::get<1>(arglist)))>>::value,
+                      "Type mismatch for tangent reference, check iterator"
+                      "value_type");
+        static_assert(
+            std::is_same<Real, std::remove_reference_t<decltype(
+                                   std::get<3>(arglist))>>::value,
+            "Type mismatch for ratio reference, expected a real number");
+        auto && strain{std::get<0>(arglist)};
+        auto && stress_stiffness{std::get<1>(arglist)};
+        auto && quad_pt_id{std::get<2>(arglist)};
 
-      if (IsCellSplit == SplitCell::simple) {
-        auto && ratio{std::get<3>(arglist)};
-        MatTB::constitutive_law_tangent<Form>(
-            this_mat, strain, stress_stiffness, quad_pt_id, ratio);
-      } else {
-        MatTB::constitutive_law_tangent<Form>(this_mat, strain,
-                                              stress_stiffness, quad_pt_id);
+        if (IsCellSplit == SplitCell::simple) {
+          auto && ratio{std::get<3>(arglist)};
+          MatTB::constitutive_law_tangent<Form>(
+              this_mat, strain, stress_stiffness, quad_pt_id, ratio);
+        } else {
+          MatTB::constitutive_law_tangent<Form>(this_mat, strain,
+                                                stress_stiffness, quad_pt_id);
+        }
       }
+      break;
+    }
+    case StoreNativeStress::yes: {
+      auto & native_stress_map{this->native_stress.get().get_map()};
+      for (auto && arglist : fields) {
+        /**
+         * arglist is a tuple of three tuples containing only Lvalue
+         * references (see value_tye in the class definition of
+         * iterable_proxy::iterator). Tuples contain strains, stresses
+         * and internal variables, respectively,
+         */
+
+        static_assert(std::is_same<typename traits::StrainMap_t::reference,
+                                   std::remove_reference_t<decltype(std::get<0>(
+                                       std::get<0>(arglist)))>>::value,
+                      "Type mismatch for strain reference, check iterator "
+                      "value_type");
+        static_assert(std::is_same<typename traits::StressMap_t::reference,
+                                   std::remove_reference_t<decltype(std::get<0>(
+                                       std::get<1>(arglist)))>>::value,
+                      "Type mismatch for stress reference, check iterator"
+                      "value_type");
+        static_assert(std::is_same<typename traits::TangentMap_t::reference,
+                                   std::remove_reference_t<decltype(std::get<1>(
+                                       std::get<1>(arglist)))>>::value,
+                      "Type mismatch for tangent reference, check iterator"
+                      "value_type");
+        static_assert(
+            std::is_same<Real, std::remove_reference_t<decltype(
+                                   std::get<3>(arglist))>>::value,
+            "Type mismatch for ratio reference, expected a real number");
+        auto && strain{std::get<0>(arglist)};
+        auto && stress_stiffness{std::get<1>(arglist)};
+        auto && quad_pt_id{std::get<2>(arglist)};
+        auto && quad_pt_native_stress{native_stress_map[quad_pt_id]};
+
+        if (IsCellSplit == SplitCell::simple) {
+          auto && ratio{std::get<3>(arglist)};
+          MatTB::constitutive_law_tangent<Form>(this_mat, strain,
+                                                stress_stiffness, quad_pt_id,
+                                                ratio, quad_pt_native_stress);
+        } else {
+          MatTB::constitutive_law_tangent<Form>(this_mat, strain,
+                                                stress_stiffness, quad_pt_id,
+                                                quad_pt_native_stress);
+        }
+      }
+      break;
+    }
+    default:
+      throw std::runtime_error("Unknown StoreNativeStress parameter");
+      break;
     }
   }
 
   /* ---------------------------------------------------------------------- */
   template <class Material, Dim_t DimM>
-  template <Formulation Form, SplitCell IsCellSplit>
+  template <Formulation Form, SplitCell IsCellSplit,
+            StoreNativeStress DoStoreNative>
   void MaterialMuSpectre<Material, DimM>::compute_stresses_worker(
       const muGrid::RealField & F, muGrid::RealField & P) {
     /* These lambdas are executed for every integration point.
@@ -446,40 +598,90 @@ namespace muSpectre {
 
     iterable_proxy_t fields(*this, F, P);
 
-    for (auto && arglist : fields) {
-      /**
-       * arglist is a tuple of three tuples containing only Lvalue
-       * references (see value_type in the class definition of
-       * iterable_proxy::iterator). Tuples contain strains, stresses
-       * and internal variables, respectively,
-       */
+    switch (DoStoreNative) {
+    case StoreNativeStress::no: {
+      for (auto && arglist : fields) {
+        /**
+         * arglist is a tuple of three tuples containing only Lvalue
+         * references (see value_type in the class definition of
+         * iterable_proxy::iterator). Tuples contain strains, stresses
+         * and internal variables, respectively,
+         */
 
-      static_assert(std::is_same<typename traits::StrainMap_t::reference,
-                                 std::remove_reference_t<decltype(std::get<0>(
-                                     std::get<0>(arglist)))>>::value,
-                    "Type mismatch for strain reference, check iterator "
-                    "value_type");
-      static_assert(std::is_same<typename traits::StressMap_t::reference,
-                                 std::remove_reference_t<decltype(std::get<0>(
-                                     std::get<1>(arglist)))>>::value,
-                    "Type mismatch for stress reference, check iterator"
-                    "value_type");
-      static_assert(
-          std::is_same<Real, std::remove_reference_t<decltype(
-                                 std::get<3>(arglist))>>::value,
-          "Type mismatch for ratio reference, expected a real number");
+        static_assert(std::is_same<typename traits::StrainMap_t::reference,
+                                   std::remove_reference_t<decltype(std::get<0>(
+                                       std::get<0>(arglist)))>>::value,
+                      "Type mismatch for strain reference, check iterator "
+                      "value_type");
+        static_assert(std::is_same<typename traits::StressMap_t::reference,
+                                   std::remove_reference_t<decltype(std::get<0>(
+                                       std::get<1>(arglist)))>>::value,
+                      "Type mismatch for stress reference, check iterator"
+                      "value_type");
+        static_assert(
+            std::is_same<Real, std::remove_reference_t<decltype(
+                                   std::get<3>(arglist))>>::value,
+            "Type mismatch for ratio reference, expected a real number");
 
-      auto && strain{std::get<0>(arglist)};
-      auto && stress{std::get<0>(std::get<1>(arglist))};
-      auto && quad_pt_id{std::get<2>(arglist)};
+        auto && strain{std::get<0>(arglist)};
+        auto && stress{std::get<0>(std::get<1>(arglist))};
+        auto && quad_pt_id{std::get<2>(arglist)};
 
-      if (IsCellSplit == SplitCell::simple) {
-        auto && ratio{std::get<3>(arglist)};
-        MatTB::constitutive_law<Form>(this_mat, strain, stress, quad_pt_id,
-                                      ratio);
-      } else {
-        MatTB::constitutive_law<Form>(this_mat, strain, stress, quad_pt_id);
+        if (IsCellSplit == SplitCell::simple) {
+          auto && ratio{std::get<3>(arglist)};
+          MatTB::constitutive_law<Form>(this_mat, strain, stress, quad_pt_id,
+                                        ratio);
+        } else {
+          MatTB::constitutive_law<Form>(this_mat, strain, stress, quad_pt_id);
+        }
       }
+      break;
+    }
+    case StoreNativeStress::yes: {
+      auto & native_stress_map{this->native_stress.get().get_map()};
+
+      for (auto && arglist : fields) {
+        /**
+         * arglist is a tuple of three tuples containing only Lvalue
+         * references (see value_type in the class definition of
+         * iterable_proxy::iterator). Tuples contain strains, stresses
+         * and internal variables, respectively,
+         */
+
+        static_assert(std::is_same<typename traits::StrainMap_t::reference,
+                                   std::remove_reference_t<decltype(std::get<0>(
+                                       std::get<0>(arglist)))>>::value,
+                      "Type mismatch for strain reference, check iterator "
+                      "value_type");
+        static_assert(std::is_same<typename traits::StressMap_t::reference,
+                                   std::remove_reference_t<decltype(std::get<0>(
+                                       std::get<1>(arglist)))>>::value,
+                      "Type mismatch for stress reference, check iterator"
+                      "value_type");
+        static_assert(
+            std::is_same<Real, std::remove_reference_t<decltype(
+                                   std::get<3>(arglist))>>::value,
+            "Type mismatch for ratio reference, expected a real number");
+
+        auto && strain{std::get<0>(arglist)};
+        auto && stress{std::get<0>(std::get<1>(arglist))};
+        auto && quad_pt_id{std::get<2>(arglist)};
+        auto && quad_pt_native_stress{native_stress_map[quad_pt_id]};
+
+        if (IsCellSplit == SplitCell::simple) {
+          auto && ratio{std::get<3>(arglist)};
+          MatTB::constitutive_law<Form>(this_mat, strain, stress, quad_pt_id,
+                                        ratio, quad_pt_native_stress);
+        } else {
+          MatTB::constitutive_law<Form>(this_mat, strain, stress, quad_pt_id,
+                                        quad_pt_native_stress);
+        }
+      }
+      break;
+    }
+    default:
+      throw std::runtime_error("Unknown StoreNativeStress parameter");
+      break;
     }
   }
 

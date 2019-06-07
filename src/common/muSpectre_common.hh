@@ -102,6 +102,9 @@ namespace muSpectre {
   //! split cell flags
   enum class SplitCell { laminate, simple, no };
 
+  //! used to indicate whether internal (native) stresses should be stored
+  enum class StoreNativeStress { yes, no };
+
   //! finite differences flags
   enum class FiniteDiff {
     forward,   //!< ∂f/∂x ≈ (f(x+Δx) - f(x))/Δx

@@ -69,14 +69,16 @@ namespace muSpectre {
     this->assigned_ratio->get_field().push_back(ratio);
   }
 
-  void MaterialBase::compute_stresses(const muGrid::Field & F,
-                                      muGrid::Field & P,
-                                      const Formulation & form,
-                                      SplitCell is_cell_split) {
+  /* ---------------------------------------------------------------------- */
+  void MaterialBase::compute_stresses(
+      const muGrid::Field & F, muGrid::Field & P, const Formulation & form,
+      const SplitCell & is_cell_split,
+      const StoreNativeStress & store_native_stress) {
     const auto t2_dim{muGrid::ipow(this->material_dimension, 2)};
     const auto & real_F{muGrid::RealField::safe_cast(F, t2_dim)};
     auto & real_P{muGrid::RealField::safe_cast(P, t2_dim)};
-    this->compute_stresses(real_F, real_P, form, is_cell_split);
+    this->compute_stresses(real_F, real_P, form, is_cell_split,
+                           store_native_stress);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -114,16 +116,16 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  void MaterialBase::compute_stresses_tangent(const muGrid::Field & F,
-                                              muGrid::Field & P,
-                                              muGrid::Field & K,
-                                              Formulation form,
-                                              SplitCell is_cell_split) {
+  void MaterialBase::compute_stresses_tangent(
+      const muGrid::Field & F, muGrid::Field & P, muGrid::Field & K,
+      const Formulation & form, const SplitCell & is_cell_split,
+      const StoreNativeStress & store_native_stress) {
     const auto t2_dim{muGrid::ipow(this->material_dimension, 2)};
     const auto & real_F{muGrid::RealField::safe_cast(F, t2_dim)};
     auto & real_P{muGrid::RealField::safe_cast(P, t2_dim)};
     auto & real_K{muGrid::RealField::safe_cast(K, muGrid::ipow(t2_dim, 2))};
-    this->compute_stresses_tangent(real_F, real_P, real_K, form, is_cell_split);
+    this->compute_stresses_tangent(real_F, real_P, real_K, form, is_cell_split,
+                                   store_native_stress);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -141,6 +143,21 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   std::vector<std::string> MaterialBase::list_fields() const {
     return this->internal_fields.list_fields();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  muGrid::LocalFieldCollection & MaterialBase::get_collection() {
+    return this->internal_fields;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  bool MaterialBase::has_native_stress() const {
+    return false;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  muGrid::RealField& MaterialBase::get_native_stress() {
+    throw std::runtime_error("Not implemented for this material");
   }
 
   /* ---------------------------------------------------------------------- */

@@ -178,11 +178,13 @@ namespace muSpectre {
     using Parent::compute_stresses_tangent;
     void compute_stresses(const RealField & F, RealField & P,
                           const Formulation & form,
-                          SplitCell is_cell_split) final;
+                          const SplitCell & is_cell_split,
+                          const StoreNativeStress & store_native_stress) final;
     //!  stress and tangent modulus
-    void compute_stresses_tangent(const RealField & F, RealField & P,
-                                  RealField & K, const Formulation & form,
-                                  SplitCell is_cell_split) final;
+    void compute_stresses_tangent(
+        const RealField & F, RealField & P, RealField & K,
+        const Formulation & form, const SplitCell & is_cell_split,
+        const StoreNativeStress & store_native_stress) final;
     /**
      * overload add_pixel to write into volume ratio and normal vectors and ...
      */
