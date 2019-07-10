@@ -2,10 +2,12 @@
  * @file   projection_finite_strain.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
+ *         Richard Leute <richard.leute@imtek.uni-freiburg.de>
+ *         Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
  * @date   05 Dec 2017
  *
- * @brief  implementation of standard finite strain projection operator
+ * @brief  implementation of the finite strain projection operator
  *
  * Copyright © 2017 Till Junge
  *
@@ -42,51 +44,59 @@
 #include "Eigen/Dense"
 
 namespace muSpectre {
-
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   ProjectionFiniteStrain<DimS, DimM>::ProjectionFiniteStrain(
-      FFTEngine_ptr engine, Rcoord lengths)
-      : Parent{std::move(engine), lengths, Formulation::finite_strain} {
+      FFTEngine_ptr engine, Rcoord lengths, Gradient_t gradient)
+      : Parent{std::move(engine), lengths, gradient,
+               Formulation::finite_strain} {
     for (auto res : this->fft_engine->get_nb_domain_grid_pts()) {
       if (res % 2 == 0) {
         throw ProjectionError(
-            "Only an odd number of gridpoints in each direction is supported");
+            "Only an odd number of grid points in each direction is supported");
       }
     }
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void
-  ProjectionFiniteStrain<DimS, DimM>::initialise(muFFT::FFT_PlanFlags flags) {
+  void ProjectionFiniteStrain<DimS, DimM>::initialise(
+      muFFT::FFT_PlanFlags flags) {
     Parent::initialise(flags);
-    muFFT::FFT_freqs<DimS> fft_freqs(this->fft_engine->get_nb_domain_grid_pts(),
-                                     this->domain_lengths);
+    using FFTFreqs_t = muFFT::FFT_freqs<DimS>;
+    using Vector_t = typename  FFTFreqs_t::Vector;
+
+    const auto & nb_domain_grid_pts =
+        this->fft_engine->get_nb_domain_grid_pts();
+    const Vector_t grid_spacing{
+        eigen(this->domain_lengths / nb_domain_grid_pts)};
+
+    muFFT::FFT_freqs<DimS> fft_freqs(nb_domain_grid_pts);
     for (auto && tup : akantu::zip(*this->fft_engine, this->Ghat)) {
       const auto & ccoord = std::get<0>(tup);
       auto & G = std::get<1>(tup);
-      auto xi = fft_freqs.get_unit_xi(ccoord);
-      //! this is simplifiable using Curnier's Méthodes numériques, 6.69(c)
-      G = Matrices::outer_under(Matrices::I2<DimM>(), xi * xi.transpose());
-      // The commented block below corresponds to the original
-      // definition of the operator in de Geus et
-      // al. (https://doi.org/10.1016/j.cma.2016.12.032). However,
-      // they use a bizarre definition of the double contraction
-      // between fourth-order and second-order tensors that has a
-      // built-in transpose operation (i.e., C = A:B <-> AᵢⱼₖₗBₗₖ =
-      // Cᵢⱼ , note the inverted ₗₖ instead of ₖₗ), here, we define
-      // the double contraction without the transposition. As a
-      // result, the Projection operator produces the transpose of de
-      // Geus's
 
-      // for (Dim_t im = 0; im < DimS; ++im) {
-      //   for (Dim_t j = 0; j < DimS; ++j) {
-      //     for (Dim_t l = 0; l < DimS; ++l) {
-      //       get(G, im, j, l, im) = xi(j)*xi(l);
-      //     }
-      //   }
-      // }
+      const Vector_t xi{
+          (fft_freqs.get_xi(ccoord).array() /
+           eigen(nb_domain_grid_pts).array().template cast<Real>())
+              .matrix()};
+
+      Eigen::Matrix<Complex, DimS, 1> diffop;
+      for (int i = 0; i < DimS; ++i) {
+        diffop(i) = this->gradient[i]->fourier(xi) / grid_spacing[i];
+      }
+      const Real norm2{diffop.squaredNorm()};
+
+      const Eigen::Matrix<Complex, DimS, DimS> diff_mat{
+          diffop * diffop.adjoint() / norm2};
+
+      for (Dim_t im = 0; im < DimS; ++im) {
+        for (Dim_t j = 0; j < DimS; ++j) {
+          for (Dim_t l = 0; l < DimS; ++l) {
+            get(G, im, j, im, l) = diff_mat(j, l);
+          }
+        }
+      }
     }
     if (this->get_subdomain_locations() == Ccoord{}) {
       this->Ghat[0].setZero();

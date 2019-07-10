@@ -36,12 +36,12 @@
 #include "cell/cell_factory.hh"
 #include "cell/cell_base.hh"
 
-#include <libmugrid/ccoord_operations.hh>
+#include "libmugrid/ccoord_operations.hh"
 #ifdef WITH_FFTWMPI
-#include <libmufft/fftwmpi_engine.hh>
+#include "libmufft/fftwmpi_engine.hh"
 #endif
 #ifdef WITH_PFFT
-#include <libmufft/pfft_engine.hh>
+#include "libmufft/pfft_engine.hh"
 #endif
 
 #include <pybind11/pybind11.h>
@@ -56,6 +56,7 @@ using muSpectre::Ccoord_t;
 using muSpectre::Dim_t;
 using muSpectre::Formulation;
 using muSpectre::Rcoord_t;
+using muSpectre::Gradient_t;
 using pybind11::literals::operator""_a;
 namespace py = pybind11;
 
@@ -67,30 +68,20 @@ template <Dim_t dim, class FFTEngine>
 void add_parallel_cell_factory_helper(py::module & mod, const char * name) {
   using Ccoord = Ccoord_t<dim>;
   using Rcoord = Rcoord_t<dim>;
+  using Gradient = Gradient_t<dim>;
 
   mod.def(name,
-          [](Ccoord res, Rcoord lens, Formulation form,
-             muFFT::Communicator & comm) {
+          [](Ccoord nb_grid_pts, Rcoord lens, Formulation form,
+             Gradient gradient, muFFT::Communicator & comm) {
             // Initialize with muFFT Communicator object
-            return muSpectre::make_parallel_cell<
-                dim, dim, muSpectre::CellBase<dim, dim>, FFTEngine>(
-                std::move(res), std::move(lens), std::move(form),
-                std::move(comm));
+            return muSpectre::make_cell(
+                std::move(nb_grid_pts), std::move(lens), std::move(form),
+                std::move(gradient), std::move(comm));
           },
           "nb_grid_pts"_a, "lengths"_a = muGrid::CcoordOps::get_cube<dim>(1.),
           "formulation"_a = Formulation::finite_strain,
+          "gradient"_a = muSpectre::make_fourier_gradient<dim>(),
           "communicator"_a = muFFT::Communicator(MPI_COMM_SELF));
-  mod.def(name,
-          [](Ccoord res, Rcoord lens, Formulation form, size_t comm) {
-            // Initialize with bare MPI handle
-            return muSpectre::make_parallel_cell<
-                dim, dim, muSpectre::CellBase<dim, dim>, FFTEngine>(
-                std::move(res), std::move(lens), std::move(form),
-                std::move(muFFT::Communicator(MPI_Comm(comm))));
-          },
-          "nb_grid_pts"_a, "lengths"_a = muGrid::CcoordOps::get_cube<dim>(1.),
-          "formulation"_a = Formulation::finite_strain,
-          "communicator"_a = size_t(MPI_COMM_SELF));
 }
 #endif
 
@@ -101,13 +92,18 @@ template <Dim_t dim>
 void add_cell_factory_helper(py::module & mod) {
   using Ccoord = Ccoord_t<dim>;
   using Rcoord = Rcoord_t<dim>;
+  using Gradient = Gradient_t<dim>;
 
   mod.def("CellFactory",
-          [](Ccoord res, Rcoord lens, Formulation form) {
-            return make_cell(std::move(res), std::move(lens), std::move(form));
+          [](Ccoord res, Rcoord lens, Formulation form,
+             Gradient gradient) {
+            return muSpectre::make_cell(
+                std::move(res), std::move(lens), std::move(form),
+                std::move(gradient));
           },
           "nb_grid_pts"_a, "lengths"_a = muGrid::CcoordOps::get_cube<dim>(1.),
-          "formulation"_a = Formulation::finite_strain);
+          "formulation"_a = Formulation::finite_strain,
+          "gradient"_a = muSpectre::make_fourier_gradient<dim>());
 
 #ifdef WITH_FFTWMPI
   add_parallel_cell_factory_helper<dim, muFFT::FFTWMPIEngine<dim>>(
@@ -134,6 +130,7 @@ void add_cell_base_helper(py::module & mod) {
   name_stream << "CellBase" << dim << 'd';
   const std::string name = name_stream.str();
   using sys_t = muSpectre::CellBase<dim, dim>;
+
   py::class_<sys_t, muSpectre::Cell>(mod, name.c_str())
       .def("__len__", &sys_t::size)
       .def("__iter__",

@@ -122,7 +122,7 @@ namespace muSpectre {
                   "the number or layers in the hard material must be smaller "
                   "than the total number of layers in dimension 0");
 
-    auto sys{make_parallel_cell(nb_grid_pts, lengths, form, comm)};
+    auto sys{make_cell(nb_grid_pts, lengths, form, comm)};
 
     using Mat_t = MaterialLinearElastic1<dim, dim>;
     constexpr Real Young{2.}, Poisson{.33};

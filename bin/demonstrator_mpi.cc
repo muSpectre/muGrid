@@ -102,7 +102,8 @@ int main(int argc, char * argv[]) {
     muFFT::Communicator comm{MPI_COMM_WORLD};
     MPI_Init(&argc, &argv);
 
-    auto cell{make_parallel_cell<dim, dim>(nb_grid_pts, lengths, form, comm)};
+    auto cell{make_cell<dim, dim>(nb_grid_pts, lengths, form,
+                                  make_fourier_gradient<dim>(), comm)};
 
     constexpr Real E{1.0030648180242636};
     constexpr Real nu{0.29930675909878679};

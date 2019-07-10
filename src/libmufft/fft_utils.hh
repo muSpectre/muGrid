@@ -62,10 +62,23 @@ namespace muFFT {
    */
   template <size_t dim>
   inline std::array<std::valarray<Real>, dim>
-  fft_freqs(Ccoord_t<dim> sizes, std::array<Real, dim> lengths) {
+  fft_freqs(Ccoord_t<dim> nb_grid_pts) {
     std::array<std::valarray<Real>, dim> retval{};
     for (size_t i = 0; i < dim; ++i) {
-      retval[i] = std::move(fft_freqs(sizes[i], lengths[i]));
+      retval[i] = std::move(fft_freqs(nb_grid_pts[i]));
+    }
+    return retval;
+  }
+
+  /**
+   * Get fft_freqs for a grid in correct length or time units.
+   */
+  template <size_t dim>
+  inline std::array<std::valarray<Real>, dim>
+  fft_freqs(Ccoord_t<dim> nb_grid_pts, std::array<Real, dim> lengths) {
+    std::array<std::valarray<Real>, dim> retval{};
+    for (size_t i = 0; i < dim; ++i) {
+      retval[i] = std::move(fft_freqs(nb_grid_pts[i], lengths[i]));
     }
     return retval;
   }
@@ -79,12 +92,18 @@ namespace muFFT {
    public:
     //! return type for wave vectors
     using Vector = Eigen::Matrix<Real, dim, 1>;
+    //! return type for complex wave vectors
+    using VectorComplex = Eigen::Matrix<Complex, dim, 1>;
     //! Default constructor
     FFT_freqs() = delete;
 
-    //! constructor with problem sizes
-    FFT_freqs(Ccoord_t<dim> sizes, std::array<Real, dim> lengths)
-        : freqs{fft_freqs(sizes, lengths)} {}
+    //! constructor with just number of grid points
+    explicit FFT_freqs(Ccoord_t<dim> nb_grid_pts)
+        : freqs{fft_freqs(nb_grid_pts)} {}
+
+    //! constructor with domain length
+    FFT_freqs(Ccoord_t<dim> nb_grid_pts, std::array<Real, dim> lengths)
+        : freqs{fft_freqs(nb_grid_pts, lengths)} {}
 
     //! Copy constructor
     FFT_freqs(const FFT_freqs & other) = delete;
@@ -103,6 +122,9 @@ namespace muFFT {
 
     //! get unnormalised wave vector (in sampling units)
     inline Vector get_xi(const Ccoord_t<dim> ccoord) const;
+
+    //! get unnormalised complex wave vector (in sampling units)
+    inline VectorComplex get_complex_xi(const Ccoord_t<dim> ccoord) const;
 
     //! get normalised wave vector
     inline Vector get_unit_xi(const Ccoord_t<dim> ccoord) const {
@@ -124,6 +146,7 @@ namespace muFFT {
     }
     return retval;
   }
+
 }  // namespace muFFT
 
 #endif  // SRC_LIBMUFFT_FFT_UTILS_HH_

@@ -32,6 +32,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
+#include <Eigen/Dense>
+
 #include <array>
 #include <cmath>
 #include <complex>
@@ -66,11 +68,21 @@ namespace muGrid {
   //! \addtogroup Coordinates Coordinate types
   //@{
   //! Ccoord_t are cell coordinates, i.e. integer coordinates
-  template <Dim_t dim>
-  using Ccoord_t = std::array<Dim_t, dim>;
+  template <size_t Dim>
+  using Ccoord_t = std::array<Dim_t, Dim>;
   //! Real space coordinates
-  template <Dim_t dim>
-  using Rcoord_t = std::array<Real, dim>;
+  template <size_t Dim>
+  using Rcoord_t = std::array<Real, Dim>;
+
+  template<typename T, size_t Dim>
+  Eigen::Map<Eigen::Matrix<T, Dim, 1>> eigen(std::array<T, Dim> & coord) {
+    return Eigen::Map<Eigen::Matrix<T, Dim, 1>>{coord.data()};
+  }
+  template <typename T, size_t Dim>
+  Eigen::Map<const Eigen::Matrix<T, Dim, 1>>
+  eigen(const std::array<T, Dim> & coord) {
+    return Eigen::Map<const Eigen::Matrix<T, Dim, 1>>{coord.data()};
+  }
   //@}
 
   /**

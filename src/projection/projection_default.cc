@@ -41,8 +41,9 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   ProjectionDefault<DimS, DimM>::ProjectionDefault(FFTEngine_ptr engine,
                                                    Rcoord lengths,
+                                                   Gradient_t gradient,
                                                    Formulation form)
-      : Parent{std::move(engine), lengths, form},
+      : Parent{std::move(engine), lengths, gradient, form},
         Gfield{muGrid::make_field<Proj_t>("Projection Operator",
                                           this->projection_container)},
         Ghat{Gfield} {}
@@ -62,7 +63,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  Eigen::Map<Eigen::ArrayXXd> ProjectionDefault<DimS, DimM>::get_operator() {
+  Eigen::Map<ArrayXXc> ProjectionDefault<DimS, DimM>::get_operator() {
     return this->Gfield.dyn_eigen();
   }
 

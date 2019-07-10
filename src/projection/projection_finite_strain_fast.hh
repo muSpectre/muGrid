@@ -2,6 +2,7 @@
  * @file   projection_finite_strain_fast.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
+ *         Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
  * @date   12 Dec 2017
  *
@@ -54,6 +55,8 @@ namespace muSpectre {
     using Parent = ProjectionBase<DimS, DimM>;  //!< base class
     //! polymorphic pointer to FFT engines
     using FFTEngine_ptr = typename Parent::FFTEngine_ptr;
+    //! gradient, i.e. derivatives in each Cartesian direction
+    using Gradient_t = typename Parent::Gradient_t;
     using Ccoord = typename Parent::Ccoord;  //!< cell coordinates type
     using Rcoord = typename Parent::Rcoord;  //!< spatial coordinates type
     //! global field collection (for real-space representations)
@@ -64,9 +67,10 @@ namespace muSpectre {
     using Field_t = muGrid::TypedField<GFieldCollection_t, Real>;
     //! Fourier-space field containing the projection operator itself
     using Proj_t =
-        muGrid::TensorField<LFieldCollection_t, Real, firstOrder, DimM>;
+        muGrid::TensorField<LFieldCollection_t, Complex, firstOrder, DimM>;
     //! iterable form of the operator
-    using Proj_map = muGrid::MatrixFieldMap<LFieldCollection_t, Real, DimM, 1>;
+    using Proj_map =
+        muGrid::MatrixFieldMap<LFieldCollection_t, Complex, DimM, 1>;
     //! iterable Fourier-space second-order tensor field
     using Grad_map =
         muGrid::MatrixFieldMap<LFieldCollection_t, Complex, DimM, DimM>;
@@ -75,7 +79,9 @@ namespace muSpectre {
     ProjectionFiniteStrainFast() = delete;
 
     //! Constructor with fft_engine
-    ProjectionFiniteStrainFast(FFTEngine_ptr engine, Rcoord lengths);
+    ProjectionFiniteStrainFast(
+        FFTEngine_ptr engine, Rcoord lengths,
+        Gradient_t gradient = make_fourier_gradient<DimS>());
 
     //! Copy constructor
     ProjectionFiniteStrainFast(const ProjectionFiniteStrainFast & other) =
@@ -102,7 +108,7 @@ namespace muSpectre {
     //! apply the projection operator to a field
     void apply_projection(Field_t & field) final;
 
-    Eigen::Map<Eigen::ArrayXXd> get_operator() final;
+    Eigen::Map<ArrayXXc> get_operator() final;
 
     /**
      * returns the number of rows and cols for the strain matrix type
@@ -115,8 +121,8 @@ namespace muSpectre {
     constexpr static Dim_t NbComponents() { return muGrid::ipow(DimM, 2); }
 
    protected:
-    Proj_t & xiField;  //!< field of normalised wave vectors
-    Proj_map xis;      //!< iterable normalised wave vectors
+    Proj_t & xi_field;  //!< field of normalised wave vectors
+    Proj_map xis;       //!< iterable normalised wave vectors
   };
 
 }  // namespace muSpectre

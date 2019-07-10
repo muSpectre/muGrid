@@ -57,6 +57,7 @@ set (PY_BINDING_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_hyper_elasto_plastic1.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_linear_elastic_generic.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_solvers.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_derivatives.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_projections.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_field_collection.cc
   )

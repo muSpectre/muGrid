@@ -82,26 +82,29 @@ template <class Proj, Dim_t DimS, Dim_t DimM = DimS>
 void add_proj_helper(py::module & mod, std::string name_start) {
   using Ccoord = muGrid::Ccoord_t<DimS>;
   using Rcoord = muGrid::Rcoord_t<DimS>;
+  using Gradient_t = muSpectre::Gradient_t<DimS>;
   using Field_t = typename Proj::Field_t;
 
 #ifdef WITH_MPI
-  auto make_proj = [](Ccoord res, Rcoord lengths, const std::string & fft,
+  auto make_proj = [](Ccoord res, Rcoord lengths,
+                      const Gradient_t & gradient,
+                      const std::string & fft,
                       const muFFT::Communicator & comm) {
     if (fft == "fftw") {
       auto engine = std::make_unique<muFFT::FFTWEngine<DimS>>(
           res, Proj::NbComponents(), comm);
-      return Proj(std::move(engine), lengths);
+      return Proj(std::move(engine), lengths, gradient);
 #ifdef WITH_FFTWMPI
     } else if (fft == "fftwmpi") {
       auto engine = std::make_unique<muFFT::FFTWMPIEngine<DimS>>(
           res, Proj::NbComponents(), comm);
-      return Proj(std::move(engine), lengths);
+      return Proj(std::move(engine), lengths, gradient);
 #endif
 #ifdef WITH_PFFT
     } else if (fft == "pfft") {
       auto engine = std::make_unique<muFFT::PFFTEngine<DimS>>(
           res, Proj::NbComponents(), comm);
-      return Proj(std::move(engine), lengths);
+      return Proj(std::move(engine), lengths, gradient);
 #endif
     } else {
       throw std::runtime_error("Unknown FFT engine '" + fft + "' specified.");
@@ -117,27 +120,41 @@ void add_proj_helper(py::module & mod, std::string name_start) {
   py::class_<Proj>(mod, name.str().c_str())
 #ifdef WITH_MPI
       .def(py::init(make_proj),
-           "nb_grid_pts"_a, "lengths"_a, "fft"_a = "fftw",
-           "communicator"_a = muFFT::Communicator(MPI_COMM_SELF))
-      .def(py::init([make_proj](Ccoord res, Rcoord lengths,
-                                const std::string & fft, size_t comm) {
-             return make_proj(res, lengths, fft,
+           "nb_grid_pts"_a,
+           "lengths"_a,
+           "gradient"_a = muSpectre::make_fourier_gradient<DimS>(),
+            "fft"_a = "fftw",
+           "communicator"_a = muFFT::Communicator())
+      .def(py::init([make_proj](Ccoord res,
+                                Rcoord lengths,
+                                const Gradient_t & gradient,
+                                const std::string & fft,
+                                size_t comm) {
+             return make_proj(res, lengths, gradient, fft,
                               std::move(muFFT::Communicator(MPI_Comm(comm))));
            }),
-           "nb_grid_pts"_a, "lengths"_a, "fft"_a = "fftw",
+           "nb_grid_pts"_a,
+           "lengths"_a,
+           "gradient"_a = muSpectre::make_fourier_gradient<DimS>(),
+           "fft"_a = "fftw",
            "communicator"_a = size_t(MPI_COMM_SELF))
 #else
-      .def(py::init([](Ccoord res, Rcoord lengths, const std::string & fft) {
+      .def(py::init([](Ccoord res,
+                       Rcoord lengths,
+                       const Gradient_t & gradient,
+                       const std::string & fft) {
              if (fft == "fftw") {
                auto engine = std::make_unique<muFFT::FFTWEngine<DimS>>(
                    res, Proj::NbComponents());
-               return Proj(std::move(engine), lengths);
+               return Proj(std::move(engine), lengths, gradient);
              } else {
                throw std::runtime_error("Unknown FFT engine '" + fft +
                                         "' specified.");
              }
            }),
-           "nb_grid_pts"_a, "lengths"_a,
+           "nb_grid_pts"_a,
+           "lengths"_a,
+           "gradient"_a = muSpectre::make_fourier_gradient<DimS>(),
            "fft"_a = "fftw")
 #endif
       .def("initialise", &Proj::initialise,

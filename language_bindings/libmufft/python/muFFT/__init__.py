@@ -34,6 +34,7 @@ covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
 
+import numpy as np
 
 try:
     from mpi4py import MPI
@@ -265,6 +266,28 @@ class FFT(object):
         return tuple((slice(start, start + length)
                       for start, length in zip(self.fourier_locations,
                                                self.nb_fourier_grid_pts)))
+
+    def wavevectors(self, domain_lengths=None):
+        """
+        Create an array containing wavevectors for the Fourier grid.
+
+        Parameters
+        ----------
+        domain_lengths : array
+            Phyiscal size of the simulation domain. If None, the method returns
+            phases rather than wavevectors. (This is the default.)
+
+        Returns
+        -------
+        wavevectors : array
+            Wavevectors or phases
+        """
+        if domain_lengths is None:
+            return (np.mgrid[self.fourier_slices].T /
+                self.nb_domain_grid_pts).T
+        else:
+            return (np.mgrid[self.fourier_slices].T /
+                np.asarray(domain_lengths)).T
 
     @property
     def subdomain_slices(self):

@@ -42,7 +42,8 @@ void add_common(py::module & mod);
 void add_cell(py::module & mod);
 void add_material(py::module & mod);
 void add_solvers(py::module & mod);
-void add_projections(py::module & submodule);
-void add_field_collections(py::module & submodule);
+void add_derivatives(py::module & mod);
+void add_projections(py::module & mod);
+void add_field_collections(py::module & mod);
 
 #endif  // LANGUAGE_BINDINGS_PYTHON_BIND_PY_DECLARATIONS_HH_

@@ -54,6 +54,8 @@ namespace muSpectre {
     using Vector_t = typename Parent::Vector_t;  //!< to represent fields
     //! polymorphic FFT pointer type
     using FFTEngine_ptr = typename Parent::FFTEngine_ptr;
+    //! gradient, i.e. derivatives in each Cartesian direction
+    using Gradient_t = typename Parent::Gradient_t;
     using Ccoord = typename Parent::Ccoord;  //!< cell coordinates type
     using Rcoord = typename Parent::Rcoord;  //!< spatial coordinates type
     //! global field collection
@@ -64,9 +66,10 @@ namespace muSpectre {
     using Field_t = muGrid::TypedField<GFieldCollection_t, Real>;
     //! Fourier-space field containing the projection operator itself
     using Proj_t =
-        muGrid::TensorField<LFieldCollection_t, Real, fourthOrder, DimM>;
+        muGrid::TensorField<LFieldCollection_t, Complex, fourthOrder, DimM>;
     //! iterable form of the operator
-    using Proj_map = muGrid::T4MatrixFieldMap<LFieldCollection_t, Real, DimM>;
+    using Proj_map =
+        muGrid::T4MatrixFieldMap<LFieldCollection_t, Complex, DimM>;
     //! vectorized version of the Fourier-space second-order tensor field
     using Vector_map =
         muGrid::MatrixFieldMap<LFieldCollection_t, Complex, DimM * DimM, 1>;
@@ -74,7 +77,8 @@ namespace muSpectre {
     ProjectionDefault() = delete;
 
     //! Constructor with cell sizes and formulation
-    ProjectionDefault(FFTEngine_ptr engine, Rcoord lengths, Formulation form);
+    ProjectionDefault(FFTEngine_ptr engine, Rcoord lengths, Gradient_t gradient,
+                      Formulation form);
 
     //! Copy constructor
     ProjectionDefault(const ProjectionDefault & other) = delete;
@@ -94,7 +98,7 @@ namespace muSpectre {
     //! apply the projection operator to a field
     void apply_projection(Field_t & field) final;
 
-    Eigen::Map<Eigen::ArrayXXd> get_operator() final;
+    Eigen::Map<ArrayXXc> get_operator() final;
 
     /**
      * returns the number of rows and cols for the strain matrix type

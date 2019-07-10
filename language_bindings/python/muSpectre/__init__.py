@@ -34,6 +34,7 @@ covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
 
+import numpy as np
 
 try:
     from mpi4py import MPI
@@ -45,7 +46,7 @@ from _muFFT import (get_domain_ccoord, get_domain_index, get_hermitian_sizes,
                     FFT_PlanFlags)
 
 import _muSpectre
-from _muSpectre import Formulation, material, solvers, FiniteDiff
+from _muSpectre import (Formulation, material, solvers, FiniteDiff)
 
 from muFFT import Communicator
 import muSpectre.gradient_integration
@@ -55,12 +56,40 @@ _factories = {'fftw': ('CellFactory', False),
               'pfft': ('PFFTCellFactory', True),
               'p3dfft': ('P3DFFTCellFactory', True)}
 
-_projections = {_muSpectre.Formulation.finite_strain: 'FiniteStrainFast',
-                _muSpectre.Formulation.small_strain: 'SmallStrain'}
+_projections = {
+    Formulation.finite_strain: 'FiniteStrainFast',
+    Formulation.small_strain: 'SmallStrain',
+}
+
+def FourierDerivative(dims, direction):
+    class_name = 'FourierDerivative_{}d'.format(dims)
+    try:
+        factory = _muSpectre.__dict__[class_name]
+    except KeyError:
+        raise KeyError("FourierDerivative class '{}' has not been compiled "
+                       "into the muSpectre library.".format(class_name))
+    return factory(direction)
 
 
-def Cell(nb_grid_pts, lengths, formulation=Formulation.finite_strain,
-         fft='fftw', communicator=None):
+def DiscreteDerivative(lbounds, stencil):
+    lbounds = np.asarray(lbounds)
+    stencil = np.asarray(stencil)
+    dims = len(stencil.shape)
+    if lbounds.shape != (dims,):
+        raise ValueError("Lower bounds (lbounds) of shape {} are incompatible "
+                         "with a {}-dimensional stencil."
+                         .format(lbounds.shape, dims))
+    class_name = 'DiscreteDerivative_{}d'.format(dims)
+    try:
+        factory = _muSpectre.__dict__[class_name]
+    except KeyError:
+        raise KeyError("DiscreteDerivative class '{}' has not been compiled "
+                       "into the muSpectre library.".format(class_name))
+    return factory(list(stencil.shape), list(lbounds), stencil.ravel())
+
+
+def Cell(nb_grid_pts, domain_lengths, formulation=Formulation.finite_strain,
+         gradient=None, fft='fftw', communicator=None):
     """
     Instantiate a muSpectre Cell class.
 
@@ -68,12 +97,17 @@ def Cell(nb_grid_pts, lengths, formulation=Formulation.finite_strain,
     ----------
     nb_grid_pts: list
         Grid nb_grid_pts in the Cartesian directions.
-    lengths: list
+    domain_lengths: list
         Physical size of the cell in the Cartesian directions.
     formulation: Formulation
         Formulation for strains and stresses used by the solver. Options are
         `Formulation.finite_strain` and `Formulation.small_strain`. Finite
         strain formulation is the default.
+    gradient: list of subclasses of DerivativeBase
+        This is the Nabla operator in vector form (a list of one instance of
+        `DerivativeBase` per spatial direction). It is used to automatically
+        construct the projection operator. The default is FourierDerivative for
+        each direction.
     fft: string
         FFT engine to use. Options are 'fftw', 'fftwmpi', 'pfft' and 'p3dfft'.
         Default is 'fftw'.
@@ -89,8 +123,12 @@ def Cell(nb_grid_pts, lengths, formulation=Formulation.finite_strain,
     """
     communicator = Communicator(communicator)
 
+    if gradient is None:
+        dims = len(nb_grid_pts)
+        gradient = [FourierDerivative(dims, i) for i in range(dims)]
+
     nb_grid_pts = list(nb_grid_pts)
-    lengths = list(lengths)
+    domain_lengths = list(domain_lengths)
     try:
         factory_name, is_parallel = _factories[fft]
     except KeyError:
@@ -101,13 +139,16 @@ def Cell(nb_grid_pts, lengths, formulation=Formulation.finite_strain,
         raise KeyError("FFT engine '{}' has not been compiled into the "
                        "muSpectre library.".format(fft))
     if communicator.size == 1:
-        return factory(nb_grid_pts, lengths, formulation)
+        return factory(nb_grid_pts, domain_lengths, formulation,
+                       gradient)
     else:
-        return factory(nb_grid_pts, lengths, formulation, communicator)
+        return factory(nb_grid_pts, domain_lengths, formulation,
+                       gradient, communicator)
 
 
 def Projection(nb_grid_pts, lengths,
                formulation=_muSpectre.Formulation.finite_strain,
+               gradient = None,
                fft='fftw', communicator=None):
     """
     Instantiate a muSpectre Projection class.
@@ -118,6 +159,9 @@ def Projection(nb_grid_pts, lengths,
         Grid nb_grid_pts in the Cartesian directions.
     formulation: muSpectre.Formulation
         Determines whether to use finite or small strain formulation.
+    gradient: list of subclasses of DerivativeBase
+        Type of the derivative operator used for the projection for each
+        Cartesian direction. Default is FourierDerivative for each direction.
     fft: string
         FFT engine to use. Options are 'fftw', 'fftwmpi', 'pfft' and 'p3dfft'.
         Default is 'fftw'.
@@ -133,11 +177,20 @@ def Projection(nb_grid_pts, lengths,
     """
     communicator = Communicator(communicator)
 
-    factory_name = 'Projection{}_{}d'.format(_projections[formulation],
-                                             len(nb_grid_pts))
+    if gradient is None:
+        dims = len(nb_grid_pts)
+        gradient = [FourierDerivative(dims, i) for i in range(dims)]
+
+    class_name = 'Projection{}_{}d'.format(
+        _projections[formulation],
+        len(nb_grid_pts))
     try:
-        factory = _muSpectre.__dict__[factory_name]
+        factory = _muSpectre.__dict__[class_name]
     except KeyError:
         raise KeyError("Projection engine '{}' has not been compiled into the "
-                       "muSpectre library.".format(factory_name))
-    return factory(nb_grid_pts, lengths, fft, communicator)
+                       "muSpectre library.".format(class_name))
+    if communicator.size == 1:
+        return factory(nb_grid_pts, lengths, gradient, fft)
+    else:
+        return factory(nb_grid_pts, lengths, gradient, fft, communicator)
+

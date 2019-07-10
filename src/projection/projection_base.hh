@@ -36,6 +36,7 @@
 #define SRC_PROJECTION_PROJECTION_BASE_HH_
 
 #include "common/muSpectre_common.hh"
+#include "projection/derivative.hh"
 #include <libmugrid/field.hh>
 #include <libmugrid/field_collection.hh>
 #include <libmufft/fft_engine_base.hh>
@@ -44,17 +45,7 @@
 
 namespace muSpectre {
 
-  /**
-   * base class for projection related exceptions
-   */
-  class ProjectionError : public std::runtime_error {
-   public:
-    //! constructor
-    explicit ProjectionError(const std::string & what)
-        : std::runtime_error(what) {}
-    //! constructor
-    explicit ProjectionError(const char * what) : std::runtime_error(what) {}
-  };
+  using ArrayXXc = Eigen::Array<Complex, Eigen::Dynamic, Eigen::Dynamic>;
 
   template <class Projection>
   struct Projection_traits {};
@@ -71,6 +62,8 @@ namespace muSpectre {
     using FFTEngine = muFFT::FFTEngineBase<DimS>;
     //! reference to fft engine is safely managed through a `std::unique_ptr`
     using FFTEngine_ptr = std::unique_ptr<FFTEngine>;
+    //! gradient, i.e. derivatives in each Cartesian direction
+    using Gradient_t = muSpectre::Gradient_t<DimS>;
     //! cell coordinates type
     using Ccoord = typename FFTEngine::Ccoord;
     //! spatial coordinates type
@@ -94,7 +87,7 @@ namespace muSpectre {
 
     //! Constructor with cell sizes
     ProjectionBase(FFTEngine_ptr engine, Rcoord domain_lengths,
-                   Formulation form);
+                   Gradient_t gradient, Formulation form);
 
     //! Copy constructor
     ProjectionBase(const ProjectionBase & other) = delete;
@@ -146,7 +139,7 @@ namespace muSpectre {
     //! return the raw projection operator. This is mainly intended
     //! for maintenance and debugging and should never be required in
     //! regular use
-    virtual Eigen::Map<Eigen::ArrayXXd> get_operator() = 0;
+    virtual Eigen::Map<ArrayXXc> get_operator() = 0;
 
     //! return the communicator object
     const auto & get_communicator() const {
@@ -156,7 +149,7 @@ namespace muSpectre {
     /**
      * returns the number of rows and cols for the strain matrix type
      * (for full storage, the strain is stored in material_dim ×
-     * material_dim matrices, but in symmetriy storage, it is a column
+     * material_dim matrices, but in symmetric storage, it is a column
      * vector)
      */
     virtual std::array<Dim_t, 2> get_strain_shape() const = 0;
@@ -168,6 +161,11 @@ namespace muSpectre {
     //! handle on the fft_engine used
     FFTEngine_ptr fft_engine;
     const Rcoord domain_lengths;  //!< physical sizes of the cell
+    /**
+     * gradient (nabla) operator, can be computed using Fourier interpolation
+     * or through a weighted residual
+     */
+    Gradient_t gradient;
     /**
      * formulation this projection can be applied to (determines
      * whether the projection enforces gradients, small strain tensor

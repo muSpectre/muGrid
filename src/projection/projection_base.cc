@@ -40,10 +40,11 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   ProjectionBase<DimS, DimM>::ProjectionBase(FFTEngine_ptr engine,
                                              Rcoord domain_lengths,
+                                             Gradient_t gradient,
                                              Formulation form)
       : fft_engine{std::move(engine)}, domain_lengths{domain_lengths},
-        form{form}, projection_container{
-                        this->fft_engine->get_field_collection()} {
+        gradient{gradient}, form{form},
+        projection_container{this->fft_engine->get_field_collection()} {
     static_assert((DimS == FFTEngine::sdim),
                   "spatial dimensions are incompatible");
     if (this->get_nb_components() != fft_engine->get_nb_components()) {

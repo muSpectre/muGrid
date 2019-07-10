@@ -569,7 +569,7 @@ namespace muSpectre {
      * get a reference to the projection object. should only be
      * required for debugging
      */
-    Eigen::Map<Eigen::ArrayXXd> get_projection() {
+    Eigen::Map<ArrayXXc> get_projection() {
       return this->projection->get_operator();
     }
 

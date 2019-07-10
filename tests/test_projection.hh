@@ -34,6 +34,7 @@
  */
 
 #include "tests.hh"
+#include "projection/derivative.hh"
 #include <libmufft/fftw_engine.hh>
 
 #include <boost/mpl/list.hpp>
@@ -86,9 +87,60 @@ namespace muSpectre {
       return Rcoord_t<threeD>{7, 7, 7};
     }
   };
+  template <Dim_t DimS>
+  struct FourierGradient {};
+  template <>
+  struct FourierGradient<twoD> {
+    static Gradient_t<twoD> get_gradient() {
+      return Gradient_t<twoD>{std::make_shared<FourierDerivative<twoD>>(0),
+                              std::make_shared<FourierDerivative<twoD>>(1)};
+    }
+  };
+  template <>
+  struct FourierGradient<threeD> {
+    static Gradient_t<threeD> get_gradient() {
+      return Gradient_t<threeD>{std::make_shared<FourierDerivative<threeD>>(0),
+                                std::make_shared<FourierDerivative<threeD>>(1),
+                                std::make_shared<FourierDerivative<threeD>>(2)};
+    }
+  };
+  template <Dim_t DimS>
+  struct DiscreteGradient {};
+  template <>
+  struct DiscreteGradient<twoD> {
+    static Gradient_t<twoD> get_gradient() {
+      using Ccoord = DiscreteDerivative<twoD>::Ccoord;
+      return Gradient_t<twoD>{
+          std::make_shared<DiscreteDerivative<twoD>>(
+              Ccoord{2, 2}, Ccoord{0, 0},
+              std::vector<Real>{-0.5, -0.5, 0.5, 0.5}),
+          std::make_shared<DiscreteDerivative<twoD>>(
+              Ccoord{2, 2}, Ccoord{0, 0},
+              std::vector<Real>{-0.5, 0.5, -0.5, 0.5})
+          };
+    }
+  };
+  template <>
+  struct DiscreteGradient<threeD> {
+    static Gradient_t<threeD> get_gradient() {
+      using Ccoord = DiscreteDerivative<threeD>::Ccoord;
+      return Gradient_t<threeD>{
+          std::make_shared<DiscreteDerivative<threeD>>(
+              Ccoord{2, 2, 2}, Ccoord{0, 0, 0},
+              std::vector<Real>{-0.5, -0.5, -0.5, -0.5, 0.5, 0.5, 0.5, 0.5}),
+          std::make_shared<DiscreteDerivative<threeD>>(
+              Ccoord{2, 2, 2}, Ccoord{0, 0, 0},
+              std::vector<Real>{-0.5, -0.5, 0.5, 0.5, -0.5, -0.5, 0.5, 0.5}),
+          std::make_shared<DiscreteDerivative<threeD>>(
+              Ccoord{2, 2, 2}, Ccoord{0, 0, 0},
+              std::vector<Real>{-0.5, 0.5, -0.5, 0.5, -0.5, 0.5, -0.5, 0.5})
+          };
+    }
+  };
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM, class SizeGiver, class Proj>
+  template <Dim_t DimS, Dim_t DimM, class SizeGiver, class GradientGiver,
+            class Proj>
   struct ProjectionFixture {
     using Engine = muFFT::FFTWEngine<DimS>;
     using Parent = Proj;
@@ -97,7 +149,8 @@ namespace muSpectre {
     ProjectionFixture()
         : projector(std::make_unique<Engine>(SizeGiver::get_nb_grid_pts(),
                                              mdim * mdim),
-                    SizeGiver::get_lengths()) {}
+                    SizeGiver::get_lengths(),
+                    GradientGiver::get_gradient()) {}
     Parent projector;
   };
 

@@ -58,6 +58,7 @@ namespace muSpectre {
     // initialisation of algorithm
     this->r_k =
         (this->cell.evaluate_projected_directional_stiffness(this->x_k) - rhs);
+
     this->p_k = -this->r_k;
     this->converged = false;
 

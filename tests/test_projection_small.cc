@@ -44,12 +44,16 @@ namespace muSpectre {
 
   using fixlist = boost::mpl::list<
       ProjectionFixture<twoD, twoD, Squares<twoD>,
+                        FourierGradient<twoD>,
                         ProjectionSmallStrain<twoD, twoD>>,
       ProjectionFixture<threeD, threeD, Squares<threeD>,
+                        FourierGradient<threeD>,
                         ProjectionSmallStrain<threeD, threeD>>,
       ProjectionFixture<twoD, twoD, Sizes<twoD>,
+                        FourierGradient<twoD>,
                         ProjectionSmallStrain<twoD, twoD>>,
       ProjectionFixture<threeD, threeD, Sizes<threeD>,
+                        FourierGradient<threeD>,
                         ProjectionSmallStrain<threeD, threeD>>>;
 
   /* ---------------------------------------------------------------------- */

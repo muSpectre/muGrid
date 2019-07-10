@@ -63,6 +63,8 @@ namespace muSpectre {
 
   using muGrid::Ccoord_t;
   using muGrid::Rcoord_t;
+  using muGrid::eigen;
+  using muGrid::operator/;
 
   using muGrid::apply;
   using muGrid::optional;

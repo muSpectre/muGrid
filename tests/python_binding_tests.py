@@ -55,6 +55,7 @@ from python_muSpectre_gradient_integration_test import \
 
 from python_material_evaluator_test import MaterialEvaluator_Check
 
+from python_derivative_tests import *
 from python_projection_tests import *
 
 class CellCheck(unittest.TestCase):

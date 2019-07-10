@@ -2,11 +2,12 @@
  * @file   projection_finite_strain.hh
  *
  * @author Till Junge <till.junge@altermail.ch>
+ *         Richard Leute <richard.leute@imtek.uni-freiburg.de>
+ *         Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
  * @date   05 Dec 2017
  *
- * @brief  Class for standard finite-strain gradient projections see de Geus et
- *         al. (https://doi.org/10.1016/j.cma.2016.12.032) for derivation
+ * @brief  Class for discrete finite-strain gradient projections
  *
  * Copyright © 2017 Till Junge
  *
@@ -44,9 +45,7 @@
 namespace muSpectre {
 
   /**
-   * Implements the finite strain gradient projection operator as
-   * defined in de Geus et
-   * al. (https://doi.org/10.1016/j.cma.2016.12.032) for derivation
+   * Implements the discrete finite strain gradient projection operator
    */
   template <Dim_t DimS, Dim_t DimM>
   class ProjectionFiniteStrain : public ProjectionDefault<DimS, DimM> {
@@ -56,6 +55,8 @@ namespace muSpectre {
     using FFTEngine_ptr = typename Parent::FFTEngine_ptr;
     using Ccoord = typename Parent::Ccoord;  //!< cell coordinates type
     using Rcoord = typename Parent::Rcoord;  //!< spatial coordinates type
+    //! gradient, i.e. derivatives in each Cartesian direction
+    using Gradient_t = typename Parent::Gradient_t;
     //! local field collection (for Fourier-space representations)
     using LFieldCollection_t = muGrid::LocalFieldCollection<DimS>;
     //! iterable operator
@@ -67,14 +68,17 @@ namespace muSpectre {
     //! Default constructor
     ProjectionFiniteStrain() = delete;
 
-    //! Constructor with fft_engine
-    ProjectionFiniteStrain(FFTEngine_ptr engine, Rcoord lengths);
+    //! Constructor with fft_engine and stencil
+    ProjectionFiniteStrain(FFTEngine_ptr engine, Rcoord lengths,
+                           Gradient_t gradient = make_fourier_gradient<DimS>());
 
     //! Copy constructor
-    ProjectionFiniteStrain(const ProjectionFiniteStrain & other) = delete;
+    ProjectionFiniteStrain(
+        const ProjectionFiniteStrain & other) = delete;
 
     //! Move constructor
-    ProjectionFiniteStrain(ProjectionFiniteStrain && other) = default;
+    ProjectionFiniteStrain(ProjectionFiniteStrain && other) =
+        default;
 
     //! Destructor
     virtual ~ProjectionFiniteStrain() = default;

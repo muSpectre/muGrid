@@ -40,8 +40,10 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   ProjectionSmallStrain<DimS, DimM>::ProjectionSmallStrain(FFTEngine_ptr engine,
-                                                           Rcoord lengths)
-      : Parent{std::move(engine), lengths, Formulation::small_strain} {
+                                                           Rcoord lengths,
+                                                           Gradient_t gradient)
+      : Parent{std::move(engine), lengths, gradient,
+               Formulation::small_strain} {
     for (auto res : this->fft_engine->get_nb_domain_grid_pts()) {
       if (res % 2 == 0) {
         throw ProjectionError(
@@ -70,7 +72,7 @@ namespace muSpectre {
         for (Dim_t j{0}; j < DimS; ++j) {
           for (Dim_t l{0}; l < DimS; ++l) {
             for (Dim_t m{0}; m < DimS; ++m) {
-              Real & g = get(G, i, j, l, m);
+              Complex & g = get(G, i, j, l, m);
               g = 0.5 *
                       (xi(i) * kron(j, l) * xi(m) + xi(i) * kron(j, m) * xi(l) +
                        xi(j) * kron(i, l) * xi(m) +

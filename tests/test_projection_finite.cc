@@ -44,22 +44,24 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   using fixlist = boost::mpl::list<
-      ProjectionFixture<twoD, twoD, Squares<twoD>,
+      ProjectionFixture<twoD, twoD, Squares<twoD>, FourierGradient<twoD>,
                         ProjectionFiniteStrain<twoD, twoD>>,
       ProjectionFixture<threeD, threeD, Squares<threeD>,
+                        FourierGradient<threeD>,
                         ProjectionFiniteStrain<threeD, threeD>>,
-      ProjectionFixture<twoD, twoD, Sizes<twoD>,
+      ProjectionFixture<twoD, twoD, Sizes<twoD>, FourierGradient<twoD>,
                         ProjectionFiniteStrain<twoD, twoD>>,
-      ProjectionFixture<threeD, threeD, Sizes<threeD>,
+      ProjectionFixture<threeD, threeD, Sizes<threeD>, FourierGradient<threeD>,
                         ProjectionFiniteStrain<threeD, threeD>>,
 
-      ProjectionFixture<twoD, twoD, Squares<twoD>,
+      ProjectionFixture<twoD, twoD, Squares<twoD>, FourierGradient<twoD>,
                         ProjectionFiniteStrainFast<twoD, twoD>>,
       ProjectionFixture<threeD, threeD, Squares<threeD>,
+                        FourierGradient<threeD>,
                         ProjectionFiniteStrainFast<threeD, threeD>>,
-      ProjectionFixture<twoD, twoD, Sizes<twoD>,
+      ProjectionFixture<twoD, twoD, Sizes<twoD>, FourierGradient<twoD>,
                         ProjectionFiniteStrainFast<twoD, twoD>>,
-      ProjectionFixture<threeD, threeD, Sizes<threeD>,
+      ProjectionFixture<threeD, threeD, Sizes<threeD>, FourierGradient<threeD>,
                         ProjectionFiniteStrainFast<threeD, threeD>>>;
 
   /* ---------------------------------------------------------------------- */
@@ -72,7 +74,7 @@ namespace muSpectre {
   BOOST_AUTO_TEST_CASE(even_grid_test) {
     using Engine = muFFT::FFTWEngine<twoD>;
     using proj = ProjectionFiniteStrainFast<twoD, twoD>;
-    auto engine = std::make_unique<Engine>(Ccoord_t<twoD>{2, 2}, 2 * 2);
+    auto engine = std::make_unique<Engine>(Ccoord_t<twoD>{2, 3}, 2 * 2);
     BOOST_CHECK_THROW(proj(std::move(engine), Rcoord_t<twoD>{4.3, 4.3}),
                       std::runtime_error);
   }
@@ -105,7 +107,7 @@ namespace muSpectre {
                                 fix::projector.get_domain_lengths()};
     Vector k;
     for (Dim_t i = 0; i < dim; ++i) {
-      // the wave vector has to be such that it leads to an integer
+      // The wave vector has to be such that it leads to an integer
       // number of periods in each length of the domain
       k(i) = (i + 1) * 2 * muGrid::pi / fix::projector.get_domain_lengths()[i];
     }
@@ -122,7 +124,9 @@ namespace muSpectre {
           ccoord, fix::projector.get_domain_lengths() /
                       fix::projector.get_nb_domain_grid_pts());
       // do efficient linear algebra on iterates
-      g.row(0) = k.transpose() * cos(k.dot(vec));
+      g.row(0) = k.transpose() *
+                 cos(k.dot(vec));  // This is a plane wave with wave vector k in
+                                   // real space. A valid gradient field.
       v.row(0) = g.row(0);
     }
     // end_field_iteration_snippet
@@ -147,6 +151,49 @@ namespace muSpectre {
         std::cout << std::endl
                   << "vector :" << std::endl
                   << vec.transpose() << std::endl;
+      }
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(idempotent_test, fix, fixlist, fix) {
+    // check if the exact projection operator is a valid projection operator.
+    // Thus it has to be idempotent, G^2=G or G:G:test_field = G:test_field.
+    constexpr Dim_t sdim{fix::sdim}, mdim{fix::mdim};
+    using Fields = muGrid::GlobalFieldCollection<sdim>;
+    using FieldT = muGrid::TensorField<Fields, Real, secondOrder, mdim>;
+    using FieldMap = muGrid::MatrixFieldMap<Fields, Real, mdim, mdim>;
+
+    Fields fields{};
+    FieldT & f_grad{muGrid::make_field<FieldT>("gradient", fields)};
+    FieldT & f_grad_test{muGrid::make_field<FieldT>("gradient_test", fields)};
+    FieldMap grad(f_grad);
+    FieldMap grad_test(f_grad_test);
+
+    fields.initialise(fix::projector.get_nb_subdomain_grid_pts(),
+                      fix::projector.get_subdomain_locations());
+
+    f_grad.eigen().setRandom();
+    f_grad_test.eigen() = f_grad.eigen();
+
+    fix::projector.initialise(muFFT::FFT_PlanFlags::estimate);
+    // apply projection once; G:f_grad
+    fix::projector.apply_projection(f_grad);
+
+    // apply projection twice; G:G:f_grad_test
+    fix::projector.apply_projection(f_grad_test);
+    fix::projector.apply_projection(f_grad_test);
+
+    for (auto && tup : akantu::zip(grad, grad_test)) {
+      auto & g = std::get<0>(tup);
+      auto & gt = std::get<1>(tup);
+      Real error = (g - gt).norm();
+      BOOST_CHECK_LT(error, tol);
+      if (not(error < tol)) {
+        std::cout
+            << std::endl
+            << "The exact compatibility operator seems to be not idempotent!"
+            << std::endl;
       }
     }
   }
