@@ -1,7 +1,29 @@
 FROM debian:testing
 MAINTAINER Till Junge <till.junge@epfl.ch>
 
-RUN apt-get -qq update && apt-get -y -qq install libfftw3-dev libfftw3-mpi-dev libeigen3-dev libboost-test-dev python3-dev curl python3-numpy python3-scipy python3-breathe python3-sphinx python3-pytest python3-pip git doxygen python3-mpi4py g++-7 clang cmake mayavi2 locales && rm -rf /var/lib/apt/lists/*
+RUN apt-get -qq update && apt-get -y -qq install \
+    clang \
+    cmake \
+    curl \
+    doxygen \
+    g++-7 \
+    git \
+    libboost-test-dev \
+    libeigen3-dev \
+    libfftw3-dev \
+    libfftw3-mpi-dev \
+    libgmp-dev \
+    locales \
+    mayavi2 \
+    python3-breathe \
+    python3-dev \
+    python3-mpi4py \
+    python3-numpy \
+    python3-pip \
+    python3-pytest \
+    python3-scipy \
+    python3-sphinx \
+    && rm -rf /var/lib/apt/lists/*
 # apt-get on one line due to https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#run
 RUN update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 10
 
