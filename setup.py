@@ -90,16 +90,25 @@ def detect_library(info):
         print("  * Looking for executable '{}'".format(info['command']))
         command_path = find_executable(info['command'])
         if command_path is not None:
-            root = os.path.dirname(command_path)
-            found = True
+            root = os.path.abspath(os.path.dirname(command_path) + '/../lib')
+        print("  * Attempting to load library '{}' in path '{}'".format(libname, root))
+        import ctypes
+        found = True
+        try:
+            loaded_lib = ctypes.CDLL('{}/fftw3_mpi.so')
+        except OSError:
+            found = False
     include_dirs = []
     libraries = []
     library_dirs = []
     if found:
-        print("  * Detected library '{}'".format(info['name']))
-
         if root is not None and (root.endswith('/bin') or root.endswith('/lib')):
             root = root[:-4]
+
+        if root is None:
+            print("  * Detected library '{}' in standard library search path".format(info['name']))
+        else:
+            print("  * Detected library '{}' in path '{}'".format(info['name'], root))
 
         for lib in info['required_libraries']:
             if root is not None:
@@ -168,11 +177,20 @@ for info, _sources in [(fftw_info, ['src/libmufft/fftw_engine.cc']),
         if 'mpi' in info:
             mpi = mpi or info['mpi']
 if mpi:
-    print('At least one of the FFT libraries is MPI-parallel.')
+    print('At least one of the FFT libraries is MPI-parallel. Using the MPI compiler wrapper.')
+    print('(You can specify the compiler wrapper through the MPICC and MPICXX environment variables.)')
     macros += [('WITH_MPI', None)]
     # FIXME! This is a brute-force override.
-    os.environ['CC'] = 'mpicc'
-    os.environ['CXX'] = 'mpicxx'
+    try:
+        os.environ['CC'] = os.environ['MPICC']
+    except KeyError:
+        os.environ['CC'] = 'mpicc'
+    try:
+        os.environ['CXX'] = os.environ['MPICXX']
+    except:
+        os.environ['CXX'] = 'mpicxx'
+    print('  * C-compiler: {}'.format(os.environ['CC']))
+    print('  * C++-compiler: {}'.format(os.environ['CXX']))
 
 ext_modules = [
     Extension(

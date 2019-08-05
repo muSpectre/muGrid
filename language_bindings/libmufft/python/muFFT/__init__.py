@@ -83,16 +83,35 @@ def Communicator(communicator=None):
     communicator: mpi4py or muFFT communicator object
         The bare MPI communicator. (Default: _muFFT.Communicator())
     """
+    # If the communicator is None, we return a communicator that contains just
+    # the present process.
     if communicator is None:
         communicator = _muFFT.Communicator()
 
+    # If the communicator is already an instance if _muFFT.Communicator, just
+    # return that communicator.
     if isinstance(communicator, _muFFT.Communicator):
         return communicator
 
-    if _muFFT.Communicator.has_mpi:
+    # Now we need to do some magic. See if the communicator that was passed
+    # conforms with the mpi4py interface, i.e. it has a method 'Get_size'.
+    # The present magic enables using either mpi4py or stub implementations
+    # of the same interface.
+    if hasattr(communicator, 'Get_size'):
+        # If the size of the communicator group is 1, just return a
+        # communicator that contains just the present process.
+        if communicator.Get_size() == 1:
+            return _muFFT.Communicator()
+        # Otherwise, check if muFFT does actually have MPI support. If yes
+        # we assume that the communicator is an mpi4py communicator.
+        elif _muFFT.Communicator.has_mpi:
             return _muFFT.Communicator(MPI._handleof(communicator))
+        else:
+            raise RuntimeError('muFFT was compiled without MPI support.')
     else:
-        raise RuntimeError('muFFT was compiled without MPI support.')
+        raise RuntimeError("The communicator does not have a 'Get_size' "
+                           "method. muFFT only supports communicators that "
+                           "conform to the mpi4py interface.")
 
 
 class FFT(object):
