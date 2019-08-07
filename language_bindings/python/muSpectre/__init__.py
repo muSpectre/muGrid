@@ -61,6 +61,24 @@ _projections = {
     Formulation.small_strain: 'SmallStrain',
 }
 
+
+class DerivativeWrapper(object):
+    def __init__(self, derivative):
+        self._derivative = derivative
+
+    @property
+    def wrapped_object(self):
+        return self._derivative
+    
+    def fourier(self, phase):
+        phase = np.asarray(phase)
+        return self._derivative.fourier(phase.reshape(2, -1)) \
+            .reshape(phase.shape[1:])
+
+    def __getattr__(self, name):
+        return getattr(self._derivative, name)
+
+
 def FourierDerivative(dims, direction):
     class_name = 'FourierDerivative_{}d'.format(dims)
     try:
@@ -68,7 +86,7 @@ def FourierDerivative(dims, direction):
     except KeyError:
         raise KeyError("FourierDerivative class '{}' has not been compiled "
                        "into the muSpectre library.".format(class_name))
-    return factory(direction)
+    return DerivativeWrapper(factory(direction))
 
 
 def DiscreteDerivative(lbounds, stencil):
@@ -85,7 +103,8 @@ def DiscreteDerivative(lbounds, stencil):
     except KeyError:
         raise KeyError("DiscreteDerivative class '{}' has not been compiled "
                        "into the muSpectre library.".format(class_name))
-    return factory(list(stencil.shape), list(lbounds), stencil.ravel())
+    return DerivativeWrapper(factory(list(stencil.shape), list(lbounds),
+                                     stencil.ravel()))
 
 
 def Cell(nb_grid_pts, domain_lengths, formulation=Formulation.finite_strain,
@@ -140,10 +159,10 @@ def Cell(nb_grid_pts, domain_lengths, formulation=Formulation.finite_strain,
                        "muSpectre library.".format(fft))
     if communicator.size == 1:
         return factory(nb_grid_pts, domain_lengths, formulation,
-                       gradient)
+                       [g.wrapped_object for g in gradient])
     else:
         return factory(nb_grid_pts, domain_lengths, formulation,
-                       gradient, communicator)
+                       [g.wrapped_object for g in gradient], communicator)
 
 
 def Projection(nb_grid_pts, lengths,

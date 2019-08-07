@@ -36,6 +36,9 @@ Program grant you additional permission to convey the resulting work.
 
 import numpy as np
 
+from muFFT.Communicator import Communicator
+from muFFT.NetCDF import NCStructuredGrid
+
 try:
     from mpi4py import MPI
 except ImportError:
@@ -282,9 +285,9 @@ class FFT(object):
 
     @property
     def fourier_slices(self):
-        return tuple((slice(start, start + length)
-                      for start, length in zip(self.fourier_locations,
-                                               self.nb_fourier_grid_pts)))
+        return tuple(slice(start, start + length)
+                     for start, length in zip(self.fourier_locations,
+                                              self.nb_fourier_grid_pts))
 
     def wavevectors(self, domain_lengths=None):
         """
@@ -310,9 +313,9 @@ class FFT(object):
 
     @property
     def subdomain_slices(self):
-        return tuple((slice(start, start + length)
-                      for start, length in zip(self.subdomain_locations,
-                                               self.nb_subdomain_grid_pts)))
+        return tuple(slice(start, start + length)
+                     for start, length in zip(self.subdomain_locations,
+                                              self.nb_subdomain_grid_pts))
 
     @property
     def normalisation(self):

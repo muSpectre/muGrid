@@ -48,10 +48,17 @@ class DerivativeCheck(unittest.TestCase):
         self.fft = muFFT.FFT(self.nb_pts)
         self.fourier_field = self.fft.fft(self.field)
 
+    def test_fourier_derivative(self):
+        diffop = µ.FourierDerivative(2, 0)
+        q = self.fft.wavevectors()
+        d = diffop.fourier(q)
+        diff_field = self.fft.ifft(d * self.fourier_field) * \
+            self.fft.normalisation
+
     def test_upwind_differences(self):
         diffop = µ.DiscreteDerivative([0, 0], [[-1, 1]])
         q = self.fft.wavevectors()
-        d = diffop.fourier(q.reshape(2, -1)).reshape(q.shape[1:])
+        d = diffop.fourier(q)
         diff_field = self.fft.ifft(d * self.fourier_field) * \
             self.fft.normalisation
         nx, ny = self.nb_pts
@@ -63,7 +70,7 @@ class DerivativeCheck(unittest.TestCase):
     def test_central_differences(self):
         diffop = µ.DiscreteDerivative([-1, 0], [[-0.5], [0], [0.5]])
         q = self.fft.wavevectors()
-        d = diffop.fourier(q.reshape(2, -1)).reshape(q.shape[1:])
+        d = diffop.fourier(q)
         diff_field = self.fft.ifft(d * self.fourier_field) * \
             self.fft.normalisation
         nx, ny = self.nb_pts
@@ -77,7 +84,7 @@ class DerivativeCheck(unittest.TestCase):
                                       [[-1/60, 3/20, -3/4, 0,
                                         3/4, -3/20, 1/60]])
         q = self.fft.wavevectors()
-        d = diffop.fourier(q.reshape(2, -1)).reshape(q.shape[1:])
+        d = diffop.fourier(q)
         diff_field = self.fft.ifft(d * self.fourier_field) * \
             self.fft.normalisation
         nx, ny = self.nb_pts

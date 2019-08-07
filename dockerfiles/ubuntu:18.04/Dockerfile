@@ -16,13 +16,17 @@ RUN apt-get -qq update && apt-get -y -qq install \
     g++ \
     git \
     libboost-test-dev \
+    libcurl4-openssl-dev \
     libeigen3-dev \
     libfftw3-dev \
     libfftw3-mpi-dev \
     libgmp-dev \
+    libhdf5-mpi-dev \
+    libpnetcdf-dev \
     m4 \
     python3-breathe \
     python3-dev \
+    python3-netcdf4 \
     python3-numpy \
     python3-pytest \
     python3-scipy \

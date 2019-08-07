@@ -1,19 +1,17 @@
-#!/usr/bin/env python3
+# -*- coding:utf-8 -*-
 """
-file   python_binding_tests.py
+@file   __init__.py
 
-@author Till Junge <till.junge@epfl.ch>
+@author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
 
-@date   09 Jan 2018
+@date   21 Mar 2018
 
-@brief  Unit tests for python bindings
-
-@section LICENCE
+@brief  Main entry point for muFFT Python module
 
 Copyright © 2018 Till Junge
 
 µSpectre is free software; you can redistribute it and/or
-modify it under the terms of the GNU Lesser General Public License as
+modify it under the terms of the GNU General Lesser Public License as
 published by the Free Software Foundation, either version 3, or (at
 your option) any later version.
 
@@ -35,14 +33,30 @@ covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
 
-import unittest
-import numpy as np
+import _muFFT
 
-from python_test_imports import muFFT
+try:
+    from mpi4py import MPI
+except ImportError:
+    MPI = None
 
-from python_communicator_tests import Communicator_Check
-from python_fft_tests import FFT_Check
-from python_netcdf_tests import NetCDF_Check_2d, NetCDF_Check_3d
 
-if __name__ == '__main__':
-    unittest.main()
+def Communicator(communicator=None):
+    """
+    Factory function for the communicator class.
+
+    Parameters
+    ----------
+    communicator: mpi4py or muFFT communicator object
+        The bare MPI communicator. (Default: _muFFT.Communicator())
+    """
+    if communicator is None:
+        communicator = _muFFT.Communicator()
+
+    if isinstance(communicator, _muFFT.Communicator):
+        return communicator
+
+    if _muFFT.Communicator.has_mpi:
+            return _muFFT.Communicator(MPI._handleof(communicator))
+    else:
+        raise RuntimeError('muFFT was compiled without MPI support.')

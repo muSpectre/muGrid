@@ -1,6 +1,8 @@
 FROM debian:stretch
 MAINTAINER Till Junge <till.junge@epfl.ch>
 
+ARG NETCDF4_PYTHON_VERSION=1.5.1.2
+
 RUN apt-get -qq update && apt-get -y -qq install \
     clang \
     cmake \
@@ -9,16 +11,20 @@ RUN apt-get -qq update && apt-get -y -qq install \
     g++ \
     git \
     libboost-test-dev \
+    libcurl4-openssl-dev \
     libeigen3-dev \
     libfftw3-dev \
     libfftw3-mpi-dev \
     libgmp-dev \
+    libhdf5-mpi-dev \
+    libpnetcdf-dev \
     locales \
-    m4 \			     
+    m4 \
     python3-breathe \
     python3-dev \
     python3-mpi4py \
     python3-numpy \
+    python3-pip \
     python3-pytest \
     python3-scipy \
     python3-setuptools \
@@ -31,4 +37,4 @@ RUN apt-get -qq update && apt-get -y -qq install \
 RUN  sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen &&     dpkg-reconfigure --frontend=noninteractive locales &&  update-locale LANG=en_US.UTF-8
 ENV LANG C.UTF-8
 
-
+RUN python3 -m pip install netCDF4==${NETCDF4_PYTHON_VERSION}

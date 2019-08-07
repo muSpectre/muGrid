@@ -75,12 +75,14 @@ set_target_properties(pyMuFFTLib PROPERTIES OUTPUT_NAME _muFFT)
 target_include_directories(pyMuFFTLib PUBLIC ${PYTHON_INCLUDE_DIRS})
 
 add_custom_target(pyMuFFT ALL SOURCES
-  muFFT/__init__.py)
+  muFFT/__init__.py
+  muFFT/Communicator.py
+  muFFT/NetCDF.py)
 add_custom_command(TARGET pyMuFFT POST_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_directory
                    ${CMAKE_SOURCE_DIR}/language_bindings/libmufft/python/muFFT
                    $<TARGET_FILE_DIR:pyMuFFTLib>/muFFT)
 
 install(TARGETS pyMuFFTLib LIBRARY DESTINATION ${PYTHON_USER_SITE})
-install(FILES muFFT/__init__.py DESTINATION
-  ${PYTHON_USER_SITE}/muFFT)
+install(FILES muFFT/__init__.py muFFT/Communicator.py muFFT/NetCDF.py
+  DESTINATION ${PYTHON_USER_SITE}/muFFT)

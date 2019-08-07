@@ -88,6 +88,9 @@ void add_derivative_base(py::module & mod, std::string name_start) {
 
 template <Dim_t DimS>
 void add_fourier_derivative(py::module & mod, std::string name_start) {
+  using ArrayXDd = Eigen::Array<Real, DimS, Eigen::Dynamic, Eigen::RowMajor>;
+  using ArrayXc = Eigen::Array<Complex, Eigen::Dynamic, 1>;
+
   std::stringstream name{};
   name << name_start << '_' << DimS << 'd';
 
@@ -100,13 +103,26 @@ void add_fourier_derivative(py::module & mod, std::string name_start) {
       .def("fourier", &FourierDerivative<DimS>::fourier,
            "wavevec"_a,
            "return Fourier representation of the derivative operator for a "
+           "certain wavevector")
+      .def("fourier",
+           [](FourierDerivative<DimS> & derivative,
+              const Eigen::Ref<ArrayXDd> & wavevectors) {
+             ArrayXc factors(wavevectors.cols());
+             for (int i = 0; i < wavevectors.cols(); ++i) {
+               factors[i] = derivative.fourier(wavevectors.col(i));
+             }
+             return factors;
+           },
+           "wavevectors"_a,
+           "return Fourier representation of the derivative operator for a "
            "certain wavevector");
 }
 
 template <Dim_t DimS>
 void add_discrete_derivative(py::module & mod, std::string name_start) {
   using Ccoord = typename DiscreteDerivative<DimS>::Ccoord;
-  using ArrayDXd = Eigen::Array<Real, Eigen::Dynamic, DimS, Eigen::RowMajor>;
+  /* TODO: Belong to the second "fourier" implementation below
+  using ArrayDXd = Eigen::Array<Real, Eigen::Dynamic, DimS, Eigen::RowMajor>; */
   using ArrayXDd = Eigen::Array<Real, DimS, Eigen::Dynamic, Eigen::RowMajor>;
   using ArrayXc = Eigen::Array<Complex, Eigen::Dynamic, 1>;
 
@@ -122,6 +138,8 @@ void add_discrete_derivative(py::module & mod, std::string name_start) {
            "wavevector"_a,
            "return Fourier representation of the derivative operator for a "
            "certain wavevector")
+      /* TODO: Decide if we need both functions below. There can be confusion for
+         symmetric matrices.
       .def("fourier",
            [](DiscreteDerivative<DimS> & derivative,
               const Eigen::Ref<ArrayDXd> & wavevectors) {
@@ -134,6 +152,7 @@ void add_discrete_derivative(py::module & mod, std::string name_start) {
            "wavevectors"_a,
            "return Fourier representation of the derivative operator for a "
            "certain wavevector")
+      */
       .def("fourier",
            [](DiscreteDerivative<DimS> & derivative,
               const Eigen::Ref<ArrayXDd> & wavevectors) {
