@@ -180,7 +180,7 @@ namespace muSpectre {
     /**
      * overload add_pixel to write into loacal stiffness tensor
      */
-    void add_pixel(const Ccoord_t<DimS> & pixel) final;
+    void yadd_pixel(const Ccoord_t<DimS> & pixel) final;
 
     /**
      * overload add_pixel to write into local stiffness tensor

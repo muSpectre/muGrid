@@ -254,12 +254,10 @@ void add_material_helper(py::module & mod) {
   std::string name{name_stream.str()};
   using Material = muSpectre::MaterialBase<Dim, Dim>;
   using MaterialTrampoline = PyMaterialBase<Dim>;
-  using FC_t = muGrid::LocalFieldCollection<Dim>;
-  using FCBase_t = muGrid::FieldCollectionBase<Dim, FC_t>;
 
   py::class_<Material, MaterialTrampoline /* <--- trampoline*/,
              std::shared_ptr<Material>>(mod, name.c_str())
-      .def(py::init<std::string>())
+      .def(py::init<const std::string &, const Dim_t &, const Dim_t &>())
       .def("save_history_variables", &Material::save_history_variables)
       .def("list_fields", &Material::list_fields)
       .def("get_real_field", &Material::get_real_field, "field_name"_a,
@@ -267,14 +265,15 @@ void add_material_helper(py::module & mod) {
       .def("size", &Material::size)
       .def(
           "add_pixel",
-          [](Material & mat, muGrid::Ccoord_t<Dim> pix) { mat.add_pixel(pix); },
+          [](Material & mat, size_t pix) { mat.add_pixel(pix); },
           "pixel"_a)
-      .def_property_readonly("collection",
-                             [](Material & material) -> FCBase_t & {
-                               return material.get_collection();
-                             },
-                             "returns the field collection containing internal "
-                             "fields of this material");
+      .def_property_readonly(
+          "collection",
+          [](Material & material) -> muGrid::NFieldCollection & {
+            return material.get_collection();
+          },
+          "returns the field collection containing internal "
+          "fields of this material");
 
   add_material_linear_elastic1_helper<Dim>(mod);
   add_material_linear_elastic2_helper<Dim>(mod);

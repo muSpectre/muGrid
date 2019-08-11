@@ -49,8 +49,8 @@ namespace muFFT {
   template <Dim_t Dim>
   class FFTWMPIEngine : public FFTEngineBase<Dim> {
    public:
-    using Parent = FFTEngineBase<Dim>;       //!< base class
-    using Ccoord = typename Parent::Ccoord;  //!< cell coordinates type
+    using Parent = FFTEngineBase<Dim>;  //!< base class
+    using Ccoord = typename Parent::Ccoord;      //!< cell coordinates type
     //! field for Fourier transform of second-order tensor
     using Workspace_t = typename Parent::Workspace_t;
     //! real-valued second-order tensor
@@ -75,10 +75,10 @@ namespace muFFT {
     virtual ~FFTWMPIEngine() noexcept;
 
     //! Copy assignment operator
-    FFTWMPIEngine & operator=(const FFTWMPIEngine & other) = delete;
+    FFTWMPIEngine<Dim> & operator=(const FFTWMPIEngine & other) = delete;
 
     //! Move assignment operator
-    FFTWMPIEngine & operator=(FFTWMPIEngine && other) = default;
+    FFTWMPIEngine<Dim> & operator=(FFTWMPIEngine && other) = default;
 
     // compute the plan, etc
     void initialise(FFT_PlanFlags plan_flags) override;
@@ -104,7 +104,6 @@ namespace muFFT {
     bool initialised{false};  //!< to prevent double initialisation
     bool active{true};        //!< FFTWMPI sometimes assigns zero grid points
   };
-
 }  // namespace muFFT
 
 #endif  // SRC_LIBMUFFT_FFTWMPI_ENGINE_HH_

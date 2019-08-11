@@ -46,25 +46,24 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   using fixlist = boost::mpl::list<
       ProjectionFixture<twoD, twoD, Squares<twoD>, FourierGradient<twoD>,
-                        ProjectionFiniteStrain<twoD, twoD>>,
+                        ProjectionFiniteStrain<twoD>>,
       ProjectionFixture<threeD, threeD, Squares<threeD>,
                         FourierGradient<threeD>,
-                        ProjectionFiniteStrain<threeD, threeD>>,
+                        ProjectionFiniteStrain<threeD>>,
       ProjectionFixture<twoD, twoD, Sizes<twoD>, FourierGradient<twoD>,
-                        ProjectionFiniteStrain<twoD, twoD>>,
+                        ProjectionFiniteStrain<twoD>>,
       ProjectionFixture<threeD, threeD, Sizes<threeD>, FourierGradient<threeD>,
-                        ProjectionFiniteStrain<threeD, threeD>>,
+                        ProjectionFiniteStrain<threeD>>,
 
       ProjectionFixture<twoD, twoD, Squares<twoD>, FourierGradient<twoD>,
-                        ProjectionFiniteStrainFast<twoD, twoD>>,
+                        ProjectionFiniteStrainFast<twoD>>,
       ProjectionFixture<threeD, threeD, Squares<threeD>,
                         FourierGradient<threeD>,
-                        ProjectionFiniteStrainFast<threeD, threeD>>,
-
+                        ProjectionFiniteStrainFast<threeD>>,
       ProjectionFixture<twoD, twoD, Sizes<twoD>, FourierGradient<twoD>,
-                        ProjectionFiniteStrainFast<twoD, twoD>>,
+                        ProjectionFiniteStrainFast<twoD>>,
       ProjectionFixture<threeD, threeD, Sizes<threeD>, FourierGradient<threeD>,
-                        ProjectionFiniteStrainFast<threeD, threeD>>>;
+                        ProjectionFiniteStrainFast<threeD>>>;
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(constructor_test, fix, fixlist, fix) {
@@ -75,7 +74,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   BOOST_AUTO_TEST_CASE(even_grid_test) {
     using Engine = muFFT::FFTWEngine<twoD>;
-    using proj = ProjectionFiniteStrainFast<twoD, twoD>;
+    using proj = ProjectionFiniteStrainFast<twoD>;
     auto engine = std::make_unique<Engine>(Ccoord_t<twoD>{2, 3}, 2 * 2);
     BOOST_CHECK_THROW(proj(std::move(engine), Rcoord_t<twoD>{4.3, 4.3}),
                       std::runtime_error);
@@ -91,20 +90,25 @@ namespace muSpectre {
         dim == fix::mdim,
         "These tests assume that the material and spatial dimension are "
         "identical");
-    using Fields = muGrid::GlobalFieldCollection<sdim>;
-    using FieldT = muGrid::TensorField<Fields, Real, secondOrder, mdim>;
-    using FieldMap = muGrid::MatrixFieldMap<Fields, Real, mdim, mdim>;
+    using Fields = muGrid::GlobalNFieldCollection<sdim>;
+    using FieldT = muGrid::TypedNField<Real>;
+    using FieldMap = muGrid::MatrixNFieldMap<Real, false, mdim, mdim>;
     using Vector = Eigen::Matrix<Real, dim, 1>;
 
-    Fields fields{};
-    FieldT & f_grad{muGrid::make_field<FieldT>("gradient", fields)};
-    FieldT & f_var{muGrid::make_field<FieldT>("working field", fields)};
+    Fields fields{1};
+    FieldT & f_grad{fields.template register_field<FieldT>(
+        "gradient", mdim*mdim)};
+    FieldT & f_var{fields.template register_field<FieldT>(
+        "working field", mdim*mdim)};
 
     FieldMap grad(f_grad);
     FieldMap var(f_var);
 
     fields.initialise(fix::projector.get_nb_subdomain_grid_pts(),
                       fix::projector.get_subdomain_locations());
+    grad.initialise();
+    var.initialise();
+
     muFFT::FFT_freqs<dim> freqs{fix::projector.get_nb_domain_grid_pts(),
                                 fix::projector.get_domain_lengths()};
     Vector k;
@@ -116,7 +120,7 @@ namespace muSpectre {
 
     using muGrid::operator/;
     // start_field_iteration_snippet
-    for (auto && tup : akantu::zip(fields, grad, var)) {
+    for (auto && tup : akantu::zip(fields.get_pixels(), grad, var)) {
       auto & ccoord = std::get<0>(tup);  // iterate from fields
       auto & g = std::get<1>(tup);       // iterate from grad
       auto & v = std::get<2>(tup);       // iterate from var
@@ -136,7 +140,7 @@ namespace muSpectre {
     fix::projector.initialise(muFFT::FFT_PlanFlags::estimate);
     fix::projector.apply_projection(f_var);
 
-    for (auto && tup : akantu::zip(fields, grad, var)) {
+    for (auto && tup : akantu::zip(fields.get_pixels(), grad, var)) {
       auto & ccoord = std::get<0>(tup);
       auto & g = std::get<1>(tup);
       auto & v = std::get<2>(tup);
@@ -162,21 +166,25 @@ namespace muSpectre {
     // check if the exact projection operator is a valid projection operator.
     // Thus it has to be idempotent, G^2=G or G:G:test_field = G:test_field.
     constexpr Dim_t sdim{fix::sdim}, mdim{fix::mdim};
-    using Fields = muGrid::GlobalFieldCollection<sdim>;
-    using FieldT = muGrid::TensorField<Fields, Real, secondOrder, mdim>;
-    using FieldMap = muGrid::MatrixFieldMap<Fields, Real, mdim, mdim>;
+    using Fields = muGrid::GlobalNFieldCollection<sdim>;
+    using FieldT = muGrid::TypedNField<Real>;
+    using FieldMap = muGrid::MatrixNFieldMap<Real, false, mdim, mdim>;
 
-    Fields fields{};
-    FieldT & f_grad{muGrid::make_field<FieldT>("gradient", fields)};
-    FieldT & f_grad_test{muGrid::make_field<FieldT>("gradient_test", fields)};
+    Fields fields{1};
+    FieldT & f_grad{fields.template register_field<FieldT>(
+        "gradient", mdim*mdim)};
+    FieldT & f_grad_test{fields.template register_field<FieldT>(
+        "gradient_test", mdim*mdim)};
     FieldMap grad(f_grad);
     FieldMap grad_test(f_grad_test);
 
     fields.initialise(fix::projector.get_nb_subdomain_grid_pts(),
                       fix::projector.get_subdomain_locations());
+    grad.initialise();
+    grad_test.initialise();
 
-    f_grad.eigen().setRandom();
-    f_grad_test.eigen() = f_grad.eigen();
+    f_grad.eigen_vec().setRandom();
+    f_grad_test.eigen_vec() = f_grad.eigen_vec();
 
     fix::projector.initialise(muFFT::FFT_PlanFlags::estimate);
     // apply projection once; G:f_grad

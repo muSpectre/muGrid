@@ -42,8 +42,8 @@ except ImportError:
     MPI = None
 
 import _muFFT
-from _muFFT import (get_domain_ccoord, get_domain_index, get_hermitian_sizes,
-                    FFT_PlanFlags)
+from _muFFT import (get_domain_ccoord, get_domain_index,
+                    get_nb_hermitian_grid_pts, FFT_PlanFlags)
 
 import _muSpectre
 from _muSpectre import (SplitCell, Formulation, material, solvers, FiniteDiff)

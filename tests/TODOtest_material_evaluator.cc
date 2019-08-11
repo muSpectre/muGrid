@@ -154,7 +154,7 @@ namespace muSpectre {
       return 1e-4 * (x + x.transpose());
     }(T2_t::Random() - T2_t::Ones() * .5)};
 
-    mat.add_pixel({}, eigen_strain);
+    mat.add_pixel(0, eigen_strain);
 
     const T2_t sigma{evaluator.evaluate_stress(eps, Formulation::small_strain)};
     const T2_t P{evaluator.evaluate_stress(F, Formulation::finite_strain)};

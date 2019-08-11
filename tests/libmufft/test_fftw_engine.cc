@@ -37,8 +37,8 @@
 
 #include <libmufft/fftw_engine.hh>
 #include <libmugrid/ccoord_operations.hh>
-#include <libmugrid/field_collection.hh>
-#include <libmugrid/field_map.hh>
+#include <libmugrid/nfield_collection.hh>
+#include <libmugrid/nfield_map_static.hh>
 #include <libmugrid/iterators.hh>
 
 #include <boost/mpl/list.hpp>
@@ -90,24 +90,23 @@ namespace muFFT {
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(fft_test, Fix, fixlist, Fix) {
     Fix::engine.initialise(FFT_PlanFlags::estimate);
-    constexpr Dim_t order{2};
-    using FC_t = muGrid::GlobalFieldCollection<Fix::sdim>;
-    FC_t fc;
-    auto & input{
-        muGrid::make_field<muGrid::TensorField<FC_t, Real, order, Fix::mdim>>(
-            "input", fc)};
-    auto & ref{
-        muGrid::make_field<muGrid::TensorField<FC_t, Real, order, Fix::mdim>>(
-            "reference", fc)};
-    auto & result{
-        muGrid::make_field<muGrid::TensorField<FC_t, Real, order, Fix::mdim>>(
-            "result", fc)};
+    using FC_t = muGrid::GlobalNFieldCollection<Fix::sdim>;
+    FC_t fc(1);
+    auto & input{fc.template register_field<muGrid::TypedNField<Real>>(
+        "input", Fix::mdim*Fix::mdim)};
+    auto & ref{fc.template register_field<muGrid::TypedNField<Real>>(
+            "reference", Fix::mdim*Fix::mdim)};
+    auto & result{fc.template register_field<muGrid::TypedNField<Real>>(
+            "result", Fix::mdim*Fix::mdim)};
     fc.initialise(Fix::res(), Fix::loc());
 
-    using map_t = muGrid::MatrixFieldMap<FC_t, Real, Fix::mdim, Fix::mdim>;
+    using map_t = muGrid::MatrixNFieldMap<Real, false, Fix::mdim, Fix::mdim>;
     map_t inmap{input};
+    inmap.initialise();
     auto refmap{map_t{ref}};
+    refmap.initialise();
     auto resultmap{map_t{result}};
+    resultmap.initialise();
     size_t cntr{0};
     for (auto tup : akantu::zip(inmap, refmap)) {
       cntr++;
@@ -118,9 +117,9 @@ namespace muFFT {
     }
     auto & complex_field = Fix::engine.fft(input);
     using cmap_t =
-        muGrid::MatrixFieldMap<muGrid::LocalFieldCollection<Fix::sdim>, Complex,
-                               Fix::mdim, Fix::mdim>;
+        muGrid::MatrixNFieldMap<Complex, false, Fix::mdim, Fix::mdim>;
     cmap_t complex_map(complex_field);
+    complex_map.initialise();
     Real error = complex_map[0].imag().norm();
     BOOST_CHECK_LT(error, tol);
 

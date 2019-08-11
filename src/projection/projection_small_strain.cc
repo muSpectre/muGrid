@@ -39,10 +39,9 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  ProjectionSmallStrain<DimS, DimM>::ProjectionSmallStrain(FFTEngine_ptr engine,
-                                                           Rcoord lengths,
-                                                           Gradient_t gradient)
+  template <Dim_t DimS>
+  ProjectionSmallStrain<DimS>::ProjectionSmallStrain(
+    FFTEngine_ptr engine, Rcoord lengths, Gradient_t gradient)
       : Parent{std::move(engine), lengths, gradient,
                Formulation::small_strain} {
     for (auto res : this->fft_engine->get_nb_domain_grid_pts()) {
@@ -54,15 +53,16 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimS>
   void
-  ProjectionSmallStrain<DimS, DimM>::initialise(muFFT::FFT_PlanFlags flags) {
+  ProjectionSmallStrain<DimS>::initialise(muFFT::FFT_PlanFlags flags) {
     using muGrid::get;
     Parent::initialise(flags);
 
     muFFT::FFT_freqs<DimS> fft_freqs(this->fft_engine->get_nb_domain_grid_pts(),
                                      this->domain_lengths);
-    for (auto && tup : akantu::zip(*this->fft_engine, this->Ghat)) {
+    for (auto && tup : akantu::zip(this->fft_engine->get_pixels(),
+                                   this->Ghat)) {
       const auto & ccoord = std::get<0>(tup);
       auto & G = std::get<1>(tup);
       auto xi = fft_freqs.get_unit_xi(ccoord);
@@ -89,6 +89,6 @@ namespace muSpectre {
     }
   }
 
-  template class ProjectionSmallStrain<twoD, twoD>;
-  template class ProjectionSmallStrain<threeD, threeD>;
+  template class ProjectionSmallStrain<twoD>;
+  template class ProjectionSmallStrain<threeD>;
 }  // namespace muSpectre

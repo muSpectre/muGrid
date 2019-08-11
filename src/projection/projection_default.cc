@@ -39,19 +39,17 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  ProjectionDefault<DimS, DimM>::ProjectionDefault(FFTEngine_ptr engine,
-                                                   Rcoord lengths,
-                                                   Gradient_t gradient,
-                                                   Formulation form)
+  template <Dim_t DimS>
+  ProjectionDefault<DimS>::ProjectionDefault(
+    FFTEngine_ptr engine, Rcoord lengths, Gradient_t gradient, Formulation form)
       : Parent{std::move(engine), lengths, gradient, form},
-        Gfield{muGrid::make_field<Proj_t>("Projection Operator",
-                                          this->projection_container)},
+        Gfield{this->projection_container.template register_field<Proj_t>(
+          "Projection Operator", DimS * DimS * DimS * DimS)},
         Ghat{Gfield} {}
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void ProjectionDefault<DimS, DimM>::apply_projection(Field_t & field) {
+  template <Dim_t DimS>
+  void ProjectionDefault<DimS>::apply_projection(Field_t & field) {
     Vector_map field_map{this->fft_engine->fft(field)};
     Real factor = this->fft_engine->normalisation();
     for (auto && tup : akantu::zip(this->Ghat, field_map)) {
@@ -63,18 +61,18 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  Eigen::Map<ArrayXXc> ProjectionDefault<DimS, DimM>::get_operator() {
-    return this->Gfield.dyn_eigen();
+  template <Dim_t DimS>
+  Eigen::Map<MatrixXXc> ProjectionDefault<DimS>::get_operator() {
+    return this->Gfield.eigen_pixel();
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  std::array<Dim_t, 2> ProjectionDefault<DimS, DimM>::get_strain_shape() const {
-    return std::array<Dim_t, 2>{DimM, DimM};
+  template <Dim_t DimS>
+  std::array<Dim_t, 2> ProjectionDefault<DimS>::get_strain_shape() const {
+    return std::array<Dim_t, 2>{DimS, DimS};
   }
 
   /* ---------------------------------------------------------------------- */
-  template class ProjectionDefault<twoD, twoD>;
-  template class ProjectionDefault<threeD, threeD>;
+  template class ProjectionDefault<twoD>;
+  template class ProjectionDefault<threeD>;
 }  // namespace muSpectre

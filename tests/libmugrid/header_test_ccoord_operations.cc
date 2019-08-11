@@ -64,7 +64,7 @@ namespace muGrid {
     constexpr Dim_t size{5};
 
     constexpr Ccoord cube = CcoordOps::get_cube<dim>(size);
-    constexpr Ccoord herm = CcoordOps::get_hermitian_sizes(cube);
+    constexpr Ccoord herm = CcoordOps::get_nb_hermitian_grid_pts(cube);
     Ccoord ref_cube = cube;
     ref_cube.front() = (cube.front() + 1) / 2;
 

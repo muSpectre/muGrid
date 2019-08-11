@@ -64,7 +64,7 @@ namespace muSpectre {
     constexpr Rcoord_t<dim> lengths{5, 5, 5};
     auto fft_ptr{std::make_unique<muFFT::FFTWEngine<dim>>(
         nb_grid_pts, muGrid::ipow(dim, 2))};
-    auto proj_ptr{std::make_unique<ProjectionFiniteStrainFast<dim, dim>>(
+    auto proj_ptr{std::make_unique<ProjectionFiniteStrainFast<dim>>(
         std::move(fft_ptr), lengths)};
     CellBase<dim, dim> sys(std::move(proj_ptr));
 

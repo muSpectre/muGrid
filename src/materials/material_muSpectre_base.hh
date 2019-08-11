@@ -127,7 +127,9 @@ namespace muSpectre {
     MaterialMuSpectre() = delete;
 
     //! Construct by name
-    explicit MaterialMuSpectre(std::string name);
+    explicit MaterialMuSpectre(const std::string & name,
+                               const Dim_t & spatial_dimension,
+                               const Dim_t & nb_quad_pts);
 
     //! Copy constructor
     MaterialMuSpectre(const MaterialMuSpectre & other) = delete;
@@ -220,8 +222,10 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <class Material, Dim_t DimS, Dim_t DimM>
-  MaterialMuSpectre<Material, DimS, DimM>::MaterialMuSpectre(std::string name)
-      : Parent(name) {
+  MaterialMuSpectre<Material, DimS, DimM>::MaterialMuSpectre(
+      const std::string & name, const Dim_t & spatial_dimension,
+      const Dim_t & nb_quad_pts)
+    : Parent(name, spatial_dimension, nb_quad_pts) {
     using stress_compatible =
         typename traits::StressMap_t::template is_compatible<StressField_t>;
     using strain_compatible =
@@ -297,7 +301,10 @@ namespace muSpectre {
   std::tuple<std::shared_ptr<Material>, MaterialEvaluator<DimM>>
   MaterialMuSpectre<Material, DimS, DimM>::make_evaluator(
       ConstructorArgs &&... args) {
-    auto mat = std::make_shared<Material>("name", args...);
+    constexpr Dim_t SpatialDimension{muGrid::Unknown};
+    constexpr Dim_t NbQuadPts{1};
+    auto mat = std::make_shared<Material>("name", SpatialDimension, NbQuadPts,
+                                          args...);
     using Ret_t =
         std::tuple<std::shared_ptr<Material>, MaterialEvaluator<DimM>>;
     return Ret_t(mat, MaterialEvaluator<DimM>{mat});

@@ -36,9 +36,12 @@
 #ifndef SRC_LIBMUFFT_FFT_ENGINE_BASE_HH_
 #define SRC_LIBMUFFT_FFT_ENGINE_BASE_HH_
 
-#include "mufft_common.hh"
+#include <libmugrid/ccoord_operations.hh>
+#include <libmugrid/nfield_collection_global.hh>
+#include <libmugrid/nfield_typed.hh>
+
 #include "communicator.hh"
-#include <libmugrid/field_collection.hh>
+#include "mufft_common.hh"
 
 namespace muFFT {
 
@@ -53,20 +56,24 @@ namespace muFFT {
     //! cell coordinates type
     using Ccoord = Ccoord_t<DimS>;
     //! global FieldCollection
-    using GFieldCollection_t = muGrid::GlobalFieldCollection<DimS>;
-    //! local FieldCollection (for Fourier-space pixels)
-    using LFieldCollection_t = muGrid::LocalFieldCollection<DimS>;
-    //! Field type on which to apply the projection
-    using Field_t = muGrid::TypedField<GFieldCollection_t, Real>;
+    using GFieldCollection_t = muGrid::GlobalNFieldCollection<DimS>;
+    //! pixel iterator
+    using Pixels = typename GFieldCollection_t::Pixels;
+    /**
+     * Field type on which to apply the projection.
+     * This is a TypedNFieldBase because it need to be able to hold
+     * either TypedNField or a WrappedNField.
+     */
+    using Field_t = muGrid::TypedNFieldBase<Real>;
     /**
      * Field type holding a Fourier-space representation of a
      * real-valued second-order tensor field
      */
-    using Workspace_t = muGrid::TypedField<LFieldCollection_t, Complex>;
+    using Workspace_t = muGrid::ComplexNField;
     /**
      * iterator over Fourier-space discretisation point
      */
-    using iterator = typename LFieldCollection_t::iterator;
+    using iterator = typename GFieldCollection_t::Pixels::iterator;
 
     //! Default constructor
     FFTEngineBase() = delete;
@@ -109,14 +116,13 @@ namespace muFFT {
      * iterators over only those pixels that exist in frequency space
      * (i.e. about half of all pixels, see rfft)
      */
-    //! returns an iterator to the first pixel in Fourier space
-    inline iterator begin() { return this->work_space_container.begin(); }
-    //! returns an iterator past to the last pixel in Fourier space
-    inline iterator end() { return this->work_space_container.end(); }
+    const Pixels & get_pixels() const;
 
     //! nb of pixels (mostly for debugging)
     size_t size() const;
     //! nb of pixels in Fourier space
+    size_t fourier_size() const;
+    //! nb of pixels in the work space (may contain a padding region)
     size_t workspace_size() const;
 
     //! return the communicator object
@@ -150,7 +156,7 @@ namespace muFFT {
     }
 
     //! only required for testing and debugging
-    LFieldCollection_t & get_field_collection() {
+    GFieldCollection_t & get_field_collection() {
       return this->work_space_container;
     }
     //! only required for testing and debugging
@@ -175,7 +181,7 @@ namespace muFFT {
      * Fourier-space points
      */
     Communicator comm;  //!< communicator
-    LFieldCollection_t work_space_container{};
+    GFieldCollection_t work_space_container;
     Ccoord nb_subdomain_grid_pts;  //!< nb_grid_pts of the process-local
                                    //!< (subdomain) portion of the cell
     Ccoord subdomain_locations;  // !< location of the process-local (subdomain)

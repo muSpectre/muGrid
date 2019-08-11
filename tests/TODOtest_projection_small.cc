@@ -46,16 +46,16 @@ namespace muSpectre {
   using fixlist = boost::mpl::list<
       ProjectionFixture<twoD, twoD, Squares<twoD>,
                         FourierGradient<twoD>,
-                        ProjectionSmallStrain<twoD, twoD>>,
+                        ProjectionSmallStrain<twoD>>,
       ProjectionFixture<threeD, threeD, Squares<threeD>,
                         FourierGradient<threeD>,
-                        ProjectionSmallStrain<threeD, threeD>>,
+                        ProjectionSmallStrain<threeD>>,
       ProjectionFixture<twoD, twoD, Sizes<twoD>,
                         FourierGradient<twoD>,
-                        ProjectionSmallStrain<twoD, twoD>>,
+                        ProjectionSmallStrain<twoD>>,
       ProjectionFixture<threeD, threeD, Sizes<threeD>,
                         FourierGradient<threeD>,
-                        ProjectionSmallStrain<threeD, threeD>>>;
+                        ProjectionSmallStrain<threeD>>>;
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(constructor_test, fix, fixlist, fix) {
@@ -73,20 +73,25 @@ namespace muSpectre {
         dim == fix::mdim,
         "These tests assume that the material and spatial dimension are "
         "identical");
-    using Fields = muGrid::GlobalFieldCollection<sdim>;
-    using FieldT = muGrid::TensorField<Fields, Real, secondOrder, mdim>;
-    using FieldMap = muGrid::MatrixFieldMap<Fields, Real, mdim, mdim>;
+    using Fields = muGrid::GlobalNFieldCollection<sdim>;
+    using FieldT = muGrid::RealNField;
+    using FieldMap = muGrid::MatrixNFieldMap<Real, false, mdim, mdim>;
     using Vector = Eigen::Matrix<Real, dim, 1>;
 
-    Fields fields{};
-    FieldT & f_grad{muGrid::make_field<FieldT>("strain", fields)};
-    FieldT & f_var{muGrid::make_field<FieldT>("working field", fields)};
+    Fields fields{1};
+    FieldT & f_grad{fields.template register_field<FieldT>(
+        "strain", mdim*mdim)};
+    FieldT & f_var{fields.template register_field<FieldT>(
+        "working field", mdim*mdim)};
 
     FieldMap grad(f_grad);
     FieldMap var(f_var);
 
     fields.initialise(fix::projector.get_nb_subdomain_grid_pts(),
                       fix::projector.get_subdomain_locations());
+    grad.initialise();
+    var.initialise();
+
     muFFT::FFT_freqs<dim> freqs{fix::projector.get_nb_domain_grid_pts(),
                                 fix::projector.get_domain_lengths()};
 
@@ -98,7 +103,7 @@ namespace muSpectre {
     }
 
     using muGrid::operator/;
-    for (auto && tup : akantu::zip(fields, grad, var)) {
+    for (auto && tup : akantu::zip(fields.get_pixels(), grad, var)) {
       auto & ccoord = std::get<0>(tup);
       auto & g = std::get<1>(tup);
       auto & v = std::get<2>(tup);
@@ -119,7 +124,7 @@ namespace muSpectre {
 
     using muGrid::operator/;
     constexpr bool verbose{false};
-    for (auto && tup : akantu::zip(fields, grad, var)) {
+    for (auto && tup : akantu::zip(fields.get_pixels(), grad, var)) {
       auto & ccoord = std::get<0>(tup);
       auto & g = std::get<1>(tup);
       auto & v = std::get<2>(tup);

@@ -114,16 +114,6 @@ namespace muFFT {
                                  "processes.");
       }
     }
-
-    for (auto && pixel :
-         std::conditional_t<DimS == 2, muGrid::CcoordOps::Pixels<DimS, 1, 0>,
-                            // TODO(pastewka): This should be the correct order
-                            // of dimension for a 2d process mesh, but tests
-                            // don't pass.  CcoordOps::Pixels<DimS, 1, 2, 0>
-                            muGrid::CcoordOps::Pixels<DimS, 0, 2, 1>>(
-             this->nb_fourier_grid_pts, this->fourier_locations)) {
-      this->work_space_container.add_pixel(pixel);
-    }
   }
 
   /* ---------------------------------------------------------------------- */
@@ -224,7 +214,12 @@ namespace muFFT {
     }
     if (field.size() !=
         muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)) {
-      throw std::runtime_error("size mismatch");
+      std::stringstream error;
+      error << "The size of the field passed to the forward FFT is "
+            << field.size() << " and does not match the size "
+            << muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)
+            << " of the (sub)domain handled by PFFTEngine.";
+      throw std::runtime_error(error.str());
     }
     // Copy field data to workspace buffer. This is necessary because workspace
     // buffer is larger than field buffer.
@@ -243,7 +238,12 @@ namespace muFFT {
     }
     if (field.size() !=
         muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)) {
-      throw std::runtime_error("size mismatch");
+      std::stringstream error;
+      error << "The size of the field passed to the inverse FFT is "
+            << field.size() << " and does not match the size "
+            << muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)
+            << " of the (sub)domain handled by PFFTEngine.";
+      throw std::runtime_error(error.str());
     }
     pfft_execute_dft_c2r(this->plan_ifft,
                          reinterpret_cast<pfft_complex *>(this->work.data()),

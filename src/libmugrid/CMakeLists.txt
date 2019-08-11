@@ -62,11 +62,21 @@ set(mugrid_HDRS
   tensor_algebra.hh
   )
 
-add_library(muGrid INTERFACE)
-#target_sources(muGrid INTERFACE ${mugrid_HDRS})
+set(mugrid_SRCS
+  nfield_collection.cc
+  nfield_collection_global.cc
+  nfield_collection_local.cc
+  nfield.cc
+  nfield_typed.cc
+  nfield_map.cc
+  state_nfield.cc
+  state_nfield_map.cc
+  )
+
+add_library(muGrid "")
 
 # defining external dependencies
-target_link_libraries(muGrid INTERFACE Eigen3::Eigen)
+target_link_libraries(muGrid PUBLIC Eigen3::Eigen)
 
 # defining exported include directories
 target_include_directories(muGrid
@@ -76,8 +86,10 @@ target_include_directories(muGrid
 set_property(TARGET muGrid APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>)
 
-target_compile_features(muGrid INTERFACE
+target_compile_features(muGrid PUBLIC
   cxx_auto_type cxx_constexpr cxx_decltype cxx_decltype_auto)
+
+target_sources(muGrid PRIVATE ${mugrid_SRCS})
 
 if(MUGRID_NAMESPACE)
   add_library(${MUGRID_NAMESPACE}muGrid ALIAS muGrid)
@@ -85,11 +97,13 @@ endif()
 
 # ------------------------------------------------------------------------------
 if(NOT MUGRID_TARGETS_EXPORT)
-  set(MUGRID_TARGETS_EXPORT muGridTargets)
+  set(MUGRID_TARGETS_EXPORT muGridTargets eigen3)
 endif()
 
 install(TARGETS muGrid
   EXPORT ${MUGRID_TARGETS_EXPORT}
+  LIBRARY
+    DESTINATION lib
   INCLUDES
     DESTINATION include/libmugrid)
 
@@ -100,13 +114,13 @@ if("${MUGRID_TARGETS_EXPORT}" STREQUAL "muGridTargets")
     set(_namespace NAMESPACE ${MUGRID_NAMESPACE})
   endif()
 
-  install(EXPORT ${MUGRID_TARGETS_EXPORT}
-    ${_namespace}
-    DESTINATION share/cmake/${PROJECT_NAME}
-    COMPONENT dev)
+  # install(EXPORT ${MUGRID_TARGETS_EXPORT}
+  #   ${_namespace}
+  #   DESTINATION share/cmake/${PROJECT_NAME}
+  #   COMPONENT dev)
 
-  #Export for build tree
-  export(EXPORT ${MUGRID_TARGETS_EXPORT}
-    ${_namespace}
-    FILE "${CMAKE_BINARY_DIR}/${MUGRID_TARGETS_EXPORT}.cmake")
+  # #Export for build tree
+  # export(EXPORT ${MUGRID_TARGETS_EXPORT}
+  #   ${_namespace}
+  #   FILE "${CMAKE_BINARY_DIR}/${MUGRID_TARGETS_EXPORT}.cmake")
 endif()

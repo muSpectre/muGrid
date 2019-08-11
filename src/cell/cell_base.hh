@@ -307,7 +307,7 @@ namespace muSpectre {
     //! materials handled through `std::unique_ptr`s
     using Material_ptr = std::unique_ptr<Material_t>;
     //! polymorphic base projection type
-    using Projection_t = ProjectionBase<DimS, DimM>;
+    using Projection_t = ProjectionBase<DimS>;
     //! projections handled through `std::unique_ptr`s
     using Projection_ptr = std::unique_ptr<Projection_t>;
     //! dynamic global fields
@@ -603,7 +603,7 @@ namespace muSpectre {
      * get a reference to the projection object. should only be
      * required for debugging
      */
-    Eigen::Map<ArrayXXc> get_projection() {
+    Eigen::Map<MatrixXXc> get_projection() {
       return this->projection->get_operator();
     }
 

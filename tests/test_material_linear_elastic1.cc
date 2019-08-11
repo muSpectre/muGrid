@@ -54,10 +54,11 @@ namespace muSpectre {
   template <class Mat_t>
   struct MaterialFixture : public Mat_t {
     using Mat = Mat_t;
-    constexpr static Real lambda{2}, mu{1.5};
-    constexpr static Real young{mu * (3 * lambda + 2 * mu) / (lambda + mu)};
-    constexpr static Real poisson{lambda / (2 * (lambda + mu))};
-    MaterialFixture() : Mat("Name", young, poisson) {}
+    const Dim_t NbQuadPts{1};
+    const Real lambda{2}, mu{1.5};
+    const Real young{mu * (3 * lambda + 2 * mu) / (lambda + mu)};
+    const Real poisson{lambda / (2 * (lambda + mu))};
+    MaterialFixture() : mat("Name", Mat_t::mdim(), NbQuadPts, young, poisson) {}
     constexpr static Dim_t sdim{Mat_t::sdim()};
     constexpr static Dim_t mdim{Mat_t::mdim()};
   };
@@ -85,16 +86,12 @@ namespace muSpectre {
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_add_pixel, Fix, mat_list, Fix) {
-    constexpr Dim_t sdim{Fix::sdim};
+    auto & mat{Fix::mat};
     muGrid::testGoodies::RandRange<size_t> rng;
 
     const Dim_t nb_pixel{7}, box_size{17};
-    using Ccoord = Ccoord_t<sdim>;
     for (Dim_t i = 0; i < nb_pixel; ++i) {
-      Ccoord c;
-      for (Dim_t j = 0; j < sdim; ++j) {
-        c[j] = rng.randval(0, box_size);
-      }
+      auto && c = rng.randval(0, muGrid::ipow(box_size, mat.mdim()));
       if (!has_internals<typename Fix::Mat>::value) {
         BOOST_CHECK_NO_THROW(Fix::add_pixel(c));
       }
@@ -113,8 +110,9 @@ namespace muSpectre {
       using Ccoord = Ccoord_t<Mat_t::sdim()>;
       Ccoord cube{muGrid::CcoordOps::get_cube<Mat_t::sdim()>(box_size)};
       muGrid::CcoordOps::Pixels<Mat_t::sdim()> pixels(cube);
-      for (auto pixel : pixels) {
-        this->mat.add_pixel(pixel);
+      for (auto && id_pixel : akantu::enumerate(pixels)) {
+        auto && id{std::get<0>(id_pixel)};
+        this->mat.add_pixel(id);
       }
       this->mat.initialise();
     }

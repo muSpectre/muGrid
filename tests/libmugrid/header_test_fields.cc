@@ -34,9 +34,9 @@
  */
 
 #include "tests.hh"
-#include <libmugrid/field_collection.hh>
-#include <libmugrid/field.hh>
-#include <libmugrid/ccoord_operations.hh>
+#include "libmugrid/field_collection.hh"
+#include "libmugrid/field.hh"
+#include "libmugrid/ccoord_operations.hh"
 
 #include <boost/mpl/list.hpp>
 

@@ -61,30 +61,30 @@ namespace muFFT {
   using fixlist = boost::mpl::list<
 #ifdef WITH_FFTWMPI
       ProjectionFixture<twoD, twoD, Squares<twoD>,
-                        ProjectionSmallStrain<twoD, twoD>, FFTWMPIEngine<twoD>>,
+                        ProjectionSmallStrain<twoD>, FFTWMPIEngine<twoD>>,
       ProjectionFixture<threeD, threeD, Squares<threeD>,
-                        ProjectionSmallStrain<threeD, threeD>,
+                        ProjectionSmallStrain<threeD>,
                         FFTWMPIEngine<threeD>>,
       ProjectionFixture<twoD, twoD, Sizes<twoD>,
-                        ProjectionSmallStrain<twoD, twoD>, FFTWMPIEngine<twoD>>,
+                        ProjectionSmallStrain<twoD>, FFTWMPIEngine<twoD>>,
       ProjectionFixture<threeD, threeD, Sizes<threeD>,
-                        ProjectionSmallStrain<threeD, threeD>,
+                        ProjectionSmallStrain<threeD>,
                         FFTWMPIEngine<threeD>>,
 #endif
 #ifdef WITH_PFFT
       ProjectionFixture<twoD, twoD, Squares<twoD>,
-                        ProjectionSmallStrain<twoD, twoD>, PFFTEngine<twoD>>,
+                        ProjectionSmallStrain<twoD>, PFFTEngine<twoD>>,
       ProjectionFixture<threeD, threeD, Squares<threeD>,
-                        ProjectionSmallStrain<threeD, threeD>,
+                        ProjectionSmallStrain<threeD>,
                         PFFTEngine<threeD>>,
       ProjectionFixture<twoD, twoD, Sizes<twoD>,
-                        ProjectionSmallStrain<twoD, twoD>, PFFTEngine<twoD>>,
+                        ProjectionSmallStrain<twoD>, PFFTEngine<twoD>>,
       ProjectionFixture<threeD, threeD, Sizes<threeD>,
-                        ProjectionSmallStrain<threeD, threeD>,
+                        ProjectionSmallStrain<threeD>,
                         PFFTEngine<threeD>>,
 #endif
       ProjectionFixture<twoD, twoD, Squares<twoD>,
-                        ProjectionSmallStrain<twoD, twoD>, FFTWEngine<twoD>,
+                        ProjectionSmallStrain<twoD>, FFTWEngine<twoD>,
                         false>>;
 
   /* ---------------------------------------------------------------------- */
@@ -107,20 +107,24 @@ namespace muFFT {
         dim == fix::mdim,
         "These tests assume that the material and spatial dimension are "
         "identical");
-    using Fields = muGrid::GlobalFieldCollection<sdim>;
-    using FieldT = muGrid::TensorField<Fields, Real, muGrid::secondOrder, mdim>;
-    using FieldMap = muGrid::MatrixFieldMap<Fields, Real, mdim, mdim>;
+    using Fields = muGrid::GlobalFFieldCollection<sdim>;
+    using FieldT = muGrid::RealNField;
+    using FieldMap = muGrid::MatrixFieldMap<Real, false, mdim, mdim>;
     using Vector = Eigen::Matrix<Real, dim, 1>;
 
-    Fields fields{};
-    FieldT & f_grad{muGrid::make_field<FieldT>("strain", fields)};
-    FieldT & f_var{muGrid::make_field<FieldT>("working field", fields)};
+    Fields fields{1};
+    FieldT & f_grad{fields.template register_field<FieldT>(
+        "strain", mdim*mdim)};
+    FieldT & f_var{fields.template register_field<FieldT>(
+        "working field", mdim*mdim)};
 
     FieldMap grad(f_grad);
     FieldMap var(f_var);
 
     fields.initialise(fix::projector.get_nb_subdomain_grid_pts(),
                       fix::projector.get_subdomain_locations());
+    grad.initialise();
+    var.initialise();
 
     Vector k;
     for (Dim_t i = 0; i < dim; ++i) {
@@ -129,7 +133,7 @@ namespace muFFT {
       k(i) = (i + 1) * 2 * muGrid::pi / fix::projector.get_domain_lengths()[i];
     }
 
-    for (auto && tup : akantu::zip(fields, grad, var)) {
+    for (auto && tup : akantu::zip(fields.get_pixels(), grad, var)) {
       auto & ccoord = std::get<0>(tup);
       auto & g = std::get<1>(tup);
       auto & v = std::get<2>(tup);
@@ -149,7 +153,7 @@ namespace muFFT {
     fix::projector.apply_projection(f_var);
 
     constexpr bool verbose{false};
-    for (auto && tup : akantu::zip(fields, grad, var)) {
+    for (auto && tup : akantu::zip(fields.get_pixels(), grad, var)) {
       auto & ccoord = std::get<0>(tup);
       auto & g = std::get<1>(tup);
       auto & v = std::get<2>(tup);

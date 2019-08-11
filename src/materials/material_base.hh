@@ -41,6 +41,7 @@
 
 #include <libmugrid/field.hh>
 #include <libmugrid/field_collection.hh>
+#include <libmugrid/nfield_collection_local.hh>
 
 #include <string>
 #include <tuple>
@@ -62,7 +63,8 @@ namespace muSpectre {
     //! field collection for internal variables, such as eigen-strains,
     //! plastic strains, damage variables, etc, but also for managing which
     //! pixels the material is responsible for
-    using MFieldCollection_t = muGrid::LocalFieldCollection<DimS>;
+    using MFieldCollection_t = muGrid::LocalNFieldCollection;
+
     using iterator = typename MFieldCollection_t::iterator;  //!< pixel iterator
     //! polymorphic base class for fields only to be used for debugging
     using Field_t = muGrid::internal::FieldBase<GFieldCollection_t>;
@@ -94,7 +96,8 @@ namespace muSpectre {
     MaterialBase() = delete;
 
     //! Construct by name
-    explicit MaterialBase(std::string name);
+    MaterialBase(const std::string & name, const Dim_t & spatial_dimension,
+                 const Dim_t & nb_quad_pts);
 
     //! Copy constructor
     MaterialBase(const MaterialBase & other) = delete;
@@ -117,7 +120,7 @@ namespace muSpectre {
      *  (as, e.g. for eigenstrain), we need to pass more parameters. Materials
      *  of this type need to overload add_pixel
      */
-    virtual void add_pixel(const Ccoord & ccooord);
+    virtual void add_pixel(const size_t & pixel_index);
 
     virtual void add_pixel_split(const Ccoord & local_ccoord, Real ratio);
 
@@ -191,7 +194,7 @@ namespace muSpectre {
 
     //! type to return real-valued fields in
     using EigenMap =
-        Eigen::Map<Eigen::Array<Real, Eigen::Dynamic, Eigen::Dynamic>>;
+        Eigen::Map<Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>>;
     /**
      * return an internal field identified by its name as an Eigen Array
      */

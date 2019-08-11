@@ -36,17 +36,19 @@
 #ifndef SRC_PROJECTION_PROJECTION_BASE_HH_
 #define SRC_PROJECTION_PROJECTION_BASE_HH_
 
+#include <libmugrid/nfield_collection.hh>
+#include <libmugrid/nfield_typed.hh>
+
+#include <libmufft/fft_engine_base.hh>
+
 #include "common/muSpectre_common.hh"
 #include "projection/derivative.hh"
-#include <libmugrid/field.hh>
-#include <libmugrid/field_collection.hh>
-#include <libmufft/fft_engine_base.hh>
 
 #include <memory>
 
 namespace muSpectre {
 
-  using ArrayXXc = Eigen::Array<Complex, Eigen::Dynamic, Eigen::Dynamic>;
+  using MatrixXXc = Eigen::Matrix<Complex, Eigen::Dynamic, Eigen::Dynamic>;
 
   template <class Projection>
   struct Projection_traits {};
@@ -54,7 +56,7 @@ namespace muSpectre {
   /**
    * defines the interface which must be implemented by projection operators
    */
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimS>
   class ProjectionBase {
    public:
     //! Eigen type to replace fields
@@ -71,10 +73,8 @@ namespace muSpectre {
     using Rcoord = Rcoord_t<DimS>;
     //! global FieldCollection
     using GFieldCollection_t = typename FFTEngine::GFieldCollection_t;
-    //! local FieldCollection (for Fourier-space pixels)
-    using LFieldCollection_t = typename FFTEngine::LFieldCollection_t;
     //! Field type on which to apply the projection
-    using Field_t = muGrid::TypedField<GFieldCollection_t, Real>;
+    using Field_t = muGrid::RealNField;
     /**
      * iterator over all pixels. This is taken from the FFT engine,
      * because depending on the real-to-complex FFT employed, only
@@ -140,7 +140,7 @@ namespace muSpectre {
     //! return the raw projection operator. This is mainly intended
     //! for maintenance and debugging and should never be required in
     //! regular use
-    virtual Eigen::Map<ArrayXXc> get_operator() = 0;
+    virtual Eigen::Map<MatrixXXc> get_operator() = 0;
 
     //! return the communicator object
     const auto & get_communicator() const {
@@ -156,7 +156,7 @@ namespace muSpectre {
     virtual std::array<Dim_t, 2> get_strain_shape() const = 0;
 
     //! get number of components to project per pixel
-    virtual Dim_t get_nb_components() const { return DimM * DimM; }
+    virtual Dim_t get_nb_components() const = 0;
 
    protected:
     //! handle on the fft_engine used
@@ -181,7 +181,7 @@ namespace muSpectre {
      * http://www.fftw.org/fftw3_doc/Multi_002dDimensional-DFTs-of-Real-Data.html#Multi_002dDimensional-DFTs-of-Real-Data
      * for an example
      */
-    LFieldCollection_t & projection_container{};
+    GFieldCollection_t & projection_container{};
   };
 
 }  // namespace muSpectre

@@ -36,6 +36,8 @@
 #ifndef SRC_LIBMUFFT_COMMUNICATOR_HH_
 #define SRC_LIBMUFFT_COMMUNICATOR_HH_
 
+#include <type_traits>
+
 #ifdef WITH_MPI
 #include <mpi.h>
 #endif

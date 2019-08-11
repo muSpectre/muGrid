@@ -38,6 +38,7 @@
 #define SRC_LIBMUGRID_FIELD_HELPERS_HH_
 
 #include <memory>
+#include <string>
 
 namespace muGrid {
 

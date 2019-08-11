@@ -35,11 +35,17 @@
 
 #include "materials/material_base.hh"
 
+#include <libmugrid/nfield.hh>
+#include <libmugrid/nfield_typed.hh>
+
 namespace muSpectre {
 
   //----------------------------------------------------------------------------//
   template <Dim_t DimS, Dim_t DimM>
-  MaterialBase<DimS, DimM>::MaterialBase(std::string name) : name(name) {
+  MaterialBase<DimS, DimM>::MaterialBase(const std::string & name,
+                                         const Dim_t & spatial_dimension,
+                                         const Dim_t & nb_quad_pts)
+      : name(name), internal_fields{spatial_dimension, nb_quad_pts} {
     static_assert((DimM == oneD) || (DimM == twoD) || (DimM == threeD),
                   "only 1, 2, or threeD supported");
   }
@@ -52,8 +58,8 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void MaterialBase<DimS, DimM>::add_pixel(const Ccoord & ccoord) {
-    this->internal_fields.add_pixel(ccoord);
+  void MaterialBase<DimS, DimM>::add_pixel(const size_t & global_index) {
+    this->internal_fields.add_pixel(global_index);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -126,36 +132,27 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   auto MaterialBase<DimS, DimM>::get_real_field(std::string field_name)
       -> EigenMap {
-    if (not this->internal_fields.check_field_exists(field_name)) {
+    if (not this->internal_fields.field_exists(field_name)) {
       std::stringstream err{};
       err << "Field '" << field_name << "' does not exist in material '"
           << this->name << "'.";
       throw muGrid::FieldCollectionError(err.str());
     }
-    auto & field{this->internal_fields[field_name]};
-    if (field.get_stored_typeid().hash_code() != typeid(Real).hash_code()) {
+    auto & field{this->internal_fields.get_field(field_name)};
+    if (field.get_stored_typeid() != typeid(Real)) {
       std::stringstream err{};
       err << "Field '" << field_name << "' is not real-valued";
       throw muGrid::FieldCollectionError(err.str());
     }
 
-    return static_cast<muGrid::TypedField<MFieldCollection_t, Real> &>(field)
-        .eigen();
+    return static_cast<muGrid::RealNField &>(field).eigen_quad_pt();
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  std::vector<std::string> MaterialBase<DimS, DimM>::list_fields() const {
-    return this->internal_fields.list_fields();
-  }
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void MaterialBase<DimS, DimM>::initialise() {
-    if (!this->is_initialised) {
-      this->internal_fields.initialise();
-      this->is_initialised = true;
-    }
-  }
+  // template <Dim_t DimS, Dim_t DimM>
+  // std::vector<std::string> MaterialBase<DimS, DimM>::list_fields() const {
+  //   return this->internal_fields.list_fields();
+  // }
 
   template class MaterialBase<2, 2>;
   template class MaterialBase<2, 3>;

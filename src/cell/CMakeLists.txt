@@ -43,4 +43,5 @@ if(${SPLIT_CELL})
     ${CMAKE_CURRENT_SOURCE_DIR}/cell_split.cc
     )
 endif()
-target_sources(muSpectre PRIVATE ${cells_SRC})
+#TODO: reactivate
+#target_sources(muSpectre PRIVATE ${cells_SRC})

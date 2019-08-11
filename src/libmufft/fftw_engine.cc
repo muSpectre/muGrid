@@ -44,12 +44,7 @@ namespace muFFT {
   FFTWEngine<Dim>::FFTWEngine(Ccoord nb_grid_pts, Dim_t nb_components,
                               Communicator comm)
       : Parent{nb_grid_pts, nb_components, comm}, plan_fft{nullptr},
-        plan_ifft{nullptr} {
-    for (auto && pixel :
-         muGrid::CcoordOps::Pixels<Dim>(this->nb_fourier_grid_pts)) {
-      this->work_space_container.add_pixel(pixel);
-    }
-  }
+        plan_ifft{nullptr} {}
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t Dim>
@@ -150,7 +145,12 @@ namespace muFFT {
     }
     if (field.size() !=
         muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)) {
-      throw std::runtime_error("size mismatch");
+      std::stringstream error;
+      error << "The size of the field passed to the forward FFT is "
+            << field.size() << " and does not match the size "
+            << muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)
+            << " of the (sub)domain handled by FFTWEngine.";
+      throw std::runtime_error(error.str());
     }
     fftw_execute_dft_r2c(this->plan_fft, field.data(),
                          reinterpret_cast<fftw_complex *>(this->work.data()));
@@ -165,7 +165,12 @@ namespace muFFT {
     }
     if (field.size() !=
         muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)) {
-      throw std::runtime_error("size mismatch");
+      std::stringstream error;
+      error << "The size of the field passed to the inverse FFT is "
+            << field.size() << " and does not match the size "
+            << muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)
+            << " of the (sub)domain handled by FFTWEngine.";
+      throw std::runtime_error(error.str());
     }
     fftw_execute_dft_c2r(this->plan_ifft,
                          reinterpret_cast<fftw_complex *>(this->work.data()),

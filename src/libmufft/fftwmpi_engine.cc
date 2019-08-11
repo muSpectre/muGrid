@@ -83,13 +83,6 @@ namespace muFFT {
         this->active = false;
       }
     }
-
-    for (auto && pixel :
-         std::conditional_t<Dim == 2, muGrid::CcoordOps::Pixels<Dim, 1, 0>,
-                            muGrid::CcoordOps::Pixels<Dim, 0, 2, 1>>(
-             this->nb_fourier_grid_pts, this->fourier_locations)) {
-      this->work_space_container.add_pixel(pixel);
-    }
   }
 
   /* ---------------------------------------------------------------------- */
@@ -195,7 +188,12 @@ namespace muFFT {
     }
     if (field.size() !=
         muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)) {
-      throw std::runtime_error("size mismatch");
+      std::stringstream error;
+      error << "The size of the field passed to the forward FFT is "
+            << field.size() << " and does not match the size "
+            << muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)
+            << " of the (sub)domain handled by FFTWMPIEngine.";
+      throw std::runtime_error(error.str());
     }
     // Copy non-padded field to padded real_workspace.
     // Transposed output of M x N x L transform for >= 3 dimensions is padded
@@ -228,7 +226,12 @@ namespace muFFT {
     }
     if (field.size() !=
         muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)) {
-      throw std::runtime_error("size mismatch");
+      std::stringstream error;
+      error << "The size of the field passed to the forward FFT is "
+            << field.size() << " and does not match the size "
+            << muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)
+            << " of the (sub)domain handled by FFTWMPIEngine.";
+      throw std::runtime_error(error.str());
     }
     // Compute inverse FFT
     fftw_mpi_execute_dft_c2r(

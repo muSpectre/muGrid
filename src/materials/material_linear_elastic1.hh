@@ -104,7 +104,10 @@ namespace muSpectre {
     MaterialLinearElastic1(const MaterialLinearElastic1 & other) = delete;
 
     //! Construct by name, Young's modulus and Poisson's ratio
-    MaterialLinearElastic1(std::string name, Real young, Real poisson);
+    MaterialLinearElastic1(const std::string & name,
+                           const Dim_t & spatial_dimension,
+                           const Dim_t & nb_quad_pts, const Real & young,
+                           const Real & poisson);
 
     //! Move constructor
     MaterialLinearElastic1(MaterialLinearElastic1 && other) = delete;

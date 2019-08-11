@@ -41,6 +41,8 @@
 
 #include "projection/projection_base.hh"
 
+#include <libmugrid/nfield_map_static.hh>
+
 namespace muSpectre {
 
   /**
@@ -48,10 +50,10 @@ namespace muSpectre {
    * operator that is stored in form of a fourth-order tensor of real
    * values per k-grid point
    */
-  template <Dim_t DimS, Dim_t DimM>
-  class ProjectionDefault : public ProjectionBase<DimS, DimM> {
+  template <Dim_t DimS>
+  class ProjectionDefault : public ProjectionBase<DimS> {
    public:
-    using Parent = ProjectionBase<DimS, DimM>;   //!< base class
+    using Parent = ProjectionBase<DimS>;   //!< base class
     using Vector_t = typename Parent::Vector_t;  //!< to represent fields
     //! polymorphic FFT pointer type
     using FFTEngine_ptr = typename Parent::FFTEngine_ptr;
@@ -60,20 +62,15 @@ namespace muSpectre {
     using Ccoord = typename Parent::Ccoord;  //!< cell coordinates type
     using Rcoord = typename Parent::Rcoord;  //!< spatial coordinates type
     //! global field collection
-    using GFieldCollection_t = muGrid::GlobalFieldCollection<DimS>;
-    //! local field collection for Fourier-space fields
-    using LFieldCollection_t = muGrid::LocalFieldCollection<DimS>;
+    using GFieldCollection_t = muGrid::GlobalNFieldCollection<DimS>;
     //! Real space second order tensor fields (to be projected)
-    using Field_t = muGrid::TypedField<GFieldCollection_t, Real>;
+    using Field_t = muGrid::RealNField;
     //! Fourier-space field containing the projection operator itself
-    using Proj_t =
-        muGrid::TensorField<LFieldCollection_t, Complex, fourthOrder, DimM>;
+    using Proj_t = muGrid::ComplexNField;
     //! iterable form of the operator
-    using Proj_map =
-        muGrid::T4MatrixFieldMap<LFieldCollection_t, Complex, DimM>;
+    using Proj_map = muGrid::T4NFieldMap<Complex, false, DimS>;
     //! vectorized version of the Fourier-space second-order tensor field
-    using Vector_map =
-        muGrid::MatrixFieldMap<LFieldCollection_t, Complex, DimM * DimM, 1>;
+    using Vector_map = muGrid::MatrixNFieldMap<Complex, false, DimS * DimS, 1>;
     //! Default constructor
     ProjectionDefault() = delete;
 
@@ -99,7 +96,7 @@ namespace muSpectre {
     //! apply the projection operator to a field
     void apply_projection(Field_t & field) final;
 
-    Eigen::Map<ArrayXXc> get_operator() final;
+    Eigen::Map<MatrixXXc> get_operator() final;
 
     /**
      * returns the number of rows and cols for the strain matrix type
@@ -109,7 +106,11 @@ namespace muSpectre {
      */
     std::array<Dim_t, 2> get_strain_shape() const final;
 
-    constexpr static Dim_t NbComponents() { return muGrid::ipow(DimM, 2); }
+    //! get number of components to project per pixel
+    constexpr static Dim_t NbComponents() { return DimS * DimS; }
+
+    //! get number of components to project per pixel
+    virtual Dim_t get_nb_components() const { return NbComponents(); }
 
    protected:
     Proj_t & Gfield;  //!< field holding the operator

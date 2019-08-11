@@ -59,26 +59,27 @@ void add_material_linear_elastic1_helper(py::module & mod) {
   const auto name{name_stream.str()};
 
   using Mat_t = muSpectre::MaterialLinearElastic1<dim, dim>;
-  using Mat_ptr = std::shared_ptr<Mat_t>;
-  using Sys_t = muSpectre::CellBase<dim, dim>;
+  //TODO: reactivate  using Sys_t = muSpectre::CellBase<dim, dim>;
   py::class_<Mat_t, muSpectre::MaterialBase<dim, dim>, std::shared_ptr<Mat_t>>(
       mod, name.c_str())
-      .def_static("make",
-                  [](Sys_t & sys, std::string n, Real e, Real p) -> Mat_t & {
-                    return Mat_t::make(sys, n, e, p);
-                  },
-                  "cell"_a, "name"_a, "Young"_a, "Poisson"_a,
-                  py::return_value_policy::reference, py::keep_alive<1, 0>())
-      .def_static("make_evaluator",
-                  [](Real e, Real p) { return Mat_t::make_evaluator(e, p); },
-                  "Young"_a, "Poisson"_a)
-      .def_static("make_free",
-                  [](std::string n, Real e, Real p) -> Mat_ptr {
-                    Mat_ptr ret_mat{std::make_shared<Mat_t>(n, e, p)};
-                    return ret_mat;
-                  },
-                  "name"_a, "Young"_a, "Poisson"_a,
-                  py::return_value_policy::reference);
+      // TODO: reactivate
+      // .def_static("make",
+      //             [](Sys_t & sys, std::string n, Real e, Real p) -> Mat_t & {
+      //               return Mat_t::make(sys, n, e, p);
+      //             },
+      //             "cell"_a, "name"_a, "Young"_a, "Poisson"_a,
+      //             py::return_value_policy::reference, py::keep_alive<1, 0>())
+      // .def_static("make_evaluator",
+      //             [](Real e, Real p) { return Mat_t::make_evaluator(e, p); },
+      //             "Young"_a, "Poisson"_a)
+      // .def_static("make_free",
+      //             [](std::string n, Real e, Real p) -> Mat_ptr {
+      //               Mat_ptr ret_mat{std::make_shared<Mat_t>(n, e, p)};
+      //               return ret_mat;
+      //             },
+      //             "name"_a, "Young"_a, "Poisson"_a,
+      //             py::return_value_policy::reference);
+    ;
 }
 
 template void

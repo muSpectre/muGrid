@@ -56,8 +56,9 @@ void add_get_cube_helper(py::module & mod) {
 }
 
 template <muGrid::Dim_t dim>
-void add_get_hermitian_helper(py::module & mod) {
-  mod.def("get_hermitian_sizes", &muGrid::CcoordOps::get_hermitian_sizes<dim>,
+void add_get_nb_hermitian_grid_pts_helper(py::module & mod) {
+  mod.def("get_nb_hermitian_grid_pts",
+          &muGrid::CcoordOps::get_nb_hermitian_grid_pts<dim>,
           "full_sizes"_a,
           "return the hermitian sizes corresponding to the true sizes");
 }
@@ -120,9 +121,9 @@ void add_get_cube(py::module & mod) {
   add_get_cube_helper<muGrid::threeD, muGrid::Dim_t>(mod);
   add_get_cube_helper<muGrid::threeD, muGrid::Real>(mod);
 
-  add_get_hermitian_helper<muGrid::oneD>(mod);
-  add_get_hermitian_helper<muGrid::twoD>(mod);
-  add_get_hermitian_helper<muGrid::threeD>(mod);
+  add_get_nb_hermitian_grid_pts_helper<muGrid::oneD>(mod);
+  add_get_nb_hermitian_grid_pts_helper<muGrid::twoD>(mod);
+  add_get_nb_hermitian_grid_pts_helper<muGrid::threeD>(mod);
 
   add_get_ccoord_helper<muGrid::oneD>(mod);
   add_get_ccoord_helper<muGrid::twoD>(mod);

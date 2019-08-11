@@ -46,8 +46,8 @@
 
 namespace muSpectre {
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  ProjectionFiniteStrain<DimS, DimM>::ProjectionFiniteStrain(
+  template <Dim_t DimS>
+  ProjectionFiniteStrain<DimS>::ProjectionFiniteStrain(
       FFTEngine_ptr engine, Rcoord lengths, Gradient_t gradient)
       : Parent{std::move(engine), lengths, gradient,
                Formulation::finite_strain} {
@@ -60,8 +60,8 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void ProjectionFiniteStrain<DimS, DimM>::initialise(
+  template <Dim_t DimS>
+  void ProjectionFiniteStrain<DimS>::initialise(
       muFFT::FFT_PlanFlags flags) {
     Parent::initialise(flags);
     using FFTFreqs_t = muFFT::FFT_freqs<DimS>;
@@ -73,7 +73,8 @@ namespace muSpectre {
         eigen(this->domain_lengths / nb_domain_grid_pts)};
 
     muFFT::FFT_freqs<DimS> fft_freqs(nb_domain_grid_pts);
-    for (auto && tup : akantu::zip(*this->fft_engine, this->Ghat)) {
+    for (auto && tup : akantu::zip(this->fft_engine->get_pixels(),
+                                   this->Ghat)) {
       const auto & ccoord = std::get<0>(tup);
       auto & G = std::get<1>(tup);
 
@@ -104,6 +105,6 @@ namespace muSpectre {
     }
   }
 
-  template class ProjectionFiniteStrain<twoD, twoD>;
-  template class ProjectionFiniteStrain<threeD, threeD>;
+  template class ProjectionFiniteStrain<twoD>;
+  template class ProjectionFiniteStrain<threeD>;
 }  // namespace muSpectre

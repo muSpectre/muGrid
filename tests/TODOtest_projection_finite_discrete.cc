@@ -51,17 +51,17 @@ namespace muSpectre {
   using fixlist = boost::mpl::list<
       ProjectionFixture<twoD, twoD, Squares<twoD>,
                         DiscreteGradient<twoD>,
-                        ProjectionFiniteStrain<twoD, twoD>>,
+                        ProjectionFiniteStrain<twoD>>,
       ProjectionFixture<threeD, threeD, Squares<threeD>,
                         DiscreteGradient<threeD>,
-                        ProjectionFiniteStrain<threeD, threeD>>,
+                        ProjectionFiniteStrain<threeD>>,
 
       ProjectionFixture<twoD, twoD, Squares<twoD>,
                         DiscreteGradient<twoD>,
-                        ProjectionFiniteStrainFast<twoD, twoD>>,
+                        ProjectionFiniteStrainFast<twoD>>,
       ProjectionFixture<threeD, threeD, Squares<threeD>,
                         DiscreteGradient<threeD>,
-                        ProjectionFiniteStrainFast<threeD, threeD>>>;
+                        ProjectionFiniteStrainFast<threeD>>>;
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(constructor_test, fix, fixlist, fix) {
@@ -243,7 +243,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   BOOST_AUTO_TEST_CASE(even_grid_test) {
     using Engine = muFFT::FFTWEngine<twoD>;
-    using proj = ProjectionFiniteStrain<twoD, twoD>;
+    using proj = ProjectionFiniteStrain<twoD>;
     auto engine = std::make_unique<Engine>(Ccoord_t<twoD>{2, 3}, 2 * 2);
     BOOST_CHECK_THROW(proj(std::move(engine), Rcoord_t<twoD>{4.3, 4.3}),
                       std::runtime_error);
@@ -259,34 +259,45 @@ namespace muSpectre {
         dim == fix::mdim,
         "These tests assume that the material and spatial dimension are "
         "identical");
-    using Fields = muGrid::GlobalFieldCollection<sdim>;
-    using FieldT = muGrid::TensorField<Fields, Real, secondOrder, mdim>;
-    using FieldT1D = muGrid::TensorField<Fields, Real, firstOrder, mdim>;
-    using FieldMap = muGrid::MatrixFieldMap<Fields, Real, mdim, mdim>;
-    using FieldMap1D = muGrid::MatrixFieldMap<Fields, Real, oneD, mdim>;
+    using Fields = muGrid::GlobalNFieldCollection<sdim>;
+    using FieldT = muGrid::RealNField;
+    using FieldT1D = muGrid::RealNField;
+    using FieldMap = muGrid::MatrixNFieldMap<Real, false, mdim, mdim>;
+    using FieldMap1D = muGrid::MatrixNFieldMap<Real, false, 1, mdim>;
     using Vector = Eigen::Matrix<Real, dim, 1>;
 
-    Fields fields{};
+    Fields fields{1};
     // displacement field
-    FieldT1D & f_disp{muGrid::make_field<FieldT1D>("displacement", fields)};
+    FieldT1D & f_disp{fields.template register_field<FieldT1D>(
+        "displacement", mdim)};
     // gradient of the displacement field
-    FieldT & f_grad{muGrid::make_field<FieldT>("gradient", fields)};
+    FieldT & f_grad{fields.template register_field<FieldT>(
+        "gradient", mdim*mdim)};
     // field for comparision
-    FieldT & f_var{muGrid::make_field<FieldT>("working field", fields)};
+    FieldT & f_var{fields.template register_field<FieldT>(
+        "working field", mdim*mdim)};
 
     FieldMap1D disp(f_disp);
     FieldMap grad(f_grad);
     FieldMap var(f_var);
 
+    BOOST_TEST_CHECKPOINT("fields and maps constructed");
+
     fields.initialise(fix::projector.get_nb_subdomain_grid_pts(),
                       fix::projector.get_subdomain_locations());
+    disp.initialise();
+    grad.initialise();
+    var.initialise();
+
+    BOOST_TEST_CHECKPOINT("fields and maps initialised");
+
     muFFT::FFT_freqs<dim> freqs{fix::projector.get_nb_domain_grid_pts(),
                                 fix::projector.get_domain_lengths()};
 
     auto delta_x{muGrid::operator/(fix::projector.get_domain_lengths(),
                                    fix::projector.get_nb_domain_grid_pts())};
     // fill the displacement field
-    for (auto && tup : akantu::zip(fields, disp)) {
+    for (auto && tup : akantu::zip(fields.get_pixels(), disp)) {
       auto & ccoord = std::get<0>(tup);
       auto & d = std::get<1>(tup);
       Vector vec = muGrid::CcoordOps::get_vector(ccoord, delta_x);
@@ -298,8 +309,10 @@ namespace muSpectre {
           1.0 / (2.0 * muGrid::pi) * (2.0 * muGrid::pi * devided.array()).sin();
     }
 
+    BOOST_TEST_CHECKPOINT("displacement field filled");
+
     // compute the gradient field
-    for (auto && tup : akantu::zip(fields, grad, var)) {
+    for (auto && tup : akantu::zip(fields.get_pixels(), grad, var)) {
       auto & ccoord = std::get<0>(tup);
       auto & g = std::get<1>(tup);
       auto & v = std::get<2>(tup);
@@ -309,30 +322,33 @@ namespace muSpectre {
       ccoord_min.fill(0);
       Ccoord_t<sdim> ccoord_max;
       ccoord_max = fix::projector.get_nb_domain_grid_pts();
-      for (Dim_t i = 0; i < dim; i++) {
-        for (Dim_t j = 0; j < dim; j++) {
-          auto ccoord_minus_delta = ccoord;
-          auto ccoord_plus_delta = ccoord;
-          ccoord_minus_delta[j] -= 1;
-          ccoord_plus_delta[j] += 1;
-          // fix for periodic boundary conditions
-          if (ccoord_minus_delta[j] < ccoord_min[j]) {
-            ccoord_minus_delta[j] = ccoord_max[j]-1;
-          }
-          if (ccoord_plus_delta[j] >= ccoord_max[j]) {
-            ccoord_plus_delta[j] = ccoord_min[j];
-          }
-          g.row(j) = (disp[ccoord_plus_delta] - disp[ccoord_minus_delta]) /
-                     (2 * delta_x[j]);
+      for (Dim_t j = 0; j < dim; j++) {
+        auto ccoord_minus_delta = ccoord;
+        auto ccoord_plus_delta = ccoord;
+        ccoord_minus_delta[j] -= 1;
+        ccoord_plus_delta[j] += 1;
+        // fix for periodic boundary conditions
+        if (ccoord_minus_delta[j] < ccoord_min[j]) {
+          ccoord_minus_delta[j] = ccoord_max[j]-1;
         }
+        if (ccoord_plus_delta[j] >= ccoord_max[j]) {
+          ccoord_plus_delta[j] = ccoord_min[j];
+        }
+        g.col(j) = (disp[fields.get_index(ccoord_plus_delta)]
+                    - disp[fields.get_index(ccoord_minus_delta)]) /
+                    (2 * delta_x[j]);
       }
       v = g;
     }
 
+    BOOST_TEST_CHECKPOINT("gradient field computed");
+
     fix::projector.initialise(muFFT::FFT_PlanFlags::estimate);
     fix::projector.apply_projection(f_var);
 
-    for (auto && tup : akantu::zip(fields, grad, var)) {
+    BOOST_TEST_CHECKPOINT("projection applied");
+
+    for (auto && tup : akantu::zip(fields.get_pixels(), grad, var)) {
       auto & ccoord = std::get<0>(tup);
       auto & g = std::get<1>(tup);
       auto & v = std::get<2>(tup);
@@ -358,21 +374,23 @@ namespace muSpectre {
     // check if the discrete projection operator is still a projection operator.
     // Thus it has to be idempotent, G^2=G or G:G:test_field = G:test_field.
     constexpr Dim_t dim{fix::sdim}, sdim{fix::sdim}, mdim{fix::mdim};
-    using Fields = muGrid::GlobalFieldCollection<sdim>;
-    using FieldT = muGrid::TensorField<Fields, Real, secondOrder, mdim>;
-    using FieldMap = muGrid::MatrixFieldMap<Fields, Real, mdim, mdim>;
+    using Fields = muGrid::GlobalNFieldCollection<sdim>;
+    using FieldT = muGrid::RealNField;
+    using FieldMap = muGrid::MatrixNFieldMap<Real, false, mdim, mdim>;
     using Vector = Eigen::Matrix<Real, dim, 1>;
 
-    Fields fields{};
-    FieldT & f_grad{muGrid::make_field<FieldT>("gradient", fields)};
-    FieldT & f_grad_test{muGrid::make_field<FieldT>("gradient_test", fields)};
+    Fields fields{1};
+    FieldT & f_grad{fields.template register_field<FieldT>(
+        "gradient", mdim*mdim)};
+    FieldT & f_grad_test{fields.template register_field<FieldT>(
+        "gradient_test", mdim*mdim)};
     FieldMap grad(f_grad);
     FieldMap grad_test(f_grad_test);
 
     fields.initialise(fix::projector.get_nb_subdomain_grid_pts(),
                       fix::projector.get_subdomain_locations());
 
-    for (auto && tup : akantu::zip(fields, grad, grad_test)) {
+    for (auto && tup : akantu::zip(fields.get_pixels()  , grad, grad_test)) {
       auto & ccoord = std::get<0>(tup);
       auto & g = std::get<1>(tup);
       auto & gt = std::get<2>(tup);

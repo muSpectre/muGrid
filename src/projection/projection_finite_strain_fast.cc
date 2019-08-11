@@ -41,13 +41,13 @@
 
 namespace muSpectre {
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  ProjectionFiniteStrainFast<DimS, DimM>::ProjectionFiniteStrainFast(
+  template <Dim_t DimS, Dim_t NbQuadPts>
+  ProjectionFiniteStrainFast<DimS, NbQuadPts>::ProjectionFiniteStrainFast(
       FFTEngine_ptr engine, Rcoord lengths, Gradient_t gradient)
       : Parent{std::move(engine), lengths, gradient,
                Formulation::finite_strain},
-        xi_field{muGrid::make_field<Proj_t>("Projection Operator",
-                                            this->projection_container)},
+        xi_field{this->projection_container.template register_field<Proj_t>(
+          "Projection Operator", DimS)},
         xis(xi_field) {
     for (auto res : this->fft_engine->get_nb_domain_grid_pts()) {
       if (res % 2 == 0) {
@@ -58,13 +58,13 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void ProjectionFiniteStrainFast<DimS, DimM>::initialise(
+  template <Dim_t DimS, Dim_t NbQuadPts>
+  void ProjectionFiniteStrainFast<DimS, NbQuadPts>::initialise(
       muFFT::FFT_PlanFlags flags) {
     Parent::initialise(flags);
 
     using FFTFreqs_t = muFFT::FFT_freqs<DimS>;
-    using Vector_t = typename  FFTFreqs_t::Vector;
+    using Vector_t = typename FFTFreqs_t::Vector;
 
     const auto & nb_domain_grid_pts =
         this->fft_engine->get_nb_domain_grid_pts();
@@ -73,7 +73,8 @@ namespace muSpectre {
         eigen(this->domain_lengths / nb_domain_grid_pts)};
 
     FFTFreqs_t fft_freqs(nb_domain_grid_pts);
-    for (auto && tup : akantu::zip(*this->fft_engine, this->xis)) {
+    for (auto && tup : akantu::zip(this->fft_engine->get_pixels(),
+                                   this->xis)) {
       const auto & ccoord = std::get<0>(tup);
       auto & xi = std::get<1>(tup);
 
@@ -100,9 +101,10 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimS, Dim_t NbQuadPts>
   void
-  ProjectionFiniteStrainFast<DimS, DimM>::apply_projection(Field_t & field) {
+  ProjectionFiniteStrainFast<DimS, NbQuadPts>::apply_projection(
+    Field_t & field) {
     Grad_map field_map{this->fft_engine->fft(field)};
     Real factor = this->fft_engine->normalisation();
     for (auto && tup : akantu::zip(this->xis, field_map)) {
@@ -114,20 +116,20 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  Eigen::Map<ArrayXXc>
-  ProjectionFiniteStrainFast<DimS, DimM>::get_operator() {
-    return this->xi_field.dyn_eigen();
+  template <Dim_t DimS, Dim_t NbQuadPts>
+  Eigen::Map<MatrixXXc>
+  ProjectionFiniteStrainFast<DimS, NbQuadPts>::get_operator() {
+    return this->xi_field.eigen_pixel();
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimS, Dim_t NbQuadPts>
   std::array<Dim_t, 2>
-  ProjectionFiniteStrainFast<DimS, DimM>::get_strain_shape() const {
-    return std::array<Dim_t, 2>{DimM, DimM};
+  ProjectionFiniteStrainFast<DimS, NbQuadPts>::get_strain_shape() const {
+    return std::array<Dim_t, 2>{DimS, DimS * NbQuadPts};
   }
 
   /* ---------------------------------------------------------------------- */
-  template class ProjectionFiniteStrainFast<twoD, twoD>;
-  template class ProjectionFiniteStrainFast<threeD, threeD>;
+  template class ProjectionFiniteStrainFast<twoD>;
+  template class ProjectionFiniteStrainFast<threeD>;
 }  // namespace muSpectre

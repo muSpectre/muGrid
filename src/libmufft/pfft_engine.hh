@@ -36,7 +36,6 @@
 #ifndef SRC_LIBMUFFT_PFFT_ENGINE_HH_
 #define SRC_LIBMUFFT_PFFT_ENGINE_HH_
 
-#include "communicator.hh"
 #include "fft_engine_base.hh"
 
 #include <pfft.h>
@@ -50,7 +49,7 @@ namespace muFFT {
   template <Dim_t DimS>
   class PFFTEngine : public FFTEngineBase<DimS> {
    public:
-    using Parent = FFTEngineBase<DimS>;      //!< base class
+    using Parent = FFTEngineBase<DimS>;  //!< base class
     using Ccoord = typename Parent::Ccoord;  //!< cell coordinates type
     //! field for Fourier transform of second-order tensor
     using Workspace_t = typename Parent::Workspace_t;

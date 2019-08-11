@@ -180,7 +180,7 @@ class FFT_Check(unittest.TestCase):
                     raise RuntimeError('Cannot handle {}-dim transforms'
                                        .format(len(nb_grid_pts)))
 
-                complex_res = muFFT.get_hermitian_sizes(nb_grid_pts)
+                complex_res = muFFT.get_nb_hermitian_grid_pts(nb_grid_pts)
                 in_arr_ref = np.zeros([*complex_res, *dims],
                                       dtype=complex)
                 np.random.seed(1)
@@ -265,7 +265,7 @@ class FFT_Check(unittest.TestCase):
                     # test.
                     continue
 
-                complex_res = muFFT.get_hermitian_sizes(nb_grid_pts)
+                complex_res = muFFT.get_nb_hermitian_grid_pts(nb_grid_pts)
                 global_in_arr = np.zeros(complex_res,
                                          dtype=complex)
                 np.random.seed(1)

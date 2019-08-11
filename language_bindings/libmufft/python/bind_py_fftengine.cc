@@ -48,6 +48,7 @@
 #include <pybind11/eigen.h>
 
 using muGrid::Ccoord_t;
+using muGrid::Real;
 using muGrid::Complex;
 using muGrid::Dim_t;
 using pybind11::literals::operator""_a;
@@ -78,40 +79,40 @@ void add_engine_helper(py::module & mod, std::string name) {
            [](Engine & eng,
               Eigen::Ref<typename Engine::Field_t::EigenRep_t> v) {
              using Coll_t = typename Engine::GFieldCollection_t;
-             using Field_t = typename Engine::Field_t;
-             Coll_t coll{};
+             using Field_t = muGrid::WrappedNField<Real>;
+             Coll_t coll{1};
              coll.initialise(eng.get_nb_subdomain_grid_pts(),
                              eng.get_subdomain_locations());
              // Do not make a copy, just wrap the Eigen array into a field that
              // does not manage its own data.
-             Field_t & proxy{muGrid::make_field<Field_t>(
-                 "proxy_field", coll, v, eng.get_nb_components())};
+             Field_t & proxy{coll.template register_field<Field_t>(
+                 "proxy_field", eng.get_nb_components(), v)};
              // We need to tie the lifetime of the return value to the lifetime
              // of the engine object, because we are returning the internal work
              // space buffer that is managed by the engine;
              // see return_value_policy below.
-             return eng.fft(proxy).eigen();
+             return eng.fft(proxy).eigen_pixel();
            },
            "array"_a,
            py::return_value_policy::reference_internal)
       .def("ifft",
            [](Engine & eng, py::EigenDRef<ArrayXXc> v) {
              using Coll_t = typename Engine::GFieldCollection_t;
-             using Field_t = typename Engine::Field_t;
+             using Field_t = muGrid::WrappedNField<Real>;
              // Create an Eigen array that will hold the result of the inverse
              // FFT. We don't want the storage managed by a field because we
              // want to transfer possession of storage to Python without a copy
              // operation.
              typename Field_t::EigenRep_t res{eng.get_nb_components(),
                                               eng.size()};
-             Coll_t coll{};
+             Coll_t coll{1};
              coll.initialise(eng.get_nb_subdomain_grid_pts(),
                              eng.get_subdomain_locations());
              // Wrap the Eigen array into a proxy field that does not manage
              // its own data.
-             Field_t & proxy{muGrid::make_field<Field_t>(
-                 "proxy_field", coll, res, eng.get_nb_components())};
-             eng.get_work_space().eigen() = v;
+             Field_t & proxy{coll.template register_field<Field_t>(
+                 "proxy_field", eng.get_nb_components(), res)};
+             eng.get_work_space().eigen_pixel() = v;
              eng.ifft(proxy);
              // We can safely transfer possession to Python since the Eigen
              // array is not tied to the engine object;

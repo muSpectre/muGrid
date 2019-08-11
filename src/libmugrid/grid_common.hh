@@ -66,6 +66,12 @@ namespace muGrid {
   using Complex = std::complex<Real>;
   //@}
 
+  /**
+   * Used to specify whether to iterate over pixels or quadrature points in
+   * field maps
+   */
+  enum class Iteration { Pixel, QuadPt };
+
   //! \addtogroup Coordinates Coordinate types
   //@{
   //! Ccoord_t are cell coordinates, i.e. integer coordinates
@@ -123,6 +129,8 @@ namespace muGrid {
 
   //! convenience definitions
   constexpr Real pi{3.1415926535897932384626433};
+  //! constant used to explicitly denote unknown positive integers
+  constexpr static Dim_t Unknown{-1};
 
   //! compile-time potentiation required for field-size computations
   template <typename R, typename I>

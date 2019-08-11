@@ -224,7 +224,7 @@ namespace muGrid {
      * storage of field refs (can't be a `std::array`, because arrays
      * of refs are explicitely forbidden
      */
-    using Fields_t = RefArray<Field_t, NbMemory + 1>;
+    using  Fields_t = RefArray<Field_t, NbMemory + 1>;
     //! Typed field
     using TypedField_t = TypedField<FieldCollection_t, Scalar>;
 

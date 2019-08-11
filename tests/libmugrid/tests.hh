@@ -37,6 +37,8 @@
 #include <boost/test/unit_test.hpp>
 #include <boost/mpl/list.hpp>
 
+#include "iostream"
+
 #ifndef TESTS_LIBMUGRID_TESTS_HH_
 #define TESTS_LIBMUGRID_TESTS_HH_
 

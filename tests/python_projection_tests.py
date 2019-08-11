@@ -68,7 +68,7 @@ def build_test_classes(Projection, RefProjection, name):
             # ijkl, xy(z)
             # reshape mspG so they are ¶(hermitian) × n² × n²
             ref_sizes = self.shape
-            msp_sizes = µ.get_hermitian_sizes(self.shape)
+            msp_sizes = µ.get_nb_hermitian_grid_pts(self.shape)
             hermitian_size = np.prod(msp_sizes)
             mspG = self.projection.operator
             #this test only makes sense for fully stored ghats (i.e.,

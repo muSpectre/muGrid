@@ -39,27 +39,29 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  MaterialLinearElastic2<DimS, DimM>::MaterialLinearElastic2(std::string name,
-                                                             Real young,
-                                                             Real poisson)
-      : Parent{name}, material{name, young, poisson},
-        eigen_field{
-            muGrid::make_field<Field_t>("Eigenstrain", this->internal_fields)},
-        eigen_map{eigen_field.get_map()} {}
+  MaterialLinearElastic2<DimS, DimM>::MaterialLinearElastic2(
+      const std::string & name, const Dim_t & spatial_dimension,
+      const Dim_t & nb_quad_pts, Real young, Real poisson)
+      : Parent{name, spatial_dimension, nb_quad_pts},
+        material{name, spatial_dimension, nb_quad_pts, young, poisson},
+        eigen_field{this->internal_fields
+                        .template register_field<muGrid::TypedNField<Real>>(
+                            "Eigenstrain", DimM * DimM)},
+        eigen_map{this->eigen_field} {}
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   void MaterialLinearElastic2<DimS, DimM>::add_pixel(
-      const Ccoord_t<DimS> & /*pixel*/) {
+      const size_t & /*pixel_index*/) {
     throw std::runtime_error("this material needs pixels with and eigenstrain");
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   void
-  MaterialLinearElastic2<DimS, DimM>::add_pixel(const Ccoord_t<DimS> & pixel,
+  MaterialLinearElastic2<DimS, DimM>::add_pixel(const size_t & pixel_index,
                                                 const StrainTensor & E_eig) {
-    this->internal_fields.add_pixel(pixel);
+    this->internal_fields.add_pixel(pixel_index);
     Eigen::Map<const Eigen::Array<Real, DimM * DimM, 1>> strain_array(
         E_eig.data());
     this->eigen_field.push_back(strain_array);

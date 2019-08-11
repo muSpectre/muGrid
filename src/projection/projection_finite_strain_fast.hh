@@ -37,10 +37,11 @@
 #ifndef SRC_PROJECTION_PROJECTION_FINITE_STRAIN_FAST_HH_
 #define SRC_PROJECTION_PROJECTION_FINITE_STRAIN_FAST_HH_
 
-#include "projection/projection_base.hh"
+#include <libmugrid/nfield_collection.hh>
+#include <libmugrid/nfield_map_static.hh>
+
 #include "common/muSpectre_common.hh"
-#include <libmugrid/field_collection.hh>
-#include <libmugrid/field_map.hh>
+#include "projection/projection_base.hh"
 
 namespace muSpectre {
 
@@ -50,31 +51,26 @@ namespace muSpectre {
    * have a very good reason not to (and tell me (author) about it,
    * I'd be interested to hear it).
    */
-  template <Dim_t DimS, Dim_t DimM>
-  class ProjectionFiniteStrainFast : public ProjectionBase<DimS, DimM> {
+  template <Dim_t DimS, Dim_t NbQuadPts = 1>
+  class ProjectionFiniteStrainFast : public ProjectionBase<DimS> {
    public:
-    using Parent = ProjectionBase<DimS, DimM>;  //!< base class
+    using Parent = ProjectionBase<DimS>;  //!< base class
     //! polymorphic pointer to FFT engines
     using FFTEngine_ptr = typename Parent::FFTEngine_ptr;
     //! gradient, i.e. derivatives in each Cartesian direction
     using Gradient_t = typename Parent::Gradient_t;
     using Ccoord = typename Parent::Ccoord;  //!< cell coordinates type
     using Rcoord = typename Parent::Rcoord;  //!< spatial coordinates type
-    //! global field collection (for real-space representations)
-    using GFieldCollection_t = muGrid::GlobalFieldCollection<DimS>;
-    //! local field collection (for Fourier-space representations)
-    using LFieldCollection_t = muGrid::LocalFieldCollection<DimS>;
     //! Real space second order tensor fields (to be projected)
-    using Field_t = muGrid::TypedField<GFieldCollection_t, Real>;
+    using Field_t = muGrid::RealNField;
     //! Fourier-space field containing the projection operator itself
-    using Proj_t =
-        muGrid::TensorField<LFieldCollection_t, Complex, firstOrder, DimM>;
+    using Proj_t = muGrid::ComplexNField;
     //! iterable form of the operator
-    using Proj_map =
-        muGrid::MatrixFieldMap<LFieldCollection_t, Complex, DimM, 1>;
+    using Proj_map = muGrid::MatrixNFieldMap<Complex, false, DimS, 1,
+                                             muGrid::Iteration::Pixel>;
     //! iterable Fourier-space second-order tensor field
-    using Grad_map =
-        muGrid::MatrixFieldMap<LFieldCollection_t, Complex, DimM, DimM>;
+    using Grad_map = muGrid::MatrixNFieldMap<Complex, false, DimS, DimS,
+                                             muGrid::Iteration::Pixel>;
 
     //! Default constructor
     ProjectionFiniteStrainFast() = delete;
@@ -109,7 +105,7 @@ namespace muSpectre {
     //! apply the projection operator to a field
     void apply_projection(Field_t & field) final;
 
-    Eigen::Map<ArrayXXc> get_operator() final;
+    Eigen::Map<MatrixXXc> get_operator() final;
 
     /**
      * returns the number of rows and cols for the strain matrix type
@@ -119,7 +115,11 @@ namespace muSpectre {
      */
     std::array<Dim_t, 2> get_strain_shape() const final;
 
-    constexpr static Dim_t NbComponents() { return muGrid::ipow(DimM, 2); }
+    //! get number of components to project per pixel
+    constexpr static Dim_t NbComponents() { return DimS * DimS * NbQuadPts; }
+
+    //! get number of components to project per pixel
+    virtual Dim_t get_nb_components() const { return NbComponents(); }
 
    protected:
     Proj_t & xi_field;  //!< field of normalised wave vectors

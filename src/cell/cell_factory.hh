@@ -56,9 +56,9 @@ namespace muSpectre {
    * Create a unique ptr to a Projection operator (with appropriate
    * FFT_engine) to be used in a cell constructor
    */
-  template <Dim_t DimS, Dim_t DimM,
+  template <Dim_t DimS,
             typename FFTEngine = muFFT::FFTWEngine<DimS>>
-  inline std::unique_ptr<ProjectionBase<DimS, DimM>>
+  inline std::unique_ptr<ProjectionBase<DimS>>
   cell_input(Ccoord_t<DimS> nb_grid_pts,
              Rcoord_t<DimS> lengths,
              Formulation form,
@@ -68,13 +68,13 @@ namespace muSpectre {
         nb_grid_pts, dof_for_formulation(form, DimS), comm)};
     switch (form) {
     case Formulation::finite_strain: {
-      using Projection = ProjectionFiniteStrainFast<DimS, DimM>;
+      using Projection = ProjectionFiniteStrainFast<DimS>;
       return std::make_unique<Projection>(std::move(fft_ptr), lengths,
                                           gradient);
       break;
     }
     case Formulation::small_strain: {
-      using Projection = ProjectionSmallStrain<DimS, DimM>;
+      using Projection = ProjectionSmallStrain<DimS>;
       return std::make_unique<Projection>(std::move(fft_ptr), lengths,
                                           gradient);
       break;
@@ -100,8 +100,7 @@ namespace muSpectre {
             Gradient_t<DimS> gradient = make_fourier_gradient<DimS>(),
             const muFFT::Communicator & comm = muFFT::Communicator()) {
     auto && input =
-      cell_input<DimS, DimM, FFTEngine>(nb_grid_pts, lengths, form, gradient,
-                                        comm);
+      cell_input<DimS, FFTEngine>(nb_grid_pts, lengths, form, gradient, comm);
     auto cell{Cell{std::move(input)}};
     return cell;
   }

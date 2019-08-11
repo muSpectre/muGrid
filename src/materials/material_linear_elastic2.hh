@@ -41,6 +41,8 @@
 #include "materials/material_linear_elastic1.hh"
 
 #include <libmugrid/field.hh>
+#include <libmugrid/nfield_typed.hh>
+#include <libmugrid/nfield_map_static.hh>
 
 #include <Eigen/Dense>
 
@@ -95,7 +97,9 @@ namespace muSpectre {
     MaterialLinearElastic2() = delete;
 
     //! Construct by name, Young's modulus and Poisson's ratio
-    MaterialLinearElastic2(std::string name, Real young, Real poisson);
+    MaterialLinearElastic2(const std::string & name,
+                           const Dim_t & spatial_dimension,
+                           const Dim_t & nb_quad_pts, Real young, Real poisson);
 
     //! Copy constructor
     MaterialLinearElastic2(const MaterialLinearElastic2 & other) = delete;
@@ -133,24 +137,19 @@ namespace muSpectre {
     /**
      * overload add_pixel to write into eigenstrain
      */
-    void add_pixel(const Ccoord_t<DimS> & pixel) final;
+    void add_pixel(const size_t & pixel_index) final;
 
     /**
      * overload add_pixel to write into eigenstrain
      */
-    void add_pixel(const Ccoord_t<DimS> & pixel, const StrainTensor & E_eig);
+    void add_pixel(const size_t & pixel_index, const StrainTensor & E_eig);
 
    protected:
     //! linear material without eigenstrain used to compute response
     MaterialLinearElastic1<DimS, DimM> material;
     //! storage for eigenstrain
-    using Field_t = muGrid::TensorField<muGrid::LocalFieldCollection<DimS>,
-                                        Real, secondOrder, DimM>;
-    using FieldMap_t =
-        muGrid::MatrixFieldMap<muGrid::LocalFieldCollection<DimS>, Real, DimM,
-                               DimM>;
-    Field_t & eigen_field;  //!< field holding the eigen strain per pixel
-    FieldMap_t eigen_map;
+    muGrid::RealNField & eigen_field;  //!< field holding the eigen strain per pixel
+    muGrid::T2NFieldMap<Real, true, DimM> eigen_map;
   };
 
   /* ----------------------------------------------------------------------*/

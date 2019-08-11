@@ -39,21 +39,25 @@ namespace muFFT {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t Dim>
-  FFTEngineBase<Dim>::FFTEngineBase(Ccoord nb_grid_pts, Dim_t nb_components,
-                                    Communicator comm)
-      : comm{comm}, nb_subdomain_grid_pts{nb_grid_pts}, subdomain_locations{},
+  FFTEngineBase<Dim>::FFTEngineBase(
+    Ccoord nb_grid_pts, Dim_t nb_components, Communicator comm)
+      : comm{comm},
+        work_space_container{1},
+        nb_subdomain_grid_pts{nb_grid_pts},
+        subdomain_locations{},
         nb_fourier_grid_pts{
-            muGrid::CcoordOps::get_hermitian_sizes(nb_grid_pts)},
+            muGrid::CcoordOps::get_nb_hermitian_grid_pts(nb_grid_pts)},
         fourier_locations{}, nb_domain_grid_pts{nb_grid_pts},
-        work{muGrid::make_field<Workspace_t>("work space", work_space_container,
-                                             nb_components)},
+        work{work_space_container.template register_field<Workspace_t>(
+            "work space", nb_components)},
         norm_factor{1. / muGrid::CcoordOps::get_size(nb_domain_grid_pts)},
         nb_components{nb_components} {}
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t Dim>
-  void FFTEngineBase<Dim>::initialise(FFT_PlanFlags /*plan_flags*/) {
-    this->work_space_container.initialise();
+  void FFTEngineBase<Dim>::initialise(
+    FFT_PlanFlags /*plan_flags*/) {
+    this->work_space_container.initialise(this->nb_fourier_grid_pts);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -64,8 +68,21 @@ namespace muFFT {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t Dim>
+  size_t FFTEngineBase<Dim>::fourier_size() const {
+    return muGrid::CcoordOps::get_size(this->nb_fourier_grid_pts);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t Dim>
   size_t FFTEngineBase<Dim>::workspace_size() const {
     return this->work_space_container.size();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t Dim>
+  const typename FFTEngineBase<Dim>::Pixels &
+  FFTEngineBase<Dim>::get_pixels() const {
+    return this->work_space_container.get_pixels();
   }
 
   template class FFTEngineBase<muGrid::oneD>;

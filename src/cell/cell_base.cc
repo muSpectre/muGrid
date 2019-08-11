@@ -37,6 +37,7 @@
 
 #include <libmugrid/ccoord_operations.hh>
 #include <libmugrid/iterators.hh>
+#include <libmugrid/state_nfield.hh>
 
 #include <sstream>
 #include <algorithm>
@@ -223,7 +224,8 @@ namespace muSpectre {
     muGrid::TypedField<FieldCollection_t, Real> field(
         "Proxy for projection", *this->fields, vec,
         this->F.get_nb_components());
-    this->projection->apply_projection(field);
+    // FIXME! Replace once cell is changed to NField
+    // this->projection->apply_projection(field);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -315,7 +317,8 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   typename CellBase<DimS, DimM>::StressField_t &
   CellBase<DimS, DimM>::project(StressField_t & field) {
-    this->projection->apply_projection(field);
+    // FIXME! Replace once cell is changed to NField
+    // this->projection->apply_projection(field);
     return field;
   }
 
@@ -389,39 +392,35 @@ namespace muSpectre {
   template <typename T, bool IsStateField>
   auto CellBase<DimS, DimM>::globalised_field_helper(
       const std::string & unique_name, int nb_steps_ago) -> Field_t<T> & {
-    using LField_t = const typename Field_t<T>::LocalField_t;
     // start by checking that the field exists at least once, and that
     // it always has th same number of components
     std::set<Dim_t> nb_component_categories{};
-    std::vector<std::reference_wrapper<LField_t>> local_fields;
+    std::vector<std::reference_wrapper<muGrid::NField>> local_fields;
     auto check{[&unique_name](auto & coll) -> bool {
       if (IsStateField) {
-        return coll.check_statefield_exists(unique_name);
+        return coll.state_field_exists(unique_name);
       } else {
-        return coll.check_field_exists(unique_name);
+        return coll.field_exists(unique_name);
       }
     }};
     auto get = [&unique_name, &
-                nb_steps_ago ](auto & coll) -> const typename LField_t::Base & {
+                nb_steps_ago ](auto & coll) -> const typename muGrid::NField & {
       if (IsStateField) {
-        using Coll_t = typename Material_t::MFieldCollection_t;
-        using TypedStateField_t = muGrid::TypedStateField<Coll_t, T>;
-        auto & statefield{coll.get_statefield(unique_name)};
-        auto & typed_statefield{TypedStateField_t::check_ref(statefield)};
-        const typename LField_t::Base & f1{
-            typed_statefield.get_old_field(nb_steps_ago)};
-        const typename LField_t::Base & f2{
-            typed_statefield.get_current_field()};
-        return (nb_steps_ago ? f1 : f2);
+        using TypedStateField_t = muGrid::TypedStateNField<T>;
+        auto & typed_statefield{dynamic_cast<TypedStateField_t &>(
+            coll.get_state_field(unique_name))};
+        return (nb_steps_ago ? typed_statefield.old(nb_steps_ago)
+                             : typed_statefield.current());
       } else {
-        return coll[unique_name];
+        return coll.get_field(unique_name);
       }
     };
 
     for (auto & mat : this->materials) {
       auto & coll = mat->get_collection();
       if (check(coll)) {
-        const auto & field{LField_t::check_ref(get(coll))};
+        const auto & field{
+            dynamic_cast<const muGrid::TypedNField<T> &>(get(coll))};
         local_fields.emplace_back(field);
         nb_component_categories.insert(field.get_nb_components());
       }
@@ -437,8 +436,15 @@ namespace muSpectre {
             << "found by material:" << std::endl;
         for (auto & mat : this->materials) {
           auto & coll = mat->get_collection();
-          if (coll.check_field_exists(unique_name)) {
-            auto & field{LField_t::check_ref(coll[unique_name])};
+          if (coll.field_exists(unique_name)) {
+            auto & field{coll.get_field(unique_name)};
+            if (field.get_stored_typeid() != typeid(T)) {
+              std::string err =
+                  "Cannot create a Reference of requested type " +
+                  ("for field '" + field.get_name() + "' of type '" +
+                   field.get_stored_typeid().name() + "'");
+              throw std::runtime_error(err);
+            }
             err_str << field.get_nb_components() << " components in material '"
                     << mat->get_name() << "'" << std::endl;
           }
@@ -673,15 +679,12 @@ namespace muSpectre {
     auto nb_pixels = muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts);
     std::vector<MaterialBase<DimS, DimM> *> assignments(nb_pixels, nullptr);
     for (auto & mat : this->materials) {
-      for (auto & pixel : *mat) {
-        auto index = muGrid::CcoordOps::get_index(
-            this->nb_subdomain_grid_pts, this->subdomain_locations, pixel);
+      for (auto & index : *mat) {
         auto & assignment{assignments.at(index)};
         if (assignment != nullptr) {
           std::stringstream err{};
-          err << "Pixel ";
-          muGrid::operator<<(err, pixel)
-              << "is already assigned to material '" << assignment->get_name()
+          err << "Pixel " << index << "is already assigned to material '"
+              << assignment->get_name()
               << "' and cannot be reassigned to material '" << mat->get_name();
           throw std::runtime_error(err.str());
         } else {

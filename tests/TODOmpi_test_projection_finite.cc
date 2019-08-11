@@ -62,58 +62,59 @@ namespace muFFT {
   using fixlist = boost::mpl::list<
 #ifdef WITH_FFTWMPI
       ProjectionFixture<twoD, twoD, Squares<twoD>,
-                        ProjectionFiniteStrain<twoD, twoD>,
+                        ProjectionFiniteStrain<twoD>,
                         FFTWMPIEngine<twoD>>,
       ProjectionFixture<threeD, threeD, Squares<threeD>,
-                        ProjectionFiniteStrain<threeD, threeD>,
+                        ProjectionFiniteStrain<threeD>,
                         FFTWMPIEngine<threeD>>,
       ProjectionFixture<twoD, twoD, Sizes<twoD>,
-                        ProjectionFiniteStrain<twoD, twoD>,
+                        ProjectionFiniteStrain<twoD>,
                         FFTWMPIEngine<twoD>>,
       ProjectionFixture<threeD, threeD, Sizes<threeD>,
-                        ProjectionFiniteStrain<threeD, threeD>,
+                        ProjectionFiniteStrain<threeD>,
                         FFTWMPIEngine<threeD>>,
 
       ProjectionFixture<twoD, twoD, Squares<twoD>,
-                        ProjectionFiniteStrainFast<twoD, twoD>,
+                        ProjectionFiniteStrainFast<twoD>,
                         FFTWMPIEngine<twoD>>,
       ProjectionFixture<threeD, threeD, Squares<threeD>,
-                        ProjectionFiniteStrainFast<threeD, threeD>,
+                        ProjectionFiniteStrainFast<threeD>,
                         FFTWMPIEngine<threeD>>,
       ProjectionFixture<twoD, twoD, Sizes<twoD>,
-                        ProjectionFiniteStrainFast<twoD, twoD>,
+                        ProjectionFiniteStrainFast<twoD>,
                         FFTWMPIEngine<twoD>>,
       ProjectionFixture<threeD, threeD, Sizes<threeD>,
-                        ProjectionFiniteStrainFast<threeD, threeD>,
+                        ProjectionFiniteStrainFast<threeD>,
                         FFTWMPIEngine<threeD>>,
 #endif
 #ifdef WITH_PFFT
       ProjectionFixture<twoD, twoD, Squares<twoD>,
-                        ProjectionFiniteStrain<twoD, twoD>, PFFTEngine<twoD>>,
+                        ProjectionFiniteStrain<twoD>, PFFTEngine<twoD>>,
       ProjectionFixture<threeD, threeD, Squares<threeD>,
-                        ProjectionFiniteStrain<threeD, threeD>,
+                        ProjectionFiniteStrain<threeD>,
                         PFFTEngine<threeD>>,
       ProjectionFixture<twoD, twoD, Sizes<twoD>,
-                        ProjectionFiniteStrain<twoD, twoD>, PFFTEngine<twoD>>,
+                        ProjectionFiniteStrain<twoD>, PFFTEngine<twoD>>,
       ProjectionFixture<threeD, threeD, Sizes<threeD>,
-                        ProjectionFiniteStrain<threeD, threeD>,
+                        ProjectionFiniteStrain<threeD>,
                         PFFTEngine<threeD>>,
 
       ProjectionFixture<twoD, twoD, Squares<twoD>,
-                        ProjectionFiniteStrainFast<twoD, twoD>,
+                        ProjectionFiniteStrainFast<twoD>,
                         PFFTEngine<twoD>>,
       ProjectionFixture<threeD, threeD, Squares<threeD>,
-                        ProjectionFiniteStrainFast<threeD, threeD>,
+                        ProjectionFiniteStrainFast<threeD>,
                         PFFTEngine<threeD>>,
       ProjectionFixture<twoD, twoD, Sizes<twoD>,
-                        ProjectionFiniteStrainFast<twoD, twoD>,
+                        ProjectionFiniteStrainFast<twoD>,
                         PFFTEngine<twoD>>,
       ProjectionFixture<threeD, threeD, Sizes<threeD>,
-                        ProjectionFiniteStrainFast<threeD, threeD>,
+                        ProjectionFiniteStrainFast<threeD>,
                         PFFTEngine<threeD>>,
 #endif
       ProjectionFixture<twoD, twoD, Squares<twoD>,
-                        ProjectionFiniteStrain<twoD, twoD>, FFTWEngine<twoD>,
+                        ProjectionFiniteStrain<twoD>,
+                        FFTWEngine<twoD>,
                         false>>;
 
   /* ---------------------------------------------------------------------- */
@@ -136,20 +137,25 @@ namespace muFFT {
         dim == fix::mdim,
         "These tests assume that the material and spatial dimension are "
         "identical");
-    using Fields = muGrid::GlobalFieldCollection<sdim>;
-    using FieldT = muGrid::TensorField<Fields, Real, muGrid::secondOrder, mdim>;
-    using FieldMap = muGrid::MatrixFieldMap<Fields, Real, mdim, mdim>;
+    using Fields = muGrid::GlobalNFieldCollection<sdim>;
+    using FieldT = muGrid::RealNField;
+    using FieldMap = muGrid::MatrixNFieldMap<Real, false, mdim, mdim>;
     using Vector = Eigen::Matrix<Real, dim, 1>;
 
-    Fields fields{};
-    FieldT & f_grad{muGrid::make_field<FieldT>("gradient", fields)};
-    FieldT & f_var{muGrid::make_field<FieldT>("working field", fields)};
+    Fields fields{1};
+    FieldT & f_grad{fields.template register_field<FieldT>(
+        "gradient", mdim*mdim)};
+    FieldT & f_var{fields.template register_field<FieldT>(
+        "working field", mdim*mdim)};
 
     FieldMap grad(f_grad);
     FieldMap var(f_var);
 
     fields.initialise(fix::projector.get_nb_subdomain_grid_pts(),
                       fix::projector.get_subdomain_locations());
+    grad.initialise();
+    var.initialise();
+
     Vector k;
     for (Dim_t i = 0; i < dim; ++i) {
       // the wave vector has to be such that it leads to an integer
@@ -158,7 +164,7 @@ namespace muFFT {
     }
 
     using muGrid::operator/;
-    for (auto && tup : akantu::zip(fields, grad, var)) {
+    for (auto && tup : akantu::zip(fields.get_pixels(), grad, var)) {
       auto & ccoord = std::get<0>(tup);
       auto & g = std::get<1>(tup);
       auto & v = std::get<2>(tup);
@@ -173,7 +179,7 @@ namespace muFFT {
     fix::projector.apply_projection(f_var);
 
     using muGrid::operator<<;
-    for (auto && tup : akantu::zip(fields, grad, var)) {
+    for (auto && tup : akantu::zip(fields.get_pixels(), grad, var)) {
       auto & ccoord = std::get<0>(tup);
       auto & g = std::get<1>(tup);
       auto & v = std::get<2>(tup);

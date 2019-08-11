@@ -33,33 +33,39 @@
  *
  */
 
+#include <sstream>
+
 #include "projection/projection_base.hh"
 
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  ProjectionBase<DimS, DimM>::ProjectionBase(FFTEngine_ptr engine,
-                                             Rcoord domain_lengths,
-                                             Gradient_t gradient,
-                                             Formulation form)
+  template <Dim_t DimS>
+  ProjectionBase<DimS>::ProjectionBase(FFTEngine_ptr engine,
+                                       Rcoord domain_lengths,
+                                       Gradient_t gradient,
+                                       Formulation form)
       : fft_engine{std::move(engine)}, domain_lengths{domain_lengths},
         gradient{gradient}, form{form},
         projection_container{this->fft_engine->get_field_collection()} {
     static_assert((DimS == FFTEngine::sdim),
                   "spatial dimensions are incompatible");
-    if (this->get_nb_components() != fft_engine->get_nb_components()) {
-      throw ProjectionError("Incompatible number of components per pixel");
-    }
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void ProjectionBase<DimS, DimM>::initialise(muFFT::FFT_PlanFlags flags) {
+  template <Dim_t DimS>
+  void ProjectionBase<DimS>::initialise(muFFT::FFT_PlanFlags flags) {
+    if (this->get_nb_components() != fft_engine->get_nb_components()) {
+      std::stringstream error;
+      error << "Incompatible number of components per pixel. The projection "
+            << "operator expects " << this->get_nb_components()
+            << " components, but the FFT engine reported "
+            << fft_engine->get_nb_components() << " components.";
+      throw ProjectionError(error.str());
+    }
     fft_engine->initialise(flags);
   }
 
-  template class ProjectionBase<twoD, twoD>;
-  template class ProjectionBase<twoD, threeD>;
-  template class ProjectionBase<threeD, threeD>;
+  template class ProjectionBase<twoD>;
+  template class ProjectionBase<threeD>;
 }  // namespace muSpectre

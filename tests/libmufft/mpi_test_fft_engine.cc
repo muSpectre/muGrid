@@ -49,8 +49,8 @@
 #endif
 
 #include <libmugrid/ccoord_operations.hh>
-#include <libmugrid/field_collection.hh>
-#include <libmugrid/field_map.hh>
+#include <libmugrid/nfield_collection.hh>
+#include <libmugrid/nfield_map_static.hh>
 #include <libmugrid/iterators.hh>
 
 namespace muFFT {
@@ -121,26 +121,25 @@ namespace muFFT {
     } else {
       Fix::engine.initialise(FFT_PlanFlags::estimate);
     }
-    constexpr Dim_t order{2};
-    using FC_t = muGrid::GlobalFieldCollection<Fix::sdim>;
-    FC_t fc;
-    auto & input{
-        muGrid::make_field<muGrid::TensorField<FC_t, Real, order, Fix::sdim>>(
-            "input", fc)};
-    auto & ref{
-        muGrid::make_field<muGrid::TensorField<FC_t, Real, order, Fix::sdim>>(
-            "reference", fc)};
-    auto & result{
-        muGrid::make_field<muGrid::TensorField<FC_t, Real, order, Fix::sdim>>(
-            "result", fc)};
+    using FC_t = muGrid::GlobalNFieldCollection<Fix::sdim>;
+    FC_t fc{1};
+    auto & input{fc.template register_field<muGrid::TypedNField<Real>>(
+            "input", Fix::sdim*Fix::sdim)};
+    auto & ref{fc.template register_field<muGrid::TypedNField<Real>>(
+            "reference", Fix::sdim*Fix::sdim)};
+    auto & result{fc.template register_field<muGrid::TypedNField<Real>>(
+            "result", Fix::sdim*Fix::sdim)};
 
     fc.initialise(Fix::engine.get_nb_subdomain_grid_pts(),
                   Fix::engine.get_subdomain_locations());
 
-    using map_t = muGrid::MatrixFieldMap<FC_t, Real, Fix::sdim, Fix::sdim>;
+    using map_t = muGrid::MatrixNFieldMap<Real, false, Fix::sdim, Fix::sdim>;
     map_t inmap{input};
+    inmap.initialise();
     auto refmap{map_t{ref}};
+    refmap.initialise();
     auto resultmap{map_t{result}};
+    resultmap.initialise();
     size_t cntr{0};
     for (auto tup : akantu::zip(inmap, refmap)) {
       cntr++;
@@ -151,9 +150,9 @@ namespace muFFT {
     }
     auto & complex_field = Fix::engine.fft(input);
     using cmap_t =
-        muGrid::MatrixFieldMap<muGrid::LocalFieldCollection<Fix::sdim>, Complex,
-                               Fix::sdim, Fix::sdim>;
+        muGrid::MatrixNFieldMap<Complex, false, Fix::sdim, Fix::sdim>;
     cmap_t complex_map(complex_field);
+    complex_map.initialise();
     if (Fix::engine.get_subdomain_locations() ==
         muGrid::CcoordOps::get_cube<Fix::sdim>(0)) {
       // Check that 0,0 location has no imaginary part.
