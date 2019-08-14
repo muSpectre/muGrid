@@ -18,9 +18,20 @@ set(Eigen3_VERSION ${_eigen_world_version}.${_eigen_major_version}.${_eigen_mino
 set(EIGEN3_INCLUDE_DIR ${_Eigen3_external_dir}/Eigen3 CACHE PATH "Eigen include directory")
 add_library(eigen3 INTERFACE)
 add_library(Eigen3::Eigen ALIAS eigen3)
-target_include_directories(eigen3 SYSTEM INTERFACE
-  $<BUILD_INTERFACE:${EIGEN3_INCLUDE_DIR}>)
+
+# defining exported include directories
+target_include_directories(eigen3
+  SYSTEM INTERFACE $<BUILD_INTERFACE:${EIGEN3_INCLUDE_DIR}>
+  )
+
+# small trick for build includes in public
+set_property(TARGET eigen3 APPEND PROPERTY INTERFACE_SYSTEM_INCLUDE_DIRECTORIES
+  $<INSTALL_INTERFACE:include/>)
 
 set(Eigen3_FOUND TRUE CACHE BOOL INTERNAL "")
 set(Eigen3_FOUND_EXTERNAL TRUE CACHE BOOL INTERNAL "")
 message(STATUS "Eigen3 ${Eigen3_VERSION}")
+
+install(TARGETS eigen3
+  EXPORT ${EIGEN_EXPORT_NAME})
+
