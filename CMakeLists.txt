@@ -37,11 +37,19 @@
 cmake_minimum_required(VERSION 3.5.0)
 
 project(muSpectre)
+
+# Enable overriding variables/options in directories above (necessary from CMake 3.15)
+if(POLICY CMP0077)
+  cmake_policy(SET CMP0077 NEW)
+endif()
+
 # ------------------------------------------------------------------------------
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(BUILD_SHARED_LIBS ON)
+if(NOT DEFINED BUILD_SHARED_LIBS)
+  set(BUILD_SHARED_LIBS ON)
+endif()
 set(MUSPECTRE_PYTHON_MAJOR_VERSION 3)
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 # ------------------------------------------------------------------------------
 option(MUSPECTRE_MAKE_DOC_TARGET "If on, a target dev_doc (which builds the documentation) is added" OFF)
@@ -71,6 +79,14 @@ set(PYBIND11_EXPORT_NAME ${MUSPECTRE_TARGETS_EXPORT})
 if(MUSPECTRE_MUFFT_ONLY OR MUSPECTRE_MUGRID_ONLY)
   set(MUSPECTRE_MAKE_TESTS OFF CACHE BOOL "" FORCE)
   set(MUSPECTRE_MAKE_EXAMPLES OFF CACHE BOOL "" FORCE)
+endif()
+
+# Set options suitable for using muSpectre as a subproject
+if(NOT CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+  set(MUSPECTRE_MAKE_DOC_TARGET OFF)
+  set(MUSPECTRE_MAKE_TESTS OFF)
+  set(MUSPECTRE_MAKE_EXAMPLES OFF)
+  set(MUSPECTRE_MAKE_BENCHMARKS OFF)
 endif()
 
 # ------------------------------------------------------------------------------
@@ -113,9 +129,9 @@ endif()
 ################################################################################
 # compile the library
 add_compile_options(-Werror)
-add_subdirectory(${CMAKE_SOURCE_DIR}/src)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/src)
 if(MUCHOICE MATCHES "muSpectre")
-  add_subdirectory(${CMAKE_SOURCE_DIR}/language_bindings)
+  add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/language_bindings)
 endif()
 
 if(MUCHOICE MATCHES "muFFT")
@@ -123,12 +139,12 @@ if(MUCHOICE MATCHES "muFFT")
 endif()
 
 if (${MUSPECTRE_MAKE_DOC_TARGET})
-  add_subdirectory(${CMAKE_SOURCE_DIR}/doc)
+  add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/doc)
 endif()
 
 ################################################################################
 if(${MUSPECTRE_MAKE_EXAMPLES} AND ${MUCHOICE} MATCHES "muSpectre")
-  add_subdirectory(${CMAKE_SOURCE_DIR}/examples)
+  add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/examples)
 endif()
 
 ################################################################################

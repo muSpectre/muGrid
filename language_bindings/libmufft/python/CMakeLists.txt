@@ -81,7 +81,7 @@ add_custom_target(pyMuFFT ALL SOURCES
   muFFT/NetCDF.py)
 add_custom_command(TARGET pyMuFFT POST_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_directory
-                   ${CMAKE_SOURCE_DIR}/language_bindings/libmufft/python/muFFT
+                   ${CMAKE_CURRENT_SOURCE_DIR}/muFFT
                    $<TARGET_FILE_DIR:pyMuFFTLib>/muFFT)
 
 install(TARGETS pyMuFFTLib LIBRARY DESTINATION ${PYTHON_USER_SITE})

@@ -89,7 +89,7 @@ add_custom_target(pyMuSpectre ALL SOURCES
   muSpectre/stochastic_plasticity_search.py)
 add_custom_command(TARGET pyMuSpectre POST_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_directory
-                   ${CMAKE_SOURCE_DIR}/language_bindings/python/muSpectre
+                   ${CMAKE_CURRENT_SOURCE_DIR}/muSpectre
                    $<TARGET_FILE_DIR:pyMuSpectreLib>/muSpectre)
 
 install(TARGETS pyMuSpectreLib LIBRARY DESTINATION ${PYTHON_USER_SITE})

@@ -52,6 +52,12 @@ set(fft_engine_PFFT_SRCS
 find_package(FFTW3 COMPONENTS double REQUIRED)
 target_link_libraries(muFFT PUBLIC fftw3::double)
 
+if(BUILD_SHARED_LIBS STREQUAL "OFF")
+  set_target_properties(muFFT PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+  )
+endif()
+
 if(${MUSPECTRE_MPI_PARALLEL})
   find_package(MPI REQUIRED)
   set(mufft_SRCS ${mufft_SRCS} communicator.cc)
@@ -112,6 +118,8 @@ endif()
 
 install(TARGETS muFFT
   EXPORT ${MUFFT_TARGETS_EXPORT}
+  ARCHIVE
+    DESTINATION lib
   LIBRARY
     DESTINATION lib
   PUBLIC_HEADER
