@@ -33,6 +33,7 @@
  */
 
 #include "common/muSpectre_common.hh"
+#include <libmugrid/ccoord_operations.hh>
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -40,10 +41,10 @@
 #include <sstream>
 
 using muSpectre::Dim_t;
-using muSpectre::Real;
-using muSpectre::StressMeasure;
-using muSpectre::StrainMeasure;
 using muSpectre::Formulation;
+using muSpectre::Real;
+using muSpectre::StrainMeasure;
+using muSpectre::StressMeasure;
 using pybind11::literals::operator""_a;
 
 namespace py = pybind11;
@@ -51,7 +52,17 @@ namespace py = pybind11;
 void add_common(py::module & mod) {
   py::enum_<Formulation>(mod, "Formulation")
       .value("finite_strain", Formulation::finite_strain)
+      // "µSpectre handles a problem in terms of tranformation gradient F and"
+      // " first Piola-Kirchhoff stress P")
       .value("small_strain", Formulation::small_strain);
+  // "µSpectre handles a problem in terms of the infinitesimal strain "
+  // "tensor ε and Cauchy stress σ");
+
+  py::enum_<muSpectre::SplitCell>(mod, "SplitCell")
+      // informs the µSpctre about the kind of cell (split or not_split)
+      .value("laminate", muSpectre::SplitCell::laminate)
+      .value("split", muSpectre::SplitCell::simple)
+      .value("non_split", muSpectre::SplitCell::no);
 
   py::enum_<StressMeasure>(mod, "StressMeasure")
       .value("Cauchy", StressMeasure::Cauchy)

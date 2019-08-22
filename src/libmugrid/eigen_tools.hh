@@ -133,14 +133,21 @@ namespace muGrid {
      * into a `Eigen::Matrix`, `Eigen::Array`, etc. and which helps
      * determine compile-time size
      */
-    template <class Derived>
+    template <class TestClass>
     struct is_matrix {
-      //! raw type for testing
-      using T = std::remove_reference_t<Derived>;
-      //! evaluated test
+      using T = std::remove_cv_t<std::remove_reference_t<TestClass>>;
       constexpr static bool value{
-          std::is_same<typename Eigen::internal::traits<T>::XprKind,
-                       Eigen::MatrixXpr>::value};
+          std::is_base_of<Eigen::MatrixBase<T>, T>::value};
+    };
+
+    template <class Derived>
+    struct is_matrix<Eigen::Map<Derived>> {
+      constexpr static bool value{is_matrix<Derived>::value};
+    };
+
+    template <class Derived>
+    struct is_matrix<Eigen::Ref<Derived>> {
+      constexpr static bool value{is_matrix<Derived>::value};
     };
 
     /**
@@ -150,7 +157,7 @@ namespace muGrid {
     template <class Derived>
     struct is_fixed {
       //! raw type for testing
-      using T = std::remove_reference_t<Derived>;
+      using T = std::remove_cv_t<std::remove_reference_t<Derived>>;
       //! evaluated test
       constexpr static bool value{T::SizeAtCompileTime != Eigen::Dynamic};
     };
@@ -162,7 +169,7 @@ namespace muGrid {
     template <class Derived>
     struct is_square {
       //! raw type for testing
-      using T = std::remove_reference_t<Derived>;
+      using T = std::remove_cv_t<std::remove_reference_t<Derived>>;
       //! true if the object is square and statically sized
       constexpr static bool value{
           (T::RowsAtCompileTime == T::ColsAtCompileTime) && is_fixed<T>::value};
@@ -345,7 +352,8 @@ namespace muGrid {
     }
 
   }  // namespace log_comp
-
+  template <Dim_t dim>
+  using Decomp_t = Eigen::SelfAdjointEigenSolver<Eigen::Matrix<Real, dim, dim>>;
   /**
    * computes the matrix logarithm efficiently for dim=1, 2, or 3 for
    * a diagonizable tensor. For larger tensors, better use the direct
@@ -353,17 +361,18 @@ namespace muGrid {
    */
   template <Dim_t dim>
   inline decltype(auto) logm(const log_comp::Mat_t<dim> & mat) {
-    using Mat = log_comp::Mat_t<dim>;
-    Eigen::SelfAdjointEigenSolver<Mat> Solver{};
+    using Mat_t = Eigen::Matrix<Real, dim, dim>;
+    Eigen::SelfAdjointEigenSolver<Mat_t> Solver{};
     Solver.computeDirect(mat, Eigen::EigenvaluesOnly);
-    return Mat{log_comp::Sum(Solver.eigenvalues(), mat)};
+    return Mat_t{log_comp::Sum(Solver.eigenvalues(), mat)};
   }
 
   /**
    * compute the spectral decomposition
    */
 
-  template <class Derived>
+  template <class Derived, template <class Matrix_t>
+                           class DecompType = Eigen::SelfAdjointEigenSolver>
   inline decltype(auto)
   spectral_decomposition(const Eigen::MatrixBase<Derived> & mat) {
     static_assert(Derived::SizeAtCompileTime != Eigen::Dynamic,
@@ -371,9 +380,8 @@ namespace muGrid {
     static_assert(Derived::RowsAtCompileTime == Derived::ColsAtCompileTime,
                   "works only for square matrices");
     constexpr Dim_t dim{Derived::RowsAtCompileTime};
-
-    using Mat = log_comp::Mat_t<dim>;
-    Eigen::SelfAdjointEigenSolver<Mat> Solver{};
+    using Mat_t = Eigen::Matrix<Real, dim, dim>;
+    DecompType<Mat_t> Solver{};
     Solver.computeDirect(mat, Eigen::ComputeEigenvectors);
     return Solver;
   }
@@ -383,13 +391,14 @@ namespace muGrid {
    * efficient way to do this
    */
   template <Dim_t Dim>
-  using Decomp_t = Eigen::SelfAdjointEigenSolver<Eigen::Matrix<Real, Dim, Dim>>;
+  using Matrix_t = Eigen::Matrix<Real, Dim, Dim>;
 
-  template <Dim_t Dim>
-  inline decltype(auto) logm_alt(const Decomp_t<Dim> & spectral_decomp) {
-    using Mat = log_comp::Mat_t<Dim>;
-
-    Mat retval{Mat::Zero()};
+  template <Dim_t Dim, template <class Matrix_t>
+                       class DecompType = Eigen::SelfAdjointEigenSolver>
+  inline decltype(auto)
+  logm_alt(const DecompType<Matrix_t<Dim>> & spectral_decomp) {
+    using Mat_t = Eigen::Matrix<Real, Dim, Dim>;
+    Mat_t retval{Mat_t::Zero()};
     for (Dim_t i = 0; i < Dim; ++i) {
       const Real & val = spectral_decomp.eigenvalues()(i);
       auto & vec = spectral_decomp.eigenvectors().col(i);
@@ -405,10 +414,7 @@ namespace muGrid {
     static_assert(Derived::RowsAtCompileTime == Derived::ColsAtCompileTime,
                   "works only for square matrices");
     constexpr Dim_t dim{Derived::RowsAtCompileTime};
-    using Mat = log_comp::Mat_t<dim>;
-    using Decomp_t = Eigen::SelfAdjointEigenSolver<Mat>;
-
-    Decomp_t decomp{spectral_decomposition(mat)};
+    Decomp_t<dim> decomp{spectral_decomposition(mat)};
 
     return logm_alt(decomp);
   }
@@ -417,11 +423,12 @@ namespace muGrid {
    * compute the matrix exponential. This may not be the most
    * efficient way to do this
    */
-  template <Dim_t Dim>
-  inline decltype(auto) expm(const Decomp_t<Dim> & spectral_decomp) {
-    using Mat = log_comp::Mat_t<Dim>;
-
-    Mat retval{Mat::Zero()};
+  template <Dim_t Dim, template <class Matrix_t>
+                       class DecompType = Eigen::SelfAdjointEigenSolver>
+  inline decltype(auto)
+  expm(const DecompType<Matrix_t<Dim>> & spectral_decomp) {
+    using Mat_t = Matrix_t<Dim>;
+    Mat_t retval{Mat_t::Zero()};
     for (Dim_t i = 0; i < Dim; ++i) {
       const Real & val = spectral_decomp.eigenvalues()(i);
       auto & vec = spectral_decomp.eigenvectors().col(i);
@@ -437,11 +444,7 @@ namespace muGrid {
     static_assert(Derived::RowsAtCompileTime == Derived::ColsAtCompileTime,
                   "works only for square matrices");
     constexpr Dim_t Dim{Derived::RowsAtCompileTime};
-    using Mat = log_comp::Mat_t<Dim>;
-    using Decomp_t = Eigen::SelfAdjointEigenSolver<Mat>;
-
-    Decomp_t decomp{spectral_decomposition(mat)};
-
+    Decomp_t<Dim> decomp{spectral_decomposition(mat)};
     return expm(decomp);
   }
 

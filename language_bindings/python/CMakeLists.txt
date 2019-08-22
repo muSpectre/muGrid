@@ -1,3 +1,4 @@
+
 #==============================================================================
 # file   CMakeLists.txt
 #
@@ -61,7 +62,12 @@ set (PY_BINDING_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_projections.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_field_collection.cc
   )
-
+if(${SPLIT_CELL})
+  set (PY_BINDING_SRCS
+    ${PY_BINDING_SRCS}
+    ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_laminate.cc
+    )
+endif()
 find_package(PythonLibsNew ${MUSPECTRE_PYTHON_MAJOR_VERSION} MODULE REQUIRED)
 
 # On OS X, add -Wno-deprecated-declarations

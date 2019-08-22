@@ -16,6 +16,7 @@
 
 build:testing_gcc_mpi:
   extends: .builds
+
   image: registry.gitlab.com/muspectre/muspectre:debian_testing
   script:
     - echo "free -h"
@@ -55,6 +56,18 @@ build:stable_gcc:
 build:ubuntu16.04_gcc:
   extends: .builds
   image: registry.gitlab.com/muspectre/muspectre:ubuntu16.04
+
+build:testing_gcc_split:
+  extends: .builds
+  image: registry.gitlab.com/muspectre/muspectre:debian_testing
+  script:
+    - echo "free -h"
+    - free -h
+    - echo "grep -c ^processor /proc/cpuinfo"
+    - grep -c ^processor /proc/cpuinfo
+    - cd build
+    - cmake -DCMAKE_BUILD_TYPE:STRING=Release -DSPLIT_CELL=ON ..
+    - make
 
 .tests:
   stage: test
@@ -111,3 +124,10 @@ test:ubuntu16.04_gcc:
   extends: .tests
   dependencies:
     - build:ubuntu16.04_gcc
+
+test:testing_gcc_split:
+ image: registry.gitlab.com/muspectre/muspectre:debian_testing
+ extends: .tests
+ dependencies:
+    - build:testing_gcc_split
+

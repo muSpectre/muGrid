@@ -130,6 +130,7 @@ namespace muGrid {
     ccoords_container ccoords{};
     //! container of indices for non-global collections (slow!)
     std::map<Ccoord, size_t> indices{};
+    std::vector<Real> assigned_ratio{};
   };
 
   /* ---------------------------------------------------------------------- */
@@ -148,7 +149,6 @@ namespace muGrid {
     this->ccoords.push_back(local_ccoord);
     this->size_++;
   }
-
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS>
   void LocalFieldCollection<DimS>::initialise() {

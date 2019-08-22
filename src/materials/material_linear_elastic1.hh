@@ -127,6 +127,8 @@ namespace muSpectre {
     inline decltype(auto) evaluate_stress(s_t && E,
                                           const size_t & /*pixel_index*/);
 
+    template <class s_t>
+    inline decltype(auto) evaluate_stress(s_t && E);
     /**
      * evaluates both second Piola-Kirchhoff stress and stiffness given
      * the Green-Lagrange strain (or Cauchy stress and stiffness if
@@ -135,6 +137,10 @@ namespace muSpectre {
     template <class s_t>
     inline decltype(auto)
     evaluate_stress_tangent(s_t && E, const size_t & /*pixel_index*/);
+
+    template <class s_t>
+    inline decltype(auto)
+    evaluate_stress_tangent(s_t && E);
 
    protected:
     const Real young;     //!< Young's modulus
@@ -157,6 +163,26 @@ namespace muSpectre {
     std::unique_ptr<const Stiffness_t> C_holder;  //!< stiffness tensor
     const Stiffness_t & C;                        //! ref to stiffness tensor
   };
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  template <class s_t>
+  auto MaterialLinearElastic1<DimS, DimM>::evaluate_stress(s_t && E)
+      -> decltype(auto) {
+    return Hooke::evaluate_stress(this->lambda, this->mu, std::move(E));
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  template <class s_t>
+  auto MaterialLinearElastic1<DimS, DimM>::evaluate_stress_tangent(s_t && E)
+      -> decltype(auto) {
+    using Tangent_t = typename traits::TangentMap_t::reference;
+
+    return Hooke::evaluate_stress(
+        this->lambda, this->mu, Tangent_t(const_cast<double *>(this->C.data())),
+        std::move(E));
+  }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>

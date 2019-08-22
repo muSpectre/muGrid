@@ -37,7 +37,6 @@
 cmake_minimum_required(VERSION 3.5.0)
 
 project(muSpectre)
-
 # ------------------------------------------------------------------------------
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(BUILD_SHARED_LIBS ON)
@@ -50,6 +49,7 @@ option(MUSPECTRE_MAKE_TESTS "If on, several ctest targets will be built automati
 option(MUSPECTRE_MAKE_EXAMPLES "If on, the executables in the bin folder will be compiled" ON)
 option(MUSPECTRE_MAKE_BENCHMARKS "If on, the benchmarks will be compiled" ON)
 option(MUSPECTRE_MPI_PARALLEL "If on, MPI-parallel solvers become available" OFF)
+option(SPLIT_CELL "If on, split cell, cork and gmp are accessible" OFF)
 set(MUCHOICE "muSpectre" CACHE STRING "Which µLevel is required")
 set_property(CACHE MUCHOICE PROPERTY STRINGS
   "muGrid"
@@ -79,15 +79,22 @@ include(muTools)
 include(cpplint)
 mark_as_advanced_prefix(CPPLINT)
 
-muSpectre_set_global_compile_options()
+
 
 # ------------------------------------------------------------------------------
 add_external_package(Eigen3 VERSION 3.3.0 CONFIG)
 add_external_package(pybind11 VERSION 2.2 CONFIG)
 find_package(PythonLibsNew ${MUSPECTRE_PYTHON_MAJOR_VERSION} MODULE REQUIRED)
 
+
+if(${SPLIT_CELL})
+  add_external_package(gmp)
+  add_external_package(corkpp)
+endif()
+
 add_subdirectory(external)
 
+muSpectre_set_global_compile_options()
 # ------------------------------------------------------------------------------
 if(APPLE)
   include_directories(
@@ -95,10 +102,13 @@ if(APPLE)
     ${Boost_INCLUDE_DIR})
 endif()
 
+
 if (${MUSPECTRE_MAKE_TESTS})
   enable_testing()
   add_subdirectory(tests)
 endif()
+
+
 
 ################################################################################
 # compile the library

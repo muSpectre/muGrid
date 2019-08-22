@@ -34,8 +34,7 @@ namespace muSpectre {
 
     namespace internal {
 
-      /* ----------------------------------------------------------------------
-       */
+     // ----------------------------------------------------------------------
       /**
        * Specialisation for the case where we get Kirchhoff stress (τ)
        */
@@ -50,8 +49,7 @@ namespace muSpectre {
         }
       };
 
-      /* ----------------------------------------------------------------------
-       */
+     // ----------------------------------------------------------------------
       /**
        * Specialisation for the case where we get Kirchhoff stress (τ) derived
        * with respect to Gradient

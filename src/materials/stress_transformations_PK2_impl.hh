@@ -28,14 +28,16 @@
 #ifndef SRC_MATERIALS_STRESS_TRANSFORMATIONS_PK2_IMPL_HH_
 #define SRC_MATERIALS_STRESS_TRANSFORMATIONS_PK2_IMPL_HH_
 
+#include "common/muSpectre_common.hh"
+#include <libmugrid/T4_map_proxy.hh>
+
 namespace muSpectre {
 
   namespace MatTB {
 
     namespace internal {
 
-      /* ----------------------------------------------------------------------
-       */
+      // ----------------------------------------------------------------------
       /**
        * Specialisation for the case where we get material stress
        * (Piola-Kirchhoff-2, PK2)
@@ -51,8 +53,7 @@ namespace muSpectre {
         }
       };
 
-      /* ----------------------------------------------------------------------
-       */
+      // ----------------------------------------------------------------------
       /**
        * Specialisation for the case where we get material stress
        * (Piola-Kirchhoff-2, PK2) derived with respect to
@@ -75,9 +76,8 @@ namespace muSpectre {
           using Tmap = muGrid::T4MatMap<Real, Dim>;
           using muGrid::get;
 
-          T4 K;
+          T4 K{T4::Zero()};
           Tmap Kmap{K.data()};
-          K.setZero();
 
           for (int i = 0; i < Dim; ++i) {
             for (int m = 0; m < Dim; ++m) {
@@ -122,9 +122,8 @@ namespace muSpectre {
                                              Tangent_t && C) {
           using T4 = typename std::remove_reference_t<Tangent_t>::PlainObject;
           using Tmap = muGrid::T4MatMap<Real, Dim>;
-          T4 K;
+          T4 K{T4::Zero()};
           Tmap Kmap{K.data()};
-          K.setZero();
 
           for (int i = 0; i < Dim; ++i) {
             for (int m = 0; m < Dim; ++m) {
@@ -141,6 +140,45 @@ namespace muSpectre {
           auto && P =
               compute(std::forward<Strain_t>(F), std::forward<Stress_t>(S));
           return std::make_tuple(std::move(P), std::move(K));
+        }
+      };
+
+      // ----------------------------------------------------------------------
+      /** Specialisation for the transparent case, where we already
+          have PK2 stress
+       **/
+      template <Dim_t Dim, StrainMeasure StrainM>
+      struct PK2_stress<Dim, StressMeasure::PK2, StrainM>
+          : public PK2_stress<Dim, StressMeasure::no_stress_,
+                              StrainMeasure::no_strain_> {
+        //! returns the converted stress
+        template <class Strain_t, class Stress_t>
+        inline static decltype(auto) compute(Strain_t && /*dummy*/,
+                                             Stress_t && S) {
+          return std::forward<Stress_t>(S);
+        }
+      };
+
+      // ----------------------------------------------------------------------
+      /** Specialisation for the transparent case, where we already have PK2
+          stress *and* stiffness is given with respect to the transformation
+          Green-Lagrange
+       **/
+      template <Dim_t Dim>
+      struct PK2_stress<Dim, StressMeasure::PK2, StrainMeasure::GreenLagrange>
+          : public PK2_stress<Dim, StressMeasure::PK2,
+                              StrainMeasure::no_strain_> {
+        //! base class
+        using Parent =
+            PK2_stress<Dim, StressMeasure::PK2, StrainMeasure::no_strain_>;
+        using Parent::compute;
+
+        //! returns the converted stress and stiffness
+        template <class Strain_t, class Stress_t, class Tangent_t>
+        inline static decltype(auto) compute(Strain_t && /*dummy*/,
+                                             Stress_t && S, Tangent_t && C) {
+          return std::make_tuple(std::forward<Stress_t>(S),
+                                 std::forward<Tangent_t>(C));
         }
       };
 

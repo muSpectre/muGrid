@@ -44,7 +44,7 @@ except ImportError:
 import unittest
 import numpy as np
 
-from python_test_imports import muFFT, µ
+from python_test_imports import µ, muFFT
 
 
 def build_test_classes(fft):

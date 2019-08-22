@@ -61,6 +61,10 @@ endmacro()
 
 # build library tests
 file(GLOB TEST_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/test_*.cc")
+if(${SPLIT_CELL})
+  file( GLOB SPLIT_TEST_SRCS "${CMAKE_SOURCE_DIR}/tests/split_test_*.cc")
+  list (APPEND TEST_SRCS ${SPLIT_TEST_SRCS})
+endif(${SPLIT_CELL})
 muSpectre_add_test(main_test_suite
   SOURCES main_test_suite.cc ${TEST_SRCS}
   TYPE BOOST --report_level=detailed)

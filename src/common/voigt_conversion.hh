@@ -49,15 +49,17 @@ namespace muSpectre {
    * implements a bunch of static functions to convert between full
    * and Voigt notation of tensors
    */
+  //----------------------------------------------------------------------------//
+
   template <Dim_t dim>
   class VoigtConversion {
    public:
     VoigtConversion();
-    virtual ~VoigtConversion();
 
     //! obtain a fourth order voigt matrix from a tensor
     template <class Tens4, class Voigt, bool sym = true>
     inline static void fourth_to_voigt(const Tens4 & t, Voigt & v);
+
     //! return a fourth order voigt matrix from a tensor
     template <class Tens4, bool sym = true>
     inline static Eigen::Matrix<Real, vsize<sym>(dim), vsize<sym>(dim)>
@@ -87,67 +89,147 @@ namespace muSpectre {
     template <class Tens2, class Voigt, bool sym = true>
     inline static void stress_from_voigt(const Voigt & v, Tens2 & sigma);
 
-   public:
+   private:
     //! matrix of vector index I as function of tensor indices i,j
     static const Eigen::Matrix<Dim_t, dim, dim> mat;
+
     //! matrix of vector index I as function of tensor indices i,j
     static const Eigen::Matrix<Dim_t, dim, dim> sym_mat;
     //! array of matrix indices ij as function of vector index I
     static const Eigen::Matrix<Dim_t, dim * dim, 2> vec;
     //! factors to multiply the strain by for voigt notation
     static const Eigen::Matrix<Real, vsize(dim), 1> factors;
+    /**
+     * reordering between a row/column in voigt vs col-major matrix
+     * (e.g., stiffness tensor)
+     */
+    static const Eigen::Matrix<Dim_t, dim * dim, 1> vec_vec;
+
+   public:
+    inline static auto get_mat() -> decltype(auto);
+    inline static auto get_sym_mat() -> decltype(auto);
+    inline static auto get_vec() -> decltype(auto);
+    inline static auto get_factors() -> decltype(auto);
+    inline static auto get_vec_vec() -> decltype(auto);
   };
 
-  //! voigt vector indices for non-symmetric tensors
+  //----------------------------------------------------------------------------//
+  //! voigt vector indices for symmetric tensors
   template <>
-  const Eigen::Matrix<Dim_t, 1, 1>
-      VoigtConversion<1>::mat = (Eigen::Matrix<Dim_t, 1, 1>() << 0).finished();
-  //! voigt vector indices for non-symmetric tensors
+  auto inline VoigtConversion<1>::get_sym_mat() -> decltype(auto) {
+    const Eigen::Matrix<Dim_t, 1 * 1, 1> sym_mat{
+        (Eigen::Matrix<Dim_t, 1 * 1, 1>() << 0).finished()};
+    return sym_mat;
+  }
+
   template <>
-  const Eigen::Matrix<Dim_t, 2, 2> VoigtConversion<2>::mat =
-      (Eigen::Matrix<Dim_t, 2, 2>() << 0, 2, 3, 1).finished();
-  //! voigt vector indices for non-symmetric tensors
+  auto inline VoigtConversion<2>::get_sym_mat() -> decltype(auto) {
+    const Eigen::Matrix<Dim_t, 2, 2> sym_mat{
+        (Eigen::Matrix<Dim_t, 2, 2>() << 0, 2, 2, 1).finished()};
+    return sym_mat;
+  }
+
   template <>
-  const Eigen::Matrix<Dim_t, 3, 3> VoigtConversion<3>::mat =
-      (Eigen::Matrix<Dim_t, 3, 3>() << 0, 5, 4, 8, 1, 3, 7, 6, 2).finished();
-  //! voigt vector indices
+  auto inline VoigtConversion<3>::get_sym_mat() -> decltype(auto) {
+    const Eigen::Matrix<Dim_t, 3, 3> sym_mat{
+        (Eigen::Matrix<Dim_t, 3, 3>() << 0, 5, 4, 5, 1, 3, 4, 3, 2).finished()};
+    return sym_mat;
+  }
+  //----------------------------------------------------------------------------//
+
+  //! voigt vector indices for non_symmetric tensors
   template <>
-  const Eigen::Matrix<Dim_t, 1, 1> VoigtConversion<1>::sym_mat =
-      (Eigen::Matrix<Dim_t, 1, 1>() << 0).finished();
-  //! voigt vector indices
+  auto inline VoigtConversion<1>::get_mat() -> decltype(auto) {
+    const Eigen::Matrix<Dim_t, 1 * 1, 1> mat{
+        (Eigen::Matrix<Dim_t, 1 * 1, 1>() << 0).finished()};
+    return mat;
+  }
+
   template <>
-  const Eigen::Matrix<Dim_t, 2, 2> VoigtConversion<2>::sym_mat =
-      (Eigen::Matrix<Dim_t, 2, 2>() << 0, 2, 2, 1).finished();
-  //! voigt vector indices
+  auto inline VoigtConversion<2>::get_mat() -> decltype(auto) {
+    const Eigen::Matrix<Dim_t, 2, 2> mat{
+        (Eigen::Matrix<Dim_t, 2, 2>() << 0, 2, 3, 1).finished()};
+    return mat;
+  }
+
   template <>
-  const Eigen::Matrix<Dim_t, 3, 3> VoigtConversion<3>::sym_mat =
-      (Eigen::Matrix<Dim_t, 3, 3>() << 0, 5, 4, 5, 1, 3, 4, 3, 2).finished();
+  auto inline VoigtConversion<3>::get_mat() -> decltype(auto) {
+    const Eigen::Matrix<Dim_t, 3, 3> mat{
+        (Eigen::Matrix<Dim_t, 3, 3>() << 0, 5, 4, 8, 1, 3, 7, 6, 2).finished()};
+    return mat;
+  }
+  //----------------------------------------------------------------------------//
   //! matrix indices from voigt vectors
   template <>
-  const Eigen::Matrix<Dim_t, 1 * 1, 2> VoigtConversion<1>::vec =
-      (Eigen::Matrix<Dim_t, 1 * 1, 2>() << 0, 0).finished();
-  //! matrix indices from voigt vectors
+  auto inline VoigtConversion<1>::get_vec() -> decltype(auto) {
+    const Eigen::Matrix<Dim_t, 1 * 1, 2> vec{
+        (Eigen::Matrix<Dim_t, 1 * 1, 2>() << 0, 0).finished()};
+    return vec;
+  }
+
   template <>
-  const Eigen::Matrix<Dim_t, 2 * 2, 2> VoigtConversion<2>::vec =
-      (Eigen::Matrix<Dim_t, 2 * 2, 2>() << 0, 0, 1, 1, 0, 1, 1, 0).finished();
-  //! matrix indices from voigt vectors
+  auto inline VoigtConversion<2>::get_vec() -> decltype(auto) {
+    const Eigen::Matrix<Dim_t, 2 * 2, 2> vec{
+        (Eigen::Matrix<Dim_t, 2 * 2, 2>() << 0, 0, 1, 1, 0, 1, 1, 0)
+            .finished()};
+    return vec;
+  }
   template <>
-  const Eigen::Matrix<Dim_t, 3 * 3, 2>
-      VoigtConversion<3>::vec = (Eigen::Matrix<Dim_t, 3 * 3, 2>() << 0, 0, 1, 1,
-                                 2, 2, 1, 2, 0, 2, 0, 1, 2, 1, 2, 0, 1, 0)
-                                    .finished();
-  //! factors for shear components in voigt notation
+  auto inline VoigtConversion<3>::get_vec() -> decltype(auto) {
+    const Eigen::Matrix<Dim_t, 3 * 3, 2> vec{
+        (Eigen::Matrix<Dim_t, 3 * 3, 2>() << 0, 0, 1, 1, 2, 2, 1, 2, 0, 2, 0, 1,
+         2, 1, 2, 0, 1, 0)
+            .finished()};
+    return vec;
+  }
+  //----------------------------------------------------------------------------//
   template <>
-  const Eigen::Matrix<Real, vsize(1), 1> VoigtConversion<1>::factors =
-      (Eigen::Matrix<Real, vsize(1), 1>() << 1).finished();
-  //! factors for shear components in voigt notation
+  auto inline VoigtConversion<1>::get_factors() -> decltype(auto) {
+    const Eigen::Matrix<Dim_t, vsize(1), 1> factors{
+        (Eigen::Matrix<Dim_t, vsize(1), 1>() << 1).finished()};
+    return factors;
+  }
+
   template <>
-  const Eigen::Matrix<Real, vsize(2), 1> VoigtConversion<2>::factors =
-      (Eigen::Matrix<Real, vsize(2), 1>() << 1, 1, 2).finished();
-  //! factors for shear components in voigt notation
+  auto inline VoigtConversion<2>::get_factors() -> decltype(auto) {
+    const Eigen::Matrix<Dim_t, vsize(2), 1> factors{
+        (Eigen::Matrix<Dim_t, vsize(2), 1>() << 1, 1, 2).finished()};
+    return factors;
+  }
+
   template <>
-  const Eigen::Matrix<Real, vsize(3), 1> VoigtConversion<3>::factors =
-      (Eigen::Matrix<Real, vsize(3), 1>() << 1, 1, 1, 2, 2, 2).finished();
+  auto inline VoigtConversion<3>::get_factors() -> decltype(auto) {
+    const Eigen::Matrix<Dim_t, vsize(3), 1> factors{
+        (Eigen::Matrix<Dim_t, vsize(3), 1>() << 1, 1, 1, 2, 2, 2).finished()};
+    return factors;
+  }
+  //----------------------------------------------------------------------------//
+  /**
+   * reordering between a row/column in voigt vs col-major matrix
+   * (e.g., stiffness tensor)
+   */
+  template <>
+  auto inline VoigtConversion<1>::get_vec_vec() -> decltype(auto) {
+    const Eigen::Matrix<Dim_t, 1 * 1, 1> vec_vec{
+        (Eigen::Matrix<Dim_t, 1 * 1, 1>() << 0).finished()};
+    return vec_vec;
+  }
+
+  template <>
+  auto inline VoigtConversion<2>::get_vec_vec() -> decltype(auto) {
+    const Eigen::Matrix<Dim_t, 2 * 2, 1> vec_vec{
+        (Eigen::Matrix<Dim_t, 2 * 2, 1>() << 0, 3, 2, 1).finished()};
+    return vec_vec;
+  }
+
+  template <>
+  auto inline VoigtConversion<3>::get_vec_vec() -> decltype(auto) {
+    const Eigen::Matrix<Dim_t, 3 * 3, 1> vec_vec{
+        (Eigen::Matrix<Dim_t, 3 * 3, 1>() << 0, 8, 7, 5, 1, 6, 4, 3, 2)
+            .finished()};
+    return vec_vec;
+  }
+  //----------------------------------------------------------------------------//
 
   //----------------------------------------------------------------------------//
   template <Dim_t dim>

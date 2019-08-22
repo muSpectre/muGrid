@@ -47,6 +47,8 @@
 
 namespace muSpectre {
 
+  using muGrid::testGoodies::rel_error;
+
   BOOST_AUTO_TEST_SUITE(materials_toolbox)
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_strain_conversion, Fix,
@@ -63,7 +65,7 @@ namespace muSpectre {
                                     StrainMeasure::GreenLagrange>(
         Eigen::Map<Eigen::Matrix<Real, dim, dim>>(F.data()));
 
-    Real error = (Eref - E_tb).norm();
+    Real error = rel_error(Eref, E_tb);
     BOOST_CHECK_LT(error, tol);
 
     // checking Left Cauchy-Green
@@ -71,7 +73,7 @@ namespace muSpectre {
     E_tb = MatTB::convert_strain<StrainMeasure::Gradient,
                                  StrainMeasure::LCauchyGreen>(F);
 
-    error = (Eref - E_tb).norm();
+    error = rel_error(Eref, E_tb);
     BOOST_CHECK_LT(error, tol);
 
     // checking Right Cauchy-Green
@@ -79,7 +81,7 @@ namespace muSpectre {
     E_tb = MatTB::convert_strain<StrainMeasure::Gradient,
                                  StrainMeasure::RCauchyGreen>(F);
 
-    error = (Eref - E_tb).norm();
+    error = rel_error(Eref, E_tb);
     BOOST_CHECK_LT(error, tol);
 
     // checking Hencky (logarithmic) strain
@@ -95,14 +97,14 @@ namespace muSpectre {
     E_tb =
         MatTB::convert_strain<StrainMeasure::Gradient, StrainMeasure::Log>(F);
 
-    error = (Eref - E_tb).norm();
+    error = rel_error(Eref, E_tb);
     BOOST_CHECK_LT(error, tol);
 
     auto F_tb =
         MatTB::convert_strain<StrainMeasure::Gradient, StrainMeasure::Gradient>(
             F);
 
-    error = (F - F_tb).norm();
+    error = rel_error(F, F_tb);
     BOOST_CHECK_LT(error, tol);
   }
 
@@ -129,7 +131,7 @@ namespace muSpectre {
         }
       }
     }
-    auto error{(R1 - R2).norm()};
+    auto error{rel_error(R1, R2)};
     BOOST_CHECK_LT(error, tol);
   }
 
@@ -157,7 +159,7 @@ namespace muSpectre {
     T2 S = Matrices::tensmult(C, E_tb);
     T2 Sref = lambda * E_tb.trace() * I + 2 * mu * E_tb;
 
-    auto error{(Sref - S).norm()};
+    auto error = rel_error(Sref, S);
     BOOST_CHECK_LT(error, tol);
 
     T4 K = Matrices::outer_under(I, S) +
@@ -183,13 +185,21 @@ namespace muSpectre {
         }
       }
     }
-    error = (Kref - K).norm();
+    error = rel_error(Kref, K);
     BOOST_CHECK_LT(error, tol);
 
     T2 P = MatTB::PK1_stress<StressMeasure::PK2, StrainMeasure::GreenLagrange>(
         F, S);
     T2 Pref = F * S;
-    error = (P - Pref).norm();
+    error = rel_error(P, Pref);
+    BOOST_CHECK_LT(error, tol);
+
+    T2 S_back =
+        MatTB::PK2_stress<StressMeasure::PK1, StrainMeasure::Gradient>(F, P);
+    error = rel_error(S_back, S);
+    BOOST_CHECK_LT(error, tol);
+
+    error = rel_error(S_back, S_back.transpose());
     BOOST_CHECK_LT(error, tol);
 
     auto && stress_tgt =
@@ -197,10 +207,27 @@ namespace muSpectre {
             F, S, C);
     T2 P_t = std::move(std::get<0>(stress_tgt));
     T4 K_t = std::move(std::get<1>(stress_tgt));
-    error = (P_t - Pref).norm();
+    error = rel_error(P_t, Pref);
     BOOST_CHECK_LT(error, tol);
 
-    error = (K_t - Kref).norm();
+    error = rel_error(K_t, Kref);
+    BOOST_CHECK_LT(error, tol);
+
+    auto && stress_tgt_back =
+        MatTB::PK2_stress<StressMeasure::PK1, StrainMeasure::Gradient>(F, P,
+                                                                       K_t);
+
+    T2 stress_back = std::move(std::get<0>(stress_tgt_back));
+    T4 stiffness_back = std::move(std::get<1>(stress_tgt_back));
+
+    error = rel_error(stress_back, S);
+    BOOST_CHECK_LT(error, tol);
+    error = rel_error(stress_back, stress_back.transpose());
+    BOOST_CHECK_LT(error, tol);
+
+    error = rel_error(stiffness_back, C);
+    BOOST_CHECK_LT(error, tol);
+    error = rel_error(stiffness_back, stiffness_back.transpose());
     BOOST_CHECK_LT(error, tol);
 
     auto && stress_tgt_trivial =
@@ -208,10 +235,10 @@ namespace muSpectre {
     T2 P_u = std::move(std::get<0>(stress_tgt_trivial));
     T4 K_u = std::move(std::get<1>(stress_tgt_trivial));
 
-    error = (P_u - Pref).norm();
+    error = rel_error(P_u, Pref);
     BOOST_CHECK_LT(error, tol);
 
-    error = (K_u - Kref).norm();
+    error = rel_error(K_u, Kref);
     BOOST_CHECK_LT(error, tol);
 
     T2 P_g;
@@ -219,10 +246,10 @@ namespace muSpectre {
     std::tie(P_g, K_g) =
         muGrid::testGoodies::objective_hooke_explicit(lambda, mu, F);
 
-    error = (P_g - Pref).norm();
+    error = rel_error(P_g, Pref);
     BOOST_CHECK_LT(error, tol);
 
-    error = (K_g - Kref).norm();
+    error = rel_error(K_g, Kref);
     BOOST_CHECK_LT(error, tol);
   }
 

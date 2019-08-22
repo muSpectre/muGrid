@@ -35,7 +35,7 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include "materials/material_linear_elastic4.hh"
+#include "material_linear_elastic4.hh"
 
 namespace muSpectre {
 

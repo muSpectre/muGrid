@@ -13,7 +13,8 @@ Constitutive Laws
    :maxdepth: 2
 
    MaterialLinearElasticGeneric
-
+   CellSplit
+   MaterialLaminate
 
 Testing Constitutive Laws
 ~~~~~~~~~~~~~~~~~~~~~~~~~

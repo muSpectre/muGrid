@@ -46,7 +46,8 @@ from _muFFT import (get_domain_ccoord, get_domain_index, get_hermitian_sizes,
                     FFT_PlanFlags)
 
 import _muSpectre
-from _muSpectre import (Formulation, material, solvers, FiniteDiff)
+from _muSpectre import (SplitCell, Formulation, material, solvers, FiniteDiff)
+
 
 from muFFT import Communicator
 import muSpectre.gradient_integration
@@ -107,8 +108,10 @@ def DiscreteDerivative(lbounds, stencil):
                                      stencil.ravel()))
 
 
+
 def Cell(nb_grid_pts, domain_lengths, formulation=Formulation.finite_strain,
-         gradient=None, fft='fftw', communicator=None):
+         gradient=None, fft='fftw', communicator=None, is_cell_split=SplitCell.non_split):
+
     """
     Instantiate a muSpectre Cell class.
 
@@ -140,7 +143,10 @@ def Cell(nb_grid_pts, domain_lengths, formulation=Formulation.finite_strain,
     cell: object
         Return a muSpectre Cell object.
     """
-    communicator = Communicator(communicator)
+    if communicator is not None:
+        communicator = Communicator(communicator)
+    else:
+        communicator = Communicator()
 
     if gradient is None:
         dims = len(nb_grid_pts)
@@ -152,6 +158,8 @@ def Cell(nb_grid_pts, domain_lengths, formulation=Formulation.finite_strain,
         factory_name, is_parallel = _factories[fft]
     except KeyError:
         raise KeyError("Unknown FFT engine '{}'.".format(fft))
+    if is_cell_split == SplitCell.split:
+        factory_name = factory_name + "Split"
     try:
         factory = _muSpectre.__dict__[factory_name]
     except KeyError:
@@ -166,7 +174,7 @@ def Cell(nb_grid_pts, domain_lengths, formulation=Formulation.finite_strain,
 
 
 def Projection(nb_grid_pts, lengths,
-               formulation=_muSpectre.Formulation.finite_strain,
+               formulation=Formulation.finite_strain,
                gradient = None,
                fft='fftw', communicator=None):
     """

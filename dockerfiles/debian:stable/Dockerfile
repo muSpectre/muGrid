@@ -31,6 +31,7 @@ RUN apt-get -qq update && apt-get -y -qq install \
     python3-sphinx \
     python3-sphinx-rtd-theme \
     && rm -rf /var/lib/apt/lists/*
+
 # apt-get on one line due to https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#run
 
 # generating utf8 locales is required by the tests for debian stable

@@ -69,6 +69,11 @@ void add_material_linear_elastic4_helper(py::module & mod);
 template <Dim_t Dim>
 void add_material_hyper_elasto_plastic1_helper(py::module & mod);
 
+#ifdef WITH_SPLIT
+template <Dim_t Dim>
+void add_material_laminate_helper(py::module & mod);
+#endif
+
 /* ---------------------------------------------------------------------- */
 template <Dim_t Dim>
 class PyMaterialBase : public muSpectre::MaterialBase<Dim, Dim> {
@@ -76,6 +81,10 @@ class PyMaterialBase : public muSpectre::MaterialBase<Dim, Dim> {
   /* Inherit the constructors */
   using Parent = muSpectre::MaterialBase<Dim, Dim>;
   using Parent::Parent;
+  using Strain_t = typename Parent::Strain_t;
+  using Stress_t = typename Parent::Stress_t;
+  using Stiffness_t = typename Parent::Stiffness_t;
+  using StressStiffness_t = typename std::tuple<Stress_t, Stiffness_t>;
 
   /* Trampoline (need one for each virtual function) */
   void save_history_variables() override {
@@ -87,7 +96,7 @@ class PyMaterialBase : public muSpectre::MaterialBase<Dim, Dim> {
 
   /* Trampoline (need one for each virtual function) */
   void initialise() override {
-    PYBIND11_OVERLOAD_PURE(
+    PYBIND11_OVERLOAD(
         void,         // Return type
         Parent,       // Parent class
         initialise);  // Name of function in C++ (must match Python name)
@@ -95,23 +104,69 @@ class PyMaterialBase : public muSpectre::MaterialBase<Dim, Dim> {
 
   void compute_stresses(const typename Parent::StrainField_t & F,
                         typename Parent::StressField_t & P,
-                        muSpectre::Formulation form) override {
+                        muSpectre::Formulation form,
+                        muSpectre::SplitCell is_cell_split) override {
     PYBIND11_OVERLOAD_PURE(
         void,              // Return type
         Parent,            // Parent class
         compute_stresses,  // Name of function in C++ (must match Python name)
-        F, P, form);
+        F, P, form, is_cell_split);
   }
 
   void compute_stresses_tangent(const typename Parent::StrainField_t & F,
                                 typename Parent::StressField_t & P,
                                 typename Parent::TangentField_t & K,
-                                muSpectre::Formulation form) override {
+                                muSpectre::Formulation form,
+                                muSpectre::SplitCell is_cell_split) override {
     PYBIND11_OVERLOAD_PURE(
         void,             /* Return type */
         Parent,           /* Parent class */
         compute_stresses, /* Name of function in C++ (must match Python name) */
-        F, P, K, form);
+        F, P, K, form, is_cell_split);
+  }
+
+  Stress_t
+  constitutive_law_small_strain(const Eigen::Ref<const Strain_t> & strain,
+                                const size_t & pixel_index) override {
+    PYBIND11_OVERLOAD_PURE(
+        Stress_t, /* Return type */
+        Parent,   /* Parent class */
+        constitutive_law_small_strain,
+        /* Name of function in C++ (must match Python name) */
+        strain, pixel_index);
+  }
+
+  Stress_t
+  constitutive_law_finite_strain(const Eigen::Ref<const Strain_t> & strain,
+                                 const size_t & pixel_index) override {
+    PYBIND11_OVERLOAD_PURE(
+        Stress_t, /* Return type */
+        Parent,   /* Parent class */
+        constitutive_law_finite_strain,
+        /* Name of function in C++ (must match Python name) */
+        strain, pixel_index);
+  }
+
+  std::tuple<Stress_t, Stiffness_t> constitutive_law_tangent_small_strain(
+      const Eigen::Ref<const Strain_t> & strain,
+      const size_t & pixel_index) override {
+    PYBIND11_OVERLOAD_PURE(
+        StressStiffness_t, /* Return type */
+        Parent,            /* Parent class */
+        constitutive_law_tangent_small_strain,
+        /* Name of function in C++ (must match Python name) */
+        strain, pixel_index);
+  }
+
+  std::tuple<Stress_t, Stiffness_t> constitutive_law_tangent_finite_strain(
+      const Eigen::Ref<const Strain_t> & strain,
+      const size_t & pixel_index) override {
+    PYBIND11_OVERLOAD_PURE(
+        StressStiffness_t, /* Return type */
+        Parent,            /* Parent class */
+        constitutive_law_tangent_finite_strain,
+        /* Name of function in C++ (must match Python name) */
+        strain, pixel_index);
   }
 };
 
@@ -132,8 +187,8 @@ void add_material_evaluator(py::module & mod) {
              if ((grad.cols() != Dim) or (grad.rows() != Dim)) {
                std::stringstream err{};
                err << "need matrix of shape (" << Dim << "×" << Dim
-                   << ") but got (" << grad.rows() << "×"
-                   << grad.cols() << ").";
+                   << ") but got (" << grad.rows() << "×" << grad.cols()
+                   << ").";
                throw std::runtime_error(err.str());
              }
              return mateval.evaluate_stress(grad, form);
@@ -150,8 +205,8 @@ void add_material_evaluator(py::module & mod) {
              if ((grad.cols() != Dim) or (grad.rows() != Dim)) {
                std::stringstream err{};
                err << "need matrix of shape (" << Dim << "×" << Dim
-                   << ") but got (" << grad.rows() << "×"
-                   << grad.cols() << ").";
+                   << ") but got (" << grad.rows() << "×" << grad.cols()
+                   << ").";
                throw std::runtime_error(err.str());
              }
              return mateval.evaluate_stress_tangent(grad, form);
@@ -172,8 +227,8 @@ void add_material_evaluator(py::module & mod) {
              if ((grad.cols() != Dim) or (grad.rows() != Dim)) {
                std::stringstream err{};
                err << "need matrix of shape (" << Dim << "×" << Dim
-                   << ") but got (" << grad.rows() << "×"
-                   << grad.cols() << ").";
+                   << ") but got (" << grad.rows() << "×" << grad.cols()
+                   << ").";
                throw std::runtime_error(err.str());
              }
              return evaluator.estimate_tangent(grad, form, step, diff_type);
@@ -223,6 +278,9 @@ void add_material_helper(py::module & mod) {
   add_material_hyper_elasto_plastic1_helper<Dim>(mod);
   add_material_linear_elastic_generic1_helper<Dim>(mod);
   add_material_linear_elastic_generic2_helper<Dim>(mod);
+#ifdef WITH_SPLIT
+  add_material_laminate_helper<Dim>(mod);
+#endif
 
   add_material_evaluator<Dim>(mod);
 }

@@ -53,7 +53,6 @@ using muSpectre::Uint;
 using pybind11::literals::operator""_a;
 namespace py = pybind11;
 
-
 template <Dim_t Dim, class FieldCollectionDerived>
 void add_field_collection(py::module & mod) {
   std::stringstream name_stream{};

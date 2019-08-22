@@ -41,6 +41,10 @@
 #include "projection/projection_base.hh"
 #include "cell/cell_traits.hh"
 
+#ifdef WITH_SPLIT
+#include "materials/material_laminate.hh"
+#endif
+
 #include <libmugrid/ccoord_operations.hh>
 #include <libmugrid/field.hh>
 
@@ -51,11 +55,13 @@
 #include <array>
 
 namespace muSpectre {
+
   /**
    * Cell adaptors implement the matrix-vector multiplication and
    * allow the system to be used like a sparse matrix in
    * conjugate-gradient-type solvers
    */
+
   template <class Cell>
   class CellAdaptor;
 
@@ -295,6 +301,8 @@ namespace muSpectre {
     using Collection_ptr = std::unique_ptr<FieldCollection_t>;
     //! polymorphic base material type
     using Material_t = MaterialBase<DimS, DimM>;
+    using MaterialPtr_t = std::shared_ptr<Material_t>;
+
     //! materials handled through `std::unique_ptr`s
     using Material_ptr = std::unique_ptr<Material_t>;
     //! polymorphic base projection type
@@ -343,7 +351,8 @@ namespace muSpectre {
     CellBase() = delete;
 
     //! constructor using underlying projection
-    explicit CellBase(Projection_ptr projection);
+    explicit CellBase(Projection_ptr projection,
+                      SplitCell is_cell_split = SplitCell::no);
 
     //! Copy constructor
     CellBase(const CellBase & other) = delete;
@@ -365,7 +374,21 @@ namespace muSpectre {
      * ownership of any material by this cell
      */
     Material_t & add_material(Material_ptr mat);
-
+    /**
+     * By taking a material as input this function assigns all the
+     * untouched(not-assigned) pixels to that material
+     */
+    void complete_material_assignment_simple(Material_t & material);
+    /**
+     * Given the vertices of polygonal/Polyhedral precipitate, this function
+     * assign pixels 1. inside precipitate->mat_precipitate_cell, material at
+     * the interface of precipitae-> to mat_precipitate & mat_matrix according
+     * to the intersection of pixels with the precipitate
+     */
+    void make_pixels_precipitate_for_laminate_material(
+        std::vector<Rcoord_t<DimS>> precipitate_vertices,
+        Material_t & mat_laminate, Material_t & mat_precipitate_cell,
+        MaterialPtr_t mat_precipitate, MaterialPtr_t mat_matrix);
     /**
      * returns a writable map onto the strain field of this cell. This
      * corresponds to the unknowns in a typical solve cycle.
@@ -432,9 +455,9 @@ namespace muSpectre {
     void set_uniform_strain(const Eigen::Ref<const Matrix_t> &) override;
 
     /**
-     * evaluates all materials
+     * evaluate all materials
      */
-    FullResponse_t evaluate_stress_tangent(StrainField_t & F);
+    virtual FullResponse_t evaluate_stress_tangent(StrainField_t & F);
 
     /**
      * evaluate directional stiffness (i.e. G:K:δF or G:K:δε)
@@ -557,6 +580,16 @@ namespace muSpectre {
     }
     //! return the sizes of the cell
     const Rcoord & get_domain_lengths() const { return this->domain_lengths; }
+    //! return the real space coordinates of the center of pixel
+    Rcoord get_pixel_coordinate(Ccoord & pixel) const;
+    //! return the physical dimension of a pixel
+    Rcoord get_pixel_lengths() const;
+    //! check if the pixel is inside of the cell
+    bool is_inside(Rcoord point);
+    //! check if the point is inside of the cell
+    bool is_inside(Ccoord pixel);
+    // calculate the volume of each pixel:
+    Real get_pixel_volume();
 
     /**
      * formulation is hard set by the choice of the projection class
@@ -579,9 +612,12 @@ namespace muSpectre {
     //! return a sparse matrix adaptor to the cell
     Adaptor get_adaptor() override;
     //! returns the number of degrees of freedom in the cell
+
     Dim_t get_nb_dof() const override {
       return this->size() * muGrid::ipow(DimS, 2);
     };
+    //! returns the splitness status of the cell
+    SplitCell get_splitness() const { return this->is_cell_split; }
 
     //! return the communicator object
     const muFFT::Communicator & get_communicator() const override {
@@ -592,13 +628,16 @@ namespace muSpectre {
     template <typename T, bool IsStateField>
     Field_t<T> & globalised_field_helper(const std::string & unique_name,
                                          int nb_steps_ago);
+    //! retrun unassigned pixels
+    std::vector<size_t> get_index_unassigned_pixels();
+
     //! make sure that every pixel is assigned to one and only one material
-    void check_material_coverage();
+    virtual void check_material_coverage();
 
     const Ccoord & nb_subdomain_grid_pts;  //!< the cell's subdomain nb_grid_pts
     const Ccoord &
-        subdomain_locations;  //!< subdomain's bottom-left-lower pixel
-    const Ccoord & nb_domain_grid_pts;     //!< the cell's domain nb_grid_pts
+        subdomain_locations;            //!< subdomain's bottom-left-lower pixel
+    const Ccoord & nb_domain_grid_pts;  //!< the cell's domain nb_grid_pts
     muGrid::CcoordOps::Pixels<DimS>
         pixels;                     //!< helper to iterate over the pixels
     const Rcoord & domain_lengths;  //!< the cell's lengths
@@ -611,6 +650,7 @@ namespace muSpectre {
     //! container of the materials present in the cell
     std::vector<Material_ptr> materials{};
     Projection_ptr projection;  //!< handle for the projection operator
+    SplitCell is_cell_split;
   };
 
   /**

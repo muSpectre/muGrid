@@ -47,7 +47,6 @@ from python_goose_ref import (SmallStrainProjectionGooseFFT,
                               FiniteStrainProjectionGooseFFT)
 from muFFT import fft_engines, Communicator
 from muSpectre import Formulation
-from muSpectre import Projection
 
 
 def build_test_classes(formulation, RefProjection, fft):

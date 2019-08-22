@@ -5,7 +5,7 @@ ARG HDF5_VERSION=1.10.5
 ARG NETCDF4_VERSION=4.7.0
 ARG NETCDF4_PYTHON_VERSION=1.5.1.2
 
-RUN apt-get -qq update && apt-get -y -qq install \       
+RUN apt-get -qq update && apt-get -y -qq install \
     clang \
     cmake \
     curl \

@@ -46,7 +46,8 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  CellBase<DimS, DimM>::CellBase(Projection_ptr projection_)
+  CellBase<DimS, DimM>::CellBase(Projection_ptr projection_,
+                                 SplitCell is_cell_split)
       : nb_subdomain_grid_pts{projection_->get_nb_subdomain_grid_pts()},
         subdomain_locations{projection_->get_subdomain_locations()},
         nb_domain_grid_pts{projection_->get_nb_domain_grid_pts()},
@@ -56,7 +57,7 @@ namespace muSpectre {
         F{muGrid::make_field<StrainField_t>("Gradient", *this->fields)},
         P{muGrid::make_field<StressField_t>("Piola-Kirchhoff-1",
                                             *this->fields)},
-        projection{std::move(projection_)} {
+        projection{std::move(projection_)}, is_cell_split{is_cell_split} {
     // resize all global fields (strain, stress, etc)
     this->fields->initialise(this->nb_subdomain_grid_pts,
                              this->subdomain_locations);
@@ -78,8 +79,9 @@ namespace muSpectre {
                                              other.domain_lengths)},
         fields{std::move(other.fields)}, F{other.F}, P{other.P},
         K{other.K},  // this seems to segfault under clang if it's not a move
-        materials{std::move(other.materials)}, projection{std::move(
-                                                   other.projection)} {}
+        materials{std::move(other.materials)},
+        projection{std::move(other.projection)}, is_cell_split{
+                                                     other.is_cell_split} {}
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
@@ -563,7 +565,107 @@ namespace muSpectre {
   auto CellBase<DimS, DimM>::get_adaptor() -> Adaptor {
     return Adaptor(*this);
   }
+  /* ---------------------------------------------------------------------- */
+#ifdef WITH_SPLIT
+  template <Dim_t DimS, Dim_t DimM>
+  void CellBase<DimS, DimM>::make_pixels_precipitate_for_laminate_material(
+      std::vector<Rcoord_t<DimS>> precipitate_vertices,
+      Material_t & mat_laminate, Material_t & mat_precipitate_cell,
+      MaterialPtr_t mat_precipitate, MaterialPtr_t mat_matrix) {
+    auto & mat_lam_cast =
+        static_cast<MaterialLaminate<DimS, DimM> &>(mat_laminate);
 
+    RootNode<DimS, SplitCell::laminate> precipitate(*this,
+                                                    precipitate_vertices);
+    auto && precipitate_intersects = precipitate.get_intersected_pixels();
+    auto && precipitate_intersection_ratios =
+        precipitate.get_intersection_ratios();
+    auto && precipitate_intersection_normals =
+        precipitate.get_intersection_normals();
+    auto && precipitate_intersection_states =
+        precipitate.get_intersection_status();
+    bool if_print{false};
+
+    for (auto tup :
+         akantu::zip(precipitate_intersects, precipitate_intersection_ratios,
+                     precipitate_intersection_normals,
+                     precipitate_intersection_states)) {
+      auto pix = std::get<0>(tup);
+      auto ratio = std::get<1>(tup);
+      auto normal = std::get<2>(tup);
+
+      auto state = std::get<3>(tup);
+      if (if_print) {
+        if (state != corkpp::IntersectionState::enclosing) {
+          normal.normalize();
+          std::cout
+              << pix[0] << ", " << pix[1] << ", "
+              << "s: "
+              << static_cast<
+                     std::underlying_type<corkpp::IntersectionState>::type>(
+                     state)
+              << ",r: " << ratio << ",n: " << normal(0) << ", " << normal(1)
+              << std::endl;
+        }
+      }
+      if (state == corkpp::IntersectionState::enclosing) {
+        mat_precipitate_cell.add_pixel(pix);
+      } else if (state == corkpp::IntersectionState::intersecting) {
+        normal.normalize();
+        mat_lam_cast.add_pixel(pix, mat_precipitate, mat_matrix, ratio, normal);
+      }
+    }
+  }
+#endif
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  std::vector<size_t> CellBase<DimS, DimM>::get_index_unassigned_pixels() {
+    auto nb_pixels = muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts);
+
+    std::vector<bool> assignments(nb_pixels, false);
+    for (auto & mat : this->materials) {
+      for (auto & pixel : *mat) {
+        auto index = muGrid::CcoordOps::get_index(
+            this->nb_subdomain_grid_pts, this->subdomain_locations, pixel);
+        assignments[index] = true;
+      }
+    }
+
+    std::vector<size_t> index_unassigned_pixels;
+    for (auto tup : akantu::enumerate(assignments)) {
+      auto index = std::get<0>(tup);
+      auto assignment = std::get<1>(tup);
+      if (assignment) {
+        index_unassigned_pixels.push_back(index);
+      }
+    }
+    return index_unassigned_pixels;
+  }
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  void CellBase<DimS, DimM>::complete_material_assignment_simple(
+      Material_t & material) {
+    auto nb_pixels = muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts);
+    std::vector<bool> assignments(nb_pixels, false);
+    for (auto & mat : this->materials) {
+      for (auto & pixel : *mat) {
+        auto index = muGrid::CcoordOps::get_index(
+            this->nb_subdomain_grid_pts, this->subdomain_locations, pixel);
+        assignments[index] = true;
+      }
+    }
+
+    std::vector<size_t> index_unassigned_pixels;
+    for (auto tup : akantu::enumerate(assignments)) {
+      auto index = std::get<0>(tup);
+      auto assignment = std::get<1>(tup);
+      if (!assignment) {
+        auto pix = muGrid::CcoordOps::get_ccoord(
+            this->nb_subdomain_grid_pts, this->subdomain_locations, index);
+        material.add_pixel(pix);
+      }
+    }
+  }
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   void CellBase<DimS, DimM>::check_material_coverage() {
@@ -586,7 +688,6 @@ namespace muSpectre {
         }
       }
     }
-
     // find and identify unassigned pixels
     std::vector<Ccoord> unassigned_pixels;
     for (size_t i = 0; i < assignments.size(); ++i) {
@@ -605,6 +706,64 @@ namespace muSpectre {
       err << "and that cannot be handled";
       throw std::runtime_error(err.str());
     }
+  }
+
+  template <Dim_t DimS, Dim_t DimM>
+  Rcoord_t<DimS> CellBase<DimS, DimM>::get_pixel_lengths() const {
+    auto nb_pixels = this->get_nb_domain_grid_pts();
+    auto length_pixels = this->get_domain_lengths();
+    Rcoord_t<DimS> ret_val;
+    for (int i = 0; i < DimS; i++) {
+      ret_val[i] = length_pixels[i] / nb_pixels[i];
+    }
+    return ret_val;
+  }
+
+  template <Dim_t DimS, Dim_t DimM>
+  Rcoord_t<DimS>
+  CellBase<DimS, DimM>::get_pixel_coordinate(Ccoord_t<DimS> & pixel) const {
+    auto pixel_length = this->get_pixel_lengths();
+    Rcoord_t<DimS> pixel_coordinate;
+    for (int i = 0; i < DimS; i++) {
+      pixel_coordinate[i] = pixel_length[i] * (pixel[i] + 0.5);
+      // 0.5 is added to shift to the center of the pixel;
+    }
+    //    return pixel_length * pixel;
+    return pixel_coordinate;
+  }
+
+  template <Dim_t DimS, Dim_t DimM>
+  bool CellBase<DimS, DimM>::is_inside(Rcoord_t<DimS> point) {
+    auto length_pixels = this->get_domain_lengths();
+    Dim_t counter = 0;
+    for (int i = 0; i < DimS; i++) {
+      if (point[i] <= length_pixels[i]) {
+        counter++;
+      }
+    }
+    return counter == DimS;
+  }
+
+  template <Dim_t DimS, Dim_t DimM>
+  bool CellBase<DimS, DimM>::is_inside(Ccoord_t<DimS> pixel) {
+    auto nb_pixels = this->get_nb_domain_grid_pts();
+    Dim_t counter = 0;
+    for (int i = 0; i < DimS; i++) {
+      if (pixel[i] < nb_pixels[i]) {
+        counter++;
+      }
+    }
+    return counter == DimS;
+  }
+
+  template <Dim_t DimS, Dim_t DimM>
+  Real CellBase<DimS, DimM>::get_pixel_volume() {
+    auto pixel_length = get_pixel_lengths();
+    Real Retval = 1.0;
+    for (int i = 0; i < DimS; i++) {
+      Retval *= pixel_length[i];
+    }
+    return Retval;
   }
 
   template class CellBase<twoD, twoD>;

@@ -81,10 +81,21 @@ endif()
 
 file(GLOB_RECURSE _headers RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "*.hh")
 list(APPEND muSpectre_SRC ${_headers})
+set(muSpectre_INCLUDES ${FFTW_INCLUDES})
+
+if(${SPLIT_CELL})
+  target_compile_definitions(muSpectre PUBLIC -DWITH_SPLIT)
+endif()
+
+
+if(${SPLIT_CELL})
+    target_link_libraries(muSpectre PUBLIC Eigen3::Eigen   corkpp gmp )
+else()
+  target_link_libraries(muSpectre PUBLIC Eigen3::Eigen)
+endif()
 
 target_include_directories(muSpectre INTERFACE ${muSpectre_INCLUDES})
 
-target_link_libraries(muSpectre PUBLIC Eigen3::Eigen)
 target_link_libraries(muSpectre PUBLIC
   ${MUFFT_NAMESPACE}muFFT ${MUGRID_NAMESPACE}muGrid)
 

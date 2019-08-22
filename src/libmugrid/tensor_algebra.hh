@@ -57,7 +57,7 @@ namespace muGrid {
     using Tens4_t =
         Eigen::TensorFixedSize<Real, Eigen::Sizes<dim, dim, dim, dim>>;
 
-    //----------------------------------------------------------------------------//
+    //------------------------------------------------------------------------//
     //! compile-time second-order identity
     template <Dim_t dim>
     constexpr inline Tens2_t<dim> I2() {
@@ -176,11 +176,13 @@ namespace muGrid {
      *    0123     02   13
      *    0213     01   23 <- this defines the shuffle order
      */
-    template <typename T1, typename T2>
-    constexpr inline decltype(auto) outer_under(T1 && A, T2 && B) {
+    template <typename Derived1, typename Derived2>
+    constexpr inline decltype(auto)
+    outer_under(const Eigen::MatrixBase<Derived1> & A,
+                const Eigen::MatrixBase<Derived2> & B) {
       // Just make sure that the right type of parameters have been given
-      constexpr Dim_t dim{EigenCheck::tensor_dim<T1>::value};
-      static_assert((dim == EigenCheck::tensor_dim<T2>::value),
+      constexpr Dim_t dim{EigenCheck::tensor_dim<Derived1>::value};
+      static_assert((dim == EigenCheck::tensor_dim<Derived2>::value),
                     "A and B do not have the same dimension");
       Tens4_t<dim> product;
 

@@ -37,5 +37,10 @@
 set (cells_SRC
   ${CMAKE_CURRENT_SOURCE_DIR}/cell_base.cc
   )
-
+if(${SPLIT_CELL})
+  set (cells_SRC
+    ${cells_SRC}
+    ${CMAKE_CURRENT_SOURCE_DIR}/cell_split.cc
+    )
+endif()
 target_sources(muSpectre PRIVATE ${cells_SRC})

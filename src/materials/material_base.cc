@@ -5,7 +5,7 @@
  *
  * @date   01 Nov 2017
  *
- * @brief  implementation of materi
+ * @brief  implementation of material
  *
  * Copyright © 2017 Till Junge
  *
@@ -57,25 +57,64 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void MaterialBase<DimS, DimM>::compute_stresses(const Field_t & F,
-                                                  Field_t & P,
-                                                  Formulation form) {
-    this->compute_stresses(StrainField_t::check_ref(F),
-                           StressField_t::check_ref(P), form);
+  void MaterialBase<DimS, DimM>::add_pixel_split(const Ccoord & local_ccoord,
+                                                 Real ratio) {
+    auto & this_mat = static_cast<MaterialBase &>(*this);
+    this_mat.add_pixel(local_ccoord);
+    this->assigned_ratio.value().get().push_back(ratio);
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void MaterialBase<DimS, DimM>::compute_stresses_tangent(const Field_t & F,
-                                                          Field_t & P,
-                                                          Field_t & K,
-                                                          Formulation form) {
-    this->compute_stresses_tangent(StrainField_t::check_ref(F),
-                                   StressField_t::check_ref(P),
-                                   TangentField_t::check_ref(K), form);
+  void
+  MaterialBase<DimS, DimM>::allocate_optional_fields(SplitCell is_cell_split) {
+    if (is_cell_split == SplitCell::simple) {
+      this->assigned_ratio =
+          muGrid::make_field<MScalarField_t>("ratio", this->internal_fields);
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  void MaterialBase<DimS, DimM>::compute_stresses(const Field_t & F,
+                                                  Field_t & P, Formulation form,
+                                                  SplitCell is_cell_split) {
+    this->compute_stresses(StrainField_t::check_ref(F),
+                           StressField_t::check_ref(P), form, is_cell_split);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  void MaterialBase<DimS, DimM>::get_assigned_ratios(
+      std::vector<Real> & pixel_assigned_ratios, Ccoord subdomain_resolutions,
+      Ccoord subdomain_locations) {
+    auto assigned_ratio_mapped = this->assigned_ratio.value().get().get_map();
+    for (auto && key_val :
+         this->assigned_ratio.value().get().get_map().enumerate()) {
+      const auto & ccoord = std::get<0>(key_val);
+      const auto & val = std::get<1>(key_val);
+      auto index = muGrid::CcoordOps::get_index(subdomain_resolutions,
+                                                subdomain_locations, ccoord);
+      pixel_assigned_ratios[index] += val;
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  Real MaterialBase<DimS, DimM>::get_assigned_ratio(Ccoord pixel) {
+    return this->assigned_ratio.value().get().get_map()[pixel];
   }
 
   //----------------------------------------------------------------------------//
+  template <Dim_t DimS, Dim_t DimM>
+  void MaterialBase<DimS, DimM>::compute_stresses_tangent(
+      const Field_t & F, Field_t & P, Field_t & K, Formulation form,
+      SplitCell is_cell_split) {
+    this->compute_stresses_tangent(
+        StrainField_t::check_ref(F), StressField_t::check_ref(P),
+        TangentField_t::check_ref(K), form, is_cell_split);
+  }
+
   template <Dim_t DimS, Dim_t DimM>
   auto MaterialBase<DimS, DimM>::get_real_field(std::string field_name)
       -> EigenMap {
@@ -100,6 +139,14 @@ namespace muSpectre {
   template <Dim_t DimS, Dim_t DimM>
   std::vector<std::string> MaterialBase<DimS, DimM>::list_fields() const {
     return this->internal_fields.list_fields();
+  }
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  void MaterialBase<DimS, DimM>::initialise() {
+    if (!this->is_initialised) {
+      this->internal_fields.initialise();
+      this->is_initialised = true;
+    }
   }
 
   template class MaterialBase<2, 2>;

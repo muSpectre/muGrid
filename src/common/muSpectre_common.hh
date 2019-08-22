@@ -90,6 +90,9 @@ namespace muSpectre {
     small_strain_sym  //!< symmetric storage as vector ε
   };
 
+  //! split cell flags
+  enum class SplitCell { laminate, simple, no };
+
   //! finite differences flags
   enum class FiniteDiff {
     forward,   //!< ∂f/∂x ≈ (f(x+Δx) - f(x))/Δx

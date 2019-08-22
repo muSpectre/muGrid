@@ -57,8 +57,8 @@ namespace muSpectre {
       for (int j{0}; j < DimM; ++j) {
         for (int k{0}; k < DimM; ++k) {
           for (int l{0}; l < DimM; ++l) {
-            get(this->C, i, j, k, l) =
-                C_voigt(VC_t::sym_mat(i, j), VC_t::sym_mat(k, l));
+            get(this->C, i, j, k, l) = C_voigt((VC_t::get_sym_mat())(i, j),
+                                               (VC_t::get_sym_mat())(k, l));
           }
         }
       }

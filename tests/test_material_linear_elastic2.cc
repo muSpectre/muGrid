@@ -46,7 +46,6 @@
 #include <boost/mpl/list.hpp>
 #include <boost/range/combine.hpp>
 
-
 namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE(material_linear_elastic_2);

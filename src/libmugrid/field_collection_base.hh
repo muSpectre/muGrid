@@ -69,6 +69,7 @@ namespace muGrid {
 
     using StateField_p = std::unique_ptr<StateField_t>;
     using Ccoord = Ccoord_t<DimS>;  //!< cell coordinates type
+    using Rcoord = Rcoord_t<DimS>;  //!< cell coordinates type
 
     //! Default constructor
     FieldCollectionBase();

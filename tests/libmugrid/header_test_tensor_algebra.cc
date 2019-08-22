@@ -38,7 +38,8 @@
 
 #include "tests.hh"
 #include "test_goodies.hh"
-#include <libmugrid/tensor_algebra.hh>
+#include "libmugrid/eigen_tools.hh"
+#include "libmugrid/tensor_algebra.hh"
 #include <iostream>
 
 namespace muGrid {

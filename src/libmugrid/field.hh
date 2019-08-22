@@ -555,7 +555,7 @@ namespace muGrid {
     template <class FieldCollection, typename T, Dim_t dim, bool ConstMap>
     struct tensor_map_type<FieldCollection, T, fourthOrder, dim, ConstMap> {
       //! use this type
-      using type = T4MatrixFieldMap<FieldCollection, T, dim, ConstMap>;
+      using type = muGrid::T4MatrixFieldMap<FieldCollection, T, dim, ConstMap>;
     };
 
     /* ---------------------------------------------------------------------- */

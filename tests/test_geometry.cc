@@ -34,6 +34,7 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
+#include "common/geometry.hh"
 #include "tests.hh"
 #include "libmugrid/test_goodies.hh"
 
@@ -47,33 +48,114 @@
 #include <iostream>
 
 namespace muSpectre {
+
+  enum class IsCollinear { yes, no };
+
   BOOST_AUTO_TEST_SUITE(geometry);
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim_, RotationOrder Rot>
+  template <Dim_t Dim_>
   struct RotationFixture {
     static constexpr Dim_t Dim{Dim_};
     using Vec_t = Eigen::Matrix<Real, Dim, 1>;
     using Mat_t = Eigen::Matrix<Real, Dim, Dim>;
     using Ten_t = muGrid::T4Mat<Real, Dim>;
-    using Angles_t = Eigen::Matrix<Real, (Dim == threeD ? 3 : 1), 1>;
-    using Rot_t = Rotator<Dim, Rot>;
-    static constexpr RotationOrder EulerOrder{Rot};
     static constexpr Dim_t get_Dim() { return Dim_; }
-    RotationFixture() : rotator{euler} {}
-
-    muGrid::testGoodies::RandRange<Real> rr{};
-    Angles_t euler{2 * muGrid::pi * Angles_t::Random()};
+    using Rot_t = RotatorBase<Dim>;
+    explicit RotationFixture(Rot_t rot_mat_inp)
+        : rot_mat{rot_mat_inp}, rotator(rot_mat) {}
     Vec_t v{Vec_t::Random()};
     Mat_t m{Mat_t::Random()};
     Ten_t t{Ten_t::Random()};
+    Mat_t rot_mat;
     Rot_t rotator;
+    muGrid::testGoodies::RandRange<Real> rr{};
   };
 
+  template <Dim_t Dim_, RotationOrder Rot>
+  struct RotationAngleFixture {
+    static constexpr Dim_t Dim{Dim_};
+    using Parent = RotationFixture<Dim>;
+    using Vec_t = Eigen::Matrix<Real, Dim, 1>;
+    using Mat_t = Eigen::Matrix<Real, Dim, Dim>;
+    using Ten_t = muGrid::T4Mat<Real, Dim>;
+    using Angles_t = Eigen::Matrix<Real, (Dim == threeD ? 3 : 1), 1>;
+    using RotAng_t = RotatorAngle<Dim, Rot>;
+    static constexpr RotationOrder EulerOrder{Rot};
+    static constexpr Dim_t get_Dim() { return Dim_; }
+    RotationAngleFixture() : rotator{euler} {}
+    Vec_t v{Vec_t::Random()};
+    Mat_t m{Mat_t::Random()};
+    Ten_t t{Ten_t::Random()};
+    Angles_t euler{2 * muGrid::pi * Angles_t::Random()};
+    RotatorAngle<Dim, Rot> rotator;
+  };
+
+  template <Dim_t Dim_, IsCollinear is_aligned = IsCollinear::no>
+  struct RotationTwoVecFixture {
+    static constexpr Dim_t Dim{Dim_};
+    using Parent = RotationFixture<Dim>;
+    using Vec_t = Eigen::Matrix<Real, Dim, 1>;
+    using Mat_t = Eigen::Matrix<Real, Dim, Dim>;
+    using Ten_t = muGrid::T4Mat<Real, Dim>;
+    static constexpr Dim_t get_Dim() { return Dim_; }
+    RotationTwoVecFixture()
+        : vec_ref{this->ref_vec_maker()}, vec_des{this->des_vec_maker()},
+          rotator(vec_ref, vec_des) {}
+
+    Vec_t ref_vec_maker() {
+      Vec_t ret_vec{Vec_t::Random()};
+      return ret_vec / ret_vec.norm();
+    }
+    Vec_t des_vec_maker() {
+      if (is_aligned == IsCollinear::yes) {
+        return -this->vec_ref;
+      } else {
+        Vec_t ret_vec{Vec_t::Random()};
+        return ret_vec / ret_vec.norm();
+      }
+    }
+    Vec_t v{Vec_t::Random()};
+    Mat_t m{Mat_t::Random()};
+    Ten_t t{Ten_t::Random()};
+    Vec_t vec_ref{Vec_t::Random()};
+    Vec_t vec_des{Vec_t::Random()};
+    RotatorTwoVec<Dim> rotator;
+  };
+
+  template <Dim_t Dim_, IsCollinear is_aligned = IsCollinear::no>
+  struct RotationNormalFixture {
+    static constexpr Dim_t Dim{Dim_};
+    using Parent = RotationFixture<Dim>;
+    using Vec_t = Eigen::Matrix<Real, Dim, 1>;
+    using Mat_t = Eigen::Matrix<Real, Dim, Dim>;
+    using Ten_t = muGrid::T4Mat<Real, Dim>;
+    static constexpr Dim_t get_Dim() { return Dim_; }
+
+    // Constructor :
+    RotationNormalFixture() : vec_norm{this->vec_maker()}, rotator(vec_norm) {}
+
+    Vec_t vec_maker() {
+      if (is_aligned == IsCollinear::yes) {
+        return -Vec_t::UnitX();
+      } else {
+        Vec_t ret_vec{Vec_t::Random()};
+        return ret_vec / ret_vec.norm();
+      }
+    }
+
+    Vec_t v{Vec_t::Random()};
+    Mat_t m{Mat_t::Random()};
+    Ten_t t{Ten_t::Random()};
+    Vec_t vec_norm;
+    RotatorNormal<Dim> rotator;
+  };
   /* ---------------------------------------------------------------------- */
-  using fix_list =
-      boost::mpl::list<RotationFixture<twoD, RotationOrder::Z>,
-                       RotationFixture<threeD, RotationOrder::ZXYTaitBryan>>;
+  using fix_list = boost::mpl::list<
+      RotationAngleFixture<twoD, RotationOrder::Z>,
+      RotationAngleFixture<threeD, RotationOrder::ZXYTaitBryan>,
+      RotationNormalFixture<twoD>, RotationNormalFixture<threeD>,
+      RotationTwoVecFixture<twoD>, RotationTwoVecFixture<threeD>>;
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(rotation_test, Fix, fix_list, Fix) {
@@ -143,8 +225,8 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  using threeD_list =
-      boost::mpl::list<RotationFixture<threeD, RotationOrder::ZXYTaitBryan>>;
+  using threeD_list = boost::mpl::list<
+      RotationAngleFixture<threeD, RotationOrder::ZXYTaitBryan>>;
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(rotation_matrix_test, Fix, threeD_list,
@@ -171,10 +253,75 @@ namespace muSpectre {
     }
     auto err{(rot_ref - Fix::rotator.get_rot_mat()).norm()};
     BOOST_CHECK_LT(err, tol);
-    if (err >= tol) {
+    if (not(err < tol)) {
       std::cout << "Reference:" << std::endl << rot_ref << std::endl;
       std::cout << "Rotator:" << std::endl
                 << Fix::rotator.get_rot_mat() << std::endl;
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  using twovec_list =
+      boost::mpl::list<RotationTwoVecFixture<threeD>,
+                       RotationTwoVecFixture<twoD>,
+                       RotationTwoVecFixture<threeD, IsCollinear::yes>,
+                       RotationTwoVecFixture<twoD, IsCollinear::yes>>;
+
+  /* ---------------------------------------------------------------------- */
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(rotation_twovec_test, Fix, twovec_list,
+                                   Fix) {
+    using Vec_t = typename Fix::Vec_t;
+    Vec_t vec_ref{Fix::vec_ref};
+    Vec_t vec_des{Fix::vec_des};
+    Vec_t vec_res{Fix::rotator.rotate(vec_ref)};
+    Vec_t vec_back{Fix::rotator.rotate_back(vec_res)};
+
+    auto err_f{(vec_res - vec_des).norm()};
+    BOOST_CHECK_LT(err_f, tol);
+    if (err_f >= tol) {
+      std::cout << "Destination:" << std::endl << vec_des << std::endl;
+      std::cout << "Rotated:" << std::endl << vec_res << std::endl;
+    }
+    auto err_b{(vec_back - vec_ref).norm()};
+    BOOST_CHECK_LT(err_b, tol);
+    if (err_b >= tol) {
+      std::cout << "Refrence:" << std::endl << vec_ref << std::endl;
+      std::cout << "Rotated Back:" << std::endl << vec_back << std::endl;
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  using normal_list =
+      boost::mpl::list<RotationNormalFixture<threeD>,
+                       RotationNormalFixture<twoD>,
+                       RotationNormalFixture<threeD, IsCollinear::yes>,
+                       RotationNormalFixture<twoD, IsCollinear::yes>>;
+
+  /* ---------------------------------------------------------------------- */
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(rotation_normal_test, Fix, normal_list,
+                                   Fix) {
+    using Vec_t = typename Fix::Vec_t;
+    Vec_t vec_ref{Fix::vec_norm};
+    Vec_t vec_des{Vec_t::UnitX()};
+    Vec_t vec_res{Fix::rotator.rotate_back(vec_ref)};
+    Vec_t vec_back{Fix::rotator.rotate(vec_res)};
+
+    // cehcking whether the reuslt of the rotation of the vector rotated
+    // is aligned with the destination which in face x-axi
+    auto err_f{(vec_res - vec_des).norm()};
+    BOOST_CHECK_LT(err_f, tol);
+    if (err_f >= tol) {
+      std::cout << "Destination:" << std::endl << vec_des << std::endl;
+      std::cout << "Rotated:" << std::endl << vec_res << std::endl;
+    }
+
+    // checking if the result of rotating back the result of rotaion (x-axis) is
+    // aligned with the original vector before rotation
+    auto err_b{(vec_back - vec_ref).norm()};
+    BOOST_CHECK_LT(err_b, tol);
+    if (err_b >= tol) {
+      std::cout << "Refrence:" << std::endl << vec_ref << std::endl;
+      std::cout << "Rotated Back:" << std::endl << vec_back << std::endl;
     }
   }
 

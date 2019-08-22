@@ -38,6 +38,7 @@ extensions = ['sphinx.ext.autodoc',
               'sphinx.ext.coverage',
               'sphinx.ext.mathjax',
               'sphinx.ext.viewcode',
+              'sphinx.ext.ifconfig',
               'breathe']
 read_the_docs_build = os.environ.get('READTHEDOCS', None) == 'True'
 if os.environ.get('READTHEDOCS', None) is not None:

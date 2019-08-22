@@ -1,4 +1,4 @@
-FROM debian:testing
+    FROM debian:testing
 MAINTAINER Till Junge <till.junge@epfl.ch>
 
 RUN apt-get -qq update && apt-get -y -qq install \

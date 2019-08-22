@@ -71,9 +71,7 @@ void add_material_linear_elastic2_helper(py::module & mod) {
            },
            "pixel"_a, "eigenstrain"_a)
       .def_static("make_evaluator",
-                  [](Real e, Real p) {
-                    return Mat_t::make_evaluator(e, p);
-                  },
+                  [](Real e, Real p) { return Mat_t::make_evaluator(e, p); },
                   "Young"_a, "Poisson"_a);
 }
 

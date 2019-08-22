@@ -36,6 +36,12 @@
 
 set (common_SRC
   ${CMAKE_CURRENT_SOURCE_DIR}/common.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/voigt_conversion.cc
   )
-
+if(${SPLIT_CELL})
+  set (common_SRC
+    ${common_SRC}
+    ${CMAKE_CURRENT_SOURCE_DIR}/intersection_octree.cc
+    )
+endif()
 target_sources(muSpectre PRIVATE ${common_SRC})

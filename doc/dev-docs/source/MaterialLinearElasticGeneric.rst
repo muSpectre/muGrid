@@ -30,6 +30,8 @@ This law can be used in both small strain and finite strain calculations.
 The following snippet shows how to use this law in python to implement isotropic
 linear elasticity:
 
+Python Usage Example
+````````````````````
 .. code-block:: python
 
    C = np.array([[2 * mu + lam,          lam,          lam,  0,  0,  0],

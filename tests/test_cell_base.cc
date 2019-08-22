@@ -162,7 +162,6 @@ namespace muSpectre {
       Real norm = (mat - P_ref).norm();
       BOOST_CHECK_EQUAL(norm, 0.);
     }
-
     auto tan_ref = std::get<1>(tup);
     for (const auto tan : tangent) {
       Real norm = (tan - tan_ref).norm();

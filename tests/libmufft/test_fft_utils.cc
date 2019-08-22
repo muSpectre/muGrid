@@ -70,8 +70,7 @@ namespace muFFT {
     typename FFT_freqs<dim>::Vector ref;
     ref << 2., .3;  // from above tests
     BOOST_CHECK_LT((xi - ref).norm(), tol);
-    BOOST_CHECK_LT(std::abs(xi.dot(unit_xi) - xi.norm()),
-                   xi.norm() * tol);
+    BOOST_CHECK_LT(std::abs(xi.dot(unit_xi) - xi.norm()), xi.norm() * tol);
     BOOST_CHECK_LT(std::abs(unit_xi.norm() - 1.), tol);
 
     ccoord1 = {7, 8};
@@ -80,8 +79,7 @@ namespace muFFT {
 
     ref << -5., -.2;
     BOOST_CHECK_LT((xi - ref).norm(), tol);
-    BOOST_CHECK_LT(std::abs(xi.dot(unit_xi) - xi.norm()),
-                   xi.norm() * tol);
+    BOOST_CHECK_LT(std::abs(xi.dot(unit_xi) - xi.norm()), xi.norm() * tol);
     BOOST_CHECK_LT(std::abs(unit_xi.norm() - 1.), tol);
   }
 

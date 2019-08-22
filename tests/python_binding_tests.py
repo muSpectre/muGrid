@@ -37,9 +37,7 @@ Program grant you additional permission to convey the resulting work.
 
 import unittest
 import numpy as np
-
 from python_test_imports import µ
-
 from python_material_linear_elastic3_test import MaterialLinearElastic3_Check
 from python_material_linear_elastic4_test import MaterialLinearElastic4_Check
 from python_material_linear_elastic_generic1_test import MaterialLinearElasticGeneric1_Check
@@ -213,8 +211,6 @@ class EigenStrainCheck(unittest.TestCase):
             print("F2:\n{}".format(results[1].grad[:,0]))
             print("end test_solve")
         self.assertLess(error, tol)
-
-
 
 
 
