@@ -124,7 +124,7 @@ endif()
 
 ################################################################################
 if(${MUSPECTRE_MAKE_EXAMPLES} AND ${MUCHOICE} MATCHES "muSpectre")
-  add_subdirectory(${CMAKE_SOURCE_DIR}/bin)
+  add_subdirectory(${CMAKE_SOURCE_DIR}/examples)
 endif()
 
 ################################################################################
