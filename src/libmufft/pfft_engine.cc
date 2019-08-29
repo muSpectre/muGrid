@@ -77,22 +77,27 @@ namespace muFFT {
     }
 
     std::array<ptrdiff_t, DimS> narr;
-    std::copy(this->nb_domain_grid_pts.begin(), this->nb_domain_grid_pts.end(),
-              narr.begin());
+    for (Dim_t i = 0; i < DimS; ++i) {
+      narr[i] = this->nb_domain_grid_pts[DimS - 1 - i];
+    }
     ptrdiff_t res[DimS], loc[DimS], fres[DimS], floc[DimS];
     this->workspace_size = pfft_local_size_many_dft_r2c(
         DimS, narr.data(), narr.data(), narr.data(), this->nb_components,
         PFFT_DEFAULT_BLOCKS, PFFT_DEFAULT_BLOCKS, this->mpi_comm,
         PFFT_TRANSPOSED_OUT, res, loc, fres, floc);
-    std::copy(res, res + DimS, this->nb_subdomain_grid_pts.begin());
-    std::copy(loc, loc + DimS, this->subdomain_locations.begin());
-    std::copy(fres, fres + DimS, this->nb_fourier_grid_pts.begin());
-    std::copy(floc, floc + DimS, this->fourier_locations.begin());
+    for (Dim_t i = 0; i < DimS; ++i) {
+      this->nb_subdomain_grid_pts[DimS-1-i] = res[i];
+      this->subdomain_locations[DimS-1-i] = loc[i];
+      this->nb_fourier_grid_pts[DimS-1-i] = fres[i];
+      this->fourier_locations[DimS-1-i] = floc[i];
+    }
     // TODO(pastewka): Enable this to enable 2d process mesh. This does not pass
     // tests.  for (int i = 0; i < DimS-1; ++i) {
-    for (int i = 0; i < 1; ++i) {
-      std::swap(this->nb_fourier_grid_pts[i], this->nb_fourier_grid_pts[i + 1]);
-      std::swap(this->fourier_locations[i], this->fourier_locations[i + 1]);
+    if (DimS > 1) {
+      std::swap(this->nb_fourier_grid_pts[DimS - 2],
+                this->nb_fourier_grid_pts[DimS - 1]);
+      std::swap(this->fourier_locations[DimS - 2],
+                this->fourier_locations[DimS - 1]);
     }
 
     for (auto & n : this->nb_subdomain_grid_pts) {
@@ -165,8 +170,9 @@ namespace muFFT {
     }
 
     std::array<ptrdiff_t, DimS> narr;
-    std::copy(this->nb_domain_grid_pts.begin(), this->nb_domain_grid_pts.end(),
-              narr.begin());
+    for (Dim_t i = 0; i < DimS; ++i) {
+      narr[i] = this->nb_domain_grid_pts[DimS - 1 - i];
+    }
     Real * in{this->real_workspace};
     pfft_complex * out{reinterpret_cast<pfft_complex *>(this->work.data())};
     this->plan_fft = pfft_plan_many_dft_r2c(

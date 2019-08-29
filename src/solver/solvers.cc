@@ -50,7 +50,8 @@ namespace muSpectre {
   std::vector<OptimizeResult> newton_cg(Cell & cell,
                                         const LoadSteps_t & load_steps,
                                         SolverBase & solver, Real newton_tol,
-                                        Real equil_tol, Dim_t verbose) {
+                                        Real equil_tol,  Dim_t verbose,
+                                        IsStrainInitialised strain_init) {
     const auto & comm = cell.get_communicator();
 
     using Vector_t = Eigen::Matrix<Real, Eigen::Dynamic, 1>;
@@ -103,7 +104,9 @@ namespace muSpectre {
 
     switch (form) {
     case Formulation::finite_strain: {
-      cell.set_uniform_strain(Matrix_t::Identity(shape[0], shape[1]));
+      if (strain_init == IsStrainInitialised::False) {
+        cell.set_uniform_strain(Matrix_t::Identity(shape[0], shape[1]));
+      }
       for (const auto & delF : load_steps) {
         if (not((delF.rows() == shape[0]) and (delF.cols() == shape[1]))) {
           std::stringstream err{};
@@ -144,7 +147,9 @@ namespace muSpectre {
     // storage for the previous mean strain (to compute ΔF or Δε)
     Matrix_t previous_macro_strain{load_steps.back().Zero(shape[0], shape[1])};
 
+    // initialization of F
     auto F{cell.get_strain_vector()};
+
     //! incremental loop
     for (const auto & tup : akantu::enumerate(load_steps)) {
       const auto & strain_step{std::get<0>(tup)};
@@ -226,6 +231,7 @@ namespace muSpectre {
         }
         convergence_test();
       }
+
       if (newt_iter == solver.get_maxiter()) {
         std::stringstream err{};
         err << "Failure at load step " << strain_step + 1 << " of "

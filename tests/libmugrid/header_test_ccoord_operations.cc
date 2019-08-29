@@ -65,7 +65,7 @@ namespace muGrid {
     constexpr Ccoord cube = CcoordOps::get_cube<dim>(size);
     constexpr Ccoord herm = CcoordOps::get_hermitian_sizes(cube);
     Ccoord ref_cube = cube;
-    ref_cube.back() = (cube.back() + 1) / 2;
+    ref_cube.front() = (cube.front() + 1) / 2;
 
     BOOST_CHECK_EQUAL_COLLECTIONS(ref_cube.begin(), ref_cube.end(),
                                   herm.begin(), herm.end());
@@ -94,7 +94,8 @@ namespace muGrid {
                       ipow(size, dim));
   }
 
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_index, Fix, testGoodies::dimlist, Fix) {
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_get_ccoord, Fix, testGoodies::dimlist,
+                                   Fix) {
     constexpr auto dim{Fix::dim};
     using Ccoord = Ccoord_t<dim>;
 
@@ -115,6 +116,28 @@ namespace muGrid {
                  stride, CcoordOps::get_ccoord(sizes, locations, i)));
     }
   }
+
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_index, Fix, testGoodies::dimlist, Fix) {
+    constexpr auto dim{Fix::dim};
+    using Ccoord = Ccoord_t<dim>;
+
+    testGoodies::RandRange<Dim_t> rng;
+
+    Ccoord sizes{};
+    for (Dim_t i{0}; i < dim; ++i) {
+      sizes[i] = rng.randval(2, 5);
+    }
+    Ccoord locations{};
+
+    const size_t nb_pix{CcoordOps::get_size(sizes)};
+
+    for (size_t i{0}; i < nb_pix; ++i) {
+      BOOST_CHECK_EQUAL(
+          i, CcoordOps::get_index(sizes, locations,
+                                  CcoordOps::get_ccoord(sizes, locations, i)));
+    }
+  }
+
 
   BOOST_AUTO_TEST_CASE(vector_test) {
     constexpr Ccoord_t<threeD> c3{1, 2, 3};

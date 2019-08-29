@@ -239,15 +239,15 @@ class MuSpectre_gradient_integration_Check(unittest.TestCase):
         for n in range(2,4):
             sys = µ.Cell(res[:n], lens[:n], formulation)
             if n == 2:
-                mat = µ.material.MaterialLinearElastic1_2d.make(sys, "material",
+                mat = µ.material.MaterialLinearElastic1_2d.make(sys.wrapped_cell, "material",
                                                                 10, 0.3)
             if n == 3:
-                mat = µ.material.MaterialLinearElastic1_3d.make(sys, "material",
+                mat = µ.material.MaterialLinearElastic1_3d.make(sys.wrapped_cell, "material",
                                                                 10, 0.3)
             for pixel in sys:
                 mat.add_pixel(pixel)
-            solver = µ.solvers.SolverCG(sys, tol, maxiter=100, verbose=0)
-            r = µ.solvers.newton_cg(sys, DelF[:n, :n],
+            solver = µ.solvers.SolverCG(sys.wrapped_cell, tol, maxiter=100, verbose=0)
+            r = µ.solvers.newton_cg(sys.wrapped_cell, DelF[:n, :n],
                                     solver, tol, tol , verbose=0)
             grad = µ.gradient_integration.reshape_gradient(r.grad,list(res[:n]))
             grad_theo = (DelF[:n, :n] + one[:n, :n]).reshape((1,)*n+(n,n,))
@@ -494,9 +494,9 @@ class MuSpectre_gradient_integration_Check(unittest.TestCase):
         h            = res[1]//2
         phase        = np.zeros(tuple(res), dtype=int)
         phase[:, h:] = 1
-        phase        = phase.flatten()
+        phase        = phase.flatten(order='F')
         cell = µ.Cell(res, lens, formulation)
-        mat  = µ.material.MaterialLinearElastic4_2d.make(cell, "material")
+        mat  = µ.material.MaterialLinearElastic4_2d.make(cell.wrapped_cell, "material")
         for i, pixel in enumerate(cell):
             mat.add_pixel(pixel, Young[phase[i]], Poisson[phase[i]])
         cell.initialise()
@@ -504,8 +504,8 @@ class MuSpectre_gradient_integration_Check(unittest.TestCase):
                          [0 , 0   ]])
 
         # µSpectre solution
-        solver = µ.solvers.SolverCG(cell, tol=1e-6, maxiter=100, verbose=0)
-        result = µ.solvers.newton_cg(cell, DelF, solver, newton_tol=1e-6,
+        solver = µ.solvers.SolverCG(cell.wrapped_cell, tol=1e-6, maxiter=100, verbose=0)
+        result = µ.solvers.newton_cg(cell.wrapped_cell, DelF, solver, newton_tol=1e-6,
                                      equil_tol=1e-6, verbose=0)
         F = µ.gradient_integration.reshape_gradient(result.grad, res)
         fin_pos = {} #µSpectre computed center and node positions for all orders
@@ -640,7 +640,7 @@ class MuSpectre_gradient_integration_Check(unittest.TestCase):
         ### finite strain
         formulation = µ.Formulation.finite_strain
         cell = µ.Cell(res, lens, formulation)
-        mat  = µ.material.MaterialLinearElastic1_2d.make(cell, "material",
+        mat  = µ.material.MaterialLinearElastic1_2d.make(cell.wrapped_cell, "material",
                                                          Young=10, Poisson=0.3)
         for pixel in cell:
             mat.add_pixel(pixel)
@@ -651,8 +651,8 @@ class MuSpectre_gradient_integration_Check(unittest.TestCase):
         placement_ana = np.copy(x_n)
         placement_ana[:,:,0] += DelF[0,1]*x_n[:,:,1]
         # µSpectre solution
-        solver = µ.solvers.SolverCG(cell, tol=1e-6, maxiter=100, verbose=0)
-        result = µ.solvers.newton_cg(cell, DelF, solver, newton_tol=1e-6,
+        solver = µ.solvers.SolverCG(cell.wrapped_cell, tol=1e-6, maxiter=100, verbose=0)
+        result = µ.solvers.newton_cg(cell.wrapped_cell, DelF, solver, newton_tol=1e-6,
                                      equil_tol=1e-6, verbose=0)
         for r in [result, result.grad]:
             #check input of result=OptimiseResult and result=np.ndarray

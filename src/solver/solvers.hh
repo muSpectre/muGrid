@@ -46,6 +46,11 @@ namespace muSpectre {
 
   using LoadSteps_t = std::vector<Eigen::MatrixXd>;
 
+  enum class IsStrainInitialised{
+    True,
+    False
+  };
+
   /**
    * Uses the Newton-conjugate Gradient method to find the static
    * equilibrium of a cell given a series of mean applied strain steps.
@@ -57,7 +62,9 @@ namespace muSpectre {
   std::vector<OptimizeResult> newton_cg(Cell & cell,
                                         const LoadSteps_t & load_steps,
                                         SolverBase & solver, Real newton_tol,
-                                        Real equil_tol, Dim_t verbose = 0);
+                                        Real equil_tol, Dim_t verbose = 0,
+                                        IsStrainInitialised strain_init =
+                                        IsStrainInitialised::False);
 
   /**
    * Uses the Newton-conjugate Gradient method to find the static
@@ -66,10 +73,12 @@ namespace muSpectre {
   inline OptimizeResult newton_cg(Cell & cell,
                                   const Eigen::Ref<Eigen::MatrixXd> load_step,
                                   SolverBase & solver, Real newton_tol,
-                                  Real equil_tol, Dim_t verbose = 0) {
+                                  Real equil_tol, Dim_t verbose = 0,
+                                  IsStrainInitialised strain_init =
+                                  IsStrainInitialised::False) {
     LoadSteps_t load_steps{load_step};
-    return newton_cg(cell, load_steps, solver, newton_tol, equil_tol, verbose)
-        .front();
+    return newton_cg(cell, load_steps, solver, newton_tol, equil_tol,
+                     verbose, strain_init).front();
   }
 
   /* ---------------------------------------------------------------------- */

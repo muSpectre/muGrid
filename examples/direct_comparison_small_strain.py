@@ -80,9 +80,9 @@ G_K_deps = lambda depsm: G(K_deps(depsm))
 E2, E1 = 75e10, 70e9
 poisson = .33
 
-hard = µ.material.MaterialHooke2d.make(cell, "hard",
+hard = µ.material.MaterialHooke2d.make(cell.wrapped_cell, "hard",
                                        E2, poisson)
-soft = µ.material.MaterialHooke2d.make(cell, "soft",
+soft = µ.material.MaterialHooke2d.make(cell.wrapped_cell, "soft",
                                        E1, poisson)
 
 #for pixel in cell:
@@ -159,10 +159,10 @@ class accumul(object):
 acc = accumul()
 cg_tol = 1e-8
 maxiter = 60
-solver = µ.solvers.SolverCGEigen(cell, cg_tol, maxiter, verbose=True)
-solver = µ.solvers.SolverCG(cell, cg_tol, maxiter, verbose=True)
+solver = µ.solvers.SolverCGEigen(cell.wrapped_cell, cg_tol, maxiter, verbose=True)
+solver = µ.solvers.SolverCG(cell.wrapped_cell, cg_tol, maxiter, verbose=True)
 try:
-    r = µ.solvers.newton_cg(cell, delEps0, solver, 1e-5, verbose=True)
+    r = µ.solvers.newton_cg(cell.wrapped_cell, delEps0, solver, 1e-5, verbose=True)
 except Exception as err:
     print(err)
 while True:

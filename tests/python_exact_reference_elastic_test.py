@@ -71,30 +71,17 @@ def scalar_to_goose(s_msp):
         pass
     return s_goose
 
-def t2_to_goose(t2_msp):
-    t2_goose = np.zeros((ndim, ndim, Nx, Ny, Nz))
-    for i in range(Nx):
-        for j in range(Ny):
-            for k in range(Nz):
-                t2_goose[:,:,i,j,k] = t2_msp[:, Nz*Ny*i + Nz*j + k].reshape(ndim, ndim).T
-            pass
-        pass
-    return t2_goose
-
-def t2_vec_to_goose(t2_msp_vec):
-    return t2_to_goose(t2_msp_vec.reshape(ndim*ndim, Nx*Ny*Nz)).reshape(-1)
-
 def scalar_vec_to_goose(s_msp_vec):
     return scalar_to_goose(s_msp_vec.reshape(Nx*Ny*N)).reshape(-1)
 
 def t4_to_goose(t4_msp, right_transposed=True):
     t4_goose = np.zeros((ndim, ndim, ndim, ndim, Nx, Ny, Nz))
     turnaround = np.arange(ndim**2).reshape(ndim,ndim).T.reshape(-1)
-    for i in range(Nx):
+    for i in range(Nz):
         for j in range(Ny):
-            for k in range(Nz):
-                tmp = t4_msp[:, Nz*Ny*i + Nz*j + k].reshape(ndim**2, ndim**2)
-                goose_view = t4_goose[:,:,:,:,i,j,k].reshape(ndim**2, ndim**2)
+            for k in range(Nx):
+                tmp = t4_msp[:, Nx*Ny*i + Nx*j + k].reshape(ndim**2, ndim**2)
+                goose_view = t4_goose[:,:,:,:,k,j,i].reshape(ndim**2, ndim**2)
                 for a,b in itertools.product(range(ndim**2), repeat=2):
                     a_id = a if right_transposed else turnaround[a]
                     goose_view[a,b] = tmp[a_id, turnaround[b]]
@@ -103,7 +90,7 @@ def t4_to_goose(t4_msp, right_transposed=True):
     return t4_goose
 
 def t4_vec_to_goose(t4_msp_vec):
-    return t4_to_goose(t4_msp_vec.reshape(ndim**4, Nx*Ny*Nz)).reshape(-1)
+    return t4_to_goose(t4_msp_vec.reshape((ndim**4, Nx*Ny*Nz),order='F')).reshape(-1)
 
 def t2_from_goose(t2_goose):
     nb_pix = Nx*Ny*Nz
@@ -203,9 +190,9 @@ class LinearElastic_Check(unittest.TestCase):
         err_max = 0.
         for counter, (i, j, k) in enumerate(self.rve):
             print((i,j,k))
-            µ_arr = µT2[:, counter].reshape(ndim, ndim).T
+            µ_arr = µT2[:,:,i,j,k]
             g_arr = gT2[:,:,i,j,k]
-            self.assertEqual(Nz*Ny*i+Nz*j + k, counter)
+            self.assertEqual(i+Nx*j + Nx*Ny*k, counter)
             print("µSpectre:")
             print(µ_arr)
             print("Goose:")
@@ -234,13 +221,13 @@ class LinearElastic_Check(unittest.TestCase):
             arrcopy[abs(arr)<1e-13] = 0.
             return arrcopy
         for counter, (i, j, k) in enumerate(self.rve):
-            µ_arr_tmp = µT4[:, counter].reshape(ndim**2, ndim**2).T
+            µ_arr_tmp = µT4[:,:,:,:,i,j,k].reshape((ndim**2, ndim**2),order='F')
             µ_arr = np.empty((ndim**2, ndim**2))
             for a,b in itertools.product(range(ndim**2), repeat=2):
                 a = a if right_transposed else turnaround[a]
                 µ_arr[a,b] = µ_arr_tmp[a, turnaround[b]]
             g_arr = gT4[:,:,:,:,i,j,k].reshape(ndim**2, ndim**2)
-            self.assertEqual(Nz*Ny*i+Nz*j + k, counter)
+            self.assertEqual(i+Nx*j + Nx*Ny*k, counter)
 
             print("µSpectre:")
             print(zero_repr(µ_arr[:, :comparator_nb_cols]))
@@ -284,8 +271,8 @@ class LinearElastic_Check(unittest.TestCase):
         mat = µ.material.MaterialLinearElastic1_3d
 
         E, nu = get_E_nu(.833, .386)
-        hard = mat.make(self.rve, 'hard', 10*E, nu)
-        soft = mat.make(self.rve, 'soft',    E, nu)
+        hard = mat.make(self.rve.wrapped_cell, 'hard', 10*E, nu)
+        soft = mat.make(self.rve.wrapped_cell, 'soft',    E, nu)
 
         for pixel in self.rve:
             if pixel[0] < 2 and pixel[1] < 2 and pixel[2] < 2:
@@ -307,9 +294,9 @@ class LinearElastic_Check(unittest.TestCase):
         P2,K42  = constitutive(F2)
         P,K4  = constitutive(F)
         self.rve.set_uniform_strain(np.array(np.eye(ndim)))
-        µF = self.rve.get_strain()
+        µF = self.rve.strain
 
-        self.assertLess(norm(t2_vec_to_goose(µF) - F.reshape(-1))/norm(F), before_cg_tol)
+        self.assertLess(norm(µF - F)/norm(F), before_cg_tol)
         # set macroscopic loading
         DbarF = np.zeros([ndim,ndim,N,N,N]); DbarF[0,1] += 1.0
 
@@ -321,36 +308,36 @@ class LinearElastic_Check(unittest.TestCase):
 
         # µSpectre inits
         µbarF    = np.zeros_like(µF)
-        µbarF[ndim, :] += 1.
+        #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        µbarF[0,1] += 1.
         µF2 = µF.copy()*1.1
         µP2, µK2 = self.rve.evaluate_stress_tangent(µF2)
-        err = norm(t2_vec_to_goose(µP2) - P2.reshape(-1))/norm(P2)
-
+        err = norm(µP2 - P2)/norm(P2)
 
         if not (err < before_cg_tol):
-            self.t2_comparator(µP2, µK2)
+            self.t2_comparator(µP2, P2)
         self.assertLess(err, before_cg_tol)
         self.rve.set_uniform_strain(np.array(np.eye(ndim)))
         µP, µK = self.rve.evaluate_stress_tangent(µF)
-        err = norm(t2_vec_to_goose(µP) - P.reshape(-1))
+        err = norm(µP - P)
         if not (err < before_cg_tol):
+            print("µF:")
             print(µF)
             self.t2_comparator(µP, P)
         self.assertLess(err, before_cg_tol)
-        err = norm(t4_vec_to_goose(µK) - K4.reshape(-1))/norm(K4)
+        err = norm(µK - K4)/norm(K4)
         if not (err < before_cg_tol):
             print ("err = {}".format(err))
 
         self.assertLess(err, before_cg_tol)
         µF += µbarF
         µFn = norm(µF)
-        self.assertLess(norm(t2_vec_to_goose(µF) - F.reshape(-1))/norm(F), before_cg_tol)
+        self.assertLess(norm(µF - F)/norm(F), before_cg_tol)
         µG_K_dF = lambda x: self.rve.directional_stiffness(x.reshape(µF.shape)).reshape(-1)
         µG = lambda x: self.rve.project(x).reshape(-1)
         µb = -µG_K_dF(µbarF)
 
-        err = (norm(t2_vec_to_goose(µb.reshape(µF.shape)) - b) /
-               norm(b))
+        err = norm(µb - b) /  norm(b)
         if not (err < before_cg_tol):
             print("|µb| = {}".format(norm(µb)))
             print("|b| = {}".format(norm(b)))
@@ -385,7 +372,7 @@ class LinearElastic_Check(unittest.TestCase):
 
             # in the last iteration, the increment is essentially
             # zero, so we don't care about relative error anymore
-            err = norm(t2_vec_to_goose(µdFm) - dFm)/norm(dFm)
+            err = norm(µdFm - dFm)/norm(dFm)
             if norm(dFm)/Fn > newton_tol and norm(µdFm)/Fn > newton_tol:
                 if not (err < after_cg_tol):
                     self.t2_comparator(µdFm.reshape(µF.shape), dFm.reshape(F.shape))
@@ -403,7 +390,7 @@ class LinearElastic_Check(unittest.TestCase):
             P,K4  = constitutive(F)
             µP, µK = self.rve.evaluate_stress_tangent(µF)
 
-            err = norm(t2_vec_to_goose(µP) - P.reshape(-1))/norm(P)
+            err = norm((µP - P)/norm(P))
             self.assertLess(err, before_cg_tol)
 
             err = norm(t4_vec_to_goose(µK) - K4.reshape(-1))/norm(K4)
@@ -418,7 +405,7 @@ class LinearElastic_Check(unittest.TestCase):
             # leading to large relative errors, which are ok. So we
             # want either the relative error for the rhs to be small,
             # or their absolute error to be small compared to unity
-            diff_norm = norm(t2_vec_to_goose(µb) - b.reshape(-1))
+            diff_norm = norm(µb - b)
             err = diff_norm/norm(b)
             if not ((err < after_cg_tol) or (diff_norm < before_cg_tol)):
                 self.t2_comparator(µb.reshape(µF.shape), b.reshape(F.shape))

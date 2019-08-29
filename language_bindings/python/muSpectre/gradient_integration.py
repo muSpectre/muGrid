@@ -112,7 +112,7 @@ def reshape_gradient(F, nb_grid_pts):
         raise Exception("nb_grid_pts needs to be in list form, "+
                         "for concatenation")
     expected_input_shape = [np.prod(nb_grid_pts) * dim**2]
-    output_shape = nb_grid_pts + [dim, dim]
+    output_shape = list(reversed(nb_grid_pts)) + [dim, dim]
     if not ((F.shape[0] == expected_input_shape[0]) and
             (F.size == expected_input_shape[0])):
         raise Exception("expected gradient of shape {}, got {}".format(
@@ -120,6 +120,7 @@ def reshape_gradient(F, nb_grid_pts):
 
     order = list(range(dim+2))
     order[-2:] = reversed(order[-2:])
+    order[0:dim] = reversed(order[0:dim])
     return F.reshape(output_shape).transpose(*order)
 
 def complement_periodically(array, dim):

@@ -33,18 +33,18 @@ with proprietary FFT implementations or numerical libraries, containing parts
 covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
+import muSpectre as µ
 import sys
 import os
 import numpy as np
 from mpi4py import MPI
 
 sys.path.append(os.path.join(os.getcwd(), "language_bindings/python"))
-import muSpectre as µ
 
 
 # set up of the microstructure (omit the slice operator at the end to
 # run the full problem)
-phase  = np.load('odd_image.npz')['phase'][:41, :41]
+phase = np.load('odd_image.npz')['phase'][:41, :41]
 nb_grid_pts = list(phase.shape)
 dim = len(nb_grid_pts)
 lengths = nb_grid_pts
@@ -66,8 +66,8 @@ Poisson = (3 * K - 2 * mu) / (2 * (3 * K + mu))
 # set up system
 rve = µ.Cell(nb_grid_pts, lengths, formulation, fft='fftwmpi',
              communicator=MPI.COMM_WORLD)
-hard = Mat.make(rve, "hard", Young, Poisson, tauy0_hard, H_hard)
-soft = Mat.make(rve, "soft", Young, Poisson, tauy0_soft, H_soft)
+hard = Mat.make(rve.wrapped_cell, "hard", Young, Poisson, tauy0_hard, H_hard)
+soft = Mat.make(rve.wrapped_cell, "soft", Young, Poisson, tauy0_soft, H_soft)
 
 
 for pixel in rve:
@@ -83,12 +83,12 @@ for pixel in rve:
 rve.initialise(flags=µ.FFT_PlanFlags.patient)
 
 # number if load increments
-ninc    = 250
-epsbar  = np.linspace(0.0,0.1,ninc+1)[1:]
+ninc = 250
+epsbar = np.linspace(0.0, 0.1, ninc+1)[1:]
 stretch = np.exp(np.sqrt(3.0)/2.0*epsbar)
 
 ΔFbars = list()
-for inc, lam  in zip(range(1,ninc+1),stretch[:40]):
+for inc, lam in zip(range(1, ninc+1), stretch[:40]):
     print('=============================')
     print('inc: {0:d}'.format(inc))
 
@@ -107,7 +107,7 @@ newton_tol = 1e-5
 equil_tol = 1e-10
 maxiter = 1000
 
-solver = µ.solvers.SolverCG(rve, cg_tol, maxiter, verbose=False)
+solver = µ.solvers.SolverCG(rve.wrapped_cell, cg_tol, maxiter, verbose=False)
 
 results = µ.solvers.de_geus(
-    rve, ΔFbars, solver, newton_tol, equil_tol, verbose = 2)
+    rve.wrapped_cell, ΔFbars, solver, newton_tol, equil_tol, verbose=2)

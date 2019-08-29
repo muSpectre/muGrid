@@ -35,13 +35,13 @@ covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
 
+import muSpectre as µ
 import sys
 import os
 import numpy as np
 
 sys.path.append(os.path.join(os.getcwd(), "language_bindings/python"))
 sys.path.append(os.path.join(os.getcwd(), "language_bindings/libmufft/python"))
-import muSpectre as µ
 
 
 nb_grid_pts = [51, 51]
@@ -53,15 +53,15 @@ formulation = µ.Formulation.small_strain
 
 rve = µ.Cell(nb_grid_pts, lengths, formulation)
 hard = µ.material.MaterialLinearElastic1_2d.make(
-    rve, "hard", 10e9, .33)
+    rve.wrapped_cell, "hard", 10e9, .33)
 soft = µ.material.MaterialLinearElastic1_2d.make(
-    rve, "soft",  70e9, .33)
+    rve.wrapped_cell, "soft",  70e9, .33)
 
 
 for i, pixel in enumerate(rve):
-    if np.linalg.norm(center - np.array(pixel),2)<incl:
-    #if (abs(center - np.array(pixel)).max()<incl or
-    #    np.linalg.norm(center/2 - np.array(pixel))<incl):
+    if np.linalg.norm(center - np.array(pixel), 2) < incl:
+        # if (abs(center - np.array(pixel)).max()<incl or
+        #    np.linalg.norm(center/2 - np.array(pixel))<incl):
         hard.add_pixel(pixel)
     else:
         soft.add_pixel(pixel)
@@ -84,14 +84,14 @@ for solvclass in (µ.solvers.SolverCG,
                   µ.solvers.SolverMINRESEigen):
     print()
     try:
-        solver = solvclass(rve, cg_tol, maxiter, verbose=False)
-        r = µ.solvers.newton_cg(rve, Del0, solver, tol, verbose)
+        solver = solvclass(rve.wrapped_cell, cg_tol, maxiter, verbose=False)
+        r = µ.solvers.newton_cg(rve.wrapped_cell, Del0, solver, tol, verbose)
         print("nb of {} iterations: {}".format(solver.name(), r.nb_fev))
     except RuntimeError as err:
         print(err)
     try:
-        solver = solvclass(rve, cg_tol, maxiter, verbose=False)
-        r = µ.solvers.de_geus(rve, Del0, solver, tol, verbose)
+        solver = solvclass(rve.wrapped_cell, cg_tol, maxiter, verbose=False)
+        r = µ.solvers.de_geus(rve.wrapped_cell, Del0, solver, tol, verbose)
         print("nb of {} iterations: {}".format(solver.name(), r.nb_fev))
     except RuntimeError as err:
         print(err)

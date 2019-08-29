@@ -66,23 +66,22 @@ namespace muGrid {
       template <Dim_t Dim, size_t... I>
       constexpr Ccoord_t<Dim> herm(const Ccoord_t<Dim> & full_sizes,
                                    std::index_sequence<I...>) {
-        return Ccoord_t<Dim>{full_sizes[I]..., full_sizes.back() / 2 + 1};
+        return Ccoord_t<Dim>{full_sizes.front() / 2 + 1, full_sizes[I+1]...};
       }
 
-      //! compute the stride in a direction of a row-major grid
+      //! compute the stride in a direction of a column-major grid
       template <Dim_t Dim>
       constexpr Dim_t stride(const Ccoord_t<Dim> & sizes, const size_t index) {
         static_assert(Dim > 0, "only for positive numbers of dimensions");
 
-        auto const diff{Dim - 1 - Dim_t(index)};
         Dim_t ret_val{1};
-        for (Dim_t i{0}; i < diff; ++i) {
-          ret_val *= sizes[Dim - 1 - i];
+        for (size_t i{0}; i < index; ++i) {
+          ret_val *= sizes[i];
         }
         return ret_val;
       }
 
-      //! get all strides from a row-major grid (helper function)
+      //! get all strides from a column-major grid (helper function)
       template <Dim_t Dim, size_t... I>
       constexpr Ccoord_t<Dim> compute_strides(const Ccoord_t<Dim> & sizes,
                                               std::index_sequence<I...>) {
@@ -142,7 +141,7 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
-    //! get all strides from a row-major grid
+    //! get all strides from a column-major grid
     template <size_t dim>
     constexpr Ccoord_t<dim> get_default_strides(const Ccoord_t<dim> & sizes) {
       return internal::compute_strides<dim>(sizes,
@@ -157,9 +156,9 @@ namespace muGrid {
                                        Dim_t index) {
       Ccoord_t<dim> retval{{0}};
       Dim_t factor{1};
-      for (Dim_t i = dim - 1; i >= 0; --i) {
+      for (size_t i = 0; i < dim; ++i) {
         retval[i] = index / factor % nb_grid_pts[i] + locations[i];
-        if (i != 0) {
+        if (i != dim-1) {
           factor *= nb_grid_pts[i];
         }
       }
@@ -194,9 +193,9 @@ namespace muGrid {
                               const Ccoord_t<dim> & ccoord) {
       Dim_t retval{0};
       Dim_t factor{1};
-      for (Dim_t i = dim - 1; i >= 0; --i) {
+      for (size_t i = 0; i < dim; ++i) {
         retval += (ccoord[i] - locations[i]) * factor;
-        if (i != 0) {
+        if (i != dim-1) {
           factor *= sizes[i];
         }
       }
@@ -233,7 +232,7 @@ namespace muGrid {
     template <size_t dim>
     constexpr size_t get_size_from_strides(const Ccoord_t<dim> & sizes,
                                            const Ccoord_t<dim> & strides) {
-      return sizes[0] * strides[0];
+      return sizes[dim-1] * strides[dim-1];
     }
 
     /* ---------------------------------------------------------------------- */

@@ -50,23 +50,27 @@ namespace muFFT {
     this->nb_engines++;
 
     std::array<ptrdiff_t, Dim> narr;
-    std::copy(this->nb_domain_grid_pts.begin(), this->nb_domain_grid_pts.end(),
-              narr.begin());
-    narr[Dim - 1] = this->nb_domain_grid_pts[Dim - 1] / 2 + 1;
+    for (Dim_t i = 0; i < Dim; ++i) {
+      narr[i] = this->nb_domain_grid_pts[Dim - 1 - i];
+    }
+    narr[Dim - 1] = this->nb_domain_grid_pts[0] / 2 + 1;
     ptrdiff_t res_x, loc_x, res_y, loc_y;
     this->workspace_size = fftw_mpi_local_size_many_transposed(
         Dim, narr.data(), this->nb_components, FFTW_MPI_DEFAULT_BLOCK,
         FFTW_MPI_DEFAULT_BLOCK, this->comm.get_mpi_comm(), &res_x, &loc_x,
         &res_y, &loc_y);
     // A factor of two is required because we are using the c2r/r2c DFTs.
-    // See: http://www.fftw.org/fftw3_doc/Multi_002ddimensional-MPI-DFTs-of-Real-Data.html
+    // See:
+    // http://www.fftw.org/fftw3_doc/Multi_002ddimensional-MPI-DFTs-of-Real-Data.html
     this->workspace_size *= 2;
-    this->nb_fourier_grid_pts[1] = this->nb_fourier_grid_pts[0];
-    this->fourier_locations[1] = this->fourier_locations[0];
-    this->nb_subdomain_grid_pts[0] = res_x;
-    this->subdomain_locations[0] = loc_x;
-    this->nb_fourier_grid_pts[0] = res_y;
-    this->fourier_locations[0] = loc_y;
+    if (Dim > 1) {
+      this->nb_fourier_grid_pts[Dim-2] = this->nb_fourier_grid_pts[Dim-1];
+      this->fourier_locations[Dim-2] = this->fourier_locations[Dim-1];
+    }
+    this->nb_subdomain_grid_pts[Dim-1] = res_x;
+    this->subdomain_locations[Dim-1] = loc_x;
+    this->nb_fourier_grid_pts[Dim-1] = res_y;
+    this->fourier_locations[Dim-1] = loc_y;
 
     for (auto & n : this->nb_subdomain_grid_pts) {
       if (n == 0) {
@@ -135,8 +139,9 @@ namespace muFFT {
     }
 
     std::array<ptrdiff_t, Dim> narr;
-    std::copy(this->nb_domain_grid_pts.begin(), this->nb_domain_grid_pts.end(),
-              narr.begin());
+    for (Dim_t i = 0; i < Dim; ++i) {
+      narr[i] = this->nb_domain_grid_pts[Dim - 1 - i];
+    }
     Real * in{this->real_workspace};
     fftw_complex * out{reinterpret_cast<fftw_complex *>(this->work.data())};
     this->plan_fft = fftw_mpi_plan_many_dft_r2c(
@@ -198,10 +203,10 @@ namespace muFFT {
     // Transposed output of M x N x L transform for >= 3 dimensions is padded
     // M x N x 2*(L/2+1).
     ptrdiff_t fstride =
-        (this->nb_components * this->nb_subdomain_grid_pts[Dim - 1]);
+        (this->nb_components * this->nb_subdomain_grid_pts[0]);
     ptrdiff_t wstride = (this->nb_components * 2 *
-                         (this->nb_subdomain_grid_pts[Dim - 1] / 2 + 1));
-    ptrdiff_t n = field.size() / this->nb_subdomain_grid_pts[Dim - 1];
+                         (this->nb_subdomain_grid_pts[0] / 2 + 1));
+    ptrdiff_t n = field.size() / this->nb_subdomain_grid_pts[0];
 
     auto fdata = field.data();
     auto wdata = this->real_workspace;
@@ -235,10 +240,10 @@ namespace muFFT {
     // Transposed output of M x N x L transform for >= 3 dimensions is padded
     // M x N x 2*(L/2+1).
     ptrdiff_t fstride{this->nb_components *
-                      this->nb_subdomain_grid_pts[Dim - 1]};
+                      this->nb_subdomain_grid_pts[0]};
     ptrdiff_t wstride{this->nb_components * 2 *
-                      (this->nb_subdomain_grid_pts[Dim - 1] / 2 + 1)};
-    ptrdiff_t n(field.size() / this->nb_subdomain_grid_pts[Dim - 1]);
+                      (this->nb_subdomain_grid_pts[0] / 2 + 1)};
+    ptrdiff_t n(field.size() / this->nb_subdomain_grid_pts[0]);
 
     auto fdata{field.data()};
     auto wdata{this->real_workspace};

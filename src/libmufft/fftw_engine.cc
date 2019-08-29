@@ -59,8 +59,11 @@ namespace muFFT {
     const int & rank = Dim;
     std::array<int, Dim> narr;
     const int * const n = &narr[0];
-    std::copy(this->nb_subdomain_grid_pts.begin(),
-              this->nb_subdomain_grid_pts.end(), narr.begin());
+    // Reverse the order of the array dimensions, because FFTW expects a
+    // row-major array and the arrays used in muSpectre are column-major
+    for (Dim_t i = 0; i < Dim; ++i) {
+      narr[i] = this->nb_subdomain_grid_pts[Dim - 1 - i];
+    }
     int howmany = this->nb_components;
     // temporary buffer for plan
     size_t alloc_size =
@@ -73,7 +76,7 @@ namespace muFFT {
     int idist = 1;
     fftw_complex * out = reinterpret_cast<fftw_complex *>(this->work.data());
     const int * const onembed = nullptr;
-    int ostride = howmany;
+    int ostride = istride;
     int odist = idist;
 
     unsigned int flags;

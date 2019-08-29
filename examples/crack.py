@@ -109,8 +109,8 @@ phase = -np.ones(nb_domain_grid_pts, dtype=int)
 for i, derivative in enumerate([fourier_gradient, discrete_gradient]):
     rve = msp.Cell(nb_domain_grid_pts, domain_lengths,
                    msp.Formulation.finite_strain, derivative)
-    hard = msp.material.MaterialLinearElastic1_2d.make(rve, "hard", 1., .33)
-    vacuum = msp.material.MaterialLinearElastic1_2d.make(rve, "vacuum", 0., 0.)
+    hard = msp.material.MaterialLinearElastic1_2d.make(rve.wrapped_cell, "hard", 1., .33)
+    vacuum = msp.material.MaterialLinearElastic1_2d.make(rve.wrapped_cell, "vacuum", 0., 0.)
     for pixel in rve:
         if pixel[1] == center[1] and \
             abs(pixel[0] - center[0]) < crack_length//2:
@@ -119,8 +119,8 @@ for i, derivative in enumerate([fourier_gradient, discrete_gradient]):
         else:
             hard.add_pixel(pixel)
             phase[pixel[0], pixel[1]] = 0
-    solver = msp.solvers.SolverCG(rve, cg_tol, maxiter, verbose=False)
-    result = msp.solvers.newton_cg(rve, applied_strain, solver,
+    solver = msp.solvers.SolverCG(rve.wrapped_cell, cg_tol, maxiter, verbose=False)
+    result = msp.solvers.newton_cg(rve.wrapped_cell, applied_strain, solver,
                                    newton_tol=newton_tol, equil_tol=equil_tol,
                                    verbose=verbose)
     stress[i] = result.stress.T.reshape(*nb_domain_grid_pts, 2, 2)

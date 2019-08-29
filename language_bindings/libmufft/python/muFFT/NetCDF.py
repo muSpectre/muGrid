@@ -224,7 +224,7 @@ class NCStructuredGrid(object):
     def __init__(self, fn, mode='r', nb_domain_grid_pts=None,
                  decomposition='serial', subdomain_locations=None,
                  nb_subdomain_grid_pts=None, communicator=None,
-                 frame=0, format='NETCDF4'):
+                 frame=0, format='NETCDF3_64BIT_DATA'):
         """
         Open a NetCDF file for reading or writing.
 

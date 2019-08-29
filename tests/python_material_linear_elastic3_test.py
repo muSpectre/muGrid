@@ -57,7 +57,7 @@ class MaterialLinearElastic3_Check(unittest.TestCase):
                           self.formulation)
         self.dim = len(self.lengths)
         self.mat = µ.material.MaterialLinearElastic3_2d.make(
-            self.sys, "material")
+            self.sys.wrapped_cell, "material")
 
     def test_solver(self):
         Young   = 10.
@@ -73,8 +73,8 @@ class MaterialLinearElastic3_Check(unittest.TestCase):
         maxiter = 100
         verbose = False
 
-        solver=µ.solvers.SolverCG(self.sys, tol, maxiter, verbose)
-        r = µ.solvers.newton_cg(self.sys, Del0,
+        solver=µ.solvers.SolverCG(self.sys.wrapped_cell, tol, maxiter, verbose)
+        r = µ.solvers.newton_cg(self.sys.wrapped_cell, Del0,
                                 solver, tol, tol, verbose)
 
         #compare the computed stress with the trivial by hand computed stress

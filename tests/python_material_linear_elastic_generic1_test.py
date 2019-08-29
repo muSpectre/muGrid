@@ -52,9 +52,9 @@ class MaterialLinearElasticGeneric1_Check(unittest.TestCase):
         self.Young = 210e9
         self.Poisson = .33
         self.mat1 = µ.material.MaterialLinearElastic1_3d.make(
-            self.cell1, "material", self.Young, self.Poisson)
+            self.cell1.wrapped_cell, "material", self.Young, self.Poisson)
         self.matO1 = µ.material.MaterialLinearElastic1_3d.make(
-            self.cell1, "material", 2* self.Young, self.Poisson)
+            self.cell1.wrapped_cell, "material", 2* self.Young, self.Poisson)
 
         E, nu = self.Young, self.Poisson
         lam, mu = E*nu/((1+nu)*(1-2*nu)), E/(2*(1+nu))
@@ -70,9 +70,9 @@ class MaterialLinearElasticGeneric1_Check(unittest.TestCase):
                             self.lengths,
                             self.formulation)
         self.mat2 = µ.material.MaterialLinearElasticGeneric1_3d.make(
-            self.cell2, "material", C)
+            self.cell2.wrapped_cell, "material", C)
         self.matO2 = µ.material.MaterialLinearElastic1_3d.make(
-            self.cell2, "material", 2* self.Young, self.Poisson)
+            self.cell2.wrapped_cell, "material", 2* self.Young, self.Poisson)
 
     def test_equivalence(self):
         sym = lambda x: .5*(x + x.T)
@@ -90,15 +90,15 @@ class MaterialLinearElasticGeneric1_Check(unittest.TestCase):
         maxiter = 100
         verbose = 0
 
-        solver1 = µ.solvers.SolverCG(self.cell1, tol, maxiter, verbose)
-        solver2 = µ.solvers.SolverCG(self.cell2, tol, maxiter, verbose)
+        solver1 = µ.solvers.SolverCG(self.cell1.wrapped_cell, tol, maxiter, verbose)
+        solver2 = µ.solvers.SolverCG(self.cell2.wrapped_cell, tol, maxiter, verbose)
 
 
-        r1 = µ.solvers.de_geus(self.cell1, Del0,
+        r1 = µ.solvers.de_geus(self.cell1.wrapped_cell, Del0,
                                solver1, tol, equil_tol, verbose)
 
 
-        r2 = µ.solvers.de_geus(self.cell2, Del0,
+        r2 = µ.solvers.de_geus(self.cell2.wrapped_cell, Del0,
                                solver2, tol, equil_tol, verbose)
 
         error = (np.linalg.norm(r1.stress - r2.stress) /

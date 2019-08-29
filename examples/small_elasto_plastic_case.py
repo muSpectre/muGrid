@@ -35,12 +35,12 @@ covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
 
+import muSpectre as µ
 import sys
 import os
 import numpy as np
 
 sys.path.append(os.path.join(os.getcwd(), "language_bindings/python"))
-import muSpectre as µ
 
 
 nb_grid_pts = [3, 3]
@@ -51,22 +51,22 @@ lengths = [7., 5.]
 formulation = µ.Formulation.finite_strain
 
 K = .833
-mu= .386
+mu = .386
 H = .004
 tauy0 = .006
 Young = 9*K*mu/(3*K + mu)
 Poisson = (3*K-2*mu)/(2*(3*K+mu))
 rve = µ.Cell(nb_grid_pts, lengths, formulation)
 hard = µ.material.MaterialHyperElastoPlastic1_2d.make(
-    rve, "hard", Young, Poisson, 2*tauy0, h=2*H)
+    rve.wrapped_cell, "hard", Young, Poisson, 2*tauy0, h=2*H)
 soft = µ.material.MaterialHyperElastoPlastic1_2d.make(
-    rve, "soft", Young, Poisson,   tauy0, h=  H)
+    rve.wrapped_cell, "soft", Young, Poisson,   tauy0, h=H)
 
 
 for i, pixel in enumerate(rve):
-    #if np.linalg.norm(center - np.array(pixel),2)<incl:
-    i,j= pixel
-    if (i,j) == (1,1):
+    # if np.linalg.norm(center - np.array(pixel),2)<incl:
+    i, j = pixel
+    if (i, j) == (1, 1):
         hard.add_pixel(pixel)
     else:
         soft.add_pixel(pixel)
@@ -82,6 +82,7 @@ if formulation == µ.Formulation.small_strain:
 maxiter = 401
 verbose = 2
 
-solver = µ.solvers.SolverCG(rve, cg_tol, maxiter, verbose=True)
-r = µ.solvers.newton_cg(rve, Del0, solver, tol, equil_tol, verbose)
+solver = µ.solvers.SolverCG(rve.wrapped_cell, cg_tol, maxiter, verbose=True)
+r = µ.solvers.newton_cg(rve.wrapped_cell, Del0, solver,
+                        tol, equil_tol, verbose)
 print("nb of {} iterations: {}".format(solver.name(), r.nb_fev))

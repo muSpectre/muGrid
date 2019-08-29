@@ -41,6 +41,7 @@ import numpy as np
 
 from python_test_imports import µ
 
+
 class MaterialLinearElastic4_Check(unittest.TestCase):
     """
     Check the implementation of storing the first and second Lame constant in
@@ -49,20 +50,21 @@ class MaterialLinearElastic4_Check(unittest.TestCase):
     the stress and compare the result with stress=2*mu*Del0 (Hooke law for small
     symmetric strains).
     """
+
     def setUp(self):
-        self.nb_grid_pts = [7,7]
+        self.nb_grid_pts = [7, 7]
         self.lengths = [2.3, 3.9]
         self.formulation = µ.Formulation.small_strain
         self.sys = µ.Cell(self.nb_grid_pts,
                           self.lengths,
                           self.formulation)
-        self.dim = len (self.lengths)
+        self.dim = len(self.lengths)
         self.mat = µ.material.MaterialLinearElastic4_2d.make(
-            self.sys, "material")
+            self.sys.wrapped_cell, "material")
 
     def test_solver(self):
         Youngs_modulus = 10.
-        Poisson_ratio  = 0.3
+        Poisson_ratio = 0.3
 
         for i, pixel in enumerate(self.sys):
             self.mat.add_pixel(pixel, Youngs_modulus, Poisson_ratio)
@@ -74,13 +76,14 @@ class MaterialLinearElastic4_Check(unittest.TestCase):
         maxiter = 100
         verbose = False
 
-        solver=µ.solvers.SolverCG(self.sys, tol, maxiter, verbose)
-        r = µ.solvers.newton_cg(self.sys, Del0,
+        solver = µ.solvers.SolverCG(
+            self.sys.wrapped_cell, tol, maxiter, verbose)
+        r = µ.solvers.newton_cg(self.sys.wrapped_cell, Del0,
                                 solver, tol, tol, verbose)
 
-        #compare the computed stress with the trivial by hand computed stress
+        # compare the computed stress with the trivial by hand computed stress
         mu = (Youngs_modulus/(2*(1+Poisson_ratio)))
         stress = 2*mu*Del0
 
         self.assertLess(np.linalg.norm(r.stress.reshape(-1, self.dim**2) -
-                                       stress.reshape(1,self.dim**2)), 1e-8)
+                                       stress.reshape(1, self.dim**2)), 1e-8)

@@ -62,7 +62,9 @@ def build_test_classes(Projection, RefProjection, name):
         def test_CompareGhat4(self):
             # refG is rowmajor and the dims are i,j,k,l,x,y(,z)
             # reshape refG so they are n² × n² × ¶(nb_grid_pts)
-            refG = self.ref.Ghat4.reshape(
+            order = list(range(self.ndim+4))
+            order[-self.ndim:] = reversed(order[-self.ndim:])
+            refG = self.ref.Ghat4.transpose(*order).reshape(
                 self.ndim**2, self.ndim**2, np.prod(self.shape))
             # mspG is colmajor (not sure what that's worth, though) with dims
             # ijkl, xy(z)
@@ -70,7 +72,7 @@ def build_test_classes(Projection, RefProjection, name):
             ref_sizes = self.shape
             msp_sizes = µ.get_hermitian_sizes(self.shape)
             hermitian_size = np.prod(msp_sizes)
-            mspG = self.projection.get_operator()
+            mspG = self.projection.operator
             #this test only makes sense for fully stored ghats (i.e.,
             #not for the faster alternative implementation
             if mspG.size != hermitian_size*self.ndim**4:
@@ -81,7 +83,6 @@ def build_test_classes(Projection, RefProjection, name):
                 coord = µ.get_domain_ccoord(msp_sizes, i)
                 ref_id = µ.get_domain_index(ref_sizes, coord)
                 msp_id = µ.get_domain_index(msp_sizes, coord)
-
                 # story behind this order vector:
                 # There was this issue with the projection operator of
                 # de Geus acting on the the transpose of the gradient.
@@ -102,7 +103,7 @@ def build_test_classes(Projection, RefProjection, name):
             strain_shape = (self.ndim, self.ndim, *self.shape)
             strain = np.arange(np.prod(strain_shape)).reshape(strain_shape)
             # if we're testing small strain projections, it needs to be symmetric
-            if self.projection.get_formulation() == µ.Formulation.small_strain:
+            if self.projection.formulation == µ.Formulation.small_strain:
                 strain += strain.transpose(1, 0, *range(2, len(strain.shape)))
             strain_g = strain.copy()
             b_g = self.ref.G(strain_g).reshape(strain_g.shape)
@@ -113,11 +114,12 @@ def build_test_classes(Projection, RefProjection, name):
                 strain_µ[index_µ] = strain_g[index_g].T
 
             b_µ = self.projection.apply_projection(strain_µ.reshape(
-                np.prod(self.shape), self.ndim**2).T).T.reshape(strain_µ.shape)
+                np.prod(self.shape), self.ndim**2,order='F').T).T.reshape(
+                    strain_µ.shape,order='F')
             for ijk in itertools.product(range(self.nb_grid_pts), repeat=self.ndim):
                 index_µ = tuple((*ijk, slice(None), slice(None)))
                 index_g = tuple((slice(None), slice(None), *ijk))
-                b_µ_sl = b_µ[index_µ].T
+                b_µ_sl = b_µ[index_µ]
                 b_g_sl = b_g[index_g]
                 error = np.linalg.norm(b_µ_sl-b_g_sl)
                 condition = error < self.tol

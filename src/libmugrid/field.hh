@@ -242,6 +242,11 @@ namespace muGrid {
      */
     inline TensorField & get_zeros_like(std::string unique_name) const;
 
+    /**
+     * returns the real part of a complex TensorField
+     **/
+    // inline decltype(auto) & real() { return this->}
+
    protected:
     //! constructor protected!
     TensorField(std::string unique_name, FieldCollection & collection);

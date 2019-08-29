@@ -70,7 +70,7 @@ int main() {
   rve.initialise();
 
   Real tol{1e-6};
-  Eigen::MatrixXd Del0{};
+  Eigen::MatrixXd Del0(dim, dim);
   Del0 << 0, .1, 0, 0;
 
   Uint maxiter{31};

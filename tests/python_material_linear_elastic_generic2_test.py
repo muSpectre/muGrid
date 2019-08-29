@@ -61,11 +61,11 @@ class MaterialLinearElasticGeneric2_Check(unittest.TestCase):
                       [           0,            0,            0,  0,  0, mu]])
 
         self.mat1 = µ.material.MaterialLinearElasticGeneric1_2d.make(
-            self.cell1, "simple", C)
+            self.cell1.wrapped_cell, "simple", C)
         self.mat2 = µ.material.MaterialLinearElasticGeneric2_2d.make(
-            self.cell2, "eigen", C)
+            self.cell2.wrapped_cell, "eigen", C)
         self.mat3 = µ.material.MaterialLinearElastic2_2d.make(
-            self.cell2, "eigen2", 120e9, .33)
+            self.cell2.wrapped_cell, "eigen2", 120e9, .33)
 
 
     def test_solve(self):
@@ -91,8 +91,8 @@ class MaterialLinearElasticGeneric2_Check(unittest.TestCase):
         verbose = 0
 
         def solve(cell, grad):
-            solver=µ.solvers.SolverCG(cell, tol, maxiter, verbose)
-            r = µ.solvers.newton_cg(cell, grad,
+            solver=µ.solvers.SolverCG(cell.wrapped_cell, tol, maxiter, verbose)
+            r = µ.solvers.newton_cg(cell.wrapped_cell, grad,
                                     solver, tol, tol, verbose)
             return r
         results = [solve(cell, del0) for (cell, del0)

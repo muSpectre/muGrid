@@ -59,6 +59,7 @@ namespace muSpectre {
       ProjectionFixture<threeD, threeD, Squares<threeD>,
                         FourierGradient<threeD>,
                         ProjectionFiniteStrainFast<threeD, threeD>>,
+
       ProjectionFixture<twoD, twoD, Sizes<twoD>, FourierGradient<twoD>,
                         ProjectionFiniteStrainFast<twoD, twoD>>,
       ProjectionFixture<threeD, threeD, Sizes<threeD>, FourierGradient<threeD>,

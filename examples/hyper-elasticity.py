@@ -50,9 +50,9 @@ def compute():
 
     formulation = µ.Formulation.finite_strain
     cell = µ.Cell(N, lens, formulation)
-    hard = µ.material.MaterialLinearElastic1_3d.make(cell, "hard",
+    hard = µ.material.MaterialLinearElastic1_3d.make(cell.wrapped_cell, "hard",
                                            210.e9, .33)
-    soft = µ.material.MaterialLinearElastic1_3d.make(cell, "soft",
+    soft = µ.material.MaterialLinearElastic1_3d.make(cell.wrapped_cell, "soft",
                                             70.e9, .33)
     for  pixel in cell:
         # if ((pixel[0] >= N[0]-incl_size) and
@@ -76,9 +76,9 @@ def compute():
     test_grad = np.zeros((9, cell.size))
     test_grad[:,:] = dF_bar.reshape(-1,1)
     print(cell.directional_stiffness(test_grad)[:,:3])
-    solver = µ.solvers.SolverCG(cell, cg_tol, maxiter, verbose=False);
+    solver = µ.solvers.SolverCG(cell.wrapped_cell, cg_tol, maxiter, verbose=False);
     optimize_res = µ.solvers.de_geus(
-        cell, dF_bar, solver, newton_tol, verbose)
+        cell.wrapped_cell, dF_bar, solver, newton_tol, verbose)
     print("nb_cg: {}\n{}".format(optimize_res.nb_fev, optimize_res.grad.T[:2,:]))
 
 def main():

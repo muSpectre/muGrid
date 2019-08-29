@@ -53,7 +53,7 @@ has_mpi = _muFFT.Communicator.has_mpi
 
 # This is a list of FFT engines that are potentially available.
 #              |------------------------------- Identifier for 'FFT' class
-#              |        |---------------------- Name of 1D engine class 
+#              |        |---------------------- Name of 1D engine class
 #              |        |          |----------- Name of 2D engine class
 #              v        v          v         v- Name of 3D engine class
 #                                   MPI parallel calcs --------|
@@ -68,13 +68,15 @@ _factories = {'fftw': ('FFTW_1d', 'FFTW_2d', 'FFTW_3d', False, False),
 # of all engines that have been compiled into the library.
 def _find_fft_engines():
     fft_engines = []
-    for fft, (factory_name_1d, factory_name_2d, factory_name_3d, \
-        is_transposed, is_parallel) in _factories.items():
+    for fft, (factory_name_1d, factory_name_2d, factory_name_3d,
+              is_transposed, is_parallel) in _factories.items():
         if factory_name_1d in _muFFT.__dict__ and \
-            factory_name_2d in _muFFT.__dict__ and \
-            factory_name_3d in _muFFT.__dict__:
+                factory_name_2d in _muFFT.__dict__ and \
+                factory_name_3d in _muFFT.__dict__:
             fft_engines += [(fft, is_transposed, is_parallel)]
     return fft_engines
+
+
 fft_engines = _find_fft_engines()
 
 
@@ -128,7 +130,7 @@ class FFT(object):
         The class holds the plan for the transform. It can only carry out
         transforms of the size specified upon instantiation. All transforms are
         real-to-complex.
-    
+
         Parameters
         ----------
         nb_grid_pts: list
@@ -205,13 +207,15 @@ class FFT(object):
             raise ValueError('Forward transform received a field with '
                              '{} grid points, but FFT has been planned for a '
                              'field with {} grid points'.format(field_shape,
-                                self.nb_subdomain_grid_pts))
-        out_data = self.engine.fft(data.reshape(-1, self._nb_components).T)
+                                                      self.nb_subdomain_grid_pts))
+        in_data = np.array(data.reshape(-1, self._nb_components, order='F').T,
+                           order='F')
+        out_data = self.engine.fft(in_data)
         new_shape = tuple(self.engine.get_nb_fourier_grid_pts()) \
             + component_shape
-        out_data = out_data.T.reshape(new_shape)
+        out_data = out_data.T.reshape(new_shape, order='F')
         if self._is_transposed:
-            return out_data.swapaxes(0, 1)
+            return out_data.swapaxes(self._dim-2, self._dim-1)
         return out_data
 
     def ifft(self, data):
@@ -236,17 +240,18 @@ class FFT(object):
             `nb_subdomain_grid_pts` plus components.
         """
         if self._is_transposed:
-            data = data.swapaxes(0, 1)
+            data = data.swapaxes(self._dim-2, self._dim-1)
         field_shape = data.shape[:self._dim]
         component_shape = data.shape[self._dim:]
         if field_shape != tuple(self.engine.get_nb_fourier_grid_pts()):
             raise ValueError('Inverse transform received a field with '
                              '{} grid points, but FFT has been planned for a '
                              'field with {} grid points'.format(field_shape,
-                                tuple(self.engine.get_nb_fourier_grid_pts())))
-        out_data = self.engine.ifft(data.reshape(-1, self._nb_components).T)
+                                      tuple(self.engine.get_nb_fourier_grid_pts())))
+        out_data = self.engine.ifft(
+            data.reshape(-1, self._nb_components, order='F').T)
         new_shape = self.nb_subdomain_grid_pts + component_shape
-        return out_data.T.reshape(new_shape)
+        return out_data.T.reshape(new_shape, order='F')
 
     @property
     def nb_domain_grid_pts(self):
@@ -261,7 +266,7 @@ class FFT(object):
                 return loc1, loc0
             elif self._dim == 3:
                 loc0, loc1, loc2 = fourier_locations
-                return loc1, loc0, loc2
+                return loc0, loc2, loc1
         return tuple(fourier_locations)
 
     @property
@@ -273,7 +278,7 @@ class FFT(object):
                 return n1, n0
             elif self._dim == 3:
                 n0, n1, n2 = nb_fourier_grid_pts
-                return n1, n0, n2
+                return n0, n2, n1
         return tuple(nb_fourier_grid_pts)
 
     @property
@@ -307,10 +312,10 @@ class FFT(object):
         """
         if domain_lengths is None:
             return (np.mgrid[self.fourier_slices].T /
-                self.nb_domain_grid_pts).T
+                    self.nb_domain_grid_pts).T
         else:
             return (np.mgrid[self.fourier_slices].T /
-                np.asarray(domain_lengths)).T
+                    np.asarray(domain_lengths)).T
 
     @property
     def subdomain_slices(self):
@@ -335,4 +340,3 @@ class FFT(object):
     @property
     def communicator(self):
         return self.engine.get_communicator()
-    

@@ -88,5 +88,4 @@ int main() {
 
   std::cout << "nb_cg: " << optimize_res.nb_fev << std::endl;
   std::cout << optimize_res.grad.transpose().block(0, 0, 10, 9) << std::endl;
-  return 0;
-}
+  return 0;}

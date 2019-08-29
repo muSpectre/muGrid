@@ -132,6 +132,37 @@ namespace muFFT {
       return xi / xi.norm();
     }
 
+    //! get sin(xi Δx) for the first order discrete compatibility operator.
+    //! Δx is the gridspacing in each direction and xi the unnormalised wave
+    //! vector. sin(xi Δx) = [sin(xi₁ Δx₁), sin(xi₂ Δx₂), sin(xi₃ Δx₃)]
+    inline Vector get_sin_xi_deltax(const Ccoord_t<dim> ccoord,
+                                    Ccoord_t<dim> sizes,
+                                    std::array<Real, dim> lengths) const {
+      auto && xi = this->get_xi(std::move(ccoord));
+      Vector retval = {};
+      for (Dim_t i = 0; i < dim; ++i) {
+        // sin(xi Δx)
+        retval(i) = std::sin(2. * muGrid::pi * xi[i] * lengths[i] / sizes[i]);
+      }
+      return retval;
+    }
+
+    //! get sin(xi Δx) for the first order discrete compatibility operator.
+    //! Δx is the gridspacing in each direction and xi the unnormalised wave
+    //! vector. sin(xi Δx) = [sin(xi₁ Δx₁), sin(xi₂ Δx₂), sin(xi₃ Δx₃)]
+    inline Vector get_sin_xi_deltaxhalf(const Ccoord_t<dim> ccoord,
+                                        Ccoord_t<dim> sizes,
+                                        std::array<Real, dim> lengths) const {
+      auto && xi = this->get_xi(std::move(ccoord));
+      Vector retval = {};
+      for (Dim_t i = 0; i < dim; ++i) {
+        // sin(xi Δx)
+        retval(i) =
+            std::sin(2. * muGrid::pi * xi[i] * lengths[i] / sizes[i] / 2.0);
+      }
+      return retval;
+    }
+
    protected:
     //! container for frequencies ordered by spatial dimension
     const std::array<std::valarray<Real>, dim> freqs;

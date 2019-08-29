@@ -113,10 +113,10 @@ namespace muSpectre {
       return Gradient_t<twoD>{
           std::make_shared<DiscreteDerivative<twoD>>(
               Ccoord{2, 2}, Ccoord{0, 0},
-              std::vector<Real>{-0.5, -0.5, 0.5, 0.5}),
+              std::vector<Real>{-0.5, 0.5, -0.5, 0.5}),
           std::make_shared<DiscreteDerivative<twoD>>(
               Ccoord{2, 2}, Ccoord{0, 0},
-              std::vector<Real>{-0.5, 0.5, -0.5, 0.5})
+              std::vector<Real>{-0.5, -0.5, 0.5, 0.5})
           };
     }
   };
@@ -127,13 +127,13 @@ namespace muSpectre {
       return Gradient_t<threeD>{
           std::make_shared<DiscreteDerivative<threeD>>(
               Ccoord{2, 2, 2}, Ccoord{0, 0, 0},
-              std::vector<Real>{-0.5, -0.5, -0.5, -0.5, 0.5, 0.5, 0.5, 0.5}),
+              std::vector<Real>{-0.5, 0.5, -0.5, 0.5, -0.5, 0.5, -0.5, 0.5}),
           std::make_shared<DiscreteDerivative<threeD>>(
               Ccoord{2, 2, 2}, Ccoord{0, 0, 0},
               std::vector<Real>{-0.5, -0.5, 0.5, 0.5, -0.5, -0.5, 0.5, 0.5}),
           std::make_shared<DiscreteDerivative<threeD>>(
               Ccoord{2, 2, 2}, Ccoord{0, 0, 0},
-              std::vector<Real>{-0.5, 0.5, -0.5, 0.5, -0.5, 0.5, -0.5, 0.5})
+              std::vector<Real>{-0.5, -0.5, -0.5, -0.5, 0.5, 0.5, 0.5, 0.5})
           };
     }
   };

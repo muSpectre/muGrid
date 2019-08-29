@@ -199,7 +199,7 @@ namespace muSpectre {
 
     // Averaged upwind differences
     DiscreteDerivative<twoD> stencil3({2, 2}, {0, 0},
-                                      std::vector<Real>{-0.5, 0.5, -0.5, 0.5});
+                                      std::vector<Real>{-0.5, -0.5, 0.5, 0.5});
     DiscreteDerivative<twoD> stencil4{stencil3.rollaxes()};
     BOOST_CHECK_SMALL(stencil4.fourier(
         (DiscreteDerivative<twoD>::Vector() << 0, 0)

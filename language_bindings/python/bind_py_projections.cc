@@ -86,8 +86,7 @@ void add_proj_helper(py::module & mod, std::string name_start) {
   using Field_t = typename Proj::Field_t;
 
 #ifdef WITH_MPI
-  auto make_proj = [](Ccoord res, Rcoord lengths,
-                      const Gradient_t & gradient,
+  auto make_proj = [](Ccoord res, Rcoord lengths, const Gradient_t & gradient,
                       const std::string & fft,
                       const muFFT::Communicator & comm) {
     if (fft == "fftw") {
@@ -119,29 +118,20 @@ void add_proj_helper(py::module & mod, std::string name_start) {
 
   py::class_<Proj>(mod, name.str().c_str())
 #ifdef WITH_MPI
-      .def(py::init(make_proj),
-           "nb_grid_pts"_a,
-           "lengths"_a,
+      .def(py::init(make_proj), "nb_grid_pts"_a, "lengths"_a,
            "gradient"_a = muSpectre::make_fourier_gradient<DimS>(),
-            "fft"_a = "fftw",
-           "communicator"_a = muFFT::Communicator())
-      .def(py::init([make_proj](Ccoord res,
-                                Rcoord lengths,
+           "fft"_a = "fftw", "communicator"_a = muFFT::Communicator())
+      .def(py::init([make_proj](Ccoord res, Rcoord lengths,
                                 const Gradient_t & gradient,
-                                const std::string & fft,
-                                size_t comm) {
+                                const std::string & fft, size_t comm) {
              return make_proj(res, lengths, gradient, fft,
                               std::move(muFFT::Communicator(MPI_Comm(comm))));
            }),
-           "nb_grid_pts"_a,
-           "lengths"_a,
+           "nb_grid_pts"_a, "lengths"_a,
            "gradient"_a = muSpectre::make_fourier_gradient<DimS>(),
-           "fft"_a = "fftw",
-           "communicator"_a = size_t(MPI_COMM_SELF))
+           "fft"_a = "fftw", "communicator"_a = size_t(MPI_COMM_SELF))
 #else
-      .def(py::init([](Ccoord res,
-                       Rcoord lengths,
-                       const Gradient_t & gradient,
+      .def(py::init([](Ccoord res, Rcoord lengths, const Gradient_t & gradient,
                        const std::string & fft) {
              if (fft == "fftw") {
                auto engine = std::make_unique<muFFT::FFTWEngine<DimS>>(
@@ -152,8 +142,7 @@ void add_proj_helper(py::module & mod, std::string name_start) {
                                         "' specified.");
              }
            }),
-           "nb_grid_pts"_a,
-           "lengths"_a,
+           "nb_grid_pts"_a, "lengths"_a,
            "gradient"_a = muSpectre::make_fourier_gradient<DimS>(),
            "fft"_a = "fftw")
 #endif
@@ -181,15 +170,18 @@ void add_proj_helper(py::module & mod, std::string name_start) {
              proj.apply_projection(temp);
              return Eigen::ArrayXXd{temp.eigen()};
            })
-      .def("get_operator", &Proj::get_operator)
-      .def(
-          "get_formulation", &Proj::get_formulation,
+      .def_property_readonly("operator", &Proj::get_operator)
+      .def_property_readonly(
+          "formulation", &Proj::get_formulation,
           "return a Formulation enum indicating whether the projection is small"
           " or finite strain")
-      .def("get_nb_subdomain_grid_pts", &Proj::get_nb_subdomain_grid_pts)
-      .def("get_subdomain_locations", &Proj::get_subdomain_locations)
-      .def("get_nb_domain_grid_pts", &Proj::get_nb_domain_grid_pts)
-      .def("get_domain_lengths", &Proj::get_nb_domain_grid_pts);
+      .def_property_readonly("nb_subdomain_grid_pts",
+                             &Proj::get_nb_subdomain_grid_pts)
+      .def_property_readonly("subdomain_locations",
+                             &Proj::get_subdomain_locations)
+      .def_property_readonly("nb_domain_grid_pts",
+                             &Proj::get_nb_domain_grid_pts)
+      .def_property_readonly("domain_lengths", &Proj::get_domain_lengths);
 }
 
 void add_proj_dispatcher(py::module & mod) {

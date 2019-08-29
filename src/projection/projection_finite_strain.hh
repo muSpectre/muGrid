@@ -5,7 +5,7 @@
  *         Richard Leute <richard.leute@imtek.uni-freiburg.de>
  *         Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
- * @date   05 Dec 2017
+ * @date   16 Apr 2019
  *
  * @brief  Class for discrete finite-strain gradient projections
  *

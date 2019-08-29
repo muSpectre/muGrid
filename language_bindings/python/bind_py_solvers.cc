@@ -46,6 +46,7 @@ using muSpectre::OptimizeResult;
 using muSpectre::Real;
 using muSpectre::Uint;
 using pybind11::literals::operator""_a;
+using muSpectre::IsStrainInitialised;
 namespace py = pybind11;
 
 /**
@@ -57,7 +58,7 @@ void add_iterative_solver_helper(py::module & mod, std::string name) {
   py::class_<Solver, typename Solver::Parent>(mod, name.c_str())
       .def(py::init<muSpectre::Cell &, Real, Uint, bool>(), "cell"_a, "tol"_a,
            "maxiter"_a, "verbose"_a = false)
-      .def("name", &Solver::get_name);
+    .def_property_readonly("name", &Solver::get_name);
 }
 
 void add_iterative_solver(py::module & mod) {
@@ -82,21 +83,29 @@ void add_newton_cg_helper(py::module & mod) {
   using grad = py::EigenDRef<Eigen::MatrixXd>;
   using grad_vec = muSpectre::LoadSteps_t;
 
+  py::enum_<IsStrainInitialised>(mod, "IsStrainInitialised")
+      .value("Yes", IsStrainInitialised::True)
+      .value("No", IsStrainInitialised::False);
+
   mod.def(name,
           [](muSpectre::Cell & s, const grad & g, solver & so, Real nt,
-             Real eqt, Dim_t verb) -> OptimizeResult {
+             Real eqt, Dim_t verb,
+             IsStrainInitialised strain_init) -> OptimizeResult {
             Eigen::MatrixXd tmp{g};
-            return newton_cg(s, tmp, so, nt, eqt, verb);
+            return newton_cg(s, tmp, so, nt, eqt, verb, strain_init);
           },
           "cell"_a, "ΔF₀"_a, "solver"_a, "newton_tol"_a, "equil_tol"_a,
-          "verbose"_a = 0);
+          "verbose"_a = 0,
+          "IsStrainInitialised"_a = IsStrainInitialised::False);
   mod.def(name,
           [](muSpectre::Cell & s, const grad_vec & g, solver & so, Real nt,
-             Real eqt, Dim_t verb) -> std::vector<OptimizeResult> {
-            return newton_cg(s, g, so, nt, eqt, verb);
+             Real eqt, Dim_t verb,
+             IsStrainInitialised strain_init) -> std::vector<OptimizeResult> {
+            return newton_cg(s, g, so, nt, eqt, verb, strain_init);
           },
           "cell"_a, "ΔF₀"_a, "solver"_a, "newton_tol"_a, "equilibrium_tol"_a,
-          "verbose"_a = 0);
+          "verbose"_a = 0,
+          "IsStrainInitialised"_a = IsStrainInitialised::False);
 }
 
 void add_de_geus_helper(py::module & mod) {
