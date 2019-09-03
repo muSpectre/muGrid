@@ -48,8 +48,7 @@ from python_field_tests import FieldCollection_Check
 from python_exact_reference_elastic_test import LinearElastic_Check
 
 from python_field_tests import FieldCollection_Check
-from python_muSpectre_gradient_integration_test import \
-    MuSpectre_gradient_integration_Check
+from python_gradient_integration_test import GradientIntegration_Check
 
 from python_material_evaluator_test import MaterialEvaluator_Check
 

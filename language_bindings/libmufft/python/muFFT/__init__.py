@@ -80,6 +80,35 @@ def _find_fft_engines():
 fft_engines = _find_fft_engines()
 
 
+class FFTFreqs(object):
+    def __init__(self, nb_grid_pts, lengths=None):
+        """
+        The FFTFreq class implements numpy.fft.fftfreq but allow to use mgrid
+        to compute just a specific portion of the wavevector spectrum.
+
+        Parameters
+        ----------
+        nb_grid_pts : array
+            Number of grid points
+        lengths : array
+            Normalization factors
+        """
+        self._dim = len(nb_grid_pts)
+        if lengths is None:
+            lengths = [1]*self._dim
+        self._fft_freqs = getattr(_muFFT, 'FFTFreqs_{}d'
+            .format(len(nb_grid_pts)))(list(nb_grid_pts), list(lengths))
+
+    def get_xi(self, grid_pts):
+        grid_pts = np.asarray(grid_pts)
+        if grid_pts.shape[0] != self._dim:
+            raise ValueError('The first dimension of the grid points array '
+                             'must equal the dimension of the fft frequencies')
+        field_shape = grid_pts.shape[1:]
+        xi = self._fft_freqs.get_xi(grid_pts.reshape(self._dim, -1))
+        return xi.reshape([self._dim] + list(field_shape))
+
+
 def Communicator(communicator=None):
     """
     Factory function for the communicator class.
@@ -154,6 +183,8 @@ class FFT(object):
         self._nb_grid_pts = nb_grid_pts
         self._nb_components = nb_components
 
+        self._fft_freqs = FFTFreqs(nb_grid_pts, nb_grid_pts)
+
         nb_grid_pts = list(nb_grid_pts)
         try:
             factory_name_1d, factory_name_2d, factory_name_3d, is_transposed, \
@@ -170,7 +201,7 @@ class FFT(object):
             raise ValueError('{}-d transforms are not supported'
                              .format(self._dim))
         try:
-            factory = _muFFT.__dict__[factory_name]
+            factory = getattr(_muFFT, factory_name)
         except KeyError:
             raise KeyError("FFT engine '{}' has not been compiled into the "
                            "muFFT library.".format(factory_name))
@@ -310,12 +341,11 @@ class FFT(object):
         wavevectors : array
             Wavevectors or phases
         """
-        if domain_lengths is None:
-            return (np.mgrid[self.fourier_slices].T /
-                    self.nb_domain_grid_pts).T
-        else:
-            return (np.mgrid[self.fourier_slices].T /
-                    np.asarray(domain_lengths)).T
+        w = self._fft_freqs.get_xi(
+            np.mgrid[self.fourier_slices].astype(np.int32))
+        if domain_lengths is not None:
+            w = (w.T * self._nb_grid_pts / np.asarray(domain_lengths)).T
+        return w
 
     @property
     def subdomain_slices(self):

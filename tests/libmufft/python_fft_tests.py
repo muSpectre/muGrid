@@ -73,7 +73,7 @@ class FFT_Check(unittest.TestCase):
                 try:
                     engine = muFFT.FFT([6*s, 4*s], 6, fft=engine_str,
                                        communicator=MPI.COMM_WORLD)
-                except KeyError:
+                except AttributeError:
                     # This FFT engine has not been compiled into the code. Skip
                     # test.
                     continue
@@ -101,7 +101,7 @@ class FFT_Check(unittest.TestCase):
                     engine = muFFT.FFT(nb_grid_pts, np.prod(dims),
                                        fft=engine_str,
                                        communicator=self.communicator)
-                except KeyError:
+                except AttributeError:
                     # This FFT engine has not been compiled into the code. Skip
                     # test.
                     continue
@@ -164,7 +164,7 @@ class FFT_Check(unittest.TestCase):
                     engine = muFFT.FFT(nb_grid_pts, np.prod(dims),
                                        fft=engine_str,
                                        communicator=self.communicator)
-                except KeyError:
+                except AttributeError:
                     # This FFT engine has not been compiled into the code. Skip
                     # test.
                     continue
@@ -227,7 +227,7 @@ class FFT_Check(unittest.TestCase):
                     engine = muFFT.FFT(nb_grid_pts,
                                        fft=engine_str,
                                        communicator=self.communicator)
-                except KeyError:
+                except AttributeError:
                     # This FFT engine has not been compiled into the code. Skip
                     # test.
                     continue
@@ -257,7 +257,7 @@ class FFT_Check(unittest.TestCase):
                     engine = muFFT.FFT(nb_grid_pts,
                                        fft=engine_str,
                                        communicator=self.communicator)
-                except KeyError:
+                except AttributeError:
                     # This FFT engine has not been compiled into the code. Skip
                     # test.
                     continue

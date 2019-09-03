@@ -42,7 +42,6 @@
 #include "libmugrid/ccoord_operations.hh"
 
 namespace muSpectre {
-
   /**
    * base class for projection related exceptions
    */
@@ -128,7 +127,7 @@ namespace muSpectre {
      * Return Fourier representation of the Fourier interpolated derivative.
      * This here simply returns I*2*pi*phase. (I*2*pi*wavevector is the
      * Fourier representation of the derivative.)
-     */ 
+     */
     virtual Complex fourier(const Vector & phase) const {
       return Complex(0, 2*muGrid::pi*phase[this->direction]);
     }

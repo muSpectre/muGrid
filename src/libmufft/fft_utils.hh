@@ -90,6 +90,8 @@ namespace muFFT {
   template <Dim_t dim>
   class FFT_freqs {
    public:
+    //! Eigen variant equivalent to Ccoord_t
+    using CcoordVector = Eigen::Matrix<Dim_t, dim, 1>;
     //! return type for wave vectors
     using Vector = Eigen::Matrix<Real, dim, 1>;
     //! return type for complex wave vectors
@@ -132,35 +134,8 @@ namespace muFFT {
       return xi / xi.norm();
     }
 
-    //! get sin(xi Δx) for the first order discrete compatibility operator.
-    //! Δx is the gridspacing in each direction and xi the unnormalised wave
-    //! vector. sin(xi Δx) = [sin(xi₁ Δx₁), sin(xi₂ Δx₂), sin(xi₃ Δx₃)]
-    inline Vector get_sin_xi_deltax(const Ccoord_t<dim> ccoord,
-                                    Ccoord_t<dim> sizes,
-                                    std::array<Real, dim> lengths) const {
-      auto && xi = this->get_xi(std::move(ccoord));
-      Vector retval = {};
-      for (Dim_t i = 0; i < dim; ++i) {
-        // sin(xi Δx)
-        retval(i) = std::sin(2. * muGrid::pi * xi[i] * lengths[i] / sizes[i]);
-      }
-      return retval;
-    }
-
-    //! get sin(xi Δx) for the first order discrete compatibility operator.
-    //! Δx is the gridspacing in each direction and xi the unnormalised wave
-    //! vector. sin(xi Δx) = [sin(xi₁ Δx₁), sin(xi₂ Δx₂), sin(xi₃ Δx₃)]
-    inline Vector get_sin_xi_deltaxhalf(const Ccoord_t<dim> ccoord,
-                                        Ccoord_t<dim> sizes,
-                                        std::array<Real, dim> lengths) const {
-      auto && xi = this->get_xi(std::move(ccoord));
-      Vector retval = {};
-      for (Dim_t i = 0; i < dim; ++i) {
-        // sin(xi Δx)
-        retval(i) =
-            std::sin(2. * muGrid::pi * xi[i] * lengths[i] / sizes[i] / 2.0);
-      }
-      return retval;
+    inline Dim_t get_nb_grid_pts(Dim_t i) const {
+      return this->freqs[i].size();
     }
 
    protected:

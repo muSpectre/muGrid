@@ -80,8 +80,7 @@ void add_derivative_base(py::module & mod, std::string name_start) {
              PyDerivativeBase<DimS>                  // trampoline
              >(mod, name.str().c_str())
       .def(py::init<>())
-      .def("fourier", &DerivativeBase<DimS>::fourier,
-           "wavevec"_a,
+      .def("fourier", &DerivativeBase<DimS>::fourier, "wavevec"_a,
            "return Fourier representation of the derivative operator for a "
            "certain wavevector");
 }
@@ -98,10 +97,8 @@ void add_fourier_derivative(py::module & mod, std::string name_start) {
              std::shared_ptr<FourierDerivative<DimS>>,  // holder
              DerivativeBase<DimS>                       // base class
              >(mod, name.str().c_str())
-      .def(py::init<Dim_t>(),
-           "direction"_a)
-      .def("fourier", &FourierDerivative<DimS>::fourier,
-           "wavevec"_a,
+      .def(py::init<Dim_t>(), "direction"_a)
+      .def("fourier", &FourierDerivative<DimS>::fourier, "wavevec"_a,
            "return Fourier representation of the derivative operator for a "
            "certain wavevector")
       .def("fourier",
@@ -134,8 +131,7 @@ void add_discrete_derivative(py::module & mod, std::string name_start) {
              DerivativeBase<DimS>                        // base class
              >(mod, name.str().c_str())
       .def(py::init<Ccoord, Ccoord, const Eigen::ArrayXd &>())
-      .def("fourier", &DiscreteDerivative<DimS>::fourier,
-           "wavevector"_a,
+      .def("fourier", &DiscreteDerivative<DimS>::fourier, "wavevector"_a,
            "return Fourier representation of the derivative operator for a "
            "certain wavevector")
       /* TODO: Decide if we need both functions below. There can be confusion for
@@ -165,8 +161,7 @@ void add_discrete_derivative(py::module & mod, std::string name_start) {
            "wavevectors"_a,
            "return Fourier representation of the derivative operator for a "
            "certain wavevector")
-      .def("rollaxes", &DiscreteDerivative<DimS>::rollaxes,
-           "distance"_a = 1);
+      .def("rollaxes", &DiscreteDerivative<DimS>::rollaxes, "distance"_a = 1);
 }
 
 void add_derivatives(py::module & mod) {

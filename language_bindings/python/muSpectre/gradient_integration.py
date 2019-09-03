@@ -4,6 +4,8 @@
 @file   gradient_integration.py
 
 @author Till Junge <till.junge@epfl.ch>
+        Richard Leute <richard.leute@imtek.uni-freiburg.de>
+        Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
 
 @date   22 Nov 2018
 
@@ -35,34 +37,15 @@ covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
 
-import numpy as np
 import sys
+
+import numpy as np
+
+import muFFT
+
 from . import Formulation
 
-def compute_wave_vectors(lengths, nb_grid_pts):
-    """Computes the wave vectors for a dim-dimensional rectangular or
-    cubic (or hypercubic) grid as a function of the edge lengths and
-    number of grid points.
-
-    Note: the norm of the wave vectors corresponds to the angular
-    velocity, not the frequency.
-
-    Keyword Arguments:
-    lengths     -- np.ndarray of length dim with the edge lengths in each
-                   spatial dimension (dtype = float)
-    nb_grid_pts -- np.ndarray of length dim with the nb_grid_pts in each
-                   spatial dimension (dtype = int)
-
-    Returns:
-    np.ndarary of shape nb_grid_pts + [dim]. The wave vector for a
-    given pixel/voxel is given in the last dimension
-
-    """
-    return np.moveaxis(np.meshgrid(
-        *[2*np.pi*np.fft.fftfreq(r, l/r) for l,r in zip(lengths, nb_grid_pts)],
-        indexing="ij"), 0, -1)
-
-def compute_grid(lengths, nb_grid_pts):
+def make_grid(lengths, nb_grid_pts):
     """For a dim-dimensional pixel/voxel grid, computes the pixel/voxel
     centre and corner positions as a function of the grid's edge
     lengths and number of grid points
@@ -73,23 +56,24 @@ def compute_grid(lengths, nb_grid_pts):
     nb_grid_pts -- np.ndarray of length dim with the nb_grid_pts in each
                    spatial dimension (dtype = int)
     Returns:
-    tuple((x_n, x_c)) two ndarrays with nodal/corner positions and
-    centre positions respectively. x_n has one more entry in every
-    direction than the number of grid points of the grid (added points
-    correspond to the periodic repetitions)
-
+    (nodal_positions, center_positions) two ndarrays with nodal/corner
+    positions and center positions respectively. `nodal_positions` has one
+    more entry in every direction than the number of grid points of the grid
+    (added points correspond to the periodic repetitions).
     """
-    x_n = np.moveaxis(np.meshgrid(
-        *[np.linspace(0, l, r+1) for l,r in zip(lengths, nb_grid_pts)],
-        indexing="ij"), 0 ,-1)
+    nodal_positions = np.array(np.meshgrid(
+        *[np.linspace(0, l, r+1) for l, r in zip(lengths, nb_grid_pts)],
+        indexing="ij"))
+
     dx = lengths/nb_grid_pts
-
-    x_c = np.moveaxis(np.meshgrid(
-        *[np.linspace(0, l, r, endpoint=False) for l,r in
+    dim = len(dx)
+    center_positions = np.array(np.meshgrid(
+        *[np.linspace(0, l, r, endpoint=False) for l, r in
           zip(lengths, nb_grid_pts)],
-        indexing="ij"), 0, -1) + .5*dx
+        indexing="ij") + 0.5*dx.reshape((dim,)+(1,)*dim))
 
-    return x_n, x_c
+    return nodal_positions, center_positions
+
 
 def reshape_gradient(F, nb_grid_pts):
     """reshapes a flattened second-rank tensor into a multidimensional array of
@@ -123,6 +107,7 @@ def reshape_gradient(F, nb_grid_pts):
     order[0:dim] = reversed(order[0:dim])
     return F.reshape(output_shape).transpose(*order)
 
+
 def complement_periodically(array, dim):
     """Takes an arbitrary multidimensional array of at least dimension dim
     and returns an augmented copy with periodic copies of the
@@ -149,56 +134,54 @@ def complement_periodically(array, dim):
     return out_arr
 
 
-def get_integrator(x, freqs, order=0):
-    """returns the discrete Fourier-space integration operator as a
-    function of the position grid (used to determine the spatial
-    dimension and number of grid points), the wave vectors, and the integration
-    order
+def get_integrator(fft, gradient_op, grid_spacing):
+    """Returns the discrete Fourier-space integration operator as a function
+    of the position grid (used to determine the spatial dimension and number
+    of grid points), the wave vectors, and the integration order. Note that
+    the integrator contains the FFT normalisation factor.
 
     Keyword Arguments:
-    x     -- np.ndarray of pixel/voxel centre positons in shape
-             nb_grid_pts_per_dim + [dim]
-    freqs -- wave vectors as computed by compute_wave_vectors
-    order -- (default 0) integration order. 0 stands for exact integration
-
+    fft         -- µFFT FFT object performing the FFT for a matrix on the cell
+    gradient_op -- List of µSpectre DerivativeBase objects representing the
+                   gradient operator.
+    grid_spacing     -- np.array of grid spacing in each spatial direction of shape
+                   (dim,).
     Returns:
-    (dim, shape, integrator)
+    np.ndarray containing the fourier coefficients of the integrator
     """
-    dim = x.shape[-1]
-    shape = x.shape[:-1]
-    delta_x = x[tuple([1]*dim)] - x[tuple([0]*dim)]
-    def correct_denom(denom):
-        """Corrects the denominator to avoid division by zero
-        for freqs = 0 and on even grids for freqs*delta_x=pi."""
-        denom[tuple([0]*dim)] = 1.
-        for i, n in enumerate(shape):
-            if n%2 == 0:
-                denom[tuple([np.s_[:]]*i + [n//2] + [np.s_[:]]*(dim-1-i))] = 1.
-        return denom[..., np.newaxis]
-    if order == 0:
-        freqs_norm_square = np.einsum("...i,...i ->...", freqs, freqs)
-        freqs_norm_square.reshape(-1)[0] = 1.
-        integrator = 1j * freqs/freqs_norm_square[...,np.newaxis]
-    # Higher order corrections after:
-    # A. Vidyasagar et al., Computer Methods in Applied Mechanics and
-    # Engineering 106 (2017) 133-151, sec. 3.4 and Appendix C.
-    # and
-    # P. Eisenlohr et al., International Journal of Plasticity 46 (2013)
-    # 37-53, Appendix B, eq. 23.
-    elif order == 1:
-        sin_1 = np.sin(freqs*delta_x)
-        denom = correct_denom((sin_1**2).sum(axis=-1))
-        integrator = 1j*delta_x*sin_1 / denom
-    elif order == 2:
-        sin_1, sin_2 = 8*np.sin(freqs*delta_x), np.sin(2*freqs*delta_x)
-        denom = correct_denom((sin_1**2).sum(axis=-1) - (sin_2**2).sum(axis=-1))
-        integrator = 1j*6*delta_x*(sin_1+sin_2) / denom
-    else:
-        raise Exception("order '{}' is not implemented".format(order))
-    return dim, shape, integrator
+    dim = len(grid_spacing)
+    nb_grid_pts = np.asarray(fft.nb_domain_grid_pts)
+
+    phase = fft.wavevectors()
+    # The shift is needed to move the Fourier integration from the cell center
+    # to the cell edges. We only compute it if at least one of the directions
+    # report a fourier derivative.
+    if any([_derivative.wrapped_object.__class__.__name__.startswith('Fourier')
+            for _derivative in gradient_op]):
+        shift = np.exp(1j*np.pi*np.sum(phase, axis=0))
+
+    xi = np.zeros(phase.shape, dtype=complex)
+    for i, (_derivative, _grid_spacing) in enumerate(zip(gradient_op, grid_spacing)):
+        if _derivative.wrapped_object.__class__.__name__.startswith('Fourier'):
+            # Shift to cell edges.
+            xi[i] = _derivative.fourier(phase) * shift / _grid_spacing
+        else:
+            xi[i] = _derivative.fourier(phase) / _grid_spacing
+    # Corrects the denominator to avoid division by zero for freqs = 0
+    for i in range(dim):
+        xi[i][(0,) * dim] = 1
+    # The following is the integrator because taking its derivative should
+    # be the unit operation. Taking the derivative is simply a dot product
+    # with xi.
+    integrator = xi.conj() / (xi*xi.conj()).sum(axis=0)
+    # Correct integrator for freqs = 0
+    for i in range(dim):
+        integrator[i][(0,) * dim] = 0
+
+    return integrator
 
 
-def integrate_tensor_2(grad, x, freqs, staggered_grid=False, order=0):
+def integrate_tensor_2(grad, fft_vec, fft_mat, gradient_op, grid_spacing):
     """Integrates a second-rank tensor gradient field to a chosen order as
     a function of the given field, the grid positions, and wave
     vectors. Optionally, the integration can be performed on the
@@ -207,51 +190,39 @@ def integrate_tensor_2(grad, x, freqs, staggered_grid=False, order=0):
     Keyword Arguments:
     grad           -- np.ndarray of shape nb_grid_pts_per_dim + [dim, dim]
                       containing the second-rank gradient to be integrated
-    x              -- np.ndarray of shape nb_grid_pts_per_dim + [dim] (or
-                      augmented nb_grid_pts_per_dim + [dim]) containing the
-                      pixel/voxel centre positions (for un-staggered grid
-                      integration) or the pixel/voxel corner positions (for
-                      staggered grid integration)
-    freqs          -- wave vectors as computed by compute_wave_vectors
-    staggered_grid -- (default False) if set to True, the integration is
-                      performed on the pixel/voxel corners, rather than the
-                      centres. This leads to a different integration scheme
-    order          -- (default 0) integration order.
-                      0 stands for exact integration
+    fft_vec        -- µFFT FFT object performing the FFT for a vector on the cell
+    fft_mat        -- µFFT FFT object performing the FFT for a matrix on the cell
+    gradient_op    -- µSpectre DerivativeBase class representing the gradient
+                      operator.
+    grid_spacing   -- np.array of grid spacing in each spatial direction of
+                      shape (dim,).
 
     Returns:
-    np.ndarray contaning the integrated field
+    np.ndarray containing the integrated field
     """
+    dim = len(grid_spacing)
+    nb_grid_pts = np.array(grad.shape[:dim])
+    lengths = nb_grid_pts * grid_spacing
+    x = make_grid(lengths, nb_grid_pts)[0]
+    integrator = get_integrator(fft_mat, gradient_op, grid_spacing)
+    grad_k = (fft_mat.fft(grad) * fft_mat.normalisation)
+    f_k = np.einsum("j...,...ij->...i", integrator, grad_k)
+    grad_k_0 = grad_k[(0,)*dim]
+    #The homogeneous integration computes the affine part of the deformation
+    homogeneous = np.einsum("ij,j...->i...", grad_k_0.real, x)
 
-    dim, shape, integrator = get_integrator(x, freqs, order)
-
-    axes = range(dim)
-    grad_k = np.fft.fftn(grad, axes=axes)
-    f_k = np.einsum("...j,...ij ->...i", integrator, grad_k)
-    normalisation = np.prod(grad.shape[:dim])
-    grad_k_0 = grad_k[tuple((0 for _ in range(dim)))].real/normalisation
-    homogeneous = np.einsum("ij,...j ->...i",
-                            grad_k_0, x)
-    if not staggered_grid:
-        fluctuation = -np.fft.ifftn(f_k, axes=axes).real
-    else:
-        del_x = (x[tuple((1 for _ in range(dim)))] -
-                 x[tuple((0 for _ in range(dim)))])
-        k_del_x = np.einsum("...i, i ->...", freqs, del_x)[...,np.newaxis]
-        if order == 0:
-            shift = np.exp(-1j * k_del_x/2)
-        elif order == 1:
-            shift = (np.exp(-1j * k_del_x) + 1) / 2
-        elif order == 2:
-            shift = np.exp(-1j*k_del_x/2) * np.cos(k_del_x/2) *\
-                    (np.cos(k_del_x) - 4) / (np.cos(k_del_x/2) - 4)
-        fluctuation = complement_periodically(
-            -np.fft.ifftn(shift*f_k, axes=axes).real, dim)
+    fluctuation_non_pbe = fft_vec.ifft(f_k)
+    if np.linalg.norm(fluctuation_non_pbe.imag) > 1e-10:
+        raise RuntimeError("Integrate_tensor_2() computed complex placements, "
+                           "probably there went something wrong.\n"
+                           "Please inform the developers about this bug!")
+    fluctuation = np.moveaxis(
+        complement_periodically(fluctuation_non_pbe.real, dim), -1, 0)
 
     return fluctuation + homogeneous
 
 
-def integrate_vector(df, x, freqs, staggered_grid=False, order=0):
+def integrate_vector(grad, fft_sca, fft_vec, gradient_op, grid_spacing):
     """Integrates a first-rank tensor gradient field to a chosen order as
     a function of the given field, the grid positions, and wave
     vectors. Optionally, the integration can be performed on the
@@ -260,11 +231,6 @@ def integrate_vector(df, x, freqs, staggered_grid=False, order=0):
     Keyword Arguments:
     df             -- np.ndarray of shape nb_grid_pts_per_dim + [dim] containing
                       the first-rank tensor gradient to be integrated
-    x              -- np.ndarray of shape nb_grid_pts_per_dim + [dim] (or
-                      augmented nb_grid_pts_per_dim + [dim]) containing the
-                      pixel/voxel centre positions (for un-staggered grid
-                      integration) or the pixel/voxel corner positions (for
-                      staggered grid integration)
     freqs          -- wave vectors as computed by compute_wave_vectors
     staggered_grid -- (default False) if set to True, the integration is
                       performed on the pixel/voxel corners, rather than the
@@ -275,34 +241,29 @@ def integrate_vector(df, x, freqs, staggered_grid=False, order=0):
     Returns:
     np.ndarray contaning the integrated field
     """
-    dim, shape, integrator = get_integrator(x, freqs, order)
+    dim = len(grid_spacing)
+    nb_grid_pts = np.array(grad.shape[:dim])
+    lengths = nb_grid_pts * grid_spacing
+    x = make_grid(lengths, nb_grid_pts)[0]
+    integrator = get_integrator(fft_vec, gradient_op, grid_spacing)
+    grad_k = (fft_vec.fft(grad) * fft_vec.normalisation)
+    f_k = np.einsum("j...,...j->...", integrator, grad_k)
+    grad_k_0 = grad_k[(0,)*dim]
+    #The homogeneous integration computes the affine part of the deformation
+    homogeneous = np.einsum("j,j...->...", grad_k_0.real, x)
 
-    axes = range(dim)
-    df_k = np.fft.fftn(df, axes=axes)
-    f_k = np.einsum("...i,...i ->...", df_k, integrator)
-    df_k_0 = df_k[tuple((0 for _ in range(dim)))].real
-    homogeneous = np.einsum("i,...i ->...", df_k_0, x/np.prod(shape))
-
-    if not staggered_grid:
-        fluctuation = -np.fft.ifftn(f_k, axes=axes).real
-    else:
-        del_x = x[tuple((1 for _ in range(dim)))] \
-                - x[tuple((0 for _ in range(dim)))]
-        k_del_x = np.einsum("...i, i ->...", freqs, del_x)
-        if order == 0:
-            shift = np.exp(-1j * k_del_x/2)
-        elif order == 1:
-            shift = (np.exp(-1j * k_del_x) + 1) / 2
-        elif order == 2:
-            shift = np.exp(-1j*k_del_x/2) * np.cos(k_del_x/2) *\
-                    (np.cos(k_del_x) - 4) / (np.cos(k_del_x/2) - 4)
-        fluctuation = complement_periodically(
-            -np.fft.ifftn(shift*f_k, axes=axes).real, dim)
+    fluctuation_non_pbe = fft_sca.ifft(f_k)
+    if np.linalg.norm(fluctuation_non_pbe.imag) > 1e-10:
+        raise RuntimeError("Integrate_tensor_2() computed complex placements, "
+                           "probably there went something wrong.\n"
+                           "Please inform the developers about this bug!")
+    fluctuation = complement_periodically(fluctuation_non_pbe.real, dim)
 
     return fluctuation + homogeneous
 
 
-def compute_placement(result, lengths, nb_grid_pts, order=0, formulation=None):
+def compute_placement(result, lengths, nb_grid_pts, gradient_op,
+                      fft=None, formulation=None):
     """computes the placement (the sum of original position and
     displacement) as a function of a OptimizeResult, domain edge
     lengths, domain discretisation nb_grid_pts, the chosen
@@ -315,14 +276,19 @@ def compute_placement(result, lengths, nb_grid_pts, order=0, formulation=None):
                    spatial dimension (dtype = float)
     nb_grid_pts -- np.ndarray of length dim with the nb_grid_pts in each
                    spatial dimension (dtype = int)
-    order       -- (default 0) integration order. 0 stands for exact integration
+    gradient_op -- µSpectre DerivativeBase class representing the gradient
+                   operator.
+    fft         -- (default None) can be used to pass the FFT object from a
+                   parallel simulation. Up to now only "None" is implemented in
+                   the code.
     formulation -- (default None) the formulation is derived from the
                    OptimiseResult argument. If this is not possible you have to
                    fix the formulation to either Formulation.small_strain or
                    Formulation.finite_strain.
     Returns:
-    (placement, x_n) tuple of ndarrays containing the placement and the
-                     corresponding original positions
+    (placement, nodal_positions)
+                   tuple of ndarrays containing the placement and the
+                   corresponding original nodal positions
 
     """
 
@@ -360,10 +326,14 @@ def compute_placement(result, lengths, nb_grid_pts, order=0, formulation=None):
         raise ValueError('\nThe formulation: "{}" is unknown!'
                          .format(formulation))
 
-    #compute the placement by integrating
-    x_n, x_c = compute_grid(lengths, nb_grid_pts)
-    freqs = compute_wave_vectors(lengths, nb_grid_pts)
-    placement = integrate_tensor_2(grad, x_n, freqs,
-                                   staggered_grid=True, order=order)
+    #load or initialise muFFT.FFT engine
+    if fft is None:
+        dim = len(nb_grid_pts)
+        fft_mat = muFFT.FFT(nb_grid_pts, dim*dim) #FFT for (dim,dim) matrix
+        fft_vec = muFFT.FFT(nb_grid_pts, dim)     #FFT for (dim) vector
+    #compute the placement
+    nodal_positions, _ = make_grid(lengths, nb_grid_pts)
+    grid_spacing = np.array(lengths / nb_grid_pts)
+    placement = integrate_tensor_2(grad, fft_vec, fft_mat, gradient_op, grid_spacing)
 
-    return placement, x_n
+    return placement, nodal_positions

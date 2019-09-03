@@ -73,8 +73,12 @@ class DerivativeWrapper(object):
 
     def fourier(self, phase):
         phase = np.asarray(phase)
-        return self._derivative.fourier(phase.reshape(2, -1)) \
+        dim = phase.shape[0]
+        return self._derivative.fourier(phase.reshape(dim, -1)) \
             .reshape(phase.shape[1:])
+
+    def rollaxes(self, distance):
+        return DerivativeWrapper(self._derivative.rollaxes(distance))
 
     def __getattr__(self, name):
         return getattr(self._derivative, name)

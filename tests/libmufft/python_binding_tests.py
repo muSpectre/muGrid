@@ -41,6 +41,7 @@ import numpy as np
 from python_test_imports import muFFT
 
 from python_communicator_tests import Communicator_Check
+from python_common_tests import Common_Check
 from python_fft_tests import FFT_Check
 from python_netcdf_tests import NetCDF_Check_2d, NetCDF_Check_3d
 

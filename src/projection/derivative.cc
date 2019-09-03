@@ -86,6 +86,11 @@ namespace muSpectre {
     }
   }
 
+  template <typename T>
+  T modulo(T a, T b) {
+    return (b + (a % b)) % b;
+  }
+
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS>
   DiscreteDerivative<DimS> DiscreteDerivative<DimS>::rollaxes(
@@ -94,14 +99,14 @@ namespace muSpectre {
     Eigen::ArrayXd stencil(this->stencil.size());
 
     for (Dim_t dim = 0; dim < DimS; ++dim) {
-      nb_pts[(dim+distance)%DimS] = this->nb_pts[dim];
-      lbounds[(dim+distance)%DimS] = this->lbounds[dim];
+      nb_pts[modulo(dim+distance, DimS)] = this->nb_pts[dim];
+      lbounds[modulo(dim+distance, DimS)] = this->lbounds[dim];
     }
 
     for (auto && pixel : Pixels<DimS>(this->nb_pts, this->lbounds)) {
       Ccoord rolled_pixel;
       for (Dim_t dim = 0; dim < DimS; ++dim) {
-        Dim_t rolled_dim = (dim+distance)%DimS;
+        Dim_t rolled_dim = modulo(dim+distance, DimS);
         rolled_pixel[rolled_dim] = pixel[dim]-this->lbounds[dim]+lbounds[dim];
       }
       stencil[get_index(nb_pts, lbounds, rolled_pixel)] = (*this)(pixel);

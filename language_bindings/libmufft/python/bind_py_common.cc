@@ -34,9 +34,11 @@
 
 #include <libmugrid/ccoord_operations.hh>
 #include <libmufft/mufft_common.hh>
+#include <libmufft/fft_utils.hh>
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <pybind11/eigen.h>
 
 #include <sstream>
 
@@ -70,6 +72,43 @@ void add_get_ccoord_helper(py::module & mod) {
       "nb_grid_pts"_a, "i"_a,
       "return the cell coordinate corresponding to the i'th cell in a grid of "
       "shape nb_grid_pts");
+}
+
+template <muGrid::Dim_t dim>
+void add_fft_freqs_helper(py::module & mod) {
+  using Ccoord = muGrid::Ccoord_t<dim>;
+  using FFTFreqs = muFFT::FFT_freqs<dim>;
+  using ArrayXDd =
+    Eigen::Array<muGrid::Real, dim, Eigen::Dynamic, Eigen::RowMajor>;
+  using ArrayXDi =
+    Eigen::Array<muGrid::Dim_t, dim, Eigen::Dynamic, Eigen::RowMajor>;
+  std::stringstream name{};
+  name << "FFTFreqs_" << dim << "d";
+  py::class_<FFTFreqs>(mod, name.str().c_str())
+    .def(py::init<Ccoord, std::array<muGrid::Real, dim>>(),
+         "nb_grid_pts"_a,
+         "lengths"_a)
+    .def("get_xi",
+         [](FFTFreqs & fft_freqs, const Eigen::Ref<ArrayXDi> & grid_pts) {
+             ArrayXDd xi(dim, grid_pts.cols());
+             Ccoord nb_grid_pts;
+             for (int j = 0; j < dim; ++j) {
+               nb_grid_pts[j] = fft_freqs.get_nb_grid_pts(j);
+             }
+             for (int i = 0; i < grid_pts.cols(); ++i) {
+               auto && grid_coords = grid_pts.col(i);
+               Ccoord c;
+               /* Wrap back to grid point */
+               for (int j = 0; j < dim; ++j) {
+                 c[j] = grid_coords(j) % nb_grid_pts[j];
+                 if (c[j] < 0) c[j] += nb_grid_pts[j];
+               }
+               xi.col(i) = fft_freqs.get_xi(c);
+             }
+             return xi;
+           },
+         "grid_pts"_a,
+         "return wavevectors corresponding to the given grid indices");
 }
 
 void add_get_cube(py::module & mod) {
@@ -122,6 +161,12 @@ void add_Pixels(py::module & mod) {
   add_Pixels_helper<muGrid::threeD>(mod);
 }
 
+void add_fft_freqs(py::module & mod) {
+  add_fft_freqs_helper<muGrid::oneD>(mod);
+  add_fft_freqs_helper<muGrid::twoD>(mod);
+  add_fft_freqs_helper<muGrid::threeD>(mod);
+}
+
 void add_common(py::module & mod) {
   py::enum_<muFFT::FFT_PlanFlags>(mod, "FFT_PlanFlags")
       .value("estimate", muFFT::FFT_PlanFlags::estimate)
@@ -133,4 +178,6 @@ void add_common(py::module & mod) {
   add_Pixels(mod);
 
   add_get_index(mod);
+
+  add_fft_freqs(mod);
 }
