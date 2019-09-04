@@ -80,9 +80,10 @@ void add_parallel_cell_factory_helper(py::module & mod, const char * name) {
           [](Ccoord nb_grid_pts, Rcoord lens, Formulation form,
              Gradient gradient, muFFT::Communicator & comm) {
             // Initialize with muFFT Communicator object
-            return muSpectre::make_cell(std::move(nb_grid_pts), std::move(lens),
-                                        std::move(form), std::move(gradient),
-                                        std::move(comm));
+            return muSpectre::make_cell<dim, dim, muSpectre::CellBase<dim, dim>,
+                                        FFTEngine>(
+                std::move(nb_grid_pts), std::move(lens), std::move(form),
+                std::move(gradient), std::move(comm));
           },
           "nb_grid_pts"_a, "lengths"_a = muGrid::CcoordOps::get_cube<dim>(1.),
           "formulation"_a = Formulation::finite_strain,

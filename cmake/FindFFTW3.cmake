@@ -17,7 +17,7 @@
 #
 
 #If environment variable FFTWDIR is specified, it has same effect as FFTW3_ROOT
-if(NOT FFTW3_ROOT AND ENV{FFTWDIR})
+if(NOT DEFINED FFTW3_ROOT AND DEFINED ENV{FFTWDIR})
   set(FFTW3_ROOT $ENV{FFTWDIR})
 endif()
 
@@ -102,7 +102,7 @@ foreach(_impl ${_implementations})
 
   foreach(_prec ${_precisions})
     set(_lib FFTW3_${_prec}_${_impl}_LIBRARY)
-    
+   
     find_library(
       ${_lib}
       NAMES "fftw3${_precision_${_prec}}${_suffix}"
@@ -110,7 +110,6 @@ foreach(_impl ${_implementations})
       HINTS ${PKG_FFTW3_PREFIX} ${PKG_FFTW3_LIBRARY_DIRS}
       PATH_SUFFIXES "lib" "lib64"
       )
-
 
     if(${_lib})
       list(APPEND FFTW3_${_impl}_LIBRARIES ${${_lib}})

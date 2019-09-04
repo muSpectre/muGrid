@@ -68,6 +68,12 @@ def build_test_classes(fft):
             self.mat = µ.material.MaterialLinearElastic4_2d.make(
                 self.sys, "material")
 
+        def test_decomposition(self):
+            self.assertEqual(
+                self.sys.communicator.sum(np.prod(self.sys.nb_subdomain_grid_pts)),
+                np.prod(self.sys.nb_domain_grid_pts),
+                msg='{} engine'.format(fft))
+
         def test_solver(self):
             Youngs_modulus = 10.
             Poisson_ratio  = 0.3

@@ -190,7 +190,7 @@ namespace muSpectre {
    protected:
     //! storage for first Lamé constant λ
     Field_t lambda_field;
-    //! storage for secont Lamé constant (shear modulus) μ
+    //! storage for second Lamé constant (shear modulus) μ
     Field_t mu_field;
   };
 

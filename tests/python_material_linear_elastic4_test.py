@@ -55,21 +55,19 @@ class MaterialLinearElastic4_Check(unittest.TestCase):
         self.nb_grid_pts = [7, 7]
         self.lengths = [2.3, 3.9]
         self.formulation = µ.Formulation.small_strain
-        self.sys = µ.Cell(self.nb_grid_pts,
-                          self.lengths,
-                          self.formulation)
         self.dim = len(self.lengths)
-        self.mat = µ.material.MaterialLinearElastic4_2d.make(
-            self.sys.wrapped_cell, "material")
 
     def test_solver(self):
         Youngs_modulus = 10.
         Poisson_ratio = 0.3
 
-        for i, pixel in enumerate(self.sys):
-            self.mat.add_pixel(pixel, Youngs_modulus, Poisson_ratio)
+        cell = µ.Cell(self.nb_grid_pts, self.lengths, self.formulation)
+        mat = µ.material.MaterialLinearElastic4_2d.make(cell.wrapped_cell, "material")
 
-        self.sys.initialise()
+        for i, pixel in enumerate(cell):
+            mat.add_pixel(pixel, Youngs_modulus, Poisson_ratio)
+
+        cell.initialise()
         tol = 1e-6
         Del0 = np.array([[0, 0.025],
                          [0.025,  0]])
@@ -77,13 +75,57 @@ class MaterialLinearElastic4_Check(unittest.TestCase):
         verbose = False
 
         solver = µ.solvers.SolverCG(
-            self.sys.wrapped_cell, tol, maxiter, verbose)
-        r = µ.solvers.newton_cg(self.sys.wrapped_cell, Del0,
-                                solver, tol, tol, verbose)
+            cell.wrapped_cell, tol, maxiter, verbose)
+        r = µ.solvers.newton_cg(
+            cell.wrapped_cell, Del0, solver, tol, tol, verbose)
 
         # compare the computed stress with the trivial by hand computed stress
         mu = (Youngs_modulus/(2*(1+Poisson_ratio)))
         stress = 2*mu*Del0
 
         self.assertLess(np.linalg.norm(r.stress.reshape(-1, self.dim**2) -
-                                       stress.reshape(1, self.dim**2)), 1e-8)
+                                       stress.reshape(1,self.dim**2)), 1e-8)
+
+    def test_tangent(self):
+        Youngs_modulus = 10.*(1 + 0.1*np.random.random(np.prod(self.nb_grid_pts)))
+        Poisson_ratio  = 0.3*(1 + 0.1*np.random.random(np.prod(self.nb_grid_pts)))
+
+        cell = µ.Cell(self.nb_grid_pts, self.lengths, self.formulation)
+        mat = µ.material.MaterialLinearElastic4_2d.make(cell.wrapped_cell,
+                                                        "material")
+
+        for i, pixel in enumerate(cell):
+            mat.add_pixel(pixel, Youngs_modulus[i], Poisson_ratio[i])
+
+        cell.initialise()
+        tol = 1e-6
+        Del0 = np.array([[0.1, 0.05],
+                         [0.05,  -0.02]])
+        maxiter = 100
+        verbose = False
+
+        solver = µ.solvers.SolverCG(cell.wrapped_cell, tol, maxiter, verbose)
+        r = µ.solvers.newton_cg(cell.wrapped_cell   , Del0,
+                                solver, tol, tol, verbose)
+
+        ### Compute tangent through a finite differences approximation
+
+        F = cell.strain
+        stress, tangent = cell.evaluate_stress_tangent(F)
+
+        numerical_tangent = np.zeros_like(tangent)
+
+        eps = 1e-4
+        for i in range(2):
+            for j in range(2):
+                F[i, j] += eps
+                stress_plus = cell.evaluate_stress(F).copy()
+                F[i, j] -= 2*eps
+                stress_minus = cell.evaluate_stress(F).copy()
+                F[i, j] += eps
+                numerical_tangent[i, j] = (stress_plus - stress_minus)/(2*eps)
+
+        self.assertTrue(np.allclose(tangent, numerical_tangent))
+
+if __name__ == '__main__':
+    unittest.main()

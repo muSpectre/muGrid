@@ -122,7 +122,7 @@ class NCStructuredGridFrame(object):
     @property
     def decomposition(self):
         return self.parent.decomposition
-    
+
 
     @property
     def nb_domain_grid_pts(self):
@@ -255,7 +255,7 @@ class NCStructuredGrid(object):
         frame : int
             Initial frame. (Default: 0)
         format : str
-            NetCDF format string. (Default: 'NETCDF4')
+            NetCDF format string. (Default: 'NETCDF3_64BIT_DATA')
         """
         self._data = None
 

@@ -113,7 +113,8 @@ def DiscreteDerivative(lbounds, stencil):
 
 
 def Cell(nb_grid_pts, domain_lengths, formulation=Formulation.finite_strain,
-         gradient=None, fft='fftw', communicator=None, is_cell_split=SplitCell.non_split):
+         gradient=None, fft='fftw', communicator=None,
+         is_cell_split=SplitCell.non_split):
     """
     Instantiate a muSpectre Cell class.
 
@@ -265,7 +266,6 @@ class CellWrapper (object):
         shape = list((dim**2, self._cell.size))
         stress = self._cell.evaluate_stress(strain.reshape(shape, order='F'))
         shape = list((dim, dim)) + list(self._cell.nb_domain_grid_pts)
-        print(shape)
         return stress.reshape(shape, order='F')
 
     def evaluate_stress_tangent(self, strain):

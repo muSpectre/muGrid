@@ -68,6 +68,8 @@ template <Dim_t Dim>
 void add_material_linear_elastic4_helper(py::module & mod);
 template <Dim_t Dim>
 void add_material_hyper_elasto_plastic1_helper(py::module & mod);
+template <Dim_t Dim>
+void add_material_hyper_elasto_plastic2_helper(py::module & mod);
 
 #ifdef WITH_SPLIT
 template <Dim_t Dim>
@@ -276,6 +278,7 @@ void add_material_helper(py::module & mod) {
   add_material_linear_elastic3_helper<Dim>(mod);
   add_material_linear_elastic4_helper<Dim>(mod);
   add_material_hyper_elasto_plastic1_helper<Dim>(mod);
+  add_material_hyper_elasto_plastic2_helper<Dim>(mod);
   add_material_linear_elastic_generic1_helper<Dim>(mod);
   add_material_linear_elastic_generic2_helper<Dim>(mod);
 #ifdef WITH_SPLIT

@@ -68,6 +68,7 @@ class FFT_Check(unittest.TestCase):
         communicator or muFFT communicators"""
         for engine_str in self.engines:
             if muFFT.has_mpi:
+                # Check initialization with bare MPI communicator
                 from mpi4py import MPI
                 s = MPI.COMM_WORLD.Get_size()
                 try:
@@ -82,6 +83,10 @@ class FFT_Check(unittest.TestCase):
             engine = muFFT.FFT([6*s, 4*s], 6,
                                fft=engine_str,
                                communicator=self.communicator)
+            self.assertEqual(
+                self.communicator.sum(np.prod(engine.nb_subdomain_grid_pts)),
+                np.prod(engine.nb_domain_grid_pts),
+                msg='{} engine'.format(engine_str))
 
             comm = engine.engine.get_communicator()
             self.assertEqual(comm.sum(comm.rank+4),
@@ -144,12 +149,12 @@ class FFT_Check(unittest.TestCase):
                 if engine.is_transposed:
                     out_msp = out_msp.swapaxes(len(nb_grid_pts)-2, len(nb_grid_pts)-1)
                 err = np.linalg.norm(out_ref - out_msp.reshape(out_ref.shape))
-                self.assertTrue(err < tol, msg='{} engine'.format(engine_str))
+                self.assertLess(err, tol, msg='{} engine'.format(engine_str))
 
                 # Separately test convenience interface
                 out_msp = engine.fft(in_arr)
                 err = np.linalg.norm(out_ref - out_msp)
-                self.assertTrue(err < tol, msg='{} engine'.format(engine_str))
+                self.assertLess(err, tol, msg='{} engine'.format(engine_str))
 
     def test_reverse_transform(self):
         for engine_str in self.engines:
@@ -209,13 +214,13 @@ class FFT_Check(unittest.TestCase):
                 out_msp = out_msp.T
                 err = np.linalg.norm(
                     out_ref - out_msp.reshape(out_ref.shape, order='F'))
-                self.assertTrue(err < tol, msg='{} engine'.format(engine_str))
+                self.assertLess(err, tol, msg='{} engine'.format(engine_str))
 
                 # Separately test convenience interface
                 out_msp = engine.ifft(in_arr)
                 out_msp *= engine.normalisation
                 err = np.linalg.norm(out_ref - out_msp)
-                self.assertTrue(err < tol, msg='{} engine'.format(engine_str))
+                self.assertLess(err, tol, msg='{} engine'.format(engine_str))
 
     def test_nb_components1_forward_transform(self):
         for engine_str in self.engines:

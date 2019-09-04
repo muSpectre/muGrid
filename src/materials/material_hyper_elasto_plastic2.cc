@@ -1,13 +1,16 @@
 /**
- * @file   material_hyper_elasto_plastic1.cc
+ * @file   material_hyper_elasto_plastic2.cc
  *
- * @author Till Junge <till.junge@epfl.ch>
+ * @author Richard Leute <richard.leute@imtek.uni-freiburg.de>
  *
- * @date   21 Feb 2018
+ * @date   08 Jul 2019
  *
- * @brief  implementation for MaterialHyperElastoPlastic1
+ * @brief  copy of material_hyper_elasto_plastic1 with Young, Poisson, yield
+ *         criterion and  hardening modulus per pixel. As defined in de Geus
+ *         2017 (https://doi.org/10.1016/j.cma.2016.12.032) and further
+ *         explained in Geers 2003 (https://doi.org/10.1016/j.cma.2003.07.014).
  *
- * Copyright © 2018 Till Junge
+ * Copyright © 2019 Till Junge
  *
  * µSpectre is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -23,11 +26,18 @@
  * along with µSpectre; see the file COPYING. If not, write to the
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
+ *
+ * Additional permission under GNU GPL version 3 section 7
+ *
+ * If you modify this Program, or any covered work, by linking or combining it
+ * with proprietary FFT implementations or numerical libraries, containing parts
+ * covered by the terms of those libraries' licenses, the licensors of this
+ * Program grant you additional permission to convey the resulting work.
  */
 
 #include "common/muSpectre_common.hh"
 #include "materials/stress_transformations_Kirchhoff.hh"
-#include "materials/material_hyper_elasto_plastic1.hh"
+#include "materials/material_hyper_elasto_plastic2.hh"
 
 #include <libmugrid/T4_map_proxy.hh>
 
@@ -35,24 +45,24 @@ namespace muSpectre {
 
   //--------------------------------------------------------------------------//
   template <Dim_t DimS, Dim_t DimM>
-  MaterialHyperElastoPlastic1<DimS, DimM>::MaterialHyperElastoPlastic1(
-      std::string name, Real young, Real poisson, Real tau_y0, Real H)
+  MaterialHyperElastoPlastic2<DimS, DimM>::MaterialHyperElastoPlastic2(
+      std::string name)
       : Parent{name}, plast_flow_field{this->internal_fields,
                                        "cumulated plastic flow εₚ"},
         F_prev_field{this->internal_fields, "Previous placement gradient Fᵗ"},
         be_prev_field{this->internal_fields,
                       "Previous left Cauchy-Green deformation bₑᵗ"},
-        young{young}, poisson{poisson}, lambda{Hooke::compute_lambda(young,
-                                                                     poisson)},
-        mu{Hooke::compute_mu(young, poisson)},
-        K{Hooke::compute_K(young, poisson)}, tau_y0{tau_y0}, H{H},
-        // the factor .5 comes from equation (18) in Geers 2003
-        // (https://doi.org/10.1016/j.cma.2003.07.014)
-        C{0.5 * Hooke::compute_C_T4(lambda, mu)} {}
+        lambda_field{this->internal_fields, "local first Lame constant"},
+        mu_field(this->internal_fields,
+                 "local second Lame constant(shear modulus)"),
+        tau_y0_field{this->internal_fields, "local initial yield stress"},
+        H_field{this->internal_fields, "local hardening modulus"},
+        K_field(this->internal_fields, "local Bulk modulus") {}
 
-  /* ---------------------------------------------------------------------- */
+  /* ----------------------------------------------------------------------
+   */
   template <Dim_t DimS, Dim_t DimM>
-  void MaterialHyperElastoPlastic1<DimS, DimM>::save_history_variables() {
+  void MaterialHyperElastoPlastic2<DimS, DimM>::save_history_variables() {
     this->plast_flow_field.get_field().cycle();
     this->F_prev_field.get_field().cycle();
     this->be_prev_field.get_field().cycle();
@@ -60,7 +70,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
-  void MaterialHyperElastoPlastic1<DimS, DimM>::initialise() {
+  void MaterialHyperElastoPlastic2<DimS, DimM>::initialise() {
     Parent::initialise();
     this->F_prev_field.get_map().current() =
         Eigen::Matrix<Real, DimM, DimM>::Identity();
@@ -68,11 +78,39 @@ namespace muSpectre {
         Eigen::Matrix<Real, DimM, DimM>::Identity();
     this->save_history_variables();
   }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  void MaterialHyperElastoPlastic2<DimS, DimM>::add_pixel(
+      const Ccoord_t<DimS> & /*pixel*/) {
+    throw std::runtime_error(
+        "This material needs pixels with Young's modulus, Poisson's ratio, "
+        "initial yield stress and hardening modulus.");
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  void MaterialHyperElastoPlastic2<DimS, DimM>::add_pixel(
+      const Ccoord_t<DimS> & pixel, const Real & Youngs_modulus,
+      const Real & Poisson_ratio, const Real & tau_y0, const Real & H) {
+    this->internal_fields.add_pixel(pixel);
+    // store the first(lambda) and second(mu) Lame constant in the field
+    Real lambda{Hooke::compute_lambda(Youngs_modulus, Poisson_ratio)};
+    Real mu{Hooke::compute_mu(Youngs_modulus, Poisson_ratio)};
+    this->lambda_field.get_field().push_back(lambda);
+    this->mu_field.get_field().push_back(mu);
+    this->tau_y0_field.get_field().push_back(tau_y0);
+    this->H_field.get_field().push_back(H);
+    Real K{Hooke::compute_K(Youngs_modulus, Poisson_ratio)};
+    this->K_field.get_field().push_back(K);
+  }
+
   //--------------------------------------------------------------------------//
   template <Dim_t DimS, Dim_t DimM>
-  auto MaterialHyperElastoPlastic1<DimS, DimM>::stress_n_internals_worker(
+  auto MaterialHyperElastoPlastic2<DimS, DimM>::stress_n_internals_worker(
       const T2_t & F, StrainStRef_t & F_prev, StrainStRef_t & be_prev,
-      FlowStRef_t & eps_p) -> Worker_t {
+      FlowStRef_t & eps_p, const Real lambda, const Real mu, const Real tau_y0,
+      const Real H) -> Worker_t {
     // the notation in this function follows Geers 2003
     // (https://doi.org/10.1016/j.cma.2003.07.014).
 
@@ -85,7 +123,7 @@ namespace muSpectre {
         muGrid::spectral_decomposition(be_star)};
     Mat_t ln_be_star{muGrid::logm_alt(spectral_decomp)};
     Mat_t tau_star{.5 *
-                   Hooke::evaluate_stress(this->lambda, this->mu, ln_be_star)};
+                   Hooke::evaluate_stress(lambda, mu, ln_be_star)};
     // deviatoric part of Kirchhoff stress
     Mat_t tau_d_star{tau_star - tau_star.trace() / DimM * tau_star.Identity()};
     Real tau_eq_star{std::sqrt(
@@ -96,11 +134,11 @@ namespace muSpectre {
     Mat_t N_star{3 * .5 * tau_d_star / division_safe_tau_eq_star};
     // this is eq (27), and the std::max enforces the Kuhn-Tucker relation (16)
     Real phi_star{
-        std::max(tau_eq_star - this->tau_y0 - this->H * eps_p.old(), 0.)};
+        std::max(tau_eq_star - tau_y0 - H * eps_p.old(), 0.)};
 
     // return mapping
-    Real Del_gamma{phi_star / (this->H + 3 * this->mu)};
-    Mat_t tau{tau_star - 2 * Del_gamma * this->mu * N_star};
+    Real Del_gamma{phi_star / (H + 3 * mu)};
+    Mat_t tau{tau_star - 2 * Del_gamma * mu * N_star};
 
     // update the previous values to the new ones
     F_prev.current() = F;
@@ -116,24 +154,28 @@ namespace muSpectre {
 
   //--------------------------------------------------------------------------//
   template <Dim_t DimS, Dim_t DimM>
-  auto MaterialHyperElastoPlastic1<DimS, DimM>::evaluate_stress(
+  auto MaterialHyperElastoPlastic2<DimS, DimM>::evaluate_stress(
       const T2_t & F, StrainStRef_t F_prev, StrainStRef_t be_prev,
-      FlowStRef_t eps_p) -> T2_t {
+      FlowStRef_t eps_p, const Real lambda, const Real mu, const Real tau_y0,
+      const Real H) -> T2_t {
     Eigen::Matrix<Real, DimM, DimM> tau;
     std::tie(tau, std::ignore, std::ignore, std::ignore, std::ignore,
              std::ignore) =
-        this->stress_n_internals_worker(F, F_prev, be_prev, eps_p);
+        this->stress_n_internals_worker(F, F_prev, be_prev, eps_p, lambda, mu,
+                                        tau_y0, H);
 
     return tau;
   }
 
   //--------------------------------------------------------------------------//
   template <Dim_t DimS, Dim_t DimM>
-  auto MaterialHyperElastoPlastic1<DimS, DimM>::evaluate_stress_tangent(
+  auto MaterialHyperElastoPlastic2<DimS, DimM>::evaluate_stress_tangent(
       const T2_t & F, StrainStRef_t F_prev, StrainStRef_t be_prev,
-      FlowStRef_t eps_p) -> std::tuple<T2_t, T4_t> {
+      FlowStRef_t eps_p, const Real lambda, const Real mu, const Real tau_y0,
+      const Real H, const Real K) -> std::tuple<T2_t, T4_t> {
     //! after the stress computation, all internals are up to date
-    auto && vals{this->stress_n_internals_worker(F, F_prev, be_prev, eps_p)};
+    auto && vals{this->stress_n_internals_worker(F, F_prev, be_prev, eps_p,
+                                                 lambda, mu, tau_y0, H)};
     auto & tau{std::get<0>(vals)};
     auto & tau_eq_star{std::get<1>(vals)};
     auto & Del_gamma{std::get<2>(vals)};
@@ -144,15 +186,17 @@ namespace muSpectre {
     using Vec_t = Eigen::Matrix<Real, DimM, 1>;
     using T4_t = muGrid::T4Mat<Real, DimM>;
 
-    auto && a0 = Del_gamma * this->mu / tau_eq_star;
-    auto && a1 = this->mu / (this->H + 3 * this->mu);
+    // compute stiffness tensor
+    // the factor .5 comes from equation (18) in Geers 2003
+    // (https://doi.org/10.1016/j.cma.2003.07.014)
+    auto && a0 = Del_gamma * mu / tau_eq_star;
+    auto && a1 = mu / (H + 3 * mu);
     T4_t mat_tangent{is_plastic ?
-                     ((this->K / 2. - this->mu / 3 + a0 * this->mu) *
+                     ((K / 2. - mu / 3 + a0 * mu) *
                          Matrices::Itrac<DimM>() +
-                      (1 - 3 * a0) * this->mu * Matrices::Isymm<DimM>() +
-                      2 * this->mu * (a0 - a1) *
-                         Matrices::outer(N_star, N_star))
-                     : this->C};
+                      (1 - 3 * a0) * mu * Matrices::Isymm<DimM>() +
+                      2 * mu * (a0 - a1) * Matrices::outer(N_star, N_star))
+                     : T4_t{0.5 * Hooke::compute_C_T4(lambda, mu)}};
 
     // compute derivative ∂ln(be_star)/∂be_star, see (77) through (80)
     T4_t dlnbe_dbe{T4_t::Zero()};
@@ -200,7 +244,7 @@ namespace muSpectre {
     return std::tuple<Mat_t, T4_t>(tau, dtau_dF);
   }
 
-  template class MaterialHyperElastoPlastic1<twoD, twoD>;
-  template class MaterialHyperElastoPlastic1<twoD, threeD>;
-  template class MaterialHyperElastoPlastic1<threeD, threeD>;
+  template class MaterialHyperElastoPlastic2<twoD, twoD>;
+  template class MaterialHyperElastoPlastic2<twoD, threeD>;
+  template class MaterialHyperElastoPlastic2<threeD, threeD>;
 }  // namespace muSpectre
