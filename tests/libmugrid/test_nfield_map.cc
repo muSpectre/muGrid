@@ -42,6 +42,7 @@
 #include "libmugrid/iterators.hh"
 
 namespace muGrid {
+  BOOST_AUTO_TEST_SUITE(nfield_maps);
 
   struct BaseFixture {
     constexpr static Dim_t NbQuadPts() { return 2; }
@@ -107,8 +108,8 @@ namespace muGrid {
       NFieldMapFixture<Complex, GlobalNFieldCollectionFixture>>;
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(construction_test, Fix, Maps, Fix) {
-    typename NFieldMap<typename Fix::type, false>::template Iterator<false>
-        beg{Fix::scalar_quad.begin()};
+    typename NFieldMap<typename Fix::type, false>::template Iterator<false> beg{
+        Fix::scalar_quad.begin()};
     BOOST_CHECK_EQUAL((*beg).size(), 1);
     BOOST_CHECK_EQUAL((*Fix::scalar_pixel.begin()).size(), Fix::NbQuadPts());
     // check also const version
@@ -201,4 +202,6 @@ namespace muGrid {
       BOOST_CHECK_EQUAL((matrix4_iterate.matrix() - t4_iterate).norm(), 0);
     }
   }
+
+  BOOST_AUTO_TEST_SUITE_END();
 }  // namespace muGrid

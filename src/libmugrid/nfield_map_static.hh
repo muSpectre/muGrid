@@ -51,11 +51,15 @@ namespace muGrid {
                   "The MapType you chose is not compatible");
 
    public:
+    using Scalar_t = T;
     using Parent = NFieldMap<T, ConstField>;
     using NField_t = typename Parent::NField_t;
     template <bool ConstNess>
-    using return_type = typename MapType::template return_type<ConstNess>;
+    using Return_t = typename MapType::template Return_t<ConstNess>;
     using PlainType = typename MapType::PlainType;
+    constexpr static bool IsConstField() { return ConstField; }
+    constexpr static Iteration GetIterationType() { return IterationType; }
+    constexpr static size_t Stride() { return MapType::stride(); }
     //! Default constructor
     StaticNFieldMap() = delete;
 
@@ -91,13 +95,12 @@ namespace muGrid {
     using iterator = Iterator<false or ConstField>;
     using const_iterator = Iterator<true>;
 
-
-    return_type<ConstField> operator[](size_t index) {
+    Return_t<ConstField> operator[](size_t index) {
       return MapType::template from_data_ptr<ConstField>(
           this->data_ptr + index * MapType::stride());
     }
 
-    return_type<true> operator[](size_t index) const {
+    Return_t<true> operator[](size_t index) const {
       return MapType::template from_data_ptr<true>(this->data_ptr +
                                                    index * MapType::stride());
     }
@@ -128,7 +131,6 @@ namespace muGrid {
   template <bool ConstIter>
   class StaticNFieldMap<T, ConstField, MapType, IterationType>::Iterator {
    public:
-    constexpr static size_t Stride{MapType::stride()};
     using value_type = typename MapType::template value_type<ConstIter>;
     using storage_type = typename MapType::template storage_type<ConstIter>;
     //! Default constructor
@@ -157,7 +159,7 @@ namespace muGrid {
     Iterator & operator++() {
       this->index++;
       new (&this->iterate)
-          storage_type(this->map.data_ptr + this->index * Stride);
+        storage_type(this->map.data_ptr + this->index * Stride());
       return *this;
     }
     //! dereference
@@ -200,7 +202,7 @@ namespace muGrid {
       using ref_type = value_type<ConstIter>;
       // for direct access through operator[]
       template <bool ConstIter>
-      using return_type = value_type<ConstIter>;
+      using Return_t = value_type<ConstIter>;
 
       template <bool ConstIter>
       using storage_type = value_type<ConstIter>;
@@ -218,9 +220,9 @@ namespace muGrid {
       }
 
       template <bool ConstIter>
-      constexpr static return_type<ConstIter>
+      constexpr static Return_t<ConstIter>
       from_data_ptr(std::conditional_t<ConstIter, const T *, T *> data) {
-        return return_type<ConstIter>(data);
+        return Return_t<ConstIter>(data);
       }
 
       template <bool ConstIter>
@@ -258,7 +260,7 @@ namespace muGrid {
 
       // for direct access through operator[]
       template <bool ConstIter>
-      using return_type = value_type<ConstIter> &;
+      using Return_t = value_type<ConstIter> &;
 
       // need to encapsulate
       template <bool ConstIter>
@@ -277,7 +279,7 @@ namespace muGrid {
       }
 
       template <bool ConstIter>
-      constexpr static return_type<ConstIter>
+      constexpr static Return_t<ConstIter>
       from_data_ptr(std::conditional_t<ConstIter, const T *, T *> data) {
         return *data;
       }
