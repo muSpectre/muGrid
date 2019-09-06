@@ -1,13 +1,13 @@
 /**
- * @file   material_linear_elastic1.cc
+ * @file   ncell.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
- * @date   14 Nov 2017
+ * @date   13 Sep 2019
  *
- * @brief  Implementation for materiallinearelastic1
+ * @brief  Base class for the representation of a homogenisation problem in µSpectre
  *
- * Copyright © 2017 Till Junge
+ * Copyright © 2019 Till Junge
  *
  * µSpectre is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
@@ -17,12 +17,12 @@
  * µSpectre is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * Lesser General Public License for more details.
+ * General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with µSpectre; see the file COPYING. If not, write to the
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * * Boston, MA 02111-1307, USA.
+ * Boston, MA 02111-1307, USA.
  *
  * Additional permission under GNU GPL version 3 section 7
  *
@@ -30,26 +30,15 @@
  * with proprietary FFT implementations or numerical libraries, containing parts
  * covered by the terms of those libraries' licenses, the licensors of this
  * Program grant you additional permission to convey the resulting work.
- *
  */
 
-#include "materials/material_linear_elastic1.hh"
+#ifndef SRC_CELL_NCELL_HH_
+#define SRC_CELL_NCELL_HH_NCELL_H
 
 namespace muSpectre {
 
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
-  MaterialLinearElastic1<DimM>::MaterialLinearElastic1(
-      const std::string & name, const Dim_t & spatial_dimension,
-      const Dim_t & nb_quad_pts, const Real & young, const Real & poisson)
-      : Parent{name, spatial_dimension, nb_quad_pts}, young{young},
-        poisson{poisson}, lambda{Hooke::compute_lambda(young, poisson)},
-        mu{Hooke::compute_mu(young, poisson)},
-        C_holder{
-            std::make_unique<Stiffness_t>(Hooke::compute_C_T4(lambda, mu))},
-        C{*C_holder} {}
+  
 
-  template class MaterialLinearElastic1<twoD>;
-  template class MaterialLinearElastic1<threeD>;
+}  // muSpectre
 
-}  // namespace muSpectre
+#endif  // SRC_CELL_NCELL_HH_NCELL_H 

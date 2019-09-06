@@ -49,9 +49,9 @@ namespace muGrid {
     LocalNFieldCollection fc{Unknown, Unknown};
     constexpr Dim_t NbComponents{3}, NbQuadPts{4};
     auto & scalar_field{
-        fc.register_field<TypedNField<Real>>("scalar_field", 1)};
+        fc.register_field<Real>("scalar_field", 1)};
     auto & vector_field{
-        fc.register_field<TypedNField<Real>>("vector_field", NbComponents)};
+        fc.register_field<Real>("vector_field", NbComponents)};
     const bool is_same_type{scalar_field.get_stored_typeid() == typeid(Real)};
     BOOST_CHECK(is_same_type);
 
@@ -84,9 +84,9 @@ namespace muGrid {
     GlobalNFieldCollection<twoD> fc{Unknown};
     constexpr Dim_t NbComponents{3};
     auto & scalar_field{
-        fc.register_field<TypedNField<Real>>("scalar_field", 1)};
+        fc.register_field<Real>("scalar_field", 1)};
     auto & vector_field{
-        fc.register_field<TypedNField<Real>>("vector_field", NbComponents)};
+        fc.register_field<Real>("vector_field", NbComponents)};
 
     BOOST_CHECK_THROW(scalar_field.push_back(3.7), NFieldError);
     Eigen::Matrix<Real, NbComponents, 1> vector_mat{};
@@ -98,9 +98,9 @@ namespace muGrid {
     constexpr Dim_t NbQuadPts{3}, NbComponents{4};
     fc.set_nb_quad(NbQuadPts);
     auto & scalar_field{
-        fc.register_field<TypedNField<Real>>("scalar_field", 1)};
+        fc.register_field<Real>("scalar_field", 1)};
     auto & vector_field{
-        fc.register_field<TypedNField<Real>>("vector_field", NbComponents)};
+        fc.register_field<Real>("vector_field", NbComponents)};
     scalar_field.push_back(1);
     vector_field.push_back(Eigen::Array<Real, NbComponents, 1>::Ones());
     fc.add_pixel(24);
@@ -138,7 +138,7 @@ namespace muGrid {
     constexpr Dim_t NbQuadPts{2}, NbComponents{3};
     fc.set_nb_quad(NbQuadPts);
     auto & vector_field{
-        fc.register_field<TypedNField<Real>>("vector_field", NbComponents)};
+        fc.register_field<Real>("vector_field", NbComponents)};
     const auto & cvector_field{vector_field};
     fc.add_pixel(0);
     fc.add_pixel(1);

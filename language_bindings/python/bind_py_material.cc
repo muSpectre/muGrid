@@ -80,11 +80,10 @@ void add_material_laminate_helper(py::module & mod);
 #endif
 
 /* ---------------------------------------------------------------------- */
-template <Dim_t Dim>
-class PyMaterialBase : public muSpectre::MaterialBase<Dim, Dim> {
+class PyMaterialBase : public muSpectre::MaterialBase {
  public:
   /* Inherit the constructors */
-  using Parent = muSpectre::MaterialBase<Dim, Dim>;
+  using Parent = muSpectre::MaterialBase;
   using Parent::Parent;
   using Strain_t = typename Parent::Strain_t;
   using Stress_t = typename Parent::Stress_t;
@@ -107,10 +106,9 @@ class PyMaterialBase : public muSpectre::MaterialBase<Dim, Dim> {
         initialise);  // Name of function in C++ (must match Python name)
   }
 
-  void compute_stresses(const typename Parent::StrainField_t & F,
-                        typename Parent::StressField_t & P,
-                        muSpectre::Formulation form,
-                        muSpectre::SplitCell is_cell_split) override {
+  void compute_stresses(const muGrid::RealNField & F,
+                        muGrid::RealNField & P,
+                        muSpectre::Formulation form) override {
     PYBIND11_OVERLOAD_PURE(
         void,              // Return type
         Parent,            // Parent class
@@ -118,11 +116,10 @@ class PyMaterialBase : public muSpectre::MaterialBase<Dim, Dim> {
         F, P, form, is_cell_split);
   }
 
-  void compute_stresses_tangent(const typename Parent::StrainField_t & F,
-                                typename Parent::StressField_t & P,
-                                typename Parent::TangentField_t & K,
-                                muSpectre::Formulation form,
-                                muSpectre::SplitCell is_cell_split) override {
+  void compute_stresses_tangent(const muGrid::RealNField & F,
+                                muGrid::RealNField & P,
+                                muGrid::RealNField & K,
+                                muSpectre::Formulation form) override {
     PYBIND11_OVERLOAD_PURE(
         void,             /* Return type */
         Parent,           /* Parent class */
@@ -183,7 +180,7 @@ void add_material_evaluator(py::module & mod) {
 
   using MatEval_t = muSpectre::MaterialEvaluator<Dim>;
   py::class_<MatEval_t>(mod, name.c_str())
-      .def(py::init<std::shared_ptr<muSpectre::MaterialBase<Dim, Dim>>>())
+      .def(py::init<std::shared_ptr<muSpectre::MaterialBase>>())
       .def("save_history_variables", &MatEval_t::save_history_variables,
            "for materials with state variables")
       .def("evaluate_stress",
@@ -247,17 +244,15 @@ void add_material_evaluator(py::module & mod) {
            "accurate results at an increased computational cost.");
 }
 
-template <Dim_t Dim>
-void add_material_helper(py::module & mod) {
-  std::stringstream name_stream{};
-  name_stream << "MaterialBase_" << Dim << "d";
-  std::string name{name_stream.str()};
-  using Material = muSpectre::MaterialBase<Dim, Dim>;
-  using MaterialTrampoline = PyMaterialBase<Dim>;
+void add_material_base_helper(py::module & mod) {
+  std::string name{"MaterialBase"};
+  using Material = muSpectre::MaterialBase;
+  using MaterialTrampoline = PyMaterialBase;
 
   py::class_<Material, MaterialTrampoline /* <--- trampoline*/,
              std::shared_ptr<Material>>(mod, name.c_str())
-      .def(py::init<const std::string &, const Dim_t &, const Dim_t &>())
+      .def(py::init<const std::string &, const Dim_t &, const Dim_t &,
+                    const Dim_t &>())
       .def("save_history_variables", &Material::save_history_variables)
       .def("list_fields", &Material::list_fields)
       .def("get_real_field", &Material::get_real_field, "field_name"_a,
@@ -274,7 +269,10 @@ void add_material_helper(py::module & mod) {
           },
           "returns the field collection containing internal "
           "fields of this material");
+}
 
+template <Dim_t Dim>
+void add_material_helper(py::module & mod) {
   add_material_linear_elastic1_helper<Dim>(mod);
   add_material_linear_elastic2_helper<Dim>(mod);
   add_material_linear_elastic3_helper<Dim>(mod);
@@ -294,6 +292,7 @@ void add_material_helper(py::module & mod) {
 void add_material(py::module & mod) {
   auto material{mod.def_submodule("material")};
   material.doc() = "bindings for constitutive laws";
+  add_material_base_helper(material);
   add_material_helper<muGrid::twoD>(material);
   add_material_helper<muGrid::threeD>(material);
 }

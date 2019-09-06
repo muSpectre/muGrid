@@ -66,10 +66,10 @@ namespace muSpectre {
     //! Fourier-space field containing the projection operator itself
     using Proj_t = muGrid::ComplexNField;
     //! iterable form of the operator
-    using Proj_map = muGrid::MatrixNFieldMap<Complex, false, DimS, 1,
+    using Proj_map = muGrid::MatrixNFieldMap<Complex, Mapping::Mut, DimS, 1,
                                              muGrid::Iteration::Pixel>;
     //! iterable Fourier-space second-order tensor field
-    using Grad_map = muGrid::MatrixNFieldMap<Complex, false, DimS, DimS,
+    using Grad_map = muGrid::MatrixNFieldMap<Complex, Mapping::Mut, DimS, DimS,
                                              muGrid::Iteration::Pixel>;
 
     //! Default constructor

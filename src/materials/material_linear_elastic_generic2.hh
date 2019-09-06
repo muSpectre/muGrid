@@ -37,60 +37,45 @@
 #define SRC_MATERIALS_MATERIAL_LINEAR_ELASTIC_GENERIC2_HH_
 
 #include "material_linear_elastic_generic1.hh"
-#include "libmugrid/mapped_field.hh"
+#include "libmugrid/mapped_nfield.hh"
 
 namespace muSpectre {
 
   /**
    * forward declaration
    */
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimM>
   class MaterialLinearElasticGeneric2;
 
   /**
    * traits for use by MaterialMuSpectre for crtp
    */
 
-  template <Dim_t DimS, Dim_t DimM>
-  struct MaterialMuSpectre_traits<MaterialLinearElasticGeneric2<DimS, DimM>> {
-    //! global field collection
-    using GFieldCollection_t =
-        typename MaterialBase<DimS, DimM>::GFieldCollection_t;
-
+  template <Dim_t DimM>
+  struct MaterialMuSpectre_traits<MaterialLinearElasticGeneric2<DimM>> {
     //! expected map type for strain fields
-    using StrainMap_t =
-        muGrid::MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM, true>;
+    using StrainMap_t = muGrid::T2NFieldMap<Real, Mapping::Const, DimM>;
     //! expected map type for stress fields
-    using StressMap_t =
-        muGrid::MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
+    using StressMap_t = muGrid::T2NFieldMap<Real, Mapping::Mut, DimM>;
     //! expected map type for tangent stiffness fields
-    using TangentMap_t =
-        muGrid::T4MatrixFieldMap<GFieldCollection_t, Real, DimM>;
+    using TangentMap_t = muGrid::T4NFieldMap<Real, Mapping::Mut, DimM>;
 
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
     //! declare what type of stress measure your law yields as output
     constexpr static auto stress_measure{StressMeasure::PK2};
-
-    //! local field_collections used for internals
-    using LFieldColl_t = muGrid::LocalFieldCollection<DimS>;
-    //! local strain type
-    using LStrainMap_t =
-        muGrid::MatrixFieldMap<LFieldColl_t, Real, DimM, DimM, true>;
   };
 
   /**
    * Implementation proper of the class
    */
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimM>
   class MaterialLinearElasticGeneric2
-      : public MaterialMuSpectre<MaterialLinearElasticGeneric2<DimS, DimM>,
-                                 DimS, DimM> {
+      : public MaterialMuSpectre<MaterialLinearElasticGeneric2<DimM>, DimM> {
     //! parent type
-    using Parent = MaterialMuSpectre<MaterialLinearElasticGeneric2<DimS, DimM>,
-                                     DimS, DimM>;
+    using Parent = MaterialMuSpectre<MaterialLinearElasticGeneric2<DimM>, DimM>;
     //! underlying worker class
-    using Law_t = MaterialLinearElasticGeneric1<DimS, DimM>;
+    using Law_t = MaterialLinearElasticGeneric1<DimM>;
 
     //! generic input tolerant to python input
     using CInput_t = typename Law_t::CInput_t;
@@ -101,16 +86,14 @@ namespace muSpectre {
     //! traits of this material
     using traits = MaterialMuSpectre_traits<MaterialLinearElasticGeneric2>;
 
-    //! type in which eigenstrains are referenced
-    using Eigenstrain_ref = typename traits::LStrainMap_t::reference;
-
-
    public:
     //! Default constructor
     MaterialLinearElasticGeneric2() = delete;
 
     //! Construct by name and elastic stiffness tensor
     MaterialLinearElasticGeneric2(const std::string & name,
+                                  const Dim_t & spatial_dimension,
+                                  const Dim_t & nb_quad_pts,
                                   const CInput_t & C_voigt);
 
     //! Copy constructor
@@ -132,18 +115,14 @@ namespace muSpectre {
     MaterialLinearElasticGeneric2 &
     operator=(MaterialLinearElasticGeneric2 && other) = default;
 
-    //! see
-    //! http://eigen.tuxfamily.org/dox/group__TopicStructHavingEigenMembers.html
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-
     /**
      * evaluates second Piola-Kirchhoff stress given the Green-Lagrange
      * strain (or Cauchy stress if called with a small strain tensor)
      */
     template <class Derived>
-    inline decltype(auto)
-    evaluate_stress(const Eigen::MatrixBase<Derived> & E,
-                    const Eigenstrain_ref & E_eig);
+    inline decltype(auto) evaluate_stress(
+        const Eigen::MatrixBase<Derived> & E,
+        const Eigen::Map<const Eigen::Matrix<Real, DimM, DimM>> & E_eig);
 
     /**
      * evaluates second Piola-Kirchhoff stress given the Green-Lagrange
@@ -151,10 +130,9 @@ namespace muSpectre {
      * local pixel id
      */
     template <class Derived>
-    inline decltype(auto)
-    evaluate_stress(const Eigen::MatrixBase<Derived> & E,
-                    const size_t & pixel_index) {
-      auto && E_eig{this->eigen_field[pixel_index]};
+    inline decltype(auto) evaluate_stress(const Eigen::MatrixBase<Derived> & E,
+                                          const size_t & quad_pt_index) {
+      auto && E_eig{this->eigen_field[quad_pt_index]};
       return this->evaluate_stress(E, E_eig);
     }
 
@@ -164,9 +142,9 @@ namespace muSpectre {
      * called with a small strain tensor)
      */
     template <class Derived>
-    inline decltype(auto)
-    evaluate_stress_tangent(const Eigen::MatrixBase<Derived> & E,
-                            const Eigenstrain_ref & E_eig);
+    inline decltype(auto) evaluate_stress_tangent(
+        const Eigen::MatrixBase<Derived> & E,
+        const Eigen::Map<const Eigen::Matrix<Real, DimM, DimM>> & E_eig);
 
     /**
      * evaluates both second Piola-Kirchhoff stress and tangent moduli given
@@ -176,8 +154,8 @@ namespace muSpectre {
     template <class Derived>
     inline decltype(auto)
     evaluate_stress_tangent(const Eigen::MatrixBase<Derived> & E,
-                            const size_t & pixel_index) {
-      auto && E_eig{this->eigen_field[pixel_index]};
+                            const size_t & quad_pt_index) {
+      auto && E_eig{this->eigen_field[quad_pt_index]};
       return this->evaluate_stress_tangent(E, E_eig);
     }
 
@@ -191,34 +169,36 @@ namespace muSpectre {
     /**
      * overload add_pixel to write into eigenstrain
      */
-    void add_pixel(const Ccoord_t<DimS> & pixel) final;
+    void add_pixel(const size_t & pixel_index) final;
 
     /**
      * overload add_pixel to write into eigenstrain
      */
-    void add_pixel(const Ccoord_t<DimS> & pixel, const StrainTensor & E_eig);
+    void add_pixel(const size_t & pixel_index, const StrainTensor & E_eig);
 
    protected:
     Law_t worker;  //! underlying law to be evaluated
     //! storage for eigenstrain
-    muGrid::MappedT2Field<Real, DimS, DimM, true> eigen_field;
+    muGrid::MappedT2NField<Real, Mapping::Const, DimM> eigen_field;
   };
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimM>
   template <class Derived>
-  auto MaterialLinearElasticGeneric2<DimS, DimM>::evaluate_stress(
+  auto MaterialLinearElasticGeneric2<DimM>::evaluate_stress(
       const Eigen::MatrixBase<Derived> & E,
-      const Eigenstrain_ref & E_eig) -> decltype(auto) {
+      const Eigen::Map<const Eigen::Matrix<Real, DimM, DimM>> & E_eig)
+      -> decltype(auto) {
     return this->worker.evaluate_stress(E - E_eig);
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimM>
   template <class Derived>
-  auto MaterialLinearElasticGeneric2<DimS, DimM>::evaluate_stress_tangent(
+  auto MaterialLinearElasticGeneric2<DimM>::evaluate_stress_tangent(
       const Eigen::MatrixBase<Derived> & E,
-      const Eigenstrain_ref & E_eig) -> decltype(auto) {
+      const Eigen::Map<const Eigen::Matrix<Real, DimM, DimM>> & E_eig)
+      -> decltype(auto) {
     return this->worker.evaluate_stress_tangent(E - E_eig);
   }
 

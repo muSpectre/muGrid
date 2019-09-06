@@ -45,7 +45,7 @@ namespace muSpectre {
 
   template <Dim_t Dim>
   struct MatFixture {
-    using Mat_t = MaterialLinearElasticGeneric1<Dim, Dim>;
+    using Mat_t = MaterialLinearElasticGeneric1<Dim>;
     using T2_t = Eigen::Matrix<Real, Dim, Dim>;
     using T4_t = muGrid::T4Mat<Real, Dim>;
     using V_t = Eigen::Matrix<Real, vsize(Dim), vsize(Dim)>;
@@ -56,7 +56,12 @@ namespace muSpectre {
     constexpr static Real poisson{lambda / (2 * (lambda + mu))};
     using Hooke = MatTB::Hooke<Dim, T2_t, T4_t>;
 
-    MatFixture() : C_voigt{get_C_voigt()}, mat("material", this->C_voigt) {}
+    constexpr static Dim_t mdim() { return Dim; }
+    constexpr static Dim_t NbQuadPts() { return 2; }
+
+    MatFixture()
+        : C_voigt{get_C_voigt()},
+          mat("material", mdim(), NbQuadPts(), this->C_voigt) {}
 
     static V_t get_C_voigt() {
       V_t C{};

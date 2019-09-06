@@ -56,7 +56,7 @@ namespace muGrid {
    public:
     using Scalar_t = typename FieldMapType::Scalar_t;
     using Return_t =
-        typename FieldMapType::template Return_t<FieldMapType::IsConstField()>;
+        typename FieldMapType::template Return_t<FieldMapType::FieldMutability()>;
     using iterator = typename FieldMapType::iterator;
     using const_iterator = typename FieldMapType::const_iterator;
     //! Default constructor
@@ -64,7 +64,7 @@ namespace muGrid {
 
     MappedField(const std::string & unique_name, NFieldCollection & collection)
         : nb_components{compute_nb_components(unique_name, collection)},
-          field(collection.register_field<TypedNField<Scalar_t>>(
+          field(collection.register_field<Scalar_t>(
               unique_name, this->nb_components)),
           map{this->field} {}
 
@@ -123,28 +123,28 @@ namespace muGrid {
   };
 
   /* ---------------------------------------------------------------------- */
-  template <typename T, bool ConstField, Dim_t NbRow, Dim_t NbCol,
+  template <typename T, Mapping Mutability, Dim_t NbRow, Dim_t NbCol,
             Iteration IterationType = Iteration::QuadPt>
   using MappedMatrixNField =
-      MappedField<MatrixNFieldMap<T, ConstField, NbRow, NbCol, IterationType>>;
+      MappedField<MatrixNFieldMap<T, Mutability, NbRow, NbCol, IterationType>>;
 
   /* ---------------------------------------------------------------------- */
-  template <typename T, bool ConstField, Dim_t NbRow, Dim_t NbCol,
+  template <typename T, Mapping Mutability, Dim_t NbRow, Dim_t NbCol,
             Iteration IterationType = Iteration::QuadPt>
   using MappedArrayNField =
-      MappedField<ArrayNFieldMap<T, ConstField, NbRow, NbCol, IterationType>>;
+      MappedField<ArrayNFieldMap<T, Mutability, NbRow, NbCol, IterationType>>;
 
   /* ---------------------------------------------------------------------- */
-  template <typename T, bool ConstField>
-  using MappedScalarNField = MappedField<ScalarNFieldMap<T, ConstField>>;
+  template <typename T, Mapping Mutability>
+  using MappedScalarNField = MappedField<ScalarNFieldMap<T, Mutability>>;
 
   /* ---------------------------------------------------------------------- */
-  template <typename T, bool ConstField, Dim_t Dim>
-  using MappedT2NField = MappedField<T2NFieldMap<T, ConstField, Dim>>;
+  template <typename T, Mapping Mutability, Dim_t Dim>
+  using MappedT2NField = MappedField<T2NFieldMap<T, Mutability, Dim>>;
 
   /* ---------------------------------------------------------------------- */
-  template <typename T, bool ConstField, Dim_t Dim>
-  using MappedT4NField = MappedField<T4NFieldMap<T, ConstField, Dim>>;
+  template <typename T, Mapping Mutability, Dim_t Dim>
+  using MappedT4NField = MappedField<T4NFieldMap<T, Mutability, Dim>>;
 
 }  // namespace muGrid
 

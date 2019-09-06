@@ -44,24 +44,28 @@
 namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
-  template <typename T, bool ConstField, class MapType,
+  template <typename T, Mapping Mutability, class MapType,
             Iteration IterationType = Iteration::QuadPt>
-  class StaticNFieldMap : public NFieldMap<T, ConstField> {
+  class StaticNFieldMap : public NFieldMap<T, Mutability> {
     static_assert(MapType::IsValidStaticMapType(),
                   "The MapType you chose is not compatible");
 
    public:
     using Scalar_t = T;
-    using Parent = NFieldMap<T, ConstField>;
+    using Parent = NFieldMap<T, Mutability>;
     using NField_t = typename Parent::NField_t;
-    template <bool ConstNess>
-    using Return_t = typename MapType::template Return_t<ConstNess>;
+    template <Mapping MutType>
+    using Return_t = typename MapType::template Return_t<MutType>;
+    using reference = Return_t<Mutability>;
     using PlainType = typename MapType::PlainType;
-    constexpr static bool IsConstField() { return ConstField; }
+    constexpr static Mapping FieldMutability() { return Mutability; }
     constexpr static Iteration GetIterationType() { return IterationType; }
     constexpr static size_t Stride() { return MapType::stride(); }
     //! Default constructor
     StaticNFieldMap() = delete;
+
+    explicit StaticNFieldMap(NField & field)
+        : StaticNFieldMap(TypedNField<T>::safe_cast(field)) {}
 
     explicit StaticNFieldMap(NField_t & field) : Parent{field, IterationType} {
       if (this->stride != MapType::stride()) {
@@ -90,19 +94,22 @@ namespace muGrid {
     //! Move assignment operator
     StaticNFieldMap & operator=(StaticNFieldMap && other) = default;
 
-    template <bool ConstIter>
+    template <Mapping MutIter>
     class Iterator;
-    using iterator = Iterator<false or ConstField>;
-    using const_iterator = Iterator<true>;
+    using iterator =
+        Iterator<(Mutability == Mapping::Mut) ? Mapping::Mut : Mapping::Const>;
+    using const_iterator = Iterator<Mapping::Const>;
 
-    Return_t<ConstField> operator[](size_t index) {
-      return MapType::template from_data_ptr<ConstField>(
+    Return_t<Mutability> operator[](size_t index) {
+      assert(this->is_initialised);
+      return MapType::template from_data_ptr<Mutability>(
           this->data_ptr + index * MapType::stride());
     }
 
-    Return_t<true> operator[](size_t index) const {
-      return MapType::template from_data_ptr<true>(this->data_ptr +
-                                                   index * MapType::stride());
+    Return_t<Mapping::Const> operator[](size_t index) const {
+      assert(this->is_initialised);
+      return MapType::template from_data_ptr<Mapping::Const>(
+          this->data_ptr + index * MapType::stride());
     }
 
     iterator begin() {
@@ -127,12 +134,13 @@ namespace muGrid {
     inline PlainType mean() const;
   };
 
-  template <typename T, bool ConstField, class MapType, Iteration IterationType>
-  template <bool ConstIter>
-  class StaticNFieldMap<T, ConstField, MapType, IterationType>::Iterator {
+  template <typename T, Mapping Mutability, class MapType,
+            Iteration IterationType>
+  template <Mapping MutIter>
+  class StaticNFieldMap<T, Mutability, MapType, IterationType>::Iterator {
    public:
-    using value_type = typename MapType::template value_type<ConstIter>;
-    using storage_type = typename MapType::template storage_type<ConstIter>;
+    using value_type = typename MapType::template value_type<MutIter>;
+    using storage_type = typename MapType::template storage_type<MutIter>;
     //! Default constructor
     Iterator() = delete;
 
@@ -159,16 +167,16 @@ namespace muGrid {
     Iterator & operator++() {
       this->index++;
       new (&this->iterate)
-        storage_type(this->map.data_ptr + this->index * Stride());
+          storage_type(this->map.data_ptr + this->index * Stride());
       return *this;
     }
     //! dereference
     inline value_type & operator*() {
-      return MapType::template provide_ref<ConstIter>(this->iterate);
+      return MapType::template provide_ref<MutIter>(this->iterate);
     }
     //! pointer to member
     inline value_type * operator->() {
-      return (MapType::template provide_ptr<ConstIter>(this->iterate));
+      return (MapType::template provide_ptr<MutIter>(this->iterate));
     }
     //! equality
     inline bool operator==(const Iterator & other) const {
@@ -194,40 +202,46 @@ namespace muGrid {
     struct EigenMap {
       constexpr static bool IsValidStaticMapType() { return true; }
       using PlainType = EigenPlain;
-      template <bool ConstIter>
-      using value_type =
-          std::conditional_t<ConstIter, Eigen::Map<const PlainType>,
-                             Eigen::Map<PlainType>>;
-      template <bool ConstIter>
-      using ref_type = value_type<ConstIter>;
+      template <Mapping MutIter>
+      using value_type = std::conditional_t<MutIter == Mapping::Const,
+                                            Eigen::Map<const PlainType>,
+                                            Eigen::Map<PlainType>>;
+      template <Mapping MutIter>
+      using ref_type = value_type<MutIter>;
       // for direct access through operator[]
-      template <bool ConstIter>
-      using Return_t = value_type<ConstIter>;
+      template <Mapping MutIter>
+      using Return_t = value_type<MutIter>;
 
-      template <bool ConstIter>
-      using storage_type = value_type<ConstIter>;
+      template <Mapping MutIter>
+      using storage_type = value_type<MutIter>;
 
-      template <bool ConstIter>
-      constexpr static value_type<ConstIter> &
-      provide_ref(storage_type<ConstIter> & storage) {
+      template <Mapping MutIter>
+      constexpr static value_type<MutIter> &
+      provide_ref(storage_type<MutIter> & storage) {
         return storage;
       }
 
-      template <bool ConstIter>
-      constexpr static value_type<ConstIter> *
-      provide_ptr(storage_type<ConstIter> & storage) {
+      template <Mapping MutIter>
+      constexpr static const value_type<MutIter> &
+      provide_const_ref(const storage_type<MutIter> & storage) {
+        return storage;
+      }
+
+      template <Mapping MutIter>
+      constexpr static value_type<MutIter> *
+      provide_ptr(storage_type<MutIter> & storage) {
         return &storage;
       }
 
-      template <bool ConstIter>
-      constexpr static Return_t<ConstIter>
-      from_data_ptr(std::conditional_t<ConstIter, const T *, T *> data) {
-        return Return_t<ConstIter>(data);
+      template <Mapping MutIter>
+      constexpr static Return_t<MutIter> from_data_ptr(
+          std::conditional_t<MutIter == Mapping::Const, const T *, T *> data) {
+        return Return_t<MutIter>(data);
       }
 
-      template <bool ConstIter>
-      constexpr static storage_type<ConstIter>
-      to_storage(value_type<ConstIter> && value) {
+      template <Mapping MutIter>
+      constexpr static storage_type<MutIter>
+      to_storage(value_type<MutIter> && value) {
         return std::move(value);
       }
 
@@ -253,40 +267,47 @@ namespace muGrid {
     struct ScalarMap {
       constexpr static bool IsValidStaticMapType() { return true; }
       using PlainType = T;
-      template <bool ConstIter>
-      using value_type = std::conditional_t<ConstIter, const T, T>;
-      template <bool ConstIter>
-      using ref_type = value_type<ConstIter> &;
+      template <Mapping MutIter>
+      using value_type =
+          std::conditional_t<MutIter == Mapping::Const, const T, T>;
+      template <Mapping MutIter>
+      using ref_type = value_type<MutIter> &;
 
       // for direct access through operator[]
-      template <bool ConstIter>
-      using Return_t = value_type<ConstIter> &;
+      template <Mapping MutIter>
+      using Return_t = value_type<MutIter> &;
 
       // need to encapsulate
-      template <bool ConstIter>
-      using storage_type = std::conditional_t<ConstIter, const T *, T *>;
+      template <Mapping MutIter>
+      using storage_type =
+          std::conditional_t<MutIter == Mapping::Const, const T *, T *>;
 
-      template <bool ConstIter>
-      constexpr static value_type<ConstIter> &
-      provide_ref(storage_type<ConstIter> storage) {
+      template <Mapping MutIter>
+      constexpr static value_type<MutIter> &
+      provide_ref(storage_type<MutIter> storage) {
         return *storage;
       }
 
-      template <bool ConstIter>
-      constexpr static storage_type<ConstIter>
-      provide_ptr(storage_type<ConstIter> storage) {
+      template <Mapping MutIter>
+      constexpr static const value_type<MutIter> &
+      provide_const_ref(const storage_type<MutIter> storage) {
+        return *storage;
+      }
+
+      template <Mapping MutIter>
+      constexpr static storage_type<MutIter>
+      provide_ptr(storage_type<MutIter> storage) {
         return storage;
       }
 
-      template <bool ConstIter>
-      constexpr static Return_t<ConstIter>
-      from_data_ptr(std::conditional_t<ConstIter, const T *, T *> data) {
+      template <Mapping MutIter>
+      constexpr static Return_t<MutIter> from_data_ptr(
+          std::conditional_t<MutIter == Mapping::Const, const T *, T *> data) {
         return *data;
       }
 
-      template <bool ConstIter>
-      constexpr static storage_type<ConstIter>
-      to_storage(ref_type<ConstIter> ref) {
+      template <Mapping MutIter>
+      constexpr static storage_type<MutIter> to_storage(ref_type<MutIter> ref) {
         return &ref;
       }
 
@@ -298,9 +319,10 @@ namespace muGrid {
   }  // namespace internal
 
   /* ---------------------------------------------------------------------- */
-  template <typename T, bool ConstField, class MapType, Iteration IterationType>
-  typename StaticNFieldMap<T, ConstField, MapType, IterationType>::PlainType
-  StaticNFieldMap<T, ConstField, MapType, IterationType>::mean() const {
+  template <typename T, Mapping Mutability, class MapType,
+            Iteration IterationType>
+  typename StaticNFieldMap<T, Mutability, MapType, IterationType>::PlainType
+  StaticNFieldMap<T, Mutability, MapType, IterationType>::mean() const {
     PlainType mean{PlainType::Zero()};
     for (auto && val : *this) {
       mean += val;
@@ -310,34 +332,34 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T, bool ConstField, Dim_t NbRow, Dim_t NbCol,
+  template <typename T, Mapping Mutability, Dim_t NbRow, Dim_t NbCol,
             Iteration IterationType = Iteration::QuadPt>
   using MatrixNFieldMap =
-      StaticNFieldMap<T, ConstField, internal::MatrixMap<T, NbRow, NbCol>,
+      StaticNFieldMap<T, Mutability, internal::MatrixMap<T, NbRow, NbCol>,
                       IterationType>;
 
   /* ---------------------------------------------------------------------- */
-  template <typename T, bool ConstField, Dim_t NbRow, Dim_t NbCol,
+  template <typename T, Mapping Mutability, Dim_t NbRow, Dim_t NbCol,
             Iteration IterationType = Iteration::QuadPt>
   using ArrayNFieldMap =
-      StaticNFieldMap<T, ConstField, internal::ArrayMap<T, NbRow, NbCol>,
+      StaticNFieldMap<T, Mutability, internal::ArrayMap<T, NbRow, NbCol>,
                       IterationType>;
 
   //! the following only make sense as per-quadrature-point maps
-  template <typename T, bool ConstField>
+  template <typename T, Mapping Mutability>
   using ScalarNFieldMap =
-      StaticNFieldMap<T, ConstField, internal::ScalarMap<T>, Iteration::QuadPt>;
+      StaticNFieldMap<T, Mutability, internal::ScalarMap<T>, Iteration::QuadPt>;
 
   /* ---------------------------------------------------------------------- */
-  template <typename T, bool ConstField, Dim_t Dim>
+  template <typename T, Mapping Mutability, Dim_t Dim>
   using T2NFieldMap =
-      StaticNFieldMap<T, ConstField, internal::MatrixMap<T, Dim, Dim>,
+      StaticNFieldMap<T, Mutability, internal::MatrixMap<T, Dim, Dim>,
                       Iteration::QuadPt>;
 
   /* ---------------------------------------------------------------------- */
-  template <typename T, bool ConstField, Dim_t Dim>
+  template <typename T, Mapping Mutability, Dim_t Dim>
   using T4NFieldMap =
-      StaticNFieldMap<T, ConstField,
+      StaticNFieldMap<T, Mutability,
                       internal::MatrixMap<T, Dim * Dim, Dim * Dim>,
                       Iteration::QuadPt>;
 

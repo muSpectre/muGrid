@@ -41,15 +41,19 @@
 namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
-  template <typename T, bool ConstField>
-  NFieldMap<T, ConstField>::NFieldMap(NField_t & field, Iteration iter_type)
+  template <typename T, Mapping Mutability>
+  NFieldMap<T, Mutability>::NFieldMap(NField_t & field, Iteration iter_type)
       : field{field}, iteration{iter_type}, stride{this->field.get_stride(
                                                 iter_type)},
-        nb_rows{this->stride}, nb_cols{1} {}
+        nb_rows{this->stride}, nb_cols{1} {
+    if (this->field.get_collection().is_initialised()) {
+      this->initialise();
+    }
+  }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T, bool ConstField>
-  NFieldMap<T, ConstField>::NFieldMap(NField_t & field, Dim_t nb_rows_,
+  template <typename T, Mapping Mutability>
+  NFieldMap<T, Mutability>::NFieldMap(NField_t & field, Dim_t nb_rows_,
                                       Iteration iter_type)
       : field{field}, iteration{iter_type}, stride{this->field.get_stride(
                                                 iter_type)},
@@ -65,8 +69,8 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T, bool ConstField>
-  auto NFieldMap<T, ConstField>::begin() -> iterator {
+  template <typename T, Mapping Mutability>
+  auto NFieldMap<T, Mutability>::begin() -> iterator {
     if (not this->is_initialised) {
       this->initialise();
     }
@@ -74,14 +78,14 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T, bool ConstField>
-  auto NFieldMap<T, ConstField>::end() -> iterator {
+  template <typename T, Mapping Mutability>
+  auto NFieldMap<T, Mutability>::end() -> iterator {
     return iterator{*this, true};
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T, bool ConstField>
-  auto NFieldMap<T, ConstField>::cbegin() -> const_iterator {
+  template <typename T, Mapping Mutability>
+  auto NFieldMap<T, Mutability>::cbegin() -> const_iterator {
     if (not this->is_initialised) {
       this->initialise();
     }
@@ -89,14 +93,14 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T, bool ConstField>
-  auto NFieldMap<T, ConstField>::cend() -> const_iterator {
+  template <typename T, Mapping Mutability>
+  auto NFieldMap<T, Mutability>::cend() -> const_iterator {
     return const_iterator{*this, true};
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T, bool ConstField>
-  auto NFieldMap<T, ConstField>::begin() const -> const_iterator {
+  template <typename T, Mapping Mutability>
+  auto NFieldMap<T, Mutability>::begin() const -> const_iterator {
     if (not this->is_initialised) {
       throw NFieldMapError("Needs to be initialised");
     }
@@ -104,22 +108,22 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T, bool ConstField>
-  auto NFieldMap<T, ConstField>::end() const -> const_iterator {
+  template <typename T, Mapping Mutability>
+  auto NFieldMap<T, Mutability>::end() const -> const_iterator {
     return const_iterator{*this, true};
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T, bool ConstField>
-  size_t NFieldMap<T, ConstField>::size() const {
+  template <typename T, Mapping Mutability>
+  size_t NFieldMap<T, Mutability>::size() const {
     return (this->iteration == Iteration::QuadPt)
                ? this->field.size()
                : this->field.get_collection().get_nb_pixels();
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T, bool ConstField>
-  void NFieldMap<T, ConstField>::initialise() {
+  template <typename T, Mapping Mutability>
+  void NFieldMap<T, Mutability>::initialise() {
     if (not(this->field.get_collection().is_initialised())) {
       throw NFieldMapError("Can't initialise map before the field collection "
                            "has been initialised");
@@ -129,12 +133,12 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  template class NFieldMap<Real, true>;
-  template class NFieldMap<Real, false>;
-  template class NFieldMap<Complex, true>;
-  template class NFieldMap<Complex, false>;
-  template class NFieldMap<Int, true>;
-  template class NFieldMap<Int, false>;
-  template class NFieldMap<Uint, true>;
-  template class NFieldMap<Uint, false>;
+  template class NFieldMap<Real, Mapping::Const>;
+  template class NFieldMap<Real, Mapping::Mut>;
+  template class NFieldMap<Complex, Mapping::Const>;
+  template class NFieldMap<Complex, Mapping::Mut>;
+  template class NFieldMap<Int, Mapping::Const>;
+  template class NFieldMap<Int, Mapping::Mut>;
+  template class NFieldMap<Uint, Mapping::Const>;
+  template class NFieldMap<Uint, Mapping::Mut>;
 }  // namespace muGrid

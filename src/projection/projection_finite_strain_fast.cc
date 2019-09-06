@@ -46,8 +46,8 @@ namespace muSpectre {
       FFTEngine_ptr engine, Rcoord lengths, Gradient_t gradient)
       : Parent{std::move(engine), lengths, gradient,
                Formulation::finite_strain},
-        xi_field{this->projection_container.template register_field<Proj_t>(
-          "Projection Operator", DimS)},
+        xi_field{this->projection_container.register_complex_field(
+            "Projection Operator", DimS)},
         xis(xi_field) {
     for (auto res : this->fft_engine->get_nb_domain_grid_pts()) {
       if (res % 2 == 0) {
@@ -73,8 +73,7 @@ namespace muSpectre {
         eigen(this->domain_lengths / nb_domain_grid_pts)};
 
     FFTFreqs_t fft_freqs(nb_domain_grid_pts);
-    for (auto && tup : akantu::zip(this->fft_engine->get_pixels(),
-                                   this->xis)) {
+    for (auto && tup : akantu::zip(this->fft_engine->get_pixels(), this->xis)) {
       const auto & ccoord = std::get<0>(tup);
       auto & xi = std::get<1>(tup);
 
@@ -102,9 +101,8 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t NbQuadPts>
-  void
-  ProjectionFiniteStrainFast<DimS, NbQuadPts>::apply_projection(
-    Field_t & field) {
+  void ProjectionFiniteStrainFast<DimS, NbQuadPts>::apply_projection(
+      Field_t & field) {
     Grad_map field_map{this->fft_engine->fft(field)};
     Real factor = this->fft_engine->normalisation();
     for (auto && tup : akantu::zip(this->xis, field_map)) {

@@ -123,17 +123,15 @@ namespace muFFT {
     }
     using FC_t = muGrid::GlobalNFieldCollection<Fix::sdim>;
     FC_t fc{1};
-    auto & input{fc.template register_field<muGrid::TypedNField<Real>>(
-            "input", Fix::sdim*Fix::sdim)};
-    auto & ref{fc.template register_field<muGrid::TypedNField<Real>>(
-            "reference", Fix::sdim*Fix::sdim)};
-    auto & result{fc.template register_field<muGrid::TypedNField<Real>>(
-            "result", Fix::sdim*Fix::sdim)};
+    auto & input{fc.register_real_field("input", Fix::sdim*Fix::sdim)};
+    auto & ref{fc.register_real_field("reference", Fix::sdim*Fix::sdim)};
+    auto & result{fc.register_real_field("result", Fix::sdim*Fix::sdim)};
 
     fc.initialise(Fix::engine.get_nb_subdomain_grid_pts(),
                   Fix::engine.get_subdomain_locations());
 
-    using map_t = muGrid::MatrixNFieldMap<Real, false, Fix::sdim, Fix::sdim>;
+    using map_t = muGrid::MatrixNFieldMap<
+        Real, Mapping::Mut, Fix::sdim, Fix::sdim>;
     map_t inmap{input};
     inmap.initialise();
     auto refmap{map_t{ref}};
@@ -150,7 +148,7 @@ namespace muFFT {
     }
     auto & complex_field = Fix::engine.fft(input);
     using cmap_t =
-        muGrid::MatrixNFieldMap<Complex, false, Fix::sdim, Fix::sdim>;
+        muGrid::MatrixNFieldMap<Complex, Mapping::Mut, Fix::sdim, Fix::sdim>;
     cmap_t complex_map(complex_field);
     complex_map.initialise();
     if (Fix::engine.get_subdomain_locations() ==

@@ -60,10 +60,10 @@ void add_material_hyper_elasto_plastic1_helper(py::module & mod) {
   name_stream << "MaterialHyperElastoPlastic1_" << Dim << "d";
   const auto name{name_stream.str()};
 
-  using Mat_t = muSpectre::MaterialHyperElastoPlastic1<Dim, Dim>;
-  using Cell_t = muSpectre::CellBase<Dim, Dim>;
+  using Mat_t = muSpectre::MaterialHyperElastoPlastic1<Dim>;
+  using Cell_t = muSpectre::CellBase;
 
-  py::class_<Mat_t, muSpectre::MaterialBase<Dim, Dim>, std::shared_ptr<Mat_t>>(
+  py::class_<Mat_t, muSpectre::MaterialBase, std::shared_ptr<Mat_t>>(
       mod, name.c_str())
       .def_static("make",
                   [](Cell_t & cell, std::string name, Real Young, Real Poisson,

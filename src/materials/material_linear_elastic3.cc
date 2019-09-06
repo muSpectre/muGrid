@@ -40,23 +40,25 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  MaterialLinearElastic3<DimS, DimM>::MaterialLinearElastic3(std::string name)
-      : Parent{name}, C_field{this->internal_fields, "local stiffness tensor"} {
-  }
+  template <Dim_t DimM>
+  MaterialLinearElastic3<DimM>::MaterialLinearElastic3(
+      const std::string & name, const Dim_t & spatial_dimension,
+      const Dim_t & nb_quad_pts)
+      : Parent{name, spatial_dimension, nb_quad_pts},
+        C_field{"local stiffness tensor", this->internal_fields} {}
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void MaterialLinearElastic3<DimS, DimM>::add_pixel(
-      const Ccoord_t<DimS> & /*pixel*/) {
+  template <Dim_t DimM>
+  void MaterialLinearElastic3<DimM>::add_pixel(
+      const size_t & /*pixel*/) {
     throw std::runtime_error(
         "this material needs pixels with Youngs modulus and Poisson ratio.");
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void MaterialLinearElastic3<DimS, DimM>::add_pixel(
-      const Ccoord_t<DimS> & pixel, const Real & Young, const Real & Poisson) {
+  template <Dim_t DimM>
+  void MaterialLinearElastic3<DimM>::add_pixel(
+      const size_t & pixel, const Real & Young, const Real & Poisson) {
     this->internal_fields.add_pixel(pixel);
     Real lambda = Hooke::compute_lambda(Young, Poisson);
     Real mu = Hooke::compute_mu(Young, Poisson);
@@ -66,8 +68,14 @@ namespace muSpectre {
     this->C_field.get_field().push_back(C);
   }
 
-  template class MaterialLinearElastic3<twoD, twoD>;
-  template class MaterialLinearElastic3<twoD, threeD>;
-  template class MaterialLinearElastic3<threeD, threeD>;
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimM>
+  void MaterialLinearElastic3<DimM>::initialise() {
+    Parent::initialise();
+    this->C_field.get_map().initialise();
+  }
+
+      template class MaterialLinearElastic3<twoD>;
+  template class MaterialLinearElastic3<threeD>;
 
 }  // namespace muSpectre

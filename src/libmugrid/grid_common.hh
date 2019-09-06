@@ -72,6 +72,12 @@ namespace muGrid {
    */
   enum class Iteration { Pixel, QuadPt };
 
+  /**
+   * Maps can give constant or mutable access to the mapped field through their
+   * iterators or access operators.
+   */
+  enum class Mapping { Const, Mut };
+
   //! \addtogroup Coordinates Coordinate types
   //@{
   //! Ccoord_t are cell coordinates, i.e. integer coordinates

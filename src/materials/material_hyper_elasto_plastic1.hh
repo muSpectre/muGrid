@@ -42,51 +42,32 @@
 #include "materials/materials_toolbox.hh"
 
 #include <libmugrid/eigen_tools.hh>
-#include <libmugrid/mapped_field.hh>
+#include <libmugrid/mapped_nfield.hh>
+#include <libmugrid/mapped_state_nfield.hh>
 
 #include <algorithm>
 
 namespace muSpectre {
 
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimM>
   class MaterialHyperElastoPlastic1;
 
   /**
    * traits for hyper-elastoplastic material
    */
-  template <Dim_t DimS, Dim_t DimM>
-  struct MaterialMuSpectre_traits<MaterialHyperElastoPlastic1<DimS, DimM>> {
-    //! global field collection
-    using GFieldCollection_t =
-        typename MaterialBase<DimS, DimM>::GFieldCollection_t;
-
+  template <Dim_t DimM>
+  struct MaterialMuSpectre_traits<MaterialHyperElastoPlastic1<DimM>> {
     //! expected map type for strain fields
-    using StrainMap_t =
-        muGrid::MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM, true>;
+    using StrainMap_t = muGrid::T2NFieldMap<Real, Mapping::Const, DimM>;
     //! expected map type for stress fields
-    using StressMap_t =
-        muGrid::MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
+    using StressMap_t = muGrid::T2NFieldMap<Real, Mapping::Mut, DimM>;
     //! expected map type for tangent stiffness fields
-    using TangentMap_t =
-        muGrid::T4MatrixFieldMap<GFieldCollection_t, Real, DimM>;
+    using TangentMap_t = muGrid::T4NFieldMap<Real, Mapping::Mut, DimM>;
 
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::Gradient};
     //! declare what type of stress measure your law yields as output
     constexpr static auto stress_measure{StressMeasure::Kirchhoff};
-
-    //! local field collection used for internals
-    using LFieldColl_t = muGrid::LocalFieldCollection<DimS>;
-
-    //! storage type for plastic flow measure (εₚ in the papers)
-    using LScalarMap_t =
-        muGrid::StateFieldMap<muGrid::ScalarFieldMap<LFieldColl_t, Real>>;
-    /**
-     * storage type for for previous gradient Fᵗ and elastic left
-     * Cauchy-Green deformation tensor bₑᵗ
-     */
-    using LStrainMap_t = muGrid::StateFieldMap<
-        muGrid::MatrixFieldMap<LFieldColl_t, Real, DimM, DimM, false>>;
   };
 
   /**
@@ -94,23 +75,14 @@ namespace muSpectre {
    * developpers: this law is tested against a reference python implementation
    * in `py_comparison_test_material_hyper_elasto_plastic1.py`
    */
-  template <Dim_t DimS, Dim_t DimM = DimS>
+  template <Dim_t DimM>
   class MaterialHyperElastoPlastic1
-      : public MaterialMuSpectre<MaterialHyperElastoPlastic1<DimS, DimM>, DimS,
-                                 DimM> {
+      : public MaterialMuSpectre<MaterialHyperElastoPlastic1<DimM>, DimM> {
    public:
     //! base class
-    using Parent =
-        MaterialMuSpectre<MaterialHyperElastoPlastic1<DimS, DimM>, DimS, DimM>;
+    using Parent = MaterialMuSpectre<MaterialHyperElastoPlastic1<DimM>, DimM>;
     using T2_t = Eigen::Matrix<Real, DimM, DimM>;
     using T4_t = muGrid::T4Mat<Real, DimM>;
-
-    /**
-     * type used to determine whether the
-     * `muSpectre::MaterialMuSpectre::iterable_proxy` evaluate only
-     * stresses or also tangent stiffnesses
-     */
-    using NeedTangent = typename Parent::NeedTangent;
 
     //! shortcut to traits
     using traits = MaterialMuSpectre_traits<MaterialHyperElastoPlastic1>;
@@ -121,19 +93,21 @@ namespace muSpectre {
                               typename traits::TangentMap_t::reference>;
 
     //! type in which the previous strain state is referenced
-    using StrainStRef_t = typename traits::LStrainMap_t::reference;
+    using T2StRef_t = typename muGrid::MappedT2StateNField<Real, Mapping::Mut,
+                                                           DimM>::Return_t;
     //! type in which the previous plastic flow is referenced
-    using FlowStRef_t = typename traits::LScalarMap_t::reference;
-
-    //! Local FieldCollection type for field storage
-    using LColl_t = muGrid::LocalFieldCollection<DimS>;
+    using ScalarStRef_t =
+        typename muGrid::MappedScalarStateNField<Real, Mapping::Mut>::Return_t;
 
     //! Default constructor
     MaterialHyperElastoPlastic1() = delete;
 
     //! Constructor with name and material properties
-    MaterialHyperElastoPlastic1(std::string name, Real young, Real poisson,
-                                Real tau_y0, Real H);
+    MaterialHyperElastoPlastic1(const std::string & name,
+                                const Dim_t & spatial_dimension,
+                                const Dim_t & nb_quad_pts, const Real & young,
+                                const Real & poisson, const Real & tau_y0,
+                                const Real & H);
 
     //! Copy constructor
     MaterialHyperElastoPlastic1(const MaterialHyperElastoPlastic1 & other) =
@@ -158,16 +132,16 @@ namespace muSpectre {
      * Fₜ, the previous Gradient Fₜ₋₁ and the cumulated plastic flow
      * εₚ
      */
-    T2_t evaluate_stress(const T2_t & F, StrainStRef_t F_prev,
-                         StrainStRef_t be_prev, FlowStRef_t plast_flow);
+    T2_t evaluate_stress(const T2_t & F, T2StRef_t F_prev, T2StRef_t be_prev,
+                         ScalarStRef_t plast_flow);
     /**
      * evaluates Kirchhoff stress given the local placement gradient and pixel
      * id.
      */
-    T2_t evaluate_stress(const T2_t & F, const size_t & pixel_index) {
-      auto && F_prev{this->F_prev_field[pixel_index]};
-      auto && be_prev{this->be_prev_field[pixel_index]};
-      auto && plast_flow{this->plast_flow_field[pixel_index]};
+    T2_t evaluate_stress(const T2_t & F, const size_t & quad_pt_index) {
+      auto && F_prev{this->F_prev_field[quad_pt_index]};
+      auto && be_prev{this->be_prev_field[quad_pt_index]};
+      auto && plast_flow{this->plast_flow_field[quad_pt_index]};
       return this->evaluate_stress(F, F_prev, be_prev, plast_flow);
     }
     /**
@@ -175,18 +149,18 @@ namespace muSpectre {
      * gradient Fₜ, the previous Gradient Fₜ₋₁ and the cumulated plastic flow εₚ
      */
     std::tuple<T2_t, T4_t> evaluate_stress_tangent(const T2_t & F,
-                                                   StrainStRef_t F_prev,
-                                                   StrainStRef_t be_prev,
-                                                   FlowStRef_t plast_flow);
+                                                   T2StRef_t F_prev,
+                                                   T2StRef_t be_prev,
+                                                   ScalarStRef_t plast_flow);
     /**
      * evaluates Kirchhoff stressstiffness and tangent moduli given the local
      * placement gradient and pixel id.
      */
-    std::tuple<T2_t, T4_t> evaluate_stress_tangent(const T2_t & F,
-                                                   const size_t & pixel_index) {
-      auto && F_prev{this->F_prev_field[pixel_index]};
-      auto && be_prev{this->be_prev_field[pixel_index]};
-      auto && plast_flow{this->plast_flow_field[pixel_index]};
+    std::tuple<T2_t, T4_t>
+    evaluate_stress_tangent(const T2_t & F, const size_t & quad_pt_index) {
+      auto && F_prev{this->F_prev_field[quad_pt_index]};
+      auto && be_prev{this->be_prev_field[quad_pt_index]};
+      auto && plast_flow{this->plast_flow_field[quad_pt_index]};
       return this->evaluate_stress_tangent(F, F_prev, be_prev, plast_flow);
     }
 
@@ -201,28 +175,19 @@ namespace muSpectre {
     void initialise() final;
 
     //! getter for internal variable field εₚ
-    muGrid::StateField<muGrid::ScalarField<LColl_t, Real>> &
-    get_plast_flow_field() {
-      return this->plast_flow_field.get_field();
+    muGrid::TypedStateNField<Real> & get_plast_flow_field() {
+      return this->plast_flow_field.get_state_field();
     }
 
     //! getter for previous gradient field Fᵗ
-    muGrid::StateField<muGrid::TensorField<LColl_t, Real, secondOrder, DimM>> &
-    get_F_prev_field() {
-      return this->F_prev_field.get_field();
+    muGrid::TypedStateNField<Real> & get_F_prev_field() {
+      return this->F_prev_field.get_state_field();
     }
 
     //! getterfor elastic left Cauchy-Green deformation tensor bₑᵗ
-    muGrid::StateField<muGrid::TensorField<LColl_t, Real, secondOrder, DimM>> &
-    get_be_prev_field() {
-      return this->be_prev_field.get_field();
+    muGrid::TypedStateNField<Real> & get_be_prev_field() {
+      return this->be_prev_field.get_state_field();
     }
-
-    /**
-     * needed to accomodate the static-sized member variable C, see
-     * http://eigen.tuxfamily.org/dox-devel/group__TopicStructHavingEigenMembers.html
-     */
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
    protected:
     /**
@@ -230,16 +195,16 @@ namespace muSpectre {
      */
     using Worker_t =
         std::tuple<T2_t, Real, Real, T2_t, bool, muGrid::Decomp_t<DimM>>;
-    Worker_t stress_n_internals_worker(const T2_t & F, StrainStRef_t & F_prev,
-                                       StrainStRef_t & be_prev,
-                                       FlowStRef_t & plast_flow);
+    Worker_t stress_n_internals_worker(const T2_t & F, T2StRef_t & F_prev,
+                                       T2StRef_t & be_prev,
+                                       ScalarStRef_t & plast_flow);
     //! storage for cumulated plastic flow εₚ
-    muGrid::MappedScalarStateField<Real, DimS> plast_flow_field;
+    muGrid::MappedScalarStateNField<Real, Mapping::Mut> plast_flow_field;
     //! storage for previous gradient Fᵗ
-    muGrid::MappedT2StateField<Real, DimS, DimM> F_prev_field;
+    muGrid::MappedT2StateNField<Real, Mapping::Mut, DimM> F_prev_field;
 
     //! storage for elastic left Cauchy-Green deformation tensor bₑᵗ
-    muGrid::MappedT2StateField<Real, DimS, DimM> be_prev_field;
+    muGrid::MappedT2StateNField<Real, Mapping::Mut, DimM> be_prev_field;
 
     // material properties
     const Real young;    //!< Young's modulus
@@ -249,7 +214,9 @@ namespace muSpectre {
     const Real K;        //!< Bulk modulus
     const Real tau_y0;   //!< initial yield stress
     const Real H;        //!< hardening modulus
-    const muGrid::T4Mat<Real, DimM> C;  //!< stiffness tensor
+    std::unique_ptr<const muGrid::T4Mat<Real, DimM>>
+        C_holder;  //!< stiffness tensor
+    const muGrid::T4Mat<Real, DimM> & C;
   };
 
 }  // namespace muSpectre

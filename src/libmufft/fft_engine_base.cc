@@ -48,7 +48,7 @@ namespace muFFT {
         nb_fourier_grid_pts{
             muGrid::CcoordOps::get_nb_hermitian_grid_pts(nb_grid_pts)},
         fourier_locations{}, nb_domain_grid_pts{nb_grid_pts},
-        work{work_space_container.template register_field<Workspace_t>(
+        work{work_space_container.register_complex_field(
             "work space", nb_components)},
         norm_factor{1. / muGrid::CcoordOps::get_size(nb_domain_grid_pts)},
         nb_components{nb_components} {}

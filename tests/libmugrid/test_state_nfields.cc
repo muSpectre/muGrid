@@ -50,7 +50,7 @@ namespace muGrid {
     static constexpr Dim_t NbComponents() { return 21; }
 
     LocalNFieldBasicFixtureFilled()
-        : state_field{fc.register_state_field<TypedStateNField<Real>>(
+        : state_field{fc.register_state_field<Real>(
               "test", NbMemory(), NbComponents())} {
       this->fc.add_pixel(4);
       this->fc.add_pixel(8);
@@ -62,13 +62,13 @@ namespace muGrid {
 
   BOOST_FIXTURE_TEST_CASE(construction_test, LocalNFieldBasicFixture) {
     constexpr Dim_t NbMemory{1}, NbComponents{21};
-    auto & state_field{fc.register_state_field<TypedStateNField<Real>>(
+    auto & state_field{fc.register_state_field<Real>(
         "test", NbMemory, NbComponents)};
 
     state_field.current();
     BOOST_CHECK(fc.state_field_exists("test"));
 
-    BOOST_CHECK_THROW(fc.register_state_field<TypedStateNField<Real>>(
+    BOOST_CHECK_THROW(fc.register_state_field<Real>(
                           "test", NbMemory, NbComponents),
                       NFieldCollectionError);
   }

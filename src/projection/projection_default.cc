@@ -43,7 +43,7 @@ namespace muSpectre {
   ProjectionDefault<DimS>::ProjectionDefault(
     FFTEngine_ptr engine, Rcoord lengths, Gradient_t gradient, Formulation form)
       : Parent{std::move(engine), lengths, gradient, form},
-        Gfield{this->projection_container.template register_field<Proj_t>(
+        Gfield{this->projection_container.register_complex_field(
           "Projection Operator", DimS * DimS * DimS * DimS)},
         Ghat{Gfield} {}
 

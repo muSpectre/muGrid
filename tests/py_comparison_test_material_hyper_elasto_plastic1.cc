@@ -53,7 +53,7 @@ namespace muSpectre {
                                   py::EigenDRef<const Eigen::MatrixXd> F,
                                   py::EigenDRef<const Eigen::MatrixXd> F_prev,
                                   py::EigenDRef<const Eigen::MatrixXd> be_prev,
-                                  Real eps_prev) {
+                                  py::EigenDRef<const Eigen::MatrixXd> eps_prev) {
     const Real Young{MatTB::convert_elastic_modulus<
         ElasticModulus::Young, ElasticModulus::Bulk, ElasticModulus::Shear>(
         K, mu)};
@@ -61,8 +61,8 @@ namespace muSpectre {
         ElasticModulus::Poisson, ElasticModulus::Bulk, ElasticModulus::Shear>(
         K, mu)};
 
-    using Mat_t = MaterialHyperElastoPlastic1<Dim, Dim>;
-    Mat_t mat("Name", Young, Poisson, tau_y0, H);
+    using Mat_t = MaterialHyperElastoPlastic1<Dim>;
+    Mat_t mat("Name", Dim, 1, Young, Poisson, tau_y0, H);
 
     auto & coll{mat.get_collection()};
     coll.add_pixel({0});
@@ -72,13 +72,13 @@ namespace muSpectre {
     auto & be_{mat.get_be_prev_field()};
     auto & eps_{mat.get_plast_flow_field()};
 
-    F_.get_map()[0].current() = F_prev;
-    be_.get_map()[0].current() = be_prev;
-    eps_.get_map()[0].current() = eps_prev;
+    F_.current().get_quad_pt_map() = F_prev;
+    be_.current().get_quad_pt_map() = be_prev;
+    eps_.current().get_quad_pt_map() = eps_prev;
     mat.save_history_variables();
 
-    return mat.evaluate_stress_tangent(F, F_.get_map()[0], be_.get_map()[0],
-                                       eps_.get_map()[0]);
+    return mat.evaluate_stress_tangent(F, F_, be_,
+                                       eps_);
   }
 
   template <Dim_t Dim>
@@ -86,7 +86,7 @@ namespace muSpectre {
                           py::EigenDRef<const Eigen::MatrixXd> F,
                           py::EigenDRef<const Eigen::MatrixXd> F_prev,
                           py::EigenDRef<const Eigen::MatrixXd> be_prev,
-                          Real eps_prev) {
+                          py::EigenDRef<const Eigen::MatrixXd> eps_prev) {
     auto && tup{
         material_wrapper<Dim>(K, mu, H, tau_y0, F, F_prev, be_prev, eps_prev)};
     auto && tau{std::get<0>(tup)};
@@ -100,13 +100,13 @@ namespace muSpectre {
                     py::EigenDRef<const Eigen::MatrixXd> F,
                     py::EigenDRef<const Eigen::MatrixXd> F_prev,
                     py::EigenDRef<const Eigen::MatrixXd> be_prev,
-                    Real eps_prev) {
+                    py::EigenDRef<const Eigen::MatrixXd> eps_prev) {
     auto && tup{
         material_wrapper<Dim>(K, mu, H, tau_y0, F, F_prev, be_prev, eps_prev)};
     auto && tau{std::get<0>(tup)};
     auto && C{std::get<1>(tup)};
 
-    using Mat_t = MaterialHyperElastoPlastic1<Dim, Dim>;
+    using Mat_t = MaterialHyperElastoPlastic1<Dim>;
     constexpr auto StrainM{Mat_t::traits::strain_measure};
     constexpr auto StressM{Mat_t::traits::stress_measure};
 

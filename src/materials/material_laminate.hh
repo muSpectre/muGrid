@@ -110,9 +110,7 @@ namespace muSpectre {
 
     using FieldMap_t = muGrid::MatrixFieldMap<LFieldColl_t, Real, DimM, DimM>;
 
-    using Strain_t = typename MatBase_t::Strain_t;
-    using Stress_t = Strain_t;
-    using Stiffness_t = typename MatBase_t::Stiffness_t;
+    using DynMatrix_t = Parent::DynMatrix_t;
     /**
      * type used to determine whether the
      * `muSpectre::MaterialMuSpectre::iterable_proxy` evaluate only
@@ -167,22 +165,10 @@ namespace muSpectre {
                                                   const size_t & pixel_index,
                                                   Formulation form);
 
-    inline auto
-    constitutive_law_small_strain(const Eigen::Ref<const Strain_t> & strain,
-                                  const size_t & pixel_index) -> Stress_t final;
-
-    inline auto
-    constitutive_law_finite_strain(const Eigen::Ref<const Strain_t> & strain,
-                                   const size_t & pixel_index)
-        -> Stress_t final;
-
-    inline auto constitutive_law_tangent_small_strain(
-        const Eigen::Ref<const Strain_t> & strain, const size_t & pixel_index)
-        -> std::tuple<Stress_t, Stiffness_t> final;
-
-    inline auto constitutive_law_tangent_finite_strain(
-        const Eigen::Ref<const Strain_t> & strain, const size_t & pixel_index)
-        -> std::tuple<Stress_t, Stiffness_t> final;
+    std::tuple<DynMatrix_t, DynMatrix_t>
+    constitutive_law_dynamic(const Eigen::Ref<const DynMatrix_t> & strain,
+                             const size_t & pixel_index,
+                             const Formulation & form) final;
 
     //! computes stress
     using Parent::compute_stresses;
@@ -338,40 +324,10 @@ namespace muSpectre {
     }
 
     return ret_stress_stiffness;
-  }  // namespace muSpectre
+  }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  auto MaterialLaminate<DimS, DimM>::constitutive_law_finite_strain(
-      const Eigen::Ref<const Strain_t> & strain, const size_t & pixel_index)
-      -> Stress_t {
-    Eigen::Map<const Strain_t> F(strain.data());
-    return std::move(
-        MatTB::constitutive_law_with_formulation<Formulation::finite_strain>(
-            *this, std::make_tuple(F), pixel_index));
-  }
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  auto MaterialLaminate<DimS, DimM>::constitutive_law_small_strain(
-      const Eigen::Ref<const Strain_t> & strain, const size_t & pixel_index)
-      -> Stress_t {
-    Eigen::Map<const Strain_t> F(strain.data());
-    return std::move(
-        MatTB::constitutive_law_with_formulation<Formulation::small_strain>(
-            *this, std::make_tuple(F), pixel_index));
-  }
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  auto MaterialLaminate<DimS, DimM>::constitutive_law_tangent_finite_strain(
-      const Eigen::Ref<const Strain_t> & strain, const size_t & pixel_index)
-      -> std::tuple<Stress_t, Stiffness_t> {
-    Eigen::Map<const Strain_t> F(strain.data());
-    return std::move(MatTB::constitutive_law_tangent_with_formulation<
-                     Formulation::finite_strain>(*this, std::make_tuple(F),
-                                                 pixel_index));
-  }
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimM>
   auto MaterialLaminate<DimS, DimM>::constitutive_law_tangent_small_strain(
       const Eigen::Ref<const Strain_t> & strain, const size_t & pixel_index)
       -> std::tuple<Stress_t, Stiffness_t> {
@@ -380,6 +336,38 @@ namespace muSpectre {
         MatTB::constitutive_law_tangent_with_formulation<
             Formulation::small_strain>(*this, std::make_tuple(F), pixel_index));
   }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimM>
+  auto MaterialLaminate<DimM>::constitutive_law_dynamic(
+      const Eigen::Ref<const DynMatrix_t> & strain, const size_t & pixel_index,
+      const Formulation & form) -> std::tuple<DynMatrix_t, DynMatrix_t> {
+
+    Eigen::Map < const Eigen::Matrix<Real, DimM, DimM> F(strain.data());
+
+    if (strain.cols() != DimM or strain.rows() != DimM) {
+      std::stringstream error {};
+      error << "incompatible strain shape, expected " << DimM << " × " << DimM
+            << ", but received " << strain.rows() << " × " strain.cols() << ".";
+      throw Material(error.str());
+    }
+    switch (form) {
+    case Formulation::finite_strain: {
+      return MatTB::constitutive_law_tangent<Formulation::finite_strain>(
+            *this, std::make_tuple(F), pixel_index));
+      break;
+    }
+    case Formulation::small_strain: {
+      return MatTB::constitutive_law_tangent<Formulation::small_strain>(
+            *this, std::make_tuple(F), pixel_index));
+      break;
+    }
+    default:
+      throw MaterialError("unknown formulation");
+      break;
+    }
+  }
+
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   template <Formulation Form, SplitCell is_cell_split>

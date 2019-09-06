@@ -43,6 +43,11 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   void LocalNFieldCollection::add_pixel(const size_t &global_index) {
+    if (this->initialised) {
+      throw NFieldCollectionError(
+          "Cannot add pixels once the collection has been initialised (because "
+          "the fields all have been allocated)");
+    }
     this->indices.emplace_back(global_index);
   }
 

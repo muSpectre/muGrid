@@ -43,33 +43,31 @@
 #include "materials/material_muSpectre_base.hh"
 
 #include <libmugrid/T4_map_proxy.hh>
+#include <libmugrid/nfield_map_static.hh>
+
+#include <memory>
 
 namespace muSpectre {
 
   /**
    * forward declaration
    */
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimM>
   class MaterialLinearElasticGeneric1;
 
   /**
    * traits for use by MaterialMuSpectre for crtp
    */
-  template <Dim_t DimS, Dim_t DimM>
-  struct MaterialMuSpectre_traits<MaterialLinearElasticGeneric1<DimS, DimM>> {
+  template <Dim_t DimM>
+  struct MaterialMuSpectre_traits<MaterialLinearElasticGeneric1<DimM>> {
     //! global field collection
-    using GFieldCollection_t =
-        typename MaterialBase<DimS, DimM>::GFieldCollection_t;
 
     //! expected map type for strain fields
-    using StrainMap_t =
-        muGrid::MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM, true>;
+    using StrainMap_t = muGrid::T2NFieldMap<Real, Mapping::Const, DimM>;
     //! expected map type for stress fields
-    using StressMap_t =
-        muGrid::MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
+    using StressMap_t = muGrid::T2NFieldMap<Real, Mapping::Mut, DimM>;
     //! expected map type for tangent stiffness fields
-    using TangentMap_t =
-        muGrid::T4MatrixFieldMap<GFieldCollection_t, Real, DimM>;
+    using TangentMap_t = muGrid::T4NFieldMap<Real, Mapping::Mut, DimM>;
 
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
@@ -81,14 +79,14 @@ namespace muSpectre {
    * Linear elastic law defined by a full stiffness tensor. Very
    * generic, but not most efficient
    */
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimM>
   class MaterialLinearElasticGeneric1
-      : public MaterialMuSpectre<MaterialLinearElasticGeneric1<DimS, DimM>,
-                                 DimS, DimM> {
+      : public MaterialMuSpectre<MaterialLinearElasticGeneric1<DimM>,
+                                 DimM> {
    public:
     //! parent type
-    using Parent = MaterialMuSpectre<MaterialLinearElasticGeneric1<DimS, DimM>,
-                                     DimS, DimM>;
+    using Parent = MaterialMuSpectre<MaterialLinearElasticGeneric1<DimM>,
+                                     DimM>;
     //! generic input tolerant to python input
     using CInput_t =
         Eigen::Ref<Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>, 0,
@@ -103,6 +101,8 @@ namespace muSpectre {
      * @param C_voigt elastic tensor in Voigt notation
      */
     MaterialLinearElasticGeneric1(const std::string & name,
+                                  const Dim_t & spatial_dimension,
+                                  const Dim_t & nb_quad_pts,
                                   const CInput_t & C_voigt);
 
     //! Copy constructor
@@ -124,10 +124,6 @@ namespace muSpectre {
     MaterialLinearElasticGeneric1 &
     operator=(MaterialLinearElasticGeneric1 && other) = delete;
 
-    //! see
-    //! http://eigen.tuxfamily.org/dox/group__TopicStructHavingEigenMembers.html
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-
     /**
      * evaluates second Piola-Kirchhoff stress given the Green-Lagrange
      * strain (or Cauchy stress if called with a small strain tensor). Note: the
@@ -135,7 +131,7 @@ namespace muSpectre {
      */
     template <class Derived>
     inline decltype(auto) evaluate_stress(const Eigen::MatrixBase<Derived> & E,
-                                          const size_t & pixel_index = 0);
+                                          const size_t & quad_pt_index = 0);
 
     /**
      * evaluates both second Piola-Kirchhoff stress and stiffness given
@@ -145,12 +141,7 @@ namespace muSpectre {
     template <class Derived>
     inline decltype(auto)
     evaluate_stress_tangent(const Eigen::MatrixBase<Derived> & E,
-                            const size_t & pixel_index = 0);
-
-    /**
-     * return the empty internals tuple
-     */
-    std::tuple<> & get_internals() { return this->internal_variables; }
+                            const size_t & quad_pt_index = 0);
 
     /**
      * return a reference to the stiffness tensor
@@ -158,16 +149,27 @@ namespace muSpectre {
     const muGrid::T4Mat<Real, DimM> & get_C() const { return this->C; }
 
    protected:
-    muGrid::T4Mat<Real, DimM> C{};  //! stiffness tensor
-    //! empty tuple
-    std::tuple<> internal_variables{};
+    // Here, the stiffness tensor is encapsulated into a unique ptr because of
+    // this bug:
+    // https://eigen.tuxfamily.narkive.com/maHiFSha/fixed-size-vectorizable-members-and-std-make-shared
+    // . The problem is that `std::make_shared` uses the global `::new` to
+    // allocate `void *` rather than using the the object's `new` operator, and
+    // therefore ignores the solution proposed by eigen (documented here
+    // http://eigen.tuxfamily.org/dox-devel/group__TopicStructHavingEigenMembers.html).
+    // Offloading the offending object into a heap-allocated structure who's
+    // construction we control fixes this problem temporarily, until we can use
+    // C++17 and guarantee alignment. This comes at the cost of a heap
+    // allocation, which is not an issue here, as this happens only once per
+    // material and run.
+    std::unique_ptr<muGrid::T4Mat<Real, DimM>> C_holder;  //! stiffness tensor
+    const muGrid::T4Mat<Real, DimM> & C;
   };
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimM>
   template <class Derived>
-  auto MaterialLinearElasticGeneric1<DimS, DimM>::evaluate_stress(
-      const Eigen::MatrixBase<Derived> & E, const size_t & /*pixel_index*/)
+  auto MaterialLinearElasticGeneric1<DimM>::evaluate_stress(
+      const Eigen::MatrixBase<Derived> & E, const size_t & /*quad_pt_index*/)
       -> decltype(auto) {
     static_assert(Derived::ColsAtCompileTime == DimM, "wrong input size");
     static_assert(Derived::RowsAtCompileTime == DimM, "wrong input size");
@@ -175,13 +177,13 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimM>
   template <class Derived>
-  auto MaterialLinearElasticGeneric1<DimS, DimM>::evaluate_stress_tangent(
-      const Eigen::MatrixBase<Derived> & E, const size_t & /*pixel_index*/)
+  auto MaterialLinearElasticGeneric1<DimM>::evaluate_stress_tangent(
+      const Eigen::MatrixBase<Derived> & E, const size_t & /*quad_pt_index*/)
       -> decltype(auto) {
     using Stress_t = decltype(this->evaluate_stress(E));
-    using Stiffness_t = Eigen::Map<muGrid::T4Mat<Real, DimM>>;
+    using Stiffness_t = Eigen::Map<const muGrid::T4Mat<Real, DimM>>;
     using Ret_t = std::tuple<Stress_t, Stiffness_t>;
     return Ret_t{this->evaluate_stress(E),
                  Stiffness_t(this->C.data())};

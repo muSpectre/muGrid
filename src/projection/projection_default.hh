@@ -53,7 +53,7 @@ namespace muSpectre {
   template <Dim_t DimS>
   class ProjectionDefault : public ProjectionBase<DimS> {
    public:
-    using Parent = ProjectionBase<DimS>;   //!< base class
+    using Parent = ProjectionBase<DimS>;         //!< base class
     using Vector_t = typename Parent::Vector_t;  //!< to represent fields
     //! polymorphic FFT pointer type
     using FFTEngine_ptr = typename Parent::FFTEngine_ptr;
@@ -68,9 +68,10 @@ namespace muSpectre {
     //! Fourier-space field containing the projection operator itself
     using Proj_t = muGrid::ComplexNField;
     //! iterable form of the operator
-    using Proj_map = muGrid::T4NFieldMap<Complex, false, DimS>;
+    using Proj_map = muGrid::T4NFieldMap<Complex, Mapping::Mut, DimS>;
     //! vectorized version of the Fourier-space second-order tensor field
-    using Vector_map = muGrid::MatrixNFieldMap<Complex, false, DimS * DimS, 1>;
+    using Vector_map =
+        muGrid::MatrixNFieldMap<Complex, Mapping::Mut, DimS * DimS, 1>;
     //! Default constructor
     ProjectionDefault() = delete;
 

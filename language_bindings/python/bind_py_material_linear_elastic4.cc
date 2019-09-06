@@ -59,10 +59,10 @@ void add_material_linear_elastic4_helper(py::module & mod) {
   name_stream << "MaterialLinearElastic4_" << dim << 'd';
   const auto name{name_stream.str()};
 
-  using Mat_t = muSpectre::MaterialLinearElastic4<dim, dim>;
-  using Sys_t = muSpectre::CellBase<dim, dim>;
+  using Mat_t = muSpectre::MaterialLinearElastic4<dim>;
+  using Sys_t = muSpectre::CellBase;
 
-  py::class_<Mat_t, muSpectre::MaterialBase<dim, dim>, std::shared_ptr<Mat_t>>(
+  py::class_<Mat_t, muSpectre::MaterialBase, std::shared_ptr<Mat_t>>(
       mod, name.c_str())
       .def(py::init<std::string>(), "name"_a)
       .def_static("make",

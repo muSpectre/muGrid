@@ -49,11 +49,11 @@ namespace muGrid {
   class TypedStateNField;
   class NField;
 
-  template <typename T, bool ConstField>
+  template <typename T, Mapping Mutability>
   class StateNFieldMap {
    public:
-    using NFieldMap_t = NFieldMap<T, ConstField>;
-    using CNFieldMap_t = NFieldMap<T, true>;
+    using NFieldMap_t = NFieldMap<T, Mutability>;
+    using CNFieldMap_t = NFieldMap<T, Mapping::Const>;
     using CurrentIteratort = typename NFieldMap_t::iterator;
     using OldIteratort = typename CNFieldMap_t::iterator;
 
@@ -88,10 +88,11 @@ namespace muGrid {
     //! Move assignment operator
     StateNFieldMap & operator=(StateNFieldMap && other) = delete;
 
-    template <bool ConstIter>
+    template <Mapping MutIter>
     class Iterator;
-    using iterator = Iterator<false or ConstField>;
-    using const_iterator = Iterator<true>;
+    using iterator =
+        Iterator<(Mutability == Mapping::Mut) ? Mapping::Mut : Mapping::Const>;
+    using const_iterator = Iterator<Mapping::Const>;
 
     iterator begin();
     iterator end();
@@ -109,15 +110,15 @@ namespace muGrid {
      */
     size_t size() const;
 
-    template <bool ConstWrapper>
+    template <Mapping MutWrapper>
     class StateWrapper {
      public:
       using StateNFieldMap_t =
-          std::conditional_t<ConstWrapper, const StateNFieldMap,
+          std::conditional_t<MutWrapper == Mapping::Const, const StateNFieldMap,
                              StateNFieldMap>;
       using CurrentVal_t =
-          typename NFieldMap_t::template value_type<ConstWrapper>;
-      using OldVal_t = typename NFieldMap_t::template value_type<true>;
+          typename NFieldMap_t::template value_type<MutWrapper>;
+      using OldVal_t = typename NFieldMap_t::template value_type<Mapping::Const>;
       StateWrapper(StateNFieldMap_t & state_field_map, size_t index)
           : current_val{state_field_map.get_current()[index]} {
         const Dim_t nb_memory{state_field_map.state_field.get_nb_memory()};
@@ -139,20 +140,21 @@ namespace muGrid {
       std::vector<OldVal_t> old_vals{};
     };
 
-    StateWrapper<ConstField> operator[](size_t index) {
-      return StateWrapper<ConstField>{*this, index};
+    StateWrapper<Mutability> operator[](size_t index) {
+      return StateWrapper<Mutability>{*this, index};
     }
 
-    StateWrapper<true> operator[](size_t index) const {
-      return StateWrapper<true>{*this, index};
+    StateWrapper<Mapping::Const> operator[](size_t index) const {
+      return StateWrapper<Mapping::Const>{*this, index};
     }
 
     void initialise();
 
-   protected:
     NFieldMap_t & get_current();
     const NFieldMap_t & get_current() const;
     const CNFieldMap_t & get_old(size_t nb_steps_ago) const;
+
+   protected:
     RefVector<NField> & get_fields();
 
     //< mapped state field. Needed for query at initialisations
@@ -166,14 +168,15 @@ namespace muGrid {
   };
 
   /* ---------------------------------------------------------------------- */
-  template <typename T, bool ConstField>
-  template <bool ConstIter>
-  class StateNFieldMap<T, ConstField>::Iterator {
+  template <typename T, Mapping Mutability>
+  template <Mapping MutIter>
+  class StateNFieldMap<T, Mutability>::Iterator {
    public:
     using StateNFieldMap_t =
-        std::conditional_t<ConstIter, const StateNFieldMap, StateNFieldMap>;
+        std::conditional_t<MutIter == Mapping::Const, const StateNFieldMap,
+                           StateNFieldMap>;
     using StateWrapper_t =
-        typename StateNFieldMap::template StateWrapper<ConstIter>;
+        typename StateNFieldMap::template StateWrapper<MutIter>;
     //! Default constructor
     Iterator() = delete;
 

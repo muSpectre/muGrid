@@ -85,7 +85,7 @@ void add_engine_helper(py::module & mod, std::string name) {
                              eng.get_subdomain_locations());
              // Do not make a copy, just wrap the Eigen array into a field that
              // does not manage its own data.
-             Field_t & proxy{coll.template register_field<Field_t>(
+             Field_t & proxy{coll.register_real_wrapped_field(
                  "proxy_field", eng.get_nb_components(), v)};
              // We need to tie the lifetime of the return value to the lifetime
              // of the engine object, because we are returning the internal work
@@ -110,7 +110,7 @@ void add_engine_helper(py::module & mod, std::string name) {
                              eng.get_subdomain_locations());
              // Wrap the Eigen array into a proxy field that does not manage
              // its own data.
-             Field_t & proxy{coll.template register_field<Field_t>(
+             Field_t & proxy{coll.register_real_wrapped_field(
                  "proxy_field", eng.get_nb_components(), res)};
              eng.get_work_space().eigen_pixel() = v;
              eng.ifft(proxy);

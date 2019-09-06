@@ -579,12 +579,11 @@ namespace muSpectre {
      */
     template <Dim_t DimM>
     inline Eigen::Matrix<Real, DimM, DimM>
-    compute_deviatoric_stress(const Eigen::Matrix<Real, DimM, DimM>& PK2) {
+    compute_deviatoric_stress(const Eigen::Matrix<Real, DimM, DimM> & PK2) {
       //! compute deviatoric stress tensor σ^{dev}=σ-\frac{1}{dim} tr(σ) I
-      return PK2 -
-             (1. / DimM) *
-                 (PK2.trace() * Eigen::Matrix<Real, DimM, DimM>::Identity())
-                     .eval();
+      return PK2 - (1. / DimM) * (PK2.trace() *
+                                  Eigen::Matrix<Real, DimM, DimM>::Identity())
+                                     .eval();
     }
 
     /**
@@ -623,184 +622,113 @@ namespace muSpectre {
     }
 
     /* ----------------------------------------------------------------------*/
-    /**
-     * Function used for as a wrapper around materials evaluate stress functions
-     * for calling stress/strain conversions according to their traits if
-     * necessary
-     */
+    namespace internal {
+
+      template <Formulation Form>
+      struct MaterialStressEvaluator {
+
+        template <class Material, class Strain>
+        auto static compute(Material & mat, const Strain & strain,
+                            const size_t & quad_pt_id) -> decltype(auto) {
+          using traits = MaterialMuSpectre_traits<Material>;
+
+          constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
+          constexpr StrainMeasure expected_strain_m{
+              get_formulation_strain_type(Form, traits::strain_measure)};
+
+          auto && eps =
+              MatTB::convert_strain<stored_strain_m, expected_strain_m>(
+                  std::get<0>(strain));
+          return mat.evaluate_stress(std::move(eps), quad_pt_id);
+        }
+      };
+
+      template <>
+      struct MaterialStressEvaluator<Formulation::finite_strain> {
+
+        template <class Material, class Strain>
+        auto static compute(Material & mat, const Strain & strain,
+                            const size_t & quad_pt_id) -> decltype(auto) {
+          constexpr static Formulation Form{Formulation::finite_strain};
+          using traits = MaterialMuSpectre_traits<Material>;
+
+          constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
+          constexpr StrainMeasure expected_strain_m{
+              get_formulation_strain_type(Form, traits::strain_measure)};
+
+          auto & grad = std::get<0>(strain);
+          auto && E =
+              MatTB::convert_strain<stored_strain_m, expected_strain_m>(grad);
+          auto && stress_mat = mat.evaluate_stress(std::move(E), quad_pt_id);
+          return ::muSpectre::MatTB::PK1_stress<traits::stress_measure,
+                                                traits::strain_measure>(
+              std::move(grad), std::move(stress_mat));
+        }
+      };
+
+    }  // namespace internal
+    /* ----------------------------------------------------------------------*/
     template <Formulation Form, class Material, class Strains_t>
-    auto constitutive_law(Material & mat, Strains_t Strains,
-                          const size_t & pixel_index) -> decltype(auto) {
-      using traits = MaterialMuSpectre_traits<Material>;
-      constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
-      constexpr StrainMeasure expected_strain_m{
-          get_formulation_strain_type(Form, traits::strain_measure)};
-
-      using Strain_t = Eigen::Matrix<Real, Material::mdim(), Material::mdim()>;
-      using Stress_t = Strain_t;
-      Stress_t stress;
-
-      auto & grad = std::get<0>(Strains);
-      auto && strain =
-          MatTB::convert_strain<stored_strain_m, expected_strain_m>(grad);
-
-      switch (Form) {
-      case Formulation::small_strain: {
-        stress = mat.evaluate_stress(std::move(strain), pixel_index);
-        break;
-      }
-      case Formulation::finite_strain: {
-        auto && stress_mat =
-            mat.evaluate_stress(std::move(strain), pixel_index);
-        stress = PK1_stress<traits::stress_measure, traits::strain_measure>(
-            std::move(grad), std::move(stress_mat));
-
-        break;
-      }
-      }
-      return stress;
+    auto constitutive_law(Material & mat, const Strains_t & Strains,
+                          const size_t & quad_pt_id) -> decltype(auto) {
+      return internal::MaterialStressEvaluator<Form>::compute(mat, Strains,
+                                                              quad_pt_id);
     }
+    /* ----------------------------------------------------------------------*/
+    namespace internal {
+
+      template <Formulation Form>
+      struct MaterialStressTangentEvaluator {
+        template <class Material, class Strain>
+        auto static compute(Material & mat, const Strain & strain,
+                            const size_t & quad_pt_id) -> decltype(auto) {
+          using traits = MaterialMuSpectre_traits<Material>;
+
+          constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
+          constexpr StrainMeasure expected_strain_m{
+              get_formulation_strain_type(Form, traits::strain_measure)};
+
+          auto && eps =
+              MatTB::convert_strain<stored_strain_m, expected_strain_m>(
+                  std::get<0>(strain));
+          return mat.evaluate_stress_tangent(std::move(eps), quad_pt_id);
+        }
+      };
+
+      template <>
+      struct MaterialStressTangentEvaluator<Formulation::finite_strain> {
+
+        template <class Material, class Strain>
+        auto static compute(Material & mat, const Strain & strain,
+                            const size_t & quad_pt_id) -> decltype(auto) {
+          constexpr static Formulation Form{Formulation::finite_strain};
+          using traits = MaterialMuSpectre_traits<Material>;
+
+          constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
+          constexpr StrainMeasure expected_strain_m{
+              get_formulation_strain_type(Form, traits::strain_measure)};
+
+          auto & grad = std::get<0>(strain);
+          auto && E =
+              MatTB::convert_strain<stored_strain_m, expected_strain_m>(grad);
+          auto && stress_stiffness_mat =
+              mat.evaluate_stress_tangent(std::move(E), quad_pt_id);
+          return ::muSpectre::MatTB::PK1_stress<traits::stress_measure,
+                                                traits::strain_measure>(
+              std::move(grad), std::move(std::get<0>(stress_stiffness_mat)),
+              std::move(std::get<1>(stress_stiffness_mat)));
+        }
+      };
+
+    }  // namespace internal
     /*----------------------------------------------------------------------*/
-    /**
-     * Function used for as a wrapper around materials evaluate
-     * stress_tangent_stiffenss functions for calling stress/strain conversions
-     * according to their traits if necessary
-     */
     template <Formulation Form, class Material, class Strains_t>
     auto constitutive_law_tangent(Material & mat, Strains_t Strains,
-                                  const size_t & pixel_index)
-        -> decltype(auto) {
-      using traits = MaterialMuSpectre_traits<Material>;
-
-      constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
-      constexpr StrainMeasure expected_strain_m{
-          get_formulation_strain_type(Form, traits::strain_measure)};
-      using Stiffness_t = muGrid::T4Mat<Real, Material::mdim()>;
-      using Strain_t = Eigen::Matrix<Real, Material::mdim(), Material::mdim()>;
-      using Stress_t = Strain_t;
-      Stress_t stress_mat;
-      std::tuple<Stress_t, Stiffness_t> stress_stiffness;
-
-      auto & grad = std::get<0>(Strains);
-      auto && strain =
-          MatTB::convert_strain<stored_strain_m, expected_strain_m>(grad);
-
-      switch (Form) {
-      case Formulation::small_strain: {
-        stress_stiffness =
-            mat.evaluate_stress_tangent(std::move(strain), pixel_index);
-        break;
-      }
-      case Formulation::finite_strain: {
-        auto && stress_stiffness_mat =
-            mat.evaluate_stress_tangent(std::move(strain), pixel_index);
-        auto && stress_mat{std::get<0>(stress_stiffness_mat)};
-        auto && tangent_mat{std::get<1>(stress_stiffness_mat)};
-        stress_stiffness =
-            PK1_stress<traits::stress_measure, traits::strain_measure>(
-                std::move(grad), std::move(stress_mat), std::move(tangent_mat));
-
-        break;
-      }
-      }
-      return stress_stiffness;
+                                  const size_t & quad_pt_id) -> decltype(auto) {
+      return internal::MaterialStressTangentEvaluator<Form>::compute(
+          mat, Strains, quad_pt_id);
     }
 
-    /* ----------------------------------------------------------------------*/
-    /**
-     * Function used for as a wrapper around materials evaluate stress functions
-     * for calling stress/strain conversions according to their traits if
-     * necessary. This function is specialised for materials whose
-     * evaluate_stress functions need the Formulation as an input
-     */
-    template <Formulation Form, class Material, class Strains_t>
-    auto constitutive_law_with_formulation(Material & mat, Strains_t Strains,
-                                           const size_t & pixel_index)
-        -> decltype(auto) {
-      using traits = MaterialMuSpectre_traits<Material>;
-
-      constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
-      constexpr StrainMeasure expected_strain_m{
-          get_formulation_strain_type(Form, traits::strain_measure)};
-
-      using Strain_t = Eigen::Matrix<Real, Material::mdim(), Material::mdim()>;
-      using Stress_t = Strain_t;
-
-      Stress_t stress;
-
-      auto & grad = std::get<0>(Strains);
-      auto && strain =
-          MatTB::convert_strain<stored_strain_m, expected_strain_m>(grad);
-
-      switch (Form) {
-      case Formulation::small_strain: {
-        stress = mat.evaluate_stress(std::move(strain), pixel_index, Form);
-        break;
-      }
-      case Formulation::finite_strain: {
-        auto && stress_mat =
-            mat.evaluate_stress(std::move(strain), pixel_index, Form);
-        stress = PK1_stress<traits::stress_measure, traits::strain_measure>(
-            std::move(grad), std::move(stress_mat));
-
-        break;
-      }
-      }
-      return stress;
-    }
-
-    /*----------------------------------------------------------------------*/
-    /**
-     * Function used for as a wrapper around materials evaluate
-     * stress_tangent_stiffenss functions for calling stress/strain conversions
-     * according to their traits if necessary. This function is specialised for
-     * materials whose evaluate_stress_tangent functions need the Formulation as
-     * an input
-     */
-    template <Formulation Form, class Material, class Strains_t>
-    auto constitutive_law_tangent_with_formulation(Material & mat,
-                                                   Strains_t Strains,
-                                                   const size_t & pixel_index)
-        -> decltype(auto) {
-      using traits = MaterialMuSpectre_traits<Material>;
-
-      constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
-      constexpr StrainMeasure expected_strain_m{
-          get_formulation_strain_type(Form, traits::strain_measure)};
-
-      using Stiffness_t = muGrid::T4Mat<Real, Material::mdim()>;
-      using Strain_t = Eigen::Matrix<Real, Material::mdim(), Material::mdim()>;
-      using Stress_t = Strain_t;
-
-      Stress_t stress_mat;
-      std::tuple<Stress_t, Stiffness_t> stress_stiffness;
-
-      auto & grad = std::get<0>(Strains);
-      auto && strain =
-          MatTB::convert_strain<stored_strain_m, expected_strain_m>(grad);
-
-      switch (Form) {
-      case Formulation::small_strain: {
-        stress_stiffness =
-            mat.evaluate_stress_tangent(std::move(strain), pixel_index, Form);
-        break;
-      }
-      case Formulation::finite_strain: {
-        auto && stress_stiffness_mat =
-            mat.evaluate_stress_tangent(std::move(strain), pixel_index, Form);
-        auto && stress_mat{std::get<0>(stress_stiffness_mat)};
-        auto && tangent_mat{std::get<1>(stress_stiffness_mat)};
-        stress_stiffness =
-            PK1_stress<traits::stress_measure, traits::strain_measure>(
-                std::move(grad), std::move(stress_mat), std::move(tangent_mat));
-
-        break;
-      }
-      }
-      return stress_stiffness;
-    }
-
-    /* ---------------------------------------------------------------------- */
   }  // namespace MatTB
 }  // namespace muSpectre
 

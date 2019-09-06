@@ -163,8 +163,9 @@ void add_proj_helper(py::module & mod, std::string name_start) {
              }
              coll.initialise(proj.get_nb_subdomain_grid_pts(),
                              proj.get_subdomain_locations());
-             Field_t & temp{coll.template register_field<Field_t>(
-                 "temp_field", proj.get_nb_components())};
+             Field_t & temp{coll.template register_field<
+                typename Field_t::Element_t>("temp_field",
+                                             proj.get_nb_components())};
              temp.eigen_pixel() = v;
              proj.apply_projection(temp);
              return Eigen::ArrayXXd{temp.eigen_pixel()};

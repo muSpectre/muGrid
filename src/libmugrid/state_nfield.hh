@@ -120,7 +120,7 @@ namespace muGrid {
     RefVector<NField> fields{};
   };
 
-  template <typename T, bool ConstField>
+  template <typename T, Mapping Mutability>
   class StateNFieldMap;
 
   /**
@@ -164,11 +164,18 @@ namespace muGrid {
     const TypedNField<T> & old(size_t nb_steps_ago = 1) const;
 
     friend NFieldCollection;
-    friend class StateNFieldMap<T, true>;
-    friend class StateNFieldMap<T, false>;
+    friend class StateNFieldMap<T, Mapping::Const>;
+    friend class StateNFieldMap<T, Mapping::Mut>;
    protected:
     RefVector<NField> & get_fields();
   };
+
+  /* ---------------------------------------------------------------------- */
+  using RealStateNField = TypedStateNField<Real>;
+  using ComplexStateNField = TypedStateNField<Complex>;
+  using IntStateNField = TypedStateNField<Int>;
+  using Uintnfield = TypedStateNField<Uint>;
+
 }  // namespace muGrid
 
 #endif  // SRC_LIBMUGRID_STATE_NFIELD_HH_

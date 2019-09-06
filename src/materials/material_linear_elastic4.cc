@@ -41,27 +41,27 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  MaterialLinearElastic4<DimS, DimM>::MaterialLinearElastic4(std::string name)
-      : Parent{name}, lambda_field{this->internal_fields,
-                                   "local first Lame constant"},
-        mu_field(this->internal_fields,
-                 "local second Lame constant(shear modulus)") {}
+  template <Dim_t DimM>
+  MaterialLinearElastic4<DimM>::MaterialLinearElastic4(
+      const std::string & name, const Dim_t & spatial_dimension,
+      const Dim_t & nb_quad_pts)
+      : Parent{name, spatial_dimension, nb_quad_pts},
+        lambda_field{"local first Lame constant", this->internal_fields},
+        mu_field("local second Lame constant(shear modulus)",
+                 this->internal_fields) {}
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void MaterialLinearElastic4<DimS, DimM>::add_pixel(
-      const Ccoord_t<DimS> & /*pixel*/) {
+  template <Dim_t DimM>
+  void MaterialLinearElastic4<DimM>::add_pixel(const size_t & /*pixel*/) {
     throw std::runtime_error(
         "This material needs pixels with Youngs modulus and Poisson ratio.");
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void
-  MaterialLinearElastic4<DimS, DimM>::add_pixel(const Ccoord_t<DimS> & pixel,
-                                                const Real & Young_modulus,
-                                                const Real & Poisson_ratio) {
+  template <Dim_t DimM>
+  void MaterialLinearElastic4<DimM>::add_pixel(const size_t & pixel,
+                                               const Real & Young_modulus,
+                                               const Real & Poisson_ratio) {
     this->internal_fields.add_pixel(pixel);
     // store the first(lambda) and second(mu) Lame constant in the field
     Real lambda = Hooke::compute_lambda(Young_modulus, Poisson_ratio);
@@ -70,8 +70,15 @@ namespace muSpectre {
     this->mu_field.get_field().push_back(mu);
   }
 
-  template class MaterialLinearElastic4<twoD, twoD>;
-  template class MaterialLinearElastic4<twoD, threeD>;
-  template class MaterialLinearElastic4<threeD, threeD>;
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimM>
+  void MaterialLinearElastic4<DimM>::initialise() {
+    Parent::initialise();
+    this->lambda_field.get_map().initialise();
+    this->mu_field.get_map().initialise();
+  }
+
+  template class MaterialLinearElastic4<twoD>;
+  template class MaterialLinearElastic4<threeD>;
 
 }  // namespace muSpectre

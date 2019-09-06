@@ -48,8 +48,16 @@ namespace muGrid {
 
   //! forward declaration of the field
   class NField;
+  template <typename T>
+  class TypedNField;
   //! forward declaration of the state field
   class StateNField;
+  //! forward declaration of the state field
+  template <typename T>
+  class TypedStateNField;
+  //! forward declaration of the wrapped field
+  template <typename T>
+  class WrappedNField;
   //! forward declaration of the field collection
   class NFieldCollection;
   //! forward declacation of the field's destructor-functor
@@ -115,30 +123,103 @@ namespace muGrid {
 
     //! place a new field in the responsibility of this collection (Note,
     //! because fields have protected constructors, users can't create them
-    template <class NFieldType, typename... Args>
-    NFieldType & register_field(const std::string & unique_name,
-                                Args &&... args);
+    template <typename T>
+    TypedNField<T> & register_field(const std::string & unique_name,
+                                    Dim_t nb_components) {
+      static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
+                    "You can only register fields templated with one of the "
+                    "numeric types Real, Complex, Int, or UInt");
+      return this->register_field_helper<T>(unique_name, nb_components);
+    }
 
-    //! place a new state field in the responsibility of this collection (Note,
-    //! because state fields have protected constructors, users can't create
-    //! them
-    template <class StateNFieldType, typename... Args>
-    StateNFieldType & register_state_field(const std::string & unique_prefix,
-                                           Args &&... args);
+    TypedNField<Real> & register_real_field(const std::string & unique_name,
+                                            Dim_t nb_components);
+    TypedNField<Complex> &
+    register_complex_field(const std::string & unique_name,
+                           Dim_t nb_components);
+    TypedNField<Int> & register_int_field(const std::string & unique_name,
+                                          Dim_t nb_components);
+    TypedNField<Uint> & register_uint_field(const std::string & unique_name,
+                                            Dim_t nb_components);
 
-    //! check whether a field of name 'unique_name' has already been registered
+    //! place a new state field in the responsibility of this collection
+    //! (Note, because state fields have protected constructors, users can't
+    //! create them
+    template <typename T>
+    TypedStateNField<T> &
+    register_state_field(const std::string & unique_prefix,
+                         Dim_t nb_memory, Dim_t nb_components) {
+      static_assert(
+          std::is_scalar<T>::value or std::is_same<T, Complex>::value,
+          "You can only register state fields templated with one of the "
+          "numeric types Real, Complex, Int, or UInt");
+      return this->register_state_field_helper<T>(unique_prefix, nb_memory,
+                                                  nb_components);
+    }
+
+    TypedStateNField<Real> &
+    register_real_state_field(const std::string & unique_name,
+                              Dim_t nb_memory,
+                              Dim_t nb_components);
+    TypedStateNField<Complex> &
+    register_complex_state_field(const std::string & unique_name,
+                                 Dim_t nb_memory,
+                                 Dim_t nb_components);
+    TypedStateNField<Int> &
+    register_int_state_field(const std::string & unique_name,
+                             Dim_t nb_memory,
+                             Dim_t nb_components);
+    TypedStateNField<Uint> &
+    register_uint_state_field(const std::string & unique_name,
+                              Dim_t nb_memory,
+                              Dim_t nb_components);
+
+    //! place a new field in the responsibility of this collection (Note,
+    //! because fields have protected constructors, users can't create them
+    template <typename T>
+    WrappedNField<T> & register_wrapped_field(
+        const std::string & unique_name, Dim_t nb_components,
+        Eigen::Ref<typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>>
+        values) {
+      static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
+                    "You can only register wrapped fields templated with one "
+                    "of the numeric types Real, Complex, Int, or UInt");
+      return this->register_wrapped_field_helper<T>(unique_name, nb_components, values);
+    }
+
+    WrappedNField<Real> &
+    register_real_wrapped_field(
+        const std::string & unique_name, Dim_t nb_components,
+        Eigen::Ref<Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>> values);
+    WrappedNField<Complex> &
+    register_complex_wrapped_field(
+        const std::string & unique_name, Dim_t nb_components,
+        Eigen::Ref<Eigen::Matrix<Complex, Eigen::Dynamic, Eigen::Dynamic>> values);
+    WrappedNField<Int> &
+    register_int_wrapped_field(
+        const std::string & unique_name, Dim_t nb_components,
+        Eigen::Ref<Eigen::Matrix<Int, Eigen::Dynamic, Eigen::Dynamic>> values);
+    WrappedNField<Uint> &
+    register_uint_wrapped_field(
+        const std::string & unique_name, Dim_t nb_components,
+        Eigen::Ref<Eigen::Matrix<Uint, Eigen::Dynamic, Eigen::Dynamic>> values);
+
+    //! check whether a field of name 'unique_name' has already been
+    //! registered
     bool field_exists(const std::string & unique_name) const;
 
-    //! check whether a field of name 'unique_name' has already been registered
+    //! check whether a field of name 'unique_name' has already been
+    //! registered
     bool state_field_exists(const std::string & unique_prefix) const;
 
     /**
-     * returns the number of entries held by any given field in this collection.
-     * This correspons nb_pixels × nb_quad_pts, (I.e., a scalar field field and
-     * a vector field sharing the the same collection have the same number of
-     * entries, even though the vector field has more scalar values.)
+     * returns the number of entries held by any given field in this
+     * collection. This correspons nb_pixels × nb_quad_pts, (I.e., a scalar
+     * field field and a vector field sharing the the same collection have the
+     * same number of entries, even though the vector field has more scalar
+     * values.)
      */
-    const Dim_t & size() const;
+    Dim_t size() const;
 
     //! returns the number of pixels present in the collection
     size_t get_nb_pixels() const;
@@ -153,12 +234,12 @@ namespace muGrid {
      * set the number of quadrature points per pixel/voxel. Can only be done
      * once.
      */
-    void set_nb_quad(const Dim_t & nb_quad_pts_per_pixel);
+    void set_nb_quad(Dim_t nb_quad_pts_per_pixel);
 
     /**
      * returns the number of quadrature points
      */
-    const Dim_t & get_nb_quad() const;
+    Dim_t get_nb_quad() const;
 
     const Domain & get_domain() const;
 
@@ -172,10 +253,28 @@ namespace muGrid {
     NField & get_field(const std::string & unique_name);
     StateNField & get_state_field(const std::string & unique_prefix);
 
+    const std::map<std::string, NField_ptr> & get_fields() const;
+
+    std::vector<std::string> list_fields() const;
+
    protected:
+    template <typename T>
+    TypedNField<T> & register_field_helper(const std::string & unique_name,
+                                           Dim_t nb_components);
+    template <typename T>
+    TypedStateNField<T> &
+    register_state_field_helper(const std::string & unique_prefix,
+                                Dim_t nb_memory, Dim_t nb_components);
+    template <typename T>
+    WrappedNField<T> &
+    register_wrapped_field_helper(
+        const std::string & unique_prefix, Dim_t nb_components,
+        Eigen::Ref<typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>>
+        values);
+
     /**
-     * loop through all fields and allocate their memory. Is exclusively called
-     * by the daughter classes' `initialise` member function.
+     * loop through all fields and allocate their memory. Is exclusively
+     * called by the daughter classes' `initialise` member function.
      */
     void allocate_fields();
     //! storage container for fields
@@ -195,70 +294,13 @@ namespace muGrid {
     /**
      * Storage for indices of the stored quadrature points in the global field
      * collection. Note that these are not truly global indices, but rather
-     * absolute indices within the domain of the local processor. I.e., they are
-     * universally valid to address any quadrature point on the local processor,
-     * and not for any quadrature point located on anothe processor.
+     * absolute indices within the domain of the local processor. I.e., they
+     * are universally valid to address any quadrature point on the local
+     * processor, and not for any quadrature point located on anothe
+     * processor.
      */
     std::vector<size_t> indices{};
   };
-
-  /* ---------------------------------------------------------------------- */
-  template <class NFieldType, typename... Args>
-  NFieldType & NFieldCollection::register_field(const std::string & unique_name,
-                                                Args &&... args) {
-    if (this->field_exists(unique_name)) {
-      std::stringstream error{};
-      error << "A NField of name '" << unique_name
-            << "' is already registered in this field collection. "
-            << "Currently registered fields: ";
-      std::string prelude{""};
-      for (const auto & name_field_pair : this->fields) {
-        error << prelude << '\'' << name_field_pair.first << '\'';
-        prelude = ", ";
-      }
-      throw NFieldCollectionError(error.str());
-    }
-
-    //! If you get a compiler warning about narrowing conversion on the
-    //! following line, please check whether you are creating a TypedNField with
-    //! the number of components specified in 'int' rather than 'size_t'.
-    NFieldType * raw_ptr{new NFieldType{unique_name, *this, args...}};
-    NFieldType & retref{*raw_ptr};
-    NField_ptr field{raw_ptr};
-    if (this->initialised) {
-      retref.resize(this->size());
-    }
-    this->fields[unique_name] = std::move(field);
-    return retref;
-  }
-
-  template <class StateNFieldType, typename... Args>
-  StateNFieldType &
-  NFieldCollection::register_state_field(const std::string & unique_prefix,
-                                         Args &&... args) {
-    if (this->state_field_exists(unique_prefix)) {
-      std::stringstream error{};
-      error << "A StateNField of name '" << unique_prefix
-            << "' is already registered in this field collection. "
-            << "Currently registered state fields: ";
-      std::string prelude{""};
-      for (const auto & name_field_pair : this->state_fields) {
-        error << prelude << '\'' << name_field_pair.first << '\'';
-        prelude = ", ";
-      }
-      throw NFieldCollectionError(error.str());
-    }
-
-    //! If you get a compiler warning about narrowing conversion on the
-    //! following line, please check whether you are creating a TypedNField with
-    //! the number of components specified in 'int' rather than 'size_t'.
-    StateNFieldType * raw_ptr{
-        new StateNFieldType{unique_prefix, *this, args...}};
-    StateNFieldType & retref{*raw_ptr};
-    StateNField_ptr field{raw_ptr};
-    this->state_fields[unique_prefix] = std::move(field);
-    return retref;
-  }
 
   /* ---------------------------------------------------------------------- */
 

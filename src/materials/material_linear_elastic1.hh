@@ -42,31 +42,23 @@
 #include "materials/stress_transformations_PK2.hh"
 #include "materials/material_muSpectre_base.hh"
 #include "materials/materials_toolbox.hh"
+#include <libmugrid/nfield_map_static.hh>
 
 namespace muSpectre {
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimM>
   class MaterialLinearElastic1;
 
   /**
    * traits for objective linear elasticity
    */
-  template <Dim_t DimS, Dim_t DimM>
-  struct MaterialMuSpectre_traits<MaterialLinearElastic1<DimS, DimM>> {
-    using Parent = MaterialMuSpectre_traits<void>;  //!< base for elasticity
-
-    //! global field collection
-    using GFieldCollection_t =
-        typename MaterialBase<DimS, DimM>::GFieldCollection_t;
-
+  template <Dim_t DimM>
+  struct MaterialMuSpectre_traits<MaterialLinearElastic1<DimM>> {
     //! expected map type for strain fields
-    using StrainMap_t =
-        muGrid::MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM, true>;
+    using StrainMap_t = muGrid::T2NFieldMap<Real, Mapping::Const, DimM>;
     //! expected map type for stress fields
-    using StressMap_t =
-        muGrid::MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
+    using StressMap_t = muGrid::T2NFieldMap<Real, Mapping::Mut, DimM>;
     //! expected map type for tangent stiffness fields
-    using TangentMap_t =
-        muGrid::T4MatrixFieldMap<GFieldCollection_t, Real, DimM>;
+    using TangentMap_t = muGrid::T4NFieldMap<Real, Mapping::Mut, DimM>;
 
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
@@ -74,18 +66,16 @@ namespace muSpectre {
     constexpr static auto stress_measure{StressMeasure::PK2};
   };
 
-  //! DimS spatial dimension (dimension of problem
   //! DimM material_dimension (dimension of constitutive law)
   /**
    * implements objective linear elasticity
    */
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimM>
   class MaterialLinearElastic1
-      : public MaterialMuSpectre<MaterialLinearElastic1<DimS, DimM>, DimS,
-                                 DimM> {
+      : public MaterialMuSpectre<MaterialLinearElastic1<DimM>, DimM> {
    public:
     //! base class
-    using Parent = MaterialMuSpectre<MaterialLinearElastic1, DimS, DimM>;
+    using Parent = MaterialMuSpectre<MaterialLinearElastic1, DimM>;
 
     using Stiffness_t = T4Mat<Real, DimM>;
 
@@ -127,9 +117,9 @@ namespace muSpectre {
      * evaluates second Piola-Kirchhoff stress given the Green-Lagrange
      * strain (or Cauchy stress if called with a small strain tensor)
      */
-    template <class s_t>
-    inline decltype(auto) evaluate_stress(s_t && E,
-                                          const size_t & /*pixel_index*/);
+    template <class Derived>
+    inline decltype(auto) evaluate_stress(const Eigen::MatrixBase<Derived> & E,
+                                          const size_t & /*quad_pt_index*/);
 
     template <class s_t>
     inline decltype(auto) evaluate_stress(s_t && E);
@@ -138,19 +128,20 @@ namespace muSpectre {
      * the Green-Lagrange strain (or Cauchy stress and stiffness if
      * called with a small strain tensor)
      */
-    template <class s_t>
+    template <class Derived>
     inline decltype(auto)
-    evaluate_stress_tangent(s_t && E, const size_t & /*pixel_index*/);
+    evaluate_stress_tangent(const Eigen::MatrixBase<Derived> & E,
+                            const size_t & /*quad_pt_index*/);
 
     template <class s_t>
     inline decltype(auto)
     evaluate_stress_tangent(s_t && E);
 
    protected:
-    const Real young;     //!< Young's modulus
-    const Real poisson;   //!< Poisson's ratio
-    const Real lambda;    //!< first Lamé constant
-    const Real mu;        //!< second Lamé constant (shear modulus)
+    const Real young;    //!< Young's modulus
+    const Real poisson;  //!< Poisson's ratio
+    const Real lambda;   //!< first Lamé constant
+    const Real mu;       //!< second Lamé constant (shear modulus)
 
     // Here, the stiffness tensor is encapsulated into a unique ptr because of
     // this bug:
@@ -169,45 +160,25 @@ namespace muSpectre {
   };
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  template <class s_t>
-  auto MaterialLinearElastic1<DimS, DimM>::evaluate_stress(s_t && E)
-      -> decltype(auto) {
-    return Hooke::evaluate_stress(this->lambda, this->mu, std::move(E));
+  template <Dim_t DimM>
+  template <class Derived>
+  auto MaterialLinearElastic1<DimM>::evaluate_stress(
+      const Eigen::MatrixBase<Derived> & E, const size_t &
+      /*quad_pt_index*/) -> decltype(auto) {
+    return Hooke::evaluate_stress(this->lambda, this->mu, E);
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  template <class s_t>
-  auto MaterialLinearElastic1<DimS, DimM>::evaluate_stress_tangent(s_t && E)
-      -> decltype(auto) {
+  template <Dim_t DimM>
+  template <class Derived>
+  auto MaterialLinearElastic1<DimM>::evaluate_stress_tangent(
+      const Eigen::MatrixBase<Derived> & E, const size_t &
+      /*quad_pt_index*/) -> decltype(auto) {
     using Tangent_t = typename traits::TangentMap_t::reference;
 
     return Hooke::evaluate_stress(
         this->lambda, this->mu, Tangent_t(const_cast<double *>(this->C.data())),
-        std::move(E));
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  template <class s_t>
-  auto MaterialLinearElastic1<DimS, DimM>::evaluate_stress(s_t && E,
-                                                           const size_t &
-                                                           /*pixel_index*/)
-      -> decltype(auto) {
-    return Hooke::evaluate_stress(this->lambda, this->mu, std::move(E));
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  template <class s_t>
-  auto MaterialLinearElastic1<DimS, DimM>::evaluate_stress_tangent(
-      s_t && E, const size_t & /*pixel_index*/) -> decltype(auto) {
-    using Tangent_t = typename traits::TangentMap_t::reference;
-
-    return Hooke::evaluate_stress(
-        this->lambda, this->mu, Tangent_t(const_cast<double *>(this->C.data())),
-        std::move(E));
+        E);
   }
 
 }  // namespace muSpectre

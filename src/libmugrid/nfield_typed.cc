@@ -54,6 +54,12 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
+  void TypedNField<T>::set_zero() {
+    std::fill(this->values.begin(), this->values.end(), T{});
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
   void TypedNField<T>::set_pad_size(size_t pad_size) {
     this->pad_size = pad_size;
     this->resize(this->size());
@@ -61,8 +67,60 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  void TypedNField<T>::set_zero() {
-    std::fill(this->values.begin(), this->values.end(), T{});
+  TypedNField<T> & TypedNField<T>::safe_cast(NField & other) {
+    try {
+      return dynamic_cast<TypedNField<T> &>(other);
+    } catch (const std::bad_cast &) {
+      std::stringstream error{};
+      error << "Cannot cast field'" << other.get_name()
+            << "' to a typed field of type '" << typeid(T).name()
+            << "', because it is of type '" << other.get_stored_typeid().name()
+            << "'.";
+      throw NFieldError(error.str());
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
+  const TypedNField<T> & TypedNField<T>::safe_cast(const NField & other) {
+    try {
+      return dynamic_cast<const TypedNField<T> &>(other);
+    } catch (const std::bad_cast &) {
+      std::stringstream error{};
+      error << "Cannot cast field'" << other.get_name()
+            << "' to a typed field of type '" << typeid(T).name()
+            << "', because it is of type '" << other.get_stored_typeid().name()
+            << "'.";
+      throw NFieldError(error.str());
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
+  TypedNField<T> & TypedNField<T>::safe_cast(NField & other,
+                                             const Dim_t & nb_components) {
+    if (other.get_nb_components() != nb_components) {
+      std::stringstream error{};
+      error << "Cannot cast field'" << other.get_name() << "', because it has "
+            << other.get_nb_components() << " compoments, rather than the "
+            << nb_components << " components which are requested.";
+      throw NFieldError(error.str());
+    }
+    return TypedNField::safe_cast(other);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
+  const TypedNField<T> &
+  TypedNField<T>::safe_cast(const NField & other, const Dim_t & nb_components) {
+    if (other.get_nb_components() != nb_components) {
+      std::stringstream error{};
+      error << "Cannot cast field'" << other.get_name() << "', because it has "
+            << other.get_nb_components() << " compoments, rather than the "
+            << nb_components << " components which are requested.";
+      throw NFieldError(error.str());
+    }
+    return TypedNField::safe_cast(other);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -203,26 +261,26 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  auto TypedNFieldBase<T>::get_pixel_map() -> NFieldMap<T, false> {
-    return NFieldMap<T, false>{*this, Iteration::Pixel};
+  auto TypedNFieldBase<T>::get_pixel_map() -> NFieldMap<T, Mapping::Mut> {
+    return NFieldMap<T, Mapping::Mut>{*this, Iteration::Pixel};
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  auto TypedNFieldBase<T>::get_pixel_map() const -> NFieldMap<T, true> {
-    return NFieldMap<T, true>{*this, Iteration::Pixel};
+  auto TypedNFieldBase<T>::get_pixel_map() const -> NFieldMap<T, Mapping::Const> {
+    return NFieldMap<T, Mapping::Const>{*this, Iteration::Pixel};
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  auto TypedNFieldBase<T>::get_quad_pt_map() -> NFieldMap<T, false> {
-    return NFieldMap<T, false>{*this, Iteration::QuadPt};
+  auto TypedNFieldBase<T>::get_quad_pt_map() -> NFieldMap<T, Mapping::Mut> {
+    return NFieldMap<T, Mapping::Mut>{*this, Iteration::QuadPt};
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  auto TypedNFieldBase<T>::get_quad_pt_map() const -> NFieldMap<T, true> {
-    return NFieldMap<T, true>{*this, Iteration::QuadPt};
+  auto TypedNFieldBase<T>::get_quad_pt_map() const -> NFieldMap<T, Mapping::Const> {
+    return NFieldMap<T, Mapping::Const>{*this, Iteration::QuadPt};
   }
 
   template <typename T>

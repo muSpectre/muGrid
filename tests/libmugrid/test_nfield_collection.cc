@@ -72,13 +72,13 @@ namespace muGrid {
                                    Fix) {
     BOOST_CHECK(Fix::fc.get_domain() == NFieldCollection::Domain::Global);
     const std::string right_name{"right name"}, wrong_name{"wrong name"};
-    Fix::fc.template register_field<TypedNField<Real>>(right_name, 1);
+    Fix::fc.register_real_field(right_name, 1);
     const bool should_be_true{Fix::fc.field_exists(right_name)};
     const bool should_be_false{Fix::fc.field_exists(wrong_name)};
     BOOST_CHECK_EQUAL(true, should_be_true);
     BOOST_CHECK_EQUAL(false, should_be_false);
     BOOST_CHECK_EQUAL(Unknown, Fix::fc.size());
-    BOOST_CHECK_THROW(Fix::fc.template register_field<TypedNField<Real>>(
+    BOOST_CHECK_THROW(Fix::fc.register_real_field(
                           right_name, 24),
                       NFieldCollectionError);
   }
@@ -90,7 +90,7 @@ namespace muGrid {
     LocalNFieldCollection fc{Unknown, Unknown};
     BOOST_CHECK(fc.get_domain() == NFieldCollection::Domain::Local);
     const std::string right_name{"right name"}, wrong_name{"wrong name"};
-    fc.template register_field<TypedNField<Real>>(right_name, 1);
+    fc.template register_field<Real>(right_name, 1);
     const bool should_be_true{fc.field_exists(right_name)};
     const bool should_be_false{fc.field_exists(wrong_name)};
     BOOST_CHECK_EQUAL(true, should_be_true);

@@ -92,15 +92,12 @@ namespace muFFT {
     Fix::engine.initialise(FFT_PlanFlags::estimate);
     using FC_t = muGrid::GlobalNFieldCollection<Fix::sdim>;
     FC_t fc(1);
-    auto & input{fc.template register_field<muGrid::TypedNField<Real>>(
-        "input", Fix::mdim*Fix::mdim)};
-    auto & ref{fc.template register_field<muGrid::TypedNField<Real>>(
-            "reference", Fix::mdim*Fix::mdim)};
-    auto & result{fc.template register_field<muGrid::TypedNField<Real>>(
-            "result", Fix::mdim*Fix::mdim)};
+    auto & input{fc.register_real_field("input", Fix::mdim * Fix::mdim)};
+    auto & ref{fc.register_real_field("reference", Fix::mdim * Fix::mdim)};
+    auto & result{fc.register_real_field("result", Fix::mdim * Fix::mdim)};
     fc.initialise(Fix::res(), Fix::loc());
 
-    using map_t = muGrid::MatrixNFieldMap<Real, false, Fix::mdim, Fix::mdim>;
+    using map_t = muGrid::MatrixNFieldMap<Real, Mapping::Mut, Fix::mdim, Fix::mdim>;
     map_t inmap{input};
     inmap.initialise();
     auto refmap{map_t{ref}};
@@ -117,7 +114,7 @@ namespace muFFT {
     }
     auto & complex_field = Fix::engine.fft(input);
     using cmap_t =
-        muGrid::MatrixNFieldMap<Complex, false, Fix::mdim, Fix::mdim>;
+        muGrid::MatrixNFieldMap<Complex, Mapping::Mut, Fix::mdim, Fix::mdim>;
     cmap_t complex_map(complex_field);
     complex_map.initialise();
     Real error = complex_map[0].imag().norm();

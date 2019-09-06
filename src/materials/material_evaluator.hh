@@ -41,7 +41,7 @@
 
 #include <libmugrid/T4_map_proxy.hh>
 #include <libmugrid/ccoord_operations.hh>
-#include <libmugrid/field.hh>
+#include <libmugrid/mapped_nfield.hh>
 
 #include <exception>
 #include <memory>
@@ -50,9 +50,8 @@
 namespace muSpectre {
 
   /**
-   * forward declaration to avoid incluning material_base.hh
+   * forward declaration to avoid including material_base.hh
    */
-  template <Dim_t DimS, Dim_t DimM>
   class MaterialBase;
 
   template <Dim_t DimM>
@@ -67,9 +66,7 @@ namespace muSpectre {
     using T2_const_map = Eigen::Map<const T2_t>;
     using T4_const_map = muGrid::T4MatMap<Real, DimM, true>;
 
-    using FieldColl_t = muGrid::GlobalFieldCollection<DimM>;
-    using T2Field_t = muGrid::TensorField<FieldColl_t, Real, secondOrder, DimM>;
-    using T4Field_t = muGrid::TensorField<FieldColl_t, Real, fourthOrder, DimM>;
+    using FieldColl_t = muGrid::GlobalNFieldCollection<DimM>;
 
     //! Default constructor
     MaterialEvaluator() = delete;
@@ -77,12 +74,11 @@ namespace muSpectre {
     /**
      * constructor with a shared pointer to a Material
      */
-    explicit MaterialEvaluator(
-        std::shared_ptr<MaterialBase<DimM, DimM>> material)
-        : material{material}, collection{std::make_unique<FieldColl_t>()},
-          strain{muGrid::make_field<T2Field_t>("gradient", *this->collection)},
-          stress{muGrid::make_field<T2Field_t>("stress", *this->collection)},
-          tangent{muGrid::make_field<T4Field_t>("tangent", *this->collection)} {
+    explicit MaterialEvaluator(std::shared_ptr<MaterialBase> material)
+        : material{material}, collection{std::make_unique<FieldColl_t>(1)},
+          strain("gradient", *this->collection),
+          stress{"stress", *this->collection}, tangent{"tangent",
+                                                       *this->collection} {
       this->collection->initialise(muGrid::CcoordOps::get_cube<DimM>(1), {0});
     }
 
@@ -136,18 +132,21 @@ namespace muSpectre {
                      const Formulation & form, const Real step,
                      const FiniteDiff diff_type = FiniteDiff::centred);
 
+    inline void initialise();
+
    protected:
     /**
      * throws a runtime error if the material's per-pixel data has not been set.
      */
-    void check_init() const;
+    void check_init();
 
-    std::shared_ptr<MaterialBase<DimM, DimM>> material;
+    std::shared_ptr<MaterialBase> material;
     std::unique_ptr<FieldColl_t> collection;
-    T2Field_t & strain;
-    T2Field_t & stress;
-    T4Field_t & tangent;
-  };
+    muGrid::MappedT2NField<Real, Mapping::Mut, DimM> strain;
+    muGrid::MappedT2NField<Real, Mapping::Mut, DimM> stress;
+    muGrid::MappedT4NField<Real, Mapping::Mut, DimM> tangent;
+    bool is_initialised{false};
+  };  // namespace muSpectre
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimM>
@@ -157,7 +156,8 @@ namespace muSpectre {
       -> T2_const_map {
     this->check_init();
     this->strain.get_map()[0] = grad;
-    this->material->compute_stresses(this->strain, this->stress, form);
+    this->material->compute_stresses(this->strain.get_field(),
+                                     this->stress.get_field(), form);
     return T2_const_map(this->stress.get_map()[0].data());
   }
 
@@ -168,14 +168,18 @@ namespace muSpectre {
       -> std::tuple<T2_const_map, T4_const_map> {
     this->check_init();
     this->strain.get_map()[0] = grad;
-    this->material->compute_stresses_tangent(this->strain, this->stress,
-                                             this->tangent, form);
+    this->material->compute_stresses_tangent(this->strain.get_field(),
+                                             this->stress.get_field(),
+                                             this->tangent.get_field(), form);
     return std::make_tuple(T2_const_map(this->stress.get_map()[0].data()),
                            T4_const_map(this->tangent.get_map()[0].data()));
   }
 
   template <Dim_t DimM>
-  void MaterialEvaluator<DimM>::check_init() const {
+  void MaterialEvaluator<DimM>::check_init() {
+    if (not this->is_initialised) {
+      this->initialise();
+    }
     const auto & size{this->material->size()};
     if (size < 1) {
       throw std::runtime_error(
@@ -262,6 +266,16 @@ namespace muSpectre {
                     "wrong column size");
     }
     return tangent;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimM>
+  void MaterialEvaluator<DimM>::initialise() {
+    this->material->initialise();
+    this->strain.get_map().initialise();
+    this->stress.get_map().initialise();
+    this->tangent.get_map().initialise();
+    this->is_initialised = true;
   }
 
 }  // namespace muSpectre

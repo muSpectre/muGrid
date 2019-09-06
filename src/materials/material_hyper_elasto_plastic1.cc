@@ -42,45 +42,49 @@
 namespace muSpectre {
 
   //--------------------------------------------------------------------------//
-  template <Dim_t DimS, Dim_t DimM>
-  MaterialHyperElastoPlastic1<DimS, DimM>::MaterialHyperElastoPlastic1(
-      std::string name, Real young, Real poisson, Real tau_y0, Real H)
-      : Parent{name}, plast_flow_field{this->internal_fields,
-                                       "cumulated plastic flow εₚ"},
-        F_prev_field{this->internal_fields, "Previous placement gradient Fᵗ"},
-        be_prev_field{this->internal_fields,
-                      "Previous left Cauchy-Green deformation bₑᵗ"},
+  template <Dim_t DimM>
+  MaterialHyperElastoPlastic1<DimM>::MaterialHyperElastoPlastic1(
+      const std::string & name, const Dim_t & spatial_dimension,
+      const Dim_t & nb_quad_pts, const Real & young, const Real & poisson,
+      const Real & tau_y0, const Real & H)
+      : Parent{name, spatial_dimension, nb_quad_pts},
+        plast_flow_field{"cumulated plastic flow εₚ", this->internal_fields},
+        F_prev_field{"Previous placement gradient Fᵗ", this->internal_fields},
+        be_prev_field{"Previous left Cauchy-Green deformation bₑᵗ",
+                      this->internal_fields},
         young{young}, poisson{poisson}, lambda{Hooke::compute_lambda(young,
                                                                      poisson)},
         mu{Hooke::compute_mu(young, poisson)},
         K{Hooke::compute_K(young, poisson)}, tau_y0{tau_y0}, H{H},
         // the factor .5 comes from equation (18) in Geers 2003
         // (https://doi.org/10.1016/j.cma.2003.07.014)
-        C{0.5 * Hooke::compute_C_T4(lambda, mu)} {}
+        C_holder{std::make_unique<const muGrid::T4Mat<Real, DimM>>(
+            0.5 * Hooke::compute_C_T4(lambda, mu))},
+        C{*this->C_holder} {}
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void MaterialHyperElastoPlastic1<DimS, DimM>::save_history_variables() {
-    this->plast_flow_field.get_field().cycle();
-    this->F_prev_field.get_field().cycle();
-    this->be_prev_field.get_field().cycle();
+  template <Dim_t DimM>
+  void MaterialHyperElastoPlastic1<DimM>::save_history_variables() {
+    this->plast_flow_field.get_state_field().cycle();
+    this->F_prev_field.get_state_field().cycle();
+    this->be_prev_field.get_state_field().cycle();
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void MaterialHyperElastoPlastic1<DimS, DimM>::initialise() {
+  template <Dim_t DimM>
+  void MaterialHyperElastoPlastic1<DimM>::initialise() {
     Parent::initialise();
-    this->F_prev_field.get_map().current() =
+    this->F_prev_field.get_map().get_current() =
         Eigen::Matrix<Real, DimM, DimM>::Identity();
-    this->be_prev_field.get_map().current() =
+    this->be_prev_field.get_map().get_current() =
         Eigen::Matrix<Real, DimM, DimM>::Identity();
     this->save_history_variables();
   }
   //--------------------------------------------------------------------------//
-  template <Dim_t DimS, Dim_t DimM>
-  auto MaterialHyperElastoPlastic1<DimS, DimM>::stress_n_internals_worker(
-      const T2_t & F, StrainStRef_t & F_prev, StrainStRef_t & be_prev,
-      FlowStRef_t & eps_p) -> Worker_t {
+  template <Dim_t DimM>
+  auto MaterialHyperElastoPlastic1<DimM>::stress_n_internals_worker(
+      const T2_t & F, T2StRef_t & F_prev, T2StRef_t & be_prev,
+      ScalarStRef_t & eps_p) -> Worker_t {
     // the notation in this function follows Geers 2003
     // (https://doi.org/10.1016/j.cma.2003.07.014).
 
@@ -123,10 +127,12 @@ namespace muSpectre {
   }
 
   //--------------------------------------------------------------------------//
-  template <Dim_t DimS, Dim_t DimM>
-  auto MaterialHyperElastoPlastic1<DimS, DimM>::evaluate_stress(
-      const T2_t & F, StrainStRef_t F_prev, StrainStRef_t be_prev,
-      FlowStRef_t eps_p) -> T2_t {
+  template <Dim_t DimM>
+  auto MaterialHyperElastoPlastic1<DimM>::evaluate_stress(const T2_t & F,
+                                                          T2StRef_t F_prev,
+                                                          T2StRef_t be_prev,
+                                                          ScalarStRef_t eps_p)
+      -> T2_t {
     Eigen::Matrix<Real, DimM, DimM> tau;
     std::tie(tau, std::ignore, std::ignore, std::ignore, std::ignore,
              std::ignore) =
@@ -136,10 +142,10 @@ namespace muSpectre {
   }
 
   //--------------------------------------------------------------------------//
-  template <Dim_t DimS, Dim_t DimM>
-  auto MaterialHyperElastoPlastic1<DimS, DimM>::evaluate_stress_tangent(
-      const T2_t & F, StrainStRef_t F_prev, StrainStRef_t be_prev,
-      FlowStRef_t eps_p) -> std::tuple<T2_t, T4_t> {
+  template <Dim_t DimM>
+  auto MaterialHyperElastoPlastic1<DimM>::evaluate_stress_tangent(
+      const T2_t & F, T2StRef_t F_prev, T2StRef_t be_prev, ScalarStRef_t eps_p)
+      -> std::tuple<T2_t, T4_t> {
     //! after the stress computation, all internals are up to date
     auto && vals{this->stress_n_internals_worker(F, F_prev, be_prev, eps_p)};
     auto & tau{std::get<0>(vals)};
@@ -208,7 +214,6 @@ namespace muSpectre {
     return std::tuple<Mat_t, T4_t>(tau, dtau_dF);
   }
 
-  template class MaterialHyperElastoPlastic1<twoD, twoD>;
-  template class MaterialHyperElastoPlastic1<twoD, threeD>;
-  template class MaterialHyperElastoPlastic1<threeD, threeD>;
+  template class MaterialHyperElastoPlastic1<twoD>;
+  template class MaterialHyperElastoPlastic1<threeD>;
 }  // namespace muSpectre

@@ -38,6 +38,7 @@
 
 #include "state_nfield_map.hh"
 #include "nfield_map_static.hh"
+#include "nfield_typed.hh"
 
 #include <array>
 #include <sstream>
@@ -46,19 +47,25 @@
 namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
-  template <typename T, bool ConstField, class MapType, size_t NbMemory,
+  template <typename T, Mapping Mutability, class MapType, size_t NbMemory,
             Iteration IterationType = Iteration::QuadPt>
-  class StaticStateNFieldMap : public StateNFieldMap<T, ConstField> {
+  class StaticStateNFieldMap : public StateNFieldMap<T, Mutability> {
     static_assert(MapType::IsValidStaticMapType(),
                   "The MapType you chose is not compatible");
 
    public:
-    using Parent = StateNFieldMap<T, ConstField>;
+    using Scalar_t = T;
+    using Parent = StateNFieldMap<T, Mutability>;
     using StaticNFieldMap_t =
-        StaticNFieldMap<T, ConstField, MapType, IterationType>;
-    using CStaticNFieldMap_t = StaticNFieldMap<T, true, MapType, IterationType>;
+        StaticNFieldMap<T, Mutability, MapType, IterationType>;
+    using CStaticNFieldMap_t =
+        StaticNFieldMap<T, Mapping::Const, MapType, IterationType>;
     using MapArray_t = std::array<StaticNFieldMap_t, NbMemory + 1>;
     using CMapArray_t = std::array<CStaticNFieldMap_t, NbMemory + 1>;
+
+    constexpr static size_t GetNbMemory() { return NbMemory; }
+    constexpr static Mapping FieldMutability() { return Mutability; }
+    constexpr static Iteration GetIterationType() { return IterationType; }
 
     //! Default constructor
     StaticStateNFieldMap() = delete;
@@ -86,10 +93,11 @@ namespace muGrid {
     //! Move assignment operator
     StaticStateNFieldMap & operator=(StaticStateNFieldMap && other) = default;
 
-    template <bool ConstIter>
+    template <Mapping MutIter>
     class Iterator;
-    using iterator = Iterator<false or ConstField>;
-    using const_iterator = Iterator<true>;
+    using iterator =
+        Iterator<(Mutability == Mapping::Mut) ? Mapping::Mut : Mapping::Const>;
+    using const_iterator = Iterator<Mapping::Const>;
 
     iterator begin() { return iterator{*this, 0}; }
     iterator end() { return iterator{*this, this->static_maps.front().size()}; }
@@ -106,29 +114,38 @@ namespace muGrid {
       return this->static_maps[this->state_field.get_indices()[0]];
     }
 
-    template <bool ConstWrapper>
+    template <Mapping MutWrapper>
     class StaticStateWrapper {
      public:
       using StaticStateNFieldMap_t =
-          std::conditional_t<ConstWrapper, const StaticStateNFieldMap,
-                             StaticStateNFieldMap>;
-      using CurrentVal_t = typename MapType::template ref_type<ConstWrapper>;
+          std::conditional_t<MutWrapper == Mapping::Const,
+                             const StaticStateNFieldMap, StaticStateNFieldMap>;
+      using CurrentVal_t = typename MapType::template ref_type<MutWrapper>;
       using CurrentStorage_t =
-          typename MapType::template storage_type<ConstWrapper>;
-      using OldVal_t =  typename MapType::template ref_type<true>;
-      using OldStorage_t = typename MapType::template storage_type<true>;
+          typename MapType::template storage_type<MutWrapper>;
+      using OldVal_t = typename MapType::template ref_type<Mapping::Const>;
+      using OldStorage_t =
+          typename MapType::template storage_type<Mapping::Const>;
       StaticStateWrapper(StaticStateNFieldMap_t & state_field_map, size_t index)
-          : current_val(MapType::template to_storage<ConstWrapper>(
+          : current_val(MapType::template to_storage<MutWrapper>(
                 state_field_map.get_current_static()[index])),
             old_vals{this->make_old_vals_static(state_field_map, index)} {}
       ~StaticStateWrapper() = default;
 
       CurrentVal_t & current() {
-        return MapType::template provide_ref<ConstWrapper>(this->current_val);
+        return MapType::template provide_ref<MutWrapper>(this->current_val);
       }
 
       const OldVal_t & old(size_t nb_steps_ago) const {
-        return this->old_vals[nb_steps_ago - 1];
+        return MapType::template provide_const_ref<Mapping::Const>(
+            this->old_vals[nb_steps_ago - 1]);
+      }
+
+      template <size_t NbStepsAgo = 1>
+      const OldVal_t & old() const {
+        static_assert(NbStepsAgo <= NbMemory, "NbStepsAgo out of range");
+        return MapType::template provide_const_ref<Mapping::Const>(
+            this->old_vals[NbStepsAgo - 1]);
       }
 
      protected:
@@ -145,17 +162,17 @@ namespace muGrid {
       old_vals_helper_static(StaticStateNFieldMap_t & state_field_map,
                              size_t index, std::index_sequence<NbStepsAgo...>) {
         return std::array<OldStorage_t, NbMemory>{
-            MapType::template to_storage<true>(
+            MapType::template to_storage<Mapping::Const>(
                 state_field_map.get_old_static(NbStepsAgo)[index])...};
       }
     };
 
-    StaticStateWrapper<ConstField> operator[](size_t index) {
-      return StaticStateWrapper<ConstField>{*this, index};
+    StaticStateWrapper<Mutability> operator[](size_t index) {
+      return StaticStateWrapper<Mutability>{*this, index};
     }
 
-    StaticStateWrapper<true> operator[](size_t index) const {
-      return StaticStateWrapper<true>{*this, index};
+    StaticStateWrapper<Mapping::Const> operator[](size_t index) const {
+      return StaticStateWrapper<Mapping::Const>{*this, index};
     }
 
     void initialise() {
@@ -170,12 +187,13 @@ namespace muGrid {
 
    protected:
     /* ---------------------------------------------------------------------- */
-    template <bool ConstIter>
-    using HelperRet_t = std::conditional_t<ConstIter, CMapArray_t, MapArray_t>;
+    template <Mapping MutIter>
+    using HelperRet_t =
+        std::conditional_t<MutIter == Mapping::Const, CMapArray_t, MapArray_t>;
 
     /* ---------------------------------------------------------------------- */
-    template <bool ConstIter, size_t... I>
-    inline auto map_helper(std::index_sequence<I...>) -> HelperRet_t<ConstIter>;
+    template <Mapping MutIter, size_t... I>
+    inline auto map_helper(std::index_sequence<I...>) -> HelperRet_t<MutIter>;
 
     /* ---------------------------------------------------------------------- */
     inline MapArray_t make_maps();
@@ -186,24 +204,25 @@ namespace muGrid {
   };
 
   /* ---------------------------------------------------------------------- */
-  template <typename T, bool ConstField, class MapType, size_t NbMemory,
+  template <typename T, Mapping Mutability, class MapType, size_t NbMemory,
             Iteration IterationType>
-  template <bool ConstIter, size_t... I>
+  template <Mapping MutIter, size_t... I>
   auto
-  StaticStateNFieldMap<T, ConstField, MapType, NbMemory,
+  StaticStateNFieldMap<T, Mutability, MapType, NbMemory,
                        IterationType>::map_helper(std::index_sequence<I...>)
-      -> HelperRet_t<ConstIter> {
-    using Array_t = std::conditional_t<ConstIter, CMapArray_t, MapArray_t>;
-    using Map_t =
-        std::conditional_t<ConstIter, CStaticNFieldMap_t, StaticNFieldMap_t>;
+      -> HelperRet_t<MutIter> {
+    using Array_t =
+        std::conditional_t<MutIter == Mapping::Const, CMapArray_t, MapArray_t>;
+    using Map_t = std::conditional_t<MutIter == Mapping::Const,
+                                     CStaticNFieldMap_t, StaticNFieldMap_t>;
     auto & fields{this->get_fields()};
-    return Array_t{Map_t(static_cast<TypedNFieldBase<T> &>(fields[I]))...};
+    return Array_t{Map_t(dynamic_cast<TypedNFieldBase<T> &>(fields[I]))...};
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T, bool ConstField, class MapType, size_t NbMemory,
+  template <typename T, Mapping Mutability, class MapType, size_t NbMemory,
             Iteration IterationType>
-  auto StaticStateNFieldMap<T, ConstField, MapType, NbMemory,
+  auto StaticStateNFieldMap<T, Mutability, MapType, NbMemory,
                             IterationType>::make_maps() -> MapArray_t {
     if (this->state_field.get_nb_memory() != NbMemory) {
       std::stringstream error{};
@@ -213,30 +232,31 @@ namespace muGrid {
       throw NFieldMapError{error.str()};
     }
 
-    return this->map_helper<ConstField>(
+    return this->map_helper<Mutability>(
         std::make_index_sequence<NbMemory + 1>{});
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T, bool ConstField, class MapType, size_t NbMemory,
+  template <typename T, Mapping Mutability, class MapType, size_t NbMemory,
             Iteration IterationType>
-  auto StaticStateNFieldMap<T, ConstField, MapType, NbMemory,
+  auto StaticStateNFieldMap<T, Mutability, MapType, NbMemory,
                             IterationType>::make_cmaps() -> CMapArray_t {
-    return this->map_helper<true>(std::make_index_sequence<NbMemory + 1>{});
+    return this->map_helper<Mapping::Const>(
+        std::make_index_sequence<NbMemory + 1>{});
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T, bool ConstField, class MapType, size_t NbMemory,
+  template <typename T, Mapping Mutability, class MapType, size_t NbMemory,
             Iteration IterationType>
-  template <bool ConstIter>
-  class StaticStateNFieldMap<T, ConstField, MapType, NbMemory,
+  template <Mapping MutIter>
+  class StaticStateNFieldMap<T, Mutability, MapType, NbMemory,
                              IterationType>::Iterator {
    public:
     using StaticStateNFieldMap_t =
-        std::conditional_t<ConstIter, const StaticStateNFieldMap,
-                           StaticStateNFieldMap>;
+        std::conditional_t<MutIter == Mapping::Const,
+                           const StaticStateNFieldMap, StaticStateNFieldMap>;
     using StateWrapper_t =
-        typename StaticStateNFieldMap::template StaticStateWrapper<ConstIter>;
+        typename StaticStateNFieldMap::template StaticStateWrapper<MutIter>;
 
     //! Default constructor
     Iterator() = delete;
@@ -260,8 +280,13 @@ namespace muGrid {
     Iterator & operator=(Iterator && other) = default;
 
     //! comparison
-    bool operator!=(const Iterator & other) {
+    bool operator!=(const Iterator & other) const {
       return this->index != other.index;
+    }
+
+    //! comparison (needed by akantu::iterator
+    bool operator==(const Iterator & other) const {
+      return not(*this != other);
     }
 
     //! pre-increment
@@ -283,35 +308,35 @@ namespace muGrid {
    * Convenience aliases to useful state field maps
    */
   /* ---------------------------------------------------------------------- */
-  template <typename T, bool ConstField, Dim_t NbRow, Dim_t NbCol,
+  template <typename T, Mapping Mutability, Dim_t NbRow, Dim_t NbCol,
             size_t NbMemory, Iteration IterationType = Iteration::QuadPt>
   using MatrixStateNFieldMap =
-      StaticStateNFieldMap<T, ConstField, internal::MatrixMap<T, NbRow, NbCol>,
+      StaticStateNFieldMap<T, Mutability, internal::MatrixMap<T, NbRow, NbCol>,
                            NbMemory, IterationType>;
 
   /* ---------------------------------------------------------------------- */
-  template <typename T, bool ConstField, Dim_t NbRow, Dim_t NbCol,
+  template <typename T, Mapping Mutability, Dim_t NbRow, Dim_t NbCol,
             size_t NbMemory, Iteration IterationType = Iteration::QuadPt>
   using ArrayStateNFieldMap =
-      StaticStateNFieldMap<T, ConstField, internal::ArrayMap<T, NbRow, NbCol>,
+      StaticStateNFieldMap<T, Mutability, internal::ArrayMap<T, NbRow, NbCol>,
                            NbMemory, IterationType>;
 
   //! the following only make sense as per-quadrature-point maps
   /* ---------------------------------------------------------------------- */
-  template <typename T, bool ConstField, size_t NbMemory>
+  template <typename T, Mapping Mutability, size_t NbMemory>
   using ScalarStateNFieldMap =
-      StaticStateNFieldMap<T, ConstField, internal::ScalarMap<T>, NbMemory,
+      StaticStateNFieldMap<T, Mutability, internal::ScalarMap<T>, NbMemory,
                            Iteration::QuadPt>;
 
   /* ---------------------------------------------------------------------- */
-  template <typename T, bool ConstField, Dim_t Dim, size_t NbMemory>
+  template <typename T, Mapping Mutability, Dim_t Dim, size_t NbMemory>
   using T2StateNFieldMap =
-      StaticStateNFieldMap<T, ConstField, internal::MatrixMap<T, Dim, Dim>,
+      StaticStateNFieldMap<T, Mutability, internal::MatrixMap<T, Dim, Dim>,
                            NbMemory, Iteration::QuadPt>;
 
-  template <typename T, bool ConstField, Dim_t Dim, size_t NbMemory>
+  template <typename T, Mapping Mutability, Dim_t Dim, size_t NbMemory>
   using T4StateNFieldMap =
-      StaticStateNFieldMap<T, ConstField,
+      StaticStateNFieldMap<T, Mutability,
                            internal::MatrixMap<T, Dim * Dim, Dim * Dim>,
                            NbMemory, Iteration::QuadPt>;
 }  // namespace muGrid

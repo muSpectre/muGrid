@@ -82,7 +82,7 @@ namespace muGrid {
       std::stringstream unique_name_stream{};
       unique_name_stream << this->prefix << ", sub_field index " << i;
       this->fields.push_back(
-          this->collection.template register_field<TypedNField<T>>(
+          this->collection.template register_field<T>(
               unique_name_stream.str(), nb_components));
     }
   }

@@ -48,7 +48,9 @@ namespace muSpectre {
   struct MaterialFixture {
     using Material_t = Mat_t;
     Material_t mat;
-    MaterialFixture() : mat("name") {
+    constexpr static Dim_t mdim() { return Material_t::MaterialDimension(); }
+    constexpr static Dim_t NbQuadPts() { return 2; }
+    MaterialFixture() : mat("name", mdim(), NbQuadPts()) {
       mat.add_pixel({0}, Youngs_modulus, Poisson_ratio);
     }
     Real Youngs_modulus{10};
@@ -56,14 +58,13 @@ namespace muSpectre {
   };
 
   using mat_list =
-      boost::mpl::list<MaterialFixture<MaterialLinearElastic4<twoD, twoD>>,
-                       MaterialFixture<MaterialLinearElastic4<twoD, threeD>>,
-                       MaterialFixture<MaterialLinearElastic4<threeD, threeD>>>;
+      boost::mpl::list<MaterialFixture<MaterialLinearElastic4<twoD>>,
+                       MaterialFixture<MaterialLinearElastic4<threeD>>>;
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_constructor, Fix, mat_list, Fix){};
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_response, Fix, mat_list, Fix) {
-    constexpr Dim_t Dim{Fix::Material_t::Parent::Parent::mdim()};
+    constexpr Dim_t Dim{Fix::mdim()};
     Eigen::Matrix<Real, Dim, Dim> E;
     E.setZero();
     E(0, 0) = 0.001;

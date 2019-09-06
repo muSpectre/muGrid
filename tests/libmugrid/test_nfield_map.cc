@@ -74,13 +74,12 @@ namespace muGrid {
   struct NFieldMapFixture : public CollectionFixture {
     using type = T;
     NFieldMapFixture()
-        : scalar_field{this->fc.template register_field<TypedNField<T>>(
-              "scalar_field", 1)},
-          vector_field{this->fc.template register_field<TypedNField<T>>(
-              "vector_field", BaseFixture::Dim())},
-          matrix_field{this->fc.template register_field<TypedNField<T>>(
+        : scalar_field{this->fc.template register_field<T>("scalar_field", 1)},
+          vector_field{this->fc.template register_field<T>("vector_field",
+                                                           BaseFixture::Dim())},
+          matrix_field{this->fc.template register_field<T>(
               "matrix_field", BaseFixture::Dim() * BaseFixture::Dim())},
-          T4_field{this->fc.template register_field<TypedNField<T>>(
+          T4_field{this->fc.template register_field<T>(
               "tensor4_field", ipow(BaseFixture::Dim(), 4))},
           scalar_quad{scalar_field, Iteration::QuadPt},
           scalar_pixel{scalar_field, Iteration::Pixel},
@@ -93,12 +92,12 @@ namespace muGrid {
     TypedNField<T> & matrix_field;
     TypedNField<T> & T4_field;
 
-    NFieldMap<T, false> scalar_quad;
-    NFieldMap<T, false> scalar_pixel;
-    NFieldMap<T, false> vector_quad;
-    NFieldMap<T, false> vector_pixel;
-    NFieldMap<T, false> matrix_quad;
-    NFieldMap<T, false> matrix_pixel;
+    NFieldMap<T, Mapping::Mut> scalar_quad;
+    NFieldMap<T, Mapping::Mut> scalar_pixel;
+    NFieldMap<T, Mapping::Mut> vector_quad;
+    NFieldMap<T, Mapping::Mut> vector_pixel;
+    NFieldMap<T, Mapping::Mut> matrix_quad;
+    NFieldMap<T, Mapping::Mut> matrix_pixel;
   };
 
   using Maps = boost::mpl::list<
@@ -108,8 +107,9 @@ namespace muGrid {
       NFieldMapFixture<Complex, GlobalNFieldCollectionFixture>>;
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(construction_test, Fix, Maps, Fix) {
-    typename NFieldMap<typename Fix::type, false>::template Iterator<false> beg{
-        Fix::scalar_quad.begin()};
+    typename NFieldMap<typename Fix::type,
+                       Mapping::Mut>::template Iterator<Mapping::Mut>
+        beg{Fix::scalar_quad.begin()};
     BOOST_CHECK_EQUAL((*beg).size(), 1);
     BOOST_CHECK_EQUAL((*Fix::scalar_pixel.begin()).size(), Fix::NbQuadPts());
     // check also const version
@@ -132,7 +132,7 @@ namespace muGrid {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(static_size_test, Fix, Maps, Fix) {
     using StaticMap_t =
-        MatrixNFieldMap<typename Fix::type, true, Fix::Dim(), Fix::Dim()>;
+        MatrixNFieldMap<typename Fix::type, Mapping::Const, Fix::Dim(), Fix::Dim()>;
     StaticMap_t static_map{Fix::matrix_field};
     for (auto && iterate : Fix::matrix_pixel) {
       iterate.setRandom();
@@ -146,7 +146,7 @@ namespace muGrid {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(static_size_test_pixels, Fix, Maps, Fix) {
     using StaticMatrixMap_t =
-        MatrixNFieldMap<typename Fix::type, true, Fix::Dim(),
+        MatrixNFieldMap<typename Fix::type, Mapping::Const, Fix::Dim(),
                         Fix::Dim() * Fix::NbQuadPts(), Iteration::Pixel>;
     StaticMatrixMap_t static_map{Fix::matrix_field};
     for (auto && iterate : Fix::matrix_pixel) {
@@ -158,7 +158,7 @@ namespace muGrid {
       BOOST_CHECK_EQUAL((dynamic_iterate - static_iterate).norm(), 0);
     }
 
-    using ScalarMap_t = ScalarNFieldMap<typename Fix::type, false>;
+    using ScalarMap_t = ScalarNFieldMap<typename Fix::type, Mapping::Mut>;
     ScalarMap_t scalar_map{Fix::scalar_field};
 
     for (auto && tup : akantu::zip(Fix::scalar_quad, scalar_map)) {
@@ -175,10 +175,10 @@ namespace muGrid {
 
     // testing array map and t2 map
     using StaticArrayMap_t =
-        ArrayNFieldMap<typename Fix::type, true, Fix::Dim(), Fix::Dim(),
+        ArrayNFieldMap<typename Fix::type, Mapping::Const, Fix::Dim(), Fix::Dim(),
                        Iteration::QuadPt>;
     StaticArrayMap_t array_map{Fix::matrix_field};
-    using T2Map_t = T2NFieldMap<typename Fix::type, true, Fix::Dim()>;
+    using T2Map_t = T2NFieldMap<typename Fix::type, Mapping::Const, Fix::Dim()>;
     T2Map_t t2_map{Fix::matrix_field};
 
     for (auto && tup : akantu::zip(array_map, t2_map)) {
@@ -188,11 +188,11 @@ namespace muGrid {
     }
     // testing t4 map
     using StaticMatrix4Map_t =
-        MatrixNFieldMap<typename Fix::type, true, Fix::Dim() * Fix::Dim(),
+        MatrixNFieldMap<typename Fix::type, Mapping::Const, Fix::Dim() * Fix::Dim(),
                         Fix::Dim() * Fix::Dim(), Iteration::QuadPt>;
     StaticMatrix4Map_t matrix4_map{Fix::T4_field};
 
-    using T4Map_t = T4NFieldMap<typename Fix::type, false, Fix::Dim()>;
+    using T4Map_t = T4NFieldMap<typename Fix::type, Mapping::Mut, Fix::Dim()>;
     T4Map_t t4_map{Fix::T4_field};
     Fix::T4_field.eigen_vec().setRandom();
 

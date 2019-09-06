@@ -58,10 +58,10 @@ void add_material_linear_elastic_generic1_helper(py::module & mod) {
   name_stream << "MaterialLinearElasticGeneric1_" << Dim << "d";
   const auto name{name_stream.str()};
 
-  using Mat_t = MaterialLinearElasticGeneric1<Dim, Dim>;
-  using Cell_t = CellBase<Dim, Dim>;
+  using Mat_t = MaterialLinearElasticGeneric1<Dim>;
+  using Cell_t = CellBase;
 
-  py::class_<Mat_t, MaterialBase<Dim, Dim>, std::shared_ptr<Mat_t>>(
+  py::class_<Mat_t, MaterialBase, std::shared_ptr<Mat_t>>(
       mod, name.c_str())
       .def_static(
           "make",

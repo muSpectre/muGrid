@@ -55,6 +55,8 @@ namespace muFFT {
   using muGrid::threeD;
   using muGrid::twoD;
 
+  using muGrid::Mapping;
+
   /**
    * Planner flags for FFT (follows FFTW, hopefully this choice will
    * be compatible with alternative FFT implementations)

@@ -40,34 +40,27 @@
 #define SRC_MATERIALS_MATERIAL_LINEAR_ELASTIC4_HH_
 
 #include "materials/material_linear_elastic1.hh"
-#include "libmugrid/mapped_field.hh"
-
+#include "libmugrid/mapped_nfield.hh"
 
 #include <Eigen/Dense>
 
 namespace muSpectre {
 
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimM>
   class MaterialLinearElastic4;
 
   /**
    * traits for objective linear elasticity with eigenstrain
    */
-  template <Dim_t DimS, Dim_t DimM>
-  struct MaterialMuSpectre_traits<MaterialLinearElastic4<DimS, DimM>> {
-    //! global field collection
-    using GFieldCollection_t =
-        typename MaterialBase<DimS, DimM>::GFieldCollection_t;
+  template <Dim_t DimM>
+  struct MaterialMuSpectre_traits<MaterialLinearElastic4<DimM>> {
 
     //! expected map type for strain fields
-    using StrainMap_t =
-        muGrid::MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM, true>;
+    using StrainMap_t = muGrid::T2NFieldMap<Real, Mapping::Const, DimM>;
     //! expected map type for stress fields
-    using StressMap_t =
-        muGrid::MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
+    using StressMap_t = muGrid::T2NFieldMap<Real, Mapping::Mut, DimM>;
     //! expected map type for tangent stiffness fields
-    using TangentMap_t =
-        muGrid::T4MatrixFieldMap<GFieldCollection_t, Real, DimM>;
+    using TangentMap_t =muGrid::T4NFieldMap<Real, Mapping::Mut, DimM>;
 
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
@@ -78,13 +71,12 @@ namespace muSpectre {
   /**
    * implements objective linear elasticity with an eigenstrain per pixel
    */
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimM>
   class MaterialLinearElastic4
-      : public MaterialMuSpectre<MaterialLinearElastic4<DimS, DimM>, DimS,
-                                 DimM> {
+      : public MaterialMuSpectre<MaterialLinearElastic4<DimM>, DimM> {
    public:
     //! base class
-    using Parent = MaterialMuSpectre<MaterialLinearElastic4, DimS, DimM>;
+    using Parent = MaterialMuSpectre<MaterialLinearElastic4, DimM>;
     /**
      * type used to determine whether the
      * `muSpectre::MaterialMuSpectre::iterable_proxy` evaluate only
@@ -100,7 +92,7 @@ namespace muSpectre {
     using traits = MaterialMuSpectre_traits<MaterialLinearElastic4>;
 
     //! storage type for Lamé constants
-    using Field_t = muGrid::MappedScalarField<Real, DimS, true>;
+    using Field_t = muGrid::MappedScalarNField<Real, Mapping::Const>;
 
     //! Hooke's law implementation
     using Hooke =
@@ -111,7 +103,9 @@ namespace muSpectre {
     MaterialLinearElastic4() = delete;
 
     //! Construct by name
-    explicit MaterialLinearElastic4(std::string name);
+    explicit MaterialLinearElastic4(const std::string & name,
+                                    const Dim_t & spatial_dimension,
+                                    const Dim_t & nb_quad_pts);
 
     //! Copy constructor
     MaterialLinearElastic4(const MaterialLinearElastic4 & other) = delete;
@@ -145,9 +139,9 @@ namespace muSpectre {
      */
     template <class Derived>
     inline decltype(auto) evaluate_stress(const Eigen::MatrixBase<Derived> & E,
-                                          const size_t & pixel_index) {
-      auto && lambda{this->lambda_field[pixel_index]};
-      auto && mu{this->mu_field[pixel_index]};
+                                          const size_t & quad_pt_index) {
+      auto && lambda{this->lambda_field[quad_pt_index]};
+      auto && mu{this->mu_field[quad_pt_index]};
       return this->evaluate_stress(E, lambda, mu);
     }
 
@@ -171,22 +165,25 @@ namespace muSpectre {
     template <class Derived>
     inline decltype(auto)
     evaluate_stress_tangent(const Eigen::MatrixBase<Derived> & E,
-                            const size_t & pixel_index) {
-      auto && lambda{this->lambda_field[pixel_index]};
-      auto && mu{this->mu_field[pixel_index]};
+                            const size_t & quad_pt_index) {
+      auto && lambda{this->lambda_field[quad_pt_index]};
+      auto && mu{this->mu_field[quad_pt_index]};
       return this->evaluate_stress_tangent(E, lambda, mu);
     }
 
     /**
      * overload add_pixel to write into loacal stiffness tensor
      */
-    void yadd_pixel(const Ccoord_t<DimS> & pixel) final;
+    void add_pixel(const size_t & pixel_index) final;
 
     /**
      * overload add_pixel to write into local stiffness tensor
      */
-    void add_pixel(const Ccoord_t<DimS> & pixel, const Real & Youngs_modulus,
+    void add_pixel(const size_t & pixel_index, const Real & Youngs_modulus,
                    const Real & Poisson_ratio);
+
+    //! initialises the maps for λ and μ
+    void initialise() final;
 
    protected:
     //! storage for first Lamé constant λ
@@ -196,9 +193,9 @@ namespace muSpectre {
   };
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimM>
   template <class Derived>
-  auto MaterialLinearElastic4<DimS, DimM>::evaluate_stress(
+  auto MaterialLinearElastic4<DimM>::evaluate_stress(
       const Eigen::MatrixBase<Derived> & E, const Real & lambda,
       const Real & mu) -> decltype(auto) {
     auto C = Hooke::compute_C_T4(lambda, mu);
@@ -206,14 +203,13 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimM>
   template <class Derived>
-  auto MaterialLinearElastic4<DimS, DimM>::evaluate_stress_tangent(
+  auto MaterialLinearElastic4<DimM>::evaluate_stress_tangent(
       const Eigen::MatrixBase<Derived> & E, const Real & lambda,
       const Real & mu) -> decltype(auto) {
     muGrid::T4Mat<Real, DimM> C = Hooke::compute_C_T4(lambda, mu);
-    return std::make_tuple(
-        this->evaluate_stress(E, lambda, mu), C);
+    return std::make_tuple(this->evaluate_stress(E, lambda, mu), C);
   }
 
 }  // namespace muSpectre

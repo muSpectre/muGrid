@@ -57,16 +57,20 @@ namespace muGrid {
   class TypedNFieldBase;
 
   /* ---------------------------------------------------------------------- */
-  template <typename T, bool ConstField>
+  template <typename T, Mapping Mutability>
   class NFieldMap {
    public:
-    using NField_t = std::conditional_t<ConstField, const TypedNFieldBase<T>,
-                                        TypedNFieldBase<T>>;
-    template <bool ConstVal>
+    using NField_t =
+        std::conditional_t<Mutability == Mapping::Const,
+                           const TypedNFieldBase<T>, TypedNFieldBase<T>>;
+    template <Mapping MutVal>
     using value_type = std::conditional_t<
-        ConstVal,
+        MutVal == Mapping::Const,
         Eigen::Map<const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>>,
         Eigen::Map<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>>>;
+
+    using EigenRef =
+        Eigen::Ref<const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>>;
     //! Default constructor
     NFieldMap() = delete;
 
@@ -100,10 +104,30 @@ namespace muGrid {
     //! Move assignment operator (delete because of reference member)
     NFieldMap & operator=(NFieldMap && other) = delete;
 
-    template <bool ConstIter>
+    //! Assign a matrixline value to every entry
+    template <bool IsMutableField = Mutability == Mapping::Mut>
+    std::enable_if_t<IsMutableField, NFieldMap> &
+    operator=(const EigenRef & val) {
+      if (not((val.rows() == this->nb_rows) and
+              (val.cols() == this->nb_cols))) {
+        std::stringstream error_str{};
+        error_str << "Expected an array/matrix with shape (" << this->nb_rows
+                  << " × " << this->nb_cols
+                  << "), but received a value of shape (" << val.rows() << " × "
+                  << val.cols() << ").";
+        throw NFieldMapError(error_str.str());
+      }
+      for (auto && entry : *this) {
+        entry = val;
+      }
+      return *this;
+    }
+
+    template <Mapping MutIter>
     class Iterator;
-    using iterator = Iterator<false or ConstField>;
-    using const_iterator = Iterator<true>;
+    using iterator =
+        Iterator<(Mutability == Mapping::Mut) ? Mapping::Mut : Mapping::Const>;
+    using const_iterator = Iterator<Mapping::Const>;
 
     iterator begin();
     iterator end();
@@ -119,13 +143,15 @@ namespace muGrid {
      */
     size_t size() const;
 
-    value_type<ConstField> operator[](size_t index) {
-      return value_type<ConstField>{this->data_ptr + index * this->stride,
+    value_type<Mutability> operator[](size_t index) {
+      assert(this->is_initialised);
+      return value_type<Mutability>{this->data_ptr + index * this->stride,
                                     this->nb_rows, this->nb_cols};
     }
-    value_type<true> operator[](size_t index) const {
-      return value_type<true>{this->data_ptr + index * this->stride,
-                              this->nb_rows, this->nb_cols};
+    value_type<Mapping::Const> operator[](size_t index) const {
+      assert(this->is_initialised);
+      return value_type<Mapping::Const>{this->data_ptr + index * this->stride,
+                                        this->nb_rows, this->nb_cols};
     }
 
     //! query the size from the field's collection and set data_ptr
@@ -146,16 +172,16 @@ namespace muGrid {
     bool is_initialised{false};
   };
 
-  template <typename T, bool ConstField>
-  template <bool ConstIter>
-  class NFieldMap<T, ConstField>::Iterator {
+  template <typename T, Mapping Mutability>
+  template <Mapping MutIter>
+  class NFieldMap<T, Mutability>::Iterator {
    public:
-    using NFieldMap_t =
-        std::conditional_t<ConstIter, const NFieldMap, NFieldMap>;
+    using NFieldMap_t = std::conditional_t<MutIter == Mapping::Const,
+                                           const NFieldMap, NFieldMap>;
     using value_type =
-        typename NFieldMap<T, ConstField>::template value_type<ConstIter>;
+        typename NFieldMap<T, Mutability>::template value_type<MutIter>;
     using cvalue_type =
-        typename NFieldMap<T, ConstField>::template value_type<true>;
+        typename NFieldMap<T, Mutability>::template value_type<Mapping::Const>;
     //! Default constructor
     Iterator() = delete;
 

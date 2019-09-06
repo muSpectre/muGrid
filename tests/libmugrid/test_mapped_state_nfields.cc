@@ -1,11 +1,11 @@
 /**
- * @file   test_mapped_nfields.cc
+ * @file   test_mapped_state_nfields.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
- * @date   05 Sep 2019
+ * @date   09 Sep 2019
  *
- * @brief  Tests for the mapped field classes
+ * @brief  Tests for the mapped state field classes
  *
  * Copyright © 2019 Till Junge
  *
@@ -34,51 +34,56 @@
 
 #include "tests.hh"
 #include "libmugrid/nfield_collection_global.hh"
-#include "libmugrid/mapped_nfield.hh"
+#include "libmugrid/mapped_state_nfield.hh"
 
 namespace muGrid {
 
-  BOOST_AUTO_TEST_SUITE(mapped_nfields);
-
+  BOOST_AUTO_TEST_SUITE(mapped_state_nfields);
   struct InitialiserBase {
     constexpr static Dim_t DimS{twoD};
     constexpr static Dim_t NbRow{2}, NbCol{3};
     constexpr static Dim_t NbQuad() { return 2; }
+    constexpr static size_t NbMemory() { return 1; }
     GlobalNFieldCollection<DimS> fc{NbQuad()};
     InitialiserBase() { this->fc.initialise({2, 3}); }
   };
 
-  struct MappedNFieldFixture : public InitialiserBase {
-    MappedMatrixNField<Real, Mapping::Mut, NbRow, NbCol> mapped_matrix;
-    MappedArrayNField<Real, Mapping::Mut, NbRow, NbCol> mapped_array;
-    MappedScalarNField<Real, Mapping::Mut> mapped_scalar;
-    MappedT2NField<Real, Mapping::Mut, DimS> mapped_t2;
-    MappedT4NField<Real, Mapping::Mut, DimS> mapped_t4;
+  struct MappedStateNFieldFixture : public InitialiserBase {
+    MappedMatrixStateNField<Real, Mapping::Mut, NbRow, NbCol, NbMemory()>
+        mapped_matrix;
+    MappedArrayStateNField<Real, Mapping::Mut, NbRow, NbCol, NbMemory()>
+        mapped_array;
+    MappedScalarStateNField<Real, Mapping::Mut, NbMemory()> mapped_scalar;
+    MappedT2StateNField<Real, Mapping::Mut, DimS, NbMemory()> mapped_t2;
+    MappedT4StateNField<Real, Mapping::Mut, DimS, NbMemory()> mapped_t4;
 
-    MappedNFieldFixture()
+    MappedStateNFieldFixture()
         : InitialiserBase{}, mapped_matrix{"matrix", this->fc},
           mapped_array{"array", this->fc}, mapped_scalar{"scalar", this->fc},
           mapped_t2{"t2", this->fc}, mapped_t4{"t4", this->fc} {};
   };
 
-  BOOST_FIXTURE_TEST_CASE(access_and_iteration_test, MappedNFieldFixture) {
+  BOOST_FIXTURE_TEST_CASE(access_and_iteration_test, MappedStateNFieldFixture) {
     for (auto && iterate : this->mapped_t2) {
-      iterate.setRandom();
+      iterate.current().setRandom();
     }
-    for (auto && iterate:this->mapped_matrix) {
-      iterate.setRandom();
+    for (auto && iterate : this->mapped_matrix) {
+      iterate.current().setRandom();
     }
-    this->mapped_array.get_field().eigen_quad_pt() =
-        this->mapped_matrix.get_field().eigen_quad_pt();
-    for (auto && tup: akantu::zip(this->mapped_matrix, this->mapped_array)) {
-      const auto & matrix{std::get<0>(tup)};
-      const auto & array{std::get<1>(tup)};
-      BOOST_CHECK_EQUAL( (matrix-array.matrix()).norm(), 0);
+    this->mapped_array.get_state_field().current().eigen_quad_pt() =
+        this->mapped_matrix.get_state_field().current().eigen_quad_pt();
+    for (auto && tup : akantu::zip(this->mapped_matrix, this->mapped_array)) {
+      const auto & matrix{std::get<0>(tup).current()};
+      const auto & array{std::get<1>(tup).current()};
+      BOOST_CHECK_EQUAL((matrix - array.matrix()).norm(), 0);
     }
 
-    BOOST_CHECK_EQUAL(
-        (this->mapped_array[4].matrix() - this->mapped_matrix[4]).norm(), 0);
+    BOOST_CHECK_EQUAL((this->mapped_array[4].current().matrix() -
+                       this->mapped_matrix[4].current())
+                          .norm(),
+                      0);
   }
+
   BOOST_AUTO_TEST_SUITE_END();
 
 }  // namespace muGrid

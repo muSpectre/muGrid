@@ -74,6 +74,8 @@ namespace muSpectre {
   using muGrid::T4MatMap;
   using muGrid::get;
 
+  using muGrid::Mapping;
+
   namespace Tensors = ::muGrid::Tensors;
   namespace Matrices = ::muGrid::Matrices;
 

@@ -60,10 +60,10 @@ void add_material_linear_elastic2_helper(py::module & mod) {
   name_stream << "MaterialLinearElastic2_" << dim << 'd';
   const auto name{name_stream.str()};
 
-  using Mat_t = muSpectre::MaterialLinearElastic2<dim, dim>;
-  using Sys_t = muSpectre::CellBase<dim, dim>;
+  using Mat_t = muSpectre::MaterialLinearElastic2<dim>;
+  using Sys_t = muSpectre::CellBase;
 
-  py::class_<Mat_t, muSpectre::MaterialBase<dim, dim>, std::shared_ptr<Mat_t>>(
+  py::class_<Mat_t, muSpectre::MaterialBase, std::shared_ptr<Mat_t>>(
       mod, name.c_str())
       .def_static("make",
                   [](Sys_t & sys, std::string n, Real e, Real p) -> Mat_t & {

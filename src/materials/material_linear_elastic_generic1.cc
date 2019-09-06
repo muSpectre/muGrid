@@ -39,10 +39,13 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  MaterialLinearElasticGeneric1<DimS, DimM>::MaterialLinearElasticGeneric1(
-      const std::string & name, const CInput_t & C_voigt)
-      : Parent{name} {
+  template <Dim_t DimM>
+  MaterialLinearElasticGeneric1<DimM>::MaterialLinearElasticGeneric1(
+      const std::string & name, const Dim_t & spatial_dimension,
+      const Dim_t & nb_quad_pts, const CInput_t & C_voigt)
+      : Parent{name, spatial_dimension, nb_quad_pts},
+        C_holder{std::make_unique<muGrid::T4Mat<Real, DimM>>()},
+        C{*this->C_holder} {
     using muGrid::get;
     using VC_t = VoigtConversion<DimM>;
     constexpr Dim_t VSize{vsize(DimM)};
@@ -58,16 +61,15 @@ namespace muSpectre {
       for (int j{0}; j < DimM; ++j) {
         for (int k{0}; k < DimM; ++k) {
           for (int l{0}; l < DimM; ++l) {
-            get(this->C, i, j, k, l) = C_voigt((VC_t::get_sym_mat())(i, j),
-                                               (VC_t::get_sym_mat())(k, l));
+            get(*this->C_holder, i, j, k, l) =
+                C_voigt(VC_t::sym_mat(i, j), VC_t::sym_mat(k, l));
           }
         }
       }
     }
   }
 
-  template class MaterialLinearElasticGeneric1<twoD, twoD>;
-  template class MaterialLinearElasticGeneric1<twoD, threeD>;
-  template class MaterialLinearElasticGeneric1<threeD, threeD>;
+  template class MaterialLinearElasticGeneric1<twoD>;
+  template class MaterialLinearElasticGeneric1<threeD>;
 
 }  // namespace muSpectre

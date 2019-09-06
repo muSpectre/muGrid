@@ -41,97 +41,91 @@
 namespace muSpectre {
 
   //----------------------------------------------------------------------------//
-  template <Dim_t DimS, Dim_t DimM>
-  MaterialBase<DimS, DimM>::MaterialBase(const std::string & name,
-                                         const Dim_t & spatial_dimension,
-                                         const Dim_t & nb_quad_pts)
-      : name(name), internal_fields{spatial_dimension, nb_quad_pts} {
-    static_assert((DimM == oneD) || (DimM == twoD) || (DimM == threeD),
-                  "only 1, 2, or threeD supported");
+  MaterialBase::MaterialBase(const std::string & name,
+                             const Dim_t & spatial_dimension,
+                             const Dim_t & material_dimension,
+                             const Dim_t & nb_quad_pts)
+      : name(name), internal_fields{spatial_dimension, nb_quad_pts},
+        material_dimension{material_dimension} {
+    if (not((this->material_dimension == oneD) ||
+            (this->material_dimension == twoD) ||
+            (this->material_dimension == threeD))) {
+      throw MaterialError("only 1, 2, or threeD supported");
+    }
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  const std::string & MaterialBase<DimS, DimM>::get_name() const {
-    return this->name;
-  }
+  const std::string & MaterialBase::get_name() const { return this->name; }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void MaterialBase<DimS, DimM>::add_pixel(const size_t & global_index) {
+  void MaterialBase::add_pixel(const size_t & global_index) {
     this->internal_fields.add_pixel(global_index);
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void MaterialBase<DimS, DimM>::add_pixel_split(const Ccoord & local_ccoord,
-                                                 Real ratio) {
-    auto & this_mat = static_cast<MaterialBase &>(*this);
-    this_mat.add_pixel(local_ccoord);
-    this->assigned_ratio.value().get().push_back(ratio);
+  // template <Dim_t DimS, Dim_t DimM>
+  // void MaterialBase<DimS, DimM>::add_pixel_split(const Ccoord & local_ccoord,
+  //                                                Real ratio) {
+  //   auto & this_mat = static_cast<MaterialBase &>(*this);
+  //   this_mat.add_pixel(local_ccoord);
+  //   this->assigned_ratio.value().get().push_back(ratio);
+
+  void MaterialBase::compute_stresses(const muGrid::NField & F,
+                                      muGrid::NField & P, Formulation form,
+                                      SplitCell is_cell_split) {
+    const auto t2_dim{muGrid::ipow(this->material_dimension, 2)};
+    const auto & real_F{muGrid::RealNField::safe_cast(F, t2_dim)};
+    auto & real_P{muGrid::RealNField::safe_cast(P, t2_dim)};
+    this->compute_stresses(real_F, real_P, form, is_cell_split);
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void
-  MaterialBase<DimS, DimM>::allocate_optional_fields(SplitCell is_cell_split) {
+  void MaterialBase::allocate_optional_fields(SplitCell is_cell_split) {
     if (is_cell_split == SplitCell::simple) {
-      this->assigned_ratio =
-          muGrid::make_field<MScalarField_t>("ratio", this->internal_fields);
+      this->assigned_ratio = std::make_unique<
+          muGrid::MappedScalarNField<Real, muGrid::Mapping::Mut>>(
+          "ratio", this->internal_fields);
+    }
+  }
+  /* ---------------------------------------------------------------------- */
+  void MaterialBase::get_assigned_ratios(
+      std::vector<Real> & quad_pt_assigned_ratios) {
+    for (auto && tup : akantu::zip(this->get_quad_pt_indices(),
+                                   this->assigned_ratio->get_map())) {
+      const auto & index = std::get<0>(tup);
+      const auto & val = std::get<1>(tup);
+      quad_pt_assigned_ratios[index] += val;
     }
   }
 
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void MaterialBase<DimS, DimM>::compute_stresses(const Field_t & F,
-                                                  Field_t & P, Formulation form,
-                                                  SplitCell is_cell_split) {
-    this->compute_stresses(StrainField_t::check_ref(F),
-                           StressField_t::check_ref(P), form, is_cell_split);
-  }
+  // /* ----------------------------------------------------------------------
+  // */ template <Dim_t DimS, Dim_t DimM> Real MaterialBase<DimS,
+  // DimM>::get_assigned_ratio(Ccoord pixel) {
+  //   return this->assigned_ratio.value().get().get_map()[pixel];
+  // }
+
+  // /* ----------------------------------------------------------------------
+  // */ template <Dim_t DimS, Dim_t DimM> auto MaterialBase<DimS,
+  // DimM>::get_assigned_ratio_field()
+  //     -> MScalarField_t & {
+  //   return this->assigned_ratio.value().get();
+  // }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void MaterialBase<DimS, DimM>::get_assigned_ratios(
-      std::vector<Real> & pixel_assigned_ratios, Ccoord subdomain_resolutions,
-      Ccoord subdomain_locations) {
-    auto assigned_ratio_mapped = this->assigned_ratio.value().get().get_map();
-    for (auto && key_val :
-         this->assigned_ratio.value().get().get_map().enumerate()) {
-      const auto & ccoord = std::get<0>(key_val);
-      const auto & val = std::get<1>(key_val);
-      auto index = muGrid::CcoordOps::get_index(subdomain_resolutions,
-                                                subdomain_locations, ccoord);
-      pixel_assigned_ratios[index] += val;
-    }
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  Real MaterialBase<DimS, DimM>::get_assigned_ratio(Ccoord pixel) {
-    return this->assigned_ratio.value().get().get_map()[pixel];
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  auto MaterialBase<DimS, DimM>::get_assigned_ratio_field()
-      -> MScalarField_t & {
-    return this->assigned_ratio.value().get();
+  void MaterialBase::compute_stresses_tangent(const muGrid::NField & F,
+                                              muGrid::NField & P,
+                                              muGrid::NField & K,
+                                              Formulation form,
+                                              SplitCell is_cell_split) {
+    const auto t2_dim{muGrid::ipow(this->material_dimension, 2)};
+    const auto & real_F{muGrid::RealNField::safe_cast(F, t2_dim)};
+    auto & real_P{muGrid::RealNField::safe_cast(P, t2_dim)};
+    auto & real_K{muGrid::RealNField::safe_cast(K, muGrid::ipow(t2_dim, 2))};
+    this->compute_stresses_tangent(real_F, real_P, real_K, form, is_cell_split);
   }
 
   //----------------------------------------------------------------------------//
-  template <Dim_t DimS, Dim_t DimM>
-  void MaterialBase<DimS, DimM>::compute_stresses_tangent(
-      const Field_t & F, Field_t & P, Field_t & K, Formulation form,
-      SplitCell is_cell_split) {
-    this->compute_stresses_tangent(
-        StrainField_t::check_ref(F), StressField_t::check_ref(P),
-        TangentField_t::check_ref(K), form, is_cell_split);
-  }
-
-  template <Dim_t DimS, Dim_t DimM>
-  auto MaterialBase<DimS, DimM>::get_real_field(std::string field_name)
-      -> EigenMap {
+  auto MaterialBase::get_real_field(std::string field_name) -> EigenMap {
     if (not this->internal_fields.field_exists(field_name)) {
       std::stringstream err{};
       err << "Field '" << field_name << "' does not exist in material '"
@@ -149,13 +143,16 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  // template <Dim_t DimS, Dim_t DimM>
-  // std::vector<std::string> MaterialBase<DimS, DimM>::list_fields() const {
-  //   return this->internal_fields.list_fields();
-  // }
+  std::vector<std::string> MaterialBase::list_fields() const {
+    return this->internal_fields.list_fields();
+  }
 
-  template class MaterialBase<2, 2>;
-  template class MaterialBase<2, 3>;
-  template class MaterialBase<3, 3>;
+  /* ---------------------------------------------------------------------- */
+  void MaterialBase::initialise() {
+    if (!this->is_initialised) {
+      this->internal_fields.initialise();
+      this->is_initialised = true;
+    }
+  }
 
 }  // namespace muSpectre

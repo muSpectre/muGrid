@@ -45,16 +45,21 @@
 namespace muGrid {
 
   //! forward declaration
-  template <typename T, bool ConstField>
+  template <typename T, Mapping Mutability>
   class NFieldMap;
 
   template <typename T>
   class TypedNFieldBase : public NField {
+    static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
+                  "You can only register fields templated with one of the "
+                  "numeric types Real, Complex, Int, or UInt");
+
    protected:
     /**
      * `NField`s are supposed to only exist in the form of `std::unique_ptr`s
-     * held by a NFieldCollection. The `NField` constructor is protected to
-     * ensure this.
+     * held by a `NFieldCollection. The `NField` constructor is protected to
+     * ensure this. Fields are instantiated through the `register_field`
+     * methods NFieldCollection.
      * @param unique_name unique field name (unique within a collection)
      * @param nb_components number of components to store per quadrature point
      * @param collection reference to the holding field collection.
@@ -64,6 +69,7 @@ namespace muGrid {
         : Parent{unique_name, collection, nb_components} {}
 
    public:
+    using Element_t = T;
     using EigenRep_t = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
     using Eigen_map = Eigen::Map<EigenRep_t>;
     using Eigen_cmap = Eigen::Map<const EigenRep_t>;
@@ -115,14 +121,14 @@ namespace muGrid {
      */
     Eigen_cmap eigen_pixel() const;
 
-    template <typename T_int, bool ConstField>
+    template <typename T_int, Mapping Mutability>
     friend class NFieldMap;
 
-    NFieldMap<T, false> get_pixel_map();
-    NFieldMap<T, true>  get_pixel_map() const;
+    NFieldMap<T, Mapping::Mut> get_pixel_map();
+    NFieldMap<T, Mapping::Const> get_pixel_map() const;
 
-    NFieldMap<T, false> get_quad_pt_map();
-    NFieldMap<T, true>  get_quad_pt_map() const;
+    NFieldMap<T, Mapping::Mut> get_quad_pt_map();
+    NFieldMap<T, Mapping::Const> get_quad_pt_map() const;
 
     //! get the raw data ptr. don't use unless interfacing with external libs
     T * data() const;
@@ -192,6 +198,13 @@ namespace muGrid {
 
     void set_zero() final;
     void set_pad_size(size_t pad_size) final;
+
+    static TypedNField & safe_cast(NField & other);
+    static const TypedNField & safe_cast(const NField & other);
+
+    static TypedNField & safe_cast(NField & other, const Dim_t & nb_components);
+    static const TypedNField & safe_cast(const NField & other,
+                                         const Dim_t & nb_components);
 
     size_t buffer_size() const final;
 
@@ -277,6 +290,8 @@ namespace muGrid {
 
   using RealNField = TypedNField<Real>;
   using ComplexNField = TypedNField<Complex>;
+  using IntNField = TypedNField<Int>;
+  using UintNField = TypedNField<Uint>;
 
 }  // namespace muGrid
 

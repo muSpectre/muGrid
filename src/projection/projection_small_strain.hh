@@ -63,17 +63,17 @@ namespace muSpectre {
     //! Fourier-space field containing the projection operator itself
     using Proj_t = muGrid::RealNField;
     //! iterable operator
-    using Proj_map = muGrid::T4NFieldMap<Real, false, DimS>;
+    using Proj_map = muGrid::T4NFieldMap<Real, Mapping::Mut, DimS>;
     //! iterable vectorised version of the Fourier-space tensor field
-    using Vector_map = muGrid::MatrixNFieldMap<Complex, false, DimS * DimS, 1>;
+    using Vector_map =
+        muGrid::MatrixNFieldMap<Complex, Mapping::Mut, DimS * DimS, 1>;
 
     //! Default constructor
     ProjectionSmallStrain() = delete;
 
     //! Constructor with fft_engine
-    ProjectionSmallStrain(
-        FFTEngine_ptr engine, Rcoord lengths,
-        Gradient_t gradient = make_fourier_gradient<DimS>());
+    ProjectionSmallStrain(FFTEngine_ptr engine, Rcoord lengths,
+                          Gradient_t gradient = make_fourier_gradient<DimS>());
 
     //! Copy constructor
     ProjectionSmallStrain(const ProjectionSmallStrain & other) = delete;

@@ -45,19 +45,17 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE(material_evaluator_tests);
 
-  /* ---------------------------------------------------------------------- */
-  BOOST_AUTO_TEST_CASE(without_per_pixel_data) {
-    using Mat_t = MaterialLinearElastic1<twoD, twoD>;
+  BOOST_AUTO_TEST_CASE(without_adding_a_pixel) {
+ using Mat_t = MaterialLinearElastic1<twoD>;
 
     constexpr Real Young{210e9};
     constexpr Real Poisson{.33};
 
     auto mat_eval = Mat_t::make_evaluator(Young, Poisson);
-    auto & mat = *std::get<0>(mat_eval);
+
     auto & evaluator = std::get<1>(mat_eval);
 
     using T2_t = Eigen::Matrix<Real, twoD, twoD>;
-    using T4_t = muGrid::T4Mat<Real, twoD>;
     const T2_t F{(T2_t::Random() - (T2_t::Ones() * .5)) * 1e-4 +
                  T2_t::Identity()};
     const T2_t eps{
@@ -70,6 +68,54 @@ namespace muSpectre {
      */
     BOOST_CHECK_THROW(evaluator.evaluate_stress(eps, Formulation::small_strain),
                       std::runtime_error);
+  }
+
+  BOOST_AUTO_TEST_CASE(multiple_pixels) {
+    using Mat_t = MaterialLinearElastic1<twoD>;
+
+    constexpr Real Young{210e9};
+    constexpr Real Poisson{.33};
+
+    auto mat_eval = Mat_t::make_evaluator(Young, Poisson);
+
+    auto & mat = *std::get<0>(mat_eval);
+    auto & evaluator = std::get<1>(mat_eval);
+
+    using T2_t = Eigen::Matrix<Real, twoD, twoD>;
+    const T2_t F{(T2_t::Random() - (T2_t::Ones() * .5)) * 1e-4 +
+                 T2_t::Identity()};
+    const T2_t eps{
+        .5 * ((F - T2_t::Identity()) + (F - T2_t::Identity()).transpose())};
+
+    mat.add_pixel(0);
+    mat.add_pixel(1);
+    /*
+     * at this point, the evaluator has been created, but the underlying
+     * material has two pixels. Evaluation would be ambiguous, and
+     * trying to do so has to fail with an explicit error message
+     */
+    BOOST_CHECK_THROW(evaluator.evaluate_stress(eps, Formulation::small_strain),
+                      std::runtime_error);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  BOOST_AUTO_TEST_CASE(without_per_pixel_data) {
+    using Mat_t = MaterialLinearElastic1<twoD>;
+
+    constexpr Real Young{210e9};
+    constexpr Real Poisson{.33};
+
+    auto mat_eval = Mat_t::make_evaluator(Young, Poisson);
+    auto & mat = *std::get<0>(mat_eval);
+
+    auto & evaluator = std::get<1>(mat_eval);
+
+    using T2_t = Eigen::Matrix<Real, twoD, twoD>;
+    using T4_t = muGrid::T4Mat<Real, twoD>;
+    const T2_t F{(T2_t::Random() - (T2_t::Ones() * .5)) * 1e-4 +
+                 T2_t::Identity()};
+    const T2_t eps{
+        .5 * ((F - T2_t::Identity()) + (F - T2_t::Identity()).transpose())};
 
     mat.add_pixel({});
 
@@ -120,18 +166,15 @@ namespace muSpectre {
     }
     BOOST_CHECK_LE(error, small_strain_tol);
 
-    mat.add_pixel({1});
     /*
-     * Now, the material has two pixels, and evaluating it would be ambiguous.
-     * It should fail with an explicit error message
+     * Now, the material already has a pixel, adding more should be rejected
      */
-    BOOST_CHECK_THROW(evaluator.evaluate_stress(eps, Formulation::small_strain),
-                      std::runtime_error);
+    BOOST_CHECK_THROW(mat.add_pixel({1}), muGrid::NFieldCollectionError);
   }
 
   /* ---------------------------------------------------------------------- */
   BOOST_AUTO_TEST_CASE(with_per_pixel_data) {
-    using Mat_t = MaterialLinearElastic2<twoD, twoD>;
+    using Mat_t = MaterialLinearElastic2<twoD>;
 
     constexpr Real Young{210e9};
     constexpr Real Poisson{.33};
@@ -146,9 +189,6 @@ namespace muSpectre {
                  T2_t::Identity()};
     const T2_t eps{
         .5 * ((F - T2_t::Identity()) + (F - T2_t::Identity()).transpose())};
-
-    BOOST_CHECK_THROW(evaluator.evaluate_stress(eps, Formulation::small_strain),
-                      std::runtime_error);
 
     T2_t eigen_strain{[](auto x) {
       return 1e-4 * (x + x.transpose());
@@ -206,7 +246,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   BOOST_AUTO_TEST_CASE(tangent_estimation) {
-    using Mat_t = MaterialLinearElastic1<twoD, twoD>;
+    using Mat_t = MaterialLinearElastic1<twoD>;
 
     constexpr Real Young{210e9};
     constexpr Real Poisson{.33};
@@ -221,9 +261,6 @@ namespace muSpectre {
                  T2_t::Identity()};
     const T2_t eps{
         .5 * ((F - T2_t::Identity()) + (F - T2_t::Identity()).transpose())};
-
-    BOOST_CHECK_THROW(evaluator.evaluate_stress(eps, Formulation::small_strain),
-                      std::runtime_error);
 
     mat.add_pixel({});
 
