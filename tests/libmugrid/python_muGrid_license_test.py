@@ -82,37 +82,54 @@ py_lic_paras = ["µGrid is free software; you can redistribute it and/or\n"
                 " grant you additional permission to convey the resulting"
                 " work.\n"]
 
+test_case = unittest.TestCase('__init__')
 
-class CheckMuGridHeaderFiles():
+
+class CheckMuFFTHeaderFiles():
 
     def test_muGrid_header_files(self, muGrid_sources):
-        lic_test.header_license_test(muGrid_sources, lic_paras)
+        msg_listh = ""
+        msg_listh = lic_test.header_license_test(muGrid_sources, lic_paras)
+        return msg_listh
 
 
-class CheckMuGridSourceFiles():
+class CheckMuFFTSourceFiles():
 
     def test_muGrid_source_files(self, muGrid_sources):
-        lic_test.source_license_test(muGrid_sources, lic_paras)
+        msg_listc = ""
+        msg_listc = lic_test.source_license_test(muGrid_sources, lic_paras)
+        return msg_listc
 
 
-class CheckMuGridPythonFiles():
+class CheckMuFFTPythonFiles():
 
     def test_muGrid_python_files(self, muGrid_sources):
-        lic_test.python_license_test(muGrid_sources, py_lic_paras)
+        msg_listp = ""
+        msg_listp = lic_test.python_license_test(muGrid_sources, py_lic_paras)
+        return msg_listp
 
 
 def main():
+    msg_list = ""
+    muGrid_sources = []
     muGrid_sources = lic_test.arg_parser.parse_args(sys.argv[1:])
-    header_test_case = CheckMuGridHeaderFiles
-    header_test_case.test_muGrid_header_files(header_test_case,
-                                              muGrid_sources)
-    source_test_case = CheckMuGridSourceFiles
-    source_test_case.test_muGrid_source_files(source_test_case,
-                                              muGrid_sources)
 
-    python_test_case = CheckMuGridPythonFiles
-    python_test_case.test_muGrid_python_files(python_test_case,
-                                              muGrid_sources)
+    header_test_case = CheckMuFFTHeaderFiles
+    msg_list = msg_list + header_test_case.test_muGrid_header_files(
+        header_test_case,
+        muGrid_sources)
+
+    source_test_case = CheckMuFFTSourceFiles
+    msg_list = msg_list + source_test_case.test_muGrid_source_files(
+        source_test_case,
+        muGrid_sources)
+
+    python_test_case = CheckMuFFTPythonFiles
+    msg_list = msg_list + python_test_case.test_muGrid_python_files(
+        python_test_case,
+        muGrid_sources)
+
+    test_case.assertEqual(len(msg_list), 0, msg_list)
 
 
 if __name__ == "__main__":

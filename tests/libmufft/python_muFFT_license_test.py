@@ -84,38 +84,54 @@ py_lic_paras = ["µFFT is free software; you can redistribute it and/or\n"
                 " grant you additional permission to convey the resulting"
                 " work.\n"]
 
+test_case = unittest.TestCase('__init__')
+
 
 class CheckMuFFTHeaderFiles():
 
     def test_muFFT_header_files(self, muFFT_sources):
-        lic_test.header_license_test(muFFT_sources, lic_paras)
+        msg_listh = ""
+        msg_listh = lic_test.header_license_test(muFFT_sources, lic_paras)
+        return msg_listh
 
 
 class CheckMuFFTSourceFiles():
 
     def test_muFFT_source_files(self, muFFT_sources):
-        lic_test.source_license_test(muFFT_sources, lic_paras)
+        msg_listc = ""
+        msg_listc = lic_test.source_license_test(muFFT_sources, lic_paras)
+        return msg_listc
 
 
 class CheckMuFFTPythonFiles():
 
     def test_muFFT_python_files(self, muFFT_sources):
-        lic_test.python_license_test(muFFT_sources, py_lic_paras)
+        msg_listp = ""
+        msg_listp = lic_test.python_license_test(muFFT_sources, py_lic_paras)
+        return msg_listp
 
 
 def main():
+    msg_list = ""
     muFFT_sources = []
     muFFT_sources = lic_test.arg_parser.parse_args(sys.argv[1:])
+
     header_test_case = CheckMuFFTHeaderFiles
-    header_test_case.test_muFFT_header_files(header_test_case,
-                                             muFFT_sources)
+    msg_list = msg_list + header_test_case.test_muFFT_header_files(
+        header_test_case,
+        muFFT_sources)
+
     source_test_case = CheckMuFFTSourceFiles
-    source_test_case.test_muFFT_source_files(source_test_case,
-                                             muFFT_sources)
+    msg_list = msg_list + source_test_case.test_muFFT_source_files(
+        source_test_case,
+        muFFT_sources)
 
     python_test_case = CheckMuFFTPythonFiles
-    python_test_case.test_muFFT_python_files(python_test_case,
-                                             muFFT_sources)
+    msg_list = msg_list + python_test_case.test_muFFT_python_files(
+        python_test_case,
+        muFFT_sources)
+
+    test_case.assertEqual(len(msg_list), 0, msg_list)
 
 
 if __name__ == "__main__":

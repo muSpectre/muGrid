@@ -107,23 +107,23 @@ function(muTools_add_test test_name)
     if(NOT TARGET ${target_test_name})
       add_executable(${target_test_name} ${_mat_args_SOURCES})
       if(_mat_args_TEST_LIST)
-	set(_tmp ${${_mat_args_TEST_LIST}})
-	list(APPEND _tmp ${target_test_name})
-	set(${_mat_args_TEST_LIST} ${_tmp} PARENT_SCOPE)
+        set(_tmp ${${_mat_args_TEST_LIST}})
+        list(APPEND _tmp ${target_test_name})
+        set(${_mat_args_TEST_LIST} ${_tmp} PARENT_SCOPE)
       endif()
 
       muTools_move_to_project(${target_test_name})
       target_link_libraries(${target_test_name}
-	PRIVATE Boost::boost Boost::unit_test_framework cxxopts ${_mat_args_LINK_LIBRARIES})
+        PRIVATE Boost::boost Boost::unit_test_framework cxxopts ${_mat_args_LINK_LIBRARIES})
 
       if(_mat_HEADER_ONLY)
-	foreach(_target ${_mat_args_LINK_LIBRARIES})
-	  if(TARGET ${_target})
+        foreach(_target ${_mat_args_LINK_LIBRARIES})
+          if(TARGET ${_target})
             get_target_property(_features ${_target} INTERFACE_COMPILE_FEATURES)
             target_compile_features(${target_test_name}
               PRIVATE ${_features})
-	  endif()
-	endforeach()
+          endif()
+        endforeach()
       endif()
     endif()
   endif()
@@ -156,4 +156,40 @@ function(muTools_add_test test_name)
     NAME ${test_name}
     COMMAND ${_exe}
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+endfunction()
+
+##############################################################################
+
+# license test
+set(LICENSETEST_TARGET license CACHE STRING "license test")
+# project root directory
+add_custom_target(${LICENSETEST_TARGET})
+
+function(license_add_subdirectory DIR LICENSETEST)
+  if(LICENSETEST)
+    message(STATUS "license parser: ${LICENSETEST}")
+  else()
+    message(FATAL_ERROR "license script: NOT FOUND!")
+  endif()
+
+  set(LICENSETEST_EXC ${PYTHON_EXECUTABLE} ${LICENSETEST})
+  # create relative path to the directory
+
+  string(REGEX REPLACE "/" "." TEST_NAME ${DIR})
+
+  # perform license check
+  set(TARGET_NAME ${LICENSETEST_TARGET}.${TEST_NAME})
+  add_custom_target(${TARGET_NAME}
+    COMMAND
+    ${LICENSETEST_EXC}
+    ${DIR}
+    DEPENDS ${DIR}
+    COMMENT "license test"
+    )
+  # run this target when root cpplint.py test is triggered
+  add_dependencies(${LICENSETEST_TARGET} ${TARGET_NAME})
+
+  # add this test to CTest
+  add_test(${TARGET_NAME} ${CMAKE_MAKE_PROGRAM} ${TARGET_NAME})
+  unset(LICENSETEST)
 endfunction()

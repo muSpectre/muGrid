@@ -77,8 +77,7 @@ endif()
 ##############################################################################
 # license test
 
-muFFT_add_test(mufft_python_muFFT_license_test TYPE PYTHON python_muFFT_license_test.py ARG_LIST "${CMAKE_SOURCE_DIR}/src/libmufft ${CMAKE_SOURCE_DIR}/tests/libmufft ${CMAKE_SOURCE_DIR}/language_bindings/libmufft/python ${CMAKE_SOURCE_DIR}/language_bindings/libmufft/python/muFFT")
-
 
 add_custom_target(test_mufft DEPENDS ${mufft_tests})
 
+add_subdirectory(license)

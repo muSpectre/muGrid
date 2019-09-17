@@ -5,9 +5,9 @@
 
 @author Ali Falsafi<ali.falsafi @epfl.ch>
 
-@date 18 Sep 2019
+@date 17 Sep 2019
 
-@brief description
+@brief description checks the license of all of the files in src, test, binding
 
 Copyright © 2018 Till Junge
 
@@ -33,6 +33,7 @@ with proprietary FFT implementations or numerical libraries, containing parts
 covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
+
 import unittest
 import sys
 import python_license_test as lic_test
@@ -82,38 +83,57 @@ py_lic_paras = ["µSpectre is free software; you can redistribute it and/or\n"
                 " grant you additional permission to convey the resulting"
                 " work.\n"]
 
+test_case = unittest.TestCase('__init__')
+
 
 class CheckMuSpectreHeaderFiles():
 
     def test_muSpectre_header_files(self, muSpectre_sources):
-        lic_test.header_license_test(muSpectre_sources, lic_paras)
+        msg_listh = ""
+        msg_listh = lic_test.header_license_test(muSpectre_sources,
+                                                 lic_paras)
+        return msg_listh
 
 
 class CheckMuSpectreSourceFiles():
 
     def test_muSpectre_source_files(self, muSpectre_sources):
-        lic_test.source_license_test(muSpectre_sources, lic_paras)
+        msg_listc = ""
+        msg_listc = lic_test.source_license_test(muSpectre_sources,
+                                                 lic_paras)
+        return msg_listc
 
 
 class CheckMuSpectrePythonFiles():
 
     def test_muSpectre_python_files(self, muSpectre_sources):
-        lic_test.python_license_test(muSpectre_sources, py_lic_paras)
+        msg_listp = ""
+        msg_listp = lic_test.python_license_test(muSpectre_sources,
+                                                 py_lic_paras)
+        return msg_listp
 
 
 def main():
+    msg_list = ""
     muSpectre_sources = []
     muSpectre_sources = lic_test.arg_parser.parse_args(sys.argv[1:])
+
     header_test_case = CheckMuSpectreHeaderFiles
-    header_test_case.test_muSpectre_header_files(header_test_case,
-                                                 muSpectre_sources)
+    msg_list = msg_list + header_test_case.test_muSpectre_header_files(
+        header_test_case,
+        muSpectre_sources)
+
     source_test_case = CheckMuSpectreSourceFiles
-    source_test_case.test_muSpectre_source_files(source_test_case,
-                                                 muSpectre_sources)
+    msg_list = msg_list + source_test_case.test_muSpectre_source_files(
+        source_test_case,
+        muSpectre_sources)
 
     python_test_case = CheckMuSpectrePythonFiles
-    python_test_case.test_muSpectre_python_files(python_test_case,
-                                                 muSpectre_sources)
+    msg_list = msg_list + python_test_case.test_muSpectre_python_files(
+        python_test_case,
+        muSpectre_sources)
+
+    test_case.assertEqual(len(msg_list), 0, msg_list)
 
 
 if __name__ == "__main__":

@@ -67,12 +67,14 @@ test_case = unittest.TestCase('__init__')
 
 
 def header_license_test(source_dirs, lic_paras):
+    msg_list = ""
     for source_dir in source_dirs:
         header_files = []
         for r, d, f in walklevel(source_dir, 0):
+            print("source_dir = {}, r,d,f = {}".format(source_dir, (r, d, f)))
             for file in f:
                 if ('.hh' in file and '.hh~' not in file and '#'
-                   not in file and 'iterators.hh' not in file):
+                        not in file and 'iterators.hh' not in file):
                     header_files.append(os.path.join(r, file))
 
         for header_file in header_files:
@@ -86,10 +88,16 @@ def header_license_test(source_dirs, lic_paras):
             file_name = re.sub('\*\@file', '', file_name_line)
             header_file_name = re.split('\/', header_file)[-1]
             header_file_name = re.sub(' +', '', header_file_name)
-            test_case.assertEqual(file_name,
-                                  header_file_name,
-                                  msg="The name supplied in the first line"
-                                  "of the license should match the file name")
+            msg = ""
+            msg = test_case._formatMessage(
+                msg,
+                "The name supplied in the first "
+                "line of the license should match "
+                "file name\n {}:1:1:\n"
+                .format(os.path.join(r, header_file)))
+            if (not (file_name == header_file_name)):
+                msg_list = msg_list + msg
+
             mu_license_text = re.split('Copyright', license_text, 2)[1]
             mu_license_text_lines = re.split('\*\n', mu_license_text)
             mu_license_text_lines_new = []
@@ -101,22 +109,26 @@ def header_license_test(source_dirs, lic_paras):
             del mu_license_text_lines_new[0]
             msg = ""
             for num, lic_para in enumerate(lic_paras):
-                if mu_license_text_lines_new[num] != lic_para:
-                    msg = test_case._formatMessage(msg,
-                                                   "the paragraph number {}"
-                                                   " of the license in file "
-                                                   "\"{}\" is not correct."
-                                                   "It should be replaced by"
-                                                   "\n\'{}\'"
-                                                   .format(num+1,
-                                                           header_file,
-                                                           lic_para))
-                    raise test_case.failureException(msg)
+                if (mu_license_text_lines_new[num] != lic_para):
+                    msg = test_case._formatMessage(
+                        msg,
+                        "the paragraph number {} of"
+                        "the license in file"
+                        "\n{}:1:1:\n"
+                        "is not correct. It should "
+                        "be replaced by \n\'{}\'\n"
+                        .format(num+1,
+                                os.path.join(r, header_file_name),
+                                lic_para))
+                    msg_list = msg_list + msg
+
             print("\"{}\" License text approved".format(header_file))
             file_obj.close()
+    return msg_list
 
 
 def source_license_test(source_dirs, lic_paras):
+    msg_list = ""
     for source_dir in source_dirs:
         source_files = []
         for r, d, f in walklevel(source_dir, 0):
@@ -135,10 +147,17 @@ def source_license_test(source_dirs, lic_paras):
             file_name = re.sub('\*\@file', '', file_name_line)
             source_file_name = re.split('\/', source_file)[-1]
             source_file_name = re.sub(' +', '', source_file_name)
-            test_case.assertEqual(file_name,
-                                  source_file_name,
-                                  msg="The name supplied in the first line"
-                                  "of the license should match the file name")
+            msg = ""
+            msg = test_case._formatMessage(
+                msg,
+                "The name supplied in the first "
+                "line of the license should match "
+                "file name\n {}:1:1:"
+                .format(os.path.join(r,
+                                     source_file)))
+            if (not (file_name == source_file_name)):
+                msg_list = msg_list + msg
+
             mu_license_text = re.split('Copyright', license_text, 2)[1]
             mu_license_text_lines = re.split('\*\n', mu_license_text)
             mu_license_text_lines_new = []
@@ -151,37 +170,38 @@ def source_license_test(source_dirs, lic_paras):
             msg = ""
             for num, lic_para in enumerate(lic_paras):
                 if mu_license_text_lines_new[num] != lic_para:
-                    msg = test_case._formatMessage(msg,
-                                                   "the paragraph number {} of"
-                                                   "the license in file \"{}\""
-                                                   "is not correct. It should "
-                                                   "be replaced by \n\'{}\'"
-                                                   .format(num+1,
-                                                           source_file,
-                                                           lic_para))
-                    raise test_case.failureException(msg)
+                    msg = test_case._formatMessage(
+                        msg,
+                        "the paragraph number {} of"
+                        "the license in file"
+                        "\n{}:1:1:\n"
+                        "is not correct. It should "
+                        "be replaced by \n\'{}\'\n"
+                        .format(num+1,
+                                os.path.join(r, source_file_name),
+                                lic_para))
+                    msg_list = msg_list + msg
+
             print("\"{}\" License text approved".format(source_file))
             file_obj.close()
+    return msg_list
 
 
 def python_license_test(source_dirs, py_lic_paras):
+    msg_list = ""
     for source_dir in source_dirs:
         python_files = []
         for r, d, f in walklevel(source_dir, 0):
             for file in f:
                 if ('.py' in file and '.py~' not in file and '#'
-                   not in file and 'pyc' not in file):
+                        not in file and 'pyc' not in file):
                     python_files.append(os.path.join(r, file))
 
         for python_file in python_files:
             file_obj = open(python_file, "r")
             file_text = file_obj.read()
             hash_bang_text = re.split("\"\"\"", file_text, 3)[0]
-            test_case.assertEqual(hash_bang_text,
-                                  "#!/usr/bin/env python3\n"
-                                  "# -*- coding:utf-8 -*-\n",
-                                  msg="the hashbang of file {} is incorrect"
-                                  .format(python_file))
+            msg = ""
             license_text = re.split("\"\"\"", file_text, 3)[1]
             lines_text = re.split("\n\n", license_text)
             file_name_line = lines_text[0]
@@ -190,26 +210,47 @@ def python_license_test(source_dirs, py_lic_paras):
             file_name = re.sub('\@file', '', file_name_line)
             python_file_name = re.split('\/', python_file)[-1]
             python_file_name = re.sub(' +', '', python_file_name)
-            test_case.assertEqual(
-                file_name,
-                python_file_name,
-                msg=("The name supplied in the first line of"
-                     "the license should match the file name for :{}").format(
-                         python_file))
+            msg = ""
+            msg = test_case._formatMessage(
+                msg, "The has_bang of file:"
+                "\n{}:1:1\n is incorrect"
+                "it should be:\n"
+                "#!/usr/bin/env python3\n"
+                "# -*- coding:utf-8 -*-\n"
+                .format(os.path.join(r, python_file_name)))
+            if (not (hash_bang_text ==
+                     "#!/usr/bin/env python3\n"
+                     "# -*- coding:utf-8 -*-\n")):
+                msg_list = msg_list + msg
+
+            msg = ""
+            msg = test_case._formatMessage(
+                msg,
+                "The name supplied in the first "
+                "line of the license should match "
+                "file name\n {}:1:1:"
+                .format(os.path.join(r,
+                                     python_file_name)))
+            if (not (file_name == python_file_name)):
+                msg_list = msg_list + msg
+
             del lines_text[0:5]
             msg = ""
             for num, lic_para in enumerate(py_lic_paras):
                 re.sub("\ \n", "\n", lines_text[num])
                 if lines_text[num] != lic_para:
-                    msg = test_case._formatMessage(msg,
-                                                   "the paragraph number "
-                                                   "{} of the license in file"
-                                                   "\"{}\" is not correct. It"
-                                                   " should be replaced by \n"
-                                                   "\"'{}\' "
-                                                   .format(num+1,
-                                                           python_file,
-                                                           lic_para,))
-                    raise test_case.failureException(msg)
+                    msg = test_case._formatMessage(
+                        msg,
+                        "the paragraph number {} of"
+                        "the license in file"
+                        "\n{}:1:1:\n"
+                        "is not correct. It should "
+                        "be replaced by \n\'{}\'"
+                        .format(num+1,
+                                os.path.join(r, python_file_name),
+                                lic_para))
+                    msg_list = msg_list + msg
+
             print("\"{}\" License text approved".format(python_file))
             file_obj.close()
+    return msg_list
