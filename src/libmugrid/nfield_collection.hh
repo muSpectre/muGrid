@@ -46,23 +46,27 @@
 
 namespace muGrid {
 
-  //! forward declaration of the field
+  //! forward declaration of the `muSpectre::NField`
   class NField;
+
+  //! forward declaration of the `muSpectre::TypedNField`
   template <typename T>
   class TypedNField;
+
   //! forward declaration of the state field
   class StateNField;
+
   //! forward declaration of the state field
   template <typename T>
   class TypedStateNField;
-  //! forward declaration of the wrapped field
-  template <typename T>
-  class WrappedNField;
+
   //! forward declaration of the field collection
   class NFieldCollection;
+
   //! forward declacation of the field's destructor-functor
   template <class DefaultDestroyable>
   struct NFieldDestructor {
+    //! deletes the held field
     void operator()(DefaultDestroyable * field);
   };
 
@@ -79,7 +83,12 @@ namespace muGrid {
         : std::runtime_error(what) {}
   };
 
-  /* ---------------------------------------------------------------------- */
+  /**
+   * Base class for both `muGrid::GlobalNFieldCollection` and
+   * `muGrid::LocalNFieldCollection`. Manages the a group of fields with the
+   * same domain of validitiy (i.e., global fields, or local fields defined on
+   * the same pixels).
+   */
   class NFieldCollection {
    public:
     //! unique_ptr for holding fields
@@ -87,20 +96,26 @@ namespace muGrid {
     //! unique_ptr for holding state fields
     using StateNField_ptr =
         std::unique_ptr<StateNField, NFieldDestructor<StateNField>>;
-    enum class Domain { Global, Local };
-    using iterator = typename std::vector<size_t>::const_iterator;
+    //! domain of validity of the managed fields
+    enum class ValidityDomain { Global, Local };
+
+    class IndexIterable;
+    //! convenience alias
+    using QuadPtIndexIterable = IndexIterable;
+    class PixelIndexIterable;
 
    protected:
     /**
      * Constructor (not called by user, who constructs either a
      * LocalNFieldCollection or a GlobalNFieldCollection
      * @param domain Domain of validity, can be global or local
-     * @param spatial_dim spatial dimension of the field (can be
+     * @param spatial_dimension spatial dimension of the field (can be
      *                    muGrid::Unknown, e.g., in the case of the local fields
      *                    for storing internal material variables)
      * @param nb_quad_pts number of quadrature points per pixel/voxel
      */
-    NFieldCollection(Domain domain, Dim_t spatial_dimension, Dim_t nb_quad_pts);
+    NFieldCollection(ValidityDomain domain, Dim_t spatial_dimension,
+                     Dim_t nb_quad_pts);
 
    public:
     //! Default constructor
@@ -121,34 +136,77 @@ namespace muGrid {
     //! Move assignment operator
     NFieldCollection & operator=(NFieldCollection && other) = default;
 
-    //! place a new field in the responsibility of this collection (Note,
-    //! because fields have protected constructors, users can't create them
+    /**
+     * place a new field in the responsibility of this collection (Note, because
+     * fields have protected constructors, users can't create them
+     * @param unique_name unique identifier for this field
+     * @param nb_components number of components to be stored per quadrature
+     * point (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a
+     * scalar field)
+     */
     template <typename T>
     TypedNField<T> & register_field(const std::string & unique_name,
-                                    Dim_t nb_components) {
+                                    const Dim_t & nb_components) {
       static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
                     "You can only register fields templated with one of the "
                     "numeric types Real, Complex, Int, or UInt");
       return this->register_field_helper<T>(unique_name, nb_components);
     }
 
+    /**
+     * place a new real-valued field  in the responsibility of this collection
+     * (Note, because fields have protected constructors, users can't create
+     * them
+     * @param unique_name unique identifier for this field
+     * @param nb_components number of components to be stored per quadrature
+     * point (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a
+     * scalar field)
+     */
     TypedNField<Real> & register_real_field(const std::string & unique_name,
-                                            Dim_t nb_components);
+                                            const Dim_t & nb_components);
+    /**
+     * place a new complex-valued field  in the responsibility of this
+     * collection (Note, because fields have protected constructors, users can't
+     * create them
+     * @param unique_name unique identifier for this field
+     * @param nb_components number of components to be stored per quadrature
+     * point (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a
+     * scalar field)
+     */
     TypedNField<Complex> &
     register_complex_field(const std::string & unique_name,
-                           Dim_t nb_components);
+                           const Dim_t & nb_components);
+    /**
+     * place a new integer-valued field  in the responsibility of this
+     * collection (Note, because fields have protected constructors, users can't
+     * create them
+     * @param unique_name unique identifier for this field
+     * @param nb_components number of components to be stored per quadrature
+     * point (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a
+     * scalar field)
+     */
     TypedNField<Int> & register_int_field(const std::string & unique_name,
-                                          Dim_t nb_components);
+                                          const Dim_t & nb_components);
+    /**
+     * place a new unsigned integer-valued field  in the responsibility of this
+     * collection (Note, because fields have protected constructors, users can't
+     * create them
+     * @param unique_name unique identifier for this field
+     * @param nb_components number of components to be stored per quadrature
+     * point (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a
+     * scalar field)
+     */
     TypedNField<Uint> & register_uint_field(const std::string & unique_name,
-                                            Dim_t nb_components);
+                                            const Dim_t & nb_components);
 
-    //! place a new state field in the responsibility of this collection
-    //! (Note, because state fields have protected constructors, users can't
-    //! create them
+    /**
+     * place a new state field in the responsibility of this collection (Note,
+     * because state fields have protected constructors, users can't create them
+     */
     template <typename T>
     TypedStateNField<T> &
     register_state_field(const std::string & unique_prefix,
-                         Dim_t nb_memory, Dim_t nb_components) {
+                         const Dim_t & nb_memory, const Dim_t & nb_components) {
       static_assert(
           std::is_scalar<T>::value or std::is_same<T, Complex>::value,
           "You can only register state fields templated with one of the "
@@ -157,52 +215,65 @@ namespace muGrid {
                                                   nb_components);
     }
 
+    /**
+     * place a new real-valued state field in the responsibility of this
+     * collection (Note, because state fields have protected constructors, users
+     * can't create them
+     *
+     * @param unique_prefix unique idendifier for this state field
+     * @param nb_memory number of previous values of this field to store
+     * @param nb_components number of scalar components to store per quadrature
+     * point
+     */
     TypedStateNField<Real> &
-    register_real_state_field(const std::string & unique_name,
-                              Dim_t nb_memory,
-                              Dim_t nb_components);
+    register_real_state_field(const std::string & unique_prefix,
+                              const Dim_t & nb_memory,
+                              const Dim_t & nb_components);
+
+    /**
+     * place a new complex-valued state field in the responsibility of this
+     * collection (Note, because state fields have protected constructors, users
+     * can't create them
+     *
+     * @param unique_prefix unique idendifier for this state field
+     * @param nb_memory number of previous values of this field to store
+     * @param nb_components number of scalar components to store per quadrature
+     * point
+     */
     TypedStateNField<Complex> &
-    register_complex_state_field(const std::string & unique_name,
-                                 Dim_t nb_memory,
-                                 Dim_t nb_components);
+    register_complex_state_field(const std::string & unique_prefix,
+                                 const Dim_t & nb_memory,
+                                 const Dim_t & nb_components);
+
+    /**
+     * place a new integer-valued state field in the responsibility of this
+     * collection (Note, because state fields have protected constructors, users
+     * can't create them
+     *
+     * @param unique_prefix unique idendifier for this state field
+     * @param nb_memory number of previous values of this field to store
+     * @param nb_components number of scalar components to store per quadrature
+     * point
+     */
     TypedStateNField<Int> &
-    register_int_state_field(const std::string & unique_name,
-                             Dim_t nb_memory,
-                             Dim_t nb_components);
+    register_int_state_field(const std::string & unique_prefix,
+                             const Dim_t & nb_memory,
+                             const Dim_t & nb_components);
+
+    /**
+     * place a new unsigned integer-valued state field in the responsibility of
+     * this collection (Note, because state fields have protected constructors,
+     * users can't create them
+     *
+     * @param unique_prefix unique idendifier for this state field
+     * @param nb_memory number of previous values of this field to store
+     * @param nb_components number of scalar components to store per quadrature
+     * point
+     */
     TypedStateNField<Uint> &
-    register_uint_state_field(const std::string & unique_name,
-                              Dim_t nb_memory,
-                              Dim_t nb_components);
-
-    //! place a new field in the responsibility of this collection (Note,
-    //! because fields have protected constructors, users can't create them
-    template <typename T>
-    WrappedNField<T> & register_wrapped_field(
-        const std::string & unique_name, Dim_t nb_components,
-        Eigen::Ref<typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>>
-        values) {
-      static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
-                    "You can only register wrapped fields templated with one "
-                    "of the numeric types Real, Complex, Int, or UInt");
-      return this->register_wrapped_field_helper<T>(unique_name, nb_components, values);
-    }
-
-    WrappedNField<Real> &
-    register_real_wrapped_field(
-        const std::string & unique_name, Dim_t nb_components,
-        Eigen::Ref<Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>> values);
-    WrappedNField<Complex> &
-    register_complex_wrapped_field(
-        const std::string & unique_name, Dim_t nb_components,
-        Eigen::Ref<Eigen::Matrix<Complex, Eigen::Dynamic, Eigen::Dynamic>> values);
-    WrappedNField<Int> &
-    register_int_wrapped_field(
-        const std::string & unique_name, Dim_t nb_components,
-        Eigen::Ref<Eigen::Matrix<Int, Eigen::Dynamic, Eigen::Dynamic>> values);
-    WrappedNField<Uint> &
-    register_uint_wrapped_field(
-        const std::string & unique_name, Dim_t nb_components,
-        Eigen::Ref<Eigen::Matrix<Uint, Eigen::Dynamic, Eigen::Dynamic>> values);
+    register_uint_state_field(const std::string & unique_prefix,
+                              const Dim_t & nb_memory,
+                              const Dim_t & nb_components);
 
     //! check whether a field of name 'unique_name' has already been
     //! registered
@@ -214,12 +285,12 @@ namespace muGrid {
 
     /**
      * returns the number of entries held by any given field in this
-     * collection. This correspons nb_pixels × nb_quad_pts, (I.e., a scalar
+     * collection. This corresponds to nb_pixels × nb_quad_pts, (I.e., a scalar
      * field field and a vector field sharing the the same collection have the
      * same number of entries, even though the vector field has more scalar
      * values.)
      */
-    Dim_t size() const;
+    const Dim_t & get_nb_entries() const;
 
     //! returns the number of pixels present in the collection
     size_t get_nb_pixels() const;
@@ -237,52 +308,87 @@ namespace muGrid {
     void set_nb_quad(Dim_t nb_quad_pts_per_pixel);
 
     /**
-     * returns the number of quadrature points
+     * return the number of quadrature points per pixel
      */
-    Dim_t get_nb_quad() const;
+    const Dim_t & get_nb_quad() const;
 
-    const Domain & get_domain() const;
+    /**
+     * return the spatial dimension of the underlying discretisation grid
+     */
+    const Dim_t & get_spatial_dim() const;
 
+    /**
+     * return the domain of validity (i.e., wher the fields are defined globally
+     * (`muGrid::NFieldCollection::ValidityDomain::Global`) or locally
+     * (`muGrid::NFieldCollection::ValidityDomain::Local`)
+     */
+    const ValidityDomain & get_domain() const;
+
+    /**
+     * whether the collection has been properly initialised (i.e., it knows the
+     * number of quadrature points and all its pixels/voxels
+     */
     bool is_initialised() const;
 
-    //! iterator over indices
-    iterator begin() const;
-    //! iterator to end of indices
-    iterator end() const;
+    /**
+     * return an iterable proxy to the collection which allows to efficiently
+     * iterate over the indices fo the collection's pixels
+     */
+    PixelIndexIterable get_pixel_indices_fast() const;
 
+    /**
+     * return an iterable proxy to the collection which allows to iterate over
+     * the indices fo the collection's pixels
+     */
+    IndexIterable get_pixel_indices() const;
+
+    /**
+     * return an iterable proxy to the collection which allows to iterate over
+     * the indices fo the collection's quadrature points
+     */
+    IndexIterable get_quad_pt_indices() const;
+
+    /**
+     * returns a (base-type) reference to the field identified by `unique_name`.
+     * Throws a `muGrid::NFieldCollectionError` if the field does not exist.
+     */
     NField & get_field(const std::string & unique_name);
+
+    /**
+     * returns a (base-type) reference to the state field identified by
+     * `unique_prefix`. Throws a `muGrid::NFieldCollectionError` if the state
+     * field does not exist.
+     */
     StateNField & get_state_field(const std::string & unique_prefix);
 
-    const std::map<std::string, NField_ptr> & get_fields() const;
-
+    //! returns a vector of all field names
     std::vector<std::string> list_fields() const;
 
    protected:
+    //! internal worker function called by register_<T>_field
     template <typename T>
     TypedNField<T> & register_field_helper(const std::string & unique_name,
-                                           Dim_t nb_components);
+                                           const Dim_t & nb_components);
+
+    //! internal worker function called by register_<T>_state_field
     template <typename T>
     TypedStateNField<T> &
     register_state_field_helper(const std::string & unique_prefix,
-                                Dim_t nb_memory, Dim_t nb_components);
-    template <typename T>
-    WrappedNField<T> &
-    register_wrapped_field_helper(
-        const std::string & unique_prefix, Dim_t nb_components,
-        Eigen::Ref<typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>>
-        values);
+                                const Dim_t & nb_memory,
+                                const Dim_t & nb_components);
 
     /**
      * loop through all fields and allocate their memory. Is exclusively
      * called by the daughter classes' `initialise` member function.
      */
     void allocate_fields();
+
     //! storage container for fields
     std::map<std::string, NField_ptr> fields{};
     //! storage container for state fields
     std::map<std::string, StateNField_ptr> state_fields{};
     //! domain of validity
-    const Domain domain;
+    ValidityDomain domain;
     //! spatial dimension
     Dim_t spatial_dim;
     //! number of quadrature points per pixel/voxel
@@ -299,7 +405,181 @@ namespace muGrid {
      * processor, and not for any quadrature point located on anothe
      * processor.
      */
-    std::vector<size_t> indices{};
+    std::vector<size_t> pixel_indices{};
+  };
+
+  /**
+   * Lightweight proxy class providing iteration over the pixel indices of a
+   * `muGrid::NFieldCollection`
+   */
+  class NFieldCollection::PixelIndexIterable {
+   public:
+    //! stl
+    using iterator = typename std::vector<size_t>::const_iterator;
+    //! Default constructor
+    PixelIndexIterable() = delete;
+
+    //! Copy constructor
+    PixelIndexIterable(const PixelIndexIterable & other) = delete;
+
+    //! Move constructor
+    PixelIndexIterable(PixelIndexIterable && other) = default;
+
+    //! Destructor
+    virtual ~PixelIndexIterable() = default;
+
+    //! Copy assignment operator
+    PixelIndexIterable & operator=(const PixelIndexIterable & other) = delete;
+
+    //! Move assignment operator
+    PixelIndexIterable & operator=(PixelIndexIterable && other) = delete;
+
+    //! stl
+    iterator begin() const;
+
+    //! stl
+    iterator end() const;
+
+    //! stl
+    size_t size() const;
+
+   protected:
+    //! allow field collections to call the procted constructor of this iterable
+    friend NFieldCollection;
+
+    //! Constructor is protected, because no one ever need to construct this
+    //! except the fieldcollection
+    explicit PixelIndexIterable(const NFieldCollection & collection);
+
+    //! reference back to the proxied collection
+    const NFieldCollection & collection;
+  };
+
+  /**
+   * Iterate class for iterating over quadrature point indices of a field
+   * collection (i.e. the iterate you get when iterating over the result of
+   * `muGrid::NFieldCollection::get_quad_pt_indices`).
+   */
+  class NFieldCollection::IndexIterable {
+   public:
+    class iterator;
+    //! Default constructor
+    IndexIterable() = delete;
+
+    //! Copy constructor
+    IndexIterable(const IndexIterable & other) = delete;
+
+    //! Move constructor
+    IndexIterable(IndexIterable && other) = default;
+
+    //! Destructor
+    virtual ~IndexIterable() = default;
+
+    //! Copy assignment operator
+    IndexIterable & operator=(const IndexIterable & other) = delete;
+
+    //! Move assignment operator
+    IndexIterable & operator=(IndexIterable && other) = delete;
+
+    //! stl
+    iterator begin() const;
+
+    //! stl
+    iterator end() const;
+
+    //! stl
+    size_t size() const;
+
+   protected:
+    /**
+     * evaluate and return the stride with with the fast index of the iterators
+     * over the indices of this collection rotate
+     */
+    Dim_t get_stride() const {
+      return (this->iteration_type == Iteration::QuadPt)
+                 ? this->collection.get_nb_quad()
+                 : 1;
+    }
+
+    /**
+     * allow the field collection to create
+     * `muGrid::NFieldCollection::IndexIterable`s
+     */
+    friend NFieldCollection;
+    //! Constructor is protected, because no one ever need to construct this
+    //! except the fieldcollection
+    IndexIterable(const NFieldCollection & collection,
+                  const Iteration & iteration_type);
+
+    //! reference back to the proxied collection
+    const NFieldCollection & collection;
+
+    //! whether to iterate over pixels or quadrature points
+    const Iteration iteration_type;
+  };
+
+  /**
+   * iterator class for iterating over quadrature point indices or pixel indices
+   * of a `muGrid::NFieldCollection::IndexIterable`. Dereferences to an index.
+   */
+  class NFieldCollection::IndexIterable::iterator final {
+   public:
+    //! convenience alias
+    using PixelIndexIterator_t = typename std::vector<size_t>::const_iterator;
+    //! Default constructor
+    iterator() = delete;
+
+    //! constructor
+    iterator(const PixelIndexIterator_t & pixel_index_iterator,
+             const size_t & stride);
+
+    //! Copy constructor
+    iterator(const iterator & other) = default;
+
+    //! Move constructor
+    iterator(iterator && other) = default;
+
+    //! Destructor
+    ~iterator() = default;
+
+    //! Copy assignment operator
+    iterator & operator=(const iterator & other) = default;
+
+    //! Move assignment operator
+    iterator & operator=(iterator && other) = default;
+
+    //! pre-increment
+    iterator & operator++() {
+      // increment the offset and keep only the modulo
+      (++this->offset) %= this->stride;
+      // conditionally increment the pixel if the offset has recycled to zero
+      this->pixel_index_iterator += size_t(this->offset == 0);
+      return *this;
+    }
+
+    //! comparison
+    bool operator!=(const iterator & other) const {
+      return (this->pixel_index_iterator != other.pixel_index_iterator) or
+             (this->offset != other.offset);
+    }
+
+    //! comparison (required by akantu::iterators)
+    bool operator==(const iterator & other) const {
+      return not(*this != other);
+    }
+
+    //! dereference
+    size_t operator*() {
+      return *(this->pixel_index_iterator) * this->stride + this->offset;
+    }
+
+   protected:
+    //! stride for the slow moving index
+    size_t stride;
+    //! fast-moving index
+    size_t offset{};
+    //! iterator of slow moving index
+    PixelIndexIterator_t pixel_index_iterator;
   };
 
   /* ---------------------------------------------------------------------- */

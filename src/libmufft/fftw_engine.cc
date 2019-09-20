@@ -40,15 +40,13 @@
 
 namespace muFFT {
 
-  template <Dim_t Dim>
-  FFTWEngine<Dim>::FFTWEngine(Ccoord nb_grid_pts, Dim_t nb_components,
-                              Communicator comm)
-      : Parent{nb_grid_pts, nb_components, comm}, plan_fft{nullptr},
+  FFTWEngine::FFTWEngine(const DynCcoord_t & nb_grid_pts,
+                         Dim_t nb_dof_per_pixel, Communicator comm)
+      : Parent{nb_grid_pts, nb_dof_per_pixel, comm}, plan_fft{nullptr},
         plan_ifft{nullptr} {}
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim>
-  void FFTWEngine<Dim>::initialise(FFT_PlanFlags plan_flags) {
+  void FFTWEngine::initialise(FFT_PlanFlags plan_flags) {
     if (this->comm.size() > 1) {
       std::stringstream error;
       error << "FFTW engine does not support MPI parallel execution, but a "
@@ -61,15 +59,17 @@ namespace muFFT {
     }
     Parent::initialise(plan_flags);
 
-    const int & rank = Dim;
-    std::array<int, Dim> narr;
+    const int & rank = this->nb_subdomain_grid_pts.get_dim();
+    std::vector<int> narr(rank);
+    std::copy(this->nb_subdomain_grid_pts.begin(),
+              this->nb_subdomain_grid_pts.end(), narr.begin());
     const int * const n = &narr[0];
     // Reverse the order of the array dimensions, because FFTW expects a
     // row-major array and the arrays used in muSpectre are column-major
-    for (Dim_t i = 0; i < Dim; ++i) {
-      narr[i] = this->nb_subdomain_grid_pts[Dim - 1 - i];
+    for (Dim_t i = 0; i < rank; ++i) {
+      narr[i] = this->nb_subdomain_grid_pts[rank - 1 - i];
     }
-    int howmany = this->nb_components;
+    int howmany = this->nb_dof_per_pixel;
     // temporary buffer for plan
     size_t alloc_size =
         (muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts) * howmany);
@@ -125,8 +125,7 @@ namespace muFFT {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim>
-  FFTWEngine<Dim>::~FFTWEngine<Dim>() noexcept {
+  FFTWEngine::~FFTWEngine() noexcept {
     if (this->plan_fft != nullptr)
       fftw_destroy_plan(this->plan_fft);
     if (this->plan_ifft != nullptr)
@@ -137,9 +136,7 @@ namespace muFFT {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim>
-  typename FFTWEngine<Dim>::Workspace_t &
-  FFTWEngine<Dim>::fft(Field_t & field) {
+  typename FFTWEngine::Workspace_t & FFTWEngine::fft(Field_t & field) {
     if (this->plan_fft == nullptr) {
       throw std::runtime_error("fft plan not initialised");
     }
@@ -158,8 +155,7 @@ namespace muFFT {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim>
-  void FFTWEngine<Dim>::ifft(Field_t & field) const {
+  void FFTWEngine::ifft(Field_t & field) const {
     if (this->plan_ifft == nullptr) {
       throw std::runtime_error("ifft plan not initialised");
     }
@@ -177,7 +173,4 @@ namespace muFFT {
                          field.data());
   }
 
-  template class FFTWEngine<muGrid::oneD>;
-  template class FFTWEngine<muGrid::twoD>;
-  template class FFTWEngine<muGrid::threeD>;
 }  // namespace muFFT

@@ -49,13 +49,20 @@ namespace muGrid {
   class TypedStateNField;
   class NField;
 
+  /**
+   * Dynamically sized map for iterating over `muGrid::StateNField`s
+   */
   template <typename T, Mapping Mutability>
   class StateNFieldMap {
    public:
+    /**
+     * type for the current-values map (may be mutable, if the underlying field
+     * was)
+     */
     using NFieldMap_t = NFieldMap<T, Mutability>;
+
+    //! type for the old-values map, non-mutable
     using CNFieldMap_t = NFieldMap<T, Mapping::Const>;
-    using CurrentIteratort = typename NFieldMap_t::iterator;
-    using OldIteratort = typename CNFieldMap_t::iterator;
 
     //! Default constructor
     StateNFieldMap() = delete;
@@ -88,19 +95,28 @@ namespace muGrid {
     //! Move assignment operator
     StateNFieldMap & operator=(StateNFieldMap && other) = delete;
 
+
+    //! iterator type
     template <Mapping MutIter>
     class Iterator;
+
+    //! stl
     using iterator =
         Iterator<(Mutability == Mapping::Mut) ? Mapping::Mut : Mapping::Const>;
+
+    //! stl
     using const_iterator = Iterator<Mapping::Const>;
 
+    //! stl
     iterator begin();
-    iterator end();
-    // const_iterator begin() const;
-    // const_iterator end() const;
 
+    //! stl
+    iterator end();
+
+    //! return a const reference to the mapped state field
     const TypedStateNField<T> & get_state_field() const;
 
+    //! return the number of rows the iterates have
     const Dim_t & get_nb_rows() const;
 
     /**
@@ -110,76 +126,125 @@ namespace muGrid {
      */
     size_t size() const;
 
+    /**
+     * The iterate needs to give access to current or previous values. This is
+     * handled by the `muGrid::StateNFieldMap::StateWrapper`, a light-weight
+     * wrapper around the iterate's data.
+     */
     template <Mapping MutWrapper>
     class StateWrapper {
      public:
+      //! convenience alias
       using StateNFieldMap_t =
           std::conditional_t<MutWrapper == Mapping::Const, const StateNFieldMap,
                              StateNFieldMap>;
-      using CurrentVal_t =
-          typename NFieldMap_t::template value_type<MutWrapper>;
-      using OldVal_t = typename NFieldMap_t::template value_type<Mapping::Const>;
+
+      //! return value when getting current value from iterate
+      using CurrentVal_t = typename NFieldMap_t::template Return_t<MutWrapper>;
+
+      //! return value when getting old value from iterate
+      using OldVal_t = typename NFieldMap_t::template Return_t<Mapping::Const>;
+
+      //! constructor (should never have to be called by user)
       StateWrapper(StateNFieldMap_t & state_field_map, size_t index)
           : current_val{state_field_map.get_current()[index]} {
         const Dim_t nb_memory{state_field_map.state_field.get_nb_memory()};
         this->old_vals.reserve(nb_memory);
-        for (Dim_t i{1}; i < nb_memory + 1 ; ++i) {
+        for (Dim_t i{1}; i < nb_memory + 1; ++i) {
           this->old_vals.emplace_back(
               std::move(state_field_map.get_old(i))[index]);
         }
       }
       ~StateWrapper() = default;
 
+      //! return the current value at this iterate
       CurrentVal_t & current() { return this->current_val; }
+
+      //! return the value at this iterate which was current `nb_steps_ago` ago
       const OldVal_t & old(size_t nb_steps_ago) const {
         return this->old_vals.at(nb_steps_ago - 1);
       }
 
      protected:
+      //! current value at this iterate
       CurrentVal_t current_val;
+      //! all old values at this iterate
       std::vector<OldVal_t> old_vals{};
     };
 
+    //! random access operator
     StateWrapper<Mutability> operator[](size_t index) {
       return StateWrapper<Mutability>{*this, index};
     }
 
+    //! random constaccess operator
     StateWrapper<Mapping::Const> operator[](size_t index) const {
       return StateWrapper<Mapping::Const>{*this, index};
     }
 
+    /**
+     * make sure the underlying collection is initialised and update the data
+     * pointers of all maps
+     */
     void initialise();
 
+    //! returns a reference to the map over the current data
     NFieldMap_t & get_current();
+
+    //! returns a const reference to the map over the current data
     const NFieldMap_t & get_current() const;
+    /**
+     * returns a const reference to the map over the data which was current
+     * `nb_steps_ago` ago
+     */
     const CNFieldMap_t & get_old(size_t nb_steps_ago) const;
 
    protected:
+    //! protected access to the constituent fields
     RefVector<NField> & get_fields();
 
-    //< mapped state field. Needed for query at initialisations
+    //! mapped state field. Needed for query at initialisations
     TypedStateNField<T> & state_field;
     const Iteration iteration;  //!< type of map iteration
     const Dim_t nb_rows;        //!< number of rows of the iterate
+
+    /**
+     * maps over nb_memory + 1 possibly mutable maps. current points to one of
+     * these
+     */
     std::vector<NFieldMap_t> maps;
+
+    //! helper function creating the list of maps to store for current values
     std::vector<NFieldMap_t> make_maps(RefVector<NField> & fields);
+
+    /**
+     * maps over nb_memory + 1 const maps. old(nb_steps_ago) points to one of
+     * these
+     */
     std::vector<CNFieldMap_t> cmaps;
+
+    //! helper function creating the list of maps to store for old values
     std::vector<CNFieldMap_t> make_cmaps(RefVector<NField> & fields);
   };
 
-  /* ---------------------------------------------------------------------- */
+  /**
+   * Iterator class for `muGrid::StateNFieldMap`
+   */
   template <typename T, Mapping Mutability>
   template <Mapping MutIter>
   class StateNFieldMap<T, Mutability>::Iterator {
    public:
+    //! convenience alias
     using StateNFieldMap_t =
         std::conditional_t<MutIter == Mapping::Const, const StateNFieldMap,
                            StateNFieldMap>;
+    //! const-correct proxy for iterates
     using StateWrapper_t =
         typename StateNFieldMap::template StateWrapper<MutIter>;
-    //! Default constructor
+    //! Deleted default constructor
     Iterator() = delete;
 
+    //! constructor (should never have to be called by the user)
     Iterator(StateNFieldMap_t & state_field_map, size_t index);
 
     //! Copy constructor
@@ -203,14 +268,20 @@ namespace muGrid {
     }
 
     //! pre-increment
-    Iterator & operator++() { ++this->index; return *this;}
+    Iterator & operator++() {
+      ++this->index;
+      return *this;
+    }
 
+    //! dereference
     StateWrapper_t operator*() {
       return StateWrapper_t{this->state_field_map, this->index};
     }
 
    protected:
+    //! reference back to the iterated map
     StateNFieldMap_t & state_field_map;
+    //! current iteration progress
     size_t index;
   };
 

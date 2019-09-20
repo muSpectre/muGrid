@@ -54,19 +54,36 @@ namespace muSpectre {
    */
   class MaterialBase;
 
+  /**
+   * Small convenience class providing a common interface to evaluate materials
+   * without the need to set up an entire homogenisation problem. Useful for
+   * debugging material laws.
+   *
+   * \tparam DimM Dimensionality of the material
+   */
   template <Dim_t DimM>
   class MaterialEvaluator {
    public:
+    //! shorthand for second-rank tensors
     using T2_t = Eigen::Matrix<Real, DimM, DimM>;
+
+    //! shorthand for fourth-rank tensors
     using T4_t = muGrid::T4Mat<Real, DimM>;
 
+    //! map of a second-rank tensor
     using T2_map = Eigen::Map<T2_t>;
+
+    //! map of a fourth-rank tensor
     using T4_map = muGrid::T4MatMap<Real, DimM>;
 
+    //! const map of a second-rank tensor
     using T2_const_map = Eigen::Map<const T2_t>;
+
+    //! const map of a fourth-rank tensor
     using T4_const_map = muGrid::T4MatMap<Real, DimM, true>;
 
-    using FieldColl_t = muGrid::GlobalNFieldCollection<DimM>;
+    //! convenience alias
+    using FieldColl_t = muGrid::GlobalNFieldCollection;
 
     //! Default constructor
     MaterialEvaluator() = delete;
@@ -75,11 +92,13 @@ namespace muSpectre {
      * constructor with a shared pointer to a Material
      */
     explicit MaterialEvaluator(std::shared_ptr<MaterialBase> material)
-        : material{material}, collection{std::make_unique<FieldColl_t>(1)},
+        : material{material}, collection{std::make_unique<FieldColl_t>(DimM,
+                                                                       1)},
           strain("gradient", *this->collection),
           stress{"stress", *this->collection}, tangent{"tangent",
                                                        *this->collection} {
-      this->collection->initialise(muGrid::CcoordOps::get_cube<DimM>(1), {0});
+      this->collection->initialise(muGrid::CcoordOps::get_cube<DimM>(1),
+                                   Ccoord_t<DimM>{});
     }
 
     //! Copy constructor
@@ -132,6 +151,9 @@ namespace muSpectre {
                      const Formulation & form, const Real step,
                      const FiniteDiff diff_type = FiniteDiff::centred);
 
+    /**
+     * initialise the material and the fields
+     */
     inline void initialise();
 
    protected:
@@ -140,13 +162,29 @@ namespace muSpectre {
      */
     void check_init();
 
+    /**
+     * storage of the material is managed through a shared pointer
+     */
     std::shared_ptr<MaterialBase> material;
+
+    /**
+     * storage of the strain, stress and tangent fields is managed through a
+     * unique pointer
+     */
     std::unique_ptr<FieldColl_t> collection;
+
+    //! strain field (independent variable)
     muGrid::MappedT2NField<Real, Mapping::Mut, DimM> strain;
+
+    //! stress field (result)
     muGrid::MappedT2NField<Real, Mapping::Mut, DimM> stress;
+
+    //! field of tangent moduli (result)
     muGrid::MappedT4NField<Real, Mapping::Mut, DimM> tangent;
+
+    //! whether the evaluator has been initialised
     bool is_initialised{false};
-  };  // namespace muSpectre
+  };
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimM>
@@ -188,8 +226,8 @@ namespace muSpectre {
     } else if (size > 1) {
       std::stringstream error{};
       error << "The material to be evaluated should have exactly one pixel "
-               "added. You've added "
-            << size << " pixels.";
+               "with one quadrature point added. You've added "
+            << size << " quadrature points.";
       throw std::runtime_error(error.str());
     }
   }

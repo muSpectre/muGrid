@@ -39,9 +39,11 @@
 #ifndef SRC_PROJECTION_PROJECTION_DEFAULT_HH_
 #define SRC_PROJECTION_PROJECTION_DEFAULT_HH_
 
-#include "projection/projection_base.hh"
-
 #include <libmugrid/nfield_map_static.hh>
+
+#include <libmufft/derivative.hh>
+
+#include "projection/projection_base.hh"
 
 namespace muSpectre {
 
@@ -51,21 +53,19 @@ namespace muSpectre {
    * values per k-grid point
    */
   template <Dim_t DimS>
-  class ProjectionDefault : public ProjectionBase<DimS> {
+  class ProjectionDefault : public ProjectionBase {
    public:
-    using Parent = ProjectionBase<DimS>;         //!< base class
+    using Parent = ProjectionBase;         //!< base class
     using Vector_t = typename Parent::Vector_t;  //!< to represent fields
-    //! polymorphic FFT pointer type
-    using FFTEngine_ptr = typename Parent::FFTEngine_ptr;
     //! gradient, i.e. derivatives in each Cartesian direction
-    using Gradient_t = typename Parent::Gradient_t;
-    using Ccoord = typename Parent::Ccoord;  //!< cell coordinates type
-    using Rcoord = typename Parent::Rcoord;  //!< spatial coordinates type
+    using Gradient_t = muFFT::Gradient_t;
+    using Ccoord = Ccoord_t<DimS>;  //!< cell coordinates type
+    using Rcoord = Rcoord_t<DimS>;  //!< spatial coordinates type
     //! global field collection
-    using GFieldCollection_t = muGrid::GlobalNFieldCollection<DimS>;
+    using GFieldCollection_t = muGrid::GlobalNFieldCollection;
     //! Real space second order tensor fields (to be projected)
-    using Field_t = muGrid::RealNField;
-    //! Fourier-space field containing the projection operator itself
+    using Field_t = muGrid::TypedNFieldBase<Real>;
+    //! fourier-space field containing the projection operator itself
     using Proj_t = muGrid::ComplexNField;
     //! iterable form of the operator
     using Proj_map = muGrid::T4NFieldMap<Complex, Mapping::Mut, DimS>;
@@ -76,8 +76,8 @@ namespace muSpectre {
     ProjectionDefault() = delete;
 
     //! Constructor with cell sizes and formulation
-    ProjectionDefault(FFTEngine_ptr engine, Rcoord lengths, Gradient_t gradient,
-                      Formulation form);
+    ProjectionDefault(muFFT::FFTEngine_ptr engine, DynRcoord_t lengths,
+                      Gradient_t gradient, Formulation form);
 
     //! Copy constructor
     ProjectionDefault(const ProjectionDefault & other) = delete;
@@ -116,6 +116,11 @@ namespace muSpectre {
    protected:
     Proj_t & Gfield;  //!< field holding the operator
     Proj_map Ghat;    //!< iterable version of operator
+    /**
+     * gradient (nabla) operator, can be computed using Fourier interpolation
+     * or through a weighted residual
+     */
+    Gradient_t gradient;
   };
 
 }  // namespace muSpectre

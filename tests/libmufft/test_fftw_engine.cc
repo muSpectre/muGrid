@@ -60,8 +60,8 @@ namespace muFFT {
     constexpr static Ccoord_t<sdim> loc() {
       return muGrid::CcoordOps::get_cube<DimS>(0);
     }
-    FFTW_fixture() : engine(res(), DimM * DimM) {}
-    FFTWEngine<DimS> engine;
+    FFTW_fixture() : engine{DynCcoord_t(res()), DimM * DimM} {}
+    FFTWEngine engine;
   };
 
   struct FFTW_fixture_python_segfault {
@@ -70,8 +70,8 @@ namespace muFFT {
     constexpr static Dim_t mdim{twoD};
     constexpr static Ccoord_t<sdim> res() { return {6, 4}; }
     constexpr static Ccoord_t<sdim> loc() { return {0, 0}; }
-    FFTW_fixture_python_segfault() : engine{res(), mdim * mdim} {}
-    FFTWEngine<sdim> engine;
+    FFTW_fixture_python_segfault() : engine{DynCcoord_t(res()), mdim * mdim} {}
+    FFTWEngine engine;
   };
 
   using fixlist = boost::mpl::list<
@@ -90,14 +90,15 @@ namespace muFFT {
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(fft_test, Fix, fixlist, Fix) {
     Fix::engine.initialise(FFT_PlanFlags::estimate);
-    using FC_t = muGrid::GlobalNFieldCollection<Fix::sdim>;
-    FC_t fc(1);
+    using FC_t = muGrid::GlobalNFieldCollection;
+    FC_t fc(Fix::sdim, OneQuadPt);
     auto & input{fc.register_real_field("input", Fix::mdim * Fix::mdim)};
     auto & ref{fc.register_real_field("reference", Fix::mdim * Fix::mdim)};
     auto & result{fc.register_real_field("result", Fix::mdim * Fix::mdim)};
     fc.initialise(Fix::res(), Fix::loc());
 
-    using map_t = muGrid::MatrixNFieldMap<Real, Mapping::Mut, Fix::mdim, Fix::mdim>;
+    using map_t =
+        muGrid::MatrixNFieldMap<Real, Mapping::Mut, Fix::mdim, Fix::mdim>;
     map_t inmap{input};
     inmap.initialise();
     auto refmap{map_t{ref}};

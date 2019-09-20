@@ -58,15 +58,15 @@ namespace muFFT {
 
   BOOST_AUTO_TEST_SUITE(mpi_fft_engine);
   /* ---------------------------------------------------------------------- */
-  template <typename Engine, Dim_t NbGridPts, bool serial = false>
+  template <typename Engine, Dim_t dim, Dim_t NbGridPts, bool serial = false>
   struct FFTW_fixture {
     constexpr static Dim_t BoxNbGridPts{NbGridPts};
     constexpr static Dim_t serial_engine{serial};
     constexpr static Real BoxLength{4.5};
-    constexpr static Dim_t sdim{Engine::sdim};
+    constexpr static Dim_t sdim{dim};
     constexpr static Dim_t nb_components{sdim * sdim};
-    constexpr static Ccoord_t<sdim> res() {
-      return muGrid::CcoordOps::get_cube<sdim>(BoxNbGridPts);
+    constexpr static DynCcoord_t res() {
+      return muGrid::CcoordOps::get_cube(sdim, BoxNbGridPts);
     }
     FFTW_fixture()
         : engine(res(), nb_components, MPIContext::get_context().comm) {}
@@ -80,7 +80,7 @@ namespace muFFT {
     constexpr static Dim_t sdim{twoD};
     constexpr static Dim_t mdim{twoD};
     constexpr static Dim_t nb_components{sdim * sdim};
-    constexpr static Ccoord_t<sdim> res() { return {6, 4}; }
+    constexpr static DynCcoord_t res() { return {6, 4}; }
     FFTW_fixture_python_segfault()
         : engine{res(), nb_components, MPIContext::get_context().comm} {}
     Engine engine;
@@ -88,18 +88,20 @@ namespace muFFT {
 
   using fixlist = boost::mpl::list<
 #ifdef WITH_FFTWMPI
-      FFTW_fixture<FFTWMPIEngine<twoD>, 3>,
-      FFTW_fixture<FFTWMPIEngine<threeD>, 3>,
-      FFTW_fixture<FFTWMPIEngine<twoD>, 4>,
-      FFTW_fixture<FFTWMPIEngine<threeD>, 4>,
-      FFTW_fixture_python_segfault<FFTWMPIEngine<twoD>>,
+      FFTW_fixture<FFTWMPIEngine, twoD, 3>,
+      FFTW_fixture<FFTWMPIEngine, threeD, 3>,
+      FFTW_fixture<FFTWMPIEngine, twoD, 4>,
+      FFTW_fixture<FFTWMPIEngine, threeD, 4>,
+      FFTW_fixture_python_segfault<FFTWMPIEngine>,
 #endif
 #ifdef WITH_PFFT
-      FFTW_fixture<PFFTEngine<twoD>, 3>, FFTW_fixture<PFFTEngine<threeD>, 3>,
-      FFTW_fixture<PFFTEngine<twoD>, 4>, FFTW_fixture<PFFTEngine<threeD>, 4>,
-      FFTW_fixture_python_segfault<PFFTEngine<twoD>>,
+      FFTW_fixture<PFFTEngine, twoD, 3>,
+      FFTW_fixture<PFFTEngine, threeD, 3>,
+      FFTW_fixture<PFFTEngine, twoD, 4>,
+      FFTW_fixture<PFFTEngine, threeD, 4>,
+      FFTW_fixture_python_segfault<PFFTEngine>,
 #endif
-      FFTW_fixture<FFTWEngine<twoD>, 3, true>>;
+      FFTW_fixture<FFTWEngine, twoD, 3, true>>;
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(Constructor_test, Fix, fixlist, Fix) {
@@ -121,8 +123,8 @@ namespace muFFT {
     } else {
       Fix::engine.initialise(FFT_PlanFlags::estimate);
     }
-    using FC_t = muGrid::GlobalNFieldCollection<Fix::sdim>;
-    FC_t fc{1};
+    using FC_t = muGrid::GlobalNFieldCollection;
+    FC_t fc{Fix::sdim, OneQuadPt};
     auto & input{fc.register_real_field("input", Fix::sdim*Fix::sdim)};
     auto & ref{fc.register_real_field("reference", Fix::sdim*Fix::sdim)};
     auto & result{fc.register_real_field("result", Fix::sdim*Fix::sdim)};

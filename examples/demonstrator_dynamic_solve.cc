@@ -88,39 +88,43 @@ int main(int argc, char * argv[]) {
   auto & opt{*options};
   const Dim_t size{opt["N0"].as<int>()};
   constexpr Real fsize{1.};
-  constexpr Dim_t dim{3};
-  const Dim_t nb_dofs{ipow(size, dim) * ipow(dim, 2)};
+  constexpr Dim_t Dim{3};
+  const Dim_t nb_dofs{ipow(size, Dim) * ipow(Dim, 2)};
   std::cout << "Number of dofs: " << nb_dofs << std::endl;
 
   constexpr Formulation form{Formulation::finite_strain};
 
-  const Rcoord_t<dim> lengths{CcoordOps::get_cube<dim>(fsize)};
-  const Ccoord_t<dim> nb_grid_pts{CcoordOps::get_cube<dim>(size)};
+  const DynRcoord_t lengths{CcoordOps::get_cube<Dim>(fsize)};
+  const DynCcoord_t nb_grid_pts{CcoordOps::get_cube<Dim>(size)};
 
-  auto cell{make_cell<dim, dim>(nb_grid_pts, lengths, form)};
+  auto cell{make_cell(nb_grid_pts, lengths, form)};
 
   constexpr Real E{1.0030648180242636};
   constexpr Real nu{0.29930675909878679};
 
-  using Material_t = MaterialLinearElastic1<dim, dim>;
-  auto & Material_soft{Material_t::make(cell, "soft", E, nu)};
-  auto & Material_hard{Material_t::make(cell, "hard", 10 * E, nu)};
+  using Material_t = MaterialLinearElastic1<Dim>;
+  auto & material_soft{Material_t::make(cell, "soft", Dim, OneQuadPt, E, nu)};
+  auto & material_hard{
+      Material_t::make(cell, "hard", Dim, OneQuadPt, 10 * E, nu)};
 
   int counter{0};
-  for (const auto && pixel : cell) {
-    int sum = 0;
-    for (Dim_t i = 0; i < dim; ++i) {
+  for (auto && id_pixel :
+       akantu::zip(cell.get_pixel_indices(), cell.get_pixels())) {
+    const auto & pixel_index{std::get<0>(id_pixel)};
+    const auto & pixel{std::get<1>(id_pixel)};
+    int sum{0};
+    for (Dim_t i = 0; i < Dim; ++i) {
       sum += pixel[i] * 2 / nb_grid_pts[i];
     }
 
     if (sum == 0) {
-      Material_hard.add_pixel(pixel);
+      material_hard.add_pixel(pixel_index);
       counter++;
     } else {
-      Material_soft.add_pixel(pixel);
+      material_soft.add_pixel(pixel_index);
     }
   }
-  std::cout << counter << " Pixel out of " << cell.size()
+  std::cout << counter << " Pixel out of " << cell.get_nb_pixels()
             << " are in the hard material" << std::endl;
 
   cell.initialise(FFT_PlanFlags::measure);
@@ -129,7 +133,7 @@ int main(int argc, char * argv[]) {
   constexpr Real cg_tol{1e-7};
   const Uint maxiter = nb_dofs;
 
-  Eigen::MatrixXd DeltaF{Eigen::MatrixXd::Zero(dim, dim)};
+  Eigen::MatrixXd DeltaF{Eigen::MatrixXd::Zero(Dim, Dim)};
   DeltaF(0, 1) = .1;
   Dim_t verbose{1};
 

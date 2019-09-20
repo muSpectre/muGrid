@@ -38,26 +38,25 @@
 
 namespace muFFT {
 
-  template <Dim_t Dim>
-  int FFTWMPIEngine<Dim>::nb_engines{0};
+  int FFTWMPIEngine::nb_engines{0};
 
-  template <Dim_t Dim>
-  FFTWMPIEngine<Dim>::FFTWMPIEngine(Ccoord nb_grid_pts, Dim_t nb_components,
-                                    Communicator comm)
-      : Parent{nb_grid_pts, nb_components, comm}, plan_fft{nullptr},
-        plan_ifft{nullptr}, real_workspace{nullptr} {
+  FFTWMPIEngine::FFTWMPIEngine(DynCcoord_t nb_grid_pts, Dim_t nb_dof_per_pixel,
+                               Communicator comm)
+      : Parent{nb_grid_pts, nb_dof_per_pixel, comm},
+        plan_fft{nullptr}, plan_ifft{nullptr}, real_workspace{nullptr} {
     if (!this->nb_engines)
       fftw_mpi_init();
     this->nb_engines++;
 
-    std::array<ptrdiff_t, Dim> narr;
-    for (Dim_t i = 0; i < Dim; ++i) {
-      narr[i] = this->nb_domain_grid_pts[Dim - 1 - i];
+    int dim = this->nb_domain_grid_pts.get_dim();
+    std::vector<ptrdiff_t> narr(dim);
+    for (Dim_t i = 0; i < dim; ++i) {
+      narr[i] = this->nb_domain_grid_pts[dim - 1 - i];
     }
-    narr[Dim - 1] = this->nb_domain_grid_pts[0] / 2 + 1;
+    narr[dim - 1] = this->nb_domain_grid_pts[0] / 2 + 1;
     ptrdiff_t res_x, loc_x, res_y, loc_y;
     this->workspace_size = fftw_mpi_local_size_many_transposed(
-        Dim, narr.data(), this->nb_components, FFTW_MPI_DEFAULT_BLOCK,
+        dim, narr.data(), this->nb_dof_per_pixel, FFTW_MPI_DEFAULT_BLOCK,
         FFTW_MPI_DEFAULT_BLOCK, this->comm.get_mpi_comm(), &res_x, &loc_x,
         &res_y, &loc_y);
     // A factor of two is required because we are using the c2r/r2c DFTs.
@@ -86,8 +85,7 @@ namespace muFFT {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim>
-  void FFTWMPIEngine<Dim>::initialise(FFT_PlanFlags plan_flags) {
+  void FFTWMPIEngine::initialise(FFT_PlanFlags plan_flags) {
     if (this->initialised) {
       throw std::runtime_error("double initialisation, will leak memory");
     }
@@ -104,10 +102,10 @@ namespace muFFT {
      * enough. MPI parallel FFTW may request a workspace size larger than the
      * nominal size of the complex buffer.
      */
-    if (static_cast<int>(this->work.size() * this->nb_components) <
+    if (static_cast<int>(this->work.size() * this->nb_dof_per_pixel) <
         this->workspace_size) {
       this->work.set_pad_size(this->workspace_size -
-                              this->nb_components * this->work.size());
+                              this->nb_dof_per_pixel * this->work.size());
     }
 
     unsigned int flags;
@@ -129,18 +127,19 @@ namespace muFFT {
       break;
     }
 
-    std::array<ptrdiff_t, Dim> narr;
-    for (Dim_t i = 0; i < Dim; ++i) {
-      narr[i] = this->nb_domain_grid_pts[Dim - 1 - i];
+    int dim = this->nb_domain_grid_pts.get_dim();
+    std::vector<ptrdiff_t> narr(dim);
+    for (Dim_t i = 0; i < dim; ++i) {
+      narr[i] = this->nb_domain_grid_pts[dim - 1 - i];
     }
     Real * in{this->real_workspace};
     fftw_complex * out{reinterpret_cast<fftw_complex *>(this->work.data())};
     this->plan_fft = fftw_mpi_plan_many_dft_r2c(
-        Dim, narr.data(), this->nb_components, FFTW_MPI_DEFAULT_BLOCK,
+        dim, narr.data(), this->nb_dof_per_pixel, FFTW_MPI_DEFAULT_BLOCK,
         FFTW_MPI_DEFAULT_BLOCK, in, out, this->comm.get_mpi_comm(),
         FFTW_MPI_TRANSPOSED_OUT | flags);
     if (this->plan_fft == nullptr) {
-      if (Dim == 1)
+      if (dim == 1)
         throw std::runtime_error("r2c plan failed; MPI parallel FFTW does not "
                                  "support 1D r2c FFTs");
       else
@@ -151,11 +150,11 @@ namespace muFFT {
     Real * i_out = this->real_workspace;
 
     this->plan_ifft = fftw_mpi_plan_many_dft_c2r(
-        Dim, narr.data(), this->nb_components, FFTW_MPI_DEFAULT_BLOCK,
+        dim, narr.data(), this->nb_dof_per_pixel, FFTW_MPI_DEFAULT_BLOCK,
         FFTW_MPI_DEFAULT_BLOCK, i_in, i_out, this->comm.get_mpi_comm(),
         FFTW_MPI_TRANSPOSED_IN | flags);
     if (this->plan_ifft == nullptr) {
-      if (Dim == 1)
+      if (dim == 1)
         throw std::runtime_error("c2r plan failed; MPI parallel FFTW does not "
                                  "support 1D c2r FFTs");
       else
@@ -165,8 +164,7 @@ namespace muFFT {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim>
-  FFTWMPIEngine<Dim>::~FFTWMPIEngine<Dim>() noexcept {
+  FFTWMPIEngine::~FFTWMPIEngine() noexcept {
     if (this->real_workspace != nullptr)
       fftw_free(this->real_workspace);
     if (this->plan_fft != nullptr)
@@ -180,9 +178,8 @@ namespace muFFT {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim>
-  typename FFTWMPIEngine<Dim>::Workspace_t &
-  FFTWMPIEngine<Dim>::fft(Field_t & field) {
+  typename FFTWMPIEngine::Workspace_t &
+  FFTWMPIEngine::fft(Field_t & field) {
     if (this->plan_fft == nullptr) {
       throw std::runtime_error("fft plan not initialised");
     }
@@ -198,9 +195,10 @@ namespace muFFT {
     // Copy non-padded field to padded real_workspace.
     // Transposed output of M x N x L transform for >= 3 dimensions is padded
     // M x N x 2*(L/2+1).
+    int dim = this->nb_subdomain_grid_pts.get_dim();
     ptrdiff_t fstride =
-        (this->nb_components * this->nb_subdomain_grid_pts[0]);
-    ptrdiff_t wstride = (this->nb_components * 2 *
+        (this->nb_dof_per_pixel * this->nb_subdomain_grid_pts[0]);
+    ptrdiff_t wstride = (this->nb_dof_per_pixel * 2 *
                          (this->nb_subdomain_grid_pts[0] / 2 + 1));
     ptrdiff_t n = field.size() / this->nb_subdomain_grid_pts[0];
 
@@ -219,8 +217,7 @@ namespace muFFT {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim>
-  void FFTWMPIEngine<Dim>::ifft(Field_t & field) const {
+  void FFTWMPIEngine::ifft(Field_t & field) const {
     if (this->plan_ifft == nullptr) {
       throw std::runtime_error("ifft plan not initialised");
     }
@@ -240,9 +237,9 @@ namespace muFFT {
     // Copy non-padded field to padded real_workspace.
     // Transposed output of M x N x L transform for >= 3 dimensions is padded
     // M x N x 2*(L/2+1).
-    ptrdiff_t fstride{this->nb_components *
+    ptrdiff_t fstride{this->nb_dof_per_pixel *
                       this->nb_subdomain_grid_pts[0]};
-    ptrdiff_t wstride{this->nb_components * 2 *
+    ptrdiff_t wstride{this->nb_dof_per_pixel * 2 *
                       (this->nb_subdomain_grid_pts[0] / 2 + 1)};
     ptrdiff_t n(field.size() / this->nb_subdomain_grid_pts[0]);
 
@@ -255,7 +252,4 @@ namespace muFFT {
     }
   }
 
-  template class FFTWMPIEngine<oneD>;
-  template class FFTWMPIEngine<twoD>;
-  template class FFTWMPIEngine<threeD>;
 }  // namespace muFFT

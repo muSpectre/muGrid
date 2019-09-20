@@ -41,22 +41,18 @@ try:
 except ImportError:
     MPI = None
 
-import _muFFT
-from _muFFT import (get_domain_ccoord, get_domain_index,
-                    get_nb_hermitian_grid_pts, FFT_PlanFlags)
-
 import _muSpectre
-from _muSpectre import (SplitCell, Formulation, material, solvers, FiniteDiff)
+from _muSpectre import SplitCell, Formulation, material, solvers, FiniteDiff
 
 
-from muFFT import Communicator
+from muGrid import get_domain_ccoord, get_domain_index
+from muFFT import Communicator, FourierDerivative, FFT_PlanFlags
 import muSpectre.gradient_integration
 import muSpectre.stochastic_plasticity_search
 
 _factories = {'fftw': ('CellFactory', False),
               'fftwmpi': ('FFTWMPICellFactory', True),
-              'pfft': ('PFFTCellFactory', True),
-              'p3dfft': ('P3DFFTCellFactory', True)}
+              'pfft': ('PFFTCellFactory', True)}
 
 _projections = {
     Formulation.finite_strain: 'FiniteStrainFast',

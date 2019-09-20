@@ -54,8 +54,6 @@ namespace muSpectre {
   class ProjectionSmallStrain : public ProjectionDefault<DimS> {
    public:
     using Parent = ProjectionDefault<DimS>;  //!< base class
-    //! polymorphic pointer to FFT engines
-    using FFTEngine_ptr = typename Parent::FFTEngine_ptr;
     //! gradient, i.e. derivatives in each Cartesian direction
     using Gradient_t = typename Parent::Gradient_t;
     using Ccoord = typename Parent::Ccoord;  //!< cell coordinates type
@@ -72,8 +70,13 @@ namespace muSpectre {
     ProjectionSmallStrain() = delete;
 
     //! Constructor with fft_engine
-    ProjectionSmallStrain(FFTEngine_ptr engine, Rcoord lengths,
-                          Gradient_t gradient = make_fourier_gradient<DimS>());
+    ProjectionSmallStrain(muFFT::FFTEngine_ptr engine,
+                          const DynRcoord_t & lengths,
+                          Gradient_t gradient);
+
+    //! Constructor with fft_engine and default (Fourier) gradient
+    ProjectionSmallStrain(muFFT::FFTEngine_ptr engine,
+                          const DynRcoord_t & lengths);
 
     //! Copy constructor
     ProjectionSmallStrain(const ProjectionSmallStrain & other) = delete;

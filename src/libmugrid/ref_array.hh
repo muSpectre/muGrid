@@ -43,27 +43,41 @@
 namespace muGrid {
   namespace internal {
 
+    /**
+     * Struct user for checking that every member of a parameter pack has type
+     * `T`
+     */
     template <typename T, typename FirstVal, typename... RestVals>
     struct TypeChecker {
+      //! whether the check passed
       constexpr static bool value{
           std::is_same<T, std::remove_reference_t<FirstVal>>::value and
           TypeChecker<T, RestVals...>::value};
     };
 
+    /**
+     * Specialisation for recursion tail
+     */
     template <typename T, typename OnlyVal>
     struct TypeChecker<T, OnlyVal> {
+      //! whether the check passed
       constexpr static bool value{
           std::is_same<T, std::remove_reference_t<OnlyVal>>::value};
     };
 
   }  // namespace internal
 
+  /**
+   * work-around to allow making a statically sized array of references (which
+   * are forbidden by the C++ language
+   */
   template <typename T, size_t N>
   class RefArray {
    public:
-    //! Default constructor
+    //! Deleted default constructor
     RefArray() = delete;
 
+    //! bulk initialisation constructor
     template <typename... Vals>
     explicit RefArray(Vals &... vals) : values{&vals...} {
       static_assert(internal::TypeChecker<T, Vals...>::value,
@@ -85,12 +99,16 @@ namespace muGrid {
     //! Move assignment operator
     RefArray & operator=(RefArray && other) = delete;
 
+    //! random access operator
     T & operator[](size_t index) { return *this->values[index]; }
+
+    //! random constant access operator
     constexpr T & operator[](size_t index) const {
       return *this->values[index];
     }
 
    protected:
+    //! storage
     std::array<T *, N> values{};
   };
 

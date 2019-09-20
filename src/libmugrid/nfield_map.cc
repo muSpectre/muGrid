@@ -35,6 +35,7 @@
 #include "nfield_map.hh"
 #include "nfield_typed.hh"
 #include "nfield_collection.hh"
+#include "iterators.hh"
 
 #include "sstream"
 
@@ -130,6 +131,36 @@ namespace muGrid {
     }
     this->data_ptr = this->field.data();
     this->is_initialised = true;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T, Mapping Mutability>
+  auto NFieldMap<T, Mutability>::enumerate_pixel_indices_fast()
+      -> PixelEnumeration_t {
+    if (this->iteration != Iteration::Pixel) {
+      throw NFieldMapError("Cannot enumerate pixels unless the iteration mode "
+                           "of this map is Iteration::Pixels.");
+    }
+    return akantu::zip(this->field.get_collection().get_pixel_indices_fast(),
+                       *this);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T, Mapping Mutability>
+  auto NFieldMap<T, Mutability>::enumerate_indices() -> Enumeration_t {
+    return akantu::zip(this->field.get_collection().get_quad_pt_indices(),
+                       *this);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T, Mapping Mutability>
+  auto NFieldMap<T, Mutability>::mean() const -> PlainType {
+    PlainType mean{PlainType::Zero(this->nb_rows, this->nb_cols)};
+    for (auto && val : *this) {
+      mean += val;
+    }
+    mean *= 1. / Real(this->size());
+    return mean;
   }
 
   /* ---------------------------------------------------------------------- */

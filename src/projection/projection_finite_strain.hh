@@ -38,10 +38,13 @@
 #ifndef SRC_PROJECTION_PROJECTION_FINITE_STRAIN_HH_
 #define SRC_PROJECTION_PROJECTION_FINITE_STRAIN_HH_
 
-#include "projection/projection_default.hh"
-#include "common/muSpectre_common.hh"
 #include <libmugrid/field_collection.hh>
 #include <libmugrid/field_map.hh>
+
+#include <libmufft/derivative.hh>
+
+#include "common/muSpectre_common.hh"
+#include "projection/projection_default.hh"
 
 namespace muSpectre {
 
@@ -53,7 +56,6 @@ namespace muSpectre {
    public:
     using Parent = ProjectionDefault<DimS>;  //!< base class
     //! polymorphic pointer to FFT engines
-    using FFTEngine_ptr = typename Parent::FFTEngine_ptr;
     using Ccoord = typename Parent::Ccoord;  //!< cell coordinates type
     using Rcoord = typename Parent::Rcoord;  //!< spatial coordinates type
     //! gradient, i.e. derivatives in each Cartesian direction
@@ -68,8 +70,13 @@ namespace muSpectre {
     ProjectionFiniteStrain() = delete;
 
     //! Constructor with fft_engine and stencil
-    ProjectionFiniteStrain(FFTEngine_ptr engine, Rcoord lengths,
-                           Gradient_t gradient = make_fourier_gradient<DimS>());
+    ProjectionFiniteStrain(muFFT::FFTEngine_ptr engine,
+                           const DynRcoord_t & lengths,
+                           Gradient_t gradient);
+
+    //! Constructor with fft_engine and default (Fourier) gradient
+    ProjectionFiniteStrain(muFFT::FFTEngine_ptr engine,
+                           const DynRcoord_t & lengths);
 
     //! Copy constructor
     ProjectionFiniteStrain(const ProjectionFiniteStrain & other) = delete;

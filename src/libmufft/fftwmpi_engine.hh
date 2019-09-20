@@ -46,11 +46,9 @@ namespace muFFT {
    * implements the `muFFT::FFTEngineBase` interface using the
    * FFTW library
    */
-  template <Dim_t Dim>
-  class FFTWMPIEngine : public FFTEngineBase<Dim> {
+  class FFTWMPIEngine : public FFTEngineBase {
    public:
-    using Parent = FFTEngineBase<Dim>;  //!< base class
-    using Ccoord = typename Parent::Ccoord;      //!< cell coordinates type
+    using Parent = FFTEngineBase;  //!< base class
     //! field for Fourier transform of second-order tensor
     using Workspace_t = typename Parent::Workspace_t;
     //! real-valued second-order tensor
@@ -62,23 +60,23 @@ namespace muFFT {
      * Constructor with the domain's number of grid points in each direciton,
      * the number of components to transform, and the communicator
      */
-    FFTWMPIEngine(Ccoord nb_grid_pts, Dim_t nb_components,
+    FFTWMPIEngine(DynCcoord_t nb_grid_pts, Dim_t nb_dof_per_pixel,
                   Communicator comm = Communicator());
 
     //! Copy constructor
     FFTWMPIEngine(const FFTWMPIEngine & other) = delete;
 
     //! Move constructor
-    FFTWMPIEngine(FFTWMPIEngine && other) = default;
+    FFTWMPIEngine(FFTWMPIEngine && other) = delete;
 
     //! Destructor
     virtual ~FFTWMPIEngine() noexcept;
 
     //! Copy assignment operator
-    FFTWMPIEngine<Dim> & operator=(const FFTWMPIEngine & other) = delete;
+    FFTWMPIEngine & operator=(const FFTWMPIEngine & other) = delete;
 
     //! Move assignment operator
-    FFTWMPIEngine<Dim> & operator=(FFTWMPIEngine && other) = default;
+    FFTWMPIEngine & operator=(FFTWMPIEngine && other) = delete;
 
     // compute the plan, etc
     void initialise(FFT_PlanFlags plan_flags) override;

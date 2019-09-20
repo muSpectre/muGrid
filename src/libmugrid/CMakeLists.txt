@@ -63,6 +63,7 @@ set(mugrid_HDRS
   )
 
 set(mugrid_SRCS
+  ccoord_operations.cc
   nfield_collection.cc
   nfield_collection_global.cc
   nfield_collection_local.cc

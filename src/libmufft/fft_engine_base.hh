@@ -49,16 +49,12 @@ namespace muFFT {
    * Virtual base class for FFT engines. To be implemented by all
    * FFT_engine implementations.
    */
-  template <Dim_t DimS>
   class FFTEngineBase {
    public:
-    constexpr static Dim_t sdim{DimS};  //!< spatial dimension of the cell
-    //! cell coordinates type
-    using Ccoord = Ccoord_t<DimS>;
     //! global FieldCollection
-    using GFieldCollection_t = muGrid::GlobalNFieldCollection<DimS>;
+    using GFieldCollection_t = muGrid::GlobalNFieldCollection;
     //! pixel iterator
-    using Pixels = typename GFieldCollection_t::Pixels;
+    using Pixels = typename GFieldCollection_t::DynamicPixels;
     /**
      * Field type on which to apply the projection.
      * This is a TypedNFieldBase because it need to be able to hold
@@ -73,7 +69,7 @@ namespace muFFT {
     /**
      * iterator over Fourier-space discretisation point
      */
-    using iterator = typename GFieldCollection_t::Pixels::iterator;
+    using iterator = typename GFieldCollection_t::DynamicPixels::iterator;
 
     //! Default constructor
     FFTEngineBase() = delete;
@@ -82,14 +78,14 @@ namespace muFFT {
      * Constructor with the domain's number of grid points in each direciton,
      * the number of components to transform, and the communicator
      */
-    FFTEngineBase(Ccoord nb_grid_pts, Dim_t nb_components,
+    FFTEngineBase(DynCcoord_t nb_grid_pts, Dim_t nb_dof_per_pixel,
                   Communicator comm = Communicator());
 
     //! Copy constructor
     FFTEngineBase(const FFTEngineBase & other) = delete;
 
     //! Move constructor
-    FFTEngineBase(FFTEngineBase && other) = default;
+    FFTEngineBase(FFTEngineBase && other) = delete;
 
     //! Destructor
     virtual ~FFTEngineBase() = default;
@@ -98,7 +94,7 @@ namespace muFFT {
     FFTEngineBase & operator=(const FFTEngineBase & other) = delete;
 
     //! Move assignment operator
-    FFTEngineBase & operator=(FFTEngineBase && other) = default;
+    FFTEngineBase & operator=(FFTEngineBase && other) = delete;
 
     //! compute the plan, etc
     virtual void initialise(FFT_PlanFlags /*plan_flags*/);
@@ -132,27 +128,30 @@ namespace muFFT {
      * returns the process-local number of grid points in each direction of the
      * cell
      */
-    const Ccoord & get_nb_subdomain_grid_pts() const {
+    const DynCcoord_t & get_nb_subdomain_grid_pts() const {
       return this->nb_subdomain_grid_pts;
     }
+    /**
+     * returns the process-local number of grid points in each direction of the
+     * cell
+     */
+    const DynCcoord_t & get_nb_domain_grid_pts() const {
+      return this->nb_domain_grid_pts;
+    }
     //! returns the process-local locations of the cell
-    const Ccoord & get_subdomain_locations() const {
+    const DynCcoord_t & get_subdomain_locations() const {
       return this->subdomain_locations;
     }
     /**
      * returns the process-local number of grid points in each direction of the
      * cell in Fourier space
      */
-    const Ccoord & get_nb_fourier_grid_pts() const {
+    const DynCcoord_t & get_nb_fourier_grid_pts() const {
       return this->nb_fourier_grid_pts;
     }
     //! returns the process-local locations of the cell in Fourier space
-    const Ccoord & get_fourier_locations() const {
+    const DynCcoord_t & get_fourier_locations() const {
       return this->fourier_locations;
-    }
-    //! returns the number of grid points in each direction of the cell
-    const Ccoord & get_nb_domain_grid_pts() const {
-      return this->nb_domain_grid_pts;
     }
 
     //! only required for testing and debugging
@@ -173,30 +172,48 @@ namespace muFFT {
     inline Real normalisation() const { return norm_factor; }
 
     //! return the number of components per pixel
-    Dim_t get_nb_components() const { return nb_components; }
+    const Dim_t & get_nb_dof_per_pixel() const;
+
+    //! return the number of spatial dimensions
+    const Dim_t & get_dim() const;
+
+    /**
+     * returns the number of quadrature points
+     */
+    const Dim_t & get_nb_quad() const;
 
    protected:
+    //! spatial dimension of the grid
+    Dim_t spatial_dimension;
     /**
      * Field collection in which to store fields associated with
      * Fourier-space points
      */
     Communicator comm;  //!< communicator
+    //! Field collection to store the fft workspace
     GFieldCollection_t work_space_container;
-    Ccoord nb_subdomain_grid_pts;  //!< nb_grid_pts of the process-local
-                                   //!< (subdomain) portion of the cell
-    Ccoord subdomain_locations;  // !< location of the process-local (subdomain)
-                                 // portion of the cell
-    Ccoord
-        nb_fourier_grid_pts;   //!< nb_grid_pts of the process-local (subdomain)
-                               //!< portion of the Fourier transformed data
-    Ccoord fourier_locations;  // !< location of the process-local (subdomain)
-                               // portion of the Fourier transformed data
-    const Ccoord
+    DynCcoord_t nb_subdomain_grid_pts;  //!< nb_grid_pts of the process-local
+                                        //!< (subdomain) portion of the cell
+    DynCcoord_t subdomain_locations;    //!< location of the process-local
+                                        //!< (subdomain) portion of the cell
+    DynCcoord_t
+        nb_fourier_grid_pts;  //!< nb_grid_pts of the process-local (subdomain)
+                              //!< portion of the Fourier transformed data
+    DynCcoord_t
+        fourier_locations;  //!< location of the process-local (subdomain)
+                            //!< portion of the Fourier transformed data
+    const DynCcoord_t
         nb_domain_grid_pts;  //!< nb_grid_pts of the full domain of the cell
     Workspace_t & work;      //!< field to store the Fourier transform of P
     const Real norm_factor;  //!< normalisation coefficient of fourier transform
-    Dim_t nb_components;
+    //! number of degrees of freedom per pixel. Corresponds to the number of
+    //! quadrature points per pixel multiplied by the number of components per
+    //! quadrature point
+    Dim_t nb_dof_per_pixel;
   };
+
+  //! reference to fft engine is safely managed through a `std::shared_ptr`
+  using FFTEngine_ptr = std::shared_ptr<FFTEngineBase>;
 
 }  // namespace muFFT
 

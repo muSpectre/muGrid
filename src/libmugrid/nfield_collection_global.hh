@@ -40,29 +40,33 @@
 
 namespace muGrid {
 
-  template <Dim_t DimS>
+  /** `muGrid::GlobalNFieldCollection` derives from `muGrid::NFieldCollection`
+   * and stores global fields that live throughout the whole computational
+   * domain, i.e. are defined for every pixel/voxel.
+   */
   class GlobalNFieldCollection : public NFieldCollection {
    public:
+    //! alias of base class
     using Parent = NFieldCollection;
-    //! cell coordinates
-    using Ccoord = Ccoord_t<DimS>;
     //! pixel iterator
-    using Pixels = CcoordOps::Pixels<DimS>;
+    using DynamicPixels = CcoordOps::DynamicPixels;
 
     //! Default constructor
     GlobalNFieldCollection() = delete;
 
     /**
      * Constructor
+     * @param spatial_dimension number of spatial dimensions, must be 1, 2, 3,
+     * or Unknown
      * @param nb_quad_pts number of quadrature points per pixel/voxel
      */
-    explicit GlobalNFieldCollection(Dim_t nb_quad_pts);
+    GlobalNFieldCollection(Dim_t spatial_dimension, Dim_t nb_quad_pts);
 
     //! Copy constructor
     GlobalNFieldCollection(const GlobalNFieldCollection & other) = delete;
 
     //! Move constructor
-    GlobalNFieldCollection(GlobalNFieldCollection && other) = delete;
+    GlobalNFieldCollection(GlobalNFieldCollection && other) = default;
 
     //! Destructor
     virtual ~GlobalNFieldCollection() = default;
@@ -72,15 +76,23 @@ namespace muGrid {
     operator=(const GlobalNFieldCollection & other) = delete;
 
     //! Move assignment operator
-    GlobalNFieldCollection & operator=(
-        GlobalNFieldCollection && other) = delete;
+    GlobalNFieldCollection &
+    operator=(GlobalNFieldCollection && other) = delete;
 
     //! Return the pixels class that allows to iterator over pixels
-    const Pixels & get_pixels() const;
+    const DynamicPixels & get_pixels() const;
 
     //! Return index for a ccoord
-    Dim_t get_index(const Ccoord & ccoord) const {
+    template <size_t Dim>
+    Dim_t get_index(const Ccoord_t<Dim> & ccoord) const {
       return this->get_pixels().get_index(ccoord);
+    }
+
+    //! return coordinates of the i-th pixel
+    DynCcoord_t get_ccoord(const Dim_t & index) const {
+      return CcoordOps::get_ccoord_from_strides(
+          this->pixels.get_nb_grid_pts(), this->pixels.get_locations(),
+          this->pixels.get_strides(), index);
     }
 
     /**
@@ -88,22 +100,48 @@ namespace muGrid {
      * collection. NFields added later on will have their memory allocated
      * upon construction.
      */
-    void initialise(Ccoord nb_grid_pts, Ccoord locations = {});
+    void initialise(const DynCcoord_t & nb_grid_pts,
+                    const DynCcoord_t & locations = {});
 
     /**
      * freeze the problem size and allocate memory for all fields of the
      * collection. NFields added later on will have their memory allocated
      * upon construction.
      */
-    void initialise(Ccoord nb_grid_pts, Ccoord locations, Ccoord strides);
+    template <size_t Dim>
+    void initialise(const Ccoord_t<Dim> & nb_grid_pts,
+                    const Ccoord_t<Dim> & locations = {}) {
+      this->initialise(DynCcoord_t{nb_grid_pts}, DynCcoord_t{locations});
+    }
 
-   private:
-    //! number of discretisation cells in each of the DimS spatial directions
-    Ccoord nb_grid_pts{};
-    //! subdomain locations (i.e. coordinates of hind bottom left corner of this
-    //! subdomain)
-    Ccoord locations{};
-    Pixels pixels{};  //!< helper to iterate over the grid
+    /**
+     * freeze the problem size and allocate memory for all fields of the
+     * collection. NFields added later on will have their memory allocated
+     * upon construction.
+     */
+    void initialise(const DynCcoord_t & nb_grid_pts,
+                    const DynCcoord_t & locations, const DynCcoord_t & strides);
+
+    /**
+     * freeze the problem size and allocate memory for all fields of the
+     * collection. NFields added later on will have their memory allocated
+     * upon construction.
+     */
+    template <size_t Dim>
+    void initialise(const Ccoord_t<Dim> & nb_grid_pts,
+                    const Ccoord_t<Dim> & locations,
+                    const Ccoord_t<Dim> & strides) {
+      this->initialise(DynCcoord_t{nb_grid_pts}, DynCcoord_t{locations},
+                       DynCcoord_t{strides});
+    }
+
+    /**
+     * obtain a new field collection with the same domain and pixels
+     */
+    GlobalNFieldCollection get_empty_clone() const;
+
+   protected:
+    DynamicPixels pixels{};  //!< helper to iterate over the grid
   };
 
 }  // namespace muGrid

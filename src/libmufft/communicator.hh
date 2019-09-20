@@ -155,6 +155,8 @@ namespace muFFT {
 
     MPI_Comm get_mpi_comm() { return &this->comm; }
 
+    //! find whether the underlying communicator is mpi
+    // TODO(pastewka) why do we need this?
     static bool has_mpi() { return true; }
 
    private:
@@ -193,6 +195,9 @@ namespace muFFT {
       return arg;
     }
 
+
+    //! find whether the underlying communicator is mpi
+    // TODO(pastewka) why do we need this?
     static bool has_mpi() { return false; }
   };
 

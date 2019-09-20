@@ -61,6 +61,12 @@ namespace muGrid {
   template <class Derived>
   struct DimCounter {};
 
+  /**
+   * Convenience structure to determine the spatial dimension of a tensor
+   * represented by a fixed-size `Eigen::Matrix`. used to derive spatial
+   * dimension from input arguments of template functions thus avoiding the need
+   * for redundant explicit specification.
+   */
   template <class Derived>
   struct DimCounter<Eigen::MatrixBase<Derived>> {
    private:
@@ -70,10 +76,12 @@ namespace muGrid {
    public:
     static_assert(Rows != Eigen::Dynamic, "matrix type not statically sized");
     static_assert(Rows == Type::ColsAtCompileTime, "matrix type not square");
+    //! storage for the dimension
     constexpr static Dim_t value{ct_sqrt(Rows)};
     static_assert(value * value == Rows,
                   "Only integer numbers of dimensions allowed");
   };
+
   /**
    * provides index-based access to fourth-order Tensors represented
    * by square matrices
@@ -90,6 +98,10 @@ namespace muGrid {
               k * myRowStride + l * myColStride);
   }
 
+  /**
+   * provides constant index-based access to fourth-order Tensors represented
+   * by square matrices
+   */
   template <typename T4>
   inline auto get(Eigen::MatrixBase<T4> & t4, Dim_t i, Dim_t j, Dim_t k,
                   Dim_t l) -> decltype(t4.coeffRef(i, j)) {

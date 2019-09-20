@@ -208,19 +208,27 @@ namespace muGrid {
     };
 
     namespace internal {
-      template <Dim_t dim, Dim_t nb_row, Dim_t nb_col>
+      /**
+       * determine the rank of a Dim-dimensional tensor represented by an
+       * `Eigen::Matrix` of shape NbRow × NbCol
+       *
+       * @tparam Dim spatial dimension
+       * @tparam NbRow number of rows
+       * @tparam NbCol number of columns
+       */
+      template <Dim_t Dim, Dim_t NbRow, Dim_t NbCol>
       constexpr inline Dim_t get_rank() {
-        constexpr bool is_vec{(nb_row == dim) and (nb_col == 1)};
-        constexpr bool is_mat{(nb_row == dim) and (nb_col == nb_row)};
-        constexpr bool is_ten{(nb_row == dim * dim) and (nb_col == dim * dim)};
-        static_assert(is_vec or is_mat or is_ten,
+        constexpr bool IsVec{(NbRow == Dim) and (NbCol == 1)};
+        constexpr bool IsMat{(NbRow == Dim) and (NbCol == NbRow)};
+        constexpr bool IsTen{(NbRow == Dim * Dim) and (NbCol == Dim * Dim)};
+        static_assert(IsVec or IsMat or IsTen,
                       "can't understand the data type as a first-, second-, or "
                       "fourth-order tensor");
-        if (is_vec) {
+        if (IsVec) {
           return firstOrder;
-        } else if (is_mat) {
+        } else if (IsMat) {
           return secondOrder;
-        } else if (is_ten) {
+        } else if (IsTen) {
           return fourthOrder;
         }
       }
@@ -368,10 +376,11 @@ namespace muGrid {
     return Mat_t{log_comp::Sum(Solver.eigenvalues(), mat)};
   }
 
+  template <Dim_t Dim>
+  using Matrix_t = Eigen::Matrix<Real, Dim, Dim>;
   /**
    * compute the spectral decomposition
    */
-
   template <class Derived, template <class Matrix_t>
                            class DecompType = Eigen::SelfAdjointEigenSolver>
   inline decltype(auto)
@@ -388,16 +397,21 @@ namespace muGrid {
   }
 
   /**
-   * compute the matrix log. This may not be the most
-   * efficient way to do this
+   * It seems we only need to take logs of self-adjoint matrices
    */
   template <Dim_t Dim>
-  using Matrix_t = Eigen::Matrix<Real, Dim, Dim>;
+  using Decomp_t = Eigen::SelfAdjointEigenSolver<Eigen::Matrix<Real, Dim, Dim>>;
 
-  template <Dim_t Dim, template <class Matrix_t>
-                       class DecompType = Eigen::SelfAdjointEigenSolver>
-  inline decltype(auto)
-  logm_alt(const DecompType<Matrix_t<Dim>> & spectral_decomp) {
+  /**
+   * Uses a pre-existing spectral decomposition of a matrix to compute its
+   * logarithm
+   *
+   * @param spectral_decomp spectral decomposition of a matrix
+   * @tparam Dim spatial dimension (i.e., number of rows and colums in the
+   * matrix)
+   */
+  template <Dim_t Dim>
+  inline decltype(auto) logm_alt(const Decomp_t<Dim> & spectral_decomp) {
     using Mat_t = Eigen::Matrix<Real, Dim, Dim>;
     Mat_t retval{Mat_t::Zero()};
     for (Dim_t i = 0; i < Dim; ++i) {
@@ -408,6 +422,10 @@ namespace muGrid {
     return retval;
   }
 
+  /**
+   * compute the matrix log with a spectral decomposition. This may not be the
+   * most efficient way to do this
+   */
   template <class Derived>
   inline decltype(auto) logm_alt(const Eigen::MatrixBase<Derived> & mat) {
     static_assert(Derived::SizeAtCompileTime != Eigen::Dynamic,
@@ -421,13 +439,16 @@ namespace muGrid {
   }
 
   /**
-   * compute the matrix exponential. This may not be the most
-   * efficient way to do this
+   * Uses a pre-existing spectral decomposition of a matrix to compute its
+   * exponential
+   *
+   * @param spectral_decomp spectral decomposition of a matrix
+   * @tparam Dim spatial dimension (i.e., number of rows and colums in the
+   * matrix)
    */
   template <Dim_t Dim, template <class Matrix_t>
                        class DecompType = Eigen::SelfAdjointEigenSolver>
-  inline decltype(auto)
-  expm(const DecompType<Matrix_t<Dim>> & spectral_decomp) {
+  inline decltype(auto) expm(const Decomp_t<Dim> & spectral_decomp) {
     using Mat_t = Matrix_t<Dim>;
     Mat_t retval{Mat_t::Zero()};
     for (Dim_t i = 0; i < Dim; ++i) {
@@ -438,6 +459,10 @@ namespace muGrid {
     return retval;
   }
 
+  /**
+   * compute the matrix exponential with a spectral decomposition. This may not
+   * be the most efficient way to do this
+   */
   template <class Derived>
   inline decltype(auto) expm(const Eigen::MatrixBase<Derived> & mat) {
     static_assert(Derived::SizeAtCompileTime != Eigen::Dynamic,

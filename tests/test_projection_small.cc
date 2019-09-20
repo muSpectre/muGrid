@@ -44,17 +44,13 @@ namespace muSpectre {
   BOOST_AUTO_TEST_SUITE(projection_small_strain);
 
   using fixlist = boost::mpl::list<
-      ProjectionFixture<twoD, twoD, Squares<twoD>,
-                        FourierGradient<twoD>,
+      ProjectionFixture<twoD, twoD, Squares<twoD>, FourierGradient<twoD>,
                         ProjectionSmallStrain<twoD>>,
       ProjectionFixture<threeD, threeD, Squares<threeD>,
-                        FourierGradient<threeD>,
-                        ProjectionSmallStrain<threeD>>,
-      ProjectionFixture<twoD, twoD, Sizes<twoD>,
-                        FourierGradient<twoD>,
+                        FourierGradient<threeD>, ProjectionSmallStrain<threeD>>,
+      ProjectionFixture<twoD, twoD, Sizes<twoD>, FourierGradient<twoD>,
                         ProjectionSmallStrain<twoD>>,
-      ProjectionFixture<threeD, threeD, Sizes<threeD>,
-                        FourierGradient<threeD>,
+      ProjectionFixture<threeD, threeD, Sizes<threeD>, FourierGradient<threeD>,
                         ProjectionSmallStrain<threeD>>>;
 
   /* ---------------------------------------------------------------------- */
@@ -73,16 +69,14 @@ namespace muSpectre {
         dim == fix::mdim,
         "These tests assume that the material and spatial dimension are "
         "identical");
-    using Fields = muGrid::GlobalNFieldCollection<sdim>;
+    using Fields = muGrid::GlobalNFieldCollection;
     using FieldT = muGrid::RealNField;
-    using FieldMap = muGrid::MatrixNFieldMap<Real, false, mdim, mdim>;
+    using FieldMap = muGrid::MatrixNFieldMap<Real, Mapping::Mut, mdim, mdim>;
     using Vector = Eigen::Matrix<Real, dim, 1>;
 
-    Fields fields{1};
-    FieldT & f_grad{fields.template register_field<FieldT>(
-        "strain", mdim*mdim)};
-    FieldT & f_var{fields.template register_field<FieldT>(
-        "working field", mdim*mdim)};
+    Fields fields{sdim, OneQuadPt};
+    FieldT & f_grad{fields.register_real_field("strain", mdim * mdim)};
+    FieldT & f_var{fields.register_real_field("working field", mdim * mdim)};
 
     FieldMap grad(f_grad);
     FieldMap var(f_var);
@@ -108,8 +102,9 @@ namespace muSpectre {
       auto & g = std::get<1>(tup);
       auto & v = std::get<2>(tup);
       Vector vec = muGrid::CcoordOps::get_vector(
-          ccoord, fix::projector.get_domain_lengths() /
-                      fix::projector.get_nb_domain_grid_pts());
+          ccoord.template get<mdim>(), (fix::projector.get_domain_lengths() /
+                                        fix::projector.get_nb_domain_grid_pts())
+                                           .template get<mdim>());
       g.row(0) << k.transpose() * cos(k.dot(vec));
 
       // We need to add I to the term, because this field has a net
@@ -124,13 +119,16 @@ namespace muSpectre {
 
     using muGrid::operator/;
     constexpr bool verbose{false};
-    for (auto && tup : akantu::zip(fields.get_pixels(), grad, var)) {
+    for (auto && tup : akantu::zip(
+             fields.get_pixels().template get_dimensioned_pixels<mdim>(), grad,
+             var)) {
       auto & ccoord = std::get<0>(tup);
       auto & g = std::get<1>(tup);
       auto & v = std::get<2>(tup);
       Vector vec = muGrid::CcoordOps::get_vector(
-          ccoord, fix::projector.get_domain_lengths() /
-                      fix::projector.get_nb_domain_grid_pts());
+          ccoord, (fix::projector.get_domain_lengths() /
+                   fix::projector.get_nb_domain_grid_pts())
+                      .template get<mdim>());
       Real error = (g - v).norm();
       BOOST_CHECK_LT(error, tol);
       if ((error >= tol) || verbose) {

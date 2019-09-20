@@ -5,7 +5,7 @@
  *
  * @date   08 Jan 2018
  *
- * @brief  Python bindings for the common part of µSpectre
+ * @brief  Python bindings for the common part of µFFT
  *
  * Copyright © 2018 Till Junge
  *
@@ -43,9 +43,11 @@
 
 #include <sstream>
 
-using pybind11::literals::operator""_a;
+#include "libmufft/mufft_common.hh"
+#include "libmufft/fft_utils.hh"
 
 namespace py = pybind11;
+using pybind11::literals::operator""_a;
 
 template <muGrid::Dim_t dim, typename T>
 void add_get_cube_helper(py::module & mod) {
@@ -58,7 +60,7 @@ void add_get_cube_helper(py::module & mod) {
 template <muGrid::Dim_t dim>
 void add_get_nb_hermitian_grid_pts_helper(py::module & mod) {
   mod.def("get_nb_hermitian_grid_pts",
-          &muGrid::CcoordOps::get_nb_hermitian_grid_pts<dim>,
+          &muFFT::get_nb_hermitian_grid_pts<dim>,
           "full_sizes"_a,
           "return the hermitian sizes corresponding to the true sizes");
 }

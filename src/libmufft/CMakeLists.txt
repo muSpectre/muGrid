@@ -36,6 +36,7 @@ cmake_minimum_required(VERSION 3.5)
 add_library(muFFT "")
 
 set(mufft_SRCS
+  derivative.cc
   fft_utils.cc
   fft_engine_base.cc
   fftw_engine.cc

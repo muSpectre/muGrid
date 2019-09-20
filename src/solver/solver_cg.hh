@@ -71,7 +71,7 @@ namespace muSpectre {
      * Constructor takes a Cell, tolerance, max number of iterations
      * and verbosity flag as input
      */
-    SolverCG(Cell & cell, Real tol, Uint maxiter, bool verbose = false);
+    SolverCG(NCell & cell, Real tol, Uint maxiter, bool verbose = false);
 
     //! Move constructor
     SolverCG(SolverCG && other) = default;
@@ -83,7 +83,7 @@ namespace muSpectre {
     SolverCG & operator=(const SolverCG & other) = delete;
 
     //! Move assignment operator
-    SolverCG & operator=(SolverCG && other) = default;
+    SolverCG & operator=(SolverCG && other) = delete;
 
     //! initialisation does not need to do anything in this case
     void initialise() final{};

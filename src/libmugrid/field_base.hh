@@ -162,6 +162,7 @@ namespace muGrid {
       friend FieldCollection;
       //! give access to collection's base class
       using FParent_t = typename FieldCollection::Parent;
+      //! give access to collection's base class
       friend FParent_t;
 
      protected:

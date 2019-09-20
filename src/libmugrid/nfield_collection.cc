@@ -51,8 +51,8 @@ namespace muGrid {
   template struct NFieldDestructor<StateNField>;
 
   /* ---------------------------------------------------------------------- */
-  NFieldCollection::NFieldCollection(Domain domain, Dim_t spatial_dimension,
-                                     Dim_t nb_quad_pts)
+  NFieldCollection::NFieldCollection(ValidityDomain domain,
+                                     Dim_t spatial_dimension, Dim_t nb_quad_pts)
       : domain{domain}, spatial_dim{spatial_dimension}, nb_quad_pts{
                                                             nb_quad_pts} {}
 
@@ -60,7 +60,7 @@ namespace muGrid {
   template <typename T>
   TypedNField<T> &
   NFieldCollection::register_field_helper(const std::string & unique_name,
-                                          Dim_t nb_components) {
+                                          const Dim_t & nb_components) {
     static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
                   "You can only register fields templated with one of the "
                   "numeric types Real, Complex, Int, or UInt");
@@ -85,7 +85,7 @@ namespace muGrid {
     TypedNField<T> & retref{*raw_ptr};
     NField_ptr field{raw_ptr};
     if (this->initialised) {
-      retref.resize(this->size());
+      retref.resize(this->get_nb_entries());
     }
     this->fields[unique_name] = std::move(field);
     return retref;
@@ -94,35 +94,36 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   TypedNField<Real> &
   NFieldCollection::register_real_field(const std::string & unique_name,
-                                        Dim_t nb_components) {
+                                        const Dim_t & nb_components) {
     return this->register_field_helper<Real>(unique_name, nb_components);
   }
 
   /* ---------------------------------------------------------------------- */
   TypedNField<Complex> &
   NFieldCollection::register_complex_field(const std::string & unique_name,
-                                           Dim_t nb_components) {
+                                           const Dim_t & nb_components) {
     return this->register_field_helper<Complex>(unique_name, nb_components);
   }
 
   /* ---------------------------------------------------------------------- */
   TypedNField<Int> &
   NFieldCollection::register_int_field(const std::string & unique_name,
-                                       Dim_t nb_components) {
+                                       const Dim_t & nb_components) {
     return this->register_field_helper<Int>(unique_name, nb_components);
   }
 
   /* ---------------------------------------------------------------------- */
   TypedNField<Uint> &
   NFieldCollection::register_uint_field(const std::string & unique_name,
-                                        Dim_t nb_components) {
+                                        const Dim_t & nb_components) {
     return this->register_field_helper<Uint>(unique_name, nb_components);
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
   TypedStateNField<T> & NFieldCollection::register_state_field_helper(
-      const std::string & unique_prefix, Dim_t nb_memory, Dim_t nb_components) {
+      const std::string & unique_prefix, const Dim_t & nb_memory,
+      const Dim_t & nb_components) {
     static_assert(
         std::is_scalar<T>::value or std::is_same<T, Complex>::value,
         "You can only register state fields templated with one of the "
@@ -154,16 +155,16 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   TypedStateNField<Real> &
   NFieldCollection::register_real_state_field(const std::string & unique_name,
-                                              Dim_t nb_memory,
-                                              Dim_t nb_components) {
+                                              const Dim_t & nb_memory,
+                                              const Dim_t & nb_components) {
     return this->register_state_field_helper<Real>(unique_name, nb_memory,
                                                    nb_components);
   }
 
   /* ---------------------------------------------------------------------- */
   TypedStateNField<Complex> & NFieldCollection::register_complex_state_field(
-      const std::string & unique_name, Dim_t nb_memory,
-      Dim_t nb_components) {
+      const std::string & unique_name, const Dim_t & nb_memory,
+      const Dim_t & nb_components) {
     return this->register_state_field_helper<Complex>(unique_name, nb_memory,
                                                       nb_components);
   }
@@ -171,8 +172,8 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   TypedStateNField<Int> &
   NFieldCollection::register_int_state_field(const std::string & unique_name,
-                                             Dim_t nb_memory,
-                                             Dim_t nb_components) {
+                                             const Dim_t & nb_memory,
+                                             const Dim_t & nb_components) {
     return this->register_state_field_helper<Int>(unique_name, nb_memory,
                                                   nb_components);
   }
@@ -180,87 +181,10 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   TypedStateNField<Uint> &
   NFieldCollection::register_uint_state_field(const std::string & unique_name,
-                                              Dim_t nb_memory,
-                                              Dim_t nb_components) {
+                                              const Dim_t & nb_memory,
+                                              const Dim_t & nb_components) {
     return this->register_state_field_helper<Uint>(unique_name, nb_memory,
                                                    nb_components);
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <typename T>
-  WrappedNField<T> &
-  NFieldCollection::register_wrapped_field_helper(
-      const std::string & unique_name, Dim_t nb_components,
-      Eigen::Ref<typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>>
-      values) {
-    static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
-                  "You can only register fields templated with one of the "
-                  "numeric types Real, Complex, Int, or UInt");
-    if (this->field_exists(unique_name)) {
-      std::stringstream error{};
-      error << "A NField of name '" << unique_name
-            << "' is already registered in this field collection. "
-            << "Currently registered fields: ";
-      std::string prelude{""};
-      for (const auto & name_field_pair : this->fields) {
-        error << prelude << '\'' << name_field_pair.first << '\'';
-        prelude = ", ";
-      }
-      throw NFieldCollectionError(error.str());
-    }
-
-    //! If you get a compiler warning about narrowing conversion on the
-    //! following line, please check whether you are creating a TypedNField with
-    //! the number of components specified in 'int' rather than 'size_t'.
-    WrappedNField<T> * raw_ptr{
-        new WrappedNField<T>{unique_name, *this, nb_components, values}};
-    WrappedNField<T> & retref{*raw_ptr};
-    NField_ptr field{raw_ptr};
-    if (this->initialised) {
-      retref.resize(this->size());
-    }
-    this->fields[unique_name] = std::move(field);
-    return retref;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  WrappedNField<Real> &
-  NFieldCollection::register_real_wrapped_field(
-      const std::string & unique_name, Dim_t nb_components,
-      Eigen::Ref<typename Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>>
-      values) {
-    return this->register_wrapped_field_helper<Real>(unique_name, nb_components,
-                                                     values);
-  }
-
-  /* ---------------------------------------------------------------------- */
-  WrappedNField<Complex> &
-  NFieldCollection::register_complex_wrapped_field(
-      const std::string & unique_name, Dim_t nb_components,
-      Eigen::Ref<typename Eigen::Matrix<Complex, Eigen::Dynamic,
-                 Eigen::Dynamic>> values) {
-    return this->register_wrapped_field_helper<Complex>(unique_name, nb_components,
-                                                     values);
-  }
-
-  /* ---------------------------------------------------------------------- */
-  WrappedNField<Int> &
-  NFieldCollection::register_int_wrapped_field(
-      const std::string & unique_name, Dim_t nb_components,
-      Eigen::Ref<typename Eigen::Matrix<Int, Eigen::Dynamic, Eigen::Dynamic>>
-      values) {
-    return this->register_wrapped_field_helper<Int>(unique_name, nb_components,
-                                                     values);
-  }
-
-  /* ---------------------------------------------------------------------- */
-  WrappedNField<Uint> &
-  NFieldCollection::register_uint_wrapped_field(
-      const std::string & unique_name, Dim_t nb_components,
-      Eigen::Ref<typename Eigen::Matrix<Uint, Eigen::Dynamic, Eigen::Dynamic>>
-      values) {
-    return this->register_wrapped_field_helper<Uint>(unique_name, nb_components,
-                                                     values);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -275,7 +199,9 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  Dim_t NFieldCollection::size() const { return this->nb_entries; }
+  const Dim_t & NFieldCollection::get_nb_entries() const {
+    return this->nb_entries;
+  }
 
   /* ---------------------------------------------------------------------- */
   size_t NFieldCollection::get_nb_pixels() const {
@@ -306,12 +232,16 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  Dim_t NFieldCollection::get_nb_quad() const {
+  const Dim_t & NFieldCollection::get_nb_quad() const {
     return this->nb_quad_pts;
   }
 
   /* ---------------------------------------------------------------------- */
-  auto NFieldCollection::get_domain() const -> const Domain & {
+  const Dim_t & NFieldCollection::get_spatial_dim() const {
+    return this->spatial_dim;
+  }
+  /* ---------------------------------------------------------------------- */
+  auto NFieldCollection::get_domain() const -> const ValidityDomain & {
     return this->domain;
   }
 
@@ -319,32 +249,36 @@ namespace muGrid {
   bool NFieldCollection::is_initialised() const { return this->initialised; }
 
   /* ---------------------------------------------------------------------- */
-  auto NFieldCollection::begin() const -> iterator {
-    if (not this->is_initialised()) {
-      throw NFieldCollectionError(
-          "Can't iterate over a collection before it's initialised");
-    }
-    return this->indices.begin();
+  auto NFieldCollection::get_pixel_indices_fast() const -> PixelIndexIterable {
+    return PixelIndexIterable{*this};
   }
 
   /* ---------------------------------------------------------------------- */
-  auto NFieldCollection::end() const -> iterator { return this->indices.end(); }
+  auto NFieldCollection::get_pixel_indices() const -> IndexIterable {
+    return IndexIterable{*this, Iteration::Pixel};
+  }
+
+  /* ---------------------------------------------------------------------- */
+  auto NFieldCollection::get_quad_pt_indices() const -> IndexIterable {
+    return IndexIterable{*this, Iteration::QuadPt};
+  }
 
   /* ---------------------------------------------------------------------- */
   void NFieldCollection::allocate_fields() {
     for (auto && item : this->fields) {
       auto && field{*item.second};
       const auto field_size = field.size();
-      if ((field_size != 0) and (field_size != size_t(this->size()))) {
+      if ((field_size != 0) and
+          (field_size != size_t(this->get_nb_entries()))) {
         std::stringstream err_stream;
         err_stream << "NField '" << field.get_name() << "' contains "
                    << field_size << " entries, but the field collection "
-                   << "has " << this->size() << " pixels";
+                   << "has " << this->get_nb_entries() << " pixels";
         throw NFieldCollectionError(err_stream.str());
       }
       // resize is being called unconditionally, because it alone guarantees
       // the exactness of the field's `data_ptr`
-      field.resize(this->size());
+      field.resize(this->get_nb_entries());
     }
   }
 
@@ -370,15 +304,9 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  auto NFieldCollection::get_fields() const
-      -> const std::map<std::string, NField_ptr> & {
-    return this->fields;
-  }
-
-  /* ---------------------------------------------------------------------- */
   std::vector<std::string> NFieldCollection::list_fields() const {
     std::vector<std::string> field_names;
-    for (auto & f: this->get_fields()) {
+    for (const auto & f : this->fields) {
       field_names.push_back(std::get<0>(f));
     }
     return field_names;
@@ -390,14 +318,61 @@ namespace muGrid {
    * are compiled.
    */
   template TypedNField<Real> &
-  NFieldCollection::register_field<Real>(const std::string &, Dim_t);
+  NFieldCollection::register_field<Real>(const std::string &, const Dim_t &);
 
   template TypedNField<Complex> &
-  NFieldCollection::register_field<Complex>(const std::string &, Dim_t);
+  NFieldCollection::register_field<Complex>(const std::string &, const Dim_t &);
 
   template TypedNField<Int> &
-  NFieldCollection::register_field<Int>(const std::string &, Dim_t);
+  NFieldCollection::register_field<Int>(const std::string &, const Dim_t &);
 
   template TypedNField<Uint> &
-  NFieldCollection::register_field<Uint>(const std::string &, Dim_t);
+  NFieldCollection::register_field<Uint>(const std::string &, const Dim_t &);
+
+  /* ---------------------------------------------------------------------- */
+  NFieldCollection::PixelIndexIterable::PixelIndexIterable(
+      const NFieldCollection & collection)
+      : collection{collection} {}
+
+  /* ---------------------------------------------------------------------- */
+  auto NFieldCollection::PixelIndexIterable::begin() const -> iterator {
+    return this->collection.pixel_indices.begin();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  auto NFieldCollection::PixelIndexIterable::end() const -> iterator {
+    return this->collection.pixel_indices.end();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  size_t NFieldCollection::PixelIndexIterable::size() const {
+    return this->collection.get_nb_pixels();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  NFieldCollection::IndexIterable::IndexIterable(
+      const NFieldCollection & collection, const Iteration & iteration_type)
+      : collection{collection}, iteration_type{iteration_type} {}
+
+  /* ---------------------------------------------------------------------- */
+  auto NFieldCollection::IndexIterable::begin() const -> iterator {
+    return iterator(this->collection.pixel_indices.begin(), this->get_stride());
+  }
+
+  /* ---------------------------------------------------------------------- */
+  auto NFieldCollection::IndexIterable::end() const -> iterator {
+    return iterator(this->collection.pixel_indices.end(), this->get_stride());
+  }
+
+  /* ---------------------------------------------------------------------- */
+  size_t NFieldCollection::IndexIterable::size() const {
+    return (this->iteration_type == Iteration::QuadPt)
+               ? this->collection.get_nb_entries()
+               : this->collection.get_nb_pixels();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  NFieldCollection::IndexIterable::iterator::iterator(
+      const PixelIndexIterator_t & pixel_index_iterator, const size_t & stride)
+      : stride{stride}, pixel_index_iterator{pixel_index_iterator} {}
 }  // namespace muGrid

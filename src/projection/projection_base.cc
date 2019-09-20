@@ -40,32 +40,54 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
-  ProjectionBase<DimS>::ProjectionBase(FFTEngine_ptr engine,
-                                       Rcoord domain_lengths,
-                                       Gradient_t gradient,
-                                       Formulation form)
+  ProjectionBase::ProjectionBase(muFFT::FFTEngine_ptr engine,
+                                 DynRcoord_t domain_lengths, Formulation form)
       : fft_engine{std::move(engine)}, domain_lengths{domain_lengths},
-        gradient{gradient}, form{form},
-        projection_container{this->fft_engine->get_field_collection()} {
-    static_assert((DimS == FFTEngine::sdim),
-                  "spatial dimensions are incompatible");
+        form{form}, projection_container{
+                        this->fft_engine->get_field_collection()} {
+    if (this->domain_lengths.get_dim() != this->fft_engine->get_dim()) {
+      std::stringstream error{};
+      error << "The domain lengths supplied are "
+            << this->domain_lengths.get_dim()
+            << "-dimensional, while the FFT engine is "
+            << this->fft_engine->get_dim() << "-dimensional";
+      throw std::runtime_error(error.str());
+    }
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
-  void ProjectionBase<DimS>::initialise(muFFT::FFT_PlanFlags flags) {
-    if (this->get_nb_components() != fft_engine->get_nb_components()) {
+  void ProjectionBase::initialise(muFFT::FFT_PlanFlags flags) {
+    if (this->get_nb_components()*this->get_nb_quad() !=
+        fft_engine->get_nb_dof_per_pixel()) {
       std::stringstream error;
       error << "Incompatible number of components per pixel. The projection "
-            << "operator expects " << this->get_nb_components()
-            << " components, but the FFT engine reported "
-            << fft_engine->get_nb_components() << " components.";
+            << "operator expects " << this->get_nb_components() << " for "
+            << this->get_nb_quad() << " quadrature points, "
+            << "but the FFT engine reported "
+            << fft_engine->get_nb_dof_per_pixel() << " degrees of freedom.";
       throw ProjectionError(error.str());
     }
     fft_engine->initialise(flags);
   }
 
-  template class ProjectionBase<twoD>;
-  template class ProjectionBase<threeD>;
+  /* ---------------------------------------------------------------------- */
+  const Dim_t & ProjectionBase::get_dim() const {
+    return this->fft_engine->get_dim();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  const Dim_t & ProjectionBase::get_nb_quad() const {
+    return this->fft_engine->get_nb_quad();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  const DynCcoord_t & ProjectionBase::get_nb_domain_grid_pts() const {
+    return this->fft_engine->get_nb_domain_grid_pts();
+  }
+  /* ---------------------------------------------------------------------- */
+
+  const DynCcoord_t & ProjectionBase::get_nb_subdomain_grid_pts() const {
+    return this->fft_engine->get_nb_subdomain_grid_pts();
+  }
+
 }  // namespace muSpectre

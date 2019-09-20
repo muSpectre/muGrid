@@ -48,12 +48,16 @@ namespace muFFT {
 
   using muGrid::Ccoord_t;
   using muGrid::Rcoord_t;
+  using muGrid::DynCcoord_t;
+  using muGrid::DynRcoord_t;
 
   using muGrid::optional;
 
   using muGrid::oneD;
   using muGrid::threeD;
   using muGrid::twoD;
+
+  using muGrid::OneQuadPt;
 
   using muGrid::Mapping;
 

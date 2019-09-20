@@ -35,7 +35,8 @@
 # =============================================================================
 
 set (cells_SRC
-  ${CMAKE_CURRENT_SOURCE_DIR}/cell_base.cc
+  # ${CMAKE_CURRENT_SOURCE_DIR}/cell_base.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/ncell.cc
   )
 if(${SPLIT_CELL})
   set (cells_SRC
@@ -43,5 +44,4 @@ if(${SPLIT_CELL})
     ${CMAKE_CURRENT_SOURCE_DIR}/cell_split.cc
     )
 endif()
-#TODO: reactivate
-#target_sources(muSpectre PRIVATE ${cells_SRC})
+target_sources(muSpectre PRIVATE ${cells_SRC})

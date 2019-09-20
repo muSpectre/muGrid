@@ -40,6 +40,8 @@
 #include <libmugrid/nfield_collection.hh>
 #include <libmugrid/nfield_map_static.hh>
 
+#include <libmufft/derivative.hh>
+
 #include "common/muSpectre_common.hh"
 #include "projection/projection_base.hh"
 
@@ -51,18 +53,16 @@ namespace muSpectre {
    * have a very good reason not to (and tell me (author) about it,
    * I'd be interested to hear it).
    */
-  template <Dim_t DimS, Dim_t NbQuadPts = 1>
-  class ProjectionFiniteStrainFast : public ProjectionBase<DimS> {
+  template <Dim_t DimS>
+  class ProjectionFiniteStrainFast : public ProjectionBase {
    public:
-    using Parent = ProjectionBase<DimS>;  //!< base class
-    //! polymorphic pointer to FFT engines
-    using FFTEngine_ptr = typename Parent::FFTEngine_ptr;
+    using Parent = ProjectionBase;  //!< base class
     //! gradient, i.e. derivatives in each Cartesian direction
-    using Gradient_t = typename Parent::Gradient_t;
-    using Ccoord = typename Parent::Ccoord;  //!< cell coordinates type
-    using Rcoord = typename Parent::Rcoord;  //!< spatial coordinates type
+    using Gradient_t = muFFT::Gradient_t;
+    using Ccoord = Ccoord_t<DimS>;  //!< cell coordinates type
+    using Rcoord = Rcoord_t<DimS>;  //!< spatial coordinates type
     //! Real space second order tensor fields (to be projected)
-    using Field_t = muGrid::RealNField;
+    using Field_t = muGrid::TypedNFieldBase<Real>;
     //! Fourier-space field containing the projection operator itself
     using Proj_t = muGrid::ComplexNField;
     //! iterable form of the operator
@@ -75,10 +75,14 @@ namespace muSpectre {
     //! Default constructor
     ProjectionFiniteStrainFast() = delete;
 
-    //! Constructor with fft_engine
-    ProjectionFiniteStrainFast(
-        FFTEngine_ptr engine, Rcoord lengths,
-        Gradient_t gradient = make_fourier_gradient<DimS>());
+    //! Constructor with FFT engine
+    ProjectionFiniteStrainFast(muFFT::FFTEngine_ptr engine,
+                               const DynRcoord_t & lengths,
+                               Gradient_t gradient);
+
+    //! Constructor with FFT engine and default (Fourier) gradient
+    ProjectionFiniteStrainFast(muFFT::FFTEngine_ptr engine,
+                               const DynRcoord_t & lengths);
 
     //! Copy constructor
     ProjectionFiniteStrainFast(const ProjectionFiniteStrainFast & other) =
@@ -116,7 +120,7 @@ namespace muSpectre {
     std::array<Dim_t, 2> get_strain_shape() const final;
 
     //! get number of components to project per pixel
-    constexpr static Dim_t NbComponents() { return DimS * DimS * NbQuadPts; }
+    constexpr static Dim_t NbComponents() { return DimS * DimS * OneQuadPt; }
 
     //! get number of components to project per pixel
     virtual Dim_t get_nb_components() const { return NbComponents(); }
@@ -124,6 +128,11 @@ namespace muSpectre {
    protected:
     Proj_t & xi_field;  //!< field of normalised wave vectors
     Proj_map xis;       //!< iterable normalised wave vectors
+    /**
+     * gradient (nabla) operator, can be computed using Fourier interpolation
+     * or through a weighted residual
+     */
+    Gradient_t gradient;
   };
 
 }  // namespace muSpectre

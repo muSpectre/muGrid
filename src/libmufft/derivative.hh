@@ -34,40 +34,40 @@
  *
  */
 
-#ifndef SRC_PROJECTION_DERIVATIVE_HH_
-#define SRC_PROJECTION_DERIVATIVE_HH_
+#ifndef SRC_LIBMUFFT_DERIVATIVE_HH_
+#define SRC_LIBMUFFT_DERIVATIVE_HH_
 
 #include <memory>
 
 #include "common/muSpectre_common.hh"
-#include "libmugrid/ccoord_operations.hh"
+#include <libmugrid/ccoord_operations.hh>
 
-namespace muSpectre {
+namespace muFFT {
   /**
    * base class for projection related exceptions
    */
-  class ProjectionError : public std::runtime_error {
+  class DerivativeError : public std::runtime_error {
    public:
     //! constructor
-    explicit ProjectionError(const std::string & what)
+    explicit DerivativeError(const std::string & what)
         : std::runtime_error(what) {}
     //! constructor
-    explicit ProjectionError(const char * what) : std::runtime_error(what) {}
+    explicit DerivativeError(const char * what) : std::runtime_error(what) {}
   };
 
   /**
    * Representation of a derivative
    */
-  template <Dim_t DimS>
   class DerivativeBase {
    public:
-    constexpr static Dim_t sdim{DimS};  //!< spatial dimension of the cell
-    //! cell coordinates type
-    using Ccoord = Ccoord_t<DimS>;
-    using Vector = Eigen::Matrix<Real, DimS, 1>;
+    //! convenience alias
+    using Vector = Eigen::Matrix<Real, Eigen::Dynamic, 1>;
 
-    //! Default constructor
-    DerivativeBase() = default;
+    //! Deleted default constructor
+    DerivativeBase() = delete;
+
+    //! constructor with spatial dimension
+    explicit DerivativeBase(Dim_t spatial_dimension);
 
     //! Copy constructor
     DerivativeBase(const DerivativeBase & other) = default;
@@ -87,27 +87,29 @@ namespace muSpectre {
     /**
      * Return Fourier representation of the derivative as a function of the
      * phase. The phase is the wavevector times cell dimension, but lacking a
-     * factor of 2 pi.
+     * factor of 2 π.
      */
     virtual Complex fourier(const Vector & phase) const = 0;
+
+   protected:
+    //! spatial dimension of the problem
+    Dim_t spatial_dimension;
   };
 
   /**
    * Representation of a derivative computed by Fourier interpolation
    */
-  template <Dim_t DimS>
-  class FourierDerivative : public DerivativeBase<DimS> {
+  class FourierDerivative : public DerivativeBase {
    public:
-    using Parent = DerivativeBase<DimS>;  //!< base class
-    //! cell coordinates type
-    using Ccoord = typename Parent::Ccoord;
+    using Parent = DerivativeBase;  //!< base class
+    //! convenience alias
     using Vector = typename Parent::Vector;
 
     //! Default constructor
     FourierDerivative() = delete;
 
     //! Constructor with raw FourierDerivative information
-    explicit FourierDerivative(Dim_t direction);
+    explicit FourierDerivative(Dim_t spatial_dimension, Dim_t direction);
 
     //! Copy constructor
     FourierDerivative(const FourierDerivative & other) = default;
@@ -130,22 +132,21 @@ namespace muSpectre {
      * Fourier representation of the derivative.)
      */
     virtual Complex fourier(const Vector & phase) const {
-      return Complex(0, 2*muGrid::pi*phase[this->direction]);
+      return Complex(0, 2 * muGrid::pi * phase[this->direction]);
     }
 
    protected:
+    //! spatial direction in which to perform differentiation
     Dim_t direction;
   };
 
   /**
    * Representation of a finite-differences stencil
    */
-  template <Dim_t DimS>
-  class DiscreteDerivative : public DerivativeBase<DimS> {
+  class DiscreteDerivative : public DerivativeBase {
    public:
-    using Parent = DerivativeBase<DimS>;  //!< base class
-    //! cell coordinates type
-    using Ccoord = typename Parent::Ccoord;
+    using Parent = DerivativeBase;  //!< base class
+    //! convenience alias
     using Vector = typename Parent::Vector;
 
     //! Default constructor
@@ -157,11 +158,11 @@ namespace muSpectre {
      * @param lbounds: relative starting point of stencil
      * @param stencil: stencil coefficients
      */
-    DiscreteDerivative(Ccoord nb_pts, Ccoord lbounds,
+    DiscreteDerivative(DynCcoord_t nb_pts, DynCcoord_t lbounds,
                        const std::vector<Real> & stencil);
 
     //! Constructor with raw stencil information
-    DiscreteDerivative(Ccoord nb_pts, Ccoord lbounds,
+    DiscreteDerivative(DynCcoord_t nb_pts, DynCcoord_t lbounds,
                        const Eigen::ArrayXd & stencil);
 
     //! Copy constructor
@@ -180,20 +181,16 @@ namespace muSpectre {
     DiscreteDerivative & operator=(DiscreteDerivative && other) = delete;
 
     //! Return stencil value
-    Real operator()(const Ccoord & dcoord) const {
-      return this->stencil[
-          muGrid::CcoordOps::get_index(this->nb_pts, this->lbounds, dcoord)];
+    Real operator()(const DynCcoord_t & dcoord) const {
+      return this->stencil[muGrid::CcoordOps::get_index(this->nb_pts,
+                                                        this->lbounds, dcoord)];
     }
 
     //! Return number of grid points in stencil
-    const Ccoord & get_nb_pts() const {
-      return this->nb_pts;
-    }
+    const DynCcoord_t & get_nb_pts() const { return this->nb_pts; }
 
     //! Return lower stencil bound
-    const Ccoord & get_lbounds() const {
-      return this->lbounds;
-    }
+    const DynCcoord_t & get_lbounds() const { return this->lbounds; }
 
     /**
      * Any translationally invariant linear combination of grid values (as
@@ -204,10 +201,10 @@ namespace muSpectre {
     virtual Complex fourier(const Vector & phase) const {
       Complex s{0, 0};
       for (auto && dcoord :
-           muGrid::CcoordOps::Pixels<DimS>(this->nb_pts, this->lbounds)) {
+           muGrid::CcoordOps::DynamicPixels(this->nb_pts, this->lbounds)) {
         const Real arg{phase.matrix().dot(eigen(dcoord).template cast<Real>())};
         s += this->operator()(dcoord) *
-            std::exp(Complex(0, 2*muGrid::pi * arg));
+             std::exp(Complex(0, 2 * muGrid::pi * arg));
       }
       return s;
     }
@@ -225,47 +222,31 @@ namespace muSpectre {
     DiscreteDerivative rollaxes(int distance = 1) const;
 
    protected:
-    const Ccoord nb_pts;   //!< Number of stencil points
-    const Ccoord lbounds;  //!< Lower bound of the finite-differences stencil
+    const DynCcoord_t nb_pts;  //!< Number of stencil points
+    const DynCcoord_t
+        lbounds;  //!< Lower bound of the finite-differences stencil
     const Eigen::ArrayXd stencil;  //!< Finite-differences stencil
   };
 
   /**
-   * Allows inserting `muSpectre::DiscreteDerivative`s into `std::ostream`s
+   * Allows inserting `muFFT::DiscreteDerivative`s into `std::ostream`s
    */
-  template <Dim_t DimS>
   std::ostream & operator<<(std::ostream & os,
-                            const DiscreteDerivative<DimS> & derivative) {
-    const typename DiscreteDerivative<DimS>::Ccoord &
-        nb_pts{derivative.get_nb_pts()};
-    const typename DiscreteDerivative<DimS>::Ccoord &
-        lbounds{derivative.get_lbounds()};
-    os << "{ ";
-    muGrid::operator<<(os, nb_pts);
-    os << " ";
-    muGrid::operator<<(os, lbounds);
-    os << " ";
-    for (auto && pixel : muGrid::CcoordOps::Pixels<DimS>(nb_pts, lbounds)) {
-      os << derivative(pixel) << " ";
-    }
-    os << "}";
-    return os;
-  }
+                            const DiscreteDerivative & derivative);
 
-  template<Dim_t DimS>
-  using Derivative_ptr = std::shared_ptr<DerivativeBase<DimS>>;
+  //! convenience alias
+  using Derivative_ptr = std::shared_ptr<DerivativeBase>;
 
-  template<size_t DimS>
-  using Gradient_t = std::array<Derivative_ptr<static_cast<Dim_t>(DimS)>, DimS>;
+  //! convenience alias
+  using Gradient_t = std::vector<Derivative_ptr>;
 
-  template<Dim_t DimS>
-  Gradient_t<DimS> make_fourier_gradient() {
-    Gradient_t<DimS> && g{};
-    for (Dim_t dim = 0; dim < DimS; ++dim) {
-      g[dim] = std::make_shared<FourierDerivative<DimS>>(dim);
-    }
-    return std::move(g);
-  }
-}  // namespace muSpectre
+  /**
+   * convenience function to build a spatial_dimension-al gradient operator
+   * using exact Fourier differentiation
+   *
+   * @param spatial_dimension number of spatial dimensions
+   */
+  Gradient_t make_fourier_gradient(const Dim_t & spatial_dimension);
+}  // namespace muFFT
 
-#endif  // SRC_PROJECTION_DERIVATIVE_HH_
+#endif  // SRC_LIBMUFFT_DERIVATIVE_HH_

@@ -90,7 +90,7 @@ namespace muFFT {
     void ifft(Field_t & field) const override;
 
    protected:
-    MPI_Comm mpi_comm;  //! < MPI communicator
+    MPI_Comm mpi_comm;  //!< MPI communicator
     static int
         nb_engines;        //!< number of times this engine has been instatiated
     pfft_plan plan_fft{};  //!< holds the plan for forward fourier transform

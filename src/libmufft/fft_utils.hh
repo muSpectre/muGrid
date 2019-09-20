@@ -45,6 +45,56 @@
 
 namespace muFFT {
 
+  namespace internal {
+    //! computes hermitian size according to FFTW
+    template <Dim_t Dim, size_t... I>
+    constexpr Ccoord_t<Dim> herm(const Ccoord_t<Dim> & nb_grid_pts,
+                                 std::index_sequence<I...>) {
+      return Ccoord_t<Dim>{nb_grid_pts[I]..., nb_grid_pts.back() / 2 + 1};
+    }
+  }
+
+  /**
+   * returns the hermition grid to correcsponding to a full grid, assuming
+   * that the last dimension is not fully represented in reciprocal space
+   */
+  template <size_t dim>
+  constexpr Ccoord_t<dim>
+  get_nb_hermitian_grid_pts(Ccoord_t<dim> full_nb_grid_pts) {
+    return internal::herm<dim>(full_nb_grid_pts,
+                               std::make_index_sequence<dim - 1>{});
+  }
+
+  /**
+   * returns the hermition grid to correcsponding to a full grid, assuming
+   * that the last dimension is not fully represented in reciprocal space
+   */
+  template <size_t MaxDim>
+  inline muGrid::DynCcoord<MaxDim>
+  get_nb_hermitian_grid_pts(muGrid::DynCcoord<MaxDim> full_nb_grid_pts) {
+    switch (full_nb_grid_pts.get_dim()) {
+    case oneD: {
+      return muGrid::DynCcoord<MaxDim>{
+          get_nb_hermitian_grid_pts(Ccoord_t<oneD>(full_nb_grid_pts))};
+      break;
+    }
+    case twoD: {
+      return muGrid::DynCcoord<MaxDim>{
+          get_nb_hermitian_grid_pts(Ccoord_t<twoD>(full_nb_grid_pts))};
+      break;
+    }
+    case threeD: {
+      return muGrid::DynCcoord<MaxDim>{
+          get_nb_hermitian_grid_pts(Ccoord_t<threeD>(full_nb_grid_pts))};
+      break;
+    }
+    default:
+      throw std::runtime_error(
+          "One 1, 2, and 3-dimensional cases are allowed");
+      break;
+    }
+  }
+
   /**
    * compute fft frequencies (in time (or length) units of of sampling
    * periods), see numpy's fftfreq function for reference

@@ -59,6 +59,14 @@ namespace muGrid {
   //! forward-declaration
   class StateNField;
 
+  /**
+   * Abstract base class for all fields. A field provides storage discretising a
+   * mathematical (scalar, vectorial, tensorial) (real-valued,
+   * integer-valued, complex-valued) field on a fixed number of quadrature
+   * points per pixel/voxel of a regular grid.
+   * Fields defined on the same domains are grouped within
+   * `muGrid::NFieldCollection`s.
+   */
   class NField {
    protected:
     /**
@@ -91,10 +99,25 @@ namespace muGrid {
     //! Move assignment operator
     NField & operator=(NField && other) = delete;
 
+    //! return the field's unique name
     const std::string & get_name() const;
+
+    //! return a const reference to the field's collection
     const NFieldCollection & get_collection() const;
+
+    //! return the number of components stored per quadrature point
     const Dim_t & get_nb_components() const;
+
+    /**
+     * evaluate and return the number of components in an iterate when iterating
+     * over this field
+     */
     Dim_t get_stride(Iteration iter_type) const;
+
+    /**
+     * return the type information of the stored scalar (for compatibility
+     * checking)
+     */
     virtual const std::type_info & get_stored_typeid() const = 0;
 
     //! number of entries in the field (= nb_pixel × nb_quad)
@@ -123,25 +146,31 @@ namespace muGrid {
      */
     bool is_global() const;
 
-    friend NFieldCollection;
-    friend StateNField;
-
    protected:
+    //! gives field collections the ability to resize() fields
+    friend NFieldCollection;
+
     /**
      * maintains a tally of the current size, as it cannot be reliably
      * determined from either `values` or `alt_values` alone.
      */
     size_t current_size{};
+
+    //! resizes the field to the given size
     virtual void resize(size_t size) = 0;
+
     const std::string name;  //!< the field's unique name
+
     //! reference to the collection this field belongs to
     NFieldCollection & collection;
+
     /**
      * number of components stored per quadrature point (e.g., 3 for a
      * three-dimensional vector, or 9 for a three-dimensional second-rank
      * tensor)
      */
     const Dim_t nb_components;
+
     //! size of padding region at end of buffer
     size_t pad_size{};
   };

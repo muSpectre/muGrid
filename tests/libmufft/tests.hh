@@ -47,4 +47,13 @@ namespace muFFT {
   using muGrid::tol;
 }  // namespace muFFT
 
+template <muFFT::Dim_t Dim>
+struct dimFixture {
+  constexpr static muFFT::Dim_t dim{Dim};
+};
+
+using dimlist =
+    boost::mpl::list<dimFixture<muFFT::oneD>, dimFixture<muFFT::twoD>,
+                     dimFixture<muFFT::threeD>>;
+
 #endif  // TESTS_LIBMUFFT_TESTS_HH_

@@ -81,7 +81,11 @@ namespace muSpectre {
    public:
     //! base class
     using Parent = MaterialMuSpectre<MaterialHyperElastoPlastic1<DimM>, DimM>;
+
+    //! short-hand for second-rank tensors
     using T2_t = Eigen::Matrix<Real, DimM, DimM>;
+
+    //! short-hand for fourth-rank tensors
     using T4_t = muGrid::T4Mat<Real, DimM>;
 
     //! shortcut to traits
@@ -175,26 +179,34 @@ namespace muSpectre {
     void initialise() final;
 
     //! getter for internal variable field εₚ
-    muGrid::TypedStateNField<Real> & get_plast_flow_field() {
-      return this->plast_flow_field.get_state_field();
+    muGrid::MappedScalarStateNField<Real, Mapping::Mut> &
+    get_plast_flow_field() {
+      return this->plast_flow_field;
     }
 
     //! getter for previous gradient field Fᵗ
-    muGrid::TypedStateNField<Real> & get_F_prev_field() {
-      return this->F_prev_field.get_state_field();
+    muGrid::MappedT2StateNField<Real, Mapping::Mut, DimM> &
+    get_F_prev_field() {
+      return this->F_prev_field;
     }
 
     //! getterfor elastic left Cauchy-Green deformation tensor bₑᵗ
-    muGrid::TypedStateNField<Real> & get_be_prev_field() {
-      return this->be_prev_field.get_state_field();
+    muGrid::MappedT2StateNField<Real, Mapping::Mut, DimM> &
+    get_be_prev_field() {
+      return this->be_prev_field;
     }
 
    protected:
     /**
-     * worker function computing stresses and internal variables
+     * result type of the stress calculation with intermediate results for
+     * tangent moduli calculation
      */
     using Worker_t =
         std::tuple<T2_t, Real, Real, T2_t, bool, muGrid::Decomp_t<DimM>>;
+
+    /**
+     * worker function computing stresses and internal variables
+     */
     Worker_t stress_n_internals_worker(const T2_t & F, T2StRef_t & F_prev,
                                        T2StRef_t & be_prev,
                                        ScalarStRef_t & plast_flow);
@@ -216,6 +228,7 @@ namespace muSpectre {
     const Real H;        //!< hardening modulus
     std::unique_ptr<const muGrid::T4Mat<Real, DimM>>
         C_holder;  //!< stiffness tensor
+    //! ref to elastic tensor
     const muGrid::T4Mat<Real, DimM> & C;
   };
 

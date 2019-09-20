@@ -54,6 +54,27 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
+  TypedNField<T> & TypedNField<T>::operator=(const TypedNField & other) {
+    Parent::operator=(other);
+    return *this;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
+  TypedNField<T> & TypedNField<T>::operator=(const Negative & other) {
+    Parent::operator=(other);
+    return *this;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
+  TypedNField<T> & TypedNField<T>::operator=(const EigenRep_t & other) {
+    Parent::operator=(other);
+    return *this;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
   void TypedNField<T>::set_zero() {
     std::fill(this->values.begin(), this->values.end(), T{});
   }
@@ -221,6 +242,42 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
+  TypedNFieldBase<T> & TypedNFieldBase<T>::
+  operator=(const TypedNFieldBase & other) {
+    this->eigen_vec() = other.eigen_vec();
+    return *this;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
+  TypedNFieldBase<T> & TypedNFieldBase<T>::operator=(const Negative & other) {
+    this->eigen_vec() = -other.field.eigen_vec();
+    return *this;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
+  TypedNFieldBase<T> & TypedNFieldBase<T>::operator=(const EigenRep_t & other) {
+    this->eigen_vec() = other;
+    return *this;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
+  auto TypedNFieldBase<T>::operator-() const -> Negative {
+    return Negative{*this};
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
+  TypedNFieldBase<T> & TypedNFieldBase<T>::
+  operator+=(const TypedNFieldBase & other) {
+    this->eigen_vec() += other.eigen_vec();
+    return *this;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
   auto TypedNFieldBase<T>::eigen_vec() -> Eigen_map {
     return this->eigen_map(this->size() * this->nb_components, 1);
   }
@@ -261,26 +318,58 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  auto TypedNFieldBase<T>::get_pixel_map() -> NFieldMap<T, Mapping::Mut> {
-    return NFieldMap<T, Mapping::Mut>{*this, Iteration::Pixel};
+  auto TypedNFieldBase<T>::get_pixel_map(const Dim_t & nb_rows)
+      -> NFieldMap<T, Mapping::Mut> {
+    auto ret_val{
+        (nb_rows == -1)
+            ? NFieldMap<T, Mapping::Mut>{*this, Iteration::Pixel}
+            : NFieldMap<T, Mapping::Mut>{*this, nb_rows, Iteration::Pixel}};
+    if (this->collection.is_initialised()) {
+      ret_val.initialise();
+    }
+    return ret_val;
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  auto TypedNFieldBase<T>::get_pixel_map() const -> NFieldMap<T, Mapping::Const> {
-    return NFieldMap<T, Mapping::Const>{*this, Iteration::Pixel};
+  auto TypedNFieldBase<T>::get_pixel_map(const Dim_t & nb_rows) const
+      -> NFieldMap<T, Mapping::Const> {
+    auto ret_val{
+        (nb_rows == -1)
+            ? NFieldMap<T, Mapping::Const>{*this, Iteration::Pixel}
+            : NFieldMap<T, Mapping::Const>{*this, nb_rows, Iteration::Pixel}};
+    if (this->collection.is_initialised()) {
+      ret_val.initialise();
+    }
+    return ret_val;
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  auto TypedNFieldBase<T>::get_quad_pt_map() -> NFieldMap<T, Mapping::Mut> {
-    return NFieldMap<T, Mapping::Mut>{*this, Iteration::QuadPt};
+  auto TypedNFieldBase<T>::get_quad_pt_map(const Dim_t & nb_rows)
+      -> NFieldMap<T, Mapping::Mut> {
+    auto ret_val{
+        (nb_rows == -1)
+            ? NFieldMap<T, Mapping::Mut>{*this, Iteration::QuadPt}
+            : NFieldMap<T, Mapping::Mut>{*this, nb_rows, Iteration::QuadPt}};
+    if (this->collection.is_initialised()) {
+      ret_val.initialise();
+    }
+    return ret_val;
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  auto TypedNFieldBase<T>::get_quad_pt_map() const -> NFieldMap<T, Mapping::Const> {
-    return NFieldMap<T, Mapping::Const>{*this, Iteration::QuadPt};
+  auto TypedNFieldBase<T>::get_quad_pt_map(const Dim_t & nb_rows) const
+      -> NFieldMap<T, Mapping::Const> {
+    auto ret_val{
+        (nb_rows == -1)
+            ? NFieldMap<T, Mapping::Const>{*this, Iteration::QuadPt}
+            : NFieldMap<T, Mapping::Const>{*this, nb_rows, Iteration::QuadPt}};
+    if (this->collection.is_initialised()) {
+      ret_val.initialise();
+    }
+    return ret_val;
   }
 
   template <typename T>
@@ -300,13 +389,13 @@ namespace muGrid {
             << this->nb_components << ").";
       throw NFieldError(error.str());
     }
-    if (this->collection.size() != Dim_t(this->current_size)) {
+    if (this->collection.get_nb_entries() != Dim_t(this->current_size)) {
       std::stringstream error{};
       error << "Size mismatch: This field should store " << this->nb_components
             << " component(s) on " << this->collection.get_nb_pixels()
             << " pixels/voxels with " << this->collection.get_nb_quad()
             << " quadrature point(s) each, i.e. with a total of "
-            << this->collection.size() * this->nb_components
+            << this->collection.get_nb_entries() * this->nb_components
             << " scalar values, but you supplied an array of size "
             << values.size() << '.';
       throw NFieldError(error.str());
@@ -314,6 +403,18 @@ namespace muGrid {
     this->set_data_ptr(values.data());
   }
 
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
+  auto WrappedNField<T>::make_const(const std::string & unique_name,
+                                    NFieldCollection & collection,
+                                    Dim_t nb_components,
+                                    Eigen::Ref<const EigenRep_t> values)
+      -> std::unique_ptr<const WrappedNField> {
+    Eigen::Map<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>> map{
+        const_cast<T *>(values.data()), values.rows(), values.cols()};
+    return std::make_unique<WrappedNField>(unique_name, collection,
+                                           nb_components, map);
+  }
   /* ---------------------------------------------------------------------- */
   template <typename T>
   void WrappedNField<T>::set_pad_size(size_t pad_size) {

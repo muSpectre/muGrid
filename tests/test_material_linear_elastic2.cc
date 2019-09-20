@@ -99,8 +99,8 @@ namespace muSpectre {
     constexpr auto loc{muGrid::CcoordOps::get_cube<Fix::sdim>(0)};
 
     using Mat_t = Eigen::Matrix<Real, Fix::mdim(), Fix::mdim()>;
-    using FC_t = muGrid::GlobalNFieldCollection<Fix::sdim>;
-    FC_t globalfields{Fix::NbQuadPts()};
+    using FC_t = muGrid::GlobalNFieldCollection;
+    FC_t globalfields{Fix::mdim(), Fix::NbQuadPts()};
     globalfields.initialise(cube, loc);
 
     Mat_t zero{Mat_t::Zero()};
@@ -153,7 +153,7 @@ namespace muSpectre {
       using Ccoord = Ccoord_t<Par::sdim>;
       Ccoord cube{muGrid::CcoordOps::get_cube<Par::sdim>(box_size)};
       muGrid::CcoordOps::Pixels<Par::sdim> pixels(cube);
-      for (auto && id_pixel : pixels) {
+      for (auto && id_pixel : akantu::enumerate(pixels)) {
         auto && id{std::get<0>(id_pixel)};
         Eigen::Matrix<Real, Par::mdim(), Par::mdim()> Zero =
             Eigen::Matrix<Real, Par::mdim(), Par::mdim()>::Zero();
@@ -172,8 +172,8 @@ namespace muSpectre {
     constexpr auto loc{muGrid::CcoordOps::get_cube<Fix::sdim>(0)};
     auto & mat{Fix::mat};
 
-    using FC_t = muGrid::GlobalNFieldCollection<Fix::sdim>;
-    FC_t globalfields{Fix::NbQuadPts()};
+    using FC_t = muGrid::GlobalNFieldCollection;
+    FC_t globalfields{Fix::sdim, Fix::NbQuadPts()};
     globalfields.register_real_field("Transformation Gradient",
                                      Fix::mdim() * Fix::mdim());
     globalfields.register_real_field(

@@ -77,6 +77,7 @@ namespace muSpectre {
     //! base class
     using Parent = MaterialMuSpectre<MaterialLinearElastic1, DimM>;
 
+    //! short hand for the type of the elastic tensor
     using Stiffness_t = T4Mat<Real, DimM>;
 
     //! traits of this material
@@ -156,7 +157,7 @@ namespace muSpectre {
     // allocation, which is not an issue here, as this happens only once per
     // material and run.
     std::unique_ptr<const Stiffness_t> C_holder;  //!< stiffness tensor
-    const Stiffness_t & C;                        //! ref to stiffness tensor
+    const Stiffness_t & C;                        //!< ref to stiffness tensor
   };
 
   /* ---------------------------------------------------------------------- */

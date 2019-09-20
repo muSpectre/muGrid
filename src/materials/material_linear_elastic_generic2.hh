@@ -177,6 +177,7 @@ namespace muSpectre {
     void add_pixel(const size_t & pixel_index, const StrainTensor & E_eig);
 
    protected:
+    //! elastic law without eigenstrain used as worker
     Law_t worker;  //! underlying law to be evaluated
     //! storage for eigenstrain
     muGrid::MappedT2NField<Real, Mapping::Const, DimM> eigen_field;

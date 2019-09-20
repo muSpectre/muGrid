@@ -86,7 +86,7 @@ class FFT_Check(unittest.TestCase):
                 np.prod(engine.nb_domain_grid_pts),
                 msg='{} engine'.format(engine_str))
 
-            comm = engine.engine.get_communicator()
+            comm = engine.engine.communicator
             self.assertEqual(comm.sum(comm.rank+4),
                              comm.size*(comm.size+1)/2 + 3*comm.size,
                              msg='{} engine'.format(engine_str))
@@ -130,7 +130,7 @@ class FFT_Check(unittest.TestCase):
                 in_arr_f_cont = in_arr.reshape(-1, np.prod(dims), order='F').T
                 in_arr_f_cont = np.array(in_arr_f_cont, order='F')
                 out_msp = engine.engine.fft(in_arr_f_cont)
-                shape = tuple(engine.engine.get_nb_fourier_grid_pts()) + dims
+                shape = tuple(engine.engine.nb_fourier_grid_pts) + dims
                 out_msp = out_msp.T.reshape(shape, order='F')
                 if engine.is_transposed:
                     out_msp = out_msp.swapaxes(len(nb_grid_pts)-2, len(nb_grid_pts)-1)
@@ -180,9 +180,8 @@ class FFT_Check(unittest.TestCase):
                     raise RuntimeError('Cannot handle {}-dim transforms'
                                        .format(len(nb_grid_pts)))
 
-                complex_res = muFFT.get_nb_hermitian_grid_pts(nb_grid_pts)
-                in_arr_ref = np.zeros([*complex_res, *dims],
-                                      dtype=complex)
+                complex_res = engine.nb_fourier_grid_pts
+                global_in_arr = np.zeros([*complex_res, *dims], dtype=complex)
                 np.random.seed(1)
                 in_arr_ref.real = np.random.random(in_arr_ref.shape)
                 in_arr_ref.imag = np.random.random(in_arr_ref.shape)
@@ -200,8 +199,8 @@ class FFT_Check(unittest.TestCase):
 
                 tol = 1e-14 * np.prod(nb_grid_pts)
 
-                # muFFT expects a F-contiguous array
-                tr_in_arr = in_arr = in_arr_ref[(*engine.fourier_slices, ...)]
+                tr_in_arr = in_arr = global_in_arr[(*engine.fourier_slices,
+                                                    ...)]
                 if engine.is_transposed:
                     tr_in_arr = tr_in_arr.swapaxes(
                         len(nb_grid_pts)-2, len(nb_grid_pts)-1)
@@ -265,9 +264,8 @@ class FFT_Check(unittest.TestCase):
                     # test.
                     continue
 
-                complex_res = muFFT.get_nb_hermitian_grid_pts(nb_grid_pts)
-                global_in_arr = np.zeros(complex_res,
-                                         dtype=complex)
+                complex_res = engine.nb_fourier_grid_pts
+                global_in_arr = np.zeros(complex_res, dtype=complex)
                 np.random.seed(1)
                 global_in_arr.real = np.random.random(global_in_arr.shape)
                 global_in_arr.imag = np.random.random(global_in_arr.shape)

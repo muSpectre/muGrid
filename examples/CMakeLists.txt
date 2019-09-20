@@ -37,13 +37,13 @@
 #compile executables
 
 #TODO: reactivate
-# set(binaries
-#   demonstrator1.cc
-#   demonstrator_dynamic_solve.cc
-#   demonstrator2.cc
-#   hyper-elasticity.cc
-#   small_case.cc
-#   )
+set(binaries
+  #   demonstrator1.cc
+  demonstrator_dynamic_solve.cc
+  #   demonstrator2.cc
+  #   hyper-elasticity.cc
+  #   small_case.cc
+  )
 
 # if(${MUSPECTRE_MPI_PARALLEL})
 #   list(APPEND binaries
@@ -51,13 +51,13 @@
 #     )
 # endif()
 
-# foreach(binaryfile ${binaries})
-#   get_filename_component(binaryname  ${binaryfile} NAME_WE)
-#   add_executable(${binaryname} ${binaryfile})
-#   target_link_libraries(${binaryname} PRIVATE ${MUSPECTRE_NAMESPACE}muSpectre cxxopts)
+foreach(binaryfile ${binaries})
+  get_filename_component(binaryname  ${binaryfile} NAME_WE)
+  add_executable(${binaryname} ${binaryfile})
+  target_link_libraries(${binaryname} PRIVATE ${MUSPECTRE_NAMESPACE}muSpectre cxxopts)
 
-#   muTools_move_to_project(${binaryname})
-# endforeach()
+  muTools_move_to_project(${binaryname})
+endforeach()
 
 # # or copy them
 # file(GLOB pybins "${CMAKE_SOURCE_DIR}/bin/*.py")

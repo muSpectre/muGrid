@@ -6,7 +6,7 @@
  * @date   13 Sep 2019
  *
  * @brief  Cell Adaptor implements the matrix-vector multiplication and allows
- *         the adapted cell to be used like a spacse matrix in 
+ *         the adapted cell to be used like a spacse matrix in
  *         conjugate-gradient-type solvers
  *
  * Copyright © 2019 Till Junge
@@ -37,10 +37,31 @@
 #ifndef SRC_CELL_CELL_ADAPTOR_HH_
 #define SRC_CELL_CELL_ADAPTOR_HH_
 
-namespace muSpectre{
+#include <common/muSpectre_common.hh>
 
-    /**
-   * lightweight resource handle wrapping a `muSpectre::Cell` or
+#include <Eigen/IterativeLinearSolvers>
+
+namespace muSpectre {
+
+  template <class Cell>
+  class CellAdaptor;
+
+}  // namespace muSpectre
+
+namespace Eigen {
+  namespace internal {
+    using Dim_t = muSpectre::Dim_t;  //!< universal index type
+    using Real = muSpectre::Real;    //!< universal real value type
+    template <class Cell>
+    struct traits<muSpectre::CellAdaptor<Cell>>
+        : public Eigen::internal::traits<Eigen::SparseMatrix<Real>> {};
+  }  // namespace internal
+}  // namespace Eigen
+
+namespace muSpectre {
+
+  /**
+   * lightweight resource handle wrapping a `muSpectre::NCell` or
    * a subclass thereof into `Eigen::EigenBase`, so it can be
    * interpreted as a sparse matrix by Eigen solvers
    */
@@ -74,9 +95,9 @@ namespace muSpectre{
     }
     Cell & cell;  //!< ref to the cell
   };
-}  // muSpectre
-n
-amespace Eigen {
+}  // namespace muSpectre
+
+namespace Eigen {
   namespace internal {
     //! Implementation of `muSpectre::CellAdaptor` * `Eigen::DenseVector`
     //! through a specialization of `Eigen::internal::generic_product_impl`:
@@ -91,18 +112,16 @@ amespace Eigen {
       //! undocumented
       template <typename Dest>
       static void scaleAndAddTo(Dest & dst, const CellAdaptor & lhs,
-                                const Rhs & rhs, const Scalar & /*alpha*/) {
+                                const Rhs & rhs, const Scalar & alpha) {
         // This method should implement "dst += alpha * lhs * rhs" inplace,
         // however, for iterative solvers, alpha is always equal to 1, so
         // let's not bother about it.
         // Here we could simply call dst.noalias() += lhs.my_matrix() * rhs,
-        dst.noalias() +=
-            const_cast<CellAdaptor &>(lhs)
-                .cell.evaluate_projected_directional_stiffness(rhs);
+        auto & cell{const_cast<CellAdaptor &>(lhs).cell};
+        cell.add_projected_directional_stiffness(rhs, alpha, dst);
       }
     };
   }  // namespace internal
 }  // namespace Eigen
 
-
-#endif /* SRC_CELL_CELL_ADAPTOR_HH_ */
+#endif  // SRC_CELL_CELL_ADAPTOR_HH_

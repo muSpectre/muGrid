@@ -41,12 +41,16 @@
 #include <Eigen/Dense>
 
 #include <vector>
+#include <memory>
 
 namespace muGrid {
 
   //! forward declaration
   template <typename T, Mapping Mutability>
   class NFieldMap;
+  //! forward declaration
+  template <typename T>
+  class TypedNFieldBase;
 
   template <typename T>
   class TypedNFieldBase : public NField {
@@ -55,6 +59,16 @@ namespace muGrid {
                   "numeric types Real, Complex, Int, or UInt");
 
    protected:
+    /**
+     * Simple structure used to allow for lazy evaluation of the unary '-' sign.
+     * When assiging the the negative of a field to another, as in field_a =
+     * -field_b, this structure allows to implement this operation without
+     * needing a temporary object holding the negative value of field_b.
+     */
+    struct Negative {
+      //! field on which the unary '-' was applied
+      const TypedNFieldBase & field;
+    };
     /**
      * `NField`s are supposed to only exist in the form of `std::unique_ptr`s
      * held by a `NFieldCollection. The `NField` constructor is protected to
@@ -69,11 +83,21 @@ namespace muGrid {
         : Parent{unique_name, collection, nb_components} {}
 
    public:
-    using Element_t = T;
+    //! stored scalar type
+    using Scalar = T;
+
+    //! Eigen type used to represent the field's data
     using EigenRep_t = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
+
+    //! eigen map (handle for EigenRep_t)
     using Eigen_map = Eigen::Map<EigenRep_t>;
+
+    //! eigen const map (handle for EigenRep_t)
     using Eigen_cmap = Eigen::Map<const EigenRep_t>;
+
+    //! base class
     using Parent = NField;
+
     //! Default constructor
     TypedNFieldBase() = delete;
 
@@ -86,11 +110,23 @@ namespace muGrid {
     //! Destructor
     virtual ~TypedNFieldBase() = default;
 
-    //! Copy assignment operator
-    TypedNFieldBase & operator=(const TypedNFieldBase & other) = delete;
-
     //! Move assignment operator
     TypedNFieldBase & operator=(TypedNFieldBase && other) = delete;
+
+    //! Copy assignment operator
+    TypedNFieldBase & operator=(const TypedNFieldBase & other);
+
+    //! Copy assignment operator
+    TypedNFieldBase & operator=(const Negative & other);
+
+    //! Copy assignment operators
+    TypedNFieldBase & operator=(const EigenRep_t & other);
+
+    //! Unary negative
+    Negative operator-() const;
+
+    //! addition assignment
+    TypedNFieldBase & operator+=(const TypedNFieldBase & other);
 
     const std::type_info & get_stored_typeid() const final { return typeid(T); }
 
@@ -124,11 +160,44 @@ namespace muGrid {
     template <typename T_int, Mapping Mutability>
     friend class NFieldMap;
 
-    NFieldMap<T, Mapping::Mut> get_pixel_map();
-    NFieldMap<T, Mapping::Const> get_pixel_map() const;
+    /**
+     * convenience function returns a map of this field, iterable per pixel.
+     *
+     * @param nb_rows optional specification of the number of rows for the
+     * iterate. If left to default value, a matrix of shape `nb_components` ×
+     * `nb_quad_pts` is used
+     */
+    NFieldMap<T, Mapping::Mut> get_pixel_map(const Dim_t & nb_rows = Unknown);
 
-    NFieldMap<T, Mapping::Mut> get_quad_pt_map();
-    NFieldMap<T, Mapping::Const> get_quad_pt_map() const;
+    /**
+     * convenience function returns a const map of this field, iterable per
+     * pixel.
+     *
+     * @param nb_rows optional specification of the number of rows for the
+     * iterate. If left to default value, a matrix of shape `nb_components` ×
+     * `nb_quad_pts` is used
+     */
+    NFieldMap<T, Mapping::Const>
+    get_pixel_map(const Dim_t & nb_rows = Unknown) const;
+
+    /**
+     * convenience function returns a map of this field, iterable per quadrature
+     * point.
+     *
+     * @param nb_rows optional specification of the number of rows for the
+     * iterate. If left to default value, a column vector is used
+     */
+    NFieldMap<T, Mapping::Mut> get_quad_pt_map(const Dim_t & nb_rows = Unknown);
+
+    /**
+     * convenience function returns a const  map of this field, iterable per
+     * quadrature point.
+     *
+     * @param nb_rows optional specification of the number of rows for the
+     * iterate. If left to default value, a column vector is used
+     */
+    NFieldMap<T, Mapping::Const>
+    get_quad_pt_map(const Dim_t & nb_rows = Unknown) const;
 
     //! get the raw data ptr. don't use unless interfacing with external libs
     T * data() const;
@@ -158,7 +227,13 @@ namespace muGrid {
     T * data_ptr{};
   };
 
-  /* ---------------------------------------------------------------------- */
+  /**
+   * A `muGrid::TypedNField` holds a certain number of components (scalars of
+   * type `T` per quadrature point of a `muGrid::NFieldCollection`'s domain.
+   *
+   * @tparam T type of scalar to hold. Must be one of `muGrid::Real`,
+   * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`.
+   */
   template <typename T>
   class TypedNField : public TypedNFieldBase<T> {
    protected:
@@ -175,8 +250,14 @@ namespace muGrid {
         : Parent{unique_name, collection, nb_components} {}
 
    public:
+    //! base class
     using Parent = TypedNFieldBase<T>;
+
+    //! Eigen type to represent the field's data
     using EigenRep_t = typename Parent::EigenRep_t;
+
+    //! convenience alias
+    using Negative = typename Parent::Negative;
 
     //! Default constructor
     TypedNField() = delete;
@@ -190,19 +271,37 @@ namespace muGrid {
     //! Destructor
     virtual ~TypedNField() = default;
 
-    //! Copy assignment operator
-    TypedNField & operator=(const TypedNField & other) = delete;
-
     //! Move assignment operator
     TypedNField & operator=(TypedNField && other) = delete;
+
+    //! Copy assignment operator
+    TypedNField & operator=(const TypedNField & other);
+
+    //! Copy assignment operator
+    TypedNField & operator=(const Negative & other);
+
+    //! Copy assignment operator
+    TypedNField & operator=(const EigenRep_t & other);
 
     void set_zero() final;
     void set_pad_size(size_t pad_size) final;
 
+    //! cast a reference to a base type to this type, with full checks
     static TypedNField & safe_cast(NField & other);
+
+    //! cast a const reference to a base type to this type, with full checks
     static const TypedNField & safe_cast(const NField & other);
 
+    /**
+     * cast a reference to a base type to this type safely, plus check whether
+     * it has the right number of components
+     */
     static TypedNField & safe_cast(NField & other, const Dim_t & nb_components);
+
+    /**
+     * cast a const reference to a base type to this type safely, plus check
+     * whether it has the right number of components
+     */
     static const TypedNField & safe_cast(const NField & other,
                                          const Dim_t & nb_components);
 
@@ -226,23 +325,26 @@ namespace muGrid {
     friend NFieldCollection;
 
    protected:
-    T * get_ptr_to_pixel(const size_t & pixel_index);
-    const T * get_ptr_to_pixel(const size_t & pixel_index) const;
-    T * get_ptr_to_quad_pt(const size_t & quad_pt_index);
-    const T * get_ptr_to_quad_pt(const size_t & quad_pt_index) const;
-
     void resize(size_t size) final;
+
+    //! storage of the raw field data
     std::vector<T> values{};
   };
 
-  /* ---------------------------------------------------------------------- */
+  /**
+   * Wrapper class providing a field view of existing memory. This is
+   * particularly useful when  dealing with input from external libraries (e.g.,
+   * numpy arrays)
+   */
   template <typename T>
   class WrappedNField : public TypedNFieldBase<T> {
    public:
+    //! base class
     using Parent = TypedNFieldBase<T>;
+    //! convenience alias to the Eigen representation of this field's data
     using EigenRep_t = typename Parent::EigenRep_t;
 
-   protected:
+   public:
     /**
      * constructor from an eigen array ref. Typically, this would be a reference
      * to a numpy array from the python bindings.
@@ -251,7 +353,6 @@ namespace muGrid {
                   NFieldCollection & collection, Dim_t nb_components,
                   Eigen::Ref<EigenRep_t> values);
 
-   public:
     //! Default constructor
     WrappedNField() = delete;
 
@@ -269,6 +370,11 @@ namespace muGrid {
 
     //! Move assignment operator
     WrappedNField & operator=(WrappedNField && other) = delete;
+
+    //! Emulation of a const constructor
+    static std::unique_ptr<const WrappedNField>
+    make_const(const std::string & unique_name, NFieldCollection & collection,
+               Dim_t nb_components, const Eigen::Ref<const EigenRep_t> values);
 
     void set_zero() final;
     void set_pad_size(size_t pad_size) final;
@@ -288,9 +394,13 @@ namespace muGrid {
     void resize(size_t size) final;
   };
 
+  //! Alias for real-valued fields
   using RealNField = TypedNField<Real>;
+  //! Alias for complex-valued fields
   using ComplexNField = TypedNField<Complex>;
+  //! Alias for integer-valued fields
   using IntNField = TypedNField<Int>;
+  //! Alias for unsigned integer-valued fields
   using UintNField = TypedNField<Uint>;
 
 }  // namespace muGrid

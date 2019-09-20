@@ -38,10 +38,14 @@
 
 #include <tuple>
 
+#if __cplusplus < 201703L
 #ifdef NO_EXPERIMENTAL
 #include <boost/optional.hpp>
 #else
 #include <experimental/optional>
+#endif
+#else
+#include <optional>
 #endif
 
 namespace std_replacement {

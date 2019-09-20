@@ -91,6 +91,8 @@ namespace muSpectre {
     using Hooke =
         typename MatTB::Hooke<DimM, typename traits::StrainMap_t::reference,
                               typename traits::TangentMap_t::reference>;
+
+    //! short hand for storage type of elastic tensors
     using StiffnessField_t = muGrid::MappedT4NField<Real, Mapping::Const, DimM>;
 
     //! Default constructor

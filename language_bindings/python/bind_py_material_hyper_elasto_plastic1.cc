@@ -61,17 +61,19 @@ void add_material_hyper_elasto_plastic1_helper(py::module & mod) {
   const auto name{name_stream.str()};
 
   using Mat_t = muSpectre::MaterialHyperElastoPlastic1<Dim>;
-  using Cell_t = muSpectre::CellBase;
+  using Cell_t = muSpectre::CellBase<Dim>;
 
   py::class_<Mat_t, muSpectre::MaterialBase, std::shared_ptr<Mat_t>>(
       mod, name.c_str())
       .def_static("make",
-                  [](Cell_t & cell, std::string name, Real Young, Real Poisson,
-                     Real tau_y0, Real h) -> Mat_t & {
-                    return Mat_t::make(cell, name, Young, Poisson, tau_y0, h);
+                  [](Cell_t & cell, std::string name, Dim_t nb_quad_pts,
+                     Real Young, Real Poisson, Real tau_y0, Real h) -> Mat_t & {
+                    return Mat_t::make(cell, name, Dim, nb_quad_pts, Young,
+                                       Poisson, tau_y0, h);
                   },
-                  "cell"_a, "name"_a, "YoungModulus"_a, "PoissonRatio"_a,
-                  "τ_y₀"_a, "h"_a, py::return_value_policy::reference,
+                  "cell"_a, "name"_a, "nb_quad_pts"_a, "YoungModulus"_a,
+                  "PoissonRatio"_a, "τ_y₀"_a, "h"_a,
+                  py::return_value_policy::reference,
                   py::keep_alive<1, 0>())
       .def_static("make_evaluator",
                   [](Real Young, Real Poisson, Real tau_y0, Real h) {

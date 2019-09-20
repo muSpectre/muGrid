@@ -5,7 +5,7 @@ INPUT                  = ../../../src
 @INCLUDE               = input_def
 RECURSIVE              = YES
 
-EXTRACT_ALL            = YES
+EXTRACT_ALL            = No
 
 SOURCE_BROWSER         = YES
 

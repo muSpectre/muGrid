@@ -40,15 +40,23 @@
 
 namespace muGrid {
 
+  /** `muGrid::LocalNFieldCollection` derives from `muGrid::NFieldCollection`
+   * and stores local fields, i.e. fields that are only defined for a subset of
+   * all pixels/voxels in the computational domain. The coordinates of these
+   * active pixels are explicitly stored by this field collection.
+   * `muGrid::LocalFieldCollection::add_pixel` allows to add individual
+   * pixels/voxels to the field collection.
+   */
   class LocalNFieldCollection : public NFieldCollection {
    public:
+    //! alias for base class
     using Parent = NFieldCollection;
     //! Default constructor
     LocalNFieldCollection() = delete;
 
     /**
      * Constructor
-     * @param spatial_dim spatial dimension of the field (can be
+     * @param spatial_dimension spatial dimension of the field (can be
      *                    muGrid::Unknown, e.g., in the case of the local fields
      *                    for storing internal material variables)
      * @param nb_quad_pts number of quadrature points per pixel/voxel
@@ -59,7 +67,7 @@ namespace muGrid {
     LocalNFieldCollection(const LocalNFieldCollection & other) = delete;
 
     //! Move constructor
-    LocalNFieldCollection(LocalNFieldCollection && other) = delete;
+    LocalNFieldCollection(LocalNFieldCollection && other) = default;
 
     //! Destructor
     virtual ~LocalNFieldCollection() = default;
@@ -84,6 +92,11 @@ namespace muGrid {
      * their memory allocated upon construction
      */
     void initialise();
+
+    /**
+     * obtain a new field collection with the same domain and pixels
+     */
+    LocalNFieldCollection get_empty_clone() const;
   };
 
 }  // namespace muGrid

@@ -71,13 +71,22 @@ namespace muSpectre {
 
   namespace internal {
 
+    /**
+     * convenience structure providing the default order of rotations around (in
+     * order) the z, x, and y axis
+     */
     template <Dim_t Dim>
     struct DefaultOrder {
+      //! holds the value of the rotation order
       constexpr static RotationOrder value{RotationOrder::ZXYTaitBryan};
     };
 
+    /**
+     * specialisation for two-dimensional problems
+     */
     template <>
     struct DefaultOrder<twoD> {
+      //! holds the value of the rotation order
       constexpr static RotationOrder value{RotationOrder::Z};
     };
 
@@ -194,16 +203,23 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   namespace internal {
 
+    /**
+     * internal structure for computing rotation matrices
+     */
     template <RotationOrder Order, Dim_t Dim>
     struct RotationMatrixComputerAngle {};
 
+    /**
+     * specialisation for two-dimensional problems
+     */
     template <RotationOrder Order>
     struct RotationMatrixComputerAngle<Order, twoD> {
       constexpr static Dim_t Dim{twoD};
       using RotMat_t = typename RotatorAngle<Dim, Order>::RotMat_t;
       using Angles_t = typename RotatorAngle<Dim, Order>::Angles_t;
 
-      inline static decltype(auto)
+      //! compute and return the rotation matrix
+      inline static RotMat_t
       compute(const Eigen::Ref<Angles_t> & angles) {
         static_assert(Order == RotationOrder::Z,
                       "Two-d rotations can only be around the z axis");
@@ -211,14 +227,17 @@ namespace muSpectre {
       }
     };
 
+    /**
+     * specialisation for three-dimensional problems
+     */
     template <RotationOrder Order>
     struct RotationMatrixComputerAngle<Order, threeD> {
       constexpr static Dim_t Dim{threeD};
       using RotMat_t = typename RotatorAngle<Dim, Order>::RotMat_t;
       using Angles_t = typename RotatorAngle<Dim, Order>::Angles_t;
 
-      inline static decltype(auto)
-      compute(const Eigen::Ref<Angles_t> & angles) {
+      //! compute and return the rotation matrix
+      inline static RotMat_t compute(const Eigen::Ref<Angles_t> & angles) {
         static_assert(Order != RotationOrder::Z,
                       "three-d rotations cannot only be around the z axis");
 
@@ -236,7 +255,9 @@ namespace muSpectre {
                Eigen::AngleAxisd(angles(1), Eigen::Vector3d::UnitX()) *
                Eigen::AngleAxisd(angles(2), Eigen::Vector3d::UnitY())));
         }
-        default: { throw std::runtime_error("not yet implemented."); }
+        default: {
+          throw std::runtime_error("not yet implemented.");
+        }
         }
       }
     };
@@ -454,7 +475,9 @@ namespace muSpectre {
     template <Dim_t Rank>
     struct RotationHelper {};
 
-    /* ---------------------------------------------------------------------- */
+    /**
+     * Specialisation for first-rank tensors (vectors)
+     */
     template <>
     struct RotationHelper<firstOrder> {
       template <class Derived1, class Derived2>
@@ -465,9 +488,12 @@ namespace muSpectre {
       }
     };
 
-    /* ---------------------------------------------------------------------- */
+    /**
+     * Specialisation for second-rank tensors
+     */
     template <>
     struct RotationHelper<secondOrder> {
+      //! raison d'être
       template <class Derived1, class Derived2>
       inline static decltype(auto)
       rotate(const Eigen::MatrixBase<Derived1> & input,
@@ -476,7 +502,9 @@ namespace muSpectre {
       }
     };
 
-    /* ---------------------------------------------------------------------- */
+    /**
+     * Specialisation for fourth-rank tensors
+     */
     template <>
     struct RotationHelper<fourthOrder> {
       template <class Derived1, class Derived2>

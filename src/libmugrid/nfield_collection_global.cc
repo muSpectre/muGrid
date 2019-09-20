@@ -33,18 +33,18 @@
  */
 
 #include "nfield_collection_global.hh"
-
+#include <iostream>
 namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
-  GlobalNFieldCollection<DimS>::GlobalNFieldCollection(Dim_t nb_quad_pts)
-      : Parent{Domain::Global, DimS, nb_quad_pts} {}
+  GlobalNFieldCollection::GlobalNFieldCollection(Dim_t spatial_dimension,
+                                                 Dim_t nb_quad_pts)
+      : Parent{ValidityDomain::Global, spatial_dimension, nb_quad_pts} {}
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
-  void GlobalNFieldCollection<DimS>::initialise(
-      Ccoord nb_grid_pts, Ccoord locations, Ccoord strides) {
+  void GlobalNFieldCollection::initialise(const DynCcoord_t & nb_grid_pts,
+                                          const DynCcoord_t & locations,
+                                          const DynCcoord_t & strides) {
     if (this->initialised) {
       throw NFieldCollectionError("double initialisation");
     } else if (not this->has_nb_quad()) {
@@ -52,31 +52,29 @@ namespace muGrid {
           "The number of quadrature points has not been set.");
     }
 
-    this->pixels = CcoordOps::Pixels<DimS>{
-      nb_grid_pts, locations, strides};
+    this->pixels = CcoordOps::DynamicPixels(nb_grid_pts, locations, strides);
     this->nb_entries = CcoordOps::get_size(nb_grid_pts) * this->nb_quad_pts;
-    this->nb_grid_pts = nb_grid_pts;
-    this->locations = locations;
     this->allocate_fields();
-    this->indices.resize(this->nb_entries);
+    this->pixel_indices.resize(this->nb_entries);
     for (int i{0}; i < this->nb_entries; ++i) {
-      indices[i] = i;
+      this->pixel_indices[i] = i;
     }
     this->initialised = true;
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
-  void GlobalNFieldCollection<DimS>::initialise(
-      Ccoord nb_grid_pts, Ccoord locations) {
-    this->initialise(nb_grid_pts, locations,
+  void GlobalNFieldCollection::initialise(const DynCcoord_t & nb_grid_pts,
+                                          const DynCcoord_t & locations) {
+    this->initialise(nb_grid_pts,
+                     ((locations.get_dim() == 0)
+                          ? DynCcoord_t(nb_grid_pts.get_dim())
+                          : locations),
                      muGrid::CcoordOps::get_default_strides(nb_grid_pts));
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
-  const typename GlobalNFieldCollection<DimS>::Pixels &
-  GlobalNFieldCollection<DimS>::get_pixels() const {
+  const typename GlobalNFieldCollection::DynamicPixels &
+  GlobalNFieldCollection::get_pixels() const {
     if (not(this->initialised)) {
       throw NFieldCollectionError(
           "Can't iterate over the collection before it is initialised.");
@@ -84,7 +82,13 @@ namespace muGrid {
     return this->pixels;
   }
 
-  template class GlobalNFieldCollection<oneD>;
-  template class GlobalNFieldCollection<twoD>;
-  template class GlobalNFieldCollection<threeD>;
+  /* ---------------------------------------------------------------------- */
+  GlobalNFieldCollection GlobalNFieldCollection::get_empty_clone() const {
+    GlobalNFieldCollection ret_val{this->get_spatial_dim(),
+                                   this->get_nb_quad()};
+    ret_val.initialise(this->pixels.get_nb_grid_pts(),
+                       this->pixels.get_locations());
+    return ret_val;
+  }
+
 }  // namespace muGrid

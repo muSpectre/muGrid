@@ -33,8 +33,8 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#ifndef SRC_CELL_CELL_CELL_HH_
-#define SRC_CELL_CELL_CELL_HH_
+#ifndef SRC_CELL_CELL_HH_
+#define SRC_CELL_CELL_HH_
 
 #include "common/muSpectre_common.hh"
 #include "materials/material_base.hh"
@@ -281,4 +281,4 @@ namespace muSpectre {
 
 }  // namespace muSpectre
 
-#endif /* SRC_CELL_CELL_CELL_HH_ */
+#endif  // SRC_CELL_CELL_HH_

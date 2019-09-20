@@ -40,8 +40,8 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   NField::NField(const std::string & unique_name, NFieldCollection & collection,
                  Dim_t nb_components)
-      : name{unique_name}, collection{collection},
-        nb_components{nb_components} {}
+      : name{unique_name}, collection{collection}, nb_components{
+                                                       nb_components} {}
   /* ---------------------------------------------------------------------- */
   const std::string & NField::get_name() const { return this->name; }
 
@@ -70,6 +70,7 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   bool NField::is_global() const {
-    return this->collection.get_domain() == NFieldCollection::Domain::Global;
+    return this->collection.get_domain() ==
+           NFieldCollection::ValidityDomain::Global;
   }
 }  // namespace muGrid

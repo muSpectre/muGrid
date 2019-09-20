@@ -45,6 +45,9 @@
 
 namespace muSpectre {
 
+  /**
+   * Input type for specifying a load regime
+   */
   using LoadSteps_t = std::vector<Eigen::MatrixXd>;
 
   enum class IsStrainInitialised { True, False };
@@ -56,7 +59,7 @@ namespace muSpectre {
    * The initial macroscopic strain state is set to zero in cell initialisation.
    */
   std::vector<OptimizeResult>
-  newton_cg(Cell & cell, const LoadSteps_t & load_steps, SolverBase & solver,
+  newton_cg(NCell & cell, const LoadSteps_t & load_steps, SolverBase & solver,
             Real newton_tol, Real equil_tol, Dim_t verbose = 0,
             IsStrainInitialised strain_init = IsStrainInitialised::False);
 
@@ -65,7 +68,7 @@ namespace muSpectre {
    * equilibrium of a cell given a mean applied strain.
    */
   inline OptimizeResult
-  newton_cg(Cell & cell, const Eigen::Ref<Eigen::MatrixXd> load_step,
+  newton_cg(NCell & cell, const Eigen::Ref<Eigen::MatrixXd> load_step,
             SolverBase & solver, Real newton_tol, Real equil_tol,
             Dim_t verbose = 0,
             IsStrainInitialised strain_init = IsStrainInitialised::False) {
@@ -82,22 +85,23 @@ namespace muSpectre {
    * and H (=F-I) for Formulation::finite_strain). The initial macroscopic
    * strain state is set to zero in cell initialisation.
    */
-  std::vector<OptimizeResult> de_geus(Cell & cell,
-                                      const LoadSteps_t & load_steps,
-                                      SolverBase & solver, Real newton_tol,
-                                      Real equil_tol, Dim_t verbose = 0);
+  std::vector<OptimizeResult>
+  de_geus(NCell & cell, const LoadSteps_t & load_steps, SolverBase & solver,
+          Real newton_tol, Real equil_tol, Dim_t verbose = 0,
+          IsStrainInitialised strain_init = IsStrainInitialised::False);
 
   /* ---------------------------------------------------------------------- */
   /**
    * Uses the method proposed by de Geus method to find the static
    * equilibrium of a cell given a mean applied strain.
    */
-  inline OptimizeResult de_geus(Cell & cell,
-                                const Eigen::Ref<Eigen::MatrixXd> load_step,
-                                SolverBase & solver, Real newton_tol,
-                                Real equil_tol, Dim_t verbose = 0) {
+  inline OptimizeResult
+  de_geus(NCell & cell, const Eigen::Ref<Eigen::MatrixXd> load_step,
+          SolverBase & solver, Real newton_tol, Real equil_tol,
+          Dim_t verbose = 0,
+          IsStrainInitialised strain_init = IsStrainInitialised::False) {
     return de_geus(cell, LoadSteps_t{load_step}, solver, newton_tol, equil_tol,
-                   verbose)[0];
+                   verbose, strain_init)[0];
   }
 
 }  // namespace muSpectre

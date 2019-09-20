@@ -50,11 +50,12 @@ namespace muGrid {
   };
 
   struct GlobalNFieldCollectionFixture : public BaseFixture {
-    GlobalNFieldCollectionFixture() : fc{BaseFixture::NbQuadPts()} {
+    GlobalNFieldCollectionFixture()
+        : fc{BaseFixture::Dim(), BaseFixture::NbQuadPts()} {
       Ccoord_t<BaseFixture::Dim()> nb_grid_pts{2, 2, 3};
       this->fc.initialise(nb_grid_pts);
     }
-    GlobalNFieldCollection<BaseFixture::Dim()> fc;
+    GlobalNFieldCollection fc;
     constexpr static Dim_t size{12};
   };
 
@@ -131,8 +132,8 @@ namespace muGrid {
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(static_size_test, Fix, Maps, Fix) {
-    using StaticMap_t =
-        MatrixNFieldMap<typename Fix::type, Mapping::Const, Fix::Dim(), Fix::Dim()>;
+    using StaticMap_t = MatrixNFieldMap<typename Fix::type, Mapping::Const,
+                                        Fix::Dim(), Fix::Dim()>;
     StaticMap_t static_map{Fix::matrix_field};
     for (auto && iterate : Fix::matrix_pixel) {
       iterate.setRandom();
@@ -175,8 +176,8 @@ namespace muGrid {
 
     // testing array map and t2 map
     using StaticArrayMap_t =
-        ArrayNFieldMap<typename Fix::type, Mapping::Const, Fix::Dim(), Fix::Dim(),
-                       Iteration::QuadPt>;
+        ArrayNFieldMap<typename Fix::type, Mapping::Const, Fix::Dim(),
+                       Fix::Dim(), Iteration::QuadPt>;
     StaticArrayMap_t array_map{Fix::matrix_field};
     using T2Map_t = T2NFieldMap<typename Fix::type, Mapping::Const, Fix::Dim()>;
     T2Map_t t2_map{Fix::matrix_field};
@@ -188,8 +189,9 @@ namespace muGrid {
     }
     // testing t4 map
     using StaticMatrix4Map_t =
-        MatrixNFieldMap<typename Fix::type, Mapping::Const, Fix::Dim() * Fix::Dim(),
-                        Fix::Dim() * Fix::Dim(), Iteration::QuadPt>;
+        MatrixNFieldMap<typename Fix::type, Mapping::Const,
+                        Fix::Dim() * Fix::Dim(), Fix::Dim() * Fix::Dim(),
+                        Iteration::QuadPt>;
     StaticMatrix4Map_t matrix4_map{Fix::T4_field};
 
     using T4Map_t = T4NFieldMap<typename Fix::type, Mapping::Mut, Fix::Dim()>;
@@ -203,5 +205,90 @@ namespace muGrid {
     }
   }
 
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(enumeration_test, Fix, Maps, Fix) {
+    for (auto && tup :
+         akantu::zip(Fix::fc.get_pixel_indices(), Fix::scalar_pixel)) {
+      const auto & i{std::get<0>(tup)};
+      auto iterate{std::get<1>(tup)};
+      iterate(0, 0) = i;
+    }
+    for (auto && tup : Fix::scalar_pixel.enumerate_pixel_indices_fast()) {
+      const auto & i{std::get<0>(tup)};
+      auto & iterate{std::get<1>(tup)};
+      BOOST_CHECK_EQUAL(iterate.norm(), i);
+    }
+
+    BOOST_CHECK_THROW(Fix::scalar_quad.enumerate_pixel_indices_fast(),
+                      NFieldMapError);
+
+    for (auto && tup :
+         akantu::zip(Fix::fc.get_quad_pt_indices(), Fix::scalar_quad)) {
+      const auto & i{std::get<0>(tup)};
+      auto iterate{std::get<1>(tup)};
+      iterate(0, 0) = i;
+    }
+
+    for (auto && tup : Fix::scalar_quad.enumerate_indices()) {
+      const auto & i{std::get<0>(tup)};
+      auto & iterate{std::get<1>(tup)};
+      BOOST_CHECK_EQUAL(iterate.norm(), i);
+    }
+
+    for (auto && val : Fix::scalar_quad.enumerate_indices()) {
+      static_assert(std::remove_reference_t<decltype(std::get<1>(
+                            val))>::SizeAtCompileTime == Eigen::Dynamic,
+                    "Should be testing the dynamic maps");
+    }
+    for (auto && val : Fix::scalar_pixel.enumerate_indices()) {
+      static_assert(std::remove_reference_t<decltype(std::get<1>(
+                            val))>::SizeAtCompileTime == Eigen::Dynamic,
+                    "Should be testing the dynamic maps");
+    }
+  }
+
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(static_enumeration_test, Fix, Maps, Fix) {
+    ScalarNFieldMap<typename Fix::type, Mapping::Const> static_scalar_quad{
+        Fix::scalar_field};
+    MatrixNFieldMap<typename Fix::type, Mapping::Const, Fix::NbQuadPts(), 1,
+                    Iteration::Pixel>
+        static_scalar_pixel{Fix::scalar_field};
+    for (auto && tup :
+         akantu::zip(Fix::fc.get_pixel_indices(), Fix::scalar_pixel)) {
+      const auto & i{std::get<0>(tup)};
+      auto iterate{std::get<1>(tup)};
+      iterate(0, 0) = i;
+    }
+    for (auto && tup : static_scalar_pixel.enumerate_indices()) {
+      const auto & i{std::get<0>(tup)};
+      auto & iterate{std::get<1>(tup)};
+      BOOST_CHECK_EQUAL(iterate.norm(), i);
+    }
+
+    for (auto && tup :
+         akantu::zip(Fix::fc.get_quad_pt_indices(), Fix::scalar_quad)) {
+      const auto & i{std::get<0>(tup)};
+      auto iterate{std::get<1>(tup)};
+      iterate(0, 0) = i;
+    }
+
+    for (auto && tup : static_scalar_quad.enumerate_indices()) {
+      const auto & i{std::get<0>(tup)};
+      auto & iterate{std::get<1>(tup)};
+      // the std::remove_reference_t<decltype(... is because of the Complex case
+      BOOST_CHECK_EQUAL(iterate, std::remove_reference_t<decltype(iterate)>(i));
+    }
+
+    for (auto && val : static_scalar_quad.enumerate_indices()) {
+      using Iterate_t = std::remove_reference_t<decltype(std::get<1>(val))>;
+
+      static_assert(std::is_same<Iterate_t, const typename Fix::type>::value,
+                    "Should be a scalar");
+    }
+    for (auto && val : static_scalar_pixel.enumerate_indices()) {
+      static_assert(std::remove_reference_t<decltype(std::get<1>(
+                            val))>::SizeAtCompileTime != Eigen::Dynamic,
+                    "Should be testing the dynamic maps");
+    }
+  }
   BOOST_AUTO_TEST_SUITE_END();
 }  // namespace muGrid

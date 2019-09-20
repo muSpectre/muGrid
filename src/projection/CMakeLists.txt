@@ -35,7 +35,6 @@
 # =============================================================================
 
 set (projection_SRC
-  ${CMAKE_CURRENT_SOURCE_DIR}/derivative.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/projection_base.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/projection_default.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/projection_finite_strain.cc

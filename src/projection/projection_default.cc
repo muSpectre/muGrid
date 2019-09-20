@@ -40,12 +40,14 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS>
-  ProjectionDefault<DimS>::ProjectionDefault(
-    FFTEngine_ptr engine, Rcoord lengths, Gradient_t gradient, Formulation form)
-      : Parent{std::move(engine), lengths, gradient, form},
+  ProjectionDefault<DimS>::ProjectionDefault(muFFT::FFTEngine_ptr engine,
+                                             DynRcoord_t lengths,
+                                             Gradient_t gradient,
+                                             Formulation form)
+      : Parent{std::move(engine), lengths, form},
         Gfield{this->projection_container.register_complex_field(
-          "Projection Operator", DimS * DimS * DimS * DimS)},
-        Ghat{Gfield} {}
+            "Projection Operator", DimS * DimS * DimS * DimS)},
+        Ghat{Gfield}, gradient(gradient) {}
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS>
@@ -73,6 +75,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
+  template class ProjectionDefault<oneD>;
   template class ProjectionDefault<twoD>;
   template class ProjectionDefault<threeD>;
 }  // namespace muSpectre

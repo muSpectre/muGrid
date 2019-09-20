@@ -38,17 +38,17 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   LocalNFieldCollection::LocalNFieldCollection(Dim_t spatial_dimension,
-                                             Dim_t nb_quad_pts)
-      : Parent{Domain::Local, spatial_dimension, nb_quad_pts} {}
+                                               Dim_t nb_quad_pts)
+      : Parent{ValidityDomain::Local, spatial_dimension, nb_quad_pts} {}
 
   /* ---------------------------------------------------------------------- */
-  void LocalNFieldCollection::add_pixel(const size_t &global_index) {
+  void LocalNFieldCollection::add_pixel(const size_t & global_index) {
     if (this->initialised) {
       throw NFieldCollectionError(
           "Cannot add pixels once the collection has been initialised (because "
           "the fields all have been allocated)");
     }
-    this->indices.emplace_back(global_index);
+    this->pixel_indices.emplace_back(global_index);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -59,8 +59,17 @@ namespace muGrid {
       throw NFieldCollectionError(
           "The number of quadrature points has not been set.");
     }
-    this->nb_entries = this->indices.size()*this->nb_quad_pts;
+    this->nb_entries = this->pixel_indices.size() * this->nb_quad_pts;
     this->allocate_fields();
     this->initialised = true;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  LocalNFieldCollection LocalNFieldCollection::get_empty_clone() const {
+    LocalNFieldCollection ret_val{this->get_spatial_dim(), this->get_nb_quad()};
+    for (const auto & pixel_id : this->get_pixel_indices_fast()) {
+      ret_val.add_pixel(pixel_id);
+    }
+    return ret_val;
   }
 }  // namespace muGrid

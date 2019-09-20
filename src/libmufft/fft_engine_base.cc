@@ -35,58 +35,62 @@
 
 #include "fft_engine_base.hh"
 
+#include "fft_utils.hh"
+
 namespace muFFT {
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim>
-  FFTEngineBase<Dim>::FFTEngineBase(
-    Ccoord nb_grid_pts, Dim_t nb_components, Communicator comm)
-      : comm{comm},
-        work_space_container{1},
+  FFTEngineBase::FFTEngineBase(DynCcoord_t nb_grid_pts, Dim_t nb_dof_per_pixel,
+                               Communicator comm)
+      : spatial_dimension{nb_grid_pts.get_dim()}, comm{comm},
+        work_space_container{this->spatial_dimension, OneQuadPt},
         nb_subdomain_grid_pts{nb_grid_pts},
-        subdomain_locations{},
-        nb_fourier_grid_pts{
-            muGrid::CcoordOps::get_nb_hermitian_grid_pts(nb_grid_pts)},
-        fourier_locations{}, nb_domain_grid_pts{nb_grid_pts},
-        work{work_space_container.register_complex_field(
-            "work space", nb_components)},
+        subdomain_locations(spatial_dimension),
+        nb_fourier_grid_pts{get_nb_hermitian_grid_pts(nb_grid_pts)},
+        fourier_locations(spatial_dimension), nb_domain_grid_pts{nb_grid_pts},
+        work{work_space_container.register_complex_field("work space",
+                                                         nb_dof_per_pixel)},
         norm_factor{1. / muGrid::CcoordOps::get_size(nb_domain_grid_pts)},
-        nb_components{nb_components} {}
+        nb_dof_per_pixel{nb_dof_per_pixel} {}
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim>
-  void FFTEngineBase<Dim>::initialise(
-    FFT_PlanFlags /*plan_flags*/) {
+  void FFTEngineBase::initialise(FFT_PlanFlags /*plan_flags*/) {
     this->work_space_container.initialise(this->nb_fourier_grid_pts);
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim>
-  size_t FFTEngineBase<Dim>::size() const {
+  size_t FFTEngineBase::size() const {
     return muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts);
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim>
-  size_t FFTEngineBase<Dim>::fourier_size() const {
+  size_t FFTEngineBase::fourier_size() const {
     return muGrid::CcoordOps::get_size(this->nb_fourier_grid_pts);
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim>
-  size_t FFTEngineBase<Dim>::workspace_size() const {
-    return this->work_space_container.size();
+  size_t FFTEngineBase::workspace_size() const {
+    return this->work_space_container.get_nb_entries();
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim>
-  const typename FFTEngineBase<Dim>::Pixels &
-  FFTEngineBase<Dim>::get_pixels() const {
+  const typename FFTEngineBase::Pixels & FFTEngineBase::get_pixels() const {
     return this->work_space_container.get_pixels();
   }
 
-  template class FFTEngineBase<muGrid::oneD>;
-  template class FFTEngineBase<muGrid::twoD>;
-  template class FFTEngineBase<muGrid::threeD>;
+  /* ---------------------------------------------------------------------- */
+  const Dim_t & FFTEngineBase::get_nb_dof_per_pixel() const {
+    return this->nb_dof_per_pixel;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  const Dim_t & FFTEngineBase::get_dim() const {
+    return this->spatial_dimension;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  const Dim_t & FFTEngineBase::get_nb_quad() const {
+    return this->work_space_container.get_nb_quad();
+  }
 
 }  // namespace muFFT

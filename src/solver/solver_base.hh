@@ -37,7 +37,7 @@
 #define SRC_SOLVER_SOLVER_BASE_HH_
 
 #include "solver/solver_common.hh"
-#include "cell/cell_base.hh"
+#include "cell/ncell.hh"
 
 #include <Eigen/Dense>
 
@@ -65,7 +65,7 @@ namespace muSpectre {
      * Constructor takes a Cell, tolerance, max number of iterations
      * and verbosity flag as input
      */
-    SolverBase(Cell & cell, Real tol, Uint maxiter, bool verbose = false);
+    SolverBase(NCell & cell, Real tol, Uint maxiter, bool verbose = false);
 
     //! Copy constructor
     SolverBase(const SolverBase & other) = delete;
@@ -80,7 +80,7 @@ namespace muSpectre {
     SolverBase & operator=(const SolverBase & other) = delete;
 
     //! Move assignment operator
-    SolverBase & operator=(SolverBase && other) = default;
+    SolverBase & operator=(SolverBase && other) = delete;
 
     //! Allocate fields used during the solution
     virtual void initialise() = 0;
@@ -108,7 +108,7 @@ namespace muSpectre {
     virtual Vector_map solve(const ConstVector_ref rhs) = 0;
 
    protected:
-    Cell & cell;            //!< reference to the problem's cell
+    NCell & cell;            //!< reference to the problem's cell
     Real tol;               //!< convergence tolerance
     Uint maxiter;           //!< maximum allowed number of iterations
     bool verbose;           //!< whether to write information to the stdout

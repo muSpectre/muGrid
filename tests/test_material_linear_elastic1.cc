@@ -202,8 +202,8 @@ namespace muSpectre {
     constexpr auto cube{muGrid::CcoordOps::get_cube<Fix::sdim>(Fix::box_size)};
     constexpr auto loc{muGrid::CcoordOps::get_cube<Fix::sdim>(0)};
 
-    using FC_t = muGrid::GlobalNFieldCollection<SDim>;
-    FC_t globalfields{muGrid::Unknown};
+    using FC_t = muGrid::GlobalNFieldCollection;
+    FC_t globalfields{SDim, muGrid::Unknown};
     globalfields.set_nb_quad(Fix::NbQuadPts);
     globalfields.initialise(cube, loc);
     globalfields.register_real_field("Transformation Gradient", mdim * mdim);

@@ -52,7 +52,10 @@
 #include <sstream>
 #include <memory>
 
+using muFFT::Gradient_t;
 using muGrid::Dim_t;
+using muGrid::DynRcoord_t;
+using muSpectre::MatrixXXc;
 using muSpectre::ProjectionBase;
 using pybind11::literals::operator""_a;
 namespace py = pybind11;
@@ -63,10 +66,10 @@ namespace py = pybind11;
  * for details
  */
 template <Dim_t DimS>
-class PyProjectionBase : public ProjectionBase<DimS> {
+class PyProjectionBase : public ProjectionBase {
  public:
   //! base class
-  using Parent = ProjectionBase<DimS>;
+  using Parent = ProjectionBase;
   //! field type on which projection is applied
   using Field_t = typename Parent::Field_t;
 
@@ -74,16 +77,13 @@ class PyProjectionBase : public ProjectionBase<DimS> {
     PYBIND11_OVERLOAD_PURE(void, Parent, apply_projection, field);
   }
 
-  Eigen::Map<Eigen::ArrayXXd> get_operator() override {
-    PYBIND11_OVERLOAD_PURE(Eigen::Map<Eigen::ArrayXXd>, Parent, get_operator);
+  Eigen::Map<MatrixXXc> get_operator() override {
+    PYBIND11_OVERLOAD_PURE(Eigen::Map<MatrixXXc>, Parent, get_operator);
   }
 };
 
 template <class Proj, Dim_t DimS>
 void add_proj_helper(py::module & mod, std::string name_start) {
-  using Ccoord = muGrid::Ccoord_t<DimS>;
-  using Rcoord = muGrid::Rcoord_t<DimS>;
-  using Gradient_t = muSpectre::Gradient_t<DimS>;
   using Field_t = typename Proj::Field_t;
 
 #ifdef WITH_MPI
@@ -148,9 +148,13 @@ void add_proj_helper(py::module & mod, std::string name_start) {
       .def("initialise", &Proj::initialise,
            "flags"_a = muFFT::FFT_PlanFlags::estimate,
            "initialises the fft engine (plan the transform)")
+      // apply_projection that takes Fields
+      .def("apply_projection", &Proj::apply_projection)
+      // apply_projection that takes numpy arrays
+      /*
       .def("apply_projection",
            [](Proj & proj, py::EigenDRef<Eigen::ArrayXXd> v) {
-             typename muFFT::FFTEngineBase<DimS>::GFieldCollection_t coll{1};
+             typename muFFT::FFTEngineBase::GFieldCollection_t coll{1};
              Eigen::Index subdomain_size =
                  muGrid::CcoordOps::get_size(proj.get_nb_subdomain_grid_pts());
              if (v.rows() != DimS * DimS || v.cols() != subdomain_size) {
@@ -170,39 +174,33 @@ void add_proj_helper(py::module & mod, std::string name_start) {
              proj.apply_projection(temp);
              return Eigen::ArrayXXd{temp.eigen_pixel()};
            })
+           */
       .def_property_readonly("operator", &Proj::get_operator)
-      .def_property_readonly(
-          "formulation", &Proj::get_formulation,
-          "return a Formulation enum indicating whether the projection is small"
-          " or finite strain")
+      .def_property_readonly("formulation", &Proj::get_formulation,
+                             "return a Formulation enum indicating whether the "
+                             "projection is small or finite strain")
       .def_property_readonly("nb_subdomain_grid_pts",
                              &Proj::get_nb_subdomain_grid_pts)
       .def_property_readonly("subdomain_locations",
                              &Proj::get_subdomain_locations)
       .def_property_readonly("nb_domain_grid_pts",
                              &Proj::get_nb_domain_grid_pts)
-      .def_property_readonly("domain_lengths", &Proj::get_domain_lengths);
+      .def_property_readonly("domain_lengths", &Proj::get_nb_domain_grid_pts);
 }
 
-void add_proj_dispatcher(py::module & mod) {
+void add_projections(py::module & mod) {
   add_proj_helper<muSpectre::ProjectionSmallStrain<muGrid::twoD>,
                   muGrid::twoD>(mod, "ProjectionSmallStrain");
-  add_proj_helper<
-      muSpectre::ProjectionSmallStrain<muGrid::threeD>,
-      muGrid::threeD>(mod, "ProjectionSmallStrain");
+  add_proj_helper<muSpectre::ProjectionSmallStrain<muGrid::threeD>,
+                  muGrid::threeD>(mod, "ProjectionSmallStrain");
 
   add_proj_helper<muSpectre::ProjectionFiniteStrain<muGrid::twoD>,
                   muGrid::twoD>(mod, "ProjectionFiniteStrain");
-  add_proj_helper<
-      muSpectre::ProjectionFiniteStrain<muGrid::threeD>,
-      muGrid::threeD>(mod, "ProjectionFiniteStrain");
+  add_proj_helper<muSpectre::ProjectionFiniteStrain<muGrid::threeD>,
+                  muGrid::threeD>(mod, "ProjectionFiniteStrain");
 
-  add_proj_helper<
-      muSpectre::ProjectionFiniteStrainFast<muGrid::twoD>,
-      muGrid::twoD>(mod, "ProjectionFiniteStrainFast");
-  add_proj_helper<
-      muSpectre::ProjectionFiniteStrainFast<muGrid::threeD>,
-      muGrid::threeD>(mod, "ProjectionFiniteStrainFast");
+  add_proj_helper<muSpectre::ProjectionFiniteStrainFast<muGrid::twoD>,
+                  muGrid::twoD>(mod, "ProjectionFiniteStrainFast");
+  add_proj_helper<muSpectre::ProjectionFiniteStrainFast<muGrid::threeD>,
+                  muGrid::threeD>(mod, "ProjectionFiniteStrainFast");
 }
-
-void add_projections(py::module & mod) { add_proj_dispatcher(mod); }

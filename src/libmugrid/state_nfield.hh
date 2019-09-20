@@ -49,14 +49,23 @@
 
 namespace muGrid {
 
-  //! forward declarations
+  //! forward declaration of the `muGrid::NFieldCollection`
   class NFieldCollection;
+  //! forward declaration of the `muGrid::NField`
   class NField;
+
+  //! forward declaration of the `muGrid::TypedNField`
   template <typename T>
   class TypedNField;
 
+  /**
+   * Base class for state fields, useful for storing polymorphic references
+   */
   class StateNField {
    protected:
+    /**
+     * Protected constructor
+     */
     StateNField(const std::string & unique_prefix,
                 NFieldCollection & collection, Dim_t nb_memory = 1);
 
@@ -82,7 +91,7 @@ namespace muGrid {
     /**
      * returns number of old states that are stored
      */
-    const Dim_t& get_nb_memory() const;
+    const Dim_t & get_nb_memory() const;
 
     //! return type_id of stored type
     virtual const std::type_info & get_stored_typeid() const = 0;
@@ -93,14 +102,22 @@ namespace muGrid {
      */
     void cycle();
 
+    //! return a reference to the field holding the current values
     NField & current();
 
+    //! return a const reference to the field holding the current values
     const NField & current() const;
 
+    /**
+     * return a reference to the field holding the values which were current
+     * `nb_steps_ago` ago
+     */
     const NField & old(size_t nb_steps_ago = 1) const;
 
-    //! get the current ordering of the fields (inlineable because called in hot
-    //! loop)
+    /**
+     * get the current ordering of the fields (inlineable because called in hot
+     * loop)
+     */
     const std::vector<size_t> & get_indices() const { return this->indices; }
 
    protected:
@@ -117,9 +134,12 @@ namespace muGrid {
     const Dim_t nb_memory;
     //! the current (historically accurate) ordering of the fields
     std::vector<size_t> indices{};
+
+    //! storage of references to the diverse fields
     RefVector<NField> fields{};
   };
 
+  //! forward-declaration for friending
   template <typename T, Mapping Mutability>
   class StateNFieldMap;
 
@@ -130,13 +150,21 @@ namespace muGrid {
   template <typename T>
   class TypedStateNField : public StateNField {
    protected:
+    /**
+     * protected constructor, to avoid the creation of unregistered fields.
+     * Users should create fields through the
+     * `muGrid::NFieldCollection::register_real_field()` (or `int`, `uint`,
+     * `compplex`) factory functions.
+     */
     TypedStateNField(const std::string & unique_prefix,
                      NFieldCollection & collection, Dim_t nb_memory,
                      Dim_t nb_components);
 
    public:
+    //! base class
     using Parent = StateNField;
-    //! Default constructor
+
+    //! Deleted default constructor
     TypedStateNField() = delete;
 
     //! Copy constructor
@@ -157,23 +185,39 @@ namespace muGrid {
     //! return type_id of stored type
     const std::type_info & get_stored_typeid() const final;
 
+    //! return a reference to the current field
     TypedNField<T> & current();
 
+    //! return a const reference to the current field
     const TypedNField<T> & current() const;
 
+    /**
+     * return a const reference to the field which was current `nb_steps_ago`
+     * steps ago
+     */
     const TypedNField<T> & old(size_t nb_steps_ago = 1) const;
 
-    friend NFieldCollection;
-    friend class StateNFieldMap<T, Mapping::Const>;
-    friend class StateNFieldMap<T, Mapping::Mut>;
    protected:
+    //! give access to the protected state field constructor
+    friend NFieldCollection;
+
+    //! give access to `get_fields()`
+    friend class StateNFieldMap<T, Mapping::Const>;
+
+    //! give access to `get_fields()`
+    friend class StateNFieldMap<T, Mapping::Mut>;
+
+    //! return a reference to the storage of the constituent fields
     RefVector<NField> & get_fields();
   };
 
-  /* ---------------------------------------------------------------------- */
+  //! Alias for real-valued state fields
   using RealStateNField = TypedStateNField<Real>;
+  //! Alias for complex-valued state fields
   using ComplexStateNField = TypedStateNField<Complex>;
+  //! Alias for integer-valued state fields
   using IntStateNField = TypedStateNField<Int>;
+  //! Alias for unsigned integer-valued state fields
   using Uintnfield = TypedStateNField<Uint>;
 
 }  // namespace muGrid

@@ -75,7 +75,7 @@ namespace muSpectre {
     //! materials handled through `std::unique_ptr`s
     using Material_ptr = std::unique_ptr<Material_t>;
     //! polymorphic base projection type
-    using Projection_t = ProjectionBase<DimS>;
+    using Projection_t = ProjectionBase;
     //! projections handled through `std::unique_ptr`s
     using Projection_ptr = std::unique_ptr<Projection_t>;
     //! dynamic global fields

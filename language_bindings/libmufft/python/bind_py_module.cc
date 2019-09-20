@@ -5,7 +5,7 @@
  *
  * @date   12 Jan 2018
  *
- * @brief  Python bindings for µSpectre
+ * @brief  Python bindings for µFFT
  *
  * Copyright © 2018 Till Junge
  *
@@ -42,5 +42,6 @@ PYBIND11_MODULE(_muFFT, mod) {
 
   add_common(mod);
   add_communicator(mod);
+  add_derivatives(mod);
   add_fft_engines(mod);
 }

@@ -55,7 +55,6 @@ namespace muSpectre {
    */
   template <Dim_t DimM>
   struct MaterialMuSpectre_traits<MaterialLinearElastic2<DimM>> {
-
     //! expected map type for strain fields
     using StrainMap_t = muGrid::T2NFieldMap<double, Mapping::Const, DimM>;
     //! expected map type for stress fields
@@ -115,7 +114,8 @@ namespace muSpectre {
      * strain (or Cauchy stress if called with a small strain tensor)
      */
     template <class s_t>
-    inline decltype(auto) evaluate_stress(s_t && E, const size_t & quad_pt_index);
+    inline decltype(auto) evaluate_stress(s_t && E,
+                                          const size_t & quad_pt_index);
 
     /**
      * evaluates both second Piola-Kirchhoff stress and stiffness given
@@ -149,8 +149,8 @@ namespace muSpectre {
   /* ----------------------------------------------------------------------*/
   template <Dim_t DimM>
   template <class s_t>
-  auto MaterialLinearElastic2<DimM>::evaluate_stress(s_t && E,
-                                                     const size_t & quad_pt_index)
+  auto MaterialLinearElastic2<DimM>::evaluate_stress(
+      s_t && E, const size_t & quad_pt_index)
       -> decltype(auto) {
     auto && E_eig = this->eigen_strains[quad_pt_index];
     return this->material.evaluate_stress(E - E_eig, quad_pt_index);

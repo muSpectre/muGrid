@@ -39,8 +39,6 @@
 #include "common/muSpectre_common.hh"
 #include "materials/materials_toolbox.hh"
 
-#include <libmugrid/field.hh>
-#include <libmugrid/field_collection.hh>
 #include <libmugrid/nfield_collection_local.hh>
 #include <libmugrid/nfield_typed.hh>
 #include <libmugrid/mapped_nfield.hh>
@@ -71,7 +69,6 @@ namespace muSpectre {
     //! pixels the material is responsible for
     using MFieldCollection_t = muGrid::LocalNFieldCollection;
 
-    using iterator = typename MFieldCollection_t::iterator;  //!< pixel iterator
     //! Default constructor
     MaterialBase() = delete;
 
@@ -174,12 +171,17 @@ namespace muSpectre {
     // material
     auto get_assigned_ratio_field() -> muGrid::RealNField &;
 
-    //! iterator to first pixel handled by this material
-    inline iterator begin() { return this->internal_fields.begin(); }
-    //! iterator past the last pixel handled by this material
-    inline iterator end() { return this->internal_fields.end(); }
-    //! number of pixels assigned to this material
-    inline Dim_t size() const { return this->internal_fields.size(); }
+    //! return and iterable proxy over the indices of this material's pixels
+    typename MFieldCollection_t::PixelIndexIterable get_pixel_indices() const;
+
+    /**
+     * return and iterable proxy over the indices of this material's quadrature
+     * points
+     */
+    typename MFieldCollection_t::IndexIterable get_quad_pt_indices() const;
+
+    //! number of quadrature points assigned to this material
+    inline Dim_t size() const { return this->internal_fields.get_nb_entries(); }
 
     //! type to return real-valued fields in
     using EigenMap =
@@ -214,6 +216,7 @@ namespace muSpectre {
    protected:
     const std::string name;  //!< material's name (for output and debugging)
     MFieldCollection_t internal_fields;  //!< storage for internal variables
+    //! spatial dimension of the material
     Dim_t material_dimension;
 
     //!< field holding the assigned ratios of the material

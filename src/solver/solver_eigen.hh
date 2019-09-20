@@ -37,7 +37,8 @@
 #define SRC_SOLVER_SOLVER_EIGEN_HH_
 
 #include "solver/solver_base.hh"
-#include "cell/cell_base.hh"
+#include "cell/ncell.hh"
+#include "cell/cell_adaptor.hh"
 
 #include <Eigen/IterativeLinearSolvers>
 #include <iostream>
@@ -67,7 +68,7 @@ namespace muSpectre {
     template <>
     struct Solver_traits<SolverCGEigen> {
       //! Eigen Iterative Solver
-      using Solver = Eigen::ConjugateGradient<typename Cell::Adaptor,
+      using Solver = Eigen::ConjugateGradient<typename NCell::Adaptor,
                                               Eigen::Lower | Eigen::Upper,
                                               Eigen::IdentityPreconditioner>;
     };
@@ -77,14 +78,14 @@ namespace muSpectre {
     struct Solver_traits<SolverGMRESEigen> {
       //! Eigen Iterative Solver
       using Solver =
-          Eigen::GMRES<typename Cell::Adaptor, Eigen::IdentityPreconditioner>;
+          Eigen::GMRES<typename NCell::Adaptor, Eigen::IdentityPreconditioner>;
     };
 
     //! traits for the Eigen BiCGSTAB solver
     template <>
     struct Solver_traits<SolverBiCGSTABEigen> {
       //! Eigen Iterative Solver
-      using Solver = Eigen::BiCGSTAB<typename Cell::Adaptor,
+      using Solver = Eigen::BiCGSTAB<typename NCell::Adaptor,
                                      Eigen::IdentityPreconditioner>;
     };
 
@@ -93,7 +94,7 @@ namespace muSpectre {
     struct Solver_traits<SolverDGMRESEigen> {
       //! Eigen Iterative Solver
       using Solver =
-          Eigen::DGMRES<typename Cell::Adaptor, Eigen::IdentityPreconditioner>;
+          Eigen::DGMRES<typename NCell::Adaptor, Eigen::IdentityPreconditioner>;
     };
 
     //! traits for the Eigen MINRES solver
@@ -101,7 +102,7 @@ namespace muSpectre {
     struct Solver_traits<SolverMINRESEigen> {
       //! Eigen Iterative Solver
       using Solver =
-          Eigen::MINRES<typename Cell::Adaptor, Eigen::Lower | Eigen::Upper,
+          Eigen::MINRES<typename NCell::Adaptor, Eigen::Lower | Eigen::Upper,
                         Eigen::IdentityPreconditioner>;
     };
 
@@ -127,7 +128,7 @@ namespace muSpectre {
     SolverEigen() = delete;
 
     //! Constructor with cell and solver parameters.
-    SolverEigen(Cell & cell, Real tol, Uint maxiter = 0, bool verbose = false);
+    SolverEigen(NCell & cell, Real tol, Uint maxiter = 0, bool verbose = false);
 
     //! Copy constructor
     SolverEigen(const SolverEigen & other) = delete;
@@ -151,7 +152,7 @@ namespace muSpectre {
     Vector_map solve(const ConstVector_ref rhs) final;
 
    protected:
-    Cell::Adaptor adaptor;  //!< cell handle
+    NCell::Adaptor adaptor;  //!< cell handle
     Solver solver;          //!< Eigen's Iterative solver
     Vector_t result;        //!< storage for result
   };

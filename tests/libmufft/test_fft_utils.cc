@@ -36,11 +36,26 @@
 #include <boost/mpl/list.hpp>
 
 #include "tests.hh"
+#include <libmugrid/ccoord_operations.hh>
 #include <libmufft/fft_utils.hh>
 
 namespace muFFT {
 
   BOOST_AUTO_TEST_SUITE(fft_utils);
+
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_hermitian, Fix, dimlist, Fix) {
+    constexpr auto dim{Fix::dim};
+    using Ccoord = Ccoord_t<dim>;
+    constexpr Dim_t size{5};
+
+    constexpr Ccoord cube = muGrid::CcoordOps::get_cube<dim>(size);
+    constexpr Ccoord herm = get_nb_hermitian_grid_pts(cube);
+    Ccoord ref_cube = cube;
+    ref_cube.back() = (cube.back() + 1) / 2;
+
+    BOOST_CHECK_EQUAL_COLLECTIONS(ref_cube.begin(), ref_cube.end(),
+                                  herm.begin(), herm.end());
+  }
 
   BOOST_AUTO_TEST_CASE(fft_freqs_test) {
     // simply comparing to np.fft.fftfreq(12, 1/12.)

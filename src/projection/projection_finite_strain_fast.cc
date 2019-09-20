@@ -41,14 +41,14 @@
 
 namespace muSpectre {
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t NbQuadPts>
-  ProjectionFiniteStrainFast<DimS, NbQuadPts>::ProjectionFiniteStrainFast(
-      FFTEngine_ptr engine, Rcoord lengths, Gradient_t gradient)
-      : Parent{std::move(engine), lengths, gradient,
-               Formulation::finite_strain},
+  template <Dim_t DimS>
+  ProjectionFiniteStrainFast<DimS>::ProjectionFiniteStrainFast(
+      muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths,
+      Gradient_t gradient)
+      : Parent{std::move(engine), lengths, Formulation::finite_strain},
         xi_field{this->projection_container.register_complex_field(
             "Projection Operator", DimS)},
-        xis(xi_field) {
+        xis(xi_field), gradient{gradient} {
     for (auto res : this->fft_engine->get_nb_domain_grid_pts()) {
       if (res % 2 == 0) {
         throw ProjectionError(
@@ -58,8 +58,16 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t NbQuadPts>
-  void ProjectionFiniteStrainFast<DimS, NbQuadPts>::initialise(
+  template <Dim_t DimS>
+  ProjectionFiniteStrainFast<DimS>::ProjectionFiniteStrainFast(
+      muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths)
+      : ProjectionFiniteStrainFast{
+          std::move(engine), lengths,
+          muFFT::make_fourier_gradient(lengths.get_dim())} {}
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS>
+  void ProjectionFiniteStrainFast<DimS>::initialise(
       muFFT::FFT_PlanFlags flags) {
     Parent::initialise(flags);
 
@@ -70,17 +78,19 @@ namespace muSpectre {
         this->fft_engine->get_nb_domain_grid_pts();
 
     const Vector_t grid_spacing{
-        eigen(this->domain_lengths / nb_domain_grid_pts)};
+        eigen(Rcoord(this->domain_lengths) / Ccoord(nb_domain_grid_pts))};
 
     FFTFreqs_t fft_freqs(nb_domain_grid_pts);
-    for (auto && tup : akantu::zip(this->fft_engine->get_pixels(), this->xis)) {
+    for (auto && tup : akantu::zip(this->fft_engine->get_pixels()
+                                       .template get_dimensioned_pixels<DimS>(),
+                                   this->xis)) {
       const auto & ccoord = std::get<0>(tup);
       auto & xi = std::get<1>(tup);
 
       // compute phase (without the factor of 2 pi)
       const Vector_t phase{
           (fft_freqs.get_xi(ccoord).array() /
-           eigen(nb_domain_grid_pts).template cast<Real>().array())
+           eigen(Ccoord(nb_domain_grid_pts)).template cast<Real>().array())
               .matrix()};
       for (int i = 0; i < DimS; ++i) {
         xi[i] = this->gradient[i]->fourier(phase) / grid_spacing[i];
@@ -100,8 +110,8 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t NbQuadPts>
-  void ProjectionFiniteStrainFast<DimS, NbQuadPts>::apply_projection(
+  template <Dim_t DimS>
+  void ProjectionFiniteStrainFast<DimS>::apply_projection(
       Field_t & field) {
     Grad_map field_map{this->fft_engine->fft(field)};
     Real factor = this->fft_engine->normalisation();
@@ -114,20 +124,20 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t NbQuadPts>
+  template <Dim_t DimS>
   Eigen::Map<MatrixXXc>
-  ProjectionFiniteStrainFast<DimS, NbQuadPts>::get_operator() {
+  ProjectionFiniteStrainFast<DimS>::get_operator() {
     return this->xi_field.eigen_pixel();
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t NbQuadPts>
+  template <Dim_t DimS>
   std::array<Dim_t, 2>
-  ProjectionFiniteStrainFast<DimS, NbQuadPts>::get_strain_shape() const {
-    return std::array<Dim_t, 2>{DimS, DimS * NbQuadPts};
+  ProjectionFiniteStrainFast<DimS>::get_strain_shape() const {
+    return std::array<Dim_t, 2>{DimS, DimS * OneQuadPt};
   }
 
-  /* ---------------------------------------------------------------------- */
+  template class ProjectionFiniteStrainFast<oneD>;
   template class ProjectionFiniteStrainFast<twoD>;
   template class ProjectionFiniteStrainFast<threeD>;
 }  // namespace muSpectre

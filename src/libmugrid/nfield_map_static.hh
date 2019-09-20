@@ -36,6 +36,8 @@
 #ifndef SRC_LIBMUGRID_NFIELD_MAP_STATIC_HH_
 #define SRC_LIBMUGRID_NFIELD_MAP_STATIC_HH_
 
+#include "nfield.hh"
+#include "nfield_typed.hh"
 #include "nfield_map.hh"
 #include "T4_map_proxy.hh"
 
@@ -43,7 +45,11 @@
 
 namespace muGrid {
 
-  /* ---------------------------------------------------------------------- */
+  /**
+   * Statically sized field map. Static field maps reproduce the capabilities of
+   * the (dynamically sized) `muGrid::NFieldMap`, but iterate much more
+   * efficiently.
+   */
   template <typename T, Mapping Mutability, class MapType,
             Iteration IterationType = Iteration::QuadPt>
   class StaticNFieldMap : public NFieldMap<T, Mutability> {
@@ -51,22 +57,55 @@ namespace muGrid {
                   "The MapType you chose is not compatible");
 
    public:
-    using Scalar_t = T;
+    //! stored scalar type
+    using Scalar = T;
+
+    //! base class
     using Parent = NFieldMap<T, Mutability>;
+
+    //! convenience alias
     using NField_t = typename Parent::NField_t;
+
+    //! return type when dereferencing iterators over this map
     template <Mapping MutType>
     using Return_t = typename MapType::template Return_t<MutType>;
+
+    //! stl
     using reference = Return_t<Mutability>;
+
+    //! Eigen type representing iterates of this map
     using PlainType = typename MapType::PlainType;
-    constexpr static Mapping FieldMutability() { return Mutability; }
+
+    /**
+     * determine at compile time  whether pixels or quadrature points are
+     * iterater over
+     */
     constexpr static Iteration GetIterationType() { return IterationType; }
+    //! determine the number of components in the iterate at compile time
     constexpr static size_t Stride() { return MapType::stride(); }
+    //! determine whether this map has statically sized iterates at compile time
+    constexpr static bool IsStatic() { return true; }
+
+    /**
+     * iterable proxy type to iterate over the quad point/pixel indices and
+     * stored values simultaneously
+     */
+    using Enumeration_t = akantu::containers::ZipContainer<
+        std::conditional_t<(IterationType == Iteration::QuadPt),
+                           NFieldCollection::IndexIterable,
+                           NFieldCollection::PixelIndexIterable>,
+        StaticNFieldMap &>;
     //! Default constructor
     StaticNFieldMap() = delete;
 
+    /**
+     * Constructor from a non-typed field ref (has more runtime cost than the
+     * next constructor
+     */
     explicit StaticNFieldMap(NField & field)
         : StaticNFieldMap(TypedNField<T>::safe_cast(field)) {}
 
+    //! Constructor from typed field ref.
     explicit StaticNFieldMap(NField_t & field) : Parent{field, IterationType} {
       if (this->stride != MapType::stride()) {
         std::stringstream error{};
@@ -89,29 +128,75 @@ namespace muGrid {
     virtual ~StaticNFieldMap() = default;
 
     //! Copy assignment operator
-    StaticNFieldMap & operator=(const StaticNFieldMap & other) = default;
+    StaticNFieldMap & operator=(const StaticNFieldMap & other) = delete;
 
     //! Move assignment operator
-    StaticNFieldMap & operator=(StaticNFieldMap && other) = default;
+    StaticNFieldMap & operator=(StaticNFieldMap && other) = delete;
+
+    //! Assign a matrix-like value with dynamic size to every entry
+    template <bool IsMutableField = Mutability == Mapping::Mut>
+    std::enable_if_t<IsMutableField, StaticNFieldMap> &
+    operator=(const typename Parent::EigenRef & val) {
+      dynamic_cast<Parent &>(*this) = val;
+      return *this;
+    }
+
+    //! Assign a matrix-like value with static size to every entry
+    template <bool IsMutableField = Mutability == Mapping::Mut>
+    std::enable_if_t<IsMutableField && !MapType::IsScalarMapType(),
+                     StaticNFieldMap<T, Mutability, MapType, IterationType>> &
+    operator=(const reference & val) {
+      for (auto && entry : *this) {
+        entry = val;
+      }
+      return *this;
+    }
+
+    //! Assign a scalar value to every entry
+    template <bool IsMutableField = Mutability == Mapping::Mut>
+    std::enable_if_t<IsMutableField && MapType::IsScalarMapType(),
+                     StaticNFieldMap<T, Mutability, MapType, IterationType>> &
+    operator=(const Scalar & val) {
+      if (not(this->nb_rows == 1 && this->nb_cols == 1)) {
+        std::stringstream error_str{};
+        error_str << "Expected an array/matrix with shape (" << this->nb_rows
+                  << " × " << this->nb_cols
+                  << "), but received a scalar value.";
+        throw NFieldMapError(error_str.str());
+      }
+      for (auto && entry : *this) {
+        entry = val;
+      }
+      return *this;
+    }
 
     template <Mapping MutIter>
     class Iterator;
+    //! stl
     using iterator =
         Iterator<(Mutability == Mapping::Mut) ? Mapping::Mut : Mapping::Const>;
+
+    //! stl
     using const_iterator = Iterator<Mapping::Const>;
 
+    //! random access operator
     Return_t<Mutability> operator[](size_t index) {
       assert(this->is_initialised);
       return MapType::template from_data_ptr<Mutability>(
           this->data_ptr + index * MapType::stride());
     }
 
+    //! random const access operator
     Return_t<Mapping::Const> operator[](size_t index) const {
       assert(this->is_initialised);
       return MapType::template from_data_ptr<Mapping::Const>(
           this->data_ptr + index * MapType::stride());
     }
 
+    //! evaluate the average of the field
+    inline PlainType mean() const;
+
+    //! stl
     iterator begin() {
       if (not this->is_initialised) {
         this->initialise();
@@ -119,8 +204,10 @@ namespace muGrid {
       return iterator{*this, false};
     }
 
+    //! stl
     iterator end() { return iterator{*this, true}; }
 
+    //! stl
     const_iterator begin() const {
       if (not this->is_initialised) {
         throw NFieldMapError("Const FieldMaps cannot be initialised");
@@ -128,19 +215,45 @@ namespace muGrid {
       return const_iterator{*this, false};
     }
 
+    //! stl
     const_iterator end() const { return const_iterator{*this, true}; }
 
-    //! evaluate the average of the field
-    inline PlainType mean() const;
+    //! iterate over pixel/quad point indices and stored values simultaneously
+    template <bool IsPixelIterable = (IterationType == Iteration::Pixel)>
+    std::enable_if_t<IsPixelIterable, Enumeration_t> enumerate_indices() {
+      static_assert(IsPixelIterable == (IterationType == Iteration::Pixel),
+                    "IsPixelIterable is a SFINAE parameter, do not touch it.");
+      return akantu::zip(this->field.get_collection().get_pixel_indices_fast(),
+                         *this);
+    }
+
+    //! iterate over pixel/quad point indices and stored values simultaneously
+    template <Iteration Iter = Iteration::QuadPt,
+              class Dummy = std::enable_if_t<IterationType == Iter, bool>>
+    Enumeration_t enumerate_indices() {
+      static_assert(Iter == Iteration::QuadPt,
+                    "Iter is a SFINAE parameter, do not touch it.");
+      static_assert(std::is_same<Dummy, bool>::value,
+                    "Dummy is a SFINAE parameter, do not touch it.");
+      return akantu::zip(this->field.get_collection().get_quad_pt_indices(),
+                         *this);
+    }
   };
 
+  /**
+   * Iterator class for `muGrid::StaticNFieldMap`
+   */
   template <typename T, Mapping Mutability, class MapType,
             Iteration IterationType>
   template <Mapping MutIter>
   class StaticNFieldMap<T, Mutability, MapType, IterationType>::Iterator {
    public:
+    //! type returned by iterator
     using value_type = typename MapType::template value_type<MutIter>;
+
+    //! type stored
     using storage_type = typename MapType::template storage_type<MutIter>;
+
     //! Default constructor
     Iterator() = delete;
 
@@ -198,55 +311,83 @@ namespace muGrid {
 
   namespace internal {
 
+    /**
+     * Internal struct for handling the matrix-shaped iterates of
+     * `muGrid::NFieldMap`
+     */
     template <typename T, class EigenPlain>
     struct EigenMap {
+      /**
+       * check at compile time whether the type is meant to be a map with
+       * statically sized iterates.
+       */
       constexpr static bool IsValidStaticMapType() { return true; }
+
+      /**
+       * check at compiler time whether this map is scalar
+       */
+      constexpr static bool IsScalarMapType() { return false; }
+
+      //! Eigen type of the iterate
       using PlainType = EigenPlain;
+
+      //! stl (const-correct)
       template <Mapping MutIter>
       using value_type = std::conditional_t<MutIter == Mapping::Const,
                                             Eigen::Map<const PlainType>,
                                             Eigen::Map<PlainType>>;
+
+      //! stl (const-correct)
       template <Mapping MutIter>
       using ref_type = value_type<MutIter>;
-      // for direct access through operator[]
+
+      //! for direct access through operator[]
       template <Mapping MutIter>
       using Return_t = value_type<MutIter>;
 
+      //! stored type (cannot always be same as ref_type)
       template <Mapping MutIter>
       using storage_type = value_type<MutIter>;
 
+      //! return the return_type version of the iterate from storage_type
       template <Mapping MutIter>
       constexpr static value_type<MutIter> &
       provide_ref(storage_type<MutIter> & storage) {
         return storage;
       }
 
+      //! return the const return_type version of the iterate from storage_type
       template <Mapping MutIter>
       constexpr static const value_type<MutIter> &
       provide_const_ref(const storage_type<MutIter> & storage) {
         return storage;
       }
 
+      //! return a pointer to the iterate from storage_type
       template <Mapping MutIter>
       constexpr static value_type<MutIter> *
       provide_ptr(storage_type<MutIter> & storage) {
         return &storage;
       }
 
+      //! return a return_type version of the iterate from its pointer
       template <Mapping MutIter>
       constexpr static Return_t<MutIter> from_data_ptr(
           std::conditional_t<MutIter == Mapping::Const, const T *, T *> data) {
         return Return_t<MutIter>(data);
       }
 
+      //! return a storage_type version of the iterate from its value
       template <Mapping MutIter>
       constexpr static storage_type<MutIter>
       to_storage(value_type<MutIter> && value) {
         return std::move(value);
       }
 
+      //! return the nb of components of the iterate (known at compile time)
       constexpr static Dim_t stride() { return PlainType::SizeAtCompileTime; }
 
+      //! return the iterate's shape as text, mostly for error messages
       static_assert(stride() > 0,
                     "Only statically sized Eigen types allowed here");
       static std::string shape() {
@@ -257,63 +398,99 @@ namespace muGrid {
       }
     };
 
+    /**
+     * internal convenience alias for creating maps iterating over statically
+     * sized `Eigen::Matrix`s
+     */
     template <typename T, Dim_t NbRow, Dim_t NbCol>
     using MatrixMap = EigenMap<T, Eigen::Matrix<T, NbRow, NbCol>>;
 
+    /**
+     * internal convenience alias for creating maps iterating over statically
+     * sized `Eigen::Array`s
+     */
     template <typename T, Dim_t NbRow, Dim_t NbCol>
     using ArrayMap = EigenMap<T, Eigen::Array<T, NbRow, NbCol>>;
 
+    /**
+     * Internal struct for handling the scalar iterates of `muGrid::NFieldMap`
+     */
     template <typename T>
     struct ScalarMap {
+      /**
+       * check at compile time whether this map is suitable for statically sized
+       * iterates
+       */
       constexpr static bool IsValidStaticMapType() { return true; }
+
+      /**
+       * check at compiler time whether this map is scalar
+       */
+      constexpr static bool IsScalarMapType() { return true; }
+
+      /**
+       * Scalar maps don't have an eigen type representing the iterate, just the
+       * raw stored type itsef
+       */
       using PlainType = T;
+
+      //! return type for iterates
       template <Mapping MutIter>
       using value_type =
           std::conditional_t<MutIter == Mapping::Const, const T, T>;
+
+      //! reference type for iterates
       template <Mapping MutIter>
       using ref_type = value_type<MutIter> &;
 
-      // for direct access through operator[]
+      //! for direct access through operator[]
       template <Mapping MutIter>
       using Return_t = value_type<MutIter> &;
 
-      // need to encapsulate
+      //! need to encapsulate
       template <Mapping MutIter>
       using storage_type =
           std::conditional_t<MutIter == Mapping::Const, const T *, T *>;
 
+      //! return the return_type version of the iterate from storage_type
       template <Mapping MutIter>
       constexpr static value_type<MutIter> &
       provide_ref(storage_type<MutIter> storage) {
         return *storage;
       }
 
+      //! return the const return_type version of the iterate from storage_type
       template <Mapping MutIter>
       constexpr static const value_type<MutIter> &
       provide_const_ref(const storage_type<MutIter> storage) {
         return *storage;
       }
 
+      //! return a pointer to the iterate from storage_type
       template <Mapping MutIter>
       constexpr static storage_type<MutIter>
       provide_ptr(storage_type<MutIter> storage) {
         return storage;
       }
 
+      //! return a return_type version of the iterate from its pointer
       template <Mapping MutIter>
       constexpr static Return_t<MutIter> from_data_ptr(
           std::conditional_t<MutIter == Mapping::Const, const T *, T *> data) {
         return *data;
       }
 
+      //! return a storage_type version of the iterate from its value
       template <Mapping MutIter>
       constexpr static storage_type<MutIter> to_storage(ref_type<MutIter> ref) {
         return &ref;
       }
 
-      static std::string shape() { return "scalar"; }
-
+      //! return the nb of components of the iterate (known at compile time)
       constexpr static Dim_t stride() { return 1; }
+
+      //! return the iterate's shape as text, mostly for error messages
+      static std::string shape() { return "scalar"; }
     };
 
   }  // namespace internal
@@ -331,32 +508,82 @@ namespace muGrid {
     return mean;
   }
 
-  /* ---------------------------------------------------------------------- */
+  /**
+   * Alias of `muGrid::StaticNFieldMap` you wish to iterate over pixel by pixel
+   * or quadrature point by quadrature point with statically sized
+   * `Eigen::Matrix` iterates
+   *
+   * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
+   * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
+   * @tparam Mutability whether or not the map allows to modify the content of
+   * the field
+   * @tparam NbRow number of rows of the iterate
+   * @tparam NbCol number of columns of the iterate
+   * @tparam IterationType whether to iterate over pixels or quadrature points
+   */
   template <typename T, Mapping Mutability, Dim_t NbRow, Dim_t NbCol,
             Iteration IterationType = Iteration::QuadPt>
   using MatrixNFieldMap =
       StaticNFieldMap<T, Mutability, internal::MatrixMap<T, NbRow, NbCol>,
                       IterationType>;
 
-  /* ---------------------------------------------------------------------- */
+  /**
+   * Alias of `muGrid::StaticNFieldMap` you wish to iterate over pixel by pixel
+   * or quadrature point by quadrature point with* statically sized
+   * `Eigen::Array` iterates
+   *
+   * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
+   * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
+   * @tparam Mutability whether or not the map allows to modify the content of
+   * the field
+   * @tparam NbRow number of rows of the iterate
+   * @tparam NbCol number of columns of the iterate
+   * @tparam IterationType whether to iterate over pixels or quadrature points
+   */
   template <typename T, Mapping Mutability, Dim_t NbRow, Dim_t NbCol,
             Iteration IterationType = Iteration::QuadPt>
   using ArrayNFieldMap =
       StaticNFieldMap<T, Mutability, internal::ArrayMap<T, NbRow, NbCol>,
                       IterationType>;
 
-  //! the following only make sense as per-quadrature-point maps
+  /**
+   * Alias of `muGrid::StaticNFieldMap` over a scalar field you wish to iterate
+   * over quadrature point by quadrature point.
+   *
+   * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
+   * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
+   * @tparam Mutability whether or not the map allows to modify the content of
+   * the field
+   */
   template <typename T, Mapping Mutability>
   using ScalarNFieldMap =
       StaticNFieldMap<T, Mutability, internal::ScalarMap<T>, Iteration::QuadPt>;
 
-  /* ---------------------------------------------------------------------- */
+  /**
+   * Alias of `muGrid::StaticNFieldMap` over a second-rank tensor field you wish
+   * to iterate over quadrature point by quadrature point.
+   *
+   * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
+   * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
+   * @tparam Mutability whether or not the map allows to modify the content of
+   * the field
+   * @tparam Dim spatial dimension of the tensor
+   */
   template <typename T, Mapping Mutability, Dim_t Dim>
   using T2NFieldMap =
       StaticNFieldMap<T, Mutability, internal::MatrixMap<T, Dim, Dim>,
                       Iteration::QuadPt>;
 
-  /* ---------------------------------------------------------------------- */
+  /**
+   * Alias of `muGrid::StaticNFieldMap` over a fourth-rank tensor field you wish
+   * to iterate over quadrature point by quadrature point.
+   *
+   * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
+   * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
+   * @tparam Mutability whether or not the map allows to modify the content of
+   * the field
+   * @tparam Dim spatial dimension of the tensor
+   */
   template <typename T, Mapping Mutability, Dim_t Dim>
   using T4NFieldMap =
       StaticNFieldMap<T, Mutability,

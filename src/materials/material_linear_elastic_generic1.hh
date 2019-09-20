@@ -81,12 +81,10 @@ namespace muSpectre {
    */
   template <Dim_t DimM>
   class MaterialLinearElasticGeneric1
-      : public MaterialMuSpectre<MaterialLinearElasticGeneric1<DimM>,
-                                 DimM> {
+      : public MaterialMuSpectre<MaterialLinearElasticGeneric1<DimM>, DimM> {
    public:
     //! parent type
-    using Parent = MaterialMuSpectre<MaterialLinearElasticGeneric1<DimM>,
-                                     DimM>;
+    using Parent = MaterialMuSpectre<MaterialLinearElasticGeneric1<DimM>, DimM>;
     //! generic input tolerant to python input
     using CInput_t =
         Eigen::Ref<Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>, 0,
@@ -98,6 +96,9 @@ namespace muSpectre {
      * Constructor by name and stiffness tensor.
      *
      * @param name unique material name
+     * @param spatial_dimension spatial dimension of the problem. This
+     * corresponds to the dimensionality of the Cell
+     * @param nb_quad_pts number of quadrature points per pixel
      * @param C_voigt elastic tensor in Voigt notation
      */
     MaterialLinearElasticGeneric1(const std::string & name,
@@ -185,8 +186,7 @@ namespace muSpectre {
     using Stress_t = decltype(this->evaluate_stress(E));
     using Stiffness_t = Eigen::Map<const muGrid::T4Mat<Real, DimM>>;
     using Ret_t = std::tuple<Stress_t, Stiffness_t>;
-    return Ret_t{this->evaluate_stress(E),
-                 Stiffness_t(this->C.data())};
+    return Ret_t{this->evaluate_stress(E), Stiffness_t(this->C.data())};
   }
 }  // namespace muSpectre
 

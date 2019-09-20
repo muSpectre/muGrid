@@ -42,53 +42,55 @@
 #include <libmufft/fft_engine_base.hh>
 
 #include "common/muSpectre_common.hh"
-#include "projection/derivative.hh"
 
 #include <memory>
 
 namespace muSpectre {
 
+  //! convenience alias
   using MatrixXXc = Eigen::Matrix<Complex, Eigen::Dynamic, Eigen::Dynamic>;
 
   template <class Projection>
   struct Projection_traits {};
 
   /**
+   * base class for projection related exceptions
+   */
+  class ProjectionError : public std::runtime_error {
+   public:
+    //! constructor
+    explicit ProjectionError(const std::string & what)
+        : std::runtime_error(what) {}
+    //! constructor
+    explicit ProjectionError(const char * what) : std::runtime_error(what) {}
+  };
+
+  /**
    * defines the interface which must be implemented by projection operators
    */
-  template <Dim_t DimS>
   class ProjectionBase {
    public:
     //! Eigen type to replace fields
     using Vector_t = Eigen::Matrix<Real, Eigen::Dynamic, 1>;
-    //! type of fft_engine used
-    using FFTEngine = muFFT::FFTEngineBase<DimS>;
-    //! reference to fft engine is safely managed through a `std::unique_ptr`
-    using FFTEngine_ptr = std::unique_ptr<FFTEngine>;
-    //! gradient, i.e. derivatives in each Cartesian direction
-    using Gradient_t = muSpectre::Gradient_t<DimS>;
-    //! cell coordinates type
-    using Ccoord = typename FFTEngine::Ccoord;
-    //! spatial coordinates type
-    using Rcoord = Rcoord_t<DimS>;
     //! global FieldCollection
-    using GFieldCollection_t = typename FFTEngine::GFieldCollection_t;
+    using GFieldCollection_t =
+        typename muFFT::FFTEngineBase::GFieldCollection_t;
     //! Field type on which to apply the projection
-    using Field_t = muGrid::RealNField;
+    using Field_t = muGrid::TypedNFieldBase<Real>;
     /**
      * iterator over all pixels. This is taken from the FFT engine,
      * because depending on the real-to-complex FFT employed, only
      * roughly half of the pixels are present in Fourier space
      * (because of the hermitian nature of the transform)
      */
-    using iterator = typename FFTEngine::iterator;
+    using iterator = typename muFFT::FFTEngineBase::iterator;
 
     //! Default constructor
     ProjectionBase() = delete;
 
     //! Constructor with cell sizes
-    ProjectionBase(FFTEngine_ptr engine, Rcoord domain_lengths,
-                   Gradient_t gradient, Formulation form);
+    ProjectionBase(muFFT::FFTEngine_ptr engine, DynRcoord_t domain_lengths,
+                   Formulation form);
 
     //! Copy constructor
     ProjectionBase(const ProjectionBase & other) = delete;
@@ -103,7 +105,7 @@ namespace muSpectre {
     ProjectionBase & operator=(const ProjectionBase & other) = delete;
 
     //! Move assignment operator
-    ProjectionBase & operator=(ProjectionBase && other) = default;
+    ProjectionBase & operator=(ProjectionBase && other) = delete;
 
     //! initialises the fft engine (plan the transform)
     virtual void
@@ -116,19 +118,19 @@ namespace muSpectre {
      * returns the process-local number of grid points in each direction of the
      * cell
      */
-    const Ccoord & get_nb_subdomain_grid_pts() const {
-      return this->fft_engine->get_nb_subdomain_grid_pts();
-    }
+    const DynCcoord_t & get_nb_subdomain_grid_pts() const;
+
     //! returns the process-local locations of the cell
-    const Ccoord & get_subdomain_locations() const {
+    const DynCcoord_t & get_subdomain_locations() const {
       return this->fft_engine->get_subdomain_locations();
     }
     //! returns the global number of grid points in each direction of the cell
-    const Ccoord & get_nb_domain_grid_pts() const {
-      return this->fft_engine->get_nb_domain_grid_pts();
-    }
+    const DynCcoord_t & get_nb_domain_grid_pts() const;
+
     //! returns the physical sizes of the cell
-    const Rcoord & get_domain_lengths() const { return this->domain_lengths; }
+    const DynRcoord_t & get_domain_lengths() const {
+      return this->domain_lengths;
+    }
 
     /**
      * return the `muSpectre::Formulation` that is used in solving
@@ -158,21 +160,24 @@ namespace muSpectre {
     //! get number of components to project per pixel
     virtual Dim_t get_nb_components() const = 0;
 
+    //! return the number of spatial dimensions
+    const Dim_t & get_dim() const;
+
+    /**
+     * returns the number of quadrature points
+     */
+    const Dim_t & get_nb_quad() const;
+
    protected:
     //! handle on the fft_engine used
-    FFTEngine_ptr fft_engine;
-    const Rcoord domain_lengths;  //!< physical sizes of the cell
-    /**
-     * gradient (nabla) operator, can be computed using Fourier interpolation
-     * or through a weighted residual
-     */
-    Gradient_t gradient;
+    muFFT::FFTEngine_ptr fft_engine;
+    DynRcoord_t domain_lengths;  //!< physical sizes of the cell
     /**
      * formulation this projection can be applied to (determines
      * whether the projection enforces gradients, small strain tensor
      * or symmetric smal strain tensor
      */
-    const Formulation form;
+    Formulation form;
     /**
      * A local `muSpectre::FieldCollection` to store the projection
      * operator per k-space point. This is a local rather than a
@@ -181,7 +186,7 @@ namespace muSpectre {
      * http://www.fftw.org/fftw3_doc/Multi_002dDimensional-DFTs-of-Real-Data.html#Multi_002dDimensional-DFTs-of-Real-Data
      * for an example
      */
-    GFieldCollection_t & projection_container{};
+    GFieldCollection_t & projection_container;
   };
 
 }  // namespace muSpectre

@@ -45,11 +45,9 @@
 #include "materials/material_base.hh"
 #include "materials/materials_toolbox.hh"
 #include "materials/material_evaluator.hh"
-#include "materials/stress_transformations.hh"
 #include "materials/iterable_proxy.hh"
 
-#include <libmugrid/field_collection.hh>
-#include <libmugrid/field.hh>
+#include "cell/ncell.hh"
 
 #include <tuple>
 #include <type_traits>
@@ -167,6 +165,7 @@ namespace muSpectre {
                              Formulation form,
                              SplitCell is_cell_split = SplitCell::no) final;
 
+    //! return the material dimension at compile time
     constexpr static Dim_t MaterialDimension() { return DimM; }
 
     std::tuple<DynMatrix_t, DynMatrix_t>
@@ -201,13 +200,13 @@ namespace muSpectre {
       const Dim_t & nb_quad_pts)
       : Parent(name, spatial_dimension, DimM, nb_quad_pts) {
     static_assert(
-        std::is_same<typename traits::StressMap_t::Scalar_t, Real>::value,
+        std::is_same<typename traits::StressMap_t::Scalar, Real>::value,
         "The stress map needs to be of type Real");
     static_assert(
-        std::is_same<typename traits::StrainMap_t::Scalar_t, Real>::value,
+        std::is_same<typename traits::StrainMap_t::Scalar, Real>::value,
         "The strain map needs to be of type Real");
     static_assert(
-        std::is_same<typename traits::TangentMap_t::Scalar_t, Real>::value,
+        std::is_same<typename traits::TangentMap_t::Scalar, Real>::value,
         "The tangent map needs to be of type Real");
   }
 

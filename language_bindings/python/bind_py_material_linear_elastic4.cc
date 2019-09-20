@@ -60,20 +60,21 @@ void add_material_linear_elastic4_helper(py::module & mod) {
   const auto name{name_stream.str()};
 
   using Mat_t = muSpectre::MaterialLinearElastic4<dim>;
-  using Sys_t = muSpectre::CellBase;
+  using Cell_t = muSpectre::CellBase<dim>;
 
   py::class_<Mat_t, muSpectre::MaterialBase, std::shared_ptr<Mat_t>>(
       mod, name.c_str())
-      .def(py::init<std::string>(), "name"_a)
       .def_static("make",
-                  [](Sys_t & sys, std::string n) -> Mat_t & {
-                    return Mat_t::make(sys, n);
+                  [](Cell_t & cell, std::string n, Dim_t nb_quad_pts)
+                      -> Mat_t & {
+                    return Mat_t::make(cell, n, dim, nb_quad_pts);
                   },
-                  "cell"_a, "name"_a, py::return_value_policy::reference,
+                  "cell"_a, "name"_a, "nb_quad_pts"_a,
+                  py::return_value_policy::reference,
                   py::keep_alive<1, 0>())
       .def("add_pixel",
-           [](Mat_t & mat, muSpectre::Ccoord_t<dim> pix, Real Young,
-              Real Poisson) { mat.add_pixel(pix, Young, Poisson); },
+           [](Mat_t & mat, size_t pixel_index, Real Young,
+              Real Poisson) { mat.add_pixel(pixel_index, Young, Poisson); },
            "pixel"_a, "Young"_a, "Poisson"_a)
       .def_static("make_evaluator", []() { return Mat_t::make_evaluator(); });
 }

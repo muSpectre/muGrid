@@ -34,8 +34,10 @@
  */
 #include "projection/projection_finite_strain.hh"
 #include "projection/projection_finite_strain_fast.hh"
-#include <libmufft/fft_utils.hh>
 #include "test_projection.hh"
+
+#include <libmufft/fft_utils.hh>
+#include <libmugrid/nfield_typed.hh>
 
 #include <Eigen/Dense>
 
@@ -73,10 +75,10 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   BOOST_AUTO_TEST_CASE(even_grid_test) {
-    using Engine = muFFT::FFTWEngine<twoD>;
+    using Engine = muFFT::FFTWEngine;
     using proj = ProjectionFiniteStrainFast<twoD>;
-    auto engine = std::make_unique<Engine>(Ccoord_t<twoD>{2, 3}, 2 * 2);
-    BOOST_CHECK_THROW(proj(std::move(engine), Rcoord_t<twoD>{4.3, 4.3}),
+    auto engine = std::make_unique<Engine>(DynCcoord_t{2, 3}, 2 * 2);
+    BOOST_CHECK_THROW(proj(std::move(engine), DynRcoord_t{4.3, 4.3}),
                       std::runtime_error);
   }
 
@@ -90,16 +92,15 @@ namespace muSpectre {
         dim == fix::mdim,
         "These tests assume that the material and spatial dimension are "
         "identical");
-    using Fields = muGrid::GlobalNFieldCollection<sdim>;
-    using FieldT = muGrid::TypedNField<Real>;
-    using FieldMap = muGrid::MatrixNFieldMap<Real, false, mdim, mdim>;
+    using Fields = muGrid::GlobalNFieldCollection;
+    using FieldMap = muGrid::MatrixNFieldMap<Real, Mapping::Mut, mdim, mdim>;
     using Vector = Eigen::Matrix<Real, dim, 1>;
 
-    Fields fields{1};
-    FieldT & f_grad{fields.template register_field<FieldT>(
-        "gradient", mdim*mdim)};
-    FieldT & f_var{fields.template register_field<FieldT>(
-        "working field", mdim*mdim)};
+    Fields fields{sdim, OneQuadPt};
+    muGrid::RealNField & f_grad{
+        fields.register_real_field("gradient", mdim * mdim)};
+    muGrid::RealNField & f_var{
+        fields.register_real_field("working field", mdim * mdim)};
 
     FieldMap grad(f_grad);
     FieldMap var(f_var);
@@ -120,15 +121,18 @@ namespace muSpectre {
 
     using muGrid::operator/;
     // start_field_iteration_snippet
-    for (auto && tup : akantu::zip(fields.get_pixels(), grad, var)) {
+    for (auto && tup :
+         akantu::zip(fields.get_pixels().template get_dimensioned_pixels<dim>(),
+                     grad, var)) {
       auto & ccoord = std::get<0>(tup);  // iterate from fields
       auto & g = std::get<1>(tup);       // iterate from grad
       auto & v = std::get<2>(tup);       // iterate from var
 
       // use iterate in arbitrary expressions
       Vector vec = muGrid::CcoordOps::get_vector(
-          ccoord, fix::projector.get_domain_lengths() /
-                      fix::projector.get_nb_domain_grid_pts());
+          ccoord, (fix::projector.get_domain_lengths() /
+                   fix::projector.get_nb_domain_grid_pts())
+                      .template get<dim>());
       // do efficient linear algebra on iterates
       g.row(0) = k.transpose() *
                  cos(k.dot(vec));  // This is a plane wave with wave vector k in
@@ -140,13 +144,16 @@ namespace muSpectre {
     fix::projector.initialise(muFFT::FFT_PlanFlags::estimate);
     fix::projector.apply_projection(f_var);
 
-    for (auto && tup : akantu::zip(fields.get_pixels(), grad, var)) {
+    for (auto && tup :
+         akantu::zip(fields.get_pixels().template get_dimensioned_pixels<dim>(),
+                     grad, var)) {
       auto & ccoord = std::get<0>(tup);
       auto & g = std::get<1>(tup);
       auto & v = std::get<2>(tup);
       Vector vec = muGrid::CcoordOps::get_vector(
-          ccoord, fix::projector.get_domain_lengths() /
-                      fix::projector.get_nb_domain_grid_pts());
+          ccoord, (fix::projector.get_domain_lengths() /
+                   fix::projector.get_nb_domain_grid_pts())
+                      .template get<dim>());
       Real error = (g - v).norm();
       BOOST_CHECK_LT(error, tol);
       if (error >= tol) {
@@ -166,15 +173,14 @@ namespace muSpectre {
     // check if the exact projection operator is a valid projection operator.
     // Thus it has to be idempotent, G^2=G or G:G:test_field = G:test_field.
     constexpr Dim_t sdim{fix::sdim}, mdim{fix::mdim};
-    using Fields = muGrid::GlobalNFieldCollection<sdim>;
+    using Fields = muGrid::GlobalNFieldCollection;
     using FieldT = muGrid::TypedNField<Real>;
-    using FieldMap = muGrid::MatrixNFieldMap<Real, false, mdim, mdim>;
+    using FieldMap = muGrid::MatrixNFieldMap<Real, Mapping::Mut, mdim, mdim>;
 
-    Fields fields{1};
-    FieldT & f_grad{fields.template register_field<FieldT>(
-        "gradient", mdim*mdim)};
-    FieldT & f_grad_test{fields.template register_field<FieldT>(
-        "gradient_test", mdim*mdim)};
+    Fields fields{sdim, OneQuadPt};
+    FieldT & f_grad{fields.register_real_field("gradient", mdim * mdim)};
+    FieldT & f_grad_test{
+        fields.register_real_field("gradient_test", mdim * mdim)};
     FieldMap grad(f_grad);
     FieldMap grad_test(f_grad_test);
 

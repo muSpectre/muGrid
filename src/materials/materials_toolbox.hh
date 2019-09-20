@@ -454,69 +454,74 @@ namespace muSpectre {
 
     namespace internal {
 
-      /* ----------------------------------------------------------------------
+      /**
+       * implementation-structure for computing numerical tangents. For internal
+       * use only.
+       * @tparam Dim dimensionality of the material
+       * @tparam FinDif specificaition of the type of finite differences
        */
       template <Dim_t Dim, FiniteDiff FinDif>
       struct NumericalTangentHelper {
+        //! short-hand for fourth-rank tensors
         using T4_t = muGrid::T4Mat<Real, Dim>;
+        //! short-hand for second-rank tensors
         using T2_t = Eigen::Matrix<Real, Dim, Dim>;
+        //! short-hand for second-rank tensor reshaped to a vector
         using T2_vec = Eigen::Map<Eigen::Matrix<Real, Dim * Dim, 1>>;
 
+        //! compute and return the approximate tangent moduli at strain `strain`
         template <class FunType, class Derived>
         static inline T4_t compute(FunType && fun,
                                    const Eigen::MatrixBase<Derived> & strain,
-                                   Real delta);
+                                   Real delta) {
+          static_assert((FinDif == FiniteDiff::forward) or
+                            (FinDif == FiniteDiff::backward),
+                        "should use specialised version");
+          T4_t tangent{T4_t::Zero()};
+
+          const T2_t fun_val{fun(strain)};
+          for (Dim_t i{}; i < Dim * Dim; ++i) {
+            T2_t strain2{strain};
+            T2_vec strain_vec{strain2.data()};
+            switch (FinDif) {
+            case FiniteDiff::forward: {
+              strain_vec(i) += delta;
+
+              T2_t del_f_del{(fun(strain2) - fun_val) / delta};
+
+              tangent.col(i) = T2_vec(del_f_del.data());
+              break;
+            }
+            case FiniteDiff::backward: {
+              strain_vec(i) -= delta;
+
+              T2_t del_f_del{(fun_val - fun(strain2)) / delta};
+
+              tangent.col(i) = T2_vec(del_f_del.data());
+              break;
+            }
+            }
+            static_assert(Int(decltype(tangent.col(i))::SizeAtCompileTime) ==
+                              Int(T2_t::SizeAtCompileTime),
+                          "wrong column size");
+          }
+          return tangent;
+        }
       };
 
-      /* ----------------------------------------------------------------------
-       */
-      template <Dim_t Dim, FiniteDiff FinDif>
-      template <class FunType, class Derived>
-      auto NumericalTangentHelper<Dim, FinDif>::compute(
-          FunType && fun, const Eigen::MatrixBase<Derived> & strain, Real delta)
-          -> T4_t {
-        static_assert((FinDif == FiniteDiff::forward) or
-                          (FinDif == FiniteDiff::backward),
-                      "Not implemented");
-        T4_t tangent{T4_t::Zero()};
-
-        const T2_t fun_val{fun(strain)};
-        for (Dim_t i{}; i < Dim * Dim; ++i) {
-          T2_t strain2{strain};
-          T2_vec strain_vec{strain2.data()};
-          switch (FinDif) {
-          case FiniteDiff::forward: {
-            strain_vec(i) += delta;
-
-            T2_t del_f_del{(fun(strain2) - fun_val) / delta};
-
-            tangent.col(i) = T2_vec(del_f_del.data());
-            break;
-          }
-          case FiniteDiff::backward: {
-            strain_vec(i) -= delta;
-
-            T2_t del_f_del{(fun_val - fun(strain2)) / delta};
-
-            tangent.col(i) = T2_vec(del_f_del.data());
-            break;
-          }
-          }
-          static_assert(Int(decltype(tangent.col(i))::SizeAtCompileTime) ==
-                            Int(T2_t::SizeAtCompileTime),
-                        "wrong column size");
-        }
-        return tangent;
-      }
-
-      /* ----------------------------------------------------------------------
+      /**
+       * specialisation for centred differences
        */
       template <Dim_t Dim>
       struct NumericalTangentHelper<Dim, FiniteDiff::centred> {
+        //! short-hand for fourth-rank tensors
         using T4_t = muGrid::T4Mat<Real, Dim>;
+        //! short-hand for second-rank tensors
         using T2_t = Eigen::Matrix<Real, Dim, Dim>;
+        //! short-hand for second-rank tensor reshaped to a vector
         using T2_vec = Eigen::Map<Eigen::Matrix<Real, Dim * Dim, 1>>;
 
+        //! compute and return the approximate tangent moduli at strain `strain`
         template <class FunType, class Derived>
         static inline T4_t compute(FunType && fun,
                                    const Eigen::MatrixBase<Derived> & strain,

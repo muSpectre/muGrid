@@ -289,10 +289,13 @@ namespace muGrid {
       template <Dim_t Dim, Dim_t Rank1, Dim_t Rank2>
       struct Dotter {};
 
-      /* ----------------------------------------------------------------------
+      /**
+       * Tensor-product between a second-rank tensor A and a fourth-rank
+       * tensor B. Returns a fourth-rank Cᵢⱼₖₗ = Aᵢₐ·Bₐⱼₖₗ
        */
       template <Dim_t Dim>
       struct Dotter<Dim, secondOrder, fourthOrder> {
+        //! raison d'être
         template <class T1, class T2>
         static constexpr decltype(auto) dot(T1 && t1, T2 && t2) {
           using T4_t = T4Mat<typename std::remove_reference_t<T1>::Scalar, Dim>;
@@ -312,10 +315,13 @@ namespace muGrid {
         }
       };
 
-      /* ----------------------------------------------------------------------
+      /**
+       * Tensor-product between a fourth-rank tensor A and a second-rank
+       * tensor B. Returns a fourth-rank Cᵢⱼₖₗ = Aᵢⱼₖₐ·Bₐₗ
        */
       template <Dim_t Dim>
       struct Dotter<Dim, fourthOrder, secondOrder> {
+        //! raison d'être
         template <class T4, class T2>
         static constexpr decltype(auto) dot(T4 && t4, T2 && t2) {
           using T4_t = T4Mat<typename std::remove_reference_t<T4>::Scalar, Dim>;
@@ -335,20 +341,26 @@ namespace muGrid {
         }
       };
 
-      /* ----------------------------------------------------------------------
+      /**
+       * Double contraction between two fourth-rank tensors A and B returns a
+       * fourth-rank tensor Cᵢⱼₖₗ = Aᵢⱼₐₑ·Bₐₑₖₗ
        */
       template <Dim_t Dim>
       struct Dotter<Dim, fourthOrder, fourthOrder> {
+        //! raison d'être
         template <class T1, class T2>
         static constexpr decltype(auto) ddot(T1 && t1, T2 && t2) {
           return t1 * t2;
         }
       };
 
-      /* ----------------------------------------------------------------------
+      /**
+       * Double contraction between two second-rank tensors A and B returns a
+       * scalar c = AᵢⱼBᵢⱼ
        */
       template <Dim_t Dim>
       struct Dotter<Dim, secondOrder, secondOrder> {
+        //! raison d'être
         template <class T1, class T2>
         static constexpr decltype(auto) ddot(T1 && t1, T2 && t2) {
           return (t1 * t2.transpose()).trace();
@@ -357,7 +369,10 @@ namespace muGrid {
 
     }  // namespace internal
 
-    /* ---------------------------------------------------------------------- */
+    /**
+     * simple contraction between two tensors. The result depends on the rank of
+     * the tesnors, see documentation for `muGrid::internal::Dotter`
+     */
     template <Dim_t Dim, class T1, class T2>
     decltype(auto) dot(T1 && t1, T2 && t2) {
       using EigenCheck::tensor_rank;
@@ -367,7 +382,10 @@ namespace muGrid {
                                                       std::forward<T2>(t2));
     }
 
-    /* ---------------------------------------------------------------------- */
+    /**
+     * double contraction between two tensors. The result depends on the rank of
+     * the tesnors, see documentation for `muGrid::internal::Dotter`
+     */
     template <Dim_t Dim, class T1, class T2>
     decltype(auto) ddot(T1 && t1, T2 && t2) {
       using EigenCheck::tensor_rank;

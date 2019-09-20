@@ -36,6 +36,8 @@
 #define SRC_LIBMUGRID_NFIELD_MAP_HH_
 
 #include "grid_common.hh"
+#include "iterators.hh"
+#include "nfield_collection.hh"
 
 #include <type_traits>
 
@@ -56,21 +58,56 @@ namespace muGrid {
   template <typename T>
   class TypedNFieldBase;
 
-  /* ---------------------------------------------------------------------- */
+  /**
+   * Dynamically sized field map. Field maps allow iterating over the pixels or
+   * quadrature points of a field and to select the shape (in a matrix sense) of
+   * the iterate. For example, it allows to iterate in 2×2 matrices over the
+   * quadrature points of a strain field for a two-dimensional problem.
+   */
   template <typename T, Mapping Mutability>
   class NFieldMap {
    public:
+    //! stored scalar type
+    using Scalar = T;
+
+    //! const-correct field depending on mapping mutability
     using NField_t =
         std::conditional_t<Mutability == Mapping::Const,
                            const TypedNFieldBase<T>, TypedNFieldBase<T>>;
-    template <Mapping MutVal>
-    using value_type = std::conditional_t<
-        MutVal == Mapping::Const,
-        Eigen::Map<const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>>,
-        Eigen::Map<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>>>;
 
-    using EigenRef =
-        Eigen::Ref<const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>>;
+    //! dynamically mapped eigen type
+    using PlainType = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
+
+    //! return type for iterators over this- map
+    template <Mapping MutVal>
+    using Return_t =
+        std::conditional_t<MutVal == Mapping::Const,
+                           Eigen::Map<const PlainType>, Eigen::Map<PlainType>>;
+
+    //! Input type for matrix-like values (used for setting uniform values)
+    using EigenRef = Eigen::Ref<const PlainType>;
+
+    /**
+     * zip-container for iterating over pixel index and stored value
+     * simultaneously
+     */
+    using PixelEnumeration_t =
+        akantu::containers::ZipContainer<NFieldCollection::PixelIndexIterable,
+                                         NFieldMap &>;
+    /**
+     * zip-container for iterating over pixel or quadrature point index and
+     * stored value simultaneously
+     */
+    using Enumeration_t =
+        akantu::containers::ZipContainer<NFieldCollection::IndexIterable,
+                                         NFieldMap &>;
+
+    //! determine whether a field is mutably mapped at compile time
+    constexpr static Mapping FieldMutability() { return Mutability; }
+
+    //! determine whether a field map is statically sized at compile time
+    constexpr static bool IsStatic() { return false; }
+
     //! Default constructor
     NFieldMap() = delete;
 
@@ -104,7 +141,7 @@ namespace muGrid {
     //! Move assignment operator (delete because of reference member)
     NFieldMap & operator=(NFieldMap && other) = delete;
 
-    //! Assign a matrixline value to every entry
+    //! Assign a matrix-like value to every entry
     template <bool IsMutableField = Mutability == Mapping::Mut>
     std::enable_if_t<IsMutableField, NFieldMap> &
     operator=(const EigenRef & val) {
@@ -123,17 +160,51 @@ namespace muGrid {
       return *this;
     }
 
+    //! Assign a scalar value to every entry
+    template <bool IsMutableField = Mutability == Mapping::Mut>
+    std::enable_if_t<IsMutableField, NFieldMap> &
+    operator=(const Scalar & val) {
+      if (not(this->nb_rows == 1 && this->nb_cols == 1)) {
+        std::stringstream error_str{};
+        error_str << "Expected an array/matrix with shape (" << this->nb_rows
+                  << " × " << this->nb_cols
+                  << "), but received a scalar value.";
+        throw NFieldMapError(error_str.str());
+      }
+      for (auto && entry : *this) {
+        entry(0, 0) = val;
+      }
+      return *this;
+    }
+
+    /**
+     * forward-declaration for `mugrid::NFieldMap`'s iterator
+     */
     template <Mapping MutIter>
     class Iterator;
+    //! stl
     using iterator =
         Iterator<(Mutability == Mapping::Mut) ? Mapping::Mut : Mapping::Const>;
+
+    //! stl
     using const_iterator = Iterator<Mapping::Const>;
 
+    //! stl
     iterator begin();
+
+    //! stl
     iterator end();
+
+    //! stl
     const_iterator cbegin();
+
+    //! stl
     const_iterator cend();
+
+    //! stl
     const_iterator begin() const;
+
+    //! stl
     const_iterator end() const;
 
     /**
@@ -143,19 +214,38 @@ namespace muGrid {
      */
     size_t size() const;
 
-    value_type<Mutability> operator[](size_t index) {
+    //! random acces operator
+    Return_t<Mutability> operator[](size_t index) {
       assert(this->is_initialised);
-      return value_type<Mutability>{this->data_ptr + index * this->stride,
-                                    this->nb_rows, this->nb_cols};
+      return Return_t<Mutability>{this->data_ptr + index * this->stride,
+                                  this->nb_rows, this->nb_cols};
     }
-    value_type<Mapping::Const> operator[](size_t index) const {
+
+    //! random const acces operator
+    Return_t<Mapping::Const> operator[](size_t index) const {
       assert(this->is_initialised);
-      return value_type<Mapping::Const>{this->data_ptr + index * this->stride,
-                                        this->nb_rows, this->nb_cols};
+      return Return_t<Mapping::Const>{this->data_ptr + index * this->stride,
+                                      this->nb_rows, this->nb_cols};
     }
 
     //! query the size from the field's collection and set data_ptr
     void initialise();
+
+    /**
+     * return an iterable proxy over pixel indices and stored values
+     * simultaneously. Throws a `muGrid::NFieldMapError` if the iteration type
+     * is over quadrature points
+     */
+    PixelEnumeration_t enumerate_pixel_indices_fast();
+
+    /**
+     * return an iterable proxy over pixel/quadrature indices and stored values
+     * simultaneously
+     */
+    Enumeration_t enumerate_indices();
+
+    //! evaluate and return the mean value of the map
+    PlainType mean() const;
 
    protected:
     //! mapped field. Needed for query at initialisations
@@ -164,11 +254,14 @@ namespace muGrid {
     const Dim_t stride;         //!< precomputed stride
     const Dim_t nb_rows;        //!< number of rows of the iterate
     const Dim_t nb_cols;        //!< number of columns fo the iterate
+
     /**
      * Pointer to mapped data; is also unknown at construction and set in the
      * map's begin function
      */
     T * data_ptr{nullptr};
+
+    //! keeps track of whether the map has been initialised.
     bool is_initialised{false};
   };
 
@@ -176,12 +269,17 @@ namespace muGrid {
   template <Mapping MutIter>
   class NFieldMap<T, Mutability>::Iterator {
    public:
+    //! convenience alias
     using NFieldMap_t = std::conditional_t<MutIter == Mapping::Const,
                                            const NFieldMap, NFieldMap>;
+    //! stl
     using value_type =
-        typename NFieldMap<T, Mutability>::template value_type<MutIter>;
+        typename NFieldMap<T, Mutability>::template Return_t<MutIter>;
+
+    //! stl
     using cvalue_type =
-        typename NFieldMap<T, Mutability>::template value_type<Mapping::Const>;
+        typename NFieldMap<T, Mutability>::template Return_t<Mapping::Const>;
+
     //! Default constructor
     Iterator() = delete;
 

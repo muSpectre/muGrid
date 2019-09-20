@@ -44,8 +44,8 @@ namespace muGrid {
     constexpr static Dim_t NbRow{2}, NbCol{3};
     constexpr static Dim_t NbQuad() { return 2; }
     constexpr static size_t NbMemory() { return 1; }
-    GlobalNFieldCollection<DimS> fc{NbQuad()};
-    InitialiserBase() { this->fc.initialise({2, 3}); }
+    GlobalNFieldCollection fc{DimS, NbQuad()};
+    InitialiserBase() { this->fc.initialise(Ccoord_t<twoD>{2, 3}); }
   };
 
   struct MappedStateNFieldFixture : public InitialiserBase {

@@ -47,103 +47,130 @@
 #include <pybind11/stl.h>
 #include <pybind11/eigen.h>
 
-using muGrid::Ccoord_t;
-using muGrid::Real;
 using muGrid::Complex;
 using muGrid::Dim_t;
+using muGrid::DynCcoord_t;
+using muGrid::OneQuadPt;
+using muGrid::Real;
 using pybind11::literals::operator""_a;
 namespace py = pybind11;
 
 template <class Engine>
 void add_engine_helper(py::module & mod, std::string name) {
-  using Ccoord = typename Engine::Ccoord;
   using ArrayXXc = Eigen::Array<Complex, Eigen::Dynamic, Eigen::Dynamic>;
   py::class_<Engine>(mod, name.c_str())
-      .def(py::init([](Ccoord res, Dim_t nb_components,
+      .def(py::init([](std::vector<Dim_t> nb_grid_pts, Dim_t nb_dof_per_pixel,
                        muFFT::Communicator & comm) {
              // Initialize with muFFT Communicator object
-             return new Engine(res, nb_components, comm);
+             return new Engine(DynCcoord_t(nb_grid_pts), nb_dof_per_pixel,
+                               comm);
            }),
-           "nb_grid_pts"_a, "nb_components"_a,
+           "nb_grid_pts"_a, "nb_dof_per_pixel"_a,
            "communicator"_a = muFFT::Communicator())
 #ifdef WITH_MPI
-      .def(py::init([](Ccoord res, Dim_t nb_components, size_t comm) {
+      .def(py::init([](std::vector<Dim_t> nb_grid_pts, Dim_t nb_dof_per_pixel,
+                       size_t comm) {
              // Initialize with bare MPI handle
-             return new Engine(res, nb_components,
+             return new Engine(DynCcoord_t(nb_grid_pts), nb_dof_per_pixel,
                                std::move(muFFT::Communicator(MPI_Comm(comm))));
            }),
-           "nb_grid_pts"_a, "nb_components"_a,
+           "nb_grid_pts"_a, "nb_dof_per_pixel"_a,
            "communicator"_a = size_t(MPI_COMM_SELF))
 #endif
-      .def("fft",
-           [](Engine & eng,
-              Eigen::Ref<typename Engine::Field_t::EigenRep_t> v) {
-             using Coll_t = typename Engine::GFieldCollection_t;
-             using Field_t = muGrid::WrappedNField<Real>;
-             Coll_t coll{1};
-             coll.initialise(eng.get_nb_subdomain_grid_pts(),
-                             eng.get_subdomain_locations());
-             // Do not make a copy, just wrap the Eigen array into a field that
-             // does not manage its own data.
-             Field_t & proxy{coll.register_real_wrapped_field(
-                 "proxy_field", eng.get_nb_components(), v)};
-             // We need to tie the lifetime of the return value to the lifetime
-             // of the engine object, because we are returning the internal work
-             // space buffer that is managed by the engine;
-             // see return_value_policy below.
-             return eng.fft(proxy).eigen_pixel();
-           },
-           "array"_a,
-           py::return_value_policy::reference_internal)
-      .def("ifft",
-           [](Engine & eng, py::EigenDRef<ArrayXXc> v) {
-             using Coll_t = typename Engine::GFieldCollection_t;
-             using Field_t = muGrid::WrappedNField<Real>;
-             // Create an Eigen array that will hold the result of the inverse
-             // FFT. We don't want the storage managed by a field because we
-             // want to transfer possession of storage to Python without a copy
-             // operation.
-             typename Field_t::EigenRep_t res{eng.get_nb_components(),
-                                              eng.size()};
-             Coll_t coll{1};
-             coll.initialise(eng.get_nb_subdomain_grid_pts(),
-                             eng.get_subdomain_locations());
-             // Wrap the Eigen array into a proxy field that does not manage
-             // its own data.
-             Field_t & proxy{coll.register_real_wrapped_field(
-                 "proxy_field", eng.get_nb_components(), res)};
-             eng.get_work_space().eigen_pixel() = v;
-             eng.ifft(proxy);
-             // We can safely transfer possession to Python since the Eigen
-             // array is not tied to the engine object;
-             // see return_value_policy below.
-             return res;
-           },
-           "array"_a,
-           py::return_value_policy::move)
+      // Interface for passing Fields directly
+      .def("fft", &Engine::fft)
+      .def("ifft", &Engine::ifft)
+      // Interface for passing numpy arrays
+      .def(
+          "fft",
+          [](Engine & eng, Eigen::Ref<typename Engine::Field_t::EigenRep_t> v) {
+            using Coll_t = typename Engine::GFieldCollection_t;
+            using Field_t = muGrid::WrappedNField<Real>;
+            Coll_t coll{eng.get_dim(), OneQuadPt};
+            coll.initialise(eng.get_nb_subdomain_grid_pts(),
+                            eng.get_subdomain_locations());
+            // Do not make a copy, just wrap the Eigen array into a field that
+            // does not manage its own data.
+            Field_t proxy{"proxy_field", coll, eng.get_nb_dof_per_pixel(), v};
+            // We need to tie the lifetime of the return value to the lifetime
+            // of the engine object, because we are returning the internal work
+            // space buffer that is managed by the engine;
+            // see return_value_policy below.
+            return eng.fft(proxy).eigen_pixel();
+          },
+          "array"_a, py::return_value_policy::reference_internal)
+      .def(
+          "ifft",
+          [](Engine & eng, py::EigenDRef<ArrayXXc> v) {
+            using Coll_t = typename Engine::GFieldCollection_t;
+            using Field_t = muGrid::WrappedNField<Real>;
+            // Create an Eigen array that will hold the result of the inverse
+            // FFT. We don't want the storage managed by a field because we
+            // want to transfer possession of storage to Python without a copy
+            // operation.
+            typename Field_t::EigenRep_t res{eng.get_nb_dof_per_pixel(),
+                                             eng.size()};
+            Coll_t coll{eng.get_dim(), OneQuadPt};
+            coll.initialise(eng.get_nb_subdomain_grid_pts(),
+                            eng.get_subdomain_locations());
+            // Wrap the Eigen array into a proxy field that does not manage
+            // its own data.
+            Field_t proxy{"proxy_field", coll, eng.get_nb_dof_per_pixel(), res};
+            eng.get_work_space().eigen_pixel() = v;
+            eng.ifft(proxy);
+            // We can safely transfer possession to Python since the Eigen
+            // array is not tied to the engine object;
+            // see return_value_policy below.
+            return res;
+          },
+          "array"_a, py::return_value_policy::move)
       .def("initialise", &Engine::initialise,
            "flags"_a = muFFT::FFT_PlanFlags::estimate)
-      .def("normalisation", &Engine::normalisation)
-      .def("get_communicator", &Engine::get_communicator)
-      .def("get_nb_subdomain_grid_pts", &Engine::get_nb_subdomain_grid_pts)
-      .def("get_subdomain_locations", &Engine::get_subdomain_locations)
-      .def("get_nb_fourier_grid_pts", &Engine::get_nb_fourier_grid_pts)
-      .def("get_fourier_locations", &Engine::get_fourier_locations)
-      .def("get_nb_domain_grid_pts", &Engine::get_nb_domain_grid_pts);
+      .def_property_readonly("normalisation", &Engine::normalisation)
+      .def_property_readonly("communicator", &Engine::get_communicator)
+      .def_property_readonly(
+          "nb_subdomain_grid_pts",
+          [](const Engine & eng) {
+            auto nb = eng.get_nb_subdomain_grid_pts();
+            return py::array(nb.get_dim(), nb.data());
+          },
+          py::return_value_policy::reference)
+      .def_property_readonly(
+          "subdomain_locations",
+          [](const Engine & eng) {
+            auto nb = eng.get_subdomain_locations();
+            return py::array(nb.get_dim(), nb.data());
+          },
+          py::return_value_policy::reference)
+      .def_property_readonly(
+          "nb_fourier_grid_pts",
+          [](const Engine & eng) {
+            auto nb = eng.get_nb_fourier_grid_pts();
+            return py::array(nb.get_dim(), nb.data());
+          },
+          py::return_value_policy::reference)
+      .def_property_readonly(
+          "fourier_locations",
+          [](const Engine & eng) {
+            auto nb = eng.get_fourier_locations();
+            return py::array(nb.get_dim(), nb.data());
+          },
+          py::return_value_policy::reference)
+      .def_property_readonly(
+          "nb_domain_grid_pts",
+          [](const Engine & eng) {
+            auto nb = eng.get_nb_domain_grid_pts();
+            return py::array(nb.get_dim(), nb.data());
+          },
+          py::return_value_policy::reference);
 }
 
 void add_fft_engines(py::module & fft) {
-  add_engine_helper<muFFT::FFTWEngine<muGrid::oneD>>(fft, "FFTW_1d");
-  add_engine_helper<muFFT::FFTWEngine<muGrid::twoD>>(fft, "FFTW_2d");
-  add_engine_helper<muFFT::FFTWEngine<muGrid::threeD>>(fft, "FFTW_3d");
+  add_engine_helper<muFFT::FFTWEngine>(fft, "FFTW");
 #ifdef WITH_FFTWMPI
-  add_engine_helper<muFFT::FFTWMPIEngine<muGrid::oneD>>(fft, "FFTWMPI_1d");
-  add_engine_helper<muFFT::FFTWMPIEngine<muGrid::twoD>>(fft, "FFTWMPI_2d");
-  add_engine_helper<muFFT::FFTWMPIEngine<muGrid::threeD>>(fft, "FFTWMPI_3d");
+  add_engine_helper<muFFT::FFTWMPIEngine>(fft, "FFTWMPI");
 #endif
 #ifdef WITH_PFFT
-  add_engine_helper<muFFT::PFFTEngine<muGrid::oneD>>(fft, "PFFT_1d");
-  add_engine_helper<muFFT::PFFTEngine<muGrid::twoD>>(fft, "PFFT_2d");
-  add_engine_helper<muFFT::PFFTEngine<muGrid::threeD>>(fft, "PFFT_3d");
+  add_engine_helper<muFFT::PFFTEngine>(fft, "PFFT");
 #endif
 }

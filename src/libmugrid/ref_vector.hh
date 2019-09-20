@@ -38,6 +38,10 @@
 
 namespace muGrid {
 
+  /**
+   * work-around to allow using vectors of references (which are
+   * forbidden by the C++ stl
+   */
   template <typename T>
   class RefVector : protected std::vector<T *> {
     class iterator;
@@ -63,25 +67,47 @@ namespace muGrid {
     //! Move assignment operator
     RefVector & operator=(RefVector && other) = default;
 
+    //! stl
     void push_back(T & value) { Parent::push_back(&value); }
+
+    //! stl
     T & at(size_t index) { return *Parent::at(index); }
+
+    //! stl
     const T & at(size_t index) const { return *Parent::at(index); }
+
+    //! random access operator
     T & operator[](size_t index) { return *Parent::operator[](index); }
+
+    //! random const access operator
     const T & operator[](size_t index) const {
       return *Parent::operator[](index);
     }
+
+    //! stl
     iterator begin() { return iterator{Parent::begin()}; }
+
+    //! stl
     iterator end() { return iterator{Parent::end()}; }
   };
 
+  /**
+   * iterator over `muGrid::RefVector`
+   */
   template <typename T>
   class RefVector<T>::iterator : public std::vector<T *>::iterator {
     using Parent = typename std::vector<T *>::iterator;
 
    public:
     using std::vector<T *>::iterator::iterator;
+
+    //! copy constructor
     iterator(Parent & iterator) : Parent{iterator} {}
+
+    //! move constructor
     iterator(Parent && iterator) : Parent{std::move(iterator)} {}
+
+    //! dereference
     T & operator*() {
       T & retval{*Parent::operator*()};
       return retval;

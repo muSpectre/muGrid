@@ -48,7 +48,8 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS>
   ProjectionFiniteStrain<DimS>::ProjectionFiniteStrain(
-      FFTEngine_ptr engine, Rcoord lengths, Gradient_t gradient)
+      muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths,
+      Gradient_t gradient)
       : Parent{std::move(engine), lengths, gradient,
                Formulation::finite_strain} {
     for (auto res : this->fft_engine->get_nb_domain_grid_pts()) {
@@ -61,27 +62,36 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS>
-  void ProjectionFiniteStrain<DimS>::initialise(
-      muFFT::FFT_PlanFlags flags) {
+  ProjectionFiniteStrain<DimS>::ProjectionFiniteStrain(
+      muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths)
+      : ProjectionFiniteStrain{
+          std::move(engine), lengths,
+          muFFT::make_fourier_gradient(lengths.get_dim())} {}
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS>
+  void ProjectionFiniteStrain<DimS>::initialise(muFFT::FFT_PlanFlags flags) {
     Parent::initialise(flags);
     using FFTFreqs_t = muFFT::FFT_freqs<DimS>;
-    using Vector_t = typename  FFTFreqs_t::Vector;
+    using Vector_t = typename FFTFreqs_t::Vector;
 
     const auto & nb_domain_grid_pts =
         this->fft_engine->get_nb_domain_grid_pts();
-    const Vector_t grid_spacing{
-        eigen(this->domain_lengths / nb_domain_grid_pts)};
+    const Vector_t grid_spacing{eigen(
+        (this->domain_lengths / nb_domain_grid_pts).template get<DimS>())};
 
     muFFT::FFT_freqs<DimS> fft_freqs(nb_domain_grid_pts);
-    for (auto && tup : akantu::zip(this->fft_engine->get_pixels(),
+    for (auto && tup : akantu::zip(this->fft_engine->get_pixels()
+                                       .template get_dimensioned_pixels<DimS>(),
                                    this->Ghat)) {
       const auto & ccoord = std::get<0>(tup);
       auto & G = std::get<1>(tup);
 
-      const Vector_t xi{
-          (fft_freqs.get_xi(ccoord).array() /
-           eigen(nb_domain_grid_pts).array().template cast<Real>())
-              .matrix()};
+      const Vector_t xi{(fft_freqs.get_xi(ccoord).array() /
+                         eigen(nb_domain_grid_pts.template get<DimS>())
+                             .array()
+                             .template cast<Real>())
+                            .matrix()};
 
       Eigen::Matrix<Complex, DimS, 1> diffop;
       for (int i = 0; i < DimS; ++i) {
@@ -105,6 +115,7 @@ namespace muSpectre {
     }
   }
 
+  template class ProjectionFiniteStrain<oneD>;
   template class ProjectionFiniteStrain<twoD>;
   template class ProjectionFiniteStrain<threeD>;
 }  // namespace muSpectre

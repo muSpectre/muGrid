@@ -34,6 +34,7 @@
  */
 
 #include "solver/solver_cg.hh"
+#include "cell/cell_adaptor.hh"
 #include <libmufft/communicator.hh>
 
 #include <iomanip>
@@ -43,7 +44,7 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  SolverCG::SolverCG(Cell & cell, Real tol, Uint maxiter, bool verbose)
+  SolverCG::SolverCG(NCell & cell, Real tol, Uint maxiter, bool verbose)
       : Parent(cell, tol, maxiter, verbose), r_k(cell.get_nb_dof()),
         p_k(cell.get_nb_dof()), Ap_k(cell.get_nb_dof()),
         x_k(cell.get_nb_dof()) {}
@@ -57,8 +58,7 @@ namespace muSpectre {
     // Numerical Optimization (p. 112)
 
     // initialisation of algorithm
-    this->r_k =
-        (this->cell.evaluate_projected_directional_stiffness(this->x_k) - rhs);
+    this->r_k = this->cell.get_adaptor() * this->x_k - rhs;
 
     this->p_k = -this->r_k;
     this->converged = false;
@@ -74,8 +74,7 @@ namespace muSpectre {
 
     for (Uint i = 0; i < this->maxiter && (rdr > tol2 || i == 0);
          ++i, ++this->counter) {
-      this->Ap_k =
-          this->cell.evaluate_projected_directional_stiffness(this->p_k);
+      this->Ap_k = this->cell.get_adaptor() * this->p_k;
 
       Real alpha = rdr / comm.sum(this->p_k.dot(this->Ap_k));
 

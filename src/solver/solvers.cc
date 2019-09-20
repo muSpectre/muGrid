@@ -36,6 +36,7 @@
 #include "solver/solvers.hh"
 
 #include <libmugrid/iterators.hh>
+#include <libmugrid/mapped_nfield.hh>
 
 #include <Eigen/Dense>
 
@@ -44,25 +45,33 @@
 
 namespace muSpectre {
 
+  //! produces numpy-compatible full precision text output. great for debugging
   Eigen::IOFormat format(Eigen::FullPrecision, 0, ", ", ",\n", "[", "]", "[",
                          "]");
 
   //--------------------------------------------------------------------------//
-  std::vector<OptimizeResult> newton_cg(Cell & cell,
+  std::vector<OptimizeResult> newton_cg(NCell & cell,
                                         const LoadSteps_t & load_steps,
                                         SolverBase & solver, Real newton_tol,
                                         Real equil_tol, Dim_t verbose,
                                         IsStrainInitialised strain_init) {
     const auto & comm = cell.get_communicator();
 
-    using Vector_t = Eigen::Matrix<Real, Eigen::Dynamic, 1>;
     using Matrix_t = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
 
+    auto shape{cell.get_strain_shape()};
+
+    // create a field collection to store workspaces
+    auto field_collection{cell.get_fields().get_empty_clone()};
     // Corresponds to symbol δF or δε
-    Vector_t incrF(cell.get_nb_dof());
+    muGrid::MappedField<muGrid::NFieldMap<Real, Mapping::Mut>> incrF_field{
+        "incrF", shape[0], shape[1], muGrid::Iteration::QuadPt,
+        field_collection};
 
     // field to store the rhs for cg calculations
-    Vector_t rhs(cell.get_nb_dof());
+    muGrid::MappedField<muGrid::NFieldMap<Real, Mapping::Mut>> rhs_field{
+        "rhs", shape[0], shape[1], muGrid::Iteration::QuadPt,
+        field_collection};
 
     solver.initialise();
 
@@ -100,8 +109,6 @@ namespace muSpectre {
                 << std::endl;
       count_width = size_t(std::log10(solver.get_maxiter())) + 1;
     }
-
-    auto shape{cell.get_strain_shape()};
 
     switch (form) {
     case Formulation::finite_strain: {
@@ -172,11 +179,8 @@ namespace muSpectre {
     // storage for the previous mean strain (to compute ΔF or Δε )
     Matrix_t previous_macro_strain{load_steps.back().Zero(shape[0], shape[1])};
 
-    // initialization of F (F in Formulation::finite_strain and ε in
-    // Formuation::samll_strain)
-    auto F{cell.get_strain_vector()};
-
-    // incremental loop
+    auto & F{cell.get_strain()};
+    //! incremental loop
     for (const auto & tup : akantu::enumerate(load_steps)) {
       const auto & strain_step{std::get<0>(tup)};
       const auto & macro_strain{std::get<1>(tup)};
@@ -184,10 +188,10 @@ namespace muSpectre {
         std::cout << "at Load step " << std::setw(count_width)
                   << strain_step + 1 << std::endl;
       }
-      using StrainMap_t = muGrid::RawFieldMap<Eigen::Map<Eigen::MatrixXd>>;
       // updating cell strain with the difference of the current and previous
       // strain input.
-      for (auto && strain : StrainMap_t(F, shape[0], shape[1])) {
+      for (auto && strain : muGrid::NFieldMap<Real, Mapping::Mut>(
+               F, shape[0], muGrid::Iteration::QuadPt)) {
         strain += macro_strain - previous_macro_strain;
       }
 
@@ -216,17 +220,21 @@ namespace muSpectre {
         auto res_tup{cell.evaluate_stress_tangent()};
         auto & P{std::get<0>(res_tup)};
 
+        auto & rhs{rhs_field.get_field()};
+
         rhs = -P;
         cell.apply_projection(rhs);
-        stress_norm = std::sqrt(comm.sum(rhs.squaredNorm()));
+        stress_norm = std::sqrt(comm.sum(rhs.eigen_vec().squaredNorm()));
 
         if (convergence_test()) {
           break;
         }
+
         // calling sovler for solving the current (iteratively approximated)
         // linear equilibrium problem
+        auto & incrF{incrF_field.get_field()};
         try {
-          incrF = solver.solve(rhs);
+          incrF = solver.solve(rhs.eigen_vec());
         } catch (ConvergenceError & error) {
           std::stringstream err{};
           err << "Failure at load step " << strain_step + 1 << " of "
@@ -248,8 +256,8 @@ namespace muSpectre {
 
         // updating the incremental differences for checking the termination
         // criteria
-        incr_norm = std::sqrt(comm.sum(incrF.squaredNorm()));
-        grad_norm = std::sqrt(comm.sum(F.squaredNorm()));
+        incr_norm = std::sqrt(comm.sum(incrF.eigen_vec().squaredNorm()));
+        grad_norm = std::sqrt(comm.sum(F.eigen_vec().squaredNorm()));
 
         if ((verbose > 1) and (comm.rank() == 0)) {
           std::cout << "at Newton step " << std::setw(count_width) << newt_iter
@@ -258,8 +266,9 @@ namespace muSpectre {
                     << ", tol = " << newton_tol << std::endl;
 
           if (verbose - 1 > 1) {
+            using StrainMap_t = muGrid::NFieldMap<Real, Mapping::Const>;
             std::cout << "<" << strain_symb << "> =" << std::endl
-                      << StrainMap_t(F, shape[0], shape[1]).mean() << std::endl;
+                      << StrainMap_t{F, shape[0]}.mean() << std::endl;
           }
         }
         convergence_test();
@@ -282,9 +291,9 @@ namespace muSpectre {
 
       // store results
       ret_val.emplace_back(
-          OptimizeResult{F, cell.get_stress_vector(), convergence_test(),
-                         Int(convergence_test()), message, newt_iter,
-                         solver.get_counter(), form});
+          OptimizeResult{F.eigen_vec(), cell.get_stress().eigen_vec(),
+                         convergence_test(), Int(convergence_test()), message,
+                         newt_iter, solver.get_counter(), form});
 
       // store history variables for next load increment
       cell.save_history_variables();
@@ -293,25 +302,33 @@ namespace muSpectre {
     return ret_val;
   }
 
-  //----------------------------------------------------------------------------//
-  std::vector<OptimizeResult> de_geus(Cell & cell,
+  /* ---------------------------------------------------------------------- */
+  std::vector<OptimizeResult> de_geus(NCell & cell,
                                       const LoadSteps_t & load_steps,
                                       SolverBase & solver, Real newton_tol,
                                       Real equil_tol, Dim_t verbose) {
     const auto & comm = cell.get_communicator();
 
-    using Vector_t = Eigen::Matrix<Real, Eigen::Dynamic, 1>;
     using Matrix_t = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
 
+    auto shape{cell.get_strain_shape()};
+
+    // create a field collection to store workspaces
+    auto field_collection{cell.get_fields().get_empty_clone()};
     // Corresponds to symbol δF or δε
-    Vector_t incrF(cell.get_nb_dof());
+    muGrid::MappedField<muGrid::NFieldMap<Real, Mapping::Mut>> incrF_field{
+        "incrF", shape[0], shape[1], muGrid::Iteration::QuadPt,
+        field_collection};
 
     // Corresponds to symbol ΔF or Δε
-    Vector_t DeltaF(cell.get_nb_dof());
+    muGrid::MappedField<muGrid::NFieldMap<Real, Mapping::Mut>> DeltaF_field{
+        "DeltaF", shape[0], shape[1], muGrid::Iteration::QuadPt,
+        field_collection};
 
     // field to store the rhs for cg calculations
-    Vector_t rhs(cell.get_nb_dof());
-
+    muGrid::MappedField<muGrid::NFieldMap<Real, Mapping::Mut>> rhs_field{
+        "rhs", shape[0], shape[1], muGrid::Iteration::QuadPt,
+        field_collection};
     solver.initialise();
 
     size_t count_width{};
@@ -349,7 +366,6 @@ namespace muSpectre {
       count_width = size_t(std::log10(solver.get_maxiter())) + 1;
     }
 
-    auto shape{cell.get_strain_shape()};
     Matrix_t default_strain_val{};
 
     switch (form) {
@@ -405,12 +421,11 @@ namespace muSpectre {
 
     // initialization of F (F in Formulation::finite_strain and ε in
     // Formuation::samll_strain)
-    auto F{cell.get_strain_vector()};
+    auto & F{cell.get_strain()};
     //! incremental loop
     for (const auto & tup : akantu::enumerate(load_steps)) {
       const auto & strain_step{std::get<0>(tup)};
       const auto & macro_strain{std::get<1>(tup)};
-      using StrainMap_t = muGrid::RawFieldMap<Eigen::Map<Eigen::MatrixXd>>;
       if ((verbose > 0) and (comm.rank() == 0)) {
         std::cout << "at Load step " << std::setw(count_width)
                   << strain_step + 1 << ", " << strain_symb << " =" << std::endl
@@ -445,29 +460,36 @@ namespace muSpectre {
         auto res_tup{cell.evaluate_stress_tangent()};
         auto & P{std::get<0>(res_tup)};
 
+        auto & rhs{rhs_field.get_field()};
+        auto & DeltaF{DeltaF_field.get_field()};
+        auto & incrF{incrF_field.get_field()};
         try {
           if (newt_iter == 0) {
             // updating cell strain with the difference of the current and
             // previous strain input.
-            for (auto && strain : StrainMap_t(DeltaF, shape[0], shape[1])) {
+            for (auto && strain :  muGrid::NFieldMap<Real, Mapping::Mut>(
+               F, shape[0], muGrid::Iteration::QuadPt)) {
               strain = macro_strain - previous_macro_strain;
             }
-            rhs = -cell.evaluate_projected_directional_stiffness(DeltaF);
+            // this corresponds to rhs=-G:K:δF
+            cell.evaluate_projected_directional_stiffness(DeltaF, rhs);
             F += DeltaF;
-            stress_norm = std::sqrt(comm.sum(rhs.matrix().squaredNorm()));
+            stress_norm =
+                std::sqrt(comm.sum(rhs.eigen_vec().matrix().squaredNorm()));
             if (stress_norm < equil_tol) {
-              incrF.setZero();
+              incrF.set_zero();
             } else {
-              incrF = solver.solve(rhs);
+              incrF = solver.solve(rhs.eigen_vec());
             }
           } else {
             rhs = -P;
             cell.apply_projection(rhs);
-            stress_norm = std::sqrt(comm.sum(rhs.matrix().squaredNorm()));
+            stress_norm =
+                std::sqrt(comm.sum(rhs.eigen_vec().matrix().squaredNorm()));
             if (stress_norm < equil_tol) {
-              incrF.setZero();
+              incrF.set_zero();
             } else {
-              incrF = solver.solve(rhs);
+              incrF = solver.solve(rhs.eigen_vec());
             }
           }
         } catch (ConvergenceError & error) {
@@ -491,8 +513,8 @@ namespace muSpectre {
 
         // updating the incremental differences for checking the termination
         // criteria
-        incr_norm = std::sqrt(comm.sum(incrF.squaredNorm()));
-        grad_norm = std::sqrt(comm.sum(F.squaredNorm()));
+        incr_norm = std::sqrt(comm.sum(incrF.eigen_vec().squaredNorm()));
+        grad_norm = std::sqrt(comm.sum(F.eigen_vec().squaredNorm()));
 
         if ((verbose > 0) and (comm.rank() == 0)) {
           std::cout << "at Newton step " << std::setw(count_width) << newt_iter
@@ -501,8 +523,9 @@ namespace muSpectre {
                     << ", tol = " << newton_tol << std::endl;
 
           if (verbose - 1 > 1) {
+            using StrainMap_t = muGrid::NFieldMap<Real, Mapping::Const>;
             std::cout << "<" << strain_symb << "> =" << std::endl
-                      << StrainMap_t(F, shape[0], shape[1]).mean() << std::endl;
+                      << StrainMap_t{F, shape[0]}.mean() << std::endl;
           }
         }
         convergence_test();
@@ -524,9 +547,9 @@ namespace muSpectre {
 
       // store results
       ret_val.emplace_back(
-          OptimizeResult{F, cell.get_stress_vector(), convergence_test(),
-                         Int(convergence_test()), message, newt_iter,
-                         solver.get_counter(), form});
+          OptimizeResult{F.eigen_vec(), cell.get_stress().eigen_vec(),
+                         convergence_test(), Int(convergence_test()), message,
+                         newt_iter, solver.get_counter(), form});
 
       // store history variables for next load increment
       cell.save_history_variables();

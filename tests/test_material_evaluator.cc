@@ -46,7 +46,7 @@ namespace muSpectre {
   BOOST_AUTO_TEST_SUITE(material_evaluator_tests);
 
   BOOST_AUTO_TEST_CASE(without_adding_a_pixel) {
- using Mat_t = MaterialLinearElastic1<twoD>;
+    using Mat_t = MaterialLinearElastic1<twoD>;
 
     constexpr Real Young{210e9};
     constexpr Real Poisson{.33};

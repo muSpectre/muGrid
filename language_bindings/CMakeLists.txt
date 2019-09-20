@@ -34,5 +34,6 @@
 # Program grant you additional permission to convey the resulting work.
 # =============================================================================
 
-add_subdirectory(python)
+add_subdirectory(libmugrid)
 add_subdirectory(libmufft)
+add_subdirectory(python)

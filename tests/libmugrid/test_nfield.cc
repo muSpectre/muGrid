@@ -45,6 +45,27 @@ namespace muGrid {
     LocalNFieldCollection fc{Unknown, Unknown};
   };
 
+  /* ---------------------------------------------------------------------- */
+  BOOST_AUTO_TEST_CASE(simple_creation) {
+    constexpr Dim_t SDim{twoD};
+    constexpr Dim_t MDim{twoD};
+    using FC_t = GlobalNFieldCollection;
+    FC_t fc{SDim, OneQuadPt};
+
+    auto & field{fc.register_real_field("TensorField 1", MDim * MDim)};
+
+    // check that fields are initialised with empty vector
+    BOOST_CHECK_EQUAL(field.size(), 0);
+    Dim_t len{2};
+    fc.initialise(CcoordOps::get_cube<SDim>(len), {});
+    // check that returned size is correct
+    BOOST_CHECK_EQUAL(field.size(), ipow(len, SDim));
+    // check that setting pad size won't change logical size
+    field.set_pad_size(24);
+    BOOST_CHECK_EQUAL(field.size(), ipow(len, SDim));
+  }
+
+
   BOOST_AUTO_TEST_CASE(TypedNField_local_filling) {
     LocalNFieldCollection fc{Unknown, Unknown};
     constexpr Dim_t NbComponents{3}, NbQuadPts{4};
@@ -81,7 +102,7 @@ namespace muGrid {
   }
 
   BOOST_AUTO_TEST_CASE(TypedNField_globel_not_filling) {
-    GlobalNFieldCollection<twoD> fc{Unknown};
+    GlobalNFieldCollection fc{twoD, Unknown};
     constexpr Dim_t NbComponents{3};
     auto & scalar_field{
         fc.register_field<Real>("scalar_field", 1)};
@@ -150,7 +171,7 @@ namespace muGrid {
     using CMap_t = TypedNFieldBase<Real>::Eigen_cmap;
     Map_t vector{vector_field.eigen_vec()};
     CMap_t cvector{cvector_field.eigen_vec()};
-    BOOST_CHECK_EQUAL(vector.size(), fc.size() * NbComponents);
+    BOOST_CHECK_EQUAL(vector.size(), fc.get_nb_entries() * NbComponents);
     for (int i{0}; i < vector.size(); ++i) {
       vector(i) = i;
       BOOST_CHECK_EQUAL(vector(i), cvector(i));
@@ -158,7 +179,7 @@ namespace muGrid {
 
     Map_t quad_map{vector_field.eigen_quad_pt()};
     CMap_t quad_cmap{cvector_field.eigen_quad_pt()};
-    BOOST_CHECK_EQUAL(quad_cmap.cols(), fc.size());
+    BOOST_CHECK_EQUAL(quad_cmap.cols(), fc.get_nb_entries());
     BOOST_CHECK_EQUAL(quad_cmap.rows(), NbComponents);
     for (int i{0}; i < quad_cmap.rows(); ++i) {
       for (int j{0}; j < quad_cmap.cols(); ++j) {
@@ -169,7 +190,7 @@ namespace muGrid {
 
     Map_t pixel_map{vector_field.eigen_pixel()};
     CMap_t pixel_cmap{cvector_field.eigen_pixel()};
-    BOOST_CHECK_EQUAL(pixel_cmap.cols(), fc.size() / NbQuadPts);
+    BOOST_CHECK_EQUAL(pixel_cmap.cols(), fc.get_nb_entries() / NbQuadPts);
     BOOST_CHECK_EQUAL(pixel_cmap.rows(), NbComponents * NbQuadPts);
     for (int i{0}; i < pixel_cmap.rows(); ++i) {
       for (int j{0}; j < pixel_cmap.cols(); ++j) {

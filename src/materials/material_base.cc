@@ -124,19 +124,30 @@ namespace muSpectre {
     this->compute_stresses_tangent(real_F, real_P, real_K, form, is_cell_split);
   }
 
-  //----------------------------------------------------------------------------//
+  /* ---------------------------------------------------------------------- */
+  auto MaterialBase::get_pixel_indices() const ->
+      typename MFieldCollection_t::PixelIndexIterable {
+    return this->internal_fields.get_pixel_indices_fast();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  auto MaterialBase::get_quad_pt_indices() const ->
+      typename MFieldCollection_t::IndexIterable {
+    return this->internal_fields.get_quad_pt_indices();
+  }
+  /* ---------------------------------------------------------------------- */
   auto MaterialBase::get_real_field(std::string field_name) -> EigenMap {
     if (not this->internal_fields.field_exists(field_name)) {
       std::stringstream err{};
       err << "Field '" << field_name << "' does not exist in material '"
           << this->name << "'.";
-      throw muGrid::FieldCollectionError(err.str());
+      throw muGrid::NFieldCollectionError(err.str());
     }
     auto & field{this->internal_fields.get_field(field_name)};
     if (field.get_stored_typeid() != typeid(Real)) {
       std::stringstream err{};
       err << "Field '" << field_name << "' is not real-valued";
-      throw muGrid::FieldCollectionError(err.str());
+      throw muGrid::NFieldCollectionError(err.str());
     }
 
     return static_cast<muGrid::RealNField &>(field).eigen_quad_pt();

@@ -37,10 +37,11 @@
 #define SRC_CELL_CELL_FACTORY_HH_
 
 #include "common/muSpectre_common.hh"
-#include "cell/cell_base.hh"
+#include "cell/ncell.hh"
 #include "projection/projection_finite_strain_fast.hh"
 #include "projection/projection_small_strain.hh"
 #include <libmugrid/ccoord_operations.hh>
+#include <libmufft/derivative.hh>
 #include <libmufft/fftw_engine.hh>
 
 #ifdef WITH_MPI
@@ -52,57 +53,154 @@
 
 namespace muSpectre {
 
+  namespace internal {
+
+    /**
+     * function to create consistent input for the constructor of
+     * `muSpectre::NCell`. Users should never need to call this function, for
+     * internal use only
+     */
+    template <size_t DimS, class FFTEngine>
+    inline std::unique_ptr<ProjectionBase> cell_input_helper(
+        const DynCcoord_t & nb_grid_pts, const DynRcoord_t & lengths,
+        const Formulation & form, muFFT::Gradient_t gradient,
+        const muFFT::Communicator & comm = muFFT::Communicator()) {
+      // TODO(pastewka) the number of quad points should be deducible from the
+      // gradient, right?
+      auto fft_ptr{std::make_unique<FFTEngine>(
+          nb_grid_pts, dof_for_formulation(form, DimS), comm)};
+      switch (form) {
+      case Formulation::finite_strain: {
+        using Projection = ProjectionFiniteStrainFast<DimS>;
+        return std::make_unique<Projection>(std::move(fft_ptr), lengths,
+                                            gradient);
+        break;
+      }
+      case Formulation::small_strain: {
+        using Projection = ProjectionSmallStrain<DimS>;
+        return std::make_unique<Projection>(std::move(fft_ptr), lengths,
+                                            gradient);
+        break;
+      }
+      default: {
+        throw std::runtime_error("Unknown formulation.");
+        break;
+      }
+      }
+    }
+
+  }  // namespace internal
+
   /**
-   * Create a unique ptr to a Projection operator (with appropriate
-   * FFT_engine) to be used in a cell constructor
+   * Convenience function to create consistent input for the constructor of *
+   * `muSpectre::NCell`. Creates a unique ptr to a Projection operator (with
+   * appropriate FFT_engine) to be used in a cell constructor
+   *
+   * @param nb_grid_pts resolution of the discretisation grid in each spatial
+   * directional
+   * @param lengths length of the computational domain in each spatial direction
+   * @param form problem formulation (small vs finite strain)
+   * @param gradient gradient operator to use (i.e., "exact" Fourier derivation,
+   * finite differences, etc)
+   * @param comm communicator used for solving distributed problems
    */
-  template <Dim_t DimS,
-            typename FFTEngine = muFFT::FFTWEngine<DimS>>
-  inline std::unique_ptr<ProjectionBase<DimS>>
-  cell_input(Ccoord_t<DimS> nb_grid_pts,
-             Rcoord_t<DimS> lengths,
-             Formulation form,
-             Gradient_t<DimS> gradient = make_fourier_gradient<DimS>(),
+  template <class FFTEngine = muFFT::FFTWEngine>
+  inline std::unique_ptr<ProjectionBase>
+  cell_input(const DynCcoord_t & nb_grid_pts, const DynRcoord_t & lengths,
+             const Formulation & form, muFFT::Gradient_t gradient,
              const muFFT::Communicator & comm = muFFT::Communicator()) {
-    auto fft_ptr{std::make_unique<FFTEngine>(
-        nb_grid_pts, dof_for_formulation(form, DimS), comm)};
-    switch (form) {
-    case Formulation::finite_strain: {
-      using Projection = ProjectionFiniteStrainFast<DimS>;
-      return std::make_unique<Projection>(std::move(fft_ptr), lengths,
-                                          gradient);
+    const Dim_t dim{nb_grid_pts.get_dim()};
+    if (dim != lengths.get_dim()) {
+      std::stringstream error{};
+      error << "Dimension mismatch between nb_grid_pts (dim = " << dim
+            << ") and lengths (dim = " << lengths.get_dim() << ").";
+      throw std::runtime_error(error.str());
+    }
+    switch (dim) {
+    case oneD: {
+      return internal::cell_input_helper<oneD, FFTEngine>(nb_grid_pts, lengths,
+                                                          form, gradient, comm);
       break;
     }
-    case Formulation::small_strain: {
-      using Projection = ProjectionSmallStrain<DimS>;
-      return std::make_unique<Projection>(std::move(fft_ptr), lengths,
-                                          gradient);
+    case twoD: {
+      return internal::cell_input_helper<twoD, FFTEngine>(nb_grid_pts, lengths,
+                                                          form, gradient, comm);
       break;
     }
-    default: {
-      throw std::runtime_error("Unknown formulation.");
+    case threeD: {
+      return internal::cell_input_helper<threeD, FFTEngine>(
+          nb_grid_pts, lengths, form, gradient, comm);
       break;
     }
+    default:
+      throw std::runtime_error("Unknown dimension.");
+      break;
     }
+  }
+
+  /**
+   * Convenience function to create consistent input for the constructor of *
+   * `muSpectre::NCell`. Creates a unique ptr to a Projection operator (with
+   * appropriate FFT_engine) to be used in a cell constructor. Uses the "exact"
+   * fourier derivation operator for calculating gradients
+   *
+   * @param nb_grid_pts resolution of the discretisation grid in each spatial
+   * directional
+   * @param lengths length of the computational domain in each spatial direction
+   * @param form problem formulation (small vs finite strain)
+   * @param comm communicator used for solving distributed problems
+   */
+  template <class FFTEngine = muFFT::FFTWEngine>
+  inline std::unique_ptr<ProjectionBase>
+  cell_input(const DynCcoord_t & nb_grid_pts, const DynRcoord_t & lengths,
+             const Formulation & form,
+             const muFFT::Communicator & comm = muFFT::Communicator()) {
+    const Dim_t dim{nb_grid_pts.get_dim()};
+    return cell_input<FFTEngine>(nb_grid_pts, lengths, form,
+                                 muFFT::make_fourier_gradient(dim), comm);
   }
 
   /**
    * convenience function to create a cell (avoids having to build
    * and move the chain of unique_ptrs
+   *
+   * @param nb_grid_pts resolution of the discretisation grid in each spatial
+   * directional
+   * @param lengths length of the computational domain in each spatial direction
+   * @param form problem formulation (small vs finite strain)
+   * @param gradient gradient operator to use (i.e., "exact" Fourier derivation,
+   * finite differences, etc)
+   * @param comm communicator used for solving distributed problems
    */
-  template <size_t DimS, size_t DimM = DimS,
-            typename Cell = CellBase<DimS, DimM>,
-            typename FFTEngine = muFFT::FFTWEngine<DimS>>
-  inline Cell
-  make_cell(Ccoord_t<DimS> nb_grid_pts,
-            Rcoord_t<DimS> lengths,
-            Formulation form,
-            Gradient_t<DimS> gradient = make_fourier_gradient<DimS>(),
+  template <typename Cell_t = NCell, class FFTEngine = muFFT::FFTWEngine>
+  inline Cell_t
+  make_cell(DynCcoord_t nb_grid_pts, DynRcoord_t lengths, Formulation form,
+            muFFT::Gradient_t gradient,
             const muFFT::Communicator & comm = muFFT::Communicator()) {
     auto && input =
-      cell_input<DimS, FFTEngine>(nb_grid_pts, lengths, form, gradient, comm);
-    auto cell{Cell{std::move(input)}};
+        cell_input<FFTEngine>(nb_grid_pts, lengths, form, gradient, comm);
+    auto cell{Cell_t{std::move(input)}};
     return cell;
+  }
+
+  /**
+   * convenience function to create a cell (avoids having to build
+   * and move the chain of unique_ptrs. Uses the "exact" fourier derivation
+   * operator for calculating gradients
+   *
+   * @param nb_grid_pts resolution of the discretisation grid in each spatial
+   * directional
+   * @param lengths length of the computational domain in each spatial direction
+   * @param form problem formulation (small vs finite strain)
+   * @param comm communicator used for solving distributed problems
+   */
+  template <typename Cell_t = NCell, class FFTEngine = muFFT::FFTWEngine>
+  inline Cell_t
+  make_cell(DynCcoord_t nb_grid_pts, DynRcoord_t lengths, Formulation form,
+            const muFFT::Communicator & comm = muFFT::Communicator()) {
+    const Dim_t dim{nb_grid_pts.get_dim()};
+    return make_cell<Cell_t, FFTEngine>(
+        nb_grid_pts, lengths, form, muFFT::make_fourier_gradient(dim), comm);
   }
 
 }  // namespace muSpectre

@@ -37,7 +37,7 @@ Program grant you additional permission to convey the resulting work.
 import unittest
 import numpy as np
 
-from python_test_imports import µ, muFFT
+from python_test_imports import muFFT
 
 class DerivativeCheck2d(unittest.TestCase):
     def setUp(self):
@@ -48,7 +48,7 @@ class DerivativeCheck2d(unittest.TestCase):
         self.fourier_field = self.fft.fft(self.field)
 
     def test_fourier_derivative(self):
-        diffop = µ.FourierDerivative(2, 0)
+        diffop = muFFT.FourierDerivative(2, 0)
         q = self.fft.wavevectors()
         d = diffop.fourier(q)
         fourier_field_copy = np.copy(self.fourier_field)
@@ -62,7 +62,7 @@ class DerivativeCheck2d(unittest.TestCase):
                 self.assertAlmostEqual(diff_field[x,y], ndiff[x,y])
 
     def test_upwind_differences(self):
-        diffop = µ.DiscreteDerivative([0, 0], [[-1, 1]])
+        diffop = muFFT.DiscreteDerivative([0, 0], [[-1, 1]])
         q = self.fft.wavevectors()
         d = diffop.fourier(q)
         diff_field = self.fft.ifft(d * self.fourier_field) * \
@@ -88,7 +88,7 @@ class DerivativeCheck2d(unittest.TestCase):
                 self.assertAlmostEqual(diff_field[x, y], ndiff)
 
     def test_central_differences(self):
-        diffop = µ.DiscreteDerivative([-1, 0], [[-0.5], [0], [0.5]])
+        diffop = muFFT.DiscreteDerivative([-1, 0], [[-0.5], [0], [0.5]])
         q = self.fft.wavevectors()
         d = diffop.fourier(q)
         diff_field = self.fft.ifft(d * self.fourier_field) * \
@@ -100,9 +100,9 @@ class DerivativeCheck2d(unittest.TestCase):
                 self.assertAlmostEqual(diff_field[x, y], ndiff)
 
     def test_sixth_order_central_differences(self):
-        diffop = µ.DiscreteDerivative([0, -3],
-                                      [[-1/60, 3/20, -3/4, 0,
-                                        3/4, -3/20, 1/60]])
+        diffop = muFFT.DiscreteDerivative([0, -3],
+                                          [[-1/60, 3/20, -3/4, 0,
+                                            3/4, -3/20, 1/60]])
         q = self.fft.wavevectors()
         d = diffop.fourier(q)
         diff_field = self.fft.ifft(d * self.fourier_field) * \
