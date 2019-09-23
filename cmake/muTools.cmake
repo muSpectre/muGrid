@@ -47,6 +47,7 @@ muTools_add_test(test_name
   [MPI_NB_PROCS]
   [TARGET]
   [SOURCES]
+  [ARG_LIST]
   [LINK_LIBRARIES libraries|targets]
   )
 
@@ -79,6 +80,7 @@ function(muTools_add_test test_name)
     )
   set(_mat_multi_variables
     SOURCES
+    ARG_LIST
     LINK_LIBRARIES
     )
 
@@ -129,7 +131,7 @@ function(muTools_add_test test_name)
   if ("${_mat_args_TYPE}" STREQUAL "BOOST")
     set(_exe $<TARGET_FILE:${target_test_name}> ${_mat_args_UNPARSED_ARGUMENTS})
   else()
-    set(_exe ${_mat_args_UNPARSED_ARGUMENTS})
+    set(_exe ${_mat_args_UNPARSED_ARGUMENTS} ${_mat_args_ARG_LIST})
   endif()
 
 

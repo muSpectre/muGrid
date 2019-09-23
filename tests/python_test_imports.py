@@ -1,15 +1,13 @@
-#!/usr/bin/env python3
+# !/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
-file   python_test_imports.py
+@file   python_test_imports.py
 
 @author Till Junge <till.junge@altermail.ch>
 
 @date   18 Jan 2018
 
 @brief  prepares sys.path to load muSpectre
-
-@section LICENSE
 
 Copyright © 2018 Till Junge
 
@@ -21,7 +19,7 @@ your option) any later version.
 µSpectre is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-General Public License for more details.
+Lesser General Public License for more details.
 
 You should have received a copy of the GNU Lesser General Public License
 along with µSpectre; see the file COPYING. If not, write to the

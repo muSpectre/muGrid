@@ -123,6 +123,12 @@ if(${MUSPECTRE_MPI_PARALLEL})
     python_mpi_binding_tests.py)
 endif()
 
+##############################################################################
+# license test
+
+muSpectre_add_test(python_muSpectre_license_test TYPE PYTHON python_muSpectre_license_test.py ARG_LIST "${CMAKE_SOURCE_DIR}/src/materials/ ${CMAKE_SOURCE_DIR}/src/cell/ ${CMAKE_SOURCE_DIR}/src/common/ ${CMAKE_SOURCE_DIR}/src/projection ${CMAKE_SOURCE_DIR}/src/solver/ ${CMAKE_SOURCE_DIR}/tests/ ${CMAKE_SOURCE_DIR}/language_bindings/python ${CMAKE_SOURCE_DIR}/language_bindings/python/muSpectre")
+
+
 add_custom_target(test_muspectre DEPENDS ${muspectre_tests})
 
 

@@ -20,12 +20,12 @@
  * µSpectre is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * General Public License for more details.
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with µSpectre; see the file COPYING. If not, write to the
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * * Boston, MA 02111-1307, USA.
+ * Boston, MA 02111-1307, USA.
  *
  * Additional permission under GNU GPL version 3 section 7
  *
@@ -33,6 +33,7 @@
  * with proprietary FFT implementations or numerical libraries, containing parts
  * covered by the terms of those libraries' licenses, the licensors of this
  * Program grant you additional permission to convey the resulting work.
+ *
  */
 
 #include "material_linear_elastic4.hh"
@@ -42,8 +43,8 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM>
   MaterialLinearElastic4<DimS, DimM>::MaterialLinearElastic4(std::string name)
-      : Parent{name},
-        lambda_field{this->internal_fields, "local first Lame constant"},
+      : Parent{name}, lambda_field{this->internal_fields,
+                                   "local first Lame constant"},
         mu_field(this->internal_fields,
                  "local second Lame constant(shear modulus)") {}
 

@@ -38,6 +38,15 @@ macro(muGrid_add_test)
   muTools_add_test(${ARGN} LINK_LIBRARIES ${MUGRID_NAMESPACE}muGrid TEST_LIST mugrid_tests)
 endmacro()
 
+file(GLOB PY_TEST_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/python_*.py")
+foreach(pytest ${PY_TEST_SRCS})
+  get_filename_component(pytest_name ${pytest} NAME)
+  configure_file(
+    ${pytest}
+    "${CMAKE_CURRENT_BINARY_DIR}/${pytest_name}"
+    COPYONLY)
+endforeach(pytest ${PY_TEST_SRCS})
+
 file(GLOB HEADER_TEST_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/header*.cc")
 foreach(header_test ${HEADER_TEST_SRCS})
   get_test_name(test_name ${header_test} ".*_test")
@@ -53,4 +62,11 @@ muGrid_add_test(main_mugrid_test_suite
   SOURCES main_test_suite.cc ${TEST_SRCS}
   TYPE BOOST --report_level=detailed)
 
+##############################################################################
+# license test
+
+muGrid_add_test(mugrid_python_muGrid_license_test TYPE PYTHON python_muGrid_license_test.py ARG_LIST "${CMAKE_SOURCE_DIR}/src/libmugrid ${CMAKE_SOURCE_DIR}/tests/libmugrid")
+
 add_custom_target(test_mugrid DEPENDS ${mugrid_tests})
+
+

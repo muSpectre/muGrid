@@ -1,5 +1,7 @@
+# !/usr/bin/env python3
+# -*- coding:utf-8 -*-
 """
-file   python_field_tests.py
+@file   python_field_tests.py
 
 @author Till Junge <till.junge@epfl.ch>
 
@@ -17,7 +19,7 @@ your option) any later version.
 µSpectre is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-General Public License for more details.
+Lesser General Public License for more details.
 
 You should have received a copy of the GNU Lesser General Public License
 along with µSpectre; see the file COPYING. If not, write to the

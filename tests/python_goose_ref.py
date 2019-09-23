@@ -1,16 +1,14 @@
-#!/usr/bin/env python3
+# !/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
-file   python_goose_ref.py
+@file   python_goose_ref.py
 
 @author Till Junge <till.junge@altermail.ch>
 
 @date   19 Jan 2018
 
-@brief  adapted scripts from GooseFFT, https://github.com/tdegeus/GooseFFT, 
+@brief  adapted scripts from GooseFFT, https://github.com/tdegeus/GooseFFT,
         which are MIT licensed
-
-@section LICENSE
 
 Copyright © 2018 Till Junge
 
@@ -22,7 +20,7 @@ your option) any later version.
 µSpectre is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-General Public License for more details.
+Lesser General Public License for more details.
 
 You should have received a copy of the GNU Lesser General Public License
 along with µSpectre; see the file COPYING. If not, write to the

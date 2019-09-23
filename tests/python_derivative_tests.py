@@ -1,15 +1,13 @@
-#!/usr/bin/env python3
+# !/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
-file   python_derivative_tests.py
+@file   python_derivative_tests.py
 
 @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
 
 @date   20 Jun 2019
 
 @brief  test discrete derivative
-
-@section LICENSE
 
 Copyright © 2018 Till Junge
 
@@ -21,7 +19,7 @@ your option) any later version.
 µSpectre is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-General Public License for more details.
+Lesser General Public License for more details.
 
 You should have received a copy of the GNU Lesser General Public License
 along with µSpectre; see the file COPYING. If not, write to the

@@ -10,19 +10,27 @@
  * Copyright © 2018 Till Junge
  *
  * µSpectre is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
+ * modify it under the terms of the GNU Lesser General Public License as
  * published by the Free Software Foundation, either version 3, or (at
  * your option) any later version.
  *
  * µSpectre is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * General Public License for more details.
+ * Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Lesser General Public License
  * along with µSpectre; see the file COPYING. If not, write to the
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
+ *
+ * Additional permission under GNU GPL version 3 section 7
+ *
+ * If you modify this Program, or any covered work, by linking or combining it
+ * with proprietary FFT implementations or numerical libraries, containing parts
+ * covered by the terms of those libraries' licenses, the licensors of this
+ * Program grant you additional permission to convey the resulting work.
+ *
  */
 
 #include "common/muSpectre_common.hh"
@@ -146,13 +154,13 @@ namespace muSpectre {
 
     auto && a0 = Del_gamma * this->mu / tau_eq_star;
     auto && a1 = this->mu / (this->H + 3 * this->mu);
-    T4_t mat_tangent{is_plastic ?
-                     ((this->K / 2. - this->mu / 3 + a0 * this->mu) *
-                         Matrices::Itrac<DimM>() +
-                      (1 - 3 * a0) * this->mu * Matrices::Isymm<DimM>() +
-                      2 * this->mu * (a0 - a1) *
-                         Matrices::outer(N_star, N_star))
-                     : this->C};
+    T4_t mat_tangent{
+        is_plastic
+            ? ((this->K / 2. - this->mu / 3 + a0 * this->mu) *
+                   Matrices::Itrac<DimM>() +
+               (1 - 3 * a0) * this->mu * Matrices::Isymm<DimM>() +
+               2 * this->mu * (a0 - a1) * Matrices::outer(N_star, N_star))
+            : this->C};
 
     // compute derivative ∂ln(be_star)/∂be_star, see (77) through (80)
     T4_t dlnbe_dbe{T4_t::Zero()};
