@@ -118,6 +118,10 @@ if(MUCHOICE MATCHES "muSpectre")
   add_subdirectory(${CMAKE_SOURCE_DIR}/language_bindings)
 endif()
 
+if(MUCHOICE MATCHES "muFFT")
+  add_subdirectory(${CMAKE_SOURCE_DIR}/language_bindings/libmufft)
+endif()
+
 if (${MUSPECTRE_MAKE_DOC_TARGET})
   add_subdirectory(${CMAKE_SOURCE_DIR}/doc)
 endif()
