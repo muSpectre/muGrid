@@ -69,7 +69,10 @@ class NCStructuredGridFrame(object):
             self._create_variable(name, template)
         var = self.parent._data.variables[name]
         if self.parent.is_parallel:
-            var.set_collective(True)
+            pass
+            # Collective I/O causes trouble on some configurations. Disable
+            # for now.
+            #var.set_collective(True)
         return var
 
 
@@ -373,8 +376,17 @@ class NCStructuredGrid(object):
         multidimension arrays of types given by `template`.
         """
         nb_grid_dims = len(self._nb_domain_grid_pts)
-        if len(template.shape) >= nb_grid_dims and \
-            template.shape[:nb_grid_dims] == self._nb_domain_grid_pts:
+        guessed_nb_grid_pts = template.shape[:nb_grid_dims]
+        if self._decomposition == 'subdomain' and \
+            len(template.shape) >= nb_grid_dims and \
+            guessed_nb_grid_pts == tuple(self._nb_subdomain_grid_pts):
+            component_dims = [self._tensor_dimension_name(i)
+                              for i in template.shape[nb_grid_dims:]]
+            grid_dims = [self._grid_dimension_name(i)
+                         for i in range(nb_grid_dims)]
+            dims = grid_dims + component_dims
+        elif len(template.shape) >= nb_grid_dims and \
+            guessed_nb_grid_pts == tuple(self._nb_domain_grid_pts):
             component_dims = [self._tensor_dimension_name(i)
                               for i in template.shape[nb_grid_dims:]]
             grid_dims = [self._grid_dimension_name(i)
@@ -391,7 +403,10 @@ class NCStructuredGrid(object):
             self._create_variable(name, template, prefix)
         var = self._data.variables[name]
         if self.is_parallel:
-            var.set_collective(True)
+            pass
+            # Collective I/O causes trouble on some configurations. Disable
+            # for now.
+            #var.set_collective(True)
         return var
 
 

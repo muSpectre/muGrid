@@ -120,7 +120,7 @@ namespace muFFT {
                             // TODO(pastewka): This should be the correct order
                             // of dimension for a 2d process mesh, but tests
                             // don't pass.  CcoordOps::Pixels<DimS, 1, 2, 0>
-                            muGrid::CcoordOps::Pixels<DimS, 1, 0, 2>>(
+                            muGrid::CcoordOps::Pixels<DimS, 0, 2, 1>>(
              this->nb_fourier_grid_pts, this->fourier_locations)) {
       this->work_space_container.add_pixel(pixel);
     }

@@ -110,7 +110,7 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         cg_tol     = 1e-8
         equil_tol  = 1e-8
         maxiter = 200
-        verbose = 2
+        verbose = 0
         solver = µ.solvers.SolverCG(cell.wrapped_cell, cg_tol, maxiter, verbose)
         cell.initialise()
 
@@ -188,7 +188,7 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         cg_tol     = 1e-8
         equil_tol  = 1e-8
         maxiter = 200
-        verbose = 2
+        verbose = 0
         solver = µ.solvers.SolverCG(cell.wrapped_cell, cg_tol, maxiter,
                                     verbose)
         cell.initialise()

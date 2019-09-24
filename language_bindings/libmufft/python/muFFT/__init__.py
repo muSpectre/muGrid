@@ -175,9 +175,16 @@ class FFT(object):
             Default: None
         """
         fft = 'fftw' if fft == 'serial' else fft
-        fft = 'fftwmpi' if fft == 'mpi' else fft
 
         communicator = Communicator(communicator)
+
+        # 'mpi' is a convenience setting that falls back to 'fftw' for single
+        # process jobs and to 'fftwmpi' for multi-process jobs
+        if fft == 'mpi':
+            if communicator.size > 1:
+                fft = 'fftwmpi'
+            else:
+                fft = 'fftw'
 
         self._dim = len(nb_grid_pts)
         self._nb_grid_pts = nb_grid_pts

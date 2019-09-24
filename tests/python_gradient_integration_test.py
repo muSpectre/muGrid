@@ -83,7 +83,7 @@ class GradientIntegration_Check(unittest.TestCase):
     """
 
     def setUp(self):
-        self.lengths    = np.array([2.4, 3.7, 4.1])
+        self.lengths = np.array([2.4, 3.7, 4.1])
         self.nb_grid_pts = np.array([5, 3, 5])
 
         self.norm_tol = 1e-8
@@ -300,7 +300,7 @@ class GradientIntegration_Check(unittest.TestCase):
 
         self.assertLess(np.linalg.norm(Chi_n - placement_n), self.norm_tol)
 
-
+    def test_shear_composite(self):
         ### Realistic test:
         #   shear of a two dimensional material with two different Young moduli.
         #initialize material structure
@@ -525,13 +525,112 @@ class GradientIntegration_Check(unittest.TestCase):
                                     verbose=0)
         result = µ.solvers.newton_cg(cell.wrapped_cell, DelF, solver,
                                      newton_tol=1e-6, equil_tol=1e-6, verbose=0)
-        for r in [result, result.grad]:
+        result_reshaped = µ.gradient_integration.reshape_gradient(
+            result.grad, res).flatten()
+        for r in [result, result_reshaped]:
             #check input of result=OptimiseResult and result=np.ndarray
             placement, x = µ.gradient_integration.compute_placement(
                 r, lens, res, fourier_gradient,
                 formulation=µ.Formulation.finite_strain)
             self.assertLess(np.linalg.norm(placement_ana - placement), 1e-12)
             self.assertTrue((x_n == x).all())
+
+    def test_vacuum(self):
+        form = µ.Formulation.finite_strain
+        Poisson = 0.3
+        nb_pts = 9
+
+        for dim in [2, 3]:
+            print(dim)
+            if dim == 2:
+                dy = µ.DiscreteDerivative([0, 0], [[-0.5, -0.5], [0.5, 0.5]])
+                dx = dy.rollaxes(1)
+                discrete_gradient = [dx, dy]
+                # We are compressing 10% in lateral and 50% in normal direction
+                DelF  = np.array([[-0.10, 0.0 ],
+                                  [ 0.0,  0.50]])
+                mat = µ.material.MaterialLinearElastic1_2d
+            else:
+                dz = µ.DiscreteDerivative([0, 0, 0],
+                                          [[[-0.25, -0.25], [-0.25, -0.25]],
+                                           [[0.25, 0.25], [0.25, 0.25]]])
+                dy = dz.rollaxes(-1)
+                dx = dy.rollaxes(-1)
+                discrete_gradient = [dx, dy, dz]
+                # We are compressing 10% in lateral and 50% in normal direction
+                DelF  = np.array([[-0.10 ,  0.0,  0.0],
+                                  [0.0 ,  -0.10,  0.0],
+                                  [0.0 ,  0.0,   0.50]])
+                mat = µ.material.MaterialLinearElastic1_3d
+
+            fourier_gradient = [µ.FourierDerivative(dim, d) for d in range(dim)]
+
+            lengths = [1.]*dim
+            nb_grid_pts = [nb_pts]*dim
+
+            for k, gradient_op in enumerate([fourier_gradient, discrete_gradient]):
+                cell = µ.Cell(nb_grid_pts, lengths, form, gradient_op)
+
+                mat_vac = mat.make(cell.wrapped_cell, "vacuum", 0, 0)
+                mat_sol = mat.make(cell.wrapped_cell, "el", 1, Poisson)
+
+                for i, pixel in enumerate(cell):
+                    if pixel[-1] == nb_grid_pts[-1]-1:
+                        mat_vac.add_pixel(pixel)
+                    else:
+                        mat_sol.add_pixel(pixel)
+
+                # Solver
+                newton_tol = 1e-8 #tolerance for newton algo
+                cg_tol = 1e-8 #tolerance for cg algo
+                equil_tol = 1e-8 #tolerance for equilibrium
+                maxiter = 1000
+                verbose = 0
+
+                solver = µ.solvers.SolverCG(cell.wrapped_cell, cg_tol, maxiter,
+                                            verbose)
+                cell.initialise()
+
+                result = µ.solvers.newton_cg(cell.wrapped_cell, DelF, solver,
+                                             newton_tol, equil_tol, verbose)
+
+                F = µ.gradient_integration.reshape_gradient(
+                    result.grad, cell.nb_subdomain_grid_pts)
+                PK1 = µ.gradient_integration.reshape_gradient(
+                    result.stress, cell.nb_subdomain_grid_pts)
+
+                displ, r = µ.gradient_integration.compute_placement(
+                    F, lengths, nb_grid_pts, gradient_op,
+                    formulation=µ.Formulation.finite_strain)
+
+                if dim == 2:
+                    x, y = displ
+                    if k == 1:
+                        # Fourier gradient
+                        self.assertAlmostEqual(
+                            y[0, -1] - y[0, -2],
+                            1.5-(nb_pts-1)/nb_pts*(1 + Poisson*0.1*dim),
+                            delta=0.03)
+                    else:
+                        # discrete gradient
+                        self.assertAlmostEqual(
+                            y[0, -1] - y[0, -2],
+                            1.5-(nb_pts-1)/nb_pts*(1 + Poisson*0.1*dim),
+                            delta=0.05)
+                else:
+                    x, y, z = displ
+                    if k == 1:
+                        # Fourier gradient
+                        self.assertAlmostEqual(
+                            z[0, 0, -1] - z[0, 0, -2],
+                            1.5-(nb_pts-1)/nb_pts*(1 + Poisson*0.1*dim),
+                            delta=0.015)
+                    else:
+                        # discrete gradient
+                        self.assertAlmostEqual(
+                            z[0, 0, -1] - z[0, 0, -2],
+                            1.5-(nb_pts-1)/nb_pts*(1 + Poisson*0.1*dim),
+                            delta=0.05)
 
 if __name__ == '__main__':
     unittest.main()

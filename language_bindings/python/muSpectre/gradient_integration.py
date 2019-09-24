@@ -88,7 +88,7 @@ def reshape_gradient(F, nb_grid_pts):
                    spatial dimension (dtype = int)
 
     Returns:
-    np.ndarray
+    np.ndarray of the shape nb_grid_pts + [dim, dim]
     """
 
     dim = len(nb_grid_pts)
@@ -111,12 +111,14 @@ def reshape_gradient(F, nb_grid_pts):
 def complement_periodically(array, dim):
     """Takes an arbitrary multidimensional array of at least dimension dim
     and returns an augmented copy with periodic copies of the
-    left/lower entries in the added right/upper boundaries
+    left/lower entries in the added right/upper boundaries.
 
     Keyword Arguments:
     array -- arbitrary np.ndarray of at least dim dimensions
     dim   -- nb of dimension to complement periodically
 
+    Returns:
+    np.ndarray with left/lower entries added in the right/upper boundaries
     """
     shape = list(array.shape)
     shape[:dim] = [d+1 for d in shape[:dim]]
@@ -182,10 +184,9 @@ def get_integrator(fft, gradient_op, grid_spacing):
 
 
 def integrate_tensor_2(grad, fft_vec, fft_mat, gradient_op, grid_spacing):
-    """Integrates a second-rank tensor gradient field to a chosen order as
-    a function of the given field, the grid positions, and wave
-    vectors. Optionally, the integration can be performed on the
-    pixel/voxel corners (staggered grid).
+    """Integrates a second-rank tensor gradient field, given on the center
+    positions of the grid, by a compatible integration operator derived from the
+    gradient operator. The integrated field is returned on the node positions.
 
     Keyword Arguments:
     grad           -- np.ndarray of shape nb_grid_pts_per_dim + [dim, dim]
@@ -223,20 +224,19 @@ def integrate_tensor_2(grad, fft_vec, fft_mat, gradient_op, grid_spacing):
 
 
 def integrate_vector(grad, fft_sca, fft_vec, gradient_op, grid_spacing):
-    """Integrates a first-rank tensor gradient field to a chosen order as
-    a function of the given field, the grid positions, and wave
-    vectors. Optionally, the integration can be performed on the
-    pixel/voxel corners (staggered_grid)
+    """Integrates a first-rank tensor gradient field, given on the center
+    positions of the grid, by a compatible integration operator derived from the
+    gradient operator. The integrated field is returned on the node positions.
 
     Keyword Arguments:
-    df             -- np.ndarray of shape nb_grid_pts_per_dim + [dim] containing
+    grad           -- np.ndarray of shape nb_grid_pts_per_dim + [dim] containing
                       the first-rank tensor gradient to be integrated
-    freqs          -- wave vectors as computed by compute_wave_vectors
-    staggered_grid -- (default False) if set to True, the integration is
-                      performed on the pixel/voxel corners, rather than the
-                      centres. This leads to a different integration scheme...
-    order          -- (default 0) integration order.
-                      0 stands for exact integration
+    fft_sca        -- µFFT FFT object performing the FFT for a scalar on the cell
+    fft_vec        -- µFFT FFT object performing the FFT for a vector on the cell
+    gradient_op    -- µSpectre DerivativeBase class representing the gradient
+                      operator.
+    grid_spacing   -- np.array of grid spacing in each spatial direction of
+                      shape (dim,).
 
     Returns:
     np.ndarray contaning the integrated field
@@ -271,7 +271,8 @@ def compute_placement(result, lengths, nb_grid_pts, gradient_op,
     strain description)
 
     Keyword Arguments:
-    result      -- OptimiseResult, or just the grad field of an OptimizeResult
+    result      -- OptimiseResult, or just the reshaped(using reshape_gradient())
+                   and afterwards flattend gradient field from an OptimizeResult.
     lengths     -- np.ndarray of length dim with the edge lengths in each
                    spatial dimension (dtype = float)
     nb_grid_pts -- np.ndarray of length dim with the nb_grid_pts in each
@@ -291,7 +292,6 @@ def compute_placement(result, lengths, nb_grid_pts, gradient_op,
                    corresponding original nodal positions
 
     """
-
     lengths = np.array(lengths)
     nb_grid_pts = np.array(nb_grid_pts)
 
@@ -306,7 +306,7 @@ def compute_placement(result, lengths, nb_grid_pts, gradient_op,
                 'Otherwise you can give a result=OptimiseResult object, which '
                 'tells me the formulation.')
         form = formulation
-        grad = reshape_gradient(result, nb_grid_pts.tolist())
+        grad = result.reshape(tuple(nb_grid_pts)+(len(nb_grid_pts),)*2)
     else:
         form = result.formulation
         if form != formulation and formulation != None:
@@ -334,6 +334,7 @@ def compute_placement(result, lengths, nb_grid_pts, gradient_op,
     #compute the placement
     nodal_positions, _ = make_grid(lengths, nb_grid_pts)
     grid_spacing = np.array(lengths / nb_grid_pts)
-    placement = integrate_tensor_2(grad, fft_vec, fft_mat, gradient_op, grid_spacing)
+    placement = integrate_tensor_2(grad, fft_vec, fft_mat,
+                                   gradient_op, grid_spacing)
 
     return placement, nodal_positions

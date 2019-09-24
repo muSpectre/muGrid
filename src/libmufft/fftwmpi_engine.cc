@@ -75,21 +75,18 @@ namespace muFFT {
 
     for (auto & n : this->nb_subdomain_grid_pts) {
       if (n == 0) {
-        throw std::runtime_error("FFTW MPI planning returned zero grid points. "
-                                 "You may need to run on fewer processes.");
+        this->active = false;
       }
     }
     for (auto & n : this->nb_fourier_grid_pts) {
       if (n == 0) {
-        throw std::runtime_error("FFTW MPI planning returned zero Fourier "
-                                 "grid points. You may need to run on fewer "
-                                 "processes.");
+        this->active = false;
       }
     }
 
     for (auto && pixel :
          std::conditional_t<Dim == 2, muGrid::CcoordOps::Pixels<Dim, 1, 0>,
-                            muGrid::CcoordOps::Pixels<Dim, 1, 0, 2>>(
+                            muGrid::CcoordOps::Pixels<Dim, 0, 2, 1>>(
              this->nb_fourier_grid_pts, this->fourier_locations)) {
       this->work_space_container.add_pixel(pixel);
     }

@@ -102,6 +102,9 @@ namespace muFFT {
     //! inverse transform (dummy for interface)
     virtual void ifft(Field_t & /*field*/) const = 0;
 
+    //! return whether this engine is active
+    virtual bool is_active() const { return true; }
+
     /**
      * iterators over only those pixels that exist in frequency space
      * (i.e. about half of all pixels, see rfft)

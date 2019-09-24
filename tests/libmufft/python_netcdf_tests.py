@@ -55,7 +55,8 @@ def build_test_classes(nb_grid_pts):
                 self.communicator = MPI.COMM_WORLD
             else:
                 self.communicator = None
-            self.fft = muFFT.FFT(self.nb_grid_pts, communicator=self.communicator)
+            self.fft = muFFT.FFT(self.nb_grid_pts, fft='mpi',
+                                 communicator=self.communicator)
 
         def test_write_read_domain(self):
             if self.communicator is None:
@@ -90,9 +91,9 @@ def build_test_classes(nb_grid_pts):
             # Read file and check data
             nc = muFFT.NCStructuredGrid('test_{}d.nc'.format(len(self.nb_grid_pts)), mode='r')
             self.assertEqual(tuple(nc.nb_domain_grid_pts), tuple(self.nb_grid_pts))
-            self.assertTrue((nc.scalar == self.scalar_grid).all())
-            self.assertTrue((nc.tensor == self.tensor_grid).all())
-            self.assertTrue((nc[3].per_frame_tensor == self.tensor_grid).all())
+            self.assertTrue(np.equal(nc.scalar, self.scalar_grid).all())
+            self.assertTrue(np.equal(nc.tensor, self.tensor_grid).all())
+            self.assertTrue(np.equal(nc[3].per_frame_tensor, self.tensor_grid).all())
             nc.close()
 
         def test_write_read_subdomain(self):
@@ -131,9 +132,9 @@ def build_test_classes(nb_grid_pts):
             # Read file and check data
             nc = muFFT.NCStructuredGrid('test_{}d.nc'.format(len(self.nb_grid_pts)), mode='r')
             self.assertEqual(tuple(nc.nb_domain_grid_pts), tuple(self.nb_grid_pts))
-            self.assertTrue((nc.scalar == scalar_grid).all())
-            self.assertTrue((nc.tensor == tensor_grid).all())
-            self.assertTrue((nc[3].per_frame_tensor == tensor_grid).all())
+            self.assertTrue(np.equal(nc.scalar, self.scalar_grid).all())
+            self.assertTrue(np.equal(nc.tensor, self.tensor_grid).all())
+            self.assertTrue(np.equal(nc[3].per_frame_tensor, self.tensor_grid).all())
             nc.close()
 
     return NetCDF_Check

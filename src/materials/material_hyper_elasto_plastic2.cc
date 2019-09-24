@@ -190,8 +190,8 @@ namespace muSpectre {
     // compute stiffness tensor
     // the factor .5 comes from equation (18) in Geers 2003
     // (https://doi.org/10.1016/j.cma.2003.07.014)
-    auto && a0 = Del_gamma * mu / tau_eq_star;
-    auto && a1 = mu / (H + 3 * mu);
+    auto && a0 = is_plastic ? Del_gamma * mu / tau_eq_star : 1./3;
+    auto && a1 = is_plastic ? mu / (H + 3 * mu) : 0;
     T4_t mat_tangent{is_plastic ?
                      ((K / 2. - mu / 3 + a0 * mu) *
                          Matrices::Itrac<DimM>() +

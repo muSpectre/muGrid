@@ -241,20 +241,20 @@ class CellWrapper (object):
 
     @property
     def strain(self):
-        dim = len(self._cell.nb_domain_grid_pts)
-        shape = list((dim, dim)) + list(self._cell.nb_domain_grid_pts)
+        dim = len(self._cell.nb_subdomain_grid_pts)
+        shape = list((dim, dim)) + list(self._cell.nb_subdomain_grid_pts)
         return self._cell.strain.reshape(shape, order='F')
 
     @property
     def stress(self):
-        dim = len(self._cell.nb_domain_grid_pts)
-        shape = list((dim, dim)) + list(self._cell.nb_domain_grid_pts)
+        dim = len(self._cell.nb_subdomain_grid_pts)
+        shape = list((dim, dim)) + list(self._cell.nb_subdomain_grid_pts)
         return self._cell.stress.reshape(shape, order='F')
 
     @property
     def projection(self):
         xi = self._cell.projection
-        shape = self._cell.nb_domain_grid_pts.copy()
+        shape = self._cell.nb_subdomain_grid_pts.copy()
         dim = len(shape)
         m = (shape[0]+1)//2
         shape[0] = m
@@ -262,40 +262,40 @@ class CellWrapper (object):
         return xi.reshape(shape, order='F')
 
     def evaluate_stress(self, strain):
-        dim = len(self._cell.nb_domain_grid_pts)
+        dim = len(self._cell.nb_subdomain_grid_pts)
         shape = list((dim**2, self._cell.size))
         stress = self._cell.evaluate_stress(strain.reshape(shape, order='F'))
-        shape = list((dim, dim)) + list(self._cell.nb_domain_grid_pts)
+        shape = list((dim, dim)) + list(self._cell.nb_subdomain_grid_pts)
         return stress.reshape(shape, order='F')
 
     def evaluate_stress_tangent(self, strain):
-        dim = len(self._cell.nb_domain_grid_pts)
+        dim = len(self._cell.nb_subdomain_grid_pts)
         shape = list((dim**2, self._cell.size))
         stress, K = self._cell.evaluate_stress_tangent(
             strain.reshape(shape, order='F'))
-        shape = list((dim, dim)) + list(self._cell.nb_domain_grid_pts)
+        shape = list((dim, dim)) + list(self._cell.nb_subdomain_grid_pts)
         stress = stress.reshape(shape, order='F')
         shape = list((dim, dim, dim, dim)) + \
-            list(self._cell.nb_domain_grid_pts)
+            list(self._cell.nb_subdomain_grid_pts)
         K = K.reshape(shape, order='F')
         return stress, K
 
     def project(self, field):
-        dim = len(self._cell.nb_domain_grid_pts)
+        dim = len(self._cell.nb_subdomain_grid_pts)
         shape = list((dim**2, self._cell.size))
         projected_field = self._cell.project(field.reshape(shape, order='F'))
-        shape = list((dim, dim)) + list(self._cell.nb_domain_grid_pts)
+        shape = list((dim, dim)) + list(self._cell.nb_subdomain_grid_pts)
         return projected_field.reshape(shape, order='F')
 
     def directional_stiffness(self, strain):
-        dim = len(self._cell.nb_domain_grid_pts)
+        dim = len(self._cell.nb_subdomain_grid_pts)
         shape = list((dim**2, self._cell.size))
         K = self._cell.directional_stiffness(strain.reshape(shape, order='F'))
-        shape = list((dim, dim)) + list(self._cell.nb_domain_grid_pts)
+        shape = list((dim, dim)) + list(self._cell.nb_subdomain_grid_pts)
         return K.reshape(shape, order='F')
 
     def get_globalised_internal_real_array(self, name):
-        shape = list(self._cell.nb_domain_grid_pts)
+        shape = list(self._cell.nb_subdomain_grid_pts)
         array = self._cell.get_globalised_internal_real_array(name)
         nb_components = array.shape[0]
         shape = list([nb_components]) + shape
@@ -303,7 +303,7 @@ class CellWrapper (object):
         return array
 
     def get_globalised_current_real_array(self, name):
-        shape = list(self._cell.nb_domain_grid_pts)
+        shape = list(self._cell.nb_subdomain_grid_pts)
         array = self._cell.get_globalised_current_real_array(name)
         nb_components = array.shape[0]
         shape = list([nb_components]) + shape
@@ -311,7 +311,7 @@ class CellWrapper (object):
         return array
 
     def get_globalised_old_real_array(self, name, nb_steps_ago):
-        shape = list(self._cell.nb_domain_grid_pts)
+        shape = list(self._cell.nb_subdomain_grid_pts)
         array = self._cell.get_globalised_old_real_array(name, nb_steps_ago)
         nb_components = array.shape[0]
         shape = list([nb_components]) + shape
@@ -319,7 +319,7 @@ class CellWrapper (object):
         return array
 
     def get_managed_real_array(self, name, nb_components):
-        shape = list([nb_components]) + list(self._cell.nb_domain_grid_pts)
+        shape = list([nb_components]) + list(self._cell.nb_subdomain_grid_pts)
         array = self._cell.get_managed_real_array(name,
                                                   nb_components).reshape(shape, order='F')
         return array

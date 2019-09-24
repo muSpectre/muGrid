@@ -89,6 +89,9 @@ namespace muFFT {
     //! inverse transform
     void ifft(Field_t & field) const override;
 
+    //! return whether this engine is active
+    bool is_active() const override { return this->active; }
+
    protected:
     static int
         nb_engines;        //!< number of times this engine has been instatiated
@@ -99,6 +102,7 @@ namespace muFFT {
     Real * real_workspace{};  //!< temporary real workspace that is correctly
                               //!< padded
     bool initialised{false};  //!< to prevent double initialisation
+    bool active{true};        //!< FFTWMPI sometimes assigns zero grid points
   };
 
 }  // namespace muFFT

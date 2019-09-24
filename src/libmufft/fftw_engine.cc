@@ -33,6 +33,8 @@
  *
  */
 
+#include <sstream>
+
 #include "fftw_engine.hh"
 #include <libmugrid/ccoord_operations.hh>
 
@@ -52,6 +54,13 @@ namespace muFFT {
   /* ---------------------------------------------------------------------- */
   template <Dim_t Dim>
   void FFTWEngine<Dim>::initialise(FFT_PlanFlags plan_flags) {
+    if (this->comm.size() > 1) {
+      std::stringstream error;
+      error << "FFTW engine does not support MPI parallel execution, but a "
+            << "communicator of size " << this->comm.size() << " was passed "
+            << "during construction";
+      throw std::runtime_error(error.str());
+    }
     if (this->initialised) {
       throw std::runtime_error("double initialisation, will leak memory");
     }

@@ -62,6 +62,7 @@ namespace muSpectre {
   void ProjectionFiniteStrainFast<DimS, DimM>::initialise(
       muFFT::FFT_PlanFlags flags) {
     Parent::initialise(flags);
+
     using FFTFreqs_t = muFFT::FFT_freqs<DimS>;
     using Vector_t = typename  FFTFreqs_t::Vector;
 
@@ -85,11 +86,16 @@ namespace muSpectre {
         xi[i] = this->gradient[i]->fourier(phase) / grid_spacing[i];
       }
 
-      xi /= xi.norm();
+      if (xi.norm() > 0) {
+        xi /= xi.norm();
+      }
     }
 
-    if (this->get_subdomain_locations() == Ccoord{}) {
-      this->xis[0].setZero();
+    if (this->fft_engine->is_active()) {
+      // locations are also zero if the engine is not active
+      if (this->get_subdomain_locations() == Ccoord{}) {
+        this->xis[0].setZero();
+      }
     }
   }
 
