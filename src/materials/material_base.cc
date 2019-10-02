@@ -106,6 +106,13 @@ namespace muSpectre {
     return this->assigned_ratio.value().get().get_map()[pixel];
   }
 
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM>
+  auto MaterialBase<DimS, DimM>::get_assigned_ratio_field()
+      -> MScalarField_t & {
+    return this->assigned_ratio.value().get();
+  }
+
   //----------------------------------------------------------------------------//
   template <Dim_t DimS, Dim_t DimM>
   void MaterialBase<DimS, DimM>::compute_stresses_tangent(

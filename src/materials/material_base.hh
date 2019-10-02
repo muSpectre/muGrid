@@ -172,11 +172,15 @@ namespace muSpectre {
 
     // this function return the ratio of which the
     // input pixel is consisted of this material
+    Real get_assigned_ratio(Ccoord pixel);
+
     void get_assigned_ratios(std::vector<Real> & pixel_assigned_ratios,
                              Ccoord subdomain_resolutions,
                              Ccoord subdomain_locations);
+    // This function returns the local field containng assigned ratios of this
+    // material
+    auto get_assigned_ratio_field() -> MScalarField_t &;
 
-    Real get_assigned_ratio(Ccoord pixel);
     //! iterator to first pixel handled by this material
     inline iterator begin() { return this->internal_fields.begin(); }
     //! iterator past the last pixel handled by this material
