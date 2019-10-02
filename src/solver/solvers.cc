@@ -51,7 +51,7 @@ namespace muSpectre {
   std::vector<OptimizeResult> newton_cg(Cell & cell,
                                         const LoadSteps_t & load_steps,
                                         SolverBase & solver, Real newton_tol,
-                                        Real equil_tol,  Dim_t verbose,
+                                        Real equil_tol, Dim_t verbose,
                                         IsStrainInitialised strain_init) {
     const auto & comm = cell.get_communicator();
 
@@ -106,6 +106,8 @@ namespace muSpectre {
     switch (form) {
     case Formulation::finite_strain: {
       if (strain_init == IsStrainInitialised::False) {
+        // initilasing cell placement gradient (F) with identity matrix in case
+        // of finite strain
         cell.set_uniform_strain(Matrix_t::Identity(shape[0], shape[1]));
       }
       for (const auto & delF : load_steps) {
@@ -121,6 +123,8 @@ namespace muSpectre {
       break;
     }
     case Formulation::small_strain: {
+      // initilasing cell strain (ε) with zero-filled matrix in case of small
+      // strain
       cell.set_uniform_strain(Matrix_t::Zero(shape[0], shape[1]));
       for (const auto & delF : load_steps) {
         if (not((delF.rows() == shape[0]) and (delF.cols() == shape[1]))) {
@@ -145,13 +149,14 @@ namespace muSpectre {
     // initialise return value
     std::vector<OptimizeResult> ret_val{};
 
-    // storage for the previous mean strain (to compute ΔF or Δε)
+    // storage for the previous mean strain (to compute ΔF or Δε )
     Matrix_t previous_macro_strain{load_steps.back().Zero(shape[0], shape[1])};
 
-    // initialization of F
+    // initialization of F (F in Formulation::finite_strain and ε in
+    // Formuation::samll_strain)
     auto F{cell.get_strain_vector()};
 
-    //! incremental loop
+    // incremental loop
     for (const auto & tup : akantu::enumerate(load_steps)) {
       const auto & strain_step{std::get<0>(tup)};
       const auto & macro_strain{std::get<1>(tup)};
@@ -160,6 +165,8 @@ namespace muSpectre {
                   << strain_step + 1 << std::endl;
       }
       using StrainMap_t = muGrid::RawFieldMap<Eigen::Map<Eigen::MatrixXd>>;
+      // updating cell strain with the difference of the current and previous
+      // strain input.
       for (auto && strain : StrainMap_t(F, shape[0], shape[1])) {
         strain += macro_strain - previous_macro_strain;
       }
@@ -196,7 +203,8 @@ namespace muSpectre {
         if (convergence_test()) {
           break;
         }
-
+        // calling sovler for solving the current (iteratively approximated)
+        // linear equilibrium problem
         try {
           incrF = solver.solve(rhs);
         } catch (ConvergenceError & error) {
@@ -214,8 +222,12 @@ namespace muSpectre {
           throw ConvergenceError(err.str());
         }
 
+        // updating cell strain with the periodic (non-constant) solution
+        // resulted from imposing the new macro_strain
         F += incrF;
 
+        // updating the incremental differences for checking the termination
+        // criteria
         incr_norm = std::sqrt(comm.sum(incrF.squaredNorm()));
         grad_norm = std::sqrt(comm.sum(F.squaredNorm()));
 

@@ -47,49 +47,40 @@ namespace muSpectre {
 
   using LoadSteps_t = std::vector<Eigen::MatrixXd>;
 
-  enum class IsStrainInitialised{
-    True,
-    False
-  };
+  enum class IsStrainInitialised { True, False };
 
   /**
    * Uses the Newton-conjugate Gradient method to find the static
-   * equilibrium of a cell given a series of mean applied strain steps.
-   * Each strain step is added to the previous macroscopic strain of
-   * the cell. The initial macroscopic strain state depends on the formulation
-   * (zero strain tensor for Formulation::small_strain, identity placement
-   * gradient tensor for Formulation::finite_strain).
+   * given a series of mean applied strain(ε for Formulation::small_strain
+   * and H (=F-I) for Formulation::finite_strain ε). The initial macroscopic
+   * strain state is set to zero in cell initialisation.
    */
-  std::vector<OptimizeResult> newton_cg(Cell & cell,
-                                        const LoadSteps_t & load_steps,
-                                        SolverBase & solver, Real newton_tol,
-                                        Real equil_tol, Dim_t verbose = 0,
-                                        IsStrainInitialised strain_init =
-                                        IsStrainInitialised::False);
+  std::vector<OptimizeResult>
+  newton_cg(Cell & cell, const LoadSteps_t & load_steps, SolverBase & solver,
+            Real newton_tol, Real equil_tol, Dim_t verbose = 0,
+            IsStrainInitialised strain_init = IsStrainInitialised::False);
 
   /**
    * Uses the Newton-conjugate Gradient method to find the static
    * equilibrium of a cell given a mean applied strain.
    */
-  inline OptimizeResult newton_cg(Cell & cell,
-                                  const Eigen::Ref<Eigen::MatrixXd> load_step,
-                                  SolverBase & solver, Real newton_tol,
-                                  Real equil_tol, Dim_t verbose = 0,
-                                  IsStrainInitialised strain_init =
-                                  IsStrainInitialised::False) {
+  inline OptimizeResult
+  newton_cg(Cell & cell, const Eigen::Ref<Eigen::MatrixXd> load_step,
+            SolverBase & solver, Real newton_tol, Real equil_tol,
+            Dim_t verbose = 0,
+            IsStrainInitialised strain_init = IsStrainInitialised::False) {
     LoadSteps_t load_steps{load_step};
-    return newton_cg(cell, load_steps, solver, newton_tol, equil_tol,
-                     verbose, strain_init).front();
+    return newton_cg(cell, load_steps, solver, newton_tol, equil_tol, verbose,
+                     strain_init)
+        .front();
   }
 
   /* ---------------------------------------------------------------------- */
   /**
    * Uses the method proposed by de Geus method to find the static
-   * equilibrium of a cell given a series of mean applied strain steps.
-   * Each strain step is added to the previous macroscopic strain of
-   * the cell. The initial macroscopic strain state depends on the formulation
-   * (zero strain tensor for Formulation::small_strain, identity placement
-   * gradient tensor for Formulation::finite_strain).
+   * given a series of mean applied strain(ε for Formulation::small_strain
+   * and H (=F-I) for Formulation::finite_strain ε). The initial macroscopic
+   * strain state is set to zero in cell initialisation.
    */
   std::vector<OptimizeResult> de_geus(Cell & cell,
                                       const LoadSteps_t & load_steps,
