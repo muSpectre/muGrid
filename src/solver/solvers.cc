@@ -110,6 +110,7 @@ namespace muSpectre {
         // of finite strain
         cell.set_uniform_strain(Matrix_t::Identity(shape[0], shape[1]));
       }
+      // Checking the consistancy of input load_steps and cell shape
       for (const auto & delF : load_steps) {
         if (not((delF.rows() == shape[0]) and (delF.cols() == shape[1]))) {
           std::stringstream err{};
@@ -126,6 +127,7 @@ namespace muSpectre {
       // initilasing cell strain (ε) with zero-filled matrix in case of small
       // strain
       cell.set_uniform_strain(Matrix_t::Zero(shape[0], shape[1]));
+      // Checking the consistancy of input load_steps and cell shape
       for (const auto & delF : load_steps) {
         if (not((delF.rows() == shape[0]) and (delF.cols() == shape[1]))) {
           std::stringstream err{};
@@ -334,7 +336,10 @@ namespace muSpectre {
 
     switch (form) {
     case Formulation::finite_strain: {
+      // initilasing cell placement gradient (F) with identity matrix in case
+      // of finite strain
       cell.set_uniform_strain(Matrix_t::Identity(shape[0], shape[1]));
+      // Checking the consistancy of input load_steps and cell shape
       for (const auto & delF : load_steps) {
         auto rows = delF.rows();
         auto cols = delF.cols();
@@ -350,7 +355,10 @@ namespace muSpectre {
       break;
     }
     case Formulation::small_strain: {
+      // initilasing cell strain (ε) with zero-filled matrix in case of small
+      // strain
       cell.set_uniform_strain(Matrix_t::Zero(shape[0], shape[1]));
+      // Checking the consistancy of input load_steps and cell shape
       for (const auto & delF : load_steps) {
         if (not((delF.rows() == shape[0]) and (delF.cols() == shape[1]))) {
           std::stringstream err{};
@@ -377,6 +385,8 @@ namespace muSpectre {
     // storage for the previous mean strain (to compute ΔF or Δε)
     Matrix_t previous_macro_strain{load_steps.back().Zero(shape[0], shape[1])};
 
+    // initialization of F (F in Formulation::finite_strain and ε in
+    // Formuation::samll_strain)
     auto F{cell.get_strain_vector()};
     //! incremental loop
     for (const auto & tup : akantu::enumerate(load_steps)) {
@@ -419,6 +429,8 @@ namespace muSpectre {
 
         try {
           if (newt_iter == 0) {
+            // updating cell strain with the difference of the current and
+            // previous strain input.
             for (auto && strain : StrainMap_t(DeltaF, shape[0], shape[1])) {
               strain = macro_strain - previous_macro_strain;
             }
@@ -455,8 +467,12 @@ namespace muSpectre {
           throw ConvergenceError(err.str());
         }
 
+        // updating cell strain with the periodic (non-constant) solution
+        // resulted from imposing the new macro_strain
         F += incrF;
 
+        // updating the incremental differences for checking the termination
+        // criteria
         incr_norm = std::sqrt(comm.sum(incrF.squaredNorm()));
         grad_norm = std::sqrt(comm.sum(F.squaredNorm()));
 
