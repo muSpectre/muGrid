@@ -50,10 +50,10 @@ namespace muSpectre {
   enum class IsStrainInitialised { True, False };
 
   /**
-   * Uses the Newton-conjugate Gradient method to find the static
-   * given a series of mean applied strain(ε for Formulation::small_strain
-   * and H (=F-I) for Formulation::finite_strain ε). The initial macroscopic
-   * strain state is set to zero in cell initialisation.
+   * Uses the Newton-conjugate Gradient method to find the static equilibrium of
+   * a cell given a series of mean applied strain(ε for *
+   * Formulation::small_strain and H (=F-I) for Formulation::finite_strain). The
+   * initial macroscopic strain state is set to zero in cell initialisation.
    */
   std::vector<OptimizeResult>
   newton_cg(Cell & cell, const LoadSteps_t & load_steps, SolverBase & solver,
@@ -79,7 +79,7 @@ namespace muSpectre {
   /**
    * Uses the method proposed by de Geus method to find the static
    * given a series of mean applied strain(ε for Formulation::small_strain
-   * and H (=F-I) for Formulation::finite_strain ε). The initial macroscopic
+   * and H (=F-I) for Formulation::finite_strain). The initial macroscopic
    * strain state is set to zero in cell initialisation.
    */
   std::vector<OptimizeResult> de_geus(Cell & cell,

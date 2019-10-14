@@ -177,7 +177,8 @@ namespace muSpectre {
     void get_assigned_ratios(std::vector<Real> & pixel_assigned_ratios,
                              Ccoord subdomain_resolutions,
                              Ccoord subdomain_locations);
-    // This function returns the local field containng assigned ratios of this
+
+    // This function returns the local field containing assigned ratios of this
     // material
     auto get_assigned_ratio_field() -> MScalarField_t &;
 
