@@ -52,7 +52,7 @@ namespace muSpectre {
     std::array<Dim_t, 2> constexpr output_size{6, 21};
     std::vector<Real> retval{};
     // in case the length of the input is inconsistnent:
-    if (input.size() != input_size[DimM - 2]) {
+    if (input.size() != size_t(input_size[DimM - 2])) {
       std::stringstream err_str{};
       err_str << "Number of the inputs should be" << input_size[DimM - 2]
               << std::endl;

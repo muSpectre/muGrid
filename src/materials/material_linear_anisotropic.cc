@@ -53,7 +53,7 @@ namespace muSpectre {
     // voigt stiffness matrix
     Stiffness_t C4_v{Stiffness_t::Zero()};
 
-    if (input.size() != input_size[DimM - 2]) {
+    if (input.size() != size_t(input_size[DimM - 2])) {
       std::stringstream err_str{};
       err_str << "Number of the inputs should be" << input_size[DimM - 2]
               << std::endl;
