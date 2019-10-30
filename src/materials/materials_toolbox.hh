@@ -573,9 +573,58 @@ namespace muSpectre {
           std::forward<FunType>(fun), strain, delta);
     }
 
+    /**
+     * Computes the deviatoric stress σ_{dev}=σ-\frac{1}{3} tr(σ)*I, on each
+     * pixel from a given stress, first only for PK2.
+     */
+    template <Dim_t DimM>
+    inline Eigen::Matrix<Real, DimM, DimM>
+    compute_deviatoric_stress(const Eigen::Matrix<Real, DimM, DimM>& PK2) {
+      //! compute deviatoric stress tensor σ^{dev}=σ-\frac{1}{dim} tr(σ) I
+      return PK2 -
+             (1. / DimM) *
+                 (PK2.trace() * Eigen::Matrix<Real, DimM, DimM>::Identity())
+                     .eval();
+    }
+
+    /**
+     * Computes the equivalent von Mises stress σ_{eq} on each pixel from a
+     * given PK2 stress.
+     */
+    template <Dim_t DimM>
+    inline decltype(auto) compute_equivalent_von_Mises_stress(
+        const Eigen::Map<const Eigen::Matrix<Real, DimM, DimM>> PK2) {
+      Eigen::Matrix<Real, DimM, DimM> PK2_matrix = PK2;
+      if (DimM == 3) {
+        auto && deviatoric_stress = compute_deviatoric_stress<DimM>(PK2_matrix);
+        //! 3D case:
+        //! compute σ_{eq} = \sqrt{\frac{3}{2} σ^{dev} : σ^{dev}}
+        //!                = \sqrt{\frac{3}{2} tr(σᵈᵉᵛ·(σᵈᵉᵛ)ᵀ)}
+        const Real equivalent_stress{
+            sqrt(3. / 2. *
+                 (deviatoric_stress * deviatoric_stress.transpose()).trace())};
+        return equivalent_stress;
+      } else if (DimM == 2) {
+        //! 2D case:
+        //! For the 2D von Mises stress we assume a general plane stress
+        //! (σ₃₃=σ₃₁=σ₃₂=0) state.
+        //! σ_{eq} = \sqrt{σ₁₁² + σ₂₂² - σ₁₁σ₂₂ + 3σ₁₂²}
+        //! Bruchmechanik 6. edition (2016); Dietmar Gross, Thomas Seelig;
+        //! DOI 10.1007/978-3-662-46737-4; chap. 1.3.3.1, eq(1.78)
+        const Real equivalent_stress{
+            sqrt(PK2(0, 0) * PK2(0, 0) + PK2(1, 1) * PK2(1, 1) -
+                 PK2(0, 0) * PK2(1, 1) + 3 * PK2(0, 1) * PK2(0, 1))};
+        return equivalent_stress;
+      } else if (DimM == 0) {
+        //! 1D case:
+        const Real equivalent_stress{PK2(0, 0)};
+        return equivalent_stress;
+      }
+    }
+
     /* ----------------------------------------------------------------------*/
     /**
-     * Fucntion used for as a wrapper around materials evaluate stress functions
+     * Function used for as a wrapper around materials evaluate stress functions
      * for calling stress/strain conversions according to their traits if
      * necessary
      */
@@ -583,7 +632,6 @@ namespace muSpectre {
     auto constitutive_law(Material & mat, Strains_t Strains,
                           const size_t & pixel_index) -> decltype(auto) {
       using traits = MaterialMuSpectre_traits<Material>;
-
       constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
       constexpr StrainMeasure expected_strain_m{
           get_formulation_strain_type(Form, traits::strain_measure)};
@@ -612,10 +660,9 @@ namespace muSpectre {
       }
       return stress;
     }
-
     /*----------------------------------------------------------------------*/
     /**
-     * Fucntion used for as a wrapper around materials evaluate
+     * Function used for as a wrapper around materials evaluate
      * stress_tangent_stiffenss functions for calling stress/strain conversions
      * according to their traits if necessary
      */
@@ -661,10 +708,10 @@ namespace muSpectre {
 
     /* ----------------------------------------------------------------------*/
     /**
-     * Fucntion used for as a wrapper around materials evaluate stress functions
+     * Function used for as a wrapper around materials evaluate stress functions
      * for calling stress/strain conversions according to their traits if
      * necessary. This function is specialised for materials whose
-     * evaluate_stress functions need the Fornulation as an input
+     * evaluate_stress functions need the Formulation as an input
      */
     template <Formulation Form, class Material, class Strains_t>
     auto constitutive_law_with_formulation(Material & mat, Strains_t Strains,
@@ -704,10 +751,10 @@ namespace muSpectre {
 
     /*----------------------------------------------------------------------*/
     /**
-     * Fucntion used for as a wrapper around materials evaluate
+     * Function used for as a wrapper around materials evaluate
      * stress_tangent_stiffenss functions for calling stress/strain conversions
      * according to their traits if necessary. This function is specialised for
-     * materials whose evaluate_stress_tangent functions need the Fornulation as
+     * materials whose evaluate_stress_tangent functions need the Formulation as
      * an input
      */
     template <Formulation Form, class Material, class Strains_t>

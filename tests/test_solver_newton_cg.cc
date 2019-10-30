@@ -119,7 +119,7 @@ namespace muSpectre {
     // number of layers in the hard material
     constexpr Dim_t nb_lays{1};
     constexpr Real contrast{2};
-    static_assert(nb_lays < nb_grid_pts[0],
+    static_assert(nb_lays < size_t(nb_grid_pts[0]),
                   "the number or layers in the hard material must be smaller "
                   "than the total number of layers in dimension 0");
 
@@ -245,7 +245,7 @@ namespace muSpectre {
     // number of layers in the hard material
     constexpr Dim_t nb_lays{1};
     constexpr Real contrast{2};
-    static_assert(nb_lays < nb_grid_pts[0],
+    static_assert(nb_lays < size_t(nb_grid_pts[0]),
                   "the number or layers in the hard material must be smaller "
                   "than the total number of layers in dimension 0");
 
@@ -355,7 +355,7 @@ namespace muSpectre {
     // number of layers in the hard material
     constexpr Dim_t nb_lays{1};
     constexpr Real contrast{2};
-    static_assert(nb_lays < nb_grid_pts[0],
+    static_assert(nb_lays < size_t(nb_grid_pts[0]),
                   "the number or layers in the hard material must be smaller "
                   "than the total number of layers in dimension 0");
 

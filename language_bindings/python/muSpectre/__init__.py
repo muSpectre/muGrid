@@ -51,6 +51,7 @@ from _muSpectre import (SplitCell, Formulation, material, solvers, FiniteDiff)
 
 from muFFT import Communicator
 import muSpectre.gradient_integration
+import muSpectre.stochastic_plasticity_search
 
 _factories = {'fftw': ('CellFactory', False),
               'fftwmpi': ('FFTWMPICellFactory', True),

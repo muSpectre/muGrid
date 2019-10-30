@@ -39,8 +39,10 @@ import numpy as np
 from python_test_imports import µ
 from python_material_linear_elastic3_test import MaterialLinearElastic3_Check
 from python_material_linear_elastic4_test import MaterialLinearElastic4_Check
-from python_material_linear_elastic_generic1_test import MaterialLinearElasticGeneric1_Check
-from python_material_linear_elastic_generic2_test import MaterialLinearElasticGeneric2_Check
+from python_material_linear_elastic_generic1_test import \
+    MaterialLinearElasticGeneric1_Check
+from python_material_linear_elastic_generic2_test import \
+    MaterialLinearElasticGeneric2_Check
 from python_comparison_test_material_linear_elastic1 import MatTest as MatTest1
 from python_material_hyper_elasto_plastic2_test import MaterialHyperElastoPlastic2_Check
 from python_field_tests import FieldCollection_Check
@@ -51,6 +53,9 @@ from python_field_tests import FieldCollection_Check
 from python_gradient_integration_test import GradientIntegration_Check
 
 from python_material_evaluator_test import MaterialEvaluator_Check
+
+from python_stochastic_plasticity_search_test import \
+    StochasticPlasticitySearch_Check
 
 from python_derivative_tests import *
 from python_projection_tests import *

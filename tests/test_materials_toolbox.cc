@@ -395,6 +395,55 @@ namespace muSpectre {
     }
   }
 
+  BOOST_AUTO_TEST_CASE(deviatoric_stress_test) {
+    constexpr Dim_t Dim{threeD};
+    using T2_t = Eigen::Matrix<Real, Dim, Dim>;
+
+    bool verbose{false};
+
+    T2_t stress(Dim, Dim);
+    stress << 1, 0.2, 0, 0, 2, 0, 0, 0, 3;
+    if (verbose) {
+      std::cout << "stress:\n" << stress << std::endl;
+    }
+    T2_t sigma_dev{MatTB::compute_deviatoric_stress<Dim>(stress)};
+    T2_t sigma_dev_analytic{Eigen::Matrix<Real, Dim, Dim>::Zero()};
+    sigma_dev_analytic(0, 0) = -1;
+    sigma_dev_analytic(0, 1) = 0.2;
+    sigma_dev_analytic(2, 2) = 1;
+    if (verbose) {
+      std::cout << "deviatoric stress:\n" << sigma_dev << std::endl;
+    }
+    auto sigma_dev_error{(sigma_dev - sigma_dev_analytic).norm() /
+                         sigma_dev.norm()};
+    BOOST_CHECK_LT(sigma_dev_error, tol);
+  }
+
+  BOOST_AUTO_TEST_CASE(equivalent_von_Mises_stress_test) {
+    constexpr Dim_t Dim{threeD};
+    using T2_t = Eigen::Matrix<Real, Dim, Dim>;
+    using T2Map_t = Eigen::Map<const Eigen::Matrix<Real, Dim, Dim>>;
+
+    bool verbose{false};
+
+    T2_t stress(Dim, Dim);
+    stress << 1, 0.2, 0, 0, 2, 0, 0, 0, 3;
+    if (verbose) {
+      std::cout << "stress:\n" << stress << std::endl;
+    }
+    const auto *p = &stress(0, 0);  // pointer to stress
+    if (verbose) {
+      std::cout << "*p: " << p << std::endl;
+    }
+
+    T2Map_t stress_map(p, 3, 3);
+    auto sigma_eq{MatTB::compute_equivalent_von_Mises_stress<Dim>(stress_map)};
+    Real sigma_eq_analytic{1.7492855684535902};  // computed with python
+    if (verbose) {
+      std::cout << "equivalen von Mises stress:" << sigma_eq << std::endl;
+    }
+    BOOST_CHECK_CLOSE(sigma_eq, sigma_eq_analytic, 1e-8);
+  }
   BOOST_AUTO_TEST_SUITE_END();
 
 }  // namespace muSpectre

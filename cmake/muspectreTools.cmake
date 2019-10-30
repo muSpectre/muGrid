@@ -242,7 +242,6 @@ function(muSpectre_set_global_compile_options)
   elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     # using GCC
     add_compile_options(-Wno-non-virtual-dtor)
-    add_compile_options(-march=native)
     if (("relwithdebinfo" STREQUAL "${build_type}") OR ("release" STREQUAL "${build_type}" ))
       add_compile_options(-march=native)
     endif()

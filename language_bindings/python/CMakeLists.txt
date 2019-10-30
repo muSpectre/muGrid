@@ -58,6 +58,7 @@ set (PY_BINDING_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_hyper_elasto_plastic1.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_hyper_elasto_plastic2.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_linear_elastic_generic.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_stochastic_plasticity.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_solvers.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_derivatives.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_projections.cc
@@ -86,7 +87,8 @@ target_include_directories(pyMuSpectreLib PUBLIC ${PYTHON_INCLUDE_DIRS})
 add_custom_target(pyMuSpectre ALL SOURCES
   muSpectre/__init__.py
   muSpectre/gradient_integration.py
-  muSpectre/vtk_export.py)
+  muSpectre/vtk_export.py
+  muSpectre/stochastic_plasticity_search.py)
 add_custom_command(TARGET pyMuSpectre POST_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_directory
                    ${CMAKE_SOURCE_DIR}/language_bindings/python/muSpectre
@@ -94,4 +96,5 @@ add_custom_command(TARGET pyMuSpectre POST_BUILD
 
 install(TARGETS pyMuSpectreLib LIBRARY DESTINATION ${PYTHON_USER_SITE})
 install(FILES muSpectre/__init__.py muSpectre/gradient_integration.py
-  muSpectre/vtk_export.py DESTINATION ${PYTHON_USER_SITE}/muSpectre)
+  muSpectre/vtk_export.py muSpectre/stochastic_plasticity_search.py
+  DESTINATION ${PYTHON_USER_SITE}/muSpectre)

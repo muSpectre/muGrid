@@ -625,6 +625,11 @@ namespace muSpectre {
       return this->projection->get_communicator();
     }
 
+    //! return the field collection
+    FieldCollection_t & get_collection() {
+      return *this->fields;
+    }
+
    protected:
     template <typename T, bool IsStateField>
     Field_t<T> & globalised_field_helper(const std::string & unique_name,

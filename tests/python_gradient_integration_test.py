@@ -41,6 +41,7 @@ import unittest
 import numpy as np
 import scipy.misc as sm
 import itertools
+import time
 
 ### Helper functions
 def init_X_F_Chi(lens, res, rank=2):
@@ -85,8 +86,16 @@ class GradientIntegration_Check(unittest.TestCase):
     def setUp(self):
         self.lengths = np.array([2.4, 3.7, 4.1])
         self.nb_grid_pts = np.array([5, 3, 5])
-
         self.norm_tol = 1e-8
+
+        #set timing = True for timing information
+        self.timing = False
+        self.startTime = time.time()
+
+    def tearDown(self):
+        if self.timing:
+            t = time.time() - self.startTime
+            print("{}:\n{:.3f} seconds".format(self.id(), t))
 
     def test_compute_grid(self):
         """

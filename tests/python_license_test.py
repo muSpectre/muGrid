@@ -104,7 +104,7 @@ def header_license_test(source_dirs, lic_paras):
                 if mu_license_text_lines_new[num] != lic_para:
                     msg = test_case._formatMessage(msg,
                                                    "the paragraph number {}"
-                                                   "of the license in file "
+                                                   " of the license in file "
                                                    "\"{}\" is not correct."
                                                    "It should be replaced by"
                                                    "\n\'{}\'"
@@ -203,7 +203,7 @@ def python_license_test(source_dirs, py_lic_paras):
                                                    "the paragraph number "
                                                    "{} of the license in file"
                                                    "\"{}\" is not correct. It"
-                                                   "should be replaced by \n"
+                                                   " should be replaced by \n"
                                                    "\"'{}\' "
                                                    .format(num+1,
                                                            python_file_name,

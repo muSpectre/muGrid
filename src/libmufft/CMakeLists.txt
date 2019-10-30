@@ -53,6 +53,7 @@ target_link_libraries(muFFT PUBLIC fftw3::double)
 
 if(${MUSPECTRE_MPI_PARALLEL})
   find_package(MPI REQUIRED)
+  set(mufft_SRCS ${mufft_SRCS} communicator.cc)
 
   target_link_libraries(muFFT PUBLIC ${MPI_LIBRARIES})
   target_include_directories(muFFT SYSTEM PUBLIC ${MPI_C_INCLUDE_PATH})

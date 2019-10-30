@@ -109,6 +109,14 @@ namespace muSpectre {
         // initilasing cell placement gradient (F) with identity matrix in case
         // of finite strain
         cell.set_uniform_strain(Matrix_t::Identity(shape[0], shape[1]));
+        if (verbose > 0 && comm.rank() == 0) {
+          std::cout << "\nThe strain is initialised by default to the identity "
+                       "matrix!\n"
+                    << std::endl;
+        }
+      } else if (verbose > 0 && comm.rank() == 0 &&
+                 strain_init == IsStrainInitialised::True) {
+        std::cout << "\nThe strain was initialised by the user!\n" << std::endl;
       }
       // Checking the consistancy of input load_steps and cell shape
       for (const auto & delF : load_steps) {
@@ -124,9 +132,19 @@ namespace muSpectre {
       break;
     }
     case Formulation::small_strain: {
-      // initilasing cell strain (ε) with zero-filled matrix in case of small
-      // strain
-      cell.set_uniform_strain(Matrix_t::Zero(shape[0], shape[1]));
+      if (strain_init == IsStrainInitialised::False) {
+        // initilasing cell strain (ε) with zero-filled matrix in case of small
+        // strain
+        cell.set_uniform_strain(Matrix_t::Zero(shape[0], shape[1]));
+        if (verbose > 0 && comm.rank() == 0) {
+          std::cout << "\nThe strain is initialised by default to the zero "
+                       "matrix!\n"
+                    << std::endl;
+        }
+      } else if (verbose > 0 && comm.rank() == 0 &&
+                 strain_init == IsStrainInitialised::True) {
+        std::cout << "\nThe strain was initialised by the user!\n" << std::endl;
+      }
       // Checking the consistancy of input load_steps and cell shape
       for (const auto & delF : load_steps) {
         if (not((delF.rows() == shape[0]) and (delF.cols() == shape[1]))) {

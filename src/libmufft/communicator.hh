@@ -40,12 +40,24 @@
 #include <mpi.h>
 #endif
 
+#include "mufft_common.hh"
+#include <Eigen/Dense>
+
 namespace muFFT {
+
+  template <typename T>
+  using Matrix_t = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
 
 #ifdef WITH_MPI
 
-  template <typename T>
-  decltype(auto) mpi_type() {}
+  template <typename T, typename T2 = T>
+  inline decltype(auto) mpi_type() {
+    static_assertt(std::is_same<T, T2>::value,
+                   "T2 is a SFINAE parameter, do not touch");
+    static_assert(std::is_same<T, T2>::value and not std::is_same<T, T2>::value,
+                  "The type you're trying to map has not been declared.");
+    return MPI_LONG;
+  }
   template <>
   inline decltype(auto) mpi_type<char>() {
     return MPI_CHAR;
@@ -85,6 +97,10 @@ namespace muFFT {
   template <>
   inline decltype(auto) mpi_type<double>() {
     return MPI_DOUBLE;
+  }
+  template <>
+  inline decltype(auto) mpi_type<Complex>() {
+    return MPI_DOUBLE_COMPLEX;
   }
 
   //! lightweight abstraction for the MPI communicator object
@@ -127,6 +143,14 @@ namespace muFFT {
       return res;
     }
 
+    //! sum reduction on EigenMatrix types
+    template <typename T>
+    Matrix_t<T> sum_mat(const Eigen::Ref<Matrix_t<T>> & arg) const;
+
+    //! gather on EigenMatrix types
+    template <typename T>
+    Matrix_t<T> gather(const Eigen::Ref<Matrix_t<T>> & arg) const;
+
     MPI_Comm get_mpi_comm() { return &this->comm; }
 
     static bool has_mpi() { return true; }
@@ -152,6 +176,18 @@ namespace muFFT {
     //! sum reduction on scalar types
     template <typename T>
     T sum(const T & arg) const {
+      return arg;
+    }
+
+    //! sum reduction on EigenMatrix types
+    template <typename T>
+    Matrix_t<T> sum_mat(const Eigen::Ref<Matrix_t<T>> & arg) const {
+      return arg;
+    }
+
+    //! gather on EigenMatrix types
+    template <typename T>
+    Matrix_t<T> gather(const Eigen::Ref<Matrix_t<T>> & arg) const {
       return arg;
     }
 

@@ -57,7 +57,6 @@ namespace muFFT {
   using muFFT::tol;
 
   BOOST_AUTO_TEST_SUITE(mpi_fft_engine);
-
   /* ---------------------------------------------------------------------- */
   template <typename Engine, Dim_t NbGridPts, bool serial = false>
   struct FFTW_fixture {
@@ -180,6 +179,49 @@ namespace muFFT {
         std::cout << std::get<0>(tup).array() / std::get<1>(tup).array()
                   << std::endl
                   << std::endl;
+      }
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  BOOST_AUTO_TEST_CASE(gather_test) {
+    auto & comm{MPIContext::get_context().comm};
+    auto rank{comm.rank()};
+    const Dim_t nb_cols = rank + 1;
+    Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> send_mat(2, nb_cols);
+
+    for (int col{0}; col < nb_cols; ++col) {
+      send_mat.col(col) = send_mat.col(col).Ones(2, 1) * (rank + col);
+    }
+
+    auto res{comm.template gather<Real>(send_mat)};
+    int counter{0};
+    for (int lrank{0}; lrank < comm.size(); ++lrank) {
+      for (int col{0}; col < lrank + 1; ++col) {
+        BOOST_CHECK_EQUAL(res(0, counter), lrank + col);
+        counter++;
+      }
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  BOOST_AUTO_TEST_CASE(sum_mat_test) {
+    auto & comm{MPIContext::get_context().comm};
+    auto nb_cores{comm.size()};
+    Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> send_mat(2, 3);
+    send_mat(0, 0) = 1.;
+    send_mat(0, 1) = 2.;
+    send_mat(0, 2) = 3.;
+    send_mat(1, 0) = 4.;
+    send_mat(1, 1) = 5.;
+    send_mat(1, 2) = 6.;
+    auto res{comm.template sum_mat<Real>(send_mat)};
+    const auto nb_cols{send_mat.cols()};
+    const auto nb_rows{send_mat.rows()};
+    for (int row{0}; row < nb_rows; row++) {
+      for (int col{0}; col < nb_cols; col++) {
+        BOOST_CHECK_EQUAL(res(row, col),
+                          (row * nb_cols + col + 1) * nb_cores);
       }
     }
   }

@@ -104,16 +104,6 @@ def vtk_export(fpath, x_n, placement, point_data=None, cell_data=None,
         raise Exception("Name 'displacement' is reserved")
     if "displacement" in cell_data.keys():
         raise Exception("Name 'displacement' is reserved")
-    #clash_set = set(point_data.keys()) & set(cell_data.keys())
-    #if clash_set:
-    #    clash_names = ["'{}'".format(name) for name in clash_set]
-    #    clash_names_fmt = ", ".join(clash_names)
-    #    raise Exception(
-    #        ("Only unique names are allowed, but the names {} appear in both "
-    #         "point- and cell data").format(clash_names_fmt))
-    #Note: is this necessary -> only same name in same dictionary doesn't make sense.
-    #      I think it's ok to have e.g. the material phase as cell and point data?
-    #Richard: I think the same, so I commented the check and would throw it away
 
     # helper functions to add data
     def add_data(value, name, point=True):

@@ -35,15 +35,31 @@ Program grant you additional permission to convey the resulting work.
 """
 
 import unittest
+import time
 import numpy as np
 
 from python_test_imports import µ
 
 class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
+    def setUp(self):
+        #set timing = True for timing information
+        self.timing = False
+        self.startTime = time.time()
+
+    def tearDown(self):
+        if self.timing:
+            t = time.time() - self.startTime
+            print("{}:\n{:.3f} seconds".format(self.id(), t))
+
     def test_2_vs_1(self):
+        """
+        Compares stress and strain computed by material_hyper_elasto_plastic2 vs
+        stress and strain computed by material_hyper_elasto_plastic1. The yield
+        thresholds and Young moduli are set random.
+        """
         ### material geometry
         lens = [10, 10, 10]
-        nb_grid_pts  = [5, 5, 5]
+        nb_grid_pts  = [3, 3, 3]
         dim = len(nb_grid_pts)
 
         ### material parameters
@@ -51,16 +67,18 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         Poisson = 0.30
         mu = Young / (2*(1+Poisson))
 
-        np.random.seed(125769235)
-        yield_crit = (mu * (0.025 + 0.01 * (np.random.random(nb_grid_pts) > 0.5))).flatten()
-        hardening = 100
+        np.random.seed(102919) # just the date
+        yield_crit = mu * (0.025 + 0.05 * np.random.random(nb_grid_pts))
+        E = Young * (0.5 + 0.5 * np.random.random(nb_grid_pts))
+        hardening = 1
 
         ### µSpectre init stuff
         fft = "fftw"
         form = µ.Formulation.finite_strain
+        #use e.g. average upwind differences
         dz = µ.DiscreteDerivative([0, 0, 0],
-                                    [[[-0.25, 0.25], [-0.25, 0.25]],
-                                     [[-0.25, 0.25], [-0.25, 0.25]]])
+                                    [[[-0.25, -0.25], [-0.25, -0.25]],
+                                     [[ 0.25,  0.25], [ 0.25,  0.25]]])
         dx = dz.rollaxes(1)
         dy = dx.rollaxes(1)
         discrete_gradient = [dx, dy, dz]
@@ -68,48 +86,28 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         cell = µ.Cell(nb_grid_pts, lens, form, discrete_gradient, fft)
         cell2 = µ.Cell(nb_grid_pts, lens, form, discrete_gradient, fft)
 
-        mat_vac = µ.material.MaterialLinearElastic1_3d.make(cell.wrapped_cell,
-                                                            "3d-vacuum",
-                                                            0.5*Young, Poisson)
-        mat_vac2 = µ.material.MaterialLinearElastic1_3d.make(cell2.wrapped_cell,
-                                                             "3d-vacuum",
-                                                             0.5*Young, Poisson)
+        # stores a hyper elasto plastic 1 material for each pixel
+        mat_hpl1_array = np.empty((3,3,3), dtype=object)
+        for index, mat in np.ndenumerate(mat_hpl1_array):
+            mat_hpl1_array[index] = µ.material.MaterialHyperElastoPlastic1_3d.make(
+                cell.wrapped_cell, "3d-small", E[index], Poisson,
+                yield_crit[index], hardening)
 
-        mat_min = µ.material.MaterialHyperElastoPlastic1_3d.make(
-          cell.wrapped_cell, "3d-small", Young, Poisson, yield_crit.min(), hardening)
-        mat_max = µ.material.MaterialHyperElastoPlastic1_3d.make(
-          cell.wrapped_cell, "3d-large", Young, Poisson, yield_crit.max(), hardening)
-
-        mat_hpl = µ.material.MaterialHyperElastoPlastic2_3d.make(
+        mat_hpl2 = µ.material.MaterialHyperElastoPlastic2_3d.make(
           cell2.wrapped_cell, "3d-hpl")
 
-        E        = np.zeros(nb_grid_pts)
-        E[:, :, :] = 0.5*Young
-        E[:, :, :-1] = Young
-        E = E.flatten()
-
-        m = (yield_crit.max() + yield_crit.min())/2
-
         for i, pixel in enumerate(cell):
-            if E[i] < 0.9*Young:
-                mat_vac.add_pixel(pixel)
-            else:
-                if yield_crit[i] < m:
-                    mat_min.add_pixel(pixel)
-                else:
-                    mat_max.add_pixel(pixel)
+            mat_hpl1_array[tuple(pixel)].add_pixel(pixel)
 
         for i, pixel in enumerate(cell2):
-            if E[i] < 0.9*Young:
-                mat_vac2.add_pixel(pixel)
-            else:
-                mat_hpl.add_pixel(pixel, E[i], Poisson, yield_crit[i], hardening)
+            mat_hpl2.add_pixel(pixel, E[tuple(pixel)], Poisson,
+                               yield_crit[tuple(pixel)], hardening)
 
         #solver
-        newton_tol = 1e-8
-        cg_tol     = 1e-8
-        equil_tol  = 1e-8
-        maxiter = 200
+        newton_tol = 1e-6
+        cg_tol     = 1e-6
+        equil_tol  = 1e-6
+        maxiter = 2000
         verbose = 0
         solver = µ.solvers.SolverCG(cell.wrapped_cell, cg_tol, maxiter, verbose)
         cell.initialise()
@@ -118,8 +116,8 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         cell2.initialise()
 
         #total deformation
-        DelF  = np.array([[-0.10 ,  0.00,  0.00],
-                          [ 0.00 , -0.10,  0.00],
+        DelF  = np.array([[-0.05 ,  0.10,  0.00],
+                          [ 0.00 , -0.05,  0.00],
                           [ 0.00 ,  0.00,  0.00]])
 
         ### Start muSpectre ###

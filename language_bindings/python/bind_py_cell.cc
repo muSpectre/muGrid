@@ -43,6 +43,7 @@
 #endif
 
 #include <libmugrid/ccoord_operations.hh>
+#include <libmufft/communicator.hh>
 
 #ifdef WITH_FFTWMPI
 #include "libmufft/fftwmpi_engine.hh"
@@ -252,6 +253,7 @@ void add_cell_base_helper(py::module & mod) {
            },
            "strain"_a, py::return_value_policy::reference_internal)
       .def_property_readonly("projection", &sys_t::get_projection)
+      .def_property_readonly("communicator", &sys_t::get_communicator)
       .def_property_readonly("nb_subdomain_grid_pts",
                              &sys_t::get_nb_subdomain_grid_pts)
       .def_property_readonly("subdomain_locations",
@@ -265,6 +267,7 @@ void add_cell_base_helper(py::module & mod) {
            },
            "strain"_a)
       .def("save_history_variables", &sys_t::save_history_variables)
+
 #ifdef WITH_SPLIT
       .def("make_precipitate_laminate",
            [](sys_t & cell, Mat_t & mat_lam, Mat_t & mat_precipitate_cell,

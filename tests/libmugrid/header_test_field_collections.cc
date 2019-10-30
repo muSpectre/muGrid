@@ -541,6 +541,7 @@ namespace muGrid {
                                    Fix) {
     Eigen::VectorXd t4values{Fix::t4_field.eigenvec()};
 
+
     using FieldProxy_t = TypedField<typename Fix::FC_t, Real>;
 
     //! create a field proxy

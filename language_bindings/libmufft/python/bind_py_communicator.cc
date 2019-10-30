@@ -41,7 +41,13 @@
 #include <pybind11/stl.h>
 #include <pybind11/eigen.h>
 
+#include <Eigen/Dense>
+
 using pybind11::literals::operator""_a;
+using muFFT::Int;
+using muFFT::Real;
+using muFFT::Uint;
+using muFFT::Complex;
 namespace py = pybind11;
 
 void add_communicator(py::module & mod) {
@@ -51,18 +57,25 @@ void add_communicator(py::module & mod) {
              return new muFFT::Communicator(MPI_Comm(comm));
            }),
            "communicator"_a = size_t(MPI_COMM_SELF))
-      .def_property_readonly("mpi_comm", [](muFFT::Communicator & comm) {
-        return size_t(comm.get_mpi_comm());
-      })
+      .def_property_readonly("mpi_comm",
+                             [](muFFT::Communicator & comm) {
+                               return size_t(comm.get_mpi_comm());
+                             })
 #else
       .def(py::init())
 #endif
-      .def_property_readonly_static("has_mpi",
-                                    [](py::object) {
-                                      return muFFT::Communicator::has_mpi();
-                                    })
+      .def_property_readonly_static(
+          "has_mpi", [](py::object) { return muFFT::Communicator::has_mpi(); })
       .def_property_readonly("rank", &muFFT::Communicator::rank)
       .def_property_readonly("size", &muFFT::Communicator::size)
-      .def("sum", &muFFT::Communicator::sum<int>)
-      .def("sum", &muFFT::Communicator::sum<double>);
+      .def("sum", &muFFT::Communicator::sum<Int>)
+      .def("sum", &muFFT::Communicator::sum<Real>)
+      .def("sum", &muFFT::Communicator::sum_mat<Real>)
+      .def("sum", &muFFT::Communicator::sum_mat<Int>)
+      .def("sum", &muFFT::Communicator::sum_mat<Uint>)
+      .def("sum", &muFFT::Communicator::sum_mat<Complex>)
+      .def("gather", &muFFT::Communicator::gather<Real>)
+      .def("gather", &muFFT::Communicator::gather<Int>)
+      .def("gather", &muFFT::Communicator::gather<Uint>)
+      .def("gather", &muFFT::Communicator::gather<Complex>);
 }

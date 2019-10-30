@@ -153,6 +153,7 @@ sources = ['language_bindings/libmufft/python/bind_py_module.cc',
            'language_bindings/libmufft/python/bind_py_communicator.cc',
            'language_bindings/libmufft/python/bind_py_fftengine.cc',
            'src/libmufft/fft_engine_base.cc',
+           'src/libmufft/communicator.cc',
            'src/libmufft/fft_utils.cc']
 macros = []
 include_dirs = [get_eigen_include(), # Path to pybind11 headers

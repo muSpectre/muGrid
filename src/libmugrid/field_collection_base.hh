@@ -91,11 +91,11 @@ namespace muGrid {
     FieldCollectionBase & operator=(FieldCollectionBase && other) = delete;
 
     //! Register a new field (fields need to be in heap, so I want to keep them
-    //! as shared pointers
+    //! as unique pointers
     void register_field(Field_p && field);
 
     //! Register a new field (fields need to be in heap, so I want to keep them
-    //! as shared pointers
+    //! as unique pointers
     void register_statefield(StateField_p && field);
 
     //! for return values of iterators
