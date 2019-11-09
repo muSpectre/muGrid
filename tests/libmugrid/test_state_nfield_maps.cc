@@ -17,7 +17,7 @@
  * µGrid is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * General Public License for more details.
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with µGrid; see the file COPYING. If not, write to the
@@ -30,6 +30,7 @@
  * with proprietary FFT implementations or numerical libraries, containing parts
  * covered by the terms of those libraries' licenses, the licensors of this
  * Program grant you additional permission to convey the resulting work.
+ *
  */
 
 #include "tests.hh"
@@ -39,6 +40,8 @@
 #include "libmugrid/nfield_collection_local.hh"
 #include "libmugrid/state_nfield_map_static.hh"
 
+#include <boost/mpl/list.hpp>
+
 namespace muGrid {
 
   BOOST_AUTO_TEST_SUITE(state_nfield_maps_tests);
@@ -47,8 +50,9 @@ namespace muGrid {
     LocalNFieldCollection fc{Unknown, Unknown};
   };
 
+  template <Dim_t NbMemoryChoice>
   struct LocalNFieldBasicFixtureFilled : public LocalNFieldBasicFixture {
-    static constexpr Dim_t NbMemory() { return 3; }
+    static constexpr Dim_t NbMemory() { return NbMemoryChoice; }
     static constexpr Dim_t NbComponents() { return twoD * twoD; }
     static constexpr Dim_t NbQuad() { return 2; }
 
@@ -69,7 +73,9 @@ namespace muGrid {
     TypedStateNField<Int> & t4_field;
   };
 
-  struct StateNFieldMapFixture : public LocalNFieldBasicFixtureFilled {
+  template <Dim_t NbMemoryChoice>
+  struct StateNFieldMapFixture
+      : public LocalNFieldBasicFixtureFilled<NbMemoryChoice> {
     StateNFieldMapFixture()
         : array_field_map{this->array_field}, const_array_field_map{
                                                   this->array_field} {}
@@ -77,84 +83,114 @@ namespace muGrid {
     StateNFieldMap<Int, Mapping::Const> const_array_field_map;
   };
 
-  struct StaticStateNFieldMapFixture : public LocalNFieldBasicFixtureFilled {
+  template <Dim_t NbMemoryChoice>
+  struct StaticStateNFieldMapFixture
+      : public LocalNFieldBasicFixtureFilled<NbMemoryChoice> {
     StaticStateNFieldMapFixture()
-        : array_field_map{this->array_field},
-          const_array_field_map{this->array_field},
+        : static_array_field_map{this->array_field},
+          static_const_array_field_map{this->array_field},
           pixel_map{this->array_field}, t2_map{this->array_field},
           t4_map{this->t4_field}, scalar_map{this->scalar_field} {}
-    ArrayStateNFieldMap<Int, Mapping::Mut, NbComponents(), 1, NbMemory()>
-        array_field_map;
-    ArrayStateNFieldMap<Int, Mapping::Const, NbComponents(), 1, NbMemory()>
-        const_array_field_map;
-    ArrayStateNFieldMap<Int, Mapping::Mut, NbComponents(), NbQuad(), NbMemory(),
-                        Iteration::Pixel>
+    using Parent = LocalNFieldBasicFixtureFilled<NbMemoryChoice>;
+    ArrayStateNFieldMap<Int, Mapping::Mut, Parent::NbComponents(), 1,
+                        Parent::NbMemory()>
+        static_array_field_map;
+    ArrayStateNFieldMap<Int, Mapping::Const, Parent::NbComponents(), 1,
+                        Parent::NbMemory()>
+        static_const_array_field_map;
+    ArrayStateNFieldMap<Int, Mapping::Mut, Parent::NbComponents(),
+                        Parent::NbQuad(), Parent::NbMemory(), Iteration::Pixel>
         pixel_map;
-    T2StateNFieldMap<Int, Mapping::Mut, twoD, NbMemory()> t2_map;
-    T4StateNFieldMap<Int, Mapping::Mut, twoD, NbMemory()> t4_map;
-    ScalarStateNFieldMap<Int, Mapping::Mut, NbMemory()> scalar_map;
+    T2StateNFieldMap<Int, Mapping::Mut, twoD, Parent::NbMemory()> t2_map;
+    T4StateNFieldMap<Int, Mapping::Mut, twoD, Parent::NbMemory()> t4_map;
+    ScalarStateNFieldMap<Int, Mapping::Mut, Parent::NbMemory()> scalar_map;
   };
 
+  using StateNFieldMapFixtures =
+      boost::mpl::list<StateNFieldMapFixture<1>, StateNFieldMapFixture<3>>;
+  using StaticStateNFieldMapFixtures =
+      boost::mpl::list<StaticStateNFieldMapFixture<1>,
+                       StaticStateNFieldMapFixture<3>>;
   /* ---------------------------------------------------------------------- */
-  BOOST_FIXTURE_TEST_CASE(iteration_test, StateNFieldMapFixture) {
-    array_field_map.initialise();
-    const_array_field_map.initialise();
-    array_field.current().eigen_vec().setZero();
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(iteration_test, Fix, StateNFieldMapFixtures,
+                                   Fix) {
+    Fix::array_field_map.initialise();
+    Fix::const_array_field_map.initialise();
+    Fix::array_field.current().eigen_vec().setZero();
     for (Dim_t i{1}; i < this->NbMemory() + 1; ++i) {
-      array_field.cycle();
-      array_field.current().eigen_vec().setOnes();
-      array_field.current().eigen_vec() *= i;
+      Fix::array_field.cycle();
+      Fix::array_field.current().eigen_vec().setOnes();
+      Fix::array_field.current().eigen_vec() *= i;
     }
-    for (Dim_t i{1}; i < this->NbMemory() + 1; ++i) {
-      for (auto && iterate : array_field_map) {
-        auto && current{iterate.current()};
-        auto && old{iterate.old(1)};
-        BOOST_CHECK_EQUAL((current - old).array().mean() % this->NbMemory(), 1);
-      }
-      for (auto && iterate : const_array_field_map) {
-        BOOST_CHECK_EQUAL((iterate.current() - iterate.old(1)).array().mean() %
-                              this->NbMemory(),
-                          1);  //! dummy test meant to fail for now
+    for (auto && iterate : Fix::array_field_map) {
+      auto && current{iterate.current()};
+      for (Dim_t i{1}; i < this->NbMemory() + 1; ++i) {
+        auto && old{iterate.old(i)};
+        BOOST_CHECK_EQUAL((current - old).array().mean(), i);
       }
     }
   }
 
   /* ---------------------------------------------------------------------- */
-  BOOST_FIXTURE_TEST_CASE(static_size_test, StateNFieldMapFixture) {
-    using Type1 = ArrayStateNFieldMap<Int, Mapping::Mut, NbComponents(), 1,
-                                      NbMemory(), Iteration::QuadPt>;
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(direct_access_test, Fix,
+                                   StateNFieldMapFixtures, Fix) {
+    Fix::array_field_map.initialise();
+    Fix::const_array_field_map.initialise();
+    Fix::array_field.current().eigen_vec().setZero();
+    for (Dim_t i{1}; i < this->NbMemory() + 1; ++i) {
+      Fix::array_field.cycle();
+      Fix::array_field.current().eigen_vec().setOnes();
+      Fix::array_field.current().eigen_vec() *= i;
+    }
+    auto && iterate{Fix::array_field_map[0]};
+    auto && current{iterate.current()};
+    for (Dim_t i{1}; i < this->NbMemory() + 1; ++i) {
+      auto && old{iterate.old(i)};
+      BOOST_CHECK_EQUAL((current - old).array().mean(), i);
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(static_size_test, Fix,
+                                   StateNFieldMapFixtures, Fix) {
+    using Type1 = ArrayStateNFieldMap<Int, Mapping::Mut, Fix::NbComponents(), 1,
+                                      Fix::NbMemory(), Iteration::QuadPt>;
     BOOST_CHECK_NO_THROW(Type1{this->array_field};);
-    using Type2 = ArrayStateNFieldMap<Int, Mapping::Const, NbComponents(), 1,
-                                      NbMemory(), Iteration::QuadPt>;
+    using Type2 = ArrayStateNFieldMap<Int, Mapping::Const, Fix::NbComponents(),
+                                      1, Fix::NbMemory(), Iteration::QuadPt>;
     BOOST_CHECK_NO_THROW(Type2{this->array_field});
     using WrongSize_t =
-        ArrayStateNFieldMap<Int, Mapping::Mut, NbComponents(), NbComponents(),
-                            NbMemory(), Iteration::QuadPt>;
+        ArrayStateNFieldMap<Int, Mapping::Mut, Fix::NbComponents(),
+                            Fix::NbComponents(), Fix::NbMemory(),
+                            Iteration::QuadPt>;
     BOOST_CHECK_THROW(WrongSize_t{this->array_field}, NFieldMapError);
 
     using WrongNbMemory_t =
-        ArrayStateNFieldMap<Int, Mapping::Mut, 1, NbComponents(),
-                            NbMemory() + 1, Iteration::QuadPt>;
+        ArrayStateNFieldMap<Int, Mapping::Mut, 1, Fix::NbComponents(),
+                            Fix::NbMemory() + 1, Iteration::QuadPt>;
     BOOST_CHECK_THROW(WrongNbMemory_t{this->array_field}, NFieldMapError);
 
-    using Pixel_t = ArrayStateNFieldMap<Int, Mapping::Mut, NbComponents(),
-                                        NbQuad(), NbMemory(), Iteration::Pixel>;
+    using Pixel_t =
+        ArrayStateNFieldMap<Int, Mapping::Mut, Fix::NbComponents(),
+                            Fix::NbQuad(), Fix::NbMemory(), Iteration::Pixel>;
     BOOST_CHECK_NO_THROW(Pixel_t{this->array_field});
 
-    using Matrix_t = MatrixStateNFieldMap<Int, Mapping::Mut, NbComponents(), 1,
-                                          NbMemory(), Iteration::QuadPt>;
+    using Matrix_t =
+        MatrixStateNFieldMap<Int, Mapping::Mut, Fix::NbComponents(), 1,
+                             Fix::NbMemory(), Iteration::QuadPt>;
     BOOST_CHECK_NO_THROW(Matrix_t{this->array_field});
 
-    using T2_t = T2StateNFieldMap<Int, Mapping::Mut, twoD, NbMemory()>;
+    using T2_t = T2StateNFieldMap<Int, Mapping::Mut, twoD, Fix::NbMemory()>;
     BOOST_CHECK_NO_THROW(T2_t{this->array_field});
-    using T4_t = T4StateNFieldMap<Int, Mapping::Mut, twoD, NbMemory()>;
+    using T4_t = T4StateNFieldMap<Int, Mapping::Mut, twoD, Fix::NbMemory()>;
     BOOST_CHECK_NO_THROW(T4_t{this->t4_field});
-    using Scalar_t = ScalarStateNFieldMap<Int, Mapping::Mut, NbMemory()>;
+    using Scalar_t = ScalarStateNFieldMap<Int, Mapping::Mut, Fix::NbMemory()>;
     BOOST_CHECK_NO_THROW(Scalar_t{this->scalar_field});
   }
 
   /* ---------------------------------------------------------------------- */
-  BOOST_FIXTURE_TEST_CASE(static_iteration_test, StaticStateNFieldMapFixture) {
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(static_iteration_test, Fix,
+                                   StaticStateNFieldMapFixtures, Fix) {
     size_t counter{0};
 
     this->scalar_map.initialise();
@@ -172,6 +208,44 @@ namespace muGrid {
     this->scalar_field.cycle();
     for (int i{0}; i < this->scalar_field.current().eigen_vec().size(); ++i) {
       BOOST_CHECK_EQUAL(i, this->scalar_field.old(1).eigen_vec()(i));
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(static_direct_access_test, Fix,
+                                   StaticStateNFieldMapFixtures, Fix) {
+    Fix::static_array_field_map.initialise();
+    Fix::static_const_array_field_map.initialise();
+    Fix::array_field.current().eigen_vec().setZero();
+    for (Dim_t i{1}; i < this->NbMemory() + 1; ++i) {
+      Fix::array_field.cycle();
+      Fix::array_field.current().eigen_vec().setOnes();
+      Fix::array_field.current().eigen_vec() *= i;
+    }
+    auto && iterate{Fix::static_array_field_map[0]};
+    auto && current{iterate.current()};
+    for (Dim_t i{1}; i < this->NbMemory() + 1; ++i) {
+      auto && old{iterate.old(i)};
+      BOOST_CHECK_EQUAL((current - old).array().mean(), i);
+    }
+  }
+  /* ---------------------------------------------------------------------- */
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(static_iteration_testb, Fix,
+                                   StaticStateNFieldMapFixtures, Fix) {
+    Fix::static_array_field_map.initialise();
+    Fix::static_const_array_field_map.initialise();
+    Fix::array_field.current().eigen_vec().setZero();
+    for (Dim_t i{1}; i < this->NbMemory() + 1; ++i) {
+      Fix::array_field.cycle();
+      Fix::array_field.current().eigen_vec().setOnes();
+      Fix::array_field.current().eigen_vec() *= i;
+    }
+    for (auto && iterate : Fix::static_array_field_map) {
+      auto && current{iterate.current()};
+      for (Dim_t i{1}; i < this->NbMemory() + 1; ++i) {
+        auto && old{iterate.old(i)};
+        BOOST_CHECK_EQUAL((current - old).array().mean(), i);
+      }
     }
   }
 

@@ -1,4 +1,4 @@
-# !/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
 @file   python_projection_tests.py
@@ -38,7 +38,7 @@ import unittest
 import numpy as np
 import itertools
 
-from python_test_imports import µ
+from python_test_imports import µ, muFFT
 from python_goose_ref import SmallStrainProjectionGooseFFT, FiniteStrainProjectionGooseFFT
 import _muSpectre
 
@@ -53,7 +53,8 @@ def build_test_classes(Projection, RefProjection, name):
             self.nb_grid_pts = self.ref.nb_grid_pts
             self.ndim = self.ref.ndim
             self.shape = list((self.nb_grid_pts for _ in range(self.ndim)))
-            self.projection = Projection(self.shape, self.shape)
+            self.fft = muFFT.FFT(self.shape, self.ndim*self.ndim)
+            self.projection = Projection(self.fft, [float(x) for x in self.shape])
             self.projection.initialise()
             self.tol = 1e-12*np.prod(self.shape)
 
@@ -68,7 +69,7 @@ def build_test_classes(Projection, RefProjection, name):
             # ijkl, xy(z)
             # reshape mspG so they are ¶(hermitian) × n² × n²
             ref_sizes = self.shape
-            msp_sizes = µ.get_nb_hermitian_grid_pts(self.shape)
+            msp_sizes = muFFT.get_nb_hermitian_grid_pts(self.shape)
             hermitian_size = np.prod(msp_sizes)
             mspG = self.projection.operator
             #this test only makes sense for fully stored ghats (i.e.,
@@ -103,31 +104,10 @@ def build_test_classes(Projection, RefProjection, name):
             # if we're testing small strain projections, it needs to be symmetric
             if self.projection.formulation == µ.Formulation.small_strain:
                 strain += strain.transpose(1, 0, *range(2, len(strain.shape)))
-            strain_g = strain.copy()
-            b_g = self.ref.G(strain_g).reshape(strain_g.shape)
-            strain_µ = np.zeros((*self.shape, self.ndim, self.ndim))
-            for ijk in itertools.product(range(self.nb_grid_pts), repeat=self.ndim):
-                index_µ = tuple((*ijk, slice(None), slice(None)))
-                index_g = tuple((slice(None), slice(None), *ijk))
-                strain_µ[index_µ] = strain_g[index_g].T
+            b_g = self.ref.G(strain).reshape(strain.shape)
+            b_µ = self.projection.apply_projection(strain)
 
-            b_µ = self.projection.apply_projection(strain_µ.reshape(
-                np.prod(self.shape), self.ndim**2,order='F').T).T.reshape(
-                    strain_µ.shape,order='F')
-            for ijk in itertools.product(range(self.nb_grid_pts), repeat=self.ndim):
-                index_µ = tuple((*ijk, slice(None), slice(None)))
-                index_g = tuple((slice(None), slice(None), *ijk))
-                b_µ_sl = b_µ[index_µ]
-                b_g_sl = b_g[index_g]
-                error = np.linalg.norm(b_µ_sl-b_g_sl)
-                condition = error < self.tol
-                slice_printer = lambda tup: "({})".format(
-                    ", ".join("{}".format(":" if val == slice(None) else val) for val in tup))
-                if not condition:
-                    print("error = {}, tol = {}".format(error, self.tol))
-                    print("b_µ{} =\n{}".format(slice_printer(index_µ), b_µ_sl))
-                    print("b_g{} =\n{}".format(slice_printer(index_g), b_g_sl))
-                self.assertTrue(condition)
+            assert np.allclose(b_g, b_µ)
 
 
     return ProjectionCheck

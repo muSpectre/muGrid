@@ -142,7 +142,7 @@ namespace muSpectre {
     //! return the raw projection operator. This is mainly intended
     //! for maintenance and debugging and should never be required in
     //! regular use
-    virtual Eigen::Map<MatrixXXc> get_operator() = 0;
+    // virtual Eigen::Map<MatrixXXc> get_operator() = 0;
 
     //! return the communicator object
     const auto & get_communicator() const {
@@ -167,6 +167,9 @@ namespace muSpectre {
      * returns the number of quadrature points
      */
     const Dim_t & get_nb_quad() const;
+
+    //! return a reference to the fft_engine
+    muFFT::FFTEngineBase& get_fft_engine();
 
    protected:
     //! handle on the fft_engine used

@@ -17,7 +17,7 @@
  * µGrid is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * General Public License for more details.
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with µGrid; see the file COPYING. If not, write to the
@@ -30,6 +30,7 @@
  * with proprietary FFT implementations or numerical libraries, containing parts
  * covered by the terms of those libraries' licenses, the licensors of this
  * Program grant you additional permission to convey the resulting work.
+ *
  */
 
 #include "nfield_collection_global.hh"
@@ -40,6 +41,16 @@ namespace muGrid {
   GlobalNFieldCollection::GlobalNFieldCollection(Dim_t spatial_dimension,
                                                  Dim_t nb_quad_pts)
       : Parent{ValidityDomain::Global, spatial_dimension, nb_quad_pts} {}
+
+  /* ---------------------------------------------------------------------- */
+  GlobalNFieldCollection::GlobalNFieldCollection(
+      Dim_t spatial_dimension,
+      Dim_t nb_quad_pts,
+      const DynCcoord_t & nb_grid_pts,
+      const DynCcoord_t & locations)
+      : Parent{ValidityDomain::Global, spatial_dimension, nb_quad_pts} {
+    this->initialise(nb_grid_pts, locations);
+  }
 
   /* ---------------------------------------------------------------------- */
   void GlobalNFieldCollection::initialise(const DynCcoord_t & nb_grid_pts,

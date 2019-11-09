@@ -65,13 +65,17 @@ namespace muFFT {
     constexpr static Real BoxLength{4.5};
     constexpr static Dim_t sdim{dim};
     constexpr static Dim_t nb_components{sdim * sdim};
-    constexpr static DynCcoord_t res() {
+    static DynCcoord_t res() {
       return muGrid::CcoordOps::get_cube(sdim, BoxNbGridPts);
     }
     FFTW_fixture()
         : engine(res(), nb_components, MPIContext::get_context().comm) {}
     Engine engine;
   };
+  template <typename Engine, Dim_t dim, Dim_t NbGridPts, bool serial>
+  constexpr Dim_t FFTW_fixture<Engine, dim, NbGridPts, serial>::BoxNbGridPts;
+  template <typename Engine, Dim_t dim, Dim_t NbGridPts, bool serial>
+  constexpr Dim_t FFTW_fixture<Engine, dim, NbGridPts, serial>::sdim;
 
   template <typename Engine>
   struct FFTW_fixture_python_segfault {
@@ -80,7 +84,7 @@ namespace muFFT {
     constexpr static Dim_t sdim{twoD};
     constexpr static Dim_t mdim{twoD};
     constexpr static Dim_t nb_components{sdim * sdim};
-    constexpr static DynCcoord_t res() { return {6, 4}; }
+    static DynCcoord_t res() { return {6, 4}; }
     FFTW_fixture_python_segfault()
         : engine{res(), nb_components, MPIContext::get_context().comm} {}
     Engine engine;

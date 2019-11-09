@@ -17,7 +17,7 @@
  * µGrid is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * General Public License for more details.
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with µGrid; see the file COPYING. If not, write to the
@@ -30,6 +30,7 @@
  * with proprietary FFT implementations or numerical libraries, containing parts
  * covered by the terms of those libraries' licenses, the licensors of this
  * Program grant you additional permission to convey the resulting work.
+ *
  */
 
 #ifndef SRC_LIBMUGRID_NFIELD_TYPED_HH_
@@ -105,7 +106,7 @@ namespace muGrid {
     TypedNFieldBase(const TypedNFieldBase & other) = delete;
 
     //! Move constructor
-    TypedNFieldBase(TypedNFieldBase && other) = delete;
+    TypedNFieldBase(TypedNFieldBase && other) = default;
 
     //! Destructor
     virtual ~TypedNFieldBase() = default;
@@ -127,6 +128,9 @@ namespace muGrid {
 
     //! addition assignment
     TypedNFieldBase & operator+=(const TypedNFieldBase & other);
+
+    //! subtraction assignment
+    TypedNFieldBase & operator-=(const TypedNFieldBase & other);
 
     const std::type_info & get_stored_typeid() const final { return typeid(T); }
 
@@ -275,7 +279,7 @@ namespace muGrid {
     TypedNField & operator=(TypedNField && other) = delete;
 
     //! Copy assignment operator
-    TypedNField & operator=(const TypedNField & other);
+    TypedNField & operator=(const Parent & other);
 
     //! Copy assignment operator
     TypedNField & operator=(const Negative & other);
@@ -346,8 +350,15 @@ namespace muGrid {
 
    public:
     /**
-     * constructor from an eigen array ref. Typically, this would be a reference
+     * constructor from a raw pointer. Typically, this would be a reference
      * to a numpy array from the python bindings.
+     */
+    WrappedNField(const std::string & unique_name,
+                  NFieldCollection & collection, Dim_t nb_components,
+                  size_t size, T *ptr);
+
+    /**
+     * constructor from an eigen array ref.
      */
     WrappedNField(const std::string & unique_name,
                   NFieldCollection & collection, Dim_t nb_components,
@@ -360,7 +371,7 @@ namespace muGrid {
     WrappedNField(const WrappedNField & other) = delete;
 
     //! Move constructor
-    WrappedNField(WrappedNField && other) = delete;
+    WrappedNField(WrappedNField && other) = default;
 
     //! Destructor
     virtual ~WrappedNField() = default;
@@ -385,13 +396,10 @@ namespace muGrid {
     friend NFieldCollection;
 
    protected:
-    /**
-     * an unregistered typed field can be mapped onto an array of
-     * existing values
-     */
-    Eigen::Ref<EigenRep_t> values{};
-
     void resize(size_t size) final;
+
+    //! size of the wrapped buffer
+    size_t size;
   };
 
   //! Alias for real-valued fields

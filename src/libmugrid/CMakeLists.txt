@@ -56,6 +56,7 @@ set(mugrid_HDRS
   field_typed.hh
   grid_common.hh
   iterators.hh
+  numpy.hh
   statefield.hh
   eigen_tools.hh
   T4_map_proxy.hh

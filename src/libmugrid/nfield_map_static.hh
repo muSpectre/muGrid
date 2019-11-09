@@ -18,7 +18,7 @@
  * µGrid is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * General Public License for more details.
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with µGrid; see the file COPYING. If not, write to the
@@ -31,6 +31,7 @@
  * with proprietary FFT implementations or numerical libraries, containing parts
  * covered by the terms of those libraries' licenses, the licensors of this
  * Program grant you additional permission to convey the resulting work.
+ *
  */
 
 #ifndef SRC_LIBMUGRID_NFIELD_MAP_STATIC_HH_
@@ -106,7 +107,8 @@ namespace muGrid {
         : StaticNFieldMap(TypedNField<T>::safe_cast(field)) {}
 
     //! Constructor from typed field ref.
-    explicit StaticNFieldMap(NField_t & field) : Parent{field, IterationType} {
+    explicit StaticNFieldMap(NField_t & field)
+        : Parent{field, MapType::NbRow(), IterationType} {
       if (this->stride != MapType::stride()) {
         std::stringstream error{};
         error << "Incompatible number of components in the field '"
@@ -396,6 +398,7 @@ namespace muGrid {
                      << PlainType::ColsAtCompileTime;
         return shape_stream.str();
       }
+      constexpr static Dim_t NbRow() { return PlainType::RowsAtCompileTime; }
     };
 
     /**
@@ -491,6 +494,7 @@ namespace muGrid {
 
       //! return the iterate's shape as text, mostly for error messages
       static std::string shape() { return "scalar"; }
+      constexpr static Dim_t NbRow() { return 1; }
     };
 
   }  // namespace internal

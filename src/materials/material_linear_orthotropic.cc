@@ -40,25 +40,39 @@
 
 namespace muSpectre {
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  MaterialLinearOrthotropic<DimS, DimM>::MaterialLinearOrthotropic(
-      std::string name, std::vector<Real> input)
-      : Parent(name, input_c_maker(input)) {}
+  template <Dim_t DimM>
+  MaterialLinearOrthotropic<DimM>::MaterialLinearOrthotropic(
+      const std::string & name, const Dim_t & spatial_dimension,
+      const Dim_t & nb_quad_pts, const std::vector<Real> & input)
+      : Parent{name, spatial_dimension, nb_quad_pts, input_c_maker(input)} {}
 
-  template <Dim_t DimS, Dim_t DimM>
-  std::vector<Real> MaterialLinearOrthotropic<DimS, DimM>::input_c_maker(
-      std::vector<Real> input) {
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimM>
+  MaterialLinearOrthotropic<DimM> & MaterialLinearOrthotropic<DimM>::make(
+      NCell & cell, const std::string & name, const Dim_t & spatial_dimension,
+      const Dim_t & nb_quad_pts, const std::vector<Real> & input) {
+    auto mat = std::make_unique<MaterialLinearOrthotropic<DimM>>(
+        name, spatial_dimension, nb_quad_pts, input);
+    auto & mat_ref = *mat;
+    cell.add_material(std::move(mat));
+    return mat_ref;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimM>
+  std::vector<Real> MaterialLinearOrthotropic<DimM>::input_c_maker(
+      const std::vector<Real> & input) {
     std::array<Dim_t, 2> constexpr input_size{4, 9};
     std::array<Dim_t, 2> constexpr output_size{6, 21};
     std::vector<Real> retval{};
     // in case the length of the input is inconsistnent:
     if (input.size() != size_t(input_size[DimM - 2])) {
       std::stringstream err_str{};
-      err_str << "Number of the inputs should be" << input_size[DimM - 2]
+      err_str << "Number of the inputs should be, " << input_size[DimM - 2]
               << std::endl;
       throw std::runtime_error(err_str.str());
     }
-    Dim_t S{output_size[DimS - 2]};
+    Dim_t S{output_size[DimM - 2]};
     Dim_t counter{0};
     for (Dim_t i = 0; i < S; ++i) {
       if (this->ret_flag[i]) {
@@ -73,16 +87,15 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <>
-  std::array<bool, 6> MaterialLinearOrthotropic<twoD, twoD>::ret_flag = {
-      1, 1, 0, 1, 0, 1};
+  std::array<bool, 6> MaterialLinearOrthotropic<twoD>::ret_flag = {1, 1, 0,
+                                                                   1, 0, 1};
 
   template <>
-  std::array<bool, 21> MaterialLinearOrthotropic<threeD, threeD>::ret_flag = {
+  std::array<bool, 21> MaterialLinearOrthotropic<threeD>::ret_flag = {
       1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 1};
 
   /* ---------------------------------------------------------------------- */
-  template class MaterialLinearOrthotropic<twoD, twoD>;
-  // template class MaterialLinearOrthotropic<twoD, threeD>;
-  template class MaterialLinearOrthotropic<threeD, threeD>;
+  template class MaterialLinearOrthotropic<twoD>;
+  template class MaterialLinearOrthotropic<threeD>;
 
 }  // namespace muSpectre

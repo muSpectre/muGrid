@@ -43,6 +43,7 @@
 
 #include <sstream>
 #include <string>
+#include <tuple>
 
 using muSpectre::Dim_t;
 using muSpectre::Real;
@@ -85,10 +86,6 @@ class PyMaterialBase : public muSpectre::MaterialBase {
   /* Inherit the constructors */
   using Parent = muSpectre::MaterialBase;
   using Parent::Parent;
-  using Strain_t = typename Parent::Strain_t;
-  using Stress_t = typename Parent::Stress_t;
-  using Stiffness_t = typename Parent::Stiffness_t;
-  using StressStiffness_t = typename std::tuple<Stress_t, Stiffness_t>;
 
   /* Trampoline (need one for each virtual function) */
   void save_history_variables() override {
@@ -106,9 +103,9 @@ class PyMaterialBase : public muSpectre::MaterialBase {
         initialise);  // Name of function in C++ (must match Python name)
   }
 
-  void compute_stresses(const muGrid::RealNField & F,
-                        muGrid::RealNField & P,
-                        muSpectre::Formulation form) override {
+  void compute_stresses(const muGrid::RealNField & F, muGrid::RealNField & P,
+                        muSpectre::Formulation form,
+                        muSpectre::SplitCell is_cell_split) override {
     PYBIND11_OVERLOAD_PURE(
         void,              // Return type
         Parent,            // Parent class
@@ -117,9 +114,9 @@ class PyMaterialBase : public muSpectre::MaterialBase {
   }
 
   void compute_stresses_tangent(const muGrid::RealNField & F,
-                                muGrid::RealNField & P,
-                                muGrid::RealNField & K,
-                                muSpectre::Formulation form) override {
+                                muGrid::RealNField & P, muGrid::RealNField & K,
+                                muSpectre::Formulation form,
+                                muSpectre::SplitCell is_cell_split) override {
     PYBIND11_OVERLOAD_PURE(
         void,             /* Return type */
         Parent,           /* Parent class */
@@ -127,48 +124,21 @@ class PyMaterialBase : public muSpectre::MaterialBase {
         F, P, K, form, is_cell_split);
   }
 
-  Stress_t
-  constitutive_law_small_strain(const Eigen::Ref<const Strain_t> & strain,
-                                const size_t & pixel_index) override {
+  using DynMatrix_t = typename Parent::DynMatrix_t;
+  using StressTangent_t = std::tuple<DynMatrix_t, DynMatrix_t>;
+  std::tuple<DynMatrix_t, DynMatrix_t>
+  constitutive_law_dynamic(const Eigen::Ref<const DynMatrix_t> & strain,
+                           const size_t & quad_pt_index,
+                           const muSpectre::Formulation & form) override {
     PYBIND11_OVERLOAD_PURE(
-        Stress_t, /* Return type */
-        Parent,   /* Parent class */
-        constitutive_law_small_strain,
-        /* Name of function in C++ (must match Python name) */
-        strain, pixel_index);
-  }
-
-  Stress_t
-  constitutive_law_finite_strain(const Eigen::Ref<const Strain_t> & strain,
-                                 const size_t & pixel_index) override {
-    PYBIND11_OVERLOAD_PURE(
-        Stress_t, /* Return type */
-        Parent,   /* Parent class */
-        constitutive_law_finite_strain,
-        /* Name of function in C++ (must match Python name) */
-        strain, pixel_index);
-  }
-
-  std::tuple<Stress_t, Stiffness_t> constitutive_law_tangent_small_strain(
-      const Eigen::Ref<const Strain_t> & strain,
-      const size_t & pixel_index) override {
-    PYBIND11_OVERLOAD_PURE(
-        StressStiffness_t, /* Return type */
-        Parent,            /* Parent class */
-        constitutive_law_tangent_small_strain,
-        /* Name of function in C++ (must match Python name) */
-        strain, pixel_index);
-  }
-
-  std::tuple<Stress_t, Stiffness_t> constitutive_law_tangent_finite_strain(
-      const Eigen::Ref<const Strain_t> & strain,
-      const size_t & pixel_index) override {
-    PYBIND11_OVERLOAD_PURE(
-        StressStiffness_t, /* Return type */
-        Parent,            /* Parent class */
-        constitutive_law_tangent_finite_strain,
-        /* Name of function in C++ (must match Python name) */
-        strain, pixel_index);
+        // Return type
+        StressTangent_t,
+        // Return type
+        Parent,
+        // Name of function in C++ (must match Python name)
+        constitutive_law_dynamic,
+        // arguments
+        strain, quad_pt_index, form);
   }
 };
 
@@ -255,8 +225,6 @@ void add_material_base_helper(py::module & mod) {
                     const Dim_t &>())
       .def("save_history_variables", &Material::save_history_variables)
       .def("list_fields", &Material::list_fields)
-      .def("get_real_field", &Material::get_real_field, "field_name"_a,
-           py::return_value_policy::reference_internal)
       .def("size", &Material::size)
       .def(
           "add_pixel",

@@ -44,30 +44,29 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  MaterialStochasticPlasticity<DimS, DimM>::MaterialStochasticPlasticity(
-      std::string name)
-      : Parent{name}, lambda_field{this->internal_fields,
-                                   "local first Lame constant"},
-        mu_field{this->internal_fields,
-                 "local second Lame constant(shear modulus)"},
-        plastic_increment_field{this->internal_fields, "plastic increment"},
-        stress_threshold_field{this->internal_fields, "threshold"},
-        eigen_strain_field{this->internal_fields, "eigen strain"},
-        overloaded_pixels{std::vector<Ccoord_t<DimS>>(0)} {}
+  template <Dim_t DimM>
+  MaterialStochasticPlasticity<DimM>::MaterialStochasticPlasticity(
+      const std::string & name, const Dim_t & spatial_dimension,
+      const Dim_t & nb_quad_pts)
+      : Parent{name, spatial_dimension, nb_quad_pts},
+        lambda_field{"local first Lame constant", this->internal_fields},
+        mu_field{"local second Lame constant(shear modulus)",
+                 this->internal_fields},
+        plastic_increment_field{"plastic increment", this->internal_fields},
+        stress_threshold_field{"threshold", this->internal_fields},
+        eigen_strain_field{"eigen strain", this->internal_fields} {}
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void MaterialStochasticPlasticity<DimS, DimM>::
-  add_pixel(const Ccoord_t<DimS> & /*pixel*/) {
-    throw std::runtime_error
-      ("This material needs pixels with Youngs modulus and Poisson ratio.");
+  template <Dim_t DimM>
+  void MaterialStochasticPlasticity<DimM>::add_pixel(const size_t & /*pixel*/) {
+    throw std::runtime_error(
+        "This material needs pixels with Youngs modulus and Poisson ratio.");
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void MaterialStochasticPlasticity<DimS, DimM>::add_pixel(
-      const Ccoord_t<DimS> & pixel, const Real & Young_modulus,
+  template <Dim_t DimM>
+  void MaterialStochasticPlasticity<DimM>::add_pixel(
+      const size_t & pixel, const Real & Young_modulus,
       const Real & Poisson_ratio, const Real & plastic_increment,
       const Real & stress_threshold,
       const Eigen::Ref<const Eigen::Matrix<Real, Eigen::Dynamic,
@@ -80,7 +79,7 @@ namespace muSpectre {
             << " for the eigen strain matrix.\nI expected the shape: "
             << std::to_string(DimM) << "×" << std::to_string(DimM);
       throw std::runtime_error(error.str());
-      }
+    }
     this->internal_fields.add_pixel(pixel);
     // store the first(lambda) and second(mu) Lame constant in the field
     Real lambda = Hooke::compute_lambda(Young_modulus, Poisson_ratio);
@@ -95,62 +94,61 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void MaterialStochasticPlasticity<DimS, DimM>::set_plastic_increment(
-      const Ccoord_t<DimS> pixel, const Real increment) {
+  template <Dim_t DimM>
+  void MaterialStochasticPlasticity<DimM>::set_plastic_increment(
+      const size_t & quad_pt_id, const Real & increment) {
     auto && plastic_increment_map{this->plastic_increment_field.get_map()};
-    plastic_increment_map[pixel] = increment;
+    plastic_increment_map[quad_pt_id] = increment;
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void MaterialStochasticPlasticity<DimS, DimM>::set_stress_threshold(
-      const Ccoord_t<DimS> pixel, const Real threshold) {
+  template <Dim_t DimM>
+  void MaterialStochasticPlasticity<DimM>::set_stress_threshold(
+      const size_t & quad_pt_id, const Real & threshold) {
     auto && stress_threshold_map{this->stress_threshold_field.get_map()};
-    stress_threshold_map[pixel] = threshold;
+    stress_threshold_map[quad_pt_id] = threshold;
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void MaterialStochasticPlasticity<DimS, DimM>::set_eigen_strain(
-      const Ccoord_t<DimS> pixel,
+  template <Dim_t DimM>
+  void MaterialStochasticPlasticity<DimM>::set_eigen_strain(
+      const size_t & quad_pt_id,
       Eigen::Ref<Eigen::Matrix<Real, DimM, DimM>> & eigen_strain) {
     auto && eigen_strain_map{this->eigen_strain_field.get_map()};
-    eigen_strain_map[pixel] = eigen_strain;
+    eigen_strain_map[quad_pt_id] = eigen_strain;
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  const Real & MaterialStochasticPlasticity<DimS, DimM>::get_plastic_increment(
-      const Ccoord_t<DimS> pixel) {
+  template <Dim_t DimM>
+  const Real & MaterialStochasticPlasticity<DimM>::get_plastic_increment(
+      const size_t & quad_pt_id) {
     auto && plastic_increment_map{this->plastic_increment_field.get_map()};
-    return plastic_increment_map[pixel];
+    return plastic_increment_map[quad_pt_id];
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  const Real & MaterialStochasticPlasticity<DimS, DimM>::get_stress_threshold(
-      const Ccoord_t<DimS> pixel) {
+  template <Dim_t DimM>
+  const Real & MaterialStochasticPlasticity<DimM>::get_stress_threshold(
+      const size_t & quad_pt_id) {
     auto && stress_threshold_map{this->stress_threshold_field.get_map()};
-    return stress_threshold_map[pixel];
+    return stress_threshold_map[quad_pt_id];
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimM>
   const Eigen::Ref<Eigen::Matrix<Real, DimM, DimM>>
-  MaterialStochasticPlasticity<DimS, DimM>::get_eigen_strain(
-      const Ccoord_t<DimS> pixel) {
+  MaterialStochasticPlasticity<DimM>::get_eigen_strain(
+      const size_t & quad_pt_id) {
     auto && eigen_strain_map{this->eigen_strain_field.get_map()};
-    return eigen_strain_map[pixel];
+    return eigen_strain_map[quad_pt_id];
   }
 
-  template <Dim_t DimS, Dim_t DimM>
-  void MaterialStochasticPlasticity<DimS, DimM>::reset_overloaded_pixels() {
-    this->overloaded_pixels.clear();
+  template <Dim_t DimM>
+  void MaterialStochasticPlasticity<DimM>::reset_overloaded_quad_pts() {
+    this->overloaded_quad_pts.clear();
   }
 
-  template class MaterialStochasticPlasticity<twoD, twoD>;
-  template class MaterialStochasticPlasticity<twoD, threeD>;
-  template class MaterialStochasticPlasticity<threeD, threeD>;
+  template class MaterialStochasticPlasticity<twoD>;
+  template class MaterialStochasticPlasticity<threeD>;
 
 }  // namespace muSpectre

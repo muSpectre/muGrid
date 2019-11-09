@@ -40,7 +40,7 @@
 
 namespace muSpectre {
 
-  //----------------------------------------------------------------------------//
+  /* ---------------------------------------------------------------------- */
   MaterialBase::MaterialBase(const std::string & name,
                              const Dim_t & spatial_dimension,
                              const Dim_t & material_dimension,
@@ -63,12 +63,11 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  // template <Dim_t DimS, Dim_t DimM>
-  // void MaterialBase<DimS, DimM>::add_pixel_split(const Ccoord & local_ccoord,
-  //                                                Real ratio) {
-  //   auto & this_mat = static_cast<MaterialBase &>(*this);
-  //   this_mat.add_pixel(local_ccoord);
-  //   this->assigned_ratio.value().get().push_back(ratio);
+  void MaterialBase::add_pixel_split(const size_t & local_ccoord,
+                                     const Real & ratio) {
+    this->add_pixel(local_ccoord);
+    this->assigned_ratio->get_field().push_back(ratio);
+  }
 
   void MaterialBase::compute_stresses(const muGrid::NField & F,
                                       muGrid::NField & P, Formulation form,
@@ -98,11 +97,10 @@ namespace muSpectre {
     }
   }
 
-  // /* ----------------------------------------------------------------------
-  // */ template <Dim_t DimS, Dim_t DimM> Real MaterialBase<DimS,
-  // DimM>::get_assigned_ratio(Ccoord pixel) {
-  //   return this->assigned_ratio.value().get().get_map()[pixel];
-  // }
+  /* ---------------------------------------------------------------------- */
+  Real MaterialBase::get_assigned_ratio(const size_t & pixel_id) {
+    return this->assigned_ratio->get_map()[pixel_id];
+  }
 
   // /* ----------------------------------------------------------------------
   // */ template <Dim_t DimS, Dim_t DimM> auto MaterialBase<DimS,
@@ -126,31 +124,14 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   auto MaterialBase::get_pixel_indices() const ->
-      typename MFieldCollection_t::PixelIndexIterable {
+      typename muGrid::LocalNFieldCollection::PixelIndexIterable {
     return this->internal_fields.get_pixel_indices_fast();
   }
 
   /* ---------------------------------------------------------------------- */
   auto MaterialBase::get_quad_pt_indices() const ->
-      typename MFieldCollection_t::IndexIterable {
+      typename muGrid::LocalNFieldCollection::IndexIterable {
     return this->internal_fields.get_quad_pt_indices();
-  }
-  /* ---------------------------------------------------------------------- */
-  auto MaterialBase::get_real_field(std::string field_name) -> EigenMap {
-    if (not this->internal_fields.field_exists(field_name)) {
-      std::stringstream err{};
-      err << "Field '" << field_name << "' does not exist in material '"
-          << this->name << "'.";
-      throw muGrid::NFieldCollectionError(err.str());
-    }
-    auto & field{this->internal_fields.get_field(field_name)};
-    if (field.get_stored_typeid() != typeid(Real)) {
-      std::stringstream err{};
-      err << "Field '" << field_name << "' is not real-valued";
-      throw muGrid::NFieldCollectionError(err.str());
-    }
-
-    return static_cast<muGrid::RealNField &>(field).eigen_quad_pt();
   }
 
   /* ---------------------------------------------------------------------- */

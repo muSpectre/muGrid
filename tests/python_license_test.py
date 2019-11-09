@@ -1,4 +1,4 @@
-# !/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
 @file python_license_test.py
@@ -109,7 +109,7 @@ def header_license_test(source_dirs, lic_paras):
                                                    "It should be replaced by"
                                                    "\n\'{}\'"
                                                    .format(num+1,
-                                                           header_file_name,
+                                                           header_file,
                                                            lic_para))
                     raise test_case.failureException(msg)
             print("\"{}\" License text approved".format(header_file))
@@ -157,7 +157,7 @@ def source_license_test(source_dirs, lic_paras):
                                                    "is not correct. It should "
                                                    "be replaced by \n\'{}\'"
                                                    .format(num+1,
-                                                           source_file_name,
+                                                           source_file,
                                                            lic_para))
                     raise test_case.failureException(msg)
             print("\"{}\" License text approved".format(source_file))
@@ -178,9 +178,9 @@ def python_license_test(source_dirs, py_lic_paras):
             file_text = file_obj.read()
             hash_bang_text = re.split("\"\"\"", file_text, 3)[0]
             test_case.assertEqual(hash_bang_text,
-                                  "# !/usr/bin/env python3\n"
+                                  "#!/usr/bin/env python3\n"
                                   "# -*- coding:utf-8 -*-\n",
-                                  msg="the has_bang of file {} is incorrect"
+                                  msg="the hashbang of file {} is incorrect"
                                   .format(python_file))
             license_text = re.split("\"\"\"", file_text, 3)[1]
             lines_text = re.split("\n\n", license_text)
@@ -190,10 +190,12 @@ def python_license_test(source_dirs, py_lic_paras):
             file_name = re.sub('\@file', '', file_name_line)
             python_file_name = re.split('\/', python_file)[-1]
             python_file_name = re.sub(' +', '', python_file_name)
-            test_case.assertEqual(file_name,
-                                  python_file_name,
-                                  msg="The name supplied in the first line of"
-                                  "the license should match the file name")
+            test_case.assertEqual(
+                file_name,
+                python_file_name,
+                msg=("The name supplied in the first line of"
+                     "the license should match the file name for :{}").format(
+                         python_file))
             del lines_text[0:5]
             msg = ""
             for num, lic_para in enumerate(py_lic_paras):
@@ -206,7 +208,7 @@ def python_license_test(source_dirs, py_lic_paras):
                                                    " should be replaced by \n"
                                                    "\"'{}\' "
                                                    .format(num+1,
-                                                           python_file_name,
+                                                           python_file,
                                                            lic_para,))
                     raise test_case.failureException(msg)
             print("\"{}\" License text approved".format(python_file))

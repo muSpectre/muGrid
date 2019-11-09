@@ -17,7 +17,7 @@
  * µSpectre is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * General Public License for more details.
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with µSpectre; see the file COPYING. If not, write to the
@@ -30,6 +30,7 @@
  * with proprietary FFT implementations or numerical libraries, containing parts
  * covered by the terms of those libraries' licenses, the licensors of this
  * Program grant you additional permission to convey the resulting work.
+ *
  */
 
 #include "cell_adaptor.hh"
@@ -253,7 +254,7 @@ namespace muSpectre {
     return this->stress;
   }
 
-  //----------------------------------------------------------------------------//
+  /* ---------------------------------------------------------------------- */
   auto NCell::evaluate_stress_eigen() -> Eigen_cmap {
     return this->evaluate_stress().eigen_vec();
   }
@@ -261,7 +262,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   std::tuple<const muGrid::RealNField &, const muGrid::RealNField &>
   NCell::evaluate_stress_tangent() {
-    if (this->initialised == false) {
+    if (not this->initialised) {
       this->initialise();
     }
 
@@ -276,7 +277,7 @@ namespace muSpectre {
     return std::tie(this->stress, this->tangent.value());
   }
 
-  //----------------------------------------------------------------------------//
+  /* ---------------------------------------------------------------------- */
   auto NCell::evaluate_stress_tangent_eigen()
       -> std::tuple<const Eigen_cmap, const Eigen_cmap> {
     auto && fields{this->evaluate_stress_tangent()};
@@ -315,10 +316,10 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimM>
-  void
-  NCell::apply_directional_stiffness(const muGrid::RealNField & delta_strain,
-                                     const muGrid::RealNField & tangent,
-                                     muGrid::RealNField & delta_stress) {
+  void NCell::apply_directional_stiffness(
+      const muGrid::TypedNFieldBase<Real> & delta_strain,
+      const muGrid::TypedNFieldBase<Real> & tangent,
+      muGrid::TypedNFieldBase<Real> & delta_stress) {
     muGrid::T2NFieldMap<Real, muGrid::Mapping::Const, DimM> strain_map{
         delta_strain};
     muGrid::T4NFieldMap<Real, muGrid::Mapping::Const, DimM> tangent_map{
@@ -329,14 +330,14 @@ namespace muSpectre {
       auto & df = std::get<0>(tup);
       auto & k = std::get<1>(tup);
       auto & dp = std::get<2>(tup);
-      dp = -Matrices::tensmult(k, df);
+      dp = Matrices::tensmult(k, df);
     }
   }
 
   /* ---------------------------------------------------------------------- */
   void NCell::evaluate_projected_directional_stiffness(
-      const muGrid::RealNField & delta_strain,
-      muGrid::RealNField & del_stress) {
+      const muGrid::TypedNFieldBase<Real> & delta_strain,
+      muGrid::TypedNFieldBase<Real> & del_stress) {
     if (not this->tangent) {
       throw std::runtime_error("evaluate_projected_directional_stiffness "
                                "requires the tangent moduli");
@@ -434,6 +435,11 @@ namespace muSpectre {
     }
     this->apply_projection(del_stress_field);
   }
+
+  /* ---------------------------------------------------------------------- */
+  auto NCell::get_projection() const -> const ProjectionBase & {
+    return *this->projection;
+  }
   /* ---------------------------------------------------------------------- */
   template <typename T>
   muGrid::TypedNField<T> &
@@ -489,8 +495,8 @@ namespace muSpectre {
 
     // fill it with local internal values
     for (auto & local_field : local_fields) {
-      auto pixel_map{muGrid::TypedNField<T>::safe_cast(local_field)
-                                .get_pixel_map()};
+      auto pixel_map{
+          muGrid::TypedNField<T>::safe_cast(local_field).get_pixel_map()};
       for (auto && pixel_id__value : pixel_map.enumerate_pixel_indices_fast()) {
         const auto & pixel_id{std::get<0>(pixel_id__value)};
         const auto & value{std::get<1>(pixel_id__value)};

@@ -57,12 +57,13 @@ namespace muSpectre {
               << " matrix";
     }
 
+    const auto & sym_mat{VC_t::get_sym_mat()};
     for (int i{0}; i < DimM; ++i) {
       for (int j{0}; j < DimM; ++j) {
         for (int k{0}; k < DimM; ++k) {
           for (int l{0}; l < DimM; ++l) {
             get(*this->C_holder, i, j, k, l) =
-                C_voigt(VC_t::sym_mat(i, j), VC_t::sym_mat(k, l));
+                C_voigt(sym_mat(i, j), sym_mat(k, l));
           }
         }
       }

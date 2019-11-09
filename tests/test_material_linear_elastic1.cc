@@ -40,6 +40,7 @@
 
 #include "materials/material_linear_elastic1.hh"
 #include "materials/material_linear_elastic2.hh"
+#include "materials/iterable_proxy.hh"
 
 #include <libmugrid/iterators.hh>
 #include <libmugrid/nfield_typed.hh>
@@ -55,14 +56,22 @@ namespace muSpectre {
   template <class Mat_t>
   struct MaterialFixture : public Mat_t {
     using Mat = Mat_t;
-    const Dim_t NbQuadPts{1};
-    const Real lambda{2}, mu{1.5};
-    const Real young{mu * (3 * lambda + 2 * mu) / (lambda + mu)};
-    const Real poisson{lambda / (2 * (lambda + mu))};
-    MaterialFixture()
-        : mat("Name", Mat_t::MaterialDimension(), NbQuadPts, young, poisson) {}
-    Mat_t mat;
+    constexpr static Dim_t NbQuadPts{1};
+    constexpr static Real lambda{2}, mu{1.5};
+    constexpr static Real young{mu * (3 * lambda + 2 * mu) / (lambda + mu)};
+    constexpr static Real poisson{lambda / (2 * (lambda + mu))};
+    constexpr static Dim_t mdim{Mat_t::MaterialDimension()};
+
+    MaterialFixture() : Mat("Name", mdim, NbQuadPts, young, poisson) {}
   };
+  template <class Mat_t>
+  constexpr Real MaterialFixture<Mat_t>::poisson;
+  template <class Mat_t>
+  constexpr Real MaterialFixture<Mat_t>::young;
+  template <class Mat_t>
+  constexpr Dim_t MaterialFixture<Mat_t>::NbQuadPts;
+  template <class Mat_t>
+  constexpr Dim_t MaterialFixture<Mat_t>::mdim;
 
   template <class Mat_t>
   struct has_internals {
@@ -81,17 +90,16 @@ namespace muSpectre {
                        MaterialFixture<MaterialLinearElastic2<threeD>>>;
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_constructor, Fix, mat_list, Fix) {
-    BOOST_CHECK_EQUAL("Name", Fix::mat.get_name());
+    BOOST_CHECK_EQUAL("Name", Fix::get_name());
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_add_pixel, Fix, mat_list, Fix) {
-    auto & mat{Fix::mat};
     muGrid::testGoodies::RandRange<size_t> rng;
 
     const Dim_t nb_pixel{7}, box_size{17};
     for (Dim_t i = 0; i < nb_pixel; ++i) {
       auto && c =
-          rng.randval(0, muGrid::ipow(box_size, mat.MaterialDimension()));
+          rng.randval(0, muGrid::ipow(box_size, Fix::MaterialDimension()));
       if (!has_internals<typename Fix::Mat>::value) {
         BOOST_CHECK_NO_THROW(Fix::add_pixel(c));
       }
@@ -105,11 +113,12 @@ namespace muSpectre {
     using Mat = Mat_t;
     constexpr static Dim_t box_size{3};
     MaterialFixtureFilled()
-        : MaterialFixture<Mat_t>(),
-          mat("Mat Name", this->young, this->poisson) {
-      using Ccoord = Ccoord_t<Mat_t::sdim()>;
-      Ccoord cube{muGrid::CcoordOps::get_cube<Mat_t::sdim()>(box_size)};
-      muGrid::CcoordOps::Pixels<Mat_t::sdim()> pixels(cube);
+        : MaterialFixture<Mat_t>(), mat("Mat Name", Mat::MaterialDimension(),
+                                        OneQuadPt, this->young, this->poisson) {
+      using Ccoord = Ccoord_t<Mat_t::MaterialDimension()>;
+      Ccoord cube{
+          muGrid::CcoordOps::get_cube<Mat_t::MaterialDimension()>(box_size)};
+      muGrid::CcoordOps::Pixels<Mat_t::MaterialDimension()> pixels(cube);
       for (auto && id_pixel : akantu::enumerate(pixels)) {
         auto && id{std::get<0>(id_pixel)};
         this->mat.add_pixel(id);
@@ -128,82 +137,84 @@ namespace muSpectre {
     Eigen::Matrix<Real, Fix::mdim, Fix::mdim> I{
         Eigen::Matrix<Real, Fix::mdim, Fix::mdim>::Identity() +
         0.1 * Eigen::Matrix<Real, Fix::mdim, Fix::mdim>::Random()};
-    auto origin_eval_func_result = Fix::evaluate_stress(I, 0);
+    auto origin_eval_func_result = Fix::evaluate_stress_tangent(I, 0);
     auto base_eval_func_result =
-        Fix::evaluate_stress_base(I, 0, Formulation::small_strain);
-    Real error = (origin_eval_func_result - base_eval_func_result).norm();
+        Fix::constitutive_law_dynamic(I, 0, Formulation::small_strain);
+    Real error{(std::get<0>(origin_eval_func_result) -
+                std::get<0>(base_eval_func_result))
+                   .norm()};
     BOOST_CHECK_EQUAL(error, 0.0);
-
-    auto origin_eval_func_result_2 = Fix::evaluate_stress_tangent(
-        Eigen::Matrix<Real, Fix::mdim, Fix::mdim>::Identity(), 0);
-    auto base_eval_func_result_2 =
-        Fix::evaluate_stress_tangent_base(I, 0, Formulation::small_strain);
-    error = (std::get<1>(origin_eval_func_result_2) -
-             std::get<1>(base_eval_func_result_2))
+    error = (std::get<1>(origin_eval_func_result) -
+             std::get<1>(base_eval_func_result))
                 .norm();
     BOOST_CHECK_EQUAL(error, 0.0);
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_iterable_proxy_constructors, Fix,
                                    mat_fill, Fix) {
-    constexpr auto cube{muGrid::CcoordOps::get_cube<Fix::sdim>(Fix::box_size)};
-    constexpr auto loc{muGrid::CcoordOps::get_cube<Fix::sdim>(0)};
+    constexpr auto cube{
+        muGrid::CcoordOps::get_cube<Fix::MaterialDimension()>(Fix::box_size)};
+    constexpr auto loc{
+        muGrid::CcoordOps::get_cube<Fix::MaterialDimension()>(0)};
 
-    using FC_t = muGrid::GlobalFieldCollection<Fix::sdim>;
-    FC_t globalfields;
-    auto & F{muGrid::make_field<typename Fix::Mat::StrainField_t>(
-        "Transformation Gradient", globalfields)};
-    auto & F_rate{muGrid::make_field<typename Fix::Mat::StrainField_t>(
-        "Transformation Gradient Rate", globalfields)};
-    auto & P = muGrid::make_field<typename Fix::Mat::StressField_t>(
-        "Nominal Stress1", globalfields);  // to be computed alone
-    auto & K = muGrid::make_field<typename Fix::Mat::TangentField_t>(
-        "Tangent Moduli", globalfields);  // to be computed with tangent
+    muGrid::GlobalNFieldCollection globalfields{Fix::mdim, Fix::NbQuadPts};
+    auto & F{globalfields.register_real_field(
+        "Transformation Gradient",
+        muGrid::ipow(Fix::MaterialDimension(), secondOrder))};
+    auto & F_rate{globalfields.register_real_field(
+        "Transformation Gradient Rate",
+        muGrid::ipow(Fix::MaterialDimension(), secondOrder))};
+    auto & P{globalfields.register_real_field(
+        "Nominal Stress1", muGrid::ipow(Fix::MaterialDimension(),
+                                        secondOrder))};  // to be computed alone
+    auto & K{globalfields.register_real_field(
+        "Tangent Moduli",
+        muGrid::ipow(Fix::MaterialDimension(),
+                     fourthOrder))};  // to be computed with tangent
     globalfields.initialise(cube, loc);
 
-    using traits =
-        MaterialMuSpectre_traits<MaterialLinearElastic1<Fix::sdim, Fix::mdim>>;
+    using traits = MaterialMuSpectre_traits<
+        MaterialLinearElastic1<Fix::MaterialDimension()>>;
 
     using iterable_proxy_t_without_rate_without_tangent =
-        typename Fix::template iterable_proxy<
-            std::tuple<typename traits::StrainMap_t>,
-            std::tuple<typename traits::StressMap_t>>;
+        iterable_proxy<std::tuple<typename traits::StrainMap_t>,
+                       std::tuple<typename traits::StressMap_t>>;
     iterable_proxy_t_without_rate_without_tangent
         field_without_rate_without_tangent(Fix::mat, F, P);
 
     using iterable_proxy_t_without_rate_with_tangent =
-        typename Fix::template iterable_proxy<
-            std::tuple<typename traits::StrainMap_t>,
-            std::tuple<typename traits::StressMap_t,
-                       typename traits::TangentMap_t>>;
+        iterable_proxy<std::tuple<typename traits::StrainMap_t>,
+                       std::tuple<typename traits::StressMap_t,
+                                  typename traits::TangentMap_t>>;
     iterable_proxy_t_without_rate_with_tangent fields_without_rate_with_tangent(
         Fix::mat, F, P, K);
 
-    using iterable_proxy_t_with_rate_without_tangent =
-        typename Fix::template iterable_proxy<
-            std::tuple<typename traits::StrainMap_t,
-                       typename traits::StrainMap_t>,
-            std::tuple<typename traits::StressMap_t>>;
+    using iterable_proxy_t_with_rate_without_tangent = iterable_proxy<
+        std::tuple<typename traits::StrainMap_t, typename traits::StrainMap_t>,
+        std::tuple<typename traits::StressMap_t>>;
     iterable_proxy_t_with_rate_without_tangent fields_with_rate_without_tangent(
         Fix::mat, F, F_rate, P);
 
-    using iterable_proxy_t_with_rate_with_tangent =
-        typename Fix::template iterable_proxy<
-            std::tuple<typename traits::StrainMap_t,
-                       typename traits::StrainMap_t>,
-            std::tuple<typename traits::StressMap_t,
-                       typename traits::TangentMap_t>>;
+    using iterable_proxy_t_with_rate_with_tangent = iterable_proxy<
+        std::tuple<typename traits::StrainMap_t, typename traits::StrainMap_t>,
+        std::tuple<typename traits::StressMap_t,
+                   typename traits::TangentMap_t>>;
 
     iterable_proxy_t_with_rate_with_tangent fields_with_rate_with_tangent(
         Fix::mat, F, F_rate, P, K);
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_evaluate_law, Fix, mat_fill, Fix) {
-    constexpr auto cube{muGrid::CcoordOps::get_cube<Fix::sdim>(Fix::box_size)};
-    constexpr auto loc{muGrid::CcoordOps::get_cube<Fix::sdim>(0)};
+    constexpr auto cube{
+        muGrid::CcoordOps::get_cube<Fix::MaterialDimension()>(Fix::box_size)};
+    constexpr auto loc{
+        muGrid::CcoordOps::get_cube<Fix::MaterialDimension()>(0)};
+
+    constexpr Dim_t mdim{Fix::MaterialDimension()};
+    auto & mat{Fix::mat};
 
     using FC_t = muGrid::GlobalNFieldCollection;
-    FC_t globalfields{SDim, muGrid::Unknown};
+    FC_t globalfields{Fix::MaterialDimension(), muGrid::Unknown};
     globalfields.set_nb_quad(Fix::NbQuadPts);
     globalfields.initialise(cube, loc);
     globalfields.register_real_field("Transformation Gradient", mdim * mdim);

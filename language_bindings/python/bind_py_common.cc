@@ -95,6 +95,7 @@ void add_common(py::module & mod) {
       .value("backward", muSpectre::FiniteDiff::backward)
       .value("centred", muSpectre::FiniteDiff::centred);
 
+  mod.attr("OneQuadPt") = muGrid::OneQuadPt;
   mod.def("banner", &muSpectre::banner, "name"_a, "year"_a,
           "copyright_holder"_a);
 }

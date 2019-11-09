@@ -105,8 +105,11 @@ namespace muSpectre {
     FieldMap grad(f_grad);
     FieldMap var(f_var);
 
+    fix::projector.initialise(muFFT::FFT_PlanFlags::estimate);
+
     fields.initialise(fix::projector.get_nb_subdomain_grid_pts(),
                       fix::projector.get_subdomain_locations());
+    fix::projector.apply_projection(f_var);
     grad.initialise();
     var.initialise();
 
@@ -140,9 +143,6 @@ namespace muSpectre {
       v.row(0) = g.row(0);
     }
     // end_field_iteration_snippet
-
-    fix::projector.initialise(muFFT::FFT_PlanFlags::estimate);
-    fix::projector.apply_projection(f_var);
 
     for (auto && tup :
          akantu::zip(fields.get_pixels().template get_dimensioned_pixels<dim>(),

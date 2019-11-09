@@ -48,6 +48,8 @@ using muGrid::GlobalNFieldCollection;
 using muGrid::NField;
 using muGrid::NFieldCollection;
 using muGrid::TypedNField;
+using muGrid::TypedNFieldBase;
+using muGrid::WrappedNField;
 using pybind11::literals::operator""_a;
 
 namespace py = pybind11;
@@ -67,85 +69,100 @@ void add_field(py::module & mod) {
 
 template <class T>
 void add_typed_field(py::module & mod, std::string name) {
-  py::class_<TypedNField<T>, NField> py_class(mod, name.c_str(),
-                                              py::buffer_protocol());
-  py_class.def_buffer([](TypedNField<T> & self) {
+  auto && array_computer = [](TypedNFieldBase<T> & self,
+                              const std::vector<Dim_t> & shape,
+                              const muGrid::Iteration & it) {
+    // py_class will be passed as the `base` class to the array
+    // constructors below. This ties the lifetime of the array that does
+    // not own its own data to the field object. (Without this
+    // parameter, the constructor makes a copy of the array.)
+    std::vector<size_t> return_shape;
+    const size_t dim{shape.size()};
+
+    // If shape is given, then we return a field of tensors of this
+    // shape
+    Dim_t ntotal = 1;
+    if (dim != 0) {
+      for (auto & n : shape) {
+        return_shape.push_back(n);
+        ntotal *= n;
+      }
+    }
+
+    auto nb_quad = self.get_collection().get_nb_quad();
+    if (it == muGrid::Iteration::QuadPt) {
+      // If shape is not given, we just return column vectors with the
+      // components
+      if (dim == 0) {
+        return_shape.push_back(self.get_nb_components());
+      } else if (ntotal != self.get_nb_components()) {
+        std::stringstream error{};
+        error << "Field has " << self.get_nb_components() << " components "
+              << "per quadrature point, but shape requested would "
+                 "require "
+              << ntotal << " components.";
+        throw std::runtime_error(error.str());
+      }
+      return_shape.push_back(nb_quad);
+    } else {
+      // If shape is not given, we just return column vectors with the
+      // components
+      if (dim == 0) {
+        return_shape.push_back(self.get_nb_components() * nb_quad);
+      } else if (ntotal != self.get_nb_components() * nb_quad) {
+        std::stringstream error{};
+        error << "Field has " << self.get_nb_components() * nb_quad
+              << " components per pixel, but shape requested would "
+                 "require "
+              << ntotal << " components.";
+        throw std::runtime_error(error.str());
+      }
+    }
+
     auto & coll = self.get_collection();
-    return py::buffer_info(
-        self.data(),
-        {static_cast<size_t>(coll.get_nb_pixels()),
-         static_cast<size_t>(coll.get_nb_quad()),
-         static_cast<size_t>(self.get_nb_components())},
-        {sizeof(T) *
-             static_cast<size_t>(self.get_nb_components() * coll.get_nb_quad()),
-         sizeof(T) * static_cast<size_t>(self.get_nb_components()), sizeof(T)});
-  });
-  py_class.def(
-      "array",
-      [py_class](TypedNField<T> & self, const muGrid::DynCcoord_t & shape,
-                 const muGrid::Iteration & it) {
-        // py_class will be passed as the `base` class to the array constructors
-        // below. This ties the lifetime of the array that does not own its own
-        // data to the field object. (Without this parameter, the constructor
-        // makes a copy of the array.)
-        std::vector<size_t> return_shape;
+    if (coll.get_domain() == NFieldCollection::ValidityDomain::Global) {
+      // We have a global field collection and can return array that
+      // have the correct shape corresponding to the grid (on the local
+      // MPI process).
+      const GlobalNFieldCollection & global_coll =
+          dynamic_cast<const GlobalNFieldCollection &>(coll);
+      auto & nb_grid_pts = global_coll.get_pixels().get_nb_grid_pts();
+      for (auto & n : nb_grid_pts) {
+        return_shape.push_back(n);
+      }
+    } else {
+      return_shape.push_back(coll.get_nb_pixels());
+    }
+    return py::array_t<T, py::array::f_style>(return_shape, self.data(),
+                                              py::capsule([]() {}));
+  };
 
-        // If shape is given, then we return a field of tensors of this shape
-        Dim_t ntotal = 1;
-        if (shape.get_dim() != 0) {
-          for (auto & n : shape) {
-            return_shape.push_back(n);
-            ntotal *= n;
-          }
-        }
-
-        auto nb_quad = self.get_collection().get_nb_quad();
-        if (it == muGrid::Iteration::QuadPt) {
-          // If shape is not given, we just return column vectors with the
-          // components
-          if (shape.get_dim() == 0) {
-            return_shape.push_back(self.get_nb_components());
-          } else if (ntotal != self.get_nb_components()) {
-            std::stringstream error{};
-            error << "Field has " << self.get_nb_components() << " components "
-                  << "per quadrature point, but shape requested would require "
-                  << ntotal << " components.";
-            throw std::runtime_error(error.str());
-          }
-          return_shape.push_back(nb_quad);
-        } else {
-          // If shape is not given, we just return column vectors with the
-          // components
-          if (shape.get_dim() == 0) {
-            return_shape.push_back(self.get_nb_components() * nb_quad);
-          } else if (ntotal != self.get_nb_components() * nb_quad) {
-            std::stringstream error{};
-            error << "Field has " << self.get_nb_components() * nb_quad
-                  << " components per pixel, but shape requested would require "
-                  << ntotal << " components.";
-            throw std::runtime_error(error.str());
-          }
-        }
-
+  py::class_<TypedNFieldBase<T>, NField>(mod, (name + "Base").c_str(),
+                                         py::buffer_protocol())
+      .def_buffer([](TypedNFieldBase<T> & self) {
         auto & coll = self.get_collection();
-        if (coll.get_domain() == NFieldCollection::ValidityDomain::Global) {
-          // We have a global field collection and can return array that have
-          // the correct shape corresponding to the grid (on the local MPI
-          // process).
-          const GlobalNFieldCollection & global_coll =
-              dynamic_cast<const GlobalNFieldCollection &>(coll);
-          auto & nb_grid_pts = global_coll.get_pixels().get_nb_grid_pts();
-          for (auto & n : nb_grid_pts) {
-            return_shape.push_back(n);
-          }
-        } else {
-          return_shape.push_back(coll.get_nb_pixels());
-        }
-        return py::array_t<T, py::array::f_style>(return_shape, self.data(),
-                                                  py_class);
-      },
-      "shape"_a = muGrid::DynCcoord_t(0),
-      "iteration_type"_a = muGrid::Iteration::QuadPt, py::keep_alive<0, 1>());
+        return py::buffer_info(
+            self.data(),
+            {static_cast<size_t>(coll.get_nb_pixels()),
+             static_cast<size_t>(coll.get_nb_quad()),
+             static_cast<size_t>(self.get_nb_components())},
+            {sizeof(T) * static_cast<size_t>(self.get_nb_components() *
+                                             coll.get_nb_quad()),
+             sizeof(T) * static_cast<size_t>(self.get_nb_components()),
+             sizeof(T)});
+      })
+      .def("array", array_computer, "shape"_a = std::vector<Dim_t>{},
+           "iteration_type"_a = muGrid::Iteration::QuadPt,
+           py::return_value_policy::reference_internal)
+      .def("array",
+           [&array_computer](TypedNFieldBase<T> & self,
+                             const muGrid::Iteration & it) {
+             return array_computer(self, std::vector<Dim_t>{}, it);
+           },
+           "iteration_type"_a = muGrid::Iteration::QuadPt,
+           py::return_value_policy::reference_internal);
+
+  py::class_<TypedNField<T>, TypedNFieldBase<T>>(mod, name.c_str());
 }
 
 void add_field_classes(py::module & mod) {

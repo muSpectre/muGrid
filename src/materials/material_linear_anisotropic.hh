@@ -46,30 +46,23 @@
 #include "libmugrid/T4_map_proxy.hh"
 #include "libmugrid/tensor_algebra.hh"
 #include "libmugrid/eigen_tools.hh"
+#include "libmugrid/mapped_nfield.hh"
 
 namespace muSpectre {
 
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimM>
   class MaterialLinearAnisotropic;
 
   // traits for anisotropic material
-  template <Dim_t DimS, Dim_t DimM>
-  struct MaterialMuSpectre_traits<MaterialLinearAnisotropic<DimS, DimM>> {
-    using Parent = MaterialMuSpectre_traits<void>;  //!< base for elasticity
-
-    //! global field collection
-    using GFieldCollection_t =
-        typename MaterialBase<DimS, DimM>::GFieldCollection_t;
-
+  template <Dim_t DimM>
+  struct MaterialMuSpectre_traits<MaterialLinearAnisotropic<DimM>> {
     //! expected map type for strain fields
-    using StrainMap_t =
-        muGrid::MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM, true>;
+    using StrainMap_t = muGrid::T2NFieldMap<Real, Mapping::Const, DimM>;
     //! expected map type for stress fields
-    using StressMap_t =
-        muGrid::MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
+    using StressMap_t = muGrid::T2NFieldMap<Real, Mapping::Mut, DimM>;
     //! expected map type for tangent stiffness fields
-    using TangentMap_t =
-        muGrid::T4MatrixFieldMap<GFieldCollection_t, Real, DimM>;
+    using TangentMap_t = muGrid::T4NFieldMap<Real, Mapping::Mut, DimM>;
+
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
     //! declare what type of stress measure your law yields as output
@@ -79,13 +72,12 @@ namespace muSpectre {
   /**
    * Material implementation for anisotropic constitutive law
    */
-  template <Dim_t DimS, Dim_t DimM = DimS>
+  template <Dim_t DimM>
   class MaterialLinearAnisotropic
-      : public MaterialMuSpectre<MaterialLinearAnisotropic<DimS, DimM>, DimS,
-                                 DimM> {
+      : public MaterialMuSpectre<MaterialLinearAnisotropic<DimM>, DimM> {
    public:
     //! base class
-    using Parent = MaterialMuSpectre<MaterialLinearAnisotropic, DimS, DimM>;
+    using Parent = MaterialMuSpectre<MaterialLinearAnisotropic, DimM>;
 
     using Stiffness_t = muGrid::T4Mat<Real, DimM>;
 
@@ -96,12 +88,6 @@ namespace muSpectre {
     using Hooke =
         typename MatTB::Hooke<DimM, typename traits::StrainMap_t::reference,
                               typename traits::TangentMap_t::reference>;
-    //! global field collection
-    using GFieldCollection_t =
-        typename MaterialBase<DimS, DimM>::GFieldCollection_t;
-
-    //! expected map type for tangent stiffness fields
-    using Tangent_t = muGrid::T4MatrixFieldMap<GFieldCollection_t, Real, DimM>;
 
     //! Default constructor
     MaterialLinearAnisotropic() = delete;
@@ -109,7 +95,10 @@ namespace muSpectre {
     // constructor
     // a std::vector is utilized as the input of the constructor to
     // enable us to check its length so to prevent user mistake
-    MaterialLinearAnisotropic(std::string name, std::vector<Real> input_c);
+    MaterialLinearAnisotropic(const std::string & name,
+                              const Dim_t & spatial_dimension,
+                              const Dim_t & nb_quad_pts,
+                              const std::vector<Real> & input_c);
 
     //! Copy constructor
     MaterialLinearAnisotropic(const MaterialLinearAnisotropic & other) = delete;
@@ -144,41 +133,42 @@ namespace muSpectre {
     static auto c_maker(std::vector<Real> input) -> Stiffness_t;
 
    protected:
-    Stiffness_t C;  //!< stiffness tensor
+    std::unique_ptr<Stiffness_t> C_holder;  //! memory for stiffness tensor
+    Stiffness_t & C;                        //!< stiffness tensor
   };
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimM>
   template <class s_t>
-  auto MaterialLinearAnisotropic<DimS, DimM>::evaluate_stress(s_t && E)
+  auto MaterialLinearAnisotropic<DimM>::evaluate_stress(s_t && E)
       -> decltype(auto) {
     return Matrices::tensmult(this->C, E);
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimM>
   template <class s_t>
-  auto MaterialLinearAnisotropic<DimS, DimM>::evaluate_stress_tangent(s_t && E)
+  auto MaterialLinearAnisotropic<DimM>::evaluate_stress_tangent(s_t && E)
       -> decltype(auto) {
     return std::make_tuple(Hooke::evaluate_stress(this->C, E), this->C);
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimM>
   template <class s_t>
-  auto MaterialLinearAnisotropic<DimS, DimM>::evaluate_stress(s_t && E,
+  auto MaterialLinearAnisotropic<DimM>::evaluate_stress(s_t && E,
                                                               const size_t &
                                                               /*pixel_index*/)
       -> decltype(auto) {
-    return MaterialLinearAnisotropic<DimS, DimM>::evaluate_stress(E);
+    return MaterialLinearAnisotropic<DimM>::evaluate_stress(E);
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimM>
   template <class s_t>
-  auto MaterialLinearAnisotropic<DimS, DimM>::evaluate_stress_tangent(
+  auto MaterialLinearAnisotropic<DimM>::evaluate_stress_tangent(
       s_t && E, const size_t & /*pixel_index*/) -> decltype(auto) {
-    return MaterialLinearAnisotropic<DimS, DimM>::evaluate_stress_tangent(E);
+    return MaterialLinearAnisotropic<DimM>::evaluate_stress_tangent(E);
   }
 
 }  // namespace muSpectre

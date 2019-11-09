@@ -33,10 +33,9 @@
  *
  */
 
-
 #include "common/muSpectre_common.hh"
 #include "materials/material_stochastic_plasticity.hh"
-#include "cell/cell_base.hh"
+#include "cell/ncell.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -54,80 +53,86 @@ namespace py = pybind11;
  * python binding for the optionally objective form of Hooke's law
  * with per-pixel elastic properties
  */
-template <Dim_t dim>
+template <Dim_t Dim>
 void add_material_stochastic_plasticity_helper(py::module & mod) {
   std::stringstream name_stream{};
-  name_stream << "MaterialStochasticPlasticity_" << dim << 'd';
+  name_stream << "MaterialStochasticPlasticity_" << Dim << 'd';
   const auto name{name_stream.str()};
 
-  using Mat_t = muSpectre::MaterialStochasticPlasticity<dim, dim>;
-  using Sys_t = muSpectre::CellBase<dim, dim>;
+  using Mat_t = muSpectre::MaterialStochasticPlasticity<Dim>;
+  using Cell_t = muSpectre::NCell;
 
   //! dynamic vector type for interactions with numpy/scipy/solvers etc.
   using Vector_t = Eigen::Matrix<Real, Eigen::Dynamic, 1>;
   using StressField_t = Eigen::Ref<Vector_t>;
 
-  py::class_<Mat_t, muSpectre::MaterialBase<dim, dim>, std::shared_ptr<Mat_t>>(
+  py::class_<Mat_t, muSpectre::MaterialBase, std::shared_ptr<Mat_t>>(
       mod, name.c_str())
-      .def(py::init<std::string>(), "name"_a)
-      .def_static("make",
-                  [](Sys_t & sys, std::string n) -> Mat_t & {
-                    return Mat_t::make(sys, n);
-                  },
-                  "cell"_a, "name"_a, py::return_value_policy::reference,
-                  py::keep_alive<1, 0>())
-      .def("add_pixel",
-           [](Mat_t & mat, muSpectre::Ccoord_t<dim> pix, Real Young,
-              Real Poisson, Real plastic_increment, Real stress_threshold,
-              Eigen::Ref<
-                  const Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>>
-                  eigen_strain) {
-             mat.add_pixel(pix, Young, Poisson, plastic_increment,
-                           stress_threshold, eigen_strain);
-           },
-           "pixel"_a, "Young"_a, "Poisson"_a, "increment"_a, "threshold"_a,
-           "strain"_a)
+      .def_static(
+          "make",
+          [](Cell_t & cell, std::string n, Dim_t nb_quad_pts) -> Mat_t & {
+            return Mat_t::make(cell, n, Dim, nb_quad_pts);
+          },
+          "cell"_a, "name"_a, "nb_quad_pts"_a,
+          py::return_value_policy::reference_internal)
+      .def(
+          "add_pixel",
+          [](Mat_t & mat, Dim_t pix_id, Real Young, Real Poisson,
+             Real plastic_increment, Real stress_threshold,
+             Eigen::Ref<
+                 const Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>>
+                 eigen_strain) {
+            mat.add_pixel(pix_id, Young, Poisson, plastic_increment,
+                          stress_threshold, eigen_strain);
+          },
+          "pixel_index"_a, "Young"_a, "Poisson"_a, "increment"_a, "threshold"_a,
+          "strain"_a)
       .def_static("make_evaluator", []() { return Mat_t::make_evaluator(); })
-      .def("identify_overloaded_pixels",
-           [](Mat_t & mat, Sys_t & sys, StressField_t & stress) {
-             return mat.identify_overloaded_pixels(sys, stress);
-           },
-           "sys"_a, "stress"_a)
-      .def("set_plastic_increment",
-           [](Mat_t & mat, const muSpectre::Ccoord_t<dim> pixel,
-              const Real increment) {
-             return mat.set_plastic_increment(pixel, increment);
-           },
-           "pixel"_a, "increment"_a)
-      .def("set_stress_threshold",
-           [](Mat_t & mat, const muSpectre::Ccoord_t<dim> pixel,
-              const Real threshold) {
-             return mat.set_stress_threshold(pixel, threshold);
-           },
-           "pixel"_a, "threshold"_a)
-      .def("set_eigen_strain",
-           [](Mat_t & mat, const muSpectre::Ccoord_t<dim> pixel,
-              Eigen::Ref<Eigen::Matrix<Real, dim, dim>> eigen_strain) {
-             return mat.set_eigen_strain(pixel, eigen_strain);
-           },
-           "pixel"_a, "eigen_strain"_a)
-      .def("get_plastic_increment",
-           [](Mat_t & mat, const muSpectre::Ccoord_t<dim> pixel) {
-             return mat.get_plastic_increment(pixel);
-           },
-           "pixel"_a)
-      .def("get_stress_threshold",
-           [](Mat_t & mat, const muSpectre::Ccoord_t<dim> pixel) {
-             return mat.get_stress_threshold(pixel);
-           },
-           "pixel"_a)
-      .def("get_eigen_strain",
-           [](Mat_t & mat, const muSpectre::Ccoord_t<dim> pixel) {
-             return mat.get_eigen_strain(pixel);
-           },
-           "pixel"_a)
+      .def(
+          "identify_overloaded_pixels",
+          [](Mat_t & mat, Cell_t & cell, StressField_t & stress) {
+            return mat.identify_overloaded_quad_pts(cell, stress);
+          },
+          "cell"_a, "stress"_a)
+      .def(
+          "set_plastic_increment",
+          [](Mat_t & mat, const size_t & quad_pt_id, const Real increment) {
+            return mat.set_plastic_increment(quad_pt_id, increment);
+          },
+          "quad_pt_id"_a, "increment"_a)
+      .def(
+          "set_stress_threshold",
+          [](Mat_t & mat, const size_t & quad_pt_id, const Real threshold) {
+            return mat.set_stress_threshold(quad_pt_id, threshold);
+          },
+          "quad_pt_id"_a, "threshold"_a)
+      .def(
+          "set_eigen_strain",
+          [](Mat_t & mat, const size_t & quad_pt_id,
+             Eigen::Ref<Eigen::Matrix<Real, Dim, Dim>> eigen_strain) {
+            return mat.set_eigen_strain(quad_pt_id, eigen_strain);
+          },
+          "pixel"_a, "eigen_strain"_a)
+      .def(
+          "get_plastic_increment",
+          [](Mat_t & mat, const size_t & quad_pt_id) {
+            return mat.get_plastic_increment(quad_pt_id);
+          },
+          "pixel"_a)
+      .def(
+          "get_stress_threshold",
+          [](Mat_t & mat, const size_t & quad_pt_id) {
+            return mat.get_stress_threshold(quad_pt_id);
+          },
+          "pixel"_a)
+      .def(
+          "get_eigen_strain",
+          [](Mat_t & mat, const size_t & quad_pt_id) {
+            return mat.get_eigen_strain(quad_pt_id);
+          },
+          "pixel"_a)
       .def("reset_overloaded_pixels",
-           [](Mat_t & mat) { return mat.reset_overloaded_pixels(); });
+           [](Mat_t & mat) { return mat.reset_overloaded_quad_pts(); });
 }
 
 template void

@@ -631,7 +631,6 @@ namespace muSpectre {
 
       template <Formulation Form>
       struct MaterialStressEvaluator {
-
         template <class Material, class Strain>
         auto static compute(Material & mat, const Strain & strain,
                             const size_t & quad_pt_id) -> decltype(auto) {
@@ -650,7 +649,6 @@ namespace muSpectre {
 
       template <>
       struct MaterialStressEvaluator<Formulation::finite_strain> {
-
         template <class Material, class Strain>
         auto static compute(Material & mat, const Strain & strain,
                             const size_t & quad_pt_id) -> decltype(auto) {
@@ -702,7 +700,6 @@ namespace muSpectre {
 
       template <>
       struct MaterialStressTangentEvaluator<Formulation::finite_strain> {
-
         template <class Material, class Strain>
         auto static compute(Material & mat, const Strain & strain,
                             const size_t & quad_pt_id) -> decltype(auto) {

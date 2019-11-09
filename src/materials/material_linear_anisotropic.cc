@@ -37,14 +37,17 @@
 
 namespace muSpectre {
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  MaterialLinearAnisotropic<DimS, DimM>::MaterialLinearAnisotropic(
-      std::string name, std::vector<Real> input_c)
-      : Parent(name), C{c_maker(input_c)} {};
+  template <Dim_t DimM>
+  MaterialLinearAnisotropic<DimM>::MaterialLinearAnisotropic(
+      const std::string & name, const Dim_t & spatial_dimension,
+      const Dim_t & nb_quad_pts, const std::vector<Real> & input_c)
+      : Parent{name, spatial_dimension, nb_quad_pts},
+        C_holder{std::make_unique<Stiffness_t>(c_maker(input_c))},
+        C{*this->C_holder} {};
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  auto MaterialLinearAnisotropic<DimS, DimM>::c_maker(std::vector<Real> input)
+  template <Dim_t DimM>
+  auto MaterialLinearAnisotropic<DimM>::c_maker(std::vector<Real> input)
       -> Stiffness_t {
     // the correct size of the input according to the dimension
     std::array<Dim_t, 2> constexpr input_size{6, 21};
@@ -55,7 +58,7 @@ namespace muSpectre {
 
     if (input.size() != size_t(input_size[DimM - 2])) {
       std::stringstream err_str{};
-      err_str << "Number of the inputs should be" << input_size[DimM - 2]
+      err_str << "Number of the inputs should be " << input_size[DimM - 2]
               << std::endl;
       throw std::runtime_error(err_str.str());
     }
@@ -96,9 +99,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-
-  template class MaterialLinearAnisotropic<twoD, twoD>;
-  template class MaterialLinearAnisotropic<twoD, threeD>;
-  template class MaterialLinearAnisotropic<threeD, threeD>;
+  template class MaterialLinearAnisotropic<twoD>;
+  template class MaterialLinearAnisotropic<threeD>;
 
 }  // namespace muSpectre

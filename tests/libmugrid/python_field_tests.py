@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
-file     python_field_tests.py
+@file     python_field_tests.py
 
 @author  Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
 
@@ -9,22 +9,20 @@ file     python_field_tests.py
 
 @brief   test field collections and fields
 
-@section LICENSE
-
 Copyright © 2018 Till Junge
 
-µSpectre is free software; you can redistribute it and/or
+µGrid is free software; you can redistribute it and/or
 modify it under the terms of the GNU Lesser General Public License as
 published by the Free Software Foundation, either version 3, or (at
 your option) any later version.
 
-µSpectre is distributed in the hope that it will be useful, but
+µGrid is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-General Public License for more details.
+Lesser General Public License for more details.
 
 You should have received a copy of the GNU Lesser General Public License
-along with µSpectre; see the file COPYING. If not, write to the
+along with µGrid; see the file COPYING. If not, write to the
 Free Software Foundation, Inc., 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.
 
@@ -57,11 +55,8 @@ class FieldCheck(unittest.TestCase):
         self.assertEqual(f2.array(muGrid.Pixel).shape,
                          (4,) + self.nb_grid_pts)
         # Check that we get those fields back
-        self.assertEqual(fc['test-field'], f)
-        self.assertEqual(fc['test-field2'], f2)
-        # Check size
-        self.assertEqual(f.nb_components * f.size, len(f))
-        self.assertEqual(f2.nb_components * f2.size, len(f2))
+        self.assertEqual(fc.get_field('test-field'), f)
+        self.assertEqual(fc.get_field('test-field2'), f2)
         # Check strides
         self.assertEqual(f.stride(muGrid.Pixel), 1)
         self.assertEqual(f2.stride(muGrid.Pixel), 4)
@@ -84,11 +79,8 @@ class FieldCheck(unittest.TestCase):
         self.assertEqual(f2.array(muGrid.QuadPt).shape,
                          (3, 4) + self.nb_grid_pts)
         # Check that we get those fields back
-        self.assertEqual(fc['test-field'], f)
-        self.assertEqual(fc['test-field2'], f2)
-        # Check size
-        self.assertEqual(f.nb_components * f.size, len(f))
-        self.assertEqual(f2.nb_components * f2.size, len(f2))
+        self.assertEqual(fc.get_field('test-field'), f)
+        self.assertEqual(fc.get_field('test-field2'), f2)
         # Check strides
         self.assertEqual(f.stride(muGrid.Pixel), 4)
         self.assertEqual(f2.stride(muGrid.Pixel), 3*4)

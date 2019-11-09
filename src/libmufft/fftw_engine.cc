@@ -61,14 +61,12 @@ namespace muFFT {
 
     const int & rank = this->nb_subdomain_grid_pts.get_dim();
     std::vector<int> narr(rank);
-    std::copy(this->nb_subdomain_grid_pts.begin(),
-              this->nb_subdomain_grid_pts.end(), narr.begin());
-    const int * const n = &narr[0];
     // Reverse the order of the array dimensions, because FFTW expects a
     // row-major array and the arrays used in muSpectre are column-major
     for (Dim_t i = 0; i < rank; ++i) {
       narr[i] = this->nb_subdomain_grid_pts[rank - 1 - i];
     }
+    const int * const n = &narr[0];
     int howmany = this->nb_dof_per_pixel;
     // temporary buffer for plan
     size_t alloc_size =

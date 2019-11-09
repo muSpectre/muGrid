@@ -74,6 +74,7 @@ namespace muSpectre {
                                        .template get_dimensioned_pixels<DimS>(),
                                    this->Ghat)) {
       const auto & ccoord = std::get<0>(tup);
+
       auto & G = std::get<1>(tup);
       auto xi = fft_freqs.get_unit_xi(ccoord);
       auto kron = [](const Dim_t i, const Dim_t j) -> Real {

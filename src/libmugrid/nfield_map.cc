@@ -17,7 +17,7 @@
  * µGrid is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * General Public License for more details.
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with µGrid; see the file COPYING. If not, write to the
@@ -30,6 +30,7 @@
  * with proprietary FFT implementations or numerical libraries, containing parts
  * covered by the terms of those libraries' licenses, the licensors of this
  * Program grant you additional permission to convey the resulting work.
+ *
  */
 
 #include "nfield_map.hh"
@@ -59,6 +60,9 @@ namespace muGrid {
       : field{field}, iteration{iter_type}, stride{this->field.get_stride(
                                                 iter_type)},
         nb_rows{nb_rows_}, nb_cols{this->stride / nb_rows_} {
+    if (this->field.get_collection().is_initialised()) {
+      this->initialise();
+    }
     if (this->nb_rows * this->nb_cols != this->stride) {
       std::stringstream error{};
       error << "You chose an iterate with " << this->nb_rows

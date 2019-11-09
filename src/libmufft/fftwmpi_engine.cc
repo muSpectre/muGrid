@@ -63,14 +63,14 @@ namespace muFFT {
     // See:
     // http://www.fftw.org/fftw3_doc/Multi_002ddimensional-MPI-DFTs-of-Real-Data.html
     this->workspace_size *= 2;
-    if (Dim > 1) {
-      this->nb_fourier_grid_pts[Dim-2] = this->nb_fourier_grid_pts[Dim-1];
-      this->fourier_locations[Dim-2] = this->fourier_locations[Dim-1];
+    if (dim > 1) {
+      this->nb_fourier_grid_pts[dim-2] = this->nb_fourier_grid_pts[dim-1];
+      this->fourier_locations[dim-2] = this->fourier_locations[dim-1];
     }
-    this->nb_subdomain_grid_pts[Dim-1] = res_x;
-    this->subdomain_locations[Dim-1] = loc_x;
-    this->nb_fourier_grid_pts[Dim-1] = res_y;
-    this->fourier_locations[Dim-1] = loc_y;
+    this->nb_subdomain_grid_pts[dim-1] = res_x;
+    this->subdomain_locations[dim-1] = loc_x;
+    this->nb_fourier_grid_pts[dim-1] = res_y;
+    this->fourier_locations[dim-1] = loc_y;
 
     for (auto & n : this->nb_subdomain_grid_pts) {
       if (n == 0) {
@@ -195,7 +195,6 @@ namespace muFFT {
     // Copy non-padded field to padded real_workspace.
     // Transposed output of M x N x L transform for >= 3 dimensions is padded
     // M x N x 2*(L/2+1).
-    int dim = this->nb_subdomain_grid_pts.get_dim();
     ptrdiff_t fstride =
         (this->nb_dof_per_pixel * this->nb_subdomain_grid_pts[0]);
     ptrdiff_t wstride = (this->nb_dof_per_pixel * 2 *

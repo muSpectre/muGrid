@@ -17,7 +17,7 @@
  * µGrid is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * General Public License for more details.
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with µGrid; see the file COPYING. If not, write to the
@@ -30,13 +30,14 @@
  * with proprietary FFT implementations or numerical libraries, containing parts
  * covered by the terms of those libraries' licenses, the licensors of this
  * Program grant you additional permission to convey the resulting work.
+ *
  */
+
+#include <sstream>
 
 #include "nfield_typed.hh"
 #include "nfield_collection.hh"
 #include "nfield_map.hh"
-
-#include <sstream>
 
 namespace muGrid {
 
@@ -54,7 +55,7 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  TypedNField<T> & TypedNField<T>::operator=(const TypedNField & other) {
+  TypedNField<T> & TypedNField<T>::operator=(const Parent & other) {
     Parent::operator=(other);
     return *this;
   }
@@ -148,11 +149,11 @@ namespace muGrid {
   template <typename T>
   void TypedNField<T>::resize(size_t size) {
     const auto expected_size{size * this->get_nb_components() + this->pad_size};
-    if (not(this->values.size() == expected_size)) {
+    if (this->values.size() != expected_size or this->current_size != size) {
       this->current_size = size;
       this->values.resize(expected_size);
     }
-    this->set_data_ptr(&this->values.front());
+    this->set_data_ptr(this->values.data());
   }
 
   /* ---------------------------------------------------------------------- */
@@ -278,6 +279,14 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
+  TypedNFieldBase<T> & TypedNFieldBase<T>::
+  operator-=(const TypedNFieldBase & other) {
+    this->eigen_vec() -= other.eigen_vec();
+    return *this;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
   auto TypedNFieldBase<T>::eigen_vec() -> Eigen_map {
     return this->eigen_map(this->size() * this->nb_components, 1);
   }
@@ -376,8 +385,41 @@ namespace muGrid {
   WrappedNField<T>::WrappedNField(const std::string & unique_name,
                                   NFieldCollection & collection,
                                   Dim_t nb_components,
+                                  size_t size, T *ptr)
+      : Parent{unique_name, collection, nb_components},
+        size{static_cast<size_t>(size)} {
+    this->current_size = size / this->nb_components;
+
+    if (size != this->nb_components * this->current_size) {
+      std::stringstream error{};
+      error << "Size mismatch: the provided array has a size of "
+            << size
+            << " which is not a multiple of the specified number of components "
+               "(nb_components = "
+            << this->nb_components << ").";
+      throw NFieldError(error.str());
+    }
+    if (this->collection.get_nb_entries() != Dim_t(this->current_size)) {
+      std::stringstream error{};
+      error << "Size mismatch: This field should store " << this->nb_components
+            << " component(s) on " << this->collection.get_nb_pixels()
+            << " pixels/voxels with " << this->collection.get_nb_quad()
+            << " quadrature point(s) each, i.e. with a total of "
+            << this->collection.get_nb_entries() * this->nb_components
+            << " scalar values, but you supplied an array of size "
+            << size << '.';
+      throw NFieldError(error.str());
+    }
+    this->set_data_ptr(ptr);
+  }
+
+  template <typename T>
+  WrappedNField<T>::WrappedNField(const std::string & unique_name,
+                                  NFieldCollection & collection,
+                                  Dim_t nb_components,
                                   Eigen::Ref<EigenRep_t> values)
-      : Parent{unique_name, collection, nb_components}, values{values} {
+      : Parent{unique_name, collection, nb_components},
+        size{static_cast<size_t>(values.size())} {
     this->current_size = values.size() / this->nb_components;
 
     if (values.size() != Dim_t(this->nb_components * this->current_size)) {
@@ -427,7 +469,9 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   template <typename T>
   void WrappedNField<T>::set_zero() {
-    this->values.setZero();
+    std::fill(static_cast<T*>(this->data_ptr),
+              static_cast<T*>(this->data_ptr) + this->size,
+              T{});
   }
 
   /* ---------------------------------------------------------------------- */
@@ -446,7 +490,7 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   template <typename T>
   size_t WrappedNField<T>::buffer_size() const {
-    return this->values.size();
+    return this->size;
   }
 
   /* ---------------------------------------------------------------------- */

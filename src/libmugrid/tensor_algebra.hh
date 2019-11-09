@@ -229,8 +229,9 @@ namespace muGrid {
      * Standart tensor multiplication
      */
     template <typename T4, typename T2>
-    constexpr inline decltype(auto) tensmult(const Eigen::MatrixBase<T4> & A,
-                                             const Eigen::MatrixBase<T2> & B) {
+    constexpr inline auto tensmult(const Eigen::MatrixBase<T4> & A,
+                                   const Eigen::MatrixBase<T2> & B)
+        -> Tens2_t<T2::RowsAtCompileTime> {
       constexpr Dim_t dim{T2::RowsAtCompileTime};
       static_assert(dim == T2::ColsAtCompileTime, "B is not square");
       static_assert(dim != Eigen::Dynamic, "B not statically sized");

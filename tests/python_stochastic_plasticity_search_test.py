@@ -1,4 +1,4 @@
-# !/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
 @file   python_stochastic_plasticity_search_test.py
@@ -49,7 +49,7 @@ def init_cell(res, lens, formulation):
 def init_material(res, lens, formulation, young, poisson,
                   yield_stress, plastic_increment, eigen_strain):
     cell = init_cell(res, lens, formulation)
-    mat = µ.material.MaterialStochasticPlasticity_3d.make(cell.wrapped_cell,
+    mat = µ.material.MaterialStochasticPlasticity_3d.make(cell,
                                                           'test_mat')
     #init pixels
     for pixel in cell:
@@ -113,7 +113,7 @@ def sigma_eq(sigma):
     return sigma_eq
 
 def init_cg_solver(cell, cg_tol, maxiter, verbose):
-    return µ.solvers.SolverCG(cell.wrapped_cell, cg_tol, maxiter, verbose)
+    return µ.solvers.SolverCG(cell, cg_tol, maxiter, verbose)
 
 
 class StochasticPlasticitySearch_Check(unittest.TestCase):
@@ -299,7 +299,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         strain_field[0,1,...] = strain_xy
         #check if you can find the yielding pixel
         overloaded_pixels = \
-            sps.propagate_avalanche_step(mat, cell.wrapped_cell, self.dim, cg_solver,
+            sps.propagate_avalanche_step(mat, cell, self.dim, cg_solver,
                                          self.newton_tol, self.newton_equil_tol,
                                          self.verbose)
 

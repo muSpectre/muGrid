@@ -1,4 +1,4 @@
-# !/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
 @file   python_test_imports.py
@@ -43,16 +43,16 @@ project_home = os.path.join(os.getcwd(), '../..')
 sys.path.insert(0, os.path.join(project_home,
                                 "language_bindings/python"))
 sys.path.insert(0, os.path.join(project_home,
+                                "language_bindings/libmugrid/python"))
+sys.path.insert(0, os.path.join(project_home,
                                 "language_bindings/libmufft/python"))
 
 # Path of the library when compiling with Xcode
 sys.path.insert(0, os.path.join(project_home,
                                 "language_bindings/python/Debug"))
 sys.path.insert(0, os.path.join(project_home,
+                                "language_bindings/libmugrid/python/Debug"))
+sys.path.insert(0, os.path.join(project_home,
                                 "language_bindings/libmufft/python/Debug"))
 
-try:
-    import muFFT
-except ImportError as err:
-    print(err)
-    sys.exit(-1)
+import muFFT

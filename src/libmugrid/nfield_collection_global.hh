@@ -17,7 +17,7 @@
  * µGrid is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * General Public License for more details.
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with µGrid; see the file COPYING. If not, write to the
@@ -30,6 +30,7 @@
  * with proprietary FFT implementations or numerical libraries, containing parts
  * covered by the terms of those libraries' licenses, the licensors of this
  * Program grant you additional permission to convey the resulting work.
+ *
  */
 
 #ifndef SRC_LIBMUGRID_NFIELD_COLLECTION_GLOBAL_HH_
@@ -61,6 +62,16 @@ namespace muGrid {
      * @param nb_quad_pts number of quadrature points per pixel/voxel
      */
     GlobalNFieldCollection(Dim_t spatial_dimension, Dim_t nb_quad_pts);
+
+    /**
+     * Constructor with initialization
+     * @param spatial_dimension number of spatial dimensions, must be 1, 2, 3,
+     * or Unknown
+     * @param nb_quad_pts number of quadrature points per pixel/voxel
+     */
+    GlobalNFieldCollection(Dim_t spatial_dimension, Dim_t nb_quad_pts,
+                           const DynCcoord_t & nb_grid_pts,
+                           const DynCcoord_t & locations = {});
 
     //! Copy constructor
     GlobalNFieldCollection(const GlobalNFieldCollection & other) = delete;

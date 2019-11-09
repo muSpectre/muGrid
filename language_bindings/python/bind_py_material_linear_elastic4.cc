@@ -35,7 +35,7 @@
 
 #include "common/muSpectre_common.hh"
 #include "materials/material_linear_elastic4.hh"
-#include "cell/cell_base.hh"
+#include "cell/ncell.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -60,7 +60,7 @@ void add_material_linear_elastic4_helper(py::module & mod) {
   const auto name{name_stream.str()};
 
   using Mat_t = muSpectre::MaterialLinearElastic4<dim>;
-  using Cell_t = muSpectre::CellBase<dim>;
+  using Cell_t = muSpectre::NCell;
 
   py::class_<Mat_t, muSpectre::MaterialBase, std::shared_ptr<Mat_t>>(
       mod, name.c_str())

@@ -54,25 +54,24 @@ namespace muSpectre {
   struct MaterialFixture {
     using Mat = Mat_t;
 
-    MaterialFixture() : mat("Name") {}
-    constexpr static Dim_t sdim{Mat_t::sdim()};
-    constexpr static Dim_t mdim{Mat_t::mdim()};
+    constexpr static Dim_t mdim() { return Mat_t::MaterialDimension(); }
+    constexpr static Dim_t sdim() { return mdim(); }
+    constexpr static Dim_t NbQuadPts() { return 2; }
+
+    MaterialFixture() : mat("Name", mdim(), NbQuadPts()) {}
 
     Mat_t mat;
   };
 
-  using mats = boost::mpl::list<
-      MaterialFixture<MaterialHyperElastoPlastic2<twoD, twoD>>,
-      MaterialFixture<MaterialHyperElastoPlastic2<twoD, threeD>>,
-      MaterialFixture<MaterialHyperElastoPlastic2<threeD, threeD>>>;
+  using mats =
+      boost::mpl::list<MaterialFixture<MaterialHyperElastoPlastic2<twoD>>,
+                       MaterialFixture<MaterialHyperElastoPlastic2<threeD>>>;
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_constructor, Fix, mats, Fix) {
     BOOST_CHECK_EQUAL("Name", Fix::mat.get_name());
     auto & mat{Fix::mat};
-    auto sdim{Fix::sdim};
-    auto mdim{Fix::mdim};
-    BOOST_CHECK_EQUAL(sdim, mat.sdim());
-    BOOST_CHECK_EQUAL(mdim, mat.mdim());
+    auto mdim{Fix::mdim()};
+    BOOST_CHECK_EQUAL(mdim, mat.MaterialDimension());
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_evaluate_stress, Fix, mats, Fix) {
@@ -81,17 +80,10 @@ namespace muSpectre {
 
     // need higher tol because of printout precision of reference solutions
     constexpr Real hi_tol{1e-8};
-    constexpr Dim_t mdim{Fix::mdim}, sdim{Fix::sdim};
+    constexpr Dim_t mdim{Fix::mdim()}, sdim{Fix::sdim()};
     constexpr bool has_precomputed_values{(mdim == sdim) && (mdim == threeD)};
     constexpr bool verbose{false};
     using Strain_t = Eigen::Matrix<Real, mdim, mdim>;
-    using traits =
-        MaterialMuSpectre_traits<MaterialHyperElastoPlastic2<sdim, mdim>>;
-    using LColl_t = typename traits::LFieldColl_t;
-    using StrainStField_t = muGrid::StateField<
-        muGrid::TensorField<LColl_t, Real, secondOrder, mdim>>;
-    using FlowStField_t =
-        muGrid::StateField<muGrid::ScalarField<LColl_t, Real>>;
 
     // initialise pixel
     constexpr static Real K{.833};       // bulk modulus
@@ -111,29 +103,30 @@ namespace muSpectre {
     Fix::mat.initialise();
 
     // create statefields
-    LColl_t coll{};
+    muGrid::LocalNFieldCollection coll{sdim, Fix::NbQuadPts()};
     coll.add_pixel({0});
     coll.initialise();
 
-    auto & F_{
-        muGrid::make_statefield<StrainStField_t>("previous gradient", coll)};
-    auto & be_{muGrid::make_statefield<StrainStField_t>(
-        "previous elastic strain", coll)};
-    auto & eps_{muGrid::make_statefield<FlowStField_t>("plastic flow", coll)};
+    muGrid::MappedT2StateNField<Real, Mapping::Mut, mdim> F_{
+        "previous gradient", coll};
+    muGrid::MappedT2StateNField<Real, Mapping::Mut, mdim> be_{
+        "previous elastic strain", coll};
+    muGrid::MappedScalarStateNField<Real, Mapping::Mut> eps_{"plastic flow",
+                                                             coll};
 
-    auto F_prev{F_.get_map()};
+    auto & F_prev{F_.get_map()};
     F_prev[0].current() = Strain_t::Identity();
-    auto be_prev{be_.get_map()};
+    auto & be_prev{be_.get_map()};
     be_prev[0].current() = Strain_t::Identity();
-    auto eps_prev{eps_.get_map()};
+    auto & eps_prev{eps_.get_map()};
     eps_prev[0].current() = 0;
     // elastic deformation
     Strain_t F{Strain_t::Identity()};
     F(0, 1) = 1e-5;
 
-    F_.cycle();
-    be_.cycle();
-    eps_.cycle();
+    F_.get_state_field().cycle();
+    be_.get_state_field().cycle();
+    eps_.get_state_field().cycle();
     Strain_t stress{Fix::mat.evaluate_stress(
         F, F_prev[0], be_prev[0], eps_prev[0], lambda, mu, tau_y0, H)};
 
@@ -163,9 +156,9 @@ namespace muSpectre {
       std::cout << "bₑ =" << std::endl << be_prev[0].current() << std::endl;
       std::cout << "εₚ =" << std::endl << eps_prev[0].current() << std::endl;
     }
-    F_.cycle();
-    be_.cycle();
-    eps_.cycle();
+    F_.get_state_field().cycle();
+    be_.get_state_field().cycle();
+    eps_.get_state_field().cycle();
 
     // plastic deformation
     F(0, 1) = .2;
@@ -211,22 +204,11 @@ namespace muSpectre {
 
     // need higher tol because of printout precision of reference solutions
     constexpr Real hi_tol{2e-7};
-    constexpr Dim_t mdim{Fix::mdim}, sdim{Fix::sdim};
+    constexpr Dim_t mdim{Fix::mdim()}, sdim{Fix::sdim()};
     constexpr bool has_precomputed_values{(mdim == sdim) && (mdim == threeD)};
     constexpr bool verbose{has_precomputed_values && false};
     using Strain_t = Eigen::Matrix<Real, mdim, mdim>;
     using Stiffness_t = muGrid::T4Mat<Real, mdim>;
-    using traits =
-        MaterialMuSpectre_traits<MaterialHyperElastoPlastic2<sdim, mdim>>;
-    using LColl_t = typename traits::LFieldColl_t;
-    using StrainStField_t = muGrid::StateField<
-        muGrid::TensorField<LColl_t, Real, secondOrder, mdim>>;
-    using FlowStField_t =
-        muGrid::StateField<muGrid::ScalarField<LColl_t, Real>>;
-
-    // using StrainStRef_t = typename traits::LStrainMap_t::reference;
-    // using ScalarStRef_t = typename traits::LScalarMap_t::reference;
-
 
     // initialise pixel
     constexpr static Real K{.833};       // bulk modulus
@@ -246,29 +228,30 @@ namespace muSpectre {
     Fix::mat.initialise();
 
     // create statefields
-    LColl_t coll{};
+    muGrid::LocalNFieldCollection coll{sdim, Fix::NbQuadPts()};
     coll.add_pixel({0});
     coll.initialise();
 
-    auto & F_{
-        muGrid::make_statefield<StrainStField_t>("previous gradient", coll)};
-    auto & be_{muGrid::make_statefield<StrainStField_t>(
-        "previous elastic strain", coll)};
-    auto & eps_{muGrid::make_statefield<FlowStField_t>("plastic flow", coll)};
+    muGrid::MappedT2StateNField<Real, Mapping::Mut, mdim> F_{
+        "previous gradient", coll};
+    muGrid::MappedT2StateNField<Real, Mapping::Mut, mdim> be_{
+        "previous elastic strain", coll};
+    muGrid::MappedScalarStateNField<Real, Mapping::Mut> eps_{"plastic flow",
+                                                             coll};
 
-    auto F_prev{F_.get_map()};
+    auto & F_prev{F_.get_map()};
     F_prev[0].current() = Strain_t::Identity();
-    auto be_prev{be_.get_map()};
+    auto & be_prev{be_.get_map()};
     be_prev[0].current() = Strain_t::Identity();
-    auto eps_prev{eps_.get_map()};
+    auto & eps_prev{eps_.get_map()};
     eps_prev[0].current() = 0;
     // elastic deformation
     Strain_t F{Strain_t::Identity()};
     F(0, 1) = 1e-5;
 
-    F_.cycle();
-    be_.cycle();
-    eps_.cycle();
+    F_.get_state_field().cycle();
+    be_.get_state_field().cycle();
+    eps_.get_state_field().cycle();
     Strain_t stress{};
     Stiffness_t stiffness{};
 
@@ -328,9 +311,9 @@ namespace muSpectre {
     if (verbose) {
       std::cout << "C₄  =" << std::endl << stiffness << std::endl;
     }
-    F_.cycle();
-    be_.cycle();
-    eps_.cycle();
+    F_.get_state_field().cycle();
+    be_.get_state_field().cycle();
+    eps_.get_state_field().cycle();
 
     // plastic deformation
     F(0, 1) = .2;
@@ -472,7 +455,6 @@ namespace muSpectre {
     // Fix::mat.add_pixel({0}, young, poisson, tau_y0, H);
     // Fix::mat.initialise();
   }
-
 
   BOOST_AUTO_TEST_SUITE_END();
 

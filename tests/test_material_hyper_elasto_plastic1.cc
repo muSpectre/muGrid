@@ -64,8 +64,8 @@ namespace muSpectre {
         K, mu)};
     MaterialFixture()
         : mat("Name", mdim(), NbQuadPts(), young, poisson, tau_y0, H) {}
-    constexpr static Dim_t sdim{twoD};
     constexpr static Dim_t mdim() { return Mat_t::MaterialDimension(); }
+    constexpr static Dim_t sdim() { return mdim(); }
     constexpr static Dim_t NbQuadPts() { return 2; }
 
     Mat_t mat;
@@ -88,7 +88,7 @@ namespace muSpectre {
 
     // need higher tol because of printout precision of reference solutions
     constexpr Real hi_tol{1e-8};
-    constexpr Dim_t mdim{Fix::mdim()}, sdim{Fix::sdim};
+    constexpr Dim_t mdim{Fix::mdim()}, sdim{Fix::sdim()};
     constexpr bool has_precomputed_values{(mdim == sdim) && (mdim == threeD)};
     constexpr bool verbose{false};
     using Strain_t = Eigen::Matrix<Real, mdim, mdim>;
@@ -194,7 +194,7 @@ namespace muSpectre {
 
     // need higher tol because of printout precision of reference solutions
     constexpr Real hi_tol{2e-7};
-    constexpr Dim_t mdim{Fix::mdim()}, sdim{Fix::sdim};
+    constexpr Dim_t mdim{Fix::mdim()}, sdim{Fix::sdim()};
     constexpr bool has_precomputed_values{(mdim == sdim) && (mdim == threeD)};
     constexpr bool verbose{has_precomputed_values && false};
     using Strain_t = Eigen::Matrix<Real, mdim, mdim>;

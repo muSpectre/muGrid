@@ -1,4 +1,4 @@
-# !/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
 @file   __init__.py
@@ -43,6 +43,7 @@ except ImportError:
 
 import _muSpectre
 from _muSpectre import SplitCell, Formulation, material, solvers, FiniteDiff
+from _muSpectre import OneQuadPt
 
 
 from muGrid import get_domain_ccoord, get_domain_index
@@ -58,55 +59,6 @@ _projections = {
     Formulation.finite_strain: 'FiniteStrainFast',
     Formulation.small_strain: 'SmallStrain',
 }
-
-
-class DerivativeWrapper(object):
-    def __init__(self, derivative):
-        self._derivative = derivative
-
-    @property
-    def wrapped_object(self):
-        return self._derivative
-
-    def fourier(self, phase):
-        phase = np.asarray(phase)
-        dim = phase.shape[0]
-        return self._derivative.fourier(phase.reshape(dim, -1)) \
-            .reshape(phase.shape[1:])
-
-    def rollaxes(self, distance):
-        return DerivativeWrapper(self._derivative.rollaxes(distance))
-
-    def __getattr__(self, name):
-        return getattr(self._derivative, name)
-
-
-def FourierDerivative(dims, direction):
-    class_name = 'FourierDerivative_{}d'.format(dims)
-    try:
-        factory = _muSpectre.__dict__[class_name]
-    except KeyError:
-        raise KeyError("FourierDerivative class '{}' has not been compiled "
-                       "into the muSpectre library.".format(class_name))
-    return DerivativeWrapper(factory(direction))
-
-
-def DiscreteDerivative(lbounds, stencil):
-    lbounds = np.asarray(lbounds)
-    stencil = np.asarray(stencil)
-    dims = len(stencil.shape)
-    if lbounds.shape != (dims,):
-        raise ValueError("Lower bounds (lbounds) of shape {} are incompatible "
-                         "with a {}-dimensional stencil."
-                         .format(lbounds.shape, dims))
-    class_name = 'DiscreteDerivative_{}d'.format(dims)
-    try:
-        factory = _muSpectre.__dict__[class_name]
-    except KeyError:
-        raise KeyError("DiscreteDerivative class '{}' has not been compiled "
-                       "into the muSpectre library.".format(class_name))
-    return DerivativeWrapper(factory(list(stencil.shape), list(lbounds),
-                                     stencil.ravel()))
 
 
 def Cell(nb_grid_pts, domain_lengths, formulation=Formulation.finite_strain,
@@ -166,11 +118,10 @@ def Cell(nb_grid_pts, domain_lengths, formulation=Formulation.finite_strain,
         raise KeyError("FFT engine '{}' has not been compiled into the "
                        "muSpectre library.".format(fft))
     if communicator.size == 1:
-        return CellWrapper(factory(nb_grid_pts, domain_lengths, formulation,
-                                   [g.wrapped_object for g in gradient]))
+        return factory(nb_grid_pts, domain_lengths, formulation, gradient)
     else:
-        return CellWrapper(factory(nb_grid_pts, domain_lengths, formulation,
-                                   [g.wrapped_object for g in gradient], communicator))
+        return factory(nb_grid_pts, domain_lengths, formulation, gradient,
+                       communicator)
 
 
 def Projection(nb_grid_pts, lengths,
@@ -221,102 +172,3 @@ def Projection(nb_grid_pts, lengths,
     else:
         return factory(nb_grid_pts, lengths, gradient, fft, communicator)
 
-
-class CellWrapper (object):
-    def __init__(self, cell):
-        self._cell = cell
-
-    def __getattr__(self, name):
-        return getattr(self._cell, name)
-
-    def __iter__(self):
-        return self._cell.__iter__()
-
-    @property
-    def wrapped_cell(self):
-        return self._cell
-
-    @property
-    def strain(self):
-        dim = len(self._cell.nb_subdomain_grid_pts)
-        shape = list((dim, dim)) + list(self._cell.nb_subdomain_grid_pts)
-        return self._cell.strain.reshape(shape, order='F')
-
-    @property
-    def stress(self):
-        dim = len(self._cell.nb_subdomain_grid_pts)
-        shape = list((dim, dim)) + list(self._cell.nb_subdomain_grid_pts)
-        return self._cell.stress.reshape(shape, order='F')
-
-    @property
-    def projection(self):
-        xi = self._cell.projection
-        shape = self._cell.nb_subdomain_grid_pts.copy()
-        dim = len(shape)
-        m = (shape[0]+1)//2
-        shape[0] = m
-        shape = [dim] + shape
-        return xi.reshape(shape, order='F')
-
-    def evaluate_stress(self, strain):
-        dim = len(self._cell.nb_subdomain_grid_pts)
-        shape = list((dim**2, self._cell.size))
-        stress = self._cell.evaluate_stress(strain.reshape(shape, order='F'))
-        shape = list((dim, dim)) + list(self._cell.nb_subdomain_grid_pts)
-        return stress.reshape(shape, order='F')
-
-    def evaluate_stress_tangent(self, strain):
-        dim = len(self._cell.nb_subdomain_grid_pts)
-        shape = list((dim**2, self._cell.size))
-        stress, K = self._cell.evaluate_stress_tangent(
-            strain.reshape(shape, order='F'))
-        shape = list((dim, dim)) + list(self._cell.nb_subdomain_grid_pts)
-        stress = stress.reshape(shape, order='F')
-        shape = list((dim, dim, dim, dim)) + \
-            list(self._cell.nb_subdomain_grid_pts)
-        K = K.reshape(shape, order='F')
-        return stress, K
-
-    def project(self, field):
-        dim = len(self._cell.nb_subdomain_grid_pts)
-        shape = list((dim**2, self._cell.size))
-        projected_field = self._cell.project(field.reshape(shape, order='F'))
-        shape = list((dim, dim)) + list(self._cell.nb_subdomain_grid_pts)
-        return projected_field.reshape(shape, order='F')
-
-    def directional_stiffness(self, strain):
-        dim = len(self._cell.nb_subdomain_grid_pts)
-        shape = list((dim**2, self._cell.size))
-        K = self._cell.directional_stiffness(strain.reshape(shape, order='F'))
-        shape = list((dim, dim)) + list(self._cell.nb_subdomain_grid_pts)
-        return K.reshape(shape, order='F')
-
-    def get_globalised_internal_real_array(self, name):
-        shape = list(self._cell.nb_subdomain_grid_pts)
-        array = self._cell.get_globalised_internal_real_array(name)
-        nb_components = array.shape[0]
-        shape = list([nb_components]) + shape
-        array = array.reshape(shape, order='F')
-        return array
-
-    def get_globalised_current_real_array(self, name):
-        shape = list(self._cell.nb_subdomain_grid_pts)
-        array = self._cell.get_globalised_current_real_array(name)
-        nb_components = array.shape[0]
-        shape = list([nb_components]) + shape
-        array = array.reshape(shape, order='F')
-        return array
-
-    def get_globalised_old_real_array(self, name, nb_steps_ago):
-        shape = list(self._cell.nb_subdomain_grid_pts)
-        array = self._cell.get_globalised_old_real_array(name, nb_steps_ago)
-        nb_components = array.shape[0]
-        shape = list([nb_components]) + shape
-        array = array.reshape(shape, order='F')
-        return array
-
-    def get_managed_real_array(self, name, nb_components):
-        shape = list([nb_components]) + list(self._cell.nb_subdomain_grid_pts)
-        array = self._cell.get_managed_real_array(name,
-                                                  nb_components).reshape(shape, order='F')
-        return array

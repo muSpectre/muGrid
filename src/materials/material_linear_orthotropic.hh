@@ -40,36 +40,24 @@
 #include "material_muSpectre_base.hh"
 #include "material_linear_anisotropic.hh"
 #include "common/muSpectre_common.hh"
-#include "libmugrid/T4_map_proxy.hh"
-#include "cell/cell_base.hh"
+#include "cell/ncell.hh"
+
+#include "libmugrid/nfield_map_static.hh"
 
 namespace muSpectre {
 
-  // Forward declaration for factory function
-  // template <Dim_t DimS, Dim_t DimM>
-  // class CellBase;
-
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimM>
   class MaterialLinearOrthotropic;
 
   // traits for orthotropic material
-  template <Dim_t DimS, Dim_t DimM>
-  struct MaterialMuSpectre_traits<MaterialLinearOrthotropic<DimS, DimM>> {
-    using Parent = MaterialMuSpectre_traits<void>;  //!< base for elasticity
-
-    //! global field collection
-    using GFieldCollection_t =
-        typename MaterialBase<DimS, DimM>::GFieldCollection_t;
-
+  template <Dim_t DimM>
+  struct MaterialMuSpectre_traits<MaterialLinearOrthotropic<DimM>> {
     //! expected map type for strain fields
-    using StrainMap_t =
-        muGrid::MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM, true>;
+    using StrainMap_t = muGrid::T2NFieldMap<Real, Mapping::Const, DimM>;
     //! expected map type for stress fields
-    using StressMap_t =
-        muGrid::MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
+    using StressMap_t = muGrid::T2NFieldMap<Real, Mapping::Mut, DimM>;
     //! expected map type for tangent stiffness fields
-    using TangentMap_t =
-        muGrid::T4MatrixFieldMap<GFieldCollection_t, Real, DimM>;
+    using TangentMap_t = muGrid::T4NFieldMap<Real, Mapping::Mut, DimM>;
 
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
@@ -79,32 +67,26 @@ namespace muSpectre {
   /**
    * Material implementation for orthotropic constitutive law
    */
-  template <Dim_t DimS, Dim_t DimM = DimS>
-  class MaterialLinearOrthotropic
-      : public MaterialLinearAnisotropic<DimS, DimM> {
+  template <Dim_t DimM>
+  class MaterialLinearOrthotropic : public MaterialLinearAnisotropic<DimM> {
    public:
     //! base class
-    using Parent = MaterialLinearAnisotropic<DimS, DimM>;
+    using Parent = MaterialLinearAnisotropic<DimM>;
 
     using Stiffness_t = muGrid::T4Mat<Real, DimM>;
 
     //! traits of this material
     using traits = MaterialMuSpectre_traits<MaterialLinearOrthotropic>;
 
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-    //! global field collection
-    using GFieldCollection_t =
-        typename MaterialBase<DimS, DimM>::GFieldCollection_t;
-
-    //! expected map type for tangent stiffness fields
-    using Tangent_t = muGrid::T4MatrixFieldMap<GFieldCollection_t, Real, DimM>;
-
     //! Default constructor
     MaterialLinearOrthotropic() = delete;
     // consturcutor
     // a std::vector is utilized as the input of the constructor to
     // enable us to check its length so to prevent user mistake
-    MaterialLinearOrthotropic(std::string name, std::vector<Real> input);
+    MaterialLinearOrthotropic(const std::string & name,
+                              const Dim_t & spatial_dimension,
+                              const Dim_t & nb_quad_pts,
+                              const std::vector<Real> & input);
 
     //! Copy constructor
     MaterialLinearOrthotropic(const MaterialLinearOrthotropic & other) = delete;
@@ -115,15 +97,19 @@ namespace muSpectre {
     //! Destructor
     virtual ~MaterialLinearOrthotropic() = default;
 
-    /* overloaded make function in order to make python binding
-       able to make an object of materila orthotropic*/
-    static MaterialLinearOrthotropic<DimS, DimM> &
-    make(CellBase<DimS, DimM> & cell, std::string name,
-         std::vector<Real> input);
-
-    std::vector<Real> input_c_maker(std::vector<Real> input);
+    /**
+     * make function needs to be overloaded, because this class does not
+     * directly inherit from MaterialMuSpectre. If this overload is not made,
+     * calls to make for MaterialLinearOrthotropic would call the constructor
+     * for MaterialLinearAnisotropic
+     */
+    static MaterialLinearOrthotropic<DimM> &
+    make(NCell & cell, const std::string & name,
+         const Dim_t & spatial_dimension, const Dim_t & nb_quad_pts,
+         const std::vector<Real> & input);
 
    protected:
+    std::vector<Real> input_c_maker(const std::vector<Real> & input);
     /**
      * these variable are used to determine which elements of the
      * stiffness matrix should be replaced with the inpts for the
@@ -132,19 +118,6 @@ namespace muSpectre {
     constexpr static std::array<std::size_t, 2> output_size{6, 21};
     static std::array<bool, output_size[DimM - 2]> ret_flag;
   };
-
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  MaterialLinearOrthotropic<DimS, DimM> &
-  MaterialLinearOrthotropic<DimS, DimM>::make(CellBase<DimS, DimM> & cell,
-                                              std::string name,
-                                              std::vector<Real> input) {
-    auto mat =
-        std::make_unique<MaterialLinearOrthotropic<DimS, DimM>>(name, input);
-    auto & mat_ref = *mat;
-    cell.add_material(std::move(mat));
-    return mat_ref;
-  }
 
 }  // namespace muSpectre
 #endif  // SRC_MATERIALS_MATERIAL_LINEAR_ORTHOTROPIC_HH_

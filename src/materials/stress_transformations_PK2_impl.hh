@@ -82,6 +82,7 @@ namespace muSpectre {
                                              Tangent_t && C) {
           using T4 = typename std::remove_reference_t<Tangent_t>::PlainObject;
           using Tmap = muGrid::T4MatMap<Real, Dim>;
+          using T2 = Eigen::Matrix<Real, Dim, Dim>;
           using muGrid::get;
 
           T4 K{T4::Zero()};
@@ -102,7 +103,7 @@ namespace muSpectre {
               }
             }
           }
-          auto && P =
+          T2 P =
               compute(std::forward<Strain_t>(F), std::forward<Stress_t>(S));
           return std::make_tuple(std::move(P), std::move(K));
         }

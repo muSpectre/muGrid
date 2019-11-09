@@ -1,4 +1,4 @@
-# !/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
 @file   python_binding_tests.py
@@ -40,8 +40,7 @@ import numpy as np
 from python_test_imports import muFFT
 
 from python_communicator_tests import Communicator_Check
-from python_common_tests import Common_Check
-from python_derivative_tests import *
+from python_derivative_tests import DerivativeCheck2d, DerivativeCheck3d
 from python_fft_tests import FFT_Check
 from python_netcdf_tests import NetCDF_Check_2d, NetCDF_Check_3d
 

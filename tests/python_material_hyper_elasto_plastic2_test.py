@@ -1,4 +1,4 @@
-# !/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
 @file   python_material_hyper_elasto_plastic2_test.py
@@ -90,11 +90,11 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         mat_hpl1_array = np.empty((3,3,3), dtype=object)
         for index, mat in np.ndenumerate(mat_hpl1_array):
             mat_hpl1_array[index] = µ.material.MaterialHyperElastoPlastic1_3d.make(
-                cell.wrapped_cell, "3d-small", E[index], Poisson,
+                cell, "3d-small", E[index], Poisson,
                 yield_crit[index], hardening)
 
         mat_hpl2 = µ.material.MaterialHyperElastoPlastic2_3d.make(
-          cell2.wrapped_cell, "3d-hpl")
+          cell2, "3d-hpl")
 
         for i, pixel in enumerate(cell):
             mat_hpl1_array[tuple(pixel)].add_pixel(pixel)
@@ -109,10 +109,10 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         equil_tol  = 1e-6
         maxiter = 2000
         verbose = 0
-        solver = µ.solvers.SolverCG(cell.wrapped_cell, cg_tol, maxiter, verbose)
+        solver = µ.solvers.SolverCG(cell, cg_tol, maxiter, verbose)
         cell.initialise()
 
-        solver2 = µ.solvers.SolverCG(cell2.wrapped_cell, cg_tol, maxiter, verbose)
+        solver2 = µ.solvers.SolverCG(cell2, cg_tol, maxiter, verbose)
         cell2.initialise()
 
         #total deformation
@@ -122,9 +122,9 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
 
         ### Start muSpectre ###
         #---------------------#
-        result = µ.solvers.newton_cg(cell.wrapped_cell, DelF, solver,
+        result = µ.solvers.newton_cg(cell, DelF, solver,
                                      newton_tol, equil_tol, verbose)
-        result2 = µ.solvers.newton_cg(cell2.wrapped_cell, DelF, solver2,
+        result2 = µ.solvers.newton_cg(cell2, DelF, solver2,
                                       newton_tol, equil_tol, verbose)
 
         F = cell.strain
@@ -165,9 +165,9 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         cell = µ.Cell(nb_grid_pts, lens, form, discrete_gradient, fft)
 
         mat_vac = µ.material.MaterialLinearElastic1_3d.make(
-            cell.wrapped_cell, "3d-vacuum", 0.5*Young, Poisson)
+            cell, "3d-vacuum", 0.5*Young, Poisson)
         mat_hpl = µ.material.MaterialHyperElastoPlastic2_3d.make(
-            cell.wrapped_cell, "3d-hpl")
+            cell, "3d-hpl")
 
         E        = np.zeros(nb_grid_pts)
         E[:, :, :] = 0.5*Young
@@ -187,7 +187,7 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         equil_tol  = 1e-8
         maxiter = 200
         verbose = 0
-        solver = µ.solvers.SolverCG(cell.wrapped_cell, cg_tol, maxiter,
+        solver = µ.solvers.SolverCG(cell, cg_tol, maxiter,
                                     verbose)
         cell.initialise()
 
@@ -196,7 +196,7 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
                           [ 0.00 , -0.01,  0.00],
                           [ 0.00 ,  0.00,  0.00]])
 
-        result = µ.solvers.newton_cg(cell.wrapped_cell, DelF, solver,
+        result = µ.solvers.newton_cg(cell, DelF, solver,
                                      newton_tol, equil_tol, verbose)
 
         ### Finite differences evaluation of the tangent
@@ -222,7 +222,7 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
                           [ 0.00 ,  0.00,  0.15],
                           [ 0.00 ,  0.00,  0.17]])
 
-        result = µ.solvers.newton_cg(cell.wrapped_cell, DelF, solver,
+        result = µ.solvers.newton_cg(cell, DelF, solver,
                                      newton_tol, equil_tol, verbose)
 
 

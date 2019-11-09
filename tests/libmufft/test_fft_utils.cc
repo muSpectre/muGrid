@@ -51,7 +51,7 @@ namespace muFFT {
     constexpr Ccoord cube = muGrid::CcoordOps::get_cube<dim>(size);
     constexpr Ccoord herm = get_nb_hermitian_grid_pts(cube);
     Ccoord ref_cube = cube;
-    ref_cube.back() = (cube.back() + 1) / 2;
+    ref_cube.front() = (cube.front() + 1) / 2;
 
     BOOST_CHECK_EQUAL_COLLECTIONS(ref_cube.begin(), ref_cube.end(),
                                   herm.begin(), herm.end());

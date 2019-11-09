@@ -143,9 +143,6 @@ namespace muSpectre {
     void add_pixel_split(const size_t & pixel_id, Real ratio,
                          InternalArgs... args);
 
-    void add_pixel_split(const size_t & pixel_id,
-                         Real ratio = 1.0) override;
-
     // add pixels intersecting to material to the material
     void add_split_pixels_precipitate(
         const std::vector<size_t> & intersected_pixel_ids,
@@ -172,7 +169,6 @@ namespace muSpectre {
     constitutive_law_dynamic(const Eigen::Ref<const DynMatrix_t> & strain,
                              const size_t & pixel_index,
                              const Formulation & form) final;
-
 
    protected:
     //! computes stress with the formulation available at compile time
@@ -226,15 +222,6 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <class Material, Dim_t DimM>
-  void MaterialMuSpectre<Material, DimM>::add_pixel_split(
-      const size_t & pixel_id, Real ratio) {
-    auto & this_mat = static_cast<Material &>(*this);
-    this_mat.add_pixel(pixel_id);
-    this->assigned_ratio->get_field().push_back(ratio);
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <class Material, Dim_t DimM>
   template <class... InternalArgs>
   void MaterialMuSpectre<Material, DimM>::add_pixel_split(
       const size_t & pixel_id, Real ratio, InternalArgs... args) {
@@ -269,7 +256,6 @@ namespace muSpectre {
         std::tuple<std::shared_ptr<Material>, MaterialEvaluator<DimM>>;
     return Ret_t(mat, MaterialEvaluator<DimM>{mat});
   }
-
 
   /* ---------------------------------------------------------------------- */
   template <class Material, Dim_t DimM>
@@ -422,16 +408,16 @@ namespace muSpectre {
       auto && stress_stiffness{std::get<1>(arglist)};
       auto && stress{std::get<0>(stress_stiffness)};
       auto && stiffness{std::get<1>(stress_stiffness)};
-      auto && index{std::get<2>(arglist)};
+      auto && quad_pt_id{std::get<2>(arglist)};
       auto && ratio{std::get<3>(arglist)};
       if (is_cell_split == SplitCell::simple) {
-        auto && stress_stiffness_mat{
-            MatTB::constitutive_law_tangent<Form>(this_mat, strain, index)};
+        auto && stress_stiffness_mat{MatTB::constitutive_law_tangent<Form>(
+            this_mat, strain, quad_pt_id)};
         stress += ratio * std::get<0>(stress_stiffness_mat);
         stiffness += ratio * std::get<1>(stress_stiffness_mat);
       } else {
         stress_stiffness =
-            MatTB::constitutive_law_tangent<Form>(this_mat, strain, index);
+            MatTB::constitutive_law_tangent<Form>(this_mat, strain, quad_pt_id);
       }
     }
   }
@@ -448,9 +434,9 @@ namespace muSpectre {
     */
     auto & this_mat = static_cast<Material &>(*this);
 
-    using iterable_proxy_t = iterable_proxy<
-        std::tuple<typename traits::StrainMap_t>,
-        std::tuple<typename traits::StressMap_t>, is_cell_split>;
+    using iterable_proxy_t =
+        iterable_proxy<std::tuple<typename traits::StrainMap_t>,
+                       std::tuple<typename traits::StressMap_t>, is_cell_split>;
 
     iterable_proxy_t fields(*this, F, P);
 
@@ -479,14 +465,14 @@ namespace muSpectre {
 
       auto && strain{std::get<0>(arglist)};
       auto && stress{std::get<0>(std::get<1>(arglist))};
-      auto && index{std::get<2>(arglist)};
+      auto && quad_pt_id{std::get<2>(arglist)};
       auto && ratio{std::get<3>(arglist)};
 
       if (is_cell_split == SplitCell::simple) {
         stress +=
-            ratio * MatTB::constitutive_law<Form>(this_mat, strain, index);
+            ratio * MatTB::constitutive_law<Form>(this_mat, strain, quad_pt_id);
       } else {
-        stress = MatTB::constitutive_law<Form>(this_mat, strain, index);
+        stress = MatTB::constitutive_law<Form>(this_mat, strain, quad_pt_id);
       }
     }
   }
@@ -494,26 +480,28 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <class Material, Dim_t DimM>
   auto MaterialMuSpectre<Material, DimM>::constitutive_law_dynamic(
-      const Eigen::Ref<const DynMatrix_t> & strain, const size_t & pixel_index,
-      const Formulation & form) -> std::tuple<DynMatrix_t, DynMatrix_t> {
+      const Eigen::Ref<const DynMatrix_t> & strain,
+      const size_t & quad_pt_index, const Formulation & form)
+      -> std::tuple<DynMatrix_t, DynMatrix_t> {
     auto & this_mat = static_cast<Material &>(*this);
     Eigen::Map<const Eigen::Matrix<Real, DimM, DimM>> F(strain.data());
 
     if (strain.cols() != DimM or strain.rows() != DimM) {
-      std::stringstream error {};
+      std::stringstream error{};
       error << "incompatible strain shape, expected " << DimM << " × " << DimM
-            << ", but received " << strain.rows() << " × " << strain.cols() << ".";
-      throw Material(error.str());
+            << ", but received " << strain.rows() << " × " << strain.cols()
+            << ".";
+      throw MaterialError(error.str());
     }
     switch (form) {
     case Formulation::finite_strain: {
       return MatTB::constitutive_law_tangent<Formulation::finite_strain>(
-            this_mat, std::make_tuple(F), pixel_index);
+          this_mat, std::make_tuple(F), quad_pt_index);
       break;
     }
     case Formulation::small_strain: {
       return MatTB::constitutive_law_tangent<Formulation::small_strain>(
-            this_mat, std::make_tuple(F), pixel_index);
+          this_mat, std::make_tuple(F), quad_pt_index);
       break;
     }
     default:

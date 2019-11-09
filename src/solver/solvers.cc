@@ -70,8 +70,7 @@ namespace muSpectre {
 
     // field to store the rhs for cg calculations
     muGrid::MappedField<muGrid::NFieldMap<Real, Mapping::Mut>> rhs_field{
-        "rhs", shape[0], shape[1], muGrid::Iteration::QuadPt,
-        field_collection};
+        "rhs", shape[0], shape[1], muGrid::Iteration::QuadPt, field_collection};
 
     solver.initialise();
 
@@ -110,12 +109,15 @@ namespace muSpectre {
       count_width = size_t(std::log10(solver.get_maxiter())) + 1;
     }
 
+    Matrix_t default_strain_val{};
     switch (form) {
     case Formulation::finite_strain: {
       if (strain_init == IsStrainInitialised::False) {
-        // initilasing cell placement gradient (F) with identity matrix in case
-        // of finite strain
-        cell.set_uniform_strain(Matrix_t::Identity(shape[0], shape[1]));
+        // initilasing cell placement gradient (F) with identity matrix in
+        // case of finite strain
+        default_strain_val = Matrix_t::Identity(shape[0], shape[1]);
+        cell.set_uniform_strain(default_strain_val);
+
         if (verbose > 0 && comm.rank() == 0) {
           std::cout << "\nThe strain is initialised by default to the identity "
                        "matrix!\n"
@@ -142,7 +144,8 @@ namespace muSpectre {
       if (strain_init == IsStrainInitialised::False) {
         // initilasing cell strain (ε) with zero-filled matrix in case of small
         // strain
-        cell.set_uniform_strain(Matrix_t::Zero(shape[0], shape[1]));
+        default_strain_val = Matrix_t::Zero(shape[0], shape[1]);
+        cell.set_uniform_strain(default_strain_val);
         if (verbose > 0 && comm.rank() == 0) {
           std::cout << "\nThe strain is initialised by default to the zero "
                        "matrix!\n"
@@ -306,7 +309,8 @@ namespace muSpectre {
   std::vector<OptimizeResult> de_geus(NCell & cell,
                                       const LoadSteps_t & load_steps,
                                       SolverBase & solver, Real newton_tol,
-                                      Real equil_tol, Dim_t verbose) {
+                                      Real equil_tol, Dim_t verbose,
+                                      IsStrainInitialised strain_init) {
     const auto & comm = cell.get_communicator();
 
     using Matrix_t = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
@@ -327,8 +331,7 @@ namespace muSpectre {
 
     // field to store the rhs for cg calculations
     muGrid::MappedField<muGrid::NFieldMap<Real, Mapping::Mut>> rhs_field{
-        "rhs", shape[0], shape[1], muGrid::Iteration::QuadPt,
-        field_collection};
+        "rhs", shape[0], shape[1], muGrid::Iteration::QuadPt, field_collection};
     solver.initialise();
 
     size_t count_width{};
@@ -370,9 +373,16 @@ namespace muSpectre {
 
     switch (form) {
     case Formulation::finite_strain: {
-      // initilasing cell placement gradient (F) with identity matrix in case
-      // of finite strain
-      cell.set_uniform_strain(Matrix_t::Identity(shape[0], shape[1]));
+      if (strain_init == IsStrainInitialised::False) {
+        // initilasing cell placement gradient (F) with identity matrix in case
+        // of finite strain
+        default_strain_val = Matrix_t::Identity(shape[0], shape[1]);
+        cell.set_uniform_strain(default_strain_val);
+      } else if (verbose > 0 && comm.rank() == 0 &&
+                 strain_init == IsStrainInitialised::True) {
+        std::cout << "\nThe strain was initialised by the user!\n" << std::endl;
+      }
+
       // Checking the consistancy of input load_steps and cell shape
       for (const auto & delF : load_steps) {
         auto rows = delF.rows();
@@ -389,9 +399,16 @@ namespace muSpectre {
       break;
     }
     case Formulation::small_strain: {
-      // initilasing cell strain (ε) with zero-filled matrix in case of small
-      // strain
-      cell.set_uniform_strain(Matrix_t::Zero(shape[0], shape[1]));
+      if (strain_init == IsStrainInitialised::False) {
+        // initilasing cell strain (ε) with zero-filled matrix in case of small
+        // strain
+        default_strain_val = Matrix_t::Zero(shape[0], shape[1]);
+        cell.set_uniform_strain(default_strain_val);
+      } else if (verbose > 0 && comm.rank() == 0 &&
+                 strain_init == IsStrainInitialised::True) {
+        std::cout << "\nThe strain was initialised by the user!\n" << std::endl;
+      }
+
       // Checking the consistancy of input load_steps and cell shape
       for (const auto & delF : load_steps) {
         if (not((delF.rows() == shape[0]) and (delF.cols() == shape[1]))) {
@@ -467,13 +484,14 @@ namespace muSpectre {
           if (newt_iter == 0) {
             // updating cell strain with the difference of the current and
             // previous strain input.
-            for (auto && strain :  muGrid::NFieldMap<Real, Mapping::Mut>(
-               F, shape[0], muGrid::Iteration::QuadPt)) {
+            for (auto && strain : muGrid::NFieldMap<Real, Mapping::Mut>(
+                     F, shape[0], muGrid::Iteration::QuadPt)) {
               strain = macro_strain - previous_macro_strain;
             }
             // this corresponds to rhs=-G:K:δF
-            cell.evaluate_projected_directional_stiffness(DeltaF, rhs);
-            F += DeltaF;
+            cell.evaluate_projected_directional_stiffness(DeltaF, rhs
+);
+            F -= DeltaF;
             stress_norm =
                 std::sqrt(comm.sum(rhs.eigen_vec().matrix().squaredNorm()));
             if (stress_norm < equil_tol) {

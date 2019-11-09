@@ -18,7 +18,7 @@
  * µSpectre is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * General Public License for more details.
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with µSpectre; see the file COPYING. If not, write to the
@@ -31,6 +31,7 @@
  * with proprietary FFT implementations or numerical libraries, containing parts
  * covered by the terms of those libraries' licenses, the licensors of this
  * Program grant you additional permission to convey the resulting work.
+ *
  */
 
 #ifndef SRC_MATERIALS_ITERABLE_PROXY_HH_
@@ -88,7 +89,8 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   //! this iterator class is a default for simple laws that just take a
   //! strain
-  template <class Strains_t, class Stresses_t, SplitCell is_cell_split>
+  template <class Strains_t, class Stresses_t,
+            SplitCell is_cell_split = SplitCell::no>
   class iterable_proxy {
    public:
     //! Default constructor
@@ -191,12 +193,18 @@ namespace muSpectre {
           (such as the transformation gradient F and first
           Piola-Kirchhoff stress P.
       **/
-      explicit iterator(const iterable_proxy & it, bool begin = true)
-          : it{it}, strain_map{internal::TupleBuilder<Strains_t>::build(
-                        std::remove_cv_t<StrainFieldTup>(it.strain_field))},
+      explicit iterator(const iterable_proxy & proxy, bool begin = true)
+          : proxy{proxy}, strain_map{internal::TupleBuilder<Strains_t>::build(
+                              std::remove_cv_t<StrainFieldTup>(
+                                  proxy.strain_field))},
             stress_map{internal::TupleBuilder<Stresses_t>::build(
-                std::remove_cv_t<StressFieldTup>(it.stress_tup))},
-            index{begin ? 0 : it.material.size()} {}
+                std::remove_cv_t<StressFieldTup>(proxy.stress_tup))},
+            index{begin ? 0 : size_t(proxy.material.size())},
+            quad_pt_iter{
+                begin ? proxy.material.get_collection().get_quad_pt_indices()
+                            .begin()
+                      : proxy.material.get_collection().get_quad_pt_indices()
+                            .end()} {}
 
       //! Copy constructor
       iterator(const iterator & other) = default;
@@ -221,17 +229,24 @@ namespace muSpectre {
       inline bool operator!=(const iterator & other) const;
 
      protected:
-      const iterable_proxy & it;  //!< ref to the proxy
-      Strains_t strain_map;       //!< map onto the global strain field
+      const iterable_proxy & proxy;  //!< ref to the proxy
+      Strains_t strain_map;          //!< map onto the global strain field
       //! map onto the global stress field and possibly tangent stiffness
       Stresses_t stress_map;
-      size_t index;  //!< index or pixel currently referred to
+      /**
+       * counter of current iterate (quad point). This value is the look-up
+       * index for the local field collection
+       */
+      size_t index;
+      //! iterator over quadrature point. This value is the look-up index for
+      //! the global field collection
+      muGrid::NFieldCollection::IndexIterable::iterator quad_pt_iter;
     };
 
     //! returns iterator to first pixel if this material
-    iterator begin() { return std::move(iterator(*this)); }
+    iterator begin() { return iterator(*this); }
     //! returns iterator past the last pixel in this material
-    iterator end() { return std::move(iterator(*this, false)); }
+    iterator end() { return iterator(*this, false); }
 
    protected:
     MaterialBase & material;      //!< reference to the proxied material
@@ -251,7 +266,8 @@ namespace muSpectre {
   template <class Strains_t, class Stresses_t, SplitCell is_cell_split>
   auto iterable_proxy<Strains_t, Stresses_t, is_cell_split>::iterator::
   operator++() -> iterator & {
-    this->index++;
+    ++this->index;
+    ++this->quad_pt_iter;
     return *this;
   }
 
@@ -259,8 +275,7 @@ namespace muSpectre {
   template <class Strains_t, class Stresses_t, SplitCell is_cell_split>
   auto iterable_proxy<Strains_t, Stresses_t, is_cell_split>::iterator::
   operator*() -> value_type {
-    // TODO (junge): compute quad_pt_id lfrom IndexIterable of field collection
-    const     Dim_t quad_pt_id{-1};
+    const auto & quad_pt_id{*this->quad_pt_iter};
 
     auto && strains = apply(
         [&quad_pt_id](auto &&... strain_and_rate) {
@@ -270,7 +285,7 @@ namespace muSpectre {
 
     auto && ratio = 1.0;
     if (is_cell_split != SplitCell::no) {
-      ratio = this->it.material.get_assigned_ratio(quad_pt_id);
+      ratio = this->proxy.material.get_assigned_ratio(quad_pt_id);
     }
 
     auto && stresses = apply(
@@ -284,4 +299,4 @@ namespace muSpectre {
 
 }  // namespace muSpectre
 
-#endif /* SRC_MATERIALS_ITERABLE_PROXY_HH_ */
+#endif  // SRC_MATERIALS_ITERABLE_PROXY_HH_

@@ -1,4 +1,4 @@
-# !/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
 @file   python_derivative_tests.py
@@ -11,18 +11,18 @@
 
 Copyright © 2018 Till Junge
 
-µSpectre is free software; you can redistribute it and/or
+µFFT is free software; you can redistribute it and/or
 modify it under the terms of the GNU Lesser General Public License as
 published by the Free Software Foundation, either version 3, or (at
 your option) any later version.
 
-µSpectre is distributed in the hope that it will be useful, but
+µFFT is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
 Lesser General Public License for more details.
 
 You should have received a copy of the GNU Lesser General Public License
-along with µSpectre; see the file COPYING. If not, write to the
+along with µFFT; see the file COPYING. If not, write to the
 Free Software Foundation, Inc., 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.
 
@@ -49,7 +49,7 @@ class DerivativeCheck2d(unittest.TestCase):
 
     def test_fourier_derivative(self):
         diffop = muFFT.FourierDerivative(2, 0)
-        q = self.fft.wavevectors()
+        q = self.fft.fftfreq
         d = diffop.fourier(q)
         fourier_field_copy = np.copy(self.fourier_field)
         diff_field = self.fft.ifft(d * self.fourier_field) * \
@@ -63,7 +63,7 @@ class DerivativeCheck2d(unittest.TestCase):
 
     def test_upwind_differences(self):
         diffop = muFFT.DiscreteDerivative([0, 0], [[-1, 1]])
-        q = self.fft.wavevectors()
+        q = self.fft.fftfreq
         d = diffop.fourier(q)
         diff_field = self.fft.ifft(d * self.fourier_field) * \
             self.fft.normalisation
@@ -74,9 +74,9 @@ class DerivativeCheck2d(unittest.TestCase):
                 self.assertAlmostEqual(diff_field[x, y], ndiff)
 
     def test_averaged_upwind_differences(self):
-        diffop = µ.DiscreteDerivative([0, 0], [[-0.5, -0.5],
-                                               [ 0.5,  0.5]])
-        q = self.fft.wavevectors()
+        diffop = muFFT.DiscreteDerivative([0, 0], [[-0.5, 0.5],
+                                                   [-0.5, 0.5]])
+        q = self.fft.fftfreq
         d = diffop.fourier(q)
         diff_field = self.fft.ifft(d * self.fourier_field) * \
             self.fft.normalisation
@@ -89,7 +89,7 @@ class DerivativeCheck2d(unittest.TestCase):
 
     def test_central_differences(self):
         diffop = muFFT.DiscreteDerivative([-1, 0], [[-0.5], [0], [0.5]])
-        q = self.fft.wavevectors()
+        q = self.fft.fftfreq
         d = diffop.fourier(q)
         diff_field = self.fft.ifft(d * self.fourier_field) * \
             self.fft.normalisation
@@ -103,7 +103,7 @@ class DerivativeCheck2d(unittest.TestCase):
         diffop = muFFT.DiscreteDerivative([0, -3],
                                           [[-1/60, 3/20, -3/4, 0,
                                             3/4, -3/20, 1/60]])
-        q = self.fft.wavevectors()
+        q = self.fft.fftfreq
         d = diffop.fourier(q)
         diff_field = self.fft.ifft(d * self.fourier_field) * \
             self.fft.normalisation
@@ -111,11 +111,11 @@ class DerivativeCheck2d(unittest.TestCase):
         for x in range(nx):
             for y in range(ny):
                 ndiff = -1/60*self.field[x, (y-3)%ny] \
-                        +3/20*self.field[x, (y-2)%ny] \
-                        -3/4*self.field[x, (y-1)%ny] \
-                        +3/4*self.field[x, (y+1)%ny] \
-                        -3/20*self.field[x, (y+2)%ny] \
-                        +1/60*self.field[x, (y+3)%ny]
+                    +3/20*self.field[x, (y-2)%ny] \
+                    -3/4*self.field[x, (y-1)%ny] \
+                    +3/4*self.field[x, (y+1)%ny] \
+                    -3/20*self.field[x, (y+2)%ny] \
+                    +1/60*self.field[x, (y+3)%ny]
                 self.assertAlmostEqual(diff_field[x, y], ndiff)
 
 class DerivativeCheck3d(unittest.TestCase):
@@ -126,9 +126,9 @@ class DerivativeCheck3d(unittest.TestCase):
         self.fourier_field = self.fft.fft(self.field)
 
     def test_upwind_differences_x(self):
-        diffop = µ.DiscreteDerivative([0, 0, 0], [[[-1, 1]]]) \
-            .rollaxes(-1).rollaxes(-1)
-        q = self.fft.wavevectors()
+        diffop = muFFT.DiscreteDerivative([0, 0, 0], [[[-1, 1]]]) \
+                      .rollaxes(-1).rollaxes(-1)
+        q = self.fft.fftfreq
         d = diffop.fourier(q)
         diff_field = self.fft.ifft(d * self.fourier_field) * \
             self.fft.normalisation
@@ -140,8 +140,8 @@ class DerivativeCheck3d(unittest.TestCase):
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
     def test_upwind_differences_y(self):
-        diffop = µ.DiscreteDerivative([0, 0, 0], [[[-1, 1]]]).rollaxes(-1)
-        q = self.fft.wavevectors()
+        diffop = muFFT.DiscreteDerivative([0, 0, 0], [[[-1, 1]]]).rollaxes(-1)
+        q = self.fft.fftfreq
         d = diffop.fourier(q)
         diff_field = self.fft.ifft(d * self.fourier_field) * \
             self.fft.normalisation
@@ -153,8 +153,8 @@ class DerivativeCheck3d(unittest.TestCase):
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
     def test_upwind_differences_z(self):
-        diffop = µ.DiscreteDerivative([0, 0, 0], [[[-1, 1]]])
-        q = self.fft.wavevectors()
+        diffop = muFFT.DiscreteDerivative([0, 0, 0], [[[-1, 1]]])
+        q = self.fft.fftfreq
         d = diffop.fourier(q)
         diff_field = self.fft.ifft(d * self.fourier_field) * \
             self.fft.normalisation
@@ -166,11 +166,11 @@ class DerivativeCheck3d(unittest.TestCase):
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
     def test_averaged_upwind_differences_x(self):
-        diffop = µ.DiscreteDerivative([0, 0, 0],
-                                      [[[-0.25, -0.25], [-0.25, -0.25]],
-                                       [[ 0.25,  0.25], [ 0.25,  0.25]]]) \
-            .rollaxes(-1).rollaxes(-1)
-        q = self.fft.wavevectors()
+        diffop = muFFT.DiscreteDerivative([0, 0, 0],
+                                          [[[-0.25, 0.25], [-0.25, 0.25]],
+                                           [[-0.25, 0.25], [-0.25, 0.25]]]) \
+                      .rollaxes(-1).rollaxes(-1)
+        q = self.fft.fftfreq
         d = diffop.fourier(q)
         diff_field = self.fft.ifft(d * self.fourier_field) * \
             self.fft.normalisation
@@ -179,17 +179,17 @@ class DerivativeCheck3d(unittest.TestCase):
             for y in range(ny):
                 for z in range(nz):
                     ndiff = (self.field[(x+1)%nx, y, z] - self.field[x, y, z] \
-                        + self.field[(x+1)%nx, (y+1)%ny, z] - self.field[x, (y+1)%ny, z] \
-                        + self.field[(x+1)%nx, y, (z+1)%nz] - self.field[x, y, (z+1)%nz] \
-                        + self.field[(x+1)%nx, (y+1)%ny, (z+1)%nz] - self.field[x, (y+1)%ny, (z+1)%nz])/4
+                             + self.field[(x+1)%nx, (y+1)%ny, z] - self.field[x, (y+1)%ny, z] \
+                             + self.field[(x+1)%nx, y, (z+1)%nz] - self.field[x, y, (z+1)%nz] \
+                             + self.field[(x+1)%nx, (y+1)%ny, (z+1)%nz] - self.field[x, (y+1)%ny, (z+1)%nz])/4
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
     def test_averaged_upwind_differences_y(self):
-        diffop = µ.DiscreteDerivative([0, 0, 0],
-                                      [[[-0.25, -0.25], [-0.25, -0.25]],
-                                       [[ 0.25,  0.25], [ 0.25,  0.25]]]) \
-            .rollaxes(-1)
-        q = self.fft.wavevectors()
+        diffop = muFFT.DiscreteDerivative([0, 0, 0],
+                                          [[[-0.25, 0.25], [-0.25, 0.25]],
+                                           [[-0.25, 0.25], [-0.25, 0.25]]]) \
+                      .rollaxes(-1)
+        q = self.fft.fftfreq
         d = diffop.fourier(q)
         diff_field = self.fft.ifft(d * self.fourier_field) * \
             self.fft.normalisation
@@ -198,16 +198,16 @@ class DerivativeCheck3d(unittest.TestCase):
             for y in range(ny):
                 for z in range(nz):
                     ndiff = (self.field[x, (y+1)%ny, z] - self.field[x, y, z] \
-                        + self.field[(x+1)%nx, (y+1)%ny, z] - self.field[(x+1)%nx, y, z] \
-                        + self.field[x, (y+1)%ny, (z+1)%nz] - self.field[x, y, (z+1)%nz] \
-                        + self.field[(x+1)%nx, (y+1)%ny, (z+1)%nz] - self.field[(x+1)%nx, y, (z+1)%nz])/4
+                             + self.field[(x+1)%nx, (y+1)%ny, z] - self.field[(x+1)%nx, y, z] \
+                             + self.field[x, (y+1)%ny, (z+1)%nz] - self.field[x, y, (z+1)%nz] \
+                             + self.field[(x+1)%nx, (y+1)%ny, (z+1)%nz] - self.field[(x+1)%nx, y, (z+1)%nz])/4
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
     def test_averaged_upwind_differences_z(self):
-        diffop = µ.DiscreteDerivative([0, 0, 0],
-                                      [[[-0.25, -0.25], [-0.25, -0.25]],
-                                       [[ 0.25,  0.25], [ 0.25,  0.25]]])
-        q = self.fft.wavevectors()
+        diffop = muFFT.DiscreteDerivative([0, 0, 0],
+                                          [[[-0.25, 0.25], [-0.25, 0.25]],
+                                           [[-0.25, 0.25], [-0.25, 0.25]]])
+        q = self.fft.fftfreq
         d = diffop.fourier(q)
         diff_field = self.fft.ifft(d * self.fourier_field) * \
             self.fft.normalisation
@@ -216,9 +216,9 @@ class DerivativeCheck3d(unittest.TestCase):
             for y in range(ny):
                 for z in range(nz):
                     ndiff = (self.field[x, y, (z+1)%nz] - self.field[x, y, z] \
-                        + self.field[(x+1)%nx, y, (z+1)%nz] - self.field[(x+1)%nx, y, z] \
-                        + self.field[x, (y+1)%ny, (z+1)%nz] - self.field[x, (y+1)%ny, z] \
-                        + self.field[(x+1)%nx, (y+1)%ny, (z+1)%nz] - self.field[(x+1)%nx, (y+1)%ny, z])/4
+                             + self.field[(x+1)%nx, y, (z+1)%nz] - self.field[(x+1)%nx, y, z] \
+                             + self.field[x, (y+1)%ny, (z+1)%nz] - self.field[x, (y+1)%ny, z] \
+                             + self.field[(x+1)%nx, (y+1)%ny, (z+1)%nz] - self.field[(x+1)%nx, (y+1)%ny, z])/4
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-# !/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
 @file   python_field_tests.py
@@ -54,17 +54,17 @@ class FieldCollection_Check(unittest.TestCase):
                            self.formulation)
         self.dim = len(self.lengths)
         self.mat = µ.material.MaterialLinearElastic2_2d.make(
-            self.cell.wrapped_cell, "material", 210e9, .33)
+            self.cell, "material", µ.OneQuadPt, 210e9, .33)
 
     def test_fields(self):
         eigen_strain = np.array([[.01,  .02],
                                  [.03, -.01]])
-        for i, pixel in enumerate(self.cell):
-            self.mat.add_pixel(pixel, i/self.cell.size*eigen_strain)
+        for i, pixel in enumerate(self.cell.pixels):
+            self.mat.add_pixel(i, i/len(self.cell.pixels)*eigen_strain)
 
         self.cell.initialise()
-        dir(µ.material.MaterialBase_2d)
-        self.assertTrue(isinstance(self.mat, µ.material.MaterialBase_2d))
+        dir(µ.material.MaterialBase)
+        self.assertTrue(isinstance(self.mat, µ.material.MaterialBase))
         collection = self.mat.collection
         field_name = collection.field_names[0]
         self.assertRaises(Exception, collection.get_complex_field, field_name)
@@ -72,9 +72,9 @@ class FieldCollection_Check(unittest.TestCase):
         self.assertRaises(Exception, collection.get_uint_field, field_name)
         eigen_strain_field = collection.get_real_field(field_name)
 
-        print(eigen_strain_field.array.T)
-        for i, row in enumerate(eigen_strain_field.array.T):
-            error = np.linalg.norm(i/self.cell.size*eigen_strain -
+        print(eigen_strain_field.array().T)
+        for i, row in enumerate(eigen_strain_field.array().T):
+            error = np.linalg.norm(i/len(self.cell.pixels)*eigen_strain -
                                    row.reshape(eigen_strain.shape).T)
             self.assertEqual(0, error)
 

@@ -114,7 +114,6 @@ namespace muSpectre {
     inline static auto get_vec_vec() -> decltype(auto);
   };
 
-  //----------------------------------------------------------------------------//
   //! voigt vector indices for symmetric tensors
   template <>
   auto inline VoigtConversion<1>::get_sym_mat() -> decltype(auto) {

@@ -37,7 +37,7 @@
 #include "common/muSpectre_common.hh"
 #include "materials/stress_transformations_Kirchhoff.hh"
 #include "materials/material_hyper_elasto_plastic2.hh"
-#include "cell/cell_base.hh"
+#include "cell/ncell.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -61,22 +61,26 @@ void add_material_hyper_elasto_plastic2_helper(py::module & mod) {
   name_stream << "MaterialHyperElastoPlastic2_" << Dim << "d";
   const auto name{name_stream.str()};
 
-  using Mat_t = muSpectre::MaterialHyperElastoPlastic2<Dim, Dim>;
-  using Cell_t = muSpectre::CellBase<Dim, Dim>;
+  using Mat_t = muSpectre::MaterialHyperElastoPlastic2<Dim>;
+  using Cell_t = muSpectre::NCell;
 
-  py::class_<Mat_t, muSpectre::MaterialBase<Dim, Dim>, std::shared_ptr<Mat_t>>(
+  py::class_<Mat_t, muSpectre::MaterialBase, std::shared_ptr<Mat_t>>(
       mod, name.c_str())
-      .def_static("make",
-                  [](Cell_t & cell, std::string name) -> Mat_t & {
-                    return Mat_t::make(cell, name);
-                  },
-                  "cell"_a, "name"_a, py::return_value_policy::reference,
-                  py::keep_alive<1, 0>())
-      .def("add_pixel",
-           [](Mat_t & mat, muSpectre::Ccoord_t<Dim> pix, const Real Young,
-              const Real Poisson, const Real tau_y0,
-              const Real H) { mat.add_pixel(pix, Young, Poisson, tau_y0, H); },
-           "pixel"_a, "Youngs_modulus"_a, "Poisson_ratio"_a, "tau_y0"_a, "H"_a)
+      .def_static(
+          "make",
+          [](Cell_t & cell, std::string name, Dim_t nb_quad_pts) -> Mat_t & {
+            return Mat_t::make(cell, name, Dim, nb_quad_pts);
+          },
+          "cell"_a, "name"_a, "nb_quad_pts"_a,
+          py::return_value_policy::reference_internal)
+      .def(
+          "add_pixel",
+          [](Mat_t & mat, const size_t & pix_id, const Real Young,
+             const Real Poisson, const Real tau_y0, const Real H) {
+            mat.add_pixel(pix_id, Young, Poisson, tau_y0, H);
+          },
+          "pixel_index"_a, "Youngs_modulus"_a, "Poisson_ratio"_a, "tau_y0"_a,
+          "H"_a)
       .def_static("make_evaluator", []() { return Mat_t::make_evaluator(); });
 }
 

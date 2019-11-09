@@ -35,6 +35,9 @@
 
 #include "bind_py_declarations.hh"
 
+#include <libmugrid/numpy.hh>
+
+#include <libmufft/fft_utils.hh>
 #include <libmufft/fftw_engine.hh>
 #ifdef WITH_FFTWMPI
 #include <libmufft/fftwmpi_engine.hh>
@@ -47,18 +50,63 @@
 #include <pybind11/stl.h>
 #include <pybind11/eigen.h>
 
+using muGrid::numpy_wrap;
+using muGrid::operator<<;
 using muGrid::Complex;
 using muGrid::Dim_t;
 using muGrid::DynCcoord_t;
+using muGrid::GlobalNFieldCollection;
+using muGrid::NumpyProxy;
 using muGrid::OneQuadPt;
 using muGrid::Real;
+using muGrid::WrappedNField;
+using muFFT::fft_freq;
+using muFFT::FFTEngineBase;
+using muFFT::Communicator;
 using pybind11::literals::operator""_a;
 namespace py = pybind11;
 
+/**
+ * "Trampoline" class for handling the pure virtual methods, see
+ * [http://pybind11.readthedocs.io/en/stable/advanced/classes.html#overriding-virtual-functions-in-python]
+ * for details
+ */
+class PyFFTEngineBase : public FFTEngineBase {
+ public:
+  //! base class
+  using Parent = FFTEngineBase;
+  //! field type on which projection is applied
+  using Field_t = typename Parent::Field_t;
+  //! workspace type
+  using Workspace_t = typename Parent::Workspace_t;
+
+  PyFFTEngineBase(DynCcoord_t nb_grid_pts, Dim_t nb_dof_per_pixel,
+                  Communicator comm)
+      : FFTEngineBase(nb_grid_pts, nb_dof_per_pixel, comm) {}
+
+  Workspace_t & fft(Field_t & field) override {
+    PYBIND11_OVERLOAD_PURE(Workspace_t &, Parent, fft, field);
+  }
+
+  void ifft(Field_t & field) const override {
+    PYBIND11_OVERLOAD_PURE(void, Parent, ifft, field);
+  }
+};
+
+void add_fft_engine_base(py::module & mod) {
+  py::class_<FFTEngineBase,                   // class
+             std::shared_ptr<FFTEngineBase>,  // holder
+             PyFFTEngineBase                  // trampoline base
+             >(mod, "FFTEngineBase")
+      .def(py::init<DynCcoord_t, Dim_t, Communicator>());
+}
+
 template <class Engine>
 void add_engine_helper(py::module & mod, std::string name) {
-  using ArrayXXc = Eigen::Array<Complex, Eigen::Dynamic, Eigen::Dynamic>;
-  py::class_<Engine>(mod, name.c_str())
+  py::class_<Engine,                   // class
+             std::shared_ptr<Engine>,  // holder
+             FFTEngineBase             // trampoline base
+             >(mod, name.c_str())
       .def(py::init([](std::vector<Dim_t> nb_grid_pts, Dim_t nb_dof_per_pixel,
                        muFFT::Communicator & comm) {
              // Initialize with muFFT Communicator object
@@ -83,45 +131,54 @@ void add_engine_helper(py::module & mod, std::string name) {
       // Interface for passing numpy arrays
       .def(
           "fft",
-          [](Engine & eng, Eigen::Ref<typename Engine::Field_t::EigenRep_t> v) {
-            using Coll_t = typename Engine::GFieldCollection_t;
-            using Field_t = muGrid::WrappedNField<Real>;
-            Coll_t coll{eng.get_dim(), OneQuadPt};
-            coll.initialise(eng.get_nb_subdomain_grid_pts(),
-                            eng.get_subdomain_locations());
-            // Do not make a copy, just wrap the Eigen array into a field that
-            // does not manage its own data.
-            Field_t proxy{"proxy_field", coll, eng.get_nb_dof_per_pixel(), v};
+          [](Engine & eng, py::array_t<Real, py::array::f_style> array) {
             // We need to tie the lifetime of the return value to the lifetime
             // of the engine object, because we are returning the internal work
             // space buffer that is managed by the engine;
             // see return_value_policy below.
-            return eng.fft(proxy).eigen_pixel();
+            NumpyProxy<Real> proxy(
+                eng.get_nb_subdomain_grid_pts(),
+                eng.get_subdomain_locations(),
+                eng.get_nb_dof_per_pixel(),
+                array);
+            return numpy_wrap(eng.fft(proxy.get_field()),
+                              proxy.get_components_shape());
           },
           "array"_a, py::return_value_policy::reference_internal)
       .def(
           "ifft",
-          [](Engine & eng, py::EigenDRef<ArrayXXc> v) {
-            using Coll_t = typename Engine::GFieldCollection_t;
-            using Field_t = muGrid::WrappedNField<Real>;
-            // Create an Eigen array that will hold the result of the inverse
+          [](Engine & eng, py::array_t<Complex, py::array::f_style> array) {
+            // Copy the input array to the FFT work space.
+            std::vector<Dim_t> components_shape{
+                numpy_copy(eng.get_work_space(), array)};
+            // Create an numpy array that will hold the result of the inverse
             // FFT. We don't want the storage managed by a field because we
             // want to transfer possession of storage to Python without a copy
             // operation.
-            typename Field_t::EigenRep_t res{eng.get_nb_dof_per_pixel(),
-                                             eng.size()};
-            Coll_t coll{eng.get_dim(), OneQuadPt};
-            coll.initialise(eng.get_nb_subdomain_grid_pts(),
-                            eng.get_subdomain_locations());
-            // Wrap the Eigen array into a proxy field that does not manage
+            std::vector<Dim_t> shape;
+            Dim_t nb_components = 1;
+            for (auto && n : components_shape) {
+              shape.push_back(n);
+              nb_components *= n;
+            }
+            Dim_t size = nb_components;
+            for (auto && n : eng.get_nb_subdomain_grid_pts()) {
+              shape.push_back(n);
+              size *= n;
+            }
+            // Create the numpy array that holds the output data.
+            py::array_t<Real, py::array::f_style> result(shape);
+            // Wrap the numpy array into a proxy field that does not manage
             // its own data.
-            Field_t proxy{"proxy_field", coll, eng.get_nb_dof_per_pixel(), res};
-            eng.get_work_space().eigen_pixel() = v;
-            eng.ifft(proxy);
-            // We can safely transfer possession to Python since the Eigen
-            // array is not tied to the engine object;
-            // see return_value_policy below.
-            return res;
+            NumpyProxy<Real> output_proxy(
+                eng.get_nb_subdomain_grid_pts(),
+                eng.get_subdomain_locations(),
+                eng.get_nb_dof_per_pixel(),
+                result);
+            eng.ifft(output_proxy.get_field());
+            // We can safely transfer possession to Python since the py::array
+            // is not tied to the engine object; see return_value_policy below.
+            return result;
           },
           "array"_a, py::return_value_policy::move)
       .def("initialise", &Engine::initialise,
@@ -131,46 +188,87 @@ void add_engine_helper(py::module & mod, std::string name) {
       .def_property_readonly(
           "nb_subdomain_grid_pts",
           [](const Engine & eng) {
-            auto nb = eng.get_nb_subdomain_grid_pts();
-            return py::array(nb.get_dim(), nb.data());
+            return to_tuple(eng.get_nb_subdomain_grid_pts());
           },
           py::return_value_policy::reference)
       .def_property_readonly(
           "subdomain_locations",
           [](const Engine & eng) {
-            auto nb = eng.get_subdomain_locations();
-            return py::array(nb.get_dim(), nb.data());
+            return to_tuple(eng.get_subdomain_locations());
           },
           py::return_value_policy::reference)
       .def_property_readonly(
           "nb_fourier_grid_pts",
           [](const Engine & eng) {
-            auto nb = eng.get_nb_fourier_grid_pts();
-            return py::array(nb.get_dim(), nb.data());
+            return to_tuple(eng.get_nb_fourier_grid_pts());
           },
           py::return_value_policy::reference)
       .def_property_readonly(
           "fourier_locations",
           [](const Engine & eng) {
-            auto nb = eng.get_fourier_locations();
-            return py::array(nb.get_dim(), nb.data());
+            return to_tuple(eng.get_fourier_locations());
           },
           py::return_value_policy::reference)
       .def_property_readonly(
           "nb_domain_grid_pts",
           [](const Engine & eng) {
-            auto nb = eng.get_nb_domain_grid_pts();
-            return py::array(nb.get_dim(), nb.data());
+            return to_tuple(eng.get_nb_domain_grid_pts());
           },
-          py::return_value_policy::reference);
+          py::return_value_policy::reference)
+      .def_property_readonly(
+          "subdomain_slices",
+          [](const Engine & eng) {
+            auto & nb_pts = eng.get_nb_subdomain_grid_pts();
+            auto & locs = eng.get_subdomain_locations();
+            py::tuple t(eng.get_dim());
+            for (Dim_t dim = 0; dim < eng.get_dim(); ++dim) {
+              t[dim] = py::slice(locs[dim], locs[dim] + nb_pts[dim], 1);
+            }
+            return t;
+          },
+          py::return_value_policy::reference)
+      .def_property_readonly(
+          "fourier_slices",
+          [](const Engine & eng) {
+            auto & nb_pts = eng.get_nb_fourier_grid_pts();
+            auto & locs = eng.get_fourier_locations();
+            py::tuple t(eng.get_dim());
+            for (Dim_t dim = 0; dim < eng.get_dim(); ++dim) {
+              t[dim] = py::slice(locs[dim], locs[dim] + nb_pts[dim], 1);
+            }
+            return t;
+          },
+          py::return_value_policy::reference)
+      .def_property_readonly(
+          "fftfreq",
+          [](const Engine & eng) {
+            std::vector<Dim_t> shape;
+            Dim_t dim = eng.get_dim();
+            shape.push_back(dim);
+            for (auto && n : eng.get_nb_fourier_grid_pts()) {
+              shape.push_back(n);
+            }
+            py::array_t<Real, py::array::f_style> fftfreqs(shape);
+            Real *ptr = static_cast<Real*>(fftfreqs.request().ptr);
+            auto & nb_grid_pts = eng.get_nb_domain_grid_pts();
+            for (auto && pix : eng.get_pixels()) {
+              for (int i = 0; i < dim; ++i) {
+                ptr[i] = static_cast<Real>(fft_freq(pix[i], nb_grid_pts[i]))
+                    / nb_grid_pts[i];
+              }
+              ptr += dim;
+            }
+            return fftfreqs;
+          });
 }
 
-void add_fft_engines(py::module & fft) {
-  add_engine_helper<muFFT::FFTWEngine>(fft, "FFTW");
+void add_fft_engines(py::module & mod) {
+  add_fft_engine_base(mod);
+  add_engine_helper<muFFT::FFTWEngine>(mod, "FFTW");
 #ifdef WITH_FFTWMPI
-  add_engine_helper<muFFT::FFTWMPIEngine>(fft, "FFTWMPI");
+  add_engine_helper<muFFT::FFTWMPIEngine>(mod, "FFTWMPI");
 #endif
 #ifdef WITH_PFFT
-  add_engine_helper<muFFT::PFFTEngine>(fft, "PFFT");
+  add_engine_helper<muFFT::PFFTEngine>(mod, "PFFT");
 #endif
 }

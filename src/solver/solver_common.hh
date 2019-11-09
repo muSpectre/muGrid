@@ -72,13 +72,6 @@ namespace muSpectre {
    */
   template <Dim_t Dim>
   using Grad_t = Matrices::Tens2_t<Dim>;
-  /**
-   * multiple increments can be submitted at once (useful for
-   * path-dependent materials)
-   */
-  template <Dim_t Dim>
-  using GradIncrements =
-      std::vector<Grad_t<Dim>, Eigen::aligned_allocator<Grad_t<Dim>>>;
 
   /* ---------------------------------------------------------------------- */
   class SolverError : public std::runtime_error {

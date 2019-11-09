@@ -63,12 +63,6 @@ namespace muSpectre {
    */
   class MaterialBase {
    public:
-    //! typedefs for data handled by this interface
-    //! field collection for internal variables, such as eigen-strains,
-    //! plastic strains, damage variables, etc, but also for managing which
-    //! pixels the material is responsible for
-    using MFieldCollection_t = muGrid::LocalNFieldCollection;
-
     //! Default constructor
     MaterialBase() = delete;
 
@@ -109,7 +103,8 @@ namespace muSpectre {
      */
     virtual void add_pixel(const size_t & pixel_index);
 
-    virtual void add_pixel_split(const size_t & pixel_index, Real ratio);
+    virtual void add_pixel_split(const size_t & pixel_index,
+                                 const Real & ratio);
 
     // this function is responsible for allocating fields in case cells are
     // split or laminate
@@ -172,24 +167,18 @@ namespace muSpectre {
     auto get_assigned_ratio_field() -> muGrid::RealNField &;
 
     //! return and iterable proxy over the indices of this material's pixels
-    typename MFieldCollection_t::PixelIndexIterable get_pixel_indices() const;
+    typename muGrid::LocalNFieldCollection::PixelIndexIterable
+    get_pixel_indices() const;
 
     /**
      * return and iterable proxy over the indices of this material's quadrature
      * points
      */
-    typename MFieldCollection_t::IndexIterable get_quad_pt_indices() const;
+    typename muGrid::LocalNFieldCollection::IndexIterable
+    get_quad_pt_indices() const;
 
     //! number of quadrature points assigned to this material
     inline Dim_t size() const { return this->internal_fields.get_nb_entries(); }
-
-    //! type to return real-valued fields in
-    using EigenMap =
-        Eigen::Map<Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>>;
-    /**
-     * return an internal field identified by its name as an Eigen Array
-     */
-    EigenMap get_real_field(std::string field_name);
 
     /**
      * list the names of all internal fields
@@ -197,7 +186,8 @@ namespace muSpectre {
     std::vector<std::string> list_fields() const;
 
     //! gives access to internal fields
-    inline MFieldCollection_t & get_collection() {
+    // TODO(junge): rename get_collection to get_fields
+    inline muGrid::LocalNFieldCollection & get_collection() {
       return this->internal_fields;
     }
 
@@ -210,12 +200,13 @@ namespace muSpectre {
      */
     virtual std::tuple<DynMatrix_t, DynMatrix_t>
     constitutive_law_dynamic(const Eigen::Ref<const DynMatrix_t> & strain,
-                             const size_t & pixel_index,
+                             const size_t & quad_pt_index,
                              const Formulation & form) = 0;
 
    protected:
     const std::string name;  //!< material's name (for output and debugging)
-    MFieldCollection_t internal_fields;  //!< storage for internal variables
+    muGrid::LocalNFieldCollection
+        internal_fields;  //!< storage for internal variables
     //! spatial dimension of the material
     Dim_t material_dimension;
 

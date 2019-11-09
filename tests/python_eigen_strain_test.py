@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
-@file   python_material_linear_elastic_generic2_test.py
+@file   python_eigen_strain_test.py
 
 @author Till Junge <till.junge@epfl.ch>
 
-@date   20 Dec 2018
+@date   22 Nov 2019
 
-@brief  tests the bindings for the generic linear law with eigenstrains
+@brief  Unit tests for python bindings
 
 Copyright © 2018 Till Junge
 
@@ -34,15 +34,15 @@ covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
 
-
 import unittest
 import numpy as np
-
 from python_test_imports import µ
-class MaterialLinearElasticGeneric2_Check(unittest.TestCase):
+
+
+class EigenStrainCheck(unittest.TestCase):
     def setUp(self):
-        self.nb_grid_pts = [3, 3]#[5,7]
-        self.lengths = [3., 3.]#[5.2, 8.3]
+        self.nb_grid_pts = [3, 3]  # [5,7]
+        self.lengths = [3., 3.]  # [5.2, 8.3]
         self.formulation = µ.Formulation.small_strain
         self.cell1 = µ.Cell(self.nb_grid_pts,
                             self.lengths,
@@ -50,30 +50,52 @@ class MaterialLinearElasticGeneric2_Check(unittest.TestCase):
         self.cell2 = µ.Cell(self.nb_grid_pts,
                             self.lengths,
                             self.formulation)
-        E, nu =  210e9, .33
-        lam, mu = E*nu/((1+nu)*(1-2*nu)), E/(2*(1+nu))
-
-        C = np.array([[2 * mu + lam,          lam,          lam,  0,  0,  0],
-                      [         lam, 2 * mu + lam,          lam,  0,  0,  0],
-                      [         lam,          lam, 2 * mu + lam,  0,  0,  0],
-                      [           0,            0,            0, mu,  0,  0],
-                      [           0,            0,            0,  0, mu,  0],
-                      [           0,            0,            0,  0,  0, mu]])
-
-        self.mat1 = µ.material.MaterialLinearElasticGeneric1_2d.make(
-            self.cell1, "simple", C)
-        self.mat2 = µ.material.MaterialLinearElasticGeneric2_2d.make(
-            self.cell2, "eigen", C)
+        self.mat1 = µ.material.MaterialLinearElastic1_2d.make(
+            self.cell1, "simple", 210e9, .33)
+        self.mat2 = µ.material.MaterialLinearElastic2_2d.make(
+            self.cell2, "eigen", 210e9, .33)
         self.mat3 = µ.material.MaterialLinearElastic2_2d.make(
             self.cell2, "eigen2", 120e9, .33)
 
+    def test_globalisation(self):
+        for pixel in self.cell2:
+            self.mat2.add_pixel(pixel, np.random.rand(2, 2))
+        loc_eigenstrain = self.mat2.collection.get_real_field(
+            "Eigenstrain").array
+        glo_eigenstrain = self.cell2.get_globalised_internal_real_array(
+            "Eigenstrain")
+        error = np.linalg.norm(loc_eigenstrain-glo_eigenstrain)
+        self.assertEqual(error, 0)
+
+    def test_globalisation_constant(self):
+        for i, pixel in enumerate(self.cell2):
+            if i % 2 == 0:
+                self.mat2.add_pixel(pixel, np.ones((2, 2)))
+            else:
+                self.mat3.add_pixel(pixel, np.ones((2, 2)))
+        glo_eigenstrain = self.cell2.get_globalised_internal_real_array(
+            "Eigenstrain")
+        error = np.linalg.norm(glo_eigenstrain-1)
+        self.assertEqual(error, 0)
+
+    def test_globalisation(self):
+        for pixel in self.cell2:
+            self.mat2.add_pixel(pixel, np.random.rand(2, 2))
+        loc_eigenstrain = self.mat2.collection.get_real_field(
+            "Eigenstrain").array
+        # At the moment, the cell returns reshaped arrays and the material returns the
+        # 2D eigen arrays from muSpectre (To be changed) -> Reshape loc_eigenstrain
+        glo_eigenstrain = self.cell2.get_globalised_internal_real_array("Eigenstrain")
+        loc_eigenstrain = loc_eigenstrain.reshape(glo_eigenstrain.shape, order='F')
+        error = np.linalg.norm(loc_eigenstrain-glo_eigenstrain)
+        self.assertEqual(error, 0)
 
     def test_solve(self):
         verbose_test = False
         if verbose_test:
             print("start test_solve")
         grad = np.array([[1.1,  .2],
-                         [ .3, 1.5]])
+                         [.3, 1.5]])
         gl_strain = -0.5*(grad.T.dot(grad) - np.eye(2))
         gl_strain = -0.5*(grad.T + grad - 2*np.eye(2))
         grad = -gl_strain
@@ -91,7 +113,8 @@ class MaterialLinearElasticGeneric2_Check(unittest.TestCase):
         verbose = 0
 
         def solve(cell, grad):
-            solver=µ.solvers.SolverCG(cell, tol, maxiter, verbose)
+            solver = µ.solvers.SolverCG(
+                cell, tol, maxiter, verbose)
             r = µ.solvers.newton_cg(cell, grad,
                                     solver, tol, tol, verbose)
             return r
@@ -104,16 +127,11 @@ class MaterialLinearElasticGeneric2_Check(unittest.TestCase):
 
         if verbose_test:
             print("cell 1, no eigenstrain")
-            print("P1:\n{}".format(P1[:,0]))
-            print("F1:\n{}".format(results[0].grad[:,0]))
+            print("P1:\n{}".format(P1[:, 0]))
+            print("F1:\n{}".format(results[0].grad[:, 0]))
 
             print("cell 2, with eigenstrain")
-            print("P2:\n{}".format(P2[:,0]))
-            print("F2:\n{}".format(results[1].grad[:,0]))
+            print("P2:\n{}".format(P2[:, 0]))
+            print("F2:\n{}".format(results[1].grad[:, 0]))
             print("end test_solve")
         self.assertLess(error, tol)
-
-
-
-if __name__ == '__main__':
-    unittest.main()

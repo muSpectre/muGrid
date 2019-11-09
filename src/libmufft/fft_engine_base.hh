@@ -182,6 +182,9 @@ namespace muFFT {
      */
     const Dim_t & get_nb_quad() const;
 
+    //! has this engine been initialised?
+    bool is_initialised() const { return this->initialised; }
+
    protected:
     //! spatial dimension of the grid
     Dim_t spatial_dimension;
@@ -210,6 +213,7 @@ namespace muFFT {
     //! quadrature points per pixel multiplied by the number of components per
     //! quadrature point
     Dim_t nb_dof_per_pixel;
+    bool initialised{false};  //!< to prevent double initialisation
   };
 
   //! reference to fft engine is safely managed through a `std::shared_ptr`

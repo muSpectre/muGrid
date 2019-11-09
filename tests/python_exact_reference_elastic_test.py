@@ -1,4 +1,4 @@
-# !/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
 @file   python_exact_reference_elastic_test.py
@@ -271,14 +271,14 @@ class LinearElastic_Check(unittest.TestCase):
         mat = µ.material.MaterialLinearElastic1_3d
 
         E, nu = get_E_nu(.833, .386)
-        hard = mat.make(self.rve.wrapped_cell, 'hard', 10*E, nu)
-        soft = mat.make(self.rve.wrapped_cell, 'soft',    E, nu)
+        hard = mat.make(self.rve, 'hard', µ.OneQuadPt, 10*E, nu)
+        soft = mat.make(self.rve, 'soft', µ.OneQuadPt,    E, nu)
 
-        for pixel in self.rve:
+        for id, pixel in self.rve.pixels.enumerate():
             if pixel[0] < 2 and pixel[1] < 2 and pixel[2] < 2:
-                hard.add_pixel(pixel)
+                hard.add_pixel(id)
             else:
-                soft.add_pixel(pixel)
+                soft.add_pixel(id)
 
     def test_solve(self):
         before_cg_tol = 1e-11
@@ -294,7 +294,9 @@ class LinearElastic_Check(unittest.TestCase):
         P2,K42  = constitutive(F2)
         P,K4  = constitutive(F)
         self.rve.set_uniform_strain(np.array(np.eye(ndim)))
-        µF = self.rve.strain
+        µF = self.rve.strain.array(F.shape)
+        
+        self.assertEqual(µF.array().shape, 1)
 
         self.assertLess(norm(µF - F)/norm(F), before_cg_tol)
         # set macroscopic loading

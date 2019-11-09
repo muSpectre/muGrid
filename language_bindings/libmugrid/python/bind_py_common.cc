@@ -40,10 +40,10 @@
 
 #include "libmugrid/ccoord_operations.hh"
 
-using muGrid::threeD;
 using muGrid::Dim_t;
 using muGrid::DynCcoord;
 using muGrid::Real;
+using muGrid::threeD;
 using pybind11::literals::operator""_a;
 
 namespace py = pybind11;
@@ -61,16 +61,15 @@ void add_dyn_ccoord_helper(py::module & mod, std::string name) {
       .def(py::init<const std::vector<T>>())
       .def(py::init<Dim_t>())
       .def("__len__", &DynCcoord<MaxDim, T>::get_dim)
-      .def("__getitem__",
-           [](const DynCcoord<MaxDim, T> & self, const Dim_t & index) {
-             if (index < 0 || index >= self.get_dim()) {
-               std::stringstream s;
-               s << "index " << index << " out of range 0.."
-                 << self.get_dim()-1;
-               throw std::out_of_range(s.str());
-             }
-             return self[index];
-           });
+      .def("__getitem__", [](const DynCcoord<MaxDim, T> & self,
+                             const Dim_t & index) {
+        if (index < 0 || index >= self.get_dim()) {
+          std::stringstream s;
+          s << "index " << index << " out of range 0.." << self.get_dim() - 1;
+          throw std::out_of_range(s.str());
+        }
+        return self[index];
+      });
   py::implicitly_convertible<py::list, DynCcoord<MaxDim, T>>();
   py::implicitly_convertible<py::tuple, DynCcoord<MaxDim, T>>();
 }
@@ -137,6 +136,19 @@ void add_Pixels_helper(py::module & mod) {
 }
 
 void add_Pixels(py::module & mod) {
+  py::class_<muGrid::CcoordOps::DynamicPixels::Enumerator>(mod, "Enumerator")
+      .def("__len__", &muGrid::CcoordOps::DynamicPixels::Enumerator::size)
+      .def("__iter__",
+           [](muGrid::CcoordOps::DynamicPixels::Enumerator & enumerator) {
+             return py::make_iterator(enumerator.begin(), enumerator.end());
+           });
+  py::class_<muGrid::CcoordOps::DynamicPixels>(mod, "DynamicPixels")
+      .def("__len__", &muGrid::CcoordOps::DynamicPixels::size)
+      .def("__iter__",
+           [](muGrid::CcoordOps::DynamicPixels & pixels) {
+             return py::make_iterator(pixels.begin(), pixels.end());
+           })
+      .def("enumerate", &muGrid::CcoordOps::DynamicPixels::enumerate);
   add_Pixels_helper<muGrid::oneD>(mod);
   add_Pixels_helper<muGrid::twoD>(mod);
   add_Pixels_helper<muGrid::threeD>(mod);

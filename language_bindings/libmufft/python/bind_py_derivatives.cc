@@ -9,20 +9,20 @@
  *
  * Copyright © 2018 Till Junge
  *
- * µSpectre is free software; you can redistribute it and/or
+ * µFFT is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
  * published by the Free Software Foundation, either version 3, or (at
  * your option) any later version.
  *
- * µSpectre is distributed in the hope that it will be useful, but
+ * µFFT is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * General Public License for more details.
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
- * along with µSpectre; see the file COPYING. If not, write to the
+ * along with µFFT; see the file COPYING. If not, write to the
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * * Boston, MA 02111-1307, USA.
+ * Boston, MA 02111-1307, USA.
  *
  * Additional permission under GNU GPL version 3 section 7
  *
@@ -30,6 +30,7 @@
  * with proprietary FFT implementations or numerical libraries, containing parts
  * covered by the terms of those libraries' licenses, the licensors of this
  * Program grant you additional permission to convey the resulting work.
+ *
  */
 
 #include <memory>
@@ -76,75 +77,80 @@ class PyDerivativeBase : public DerivativeBase {
 void add_derivative_base(py::module & mod, std::string name) {
   py::class_<DerivativeBase,                   // class
              std::shared_ptr<DerivativeBase>,  // holder
-             PyDerivativeBase                  // trampoline
+             PyDerivativeBase                  // trampoline base
              >(mod, name.c_str())
       .def(py::init<Dim_t>())
       .def("fourier", &DerivativeBase::fourier,
            "wavevec"_a,
            "return Fourier representation of the derivative operator for a "
+           "certain wavevector")
+      .def("fourier",
+           [](DerivativeBase & derivative,
+              py::array_t<Real, py::array::f_style> wavevectors) {
+             py::buffer_info wavevectors_buffer = wavevectors.request();
+             std::vector<ssize_t> output_shape;
+             // The first dimension contains the components of The wavevector.
+             // This is equal to the dimension of space.
+             ssize_t nb_components = wavevectors_buffer.shape[0];
+             // The next dimensions simply hold entries and we don't care about
+             // the shape. The return array should have the same shape, minus
+             // the first dimension.
+             ssize_t nb_entries = 1;
+             for (int i = 1; i < wavevectors_buffer.ndim; ++i) {
+               output_shape.push_back(wavevectors_buffer.shape[i]);
+               nb_entries *= wavevectors_buffer.shape[i];
+             }
+             // Create output array with appropriate shape.
+             py::array_t<Complex, py::array::f_style> factors(output_shape);
+             py::buffer_info factors_buffer = factors.request();
+             // Loop over all entries and call fourier method.
+             auto wavevector = static_cast<const Real*>(wavevectors_buffer.ptr);
+             for (ssize_t i = 0; i < nb_entries; ++i) {
+               static_cast<Complex*>(factors_buffer.ptr)[i] =
+                   derivative.fourier(
+                     Eigen::Map<const DerivativeBase::Vector>(
+                     wavevector, nb_components));
+               wavevector += nb_components;
+             }
+             return factors;
+           },
+           "wavevectors"_a,
+           "return Fourier representation of the derivative operator for a "
            "certain wavevector");
 }
 
 void add_fourier_derivative(py::module & mod, std::string name) {
-  using ArrayXXd = Eigen::Array<Real, Eigen::Dynamic, Eigen::Dynamic,
-                                Eigen::RowMajor>;
-  using ArrayXc = Eigen::Array<Complex, Eigen::Dynamic, 1>;
-
   py::class_<FourierDerivative,                   // class
              std::shared_ptr<FourierDerivative>,  // holder
              DerivativeBase                       // base class
              >(mod, name.c_str())
       .def(py::init<Dim_t, Dim_t>(),
-           "spatial_dimension"_a, "direction"_a)
-      .def("fourier", &FourierDerivative::fourier,
-           "wavevec"_a,
-           "return Fourier representation of the derivative operator for a "
-           "certain wavevector")
-      .def("fourier",
-           [](FourierDerivative & derivative,
-              const Eigen::Ref<ArrayXXd> & wavevectors) {
-             ArrayXc factors(wavevectors.cols());
-             for (int i = 0; i < wavevectors.cols(); ++i) {
-               factors[i] = derivative.fourier(wavevectors.col(i));
-             }
-             return factors;
-           },
-           "wavevectors"_a,
-           "return Fourier representation of the derivative operator for a "
-           "certain wavevector");
+           "spatial_dimension"_a, "direction"_a);
 }
 
 void add_discrete_derivative(py::module & mod, std::string name) {
-  using ArrayXXd = Eigen::Array<Real, Eigen::Dynamic, Eigen::Dynamic,
-                                Eigen::RowMajor>;
-  using ArrayXc = Eigen::Array<Complex, Eigen::Dynamic, 1>;
-
   py::class_<DiscreteDerivative,                   // class
              std::shared_ptr<DiscreteDerivative>,  // holder
              DerivativeBase                        // base class
              >(mod, name.c_str())
-      .def(py::init([](std::vector<Dim_t> nb_pts, std::vector<Dim_t> lbounds,
-                       const Eigen::ArrayXd &stencil) {
-             return new DiscreteDerivative(DynCcoord_t(nb_pts),
-                                           DynCcoord_t(lbounds), stencil);
-           }),
-           "nb_pts"_a, "lbounds"_a, "stencil"_a)
-      .def("fourier", &DiscreteDerivative::fourier,
-           "wavevector"_a,
-           "return Fourier representation of the derivative operator for a "
-           "certain wavevector")
-      .def("fourier",
-           [](DiscreteDerivative & derivative,
-              const Eigen::Ref<ArrayXXd> & wavevectors) {
-             ArrayXc factors(wavevectors.cols());
-             for (int i = 0; i < wavevectors.cols(); ++i) {
-               factors[i] = derivative.fourier(wavevectors.col(i));
+      .def(py::init([](const DynCcoord_t & lbounds,
+                       py::array_t<Real, py::array::c_style> stencil) {
+             const py::buffer_info & info = stencil.request();
+             if (info.ndim != lbounds.get_dim()) {
+               std::stringstream s;
+               s << "Stencil bounds have " << lbounds.get_dim() << " entries, "
+                 << "but stencil itself is " << info.ndim << "-dimensional.";
+               throw std::logic_error(s.str());
              }
-             return factors;
-           },
-           "wavevectors"_a,
-           "return Fourier representation of the derivative operator for a "
-           "certain wavevector")
+             DynCcoord_t nb_pts(info.ndim);
+             for (int i = 0; i < info.ndim; ++i) {
+               nb_pts[i] = info.shape[i];
+             }
+             return new DiscreteDerivative(nb_pts, lbounds,
+                 Eigen::Map<Eigen::ArrayXd>(static_cast<double*>(info.ptr),
+                                            info.size));
+           }),
+           "lbounds"_a, "stencil"_a)
       .def("rollaxes", &DiscreteDerivative::rollaxes,
            "distance"_a = 1);
 }

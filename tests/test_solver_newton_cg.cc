@@ -17,7 +17,7 @@
  * µSpectre is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * General Public License for more details.
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with µSpectre; see the file COPYING. If not, write to the
@@ -30,6 +30,7 @@
  * with proprietary FFT implementations or numerical libraries, containing parts
  * covered by the terms of those libraries' licenses, the licensors of this
  * Program grant you additional permission to convey the resulting work.
+ *
  */
 
 #include "tests.hh"
@@ -60,6 +61,52 @@ namespace muSpectre {
       SolverFixture<SolverGMRESEigen>, SolverFixture<SolverDGMRESEigen>,
       SolverFixture<SolverBiCGSTABEigen>, SolverFixture<SolverMINRESEigen>>;
 
+  BOOST_FIXTURE_TEST_CASE(small_strain_convergence_test,
+                          SolverFixture<SolverCG>) {
+    constexpr Dim_t Dim{twoD};
+    const DynCcoord_t nb_grid_pts{muGrid::CcoordOps::get_cube<Dim>(3)};
+    const DynRcoord_t lengths{muGrid::CcoordOps::get_cube<Dim>(1.)};
+    constexpr Formulation form{Formulation::small_strain};
+
+    // number of layers in the hard material
+    constexpr Dim_t nb_lays{1};
+    constexpr Real contrast{2};
+    if (not(nb_lays < nb_grid_pts[0])) {
+      throw std::runtime_error(
+          "the number or layers in the hard material must be smaller "
+          "than the total number of layers in dimension 0");
+    }
+
+    auto cell{make_cell(nb_grid_pts, lengths, form)};
+
+    using Mat_t = MaterialLinearElastic1<Dim>;
+    constexpr Real Young{2.}, Poisson{.33};
+    auto & material_hard{
+        Mat_t::make(cell, "hard", Dim, OneQuadPt, contrast * Young, Poisson)};
+    auto & material_soft{
+        Mat_t::make(cell, "soft", Dim, OneQuadPt, Young, Poisson)};
+
+    for (const auto & pixel_index : cell.get_pixel_indices()) {
+      if (pixel_index) {
+        material_hard.add_pixel(pixel_index);
+      } else {
+        material_soft.add_pixel(pixel_index);
+      }
+    }
+    cell.initialise();
+
+    Grad_t<Dim> delEps0{Grad_t<Dim>::Zero()};
+    constexpr Real eps0 = 1.;
+    // delEps0(0, 1) = delEps0(1, 0) = eps0;
+    delEps0(0, 0) = eps0;
+
+    constexpr Real cg_tol{1e-8}, newton_tol{1e-5}, equil_tol{1e-10};
+    constexpr Uint maxiter{Dim * 10};
+    constexpr Dim_t verbose{0};
+
+    type cg{cell, cg_tol, maxiter, static_cast<bool>(verbose)};
+    auto result = newton_cg(cell, delEps0, cg, newton_tol, equil_tol, verbose);
+  }
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(small_strain_patch_dynamic_solver, Fix,
                                    SolverList, Fix) {
     constexpr Dim_t Dim{twoD};

@@ -67,7 +67,8 @@ namespace muGrid {
       template <Dim_t Dim, size_t... I>
       constexpr Ccoord_t<Dim> herm(const Ccoord_t<Dim> & nb_grid_pts,
                                    std::index_sequence<I...>) {
-        return Ccoord_t<Dim>{nb_grid_pts.front() / 2 + 1, nb_grid_pts[I+1]...};
+        return Ccoord_t<Dim>{nb_grid_pts.front() / 2 + 1,
+                             nb_grid_pts[I + 1]...};
       }
 
       //! compute the stride in a direction of a column-major grid
@@ -276,7 +277,7 @@ namespace muGrid {
       Dim_t factor{1};
       for (size_t i = 0; i < dim; ++i) {
         retval[i] = index / factor % nb_grid_pts[i] + locations[i];
-        if (i != dim-1) {
+        if (i != dim - 1) {
           factor *= nb_grid_pts[i];
         }
       }
@@ -340,7 +341,7 @@ namespace muGrid {
       Dim_t factor{1};
       for (size_t i = 0; i < dim; ++i) {
         retval += (ccoord[i] - locations[i]) * factor;
-        if (i != dim-1) {
+        if (i != dim - 1) {
           factor *= nb_grid_pts[i];
         }
       }
@@ -356,6 +357,19 @@ namespace muGrid {
     template <size_t dim>
     constexpr Dim_t get_index_from_strides(const Ccoord_t<dim> & strides,
                                            const Ccoord_t<dim> & ccoord) {
+      Dim_t retval{0};
+      for (const auto & tup : akantu::zip(strides, ccoord)) {
+        const auto & stride = std::get<0>(tup);
+        const auto & ccord_ = std::get<1>(tup);
+        retval += stride * ccord_;
+      }
+      return retval;
+    }
+
+    //! get the linear index of a pixel given a set of strides
+    template <size_t MaxDim>
+    Dim_t get_index_from_strides(const DynCcoord<MaxDim> & strides,
+                                 const DynCcoord<MaxDim> & ccoord) {
       Dim_t retval{0};
       for (const auto & tup : akantu::zip(strides, ccoord)) {
         const auto & stride = std::get<0>(tup);
@@ -393,7 +407,7 @@ namespace muGrid {
     template <size_t dim>
     constexpr size_t get_size_from_strides(const Ccoord_t<dim> & nb_grid_pts,
                                            const Ccoord_t<dim> & strides) {
-      return nb_grid_pts[dim-1] * strides[dim-1];
+      return nb_grid_pts[dim - 1] * strides[dim - 1];
     }
 
     //! forward declaration
@@ -473,6 +487,9 @@ namespace muGrid {
       //! stl conformance
       size_t size() const;
 
+      //! return spatial dimension
+      const Dim_t & get_dim() const { return this->dim; }
+
       //! return the resolution of the discretisation grid in each spatial dim
       const DynCcoord_t & get_nb_grid_pts() const { return this->nb_grid_pts; }
 
@@ -486,6 +503,13 @@ namespace muGrid {
       //! return the strides used for iterating over the pixels
       const DynCcoord_t & get_strides() const { return this->strides; }
 
+      class Enumerator;
+      /**
+       * iterates in tuples of pixel index ond coordinate. Useful in parallel
+       * problems, where simple enumeration of the pixels would be incorrect
+       */
+      Enumerator enumerate() const;
+
      protected:
       Dim_t dim;                //!< spatial dimension
       DynCcoord_t nb_grid_pts;  //!< nb_grid_pts of this domain
@@ -496,7 +520,7 @@ namespace muGrid {
     /**
      * Iterator class for `muSpectre::DynamicPixels`
      */
-    class DynamicPixels::iterator final {
+    class DynamicPixels::iterator {
      public:
       //! stl
       using value_type = DynCcoord<threeD>;
@@ -552,6 +576,54 @@ namespace muGrid {
      protected:
       const DynamicPixels & pixels;  //!< ref to pixels in cell
       size_t index;                  //!< index of currently pointed-to pixel
+    };
+
+    /**
+     * enumerator class for `muSpectre::DynamicPixels`
+     */
+    class DynamicPixels::Enumerator final {
+     public:
+      //! Default constructor
+      Enumerator() = delete;
+
+      //! Constructor
+      Enumerator(const DynamicPixels & pixels);
+
+      //! Copy constructor
+      Enumerator(const Enumerator & other) = default;
+
+      //! Move constructor
+      Enumerator(Enumerator && other) = default;
+
+      //! Destructor
+      virtual ~Enumerator() = default;
+
+      //! Copy assignment operator
+      Enumerator & operator=(const Enumerator & other) = delete;
+
+      //! Move assignment operator
+      Enumerator & operator=(Enumerator && other) = delete;
+
+      class iterator final: public DynamicPixels::iterator {
+       public:
+        using Parent = DynamicPixels::iterator;
+        using Parent::Parent;
+        std::tuple<Dim_t, Parent::value_type> operator*() const{
+          auto && pixel{this->Parent::operator*()};
+          return std::tuple<Dim_t, Parent::value_type>{
+            get_index_from_strides(this->pixels.strides, pixel), pixel};
+        }
+      };
+
+      //! stl conformance
+      iterator begin() const;
+      //! stl conformance
+      iterator end() const;
+      //! stl conformance
+      size_t size() const;
+
+     protected:
+      const DynamicPixels & pixels;
     };
 
     /**

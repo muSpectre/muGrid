@@ -50,7 +50,7 @@ namespace muFFT {
     template <Dim_t Dim, size_t... I>
     constexpr Ccoord_t<Dim> herm(const Ccoord_t<Dim> & nb_grid_pts,
                                  std::index_sequence<I...>) {
-      return Ccoord_t<Dim>{nb_grid_pts[I]..., nb_grid_pts.back() / 2 + 1};
+      return Ccoord_t<Dim>{nb_grid_pts.front() / 2 + 1, nb_grid_pts[I+1]... };
     }
   }
 
@@ -93,6 +93,28 @@ namespace muFFT {
           "One 1, 2, and 3-dimensional cases are allowed");
       break;
     }
+  }
+
+  /**
+   * compute fft frequency (in time (or length) units of of sampling
+   * periods), see numpy's fftfreq function for reference
+   */
+  inline Int fft_freq(Int i, size_t nb_samples) {
+    Int N = (nb_samples - 1) / 2 + 1;  // needs to be signed int for neg freqs
+    if (i < N) {
+      return i;
+    } else {
+      return -Int(nb_samples) / 2 + i - N;
+    }
+  }
+
+  /**
+   * compute fft frequency in correct length or time units. Here,
+   * length refers to the total size of the domain over which the fft
+   * is taken (for instance the length of an edge of an RVE)
+   */
+  inline Real fft_freq(Int i, size_t nb_samples, Real length) {
+    return static_cast<Real>(fft_freq(i, nb_samples)) / length;
   }
 
   /**

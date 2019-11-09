@@ -17,7 +17,7 @@
  * µGrid is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * General Public License for more details.
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with µGrid; see the file COPYING. If not, write to the
@@ -30,6 +30,7 @@
  * with proprietary FFT implementations or numerical libraries, containing parts
  * covered by the terms of those libraries' licenses, the licensors of this
  * Program grant you additional permission to convey the resulting work.
+ *
  */
 
 #include "ccoord_operations.hh"
@@ -120,9 +121,33 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
+    DynamicPixels::Enumerator::Enumerator(const DynamicPixels & pixels)
+        : pixels{pixels} {}
+
+    /* ---------------------------------------------------------------------- */
+    auto DynamicPixels::Enumerator::begin() const -> iterator{
+      return iterator{this->pixels, 0};
+    }
+
+    /* ---------------------------------------------------------------------- */
+    auto DynamicPixels::Enumerator::end() const -> iterator{
+      return iterator{this->pixels, this->pixels.size()};
+    }
+
+    /* ---------------------------------------------------------------------- */
+    size_t DynamicPixels::Enumerator::size() const {
+      return this->pixels.size();
+    }
+
+    /* ---------------------------------------------------------------------- */
     size_t DynamicPixels::size() const { return get_size(this->nb_grid_pts); }
 
     /* ---------------------------------------------------------------------- */
+    auto DynamicPixels::enumerate() const -> Enumerator {
+      return Enumerator(*this);
+    }
+
+    /* ----------------------------------------------------------------------*/
     template <size_t Dim>
     const Pixels<Dim> & DynamicPixels::get_dimensioned_pixels() const {
       if (Dim != this->dim) {
@@ -133,29 +158,29 @@ namespace muGrid {
         throw std::runtime_error(error.str());
       }
       return static_cast<const Pixels<Dim> &>(*this);
-    }
+      }
 
-    template DynamicPixels::DynamicPixels(const Ccoord_t<oneD> &,
-                                          const Ccoord_t<oneD> &);
-    template DynamicPixels::DynamicPixels(const Ccoord_t<twoD> &,
-                                          const Ccoord_t<twoD> &);
-    template DynamicPixels::DynamicPixels(const Ccoord_t<threeD> &,
-                                          const Ccoord_t<threeD> &);
-    template DynamicPixels::DynamicPixels(const Ccoord_t<oneD> &,
-                                          const Ccoord_t<oneD> &,
-                                          const Ccoord_t<oneD> &);
-    template DynamicPixels::DynamicPixels(const Ccoord_t<twoD> &,
-                                          const Ccoord_t<twoD> &,
-                                          const Ccoord_t<twoD> &);
-    template DynamicPixels::DynamicPixels(const Ccoord_t<threeD> &,
-                                          const Ccoord_t<threeD> &,
-                                          const Ccoord_t<threeD> &);
-    template const Pixels<oneD> &
-    DynamicPixels::get_dimensioned_pixels<oneD>() const;
-    template const Pixels<twoD> &
-    DynamicPixels::get_dimensioned_pixels<twoD>() const;
-    template const Pixels<threeD> &
-    DynamicPixels::get_dimensioned_pixels<threeD>() const;
-  }  // namespace CcoordOps
+      template DynamicPixels::DynamicPixels(const Ccoord_t<oneD> &,
+                                            const Ccoord_t<oneD> &);
+      template DynamicPixels::DynamicPixels(const Ccoord_t<twoD> &,
+                                            const Ccoord_t<twoD> &);
+      template DynamicPixels::DynamicPixels(const Ccoord_t<threeD> &,
+                                            const Ccoord_t<threeD> &);
+      template DynamicPixels::DynamicPixels(const Ccoord_t<oneD> &,
+                                            const Ccoord_t<oneD> &,
+                                            const Ccoord_t<oneD> &);
+      template DynamicPixels::DynamicPixels(const Ccoord_t<twoD> &,
+                                            const Ccoord_t<twoD> &,
+                                            const Ccoord_t<twoD> &);
+      template DynamicPixels::DynamicPixels(const Ccoord_t<threeD> &,
+                                            const Ccoord_t<threeD> &,
+                                            const Ccoord_t<threeD> &);
+      template const Pixels<oneD> &
+      DynamicPixels::get_dimensioned_pixels<oneD>() const;
+      template const Pixels<twoD> &
+      DynamicPixels::get_dimensioned_pixels<twoD>() const;
+      template const Pixels<threeD> &
+      DynamicPixels::get_dimensioned_pixels<threeD>() const;
+    }  // namespace CcoordOps
 
 }  // namespace muGrid

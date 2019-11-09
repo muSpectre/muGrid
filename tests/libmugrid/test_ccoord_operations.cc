@@ -17,7 +17,7 @@
  * µGrid is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * General Public License for more details.
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with µGrid; see the file COPYING. If not, write to the
@@ -30,6 +30,7 @@
  * with proprietary FFT implementations or numerical libraries, containing parts
  * covered by the terms of those libraries' licenses, the licensors of this
  * Program grant you additional permission to convey the resulting work.
+ *
  */
 
 #include <libmugrid/ccoord_operations.hh>
@@ -62,6 +63,32 @@ namespace muGrid {
       }
     }
     BOOST_CHECK_EQUAL(static_pix.size(), dynamic_pix.size());
+  }
+
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_enumeration, Fix, testGoodies::dimlist,
+                                   Fix) {
+    constexpr auto Dim{Fix::dim};
+    using Ccoord = Ccoord_t<Dim>;
+    constexpr Dim_t size{5};
+    Ccoord nb_grid_pts = CcoordOps::get_cube<Dim>(size);
+    for (int i{0}; i < Dim; ++i) {
+      nb_grid_pts[i] += i;
+    }
+
+    CcoordOps::DynamicPixels dynamic_pix(nb_grid_pts);
+    for (auto && tup :
+         akantu::zip(akantu::enumerate(dynamic_pix), dynamic_pix.enumerate())) {
+      auto && aka_tup{std::get<0>(tup)};
+      auto && msp_tup{std::get<1>(tup)};
+
+      auto && aka_id{std::get<0>(aka_tup)};
+      auto && msp_id{std::get<0>(msp_tup)};
+      BOOST_CHECK_EQUAL(aka_id, msp_id);
+
+      auto && aka_pix{std::get<1>(aka_tup)};
+      auto && msp_pix{std::get<1>(msp_tup)};
+      BOOST_CHECK_EQUAL(aka_pix, msp_pix);
+    }
   }
 
   BOOST_AUTO_TEST_SUITE_END();

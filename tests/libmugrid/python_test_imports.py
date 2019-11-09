@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
-file     python_test_imports.py
+@file    python_test_imports.py
 
 @author  Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
 
@@ -9,22 +9,20 @@ file     python_test_imports.py
 
 @brief   prepares sys.path to load muGrid
 
-@section LICENSE
+yCopyright © 2018 Till Junge
 
-Copyright © 2018 Till Junge
-
-µSpectre is free software; you can redistribute it and/or
+µGrid is free software; you can redistribute it and/or
 modify it under the terms of the GNU Lesser General Public License as
 published by the Free Software Foundation, either version 3, or (at
 your option) any later version.
 
-µSpectre is distributed in the hope that it will be useful, but
+µGrid is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-General Public License for more details.
+Lesser General Public License for more details.
 
 You should have received a copy of the GNU Lesser General Public License
-along with µSpectre; see the file COPYING. If not, write to the
+along with µGrid; see the file COPYING. If not, write to the
 Free Software Foundation, Inc., 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.
 
@@ -53,8 +51,4 @@ sys.path.insert(0, os.path.join(project_home,
 sys.path.insert(0, os.path.join(project_home,
                                 "language_bindings/libmugrid/python/Debug"))
 
-try:
-    import muGrid
-except ImportError as err:
-    print(err)
-    sys.exit(-1)
+import muGrid

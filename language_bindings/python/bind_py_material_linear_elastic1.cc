@@ -35,7 +35,7 @@
 
 #include "common/muSpectre_common.hh"
 #include "materials/material_linear_elastic1.hh"
-#include "cell/cell_base.hh"
+#include "cell/ncell.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -59,27 +59,29 @@ void add_material_linear_elastic1_helper(py::module & mod) {
   const auto name{name_stream.str()};
 
   using Mat_t = muSpectre::MaterialLinearElastic1<dim>;
-  //TODO: reactivate  using Sys_t = muSpectre::CellBase<dim, dim>;
+  using Cell = muSpectre::NCell;
+  using Mat_ptr = std::shared_ptr<Mat_t>;
   py::class_<Mat_t, muSpectre::MaterialBase, std::shared_ptr<Mat_t>>(
       mod, name.c_str())
-      // TODO: reactivate
-      // .def_static("make",
-      //             [](Sys_t & sys, std::string n, Real e, Real p) -> Mat_t & {
-      //               return Mat_t::make(sys, n, e, p);
-      //             },
-      //             "cell"_a, "name"_a, "Young"_a, "Poisson"_a,
-      //             py::return_value_policy::reference, py::keep_alive<1, 0>())
-      // .def_static("make_evaluator",
-      //             [](Real e, Real p) { return Mat_t::make_evaluator(e, p); },
-      //             "Young"_a, "Poisson"_a)
-      // .def_static("make_free",
-      //             [](std::string n, Real e, Real p) -> Mat_ptr {
-      //               Mat_ptr ret_mat{std::make_shared<Mat_t>(n, e, p)};
-      //               return ret_mat;
-      //             },
-      //             "name"_a, "Young"_a, "Poisson"_a,
-      //             py::return_value_policy::reference);
-    ;
+      .def_static(
+          "make",
+          [](Cell & cell, std::string name, size_t nb_quad_pts, Real Young,
+             Real Poisson) -> Mat_t & {
+            return Mat_t::make(cell, name, dim, nb_quad_pts, Young, Poisson);
+          },
+          "cell"_a, "name"_a, "nb_quadrature_pts"_a, "Young"_a, "Poisson"_a,
+          py::return_value_policy::reference_internal)
+      .def_static(
+          "make_evaluator",
+          [](Real e, Real p) { return Mat_t::make_evaluator(e, p); }, "Young"_a,
+          "Poisson"_a)
+      .def_static(
+          "make_free",
+          [](std::string n, size_t nb_quad_pts, Real e, Real p) -> Mat_ptr {
+            Mat_ptr ret_mat{std::make_shared<Mat_t>(n, dim, nb_quad_pts, e, p)};
+            return ret_mat;
+          },
+          "name"_a, "nb_quad_pts"_a, "Young"_a, "Poisson"_a);
 }
 
 template void

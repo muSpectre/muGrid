@@ -1,4 +1,4 @@
-# !/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
 @file   gradient_integration.py
@@ -154,17 +154,17 @@ def get_integrator(fft, gradient_op, grid_spacing):
     dim = len(grid_spacing)
     nb_grid_pts = np.asarray(fft.nb_domain_grid_pts)
 
-    phase = fft.wavevectors()
+    phase = fft.fftfreq
     # The shift is needed to move the Fourier integration from the cell center
     # to the cell edges. We only compute it if at least one of the directions
     # report a fourier derivative.
-    if any([_derivative.wrapped_object.__class__.__name__.startswith('Fourier')
+    if any([_derivative.__class__.__name__.startswith('Fourier')
             for _derivative in gradient_op]):
         shift = np.exp(1j*np.pi*np.sum(phase, axis=0))
 
     xi = np.zeros(phase.shape, dtype=complex)
     for i, (_derivative, _grid_spacing) in enumerate(zip(gradient_op, grid_spacing)):
-        if _derivative.wrapped_object.__class__.__name__.startswith('Fourier'):
+        if _derivative.__class__.__name__.startswith('Fourier'):
             # Shift to cell edges.
             xi[i] = _derivative.fourier(phase) * shift / _grid_spacing
         else:

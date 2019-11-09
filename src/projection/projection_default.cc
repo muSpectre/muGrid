@@ -52,7 +52,8 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS>
   void ProjectionDefault<DimS>::apply_projection(Field_t & field) {
-    Vector_map field_map{this->fft_engine->fft(field)};
+    auto & work_space{this->fft_engine->fft(field)};
+    Vector_map field_map{work_space};
     Real factor = this->fft_engine->normalisation();
     for (auto && tup : akantu::zip(this->Ghat, field_map)) {
       auto & G{std::get<0>(tup)};

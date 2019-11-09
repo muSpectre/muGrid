@@ -97,7 +97,7 @@ namespace muSpectre {
     //! apply the projection operator to a field
     void apply_projection(Field_t & field) final;
 
-    Eigen::Map<MatrixXXc> get_operator() final;
+    Eigen::Map<MatrixXXc> get_operator();
 
     /**
      * returns the number of rows and cols for the strain matrix type

@@ -141,7 +141,7 @@ namespace muGrid {
     }
 
     /**
-     * Constructor only setting the dimenion. WARNING: This constructor *needs*
+     * Constructor only setting the dimension. WARNING: This constructor *needs*
      * regular (round) braces '()', using curly braces '{}' results in the
      * initialiser list constructor being called and creating a DynCcoord with
      * spatial dimension 1
@@ -340,6 +340,24 @@ namespace muGrid {
   //@}
 
   /**
+   * Allows inserting `std::vector` into `std::ostream`s
+   */
+  template <typename T>
+  std::ostream & operator<<(std::ostream & os,
+                            const std::vector<T> & values) {
+    os << "(";
+    for (size_t i = 0; i < values.size() - 1; ++i) {
+      os << values[i] << ", ";
+    }
+    if (values.size() > 0) {
+      os << values.back();
+    }
+    os << ")";
+    return os;
+  }
+
+
+  /**
    * Allows inserting `muGrid::Ccoord_t` and `muGrid::Rcoord_t`
    * into `std::ostream`s
    */
@@ -364,7 +382,10 @@ namespace muGrid {
     for (Dim_t i = 0; i < values.get_dim() - 1; ++i) {
       os << values[i] << ", ";
     }
-    os << values.back() << ")";
+    if (values.get_dim() > 0) {
+      os << values.back();
+    }
+    os << ")";
     return os;
   }
 

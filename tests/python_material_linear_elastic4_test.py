@@ -1,4 +1,4 @@
-# !/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
 @file   python_material_linear_elastic4_test.py
@@ -60,7 +60,7 @@ class MaterialLinearElastic4_Check(unittest.TestCase):
         Poisson_ratio = 0.3
 
         cell = µ.Cell(self.nb_grid_pts, self.lengths, self.formulation)
-        mat = µ.material.MaterialLinearElastic4_2d.make(cell.wrapped_cell, "material")
+        mat = µ.material.MaterialLinearElastic4_2d.make(cell, "material")
 
         for i, pixel in enumerate(cell):
             mat.add_pixel(pixel, Youngs_modulus, Poisson_ratio)
@@ -73,9 +73,9 @@ class MaterialLinearElastic4_Check(unittest.TestCase):
         verbose = False
 
         solver = µ.solvers.SolverCG(
-            cell.wrapped_cell, tol, maxiter, verbose)
+            cell, tol, maxiter, verbose)
         r = µ.solvers.newton_cg(
-            cell.wrapped_cell, Del0, solver, tol, tol, verbose)
+            cell, Del0, solver, tol, tol, verbose)
 
         # compare the computed stress with the trivial by hand computed stress
         mu = (Youngs_modulus/(2*(1+Poisson_ratio)))
@@ -89,7 +89,7 @@ class MaterialLinearElastic4_Check(unittest.TestCase):
         Poisson_ratio  = 0.3*(1 + 0.1*np.random.random(np.prod(self.nb_grid_pts)))
 
         cell = µ.Cell(self.nb_grid_pts, self.lengths, self.formulation)
-        mat = µ.material.MaterialLinearElastic4_2d.make(cell.wrapped_cell,
+        mat = µ.material.MaterialLinearElastic4_2d.make(cell,
                                                         "material")
 
         for i, pixel in enumerate(cell):
@@ -102,8 +102,8 @@ class MaterialLinearElastic4_Check(unittest.TestCase):
         maxiter = 100
         verbose = False
 
-        solver = µ.solvers.SolverCG(cell.wrapped_cell, tol, maxiter, verbose)
-        r = µ.solvers.newton_cg(cell.wrapped_cell   , Del0,
+        solver = µ.solvers.SolverCG(cell, tol, maxiter, verbose)
+        r = µ.solvers.newton_cg(cell   , Del0,
                                 solver, tol, tol, verbose)
 
         ### Compute tangent through a finite differences approximation

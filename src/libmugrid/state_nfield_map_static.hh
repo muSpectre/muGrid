@@ -18,7 +18,7 @@
  * µGrid is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * General Public License for more details.
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with µGrid; see the file COPYING. If not, write to the
@@ -31,6 +31,7 @@
  * with proprietary FFT implementations or numerical libraries, containing parts
  * covered by the terms of those libraries' licenses, the licensors of this
  * Program grant you additional permission to convey the resulting work.
+ *
  */
 
 #ifndef SRC_LIBMUGRID_STATE_NFIELD_MAP_STATIC_HH_
@@ -137,12 +138,19 @@ namespace muGrid {
 
     //! return a ref to an the current map
     StaticNFieldMap_t & get_current_static() {
-      return static_maps[this->state_field.get_indices()[0]];
+      auto && indices = this->state_field.get_indices();
+      return static_maps[indices[0]];
     }
+
+    StaticNFieldMap_t & get_current() { return this->get_current_static(); }
 
     //! return a const ref to an the current map
     StaticNFieldMap_t & get_current_static() const {
       return this->static_maps[this->state_field.get_indices()[0]];
+    }
+
+    StaticNFieldMap_t & get_current() const {
+      return this->get_current_static();
     }
 
     /**
@@ -175,7 +183,6 @@ namespace muGrid {
       using OldStorage_t =
           typename MapType::template storage_type<Mapping::Const>;
 
-
       //! constructor with map and index, not for user to call
       StaticStateWrapper(StaticStateNFieldMap_t & state_field_map, size_t index)
           : current_val(MapType::template to_storage<MutWrapper>(
@@ -193,8 +200,7 @@ namespace muGrid {
        * ago. Possibly has excess runtime cost compared to the next function,
        * and has no bounds checking, unlike the next function
        */
-      const OldVal_t &
-      old(size_t nb_steps_ago) const {
+      const OldVal_t & old(size_t nb_steps_ago) const {
         return MapType::template provide_const_ref<Mapping::Const>(
             this->old_vals[nb_steps_ago - 1]);
       }
@@ -230,9 +236,11 @@ namespace muGrid {
       std::array<OldStorage_t, NbMemory>
       old_vals_helper_static(StaticStateNFieldMap_t & state_field_map,
                              size_t index, std::index_sequence<NbStepsAgo...>) {
+        // the offset "NbStepsAgo + 1" below is because any old value is
+        // necessarily at least one step old
         return std::array<OldStorage_t, NbMemory>{
             MapType::template to_storage<Mapping::Const>(
-                state_field_map.get_old_static(NbStepsAgo)[index])...};
+                state_field_map.get_old_static(NbStepsAgo + 1)[index])...};
       }
     };
 

@@ -17,7 +17,7 @@
  * µSpectre is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * General Public License for more details.
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with µSpectre; see the file COPYING. If not, write to the
@@ -30,6 +30,7 @@
  * with proprietary FFT implementations or numerical libraries, containing parts
  * covered by the terms of those libraries' licenses, the licensors of this
  * Program grant you additional permission to convey the resulting work.
+ *
  */
 
 #ifndef SRC_CELL_NCELL_HH_
@@ -258,12 +259,12 @@ namespace muSpectre {
     void apply_projection(muGrid::TypedNFieldBase<Real> & field);
     /**
      * evaluates the directional and projected stiffness (this
-     * corresponds to -G:K:δF (note the negative sign in de Geus 2017,
+     * corresponds to G:K:δF (note the negative sign in de Geus 2017,
      * http://dx.doi.org/10.1016/j.cma.2016.12.032).
      */
     void evaluate_projected_directional_stiffness(
-        const muGrid::RealNField & delta_strain,
-        muGrid::RealNField & del_stress);
+        const muGrid::TypedNFieldBase<Real> & delta_strain,
+        muGrid::TypedNFieldBase<Real> & del_stress);
 
     /**
      * evaluates the directional and projected stiffness (this
@@ -278,13 +279,19 @@ namespace muSpectre {
                                              const Real & alpha,
                                              EigenVec_t del_stress);
 
+    //! transitional function, use discouraged
+    SplitCell get_splitness() const { return SplitCell::no; }
+
+    //! return a const ref to the projection implementation
+    const ProjectionBase & get_projection() const;
+
    protected:
     //! statically dimensioned worker for evaluating the tangent operator
     template <Dim_t DimM>
-    static void
-    apply_directional_stiffness(const muGrid::RealNField & delta_strain,
-                                const muGrid::RealNField & tangent,
-                                muGrid::RealNField & delta_stress);
+    static void apply_directional_stiffness(
+        const muGrid::TypedNFieldBase<Real> & delta_strain,
+        const muGrid::TypedNFieldBase<Real> & tangent,
+        muGrid::TypedNFieldBase<Real> & delta_stress);
 
     /**
      * statically dimensioned worker for evaluating the incremental tangent

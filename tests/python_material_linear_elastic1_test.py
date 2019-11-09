@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
-@file   python_test_imports.py
+@file   python_material_linear_elastic1_test.py
 
-@author Till Junge <till.junge@altermail.ch>
+@author Till Junge <till.junge@epfl.ch>
 
-@date   18 Jan 2018
+@date   22 Nov 2019
 
-@brief  prepares sys.path to load muSpectre
+@brief  Unit tests for python bindings
 
 Copyright © 2018 Till Junge
 
@@ -34,20 +34,21 @@ covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
 
-import sys
-import os
+import unittest
+import numpy as np
+from python_test_imports import µ
 
-# Default path of the library
-sys.path.insert(0, os.path.join(os.getcwd(), "../language_bindings/python"))
-sys.path.insert(0, os.path.join(os.getcwd(), "../language_bindings/libmufft/python"))
-sys.path.insert(0, os.path.join(os.getcwd(), "../language_bindings/libmugrid/python"))
-print("current working directory: '{}'".format(os.getcwd()))
 
-# Path of the library when compiling with Xcode
-sys.path.insert(0, os.path.join(os.getcwd(), "../language_bindings/python/Debug"))
-sys.path.insert(0, os.path.join(os.getcwd(), "../language_bindings/libmufft/python"))
-sys.path.insert(0, os.path.join(os.getcwd(), "../language_bindings/libmugrid/python"))
+class MaterialLinearElastic1_2dCheck(unittest.TestCase):
+    def setUp(self):
+        self.nb_grid_pts = [5, 7]
+        self.lengths = [5.2, 8.3]
+        self.formulation = µ.Formulation.small_strain
+        self.sys = µ.Cell(self.nb_grid_pts,
+                          self.lengths,
+                          self.formulation)
+        self.mat = µ.material.MaterialLinearElastic1_2d.make(
+            self.sys, "material", 210e9, .33)
 
-import muFFT
-import muSpectre as µ
-import muSpectre
+    def test_add_material(self):
+        self.mat.add_pixel([2, 1])

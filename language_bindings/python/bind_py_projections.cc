@@ -33,6 +33,15 @@
  *
  */
 
+#include <memory>
+#include <sstream>
+
+#include <pybind11/eigen.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+
+#include <libmugrid/numpy.hh>
+
 #include "projection/projection_small_strain.hh"
 #include "projection/projection_finite_strain.hh"
 #include "projection/projection_finite_strain_fast.hh"
@@ -45,16 +54,13 @@
 #include <libmufft/pfft_engine.hh>
 #endif
 
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
-#include <pybind11/eigen.h>
-
-#include <sstream>
-#include <memory>
-
 using muFFT::Gradient_t;
 using muGrid::Dim_t;
 using muGrid::DynRcoord_t;
+using muGrid::numpy_wrap;
+using muGrid::NumpyProxy;
+using muGrid::Real;
+using muSpectre::Formulation;
 using muSpectre::MatrixXXc;
 using muSpectre::ProjectionBase;
 using pybind11::literals::operator""_a;
@@ -65,116 +71,82 @@ namespace py = pybind11;
  * [http://pybind11.readthedocs.io/en/stable/advanced/classes.html#overriding-virtual-functions-in-python]
  * for details
  */
-template <Dim_t DimS>
 class PyProjectionBase : public ProjectionBase {
  public:
   //! base class
   using Parent = ProjectionBase;
   //! field type on which projection is applied
   using Field_t = typename Parent::Field_t;
+  //! shortcut fo strain shape
+  using StrainShape_t = std::array<Dim_t, 2>;
+
+  PyProjectionBase(muFFT::FFTEngine_ptr engine, DynRcoord_t domain_lengths,
+                   Formulation form)
+      : ProjectionBase(engine, domain_lengths, form) {}
 
   void apply_projection(Field_t & field) override {
     PYBIND11_OVERLOAD_PURE(void, Parent, apply_projection, field);
   }
 
-  Eigen::Map<MatrixXXc> get_operator() override {
-    PYBIND11_OVERLOAD_PURE(Eigen::Map<MatrixXXc>, Parent, get_operator);
+  //  Eigen::Map<MatrixXXc> get_operator() override {
+  //    PYBIND11_OVERLOAD_PURE(Eigen::Map<MatrixXXc>, Parent, get_operator);
+  //  }
+
+  StrainShape_t get_strain_shape() const override {
+    PYBIND11_OVERLOAD_PURE(StrainShape_t, Parent, get_strain_shape);
+  }
+
+  Dim_t get_nb_components() const override {
+    PYBIND11_OVERLOAD_PURE(Dim_t, Parent, get_nb_components);
   }
 };
 
+void add_projection_base(py::module & mod) {
+  py::class_<ProjectionBase,                   // class
+             std::shared_ptr<ProjectionBase>,  // holder
+             PyProjectionBase                  // trampoline base
+             >(mod, "ProjectionBase")
+      .def(py::init<muFFT::FFTEngine_ptr, DynRcoord_t, Formulation>());
+}
+
 template <class Proj, Dim_t DimS>
 void add_proj_helper(py::module & mod, std::string name_start) {
-  using Field_t = typename Proj::Field_t;
-
-#ifdef WITH_MPI
-  auto make_proj = [](Ccoord res, Rcoord lengths, const Gradient_t & gradient,
-                      const std::string & fft,
-                      const muFFT::Communicator & comm) {
-    if (fft == "fftw") {
-      auto engine = std::make_unique<muFFT::FFTWEngine<DimS>>(
-          res, Proj::NbComponents(), comm);
-      return Proj(std::move(engine), lengths, gradient);
-#ifdef WITH_FFTWMPI
-    } else if (fft == "fftwmpi") {
-      auto engine = std::make_unique<muFFT::FFTWMPIEngine<DimS>>(
-          res, Proj::NbComponents(), comm);
-      return Proj(std::move(engine), lengths, gradient);
-#endif
-#ifdef WITH_PFFT
-    } else if (fft == "pfft") {
-      auto engine = std::make_unique<muFFT::PFFTEngine<DimS>>(
-          res, Proj::NbComponents(), comm);
-      return Proj(std::move(engine), lengths, gradient);
-#endif
-    } else {
-      throw std::runtime_error("Unknown FFT engine '" + fft + "' specified.");
-    }
-  };
-#endif
-
   std::stringstream name{};
   name << name_start << '_' << DimS << 'd';
 
-  py::class_<Proj>(mod, name.str().c_str())
-#ifdef WITH_MPI
-      .def(py::init(make_proj), "nb_grid_pts"_a, "lengths"_a,
-           "gradient"_a = muSpectre::make_fourier_gradient<DimS>(),
-           "fft"_a = "fftw", "communicator"_a = muFFT::Communicator())
-      .def(py::init([make_proj](Ccoord res, Rcoord lengths,
-                                const Gradient_t & gradient,
-                                const std::string & fft, size_t comm) {
-             return make_proj(res, lengths, gradient, fft,
-                              std::move(muFFT::Communicator(MPI_Comm(comm))));
-           }),
-           "nb_grid_pts"_a, "lengths"_a,
-           "gradient"_a = muSpectre::make_fourier_gradient<DimS>(),
-           "fft"_a = "fftw", "communicator"_a = size_t(MPI_COMM_SELF))
-#else
-      .def(py::init([](Ccoord res, Rcoord lengths, const Gradient_t & gradient,
-                       const std::string & fft) {
-             if (fft == "fftw") {
-               auto engine = std::make_unique<muFFT::FFTWEngine<DimS>>(
-                   res, Proj::NbComponents());
-               return Proj(std::move(engine), lengths, gradient);
-             } else {
-               throw std::runtime_error("Unknown FFT engine '" + fft +
-                                        "' specified.");
-             }
-           }),
-           "nb_grid_pts"_a, "lengths"_a,
-           "gradient"_a = muSpectre::make_fourier_gradient<DimS>(),
-           "fft"_a = "fftw")
-#endif
+  py::class_<Proj,                   // class
+             std::shared_ptr<Proj>,  // holder
+             ProjectionBase          // trampoline base
+             >(mod, name.str().c_str())
+      .def(py::init<muFFT::FFTEngine_ptr, const DynRcoord_t &, Gradient_t>(),
+           "fft_engine"_a, "domain_lengths"_a, "gradient"_a)
+      .def(py::init<muFFT::FFTEngine_ptr, const DynRcoord_t &>(),
+           "fft_engine"_a, "domain_lengths"_a)
       .def("initialise", &Proj::initialise,
            "flags"_a = muFFT::FFT_PlanFlags::estimate,
            "initialises the fft engine (plan the transform)")
       // apply_projection that takes Fields
       .def("apply_projection", &Proj::apply_projection)
       // apply_projection that takes numpy arrays
-      /*
       .def("apply_projection",
-           [](Proj & proj, py::EigenDRef<Eigen::ArrayXXd> v) {
-             typename muFFT::FFTEngineBase::GFieldCollection_t coll{1};
-             Eigen::Index subdomain_size =
-                 muGrid::CcoordOps::get_size(proj.get_nb_subdomain_grid_pts());
-             if (v.rows() != DimS * DimS || v.cols() != subdomain_size) {
-               throw std::runtime_error("Expected input array of shape (" +
-                                        std::to_string(DimS * DimS) + ", " +
-                                        std::to_string(subdomain_size) +
-                                        "), but input array has shape (" +
-                                        std::to_string(v.rows()) + ", " +
-                                        std::to_string(v.cols()) + ").");
-             }
-             coll.initialise(proj.get_nb_subdomain_grid_pts(),
-                             proj.get_subdomain_locations());
-             Field_t & temp{coll.template register_field<
-                typename Field_t::Element_t>("temp_field",
-                                             proj.get_nb_components())};
-             temp.eigen_pixel() = v;
-             proj.apply_projection(temp);
-             return Eigen::ArrayXXd{temp.eigen_pixel()};
+           [](Proj & proj,
+              py::array_t<Real, py::array::f_style> & vector_field) {
+             py::buffer_info buffer{vector_field.request()};
+             py::array_t<Real, py::array::f_style> proj_vector_field(
+                 buffer.shape);
+             py::buffer_info proj_buffer{proj_vector_field.request()};
+             std::copy(static_cast<Real *>(buffer.ptr),
+                       static_cast<Real *>(buffer.ptr) + buffer.size,
+                       static_cast<Real *>(proj_buffer.ptr));
+
+             auto strain_shape = proj.get_strain_shape();
+             NumpyProxy<Real> proxy(
+                 proj.get_nb_subdomain_grid_pts(),
+                 proj.get_subdomain_locations(), proj.get_nb_quad(),
+                 {strain_shape[0], strain_shape[1]}, proj_vector_field);
+             proj.apply_projection(proxy.get_field());
+             return proj_vector_field;
            })
-           */
       .def_property_readonly("operator", &Proj::get_operator)
       .def_property_readonly("formulation", &Proj::get_formulation,
                              "return a Formulation enum indicating whether the "
@@ -189,8 +161,9 @@ void add_proj_helper(py::module & mod, std::string name_start) {
 }
 
 void add_projections(py::module & mod) {
-  add_proj_helper<muSpectre::ProjectionSmallStrain<muGrid::twoD>,
-                  muGrid::twoD>(mod, "ProjectionSmallStrain");
+  add_projection_base(mod);
+  add_proj_helper<muSpectre::ProjectionSmallStrain<muGrid::twoD>, muGrid::twoD>(
+      mod, "ProjectionSmallStrain");
   add_proj_helper<muSpectre::ProjectionSmallStrain<muGrid::threeD>,
                   muGrid::threeD>(mod, "ProjectionSmallStrain");
 

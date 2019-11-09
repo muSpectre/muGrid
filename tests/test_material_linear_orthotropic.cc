@@ -47,9 +47,9 @@
 #include "libmugrid/ccoord_operations.hh"
 #include "common/muSpectre_common.hh"
 #include "cell/cell_factory.hh"
-#include "solver/deprecated_solvers.hh"
-#include "solver/deprecated_solver_cg.hh"
-#include "solver/deprecated_solver_cg_eigen.hh"
+
+#include "solver/solvers.hh"
+#include "solver/solver_cg.hh"
 
 #include <boost/mpl/list.hpp>
 
@@ -59,23 +59,23 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_CASE(orthotropic_twoD) {
     constexpr Dim_t Dim{twoD};
-    constexpr Ccoord_t<Dim> resolutions{5, 5};
-    constexpr Rcoord_t<Dim> lengths{5, 5};
-    auto fft_ptr_non{std::make_unique<muFFT::FFTWEngine<Dim>>(
-        resolutions, muGrid::ipow(Dim, 2))};
+    const DynCcoord_t resolutions{5, 5};
+    const DynRcoord_t lengths{5, 5};
+    auto fft_ptr_non{
+        std::make_unique<muFFT::FFTWEngine>(resolutions, muGrid::ipow(Dim, 2))};
 
-    auto proj_ptr_non{std::make_unique<ProjectionFiniteStrainFast<Dim, Dim>>(
+    auto proj_ptr_non{std::make_unique<ProjectionFiniteStrainFast<Dim>>(
         std::move(fft_ptr_non), lengths)};
-    CellBase<Dim, Dim> sys_non(std::move(proj_ptr_non));
+    NCell sys_non(std::move(proj_ptr_non));
 
-    auto fft_ptr_lin{std::make_unique<muFFT::FFTWEngine<Dim>>(
-        resolutions, muGrid::ipow(Dim, 2))};
-    auto proj_ptr_lin{std::make_unique<ProjectionFiniteStrainFast<Dim, Dim>>(
+    auto fft_ptr_lin{
+        std::make_unique<muFFT::FFTWEngine>(resolutions, muGrid::ipow(Dim, 2))};
+    auto proj_ptr_lin{std::make_unique<ProjectionFiniteStrainFast<Dim>>(
         std::move(fft_ptr_lin), lengths)};
-    CellBase<Dim, Dim> sys_lin(std::move(proj_ptr_lin));
+    NCell sys_lin(std::move(proj_ptr_lin));
 
-    using Mat_t_non = MaterialLinearOrthotropic<Dim, Dim>;
-    using Mat_t_lin = MaterialLinearElastic1<Dim, Dim>;
+    using Mat_t_non = MaterialLinearOrthotropic<Dim>;
+    using Mat_t_lin = MaterialLinearElastic1<Dim>;
 
     const Real Young{1e10}, Poisson{.3};
     const int con{2};
@@ -83,9 +83,9 @@ namespace muSpectre {
     const Real mu{Young / (2 * (1 + Poisson))};
 
     auto & Material_soft_lin{
-        Mat_t_lin::make(sys_lin, "soft_lin", Young, Poisson)};
-    auto & Material_hard_lin{
-        Mat_t_lin::make(sys_lin, "hard_lin", con * Young, Poisson)};
+        Mat_t_lin::make(sys_lin, "soft_lin", Dim, OneQuadPt, Young, Poisson)};
+    auto & Material_hard_lin{Mat_t_lin::make(sys_lin, "hard_lin", Dim,
+                                             OneQuadPt, con * Young, Poisson)};
 
     std::vector<Real> input_soft;
     input_soft.push_back(lambda + 2 * mu);
@@ -99,63 +99,62 @@ namespace muSpectre {
     input_hard.push_back(con * (lambda + 2 * mu));
     input_hard.push_back(con * mu);
 
-    auto & Material_soft{Mat_t_non::make(sys_non, "soft", input_soft)};
-    auto & Material_hard{Mat_t_non::make(sys_non, "hard", input_hard)};
+    auto & Material_soft{
+        Mat_t_non::make(sys_non, "soft", Dim, OneQuadPt, input_soft)};
+    auto & Material_hard{
+        Mat_t_non::make(sys_non, "hard", Dim, OneQuadPt, input_hard)};
 
-    for (auto && tup : akantu::enumerate(sys_non)) {
-      auto && pixel{std::get<1>(tup)};
-      if (std::get<0>(tup) == 0) {
-        Material_soft.add_pixel(pixel);
-        Material_soft_lin.add_pixel(pixel);
+    for (const auto & pixel_id : sys_non.get_pixel_indices()) {
+      if (pixel_id == 0) {
+        Material_soft.add_pixel(pixel_id);
+        Material_soft_lin.add_pixel(pixel_id);
       } else {
-        Material_hard.add_pixel(pixel);
-        Material_hard_lin.add_pixel(pixel);
+        Material_hard.add_pixel(pixel_id);
+        Material_hard_lin.add_pixel(pixel_id);
       }
     }
 
     Grad_t<Dim> delF0{};
     delF0 << 1e-4, 5e-5, 5e-5, 0;  //, 0, 0, 0, 0, 0;
-    constexpr Real cg_tol{1e-8}, newton_tol{1e-5};
-    constexpr Uint maxiter{muGrid::CcoordOps::get_size(resolutions) *
-                           muGrid::ipow(Dim, secondOrder) * 10};
+    constexpr Real cg_tol{1e-8}, newton_tol{1e-5}, equil_tol{1e-5};
+    const Uint maxiter{10};
     constexpr bool verbose{false};
 
-    GradIncrements<Dim> grads;
+    LoadSteps_t grads;
     grads.push_back(delF0);
-    DeprecatedSolverCG<Dim> cg_lin{sys_lin, cg_tol, maxiter,
-                                   static_cast<bool>(verbose)};
+    SolverCG cg_lin(sys_lin, cg_tol, maxiter, static_cast<bool>(verbose));
     Eigen::ArrayXXd res2{
-        deprecated_newton_cg(sys_lin, grads, cg_lin, newton_tol, verbose)[0]
+        newton_cg(sys_lin, grads, cg_lin, newton_tol, equil_tol, verbose)[0]
             .grad};
 
-    DeprecatedSolverCG<Dim> cg_non{sys_non, cg_tol, maxiter,
-                                   static_cast<bool>(verbose)};
+    SolverCG cg_non{sys_non, cg_tol, maxiter, static_cast<bool>(verbose)};
     Eigen::ArrayXXd res1{
-        deprecated_newton_cg(sys_non, grads, cg_non, newton_tol, verbose)[0]
+        newton_cg(sys_non, grads, cg_non, newton_tol, equil_tol, verbose)[0]
             .grad};
 
-    BOOST_CHECK_LE(abs(res1 - res2).mean(), cg_tol);
+    Real error{abs(res1 - res2).mean()};
+    BOOST_CHECK_LE(error, cg_tol);
   }
 
   BOOST_AUTO_TEST_CASE(orthotropic_threeD) {
     constexpr Dim_t Dim{threeD};
 
-    constexpr Ccoord_t<Dim> resolutions{5, 5, 5};
-    constexpr Rcoord_t<Dim> lengths{5, 5, 5};
-    auto fft_ptr_non{std::make_unique<muFFT::FFTWEngine<Dim>>(
-        resolutions, muGrid::ipow(Dim, 2))};
-    auto proj_ptr_non{std::make_unique<ProjectionFiniteStrainFast<Dim, Dim>>(
+    const DynCcoord_t resolutions{5, 5, 5};
+    const DynRcoord_t lengths{5, 5, 5};
+    auto fft_ptr_non{
+        std::make_unique<muFFT::FFTWEngine>(resolutions, muGrid::ipow(Dim, 2))};
+    auto proj_ptr_non{std::make_unique<ProjectionFiniteStrainFast<Dim>>(
         std::move(fft_ptr_non), lengths)};
-    CellBase<Dim, Dim> sys_non(std::move(proj_ptr_non));
+    NCell sys_non(std::move(proj_ptr_non));
 
-    auto fft_ptr_lin{std::make_unique<muFFT::FFTWEngine<Dim>>(
-        resolutions, muGrid::ipow(Dim, 2))};
-    auto proj_ptr_lin{std::make_unique<ProjectionFiniteStrainFast<Dim, Dim>>(
+    auto fft_ptr_lin{
+        std::make_unique<muFFT::FFTWEngine>(resolutions, muGrid::ipow(Dim, 2))};
+    auto proj_ptr_lin{std::make_unique<ProjectionFiniteStrainFast<Dim>>(
         std::move(fft_ptr_lin), lengths)};
-    CellBase<Dim, Dim> sys_lin(std::move(proj_ptr_lin));
+    NCell sys_lin(std::move(proj_ptr_lin));
 
-    using Mat_t_non = MaterialLinearOrthotropic<Dim, Dim>;
-    using Mat_t_lin = MaterialLinearElastic1<Dim, Dim>;
+    using Mat_t_non = MaterialLinearOrthotropic<Dim>;
+    using Mat_t_lin = MaterialLinearElastic1<Dim>;
 
     const Real Young{1e10}, Poisson{.3};
     const int con{2};
@@ -163,9 +162,9 @@ namespace muSpectre {
     const Real mu{Young / (2 * (1 + Poisson))};
 
     auto & Material_soft_lin{
-        Mat_t_lin::make(sys_lin, "soft_lin", Young, Poisson)};
-    auto & Material_hard_lin{
-        Mat_t_lin::make(sys_lin, "hard_lin", con * Young, Poisson)};
+        Mat_t_lin::make(sys_lin, "soft_lin", Dim, OneQuadPt, Young, Poisson)};
+    auto & Material_hard_lin{Mat_t_lin::make(sys_lin, "hard_lin", Dim,
+                                             OneQuadPt, con * Young, Poisson)};
 
     std::vector<Real> input_soft;
     input_soft.push_back(lambda + 2 * mu);
@@ -189,38 +188,36 @@ namespace muSpectre {
     input_hard.push_back(con * mu);
     input_hard.push_back(con * mu);
 
-    auto & Material_soft{Mat_t_non::make(sys_non, "soft", input_soft)};
-    auto & Material_hard{Mat_t_non::make(sys_non, "hard", input_hard)};
+    auto & Material_soft{
+        Mat_t_non::make(sys_non, "soft", Dim, OneQuadPt, input_soft)};
+    auto & Material_hard{
+        Mat_t_non::make(sys_non, "hard", Dim, OneQuadPt, input_hard)};
 
-    for (auto && tup : akantu::enumerate(sys_non)) {
-      auto && pixel{std::get<1>(tup)};
-      if (std::get<0>(tup) == 0) {
-        Material_soft.add_pixel(pixel);
-        Material_soft_lin.add_pixel(pixel);
+    for (const auto & pixel_id : sys_non.get_pixel_indices()) {
+      if (pixel_id == 0) {
+        Material_soft.add_pixel(pixel_id);
+        Material_soft_lin.add_pixel(pixel_id);
       } else {
-        Material_hard.add_pixel(pixel);
-        Material_hard_lin.add_pixel(pixel);
+        Material_hard.add_pixel(pixel_id);
+        Material_hard_lin.add_pixel(pixel_id);
       }
     }
 
     Grad_t<Dim> delF0;
     delF0 << 1e-4, 5e-5, 5e-5, 0, 0, 0, 0, 0, 0;
-    constexpr Real cg_tol{1e-8}, newton_tol{1e-5};
-    constexpr Uint maxiter{muGrid::CcoordOps::get_size(resolutions) *
-                           muGrid::ipow(Dim, secondOrder) * 10};
+    constexpr Real cg_tol{1e-8}, newton_tol{1e-5}, equil_tol{1e-5};
+    const Uint maxiter{10};
     constexpr bool verbose{false};
 
-    GradIncrements<Dim> grads;
+    LoadSteps_t grads;
     grads.push_back(delF0);
-    DeprecatedSolverCG<Dim> cg_lin{sys_lin, cg_tol, maxiter,
-                                   static_cast<bool>(verbose)};
+    SolverCG cg_lin{sys_lin, cg_tol, maxiter, static_cast<bool>(verbose)};
     Eigen::ArrayXXd res2{
-        deprecated_newton_cg(sys_lin, delF0, cg_lin, newton_tol, verbose).grad};
+        newton_cg(sys_lin, delF0, cg_lin, newton_tol, equil_tol, verbose).grad};
 
-    DeprecatedSolverCG<Dim> cg_non{sys_non, cg_tol, maxiter,
-                                   static_cast<bool>(verbose)};
+    SolverCG cg_non{sys_non, cg_tol, maxiter, static_cast<bool>(verbose)};
     Eigen::ArrayXXd res1{
-        deprecated_newton_cg(sys_non, delF0, cg_non, newton_tol, verbose).grad};
+        newton_cg(sys_non, delF0, cg_non, newton_tol, equil_tol, verbose).grad};
 
     BOOST_CHECK_LE(abs(res1 - res2).mean(), cg_tol);
   }

@@ -342,7 +342,6 @@ namespace muSpectre {
   auto MaterialLaminate<DimM>::constitutive_law_dynamic(
       const Eigen::Ref<const DynMatrix_t> & strain, const size_t & pixel_index,
       const Formulation & form) -> std::tuple<DynMatrix_t, DynMatrix_t> {
-
     Eigen::Map < const Eigen::Matrix<Real, DimM, DimM> F(strain.data());
 
     if (strain.cols() != DimM or strain.rows() != DimM) {

@@ -36,7 +36,7 @@
 #include "common/muSpectre_common.hh"
 #include "materials/stress_transformations_Kirchhoff.hh"
 #include "materials/material_hyper_elasto_plastic1.hh"
-#include "cell/cell_base.hh"
+#include "cell/ncell.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -61,7 +61,7 @@ void add_material_hyper_elasto_plastic1_helper(py::module & mod) {
   const auto name{name_stream.str()};
 
   using Mat_t = muSpectre::MaterialHyperElastoPlastic1<Dim>;
-  using Cell_t = muSpectre::CellBase<Dim>;
+  using Cell_t = muSpectre::NCell;
 
   py::class_<Mat_t, muSpectre::MaterialBase, std::shared_ptr<Mat_t>>(
       mod, name.c_str())
@@ -73,8 +73,7 @@ void add_material_hyper_elasto_plastic1_helper(py::module & mod) {
                   },
                   "cell"_a, "name"_a, "nb_quad_pts"_a, "YoungModulus"_a,
                   "PoissonRatio"_a, "τ_y₀"_a, "h"_a,
-                  py::return_value_policy::reference,
-                  py::keep_alive<1, 0>())
+                  py::return_value_policy::reference_internal)
       .def_static("make_evaluator",
                   [](Real Young, Real Poisson, Real tau_y0, Real h) {
                     return Mat_t::make_evaluator(Young, Poisson, tau_y0, h);

@@ -67,7 +67,10 @@ namespace muSpectre {
             << fft_engine->get_nb_dof_per_pixel() << " degrees of freedom.";
       throw ProjectionError(error.str());
     }
-    fft_engine->initialise(flags);
+    // if the FFT engine comes from Python it may already be initialised
+    if (!fft_engine->is_initialised()) {
+      fft_engine->initialise(flags);
+    }
   }
 
   /* ---------------------------------------------------------------------- */
@@ -78,6 +81,11 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   const Dim_t & ProjectionBase::get_nb_quad() const {
     return this->fft_engine->get_nb_quad();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  muFFT::FFTEngineBase & ProjectionBase::get_fft_engine() {
+    return *this->fft_engine;
   }
 
   /* ---------------------------------------------------------------------- */

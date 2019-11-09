@@ -17,7 +17,7 @@
  * µGrid is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * General Public License for more details.
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with µGrid; see the file COPYING. If not, write to the
@@ -30,6 +30,7 @@
  * with proprietary FFT implementations or numerical libraries, containing parts
  * covered by the terms of those libraries' licenses, the licensors of this
  * Program grant you additional permission to convey the resulting work.
+ *
  */
 
 #ifndef SRC_LIBMUGRID_NFIELD_HH_
@@ -88,7 +89,7 @@ namespace muGrid {
     NField(const NField & other) = delete;
 
     //! Move constructor
-    NField(NField && other) = delete;
+    NField(NField && other) = default;
 
     //! Destructor
     virtual ~NField() = default;
@@ -109,6 +110,26 @@ namespace muGrid {
     const Dim_t & get_nb_components() const;
 
     /**
+     * evaluate and return the overall shape of the field (for passing the
+     * field to generic multidimensional array objects such as numpy.ndarray)
+     */
+    std::vector<Dim_t> get_shape(Iteration iter_type) const;
+
+    /**
+     * evaluate and return the overall shape of the pixels portion of the field
+     * (for passing the field to generic multidimensional array objects such as
+     * numpy.ndarray)
+     */
+    std::vector<Dim_t> get_pixels_shape() const;
+
+    /**
+     * evaluate and return the shape of the data contained in a single pixel or
+     * quadrature point (for passing the field to generic multidimensional
+     * array objects such as numpy.ndarray)
+     */
+    virtual std::vector<Dim_t> get_components_shape(Iteration iter_type) const;
+
+    /**
      * evaluate and return the number of components in an iterate when iterating
      * over this field
      */
@@ -123,7 +144,7 @@ namespace muGrid {
     //! number of entries in the field (= nb_pixel × nb_quad)
     size_t size() const;
 
-    //! size of the internal buffer includin the pad region (in scalars)
+    //! size of the internal buffer including the pad region (in scalars)
     virtual size_t buffer_size() const = 0;
 
     /**

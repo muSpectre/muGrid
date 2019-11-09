@@ -44,11 +44,15 @@
 #include "libmugrid/nfield_collection_local.hh"
 #include "libmugrid/state_nfield.hh"
 
+using muGrid::Complex;
 using muGrid::Dim_t;
 using muGrid::DynCcoord_t;
 using muGrid::GlobalNFieldCollection;
+using muGrid::Int;
 using muGrid::LocalNFieldCollection;
 using muGrid::NFieldCollection;
+using muGrid::Real;
+using muGrid::Uint;
 using pybind11::literals::operator""_a;
 
 namespace py = pybind11;
@@ -75,9 +79,56 @@ void add_field_collection(py::module & mod) {
                              &NFieldCollection::is_initialised)
       .def("get_field", &NFieldCollection::get_field,
            py::return_value_policy::reference_internal)
+      .def(
+          "get_real_field",
+          [](NFieldCollection & collection, const std::string & unique_name)
+              -> muGrid::TypedNFieldBase<Real> & {
+            return dynamic_cast<muGrid::TypedNFieldBase<Real> &>(
+                collection.get_field(unique_name));
+          },
+          "unique_name"_a, py::return_value_policy::reference_internal)
+      .def(
+          "get_complex_field",
+          [](NFieldCollection & collection, const std::string & unique_name)
+              -> muGrid::TypedNFieldBase<Complex> & {
+            return dynamic_cast<muGrid::TypedNFieldBase<Complex> &>(
+                collection.get_field(unique_name));
+          },
+          "unique_name"_a, py::return_value_policy::reference_internal)
+      .def(
+          "get_int_field",
+          [](NFieldCollection & collection, const std::string & unique_name)
+              -> muGrid::TypedNFieldBase<Int> & {
+            return dynamic_cast<muGrid::TypedNFieldBase<Int> &>(
+                collection.get_field(unique_name));
+          },
+          "unique_name"_a, py::return_value_policy::reference_internal)
+      .def(
+          "get_uint_field",
+          [](NFieldCollection & collection, const std::string & unique_name)
+              -> muGrid::TypedNFieldBase<Uint> & {
+            return dynamic_cast<muGrid::TypedNFieldBase<Uint> &>(
+                collection.get_field(unique_name));
+          },
+          "unique_name"_a, py::return_value_policy::reference_internal)
       .def("get_state_field", &NFieldCollection::get_state_field,
            py::return_value_policy::reference_internal)
-      .def("keys", &NFieldCollection::list_fields);
+      .def("keys", &NFieldCollection::list_fields)
+      .def_property_readonly("field_names", &NFieldCollection::list_fields);
+
+  py::class_<muGrid::NFieldCollection::IndexIterable>(mod, "IndexIterable")
+      .def("__len__", &muGrid::NFieldCollection::IndexIterable::size)
+      .def("__iter__", [](muGrid::NFieldCollection::IndexIterable & iterable) {
+        return py::make_iterator(iterable.begin(), iterable.end());
+      });
+
+  py::class_<muGrid::NFieldCollection::PixelIndexIterable>(mod,
+                                                           "PixelIndexIterable")
+      .def("__len__", &muGrid::NFieldCollection::PixelIndexIterable::size)
+      .def("__iter__",
+           [](muGrid::NFieldCollection::PixelIndexIterable & iterable) {
+             return py::make_iterator(iterable.begin(), iterable.end());
+           });
 
   py::enum_<NFieldCollection::ValidityDomain>(field_collection,
                                               "ValidityDomain")
@@ -94,11 +145,11 @@ void add_global_field_collection(py::module & mod) {
            [](GlobalNFieldCollection & self, const DynCcoord_t & nb_grid_pts) {
              self.initialise(nb_grid_pts);
            })
-      .def("initialise", (void (GlobalNFieldCollection::*)(
+      .def("initialise", (void (GlobalNFieldCollection::*)(  // NOLINT
                              const DynCcoord_t &, const DynCcoord_t &)) &
                              GlobalNFieldCollection::initialise)
       .def("initialise",
-           (void (GlobalNFieldCollection::*)(
+           (void (GlobalNFieldCollection::*)(  // NOLINT
                const DynCcoord_t &, const DynCcoord_t &, const DynCcoord_t &)) &
                GlobalNFieldCollection::initialise)
       .def_property_readonly("pixels", &GlobalNFieldCollection::get_pixels);
