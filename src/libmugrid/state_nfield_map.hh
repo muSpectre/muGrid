@@ -183,12 +183,6 @@ namespace muGrid {
       return StateWrapper<Mapping::Const>{*this, index};
     }
 
-    /**
-     * make sure the underlying collection is initialised and update the data
-     * pointers of all maps
-     */
-    void initialise();
-
     //! returns a reference to the map over the current data
     NFieldMap_t & get_current();
 

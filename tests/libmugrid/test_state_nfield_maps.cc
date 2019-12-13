@@ -114,8 +114,6 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(iteration_test, Fix, StateNFieldMapFixtures,
                                    Fix) {
-    Fix::array_field_map.initialise();
-    Fix::const_array_field_map.initialise();
     Fix::array_field.current().eigen_vec().setZero();
     for (Dim_t i{1}; i < this->NbMemory() + 1; ++i) {
       Fix::array_field.cycle();
@@ -134,8 +132,6 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(direct_access_test, Fix,
                                    StateNFieldMapFixtures, Fix) {
-    Fix::array_field_map.initialise();
-    Fix::const_array_field_map.initialise();
     Fix::array_field.current().eigen_vec().setZero();
     for (Dim_t i{1}; i < this->NbMemory() + 1; ++i) {
       Fix::array_field.cycle();
@@ -192,8 +188,6 @@ namespace muGrid {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(static_iteration_test, Fix,
                                    StaticStateNFieldMapFixtures, Fix) {
     size_t counter{0};
-
-    this->scalar_map.initialise();
     ScalarNFieldMap<Int, Mapping::Mut> & current{
         this->scalar_map.get_current_static()};
     BOOST_CHECK_NO_THROW(current[0]++);
@@ -214,8 +208,6 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(static_direct_access_test, Fix,
                                    StaticStateNFieldMapFixtures, Fix) {
-    Fix::static_array_field_map.initialise();
-    Fix::static_const_array_field_map.initialise();
     Fix::array_field.current().eigen_vec().setZero();
     for (Dim_t i{1}; i < this->NbMemory() + 1; ++i) {
       Fix::array_field.cycle();
@@ -232,8 +224,6 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(static_iteration_testb, Fix,
                                    StaticStateNFieldMapFixtures, Fix) {
-    Fix::static_array_field_map.initialise();
-    Fix::static_const_array_field_map.initialise();
     Fix::array_field.current().eigen_vec().setZero();
     for (Dim_t i{1}; i < this->NbMemory() + 1; ++i) {
       Fix::array_field.cycle();

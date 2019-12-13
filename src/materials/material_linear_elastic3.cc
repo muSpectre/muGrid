@@ -68,15 +68,7 @@ namespace muSpectre {
     this->C_field.get_field().push_back(C);
   }
 
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
-  void MaterialLinearElastic3<DimM>::initialise() {
-    Parent::initialise();
-// TODO: comment
-    // this->C_field.get_map().initialise();
-  }
-
-      template class MaterialLinearElastic3<twoD>;
+  template class MaterialLinearElastic3<twoD>;
   template class MaterialLinearElastic3<threeD>;
 
 }  // namespace muSpectre

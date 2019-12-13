@@ -254,18 +254,6 @@ namespace muGrid {
       return StaticStateWrapper<Mapping::Const>{*this, index};
     }
 
-    //! initialise all submaps, make sure the underlying fields are initialised
-    void initialise() {
-// TODO: comment
-      // for (auto && map : this->static_maps) {
-      //   map.initialise();
-      // }
-      // for (auto && map : this->static_cmaps) {
-      //   map.initialise();
-      // }
-      Parent::initialise();
-    }
-
    protected:
     //! internal convenience alias
     template <Mapping MutIter>

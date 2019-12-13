@@ -112,32 +112,6 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T, Mapping Mutability>
-  void StateNFieldMap<T, Mutability>::initialise() {
-    // TODO: comment
-    // for (auto && map : this->maps) {
-    //   map.initialise();
-    // }
-    // for (auto && map : this->cmaps) {
-    //   map.initialise();
-    // }
-  }
-
-  /* ---------------------------------------------------------------------- */
-  // template <typename T, Mapping Mutability>
-  // auto StateNFieldMap<T, Mutability>::begin() const -> const_iterator {
-  //   return const_iterator{0, this->get_current_it(false),
-  //                         this->get_old_its(false)};
-  // }
-
-  /* ---------------------------------------------------------------------- */
-  // template <typename T, Mapping Mutability>
-  // auto StateNFieldMap<T, Mutability>::end() const -> const_iterator {
-  //   return const_iterator{this->current->size(), this->get_current_it(true),
-  //                         this->get_old_its(true)};
-  // }
-
-  /* ---------------------------------------------------------------------- */
-  template <typename T, Mapping Mutability>
   auto StateNFieldMap<T, Mutability>::get_state_field() const
       -> const TypedStateNField<T> & {
     return this->state_field;

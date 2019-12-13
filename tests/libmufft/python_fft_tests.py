@@ -200,7 +200,7 @@ class FFT_Check(unittest.TestCase):
 
                 # Separately test convenience interface
                 out_msp = engine.fft(in_arr)
-                assert out_msp.shape == engine.nb_fourier_grid_pts, \
+                assert np.squeeze(out_msp).shape == engine.nb_fourier_grid_pts, \
                     "{} not equal to {}".format(out_msp.shape,
                                                 engine.nb_fourier_grid_pts)
 

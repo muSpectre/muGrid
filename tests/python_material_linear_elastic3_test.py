@@ -50,29 +50,29 @@ class MaterialLinearElastic3_Check(unittest.TestCase):
         self.nb_grid_pts = [5,5]
         self.lengths = [2.5, 3.1]
         self.formulation = µ.Formulation.small_strain
-        self.sys = µ.Cell(self.nb_grid_pts,
+        self.cell = µ.Cell(self.nb_grid_pts,
                           self.lengths,
                           self.formulation)
         self.dim = len(self.lengths)
         self.mat = µ.material.MaterialLinearElastic3_2d.make(
-            self.sys, "material")
+            self.cell, "material", µ.OneQuadPt)
 
     def test_solver(self):
         Young   = 10.
         Poisson = 0.3
 
-        for i, pixel in enumerate(self.sys):
-            self.mat.add_pixel(pixel, Young, Poisson)
+        for pixel_id in self.cell.pixel_indices:
+            self.mat.add_pixel(pixel_id, Young, Poisson)
 
-        self.sys.initialise()
+        self.cell.initialise()
         tol = 1e-6
         Del0 = np.array([[0, 0.025],
                          [0.025,  0]])
         maxiter = 100
         verbose = False
 
-        solver=µ.solvers.SolverCG(self.sys, tol, maxiter, verbose)
-        r = µ.solvers.newton_cg(self.sys, Del0,
+        solver=µ.solvers.SolverCG(self.cell, tol, maxiter, verbose)
+        r = µ.solvers.newton_cg(self.cell, Del0,
                                 solver, tol, tol, verbose)
 
         #compare the computed stress with the trivial by hand computed stress

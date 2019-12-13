@@ -82,7 +82,7 @@ void add_typed_field(py::module & mod, std::string name) {
 
     // If shape is given, then we return a field of tensors of this
     // shape
-    Dim_t ntotal = 1;
+    Dim_t ntotal{1};
     if (dim != 0) {
       for (auto & n : shape) {
         return_shape.push_back(n);
@@ -90,7 +90,7 @@ void add_typed_field(py::module & mod, std::string name) {
       }
     }
 
-    auto nb_quad = self.get_collection().get_nb_quad();
+    const auto nb_quad{self.get_collection().get_nb_quad()};
     if (it == muGrid::Iteration::QuadPt) {
       // If shape is not given, we just return column vectors with the
       // components
@@ -120,14 +120,14 @@ void add_typed_field(py::module & mod, std::string name) {
       }
     }
 
-    auto & coll = self.get_collection();
+    const auto & coll{self.get_collection()};
     if (coll.get_domain() == NFieldCollection::ValidityDomain::Global) {
       // We have a global field collection and can return array that
       // have the correct shape corresponding to the grid (on the local
       // MPI process).
       const GlobalNFieldCollection & global_coll =
           dynamic_cast<const GlobalNFieldCollection &>(coll);
-      auto & nb_grid_pts = global_coll.get_pixels().get_nb_grid_pts();
+      const auto & nb_grid_pts{global_coll.get_pixels().get_nb_grid_pts()};
       for (auto & n : nb_grid_pts) {
         return_shape.push_back(n);
       }

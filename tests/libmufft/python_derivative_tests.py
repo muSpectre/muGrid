@@ -57,6 +57,8 @@ class DerivativeCheck2d(unittest.TestCase):
         ndiff = self.fft.ifft(1j*2*np.pi*q[0] * fourier_field_copy) * \
             self.fft.normalisation
         nx, ny = self.nb_pts
+        diff_field = np.squeeze(diff_field)
+        ndiff = np.squeeze(ndiff)
         for x in range(nx):
             for y in range(ny):
                 self.assertAlmostEqual(diff_field[x,y], ndiff[x,y])
@@ -68,9 +70,11 @@ class DerivativeCheck2d(unittest.TestCase):
         diff_field = self.fft.ifft(d * self.fourier_field) * \
             self.fft.normalisation
         nx, ny = self.nb_pts
+        diff_field = np.squeeze(diff_field)
         for x in range(nx):
             for y in range(ny):
                 ndiff = self.field[x, (y+1)%ny] - self.field[x, y]
+                ndiff = np.squeeze(ndiff)
                 self.assertAlmostEqual(diff_field[x, y], ndiff)
 
     def test_averaged_upwind_differences(self):
@@ -81,10 +85,12 @@ class DerivativeCheck2d(unittest.TestCase):
         diff_field = self.fft.ifft(d * self.fourier_field) * \
             self.fft.normalisation
         nx, ny = self.nb_pts
+        diff_field = np.squeeze(diff_field)
         for x in range(nx):
             for y in range(ny):
                 ndiff = (self.field[x, (y+1)%ny] - self.field[x, y] \
                          + self.field[(x+1)%nx, (y+1)%ny] - self.field[(x+1)%nx, y])/2
+                ndiff = np.squeeze(ndiff)
                 self.assertAlmostEqual(diff_field[x, y], ndiff)
 
     def test_central_differences(self):
@@ -94,9 +100,11 @@ class DerivativeCheck2d(unittest.TestCase):
         diff_field = self.fft.ifft(d * self.fourier_field) * \
             self.fft.normalisation
         nx, ny = self.nb_pts
+        diff_field = np.squeeze(diff_field)
         for x in range(nx):
             for y in range(ny):
                 ndiff = (self.field[(x+1)%nx, y] - self.field[(x-1)%nx, y])/2
+                ndiff = np.squeeze(ndiff)
                 self.assertAlmostEqual(diff_field[x, y], ndiff)
 
     def test_sixth_order_central_differences(self):
@@ -108,6 +116,7 @@ class DerivativeCheck2d(unittest.TestCase):
         diff_field = self.fft.ifft(d * self.fourier_field) * \
             self.fft.normalisation
         nx, ny = self.nb_pts
+        diff_field = np.squeeze(diff_field)
         for x in range(nx):
             for y in range(ny):
                 ndiff = -1/60*self.field[x, (y-3)%ny] \
@@ -116,6 +125,7 @@ class DerivativeCheck2d(unittest.TestCase):
                     +3/4*self.field[x, (y+1)%ny] \
                     -3/20*self.field[x, (y+2)%ny] \
                     +1/60*self.field[x, (y+3)%ny]
+                ndiff = np.squeeze(ndiff)
                 self.assertAlmostEqual(diff_field[x, y], ndiff)
 
 class DerivativeCheck3d(unittest.TestCase):
@@ -133,10 +143,12 @@ class DerivativeCheck3d(unittest.TestCase):
         diff_field = self.fft.ifft(d * self.fourier_field) * \
             self.fft.normalisation
         nx, ny, nz = self.nb_pts
+        diff_field = np.squeeze(diff_field)
         for x in range(nx):
             for y in range(ny):
                 for z in range(nz):
                     ndiff = self.field[(x+1)%nx, y, z] - self.field[x, y, z]
+                    ndiff = np.squeeze(ndiff)
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
     def test_upwind_differences_y(self):
@@ -146,10 +158,12 @@ class DerivativeCheck3d(unittest.TestCase):
         diff_field = self.fft.ifft(d * self.fourier_field) * \
             self.fft.normalisation
         nx, ny, nz = self.nb_pts
+        diff_field = np.squeeze(diff_field)
         for x in range(nx):
             for y in range(ny):
                 for z in range(nz):
                     ndiff = self.field[x, (y+1)%ny, z] - self.field[x, y, z]
+                    ndiff = np.squeeze(ndiff)
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
     def test_upwind_differences_z(self):
@@ -159,10 +173,12 @@ class DerivativeCheck3d(unittest.TestCase):
         diff_field = self.fft.ifft(d * self.fourier_field) * \
             self.fft.normalisation
         nx, ny, nz = self.nb_pts
+        diff_field = np.squeeze(diff_field)
         for x in range(nx):
             for y in range(ny):
                 for z in range(nz):
                     ndiff = self.field[x, y, (z+1)%nz] - self.field[x, y, z]
+                    ndiff = np.squeeze(ndiff)
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
     def test_averaged_upwind_differences_x(self):
@@ -175,6 +191,7 @@ class DerivativeCheck3d(unittest.TestCase):
         diff_field = self.fft.ifft(d * self.fourier_field) * \
             self.fft.normalisation
         nx, ny, nz = self.nb_pts
+        diff_field = np.squeeze(diff_field)
         for x in range(nx):
             for y in range(ny):
                 for z in range(nz):
@@ -182,6 +199,7 @@ class DerivativeCheck3d(unittest.TestCase):
                              + self.field[(x+1)%nx, (y+1)%ny, z] - self.field[x, (y+1)%ny, z] \
                              + self.field[(x+1)%nx, y, (z+1)%nz] - self.field[x, y, (z+1)%nz] \
                              + self.field[(x+1)%nx, (y+1)%ny, (z+1)%nz] - self.field[x, (y+1)%ny, (z+1)%nz])/4
+                    ndiff = np.squeeze(ndiff)
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
     def test_averaged_upwind_differences_y(self):
@@ -194,6 +212,7 @@ class DerivativeCheck3d(unittest.TestCase):
         diff_field = self.fft.ifft(d * self.fourier_field) * \
             self.fft.normalisation
         nx, ny, nz = self.nb_pts
+        diff_field = np.squeeze(diff_field)
         for x in range(nx):
             for y in range(ny):
                 for z in range(nz):
@@ -201,6 +220,7 @@ class DerivativeCheck3d(unittest.TestCase):
                              + self.field[(x+1)%nx, (y+1)%ny, z] - self.field[(x+1)%nx, y, z] \
                              + self.field[x, (y+1)%ny, (z+1)%nz] - self.field[x, y, (z+1)%nz] \
                              + self.field[(x+1)%nx, (y+1)%ny, (z+1)%nz] - self.field[(x+1)%nx, y, (z+1)%nz])/4
+                    ndiff = np.squeeze(ndiff)
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
     def test_averaged_upwind_differences_z(self):
@@ -212,6 +232,7 @@ class DerivativeCheck3d(unittest.TestCase):
         diff_field = self.fft.ifft(d * self.fourier_field) * \
             self.fft.normalisation
         nx, ny, nz = self.nb_pts
+        diff_field = np.squeeze(diff_field)
         for x in range(nx):
             for y in range(ny):
                 for z in range(nz):
@@ -219,6 +240,7 @@ class DerivativeCheck3d(unittest.TestCase):
                              + self.field[(x+1)%nx, y, (z+1)%nz] - self.field[(x+1)%nx, y, z] \
                              + self.field[x, (y+1)%ny, (z+1)%nz] - self.field[x, (y+1)%ny, z] \
                              + self.field[(x+1)%nx, (y+1)%ny, (z+1)%nz] - self.field[(x+1)%nx, (y+1)%ny, z])/4
+                    ndiff = np.squeeze(ndiff)
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
 if __name__ == "__main__":

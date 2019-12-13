@@ -43,7 +43,6 @@
 #include "T4_map_proxy.hh"
 
 #include <sstream>
-#include <iostream>
 
 namespace muGrid {
 
@@ -185,7 +184,6 @@ namespace muGrid {
     //! random access operator
     Return_t<Mutability> operator[](size_t index) {
       assert(this->is_initialised);
-      std::cout << "passing through" << std::endl;
       return MapType::template from_data_ptr<Mutability>(
           this->data_ptr + index * MapType::stride());
     }
@@ -202,10 +200,6 @@ namespace muGrid {
 
     //! stl
     iterator begin() {
-// TODO: comment
-      // if (not this->is_initialised) {
-      //   this->initialise();
-      // }
       return iterator{*this, false};
     }
 

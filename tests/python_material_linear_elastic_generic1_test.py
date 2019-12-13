@@ -52,9 +52,9 @@ class MaterialLinearElasticGeneric1_Check(unittest.TestCase):
         self.Young = 210e9
         self.Poisson = .33
         self.mat1 = µ.material.MaterialLinearElastic1_3d.make(
-            self.cell1, "material", self.Young, self.Poisson)
+            self.cell1, "material", µ.OneQuadPt, self.Young, self.Poisson)
         self.matO1 = µ.material.MaterialLinearElastic1_3d.make(
-            self.cell1, "material", 2* self.Young, self.Poisson)
+            self.cell1, "material", µ.OneQuadPt, 2* self.Young, self.Poisson)
 
         E, nu = self.Young, self.Poisson
         lam, mu = E*nu/((1+nu)*(1-2*nu)), E/(2*(1+nu))
@@ -70,20 +70,20 @@ class MaterialLinearElasticGeneric1_Check(unittest.TestCase):
                             self.lengths,
                             self.formulation)
         self.mat2 = µ.material.MaterialLinearElasticGeneric1_3d.make(
-            self.cell2, "material", C)
+            self.cell2, "material", µ.OneQuadPt, C)
         self.matO2 = µ.material.MaterialLinearElastic1_3d.make(
-            self.cell2, "material", 2* self.Young, self.Poisson)
+            self.cell2, "material", µ.OneQuadPt, 2* self.Young, self.Poisson)
 
     def test_equivalence(self):
         sym = lambda x: .5*(x + x.T)
         Del0 = sym((np.random.random((self.dim, self.dim))-.5)/10)
-        for pixel in self.cell1:
+        for pix_id, pixel in self.cell1.pixels.enumerate():
             if pixel[0] == 0:
-                self.matO1.add_pixel(pixel)
-                self.matO2.add_pixel(pixel)
+                self.matO1.add_pixel(pix_id)
+                self.matO2.add_pixel(pix_id)
             else:
-                self.mat1.add_pixel(pixel)
-                self.mat2.add_pixel(pixel)
+                self.mat1.add_pixel(pix_id)
+                self.mat2.add_pixel(pix_id)
 
         tol = 1e-6
         equil_tol = tol

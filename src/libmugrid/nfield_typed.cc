@@ -329,71 +329,51 @@ namespace muGrid {
   template <typename T>
   auto TypedNFieldBase<T>::get_pixel_map(const Dim_t & nb_rows)
       -> NFieldMap<T, Mapping::Mut> {
-    auto ret_val{
-        (nb_rows == -1)
-            ? NFieldMap<T, Mapping::Mut>{*this, Iteration::Pixel}
-            : NFieldMap<T, Mapping::Mut>{*this, nb_rows, Iteration::Pixel}};
-// TODO: comment    // if (this->collection.is_initialised()) {
-    //   ret_val.initialise();
-    // }
-    return ret_val;
+    return (nb_rows == -1)
+               ? NFieldMap<T, Mapping::Mut>{*this, Iteration::Pixel}
+               : NFieldMap<T, Mapping::Mut>{*this, nb_rows, Iteration::Pixel};
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
   auto TypedNFieldBase<T>::get_pixel_map(const Dim_t & nb_rows) const
       -> NFieldMap<T, Mapping::Const> {
-    auto ret_val{
-        (nb_rows == -1)
-            ? NFieldMap<T, Mapping::Const>{*this, Iteration::Pixel}
-            : NFieldMap<T, Mapping::Const>{*this, nb_rows, Iteration::Pixel}};
-// TODO: comment    // if (this->collection.is_initialised()) {
-    //   ret_val.initialise();
-    // }
-    return ret_val;
+    return (nb_rows == -1)
+               ? NFieldMap<T, Mapping::Const>{*this, Iteration::Pixel}
+               : NFieldMap<T, Mapping::Const>{*this, nb_rows, Iteration::Pixel};
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
   auto TypedNFieldBase<T>::get_quad_pt_map(const Dim_t & nb_rows)
       -> NFieldMap<T, Mapping::Mut> {
-    auto ret_val{
-        (nb_rows == -1)
-            ? NFieldMap<T, Mapping::Mut>{*this, Iteration::QuadPt}
-            : NFieldMap<T, Mapping::Mut>{*this, nb_rows, Iteration::QuadPt}};
-// TODO: comment    // if (this->collection.is_initialised()) {
-    //   ret_val.initialise();
-    // }
-    return ret_val;
+    return (nb_rows == -1)
+               ? NFieldMap<T, Mapping::Mut>{*this, Iteration::QuadPt}
+               : NFieldMap<T, Mapping::Mut>{*this, nb_rows, Iteration::QuadPt};
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
   auto TypedNFieldBase<T>::get_quad_pt_map(const Dim_t & nb_rows) const
       -> NFieldMap<T, Mapping::Const> {
-    auto ret_val{
-        (nb_rows == -1)
-            ? NFieldMap<T, Mapping::Const>{*this, Iteration::QuadPt}
-            : NFieldMap<T, Mapping::Const>{*this, nb_rows, Iteration::QuadPt}};
-// TODO: comment    // if (this->collection.is_initialised()) {
-    //   ret_val.initialise();
-    // }
-    return ret_val;
+    return (nb_rows == -1)
+               ? NFieldMap<T, Mapping::Const>{*this, Iteration::QuadPt}
+               : NFieldMap<T, Mapping::Const>{*this, nb_rows,
+                                              Iteration::QuadPt};
   }
 
   template <typename T>
   WrappedNField<T>::WrappedNField(const std::string & unique_name,
                                   NFieldCollection & collection,
-                                  Dim_t nb_components,
-                                  size_t size, T *ptr)
-      : Parent{unique_name, collection, nb_components},
-        size{static_cast<size_t>(size)} {
+                                  Dim_t nb_components, size_t size, T * ptr)
+      : Parent{unique_name, collection, nb_components}, size{
+                                                            static_cast<size_t>(
+                                                                size)} {
     this->current_size = size / this->nb_components;
 
     if (size != this->nb_components * this->current_size) {
       std::stringstream error{};
-      error << "Size mismatch: the provided array has a size of "
-            << size
+      error << "Size mismatch: the provided array has a size of " << size
             << " which is not a multiple of the specified number of components "
                "(nb_components = "
             << this->nb_components << ").";
@@ -406,8 +386,8 @@ namespace muGrid {
             << " pixels/voxels with " << this->collection.get_nb_quad()
             << " quadrature point(s) each, i.e. with a total of "
             << this->collection.get_nb_entries() * this->nb_components
-            << " scalar values, but you supplied an array of size "
-            << size << '.';
+            << " scalar values, but you supplied an array of size " << size
+            << '.';
       throw NFieldError(error.str());
     }
     this->set_data_ptr(ptr);
@@ -469,9 +449,8 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   template <typename T>
   void WrappedNField<T>::set_zero() {
-    std::fill(static_cast<T*>(this->data_ptr),
-              static_cast<T*>(this->data_ptr) + this->size,
-              T{});
+    std::fill(static_cast<T *>(this->data_ptr),
+              static_cast<T *>(this->data_ptr) + this->size, T{});
   }
 
   /* ---------------------------------------------------------------------- */

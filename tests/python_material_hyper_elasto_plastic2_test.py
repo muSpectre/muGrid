@@ -155,9 +155,9 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         ### µSpectre init stuff
         fft = "fftw"
         form = µ.Formulation.finite_strain
-        dz = µ.DiscreteDerivative([0, 0, 0],
-                                    [[[-0.25, 0.25], [-0.25, 0.25]],
-                                     [[-0.25, 0.25], [-0.25, 0.25]]])
+        dz = muFFT.DiscreteDerivative([0, 0, 0],
+                                      [[[-0.25, 0.25], [-0.25, 0.25]],
+                                       [[-0.25, 0.25], [-0.25, 0.25]]])
         dx = dz.rollaxes(1)
         dy = dx.rollaxes(1)
         discrete_gradient = [dx, dy, dz]
@@ -165,20 +165,20 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         cell = µ.Cell(nb_grid_pts, lens, form, discrete_gradient, fft)
 
         mat_vac = µ.material.MaterialLinearElastic1_3d.make(
-            cell, "3d-vacuum", 0.5*Young, Poisson)
+            cell, "3d-vacuum", µ.OneQuadPt, 0.5*Young, Poisson)
         mat_hpl = µ.material.MaterialHyperElastoPlastic2_3d.make(
-            cell, "3d-hpl")
+            cell, "3d-hpl", µ.OneQuadPt)
 
         E        = np.zeros(nb_grid_pts)
         E[:, :, :] = 0.5*Young
         E[:, :, :-1] = Young
         E = E.flatten()
 
-        for i, pixel in enumerate(cell):
+        for i, pixel in cell.pixels.enumerate():
             if E[i] < 0.9*Young:
-                mat_vac.add_pixel(pixel)
+                mat_vac.add_pixel(i)
             else:
-                mat_hpl.add_pixel(pixel, E[i], Poisson, yield_crit[i],
+                mat_hpl.add_pixel(i, E[i], Poisson, yield_crit[i],
                                   hardening)
 
         #solver
@@ -200,7 +200,7 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
                                      newton_tol, equil_tol, verbose)
 
         ### Finite differences evaluation of the tangent
-        F = cell.strain
+        F = cell.strain.array((dim, dim))
         stress, tangent = cell.evaluate_stress_tangent(F)
 
         numerical_tangent = np.zeros_like(tangent)
@@ -227,8 +227,10 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
 
 
         ### Finite differences evaluation of the tangent
-        F = cell.strain
+        F = cell.strain.array((dim, dim))
         stress, tangent = cell.evaluate_stress_tangent(F)
+
+        stress = stress.copy()
 
         numerical_tangent = np.zeros_like(tangent)
 

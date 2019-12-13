@@ -216,13 +216,14 @@ namespace muSpectre {
          akantu::zip(cell.get_pixel_indices(), cell.get_pixels())) {
       auto && index{std::get<0>(index_pixel)};
       auto && pixel{std::get<1>(index_pixel)};
+      auto && strain = cell.get_strain().get_pixel_map(Dim)[index];
       if (pixel[0] < Dim_t(nb_lays)) {
         BOOST_CHECK_LE(
-            (Eps_hard - cell.get_strain().get_pixel_map(Dim)[index]).norm(),
+            (Eps_hard - strain).norm(),
             tol);
       } else {
         BOOST_CHECK_LE(
-            (Eps_soft - cell.get_strain().get_pixel_map(Dim)[index]).norm(),
+            (Eps_soft - strain).norm(),
             tol);
       }
     }
@@ -255,7 +256,7 @@ namespace muSpectre {
     auto & material_soft{
         Mat_t::make(cell, "soft", Dim, OneQuadPt, Young, Poisson)};
 
-    for (const auto && index_pixel : akantu::enumerate(cell.get_pixels())) {
+    for (const auto && index_pixel : cell.get_pixels().enumerate()) {
       auto && index{std::get<0>(index_pixel)};
       auto && pixel{std::get<1>(index_pixel)};
       if (pixel[0] < Dim_t(nb_lays)) {
@@ -267,7 +268,7 @@ namespace muSpectre {
     cell.initialise();
 
     Grad_t<Dim> delEps0{Grad_t<Dim>::Zero()};
-    constexpr Real eps0 = 1.e-6;
+    constexpr Real eps0 = 1.e-4;
     // delEps0(0, 1) = delEps0(1, 0) = eps0;
     delEps0(0, 0) = eps0;
 
@@ -341,16 +342,16 @@ namespace muSpectre {
          akantu::zip(cell.get_pixel_indices(), cell.get_pixels())) {
       auto && index{std::get<0>(index_pixel)};
       auto && pixel{std::get<1>(index_pixel)};
+      auto strain{cell.get_strain().get_pixel_map(Dim)[index]};
+      Eigen::Matrix<Real, Dim, Dim> E{
+          .5 * (strain.transpose() * strain - strain.Identity(Dim, Dim))};
+      Real error{};
       if (pixel[0] < Dim_t(nb_lays)) {
-        auto comp{cell.get_strain().get_pixel_map(Dim)[index]};
-        BOOST_CHECK_LE(
-            (Eps_hard - comp).norm(),
-            loose_tol);
+        error = (Eps_hard - E).norm();
       } else {
-        BOOST_CHECK_LE(
-            (Eps_soft - cell.get_strain().get_pixel_map(Dim)[index]).norm(),
-            loose_tol);
+        error = (Eps_soft - E).norm();
       }
+      BOOST_CHECK_LE(error, loose_tol);
     }
   }
 

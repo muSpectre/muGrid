@@ -42,6 +42,8 @@ import muSpectre as µ
 import muSpectre.gradient_integration as gi
 from _muSpectre.solvers import IsStrainInitialised as ISI
 
+from timeit import default_timer as timer
+
 ### For parallel version
 try:
     from mpi4py import MPI
@@ -120,7 +122,7 @@ def propagate_avalanche_step(mat, cell, dim, solver, newton_tol,
                         newton_verbose, IsStrainInitialised = ISI.Yes)
     mat.reset_overloaded_pixels()
     overloaded_pixels = mat.identify_overloaded_pixels(
-        cell, np.copy(cell.stress.T.reshape(-1,1)))
+        cell, np.copy(cell.stress.array((dim, dim)).reshape(-1,1)))
     return overloaded_pixels
 
 def reshape_avalanche_history(avalanche_history_list, dim):
@@ -208,112 +210,116 @@ def bracket_search(material, cell, solver, newton_tol, newton_equil_tol,
                          "verry small or even zero!\nDelF_initial:\n{}"\
                          .format(DelF_initial))
 
-    while (n_bracket < n_max_bracket_search):
-        ### compute elastic response ------------------------------------------#
-        result = µ.solvers.newton_cg(cell.wrapped_cell, DelF, solver,
-                                     newton_tol, newton_equil_tol,
-                                     newton_verbose,
-                                     IsStrainInitialised = ISI.Yes)
-        PK2 = np.copy(result.stress)
-        mat.reset_overloaded_pixels()
-        overloaded_pixels = mat.identify_overloaded_pixels(cell.wrapped_cell, PK2)
-        if not overloaded_pixels:
-            #prevent empty list which leads to incompatible function argument in
-            #comm.gather()
-            overloaded_pixels = np.empty((0, dim))
-        n_pix = comm.sum(len(overloaded_pixels))
+    # TODO rleute Bracket search goes forever
+    # start = timer()
+    # while (n_bracket < n_max_bracket_search):
+    #     if timer()-start > 1:
+    #         raise Exception("bracket search wouldn't finish within a second")
+    #     ### compute elastic response ------------------------------------------#
+    #     result = µ.solvers.newton_cg(cell, DelF, solver,
+    #                                  newton_tol, newton_equil_tol,
+    #                                  newton_verbose,
+    #                                  IsStrainInitialised = ISI.Yes)
+    #     PK2 = np.copy(result.stress)
+    #     mat.reset_overloaded_pixels()
+    #     overloaded_pixels = mat.identify_overloaded_pixels(cell, PK2)
+    #     if not overloaded_pixels:
+    #         #prevent empty list which leads to incompatible function argument in
+    #         #comm.gather()
+    #         overloaded_pixels = np.empty((0, dim))
+    #     n_pix = comm.sum(len(overloaded_pixels))
 
-        ### Decide "elastic" or "too_large_step" ?-----------------------------#
-        if n_pix == 0:
-            if previous_step_was == "elastic":
-                #go twice the step forward
-                DelF_step_size *= 2
-                DelF = +DelF_step_size
-            elif previous_step_was == "too_large_step":
-                #go half the step forward
-                DelF_step_size /= 2
-                DelF = +DelF_step_size
-            elif previous_step_was == "initial_step":
-                #keep everything as it is initialized
-                pass
+    #     ### Decide "elastic" or "too_large_step" ?-----------------------------#
+    #     if n_pix == 0:
+    #         if previous_step_was == "elastic":
+    #             #go twice the step forward
+    #             DelF_step_size *= 2
+    #             DelF = +DelF_step_size
+    #         elif previous_step_was == "too_large_step":
+    #             #go half the step forward
+    #             DelF_step_size /= 2
+    #             DelF = +DelF_step_size
+    #         elif previous_step_was == "initial_step":
+    #             #keep everything as it is initialized
+    #             pass
 
-            previous_step_was = "elastic"
+    #         previous_step_was = "elastic"
 
-        elif n_pix >= 1:
-            if n_pix == 1 and first_time:
-                #safe the current deformation step as guess for the next step
-                next_DelF_guess = np.copy(DelF_step_size)
-                first_time = False
+    #     elif n_pix >= 1:
+    #         if n_pix == 1 and first_time:
+    #             #safe the current deformation step as guess for the next step
+    #             next_DelF_guess = np.copy(DelF_step_size)
+    #             first_time = False
 
-            DelF_step_size /= 2
-            DelF = - DelF_step_size
-            previous_step_was = "too_large_step"
+    #         DelF_step_size /= 2
+    #         DelF = - DelF_step_size
+    #         previous_step_was = "too_large_step"
 
-        else:
-            if comm.rank == 0:
-                n_pix_error = \
-                    ("\nSomething went totally wrong!\nThe number of overloaded"
-                     "pixels 'n_pix' is "+str(n_pix)+"\nThis case is not "
-                     "handeled and probably doesn't make sense.")
-                raise RuntimeError(n_pix_error)
+    #     else:
+    #         if comm.rank == 0:
+    #             n_pix_error = \
+    #                 ("\nSomething went totally wrong!\nThe number of overloaded"
+    #                  "pixels 'n_pix' is "+str(n_pix)+"\nThis case is not "
+    #                  "handeled and probably doesn't make sense.")
+    #             raise RuntimeError(n_pix_error)
 
-        ### Check convergence + RETURN STATEMENT --------------------------- ###
-        reached_accuracy = (2 * np.linalg.norm(DelF_step_size) < ys_acc)
-        if reached_accuracy:
-            if n_pix == 1:
-                F = result.grad
-                if test_mode or verbose:
-                    breaking_pixel = comm.gather(np.array(overloaded_pixels,
-                                        dtype=np.int32).reshape((-1, dim)).T).T
-                    if verbose and comm.rank == 0:
-                        print("I needed {} bracket search steps."
-                              .format(n_bracket))
-                        print("The following pixel broke: ", breaking_pixel)
-                ### RETURNS:
-                if test_mode:
-                    return next_DelF_guess, PK2, F, breaking_pixel
-                else:
-                    return next_DelF_guess, PK2, F #<== RETURN
+    #     ### Check convergence + RETURN STATEMENT --------------------------- ###
+    #     reached_accuracy = (2 * np.linalg.norm(DelF_step_size) < ys_acc)
+    #     if reached_accuracy:
+    #         if n_pix == 1:
+    #             F = result.grad
+    #             if test_mode or verbose:
+    #                 breaking_pixel = comm.gather(np.array(overloaded_pixels,
+    #                                     dtype=np.int32).reshape((-1)).T).T
+    #                 if verbose and comm.rank == 0:
+    #                     print("I needed {} bracket search steps."
+    #                           .format(n_bracket))
+    #                     print("The following pixel broke: ", breaking_pixel)
+    #             ### RETURNS:
+    #             if test_mode:
+    #                 return next_DelF_guess, PK2, F, breaking_pixel
+    #             else:
+    #                 return next_DelF_guess, PK2, F #<== RETURN
 
-            reached_npixel_accuracy = (2 * np.linalg.norm(DelF_step_size) <
-                                       (1 if ys_acc > 1 else ys_acc**2))
-            if reached_npixel_accuracy and (n_pix > 1):
-                warnings.warn("The avalanche starts with {} initially "
-                    "plastically deforming pixels, instead of starting with one"
-                    " pixel!".format(n_pix), RuntimeWarning)
-                F = result.grad
-                if test_mode or verbose:
-                    breaking_pixel = comm.gather(np.array(overloaded_pixels,
-                                        dtype=np.int32).reshape((-1, dim)).T).T
-                    if verbose and comm.rank == 0:
-                        print("I needed {} bracket search steps."
-                              .format(n_bracket))
-                        print("The following pixels broke simultaneously",
-                              breaking_pixel)
-                ### RETURNS:
-                if test_mode:
-                    return next_DelF_guess, PK2, F, breaking_pixel
-                else:
-                    return next_DelF_guess, PK2, F #<== RETURN
+    #         reached_npixel_accuracy = (2 * np.linalg.norm(DelF_step_size) <
+    #                                    (1 if ys_acc > 1 else ys_acc**2))
+    #         if reached_npixel_accuracy and (n_pix > 1):
+    #             warnings.warn("The avalanche starts with {} initially "
+    #                 "plastically deforming pixels, instead of starting with one"
+    #                 " pixel!".format(n_pix), RuntimeWarning)
+    #             F = result.grad
+    #             if test_mode or verbose:
+    #                 breaking_pixel = comm.gather(np.array(overloaded_pixels,
+    #                                     dtype=np.int32).reshape((-1)).T).T
+    #                 if verbose and comm.rank == 0:
+    #                     print("I needed {} bracket search steps."
+    #                           .format(n_bracket))
+    #                     print("The following pixels broke simultaneously",
+    #                           breaking_pixel)
+    #             ### RETURNS:
+    #             if test_mode:
+    #                 return next_DelF_guess, PK2, F, breaking_pixel
+    #             else:
+    #                 return next_DelF_guess, PK2, F #<== RETURN
 
-        ### Update parameters before loop ends --------------------------------#
-        DelF_final += DelF
-        n_bracket += 1
+    #     ### Update parameters before loop ends --------------------------------#
+    #     DelF_final += DelF
+    #     n_bracket += 1
 
-    if n_bracket == n_max_bracket_search:
-        n_max_error = \
-            ("The maximum number, n_max_bracket_search={}, of bracket search "
-             "steps was reached.\nEither there is a problem or you should "
-             "increase the maximum number of allowed bracket search steps."
-             .format(n_max_bracket_search))
-        F_ava = compute_average_deformation_gradient(cell.strain, dim) \
-            * cell.nb_subdomain_grid_pts[-1] / cell.nb_domain_grid_pts[-1]
-        F_ava_tot = comm.sum(F_ava)
+    # if n_bracket == n_max_bracket_search:
+    #     n_max_error = \
+    #         ("The maximum number, n_max_bracket_search={}, of bracket search "
+    #          "steps was reached.\nEither there is a problem or you should "
+    #          "increase the maximum number of allowed bracket search steps."
+    #          .format(n_max_bracket_search))
+    #     F_ava = compute_average_deformation_gradient(cell.strain, dim) \
+    #         * cell.nb_subdomain_grid_pts[-1] / cell.nb_domain_grid_pts[-1]
+    #     F_ava_tot = comm.sum(F_ava)
 
-        if comm.rank == 0 and verbose:
-            print("Last stepsize DelF_step_size:\n", DelF_step_size)
-            print("computed average deformation:\n", F_av_tot.T)
-        raise RuntimeError(n_max_error)
+    #     if comm.rank == 0 and verbose:
+    #         print("Last stepsize DelF_step_size:\n", DelF_step_size)
+    #         print("computed average deformation:\n", F_av_tot.T)
+    #     raise RuntimeError(n_max_error)
 
 
 def propagate_avalanche(material, cell, solver, newton_tol, newton_equil_tol,
@@ -366,7 +372,6 @@ def propagate_avalanche(material, cell, solver, newton_tol, newton_equil_tol,
         No return except of the call back function "save_avalanche".
     """
     mat  = material
-    cell = cell.wrapped_cell
     comm = cell.communicator
     dim  = len(cell.nb_domain_grid_pts) #dimension
     if comm is None:
@@ -381,56 +386,57 @@ def propagate_avalanche(material, cell, solver, newton_tol, newton_equil_tol,
 
     n_avalanche = 0
     newton_verbose = 0
-    PK2_pixel = gi.reshape_gradient(PK2, cell.nb_subdomain_grid_pts)
+    # TODO (rleute)
+    # PK2_pixel = gi.reshape_gradient(PK2, cell.nb_subdomain_grid_pts)
 
-    if save_avalanche is not None:
-        ava_history = []
-        PK2_initial   = np.copy(PK2_pixel)
-        F_initial     = F_initial
+    # if save_avalanche is not None:
+    #     ava_history = []
+    #     PK2_initial   = np.copy(PK2_pixel)
+    #     F_initial     = F_initial
 
-    while (n_pix_avalanche >= 1) and (n_avalanche < n_max_avalanche):
-        if save_avalanche is not None:
-            ava_t = comm.gather(np.array(overloaded_pixels,
-                                dtype=np.int32).reshape((-1, dim)).T).T
-            if comm.rank == 0:
-                ava_history.append(ava_t)
+    # while (n_pix_avalanche >= 1) and (n_avalanche < n_max_avalanche):
+    #     if save_avalanche is not None:
+    #         ava_t = comm.gather(np.array(overloaded_pixels,
+    #                             dtype=np.int32).reshape((-1, dim)).T).T
+    #         if comm.rank == 0:
+    #             ava_history.append(ava_t)
 
-        for pixel in overloaded_pixels:
-            if comm.size > 1:
-                #shift pixel by subdomain location because each core has only
-                #its part of the stress tensor, but the pixel index is global!
-                index = tuple(np.array(pixel) -
-                              np.array(cell.subdomain_locations)) + (...,)
-            else:
-                index = tuple(pixel)+(...,)
-            update_eigen_strain(mat, pixel, PK2_pixel[index], dim)
-            set_new_threshold(mat, pixel, inverse_cumulative_dist_func)
-        overloaded_pixels =\
-            propagate_avalanche_step(mat, cell, dim, solver, newton_tol,
-                                     newton_equil_tol, newton_verbose)
-        n_pix_avalanche = comm.sum(len(overloaded_pixels))
+    #     for pixel in overloaded_pixels:
+    #         if comm.size > 1:
+    #             #shift pixel by subdomain location because each core has only
+    #             #its part of the stress tensor, but the pixel index is global!
+    #             index = tuple(np.array(pixel) -
+    #                           np.array(cell.subdomain_locations)) + (...,)
+    #         else:
+    #             index = tuple(pixel)+(...,)
+    #         update_eigen_strain(mat, pixel, PK2_pixel[index], dim)
+    #         set_new_threshold(mat, pixel, inverse_cumulative_dist_func)
+    #     overloaded_pixels =\
+    #         propagate_avalanche_step(mat, cell, dim, solver, newton_tol,
+    #                                  newton_equil_tol, newton_verbose)
+    #     n_pix_avalanche = comm.sum(len(overloaded_pixels))
 
-        n_avalanche += 1
+    #     n_avalanche += 1
 
-    if verbose:
-        print("I needed {} avalanche time steps".format(n_avalanche))
+    # if verbose:
+    #     print("I needed {} avalanche time steps".format(n_avalanche))
 
-    if (n_avalanche == n_max_avalanche): #recognise if avalanche overflows!
-        max_avalanche_error = \
-        ("\n"+str(n_avalanche)+" avalanche steps!\nYou have reached the"
-         " maximum allowed avalanche size of " + str(n_max_avalanche) +
-         " internal steps.\nIncrease the maximum allowed avalanche "
-         "steps 'n_max_avalanche' if it does make sense.")
-        raise RuntimeError(max_avalanche_error)
+    # if (n_avalanche == n_max_avalanche): #recognise if avalanche overflows!
+    #     max_avalanche_error = \
+    #     ("\n"+str(n_avalanche)+" avalanche steps!\nYou have reached the"
+    #      " maximum allowed avalanche size of " + str(n_max_avalanche) +
+    #      " internal steps.\nIncrease the maximum allowed avalanche "
+    #      "steps 'n_max_avalanche' if it does make sense.")
+    #     raise RuntimeError(max_avalanche_error)
 
-    if save_avalanche is not None:
-        if comm.rank == 0:
-            PK2_final = cell.stress
-            F_final   = cell.strain
-            ava_history = reshape_avalanche_history(ava_history, dim)
-            save_avalanche(n_strain_loop, ava_history,
-                           PK2_initial, F_initial,
-                           PK2_final, F_final, comm)
+    # if save_avalanche is not None:
+    #     if comm.rank == 0:
+    #         PK2_final = cell.stress
+    #         F_final   = cell.strain
+    #         ava_history = reshape_avalanche_history(ava_history, dim)
+    #         save_avalanche(n_strain_loop, ava_history,
+    #                        PK2_initial, F_initial,
+    #                        PK2_final, F_final, comm)
 
 def strain_cell(material, cell, solver, newton_tol, newton_equil_tol,
                 DelF, F_tot, yield_surface_accuracy, n_max_strain_loop,
@@ -503,8 +509,8 @@ def strain_cell(material, cell, solver, newton_tol, newton_equil_tol,
 
     #if not initialised by user, initialise unit-matrix deformation gradient
     if not is_strain_initialised:
-        cell_strain = cell.strain
-        cell_strain[:] = np.tensordot(
+        cell_strain = cell.strain.array((dim, dim))
+        np.squeeze(cell_strain)[:] = np.tensordot(
             np.eye(dim), np.ones(cell.nb_subdomain_grid_pts), axes=0)
 
     #--------------------- cross check input on consistency -------------------#
@@ -552,28 +558,30 @@ def strain_cell(material, cell, solver, newton_tol, newton_equil_tol,
             inverse_cumulative_dist_func = inverse_cumulative_dist_func,
             save_avalanche = save_avalanche, n_strain_loop = n_strain_loop)
 
-        F_ava = compute_average_deformation_gradient(cell.strain, dim) \
-            * cell.nb_subdomain_grid_pts[-1] / cell.nb_domain_grid_pts[-1]
-        F_ava_tot = comm.sum(F_ava)
-        if ((F_ava_tot - F_tot)[test_mask] >= 0).all() :
-            # reached/overcome the required deformation
-            break
 
-        n_strain_loop += 1
+    # TODO (rleute)
+    #     F_ava = compute_average_deformation_gradient(cell.strain, dim) \
+    #         * cell.nb_subdomain_grid_pts[-1] / cell.nb_domain_grid_pts[-1]
+    #     F_ava_tot = comm.sum(F_ava)
+    #     if ((F_ava_tot - F_tot)[test_mask] >= 0).all() :
+    #         # reached/overcome the required deformation
+    #         break
 
-    if ((F_ava_tot - F_tot)[test_mask] >= 0).all() and (comm.rank == 0):
-        if verbose:
-            print("\nReached the required deformation!")
-            print("The required average deformation gradient was:\n", F_tot)
-            print("The reached final average deformation gradient is:\n",
-                  F_ava_tot)
+    #     n_strain_loop += 1
 
-    #give warnings if the while loop breakes without having converged
-    if (n_strain_loop == n_max_strain_loop) and (comm.rank == 0):
-        warnings.warn("Not converged!\nReached the maximum number of "
-            "deformation steps: n_strain_loop ({}) = n_max_strain_loop ({})"
-            "The reached final average deformation gradient is:\n{}"\
-            .format(n_strain_loop, n_max_strain_loop, F_ava_tot),
-            RuntimeWarning)
+    # if ((F_ava_tot - F_tot)[test_mask] >= 0).all() and (comm.rank == 0):
+    #     if verbose:
+    #         print("\nReached the required deformation!")
+    #         print("The required average deformation gradient was:\n", F_tot)
+    #         print("The reached final average deformation gradient is:\n",
+    #               F_ava_tot)
 
-    return F_ava_tot
+    # #give warnings if the while loop breakes without having converged
+    # if (n_strain_loop == n_max_strain_loop) and (comm.rank == 0):
+    #     warnings.warn("Not converged!\nReached the maximum number of "
+    #         "deformation steps: n_strain_loop ({}) = n_max_strain_loop ({})"
+    #         "The reached final average deformation gradient is:\n{}"\
+    #         .format(n_strain_loop, n_max_strain_loop, F_ava_tot),
+    #         RuntimeWarning)
+
+    # return F_ava_tot

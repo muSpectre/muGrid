@@ -136,9 +136,6 @@ namespace muSpectre {
      */
     void add_pixel(const size_t & pixel_index, const StrainTensor & E_eig);
 
-    //* initialises the internal field maps
-    void initialise() final;
-
    protected:
     //! linear material without eigenstrain used to compute response
     MaterialLinearElastic1<DimM> material;

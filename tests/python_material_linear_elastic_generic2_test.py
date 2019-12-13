@@ -61,11 +61,11 @@ class MaterialLinearElasticGeneric2_Check(unittest.TestCase):
                       [           0,            0,            0,  0,  0, mu]])
 
         self.mat1 = µ.material.MaterialLinearElasticGeneric1_2d.make(
-            self.cell1, "simple", C)
+            self.cell1, "simple", µ.OneQuadPt, C)
         self.mat2 = µ.material.MaterialLinearElasticGeneric2_2d.make(
-            self.cell2, "eigen", C)
+            self.cell2, "eigen", µ.OneQuadPt, C)
         self.mat3 = µ.material.MaterialLinearElastic2_2d.make(
-            self.cell2, "eigen2", 120e9, .33)
+            self.cell2, "eigen2", µ.OneQuadPt, 120e9, .33)
 
 
     def test_solve(self):
@@ -79,9 +79,9 @@ class MaterialLinearElasticGeneric2_Check(unittest.TestCase):
         grad = -gl_strain
         if verbose_test:
             print("grad =\n{}\ngl_strain =\n{}".format(grad, gl_strain))
-        for i, pixel in enumerate(self.cell1):
-            self.mat1.add_pixel(pixel)
-            self.mat2.add_pixel(pixel, gl_strain)
+        for pix_id in self.cell1.pixel_indices:
+            self.mat1.add_pixel(pix_id)
+            self.mat2.add_pixel(pix_id, gl_strain)
         self.cell1.initialise()
         self.cell2.initialise()
         tol = 1e-6

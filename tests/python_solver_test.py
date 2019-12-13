@@ -44,30 +44,34 @@ class SolverCheck(unittest.TestCase):
         self.nb_grid_pts = [3, 3]  # [5,7]
         self.lengths = [3., 3.]  # [5.2, 8.3]
         self.formulation = µ.Formulation.finite_strain
-        self.sys = µ.Cell(self.nb_grid_pts,
-                          self.lengths,
-                          self.formulation)
+        self.cell = µ.Cell(self.nb_grid_pts,
+                           self.lengths,
+                           self.formulation)
         self.hard = µ.material.MaterialLinearElastic1_2d.make(
-            self.sys, "hard", 210e9, .33)
+            self.cell, "hard", µ.OneQuadPt, 210e9, .33)
         self.soft = µ.material.MaterialLinearElastic1_2d.make(
-            self.sys.wrapped_cell, "soft",  70e9, .33)
+            self.cell, "soft", µ.OneQuadPt,  70e9, .33)
 
     def test_solve(self):
-        for i, pixel in enumerate(self.sys):
-            if i < 3:
-                self.hard.add_pixel(pixel)
+        for pix_id in self.cell.pixel_indices:
+            if pix_id < 3:
+                self.hard.add_pixel(pix_id)
             else:
-                self.soft.add_pixel(pixel)
+                self.soft.add_pixel(pix_id)
 
-        self.sys.initialise()
-        tol = 1e-6
+        self.cell.initialise()
+        cg_tol = 1e-8
+        newton_tol = 1e-6
+        equil_tol = 0.
         Del0 = np.array([[0, .1],
                          [0,  0]])
         maxiter = 100
         verbose = 0
 
-        solver = µ.solvers.SolverCG(
-            self.sys.wrapped_cell, tol, maxiter, verbose)
-        r = µ.solvers.de_geus(self.sys.wrapped_cell, Del0,
-                              solver, tol, verbose)
+        P, K = self.cell.evaluate_stress_tangent(self.cell.strain)
+
+        solver = µ.solvers.SolverCG(self.cell, cg_tol, maxiter, verbose)
+        r = µ.solvers.de_geus(self.cell, Del0, solver, newton_tol, equil_tol, verbose)
         # print(r)
+if __name__ == '__main__':
+    unittest.main()

@@ -176,11 +176,6 @@ namespace muSpectre {
     void add_pixel(const size_t & pixel_index, const Real & Young,
                    const Real & PoissonRatio);
 
-    /**
-     * initialises the field map for the Stiffness tensor
-     */
-    void initialise() final;
-
    protected:
     //! storage for stiffness tensor
     StiffnessField_t C_field;

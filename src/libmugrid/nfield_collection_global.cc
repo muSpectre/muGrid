@@ -71,7 +71,7 @@ namespace muGrid {
       this->pixel_indices[i] = i;
     }
     this->initialised = true;
-    this->initialise_maps(); // yes, this has to be after the previous line
+    this->initialise_maps();  // yes, this has to be after the previous line
   }
 
   /* ---------------------------------------------------------------------- */

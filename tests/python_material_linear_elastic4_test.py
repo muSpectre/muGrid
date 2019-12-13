@@ -110,7 +110,7 @@ class MaterialLinearElastic4_Check(unittest.TestCase):
         ### Compute tangent through a finite differences approximation
 
         ndim = 2
-        F = cell.strain.array((2,2))
+        F = cell.strain.array((ndim, ndim))
         stress, tangent = cell.evaluate_stress_tangent(F)
 
         numerical_tangent = np.zeros_like(tangent)

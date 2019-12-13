@@ -63,7 +63,7 @@ namespace muGrid {
     this->nb_entries = this->pixel_indices.size() * this->nb_quad_pts;
     this->allocate_fields();
     this->initialised = true;
-    this->initialise_maps(); // yes, this has to be after the previous line
+    this->initialise_maps();  // yes, this has to be after the previous line
   }
 
   /* ---------------------------------------------------------------------- */

@@ -482,22 +482,16 @@ namespace muSpectre {
         auto & incrF{incrF_field.get_field()};
         try {
           if (newt_iter == 0) {
-            // updating cell strain with the difference of the current and
-            // previous strain input.
-            for (auto && strain : muGrid::NFieldMap<Real, Mapping::Mut>(
-                     F, shape[0], muGrid::Iteration::QuadPt)) {
-              strain = macro_strain - previous_macro_strain;
-            }
+            DeltaF_field.get_map() = macro_strain-previous_macro_strain;
             // this corresponds to rhs=-G:K:δF
-            cell.evaluate_projected_directional_stiffness(DeltaF, rhs
-);
-            F -= DeltaF;
+            cell.evaluate_projected_directional_stiffness(DeltaF, rhs);
+            F += DeltaF;
             stress_norm =
                 std::sqrt(comm.sum(rhs.eigen_vec().matrix().squaredNorm()));
             if (stress_norm < equil_tol) {
               incrF.set_zero();
             } else {
-              incrF = solver.solve(rhs.eigen_vec());
+              incrF = -solver.solve(rhs.eigen_vec());
             }
           } else {
             rhs = -P;

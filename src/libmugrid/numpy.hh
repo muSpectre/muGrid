@@ -182,7 +182,7 @@ class NumpyProxy {
       s << "The numpy array has shape " << buffer.shape << ", but the muGrid "
         << "field reports a grid of " << this->field.get_pixels_shape()
         << " pixels with " << nb_quad_pts << " quadrature "
-        << (nb_quad_pts == 1 ? "point" : "points") << "holding a quantity of "
+        << (nb_quad_pts == 1 ? "point" : "points") << " holding a quantity of "
         << "shape " << components_shape << ".";
       throw NumpyError(s.str());
     }
@@ -272,6 +272,8 @@ numpy_wrap(const TypedNFieldBase<T> & field,
       throw NumpyError(s.str());
     }
     shape = components_shape;
+  } else {
+    shape.push_back(field.get_nb_components());
   }
   for (auto && n : field.get_pixels_shape()) {
     shape.push_back(n);

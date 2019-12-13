@@ -70,8 +70,6 @@ namespace muGrid {
     if (collection.is_initialised()) {
       this->set_data_ptr();
     } else {
-      std::cout << "Map on field '" << this->field.get_name() << "' = " << this
-                << std::endl;
       this->callback = std::make_shared<std::function<void()>>(
           [this]() { this->set_data_ptr(); });
       collection.preregister_map(this->callback);
@@ -94,8 +92,6 @@ namespace muGrid {
         data_ptr{other.data_ptr}, is_initialised{other.is_initialised} {
     auto & collection{this->field.get_collection()};
     if (not collection.is_initialised()) {
-      std::cout << "Resetting callback for map on field '"
-                << this->field.get_name() << "' = " << this << std::endl;
       this->callback = std::make_shared<std::function<void()>>(
           [this]() { this->set_data_ptr(); });
       collection.preregister_map(this->callback);

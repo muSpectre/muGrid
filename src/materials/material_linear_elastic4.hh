@@ -181,9 +181,6 @@ namespace muSpectre {
     void add_pixel(const size_t & pixel_index, const Real & Youngs_modulus,
                    const Real & Poisson_ratio);
 
-    //! initialises the maps for λ and μ
-    void initialise() final;
-
    protected:
     //! storage for first Lamé constant λ
     Field_t lambda_field;

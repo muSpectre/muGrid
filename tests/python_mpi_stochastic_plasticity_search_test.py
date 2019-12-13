@@ -58,7 +58,7 @@ def init_cell(res, lens, formulation, fft, comm):
 
 def init_mat(cell, young, poisson, yield_stress, plastic_increment, eigen_strain):
     mat = µ.material.MaterialStochasticPlasticity_3d.make(cell,
-                                                          'test_mat')
+                                                          'test_mat', µ.OneQuadPt)
     #init pixels
     for pixel in cell:
         mat.add_pixel(pixel, young, poisson, plastic_increment,

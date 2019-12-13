@@ -238,9 +238,11 @@ class MuSpectre_gradient_integration_Check(unittest.TestCase):
             sys = µ.Cell(res[:n], lens[:n], formulation)
             if n == 2:
                 mat = µ.material.MaterialLinearElastic1_2d.make(sys, "material",
+                                                                µ.OneQuadPt,
                                                                 10, 0.3)
             if n == 3:
                 mat = µ.material.MaterialLinearElastic1_3d.make(sys, "material",
+                                                                µ.OneQuadPt,
                                                                 10, 0.3)
             for pixel in sys:
                 mat.add_pixel(pixel)
@@ -494,7 +496,8 @@ class MuSpectre_gradient_integration_Check(unittest.TestCase):
         phase[:, h:] = 1
         phase        = phase.flatten(order='F')
         cell = µ.Cell(res, lens, formulation)
-        mat  = µ.material.MaterialLinearElastic4_2d.make(cell, "material")
+        mat  = µ.material.MaterialLinearElastic4_2d.make(cell, "material",
+                                                         µ.OneQuadPt)
         for i, pixel in enumerate(cell):
             mat.add_pixel(pixel, Young[phase[i]], Poisson[phase[i]])
         cell.initialise()
@@ -639,6 +642,7 @@ class MuSpectre_gradient_integration_Check(unittest.TestCase):
         formulation = µ.Formulation.finite_strain
         cell = µ.Cell(res, lens, formulation)
         mat  = µ.material.MaterialLinearElastic1_2d.make(cell, "material",
+                                                         µ.OneQuadPt,
                                                          Young=10, Poisson=0.3)
         for pixel in cell:
             mat.add_pixel(pixel)

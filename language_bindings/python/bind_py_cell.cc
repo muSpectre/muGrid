@@ -205,10 +205,42 @@ void add_cell_helper(py::module & mod) {
             auto delta_strain_array{NumpyT2Proxy(cell, delta_strain)};
             cell.evaluate_projected_directional_stiffness(
                 delta_strain_array.get_field(), delta_stress);
-            return numpy_wrap(delta_stress);
+            const Dim_t dim{cell.get_spatial_dim()};
+            if (delta_stress.get_nb_components() == dim * dim) {
+              std::vector<Dim_t> shape{dim, dim, 1};
+              return numpy_wrap(delta_stress, shape);
+            } else {
+              return numpy_wrap(delta_stress);
+            }
           },
           "delta_strain"_a, py::return_value_policy::reference_internal)
-      .def("project", &NCell::apply_projection, "field"_a)
+      .def("project", &NCell::apply_projection, "strain"_a)
+      .def("project",
+           [&NumpyT2Proxy](NCell & cell,
+                           py::array_t<Real, py::array::f_style> & strain) {
+             if (!cell.is_initialised()) {
+               cell.initialise();
+             }
+             auto & fields{cell.get_fields()};
+             const std::string out_name{
+                 "temp output for projection"};
+             if (not fields.field_exists(out_name)) {
+               auto && strain_shape{cell.get_strain_shape()};
+               auto && nb_components{strain_shape[0] * strain_shape[1]};
+               fields.register_real_field(out_name, nb_components);
+             }
+             auto & strain_field{dynamic_cast<muGrid::RealNField &>(
+                 fields.get_field(out_name))};
+             strain_field = NumpyT2Proxy(cell, strain).get_field();
+             cell.apply_projection(strain_field);
+            const Dim_t dim{cell.get_spatial_dim()};
+            if (strain_field.get_nb_components() == dim * dim) {
+              std::vector<Dim_t> shape{dim, dim, 1};
+              return numpy_wrap(strain_field, shape);
+            } else {
+              return numpy_wrap(strain_field);
+            }
+           }, "strain"_a)
       .def_property("strain", &NCell::get_strain,
                     [](NCell & cell, muGrid::TypedNFieldBase<Real> & strain) {
                       cell.get_strain() = strain;
@@ -226,23 +258,49 @@ void add_cell_helper(py::module & mod) {
             auto && stress_tgt{cell.evaluate_stress_tangent()};
             auto && stress{std::get<0>(stress_tgt)};
             auto && tangent{std::get<1>(stress_tgt)};
-            auto && numpy_stress{numpy_wrap(stress)};
-            auto && numpy_tangent{numpy_wrap(tangent)};
-            return py::make_tuple(numpy_stress, numpy_tangent);
+
+            const Dim_t dim{cell.get_spatial_dim()};
+            if (stress.get_nb_components() == dim * dim) {
+              std::vector<Dim_t> shape{dim, dim, 1};
+              auto && numpy_stress{numpy_wrap(stress, shape)};
+              shape.back() = dim;
+              shape.push_back(dim);
+              shape.push_back(1);
+              auto && numpy_tangent{numpy_wrap(tangent, shape)};
+              return py::make_tuple(numpy_stress, numpy_tangent);
+
+            } else {
+              auto && numpy_stress{numpy_wrap(stress)};
+              auto && numpy_tangent{numpy_wrap(tangent)};
+              return py::make_tuple(numpy_stress, numpy_tangent);
+            }
           },
           "strain"_a, py::return_value_policy::reference_internal)
-      // .def(
-      //     "evaluate_stress_tangent",
-      //     [](NCell & cell, muGrid::TypedNFieldBase<Real> & strain) {
-      //       cell.get_strain() = strain;
-      //       auto && stress_tgt{cell.evaluate_stress_tangent()};
-      //       auto && stress{std::get<0>(stress_tgt)};
-      //       auto && tangent{std::get<1>(stress_tgt)};
-      //       auto && numpy_stress{numpy_wrap(stress)};
-      //       auto && numpy_tangent{numpy_wrap(tangent)};
-      //       return py::make_tuple(numpy_stress, numpy_tangent);
-      //     },
-      //     "strain"_a, py::return_value_policy::reference_internal)
+      .def(
+          "evaluate_stress_tangent",
+          [](NCell & cell, muGrid::TypedNFieldBase<Real> & strain) {
+            cell.get_strain() = strain;
+            auto && stress_tgt{cell.evaluate_stress_tangent()};
+            auto && stress{std::get<0>(stress_tgt)};
+            auto && tangent{std::get<1>(stress_tgt)};
+
+            const Dim_t dim{cell.get_spatial_dim()};
+            if (stress.get_nb_components() == dim * dim) {
+              std::vector<Dim_t> shape{dim, dim, 1};
+              auto && numpy_stress{numpy_wrap(stress, shape)};
+              shape.back() = dim;
+              shape.push_back(dim);
+              shape.push_back(1);
+              auto && numpy_tangent{numpy_wrap(tangent, shape)};
+              return py::make_tuple(numpy_stress, numpy_tangent);
+
+            } else {
+              auto && numpy_stress{numpy_wrap(stress)};
+              auto && numpy_tangent{numpy_wrap(tangent)};
+              return py::make_tuple(numpy_stress, numpy_tangent);
+            }
+          },
+          "strain"_a, py::return_value_policy::reference_internal)
       .def(
           "evaluate_stress",
           [&NumpyT2Proxy](NCell & cell,
@@ -250,7 +308,14 @@ void add_cell_helper(py::module & mod) {
             auto strain_array{NumpyT2Proxy(cell, strain)};
 
             cell.get_strain() = strain_array.get_field();
-            return numpy_wrap(cell.evaluate_stress());
+            auto && stress{cell.evaluate_stress()};
+            const Dim_t dim{cell.get_spatial_dim()};
+            if (stress.get_nb_components() == dim * dim) {
+              std::vector<Dim_t> shape{dim, dim, 1};
+              return numpy_wrap(stress, shape);
+            } else {
+              return numpy_wrap(stress);
+            }
           },
           "strain"_a, py::return_value_policy::reference_internal)
       .def_property_readonly("projection", &NCell::get_projection)

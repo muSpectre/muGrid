@@ -58,36 +58,36 @@ def build_test_classes(fft):
             self.nb_grid_pts = [7,7]
             self.lengths = [2.3, 3.9]
             self.formulation = µ.Formulation.small_strain
-            self.sys = µ.Cell(self.nb_grid_pts,
+            self.cell = µ.Cell(self.nb_grid_pts,
                               self.lengths,
                               self.formulation,
                               fft=fft,
                               communicator=MPI.COMM_WORLD)
             self.mat = µ.material.MaterialLinearElastic4_2d.make(
-                self.sys, "material")
+                self.cell, "material", µ.OneQuadPt)
 
         def test_decomposition(self):
             self.assertEqual(
-                self.sys.communicator.sum(np.prod(self.sys.nb_subdomain_grid_pts)),
-                np.prod(self.sys.nb_domain_grid_pts),
+                self.cell.communicator.sum(np.prod(self.cell.nb_subdomain_grid_pts)),
+                np.prod(self.cell.nb_domain_grid_pts),
                 msg='{} engine'.format(fft))
 
         def test_solver(self):
             Youngs_modulus = 10.
             Poisson_ratio  = 0.3
 
-            for i, pixel in enumerate(self.sys):
+            for i, pixel in enumerate(self.cell):
                 self.mat.add_pixel(pixel, Youngs_modulus, Poisson_ratio)
 
-            self.sys.initialise()
+            self.cell.initialise()
             tol = 1e-6
             Del0 = np.array([[0, 0.025],
                              [0.025,  0]])
             maxiter = 100
             verbose = 1
 
-            solver = µ.solvers.SolverCG(self.sys, tol, maxiter, verbose)
-            r = µ.solvers.newton_cg(self.sys, Del0,
+            solver = µ.solvers.SolverCG(self.cell, tol, maxiter, verbose)
+            r = µ.solvers.newton_cg(self.cell, Del0,
                                     solver, tol, tol, verbose)
 
             #compare the computed stress with the trivial by hand computed stress
