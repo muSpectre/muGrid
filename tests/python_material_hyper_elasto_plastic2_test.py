@@ -38,7 +38,7 @@ import unittest
 import time
 import numpy as np
 
-from python_test_imports import µ
+from python_test_imports import µ, muFFT
 
 class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
     def setUp(self):
@@ -76,9 +76,9 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         fft = "fftw"
         form = µ.Formulation.finite_strain
         #use e.g. average upwind differences
-        dz = µ.DiscreteDerivative([0, 0, 0],
-                                    [[[-0.25, -0.25], [-0.25, -0.25]],
-                                     [[ 0.25,  0.25], [ 0.25,  0.25]]])
+        dz = muFFT.DiscreteDerivative([0, 0, 0],
+                                      [[[-0.25, -0.25], [-0.25, -0.25]],
+                                       [[ 0.25,  0.25], [ 0.25,  0.25]]])
         dx = dz.rollaxes(1)
         dy = dx.rollaxes(1)
         discrete_gradient = [dx, dy, dz]
@@ -90,17 +90,17 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         mat_hpl1_array = np.empty((3,3,3), dtype=object)
         for index, mat in np.ndenumerate(mat_hpl1_array):
             mat_hpl1_array[index] = µ.material.MaterialHyperElastoPlastic1_3d.make(
-                cell, "3d-small", E[index], Poisson,
+                cell, "3d-small", µ.OneQuadPt, E[index], Poisson,
                 yield_crit[index], hardening)
 
         mat_hpl2 = µ.material.MaterialHyperElastoPlastic2_3d.make(
-          cell2, "3d-hpl")
+            cell2, "3d-hpl", µ.OneQuadPt)
 
-        for i, pixel in enumerate(cell):
-            mat_hpl1_array[tuple(pixel)].add_pixel(pixel)
+        for i, pixel in cell.pixels.enumerate():
+            mat_hpl1_array[tuple(pixel)].add_pixel(i)
 
-        for i, pixel in enumerate(cell2):
-            mat_hpl2.add_pixel(pixel, E[tuple(pixel)], Poisson,
+        for i, pixel in cell2.pixels.enumerate():
+            mat_hpl2.add_pixel(i, E[tuple(pixel)], Poisson,
                                yield_crit[tuple(pixel)], hardening)
 
         #solver

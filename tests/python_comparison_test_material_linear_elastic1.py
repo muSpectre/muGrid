@@ -87,7 +87,7 @@ class MatTest(unittest.TestCase):
 
         self.linmat, self.evaluator = LinMats[self.dim].make_evaluator(
             self.Young, self.Poisson)
-        self.linmat.add_pixel([0]*self.dim)
+        self.linmat.add_pixel(0)
 
     def test_equivalence_S_C(self):
         for dim in (2, 3):

@@ -223,11 +223,26 @@ void add_cell_helper(py::module & mod) {
             auto strain_array{NumpyT2Proxy(cell, strain)};
 
             cell.get_strain() = strain_array.get_field();
-            auto stress_tgt{cell.evaluate_stress_tangent()};
-            return py::make_tuple(numpy_wrap(std::get<0>(stress_tgt)),
-                                  numpy_wrap(std::get<1>(stress_tgt)));
+            auto && stress_tgt{cell.evaluate_stress_tangent()};
+            auto && stress{std::get<0>(stress_tgt)};
+            auto && tangent{std::get<1>(stress_tgt)};
+            auto && numpy_stress{numpy_wrap(stress)};
+            auto && numpy_tangent{numpy_wrap(tangent)};
+            return py::make_tuple(numpy_stress, numpy_tangent);
           },
           "strain"_a, py::return_value_policy::reference_internal)
+      // .def(
+      //     "evaluate_stress_tangent",
+      //     [](NCell & cell, muGrid::TypedNFieldBase<Real> & strain) {
+      //       cell.get_strain() = strain;
+      //       auto && stress_tgt{cell.evaluate_stress_tangent()};
+      //       auto && stress{std::get<0>(stress_tgt)};
+      //       auto && tangent{std::get<1>(stress_tgt)};
+      //       auto && numpy_stress{numpy_wrap(stress)};
+      //       auto && numpy_tangent{numpy_wrap(tangent)};
+      //       return py::make_tuple(numpy_stress, numpy_tangent);
+      //     },
+      //     "strain"_a, py::return_value_policy::reference_internal)
       .def(
           "evaluate_stress",
           [&NumpyT2Proxy](NCell & cell,
@@ -308,9 +323,9 @@ void add_cell_helper(py::module & mod) {
           },
           "unique_prefix"_a, "nb_steps_ago"_a = 1,
           py::return_value_policy::reference_internal)
-    .def_property_readonly("pixels", &NCell::get_pixels)
-    .def_property_readonly("pixel_indices", &NCell::get_pixel_indices)
-    .def_property_readonly("quad_pt_indices", &NCell::get_quad_pt_indices)
+      .def_property_readonly("pixels", &NCell::get_pixels)
+      .def_property_readonly("pixel_indices", &NCell::get_pixel_indices)
+      .def_property_readonly("quad_pt_indices", &NCell::get_quad_pt_indices)
 
 #ifdef WITH_SPLIT
       .def(

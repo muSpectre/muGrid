@@ -310,9 +310,10 @@ namespace muSpectre {
   template <Dim_t DimM>
   void MaterialEvaluator<DimM>::initialise() {
     this->material->initialise();
-    this->strain.get_map().initialise();
-    this->stress.get_map().initialise();
-    this->tangent.get_map().initialise();
+    // TODO: comment
+    // this->strain.get_map().initialise();
+    // this->stress.get_map().initialise();
+    // this->tangent.get_map().initialise();
     this->is_initialised = true;
   }
 

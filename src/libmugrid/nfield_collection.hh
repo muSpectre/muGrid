@@ -365,6 +365,9 @@ namespace muGrid {
     //! returns a vector of all field names
     std::vector<std::string> list_fields() const;
 
+    //! preregister a map for latent initialisation
+    void preregister_map(std::shared_ptr<std::function<void()>> & call_back);
+
    protected:
     //! internal worker function called by register_<T>_field
     template <typename T>
@@ -384,10 +387,18 @@ namespace muGrid {
      */
     void allocate_fields();
 
+    /**
+     * initialise all preregistered maps
+     */
+    void initialise_maps();
+
     //! storage container for fields
     std::map<std::string, NField_ptr> fields{};
     //! storage container for state fields
     std::map<std::string, StateNField_ptr> state_fields{};
+
+    //! Maps registered before initialisation which will need their data_ptr set
+    std::vector<std::weak_ptr<std::function<void()>>> init_callbacks{};
     //! domain of validity
     ValidityDomain domain;
     //! spatial dimension

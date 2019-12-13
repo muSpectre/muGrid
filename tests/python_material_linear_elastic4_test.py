@@ -60,10 +60,11 @@ class MaterialLinearElastic4_Check(unittest.TestCase):
         Poisson_ratio = 0.3
 
         cell = µ.Cell(self.nb_grid_pts, self.lengths, self.formulation)
-        mat = µ.material.MaterialLinearElastic4_2d.make(cell, "material")
+        mat = µ.material.MaterialLinearElastic4_2d.make(cell, "material",
+                                                        µ.OneQuadPt)
 
-        for i, pixel in enumerate(cell):
-            mat.add_pixel(pixel, Youngs_modulus, Poisson_ratio)
+        for i in cell.pixel_indices:
+            mat.add_pixel(i, Youngs_modulus, Poisson_ratio)
 
         cell.initialise()
         tol = 1e-6
@@ -90,10 +91,10 @@ class MaterialLinearElastic4_Check(unittest.TestCase):
 
         cell = µ.Cell(self.nb_grid_pts, self.lengths, self.formulation)
         mat = µ.material.MaterialLinearElastic4_2d.make(cell,
-                                                        "material")
+                                                        "material", µ.OneQuadPt)
 
-        for i, pixel in enumerate(cell):
-            mat.add_pixel(pixel, Youngs_modulus[i], Poisson_ratio[i])
+        for i in cell.pixel_indices:
+            mat.add_pixel(i, Youngs_modulus[i], Poisson_ratio[i])
 
         cell.initialise()
         tol = 1e-6
@@ -108,7 +109,8 @@ class MaterialLinearElastic4_Check(unittest.TestCase):
 
         ### Compute tangent through a finite differences approximation
 
-        F = cell.strain
+        ndim = 2
+        F = cell.strain.array((2,2))
         stress, tangent = cell.evaluate_stress_tangent(F)
 
         numerical_tangent = np.zeros_like(tangent)

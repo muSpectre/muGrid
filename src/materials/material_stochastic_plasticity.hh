@@ -318,7 +318,7 @@ namespace muSpectre {
   std::vector<size_t> &
   MaterialStochasticPlasticity<DimM>::identify_overloaded_quad_pts(
       const muGrid::TypedNFieldBase<Real> & stress_field) {
-    auto threshold_map{this->stress_threshold_field.get_map()};
+    auto & threshold_map{this->stress_threshold_field.get_map()};
 
     muGrid::T2NFieldMap<Real, Mapping::Const, DimM> stress_map{stress_field};
     std::vector<size_t> & overloaded_quad_pts_ref{this->overloaded_quad_pts};

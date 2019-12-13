@@ -256,12 +256,13 @@ namespace muGrid {
 
     //! initialise all submaps, make sure the underlying fields are initialised
     void initialise() {
-      for (auto && map : this->static_maps) {
-        map.initialise();
-      }
-      for (auto && map : this->static_cmaps) {
-        map.initialise();
-      }
+// TODO: comment
+      // for (auto && map : this->static_maps) {
+      //   map.initialise();
+      // }
+      // for (auto && map : this->static_cmaps) {
+      //   map.initialise();
+      // }
       Parent::initialise();
     }
 

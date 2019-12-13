@@ -48,7 +48,7 @@ class MaterialEvaluator_Check(unittest.TestCase):
     def test_linear_elasticity(self):
         young, poisson = 210e9, .33
         material, evaluator = LinMat.make_evaluator(young, poisson)
-        material.add_pixel([0,0])
+        material.add_pixel(0)
         stress = evaluator.evaluate_stress(np.array([[1., 0],[0, 1]]),
                                            µ.Formulation.finite_strain)
         stress=stress.copy()

@@ -32,16 +32,17 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include <sstream>
-#include <stdexcept>
-
-#include <pybind11/pybind11.h>
-#include <pybind11/numpy.h>
-
 #include "libmugrid/nfield.hh"
 #include "libmugrid/nfield_typed.hh"
 #include "libmugrid/nfield_collection.hh"
 #include "libmugrid/nfield_collection_global.hh"
+
+#include <pybind11/pybind11.h>
+#include <pybind11/numpy.h>
+#include <pybind11/stl.h>
+
+#include <sstream>
+#include <stdexcept>
 
 using muGrid::Dim_t;
 using muGrid::GlobalNFieldCollection;

@@ -113,12 +113,13 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   template <typename T, Mapping Mutability>
   void StateNFieldMap<T, Mutability>::initialise() {
-    for (auto && map : this->maps) {
-      map.initialise();
-    }
-    for (auto && map : this->cmaps) {
-      map.initialise();
-    }
+    // TODO: comment
+    // for (auto && map : this->maps) {
+    //   map.initialise();
+    // }
+    // for (auto && map : this->cmaps) {
+    //   map.initialise();
+    // }
   }
 
   /* ---------------------------------------------------------------------- */

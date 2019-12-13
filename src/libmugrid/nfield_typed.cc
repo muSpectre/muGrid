@@ -333,9 +333,9 @@ namespace muGrid {
         (nb_rows == -1)
             ? NFieldMap<T, Mapping::Mut>{*this, Iteration::Pixel}
             : NFieldMap<T, Mapping::Mut>{*this, nb_rows, Iteration::Pixel}};
-    if (this->collection.is_initialised()) {
-      ret_val.initialise();
-    }
+// TODO: comment    // if (this->collection.is_initialised()) {
+    //   ret_val.initialise();
+    // }
     return ret_val;
   }
 
@@ -347,9 +347,9 @@ namespace muGrid {
         (nb_rows == -1)
             ? NFieldMap<T, Mapping::Const>{*this, Iteration::Pixel}
             : NFieldMap<T, Mapping::Const>{*this, nb_rows, Iteration::Pixel}};
-    if (this->collection.is_initialised()) {
-      ret_val.initialise();
-    }
+// TODO: comment    // if (this->collection.is_initialised()) {
+    //   ret_val.initialise();
+    // }
     return ret_val;
   }
 
@@ -361,9 +361,9 @@ namespace muGrid {
         (nb_rows == -1)
             ? NFieldMap<T, Mapping::Mut>{*this, Iteration::QuadPt}
             : NFieldMap<T, Mapping::Mut>{*this, nb_rows, Iteration::QuadPt}};
-    if (this->collection.is_initialised()) {
-      ret_val.initialise();
-    }
+// TODO: comment    // if (this->collection.is_initialised()) {
+    //   ret_val.initialise();
+    // }
     return ret_val;
   }
 
@@ -375,9 +375,9 @@ namespace muGrid {
         (nb_rows == -1)
             ? NFieldMap<T, Mapping::Const>{*this, Iteration::QuadPt}
             : NFieldMap<T, Mapping::Const>{*this, nb_rows, Iteration::QuadPt}};
-    if (this->collection.is_initialised()) {
-      ret_val.initialise();
-    }
+// TODO: comment    // if (this->collection.is_initialised()) {
+    //   ret_val.initialise();
+    // }
     return ret_val;
   }
 

@@ -100,11 +100,11 @@ namespace muFFT {
     using map_t =
         muGrid::MatrixNFieldMap<Real, Mapping::Mut, Fix::mdim, Fix::mdim>;
     map_t inmap{input};
-    inmap.initialise();
+// TODO: comment    inmap.initialise();
     auto refmap{map_t{ref}};
-    refmap.initialise();
+// TODO: comment    refmap.initialise();
     auto resultmap{map_t{result}};
-    resultmap.initialise();
+// TODO: comment    resultmap.initialise();
     size_t cntr{0};
     for (auto tup : akantu::zip(inmap, refmap)) {
       cntr++;
@@ -117,7 +117,7 @@ namespace muFFT {
     using cmap_t =
         muGrid::MatrixNFieldMap<Complex, Mapping::Mut, Fix::mdim, Fix::mdim>;
     cmap_t complex_map(complex_field);
-    complex_map.initialise();
+// TODO: comment    complex_map.1initialise();
     Real error = complex_map[0].imag().norm();
     BOOST_CHECK_LT(error, tol);
 

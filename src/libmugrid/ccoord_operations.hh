@@ -587,7 +587,7 @@ namespace muGrid {
       Enumerator() = delete;
 
       //! Constructor
-      Enumerator(const DynamicPixels & pixels);
+      explicit Enumerator(const DynamicPixels & pixels);
 
       //! Copy constructor
       Enumerator(const Enumerator & other) = default;

@@ -72,7 +72,8 @@ namespace muSpectre {
   template <Dim_t DimM>
   void MaterialLinearElastic3<DimM>::initialise() {
     Parent::initialise();
-    this->C_field.get_map().initialise();
+// TODO: comment
+    // this->C_field.get_map().initialise();
   }
 
       template class MaterialLinearElastic3<twoD>;

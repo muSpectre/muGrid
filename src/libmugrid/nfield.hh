@@ -104,7 +104,7 @@ namespace muGrid {
     const std::string & get_name() const;
 
     //! return a const reference to the field's collection
-    const NFieldCollection & get_collection() const;
+    NFieldCollection & get_collection() const;
 
     //! return the number of components stored per quadrature point
     const Dim_t & get_nb_components() const;

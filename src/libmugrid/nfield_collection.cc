@@ -284,6 +284,17 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
+  void NFieldCollection::initialise_maps() {
+    for (auto & weak_callback : this->init_callbacks) {
+      if (auto shared_callback{weak_callback.lock()}) {
+        auto && callback{*shared_callback};
+        callback();
+      }
+    }
+    this->init_callbacks.clear();
+  }
+
+  /* ---------------------------------------------------------------------- */
   NField & NFieldCollection::get_field(const std::string & unique_name) {
     if (not this->field_exists(unique_name)) {
       std::stringstream err_stream{};
@@ -311,6 +322,15 @@ namespace muGrid {
       field_names.push_back(std::get<0>(f));
     }
     return field_names;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void NFieldCollection::preregister_map(
+      std::shared_ptr<std::function<void()>> & call_back) {
+    if (this->initialised) {
+      throw NFieldCollectionError("Collection is already initialised");
+    }
+    this->init_callbacks.push_back(call_back);
   }
 
   /**

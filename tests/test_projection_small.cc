@@ -83,8 +83,8 @@ namespace muSpectre {
 
     fields.initialise(fix::projector.get_nb_subdomain_grid_pts(),
                       fix::projector.get_subdomain_locations());
-    grad.initialise();
-    var.initialise();
+// TODO: comment    // grad.initialise();
+    // var.initialise();
 
     muFFT::FFT_freqs<dim> freqs{fix::projector.get_nb_domain_grid_pts(),
                                 fix::projector.get_domain_lengths()};

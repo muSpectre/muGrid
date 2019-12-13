@@ -38,7 +38,8 @@
 #include "nfield_collection.hh"
 #include "iterators.hh"
 
-#include "sstream"
+#include <sstream>
+#include <iostream>
 
 namespace muGrid {
 
@@ -48,8 +49,13 @@ namespace muGrid {
       : field{field}, iteration{iter_type}, stride{this->field.get_stride(
                                                 iter_type)},
         nb_rows{this->stride}, nb_cols{1} {
-    if (this->field.get_collection().is_initialised()) {
-      this->initialise();
+    auto & collection{this->field.get_collection()};
+    if (collection.is_initialised()) {
+      this->set_data_ptr();
+    } else {
+      this->callback = std::make_shared<std::function<void()>>(
+          [this]() { this->set_data_ptr(); });
+      collection.preregister_map(this->callback);
     }
   }
 
@@ -60,8 +66,15 @@ namespace muGrid {
       : field{field}, iteration{iter_type}, stride{this->field.get_stride(
                                                 iter_type)},
         nb_rows{nb_rows_}, nb_cols{this->stride / nb_rows_} {
-    if (this->field.get_collection().is_initialised()) {
-      this->initialise();
+    auto & collection{this->field.get_collection()};
+    if (collection.is_initialised()) {
+      this->set_data_ptr();
+    } else {
+      std::cout << "Map on field '" << this->field.get_name() << "' = " << this
+                << std::endl;
+      this->callback = std::make_shared<std::function<void()>>(
+          [this]() { this->set_data_ptr(); });
+      collection.preregister_map(this->callback);
     }
     if (this->nb_rows * this->nb_cols != this->stride) {
       std::stringstream error{};
@@ -75,9 +88,29 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T, Mapping Mutability>
+  NFieldMap<T, Mutability>::NFieldMap(NFieldMap && other)
+      : field{other.field}, iteration{other.iteration}, stride{other.stride},
+        nb_rows{other.nb_rows}, nb_cols{other.nb_cols},
+        data_ptr{other.data_ptr}, is_initialised{other.is_initialised} {
+    auto & collection{this->field.get_collection()};
+    if (not collection.is_initialised()) {
+      std::cout << "Resetting callback for map on field '"
+                << this->field.get_name() << "' = " << this << std::endl;
+      this->callback = std::make_shared<std::function<void()>>(
+          [this]() { this->set_data_ptr(); });
+      collection.preregister_map(this->callback);
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T, Mapping Mutability>
   auto NFieldMap<T, Mutability>::begin() -> iterator {
     if (not this->is_initialised) {
-      this->initialise();
+      std::stringstream error{};
+      error << "This map on field " << this->field.get_name()
+            << " cannot yet be iterated over, as the collection is not "
+               "initialised";
+      throw NFieldMapError(error.str());
     }
     return iterator{*this, false};
   }
@@ -92,7 +125,11 @@ namespace muGrid {
   template <typename T, Mapping Mutability>
   auto NFieldMap<T, Mutability>::cbegin() -> const_iterator {
     if (not this->is_initialised) {
-      this->initialise();
+      std::stringstream error{};
+      error << "This map on field " << this->field.get_name()
+            << " cannot yet be iterated over, as the collection is not "
+               "initialised";
+      throw NFieldMapError(error.str());
     }
     return const_iterator{*this, false};
   }
@@ -128,7 +165,7 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T, Mapping Mutability>
-  void NFieldMap<T, Mutability>::initialise() {
+  void NFieldMap<T, Mutability>::set_data_ptr() {
     if (not(this->field.get_collection().is_initialised())) {
       throw NFieldMapError("Can't initialise map before the field collection "
                            "has been initialised");

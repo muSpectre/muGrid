@@ -394,9 +394,10 @@ namespace muSpectre {
 
     fields.initialise(fix::projector.get_nb_subdomain_grid_pts(),
                       fix::projector.get_subdomain_locations());
-    disp.initialise();
-    grad.initialise();
-    var.initialise();
+// TODO: comment
+    // disp.initialise();
+    // grad.initialise();
+    // var.initialise();
 
     BOOST_TEST_CHECKPOINT("fields and maps initialised");
 

@@ -294,9 +294,9 @@ class LinearElastic_Check(unittest.TestCase):
         P2,K42  = constitutive(F2)
         P,K4  = constitutive(F)
         self.rve.set_uniform_strain(np.array(np.eye(ndim)))
-        µF = self.rve.strain.array(F.shape)
-        
-        self.assertEqual(µF.array().shape, 1)
+        µF = self.rve.strain.array((ndim, ndim))
+
+        self.assertEqual(µF.shape, 1)
 
         self.assertLess(norm(µF - F)/norm(F), before_cg_tol)
         # set macroscopic loading

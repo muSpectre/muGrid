@@ -110,8 +110,9 @@ namespace muSpectre {
     fields.initialise(fix::projector.get_nb_subdomain_grid_pts(),
                       fix::projector.get_subdomain_locations());
     fix::projector.apply_projection(f_var);
-    grad.initialise();
-    var.initialise();
+// TODO: comment
+    // grad.initialise();
+    // var.initialise();
 
     muFFT::FFT_freqs<dim> freqs{fix::projector.get_nb_domain_grid_pts(),
                                 fix::projector.get_domain_lengths()};
@@ -186,8 +187,9 @@ namespace muSpectre {
 
     fields.initialise(fix::projector.get_nb_subdomain_grid_pts(),
                       fix::projector.get_subdomain_locations());
-    grad.initialise();
-    grad_test.initialise();
+// TODO: comment
+    // grad.initialise();
+    // grad_test.initialise();
 
     f_grad.eigen_vec().setRandom();
     f_grad_test.eigen_vec() = f_grad.eigen_vec();

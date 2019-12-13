@@ -41,6 +41,8 @@
 #include "nfield_collection.hh"
 
 #include <type_traits>
+#include <memory>
+#include <functional>
 
 namespace muGrid {
   /**
@@ -128,10 +130,10 @@ namespace muGrid {
               Iteration iter_type = Iteration::QuadPt);
 
     //! Copy constructor
-    NFieldMap(const NFieldMap & other) = default;
+    NFieldMap(const NFieldMap & other) = delete;
 
     //! Move constructor
-    NFieldMap(NFieldMap && other) = default;
+    NFieldMap(NFieldMap && other);
 
     //! Destructor
     virtual ~NFieldMap() = default;
@@ -230,7 +232,7 @@ namespace muGrid {
     }
 
     //! query the size from the field's collection and set data_ptr
-    void initialise();
+    void set_data_ptr();
 
     /**
      * return an iterable proxy over pixel indices and stored values
@@ -264,6 +266,8 @@ namespace muGrid {
 
     //! keeps track of whether the map has been initialised.
     bool is_initialised{false};
+    //! shared_ptr used for latent initialisation
+    std::shared_ptr<std::function<void()>> callback{nullptr};
   };
 
   template <typename T, Mapping Mutability>
@@ -326,7 +330,6 @@ namespace muGrid {
     NFieldMap_t & map;
     //! current iteration index
     size_t index;
-    //! map which is being returned per iterate
   };
 
 }  // namespace muGrid

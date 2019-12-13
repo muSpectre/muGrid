@@ -48,9 +48,7 @@ namespace muGrid {
   const std::string & NField::get_name() const { return this->name; }
 
   /* ---------------------------------------------------------------------- */
-  const NFieldCollection & NField::get_collection() const {
-    return this->collection;
-  }
+  NFieldCollection & NField::get_collection() const { return this->collection; }
 
   /* ---------------------------------------------------------------------- */
   size_t NField::size() const { return this->current_size; }
