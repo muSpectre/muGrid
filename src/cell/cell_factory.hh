@@ -37,7 +37,7 @@
 #define SRC_CELL_CELL_FACTORY_HH_
 
 #include "common/muSpectre_common.hh"
-#include "cell/ncell.hh"
+#include "cell/cell.hh"
 #include "projection/projection_finite_strain_fast.hh"
 #include "projection/projection_small_strain.hh"
 #include <libmugrid/ccoord_operations.hh>
@@ -57,7 +57,7 @@ namespace muSpectre {
 
     /**
      * function to create consistent input for the constructor of
-     * `muSpectre::NCell`. Users should never need to call this function, for
+     * `muSpectre::Cell`. Users should never need to call this function, for
      * internal use only
      */
     template <size_t DimS, class FFTEngine>
@@ -93,7 +93,7 @@ namespace muSpectre {
 
   /**
    * Convenience function to create consistent input for the constructor of *
-   * `muSpectre::NCell`. Creates a unique ptr to a Projection operator (with
+   * `muSpectre::Cell`. Creates a unique ptr to a Projection operator (with
    * appropriate FFT_engine) to be used in a cell constructor
    *
    * @param nb_grid_pts resolution of the discretisation grid in each spatial
@@ -140,7 +140,7 @@ namespace muSpectre {
 
   /**
    * Convenience function to create consistent input for the constructor of *
-   * `muSpectre::NCell`. Creates a unique ptr to a Projection operator (with
+   * `muSpectre::Cell`. Creates a unique ptr to a Projection operator (with
    * appropriate FFT_engine) to be used in a cell constructor. Uses the "exact"
    * fourier derivation operator for calculating gradients
    *
@@ -172,7 +172,7 @@ namespace muSpectre {
    * finite differences, etc)
    * @param comm communicator used for solving distributed problems
    */
-  template <typename Cell_t = NCell, class FFTEngine = muFFT::FFTWEngine>
+  template <typename Cell_t = Cell, class FFTEngine = muFFT::FFTWEngine>
   inline Cell_t
   make_cell(DynCcoord_t nb_grid_pts, DynRcoord_t lengths, Formulation form,
             muFFT::Gradient_t gradient,
@@ -194,7 +194,7 @@ namespace muSpectre {
    * @param form problem formulation (small vs finite strain)
    * @param comm communicator used for solving distributed problems
    */
-  template <typename Cell_t = NCell, class FFTEngine = muFFT::FFTWEngine>
+  template <typename Cell_t = Cell, class FFTEngine = muFFT::FFTWEngine>
   inline Cell_t
   make_cell(DynCcoord_t nb_grid_pts, DynRcoord_t lengths, Formulation form,
             const muFFT::Communicator & comm = muFFT::Communicator()) {

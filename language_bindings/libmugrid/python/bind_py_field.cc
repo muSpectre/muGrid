@@ -32,10 +32,10 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
-#include "libmugrid/nfield.hh"
-#include "libmugrid/nfield_typed.hh"
-#include "libmugrid/nfield_collection.hh"
-#include "libmugrid/nfield_collection_global.hh"
+#include "libmugrid/field.hh"
+#include "libmugrid/field_typed.hh"
+#include "libmugrid/field_collection.hh"
+#include "libmugrid/field_collection_global.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
@@ -45,32 +45,32 @@
 #include <stdexcept>
 
 using muGrid::Dim_t;
-using muGrid::GlobalNFieldCollection;
-using muGrid::NField;
-using muGrid::NFieldCollection;
-using muGrid::TypedNField;
-using muGrid::TypedNFieldBase;
-using muGrid::WrappedNField;
+using muGrid::GlobalFieldCollection;
+using muGrid::Field;
+using muGrid::FieldCollection;
+using muGrid::TypedField;
+using muGrid::TypedFieldBase;
+using muGrid::WrappedField;
 using pybind11::literals::operator""_a;
 
 namespace py = pybind11;
 
 void add_field(py::module & mod) {
-  py::class_<NField>(mod, "Field")
-      .def("buffer_size", &NField::buffer_size)
-      .def("set_zero", &NField::set_zero)
-      .def("stride", &NField::get_stride)
-      .def_property_readonly("size", &NField::size)
-      .def_property_readonly("pad_size", &NField::get_pad_size)
-      .def_property_readonly("name", &NField::get_name)
-      .def_property_readonly("collection", &NField::get_collection)
-      .def_property_readonly("nb_components", &NField::get_nb_components)
-      .def_property_readonly("is_global", &NField::is_global);
+  py::class_<Field>(mod, "Field")
+      .def("buffer_size", &Field::buffer_size)
+      .def("set_zero", &Field::set_zero)
+      .def("stride", &Field::get_stride)
+      .def_property_readonly("size", &Field::size)
+      .def_property_readonly("pad_size", &Field::get_pad_size)
+      .def_property_readonly("name", &Field::get_name)
+      .def_property_readonly("collection", &Field::get_collection)
+      .def_property_readonly("nb_components", &Field::get_nb_components)
+      .def_property_readonly("is_global", &Field::is_global);
 }
 
 template <class T>
 void add_typed_field(py::module & mod, std::string name) {
-  auto && array_computer = [](TypedNFieldBase<T> & self,
+  auto && array_computer = [](TypedFieldBase<T> & self,
                               const std::vector<Dim_t> & shape,
                               const muGrid::Iteration & it) {
     // py_class will be passed as the `base` class to the array
@@ -121,12 +121,12 @@ void add_typed_field(py::module & mod, std::string name) {
     }
 
     const auto & coll{self.get_collection()};
-    if (coll.get_domain() == NFieldCollection::ValidityDomain::Global) {
+    if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
       // We have a global field collection and can return array that
       // have the correct shape corresponding to the grid (on the local
       // MPI process).
-      const GlobalNFieldCollection & global_coll =
-          dynamic_cast<const GlobalNFieldCollection &>(coll);
+      const GlobalFieldCollection & global_coll =
+          dynamic_cast<const GlobalFieldCollection &>(coll);
       const auto & nb_grid_pts{global_coll.get_pixels().get_nb_grid_pts()};
       for (auto & n : nb_grid_pts) {
         return_shape.push_back(n);
@@ -138,9 +138,9 @@ void add_typed_field(py::module & mod, std::string name) {
                                               py::capsule([]() {}));
   };
 
-  py::class_<TypedNFieldBase<T>, NField>(mod, (name + "Base").c_str(),
+  py::class_<TypedFieldBase<T>, Field>(mod, (name + "Base").c_str(),
                                          py::buffer_protocol())
-      .def_buffer([](TypedNFieldBase<T> & self) {
+      .def_buffer([](TypedFieldBase<T> & self) {
         auto & coll = self.get_collection();
         return py::buffer_info(
             self.data(),
@@ -156,14 +156,14 @@ void add_typed_field(py::module & mod, std::string name) {
            "iteration_type"_a = muGrid::Iteration::QuadPt,
            py::return_value_policy::reference_internal)
       .def("array",
-           [&array_computer](TypedNFieldBase<T> & self,
+           [&array_computer](TypedFieldBase<T> & self,
                              const muGrid::Iteration & it) {
              return array_computer(self, std::vector<Dim_t>{}, it);
            },
            "iteration_type"_a = muGrid::Iteration::QuadPt,
            py::return_value_policy::reference_internal);
 
-  py::class_<TypedNField<T>, TypedNFieldBase<T>>(mod, name.c_str());
+  py::class_<TypedField<T>, TypedFieldBase<T>>(mod, name.c_str());
 }
 
 void add_field_classes(py::module & mod) {

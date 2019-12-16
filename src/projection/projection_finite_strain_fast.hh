@@ -37,8 +37,8 @@
 #ifndef SRC_PROJECTION_PROJECTION_FINITE_STRAIN_FAST_HH_
 #define SRC_PROJECTION_PROJECTION_FINITE_STRAIN_FAST_HH_
 
-#include <libmugrid/nfield_collection.hh>
-#include <libmugrid/nfield_map_static.hh>
+#include <libmugrid/field_collection.hh>
+#include <libmugrid/field_map_static.hh>
 
 #include <libmufft/derivative.hh>
 
@@ -62,14 +62,14 @@ namespace muSpectre {
     using Ccoord = Ccoord_t<DimS>;  //!< cell coordinates type
     using Rcoord = Rcoord_t<DimS>;  //!< spatial coordinates type
     //! Real space second order tensor fields (to be projected)
-    using Field_t = muGrid::TypedNFieldBase<Real>;
+    using Field_t = muGrid::TypedFieldBase<Real>;
     //! Fourier-space field containing the projection operator itself
-    using Proj_t = muGrid::ComplexNField;
+    using Proj_t = muGrid::ComplexField;
     //! iterable form of the operator
-    using Proj_map = muGrid::MatrixNFieldMap<Complex, Mapping::Mut, DimS, 1,
+    using Proj_map = muGrid::MatrixFieldMap<Complex, Mapping::Mut, DimS, 1,
                                              muGrid::Iteration::Pixel>;
     //! iterable Fourier-space second-order tensor field
-    using Grad_map = muGrid::MatrixNFieldMap<Complex, Mapping::Mut, DimS, DimS,
+    using Grad_map = muGrid::MatrixFieldMap<Complex, Mapping::Mut, DimS, DimS,
                                              muGrid::Iteration::Pixel>;
 
     //! Default constructor

@@ -59,12 +59,12 @@ namespace muSpectre {
     using Ccoord = typename Parent::Ccoord;  //!< cell coordinates type
     using Rcoord = typename Parent::Rcoord;  //!< spatial coordinates type
     //! Fourier-space field containing the projection operator itself
-    using Proj_t = muGrid::RealNField;
+    using Proj_t = muGrid::RealField;
     //! iterable operator
-    using Proj_map = muGrid::T4NFieldMap<Real, Mapping::Mut, DimS>;
+    using Proj_map = muGrid::T4FieldMap<Real, Mapping::Mut, DimS>;
     //! iterable vectorised version of the Fourier-space tensor field
     using Vector_map =
-        muGrid::MatrixNFieldMap<Complex, Mapping::Mut, DimS * DimS, 1>;
+        muGrid::MatrixFieldMap<Complex, Mapping::Mut, DimS * DimS, 1>;
 
     //! Default constructor
     ProjectionSmallStrain() = delete;

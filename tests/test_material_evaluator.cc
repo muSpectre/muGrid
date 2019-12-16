@@ -169,7 +169,7 @@ namespace muSpectre {
     /*
      * Now, the material already has a pixel, adding more should be rejected
      */
-    BOOST_CHECK_THROW(mat.add_pixel({1}), muGrid::NFieldCollectionError);
+    BOOST_CHECK_THROW(mat.add_pixel({1}), muGrid::FieldCollectionError);
   }
 
   /* ---------------------------------------------------------------------- */

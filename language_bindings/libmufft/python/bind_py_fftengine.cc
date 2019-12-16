@@ -35,7 +35,7 @@
 
 #include "bind_py_declarations.hh"
 
-#include <libmugrid/numpy.hh>
+#include <libmugrid/numpy_tools.hh>
 
 #include <libmufft/fft_utils.hh>
 #include <libmufft/fftw_engine.hh>
@@ -55,11 +55,11 @@ using muGrid::operator<<;
 using muGrid::Complex;
 using muGrid::Dim_t;
 using muGrid::DynCcoord_t;
-using muGrid::GlobalNFieldCollection;
+using muGrid::GlobalFieldCollection;
 using muGrid::NumpyProxy;
 using muGrid::OneQuadPt;
 using muGrid::Real;
-using muGrid::WrappedNField;
+using muGrid::WrappedField;
 using muFFT::fft_freq;
 using muFFT::FFTEngineBase;
 using muFFT::Communicator;

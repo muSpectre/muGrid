@@ -3,10 +3,10 @@
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
- * @date   27 Mar 2019
+ * @date   04 Sep 2019
  *
- * @brief convenience functions to deal with data structures common to most
- *        internal variable fields in materials
+ * @brief  convenience class to deal with data structures common to most
+ *         internal variable fields in materials
  *
  * Copyright © 2019 Till Junge
  *
@@ -34,78 +34,16 @@
  *
  */
 
-#include "libmugrid/grid_common.hh"
-#include "libmugrid/field.hh"
-#include "libmugrid/statefield.hh"
-#include "libmugrid/field_collection_local.hh"
-
-#include <string>
-#include <type_traits>
-
 #ifndef SRC_LIBMUGRID_MAPPED_FIELD_HH_
 #define SRC_LIBMUGRID_MAPPED_FIELD_HH_
 
+#include "field_map_static.hh"
+#include "field_collection.hh"
+#include "field_typed.hh"
+
+#include <string>
+
 namespace muGrid {
-
-  namespace internal {
-
-    /**
-     * simple structure calling make_field for regular (non-state) fields
-     */
-    template <class Field, bool IsStateField>
-    struct FieldMaker {
-      using Collection_t = typename Field::collection_t;
-      static Field & make(const std::string & unique_name,
-                          Collection_t & collection) {
-        return make_field<Field>(unique_name, collection);
-      }
-    };
-
-    /**
-     * specialisation for statefields
-     */
-
-    template <class StateField>
-    struct FieldMaker<StateField, true> {
-      using Collection_t = typename StateField::collection_t;
-      static StateField & make(const std::string & unique_prefix,
-                               Collection_t & collection) {
-        return make_statefield<StateField>(unique_prefix, collection);
-      }
-    };
-
-    /**
-     * simple structure constructing regular (non-state) maps
-     */
-    template <class Map, class Field, bool IsStateField>
-    struct MapMaker {
-      static Map make(Field & field) { return Map{field}; }
-    };
-
-    /**
-     * specialisation for statefield maps
-     */
-
-    template <class Map, class Field>
-    struct MapMaker<Map, Field, true> {
-      using Collection_t = typename Field::collection_t;
-      static StateFieldMap<Map, Field::nb_memory()> make(Field & field) {
-        constexpr static size_t NbMemory{Field::nb_memory()};
-        return StateFieldMap<Map, NbMemory>{field};
-      }
-    };
-
-    template <class FieldMap, class Field, bool IsStateField>
-    struct FieldMapProvider {
-      using type = StateFieldMap<FieldMap, Field::nb_memory()>;
-    };
-
-    template <class FieldMap, class Field>
-    struct FieldMapProvider<FieldMap, Field, false> {
-      using type = FieldMap;
-    };
-
-  }  // namespace internal
 
   /**
    * MappedFields are a combination of a field and an associated map, and as
@@ -114,37 +52,64 @@ namespace muGrid {
    * default use case of internal variables, which are typically used only by a
    * single material and always the same way.
    */
-  template <class Collection, class FieldMap, class Field>
+  template <class FieldMapType>
   class MappedField {
    public:
-    using Collection_t = Collection;
-    constexpr static bool IsStateField{
-        std::is_base_of<StateFieldBase<Collection>, Field>::value};
-    using FieldMap_t = typename internal::FieldMapProvider<FieldMap, Field,
-                                                           IsStateField>::type;
-    using Field_t = Field;  //! Just needed for compile-time inspection
-    using iterator = typename FieldMap_t::iterator;
-    // const iterators do not make sense for statefields, so they are defined
-    // only for regular field_maps
-    using const_iterator = typename FieldMap::const_iterator;
-
-    using reference =
-        std::conditional_t<IsStateField, typename FieldMap_t::value_type,
-                           typename FieldMap::reference>;
-    using const_reference = typename FieldMap::const_reference;
-    using size_type = typename FieldMap::size_type;
-
+    //! stored scalar type
+    using Scalar = typename FieldMapType::Scalar;
+    //! return type for iterators over this- map
+    using Return_t = typename FieldMapType::template Return_t<
+        FieldMapType::FieldMutability()>;
+    //! iterator over this map
+    using iterator = typename FieldMapType::iterator;
+    //! constant iterator over this map
+    using const_iterator = typename FieldMapType::const_iterator;
+    //! detemine at compile time whether the field map is statically sized
+    constexpr static bool IsStatic() { return FieldMapType::IsStatic(); }
     //! Default constructor
     MappedField() = delete;
 
+    /**
+     * Constructor with name and collection for statically sized mapped fields
+     */
+    template <bool StaticConstructor = IsStatic(),
+              std::enable_if_t<StaticConstructor, int> = 0>
+    MappedField(const std::string & unique_name, FieldCollection & collection)
+        : nb_components{compute_nb_components_static(unique_name, collection)},
+          field(collection.register_field<Scalar>(unique_name,
+                                                  this->nb_components)),
+          map{this->field} {
+      static_assert(
+          StaticConstructor == IsStatic(),
+          "StaticConstructor is a SFINAE parameter, do not touch it.");
+    }
+
+    /**
+     * Constructor for dynamically sized mapped field
+     *
+     * @param unique_name unique identifier for this field
+     * @param nb_rows number of rows for the iterates
+     * @param nb_cols number of columns for the iterates
+     * @param iter_type whether to iterate over pixels or quadrature points
+     * @param collection collection where the field is to be registered
+     */
+    template <bool StaticConstructor = IsStatic(),
+              std::enable_if_t<not StaticConstructor, int> = 0>
+    MappedField(const std::string & unique_name, const Dim_t & nb_rows,
+                const Dim_t & nb_cols, const Iteration & iter_type,
+                FieldCollection & collection)
+        : nb_components{compute_nb_components_dynamic(
+              nb_rows, nb_cols, iter_type, unique_name, collection)},
+          field(collection.register_field<Scalar>(unique_name,
+                                                  this->nb_components)),
+          map{this->field, nb_rows, iter_type} {
+      static_assert(
+          StaticConstructor == IsStatic(),
+          "StaticConstructor is a SFINAE parameter, do not touch it.");
+    }
+
     //! Copy constructor
     MappedField(const MappedField & other) = delete;
-
-    //! Constructor
-    MappedField(Collection & collection, std::string unique_name)
-        : field{internal::FieldMaker<Field, IsStateField>::make(unique_name,
-                                                                collection)},
-          map{internal::MapMaker<FieldMap, Field, IsStateField>::make(field)} {}
 
     //! Move constructor
     MappedField(MappedField && other) = default;
@@ -158,182 +123,188 @@ namespace muGrid {
     //! Move assignment operator
     MappedField & operator=(MappedField && other) = default;
 
-    inline reference operator[](size_type index) { return this->map[index]; }
+    //! random access operator
+    Return_t operator[](size_t index) { return this->map[index]; }
 
-    template <bool IsStandard = not IsStateField>
-    inline std::enable_if_t<IsStandard, const_reference>
-    operator[](size_type index) const {
-      static_assert(IsStandard == not IsStateField,
-                    "IsStandard is a SFINAE parameter, do not set manually");
-      return this->map[index];
-    }
+    //! stl
+    iterator begin() { return this->map.begin(); }
 
-    inline iterator begin() { return this->map.begin(); }
-    template <bool HasConst = not IsStateField>
-    inline std::enable_if_t<HasConst, const_iterator> cbegin() {
-      static_assert(HasConst == not IsStateField,
-                    "HasConst is a SFINAE parameter, do not set it manually");
-      return this->map.cbegin();
-    }
-    template <bool HasConst = not IsStateField>
-    inline std::enable_if_t<HasConst, const_iterator> cbegin() const {
-      static_assert(HasConst == not IsStateField,
-                    "HasConst is a SFINAE parameter, do not set it manually");
-      return this->map.cbegin();
-    }
-    template <bool HasConst = not IsStateField>
-    inline std::enable_if_t<HasConst, const_iterator> begin() const {
-      static_assert(HasConst == not IsStateField,
-                    "HasConst is a SFINAE parameter, do not set it manually");
-      return this->map.begin();
-    }
+    //! stl
+    iterator end() { return this->map.end(); }
 
-    inline iterator end() { return this->map.end(); }
-    template <bool HasConst = not IsStateField>
-    inline std::enable_if_t<HasConst, const_iterator> cend() {
-      static_assert(HasConst == not IsStateField,
-                    "HasConst is a SFINAE parameter, do not set it manually");
-      return this->map.cend();
-    }
-    template <bool HasConst = not IsStateField>
-    inline std::enable_if_t<HasConst, const_iterator> cend() const {
-      static_assert(HasConst == not IsStateField,
-                    "HasConst is a SFINAE parameter, do not set it manually");
-      return this->map.cend();
-    }
-    template <bool HasConst = not IsStateField>
-    inline std::enable_if_t<HasConst, const_iterator> end() const {
-      static_assert(HasConst == not IsStateField,
-                    "HasConst is a SFINAE parameter, do not set it manually");
-      return this->map.end();
-    }
+    //! stl
+    const_iterator begin() const { return this->map.begin(); }
 
-    inline Field & get_field() { return this->field; }
-    inline const Field & get_field() const { return this->field; }
+    //! stl
+    const_iterator end() const { return this->map.end(); }
 
-    inline FieldMap_t & get_map() { return this->map; }
-    inline const FieldMap_t & get_map() const { return this->map; }
+    //! return a reference to the mapped field
+    TypedField<Scalar> & get_field() { return this->field; }
 
-    constexpr static Dim_t spatial_dimension() {
-      return Field::spatial_dimension();
-    }
+    //! return a reference to the map
+    FieldMapType & get_map() { return this->map; }
 
    protected:
-    Field & field;
-    FieldMap_t map;
+    /**
+     * evaluate and return the number of components the dynamically mapped field
+     * needs to store per quadrature point
+     */
+    template <bool StaticConstructor = IsStatic(),
+              std::enable_if_t<not StaticConstructor, int> = 0>
+    static Dim_t compute_nb_components_dynamic(const Dim_t & nb_rows,
+                                               const Dim_t & nb_cols,
+                                               const Iteration & iter_type,
+                                               const std::string & unique_name,
+                                               FieldCollection & collection) {
+      static_assert(
+          StaticConstructor == IsStatic(),
+          "StaticConstructor is a SFINAE parameter, do not touch it.");
+
+      const Dim_t dof_per_quad_pt{nb_rows * nb_cols};
+      switch (iter_type) {
+      case Iteration::QuadPt: {
+        return dof_per_quad_pt;
+        break;
+      }
+      case Iteration::Pixel: {
+        if (not collection.has_nb_quad()) {
+          throw FieldMapError("Can't create a pixel map for field '" +
+                               unique_name +
+                               "' before the number of quadrature points has "
+                               "been set for the field collection.");
+        }
+        const auto & nb_quad{collection.get_nb_quad()};
+        if ((dof_per_quad_pt / nb_quad) * nb_quad != dof_per_quad_pt) {
+          std::stringstream error{};
+          error << "Inconsistent input to create a mapped field: the number of "
+                   "components per iterate ("
+                << dof_per_quad_pt << " = " << nb_rows << " × " << nb_cols
+                << ") is not a multiple of the number of quad points ("
+                << nb_quad << ").";
+          throw FieldMapError(error.str());
+        }
+        return dof_per_quad_pt / collection.get_nb_quad();
+        break;
+      }
+      default:
+        throw FieldMapError("unknown iteration type");
+        break;
+      }
+    }
+
+    /**
+     * evaluate and return the number of components the statically mapped field
+     * needs to store per quadrature point
+     */
+    template <bool StaticConstructor = IsStatic(),
+              std::enable_if_t<StaticConstructor, int> = 0>
+    static Dim_t compute_nb_components_static(const std::string & unique_name,
+                                              FieldCollection & collection) {
+      static_assert(
+          StaticConstructor == IsStatic(),
+          "StaticConstructor is a SFINAE parameter, do not touch it.");
+      switch (FieldMapType::GetIterationType()) {
+      case Iteration::QuadPt: {
+        return FieldMapType::Stride();
+        break;
+      }
+      case Iteration::Pixel: {
+        if (not collection.has_nb_quad()) {
+          throw FieldMapError("Can't create a pixel map for field '" +
+                               unique_name +
+                               "' before the number of quadrature points has "
+                               "been set for the field collection.");
+        }
+        return FieldMapType::Stride() / collection.get_nb_quad();
+        break;
+      }
+      default:
+        throw FieldMapError("unknown iteration type");
+        break;
+      }
+    }
+
+    Dim_t nb_components;  //!< number of components stored per quadrature point
+    TypedField<Scalar> & field;  //!< reference to mapped field
+    FieldMapType map;             //!< associated field map
   };
 
   /**
-   * Alias to simply create a matrix field and its associated matrix
-   * iterator
+   * Alias of `muGrid::MappedField` for a map with corresponding
+   * `muSpectre::Field` you wish to iterate over pixel by pixel or quadrature
+   * point by quadrature point with statically sized `Eigen::Matrix` iterates
+   *
+   * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
+   * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
+   * @tparam Mutability whether or not the map allows to modify the content of
+   * the field
+   * @tparam NbRow number of rows of the iterate
+   * @tparam NbCol number of columns of the iterate
+   * @tparam IterationType whether to iterate over pixels or quadrature points
    */
-  template <typename T, Dim_t Dim, Dim_t NbRows, Dim_t NbCols,
-            bool ConstField = false>
-  using MappedMatrixField = MappedField<
-      LocalFieldCollection<Dim>,
-      MatrixFieldMap<LocalFieldCollection<Dim>, T, NbRows, NbCols, ConstField>,
-      MatrixField<LocalFieldCollection<Dim>, T, NbRows, NbCols>>;
+  template <typename T, Mapping Mutability, Dim_t NbRow, Dim_t NbCol,
+            Iteration IterationType = Iteration::QuadPt>
+  using MappedMatrixField =
+      MappedField<MatrixFieldMap<T, Mutability, NbRow, NbCol, IterationType>>;
 
   /**
-   * Alias to simply create a array field and its associated array
-   * iterator
+   * Alias of `muGrid::MappedField` for a map with corresponding
+   * `muSpectre::Field` you wish to iterate over pixel by pixel or quadrature
+   * point by quadrature point with statically sized `Eigen::Array` iterates
+   *
+   * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
+   * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
+   * @tparam Mutability whether or not the map allows to modify the content of
+   * the field
+   * @tparam NbRow number of rows of the iterate
+   * @tparam NbCol number of columns of the iterate
+   * @tparam IterationType whether to iterate over pixels or quadrature points
    */
-  template <typename T, Dim_t Dim, Dim_t NbRows, Dim_t NbCols = 1,
-            bool ConstField = false>
-  using MappedArrayField = MappedField<
-      LocalFieldCollection<Dim>,
-      ArrayFieldMap<LocalFieldCollection<Dim>, T, NbRows, NbCols, ConstField>,
-      MatrixField<LocalFieldCollection<Dim>, T, NbRows, NbCols>>;
-  /**
-   * Alias to simply create second-rank tensor field and its associated matrix
-   * iterator
-   */
-  template <typename T, Dim_t DimS, Dim_t DimM = DimS, bool ConstField = false>
-  using MappedT2Field = MappedField<
-      LocalFieldCollection<DimS>,
-      MatrixFieldMap<LocalFieldCollection<DimS>, T, DimM, DimM, ConstField>,
-      TensorField<LocalFieldCollection<DimS>, T, secondOrder, DimM>>;
+  template <typename T, Mapping Mutability, Dim_t NbRow, Dim_t NbCol,
+            Iteration IterationType = Iteration::QuadPt>
+  using MappedArrayField =
+      MappedField<ArrayFieldMap<T, Mutability, NbRow, NbCol, IterationType>>;
 
   /**
-   * Alias to simply create fourth-rank tensor field and its associated T4Mat
-   * iterator
+   * Alias of `muGrid::MappedField` for a map of scalars with corresponding
+   * `muSpectre::Field` you wish to iterate over quadrature point by quadrature
+   * point.
+   *
+   * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
+   * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
+   * @tparam Mutability whether or not the map allows to modify the content of
+   * the field
    */
-  template <typename T, Dim_t DimS, Dim_t DimM = DimS, bool ConstField = false>
-  using MappedT4Field = MappedField<
-      LocalFieldCollection<DimS>,
-      MatrixFieldMap<LocalFieldCollection<DimS>, T, DimM * DimM, DimM * DimM,
-                     ConstField>,
-      TensorField<LocalFieldCollection<DimS>, T, fourthOrder, DimM>>;
+  template <typename T, Mapping Mutability>
+  using MappedScalarField = MappedField<ScalarFieldMap<T, Mutability>>;
 
   /**
-   * Alias to simply create a scalar field and its associaced iterator
-   * iterator
+   * Alias of `muGrid::MappedField` for a map of second-rank with corresponding
+   * `muSpectre::Field` you wish to iterate over quadrature point by quadrature
+   * point.
+   *
+   * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
+   * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
+   * @tparam Mutability whether or not the map allows to modify the content of
+   * the field
+   * @tparam Dim spatial dimension of the tensors
    */
-  template <typename T, Dim_t Dim, bool ConstField = false>
-  using MappedScalarField =
-      MappedField<LocalFieldCollection<Dim>,
-                  ScalarFieldMap<LocalFieldCollection<Dim>, T, ConstField>,
-                  ScalarField<LocalFieldCollection<Dim>, T>>;
-
-  /* ---------------------------------------------------------------------- */
-
-  /**
-   * Alias to simply create a matrix state field and its associated matrix
-   * iterator
-   */
-  template <typename T, Dim_t Dim, Dim_t NbRows, Dim_t NbCols,
-            size_t NbMemory = 1, bool ConstField = false>
-  using MappedMatrixStateField = MappedField<
-      LocalFieldCollection<Dim>,
-      MatrixFieldMap<LocalFieldCollection<Dim>, T, NbRows, NbCols, ConstField>,
-      StateField<MatrixField<LocalFieldCollection<Dim>, T, NbRows, NbCols>,
-                 NbMemory>>;
+  template <typename T, Mapping Mutability, Dim_t Dim>
+  using MappedT2Field = MappedField<T2FieldMap<T, Mutability, Dim>>;
 
   /**
-   * Alias to simply create a array state field and its associated array
-   * iterator
+   * Alias of `muGrid::MappedField` for a map of fourth-rank with corresponding
+   * `muSpectre::Field` you wish to iterate over quadrature point by quadrature
+   * point.
+   *
+   * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
+   * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
+   * @tparam Mutability whether or not the map allows to modify the content of
+   * the field
+   * @tparam Dim spatial dimension of the tensors
    */
-  template <typename T, Dim_t Dim, Dim_t NbRows, Dim_t NbCols = 1,
-            size_t NbMemory = 1, bool ConstField = false>
-  using MappedArrayStateField = MappedField<
-      LocalFieldCollection<Dim>,
-      ArrayFieldMap<LocalFieldCollection<Dim>, T, NbRows, NbCols, ConstField>,
-      StateField<MatrixField<LocalFieldCollection<Dim>, T, NbRows, NbCols>,
-                 NbMemory>>;
-  /**
-   * Alias to simply create second-rank tensor state field and its associated
-   * matrix iterator
-   */
-  template <typename T, Dim_t DimS, Dim_t DimM = DimS, size_t NbMemory = 1,
-            bool ConstField = false>
-  using MappedT2StateField = MappedField<
-      LocalFieldCollection<DimS>,
-      MatrixFieldMap<LocalFieldCollection<DimS>, T, DimM, DimM, ConstField>,
-      StateField<TensorField<LocalFieldCollection<DimS>, T, secondOrder, DimM>,
-                 NbMemory>>;
-
-  /**
-   * Alias to simply create fourth-rank tensor state field and its associated
-   * T4Mat iterator
-   */
-  template <typename T, Dim_t DimS, Dim_t DimM = DimS, size_t NbMemory = 1,
-            bool ConstField = false>
-  using MappedT4StateField = MappedField<
-      LocalFieldCollection<DimS>,
-      MatrixFieldMap<LocalFieldCollection<DimS>, T, DimM * DimM, DimM * DimM,
-                     ConstField>,
-      StateField<TensorField<LocalFieldCollection<DimS>, T, fourthOrder, DimM>,
-                 NbMemory>>;
-
-  /**
-   * Alias to simply create a scalar state field and its associaced iterator
-   * iterator
-   */
-  template <typename T, Dim_t Dim, size_t NbMemory = 1, bool ConstField = false>
-  using MappedScalarStateField = MappedField<
-      LocalFieldCollection<Dim>,
-      ScalarFieldMap<LocalFieldCollection<Dim>, T, ConstField>,
-      StateField<ScalarField<LocalFieldCollection<Dim>, T>, NbMemory>>;
+  template <typename T, Mapping Mutability, Dim_t Dim>
+  using MappedT4Field = MappedField<T4FieldMap<T, Mutability, Dim>>;
 
 }  // namespace muGrid
 

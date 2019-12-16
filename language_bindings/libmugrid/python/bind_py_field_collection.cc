@@ -37,20 +37,20 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include "libmugrid/nfield.hh"
-#include "libmugrid/nfield_typed.hh"
-#include "libmugrid/nfield_collection.hh"
-#include "libmugrid/nfield_collection_global.hh"
-#include "libmugrid/nfield_collection_local.hh"
-#include "libmugrid/state_nfield.hh"
+#include "libmugrid/field.hh"
+#include "libmugrid/field_typed.hh"
+#include "libmugrid/field_collection.hh"
+#include "libmugrid/field_collection_global.hh"
+#include "libmugrid/field_collection_local.hh"
+#include "libmugrid/state_field.hh"
 
 using muGrid::Complex;
 using muGrid::Dim_t;
 using muGrid::DynCcoord_t;
-using muGrid::GlobalNFieldCollection;
+using muGrid::GlobalFieldCollection;
 using muGrid::Int;
-using muGrid::LocalNFieldCollection;
-using muGrid::NFieldCollection;
+using muGrid::LocalFieldCollection;
+using muGrid::FieldCollection;
 using muGrid::Real;
 using muGrid::Uint;
 using pybind11::literals::operator""_a;
@@ -58,105 +58,105 @@ using pybind11::literals::operator""_a;
 namespace py = pybind11;
 
 void add_field_collection(py::module & mod) {
-  py::class_<NFieldCollection> field_collection(mod, "FieldCollection");
+  py::class_<FieldCollection> field_collection(mod, "FieldCollection");
   field_collection
-      .def("register_real_field", &NFieldCollection::register_real_field,
+      .def("register_real_field", &FieldCollection::register_real_field,
            py::return_value_policy::reference_internal)
-      .def("register_complex_field", &NFieldCollection::register_complex_field,
+      .def("register_complex_field", &FieldCollection::register_complex_field,
            py::return_value_policy::reference_internal)
-      .def("register_int_field", &NFieldCollection::register_int_field,
+      .def("register_int_field", &FieldCollection::register_int_field,
            py::return_value_policy::reference_internal)
-      .def("register_uint_field", &NFieldCollection::register_uint_field,
+      .def("register_uint_field", &FieldCollection::register_uint_field,
            py::return_value_policy::reference_internal)
-      .def("field_exists", &NFieldCollection::field_exists)
-      .def("state_field_exists", &NFieldCollection::state_field_exists)
-      .def_property_readonly("nb_entries", &NFieldCollection::get_nb_entries)
-      .def_property_readonly("nb_pixels", &NFieldCollection::get_nb_pixels)
-      .def_property("nb_quad", &NFieldCollection::get_nb_quad,
-                    &NFieldCollection::set_nb_quad)
-      .def_property_readonly("domain", &NFieldCollection::get_domain)
+      .def("field_exists", &FieldCollection::field_exists)
+      .def("state_field_exists", &FieldCollection::state_field_exists)
+      .def_property_readonly("nb_entries", &FieldCollection::get_nb_entries)
+      .def_property_readonly("nb_pixels", &FieldCollection::get_nb_pixels)
+      .def_property("nb_quad", &FieldCollection::get_nb_quad,
+                    &FieldCollection::set_nb_quad)
+      .def_property_readonly("domain", &FieldCollection::get_domain)
       .def_property_readonly("is_initialised",
-                             &NFieldCollection::is_initialised)
-      .def("get_field", &NFieldCollection::get_field,
+                             &FieldCollection::is_initialised)
+      .def("get_field", &FieldCollection::get_field,
            py::return_value_policy::reference_internal)
       .def(
           "get_real_field",
-          [](NFieldCollection & collection, const std::string & unique_name)
-              -> muGrid::TypedNFieldBase<Real> & {
-            return dynamic_cast<muGrid::TypedNFieldBase<Real> &>(
+          [](FieldCollection & collection, const std::string & unique_name)
+              -> muGrid::TypedFieldBase<Real> & {
+            return dynamic_cast<muGrid::TypedFieldBase<Real> &>(
                 collection.get_field(unique_name));
           },
           "unique_name"_a, py::return_value_policy::reference_internal)
       .def(
           "get_complex_field",
-          [](NFieldCollection & collection, const std::string & unique_name)
-              -> muGrid::TypedNFieldBase<Complex> & {
-            return dynamic_cast<muGrid::TypedNFieldBase<Complex> &>(
+          [](FieldCollection & collection, const std::string & unique_name)
+              -> muGrid::TypedFieldBase<Complex> & {
+            return dynamic_cast<muGrid::TypedFieldBase<Complex> &>(
                 collection.get_field(unique_name));
           },
           "unique_name"_a, py::return_value_policy::reference_internal)
       .def(
           "get_int_field",
-          [](NFieldCollection & collection, const std::string & unique_name)
-              -> muGrid::TypedNFieldBase<Int> & {
-            return dynamic_cast<muGrid::TypedNFieldBase<Int> &>(
+          [](FieldCollection & collection, const std::string & unique_name)
+              -> muGrid::TypedFieldBase<Int> & {
+            return dynamic_cast<muGrid::TypedFieldBase<Int> &>(
                 collection.get_field(unique_name));
           },
           "unique_name"_a, py::return_value_policy::reference_internal)
       .def(
           "get_uint_field",
-          [](NFieldCollection & collection, const std::string & unique_name)
-              -> muGrid::TypedNFieldBase<Uint> & {
-            return dynamic_cast<muGrid::TypedNFieldBase<Uint> &>(
+          [](FieldCollection & collection, const std::string & unique_name)
+              -> muGrid::TypedFieldBase<Uint> & {
+            return dynamic_cast<muGrid::TypedFieldBase<Uint> &>(
                 collection.get_field(unique_name));
           },
           "unique_name"_a, py::return_value_policy::reference_internal)
-      .def("get_state_field", &NFieldCollection::get_state_field,
+      .def("get_state_field", &FieldCollection::get_state_field,
            py::return_value_policy::reference_internal)
-      .def("keys", &NFieldCollection::list_fields)
-      .def_property_readonly("field_names", &NFieldCollection::list_fields);
+      .def("keys", &FieldCollection::list_fields)
+      .def_property_readonly("field_names", &FieldCollection::list_fields);
 
-  py::class_<muGrid::NFieldCollection::IndexIterable>(mod, "IndexIterable")
-      .def("__len__", &muGrid::NFieldCollection::IndexIterable::size)
-      .def("__iter__", [](muGrid::NFieldCollection::IndexIterable & iterable) {
+  py::class_<muGrid::FieldCollection::IndexIterable>(mod, "IndexIterable")
+      .def("__len__", &muGrid::FieldCollection::IndexIterable::size)
+      .def("__iter__", [](muGrid::FieldCollection::IndexIterable & iterable) {
         return py::make_iterator(iterable.begin(), iterable.end());
       });
 
-  py::class_<muGrid::NFieldCollection::PixelIndexIterable>(mod,
+  py::class_<muGrid::FieldCollection::PixelIndexIterable>(mod,
                                                            "PixelIndexIterable")
-      .def("__len__", &muGrid::NFieldCollection::PixelIndexIterable::size)
+      .def("__len__", &muGrid::FieldCollection::PixelIndexIterable::size)
       .def("__iter__",
-           [](muGrid::NFieldCollection::PixelIndexIterable & iterable) {
+           [](muGrid::FieldCollection::PixelIndexIterable & iterable) {
              return py::make_iterator(iterable.begin(), iterable.end());
            });
 
-  py::enum_<NFieldCollection::ValidityDomain>(field_collection,
+  py::enum_<FieldCollection::ValidityDomain>(field_collection,
                                               "ValidityDomain")
-      .value("Global", NFieldCollection::ValidityDomain::Global)
-      .value("Local", NFieldCollection::ValidityDomain::Local)
+      .value("Global", FieldCollection::ValidityDomain::Global)
+      .value("Local", FieldCollection::ValidityDomain::Local)
       .export_values();
 }
 
 void add_global_field_collection(py::module & mod) {
-  py::class_<GlobalNFieldCollection, NFieldCollection>(mod,
+  py::class_<GlobalFieldCollection, FieldCollection>(mod,
                                                        "GlobalFieldCollection")
       .def(py::init<Dim_t, Dim_t>())
       .def("initialise",
-           [](GlobalNFieldCollection & self, const DynCcoord_t & nb_grid_pts) {
+           [](GlobalFieldCollection & self, const DynCcoord_t & nb_grid_pts) {
              self.initialise(nb_grid_pts);
            })
-      .def("initialise", (void (GlobalNFieldCollection::*)(  // NOLINT
+      .def("initialise", (void (GlobalFieldCollection::*)(  // NOLINT
                              const DynCcoord_t &, const DynCcoord_t &)) &
-                             GlobalNFieldCollection::initialise)
+                             GlobalFieldCollection::initialise)
       .def("initialise",
-           (void (GlobalNFieldCollection::*)(  // NOLINT
+           (void (GlobalFieldCollection::*)(  // NOLINT
                const DynCcoord_t &, const DynCcoord_t &, const DynCcoord_t &)) &
-               GlobalNFieldCollection::initialise)
-      .def_property_readonly("pixels", &GlobalNFieldCollection::get_pixels);
+               GlobalFieldCollection::initialise)
+      .def_property_readonly("pixels", &GlobalFieldCollection::get_pixels);
 }
 
 void add_local_field_collection(py::module & mod) {
-  py::class_<LocalNFieldCollection, NFieldCollection>(mod,
+  py::class_<LocalFieldCollection, FieldCollection>(mod,
                                                       "LocalFieldCollection");
 }
 

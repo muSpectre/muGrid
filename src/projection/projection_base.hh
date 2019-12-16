@@ -36,8 +36,8 @@
 #ifndef SRC_PROJECTION_PROJECTION_BASE_HH_
 #define SRC_PROJECTION_PROJECTION_BASE_HH_
 
-#include <libmugrid/nfield_collection.hh>
-#include <libmugrid/nfield_typed.hh>
+#include <libmugrid/field_collection.hh>
+#include <libmugrid/field_typed.hh>
 
 #include <libmufft/fft_engine_base.hh>
 
@@ -76,7 +76,7 @@ namespace muSpectre {
     using GFieldCollection_t =
         typename muFFT::FFTEngineBase::GFieldCollection_t;
     //! Field type on which to apply the projection
-    using Field_t = muGrid::TypedNFieldBase<Real>;
+    using Field_t = muGrid::TypedFieldBase<Real>;
     /**
      * iterator over all pixels. This is taken from the FFT engine,
      * because depending on the real-to-complex FFT employed, only

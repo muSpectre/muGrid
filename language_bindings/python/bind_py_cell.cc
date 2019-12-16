@@ -33,11 +33,11 @@
  *
  */
 
-#include <libmugrid/state_nfield.hh>
+#include <libmugrid/state_field.hh>
 
 #include "common/muSpectre_common.hh"
 #include "cell/cell_factory.hh"
-#include "cell/ncell.hh"
+#include "cell/cell.hh"
 
 #ifdef WITH_SPLIT
 #include "cell/cell_split_factory.hh"
@@ -45,7 +45,7 @@
 #endif
 
 #include <libmugrid/ccoord_operations.hh>
-#include <libmugrid/numpy.hh>
+#include <libmugrid/numpy_tools.hh>
 #include <libmufft/communicator.hh>
 
 #ifdef WITH_FFTWMPI
@@ -163,13 +163,13 @@ void add_cell_factory(py::module & mod) {
  * CellBase for which the material and spatial dimension are identical
  */
 void add_cell_helper(py::module & mod) {
-  using muSpectre::NCell;
+  using muSpectre::Cell;
   using muSpectre::Real;
 #ifdef WITH_SPLIT
   using Mat_t = muSpectre::MaterialBase<dim, dim>;
 #endif
   auto NumpyT2Proxy{
-      [](NCell & cell,
+      [](Cell & cell,
          py::array_t<Real, py::array::f_style> & tensor2) -> NumpyProxy<Real> {
         auto && strain_shape{cell.get_strain_shape()};
         auto & proj{cell.get_projection()};
@@ -179,16 +179,16 @@ void add_cell_helper(py::module & mod) {
                                 {strain_shape[0], strain_shape[1]},
                                 tensor2};
       }};
-  py::class_<NCell>(mod, "Cell")
-      .def("initialise", &NCell::initialise,
+  py::class_<Cell>(mod, "Cell")
+      .def("initialise", &Cell::initialise,
            "flags"_a = muFFT::FFT_PlanFlags::estimate)
       .def(
-          "is_initialised", [](NCell & s) { return s.is_initialised(); },
+          "is_initialised", [](Cell & s) { return s.is_initialised(); },
           py::return_value_policy::reference_internal)
       .def(
           "directional_stiffness",
           [&NumpyT2Proxy](
-              NCell & cell,
+              Cell & cell,
               py::array_t<Real, py::array::f_style> & delta_strain) {
             if (!cell.is_initialised()) {
               cell.initialise();
@@ -201,7 +201,7 @@ void add_cell_helper(py::module & mod) {
               fields.register_real_field(out_name, nb_components);
             }
             auto & delta_stress{
-                dynamic_cast<muGrid::RealNField &>(fields.get_field(out_name))};
+                dynamic_cast<muGrid::RealField &>(fields.get_field(out_name))};
             auto delta_strain_array{NumpyT2Proxy(cell, delta_strain)};
             cell.evaluate_projected_directional_stiffness(
                 delta_strain_array.get_field(), delta_stress);
@@ -214,9 +214,9 @@ void add_cell_helper(py::module & mod) {
             }
           },
           "delta_strain"_a, py::return_value_policy::reference_internal)
-      .def("project", &NCell::apply_projection, "strain"_a)
+      .def("project", &Cell::apply_projection, "strain"_a)
       .def("project",
-           [&NumpyT2Proxy](NCell & cell,
+           [&NumpyT2Proxy](Cell & cell,
                            py::array_t<Real, py::array::f_style> & strain) {
              if (!cell.is_initialised()) {
                cell.initialise();
@@ -229,7 +229,7 @@ void add_cell_helper(py::module & mod) {
                auto && nb_components{strain_shape[0] * strain_shape[1]};
                fields.register_real_field(out_name, nb_components);
              }
-             auto & strain_field{dynamic_cast<muGrid::RealNField &>(
+             auto & strain_field{dynamic_cast<muGrid::RealField &>(
                  fields.get_field(out_name))};
              strain_field = NumpyT2Proxy(cell, strain).get_field();
              cell.apply_projection(strain_field);
@@ -241,16 +241,16 @@ void add_cell_helper(py::module & mod) {
               return numpy_wrap(strain_field);
             }
            }, "strain"_a)
-      .def_property("strain", &NCell::get_strain,
-                    [](NCell & cell, muGrid::TypedNFieldBase<Real> & strain) {
+      .def_property("strain", &Cell::get_strain,
+                    [](Cell & cell, muGrid::TypedFieldBase<Real> & strain) {
                       cell.get_strain() = strain;
                     })
-      .def_property_readonly("stress", &NCell::get_stress)
-      .def_property_readonly("nb_dof", &NCell::get_nb_dof)
-      .def_property_readonly("nb_pixels", &NCell::get_nb_pixels)
+      .def_property_readonly("stress", &Cell::get_stress)
+      .def_property_readonly("nb_dof", &Cell::get_nb_dof)
+      .def_property_readonly("nb_pixels", &Cell::get_nb_pixels)
       .def(
           "evaluate_stress_tangent",
-          [&NumpyT2Proxy](NCell & cell,
+          [&NumpyT2Proxy](Cell & cell,
                           py::array_t<Real, py::array::f_style> & strain) {
             auto strain_array{NumpyT2Proxy(cell, strain)};
 
@@ -278,7 +278,7 @@ void add_cell_helper(py::module & mod) {
           "strain"_a, py::return_value_policy::reference_internal)
       .def(
           "evaluate_stress_tangent",
-          [](NCell & cell, muGrid::TypedNFieldBase<Real> & strain) {
+          [](Cell & cell, muGrid::TypedFieldBase<Real> & strain) {
             cell.get_strain() = strain;
             auto && stress_tgt{cell.evaluate_stress_tangent()};
             auto && stress{std::get<0>(stress_tgt)};
@@ -303,7 +303,7 @@ void add_cell_helper(py::module & mod) {
           "strain"_a, py::return_value_policy::reference_internal)
       .def(
           "evaluate_stress",
-          [&NumpyT2Proxy](NCell & cell,
+          [&NumpyT2Proxy](Cell & cell,
                           py::array_t<Real, py::array::f_style> & strain) {
             auto strain_array{NumpyT2Proxy(cell, strain)};
 
@@ -318,38 +318,38 @@ void add_cell_helper(py::module & mod) {
             }
           },
           "strain"_a, py::return_value_policy::reference_internal)
-      .def_property_readonly("projection", &NCell::get_projection)
-      .def_property_readonly("communicator", &NCell::get_communicator)
+      .def_property_readonly("projection", &Cell::get_projection)
+      .def_property_readonly("communicator", &Cell::get_communicator)
       .def_property_readonly(
           "nb_subdomain_grid_pts",
-          [](NCell & cell) {
+          [](Cell & cell) {
             return cell.get_projection().get_nb_subdomain_grid_pts();
           })
       .def_property_readonly(
           "subdomain_locations",
 
-          [](NCell & cell) {
+          [](Cell & cell) {
             return cell.get_projection().get_subdomain_locations();
           })
       .def_property_readonly(
           "nb_domain_grid_pts",
-          [](NCell & cell) {
+          [](Cell & cell) {
             return cell.get_projection().get_nb_domain_grid_pts();
           })
       .def_property_readonly(
           "domain_lengths",
-          [](NCell & cell) {
+          [](Cell & cell) {
             return cell.get_projection().get_domain_lengths();
           })
       .def(
           "set_uniform_strain",
-          [](NCell & cell, py::EigenDRef<Eigen::ArrayXXd> & strain) -> void {
+          [](Cell & cell, py::EigenDRef<Eigen::ArrayXXd> & strain) -> void {
             cell.set_uniform_strain(strain);
           },
           "strain"_a)
-      .def("save_history_variables", &NCell::save_history_variables)
+      .def("save_history_variables", &Cell::save_history_variables)
       .def("get_globalised_internal_real_field",
-           &NCell::globalise_real_internal_field, "unique_name"_a,
+           &Cell::globalise_real_internal_field, "unique_name"_a,
            "Convenience function to copy local (internal) fields of "
            "materials into a global field. At least one of the materials in "
            "the cell needs to contain an internal field named "
@@ -367,8 +367,8 @@ void add_cell_helper(py::module & mod) {
            py::return_value_policy::reference_internal)
       .def(
           "get_globalised_current_real_field",
-          [](NCell & cell, const std::string & unique_prefix)
-              -> muGrid::TypedNFieldBase<Real> & {
+          [](Cell & cell, const std::string & unique_prefix)
+              -> muGrid::TypedFieldBase<Real> & {
             auto current_name{cell.get_fields()
                                   .get_state_field(unique_prefix)
                                   .current()
@@ -378,8 +378,8 @@ void add_cell_helper(py::module & mod) {
           "unique_prefix"_a, py::return_value_policy::reference_internal)
       .def(
           "get_globalised_old_real_field",
-          [](NCell & cell, const std::string & unique_prefix,
-             const size_t & nb_steps_ago) -> muGrid::TypedNFieldBase<Real> & {
+          [](Cell & cell, const std::string & unique_prefix,
+             const size_t & nb_steps_ago) -> muGrid::TypedFieldBase<Real> & {
             auto old_name{cell.get_fields()
                               .get_state_field(unique_prefix)
                               .old(nb_steps_ago)
@@ -388,9 +388,9 @@ void add_cell_helper(py::module & mod) {
           },
           "unique_prefix"_a, "nb_steps_ago"_a = 1,
           py::return_value_policy::reference_internal)
-      .def_property_readonly("pixels", &NCell::get_pixels)
-      .def_property_readonly("pixel_indices", &NCell::get_pixel_indices)
-      .def_property_readonly("quad_pt_indices", &NCell::get_quad_pt_indices)
+      .def_property_readonly("pixels", &Cell::get_pixels)
+      .def_property_readonly("pixel_indices", &Cell::get_pixel_indices)
+      .def_property_readonly("quad_pt_indices", &Cell::get_quad_pt_indices)
 
 #ifdef WITH_SPLIT
       .def(

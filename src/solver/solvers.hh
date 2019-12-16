@@ -59,7 +59,7 @@ namespace muSpectre {
    * The initial macroscopic strain state is set to zero in cell initialisation.
    */
   std::vector<OptimizeResult>
-  newton_cg(NCell & cell, const LoadSteps_t & load_steps, SolverBase & solver,
+  newton_cg(Cell & cell, const LoadSteps_t & load_steps, SolverBase & solver,
             Real newton_tol, Real equil_tol, Dim_t verbose = 0,
             IsStrainInitialised strain_init = IsStrainInitialised::False);
 
@@ -68,7 +68,7 @@ namespace muSpectre {
    * equilibrium of a cell given a mean applied strain.
    */
   inline OptimizeResult
-  newton_cg(NCell & cell, const Eigen::Ref<Eigen::MatrixXd> load_step,
+  newton_cg(Cell & cell, const Eigen::Ref<Eigen::MatrixXd> load_step,
             SolverBase & solver, Real newton_tol, Real equil_tol,
             Dim_t verbose = 0,
             IsStrainInitialised strain_init = IsStrainInitialised::False) {
@@ -86,7 +86,7 @@ namespace muSpectre {
    * strain state is set to zero in cell initialisation.
    */
   std::vector<OptimizeResult>
-  de_geus(NCell & cell, const LoadSteps_t & load_steps, SolverBase & solver,
+  de_geus(Cell & cell, const LoadSteps_t & load_steps, SolverBase & solver,
           Real newton_tol, Real equil_tol, Dim_t verbose = 0,
           IsStrainInitialised strain_init = IsStrainInitialised::False);
 
@@ -96,7 +96,7 @@ namespace muSpectre {
    * equilibrium of a cell given a mean applied strain.
    */
   inline OptimizeResult
-  de_geus(NCell & cell, const Eigen::Ref<Eigen::MatrixXd> load_step,
+  de_geus(Cell & cell, const Eigen::Ref<Eigen::MatrixXd> load_step,
           SolverBase & solver, Real newton_tol, Real equil_tol,
           Dim_t verbose = 0,
           IsStrainInitialised strain_init = IsStrainInitialised::False) {

@@ -37,8 +37,8 @@
 #include "tests.hh"
 #include "libmugrid/test_goodies.hh"
 
-#include <libmugrid/nfield_collection_global.hh>
-#include <libmugrid/mapped_nfield.hh>
+#include <libmugrid/field_collection_global.hh>
+#include <libmugrid/mapped_field.hh>
 #include <libmugrid/iterators.hh>
 #include <materials/material_linear_elastic2.hh>
 
@@ -99,7 +99,7 @@ namespace muSpectre {
     constexpr auto loc{muGrid::CcoordOps::get_cube<Fix::sdim>(0)};
 
     using Mat_t = Eigen::Matrix<Real, Fix::mdim(), Fix::mdim()>;
-    using FC_t = muGrid::GlobalNFieldCollection;
+    using FC_t = muGrid::GlobalFieldCollection;
     FC_t globalfields{Fix::mdim(), Fix::NbQuadPts()};
     globalfields.initialise(cube, loc);
 
@@ -114,11 +114,11 @@ namespace muSpectre {
     mat.add_pixel(pix1, strain);
     mat.initialise();
 
-    muGrid::MappedT2NField<Real, Mapping::Mut, Fix::mdim()> F_f{
+    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim()> F_f{
         "Transformation Gradient", globalfields};
-    muGrid::MappedT2NField<Real, Mapping::Mut, Fix::mdim()> P1_f{
+    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim()> P1_f{
         "Nominal Stress1", globalfields};  // to be computed alone
-    muGrid::MappedT4NField<Real, Mapping::Mut, Fix::mdim()> K_f{
+    muGrid::MappedT4Field<Real, Mapping::Mut, Fix::mdim()> K_f{
         "Tangent Moduli", globalfields};  // to be computed with tangent
     for (Dim_t quad_id{0}; quad_id < Fix::NbQuadPts(); ++quad_id) {
       F_f.get_map()[pix0 * Fix::NbQuadPts() + quad_id] = -strain;
@@ -172,7 +172,7 @@ namespace muSpectre {
     constexpr auto loc{muGrid::CcoordOps::get_cube<Fix::sdim>(0)};
     auto & mat{Fix::mat};
 
-    using FC_t = muGrid::GlobalNFieldCollection;
+    using FC_t = muGrid::GlobalFieldCollection;
     FC_t globalfields{Fix::sdim, Fix::NbQuadPts()};
     globalfields.register_real_field("Transformation Gradient",
                                      Fix::mdim() * Fix::mdim());

@@ -66,13 +66,13 @@ namespace muSpectre {
 
     auto proj_ptr_non{std::make_unique<ProjectionFiniteStrainFast<Dim>>(
         std::move(fft_ptr_non), lengths)};
-    NCell sys_non(std::move(proj_ptr_non));
+    Cell sys_non(std::move(proj_ptr_non));
 
     auto fft_ptr_lin{
         std::make_unique<muFFT::FFTWEngine>(resolutions, muGrid::ipow(Dim, 2))};
     auto proj_ptr_lin{std::make_unique<ProjectionFiniteStrainFast<Dim>>(
         std::move(fft_ptr_lin), lengths)};
-    NCell sys_lin(std::move(proj_ptr_lin));
+    Cell sys_lin(std::move(proj_ptr_lin));
 
     using Mat_t_non = MaterialLinearOrthotropic<Dim>;
     using Mat_t_lin = MaterialLinearElastic1<Dim>;
@@ -145,13 +145,13 @@ namespace muSpectre {
         std::make_unique<muFFT::FFTWEngine>(resolutions, muGrid::ipow(Dim, 2))};
     auto proj_ptr_non{std::make_unique<ProjectionFiniteStrainFast<Dim>>(
         std::move(fft_ptr_non), lengths)};
-    NCell sys_non(std::move(proj_ptr_non));
+    Cell sys_non(std::move(proj_ptr_non));
 
     auto fft_ptr_lin{
         std::make_unique<muFFT::FFTWEngine>(resolutions, muGrid::ipow(Dim, 2))};
     auto proj_ptr_lin{std::make_unique<ProjectionFiniteStrainFast<Dim>>(
         std::move(fft_ptr_lin), lengths)};
-    NCell sys_lin(std::move(proj_ptr_lin));
+    Cell sys_lin(std::move(proj_ptr_lin));
 
     using Mat_t_non = MaterialLinearOrthotropic<Dim>;
     using Mat_t_lin = MaterialLinearElastic1<Dim>;

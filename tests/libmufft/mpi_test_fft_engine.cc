@@ -49,8 +49,8 @@
 #endif
 
 #include <libmugrid/ccoord_operations.hh>
-#include <libmugrid/nfield_collection.hh>
-#include <libmugrid/nfield_map_static.hh>
+#include <libmugrid/field_collection.hh>
+#include <libmugrid/field_map_static.hh>
 #include <libmugrid/iterators.hh>
 
 namespace muFFT {
@@ -127,7 +127,7 @@ namespace muFFT {
     } else {
       Fix::engine.initialise(FFT_PlanFlags::estimate);
     }
-    using FC_t = muGrid::GlobalNFieldCollection;
+    using FC_t = muGrid::GlobalFieldCollection;
     FC_t fc{Fix::sdim, OneQuadPt};
     auto & input{fc.register_real_field("input", Fix::sdim*Fix::sdim)};
     auto & ref{fc.register_real_field("reference", Fix::sdim*Fix::sdim)};
@@ -136,7 +136,7 @@ namespace muFFT {
     fc.initialise(Fix::engine.get_nb_subdomain_grid_pts(),
                   Fix::engine.get_subdomain_locations());
 
-    using map_t = muGrid::MatrixNFieldMap<
+    using map_t = muGrid::MatrixFieldMap<
         Real, Mapping::Mut, Fix::sdim, Fix::sdim>;
     map_t inmap{input};
     inmap.initialise();
@@ -154,7 +154,7 @@ namespace muFFT {
     }
     auto & complex_field = Fix::engine.fft(input);
     using cmap_t =
-        muGrid::MatrixNFieldMap<Complex, Mapping::Mut, Fix::sdim, Fix::sdim>;
+        muGrid::MatrixFieldMap<Complex, Mapping::Mut, Fix::sdim, Fix::sdim>;
     cmap_t complex_map(complex_field);
     complex_map.initialise();
     if (Fix::engine.get_subdomain_locations() ==

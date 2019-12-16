@@ -40,7 +40,7 @@
 #include "libmugrid/test_goodies.hh"
 
 #include <libmugrid/iterators.hh>
-#include <libmugrid/nfield_map.hh>
+#include <libmugrid/field_map.hh>
 #include <cell/cell_factory.hh>
 #include <materials/material_linear_elastic1.hh>
 
@@ -63,20 +63,20 @@ namespace muSpectre {
   };
 
   template <Dim_t DimS, Dim_t DimM, Formulation form>
-  struct NCellFixture : NCell {
+  struct CellFixture : Cell {
     constexpr static Dim_t sdim{DimS};
     constexpr static Dim_t mdim{DimM};
     constexpr static Formulation formulation{form};
-    NCellFixture()
-        : NCell{std::move(cell_input(Sizes<DimS>::get_nb_grid_pts(),
+    CellFixture()
+        : Cell{std::move(cell_input(Sizes<DimS>::get_nb_grid_pts(),
                                      Sizes<DimS>::get_lengths(), form))} {}
   };
 
   using fixlist =
-      boost::mpl::list<NCellFixture<twoD, twoD, Formulation::finite_strain>,
-                       NCellFixture<threeD, threeD, Formulation::finite_strain>,
-                       NCellFixture<twoD, twoD, Formulation::small_strain>,
-                       NCellFixture<threeD, threeD, Formulation::small_strain>>;
+      boost::mpl::list<CellFixture<twoD, twoD, Formulation::finite_strain>,
+                       CellFixture<threeD, threeD, Formulation::finite_strain>,
+                       CellFixture<twoD, twoD, Formulation::small_strain>,
+                       CellFixture<threeD, threeD, Formulation::small_strain>>;
 
   BOOST_AUTO_TEST_CASE(manual_construction) {
     constexpr Dim_t dim{twoD};
@@ -87,7 +87,7 @@ namespace muSpectre {
     auto fft_ptr{std::make_unique<muFFT::FFTWEngine>(nb_grid_pts, dim * dim)};
     auto proj_ptr{std::make_unique<ProjectionFiniteStrainFast<dim>>(
         std::move(fft_ptr), lengths)};
-    NCell sys{std::move(proj_ptr)};
+    Cell sys{std::move(proj_ptr)};
 
     auto sys2{make_cell(nb_grid_pts, lengths, form)};
     auto sys2b{std::move(sys2)};
@@ -136,8 +136,8 @@ namespace muSpectre {
     }
 
     auto res_tup{fix::evaluate_stress_tangent()};
-    muGrid::T2NFieldMap<Real, Mapping::Const, dim> stress{std::get<0>(res_tup)};
-    muGrid::T4NFieldMap<Real, Mapping::Const, dim> tangent{
+    muGrid::T2FieldMap<Real, Mapping::Const, dim> stress{std::get<0>(res_tup)};
+    muGrid::T4FieldMap<Real, Mapping::Const, dim> tangent{
         std::get<1>(res_tup)};
 
     auto tup = muGrid::testGoodies::objective_hooke_explicit(
@@ -192,8 +192,8 @@ namespace muSpectre {
     }
 
     auto res_tup{fix::evaluate_stress_tangent()};
-    muGrid::T2NFieldMap<Real, Mapping::Const, dim> stress{std::get<0>(res_tup)};
-    muGrid::T4NFieldMap<Real, Mapping::Const, dim> tangent{
+    muGrid::T2FieldMap<Real, Mapping::Const, dim> stress{std::get<0>(res_tup)};
+    muGrid::T4FieldMap<Real, Mapping::Const, dim> tangent{
         std::get<1>(res_tup)};
 
     auto tup_hard{muGrid::testGoodies::objective_hooke_explicit(

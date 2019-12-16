@@ -41,7 +41,7 @@
 #include "materials/material_hyper_elasto_plastic1.hh"
 #include "materials/materials_toolbox.hh"
 
-#include "libmugrid/mapped_state_nfield.hh"
+#include "libmugrid/mapped_state_field.hh"
 
 #include <boost/mpl/list.hpp>
 
@@ -94,15 +94,15 @@ namespace muSpectre {
     using Strain_t = Eigen::Matrix<Real, mdim, mdim>;
 
     // create statefields
-    muGrid::LocalNFieldCollection coll{sdim, Fix::NbQuadPts()};
+    muGrid::LocalFieldCollection coll{sdim, Fix::NbQuadPts()};
     coll.add_pixel({0});
     coll.initialise();
 
-    muGrid::MappedT2StateNField<Real, Mapping::Mut, mdim> F_{
+    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim> F_{
         "previous gradient", coll};
-    muGrid::MappedT2StateNField<Real, Mapping::Mut, mdim> be_{
+    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim> be_{
         "previous elastic strain", coll};
-    muGrid::MappedScalarStateNField<Real, Mapping::Mut> eps_{"plastic flow",
+    muGrid::MappedScalarStateField<Real, Mapping::Mut> eps_{"plastic flow",
                                                              coll};
 
     auto & F_prev{F_.get_map()};
@@ -201,15 +201,15 @@ namespace muSpectre {
     using Stiffness_t = muGrid::T4Mat<Real, mdim>;
 
     // create statefields
-    muGrid::LocalNFieldCollection coll{sdim, Fix::NbQuadPts()};
+    muGrid::LocalFieldCollection coll{sdim, Fix::NbQuadPts()};
     coll.add_pixel({0});
     coll.initialise();
 
-    muGrid::MappedT2StateNField<Real, Mapping::Mut, mdim> F_{
+    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim> F_{
         "previous gradient", coll};
-    muGrid::MappedT2StateNField<Real, Mapping::Mut, mdim> be_{
+    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim> be_{
         "previous elastic strain", coll};
-    muGrid::MappedScalarStateNField<Real, Mapping::Mut> eps_{"plastic flow",
+    muGrid::MappedScalarStateField<Real, Mapping::Mut> eps_{"plastic flow",
                                                              coll};
 
     auto & F_prev{F_.get_map()};

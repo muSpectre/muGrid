@@ -35,8 +35,7 @@
 # =============================================================================
 
 set (cells_SRC
-  # ${CMAKE_CURRENT_SOURCE_DIR}/cell_base.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/ncell.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/cell.cc
   )
 if(${SPLIT_CELL})
   set (cells_SRC

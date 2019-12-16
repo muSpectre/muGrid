@@ -62,7 +62,7 @@ namespace Eigen {
 namespace muSpectre {
 
   /**
-   * lightweight resource handle wrapping a `muSpectre::NCell` or
+   * lightweight resource handle wrapping a `muSpectre::Cell` or
    * a subclass thereof into `Eigen::EigenBase`, so it can be
    * interpreted as a sparse matrix by Eigen solvers
    */

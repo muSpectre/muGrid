@@ -44,7 +44,7 @@
 #include "materials/materials_toolbox.hh"
 
 #include <libmugrid/eigen_tools.hh>
-#include <libmugrid/mapped_state_nfield.hh>
+#include <libmugrid/mapped_state_field.hh>
 
 #include <algorithm>
 
@@ -59,11 +59,11 @@ namespace muSpectre {
   template <Dim_t DimM>
   struct MaterialMuSpectre_traits<MaterialHyperElastoPlastic2<DimM>> {
     //! expected map type for strain fields
-    using StrainMap_t = muGrid::T2NFieldMap<Real, Mapping::Const, DimM>;
+    using StrainMap_t = muGrid::T2FieldMap<Real, Mapping::Const, DimM>;
     //! expected map type for stress fields
-    using StressMap_t = muGrid::T2NFieldMap<Real, Mapping::Mut, DimM>;
+    using StressMap_t = muGrid::T2FieldMap<Real, Mapping::Mut, DimM>;
     //! expected map type for tangent stiffness fields
-    using TangentMap_t = muGrid::T4NFieldMap<Real, Mapping::Mut, DimM>;
+    using TangentMap_t = muGrid::T4FieldMap<Real, Mapping::Mut, DimM>;
 
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::Gradient};
@@ -89,17 +89,17 @@ namespace muSpectre {
     using traits = MaterialMuSpectre_traits<MaterialHyperElastoPlastic2>;
 
     //! storage type for scalar material constant fields
-    using Field_t = muGrid::MappedScalarNField<Real, Mapping::Const>;
+    using Field_t = muGrid::MappedScalarField<Real, Mapping::Const>;
 
     //! Hooke's law implementation
     using Hooke =
         typename MatTB::Hooke<DimM, typename traits::StrainMap_t::reference,
                               typename traits::TangentMap_t::reference>;
 
-    using FlowField_t = muGrid::MappedScalarStateNField<Real, Mapping::Mut>;
+    using FlowField_t = muGrid::MappedScalarStateField<Real, Mapping::Mut>;
     using FlowField_ref = typename FlowField_t::Return_t;
 
-    using PrevStrain_t = muGrid::MappedT2StateNField<Real, Mapping::Mut, DimM>;
+    using PrevStrain_t = muGrid::MappedT2StateField<Real, Mapping::Mut, DimM>;
     using PrevStrain_ref = typename PrevStrain_t::Return_t;
 
     //! Default constructor
@@ -204,19 +204,19 @@ namespace muSpectre {
                    const Real & H);
 
     //! getter for internal variable field εₚ
-    muGrid::MappedScalarStateNField<Real, Mapping::Mut> &
+    muGrid::MappedScalarStateField<Real, Mapping::Mut> &
     get_plast_flow_field() {
       return this->plast_flow_field;
     }
 
     //! getter for previous gradient field Fᵗ
-    muGrid::MappedT2StateNField<Real, Mapping::Mut, DimM> &
+    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM> &
     get_F_prev_field() {
       return this->F_prev_field;
     }
 
     //! getterfor elastic left Cauchy-Green deformation tensor bₑᵗ
-    muGrid::MappedT2StateNField<Real, Mapping::Mut, DimM> &
+    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM> &
     get_be_prev_field() {
       return this->be_prev_field;
     }

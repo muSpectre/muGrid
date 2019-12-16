@@ -43,7 +43,7 @@
 #include "materials/material_muSpectre_base.hh"
 
 #include <libmugrid/T4_map_proxy.hh>
-#include <libmugrid/nfield_map_static.hh>
+#include <libmugrid/field_map_static.hh>
 
 #include <memory>
 
@@ -63,11 +63,11 @@ namespace muSpectre {
     //! global field collection
 
     //! expected map type for strain fields
-    using StrainMap_t = muGrid::T2NFieldMap<Real, Mapping::Const, DimM>;
+    using StrainMap_t = muGrid::T2FieldMap<Real, Mapping::Const, DimM>;
     //! expected map type for stress fields
-    using StressMap_t = muGrid::T2NFieldMap<Real, Mapping::Mut, DimM>;
+    using StressMap_t = muGrid::T2FieldMap<Real, Mapping::Mut, DimM>;
     //! expected map type for tangent stiffness fields
-    using TangentMap_t = muGrid::T4NFieldMap<Real, Mapping::Mut, DimM>;
+    using TangentMap_t = muGrid::T4FieldMap<Real, Mapping::Mut, DimM>;
 
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::GreenLagrange};

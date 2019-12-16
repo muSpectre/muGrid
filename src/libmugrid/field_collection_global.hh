@@ -3,11 +3,11 @@
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
- * @date   05 Nov 2017
+ * @date   11 Aug 2019
  *
- * @brief  FieldCollection base-class for global fields
+ * @brief  Global field collections
  *
- * Copyright © 2017 Till Junge
+ * Copyright © 2019 Till Junge
  *
  * µGrid is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
@@ -22,7 +22,7 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with µGrid; see the file COPYING. If not, write to the
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * * Boston, MA 02111-1307, USA.
+ * Boston, MA 02111-1307, USA.
  *
  * Additional permission under GNU GPL version 3 section 7
  *
@@ -36,40 +36,42 @@
 #ifndef SRC_LIBMUGRID_FIELD_COLLECTION_GLOBAL_HH_
 #define SRC_LIBMUGRID_FIELD_COLLECTION_GLOBAL_HH_
 
+#include "field_collection.hh"
 #include "ccoord_operations.hh"
-#include "field_collection_base.hh"
 
 namespace muGrid {
 
-  /**
-   * forward declaration
+  /** `muGrid::GlobalFieldCollection` derives from `muGrid::FieldCollection`
+   * and stores global fields that live throughout the whole computational
+   * domain, i.e. are defined for every pixel/voxel.
    */
-  template <Dim_t DimS>
-  class LocalFieldCollection;
-
-  /** `GlobalFieldCollection` derives from `FieldCollectionBase` and stores
-   * global fields that live throughout the whole computational domain, i.e.
-   * are defined for each pixel.
-   */
-  template <Dim_t DimS>
-  class GlobalFieldCollection
-      : public FieldCollectionBase<DimS, GlobalFieldCollection<DimS>> {
+  class GlobalFieldCollection : public FieldCollection {
    public:
-    //! for compile time check
-    constexpr static bool Global{true};
+    //! alias of base class
+    using Parent = FieldCollection;
+    //! pixel iterator
+    using DynamicPixels = CcoordOps::DynamicPixels;
 
-    using Parent =
-        FieldCollectionBase<DimS, GlobalFieldCollection<DimS>>;  //!< base class
-    //! helpful for functions that fill global fields from local fields
-    using LocalFieldCollection_t = LocalFieldCollection<DimS>;
-    //! helpful for functions that fill global fields from local fields
-    using GlobalFieldCollection_t = GlobalFieldCollection<DimS>;
-    using Ccoord = typename Parent::Ccoord;    //!< cell coordinates type
-    using Field_p = typename Parent::Field_p;  //!< spatial coordinates type
-    //! iterator over all pixels contained it the collection
-    using iterator = typename CcoordOps::Pixels<DimS>::iterator;
     //! Default constructor
-    GlobalFieldCollection();
+    GlobalFieldCollection() = delete;
+
+    /**
+     * Constructor
+     * @param spatial_dimension number of spatial dimensions, must be 1, 2, 3,
+     * or Unknown
+     * @param nb_quad_pts number of quadrature points per pixel/voxel
+     */
+    GlobalFieldCollection(Dim_t spatial_dimension, Dim_t nb_quad_pts);
+
+    /**
+     * Constructor with initialization
+     * @param spatial_dimension number of spatial dimensions, must be 1, 2, 3,
+     * or Unknown
+     * @param nb_quad_pts number of quadrature points per pixel/voxel
+     */
+    GlobalFieldCollection(Dim_t spatial_dimension, Dim_t nb_quad_pts,
+                           const DynCcoord_t & nb_grid_pts,
+                           const DynCcoord_t & locations = {});
 
     //! Copy constructor
     GlobalFieldCollection(const GlobalFieldCollection & other) = delete;
@@ -85,130 +87,73 @@ namespace muGrid {
     operator=(const GlobalFieldCollection & other) = delete;
 
     //! Move assignment operator
-    GlobalFieldCollection & operator=(GlobalFieldCollection && other) = default;
+    GlobalFieldCollection &
+    operator=(GlobalFieldCollection && other) = delete;
 
-    /** allocate memory, etc. At this point, the collection is
-        informed aboud the size and shape of the domain (through the
-        sizes parameter). The job of initialise is to make sure that
-        all fields are either of size 0, in which case they need to be
-        allocated, or are of the same size as the product of 'sizes'
-        (if standard strides apply) any field of a different size is
-        wrong.
+    //! Return the pixels class that allows to iterator over pixels
+    const DynamicPixels & get_pixels() const;
 
-        TODO: check whether it makes sense to put a runtime check here
-     **/
-    inline void initialise(Ccoord sizes, Ccoord locations);
+    //! Return index for a ccoord
+    template <size_t Dim>
+    Dim_t get_index(const Ccoord_t<Dim> & ccoord) const {
+      return this->get_pixels().get_index(ccoord);
+    }
 
-    //! return the number of grid points in each direction for this domain
-    inline const Ccoord & get_nb_grid_pts() const;
-    //! return subdomain locations
-    inline const Ccoord & get_locations() const;
+    //! return coordinates of the i-th pixel
+    DynCcoord_t get_ccoord(const Dim_t & index) const {
+      return CcoordOps::get_ccoord_from_strides(
+          this->pixels.get_nb_grid_pts(), this->pixels.get_locations(),
+          this->pixels.get_strides(), index);
+    }
 
-    //! returns the linear index corresponding to cell coordinates
-    template <class CcoordRef>
-    inline size_t get_index(CcoordRef && ccoord) const;
-    //! returns the cell coordinates corresponding to a linear index
-    inline Ccoord get_ccoord(size_t index) const;
+    /**
+     * freeze the problem size and allocate memory for all fields of the
+     * collection. Fields added later on will have their memory allocated
+     * upon construction.
+     */
+    void initialise(const DynCcoord_t & nb_grid_pts,
+                    const DynCcoord_t & locations = {});
 
-    inline iterator begin() const;  //!< returns iterator to first pixel
-    inline iterator end() const;    //!< returns iterator past the last pixel
+    /**
+     * freeze the problem size and allocate memory for all fields of the
+     * collection. Fields added later on will have their memory allocated
+     * upon construction.
+     */
+    template <size_t Dim>
+    void initialise(const Ccoord_t<Dim> & nb_grid_pts,
+                    const Ccoord_t<Dim> & locations = {}) {
+      this->initialise(DynCcoord_t{nb_grid_pts}, DynCcoord_t{locations});
+    }
 
-    //! return spatial dimension (template parameter)
-    static constexpr inline Dim_t spatial_dim() { return DimS; }
+    /**
+     * freeze the problem size and allocate memory for all fields of the
+     * collection. Fields added later on will have their memory allocated
+     * upon construction.
+     */
+    void initialise(const DynCcoord_t & nb_grid_pts,
+                    const DynCcoord_t & locations, const DynCcoord_t & strides);
 
-    //! return globalness at compile time
-    static constexpr inline bool is_global() { return Global; }
+    /**
+     * freeze the problem size and allocate memory for all fields of the
+     * collection. Fields added later on will have their memory allocated
+     * upon construction.
+     */
+    template <size_t Dim>
+    void initialise(const Ccoord_t<Dim> & nb_grid_pts,
+                    const Ccoord_t<Dim> & locations,
+                    const Ccoord_t<Dim> & strides) {
+      this->initialise(DynCcoord_t{nb_grid_pts}, DynCcoord_t{locations},
+                       DynCcoord_t{strides});
+    }
+
+    /**
+     * obtain a new field collection with the same domain and pixels
+     */
+    GlobalFieldCollection get_empty_clone() const;
 
    protected:
-    //! number of discretisation cells in each of the DimS spatial directions
-    Ccoord sizes{};
-    //! subdomain locations (i.e. coordinates of hind bottom left corner of this
-    //! subdomain)
-    Ccoord locations{};
-    CcoordOps::Pixels<DimS> pixels{};  //!< helper to iterate over the grid
+    DynamicPixels pixels{};  //!< helper to iterate over the grid
   };
-
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
-  GlobalFieldCollection<DimS>::GlobalFieldCollection() : Parent() {}
-
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
-  void GlobalFieldCollection<DimS>::initialise(Ccoord sizes, Ccoord locations) {
-    if (this->is_initialised) {
-      throw std::runtime_error("double initialisation");
-    }
-    this->pixels = CcoordOps::Pixels<DimS>(sizes, locations);
-    this->size_ = CcoordOps::get_size(sizes);
-    this->sizes = sizes;
-    this->locations = locations;
-
-    std::for_each(
-        std::begin(this->fields), std::end(this->fields), [this](auto && item) {
-          auto && field = *item.second;
-          const auto field_size = field.size();
-          if (field_size == 0) {
-            field.resize(this->size());
-          } else if (field_size != this->size()) {
-            std::stringstream err_stream;
-            err_stream << "Field '" << field.get_name() << "' contains "
-                       << field_size << " entries, but the field collection "
-                       << "has " << this->size() << " pixels";
-            throw FieldCollectionError(err_stream.str());
-          }
-        });
-    this->is_initialised = true;
-  }
-
-  //----------------------------------------------------------------------------//
-  template <Dim_t DimS>
-  const typename GlobalFieldCollection<DimS>::Ccoord &
-  GlobalFieldCollection<DimS>::get_nb_grid_pts() const {
-    return this->sizes;
-  }
-
-  //----------------------------------------------------------------------------//
-  //! return subdomain locations
-  template <Dim_t DimS>
-  const typename GlobalFieldCollection<DimS>::Ccoord &
-  GlobalFieldCollection<DimS>::get_locations() const {
-    return this->locations;
-  }
-
-  //----------------------------------------------------------------------------//
-  //! returns the cell coordinates corresponding to a linear index
-  template <Dim_t DimS>
-  typename GlobalFieldCollection<DimS>::Ccoord
-  GlobalFieldCollection<DimS>::get_ccoord(size_t index) const {
-    return CcoordOps::get_ccoord(this->get_nb_grid_pts(), this->get_locations(),
-                                 std::move(index));
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
-  typename GlobalFieldCollection<DimS>::iterator
-  GlobalFieldCollection<DimS>::begin() const {
-    return this->pixels.begin();
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
-  typename GlobalFieldCollection<DimS>::iterator
-  GlobalFieldCollection<DimS>::end() const {
-    return this->pixels.end();
-  }
-  //-------------------------------------------------------------------------//
-  //! returns the linear index corresponding to cell coordinates
-  template <Dim_t DimS>
-  template <class CcoordRef>
-  size_t GlobalFieldCollection<DimS>::get_index(CcoordRef && ccoord) const {
-    static_assert(
-        std::is_same<Ccoord, std::remove_const_t<
-                                 std::remove_reference_t<CcoordRef>>>::value,
-        "can only be called with values or references of Ccoord");
-    return CcoordOps::get_index(this->get_nb_grid_pts(), this->get_locations(),
-                                std::forward<CcoordRef>(ccoord));
-  }
 
 }  // namespace muGrid
 

@@ -40,7 +40,7 @@
 #define SRC_MATERIALS_MATERIAL_LINEAR_ELASTIC4_HH_
 
 #include "materials/material_linear_elastic1.hh"
-#include "libmugrid/mapped_nfield.hh"
+#include "libmugrid/mapped_field.hh"
 
 #include <Eigen/Dense>
 
@@ -55,11 +55,11 @@ namespace muSpectre {
   template <Dim_t DimM>
   struct MaterialMuSpectre_traits<MaterialLinearElastic4<DimM>> {
     //! expected map type for strain fields
-    using StrainMap_t = muGrid::T2NFieldMap<Real, Mapping::Const, DimM>;
+    using StrainMap_t = muGrid::T2FieldMap<Real, Mapping::Const, DimM>;
     //! expected map type for stress fields
-    using StressMap_t = muGrid::T2NFieldMap<Real, Mapping::Mut, DimM>;
+    using StressMap_t = muGrid::T2FieldMap<Real, Mapping::Mut, DimM>;
     //! expected map type for tangent stiffness fields
-    using TangentMap_t = muGrid::T4NFieldMap<Real, Mapping::Mut, DimM>;
+    using TangentMap_t = muGrid::T4FieldMap<Real, Mapping::Mut, DimM>;
 
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
@@ -91,7 +91,7 @@ namespace muSpectre {
     using traits = MaterialMuSpectre_traits<MaterialLinearElastic4>;
 
     //! storage type for Lamé constants
-    using Field_t = muGrid::MappedScalarNField<Real, Mapping::Const>;
+    using Field_t = muGrid::MappedScalarField<Real, Mapping::Const>;
 
     //! Hooke's law implementation
     using Hooke =

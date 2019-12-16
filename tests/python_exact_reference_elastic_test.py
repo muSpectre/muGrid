@@ -7,7 +7,7 @@
 
 @date   16 Dec 2019
 
-@brief  Tests exactness of each iterate with respect to python reference 
+@brief  Tests exactness of each iterate with respect to python reference
         implementation from GooseFFT for elasticity
 
 Copyright © 2019 Till Junge
@@ -40,10 +40,20 @@ from numpy.linalg import norm
 from python_test_imports import µ
 
 import scipy.sparse.linalg as sp
+import scipy
 import itertools
 
 np.set_printoptions(linewidth=180)
 comparator_nb_cols=9
+
+scipy_version = tuple((int(i) for i in scipy.__version__.split('.')))
+if scipy_version < (1, 2, 0):
+    def cg(*args, **kwargs):
+        if "atol" in kwargs.keys():
+            del kwargs["atol"]
+        return sp.cg(*args, **kwargs)
+else:
+    cg = sp.cg
 
 f = np.asfortranarray
 # ----------------------------------- GRID ------------------------------------
@@ -66,7 +76,7 @@ dot42  = lambda A4,B2: np.einsum('ijklpxy,lmpxy  ->ijkmpxy',A4,B2)
 dyad22 = lambda A2,B2: np.einsum('ijpxy  ,klpxy  ->ijklpxy',A2,B2)
 
 # identity tensor                                               [single tensor]
-i      = np.eye(ndim, order="F")
+i      = f(np.eye(ndim))
 # identity tensors                                            [grid of tensors]
 I      = f(np.einsum('ij,pxy'           ,                  i   ,np.ones([1, N,N])))
 I4     = f(np.einsum('ijkl,pxy->ijklpxy',np.einsum('il,jk',i,i),np.ones([1, N,N])))
@@ -249,22 +259,23 @@ class LinearElastic_Check(unittest.TestCase):
         self.comparator(K4.transpose(1,0,2,3,4,5,6), µK, "K")
 
 
+
         # iterate as long as the iterative update does not vanish
         while True:
             # solve linear system using CG
             g_counter = Counter()
-            dFm,_ = sp.cg(tol=cg_tol,
-                          A = sp.LinearOperator(shape=(F.size,F.size),
-                                                matvec=G_K_dF,dtype='float'),
-                          b = b,
-                          callback=g_counter, atol=0
+            dFm,_ = cg(tol=cg_tol,
+                       A = sp.LinearOperator(shape=(F.size,F.size),
+                                             matvec=G_K_dF,dtype='float'),
+                       b = b,
+                       callback=g_counter, atol=0
             )
             µ_counter = Counter()
-            µdFm,_ = sp.cg(tol=cg_tol,
-                           A =  sp.LinearOperator(shape=(F.size,F.size),
-                                                  matvec=µG_K_dF,dtype='float'),
-                           b = µb,
-                           callback=µ_counter, atol=0)
+            µdFm,_ = cg(tol=cg_tol,
+                        A =  sp.LinearOperator(shape=(F.size,F.size),
+                                               matvec=µG_K_dF,dtype='float'),
+                        b = µb,
+                        callback=µ_counter, atol=0)
 
             err = g_counter.get()-µ_counter.get()
 

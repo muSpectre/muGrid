@@ -71,7 +71,7 @@ namespace muSpectre {
      * Constructor takes a Cell, tolerance, max number of iterations
      * and verbosity flag as input
      */
-    SolverCG(NCell & cell, Real tol, Uint maxiter, bool verbose = false);
+    SolverCG(Cell & cell, Real tol, Uint maxiter, bool verbose = false);
 
     //! Move constructor
     SolverCG(SolverCG && other) = default;

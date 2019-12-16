@@ -40,9 +40,9 @@
 #include "material_muSpectre_base.hh"
 #include "material_linear_anisotropic.hh"
 #include "common/muSpectre_common.hh"
-#include "cell/ncell.hh"
+#include "cell/cell.hh"
 
-#include "libmugrid/nfield_map_static.hh"
+#include "libmugrid/field_map_static.hh"
 
 namespace muSpectre {
 
@@ -53,11 +53,11 @@ namespace muSpectre {
   template <Dim_t DimM>
   struct MaterialMuSpectre_traits<MaterialLinearOrthotropic<DimM>> {
     //! expected map type for strain fields
-    using StrainMap_t = muGrid::T2NFieldMap<Real, Mapping::Const, DimM>;
+    using StrainMap_t = muGrid::T2FieldMap<Real, Mapping::Const, DimM>;
     //! expected map type for stress fields
-    using StressMap_t = muGrid::T2NFieldMap<Real, Mapping::Mut, DimM>;
+    using StressMap_t = muGrid::T2FieldMap<Real, Mapping::Mut, DimM>;
     //! expected map type for tangent stiffness fields
-    using TangentMap_t = muGrid::T4NFieldMap<Real, Mapping::Mut, DimM>;
+    using TangentMap_t = muGrid::T4FieldMap<Real, Mapping::Mut, DimM>;
 
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
@@ -104,7 +104,7 @@ namespace muSpectre {
      * for MaterialLinearAnisotropic
      */
     static MaterialLinearOrthotropic<DimM> &
-    make(NCell & cell, const std::string & name,
+    make(Cell & cell, const std::string & name,
          const Dim_t & spatial_dimension, const Dim_t & nb_quad_pts,
          const std::vector<Real> & input);
 

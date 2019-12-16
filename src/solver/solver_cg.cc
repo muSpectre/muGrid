@@ -44,7 +44,7 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  SolverCG::SolverCG(NCell & cell, Real tol, Uint maxiter, bool verbose)
+  SolverCG::SolverCG(Cell & cell, Real tol, Uint maxiter, bool verbose)
       : Parent(cell, tol, maxiter, verbose), r_k(cell.get_nb_dof()),
         p_k(cell.get_nb_dof()), Ap_k(cell.get_nb_dof()),
         x_k(cell.get_nb_dof()) {}

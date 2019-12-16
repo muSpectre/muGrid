@@ -1,13 +1,13 @@
 /**
  * @file   field.hh
  *
- * @author Till Junge <till.junge@epfl.ch>
+ * @author Till Junge <till.junge@altermail.ch>
  *
- * @date   07 Sep 2017
+ * @date   10 Aug 2019
  *
- * @brief  header-only implementation of a field for field collections
+ * @brief  Base class for fields
  *
- * Copyright © 2017 Till Junge
+ * Copyright © 2019 Till Junge
  *
  * µGrid is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
@@ -22,7 +22,7 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with µGrid; see the file COPYING. If not, write to the
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * * Boston, MA 02111-1307, USA.
+ * Boston, MA 02111-1307, USA.
  *
  * Additional permission under GNU GPL version 3 section 7
  *
@@ -36,634 +36,165 @@
 #ifndef SRC_LIBMUGRID_FIELD_HH_
 #define SRC_LIBMUGRID_FIELD_HH_
 
-#include "T4_map_proxy.hh"
-#include "field_typed.hh"
+#include "grid_common.hh"
 
-#include <Eigen/Dense>
-
-#include <algorithm>
-#include <cmath>
-#include <sstream>
 #include <string>
-#include <type_traits>
 #include <typeinfo>
-#include <utility>
-#include <vector>
 
 namespace muGrid {
 
-  namespace internal {
-
-    /* ---------------------------------------------------------------------- */
-    //! declaraton for friending
-    template <class FieldCollection, typename T, Dim_t NbComponents,
-              bool isConst>
-    class FieldMap;
-
-    /* ---------------------------------------------------------------------- */
-    /**
-     * A `TypedSizedFieldBase` is the base class for fields that contain a
-     * statically known number of scalars of a statically known type per pixel
-     * in a `FieldCollection`. The actual data for all pixels is
-     * stored in `TypedSizeFieldBase::values`.
-     * `TypedSizedFieldBase` is the base class for `MatrixField` and
-     * `TensorField`.
-     */
-    template <class FieldCollection, typename T, Dim_t NbComponents>
-    class TypedSizedFieldBase : public TypedField<FieldCollection, T> {
-      friend class FieldMap<FieldCollection, T, NbComponents, true>;
-      friend class FieldMap<FieldCollection, T, NbComponents, false>;
-
-     public:
-      //! for compatibility checks
-      constexpr static auto nb_components{NbComponents};
-      using Parent = TypedField<FieldCollection, T>;  //!< base class
-      using Scalar = T;                               //!< for type checking
-      using Base = typename Parent::Base;             //!< root base class
-
-      //! storage container
-      using Storage_t = typename Parent::Storage_t;
-
-      //! Plain type that is being mapped (Eigen lingo)
-      using EigenRep_t = Eigen::Array<T, NbComponents, Eigen::Dynamic>;
-      //! maps returned when iterating over field
-      using EigenMap_t = Eigen::Map<EigenRep_t>;
-
-      //! maps returned when iterating over field
-      using ConstEigenMap_t = Eigen::Map<const EigenRep_t>;
-
-      //! constructor
-      TypedSizedFieldBase(std::string unique_name,
-                          FieldCollection & collection);
-      virtual ~TypedSizedFieldBase() = default;
-
-      //! add a new value at the end of the field
-      template <class Derived>
-      inline void push_back(const Eigen::DenseBase<Derived> & value);
-
-      //! add a new scalar value at the end of the field
-      template <bool scalar_store = NbComponents == 1>
-      inline std::enable_if_t<scalar_store> push_back(const T & value);
-
-      /**
-       * returns an upcasted reference to a field, or throws an
-       * exception if the field is incompatible
-       */
-      static TypedSizedFieldBase & check_ref(Base & other);
-      /**
-       * returns an upcasted reference to a field, or throws an
-       * exception if the field is incompatible
-       */
-      static const TypedSizedFieldBase & check_ref(const Base & other);
-
-      //! return a map representing the entire field as a single `Eigen::Array`
-      inline EigenMap_t eigen();
-      //! return a map representing the entire field as a single `Eigen::Array`
-      inline ConstEigenMap_t eigen() const;
-      /**
-       * return a map representing the entire field as a single
-       * dynamically sized `Eigen::Array` (for python bindings)
-       */
-      inline typename Parent::EigenMap_t dyn_eigen() { return Parent::eigen(); }
-
-      //! inner product between compatible fields
-      template <typename T2>
-      inline Real inner_product(
-          const TypedSizedFieldBase<FieldCollection, T2, NbComponents> & other)
-          const;
-
-     protected:
-      //! returns a raw pointer to the entry, for `Eigen::Map`
-      inline T * get_ptr_to_entry(const size_t && index);
-
-      //! returns a raw pointer to the entry, for `Eigen::Map`
-      inline const T * get_ptr_to_entry(const size_t && index) const;
-    };
-
-  }  // namespace internal
-
-  /* ---------------------------------------------------------------------- */
   /**
-   * The `TensorField` is a subclass of
-   * `muGrid::internal::TypedSizedFieldBase` that represents tensorial
-   * fields, i.e. arbitrary-dimensional arrays with identical number of
-   * rows/columns (that typically correspond to the spatial cartesian
-   * dimensions). It is defined by the stored scalar type @a T, the tensorial
-   * order @a order (often also called degree or rank) and the number of spatial
-   * dimensions @a dim.
+   * base class for field-related exceptions
    */
-  template <class FieldCollection, typename T, Dim_t order, Dim_t dim>
-  class TensorField : public internal::TypedSizedFieldBase<FieldCollection, T,
-                                                           ipow(dim, order)> {
+  class FieldError : public std::runtime_error {
    public:
-    //! base class
-    using Parent =
-        internal::TypedSizedFieldBase<FieldCollection, T, ipow(dim, order)>;
-    using Base = typename Parent::Base;  //!< root base class
-    //! polymorphic base class
-    using Field_p = typename FieldCollection::Field_p;
-    using Scalar = typename Parent::Scalar;  //!< for type checking
-    //! Copy constructor
-    TensorField(const TensorField & other) = delete;
-
-    //! Move constructor
-    TensorField(TensorField && other) = delete;
-
-    //! Destructor
-    virtual ~TensorField() = default;
-
-    //! Copy assignment operator
-    TensorField & operator=(const TensorField & other) = delete;
-
-    //! Move assignment operator
-    TensorField & operator=(TensorField && other) = delete;
-
-    //! return the order of the stored tensor
-    inline Dim_t get_order() const;
-    //! return the dimension of the stored tensor
-    inline Dim_t get_dim() const;
-
-    //! factory function
-    template <class FieldType, class CollectionType, typename... Args>
-    friend FieldType & make_field(std::string unique_name,
-                                  CollectionType & collection, Args &&... args);
-
-    //! return a reference or throw an exception if `other` is incompatible
-    static TensorField & check_ref(Base & other) {
-      return static_cast<TensorField &>(Parent::check_ref(other));
-    }
-    //! return a reference or throw an exception if `other` is incompatible
-    static const TensorField & check_ref(const Base & other) {
-      return static_cast<const TensorField &>(Parent::check_ref(other));
-    }
-
-    /**
-     * Convenience functions to return a map onto this field. A map allows
-     * iteration over all pixels. The map's iterator returns an object that
-     * represents the underlying mathematical structure of the field and
-     * implements common linear algebra operations on it.
-     * Specifically, this function returns
-     * - A `MatrixFieldMap` with @a dim rows and one column if the tensorial
-     * order @a order is unity.
-     * - A `MatrixFieldMap` with @a dim rows and @a dim columns if the tensorial
-     * order @a order is 2.
-     * - A `T4MatrixFieldMap` if the tensorial order is 4.
-     */
-    inline decltype(auto) get_map();
-    /**
-     * Convenience functions to return a map onto this field. A map allows
-     * iteration over all pixels. The map's iterator returns an object that
-     * represents the underlying mathematical structure of the field and
-     * implements common linear algebra operations on it.
-     * Specifically, this function returns
-     * - A `MatrixFieldMap` with @a dim rows and one column if the tensorial
-     * order @a order is unity.
-     * - A `MatrixFieldMap` with @a dim rows and @a dim columns if the tensorial
-     * order @a order is 2.
-     * - A `T4MatrixFieldMap` if the tensorial order is 4.
-     */
-    inline decltype(auto) get_const_map();
-    /**
-     * Convenience functions to return a map onto this field. A map allows
-     * iteration over all pixels. The map's iterator returns an object that
-     * represents the underlying mathematical structure of the field and
-     * implements common linear algebra operations on it.
-     * Specifically, this function returns
-     * - A `MatrixFieldMap` with @a dim rows and one column if the tensorial
-     * order @a order is unity.
-     * - A `MatrixFieldMap` with @a dim rows and @a dim columns if the tensorial
-     * order @a order is 2.
-     * - A `T4MatrixFieldMap` if the tensorial order is 4.
-     */
-    inline decltype(auto) get_map() const;
-
-    /**
-     * creates a `TensorField` same size and type as this, but all
-     * entries are zero. Convenience function
-     */
-    inline TensorField & get_zeros_like(std::string unique_name) const;
-
-    /**
-     * returns the real part of a complex TensorField
-     **/
-    // inline decltype(auto) & real() { return this->}
-
-   protected:
-    //! constructor protected!
-    TensorField(std::string unique_name, FieldCollection & collection);
+    //! constructor
+    explicit FieldError(const std::string & what) : std::runtime_error(what) {}
+    //! constructor
+    explicit FieldError(const char * what) : std::runtime_error(what) {}
   };
 
-  /* ---------------------------------------------------------------------- */
+  //! forward-declaration
+  class FieldCollection;
+
+  //! forward-declaration
+  class StateField;
+
   /**
-   * The `MatrixField` is subclass of `muGrid::internal::TypedSizedFieldBase`
-   * that represents matrix fields, i.e. a two dimensional arrays, defined by
-   * the stored scalar type @a T and the number of rows @a NbRow and columns
-   * @a NbCol of the matrix.
+   * Abstract base class for all fields. A field provides storage discretising a
+   * mathematical (scalar, vectorial, tensorial) (real-valued,
+   * integer-valued, complex-valued) field on a fixed number of quadrature
+   * points per pixel/voxel of a regular grid.
+   * Fields defined on the same domains are grouped within
+   * `muGrid::FieldCollection`s.
    */
-  template <class FieldCollection, typename T, Dim_t NbRow, Dim_t NbCol = NbRow>
-  class MatrixField : public internal::TypedSizedFieldBase<FieldCollection, T,
-                                                           NbRow * NbCol> {
+  class Field {
+   protected:
+    /**
+     * `Field`s are supposed to only exist in the form of `std::unique_ptr`s
+     * held by a FieldCollection. The `Field` constructor is protected to
+     * ensure this.
+     * @param unique_name unique field name (unique within a collection)
+     * @param nb_components number of components to store per quadrature point
+     * @param collection reference to the holding field collection.
+     */
+    Field(const std::string & unique_name, FieldCollection & collection,
+           Dim_t nb_components);
+
    public:
-    //! base class
-    using Parent =
-        internal::TypedSizedFieldBase<FieldCollection, T, NbRow * NbCol>;
-    using Base = typename Parent::Base;  //!< root base class
-    //! polymorphic base field ptr to store
-    using Field_p = std::unique_ptr<internal::FieldBase<FieldCollection>>;
+    //! Default constructor
+    Field() = delete;
+
     //! Copy constructor
-    MatrixField(const MatrixField & other) = delete;
+    Field(const Field & other) = delete;
 
     //! Move constructor
-    MatrixField(MatrixField && other) = delete;
+    Field(Field && other) = default;
 
     //! Destructor
-    virtual ~MatrixField() = default;
+    virtual ~Field() = default;
 
     //! Copy assignment operator
-    MatrixField & operator=(const MatrixField & other) = delete;
+    Field & operator=(const Field & other) = delete;
 
     //! Move assignment operator
-    MatrixField & operator=(MatrixField && other) = delete;
+    Field & operator=(Field && other) = delete;
 
-    //! returns the number of rows
-    inline Dim_t get_nb_row() const;
-    //! returns the number of columns
-    inline Dim_t get_nb_col() const;
+    //! return the field's unique name
+    const std::string & get_name() const;
 
-    //! factory function
-    template <class FieldType, class CollectionType, typename... Args>
-    friend FieldType & make_field(std::string unique_name,
-                                  CollectionType & collection, Args &&... args);
+    //! return a const reference to the field's collection
+    FieldCollection & get_collection() const;
 
-    //! returns a `MatrixField` reference if `other` is a compatible field
-    static MatrixField & check_ref(Base & other) {
-      return static_cast<MatrixField &>(Parent::check_ref(other));
-    }
-    //! returns a `MatrixField` reference if `other` is a compatible field
-    static const MatrixField & check_ref(const Base & other) {
-      return static_cast<const MatrixField &>(Parent::check_ref(other));
-    }
+    //! return the number of components stored per quadrature point
+    const Dim_t & get_nb_components() const;
 
     /**
-     * Convenience functions to return a map onto this field. A map allows
-     * iteration over all pixels. The map's iterator returns an object that
-     * represents the underlying mathematical structure of the field and
-     * implements common linear algebra operations on it.
-     * Specifically, this function returns
-     * - A `ScalarFieldMap` if @a NbRows and @a NbCols are unity.
-     * - A `MatrixFieldMap` with @a NbRows rows and @a NbCols columns
-     * otherwise.
+     * evaluate and return the overall shape of the field (for passing the
+     * field to generic multidimensional array objects such as numpy.ndarray)
      */
-    inline decltype(auto) get_map();
-    /**
-     * Convenience functions to return a map onto this field. A map allows
-     * iteration over all pixels. The map's iterator returns an object that
-     * represents the underlying mathematical structure of the field and
-     * implements common linear algebra operations on it.
-     * Specifically, this function returns
-     * - A `ScalarFieldMap` if @a NbRows and @a NbCols are unity.
-     * - A `MatrixFieldMap` with @a NbRows rows and @a NbCols columns
-     * otherwise.
-     */
-    inline decltype(auto) get_const_map();
-    /**
-     * Convenience functions to return a map onto this field. A map allows
-     * iteration over all pixels. The map's iterator returns an object that
-     * represents the underlying mathematical structure of the field and
-     * implements common linear algebra operations on it.
-     * Specifically, this function returns
-     * - A `ScalarFieldMap` if @a NbRows and @a NbCols are unity.
-     * - A `MatrixFieldMap` with @a NbRows rows and @a NbCols columns
-     * otherwise.
-     */
-    inline decltype(auto) get_map() const;
+    std::vector<Dim_t> get_shape(Iteration iter_type) const;
 
     /**
-     * creates a `MatrixField` same size and type as this, but all
-     * entries are zero. Convenience function
+     * evaluate and return the overall shape of the pixels portion of the field
+     * (for passing the field to generic multidimensional array objects such as
+     * numpy.ndarray)
      */
-    inline MatrixField & get_zeros_like(std::string unique_name) const;
+    std::vector<Dim_t> get_pixels_shape() const;
+
+    /**
+     * evaluate and return the shape of the data contained in a single pixel or
+     * quadrature point (for passing the field to generic multidimensional
+     * array objects such as numpy.ndarray)
+     */
+    virtual std::vector<Dim_t> get_components_shape(Iteration iter_type) const;
+
+    /**
+     * evaluate and return the number of components in an iterate when iterating
+     * over this field
+     */
+    Dim_t get_stride(Iteration iter_type) const;
+
+    /**
+     * return the type information of the stored scalar (for compatibility
+     * checking)
+     */
+    virtual const std::type_info & get_stored_typeid() const = 0;
+
+    //! number of entries in the field (= nb_pixel × nb_quad)
+    size_t size() const;
+
+    //! size of the internal buffer including the pad region (in scalars)
+    virtual size_t buffer_size() const = 0;
+
+    /**
+     * add a pad region to the end of the field buffer; required for using this
+     * as e.g. an FFT workspace
+     */
+    virtual void set_pad_size(size_t pad_size_) = 0;
+
+    //! pad region size
+    const size_t & get_pad_size() const;
+
+    /**
+     * initialise field to zero (do more complicated initialisations through
+     * fully typed maps)
+     */
+    virtual void set_zero() = 0;
+
+    /**
+     * checks whether this field is registered in a global FieldCollection
+     */
+    bool is_global() const;
 
    protected:
-    //! constructor protected!
-    MatrixField(std::string unique_name, FieldCollection & collection);
+    //! gives field collections the ability to resize() fields
+    friend FieldCollection;
+
+    /**
+     * maintains a tally of the current size, as it cannot be reliably
+     * determined from either `values` or `alt_values` alone.
+     */
+    size_t current_size{};
+
+    //! resizes the field to the given size
+    virtual void resize(size_t size) = 0;
+
+    const std::string name;  //!< the field's unique name
+
+    //! reference to the collection this field belongs to
+    FieldCollection & collection;
+
+    /**
+     * number of components stored per quadrature point (e.g., 3 for a
+     * three-dimensional vector, or 9 for a three-dimensional second-rank
+     * tensor)
+     */
+    const Dim_t nb_components;
+
+    //! size of padding region at end of buffer
+    size_t pad_size{};
   };
-
-  /* ---------------------------------------------------------------------- */
-  //! convenience alias
-  template <class FieldCollection, typename T>
-  using ScalarField = MatrixField<FieldCollection, T, 1, 1>;
-  /* ---------------------------------------------------------------------- */
-  // Implementations
-  /* ---------------------------------------------------------------------- */
-  namespace internal {
-
-    /* ---------------------------------------------------------------------- */
-    template <class FieldCollection, typename T, Dim_t NbComponents>
-    TypedSizedFieldBase<FieldCollection, T, NbComponents>::TypedSizedFieldBase(
-        std::string unique_name, FieldCollection & collection)
-        : Parent(unique_name, collection, NbComponents) {
-      static_assert(
-          (std::is_arithmetic<T>::value || std::is_same<T, Complex>::value),
-          "Use TypedSizedFieldBase for integer, real or complex scalars for T");
-      static_assert(NbComponents > 0,
-                    "Only fields with more than 0 components");
-    }
-
-    /* ---------------------------------------------------------------------- */
-    template <class FieldCollection, typename T, Dim_t NbComponents>
-    TypedSizedFieldBase<FieldCollection, T, NbComponents> &
-    TypedSizedFieldBase<FieldCollection, T, NbComponents>::check_ref(
-        Base & other) {
-      if (typeid(T).hash_code() != other.get_stored_typeid().hash_code()) {
-        std::stringstream err_str{};
-        err_str << "Cannot create a reference of type '" << typeid(T).name()
-                << "' for field '" << other.get_name() << "' of type '"
-                << other.get_stored_typeid().name() << "'";
-        throw std::runtime_error(err_str.str());
-      }
-      // check size compatibility
-      if (NbComponents != other.get_nb_components()) {
-        std::stringstream err_str{};
-        err_str << "Cannot create a reference to a field with " << NbComponents
-                << " components "
-                << "for field '" << other.get_name() << "' with "
-                << other.get_nb_components() << " components";
-        throw std::runtime_error{err_str.str()};
-      }
-      return static_cast<TypedSizedFieldBase &>(other);
-    }
-
-    /* ---------------------------------------------------------------------- */
-    template <class FieldCollection, typename T, Dim_t NbComponents>
-    const TypedSizedFieldBase<FieldCollection, T, NbComponents> &
-    TypedSizedFieldBase<FieldCollection, T, NbComponents>::check_ref(
-        const Base & other) {
-      if (typeid(T).hash_code() != other.get_stored_typeid().hash_code()) {
-        std::stringstream err_str{};
-        err_str << "Cannot create a reference of type '" << typeid(T).name()
-                << "' for field '" << other.get_name() << "' of type '"
-                << other.get_stored_typeid().name() << "'";
-        throw std::runtime_error(err_str.str());
-      }
-      // check size compatibility
-      if (NbComponents != other.get_nb_components()) {
-        std::stringstream err_str{};
-        err_str << "Cannot create a reference toy a field with " << NbComponents
-                << " components "
-                << "for field '" << other.get_name() << "' with "
-                << other.get_nb_components() << " components";
-        throw std::runtime_error{err_str.str()};
-      }
-      return static_cast<const TypedSizedFieldBase &>(other);
-    }
-
-    /* ---------------------------------------------------------------------- */
-    template <class FieldCollection, typename T, Dim_t NbComponents>
-    auto TypedSizedFieldBase<FieldCollection, T, NbComponents>::eigen()
-        -> EigenMap_t {
-      return EigenMap_t(this->data(), NbComponents, this->size());
-    }
-
-    /* ---------------------------------------------------------------------- */
-    template <class FieldCollection, typename T, Dim_t NbComponents>
-    auto TypedSizedFieldBase<FieldCollection, T, NbComponents>::eigen() const
-        -> ConstEigenMap_t {
-      return ConstEigenMap_t(this->data(), NbComponents, this->size());
-    }
-
-    /* ---------------------------------------------------------------------- */
-    template <class FieldCollection, typename T, Dim_t NbComponents>
-    template <typename otherT>
-    Real TypedSizedFieldBase<FieldCollection, T, NbComponents>::inner_product(
-        const TypedSizedFieldBase<FieldCollection, otherT, NbComponents> &
-            other) const {
-      return (this->eigen() * other.eigen()).sum();
-    }
-
-    /* ---------------------------------------------------------------------- */
-    template <class FieldCollection, typename T, Dim_t NbComponents>
-    T * TypedSizedFieldBase<FieldCollection, T, NbComponents>::get_ptr_to_entry(
-        const size_t && index) {
-      return this->data_ptr + NbComponents * std::move(index);
-    }
-
-    /* ---------------------------------------------------------------------- */
-    template <class FieldCollection, typename T, Dim_t NbComponents>
-    const T *
-    TypedSizedFieldBase<FieldCollection, T, NbComponents>::get_ptr_to_entry(
-        const size_t && index) const {
-      return this->data_ptr + NbComponents * std::move(index);
-    }
-
-    /* ---------------------------------------------------------------------- */
-    template <class FieldCollection, typename T, Dim_t NbComponents>
-    template <class Derived>
-    void TypedSizedFieldBase<FieldCollection, T, NbComponents>::push_back(
-        const Eigen::DenseBase<Derived> & value) {
-      static_assert(Derived::SizeAtCompileTime == NbComponents,
-                    "You provided an array with the wrong number of entries.");
-      static_assert((Derived::RowsAtCompileTime == 1) or
-                        (Derived::ColsAtCompileTime == 1),
-                    "You have not provided a column or row vector.");
-      static_assert(not FieldCollection::Global,
-                    "You can only push_back data into local field "
-                    "collections.");
-      for (Dim_t i = 0; i < NbComponents; ++i) {
-        this->values.push_back(value(i));
-      }
-      ++this->current_size;
-      this->data_ptr = &this->values.front();
-    }
-
-    /* ---------------------------------------------------------------------- */
-    template <class FieldCollection, typename T, Dim_t NbComponents>
-    template <bool scalar_store>
-    std::enable_if_t<scalar_store>
-    TypedSizedFieldBase<FieldCollection, T, NbComponents>::push_back(
-        const T & value) {
-      static_assert(scalar_store, "SFINAE");
-      this->values.push_back(value);
-      ++this->current_size;
-      this->data_ptr = &this->values.front();
-    }
-
-  }  // namespace internal
-
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T, Dim_t order, Dim_t dim>
-  TensorField<FieldCollection, T, order, dim>::TensorField(
-      std::string unique_name, FieldCollection & collection)
-      : Parent(unique_name, collection) {}
-
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T, Dim_t order, Dim_t dim>
-  Dim_t TensorField<FieldCollection, T, order, dim>::get_order() const {
-    return order;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T, Dim_t order, Dim_t dim>
-  Dim_t TensorField<FieldCollection, T, order, dim>::get_dim() const {
-    return dim;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T, Dim_t NbRow, Dim_t NbCol>
-  MatrixField<FieldCollection, T, NbRow, NbCol>::MatrixField(
-      std::string unique_name, FieldCollection & collection)
-      : Parent(unique_name, collection) {}
-
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T, Dim_t NbRow, Dim_t NbCol>
-  Dim_t MatrixField<FieldCollection, T, NbRow, NbCol>::get_nb_col() const {
-    return NbCol;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T, Dim_t NbRow, Dim_t NbCol>
-  Dim_t MatrixField<FieldCollection, T, NbRow, NbCol>::get_nb_row() const {
-    return NbRow;
-  }
-
-}  // namespace muGrid
-
-#include "field_map.hh"
-
-namespace muGrid {
-
-  namespace internal {
-
-    /* ---------------------------------------------------------------------- */
-    /**
-     * defines the default mapped type obtained when calling
-     * `muGrid::TensorField::get_map()`
-     */
-    template <class FieldCollection, typename T, size_t order, Dim_t dim,
-              bool ConstMap>
-    struct tensor_map_type {};
-
-    /// specialisation for vectors
-    template <class FieldCollection, typename T, Dim_t dim, bool ConstMap>
-    struct tensor_map_type<FieldCollection, T, firstOrder, dim, ConstMap> {
-      //! use this type
-      using type = MatrixFieldMap<FieldCollection, T, dim, 1, ConstMap>;
-    };
-
-    /// specialisation to second-order tensors (matrices)
-    template <class FieldCollection, typename T, Dim_t dim, bool ConstMap>
-    struct tensor_map_type<FieldCollection, T, secondOrder, dim, ConstMap> {
-      //! use this type
-      using type = MatrixFieldMap<FieldCollection, T, dim, dim, ConstMap>;
-    };
-
-    /// specialisation to fourth-order tensors
-    template <class FieldCollection, typename T, Dim_t dim, bool ConstMap>
-    struct tensor_map_type<FieldCollection, T, fourthOrder, dim, ConstMap> {
-      //! use this type
-      using type = muGrid::T4MatrixFieldMap<FieldCollection, T, dim, ConstMap>;
-    };
-
-    /* ---------------------------------------------------------------------- */
-    /**
-     * defines the default mapped type obtained when calling
-     * `muGrid::MatrixField::get_map()`
-     */
-    template <class FieldCollection, typename T, Dim_t NbRow, Dim_t NbCol,
-              bool ConstMap>
-    struct matrix_map_type {
-      //! mapping type
-      using type = MatrixFieldMap<FieldCollection, T, NbRow, NbCol, ConstMap>;
-    };
-
-    //! specialisation to scalar fields
-    template <class FieldCollection, typename T, bool ConstMap>
-    struct matrix_map_type<FieldCollection, T, oneD, oneD, ConstMap> {
-      //! mapping type
-      using type = ScalarFieldMap<FieldCollection, T, ConstMap>;
-    };
-
-  }  // namespace internal
-
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T, Dim_t order, Dim_t dim>
-  auto TensorField<FieldCollection, T, order, dim>::get_map()
-      -> decltype(auto) {
-    constexpr bool map_constness{false};
-    using RawMap_t =
-        typename internal::tensor_map_type<FieldCollection, T, order, dim,
-                                           map_constness>::type;
-    return RawMap_t(*this);
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T, Dim_t order, Dim_t dim>
-  auto TensorField<FieldCollection, T, order, dim>::get_const_map()
-      -> decltype(auto) {
-    constexpr bool map_constness{true};
-    using RawMap_t =
-        typename internal::tensor_map_type<FieldCollection, T, order, dim,
-                                           map_constness>::type;
-    return RawMap_t(*this);
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T, Dim_t order, Dim_t dim>
-  auto TensorField<FieldCollection, T, order, dim>::get_map() const
-      -> decltype(auto) {
-    constexpr bool map_constness{true};
-    using RawMap_t =
-        typename internal::tensor_map_type<FieldCollection, T, order, dim,
-                                           map_constness>::type;
-    return RawMap_t(*this);
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T, Dim_t order, Dim_t dim>
-  auto TensorField<FieldCollection, T, order, dim>::get_zeros_like(
-      std::string unique_name) const -> TensorField & {
-    return make_field<TensorField>(unique_name, this->collection);
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T, Dim_t NbRow, Dim_t NbCol>
-  auto MatrixField<FieldCollection, T, NbRow, NbCol>::get_map()
-      -> decltype(auto) {
-    constexpr bool map_constness{false};
-    using RawMap_t =
-        typename internal::matrix_map_type<FieldCollection, T, NbRow, NbCol,
-                                           map_constness>::type;
-    return RawMap_t(*this);
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T, Dim_t NbRow, Dim_t NbCol>
-  auto MatrixField<FieldCollection, T, NbRow, NbCol>::get_const_map()
-      -> decltype(auto) {
-    constexpr bool map_constness{true};
-    using RawMap_t =
-        typename internal::matrix_map_type<FieldCollection, T, NbRow, NbCol,
-                                           map_constness>::type;
-    return RawMap_t(*this);
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T, Dim_t NbRow, Dim_t NbCol>
-  auto MatrixField<FieldCollection, T, NbRow, NbCol>::get_map() const
-      -> decltype(auto) {
-    constexpr bool map_constness{true};
-    using RawMap_t =
-        typename internal::matrix_map_type<FieldCollection, T, NbRow, NbCol,
-                                           map_constness>::type;
-    return RawMap_t(*this);
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T, Dim_t order, Dim_t dim>
-  auto MatrixField<FieldCollection, T, order, dim>::get_zeros_like(
-      std::string unique_name) const -> MatrixField & {
-    return make_field<MatrixField>(unique_name, this->collection);
-  }
 
 }  // namespace muGrid
 

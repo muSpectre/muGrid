@@ -3,10 +3,9 @@
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
- * @date   05 Sep 2019
+ * @date   13 Sep 2019
  *
- * @brief  definition of the cell class, the fundamental representation of a
- *         homogenisation problem in µSpectre
+ * @brief  Class for the representation of a homogenisation problem in µSpectre
  *
  * Copyright © 2019 Till Junge
  *
@@ -40,8 +39,10 @@
 #include "common/muSpectre_common.hh"
 #include "materials/material_base.hh"
 #include "projection/projection_base.hh"
-#include "cell/cell_traits.hh"
 
+#include <libmugrid/ccoord_operations.hh>
+
+#include <memory>
 namespace muSpectre {
   /**
    * Cell adaptors implement the matrix-vector multiplication and
@@ -52,46 +53,44 @@ namespace muSpectre {
   class CellAdaptor;
 
   /**
-   * Base class for cells that is not templated and therefore can be
-   * in solvers that see cells as runtime-polymorphic objects. This
-   * allows the use of standard
-   * (i.e. spectral-method-implementation-agnostic) solvers, as for
-   * instance the scipy solvers
+   * Base class for the representation of a homogenisatonion problem in
+   * µSpectre. The `muSpectre::Cell` holds the global strain, stress and
+   * (optionally) tangent moduli fields of the problem, maintains the list of
+   * materials present, as well as the projection operator.
    */
-
   class Cell {
    public:
-    //! sparse matrix emulation
-    using Adaptor = CellAdaptor<Cell>;
-
     //! materials handled through `std::unique_ptr`s
     using Material_ptr = std::unique_ptr<MaterialBase>;
+    //! projections handled through `std::unique_ptr`s
+    using Projection_ptr = std::unique_ptr<ProjectionBase>;
 
-    //! dynamic vector type for interactions with numpy/scipy/solvers etc.
-    using Vector_t = Eigen::Matrix<Real, Eigen::Dynamic, 1>;
-
-    //! dynamic matrix type for setting strains
+    //! short-hand for matrices
     using Matrix_t = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
 
-    //! dynamic generic array type for interaction with numpy, i/o, etc
-    template <typename T>
-    using Array_t = Eigen::Array<T, Eigen::Dynamic, Eigen::Dynamic>;
-
-    //! ref to dynamic generic array
-    template <typename T>
-    using Array_ref = Eigen::Map<Array_t<T>>;
-
     //! ref to constant vector
-    using ConstVector_ref = Eigen::Map<const Vector_t>;
+    using Eigen_cmap = muGrid::RealField::Eigen_cmap;
+    //! ref to  vector
+    using Eigen_map = muGrid::RealField::Eigen_map;
 
-    //! output vector reference for solvers
-    using Vector_ref = Eigen::Map<Vector_t>;
+    //! Ref to input/output vector
+    using EigenVec_t = Eigen::Ref<Eigen::Matrix<Real, Eigen::Dynamic, 1>>;
 
-    //! Default constructor
-    Cell() = default;
+    //! Ref to input vector
+    using EigenCVec_t =
+        Eigen::Ref<const Eigen::Matrix<Real, Eigen::Dynamic, 1>>;
+
+    //! adaptor to represent the cell as an Eigen sparse matrix
+    using Adaptor = CellAdaptor<Cell>;
+
+    //! Deleted default constructor
+    Cell() = delete;
+
+    //! Constructor from a projection operator
+    explicit Cell(Projection_ptr projection);
 
     //! Copy constructor
-    Cell(const Cell & other) = default;
+    Cell(const Cell & other) = delete;
 
     //! Move constructor
     Cell(Cell && other) = default;
@@ -100,184 +99,227 @@ namespace muSpectre {
     virtual ~Cell() = default;
 
     //! Copy assignment operator
-    Cell & operator=(const Cell & other) = default;
+    Cell & operator=(const Cell & other) = delete;
 
     //! Move assignment operator
-    Cell & operator=(Cell && other) = default;
+    Cell & operator=(Cell && other) = delete;
 
     //! for handling double initialisations right
-    bool is_initialised() const { return this->initialised; }
+    bool is_initialised() const;
 
     //! returns the number of degrees of freedom in the cell
-    virtual Dim_t get_nb_dof() const = 0;
+    Dim_t get_nb_dof() const;
 
-    //! number of pixels in the cell
-    virtual size_t size() const = 0;
+    //! number of pixels on this processor
+    size_t get_nb_pixels() const;
 
     //! return the communicator object
-    virtual const muFFT::Communicator & get_communicator() const = 0;
+    const muFFT::Communicator & get_communicator() const;
 
     /**
      * formulation is hard set by the choice of the projection class
      */
-    virtual const Formulation & get_formulation() const = 0;
+    const Formulation & get_formulation() const;
 
     /**
      * returns the material dimension of the problem
      */
-    virtual Dim_t get_material_dim() const = 0;
-
-    /**
-     * returns the number of rows and cols for the strain matrix type
-     * (for full storage, the strain is stored in material_dim ×
-     * material_dim matrices, but in symmetriy storage, it is a column
-     * vector)
-     */
-    virtual std::array<Dim_t, 2> get_strain_shape() const = 0;
-
-    /**
-     * returns a writable map onto the strain field of this cell. This
-     * corresponds to the unknowns in a typical solve cycle.
-     */
-    virtual Vector_ref get_strain_vector() = 0;
-
-    /**
-     * returns a read-only map onto the stress field of this
-     * cell. This corresponds to the intermediate (and finally, total)
-     * solution in a typical solve cycle
-     */
-    virtual ConstVector_ref get_stress_vector() const = 0;
-
-    /**
-     * evaluates and returns the stress for the currently set strain
-     */
-    virtual ConstVector_ref evaluate_stress() = 0;
-
-    /**
-     * evaluates and returns the stress and stiffness for the currently set
-     * strain
-     */
-    virtual std::array<ConstVector_ref, 2> evaluate_stress_tangent() = 0;
-
-    /**
-     * applies the projection operator in-place on the input vector
-     */
-    virtual void apply_projection(Eigen::Ref<Vector_t> vec) = 0;
-
-    /**
-     * evaluates the projection of the input field (this corresponds
-     * to G:P in de Geus 2017,
-     * http://dx.doi.org/10.1016/j.cma.2016.12.032). The first time,
-     * this allocates the memory for the return value, and reuses it
-     * on subsequent calls
-     */
-    virtual Vector_ref evaluate_projection(Eigen::Ref<const Vector_t> P) = 0;
-
-    /**
-     * freezes all the history variables of the materials
-     */
-    virtual void save_history_variables() = 0;
-
-    /**
-     * evaluates the directional and projected stiffness (this
-     * corresponds to G:K:δF in de Geus 2017,
-     * http://dx.doi.org/10.1016/j.cma.2016.12.032). It seems that
-     * this operation needs to be implemented with a copy in oder to
-     * be compatible with scipy and EigenCG etc (At the very least,
-     * the copy is only made once)
-     */
-    virtual Vector_ref evaluate_projected_directional_stiffness(
-        Eigen::Ref<const Vector_t> delF) = 0;
-
-    /**
-     * returns a ref to a field named 'unique_name" of real values
-     * managed by the cell. If the field does not yet exist, it is
-     * created.
-     *
-     * @param unique_name name of the field. If the field already
-     * exists, an array ref mapped onto it is returned. Else, a new
-     * field with that name is created and returned-
-     *
-     * @param nb_components number of components to be stored *per
-     * pixel*. For new fields any positive number can be chosen. When
-     * accessing an existing field, this must correspond to the
-     * existing field size, and a `std::runtime_error` is thrown if
-     * this is not satisfied
-     */
-    virtual Array_ref<Real> get_managed_real_array(std::string unique_name,
-                                                   size_t nb_components) = 0;
-
-    /**
-     * Convenience function to copy local (internal) fields of
-     * materials into a global field. At least one of the materials in
-     * the cell needs to contain an internal field named
-     * `unique_name`. If multiple materials contain such a field, they
-     * all need to be of same scalar type and same number of
-     * components. This does not work for split pixel cells or
-     * laminate pixel cells, as they can have multiple entries for the
-     * same pixel. Pixels for which no field named `unique_name`
-     * exists get an array of zeros.
-     *
-     * @param unique_name fieldname to fill the global field with. At
-     * least one material must have such a field, or a
-     * `std::runtime_error` is thrown
-     */
-    virtual Array_ref<Real>
-    get_globalised_internal_real_array(const std::string & unique_name) = 0;
-
-    /**
-     * Convenience function to copy local (internal) state fields
-     * (current state) of materials into a global field. At least one
-     * of the materials in the cell needs to contain an internal field
-     * named `unique_name`. If multiple materials contain such a
-     * field, they all need to be of same scalar type and same number
-     * of components. This does not work for split pixel cells or
-     * laminate pixel cells, as they can have multiple entries for the
-     * same pixel. Pixels for which no field named `unique_name`
-     * exists get an array of zeros.
-     *
-     * @param unique_name fieldname to fill the global field with. At
-     * least one material must have such a field, or a
-     * `std::runtime_error` is thrown
-     */
-    virtual Array_ref<Real>
-    get_globalised_current_real_array(const std::string & unique_name) = 0;
-
-    /**
-     * Convenience function to copy local (internal) state fields
-     * (old state) of materials into a global field. At least one
-     * of the materials in the cell needs to contain an internal field
-     * named `unique_name`. If multiple materials contain such a
-     * field, they all need to be of same scalar type and same number
-     * of components. This does not work for split pixel cells or
-     * laminate pixel cells, as they can have multiple entries for the
-     * same pixel. Pixels for which no field named `unique_name`
-     * exists get an array of zeros.
-     *
-     * @param unique_name fieldname to fill the global field with. At least one
-     * material must have such a field, or a `std::runtime_error` is thrown
-     * @param nb_steps_ago for history variables which remember more than a
-     * single previous value, `nb_steps_ago` can be used to specify which old
-     * value to access.
-     */
-    virtual Array_ref<Real>
-    get_globalised_old_real_array(const std::string & unique_name,
-                                  int nb_steps_ago = 1) = 0;
+    Dim_t get_material_dim() const;
 
     /**
      * set uniform strain (typically used to initialise problems
      */
-    virtual void set_uniform_strain(const Eigen::Ref<const Matrix_t> &) = 0;
+    void set_uniform_strain(const Eigen::Ref<const Matrix_t> &);
+
+    /**
+     * add a new material to the cell
+     */
+    MaterialBase & add_material(Material_ptr mat);
 
     //! get a sparse matrix view on the cell
-    virtual Adaptor get_adaptor() = 0;
+    Adaptor get_adaptor();
 
-    MaterialBase& add_material(Material_ptr mat);
+    /**
+     * freezes all the history variables of the materials
+     */
+    void save_history_variables();
+
+    /**
+     * returns the number of rows and cols for the strain matrix type
+     * (for full storage, the strain is stored in material_dim ×
+     * material_dim matrices, but in symmetric storage, it is a column
+     * vector)
+     */
+    std::array<Dim_t, 2> get_strain_shape() const;
+
+    /**
+     * returns the number of components for the strain matrix type
+     * (for full storage, the strain is stored in material_dim ×
+     * material_dim matrices, but in symmetric storage, it is a column
+     * vector)
+     */
+    Dim_t get_strain_size() const;
+
+    //! return the spatial dimension of the discretisation grid
+    const Dim_t & get_spatial_dim() const;
+
+    //! return the number of quadrature points stored per pixel
+    const Dim_t & get_nb_quad() const;
+
+    //! makes sure every pixel has been assigned to exactly one material
+    void check_material_coverage() const;
+
+    //! initialise the projection, the materials and the global fields
+    void
+    initialise(muFFT::FFT_PlanFlags flags = muFFT::FFT_PlanFlags::estimate);
+
+    //! return a const reference to the grids pixels iterator
+    const muGrid::CcoordOps::DynamicPixels & get_pixels() const;
+
+    /**
+     * return an iterable proxy to this cell's field collection, iterable by
+     * quadrature point
+     */
+    muGrid::FieldCollection::IndexIterable get_quad_pt_indices() const;
+
+    /**
+     * return an iterable proxy to this cell's field collection, iterable by
+     * pixel
+     */
+    muGrid::FieldCollection::PixelIndexIterable get_pixel_indices() const;
+
+    //! return a reference to the cell's strain field
+    muGrid::RealField & get_strain();
+
+    //! return a const reference to the cell's stress field
+    const muGrid::RealField & get_stress() const;
+
+    //! return a const reference to the cell's field of tangent moduli
+    const muGrid::RealField & get_tangent(bool do_create = false);
+
+    /**
+     * evaluates and returns the stress for the currently set strain
+     */
+    const muGrid::RealField & evaluate_stress();
+
+    /**
+     * evaluates and returns the stress for the currently set strain
+     */
+    Eigen_cmap evaluate_stress_eigen();
+
+    /**
+     * evaluates and returns the stress and tangent moduli for the currently set
+     * strain
+     */
+    std::tuple<const muGrid::RealField &, const muGrid::RealField &>
+    evaluate_stress_tangent();
+
+    /**
+     * evaluates and returns the stress and tangent moduli for the currently set
+     * strain
+     */
+    std::tuple<const Eigen_cmap, const Eigen_cmap>
+    evaluate_stress_tangent_eigen();
+
+    /**
+     * collect the real-valued fields of name `unique_name` of each material in
+     * the cell and write their values into a global field of same type and name
+     */
+    muGrid::RealField &
+    globalise_real_internal_field(const std::string & unique_name);
+
+    /**
+     * collect the integer-valued fields of name `unique_name` of each material
+     * in the cell and write their values into a global field of same type and
+     * name
+     */
+    muGrid::IntField &
+    globalise_int_internal_field(const std::string & unique_name);
+
+    /**
+     * collect the unsigned integer-valued fields of name `unique_name` of each
+     * material in the cell and write their values into a global field of same
+     * type and name
+     */
+    muGrid::UintField &
+    globalise_uint_internal_field(const std::string & unique_name);
+
+    /**
+     * collect the complex-valued fields of name `unique_name` of each material
+     * in the cell and write their values into a global field of same type and
+     * name
+     */
+    muGrid::ComplexField &
+    globalise_complex_internal_field(const std::string & unique_name);
+
+    //! return a reference to the cell's global fields
+    muGrid::GlobalFieldCollection & get_fields();
+
+    //! apply the cell's projection operator to field `field` (i.e., return G:f)
+    void apply_projection(muGrid::TypedFieldBase<Real> & field);
+    /**
+     * evaluates the directional and projected stiffness (this
+     * corresponds to G:K:δF (note the negative sign in de Geus 2017,
+     * http://dx.doi.org/10.1016/j.cma.2016.12.032).
+     */
+    void evaluate_projected_directional_stiffness(
+        const muGrid::TypedFieldBase<Real> & delta_strain,
+        muGrid::TypedFieldBase<Real> & del_stress);
+
+    /**
+     * evaluates the directional and projected stiffness (this
+     * corresponds to G:K:δF (note the negative sign in de Geus 2017,
+     * http://dx.doi.org/10.1016/j.cma.2016.12.032). and then adds it do the
+     * values already in del_stress, scaled by alpha (i.e., del_stress +=
+     * alpha*Q:K:δStrain. This function should not be used directly, as it does
+     * absolutely no input checking. Rather, it is meant to be called by the
+     * scaleAndAddTo function in the CellAdaptor
+     */
+    void add_projected_directional_stiffness(EigenCVec_t delta_strain,
+                                             const Real & alpha,
+                                             EigenVec_t del_stress);
+
+    //! transitional function, use discouraged
+    SplitCell get_splitness() const { return SplitCell::no; }
+
+    //! return a const ref to the projection implementation
+    const ProjectionBase & get_projection() const;
 
    protected:
-    bool initialised{false};  //!< to handle double initialisation right
+    //! statically dimensioned worker for evaluating the tangent operator
+    template <Dim_t DimM>
+    static void apply_directional_stiffness(
+        const muGrid::TypedFieldBase<Real> & delta_strain,
+        const muGrid::TypedFieldBase<Real> & tangent,
+        muGrid::TypedFieldBase<Real> & delta_stress);
+
+    /**
+     * statically dimensioned worker for evaluating the incremental tangent
+     * operator
+     */
+    template <Dim_t DimM>
+    static void add_projected_directional_stiffness_helper(
+        const muGrid::TypedFieldBase<Real> & delta_strain,
+        const muGrid::TypedFieldBase<Real> & tangent, const Real & alpha,
+        muGrid::TypedFieldBase<Real> & delta_stress);
+
+    //! helper function for the globalise_<T>_internal_field() functions
+    template <typename T>
+    muGrid::TypedField<T> &
+    globalise_internal_field(const std::string & unique_name);
+    bool initialised{false};  //!< to handle double initialisations right
     //! container of the materials present in the cell
     std::vector<Material_ptr> materials{};
+
+    Projection_ptr projection;  //!< handle for the projection operator
+
+    //! handle for the global fields associated with this cell
+    std::unique_ptr<muGrid::GlobalFieldCollection> fields;
+    muGrid::RealField & strain;  //!< ref to strain field
+    muGrid::RealField & stress;  //!< ref to stress field
+    //! Tangent field might not even be required; so this is an
+    //! optional ref_wrapper instead of a ref
+    optional<std::reference_wrapper<muGrid::RealField>> tangent{};
   };
 
 }  // namespace muSpectre

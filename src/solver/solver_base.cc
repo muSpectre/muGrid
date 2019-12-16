@@ -38,7 +38,7 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  SolverBase::SolverBase(NCell & cell, Real tol, Uint maxiter, bool verbose)
+  SolverBase::SolverBase(Cell & cell, Real tol, Uint maxiter, bool verbose)
       : cell(cell), tol{tol}, maxiter{maxiter}, verbose{verbose} {}
 
   /* ---------------------------------------------------------------------- */

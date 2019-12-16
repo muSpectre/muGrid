@@ -104,14 +104,14 @@ namespace muSpectre {
     //! tuple containing a strain and possibly a strain-rate field
     using StrainFieldTup = std::conditional_t<
         (std::tuple_size<Strains_t>::value == 2),
-        std::tuple<const muGrid::RealNField &, const muGrid::RealNField &>,
-        std::tuple<const muGrid::RealNField &>>;
+        std::tuple<const muGrid::RealField &, const muGrid::RealField &>,
+        std::tuple<const muGrid::RealField &>>;
 
     //! tuple containing a stress and possibly a tangent stiffness field
     using StressFieldTup = std::conditional_t<
         (std::tuple_size<Stresses_t>::value == 2),
-        std::tuple<muGrid::RealNField &, muGrid::RealNField &>,
-        std::tuple<muGrid::RealNField &>>;
+        std::tuple<muGrid::RealField &, muGrid::RealField &>,
+        std::tuple<muGrid::RealField &>>;
 
     /** Iterator uses the material's internal variables field
         collection to iterate selectively over the global fields
@@ -123,10 +123,10 @@ namespace muSpectre {
     template <bool DoNeedTgt = std::tuple_size<Stresses_t>::value == 2,
               bool DoNeedRate = std::tuple_size<Strain_t>::value == 2>
     iterable_proxy(
-        MaterialBase & mat, const muGrid::RealNField & F,
-        std::enable_if_t<DoNeedRate, const muGrid::RealNField> & F_rate,
-        muGrid::RealNField & P,
-        std::enable_if_t<DoNeedTgt, muGrid::RealNField> & K)
+        MaterialBase & mat, const muGrid::RealField & F,
+        std::enable_if_t<DoNeedRate, const muGrid::RealField> & F_rate,
+        muGrid::RealField & P,
+        std::enable_if_t<DoNeedTgt, muGrid::RealField> & K)
         : material{mat}, strain_field{std::cref(F), std::cref(F_rate)},
           stress_tup{P, K} {};
 
@@ -134,9 +134,9 @@ namespace muSpectre {
     template <bool DontNeedTgt = std::tuple_size<Stresses_t>::value == 1,
               bool DoNeedRate = std::tuple_size<Strain_t>::value == 2>
     iterable_proxy(
-        MaterialBase & mat, const muGrid::RealNField & F,
-        std::enable_if_t<DoNeedRate, const muGrid::RealNField> & F_rate,
-        std::enable_if_t<DontNeedTgt, muGrid::RealNField> & P)
+        MaterialBase & mat, const muGrid::RealField & F,
+        std::enable_if_t<DoNeedRate, const muGrid::RealField> & F_rate,
+        std::enable_if_t<DontNeedTgt, muGrid::RealField> & P)
         : material{mat}, strain_field{std::cref(F), std::cref(F_rate)},
           stress_tup{P} {};
 
@@ -144,17 +144,17 @@ namespace muSpectre {
     template <bool DoNeedTgt = std::tuple_size<Stresses_t>::value == 2,
               bool DontNeedRate = std::tuple_size<Strain_t>::value == 1>
     iterable_proxy(MaterialBase & mat,
-                   std::enable_if_t<DontNeedRate, const muGrid::RealNField> & F,
-                   muGrid::RealNField & P,
-                   std::enable_if_t<DoNeedTgt, muGrid::RealNField> & K)
+                   std::enable_if_t<DontNeedRate, const muGrid::RealField> & F,
+                   muGrid::RealField & P,
+                   std::enable_if_t<DoNeedTgt, muGrid::RealField> & K)
         : material{mat}, strain_field{std::cref(F)}, stress_tup{P, K} {};
 
     // without tangent and without strain rate
     template <bool DontNeedTgt = std::tuple_size<Stresses_t>::value == 1,
               bool DontNeedRate = std::tuple_size<Strain_t>::value == 1>
     iterable_proxy(MaterialBase & mat,
-                   std::enable_if_t<DontNeedRate, const muGrid::RealNField> & F,
-                   std::enable_if_t<DontNeedTgt, muGrid::RealNField> & P)
+                   std::enable_if_t<DontNeedRate, const muGrid::RealField> & F,
+                   std::enable_if_t<DontNeedTgt, muGrid::RealField> & P)
         : material{mat}, strain_field{std::cref(F)}, stress_tup{P} {};
 
     //! Copy constructor
@@ -240,7 +240,7 @@ namespace muSpectre {
       size_t index;
       //! iterator over quadrature point. This value is the look-up index for
       //! the global field collection
-      muGrid::NFieldCollection::IndexIterable::iterator quad_pt_iter;
+      muGrid::FieldCollection::IndexIterable::iterator quad_pt_iter;
     };
 
     //! returns iterator to first pixel if this material

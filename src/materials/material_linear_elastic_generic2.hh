@@ -37,7 +37,7 @@
 #define SRC_MATERIALS_MATERIAL_LINEAR_ELASTIC_GENERIC2_HH_
 
 #include "material_linear_elastic_generic1.hh"
-#include "libmugrid/mapped_nfield.hh"
+#include "libmugrid/mapped_field.hh"
 
 namespace muSpectre {
 
@@ -54,11 +54,11 @@ namespace muSpectre {
   template <Dim_t DimM>
   struct MaterialMuSpectre_traits<MaterialLinearElasticGeneric2<DimM>> {
     //! expected map type for strain fields
-    using StrainMap_t = muGrid::T2NFieldMap<Real, Mapping::Const, DimM>;
+    using StrainMap_t = muGrid::T2FieldMap<Real, Mapping::Const, DimM>;
     //! expected map type for stress fields
-    using StressMap_t = muGrid::T2NFieldMap<Real, Mapping::Mut, DimM>;
+    using StressMap_t = muGrid::T2FieldMap<Real, Mapping::Mut, DimM>;
     //! expected map type for tangent stiffness fields
-    using TangentMap_t = muGrid::T4NFieldMap<Real, Mapping::Mut, DimM>;
+    using TangentMap_t = muGrid::T4FieldMap<Real, Mapping::Mut, DimM>;
 
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
@@ -180,7 +180,7 @@ namespace muSpectre {
     //! elastic law without eigenstrain used as worker
     Law_t worker;  //! underlying law to be evaluated
     //! storage for eigenstrain
-    muGrid::MappedT2NField<Real, Mapping::Const, DimM> eigen_field;
+    muGrid::MappedT2Field<Real, Mapping::Const, DimM> eigen_field;
   };
 
   /* ---------------------------------------------------------------------- */

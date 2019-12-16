@@ -43,7 +43,7 @@
 #include "materials/iterable_proxy.hh"
 
 #include <libmugrid/iterators.hh>
-#include <libmugrid/nfield_typed.hh>
+#include <libmugrid/field_typed.hh>
 
 #include <type_traits>
 #include <boost/mpl/list.hpp>
@@ -142,12 +142,13 @@ namespace muSpectre {
         Fix::constitutive_law_dynamic(I, 0, Formulation::small_strain);
     Real error{(std::get<0>(origin_eval_func_result) -
                 std::get<0>(base_eval_func_result))
-                   .norm()};
-    BOOST_CHECK_EQUAL(error, 0.0);
+               .norm()/std::get<0>(base_eval_func_result).norm()};
+    BOOST_CHECK_LT(error, tol);
     error = (std::get<1>(origin_eval_func_result) -
              std::get<1>(base_eval_func_result))
-                .norm();
-    BOOST_CHECK_EQUAL(error, 0.0);
+                .norm() /
+            std::get<1>(base_eval_func_result).norm();
+    BOOST_CHECK_LT(error, tol);
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_iterable_proxy_constructors, Fix,
@@ -157,7 +158,7 @@ namespace muSpectre {
     constexpr auto loc{
         muGrid::CcoordOps::get_cube<Fix::MaterialDimension()>(0)};
 
-    muGrid::GlobalNFieldCollection globalfields{Fix::mdim, Fix::NbQuadPts};
+    muGrid::GlobalFieldCollection globalfields{Fix::mdim, Fix::NbQuadPts};
     auto & F{globalfields.register_real_field(
         "Transformation Gradient",
         muGrid::ipow(Fix::MaterialDimension(), secondOrder))};
@@ -213,7 +214,7 @@ namespace muSpectre {
     constexpr Dim_t mdim{Fix::MaterialDimension()};
     auto & mat{Fix::mat};
 
-    using FC_t = muGrid::GlobalNFieldCollection;
+    using FC_t = muGrid::GlobalFieldCollection;
     FC_t globalfields{Fix::MaterialDimension(), muGrid::Unknown};
     globalfields.set_nb_quad(Fix::NbQuadPts);
     globalfields.initialise(cube, loc);
@@ -230,7 +231,7 @@ namespace muSpectre {
         "Tangent Moduli reference",
         muGrid::ipow(mdim, 4));  // to be computed with tangent
 
-    static_assert(std::is_same<decltype(P1), muGrid::RealNField &>::value,
+    static_assert(std::is_same<decltype(P1), muGrid::RealField &>::value,
                   "oh oh");
     using traits = MaterialMuSpectre_traits<typename Fix::Mat>;
     {  // block to contain not-constant gradient map
@@ -254,7 +255,7 @@ namespace muSpectre {
                           globalfields.get_field("Nominal Stress2"),
                           globalfields.get_field("Nominal Stress2"),
                           Formulation::finite_strain),
-                      muGrid::NFieldError);
+                      muGrid::FieldError);
 
     mat.compute_stresses_tangent(
         globalfields.get_field("Transformation Gradient"),

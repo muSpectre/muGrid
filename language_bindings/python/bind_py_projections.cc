@@ -40,7 +40,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include <libmugrid/numpy.hh>
+#include <libmugrid/numpy_tools.hh>
 
 #include "projection/projection_small_strain.hh"
 #include "projection/projection_finite_strain.hh"

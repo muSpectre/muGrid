@@ -1,13 +1,13 @@
 /**
  * @file   field_collection_local.hh
  *
- * @author Till Junge <till.junge@altermail.ch>
+ * @author Till Junge <till.junge@epfl.ch>
  *
- * @date   05 Nov 2017
+ * @date   12 Aug 2019
  *
- * @brief  FieldCollection base-class for local fields
+ * @brief  Local field collection
  *
- * Copyright © 2017 Till Junge
+ * Copyright © 2019 Till Junge
  *
  * µGrid is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
@@ -22,7 +22,7 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with µGrid; see the file COPYING. If not, write to the
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * * Boston, MA 02111-1307, USA.
+ * Boston, MA 02111-1307, USA.
  *
  * Additional permission under GNU GPL version 3 section 7
  *
@@ -36,52 +36,39 @@
 #ifndef SRC_LIBMUGRID_FIELD_COLLECTION_LOCAL_HH_
 #define SRC_LIBMUGRID_FIELD_COLLECTION_LOCAL_HH_
 
-#include "field_collection_base.hh"
+#include "field_collection.hh"
+#include "field_collection_global.hh"
 
 namespace muGrid {
 
-  /**
-   * forward declaration
+  /** `muGrid::LocalFieldCollection` derives from `muGrid::FieldCollection`
+   * and stores local fields, i.e. fields that are only defined for a subset of
+   * all pixels/voxels in the computational domain. The coordinates of these
+   * active pixels are explicitly stored by this field collection.
+   * `muGrid::LocalFieldCollection::add_pixel` allows to add individual
+   * pixels/voxels to the field collection.
    */
-  template <Dim_t DimS>
-  class GlobalFieldCollection;
-
-  /** `LocalFieldCollection` derives from `FieldCollectionBase` and stores
-   * local fields, i.e. fields that are only defined for a subset of all pixels
-   * in the computational domain. The coordinates of these active pixels are
-   * explicitly stored by this field collection.
-   * `LocalFieldCollection::add_pixel` allows to add individual pixels to the
-   * field collection.
-   */
-  template <Dim_t DimS>
-  class LocalFieldCollection
-      : public FieldCollectionBase<DimS, LocalFieldCollection<DimS>> {
+  class LocalFieldCollection : public FieldCollection {
    public:
-    //! for compile time check
-    constexpr static bool Global{false};
-
-    //! base class
-    using Parent = FieldCollectionBase<DimS, LocalFieldCollection<DimS>>;
-    //! helpful for functions that fill local fields from global fields
-    using GlobalFieldCollection_t = GlobalFieldCollection<DimS>;
-    //! helpful for functions that fill local fields from global fields
-    using LocalFieldCollection_t = LocalFieldCollection<DimS>;
-    using Ccoord = typename Parent::Ccoord;         //!< cell coordinates type
-    using Field_p = typename Parent::Field_p;       //!< field pointer
-    using ccoords_container = std::vector<Ccoord>;  //!< list of pixels
-    //! iterator over managed pixels
-    using iterator = typename ccoords_container::iterator;
-    //! const iterator over managed pixels
-    using const_iterator = typename ccoords_container::const_iterator;
-
+    //! alias for base class
+    using Parent = FieldCollection;
     //! Default constructor
-    LocalFieldCollection();
+    LocalFieldCollection() = delete;
+
+    /**
+     * Constructor
+     * @param spatial_dimension spatial dimension of the field (can be
+     *                    muGrid::Unknown, e.g., in the case of the local fields
+     *                    for storing internal material variables)
+     * @param nb_quad_pts number of quadrature points per pixel/voxel
+     */
+    LocalFieldCollection(Dim_t spatial_dimension, Dim_t nb_quad_pts);
 
     //! Copy constructor
     LocalFieldCollection(const LocalFieldCollection & other) = delete;
 
     //! Move constructor
-    LocalFieldCollection(LocalFieldCollection && other) = delete;
+    LocalFieldCollection(LocalFieldCollection && other) = default;
 
     //! Destructor
     virtual ~LocalFieldCollection() = default;
@@ -93,105 +80,25 @@ namespace muGrid {
     //! Move assignment operator
     LocalFieldCollection & operator=(LocalFieldCollection && other) = delete;
 
-    //! add a pixel/voxel to the field collection
-    inline void add_pixel(const Ccoord & local_ccoord);
+    /**
+     * Insert a new pixel/voxel into the collection.
+     * @param global_index refers to the linear index this pixel has in the
+     *                     global field collection defining the problem space
+     */
+    void add_pixel(const size_t & global_index);
 
-    /** allocate memory, etc. at this point, the field collection
-        knows how many entries it should have from the size of the
-        coords containes (which grows by one every time add_pixel is
-        called. The job of initialise is to make sure that all fields
-        are either of size 0, in which case they need to be allocated,
-        or are of the same size as the product of 'sizes' any field of
-        a different size is wrong TODO: check whether it makes sense
-        to put a runtime check here
-     **/
-    inline void initialise();
+    /**
+     * Freeze the set of pixels this collection is responsible for and allocate
+     * memory for all fields of the collection. Fields added lateron will have
+     * their memory allocated upon construction
+     */
+    void initialise();
 
-    //! returns the linear index corresponding to cell coordinates
-    template <class CcoordRef>
-    inline size_t get_index(CcoordRef && ccoord) const;
-    //! returns the cell coordinates corresponding to a linear index
-    inline Ccoord get_ccoord(size_t index) const;
-
-    //! iterator to first pixel
-    inline iterator begin() { return this->ccoords.begin(); }
-    //! iterator past last pixel
-    inline iterator end() { return this->ccoords.end(); }
-
-    //! const iterator to first pixel
-    inline const_iterator begin() const { return this->ccoords.cbegin(); }
-    //! const iterator past last pixel
-    inline const_iterator end() const { return this->ccoords.cend(); }
-
-    //! return globalness at compile time
-    static constexpr inline bool is_global() { return Global; }
-
-   protected:
-    //! container of pixel coords for non-global collections
-    ccoords_container ccoords{};
-    //! container of indices for non-global collections (slow!)
-    std::map<Ccoord, size_t> indices{};
-    std::vector<Real> assigned_ratio{};
+    /**
+     * obtain a new field collection with the same domain and pixels
+     */
+    LocalFieldCollection get_empty_clone() const;
   };
-
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
-  LocalFieldCollection<DimS>::LocalFieldCollection() : Parent() {}
-
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
-  void LocalFieldCollection<DimS>::add_pixel(const Ccoord & local_ccoord) {
-    if (this->is_initialised) {
-      throw FieldCollectionError(
-          "once a field collection has been initialised, you can't add new "
-          "pixels.");
-    }
-    this->indices[local_ccoord] = this->ccoords.size();
-    this->ccoords.push_back(local_ccoord);
-    this->size_++;
-  }
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
-  void LocalFieldCollection<DimS>::initialise() {
-    if (this->is_initialised) {
-      throw std::runtime_error("double initialisation");
-    }
-    std::for_each(
-        std::begin(this->fields), std::end(this->fields), [this](auto && item) {
-          auto && field = *item.second;
-          const auto field_size = field.size();
-          if (field_size == 0) {
-            field.resize(this->size());
-          } else if (field_size != this->size()) {
-            std::stringstream err_stream;
-            err_stream << "Field '" << field.get_name() << "' contains "
-                       << field_size << " entries, but the field collection "
-                       << "has " << this->size() << " pixels";
-            throw FieldCollectionError(err_stream.str());
-          }
-        });
-    this->is_initialised = true;
-  }
-
-  //----------------------------------------------------------------------------//
-  //! returns the linear index corresponding to cell coordinates
-  template <Dim_t DimS>
-  template <class CcoordRef>
-  size_t LocalFieldCollection<DimS>::get_index(CcoordRef && ccoord) const {
-    static_assert(
-        std::is_same<Ccoord, std::remove_const_t<
-                                 std::remove_reference_t<CcoordRef>>>::value,
-        "can only be called with values or references of Ccoord");
-    return this->indices.at(std::forward<CcoordRef>(ccoord));
-  }
-
-  //----------------------------------------------------------------------------//
-  //! returns the cell coordinates corresponding to a linear index
-  template <Dim_t DimS>
-  typename LocalFieldCollection<DimS>::Ccoord
-  LocalFieldCollection<DimS>::get_ccoord(size_t index) const {
-    return this->ccoords[std::move(index)];
-  }
 
 }  // namespace muGrid
 

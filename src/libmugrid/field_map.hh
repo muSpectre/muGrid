@@ -3,11 +3,11 @@
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
- * @date   26 Sep 2017
+ * @date   15 Aug 2019
  *
- * @brief  just and indirection to include all iterables defined for fields
+ * @brief  Implementation of the base class of all field maps
  *
- * Copyright © 2017 Till Junge
+ * Copyright © 2019 Till Junge
  *
  * µGrid is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
@@ -22,7 +22,7 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with µGrid; see the file COPYING. If not, write to the
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * * Boston, MA 02111-1307, USA.
+ * Boston, MA 02111-1307, USA.
  *
  * Additional permission under GNU GPL version 3 section 7
  *
@@ -33,224 +33,305 @@
  *
  */
 
-#include "field_map_tensor.hh"
-#include "field_map_matrixlike.hh"
-#include "field_map_scalar.hh"
-
-#include <sstream>
-#include <stdexcept>
-#include <type_traits>
-
 #ifndef SRC_LIBMUGRID_FIELD_MAP_HH_
 #define SRC_LIBMUGRID_FIELD_MAP_HH_
 
+#include "grid_common.hh"
+#include "iterators.hh"
+#include "field_collection.hh"
+
+#include <type_traits>
+#include <memory>
+#include <functional>
+
 namespace muGrid {
-
   /**
-   * allows to iterate over raw data as if it were a FieldMap. This is
-   * particularly useful when interacting with external solvers, such
-   * as scipy and Eigen
-   * @param EigenMap needs to be statically sized a Eigen::Map<XXX>
-   *
-   * @warning This type is not safe for re-use. I.e., after there has
-   * been an assignment to the underlying eigen array, the
-   * `RawFieldMap` might be invalidated!
+   * base class for field map-related exceptions
    */
-  template <class EigenMap>
-  class RawFieldMap {
+  class FieldMapError : public std::runtime_error {
    public:
-    /**
-     * determining the constness of the mapped array required in order
-     * to formulate the constructors const-correctly
-     */
-    constexpr static bool IsConst{std::is_const<
-        std::remove_pointer_t<typename EigenMap::PointerArgType>>::value};
-    //! short-hand for the basic scalar type
-    using T = typename EigenMap::Scalar;
-    //! raw pointer type to store
-    using T_ptr = std::conditional_t<IsConst, const T *, T *>;
-    //! input array (~field) type to be mapped
-    using FieldVec_t =
-        std::conditional_t<IsConst, const Eigen::VectorXd, Eigen::VectorXd>;
-
-    //! Plain mapped Eigen type
-    using EigenPlain = typename EigenMap::PlainObject;
-
-    //! Default constructor
-    RawFieldMap() = delete;
-
-    //! constructor from a *contiguous* array
-    RawFieldMap(Eigen::Map<FieldVec_t> vec,
-                Dim_t nb_rows = EigenMap::RowsAtCompileTime,
-                Dim_t nb_cols = EigenMap::ColsAtCompileTime)
-        : data{vec.data()}, nb_rows{nb_rows}, nb_cols{nb_cols},
-          nb_components{nb_rows * nb_cols},
-          nb_pixels(vec.size() / nb_components) {
-      if ((nb_rows == Eigen::Dynamic) or (nb_cols == Eigen::Dynamic)) {
-        throw FieldError(
-            "You have to specify the number of rows and columns if you map a "
-            "dynamically sized Eigen Map type.");
-      }
-      if ((nb_rows < 1) or (nb_cols < 1)) {
-        throw FieldError("Only positive numbers of rows and columns make "
-                         "sense");
-      }
-      if (vec.size() % this->nb_components != 0) {
-        std::stringstream err{};
-        err << "The vector size of " << vec.size()
-            << " is not an integer multiple of the size of value_type, which "
-            << "is " << this->nb_components << ".";
-        throw std::runtime_error(err.str());
-      }
-    }
-
-    //! constructor from a *contiguous* array
-    RawFieldMap(Eigen::Ref<FieldVec_t> vec,
-                Dim_t nb_rows = EigenMap::RowsAtCompileTime,
-                Dim_t nb_cols = EigenMap::ColsAtCompileTime)
-        : data{vec.data()}, nb_rows{nb_rows}, nb_cols{nb_cols},
-          nb_components{nb_rows * nb_cols},
-          nb_pixels(vec.size() / nb_components) {
-      if (vec.size() % this->nb_components != 0) {
-        std::stringstream err{};
-        err << "The vector size of " << vec.size()
-            << " is not an integer multiple of the size of value_type, which "
-            << "is " << this->nb_components << ".";
-        throw std::runtime_error(err.str());
-      }
-    }
-
-    //! Copy constructor
-    RawFieldMap(const RawFieldMap & other) = delete;
-
-    //! Move constructor
-    RawFieldMap(RawFieldMap && other) = default;
-
-    //! Destructor
-    virtual ~RawFieldMap() = default;
-
-    //! Copy assignment operator
-    RawFieldMap & operator=(const RawFieldMap & other) = delete;
-
-    //! Move assignment operator
-    RawFieldMap & operator=(RawFieldMap && other) = delete;
-
-    //! returns number of EigenMaps stored within the array
-    size_t size() const { return this->nb_pixels; }
-
-    //! forward declaration of iterator type
-    template <bool IsConst>
-    class iterator_t;
-    using iterator = iterator_t<false>;
-    using const_iterator = iterator_t<true>;
-
-    //! returns an iterator to the first element
-    iterator begin() { return iterator{*this, 0}; }
-    const_iterator begin() const { return const_iterator{*this, 0}; }
-    //! returns an iterator past the last element
-    iterator end() { return iterator{*this, this->size()}; }
-    const_iterator end() const { return const_iterator{*this, this->size()}; }
-
-    //! evaluates the average of the field
-    EigenPlain mean() const {
-      using T_t = EigenPlain;
-      T_t mean(T_t::Zero(this->nb_rows, this->nb_cols));
-      for (auto && val : *this) {
-        mean += val;
-      }
-      mean /= this->size();
-      return mean;
-    }
-
-   protected:
-    inline T_ptr get_data() { return data; }
-    inline const T_ptr get_data() const { return data; }
-    //! raw data pointer (ugly, I know)
-    T_ptr data;
-    const Dim_t nb_rows;
-    const Dim_t nb_cols;
-    const Dim_t nb_components;
-    //! number of EigenMaps stored within the array
-    size_t nb_pixels;
+    //! constructor
+    explicit FieldMapError(const std::string & what)
+        : std::runtime_error(what) {}
+    //! constructor
+    explicit FieldMapError(const char * what) : std::runtime_error(what) {}
   };
 
-  /**
-   * Small iterator class to be used with the RawFieldMap
-   */
-  template <class EigenMap>
-  template <bool IsConst>
-  class RawFieldMap<EigenMap>::iterator_t {
-   public:
-    //! short hand for the raw field map's type
-    using Parent = RawFieldMap<EigenMap>;
+  // forward declaration
+  template <typename T>
+  class TypedFieldBase;
 
-    //! the  map needs to be friend in order to access the protected constructor
-    friend Parent;
-    //! stl compliance
-    using value_type = std::conditional_t<
-        IsConst, Eigen::Map<const typename EigenMap::PlainObject>, EigenMap>;
-    using T_ptr =
-        std::conditional_t<IsConst, const Parent::T_ptr, Parent::T_ptr>;
-    //! stl compliance
-    using iterator_category = std::forward_iterator_tag;
+  /**
+   * Dynamically sized field map. Field maps allow iterating over the pixels or
+   * quadrature points of a field and to select the shape (in a matrix sense) of
+   * the iterate. For example, it allows to iterate in 2×2 matrices over the
+   * quadrature points of a strain field for a two-dimensional problem.
+   */
+  template <typename T, Mapping Mutability>
+  class FieldMap {
+   public:
+    //! stored scalar type
+    using Scalar = T;
+
+    //! const-correct field depending on mapping mutability
+    using Field_t =
+        std::conditional_t<Mutability == Mapping::Const,
+                           const TypedFieldBase<T>, TypedFieldBase<T>>;
+
+    //! dynamically mapped eigen type
+    using PlainType = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
+
+    //! return type for iterators over this- map
+    template <Mapping MutVal>
+    using Return_t =
+        std::conditional_t<MutVal == Mapping::Const,
+                           Eigen::Map<const PlainType>, Eigen::Map<PlainType>>;
+
+    //! Input type for matrix-like values (used for setting uniform values)
+    using EigenRef = Eigen::Ref<const PlainType>;
+
+    /**
+     * zip-container for iterating over pixel index and stored value
+     * simultaneously
+     */
+    using PixelEnumeration_t =
+        akantu::containers::ZipContainer<FieldCollection::PixelIndexIterable,
+                                         FieldMap &>;
+    /**
+     * zip-container for iterating over pixel or quadrature point index and
+     * stored value simultaneously
+     */
+    using Enumeration_t =
+        akantu::containers::ZipContainer<FieldCollection::IndexIterable,
+                                         FieldMap &>;
+
+    //! determine whether a field is mutably mapped at compile time
+    constexpr static Mapping FieldMutability() { return Mutability; }
+
+    //! determine whether a field map is statically sized at compile time
+    constexpr static bool IsStatic() { return false; }
 
     //! Default constructor
-    iterator_t() = delete;
+    FieldMap() = delete;
+
+    /**
+     * Constructor from a field. The default case is a map iterating over
+     * quadrature points with a matrix of shape (nb_components × 1) per field
+     * entry
+     */
+    explicit FieldMap(Field_t & field,
+                       Iteration iter_type = Iteration::QuadPt);
+
+    /**
+     * Constructor from a field with explicitly chosen shape of iterate. (the
+     * number of columns is inferred).
+     */
+    FieldMap(Field_t & field, Dim_t nb_rows,
+              Iteration iter_type = Iteration::QuadPt);
 
     //! Copy constructor
-    iterator_t(const iterator_t & other) = default;
+    FieldMap(const FieldMap & other) = delete;
 
     //! Move constructor
-    iterator_t(iterator_t && other) = default;
+    FieldMap(FieldMap && other);
 
     //! Destructor
-    virtual ~iterator_t() = default;
+    virtual ~FieldMap() = default;
 
-    //! Copy assignment operator
-    iterator_t & operator=(const iterator_t & other) = default;
+    //! Copy assignment operator (delete because of reference member)
+    FieldMap & operator=(const FieldMap & other) = delete;
 
-    //! Move assignment operator
-    iterator_t & operator=(iterator_t && other) = default;
+    //! Move assignment operator (delete because of reference member)
+    FieldMap & operator=(FieldMap && other) = delete;
 
-    //! pre-increment
-    inline iterator_t & operator++() {
-      ++this->index;
+    //! Assign a matrix-like value to every entry
+    template <bool IsMutableField = Mutability == Mapping::Mut>
+    std::enable_if_t<IsMutableField, FieldMap> &
+    operator=(const EigenRef & val) {
+      if (not((val.rows() == this->nb_rows) and
+              (val.cols() == this->nb_cols))) {
+        std::stringstream error_str{};
+        error_str << "Expected an array/matrix with shape (" << this->nb_rows
+                  << " × " << this->nb_cols
+                  << "), but received a value of shape (" << val.rows() << " × "
+                  << val.cols() << ").";
+        throw FieldMapError(error_str.str());
+      }
+      for (auto && entry : *this) {
+        entry = val;
+      }
       return *this;
     }
 
+    //! Assign a scalar value to every entry
+    template <bool IsMutableField = Mutability == Mapping::Mut>
+    std::enable_if_t<IsMutableField, FieldMap> &
+    operator=(const Scalar & val) {
+      if (not(this->nb_rows == 1 && this->nb_cols == 1)) {
+        std::stringstream error_str{};
+        error_str << "Expected an array/matrix with shape (" << this->nb_rows
+                  << " × " << this->nb_cols
+                  << "), but received a scalar value.";
+        throw FieldMapError(error_str.str());
+      }
+      for (auto && entry : *this) {
+        entry(0, 0) = val;
+      }
+      return *this;
+    }
+
+    /**
+     * forward-declaration for `mugrid::FieldMap`'s iterator
+     */
+    template <Mapping MutIter>
+    class Iterator;
+    //! stl
+    using iterator =
+        Iterator<(Mutability == Mapping::Mut) ? Mapping::Mut : Mapping::Const>;
+
+    //! stl
+    using const_iterator = Iterator<Mapping::Const>;
+
+    //! stl
+    iterator begin();
+
+    //! stl
+    iterator end();
+
+    //! stl
+    const_iterator cbegin();
+
+    //! stl
+    const_iterator cend();
+
+    //! stl
+    const_iterator begin() const;
+
+    //! stl
+    const_iterator end() const;
+
+    /**
+     * returns the number of iterates produced by this map (corresponds to the
+     * number of field entries if Iteration::Quadpt, or the number of
+     * pixels/voxels if Iteration::Pixel);
+     */
+    size_t size() const;
+
+    //! random acces operator
+    Return_t<Mutability> operator[](size_t index) {
+      assert(this->is_initialised);
+      return Return_t<Mutability>{this->data_ptr + index * this->stride,
+                                  this->nb_rows, this->nb_cols};
+    }
+
+    //! random const acces operator
+    Return_t<Mapping::Const> operator[](size_t index) const {
+      assert(this->is_initialised);
+      return Return_t<Mapping::Const>{this->data_ptr + index * this->stride,
+                                      this->nb_rows, this->nb_cols};
+    }
+
+    //! query the size from the field's collection and set data_ptr
+    void set_data_ptr();
+
+    /**
+     * return an iterable proxy over pixel indices and stored values
+     * simultaneously. Throws a `muGrid::FieldMapError` if the iteration type
+     * is over quadrature points
+     */
+    PixelEnumeration_t enumerate_pixel_indices_fast();
+
+    /**
+     * return an iterable proxy over pixel/quadrature indices and stored values
+     * simultaneously
+     */
+    Enumeration_t enumerate_indices();
+
+    //! evaluate and return the mean value of the map
+    PlainType mean() const;
+
+   protected:
+    //! mapped field. Needed for query at initialisations
+    const Field_t & field;
+    const Iteration iteration;  //!< type of map iteration
+    const Dim_t stride;         //!< precomputed stride
+    const Dim_t nb_rows;        //!< number of rows of the iterate
+    const Dim_t nb_cols;        //!< number of columns fo the iterate
+
+    /**
+     * Pointer to mapped data; is also unknown at construction and set in the
+     * map's begin function
+     */
+    T * data_ptr{nullptr};
+
+    //! keeps track of whether the map has been initialised.
+    bool is_initialised{false};
+    //! shared_ptr used for latent initialisation
+    std::shared_ptr<std::function<void()>> callback{nullptr};
+  };
+
+  template <typename T, Mapping Mutability>
+  template <Mapping MutIter>
+  class FieldMap<T, Mutability>::Iterator {
+   public:
+    //! convenience alias
+    using FieldMap_t = std::conditional_t<MutIter == Mapping::Const,
+                                           const FieldMap, FieldMap>;
+    //! stl
+    using value_type =
+        typename FieldMap<T, Mutability>::template Return_t<MutIter>;
+
+    //! stl
+    using cvalue_type =
+        typename FieldMap<T, Mutability>::template Return_t<Mapping::Const>;
+
+    //! Default constructor
+    Iterator() = delete;
+
+    //! Constructor to beginning, or to end
+    Iterator(FieldMap_t & map, bool end)
+        : map{map}, index{end ? map.size() : 0} {}
+
+    //! Copy constructor
+    Iterator(const Iterator & other) = delete;
+
+    //! Move constructor
+    Iterator(Iterator && other) = default;
+
+    //! Destructor
+    virtual ~Iterator() = default;
+
+    //! Copy assignment operator
+    Iterator & operator=(const Iterator & other) = default;
+
+    //! Move assignment operator
+    Iterator & operator=(Iterator && other) = default;
+
+    //! pre-increment
+    Iterator & operator++() {
+      this->index++;
+      return *this;
+    }
     //! dereference
-    inline value_type operator*() {
-      return value_type(raw_ptr + this->map.nb_components * index,
-                        this->map.nb_rows, this->map.nb_cols);
-    }
-
-    //! inequality
-    inline bool operator!=(const iterator_t & other) const {
-      return this->index != other.index;
-    }
-
+    inline value_type operator*() { return this->map[this->index]; }
+    //! dereference
+    inline cvalue_type operator*() const { return this->map[this->index]; }
     //! equality
-    inline bool operator==(const iterator_t & other) const {
+    inline bool operator==(const Iterator & other) const {
       return this->index == other.index;
+    }
+    //! inequality
+    inline bool operator!=(const Iterator & other) const {
+      return not(*this == other);
     }
 
    protected:
-    //! protected constructor
-    iterator_t(const Parent & map, size_t start)
-        : raw_ptr{map.get_data()}, map{map}, index{start} {}
-
-    template <bool dummy_non_const = not IsConst>
-    iterator_t(std::enable_if_t<dummy_non_const, Parent &> map, size_t start)
-        : raw_ptr{map.data}, map{map}, index{start} {
-      static_assert(dummy_non_const == not IsConst, "SFINAE");
-    }
-    //! raw data
-    T_ptr raw_ptr;
-    //! ref to underlying map
-    const Parent & map;
-    //! currently pointed-to element
+    //! FieldMap being iterated over
+    FieldMap_t & map;
+    //! current iteration index
     size_t index;
   };
+
 }  // namespace muGrid
 
 #endif  // SRC_LIBMUGRID_FIELD_MAP_HH_

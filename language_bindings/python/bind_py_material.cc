@@ -103,7 +103,7 @@ class PyMaterialBase : public muSpectre::MaterialBase {
         initialise);  // Name of function in C++ (must match Python name)
   }
 
-  void compute_stresses(const muGrid::RealNField & F, muGrid::RealNField & P,
+  void compute_stresses(const muGrid::RealField & F, muGrid::RealField & P,
                         muSpectre::Formulation form,
                         muSpectre::SplitCell is_cell_split) override {
     PYBIND11_OVERLOAD_PURE(
@@ -113,8 +113,8 @@ class PyMaterialBase : public muSpectre::MaterialBase {
         F, P, form, is_cell_split);
   }
 
-  void compute_stresses_tangent(const muGrid::RealNField & F,
-                                muGrid::RealNField & P, muGrid::RealNField & K,
+  void compute_stresses_tangent(const muGrid::RealField & F,
+                                muGrid::RealField & P, muGrid::RealField & K,
                                 muSpectre::Formulation form,
                                 muSpectre::SplitCell is_cell_split) override {
     PYBIND11_OVERLOAD_PURE(
@@ -232,7 +232,7 @@ void add_material_base_helper(py::module & mod) {
           "pixel"_a)
       .def_property_readonly(
           "collection",
-          [](Material & material) -> muGrid::NFieldCollection & {
+          [](Material & material) -> muGrid::FieldCollection & {
             return material.get_collection();
           },
           "returns the field collection containing internal "

@@ -1,4 +1,4 @@
-FROM debian:stretch
+FROM debian:stable
 MAINTAINER Till Junge <till.junge@epfl.ch>
 
 ARG NETCDF4_PYTHON_VERSION=1.5.1.2

@@ -1,14 +1,13 @@
 /**
  * @file   field_typed.hh
  *
- * @author Till Junge <till.junge@epfl.ch>
+ * @author Till Junge <till.junge@altermail.ch>
  *
- * @date   10 Apr 2018
+ * @date   10 Aug 2019
  *
- * @brief  Typed Field for dynamically sized fields and base class for fields
- *         of tensors, matrices, etc
+ * @brief  Field classes for which the scalar type has been defined
  *
- * Copyright © 2018 Till Junge
+ * Copyright © 2019 Till Junge
  *
  * µGrid is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
@@ -23,7 +22,7 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with µGrid; see the file COPYING. If not, write to the
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * * Boston, MA 02111-1307, USA.
+ * Boston, MA 02111-1307, USA.
  *
  * Additional permission under GNU GPL version 3 section 7
  *
@@ -37,227 +36,183 @@
 #ifndef SRC_LIBMUGRID_FIELD_TYPED_HH_
 #define SRC_LIBMUGRID_FIELD_TYPED_HH_
 
-#include "field_base.hh"
-#include "field_helpers.hh"
+#include "field.hh"
+#include "grid_common.hh"
 
-#include <sstream>
-#include <iostream>
+#include <Eigen/Dense>
+
+#include <vector>
+#include <memory>
 
 namespace muGrid {
 
-  /**
-   * forward-declaration
-   */
-  template <class FieldCollection, typename T, bool ConstField>
-  class TypedFieldMap;
+  //! forward declaration
+  template <typename T, Mapping Mutability>
+  class FieldMap;
+  //! forward declaration
+  template <typename T>
+  class TypedFieldBase;
 
-  namespace internal {
-
-    /* ---------------------------------------------------------------------- */
-    //! declaraton for friending
-    template <class FieldCollection, typename T, Dim_t NbComponents,
-              bool isConst>
-    class FieldMap;
-
-  }  // namespace internal
-
-  /**
-   * Dummy intermediate class to provide a run-time polymorphic
-   * typed field. Mainly for binding Python. TypedField specifies methods
-   * that return typed Eigen maps and vectors in addition to pointers to the
-   * raw data.
-   */
-  template <class FieldCollection, typename T>
-  class TypedField : public internal::FieldBase<FieldCollection> {
-    friend class internal::FieldMap<FieldCollection, T, Eigen::Dynamic, true>;
-    friend class internal::FieldMap<FieldCollection, T, Eigen::Dynamic, false>;
-
-    static constexpr bool Global{FieldCollection::is_global()};
-
-   public:
-    using Parent = internal::FieldBase<FieldCollection>;  //!< base class
-    //! for type checks when mapping this field
-    using collection_t = typename Parent::collection_t;
-
-    //! for filling global fields from local fields and vice-versa
-    using LocalField_t = std::conditional_t<
-        Global, TypedField<typename FieldCollection::LocalFieldCollection_t, T>,
-        TypedField>;
-    //! for filling global fields from local fields and vice-versa
-    using GlobalField_t = std::conditional_t<
-        Global, TypedField,
-        TypedField<typename FieldCollection::GlobalFieldCollection_t, T>>;
-
-    using Scalar = T;     //!< for type checks
-    using Base = Parent;  //!< for uniformity of interface
-    //! Plain Eigen type to map
-    using EigenRep_t = Eigen::Array<T, Eigen::Dynamic, Eigen::Dynamic>;
-    using EigenVecRep_t = Eigen::Matrix<T, Eigen::Dynamic, 1>;
-    //! map returned when accessing entire field
-    using EigenMap_t = Eigen::Map<EigenRep_t>;
-    //! map returned when accessing entire const field
-    using EigenMapConst_t = Eigen::Map<const EigenRep_t>;
-    //! Plain eigen vector to map
-    using EigenVec_t = Eigen::Map<EigenVecRep_t>;
-    //! vector map returned when accessing entire field
-    using EigenVecConst_t = Eigen::Map<const EigenVecRep_t>;
-    //! associated non-const field map
-    using FieldMap_t = TypedFieldMap<FieldCollection, T, false>;
-    //! associated const field map
-    using ConstFieldMap_t = TypedFieldMap<FieldCollection, T, true>;
-
-    /**
-     * type stored (unfortunately, we can't statically size the second
-     * dimension due to an Eigen bug, i.e., creating a row vector
-     * reference to a column vector does not raise an error :(
-     */
-    using Stored_t = Eigen::Array<T, Eigen::Dynamic, Eigen::Dynamic>;
-    //! storage container
-    using Storage_t = std::vector<T, Eigen::aligned_allocator<T>>;
-
-    //! Default constructor
-    TypedField() = delete;
-
-    //! constructor
-    TypedField(std::string unique_name, FieldCollection & collection,
-               size_t nb_components);
-
-    /**
-     * constructor for field proxies which piggy-back on existing
-     * memory. These cannot be registered in field collections and
-     * should only be used for transient temporaries
-     */
-    TypedField(std::string unique_name, FieldCollection & collection,
-               Eigen::Ref<EigenRep_t> vec, size_t nb_components);
-
-    //! Copy constructor
-    TypedField(const TypedField & other) = delete;
-
-    //! Move constructor
-    TypedField(TypedField && other) = default;
-
-    //! Destructor
-    virtual ~TypedField() = default;
-
-    //! Copy assignment operator
-    TypedField & operator=(const TypedField & other) = delete;
-
-    //! Move assignment operator
-    TypedField & operator=(TypedField && other) = delete;
-
-    //! return type_id of stored type
-    const std::type_info & get_stored_typeid() const final;
-
-    //! safe reference cast
-    static TypedField & check_ref(Base & other);
-    //! safe reference cast
-    static const TypedField & check_ref(const Base & other);
-
-    //! number of pixels in the field
-    size_t size() const final;
-
-    //! size of the internal buffer including the pad region
-    size_t buffer_size() const final;
-
-    //! add a pad region to the end of the field buffer; required for
-    //! using this as e.g. an FFT workspace
-    void set_pad_size(size_t pad_size_) final;
-
-    //! initialise field to zero (do more complicated initialisations through
-    //! fully typed maps)
-    void set_zero() final;
-
-    //! add a new value at the end of the field
-    template <class Derived>
-    inline void push_back(const Eigen::DenseBase<Derived> & value);
-
-    //! raw pointer to content (e.g., for Eigen maps)
-    virtual T * data() { return this->get_ptr_to_entry(0); }
-    //! raw pointer to content (e.g., for Eigen maps)
-    virtual const T * data() const { return this->get_ptr_to_entry(0); }
-
-    //! return a map representing the entire field as a single `Eigen::Array`
-    EigenMap_t eigen();
-    //! return a map representing the entire field as a single `Eigen::Array`
-    EigenMapConst_t eigen() const;
-    //! return a map representing the entire field as a single Eigen vector
-    EigenVec_t eigenvec();
-    //! return a map representing the entire field as a single Eigen vector
-    EigenVecConst_t eigenvec() const;
-    //! return a map representing the entire field as a single Eigen vector
-    EigenVecConst_t const_eigenvec() const;
-
-    /**
-     * Convenience function to return a map onto this field. A map
-     * allows iteration over all pixels. The map's iterator returns a
-     * dynamically sized `Eigen::Map` the data associated with a
-     * pixel.
-     */
-    inline FieldMap_t get_map();
-
-    /**
-     * Convenience function to return a map onto this field. A map
-     * allows iteration over all pixels. The map's iterator returns a
-     * dynamically sized `Eigen::Map` the data associated with a
-     * pixel.
-     */
-    inline ConstFieldMap_t get_map() const;
-
-    /**
-     * Convenience function to return a map onto this field. A map
-     * allows iteration over all pixels. The map's iterator returns a
-     * dynamically sized `Eigen::Map` the data associated with a
-     * pixel.
-     */
-    inline ConstFieldMap_t get_const_map() const;
-
-    /**
-     * creates a `TypedField` same size and type as this, but all
-     * entries are zero. Convenience function
-     */
-    inline TypedField & get_zeros_like(std::string unique_name) const;
-
-    /**
-     * Fill the content of the local field into the global field
-     * (obviously only for pixels that actually are present in the
-     * local field)
-     */
-    template <bool IsGlobal = Global>
-    inline std::enable_if_t<IsGlobal>
-    fill_from_local(const LocalField_t & local);
-
-    /**
-     * For pixels that are present in the local field, fill them with
-     * the content of the global field at those pixels
-     */
-    template <bool IsLocal = not Global>
-    inline std::enable_if_t<IsLocal>
-    fill_from_global(const GlobalField_t & global);
+  template <typename T>
+  class TypedFieldBase : public Field {
+    static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
+                  "You can only register fields templated with one of the "
+                  "numeric types Real, Complex, Int, or UInt");
 
    protected:
-    //! returns a raw pointer to the entry, for `Eigen::Map`
-    inline T * get_ptr_to_entry(const size_t && index);
-
-    //! returns a raw pointer to the entry, for `Eigen::Map`
-    inline const T * get_ptr_to_entry(const size_t && index) const;
-
-    //! set the storage size of this field
-    inline void resize(size_t size) final;
-
-    //! The actual storage container
-    Storage_t values{};
     /**
-     * an unregistered typed field can be mapped onto an array of
-     * existing values
+     * Simple structure used to allow for lazy evaluation of the unary '-' sign.
+     * When assiging the the negative of a field to another, as in field_a =
+     * -field_b, this structure allows to implement this operation without
+     * needing a temporary object holding the negative value of field_b.
      */
-    optional<Eigen::Ref<EigenRep_t>> alt_values{};
+    struct Negative {
+      //! field on which the unary '-' was applied
+      const TypedFieldBase & field;
+    };
+    /**
+     * `Field`s are supposed to only exist in the form of `std::unique_ptr`s
+     * held by a `FieldCollection. The `Field` constructor is protected to
+     * ensure this. Fields are instantiated through the `register_field`
+     * methods FieldCollection.
+     * @param unique_name unique field name (unique within a collection)
+     * @param nb_components number of components to store per quadrature point
+     * @param collection reference to the holding field collection.
+     */
+    TypedFieldBase(const std::string & unique_name,
+                    FieldCollection & collection, Dim_t nb_components)
+        : Parent{unique_name, collection, nb_components} {}
+
+   public:
+    //! stored scalar type
+    using Scalar = T;
+
+    //! Eigen type used to represent the field's data
+    using EigenRep_t = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
+
+    //! eigen map (handle for EigenRep_t)
+    using Eigen_map = Eigen::Map<EigenRep_t>;
+
+    //! eigen const map (handle for EigenRep_t)
+    using Eigen_cmap = Eigen::Map<const EigenRep_t>;
+
+    //! base class
+    using Parent = Field;
+
+    //! Default constructor
+    TypedFieldBase() = delete;
+
+    //! Copy constructor
+    TypedFieldBase(const TypedFieldBase & other) = delete;
+
+    //! Move constructor
+    TypedFieldBase(TypedFieldBase && other) = default;
+
+    //! Destructor
+    virtual ~TypedFieldBase() = default;
+
+    //! Move assignment operator
+    TypedFieldBase & operator=(TypedFieldBase && other) = delete;
+
+    //! Copy assignment operator
+    TypedFieldBase & operator=(const TypedFieldBase & other);
+
+    //! Copy assignment operator
+    TypedFieldBase & operator=(const Negative & other);
+
+    //! Copy assignment operators
+    TypedFieldBase & operator=(const EigenRep_t & other);
+
+    //! Unary negative
+    Negative operator-() const;
+
+    //! addition assignment
+    TypedFieldBase & operator+=(const TypedFieldBase & other);
+
+    //! subtraction assignment
+    TypedFieldBase & operator-=(const TypedFieldBase & other);
+
+    const std::type_info & get_stored_typeid() const final { return typeid(T); }
+
+    //! return a vector map onto the underlying data
+    Eigen_map eigen_vec();
+    //! return a const vector map onto the underlying data
+    Eigen_cmap eigen_vec() const;
 
     /**
-     * maintains a tally of the current size, as it cannot be reliably
-     * determined from either `values` or `alt_values` alone.
+     * return a matrix map onto the underlying data with one column per
+     * quadrature point
      */
-    size_t current_size;
+    Eigen_map eigen_quad_pt();
+    /**
+     * return a const matrix map onto the underlying data with one column per
+     * quadrature point
+     */
+    Eigen_cmap eigen_quad_pt() const;
 
+    /**
+     * return a matrix map onto the underlying data with one column per
+     * pixel
+     */
+    Eigen_map eigen_pixel();
+    /**
+     * return a const matrix map onto the underlying data with one column per
+     * pixel
+     */
+    Eigen_cmap eigen_pixel() const;
+
+    template <typename T_int, Mapping Mutability>
+    friend class FieldMap;
+
+    /**
+     * convenience function returns a map of this field, iterable per pixel.
+     *
+     * @param nb_rows optional specification of the number of rows for the
+     * iterate. If left to default value, a matrix of shape `nb_components` ×
+     * `nb_quad_pts` is used
+     */
+    FieldMap<T, Mapping::Mut> get_pixel_map(const Dim_t & nb_rows = Unknown);
+
+    /**
+     * convenience function returns a const map of this field, iterable per
+     * pixel.
+     *
+     * @param nb_rows optional specification of the number of rows for the
+     * iterate. If left to default value, a matrix of shape `nb_components` ×
+     * `nb_quad_pts` is used
+     */
+    FieldMap<T, Mapping::Const>
+    get_pixel_map(const Dim_t & nb_rows = Unknown) const;
+
+    /**
+     * convenience function returns a map of this field, iterable per quadrature
+     * point.
+     *
+     * @param nb_rows optional specification of the number of rows for the
+     * iterate. If left to default value, a column vector is used
+     */
+    FieldMap<T, Mapping::Mut> get_quad_pt_map(const Dim_t & nb_rows = Unknown);
+
+    /**
+     * convenience function returns a const  map of this field, iterable per
+     * quadrature point.
+     *
+     * @param nb_rows optional specification of the number of rows for the
+     * iterate. If left to default value, a column vector is used
+     */
+    FieldMap<T, Mapping::Const>
+    get_quad_pt_map(const Dim_t & nb_rows = Unknown) const;
+
+    //! get the raw data ptr. don't use unless interfacing with external libs
+    T * data() const;
+
+   protected:
+    //! back-end for the public non-const eigen_XXX functions
+    Eigen_map eigen_map(const Dim_t & nb_rows, const Dim_t & nb_cols);
+    //! back-end for the public const eigen_XXX functions
+    Eigen_cmap eigen_map(const Dim_t & nb_rows, const Dim_t & nb_cols) const;
+    //! set the data_ptr
+    void set_data_ptr(T * ptr);
     /**
      * in order to accomodate both registered fields (who own and
      * manage their data) and unregistered temporary field proxies
@@ -275,284 +230,186 @@ namespace muGrid {
      */
     T * data_ptr{};
   };
-}  // namespace muGrid
 
-#include "field_map_dynamic.hh"
+  /**
+   * A `muGrid::TypedField` holds a certain number of components (scalars of
+   * type `T` per quadrature point of a `muGrid::FieldCollection`'s domain.
+   *
+   * @tparam T type of scalar to hold. Must be one of `muGrid::Real`,
+   * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`.
+   */
+  template <typename T>
+  class TypedField : public TypedFieldBase<T> {
+   protected:
+    /**
+     * `Field`s are supposed to only exist in the form of `std::unique_ptr`s
+     * held by a FieldCollection. The `Field` constructor is protected to
+     * ensure this.
+     * @param unique_name unique field name (unique within a collection)
+     * @param nb_components number of components to store per quadrature point
+     * @param collection reference to the holding field collection.
+     */
+    TypedField(const std::string & unique_name, FieldCollection & collection,
+                Dim_t nb_components)
+        : Parent{unique_name, collection, nb_components} {}
 
-namespace muGrid {
+   public:
+    //! base class
+    using Parent = TypedFieldBase<T>;
 
-  /* ---------------------------------------------------------------------- */
-  /* Implementations                                                        */
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T>
-  TypedField<FieldCollection, T>::TypedField(std::string unique_name,
-                                             FieldCollection & collection,
-                                             size_t nb_components)
-      : Parent(unique_name, nb_components, collection), current_size{0} {}
+    //! Eigen type to represent the field's data
+    using EigenRep_t = typename Parent::EigenRep_t;
 
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T>
-  TypedField<FieldCollection, T>::TypedField(
-      std::string unique_name, FieldCollection & collection,
-      Eigen::Ref<EigenRep_t> vec, size_t nb_components)
-      : Parent(unique_name, nb_components, collection), alt_values{vec},
-        current_size{vec.size() / nb_components}, data_ptr{vec.data()} {
-    if (vec.cols() == 1) {
-      // input array represents a vector
-      if (vec.size() % nb_components) {
-        std::stringstream err{};
-        err << "The vector you supplied has a size of " << vec.size()
-            << ", which is not a multiple of the number of components ("
-            << nb_components << ").";
-        throw FieldError(err.str());
-      }
-    } else {
-      // two-dimensional input array has components as columns
-      if (size_t(vec.rows()) != nb_components) {
-        std::stringstream err{};
-        err << "The matrix you supplied has shape " << vec.rows() << " x "
-            << vec.cols() << ", but if the number of columns is not 1, then "
-            << "the number of rows must equal the number of components ("
-            << nb_components << ").";
-        throw FieldError(err.str());
-      }
-    }
-    if (current_size != collection.size()) {
-      std::stringstream err{};
-      err << "The vector or matrix you supplied has size for " << current_size
-          << " pixels with " << nb_components << "components each, but the "
-          << "field collection has " << collection.size() << " pixels.";
-      throw FieldError(err.str());
-    }
-  }
+    //! convenience alias
+    using Negative = typename Parent::Negative;
 
-  /* ---------------------------------------------------------------------- */
-  //! return type_id of stored type
-  template <class FieldCollection, typename T>
-  const std::type_info &
-  TypedField<FieldCollection, T>::get_stored_typeid() const {
-    return typeid(T);
-  }
+    //! Default constructor
+    TypedField() = delete;
 
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T>
-  auto TypedField<FieldCollection, T>::eigen() -> EigenMap_t {
-    return EigenMap_t(this->data(), this->get_nb_components(), this->size());
-  }
+    //! Copy constructor
+    // TypedField(const TypedField & other) = delete;
 
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T>
-  auto TypedField<FieldCollection, T>::eigen() const -> EigenMapConst_t {
-    return EigenMapConst_t(this->data(), this->get_nb_components(),
-                           this->size());
-  }
+    //! Move constructor
+    TypedField(TypedField && other) = delete;
 
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T>
-  auto TypedField<FieldCollection, T>::eigenvec() -> EigenVec_t {
-    return EigenVec_t(this->data(), this->get_nb_components() * this->size(),
-                      1);
-  }
+    //! Destructor
+    virtual ~TypedField() = default;
 
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T>
-  auto TypedField<FieldCollection, T>::eigenvec() const -> EigenVecConst_t {
-    return EigenVecConst_t(this->data(),
-                           this->get_nb_components() * this->size(), 1);
-  }
+    //! Move assignment operator
+    TypedField & operator=(TypedField && other) = delete;
 
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T>
-  auto TypedField<FieldCollection, T>::const_eigenvec() const
-      -> EigenVecConst_t {
-    return EigenVecConst_t(this->data(),
-                           this->get_nb_components() * this->size());
-  }
+    //! Copy assignment operator
+    TypedField & operator=(const Parent & other);
 
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T>
-  auto TypedField<FieldCollection, T>::get_map() -> FieldMap_t {
-    return FieldMap_t(*this);
-  }
+    //! Copy assignment operator
+    TypedField & operator=(const Negative & other);
 
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T>
-  auto TypedField<FieldCollection, T>::get_map() const -> ConstFieldMap_t {
-    return ConstFieldMap_t(*this);
-  }
+    //! Copy assignment operator
+    TypedField & operator=(const EigenRep_t & other);
 
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T>
-  auto TypedField<FieldCollection, T>::get_const_map() const
-      -> ConstFieldMap_t {
-    return ConstFieldMap_t(*this);
-  }
+    void set_zero() final;
+    void set_pad_size(size_t pad_size) final;
 
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T>
-  auto
-  TypedField<FieldCollection, T>::get_zeros_like(std::string unique_name) const
-      -> TypedField & {
-    return make_field<TypedField>(unique_name, this->collection,
-                                  this->nb_components);
-  }
+    //! cast a reference to a base type to this type, with full checks
+    static TypedField & safe_cast(Field & other);
 
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T>
-  template <bool IsGlobal>
-  std::enable_if_t<IsGlobal>
-  TypedField<FieldCollection, T>::fill_from_local(const LocalField_t & local) {
-    static_assert(IsGlobal == Global, "SFINAE parameter, do not touch");
-    if (not(local.get_nb_components() == this->get_nb_components())) {
-      std::stringstream err_str{};
-      err_str << "Fields not compatible: You are trying to write a local "
-              << local.get_nb_components() << "-component field into a global "
-              << this->get_nb_components() << "-component field.";
-      throw std::runtime_error(err_str.str());
-    }
-    auto this_map{this->get_map()};
-    auto local_map{local.get_map()};
-    for (const auto && key_val : local_map.enumerate()) {
-      const auto & key{std::get<0>(key_val)};
-      const auto & value{std::get<1>(key_val)};
-      this_map[key] = value;
-    }
-  }
+    //! cast a const reference to a base type to this type, with full checks
+    static const TypedField & safe_cast(const Field & other);
 
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T>
-  template <bool IsLocal>
-  std::enable_if_t<IsLocal> TypedField<FieldCollection, T>::fill_from_global(
-      const GlobalField_t & global) {
-    static_assert(IsLocal == not Global, "SFINAE parameter, do not touch");
-    if (not(global.get_nb_components() == this->get_nb_components())) {
-      std::stringstream err_str{};
-      err_str << "Fields not compatible: You are trying to write a global "
-              << global.get_nb_components() << "-component field into a local "
-              << this->get_nb_components() << "-component field.";
-      throw std::runtime_error(err_str.str());
-    }
+    /**
+     * cast a reference to a base type to this type safely, plus check whether
+     * it has the right number of components
+     */
+    static TypedField & safe_cast(Field & other, const Dim_t & nb_components);
 
-    auto global_map{global.get_map()};
+    /**
+     * cast a const reference to a base type to this type safely, plus check
+     * whether it has the right number of components
+     */
+    static const TypedField & safe_cast(const Field & other,
+                                         const Dim_t & nb_components);
 
-    auto this_map{this->get_map()};
-    for (auto && key_val : this_map.enumerate()) {
-      const auto & key{std::get<0>(key_val)};
-      auto & value{std::get<1>(key_val)};
-      value = global_map[key];
-    }
-  }
+    size_t buffer_size() const final;
 
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T>
-  void TypedField<FieldCollection, T>::resize(size_t size) {
-    if (this->alt_values) {
-      if (static_cast<size_t>(this->alt_values->size())
-          != size * this->get_nb_components() + this->pad_size) {
-        throw FieldError("Field proxies can't resize.");
-      }
-    } else {
-      if (this->values.size() != size * this->get_nb_components()
-          + this->pad_size) {
-        this->current_size = size;
-        this->values.resize(size * this->get_nb_components() + this->pad_size);
-        this->data_ptr = &this->values.front();
-      }
-    }
-  }
+    /**
+     * add a new scalar value at the end of the field (incurs runtime cost, do
+     * not use this in any hot loop)
+     */
+    void push_back(const T & value);
 
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T>
-  void TypedField<FieldCollection, T>::set_zero() {
-    std::fill(this->values.begin(), this->values.end(), T{});
-  }
+    /**
+     * add a new non-scalar value at the end of the field (incurs runtime cost,
+     * do not use this in any hot loop)
+     */
+    void
+    push_back(const Eigen::Ref<
+              const Eigen::Array<T, Eigen::Dynamic, Eigen::Dynamic>> & value);
 
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T>
-  auto TypedField<FieldCollection, T>::check_ref(Base & other) -> TypedField & {
-    if (typeid(T).hash_code() != other.get_stored_typeid().hash_code()) {
-      std::string err = "Cannot create a Reference of requested type " +
-                        ("for field '" + other.get_name() + "' of type '" +
-                         other.get_stored_typeid().name() + "'");
-      throw std::runtime_error(err);
-    }
-    return static_cast<TypedField &>(other);
-  }
+    //! give access to collections
+    friend FieldCollection;
 
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T>
-  auto TypedField<FieldCollection, T>::check_ref(const Base & other)
-      -> const TypedField & {
-    if (typeid(T).hash_code() != other.get_stored_typeid().hash_code()) {
-      std::string err = "Cannot create a Reference of requested type " +
-                        ("for field '" + other.get_name() + "' of type '" +
-                         other.get_stored_typeid().name() + "'");
-      throw std::runtime_error(err);
-    }
-    return static_cast<const TypedField &>(other);
-  }
+   protected:
+    void resize(size_t size) final;
 
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T>
-  size_t TypedField<FieldCollection, T>::size() const {
-    return this->current_size;
-  }
+    //! storage of the raw field data
+    std::vector<T> values{};
+  };
 
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T>
-  size_t TypedField<FieldCollection, T>::buffer_size() const {
-    return this->values.size();
-  }
+  /**
+   * Wrapper class providing a field view of existing memory. This is
+   * particularly useful when  dealing with input from external libraries (e.g.,
+   * numpy arrays)
+   */
+  template <typename T>
+  class WrappedField : public TypedFieldBase<T> {
+   public:
+    //! base class
+    using Parent = TypedFieldBase<T>;
+    //! convenience alias to the Eigen representation of this field's data
+    using EigenRep_t = typename Parent::EigenRep_t;
 
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T>
-  void TypedField<FieldCollection, T>::set_pad_size(size_t pad_size) {
-    if (this->alt_values) {
-      throw FieldError("You can't set the pad size of a field proxy.");
-    }
-    this->pad_size = pad_size;
-    this->resize(this->size());
-    this->data_ptr = &this->values.front();
-  }
+   public:
+    /**
+     * constructor from a raw pointer. Typically, this would be a reference
+     * to a numpy array from the python bindings.
+     */
+    WrappedField(const std::string & unique_name,
+                  FieldCollection & collection, Dim_t nb_components,
+                  size_t size, T *ptr);
 
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T>
-  T * TypedField<FieldCollection, T>::get_ptr_to_entry(const size_t && index) {
-    return this->data_ptr + this->get_nb_components() * std::move(index);
-  }
+    /**
+     * constructor from an eigen array ref.
+     */
+    WrappedField(const std::string & unique_name,
+                  FieldCollection & collection, Dim_t nb_components,
+                  Eigen::Ref<EigenRep_t> values);
 
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T>
-  const T * TypedField<FieldCollection, T>::get_ptr_to_entry(
-      const size_t && index) const {
-    return this->data_ptr + this->get_nb_components() * std::move(index);
-  }
+    //! Default constructor
+    WrappedField() = delete;
 
-  /* ---------------------------------------------------------------------- */
-  template <class FieldCollection, typename T>
-  template <class Derived>
-  void TypedField<FieldCollection, T>::push_back(
-      const Eigen::DenseBase<Derived> & value) {
-    static_assert(not FieldCollection::Global,
-                  "You can only push_back data into local field collections");
-    if (value.cols() != 1) {
-      std::stringstream err{};
-      err << "Expected a column vector, but received and array with "
-          << value.cols() << " columns.";
-      throw FieldError(err.str());
-    }
-    if (value.rows() != static_cast<Int>(this->get_nb_components())) {
-      std::stringstream err{};
-      err << "Expected a column vector of length " << this->get_nb_components()
-          << ", but received one of length " << value.rows() << ".";
-      throw FieldError(err.str());
-    }
-    for (size_t i = 0; i < this->get_nb_components(); ++i) {
-      this->values.push_back(value(i));
-    }
-    ++this->current_size;
-    this->data_ptr = &this->values.front();
-  }
+    //! Copy constructor
+    WrappedField(const WrappedField & other) = delete;
+
+    //! Move constructor
+    WrappedField(WrappedField && other) = default;
+
+    //! Destructor
+    virtual ~WrappedField() = default;
+
+    //! Copy assignment operator
+    WrappedField & operator=(const WrappedField & other) = delete;
+
+    //! Move assignment operator
+    WrappedField & operator=(WrappedField && other) = delete;
+
+    //! Emulation of a const constructor
+    static std::unique_ptr<const WrappedField>
+    make_const(const std::string & unique_name, FieldCollection & collection,
+               Dim_t nb_components, const Eigen::Ref<const EigenRep_t> values);
+
+    void set_zero() final;
+    void set_pad_size(size_t pad_size) final;
+
+    size_t buffer_size() const final;
+
+    //! give access to collections
+    friend FieldCollection;
+
+   protected:
+    void resize(size_t size) final;
+
+    //! size of the wrapped buffer
+    size_t size;
+  };
+
+  //! Alias for real-valued fields
+  using RealField = TypedField<Real>;
+  //! Alias for complex-valued fields
+  using ComplexField = TypedField<Complex>;
+  //! Alias for integer-valued fields
+  using IntField = TypedField<Int>;
+  //! Alias for unsigned integer-valued fields
+  using UintField = TypedField<Uint>;
 
 }  // namespace muGrid
 

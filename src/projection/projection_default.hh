@@ -39,7 +39,7 @@
 #ifndef SRC_PROJECTION_PROJECTION_DEFAULT_HH_
 #define SRC_PROJECTION_PROJECTION_DEFAULT_HH_
 
-#include <libmugrid/nfield_map_static.hh>
+#include <libmugrid/field_map_static.hh>
 
 #include <libmufft/derivative.hh>
 
@@ -62,16 +62,16 @@ namespace muSpectre {
     using Ccoord = Ccoord_t<DimS>;  //!< cell coordinates type
     using Rcoord = Rcoord_t<DimS>;  //!< spatial coordinates type
     //! global field collection
-    using GFieldCollection_t = muGrid::GlobalNFieldCollection;
+    using GFieldCollection_t = muGrid::GlobalFieldCollection;
     //! Real space second order tensor fields (to be projected)
-    using Field_t = muGrid::TypedNFieldBase<Real>;
+    using Field_t = muGrid::TypedFieldBase<Real>;
     //! fourier-space field containing the projection operator itself
-    using Proj_t = muGrid::ComplexNField;
+    using Proj_t = muGrid::ComplexField;
     //! iterable form of the operator
-    using Proj_map = muGrid::T4NFieldMap<Complex, Mapping::Mut, DimS>;
+    using Proj_map = muGrid::T4FieldMap<Complex, Mapping::Mut, DimS>;
     //! vectorized version of the Fourier-space second-order tensor field
     using Vector_map =
-        muGrid::MatrixNFieldMap<Complex, Mapping::Mut, DimS * DimS, 1>;
+        muGrid::MatrixFieldMap<Complex, Mapping::Mut, DimS * DimS, 1>;
     //! Default constructor
     ProjectionDefault() = delete;
 

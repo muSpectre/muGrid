@@ -41,7 +41,7 @@
 
 #include <libmugrid/T4_map_proxy.hh>
 #include <libmugrid/ccoord_operations.hh>
-#include <libmugrid/mapped_nfield.hh>
+#include <libmugrid/mapped_field.hh>
 
 #include <exception>
 #include <memory>
@@ -83,7 +83,7 @@ namespace muSpectre {
     using T4_const_map = muGrid::T4MatMap<Real, DimM, true>;
 
     //! convenience alias
-    using FieldColl_t = muGrid::GlobalNFieldCollection;
+    using FieldColl_t = muGrid::GlobalFieldCollection;
 
     //! Default constructor
     MaterialEvaluator() = delete;
@@ -174,13 +174,13 @@ namespace muSpectre {
     std::unique_ptr<FieldColl_t> collection;
 
     //! strain field (independent variable)
-    muGrid::MappedT2NField<Real, Mapping::Mut, DimM> strain;
+    muGrid::MappedT2Field<Real, Mapping::Mut, DimM> strain;
 
     //! stress field (result)
-    muGrid::MappedT2NField<Real, Mapping::Mut, DimM> stress;
+    muGrid::MappedT2Field<Real, Mapping::Mut, DimM> stress;
 
     //! field of tangent moduli (result)
-    muGrid::MappedT4NField<Real, Mapping::Mut, DimM> tangent;
+    muGrid::MappedT4Field<Real, Mapping::Mut, DimM> tangent;
 
     //! whether the evaluator has been initialised
     bool is_initialised{false};

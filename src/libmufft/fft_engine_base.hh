@@ -37,8 +37,8 @@
 #define SRC_LIBMUFFT_FFT_ENGINE_BASE_HH_
 
 #include <libmugrid/ccoord_operations.hh>
-#include <libmugrid/nfield_collection_global.hh>
-#include <libmugrid/nfield_typed.hh>
+#include <libmugrid/field_collection_global.hh>
+#include <libmugrid/field_typed.hh>
 
 #include "communicator.hh"
 #include "mufft_common.hh"
@@ -52,20 +52,20 @@ namespace muFFT {
   class FFTEngineBase {
    public:
     //! global FieldCollection
-    using GFieldCollection_t = muGrid::GlobalNFieldCollection;
+    using GFieldCollection_t = muGrid::GlobalFieldCollection;
     //! pixel iterator
     using Pixels = typename GFieldCollection_t::DynamicPixels;
     /**
      * Field type on which to apply the projection.
-     * This is a TypedNFieldBase because it need to be able to hold
-     * either TypedNField or a WrappedNField.
+     * This is a TypedFieldBase because it need to be able to hold
+     * either TypedField or a WrappedField.
      */
-    using Field_t = muGrid::TypedNFieldBase<Real>;
+    using Field_t = muGrid::TypedFieldBase<Real>;
     /**
      * Field type holding a Fourier-space representation of a
      * real-valued second-order tensor field
      */
-    using Workspace_t = muGrid::ComplexNField;
+    using Workspace_t = muGrid::ComplexField;
     /**
      * iterator over Fourier-space discretisation point
      */

@@ -69,9 +69,9 @@ namespace muSpectre {
         dim == fix::mdim,
         "These tests assume that the material and spatial dimension are "
         "identical");
-    using Fields = muGrid::GlobalNFieldCollection;
-    using FieldT = muGrid::RealNField;
-    using FieldMap = muGrid::MatrixNFieldMap<Real, Mapping::Mut, mdim, mdim>;
+    using Fields = muGrid::GlobalFieldCollection;
+    using FieldT = muGrid::RealField;
+    using FieldMap = muGrid::MatrixFieldMap<Real, Mapping::Mut, mdim, mdim>;
     using Vector = Eigen::Matrix<Real, dim, 1>;
 
     Fields fields{sdim, OneQuadPt};

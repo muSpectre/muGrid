@@ -108,7 +108,7 @@ namespace muFFT {
         "These tests assume that the material and spatial dimension are "
         "identical");
     using Fields = muGrid::GlobalFFieldCollection<sdim>;
-    using FieldT = muGrid::RealNField;
+    using FieldT = muGrid::RealField;
     using FieldMap = muGrid::MatrixFieldMap<Real, false, mdim, mdim>;
     using Vector = Eigen::Matrix<Real, dim, 1>;
 

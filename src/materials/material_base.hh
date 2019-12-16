@@ -39,9 +39,9 @@
 #include "common/muSpectre_common.hh"
 #include "materials/materials_toolbox.hh"
 
-#include <libmugrid/nfield_collection_local.hh>
-#include <libmugrid/nfield_typed.hh>
-#include <libmugrid/mapped_nfield.hh>
+#include <libmugrid/field_collection_local.hh>
+#include <libmugrid/field_typed.hh>
+#include <libmugrid/mapped_field.hh>
 
 #include <string>
 #include <tuple>
@@ -127,8 +127,8 @@ namespace muSpectre {
     //! material dimension for  inheritance
     Dim_t get_material_dimension() { return this->material_dimension; }
     //! computes stress
-    virtual void compute_stresses(const muGrid::RealNField & F,
-                                  muGrid::RealNField & P, Formulation form,
+    virtual void compute_stresses(const muGrid::RealField & F,
+                                  muGrid::RealField & P, Formulation form,
                                   SplitCell is_cell_split = SplitCell::no) = 0;
     /**
      * Convenience function to compute stresses, mostly for debugging and
@@ -136,13 +136,13 @@ namespace muSpectre {
      * conversion of the Field_t arguments that can be avoided by using the
      * version with strongly typed field references
      */
-    void compute_stresses(const muGrid::NField & F, muGrid::NField & P,
+    void compute_stresses(const muGrid::Field & F, muGrid::Field & P,
                           Formulation form,
                           SplitCell is_cell_split = SplitCell::no);
     //! computes stress and tangent moduli
     virtual void
-    compute_stresses_tangent(const muGrid::RealNField & F,
-                             muGrid::RealNField & P, muGrid::RealNField & K,
+    compute_stresses_tangent(const muGrid::RealField & F,
+                             muGrid::RealField & P, muGrid::RealField & K,
                              Formulation form,
                              SplitCell is_cell_split = SplitCell::no) = 0;
     /**
@@ -152,8 +152,8 @@ namespace muSpectre {
      * be avoided by using the version with strongly typed field references
      */
 
-    void compute_stresses_tangent(const muGrid::NField & F, muGrid::NField & P,
-                                  muGrid::NField & K, Formulation form,
+    void compute_stresses_tangent(const muGrid::Field & F, muGrid::Field & P,
+                                  muGrid::Field & K, Formulation form,
                                   SplitCell is_cell_split = SplitCell::no);
 
     // this function return the ratio of which the
@@ -164,17 +164,17 @@ namespace muSpectre {
 
     // This function returns the local field containing assigned ratios of this
     // material
-    auto get_assigned_ratio_field() -> muGrid::RealNField &;
+    auto get_assigned_ratio_field() -> muGrid::RealField &;
 
     //! return and iterable proxy over the indices of this material's pixels
-    typename muGrid::LocalNFieldCollection::PixelIndexIterable
+    typename muGrid::LocalFieldCollection::PixelIndexIterable
     get_pixel_indices() const;
 
     /**
      * return and iterable proxy over the indices of this material's quadrature
      * points
      */
-    typename muGrid::LocalNFieldCollection::IndexIterable
+    typename muGrid::LocalFieldCollection::IndexIterable
     get_quad_pt_indices() const;
 
     //! number of quadrature points assigned to this material
@@ -187,7 +187,7 @@ namespace muSpectre {
 
     //! gives access to internal fields
     // TODO(junge): rename get_collection to get_fields
-    inline muGrid::LocalNFieldCollection & get_collection() {
+    inline muGrid::LocalFieldCollection & get_collection() {
       return this->internal_fields;
     }
 
@@ -205,13 +205,13 @@ namespace muSpectre {
 
    protected:
     const std::string name;  //!< material's name (for output and debugging)
-    muGrid::LocalNFieldCollection
+    muGrid::LocalFieldCollection
         internal_fields;  //!< storage for internal variables
     //! spatial dimension of the material
     Dim_t material_dimension;
 
     //!< field holding the assigned ratios of the material
-    std::unique_ptr<muGrid::MappedScalarNField<Real, muGrid::Mapping::Mut>>
+    std::unique_ptr<muGrid::MappedScalarField<Real, muGrid::Mapping::Mut>>
         assigned_ratio{nullptr};
 
     bool is_initialised{false};

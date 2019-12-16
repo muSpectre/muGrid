@@ -370,20 +370,20 @@ namespace muSpectre {
         dim == fix::mdim,
         "These tests assume that the material and spatial dimension are "
         "identical");
-    using Fields = muGrid::GlobalNFieldCollection;
-    using FieldMap = muGrid::MatrixNFieldMap<Real, Mapping::Mut, mdim, mdim>;
-    using FieldMap1D = muGrid::MatrixNFieldMap<Real, Mapping::Mut, 1, mdim>;
+    using Fields = muGrid::GlobalFieldCollection;
+    using FieldMap = muGrid::MatrixFieldMap<Real, Mapping::Mut, mdim, mdim>;
+    using FieldMap1D = muGrid::MatrixFieldMap<Real, Mapping::Mut, 1, mdim>;
     using Vector = Eigen::Matrix<Real, dim, 1>;
 
     Fields fields{sdim, OneQuadPt};
     // displacement field
-    muGrid::RealNField & f_disp{
+    muGrid::RealField & f_disp{
         fields.register_real_field("displacement", mdim)};
     // gradient of the displacement field
-    muGrid::RealNField & f_grad{
+    muGrid::RealField & f_grad{
         fields.register_real_field("gradient", mdim * mdim)};
     // field for comparision
-    muGrid::RealNField & f_var{
+    muGrid::RealField & f_var{
         fields.register_real_field("working field", mdim * mdim)};
 
     FieldMap1D disp(f_disp);
@@ -485,14 +485,14 @@ namespace muSpectre {
     // check if the discrete projection operator is still a projection operator.
     // Thus it has to be idempotent, G^2=G or G:G:test_field = G:test_field.
     constexpr Dim_t dim{fix::sdim}, sdim{fix::sdim}, mdim{fix::mdim};
-    using Fields = muGrid::GlobalNFieldCollection;
-    using FieldMap = muGrid::MatrixNFieldMap<Real, Mapping::Mut, mdim, mdim>;
+    using Fields = muGrid::GlobalFieldCollection;
+    using FieldMap = muGrid::MatrixFieldMap<Real, Mapping::Mut, mdim, mdim>;
     using Vector = Eigen::Matrix<Real, dim, 1>;
 
     Fields fields{sdim, OneQuadPt};
-    muGrid::RealNField & f_grad{
+    muGrid::RealField & f_grad{
         fields.register_real_field("gradient", mdim * mdim)};
-    muGrid::RealNField & f_grad_test{
+    muGrid::RealField & f_grad_test{
         fields.register_real_field("gradient_test", mdim * mdim)};
     FieldMap grad(f_grad);
     FieldMap grad_test(f_grad_test);

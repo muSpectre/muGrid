@@ -38,12 +38,7 @@
 #ifndef SRC_PROJECTION_PROJECTION_FINITE_STRAIN_HH_
 #define SRC_PROJECTION_PROJECTION_FINITE_STRAIN_HH_
 
-#include <libmugrid/field_collection.hh>
-#include <libmugrid/field_map.hh>
 
-#include <libmufft/derivative.hh>
-
-#include "common/muSpectre_common.hh"
 #include "projection/projection_default.hh"
 
 namespace muSpectre {
@@ -61,10 +56,10 @@ namespace muSpectre {
     //! gradient, i.e. derivatives in each Cartesian direction
     using Gradient_t = typename Parent::Gradient_t;
     //! Field type on which to apply the projection
-    using Proj_map = muGrid::T4NFieldMap<Real, Mapping::Mut, DimS>;
+    using Proj_map = muGrid::T4FieldMap<Real, Mapping::Mut, DimS>;
     //! iterable vectorised version of the Fourier-space tensor field
     using Vector_map =
-        muGrid::MatrixNFieldMap<Complex, Mapping::Mut, DimS * DimS, 1>;
+        muGrid::MatrixFieldMap<Complex, Mapping::Mut, DimS * DimS, 1>;
 
     //! Default constructor
     ProjectionFiniteStrain() = delete;

@@ -39,40 +39,40 @@ if(POLICY CMP0076)
 endif()
 
 set(mugrid_HDRS
-  ccoord_operations.hh
-  field_base.hh
-  field_collection_base.hh
-  field_collection_global.hh
-  field_collection.hh
-  field_collection_local.hh
-  field_helpers.hh
-  field.hh
-  field_map_base.hh
-  field_map_dynamic.hh
+  numpy_tools.hh
+  tensor_algebra.hh
+  T4_map_proxy.hh
+  mapped_state_field.hh
+  cpp_compliance.hh
+  eigen_tools.hh
+  mapped_field.hh
+  ref_array.hh
+  field_map_static.hh
+  ref_vector.hh
   field_map.hh
-  field_map_matrixlike.hh
-  field_map_scalar.hh
-  field_map_tensor.hh
-  field_typed.hh
   grid_common.hh
   iterators.hh
-  numpy.hh
-  statefield.hh
-  eigen_tools.hh
-  T4_map_proxy.hh
-  tensor_algebra.hh
+  state_field.hh
+  field_collection_local.hh
+  state_field_map_static.hh
+  field_collection_global.hh
+  field_typed.hh
+  field.hh
+  field_collection.hh
+  ccoord_operations.hh
+  state_field_map.hh
   )
 
 set(mugrid_SRCS
   ccoord_operations.cc
-  nfield_collection.cc
-  nfield_collection_global.cc
-  nfield_collection_local.cc
-  nfield.cc
-  nfield_typed.cc
-  nfield_map.cc
-  state_nfield.cc
-  state_nfield_map.cc
+  field_collection.cc
+  field_collection_global.cc
+  field_collection_local.cc
+  field.cc
+  field_typed.cc
+  field_map.cc
+  state_field.cc
+  state_field_map.cc
   )
 
 add_library(muGrid "")

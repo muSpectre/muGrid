@@ -36,7 +36,7 @@
 
 #include "materials/material_linear_elastic_generic1.hh"
 #include "materials/material_linear_elastic_generic2.hh"
-#include "cell/ncell.hh"
+#include "cell/cell.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -59,7 +59,7 @@ void add_material_linear_elastic_generic1_helper(py::module & mod) {
   const auto name{name_stream.str()};
 
   using Mat_t = MaterialLinearElasticGeneric1<Dim>;
-  using Cell_t = NCell;
+  using Cell_t = Cell;
 
   py::class_<Mat_t, MaterialBase, std::shared_ptr<Mat_t>>(
       mod, name.c_str())
@@ -103,7 +103,7 @@ void add_material_linear_elastic_generic2_helper(py::module & mod) {
   const auto name{name_stream.str()};
 
   using Mat_t = MaterialLinearElasticGeneric2<Dim>;
-  using Cell_t = NCell;
+  using Cell_t = Cell;
 
   py::class_<Mat_t, MaterialBase, std::shared_ptr<Mat_t>>(
       mod, name.c_str())

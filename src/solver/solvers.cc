@@ -36,7 +36,7 @@
 #include "solver/solvers.hh"
 
 #include <libmugrid/iterators.hh>
-#include <libmugrid/mapped_nfield.hh>
+#include <libmugrid/mapped_field.hh>
 
 #include <Eigen/Dense>
 
@@ -50,7 +50,7 @@ namespace muSpectre {
                          "]");
 
   //--------------------------------------------------------------------------//
-  std::vector<OptimizeResult> newton_cg(NCell & cell,
+  std::vector<OptimizeResult> newton_cg(Cell & cell,
                                         const LoadSteps_t & load_steps,
                                         SolverBase & solver, Real newton_tol,
                                         Real equil_tol, Dim_t verbose,
@@ -64,12 +64,12 @@ namespace muSpectre {
     // create a field collection to store workspaces
     auto field_collection{cell.get_fields().get_empty_clone()};
     // Corresponds to symbol δF or δε
-    muGrid::MappedField<muGrid::NFieldMap<Real, Mapping::Mut>> incrF_field{
+    muGrid::MappedField<muGrid::FieldMap<Real, Mapping::Mut>> incrF_field{
         "incrF", shape[0], shape[1], muGrid::Iteration::QuadPt,
         field_collection};
 
     // field to store the rhs for cg calculations
-    muGrid::MappedField<muGrid::NFieldMap<Real, Mapping::Mut>> rhs_field{
+    muGrid::MappedField<muGrid::FieldMap<Real, Mapping::Mut>> rhs_field{
         "rhs", shape[0], shape[1], muGrid::Iteration::QuadPt, field_collection};
 
     solver.initialise();
@@ -193,7 +193,7 @@ namespace muSpectre {
       }
       // updating cell strain with the difference of the current and previous
       // strain input.
-      for (auto && strain : muGrid::NFieldMap<Real, Mapping::Mut>(
+      for (auto && strain : muGrid::FieldMap<Real, Mapping::Mut>(
                F, shape[0], muGrid::Iteration::QuadPt)) {
         strain += macro_strain - previous_macro_strain;
       }
@@ -269,7 +269,7 @@ namespace muSpectre {
                     << ", tol = " << newton_tol << std::endl;
 
           if (verbose - 1 > 1) {
-            using StrainMap_t = muGrid::NFieldMap<Real, Mapping::Const>;
+            using StrainMap_t = muGrid::FieldMap<Real, Mapping::Const>;
             std::cout << "<" << strain_symb << "> =" << std::endl
                       << StrainMap_t{F, shape[0]}.mean() << std::endl;
           }
@@ -306,7 +306,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  std::vector<OptimizeResult> de_geus(NCell & cell,
+  std::vector<OptimizeResult> de_geus(Cell & cell,
                                       const LoadSteps_t & load_steps,
                                       SolverBase & solver, Real newton_tol,
                                       Real equil_tol, Dim_t verbose,
@@ -320,17 +320,17 @@ namespace muSpectre {
     // create a field collection to store workspaces
     auto field_collection{cell.get_fields().get_empty_clone()};
     // Corresponds to symbol δF or δε
-    muGrid::MappedField<muGrid::NFieldMap<Real, Mapping::Mut>> incrF_field{
+    muGrid::MappedField<muGrid::FieldMap<Real, Mapping::Mut>> incrF_field{
         "incrF", shape[0], shape[1], muGrid::Iteration::QuadPt,
         field_collection};
 
     // Corresponds to symbol ΔF or Δε
-    muGrid::MappedField<muGrid::NFieldMap<Real, Mapping::Mut>> DeltaF_field{
+    muGrid::MappedField<muGrid::FieldMap<Real, Mapping::Mut>> DeltaF_field{
         "DeltaF", shape[0], shape[1], muGrid::Iteration::QuadPt,
         field_collection};
 
     // field to store the rhs for cg calculations
-    muGrid::MappedField<muGrid::NFieldMap<Real, Mapping::Mut>> rhs_field{
+    muGrid::MappedField<muGrid::FieldMap<Real, Mapping::Mut>> rhs_field{
         "rhs", shape[0], shape[1], muGrid::Iteration::QuadPt, field_collection};
     solver.initialise();
 
@@ -535,7 +535,7 @@ namespace muSpectre {
                     << ", tol = " << newton_tol << std::endl;
 
           if (verbose - 1 > 1) {
-            using StrainMap_t = muGrid::NFieldMap<Real, Mapping::Const>;
+            using StrainMap_t = muGrid::FieldMap<Real, Mapping::Const>;
             std::cout << "<" << strain_symb << "> =" << std::endl
                       << StrainMap_t{F, shape[0]}.mean() << std::endl;
           }

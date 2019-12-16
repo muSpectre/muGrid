@@ -57,7 +57,7 @@ namespace py = pybind11;
 template <class Solver>
 void add_iterative_solver_helper(py::module & mod, std::string name) {
   py::class_<Solver, typename Solver::Parent>(mod, name.c_str())
-      .def(py::init<muSpectre::NCell &, Real, Uint, bool>(), "cell"_a, "tol"_a,
+      .def(py::init<muSpectre::Cell &, Real, Uint, bool>(), "cell"_a, "tol"_a,
            "maxiter"_a, "verbose"_a = false)
     .def_property_readonly("name", &Solver::get_name);
 }
@@ -89,7 +89,7 @@ void add_newton_cg_helper(py::module & mod) {
       .value("No", IsStrainInitialised::False);
 
   mod.def(name,
-          [](muSpectre::NCell & s, const grad & g, solver & so, Real nt,
+          [](muSpectre::Cell & s, const grad & g, solver & so, Real nt,
              Real eqt, Dim_t verb,
              IsStrainInitialised strain_init) -> OptimizeResult {
             Eigen::MatrixXd tmp{g};
@@ -99,7 +99,7 @@ void add_newton_cg_helper(py::module & mod) {
           "verbose"_a = 0,
           "IsStrainInitialised"_a = IsStrainInitialised::False);
   mod.def(name,
-          [](muSpectre::NCell & s, const grad_vec & g, solver & so, Real nt,
+          [](muSpectre::Cell & s, const grad_vec & g, solver & so, Real nt,
              Real eqt, Dim_t verb,
              IsStrainInitialised strain_init) -> std::vector<OptimizeResult> {
             return newton_cg(s, g, so, nt, eqt, verb, strain_init);
@@ -116,7 +116,7 @@ void add_de_geus_helper(py::module & mod) {
   using grad_vec = muSpectre::LoadSteps_t;
 
   mod.def(name,
-          [](muSpectre::NCell & s, const grad & g, solver & so, Real nt,
+          [](muSpectre::Cell & s, const grad & g, solver & so, Real nt,
              Real eqt, Dim_t verb) -> OptimizeResult {
             Eigen::MatrixXd tmp{g};
             return de_geus(s, tmp, so, nt, eqt, verb);
@@ -124,7 +124,7 @@ void add_de_geus_helper(py::module & mod) {
           "cell"_a, "ΔF₀"_a, "solver"_a, "newton_tol"_a, "equilibrium_tol"_a,
           "verbose"_a = 0);
   mod.def(name,
-          [](muSpectre::NCell & s, const grad_vec & g, solver & so, Real nt,
+          [](muSpectre::Cell & s, const grad_vec & g, solver & so, Real nt,
              Real eqt, Dim_t verb) -> std::vector<OptimizeResult> {
             return de_geus(s, g, so, nt, eqt, verb);
           },

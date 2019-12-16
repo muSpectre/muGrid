@@ -37,8 +37,8 @@
 
 #include <libmufft/fftw_engine.hh>
 #include <libmugrid/ccoord_operations.hh>
-#include <libmugrid/nfield_collection.hh>
-#include <libmugrid/nfield_map_static.hh>
+#include <libmugrid/field_collection.hh>
+#include <libmugrid/field_map_static.hh>
 #include <libmugrid/iterators.hh>
 
 #include <boost/mpl/list.hpp>
@@ -90,7 +90,7 @@ namespace muFFT {
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(fft_test, Fix, fixlist, Fix) {
     Fix::engine.initialise(FFT_PlanFlags::estimate);
-    using FC_t = muGrid::GlobalNFieldCollection;
+    using FC_t = muGrid::GlobalFieldCollection;
     FC_t fc(Fix::sdim, OneQuadPt);
     auto & input{fc.register_real_field("input", Fix::mdim * Fix::mdim)};
     auto & ref{fc.register_real_field("reference", Fix::mdim * Fix::mdim)};
@@ -98,7 +98,7 @@ namespace muFFT {
     fc.initialise(Fix::res(), Fix::loc());
 
     using map_t =
-        muGrid::MatrixNFieldMap<Real, Mapping::Mut, Fix::mdim, Fix::mdim>;
+        muGrid::MatrixFieldMap<Real, Mapping::Mut, Fix::mdim, Fix::mdim>;
     map_t inmap{input};
     auto refmap{map_t{ref}};
     auto resultmap{map_t{result}};
@@ -112,7 +112,7 @@ namespace muFFT {
     }
     auto & complex_field = Fix::engine.fft(input);
     using cmap_t =
-        muGrid::MatrixNFieldMap<Complex, Mapping::Mut, Fix::mdim, Fix::mdim>;
+        muGrid::MatrixFieldMap<Complex, Mapping::Mut, Fix::mdim, Fix::mdim>;
     cmap_t complex_map(complex_field);
     Real error = complex_map[0].imag().norm();
     BOOST_CHECK_LT(error, tol);

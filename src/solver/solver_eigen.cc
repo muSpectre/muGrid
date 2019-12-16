@@ -42,7 +42,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <class SolverType>
-  SolverEigen<SolverType>::SolverEigen(NCell & cell, Real tol, Uint maxiter,
+  SolverEigen<SolverType>::SolverEigen(Cell & cell, Real tol, Uint maxiter,
                                        bool verbose)
       : Parent(cell, tol, maxiter, verbose), adaptor{cell.get_adaptor()},
         solver{}, result{} {}

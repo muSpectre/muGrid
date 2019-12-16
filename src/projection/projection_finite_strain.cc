@@ -37,7 +37,6 @@
 
 #include "projection/projection_finite_strain.hh"
 
-#include <libmugrid/field_map.hh>
 #include <libmugrid/iterators.hh>
 #include <libmufft/fft_utils.hh>
 #include <libmufft/fftw_engine.hh>

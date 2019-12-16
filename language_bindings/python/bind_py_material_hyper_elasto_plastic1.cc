@@ -36,7 +36,7 @@
 #include "common/muSpectre_common.hh"
 #include "materials/stress_transformations_Kirchhoff.hh"
 #include "materials/material_hyper_elasto_plastic1.hh"
-#include "cell/ncell.hh"
+#include "cell/cell.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -61,7 +61,7 @@ void add_material_hyper_elasto_plastic1_helper(py::module & mod) {
   const auto name{name_stream.str()};
 
   using Mat_t = muSpectre::MaterialHyperElastoPlastic1<Dim>;
-  using Cell_t = muSpectre::NCell;
+  using Cell_t = muSpectre::Cell;
 
   py::class_<Mat_t, muSpectre::MaterialBase, std::shared_ptr<Mat_t>>(
       mod, name.c_str())

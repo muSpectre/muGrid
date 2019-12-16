@@ -47,7 +47,7 @@
 #include "materials/material_evaluator.hh"
 #include "materials/iterable_proxy.hh"
 
-#include "cell/ncell.hh"
+#include "cell/cell.hh"
 
 #include <tuple>
 #include <type_traits>
@@ -121,7 +121,7 @@ namespace muSpectre {
 
     //! Factory
     template <class... ConstructorArgs>
-    static Material & make(NCell & cell, ConstructorArgs &&... args);
+    static Material & make(Cell & cell, ConstructorArgs &&... args);
     /** Factory
      * takes all arguments after the name of the underlying
      * Material's constructor. E.g., if the underlying material is a
@@ -152,13 +152,13 @@ namespace muSpectre {
     using Parent::compute_stresses;
     using Parent::compute_stresses_tangent;
     //! computes stress
-    void compute_stresses(const muGrid::RealNField & F, muGrid::RealNField & P,
+    void compute_stresses(const muGrid::RealField & F, muGrid::RealField & P,
                           Formulation form,
                           SplitCell is_cell_split = SplitCell::no) final;
     //! computes stress and tangent modulus
     void
-    compute_stresses_tangent(const muGrid::RealNField & F,
-                             muGrid::RealNField & P, muGrid::RealNField & K,
+    compute_stresses_tangent(const muGrid::RealField & F,
+                             muGrid::RealField & P, muGrid::RealField & K,
                              Formulation form,
                              SplitCell is_cell_split = SplitCell::no) final;
 
@@ -175,17 +175,17 @@ namespace muSpectre {
     //! __attribute__ required by g++-6 and g++-7 because of this bug:
     //! https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80947
     template <Formulation Form, SplitCell is_cell_split = SplitCell::no>
-    inline void compute_stresses_worker(const muGrid::RealNField & F,
-                                        muGrid::RealNField & P)
+    inline void compute_stresses_worker(const muGrid::RealField & F,
+                                        muGrid::RealField & P)
         __attribute__((visibility("default")));
 
     //! computes stress with the formulation available at compile time
     //! __attribute__ required by g++-6 and g++-7 because of this bug:
     //! https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80947
     template <Formulation Form, SplitCell is_cell_split = SplitCell::no>
-    inline void compute_stresses_worker(const muGrid::RealNField & F,
-                                        muGrid::RealNField & P,
-                                        muGrid::RealNField & K)
+    inline void compute_stresses_worker(const muGrid::RealField & F,
+                                        muGrid::RealField & P,
+                                        muGrid::RealField & K)
         __attribute__((visibility("default")));
   };
 
@@ -210,7 +210,7 @@ namespace muSpectre {
   template <class Material, Dim_t DimM>
   template <class... ConstructorArgs>
   Material &
-  MaterialMuSpectre<Material, DimM>::make(NCell & cell,
+  MaterialMuSpectre<Material, DimM>::make(Cell & cell,
                                           ConstructorArgs &&... args) {
     auto mat = std::make_unique<Material>(args...);
     auto & mat_ref = *mat;
@@ -260,7 +260,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <class Material, Dim_t DimM>
   void MaterialMuSpectre<Material, DimM>::compute_stresses(
-      const muGrid::RealNField & F, muGrid::RealNField & P, Formulation form,
+      const muGrid::RealField & F, muGrid::RealField & P, Formulation form,
       SplitCell is_cell_split) {
     switch (form) {
     case Formulation::finite_strain: {
@@ -308,8 +308,8 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <class Material, Dim_t DimM>
   void MaterialMuSpectre<Material, DimM>::compute_stresses_tangent(
-      const muGrid::RealNField & F, muGrid::RealNField & P,
-      muGrid::RealNField & K, Formulation form, SplitCell is_cell_split) {
+      const muGrid::RealField & F, muGrid::RealField & P,
+      muGrid::RealField & K, Formulation form, SplitCell is_cell_split) {
     switch (form) {
     case Formulation::finite_strain: {
       switch (is_cell_split) {
@@ -357,8 +357,8 @@ namespace muSpectre {
   template <class Material, Dim_t DimM>
   template <Formulation Form, SplitCell is_cell_split>
   void MaterialMuSpectre<Material, DimM>::compute_stresses_worker(
-      const muGrid::RealNField & F, muGrid::RealNField & P,
-      muGrid::RealNField & K) {
+      const muGrid::RealField & F, muGrid::RealField & P,
+      muGrid::RealField & K) {
     /* These lambdas are executed for every integration point.
 
        F contains the transformation gradient for finite strain calculations
@@ -426,7 +426,7 @@ namespace muSpectre {
   template <class Material, Dim_t DimM>
   template <Formulation Form, SplitCell is_cell_split>
   void MaterialMuSpectre<Material, DimM>::compute_stresses_worker(
-      const muGrid::RealNField & F, muGrid::RealNField & P) {
+      const muGrid::RealField & F, muGrid::RealField & P) {
     /* These lambdas are executed for every integration point.
 
        F contains the transformation gradient for finite strain calculations and

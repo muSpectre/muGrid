@@ -35,8 +35,8 @@
 
 #include "materials/material_base.hh"
 
-#include <libmugrid/nfield.hh>
-#include <libmugrid/nfield_typed.hh>
+#include <libmugrid/field.hh>
+#include <libmugrid/field_typed.hh>
 
 namespace muSpectre {
 
@@ -69,12 +69,12 @@ namespace muSpectre {
     this->assigned_ratio->get_field().push_back(ratio);
   }
 
-  void MaterialBase::compute_stresses(const muGrid::NField & F,
-                                      muGrid::NField & P, Formulation form,
+  void MaterialBase::compute_stresses(const muGrid::Field & F,
+                                      muGrid::Field & P, Formulation form,
                                       SplitCell is_cell_split) {
     const auto t2_dim{muGrid::ipow(this->material_dimension, 2)};
-    const auto & real_F{muGrid::RealNField::safe_cast(F, t2_dim)};
-    auto & real_P{muGrid::RealNField::safe_cast(P, t2_dim)};
+    const auto & real_F{muGrid::RealField::safe_cast(F, t2_dim)};
+    auto & real_P{muGrid::RealField::safe_cast(P, t2_dim)};
     this->compute_stresses(real_F, real_P, form, is_cell_split);
   }
 
@@ -82,7 +82,7 @@ namespace muSpectre {
   void MaterialBase::allocate_optional_fields(SplitCell is_cell_split) {
     if (is_cell_split == SplitCell::simple) {
       this->assigned_ratio = std::make_unique<
-          muGrid::MappedScalarNField<Real, muGrid::Mapping::Mut>>(
+          muGrid::MappedScalarField<Real, muGrid::Mapping::Mut>>(
           "ratio", this->internal_fields);
     }
   }
@@ -110,27 +110,27 @@ namespace muSpectre {
   // }
 
   /* ---------------------------------------------------------------------- */
-  void MaterialBase::compute_stresses_tangent(const muGrid::NField & F,
-                                              muGrid::NField & P,
-                                              muGrid::NField & K,
+  void MaterialBase::compute_stresses_tangent(const muGrid::Field & F,
+                                              muGrid::Field & P,
+                                              muGrid::Field & K,
                                               Formulation form,
                                               SplitCell is_cell_split) {
     const auto t2_dim{muGrid::ipow(this->material_dimension, 2)};
-    const auto & real_F{muGrid::RealNField::safe_cast(F, t2_dim)};
-    auto & real_P{muGrid::RealNField::safe_cast(P, t2_dim)};
-    auto & real_K{muGrid::RealNField::safe_cast(K, muGrid::ipow(t2_dim, 2))};
+    const auto & real_F{muGrid::RealField::safe_cast(F, t2_dim)};
+    auto & real_P{muGrid::RealField::safe_cast(P, t2_dim)};
+    auto & real_K{muGrid::RealField::safe_cast(K, muGrid::ipow(t2_dim, 2))};
     this->compute_stresses_tangent(real_F, real_P, real_K, form, is_cell_split);
   }
 
   /* ---------------------------------------------------------------------- */
   auto MaterialBase::get_pixel_indices() const ->
-      typename muGrid::LocalNFieldCollection::PixelIndexIterable {
+      typename muGrid::LocalFieldCollection::PixelIndexIterable {
     return this->internal_fields.get_pixel_indices_fast();
   }
 
   /* ---------------------------------------------------------------------- */
   auto MaterialBase::get_quad_pt_indices() const ->
-      typename muGrid::LocalNFieldCollection::IndexIterable {
+      typename muGrid::LocalFieldCollection::IndexIterable {
     return this->internal_fields.get_quad_pt_indices();
   }
 

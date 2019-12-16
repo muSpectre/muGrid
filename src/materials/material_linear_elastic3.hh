@@ -39,7 +39,7 @@
 
 #include "materials/material_linear_elastic1.hh"
 
-#include <libmugrid/mapped_nfield.hh>
+#include <libmugrid/mapped_field.hh>
 
 #include <Eigen/Dense>
 
@@ -54,12 +54,12 @@ namespace muSpectre {
   template <Dim_t DimM>
   struct MaterialMuSpectre_traits<MaterialLinearElastic3<DimM>> {
     //! expected map type for strain fields
-    using StrainMap_t = muGrid::T2NFieldMap<Real, Mapping::Const, DimM>;
+    using StrainMap_t = muGrid::T2FieldMap<Real, Mapping::Const, DimM>;
     //! expected map type for stress fields
-    using StressMap_t = muGrid::T2NFieldMap<Real, Mapping::Mut, DimM>;
+    using StressMap_t = muGrid::T2FieldMap<Real, Mapping::Mut, DimM>;
 
     //! expected map type for tangent stiffness fields
-    using TangentMap_t = muGrid::T4NFieldMap<Real, Mapping::Mut, DimM>;
+    using TangentMap_t = muGrid::T4FieldMap<Real, Mapping::Mut, DimM>;
 
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
@@ -93,7 +93,7 @@ namespace muSpectre {
                               typename traits::TangentMap_t::reference>;
 
     //! short hand for storage type of elastic tensors
-    using StiffnessField_t = muGrid::MappedT4NField<Real, Mapping::Const, DimM>;
+    using StiffnessField_t = muGrid::MappedT4Field<Real, Mapping::Const, DimM>;
 
     //! Default constructor
     MaterialLinearElastic3() = delete;
