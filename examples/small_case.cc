@@ -44,33 +44,33 @@
 using namespace muSpectre;
 
 int main() {
-  constexpr Dim_t dim{twoD};
+  constexpr Dim_t Dim{twoD};
 
-  Ccoord_t<dim> nb_grid_pts{11, 11};
+  DynCcoord_t nb_grid_pts{11, 11};
 
-  Rcoord_t<dim> lengths{
-      muGrid::CcoordOps::get_cube<dim>(11.)};  // {5.2e-9, 8.3e-9, 8.3e-9};
+  DynRcoord_t lengths{
+      muGrid::CcoordOps::get_cube<Dim>(11.)};  // {5.2e-9, 8.3e-9, 8.3e-9};
   Formulation form{Formulation::finite_strain};
 
   auto rve{make_cell(nb_grid_pts, lengths, form)};
 
-  auto & hard{MaterialLinearElastic1<dim, dim>::make(rve, "hard", 210., .33)};
-  auto & soft{MaterialLinearElastic1<dim, dim>::make(rve, "soft", 70., .33)};
+  auto & hard{MaterialLinearElastic1<Dim>::make(rve, "hard", Dim, OneQuadPt,
+                                                210., .33)};
+  auto & soft{
+      MaterialLinearElastic1<Dim>::make(rve, "soft", Dim, OneQuadPt, 70., .33)};
 
-  for (auto && tup : akantu::enumerate(rve)) {
-    auto & i = std::get<0>(tup);
-    auto & pixel = std::get<1>(tup);
+  for (auto && i : rve.get_pixel_indices()) {
     if (i < 3) {
-      hard.add_pixel(pixel);
+      hard.add_pixel(i);
     } else {
-      soft.add_pixel(pixel);
+      soft.add_pixel(i);
     }
   }
 
   rve.initialise();
 
   Real tol{1e-6};
-  Eigen::MatrixXd Del0(dim, dim);
+  Eigen::MatrixXd Del0(Dim, Dim);
   Del0 << 0, .1, 0, 0;
 
   Uint maxiter{31};

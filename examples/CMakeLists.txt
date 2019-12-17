@@ -38,11 +38,9 @@
 
 #TODO: reactivate
 set(binaries
-  #   demonstrator1.cc
   demonstrator_dynamic_solve.cc
-  #   demonstrator2.cc
-  #   hyper-elasticity.cc
-  #   small_case.cc
+  hyper-elasticity.cc
+  small_case.cc
   )
 
 # if(${MUSPECTRE_MPI_PARALLEL})
@@ -59,24 +57,24 @@ foreach(binaryfile ${binaries})
   muTools_move_to_project(${binaryname})
 endforeach()
 
-# # or copy them
-# file(GLOB pybins "${CMAKE_SOURCE_DIR}/bin/*.py")
-# foreach(pybin ${pybins})
-#   get_filename_component(binaryname  ${pybin} NAME_WE)
-#   configure_file(
-#     ${pybin}
-#     "${CMAKE_BINARY_DIR}/${binaryname}.py"
-#     COPYONLY)
-# endforeach()
+# or copy them
+file(GLOB pyexamples "${CMAKE_SOURCE_DIR}/examples/*.py")
+foreach(pyexample ${pyexamples})
+  get_filename_component(binaryname  ${pyexample} NAME_WE)
+  configure_file(
+    ${pyexample}
+    "${CMAKE_BINARY_DIR}/${binaryname}.py"
+    COPYONLY)
+endforeach()
 
-# # additional files to copy
-# set(FILES_FOR_COPY
-#   ${CMAKE_CURRENT_SOURCE_DIR}/odd_image.npz)
+# additional files to copy
+set(FILES_FOR_COPY
+  ${CMAKE_CURRENT_SOURCE_DIR}/odd_image.npz)
 
-# foreach(file_for_copy ${FILES_FOR_COPY})
-#   get_filename_component(binaryname  ${file_for_copy} NAME)
-#   configure_file(
-#     ${file_for_copy}
-#     "${PROJECT_BINARY_DIR}/${binaryname}"
-#     COPYONLY)
-# endforeach()
+foreach(file_for_copy ${FILES_FOR_COPY})
+  get_filename_component(binaryname  ${file_for_copy} NAME)
+  configure_file(
+    ${file_for_copy}
+    "${PROJECT_BINARY_DIR}/${binaryname}"
+    COPYONLY)
+endforeach()

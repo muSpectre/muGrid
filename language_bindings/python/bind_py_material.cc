@@ -43,7 +43,6 @@
 
 #include <sstream>
 #include <string>
-#include <tuple>
 
 using muSpectre::Dim_t;
 using muSpectre::Real;
