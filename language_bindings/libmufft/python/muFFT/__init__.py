@@ -95,8 +95,6 @@ def FFT(nb_grid_pts, nb_dof_per_pixel=1, fft='fftw', communicator=None):
     fft: string
         FFT engine to use. Options are 'fftw', 'fftwmpi', 'pfft' and 'p3dfft'.
         Default: 'fftw'.
-    initialise: bool
-        Initialise the engine.
     communicator: mpi4py or muFFT communicator
         communicator object passed to parallel FFT engines. Note that
         the default 'fftw' engine does not support parallel execution.

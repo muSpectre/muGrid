@@ -77,7 +77,7 @@ def make_grid(lengths, nb_grid_pts):
 
 def reshape_gradient(F, nb_grid_pts):
     """reshapes a flattened second-rank tensor into a multidimensional array of
-    shape nb_grid_pts + [dim, dim].
+    shape [dim, dim] + nb_grid_pts.
 
     Note: this reshape entails a copy, because of the column-major to
     row-major transposition between Eigen and numpy
@@ -88,7 +88,7 @@ def reshape_gradient(F, nb_grid_pts):
                    spatial dimension (dtype = int)
 
     Returns:
-    np.ndarray of the shape nb_grid_pts + [dim, dim]
+    np.ndarray of the shape [dim, dim] + nb_grid_pts
     """
 
     dim = len(nb_grid_pts)
@@ -103,9 +103,10 @@ def reshape_gradient(F, nb_grid_pts):
             expected_input_shape, F.shape))
 
     order = list(range(dim+2))
-    order[-2:] = reversed(order[-2:])
-    order[0:dim] = reversed(order[0:dim])
-    return F.reshape(output_shape).transpose(*order)
+    new_order = []
+    new_order[0:2] = reversed(order[-2:])
+    new_order[2:] = reversed(order[0:dim])
+    return F.reshape(output_shape).transpose(*new_order)
 
 
 def complement_periodically(array, dim):
@@ -121,12 +122,13 @@ def complement_periodically(array, dim):
     np.ndarray with left/lower entries added in the right/upper boundaries
     """
     shape = list(array.shape)
-    shape[:dim] = [d+1 for d in shape[:dim]]
+    tensor_rank = len(shape) - dim
+    shape[-dim:] = [d+1 for d in shape[-dim:]]
     out_arr = np.empty(shape, dtype = array.dtype)
     sl = tuple([slice(0, s) for s in array.shape])
     out_arr[sl] = array
 
-    for i in range(dim):
+    for i in range(tensor_rank, dim + tensor_rank):
         lower_slice = tuple([slice(0,s) if (d != i) else  0 for (d,s) in
                              enumerate(shape)])
         upper_slice = tuple([slice(0,s) if (d != i) else -1 for (d,s) in
@@ -189,7 +191,7 @@ def integrate_tensor_2(grad, fft_vec, fft_mat, gradient_op, grid_spacing):
     gradient operator. The integrated field is returned on the node positions.
 
     Keyword Arguments:
-    grad           -- np.ndarray of shape nb_grid_pts_per_dim + [dim, dim]
+    grad           -- np.ndarray of shape [dim, dim] + nb_grid_pts_per_dim
                       containing the second-rank gradient to be integrated
     fft_vec        -- µFFT FFT object performing the FFT for a vector on the cell
     fft_mat        -- µFFT FFT object performing the FFT for a matrix on the cell
@@ -202,13 +204,13 @@ def integrate_tensor_2(grad, fft_vec, fft_mat, gradient_op, grid_spacing):
     np.ndarray containing the integrated field
     """
     dim = len(grid_spacing)
-    nb_grid_pts = np.array(grad.shape[:dim])
+    nb_grid_pts = np.array(grad.shape[-dim:])
     lengths = nb_grid_pts * grid_spacing
     x = make_grid(lengths, nb_grid_pts)[0]
     integrator = get_integrator(fft_mat, gradient_op, grid_spacing)
     grad_k = (fft_mat.fft(grad) * fft_mat.normalisation)
-    f_k = np.einsum("j...,...ij->...i", integrator, grad_k)
-    grad_k_0 = grad_k[(0,)*dim]
+    f_k = np.einsum("j...,ij...->i...", integrator, grad_k)
+    grad_k_0 = grad_k[np.s_[:,:] + (0,)*dim]
     #The homogeneous integration computes the affine part of the deformation
     homogeneous = np.einsum("ij,j...->i...", grad_k_0.real, x)
 
@@ -217,8 +219,7 @@ def integrate_tensor_2(grad, fft_vec, fft_mat, gradient_op, grid_spacing):
         raise RuntimeError("Integrate_tensor_2() computed complex placements, "
                            "probably there went something wrong.\n"
                            "Please inform the developers about this bug!")
-    fluctuation = np.moveaxis(
-        complement_periodically(fluctuation_non_pbe.real, dim), -1, 0)
+    fluctuation = complement_periodically(fluctuation_non_pbe.real, dim)
 
     return fluctuation + homogeneous
 
@@ -229,7 +230,7 @@ def integrate_vector(grad, fft_sca, fft_vec, gradient_op, grid_spacing):
     gradient operator. The integrated field is returned on the node positions.
 
     Keyword Arguments:
-    grad           -- np.ndarray of shape nb_grid_pts_per_dim + [dim] containing
+    grad           -- np.ndarray of shape [dim] + nb_grid_pts_per_dim containing
                       the first-rank tensor gradient to be integrated
     fft_sca        -- µFFT FFT object performing the FFT for a scalar on the cell
     fft_vec        -- µFFT FFT object performing the FFT for a vector on the cell
@@ -242,13 +243,13 @@ def integrate_vector(grad, fft_sca, fft_vec, gradient_op, grid_spacing):
     np.ndarray contaning the integrated field
     """
     dim = len(grid_spacing)
-    nb_grid_pts = np.array(grad.shape[:dim])
+    nb_grid_pts = np.array(grad.shape[-dim:])
     lengths = nb_grid_pts * grid_spacing
     x = make_grid(lengths, nb_grid_pts)[0]
     integrator = get_integrator(fft_vec, gradient_op, grid_spacing)
     grad_k = (fft_vec.fft(grad) * fft_vec.normalisation)
-    f_k = np.einsum("j...,...j->...", integrator, grad_k)
-    grad_k_0 = grad_k[(0,)*dim]
+    f_k = np.einsum("j...,j...->...", integrator, grad_k)
+    grad_k_0 = grad_k[np.s_[:,] + (0,)*dim]
     #The homogeneous integration computes the affine part of the deformation
     homogeneous = np.einsum("j,j...->...", grad_k_0.real, x)
 
@@ -306,7 +307,7 @@ def compute_placement(result, lengths, nb_grid_pts, gradient_op,
                 'Otherwise you can give a result=OptimiseResult object, which '
                 'tells me the formulation.')
         form = formulation
-        grad = result.reshape(tuple(nb_grid_pts)+(len(nb_grid_pts),)*2)
+        grad = result.reshape((len(nb_grid_pts),)*2 + tuple(nb_grid_pts))
     else:
         form = result.formulation
         if form != formulation and formulation != None:
