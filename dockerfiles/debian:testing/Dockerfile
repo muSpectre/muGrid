@@ -12,6 +12,7 @@ RUN apt-get -qq update && apt-get -y -qq install \
     doxygen \
     g++ \
     git \
+    pybind11-dev \
     libboost-test-dev \
     libcurl4-openssl-dev \
     libeigen3-dev \
