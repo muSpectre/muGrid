@@ -40,6 +40,7 @@ import numpy as np
 from netCDF4 import Dataset
 
 from python_test_imports import muFFT
+from muFFT.NetCDF import NCStructuredGrid
 
 def build_test_classes(nb_grid_pts):
     class NetCDF_Check(unittest.TestCase):
@@ -60,15 +61,15 @@ def build_test_classes(nb_grid_pts):
 
         def test_write_read_domain(self):
             if self.communicator is None:
-                nc = muFFT.NCStructuredGrid('test_{}d.nc'.format(len(self.nb_grid_pts)), mode='w',
-                                           nb_domain_grid_pts=self.nb_grid_pts)
+                nc = NCStructuredGrid('test_{}d.nc'.format(len(self.nb_grid_pts)), mode='w',
+                                      nb_domain_grid_pts=self.nb_grid_pts)
             else:
-                nc = muFFT.NCStructuredGrid('test_{}d.nc'.format(len(self.nb_grid_pts)), mode='w',
-                                           nb_domain_grid_pts=self.nb_grid_pts,
-                                           decomposition='domain',
-                                           subdomain_locations=self.fft.subdomain_locations,
-                                           nb_subdomain_grid_pts=self.fft.nb_subdomain_grid_pts,
-                                           communicator=self.communicator)
+                nc = NCStructuredGrid('test_{}d.nc'.format(len(self.nb_grid_pts)), mode='w',
+                                      nb_domain_grid_pts=self.nb_grid_pts,
+                                      decomposition='domain',
+                                      subdomain_locations=self.fft.subdomain_locations,
+                                      nb_subdomain_grid_pts=self.fft.nb_subdomain_grid_pts,
+                                      communicator=self.communicator)
             nc.scalar = self.scalar_grid
             nc.tensor = self.tensor_grid
             nc[3].per_frame_tensor = self.tensor_grid
@@ -89,7 +90,7 @@ def build_test_classes(nb_grid_pts):
             nc.close()
     
             # Read file and check data
-            nc = muFFT.NCStructuredGrid('test_{}d.nc'.format(len(self.nb_grid_pts)), mode='r')
+            nc = NCStructuredGrid('test_{}d.nc'.format(len(self.nb_grid_pts)), mode='r')
             self.assertEqual(tuple(nc.nb_domain_grid_pts), tuple(self.nb_grid_pts))
             self.assertTrue(np.equal(nc.scalar, self.scalar_grid).all())
             self.assertTrue(np.equal(nc.tensor, self.tensor_grid).all())
@@ -101,15 +102,15 @@ def build_test_classes(nb_grid_pts):
             tensor_grid = self.tensor_grid[self.fft.subdomain_slices]
 
             if self.communicator is None:
-                nc = muFFT.NCStructuredGrid('test_{}d.nc'.format(len(self.nb_grid_pts)), mode='w',
-                                           nb_domain_grid_pts=self.nb_grid_pts)
+                nc = NCStructuredGrid('test_{}d.nc'.format(len(self.nb_grid_pts)), mode='w',
+                                      nb_domain_grid_pts=self.nb_grid_pts)
             else:
-                nc = muFFT.NCStructuredGrid('test_{}d.nc'.format(len(self.nb_grid_pts)), mode='w',
-                                           nb_domain_grid_pts=self.nb_grid_pts,
-                                           decomposition='subdomain',
-                                           subdomain_locations=self.fft.subdomain_locations,
-                                           nb_subdomain_grid_pts=self.fft.nb_subdomain_grid_pts,
-                                           communicator=self.communicator)
+                nc = NCStructuredGrid('test_{}d.nc'.format(len(self.nb_grid_pts)), mode='w',
+                                      nb_domain_grid_pts=self.nb_grid_pts,
+                                      decomposition='subdomain',
+                                      subdomain_locations=self.fft.subdomain_locations,
+                                      nb_subdomain_grid_pts=self.fft.nb_subdomain_grid_pts,
+                                      communicator=self.communicator)
             nc.scalar = scalar_grid
             nc.tensor = tensor_grid
             nc[3].per_frame_tensor = tensor_grid
@@ -130,7 +131,7 @@ def build_test_classes(nb_grid_pts):
             nc.close()
 
             # Read file and check data
-            nc = muFFT.NCStructuredGrid('test_{}d.nc'.format(len(self.nb_grid_pts)), mode='r')
+            nc = NCStructuredGrid('test_{}d.nc'.format(len(self.nb_grid_pts)), mode='r')
             self.assertEqual(tuple(nc.nb_domain_grid_pts), tuple(self.nb_grid_pts))
             self.assertTrue(np.equal(nc.scalar, self.scalar_grid).all())
             self.assertTrue(np.equal(nc.tensor, self.tensor_grid).all())

@@ -36,8 +36,6 @@ Program grant you additional permission to convey the resulting work.
 
 import numpy as np
 
-from muFFT.NetCDF import NCStructuredGrid
-
 try:
     from mpi4py import MPI
 except ImportError:

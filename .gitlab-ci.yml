@@ -35,7 +35,7 @@ build:testing_gcc_setuptools:
     - free -h
     - echo "grep -c ^processor /proc/cpuinfo"
     - grep -c ^processor /proc/cpuinfo
-    - python3 setup.py build
+    - python3 setup.py build --disable-mpi
 
 build:testing_clang:
   extends: .builds
@@ -103,7 +103,7 @@ test:testing_gcc_setuptools:
   dependencies:
     - build:testing_gcc_setuptools
   script:
-    - python3 setup.py install --user
+    - python3 setup.py install --user --disable-mpi
     - cd tests/libmufft
     - python3 python_binding_tests.py
 

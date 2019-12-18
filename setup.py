@@ -1,44 +1,48 @@
 # Copyright © 2019 Lars Pastewka
-# 
+#
 # µSpectre is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Lesser Public License as
 # published by the Free Software Foundation, either version 3, or (at
 # your option) any later version.
-# 
+#
 # µSpectre is distributed in the hope that it will be useful, but
 # WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
 # General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU Lesser General Public License
 # along with µSpectre; see the file COPYING. If not, write to the
 # Free Software Foundation, Inc., 59 Temple Place - Suite 330,
 # Boston, MA 02111-1307, USA.
-# 
+#
 # Additional permission under GNU GPL version 3 section 7
-# 
+#
 # If you modify this Program, or any covered work, by linking or combining it
 # with proprietary FFT implementations or numerical libraries, containing parts
 # covered by the terms of those libraries' licenses, the licensors of this
 # Program grant you additional permission to convey the resulting work.
 
 # Adapted from: https://github.com/pybind/python_example
+#               https://stackoverflow.com/questions/50938128/distutils-build-multiple-python-extension-modules-written-in-swig-that-share
 
+from distutils.ccompiler import CCompiler
 from distutils.spawn import find_executable
 from setuptools import setup, Extension
+from setuptools.command.build_clib import build_clib
 from setuptools.command.build_ext import build_ext
 import os
 import sys
 import setuptools
 
-__version__ = '0.1'
+__version__ = '0.2'
 
 ###
 
-if os.uname()[0] == 'Darwin':
-    lib_extension = 'dylib'
-else:
-    lib_extension = 'so'
+disable_mpi = False
+if '--disable-mpi' in sys.argv:
+    index = sys.argv.index('--disable-mpi')
+    sys.argv.pop(index)  # Removes the '--disable-mpi'
+    disable_mpi = True
 
 ###
 
@@ -75,7 +79,8 @@ def detect_library(info):
     found = False
     root = None
     if 'environ' in info and info['environ'] in os.environ:
-        print("  * Looking for environment variable '{}'".format(info['environ']))
+        print("  * Looking for environment variable '{}'"
+            .format(info['environ']))
         root = os.environ[info['environ']]
         found = True
     if not found:
@@ -91,7 +96,8 @@ def detect_library(info):
         command_path = find_executable(info['command'])
         if command_path is not None:
             root = os.path.abspath(os.path.dirname(command_path) + '/../lib')
-        print("  * Attempting to load library '{}' in path '{}'".format(libname, root))
+        print("  * Attempting to load library '{}' in path '{}'"
+            .format(libname, root))
         import ctypes
         found = True
         try:
@@ -102,13 +108,16 @@ def detect_library(info):
     libraries = []
     library_dirs = []
     if found:
-        if root is not None and (root.endswith('/bin') or root.endswith('/lib')):
+        if root is not None and (root.endswith('/bin') or \
+            root.endswith('/lib')):
             root = root[:-4]
 
         if root is None:
-            print("  * Detected library '{}' in standard library search path".format(info['name']))
+            print("  * Detected library '{}' in standard library search path"
+                .format(info['name']))
         else:
-            print("  * Detected library '{}' in path '{}'".format(info['name'], root))
+            print("  * Detected library '{}' in path '{}'"
+                .format(info['name'], root))
 
         for lib in info['required_libraries']:
             if root is not None:
@@ -130,7 +139,9 @@ def get_eigen_include(eigen_version='3.3.5'):
     eigen_path = '{}/depend/eigen-{}'.format(root, eigen_version)
     if not os.path.exists(eigen_path):
         os.makedirs(eigen_path, exist_ok=True)
-        os.system('curl -L http://bitbucket.org/eigen/eigen/get/{}.tar.bz2 | tar -jx -C {} --strip-components 1'.format(eigen_version, eigen_path))
+        os.system('curl -L http://bitbucket.org/eigen/eigen/get/{}.tar.bz2 | '
+                  'tar -jx -C {} --strip-components 1'
+                  .format(eigen_version, eigen_path))
     return(eigen_path)
 
 
@@ -141,34 +152,51 @@ def get_pybind11_include(pybind11_version='2.2.3'):
     pybind11_path = '{}/depend/pybind11-{}'.format(root, pybind11_version)
     if not os.path.exists(pybind11_path):
         os.makedirs(pybind11_path, exist_ok=True)
-        os.system('curl -L https://github.com/pybind/pybind11/archive/v{}.tar.gz | tar -zx -C {} --strip-components 1'.format(pybind11_version, pybind11_path))
-    return('{}/include'.format(pybind11_path))    
+        os.system('curl -L https://github.com/pybind/pybind11/archive/v{}.tar'
+                  '.gz | tar -zx -C {} --strip-components 1'
+                  .format(pybind11_version, pybind11_path))
+    return('{}/include'.format(pybind11_path))
 
 ###
 
 print('=== DETECTING FFT LIBRARIES ===')
 
-sources = ['language_bindings/libmufft/python/bind_py_module.cc',
-           'language_bindings/libmufft/python/bind_py_common.cc',
-           'language_bindings/libmufft/python/bind_py_communicator.cc',
-           'language_bindings/libmufft/python/bind_py_fftengine.cc',
-           'src/libmugrid/field.cc',
-           'src/libmugrid/field_typed.cc',
-           'src/libmugrid/field_map.cc',
-           'src/libmugrid/state_field.cc',
-           'src/libmugrid/state_field_map.cc',
-           'src/libmugrid/field_collection.cc',
-           'src/libmugrid/field_collection_global.cc',
-           'src/libmugrid/field_collection_local.cc',
-           'src/libmufft/fft_engine_base.cc',
-           'src/libmufft/communicator.cc',
-           'src/libmufft/fft_utils.cc']
+mugrid_sources = [
+    'src/libmugrid/field.cc',
+    'src/libmugrid/field_typed.cc',
+    'src/libmugrid/field_map.cc',
+    'src/libmugrid/state_field.cc',
+    'src/libmugrid/state_field_map.cc',
+    'src/libmugrid/field_collection.cc',
+    'src/libmugrid/field_collection_global.cc',
+    'src/libmugrid/field_collection_local.cc',
+    'src/libmugrid/ccoord_operations.cc',
+]
+pymugrid_sources = [
+    'language_bindings/libmugrid/python/bind_py_module.cc',
+    'language_bindings/libmugrid/python/bind_py_common.cc',
+    'language_bindings/libmugrid/python/bind_py_field.cc',
+    'language_bindings/libmugrid/python/bind_py_field_collection.cc',
+]
+mufft_sources = [
+    'src/libmufft/fft_engine_base.cc',
+    'src/libmufft/fft_utils.cc',
+    'src/libmufft/derivative.cc',
+]
+pymufft_sources = [
+    'language_bindings/libmufft/python/bind_py_module.cc',
+    'language_bindings/libmufft/python/bind_py_common.cc',
+    'language_bindings/libmufft/python/bind_py_derivatives.cc',
+    'language_bindings/libmufft/python/bind_py_communicator.cc',
+    'language_bindings/libmufft/python/bind_py_fftengine.cc',
+]
+
 macros = []
 include_dirs = [get_eigen_include(), # Path to pybind11 headers
                 get_pybind11_include(), # Path to Eigen headers
                 'src']
-libraries = []
-library_dirs = []
+fft_libraries = []
+fft_library_dirs = []
 
 mpi = False
 for info, _sources in [(fftw_info, ['src/libmufft/fftw_engine.cc']),
@@ -177,17 +205,23 @@ for info, _sources in [(fftw_info, ['src/libmufft/fftw_engine.cc']),
     lib = detect_library(info)
     if lib is not None:
         _include_dirs, _libraries, _library_dirs = lib
-        sources += _sources
-        if 'define_macro' in info:
-            macros += [(info['define_macro'], None)]
-        include_dirs += _include_dirs
-        libraries += _libraries
-        library_dirs += _library_dirs
-        if 'mpi' in info:
-            mpi = mpi or info['mpi']
+        if 'mpi' not in info or not info['mpi'] or not disable_mpi:
+            mufft_sources += _sources
+            if 'define_macro' in info:
+                macros += [(info['define_macro'], None)]
+            include_dirs += _include_dirs
+            fft_libraries += _libraries
+            fft_library_dirs += _library_dirs
+            if 'mpi' in info:
+                mpi = mpi or info['mpi']
+        else:
+            print('  ! Library detected but --disable-mpi is present')
+
 if mpi:
-    print('At least one of the FFT libraries is MPI-parallel. Using the MPI compiler wrapper.')
-    print('(You can specify the compiler wrapper through the MPICC and MPICXX environment variables.)')
+    print('At least one of the FFT libraries is MPI-parallel. Using the MPI '
+          'compiler wrapper.')
+    print('(You can specify the compiler wrapper through the MPICC and MPICXX '
+          'environment variables.)')
     macros += [('WITH_MPI', None)]
     # FIXME! This is a brute-force override.
     try:
@@ -200,19 +234,56 @@ if mpi:
         os.environ['CXX'] = 'mpicxx'
     print('  * C-compiler: {}'.format(os.environ['CC']))
     print('  * C++-compiler: {}'.format(os.environ['CXX']))
+    mufft_sources += ['src/libmufft/communicator.cc']
 
-ext_modules = [
-    Extension(
-        '_muFFT',
-        sources=sources,
-        define_macros=macros,
-        include_dirs=include_dirs,
-        libraries=libraries,
-        library_dirs=library_dirs,
-        language='c++',
+# We compile two shared libraries, libmuGrid.so and libmuFFT.so. These libraries
+# do not contain the Python interface.
+
+ext_libraries = [
+    ('muGrid',
+     dict(sources=mugrid_sources,
+          macros=macros,
+          include_dirs=include_dirs,
+          language='c++')
+    ),
+    ('muFFT',
+     dict(sources=mufft_sources,
+          macros=macros,
+          include_dirs=include_dirs,
+          libraries=fft_libraries + ['muGrid'],
+          library_dirs=fft_library_dirs,
+          language='c++')
     ),
 ]
 
+# We compile two Python interfaces, _muGrid and _muFFT that use the above shared
+# libraries.
+
+# extra_link_args is required to search for shared libraries relative to the
+# library's location. Specifically, muGrid.so and muFFT.so are placed in the
+# install directory under 'site-packages', and the Python wrappers _muGrid and
+# _muFFT need be able to find those.
+extra_link_args = ['-Wl,-rpath,${ORIGIN}'] 
+ext_modules = [
+    Extension(
+        '_muGrid',
+        sources=pymugrid_sources,
+        define_macros=macros,
+        include_dirs=include_dirs,
+        libraries=['muGrid'],
+        extra_link_args=extra_link_args,
+        language='c++',
+    ),
+    Extension(
+        '_muFFT',
+        sources=pymufft_sources,
+        define_macros=macros,
+        include_dirs=include_dirs,
+        libraries=['muGrid', 'muFFT'],
+        extra_link_args=extra_link_args,
+        language='c++',
+    ),
+]
 
 # As of Python 3.6, CCompiler has a `has_flag` method.
 # cf http://bugs.python.org/issue26689
@@ -243,7 +314,7 @@ def cpp_flag(compiler):
                            'is needed!')
 
 
-class BuildExt(build_ext):
+class build_ext_custom(build_ext):
     """A custom build extension for adding compiler-specific options."""
     c_opts = {
         'msvc': ['/EHsc'],
@@ -270,6 +341,53 @@ class BuildExt(build_ext):
         build_ext.build_extensions(self)
 
 
+class build_clib_dyn(build_clib):
+    def finalize_options(self):
+        self.set_undefined_options('build',
+                                   ('build_lib', 'build_clib'),
+                                   ('build_temp', 'build_temp'),
+                                   ('compiler', 'compiler'),
+                                   ('debug', 'debug'),
+                                   ('force', 'force'))
+        self.libraries = self.distribution.libraries
+        if self.libraries:
+            self.check_library_list(self.libraries)
+        if self.include_dirs is None:
+            self.include_dirs = self.distribution.include_dirs or []
+        if isinstance(self.include_dirs, str):
+            self.include_dirs = self.include_dirs.split(os.pathsep)
+
+    def build_libraries(self, libraries):
+        for (lib_name, build_info) in libraries:
+            sources = build_info.get('sources')
+            if sources is None or not isinstance(sources, (list, tuple)):
+                raise DistutilsSetupError(
+                       "in 'libraries' option (library '%s'), "
+                       "'sources' must be present and must be "
+                       "a list of source filenames" % lib_name)
+            sources = list(sources)
+            macros = build_info.get('macros')
+            include_dirs = build_info.get('include_dirs')
+            objects = self.compiler.compile(sources,
+                                            output_dir=self.build_temp,
+                                            macros=macros,
+                                            include_dirs=include_dirs,
+                                            debug=self.debug)
+            library_dirs = [self.build_clib]
+            if build_info.get('library_dirs') is not None:
+                library_dirs += build_info.get('library_dirs')
+            self.compiler.link_shared_object(
+                objects,
+                self.compiler.library_filename(lib_name, lib_type="shared"),
+                libraries=build_info.get('libraries'),
+                library_dirs=library_dirs,
+                output_dir=self.build_clib,
+                debug=self.debug)
+
+requirements = ['numpy']
+if mpi:
+    requirements += ['mpi4py']
+
 setup(
     name='muFFT',
     version=__version__,
@@ -277,12 +395,16 @@ setup(
     author_email='till.junge@altermail.ch',
     url='https://gitlab.com/muspectre/muspectre',
     description='muFFT is a wrapper for common FFT libraries with support '
-                'MPI parallelization',
+                'for MPI parallelization',
     long_description='',
-    packages = ['muFFT'],
-    package_dir = {'muFFT': 'language_bindings/libmufft/python/muFFT'},
+    packages = ['muFFT', 'muGrid'],
+    package_dir = {'muFFT': 'language_bindings/libmufft/python/muFFT',
+                   'muGrid': 'language_bindings/libmugrid/python/muGrid'},
+    libraries=ext_libraries,
     ext_modules=ext_modules,
-    cmdclass={'build_ext': BuildExt},
+    cmdclass={'build_clib': build_clib_dyn, 'build_ext': build_ext_custom},
     zip_safe=False,
-    test_suite='tests'
+    test_suite='tests',
+    setup_requires=requirements,
+    install_requires=requirements
 )
