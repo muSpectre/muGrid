@@ -83,9 +83,9 @@ namespace muSpectre {
     const Real mu{Young / (2 * (1 + Poisson))};
 
     auto & Material_soft_lin{
-        Mat_t_lin::make(sys_lin, "soft_lin", Dim, OneQuadPt, Young, Poisson)};
-    auto & Material_hard_lin{Mat_t_lin::make(sys_lin, "hard_lin", Dim,
-                                             OneQuadPt, con * Young, Poisson)};
+        Mat_t_lin::make(sys_lin, "soft_lin", Young, Poisson)};
+    auto & Material_hard_lin{
+        Mat_t_lin::make(sys_lin, "hard_lin", con * Young, Poisson)};
 
     std::vector<Real> input_soft;
     input_soft.push_back(lambda + 2 * mu);
@@ -162,9 +162,9 @@ namespace muSpectre {
     const Real mu{Young / (2 * (1 + Poisson))};
 
     auto & Material_soft_lin{
-        Mat_t_lin::make(sys_lin, "soft_lin", Dim, OneQuadPt, Young, Poisson)};
-    auto & Material_hard_lin{Mat_t_lin::make(sys_lin, "hard_lin", Dim,
-                                             OneQuadPt, con * Young, Poisson)};
+        Mat_t_lin::make(sys_lin, "soft_lin", Young, Poisson)};
+    auto & Material_hard_lin{
+        Mat_t_lin::make(sys_lin, "hard_lin", con * Young, Poisson)};
 
     std::vector<Real> input_soft;
     input_soft.push_back(lambda + 2 * mu);

@@ -60,8 +60,7 @@ class MaterialLinearElastic4_Check(unittest.TestCase):
         Poisson_ratio = 0.3
 
         cell = µ.Cell(self.nb_grid_pts, self.lengths, self.formulation)
-        mat = µ.material.MaterialLinearElastic4_2d.make(cell, "material",
-                                                        µ.OneQuadPt)
+        mat = µ.material.MaterialLinearElastic4_2d.make(cell, "material")
 
         for i in cell.pixel_indices:
             mat.add_pixel(i, Youngs_modulus, Poisson_ratio)
@@ -91,7 +90,7 @@ class MaterialLinearElastic4_Check(unittest.TestCase):
 
         cell = µ.Cell(self.nb_grid_pts, self.lengths, self.formulation)
         mat = µ.material.MaterialLinearElastic4_2d.make(cell,
-                                                        "material", µ.OneQuadPt)
+                                                        "material")
 
         for i in cell.pixel_indices:
             mat.add_pixel(i, Youngs_modulus[i], Poisson_ratio[i])

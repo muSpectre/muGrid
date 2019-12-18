@@ -65,24 +65,25 @@ void add_material_linear_elastic2_helper(py::module & mod) {
 
   py::class_<Mat_t, muSpectre::MaterialBase, std::shared_ptr<Mat_t>>(
       mod, name.c_str())
-      .def_static("make",
-                  [](Cell_t & cell, std::string n, Dim_t nb_quad_pts, Real e,
-                     Real p) -> Mat_t & {
-                    return Mat_t::make(cell, n, dim, nb_quad_pts, e, p);
-                  },
-                  "cell"_a, "name"_a, "nb_quad_pts"_a,
-                  "Young"_a, "Poisson"_a,
-                  py::return_value_policy::reference, py::keep_alive<1, 0>())
-      .def("add_pixel",
-           [](Mat_t & mat, size_t pixel_index,
-              py::EigenDRef<Eigen::ArrayXXd> & eig) {
-             Eigen::Matrix<Real, dim, dim> eig_strain{eig};
-             mat.add_pixel(pixel_index, eig_strain);
-           },
-           "pixel_index"_a, "eigenstrain"_a)
-      .def_static("make_evaluator",
-                  [](Real e, Real p) { return Mat_t::make_evaluator(e, p); },
-                  "Young"_a, "Poisson"_a);
+      .def_static(
+          "make",
+          [](Cell_t & cell, std::string n, Real e, Real p) -> Mat_t & {
+            return Mat_t::make(cell, n, e, p);
+          },
+          "cell"_a, "name"_a, "Young"_a, "Poisson"_a,
+          py::return_value_policy::reference, py::keep_alive<1, 0>())
+      .def(
+          "add_pixel",
+          [](Mat_t & mat, size_t pixel_index,
+             py::EigenDRef<Eigen::ArrayXXd> & eig) {
+            Eigen::Matrix<Real, dim, dim> eig_strain{eig};
+            mat.add_pixel(pixel_index, eig_strain);
+          },
+          "pixel_index"_a, "eigenstrain"_a)
+      .def_static(
+          "make_evaluator",
+          [](Real e, Real p) { return Mat_t::make_evaluator(e, p); }, "Young"_a,
+          "Poisson"_a);
 }
 
 template void

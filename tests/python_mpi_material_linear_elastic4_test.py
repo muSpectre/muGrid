@@ -64,7 +64,7 @@ def build_test_classes(fft):
                               fft=fft,
                               communicator=MPI.COMM_WORLD)
             self.mat = µ.material.MaterialLinearElastic4_2d.make(
-                self.cell, "material", µ.OneQuadPt)
+                self.cell, "material")
 
         def test_decomposition(self):
             self.assertEqual(

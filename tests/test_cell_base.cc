@@ -168,9 +168,9 @@ namespace muSpectre {
     const Real contrast{.5};
 
     auto & material_hard{
-        Mat_t::make(*this, "hard", dim, OneQuadPt, Young, Poisson)};
+        Mat_t::make(*this, "hard", Young, Poisson)};
     auto & material_soft{
-        Mat_t::make(*this, "soft", dim, OneQuadPt, contrast * Young, Poisson)};
+        Mat_t::make(*this, "soft", contrast * Young, Poisson)};
 
     for (const auto & pixel_id : this->get_pixel_indices()) {
       static_cast<bool>(pixel_id % 2) ? material_hard.add_pixel(pixel_id)
@@ -277,8 +277,8 @@ namespace muSpectre {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_globalised_fields, Fix, fixlist, Fix) {
     constexpr Dim_t Dim{Fix::sdim};
     using Mat_t = MaterialLinearElastic1<Dim>;
-    auto & material_soft{Mat_t::make(*this, "soft", Dim, OneQuadPt, 70e9, .3)};
-    auto & material_hard{Mat_t::make(*this, "hard", Dim, OneQuadPt, 210e9, .3)};
+    auto & material_soft{Mat_t::make(*this, "soft", 70e9, .3)};
+    auto & material_hard{Mat_t::make(*this, "hard", 210e9, .3)};
 
     for (const auto & pixel_id : this->get_pixel_indices()) {
       if (pixel_id % 2) {

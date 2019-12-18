@@ -81,10 +81,8 @@ namespace muSpectre {
 
     using Mat_t = MaterialLinearElastic1<Dim>;
     constexpr Real Young{2.}, Poisson{.33};
-    auto & material_hard{
-        Mat_t::make(cell, "hard", Dim, OneQuadPt, contrast * Young, Poisson)};
-    auto & material_soft{
-        Mat_t::make(cell, "soft", Dim, OneQuadPt, Young, Poisson)};
+    auto & material_hard{Mat_t::make(cell, "hard", contrast * Young, Poisson)};
+    auto & material_soft{Mat_t::make(cell, "soft", Young, Poisson)};
 
     for (const auto & pixel_index : cell.get_pixel_indices()) {
       if (pixel_index) {
@@ -128,9 +126,9 @@ namespace muSpectre {
     using Mat_t = MaterialLinearElastic1<Dim>;
     constexpr Real Young{2.}, Poisson{.33};
     auto & material_hard{
-        Mat_t::make(cell, "hard", Dim, OneQuadPt, contrast * Young, Poisson)};
+        Mat_t::make(cell, "hard", contrast * Young, Poisson)};
     auto & material_soft{
-        Mat_t::make(cell, "soft", Dim, OneQuadPt, Young, Poisson)};
+        Mat_t::make(cell, "soft", Young, Poisson)};
 
     for (const auto && index_pixel : akantu::enumerate(cell.get_pixels())) {
       auto && index{std::get<0>(index_pixel)};
@@ -218,13 +216,9 @@ namespace muSpectre {
       auto && pixel{std::get<1>(index_pixel)};
       auto && strain = cell.get_strain().get_pixel_map(Dim)[index];
       if (pixel[0] < Dim_t(nb_lays)) {
-        BOOST_CHECK_LE(
-            (Eps_hard - strain).norm(),
-            tol);
+        BOOST_CHECK_LE((Eps_hard - strain).norm(), tol);
       } else {
-        BOOST_CHECK_LE(
-            (Eps_soft - strain).norm(),
-            tol);
+        BOOST_CHECK_LE((Eps_soft - strain).norm(), tol);
       }
     }
   }
@@ -252,9 +246,9 @@ namespace muSpectre {
     using Mat_t = MaterialLinearElastic1<Dim>;
     constexpr Real Young{2.}, Poisson{.33};
     auto & material_hard{
-        Mat_t::make(cell, "hard", Dim, OneQuadPt, contrast * Young, Poisson)};
+        Mat_t::make(cell, "hard", contrast * Young, Poisson)};
     auto & material_soft{
-        Mat_t::make(cell, "soft", Dim, OneQuadPt, Young, Poisson)};
+        Mat_t::make(cell, "soft", Young, Poisson)};
 
     for (const auto && index_pixel : cell.get_pixels().enumerate()) {
       auto && index{std::get<0>(index_pixel)};

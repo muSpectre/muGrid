@@ -54,7 +54,7 @@ class FieldCollection_Check(unittest.TestCase):
                            self.formulation)
         self.dim = len(self.lengths)
         self.mat = µ.material.MaterialLinearElastic2_2d.make(
-            self.cell, "material", µ.OneQuadPt, 210e9, .33)
+            self.cell, "material", 210e9, .33)
 
     def test_fields(self):
         eigen_strain = np.array([[.01,  .02],

@@ -70,11 +70,10 @@ void add_material_stochastic_plasticity_helper(py::module & mod) {
       mod, name.c_str())
       .def_static(
           "make",
-          [](Cell_t & cell, std::string n, Dim_t nb_quad_pts) -> Mat_t & {
-            return Mat_t::make(cell, n, Dim, nb_quad_pts);
+          [](Cell_t & cell, std::string n) -> Mat_t & {
+            return Mat_t::make(cell, n);
           },
-          "cell"_a, "name"_a, "nb_quad_pts"_a,
-          py::return_value_policy::reference_internal)
+          "cell"_a, "name"_a, py::return_value_policy::reference_internal)
       .def(
           "add_pixel",
           [](Mat_t & mat, Dim_t pix_id, Real Young, Real Poisson,

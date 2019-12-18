@@ -53,8 +53,8 @@ int main() {
 
   Real ex{1e-5};
   using Mat_t = MaterialLinearElastic1<Dim>;
-  auto & hard{Mat_t::make(cell, "hard", Dim, OneQuadPt, 210. * ex, .33)};
-  auto & soft{Mat_t::make(cell, "soft", Dim, OneQuadPt, 70. * ex, .33)};
+  auto & hard{Mat_t::make(cell, "hard", 210. * ex, .33)};
+  auto & soft{Mat_t::make(cell, "soft", 70. * ex, .33)};
 
   for (auto && index_pixel : cell.get_pixels().enumerate()) {
     auto && index{std::get<0>(index_pixel)};

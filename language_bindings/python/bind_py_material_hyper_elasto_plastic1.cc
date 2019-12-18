@@ -65,20 +65,20 @@ void add_material_hyper_elasto_plastic1_helper(py::module & mod) {
 
   py::class_<Mat_t, muSpectre::MaterialBase, std::shared_ptr<Mat_t>>(
       mod, name.c_str())
-      .def_static("make",
-                  [](Cell_t & cell, std::string name, Dim_t nb_quad_pts,
-                     Real Young, Real Poisson, Real tau_y0, Real h) -> Mat_t & {
-                    return Mat_t::make(cell, name, Dim, nb_quad_pts, Young,
-                                       Poisson, tau_y0, h);
-                  },
-                  "cell"_a, "name"_a, "nb_quad_pts"_a, "YoungModulus"_a,
-                  "PoissonRatio"_a, "τ_y₀"_a, "h"_a,
-                  py::return_value_policy::reference_internal)
-      .def_static("make_evaluator",
-                  [](Real Young, Real Poisson, Real tau_y0, Real h) {
-                    return Mat_t::make_evaluator(Young, Poisson, tau_y0, h);
-                  },
-                  "YoungModulus"_a, "PoissonRatio"_a, "τ_y₀"_a, "h"_a);
+      .def_static(
+          "make",
+          [](Cell_t & cell, std::string name, Real Young, Real Poisson,
+             Real tau_y0, Real h) -> Mat_t & {
+            return Mat_t::make(cell, name, Young, Poisson, tau_y0, h);
+          },
+          "cell"_a, "name"_a, "YoungModulus"_a, "PoissonRatio"_a, "τ_y₀"_a,
+          "h"_a, py::return_value_policy::reference_internal)
+      .def_static(
+          "make_evaluator",
+          [](Real Young, Real Poisson, Real tau_y0, Real h) {
+            return Mat_t::make_evaluator(Young, Poisson, tau_y0, h);
+          },
+          "YoungModulus"_a, "PoissonRatio"_a, "τ_y₀"_a, "h"_a);
 }
 
 template void

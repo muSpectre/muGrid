@@ -119,9 +119,10 @@ namespace muSpectre {
     //! Destructor
     virtual ~MaterialMuSpectre() = default;
 
-    //! Factory
+    //! Factory. The ConstructorArgs refer the arguments after `name`
     template <class... ConstructorArgs>
-    static Material & make(Cell & cell, ConstructorArgs &&... args);
+    static Material & make(Cell & cell, const std::string & name,
+                           ConstructorArgs &&... args);
     /** Factory
      * takes all arguments after the name of the underlying
      * Material's constructor. E.g., if the underlying material is a
@@ -210,9 +211,10 @@ namespace muSpectre {
   template <class Material, Dim_t DimM>
   template <class... ConstructorArgs>
   Material &
-  MaterialMuSpectre<Material, DimM>::make(Cell & cell,
+  MaterialMuSpectre<Material, DimM>::make(Cell & cell, const std::string & name,
                                           ConstructorArgs &&... args) {
-    auto mat = std::make_unique<Material>(args...);
+    auto mat = std::make_unique<Material>(name, cell.get_spatial_dim(),
+                                          cell.get_nb_quad(), args...);
     auto & mat_ref = *mat;
     auto is_cell_split{cell.get_splitness()};
     mat_ref.allocate_optional_fields(is_cell_split);

@@ -68,11 +68,10 @@ void add_material_hyper_elasto_plastic2_helper(py::module & mod) {
       mod, name.c_str())
       .def_static(
           "make",
-          [](Cell_t & cell, std::string name, Dim_t nb_quad_pts) -> Mat_t & {
-            return Mat_t::make(cell, name, Dim, nb_quad_pts);
+          [](Cell_t & cell, std::string name) -> Mat_t & {
+            return Mat_t::make(cell, name);
           },
-          "cell"_a, "name"_a, "nb_quad_pts"_a,
-          py::return_value_policy::reference_internal)
+          "cell"_a, "name"_a, py::return_value_policy::reference_internal)
       .def(
           "add_pixel",
           [](Mat_t & mat, const size_t & pix_id, const Real Young,

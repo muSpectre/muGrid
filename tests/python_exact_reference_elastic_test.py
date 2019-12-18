@@ -171,8 +171,8 @@ class LinearElastic_Check(unittest.TestCase):
         mat = µ.material.MaterialLinearElastic1_2d
 
         E, nu = get_E_nu(.833, .386)
-        hard = mat.make(self.rve, 'hard', µ.OneQuadPt, 10*E, nu)
-        soft = mat.make(self.rve, 'soft', µ.OneQuadPt,    E, nu)
+        hard = mat.make(self.rve, 'hard', 10*E, nu)
+        soft = mat.make(self.rve, 'soft',    E, nu)
 
         for id, pixel in self.rve.pixels.enumerate():
             if phase[pixel[0], pixel[1]]:

@@ -470,8 +470,8 @@ class ElastoPlastic_Check(unittest.TestCase):
         E, nu = get_E_nu(.833, .386)
         H = 0.004
         tauy0 = .003
-        self.hard = mat.make(self.rve, 'hard', µ.OneQuadPt, E, nu, 2*tauy0, 2*H)
-        self.soft = mat.make(self.rve, 'soft', µ.OneQuadPt, E, nu,   tauy0,   H)
+        self.hard = mat.make(self.rve, 'hard', E, nu, 2*tauy0, 2*H)
+        self.soft = mat.make(self.rve, 'soft', E, nu,   tauy0,   H)
 
         for pixel in self.rve:
             if pixel[0] == 0 and pixel[1] == 0 and pixel[2] == 0:

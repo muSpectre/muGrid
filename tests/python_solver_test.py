@@ -48,9 +48,9 @@ class SolverCheck(unittest.TestCase):
                            self.lengths,
                            self.formulation)
         self.hard = µ.material.MaterialLinearElastic1_2d.make(
-            self.cell, "hard", µ.OneQuadPt, 210e9, .33)
+            self.cell, "hard", 210e9, .33)
         self.soft = µ.material.MaterialLinearElastic1_2d.make(
-            self.cell, "soft", µ.OneQuadPt,  70e9, .33)
+            self.cell, "soft",  70e9, .33)
 
     def test_solve(self):
         for pix_id in self.cell.pixel_indices:

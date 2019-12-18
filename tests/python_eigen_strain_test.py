@@ -51,11 +51,11 @@ class EigenStrainCheck(unittest.TestCase):
                             self.lengths,
                             self.formulation)
         self.mat1 = µ.material.MaterialLinearElastic1_2d.make(
-            self.cell1, "simple", µ.OneQuadPt, 210e9, .33)
+            self.cell1, "simple", 210e9, .33)
         self.mat2 = µ.material.MaterialLinearElastic2_2d.make(
-            self.cell2, "eigen", µ.OneQuadPt, 210e9, .33)
+            self.cell2, "eigen", 210e9, .33)
         self.mat3 = µ.material.MaterialLinearElastic2_2d.make(
-            self.cell2, "eigen2", µ.OneQuadPt, 120e9, .33)
+            self.cell2, "eigen2", 120e9, .33)
 
     def test_globalisation(self):
         for pixel in self.cell2:

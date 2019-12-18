@@ -55,7 +55,7 @@ class MaterialLinearElastic3_Check(unittest.TestCase):
                           self.formulation)
         self.dim = len(self.lengths)
         self.mat = µ.material.MaterialLinearElastic3_2d.make(
-            self.cell, "material", µ.OneQuadPt)
+            self.cell, "material")
 
     def test_solver(self):
         Young   = 10.

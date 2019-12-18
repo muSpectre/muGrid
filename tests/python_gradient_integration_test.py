@@ -134,10 +134,10 @@ class GradientIntegration_Check(unittest.TestCase):
             cell = µ.Cell(res[:n], lens[:n], formulation)
             if n == 2:
                 mat = µ.material.MaterialLinearElastic1_2d.make(
-                    cell, "material", µ.OneQuadPt, 10, 0.3)
+                    cell, "material", 10, 0.3)
             if n == 3:
                 mat = µ.material.MaterialLinearElastic1_3d.make(
-                    cell, "material", µ.OneQuadPt, 10, 0.3)
+                    cell, "material", 10, 0.3)
             for pixel in cell.pixel_indices:
                 mat.add_pixel(pixel)
             solver = µ.solvers.SolverCG(cell, tol, maxiter=100,
@@ -330,8 +330,7 @@ class GradientIntegration_Check(unittest.TestCase):
         phase[:, h:] = 1
         phase        = phase.T.flatten()
         cell = µ.Cell(res, lens, formulation)
-        mat  = µ.material.MaterialLinearElastic4_2d.make(cell, "material",
-                                                         µ.OneQuadPt)
+        mat  = µ.material.MaterialLinearElastic4_2d.make(cell, "material")
         for i, pixel in enumerate(cell.pixels):
             mat.add_pixel(i, Young[phase[i]], Poisson[phase[i]])
         cell.initialise()
@@ -520,7 +519,7 @@ class GradientIntegration_Check(unittest.TestCase):
         formulation = µ.Formulation.finite_strain
         cell = µ.Cell(res, lens, formulation)
         mat  = µ.material.MaterialLinearElastic1_2d.make(cell, "material",
-                                            µ.OneQuadPt, Young=10, Poisson=0.3)
+                                                         Young=10, Poisson=0.3)
         for pixel_id in cell.pixel_indices:
             mat.add_pixel(pixel_id)
         cell.initialise()
@@ -581,8 +580,8 @@ class GradientIntegration_Check(unittest.TestCase):
             for k, gradient_op in enumerate([fourier_gradient, discrete_gradient]):
                 cell = µ.Cell(nb_grid_pts, lengths, form, gradient_op)
 
-                mat_vac = mat.make(cell, "vacuum", µ.OneQuadPt, 0, 0)
-                mat_sol = mat.make(cell, "el", µ.OneQuadPt, 1, Poisson)
+                mat_vac = mat.make(cell, "vacuum", 0, 0)
+                mat_sol = mat.make(cell, "el", 1, Poisson)
 
                 for i, pixel in enumerate(cell.pixels):
                     if np.array(pixel)[-1] == nb_grid_pts[-1]-1:

@@ -61,11 +61,11 @@ class MaterialLinearElasticGeneric2_Check(unittest.TestCase):
                       [           0,            0,            0,  0,  0, mu]])
 
         self.mat1 = µ.material.MaterialLinearElasticGeneric1_2d.make(
-            self.cell1, "simple", µ.OneQuadPt, C)
+            self.cell1, "simple", C)
         self.mat2 = µ.material.MaterialLinearElasticGeneric2_2d.make(
-            self.cell2, "eigen", µ.OneQuadPt, C)
+            self.cell2, "eigen", C)
         self.mat3 = µ.material.MaterialLinearElastic2_2d.make(
-            self.cell2, "eigen2", µ.OneQuadPt, 120e9, .33)
+            self.cell2, "eigen2", 120e9, .33)
 
 
     def test_solve(self):

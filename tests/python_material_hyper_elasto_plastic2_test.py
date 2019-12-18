@@ -90,11 +90,11 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         mat_hpl1_array = np.empty((3,3,3), dtype=object)
         for index, mat in np.ndenumerate(mat_hpl1_array):
             mat_hpl1_array[index] = µ.material.MaterialHyperElastoPlastic1_3d.make(
-                cell, "3d-small", µ.OneQuadPt, E[index], Poisson,
+                cell, "3d-small", E[index], Poisson,
                 yield_crit[index], hardening)
 
         mat_hpl2 = µ.material.MaterialHyperElastoPlastic2_3d.make(
-            cell2, "3d-hpl", µ.OneQuadPt)
+            cell2, "3d-hpl")
 
         for i, pixel in cell.pixels.enumerate():
             mat_hpl1_array[tuple(pixel)].add_pixel(i)
@@ -165,9 +165,9 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         cell = µ.Cell(nb_grid_pts, lens, form, discrete_gradient, fft)
 
         mat_vac = µ.material.MaterialLinearElastic1_3d.make(
-            cell, "3d-vacuum", µ.OneQuadPt, 0.5*Young, Poisson)
+            cell, "3d-vacuum", 0.5*Young, Poisson)
         mat_hpl = µ.material.MaterialHyperElastoPlastic2_3d.make(
-            cell, "3d-hpl", µ.OneQuadPt)
+            cell, "3d-hpl")
 
         E        = np.zeros(nb_grid_pts)
         E[:, :, :] = 0.5*Young

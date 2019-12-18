@@ -54,10 +54,8 @@ int main() {
 
   auto rve{make_cell(nb_grid_pts, lengths, form)};
 
-  auto & hard{MaterialLinearElastic1<Dim>::make(rve, "hard", Dim, OneQuadPt,
-                                                210., .33)};
-  auto & soft{
-      MaterialLinearElastic1<Dim>::make(rve, "soft", Dim, OneQuadPt, 70., .33)};
+  auto & hard{MaterialLinearElastic1<Dim>::make(rve, "hard", 210., .33)};
+  auto & soft{MaterialLinearElastic1<Dim>::make(rve, "soft", 70., .33)};
 
   for (auto && i : rve.get_pixel_indices()) {
     if (i < 3) {

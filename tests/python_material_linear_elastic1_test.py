@@ -48,7 +48,7 @@ class MaterialLinearElastic1_2dCheck(unittest.TestCase):
                           self.lengths,
                           self.formulation)
         self.mat = µ.material.MaterialLinearElastic1_2d.make(
-            self.sys, "material", µ.OneQuadPt, 210e9, .33)
+            self.sys, "material", 210e9, .33)
 
     def test_add_material(self):
         self.mat.add_pixel(0)

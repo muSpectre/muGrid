@@ -103,9 +103,8 @@ int main(int argc, char * argv[]) {
   constexpr Real nu{0.29930675909878679};
 
   using Material_t = MaterialLinearElastic1<Dim>;
-  auto & material_soft{Material_t::make(cell, "soft", Dim, OneQuadPt, E, nu)};
-  auto & material_hard{
-      Material_t::make(cell, "hard", Dim, OneQuadPt, 10 * E, nu)};
+  auto & material_soft{Material_t::make(cell, "soft",      E, nu)};
+  auto & material_hard{Material_t::make(cell, "hard", 10 * E, nu)};
 
   int counter{0};
   for (auto && id_pixel :
