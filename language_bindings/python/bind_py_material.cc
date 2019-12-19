@@ -103,7 +103,7 @@ class PyMaterialBase : public muSpectre::MaterialBase {
   }
 
   void compute_stresses(const muGrid::RealField & F, muGrid::RealField & P,
-                        muSpectre::Formulation form,
+                        const muSpectre::Formulation & form,
                         muSpectre::SplitCell is_cell_split) override {
     PYBIND11_OVERLOAD_PURE(
         void,              // Return type
@@ -114,7 +114,7 @@ class PyMaterialBase : public muSpectre::MaterialBase {
 
   void compute_stresses_tangent(const muGrid::RealField & F,
                                 muGrid::RealField & P, muGrid::RealField & K,
-                                muSpectre::Formulation form,
+                                const muSpectre::Formulation & form,
                                 muSpectre::SplitCell is_cell_split) override {
     PYBIND11_OVERLOAD_PURE(
         void,             /* Return type */
@@ -152,65 +152,65 @@ void add_material_evaluator(py::module & mod) {
       .def(py::init<std::shared_ptr<muSpectre::MaterialBase>>())
       .def("save_history_variables", &MatEval_t::save_history_variables,
            "for materials with state variables")
-      .def("evaluate_stress",
-           [](MatEval_t & mateval, py::EigenDRef<Eigen::MatrixXd> & grad,
-              muSpectre::Formulation form) {
-             if ((grad.cols() != Dim) or (grad.rows() != Dim)) {
-               std::stringstream err{};
-               err << "need matrix of shape (" << Dim << "×" << Dim
-                   << ") but got (" << grad.rows() << "×" << grad.cols()
-                   << ").";
-               throw std::runtime_error(err.str());
-             }
-             return mateval.evaluate_stress(grad, form);
-           },
-           "strain"_a, "formulation"_a,
-           "Evaluates stress for a given strain and formulation "
-           "(Piola-Kirchhoff 1 stress as a function of the placement gradient "
-           "P = P(F) for formulation=Formulation.finite_strain and Cauchy "
-           "stress as a function of the infinitesimal strain tensor σ = σ(ε) "
-           "for formulation=Formulation.small_strain)")
-      .def("evaluate_stress_tangent",
-           [](MatEval_t & mateval, py::EigenDRef<Eigen::MatrixXd> & grad,
-              muSpectre::Formulation form) {
-             if ((grad.cols() != Dim) or (grad.rows() != Dim)) {
-               std::stringstream err{};
-               err << "need matrix of shape (" << Dim << "×" << Dim
-                   << ") but got (" << grad.rows() << "×" << grad.cols()
-                   << ").";
-               throw std::runtime_error(err.str());
-             }
-             return mateval.evaluate_stress_tangent(grad, form);
-           },
-           "strain"_a, "formulation"_a,
-           "Evaluates stress and tangent moduli for a given strain and "
-           "formulation (Piola-Kirchhoff 1 stress as a function of the "
-           "placement gradient P = P(F) for "
-           "formulation=Formulation.finite_strain and Cauchy stress as a "
-           "function of the infinitesimal strain tensor σ = σ(ε) for "
-           "formulation=Formulation.small_strain). The tangent moduli are K = "
-           "∂P/∂F for formulation=Formulation.finite_strain and C = ∂σ/∂ε for "
-           "formulation=Formulation.small_strain.")
-      .def("estimate_tangent",
-           [](MatEval_t & evaluator, py::EigenDRef<Eigen::MatrixXd> & grad,
-              muSpectre::Formulation form, const Real step,
-              const muSpectre::FiniteDiff diff_type) {
-             if ((grad.cols() != Dim) or (grad.rows() != Dim)) {
-               std::stringstream err{};
-               err << "need matrix of shape (" << Dim << "×" << Dim
-                   << ") but got (" << grad.rows() << "×" << grad.cols()
-                   << ").";
-               throw std::runtime_error(err.str());
-             }
-             return evaluator.estimate_tangent(grad, form, step, diff_type);
-           },
-           "strain"_a, "formulation"_a, "Delta_x"_a,
-           "difference_type"_a = muSpectre::FiniteDiff::centred,
-           "Numerical estimate of the tangent modulus using finite "
-           "differences. The finite difference scheme as well as the finite "
-           "step size can be chosen. If there are no special circumstances, "
-           "the default scheme of centred finite differences yields the most "
-           "accurate results at an increased computational cost.");
+      .def(
+          "evaluate_stress",
+          [](MatEval_t & mateval, py::EigenDRef<Eigen::MatrixXd> & grad,
+             muSpectre::Formulation form) {
+            if ((grad.cols() != Dim) or (grad.rows() != Dim)) {
+              std::stringstream err{};
+              err << "need matrix of shape (" << Dim << "×" << Dim
+                  << ") but got (" << grad.rows() << "×" << grad.cols() << ").";
+              throw std::runtime_error(err.str());
+            }
+            return mateval.evaluate_stress(grad, form);
+          },
+          "strain"_a, "formulation"_a,
+          "Evaluates stress for a given strain and formulation "
+          "(Piola-Kirchhoff 1 stress as a function of the placement gradient "
+          "P = P(F) for formulation=Formulation.finite_strain and Cauchy "
+          "stress as a function of the infinitesimal strain tensor σ = σ(ε) "
+          "for formulation=Formulation.small_strain)")
+      .def(
+          "evaluate_stress_tangent",
+          [](MatEval_t & mateval, py::EigenDRef<Eigen::MatrixXd> & grad,
+             muSpectre::Formulation form) {
+            if ((grad.cols() != Dim) or (grad.rows() != Dim)) {
+              std::stringstream err{};
+              err << "need matrix of shape (" << Dim << "×" << Dim
+                  << ") but got (" << grad.rows() << "×" << grad.cols() << ").";
+              throw std::runtime_error(err.str());
+            }
+            return mateval.evaluate_stress_tangent(grad, form);
+          },
+          "strain"_a, "formulation"_a,
+          "Evaluates stress and tangent moduli for a given strain and "
+          "formulation (Piola-Kirchhoff 1 stress as a function of the "
+          "placement gradient P = P(F) for "
+          "formulation=Formulation.finite_strain and Cauchy stress as a "
+          "function of the infinitesimal strain tensor σ = σ(ε) for "
+          "formulation=Formulation.small_strain). The tangent moduli are K = "
+          "∂P/∂F for formulation=Formulation.finite_strain and C = ∂σ/∂ε for "
+          "formulation=Formulation.small_strain.")
+      .def(
+          "estimate_tangent",
+          [](MatEval_t & evaluator, py::EigenDRef<Eigen::MatrixXd> & grad,
+             muSpectre::Formulation form, const Real step,
+             const muSpectre::FiniteDiff diff_type) {
+            if ((grad.cols() != Dim) or (grad.rows() != Dim)) {
+              std::stringstream err{};
+              err << "need matrix of shape (" << Dim << "×" << Dim
+                  << ") but got (" << grad.rows() << "×" << grad.cols() << ").";
+              throw std::runtime_error(err.str());
+            }
+            return evaluator.estimate_tangent(grad, form, step, diff_type);
+          },
+          "strain"_a, "formulation"_a, "Delta_x"_a,
+          "difference_type"_a = muSpectre::FiniteDiff::centred,
+          "Numerical estimate of the tangent modulus using finite "
+          "differences. The finite difference scheme as well as the finite "
+          "step size can be chosen. If there are no special circumstances, "
+          "the default scheme of centred finite differences yields the most "
+          "accurate results at an increased computational cost.");
 }
 
 void add_material_base_helper(py::module & mod) {
@@ -226,8 +226,7 @@ void add_material_base_helper(py::module & mod) {
       .def("list_fields", &Material::list_fields)
       .def("size", &Material::size)
       .def(
-          "add_pixel",
-          [](Material & mat, size_t pix) { mat.add_pixel(pix); },
+          "add_pixel", [](Material & mat, size_t pix) { mat.add_pixel(pix); },
           "pixel"_a)
       .def_property_readonly(
           "collection",

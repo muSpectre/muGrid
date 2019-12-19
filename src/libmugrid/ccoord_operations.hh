@@ -353,6 +353,13 @@ namespace muGrid {
                     const DynCcoord_t & locations, const DynCcoord_t & ccoord);
 
     //-----------------------------------------------------------------------//
+    //! these functions can be used whenever it is necessary to calcluate the
+    //! volume of a cell or each pixle of the cell
+    Real compute_volume(const DynRcoord_t & lenghts);
+
+    Real compute_pixel_volume(const DynCcoord_t & nb_grid_pts,
+                              const DynRcoord_t & lenghts);
+    //-----------------------------------------------------------------------//
     //! get the linear index of a pixel given a set of strides
     template <size_t dim>
     constexpr Dim_t get_index_from_strides(const Ccoord_t<dim> & strides,
@@ -459,6 +466,11 @@ namespace muGrid {
 
       //! Move assignment operator
       DynamicPixels & operator=(DynamicPixels && other) = default;
+
+      //! evaluate and return the linear index corresponding to dynamic `ccoord`
+      Dim_t get_index(const DynCcoord_t & ccoord) const {
+        return get_index_from_strides(this->strides, ccoord);
+      }
 
       //! evaluate and return the linear index corresponding to `ccoord`
       template <size_t Dim>
@@ -604,14 +616,14 @@ namespace muGrid {
       //! Move assignment operator
       Enumerator & operator=(Enumerator && other) = delete;
 
-      class iterator final: public DynamicPixels::iterator {
+      class iterator final : public DynamicPixels::iterator {
        public:
         using Parent = DynamicPixels::iterator;
         using Parent::Parent;
-        std::tuple<Dim_t, Parent::value_type> operator*() const{
+        std::tuple<Dim_t, Parent::value_type> operator*() const {
           auto && pixel{this->Parent::operator*()};
           return std::tuple<Dim_t, Parent::value_type>{
-            get_index_from_strides(this->pixels.strides, pixel), pixel};
+              get_index_from_strides(this->pixels.strides, pixel), pixel};
         }
       };
 

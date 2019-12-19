@@ -36,95 +36,162 @@
 #ifndef SRC_COMMON_INTERSECTION_OCTREE_HH_
 #define SRC_COMMON_INTERSECTION_OCTREE_HH_
 
-#include <vector>
-
-#include "libmugrid/ccoord_operations.hh"
 #include "common/muSpectre_common.hh"
-#include "cell/cell_base.hh"
+#include "cell/cell.hh"
 #include "materials/material_base.hh"
 #include "common/intersection_volume_calculator_corkpp.hh"
 
+#include "libmugrid/ccoord_operations.hh"
+
+#include <vector>
+#include <array>
+#include <algorithm>
 namespace muSpectre {
-  template <Dim_t DimS, SplitCell is_split>
+  template <SplitCell IsSplit>
   class RootNode;
 
   // this class is defined to be used instead of std::Vector<Eigen::vector>
-  template <Dim_t DimS>
   class Vectors_t {
-    using Vector_t = Eigen::Matrix<Real, DimS, 1>;
+    using Vector_t = Eigen::Matrix<Real, Eigen::Dynamic, 1>;
 
    public:
-    Eigen::Map<Vector_t> operator[](Dim_t id) {
-      return Eigen::Map<Vector_t>(&data[DimS * id]);
+    //! constructor
+    explicit Vectors_t(const Dim_t & dim) : dim{dim} {}
+
+    //! constructor
+    Vectors_t(const std::vector<Real> & data, const Dim_t & dim)
+        : data{data}, dim{dim} {}
+
+    //! access operator:
+    Eigen::Map<const Vector_t> operator[](const Dim_t & id) const {
+      return Eigen::Map<const Vector_t>(&this->data.data()[this->dim * id],
+                                        this->dim, 1);
     }
 
-    inline void push_back(Vector_t vector) {
-      for (int i = 0; i < DimS; ++i) {
-        data.push_back(vector[i]);
+    //! access operator:
+    Eigen::Map<Vector_t> operator[](const Dim_t & id) {
+      return Eigen::Map<Vector_t>(&this->data.data()[this->dim * id], this->dim,
+                                  1);
+    }
+
+    //! access to staic sized map of the vectors:
+    template <Dim_t DimS>
+    Eigen::Map<Eigen::Matrix<Real, DimS, 1>> at(const Dim_t & id) {
+      return Eigen::Map<Eigen::Matrix<Real, DimS, 1>>(
+          &this->data.data()[DimS * id], this->dim, 1);
+    }
+
+    //! push back for adding new vector to the data of the class
+    inline void push_back(const Vector_t & vector) {
+      for (int i{0}; i < this->dim; ++i) {
+        this->data.push_back(vector[i]);
       }
     }
+
+    //! push back for adding new vector to the data of the class
+    inline void push_back(const Eigen::Map<Vector_t, 0> & vector) {
+      for (int i{0}; i < this->dim; ++i) {
+        this->data.push_back(vector[i]);
+      }
+    }
+
+    //! push back for adding new vector to the data of the class
+    inline void push_back(const Eigen::Map<const Vector_t, 0> & vector) {
+      for (int i{0}; i < this->dim; ++i) {
+        this->data.push_back(vector[i]);
+      }
+    }
+
+    //! push back for adding new vector from DynRcoord
+    inline void push_back(const DynRcoord_t & vector) {
+      for (int i{0}; i < this->dim; ++i) {
+        this->data.push_back(vector[i]);
+      }
+    }
+
+    inline std::vector<Real> get_a_vector(const Dim_t & id) {
+      std::vector<Real> ret(this->dim);
+      for (int i{id * dim}; i < this->dim * (id + 1); ++i) {
+        ret.push_back(this->data[i]);
+      }
+      return ret;
+    }
+
+    inline const Dim_t & get_dim() { return this->dim; }
+
     /* --------------------------------------------------------------------- */
-    // be careful that the index increments with DimS instead of one two make
+    // be careful that the index increments with DimS instead of one make
     // the end() function easy to write via the constructor
     class iterator {
      public:
       using value_type = Eigen::Map<Vector_t>;
+      using value_type_const = Eigen::Map<const Vector_t>;
       //! constructor
-      explicit iterator(Vectors_t & data, bool begin = true)
-          : vectors{data}, index{begin ? 0 : this->vectors.data.size()} {}
+      explicit iterator(const Vectors_t & data, const Dim_t & dim,
+                        bool begin = true)
+          : vectors(data), dim{dim}, index{begin ? 0
+                                                 : this->vectors.data.size()} {}
       // deconstructor
       virtual ~iterator() = default;
+
       //! dereferencing
-      value_type operator*() {
-        auto ret_val = value_type(&this->vectors.data[this->index]);
-        return ret_val;
-      }
+      value_type_const operator*() const { return this->vectors[this->index]; }
+
       //! pre-increment
-      auto operator++() -> iterator & {
-        this->index += DimS;
+      iterator & operator++() {
+        this->index++;
         return *this;
       }
-      auto operator--() -> iterator & {
-        this->index -= DimS;
+
+      // !decremment
+      iterator & operator--() {
+        this->index--;
         return *this;
       }
+
       //! inequality
       inline bool operator!=(const iterator & other) {
         return (this->index != other.index);
       }
+
       //! equality
       inline bool operator==(const iterator & other) const {
         return (this->index == other.index);
       }
 
-     private:
-      Vectors_t & vectors;
+     protected:
+      const Vectors_t & vectors;
+      Dim_t dim;
       size_t index;
     };
+
     /* --------------------------------------------------------------------- */
 
-    inline iterator begin() { return iterator(*this); }
-    inline iterator end() { return iterator(*this, false); }
-    size_t size() const { return std::floor(this->data.size() / DimS); }
+    inline iterator begin() { return iterator(*this, this->dim, true); }
+    inline iterator end() { return iterator(*this, this->dim, false); }
+    size_t size() const {
+      return static_cast<size_t>(this->data.size() / this->dim);
+    }
+
     /* --------------------------------------------------------------------- */
    protected:
     std::vector<Real> data{};
+    Dim_t dim;
   };
 
-  template <Dim_t DimS, SplitCell is_split>
+  template <SplitCell IsSplit>
   class Node {
    public:
-    using Rcoord = Rcoord_t<DimS>;  //!< physical coordinates type
-    using Ccoord = Ccoord_t<DimS>;  //!< cell coordinates type
-    using RootNode_t = RootNode<DimS, is_split>;
-    using Vector_t = Eigen::Matrix<Real, DimS, 1>;
-    // using Vectors_t = std::vector<Vector_t>;
+    using RootNode_t = RootNode<IsSplit>;
+    using Vector_t = Eigen::Matrix<Real, Eigen::Dynamic, 1>;
+
     //! Default constructor
     Node() = delete;
 
     // Construct by origin, lenghts, and depth
-    Node(const Rcoord & new_origin, const Ccoord & new_lenghts, int depth,
-         RootNode_t & root, bool is_root);
+    Node(const Dim_t & dim, const DynRcoord_t & new_origin,
+         const DynCcoord_t & new_lenghts, const Dim_t & depth,
+         const Dim_t & max_depth, RootNode_t & root, const bool & is_root);
 
     // This function is put here as a comment, so we could add a octree by
     // giving a cell as its input that seems to be of possible use in the future
@@ -142,44 +209,60 @@ namespace muSpectre {
 
     // This function checks the status of the node and orders its devision into
     // smaller nodes or asssign material to it
-    virtual void check_node();
+    template <Dim_t DimS>
+    void check_node_helper();
+
+    void check_node();
 
     // This function gives the ratio of the node which happens to be inside the
     // precipitate and assign materila to it if node is a pixel or divide it
     // furhter if it is not
-    void split_node(Real ratio, corkpp::IntersectionState state);
-    void split_node(Real intersection_ratio, corkpp::vector_t normal_vector,
-                    corkpp::IntersectionState state);
+    template <Dim_t DimS>
+    void split_node_helper(const Real & ratio,
+                           const corkpp::IntersectionState & state);
 
+    template <Dim_t DimS>
+    void split_node_helper(const Real & intersection_ratio,
+                           const corkpp::vector_t & normal_vector,
+                           const corkpp::IntersectionState & state);
+
+    void split_node(const Real & ratio,
+                    const corkpp::IntersectionState & state);
+    void split_node(const Real & intersection_ratio,
+                    const corkpp::vector_t & normal_vector,
+                    const corkpp::IntersectionState & state);
+
+    template <Dim_t DimS>
+    void divide_node_helper();
     // this function constructs children of a node
     void divide_node();
 
    protected:
     //
+    Dim_t dim;
     RootNode_t & root_node;
-    Rcoord origin, Rlengths{};
-    Ccoord Clengths{};
+    DynRcoord_t origin, Rlengths{};
+    DynCcoord_t Clengths{};
     int depth;
     bool is_pixel;
     int children_no;
     std::vector<Node> children{};
   };
 
-  template <Dim_t DimS, SplitCell is_split>
-  class RootNode : public Node<DimS, is_split> {
-    friend class Node<DimS, is_split>;
+  template <SplitCell IsSplit>
+  class RootNode : public Node<IsSplit> {
+    friend class Node<IsSplit>;
 
    public:
-    using Rcoord = Rcoord_t<DimS>;        //!< physical coordinates type
-    using Ccoord = Ccoord_t<DimS>;        //!< cell coordinates type
-    using Parent = Node<DimS, is_split>;  //!< base class
+    using Parent = Node<IsSplit>;  //!< base class
     using Vector_t = typename Parent::Vector_t;
     // using Vectors_t = typename Parent::Vectors_t;
     //! Default Constructor
     RootNode() = delete;
 
     //! Constructing a root node for a cell and a preticipate inside that cell
-    RootNode(CellBase<DimS, DimS> & cell, std::vector<Rcoord> vert_precipitate);
+    RootNode(const Cell & cell,
+             const std::vector<DynRcoord_t> & vert_precipitate);
 
     //! Copy constructor
     RootNode(const RootNode & other) = delete;
@@ -191,41 +274,71 @@ namespace muSpectre {
     ~RootNode() = default;
 
     // returns the pixels which have intersection raio with the preipitate
-    inline auto get_intersected_pixels() -> std::vector<Ccoord> {
+    inline std::vector<DynCcoord_t> get_intersected_pixels() {
       return this->intersected_pixels;
+    }
+
+    // returns the index of the pixels which have intersection raio with the
+    // preipitate
+    inline std::vector<size_t> get_intersected_pixels_id() {
+      return this->intersected_pixels_id;
     }
 
     // return the intersection ratios of corresponding to the pixels returned by
     // get_intersected_pixels()
-    inline auto get_intersection_ratios() -> std::vector<Real> {
+    inline std::vector<Real> get_intersection_ratios() {
       return this->intersection_ratios;
     }
 
     // return the normal vector of intersection surface of corresponding to the
     // pixels returned by get_intersected_pixels()
-    inline auto get_intersection_normals() -> Vectors_t<DimS> {
+    inline Vectors_t get_intersection_normals() {
       return this->intersection_normals;
     }
 
-    inline auto get_intersection_status()
-        -> std::vector<corkpp::IntersectionState> {
+    inline std::vector<corkpp::IntersectionState> get_intersection_status() {
       return this->intersection_state;
     }
+
+    // Returns the maximum of the nb_grid_pts in all directions
+    Dim_t make_max_resolution(const Cell & cell) const;
+
+    // Retruns the maximum depth of the branches in the OctTree
+    Dim_t make_max_depth(const Cell & cell) const;
 
     // checking rootnode:
     void check_root_node();
 
+    // computes the smallest muGrid::ipower of which is greater than the maximum
+    // nb of grid points in all directions which is the size of the OctTree for
+    // checking intersections
+    int compute_squared_circum_square(const Cell & cell) const;
+
+    // make Rcoord of the origin of the root node
+    DynRcoord_t make_root_origin(const Cell & cell) const;
+
    protected:
-    CellBase<DimS, DimS> & cell;
-    Rcoord cell_length, pixel_lengths;
-    Ccoord cell_resolution;
-    int max_resolution;
-    int max_depth;
-    std::vector<Rcoord> precipitate_vertices{};
-    std::vector<Ccoord> intersected_pixels{};
-    std::vector<Real> intersection_ratios{};
-    Vectors_t<DimS> intersection_normals{};
-    std::vector<corkpp::IntersectionState> intersection_state{};
+    const Cell & cell;            //! the cell to be intersected
+    DynRcoord_t cell_length;      //! The Real size of the cell
+    DynRcoord_t pixel_lengths;    //! The Real size of each pixel
+    DynCcoord_t cell_resolution;  //! The nb_grid_pts for the
+    int max_resolution;  //! The maximum of the nb_grid_pts in all directions
+    int max_depth;       //! The maximum depth of the branches in the OctTree
+    std::vector<DynRcoord_t>
+        precipitate_vertices{};  //! The coordinates of the vertices of the
+                                 //! perticpiate
+    std::vector<DynCcoord_t>
+        intersected_pixels{};  //! The pixels of the cell which intersect with
+                               //! the percipitate
+    std::vector<size_t>
+        intersected_pixels_id{};  //! The index of the intersecting pixels
+    std::vector<Real>
+        intersection_ratios{};  //! The intesrction ratio of intersecting pixels
+    Vectors_t intersection_normals;  //! The normal vectors of the interface in
+                                     //! the intersecting pixels
+    std::vector<corkpp::IntersectionState>
+        intersection_state{};  //! The state of the interface in
+                               //! the intersecting pixels
   };
 
 }  // namespace muSpectre

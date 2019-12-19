@@ -53,7 +53,22 @@
 #include <boost/range/combine.hpp>
 
 namespace muSpectre {
+
+  using muGrid::testGoodies::rel_error;
+
   BOOST_AUTO_TEST_SUITE(laminate_homogenisation);
+
+  constexpr Dim_t OneContrast{
+      1};  //! The values used to introduce material contrast
+  constexpr Dim_t TwoContrast{
+      2};  //! The values used to introduce material contrast
+  constexpr Dim_t ThreeContrast{
+      3};  //! The values used to introduce material contrast
+  constexpr Dim_t SevenContrast{
+      7};  //! The values used to introduce material contrast
+
+  constexpr Real Tol{1e-8};
+  constexpr Real MaxIter{100};
 
   template <class Mat_t, Dim_t Dim, Dim_t c>
   struct MaterialFixture;
@@ -61,8 +76,8 @@ namespace muSpectre {
   /*--------------------------------------------------------------------------*/
   //! Material orthotropic fixture
   template <Dim_t Dim, Dim_t c>
-  struct MaterialFixture<MaterialLinearAnisotropic<Dim, Dim>, Dim, c> {
-    MaterialFixture() : mat("Name_aniso", aniso_inp_maker()) {}
+  struct MaterialFixture<MaterialLinearAnisotropic<Dim>, Dim, c> {
+    MaterialFixture() : mat("Name_aniso", Dim, OneQuadPt, aniso_inp_maker()) {}
 
     std::vector<Real> aniso_inp_maker() {
       std::vector<Real> aniso_inp{};
@@ -84,14 +99,14 @@ namespace muSpectre {
       return aniso_inp;
     }
 
-    MaterialLinearAnisotropic<Dim, Dim> mat;
+    MaterialLinearAnisotropic<Dim> mat;
   };
 
   /*--------------------------------------------------------------------------*/
   //! Material orthotropic fixture
   template <Dim_t Dim, Dim_t c>
-  struct MaterialFixture<MaterialLinearOrthotropic<Dim, Dim>, Dim, c> {
-    MaterialFixture() : mat("Name_ortho", ortho_inp_maker()) {}
+  struct MaterialFixture<MaterialLinearOrthotropic<Dim>, Dim, c> {
+    MaterialFixture() : mat("Name_ortho", Dim, OneQuadPt, ortho_inp_maker()) {}
     std::vector<Real> ortho_inp_maker() {
       std::vector<Real> ortho_inp{};
       switch (Dim) {
@@ -110,15 +125,16 @@ namespace muSpectre {
       return ortho_inp;
     }
 
-    MaterialLinearOrthotropic<Dim, Dim> mat;
+    MaterialLinearOrthotropic<Dim> mat;
   };
 
   /*--------------------------------------------------------------------------*/
   //! Material linear elastic fixture
   template <Dim_t Dim, Dim_t c>
-  struct MaterialFixture<MaterialLinearElastic1<Dim, Dim>, Dim, c> {
+  struct MaterialFixture<MaterialLinearElastic1<Dim>, Dim, c> {
     MaterialFixture()
-        : mat("Name_LinElastic1", young_maker(), poisson_maker()) {}
+        : mat("Name_LinElastic1", Dim, OneQuadPt, young_maker(),
+              poisson_maker()) {}
 
     Real young_maker() {
       Real lambda{c * 2}, mu{c * 1.5};
@@ -131,66 +147,67 @@ namespace muSpectre {
       Real poisson{lambda / (2 * (lambda + mu))};
       return poisson;
     }
-    MaterialLinearElastic1<Dim, Dim> mat;
+    MaterialLinearElastic1<Dim> mat;
   };
 
   /*--------------------------------------------------------------------------*/
   //! Material pair fixture
   template <class Mat1_t, class Mat2_t, Dim_t Dim, Dim_t c1, Dim_t c2>
   struct MaterialPairFixture {
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     using Vec_t = Eigen::Matrix<Real, Dim, 1>;
-    using Stiffness_t = muGrid::T4Mat<Real, Dim>;
-    using Serial_stiffness_t = Eigen::Matrix<Real, 2 * Dim - 1, 2 * Dim - 1>;
-    using Parallel_stiffness_t = muGrid::T4Mat<Real, (Dim - 1)>;
-
     using Strain_t = Eigen::Matrix<Real, Dim, Dim>;
-    using Serial_strain_t = Eigen::Matrix<Real, 2 * Dim - 1, 1>;
-    using Parallel_strain_t = Eigen::Matrix<Real, (Dim - 1) * (Dim - 1), 1>;
-
-    using Stress_t = Strain_t;
-    using Serial_stress_t = Serial_strain_t;
-    using Paralle_stress_t = Parallel_strain_t;
-
+    using Stress_t = Eigen::Matrix<Real, Dim, Dim>;
+    using Stiffness_t = muGrid::T4Mat<Real, Dim>;
     using Output_t = std::tuple<Stress_t, Stiffness_t>;
     using Function_t =
         std::function<Output_t(const Eigen::Ref<const Strain_t> &)>;
 
     // constructor :
-    MaterialPairFixture() {
+    MaterialPairFixture()
+        : normal_vec_holder{std::make_unique<Vec_t>(Vec_t::Random())},
+          /*normal_vec_holder{std::make_unique<Vec_t>(Vec_t::Random())}*/
+          normal_vec{*normal_vec_holder} {
       this->normal_vec = this->normal_vec / this->normal_vec.norm();
     }
 
     constexpr Dim_t get_dim() { return Dim; }
+
+   protected:
     MaterialFixture<Mat1_t, Dim, c1> mat_fix_1{};
     MaterialFixture<Mat2_t, Dim, c2> mat_fix_2{};
-    Vec_t normal_vec{Vec_t::Random()};
-    // Vec_t normal_vec { Vec_t::UnitX() + Vec_t::UnitY() };
+
+    std::unique_ptr<Vec_t> normal_vec_holder;
+    Vec_t & normal_vec;
+
     Real ratio{0.5 + 0.5 * static_cast<double>(std::rand() / (RAND_MAX))};
     static constexpr Dim_t fix_dim{Dim};
   };
 
   /*--------------------------------------------------------------------------*/
-  using fix_list = boost::mpl::list<
-      MaterialPairFixture<MaterialLinearElastic1<threeD, threeD>,
-                          MaterialLinearElastic1<threeD, threeD>, threeD, 1, 1>,
-      MaterialPairFixture<MaterialLinearOrthotropic<threeD, threeD>,
-                          MaterialLinearOrthotropic<threeD, threeD>, threeD, 1,
-                          1>,
-      MaterialPairFixture<MaterialLinearAnisotropic<threeD, threeD>,
-                          MaterialLinearAnisotropic<threeD, threeD>, threeD, 1,
-                          1>,
-      MaterialPairFixture<MaterialLinearElastic1<twoD, twoD>,
-                          MaterialLinearElastic1<twoD, twoD>, twoD, 1, 1>,
-      MaterialPairFixture<MaterialLinearOrthotropic<twoD, twoD>,
-                          MaterialLinearOrthotropic<twoD, twoD>, twoD, 1, 1>,
-      MaterialPairFixture<MaterialLinearAnisotropic<twoD, twoD>,
-                          MaterialLinearAnisotropic<twoD, twoD>, twoD, 1, 1>>;
+  using fix_list =
+      boost::mpl::list<MaterialPairFixture<MaterialLinearElastic1<threeD>,
+                                           MaterialLinearElastic1<threeD>,
+                                           threeD, OneContrast, OneContrast>,
+                       MaterialPairFixture<MaterialLinearOrthotropic<threeD>,
+                                           MaterialLinearOrthotropic<threeD>,
+                                           threeD, OneContrast, OneContrast>,
+                       MaterialPairFixture<MaterialLinearAnisotropic<threeD>,
+                                           MaterialLinearAnisotropic<threeD>,
+                                           threeD, OneContrast, OneContrast>,
+                       MaterialPairFixture<MaterialLinearElastic1<twoD>,
+                                           MaterialLinearElastic1<twoD>, twoD,
+                                           OneContrast, OneContrast>,
+                       MaterialPairFixture<MaterialLinearOrthotropic<twoD>,
+                                           MaterialLinearOrthotropic<twoD>,
+                                           twoD, OneContrast, OneContrast>,
+                       MaterialPairFixture<MaterialLinearAnisotropic<twoD>,
+                                           MaterialLinearAnisotropic<twoD>,
+                                           twoD, OneContrast, OneContrast>>;
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(identical_material, Fix, fix_list, Fix) {
     auto & mat1{Fix::mat_fix_1.mat};
     auto & mat2{Fix::mat_fix_2.mat};
-
+    constexpr Real OneRatio{1.0};
     using Strain_t = typename Fix::Strain_t;
     Real amp{1.0};
     Strain_t F{Strain_t::Identity() + amp * Strain_t::Random()};
@@ -198,21 +215,23 @@ namespace muSpectre {
                                      StrainMeasure::GreenLagrange>(F)};
     using Function_t = typename Fix::Function_t;
 
-    Function_t mat1_evaluate_stress_func{
-        [&mat1](const Eigen::Ref<const Strain_t> & strain) {
-          return mat1.evaluate_stress_tangent(std::move(strain));
-        }};
+    Function_t mat1_evaluate_stress_func = [&mat1](
+        const Eigen::Ref<const Strain_t> & strain)
+        -> std::tuple<typename Fix::Stress_t, typename Fix::Stiffness_t> {
+      return mat1.evaluate_stress_tangent(std::move(strain), OneRatio);
+    };
 
-    Function_t mat2_evaluate_stress_func{
-        [&mat2](const Eigen::Ref<const Strain_t> & strain) {
-          return mat2.evaluate_stress_tangent(std::move(strain));
-        }};
+    Function_t mat2_evaluate_stress_func = [&mat2](
+        const Eigen::Ref<const Strain_t> & strain)
+        -> std::tuple<typename Fix::Stress_t, typename Fix::Stiffness_t> {
+      return mat2.evaluate_stress_tangent(std::move(strain), OneRatio);
+    };
 
     auto && S_C_lam{
         LamHomogen<Fix::fix_dim, Formulation::small_strain>::
             evaluate_stress_tangent(E, mat1_evaluate_stress_func,
                                     mat2_evaluate_stress_func, Fix::ratio,
-                                    Fix::normal_vec, 1e-8, 10)};
+                                    Fix::normal_vec, Tol, MaxIter)};
 
     auto && S_lam{std::get<0>(S_C_lam)};
     auto && C_lam{std::get<1>(S_C_lam)};
@@ -221,45 +240,54 @@ namespace muSpectre {
     auto && S_ref{std::get<0>(S_C_ref)};
     auto && C_ref{std::get<1>(S_C_ref)};
 
-    auto && err_S{(S_lam - S_ref).norm() / S_ref.norm()};
-    auto && err_C{(C_lam - C_ref).norm() / C_ref.norm()};
+    Real err_S{rel_error(S_lam, S_ref)};
+    Real err_C{rel_error(C_lam, C_ref)};
+
+    BOOST_CHECK_LT(err_S, tol);
+    BOOST_CHECK_LT(err_C, tol);
+
     auto && solution_parameters =
         LamHomogen<Fix::fix_dim, Formulation::small_strain>::laminate_solver(
             E, mat1_evaluate_stress_func, mat2_evaluate_stress_func, Fix::ratio,
-            Fix::normal_vec, 1e-8, 10);
+            Fix::normal_vec, Tol, MaxIter);
     auto && iters{std::get<0>(solution_parameters)};
     auto && del_energy{std::get<1>(solution_parameters)};
+
     BOOST_CHECK_EQUAL(1, iters);
     BOOST_CHECK_LT(std::abs(del_energy), tol);
 
     auto && S_ref_2 = Matrices::tensmult(C_lam, E);
-    auto && err_S_2{((S_lam - S_ref_2).norm()) / S_ref_2.norm()};
-    BOOST_CHECK_LT(err_S_2, tol);
+    Real err_S_2{rel_error(S_lam, S_ref_2)};
 
-    BOOST_CHECK_LT(err_S, tol);
-    BOOST_CHECK_LT(err_C, tol);
+    BOOST_CHECK_LT(err_S_2, tol);
   };
-  // /*--------------------------------------------------------------------------*/
+  /*--------------------------------------------------------------------------*/
 
   using fix_list2 = boost::mpl::list<
-      MaterialPairFixture<MaterialLinearElastic1<threeD, threeD>,
-                          MaterialLinearElastic1<threeD, threeD>, threeD, 7, 3>,
-      MaterialPairFixture<MaterialLinearElastic1<threeD, threeD>,
-                          MaterialLinearElastic1<threeD, threeD>, threeD, 3, 7>,
-      MaterialPairFixture<MaterialLinearElastic1<twoD, twoD>,
-                          MaterialLinearElastic1<twoD, twoD>, twoD, 3, 2>,
-      MaterialPairFixture<MaterialLinearElastic1<twoD, twoD>,
-                          MaterialLinearElastic1<twoD, twoD>, twoD, 2, 3>,
-      MaterialPairFixture<MaterialLinearOrthotropic<threeD, threeD>,
-                          MaterialLinearOrthotropic<threeD, threeD>, threeD, 3,
-                          1>,
-      MaterialPairFixture<MaterialLinearOrthotropic<twoD, twoD>,
-                          MaterialLinearOrthotropic<twoD, twoD>, twoD, 3, 1>,
-      MaterialPairFixture<MaterialLinearAnisotropic<threeD, threeD>,
-                          MaterialLinearAnisotropic<threeD, threeD>, threeD, 3,
-                          1>,
-      MaterialPairFixture<MaterialLinearAnisotropic<twoD, twoD>,
-                          MaterialLinearAnisotropic<twoD, twoD>, twoD, 3, 1>>;
+      MaterialPairFixture<MaterialLinearElastic1<threeD>,
+                          MaterialLinearElastic1<threeD>, threeD, SevenContrast,
+                          ThreeContrast>,
+      MaterialPairFixture<MaterialLinearElastic1<threeD>,
+                          MaterialLinearElastic1<threeD>, threeD, ThreeContrast,
+                          SevenContrast>,
+      MaterialPairFixture<MaterialLinearElastic1<twoD>,
+                          MaterialLinearElastic1<twoD>, twoD, ThreeContrast,
+                          TwoContrast>,
+      MaterialPairFixture<MaterialLinearElastic1<twoD>,
+                          MaterialLinearElastic1<twoD>, twoD, TwoContrast,
+                          ThreeContrast>,
+      MaterialPairFixture<MaterialLinearOrthotropic<threeD>,
+                          MaterialLinearOrthotropic<threeD>, threeD,
+                          ThreeContrast, OneContrast>,
+      MaterialPairFixture<MaterialLinearOrthotropic<twoD>,
+                          MaterialLinearOrthotropic<twoD>, twoD, ThreeContrast,
+                          OneContrast>,
+      MaterialPairFixture<MaterialLinearAnisotropic<threeD>,
+                          MaterialLinearAnisotropic<threeD>, threeD,
+                          ThreeContrast, OneContrast>,
+      MaterialPairFixture<MaterialLinearAnisotropic<twoD>,
+                          MaterialLinearAnisotropic<twoD>, twoD, ThreeContrast,
+                          OneContrast>>;
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(different_material_linear_elastic, Fix,
                                    fix_list2, Fix) {
@@ -274,23 +302,23 @@ namespace muSpectre {
     using Function_t = typename Fix::Function_t;
     Function_t mat1_evaluate_stress_func{
         [&mat1](const Eigen::Ref<const Strain_t> & strain) {
-          return mat1.evaluate_stress_tangent(std::move(strain));
+          return mat1.evaluate_stress_tangent(std::move(strain), 1);
         }};
 
     Function_t mat2_evaluate_stress_func{
         [&mat2](const Eigen::Ref<const Strain_t> & strain) {
-          return mat2.evaluate_stress_tangent(std::move(strain));
+          return mat2.evaluate_stress_tangent(std::move(strain), 1);
         }};
 
     auto && S_C_lam{
         LamHomogen<Fix::fix_dim, Formulation::small_strain>::
             evaluate_stress_tangent(E, mat1_evaluate_stress_func,
                                     mat2_evaluate_stress_func, Fix::ratio,
-                                    Fix::normal_vec, 1e-9, 10)};
+                                    Fix::normal_vec, 1e-9, MaxIter)};
     auto && solution_parameters{
         LamHomogen<Fix::fix_dim, Formulation::small_strain>::laminate_solver(
             E, mat1_evaluate_stress_func, mat2_evaluate_stress_func, Fix::ratio,
-            Fix::normal_vec, 1e-8, 10)};
+            Fix::normal_vec, Tol, MaxIter)};
 
     auto && iters{std::get<0>(solution_parameters)};
     auto && del_energy{std::get<1>(solution_parameters)};
@@ -301,19 +329,22 @@ namespace muSpectre {
     auto && C_lam{std::get<1>(S_C_lam)};
 
     auto && S_ref_2{Matrices::tensmult(C_lam, E)};
-    auto && err_S_2{((S_lam - S_ref_2).norm()) / S_ref_2.norm()};
+
+    Real err_S_2{rel_error(S_lam, S_ref_2)};
     BOOST_CHECK_LT(err_S_2, tol);
   }
 
-  // /*--------------------------------------------------------------------------*/
-  // /**
-  //  * material linear elastic contrast && inb finite strain
-  //  */
-  using fix_list3 = boost::mpl::list<
-      MaterialPairFixture<MaterialLinearElastic1<threeD, threeD>,
-                          MaterialLinearElastic1<threeD, threeD>, threeD, 1, 1>,
-      MaterialPairFixture<MaterialLinearElastic1<twoD, twoD>,
-                          MaterialLinearElastic1<twoD, twoD>, twoD, 1, 1>>;
+  /*--------------------------------------------------------------------------*/
+  /**
+   * material linear elastic contrast && inb finite strain
+   */
+  using fix_list3 =
+      boost::mpl::list<MaterialPairFixture<MaterialLinearElastic1<threeD>,
+                                           MaterialLinearElastic1<threeD>,
+                                           threeD, OneContrast, OneContrast>,
+                       MaterialPairFixture<MaterialLinearElastic1<twoD>,
+                                           MaterialLinearElastic1<twoD>, twoD,
+                                           OneContrast, OneContrast>>;
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(identical_material_finite_strain, Fix,
                                    fix_list3, Fix) {
@@ -340,7 +371,7 @@ namespace muSpectre {
                                     traits::strain_measure>(strain);
 
           auto && mat_stress_tgt =
-              mat1.evaluate_stress_tangent(std::move(mat1_strain));
+              mat1.evaluate_stress_tangent(std::move(mat1_strain), 1);
 
           auto && ret_P_K =
               MatTB::PK1_stress<traits::stress_measure, traits::strain_measure>(
@@ -364,7 +395,7 @@ namespace muSpectre {
                                     traits::strain_measure>(strain);
 
           auto && mat_stress_tgt =
-              mat2.evaluate_stress_tangent(std::move(mat2_strain));
+              mat2.evaluate_stress_tangent(std::move(mat2_strain), 1);
 
           auto && ret_P_K =
               MatTB::PK1_stress<traits::stress_measure, traits::strain_measure>(
@@ -378,11 +409,11 @@ namespace muSpectre {
         LamHomogen<Fix::fix_dim, Formulation::finite_strain>::
             evaluate_stress_tangent(F, mat1_evaluate_stress_func,
                                     mat2_evaluate_stress_func, Fix::ratio,
-                                    Fix::normal_vec, 1e-9, 10)};
+                                    Fix::normal_vec, 1e-9, MaxIter)};
     auto && solution_parameters{
         LamHomogen<Fix::fix_dim, Formulation::finite_strain>::laminate_solver(
             F, mat1_evaluate_stress_func, mat2_evaluate_stress_func, Fix::ratio,
-            Fix::normal_vec, 1e-8, 10)};
+            Fix::normal_vec, Tol, MaxIter)};
 
     auto && iter{std::get<0>(solution_parameters)};
     BOOST_CHECK_EQUAL(iter, 1);
@@ -405,8 +436,8 @@ namespace muSpectre {
             F, P_ref_1)};
     auto && S_ref_2{muGrid::Matrices::tensmult(C_lam, E)};
 
-    auto err_S_1{((S_lam - S_ref_1).norm()) / S_ref_1.norm()};
-    auto err_S_2{((S_lam - S_ref_2).norm()) / S_ref_2.norm()};
+    Real err_S_1{rel_error(S_lam, S_ref_1)};
+    Real err_S_2{rel_error(S_lam, S_ref_2)};
 
     BOOST_CHECK_LT(err_S_1, tol);
     BOOST_CHECK_LT(err_S_2, tol);
@@ -416,22 +447,27 @@ namespace muSpectre {
    * material linear elastic contrast && finite strain
    */
   using fix_list4 = boost::mpl::list<
-      MaterialPairFixture<MaterialLinearElastic1<threeD, threeD>,
-                          MaterialLinearElastic1<threeD, threeD>, threeD, 1, 3>,
-      MaterialPairFixture<MaterialLinearOrthotropic<threeD, threeD>,
-                          MaterialLinearOrthotropic<threeD, threeD>, threeD, 3,
-                          7>,
-      MaterialPairFixture<MaterialLinearAnisotropic<threeD, threeD>,
-                          MaterialLinearAnisotropic<threeD, threeD>, threeD, 3,
-                          7>,
-      MaterialPairFixture<MaterialLinearElastic1<twoD, twoD>,
-                          MaterialLinearElastic1<twoD, twoD>, twoD, 3, 1>,
-      MaterialPairFixture<MaterialLinearElastic1<twoD, twoD>,
-                          MaterialLinearElastic1<twoD, twoD>, twoD, 3, 7>,
-      MaterialPairFixture<MaterialLinearOrthotropic<twoD, twoD>,
-                          MaterialLinearOrthotropic<twoD, twoD>, twoD, 3, 7>,
-      MaterialPairFixture<MaterialLinearAnisotropic<twoD, twoD>,
-                          MaterialLinearAnisotropic<twoD, twoD>, twoD, 3, 7>>;
+      MaterialPairFixture<MaterialLinearElastic1<threeD>,
+                          MaterialLinearElastic1<threeD>, threeD, OneContrast,
+                          ThreeContrast>,
+      MaterialPairFixture<MaterialLinearOrthotropic<threeD>,
+                          MaterialLinearOrthotropic<threeD>, threeD,
+                          ThreeContrast, SevenContrast>,
+      MaterialPairFixture<MaterialLinearAnisotropic<threeD>,
+                          MaterialLinearAnisotropic<threeD>, threeD,
+                          ThreeContrast, SevenContrast>,
+      MaterialPairFixture<MaterialLinearElastic1<twoD>,
+                          MaterialLinearElastic1<twoD>, twoD, ThreeContrast,
+                          OneContrast>,
+      MaterialPairFixture<MaterialLinearElastic1<twoD>,
+                          MaterialLinearElastic1<twoD>, twoD, ThreeContrast,
+                          SevenContrast>,
+      MaterialPairFixture<MaterialLinearOrthotropic<twoD>,
+                          MaterialLinearOrthotropic<twoD>, twoD, ThreeContrast,
+                          SevenContrast>,
+      MaterialPairFixture<MaterialLinearAnisotropic<twoD>,
+                          MaterialLinearAnisotropic<twoD>, twoD, ThreeContrast,
+                          SevenContrast>>;
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(different_material_finite_strain, Fix,
                                    fix_list4, Fix) {
@@ -441,6 +477,7 @@ namespace muSpectre {
     using Strain_t = typename Fix::Strain_t;
     using Stress_t = Strain_t;
 
+    constexpr Real OneRatio{1.0};
     Real amp{1e-1};
     Real amp_del{1e-6};
     Strain_t F{Strain_t::Identity() + amp * Strain_t::Random()};
@@ -471,7 +508,7 @@ namespace muSpectre {
                                     traits::strain_measure>(strain);
 
           auto && mat_stress_tgt =
-              mat1.evaluate_stress_tangent(std::move(mat1_strain));
+              mat1.evaluate_stress_tangent(std::move(mat1_strain), OneRatio);
 
           Mat_ret_t ret_P_K =
               MatTB::PK1_stress<traits::stress_measure, traits::strain_measure>(
@@ -495,7 +532,7 @@ namespace muSpectre {
                                     traits::strain_measure>(strain);
 
           auto && mat_stress_tgt =
-              mat2.evaluate_stress_tangent(std::move(mat2_strain));
+              mat2.evaluate_stress_tangent(std::move(mat2_strain), 1);
 
           Mat_ret_t ret_P_K =
               MatTB::PK1_stress<traits::stress_measure, traits::strain_measure>(
@@ -509,16 +546,16 @@ namespace muSpectre {
         LamHomogen<Fix::fix_dim, Formulation::finite_strain>::
             evaluate_stress_tangent(F_del, mat1_evaluate_stress_func,
                                     mat2_evaluate_stress_func, Fix::ratio,
-                                    Fix::normal_vec, 1e-9, 100)};
+                                    Fix::normal_vec, 1e-9, MaxIter)};
     auto && P_K_lam{
         LamHomogen<Fix::fix_dim, Formulation::finite_strain>::
             evaluate_stress_tangent(F, mat1_evaluate_stress_func,
                                     mat2_evaluate_stress_func, Fix::ratio,
-                                    Fix::normal_vec, 1e-9, 1000)};
+                                    Fix::normal_vec, 1e-9, MaxIter)};
     auto && solution_parameters{
         LamHomogen<Fix::fix_dim, Formulation::finite_strain>::laminate_solver(
             F, mat1_evaluate_stress_func, mat2_evaluate_stress_func, Fix::ratio,
-            Fix::normal_vec, 1e-9, 1000)};
+            Fix::normal_vec, 1e-9, MaxIter)};
 
     auto && del_energy{std::get<1>(solution_parameters)};
     BOOST_CHECK_LT(std::abs(del_energy), 1e-9);

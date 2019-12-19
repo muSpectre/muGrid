@@ -659,13 +659,15 @@ namespace muSpectre {
           constexpr StrainMeasure expected_strain_m{
               get_formulation_strain_type(Form, traits::strain_measure)};
 
-          auto & grad = std::get<0>(strain);
-          auto && E =
-              MatTB::convert_strain<stored_strain_m, expected_strain_m>(grad);
-          auto && stress_mat = mat.evaluate_stress(std::move(E), quad_pt_id);
-          return ::muSpectre::MatTB::PK1_stress<traits::stress_measure,
-                                                traits::strain_measure>(
-              std::move(grad), std::move(stress_mat));
+          auto & grad{std::get<0>(strain)};
+          auto && E{
+              MatTB::convert_strain<stored_strain_m, expected_strain_m>(grad)};
+          auto && stress_mat{mat.evaluate_stress(std::move(E), quad_pt_id)};
+          auto stress{::muSpectre::MatTB::PK1_stress<traits::stress_measure,
+                                                     traits::strain_measure>(
+                          std::move(grad), std::move(stress_mat))
+                          .eval()};
+          return stress;
         }
       };
 
@@ -691,9 +693,8 @@ namespace muSpectre {
           constexpr StrainMeasure expected_strain_m{
               get_formulation_strain_type(Form, traits::strain_measure)};
 
-          auto && eps =
-              MatTB::convert_strain<stored_strain_m, expected_strain_m>(
-                  std::get<0>(strain));
+          auto && eps{MatTB::convert_strain<stored_strain_m, expected_strain_m>(
+              std::get<0>(strain))};
           return mat.evaluate_stress_tangent(std::move(eps), quad_pt_id);
         }
       };
@@ -710,17 +711,17 @@ namespace muSpectre {
           constexpr StrainMeasure expected_strain_m{
               get_formulation_strain_type(Form, traits::strain_measure)};
 
-          auto & grad = std::get<0>(strain);
-          auto && E =
-              MatTB::convert_strain<stored_strain_m, expected_strain_m>(grad);
-          auto && stress_stiffness_mat =
-              mat.evaluate_stress_tangent(std::move(E), quad_pt_id);
+          auto & grad{std::get<0>(strain)};
+          auto && E{
+              MatTB::convert_strain<stored_strain_m, expected_strain_m>(grad)};
+          auto && stress_stiffness_mat{
+              mat.evaluate_stress_tangent(std::move(E), quad_pt_id)};
           return ::muSpectre::MatTB::PK1_stress<traits::stress_measure,
                                                 traits::strain_measure>(
               std::move(grad), std::move(std::get<0>(stress_stiffness_mat)),
               std::move(std::get<1>(stress_stiffness_mat)));
         }
-      };
+      };  // namespace internal
 
     }  // namespace internal
     /*----------------------------------------------------------------------*/

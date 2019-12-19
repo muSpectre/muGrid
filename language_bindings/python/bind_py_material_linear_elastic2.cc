@@ -71,7 +71,7 @@ void add_material_linear_elastic2_helper(py::module & mod) {
             return Mat_t::make(cell, n, e, p);
           },
           "cell"_a, "name"_a, "Young"_a, "Poisson"_a,
-          py::return_value_policy::reference, py::keep_alive<1, 0>())
+          py::return_value_policy::reference_internal)
       .def(
           "add_pixel",
           [](Mat_t & mat, size_t pixel_index,

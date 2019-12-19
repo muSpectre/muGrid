@@ -202,6 +202,22 @@ namespace muGrid {
       MappedStateField<ScalarStateFieldMap<T, Mutability, NbMemory>>;
 
   /**
+   * Alias of `muGrid::MappedStateField` for a map of first-rank with
+   * corresponding `muSpectre::StateNField` you wish to iterate over quadrature
+   * point by quadrature point.
+   *
+   * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
+   * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
+   * @tparam Mutability whether or not the map allows to modify the content of
+   * the field
+   * @tparam Dim spatial dimension of the tensors
+   * @tparam NbMemory number of previous values to store
+   */
+  template <typename T, Mapping Mutability, Dim_t Dim, size_t NbMemory = 1>
+  using MappedT1StateNField =
+      MappedStateField<T1StateNFieldMap<T, Mutability, Dim, NbMemory>>;
+
+  /**
    * Alias of `muGrid::MappedStateField` for a map of second-rank with
    * corresponding `muSpectre::StateField` you wish to iterate over quadrature
    * point by quadrature point.

@@ -39,7 +39,7 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   LocalFieldCollection::LocalFieldCollection(Dim_t spatial_dimension,
-                                               Dim_t nb_quad_pts)
+                                             Dim_t nb_quad_pts)
       : Parent{ValidityDomain::Local, spatial_dimension, nb_quad_pts} {}
 
   /* ---------------------------------------------------------------------- */
@@ -49,6 +49,8 @@ namespace muGrid {
           "Cannot add pixels once the collection has been initialised (because "
           "the fields all have been allocated)");
     }
+    global_to_local_index_map.insert(
+        std::make_pair(global_index, pixel_indices.size()));
     this->pixel_indices.emplace_back(global_index);
   }
 

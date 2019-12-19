@@ -2,14 +2,13 @@
  * @file   material_laminate.hh
  *
  * @author Ali Falsafi <ali.falsafi@epfl.ch>
+ * @author Till Junge <till.junge@altermail.ch>
  *
- * @date   19 Oct 2018
+ * @date    04 Jun 2018
  *
- * @brief  Defenition of MaterialLamiante class which is a lamiante
- * approximation constitutive law for two underlying materials with arbitrary
- * constutive law
+ * @brief material that uses laminae homogenisation
  *
- * Copyright © 2019 Till Junge, Ali Falsafi
+ * Copyright © 2018 Ali Falsafi
  *
  * µSpectre is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
@@ -38,79 +37,62 @@
 #ifndef SRC_MATERIALS_MATERIAL_LAMINATE_HH_
 #define SRC_MATERIALS_MATERIAL_LAMINATE_HH_
 
-#include "libmugrid/T4_map_proxy.hh"
 #include "common/muSpectre_common.hh"
 #include "materials/material_muSpectre_base.hh"
 #include "materials/materials_toolbox.hh"
 #include "materials/material_evaluator.hh"
 #include "materials/laminate_homogenisation.hh"
 #include "common/intersection_octree.hh"
-#include "cell/cell_base.hh"
+
+#include "cell/cell.hh"
+
+#include "libmugrid/T4_map_proxy.hh"
 
 #include <vector>
 namespace muSpectre {
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimM>
   class MaterialLaminate;
 
-  template <Dim_t DimS, Dim_t DimM>
-  struct MaterialMuSpectre_traits<MaterialLaminate<DimS, DimM>> {
-    using Parent = MaterialMuSpectre_traits<void>;  //!< base for elasticity
-
-    //! global field collection
-    using GFieldCollection_t =
-        typename MaterialBase<DimS, DimM>::GFieldCollection_t;
-
+  template <Dim_t DimM>
+  struct MaterialMuSpectre_traits<MaterialLaminate<DimM>> {
     //! expected map type for strain fields
-    using StrainMap_t =
-        muGrid::MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM, true>;
+    using StrainMap_t = muGrid::T2FieldMap<Real, Mapping::Const, DimM>;
     //! expected map type for stress fields
-    using StressMap_t =
-        muGrid::MatrixFieldMap<GFieldCollection_t, Real, DimM, DimM>;
+    using StressMap_t = muGrid::T2FieldMap<Real, Mapping::Mut, DimM>;
     //! expected map type for tangent stiffness fields
-    using TangentMap_t =
-        muGrid::T4MatrixFieldMap<GFieldCollection_t, Real, DimM>;
-    //! declare what type of strain measure your law takes as input
+    using TangentMap_t = muGrid::T4FieldMap<Real, Mapping::Mut, DimM>;
+
     constexpr static auto strain_measure{StrainMeasure::Gradient};
     //! declare what type of stress measure your law yields as output
     constexpr static auto stress_measure{StressMeasure::PK1};
   };
 
-  template <Dim_t DimS, Dim_t DimM>
-  class MaterialLaminate : public MaterialBase<DimS, DimM> {
+  template <Dim_t DimM>
+  class MaterialLaminate : public MaterialBase {
    public:
     //! base class
-    using Parent = MaterialBase<DimS, DimM>;
-    //! expected type for stress fields
-    using StressField_t = typename Parent::StressField_t;
-    //! expected type for strain fields
-    using StrainField_t = typename Parent::StrainField_t;
-    //! expected type for tangent stiffness fields
-    using TangentField_t = typename Parent::TangentField_t;
-    using Ccoord = Ccoord_t<DimS>;  //!< cell coordinates type
+    using Parent = MaterialBase;
+    using RealField = muGrid::RealField;
+    using DynMatrix_t = Parent::DynMatrix_t;
     //
-    using MatBase_t = MaterialBase<DimS, DimM>;
+    using MatBase_t = MaterialBase;
     using MatPtr_t = std::shared_ptr<MatBase_t>;
 
     using T2_t = Eigen::Matrix<Real, DimM, DimM>;
     using T4_t = muGrid::T4Mat<Real, DimM>;
 
-    //! local field collection used for internals
-    using LFieldColl_t = muGrid::LocalFieldCollection<DimS>;
+    using VectorField_t = muGrid::RealField;
+    using MappedVectorField_t = muGrid::MappedT1Field<Real, Mapping::Mut, DimM>;
+    using VectorFieldMap_t = muGrid::T1FieldMap<Real, Mapping::Mut, DimM>;
 
-    using VectorField_t =
-        muGrid::TensorField<LFieldColl_t, Real, firstOrder, DimM>;
-    using VectorFieldMap_t =
-        muGrid::MatrixFieldMap<LFieldColl_t, Real, DimM, 1>;
+    using ScalarField_t = muGrid::RealField;
+    using MappedScalarField_t = muGrid::MappedScalarField<Real, Mapping::Mut>;
+    using ScalarFieldMap_t = muGrid::ScalarFieldMap<Real, Mapping::Mut>;
 
-    using ScalarField_t = muGrid::ScalarField<LFieldColl_t, Real>;
-    using ScalarFieldMap_t = muGrid::ScalarFieldMap<LFieldColl_t, Real>;
+    using Strain_t = Eigen::Matrix<Real, DimM, DimM>;
+    using Stress_t = Strain_t;
+    using Stiffness_t = muGrid::T4Mat<Real, DimM>;
 
-    using ScalarFieldDim_t = muGrid::ScalarField<LFieldColl_t, Dim_t>;
-    using ScalarFieldMapDim_t = muGrid::ScalarFieldMap<LFieldColl_t, Dim_t>;
-
-    using FieldMap_t = muGrid::MatrixFieldMap<LFieldColl_t, Real, DimM, DimM>;
-
-    using DynMatrix_t = Parent::DynMatrix_t;
     /**
      * type used to determine whether the
      * `muSpectre::MaterialMuSpectre::iterable_proxy` evaluate only
@@ -121,18 +103,12 @@ namespace muSpectre {
     //! traits of this material
     using traits = MaterialMuSpectre_traits<MaterialLaminate>;
 
-    //! global field collection
-    using GFieldCollection_t =
-        typename MaterialBase<DimS, DimM>::GFieldCollection_t;
-
-    //! expected map type for tangent stiffness fields
-    using Tangent_t = muGrid::T4MatrixFieldMap<GFieldCollection_t, Real, DimM>;
-
     //! Default constructor
     MaterialLaminate() = delete;
 
     //! Constructor with name and material properties
-    explicit MaterialLaminate(std::string name);
+    MaterialLaminate(const std::string & name, const Dim_t & spatial_dimension,
+                     const Dim_t & nb_quad_pts);
 
     //! Copy constructor
     MaterialLaminate(const MaterialLaminate & other) = delete;
@@ -144,71 +120,90 @@ namespace muSpectre {
     virtual ~MaterialLaminate() = default;
 
     //! Factory
-    static MaterialLaminate<DimS, DimM> & make(CellBase<DimS, DimM> & cell,
-                                               std::string name);
+    static MaterialLaminate<DimM> & make(Cell & cell, const std::string & name);
 
     template <class... ConstructorArgs>
-    static std::tuple<std::shared_ptr<MaterialLaminate<DimS, DimM>>,
+    static std::tuple<std::shared_ptr<MaterialLaminate<DimM>>,
                       MaterialEvaluator<DimM>>
     make_evaluator(ConstructorArgs &&... args);
+
     /**
      * evaluates second Piola-Kirchhoff stress given the Green-Lagrange
      * strain (or Cauchy stress if called with a small strain tensor)
      */
 
-    template <class s_t>
-    inline decltype(auto) evaluate_stress(s_t && E, const size_t & pixel_index,
-                                          Formulation form);
+    template <typename Derived>
+    inline decltype(auto) evaluate_stress(const Eigen::MatrixBase<Derived> & E,
+                                          const size_t & pixel_index,
+                                          const Formulation & form);
 
-    template <class s_t>
-    inline decltype(auto) evaluate_stress_tangent(s_t && E,
-                                                  const size_t & pixel_index,
-                                                  Formulation form);
+    /**
+     * evaluates second Piola-Kirchhoff stress and its corresponding tangent
+     * given the Green-Lagrange strain (or Cauchy stress and its corresponding
+     * tangetn if called with a small strain tensor)
+     */
+    template <typename Derived>
+    inline decltype(auto)
+    evaluate_stress_tangent(const Eigen::MatrixBase<Derived> & E,
+                            const size_t & pixel_index,
+                            const Formulation & form);
+
+    template <Formulation Form, class Strains_t>
+    decltype(auto) constitutive_law(const Strains_t & Strains,
+                                    const size_t & quad_pt_id);
+
+    template <Formulation Form, class Strains_t>
+    decltype(auto) constitutive_law_tangent(const Strains_t & Strains,
+                                            const size_t & quad_pt_id);
+
+    //! computes stress
+    using Parent::compute_stresses;
+    using Parent::compute_stresses_tangent;
+    void compute_stresses(const RealField & F, RealField & P,
+                          const Formulation & form,
+                          SplitCell is_cell_split) final;
+    //!  stress and tangent modulus
+    void compute_stresses_tangent(const RealField & F, RealField & P,
+                                  RealField & K, const Formulation & form,
+                                  SplitCell is_cell_split) final;
+    /**
+     * overload add_pixel to write into volume ratio and normal vectors and ...
+     */
+    void add_pixel(const size_t & pixel_id) final;
+
+    /**
+     * overload add_pixel to add underlying materials and their ratio and
+     * interface direction to the material lamiante
+     */
+    void
+    add_pixel(const size_t & pixel_id, MatPtr_t mat1, MatPtr_t mat2,
+              const Real & ratio,
+              const Eigen::Ref<const Eigen::Matrix<Real, Eigen::Dynamic, 1>> &
+                  normal_Vector);
+
+    /**
+     * This function adds pixels according to the precipitate intersected pixels
+     * and the materials incolved
+     */
+    void add_pixels_precipitate(
+        const std::vector<Ccoord_t<DimM>> & intersected_pixels,
+        const std::vector<Dim_t> & intersected_pixels_id,
+        const std::vector<Real> & intersection_ratios,
+        const std::vector<Eigen::Matrix<Real, DimM, 1>> & intersection_normals,
+        MatPtr_t mat1, MatPtr_t mat2);
 
     std::tuple<DynMatrix_t, DynMatrix_t>
     constitutive_law_dynamic(const Eigen::Ref<const DynMatrix_t> & strain,
                              const size_t & pixel_index,
                              const Formulation & form) final;
 
-    //! computes stress
-    using Parent::compute_stresses;
-    using Parent::compute_stresses_tangent;
-    void compute_stresses(const StrainField_t & F, StressField_t & P,
-                          Formulation form, SplitCell is_cell_split) final;
-    //! computes stress and tangent modulus
-    void compute_stresses_tangent(const StrainField_t & F, StressField_t & P,
-                                  TangentField_t & K, Formulation form,
-                                  SplitCell is_cell_split) final;
-    /**
-     * overload add_pixel to write into volume ratio and normal vectors and ...
-     */
-    void add_pixel(const Ccoord_t<DimS> & pixel) final;
-
-    /**
-     * overload add_pixel to write into eigenstrain
-     */
-    void add_pixel(
-        const Ccoord_t<DimS> & pixel, MatPtr_t mat1, MatPtr_t mat2, Real ratio,
-        const Eigen::Ref<const Eigen::Matrix<Real, DimM, 1>> & normal_Vector);
-
-    /**
-     * This function adds pixels according to the precipitate intersected pixels
-     * and the materials involved
-     */
-
-    void add_pixels_precipitate(
-        std::vector<Ccoord_t<DimS>> intersected_pixels,
-        std::vector<Real> intersection_ratios,
-        std::vector<Eigen::Matrix<Real, DimM, 1>> intersection_normals,
-        MatPtr_t mat1, MatPtr_t mat2);
-
    protected:
-    VectorField_t & normal_vector_field;  //!< field holding the normal vector
-                                          //!< of the interface of the layers
-    VectorFieldMap_t normal_vector_map;
+    MappedVectorField_t
+        normal_vector_field;  //!< field holding the normal vector
+                              //!< of the interface of the layers
 
-    ScalarField_t & volume_ratio_field;  //!< field holding the normal vector
-    ScalarFieldMap_t volume_ratio_map;
+    MappedScalarField_t
+        volume_ratio_field;  //!< field holding the normal vector
 
     std::vector<MatPtr_t> material_left_vector{};
     std::vector<MatPtr_t> material_right_vector{};
@@ -216,162 +211,121 @@ namespace muSpectre {
     //! computes stress with the formulation available at compile time
     //! __attribute__ required by g++-6 and g++-7 because of this bug:
     //! https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80947
-    template <Formulation Form, SplitCell is_cell_split>
-    inline void compute_stresses_worker(const StrainField_t & F,
-                                        StressField_t & P)
+    template <Formulation Form, SplitCell IsCellSplit>
+    inline void compute_stresses_worker(const RealField & F, RealField & P)
         __attribute__((visibility("default")));
 
     //! computes stress with the formulation available at compile time
     //! __attribute__ required by g++-6 and g++-7 because of this bug:
     //! https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80947
-    template <Formulation Form, SplitCell is_cell_split>
-    inline void compute_stresses_worker(const StrainField_t & F,
-                                        StressField_t & P, TangentField_t & K)
+    template <Formulation Form, SplitCell IsCellSplit>
+    inline void compute_stresses_worker(const RealField & F, RealField & P,
+                                        RealField & K)
         __attribute__((visibility("default")));
   };
 
   /* ----------------------------------------------------------------------*/
-  template <Dim_t DimS, Dim_t DimM>
-  template <class s_t>
-  auto MaterialLaminate<DimS, DimM>::evaluate_stress(s_t && E,
-                                                     const size_t & pixel_index,
-                                                     Formulation form)
-      -> decltype(auto) {
+  template <Dim_t DimM>
+  template <class Derived>
+  decltype(auto)
+  MaterialLaminate<DimM>::evaluate_stress(const Eigen::MatrixBase<Derived> & E,
+                                          const size_t & pixel_index,
+                                          const Formulation & form) {
     using Output_t = std::tuple<Stress_t, Stiffness_t>;
     using Function_t =
         std::function<Output_t(const Eigen::Ref<const Strain_t> &)>;
-    auto mat_l = material_left_vector[pixel_index];
-    auto mat_r = material_right_vector[pixel_index];
+    auto && mat_l{material_left_vector[pixel_index]};
+    auto && mat_r{material_right_vector[pixel_index]};
+
     Strain_t E_eval(E);
 
-    Function_t mat_l_evaluate_stress_tangent_func =
-        [&mat_l, pixel_index, form](const Eigen::Ref<const Strain_t> & E) {
-          return mat_l->evaluate_stress_tangent_base(std::move(E), pixel_index,
-                                                     form);
-        };
+    const Function_t mat_l_evaluate_stress_tangent_func{
+        [&mat_l, &pixel_index, &form](const Eigen::Ref<const Strain_t> & E) {
+          return mat_l->constitutive_law_dynamic(std::move(E), pixel_index,
+                                                 form);
+        }};
 
-    Function_t mat_r_evaluate_stress_tangent_func =
-        [&mat_r, pixel_index, form](const Eigen::Ref<const Strain_t> & E) {
-          return mat_r->evaluate_stress_tangent_base(std::move(E), pixel_index,
-                                                     form);
-        };
+    const Function_t mat_r_evaluate_stress_tangent_func{
+        [&mat_r, &pixel_index, &form](const Eigen::Ref<const Strain_t> & E) {
+          return mat_r->constitutive_law_dynamic(std::move(E), pixel_index,
+                                                 form);
+        }};
 
-    auto && ratio = this->volume_ratio_map[pixel_index];
-    auto && normal_vec = this->normal_vector_map[pixel_index];
-    Stress_t ret_stress{};
+    auto && ratio{this->volume_ratio_field[pixel_index]};
+    auto && normal_vec{this->normal_vector_field[pixel_index]};
     switch (form) {
     case Formulation::finite_strain: {
-      ret_stress =
-          LamHomogen<DimM, Formulation::finite_strain>::evaluate_stress(
-              E_eval, mat_l_evaluate_stress_tangent_func,
-              mat_r_evaluate_stress_tangent_func, ratio, normal_vec);
-      break;
-    }
-    case Formulation::small_strain: {
-      ret_stress = LamHomogen<DimM, Formulation::small_strain>::evaluate_stress(
+      return LamHomogen<DimM, Formulation::finite_strain>::evaluate_stress(
           E_eval, mat_l_evaluate_stress_tangent_func,
           mat_r_evaluate_stress_tangent_func, ratio, normal_vec);
       break;
     }
-    default: { std::runtime_error("Unknown formualtion"); }
+    case Formulation::small_strain: {
+      return LamHomogen<DimM, Formulation::small_strain>::evaluate_stress(
+          E_eval, mat_l_evaluate_stress_tangent_func,
+          mat_r_evaluate_stress_tangent_func, ratio, normal_vec);
+      break;
     }
-    return ret_stress;
+    default: {
+      throw(std::runtime_error("Unknown formualtion"));
+    }
+    }
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  template <class s_t>
-  auto MaterialLaminate<DimS, DimM>::evaluate_stress_tangent(
-      s_t && E, const size_t & pixel_index, Formulation form)
-      -> decltype(auto) {
+  template <Dim_t DimM>
+  template <class Derived>
+  decltype(auto) MaterialLaminate<DimM>::evaluate_stress_tangent(
+      const Eigen ::MatrixBase<Derived> & E, const size_t & pixel_index,
+      const Formulation & form) {
     using Output_t = std::tuple<Stress_t, Stiffness_t>;
     using Function_t =
         std::function<Output_t(const Eigen::Ref<const Strain_t> &)>;
-    auto && mat_l = material_left_vector[pixel_index];
-    auto && mat_r = material_right_vector[pixel_index];
+    auto && mat_l{material_left_vector[pixel_index]};
+    auto && mat_r{material_right_vector[pixel_index]};
     Strain_t E_eval(E);
 
-    Function_t mat_l_evaluate_stress_tangent_func =
+    Function_t mat_l_evaluate_stress_tangent_func{
         [&mat_l, pixel_index, form](const Eigen::Ref<const Strain_t> & E) {
-          return mat_l->evaluate_stress_tangent_base(std::move(E), pixel_index,
-                                                     form);
-        };
+          return mat_l->constitutive_law_dynamic(std::move(E), pixel_index,
+                                                 form);
+        }};
 
-    Function_t mat_r_evaluate_stress_tangent_func =
+    Function_t mat_r_evaluate_stress_tangent_func{
         [&mat_r, pixel_index, form](const Eigen::Ref<const Strain_t> & E) {
-          return mat_r->evaluate_stress_tangent_base(std::move(E), pixel_index,
-                                                     form);
-        };
+          return mat_r->constitutive_law_dynamic(std::move(E), pixel_index,
+                                                 form);
+        }};
     std::tuple<Stress_t, Stiffness_t> ret_stress_stiffness{};
-    auto && ratio = this->volume_ratio_map[pixel_index];
-    auto && normal_vec = this->normal_vector_map[pixel_index];
+    auto && ratio{this->volume_ratio_field[pixel_index]};
+    auto && normal_vec{this->normal_vector_field[pixel_index]};
     switch (form) {
     case Formulation::finite_strain: {
-      ret_stress_stiffness =
-          LamHomogen<DimM, Formulation::finite_strain>::evaluate_stress_tangent(
-              E_eval, mat_l_evaluate_stress_tangent_func,
-              mat_r_evaluate_stress_tangent_func, ratio, normal_vec);
+      return LamHomogen<DimM, Formulation::finite_strain>::
+          evaluate_stress_tangent(E_eval, mat_l_evaluate_stress_tangent_func,
+                                  mat_r_evaluate_stress_tangent_func, ratio,
+                                  normal_vec);
       break;
     }
     case Formulation::small_strain: {
-      ret_stress_stiffness =
-          LamHomogen<DimM, Formulation::small_strain>::evaluate_stress_tangent(
-              E_eval, mat_l_evaluate_stress_tangent_func,
-              mat_r_evaluate_stress_tangent_func, ratio, normal_vec);
+      return LamHomogen<DimM, Formulation::small_strain>::
+          evaluate_stress_tangent(E_eval, mat_l_evaluate_stress_tangent_func,
+                                  mat_r_evaluate_stress_tangent_func, ratio,
+                                  normal_vec);
       break;
     }
-    default: { std::runtime_error("Unknown formualtion"); }
+    default: {
+      throw(std::runtime_error("Unknown formualtion"));
     }
-
-    return ret_stress_stiffness;
+    }
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimM>
-  auto MaterialLaminate<DimS, DimM>::constitutive_law_tangent_small_strain(
-      const Eigen::Ref<const Strain_t> & strain, const size_t & pixel_index)
-      -> std::tuple<Stress_t, Stiffness_t> {
-    Eigen::Map<const Strain_t> F(strain.data());
-    return std::move(
-        MatTB::constitutive_law_tangent_with_formulation<
-            Formulation::small_strain>(*this, std::make_tuple(F), pixel_index));
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
-  auto MaterialLaminate<DimM>::constitutive_law_dynamic(
-      const Eigen::Ref<const DynMatrix_t> & strain, const size_t & pixel_index,
-      const Formulation & form) -> std::tuple<DynMatrix_t, DynMatrix_t> {
-    Eigen::Map < const Eigen::Matrix<Real, DimM, DimM> F(strain.data());
-
-    if (strain.cols() != DimM or strain.rows() != DimM) {
-      std::stringstream error {};
-      error << "incompatible strain shape, expected " << DimM << " × " << DimM
-            << ", but received " << strain.rows() << " × " strain.cols() << ".";
-      throw Material(error.str());
-    }
-    switch (form) {
-    case Formulation::finite_strain: {
-      return MatTB::constitutive_law_tangent<Formulation::finite_strain>(
-            *this, std::make_tuple(F), pixel_index));
-      break;
-    }
-    case Formulation::small_strain: {
-      return MatTB::constitutive_law_tangent<Formulation::small_strain>(
-            *this, std::make_tuple(F), pixel_index));
-      break;
-    }
-    default:
-      throw MaterialError("unknown formulation");
-      break;
-    }
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  template <Formulation Form, SplitCell is_cell_split>
-  void MaterialLaminate<DimS, DimM>::compute_stresses_worker(
-      const StrainField_t & F, StressField_t & P, TangentField_t & K) {
+  template <Formulation Form, SplitCell IsCellSplit>
+  void MaterialLaminate<DimM>::compute_stresses_worker(const RealField & F,
+                                                       RealField & P,
+                                                       RealField & K) {
     /* These lambdas are executed for every integration point.
 
        F contains the transformation gradient for finite strain calculations
@@ -380,10 +334,11 @@ namespace muSpectre {
        The internal_variables tuple contains whatever internal variables
        Material declared (e.g., eigenstrain, strain rate, etc.)
     */
-    using iterable_proxy_t = typename Parent::template iterable_proxy<
+    using iterable_proxy_t = iterable_proxy<
         std::tuple<typename traits::StrainMap_t>,
         std::tuple<typename traits::StressMap_t, typename traits::TangentMap_t>,
-        is_cell_split>;
+        IsCellSplit>;
+
     iterable_proxy_t fields(*this, F, P, K);
 
     for (auto && arglist : fields) {
@@ -419,35 +374,31 @@ namespace muSpectre {
       auto && stiffness{std::get<1>(stress_stiffness)};
       auto && index{std::get<2>(arglist)};
       auto && ratio{std::get<3>(arglist)};
-      if (is_cell_split == SplitCell::simple) {
+      if (IsCellSplit == SplitCell::simple) {
         auto && stress_stiffness_mat{
-            MatTB::constitutive_law_tangent_with_formulation<Form>(
-                *this, strain, index)};
+            this->constitutive_law_tangent<Form>(strain, index)};
         stress += ratio * std::get<0>(stress_stiffness_mat);
         stiffness += ratio * std::get<1>(stress_stiffness_mat);
       } else {
-        stress_stiffness =
-            MatTB::constitutive_law_tangent_with_formulation<Form>(
-                *this, strain, index);
+        stress_stiffness = this->constitutive_law_tangent<Form>(strain, index);
       }
     }
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  template <Formulation Form, SplitCell is_cell_split>
-  void
-  MaterialLaminate<DimS, DimM>::compute_stresses_worker(const StrainField_t & F,
-                                                        StressField_t & P) {
+  template <Dim_t DimM>
+  template <Formulation Form, SplitCell IsCellSplit>
+  void MaterialLaminate<DimM>::compute_stresses_worker(const RealField & F,
+                                                       RealField & P) {
     /* These lambdas are executed for every integration point.
 
        F contains the transformation gradient for finite strain calculations and
        the infinitesimal strain tensor in small strain problems
     */
 
-    using iterable_proxy_t = typename Parent::template iterable_proxy<
-        std::tuple<typename traits::StrainMap_t>,
-        std::tuple<typename traits::StressMap_t>, is_cell_split>;
+    using iterable_proxy_t =
+        iterable_proxy<std::tuple<typename traits::StrainMap_t>,
+                       std::tuple<typename traits::StressMap_t>, IsCellSplit>;
 
     iterable_proxy_t fields(*this, F, P);
     for (auto && arglist : fields) {
@@ -475,29 +426,174 @@ namespace muSpectre {
 
       auto && strain{std::get<0>(arglist)};
       auto && stress{std::get<0>(std::get<1>(arglist))};
-      auto && index{std::get<2>(arglist)};
+      auto && quad_pt_id{std::get<2>(arglist)};
       auto && ratio{std::get<3>(arglist)};
-
-      if (is_cell_split == SplitCell::simple) {
-        stress += ratio * MatTB::constitutive_law_with_formulation<Form>(
-                              *this, strain, index);
+      if (IsCellSplit == SplitCell::simple) {
+        stress += ratio * this->constitutive_law<Form>(strain, quad_pt_id);
       } else {
-        stress = MatTB::constitutive_law_with_formulation<Form>(*this, strain,
-                                                                index);
+        stress = this->constitutive_law<Form>(strain, quad_pt_id);
       }
     }
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
+  template <Dim_t DimM>
   template <class... ConstructorArgs>
-  std::tuple<std::shared_ptr<MaterialLaminate<DimS, DimM>>,
-             MaterialEvaluator<DimM>>
-  MaterialLaminate<DimS, DimM>::make_evaluator(ConstructorArgs &&... args) {
-    auto mat = std::make_shared<MaterialLaminate<DimS, DimM>>("name", args...);
-    using Ret_t = std::tuple<std::shared_ptr<MaterialLaminate<DimS, DimM>>,
+  std::tuple<std::shared_ptr<MaterialLaminate<DimM>>, MaterialEvaluator<DimM>>
+  MaterialLaminate<DimM>::make_evaluator(ConstructorArgs &&... args) {
+    constexpr Dim_t SpatialDimension{DimM};
+    constexpr Dim_t NbQuadPts{1};
+    auto mat{std::make_shared<MaterialLaminate<DimM>>("name", SpatialDimension,
+                                                      NbQuadPts, args...)};
+    using Ret_t = std::tuple<std::shared_ptr<MaterialLaminate<DimM>>,
                              MaterialEvaluator<DimM>>;
     return Ret_t(mat, MaterialEvaluator<DimM>{mat});
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimM>
+  auto MaterialLaminate<DimM>::constitutive_law_dynamic(
+      const Eigen::Ref<const DynMatrix_t> & strain,
+      const size_t & quad_pt_index, const Formulation & form)
+      -> std::tuple<DynMatrix_t, DynMatrix_t> {
+    Eigen::Map<const Eigen::Matrix<Real, DimM, DimM>> F(strain.data());
+
+    if (strain.cols() != DimM or strain.rows() != DimM) {
+      std::stringstream error{};
+      error << "incompatible strain shape, expected " << DimM << " × " << DimM
+            << ", but received " << strain.rows() << " × " << strain.cols()
+            << ".";
+      throw MaterialError(error.str());
+    }
+    switch (form) {
+    case Formulation::finite_strain: {
+      return this->constitutive_law_tangent<Formulation::finite_strain>(
+          std::make_tuple(F), quad_pt_index);
+      break;
+    }
+    case Formulation::small_strain: {
+      return this->constitutive_law_tangent<Formulation::small_strain>(
+          std::make_tuple(F), quad_pt_index);
+      break;
+    }
+    default:
+      throw MaterialError("unknown formulation");
+      break;
+    }
+  }
+
+  /* ----------------------------------------------------------------------*/
+  namespace internal {
+
+    template <Formulation Form>
+    struct MaterialStressEvaluator {
+      template <class Material, class Strain>
+      decltype(auto) static compute(Material & mat, const Strain & strain,
+                                    const size_t & quad_pt_id) {
+        using traits = MaterialMuSpectre_traits<Material>;
+
+        constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
+        constexpr StrainMeasure expected_strain_m{
+            get_formulation_strain_type(Form, traits::strain_measure)};
+
+        auto && eps{MatTB::convert_strain<stored_strain_m, expected_strain_m>(
+            std::get<0>(strain))};
+        return mat.evaluate_stress(std::move(eps), quad_pt_id,
+                                   Formulation::small_strain);
+      }
+    };
+
+    template <>
+    struct MaterialStressEvaluator<Formulation::finite_strain> {
+      template <class Material, class Strain>
+      decltype(auto) static compute(Material & mat, const Strain & strain,
+                                    const size_t & quad_pt_id) {
+        constexpr static Formulation Form{Formulation::finite_strain};
+        using traits = MaterialMuSpectre_traits<Material>;
+
+        constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
+        constexpr StrainMeasure expected_strain_m{
+            get_formulation_strain_type(Form, traits::strain_measure)};
+
+        auto && grad{std::get<0>(strain)};
+        auto && E{
+            MatTB::convert_strain<stored_strain_m, expected_strain_m>(grad)};
+        auto && stress_mat{mat.evaluate_stress(std::move(E), quad_pt_id,
+                                               Formulation::finite_strain)};
+        // However , for the moment not doing it causes memory issue.
+        auto stress{::muSpectre::MatTB::PK1_stress<traits::stress_measure,
+                                                   traits::strain_measure>(
+                        std::move(grad), std::move(stress_mat))
+                        .eval()};
+        return stress;
+      }
+    };
+
+  }  // namespace internal
+     /* ----------------------------------------------------------------------*/
+  template <Dim_t DimM>
+  template <Formulation Form, class Strains_t>
+  decltype(auto)
+  MaterialLaminate<DimM>::constitutive_law(const Strains_t & Strains,
+                                           const size_t & quad_pt_id) {
+    return internal::MaterialStressEvaluator<Form>::compute(*this, Strains,
+                                                            quad_pt_id);
+  }
+
+  /* ----------------------------------------------------------------------*/
+  namespace internal {
+
+    template <Formulation Form>
+    struct MaterialStressTangentEvaluator {
+      template <class Material, class Strain>
+      decltype(auto) static compute(Material & mat, const Strain & strain,
+                                    const size_t & quad_pt_id) {
+        using traits = MaterialMuSpectre_traits<Material>;
+
+        constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
+        constexpr StrainMeasure expected_strain_m{
+            get_formulation_strain_type(Form, traits::strain_measure)};
+
+        auto && eps{MatTB::convert_strain<stored_strain_m, expected_strain_m>(
+            std::get<0>(strain))};
+        return mat.evaluate_stress_tangent(std::move(eps), quad_pt_id,
+                                           Formulation::small_strain);
+      }
+    };
+
+    template <>
+    struct MaterialStressTangentEvaluator<Formulation::finite_strain> {
+      template <class Material, class Strain>
+      decltype(auto) static compute(Material & mat, const Strain & strain,
+                                    const size_t & quad_pt_id) {
+        constexpr static Formulation Form{Formulation::finite_strain};
+        using traits = MaterialMuSpectre_traits<Material>;
+
+        constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
+        constexpr StrainMeasure expected_strain_m{
+            get_formulation_strain_type(Form, traits::strain_measure)};
+
+        auto && grad{std::get<0>(strain)};
+        auto && E{
+            MatTB::convert_strain<stored_strain_m, expected_strain_m>(grad)};
+        auto && stress_stiffness_mat{mat.evaluate_stress_tangent(
+            std::move(E), quad_pt_id, Formulation::finite_strain)};
+        return ::muSpectre::MatTB::PK1_stress<traits::stress_measure,
+                                              traits::strain_measure>(
+            std::move(grad), std::move(std::get<0>(stress_stiffness_mat)),
+            std::move(std::get<1>(stress_stiffness_mat)));
+      }
+    };
+
+  }  // namespace internal
+  /*----------------------------------------------------------------------*/
+  template <Dim_t DimM>
+  template <Formulation Form, class Strains_t>
+  decltype(auto)
+  MaterialLaminate<DimM>::constitutive_law_tangent(const Strains_t & Strains,
+                                                   const size_t & quad_pt_id) {
+    return internal::MaterialStressTangentEvaluator<Form>::compute(
+        *this, Strains, quad_pt_id);
   }
   /* ---------------------------------------------------------------------- */
 }  // namespace muSpectre

@@ -35,7 +35,7 @@
 
 #include "common/muSpectre_common.hh"
 #include "materials/material_laminate.hh"
-#include "cell/cell_base.hh"
+#include "cell/cell.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -58,16 +58,16 @@ void add_material_laminate_helper(py::module & mod) {
   name_stream << "MaterialLaminate_" << dim << 'd';
   const auto name{name_stream.str()};
 
-  using Mat_t = muSpectre::MaterialLaminate<dim, dim>;
-  using Sys_t = muSpectre::CellBase<dim, dim>;
-  py::class_<Mat_t, muSpectre::MaterialBase<dim, dim>, std::shared_ptr<Mat_t>>(
+  using Mat_t = muSpectre::MaterialLaminate<dim>;
+  using Sys_t = muSpectre::Cell;
+  py::class_<Mat_t, muSpectre::MaterialBase, std::shared_ptr<Mat_t>>(
       mod, name.c_str())
-      .def_static("make",
-                  [](Sys_t & sys, std::string n) -> Mat_t & {
-                    return Mat_t::make(sys, n);
-                  },
-                  "cell"_a, "name"_a, py::return_value_policy::reference,
-                  py::keep_alive<1, 0>())
+      .def_static(
+          "make",
+          [](Sys_t & sys, std::string n) -> Mat_t & {
+            return Mat_t::make(sys, n);
+          },
+          "cell"_a, "name"_a, py::return_value_policy::reference_internal)
       .def_static("make_evaluator", []() { return Mat_t::make_evaluator(); });
 }
 

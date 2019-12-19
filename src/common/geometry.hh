@@ -41,6 +41,7 @@
 #include <Eigen/Geometry>
 
 #include <array>
+#include <memory>
 
 #ifndef SRC_COMMON_GEOMETRY_HH_
 #define SRC_COMMON_GEOMETRY_HH_
@@ -96,11 +97,15 @@ namespace muSpectre {
   class RotatorBase {
    public:
     using RotMat_t = Eigen::Matrix<Real, Dim, Dim>;
+    using RotMat_ptr = std::unique_ptr<RotMat_t>;
+
     //! Default constructor
     RotatorBase() = delete;
 
-    explicit RotatorBase(const RotMat_t rotation_matrix_input)
-        : rot_mat{rotation_matrix_input} {}
+    //! constructor with given rotation matrix
+    explicit RotatorBase(RotMat_t rotation_matrix_input)
+        : rot_mat_holder{std::make_unique<RotMat_t>(rotation_matrix_input)},
+          rot_mat{*this->rot_mat_holder} {}
     //! Copy constructor
     RotatorBase(const RotatorBase & other) = default;
 
@@ -147,13 +152,14 @@ namespace muSpectre {
 
     const RotMat_t & get_rot_mat() const { return this->rot_mat; }
 
-    void set_rot_mat(const Eigen::Ref<RotMat_t> & mat_inp) {
+    template <class Derived>
+    void set_rot_mat(const Eigen::MatrixBase<Derived> & mat_inp) {
       this->rot_mat = mat_inp;
     }
 
    protected:
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-    RotMat_t rot_mat;
+    RotMat_ptr rot_mat_holder;
+    const RotMat_t & rot_mat;
   };
 
   template <Dim_t Dim, RotationOrder Order = internal::DefaultOrder<Dim>::value>
@@ -170,9 +176,10 @@ namespace muSpectre {
     //! Default constructor
     RotatorAngle() = delete;
 
-    explicit RotatorAngle(const Eigen::Ref<const Angles_t> & angles_inp)
-        : Parent(this->compute_rotation_matrix_angle(angles_inp)),
-          angles{angles_inp} {}
+    //! constructor given the euler angles:
+    template <class Derived>
+    explicit RotatorAngle(const Eigen::MatrixBase<Derived> & angles_inp)
+        : Parent(this->compute_rotation_matrix_angle(angles_inp)) {}
 
     //! Copy constructor
     RotatorAngle(const RotatorAngle & other) = default;
@@ -190,14 +197,9 @@ namespace muSpectre {
     RotatorAngle & operator=(RotatorAngle && other) = default;
 
    protected:
-    inline RotMat_t compute_rotation_matrix_angle(Angles_t angles);
-    inline RotMat_t compute_this_rotation_matrix_angle() {
-      return compute_rotation_matrix(this->angles);
-    }
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-    Angles_t angles;
-
-   private:
+    template <class Derived>
+    inline RotMat_t
+    compute_rotation_matrix_angle(const Eigen::MatrixBase<Derived> & angles);
   };
 
   /* ---------------------------------------------------------------------- */
@@ -219,8 +221,9 @@ namespace muSpectre {
       using Angles_t = typename RotatorAngle<Dim, Order>::Angles_t;
 
       //! compute and return the rotation matrix
+      template <typename Derived>
       inline static RotMat_t
-      compute(const Eigen::Ref<Angles_t> & angles) {
+      compute(const Eigen::MatrixBase<Derived> & angles) {
         static_assert(Order == RotationOrder::Z,
                       "Two-d rotations can only be around the z axis");
         return RotMat_t(Eigen::Rotation2Dd(angles(0)));
@@ -236,8 +239,10 @@ namespace muSpectre {
       using RotMat_t = typename RotatorAngle<Dim, Order>::RotMat_t;
       using Angles_t = typename RotatorAngle<Dim, Order>::Angles_t;
 
-      //! compute and return the rotation matrix
-      inline static RotMat_t compute(const Eigen::Ref<Angles_t> & angles) {
+      //! compute and return the rotation matrixtemplate <typename Derived>
+      template <typename Derived>
+      inline static RotMat_t
+      compute(const Eigen::MatrixBase<Derived> & angles) {
         static_assert(Order != RotationOrder::Z,
                       "three-d rotations cannot only be around the z axis");
 
@@ -260,13 +265,14 @@ namespace muSpectre {
         }
         }
       }
-    };
+    };  // namespace internal
 
   }  // namespace internal
   /* ---------------------------------------------------------------------- */
   template <Dim_t Dim, RotationOrder Order>
-  auto RotatorAngle<Dim, Order>::compute_rotation_matrix_angle(Angles_t angles)
-      -> RotMat_t {
+  template <typename Derived>
+  auto RotatorAngle<Dim, Order>::compute_rotation_matrix_angle(
+      const Eigen::MatrixBase<Derived> & angles) -> RotMat_t {
     return internal::RotationMatrixComputerAngle<Order, Dim>::compute(angles);
   }
 
@@ -283,14 +289,17 @@ namespace muSpectre {
    public:
     using Parent = RotatorBase<Dim>;
     using Vec_t = Eigen::Matrix<Real, (Dim == twoD) ? 2 : 3, 1>;
+    using Vec_ptr = std::unique_ptr<Vec_t>;
     using RotMat_t = Eigen::Matrix<Real, Dim, Dim>;
 
     //! Default constructor
     RotatorTwoVec() = delete;
 
-    RotatorTwoVec(Vec_t vec_a_inp, Vec_t vec_b_inp)
-        : Parent(this->compute_rotation_matrix_TwoVec(vec_a_inp, vec_b_inp)),
-          vec_ref{vec_a_inp}, vec_des{vec_b_inp} {}
+    //! Constructor given the two vectors
+    template <typename DerivedA, typename DerivedB>
+    RotatorTwoVec(const Eigen::MatrixBase<DerivedA> & vec_a_inp,
+                  const Eigen::MatrixBase<DerivedB> & vec_b_inp)
+        : Parent(this->compute_rotation_matrix_TwoVec(vec_a_inp, vec_b_inp)) {}
 
     //! Copy constructor
     RotatorTwoVec(const RotatorTwoVec & other) = default;
@@ -308,16 +317,12 @@ namespace muSpectre {
     RotatorTwoVec & operator=(RotatorTwoVec && other) = default;
 
    protected:
-    inline RotMat_t compute_rotation_matrix_TwoVec(Vec_t vec_ref,
-                                                   Vec_t vec_des);
-    inline RotMat_t compute_this_rotation_matrix_TwoVec() {
-      return compute_rotation_matrix(this->vec_ref, this->vec_des);
-    }
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-    Vec_t vec_ref, vec_des;
-
-   private:
+    template <typename DerivedA, typename DerivedB>
+    inline RotMat_t
+    compute_rotation_matrix_TwoVec(const Eigen::MatrixBase<DerivedA> & vec_ref,
+                                   const Eigen::MatrixBase<DerivedB> & vec_des);
   };
+
   /* ---------------------------------------------------------------------- */
   namespace internal {
     template <Dim_t Dim>
@@ -327,12 +332,29 @@ namespace muSpectre {
       constexpr static Dim_t Dim{twoD};
       using RotMat_t = typename RotatorTwoVec<Dim>::RotMat_t;
       using Vec_t = typename RotatorTwoVec<Dim>::Vec_t;
+      template <typename DerivedA, typename DerivedB>
+      inline static RotMat_t
+      compute(const Eigen::MatrixBase<DerivedA> & vec_ref,
+              const Eigen::MatrixBase<DerivedB> & vec_des) {
+        Real v_ref_norm{
+            sqrt(vec_ref(0) * vec_ref(0) + vec_ref(1) * vec_ref(1))};
+        Real v_des_norm{
+            sqrt(vec_des(0) * vec_des(0) + vec_des(1) * vec_des(1))};
 
-      inline static RotMat_t compute(Vec_t vec_ref, Vec_t vec_des) {
-        Real v_ref_norm =
-            sqrt(vec_ref(0) * vec_ref(0) + vec_ref(1) * vec_ref(1));
-        Real v_des_norm =
-            sqrt(vec_des(0) * vec_des(0) + vec_des(1) * vec_des(1));
+        if (v_des_norm == 0.0) {
+          std::stringstream err;
+          err << "The norm of the destiantion input vector is ZERO which is "
+                 "invalid";
+          std::runtime_error(err.str());
+        }
+
+        if (v_ref_norm == 0.0) {
+          std::stringstream err;
+          err << "The norm of the reference input vector is ZERO which is "
+                 "invalid";
+          std::runtime_error(err.str());
+        }
+
         RotMat_t ret_mat;
         ret_mat(0, 0) = ret_mat(1, 1) =
             (((vec_ref(0) / v_ref_norm) * (vec_des(0) / v_des_norm)) +
@@ -351,7 +373,10 @@ namespace muSpectre {
       constexpr static Dim_t Dim{threeD};
       using RotMat_t = typename RotatorTwoVec<Dim>::RotMat_t;
       using Vec_t = typename RotatorTwoVec<Dim>::Vec_t;
-      inline static RotMat_t compute(Vec_t vec_ref, Vec_t vec_des) {
+      template <typename DerivedA, typename DerivedB>
+      inline static RotMat_t
+      compute(const Eigen::MatrixBase<DerivedA> & vec_ref,
+              const Eigen::MatrixBase<DerivedB> & vec_des) {
         return Eigen::Quaternion<double>::FromTwoVectors(vec_ref, vec_des)
             .normalized()
             .toRotationMatrix();
@@ -360,21 +385,25 @@ namespace muSpectre {
 
   }  // namespace internal
 
-  /* ---------------------------------------------------------------------- */
+  /* ----------------------------------------------------------------------
+   */
   template <Dim_t Dim>
-  auto RotatorTwoVec<Dim>::compute_rotation_matrix_TwoVec(Vec_t vec_ref,
-                                                          Vec_t vec_des)
-      -> RotMat_t {
+  template <typename DerivedA, typename DerivedB>
+  auto RotatorTwoVec<Dim>::compute_rotation_matrix_TwoVec(
+      const Eigen::MatrixBase<DerivedA> & vec_ref,
+      const Eigen::MatrixBase<DerivedB> & vec_des) -> RotMat_t {
     return internal::RotationMatrixComputerTwoVec<Dim>::compute(vec_ref,
                                                                 vec_des);
   }
 
-  /* ---------------------------------------------------------------------- */
+  /* ----------------------------------------------------------------------
+   */
   /**
    * this class is used to make a vector aligned to x-axis of the coordinate
-   system, the input for the constructor is the vector itself and the functions
-   rotate and rotate back would be available as they exist in the parent class
-   (RotatorBase) nad can be used in order to do the functionality of the class
+   * system, the input for the constructor is the vector itself and the
+   * functions rotate and rotate back would be available as they exist in
+   * the parent class (RotatorBase) nad can be used in order to do the
+   * functionality of the class
    */
   template <Dim_t Dim>
   class RotatorNormal : public RotatorBase<Dim> {
@@ -386,8 +415,10 @@ namespace muSpectre {
     //! Default constructor
     RotatorNormal() = delete;
 
-    explicit RotatorNormal(Vec_t vec)
-        : Parent(this->compute_rotation_matrix_normal(vec)), vec{vec} {}
+    //! constructor
+    template <typename Derived>
+    explicit RotatorNormal(const Eigen::MatrixBase<Derived> & vec)
+        : Parent(this->compute_rotation_matrix_normal(vec)) {}
 
     //! Copy constructor
     RotatorNormal(const RotatorNormal & other) = default;
@@ -405,17 +436,13 @@ namespace muSpectre {
     RotatorNormal & operator=(RotatorNormal && other) = default;
 
    protected:
-    inline RotMat_t compute_rotation_matrix_normal(Vec_t vec);
-    inline RotMat_t compute_this_rotation_matrix_normal() {
-      return compute_rotation_matrix_normal(this->vec);
-    }
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-    Vec_t vec;
-
-   private:
+    template <typename Derived>
+    inline RotMat_t
+    compute_rotation_matrix_normal(const Eigen::MatrixBase<Derived> & vec);
   };
 
-  /* ---------------------------------------------------------------------- */
+  /* ----------------------------------------------------------------------
+   */
   namespace internal {
     template <Dim_t Dim>
     struct RotationMatrixComputerNormal {};
@@ -424,15 +451,19 @@ namespace muSpectre {
       constexpr static Dim_t Dim{twoD};
       using RotMat_t = typename RotatorTwoVec<Dim>::RotMat_t;
       using Vec_t = typename RotatorTwoVec<Dim>::Vec_t;
-
-      inline static RotMat_t compute(Vec_t vec) {
-        Real vec_norm = sqrt(vec(0) * vec(0) + vec(1) * vec(1));
-        Vec_t x;
-        x << 1.0, 0.0;
+      template <typename Derived>
+      inline static RotMat_t compute(const Eigen::MatrixBase<Derived> & vec) {
+        auto && vec_norm{vec.norm()};
+        if (vec_norm == 0.0) {
+          std::stringstream err;
+          err << "The norm of the input vector is ZERO which is invalid";
+          std::runtime_error(err.str());
+        }
+        const Vec_t x{(Vec_t() << 1.0, 0.0).finished()};
 
         RotMat_t ret_mat;
-        ret_mat(0, 0) = ret_mat(1, 1) = ((vec(0) / vec_norm) * x(0));
-        ret_mat(1, 0) = -(-(vec(1) / vec_norm) * x(0));
+        ret_mat(0, 0) = ret_mat(1, 1) = ((vec(0) / vec.norm()) * x(0));
+        ret_mat(1, 0) = -(-(vec(1) / vec.norm()) * x(0));
         ret_mat(0, 1) = -ret_mat(1, 0);
         return ret_mat;
       }
@@ -443,15 +474,16 @@ namespace muSpectre {
       constexpr static Dim_t Dim{threeD};
       using RotMat_t = typename RotatorTwoVec<Dim>::RotMat_t;
       using Vec_t = typename RotatorTwoVec<Dim>::Vec_t;
-      inline static RotMat_t compute(Vec_t vec) {
-        Real eps = 0.1;
-        Vec_t vec1 = vec / vec.norm();
+      template <typename Derived>
+      inline static RotMat_t compute(const Eigen::MatrixBase<Derived> & vec) {
+        Real eps{0.1};
+        Vec_t vec1{vec / vec.norm()};
         Vec_t x(Vec_t::UnitX());
         Vec_t y(Vec_t::UnitY());
-        Vec_t n_x = vec1.cross(x);
-        Vec_t vec2 = ((n_x.norm() > eps) * n_x +
-                      (1 - (n_x.norm() > eps)) * (vec1.cross(y)));
-        Vec_t vec3 = vec1.cross(vec2);
+        Vec_t n_x{vec1.cross(x)};
+        Vec_t vec2{((n_x.norm() > eps) * n_x +
+                    (1 - (n_x.norm() > eps)) * (vec1.cross(y)))};
+        Vec_t vec3{vec1.cross(vec2)};
         RotMat_t ret_mat;
         ret_mat << vec1(0), vec2(0) / vec2.norm(), vec3(0) / vec3.norm(),
             vec1(1), vec2(1) / vec2.norm(), vec3(1) / vec3.norm(), vec1(2),
@@ -461,14 +493,17 @@ namespace muSpectre {
     };
   }  // namespace internal
 
-  /* ---------------------------------------------------------------------- */
+  /* ----------------------------------------------------------------------
+   */
   template <Dim_t Dim>
-  auto RotatorNormal<Dim>::compute_rotation_matrix_normal(Vec_t vec)
-      -> RotMat_t {
+  template <typename Derived>
+  auto RotatorNormal<Dim>::compute_rotation_matrix_normal(
+      const Eigen::MatrixBase<Derived> & vec) -> RotMat_t {
     return internal::RotationMatrixComputerNormal<Dim>::compute(vec);
   }
 
-  /* ---------------------------------------------------------------------- */
+  /* ----------------------------------------------------------------------
+   */
 
   namespace internal {
 
@@ -514,33 +549,34 @@ namespace muSpectre {
         constexpr Dim_t Dim{muGrid::EigenCheck::tensor_dim<Derived2>::value};
         auto && rotator_forward{
             Matrices::outer_under(R.transpose(), R.transpose())};
-        auto && rotator_back = Matrices::outer_under(R, R);
+        auto && rotator_back{Matrices::outer_under(R, R)};
 
         // unclear behaviour. When I return this value as an
-        // expression, clange segfaults or returns an uninitialised
-        // tensor
+        // expression, clange segfaults or returns an
+        // uninitialised tensor
         return muGrid::T4Mat<Real, Dim>(rotator_back * input * rotator_forward);
       }
     };
   }  // namespace internal
 
-  /* ---------------------------------------------------------------------- */
+  /* ----------------------------------------------------------------------
+   */
   template <Dim_t Dim>
   template <class Derived1>
-  auto RotatorBase<Dim>::rotate(const Eigen::MatrixBase<Derived1> & input) const
-      -> decltype(auto) {
+  decltype(auto)
+  RotatorBase<Dim>::rotate(const Eigen::MatrixBase<Derived1> & input) const {
     constexpr Dim_t tensor_rank{
         muGrid::EigenCheck::tensor_rank<Derived1, Dim>::value};
 
     return internal::RotationHelper<tensor_rank>::rotate(input, this->rot_mat);
   }
 
-  /* ---------------------------------------------------------------------- */
+  /* ----------------------------------------------------------------------
+   */
   template <Dim_t Dim>
   template <class Derived1>
-  auto
-  RotatorBase<Dim>::rotate_back(const Eigen::MatrixBase<Derived1> & input) const
-      -> decltype(auto) {
+  decltype(auto) RotatorBase<Dim>::rotate_back(
+      const Eigen::MatrixBase<Derived1> & input) const {
     constexpr Dim_t tensor_rank{
         muGrid::EigenCheck::tensor_rank<Derived1, Dim>::value};
 

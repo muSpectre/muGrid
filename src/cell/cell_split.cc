@@ -3,7 +3,7 @@
  *
  * @author Ali Falsafi <ali.faslafi@epfl.ch>
  *
- * @date   19 Apr 2018
+ * @date   10 Dec 2019
  *
  * @brief  Implementation for cell base class
  *
@@ -32,55 +32,36 @@
  * Program grant you additional permission to convey the resulting work.
  *
  */
-#include "common/muSpectre_common.hh"
-#include "libmugrid/ccoord_operations.hh"
-#include "libmugrid/field.hh"
-// #include "common/utilities.hh"
-#include "materials/material_base.hh"
-#include "projection/projection_base.hh"
-#include "cell/cell_traits.hh"
-#include "cell/cell_base.hh"
-#include "cell/cell_split.hh"
 
-#include <vector>
-#include <memory>
-#include <tuple>
-#include <sstream>
-#include <algorithm>
+#include "cell/cell_split.hh"
 
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
 
-  template <Dim_t DimS, Dim_t DimM>
-  CellSplit<DimS, DimM>::CellSplit(Projection_ptr projection)
+  CellSplit::CellSplit(Projection_ptr projection)
       : Parent(std::move(projection), SplitCell::simple) {}
 
   /* ---------------------------------------------------------------------- */
 
-  template <Dim_t DimS, Dim_t DimM>
-  std::vector<Real> CellSplit<DimS, DimM>::get_assigned_ratios() {
-    auto nb_pixels = muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts);
+  std::vector<Real> CellSplit::get_assigned_ratios() {
+    auto nb_pixels{muGrid::CcoordOps::get_size(
+        this->get_projection().get_nb_subdomain_grid_pts())};
     std::vector<Real> pixel_assigned_ratios(nb_pixels, 0.0);
-    for (auto & mat : this->materials) {
-      mat->get_assigned_ratios(pixel_assigned_ratios,
-                               this->nb_subdomain_grid_pts,
-                               this->subdomain_locations);
+    for (auto && mat : this->materials) {
+      mat->get_assigned_ratios(pixel_assigned_ratios);
     }
     return pixel_assigned_ratios;
   }
   /* ---------------------------------------------------------------------- */
 
-  template <Dim_t DimS, Dim_t DimM>
-  std::vector<Real>
-  CellSplit<DimS, DimM>::get_unassigned_ratios_incomplete_pixels() {
-    auto nb_pixels = muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts);
+  std::vector<Real> CellSplit::get_unassigned_ratios_incomplete_pixels() const {
+    auto nb_pixels{muGrid::CcoordOps::get_size(
+        this->get_projection().get_nb_subdomain_grid_pts())};
     std::vector<Real> pixel_assigned_ratios(nb_pixels, 0.0);
     std::vector<Real> pixel_assigned_ratios_incomplete_pixels;
-    for (auto & mat : this->materials) {
-      mat->get_assigned_ratios(pixel_assigned_ratios,
-                               this->nb_subdomain_grid_pts,
-                               this->subdomain_locations);
+    for (auto && mat : this->materials) {
+      mat->get_assigned_ratios(pixel_assigned_ratios);
     }
     for (auto && ratio : pixel_assigned_ratios) {
       if (ratio < 1) {
@@ -89,23 +70,24 @@ namespace muSpectre {
     }
     return pixel_assigned_ratios_incomplete_pixels;
   }
+
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  auto CellSplit<DimS, DimM>::make_incomplete_pixels() -> IncompletePixels {
+
+  auto CellSplit::make_incomplete_pixels() -> IncompletePixels {
     return IncompletePixels(*this);
   }
+
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  std::vector<int> CellSplit<DimS, DimM>::get_index_incomplete_pixels() {
-    auto nb_pixels = muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts);
+
+  std::vector<int> CellSplit::get_index_incomplete_pixels() const {
+    auto nb_pixels{muGrid::CcoordOps::get_size(
+        this->get_projection().get_nb_subdomain_grid_pts())};
     std::vector<Real> pixel_assigned_ratios(nb_pixels, 0.0);
-    std::vector<int> index_unassigned_pixels;
-    for (auto & mat : this->materials) {
-      mat->get_assigned_ratios(pixel_assigned_ratios,
-                               this->nb_subdomain_grid_pts,
-                               this->subdomain_locations);
+    std::vector<Dim_t> index_unassigned_pixels;
+    for (auto && mat : this->materials) {
+      mat->get_assigned_ratios(pixel_assigned_ratios);
     }
-    for (auto && tup : akantu::enumerate(this->pixels)) {
+    for (auto && tup : this->get_pixels().enumerate()) {
       auto && i{std::get<0>(tup)};
       if (pixel_assigned_ratios[i] < 1) {
         index_unassigned_pixels.push_back(i);
@@ -113,18 +95,18 @@ namespace muSpectre {
     }
     return index_unassigned_pixels;
   }
+
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  std::vector<Ccoord_t<DimS>> CellSplit<DimS, DimM>::get_unassigned_pixels() {
-    auto nb_pixels = muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts);
+
+  std::vector<DynCcoord_t> CellSplit::get_unassigned_pixels() {
+    auto nb_pixels{muGrid::CcoordOps::get_size(
+        this->get_projection().get_nb_subdomain_grid_pts())};
     std::vector<Real> pixel_assigned_ratios(nb_pixels, 0.0);
-    std::vector<Ccoord_t<DimS>> unassigned_pixels;
+    std::vector<DynCcoord_t> unassigned_pixels{};
     for (auto & mat : this->materials) {
-      mat->get_assigned_ratios(pixel_assigned_ratios,
-                               this->nb_subdomain_grid_pts,
-                               this->subdomain_locations);
+      mat->get_assigned_ratios(pixel_assigned_ratios);
     }
-    for (auto && tup : akantu::enumerate(this->pixels)) {
+    for (auto && tup : this->get_pixels().enumerate()) {
       auto && index{std::get<0>(tup)};
       auto && pix{std::get<1>(tup)};
       if (pixel_assigned_ratios[index] < 1) {
@@ -136,24 +118,24 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
 
-  template <Dim_t DimS, Dim_t DimM>
-  void CellSplit<DimS, DimM>::check_material_coverage() {
-    auto nb_pixels = muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts);
+  void CellSplit::check_material_coverage() const {
+    auto nb_pixels{muGrid::CcoordOps::get_size(
+        this->get_projection().get_nb_subdomain_grid_pts())};
     std::vector<Real> pixel_assigned_ratios(nb_pixels, 0.0);
     for (auto & mat : this->materials) {
-      mat->get_assigned_ratios(pixel_assigned_ratios,
-                               this->nb_subdomain_grid_pts,
-                               this->subdomain_locations);
+      mat->get_assigned_ratios(pixel_assigned_ratios);
     }
-    std::vector<Ccoord_t<DimM>> over_assigned_pixels;
-    std::vector<Ccoord_t<DimM>> under_assigned_pixels;
-    for (size_t i = 0; i < nb_pixels; ++i) {
+    std::vector<DynCcoord_t> over_assigned_pixels{};
+    std::vector<DynCcoord_t> under_assigned_pixels;
+    for (size_t i{0}; i < nb_pixels; ++i) {
       if (pixel_assigned_ratios[i] > 1.0) {
-        over_assigned_pixels.push_back(muGrid::CcoordOps::get_ccoord(
-            this->nb_subdomain_grid_pts, this->subdomain_locations, i));
+        over_assigned_pixels.emplace_back(muGrid::CcoordOps::get_ccoord<2>(
+            this->get_projection().get_nb_subdomain_grid_pts(),
+            this->get_projection().get_subdomain_locations(), i));
       } else if (pixel_assigned_ratios[i] < 1.0) {
-        under_assigned_pixels.push_back(muGrid::CcoordOps::get_ccoord(
-            this->nb_subdomain_grid_pts, this->subdomain_locations, i));
+        under_assigned_pixels.emplace_back(muGrid::CcoordOps::get_ccoord<2>(
+            this->get_projection().get_nb_subdomain_grid_pts(),
+            this->get_projection().get_subdomain_locations(), i));
       }
     }
     if (over_assigned_pixels.size() != 0) {
@@ -175,160 +157,183 @@ namespace muSpectre {
       throw std::runtime_error(err.str());
     }
   }
+
   /* ---------------------------------------------------------------------- */
-  // this piece of code handles the evaluation of stress an dtangent matrix
+
+  // this function handles the evaluation of stress
   // in case the cells have materials in which pixels are partially composed of
   // diffferent materials.
+  const muGrid::RealField & CellSplit::evaluate_stress() {
+    if (not this->initialised) {
+      this->initialise();
+    }
+    // Here we should first set P equal to zeros first because we
+    // want to add up contribution
+    // of the partial influence of different materials assigend to each pixel.
+    // Therefore, this values should be
+    // initiialised as zero filled tensors
+    this->stress.set_zero();
+    for (auto & mat : this->materials) {
+      mat->compute_stresses(this->strain, this->stress,
+                            this->get_formulation());
+    }
+    return this->stress;
+  }
 
-  template <Dim_t DimS, Dim_t DimM>
-  typename CellSplit<DimS, DimM>::FullResponse_t
-  CellSplit<DimS, DimM>::evaluate_stress_tangent(StrainField_t & F) {
-    if (this->initialised == false) {
+  /* ---------------------------------------------------------------------- */
+  // this function handles the evaluation of stress and tangent matrix
+  // in case the cells have materials in which pixels are partially composed of
+  // diffferent materials.
+  std::tuple<const muGrid::RealField &, const muGrid::RealField &>
+  CellSplit::evaluate_stress_tangent() {
+    if (not this->initialised) {
       this->initialise();
     }
     //! High level compatibility checks
-    if (F.size() != this->F.size()) {
+    if (strain.size() != this->strain.size()) {
       throw std::runtime_error("Size mismatch");
     }
     constexpr bool create_tangent{true};
     this->get_tangent(create_tangent);
 
-    // Here we should first set P and K matrixes equal to zeros first because we
-    // want to add up contribution
-    // of the partial influence of different materials assigend to each pixel.
-    // Therefore, this values should be
+    // Here we should first set P and K matrixes equal to zeros first because
+    // we want to add up contribution of the partial influence of different
+    // materials assigend to each pixel. Therefore, this values should be
     // initiialised as zero filled tensors
     this->set_p_k_zero();
 
-    // full response is composed of the stresses and tangent matrix is retruned
-    // by this function
+    // full response is composed of the stresses and tangent matrix is
+    // retruned by this function
     for (auto & mat : this->materials) {
-      mat->compute_stresses_tangent(F, this->P, this->K.value(),
-                                    this->get_formulation(),
-                                    this->is_cell_split);
+      mat->compute_stresses_tangent(strain, this->stress, this->tangent.value(),
+                                    this->get_formulation(), SplitCell::simple);
     }
-    return std::tie(this->P, this->K.value());
+    return std::tie(this->stress, this->tangent.value());
   }
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  auto CellSplit<DimS, DimM>::evaluate_stress() -> ConstVector_ref {
-    if (not this->initialised) {
-      this->initialise();
-    }
-    this->P.set_zero();
-    for (auto & mat : this->materials) {
-      mat->compute_stresses(this->F, this->P, this->get_formulation());
-    }
 
-    return this->P.const_eigenvec();
-  }
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  auto CellSplit<DimS, DimM>::evaluate_stress_tangent()
-      -> std::array<ConstVector_ref, 2> {
-    if (not this->initialised) {
-      this->initialise();
-    }
+  /* ----------------------------------------------------------------------- */
+  void CellSplit::make_automatic_precipitate_split_pixels(
+      const std::vector<DynRcoord_t> & precipitate_vertices,
+      MaterialBase & material) {
+    RootNode<SplitCell::simple> precipitate(*this, precipitate_vertices);
+    auto && precipitate_intersects{precipitate.get_intersected_pixels()};
 
-    constexpr bool create_tangent{true};
-    this->get_tangent(create_tangent);
+    auto && precipitate_intersects_id{precipitate.get_intersected_pixels_id()};
 
-    // Here we should first set P and K matrixes equal to zeros first because we
-    // want to add up contribution
-    // of the partial influence of different materials assigend to each pixel.
-    // Therefore, this values should be
-    // initiialised as zero filled tensors
-    this->set_p_k_zero();
-    for (auto & mat : this->materials) {
-      mat->compute_stresses_tangent(this->F, this->P, this->K.value(),
-                                    this->get_formulation(),
-                                    this->is_cell_split);
-    }
-    const TangentField_t & k = this->K.value();
-    return std::array<ConstVector_ref, 2>{this->P.const_eigenvec(),
-                                          k.const_eigenvec()};
-  }
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void CellSplit<DimS, DimM>::make_automatic_precipitate_split_pixels(
-      std::vector<Rcoord_t<DimS>> precipitate_vertices,
-      MaterialBase<DimS, DimM> & material) {
-    RootNode<DimS, SplitCell::simple> precipitate(*this, precipitate_vertices);
-    auto && precipitate_intersects = precipitate.get_intersected_pixels();
-
-    auto && precipitate_intersection_ratios =
-        precipitate.get_intersection_ratios();
+    auto && precipitate_intersection_ratios{
+        precipitate.get_intersection_ratios()};
 
     for (auto tup :
-         akantu::zip(precipitate_intersects, precipitate_intersection_ratios)) {
-      auto pix = std::get<0>(tup);
-      auto ratio = std::get<1>(tup);
-      material.add_pixel_split(pix, ratio);
+         akantu::zip(precipitate_intersects_id, precipitate_intersects,
+                     precipitate_intersection_ratios)) {
+      auto pix_id{std::get<0>(tup)};
+      // auto pix { std::get<1>(tup)};
+      auto ratio{std::get<2>(tup)};
+      material.add_pixel_split(pix_id, ratio);
     }
   }
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void CellSplit<DimS, DimM>::complete_material_assignment(
-      MaterialBase<DimS, DimM> & material) {
+
+  /* ----------------------------------------------------------------------
+   */
+  MaterialBase & CellSplit::add_material(Material_ptr mat) {
+    if (mat->get_material_dimension() != this->get_spatial_dim()) {
+      throw std::runtime_error(
+          "this cell class only accepts materials with the same "
+          "dimensionality "
+          "as the spatial problem.");
+    }
+    mat->allocate_optional_fields();
+    this->materials.push_back(std::move(mat));
+    return *this->materials.back();
+  }
+
+  /* ----------------------------------------------------------------------
+   */
+
+  void CellSplit::complete_material_assignment(MaterialBase & material) {
     std::vector<Real> pixel_assigned_ratio(this->get_assigned_ratios());
-    for (auto && tup : akantu::enumerate(*this)) {
-      auto && pixel = std::get<1>(tup);
-      auto iterator = std::get<0>(tup);
+    for (auto && tup : akantu::enumerate(this->get_pixel_indices())) {
+      auto && pixel{std::get<1>(tup)};
+      auto iterator{std::get<0>(tup)};
       if (pixel_assigned_ratio[iterator] < 1.0) {
         material.add_pixel_split(pixel, 1.0 - pixel_assigned_ratio[iterator]);
       }
     }
   }
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void CellSplit<DimS, DimM>::set_p_k_zero() {
-    this->P.set_zero();
-    this->K.value().get().set_zero();
+
+  /* ----------------------------------------------------------------------
+   */
+
+  void CellSplit::set_p_k_zero() {
+    this->stress.set_zero();
+    this->tangent.value().get().set_zero();
   }
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  CellSplit<DimS, DimM>::IncompletePixels::IncompletePixels(
-      CellSplit<DimS, DimM> & cell)
+
+  /* ----------------------------------------------------------------------
+   */
+
+  CellSplit::IncompletePixels::IncompletePixels(const CellSplit & cell)
       : cell(cell), incomplete_assigned_ratios(
                         cell.get_unassigned_ratios_incomplete_pixels()),
         index_incomplete_pixels(cell.get_index_incomplete_pixels()) {}
 
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  CellSplit<DimS, DimM>::IncompletePixels::iterator::iterator(
-      const IncompletePixels & pixels, bool begin)
-      : incomplete_pixels(pixels),
+  /* ----------------------------------------------------------------------
+   */
+
+  CellSplit::IncompletePixels::iterator::iterator(
+      const IncompletePixels & pixels, Dim_t dim, bool begin)
+      : incomplete_pixels(pixels), dim{dim},
         index{begin ? 0
                     : this->incomplete_pixels.index_incomplete_pixels.size()} {}
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  auto CellSplit<DimS, DimM>::IncompletePixels::iterator::operator++()
-      -> iterator & {
+
+  /* ----------------------------------------------------------------------
+   */
+
+  auto CellSplit::IncompletePixels::iterator::operator++() -> iterator & {
     this->index++;
     return *this;
   }
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  auto CellSplit<DimS, DimM>::IncompletePixels::iterator::
-  operator!=(const iterator & other) -> bool {
-    //        return (this->incomplete_pixels.index_incomplete_pixels[index] !=
-    //                other.incomplete_pixels.index_incomplete_pixels[index]);
+
+  /* ---------------------------------------------------------------------*/
+
+  bool CellSplit::IncompletePixels::iterator::
+  operator!=(const iterator & other) {
     return (this->index != other.index);
   }
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  auto CellSplit<DimS, DimM>::IncompletePixels::iterator::operator*()
-      -> value_type const {
-    auto ccoord = muGrid::CcoordOps::get_ccoord(
-        this->incomplete_pixels.cell.get_nb_domain_grid_pts(),
-        this->incomplete_pixels.cell.get_subdomain_locations(),
-        this->incomplete_pixels.index_incomplete_pixels[index]);
-    auto ratio = this->incomplete_pixels.incomplete_assigned_ratios[index];
+
+  /* ---------------------------------------------------------------------*/
+  auto CellSplit::IncompletePixels::iterator::operator*() const -> value_type {
+    switch (this->dim) {
+    case twoD: {
+      return this->template deref_helper<twoD>();
+      break;
+    }
+    case threeD: {
+      return this->template deref_helper<threeD>();
+      break;
+    }
+    default: {
+      std::stringstream err;
+      err << "Input dimesnion is not correct. Valid dimnensions are only twoD "
+             "or threeD ";
+      throw(std::runtime_error(err.str()));
+      break;
+    }
+    }
+  }
+
+  /* ---------------------------------------------------------------------*/
+  template <Dim_t DimS>
+  auto CellSplit::IncompletePixels::iterator::deref_helper() const
+      -> value_type {
+    DynCcoord_t ccoord{muGrid::CcoordOps::get_ccoord<DimS>(
+        this->incomplete_pixels.cell.get_projection().get_nb_domain_grid_pts(),
+        this->incomplete_pixels.cell.get_projection().get_subdomain_locations(),
+        this->incomplete_pixels.index_incomplete_pixels[index])};
+    auto ratio{this->incomplete_pixels.incomplete_assigned_ratios[index]};
     return std::make_tuple(ccoord, ratio);
   }
-  /* ---------------------------------------------------------------------- */
-  template class CellSplit<twoD, twoD>;
-  template class CellSplit<threeD, threeD>;
-  /* ---------------------------------------------------------------------- */
+
+  /* ---------------------------------------------------------------------*/
 
 }  // namespace muSpectre

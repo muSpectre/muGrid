@@ -90,54 +90,48 @@ namespace muSpectre {
     // combining the laminate layers as we know some indices in a lmainate
     // structure act like the two phases are in serial and some others act like
     // two phases are parralell to each other
-    inline static constexpr auto get_parallel_indices() -> Parallel_index_t;
-    inline static constexpr auto get_equation_indices() -> Equation_index_t;
+    inline static constexpr Parallel_index_t get_parallel_indices();
+    inline static constexpr Equation_index_t get_equation_indices();
+
     // these functions return the parts of a stress or strain tensor that
     // behave either serial or parallel in a laminate structure
     // they are used to obtain a certian part of tensor which is needed by the
     // solver used in this struct to calculate the effective stress and
     // stiffness or compose the complete tensor from its sub sets.
-
     // obtain the serial part of stress or strain tensor
     template <class Derived>
-    inline static auto
-    get_equation_strain(const Eigen::MatrixBase<Derived> & E_total)
-        -> Equation_strain_t;
+    inline static Equation_strain_t
+    get_equation_strain(const Eigen::MatrixBase<Derived> & E_total);
     template <class Derived>
-    inline static auto
-    get_equation_stress(const Eigen::MatrixBase<Derived> & S_total)
-        -> Equation_stress_t;
+    inline static Equation_stress_t
+    get_equation_stress(const Eigen::MatrixBase<Derived> & S_total);
     template <class Derived>
-    inline static auto
-    get_equation_stiffness(const Eigen::MatrixBase<Derived> & C)
-        -> Equation_stiffness_t;
+    inline static Equation_stiffness_t
+    get_equation_stiffness(const Eigen::MatrixBase<Derived> & C);
 
     // obtain the parallel part of stress or strain tensor
     template <class Derived1>
-    inline static auto
-    get_parallel_strain(const Eigen::MatrixBase<Derived1> & E)
-        -> Parallel_strain_t;
+    inline static Parallel_strain_t
+    get_parallel_strain(const Eigen::MatrixBase<Derived1> & E);
     template <class Derived1>
-    inline static auto
-    get_parallel_stress(const Eigen::MatrixBase<Derived1> & S)
-        -> Parallel_stress_t;
+    inline static Parallel_stress_t
+    get_parallel_stress(const Eigen::MatrixBase<Derived1> & S);
 
     // compose the complete strain or stress tensor from
     // its serial and parallel parts
     template <class Derived1, class Derived2>
-    inline static auto
+    inline static Strain_t
     make_total_strain(const Eigen::MatrixBase<Derived1> & E_eq,
-                      const Eigen::MatrixBase<Derived2> & E_para) -> Strain_t;
+                      const Eigen::MatrixBase<Derived2> & E_para);
     template <class Derived1, class Derived2>
-    inline static auto
+    inline static Stress_t
     make_total_stress(const Eigen::MatrixBase<Derived1> & S_eq,
-                      const Eigen::MatrixBase<Derived2> & S_para) -> Stress_t;
+                      const Eigen::MatrixBase<Derived2> & S_para);
 
     template <class Derived1, class Derived2>
-    inline static auto linear_eqs(Real ratio,
-                                  const Eigen::MatrixBase<Derived1> & E_0,
-                                  const Eigen::MatrixBase<Derived2> & E_1)
-        -> Equation_strain_t;
+    inline static Equation_strain_t
+    linear_eqs(const Real & ratio, const Eigen::MatrixBase<Derived1> & E_0,
+               const Eigen::MatrixBase<Derived2> & E_1);
 
     /**
      * the objective in homogenisation of a single laminate pixel is equating
@@ -147,29 +141,30 @@ namespace muSpectre {
      * Jacobian in the solution process
      */
     template <class Derived1, class Derived2>
-    inline static auto delta_equation_stress_stiffness_eval(
+    inline static std::tuple<Equation_stress_t, Equation_stiffness_t, Real>
+    delta_equation_stress_stiffness_eval(
         const Function_t & mat_1_stress_eval,
         const Function_t & mat_2_stress_eval,
         const Eigen::MatrixBase<Derived1> & E_1,
         const Eigen::MatrixBase<Derived2> & E_2,
-        const RotatorNormal<Dim> & rotator, const Real ratio)
-        -> std::tuple<Equation_stress_t, Equation_stiffness_t, Real>;
+        const RotatorNormal<Dim> & rotator, const Real & ratio);
+
     template <class Derived1, class Derived2>
-    inline static auto delta_equation_stress_stiffness_eval_strain_1(
+    inline static std::tuple<Equation_stress_t, Equation_stiffness_t, Real>
+    delta_equation_stress_stiffness_eval_strain_1(
         const Function_t & mat_1_stress_eval,
         const Function_t & mat_2_stress_eval,
         const Eigen::MatrixBase<Derived1> & E_0,
         const Eigen::MatrixBase<Derived2> & E_1_rot,
-        const RotatorNormal<Dim> & rotator, const Real ratio)
-        -> std::tuple<Equation_stress_t, Equation_stiffness_t, Real>;
+        const RotatorNormal<Dim> & rotator, const Real & ratio);
     /**
      * the following functions claculate the energy computation error of the
      * solution. it will be used in each step of the solution to determine the
      * relevant difference that implementation of that step has had on
      * convergence to the solution.
      */
-    inline static auto del_energy_eval(const Real del_E_norm,
-                                       const Real delta_S_norm) -> Real;
+    inline static Real del_energy_eval(const Real & del_E_norm,
+                                       const Real & delta_S_norm);
     /**
      *  These functions are used as intrface for combination functions, They are
      *also used for carrying out the stress transformation necessary for
@@ -179,17 +174,16 @@ namespace muSpectre {
      *order to be able to use it
      */
     template <class Derived1, class Derived2>
-    inline static auto
+    inline static Stress_t
     lam_stress_combine(const Eigen::MatrixBase<Derived1> & stress_1,
                        const Eigen::MatrixBase<Derived2> & stress_2,
-                       const Real ratio) -> Stress_t;
-    inline static auto lam_stiffness_combine(
+                       const Real & ratio);
+    inline static Stiffness_t lam_stiffness_combine(
         const Eigen::Ref<Stiffness_t> & stiffness_1,
-        const Eigen::Ref<Stiffness_t> & stiffness_2, const Real ratio,
+        const Eigen::Ref<Stiffness_t> & stiffness_2, const Real & ratio,
         const Eigen::Ref<Strain_t> & F_1, const Eigen::Ref<Stress_t> & F_2,
         const Eigen::Ref<Strain_t> & P_1, const Eigen::Ref<Stress_t> & P_2,
-        const Eigen::Ref<Strain_t> & F, const Eigen::Ref<Stress_t> & P)
-        -> Stiffness_t;
+        const Eigen::Ref<Strain_t> & F, const Eigen::Ref<Stress_t> & P);
 
     /**
      * This is the main solver function that might be called staically from
@@ -204,31 +198,29 @@ namespace muSpectre {
      * tolerance error for the internal solution of the laminate pixel 7- the
      * maximum iterations for the internal solution of the laminate pixel
      */
-    static auto laminate_solver(Eigen::Ref<Strain_t> strain_coord,
-                                const Function_t & mat_1_stress_eval,
-                                const Function_t & mat_2_stress_eval,
-                                Real ratio,
-                                const Eigen::Ref<Vec_t> & normal_vec,
-                                Real tol = 1e-10, Dim_t max_iter = 1000)
-        -> std::tuple<Dim_t, Real, Strain_t, Strain_t>;
+    static std::tuple<Dim_t, Real, Strain_t, Strain_t>
+    laminate_solver(const Eigen::Ref<Strain_t> & strain_coord,
+                    const Function_t & mat_1_stress_eval,
+                    const Function_t & mat_2_stress_eval, const Real & ratio,
+                    const Eigen::Ref<Vec_t> & normal_vec,
+                    const Real tol = 1e-10, const Dim_t max_iter = 1000);
 
     /* ---------------------------------------------------------------------- */
-    static auto evaluate_stress(const Eigen::Ref<Strain_t> & strain_coord,
-                                const Function_t & mat_1_stress_eval,
-                                const Function_t & mat_2_stress_eval,
-                                Real ratio,
-                                const Eigen::Ref<Vec_t> & normal_vec,
-                                Real tol = 1e-10, Dim_t max_iter = 1000)
-        -> Stress_t;
+    static Stress_t evaluate_stress(const Eigen::Ref<Strain_t> & strain_coord,
+                                    const Function_t & mat_1_stress_eval,
+                                    const Function_t & mat_2_stress_eval,
+                                    const Real & ratio,
+                                    const Eigen::Ref<Vec_t> & normal_vec,
+                                    const Real tol = 1e-10,
+                                    const Dim_t max_iter = 1000);
 
     /* ---------------------------------------------------------------------- */
-    static auto
-    evaluate_stress_tangent(const Eigen::Ref<Strain_t> & strain_coord,
-                            const Function_t & mat_1_stress_eval,
-                            const Function_t & mat_2_stress_eval, Real ratio,
-                            const Eigen::Ref<Vec_t> & normal_vec,
-                            Real tol = 1e-10, Dim_t max_iter = 1000)
-        -> std::tuple<Stress_t, Stiffness_t>;
+    static std::tuple<Stress_t, Stiffness_t> evaluate_stress_tangent(
+        const Eigen::Ref<Strain_t> & strain_coord,
+        const Function_t & mat_1_stress_eval,
+        const Function_t & mat_2_stress_eval, const Real & ratio,
+        const Eigen::Ref<Vec_t> & normal_vec, const Real tol = 1e-10,
+        const Dim_t max_iter = 1000);
   };  // LamHomogen
   /* ---------------------------------------------------------------------- */
   template <Dim_t Dim>
@@ -244,13 +236,13 @@ namespace muSpectre {
      *
      */
     template <class Derived1, class Derived2>
-    inline static auto lam_S_combine(const Eigen::MatrixBase<Derived1> & S_1,
-                                     const Eigen::MatrixBase<Derived2> & S_2,
-                                     const Real ratio) -> Stress_t;
+    inline static Stress_t
+    lam_S_combine(const Eigen::MatrixBase<Derived1> & S_1,
+                  const Eigen::MatrixBase<Derived2> & S_2, const Real & ratio);
     template <class Derived1, class Derived2>
-    inline static auto lam_C_combine(const Eigen::MatrixBase<Derived1> & C_1,
-                                     const Eigen::MatrixBase<Derived2> & C_2,
-                                     const Real ratio) -> Stiffness_t;
+    inline static Stiffness_t
+    lam_C_combine(const Eigen::MatrixBase<Derived1> & C_1,
+                  const Eigen::MatrixBase<Derived2> & C_2, const Real & ratio);
   };
   /* ---------------------------------------------------------------------- */
 
@@ -340,8 +332,8 @@ namespace muSpectre {
     Parallel_strain_t E_parallel;
     auto parallel_indices{get_parallel_indices()};
     for (auto && tup : akantu::enumerate(parallel_indices)) {
-      auto && index = std::get<1>(tup);
-      auto counter = std::get<0>(tup);
+      auto && index{std::get<1>(tup)};
+      auto counter{std::get<0>(tup)};
       E_parallel(counter) = E_total(index[0], index[1]);
     }
     return E_parallel;
@@ -389,7 +381,7 @@ namespace muSpectre {
       const Function_t & mat_2_stress_eval,
       const Eigen::MatrixBase<Derived1> & strain_1,
       const Eigen::MatrixBase<Derived2> & strain_2,
-      const RotatorNormal<Dim> & rotator, const Real ratio)
+      const RotatorNormal<Dim> & rotator, const Real & ratio)
       -> std::tuple<Equation_stress_t, Equation_stiffness_t, Real> {
     auto stress_stiffness_1 = mat_1_stress_eval(strain_1);
     auto stress_stiffness_2 = mat_2_stress_eval(strain_2);
@@ -434,7 +426,7 @@ namespace muSpectre {
   template <Dim_t Dim, Formulation Form>
   template <class Derived1, class Derived2>
   auto
-  LamHomogen<Dim, Form>::linear_eqs(Real ratio,
+  LamHomogen<Dim, Form>::linear_eqs(const Real & ratio,
                                     const Eigen::MatrixBase<Derived1> & E_0_eq,
                                     const Eigen::MatrixBase<Derived2> & E_1_eq)
       -> Equation_strain_t {
@@ -448,7 +440,7 @@ namespace muSpectre {
       const Function_t & mat_2_stress_eval,
       const Eigen::MatrixBase<Derived1> & strain_0_rot,
       const Eigen::MatrixBase<Derived2> & strain_1_rot,
-      const RotatorNormal<Dim> & rotator, Real ratio)
+      const RotatorNormal<Dim> & rotator, const Real & ratio)
       -> std::tuple<Equation_stress_t, Equation_stiffness_t, Real> {
     // First we claculate strain_1 and strain_2 in rotated coordinates that we
     // have relations (parralel or serial)  between strains in two layers)
@@ -567,7 +559,7 @@ namespace muSpectre {
   template <class Derived1, class Derived2>
   auto LamHomogen<Dim, Form>::lam_stress_combine(
       const Eigen::MatrixBase<Derived1> & stress_1,
-      const Eigen::MatrixBase<Derived2> & stress_2, const Real ratio)
+      const Eigen::MatrixBase<Derived2> & stress_2, const Real & ratio)
       -> Stress_t {
     return LamCombination<Dim>::lam_S_combine(stress_1, stress_2, ratio);
   }
@@ -575,7 +567,7 @@ namespace muSpectre {
   template <Dim_t Dim, Formulation Form>
   auto LamHomogen<Dim, Form>::lam_stiffness_combine(
       const Eigen::Ref<Stiffness_t> & stiffness_1,
-      const Eigen::Ref<Stiffness_t> & stiffness_2, const Real ratio,
+      const Eigen::Ref<Stiffness_t> & stiffness_2, const Real & ratio,
       const Eigen::Ref<Strain_t> & F_1, const Eigen::Ref<Stress_t> & F_2,
       const Eigen::Ref<Strain_t> & P_1, const Eigen::Ref<Stress_t> & P_2,
       const Eigen::Ref<Strain_t> & F, const Eigen::Ref<Stress_t> &
@@ -624,78 +616,76 @@ namespace muSpectre {
   auto
   LamCombination<twoD>::lam_C_combine(const Eigen::MatrixBase<Derived1> & C_1,
                                       const Eigen::MatrixBase<Derived2> & C_2,
-                                      const Real ratio) -> Stiffness_t {
+                                      const Real & ratio) -> Stiffness_t {
     using Mat_A_t = Eigen::Matrix<Real, twoD, twoD>;
     using Vec_A_t = Eigen::Matrix<Real, twoD, 1>;
     using Vec_AT_t = Eigen::Matrix<Real, 1, twoD>;
 
     std::array<double, 3> cf = {1.0, sqrt(2.0), 2.0};
-    auto get_A11 = [cf](const Eigen::Ref<const Stiffness_t> & C) {
-      Mat_A_t A11 = Mat_A_t::Zero();
-      A11 << cf[0] * muGrid::get(C, 0, 0, 0, 0),
-          cf[1] * muGrid::get(C, 0, 0, 0, 1),
-          cf[1] * muGrid::get(C, 0, 0, 0, 1),
-          cf[2] * muGrid::get(C, 0, 1, 0, 1);
+    auto get_A11{[&cf](const Eigen::Ref<const Stiffness_t> & C) {
+      Mat_A_t A11{(Mat_A_t() << cf[0] * muGrid::get(C, 0, 0, 0, 0),
+                   cf[1] * muGrid::get(C, 0, 0, 0, 1),
+                   cf[1] * muGrid::get(C, 0, 0, 0, 1),
+                   cf[2] * muGrid::get(C, 0, 1, 0, 1))
+                      .finished()};
+
       return A11;
-    };
-    Mat_A_t A11c;
-    A11c << cf[0], cf[1], cf[1], cf[2];
-    auto get_A12 = [cf](const Eigen::Ref<const Stiffness_t> & C) {
-      Vec_A_t A12 = Vec_A_t::Zero();
-      A12 << cf[0] * muGrid::get(C, 0, 0, 1, 1),
-          cf[1] * muGrid::get(C, 1, 1, 0, 1);
+    }};
+    const Mat_A_t A11c{(Mat_A_t() << cf[0], cf[1], cf[1], cf[2]).finished()};
+    auto get_A12{[&cf](const Eigen::Ref<const Stiffness_t> & C) {
+      Vec_A_t A12{(Vec_A_t() << cf[0] * muGrid::get(C, 0, 0, 1, 1),
+                   cf[1] * muGrid::get(C, 1, 1, 0, 1))
+                      .finished()};
       return A12;
-    };
-    Vec_A_t A12c = Vec_A_t::Zero();
-    A12c << cf[0], cf[1];
+    }};
+
+    Vec_A_t A12c{(Vec_A_t() << cf[0], cf[1]).finished()};
 
     Mat_A_t A11_1{get_A11(C_1)};
     Mat_A_t A11_2{get_A11(C_2)};
 
-    Vec_A_t A12_1 = {get_A12(C_1)};
-    Vec_AT_t A21_1 = A12_1.transpose();
-    Vec_A_t A12_2 = {get_A12(C_2)};
-    Vec_AT_t A21_2 = A12_2.transpose();
+    Vec_A_t A12_1{get_A12(C_1)};
+    Vec_AT_t A21_1{A12_1.transpose()};
+    Vec_A_t A12_2{get_A12(C_2)};
+    Vec_AT_t A21_2{A12_2.transpose()};
 
-    Real A22_1 = muGrid::get(C_1, 1, 1, 1, 1);
-    Real A22_2 = muGrid::get(C_2, 1, 1, 1, 1);
+    Real A22_1{muGrid::get(C_1, 1, 1, 1, 1)};
+    Real A22_2{muGrid::get(C_2, 1, 1, 1, 1)};
 
-    auto get_inverse_average = [&ratio](const Eigen::Ref<Mat_A_t> & matrix_1,
-                                        const Eigen::Ref<Mat_A_t> & matrix_2) {
+    auto get_inverse_average{[&ratio](const Eigen::Ref<Mat_A_t> & matrix_1,
+                                      const Eigen::Ref<Mat_A_t> & matrix_2) {
       return ((ratio * matrix_1.inverse() + (1 - ratio) * matrix_2.inverse())
                   .inverse());
-    };
-    auto get_average = [&ratio](Real A_1, Real A_2) {
+    }};
+    auto get_average{[&ratio](Real A_1, Real A_2) {
       return ratio * A_1 + (1 - ratio) * A_2;
-    };
+    }};
 
-    auto get_average_vec = [&ratio](Vec_A_t A_1, Vec_A_t A_2) {
+    auto get_average_vec{[&ratio](Vec_A_t A_1, Vec_A_t A_2) {
       return ratio * A_1 + (1 - ratio) * A_2;
-    };
+    }};
 
-    auto get_average_vecT = [&ratio](Vec_AT_t A_1, Vec_AT_t A_2) {
+    auto get_average_vecT{[&ratio](Vec_AT_t A_1, Vec_AT_t A_2) {
       return ratio * A_1 + (1 - ratio) * A_2;
-    };
+    }};
 
     // calculating average of A matrices  of the materials
-    Mat_A_t A11 = get_inverse_average(A11_1, A11_2);
-    Vec_A_t A12 =
-        A11 * get_average_vec(A11_1.inverse() * A12_1, A11_2.inverse() * A12_2);
-    Real A22 =
+    Mat_A_t A11{get_inverse_average(A11_1, A11_2)};
+    Vec_A_t A12{A11 * get_average_vec(A11_1.inverse() * A12_1,
+                                      A11_2.inverse() * A12_2)};
+    Real A22{
         get_average(A22_1 - A21_1 * A11_1.inverse() * A12_1,
                     A22_2 - A21_2 * A11_2.inverse() * A12_2) +
         get_average_vecT(A21_1 * A11_1.inverse(), A21_2 * A11_2.inverse()) *
             A11 *
-            get_average_vec(A11_1.inverse() * A12_1, A11_2.inverse() * A12_2);
+            get_average_vec(A11_1.inverse() * A12_1, A11_2.inverse() * A12_2)};
 
-    std::vector<Real> c_maker_inp = {
-        A11(0, 0) / A11c(0, 0), A12(0, 0) / A12c(0, 0),
-        A11(0, 1) / A11c(0, 1), A22,
-        A12(1, 0) / A12c(1, 0), A11(1, 1) / A11c(1, 1)};
-    // now the resultant stiffness is calculated fro 6 elements obtained from
-    // A matrices averaging routine:
-    Stiffness_t ret_C = Stiffness_t::Zero();
-    ret_C = MaterialLinearAnisotropic<twoD, twoD>::c_maker(c_maker_inp);
+    std::vector<Real> c_maker_inp{
+        {A11(0, 0) / A11c(0, 0), A12(0, 0) / A12c(0, 0), A11(0, 1) / A11c(0, 1),
+         A22, A12(1, 0) / A12c(1, 0), A11(1, 1) / A11c(1, 1)}};
+    // now the resultant stiffness is calculated fro 6
+    // elements obtained from A matrices averaging routine:
+    Stiffness_t ret_C{MaterialLinearAnisotropic<twoD>::c_maker(c_maker_inp)};
     return ret_C;
   }
   /*------------------------------------------------------------------*/
@@ -704,65 +694,68 @@ namespace muSpectre {
   auto
   LamCombination<threeD>::lam_C_combine(const Eigen::MatrixBase<Derived1> & C_1,
                                         const Eigen::MatrixBase<Derived2> & C_2,
-                                        const Real ratio) -> Stiffness_t {
+                                        const Real & ratio) -> Stiffness_t {
     // the combination method is obtained form P. 163 of
     // "Theory of Composites"
     //  Author : Milton_G_W
 
-    // constructing "A" matrices( A11, A12, A21,  A22) according to the
-    // procedure from the book:
+    // constructing "A" matrices( A11, A12, A21,  A22)
+    // according to the procedure from the book:
 
-    // this type of matrix will be used in calculating the combinatio of the
-    // Stiffness matrixes
-    // using Mat_A_t = Eigen::Matrix<Real, threeD, threeD, Eigen::ColMajor>;
+    // this type of matrix will be used in calculating
+    // the combinatio of the Stiffness matrixes using
+    // Mat_A_t = Eigen::Matrix<Real, threeD, threeD,
+    // Eigen::ColMajor>;
     using Mat_A_t = Eigen::Matrix<Real, threeD, threeD>;
 
-    // these coeffs are used in constructing matrices "A" from matrices "C"
-    // and vice versa.
-    std::array<double, 3> cf = {1.0, sqrt(2.0), 2.0};
+    // these coeffs are used in constructing matrices
+    // "A" from matrices "C" and vice versa.
+    std::array<double, 3> cf{1.0, sqrt(2.0), 2.0};
 
-    // These functions make "A" matrices from "C" matrix
-    auto get_A11 = [cf](const Eigen::Ref<const Stiffness_t> & C) {
-      Mat_A_t A11 = Mat_A_t::Zero();
-      A11 << cf[0] * muGrid::get(C, 0, 0, 0, 0),
-          cf[1] * muGrid::get(C, 0, 0, 0, 2),
-          cf[1] * muGrid::get(C, 0, 0, 0, 1),
-          cf[1] * muGrid::get(C, 0, 0, 0, 2),
-          cf[2] * muGrid::get(C, 0, 2, 0, 2),
-          cf[2] * muGrid::get(C, 0, 2, 0, 1),
-          cf[1] * muGrid::get(C, 0, 0, 0, 1),
-          cf[2] * muGrid::get(C, 0, 2, 0, 1),
-          cf[2] * muGrid::get(C, 0, 1, 0, 1);
+    // These functions make "A" matrices from "C"
+    // matrix
+    auto get_A11{[&cf](const Eigen::Ref<const Stiffness_t> & C) {
+      Mat_A_t A11{(Mat_A_t() << cf[0] * muGrid::get(C, 0, 0, 0, 0),
+                   cf[1] * muGrid::get(C, 0, 0, 0, 2),
+                   cf[1] * muGrid::get(C, 0, 0, 0, 1),
+                   cf[1] * muGrid::get(C, 0, 0, 0, 2),
+                   cf[2] * muGrid::get(C, 0, 2, 0, 2),
+                   cf[2] * muGrid::get(C, 0, 2, 0, 1),
+                   cf[1] * muGrid::get(C, 0, 0, 0, 1),
+                   cf[2] * muGrid::get(C, 0, 2, 0, 1),
+                   cf[2] * muGrid::get(C, 0, 1, 0, 1))
+                      .finished()};
       return A11;
-    };
+    }};
 
-    auto get_A12 = [cf](const Eigen::Ref<const Stiffness_t> & C) {
-      Mat_A_t A12 = Mat_A_t::Zero();
-      A12 << cf[0] * muGrid::get(C, 0, 0, 1, 1),
-          cf[0] * muGrid::get(C, 0, 0, 2, 2),
-          cf[1] * muGrid::get(C, 0, 0, 1, 2),
-          cf[1] * muGrid::get(C, 1, 1, 0, 2),
-          cf[1] * muGrid::get(C, 2, 2, 0, 2),
-          cf[2] * muGrid::get(C, 1, 2, 0, 2),
-          cf[1] * muGrid::get(C, 1, 1, 0, 1),
-          cf[1] * muGrid::get(C, 2, 2, 0, 1),
-          cf[2] * muGrid::get(C, 1, 2, 0, 1);
+    auto get_A12{[&cf](const Eigen::Ref<const Stiffness_t> & C) {
+      Mat_A_t A12{(Mat_A_t() << cf[0] * muGrid::get(C, 0, 0, 1, 1),
+                   cf[0] * muGrid::get(C, 0, 0, 2, 2),
+                   cf[1] * muGrid::get(C, 0, 0, 1, 2),
+                   cf[1] * muGrid::get(C, 1, 1, 0, 2),
+                   cf[1] * muGrid::get(C, 2, 2, 0, 2),
+                   cf[2] * muGrid::get(C, 1, 2, 0, 2),
+                   cf[1] * muGrid::get(C, 1, 1, 0, 1),
+                   cf[1] * muGrid::get(C, 2, 2, 0, 1),
+                   cf[2] * muGrid::get(C, 1, 2, 0, 1))
+                      .finished()};
       return A12;
-    };
+    }};
 
-    auto get_A22 = [cf](const Eigen::Ref<const Stiffness_t> & C) {
-      Mat_A_t A22 = Mat_A_t::Zero();
-      A22 << cf[0] * muGrid::get(C, 1, 1, 1, 1),
-          cf[0] * muGrid::get(C, 1, 1, 2, 2),
-          cf[1] * muGrid::get(C, 1, 1, 2, 1),
-          cf[0] * muGrid::get(C, 1, 1, 2, 2),
-          cf[0] * muGrid::get(C, 2, 2, 2, 2),
-          cf[1] * muGrid::get(C, 2, 2, 1, 2),
-          cf[1] * muGrid::get(C, 1, 1, 1, 2),
-          cf[1] * muGrid::get(C, 2, 2, 1, 2),
-          cf[2] * muGrid::get(C, 2, 1, 2, 1);
+    auto get_A22{[&cf](const Eigen::Ref<const Stiffness_t> & C) {
+      Mat_A_t A22{(Mat_A_t() << cf[0] * muGrid::get(C, 1, 1, 1, 1),
+                   cf[0] * muGrid::get(C, 1, 1, 2, 2),
+                   cf[1] * muGrid::get(C, 1, 1, 2, 1),
+                   cf[0] * muGrid::get(C, 1, 1, 2, 2),
+                   cf[0] * muGrid::get(C, 2, 2, 2, 2),
+                   cf[1] * muGrid::get(C, 2, 2, 1, 2),
+                   cf[1] * muGrid::get(C, 1, 1, 1, 2),
+                   cf[1] * muGrid::get(C, 2, 2, 1, 2),
+                   cf[2] * muGrid::get(C, 2, 1, 2, 1))
+                      .finished()};
+
       return A22;
-    };
+    }};
 
     // Here we use the functions defined above to obtain matrices "A"
     Mat_A_t A11_1{get_A11(C_1)};
@@ -777,66 +770,68 @@ namespace muSpectre {
     Mat_A_t A22_2{get_A22(C_2)};
 
     // this matrices consists of coeeffs that are used in extraction of "A"s
-    Mat_A_t A11c;
-    A11c << cf[0], cf[1], cf[1], cf[1], cf[2], cf[2], cf[1], cf[2], cf[2];
-    Mat_A_t A12c;
-    A12c << cf[0], cf[0], cf[1], cf[1], cf[1], cf[2], cf[1], cf[1], cf[2];
-    Mat_A_t A22c;
-    A22c << cf[0], cf[0], cf[1], cf[0], cf[0], cf[1], cf[1], cf[1], cf[2];
+    Mat_A_t A11c{(Mat_A_t() << cf[0], cf[1], cf[1], cf[1], cf[2], cf[2], cf[1],
+                  cf[2], cf[2])
+                     .finished()};
+    Mat_A_t A12c{(Mat_A_t() << cf[0], cf[0], cf[1], cf[1], cf[1], cf[2], cf[1],
+                  cf[1], cf[2])
+                     .finished()};
+    Mat_A_t A22c{(Mat_A_t() << cf[0], cf[0], cf[1], cf[0], cf[0], cf[1], cf[1],
+                  cf[1], cf[2])
+                     .finished()};
 
     // these two functions are routines to compute average of "A" matrices
-    auto get_inverse_average = [&ratio](const Eigen::Ref<Mat_A_t> & matrix_1,
-                                        const Eigen::Ref<Mat_A_t> & matrix_2) {
+    auto get_inverse_average{[&ratio](const Eigen::Ref<Mat_A_t> & matrix_1,
+                                      const Eigen::Ref<Mat_A_t> & matrix_2) {
       return ((ratio * matrix_1.inverse() + (1 - ratio) * matrix_2.inverse())
                   .inverse());
-    };
+    }};
 
-    auto get_average = [&ratio](const Mat_A_t & matrix_1,
-                                const Mat_A_t & matrix_2) {
-      return (ratio * matrix_1 + (1 - ratio) * matrix_2);
-    };
+    auto get_average{
+        [&ratio](const Mat_A_t & matrix_1, const Mat_A_t & matrix_2) {
+          return (ratio * matrix_1 + (1 - ratio) * matrix_2);
+        }};
 
     // calculating average of A matrices  of the materials according to the
     // book Formulation (9.8) in the book
-    Mat_A_t A11 = get_inverse_average(A11_1, A11_2);
-    Mat_A_t A12 =
-        A11 * get_average(A11_1.inverse() * A12_1, A11_2.inverse() * A12_2);
-    Mat_A_t A22 =
-        get_average(A22_1 - A21_1 * A11_1.inverse() * A12_1,
-                    A22_2 - A21_2 * A11_2.inverse() * A12_2) +
-        get_average(A21_1 * A11_1.inverse(), A21_2 * A11_2.inverse()) * A12;
+    Mat_A_t A11{get_inverse_average(A11_1, A11_2)};
+    Mat_A_t A12{A11 *
+                get_average(A11_1.inverse() * A12_1, A11_2.inverse() * A12_2)};
+    Mat_A_t A22{get_average(A22_1 - A21_1 * A11_1.inverse() * A12_1,
+                            A22_2 - A21_2 * A11_2.inverse() * A12_2) +
+                get_average(A21_1 * A11_1.inverse(), A21_2 * A11_2.inverse()) *
+                    A12};
 
-    std::vector<Real> c_maker_inp = {
-        A11(0, 0) / A11c(0, 0), A12(0, 0) / A12c(0, 0), A12(0, 1) / A12c(0, 1),
-        A12(0, 2) / A12c(0, 2), A11(1, 0) / A11c(1, 0), A11(0, 2) / A11c(0, 2),
+    std::vector<Real> c_maker_inp{
+        {A11(0, 0) / A11c(0, 0), A12(0, 0) / A12c(0, 0), A12(0, 1) / A12c(0, 1),
+         A12(0, 2) / A12c(0, 2), A11(1, 0) / A11c(1, 0), A11(0, 2) / A11c(0, 2),
 
-        A22(0, 0) / A22c(0, 0), A22(1, 0) / A22c(1, 0), A22(2, 0) / A22c(2, 0),
-        A12(1, 0) / A12c(1, 0), A12(2, 0) / A12c(2, 0),
+         A22(0, 0) / A22c(0, 0), A22(1, 0) / A22c(1, 0), A22(2, 0) / A22c(2, 0),
+         A12(1, 0) / A12c(1, 0), A12(2, 0) / A12c(2, 0),
 
-        A22(1, 1) / A22c(1, 1), A22(2, 1) / A22c(2, 1), A12(1, 1) / A12c(1, 1),
-        A12(2, 1) / A12c(2, 1),
+         A22(1, 1) / A22c(1, 1), A22(2, 1) / A22c(2, 1), A12(1, 1) / A12c(1, 1),
+         A12(2, 1) / A12c(2, 1),
 
-        A22(2, 2) / A22c(2, 2), A12(1, 2) / A12c(1, 2), A12(2, 2) / A12c(2, 2),
+         A22(2, 2) / A22c(2, 2), A12(1, 2) / A12c(1, 2), A12(2, 2) / A12c(2, 2),
 
-        A11(1, 1) / A11c(1, 1), A11(2, 1) / A11c(2, 1),
+         A11(1, 1) / A11c(1, 1), A11(2, 1) / A11c(2, 1),
 
-        A11(2, 2) / A11c(2, 2)};
-    // now the resultant stiffness is calculated for 21 elements obtained from
-    // "A" matrices averaging routine :
-    Stiffness_t ret_C = Stiffness_t::Zero();
-    ret_C = MaterialLinearAnisotropic<threeD, threeD>::c_maker(c_maker_inp);
+         A11(2, 2) / A11c(2, 2)}};
+    // now the resultant stiffness is calculated for 21 elements
+    // obtained from "A" matrices averaging routine :
+    Stiffness_t ret_C{MaterialLinearAnisotropic<threeD>::c_maker(c_maker_inp)};
     return ret_C;
   }
 
-  /* ---------------------------------------------------------------------- */
+  /* ----------------------------------------------------------------------
+   */
   template <Dim_t Dim>
   template <class Derived1, class Derived2>
   auto
   LamCombination<Dim>::lam_S_combine(const Eigen::MatrixBase<Derived1> & S_1,
                                      const Eigen::MatrixBase<Derived2> & S_2,
-                                     const Real ratio) -> Stress_t {
-    auto ret_S = ratio * S_1 + (1 - ratio) * S_2;
-    return ret_S;
+                                     const Real & ratio) -> Stress_t {
+    return ratio * S_1 + (1 - ratio) * S_2;
   }
 }  // namespace muSpectre
 

@@ -36,6 +36,10 @@
 #include "cell_adaptor.hh"
 #include "cell.hh"
 
+#ifdef WITH_SPLIT
+#include "materials/material_laminate.hh"
+#endif
+
 #include <libmugrid/field_map.hh>
 #include <libmugrid/field_map_static.hh>
 
@@ -44,7 +48,7 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  Cell::Cell(Projection_ptr projection)
+  Cell::Cell(Projection_ptr projection, SplitCell is_cell_split)
       : projection{std::move(projection)},
         fields{std::make_unique<muGrid::GlobalFieldCollection>(
             this->get_spatial_dim(), this->get_nb_quad())},
@@ -53,7 +57,8 @@ namespace muSpectre {
                                           this->get_material_dim()))},
         stress{this->fields->register_real_field(
             "stress", dof_for_formulation(this->get_formulation(),
-                                          this->get_material_dim()))} {
+                                          this->get_material_dim()))},
+        is_cell_split{is_cell_split} {
     this->fields->initialise(this->projection->get_nb_subdomain_grid_pts(),
                              this->projection->get_subdomain_locations());
   }
@@ -105,6 +110,25 @@ namespace muSpectre {
     return *this->materials.back();
   }
 
+  /* ---------------------------------------------------------------------- */
+  void Cell::complete_material_assignment_simple(MaterialBase & material) {
+    auto nb_pixels = muGrid::CcoordOps::get_size(
+        this->get_projection().get_nb_subdomain_grid_pts());
+
+    std::vector<bool> assignments(nb_pixels, false);
+    for (auto & mat : this->materials) {
+      for (auto & index : mat->get_pixel_indices()) {
+        assignments[index] = true;
+      }
+    }
+    for (auto && tup : akantu::enumerate(assignments)) {
+      auto && index{std::get<0>(tup)};
+      auto && is_assigned{std::get<1>(tup)};
+      if (!is_assigned) {
+        material.add_pixel(index);
+      }
+    }
+  }
   /* ---------------------------------------------------------------------- */
   CellAdaptor<Cell> Cell::get_adaptor() { return CellAdaptor<Cell>(*this); }
 
@@ -194,10 +218,10 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   void Cell::initialise(muFFT::FFT_PlanFlags flags) {
     // check that all pixels have been assigned exactly one material
-    this->check_material_coverage();
     for (auto && mat : this->materials) {
       mat->initialise();
     }
+    this->check_material_coverage();
     // initialise the projection and compute the fft plan
     this->projection->initialise(flags);
     this->initialised = true;
@@ -322,8 +346,7 @@ namespace muSpectre {
       muGrid::TypedFieldBase<Real> & delta_stress) {
     muGrid::T2FieldMap<Real, muGrid::Mapping::Const, DimM> strain_map{
         delta_strain};
-    muGrid::T4FieldMap<Real, muGrid::Mapping::Const, DimM> tangent_map{
-        tangent};
+    muGrid::T4FieldMap<Real, muGrid::Mapping::Const, DimM> tangent_map{tangent};
     muGrid::T2FieldMap<Real, muGrid::Mapping::Mut, DimM> stress_map{
         delta_stress};
     for (auto && tup : akantu::zip(strain_map, tangent_map, stress_map)) {
@@ -395,8 +418,7 @@ namespace muSpectre {
       muGrid::TypedFieldBase<Real> & delta_stress) {
     muGrid::T2FieldMap<Real, muGrid::Mapping::Const, DimM> strain_map{
         delta_strain};
-    muGrid::T4FieldMap<Real, muGrid::Mapping::Const, DimM> tangent_map{
-        tangent};
+    muGrid::T4FieldMap<Real, muGrid::Mapping::Const, DimM> tangent_map{tangent};
     muGrid::T2FieldMap<Real, muGrid::Mapping::Mut, DimM> stress_map{
         delta_stress};
     for (auto && tup : akantu::zip(strain_map, tangent_map, stress_map)) {
@@ -408,8 +430,8 @@ namespace muSpectre {
   }
   /* ---------------------------------------------------------------------- */
   void Cell::add_projected_directional_stiffness(EigenCVec_t delta_strain,
-                                                  const Real & alpha,
-                                                  EigenVec_t del_stress) {
+                                                 const Real & alpha,
+                                                 EigenVec_t del_stress) {
     auto delta_strain_field_ptr{muGrid::WrappedField<Real>::make_const(
         "delta_strain", *this->fields, this->get_strain_size(), delta_strain)};
     muGrid::WrappedField<Real> del_stress_field{
@@ -440,6 +462,7 @@ namespace muSpectre {
   auto Cell::get_projection() const -> const ProjectionBase & {
     return *this->projection;
   }
+
   /* ---------------------------------------------------------------------- */
   template <typename T>
   muGrid::TypedField<T> &
@@ -506,4 +529,120 @@ namespace muSpectre {
     return global_field;
   }
 
+  /* ---------------------------------------------------------------------- */
+  bool Cell::is_point_inside(const DynRcoord_t & point) const {
+    auto length_pixels = this->get_projection().get_domain_lengths();
+    Dim_t counter = 0;
+
+    for (int i = 0; i < this->get_spatial_dim(); i++) {
+      if (point[i] <= length_pixels[i]) {
+        counter++;
+      }
+    }
+    return counter == this->get_spatial_dim();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  bool Cell::is_pixel_inside(const DynCcoord_t & pixel) const {
+    auto nb_pixels = this->get_projection().get_nb_domain_grid_pts();
+    Dim_t counter = 0;
+    for (int i = 0; i < this->get_spatial_dim(); i++) {
+      if (pixel[i] < nb_pixels[i]) {
+        counter++;
+      }
+    }
+    return counter == this->get_spatial_dim();
+  }
+
+  /* ---------------------------------------------------------------------- */
+#ifdef WITH_SPLIT
+  void Cell::make_pixels_precipitate_for_laminate_material(
+      const std::vector<DynRcoord_t> & precipitate_vertices,
+      MaterialBase & mat_laminate, MaterialBase & mat_precipitate_cell,
+      Material_sptr mat_precipitate, Material_sptr mat_matrix) {
+    switch (this->get_spatial_dim()) {
+    case twoD: {
+      this->make_pixels_precipitate_for_laminate_material_helper<twoD>(
+          precipitate_vertices, mat_laminate, mat_precipitate_cell,
+          mat_precipitate, mat_matrix);
+      break;
+    }
+    case threeD: {
+      this->make_pixels_precipitate_for_laminate_material_helper<threeD>(
+          precipitate_vertices, mat_laminate, mat_precipitate_cell,
+          mat_precipitate, mat_matrix);
+      break;
+      break;
+    }
+    default:
+      break;
+    }
+  }
+
+  template <Dim_t Dim>
+  void Cell::make_pixels_precipitate_for_laminate_material_helper(
+      const std::vector<DynRcoord_t> & precipitate_vertices,
+      MaterialBase & mat_laminate, MaterialBase & mat_precipitate_cell,
+      Material_sptr mat_precipitate, Material_sptr mat_matrix) {
+    auto & mat_lam_cast = static_cast<MaterialLaminate<Dim> &>(mat_laminate);
+
+    RootNode<SplitCell::laminate> precipitate(*this, precipitate_vertices);
+    auto && precipitate_intersects = precipitate.get_intersected_pixels();
+    auto && precipitate_intersects_id = precipitate.get_intersected_pixels_id();
+    auto && precipitate_intersection_ratios =
+        precipitate.get_intersection_ratios();
+    auto && precipitate_intersection_normals =
+        precipitate.get_intersection_normals();
+    auto && precipitate_intersection_states =
+        precipitate.get_intersection_status();
+    bool if_print{false};
+
+    // for (auto && tup : akantu::zip(
+    //          precipitate_intersects_id, precipitate_intersects,
+    //          precipitate_intersection_states,
+    //          precipitate_intersection_normals,
+    //          precipitate_intersection_ratios)) {
+    //   auto pix_id{std::get<0>(tup)};
+    //   auto pix{std::get<1>(tup)};
+    //   auto state{std::get<2>(tup)};
+    //   auto normal{std::get<3>(tup)};
+    //   auto ratio{std::get<4>(tup)};
+
+    for (auto && tup : akantu::enumerate(precipitate_intersects_id)) {
+      auto counter{std::get<0>(tup)};
+      auto pix_id{std::get<1>(tup)};
+      auto pix{precipitate_intersects[counter]};
+
+      auto state{precipitate_intersection_states[counter]};
+
+      auto normal = precipitate_intersection_normals[counter];
+      auto ratio = precipitate_intersection_ratios[counter];
+
+      // these outputs are used for debugging:
+      if (if_print) {
+        if (state != corkpp::IntersectionState::enclosing) {
+          normal.normalize();
+          std::cout
+              << pix[0] << ", " << pix[1] << ", "
+              << "s: "
+              << static_cast<
+                     std::underlying_type<corkpp::IntersectionState>::type>(
+                     state)
+              << ",r: " << ratio << ",n: " << normal(0) << ", " << normal(1)
+              << std::endl;
+        }
+      }
+      //
+
+      if (state == corkpp::IntersectionState::enclosing) {
+        mat_precipitate_cell.add_pixel(pix_id);
+      } else if (state == corkpp::IntersectionState::intersecting) {
+        normal.normalize();
+        mat_lam_cast.add_pixel(pix_id, mat_precipitate, mat_matrix, ratio,
+                               normal);
+      }
+    }
+  }
+#endif
+  /* ---------------------------------------------------------------------- */
 }  // namespace muSpectre

@@ -222,7 +222,6 @@ function(add_external_package package)
   if(EXISTS ${_cmake_includes}/${package}.cmake)
     include(${_cmake_includes}/${package}.cmake)
   endif()
-  
   string(TOUPPER ${package} u_package)
   mark_as_advanced_prefix(${package})
   mark_as_advanced_prefix(${u_package})

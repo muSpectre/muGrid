@@ -101,21 +101,19 @@ void add_parallel_cell_factory_helper(py::module & mod, const char * name) {
 #endif
 
 #ifdef WITH_SPLIT
-template <Dim_t dim>
 void add_split_cell_factory_helper(py::module & mod) {
-  using Ccoord = Ccoord_t<dim>;
-  using Rcoord = Rcoord_t<dim>;
-  using Gradient = Gradient_t<dim>;
-
+  using DynCcoord_t = muGrid::DynCcoord_t;
+  using DynRcoord_t = muGrid::DynRcoord_t;
   mod.def(
       "CellFactorySplit",
-      [](Ccoord res, Rcoord lens, Formulation form, Gradient gradient) {
+      [](DynCcoord_t res, DynRcoord_t lens, Formulation form,
+         Gradient_t gradient) {
         return make_cell_split(std::move(res), std::move(lens), std::move(form),
                                std::move(gradient));
       },
-      "resolutions"_a, "lengths"_a = muGrid::CcoordOps::get_cube<dim>(1.),
+      "resolutions"_a, "lengths"_a,
       "formulation"_a = Formulation::finite_strain,
-      "gradient"_a = muSpectre::make_fourier_gradient<dim>());
+      "gradient"_a);
 }
 #endif
 
@@ -125,12 +123,11 @@ void add_split_cell_factory_helper(py::module & mod) {
 void add_cell_factory(py::module & mod) {
   using DynCcoord_t = muGrid::DynCcoord_t;
   using DynRcoord_t = muGrid::DynRcoord_t;
-  using Gradient = Gradient_t;
 
   mod.def(
       "CellFactory",
       [](DynCcoord_t res, DynRcoord_t lens, Formulation form,
-         Gradient gradient) {
+         Gradient_t gradient) {
         return muSpectre::make_cell(std::move(res), std::move(lens),
                                     std::move(form), std::move(gradient));
       },
@@ -143,10 +140,6 @@ void add_cell_factory(py::module & mod) {
                                     std::move(form));
       },
       "nb_grid_pts"_a, "lengths"_a, "formulation"_a);
-
-#ifdef WITH_SPLIT
-  add_split_cell_factory_helper<dim>(mod);
-#endif
 
 #ifdef WITH_FFTWMPI
   add_parallel_cell_factory_helper<dim, muFFT::FFTWMPIEngine<dim>>(
@@ -166,7 +159,8 @@ void add_cell_helper(py::module & mod) {
   using muSpectre::Cell;
   using muSpectre::Real;
 #ifdef WITH_SPLIT
-  using Mat_t = muSpectre::MaterialBase<dim, dim>;
+  using Mat_t = muSpectre::MaterialBase;
+  using DynRcoord_t = muGrid::DynRcoord_t;
 #endif
   auto NumpyT2Proxy{
       [](Cell & cell,
@@ -215,24 +209,24 @@ void add_cell_helper(py::module & mod) {
           },
           "delta_strain"_a, py::return_value_policy::reference_internal)
       .def("project", &Cell::apply_projection, "strain"_a)
-      .def("project",
-           [&NumpyT2Proxy](Cell & cell,
-                           py::array_t<Real, py::array::f_style> & strain) {
-             if (!cell.is_initialised()) {
-               cell.initialise();
-             }
-             auto & fields{cell.get_fields()};
-             const std::string out_name{
-                 "temp output for projection"};
-             if (not fields.field_exists(out_name)) {
-               auto && strain_shape{cell.get_strain_shape()};
-               auto && nb_components{strain_shape[0] * strain_shape[1]};
-               fields.register_real_field(out_name, nb_components);
-             }
-             auto & strain_field{dynamic_cast<muGrid::RealField &>(
-                 fields.get_field(out_name))};
-             strain_field = NumpyT2Proxy(cell, strain).get_field();
-             cell.apply_projection(strain_field);
+      .def(
+          "project",
+          [&NumpyT2Proxy](Cell & cell,
+                          py::array_t<Real, py::array::f_style> & strain) {
+            if (!cell.is_initialised()) {
+              cell.initialise();
+            }
+            auto & fields{cell.get_fields()};
+            const std::string out_name{"temp output for projection"};
+            if (not fields.field_exists(out_name)) {
+              auto && strain_shape{cell.get_strain_shape()};
+              auto && nb_components{strain_shape[0] * strain_shape[1]};
+              fields.register_real_field(out_name, nb_components);
+            }
+            auto & strain_field{
+                dynamic_cast<muGrid::RealField &>(fields.get_field(out_name))};
+            strain_field = NumpyT2Proxy(cell, strain).get_field();
+            cell.apply_projection(strain_field);
             const Dim_t dim{cell.get_spatial_dim()};
             if (strain_field.get_nb_components() == dim * dim) {
               std::vector<Dim_t> shape{dim, dim, 1};
@@ -395,7 +389,7 @@ void add_cell_helper(py::module & mod) {
 #ifdef WITH_SPLIT
       .def(
           "make_precipitate_laminate",
-          [](Cell_t & cell, Mat_t & mat_lam, Mat_t & mat_precipitate_cell,
+          [](Cell & cell, Mat_t & mat_lam, Mat_t & mat_precipitate_cell,
              std::shared_ptr<Mat_t> mat_precipitate,
              std::shared_ptr<Mat_t> mat_matrix,
              std::vector<DynRcoord_t> precipitate_vertices) {
@@ -407,7 +401,7 @@ void add_cell_helper(py::module & mod) {
           "material_precipitate"_a, "material_matrix"_a, "vertices"_a)
       .def(
           "complete_material_assignemnt_simple",
-          [](Cell_t & cell, Mat_t & mat_matrix_cell) {
+          [](Cell & cell, Mat_t & mat_matrix_cell) {
             cell.complete_material_assignment_simple(mat_matrix_cell);
           },
           "material_matrix_cell"_a)
@@ -416,18 +410,15 @@ void add_cell_helper(py::module & mod) {
 }
 
 #ifdef WITH_SPLIT
-template <Dim_t dim>
 void add_cell_split_helper(py::module & mod) {
-  std::stringstream name_stream{};
-  name_stream << "CellSplit" << dim << 'd';
-  const std::string name = name_stream.str();
-  using sys_split_t = muSpectre::CellSplit<dim, dim>;
-  using Cell_t = muSpectre::CellBase<dim, dim>;
-  using Mat_t = muSpectre::MaterialBase<dim, dim>;
-  py::class_<sys_split_t, Cell_t>(mod, name.c_str())
+  using DynRcoord_t = muGrid::DynRcoord_t;
+  using CellSplit_t = muSpectre::CellSplit;
+  using Cell_t = muSpectre::Cell;
+  using Mat_t = muSpectre::MaterialBase;
+  py::class_<CellSplit_t, Cell_t>(mod, "CellSplit")
       .def(
           "make_precipitate",
-          [](sys_split_t & cell, Mat_t & mat,
+          [](CellSplit_t & cell, Mat_t & mat,
              std::vector<DynRcoord_t> precipitate_vertices) {
             cell.make_automatic_precipitate_split_pixels(precipitate_vertices,
                                                          mat);
@@ -436,7 +427,7 @@ void add_cell_split_helper(py::module & mod) {
 
       .def(
           "complete_material_assignment",
-          [](sys_split_t & cell, Mat_t & mat) {
+          [](CellSplit_t & cell, Mat_t & mat) {
             cell.complete_material_assignment(mat);
           },
           "material"_a)
@@ -444,14 +435,6 @@ void add_cell_split_helper(py::module & mod) {
 }
 #endif
 
-#ifdef WITH_SPLIT
-void add_cell_split(py::module & mod) {
-  add_cell_base(mod);
-  add_cell_split_helper<muSpectre::twoD>(mod);
-  add_cell_split_helper<muSpectre::threeD>(mod);
-}
-
-#endif
 void add_cell(py::module & mod) {
   add_cell_factory(mod);
 
@@ -459,7 +442,9 @@ void add_cell(py::module & mod) {
   cell.doc() = "bindings for cells and cell factories";
 
 #ifdef WITH_SPLIT
-  add_cell_split(cell);
+  add_split_cell_factory_helper(mod);
+  add_cell_helper(cell);
+  add_cell_split_helper(cell);
 #else
   add_cell_helper(cell);
 #endif

@@ -51,13 +51,14 @@ namespace muGrid {
    */
   template <typename T, Dim_t Dim>
   struct T4_fixture {
-    T4_fixture() : matrix{}, tensor(matrix.data()) {}
+    T4_fixture() : tensor(matrix.data()) {}
 
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
     using M4 = T4Mat<T, Dim>;
     using T4 = T4MatMap<T, Dim>;
     constexpr static Dim_t dim{Dim};
-    M4 matrix;
+
+    std::unique_ptr<M4> matrix_holder{std::make_unique<M4>(M4::Zero())};
+    M4 &matrix{*matrix_holder};
     T4 tensor;
   };
 
@@ -168,7 +169,7 @@ namespace muGrid {
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(assign_matrix_test, F, fix_collection, F) {
-    decltype(F::matrix) matrix;
+    typename F::M4 matrix;
     matrix.setRandom();
     F::tensor = matrix;
     for (Dim_t i = 0; i < ipow(F::dim, 4); ++i) {

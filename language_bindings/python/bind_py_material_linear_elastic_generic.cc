@@ -71,7 +71,7 @@ void add_material_linear_elastic_generic1_helper(py::module & mod) {
             return Mat_t::make(cell, name, elastic_tensor);
           },
           "cell"_a, "name"_a, "elastic_tensor"_a,
-          py::return_value_policy::reference, py::keep_alive<1, 0>(),
+          py::return_value_policy::reference_internal,
           "Factory function returning a MaterialLinearElastic instance. "
           "The elastic tensor has to be specified in Voigt notation.")
       .def(
@@ -115,7 +115,7 @@ void add_material_linear_elastic_generic2_helper(py::module & mod) {
             return Mat_t::make(cell, name, elastic_tensor);
           },
           "cell"_a, "name"_a, "elastic_tensor"_a,
-          py::return_value_policy::reference, py::keep_alive<1, 0>(),
+          py::return_value_policy::reference_internal,
           "Factory function returning a MaterialLinearElastic instance. "
           "The elastic tensor has to be specified in Voigt notation.")
       .def(

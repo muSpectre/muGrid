@@ -57,7 +57,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   void ProjectionBase::initialise(muFFT::FFT_PlanFlags flags) {
-    if (this->get_nb_components()*this->get_nb_quad() !=
+    if (this->get_nb_components() * this->get_nb_quad() !=
         fft_engine->get_nb_dof_per_pixel()) {
       std::stringstream error;
       error << "Incompatible number of components per pixel. The projection "
@@ -96,6 +96,17 @@ namespace muSpectre {
 
   const DynCcoord_t & ProjectionBase::get_nb_subdomain_grid_pts() const {
     return this->fft_engine->get_nb_subdomain_grid_pts();
+  }
+  /* ---------------------------------------------------------------------- */
+
+  const DynRcoord_t ProjectionBase::get_pixel_lengths() const {
+    auto nb_pixels{this->get_nb_domain_grid_pts()};
+    auto length_pixels{this->get_domain_lengths()};
+    DynRcoord_t ret_val;
+    for (int i{0}; i < this->get_dim(); i++) {
+      ret_val[i] = length_pixels[i] / nb_pixels[i];
+    }
+    return ret_val;
   }
 
 }  // namespace muSpectre

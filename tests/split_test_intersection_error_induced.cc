@@ -35,18 +35,18 @@
  */
 
 #include "tests.hh"
-#include "solver/deprecated_solvers.hh"
-#include "solver/deprecated_solver_cg.hh"
-#include "solver/deprecated_solver_cg_eigen.hh"
-#include "libmufft/fftw_engine.hh"
+
 #include "projection/projection_finite_strain_fast.hh"
 #include "materials/material_linear_elastic1.hh"
-#include "libmugrid/iterators.hh"
-#include "libmugrid/ccoord_operations.hh"
 #include "common/muSpectre_common.hh"
 #include "cell/cell_factory.hh"
 #include "cell/cell_split.hh"
 #include "common/intersection_octree.hh"
+
+#include "libmufft/fftw_engine.hh"
+
+#include "libmugrid/iterators.hh"
+#include "libmugrid/ccoord_operations.hh"
 
 #include <boost/mpl/list.hpp>
 #include <math.h>
@@ -57,9 +57,7 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_CASE(area_calculation_diff_resolution) {
     constexpr Dim_t dim{twoD};
-    using Rcoord = Rcoord_t<dim>;
-    using Ccoord = Ccoord_t<dim>;
-    using Mat_t = MaterialLinearElastic1<dim, dim>;
+    using Mat_t = MaterialLinearElastic1<dim>;
 
     const Real contrast{10};
     const Real Young_soft{1.0030648180242636},
@@ -70,40 +68,40 @@ namespace muSpectre {
 
     constexpr Real length{4.2};
     constexpr int high_res{55}, low_res{11};
-    constexpr Rcoord lengths_split{length, length};
-    constexpr Ccoord resolutions_split_high_res{high_res, high_res};
-    constexpr Ccoord resolutions_split_low_res{low_res, low_res};
+    DynRcoord_t lengths_split{length, length};
+    DynCcoord_t resolutions_split_high_res{high_res, high_res};
+    DynCcoord_t resolutions_split_low_res{low_res, low_res};
 
-    auto fft_ptr_split_high_res{std::make_unique<muFFT::FFTWEngine<dim>>(
+    auto fft_ptr_split_high_res{std::make_unique<muFFT::FFTWEngine>(
         resolutions_split_high_res, muGrid::ipow(dim, 2))};
-    auto fft_ptr_split_low_res{std::make_unique<muFFT::FFTWEngine<dim>>(
+    auto fft_ptr_split_low_res{std::make_unique<muFFT::FFTWEngine>(
         resolutions_split_low_res, muGrid::ipow(dim, 2))};
 
     auto proj_ptr_split_high_res{
-        std::make_unique<ProjectionFiniteStrainFast<dim, dim>>(
+        std::make_unique<ProjectionFiniteStrainFast<dim>>(
             std::move(fft_ptr_split_high_res), lengths_split)};
     auto proj_ptr_split_low_res{
-        std::make_unique<ProjectionFiniteStrainFast<dim, dim>>(
+        std::make_unique<ProjectionFiniteStrainFast<dim>>(
             std::move(fft_ptr_split_low_res), lengths_split)};
 
-    CellSplit<dim, dim> sys_split_high_res(std::move(proj_ptr_split_high_res));
-    CellSplit<dim, dim> sys_split_low_res(std::move(proj_ptr_split_low_res));
+    CellSplit sys_split_high_res(std::move(proj_ptr_split_high_res));
+    CellSplit sys_split_low_res(std::move(proj_ptr_split_low_res));
 
-    auto & Material_hard_split_high_res{
-        Mat_t::make(sys_split_high_res, "hard", Young_hard, Poisson_hard)};
-    auto & Material_soft_split_high_res{
-        Mat_t::make(sys_split_high_res, "soft", Young_soft, Poisson_soft)};
+    auto & Material_hard_split_high_res{Mat_t::make(
+        sys_split_high_res, "hard high res", Young_hard, Poisson_hard)};
+    auto & Material_soft_split_high_res{Mat_t::make(
+        sys_split_high_res, "soft high res", Young_soft, Poisson_soft)};
 
-    auto & Material_hard_split_low_res{
-        Mat_t::make(sys_split_low_res, "hard", Young_hard, Poisson_hard)};
-    auto & Material_soft_split_low_res{
-        Mat_t::make(sys_split_low_res, "soft", Young_soft, Poisson_soft)};
+    auto & Material_hard_split_low_res{Mat_t::make(
+        sys_split_low_res, "hard low res", Young_hard, Poisson_hard)};
+    auto & Material_soft_split_low_res{Mat_t::make(
+        sys_split_low_res, "soft low res", Young_soft, Poisson_soft)};
 
-    constexpr Rcoord center{2.1, 2.1};
-    constexpr Rcoord width{-0.65, 0.65};
-    constexpr Rcoord height{-0.65, 0.65};
+    DynRcoord_t center{2.1, 2.1};
+    DynRcoord_t width{-0.65, 0.65};
+    DynRcoord_t height{-0.65, 0.65};
 
-    std::vector<Rcoord> precipitate_vertices{};
+    std::vector<DynRcoord_t> precipitate_vertices{};
     precipitate_vertices.push_back(
         {center[0] + width[0], center[1] + height[0]});
     precipitate_vertices.push_back(
@@ -114,84 +112,90 @@ namespace muSpectre {
         {center[0] + width[1], center[1] + height[1]});
 
     // analyzing the intersection of the preicipitate with the pixels
-    RootNode<dim, SplitCell::simple> precipitate_low_res(sys_split_low_res,
-                                                         precipitate_vertices);
+    RootNode<SplitCell::simple> precipitate_low_res(sys_split_low_res,
+                                                    precipitate_vertices);
     // Extracting the intersected pixels and their correspondent intersection
     // ratios:
     auto && precipitate_low_res_intersects{
         precipitate_low_res.get_intersected_pixels()};
     auto && precipitate_low_res_intersection_ratios{
         precipitate_low_res.get_intersection_ratios()};
+    auto && precipitate_low_res_intersects_id{
+        precipitate_low_res.get_intersected_pixels_id()};
 
     // assign material to the pixels which have intersection with the
     // precipitate
-    for (auto tup : akantu::zip(precipitate_low_res_intersects,
+    for (auto tup : akantu::zip(precipitate_low_res_intersects_id,
+                                precipitate_low_res_intersects,
                                 precipitate_low_res_intersection_ratios)) {
-      auto && pix{std::get<0>(tup)};
-      auto && ratio{std::get<1>(tup)};
-      Material_hard_split_low_res.add_pixel_split(pix, ratio);
-      Material_soft_split_low_res.add_pixel_split(pix, 1.0 - ratio);
+      auto && pix_id{std::get<0>(tup)};
+      auto && ratio{std::get<2>(tup)};
+      Material_hard_split_low_res.add_pixel_split(pix_id, ratio);
     }
-
+    Material_hard_split_low_res.initialise();
     // assign material to the rest of the pixels:
-    std::vector<Real> assigned_ratio_low_res{
-        sys_split_low_res.get_assigned_ratios()};
-    for (auto && tup : akantu::enumerate(sys_split_low_res)) {
-      auto && pixel{std::get<1>(tup)};
-      auto && iterator{std::get<0>(tup)};
-      if (assigned_ratio_low_res[iterator] < 1.0) {
+    std::vector<Real> assigned_ratio_low_res =
+        sys_split_low_res.get_assigned_ratios();
+    for (auto && pix_id : sys_split_low_res.get_pixel_indices()) {
+      if (assigned_ratio_low_res[pix_id] < 1.0) {
         Material_soft_split_low_res.add_pixel_split(
-            pixel, 1.0 - assigned_ratio_low_res[iterator]);
+            pix_id, 1.0 - assigned_ratio_low_res[pix_id]);
       }
     }
-
+    Material_soft_split_low_res.initialise();
     sys_split_low_res.initialise();
 
     // Calculating the area of the precipitate from the intersected pixels:
     Real area_preticipitate_low_res{0.0};
     Real area_preticipitate_high_res{0.0};
+    Real pixel_volume_low_res{muGrid::CcoordOps::compute_pixel_volume(
+        sys_split_low_res.get_projection().get_nb_domain_grid_pts(),
+        sys_split_low_res.get_projection().get_domain_lengths())};
     for (auto && precipitate_area_low_res :
          precipitate_low_res_intersection_ratios) {
       area_preticipitate_low_res +=
-          precipitate_area_low_res * sys_split_low_res.get_pixel_volume();
+          precipitate_area_low_res * pixel_volume_low_res;
     }
 
     // analyzing the intersection of the precipitate with the pixels
-    RootNode<dim, SplitCell::simple> precipitate_high_res(sys_split_high_res,
-                                                          precipitate_vertices);
+    RootNode<SplitCell::simple> precipitate_high_res(sys_split_high_res,
+                                                     precipitate_vertices);
     // Extracting the intersected pixels and their correspondent intersection
     // ratios:
-    auto precipitate_high_res_intersects{
-        precipitate_high_res.get_intersected_pixels()};
+    auto precipitate_high_res_intersects_id{
+        precipitate_high_res.get_intersected_pixels_id()};
     auto precipitate_high_res_intersection_ratios{
         precipitate_high_res.get_intersection_ratios()};
 
     // assign material to the pixels which have intersection with the
     // precipitate
-    for (auto tup : akantu::zip(precipitate_high_res_intersects,
+    for (auto tup : akantu::zip(precipitate_high_res_intersects_id,
                                 precipitate_high_res_intersection_ratios)) {
       auto && pix{std::get<0>(tup)};
       auto && ratio{std::get<1>(tup)};
       Material_hard_split_high_res.add_pixel_split(pix, ratio);
-      Material_soft_split_high_res.add_pixel_split(pix, 1.0 - ratio);
     }
+    Material_hard_split_high_res.initialise();
     // assign material to the rest of the pixels:
     std::vector<Real> assigned_ratio_high_res{
         sys_split_high_res.get_assigned_ratios()};
-    for (auto && tup : akantu::enumerate(sys_split_high_res)) {
-      auto && pixel{std::get<1>(tup)};
-      auto && iterator{std::get<0>(tup)};
-      if (assigned_ratio_high_res[iterator] < 1.0) {
+
+    for (auto && pix_id : sys_split_high_res.get_pixel_indices()) {
+      if (assigned_ratio_high_res[pix_id] < 1.0) {
         Material_soft_split_high_res.add_pixel_split(
-            pixel, 1.0 - assigned_ratio_high_res[iterator]);
+            pix_id, 1.0 - assigned_ratio_high_res[pix_id]);
       }
     }
+    Material_soft_split_high_res.initialise();
     sys_split_high_res.initialise();
 
+    auto pixel_volume_high_res{muGrid::CcoordOps::compute_pixel_volume(
+        sys_split_high_res.get_projection().get_nb_domain_grid_pts(),
+        sys_split_high_res.get_projection().get_domain_lengths())};
     for (auto && precipitate_area_high_res :
          precipitate_high_res_intersection_ratios) {
       area_preticipitate_high_res +=
-          precipitate_area_high_res * sys_split_high_res.get_pixel_volume();
+          precipitate_area_high_res * pixel_volume_high_res;
     }
 
     BOOST_CHECK_LE(

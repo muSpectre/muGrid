@@ -51,10 +51,11 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t Dim, Formulation Form>
   auto LamHomogen<Dim, Form>::laminate_solver(
-      Eigen::Ref<Strain_t> strain_coord, const Function_t & mat_1_stress_eval,
-      const Function_t & mat_2_stress_eval, Real ratio,
-      const Eigen::Ref<Vec_t> & normal_vec, Real tol, Dim_t max_iter)
-      -> std::tuple<Dim_t, Real, Strain_t, Strain_t> {
+      const Eigen::Ref<Strain_t> & strain_coord,
+      const Function_t & mat_1_stress_eval,
+      const Function_t & mat_2_stress_eval, const Real & ratio,
+      const Eigen::Ref<Vec_t> & normal_vec, const Real tol,
+      const Dim_t max_iter) -> std::tuple<Dim_t, Real, Strain_t, Strain_t> {
     /*
      * here we rotate the strain such that the laminate intersection normal
      * would align with the x-axis. strain_lam is the total strain in the new
@@ -144,9 +145,9 @@ namespace muSpectre {
   auto LamHomogen<Dim, Form>::evaluate_stress(
       const Eigen::Ref<Strain_t> & strain_coord,
       const Function_t & mat_1_stress_eval,
-      const Function_t & mat_2_stress_eval, Real ratio,
-      const Eigen::Ref<Vec_t> & normal_vec, Real tol, Dim_t max_iter)
-      -> Stress_t {
+      const Function_t & mat_2_stress_eval, const Real & ratio,
+      const Eigen::Ref<Vec_t> & normal_vec, const Real tol,
+      const Dim_t max_iter) -> Stress_t {
     RotatorNormal<Dim> rotator(normal_vec);
     // Using laminate solve to find out the strains in each layer of the
     // lamiante
@@ -174,9 +175,9 @@ namespace muSpectre {
   auto LamHomogen<Dim, Form>::evaluate_stress_tangent(
       const Eigen::Ref<Strain_t> & strain_coord,
       const Function_t & mat_1_stress_eval,
-      const Function_t & mat_2_stress_eval, Real ratio,
-      const Eigen::Ref<Vec_t> & normal_vec, Real tol, Dim_t max_iter)
-      -> std::tuple<Stress_t, Stiffness_t> {
+      const Function_t & mat_2_stress_eval, const Real & ratio,
+      const Eigen::Ref<Vec_t> & normal_vec, const Real tol,
+      const Dim_t max_iter) -> std::tuple<Stress_t, Stiffness_t> {
     RotatorNormal<Dim> rotator(normal_vec);
     // Using laminate solve to find out the strains in each layer of the
     // lamiante

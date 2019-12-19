@@ -50,34 +50,28 @@
 
 #include <memory>
 namespace muSpectre {
-  template <size_t DimS, size_t DimM = DimS,
-            typename Cell = CellSplit<DimS, DimM>,
-            typename FFTEngine = muFFT::FFTWEngine<DimS>>
-  inline Cell
-  make_cell_split(Ccoord_t<DimS> resolutions, Rcoord_t<DimS> lengths,
-                  Formulation form,
-                  Gradient_t<DimS> gradient = make_fourier_gradient<DimS>(),
+  template <typename Cell_t = CellSplit, class FFTEngine = muFFT::FFTWEngine>
+  inline Cell_t
+  make_cell_split(DynCcoord_t nb_grid_pts, DynRcoord_t lengths,
+                  Formulation form, muFFT::Gradient_t gradient,
                   const muFFT::Communicator & comm = muFFT::Communicator()) {
-    auto && input = cell_input<DimS, DimM, FFTEngine>(resolutions, lengths,
-                                                      form, gradient, comm);
-    auto cell{Cell(std::move(input))};
+    auto && input{
+        cell_input<FFTEngine>(nb_grid_pts, lengths, form, gradient, comm)};
+    auto cell{Cell_t(std::move(input))};
     return cell;
   }
   /* ---------------------------------------------------------------------- */
   // this function returns a unique pointer to the CellSplit class of the cell
   // all members of cell and its descending cell class such as CellSplit are
   // available
-  template <size_t DimS, size_t DimM = DimS,
-            typename Cell = CellSplit<DimS, DimM>,
-            typename FFTEngine = muFFT::FFTWEngine<DimS>>
-  std::unique_ptr<Cell>
-  make_cell_ptr(Ccoord_t<DimS> resolutions, Rcoord_t<DimS> lengths,
-                Formulation form,
-                Gradient_t<DimS> gradient = make_fourier_gradient<DimS>(),
+  template <typename Cell_t = CellSplit, class FFTEngine = muFFT::FFTWEngine>
+  std::unique_ptr<Cell_t>
+  make_cell_ptr(const DynCcoord_t & nb_grid_pts, const DynRcoord_t & lengths,
+                const Formulation & form, muFFT::Gradient_t gradient,
                 const muFFT::Communicator & comm = muFFT::Communicator()) {
-    auto && input = cell_input<DimS, DimM, FFTEngine>(resolutions, lengths,
-                                                      form, gradient, comm);
-    return std::make_unique<Cell>(std::move(input));
+    auto && input{
+        cell_input<FFTEngine>(nb_grid_pts, lengths, form, gradient, comm)};
+    return std::make_unique<Cell_t>(std::move(input));
   }
 }  // namespace muSpectre
 

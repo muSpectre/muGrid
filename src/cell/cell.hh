@@ -62,6 +62,7 @@ namespace muSpectre {
    public:
     //! materials handled through `std::unique_ptr`s
     using Material_ptr = std::unique_ptr<MaterialBase>;
+    using Material_sptr = std::shared_ptr<MaterialBase>;
     //! projections handled through `std::unique_ptr`s
     using Projection_ptr = std::unique_ptr<ProjectionBase>;
 
@@ -87,7 +88,8 @@ namespace muSpectre {
     Cell() = delete;
 
     //! Constructor from a projection operator
-    explicit Cell(Projection_ptr projection);
+    explicit Cell(Projection_ptr projection,
+                  SplitCell is_cell_split = SplitCell::no);
 
     //! Copy constructor
     Cell(const Cell & other) = delete;
@@ -134,7 +136,29 @@ namespace muSpectre {
     /**
      * add a new material to the cell
      */
-    MaterialBase & add_material(Material_ptr mat);
+    virtual MaterialBase & add_material(Material_ptr mat);
+
+    /**
+     * By taking a material as input this function assigns all the
+     * untouched(not-assigned) pixels to that material
+     */
+    void complete_material_assignment_simple(MaterialBase & material);
+    /**
+     * Given the vertices of polygonal/Polyhedral precipitate, this function
+     * assign pixels 1. inside precipitate->mat_precipitate_cell, material at
+     * the interface of precipitae-> to mat_precipitate & mat_matrix according
+     * to the intersection of pixels with the precipitate
+     */
+    void make_pixels_precipitate_for_laminate_material(
+        const std::vector<DynRcoord_t> & precipitate_vertices,
+        MaterialBase & mat_laminate, MaterialBase & mat_precipitate_cell,
+        Material_sptr mat_precipitate, Material_sptr mat_matrix);
+
+    template <Dim_t Dim>
+    void make_pixels_precipitate_for_laminate_material_helper(
+        const std::vector<DynRcoord_t> & precipitate_vertices,
+        MaterialBase & mat_laminate, MaterialBase & mat_precipitate_cell,
+        Material_sptr mat_precipitate, Material_sptr mat_matrix);
 
     //! get a sparse matrix view on the cell
     Adaptor get_adaptor();
@@ -167,7 +191,7 @@ namespace muSpectre {
     const Dim_t & get_nb_quad() const;
 
     //! makes sure every pixel has been assigned to exactly one material
-    void check_material_coverage() const;
+    virtual void check_material_coverage() const;
 
     //! initialise the projection, the materials and the global fields
     void
@@ -200,7 +224,7 @@ namespace muSpectre {
     /**
      * evaluates and returns the stress for the currently set strain
      */
-    const muGrid::RealField & evaluate_stress();
+    virtual const muGrid::RealField & evaluate_stress();
 
     /**
      * evaluates and returns the stress for the currently set strain
@@ -211,7 +235,7 @@ namespace muSpectre {
      * evaluates and returns the stress and tangent moduli for the currently set
      * strain
      */
-    std::tuple<const muGrid::RealField &, const muGrid::RealField &>
+    virtual std::tuple<const muGrid::RealField &, const muGrid::RealField &>
     evaluate_stress_tangent();
 
     /**
@@ -280,10 +304,15 @@ namespace muSpectre {
                                              EigenVec_t del_stress);
 
     //! transitional function, use discouraged
-    SplitCell get_splitness() const { return SplitCell::no; }
+    SplitCell get_splitness() const { return this->is_cell_split; }
 
     //! return a const ref to the projection implementation
     const ProjectionBase & get_projection() const;
+
+    //! check if the pixel is inside of the cell
+    bool is_point_inside(const DynRcoord_t & point) const;
+    //! check if the point is inside of the cell
+    bool is_pixel_inside(const DynCcoord_t & pixel) const;
 
    protected:
     //! statically dimensioned worker for evaluating the tangent operator
@@ -320,6 +349,8 @@ namespace muSpectre {
     //! Tangent field might not even be required; so this is an
     //! optional ref_wrapper instead of a ref
     optional<std::reference_wrapper<muGrid::RealField>> tangent{};
+
+    SplitCell is_cell_split{SplitCell::no};
   };
 
 }  // namespace muSpectre

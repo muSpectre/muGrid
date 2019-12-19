@@ -60,14 +60,24 @@ namespace muSpectre {
     using Mat_t = Eigen::Matrix<Real, Dim, Dim>;
     using Ten_t = muGrid::T4Mat<Real, Dim>;
     static constexpr Dim_t get_Dim() { return Dim_; }
+
     using Rot_t = RotatorBase<Dim>;
+
     explicit RotationFixture(Rot_t rot_mat_inp)
-        : rot_mat{rot_mat_inp}, rotator(rot_mat) {}
-    Vec_t v{Vec_t::Random()};
-    Mat_t m{Mat_t::Random()};
-    Ten_t t{Ten_t::Random()};
-    Mat_t rot_mat;
+        : rot_mat_holder{std::make_unique<Mat_t>(rot_mat_inp)},
+          rot_mat{*this->rot_mat_holder}, rotator(rot_mat) {}
+
+    std::unique_ptr<Vec_t> v_holder{std::make_unique<Vec_t>(Vec_t::Random())};
+    const Vec_t & v{*this->v_holder};
+    std::unique_ptr<Mat_t> m_holder{std::make_unique<Mat_t>(Mat_t::Random())};
+    const Mat_t & m{*this->m_holder};
+    std::unique_ptr<Ten_t> t_holder{std::make_unique<Ten_t>(Ten_t::Random())};
+    const Ten_t & t{*this->t_holder};
+    std::unique_ptr<Mat_t> rot_mat_holder;
+    const Mat_t & rot_mat;
+
     Rot_t rotator;
+
     muGrid::testGoodies::RandRange<Real> rr{};
   };
 
@@ -80,13 +90,21 @@ namespace muSpectre {
     using Ten_t = muGrid::T4Mat<Real, Dim>;
     using Angles_t = Eigen::Matrix<Real, (Dim == threeD ? 3 : 1), 1>;
     using RotAng_t = RotatorAngle<Dim, Rot>;
+
     static constexpr RotationOrder EulerOrder{Rot};
     static constexpr Dim_t get_Dim() { return Dim_; }
+
     RotationAngleFixture() : rotator{euler} {}
-    Vec_t v{Vec_t::Random()};
-    Mat_t m{Mat_t::Random()};
-    Ten_t t{Ten_t::Random()};
-    Angles_t euler{2 * muGrid::pi * Angles_t::Random()};
+
+    std::unique_ptr<Vec_t> v_holder{std::make_unique<Vec_t>(Vec_t::Random())};
+    const Vec_t & v{*this->v_holder};
+    std::unique_ptr<Mat_t> m_holder{std::make_unique<Mat_t>(Mat_t::Random())};
+    const Mat_t & m{*this->m_holder};
+    std::unique_ptr<Ten_t> t_holder{std::make_unique<Ten_t>(Ten_t::Random())};
+    const Ten_t & t{*this->t_holder};
+    std::unique_ptr<Angles_t> euler_holder{
+        std::make_unique<Angles_t>(2 * muGrid::pi * Angles_t::Random())};
+    const Angles_t & euler{*this->euler_holder};
     RotatorAngle<Dim, Rot> rotator;
   };
 
@@ -97,10 +115,15 @@ namespace muSpectre {
     using Vec_t = Eigen::Matrix<Real, Dim, 1>;
     using Mat_t = Eigen::Matrix<Real, Dim, Dim>;
     using Ten_t = muGrid::T4Mat<Real, Dim>;
+
     static constexpr Dim_t get_Dim() { return Dim_; }
+
     RotationTwoVecFixture()
-        : vec_ref{this->ref_vec_maker()}, vec_des{this->des_vec_maker()},
-          rotator(vec_ref, vec_des) {}
+        : vec_ref_holder{std::make_unique<Vec_t>(this->ref_vec_maker())},
+          vec_ref{*this->vec_ref_holder},
+          vec_des_holder{std::make_unique<Vec_t>(this->des_vec_maker())},
+          vec_des{*this->vec_des_holder},
+          rotator(*this->vec_ref_holder, *this->vec_des_holder) {}
 
     Vec_t ref_vec_maker() {
       Vec_t ret_vec{Vec_t::Random()};
@@ -114,14 +137,24 @@ namespace muSpectre {
         return ret_vec / ret_vec.norm();
       }
     }
-    Vec_t v{Vec_t::Random()};
-    Mat_t m{Mat_t::Random()};
-    Ten_t t{Ten_t::Random()};
-    Vec_t vec_ref{Vec_t::Random()};
-    Vec_t vec_des{Vec_t::Random()};
+
+    std::unique_ptr<Vec_t> v_holder{std::make_unique<Vec_t>(Vec_t::Random())};
+    const Vec_t & v{*this->v_holder};
+    std::unique_ptr<Mat_t> m_holder{std::make_unique<Mat_t>(Mat_t::Random())};
+    const Mat_t & m{*this->m_holder};
+    std::unique_ptr<Ten_t> t_holder{std::make_unique<Ten_t>(Ten_t::Random())};
+    const Ten_t & t{*this->t_holder};
+    std::unique_ptr<Vec_t> vec_ref_holder{
+        std::make_unique<Vec_t>(Vec_t::Random())};
+    const Vec_t & vec_ref{*this->vec_ref_holder};
+    std::unique_ptr<Vec_t> vec_des_holder{
+        std::make_unique<Vec_t>(Vec_t::Random())};
+    const Vec_t & vec_des{*this->vec_des_holder};
+
     RotatorTwoVec<Dim> rotator;
   };
 
+  /* ---------------------------------------------------------------------- */
   template <Dim_t Dim_, IsCollinear is_aligned = IsCollinear::no>
   struct RotationNormalFixture {
     static constexpr Dim_t Dim{Dim_};
@@ -132,9 +165,11 @@ namespace muSpectre {
     static constexpr Dim_t get_Dim() { return Dim_; }
 
     // Constructor :
-    RotationNormalFixture() : vec_norm{this->vec_maker()}, rotator(vec_norm) {}
+    RotationNormalFixture()
+        : vec_norm_holder{std::make_unique<Vec_t>(this->vec_norm_maker())},
+          vec_norm{*this->vec_norm_holder}, rotator(vec_norm) {}
 
-    Vec_t vec_maker() {
+    Vec_t vec_norm_maker() {
       if (is_aligned == IsCollinear::yes) {
         return -Vec_t::UnitX();
       } else {
@@ -143,10 +178,16 @@ namespace muSpectre {
       }
     }
 
-    Vec_t v{Vec_t::Random()};
-    Mat_t m{Mat_t::Random()};
-    Ten_t t{Ten_t::Random()};
-    Vec_t vec_norm;
+    std::unique_ptr<Vec_t> v_holder{std::make_unique<Vec_t>(Vec_t::Random())};
+    const Vec_t & v{*this->v_holder};
+    std::unique_ptr<Mat_t> m_holder{std::make_unique<Mat_t>(Mat_t::Random())};
+    const Mat_t & m{*this->m_holder};
+    std::unique_ptr<Ten_t> t_holder{std::make_unique<Ten_t>(Ten_t::Random())};
+    const Ten_t & t{*this->t_holder};
+
+    std::unique_ptr<Vec_t> vec_norm_holder;
+    Vec_t & vec_norm{*this->v_holder};
+
     RotatorNormal<Dim> rotator;
   };
   /* ---------------------------------------------------------------------- */
@@ -164,9 +205,9 @@ namespace muSpectre {
 
     constexpr const Dim_t Dim{Fix::get_Dim()};
 
-    Vec_t & v{Fix::v};
-    Mat_t & m{Fix::m};
-    Ten_t & t{Fix::t};
+    const Vec_t & v{Fix::v};
+    const Mat_t & m{Fix::m};
+    const Ten_t & t{Fix::t};
     const Mat_t & R{Fix::rotator.get_rot_mat()};
 
     Vec_t v_ref{R * v};
@@ -266,7 +307,7 @@ namespace muSpectre {
                        RotationTwoVecFixture<threeD, IsCollinear::yes>,
                        RotationTwoVecFixture<twoD, IsCollinear::yes>>;
 
-  /* ---------------------------------------------------------------------- */
+  /* ----------------------------------------------------------------------*/
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(rotation_twovec_test, Fix, twovec_list,
                                    Fix) {
     using Vec_t = typename Fix::Vec_t;
@@ -296,7 +337,7 @@ namespace muSpectre {
                        RotationNormalFixture<threeD, IsCollinear::yes>,
                        RotationNormalFixture<twoD, IsCollinear::yes>>;
 
-  /* ---------------------------------------------------------------------- */
+  /* ----------------------------------------------------------------------*/
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(rotation_normal_test, Fix, normal_list,
                                    Fix) {
     using Vec_t = typename Fix::Vec_t;
@@ -314,8 +355,9 @@ namespace muSpectre {
       std::cout << "Rotated:" << std::endl << vec_res << std::endl;
     }
 
-    // checking if the result of rotating back the result of rotaion (x-axis) is
-    // aligned with the original vector before rotation
+    // checking if the result of rotating back the result of rotaion (x-axis)
+    // is aligned with the original vector before rotation
+
     auto err_b{(vec_back - vec_ref).norm()};
     BOOST_CHECK_LT(err_b, tol);
     if (err_b >= tol) {

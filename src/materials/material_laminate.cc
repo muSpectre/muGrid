@@ -2,13 +2,13 @@
  * @file   material_laminate.cc
  *
  * @author Ali Falsafi <ali.falsafi@epfl.ch>
+ * @author Till Junge <till.junge@altermail.ch>
  *
- * @date   14 Jun 2019
+ * @date    04 Jun 2018
  *
- * @brief  Implementation of MaterialLamiante which is a lamiante approximation
- * constitutive law for two underlting materials with arbitrary constutive law
+ * @brief material that uses laminae homogenisation
  *
- * Copyright © 2017 Till Jungex
+ * Copyright © 2018 Ali Falsafi
  *
  * µSpectre is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
@@ -37,70 +37,76 @@
 #include "material_laminate.hh"
 
 namespace muSpectre {
-  template <Dim_t DimS, Dim_t DimM>
-  MaterialLaminate<DimS, DimM>::MaterialLaminate(std::string name)
-      : Parent(name), normal_vector_field{muGrid::make_field<VectorField_t>(
-                          "Normal Vector", this->internal_fields)},
-        normal_vector_map{normal_vector_field.get_map()},
-        volume_ratio_field{muGrid::make_field<ScalarField_t>(
-            "Volume Ratio", this->internal_fields)},
-        volume_ratio_map{volume_ratio_field.get_map()} {}
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void
-  MaterialLaminate<DimS, DimM>::add_pixel(const Ccoord_t<DimS> & /*pixel*/) {
+  template <Dim_t DimM>
+  MaterialLaminate<DimM>::MaterialLaminate(const std::string & name,
+                                           const Dim_t & spatial_dimension,
+                                           const Dim_t & nb_quad_pts)
+      : Parent(name, spatial_dimension, DimM, nb_quad_pts),
+        normal_vector_field{"normal vector", this->internal_fields},
+        volume_ratio_field{"volume ratio", this->internal_fields} {}
+  /* ----------------------------------------------------------------------
+   */
+  template <Dim_t DimM>
+  void MaterialLaminate<DimM>::add_pixel(const size_t & /*pixel_id*/) {
     throw std::runtime_error("This material needs two material "
-                             "(shared)pointers making the layers of lamiante, "
+                             "(shared)pointers making the layers of "
+                             "lamiante, "
                              "their volume fraction, "
                              "and normal vector for adding pixel");
   }
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void MaterialLaminate<DimS, DimM>::add_pixel(
-      const Ccoord_t<DimS> & pixel, MatPtr_t mat1, MatPtr_t mat2, Real ratio,
-      const Eigen::Ref<const Eigen::Matrix<Real, DimM, 1>> & normal_vector) {
-    this->internal_fields.add_pixel(pixel);
+  /* ----------------------------------------------------------------------
+   */
+  template <Dim_t DimM>
+  void MaterialLaminate<DimM>::add_pixel(
+      const size_t & pixel_id, MatPtr_t mat1, MatPtr_t mat2, const Real & ratio,
+      const Eigen::Ref<const Eigen::Matrix<Real, Eigen::Dynamic, 1>> &
+          normal_vector) {
+    this->internal_fields.add_pixel(pixel_id);
 
     this->material_left_vector.push_back(mat1);
     this->material_right_vector.push_back(mat2);
 
-    this->volume_ratio_field.push_back(ratio);
-    this->normal_vector_field.push_back(normal_vector);
+    this->volume_ratio_field.get_field().push_back(ratio);
+    this->normal_vector_field.get_field().push_back(normal_vector);
   }
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void MaterialLaminate<DimS, DimM>::add_pixels_precipitate(
-      std::vector<Ccoord_t<DimS>> intersected_pixels,
-      std::vector<Real> intersection_ratios,
-      std::vector<Eigen::Matrix<Real, DimM, 1>> intersection_normals,
+  /* ----------------------------------------------------------------------
+   */
+  template <Dim_t DimM>
+  void MaterialLaminate<DimM>::add_pixels_precipitate(
+      const std::vector<Ccoord_t<DimM>> & intersected_pixels,
+      const std::vector<Dim_t> & intersected_pixels_id,
+      const std::vector<Real> & intersection_ratios,
+      const std::vector<Eigen::Matrix<Real, DimM, 1>> & intersection_normals,
       MatPtr_t mat1, MatPtr_t mat2) {
-    for (auto && tup : akantu::zip(intersected_pixels, intersection_ratios,
-                                   intersection_normals)) {
-      auto pix = std::get<0>(tup);
-      auto ratio = std::get<1>(tup);
-      auto normal = std::get<2>(tup);
-      this->add_pixel(pix, mat1, mat2, ratio, normal);
+    for (auto && tup : akantu::zip(intersected_pixels, intersected_pixels_id,
+                                   intersection_ratios, intersection_normals)) {
+      // auto pix { std::get<0>(tup)};
+      auto pix_id{std::get<1>(tup)};
+      auto ratio{std::get<2>(tup)};
+      auto normal{std::get<3>(tup)};
+      this->add_pixel(pix_id, mat1, mat2, ratio, normal);
     }
   }
 
   /* ----------------------------------------------------------------------*/
-  template <Dim_t DimS, Dim_t DimM>
-  MaterialLaminate<DimS, DimM> &
-  MaterialLaminate<DimS, DimM>::make(CellBase<DimS, DimM> & cell,
-                                     std::string name) {
-    auto mat = std::make_unique<MaterialLaminate<DimS, DimM>>(name);
-    auto & mat_ref = *mat;
+  template <Dim_t DimM>
+  MaterialLaminate<DimM> &
+  MaterialLaminate<DimM>::make(Cell & cell, const std::string & name) {
+    auto mat{std::make_unique<MaterialLaminate<DimM>>(
+        name, cell.get_spatial_dim(), cell.get_nb_quad())};
+    auto & mat_ref{*mat};
     auto is_cell_split{cell.get_splitness()};
     mat_ref.allocate_optional_fields(is_cell_split);
     cell.add_material(std::move(mat));
     return mat_ref;
   }
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void MaterialLaminate<DimS, DimM>::compute_stresses(const StrainField_t & F,
-                                                      StressField_t & P,
-                                                      Formulation form,
-                                                      SplitCell is_cell_split) {
+  /* ----------------------------------------------------------------------
+   */
+  template <Dim_t DimM>
+  void MaterialLaminate<DimM>::compute_stresses(const RealField & F,
+                                                RealField & P,
+                                                const Formulation & form,
+                                                SplitCell is_cell_split) {
     switch (form) {
     case Formulation::finite_strain: {
       switch (is_cell_split) {
@@ -144,11 +150,12 @@ namespace muSpectre {
     }
   }
 
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM>
-  void MaterialLaminate<DimS, DimM>::compute_stresses_tangent(
-      const StrainField_t & F, StressField_t & P, TangentField_t & K,
-      Formulation form, SplitCell is_cell_split) {
+  /* ----------------------------------------------------------------------
+   */
+  template <Dim_t DimM>
+  void MaterialLaminate<DimM>::compute_stresses_tangent(
+      const RealField & F, RealField & P, RealField & K,
+      const Formulation & form, SplitCell is_cell_split) {
     switch (form) {
     case Formulation::finite_strain: {
       switch (is_cell_split) {
@@ -192,7 +199,7 @@ namespace muSpectre {
     }
   }
   /* ----------------------------------------------------------------------*/
-  template class MaterialLaminate<twoD, twoD>;
-  template class MaterialLaminate<threeD, threeD>;
+  template class MaterialLaminate<twoD>;
+  template class MaterialLaminate<threeD>;
 
 }  // namespace muSpectre

@@ -53,7 +53,8 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   FieldCollection::FieldCollection(ValidityDomain domain,
-                                     Dim_t spatial_dimension, Dim_t nb_quad_pts)
+                                   const Dim_t & spatial_dimension,
+                                   const Dim_t & nb_quad_pts)
       : domain{domain}, spatial_dim{spatial_dimension}, nb_quad_pts{
                                                             nb_quad_pts} {}
 
@@ -61,7 +62,7 @@ namespace muGrid {
   template <typename T>
   TypedField<T> &
   FieldCollection::register_field_helper(const std::string & unique_name,
-                                          const Dim_t & nb_components) {
+                                         const Dim_t & nb_components) {
     static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
                   "You can only register fields templated with one of the "
                   "numeric types Real, Complex, Int, or UInt");
@@ -95,28 +96,28 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   TypedField<Real> &
   FieldCollection::register_real_field(const std::string & unique_name,
-                                        const Dim_t & nb_components) {
+                                       const Dim_t & nb_components) {
     return this->register_field_helper<Real>(unique_name, nb_components);
   }
 
   /* ---------------------------------------------------------------------- */
   TypedField<Complex> &
   FieldCollection::register_complex_field(const std::string & unique_name,
-                                           const Dim_t & nb_components) {
+                                          const Dim_t & nb_components) {
     return this->register_field_helper<Complex>(unique_name, nb_components);
   }
 
   /* ---------------------------------------------------------------------- */
   TypedField<Int> &
   FieldCollection::register_int_field(const std::string & unique_name,
-                                       const Dim_t & nb_components) {
+                                      const Dim_t & nb_components) {
     return this->register_field_helper<Int>(unique_name, nb_components);
   }
 
   /* ---------------------------------------------------------------------- */
   TypedField<Uint> &
   FieldCollection::register_uint_field(const std::string & unique_name,
-                                        const Dim_t & nb_components) {
+                                       const Dim_t & nb_components) {
     return this->register_field_helper<Uint>(unique_name, nb_components);
   }
 
@@ -145,8 +146,8 @@ namespace muGrid {
     //! If you get a compiler warning about narrowing conversion on the
     //! following line, please check whether you are creating a TypedField
     //! with the number of components specified in 'int' rather than 'size_t'.
-    TypedStateField<T> * raw_ptr{new TypedStateField<T>{
-        unique_prefix, *this, nb_memory, nb_components}};
+    TypedStateField<T> * raw_ptr{
+        new TypedStateField<T>{unique_prefix, *this, nb_memory, nb_components}};
     TypedStateField<T> & retref{*raw_ptr};
     StateField_ptr field{raw_ptr};
     this->state_fields[unique_prefix] = std::move(field);
@@ -156,16 +157,17 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   TypedStateField<Real> &
   FieldCollection::register_real_state_field(const std::string & unique_name,
-                                              const Dim_t & nb_memory,
-                                              const Dim_t & nb_components) {
+                                             const Dim_t & nb_memory,
+                                             const Dim_t & nb_components) {
     return this->register_state_field_helper<Real>(unique_name, nb_memory,
                                                    nb_components);
   }
 
   /* ---------------------------------------------------------------------- */
-  TypedStateField<Complex> & FieldCollection::register_complex_state_field(
-      const std::string & unique_name, const Dim_t & nb_memory,
-      const Dim_t & nb_components) {
+  TypedStateField<Complex> &
+  FieldCollection::register_complex_state_field(const std::string & unique_name,
+                                                const Dim_t & nb_memory,
+                                                const Dim_t & nb_components) {
     return this->register_state_field_helper<Complex>(unique_name, nb_memory,
                                                       nb_components);
   }
@@ -173,8 +175,8 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   TypedStateField<Int> &
   FieldCollection::register_int_state_field(const std::string & unique_name,
-                                             const Dim_t & nb_memory,
-                                             const Dim_t & nb_components) {
+                                            const Dim_t & nb_memory,
+                                            const Dim_t & nb_components) {
     return this->register_state_field_helper<Int>(unique_name, nb_memory,
                                                   nb_components);
   }
@@ -182,8 +184,8 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   TypedStateField<Uint> &
   FieldCollection::register_uint_state_field(const std::string & unique_name,
-                                              const Dim_t & nb_memory,
-                                              const Dim_t & nb_components) {
+                                             const Dim_t & nb_memory,
+                                             const Dim_t & nb_components) {
     return this->register_state_field_helper<Uint>(unique_name, nb_memory,
                                                    nb_components);
   }
@@ -194,8 +196,8 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  bool FieldCollection::state_field_exists(
-      const std::string & unique_prefix) const {
+  bool
+  FieldCollection::state_field_exists(const std::string & unique_prefix) const {
     return this->state_fields.find(unique_prefix) != this->state_fields.end();
   }
 

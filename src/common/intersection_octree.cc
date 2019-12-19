@@ -33,52 +33,69 @@
  *
  */
 
-#include "libmugrid/ccoord_operations.hh"
-#include "common/muSpectre_common.hh"
-#include "cell/cell_base.hh"
-#include "materials/material_base.hh"
 #include "common/intersection_octree.hh"
-#include "common/intersection_volume_calculator_corkpp.hh"
-
-#include <vector>
-#include <array>
-#include <algorithm>
 
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
 
-  template <Dim_t DimS, SplitCell is_split>
-  Node<DimS, is_split>::Node(const Rcoord & new_origin,
-                             const Ccoord & new_lengths, int depth,
-                             RootNode_t & root, bool is_root)
-      : root_node(root), origin(new_origin), Clengths(new_lengths),
-        depth(depth), is_pixel((depth == root.max_depth)),
-        children_no(((is_pixel) ? 0 : pow(2, DimS))) {
-    for (int i = 0; i < DimS; i++) {
+  template <SplitCell IsSplit>
+  Node<IsSplit>::Node(const Dim_t & dim, const DynRcoord_t & new_origin,
+                      const DynCcoord_t & new_lengths, const Dim_t & depth,
+                      const Dim_t & max_depth, RootNode_t & root,
+                      const bool & is_root)
+      : dim{dim}, root_node{root}, origin{new_origin}, Clengths{new_lengths},
+        depth{depth}, is_pixel{depth == max_depth},
+        children_no{(is_pixel) ? 0 : muGrid::ipow(2, this->dim)} {
+    for (int i{0}; i < this->dim; i++) {
       this->Rlengths[i] = this->Clengths[i] * this->root_node.pixel_lengths[i];
     }
     if (not is_root) {
       this->check_node();
     }
   }
+
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, SplitCell is_split>
-  void Node<DimS, is_split>::check_node() {
+  template <SplitCell IsSplit>
+  void Node<IsSplit>::check_node() {
+    switch (this->dim) {
+    case twoD: {
+      this->template check_node_helper<twoD>();
+      break;
+    }
+    case threeD: {
+      this->template check_node_helper<threeD>();
+      break;
+    }
+    default: {
+      std::stringstream err;
+      err << "Input dimesnion is not correct. Valid dimnensions are only twoD "
+             "or threeD";
+      throw(std::runtime_error(err.str()));
+      break;
+    }
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <SplitCell IsSplit>
+  template <Dim_t DimS>
+  void Node<IsSplit>::check_node_helper() {
     Real intersection_ratio = 0.0;
 
-    // this volume should be calculated by CGAL as the intersection volume of
+    // this volume should be calculated by CORKPP as the intersection volume of
     // the precipitate and the Node
     auto && intersect = PrecipitateIntersectBase<DimS>::intersect_precipitate(
-        this->root_node.precipitate_vertices, this->origin, this->Rlengths);
+        this->root_node.precipitate_vertices, this->origin.template get<DimS>(),
+        this->Rlengths.template get<DimS>());
 
     intersection_ratio = intersect.volume_ratio;
 
     if (intersect.status == corkpp::IntersectionState::enclosing) {
       // pixel-box is inside precipitate
-      Real pix_num = pow(2, (this->root_node.max_depth - this->depth));
-      Ccoord origin_point, pixels_number;
-      for (int i = 0; i < DimS; i++) {
+      Real pix_num = muGrid::ipow(2, (this->root_node.max_depth - this->depth));
+      DynCcoord_t origin_point, pixels_number;
+      for (int i{0}; i < this->dim; i++) {
         origin_point[i] =
             std::round(this->origin[i] / this->root_node.pixel_lengths[i]);
         pixels_number[i] = pix_num;
@@ -86,24 +103,37 @@ namespace muSpectre {
 
       muGrid::CcoordOps::Pixels<DimS> pixels(pixels_number, origin_point);
 
-      if (is_split != SplitCell::simple) {
+      if (IsSplit != SplitCell::simple) {
         for (auto && pix : pixels) {
-          this->root_node.intersected_pixels.push_back(pix);
-          this->root_node.intersection_ratios.push_back(1.0);
-          this->root_node.intersection_state.push_back(
+          auto pix_id{muGrid::CcoordOps::get_index<DimS>(
+              this->root_node.cell.get_projection()
+                  .get_nb_domain_grid_pts()
+                  .template get<DimS>(),
+              Ccoord_t<DimS>(), pix)};
+          this->root_node.intersected_pixels.emplace_back(pix);
+          this->root_node.intersected_pixels_id.emplace_back(pix_id);
+          this->root_node.intersection_ratios.emplace_back(1.0);
+          this->root_node.intersection_state.emplace_back(
               corkpp::IntersectionState::enclosing);
-          this->root_node.intersection_normals.push_back(Vector_t::Zero());
+          this->root_node.intersection_normals.push_back(
+              Vector_t::Zero(this->dim));
         }
       } else {
         for (auto && pix : pixels) {
-          this->root_node.intersected_pixels.push_back(pix);
-          this->root_node.intersection_ratios.push_back(1.0);
+          auto pix_id{muGrid::CcoordOps::get_index<DimS>(
+              this->root_node.cell.get_projection()
+                  .get_nb_domain_grid_pts()
+                  .template get<DimS>(),
+              Ccoord_t<DimS>(), pix)};
+          this->root_node.intersected_pixels.emplace_back(pix);
+          this->root_node.intersected_pixels_id.emplace_back(pix_id);
+          this->root_node.intersection_ratios.emplace_back(1.0);
         }
       }
     } else if (intersect.status ==
                    corkpp::IntersectionState::completely_inside or
                intersect.status == corkpp::IntersectionState::intersecting) {
-      if (is_split != SplitCell::simple) {
+      if (IsSplit != SplitCell::simple) {
         this->split_node(intersection_ratio, intersect.normal_vector,
                          intersect.status);
       } else {
@@ -112,111 +142,238 @@ namespace muSpectre {
     } else {
     }
   }
-
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, SplitCell is_split>
-  void Node<DimS, is_split>::split_node(Real intersection_ratio,
-                                        corkpp::IntersectionState state) {
+  template <SplitCell IsSplit>
+  void Node<IsSplit>::split_node(const Real & intersection_ratio,
+                                 const corkpp::IntersectionState & state) {
+    switch (this->dim) {
+    case twoD: {
+      this->template split_node_helper<twoD>(intersection_ratio, state);
+      break;
+    }
+    case threeD: {
+      this->template split_node_helper<threeD>(intersection_ratio, state);
+      break;
+    }
+    default: {
+      std::stringstream err;
+      err << "Input dimesnion is not correct. Valid dimnensions are only twoD "
+             "or threeD";
+      throw(std::runtime_error(err.str()));
+      break;
+    }
+    }
+  }
+  /* ---------------------------------------------------------------------- */
+  template <SplitCell IsSplit>
+  template <Dim_t DimS>
+  void
+  Node<IsSplit>::split_node_helper(const Real & intersection_ratio,
+                                   const corkpp::IntersectionState & state) {
     if (this->depth == this->root_node.max_depth) {
-      Ccoord pixel;
-      for (int i = 0; i < DimS; i++) {
+      DynCcoord_t pixel;
+      for (int i{0}; i < this->dim; i++) {
         pixel[i] =
             std::round(this->origin[i] / this->root_node.pixel_lengths[i]);
       }
-
-      this->root_node.intersected_pixels.push_back(pixel);
-      this->root_node.intersection_ratios.push_back(intersection_ratio);
-      this->root_node.intersection_state.push_back(state);
+      auto pix_id{muGrid::CcoordOps::get_index<DimS>(
+          this->root_node.cell.get_projection()
+              .get_nb_domain_grid_pts()
+              .template get<DimS>(),
+          Ccoord_t<DimS>(), pixel.template get<DimS>())};
+      this->root_node.intersected_pixels.emplace_back(
+          pixel.template get<DimS>());
+      this->root_node.intersected_pixels_id.emplace_back(pix_id);
+      this->root_node.intersection_ratios.emplace_back(intersection_ratio);
+      this->root_node.intersection_state.emplace_back(state);
     } else {
       this->divide_node();
     }
   }
+
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, SplitCell is_split>
-  void Node<DimS, is_split>::split_node(Real intersection_ratio,
-                                        corkpp::vector_t normal_vector,
-                                        corkpp::IntersectionState state) {
+  template <SplitCell IsSplit>
+  void Node<IsSplit>::split_node(const Real & intersection_ratio,
+                                 const corkpp::vector_t & normal_vector,
+                                 const corkpp::IntersectionState & state) {
+    switch (this->dim) {
+    case twoD: {
+      this->template split_node_helper<twoD>(intersection_ratio, normal_vector,
+                                             state);
+      break;
+    }
+    case threeD: {
+      this->template split_node_helper<threeD>(intersection_ratio,
+                                               normal_vector, state);
+      break;
+    }
+    default: {
+      std::stringstream err;
+      err << "Input dimesnion is not correct. Valid dimnensions are only twoD "
+             "or threeD";
+      std::runtime_error(err.str());
+      break;
+    }
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <SplitCell IsSplit>
+  template <Dim_t DimS>
+  void
+  Node<IsSplit>::split_node_helper(const Real & intersection_ratio,
+                                   const corkpp::vector_t & normal_vector,
+                                   const corkpp::IntersectionState & state) {
     if (this->depth == this->root_node.max_depth) {
-      Ccoord pixel;
-      for (int i = 0; i < DimS; i++) {
+      DynCcoord_t pixel;
+      for (int i{0}; i < this->dim; i++) {
         pixel[i] =
             std::round(this->origin[i] / this->root_node.pixel_lengths[i]);
       }
-      this->root_node.intersected_pixels.push_back(pixel);
-      this->root_node.intersection_ratios.push_back(intersection_ratio);
-      this->root_node.intersection_normals.push_back(normal_vector.head(DimS));
-      this->root_node.intersection_state.push_back(state);
+      auto pix_id{muGrid::CcoordOps::get_index<DimS>(
+          this->root_node.cell.get_projection()
+              .get_nb_domain_grid_pts()
+              .template get<DimS>(),
+          Ccoord_t<DimS>(), pixel.template get<DimS>())};
+      this->root_node.intersected_pixels.emplace_back(
+          pixel.template get<DimS>());
+
+      this->root_node.intersected_pixels_id.emplace_back(pix_id);
+      this->root_node.intersection_ratios.emplace_back(intersection_ratio);
+      this->root_node.intersection_normals.push_back(
+          normal_vector.head(this->dim));
+      this->root_node.intersection_state.emplace_back(state);
     } else {
       this->divide_node();
     }
   }
+
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, SplitCell is_split>
-  void Node<DimS, is_split>::divide_node() {
-    Rcoord new_origin;
-    Ccoord new_length;
+  template <SplitCell IsSplit>
+  int RootNode<IsSplit>::compute_squared_circum_square(
+      const Cell & cell) const {
+    auto && max_grid_size_at{
+        std::max_element(cell.get_projection().get_nb_domain_grid_pts().begin(),
+                         cell.get_projection().get_nb_domain_grid_pts().end())};
+    auto && max_grid_size{
+        cell.get_projection().get_nb_domain_grid_pts()[std::distance(
+            cell.get_projection().get_nb_domain_grid_pts().begin(),
+            max_grid_size_at)]};
+    // retrun the smallest muGrid::ipower of which is greater than the maximum
+    // nb of grid points in all directions
+    return muGrid::ipow(
+        2, static_cast<size_t>(std::ceil(std::log2(max_grid_size))));
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <SplitCell IsSplit>
+  void Node<IsSplit>::divide_node() {
+    switch (this->dim) {
+    case twoD: {
+      this->template divide_node_helper<twoD>();
+      break;
+    }
+    case threeD: {
+      this->template divide_node_helper<threeD>();
+      break;
+    }
+    default: {
+      std::stringstream err;
+      err << "Input dimesnion is not correct. Valid dimnensions are only twoD "
+             "or threeD";
+      throw(std::runtime_error(err.str()));
+      break;
+    }
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <SplitCell IsSplit>
+  template <Dim_t DimS>
+  void Node<IsSplit>::divide_node_helper() {
+    DynRcoord_t new_origin;
+    DynCcoord_t new_length;
     // this->children.reserve(children_no);
     muGrid::CcoordOps::Pixels<DimS> sub_nodes(
         muGrid::CcoordOps::get_cube<DimS>(2));
     for (auto && sub_node : sub_nodes) {
-      for (int i = 0; i < DimS; i++) {
+      for (int i{0}; i < this->dim; i++) {
         new_length[i] = std::round(this->Clengths[i] * 0.5);
         new_origin[i] = this->origin[i] + sub_node[i] * Rlengths[i] * 0.5;
       }
-      this->children.emplace_back(new_origin, new_length, this->depth + 1,
+      this->children.emplace_back(this->dim, new_origin, new_length,
+                                  this->depth + 1, this->root_node.max_depth,
                                   this->root_node, false);
     }
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, SplitCell is_split>
-  RootNode<DimS, is_split>::RootNode(CellBase<DimS, DimS> & cell,
-                                     std::vector<Rcoord> vert_precipitate)
+  template <SplitCell IsSplit>
+  DynRcoord_t RootNode<IsSplit>::make_root_origin(const Cell & cell) const {
+    return DynRcoord_t(cell.get_spatial_dim());
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <SplitCell IsSplit>
+  Dim_t RootNode<IsSplit>::make_max_resolution(const Cell & cell) const {
+    auto && max_grid_size_at{
+        std::max_element(cell.get_projection().get_nb_domain_grid_pts().begin(),
+                         cell.get_projection().get_nb_domain_grid_pts().end())};
+    return cell.get_projection().get_nb_domain_grid_pts()[std::distance(
+        cell.get_projection().get_nb_domain_grid_pts().begin(),
+        max_grid_size_at)];
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <SplitCell IsSplit>
+  Dim_t RootNode<IsSplit>::make_max_depth(const Cell & cell) const {
+    auto && max_grid_size_at{
+        std::max_element(cell.get_projection().get_nb_domain_grid_pts().begin(),
+                         cell.get_projection().get_nb_domain_grid_pts().end())};
+    return std::ceil(
+        std::log2(cell.get_projection().get_nb_domain_grid_pts()[std::distance(
+            cell.get_projection().get_nb_domain_grid_pts().begin(),
+            max_grid_size_at)]));
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <SplitCell IsSplit>
+  RootNode<IsSplit>::RootNode(const Cell & cell,
+                              const std::vector<DynRcoord_t> & vert_precipitate)
       /*Calling parent constructing method simply by argumnets of (coordinates
          of origin, 2^depth_max in each direction, 0 ,*this)*/
 
-      : Node<DimS, is_split>(
-            Rcoord{},
-            muGrid::CcoordOps::get_cube<DimS, Dim_t>(pow(
-                2,
-                std::ceil(
-                    std::log2(cell.get_nb_domain_grid_pts().at(std::distance(
-                        std::max_element(cell.get_nb_domain_grid_pts().begin(),
-                                         cell.get_nb_domain_grid_pts().end()),
-                        cell.get_nb_domain_grid_pts().begin())))))),
-            0, *this, true),
-
-        cell(cell), cell_length(cell.get_domain_lengths()),
-        pixel_lengths(cell.get_pixel_lengths()),
-        cell_resolution(cell.get_nb_domain_grid_pts()),
-        max_resolution(this->cell_resolution.at(
-            std::distance(std::max_element(this->cell_resolution.begin(),
-                                           this->cell_resolution.end()),
-                          this->cell_resolution.begin()))),
-        max_depth(std::ceil(std::log2(this->max_resolution))),
-        precipitate_vertices(vert_precipitate) {
-    for (auto && vertice : vert_precipitate) {
-      auto && is_vertice_inside = cell.is_inside(vertice);
-      if (!is_vertice_inside) {
+      : Parent(cell.get_spatial_dim(), this->make_root_origin(cell),
+               DynCcoord_t{muGrid::CcoordOps::get_cube(
+                   cell.get_spatial_dim(),
+                   this->compute_squared_circum_square(cell))},
+               0, make_max_depth(cell), *this, true),
+        cell{cell}, cell_length{cell.get_projection().get_domain_lengths()},
+        pixel_lengths{cell.get_projection().get_pixel_lengths()},
+        cell_resolution{cell.get_projection().get_nb_domain_grid_pts()},
+        max_resolution{make_max_resolution(cell)}, max_depth{make_max_depth(
+                                                       cell)},
+        precipitate_vertices{vert_precipitate}, intersection_normals{
+                                                    cell.get_spatial_dim()} {
+    for (auto && vertex : vert_precipitate) {
+      auto && dynvert{DynRcoord_t(vertex)};
+      auto && is_vertex_inside = cell.is_point_inside(dynvert);
+      if (!is_vertex_inside) {
         throw std::runtime_error(
             "The precipitate introduced does not lie inside the cell");
       }
     }
-    for (int i = 0; i < DimS; i++) {
+    for (int i{0}; i < this->dim; i++) {
       this->Rlengths[i] = this->Clengths[i] * this->root_node.pixel_lengths[i];
     }
     this->check_node();
   }
 
   /* ---------------------------------------------------------------------- */
-  template class RootNode<threeD, SplitCell::simple>;
-  template class RootNode<threeD, SplitCell::laminate>;
-  template class RootNode<twoD, SplitCell::simple>;
-  template class RootNode<twoD, SplitCell::laminate>;
+  template class RootNode<SplitCell::simple>;
+  template class RootNode<SplitCell::laminate>;
 
-  template class Node<threeD, SplitCell::simple>;
-  template class Node<threeD, SplitCell::laminate>;
-  template class Node<twoD, SplitCell::simple>;
-  template class Node<twoD, SplitCell::laminate>;
+  template class Node<SplitCell::simple>;
+  template class Node<SplitCell::laminate>;
 
 }  // namespace muSpectre

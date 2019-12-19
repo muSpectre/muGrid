@@ -63,14 +63,15 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  void MaterialBase::add_pixel_split(const size_t & local_ccoord,
+  void MaterialBase::add_pixel_split(const size_t & global_index,
                                      const Real & ratio) {
-    this->add_pixel(local_ccoord);
+    this->add_pixel(global_index);
     this->assigned_ratio->get_field().push_back(ratio);
   }
 
   void MaterialBase::compute_stresses(const muGrid::Field & F,
-                                      muGrid::Field & P, Formulation form,
+                                      muGrid::Field & P,
+                                      const Formulation & form,
                                       SplitCell is_cell_split) {
     const auto t2_dim{muGrid::ipow(this->material_dimension, 2)};
     const auto & real_F{muGrid::RealField::safe_cast(F, t2_dim)};
@@ -89,8 +90,11 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   void MaterialBase::get_assigned_ratios(
       std::vector<Real> & quad_pt_assigned_ratios) {
-    for (auto && tup : akantu::zip(this->get_quad_pt_indices(),
-                                   this->assigned_ratio->get_map())) {
+    quad_pt_assigned_ratios.reserve(
+        this->assigned_ratio->get_field().get_nb_components());
+    // for (auto && tup : akantu::zip(this->get_quad_pt_indices(),
+    //                                this->assigned_ratio->get_map())) {
+    for (auto && tup : this->assigned_ratio->get_map().enumerate_indices()) {
       const auto & index = std::get<0>(tup);
       const auto & val = std::get<1>(tup);
       quad_pt_assigned_ratios[index] += val;
@@ -99,15 +103,15 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   Real MaterialBase::get_assigned_ratio(const size_t & pixel_id) {
-    return this->assigned_ratio->get_map()[pixel_id];
+    auto id{this->internal_fields.get_global_to_local_index_map()[pixel_id]};
+    auto && tmp{this->assigned_ratio->get_map()};
+    return tmp[id];
   }
 
-  // /* ----------------------------------------------------------------------
-  // */ template <Dim_t DimS, Dim_t DimM> auto MaterialBase<DimS,
-  // DimM>::get_assigned_ratio_field()
-  //     -> MScalarField_t & {
-  //   return this->assigned_ratio.value().get();
-  // }
+  /* ----------------------------------------------------------------------*/
+  muGrid::RealField & MaterialBase::get_assigned_ratio_field() {
+    return this->assigned_ratio->get_field();
+  }
 
   /* ---------------------------------------------------------------------- */
   void MaterialBase::compute_stresses_tangent(const muGrid::Field & F,

@@ -278,8 +278,23 @@ namespace muGrid {
   template <typename T, Mapping Mutability>
   using MappedScalarField = MappedField<ScalarFieldMap<T, Mutability>>;
 
+
   /**
    * Alias of `muGrid::MappedField` for a map of second-rank with corresponding
+   * `muSpectre::Field` you wish to iterate over quadrature point by quadrature
+   * point.
+   *
+   * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
+   * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
+   * @tparam Mutability whether or not the map allows to modify the content of
+   * the field
+   * @tparam Dim spatial dimension of the tensors
+   */
+  template <typename T, Mapping Mutability, Dim_t Dim>
+  using MappedT1Field = MappedField<T1FieldMap<T, Mutability, Dim>>;
+
+  /**
+   * Alias of `muGrid::MappedField` for a map of first-rank with corresponding
    * `muSpectre::Field` you wish to iterate over quadrature point by quadrature
    * point.
    *

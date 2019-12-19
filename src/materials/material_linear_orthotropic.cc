@@ -48,11 +48,11 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimM>
-  MaterialLinearOrthotropic<DimM> & MaterialLinearOrthotropic<DimM>::make(
-      Cell & cell, const std::string & name, const Dim_t & spatial_dimension,
-      const Dim_t & nb_quad_pts, const std::vector<Real> & input) {
+  MaterialLinearOrthotropic<DimM> &
+  MaterialLinearOrthotropic<DimM>::make(Cell & cell, const std::string & name,
+                                        const std::vector<Real> & input) {
     auto mat = std::make_unique<MaterialLinearOrthotropic<DimM>>(
-        name, spatial_dimension, nb_quad_pts, input);
+        name, cell.get_spatial_dim(), cell.get_nb_quad(), input);
     auto & mat_ref = *mat;
     cell.add_material(std::move(mat));
     return mat_ref;

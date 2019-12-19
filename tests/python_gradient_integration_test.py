@@ -208,7 +208,7 @@ class GradientIntegration_Check(unittest.TestCase):
         #freqs = fft_engine.wavevectors(lens_e)
         freqs = fft_engine.fftfreq * res_e.reshape((dim,)+(1,)*dim)
         shift = np.exp(-1j*2*np.pi*np.einsum("i...,i->...", freqs, delta_x_e/2))
-        #analytic solution -i*q/|q|^2 * shift
+        # analytic solution -i*q/|q|^2 * shift
         int_ana = 1j/(2*np.pi)*np.array([[[[  0,   0,   0], [  0,   0,   1]] ,
                                           [[  0,   1,   0], [  0, 1/2, 1/2]]],
                                          [[[  1,   0,   0], [1/2,   0, 1/2]] ,
@@ -267,6 +267,7 @@ class GradientIntegration_Check(unittest.TestCase):
         fourier_gradient = [µ.FourierDerivative(dim, i) for i in range(dim)]
         fft_vec = muFFT.FFT(list(res), dim)
         fft_mat = muFFT.FFT(list(res), dim*dim)
+
         placement_n = µ.gradient_integration.integrate_tensor_2(
             F, fft_vec, fft_mat, fourier_gradient, delta_x)
 
@@ -285,6 +286,7 @@ class GradientIntegration_Check(unittest.TestCase):
         fourier_gradient = [µ.FourierDerivative(dim, i) for i in range(dim)]
         fft_vec = muFFT.FFT(list(res), dim)
         fft_mat = muFFT.FFT(list(res), dim*dim)
+
         placement_n = µ.gradient_integration.integrate_tensor_2(
             F, fft_vec, fft_mat, fourier_gradient, delta_x)
 
@@ -436,6 +438,7 @@ class GradientIntegration_Check(unittest.TestCase):
         dy = dz.rollaxes(-1)
         dx = dy.rollaxes(-1)
         discrete_gradient = [dx, dy, dz]
+
         placement_c = µ.gradient_integration.integrate_tensor_2(
             F, fft_vec, fft_mat, discrete_gradient, delta_x)
 
@@ -467,6 +470,7 @@ class GradientIntegration_Check(unittest.TestCase):
         dy = muFFT.DiscreteDerivative([0, 0], [[-1, 1]])
         dx = dy.rollaxes(1)
         discrete_gradient = [dx, dy]
+
         int_x = µ.gradient_integration.integrate_vector(
             g, fft_sca, fft_vec, discrete_gradient, delta_x)
 
@@ -502,6 +506,7 @@ class GradientIntegration_Check(unittest.TestCase):
         dy = dz.rollaxes(-1)
         dx = dy.rollaxes(-1)
         discrete_gradient = [dx, dy, dz]
+
         int_x = µ.gradient_integration.integrate_vector(
             g, fft_sca, fft_vec, discrete_gradient, delta_x)
 
@@ -536,6 +541,7 @@ class GradientIntegration_Check(unittest.TestCase):
                                      newton_tol=1e-6, equil_tol=1e-6, verbose=0)
         result_reshaped = µ.gradient_integration.reshape_gradient(
             result.grad, res).flatten()
+
         for r in [result, result_reshaped]:
             #check input of result=OptimiseResult and result=np.ndarray
             placement, x = µ.gradient_integration.compute_placement(

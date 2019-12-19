@@ -526,7 +526,7 @@ namespace muGrid {
             Iteration IterationType = Iteration::QuadPt>
   using MatrixFieldMap =
       StaticFieldMap<T, Mutability, internal::MatrixMap<T, NbRow, NbCol>,
-                      IterationType>;
+                     IterationType>;
 
   /**
    * Alias of `muGrid::StaticFieldMap` you wish to iterate over pixel by pixel
@@ -545,7 +545,7 @@ namespace muGrid {
             Iteration IterationType = Iteration::QuadPt>
   using ArrayFieldMap =
       StaticFieldMap<T, Mutability, internal::ArrayMap<T, NbRow, NbCol>,
-                      IterationType>;
+                     IterationType>;
 
   /**
    * Alias of `muGrid::StaticFieldMap` over a scalar field you wish to iterate
@@ -561,6 +561,36 @@ namespace muGrid {
       StaticFieldMap<T, Mutability, internal::ScalarMap<T>, Iteration::QuadPt>;
 
   /**
+   * Alias of `muGrid::StaticNFieldMap` over a first-rank tensor field you wish
+   * to iterate over quadrature point by quadrature point.
+   *
+   * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
+   * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
+   * @tparam Mutability whether or not the map allows to modify the content of
+   * the field
+   * @tparam Dim spatial dimension of the tensor
+   */
+  template <typename T, Mapping Mutability, Dim_t Dim>
+  using T1NFieldMap =
+      StaticFieldMap<T, Mutability, internal::MatrixMap<T, Dim, 1>,
+                     Iteration::QuadPt>;
+
+  /**
+   * Alias of `muGrid::StaticFieldMap` over a second-rank tensor field you wish
+   * to iterate over quadrature point by quadrature point.
+   *
+   * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
+   * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
+   * @tparam Mutability whether or not the map allows to modify the content of
+   * the field
+   * @tparam Dim spatial dimension of the tensor
+   */
+  template <typename T, Mapping Mutability, Dim_t Dim>
+  using T1FieldMap =
+      StaticFieldMap<T, Mutability, internal::MatrixMap<T, Dim, 1>,
+                     Iteration::QuadPt>;
+
+  /**
    * Alias of `muGrid::StaticFieldMap` over a second-rank tensor field you wish
    * to iterate over quadrature point by quadrature point.
    *
@@ -573,7 +603,7 @@ namespace muGrid {
   template <typename T, Mapping Mutability, Dim_t Dim>
   using T2FieldMap =
       StaticFieldMap<T, Mutability, internal::MatrixMap<T, Dim, Dim>,
-                      Iteration::QuadPt>;
+                     Iteration::QuadPt>;
 
   /**
    * Alias of `muGrid::StaticFieldMap` over a fourth-rank tensor field you wish
@@ -588,8 +618,8 @@ namespace muGrid {
   template <typename T, Mapping Mutability, Dim_t Dim>
   using T4FieldMap =
       StaticFieldMap<T, Mutability,
-                      internal::MatrixMap<T, Dim * Dim, Dim * Dim>,
-                      Iteration::QuadPt>;
+                     internal::MatrixMap<T, Dim * Dim, Dim * Dim>,
+                     Iteration::QuadPt>;
 
 }  // namespace muGrid
 

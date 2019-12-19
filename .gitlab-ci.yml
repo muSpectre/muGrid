@@ -57,7 +57,7 @@ build:ubuntu16.04_gcc:
   extends: .builds
   image: registry.gitlab.com/muspectre/muspectre:ubuntu16.04
 
-.build:testing_gcc_split:
+build:testing_gcc_split:
   extends: .builds
   image: registry.gitlab.com/muspectre/muspectre:debian_testing
   script:
@@ -125,7 +125,7 @@ test:ubuntu16.04_gcc:
   dependencies:
     - build:ubuntu16.04_gcc
 
-.test:testing_gcc_split:
+test:testing_gcc_split:
  image: registry.gitlab.com/muspectre/muspectre:debian_testing
  extends: .tests
  dependencies:

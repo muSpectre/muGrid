@@ -115,8 +115,8 @@ namespace muGrid {
      *                    for storing internal material variables)
      * @param nb_quad_pts number of quadrature points per pixel/voxel
      */
-    FieldCollection(ValidityDomain domain, Dim_t spatial_dimension,
-                     Dim_t nb_quad_pts);
+    FieldCollection(ValidityDomain domain,
+                    const Dim_t & spatial_dimension, const Dim_t & nb_quad_pts);
 
    public:
     //! Default constructor
@@ -147,7 +147,7 @@ namespace muGrid {
      */
     template <typename T>
     TypedField<T> & register_field(const std::string & unique_name,
-                                    const Dim_t & nb_components) {
+                                   const Dim_t & nb_components) {
       static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
                     "You can only register fields templated with one of the "
                     "numeric types Real, Complex, Int, or UInt");
@@ -164,7 +164,7 @@ namespace muGrid {
      * scalar field)
      */
     TypedField<Real> & register_real_field(const std::string & unique_name,
-                                            const Dim_t & nb_components);
+                                           const Dim_t & nb_components);
     /**
      * place a new complex-valued field  in the responsibility of this
      * collection (Note, because fields have protected constructors, users can't
@@ -187,7 +187,7 @@ namespace muGrid {
      * scalar field)
      */
     TypedField<Int> & register_int_field(const std::string & unique_name,
-                                          const Dim_t & nb_components);
+                                         const Dim_t & nb_components);
     /**
      * place a new unsigned integer-valued field  in the responsibility of this
      * collection (Note, because fields have protected constructors, users can't
@@ -198,16 +198,16 @@ namespace muGrid {
      * scalar field)
      */
     TypedField<Uint> & register_uint_field(const std::string & unique_name,
-                                            const Dim_t & nb_components);
+                                           const Dim_t & nb_components);
 
     /**
      * place a new state field in the responsibility of this collection (Note,
      * because state fields have protected constructors, users can't create them
      */
     template <typename T>
-    TypedStateField<T> &
-    register_state_field(const std::string & unique_prefix,
-                         const Dim_t & nb_memory, const Dim_t & nb_components) {
+    TypedStateField<T> & register_state_field(const std::string & unique_prefix,
+                                              const Dim_t & nb_memory,
+                                              const Dim_t & nb_components) {
       static_assert(
           std::is_scalar<T>::value or std::is_same<T, Complex>::value,
           "You can only register state fields templated with one of the "
@@ -349,6 +349,8 @@ namespace muGrid {
      */
     IndexIterable get_quad_pt_indices() const;
 
+    std::vector<size_t> get_pixel_ids() { return this->pixel_indices; }
+
     /**
      * returns a (base-type) reference to the field identified by `unique_name`.
      * Throws a `muGrid::FieldCollectionError` if the field does not exist.
@@ -372,7 +374,7 @@ namespace muGrid {
     //! internal worker function called by register_<T>_field
     template <typename T>
     TypedField<T> & register_field_helper(const std::string & unique_name,
-                                           const Dim_t & nb_components);
+                                          const Dim_t & nb_components);
 
     //! internal worker function called by register_<T>_state_field
     template <typename T>

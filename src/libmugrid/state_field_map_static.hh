@@ -440,7 +440,23 @@ namespace muGrid {
                            Iteration::QuadPt>;
 
   /**
-   * Alias of `muGrid::StaticStateFieldMap` over a second-rank tensor field you
+   * Alias of `muGrid::StaticStateNFieldMap` over a first-rank tensor field you
+   * wish to iterate over quadrature point by quadrature point.
+   *
+   * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
+   * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
+   * @tparam Mutability whether or not the map allows to modify the content of
+   * the field
+   * @tparam Dim spatial dimension of the tensor
+   * @tparam NbMemory number of previous values to store
+   */
+  template <typename T, Mapping Mutability, Dim_t Dim, size_t NbMemory>
+  using T1StateNFieldMap =
+      StaticStateFieldMap<T, Mutability, internal::MatrixMap<T, Dim, 1>,
+                           NbMemory, Iteration::QuadPt>;
+
+  /**
+   * Alias of `muGrid::StaticStateNFieldMap` over a second-rank tensor field you
    * wish to iterate over quadrature point by quadrature point.
    *
    * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,

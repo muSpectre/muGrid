@@ -154,13 +154,12 @@ namespace muSpectre {
     using Parent::compute_stresses_tangent;
     //! computes stress
     void compute_stresses(const muGrid::RealField & F, muGrid::RealField & P,
-                          Formulation form,
+                          const Formulation & form,
                           SplitCell is_cell_split = SplitCell::no) final;
     //! computes stress and tangent modulus
     void
-    compute_stresses_tangent(const muGrid::RealField & F,
-                             muGrid::RealField & P, muGrid::RealField & K,
-                             Formulation form,
+    compute_stresses_tangent(const muGrid::RealField & F, muGrid::RealField & P,
+                             muGrid::RealField & K, const Formulation & form,
                              SplitCell is_cell_split = SplitCell::no) final;
 
     //! return the material dimension at compile time
@@ -245,6 +244,7 @@ namespace muSpectre {
     }
   }
 
+  /* ---------------------------------------------------------------------- */
   template <class Material, Dim_t DimM>
   template <class... ConstructorArgs>
   std::tuple<std::shared_ptr<Material>, MaterialEvaluator<DimM>>
@@ -262,8 +262,8 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <class Material, Dim_t DimM>
   void MaterialMuSpectre<Material, DimM>::compute_stresses(
-      const muGrid::RealField & F, muGrid::RealField & P, Formulation form,
-      SplitCell is_cell_split) {
+      const muGrid::RealField & F, muGrid::RealField & P,
+      const Formulation & form, SplitCell is_cell_split) {
     switch (form) {
     case Formulation::finite_strain: {
       switch (is_cell_split) {
@@ -310,8 +310,8 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <class Material, Dim_t DimM>
   void MaterialMuSpectre<Material, DimM>::compute_stresses_tangent(
-      const muGrid::RealField & F, muGrid::RealField & P,
-      muGrid::RealField & K, Formulation form, SplitCell is_cell_split) {
+      const muGrid::RealField & F, muGrid::RealField & P, muGrid::RealField & K,
+      const Formulation & form, SplitCell is_cell_split) {
     switch (form) {
     case Formulation::finite_strain: {
       switch (is_cell_split) {
@@ -357,7 +357,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <class Material, Dim_t DimM>
-  template <Formulation Form, SplitCell is_cell_split>
+  template <Formulation Form, SplitCell IsCellSplit>
   void MaterialMuSpectre<Material, DimM>::compute_stresses_worker(
       const muGrid::RealField & F, muGrid::RealField & P,
       muGrid::RealField & K) {
@@ -375,7 +375,7 @@ namespace muSpectre {
     using iterable_proxy_t = iterable_proxy<
         std::tuple<typename traits::StrainMap_t>,
         std::tuple<typename traits::StressMap_t, typename traits::TangentMap_t>,
-        is_cell_split>;
+        IsCellSplit>;
 
     iterable_proxy_t fields(*this, F, P, K);
 
@@ -412,7 +412,7 @@ namespace muSpectre {
       auto && stiffness{std::get<1>(stress_stiffness)};
       auto && quad_pt_id{std::get<2>(arglist)};
       auto && ratio{std::get<3>(arglist)};
-      if (is_cell_split == SplitCell::simple) {
+      if (IsCellSplit == SplitCell::simple) {
         auto && stress_stiffness_mat{MatTB::constitutive_law_tangent<Form>(
             this_mat, strain, quad_pt_id)};
         stress += ratio * std::get<0>(stress_stiffness_mat);
@@ -426,7 +426,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <class Material, Dim_t DimM>
-  template <Formulation Form, SplitCell is_cell_split>
+  template <Formulation Form, SplitCell IsCellSplit>
   void MaterialMuSpectre<Material, DimM>::compute_stresses_worker(
       const muGrid::RealField & F, muGrid::RealField & P) {
     /* These lambdas are executed for every integration point.
@@ -438,7 +438,7 @@ namespace muSpectre {
 
     using iterable_proxy_t =
         iterable_proxy<std::tuple<typename traits::StrainMap_t>,
-                       std::tuple<typename traits::StressMap_t>, is_cell_split>;
+                       std::tuple<typename traits::StressMap_t>, IsCellSplit>;
 
     iterable_proxy_t fields(*this, F, P);
 
@@ -470,7 +470,7 @@ namespace muSpectre {
       auto && quad_pt_id{std::get<2>(arglist)};
       auto && ratio{std::get<3>(arglist)};
 
-      if (is_cell_split == SplitCell::simple) {
+      if (IsCellSplit == SplitCell::simple) {
         stress +=
             ratio * MatTB::constitutive_law<Form>(this_mat, strain, quad_pt_id);
       } else {

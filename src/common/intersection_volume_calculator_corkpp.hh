@@ -38,36 +38,42 @@
 
 #include "cork_interface.hh"
 
+#include "libmugrid/grid_common.hh"
+
 #include <vector>
 #include <fstream>
 #include <math.h>
 
 namespace muSpectre {
-  // using Dim_t = int;
-  // using Real = double;
+
+  using muGrid::Ccoord_t;
+  using muGrid::Dim_t;
+  using muGrid::DynCcoord_t;
+  using muGrid::DynRcoord_t;
+  using muGrid::Rcoord_t;
+  using muGrid::Real;
 
   template <Dim_t DimS>
   class Correction {
    public:
-    std::array<Real, 3> correct_origin(std::array<Real, DimS> array);
-    std::array<Real, 3> correct_length(std::array<Real, DimS> array);
-    std::vector<std::array<Real, 3>>
-    correct_vector(std::vector<std::array<Real, DimS>> vector);
+    static Rcoord_t<3> correct_origin(const Rcoord_t<DimS> & array);
+    static Rcoord_t<3> correct_length(const Rcoord_t<DimS> & array);
+    static std::vector<Rcoord_t<3>>
+    correct_vector(const std::vector<Rcoord_t<DimS>> & vector);
   };
 
   template <>
   class Correction<3> {
    public:
-    std::array<Real, 3> correct_origin(std::array<Real, 3> array) {
+    static Rcoord_t<3> correct_origin(const Rcoord_t<3> & array) {
       return array;
     }
-
-    std::array<Real, 3> correct_length(std::array<Real, 3> array) {
+    static Rcoord_t<3> correct_length(const Rcoord_t<3> & array) {
       return array;
     }
-    std::vector<std::array<Real, 3>>
-    correct_vector(std::vector<std::array<Real, 3>> vertices) {
-      std::vector<std::array<Real, 3>> corrected_convex_poly_vertices;
+    static std::vector<Rcoord_t<3>>
+    correct_vector(const std::vector<Rcoord_t<3>> & vertices) {
+      // std::vector<Rcoord_t<3>> corrected_convex_poly_vertices;
       return vertices;
     }
   };
@@ -75,8 +81,8 @@ namespace muSpectre {
   template <>
   class Correction<2> {
    public:
-    std::vector<std::array<Real, 3>>
-    correct_vector(std::vector<std::array<Real, 2>> vertices) {
+    static std::vector<Rcoord_t<3>>
+    correct_vector(const std::vector<Rcoord_t<2>> & vertices) {
       std::vector<corkpp::point_t> corrected_convex_poly_vertices;
       for (auto && vertice : vertices) {
         corrected_convex_poly_vertices.push_back({vertice[0], vertice[1], 0.0});
@@ -86,12 +92,12 @@ namespace muSpectre {
       }
       return corrected_convex_poly_vertices;
     }
-    std::array<Real, 3> correct_origin(std::array<Real, 2> array) {
-      return std::array<Real, 3>{array[0], array[1], 0.0};
+    static Rcoord_t<3> correct_origin(const Rcoord_t<2> & array) {
+      return Rcoord_t<3>{array[0], array[1], 0.0};
     }
 
-    std::array<Real, 3> correct_length(std::array<Real, 2> array) {
-      return std::array<Real, 3>{array[0], array[1], 1.0};
+    static Rcoord_t<3> correct_length(const Rcoord_t<2> & array) {
+      return Rcoord_t<3>{array[0], array[1], 1.0};
     }
   };
 
@@ -99,47 +105,53 @@ namespace muSpectre {
   template <Dim_t DimS>
   class PrecipitateIntersectBase {
    public:
-    using Return_t = corkpp::VolNormStateIntersection;
-    static inline std::tuple<std::vector<corkpp::point_t>,
-                             std::vector<corkpp::point_t>>
-    correct_dimension(std::vector<std::array<Real, DimS>> convex_poly_vertices,
-                      std::array<Real, DimS> origin,
-                      std::array<Real, DimS> lengths);
-    static inline auto intersect_precipitate(
-        std::vector<std::array<Real, DimS>> convex_poly_vertices,
-        std::array<Real, DimS> origin, std::array<Real, DimS> lengths)
-        -> Return_t;
+    static std::tuple<std::vector<corkpp::point_t>,
+                      std::vector<corkpp::point_t>>
+    correct_dimension(const std::vector<Rcoord_t<DimS>> & convex_poly_vertices,
+                      const Rcoord_t<DimS> & origin,
+                      const Rcoord_t<DimS> & lengths);
+
+    //! this function is the palce that CORK is called to analyze the geometry
+    //! and make the intersection of the precipitate with a grid
+    static corkpp::VolNormStateIntersection
+    intersect_precipitate(const std::vector<DynRcoord_t> & convex_poly_vertices,
+                          const Rcoord_t<DimS> & origin,
+                          const Rcoord_t<DimS> & lengths);
   };
 
   /* ---------------------------------------------------------------------- */
-
   template <Dim_t DimS>
   std::tuple<std::vector<corkpp::point_t>, std::vector<corkpp::point_t>>
   PrecipitateIntersectBase<DimS>::correct_dimension(
-      std::vector<std::array<Real, DimS>> convex_poly_vertices,
-      std::array<Real, DimS> origin, std::array<Real, DimS> lengths) {
-    Correction<DimS> correction;
-    std::vector<corkpp::point_t> vertices_pixel{};
-
+      const std::vector<Rcoord_t<DimS>> & convex_poly_vertices,
+      const Rcoord_t<DimS> & origin, const Rcoord_t<DimS> & lengths) {
     std::vector<corkpp::point_t> corrected_convex_poly_vertices(
-        correction.correct_vector(convex_poly_vertices));
-    corkpp::point_t corrected_origin(correction.correct_origin(origin));
-    corkpp::point_t corrected_lengths(correction.correct_length(lengths));
-
-    vertices_pixel =
-        corkpp::cube_vertice_maker(corrected_origin, corrected_lengths);
+        Correction<DimS>::correct_vector(convex_poly_vertices));
+    corkpp::point_t corrected_origin(Correction<DimS>::correct_origin(origin));
+    corkpp::point_t corrected_lengths(
+        Correction<DimS>::correct_length(lengths));
+    std::vector<corkpp::point_t> vertices_pixel{
+        corkpp::cube_vertice_maker(corrected_origin, corrected_lengths)};
     return std::make_tuple(corrected_convex_poly_vertices, vertices_pixel);
   }
+
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS>
-  auto PrecipitateIntersectBase<DimS>::intersect_precipitate(
-      std::vector<std::array<Real, DimS>> convex_poly_vertices,
-      std::array<Real, DimS> origin, std::array<Real, DimS> lengths)
-      -> Return_t {
-    auto && precipitate_pixel =
-        correct_dimension(convex_poly_vertices, origin, lengths);
-    auto && intersect = corkpp::calculate_intersection_volume_normal_state(
-        std::get<0>(precipitate_pixel), std::get<1>(precipitate_pixel), DimS);
+  corkpp::VolNormStateIntersection
+  PrecipitateIntersectBase<DimS>::intersect_precipitate(
+      const std::vector<DynRcoord_t> & convex_poly_vertices,
+      const Rcoord_t<DimS> & origin, const Rcoord_t<DimS> & lengths) {
+    std::vector<Rcoord_t<DimS>> converted_poly_vertices;
+    for (auto && poly_vert : convex_poly_vertices) {
+      converted_poly_vertices.push_back(poly_vert.get<DimS>());
+    }
+
+    auto && precipitate_pixel{
+        correct_dimension(converted_poly_vertices, origin, lengths)};
+    auto && precipitate{std::get<0>(precipitate_pixel)};
+    auto && pixel{std::get<1>(precipitate_pixel)};
+    auto && intersect{corkpp::calculate_intersection_volume_normal_state(
+        precipitate, pixel, DimS)};
     return std::move(intersect);
   }
 

@@ -128,7 +128,8 @@ namespace muSpectre {
     Dim_t get_material_dimension() { return this->material_dimension; }
     //! computes stress
     virtual void compute_stresses(const muGrid::RealField & F,
-                                  muGrid::RealField & P, Formulation form,
+                                  muGrid::RealField & P,
+                                  const Formulation & form,
                                   SplitCell is_cell_split = SplitCell::no) = 0;
     /**
      * Convenience function to compute stresses, mostly for debugging and
@@ -137,13 +138,12 @@ namespace muSpectre {
      * version with strongly typed field references
      */
     void compute_stresses(const muGrid::Field & F, muGrid::Field & P,
-                          Formulation form,
+                          const Formulation & form,
                           SplitCell is_cell_split = SplitCell::no);
     //! computes stress and tangent moduli
     virtual void
-    compute_stresses_tangent(const muGrid::RealField & F,
-                             muGrid::RealField & P, muGrid::RealField & K,
-                             Formulation form,
+    compute_stresses_tangent(const muGrid::RealField & F, muGrid::RealField & P,
+                             muGrid::RealField & K, const Formulation & form,
                              SplitCell is_cell_split = SplitCell::no) = 0;
     /**
      * Convenience function to compute stresses and tangent moduli, mostly for
@@ -164,18 +164,16 @@ namespace muSpectre {
 
     // This function returns the local field containing assigned ratios of this
     // material
-    auto get_assigned_ratio_field() -> muGrid::RealField &;
+    muGrid::RealField & get_assigned_ratio_field();
 
     //! return and iterable proxy over the indices of this material's pixels
-    typename muGrid::LocalFieldCollection::PixelIndexIterable
-    get_pixel_indices() const;
+    muGrid::LocalFieldCollection::PixelIndexIterable get_pixel_indices() const;
 
     /**
      * return and iterable proxy over the indices of this material's quadrature
      * points
      */
-    typename muGrid::LocalFieldCollection::IndexIterable
-    get_quad_pt_indices() const;
+    muGrid::LocalFieldCollection::IndexIterable get_quad_pt_indices() const;
 
     //! number of quadrature points assigned to this material
     inline Dim_t size() const { return this->internal_fields.get_nb_entries(); }

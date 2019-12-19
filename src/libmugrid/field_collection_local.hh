@@ -98,6 +98,13 @@ namespace muGrid {
      * obtain a new field collection with the same domain and pixels
      */
     LocalFieldCollection get_empty_clone() const;
+
+    std::map<size_t, size_t> & get_global_to_local_index_map() {
+      return this->global_to_local_index_map;
+    }
+
+   protected:
+    std::map<size_t, size_t> global_to_local_index_map{};
   };
 
 }  // namespace muGrid

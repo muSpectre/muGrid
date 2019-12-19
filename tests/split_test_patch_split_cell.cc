@@ -34,18 +34,21 @@
  */
 
 #include "tests.hh"
-#include "solver/deprecated_solvers.hh"
-#include "solver/deprecated_solver_cg.hh"
-#include "solver/deprecated_solver_cg_eigen.hh"
-#include "libmufft/fftw_engine.hh"
+
+#include "solver/solver_common.hh"
+#include "solver/solvers.hh"
+#include "solver/solver_cg.hh"
 #include "projection/projection_finite_strain_fast.hh"
 #include "materials/material_linear_elastic1.hh"
-#include "libmugrid/iterators.hh"
-#include "libmugrid/ccoord_operations.hh"
 #include "common/muSpectre_common.hh"
 #include "cell/cell_factory.hh"
 #include "cell/cell_split.hh"
 #include "common/intersection_octree.hh"
+
+#include "libmufft/fftw_engine.hh"
+
+#include "libmugrid/iterators.hh"
+#include "libmugrid/ccoord_operations.hh"
 
 #include <boost/mpl/list.hpp>
 
@@ -56,83 +59,77 @@ namespace muSpectre {
   BOOST_AUTO_TEST_CASE(patch_test) {
     constexpr Dim_t dim{twoD};
 
-    using Mat_t = MaterialLinearElastic1<dim, dim>;
+    using Mat_t = MaterialLinearElastic1<dim>;
     const Real contrast{10};
-    const Real Young_soft{1.0030648180242636},
-        Poisson_soft{0.29930675909878679};
-    const Real Young_hard{contrast * Young_soft},
-        Poisson_hard{0.29930675909878679};
-    const Real Young_mix{(Young_soft + Young_hard) / 2},
-        Poisson_mix{0.29930675909878679};
+    const Real Poisson{0.3};
+    const Real Young_soft{1.0};
+    const Real Young_hard{contrast * Young_soft};
+    const Real Young_mix{(Young_soft + Young_hard) / 2};
 
-    constexpr Ccoord_t<dim> nb_grid_pts_split{3, 3};
-    constexpr Rcoord_t<dim> lengths_split{3, 3};
-    auto fft_ptr_split{std::make_unique<muFFT::FFTWEngine<dim>>(
+    DynCcoord_t nb_grid_pts_split{3, 3};
+    DynRcoord_t lengths_split{3, 3};
+    auto && fft_ptr_split{std::make_unique<muFFT::FFTWEngine>(
         nb_grid_pts_split, muGrid::ipow(dim, 2))};
-    auto proj_ptr_split{std::make_unique<ProjectionFiniteStrainFast<dim, dim>>(
+    auto && proj_ptr_split{std::make_unique<ProjectionFiniteStrainFast<dim>>(
         std::move(fft_ptr_split), lengths_split)};
-    CellSplit<dim, dim> sys_split(std::move(proj_ptr_split));
+    CellSplit sys_split(std::move(proj_ptr_split));
 
-    constexpr Ccoord_t<dim> nb_grid_pts_base{3, 3};
-    constexpr Rcoord_t<dim> lengths_base{3, 3};
-    auto fft_ptr_base{std::make_unique<muFFT::FFTWEngine<dim>>(
+    DynCcoord_t nb_grid_pts_base{3, 3};
+    DynRcoord_t lengths_base{3, 3};
+    auto && fft_ptr_base{std::make_unique<muFFT::FFTWEngine>(
         nb_grid_pts_base, muGrid::ipow(dim, 2))};
-    auto proj_ptr_base{std::make_unique<ProjectionFiniteStrainFast<dim, dim>>(
+    auto && proj_ptr_base{std::make_unique<ProjectionFiniteStrainFast<dim>>(
         std::move(fft_ptr_base), lengths_base)};
-    CellBase<dim, dim> sys_base(std::move(proj_ptr_base));
+    Cell sys_base(std::move(proj_ptr_base));
 
     auto & Material_hard_split{
-        Mat_t::make(sys_split, "hard", Young_hard, Poisson_hard)};
+        Mat_t::make(sys_split, "hard", Young_hard, Poisson)};
     auto & Material_soft_split{
-        Mat_t::make(sys_split, "soft", Young_soft, Poisson_soft)};
+        Mat_t::make(sys_split, "soft", Young_soft, Poisson)};
 
-    for (auto && tup : akantu::enumerate(sys_split)) {
+    for (auto && tup : sys_split.get_pixels().enumerate()) {
+      auto && pixel_id{std::get<0>(tup)};
       auto && pixel{std::get<1>(tup)};
       if (pixel[0] < 2) {
-        Material_hard_split.add_pixel_split(pixel, 1);
+        Material_hard_split.add_pixel_split(pixel_id, 1.0);
       } else {
-        Material_hard_split.add_pixel_split(pixel, 0.5);
-        Material_soft_split.add_pixel_split(pixel, 0.5);
+        Material_hard_split.add_pixel_split(pixel_id, 0.5);
+        Material_soft_split.add_pixel_split(pixel_id, 0.5);
       }
     }
+    Material_hard_split.initialise();
+    Material_soft_split.initialise();
 
     auto & Material_hard_base{
-        Mat_t::make(sys_base, "hard", Young_hard, Poisson_hard)};
-    auto & Material_mix_base{
-        Mat_t::make(sys_base, "mix", Young_mix, Poisson_mix)};
+        Mat_t::make(sys_base, "hard", Young_hard, Poisson)};
+    auto & Material_mix_base{Mat_t::make(sys_base, "mix", Young_mix, Poisson)};
 
-    for (auto && tup : akantu::enumerate(sys_base)) {
+    for (auto && tup : sys_base.get_pixels().enumerate()) {
+      auto && pixel_id{std::get<0>(tup)};
       auto && pixel{std::get<1>(tup)};
       if (pixel[0] < 2) {
-        Material_hard_base.add_pixel(pixel);
+        Material_hard_base.add_pixel(pixel_id);
       } else {
-        Material_mix_base.add_pixel(pixel);
+        Material_mix_base.add_pixel(pixel_id);
       }
     }
 
-    Grad_t<dim> delF0;
+    Grad_t<dim> delF0{Grad_t<dim>::Zero()};
     delF0 << 0, 1, 0, 0;
     constexpr Real cg_tol{1e-8}, newton_tol{1e-5};
-    constexpr Uint maxiter{muGrid::CcoordOps::get_size(nb_grid_pts_split) *
-                           muGrid::ipow(dim, secondOrder) * 10};
+    auto && maxiter{
+        (unsigned int)muGrid::CcoordOps::get_size(nb_grid_pts_split) *
+        muGrid::ipow(dim, secondOrder) * 10};
     constexpr bool verbose{false};
 
-    GradIncrements<dim> grads{};
-    grads.push_back(delF0);
+    SolverCG cg2{sys_base, cg_tol, maxiter, static_cast<bool>(verbose)};
+    auto && res2{newton_cg(sys_base, delF0, cg2, newton_tol, verbose).grad};
 
-    DeprecatedSolverCG<dim> cg2{sys_base, cg_tol, maxiter,
-                                static_cast<bool>(verbose)};
-    Eigen::ArrayXXd res2{
-        deprecated_newton_cg(sys_base, grads, cg2, newton_tol, verbose)[0]
-            .grad};
+    SolverCG cg1{sys_split, cg_tol, maxiter, static_cast<bool>(verbose)};
+    auto && res1{newton_cg(sys_split, delF0, cg1, newton_tol, verbose).grad};
+    auto && diff{(res1 - res2).eval()};
 
-    DeprecatedSolverCG<dim> cg1{sys_split, cg_tol, maxiter,
-                                static_cast<bool>(verbose)};
-    Eigen::ArrayXXd res1{
-        deprecated_newton_cg(sys_split, grads, cg1, newton_tol, verbose)[0]
-            .grad};
-
-    BOOST_CHECK_LE(abs(res1 - res2).mean(), cg_tol);
+    BOOST_CHECK_LE(abs(diff).mean(), cg_tol);
   }
 
   BOOST_AUTO_TEST_SUITE_END();

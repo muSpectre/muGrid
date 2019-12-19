@@ -99,10 +99,8 @@ namespace muSpectre {
     input_hard.push_back(con * (lambda + 2 * mu));
     input_hard.push_back(con * mu);
 
-    auto & Material_soft{
-        Mat_t_non::make(sys_non, "soft", Dim, OneQuadPt, input_soft)};
-    auto & Material_hard{
-        Mat_t_non::make(sys_non, "hard", Dim, OneQuadPt, input_hard)};
+    auto & Material_soft{Mat_t_non::make(sys_non, "soft", input_soft)};
+    auto & Material_hard{Mat_t_non::make(sys_non, "hard", input_hard)};
 
     for (const auto & pixel_id : sys_non.get_pixel_indices()) {
       if (pixel_id == 0) {
@@ -188,10 +186,8 @@ namespace muSpectre {
     input_hard.push_back(con * mu);
     input_hard.push_back(con * mu);
 
-    auto & Material_soft{
-        Mat_t_non::make(sys_non, "soft", Dim, OneQuadPt, input_soft)};
-    auto & Material_hard{
-        Mat_t_non::make(sys_non, "hard", Dim, OneQuadPt, input_hard)};
+    auto & Material_soft{Mat_t_non::make(sys_non, "soft", input_soft)};
+    auto & Material_hard{Mat_t_non::make(sys_non, "hard", input_hard)};
 
     for (const auto & pixel_id : sys_non.get_pixel_indices()) {
       if (pixel_id == 0) {

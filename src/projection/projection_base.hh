@@ -132,6 +132,9 @@ namespace muSpectre {
       return this->domain_lengths;
     }
 
+    //! returns the physical sizes of the pixles of the cell
+    const DynRcoord_t get_pixel_lengths() const;
+
     /**
      * return the `muSpectre::Formulation` that is used in solving
      * this cell. This allows tho check whether a projection is
@@ -169,7 +172,7 @@ namespace muSpectre {
     const Dim_t & get_nb_quad() const;
 
     //! return a reference to the fft_engine
-    muFFT::FFTEngineBase& get_fft_engine();
+    muFFT::FFTEngineBase & get_fft_engine();
 
    protected:
     //! handle on the fft_engine used

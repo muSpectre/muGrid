@@ -32,7 +32,7 @@
  * Program grant you additional permission to convey the resulting work.
  *
  */
-
+#include <iostream>
 #include "ccoord_operations.hh"
 
 namespace muGrid {
@@ -66,6 +66,26 @@ namespace muGrid {
       return retval;
     }
 
+    //-----------------------------------------------------------------------//
+    Real compute_volume(const DynRcoord_t & lenghts) {
+      Real vol{1.0};
+      for (auto && length : lenghts) {
+        vol *= length;
+      }
+      return vol;
+    }
+
+    //-----------------------------------------------------------------------//
+    Real compute_pixel_volume(const DynCcoord_t & nb_grid_pts,
+                              const DynRcoord_t & lenghts) {
+      Real vol{1.0};
+      for (auto && tup : akantu::zip(nb_grid_pts, lenghts)) {
+        auto && nb_grid_pt{std::get<0>(tup)};
+        auto && length{std::get<1>(tup)};
+        vol *= (length / nb_grid_pt);
+      }
+      return vol;
+    }
     /* ---------------------------------------------------------------------- */
     DynamicPixels::DynamicPixels()
         : dim{}, nb_grid_pts{}, locations{}, strides{} {}

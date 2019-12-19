@@ -61,20 +61,20 @@ void add_material_linear_anisotropic_helper(py::module & mod) {
   using Sys_t = muSpectre::CellBase<dim, dim>;
   using MatBase_t = MaterialBase<dim, dim>;
   py::class_<Mat_t, MatBase_t>(mod, name.c_str())
-      .def_static("make",
-                  [](Sys_t & sys, std::string n,
-                     std::vector<Real> stiffness_coeffs) -> Mat_t & {
-                    return Mat_t::make(sys, n, stiffness_coeffs);
-                  },
-                  "cell"_a, "name"_a, "stiffness_coeffs"_a,
-                  py::return_value_policy::reference, py::keep_alive<1, 0>())
-      .def("add_pixel",
-           [](Mat_t & mat, Ccoord_t<dim> pix) { mat.add_pixel(pix); },
-           "pixel"_a)
-      .def("add_pixel_split",
-           [](Mat_t & mat, Ccoord_t<dim> pix, Real ratio) {
-             mat.add_pixel_split(pix, ratio);
-           },
-           "pixel"_a, "ratio"_a)
+      .def_static(
+          "make",
+          [](Sys_t & sys, std::string n, std::vector<Real> stiffness_coeffs)
+              -> Mat_t & { return Mat_t::make(sys, n, stiffness_coeffs); },
+          "cell"_a, "name"_a, "stiffness_coeffs"_a,
+          py::return_value_policy::reference_internal)
+      .def(
+          "add_pixel",
+          [](Mat_t & mat, Ccoord_t<dim> pix) { mat.add_pixel(pix); }, "pixel"_a)
+      .def(
+          "add_pixel_split",
+          [](Mat_t & mat, Ccoord_t<dim> pix, Real ratio) {
+            mat.add_pixel_split(pix, ratio);
+          },
+          "pixel"_a, "ratio"_a)
       .def("size", &Mat_t::size);
 }

@@ -3,7 +3,7 @@
  *
  * @author Ali Falsafi <ali.falsafi@epfl.ch>
  *
- * @date   19 Apr 2018
+ * @date   10 Dec 2019
  *
  * @brief Base class representing a unit cell able to handle
  *        split material assignments
@@ -37,19 +37,22 @@
 #ifndef SRC_CELL_CELL_SPLIT_HH_
 #define SRC_CELL_CELL_SPLIT_HH_
 
+#include "cell/cell.hh"
+
 #include "common/muSpectre_common.hh"
-#include "libmugrid/ccoord_operations.hh"
-#include "libmugrid/field.hh"
+#include "common/intersection_octree.hh"
 #include "materials/material_base.hh"
 #include "projection/projection_base.hh"
-#include "cell/cell_traits.hh"
-#include "cell/cell_base.hh"
-#include "common/intersection_octree.hh"
+
+#include "libmugrid/ccoord_operations.hh"
+#include "libmugrid/field.hh"
 
 #include <vector>
 #include <memory>
 #include <tuple>
 #include <functional>
+#include <sstream>
+#include <algorithm>
 
 namespace muSpectre {
 
@@ -57,31 +60,18 @@ namespace muSpectre {
   //! DimM material_dimension (dimension of constitutive law)
   /* This class handles the cells that has
      splitly assigned material to their pixels */
-  template <Dim_t DimS, Dim_t DimM = DimS>
-  class CellSplit : public CellBase<DimS, DimM> {
-    friend class CellBase<DimS, DimM>;
+  class CellSplit : public Cell {
+    friend class Cell;
 
    public:
-    using Parent = CellBase<DimS, DimM>;  //!< base class
-    //! global field collection
-    using FieldCollection_t = muGrid::GlobalFieldCollection<DimS>;
-    using Projection_t = ProjectionBase<DimS, DimM>;
+    using Parent = Cell;  //!< base class
+
     //! projections handled through `std::unique_ptr`s
-    using Projection_ptr = std::unique_ptr<Projection_t>;
-    using StrainField_t =
-        muGrid::TensorField<FieldCollection_t, Real, secondOrder, DimM>;
-    //! expected type for stress fields
-    using StressField_t =
-        muGrid::TensorField<FieldCollection_t, Real, secondOrder, DimM>;
-    //! expected type for tangent stiffness fields
-    using TangentField_t =
-        muGrid::TensorField<FieldCollection_t, Real, fourthOrder, DimM>;
+    using Projection_ptr = std::unique_ptr<ProjectionBase>;
+
     //! combined stress and tangent field
     using FullResponse_t =
-        std::tuple<const StressField_t &, const TangentField_t &>;
-
-    //! ref to constant vector
-    using ConstVector_ref = typename Parent::ConstVector_ref;
+        std::tuple<const muGrid::RealField &, const muGrid::RealField &>;
 
     //! Default constructor
     CellSplit() = delete;
@@ -102,32 +92,47 @@ namespace muSpectre {
     CellSplit & operator=(const CellSplit & other) = delete;
 
     //! Move assignment operator
-    CellSplit & operator=(CellSplit && other) = default;
+    CellSplit & operator=(CellSplit && other) = delete;
+
+    /**
+     * add a new material to the cell
+     */
+    MaterialBase & add_material(Material_ptr mat) final;
 
     /**
      *completes the assignmnet of material with a specific material so
      *all the under-assigned pixels would be assigned to a material.
      */
-    //
-    void complete_material_assignment(MaterialBase<DimS, DimM> & material);
+
+    void complete_material_assignment(MaterialBase & material);
 
     // returns the assigend ratios to each pixel
     std::vector<Real> get_assigned_ratios();
 
-    //
-    // template<class MaterialType>
+    // Assigns pixels according to the coordiantes of the
+    // precipitate
     void make_automatic_precipitate_split_pixels(
-        std::vector<Rcoord_t<DimS>> preciptiate_vertices,
-        MaterialBase<DimS, DimM> & material);
-    //
-    std::vector<Real> get_unassigned_ratios_incomplete_pixels();
-    std::vector<int> get_index_incomplete_pixels();
-    std::vector<Ccoord_t<DimS>> get_unassigned_pixels();
+        const std::vector<DynRcoord_t> & preciptiate_vertices,
+        MaterialBase & material);
 
+    // Returns the unassigend portion of the pixels whose material
+    // assignemnt are not complete
+    std::vector<Real> get_unassigned_ratios_incomplete_pixels() const;
+
+    // This function returns the index of the pixels whose material
+    // assignemnt are not complete
+    std::vector<int> get_index_incomplete_pixels() const;
+
+    // This function returns the Ccoord of the pixels whose material
+    // assignemnt are not complete
+    std::vector<DynCcoord_t> get_unassigned_pixels();
+
+    // this class is designed to handle the pixels with incomplete material
+    // assignment and itereating over them
     class IncompletePixels {
      public:
       //! constructor
-      explicit IncompletePixels(CellSplit<DimS, DimM> & cell);
+      explicit IncompletePixels(const CellSplit & cell);
       //! copy constructor
       IncompletePixels(const IncompletePixels & other) = default;
       //! move constructor
@@ -138,56 +143,74 @@ namespace muSpectre {
       //! iterator type over all incompletetedly assigned pixel's
       class iterator {
        public:
-        using value_type =
-            std::tuple<Ccoord_t<DimS>, Real>;       //!< stl conformance
-        using const_value_type = const value_type;  //!< stl conformance
-        using pointer = value_type *;               //!< stl conformance
-        using difference_type = std::ptrdiff_t;     //!< stl conformance
-        using iterator_category =
-            std::forward_iterator_tag;  //!< stl conformance
-        using reference = value_type;   //!< stl conformance
+        using value_type = std::tuple<DynCcoord_t, Real>;  //!< stl conformance
+
         //! constructor
-        explicit iterator(const IncompletePixels & pixels, bool begin = true);
+        iterator(const IncompletePixels & pixels, Dim_t dim, bool begin = true);
+
         // deconstructor
         virtual ~iterator() = default;
+
         //! dereferencing
-        auto operator*() -> value_type const;
+        value_type operator*() const;
+
+        template <Dim_t DimS>
+        value_type deref_helper() const;
+
         //! pre-increment
-        auto operator++() -> iterator &;
+        iterator & operator++();
+
         //! inequality
-        auto operator!=(const iterator & other) -> bool;
+        bool operator!=(const iterator & other);
+
         //! equality
         inline bool operator==(const iterator & other) const;
 
-       private:
+       protected:
         const IncompletePixels & incomplete_pixels;
+        Dim_t dim;
         size_t index;
       };
-      inline iterator begin() const { return iterator(*this); }
+
       //! stl conformance
-      inline iterator end() const { return iterator(*this, false); }
-      //! stl conformance
-      inline size_t size() const {
-        return muGrid::CcoordOps::get_size(this->cell.get_nb_domain_grid_pts());
+      inline iterator begin() const {
+        return iterator(*this, this->cell.get_spatial_dim());
       }
 
-     private:
-      CellSplit<DimS, DimM> & cell;
+      //! stl conformance
+      inline iterator end() const {
+        return iterator(*this, this->cell.get_spatial_dim(), false);
+      }
+
+      //! stl conformance
+      inline size_t size() const {
+        return muGrid::CcoordOps::get_size(
+            this->cell.projection->get_nb_subdomain_grid_pts());
+      }
+
+     protected:
+      const CellSplit & cell;
       std::vector<Real> incomplete_assigned_ratios;
-      std::vector<int> index_incomplete_pixels;
+      std::vector<Dim_t> index_incomplete_pixels;
     };
 
-    auto make_incomplete_pixels() -> IncompletePixels;
+    IncompletePixels make_incomplete_pixels();
+
+    //! makes sure every pixel has been assigned to materials whose ratios add
+    //! up to 1.0
+    void check_material_coverage() const final;
+
+    // full resppnse is composed of the stresses and tangent matrix
+    const muGrid::RealField & evaluate_stress() final;
+
+    // stress and the tangent of the response of the cell_split
+    std::tuple<const muGrid::RealField &, const muGrid::RealField &>
+    evaluate_stress_tangent() final;
 
    protected:
-    void check_material_coverage() final;
     // this function make the initial magnitude of the
     // stress and stiffness tensors to zero
     void set_p_k_zero();
-    // full resppnse is composed of the stresses and tangent matrix
-    FullResponse_t evaluate_stress_tangent(StrainField_t & F) override;
-    std::array<ConstVector_ref, 2> evaluate_stress_tangent() override;
-    ConstVector_ref evaluate_stress() override;
 
    private:
   };

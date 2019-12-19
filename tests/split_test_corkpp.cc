@@ -50,23 +50,20 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_CASE(corkpp_test_3D) {
     constexpr Dim_t dim{threeD};
-    using Vector_t = typename RootNode<dim, SplitCell::laminate>::Vector_t;
-    using Rcoord = Rcoord_t<dim>;
-    using Ccoord = Ccoord_t<dim>;
-    constexpr Ccoord nb_pixels{1, 1, 1};
-    constexpr Rcoord lengths{1.0, 1.0, 1.0};
+    DynCcoord_t nb_pixels{1, 1, 1};
+    DynRcoord_t lengths{1.0, 1.0, 1.0};
     constexpr Real corkpp_precision{1e-5};
-
-    auto fft_ptr_split{std::make_unique<muFFT::FFTWEngine<dim>>(
-        nb_pixels, muGrid::ipow(dim, 2))};
-    auto proj_ptr_split{std::make_unique<ProjectionFiniteStrainFast<dim, dim>>(
-        std::move(fft_ptr_split), lengths)};
-    CellSplit<dim, dim> sys_split(std::move(proj_ptr_split));
-
+    auto fft_ptr{std::make_unique<muFFT::FFTWEngine>(nb_pixels, 1)};
+    auto proj_ptr{std::make_unique<ProjectionFiniteStrainFast<dim>>(
+        std::move(fft_ptr), lengths)};
+    Cell sys_1(std::move(proj_ptr));
     constexpr Real x{0.646416436};
     constexpr Real y{0.475466546};
-    std::vector<Rcoord> precipitate_vertices{};
-    std::vector<Vector_t> p_v{};
+    std::vector<DynRcoord_t> precipitate_vertices{};
+
+    // using the class Vectors written in common/intersection_octree.hh
+    // instead of std:vector<Eigen::matrix<Real, dim, 1>>
+    Vectors_t p_v(dim);
 
     precipitate_vertices.push_back({0.00, 0.00, 0.00});
     precipitate_vertices.push_back({x, 0.00, 0.00});
@@ -75,12 +72,10 @@ namespace muSpectre {
     precipitate_vertices.push_back({y, y, y});
 
     for (auto && vertex : precipitate_vertices) {
-      Vector_t tmp_vec = Vector_t(vertex.data());
-      p_v.push_back(tmp_vec);
+      p_v.push_back(vertex);
     }
 
-    RootNode<dim, SplitCell::laminate> precipitate(sys_split,
-                                                   precipitate_vertices);
+    RootNode<SplitCell::laminate> precipitate(sys_1, precipitate_vertices);
 
     auto && precipitate_intersection_ratios{
         precipitate.get_intersection_ratios()};
@@ -89,11 +84,14 @@ namespace muSpectre {
 
     // Volume of each of the three tetrahedra can be calculated via:
     // Volume = 1/6*abs(dot(cross(P2-P0,P3-P0),P4-P0))
-    Real ratio_ref{
-        3.0 * (1.0 / 6.0) *
-        ((p_v[1] - p_v[0]).cross(p_v[2] - p_v[0])).dot(p_v[4] - p_v[0])};
+    Real ratio_ref{3.0 * (1.0 / 6.0) *
+                   ((p_v.at<dim>(1) - p_v.at<dim>(0))
+                        .cross(p_v.at<dim>(2) - p_v.at<dim>(0)))
+                       .dot(p_v.at<dim>(4) - p_v.at<dim>(0))};
+
     // the average normal is the unit vector aligned with {1.0 ,1.0 ,1.0}
-    Vector_t normal_ref{sqrt(3) / 3, sqrt(3) / 3, sqrt(3) / 3};
+    Eigen::Matrix<Real, dim, 1> normal_ref{sqrt(3) / 3, sqrt(3) / 3,
+                                           sqrt(3) / 3};
 
     auto && ratio{precipitate_intersection_ratios[0]};
     auto && normal{precipitate_intersects_normals[0]};
@@ -104,28 +102,24 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_CASE(corkpp_test_2D) {
     constexpr Dim_t dim{twoD};
-    using Rcoord = Rcoord_t<dim>;
-    using Ccoord = Ccoord_t<dim>;
-    constexpr Ccoord nb_pixels{1, 1};
-    constexpr Rcoord lengths{1.0, 1.0};
+    DynCcoord_t nb_pixels{1, 1};
+    DynRcoord_t lengths{1.0, 1.0};
     constexpr Real corkpp_precision{1e-4};
 
-    auto fft_ptr_split{std::make_unique<muFFT::FFTWEngine<dim>>(
-        nb_pixels, muGrid::ipow(dim, 2))};
-    auto proj_ptr_split{std::make_unique<ProjectionFiniteStrainFast<dim, dim>>(
+    auto fft_ptr_split{std::make_unique<muFFT::FFTWEngine>(nb_pixels, 1)};
+    auto proj_ptr_split{std::make_unique<ProjectionFiniteStrainFast<dim>>(
         std::move(fft_ptr_split), lengths)};
-    CellSplit<dim, dim> sys_split(std::move(proj_ptr_split));
+    CellSplit sys_split{std::move(proj_ptr_split)};
 
     constexpr Real x{0.646416436};
     constexpr Real y{0.475466546};
-    std::vector<Rcoord> precipitate_vertices{};
+    std::vector<DynRcoord_t> precipitate_vertices{};
     precipitate_vertices.push_back({0.00, 0.00});
     precipitate_vertices.push_back({x, 0.00});
     precipitate_vertices.push_back({0.00, x});
     precipitate_vertices.push_back({y, y});
 
-    RootNode<dim, SplitCell::laminate> precipitate(sys_split,
-                                                   precipitate_vertices);
+    RootNode<SplitCell::laminate> precipitate(sys_split, precipitate_vertices);
 
     auto && precipitate_intersection_ratios{
         precipitate.get_intersection_ratios()};
@@ -135,8 +129,7 @@ namespace muSpectre {
     // the area of each triangle of the two is (x * y / 2.0)
     Real ratio_ref{2.0 * (x * y / 2.0)};
     // the average normal is the unit vector aligned with {1.0 ,1.0}
-    RootNode<dim, SplitCell::laminate>::Vector_t normal_ref{sqrt(2) / 2,
-                                                            sqrt(2) / 2};
+    Eigen::Matrix<Real, dim, 1> normal_ref{sqrt(2) / 2, sqrt(2) / 2};
     auto && ratio{precipitate_intersection_ratios[0]};
     auto && normal{precipitate_intersects_normals[0]};
     BOOST_CHECK_LE((normal - normal_ref).norm(), corkpp_precision);

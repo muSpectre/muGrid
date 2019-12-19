@@ -105,7 +105,6 @@ namespace muSpectre {
      */
     static MaterialLinearOrthotropic<DimM> &
     make(Cell & cell, const std::string & name,
-         const Dim_t & spatial_dimension, const Dim_t & nb_quad_pts,
          const std::vector<Real> & input);
 
    protected:
