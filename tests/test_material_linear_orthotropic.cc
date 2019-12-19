@@ -55,7 +55,7 @@
 
 namespace muSpectre {
 
-  BOOST_AUTO_TEST_SUITE(orthootropic_material_tests);
+  BOOST_AUTO_TEST_SUITE(orthotropic_material_tests);
 
   BOOST_AUTO_TEST_CASE(orthotropic_twoD) {
     constexpr Dim_t Dim{twoD};

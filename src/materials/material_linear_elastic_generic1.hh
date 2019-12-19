@@ -74,10 +74,14 @@ namespace muSpectre {
     //! declare what type of stress measure your law yields as output
     constexpr static auto stress_measure{StressMeasure::PK2};
   };
-
   /**
    * Linear elastic law defined by a full stiffness tensor. Very
-   * generic, but not most efficient
+   * generic, but not most efficient. Note: it is template by ImpMaterial to
+   * make other materials to inherit form this class without any malfunctioning.
+   * i.e. the typeof classes inherits from this class will be passed to
+   * MaterialMuSpectre and MAterialMuSpectre will be able to access their types
+   * and methods directly without any interference of
+   * MaterialLinearElasticGeneric1.
    */
   template <Dim_t DimM>
   class MaterialLinearElasticGeneric1
@@ -149,20 +153,25 @@ namespace muSpectre {
      */
     const muGrid::T4Mat<Real, DimM> & get_C() const { return this->C; }
 
+    template <class Derived1, class Derived2>
+    void make_C_from_C_voigt(const Eigen::MatrixBase<Derived1> & C_voigt,
+                             Eigen::MatrixBase<Derived2> & C_holder);
+
    protected:
-    // Here, the stiffness tensor is encapsulated into a unique ptr because of
-    // this bug:
+    // Here, the stiffness tensor is encapsulated into a unique ptr because
+    // of this bug:
     // https://eigen.tuxfamily.narkive.com/maHiFSha/fixed-size-vectorizable-members-and-std-make-shared
     // . The problem is that `std::make_shared` uses the global `::new` to
-    // allocate `void *` rather than using the the object's `new` operator, and
-    // therefore ignores the solution proposed by eigen (documented here
+    // allocate `void *` rather than using the the object's `new` operator,
+    // and therefore ignores the solution proposed by eigen (documented here
     // http://eigen.tuxfamily.org/dox-devel/group__TopicStructHavingEigenMembers.html).
     // Offloading the offending object into a heap-allocated structure who's
-    // construction we control fixes this problem temporarily, until we can use
-    // C++17 and guarantee alignment. This comes at the cost of a heap
+    // construction we control fixes this problem temporarily, until we can
+    // use C++17 and guarantee alignment. This comes at the cost of a heap
     // allocation, which is not an issue here, as this happens only once per
     // material and run.
-    std::unique_ptr<muGrid::T4Mat<Real, DimM>> C_holder;  //! stiffness tensor
+    std::unique_ptr<muGrid::T4Mat<Real, DimM>> C_holder;  //! stiffness
+                                                          //! tensor
     const muGrid::T4Mat<Real, DimM> & C;
   };
 

@@ -51,8 +51,10 @@ namespace muSpectre {
       -> Stiffness_t {
     // the correct size of the input according to the dimension
     std::array<Dim_t, 2> constexpr input_size{6, 21};
+
     // stiffness_matrix
     Stiffness_t C4{Stiffness_t::Zero()};
+
     // voigt stiffness matrix
     Stiffness_t C4_v{Stiffness_t::Zero()};
 
@@ -73,29 +75,29 @@ namespace muSpectre {
 
     for (int i{0}; i < vsize(DimM); ++i) {
       // diagonal terms
-      C4(i, i) = input[counter];
+      C4_v(i, i) = input[counter];
       counter++;
       for (int j{i + 1}; j < vsize(DimM); ++j) {
-        C4(i, j) = C4(j, i) = input[counter];
+        C4_v(i, j) = C4_v(j, i) = input[counter];
         if (j >= DimM) {
-          C4(j + v_diff, i) = C4(j, i + v_diff) = C4(i + v_diff, j) =
-              C4(i, j + v_diff) = input[counter];
+          C4_v(j + v_diff, i) = C4_v(j, i + v_diff) = C4_v(i + v_diff, j) =
+              C4_v(i, j + v_diff) = input[counter];
         }
         counter++;
       }
     }
 
-    C4.bottomRightCorner(v_diff, v_diff) =
-        C4.block(DimM + v_diff, DimM, v_diff, v_diff) =
-            C4.block(DimM, DimM + v_diff, v_diff, v_diff) =
-                C4.block(DimM, DimM, v_diff, v_diff);
+    C4_v.bottomRightCorner(v_diff, v_diff) =
+        C4_v.block(DimM + v_diff, DimM, v_diff, v_diff) =
+            C4_v.block(DimM, DimM + v_diff, v_diff, v_diff) =
+                C4_v.block(DimM, DimM, v_diff, v_diff);
 
     for (int i = 0; i < DimM * DimM; i++) {
       for (int j = 0; j < DimM * DimM; j++) {
-        C4_v(i, j) = C4(v_order[i], v_order[j]);
+        C4(i, j) = C4_v(v_order[i], v_order[j]);
       }
     }
-    return C4_v;
+    return C4;
   }
 
   /* ---------------------------------------------------------------------- */

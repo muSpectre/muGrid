@@ -88,13 +88,14 @@ namespace muSpectre {
           T4 K{T4::Zero()};
           Tmap Kmap{K.data()};
 
-          for (int i = 0; i < Dim; ++i) {
-            for (int m = 0; m < Dim; ++m) {
-              for (int n = 0; n < Dim; ++n) {
+          // K = [I _⊗ S] + [F _⊗ I] C [F _⊗ I]ᵀ
+          for (int i{0}; i < Dim; ++i) {
+            for (int m{0}; m < Dim; ++m) {
+              for (int n{0}; n < Dim; ++n) {
                 get(Kmap, i, m, i, n) += S(m, n);
-                for (int j = 0; j < Dim; ++j) {
-                  for (int r = 0; r < Dim; ++r) {
-                    for (int s = 0; s < Dim; ++s) {
+                for (int j{0}; j < Dim; ++j) {
+                  for (int r{0}; r < Dim; ++r) {
+                    for (int s{0}; s < Dim; ++s) {
                       get(Kmap, i, m, j, n) +=
                           F(i, r) * get(C, r, m, s, n) * (F(j, s));
                     }
@@ -103,8 +104,8 @@ namespace muSpectre {
               }
             }
           }
-          T2 P =
-              compute(std::forward<Strain_t>(F), std::forward<Stress_t>(S));
+
+          T2 P = compute(std::forward<Strain_t>(F), std::forward<Stress_t>(S));
           return std::make_tuple(std::move(P), std::move(K));
         }
       };
@@ -134,12 +135,12 @@ namespace muSpectre {
           T4 K{T4::Zero()};
           Tmap Kmap{K.data()};
 
-          for (int i = 0; i < Dim; ++i) {
-            for (int m = 0; m < Dim; ++m) {
-              for (int n = 0; n < Dim; ++n) {
+          for (int i{0}; i < Dim; ++i) {
+            for (int m{0}; m < Dim; ++m) {
+              for (int n{0}; n < Dim; ++n) {
                 get(Kmap, i, m, i, n) += S(m, n);
-                for (int j = 0; j < Dim; ++j) {
-                  for (int r = 0; r < Dim; ++r) {
+                for (int j{0}; j < Dim; ++j) {
+                  for (int r{0}; r < Dim; ++r) {
                     get(Kmap, i, m, j, n) += F(i, r) * get(C, r, m, j, n);
                   }
                 }
@@ -190,7 +191,21 @@ namespace muSpectre {
                                  std::forward<Tangent_t>(C));
         }
       };
-
+      // ----------------------------------------------------------------------
+      /**
+       * Specialisation for the case where we get material stress
+       * (Piola-Kirchhoff-2, PK2) and we need to have Kirchhoff stress (τ)
+       */
+      template <Dim_t Dim, StrainMeasure StrainM>
+      struct Kirchhoff_stress<Dim, StressMeasure::PK2, StrainM>
+          : public Kirchhoff_stress<Dim, StressMeasure::no_stress_,
+                                    StrainMeasure::no_strain_> {
+        //! returns the converted stress
+        template <class Strain_t, class Stress_t>
+        inline static decltype(auto) compute(Strain_t && F, Stress_t && S) {
+          return F * S * F.transpose();
+        }
+      };
     }  // namespace internal
 
   }  // namespace MatTB

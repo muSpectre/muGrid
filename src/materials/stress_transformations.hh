@@ -67,7 +67,6 @@ namespace muSpectre {
                     "Stress and strain tensors have differing dimensions");
       static_assert((dim == muGrid::EigenCheck::tensor_4_dim<Tangent_t>::value),
                     "Stress and tangent tensors have differing dimensions");
-
       return internal::PK1_stress<dim, StressM, StrainM>::compute(
           std::forward<Strain_t>(strain), std::forward<Stress_t>(stress),
           std::forward<Tangent_t>(tangent));
@@ -100,6 +99,18 @@ namespace muSpectre {
       return internal::PK2_stress<dim, StressM, StrainM>::compute(
           std::forward<Strain_t>(strain), std::forward<Stress_t>(stress),
           std::forward<Tangent_t>(tangent));
+    }
+
+    /* ---------------------------------------------------------------------- */
+    //! set of functions returning an expression for Kirchhoff stress based on
+    template <StressMeasure StressM, StrainMeasure StrainM, class Stress_t,
+              class Strain_t>
+    decltype(auto) Kirchhoff_stress(Strain_t && strain, Stress_t && stress) {
+      constexpr Dim_t dim{muGrid::EigenCheck::tensor_dim<Strain_t>::value};
+      static_assert((dim == muGrid::EigenCheck::tensor_dim<Stress_t>::value),
+                    "Stress and strain tensors have differing dimensions");
+      return internal::Kirchhoff_stress<dim, StressM, StrainM>::compute(
+          std::forward<Strain_t>(strain), std::forward<Stress_t>(stress));
     }
 
   }  // namespace MatTB

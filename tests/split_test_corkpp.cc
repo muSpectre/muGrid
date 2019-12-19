@@ -34,15 +34,18 @@
  */
 
 #include "tests.hh"
-#include "libmufft/fftw_engine.hh"
+
 #include "projection/projection_finite_strain_fast.hh"
 #include "materials/material_linear_elastic1.hh"
-#include "libmugrid/iterators.hh"
-#include "libmugrid/ccoord_operations.hh"
-#include "common/muSpectre_common.hh"
+
 #include "cell/cell_factory.hh"
 #include "cell/cell_split.hh"
 #include "common/intersection_octree.hh"
+
+#include <libmugrid/iterators.hh>
+#include <libmugrid/ccoord_operations.hh>
+
+#include <libmufft/fftw_engine.hh>
 
 namespace muSpectre {
 

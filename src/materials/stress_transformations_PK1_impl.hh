@@ -66,7 +66,7 @@ namespace muSpectre {
       /** Specialisation for the transparent case, where we already have PK1
           stress *and* stiffness is given with respect to the transformation
           gradient
-       **/
+      **/
       template <Dim_t Dim>
       struct PK1_stress<Dim, StressMeasure::PK1, StrainMeasure::Gradient>
           : public PK1_stress<Dim, StressMeasure::PK1,
@@ -120,25 +120,45 @@ namespace muSpectre {
         template <class Strain_t, class Stress_t, class Tangent_t>
         inline static decltype(auto) compute(Strain_t && F, Stress_t && P,
                                              Tangent_t && K) {
-          using T4 = typename std::remove_reference_t<Tangent_t>::PlainObject;
-          using T2 = typename std::remove_reference_t<Strain_t>::PlainObject;
+          using T2_t = Eigen::Matrix<Real, Dim, Dim>;
+          using T4_t = muGrid::T4Mat<Real, Dim>;
 
-          auto && S{
-              compute(std::forward<Strain_t>(F), std::forward<Stress_t>(P))};
+          T2_t F_inv{F.inverse()};
 
-          auto && S_T4{muGrid::Matrices::outer_under(T2::Identity(), S)};
-          auto && K_tmp{K - S_T4};
+          T2_t S{F_inv * P};
+          T4_t K_tmp{K};
+          T4_t C{T4_t::Zero()};
 
-          T4 F_T4_inv{
-              muGrid::Matrices::outer_under(F, T2::Identity()).inverse()};
-          T4 F_T4_T_inv{
-              (muGrid::Matrices::outer_under(F, T2::Identity()).transpose())
-                  .inverse()};
-          T4 C{F_T4_inv * K_tmp * F_T4_T_inv};
+          // C = [F _⊗ I]⁻¹ [K - [I _⊗ S]] [F_⊗ I]⁻ᵀ
+          // Obtained from the relationship:
+          // K = [I _⊗ S] + [F _⊗ I] C [F_⊗ I]ᵀ
+          for (int i = 0; i < Dim; ++i) {
+            for (int j = 0; j < Dim; ++j) {
+              auto && k{i};
+              for (int l = 0; l < Dim; ++l) {
+                get(K_tmp, i, j, k, l) -= S(j, l);
+              }
+            }
+          }
+          for (int i = 0; i < Dim; ++i) {
+            for (int j = 0; j < Dim; ++j) {
+              for (int k = 0; k < Dim; ++k) {
+                for (int l = 0; l < Dim; ++l) {
+                  for (int m = 0; m < Dim; ++m) {
+                    for (int n = 0; n < Dim; ++n) {
+                      get(C, i, j, k, l) +=
+                          F_inv(i, m) * get(K_tmp, m, j, n, l) * F_inv(k, n);
+                    }
+                  }
+                }
+              }
+            }
+          }
 
           return std::make_tuple(std::move(S), std::move(C));
         }
-      };
+      };  // namespace internal
+
       /* ---------------------------------------------------------------*/
     }  // namespace internal
 

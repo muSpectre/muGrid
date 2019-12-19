@@ -35,16 +35,17 @@
  *
  */
 #include "tests.hh"
+#include "libmugrid/test_goodies.hh"
+
 #include "materials/material_laminate.hh"
 #include "materials/material_linear_elastic1.hh"
 #include "materials/material_linear_orthotropic.hh"
 #include "cell/cell.hh"
 #include "projection/projection_finite_strain_fast.hh"
 
-#include "libmugrid/test_goodies.hh"
-#include "libmufft/fftw_engine.hh"
-#include "libmugrid/field_collection.hh"
-#include "libmugrid/iterators.hh"
+#include <libmufft/fftw_engine.hh>
+#include <libmugrid/field_collection.hh>
+#include <libmugrid/iterators.hh>
 
 #include <type_traits>
 #include <boost/mpl/list.hpp>

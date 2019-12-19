@@ -49,6 +49,8 @@
 
 #include "cell/cell.hh"
 
+#include "libmugrid/field_map_static.hh"
+
 #include <tuple>
 #include <type_traits>
 #include <iterator>
@@ -102,6 +104,11 @@ namespace muSpectre {
     //! traits for the CRTP subclass
     using traits = MaterialMuSpectre_traits<Material>;
     using DynMatrix_t = Parent::DynMatrix_t;
+
+    using Strain_t = Eigen::Matrix<Real, DimM, DimM>;
+    using Stress_t = Strain_t;
+    using Stiffness_t = muGrid::T4Mat<Real, DimM>;
+
     //! Default constructor
     MaterialMuSpectre() = delete;
 
@@ -408,18 +415,15 @@ namespace muSpectre {
           "Type mismatch for ratio reference, expected a real number");
       auto && strain{std::get<0>(arglist)};
       auto && stress_stiffness{std::get<1>(arglist)};
-      auto && stress{std::get<0>(stress_stiffness)};
-      auto && stiffness{std::get<1>(stress_stiffness)};
       auto && quad_pt_id{std::get<2>(arglist)};
-      auto && ratio{std::get<3>(arglist)};
+
       if (IsCellSplit == SplitCell::simple) {
-        auto && stress_stiffness_mat{MatTB::constitutive_law_tangent<Form>(
-            this_mat, strain, quad_pt_id)};
-        stress += ratio * std::get<0>(stress_stiffness_mat);
-        stiffness += ratio * std::get<1>(stress_stiffness_mat);
+        auto && ratio{std::get<3>(arglist)};
+        MatTB::constitutive_law_tangent<Form>(
+            this_mat, strain, stress_stiffness, quad_pt_id, ratio);
       } else {
-        stress_stiffness =
-            MatTB::constitutive_law_tangent<Form>(this_mat, strain, quad_pt_id);
+        MatTB::constitutive_law_tangent<Form>(this_mat, strain,
+                                              stress_stiffness, quad_pt_id);
       }
     }
   }
@@ -468,13 +472,13 @@ namespace muSpectre {
       auto && strain{std::get<0>(arglist)};
       auto && stress{std::get<0>(std::get<1>(arglist))};
       auto && quad_pt_id{std::get<2>(arglist)};
-      auto && ratio{std::get<3>(arglist)};
 
       if (IsCellSplit == SplitCell::simple) {
-        stress +=
-            ratio * MatTB::constitutive_law<Form>(this_mat, strain, quad_pt_id);
+        auto && ratio{std::get<3>(arglist)};
+        MatTB::constitutive_law<Form>(this_mat, strain, stress, quad_pt_id,
+                                      ratio);
       } else {
-        stress = MatTB::constitutive_law<Form>(this_mat, strain, quad_pt_id);
+        MatTB::constitutive_law<Form>(this_mat, strain, stress, quad_pt_id);
       }
     }
   }
@@ -486,31 +490,40 @@ namespace muSpectre {
       const size_t & quad_pt_index, const Formulation & form)
       -> std::tuple<DynMatrix_t, DynMatrix_t> {
     auto & this_mat = static_cast<Material &>(*this);
-    Eigen::Map<const Eigen::Matrix<Real, DimM, DimM>> F(strain.data());
+
+    Eigen::Map<const Strain_t> F(strain.data());
+
+    Stress_t P{};
+    Stiffness_t K{};
+    std::tuple<Stress_t, Stiffness_t> PK{std::make_tuple(P, K)};
 
     if (strain.cols() != DimM or strain.rows() != DimM) {
       std::stringstream error{};
       error << "incompatible strain shape, expected " << DimM << " × " << DimM
             << ", but received " << strain.rows() << " × " << strain.cols()
-            << ".";
+            << "." << std::endl;
       throw MaterialError(error.str());
     }
+
     switch (form) {
     case Formulation::finite_strain: {
-      return MatTB::constitutive_law_tangent<Formulation::finite_strain>(
-          this_mat, std::make_tuple(F), quad_pt_index);
+      MatTB::constitutive_law_tangent<Formulation::finite_strain>(
+          this_mat, std::make_tuple(F), PK, quad_pt_index);
+      return PK;
       break;
     }
     case Formulation::small_strain: {
-      return MatTB::constitutive_law_tangent<Formulation::small_strain>(
-          this_mat, std::make_tuple(F), quad_pt_index);
+      MatTB::constitutive_law_tangent<Formulation::small_strain>(
+          this_mat, std::make_tuple(F), PK, quad_pt_index);
+      return PK;
       break;
     }
     default:
-      throw MaterialError("unknown formulation");
+      throw MaterialError("Unknown formulation");
       break;
     }
   }
+
   /* ---------------------------------------------------------------------- */
 }  // namespace muSpectre
 

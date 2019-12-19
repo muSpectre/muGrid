@@ -75,7 +75,7 @@ namespace muSpectre {
                         "The requested Stress conversion is not implemented. "
                         "You either made a programming mistake or need to "
                         "implement it as a specialisation of this function. "
-                        "See PK2stress<PK1,T1, T2> for an example.");
+                        "See PK2_stress<PK1,T1, T2> for an example.");
         }
       };
 
@@ -106,6 +106,39 @@ namespace muSpectre {
           static_assert((StressM == StressMeasure::Cauchy) &&
                             (StressM == StressMeasure::PK2),
                         "The requested Stress conversion is not implemented. "
+                        "You either made a programming mistake or need to "
+                        "implement it as a specialisation of this function. "
+                        "See PK1stress<PK2,T1, T2> for an example.");
+        }
+      };
+
+      /** Structure for functions returning PK2 stress from other stress
+       *measures
+       **/
+      template <Dim_t Dim, StressMeasure StressM, StrainMeasure StrainM>
+      struct Kirchhoff_stress {
+        //! returns the converted stress
+        template <class Strain_t, class Stress_t>
+        inline static decltype(auto) compute(Strain_t && /*strain*/,
+                                             Stress_t && /*stress*/) {
+          // the following test always fails to generate a compile-time error
+          static_assert((StressM == StressMeasure::Cauchy) &&
+                            (StressM == StressMeasure::Kirchhoff),
+                        "The requested Stress conversion is not implemented. "
+                        "You either made a programming mistake or need to "
+                        "implement it as a specialisation of this function. "
+                        "See PK1stress<PK2,T1, T2> for an example.");
+        }
+
+        //! returns the converted stress and stiffness
+        template <class Strain_t, class Stress_t, class Tangent_t>
+        inline static decltype(auto) compute(Strain_t && /*strain*/,
+                                             Stress_t && /*stress*/,
+                                             Tangent_t && /*stiffness*/) {
+          // the following test always fails to generate a compile-time error
+          static_assert((StressM == StressMeasure::Cauchy) &&
+                            (StressM == StressMeasure::PK2),
+                        "The requested Stress conversion is not implemented."
                         "You either made a programming mistake or need to "
                         "implement it as a specialisation of this function. "
                         "See PK1stress<PK2,T1, T2> for an example.");

@@ -53,19 +53,23 @@ class MaterialLinearElasticGeneric2_Check(unittest.TestCase):
         E, nu =  210e9, .33
         lam, mu = E*nu/((1+nu)*(1-2*nu)), E/(2*(1+nu))
 
-        C = np.array([[2 * mu + lam,          lam,          lam,  0,  0,  0],
-                      [         lam, 2 * mu + lam,          lam,  0,  0,  0],
-                      [         lam,          lam, 2 * mu + lam,  0,  0,  0],
-                      [           0,            0,            0, mu,  0,  0],
-                      [           0,            0,            0,  0, mu,  0],
-                      [           0,            0,            0,  0,  0, mu]])
+        # C = np.array([[2 * mu + lam,          lam,          lam,  0,  0,  0],
+        #               [         lam, 2 * mu + lam,          lam,  0,  0,  0],
+        #               [         lam,          lam, 2 * mu + lam,  0,  0,  0],
+        #               [           0,            0,            0, mu,  0,  0],
+        #               [           0,            0,            0,  0, mu,  0],
+        #               [           0,            0,            0,  0,  0, mu]])
+
+        C = np.array([[2 * mu + lam,          lam,            0],
+                      [         lam, 2 * mu + lam,            0],
+                      [           0,            0,           mu]])
 
         self.mat1 = µ.material.MaterialLinearElasticGeneric1_2d.make(
             self.cell1, "simple", C)
         self.mat2 = µ.material.MaterialLinearElasticGeneric2_2d.make(
             self.cell2, "eigen", C)
         self.mat3 = µ.material.MaterialLinearElastic2_2d.make(
-            self.cell2, "eigen2", 120e9, .33)
+            self.cell2, "eigen2", E, nu)
 
 
     def test_solve(self):

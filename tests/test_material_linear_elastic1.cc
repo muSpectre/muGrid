@@ -132,24 +132,24 @@ namespace muSpectre {
       boost::mpl::list<MaterialFixtureFilled<MaterialLinearElastic1<twoD>>,
                        MaterialFixtureFilled<MaterialLinearElastic1<threeD>>>;
 
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_evaluate_single_pixel, Fix, mat_fill,
-                                   Fix) {
-    Eigen::Matrix<Real, Fix::mdim, Fix::mdim> I{
-        Eigen::Matrix<Real, Fix::mdim, Fix::mdim>::Identity() +
-        0.1 * Eigen::Matrix<Real, Fix::mdim, Fix::mdim>::Random()};
-    auto origin_eval_func_result = Fix::evaluate_stress_tangent(I, 0);
-    auto base_eval_func_result =
-        Fix::constitutive_law_dynamic(I, 0, Formulation::small_strain);
-    Real error{(std::get<0>(origin_eval_func_result) -
-                std::get<0>(base_eval_func_result))
-               .norm()/std::get<0>(base_eval_func_result).norm()};
-    BOOST_CHECK_LT(error, tol);
-    error = (std::get<1>(origin_eval_func_result) -
-             std::get<1>(base_eval_func_result))
-                .norm() /
-            std::get<1>(base_eval_func_result).norm();
-    BOOST_CHECK_LT(error, tol);
-  }
+  // BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_evaluate_single_pixel, Fix, mat_fill,
+  //                                  Fix) {
+  //   Eigen::Matrix<Real, Fix::mdim, Fix::mdim> I{
+  //       Eigen::Matrix<Real, Fix::mdim, Fix::mdim>::Identity() +
+  //       0.1 * Eigen::Matrix<Real, Fix::mdim, Fix::mdim>::Random()};
+  //   auto origin_eval_func_result = Fix::evaluate_stress_tangent(I, 0);
+    // auto base_eval_func_result =
+    //     Fix::constitutive_law_dynamic(I, 0, Formulation::small_strain);
+    // Real error{(std::get<0>(origin_eval_func_result) -
+    //             std::get<0>(base_eval_func_result))
+    //            .norm()/std::get<0>(base_eval_func_result).norm()};
+    // BOOST_CHECK_LT(error, tol);
+    // error = (std::get<1>(origin_eval_func_result) -
+    //          std::get<1>(base_eval_func_result))
+    //             .norm() /
+    //         std::get<1>(base_eval_func_result).norm();
+    // BOOST_CHECK_LT(error, tol);
+  // }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_iterable_proxy_constructors, Fix,
                                    mat_fill, Fix) {

@@ -37,15 +37,13 @@
 #include "tests.hh"
 #include "tests/libmugrid/test_goodies.hh"
 
-#include "materials/material_linear_elastic1.hh"
 #include "materials/material_linear_elastic2.hh"
 #include "materials/material_linear_orthotropic.hh"
 #include "materials/laminate_homogenisation.hh"
-#include "materials/materials_toolbox.hh"
-#include "materials/stress_transformations.hh"
-#include "libmugrid/field_collection.hh"
-#include "libmugrid/iterators.hh"
-#include "libmugrid/tensor_algebra.hh"
+
+#include <libmugrid/field_collection.hh>
+#include <libmugrid/iterators.hh>
+#include <libmugrid/tensor_algebra.hh>
 
 #include <type_traits>
 #include <typeinfo>

@@ -67,9 +67,9 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         Poisson = 0.30
         mu = Young / (2*(1+Poisson))
 
-        np.random.seed(102919) # just the date
+        np.random.seed(102920) # just the date
         yield_crit = mu * (0.025 + 0.05 * np.random.random(nb_grid_pts))
-        E = Young * (0.5 + 0.5 * np.random.random(nb_grid_pts))
+        E = Young * (0.6 + 0.3 * np.random.random(nb_grid_pts))
         hardening = 1
 
         ### µSpectre init stuff

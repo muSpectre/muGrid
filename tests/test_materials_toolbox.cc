@@ -163,15 +163,16 @@ namespace muSpectre {
     auto error = rel_error(Sref, S);
     BOOST_CHECK_LT(error, tol);
 
-    T4 K = Matrices::outer_under(I, S) +
-           Matrices::outer_under(F, I) * C *
-               Matrices::outer_under(F.transpose(), I);
+    T4 K = (Matrices::outer_under(I, S) +
+            (Matrices::outer_under(F, I) * C *
+             Matrices::outer_under(F.transpose(), I)));
 
     // See Curnier, 2000, "Méthodes numériques en mécanique des solides", p 252
     T4 Kref;
     Real Fkrkr = (F.array() * F.array()).sum();
     T2 Fkmkn = F.transpose() * F;
     T2 Fisjs = F * F.transpose();
+
     Kref.setZero();
     for (Dim_t i = 0; i < dim; ++i) {
       for (Dim_t j = 0; j < dim; ++j) {
@@ -186,6 +187,7 @@ namespace muSpectre {
         }
       }
     }
+
     error = rel_error(Kref, K);
     BOOST_CHECK_LT(error, tol);
 
@@ -206,8 +208,10 @@ namespace muSpectre {
     auto && stress_tgt =
         MatTB::PK1_stress<StressMeasure::PK2, StrainMeasure::GreenLagrange>(
             F, S, C);
+
     T2 P_t = std::move(std::get<0>(stress_tgt));
     T4 K_t = std::move(std::get<1>(stress_tgt));
+
     error = rel_error(P_t, Pref);
     BOOST_CHECK_LT(error, tol);
 
@@ -223,11 +227,13 @@ namespace muSpectre {
 
     error = rel_error(stress_back, S);
     BOOST_CHECK_LT(error, tol);
+
     error = rel_error(stress_back, stress_back.transpose());
     BOOST_CHECK_LT(error, tol);
 
     error = rel_error(stiffness_back, C);
     BOOST_CHECK_LT(error, tol);
+
     error = rel_error(stiffness_back, stiffness_back.transpose());
     BOOST_CHECK_LT(error, tol);
 
@@ -351,6 +357,7 @@ namespace muSpectre {
 
     using cmap_t = Eigen::Map<const Eigen::Matrix<Real, Dim * Dim, 1>>;
     using map_t = Eigen::Map<Eigen::Matrix<Real, Dim * Dim, 1>>;
+
     auto fun = [&](const T2_t & x) -> T2_t {
       cmap_t x_vec{x.data()};
       T2_t ret_val{};
@@ -370,7 +377,7 @@ namespace muSpectre {
       std::cout << numerical_tangent << std::endl << std::endl;
     }
 
-    Real error{(numerical_tangent - Q).norm() / Q.norm()};
+    Real error{rel_error(numerical_tangent, Q)};
 
     BOOST_CHECK_LT(error, tol);
     if (not(error < tol)) {
@@ -431,7 +438,7 @@ namespace muSpectre {
     if (verbose) {
       std::cout << "stress:\n" << stress << std::endl;
     }
-    const auto *p = &stress(0, 0);  // pointer to stress
+    const auto * p = &stress(0, 0);  // pointer to stress
     if (verbose) {
       std::cout << "*p: " << p << std::endl;
     }

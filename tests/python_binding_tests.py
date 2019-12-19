@@ -61,9 +61,9 @@ from python_stochastic_plasticity_search_test import \
 
 from python_projection_tests import *
 
-#from python_cell_tests import CellCheck
-#from python_eigen_strain_test import EigenStrainCheck
-from python_solver_test import SolverCheck
+# from python_cell_tests import CellCheck
+# from python_eigen_strain_test import EigenStrainCheck
+# from python_solver_test import SolverCheck
 
 
 if __name__ == '__main__':

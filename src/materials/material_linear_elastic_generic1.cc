@@ -46,30 +46,10 @@ namespace muSpectre {
       : Parent{name, spatial_dimension, nb_quad_pts},
         C_holder{std::make_unique<muGrid::T4Mat<Real, DimM>>()},
         C{*this->C_holder} {
-    using muGrid::get;
-    using VC_t = VoigtConversion<DimM>;
-    constexpr Dim_t VSize{vsize(DimM)};
-    if (not(C_voigt.rows() == VSize) or not(C_voigt.cols() == VSize)) {
-      std::stringstream err_str{};
-      err_str << "The stiffness tensor should be input as a " << VSize << " × "
-              << VSize << " Matrix in Voigt notation. You supplied"
-              << " a " << C_voigt.rows() << " × " << C_voigt.cols()
-              << " matrix";
-    }
-
-    const auto & sym_mat{VC_t::get_sym_mat()};
-    for (int i{0}; i < DimM; ++i) {
-      for (int j{0}; j < DimM; ++j) {
-        for (int k{0}; k < DimM; ++k) {
-          for (int l{0}; l < DimM; ++l) {
-            get(*this->C_holder, i, j, k, l) =
-                C_voigt(sym_mat(i, j), sym_mat(k, l));
-          }
-        }
-      }
-    }
+    MatTB::make_C_from_C_voigt<DimM>(C_voigt, *this->C_holder);
   }
 
+  /* ---------------------------------------------------------------------- */
   template class MaterialLinearElasticGeneric1<twoD>;
   template class MaterialLinearElasticGeneric1<threeD>;
 

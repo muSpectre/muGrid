@@ -34,6 +34,7 @@
  */
 
 #include "tests.hh"
+#include "libmugrid/test_goodies.hh"
 #include "materials/material_linear_elastic2.hh"
 #include "materials/material_evaluator.hh"
 
@@ -42,6 +43,8 @@
 #include "Eigen/Dense"
 
 namespace muSpectre {
+
+  using muGrid::testGoodies::rel_error;
 
   BOOST_AUTO_TEST_SUITE(material_evaluator_tests);
 
@@ -279,19 +282,15 @@ namespace muSpectre {
     T4_t K_estim{
         evaluator.estimate_tangent(F, Formulation::finite_strain, nonlin_step)};
 
-    auto error_comp{[](const auto & a, const auto & b) {
-      return (a - b).norm() / (a + b).norm();
-    }};
-
     constexpr Real finite_diff_tol{1e-9};
-    Real error{error_comp(K, K_estim)};
+    Real error{rel_error(K, K_estim)};
     if (not(error <= finite_diff_tol)) {
       std::cout << "K =" << std::endl << K << std::endl;
       std::cout << "K_estim =" << std::endl << K_estim << std::endl;
     }
     BOOST_CHECK_LE(error, finite_diff_tol);
 
-    error = error_comp(C, C_estim);
+    error = rel_error(C, C_estim);
     if (not(error <= tol)) {
       std::cout << "centred difference:" << std::endl;
       std::cout << "C =" << std::endl << C << std::endl;
@@ -301,7 +300,7 @@ namespace muSpectre {
 
     C_estim = evaluator.estimate_tangent(eps, Formulation::small_strain,
                                          linear_step, FiniteDiff::forward);
-    error = error_comp(C, C_estim);
+    error = rel_error(C, C_estim);
     if (not(error <= tol)) {
       std::cout << "forward difference:" << std::endl;
       std::cout << "C =" << std::endl << C << std::endl;
@@ -311,7 +310,7 @@ namespace muSpectre {
 
     C_estim = evaluator.estimate_tangent(eps, Formulation::small_strain,
                                          linear_step, FiniteDiff::backward);
-    error = error_comp(C, C_estim);
+    error = rel_error(C, C_estim);
     if (not(error <= tol)) {
       std::cout << "backward difference:" << std::endl;
       std::cout << "C =" << std::endl << C << std::endl;

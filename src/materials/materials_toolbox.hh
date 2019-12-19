@@ -39,6 +39,8 @@
 #include "common/muSpectre_common.hh"
 #include "materials/stress_transformations_PK1.hh"
 
+#include "common/voigt_conversion.hh"
+
 #include <libmugrid/eigen_tools.hh>
 #include <libmugrid/T4_map_proxy.hh>
 #include <libmugrid/tensor_algebra.hh>
@@ -89,11 +91,11 @@ namespace muSpectre {
        **/
       template <StrainMeasure In, StrainMeasure Out = In>
       struct ConvertStrain {
-        static_assert((In == StrainMeasure::Gradient) ||
-                          (In == StrainMeasure::Infinitesimal),
-                      "This situation makes me suspect that you are not using "
-                      "MatTb as intended. Disable this assert only if you are "
-                      "sure about what you are doing.");
+        // static_assert((In == StrainMeasure::Gradient) ||
+        //                   (In == StrainMeasure::Infinitesimal),
+        //               "This situation makes me suspect that you are not using
+        //               " "MatTb as intended. Disable this assert only if you
+        //               are " "sure about what you are doing.");
 
         //! returns the converted strain
         template <class Strain_t>
@@ -627,13 +629,35 @@ namespace muSpectre {
     }
 
     /* ----------------------------------------------------------------------*/
+    struct OperationAddition {
+      explicit OperationAddition(const Real & ratio) : ratio{ratio} {};
+      const Real & ratio;
+
+      template <typename Derived1, typename Derived2>
+      void operator()(const Eigen::MatrixBase<Derived1> & material_stress,
+                      Eigen::MatrixBase<Derived2> & stored_stress) const {
+        stored_stress += this->ratio * material_stress;
+      }
+    };
+
+    /* ----------------------------------------------------------------------*/
+    struct OperationAssignment {
+      template <typename Derived1, typename Derived2>
+      void operator()(const Eigen::MatrixBase<Derived1> & material_stress,
+                      Eigen::MatrixBase<Derived2> & stored_stress) const {
+        stored_stress = material_stress;
+      }
+    };
+
+    /* ----------------------------------------------------------------------*/
     namespace internal {
 
       template <Formulation Form>
       struct MaterialStressEvaluator {
-        template <class Material, class Strain>
-        auto static compute(Material & mat, const Strain & strain,
-                            const size_t & quad_pt_id) -> decltype(auto) {
+        template <class Material, class Strain, class Stress, class Op>
+        static void compute(Material & mat, const Strain & strain,
+                            Stress & stress, const size_t & quad_pt_id,
+                            const Op & operation) {
           using traits = MaterialMuSpectre_traits<Material>;
 
           constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
@@ -643,15 +667,17 @@ namespace muSpectre {
           auto && eps =
               MatTB::convert_strain<stored_strain_m, expected_strain_m>(
                   std::get<0>(strain));
-          return mat.evaluate_stress(std::move(eps), quad_pt_id);
+          // stress evaluation:
+          operation(mat.evaluate_stress(std::move(eps), quad_pt_id), stress);
         }
       };
 
       template <>
       struct MaterialStressEvaluator<Formulation::finite_strain> {
-        template <class Material, class Strain>
-        auto static compute(Material & mat, const Strain & strain,
-                            const size_t & quad_pt_id) -> decltype(auto) {
+        template <class Material, class Strain, class Stress, class Op>
+        static void compute(Material & mat, const Strain & strain,
+                            Stress & stress, const size_t & quad_pt_id,
+                            const Op & operation) {
           constexpr static Formulation Form{Formulation::finite_strain};
           using traits = MaterialMuSpectre_traits<Material>;
 
@@ -659,34 +685,49 @@ namespace muSpectre {
           constexpr StrainMeasure expected_strain_m{
               get_formulation_strain_type(Form, traits::strain_measure)};
 
-          auto & grad{std::get<0>(strain)};
+          auto && grad{std::get<0>(strain)};
           auto && E{
               MatTB::convert_strain<stored_strain_m, expected_strain_m>(grad)};
           auto && stress_mat{mat.evaluate_stress(std::move(E), quad_pt_id)};
-          auto stress{::muSpectre::MatTB::PK1_stress<traits::stress_measure,
-                                                     traits::strain_measure>(
-                          std::move(grad), std::move(stress_mat))
-                          .eval()};
-          return stress;
+
+          operation(::muSpectre::MatTB::PK1_stress<traits::stress_measure,
+                                                   traits::strain_measure>(
+                        std::move(grad), std::move(stress_mat)),
+                    stress);
         }
       };
 
     }  // namespace internal
+
     /* ----------------------------------------------------------------------*/
-    template <Formulation Form, class Material, class Strains_t>
-    auto constitutive_law(Material & mat, const Strains_t & Strains,
-                          const size_t & quad_pt_id) -> decltype(auto) {
-      return internal::MaterialStressEvaluator<Form>::compute(mat, Strains,
-                                                              quad_pt_id);
+    template <Formulation Form, class Material, class Strains, class Stresses>
+    void constitutive_law(Material & mat, const Strains & strains,
+                          Stresses & stresses, const size_t & quad_pt_id,
+                          const Real & ratio) {
+      OperationAddition operation_addition(ratio);
+      internal::MaterialStressEvaluator<Form>::compute(
+          mat, strains, stresses, quad_pt_id, operation_addition);
     }
+
+    /* ----------------------------------------------------------------------*/
+    template <Formulation Form, class Material, class Strains, class Stresses>
+    void constitutive_law(Material & mat, const Strains & strains,
+                          Stresses & stresses, const size_t & quad_pt_id) {
+      OperationAssignment operation_assignment;
+      internal::MaterialStressEvaluator<Form>::compute(
+          mat, strains, stresses, quad_pt_id, operation_assignment);
+    }
+
     /* ----------------------------------------------------------------------*/
     namespace internal {
 
       template <Formulation Form>
       struct MaterialStressTangentEvaluator {
-        template <class Material, class Strain>
-        auto static compute(Material & mat, const Strain & strain,
-                            const size_t & quad_pt_id) -> decltype(auto) {
+        template <class Material, class Strain, class Stress, class Stiffness,
+                  class Op>
+        static void compute(Material & mat, const Strain & strain,
+                            std::tuple<Stress, Stiffness> & stress_stiffness,
+                            const size_t & quad_pt_id, const Op & operation) {
           using traits = MaterialMuSpectre_traits<Material>;
 
           constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
@@ -695,15 +736,23 @@ namespace muSpectre {
 
           auto && eps{MatTB::convert_strain<stored_strain_m, expected_strain_m>(
               std::get<0>(strain))};
-          return mat.evaluate_stress_tangent(std::move(eps), quad_pt_id);
+
+          auto && stress_stiffness_mat{
+              mat.evaluate_stress_tangent(std::move(eps), quad_pt_id)};
+          operation(std::get<0>(stress_stiffness_mat),
+                    std::get<0>(stress_stiffness));
+          operation(std::get<1>(stress_stiffness_mat),
+                    std::get<1>(stress_stiffness));
         }
       };
 
       template <>
       struct MaterialStressTangentEvaluator<Formulation::finite_strain> {
-        template <class Material, class Strain>
-        auto static compute(Material & mat, const Strain & strain,
-                            const size_t & quad_pt_id) -> decltype(auto) {
+        template <class Material, class Strain, class Stress, class Stiffness,
+                  class Op>
+        static void compute(Material & mat, const Strain & strain,
+                            std::tuple<Stress, Stiffness> & stress_stiffness,
+                            const size_t & quad_pt_id, const Op & operation) {
           constexpr static Formulation Form{Formulation::finite_strain};
           using traits = MaterialMuSpectre_traits<Material>;
 
@@ -711,27 +760,77 @@ namespace muSpectre {
           constexpr StrainMeasure expected_strain_m{
               get_formulation_strain_type(Form, traits::strain_measure)};
 
-          auto & grad{std::get<0>(strain)};
-          auto && E{
+          auto && grad{std::get<0>(strain)};
+          auto E{
               MatTB::convert_strain<stored_strain_m, expected_strain_m>(grad)};
           auto && stress_stiffness_mat{
               mat.evaluate_stress_tangent(std::move(E), quad_pt_id)};
-          return ::muSpectre::MatTB::PK1_stress<traits::stress_measure,
-                                                traits::strain_measure>(
-              std::move(grad), std::move(std::get<0>(stress_stiffness_mat)),
-              std::move(std::get<1>(stress_stiffness_mat)));
+
+          auto && stress_stiffness_mat_converted{
+              ::muSpectre::MatTB::PK1_stress<traits::stress_measure,
+                                             traits::strain_measure>(
+                  std::move(grad), std::move(std::get<0>(stress_stiffness_mat)),
+                  std::move(std::get<1>(stress_stiffness_mat)))};
+
+          operation(std::get<0>(stress_stiffness_mat_converted),
+                    std::get<0>(stress_stiffness));
+          operation(std::get<1>(stress_stiffness_mat_converted),
+                    std::get<1>(stress_stiffness));
         }
       };  // namespace internal
 
     }  // namespace internal
-    /*----------------------------------------------------------------------*/
-    template <Formulation Form, class Material, class Strains_t>
-    auto constitutive_law_tangent(Material & mat, Strains_t Strains,
-                                  const size_t & quad_pt_id) -> decltype(auto) {
-      return internal::MaterialStressTangentEvaluator<Form>::compute(
-          mat, Strains, quad_pt_id);
+
+    /* ----------------------------------------------------------------------*/
+    template <Formulation Form, class Material, class Strains, class Stresses>
+    void constitutive_law_tangent(Material & mat, const Strains & strains,
+                                  Stresses & stresses,
+                                  const size_t & quad_pt_id) {
+      OperationAssignment operation_assignment;
+      internal::MaterialStressTangentEvaluator<Form>::compute(
+          mat, strains, stresses, quad_pt_id, operation_assignment);
     }
 
+    /*----------------------------------------------------------------------*/
+    template <Formulation Form, class Material, class Strains, class Stresses>
+    void constitutive_law_tangent(Material & mat, const Strains & strains,
+                                  Stresses & stresses,
+                                  const size_t & quad_pt_id,
+                                  const Real & ratio) {
+      OperationAddition operation_addition(ratio);
+      internal::MaterialStressTangentEvaluator<Form>::compute(
+          mat, strains, stresses, quad_pt_id, operation_addition);
+    }
+
+    /*----------------------------------------------------------------------*/
+
+    template <Dim_t DimM, class Derived1, class Derived2>
+    void make_C_from_C_voigt(const Eigen::MatrixBase<Derived1> & C_voigt,
+                             Eigen::MatrixBase<Derived2> & C_holder) {
+      using muGrid::get;
+      using VC_t = VoigtConversion<DimM>;
+      constexpr Dim_t VSize{vsize(DimM)};
+      if (not(C_voigt.rows() == VSize) or not(C_voigt.cols() == VSize)) {
+        std::stringstream err_str{};
+        err_str << "The stiffness tensor should be input as a " << VSize
+                << " × " << VSize << " Matrix in Voigt notation. You supplied"
+                << " a " << C_voigt.rows() << " × " << C_voigt.cols()
+                << " matrix" << std::endl;
+        throw(std::runtime_error(err_str.str()));
+      }
+
+      const auto & sym_mat{VC_t::get_sym_mat()};
+      for (int i{0}; i < DimM; ++i) {
+        for (int j{0}; j < DimM; ++j) {
+          for (int k{0}; k < DimM; ++k) {
+            for (int l{0}; l < DimM; ++l) {
+              get(C_holder, i, j, k, l) = C_voigt(sym_mat(i, j), sym_mat(k, l));
+            }
+          }
+        }
+      }
+    }
+    /*----------------------------------------------------------------------*/
   }  // namespace MatTB
 }  // namespace muSpectre
 

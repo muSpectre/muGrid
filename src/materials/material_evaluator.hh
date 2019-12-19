@@ -190,12 +190,18 @@ namespace muSpectre {
   template <Dim_t DimM>
   auto
   MaterialEvaluator<DimM>::evaluate_stress(const Eigen::Ref<const T2_t> & grad,
-                                           const Formulation & form)
+                                           const Formulation & form_in)
       -> T2_const_map {
     this->check_init();
     this->strain.get_map()[0] = grad;
+    Formulation form_out{Formulation::finite_strain};
+    if (form_in == Formulation::native) {
+      form_out = Formulation::small_strain;
+    } else {
+      form_out = form_in;
+    }
     this->material->compute_stresses(this->strain.get_field(),
-                                     this->stress.get_field(), form);
+                                     this->stress.get_field(), form_out);
     return T2_const_map(this->stress.get_map()[0].data());
   }
 
@@ -213,6 +219,7 @@ namespace muSpectre {
                            T4_const_map(this->tangent.get_map()[0].data()));
   }
 
+  /* ---------------------------------------------------------------------- */
   template <Dim_t DimM>
   void MaterialEvaluator<DimM>::check_init() {
     if (not this->is_initialised) {
@@ -257,13 +264,13 @@ namespace muSpectre {
     for (Dim_t i{}; i < DimM * DimM; ++i) {
       T2_t strain2{grad};
       T2_vec strain2_vec{strain2.data()};
+
       switch (diff_type) {
       case FiniteDiff::forward: {
         strain2_vec(i) += delta;
         if (form == Formulation::small_strain) {
           symmetrise(strain2);
         }
-
         T2_t del_f_del{(fun(strain2) - stress) / delta};
 
         tangent.col(i) = T2_vec(del_f_del.data());
@@ -284,10 +291,12 @@ namespace muSpectre {
         T2_vec strain1_vec{strain1.data()};
         strain1_vec(i) += delta;
         strain2_vec(i) -= delta;
+
         if (form == Formulation::small_strain) {
           symmetrise(strain1);
           symmetrise(strain2);
         }
+
         T2_t del_f_del{(fun(strain1).eval() - fun(strain2).eval()) /
                        (2 * delta)};
 
@@ -299,6 +308,7 @@ namespace muSpectre {
         break;
       }
       }
+
       static_assert(Int(decltype(tangent.col(i))::SizeAtCompileTime) ==
                         Int(T2_t::SizeAtCompileTime),
                     "wrong column size");
