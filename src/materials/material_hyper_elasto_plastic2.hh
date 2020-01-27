@@ -36,12 +36,12 @@
  *
  */
 
-
 #ifndef SRC_MATERIALS_MATERIAL_HYPER_ELASTO_PLASTIC2_HH_
 #define SRC_MATERIALS_MATERIAL_HYPER_ELASTO_PLASTIC2_HH_
 
 #include "materials/material_muSpectre_base.hh"
 #include "materials/materials_toolbox.hh"
+#include "materials/material_hyper_elasto_plastic1.hh"
 
 #include <libmugrid/eigen_tools.hh>
 #include <libmugrid/mapped_state_field.hh>
@@ -79,11 +79,9 @@ namespace muSpectre {
       : public MaterialMuSpectre<MaterialHyperElastoPlastic2<DimM>, DimM> {
    public:
     //! base class
-    using Parent =
-        MaterialMuSpectre<MaterialHyperElastoPlastic2<DimM>, DimM>;
+    using Parent = MaterialMuSpectre<MaterialHyperElastoPlastic2<DimM>, DimM>;
     using T2_t = Eigen::Matrix<Real, DimM, DimM>;
     using T4_t = muGrid::T4Mat<Real, DimM>;
-
 
     //! shortcut to traits
     using traits = MaterialMuSpectre_traits<MaterialHyperElastoPlastic2>;
@@ -133,8 +131,8 @@ namespace muSpectre {
      * Fₜ, the previous Gradient Fₜ₋₁ and the cumulated plastic flow
      * εₚ
      */
-    T2_t evaluate_stress(const T2_t & F, PrevStrain_ref  F_prev,
-                         PrevStrain_ref  be_prev, FlowField_ref  plast_flow,
+    T2_t evaluate_stress(const T2_t & F, PrevStrain_ref F_prev,
+                         PrevStrain_ref be_prev, FlowField_ref plast_flow,
                          const Real lambda, const Real mu, const Real tau_y0,
                          const Real H);
     /**
@@ -210,14 +208,12 @@ namespace muSpectre {
     }
 
     //! getter for previous gradient field Fᵗ
-    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM> &
-    get_F_prev_field() {
+    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM> & get_F_prev_field() {
       return this->F_prev_field;
     }
 
     //! getterfor elastic left Cauchy-Green deformation tensor bₑᵗ
-    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM> &
-    get_be_prev_field() {
+    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM> & get_be_prev_field() {
       return this->be_prev_field;
     }
 
@@ -225,8 +221,9 @@ namespace muSpectre {
     /**
      * worker function computing stresses and internal variables
      */
-    using Worker_t =
-        std::tuple<T2_t, Real, Real, T2_t, bool, muGrid::Decomp_t<DimM>>;
+    using Worker_t = std::tuple<T2_t, Real, Real, T2_t, bool,
+                                muGrid::SelfAdjointDecomp_t<DimM>>;
+
     Worker_t stress_n_internals_worker(const T2_t & F, PrevStrain_ref & F_prev,
                                        PrevStrain_ref & be_prev,
                                        FlowField_ref & plast_flow,

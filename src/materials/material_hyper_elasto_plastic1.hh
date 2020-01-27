@@ -97,8 +97,8 @@ namespace muSpectre {
                               typename traits::TangentMap_t::reference>;
 
     //! type in which the previous strain state is referenced
-    using T2StRef_t = typename muGrid::MappedT2StateField<Real, Mapping::Mut,
-                                                           DimM>::Return_t;
+    using T2StRef_t =
+        typename muGrid::MappedT2StateField<Real, Mapping::Mut, DimM>::Return_t;
     //! type in which the previous plastic flow is referenced
     using ScalarStRef_t =
         typename muGrid::MappedScalarStateField<Real, Mapping::Mut>::Return_t;
@@ -185,14 +185,12 @@ namespace muSpectre {
     }
 
     //! getter for previous gradient field Fᵗ
-    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM> &
-    get_F_prev_field() {
+    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM> & get_F_prev_field() {
       return this->F_prev_field;
     }
 
     //! getterfor elastic left Cauchy-Green deformation tensor bₑᵗ
-    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM> &
-    get_be_prev_field() {
+    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM> & get_be_prev_field() {
       return this->be_prev_field;
     }
 
@@ -201,12 +199,13 @@ namespace muSpectre {
      * result type of the stress calculation with intermediate results for
      * tangent moduli calculation
      */
-    using Worker_t =
-        std::tuple<T2_t, Real, Real, T2_t, bool, muGrid::Decomp_t<DimM>>;
+    using Worker_t = std::tuple<T2_t, Real, Real, T2_t, bool,
+                                muGrid::SelfAdjointDecomp_t<DimM>>;
 
     /**
      * worker function computing stresses and internal variables
      */
+
     Worker_t stress_n_internals_worker(const T2_t & F, T2StRef_t & F_prev,
                                        T2StRef_t & be_prev,
                                        ScalarStRef_t & plast_flow);

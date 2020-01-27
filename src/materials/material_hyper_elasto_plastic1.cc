@@ -93,7 +93,7 @@ namespace muSpectre {
     Mat_t f{F * F_prev.old().inverse()};
     // trial elastic left Cauchy–Green deformation tensor
     Mat_t be_star{f * be_prev.old() * f.transpose()};
-    const muGrid::Decomp_t<DimM> spectral_decomp{
+    const muGrid::SelfAdjointDecomp_t<DimM> spectral_decomp{
         muGrid::spectral_decomposition(be_star)};
     Mat_t ln_be_star{muGrid::logm_alt(spectral_decomp)};
     Mat_t tau_star{.5 *
