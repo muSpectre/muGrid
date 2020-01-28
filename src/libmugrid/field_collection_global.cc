@@ -39,23 +39,22 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   GlobalFieldCollection::GlobalFieldCollection(Dim_t spatial_dimension,
-                                                 Dim_t nb_quad_pts)
+                                               Dim_t nb_quad_pts)
       : Parent{ValidityDomain::Global, spatial_dimension, nb_quad_pts} {}
 
   /* ---------------------------------------------------------------------- */
-  GlobalFieldCollection::GlobalFieldCollection(
-      Dim_t spatial_dimension,
-      Dim_t nb_quad_pts,
-      const DynCcoord_t & nb_grid_pts,
-      const DynCcoord_t & locations)
+  GlobalFieldCollection::GlobalFieldCollection(Dim_t spatial_dimension,
+                                               Dim_t nb_quad_pts,
+                                               const DynCcoord_t & nb_grid_pts,
+                                               const DynCcoord_t & locations)
       : Parent{ValidityDomain::Global, spatial_dimension, nb_quad_pts} {
     this->initialise(nb_grid_pts, locations);
   }
 
   /* ---------------------------------------------------------------------- */
   void GlobalFieldCollection::initialise(const DynCcoord_t & nb_grid_pts,
-                                          const DynCcoord_t & locations,
-                                          const DynCcoord_t & strides) {
+                                         const DynCcoord_t & locations,
+                                         const DynCcoord_t & strides) {
     if (this->initialised) {
       throw FieldCollectionError("double initialisation");
     } else if (not this->has_nb_quad()) {
@@ -70,13 +69,14 @@ namespace muGrid {
     for (int i{0}; i < this->nb_entries; ++i) {
       this->pixel_indices[i] = i;
     }
+    // needs to be here, or initialise_maps will fail (by design)
     this->initialised = true;
-    this->initialise_maps();  // yes, this has to be after the previous line
+    this->initialise_maps();
   }
 
   /* ---------------------------------------------------------------------- */
   void GlobalFieldCollection::initialise(const DynCcoord_t & nb_grid_pts,
-                                          const DynCcoord_t & locations) {
+                                         const DynCcoord_t & locations) {
     this->initialise(nb_grid_pts,
                      ((locations.get_dim() == 0)
                           ? DynCcoord_t(nb_grid_pts.get_dim())
@@ -96,8 +96,7 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   GlobalFieldCollection GlobalFieldCollection::get_empty_clone() const {
-    GlobalFieldCollection ret_val{this->get_spatial_dim(),
-                                   this->get_nb_quad()};
+    GlobalFieldCollection ret_val{this->get_spatial_dim(), this->get_nb_quad()};
     ret_val.initialise(this->pixels.get_nb_grid_pts(),
                        this->pixels.get_locations());
     return ret_val;

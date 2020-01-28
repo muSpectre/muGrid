@@ -273,7 +273,6 @@ namespace muGrid {
     BOOST_CHECK_EQUAL(fc2.get_nb_quad(), fc.get_nb_quad());
     BOOST_CHECK_EQUAL(fc2.get_nb_entries(), fc.get_nb_entries());
     BOOST_CHECK_EQUAL(fc2.get_spatial_dim(), fc.get_spatial_dim());
-    BOOST_CHECK_EQUAL(fc2.get_nb_pixels(), fc.get_nb_pixels());
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(multi_field_test, F, mult_collections, F) {

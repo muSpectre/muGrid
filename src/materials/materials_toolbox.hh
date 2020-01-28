@@ -655,9 +655,8 @@ namespace muSpectre {
       template <Formulation Form>
       struct MaterialStressEvaluator {
         template <class Material, class Strain, class Stress, class Op>
-        static void compute(Material & mat, const Strain & strain,
-                            Stress & stress, const size_t & quad_pt_id,
-                            const Op & operation) {
+        static void compute(Material & mat, Strain && strain, Stress & stress,
+                            const size_t & quad_pt_id, const Op & operation) {
           using traits = MaterialMuSpectre_traits<Material>;
 
           constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
@@ -675,9 +674,8 @@ namespace muSpectre {
       template <>
       struct MaterialStressEvaluator<Formulation::finite_strain> {
         template <class Material, class Strain, class Stress, class Op>
-        static void compute(Material & mat, const Strain & strain,
-                            Stress & stress, const size_t & quad_pt_id,
-                            const Op & operation) {
+        static void compute(Material & mat, Strain && strain, Stress & stress,
+                            const size_t & quad_pt_id, const Op & operation) {
           constexpr static Formulation Form{Formulation::finite_strain};
           using traits = MaterialMuSpectre_traits<Material>;
 
@@ -701,7 +699,7 @@ namespace muSpectre {
 
     /* ----------------------------------------------------------------------*/
     template <Formulation Form, class Material, class Strains, class Stresses>
-    void constitutive_law(Material & mat, const Strains & strains,
+    void constitutive_law(Material & mat, Strains && strains,
                           Stresses & stresses, const size_t & quad_pt_id,
                           const Real & ratio) {
       OperationAddition operation_addition(ratio);
@@ -711,7 +709,7 @@ namespace muSpectre {
 
     /* ----------------------------------------------------------------------*/
     template <Formulation Form, class Material, class Strains, class Stresses>
-    void constitutive_law(Material & mat, const Strains & strains,
+    void constitutive_law(Material & mat, Strains && strains,
                           Stresses & stresses, const size_t & quad_pt_id) {
       OperationAssignment operation_assignment;
       internal::MaterialStressEvaluator<Form>::compute(
@@ -725,7 +723,7 @@ namespace muSpectre {
       struct MaterialStressTangentEvaluator {
         template <class Material, class Strain, class Stress, class Stiffness,
                   class Op>
-        static void compute(Material & mat, const Strain & strain,
+        static void compute(Material & mat, Strain && strain,
                             std::tuple<Stress, Stiffness> & stress_stiffness,
                             const size_t & quad_pt_id, const Op & operation) {
           using traits = MaterialMuSpectre_traits<Material>;
@@ -750,7 +748,7 @@ namespace muSpectre {
       struct MaterialStressTangentEvaluator<Formulation::finite_strain> {
         template <class Material, class Strain, class Stress, class Stiffness,
                   class Op>
-        static void compute(Material & mat, const Strain & strain,
+        static void compute(Material & mat, Strain && strain,
                             std::tuple<Stress, Stiffness> & stress_stiffness,
                             const size_t & quad_pt_id, const Op & operation) {
           constexpr static Formulation Form{Formulation::finite_strain};
@@ -777,13 +775,13 @@ namespace muSpectre {
           operation(std::get<1>(stress_stiffness_mat_converted),
                     std::get<1>(stress_stiffness));
         }
-      };  // namespace internal
+      };
 
     }  // namespace internal
 
     /* ----------------------------------------------------------------------*/
     template <Formulation Form, class Material, class Strains, class Stresses>
-    void constitutive_law_tangent(Material & mat, const Strains & strains,
+    void constitutive_law_tangent(Material & mat, Strains && strains,
                                   Stresses & stresses,
                                   const size_t & quad_pt_id) {
       OperationAssignment operation_assignment;
@@ -793,7 +791,7 @@ namespace muSpectre {
 
     /*----------------------------------------------------------------------*/
     template <Formulation Form, class Material, class Strains, class Stresses>
-    void constitutive_law_tangent(Material & mat, const Strains & strains,
+    void constitutive_law_tangent(Material & mat, Strains && strains,
                                   Stresses & stresses,
                                   const size_t & quad_pt_id,
                                   const Real & ratio) {

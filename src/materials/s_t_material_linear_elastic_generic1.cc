@@ -54,15 +54,12 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimM, StrainMeasure StrainM, StressMeasure StressM>
-  std::tuple<
-      std::shared_ptr<STMaterialLinearElasticGeneric1<DimM, StrainM, StressM>>,
-      MaterialEvaluator<DimM>>
-  STMaterialLinearElasticGeneric1<DimM, StrainM, StressM>::make_evaluator(
-      const CInput_t & C_voigt) {
+  auto STMaterialLinearElasticGeneric1<DimM, StrainM, StressM>::make_evaluator(
+      const CInput_t & C_voigt)
+      -> std::tuple<Material_sptr, MaterialEvaluator<DimM>> {
     constexpr Dim_t SpatialDimension{DimM};
     constexpr Dim_t NbQuadPts{1};
-    auto mat{std::make_shared<
-        STMaterialLinearElasticGeneric1<DimM, StrainM, StressM>>(
+    auto mat{std::make_shared<STMaterialLinearElasticGeneric1>(
         "name", SpatialDimension, NbQuadPts, C_voigt)};
 
     using Ret_t = std::tuple<Material_sptr, MaterialEvaluator<DimM>>;
@@ -70,7 +67,7 @@ namespace muSpectre {
   }
   /* ---------------------------------------------------------------------- */
 
-  //! Greenlagrange strain and PK2 Stress
+  //! Green-Lagrange strain and PK2 Stress
   template class STMaterialLinearElasticGeneric1<
       twoD, StrainMeasure::GreenLagrange, StressMeasure::PK2>;
   template class STMaterialLinearElasticGeneric1<
@@ -91,7 +88,7 @@ namespace muSpectre {
       threeD, StrainMeasure::Gradient, StressMeasure::Kirchhoff>;
 
   /* ---------------------------------------------------------------------- */
-  //! GreenLagrange strain and Kirchhoff Stress
+  //! Green-Lagrange strain and Kirchhoff Stress
   template class STMaterialLinearElasticGeneric1<
       twoD, StrainMeasure::GreenLagrange, StressMeasure::Kirchhoff>;
   template class STMaterialLinearElasticGeneric1<

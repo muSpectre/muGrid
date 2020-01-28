@@ -112,8 +112,8 @@ namespace muSpectre {
         }
       };
 
-      /** Structure for functions returning PK2 stress from other stress
-       *measures
+      /** Structure for functions returning Kirchhoff stress from other stress
+       *  measures
        **/
       template <Dim_t Dim, StressMeasure StressM, StrainMeasure StrainM>
       struct Kirchhoff_stress {

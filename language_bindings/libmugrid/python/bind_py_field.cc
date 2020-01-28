@@ -46,9 +46,9 @@
 #include <stdexcept>
 
 using muGrid::Dim_t;
-using muGrid::GlobalFieldCollection;
 using muGrid::Field;
 using muGrid::FieldCollection;
+using muGrid::GlobalFieldCollection;
 using muGrid::TypedField;
 using muGrid::TypedFieldBase;
 using muGrid::WrappedField;
@@ -133,6 +133,9 @@ void add_typed_field(py::module & mod, std::string name) {
         return_shape.push_back(n);
       }
     } else {
+      if (not coll.is_initialised()) {
+        throw std::runtime_error("Field collection isn't initialised yet");
+      }
       return_shape.push_back(coll.get_nb_pixels());
     }
     return py::array_t<T, py::array::f_style>(return_shape, self.data(),
@@ -140,9 +143,12 @@ void add_typed_field(py::module & mod, std::string name) {
   };
 
   py::class_<TypedFieldBase<T>, Field>(mod, (name + "Base").c_str(),
-                                         py::buffer_protocol())
+                                       py::buffer_protocol())
       .def_buffer([](TypedFieldBase<T> & self) {
         auto & coll = self.get_collection();
+        if (not coll.is_initialised()) {
+          throw std::runtime_error("Field collection isn't initialised yet");
+        }
         return py::buffer_info(
             self.data(),
             {static_cast<size_t>(coll.get_nb_pixels()),
@@ -156,13 +162,14 @@ void add_typed_field(py::module & mod, std::string name) {
       .def("array", array_computer, "shape"_a = std::vector<Dim_t>{},
            "iteration_type"_a = muGrid::Iteration::QuadPt,
            py::return_value_policy::reference_internal)
-      .def("array",
-           [&array_computer](TypedFieldBase<T> & self,
-                             const muGrid::Iteration & it) {
-             return array_computer(self, std::vector<Dim_t>{}, it);
-           },
-           "iteration_type"_a = muGrid::Iteration::QuadPt,
-           py::return_value_policy::reference_internal);
+      .def(
+          "array",
+          [&array_computer](TypedFieldBase<T> & self,
+                            const muGrid::Iteration & it) {
+            return array_computer(self, std::vector<Dim_t>{}, it);
+          },
+          "iteration_type"_a = muGrid::Iteration::QuadPt,
+          py::return_value_policy::reference_internal);
 
   py::class_<TypedField<T>, TypedFieldBase<T>>(mod, name.c_str());
 }

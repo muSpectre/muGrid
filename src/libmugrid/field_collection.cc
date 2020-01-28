@@ -208,6 +208,7 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   size_t FieldCollection::get_nb_pixels() const {
+    assert(this->initialised);
     return this->nb_entries / this->nb_quad_pts;
   }
 

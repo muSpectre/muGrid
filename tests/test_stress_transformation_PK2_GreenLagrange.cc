@@ -103,7 +103,6 @@ namespace muSpectre {
     material.add_pixel(0);
     material.set_F(F);
 
-    // auto && linear_step{Fix::get_linear_step()};
     auto && nonlin_step{Fix::get_nonlin_step()};
     auto && tol{Fix::get_tol()};
     auto && C{material.get_C()};
@@ -116,10 +115,10 @@ namespace muSpectre {
     BOOST_CHECK_LT(err0, tol);
 
     // Using the closed form (in contrary to index expanded form) of the stress
-    // transfroamtion gives us compact and pretty convenient form of the tangent
+    // transformation gives us compact and pretty convenient form of the tangent
     // transforamtion. However, considering using products of identity these
     // formulations are not the most computationally efficient ways to
-    // implemenet tangent transforamtions and one may need to implement the
+    // implement tangent transforamtions and one may need to implement the
     // index expnaded form to maximize efficiency. By the way, the closed form
     // can give us another checkpoint to verfiy the index expanded notion of the
     // tangent transformation
@@ -214,43 +213,43 @@ namespace muSpectre {
     BOOST_CHECK_LT(err0, tol);
 
     // Using the closed form (in contrary to index expanded form) of the stress
-    // transfroamtion gives us compact and pretty convenient form of the tangent
-    // transforamtion. However, considering using products of identity these
+    // transformation gives us compact and pretty convenient form of the tangent
+    // transformation. However, considering using products of identity these
     // formulations are not the most computationally efficient ways to
-    // implemenet tangent transforamtions and one may need to implement the
-    // index expnaded form to maximize efficiency. By the way, the closed form
-    // can give us another checkpoint to verfiy the index expanded notion of the
-    // tangent transformation
+    // implement tangent transformations and one may need to implement the
+    // index expanded form to maximize efficiency. By the way, the closed form
+    // can give us another checkpoint to verfiy the index expanded notation of
+    // the tangent transformation
     T4_t S_T4{Matrices::outer_under(T2_t::Identity(), S)};
     T4_t F_T4{Matrices::outer_under(F, T2_t::Identity())};
     T4_t F_T_T4{Matrices::outer_under(F.transpose(), T2_t::Identity())};
     // K = [I _⊗ S] + [F_⊗ I] C [Fᵀ _⊗ I]
     T4_t K_closed{S_T4 + F_T4 * C_estim * F_T_T4};
 
-    // Note: Using evaluator K estimation, we avoid using the transforamtion
+    // Note: Using evaluator K estimation, we avoid using the transformation
     // implemented for stiffness. Instead, merely the transformation functions
     // of stresses is utilized. Considereing that the implementation of the
-    // stress transforamtion (not stiffness) is rather straightforward and it is
-    // supposedly easy to avoid any mistake in their implemenation. Therefore,
+    // stress transformation (not stiffness) is rather straightforward and it is
+    // supposedly easy to avoid any mistake in their implementation. Therefore,
     // we can use this estimation also as a referenece to verify the
-    // transforamtio of the tangents.
+    // transformation of the tangents.
     T4_t K_estim{
         evaluator.estimate_tangent(F, Formulation::finite_strain, nonlin_step)};
 
     // Utilizing, explictly, the implementation of the
-    // streess_tange_transforamtions implemented in the materials folder. (this
-    // is the very thing that we need to verfiy)
-    auto && P_K_stress_tangent_convertion{
+    // streess_tangent_transformations implemented in the materials folder.
+    // (this is the very thing that we need to verfiy)
+    auto && P_K_stress_tangent_conversion{
         MatTB::PK1_stress<StressMeasure::PK2, StrainMeasure::GreenLagrange>(
             F, S, C_estim)};
 
-    T4_t K_stress_tangent_convertion{
-        std::get<1>(P_K_stress_tangent_convertion)};
+    T4_t K_stress_tangent_conversion{
+        std::get<1>(P_K_stress_tangent_conversion)};
 
     Real err1{rel_error(K_closed, K_estim)};
     BOOST_CHECK_LT(err1, tol);
 
-    Real err2{rel_error(K_stress_tangent_convertion, K_estim)};
+    Real err2{rel_error(K_stress_tangent_conversion, K_estim)};
     BOOST_CHECK_LT(err2, tol);
 
     if (not(err0 < tol) or not(err1 < tol) or not(err2 < tol)) {
@@ -266,20 +265,20 @@ namespace muSpectre {
                 << C_estim << std::endl
                 << std::endl;
       std::cout
-          << "Estiamted K  of STMateriallinearelasticgeneric1 (Refernece):"
+          << "Estimated K  of STMateriallinearelasticgeneric1 (Refernece):"
           << std::endl
           << K_estim << std::endl
           << std::endl;
 
-      std::cout << "Closed form K (convertion applied on Estimated C ):"
+      std::cout << "Closed form K (conversion applied on Estimated C ):"
                 << std::endl
                 << K_closed << std::endl
                 << std::endl;
 
       std::cout
-          << "K(Implemetend stress_tangent conversion applied on Estimated C:"
+          << "K(Implemented stress_tangent conversion applied on Estimated C:"
           << std::endl
-          << K_stress_tangent_convertion << std::endl
+          << K_stress_tangent_conversion << std::endl
           << std::endl;
     }
   }

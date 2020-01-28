@@ -39,10 +39,12 @@ import unittest
 import numpy as np
 
 from python_test_imports import µ
+
+
 class MaterialLinearElasticGeneric2_Check(unittest.TestCase):
     def setUp(self):
-        self.nb_grid_pts = [3, 3]#[5,7]
-        self.lengths = [3., 3.]#[5.2, 8.3]
+        self.nb_grid_pts = [3, 3]  # [5,7]
+        self.lengths = [3., 3.]  # [5.2, 8.3]
         self.formulation = µ.Formulation.small_strain
         self.cell1 = µ.Cell(self.nb_grid_pts,
                             self.lengths,
@@ -50,19 +52,12 @@ class MaterialLinearElasticGeneric2_Check(unittest.TestCase):
         self.cell2 = µ.Cell(self.nb_grid_pts,
                             self.lengths,
                             self.formulation)
-        E, nu =  210e9, .33
+        E, nu = 210e9, .33
         lam, mu = E*nu/((1+nu)*(1-2*nu)), E/(2*(1+nu))
 
-        # C = np.array([[2 * mu + lam,          lam,          lam,  0,  0,  0],
-        #               [         lam, 2 * mu + lam,          lam,  0,  0,  0],
-        #               [         lam,          lam, 2 * mu + lam,  0,  0,  0],
-        #               [           0,            0,            0, mu,  0,  0],
-        #               [           0,            0,            0,  0, mu,  0],
-        #               [           0,            0,            0,  0,  0, mu]])
-
         C = np.array([[2 * mu + lam,          lam,            0],
-                      [         lam, 2 * mu + lam,            0],
-                      [           0,            0,           mu]])
+                      [lam, 2 * mu + lam,            0],
+                      [0,            0,           mu]])
 
         self.mat1 = µ.material.MaterialLinearElasticGeneric1_2d.make(
             self.cell1, "simple", C)
@@ -71,13 +66,12 @@ class MaterialLinearElasticGeneric2_Check(unittest.TestCase):
         self.mat3 = µ.material.MaterialLinearElastic2_2d.make(
             self.cell2, "eigen2", E, nu)
 
-
     def test_solve(self):
         verbose_test = False
         if verbose_test:
             print("start test_solve")
         grad = np.array([[1.1,  .2],
-                         [ .3, 1.5]])
+                         [.3, 1.5]])
         gl_strain = -0.5*(grad.T.dot(grad) - np.eye(2))
         gl_strain = -0.5*(grad.T + grad - 2*np.eye(2))
         grad = -gl_strain
@@ -95,7 +89,7 @@ class MaterialLinearElasticGeneric2_Check(unittest.TestCase):
         verbose = 0
 
         def solve(cell, grad):
-            solver=µ.solvers.SolverCG(cell, tol, maxiter, verbose)
+            solver =µ.solvers.SolverCG(cell, tol, maxiter, verbose)
             r = µ.solvers.newton_cg(cell, grad,
                                     solver, tol, tol, verbose)
             return r
@@ -108,15 +102,14 @@ class MaterialLinearElasticGeneric2_Check(unittest.TestCase):
 
         if verbose_test:
             print("cell 1, no eigenstrain")
-            print("P1:\n{}".format(P1[:,0]))
-            print("F1:\n{}".format(results[0].grad[:,0]))
+            print("P1:\n{}".format(P1[:, 0]))
+            print("F1:\n{}".format(results[0].grad[:, 0]))
 
             print("cell 2, with eigenstrain")
-            print("P2:\n{}".format(P2[:,0]))
-            print("F2:\n{}".format(results[1].grad[:,0]))
+            print("P2:\n{}".format(P2[:, 0]))
+            print("F2:\n{}".format(results[1].grad[:, 0]))
             print("end test_solve")
         self.assertLess(error, tol)
-
 
 
 if __name__ == '__main__':

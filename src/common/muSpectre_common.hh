@@ -55,19 +55,21 @@ namespace muSpectre {
   using muGrid::Uint;
 
   using muGrid::oneD;
-  using muGrid::OneQuadPt;
   using muGrid::threeD;
   using muGrid::twoD;
+
+  using muGrid::OneQuadPt;
 
   using muGrid::firstOrder;
   using muGrid::fourthOrder;
   using muGrid::secondOrder;
 
   using muGrid::Ccoord_t;
+  using muGrid::Rcoord_t;
+
   using muGrid::DynCcoord_t;
   using muGrid::DynRcoord_t;
   using muGrid::eigen;
-  using muGrid::Rcoord_t;
   using muGrid::operator/;
 
   using muGrid::apply;
@@ -94,7 +96,7 @@ namespace muSpectre {
     finite_strain,     //!< causes evaluation in PK1(F)
     small_strain,      //!< causes evaluation in   σ(ε)
     small_strain_sym,  //!< symmetric storage as vector ε
-    native  //! causes the materials native measures to be used in evaluation
+    native  //! causes the material's native measures to be used in evaluation
   };
 
   //! split cell flags

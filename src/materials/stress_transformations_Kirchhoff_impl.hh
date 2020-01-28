@@ -38,7 +38,6 @@
 namespace muSpectre {
   namespace MatTB {
     namespace internal {
-      // ----------------------------------------------------------------------
       /**
        * Specialisation for the case where we get Kirchhoff stress (τ)
        */
@@ -53,7 +52,6 @@ namespace muSpectre {
         }
       };
 
-      // ----------------------------------------------------------------------
       /**
        * Specialisation for the case where we get Kirchhoff stress (τ) derived
        * with respect to Gradient
@@ -76,14 +74,14 @@ namespace muSpectre {
           T4_t K{T4_t::Zero()};
 
           // K = [I _⊗  F⁻¹] c - [τF⁻ᵀ ⁻⊗ F⁻¹]
-          for (int i{0}; i < Dim; ++i) {
-            for (int j{0}; j < Dim; ++j) {
-              for (int k{0}; k < Dim; ++k) {
-                for (int l{0}; l < Dim; ++l) {
-                  for (int n{0}; n < Dim; ++n) {
+          for (Dim_t i{0}; i < Dim; ++i) {
+            for (Dim_t j{0}; j < Dim; ++j) {
+              for (Dim_t k{0}; k < Dim; ++k) {
+                for (Dim_t l{0}; l < Dim; ++l) {
+                  for (Dim_t n{0}; n < Dim; ++n) {
                     get(K, i, j, k, l) += F_inv(j, n) * get(C, i, n, k, l);
                   }
-                  for (int a{0}; a < Dim; ++a) {
+                  for (Dim_t a{0}; a < Dim; ++a) {
                     get(K, i, j, k, l) -=
                         (tau(i, a) * F_inv(l, a) * F_inv(j, k));
                   }
@@ -95,7 +93,7 @@ namespace muSpectre {
           return std::make_tuple(std::move(P), std::move(K));
         }
       };
-      // ----------------------------------------------------------------------
+
       /**
        * Specialisation for the case where we get Kirchhoff stress (τ) derived
        * with respect to GreenLagrange
@@ -119,17 +117,17 @@ namespace muSpectre {
           T4_t K{T4_t::Zero()};
 
           // K = [I _⊗  F⁻¹] C [Fᵀ _⊗  I] - [τF⁻ᵀ ⁻⊗ F⁻¹]
-          for (int i{0}; i < Dim; ++i) {
-            for (int j{0}; j < Dim; ++j) {
-              for (int k{0}; k < Dim; ++k) {
-                for (int l{0}; l < Dim; ++l) {
-                  for (int n{0}; n < Dim; ++n) {
-                    for (int s{0}; s < Dim; ++s) {
+          for (Dim_t i{0}; i < Dim; ++i) {
+            for (Dim_t j{0}; j < Dim; ++j) {
+              for (Dim_t k{0}; k < Dim; ++k) {
+                for (Dim_t l{0}; l < Dim; ++l) {
+                  for (Dim_t n{0}; n < Dim; ++n) {
+                    for (Dim_t s{0}; s < Dim; ++s) {
                       get(K, i, j, k, l) +=
                           F_inv(j, n) * (get(C, i, n, s, l) * F(s, k));
                     }
                   }
-                  for (int a{0}; a < Dim; ++a) {
+                  for (Dim_t a{0}; a < Dim; ++a) {
                     get(K, i, j, k, l) -=
                         (tau(i, a) * F_inv(l, a) * F_inv(j, k));
                   }
@@ -142,7 +140,7 @@ namespace muSpectre {
           return std::make_tuple(std::move(P), std::move(K));
         }
       };
-      // ----------------------------------------------------------------------
+
       /**
        * Specialisation for the case where we get Kirchhoff stress (τ) and we
        * need PK2(S)

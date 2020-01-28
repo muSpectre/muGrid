@@ -72,8 +72,7 @@ namespace muSpectre {
     constexpr static Dim_t mdim() { return Dim; }
     constexpr static Dim_t NbQuadPts() { return 1; }
 
-    constexpr static Real linear_step{1.e-6}, nonlin_step{1.e-6}, tol{1.e-4};
-    constexpr static Real get_linear_step() { return linear_step; }
+    constexpr static Real nonlin_step{1.e-6}, tol{1.e-4};
     constexpr static Real get_nonlin_step() { return nonlin_step; }
     constexpr static Real get_tol() { return tol; }
 
@@ -89,10 +88,10 @@ namespace muSpectre {
         return "Combined Shear and Spherical Strain";
       }
       default: {
-        throw(std::runtime_error(
+        throw std::runtime_error(
             "The strain state is not defined that allowed strain states "
             "are\n1.pure_spherical_strain\n2.pure_shear_strain\n3.combined_"
-            "strain"));
+            "strain");
       }
       }
     }

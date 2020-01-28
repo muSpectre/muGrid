@@ -67,7 +67,6 @@ namespace muSpectre {
     material.add_pixel(0);
     material.set_F(F);
 
-    // auto && linear_step{Fix::get_linear_step()};
     auto && nonlin_step{Fix::get_nonlin_step()};
     auto && tol{Fix::get_tol()};
 
@@ -108,7 +107,6 @@ namespace muSpectre {
     Real err1{rel_error(K_closed, K_estim)};
     BOOST_CHECK_LT(err1, tol);
 
-    // Real err2{0.0};
     Real err2{rel_error(K_stress_tangent_conversion, K_estim)};
     BOOST_CHECK_LT(err2, tol);
 
@@ -133,17 +131,17 @@ namespace muSpectre {
                 << K_from_C << std::endl
                 << std::endl;
 
-      std::cout << "Estiamted K (Refernece):" << std::endl
+      std::cout << "Estimated K (Refernece):" << std::endl
                 << K_estim << std::endl
                 << std::endl;
 
-      std::cout << "Closed form K convertion applied on Estimated C :"
+      std::cout << "Closed form K conversion applied on Estimated C :"
                 << std::endl
                 << K_closed << std::endl
                 << std::endl;
 
       std::cout
-          << "K(Implemetend stress_tangent conversion applied on Estimated C):"
+          << "K(Implemented stress_tangent conversion applied on Estimated C):"
           << std::endl
           << K_stress_tangent_conversion << std::endl
           << std::endl;

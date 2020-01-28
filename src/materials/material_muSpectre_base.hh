@@ -493,9 +493,7 @@ namespace muSpectre {
 
     Eigen::Map<const Strain_t> F(strain.data());
 
-    Stress_t P{};
-    Stiffness_t K{};
-    std::tuple<Stress_t, Stiffness_t> PK{std::make_tuple(P, K)};
+    std::tuple<Stress_t, Stiffness_t> PK{};
 
     if (strain.cols() != DimM or strain.rows() != DimM) {
       std::stringstream error{};
@@ -509,19 +507,18 @@ namespace muSpectre {
     case Formulation::finite_strain: {
       MatTB::constitutive_law_tangent<Formulation::finite_strain>(
           this_mat, std::make_tuple(F), PK, quad_pt_index);
-      return PK;
       break;
     }
     case Formulation::small_strain: {
       MatTB::constitutive_law_tangent<Formulation::small_strain>(
           this_mat, std::make_tuple(F), PK, quad_pt_index);
-      return PK;
       break;
     }
     default:
       throw MaterialError("Unknown formulation");
       break;
     }
+    return PK;
   }
 
   /* ---------------------------------------------------------------------- */

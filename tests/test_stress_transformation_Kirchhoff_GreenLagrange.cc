@@ -67,7 +67,6 @@ namespace muSpectre {
     material.add_pixel(0);
     material.set_F(F);
 
-    auto && linear_step{Fix::get_linear_step()};
     auto && nonlin_step{Fix::get_nonlin_step()};
     auto && tol{Fix::get_tol()};
 
@@ -78,7 +77,7 @@ namespace muSpectre {
         F, tau)};
 
     T4_t c_estim{
-        evaluator.estimate_tangent(E, Formulation::native, linear_step)};
+        evaluator.estimate_tangent(E, Formulation::native, nonlin_step)};
 
     T2_t F_inv{F.inverse()};
     T4_t I_Finv_T4{Matrices::outer_under(T2_t::Identity(), F_inv)};
@@ -89,11 +88,11 @@ namespace muSpectre {
     // K = [I _⊗  F⁻¹] C [Fᵀ _⊗  I] - [τF⁻ᵀ ⁻⊗ F⁻¹]
     T4_t K_closed{I_Finv_T4 * c_estim * FT_I_T4 - tauFinvT_Finv_T4};
 
-    auto && P_K_stress_tangent_convertion{
+    auto && P_K_stress_tangent_conversion{
         MatTB::PK1_stress<StressMeasure::Kirchhoff,
                           StrainMeasure::GreenLagrange>(F, tau, c_estim)};
-    T4_t K_stress_tangent_convertion{
-        std::get<1>(P_K_stress_tangent_convertion)};
+    T4_t K_stress_tangent_conversion{
+        std::get<1>(P_K_stress_tangent_conversion)};
 
     // Reference
     T4_t K_estim{
@@ -102,7 +101,7 @@ namespace muSpectre {
     Real err1{rel_error(K_closed, K_estim)};
     BOOST_CHECK_LT(err1, tol);
 
-    Real err2{rel_error(K_stress_tangent_convertion, K_estim)};
+    Real err2{rel_error(K_stress_tangent_conversion, K_estim)};
     BOOST_CHECK_LT(err2, tol);
 
     if (not(err1 < tol) or not(err2 < tol)) {
@@ -124,7 +123,7 @@ namespace muSpectre {
                 << K_estim << std::endl
                 << std::endl;
 
-      std::cout << "Closed form K (convertion applied on Estimated C ):"
+      std::cout << "Closed form K (conversion applied on Estimated C ):"
                 << std::endl
                 << K_closed << std::endl
                 << std::endl;
@@ -132,7 +131,7 @@ namespace muSpectre {
       std::cout
           << "K(Implemetend stress_tangent conversion applied on Estimated C:"
           << std::endl
-          << K_stress_tangent_convertion << std::endl
+          << K_stress_tangent_conversion << std::endl
           << std::endl;
     }
   }

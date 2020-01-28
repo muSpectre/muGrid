@@ -89,13 +89,13 @@ namespace muSpectre {
           Tmap Kmap{K.data()};
 
           // K = [I _⊗ S] + [F _⊗ I] C [F _⊗ I]ᵀ
-          for (int i{0}; i < Dim; ++i) {
-            for (int m{0}; m < Dim; ++m) {
-              for (int n{0}; n < Dim; ++n) {
+          for (Dim_t i{0}; i < Dim; ++i) {
+            for (Dim_t m{0}; m < Dim; ++m) {
+              for (Dim_t n{0}; n < Dim; ++n) {
                 get(Kmap, i, m, i, n) += S(m, n);
-                for (int j{0}; j < Dim; ++j) {
-                  for (int r{0}; r < Dim; ++r) {
-                    for (int s{0}; s < Dim; ++s) {
+                for (Dim_t j{0}; j < Dim; ++j) {
+                  for (Dim_t r{0}; r < Dim; ++r) {
+                    for (Dim_t s{0}; s < Dim; ++s) {
                       get(Kmap, i, m, j, n) +=
                           F(i, r) * get(C, r, m, s, n) * (F(j, s));
                     }
@@ -105,7 +105,7 @@ namespace muSpectre {
             }
           }
 
-          T2 P = compute(std::forward<Strain_t>(F), std::forward<Stress_t>(S));
+          T2 P{compute(std::forward<Strain_t>(F), std::forward<Stress_t>(S))};
           return std::make_tuple(std::move(P), std::move(K));
         }
       };
@@ -135,12 +135,12 @@ namespace muSpectre {
           T4 K{T4::Zero()};
           Tmap Kmap{K.data()};
 
-          for (int i{0}; i < Dim; ++i) {
-            for (int m{0}; m < Dim; ++m) {
-              for (int n{0}; n < Dim; ++n) {
+          for (Dim_t i{0}; i < Dim; ++i) {
+            for (Dim_t m{0}; m < Dim; ++m) {
+              for (Dim_t n{0}; n < Dim; ++n) {
                 get(Kmap, i, m, i, n) += S(m, n);
-                for (int j{0}; j < Dim; ++j) {
-                  for (int r{0}; r < Dim; ++r) {
+                for (Dim_t j{0}; j < Dim; ++j) {
+                  for (Dim_t r{0}; r < Dim; ++r) {
                     get(Kmap, i, m, j, n) += F(i, r) * get(C, r, m, j, n);
                   }
                 }

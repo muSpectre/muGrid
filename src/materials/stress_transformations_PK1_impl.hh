@@ -132,20 +132,20 @@ namespace muSpectre {
           // C = [F _⊗ I]⁻¹ [K - [I _⊗ S]] [F_⊗ I]⁻ᵀ
           // Obtained from the relationship:
           // K = [I _⊗ S] + [F _⊗ I] C [F_⊗ I]ᵀ
-          for (int i = 0; i < Dim; ++i) {
-            for (int j = 0; j < Dim; ++j) {
+          for (Dim_t i = 0; i < Dim; ++i) {
+            for (Dim_t j = 0; j < Dim; ++j) {
               auto && k{i};
-              for (int l = 0; l < Dim; ++l) {
+              for (Dim_t l = 0; l < Dim; ++l) {
                 get(K_tmp, i, j, k, l) -= S(j, l);
               }
             }
           }
-          for (int i = 0; i < Dim; ++i) {
-            for (int j = 0; j < Dim; ++j) {
-              for (int k = 0; k < Dim; ++k) {
-                for (int l = 0; l < Dim; ++l) {
-                  for (int m = 0; m < Dim; ++m) {
-                    for (int n = 0; n < Dim; ++n) {
+          for (Dim_t i = 0; i < Dim; ++i) {
+            for (Dim_t j = 0; j < Dim; ++j) {
+              for (Dim_t k = 0; k < Dim; ++k) {
+                for (Dim_t l = 0; l < Dim; ++l) {
+                  for (Dim_t m = 0; m < Dim; ++m) {
+                    for (Dim_t n = 0; n < Dim; ++n) {
                       get(C, i, j, k, l) +=
                           F_inv(i, m) * get(K_tmp, m, j, n, l) * F_inv(k, n);
                     }
@@ -157,7 +157,7 @@ namespace muSpectre {
 
           return std::make_tuple(std::move(S), std::move(C));
         }
-      };  // namespace internal
+      };
 
       /* ---------------------------------------------------------------*/
     }  // namespace internal

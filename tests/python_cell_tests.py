@@ -52,7 +52,6 @@ class CellCheck(unittest.TestCase):
                          lengths,
                          formulation)
             mat = µ.material.MaterialLinearElastic1_2d.make(sys, "material",
-                                                            µ.OneQuadPt,
                                                             210e9, .33)
 
         except Exception as err:

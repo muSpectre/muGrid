@@ -83,9 +83,7 @@ namespace muSpectre {
     using Parent = MaterialMuSpectre<
         STMaterialLinearElasticGeneric1<DimM, StrainM, StressM>, DimM>;
 
-    using CInput_t =
-        Eigen::Ref<Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>, 0,
-                   Eigen::Stride<Eigen::Dynamic, Eigen::Dynamic>>;
+    using CInput_t = Eigen::Ref<Eigen::MatrixXd>;
 
     using Strain_t = Eigen::Matrix<Real, DimM, DimM>;
     using Stress_t = Eigen::Matrix<Real, DimM, DimM>;
@@ -131,27 +129,24 @@ namespace muSpectre {
     STMaterialLinearElasticGeneric1 &
     operator=(STMaterialLinearElasticGeneric1 && other) = delete;
 
-    using Material_sptr = std::shared_ptr<
-        STMaterialLinearElasticGeneric1<DimM, StrainM, StressM>>;
+    using Material_sptr = std::shared_ptr<STMaterialLinearElasticGeneric1>;
 
     //! Factory
     static std::tuple<Material_sptr, MaterialEvaluator<DimM>>
     make_evaluator(const CInput_t & C_voigt);
 
     /**
-     * evaluates stress given the
-     * strain
+     * evaluates stress given the strain
      */
     template <class Derived>
-    inline decltype(auto) evaluate_stress(const Eigen::MatrixBase<Derived> & E,
-                                          const size_t & quad_pt_index = 0);
+    inline Stress_t evaluate_stress(const Eigen::MatrixBase<Derived> & E,
+                                    const size_t & quad_pt_index = 0);
 
     /**
-     * evaluates both stress and stiffness given
-     * the strain
+     * evaluates both stress and stiffness given the strain
      */
     template <class Derived>
-    inline decltype(auto)
+    inline std::tuple<Stress_t, Stiffness_t>
     evaluate_stress_tangent(const Eigen::MatrixBase<Derived> & strain,
                             const size_t & quad_pt_index = 0);
 
@@ -179,7 +174,7 @@ namespace muSpectre {
                                             //! tensor
     const Stiffness_t & C;
 
-    // The Gradient that is neede to carry out the stress_transforamtions in
+    // The Gradient that is needed to carry out the stress_transformations in
     // evaluate_stess() function
     std::unique_ptr<Strain_t> F_holder;
     Strain_t & F;
@@ -190,28 +185,24 @@ namespace muSpectre {
 
   template <Dim_t DimM, StrainMeasure StrainM, StressMeasure StressM>
   template <class Derived>
-  decltype(auto)
-  STMaterialLinearElasticGeneric1<DimM, StrainM, StressM>::evaluate_stress(
-      const Eigen::MatrixBase<Derived> & strain,
-      const size_t & /*quad_pt_index*/) {
+  auto STMaterialLinearElasticGeneric1<DimM, StrainM, StressM>::evaluate_stress(
+      const Eigen::MatrixBase<Derived> & strain, const size_t &
+      /*quad_pt_index*/) -> Stress_t {
     static_assert(Derived::ColsAtCompileTime == DimM, "wrong input size");
     static_assert(Derived::RowsAtCompileTime == DimM, "wrong input size");
 
     // Be careful that this F should be compatible with the strain that is
     // passed to material in whenever the evaluate_stress function is called.
-    if (not F_is_set) {
+    if (not this->F_is_set) {
       throw(std::runtime_error(
           "The gradient should be set using set_F(F), otherwise you are not "
           "allowed to use this function (it is nedded for "
-          "stress_transforamtion)"));
+          "stress_transformation)"));
     }
 
-    /////////////// Temporary //////////////////////
-    // std::cout << "Strain(F) - F" << std::endl << strain - F << std::endl;
-
-    // We have to convert strain to GreenLagrange before passing it to the
+    // We have to convert strain to Green-Lagrange before passing it to the
     // Parent material stress_evaluate function which is a
-    // MaterialLinearelasticgeneric1
+    // MaterialLinearElasticGeneric1
     Strain_t E{
         MatTB::convert_strain<StrainM, StrainMeasure::GreenLagrange>(strain)};
 
@@ -219,15 +210,13 @@ namespace muSpectre {
     // MaterialLinearElasticGeneric1 which is stress in PK2 measure
     // i.e.: S = C * E
     Stress_t S{Matrices::tensmult(this->C, E)};
-    Strain_t F{Strain_t::Zero()};
+    Strain_t F_input{Strain_t::Zero()};
 
-    /////////////// Temporary //////////////////////
     if (StrainM == StrainMeasure::Gradient) {
-      F = strain;
+      F_input = strain;
     } else {
-      F = this->F;
+      F_input = this->F;
     }
-    ///////////////////////////////////////////////
     switch (StressM) {
     case StressMeasure::PK2: {
       return S;
@@ -242,7 +231,7 @@ namespace muSpectre {
     case StressMeasure::Kirchhoff: {
       Stress_t ret_stress{MatTB::Kirchhoff_stress<StressMeasure::PK2,
                                                   StrainMeasure::GreenLagrange>(
-                              std::move(F), std::move(S))
+                              std::move(F_input), std::move(S))
                               .eval()};
       return ret_stress;
     }
@@ -262,18 +251,19 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimM, StrainMeasure StrainM, StressMeasure StressM>
   template <class Derived>
-  decltype(auto) STMaterialLinearElasticGeneric1<DimM, StrainM, StressM>::
+  auto STMaterialLinearElasticGeneric1<DimM, StrainM, StressM>::
       evaluate_stress_tangent(const Eigen::MatrixBase<Derived> & strain,
-                              const size_t & /*quad_pt_index*/) {
+                              const size_t &
+                              /*quad_pt_index*/)
+          -> std::tuple<Stress_t, Stiffness_t> {
     std::stringstream err{};
     err << "You are not allowed to use this function beacuse this material is "
-           "implemented to be used merely throug "
+           "implemented to be used merely through "
            "MaterialEvaluator<DimM>::estimate_tangent "
            "which is supposedly needless of this function and just needs the "
            "evaluate_stress(...) function. However, if once it became "
            "necessary to use this function it is necessary first to implement "
-           "the conversion of PK2 to all stree_tangent mweasures to be "
-           "implemented beforehand."
+           "the conversion of PK2 to all required stress_tangent measures."
         << std::endl;
     throw(std::runtime_error(err.str()));
     using Stiffness_t = Eigen::Map<const muGrid::T4Mat<Real, DimM>>;

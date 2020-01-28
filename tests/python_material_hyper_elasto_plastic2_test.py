@@ -40,9 +40,10 @@ import numpy as np
 
 from python_test_imports import µ, muFFT
 
+
 class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
     def setUp(self):
-        #set timing = True for timing information
+        # set timing = True for timing information
         self.timing = False
         self.startTime = time.time()
 
@@ -57,28 +58,28 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         stress and strain computed by material_hyper_elasto_plastic1. The yield
         thresholds and Young moduli are set random.
         """
-        ### material geometry
+        # material geometry
         lens = [10, 10, 10]
-        nb_grid_pts  = [3, 3, 3]
+        nb_grid_pts = [3, 3, 3]
         dim = len(nb_grid_pts)
 
-        ### material parameters
-        Young   = 210
+        # material parameters
+        Young = 210
         Poisson = 0.30
         mu = Young / (2*(1+Poisson))
 
-        np.random.seed(102920) # just the date
+        np.random.seed(102919)  # just the date
         yield_crit = mu * (0.025 + 0.05 * np.random.random(nb_grid_pts))
         E = Young * (0.6 + 0.3 * np.random.random(nb_grid_pts))
         hardening = 1
 
-        ### µSpectre init stuff
+        # µSpectre init stuff
         fft = "fftw"
         form = µ.Formulation.finite_strain
-        #use e.g. average upwind differences
+        # use e.g. average upwind differences
         dz = muFFT.DiscreteDerivative([0, 0, 0],
                                       [[[-0.25, -0.25], [-0.25, -0.25]],
-                                       [[ 0.25,  0.25], [ 0.25,  0.25]]])
+                                       [[0.25,  0.25], [0.25,  0.25]]])
         dx = dz.rollaxes(1)
         dy = dx.rollaxes(1)
         discrete_gradient = [dx, dy, dz]
@@ -87,7 +88,7 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         cell2 = µ.Cell(nb_grid_pts, lens, form, discrete_gradient, fft)
 
         # stores a hyper elasto plastic 1 material for each pixel
-        mat_hpl1_array = np.empty((3,3,3), dtype=object)
+        mat_hpl1_array = np.empty((3, 3, 3), dtype=object)
         for index, mat in np.ndenumerate(mat_hpl1_array):
             mat_hpl1_array[index] = µ.material.MaterialHyperElastoPlastic1_3d.make(
                 cell, "3d-small", E[index], Poisson,
@@ -103,10 +104,10 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
             mat_hpl2.add_pixel(i, E[tuple(pixel)], Poisson,
                                yield_crit[tuple(pixel)], hardening)
 
-        #solver
+        # solver
         newton_tol = 1e-6
-        cg_tol     = 1e-6
-        equil_tol  = 1e-6
+        cg_tol = 1e-6
+        equil_tol = 1e-6
         maxiter = 2000
         verbose = 0
         solver = µ.solvers.SolverCG(cell, cg_tol, maxiter, verbose)
@@ -115,10 +116,10 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         solver2 = µ.solvers.SolverCG(cell2, cg_tol, maxiter, verbose)
         cell2.initialise()
 
-        #total deformation
-        DelF  = np.array([[-0.05 ,  0.10,  0.00],
-                          [ 0.00 , -0.05,  0.00],
-                          [ 0.00 ,  0.00,  0.00]])
+        # total deformation
+        DelF = np.array([[-0.05,  0.10,  0.00],
+                         [0.00, -0.05,  0.00],
+                         [0.00,  0.00,  0.00]])
 
         ### Start muSpectre ###
         #---------------------#
@@ -138,21 +139,22 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
     def test_tangent(self):
         ### Input parameters ###
         #----------------------#
-        ### material geometry
+        # material geometry
         lens = [10, 10, 10]
-        nb_grid_pts  = [1, 1, 1]
+        nb_grid_pts = [1, 1, 1]
         dim = len(nb_grid_pts)
 
-        ### material parameters
-        Young   = 210
+        # material parameters
+        Young = 210
         Poisson = 0.30
         mu = Young / (2*(1+Poisson))
 
         np.random.seed(125769235)
-        yield_crit = (mu * (0.025 + 0.01 * np.random.random(nb_grid_pts))).flatten()
+        yield_crit = (
+            mu * (0.025 + 0.01 * np.random.random(nb_grid_pts))).flatten()
         hardening = 100
 
-        ### µSpectre init stuff
+        # µSpectre init stuff
         fft = "fftw"
         form = µ.Formulation.finite_strain
         dz = muFFT.DiscreteDerivative([0, 0, 0],
@@ -169,7 +171,7 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         mat_hpl = µ.material.MaterialHyperElastoPlastic2_3d.make(
             cell, "3d-hpl")
 
-        E        = np.zeros(nb_grid_pts)
+        E = np.zeros(nb_grid_pts)
         E[:, :, :] = 0.5*Young
         E[:, :, :-1] = Young
         E = E.flatten()
@@ -181,25 +183,25 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
                 mat_hpl.add_pixel(i, E[i], Poisson, yield_crit[i],
                                   hardening)
 
-        #solver
+        # solver
         newton_tol = 1e-8
-        cg_tol     = 1e-8
-        equil_tol  = 1e-8
+        cg_tol = 1e-8
+        equil_tol = 1e-8
         maxiter = 200
         verbose = 0
         solver = µ.solvers.SolverCG(cell, cg_tol, maxiter,
                                     verbose)
         cell.initialise()
 
-        #total deformation - elastic region
-        DelF  = np.array([[-0.01 ,  0.00,  0.00],
-                          [ 0.00 , -0.01,  0.00],
-                          [ 0.00 ,  0.00,  0.00]])
+        # total deformation - elastic region
+        DelF = np.array([[-0.01,  0.00,  0.00],
+                         [0.00, -0.01,  0.00],
+                         [0.00,  0.00,  0.00]])
 
         result = µ.solvers.newton_cg(cell, DelF, solver,
                                      newton_tol, equil_tol, verbose)
 
-        ### Finite differences evaluation of the tangent
+        # Finite differences evaluation of the tangent
         F = cell.strain.array((dim, dim))
         stress, tangent = cell.evaluate_stress_tangent(F)
 
@@ -217,16 +219,15 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
 
         self.assertTrue(np.allclose(tangent, numerical_tangent))
 
-        #total deformation - plastic region
-        DelF  = np.array([[ 0.00 ,  0.20,  0.00],
-                          [ 0.00 ,  0.00,  0.15],
-                          [ 0.00 ,  0.00,  0.17]])
+        # total deformation - plastic region
+        DelF = np.array([[0.00,  0.20,  0.00],
+                         [0.00,  0.00,  0.15],
+                         [0.00,  0.00,  0.17]])
 
         result = µ.solvers.newton_cg(cell, DelF, solver,
                                      newton_tol, equil_tol, verbose)
 
-
-        ### Finite differences evaluation of the tangent
+        # Finite differences evaluation of the tangent
         F = cell.strain.array((dim, dim))
         stress, tangent = cell.evaluate_stress_tangent(F)
 
@@ -243,6 +244,7 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
                 numerical_tangent[i, j] = (stress_plus - stress)/eps
 
         self.assertTrue(np.allclose(tangent, numerical_tangent))
+
 
 if __name__ == '__main__':
     unittest.main()
