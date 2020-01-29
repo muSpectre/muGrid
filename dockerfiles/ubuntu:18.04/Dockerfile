@@ -24,6 +24,7 @@ RUN apt-get -qq update && apt-get -y -qq install \
     libhdf5-mpi-dev \
     libpnetcdf-dev \
     m4 \
+    python3-pip \
     python3-breathe \
     python3-dev \
     python3-netcdf4 \
@@ -37,4 +38,4 @@ RUN apt-get -qq update && apt-get -y -qq install \
 
 # apt-get on one line due to https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#run
 
-
+RUN python3 -m pip install uvw

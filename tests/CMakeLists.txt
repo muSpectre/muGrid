@@ -105,6 +105,16 @@ foreach(pytest ${PY_TEST_SRCS})
 endforeach(pytest ${PY_TEST_SRCS})
 muSpectre_add_test(python_binding_test TYPE PYTHON python_binding_tests.py)
 
+# copy reference files
+file(GLOB REFERENCE_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/*.ref.vtr")
+foreach(ref ${REFERENCE_SRCS})
+  get_filename_component(ref_name ${ref} NAME)
+  configure_file(
+    ${ref}
+    "${CMAKE_CURRENT_BINARY_DIR}/${ref_name}"
+    COPYONLY)
+endforeach(ref ${REFERENCE_SRCS})
+
 if(${MUSPECTRE_MPI_PARALLEL})
   # add MPI tests
   file(GLOB TEST_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/mpi_test_*.cc")

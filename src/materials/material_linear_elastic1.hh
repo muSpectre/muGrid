@@ -122,6 +122,8 @@ namespace muSpectre {
     inline decltype(auto) evaluate_stress(const Eigen::MatrixBase<Derived> & E,
                                           const size_t & /*quad_pt_index*/);
 
+    template <class s_t>
+    inline decltype(auto) evaluate_stress(s_t && E);
     /**
      * evaluates both second Piola-Kirchhoff stress and stiffness given
      * the Green-Lagrange strain (or Cauchy stress and stiffness if

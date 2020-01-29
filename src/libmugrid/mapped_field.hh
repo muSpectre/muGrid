@@ -278,7 +278,6 @@ namespace muGrid {
   template <typename T, Mapping Mutability>
   using MappedScalarField = MappedField<ScalarFieldMap<T, Mutability>>;
 
-
   /**
    * Alias of `muGrid::MappedField` for a map of second-rank with corresponding
    * `muSpectre::Field` you wish to iterate over quadrature point by quadrature

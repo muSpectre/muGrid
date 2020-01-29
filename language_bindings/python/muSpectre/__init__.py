@@ -41,6 +41,8 @@ try:
 except ImportError:
     MPI = None
 
+import _muGrid
+import _muFFT
 import _muSpectre
 from _muSpectre import SplitCell, Formulation, material, solvers, FiniteDiff
 from _muSpectre import OneQuadPt
@@ -50,6 +52,7 @@ from muGrid import get_domain_ccoord, get_domain_index
 from muFFT import Communicator, FourierDerivative, FFT_PlanFlags
 import muSpectre.gradient_integration
 import muSpectre.stochastic_plasticity_search
+from . import vtk_export
 
 _factories = {'fftw': ('CellFactory', False),
               'fftwmpi': ('FFTWMPICellFactory', True),
@@ -171,4 +174,3 @@ def Projection(nb_grid_pts, lengths,
         return factory(nb_grid_pts, lengths, gradient, fft)
     else:
         return factory(nb_grid_pts, lengths, gradient, fft, communicator)
-

@@ -59,3 +59,4 @@ RUN curl https://www.unidata.ucar.edu/downloads/netcdf/ftp/netcdf-c-${NETCDF4_VE
 # otherwise it will not have parallel support.
 
 RUN CC=mpicc python3 -m pip install --no-binary netCDF4 netCDF4==${NETCDF4_PYTHON_VERSION}
+RUN python3 -m pip install uvw

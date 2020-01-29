@@ -39,3 +39,4 @@ RUN  sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen &&    
 ENV LANG C.UTF-8
 
 RUN python3 -m pip install netCDF4==${NETCDF4_PYTHON_VERSION}
+RUN python3 -m pip install uvw

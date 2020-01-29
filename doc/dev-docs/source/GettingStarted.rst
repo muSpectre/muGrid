@@ -34,7 +34,8 @@ higher). The current (and possibly incomplete list of) dependencies are
 - `FFTW <http://www.fftw.org>`_
 - `git <https://git-scm.com/>`_
 - `Python3 <https://www.python.org/>`_ including the header files.
-- `numpy <http://www.numpy.org/>`_ and `scipy <https://scipy.org/>`_.
+- `numpy <http://www.numpy.org/>`_ and `scipy <https://scipy.org/>`_
+- `UVW <https://c4science.ch/source/uvw/>`_.
 
 Recommended:
 

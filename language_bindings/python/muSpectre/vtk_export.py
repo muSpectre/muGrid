@@ -35,65 +35,63 @@ Program grant you additional permission to convey the resulting work.
 """
 
 import numpy as np
-from tvtk.api import tvtk, write_data
+from uvw import RectilinearGrid, DataArray
 
-def vtk_export(fpath, x_n, placement, point_data=None, cell_data=None,
-               legacy_ascii=False):
-    """write a vtr (vtk for rectilinear grids) file for visualisation of
-    µSpectre results. Optionally, a legacy ascii file can be written
-    (useful for debugging)
+def vtk_export(fpath, x_n, placement, point_data=None, cell_data=None):
+    """write a vtr file for visualisation of µSpectre results.
 
     Keyword Arguments:
     fpath        -- file name for output path *WITHOUT EXTENSION*
     x_n          -- nodal positions, as computed by
-                    gradient_integration.compute_grid
+                    gradient_integration.make_grid or
+                    gradient_integration.compute_placement
     placement    -- nodal deformed placement as computed by
                     gradient_integration.compute_placement
     point_data   -- (default None) dictionary of point data. These must have
                     either of the following shapes:
-                    a) tuple(x_n.shape[:dim])
+                    a) tuple(x_n.shape[1:])
                        interpreted as scalar field,
-                    b) tuple(x_n.shape[:dim] + [dim])
+                    b) tuple([dim] + x_n.shape[1:])
                        interpreted as vector field, or
-                    c) tuple(x_n.shape[:dim] + [dim, dim])
+                    c) tuple([dim, dim] + x_n.shape[1:])
                        interpreted as second-rank tensor field
     cell_data    -- (default None) dictionary of cell data. These must have
                     either of the following shapes:
-                    a) tuple(x_c.shape[:dim])
+                    a) tuple(x_c.shape[1:])
                        interpreted as scalar field,
-                    b) tuple(x_c.shape[:dim] + [dim])
+                    b) tuple([dim] + x_c.shape[1:])
                        interpreted as vector field, or
-                    c) tuple(x_c.shape[:dim] + [dim, dim])
+                    c) tuple([dim, dim] + x_c.shape[1:])
                        interpreted as second-rank tensor field
                     where x_c is the array of pixel/voxel positions as computed
-                    by gradient_integration.compute_grid
-    legacy_ascii -- (default False) If set to True, a human-readable, but larger
-                     ascii file is written
+                    by gradient_integration.make_grid
 
+    Returns:
+    uvw object with informations about the written vtr file.
     """
     dim = len(x_n.shape[:-1])
     if dim not in (2, 3):
         raise Exception(
             ("should be two- or three-dimensional, got positions for a {}-"
              "dimensional problem").format(dim))
-    res_n = list(x_n.shape[:-1])
+    res_n = list(x_n.shape[1:])
     vtk_res = res_n if dim == 3 else res_n + [1]
     res_c = [max(1, r-1) for r in res_n]
 
     # setting up the geometric grid
-    vtk_obj = tvtk.RectilinearGrid()
-    vtk_obj.dimensions = vtk_res
-    vtk_obj.x_coordinates = x_n[:,0,0] if dim == 2 else x_n[:,0,0,0]
-    vtk_obj.y_coordinates = x_n[0,:,1] if dim == 2 else x_n[0,:,0,1]
-    vtk_obj.z_coordinates = np.zeros_like(
-        vtk_obj.x_coordinates) if dim == 2 else x_n[0,0,:,2]
+    x_coordinates = x_n[0,:,0] if dim == 2 else x_n[0,:,0,0]
+    y_coordinates = x_n[1,0,:] if dim == 2 else x_n[1,0,:,0]
+    z_coordinates = np.zeros_like([1]) if dim == 2 else x_n[2,0,0,:]
+    path = fpath + ".vtr"
+    uvw_obj = RectilinearGrid(path, [np.copy(x_coordinates),
+                                     np.copy(y_coordinates),
+                                     np.copy(z_coordinates)])
 
     # displacements are mandatory, so they get added independently of
     # any additional point data
-    disp = np.zeros([np.prod(vtk_res), 3])
-    disp[:,:dim] = (placement - x_n).reshape(-1, dim, order="F")
-    vtk_obj.point_data.vectors = disp
-    vtk_obj.point_data.vectors.name = "displacement"
+    disp = np.zeros([3] + vtk_res)
+    disp[:dim, ...] = (placement - x_n).reshape((dim,)+tuple(vtk_res))
+    uvw_obj.addPointData(DataArray(disp, np.arange(1, dim+1), "displacement"))
 
     # check name clashes:
     if point_data is None:
@@ -106,29 +104,23 @@ def vtk_export(fpath, x_n, placement, point_data=None, cell_data=None,
         raise Exception("Name 'displacement' is reserved")
 
     # helper functions to add data
-    def add_data(value, name, point=True):
-        data = vtk_obj.point_data if point else vtk_obj.cell_data
-        data.add_array(value)
-        data.get_array(data._get_number_of_arrays()-1).name = name
-        return
+    def add_data(data_array, point=True):
+        if point:
+            uvw_obj.addPointData(data_array)
+        elif not point:
+            uvw_obj.addCellData(data_array)
 
     def add_scalar(value, name, point=True):
-        add_data(value.reshape(-1, order="F"), name, point)
-        return
+        data_array = DataArray(value, np.arange(0, len(value.shape)), name)
+        add_data(data_array, point)
 
     def add_vector(value, name, point=True):
-        res = vtk_res if point else res_c
-        vec = np.zeros([np.prod(res), 3])
-        vec[:,:dim] = value.reshape(-1, dim, order="F")
-        add_data(vec, name, point)
-        return
+        data_array = DataArray(value, np.arange(1, len(value.shape)), name)
+        add_data(data_array, point)
 
     def add_tensor(value, name, point=True):
-        res = vtk_res if point else res_c
-        tens = np.zeros([np.prod(res), 3, 3])
-        tens[:,:dim, :dim] = value.reshape(-1, dim, dim, order="F")
-        add_data(tens.reshape(-1, 3*3), name, point)
-        return
+        data_array = DataArray(value, np.arange(2, len(value.shape)), name)
+        add_data(data_array, point)
 
     adders = {()        : add_scalar,
               (dim,)    : add_vector,
@@ -139,13 +131,13 @@ def vtk_export(fpath, x_n, placement, point_data=None, cell_data=None,
         checks whether values have the right shape and determines the
         appropriate function to add them to the output file
         """
-        res = value.shape[:dim]
-        shape = value.shape[dim:]
+        res = value.shape[-dim:]
+        shape = value.shape[:-dim]
         if not res == tuple(reference[:dim]):
             raise Exception(
-                ("the first dim dimensions of dataset '{}' have the wrong size,"
+                ("The last {} dimensions of dataset '{}' have the wrong size,"
                  " should be {}, but got {}").format(
-                     key, reference[:dim], res))
+                     dim, key, reference[:dim], res))
         if not shape in (adders.keys()):
             raise Exception(
                 ("Can only handle scalar, vectorial, and tensorial fields, but "
@@ -162,7 +154,5 @@ def vtk_export(fpath, x_n, placement, point_data=None, cell_data=None,
         res, shape, adder = shape_checker(value, res_c)
         adder(value, key, point=False)
 
-    path = fpath + (".vtk" if legacy_ascii else "")
-
-    write_data(vtk_obj, path)
-    return vtk_obj
+    uvw_obj.write()
+    return uvw_obj

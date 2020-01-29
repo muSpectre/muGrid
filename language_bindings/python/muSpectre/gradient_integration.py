@@ -93,7 +93,7 @@ def reshape_gradient(F, nb_grid_pts):
 
     dim = len(nb_grid_pts)
     if not isinstance(nb_grid_pts, list):
-        raise Exception("nb_grid_pts needs to be in list form, "+
+        raise Exception("nb_grid_pts needs to be in list form, " +
                         "for concatenation")
     expected_input_shape = [np.prod(nb_grid_pts) * dim**2]
     output_shape = list(reversed(nb_grid_pts)) + [dim, dim]
@@ -129,9 +129,9 @@ def complement_periodically(array, dim):
     out_arr[sl] = array
 
     for i in range(tensor_rank, dim + tensor_rank):
-        lower_slice = tuple([slice(0,s) if (d != i) else  0 for (d,s) in
+        lower_slice = tuple([slice(0, s) if (d != i) else 0 for (d, s) in
                              enumerate(shape)])
-        upper_slice = tuple([slice(0,s) if (d != i) else -1 for (d,s) in
+        upper_slice = tuple([slice(0, s) if (d != i) else -1 for (d, s) in
                              enumerate(shape)])
         out_arr[upper_slice] = out_arr[lower_slice]
 
@@ -145,11 +145,11 @@ def get_integrator(fft, gradient_op, grid_spacing):
     the integrator contains the FFT normalisation factor.
 
     Keyword Arguments:
-    fft         -- µFFT FFT object performing the FFT for a matrix on the cell
-    gradient_op -- List of µSpectre DerivativeBase objects representing the
-                   gradient operator.
-    grid_spacing     -- np.array of grid spacing in each spatial direction of shape
-                   (dim,).
+    fft          -- µFFT FFT object performing the FFT for a matrix on the cell
+    gradient_op  -- List of µSpectre DerivativeBase objects representing the
+                    gradient operator.
+    grid_spacing -- np.array of grid spacing in each spatial direction of shape
+                    (dim,).
     Returns:
     np.ndarray containing the fourier coefficients of the integrator
     """
@@ -210,8 +210,8 @@ def integrate_tensor_2(grad, fft_vec, fft_mat, gradient_op, grid_spacing):
     integrator = get_integrator(fft_mat, gradient_op, grid_spacing)
     grad_k = (fft_mat.fft(grad) * fft_mat.normalisation)
     f_k = np.einsum("j...,ij...->i...", integrator, grad_k)
-    grad_k_0 = grad_k[np.s_[:,:] + (0,)*dim]
-    #The homogeneous integration computes the affine part of the deformation
+    grad_k_0 = grad_k[np.s_[:, :] + (0,)*dim]
+    # The homogeneous integration computes the affine part of the deformation
     homogeneous = np.einsum("ij,j...->i...", grad_k_0.real, x)
 
     fluctuation_non_pbe = fft_vec.ifft(f_k)
@@ -249,8 +249,8 @@ def integrate_vector(grad, fft_sca, fft_vec, gradient_op, grid_spacing):
     integrator = get_integrator(fft_vec, gradient_op, grid_spacing)
     grad_k = (fft_vec.fft(grad) * fft_vec.normalisation)
     f_k = np.einsum("j...,j...->...", integrator, grad_k)
-    grad_k_0 = grad_k[np.s_[:,] + (0,)*dim]
-    #The homogeneous integration computes the affine part of the deformation
+    grad_k_0 = grad_k[np.s_[:, ] + (0,)*dim]
+    # The homogeneous integration computes the affine part of the deformation
     homogeneous = np.einsum("j,j...->...", grad_k_0.real, x)
 
     fluctuation_non_pbe = fft_sca.ifft(f_k)
@@ -296,28 +296,28 @@ def compute_placement(result, lengths, nb_grid_pts, gradient_op,
     lengths = np.array(lengths)
     nb_grid_pts = np.array(nb_grid_pts)
 
-    #Check whether result is a np.array or an OptimiseResult object
+    # Check whether result is a np.array or an OptimiseResult object
     if isinstance(result, np.ndarray):
         if formulation == None:
-            #exit the program, if the formulation is unknown!
+            # exit the program, if the formulation is unknown!
             raise ValueError('\n'
-                'You have to specify your continuum mechanics description.\n'
-                'Either you use a formulation="small_strain" or '
-                '"finite_strain" description.\n'
-                'Otherwise you can give a result=OptimiseResult object, which '
-                'tells me the formulation.')
+                             'You have to specify your continuum mechanics description.\n'
+                             'Either you use a formulation="small_strain" or '
+                             '"finite_strain" description.\n'
+                             'Otherwise you can give a result=OptimiseResult object, which '
+                             'tells me the formulation.')
         form = formulation
         grad = result.reshape((len(nb_grid_pts),)*2 + tuple(nb_grid_pts))
     else:
         form = result.formulation
         if form != formulation and formulation != None:
-            #exit the program, if the formulation is ambiguous!
+            # exit the program, if the formulation is ambiguous!
             raise ValueError('\nThe given formulation "{}" differs from the '
                              'one saved in your result "{}"!'
                              .format(formulation, form))
         grad = reshape_gradient(result.grad, nb_grid_pts.tolist())
 
-    #reshape the gradient depending on the formulation
+    # reshape the gradient depending on the formulation
     if form == Formulation.small_strain:
         raise NotImplementedError('\nIntegration of small strains'
                                   'is not implemented yet!')
@@ -327,12 +327,12 @@ def compute_placement(result, lengths, nb_grid_pts, gradient_op,
         raise ValueError('\nThe formulation: "{}" is unknown!'
                          .format(formulation))
 
-    #load or initialise muFFT.FFT engine
+    # load or initialise muFFT.FFT engine
     if fft is None:
         dim = len(nb_grid_pts)
-        fft_mat = muFFT.FFT(nb_grid_pts, dim*dim) #FFT for (dim,dim) matrix
-        fft_vec = muFFT.FFT(nb_grid_pts, dim)     #FFT for (dim) vector
-    #compute the placement
+        fft_mat = muFFT.FFT(nb_grid_pts, dim*dim)  # FFT for (dim,dim) matrix
+        fft_vec = muFFT.FFT(nb_grid_pts, dim)  # FFT for (dim) vector
+    # compute the placement
     nodal_positions, _ = make_grid(lengths, nb_grid_pts)
     grid_spacing = np.array(lengths / nb_grid_pts)
     placement = integrate_tensor_2(grad, fft_vec, fft_mat,

@@ -261,41 +261,32 @@ namespace muSpectre {
     }
   }
 
-  /* ----------------------------------------------------------------------
-   */
-
+  /* ----------------------------------------------------------------------*/
   void CellSplit::set_p_k_zero() {
     this->stress.set_zero();
     this->tangent.value().get().set_zero();
   }
 
-  /* ----------------------------------------------------------------------
-   */
-
+  /* ----------------------------------------------------------------------*/
   CellSplit::IncompletePixels::IncompletePixels(const CellSplit & cell)
       : cell(cell), incomplete_assigned_ratios(
                         cell.get_unassigned_ratios_incomplete_pixels()),
         index_incomplete_pixels(cell.get_index_incomplete_pixels()) {}
 
-  /* ----------------------------------------------------------------------
-   */
-
+  /* ----------------------------------------------------------------------*/
   CellSplit::IncompletePixels::iterator::iterator(
       const IncompletePixels & pixels, Dim_t dim, bool begin)
       : incomplete_pixels(pixels), dim{dim},
         index{begin ? 0
                     : this->incomplete_pixels.index_incomplete_pixels.size()} {}
 
-  /* ----------------------------------------------------------------------
-   */
-
+  /* ----------------------------------------------------------------------*/
   auto CellSplit::IncompletePixels::iterator::operator++() -> iterator & {
     this->index++;
     return *this;
   }
 
   /* ---------------------------------------------------------------------*/
-
   bool CellSplit::IncompletePixels::iterator::
   operator!=(const iterator & other) {
     return (this->index != other.index);
