@@ -33,18 +33,12 @@
  *
  */
 
-#include <fenv.h>
-
 #include "bind_py_declarations.hh"
 
 #include <pybind11/pybind11.h>
 
 PYBIND11_MODULE(_muSpectre, mod) {
   mod.doc() = "Python bindings to the µSpectre library";
-
-#ifndef NDEBUG
-  feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW);
-#endif
 
   add_common(mod);
   add_material(mod);
