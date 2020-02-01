@@ -137,11 +137,12 @@ namespace muSpectre {
   };
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM, class SizeGiver, class GradientGiver,
+  template <Dim_t DimS, Dim_t DimM, class SizeGiver_, class GradientGiver,
             class Proj>
   struct ProjectionFixture {
     using Engine = muFFT::FFTWEngine;
     using Parent = Proj;
+    using SizeGiver = SizeGiver_;
     constexpr static Dim_t sdim{DimS};
     constexpr static Dim_t mdim{DimM};
     ProjectionFixture()

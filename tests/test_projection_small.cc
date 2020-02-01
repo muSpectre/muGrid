@@ -34,7 +34,11 @@
  */
 
 #include "test_projection.hh"
+#include "libmugrid/test_goodies.hh"
+
 #include "projection/projection_small_strain.hh"
+#include "projection/projection_approx_Green_operator.hh"
+
 #include <libmufft/fft_utils.hh>
 
 #include <Eigen/Dense>
@@ -57,6 +61,27 @@ namespace muSpectre {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(constructor_test, fix, fixlist, fix) {
     BOOST_CHECK_NO_THROW(
         fix::projector.initialise(muFFT::FFT_PlanFlags::estimate));
+  }
+
+  /* ---------------------------------------------------------------------- */
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(green_test, fix, fixlist, fix) {
+    fix::projector.initialise(muFFT::FFT_PlanFlags::estimate);
+    // create a C_ref function as 4T symetrisation
+    auto && C_ref(muGrid::Matrices::Isymm<fix::sdim>());
+    // create a Green operator projector
+
+    auto && fft_pointer{std::make_unique<muFFT::FFTWEngine>(
+        DynCcoord_t(fix::SizeGiver::get_nb_grid_pts()), fix::mdim * fix::mdim)};
+
+    ProjectionApproxGreenOperator<fix::mdim> green_projection{
+        std::move(fft_pointer), DynRcoord_t(fix::SizeGiver::get_lengths()),
+        C_ref};
+    green_projection.initialise();
+
+    Real error{muGrid::testGoodies::rel_error(fix::projector.get_operator(),
+                                              green_projection.get_operator())};
+
+    BOOST_CHECK_LT(error, tol);
   }
 
   /* ---------------------------------------------------------------------- */

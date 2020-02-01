@@ -44,10 +44,9 @@
 using muSpectre::Dim_t;
 using muSpectre::Formulation;
 using muSpectre::Real;
+using muSpectre::StoreNativeStress;
 using muSpectre::StrainMeasure;
 using muSpectre::StressMeasure;
-using muSpectre::Formulation;
-using muSpectre::StoreNativeStress;
 using pybind11::literals::operator""_a;
 
 namespace py = pybind11;

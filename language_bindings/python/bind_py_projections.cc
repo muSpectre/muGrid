@@ -45,6 +45,7 @@
 #include "projection/projection_small_strain.hh"
 #include "projection/projection_finite_strain.hh"
 #include "projection/projection_finite_strain_fast.hh"
+#include "projection/projection_approx_Green_operator.hh"
 
 #include <libmufft/fftw_engine.hh>
 #ifdef WITH_FFTWMPI
@@ -160,6 +161,36 @@ void add_proj_helper(py::module & mod, std::string name_start) {
       .def_property_readonly("domain_lengths", &Proj::get_nb_domain_grid_pts);
 }
 
+template <class Proj, Dim_t DimS>
+void add_green_proj_helper(py::module & mod, std::string name_start) {
+  std::stringstream name{};
+  name << name_start << '_' << DimS << 'd';
+
+  py::class_<Proj>(mod, name.str().c_str())
+
+      .def(py::init<muFFT::FFTEngine_ptr, const DynRcoord_t &,
+                    const Eigen::Ref<Eigen::Matrix<muFFT::Real, Eigen::Dynamic,
+                                                   Eigen::Dynamic>> &,
+                    Gradient_t>())
+      .def("initialise", &Proj::initialise,
+           "flags"_a = muFFT::FFT_PlanFlags::estimate,
+           "initialises the fft engine (plan the transform)")
+      // apply_projection that takes Fields
+      .def("apply_projection", &Proj::apply_projection)
+
+      .def_property_readonly("operator", &Proj::get_operator)
+      .def_property_readonly("formulation", &Proj::get_formulation,
+                             "return a Formulation enum indicating whether the "
+                             "projection is small or finite strain")
+      .def_property_readonly("nb_subdomain_grid_pts",
+                             &Proj::get_nb_subdomain_grid_pts)
+      .def_property_readonly("subdomain_locations",
+                             &Proj::get_subdomain_locations)
+      .def_property_readonly("nb_domain_grid_pts",
+                             &Proj::get_nb_domain_grid_pts)
+      .def_property_readonly("domain_lengths", &Proj::get_nb_domain_grid_pts);
+}
+
 void add_projections(py::module & mod) {
   add_projection_base(mod);
   add_proj_helper<muSpectre::ProjectionSmallStrain<muGrid::twoD>, muGrid::twoD>(
@@ -176,4 +207,10 @@ void add_projections(py::module & mod) {
                   muGrid::twoD>(mod, "ProjectionFiniteStrainFast");
   add_proj_helper<muSpectre::ProjectionFiniteStrainFast<muGrid::threeD>,
                   muGrid::threeD>(mod, "ProjectionFiniteStrainFast");
+
+  add_green_proj_helper<muSpectre::ProjectionApproxGreenOperator<muGrid::twoD>,
+                        muGrid::twoD>(mod, "ProjectionApproxGreenOperator");
+  add_green_proj_helper<
+      muSpectre::ProjectionApproxGreenOperator<muGrid::threeD>, muGrid::threeD>(
+      mod, "ProjectionApproxGreenOperator");
 }

@@ -41,6 +41,7 @@ set(binaries
   demonstrator_dynamic_solve.cc
   hyper-elasticity.cc
   small_case.cc
+  projection_comparison.cc
   )
 
 # if(${MUSPECTRE_MPI_PARALLEL})

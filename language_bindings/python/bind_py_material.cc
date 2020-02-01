@@ -172,7 +172,8 @@ void add_material_evaluator(py::module & mod) {
           "(Piola-Kirchhoff 1 stress as a function of the placement gradient "
           "P = P(F) for formulation=Formulation.finite_strain and Cauchy "
           "stress as a function of the infinitesimal strain tensor σ = σ(ε) "
-          "for formulation=Formulation.small_strain)")
+          "for formulation=Formulation.small_strain)",
+          py::return_value_policy::reference_internal)
       .def(
           "evaluate_stress_tangent",
           [](MatEval_t & mateval, py::EigenDRef<Eigen::MatrixXd> & grad,
@@ -193,7 +194,8 @@ void add_material_evaluator(py::module & mod) {
           "function of the infinitesimal strain tensor σ = σ(ε) for "
           "formulation=Formulation.small_strain). The tangent moduli are K = "
           "∂P/∂F for formulation=Formulation.finite_strain and C = ∂σ/∂ε for "
-          "formulation=Formulation.small_strain.")
+          "formulation=Formulation.small_strain.",
+          py::return_value_policy::reference_internal)
       .def(
           "estimate_tangent",
           [](MatEval_t & evaluator, py::EigenDRef<Eigen::MatrixXd> & grad,

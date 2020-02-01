@@ -33,18 +33,17 @@
  *
  */
 
+#include "libmufft/mufft_common.hh"
+#include "libmufft/fft_utils.hh"
+#include "libmufft/mufft_common.hh"
+#include "libmufft/fft_utils.hh"
+
 #include <libmugrid/ccoord_operations.hh>
-#include <libmufft/mufft_common.hh>
-#include <libmufft/fft_utils.hh>
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/eigen.h>
 
-#include <sstream>
-
-#include "libmufft/mufft_common.hh"
-#include "libmufft/fft_utils.hh"
 
 namespace py = pybind11;
 using pybind11::literals::operator""_a;
