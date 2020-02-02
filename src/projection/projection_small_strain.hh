@@ -95,8 +95,8 @@ namespace muSpectre {
     ProjectionSmallStrain & operator=(ProjectionSmallStrain && other) = delete;
 
     //! initialises the fft engine (plan the transform)
-    void initialise(
-        muFFT::FFT_PlanFlags flags = muFFT::FFT_PlanFlags::estimate) final;
+    void initialise(const muFFT::FFT_PlanFlags & flags =
+                        muFFT::FFT_PlanFlags::estimate) final;
   };
 
 }  // namespace muSpectre

@@ -103,8 +103,8 @@ namespace muSpectre {
     operator=(ProjectionFiniteStrainFast && other) = default;
 
     //! initialises the fft engine (plan the transform)
-    void initialise(
-        muFFT::FFT_PlanFlags flags = muFFT::FFT_PlanFlags::estimate) final;
+    void initialise(const muFFT::FFT_PlanFlags & flags =
+                        muFFT::FFT_PlanFlags::estimate) final;
 
     //! apply the projection operator to a field
     void apply_projection(Field_t & field) final;

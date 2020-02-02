@@ -108,8 +108,8 @@ namespace muSpectre {
     ProjectionBase & operator=(ProjectionBase && other) = delete;
 
     //! initialises the fft engine (plan the transform)
-    virtual void
-    initialise(muFFT::FFT_PlanFlags flags = muFFT::FFT_PlanFlags::estimate);
+    virtual void initialise(
+        const muFFT::FFT_PlanFlags & flags = muFFT::FFT_PlanFlags::estimate);
 
     //! apply the projection operator to a field
     virtual void apply_projection(Field_t & field) = 0;

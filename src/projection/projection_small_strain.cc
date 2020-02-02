@@ -63,7 +63,8 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS>
-  void ProjectionSmallStrain<DimS>::initialise(muFFT::FFT_PlanFlags flags) {
+  void
+  ProjectionSmallStrain<DimS>::initialise(const muFFT::FFT_PlanFlags & flags) {
     using muGrid::get;
     Parent::initialise(flags);
 

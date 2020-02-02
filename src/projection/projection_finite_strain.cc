@@ -69,7 +69,8 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS>
-  void ProjectionFiniteStrain<DimS>::initialise(muFFT::FFT_PlanFlags flags) {
+  void
+  ProjectionFiniteStrain<DimS>::initialise(const muFFT::FFT_PlanFlags & flags) {
     Parent::initialise(flags);
     using FFTFreqs_t = muFFT::FFT_freqs<DimS>;
     using Vector_t = typename FFTFreqs_t::Vector;

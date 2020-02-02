@@ -56,7 +56,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  void ProjectionBase::initialise(muFFT::FFT_PlanFlags flags) {
+  void ProjectionBase::initialise(const muFFT::FFT_PlanFlags & flags) {
     if (this->get_nb_components() * this->get_nb_quad() !=
         fft_engine->get_nb_dof_per_pixel()) {
       std::stringstream error;
