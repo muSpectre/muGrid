@@ -66,12 +66,22 @@ using muFFT::Communicator;
 using pybind11::literals::operator""_a;
 namespace py = pybind11;
 
+class FFTEngineBaseUnclonable : public FFTEngineBase {
+ public:
+  FFTEngineBaseUnclonable(DynCcoord_t nb_grid_pts, Dim_t nb_dof_per_pixel,
+                          Communicator comm)
+      : FFTEngineBase(nb_grid_pts, nb_dof_per_pixel, comm) {}
+
+  std::unique_ptr<FFTEngineBase> clone() const final {
+    throw std::runtime_error("Python version of FFTEngine cannot be cloned");
+  }
+};
 /**
  * "Trampoline" class for handling the pure virtual methods, see
  * [http://pybind11.readthedocs.io/en/stable/advanced/classes.html#overriding-virtual-functions-in-python]
  * for details
  */
-class PyFFTEngineBase : public FFTEngineBase {
+class PyFFTEngineBase : public FFTEngineBaseUnclonable {
  public:
   //! base class
   using Parent = FFTEngineBase;
@@ -82,7 +92,7 @@ class PyFFTEngineBase : public FFTEngineBase {
 
   PyFFTEngineBase(DynCcoord_t nb_grid_pts, Dim_t nb_dof_per_pixel,
                   Communicator comm)
-      : FFTEngineBase(nb_grid_pts, nb_dof_per_pixel, comm) {}
+      : FFTEngineBaseUnclonable(nb_grid_pts, nb_dof_per_pixel, comm) {}
 
   Workspace_t & fft(Field_t & field) override {
     PYBIND11_OVERLOAD_PURE(Workspace_t &, Parent, fft, field);

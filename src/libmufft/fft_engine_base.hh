@@ -185,6 +185,10 @@ namespace muFFT {
     //! has this engine been initialised?
     bool is_initialised() const { return this->initialised; }
 
+    //! perform a deep copy of the engine (this should never be necessary in
+    //! c++)
+    virtual std::unique_ptr<FFTEngineBase> clone() const = 0;
+
    protected:
     //! spatial dimension of the grid
     Dim_t spatial_dimension;

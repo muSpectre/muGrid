@@ -57,9 +57,9 @@ namespace muSpectre {
   template <Dim_t DimS>
   ProjectionSmallStrain<DimS>::ProjectionSmallStrain(
       muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths)
-      : ProjectionSmallStrain{
-          std::move(engine), lengths,
-          muFFT::make_fourier_gradient(lengths.get_dim())} {}
+      : ProjectionSmallStrain{std::move(engine), lengths,
+                              muFFT::make_fourier_gradient(lengths.get_dim())} {
+  }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS>
@@ -101,6 +101,12 @@ namespace muSpectre {
     }
   }
 
+  template <Dim_t DimS>
+  std::unique_ptr<ProjectionBase> ProjectionSmallStrain<DimS>::clone() const {
+    return std::make_unique<ProjectionSmallStrain>(
+        this->get_fft_engine().clone(), this->get_domain_lengths(),
+        this->get_gradient());
+  }
   template class ProjectionSmallStrain<oneD>;
   template class ProjectionSmallStrain<twoD>;
   template class ProjectionSmallStrain<threeD>;

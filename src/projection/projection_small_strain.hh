@@ -71,8 +71,7 @@ namespace muSpectre {
 
     //! Constructor with fft_engine
     ProjectionSmallStrain(muFFT::FFTEngine_ptr engine,
-                          const DynRcoord_t & lengths,
-                          Gradient_t gradient);
+                          const DynRcoord_t & lengths, Gradient_t gradient);
 
     //! Constructor with fft_engine and default (Fourier) gradient
     ProjectionSmallStrain(muFFT::FFTEngine_ptr engine,
@@ -97,6 +96,9 @@ namespace muSpectre {
     //! initialises the fft engine (plan the transform)
     void initialise(const muFFT::FFT_PlanFlags & flags =
                         muFFT::FFT_PlanFlags::estimate) final;
+    //! perform a deep copy of the projector (this should never be necessary in
+    //! c++)
+    std::unique_ptr<ProjectionBase> clone() const final;
   };
 
 }  // namespace muSpectre

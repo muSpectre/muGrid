@@ -67,10 +67,10 @@ namespace muSpectre {
     using Proj_t = muGrid::ComplexField;
     //! iterable form of the operator
     using Proj_map = muGrid::MatrixFieldMap<Complex, Mapping::Mut, DimS, 1,
-                                             muGrid::Iteration::Pixel>;
+                                            muGrid::Iteration::Pixel>;
     //! iterable Fourier-space second-order tensor field
     using Grad_map = muGrid::MatrixFieldMap<Complex, Mapping::Mut, DimS, DimS,
-                                             muGrid::Iteration::Pixel>;
+                                            muGrid::Iteration::Pixel>;
 
     //! Default constructor
     ProjectionFiniteStrainFast() = delete;
@@ -124,6 +124,12 @@ namespace muSpectre {
 
     //! get number of components to project per pixel
     virtual Dim_t get_nb_components() const { return NbComponents(); }
+
+    //! perform a deep copy of the projector (this should never be necessary in
+    //! c++)
+    std::unique_ptr<ProjectionBase> clone() const final;
+
+    const Gradient_t & get_gradient() const { return this->gradient; }
 
    protected:
     Proj_t & xi_field;  //!< field of normalised wave vectors

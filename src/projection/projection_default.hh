@@ -55,7 +55,7 @@ namespace muSpectre {
   template <Dim_t DimS>
   class ProjectionDefault : public ProjectionBase {
    public:
-    using Parent = ProjectionBase;         //!< base class
+    using Parent = ProjectionBase;               //!< base class
     using Vector_t = typename Parent::Vector_t;  //!< to represent fields
     //! gradient, i.e. derivatives in each Cartesian direction
     using Gradient_t = muFFT::Gradient_t;
@@ -112,6 +112,8 @@ namespace muSpectre {
 
     //! get number of components to project per pixel
     virtual Dim_t get_nb_components() const { return NbComponents(); }
+
+    const Gradient_t & get_gradient() const { return this->gradient; }
 
    protected:
     Proj_t & Gfield;  //!< field holding the operator

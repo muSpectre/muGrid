@@ -64,8 +64,8 @@ namespace muSpectre {
   ProjectionFiniteStrain<DimS>::ProjectionFiniteStrain(
       muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths)
       : ProjectionFiniteStrain{
-          std::move(engine), lengths,
-          muFFT::make_fourier_gradient(lengths.get_dim())} {}
+            std::move(engine), lengths,
+            muFFT::make_fourier_gradient(lengths.get_dim())} {}
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS>
@@ -113,6 +113,14 @@ namespace muSpectre {
     if (this->get_subdomain_locations() == Ccoord{}) {
       this->Ghat[0].setZero();
     }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS>
+  std::unique_ptr<ProjectionBase> ProjectionFiniteStrain<DimS>::clone() const {
+    return std::make_unique<ProjectionFiniteStrain>(
+        this->get_fft_engine().clone(), this->get_domain_lengths(),
+        this->get_gradient());
   }
 
   template class ProjectionFiniteStrain<oneD>;

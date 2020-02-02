@@ -99,6 +99,10 @@ namespace muSpectre {
         const Eigen::Ref<Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>> &
             C_ref_new);
 
+    //! perform a deep copy of the projector (this should never be necessary in
+    //! c++)
+    std::unique_ptr<ProjectionBase> clone() const final;
+
    protected:
     //! Elastic tensor of reference material
     using C_t = Eigen::Matrix<Real, DimS * DimS, DimS * DimS>;

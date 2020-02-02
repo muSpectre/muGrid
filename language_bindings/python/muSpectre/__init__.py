@@ -47,12 +47,15 @@ import _muSpectre
 from _muSpectre import SplitCell, Formulation, material, solvers, FiniteDiff
 from _muSpectre import OneQuadPt
 
+from _muSpectre import (ProjectionApproxGreenOperator_2d, ProjectionApproxGreenOperator_3d, ProjectionSmallStrain_2d,
+                        ProjectionSmallStrain_3d, ProjectionFiniteStrainFast_2d, ProjectionFiniteStrainFast_3d)
 
 from muGrid import get_domain_ccoord, get_domain_index
 from muFFT import Communicator, FourierDerivative, FFT_PlanFlags
 import muSpectre.gradient_integration
 import muSpectre.stochastic_plasticity_search
 from . import vtk_export
+from . import _muSpectre
 
 _factories = {'fftw': ('CellFactory', False),
               'fftwmpi': ('FFTWMPICellFactory', True),

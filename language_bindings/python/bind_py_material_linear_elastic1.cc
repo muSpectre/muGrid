@@ -79,7 +79,8 @@ void add_material_linear_elastic1_helper(py::module & mod) {
             Mat_ptr ret_mat{std::make_shared<Mat_t>(n, dim, nb_quad_pts, e, p)};
             return ret_mat;
           },
-          "name"_a, "nb_quad_pts"_a, "Young"_a, "Poisson"_a);
+          "name"_a, "nb_quad_pts"_a, "Young"_a, "Poisson"_a)
+      .def_property_readonly("C", &Mat_t::get_C);
 }
 
 template void

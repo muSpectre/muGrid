@@ -62,8 +62,8 @@ namespace muSpectre {
   ProjectionFiniteStrainFast<DimS>::ProjectionFiniteStrainFast(
       muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths)
       : ProjectionFiniteStrainFast{
-          std::move(engine), lengths,
-          muFFT::make_fourier_gradient(lengths.get_dim())} {}
+            std::move(engine), lengths,
+            muFFT::make_fourier_gradient(lengths.get_dim())} {}
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS>
@@ -111,8 +111,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS>
-  void ProjectionFiniteStrainFast<DimS>::apply_projection(
-      Field_t & field) {
+  void ProjectionFiniteStrainFast<DimS>::apply_projection(Field_t & field) {
     Grad_map field_map{this->fft_engine->fft(field)};
     Real factor = this->fft_engine->normalisation();
     for (auto && tup : akantu::zip(this->xis, field_map)) {
@@ -125,8 +124,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS>
-  Eigen::Map<MatrixXXc>
-  ProjectionFiniteStrainFast<DimS>::get_operator() {
+  Eigen::Map<MatrixXXc> ProjectionFiniteStrainFast<DimS>::get_operator() {
     return this->xi_field.eigen_pixel();
   }
 
@@ -137,6 +135,13 @@ namespace muSpectre {
     return std::array<Dim_t, 2>{DimS, DimS * OneQuadPt};
   }
 
+  template <Dim_t DimS>
+  std::unique_ptr<ProjectionBase>
+  ProjectionFiniteStrainFast<DimS>::clone() const {
+    return std::make_unique<ProjectionFiniteStrainFast>(
+        this->get_fft_engine().clone(), this->get_domain_lengths(),
+        this->get_gradient());
+  }
   template class ProjectionFiniteStrainFast<oneD>;
   template class ProjectionFiniteStrainFast<twoD>;
   template class ProjectionFiniteStrainFast<threeD>;

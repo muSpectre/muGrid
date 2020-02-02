@@ -38,6 +38,7 @@
 #include "common/muSpectre_common.hh"
 #include "cell/cell_factory.hh"
 #include "cell/cell.hh"
+#include "projection/projection_base.hh"
 
 #ifdef WITH_SPLIT
 #include "cell/cell_split_factory.hh"
@@ -104,16 +105,14 @@ void add_parallel_cell_factory_helper(py::module & mod, const char * name) {
 void add_split_cell_factory_helper(py::module & mod) {
   using DynCcoord_t = muGrid::DynCcoord_t;
   using DynRcoord_t = muGrid::DynRcoord_t;
-  mod.def(
-      "CellFactorySplit",
-      [](DynCcoord_t res, DynRcoord_t lens, Formulation form,
-         Gradient_t gradient) {
-        return make_cell_split(std::move(res), std::move(lens), std::move(form),
-                               std::move(gradient));
-      },
-      "resolutions"_a, "lengths"_a,
-      "formulation"_a = Formulation::finite_strain,
-      "gradient"_a);
+  mod.def("CellFactorySplit",
+          [](DynCcoord_t res, DynRcoord_t lens, Formulation form,
+             Gradient_t gradient) {
+            return make_cell_split(std::move(res), std::move(lens),
+                                   std::move(form), std::move(gradient));
+          },
+          "resolutions"_a, "lengths"_a,
+          "formulation"_a = Formulation::finite_strain, "gradient"_a);
 }
 #endif
 
@@ -174,6 +173,9 @@ void add_cell_helper(py::module & mod) {
                                 tensor2};
       }};
   py::class_<Cell>(mod, "Cell")
+      .def(py::init([](const muSpectre::ProjectionBase & projection) {
+        return Cell{projection.clone()};
+      }))
       .def("initialise", &Cell::initialise,
            "flags"_a = muFFT::FFT_PlanFlags::estimate)
       .def(

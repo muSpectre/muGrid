@@ -137,6 +137,14 @@ namespace muSpectre {
     }
   }
 
+  template <Dim_t DimS>
+  std::unique_ptr<ProjectionBase>
+  ProjectionApproxGreenOperator<DimS>::clone() const {
+    return std::make_unique<ProjectionApproxGreenOperator>(
+        this->get_fft_engine().clone(), this->get_domain_lengths(),
+        this->C_ref, this->get_gradient());
+  }
+
   template class ProjectionApproxGreenOperator<oneD>;
   template class ProjectionApproxGreenOperator<twoD>;
   template class ProjectionApproxGreenOperator<threeD>;

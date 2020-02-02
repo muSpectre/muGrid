@@ -174,6 +174,13 @@ namespace muSpectre {
     //! return a reference to the fft_engine
     muFFT::FFTEngineBase & get_fft_engine();
 
+    //! return a reference to the fft_engine
+    const muFFT::FFTEngineBase & get_fft_engine() const;
+
+    //! perform a deep copy of the projector (this should never be necessary in
+    //! c++)
+    virtual std::unique_ptr<ProjectionBase> clone() const = 0;
+
    protected:
     //! handle on the fft_engine used
     muFFT::FFTEngine_ptr fft_engine;

@@ -89,6 +89,11 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
+  const muFFT::FFTEngineBase & ProjectionBase::get_fft_engine() const {
+    return *this->fft_engine;
+  }
+
+  /* ---------------------------------------------------------------------- */
   const DynCcoord_t & ProjectionBase::get_nb_domain_grid_pts() const {
     return this->fft_engine->get_nb_domain_grid_pts();
   }

@@ -171,4 +171,10 @@ namespace muFFT {
                          field.data());
   }
 
+  std::unique_ptr<FFTEngineBase> FFTWEngine::clone() const {
+    return std::make_unique<FFTWEngine>(this->get_nb_domain_grid_pts(),
+                                        this->get_nb_dof_per_pixel(),
+                                        this->get_communicator());
+  }
+
 }  // namespace muFFT

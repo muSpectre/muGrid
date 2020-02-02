@@ -48,7 +48,7 @@ namespace muFFT {
    */
   class FFTWEngine : public FFTEngineBase {
    public:
-    using Parent = FFTEngineBase;       //!< base class
+    using Parent = FFTEngineBase;  //!< base class
     //! field for Fourier transform of second-order tensor
     using Workspace_t = typename Parent::Workspace_t;
     //! real-valued second-order tensor
@@ -87,9 +87,13 @@ namespace muFFT {
     //! inverse transform
     void ifft(Field_t & field) const override;
 
+    //! perform a deep copy of the engine (this should never be necessary in
+    //! c++)
+    std::unique_ptr<FFTEngineBase> clone() const final;
+
    protected:
-    fftw_plan plan_fft{};     //!< holds the plan for forward fourier transform
-    fftw_plan plan_ifft{};    //!< holds the plan for inverse fourier transform
+    fftw_plan plan_fft{};   //!< holds the plan for forward fourier transform
+    fftw_plan plan_ifft{};  //!< holds the plan for inverse fourier transform
   };
 
 }  // namespace muFFT

@@ -67,12 +67,24 @@ using muSpectre::ProjectionBase;
 using pybind11::literals::operator""_a;
 namespace py = pybind11;
 
+class ProjectionBaseUnclonable : public ProjectionBase {
+ public:
+  ProjectionBaseUnclonable(muFFT::FFTEngine_ptr engine,
+                           DynRcoord_t domain_lengths, Formulation form)
+      : ProjectionBase(engine, domain_lengths, form) {}
+
+  std::unique_ptr<ProjectionBase> clone() const final {
+    throw std::runtime_error(
+        "Python version of the projection operators can't be cloned");
+  }
+};
+
 /**
  * "Trampoline" class for handling the pure virtual methods, see
  * [http://pybind11.readthedocs.io/en/stable/advanced/classes.html#overriding-virtual-functions-in-python]
  * for details
  */
-class PyProjectionBase : public ProjectionBase {
+class PyProjectionBase : public ProjectionBaseUnclonable {
  public:
   //! base class
   using Parent = ProjectionBase;
@@ -83,7 +95,7 @@ class PyProjectionBase : public ProjectionBase {
 
   PyProjectionBase(muFFT::FFTEngine_ptr engine, DynRcoord_t domain_lengths,
                    Formulation form)
-      : ProjectionBase(engine, domain_lengths, form) {}
+      : ProjectionBaseUnclonable(engine, domain_lengths, form) {}
 
   void apply_projection(Field_t & field) override {
     PYBIND11_OVERLOAD_PURE(void, Parent, apply_projection, field);
@@ -166,12 +178,21 @@ void add_green_proj_helper(py::module & mod, std::string name_start) {
   std::stringstream name{};
   name << name_start << '_' << DimS << 'd';
 
-  py::class_<Proj>(mod, name.str().c_str())
+  py::class_<Proj,                   // class
+             std::shared_ptr<Proj>,  // holder
+             ProjectionBase          // trampoline base
+             >(mod, name.str().c_str())
 
       .def(py::init<muFFT::FFTEngine_ptr, const DynRcoord_t &,
                     const Eigen::Ref<Eigen::Matrix<muFFT::Real, Eigen::Dynamic,
                                                    Eigen::Dynamic>> &,
                     Gradient_t>())
+      .def(py::init([](muFFT::FFTEngine_ptr fft_engine,
+                       const DynRcoord_t & domain_lenghts,
+                       py::EigenDRef<Eigen::MatrixXd> C_ref) {
+        Eigen::MatrixXd tmp{C_ref};
+        return Proj(std::move(fft_engine), domain_lenghts, tmp);
+      }))
       .def("initialise", &Proj::initialise,
            "flags"_a = muFFT::FFT_PlanFlags::estimate,
            "initialises the fft engine (plan the transform)")
