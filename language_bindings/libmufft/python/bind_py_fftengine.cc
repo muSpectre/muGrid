@@ -154,7 +154,11 @@ void add_engine_helper(py::module & mod, std::string name) {
             return numpy_wrap(eng.fft(proxy.get_field()),
                               proxy.get_components_shape());
           },
-          "array"_a, py::return_value_policy::reference_internal)
+          "array"_a, py::return_value_policy::reference_internal,
+          "Perform forward FFT on the input array. The method returns an array "
+          "containing the Fourier-transformed field, but this array is "
+          "borrowed from a buffer internal to the FFT engine object. (A second "
+          "call to the forward FFT will override this array.)")
       .def(
           "ifft",
           [](Engine & eng, py::array_t<Complex, py::array::f_style> array) {
@@ -190,7 +194,10 @@ void add_engine_helper(py::module & mod, std::string name) {
             // is not tied to the engine object; see return_value_policy below.
             return result;
           },
-          "array"_a, py::return_value_policy::move)
+          "array"_a, py::return_value_policy::move,
+          "Perform inverse FFT on the input array. The method returns an array "
+          "containing the transformed field. Unlike the forward FFT, this "
+          "array is *not* borrowed but belongs to the caller.")
       .def("initialise", &Engine::initialise,
            "flags"_a = muFFT::FFT_PlanFlags::estimate)
       .def_property_readonly("normalisation", &Engine::normalisation)
