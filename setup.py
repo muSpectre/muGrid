@@ -34,8 +34,6 @@ import os
 import sys
 import setuptools
 
-__version__ = '0.2'
-
 ###
 
 disable_mpi = False
@@ -43,6 +41,12 @@ if '--disable-mpi' in sys.argv:
     index = sys.argv.index('--disable-mpi')
     sys.argv.pop(index)  # Removes the '--disable-mpi'
     disable_mpi = True
+
+verbose = False
+if '--verbose' in sys.argv:
+    index = sys.argv.index('--verbose')
+    sys.argv.pop(index)  # Removes the '--disable-mpi'
+    verbose = True
 
 ###
 
@@ -74,30 +78,35 @@ pfft_info = {
 ###
 
 def detect_library(info):
-    print("Detecting location of library '{}'".format(info['name']))
+    if verbose:
+        print("Detecting location of library '{}'".format(info['name']))
 
     found = False
     root = None
     if 'environ' in info and info['environ'] in os.environ:
-        print("  * Looking for environment variable '{}'"
-            .format(info['environ']))
+        if verbose:
+            print("  * Looking for environment variable '{}'"
+                .format(info['environ']))
         root = os.environ[info['environ']]
         found = True
     if not found:
         libname = info['required_libraries'][0]
-        print("  * Attempting to load library '{}'".format(libname))
+        if verbose:
+            print("  * Attempting to load library '{}'".format(libname))
         import ctypes.util
         full_libname = ctypes.util.find_library(libname)
         if full_libname is not None:
             # This mechanism does not give us the location of the library
             found = True
     if not found and 'command' in info:
-        print("  * Looking for executable '{}'".format(info['command']))
+        if verbose:
+            print("  * Looking for executable '{}'".format(info['command']))
         command_path = find_executable(info['command'])
         if command_path is not None:
             root = os.path.abspath(os.path.dirname(command_path) + '/../lib')
-        print("  * Attempting to load library '{}' in path '{}'"
-            .format(libname, root))
+        if verbose:
+            print("  * Attempting to load library '{}' in path '{}'"
+                .format(libname, root))
         import ctypes
         found = True
         try:
@@ -112,12 +121,13 @@ def detect_library(info):
             root.endswith('/lib')):
             root = root[:-4]
 
-        if root is None:
-            print("  * Detected library '{}' in standard library search path"
-                .format(info['name']))
-        else:
-            print("  * Detected library '{}' in path '{}'"
-                .format(info['name'], root))
+        if verbose:
+            if root is None:
+                print("  * Detected library '{}' in standard library search path"
+                    .format(info['name']))
+            else:
+                print("  * Detected library '{}' in path '{}'"
+                    .format(info['name'], root))
 
         for lib in info['required_libraries']:
             if root is not None:
@@ -126,7 +136,8 @@ def detect_library(info):
             libraries += [lib]
 
     else:
-        print("  ! Could not detect library '{}'".format(info['name']))
+        if verbose:
+            print("  ! Could not detect library '{}'".format(info['name']))
         return None
 
     return include_dirs, libraries, library_dirs
@@ -159,7 +170,8 @@ def get_pybind11_include(pybind11_version='2.2.3'):
 
 ###
 
-print('=== DETECTING FFT LIBRARIES ===')
+if verbose:
+    print('=== DETECTING FFT LIBRARIES ===')
 
 mugrid_sources = [
     'src/libmugrid/exception.cc',
@@ -216,13 +228,15 @@ for info, _sources in [(fftw_info, ['src/libmufft/fftw_engine.cc']),
             if 'mpi' in info:
                 mpi = mpi or info['mpi']
         else:
-            print('  ! Library detected but --disable-mpi is present')
+            if verbose:
+                print('  ! Library detected but --disable-mpi is present')
 
 if mpi:
-    print('At least one of the FFT libraries is MPI-parallel. Using the MPI '
-          'compiler wrapper.')
-    print('(You can specify the compiler wrapper through the MPICC and MPICXX '
-          'environment variables.)')
+    if verbose:
+        print('At least one of the FFT libraries is MPI-parallel. Using the MPI '
+              'compiler wrapper.')
+        print('(You can specify the compiler wrapper through the MPICC and MPICXX '
+              'environment variables.)')
     macros += [('WITH_MPI', None)]
     # FIXME! This is a brute-force override.
     try:
@@ -233,8 +247,9 @@ if mpi:
         os.environ['CXX'] = os.environ['MPICXX']
     except:
         os.environ['CXX'] = 'mpicxx'
-    print('  * C-compiler: {}'.format(os.environ['CC']))
-    print('  * C++-compiler: {}'.format(os.environ['CXX']))
+    if verbose:
+        print('  * C-compiler: {}'.format(os.environ['CC']))
+        print('  * C++-compiler: {}'.format(os.environ['CXX']))
     mufft_sources += ['src/libmufft/communicator.cc']
 
 # We compile two shared libraries, libmuGrid.so and libmuFFT.so. These libraries
@@ -385,13 +400,13 @@ class build_clib_dyn(build_clib):
                 output_dir=self.build_clib,
                 debug=self.debug)
 
-requirements = ['numpy']
+requirements = ['setuptools_scm', 'numpy']
 if mpi:
     requirements += ['mpi4py']
 
 setup(
     name='muFFT',
-    version=__version__,
+    use_scm_version=True,
     author='Till Junge',
     author_email='till.junge@altermail.ch',
     url='https://gitlab.com/muspectre/muspectre',
