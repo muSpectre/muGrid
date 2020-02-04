@@ -255,4 +255,10 @@ namespace muFFT {
     }
   }
 
+  std::unique_ptr<FFTEngineBase> FFTWMPIEngine::clone() const {
+    return std::make_unique<FFTWMPIEngine>(this->get_nb_domain_grid_pts(),
+                                           this->get_nb_dof_per_pixel(),
+                                           this->get_communicator());
+  }
+
 }  // namespace muFFT

@@ -90,6 +90,10 @@ namespace muFFT {
     //! return whether this engine is active
     bool is_active() const override { return this->active; }
 
+    //! perform a deep copy of the engine (this should never be necessary in
+    //! c++)
+    std::unique_ptr<FFTEngineBase> clone() const final;
+
    protected:
     static int
         nb_engines;        //!< number of times this engine has been instatiated
