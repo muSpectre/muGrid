@@ -25,17 +25,21 @@ The latter option requires you to have a user account on gitlab (`create
 
 Building *µ*\Spectre
 ********************
+You can compile *µ*\Spectre using `CMake <https://cmake.org/>`_ (3.5.0 or
+higher). 
 
-You can compile *µ*\Spectre using `CMake <https://cmake.org/>`_ (3.1.0 or
-higher). The current (and possibly incomplete list of) dependencies are
+Dependencies of *µ*\Spectre
+ The current (and possibly incomplete list of) dependencies are
 
-- `CMake <https://cmake.org/>`_ (3.1.0 or higher)
+- `CMake <https://cmake.org/>`_ (3.5.0 or higher)
 - `Boost unit test framework <http://www.boost.org/doc/libs/1_66_0/libs/test/doc/html/index.html>`_
 - `FFTW <http://www.fftw.org>`_
 - `git <https://git-scm.com/>`_
-- `Python3 <https://www.python.org/>`_ including the header files.
+- `Python3 <https://www.python.org/>`_ including the header files
 - `numpy <http://www.numpy.org/>`_ and `scipy <https://scipy.org/>`_
-- `UVW <https://c4science.ch/source/uvw/>`_.
+- `UVW <https://c4science.ch/source/uvw/>`_ for the visualization
+- `pybind11 <https://pybind11.readthedocs.io/en/stable/>`_ (2.2.4 or higher)
+- `NetCDF4 <https://unidata.github.io/netcdf4-python/netCDF4/index.html>`_ 
 
 Recommended:
 
@@ -48,7 +52,8 @@ Recommended:
   recommend installing it on your system.
 - The CMake curses graphical user interface (``ccmake``).
 
-*µ*\Spectre requires a relatively modern compiler as it makes heavy use of C++14
+Possible compilers
+ *µ*\Spectre requires a relatively modern compiler as it makes heavy use of C++14
  features. It has successfully been compiled and tested using the following
  compilers under Linux
 
@@ -63,22 +68,26 @@ and using clang-4.0 under MacOS.
 
 It does *not* compile on Intel's most recent compiler, as it is still lacking
 some C++14 support. Work-arounds are planned, but will have to wait for someone
-to pick up the `task <https://gitlab.com/muspectre/muspectre/issues/1>`_.
+to pick up the `task <https://gitlab.com/muspectre/muspectre/issues/93>`_.
 
-To compile, create a build folder and configure the CMake project. If you do
-this in the folder you cloned in the previous step, it can look for instance
-like this:
+Instructions for compiling *µ*\Spectre
+ To compile, go into the build folder and configure the CMake project. If you do
+ this in the folder you cloned in the previous step, it can look for instance
+ like this:
 
 .. code-block:: sh
 
-   $ mkdir build-release
-   $ cd build-release
+   $ cd build
    $ ccmake ..
 
 Then, set the build type to ``Release`` to produce optimised code. *µ*\Spectre
 makes heavy use of expression templates, so optimisation is paramount. (As an
 example, the performance difference between code compiled in ``Debug`` and
 ``Release`` is about a factor 40 in simple linear elasticity.)
+
+For parallel computation turn ``MUSPECTRE_MPI_PARALLEL`` to ``ON``.
+
+The ``SPLIT_CELL`` option enables the `Laminate Material <./MaterialLaminate.rst>`_
 
 Finally, compile the library and the tests by running
 

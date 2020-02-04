@@ -26,6 +26,10 @@ This README contains only a small quick start guide. Please refer to the [full
 documentation](https://muspectre.readthedocs.io) for more help.
 
 ## Building µSpectre
+For the first installation of µSpectre, please refer to the 
+[full documentation - getting started](https://muspectre.readthedocs.io/en/master/GettingStarted.html#)
+for more information.
+
 µSpectre is a CMake project that uses C++14. It depends on the Boost unit test
 framework for testing and uses uses python3 as secondary API. You will need a
 modern C++ compiler (µSpectre was tested with gcc-6 , gcc-7, clang-4 and clang5)
@@ -95,4 +99,4 @@ Python interface
     print("nb of {} iterations: {}".format(solver.name(), r.nb_fev))
 
 You can find more examples using both the python and the c++ interface in the
-`bin/` and `tests` folder.
+[`examples`](./examples) and [`tests`](./tests) folder.
