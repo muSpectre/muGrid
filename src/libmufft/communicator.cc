@@ -43,13 +43,13 @@ namespace muFFT {
   template <typename T>
   auto Communicator::sum_mat(const Eigen::Ref<Matrix_t<T>> & arg) const
       -> Matrix_t<T> {
-    if (&comm == MPI_COMM_NULL)
+    if (this->comm == MPI_COMM_NULL)
       return arg;
     Matrix_t<T> res(arg.rows(), arg.cols());
     res.setZero();
     const auto count{arg.size()};
     MPI_Allreduce(arg.data(), res.data(), count, mpi_type<T>(), MPI_SUM,
-                  &this->comm);
+                  this->comm);
     return res;
   }
 
@@ -67,14 +67,14 @@ namespace muFFT {
   template <typename T>
   auto Communicator::gather(const Eigen::Ref<Matrix_t<T>> & arg) const
       -> Matrix_t<T> {
-    if (&comm == MPI_COMM_NULL)
+    if (this->comm == MPI_COMM_NULL)
       return arg;
     Dim_t send_buf_size(arg.size());
 
     int comm_size = this->size();
     int arg_sizes[comm_size] = {};
     auto message{MPI_Allgather(&send_buf_size, 1, mpi_type<int>(), arg_sizes, 1,
-                               mpi_type<int>(), &this->comm)};
+                               mpi_type<int>(), this->comm)};
     if (message != 0) {
       std::stringstream error{};
       error << "MPI_Allgather failed with " << message << " on rank "
@@ -98,7 +98,7 @@ namespace muFFT {
 
     message =
         MPI_Allgatherv(arg.data(), send_buf_size, mpi_type<T>(), res.data(),
-                       arg_sizes, displs, mpi_type<T>(), &this->comm);
+                       arg_sizes, displs, mpi_type<T>(), this->comm);
     if (message != 0) {
       std::stringstream error{};
       error << "MPI_Allgatherv failed with " << message << " on rank "

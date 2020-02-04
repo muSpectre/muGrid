@@ -108,7 +108,6 @@ namespace muFFT {
   //! lightweight abstraction for the MPI communicator object
   class Communicator {
    public:
-    using MPI_Comm_ref = std::remove_pointer_t<MPI_Comm> &;
     explicit Communicator(MPI_Comm comm = MPI_COMM_NULL) : comm{*comm} {};
     ~Communicator() {}
 
@@ -122,7 +121,7 @@ namespace muFFT {
       if (&comm == MPI_COMM_NULL)
         return 0;
       int res;
-      MPI_Comm_rank(&this->comm, &res);
+      MPI_Comm_rank(this->comm, &res);
       return res;
     }
 
@@ -131,7 +130,7 @@ namespace muFFT {
       if (&comm == MPI_COMM_NULL)
         return 1;
       int res;
-      MPI_Comm_size(&this->comm, &res);
+      MPI_Comm_size(this->comm, &res);
       return res;
     }
 
@@ -141,7 +140,7 @@ namespace muFFT {
       if (&comm == MPI_COMM_NULL)
         return arg;
       T res;
-      MPI_Allreduce(&arg, &res, 1, mpi_type<T>(), MPI_SUM, &this->comm);
+      MPI_Allreduce(&arg, &res, 1, mpi_type<T>(), MPI_SUM, this->comm);
       return res;
     }
 
@@ -153,14 +152,14 @@ namespace muFFT {
     template <typename T>
     Matrix_t<T> gather(const Eigen::Ref<Matrix_t<T>> & arg) const;
 
-    MPI_Comm get_mpi_comm() { return &this->comm; }
+    MPI_Comm get_mpi_comm() { return this->comm; }
 
     //! find whether the underlying communicator is mpi
     // TODO(pastewka) why do we need this?
     static bool has_mpi() { return true; }
 
    private:
-    MPI_Comm_ref comm;
+    MPI_Comm comm;
   };
 
 #else /* WITH_MPI */
