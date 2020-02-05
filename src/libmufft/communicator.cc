@@ -33,9 +33,13 @@
  *
  */
 
+#include <sstream>
+
+#include <libmugrid/exception.hh>
+
 #include "communicator.hh"
 
-#include <sstream>
+using muGrid::RuntimeError;
 
 namespace muFFT {
 
@@ -79,7 +83,7 @@ namespace muFFT {
       std::stringstream error{};
       error << "MPI_Allgather failed with " << message << " on rank "
             << this->rank();
-      throw std::runtime_error(error.str());
+      throw RuntimeError(error.str());
     }
 
     int displs[comm_size] = {};
@@ -103,7 +107,7 @@ namespace muFFT {
       std::stringstream error{};
       error << "MPI_Allgatherv failed with " << message << " on rank "
             << this->rank();
-      throw std::runtime_error(error.str());
+      throw RuntimeError(error.str());
     }
     return res;
   }

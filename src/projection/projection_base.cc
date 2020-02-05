@@ -45,13 +45,13 @@ namespace muSpectre {
       : fft_engine{std::move(engine)}, domain_lengths{domain_lengths},
         form{form}, projection_container{
                         this->fft_engine->get_field_collection()} {
-    if (this->domain_lengths.get_dim() != this->fft_engine->get_dim()) {
+    if (this->domain_lengths.get_dim() != this->fft_engine->get_spatial_dim()) {
       std::stringstream error{};
       error << "The domain lengths supplied are "
             << this->domain_lengths.get_dim()
             << "-dimensional, while the FFT engine is "
-            << this->fft_engine->get_dim() << "-dimensional";
-      throw std::runtime_error(error.str());
+            << this->fft_engine->get_spatial_dim() << "-dimensional";
+      throw muGrid::RuntimeError(error.str());
     }
   }
 
@@ -75,7 +75,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   const Dim_t & ProjectionBase::get_dim() const {
-    return this->fft_engine->get_dim();
+    return this->fft_engine->get_spatial_dim();
   }
 
   /* ---------------------------------------------------------------------- */

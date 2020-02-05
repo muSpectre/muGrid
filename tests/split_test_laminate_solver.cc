@@ -92,7 +92,7 @@ namespace muSpectre {
         break;
       }
       default:
-        throw std::runtime_error("Unknown dimension");
+        throw muGrid::RuntimeError("Unknown dimension");
       }
       return aniso_inp;
     }
@@ -118,7 +118,7 @@ namespace muSpectre {
         break;
       }
       default:
-        throw std::runtime_error("Unknown dimension");
+        throw muGrid::RuntimeError("Unknown dimension");
       }
       return ortho_inp;
     }

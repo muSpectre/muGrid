@@ -59,7 +59,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimM>
   void MaterialStochasticPlasticity<DimM>::add_pixel(const size_t & /*pixel*/) {
-    throw std::runtime_error(
+    throw muGrid::RuntimeError(
         "This material needs pixels with Youngs modulus and Poisson ratio.");
   }
 
@@ -78,7 +78,7 @@ namespace muSpectre {
             << "×" << std::to_string(eigen_strain.cols())
             << " for the eigen strain matrix.\nI expected the shape: "
             << std::to_string(DimM) << "×" << std::to_string(DimM);
-      throw std::runtime_error(error.str());
+      throw muGrid::RuntimeError(error.str());
     }
     this->internal_fields.add_pixel(pixel);
     // store the first(lambda) and second(mu) Lame constant in the field

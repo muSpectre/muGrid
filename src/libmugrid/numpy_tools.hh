@@ -49,13 +49,13 @@ namespace muGrid {
 /**
  * base class for numpy related exceptions
  */
-class NumpyError : public std::runtime_error {
+class NumpyError : public muGrid::RuntimeError {
  public:
   //! constructor
   explicit NumpyError(const std::string & what)
-      : std::runtime_error(what) {}
+      : muGrid::RuntimeError(what) {}
   //! constructor
-  explicit NumpyError(const char * what) : std::runtime_error(what) {}
+  explicit NumpyError(const char * what) : muGrid::RuntimeError(what) {}
 };
 
 /**

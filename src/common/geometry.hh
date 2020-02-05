@@ -34,6 +34,8 @@
  */
 
 #include "common/muSpectre_common.hh"
+
+#include <libmugrid/exception.hh>
 #include <libmugrid/tensor_algebra.hh>
 #include <libmugrid/eigen_tools.hh>
 
@@ -261,7 +263,7 @@ namespace muSpectre {
                Eigen::AngleAxisd(angles(2), Eigen::Vector3d::UnitY())));
         }
         default: {
-          throw std::runtime_error("not yet implemented.");
+          throw muGrid::RuntimeError("not yet implemented.");
         }
         }
       }
@@ -345,14 +347,14 @@ namespace muSpectre {
           std::stringstream err;
           err << "The norm of the destiantion input vector is ZERO which is "
                  "invalid";
-          std::runtime_error(err.str());
+          muGrid::RuntimeError(err.str());
         }
 
         if (v_ref_norm == 0.0) {
           std::stringstream err;
           err << "The norm of the reference input vector is ZERO which is "
                  "invalid";
-          std::runtime_error(err.str());
+          muGrid::RuntimeError(err.str());
         }
 
         RotMat_t ret_mat;
@@ -457,7 +459,7 @@ namespace muSpectre {
         if (vec_norm == 0.0) {
           std::stringstream err;
           err << "The norm of the input vector is ZERO which is invalid";
-          std::runtime_error(err.str());
+          muGrid::RuntimeError(err.str());
         }
         const Vec_t x{(Vec_t() << 1.0, 0.0).finished()};
 

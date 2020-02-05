@@ -33,7 +33,11 @@
  *
  */
 
+#include <libmugrid/exception.hh>
+
 #include "cell/cell_split.hh"
+
+using muGrid::RuntimeError;
 
 namespace muSpectre {
 
@@ -145,7 +149,7 @@ namespace muSpectre {
         muGrid::operator<<(err, pixel);
       }
       err << "and that cannot be handled";
-      throw std::runtime_error(err.str());
+      throw RuntimeError(err.str());
     }
     if (under_assigned_pixels.size() != 0) {
       std::stringstream err{};
@@ -154,7 +158,7 @@ namespace muSpectre {
         muGrid::operator<<(err, pixel);
       }
       err << "and that cannot be handled";
-      throw std::runtime_error(err.str());
+      throw RuntimeError(err.str());
     }
   }
 
@@ -191,7 +195,7 @@ namespace muSpectre {
     }
     //! High level compatibility checks
     if (strain.size() != this->strain.size()) {
-      throw std::runtime_error("Size mismatch");
+      throw RuntimeError("Size mismatch");
     }
     constexpr bool create_tangent{true};
     this->get_tangent(create_tangent);
@@ -237,7 +241,7 @@ namespace muSpectre {
    */
   MaterialBase & CellSplit::add_material(Material_ptr mat) {
     if (mat->get_material_dimension() != this->get_spatial_dim()) {
-      throw std::runtime_error(
+      throw RuntimeError(
           "this cell class only accepts materials with the same "
           "dimensionality "
           "as the spatial problem.");
@@ -307,7 +311,7 @@ namespace muSpectre {
       std::stringstream err;
       err << "Input dimesnion is not correct. Valid dimnensions are only twoD "
              "or threeD ";
-      throw(std::runtime_error(err.str()));
+      throw(RuntimeError(err.str()));
       break;
     }
     }

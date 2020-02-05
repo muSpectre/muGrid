@@ -33,6 +33,8 @@
  *
  */
 #include <iostream>
+
+#include "exception.hh"
 #include "ccoord_operations.hh"
 
 namespace muGrid {
@@ -47,13 +49,13 @@ namespace muGrid {
         std::stringstream error{};
         error << "Dimension mismatch between nb_grid_pts (dim = " << dim
               << ") and locations (dim = " << locations.get_dim() << ")";
-        throw std::runtime_error(error.str());
+        throw RuntimeError(error.str());
       }
       if (ccoord.get_dim() != dim) {
         std::stringstream error{};
         error << "Dimension mismatch between nb_grid_pts (dim = " << dim
               << ") and ccoord (dim = " << ccoord.get_dim() << ")";
-        throw std::runtime_error(error.str());
+        throw RuntimeError(error.str());
       }
       Dim_t retval{0};
       Dim_t factor{1};
@@ -96,7 +98,7 @@ namespace muGrid {
         : dim(nb_grid_pts.get_dim()), nb_grid_pts(nb_grid_pts),
           locations(locations), strides(get_default_strides(nb_grid_pts)) {
       if (this->dim != this->locations.get_dim()) {
-        throw std::runtime_error(
+        throw RuntimeError(
             "dimension mismatch between locations and nb_grid_pts.");
       }
     }
@@ -108,11 +110,11 @@ namespace muGrid {
         : dim(nb_grid_pts.get_dim()), nb_grid_pts(nb_grid_pts),
           locations(locations), strides{strides} {
       if (this->dim != this->locations.get_dim()) {
-        throw std::runtime_error(
+        throw RuntimeError(
             "dimension mismatch between locations and nb_grid_pts.");
       }
       if (this->dim != this->strides.get_dim()) {
-        throw std::runtime_error(
+        throw RuntimeError(
             "dimension mismatch between locations and strides.");
       }
     }
@@ -175,7 +177,7 @@ namespace muGrid {
         error << "You are trying to get a " << Dim
               << "-dimensional statically dimensioned view on a " << this->dim
               << "-dimensional DynamicPixels object";
-        throw std::runtime_error(error.str());
+        throw RuntimeError(error.str());
       }
       return static_cast<const Pixels<Dim> &>(*this);
     }

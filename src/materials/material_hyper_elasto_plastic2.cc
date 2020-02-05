@@ -85,7 +85,7 @@ namespace muSpectre {
   template <Dim_t DimM>
   void
   MaterialHyperElastoPlastic2<DimM>::add_pixel(const size_t & /*pixel_id*/) {
-    throw std::runtime_error(
+    throw muGrid::RuntimeError(
         "This material needs pixels with Young's modulus, Poisson's ratio, "
         "initial yield stress and hardening modulus.");
   }

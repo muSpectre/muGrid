@@ -33,10 +33,14 @@
  *
  */
 
+#include <libmugrid/exception.hh>
+
 #include "common/muSpectre_common.hh"
 
 #include <stdexcept>
 #include <iostream>
+
+using muGrid::RuntimeError;
 
 namespace muSpectre {
 
@@ -52,7 +56,7 @@ namespace muSpectre {
       break;
     }
     default:
-      throw std::runtime_error("unknown formulation.");
+      throw RuntimeError("unknown formulation.");
       break;
     }
     return os;
@@ -86,7 +90,7 @@ namespace muSpectre {
       break;
     }
     default:
-      throw std::runtime_error("a stress measure must be missing");
+      throw RuntimeError("a stress measure must be missing");
       break;
     }
     return os;
@@ -128,7 +132,7 @@ namespace muSpectre {
       break;
     }
     default:
-      throw std::runtime_error("a strain measure must be missing");
+      throw RuntimeError("a strain measure must be missing");
     }
     return os;
   }

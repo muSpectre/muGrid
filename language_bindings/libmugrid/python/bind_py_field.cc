@@ -33,6 +33,7 @@
  *
  */
 
+#include "libmugrid/exception.hh"
 #include "libmugrid/field.hh"
 #include "libmugrid/field_typed.hh"
 #include "libmugrid/field_collection.hh"
@@ -49,6 +50,7 @@ using muGrid::Dim_t;
 using muGrid::Field;
 using muGrid::FieldCollection;
 using muGrid::GlobalFieldCollection;
+using muGrid::RuntimeError;
 using muGrid::TypedField;
 using muGrid::TypedFieldBase;
 using muGrid::WrappedField;
@@ -103,7 +105,7 @@ void add_typed_field(py::module & mod, std::string name) {
               << "per quadrature point, but shape requested would "
                  "require "
               << ntotal << " components.";
-        throw std::runtime_error(error.str());
+        throw RuntimeError(error.str());
       }
       return_shape.push_back(nb_quad);
     } else {
@@ -117,7 +119,7 @@ void add_typed_field(py::module & mod, std::string name) {
               << " components per pixel, but shape requested would "
                  "require "
               << ntotal << " components.";
-        throw std::runtime_error(error.str());
+        throw RuntimeError(error.str());
       }
     }
 
@@ -134,7 +136,7 @@ void add_typed_field(py::module & mod, std::string name) {
       }
     } else {
       if (not coll.is_initialised()) {
-        throw std::runtime_error("Field collection isn't initialised yet");
+        throw RuntimeError("Field collection isn't initialised yet");
       }
       return_shape.push_back(coll.get_nb_pixels());
     }
@@ -147,7 +149,7 @@ void add_typed_field(py::module & mod, std::string name) {
       .def_buffer([](TypedFieldBase<T> & self) {
         auto & coll = self.get_collection();
         if (not coll.is_initialised()) {
-          throw std::runtime_error("Field collection isn't initialised yet");
+          throw RuntimeError("Field collection isn't initialised yet");
         }
         return py::buffer_info(
             self.data(),

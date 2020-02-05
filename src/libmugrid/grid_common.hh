@@ -43,6 +43,8 @@
 #include <algorithm>
 #include <vector>
 
+#include "exception.hh"
+
 #ifndef SRC_LIBMUGRID_GRID_COMMON_HH_
 #define SRC_LIBMUGRID_GRID_COMMON_HH_
 
@@ -135,7 +137,7 @@ namespace muGrid {
         error << "The maximum dimension representable by this dynamic array is "
               << MaxDim << ". You supplied an initialiser list with "
               << init_list.size() << " entries.";
-        throw std::runtime_error(error.str());
+        throw RuntimeError(error.str());
       }
       std::copy(init_list.begin(), init_list.end(), this->long_array.begin());
     }
@@ -164,7 +166,7 @@ namespace muGrid {
         error << "The maximum dimension representable by this dynamic array is "
               << MaxDim << ". You supplied a vector with "
               << ccoord.size() << " entries.";
-        throw std::runtime_error(error.str());
+        throw RuntimeError(error.str());
       }
       std::copy(ccoord.begin(), ccoord.end(), this->long_array.begin());
     }
@@ -219,7 +221,7 @@ namespace muGrid {
         error << "you are trying to divide a " << this->get_dim()
               << "-dimensional coord by a " << other.get_dim()
               << "-dimensional coord element-wise.";
-        throw std::runtime_error(error.str());
+        throw RuntimeError(error.str());
       }
       DynCcoord<MaxDim, decltype(T{} / T2{})> retval(this->get_dim());
       for (Dim_t i{0}; i < this->get_dim(); ++i) {

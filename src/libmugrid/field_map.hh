@@ -48,13 +48,13 @@ namespace muGrid {
   /**
    * base class for field map-related exceptions
    */
-  class FieldMapError : public std::runtime_error {
+  class FieldMapError : public muGrid::RuntimeError {
    public:
     //! constructor
     explicit FieldMapError(const std::string & what)
-        : std::runtime_error(what) {}
+        : muGrid::RuntimeError(what) {}
     //! constructor
-    explicit FieldMapError(const char * what) : std::runtime_error(what) {}
+    explicit FieldMapError(const char * what) : muGrid::RuntimeError(what) {}
   };
 
   // forward declaration

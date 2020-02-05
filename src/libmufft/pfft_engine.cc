@@ -33,8 +33,12 @@
  *
  */
 
-#include "pfft_engine.hh"
 #include <libmugrid/ccoord_operations.hh>
+#include <libmugrid/exception.hh>
+
+#include "pfft_engine.hh"
+
+using muGrid::RuntimeError;
 
 namespace muFFT {
 
@@ -73,7 +77,7 @@ namespace muFFT {
     if (false) {
       if (pfft_create_procmesh_2d(this->comm.get_mpi_comm(), dim_x, dim_y,
                                   &this->mpi_comm)) {
-        throw std::runtime_error("Failed to create 2d PFFT process mesh.");
+        throw RuntimeError("Failed to create 2d PFFT process mesh.");
       }
     }
 
@@ -103,13 +107,13 @@ namespace muFFT {
 
     for (auto & n : this->nb_subdomain_grid_pts) {
       if (n == 0) {
-        throw std::runtime_error("PFFT planning returned zero grid points. "
+        throw RuntimeError("PFFT planning returned zero grid points. "
                                  "You may need to run on fewer processes.");
       }
     }
     for (auto & n : this->nb_fourier_grid_pts) {
       if (n == 0) {
-        throw std::runtime_error("PFFT planning returned zero Fourier "
+        throw RuntimeError("PFFT planning returned zero Fourier "
                                  "grid_points. You may need to run on fewer "
                                  "processes.");
       }
@@ -120,7 +124,7 @@ namespace muFFT {
   template <Dim_t DimS>
   void PFFTEngine<DimS>::initialise(FFT_PlanFlags plan_flags) {
     if (this->initialised) {
-      throw std::runtime_error("double initialisation, will leak memory");
+      throw RuntimeError("double initialisation, will leak memory");
     }
 
     /*
@@ -156,7 +160,7 @@ namespace muFFT {
       break;
     }
     default:
-      throw std::runtime_error("unknown planner flag type");
+      throw RuntimeError("unknown planner flag type");
       break;
     }
 
@@ -171,7 +175,7 @@ namespace muFFT {
         PFFT_DEFAULT_BLOCKS, PFFT_DEFAULT_BLOCKS, in, out, this->mpi_comm,
         PFFT_FORWARD, PFFT_TRANSPOSED_OUT | flags);
     if (this->plan_fft == nullptr) {
-      throw std::runtime_error("r2c plan failed");
+      throw RuntimeError("r2c plan failed");
     }
 
     pfft_complex * i_in{reinterpret_cast<pfft_complex *>(this->work.data())};
@@ -182,7 +186,7 @@ namespace muFFT {
         PFFT_DEFAULT_BLOCKS, PFFT_DEFAULT_BLOCKS, i_in, i_out, this->mpi_comm,
         PFFT_BACKWARD, PFFT_TRANSPOSED_IN | flags);
     if (this->plan_ifft == nullptr) {
-      throw std::runtime_error("c2r plan failed");
+      throw RuntimeError("c2r plan failed");
     }
     this->initialised = true;
   }
@@ -210,7 +214,7 @@ namespace muFFT {
   typename PFFTEngine<DimS>::Workspace_t &
   PFFTEngine<DimS>::fft(Field_t & field) {
     if (!this->plan_fft) {
-      throw std::runtime_error("fft plan not allocated");
+      throw RuntimeError("fft plan not allocated");
     }
     if (field.size() !=
         muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)) {
@@ -219,7 +223,7 @@ namespace muFFT {
             << field.size() << " and does not match the size "
             << muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)
             << " of the (sub)domain handled by PFFTEngine.";
-      throw std::runtime_error(error.str());
+      throw RuntimeError(error.str());
     }
     // Copy field data to workspace buffer. This is necessary because workspace
     // buffer is larger than field buffer.
@@ -234,7 +238,7 @@ namespace muFFT {
   template <Dim_t DimS>
   void PFFTEngine<DimS>::ifft(Field_t & field) const {
     if (!this->plan_ifft) {
-      throw std::runtime_error("ifft plan not allocated");
+      throw RuntimeError("ifft plan not allocated");
     }
     if (field.size() !=
         muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)) {
@@ -243,7 +247,7 @@ namespace muFFT {
             << field.size() << " and does not match the size "
             << muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)
             << " of the (sub)domain handled by PFFTEngine.";
-      throw std::runtime_error(error.str());
+      throw RuntimeError(error.str());
     }
     pfft_execute_dft_c2r(this->plan_ifft,
                          reinterpret_cast<pfft_complex *>(this->work.data()),

@@ -121,7 +121,7 @@ namespace muSpectre {
 
     // check if the loop has lead in convergence or not:
     if (iter == max_iter) {
-      throw std::runtime_error(
+      throw muGrid::RuntimeError(
           "Error: The laminate solver has not converged!!!!");
     }
 

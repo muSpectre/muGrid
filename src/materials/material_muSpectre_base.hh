@@ -312,7 +312,7 @@ namespace muSpectre {
   template <class Material, Dim_t DimM>
   muGrid::RealField & MaterialMuSpectre<Material, DimM>::get_native_stress() {
     if (not this->native_stress.has_value()) {
-      throw std::runtime_error("native stress has not been evaluated");
+      throw muGrid::RuntimeError("native stress has not been evaluated");
     }
     return this->native_stress.get().get_field();
   }
@@ -322,7 +322,7 @@ namespace muSpectre {
   auto MaterialMuSpectre<Material, DimM>::get_mapped_native_stress()
       -> muGrid::MappedT2Field<Real, Mapping::Mut, DimM> & {
     if (not this->native_stress.has_value()) {
-      throw std::runtime_error("native stress has not been evaluated");
+      throw muGrid::RuntimeError("native stress has not been evaluated");
     }
     return this->native_stress.get();
   }
@@ -346,7 +346,7 @@ namespace muSpectre {
       break;
     }
     default:
-      throw std::runtime_error("Unknown value for store native stress");
+      throw muGrid::RuntimeError("Unknown value for store native stress");
       break;
     }
   }
@@ -373,7 +373,7 @@ namespace muSpectre {
         break;
       }
       default:
-        throw std::runtime_error("Unknown Splitness status");
+        throw muGrid::RuntimeError("Unknown Splitness status");
       }
       break;
     }
@@ -394,12 +394,12 @@ namespace muSpectre {
         break;
       }
       default:
-        throw std::runtime_error("Unknown Splitness status");
+        throw muGrid::RuntimeError("Unknown Splitness status");
       }
       break;
     }
     default:
-      throw std::runtime_error("Unknown formulation");
+      throw muGrid::RuntimeError("Unknown formulation");
       break;
     }
   }
@@ -427,7 +427,7 @@ namespace muSpectre {
         break;
       }
       default:
-        throw std::runtime_error("Unknown Splitness status");
+        throw muGrid::RuntimeError("Unknown Splitness status");
       }
       break;
     }
@@ -447,12 +447,12 @@ namespace muSpectre {
         break;
       }
       default:
-        throw std::runtime_error("Unknown Splitness status");
+        throw muGrid::RuntimeError("Unknown Splitness status");
       }
       break;
     }
     default:
-      throw std::runtime_error("Unknown formulation");
+      throw muGrid::RuntimeError("Unknown formulation");
       break;
     }
   }
@@ -574,7 +574,7 @@ namespace muSpectre {
       break;
     }
     default:
-      throw std::runtime_error("Unknown StoreNativeStress parameter");
+      throw muGrid::RuntimeError("Unknown StoreNativeStress parameter");
       break;
     }
   }
@@ -680,7 +680,7 @@ namespace muSpectre {
       break;
     }
     default:
-      throw std::runtime_error("Unknown StoreNativeStress parameter");
+      throw muGrid::RuntimeError("Unknown StoreNativeStress parameter");
       break;
     }
   }

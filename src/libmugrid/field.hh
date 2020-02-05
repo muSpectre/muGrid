@@ -36,6 +36,7 @@
 #ifndef SRC_LIBMUGRID_FIELD_HH_
 #define SRC_LIBMUGRID_FIELD_HH_
 
+#include "exception.hh"
 #include "grid_common.hh"
 
 #include <string>
@@ -46,12 +47,12 @@ namespace muGrid {
   /**
    * base class for field-related exceptions
    */
-  class FieldError : public std::runtime_error {
+  class FieldError : public RuntimeError {
    public:
     //! constructor
-    explicit FieldError(const std::string & what) : std::runtime_error(what) {}
+    explicit FieldError(const std::string & what) : RuntimeError(what) {}
     //! constructor
-    explicit FieldError(const char * what) : std::runtime_error(what) {}
+    explicit FieldError(const char * what) : RuntimeError(what) {}
   };
 
   //! forward-declaration

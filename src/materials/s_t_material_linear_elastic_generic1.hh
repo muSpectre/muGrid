@@ -194,7 +194,7 @@ namespace muSpectre {
     // Be careful that this F should be compatible with the strain that is
     // passed to material in whenever the evaluate_stress function is called.
     if (not this->F_is_set) {
-      throw(std::runtime_error(
+      throw(muGrid::RuntimeError(
           "The gradient should be set using set_F(F), otherwise you are not "
           "allowed to use this function (it is nedded for "
           "stress_transformation)"));
@@ -243,7 +243,7 @@ namespace muSpectre {
           << ") is not defined. Please make sure that the stress "
              "transforamtion from PK2 to"
           << StressM << " is implemented.";
-      throw(std::runtime_error(err.str()));
+      throw(muGrid::RuntimeError(err.str()));
     }
     }
   }
@@ -265,7 +265,7 @@ namespace muSpectre {
            "necessary to use this function it is necessary first to implement "
            "the conversion of PK2 to all required stress_tangent measures."
         << std::endl;
-    throw(std::runtime_error(err.str()));
+    throw(muGrid::RuntimeError(err.str()));
     using Stiffness_t = Eigen::Map<const muGrid::T4Mat<Real, DimM>>;
     using Ret_t = std::tuple<Stress_t, Stiffness_t>;
     // This return statment is here only to make the declared auto return type

@@ -50,13 +50,13 @@ namespace muSpectre {
   /**
    * base class for material-related exceptions
    */
-  class MaterialError : public std::runtime_error {
+  class MaterialError : public muGrid::RuntimeError {
    public:
     //! constructor
     explicit MaterialError(const std::string & what)
-        : std::runtime_error(what) {}
+        : muGrid::RuntimeError(what) {}
     //! constructor
-    explicit MaterialError(const char * what) : std::runtime_error(what) {}
+    explicit MaterialError(const char * what) : muGrid::RuntimeError(what) {}
   };
 
   /**

@@ -33,8 +33,12 @@
  *
  */
 
-#include "fftwmpi_engine.hh"
 #include <libmugrid/ccoord_operations.hh>
+#include <libmugrid/exception.hh>
+
+#include "fftwmpi_engine.hh"
+
+using muGrid::RuntimeError;
 
 namespace muFFT {
 
@@ -87,7 +91,7 @@ namespace muFFT {
   /* ---------------------------------------------------------------------- */
   void FFTWMPIEngine::initialise(FFT_PlanFlags plan_flags) {
     if (this->initialised) {
-      throw std::runtime_error("double initialisation, will leak memory");
+      throw RuntimeError("double initialisation, will leak memory");
     }
 
     /*
@@ -123,7 +127,7 @@ namespace muFFT {
       break;
     }
     default:
-      throw std::runtime_error("unknown planner flag type");
+      throw RuntimeError("unknown planner flag type");
       break;
     }
 
@@ -140,10 +144,10 @@ namespace muFFT {
         FFTW_MPI_TRANSPOSED_OUT | flags);
     if (this->plan_fft == nullptr) {
       if (dim == 1)
-        throw std::runtime_error("r2c plan failed; MPI parallel FFTW does not "
+        throw RuntimeError("r2c plan failed; MPI parallel FFTW does not "
                                  "support 1D r2c FFTs");
       else
-        throw std::runtime_error("r2c plan failed");
+        throw RuntimeError("r2c plan failed");
     }
 
     fftw_complex * i_in = reinterpret_cast<fftw_complex *>(this->work.data());
@@ -155,10 +159,10 @@ namespace muFFT {
         FFTW_MPI_TRANSPOSED_IN | flags);
     if (this->plan_ifft == nullptr) {
       if (dim == 1)
-        throw std::runtime_error("c2r plan failed; MPI parallel FFTW does not "
+        throw RuntimeError("c2r plan failed; MPI parallel FFTW does not "
                                  "support 1D c2r FFTs");
       else
-        throw std::runtime_error("c2r plan failed");
+        throw RuntimeError("c2r plan failed");
     }
     this->initialised = true;
   }
@@ -181,7 +185,7 @@ namespace muFFT {
   typename FFTWMPIEngine::Workspace_t &
   FFTWMPIEngine::fft(Field_t & field) {
     if (this->plan_fft == nullptr) {
-      throw std::runtime_error("fft plan not initialised");
+      throw RuntimeError("fft plan not initialised");
     }
     if (field.size() !=
         muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)) {
@@ -190,7 +194,7 @@ namespace muFFT {
             << field.size() << " and does not match the size "
             << muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)
             << " of the (sub)domain handled by FFTWMPIEngine.";
-      throw std::runtime_error(error.str());
+      throw RuntimeError(error.str());
     }
     // Copy non-padded field to padded real_workspace.
     // Transposed output of M x N x L transform for >= 3 dimensions is padded
@@ -218,7 +222,7 @@ namespace muFFT {
   /* ---------------------------------------------------------------------- */
   void FFTWMPIEngine::ifft(Field_t & field) const {
     if (this->plan_ifft == nullptr) {
-      throw std::runtime_error("ifft plan not initialised");
+      throw RuntimeError("ifft plan not initialised");
     }
     if (field.size() !=
         muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)) {
@@ -227,7 +231,7 @@ namespace muFFT {
             << field.size() << " and does not match the size "
             << muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)
             << " of the (sub)domain handled by FFTWMPIEngine.";
-      throw std::runtime_error(error.str());
+      throw RuntimeError(error.str());
     }
     // Compute inverse FFT
     fftw_mpi_execute_dft_c2r(

@@ -36,6 +36,8 @@
 #ifndef SRC_SOLVER_SOLVER_COMMON_HH_
 #define SRC_SOLVER_SOLVER_COMMON_HH_
 
+#include <libmugrid/exception.hh>
+
 #include "common/muSpectre_common.hh"
 
 #include <Eigen/Dense>
@@ -74,8 +76,8 @@ namespace muSpectre {
   using Grad_t = Matrices::Tens2_t<Dim>;
 
   /* ---------------------------------------------------------------------- */
-  class SolverError : public std::runtime_error {
-    using runtime_error::runtime_error;
+  class SolverError : public muGrid::RuntimeError {
+    using muGrid::RuntimeError::RuntimeError;
   };
 
   /* ---------------------------------------------------------------------- */

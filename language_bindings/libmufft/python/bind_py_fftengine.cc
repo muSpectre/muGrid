@@ -35,6 +35,7 @@
 
 #include "bind_py_declarations.hh"
 
+#include <libmugrid/exception.hh>
 #include <libmugrid/numpy_tools.hh>
 
 #include <libmufft/fft_utils.hh>
@@ -56,6 +57,7 @@ using muGrid::Complex;
 using muGrid::Dim_t;
 using muGrid::DynCcoord_t;
 using muGrid::GlobalFieldCollection;
+using muGrid::RuntimeError;
 using muGrid::NumpyProxy;
 using muGrid::OneQuadPt;
 using muGrid::Real;
@@ -73,7 +75,7 @@ class FFTEngineBaseUnclonable : public FFTEngineBase {
       : FFTEngineBase(nb_grid_pts, nb_dof_per_pixel, comm) {}
 
   std::unique_ptr<FFTEngineBase> clone() const final {
-    throw std::runtime_error("Python version of FFTEngine cannot be cloned");
+    throw RuntimeError("Python version of FFTEngine cannot be cloned");
   }
 };
 /**
@@ -237,8 +239,8 @@ void add_engine_helper(py::module & mod, std::string name) {
           [](const Engine & eng) {
             auto & nb_pts = eng.get_nb_subdomain_grid_pts();
             auto & locs = eng.get_subdomain_locations();
-            py::tuple t(eng.get_dim());
-            for (Dim_t dim = 0; dim < eng.get_dim(); ++dim) {
+            py::tuple t(eng.get_spatial_dim());
+            for (Dim_t dim = 0; dim < eng.get_spatial_dim(); ++dim) {
               t[dim] = py::slice(locs[dim], locs[dim] + nb_pts[dim], 1);
             }
             return t;
@@ -249,8 +251,8 @@ void add_engine_helper(py::module & mod, std::string name) {
           [](const Engine & eng) {
             auto & nb_pts = eng.get_nb_fourier_grid_pts();
             auto & locs = eng.get_fourier_locations();
-            py::tuple t(eng.get_dim());
-            for (Dim_t dim = 0; dim < eng.get_dim(); ++dim) {
+            py::tuple t(eng.get_spatial_dim());
+            for (Dim_t dim = 0; dim < eng.get_spatial_dim(); ++dim) {
               t[dim] = py::slice(locs[dim], locs[dim] + nb_pts[dim], 1);
             }
             return t;
@@ -260,7 +262,7 @@ void add_engine_helper(py::module & mod, std::string name) {
           "fftfreq",
           [](const Engine & eng) {
             std::vector<Dim_t> shape;
-            Dim_t dim = eng.get_dim();
+            Dim_t dim = eng.get_spatial_dim();
             shape.push_back(dim);
             for (auto && n : eng.get_nb_fourier_grid_pts()) {
               shape.push_back(n);

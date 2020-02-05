@@ -40,6 +40,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include <libmugrid/exception.hh>
 #include <libmugrid/numpy_tools.hh>
 
 #include "projection/projection_small_strain.hh"
@@ -61,6 +62,7 @@ using muGrid::DynRcoord_t;
 using muGrid::numpy_wrap;
 using muGrid::NumpyProxy;
 using muGrid::Real;
+using muGrid::RuntimeError;
 using muSpectre::Formulation;
 using muSpectre::MatrixXXc;
 using muSpectre::ProjectionBase;
@@ -74,7 +76,7 @@ class ProjectionBaseUnclonable : public ProjectionBase {
       : ProjectionBase(engine, domain_lengths, form) {}
 
   std::unique_ptr<ProjectionBase> clone() const final {
-    throw std::runtime_error(
+    throw RuntimeError(
         "Python version of the projection operators can't be cloned");
   }
 };

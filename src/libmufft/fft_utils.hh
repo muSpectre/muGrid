@@ -36,6 +36,8 @@
 #ifndef SRC_LIBMUFFT_FFT_UTILS_HH_
 #define SRC_LIBMUFFT_FFT_UTILS_HH_
 
+#include <libmugrid/exception.hh>
+
 #include "mufft_common.hh"
 
 #include <Eigen/Dense>
@@ -89,7 +91,7 @@ namespace muFFT {
       break;
     }
     default:
-      throw std::runtime_error(
+      throw muGrid::RuntimeError(
           "One 1, 2, and 3-dimensional cases are allowed");
       break;
     }

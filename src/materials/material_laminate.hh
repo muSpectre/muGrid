@@ -286,7 +286,7 @@ namespace muSpectre {
       break;
     }
     default: {
-      throw std::runtime_error("Unknown formualtion");
+      throw muGrid::RuntimeError("Unknown formualtion");
     }
     }
   }
@@ -335,7 +335,7 @@ namespace muSpectre {
       break;
     }
     default: {
-      throw std::runtime_error("Unknown formualtion");
+      throw muGrid::RuntimeError("Unknown formualtion");
     }
     }
   }

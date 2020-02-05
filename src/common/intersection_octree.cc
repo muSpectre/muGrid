@@ -33,7 +33,11 @@
  *
  */
 
+#include <libmugrid/exception.hh>
+
 #include "common/intersection_octree.hh"
+
+using muGrid::RuntimeError;
 
 namespace muSpectre {
 
@@ -71,7 +75,7 @@ namespace muSpectre {
       std::stringstream err;
       err << "Input dimesnion is not correct. Valid dimnensions are only twoD "
              "or threeD";
-      throw(std::runtime_error(err.str()));
+      throw(RuntimeError(err.str()));
       break;
     }
     }
@@ -159,7 +163,7 @@ namespace muSpectre {
       std::stringstream err;
       err << "Input dimesnion is not correct. Valid dimnensions are only twoD "
              "or threeD";
-      throw(std::runtime_error(err.str()));
+      throw(RuntimeError(err.str()));
       break;
     }
     }
@@ -211,7 +215,7 @@ namespace muSpectre {
       std::stringstream err;
       err << "Input dimesnion is not correct. Valid dimnensions are only twoD "
              "or threeD";
-      std::runtime_error(err.str());
+      RuntimeError(err.str());
       break;
     }
     }
@@ -281,7 +285,7 @@ namespace muSpectre {
       std::stringstream err;
       err << "Input dimesnion is not correct. Valid dimnensions are only twoD "
              "or threeD";
-      throw(std::runtime_error(err.str()));
+      throw(RuntimeError(err.str()));
       break;
     }
     }
@@ -359,7 +363,7 @@ namespace muSpectre {
       auto && dynvert{DynRcoord_t(vertex)};
       auto && is_vertex_inside = cell.is_point_inside(dynvert);
       if (!is_vertex_inside) {
-        throw std::runtime_error(
+        throw RuntimeError(
             "The precipitate introduced does not lie inside the cell");
       }
     }

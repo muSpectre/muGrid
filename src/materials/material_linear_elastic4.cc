@@ -53,7 +53,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimM>
   void MaterialLinearElastic4<DimM>::add_pixel(const size_t & /*pixel*/) {
-    throw std::runtime_error(
+    throw muGrid::RuntimeError(
         "This material needs pixels with Youngs modulus and Poisson ratio.");
   }
 

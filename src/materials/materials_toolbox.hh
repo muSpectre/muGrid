@@ -42,6 +42,7 @@
 #include "common/voigt_conversion.hh"
 
 #include <libmugrid/eigen_tools.hh>
+#include <libmugrid/exception.hh>
 #include <libmugrid/T4_map_proxy.hh>
 #include <libmugrid/tensor_algebra.hh>
 
@@ -63,14 +64,14 @@ namespace muSpectre {
      * thrown when generic materials-related runtime errors occur
      * (mostly continuum mechanics problems)
      */
-    class MaterialsToolboxError : public std::runtime_error {
+    class MaterialsToolboxError : public muGrid::RuntimeError {
      public:
       //! constructor
       explicit MaterialsToolboxError(const std::string & what)
-          : std::runtime_error(what) {}
+          : muGrid::RuntimeError(what) {}
       //! constructor
       explicit MaterialsToolboxError(const char * what)
-          : std::runtime_error(what) {}
+          : muGrid::RuntimeError(what) {}
     };
 
     /* ---------------------------------------------------------------------- */
@@ -932,7 +933,7 @@ namespace muSpectre {
                 << " × " << VSize << " Matrix in Voigt notation. You supplied"
                 << " a " << C_voigt.rows() << " × " << C_voigt.cols()
                 << " matrix" << std::endl;
-        throw(std::runtime_error(err_str.str()));
+        throw(muGrid::RuntimeError(err_str.str()));
       }
 
       const auto & sym_mat{VC_t::get_sym_mat()};

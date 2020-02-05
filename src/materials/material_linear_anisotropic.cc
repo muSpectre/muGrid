@@ -62,7 +62,7 @@ namespace muSpectre {
       std::stringstream err_str{};
       err_str << "Number of the inputs should be " << input_size[DimM - 2]
               << std::endl;
-      throw std::runtime_error(err_str.str());
+      throw muGrid::RuntimeError(err_str.str());
     }
 
     constexpr Dim_t v_diff{DimM * DimM - vsize(DimM)};

@@ -41,18 +41,19 @@
 
 #include "common/muSpectre_common.hh"
 #include <libmugrid/ccoord_operations.hh>
+#include <libmugrid/exception.hh>
 
 namespace muFFT {
   /**
    * base class for projection related exceptions
    */
-  class DerivativeError : public std::runtime_error {
+  class DerivativeError : public muGrid::RuntimeError {
    public:
     //! constructor
     explicit DerivativeError(const std::string & what)
-        : std::runtime_error(what) {}
+        : muGrid::RuntimeError(what) {}
     //! constructor
-    explicit DerivativeError(const char * what) : std::runtime_error(what) {}
+    explicit DerivativeError(const char * what) : muGrid::RuntimeError(what) {}
   };
 
   /**

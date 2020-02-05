@@ -162,6 +162,7 @@ def get_pybind11_include(pybind11_version='2.2.3'):
 print('=== DETECTING FFT LIBRARIES ===')
 
 mugrid_sources = [
+    'src/libmugrid/exception.cc',
     'src/libmugrid/field.cc',
     'src/libmugrid/field_typed.cc',
     'src/libmugrid/field_map.cc',

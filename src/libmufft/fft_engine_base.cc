@@ -84,7 +84,7 @@ namespace muFFT {
   }
 
   /* ---------------------------------------------------------------------- */
-  const Dim_t & FFTEngineBase::get_dim() const {
+  const Dim_t & FFTEngineBase::get_spatial_dim() const {
     return this->spatial_dimension;
   }
 

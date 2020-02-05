@@ -35,8 +35,12 @@
 
 #include <sstream>
 
-#include "fftw_engine.hh"
 #include <libmugrid/ccoord_operations.hh>
+#include <libmugrid/exception.hh>
+
+#include "fftw_engine.hh"
+
+using muGrid::RuntimeError;
 
 namespace muFFT {
 
@@ -52,10 +56,10 @@ namespace muFFT {
       error << "FFTW engine does not support MPI parallel execution, but a "
             << "communicator of size " << this->comm.size() << " was passed "
             << "during construction";
-      throw std::runtime_error(error.str());
+      throw RuntimeError(error.str());
     }
     if (this->initialised) {
-      throw std::runtime_error("double initialisation, will leak memory");
+      throw RuntimeError("double initialisation, will leak memory");
     }
     Parent::initialise(plan_flags);
 
@@ -97,7 +101,7 @@ namespace muFFT {
       break;
     }
     default:
-      throw std::runtime_error("unknown planner flag type");
+      throw RuntimeError("unknown planner flag type");
       break;
     }
 
@@ -105,7 +109,7 @@ namespace muFFT {
         rank, n, howmany, in, inembed, istride, idist, out, onembed, ostride,
         odist, FFTW_PRESERVE_INPUT | flags);
     if (this->plan_fft == nullptr) {
-      throw std::runtime_error("Plan failed");
+      throw RuntimeError("Plan failed");
     }
 
     fftw_complex * i_in = reinterpret_cast<fftw_complex *>(this->work.data());
@@ -116,7 +120,7 @@ namespace muFFT {
                                i_out, onembed, ostride, odist, flags);
 
     if (this->plan_ifft == nullptr) {
-      throw std::runtime_error("Plan failed");
+      throw RuntimeError("Plan failed");
     }
     fftw_free(r_work_space);
     this->initialised = true;
@@ -136,7 +140,7 @@ namespace muFFT {
   /* ---------------------------------------------------------------------- */
   typename FFTWEngine::Workspace_t & FFTWEngine::fft(Field_t & field) {
     if (this->plan_fft == nullptr) {
-      throw std::runtime_error("fft plan not initialised");
+      throw RuntimeError("fft plan not initialised");
     }
     if (field.size() !=
         muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)) {
@@ -145,7 +149,7 @@ namespace muFFT {
             << field.size() << " and does not match the size "
             << muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)
             << " of the (sub)domain handled by FFTWEngine.";
-      throw std::runtime_error(error.str());
+      throw RuntimeError(error.str());
     }
     fftw_execute_dft_r2c(this->plan_fft, field.data(),
                          reinterpret_cast<fftw_complex *>(this->work.data()));
@@ -155,7 +159,7 @@ namespace muFFT {
   /* ---------------------------------------------------------------------- */
   void FFTWEngine::ifft(Field_t & field) const {
     if (this->plan_ifft == nullptr) {
-      throw std::runtime_error("ifft plan not initialised");
+      throw RuntimeError("ifft plan not initialised");
     }
     if (field.size() !=
         muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)) {
@@ -164,7 +168,7 @@ namespace muFFT {
             << field.size() << " and does not match the size "
             << muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)
             << " of the (sub)domain handled by FFTWEngine.";
-      throw std::runtime_error(error.str());
+      throw RuntimeError(error.str());
     }
     fftw_execute_dft_c2r(this->plan_ifft,
                          reinterpret_cast<fftw_complex *>(this->work.data()),

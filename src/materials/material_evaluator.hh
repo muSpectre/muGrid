@@ -227,7 +227,7 @@ namespace muSpectre {
     }
     const auto & size{this->material->size()};
     if (size < 1) {
-      throw std::runtime_error(
+      throw muGrid::RuntimeError(
           "Not initialised! You have to call `add_pixel(...)` on your material "
           "exactly one time before you can evaluate it.");
     } else if (size > 1) {
@@ -235,7 +235,7 @@ namespace muSpectre {
       error << "The material to be evaluated should have exactly one pixel "
                "with one quadrature point added. You've added "
             << size << " quadrature points.";
-      throw std::runtime_error(error.str());
+      throw muGrid::RuntimeError(error.str());
     }
   }
 
@@ -304,7 +304,7 @@ namespace muSpectre {
         break;
       }
       default: {
-        throw std::runtime_error("Unknown FiniteDiff value");
+        throw muGrid::RuntimeError("Unknown FiniteDiff value");
         break;
       }
       }

@@ -36,6 +36,7 @@
 #ifndef SRC_PROJECTION_PROJECTION_BASE_HH_
 #define SRC_PROJECTION_PROJECTION_BASE_HH_
 
+#include <libmugrid/exception.hh>
 #include <libmugrid/field_collection.hh>
 #include <libmugrid/field_typed.hh>
 
@@ -56,13 +57,14 @@ namespace muSpectre {
   /**
    * base class for projection related exceptions
    */
-  class ProjectionError : public std::runtime_error {
+  class ProjectionError : public muGrid::RuntimeError {
    public:
     //! constructor
     explicit ProjectionError(const std::string & what)
-        : std::runtime_error(what) {}
+        : muGrid::RuntimeError(what) {}
     //! constructor
-    explicit ProjectionError(const char * what) : std::runtime_error(what) {}
+    explicit ProjectionError(const char * what)
+        : muGrid::RuntimeError(what) {}
   };
 
   /**

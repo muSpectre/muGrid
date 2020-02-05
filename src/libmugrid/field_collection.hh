@@ -36,6 +36,7 @@
 #ifndef SRC_LIBMUGRID_FIELD_COLLECTION_HH_
 #define SRC_LIBMUGRID_FIELD_COLLECTION_HH_
 
+#include "exception.hh"
 #include "grid_common.hh"
 
 #include <map>
@@ -74,14 +75,14 @@ namespace muGrid {
   /**
    * base class for field collection-related exceptions
    */
-  class FieldCollectionError : public std::runtime_error {
+  class FieldCollectionError : public RuntimeError {
    public:
     //! constructor
     explicit FieldCollectionError(const std::string & what)
-        : std::runtime_error(what) {}
+        : RuntimeError(what) {}
     //! constructor
     explicit FieldCollectionError(const char * what)
-        : std::runtime_error(what) {}
+        : RuntimeError(what) {}
   };
 
   /**

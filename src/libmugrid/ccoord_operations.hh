@@ -39,6 +39,7 @@
 
 #include <Eigen/Dense>
 
+#include "exception.hh"
 #include "grid_common.hh"
 #include "iterators.hh"
 
@@ -117,7 +118,7 @@ namespace muGrid {
         break;
       }
       default:
-        throw std::runtime_error("Unknown dimension");
+        throw RuntimeError("Unknown dimension");
         break;
       }
     }
@@ -260,7 +261,7 @@ namespace muGrid {
         break;
       }
       default:
-        throw std::runtime_error(
+        throw RuntimeError(
             "unforeseen dimensionality, is it really necessary to have other "
             "dimensions than 1, 2, and 3?");
         break;
@@ -476,7 +477,7 @@ namespace muGrid {
       template <size_t Dim>
       Dim_t get_index(const Ccoord_t<Dim> & ccoord) const {
         if (this->dim != Dim) {
-          throw std::runtime_error("dimension mismatch");
+          throw RuntimeError("dimension mismatch");
         }
         return get_index_from_strides(this->strides.template get<Dim>(),
                                       ccoord);

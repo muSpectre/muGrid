@@ -175,7 +175,7 @@ namespace muFFT {
     const Dim_t & get_nb_dof_per_pixel() const;
 
     //! return the number of spatial dimensions
-    const Dim_t & get_dim() const;
+    const Dim_t & get_spatial_dim() const;
 
     /**
      * returns the number of quadrature points

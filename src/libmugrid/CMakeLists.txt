@@ -39,6 +39,7 @@ if(POLICY CMP0076)
 endif()
 
 set(mugrid_HDRS
+  exception.hh
   numpy_tools.hh
   tensor_algebra.hh
   T4_map_proxy.hh
@@ -64,6 +65,7 @@ set(mugrid_HDRS
   )
 
 set(mugrid_SRCS
+  exception.cc
   ccoord_operations.cc
   field_collection.cc
   field_collection_global.cc
@@ -78,6 +80,7 @@ set(mugrid_SRCS
 add_library(muGrid "")
 
 # defining external dependencies
+target_link_libraries(muGrid PUBLIC ${CMAKE_DL_LIBS})
 target_link_libraries(muGrid PUBLIC Eigen3::Eigen)
 
 # defining exported include directories

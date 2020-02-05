@@ -33,6 +33,8 @@
  *
  */
 
+#include <libmugrid/exception.hh>
+
 #include "common/muSpectre_common.hh"
 #include "materials/material_base.hh"
 #include "materials/material_evaluator.hh"
@@ -44,6 +46,7 @@
 #include <sstream>
 #include <string>
 
+using muGrid::RuntimeError;
 using muSpectre::Dim_t;
 using muSpectre::Real;
 using pybind11::literals::operator""_a;
@@ -163,7 +166,7 @@ void add_material_evaluator(py::module & mod) {
               std::stringstream err{};
               err << "need matrix of shape (" << Dim << "×" << Dim
                   << ") but got (" << grad.rows() << "×" << grad.cols() << ").";
-              throw std::runtime_error(err.str());
+              throw RuntimeError(err.str());
             }
             return mateval.evaluate_stress(grad, form);
           },
@@ -182,7 +185,7 @@ void add_material_evaluator(py::module & mod) {
               std::stringstream err{};
               err << "need matrix of shape (" << Dim << "×" << Dim
                   << ") but got (" << grad.rows() << "×" << grad.cols() << ").";
-              throw std::runtime_error(err.str());
+              throw RuntimeError(err.str());
             }
             return mateval.evaluate_stress_tangent(grad, form);
           },
@@ -205,7 +208,7 @@ void add_material_evaluator(py::module & mod) {
               std::stringstream err{};
               err << "need matrix of shape (" << Dim << "×" << Dim
                   << ") but got (" << grad.rows() << "×" << grad.cols() << ").";
-              throw std::runtime_error(err.str());
+              throw RuntimeError(err.str());
             }
             return evaluator.estimate_tangent(grad, form, step, diff_type);
           },

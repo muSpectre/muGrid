@@ -33,6 +33,8 @@
  *
  */
 
+#include <libmugrid/exception.hh>
+
 #include "cell_adaptor.hh"
 #include "cell.hh"
 
@@ -44,6 +46,8 @@
 #include <libmugrid/field_map_static.hh>
 
 #include <set>
+
+using muGrid::RuntimeError;
 
 namespace muSpectre {
 
@@ -102,7 +106,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   MaterialBase & Cell::add_material(Material_ptr mat) {
     if (mat->get_material_dimension() != this->get_spatial_dim()) {
-      throw std::runtime_error(
+      throw RuntimeError(
           "this cell class only accepts materials with the same dimensionality "
           "as the spatial problem.");
     }
@@ -153,7 +157,7 @@ namespace muSpectre {
       break;
     }
     default:
-      throw std::runtime_error("Formulation not implemented");
+      throw RuntimeError("Formulation not implemented");
       break;
     }
   }
@@ -189,7 +193,7 @@ namespace muSpectre {
           err << "Pixel " << index << "is already assigned to material '"
               << assignment->get_name()
               << "' and cannot be reassigned to material '" << mat->get_name();
-          throw std::runtime_error(err.str());
+          throw RuntimeError(err.str());
         } else {
           assignments[index] = mat.get();
         }
@@ -211,7 +215,7 @@ namespace muSpectre {
         muGrid::operator<<(err, pixel) << ", ";
       }
       err << "and that cannot be handled";
-      throw std::runtime_error(err.str());
+      throw RuntimeError(err.str());
     }
   }
 
@@ -260,7 +264,7 @@ namespace muSpectre {
                                              this->get_material_dim()),
                          2));
       } else {
-        throw std::runtime_error("Tangent has not been created");
+        throw RuntimeError("Tangent has not been created");
       }
     }
     return this->tangent.value();
@@ -362,7 +366,7 @@ namespace muSpectre {
       const muGrid::TypedFieldBase<Real> & delta_strain,
       muGrid::TypedFieldBase<Real> & del_stress) {
     if (not this->tangent) {
-      throw std::runtime_error("evaluate_projected_directional_stiffness "
+      throw RuntimeError("evaluate_projected_directional_stiffness "
                                "requires the tangent moduli");
     }
     if (delta_strain.get_nb_components() != this->get_strain_size()) {
@@ -370,7 +374,7 @@ namespace muSpectre {
       err << "The input field should have " << this->get_strain_size()
           << " components per quadrature point, but has "
           << delta_strain.get_nb_components() << " components.";
-      throw std::runtime_error(err.str());
+      throw RuntimeError(err.str());
     }
     if (delta_strain.get_collection().get_nb_quad() !=
         this->get_strain().get_collection().get_nb_quad()) {
@@ -379,7 +383,7 @@ namespace muSpectre {
           << this->get_strain().get_collection().get_nb_quad()
           << " quadrature point per pixel, but has "
           << delta_strain.get_collection().get_nb_quad() << " points.";
-      throw std::runtime_error(err.str());
+      throw RuntimeError(err.str());
     }
     if (delta_strain.get_collection().get_nb_pixels() !=
         this->get_strain().get_collection().get_nb_pixels()) {
@@ -388,7 +392,7 @@ namespace muSpectre {
           << this->get_strain().get_collection().get_nb_pixels()
           << " pixels, but has "
           << delta_strain.get_collection().get_nb_pixels() << " pixels.";
-      throw std::runtime_error(err.str());
+      throw RuntimeError(err.str());
     }
     switch (this->get_material_dim()) {
     case twoD: {
@@ -404,7 +408,7 @@ namespace muSpectre {
     default:
       std::stringstream err{};
       err << "unknown dimension " << this->get_material_dim() << std::endl;
-      throw std::runtime_error(err.str());
+      throw RuntimeError(err.str());
       break;
     }
     this->apply_projection(del_stress);
@@ -452,7 +456,7 @@ namespace muSpectre {
     default:
       std::stringstream err{};
       err << "unknown dimension " << this->get_material_dim() << std::endl;
-      throw std::runtime_error(err.str());
+      throw RuntimeError(err.str());
       break;
     }
     this->apply_projection(del_stress_field);
@@ -504,7 +508,7 @@ namespace muSpectre {
         err_str << "The field named '" << unique_name << "' does not exist in "
                 << "any of the materials and can therefore not be globalised!";
       }
-      throw std::runtime_error(err_str.str());
+      throw RuntimeError(err_str.str());
     }
 
     const Dim_t nb_components{*nb_component_categories.begin()};

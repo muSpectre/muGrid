@@ -52,7 +52,8 @@ namespace muSpectre {
   template <Dim_t DimM>
   void MaterialLinearElasticGeneric2<DimM>::add_pixel(
       const size_t & /*pixel*/) {
-    throw std::runtime_error("this material needs pixels with and eigenstrain");
+    throw muGrid::RuntimeError(
+        "this material needs pixels with and eigenstrain");
   }
 
   /* ---------------------------------------------------------------------- */
