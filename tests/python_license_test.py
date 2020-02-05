@@ -133,7 +133,7 @@ def source_license_test(source_dirs, lic_paras):
         source_files = []
         for r, d, f in walklevel(source_dir, 0):
             for file in f:
-                if '.cc' in file and '.cc~' not in file and '#' not in file:
+                if file.endswith('.cc'):
                     source_files.append(os.path.join(r, file))
 
         for source_file in source_files:

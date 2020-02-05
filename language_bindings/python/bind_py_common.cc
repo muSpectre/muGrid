@@ -51,7 +51,19 @@ using pybind11::literals::operator""_a;
 
 namespace py = pybind11;
 
+void add_version(py::module & mod) {
+  auto version{mod.def_submodule("version")};
+
+  version.doc() = "version information";
+
+  version.def("info", &muSpectre::version::info)
+      .def("hash", &muSpectre::version::hash)
+      .def("description", &muSpectre::version::description)
+      .def("is_dirty", &muSpectre::version::is_dirty);
+}
+
 void add_common(py::module & mod) {
+  add_version(mod);
   py::enum_<Formulation>(mod, "Formulation")
       .value("finite_strain", Formulation::finite_strain)
       // "µSpectre handles a problem in terms of tranformation gradient F and"

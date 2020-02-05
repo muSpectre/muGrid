@@ -45,7 +45,7 @@ import _muGrid
 import _muFFT
 import _muSpectre
 from _muSpectre import SplitCell, Formulation, material, solvers, FiniteDiff
-from _muSpectre import OneQuadPt
+from _muSpectre import OneQuadPt, version
 
 from _muSpectre import (ProjectionApproxGreenOperator_2d, ProjectionApproxGreenOperator_3d, ProjectionSmallStrain_2d,
                         ProjectionSmallStrain_3d, ProjectionFiniteStrainFast_2d, ProjectionFiniteStrainFast_3d)

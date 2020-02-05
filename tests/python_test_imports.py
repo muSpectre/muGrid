@@ -41,8 +41,6 @@ import os
 sys.path.insert(0, os.path.join(os.getcwd(), "../language_bindings/python"))
 sys.path.insert(0, os.path.join(os.getcwd(), "../language_bindings/libmufft/python"))
 sys.path.insert(0, os.path.join(os.getcwd(), "../language_bindings/libmugrid/python"))
-print("current working directory: '{}'".format(os.getcwd()))
-
 # Path of the library when compiling with Xcode
 sys.path.insert(0, os.path.join(os.getcwd(), "../language_bindings/python/Debug"))
 sys.path.insert(0, os.path.join(os.getcwd(), "../language_bindings/libmufft/python"))

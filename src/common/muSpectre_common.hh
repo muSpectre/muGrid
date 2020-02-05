@@ -91,6 +91,18 @@ namespace muSpectre {
    */
   void banner(std::string name, Uint year, std::string cpy_holder);
 
+  namespace version {
+    /**
+     * returns a formatted text that can be printed to stdout or to output
+     * files. It contains the git commit hash and repository url used to compile
+     * µSpectre and whether the current state was dirty or not.
+     */
+    std::string info();
+    const char * hash();
+    const char * description();
+    bool is_dirty();
+  }  // namespace version
+
   //! continuum mechanics flags
   enum class Formulation {
     finite_strain,     //!< causes evaluation in PK1(F)
