@@ -58,16 +58,6 @@ class EigenStrainCheck(unittest.TestCase):
             self.cell2, "eigen2", 120e9, .33)
         self.dim = len(self.nb_grid_pts)
 
-    def test_globalisation(self):
-        for pixel in self.cell2:
-            self.mat2.add_pixel(pixel, np.random.rand(2, 2))
-        loc_eigenstrain = self.mat2.collection.get_real_field(
-            "Eigenstrain").array
-        glo_eigenstrain = self.cell2.get_globalised_internal_real_array(
-            "Eigenstrain")
-        error = np.linalg.norm(loc_eigenstrain-glo_eigenstrain)
-        self.assertEqual(error, 0)
-
     def test_globalisation_constant(self):
         for pixel_id in self.cell2.pixel_indices:
             if pixel_id % 2 == 0:
@@ -91,10 +81,9 @@ class EigenStrainCheck(unittest.TestCase):
         glo_eigenstrain = self.cell2.get_globalised_internal_real_field(
             "Eigenstrain")
         shape = [self.dim, self.dim]
-        # commented out and raised as issue #83
-        # error = np.linalg.norm(loc_eigenstrain.array(shape).ravel() -
-        #                        glo_eigenstrain.array(shape).ravel())
-        # self.assertEqual(error, 0)
+        error = np.linalg.norm(loc_eigenstrain.array(shape).ravel(order='A') -
+                               glo_eigenstrain.array(shape).ravel(order='A'))
+        self.assertEqual(error, 0)
 
     def test_solve(self):
         verbose_test = False
