@@ -67,7 +67,7 @@ void add_field(py::module & mod) {
       .def_property_readonly("pad_size", &Field::get_pad_size)
       .def_property_readonly("name", &Field::get_name)
       .def_property_readonly("collection", &Field::get_collection)
-      .def_property_readonly("nb_components", &Field::get_nb_components)
+      .def_property_readonly("nb_dof_per_quad", &Field::get_nb_dof_per_quad_pt)
       .def_property_readonly("is_global", &Field::is_global);
 }
 
@@ -93,15 +93,15 @@ void add_typed_field(py::module & mod, std::string name) {
       }
     }
 
-    const auto nb_quad{self.get_collection().get_nb_quad()};
+    const auto nb_quad{self.get_collection().get_nb_quad_pts()};
     if (it == muGrid::Iteration::QuadPt) {
       // If shape is not given, we just return column vectors with the
       // components
       if (dim == 0) {
-        return_shape.push_back(self.get_nb_components());
-      } else if (ntotal != self.get_nb_components()) {
+        return_shape.push_back(self.get_nb_dof_per_quad_pt());
+      } else if (ntotal != self.get_nb_dof_per_quad_pt()) {
         std::stringstream error{};
-        error << "Field has " << self.get_nb_components() << " components "
+        error << "Field has " << self.get_nb_dof_per_quad_pt() << " components "
               << "per quadrature point, but shape requested would "
                  "require "
               << ntotal << " components.";
@@ -112,10 +112,10 @@ void add_typed_field(py::module & mod, std::string name) {
       // If shape is not given, we just return column vectors with the
       // components
       if (dim == 0) {
-        return_shape.push_back(self.get_nb_components() * nb_quad);
-      } else if (ntotal != self.get_nb_components() * nb_quad) {
+        return_shape.push_back(self.get_nb_dof_per_quad_pt() * nb_quad);
+      } else if (ntotal != self.get_nb_dof_per_quad_pt() * nb_quad) {
         std::stringstream error{};
-        error << "Field has " << self.get_nb_components() * nb_quad
+        error << "Field has " << self.get_nb_dof_per_quad_pt() * nb_quad
               << " components per pixel, but shape requested would "
                  "require "
               << ntotal << " components.";
@@ -130,7 +130,8 @@ void add_typed_field(py::module & mod, std::string name) {
       // MPI process).
       const GlobalFieldCollection & global_coll =
           dynamic_cast<const GlobalFieldCollection &>(coll);
-      const auto & nb_grid_pts{global_coll.get_pixels().get_nb_grid_pts()};
+      const auto & nb_grid_pts{
+          global_coll.get_pixels().get_nb_subdomain_grid_pts()};
       for (auto & n : nb_grid_pts) {
         return_shape.push_back(n);
       }
@@ -154,11 +155,11 @@ void add_typed_field(py::module & mod, std::string name) {
         return py::buffer_info(
             self.data(),
             {static_cast<size_t>(coll.get_nb_pixels()),
-             static_cast<size_t>(coll.get_nb_quad()),
-             static_cast<size_t>(self.get_nb_components())},
-            {sizeof(T) * static_cast<size_t>(self.get_nb_components() *
-                                             coll.get_nb_quad()),
-             sizeof(T) * static_cast<size_t>(self.get_nb_components()),
+             static_cast<size_t>(coll.get_nb_quad_pts()),
+             static_cast<size_t>(self.get_nb_dof_per_quad_pt())},
+            {sizeof(T) * static_cast<size_t>(self.get_nb_dof_per_quad_pt() *
+                                             coll.get_nb_quad_pts()),
+             sizeof(T) * static_cast<size_t>(self.get_nb_dof_per_quad_pt()),
              sizeof(T)});
       })
       .def("array", array_computer, "shape"_a = std::vector<Dim_t>{},

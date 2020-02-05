@@ -432,25 +432,28 @@ namespace muGrid {
       DynamicPixels();
 
       //! Constructor with default strides (column-major pixel storage order)
-      explicit DynamicPixels(const DynCcoord_t & nb_grid_pts,
-                             const DynCcoord_t & locations = DynCcoord_t{});
+      explicit DynamicPixels(
+          const DynCcoord_t & nb_subdomain_grid_pts,
+          const DynCcoord_t & subdomain_locations = DynCcoord_t{});
 
       /**
        * Constructor with custom strides (any, including partially transposed
        * pixel storage order)
        */
-      DynamicPixels(const DynCcoord_t & nb_grid_pts,
-                    const DynCcoord_t & locations, const DynCcoord_t & strides);
+      DynamicPixels(const DynCcoord_t & nb_subdomain_grid_pts,
+                    const DynCcoord_t & subdomain_locations,
+                    const DynCcoord_t & strides);
 
       //! Constructor with default strides from statically sized coords
       template <size_t Dim>
-      explicit DynamicPixels(const Ccoord_t<Dim> & nb_grid_pts,
-                             const Ccoord_t<Dim> & locations = Ccoord_t<Dim>{});
+      explicit DynamicPixels(
+          const Ccoord_t<Dim> & nb_subdomain_grid_pts,
+          const Ccoord_t<Dim> & subdomain_locations = Ccoord_t<Dim>{});
 
       //! Constructor with custom strides from statically sized coords
       template <size_t Dim>
-      DynamicPixels(const Ccoord_t<Dim> & nb_grid_pts,
-                    const Ccoord_t<Dim> & locations,
+      DynamicPixels(const Ccoord_t<Dim> & nb_subdomain_grid_pts,
+                    const Ccoord_t<Dim> & subdomain_locations,
                     const Ccoord_t<Dim> & strides);
 
       //! Copy constructor
@@ -504,14 +507,18 @@ namespace muGrid {
       const Dim_t & get_dim() const { return this->dim; }
 
       //! return the resolution of the discretisation grid in each spatial dim
-      const DynCcoord_t & get_nb_grid_pts() const { return this->nb_grid_pts; }
+      const DynCcoord_t & get_nb_subdomain_grid_pts() const {
+        return this->nb_subdomain_grid_pts;
+      }
 
       /**
        * return the ccoordinates of the bottom, left, (front) pixel/voxel of
        * this processors partition of the discretisation grid. For sequential
        * calculations, this is alvays the origin
        */
-      const DynCcoord_t & get_locations() const { return this->locations; }
+      const DynCcoord_t & get_subdomain_locations() const {
+        return this->subdomain_locations;
+      }
 
       //! return the strides used for iterating over the pixels
       const DynCcoord_t & get_strides() const { return this->strides; }
@@ -524,10 +531,10 @@ namespace muGrid {
       Enumerator enumerate() const;
 
      protected:
-      Dim_t dim;                //!< spatial dimension
-      DynCcoord_t nb_grid_pts;  //!< nb_grid_pts of this domain
-      DynCcoord_t locations;    //!< locations of this domain
-      DynCcoord_t strides;      //!< strides of memory layout
+      Dim_t dim;                          //!< spatial dimension
+      DynCcoord_t nb_subdomain_grid_pts;  //!< nb_grid_pts of this domain
+      DynCcoord_t subdomain_locations;    //!< locations of this domain
+      DynCcoord_t strides;                //!< strides of memory layout
     };
 
     /**
@@ -566,8 +573,8 @@ namespace muGrid {
 
       //! dereferencing
       inline value_type operator*() const {
-        return get_ccoord_from_strides(this->pixels.nb_grid_pts,
-                                       this->pixels.locations,
+        return get_ccoord_from_strides(this->pixels.nb_subdomain_grid_pts,
+                                       this->pixels.subdomain_locations,
                                        this->pixels.strides, this->index);
       }
 
@@ -652,13 +659,14 @@ namespace muGrid {
       using Ccoord = Ccoord_t<Dim>;
 
       //! constructor
-      Pixels(const Ccoord & nb_grid_pts = Ccoord{},
-             const Ccoord & locations = Ccoord{})
-          : Parent{nb_grid_pts, locations} {}
+      Pixels(const Ccoord & nb_subdomain_grid_pts = Ccoord{},
+             const Ccoord & subdomain_locations = Ccoord{})
+          : Parent{nb_subdomain_grid_pts, subdomain_locations} {}
       //! constructor with strides
-      Pixels(const Ccoord & nb_grid_pts, const Ccoord & locations,
+      Pixels(const Ccoord & nb_subdomain_grid_pts,
+             const Ccoord & subdomain_locations,
              const Ccoord & strides)
-          : Parent{nb_grid_pts, locations, strides} {}
+          : Parent{nb_subdomain_grid_pts, subdomain_locations, strides} {}
       //! copy constructor
       Pixels(const Pixels & other) = default;
       //! assignment operator
@@ -709,10 +717,10 @@ namespace muGrid {
 
      protected:
       const Ccoord & get_nb_grid_pts() const {
-        return this->nb_grid_pts.template get<Dim>();
+        return this->nb_subdomain_grid_pts.template get<Dim>();
       }
-      const Ccoord & get_location() const {
-        return this->locations.template get<Dim>();
+      const Ccoord & get_subdomain_locations() const {
+        return this->subdomain_locations.template get<Dim>();
       }
       const Ccoord & get_strides() const {
         return this->strides.template get<Dim>();
@@ -732,7 +740,7 @@ namespace muGrid {
     typename Pixels<Dim>::iterator::value_type Pixels<Dim>::iterator::
     operator*() const {
       return get_ccoord_from_strides(this->pixels.get_nb_grid_pts(),
-                                     this->pixels.get_location(),
+                                     this->pixels.get_subdomain_locations(),
                                      this->pixels.get_strides(), this->index);
     }
 

@@ -70,7 +70,8 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   LocalFieldCollection LocalFieldCollection::get_empty_clone() const {
-    LocalFieldCollection ret_val{this->get_spatial_dim(), this->get_nb_quad()};
+    LocalFieldCollection ret_val{this->get_spatial_dim(),
+                                     this->get_nb_quad_pts()};
     for (const auto & pixel_id : this->get_pixel_indices_fast()) {
       ret_val.add_pixel(pixel_id);
     }

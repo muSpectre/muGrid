@@ -73,7 +73,7 @@ void add_field_collection(py::module & mod) {
       .def("state_field_exists", &FieldCollection::state_field_exists)
       .def_property_readonly("nb_entries", &FieldCollection::get_nb_entries)
       .def_property_readonly("nb_pixels", &FieldCollection::get_nb_pixels)
-      .def_property("nb_quad", &FieldCollection::get_nb_quad,
+      .def_property("nb_quad", &FieldCollection::get_nb_quad_pts,
                     &FieldCollection::set_nb_quad)
       .def_property_readonly("domain", &FieldCollection::get_domain)
       .def_property_readonly("is_initialised",

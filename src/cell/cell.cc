@@ -55,7 +55,7 @@ namespace muSpectre {
   Cell::Cell(Projection_ptr projection, SplitCell is_cell_split)
       : projection{std::move(projection)},
         fields{std::make_unique<muGrid::GlobalFieldCollection>(
-            this->get_spatial_dim(), this->get_nb_quad())},
+            this->get_spatial_dim(), this->get_nb_quad_pts())},
         strain{this->fields->register_real_field(
             "strain", dof_for_formulation(this->get_formulation(),
                                           this->get_material_dim()))},
@@ -73,7 +73,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   Dim_t Cell::get_nb_dof() const {
     const auto & strain_shape{this->get_strain_shape()};
-    return this->get_nb_pixels() * this->get_nb_quad() * strain_shape[0] *
+    return this->get_nb_pixels() * this->get_nb_quad_pts() * strain_shape[0] *
            strain_shape[1];
   }
 
@@ -174,8 +174,8 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  const Dim_t & Cell::get_nb_quad() const {
-    return this->projection->get_nb_quad();
+  const Dim_t & Cell::get_nb_quad_pts() const {
+    return this->projection->get_nb_quad_pts();
   }
 
   /* ---------------------------------------------------------------------- */
@@ -369,20 +369,20 @@ namespace muSpectre {
       throw RuntimeError("evaluate_projected_directional_stiffness "
                                "requires the tangent moduli");
     }
-    if (delta_strain.get_nb_components() != this->get_strain_size()) {
+    if (delta_strain.get_nb_dof_per_quad_pt() != this->get_strain_size()) {
       std::stringstream err{};
       err << "The input field should have " << this->get_strain_size()
           << " components per quadrature point, but has "
-          << delta_strain.get_nb_components() << " components.";
+          << delta_strain.get_nb_dof_per_quad_pt() << " components.";
       throw RuntimeError(err.str());
     }
-    if (delta_strain.get_collection().get_nb_quad() !=
-        this->get_strain().get_collection().get_nb_quad()) {
+    if (delta_strain.get_collection().get_nb_quad_pts() !=
+        this->get_strain().get_collection().get_nb_quad_pts()) {
       std::stringstream err{};
       err << "The input field should have "
-          << this->get_strain().get_collection().get_nb_quad()
+          << this->get_strain().get_collection().get_nb_quad_pts()
           << " quadrature point per pixel, but has "
-          << delta_strain.get_collection().get_nb_quad() << " points.";
+          << delta_strain.get_collection().get_nb_quad_pts() << " points.";
       throw RuntimeError(err.str());
     }
     if (delta_strain.get_collection().get_nb_pixels() !=
@@ -482,7 +482,7 @@ namespace muSpectre {
         auto & field{muGrid::TypedField<T>::safe_cast(
             collection.get_field(unique_name))};
         local_fields.push_back(field);
-        nb_component_categories.insert(field.get_nb_components());
+        nb_component_categories.insert(field.get_nb_dof_per_quad_pt());
       }
     }
 
@@ -500,8 +500,9 @@ namespace muSpectre {
           auto & coll = mat->get_collection();
           if (coll.field_exists(unique_name)) {
             auto & field{coll.get_field(unique_name)};
-            err_str << field.get_nb_components() << " components in material '"
-                    << mat->get_name() << "'" << std::endl;
+            err_str << field.get_nb_dof_per_quad_pt()
+                    << " components in material '" << mat->get_name()
+                    << "'" << std::endl;
           }
         }
       } else {

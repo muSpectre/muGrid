@@ -253,7 +253,7 @@ namespace muGrid {
     Fix::fc.initialise(nb_grid_pts);
 
     auto fc2{Fix::fc.get_empty_clone()};
-    BOOST_CHECK_EQUAL(fc2.get_nb_quad(), Fix::fc.get_nb_quad());
+    BOOST_CHECK_EQUAL(fc2.get_nb_quad_pts(), Fix::fc.get_nb_quad_pts());
     BOOST_CHECK_EQUAL(fc2.get_nb_entries(), Fix::fc.get_nb_entries());
     BOOST_CHECK_EQUAL(fc2.get_spatial_dim(), Fix::fc.get_spatial_dim());
     BOOST_CHECK_EQUAL(fc2.get_nb_pixels(), Fix::fc.get_nb_pixels());
@@ -270,7 +270,7 @@ namespace muGrid {
     fc.set_nb_quad(NbQuad);
 
     auto fc2{fc.get_empty_clone()};
-    BOOST_CHECK_EQUAL(fc2.get_nb_quad(), fc.get_nb_quad());
+    BOOST_CHECK_EQUAL(fc2.get_nb_quad_pts(), fc.get_nb_quad_pts());
     BOOST_CHECK_EQUAL(fc2.get_nb_entries(), fc.get_nb_entries());
     BOOST_CHECK_EQUAL(fc2.get_spatial_dim(), fc.get_spatial_dim());
   }

@@ -180,7 +180,7 @@ namespace muFFT {
     /**
      * returns the number of quadrature points
      */
-    const Dim_t & get_nb_quad() const;
+    const Dim_t & get_nb_quad_pts() const;
 
     //! has this engine been initialised?
     bool is_initialised() const { return this->initialised; }

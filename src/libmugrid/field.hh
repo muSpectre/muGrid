@@ -76,11 +76,11 @@ namespace muGrid {
      * held by a FieldCollection. The `Field` constructor is protected to
      * ensure this.
      * @param unique_name unique field name (unique within a collection)
-     * @param nb_components number of components to store per quadrature point
+     * @param nb_dof_per_quad_pt number of components to store per quadrature point
      * @param collection reference to the holding field collection.
      */
     Field(const std::string & unique_name, FieldCollection & collection,
-           Dim_t nb_components);
+           Dim_t nb_dof_per_quad_pt);
 
    public:
     //! Default constructor
@@ -108,7 +108,7 @@ namespace muGrid {
     FieldCollection & get_collection() const;
 
     //! return the number of components stored per quadrature point
-    const Dim_t & get_nb_components() const;
+    const Dim_t & get_nb_dof_per_quad_pt() const;
 
     /**
      * evaluate and return the overall shape of the field (for passing the
@@ -191,7 +191,7 @@ namespace muGrid {
      * three-dimensional vector, or 9 for a three-dimensional second-rank
      * tensor)
      */
-    const Dim_t nb_components;
+    const Dim_t nb_dof_per_quad_pt;
 
     //! size of padding region at end of buffer
     size_t pad_size{};

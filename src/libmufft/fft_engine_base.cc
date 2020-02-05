@@ -89,8 +89,8 @@ namespace muFFT {
   }
 
   /* ---------------------------------------------------------------------- */
-  const Dim_t & FFTEngineBase::get_nb_quad() const {
-    return this->work_space_container.get_nb_quad();
+  const Dim_t & FFTEngineBase::get_nb_quad_pts() const {
+    return this->work_space_container.get_nb_quad_pts();
   }
 
 }  // namespace muFFT

@@ -238,15 +238,16 @@ namespace muGrid {
     BOOST_CHECK_EQUAL(dynamic_field2.size(), nb_pixels);
 
     // check that the buffer size is correct
-    BOOST_CHECK_EQUAL(tensor_field.get_field().buffer_size(),
-                      nb_pixels * tensor_field.get_field().get_nb_components() +
-                          pad_size);
+    BOOST_CHECK_EQUAL(
+        tensor_field.get_field().buffer_size(),
+        nb_pixels * tensor_field.get_field().get_nb_dof_per_quad_pt() +
+        pad_size);
     BOOST_CHECK_EQUAL(dynamic_field1.buffer_size(),
-                      nb_pixels * dynamic_field1.get_nb_components() +
-                          pad_size);
+                      nb_pixels * dynamic_field1.get_nb_dof_per_quad_pt() +
+                      pad_size);
     BOOST_CHECK_EQUAL(dynamic_field2.buffer_size(),
-                      nb_pixels * dynamic_field2.get_nb_components() +
-                          pad_size);
+                      nb_pixels * dynamic_field2.get_nb_dof_per_quad_pt() +
+                      pad_size);
   }
 
   BOOST_AUTO_TEST_SUITE_END();

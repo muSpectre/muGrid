@@ -90,26 +90,29 @@ namespace muGrid {
     }
     /* ---------------------------------------------------------------------- */
     DynamicPixels::DynamicPixels()
-        : dim{}, nb_grid_pts{}, locations{}, strides{} {}
+        : dim{}, nb_subdomain_grid_pts{}, subdomain_locations{}, strides{} {}
 
     /* ---------------------------------------------------------------------- */
-    DynamicPixels::DynamicPixels(const DynCcoord_t & nb_grid_pts,
-                                 const DynCcoord_t & locations)
-        : dim(nb_grid_pts.get_dim()), nb_grid_pts(nb_grid_pts),
-          locations(locations), strides(get_default_strides(nb_grid_pts)) {
-      if (this->dim != this->locations.get_dim()) {
+    DynamicPixels::DynamicPixels(const DynCcoord_t & nb_subdomain_grid_pts,
+                                 const DynCcoord_t & subdomain_locations)
+        : dim(nb_subdomain_grid_pts.get_dim()),
+          nb_subdomain_grid_pts(nb_subdomain_grid_pts),
+          subdomain_locations(subdomain_locations),
+          strides(get_default_strides(nb_subdomain_grid_pts)) {
+      if (this->dim != this->subdomain_locations.get_dim()) {
         throw RuntimeError(
             "dimension mismatch between locations and nb_grid_pts.");
       }
     }
 
     /* ---------------------------------------------------------------------- */
-    DynamicPixels::DynamicPixels(const DynCcoord_t & nb_grid_pts,
-                                 const DynCcoord_t & locations,
+    DynamicPixels::DynamicPixels(const DynCcoord_t & nb_subdomain_grid_pts,
+                                 const DynCcoord_t & subdomain_locations,
                                  const DynCcoord_t & strides)
-        : dim(nb_grid_pts.get_dim()), nb_grid_pts(nb_grid_pts),
-          locations(locations), strides{strides} {
-      if (this->dim != this->locations.get_dim()) {
+        : dim(nb_subdomain_grid_pts.get_dim()),
+          nb_subdomain_grid_pts(nb_subdomain_grid_pts),
+          subdomain_locations(subdomain_locations), strides{strides} {
+      if (this->dim != this->subdomain_locations.get_dim()) {
         throw RuntimeError(
             "dimension mismatch between locations and nb_grid_pts.");
       }
@@ -121,18 +124,19 @@ namespace muGrid {
 
     /* ---------------------------------------------------------------------- */
     template <size_t Dim>
-    DynamicPixels::DynamicPixels(const Ccoord_t<Dim> & nb_grid_pts,
-                                 const Ccoord_t<Dim> & locations)
-        : dim(Dim), nb_grid_pts(nb_grid_pts), locations(locations),
-          strides(get_default_strides(nb_grid_pts)) {}
+    DynamicPixels::DynamicPixels(const Ccoord_t<Dim> & nb_subdomain_grid_pts,
+                                 const Ccoord_t<Dim> & subdomain_locations)
+        : dim(Dim), nb_subdomain_grid_pts(nb_subdomain_grid_pts),
+          subdomain_locations(subdomain_locations),
+          strides(get_default_strides(nb_subdomain_grid_pts)) {}
 
     /* ---------------------------------------------------------------------- */
     template <size_t Dim>
-    DynamicPixels::DynamicPixels(const Ccoord_t<Dim> & nb_grid_pts,
-                                 const Ccoord_t<Dim> & locations,
+    DynamicPixels::DynamicPixels(const Ccoord_t<Dim> & nb_subdomain_grid_pts,
+                                 const Ccoord_t<Dim> & subdomain_locations,
                                  const Ccoord_t<Dim> & strides)
-        : dim(Dim), nb_grid_pts(nb_grid_pts),
-          locations(locations), strides{strides} {}
+        : dim(Dim), nb_subdomain_grid_pts(nb_subdomain_grid_pts),
+          subdomain_locations(subdomain_locations), strides{strides} {}
 
     /* ---------------------------------------------------------------------- */
     auto DynamicPixels::begin() const -> iterator { return iterator(*this, 0); }
@@ -162,7 +166,9 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
-    size_t DynamicPixels::size() const { return get_size(this->nb_grid_pts); }
+    size_t DynamicPixels::size() const {
+      return get_size(this->nb_subdomain_grid_pts);
+    }
 
     /* ---------------------------------------------------------------------- */
     auto DynamicPixels::enumerate() const -> Enumerator {

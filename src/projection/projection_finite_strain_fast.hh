@@ -123,7 +123,7 @@ namespace muSpectre {
     constexpr static Dim_t NbComponents() { return DimS * DimS * OneQuadPt; }
 
     //! get number of components to project per pixel
-    virtual Dim_t get_nb_components() const { return NbComponents(); }
+    virtual Dim_t get_nb_dof_per_pixel() const { return NbComponents(); }
 
     //! perform a deep copy of the projector (this should never be necessary in
     //! c++)

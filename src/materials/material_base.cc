@@ -93,7 +93,7 @@ namespace muSpectre {
   void MaterialBase::get_assigned_ratios(
       std::vector<Real> & quad_pt_assigned_ratios) {
     quad_pt_assigned_ratios.reserve(
-        this->assigned_ratio->get_field().get_nb_components());
+            this->assigned_ratio->get_field().get_nb_dof_per_quad_pt());
     // for (auto && tup : akantu::zip(this->get_quad_pt_indices(),
     //                                this->assigned_ratio->get_map())) {
     for (auto && tup : this->assigned_ratio->get_map().enumerate_indices()) {

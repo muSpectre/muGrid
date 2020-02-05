@@ -188,7 +188,7 @@ namespace muSpectre {
     const Dim_t & get_spatial_dim() const;
 
     //! return the number of quadrature points stored per pixel
-    const Dim_t & get_nb_quad() const;
+    const Dim_t & get_nb_quad_pts() const;
 
     //! makes sure every pixel has been assigned to exactly one material
     virtual void check_material_coverage() const;

@@ -121,10 +121,10 @@ namespace muGrid {
   template <typename T>
   TypedField<T> & TypedField<T>::safe_cast(Field & other,
                                              const Dim_t & nb_components) {
-    if (other.get_nb_components() != nb_components) {
+    if (other.get_nb_dof_per_quad_pt() != nb_components) {
       std::stringstream error{};
       error << "Cannot cast field'" << other.get_name() << "', because it has "
-            << other.get_nb_components() << " compoments, rather than the "
+            << other.get_nb_dof_per_quad_pt() << " compoments, rather than the "
             << nb_components << " components which are requested.";
       throw FieldError(error.str());
     }
@@ -135,10 +135,10 @@ namespace muGrid {
   template <typename T>
   const TypedField<T> &
   TypedField<T>::safe_cast(const Field & other, const Dim_t & nb_components) {
-    if (other.get_nb_components() != nb_components) {
+    if (other.get_nb_dof_per_quad_pt() != nb_components) {
       std::stringstream error{};
       error << "Cannot cast field'" << other.get_name() << "', because it has "
-            << other.get_nb_components() << " compoments, rather than the "
+            << other.get_nb_dof_per_quad_pt() << " compoments, rather than the "
             << nb_components << " components which are requested.";
       throw FieldError(error.str());
     }
@@ -148,7 +148,8 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   template <typename T>
   void TypedField<T>::resize(size_t size) {
-    const auto expected_size{size * this->get_nb_components() + this->pad_size};
+    const auto expected_size{size * this->get_nb_dof_per_quad_pt()
+        + this->pad_size};
     if (this->values.size() != expected_size or this->current_size != size) {
       this->current_size = size;
       this->values.resize(expected_size);
@@ -174,10 +175,10 @@ namespace muGrid {
       throw FieldError("Cannot push_back into a field before the number of "
                         "quadrature points has bee set for the collection");
     }
-    if (this->nb_components != 1) {
+    if (this->nb_dof_per_quad_pt != 1) {
       throw FieldError("This is not a scalar field. push_back an array.");
     }
-    const auto & nb_quad{this->collection.get_nb_quad()};
+    const auto & nb_quad{this->collection.get_nb_quad_pts()};
     this->current_size += nb_quad;
     for (Dim_t quad_pt_id{0}; quad_pt_id < nb_quad; ++quad_pt_id) {
       this->values.push_back(value);
@@ -198,17 +199,17 @@ namespace muGrid {
       throw FieldError("Cannot push_back into a field before the number of "
                         "quadrature points has bee set for the collection");
     }
-    if (this->nb_components != value.size()) {
+    if (this->nb_dof_per_quad_pt != value.size()) {
       std::stringstream error{};
       error << "You are trying to push an array with " << value.size()
-            << "components into a field with " << this->nb_components
+            << "components into a field with " << this->nb_dof_per_quad_pt
             << " components.";
       throw FieldError(error.str());
     }
-    const auto & nb_quad{this->collection.get_nb_quad()};
+    const auto & nb_quad{this->collection.get_nb_quad_pts()};
     this->current_size += nb_quad;
     for (Dim_t quad_pt_id{0}; quad_pt_id < nb_quad; ++quad_pt_id) {
-      for (Dim_t i{0}; i < this->nb_components; ++i) {
+      for (Dim_t i{0}; i < this->nb_dof_per_quad_pt; ++i) {
         this->values.push_back(value.data()[i]);
       }
     }
@@ -288,40 +289,40 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   template <typename T>
   auto TypedFieldBase<T>::eigen_vec() -> Eigen_map {
-    return this->eigen_map(this->size() * this->nb_components, 1);
+    return this->eigen_map(this->size() * this->nb_dof_per_quad_pt, 1);
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
   auto TypedFieldBase<T>::eigen_vec() const -> Eigen_cmap {
-    return this->eigen_map(this->size() * this->nb_components, 1);
+    return this->eigen_map(this->size() * this->nb_dof_per_quad_pt, 1);
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
   auto TypedFieldBase<T>::eigen_quad_pt() -> Eigen_map {
-    return this->eigen_map(this->nb_components, this->size());
+    return this->eigen_map(this->nb_dof_per_quad_pt, this->size());
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
   auto TypedFieldBase<T>::eigen_quad_pt() const -> Eigen_cmap {
-    return this->eigen_map(this->nb_components, this->size());
+    return this->eigen_map(this->nb_dof_per_quad_pt, this->size());
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
   auto TypedFieldBase<T>::eigen_pixel() -> Eigen_map {
-    const auto & nb_quad{this->collection.get_nb_quad()};
-    return this->eigen_map(this->nb_components * nb_quad,
+    const auto & nb_quad{this->collection.get_nb_quad_pts()};
+    return this->eigen_map(this->nb_dof_per_quad_pt * nb_quad,
                            this->size() / nb_quad);
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
   auto TypedFieldBase<T>::eigen_pixel() const -> Eigen_cmap {
-    const auto & nb_quad{this->collection.get_nb_quad()};
-    return this->eigen_map(this->nb_components * nb_quad,
+    const auto & nb_quad{this->collection.get_nb_quad_pts()};
+    return this->eigen_map(this->nb_dof_per_quad_pt * nb_quad,
                            this->size() / nb_quad);
   }
 
@@ -369,23 +370,24 @@ namespace muGrid {
       : Parent{unique_name, collection, nb_components}, size{
                                                             static_cast<size_t>(
                                                                 size)} {
-    this->current_size = size / this->nb_components;
+    this->current_size = size / this->nb_dof_per_quad_pt;
 
-    if (size != this->nb_components * this->current_size) {
+    if (size != this->nb_dof_per_quad_pt * this->current_size) {
       std::stringstream error{};
       error << "Size mismatch: the provided array has a size of " << size
             << " which is not a multiple of the specified number of components "
                "(nb_components = "
-            << this->nb_components << ").";
+            << this->nb_dof_per_quad_pt << ").";
       throw FieldError(error.str());
     }
     if (this->collection.get_nb_entries() != Dim_t(this->current_size)) {
       std::stringstream error{};
-      error << "Size mismatch: This field should store " << this->nb_components
+      error << "Size mismatch: This field should store "
+            << this->nb_dof_per_quad_pt
             << " component(s) on " << this->collection.get_nb_pixels()
-            << " pixels/voxels with " << this->collection.get_nb_quad()
+            << " pixels/voxels with " << this->collection.get_nb_quad_pts()
             << " quadrature point(s) each, i.e. with a total of "
-            << this->collection.get_nb_entries() * this->nb_components
+            << this->collection.get_nb_entries() * this->nb_dof_per_quad_pt
             << " scalar values, but you supplied an array of size " << size
             << '.';
       throw FieldError(error.str());
@@ -400,24 +402,25 @@ namespace muGrid {
                                   Eigen::Ref<EigenRep_t> values)
       : Parent{unique_name, collection, nb_components},
         size{static_cast<size_t>(values.size())} {
-    this->current_size = values.size() / this->nb_components;
+    this->current_size = values.size() / this->nb_dof_per_quad_pt;
 
-    if (values.size() != Dim_t(this->nb_components * this->current_size)) {
+    if (values.size() != Dim_t(this->nb_dof_per_quad_pt * this->current_size)) {
       std::stringstream error{};
       error << "Size mismatch: the provided array has a size of "
             << values.size()
             << " which is not a multiple of the specified number of components "
                "(nb_components = "
-            << this->nb_components << ").";
+            << this->nb_dof_per_quad_pt << ").";
       throw FieldError(error.str());
     }
     if (this->collection.get_nb_entries() != Dim_t(this->current_size)) {
       std::stringstream error{};
-      error << "Size mismatch: This field should store " << this->nb_components
+      error << "Size mismatch: This field should store "
+            << this->nb_dof_per_quad_pt
             << " component(s) on " << this->collection.get_nb_pixels()
-            << " pixels/voxels with " << this->collection.get_nb_quad()
+            << " pixels/voxels with " << this->collection.get_nb_quad_pts()
             << " quadrature point(s) each, i.e. with a total of "
-            << this->collection.get_nb_entries() * this->nb_components
+            << this->collection.get_nb_entries() * this->nb_dof_per_quad_pt
             << " scalar values, but you supplied an array of size "
             << values.size() << '.';
       throw FieldError(error.str());
@@ -456,7 +459,8 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   template <typename T>
   void WrappedField<T>::resize(size_t size) {
-    const auto expected_size{size * this->get_nb_components() + this->pad_size};
+    const auto expected_size{size * this->get_nb_dof_per_quad_pt()
+        + this->pad_size};
     if (expected_size != this->buffer_size()) {
       std::stringstream error{};
       error << "Wrapped fields cannot be resized. The current wrapped size is "

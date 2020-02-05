@@ -173,7 +173,7 @@ namespace muGrid {
                                "' before the number of quadrature points has "
                                "been set for the field collection.");
         }
-        const auto & nb_quad{collection.get_nb_quad()};
+        const auto & nb_quad{collection.get_nb_quad_pts()};
         if ((dof_per_quad_pt / nb_quad) * nb_quad != dof_per_quad_pt) {
           std::stringstream error{};
           error << "Inconsistent input to create a mapped field: the number of "
@@ -183,7 +183,7 @@ namespace muGrid {
                 << nb_quad << ").";
           throw FieldMapError(error.str());
         }
-        return dof_per_quad_pt / collection.get_nb_quad();
+        return dof_per_quad_pt / collection.get_nb_quad_pts();
         break;
       }
       default:
@@ -215,7 +215,7 @@ namespace muGrid {
                                "' before the number of quadrature points has "
                                "been set for the field collection.");
         }
-        return FieldMapType::Stride() / collection.get_nb_quad();
+        return FieldMapType::Stride() / collection.get_nb_quad_pts();
         break;
       }
       default:

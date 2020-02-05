@@ -70,8 +70,8 @@ namespace muGrid {
      * @param nb_quad_pts number of quadrature points per pixel/voxel
      */
     GlobalFieldCollection(Dim_t spatial_dimension, Dim_t nb_quad_pts,
-                           const DynCcoord_t & nb_grid_pts,
-                           const DynCcoord_t & locations = {});
+                           const DynCcoord_t & nb_subdomain_grid_pts,
+                           const DynCcoord_t & subdomain_locations = {});
 
     //! Copy constructor
     GlobalFieldCollection(const GlobalFieldCollection & other) = delete;
@@ -102,8 +102,9 @@ namespace muGrid {
     //! return coordinates of the i-th pixel
     DynCcoord_t get_ccoord(const Dim_t & index) const {
       return CcoordOps::get_ccoord_from_strides(
-          this->pixels.get_nb_grid_pts(), this->pixels.get_locations(),
-          this->pixels.get_strides(), index);
+              this->pixels.get_nb_subdomain_grid_pts(),
+              this->pixels.get_subdomain_locations(),
+              this->pixels.get_strides(), index);
     }
 
     /**
@@ -111,8 +112,8 @@ namespace muGrid {
      * collection. Fields added later on will have their memory allocated
      * upon construction.
      */
-    void initialise(const DynCcoord_t & nb_grid_pts,
-                    const DynCcoord_t & locations = {});
+    void initialise(const DynCcoord_t & nb_subdomain_grid_pts,
+                    const DynCcoord_t & subdomain_locations = {});
 
     /**
      * freeze the problem size and allocate memory for all fields of the
@@ -120,9 +121,11 @@ namespace muGrid {
      * upon construction.
      */
     template <size_t Dim>
-    void initialise(const Ccoord_t<Dim> & nb_grid_pts,
-                    const Ccoord_t<Dim> & locations = {}) {
-      this->initialise(DynCcoord_t{nb_grid_pts}, DynCcoord_t{locations});
+    void initialise(const Ccoord_t<Dim> & nb_subdomain_grid_pts,
+                    const Ccoord_t<Dim> & subdomain_locations = {}) {
+      this->initialise(
+              DynCcoord_t{nb_subdomain_grid_pts},
+              DynCcoord_t{subdomain_locations});
     }
 
     /**
@@ -130,8 +133,9 @@ namespace muGrid {
      * collection. Fields added later on will have their memory allocated
      * upon construction.
      */
-    void initialise(const DynCcoord_t & nb_grid_pts,
-                    const DynCcoord_t & locations, const DynCcoord_t & strides);
+    void initialise(const DynCcoord_t & nb_subdomain_grid_pts,
+                    const DynCcoord_t & subdomain_locations,
+                    const DynCcoord_t & strides);
 
     /**
      * freeze the problem size and allocate memory for all fields of the
@@ -139,11 +143,12 @@ namespace muGrid {
      * upon construction.
      */
     template <size_t Dim>
-    void initialise(const Ccoord_t<Dim> & nb_grid_pts,
-                    const Ccoord_t<Dim> & locations,
+    void initialise(const Ccoord_t<Dim> & nb_subdomain_grid_pts,
+                    const Ccoord_t<Dim> & subdomain_locations,
                     const Ccoord_t<Dim> & strides) {
-      this->initialise(DynCcoord_t{nb_grid_pts}, DynCcoord_t{locations},
-                       DynCcoord_t{strides});
+      this->initialise(DynCcoord_t{nb_subdomain_grid_pts},
+              DynCcoord_t{subdomain_locations},
+              DynCcoord_t{strides});
     }
 
     /**

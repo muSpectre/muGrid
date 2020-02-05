@@ -57,12 +57,12 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   void ProjectionBase::initialise(const muFFT::FFT_PlanFlags & flags) {
-    if (this->get_nb_components() * this->get_nb_quad() !=
+    if (this->get_nb_dof_per_pixel() * this->get_nb_quad_pts() !=
         fft_engine->get_nb_dof_per_pixel()) {
       std::stringstream error;
       error << "Incompatible number of components per pixel. The projection "
-            << "operator expects " << this->get_nb_components() << " for "
-            << this->get_nb_quad() << " quadrature points, "
+            << "operator expects " << this->get_nb_dof_per_pixel() << " for "
+            << this->get_nb_quad_pts() << " quadrature points, "
             << "but the FFT engine reported "
             << fft_engine->get_nb_dof_per_pixel() << " degrees of freedom.";
       throw ProjectionError(error.str());
@@ -79,8 +79,8 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  const Dim_t & ProjectionBase::get_nb_quad() const {
-    return this->fft_engine->get_nb_quad();
+  const Dim_t & ProjectionBase::get_nb_quad_pts() const {
+    return this->fft_engine->get_nb_quad_pts();
   }
 
   /* ---------------------------------------------------------------------- */

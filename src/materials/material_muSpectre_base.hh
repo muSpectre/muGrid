@@ -256,7 +256,7 @@ namespace muSpectre {
   MaterialMuSpectre<Material, DimM>::make(Cell & cell, const std::string & name,
                                           ConstructorArgs &&... args) {
     auto mat = std::make_unique<Material>(name, cell.get_spatial_dim(),
-                                          cell.get_nb_quad(), args...);
+                                          cell.get_nb_quad_pts(), args...);
     auto & mat_ref = *mat;
     auto is_cell_split{cell.get_splitness()};
     mat_ref.allocate_optional_fields(is_cell_split);

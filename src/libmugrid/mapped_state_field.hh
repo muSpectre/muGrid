@@ -130,7 +130,7 @@ namespace muGrid {
                                "been set for the field collection.");
         }
         return StateFieldMapType::StaticFieldMap_t::Stride() /
-               collection.get_nb_quad();
+                collection.get_nb_quad_pts();
         break;
       }
       default:

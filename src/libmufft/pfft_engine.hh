@@ -62,7 +62,7 @@ namespace muFFT {
      * Constructor with the domain's number of grid points in each direciton,
      * the number of components to transform, and the communicator
      */
-    PFFTEngine(Ccoord nb_grid_pts, Dim_t nb_components,
+    PFFTEngine(Ccoord nb_grid_pts, Dim_t nb_dof_per_pixel,
                Communicator comm = Communicator());
 
     //! Copy constructor

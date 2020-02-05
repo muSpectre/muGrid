@@ -72,9 +72,10 @@ namespace muGrid {
       TypedStateField<T> & state_field, Iteration iter_type)
       : state_field{state_field}, iteration{iter_type},
         nb_rows{(iter_type == Iteration::QuadPt)
-                    ? state_field.current().get_nb_components()
-                    : state_field.current().get_nb_components() *
-                          state_field.current().get_collection().get_nb_quad()},
+                    ? state_field.current().get_nb_dof_per_quad_pt()
+                    : state_field.current().get_nb_dof_per_quad_pt() *
+                          state_field.current().get_collection()
+                                .get_nb_quad_pts()},
         maps(this->make_maps(state_field.get_fields())),
         cmaps(this->make_cmaps(state_field.get_fields())) {}
 

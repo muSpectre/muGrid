@@ -1970,7 +1970,7 @@ Distinguish (member) functions that compute something at non-trivial cost from s
 .. code-block:: c++
 
    compute_stresses()  // not an accessor, does actual work
-   get_nb_components() // simple accessor
+   get_nb_components_per_quad_pt() // simple accessor
    sdim()              // constexpr compile-time access
 
 .. _`namespace names`:

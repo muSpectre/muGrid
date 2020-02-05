@@ -46,9 +46,9 @@ namespace muFFT {
   int PFFTEngine<DimsS>::nb_engines{0};
 
   template <Dim_t DimS>
-  PFFTEngine<DimS>::PFFTEngine(Ccoord nb_grid_pts, Dim_t nb_components,
+  PFFTEngine<DimS>::PFFTEngine(Ccoord nb_grid_pts, Dim_t nb_dof_per_pixel,
                                Communicator comm)
-      : Parent{nb_grid_pts, nb_components, comm},
+      : Parent{nb_grid_pts, nb_dof_per_pixel, comm},
         mpi_comm{comm.get_mpi_comm()}, plan_fft{nullptr},
         plan_ifft{nullptr}, real_workspace{nullptr} {
     if (!this->nb_engines)
@@ -87,7 +87,7 @@ namespace muFFT {
     }
     ptrdiff_t res[DimS], loc[DimS], fres[DimS], floc[DimS];
     this->workspace_size = pfft_local_size_many_dft_r2c(
-        DimS, narr.data(), narr.data(), narr.data(), this->nb_components,
+        DimS, narr.data(), narr.data(), narr.data(), this->nb_dof_per_pixel,
         PFFT_DEFAULT_BLOCKS, PFFT_DEFAULT_BLOCKS, this->mpi_comm,
         PFFT_TRANSPOSED_OUT, res, loc, fres, floc);
     for (Dim_t i = 0; i < DimS; ++i) {
@@ -139,10 +139,10 @@ namespace muFFT {
      * enough. PFFT may request a workspace size larger than the nominal size of
      * the complex buffer.
      */
-    if (static_cast<int>(this->work.size() * this->nb_components) <
+    if (static_cast<int>(this->work.size() * this->nb_dof_per_pixel) <
         this->workspace_size) {
       this->work.set_pad_size(this->workspace_size -
-                              this->nb_components * this->work.size());
+                              this->nb_dof_per_pixel * this->work.size());
     }
 
     unsigned int flags;
@@ -171,7 +171,7 @@ namespace muFFT {
     Real * in{this->real_workspace};
     pfft_complex * out{reinterpret_cast<pfft_complex *>(this->work.data())};
     this->plan_fft = pfft_plan_many_dft_r2c(
-        DimS, narr.data(), narr.data(), narr.data(), this->nb_components,
+        DimS, narr.data(), narr.data(), narr.data(), this->nb_dof_per_pixel,
         PFFT_DEFAULT_BLOCKS, PFFT_DEFAULT_BLOCKS, in, out, this->mpi_comm,
         PFFT_FORWARD, PFFT_TRANSPOSED_OUT | flags);
     if (this->plan_fft == nullptr) {
@@ -182,7 +182,7 @@ namespace muFFT {
     Real * i_out{this->real_workspace};
 
     this->plan_ifft = pfft_plan_many_dft_c2r(
-        DimS, narr.data(), narr.data(), narr.data(), this->nb_components,
+        DimS, narr.data(), narr.data(), narr.data(), this->nb_dof_per_pixel,
         PFFT_DEFAULT_BLOCKS, PFFT_DEFAULT_BLOCKS, i_in, i_out, this->mpi_comm,
         PFFT_BACKWARD, PFFT_TRANSPOSED_IN | flags);
     if (this->plan_ifft == nullptr) {
@@ -227,7 +227,8 @@ namespace muFFT {
     }
     // Copy field data to workspace buffer. This is necessary because workspace
     // buffer is larger than field buffer.
-    std::copy(field.data(), field.data() + this->nb_components * field.size(),
+    std::copy(field.data(),
+              field.data() + this->nb_dof_per_pixel * field.size(),
               this->real_workspace);
     pfft_execute_dft_r2c(this->plan_fft, this->real_workspace,
                          reinterpret_cast<pfft_complex *>(this->work.data()));
@@ -253,7 +254,7 @@ namespace muFFT {
                          reinterpret_cast<pfft_complex *>(this->work.data()),
                          this->real_workspace);
     std::copy(this->real_workspace,
-              this->real_workspace + this->nb_components * field.size(),
+              this->real_workspace + this->nb_dof_per_pixel * field.size(),
               field.data());
   }
 

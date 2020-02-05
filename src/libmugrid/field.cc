@@ -41,9 +41,9 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   Field::Field(const std::string & unique_name, FieldCollection & collection,
-                 Dim_t nb_components)
-      : name{unique_name}, collection{collection}, nb_components{
-                                                       nb_components} {}
+               Dim_t nb_dof_per_quad_pt)
+      : name{unique_name}, collection{collection}, nb_dof_per_quad_pt{
+          nb_dof_per_quad_pt} {}
   /* ---------------------------------------------------------------------- */
   const std::string & Field::get_name() const { return this->name; }
 
@@ -54,15 +54,15 @@ namespace muGrid {
   size_t Field::size() const { return this->current_size; }
 
   /* ---------------------------------------------------------------------- */
-  const Dim_t & Field::get_nb_components() const {
-    return this->nb_components;
+  const Dim_t & Field::get_nb_dof_per_quad_pt() const {
+    return this->nb_dof_per_quad_pt;
   }
 
   /* ---------------------------------------------------------------------- */
   std::vector<Dim_t> Field::get_shape(Iteration iter_type) const {
     std::vector<Dim_t> shape;
 
-    if (collection.get_nb_quad() == 1) { iter_type = Iteration::Pixel; }
+    if (collection.get_nb_quad_pts() == 1) { iter_type = Iteration::Pixel; }
 
     for (auto && n : this->get_components_shape(iter_type)) {
       shape.push_back(n);
@@ -79,7 +79,7 @@ namespace muGrid {
     if (this->is_global()) {
       auto & coll = dynamic_cast<const GlobalFieldCollection &>(
           this->collection);
-      for (auto && n : coll.get_pixels().get_nb_grid_pts()) {
+      for (auto && n : coll.get_pixels().get_nb_subdomain_grid_pts()) {
         shape.push_back(n);
       }
     } else {
@@ -92,11 +92,12 @@ namespace muGrid {
   std::vector<Dim_t> Field::get_components_shape(Iteration iter_type) const {
     std::vector<Dim_t> shape;
 
-    if (collection.get_nb_quad() == 1 || iter_type == Iteration::Pixel) {
-      shape.push_back(this->nb_components * this->collection.get_nb_quad());
+    if (collection.get_nb_quad_pts() == 1 || iter_type == Iteration::Pixel) {
+      shape.push_back(
+          this->nb_dof_per_quad_pt * this->collection.get_nb_quad_pts());
     } else {
-      shape.push_back(this->nb_components);
-      shape.push_back(this->collection.get_nb_quad());
+      shape.push_back(this->nb_dof_per_quad_pt);
+      shape.push_back(this->collection.get_nb_quad_pts());
     }
     return shape;
   }
@@ -104,8 +105,8 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   Dim_t Field::get_stride(Iteration iter_type) const {
     return (iter_type == Iteration::QuadPt)
-               ? this->nb_components
-               : this->nb_components * this->collection.get_nb_quad();
+               ? this->nb_dof_per_quad_pt
+               : this->nb_dof_per_quad_pt * this->collection.get_nb_quad_pts();
   }
 
   /* ---------------------------------------------------------------------- */

@@ -240,12 +240,12 @@ numpy_copy(const TypedFieldBase<T> & field,
     components_shape.push_back(*n);
     nb_array_components *= *n;
   }
-  if (nb_array_components != field.get_nb_components()) {
+  if (nb_array_components != field.get_nb_dof_per_quad_pt()) {
     std::stringstream s;
     s << "The numpy array has shape " << buffer.shape << ", but the muGrid "
-      << "field reports " << field.get_nb_components() << " components per "
-      << "pixel. The numpy array must equal the number of components in its "
-      << "first dimensions.";
+      << "field reports " << field.get_nb_dof_per_quad_pt() << " components "
+      << "per pixel. The numpy array must equal the number of components in its"
+      << " first dimensions.";
     throw NumpyError(s.str());
   }
 
@@ -263,18 +263,18 @@ numpy_wrap(const TypedFieldBase<T> & field,
            std::vector<Dim_t> components_shape = std::vector<Dim_t>{}) {
   std::vector<Dim_t> shape{};
   if (components_shape.size() != 0) {
-    if (field.get_nb_components() != std::accumulate(
+    if (field.get_nb_dof_per_quad_pt() != std::accumulate(
         components_shape.begin(), components_shape.end(), 1,
         std::multiplies<Dim_t>())) {
       std::stringstream s;
-      s << "Unable to wrap field with " << field.get_nb_components()
+      s << "Unable to wrap field with " << field.get_nb_dof_per_quad_pt()
         << " components into a numpy array with " << components_shape
         << " components.";
       throw NumpyError(s.str());
     }
     shape = components_shape;
   } else {
-    shape.push_back(field.get_nb_components());
+    shape.push_back(field.get_nb_dof_per_quad_pt());
   }
   for (auto && n : field.get_pixels_shape()) {
     shape.push_back(n);

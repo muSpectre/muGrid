@@ -93,7 +93,7 @@ namespace muSpectre {
   MaterialLaminate<DimM> &
   MaterialLaminate<DimM>::make(Cell & cell, const std::string & name) {
     auto mat{std::make_unique<MaterialLaminate<DimM>>(
-        name, cell.get_spatial_dim(), cell.get_nb_quad())};
+        name, cell.get_spatial_dim(), cell.get_nb_quad_pts())};
     auto & mat_ref{*mat};
     auto is_cell_split{cell.get_splitness()};
     mat_ref.allocate_optional_fields(is_cell_split);

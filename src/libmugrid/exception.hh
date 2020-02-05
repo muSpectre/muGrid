@@ -46,22 +46,22 @@ namespace muGrid {
   //! An entry from the stack traceback
   class TracebackEntry {
    public:
-    TracebackEntry(void *address, const std::string &symbol);
-    TracebackEntry(void *address, const char *symbol);
-    TracebackEntry(const TracebackEntry &other);
+    TracebackEntry(void * address, const std::string & symbol);
+    TracebackEntry(void * address, const char * symbol);
+    TracebackEntry(const TracebackEntry & other);
 
     ~TracebackEntry();
 
-    TracebackEntry &operator=(const TracebackEntry &other);
+    TracebackEntry & operator=(const TracebackEntry & other);
 
-    const std::string &get_symbol() const { return this->symbol; }
-    const std::string &get_name() const { return this->name; }
-    const std::string &get_file() const { return this->file; }
+    const std::string & get_symbol() const { return this->symbol; }
+    const std::string & get_name() const { return this->name; }
+    const std::string & get_file() const { return this->file; }
 
     bool is_resolved() const { return this->resolved; }
 
-    friend std::ostream &operator<<(std::ostream &os,
-                                    const TracebackEntry &self) {
+    friend std::ostream & operator<<(std::ostream & os,
+                                     const TracebackEntry & self) {
       if (self.resolved) {
         os << "  File \"" << self.file << "\"" << std::endl;
         os << "    " << self.name;
@@ -75,25 +75,24 @@ namespace muGrid {
    protected:
     void discover_name_and_file();
 
-    void *address;
+    void * address;
     std::string symbol;
     std::string name;
     std::string file;
     bool resolved;  // has name and file been successfully resolved?
   };
 
-
   class Traceback {
    public:
     explicit Traceback(int discard_entries);
     virtual ~Traceback();
 
-    const std::vector<TracebackEntry> &get_stack() const {
+    const std::vector<TracebackEntry> & get_stack() const {
       return this->stack;
     }
 
-    friend std::ostream &operator<<(std::ostream &os,
-                                    const Traceback &self) {
+    friend std::ostream & operator<<(std::ostream & os,
+                                     const Traceback & self) {
       size_t i = 0;
       for (; i < self.stack.size(); ++i) {
         /* We stop dumping the stack trace at the first entry that could not be
@@ -106,10 +105,10 @@ namespace muGrid {
           break;
       }
       // Print stack trace in reverse or (most recent entry last)
-      for (ssize_t j = i-1; j >= 0; --j) {
+      for (ssize_t j = i - 1; j >= 0; --j) {
         os << self.stack[j];
         if (j != 0)
-            os << std::endl;
+          os << std::endl;
       }
       return os;
     }
@@ -118,11 +117,10 @@ namespace muGrid {
     std::vector<TracebackEntry> stack;
   };
 
-
-  template<class T>
+  template <class T>
   class ExceptionWithTraceback : public T {
    public:
-    explicit ExceptionWithTraceback(const std::string &message)
+    explicit ExceptionWithTraceback(const std::string & message)
         : T{message}, traceback{3}, buffer{} {
       std::stringstream os;
       os << T::what() << std::endl;
@@ -132,9 +130,7 @@ namespace muGrid {
     }
     virtual ~ExceptionWithTraceback() noexcept {}
 
-    virtual const char *what() const noexcept {
-      return buffer.c_str();
-    }
+    virtual const char * what() const noexcept { return buffer.c_str(); }
 
    protected:
     Traceback traceback;

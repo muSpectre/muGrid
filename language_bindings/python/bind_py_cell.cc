@@ -168,7 +168,7 @@ void add_cell_helper(py::module & mod) {
         auto & proj{cell.get_projection()};
         return NumpyProxy<Real>{proj.get_nb_subdomain_grid_pts(),
                                 proj.get_subdomain_locations(),
-                                proj.get_nb_quad(),
+                                proj.get_nb_quad_pts(),
                                 {strain_shape[0], strain_shape[1]},
                                 tensor2};
       }};
@@ -202,7 +202,7 @@ void add_cell_helper(py::module & mod) {
             cell.evaluate_projected_directional_stiffness(
                 delta_strain_array.get_field(), delta_stress);
             const Dim_t dim{cell.get_spatial_dim()};
-            if (delta_stress.get_nb_components() == dim * dim) {
+            if (delta_stress.get_nb_dof_per_quad_pt() == dim * dim) {
               std::vector<Dim_t> shape{dim, dim, 1};
               return numpy_wrap(delta_stress, shape);
             } else {
@@ -230,7 +230,7 @@ void add_cell_helper(py::module & mod) {
             strain_field = NumpyT2Proxy(cell, strain).get_field();
             cell.apply_projection(strain_field);
             const Dim_t dim{cell.get_spatial_dim()};
-            if (strain_field.get_nb_components() == dim * dim) {
+            if (strain_field.get_nb_dof_per_quad_pt() == dim * dim) {
               std::vector<Dim_t> shape{dim, dim, 1};
               return numpy_wrap(strain_field, shape);
             } else {
@@ -256,7 +256,7 @@ void add_cell_helper(py::module & mod) {
             auto && tangent{std::get<1>(stress_tgt)};
 
             const Dim_t dim{cell.get_spatial_dim()};
-            if (stress.get_nb_components() == dim * dim) {
+            if (stress.get_nb_dof_per_quad_pt() == dim * dim) {
               std::vector<Dim_t> shape{dim, dim, 1};
               auto && numpy_stress{numpy_wrap(stress, shape)};
               shape.back() = dim;
@@ -281,7 +281,7 @@ void add_cell_helper(py::module & mod) {
             auto && tangent{std::get<1>(stress_tgt)};
 
             const Dim_t dim{cell.get_spatial_dim()};
-            if (stress.get_nb_components() == dim * dim) {
+            if (stress.get_nb_dof_per_quad_pt() == dim * dim) {
               std::vector<Dim_t> shape{dim, dim, 1};
               auto && numpy_stress{numpy_wrap(stress, shape)};
               shape.back() = dim;
@@ -306,7 +306,7 @@ void add_cell_helper(py::module & mod) {
             cell.get_strain() = strain_array.get_field();
             auto && stress{cell.evaluate_stress()};
             const Dim_t dim{cell.get_spatial_dim()};
-            if (stress.get_nb_components() == dim * dim) {
+            if (stress.get_nb_dof_per_quad_pt() == dim * dim) {
               std::vector<Dim_t> shape{dim, dim, 1};
               return numpy_wrap(stress, shape);
             } else {

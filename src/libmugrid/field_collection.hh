@@ -142,17 +142,17 @@ namespace muGrid {
      * place a new field in the responsibility of this collection (Note, because
      * fields have protected constructors, users can't create them
      * @param unique_name unique identifier for this field
-     * @param nb_components number of components to be stored per quadrature
+     * @param nb_dof_per_quad_pt number of components to be stored per quadrature
      * point (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a
      * scalar field)
      */
     template <typename T>
     TypedField<T> & register_field(const std::string & unique_name,
-                                   const Dim_t & nb_components) {
+                                   const Dim_t & nb_dof_per_quad_pt) {
       static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
                     "You can only register fields templated with one of the "
                     "numeric types Real, Complex, Int, or UInt");
-      return this->register_field_helper<T>(unique_name, nb_components);
+      return this->register_field_helper<T>(unique_name, nb_dof_per_quad_pt);
     }
 
     /**
@@ -160,61 +160,62 @@ namespace muGrid {
      * (Note, because fields have protected constructors, users can't create
      * them
      * @param unique_name unique identifier for this field
-     * @param nb_components number of components to be stored per quadrature
+     * @param nb_dof_per_quad_pt number of components to be stored per quadrature
      * point (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a
      * scalar field)
      */
     TypedField<Real> & register_real_field(const std::string & unique_name,
-                                           const Dim_t & nb_components);
+                                           const Dim_t & nb_dof_per_quad_pt);
     /**
      * place a new complex-valued field  in the responsibility of this
      * collection (Note, because fields have protected constructors, users can't
      * create them
      * @param unique_name unique identifier for this field
-     * @param nb_components number of components to be stored per quadrature
+     * @param nb_dof_per_quad_pt number of components to be stored per quadrature
      * point (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a
      * scalar field)
      */
     TypedField<Complex> &
     register_complex_field(const std::string & unique_name,
-                           const Dim_t & nb_components);
+                           const Dim_t & nb_dof_per_quad_pt);
     /**
      * place a new integer-valued field  in the responsibility of this
      * collection (Note, because fields have protected constructors, users can't
      * create them
      * @param unique_name unique identifier for this field
-     * @param nb_components number of components to be stored per quadrature
+     * @param nb_dof_per_quad_pt number of components to be stored per quadrature
      * point (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a
      * scalar field)
      */
     TypedField<Int> & register_int_field(const std::string & unique_name,
-                                         const Dim_t & nb_components);
+                                         const Dim_t & nb_dof_per_quad_pt);
     /**
      * place a new unsigned integer-valued field  in the responsibility of this
      * collection (Note, because fields have protected constructors, users can't
      * create them
      * @param unique_name unique identifier for this field
-     * @param nb_components number of components to be stored per quadrature
+     * @param nb_dof_per_quad_pt number of components to be stored per quadrature
      * point (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a
      * scalar field)
      */
     TypedField<Uint> & register_uint_field(const std::string & unique_name,
-                                           const Dim_t & nb_components);
+                                           const Dim_t & nb_dof_per_quad_pt);
 
     /**
      * place a new state field in the responsibility of this collection (Note,
      * because state fields have protected constructors, users can't create them
      */
     template <typename T>
-    TypedStateField<T> & register_state_field(const std::string & unique_prefix,
-                                              const Dim_t & nb_memory,
-                                              const Dim_t & nb_components) {
+    TypedStateField<T> & register_state_field(
+        const std::string & unique_prefix,
+        const Dim_t & nb_memory,
+        const Dim_t & nb_dof_per_quad_pt) {
       static_assert(
           std::is_scalar<T>::value or std::is_same<T, Complex>::value,
           "You can only register state fields templated with one of the "
           "numeric types Real, Complex, Int, or UInt");
       return this->register_state_field_helper<T>(unique_prefix, nb_memory,
-                                                  nb_components);
+                                                  nb_dof_per_quad_pt);
     }
 
     /**
@@ -224,13 +225,13 @@ namespace muGrid {
      *
      * @param unique_prefix unique idendifier for this state field
      * @param nb_memory number of previous values of this field to store
-     * @param nb_components number of scalar components to store per quadrature
+     * @param nb_dof_per_quad_pt number of scalar components to store per quadrature
      * point
      */
     TypedStateField<Real> &
     register_real_state_field(const std::string & unique_prefix,
                               const Dim_t & nb_memory,
-                              const Dim_t & nb_components);
+                              const Dim_t & nb_dof_per_quad_pt);
 
     /**
      * place a new complex-valued state field in the responsibility of this
@@ -239,13 +240,13 @@ namespace muGrid {
      *
      * @param unique_prefix unique idendifier for this state field
      * @param nb_memory number of previous values of this field to store
-     * @param nb_components number of scalar components to store per quadrature
+     * @param nb_dof_per_quad_pt number of scalar components to store per quadrature
      * point
      */
     TypedStateField<Complex> &
     register_complex_state_field(const std::string & unique_prefix,
                                  const Dim_t & nb_memory,
-                                 const Dim_t & nb_components);
+                                 const Dim_t & nb_dof_per_quad_pt);
 
     /**
      * place a new integer-valued state field in the responsibility of this
@@ -254,13 +255,13 @@ namespace muGrid {
      *
      * @param unique_prefix unique idendifier for this state field
      * @param nb_memory number of previous values of this field to store
-     * @param nb_components number of scalar components to store per quadrature
+     * @param nb_dof_per_quad_pt number of scalar components to store per quadrature
      * point
      */
     TypedStateField<Int> &
     register_int_state_field(const std::string & unique_prefix,
                              const Dim_t & nb_memory,
-                             const Dim_t & nb_components);
+                             const Dim_t & nb_dof_per_quad_pt);
 
     /**
      * place a new unsigned integer-valued state field in the responsibility of
@@ -269,13 +270,13 @@ namespace muGrid {
      *
      * @param unique_prefix unique idendifier for this state field
      * @param nb_memory number of previous values of this field to store
-     * @param nb_components number of scalar components to store per quadrature
+     * @param nb_dof_per_quad_pt number of scalar components to store per quadrature
      * point
      */
     TypedStateField<Uint> &
     register_uint_state_field(const std::string & unique_prefix,
                               const Dim_t & nb_memory,
-                              const Dim_t & nb_components);
+                              const Dim_t & nb_dof_per_quad_pt);
 
     //! check whether a field of name 'unique_name' has already been
     //! registered
@@ -312,7 +313,7 @@ namespace muGrid {
     /**
      * return the number of quadrature points per pixel
      */
-    const Dim_t & get_nb_quad() const;
+    const Dim_t & get_nb_quad_pts() const;
 
     /**
      * return the spatial dimension of the underlying discretisation grid
@@ -375,14 +376,14 @@ namespace muGrid {
     //! internal worker function called by register_<T>_field
     template <typename T>
     TypedField<T> & register_field_helper(const std::string & unique_name,
-                                          const Dim_t & nb_components);
+                                          const Dim_t & nb_dof_per_quad_pt);
 
     //! internal worker function called by register_<T>_state_field
     template <typename T>
     TypedStateField<T> &
     register_state_field_helper(const std::string & unique_prefix,
                                 const Dim_t & nb_memory,
-                                const Dim_t & nb_components);
+                                const Dim_t & nb_dof_per_quad_pt);
 
     /**
      * loop through all fields and allocate their memory. Is exclusively
@@ -512,7 +513,7 @@ namespace muGrid {
      */
     Dim_t get_stride() const {
       return (this->iteration_type == Iteration::QuadPt)
-                 ? this->collection.get_nb_quad()
+                 ? this->collection.get_nb_quad_pts()
                  : 1;
     }
 

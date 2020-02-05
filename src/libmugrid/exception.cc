@@ -39,29 +39,28 @@
 
 #include "exception.hh"
 
-using muGrid::TracebackEntry;
 using muGrid::Traceback;
+using muGrid::TracebackEntry;
 
 const int MAX_DEPTH = 256;
 
-
-TracebackEntry::TracebackEntry(void *address, const std::string & symbol)
+TracebackEntry::TracebackEntry(void * address, const std::string & symbol)
     : address(address), symbol(symbol), name{}, file{}, resolved{false} {
   discover_name_and_file();
 }
 
-TracebackEntry::TracebackEntry(void *address, const char *symbol)
+TracebackEntry::TracebackEntry(void * address, const char * symbol)
     : address(address), symbol(symbol), name{}, file{}, resolved{false} {
   discover_name_and_file();
 }
 
 TracebackEntry::TracebackEntry(const TracebackEntry & other)
-    : address(other.address), symbol(other.symbol), name(other.name),
-      file{other.file}, resolved{other.resolved} {}
+    : address(other.address), symbol(other.symbol),
+      name(other.name), file{other.file}, resolved{other.resolved} {}
 
 TracebackEntry::~TracebackEntry() {}
 
-TracebackEntry &TracebackEntry::operator=(const TracebackEntry &other) {
+TracebackEntry & TracebackEntry::operator=(const TracebackEntry & other) {
   this->address = other.address;
   this->symbol = other.symbol;
   this->name = other.name;
@@ -79,8 +78,8 @@ void TracebackEntry::discover_name_and_file() {
     this->name = info.dli_sname;
 
     int status;
-    char *demangled = abi::__cxa_demangle(this->name.c_str(), NULL, NULL,
-                                          &status);
+    char * demangled =
+        abi::__cxa_demangle(this->name.c_str(), NULL, NULL, &status);
     if (status == 0 && demangled)
       this->name = demangled;
     if (demangled)
@@ -93,12 +92,10 @@ void TracebackEntry::discover_name_and_file() {
     this->file = info.dli_fname;
 }
 
-
-Traceback::Traceback(int discard_entries)
-    : stack{} {
-  void *buffer[MAX_DEPTH];
+Traceback::Traceback(int discard_entries) : stack{} {
+  void * buffer[MAX_DEPTH];
   int size = backtrace(buffer, MAX_DEPTH);
-  char **symbols = backtrace_symbols(buffer, size);
+  char ** symbols = backtrace_symbols(buffer, size);
 
   for (int i = discard_entries; i < size; ++i) {
     this->stack.push_back(TracebackEntry{buffer[i], symbols[i]});

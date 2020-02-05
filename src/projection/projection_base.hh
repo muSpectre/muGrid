@@ -163,7 +163,7 @@ namespace muSpectre {
     virtual std::array<Dim_t, 2> get_strain_shape() const = 0;
 
     //! get number of components to project per pixel
-    virtual Dim_t get_nb_components() const = 0;
+    virtual Dim_t get_nb_dof_per_pixel() const = 0;
 
     //! return the number of spatial dimensions
     const Dim_t & get_dim() const;
@@ -171,7 +171,7 @@ namespace muSpectre {
     /**
      * returns the number of quadrature points
      */
-    const Dim_t & get_nb_quad() const;
+    const Dim_t & get_nb_quad_pts() const;
 
     //! return a reference to the fft_engine
     muFFT::FFTEngineBase & get_fft_engine();
