@@ -48,6 +48,23 @@
 namespace py = pybind11;
 using pybind11::literals::operator""_a;
 
+#ifdef WITH_MUFFT_VERSION
+void add_version(py::module & mod) {
+    auto version{mod.def_submodule("version")};
+
+    version.doc() = "version information";
+
+    version.def("info", &muSpectre::version::info)
+        .def("hash", &muSpectre::version::hash)
+        .def("description", &muSpectre::version::description)
+        .def("is_dirty", &muSpectre::version::is_dirty);
+  }
+}
+#else
+void add_version(py::module & /*mod*/) {}
+#endif
+
+
 template <muGrid::Dim_t dim>
 void add_get_nb_hermitian_grid_pts_helper(py::module & mod) {
   mod.def(
@@ -123,6 +140,7 @@ void add_fft_freqs(py::module & mod) {
 }
 
 void add_common(py::module & mod) {
+  add_version(mod);
   py::enum_<muFFT::FFT_PlanFlags>(mod, "FFT_PlanFlags")
       .value("estimate", muFFT::FFT_PlanFlags::estimate)
       .value("measure", muFFT::FFT_PlanFlags::measure)

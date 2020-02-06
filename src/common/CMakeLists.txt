@@ -36,7 +36,6 @@
 
 set(PRE_CONFIGURE_FILE "${CMAKE_CURRENT_SOURCE_DIR}/version.cc.skeleton")
 set(POST_CONFIGURE_FILE "${CMAKE_CURRENT_BINARY_DIR}/version.cc")
-message("Post_configure_file = ${POST_CONFIGURE_FILE}")
 include(git_watcher.cmake)
 
 # Create a library out of the compiled post-configure file.
