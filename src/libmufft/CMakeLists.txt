@@ -124,6 +124,7 @@ include(git_watcher.cmake)
 
 # Create a library out of the compiled post-configure file.
 add_library(version STATIC ${POST_CONFIGURE_FILE})
+set_property(TARGET version PROPERTY POSITION_INDEPENDENT_CODE ON)
 target_include_directories(version PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 add_dependencies(version check_git)
 target_link_libraries(muFFT PUBLIC version)
