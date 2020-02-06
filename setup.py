@@ -25,14 +25,16 @@
 # Adapted from: https://github.com/pybind/python_example
 #               https://stackoverflow.com/questions/50938128/distutils-build-multiple-python-extension-modules-written-in-swig-that-share
 
-from distutils.ccompiler import CCompiler
+import os
+import re
+import sys
+import setuptools
+import subprocess
+
 from distutils.spawn import find_executable
 from setuptools import setup, Extension
 from setuptools.command.build_clib import build_clib
 from setuptools.command.build_ext import build_ext
-import os
-import sys
-import setuptools
 
 ###
 
@@ -76,6 +78,43 @@ pfft_info = {
 }
 
 ###
+
+def get_version_from_git():
+    """
+    Discover muSpectre version from git repository.
+    """
+    git_describe = subprocess.run(
+        ['git', 'describe', '--tags', '--dirty', '--always'],
+        capture_output=True)
+    if git_describe.returncode != 0:
+        raise RuntimeError('git execution failed')
+    version = git_describe.stdout.decode('latin-1').strip()
+    git_hash = subprocess.run(
+        ['git', 'show', '-s', '--format=%H'], capture_output=True)
+    if git_hash.returncode != 0:
+        raise Runtimeerror('git execution failed')
+    hash = git_hash.stdout.decode('latin-1').strip()
+
+    if verbose:
+        print('GIT Version detected:', version)
+
+    return version.endswith('dirty'), version, hash
+
+
+def get_version_from_cc(fn):
+    text = open(fn, 'r').read()
+    dirty = bool(re.search('constexpr bool git_dirty{(true|false)};',
+                           text).group(1))
+    version = re.search('constexpr char git_describe\[\]{"([A-Za-z0-9_.-]*)"};',
+                        text).group(1)
+    hash = re.search('constexpr char git_hash\[\]{"([A-Za-z0-9_.-]*)"};',
+                     text).group(1)
+
+    if verbose:
+        print('Version contained in version.cc:', version)
+
+    return dirty, version, hash
+
 
 def detect_library(info):
     if verbose:
@@ -400,13 +439,41 @@ class build_clib_dyn(build_clib):
                 output_dir=self.build_clib,
                 debug=self.debug)
 
-requirements = ['setuptools_scm', 'numpy']
+requirements = ['numpy']
 if mpi:
     requirements += ['mpi4py']
 
+### Discover version and write version.cc
+
+try:
+    # Get version from git. If we get this from git, then we need to check
+    # whether we have to refresh the version.cc file.
+    dirty, version, hash = get_version_from_git()
+    try:
+        cc_dirty, cc_version, cc_hash = \
+            get_version_from_cc('src/common/version.cc')
+        cc_found = True
+    except:
+        cc_found = False
+    if not cc_found or cc_hash != hash:
+        # Write a new version.cc file
+        open('src/common/version.cc', 'w').write(
+            open('src/common/version.cc.skeleton').read()
+                .replace('@GIT_IS_DIRTY@', 'true' if dirty else 'false')
+                .replace('@GIT_COMMIT_DESCRIBE@', version)
+                .replace('@GIT_HEAD_SHA1@', hash))
+except:
+    # Detection via git failed. Get version from version.cc file.
+    try:
+        dirty, version, hash = get_version_from_cc('src/common/version.cc')
+    except:
+        raise RuntimeError('Version detection failed. This is not a git '
+                           'repository and src/common/version.cc does not '
+                           'exist.')
+
 setup(
     name='muFFT',
-    use_scm_version=True,
+    version=version,
     author='Till Junge',
     author_email='till.junge@altermail.ch',
     url='https://gitlab.com/muspectre/muspectre',
