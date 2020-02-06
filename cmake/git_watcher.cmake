@@ -125,7 +125,7 @@ function(GetGitState _working_dir)
     set(ENV{GIT_RETRIEVED_STATE} "true")
 
     # Get whether or not the working tree is dirty.
-    RunGitCommand(status --porcelain)
+    RunGitCommand(status --porcelain --untracked=no)
     if(NOT exit_code EQUAL 0)
         set(ENV{GIT_IS_DIRTY} "false")
     else()
@@ -168,7 +168,7 @@ function(GetGitState _working_dir)
         set(ENV{GIT_COMMIT_BODY} "${output}")
     endif()
 
-    RunGitCommand(describe --tags "--dirty")
+    RunGitCommand(describe --tags --dirty --always)
     message("OUTPUT = ${output}")
     if(exit_code EQUAL 0)
         set(ENV{GIT_COMMIT_DESCRIBE} "${output}")
