@@ -231,6 +231,7 @@ pymugrid_sources = [
     'language_bindings/libmugrid/python/bind_py_field_collection.cc',
 ]
 mufft_sources = [
+    'src/libmufft/version.cc',
     'src/libmufft/fft_engine_base.cc',
     'src/libmufft/fft_utils.cc',
     'src/libmufft/derivative.cc',
@@ -451,24 +452,24 @@ try:
     dirty, version, hash = get_version_from_git()
     try:
         cc_dirty, cc_version, cc_hash = \
-            get_version_from_cc('src/common/version.cc')
+            get_version_from_cc('src/libmufft/version.cc')
         cc_found = True
     except:
         cc_found = False
     if not cc_found or cc_hash != hash:
         # Write a new version.cc file
-        open('src/common/version.cc', 'w').write(
-            open('src/common/version.cc.skeleton').read()
+        open('src/libmufft/version.cc', 'w').write(
+            open('src/libmufft/version.cc.skeleton').read()
                 .replace('@GIT_IS_DIRTY@', 'true' if dirty else 'false')
                 .replace('@GIT_COMMIT_DESCRIBE@', version)
                 .replace('@GIT_HEAD_SHA1@', hash))
 except:
     # Detection via git failed. Get version from version.cc file.
     try:
-        dirty, version, hash = get_version_from_cc('src/common/version.cc')
+        dirty, version, hash = get_version_from_cc('src/libmufft/version.cc')
     except:
         raise RuntimeError('Version detection failed. This is not a git '
-                           'repository and src/common/version.cc does not '
+                           'repository and src/libmufft/version.cc does not '
                            'exist.')
 
 setup(
