@@ -37,9 +37,6 @@
 #include <libmugrid/ccoord_operations.hh>
 
 #include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
-
-#include <sstream>
 
 using muSpectre::Dim_t;
 using muSpectre::Formulation;

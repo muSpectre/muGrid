@@ -47,8 +47,8 @@ except ImportError:
 # registered and implicitly convertible.
 import muGrid
 import _muFFT
-from _muFFT import (FourierDerivative, DiscreteDerivative, FFT_PlanFlags,
-                    get_nb_hermitian_grid_pts)
+from _muFFT import (version, FourierDerivative, DiscreteDerivative,
+                    FFT_PlanFlags, get_nb_hermitian_grid_pts)
 
 from .Communicator import Communicator
 

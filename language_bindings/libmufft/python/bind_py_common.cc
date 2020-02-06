@@ -33,10 +33,8 @@
  *
  */
 
-#include "libmufft/mufft_common.hh"
 #include "libmufft/fft_utils.hh"
 #include "libmufft/mufft_common.hh"
-#include "libmufft/fft_utils.hh"
 
 #include <libmugrid/ccoord_operations.hh>
 
@@ -49,17 +47,15 @@ namespace py = pybind11;
 using pybind11::literals::operator""_a;
 
 void add_version(py::module & mod) {
-    auto version{mod.def_submodule("version")};
+  auto version{mod.def_submodule("version")};
 
-    version.doc() = "version information";
+  version.doc() = "version information";
 
-    version.def("info", &muFFT::version::info)
-        .def("hash", &muFFT::version::hash)
-        .def("description", &muFFT::version::description)
-        .def("is_dirty", &muFFT::version::is_dirty);
-  }
+  version.def("info", &muFFT::version::info)
+      .def("hash", &muFFT::version::hash)
+      .def("description", &muFFT::version::description)
+      .def("is_dirty", &muFFT::version::is_dirty);
 }
-
 
 template <muGrid::Dim_t dim>
 void add_get_nb_hermitian_grid_pts_helper(py::module & mod) {
