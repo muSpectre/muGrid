@@ -48,21 +48,17 @@
 namespace py = pybind11;
 using pybind11::literals::operator""_a;
 
-#ifdef WITH_MUFFT_VERSION
 void add_version(py::module & mod) {
     auto version{mod.def_submodule("version")};
 
     version.doc() = "version information";
 
-    version.def("info", &muSpectre::version::info)
-        .def("hash", &muSpectre::version::hash)
-        .def("description", &muSpectre::version::description)
-        .def("is_dirty", &muSpectre::version::is_dirty);
+    version.def("info", &muFFT::version::info)
+        .def("hash", &muFFT::version::hash)
+        .def("description", &muFFT::version::description)
+        .def("is_dirty", &muFFT::version::is_dirty);
   }
 }
-#else
-void add_version(py::module & /*mod*/) {}
-#endif
 
 
 template <muGrid::Dim_t dim>

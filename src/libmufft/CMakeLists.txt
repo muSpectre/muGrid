@@ -118,18 +118,15 @@ if(NOT MUFFT_TARGETS_EXPORT)
     set(MUFFT_TARGETS_EXPORT muFFTTargets)
 endif()
 
-if ("${MUCHOICE}" STREQUAL muFFT) 
-  set(PRE_CONFIGURE_FILE "${CMAKE_CURRENT_SOURCE_DIR}/version.cc.skeleton")
-  set(POST_CONFIGURE_FILE "${CMAKE_CURRENT_BINARY_DIR}/version.cc")
-  include(git_watcher.cmake)
+set(PRE_CONFIGURE_FILE "${CMAKE_CURRENT_SOURCE_DIR}/version.cc.skeleton")
+set(POST_CONFIGURE_FILE "${CMAKE_CURRENT_BINARY_DIR}/version.cc")
+include(git_watcher.cmake)
 
-  # Create a library out of the compiled post-configure file.
-  add_library(version STATIC ${POST_CONFIGURE_FILE})
-  target_include_directories(version PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-  add_dependencies(version check_git)
-  target_compile_definitions(muFFT PUBLIC -DWITH_MUFFT_VERSION)
-  target_link_libraries(muFFT PUBLIC version)
-endif()
+# Create a library out of the compiled post-configure file.
+add_library(version STATIC ${POST_CONFIGURE_FILE})
+target_include_directories(version PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+add_dependencies(version check_git)
+target_link_libraries(muFFT PUBLIC version)
 
 
 install(TARGETS muFFT

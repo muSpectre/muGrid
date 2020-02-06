@@ -71,23 +71,7 @@ namespace muFFT {
     measure,   //!< more expensive plan for fast execution
     patient    //!< very expensive plan for fastest execution
   };
-
-#ifdef WITH_MUFFT_VERSION
-  namespace version {
-
-    /**
-     * returns a formatted text that can be printed to stdout or to output
-     * files. It contains the git commit hash and repository url used to compile
-     * µSpectre and whether the current state was dirty or not.
-     */
-    std::string info();
-    const char * hash();
-    const char * description();
-    bool is_dirty();
-
-  }  // namespace version
-#endif
-
+  
 }  // namespace muFFT
 
 #endif  // SRC_LIBMUFFT_MUFFT_COMMON_HH_
