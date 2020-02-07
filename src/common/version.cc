@@ -37,18 +37,21 @@
 #include <string>
 #include <sstream>
 
+#include <libmufft/mufft_common.hh>
+
 namespace muSpectre {
   namespace version {
 
-    constexpr bool git_dirty{@GIT_IS_DIRTY@};
-    constexpr char git_describe[]{"@GIT_COMMIT_DESCRIBE@"};
-    constexpr char git_hash[]{"@GIT_HEAD_SHA1@"};
+    /* Presently, version informations is inherited from muFFT. If the
+     * repositories are split sometime in the future, this need to be created
+     * via CMake. */
 
     //------------------------------------------------------------------------//
     std::string info() {
       std::stringstream info_str{};
-      info_str << "µSpectre version: " << git_describe << std::endl;
-      if (git_dirty) {
+      info_str << "µSpectre version: " << muFFT::version::description()
+               << std::endl;
+      if (muFFT::version::is_dirty()) {
         info_str << "WARNING: state is dirty, you will not be able to recover "
                     "the state of the µSpectre sources used to compile me from "
                     "this info!"
@@ -58,13 +61,13 @@ namespace muSpectre {
     }
 
     //------------------------------------------------------------------------//
-    const char * hash() { return git_hash; }
+    const char * hash() { return muFFT::version::hash(); }
 
     //------------------------------------------------------------------------//
-    const char * description() { return git_describe; }
+    const char * description() { return muFFT::version::description(); }
 
     //------------------------------------------------------------------------//
-    bool is_dirty() { return git_dirty; }
+    bool is_dirty() { return muFFT::version::is_dirty(); }
 
   }  // namespace version
 
