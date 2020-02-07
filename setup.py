@@ -458,6 +458,8 @@ try:
         cc_found = False
     if not cc_found or cc_hash != hash:
         # Write a new version.cc file
+        if verbose:
+            print('  * Writing new src/libmufft/version.cc')
         open('src/libmufft/version.cc', 'w').write(
             open('src/libmufft/version.cc.skeleton').read()
                 .replace('@GIT_IS_DIRTY@', 'true' if dirty else 'false')
