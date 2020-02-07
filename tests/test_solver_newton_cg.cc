@@ -35,8 +35,8 @@
 
 #include "tests.hh"
 #include "solver/solvers.hh"
-#include "solver/solver_cg.hh"
-#include "solver/solver_eigen.hh"
+#include "solver/krylov_solver_cg.hh"
+#include "solver/krylov_solver_eigen.hh"
 #include "projection/projection_finite_strain_fast.hh"
 #include "materials/material_linear_elastic1.hh"
 #include "cell/cell_factory.hh"
@@ -51,18 +51,21 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE(newton_cg_tests);
 
-  template <class SolverType>
-  struct SolverFixture {
-    using type = SolverType;
+  template <class KrylovSolverType>
+  struct KrylovSolverFixture {
+    using type = KrylovSolverType;
   };
 
-  using SolverList = boost::mpl::list<
-      SolverFixture<SolverCG>, SolverFixture<SolverCGEigen>,
-      SolverFixture<SolverGMRESEigen>, SolverFixture<SolverDGMRESEigen>,
-      SolverFixture<SolverBiCGSTABEigen>, SolverFixture<SolverMINRESEigen>>;
+  using KrylovSolverList =
+      boost::mpl::list<KrylovSolverFixture<KrylovSolverCG>,
+                       KrylovSolverFixture<KrylovSolverCGEigen>,
+                       KrylovSolverFixture<KrylovSolverGMRESEigen>,
+                       KrylovSolverFixture<KrylovSolverDGMRESEigen>,
+                       KrylovSolverFixture<KrylovSolverBiCGSTABEigen>,
+                       KrylovSolverFixture<KrylovSolverMINRESEigen>>;
 
   BOOST_FIXTURE_TEST_CASE(small_strain_convergence_test,
-                          SolverFixture<SolverCG>) {
+                          KrylovSolverFixture<KrylovSolverCG>) {
     constexpr Dim_t Dim{twoD};
     const DynCcoord_t nb_grid_pts{muGrid::CcoordOps::get_cube<Dim>(3)};
     const DynRcoord_t lengths{muGrid::CcoordOps::get_cube<Dim>(1.)};
@@ -106,7 +109,7 @@ namespace muSpectre {
     auto result = newton_cg(cell, delEps0, cg, newton_tol, equil_tol, verbose);
   }
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(small_strain_patch_dynamic_solver, Fix,
-                                   SolverList, Fix) {
+                                   KrylovSolverList, Fix) {
     constexpr Dim_t Dim{twoD};
     const DynCcoord_t nb_grid_pts{muGrid::CcoordOps::get_cube<Dim>(3)};
     const DynRcoord_t lengths{muGrid::CcoordOps::get_cube<Dim>(1.)};
@@ -125,10 +128,8 @@ namespace muSpectre {
 
     using Mat_t = MaterialLinearElastic1<Dim>;
     constexpr Real Young{2.}, Poisson{.33};
-    auto & material_hard{
-        Mat_t::make(cell, "hard", contrast * Young, Poisson)};
-    auto & material_soft{
-        Mat_t::make(cell, "soft", Young, Poisson)};
+    auto & material_hard{Mat_t::make(cell, "hard", contrast * Young, Poisson)};
+    auto & material_soft{Mat_t::make(cell, "soft", Young, Poisson)};
 
     for (const auto && index_pixel : akantu::enumerate(cell.get_pixels())) {
       auto && index{std::get<0>(index_pixel)};
@@ -150,8 +151,8 @@ namespace muSpectre {
     constexpr Uint maxiter{Dim * 10};
     constexpr Dim_t verbose{0};
 
-    using Solver_t = typename Fix::type;
-    Solver_t cg{cell, cg_tol, maxiter, static_cast<bool>(verbose)};
+    using KrylovSolver_t = typename Fix::type;
+    KrylovSolver_t cg{cell, cg_tol, maxiter, static_cast<bool>(verbose)};
     auto result = newton_cg(cell, delEps0, cg, newton_tol, equil_tol, verbose);
     if (verbose) {
       std::cout << "result:" << std::endl << result.grad << std::endl;
@@ -204,7 +205,7 @@ namespace muSpectre {
     delEps0 = Grad_t<Dim>::Zero();
     delEps0(0, 1) = delEps0(1, 0) = eps0;
 
-    Solver_t cg2{cell, cg_tol, maxiter, static_cast<bool>(verbose)};
+    KrylovSolver_t cg2{cell, cg_tol, maxiter, static_cast<bool>(verbose)};
     result = de_geus(cell, delEps0, cg2, newton_tol, equil_tol, verbose);
     Eps_hard << 0, eps_hard, eps_hard, 0;
     Eps_soft << 0, eps_soft, eps_soft, 0;
@@ -224,7 +225,7 @@ namespace muSpectre {
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(finite_strain_patch_dynamic_solver, Fix,
-                                   SolverList, Fix) {
+                                   KrylovSolverList, Fix) {
     constexpr Dim_t Dim{twoD};
     const DynCcoord_t nb_grid_pts{muGrid::CcoordOps::get_cube<Dim>(3)};
     const DynRcoord_t lengths{muGrid::CcoordOps::get_cube<Dim>(1.)};
@@ -245,10 +246,8 @@ namespace muSpectre {
 
     using Mat_t = MaterialLinearElastic1<Dim>;
     constexpr Real Young{2.}, Poisson{.33};
-    auto & material_hard{
-        Mat_t::make(cell, "hard", contrast * Young, Poisson)};
-    auto & material_soft{
-        Mat_t::make(cell, "soft", Young, Poisson)};
+    auto & material_hard{Mat_t::make(cell, "hard", contrast * Young, Poisson)};
+    auto & material_soft{Mat_t::make(cell, "soft", Young, Poisson)};
 
     for (const auto && index_pixel : cell.get_pixels().enumerate()) {
       auto && index{std::get<0>(index_pixel)};
@@ -270,8 +269,8 @@ namespace muSpectre {
     constexpr Uint maxiter{Dim * 10};
     constexpr Dim_t verbose{0};
 
-    using Solver_t = typename Fix::type;
-    Solver_t cg{cell, cg_tol, maxiter, static_cast<bool>(verbose)};
+    using KrylovSolver_t = typename Fix::type;
+    KrylovSolver_t cg{cell, cg_tol, maxiter, static_cast<bool>(verbose)};
     auto result = newton_cg(cell, delEps0, cg, newton_tol, equil_tol, verbose);
     if (verbose) {
       std::cout << "result:" << std::endl << result.grad << std::endl;
@@ -326,7 +325,7 @@ namespace muSpectre {
     delEps0 = Grad_t<Dim>::Zero();
     delEps0(0, 1) = delEps0(1, 0) = eps0;
 
-    Solver_t cg2{cell, cg_tol, maxiter, static_cast<bool>(verbose)};
+    KrylovSolver_t cg2{cell, cg_tol, maxiter, static_cast<bool>(verbose)};
     result = de_geus(cell, delEps0, cg2, newton_tol, equil_tol, verbose);
     Eps_hard << 0, eps_hard, eps_hard, 0;
     Eps_soft << 0, eps_soft, eps_soft, 0;

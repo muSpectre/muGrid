@@ -36,7 +36,7 @@
 #include "cell/cell_factory.hh"
 #include "materials/material_linear_elastic1.hh"
 #include "solver/solvers.hh"
-#include "solver/solver_cg.hh"
+#include "solver/krylov_solver_cg.hh"
 #include <libmugrid/iterators.hh>
 
 #include <iostream>
@@ -74,7 +74,7 @@ int main() {
   Uint maxiter{31};
   Dim_t verbose{3};
 
-  SolverCG cg{rve, tol, maxiter, static_cast<bool>(verbose)};
+  KrylovSolverCG cg{rve, tol, maxiter, static_cast<bool>(verbose)};
   auto res = de_geus(rve, Del0, cg, tol, verbose);
   std::cout << res.grad.transpose() << std::endl;
   return 0;

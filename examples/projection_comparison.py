@@ -48,7 +48,7 @@ def example_problem(microstructure, mat1_prop, mat2_prop, projector):
     maxiter = 1001
     verbose = 0
 
-    solver = µ.solvers.SolverCG(rve, cg_tol, maxiter, verbose=False)
+    solver = µ.solvers.KrylovSolverCG(rve, cg_tol, maxiter, verbose=False)
 
     def return_function():
         r = µ.solvers.de_geus(rve, Del0, solver, tol, eq_tol, verbose)

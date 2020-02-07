@@ -1,5 +1,5 @@
 /**
- * @file   solver_cg.hh
+ * @file   krylov_solver_cg.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -35,23 +35,23 @@
  *
  */
 
-#ifndef SRC_SOLVER_SOLVER_CG_HH_
-#define SRC_SOLVER_SOLVER_CG_HH_
+#ifndef SRC_SOLVER_KRYLOV_SOLVER_CG_HH_
+#define SRC_SOLVER_KRYLOV_SOLVER_CG_HH_
 
-#include "solver/solver_base.hh"
+#include "solver/krylov_solver_base.hh"
 
 namespace muSpectre {
 
   /**
-   * implements the `muSpectre::SolverBase` interface using a
+   * implements the `muSpectre::KrylovSolverBase` interface using a
    * conjugate gradient solver. This particular class is useful for
    * trouble shooting, as it can be made very verbose, but for
    * production runs, it is probably better to use
-   * `muSpectre::SolverCGEigen`.
+   * `muSpectre::KrylovSolverCGEigen`.
    */
-  class SolverCG : public SolverBase {
+  class KrylovSolverCG : public KrylovSolverBase {
    public:
-    using Parent = SolverBase;  //!< standard short-hand for base class
+    using Parent = KrylovSolverBase;  //!< standard short-hand for base class
     //! for storage of fields
     using Vector_t = Parent::Vector_t;
     //! Input vector for solvers
@@ -62,28 +62,28 @@ namespace muSpectre {
     using Vector_map = Parent::Vector_map;
 
     //! Default constructor
-    SolverCG() = delete;
+    KrylovSolverCG() = delete;
 
     //! Copy constructor
-    SolverCG(const SolverCG & other) = delete;
+    KrylovSolverCG(const KrylovSolverCG & other) = delete;
 
     /**
      * Constructor takes a Cell, tolerance, max number of iterations
      * and verbosity flag as input
      */
-    SolverCG(Cell & cell, Real tol, Uint maxiter, bool verbose = false);
+    KrylovSolverCG(Cell & cell, Real tol, Uint maxiter, bool verbose = false);
 
     //! Move constructor
-    SolverCG(SolverCG && other) = default;
+    KrylovSolverCG(KrylovSolverCG && other) = default;
 
     //! Destructor
-    virtual ~SolverCG() = default;
+    virtual ~KrylovSolverCG() = default;
 
     //! Copy assignment operator
-    SolverCG & operator=(const SolverCG & other) = delete;
+    KrylovSolverCG & operator=(const KrylovSolverCG & other) = delete;
 
     //! Move assignment operator
-    SolverCG & operator=(SolverCG && other) = delete;
+    KrylovSolverCG & operator=(KrylovSolverCG && other) = delete;
 
     //! initialisation does not need to do anything in this case
     void initialise() final{};
@@ -103,4 +103,4 @@ namespace muSpectre {
 
 }  // namespace muSpectre
 
-#endif  // SRC_SOLVER_SOLVER_CG_HH_
+#endif  // SRC_SOLVER_KRYLOV_SOLVER_CG_HH_

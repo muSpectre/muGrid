@@ -110,10 +110,10 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         equil_tol = 1e-6
         maxiter = 2000
         verbose = 0
-        solver = µ.solvers.SolverCG(cell, cg_tol, maxiter, verbose)
+        solver = µ.solvers.KrylovSolverCG(cell, cg_tol, maxiter, verbose)
         cell.initialise()
 
-        solver2 = µ.solvers.SolverCG(cell2, cg_tol, maxiter, verbose)
+        solver2 = µ.solvers.KrylovSolverCG(cell2, cg_tol, maxiter, verbose)
         cell2.initialise()
 
         # total deformation
@@ -189,7 +189,7 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         equil_tol = 1e-8
         maxiter = 200
         verbose = 0
-        solver = µ.solvers.SolverCG(cell, cg_tol, maxiter,
+        solver = µ.solvers.KrylovSolverCG(cell, cg_tol, maxiter,
                                     verbose)
         cell.initialise()
 

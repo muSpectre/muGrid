@@ -103,7 +103,7 @@ DelF = np.array([[0, 0.7, 0],
                  [0, 0, 0],
                  [0, 0, 0]])
 
-solver_newton = µ.solvers.SolverCG(cell.wrapped_cell, cg_tol, maxiter, verbose)
+solver_newton = µ.solvers.KrylovSolverCG(cell.wrapped_cell, cg_tol, maxiter, verbose)
 result = µ.solvers.newton_cg(cell.wrapped_cell, DelF, solver_newton,
                              newton_tol, equil_tol, verbose)
 

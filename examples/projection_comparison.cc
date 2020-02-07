@@ -36,7 +36,7 @@
 #include "cell/cell_factory.hh"
 #include "materials/material_linear_elastic1.hh"
 #include "solver/solvers.hh"
-#include "solver/solver_cg.hh"
+#include "solver/krylov_solver_cg.hh"
 #include "projection/projection_approx_Green_operator.hh"
 
 #include <libmugrid/ccoord_operations.hh>
@@ -185,7 +185,7 @@ int small_sym(int argc, char * argv[]) {
   auto start = std::chrono::high_resolution_clock::now();
   LoadSteps_t loads{DeltaF};
 
-  SolverCG cg{cell, cg_tol, maxiter, static_cast<bool>(verbose)};
+  KrylovSolverCG cg{cell, cg_tol, maxiter, static_cast<bool>(verbose)};
   newton_cg(cell, loads, cg, newton_tol, stress_tol, verbose);
 
   std::chrono::duration<Real> dur =

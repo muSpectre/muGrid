@@ -35,8 +35,8 @@
 
 #include "common/muSpectre_common.hh"
 #include "solver/solvers.hh"
-#include "solver/solver_cg.hh"
-#include "solver/solver_eigen.hh"
+#include "solver/krylov_solver_cg.hh"
+#include "solver/krylov_solver_eigen.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -54,33 +54,34 @@ namespace py = pybind11;
  * Solvers instanciated for cells with equal spatial and material dimension
  */
 
-template <class Solver>
-void add_iterative_solver_helper(py::module & mod, std::string name) {
-  py::class_<Solver, typename Solver::Parent>(mod, name.c_str())
+template <class KrylovSolver>
+void add_krylov_solver_helper(py::module & mod, std::string name) {
+  py::class_<KrylovSolver, typename KrylovSolver::Parent>(mod, name.c_str())
       .def(py::init<muSpectre::Cell &, Real, Uint, bool>(), "cell"_a, "tol"_a,
            "maxiter"_a, "verbose"_a = false)
-    .def_property_readonly("name", &Solver::get_name);
+      .def_property_readonly("name", &KrylovSolver::get_name);
 }
 
-void add_iterative_solver(py::module & mod) {
+void add_krylov_solver(py::module & mod) {
   std::stringstream name{};
-  name << "SolverBase";
-  py::class_<muSpectre::SolverBase>(mod, name.str().c_str());
-  add_iterative_solver_helper<muSpectre::SolverCG>(mod, "SolverCG");
-  add_iterative_solver_helper<muSpectre::SolverCGEigen>(mod, "SolverCGEigen");
-  add_iterative_solver_helper<muSpectre::SolverGMRESEigen>(mod,
-                                                           "SolverGMRESEigen");
-  add_iterative_solver_helper<muSpectre::SolverBiCGSTABEigen>(
-      mod, "SolverBiCGSTABEigen");
-  add_iterative_solver_helper<muSpectre::SolverDGMRESEigen>(
-      mod, "SolverDGMRESEigen");
-  add_iterative_solver_helper<muSpectre::SolverMINRESEigen>(
-      mod, "SolverMINRESEigen");
+  name << "KrylovSolverBase";
+  py::class_<muSpectre::KrylovSolverBase>(mod, name.str().c_str());
+  add_krylov_solver_helper<muSpectre::KrylovSolverCG>(mod, "KrylovSolverCG");
+  add_krylov_solver_helper<muSpectre::KrylovSolverCGEigen>(
+      mod, "KrylovSolverCGEigen");
+  add_krylov_solver_helper<muSpectre::KrylovSolverGMRESEigen>(
+      mod, "KrylovSolverGMRESEigen");
+  add_krylov_solver_helper<muSpectre::KrylovSolverBiCGSTABEigen>(
+      mod, "KrylovSolverBiCGSTABEigen");
+  add_krylov_solver_helper<muSpectre::KrylovSolverDGMRESEigen>(
+      mod, "KrylovSolverDGMRESEigen");
+  add_krylov_solver_helper<muSpectre::KrylovSolverMINRESEigen>(
+      mod, "KrylovSolverMINRESEigen");
 }
 
 void add_newton_cg_helper(py::module & mod) {
   const char name[]{"newton_cg"};
-  using solver = muSpectre::SolverBase;
+  using solver = muSpectre::KrylovSolverBase;
   using grad = py::EigenDRef<Eigen::MatrixXd>;
   using grad_vec = muSpectre::LoadSteps_t;
 
@@ -88,48 +89,49 @@ void add_newton_cg_helper(py::module & mod) {
       .value("Yes", IsStrainInitialised::True)
       .value("No", IsStrainInitialised::False);
 
-  mod.def(name,
-          [](muSpectre::Cell & s, const grad & g, solver & so, Real nt,
-             Real eqt, Dim_t verb,
-             IsStrainInitialised strain_init) -> OptimizeResult {
-            Eigen::MatrixXd tmp{g};
-            return newton_cg(s, tmp, so, nt, eqt, verb, strain_init);
-          },
-          "cell"_a, "ΔF₀"_a, "solver"_a, "newton_tol"_a, "equil_tol"_a,
-          "verbose"_a = 0,
-          "IsStrainInitialised"_a = IsStrainInitialised::False);
-  mod.def(name,
-          [](muSpectre::Cell & s, const grad_vec & g, solver & so, Real nt,
-             Real eqt, Dim_t verb,
-             IsStrainInitialised strain_init) -> std::vector<OptimizeResult> {
-            return newton_cg(s, g, so, nt, eqt, verb, strain_init);
-          },
-          "cell"_a, "ΔF₀"_a, "solver"_a, "newton_tol"_a, "equilibrium_tol"_a,
-          "verbose"_a = 0,
-          "IsStrainInitialised"_a = IsStrainInitialised::False);
+  mod.def(
+      name,
+      [](muSpectre::Cell & s, const grad & g, solver & so, Real nt, Real eqt,
+         Dim_t verb, IsStrainInitialised strain_init) -> OptimizeResult {
+        Eigen::MatrixXd tmp{g};
+        return newton_cg(s, tmp, so, nt, eqt, verb, strain_init);
+      },
+      "cell"_a, "ΔF₀"_a, "solver"_a, "newton_tol"_a, "equil_tol"_a,
+      "verbose"_a = 0, "IsStrainInitialised"_a = IsStrainInitialised::False);
+  mod.def(
+      name,
+      [](muSpectre::Cell & s, const grad_vec & g, solver & so, Real nt,
+         Real eqt, Dim_t verb,
+         IsStrainInitialised strain_init) -> std::vector<OptimizeResult> {
+        return newton_cg(s, g, so, nt, eqt, verb, strain_init);
+      },
+      "cell"_a, "ΔF₀"_a, "solver"_a, "newton_tol"_a, "equilibrium_tol"_a,
+      "verbose"_a = 0, "IsStrainInitialised"_a = IsStrainInitialised::False);
 }
 
 void add_de_geus_helper(py::module & mod) {
   const char name[]{"de_geus"};
-  using solver = muSpectre::SolverBase;
+  using solver = muSpectre::KrylovSolverBase;
   using grad = py::EigenDRef<Eigen::MatrixXd>;
   using grad_vec = muSpectre::LoadSteps_t;
 
-  mod.def(name,
-          [](muSpectre::Cell & s, const grad & g, solver & so, Real nt,
-             Real eqt, Dim_t verb) -> OptimizeResult {
-            Eigen::MatrixXd tmp{g};
-            return de_geus(s, tmp, so, nt, eqt, verb);
-          },
-          "cell"_a, "ΔF₀"_a, "solver"_a, "newton_tol"_a, "equilibrium_tol"_a,
-          "verbose"_a = 0);
-  mod.def(name,
-          [](muSpectre::Cell & s, const grad_vec & g, solver & so, Real nt,
-             Real eqt, Dim_t verb) -> std::vector<OptimizeResult> {
-            return de_geus(s, g, so, nt, eqt, verb);
-          },
-          "cell"_a, "ΔF₀"_a, "solver"_a, "newton_tol"_a, "equilibrium_tol"_a,
-          "verbose"_a = 0);
+  mod.def(
+      name,
+      [](muSpectre::Cell & s, const grad & g, solver & so, Real nt, Real eqt,
+         Dim_t verb) -> OptimizeResult {
+        Eigen::MatrixXd tmp{g};
+        return de_geus(s, tmp, so, nt, eqt, verb);
+      },
+      "cell"_a, "ΔF₀"_a, "solver"_a, "newton_tol"_a, "equilibrium_tol"_a,
+      "verbose"_a = 0);
+  mod.def(
+      name,
+      [](muSpectre::Cell & s, const grad_vec & g, solver & so, Real nt,
+         Real eqt, Dim_t verb) -> std::vector<OptimizeResult> {
+        return de_geus(s, g, so, nt, eqt, verb);
+      },
+      "cell"_a, "ΔF₀"_a, "solver"_a, "newton_tol"_a, "equilibrium_tol"_a,
+      "verbose"_a = 0);
 }
 
 void add_solver_helper(py::module & mod) {
@@ -151,7 +153,7 @@ void add_solvers(py::module & mod) {
       .def_readwrite("nb_fev", &OptimizeResult::nb_fev)
       .def_readwrite("formulation", &OptimizeResult::formulation);
 
-  add_iterative_solver(solvers);
+  add_krylov_solver(solvers);
 
   add_solver_helper(solvers);
 }

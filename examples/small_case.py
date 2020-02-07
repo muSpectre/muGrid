@@ -80,12 +80,12 @@ if formulation == µ.Formulation.small_strain:
 maxiter = 401
 verbose = 2
 
-for solvclass in (µ.solvers.SolverCG,
-                  µ.solvers.SolverCGEigen,
-                  µ.solvers.SolverBiCGSTABEigen,
-                  µ.solvers.SolverGMRESEigen,
-                  µ.solvers.SolverDGMRESEigen,
-                  µ.solvers.SolverMINRESEigen):
+for solvclass in (µ.solvers.KrylovSolverCG,
+                  µ.solvers.KrylovSolverCGEigen,
+                  µ.solvers.KrylovSolverBiCGSTABEigen,
+                  µ.solvers.KrylovSolverGMRESEigen,
+                  µ.solvers.KrylovSolverDGMRESEigen,
+                  µ.solvers.KrylovSolverMINRESEigen):
     print()
     try:
         solver = solvclass(rve, cg_tol, maxiter, verbose=False)

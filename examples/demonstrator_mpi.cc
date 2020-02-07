@@ -40,7 +40,7 @@
 #include "cell/cell_factory.hh"
 #include "materials/material_linear_elastic1.hh"
 #include "solver/solvers.hh"
-#include "solver/solver_cg.hh"
+#include "solver/krylov_solvercg.hh"
 
 #include <libmugrid/ccoord_operations.hh>
 
@@ -145,7 +145,7 @@ int main(int argc, char * argv[]) {
 
     auto start = std::chrono::high_resolution_clock::now();
     LoadSteps_t grads{DeltaF};
-    SolverCG cg{cell, cg_tol, maxiter, static_cast<bool>(verbose)};
+    KrylovSolverCG cg{cell, cg_tol, maxiter, static_cast<bool>(verbose)};
     de_geus(cell, grads, cg, newton_tol, verbose);
     std::chrono::duration<Real> dur =
         std::chrono::high_resolution_clock::now() - start;

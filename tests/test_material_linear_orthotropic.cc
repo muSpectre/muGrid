@@ -37,8 +37,8 @@
 
 #include "tests.hh"
 #include "solver/solvers.hh"
-#include "solver/solver_cg.hh"
-#include "solver/solver_eigen.hh"
+#include "solver/krylov_solver_cg.hh"
+#include "solver/krylov_solver_eigen.hh"
 #include "libmufft/fftw_engine.hh"
 #include "projection/projection_finite_strain_fast.hh"
 #include "materials/material_linear_elastic1.hh"
@@ -47,9 +47,6 @@
 #include "libmugrid/ccoord_operations.hh"
 #include "common/muSpectre_common.hh"
 #include "cell/cell_factory.hh"
-
-#include "solver/solvers.hh"
-#include "solver/solver_cg.hh"
 
 #include <boost/mpl/list.hpp>
 
@@ -120,12 +117,12 @@ namespace muSpectre {
 
     LoadSteps_t grads;
     grads.push_back(delF0);
-    SolverCG cg_lin(sys_lin, cg_tol, maxiter, static_cast<bool>(verbose));
+    KrylovSolverCG cg_lin(sys_lin, cg_tol, maxiter, static_cast<bool>(verbose));
     Eigen::ArrayXXd res2{
         newton_cg(sys_lin, grads, cg_lin, newton_tol, equil_tol, verbose)[0]
             .grad};
 
-    SolverCG cg_non{sys_non, cg_tol, maxiter, static_cast<bool>(verbose)};
+    KrylovSolverCG cg_non{sys_non, cg_tol, maxiter, static_cast<bool>(verbose)};
     Eigen::ArrayXXd res1{
         newton_cg(sys_non, grads, cg_non, newton_tol, equil_tol, verbose)[0]
             .grad};
@@ -207,11 +204,11 @@ namespace muSpectre {
 
     LoadSteps_t grads;
     grads.push_back(delF0);
-    SolverCG cg_lin{sys_lin, cg_tol, maxiter, static_cast<bool>(verbose)};
+    KrylovSolverCG cg_lin{sys_lin, cg_tol, maxiter, static_cast<bool>(verbose)};
     Eigen::ArrayXXd res2{
         newton_cg(sys_lin, delF0, cg_lin, newton_tol, equil_tol, verbose).grad};
 
-    SolverCG cg_non{sys_non, cg_tol, maxiter, static_cast<bool>(verbose)};
+    KrylovSolverCG cg_non{sys_non, cg_tol, maxiter, static_cast<bool>(verbose)};
     Eigen::ArrayXXd res1{
         newton_cg(sys_non, delF0, cg_non, newton_tol, equil_tol, verbose).grad};
 

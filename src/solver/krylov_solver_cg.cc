@@ -1,11 +1,11 @@
 /**
- * @file   solver_cg.cc
+ * @file   krylov_solver_cg.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   24 Apr 2018
  *
- * @brief  implements SolverCG
+ * @brief  implements KrylovSolverCG
  *
  * Copyright © 2018 Till Junge
  *
@@ -33,7 +33,7 @@
  *
  */
 
-#include "solver/solver_cg.hh"
+#include "solver/krylov_solver_cg.hh"
 #include "cell/cell_adaptor.hh"
 #include <libmufft/communicator.hh>
 
@@ -44,13 +44,14 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  SolverCG::SolverCG(Cell & cell, Real tol, Uint maxiter, bool verbose)
+  KrylovSolverCG::KrylovSolverCG(Cell & cell, Real tol, Uint maxiter,
+                                 bool verbose)
       : Parent(cell, tol, maxiter, verbose), r_k(cell.get_nb_dof()),
         p_k(cell.get_nb_dof()), Ap_k(cell.get_nb_dof()),
         x_k(cell.get_nb_dof()) {}
 
   /* ---------------------------------------------------------------------- */
-  auto SolverCG::solve(const ConstVector_ref rhs) -> Vector_map {
+  auto KrylovSolverCG::solve(const ConstVector_ref rhs) -> Vector_map {
     this->x_k.setZero();
     const auto & comm = this->cell.get_communicator();
 

@@ -114,7 +114,7 @@ def sigma_eq(sigma):
     return sigma_eq
 
 def init_cg_solver(cell, cg_tol, maxiter, verbose):
-    return µ.solvers.SolverCG(cell, cg_tol, maxiter, verbose)
+    return µ.solvers.KrylovSolverCG(cell, cg_tol, maxiter, verbose)
 
 
 class StochasticPlasticitySearch_Check(unittest.TestCase):

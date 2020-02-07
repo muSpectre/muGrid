@@ -140,7 +140,7 @@ class GradientIntegration_Check(unittest.TestCase):
                     cell, "material", 10, 0.3)
             for pixel in cell.pixel_indices:
                 mat.add_pixel(pixel)
-            solver = µ.solvers.SolverCG(cell, tol, maxiter=100,
+            solver = µ.solvers.KrylovSolverCG(cell, tol, maxiter=100,
                                         verbose=0)
             r = µ.solvers.newton_cg(cell, DelF[:n, :n], solver,
                                     tol, tol, verbose=0)
@@ -339,7 +339,7 @@ class GradientIntegration_Check(unittest.TestCase):
                          [0, 0   ]])
 
         # µSpectre solution
-        solver = µ.solvers.SolverCG(cell, tol=1e-6, maxiter=100,
+        solver = µ.solvers.KrylovSolverCG(cell, tol=1e-6, maxiter=100,
                                     verbose=0)
         result = µ.solvers.newton_cg(cell, DelF, solver,
                                      newton_tol=1e-6, equil_tol=1e-6, verbose=0)
@@ -535,7 +535,7 @@ class GradientIntegration_Check(unittest.TestCase):
 
         # µSpectre solution
         fourier_gradient = [µ.FourierDerivative(dim, i) for i in range(dim)]
-        solver = µ.solvers.SolverCG(cell, tol=1e-6, maxiter=100, verbose=0)
+        solver = µ.solvers.KrylovSolverCG(cell, tol=1e-6, maxiter=100, verbose=0)
         result = µ.solvers.newton_cg(cell, DelF, solver,
                                      newton_tol=1e-6, equil_tol=1e-6, verbose=0)
         result_reshaped = µ.gradient_integration.reshape_gradient(
@@ -601,7 +601,7 @@ class GradientIntegration_Check(unittest.TestCase):
                 maxiter = 1000
                 verbose = 0
 
-                solver = µ.solvers.SolverCG(cell, cg_tol, maxiter,
+                solver = µ.solvers.KrylovSolverCG(cell, cg_tol, maxiter,
                                             verbose)
                 cell.initialise()
 

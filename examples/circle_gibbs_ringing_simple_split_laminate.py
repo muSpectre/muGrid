@@ -69,7 +69,7 @@ maxiter = 4010
 verbose = 2
 
 def rve_constructor(res, lens, form, inclusion, Del0, maxiter=401,
-                    verbose=2, solver_type=msp.solvers.SolverCGEigen,
+                    verbose=2, solver_type=msp.solvers.KrylovSolverCGEigen,
                     contrast=10, cg_tol=1e-8):
     rve = msp.Cell(res,
                    lengths,
@@ -98,7 +98,7 @@ def rve_constructor(res, lens, form, inclusion, Del0, maxiter=401,
 
 
 def split_rve_constructor(res, lens, form, inclusions, Del0, maxiter=401,
-                          verbose=2, solver_type=msp.solvers.SolverCGEigen,
+                          verbose=2, solver_type=msp.solvers.KrylovSolverCGEigen,
                           contrast=10, cg_tol=1e-8):
     rve = msp.Cell(res,
                    lengths,
@@ -124,7 +124,7 @@ def split_rve_constructor(res, lens, form, inclusions, Del0, maxiter=401,
 
 def rve_constructor_lam_mat(res, lens, form, inclusions,
                             Del0, maxiter=401, verbose=2,
-                            solver_type=msp.solvers.SolverCGEigen,
+                            solver_type=msp.solvers.KrylovSolverCGEigen,
                             contrast=10, cg_tol=1e-8):
     e = 70e9
     rve = msp.Cell(res,

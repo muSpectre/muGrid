@@ -72,7 +72,7 @@ class MaterialLinearElastic4_Check(unittest.TestCase):
         maxiter = 100
         verbose = False
 
-        solver = µ.solvers.SolverCG(
+        solver = µ.solvers.KrylovSolverCG(
             cell, tol, maxiter, verbose)
         r = µ.solvers.newton_cg(
             cell, Del0, solver, tol, tol, verbose)
@@ -102,7 +102,7 @@ class MaterialLinearElastic4_Check(unittest.TestCase):
         maxiter = 100
         verbose = False
 
-        solver = µ.solvers.SolverCG(cell, tol, maxiter, verbose)
+        solver = µ.solvers.KrylovSolverCG(cell, tol, maxiter, verbose)
         r = µ.solvers.newton_cg(cell   , Del0,
                                 solver, tol, tol, verbose)
 

@@ -1,5 +1,5 @@
 /**
- * @file   solver_base.hh
+ * @file   krylov_solver_base.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -33,8 +33,8 @@
  *
  */
 
-#ifndef SRC_SOLVER_SOLVER_BASE_HH_
-#define SRC_SOLVER_SOLVER_BASE_HH_
+#ifndef SRC_SOLVER_KRYLOV_SOLVER_BASE_HH_
+#define SRC_SOLVER_KRYLOV_SOLVER_BASE_HH_
 
 #include "solver/solver_common.hh"
 #include "cell/cell.hh"
@@ -47,7 +47,7 @@ namespace muSpectre {
    * Virtual base class for solvers. An implementation of this interface
    * can be used with the solution strategies in solvers.hh
    */
-  class SolverBase {
+  class KrylovSolverBase {
    public:
     //! underlying vector type
     using Vector_t = Eigen::Matrix<Real, Eigen::Dynamic, 1>;
@@ -59,28 +59,28 @@ namespace muSpectre {
     using Vector_map = Eigen::Map<Vector_t>;
 
     //! Default constructor
-    SolverBase() = delete;
+    KrylovSolverBase() = delete;
 
     /**
      * Constructor takes a Cell, tolerance, max number of iterations
      * and verbosity flag as input
      */
-    SolverBase(Cell & cell, Real tol, Uint maxiter, bool verbose = false);
+    KrylovSolverBase(Cell & cell, Real tol, Uint maxiter, bool verbose = false);
 
     //! Copy constructor
-    SolverBase(const SolverBase & other) = delete;
+    KrylovSolverBase(const KrylovSolverBase & other) = delete;
 
     //! Move constructor
-    SolverBase(SolverBase && other) = default;
+    KrylovSolverBase(KrylovSolverBase && other) = default;
 
     //! Destructor
-    virtual ~SolverBase() = default;
+    virtual ~KrylovSolverBase() = default;
 
     //! Copy assignment operator
-    SolverBase & operator=(const SolverBase & other) = delete;
+    KrylovSolverBase & operator=(const KrylovSolverBase & other) = delete;
 
     //! Move assignment operator
-    SolverBase & operator=(SolverBase && other) = delete;
+    KrylovSolverBase & operator=(KrylovSolverBase && other) = delete;
 
     //! Allocate fields used during the solution
     virtual void initialise() = 0;
@@ -118,4 +118,4 @@ namespace muSpectre {
 
 }  // namespace muSpectre
 
-#endif  // SRC_SOLVER_SOLVER_BASE_HH_
+#endif  // SRC_SOLVER_KRYLOV_SOLVER_BASE_HH_

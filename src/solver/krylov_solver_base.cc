@@ -1,11 +1,11 @@
 /**
- * @file   solver_base.cc
+ * @file   krylov_solver_base.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   24 Apr 2018
  *
- * @brief  implementation of SolverBase
+ * @brief  implementation of KrylovSolverBase
  *
  * Copyright © 2018 Till Junge
  *
@@ -33,30 +33,31 @@
  *
  */
 
-#include "solver/solver_base.hh"
+#include "solver/krylov_solver_base.hh"
 
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  SolverBase::SolverBase(Cell & cell, Real tol, Uint maxiter, bool verbose)
+  KrylovSolverBase::KrylovSolverBase(Cell & cell, Real tol, Uint maxiter,
+                                     bool verbose)
       : cell(cell), tol{tol}, maxiter{maxiter}, verbose{verbose} {}
 
   /* ---------------------------------------------------------------------- */
-  bool SolverBase::has_converged() const { return this->converged; }
+  bool KrylovSolverBase::has_converged() const { return this->converged; }
 
   /* ---------------------------------------------------------------------- */
-  void SolverBase::reset_counter() {
+  void KrylovSolverBase::reset_counter() {
     this->counter = 0;
     this->converged = false;
   }
 
   /* ---------------------------------------------------------------------- */
-  Uint SolverBase::get_counter() const { return this->counter; }
+  Uint KrylovSolverBase::get_counter() const { return this->counter; }
 
   /* ---------------------------------------------------------------------- */
-  Real SolverBase::get_tol() const { return this->tol; }
+  Real KrylovSolverBase::get_tol() const { return this->tol; }
 
   /* ---------------------------------------------------------------------- */
-  Uint SolverBase::get_maxiter() const { return this->maxiter; }
+  Uint KrylovSolverBase::get_maxiter() const { return this->maxiter; }
 
 }  // namespace muSpectre

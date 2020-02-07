@@ -159,8 +159,8 @@ class accumul(object):
 acc = accumul()
 cg_tol = 1e-8
 maxiter = 60
-solver = µ.solvers.SolverCGEigen(cell.wrapped_cell, cg_tol, maxiter, verbose=True)
-solver = µ.solvers.SolverCG(cell.wrapped_cell, cg_tol, maxiter, verbose=True)
+solver = µ.solvers.KrylovSolverCGEigen(cell.wrapped_cell, cg_tol, maxiter, verbose=True)
+solver = µ.solvers.KrylovSolverCG(cell.wrapped_cell, cg_tol, maxiter, verbose=True)
 try:
     r = µ.solvers.newton_cg(cell.wrapped_cell, delEps0, solver, 1e-5, verbose=True)
 except Exception as err:

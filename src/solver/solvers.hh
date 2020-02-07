@@ -36,7 +36,7 @@
 #ifndef SRC_SOLVER_SOLVERS_HH_
 #define SRC_SOLVER_SOLVERS_HH_
 
-#include "solver/solver_base.hh"
+#include "solver/krylov_solver_base.hh"
 
 #include <Eigen/Dense>
 
@@ -59,8 +59,9 @@ namespace muSpectre {
    * The initial macroscopic strain state is set to zero in cell initialisation.
    */
   std::vector<OptimizeResult>
-  newton_cg(Cell & cell, const LoadSteps_t & load_steps, SolverBase & solver,
-            Real newton_tol, Real equil_tol, Dim_t verbose = 0,
+  newton_cg(Cell & cell, const LoadSteps_t & load_steps,
+            KrylovSolverBase & solver, Real newton_tol, Real equil_tol,
+            Dim_t verbose = 0,
             IsStrainInitialised strain_init = IsStrainInitialised::False);
 
   /**
@@ -69,7 +70,7 @@ namespace muSpectre {
    */
   inline OptimizeResult
   newton_cg(Cell & cell, const Eigen::Ref<Eigen::MatrixXd> load_step,
-            SolverBase & solver, Real newton_tol, Real equil_tol,
+            KrylovSolverBase & solver, Real newton_tol, Real equil_tol,
             Dim_t verbose = 0,
             IsStrainInitialised strain_init = IsStrainInitialised::False) {
     LoadSteps_t load_steps{load_step};
@@ -86,8 +87,9 @@ namespace muSpectre {
    * strain state is set to zero in cell initialisation.
    */
   std::vector<OptimizeResult>
-  de_geus(Cell & cell, const LoadSteps_t & load_steps, SolverBase & solver,
-          Real newton_tol, Real equil_tol, Dim_t verbose = 0,
+  de_geus(Cell & cell, const LoadSteps_t & load_steps,
+          KrylovSolverBase & solver, Real newton_tol, Real equil_tol,
+          Dim_t verbose = 0,
           IsStrainInitialised strain_init = IsStrainInitialised::False);
 
   /* ---------------------------------------------------------------------- */
@@ -97,7 +99,7 @@ namespace muSpectre {
    */
   inline OptimizeResult
   de_geus(Cell & cell, const Eigen::Ref<Eigen::MatrixXd> load_step,
-          SolverBase & solver, Real newton_tol, Real equil_tol,
+          KrylovSolverBase & solver, Real newton_tol, Real equil_tol,
           Dim_t verbose = 0,
           IsStrainInitialised strain_init = IsStrainInitialised::False) {
     return de_geus(cell, LoadSteps_t{load_step}, solver, newton_tol, equil_tol,

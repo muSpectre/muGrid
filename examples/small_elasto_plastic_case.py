@@ -82,7 +82,7 @@ if formulation == µ.Formulation.small_strain:
 maxiter = 401
 verbose = 2
 
-solver = µ.solvers.SolverCG(rve.wrapped_cell, cg_tol, maxiter, verbose=True)
+solver = µ.solvers.KrylovSolverCG(rve.wrapped_cell, cg_tol, maxiter, verbose=True)
 r = µ.solvers.newton_cg(rve.wrapped_cell, Del0, solver,
                         tol, equil_tol, verbose)
 print("nb of {} iterations: {}".format(solver.name(), r.nb_fev))

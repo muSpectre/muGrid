@@ -1,5 +1,5 @@
 /**
- * @file   solver_eigen.hh
+ * @file   krylov_solver_eigen.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -33,10 +33,10 @@
  *
  */
 
-#ifndef SRC_SOLVER_SOLVER_EIGEN_HH_
-#define SRC_SOLVER_SOLVER_EIGEN_HH_
+#ifndef SRC_SOLVER_KRYLOV_SOLVER_EIGEN_HH_
+#define SRC_SOLVER_KRYLOV_SOLVER_EIGEN_HH_
 
-#include "solver/solver_base.hh"
+#include "solver/krylov_solver_base.hh"
 #include "cell/cell.hh"
 #include "cell/cell_adaptor.hh"
 
@@ -46,62 +46,63 @@
 
 namespace muSpectre {
 
-  template <class SolverType>
-  class SolverEigen;
+  template <class KrylovSolverType>
+  class KrylovSolverEigen;
 
-  class SolverCGEigen;
+  class KrylovSolverCGEigen;
 
-  class SolverGMRESEigen;
+  class KrylovSolverGMRESEigen;
 
-  class SolverBiCGSTABEigen;
+  class KrylovSolverBiCGSTABEigen;
 
-  class SolverDGMRESEigen;
+  class KrylovSolverDGMRESEigen;
 
-  class SolverMINRESEigen;
+  class KrylovSolverMINRESEigen;
 
   namespace internal {
 
-    template <class Solver>
-    struct Solver_traits {};
+    template <class KrylovSolver>
+    struct KrylovSolver_traits {};
 
     //! traits for the Eigen conjugate gradient solver
     template <>
-    struct Solver_traits<SolverCGEigen> {
-      //! Eigen Iterative Solver
-      using Solver = Eigen::ConjugateGradient<typename Cell::Adaptor,
-                                              Eigen::Lower | Eigen::Upper,
-                                              Eigen::IdentityPreconditioner>;
+    struct KrylovSolver_traits<KrylovSolverCGEigen> {
+      //! Eigen Iterative KrylovSolver
+      using KrylovSolver =
+          Eigen::ConjugateGradient<typename Cell::Adaptor,
+                                   Eigen::Lower | Eigen::Upper,
+                                   Eigen::IdentityPreconditioner>;
     };
 
     //! traits for the Eigen GMRES solver
     template <>
-    struct Solver_traits<SolverGMRESEigen> {
-      //! Eigen Iterative Solver
-      using Solver =
+    struct KrylovSolver_traits<KrylovSolverGMRESEigen> {
+      //! Eigen Iterative KrylovSolver
+      using KrylovSolver =
           Eigen::GMRES<typename Cell::Adaptor, Eigen::IdentityPreconditioner>;
     };
 
     //! traits for the Eigen BiCGSTAB solver
     template <>
-    struct Solver_traits<SolverBiCGSTABEigen> {
-      //! Eigen Iterative Solver
-      using Solver = Eigen::BiCGSTAB<typename Cell::Adaptor,
-                                     Eigen::IdentityPreconditioner>;
+    struct KrylovSolver_traits<KrylovSolverBiCGSTABEigen> {
+      //! Eigen Iterative KrylovSolver
+      using KrylovSolver = Eigen::BiCGSTAB<typename Cell::Adaptor,
+                                           Eigen::IdentityPreconditioner>;
     };
 
     //! traits for the Eigen DGMRES solver
     template <>
-    struct Solver_traits<SolverDGMRESEigen> {
-      //! Eigen Iterative Solver
-      using Solver =
+    struct KrylovSolver_traits<KrylovSolverDGMRESEigen> {
+      //! Eigen Iterative KrylovSolver
+      using KrylovSolver =
           Eigen::DGMRES<typename Cell::Adaptor, Eigen::IdentityPreconditioner>;
     };
 
     //! traits for the Eigen MINRES solver
     template <>
-    struct Solver_traits<SolverMINRESEigen> {
-      //! Eigen Iterative Solver
-      using Solver =
+    struct KrylovSolver_traits<KrylovSolverMINRESEigen> {
+      //! Eigen Iterative KrylovSolver
+      using KrylovSolver =
           Eigen::MINRES<typename Cell::Adaptor, Eigen::Lower | Eigen::Upper,
                         Eigen::IdentityPreconditioner>;
     };
@@ -111,12 +112,13 @@ namespace muSpectre {
   /**
    * base class for iterative solvers from Eigen
    */
-  template <class SolverType>
-  class SolverEigen : public SolverBase {
+  template <class KrylovSolverType>
+  class KrylovSolverEigen : public KrylovSolverBase {
    public:
-    using Parent = SolverBase;  //!< base class
+    using Parent = KrylovSolverBase;  //!< base class
     //! traits obtained from CRTP
-    using Solver = typename internal::Solver_traits<SolverType>::Solver;
+    using KrylovSolver =
+        typename internal::KrylovSolver_traits<KrylovSolverType>::KrylovSolver;
     //! Input vectors for solver
     using ConstVector_ref = Parent::ConstVector_ref;
     //! Output vector for solver
@@ -125,25 +127,26 @@ namespace muSpectre {
     using Vector_t = Parent::Vector_t;
 
     //! Default constructor
-    SolverEigen() = delete;
+    KrylovSolverEigen() = delete;
 
     //! Constructor with cell and solver parameters.
-    SolverEigen(Cell & cell, Real tol, Uint maxiter = 0, bool verbose = false);
+    KrylovSolverEigen(Cell & cell, Real tol, Uint maxiter = 0,
+                      bool verbose = false);
 
     //! Copy constructor
-    SolverEigen(const SolverEigen & other) = delete;
+    KrylovSolverEigen(const KrylovSolverEigen & other) = delete;
 
     //! Move constructor
-    SolverEigen(SolverEigen && other) = default;
+    KrylovSolverEigen(KrylovSolverEigen && other) = default;
 
     //! Destructor
-    virtual ~SolverEigen() = default;
+    virtual ~KrylovSolverEigen() = default;
 
     //! Copy assignment operator
-    SolverEigen & operator=(const SolverEigen & other) = delete;
+    KrylovSolverEigen & operator=(const KrylovSolverEigen & other) = delete;
 
     //! Move assignment operator
-    SolverEigen & operator=(SolverEigen && other) = default;
+    KrylovSolverEigen & operator=(KrylovSolverEigen && other) = default;
 
     //! Allocate fields used during the solution
     void initialise() final;
@@ -153,58 +156,62 @@ namespace muSpectre {
 
    protected:
     Cell::Adaptor adaptor;  //!< cell handle
-    Solver solver;          //!< Eigen's Iterative solver
+    KrylovSolver solver;    //!< Eigen's Iterative solver
     Vector_t result;        //!< storage for result
   };
 
   /**
    * Binding to Eigen's conjugate gradient solver
    */
-  class SolverCGEigen : public SolverEigen<SolverCGEigen> {
+  class KrylovSolverCGEigen : public KrylovSolverEigen<KrylovSolverCGEigen> {
    public:
-    using SolverEigen<SolverCGEigen>::SolverEigen;
+    using KrylovSolverEigen<KrylovSolverCGEigen>::KrylovSolverEigen;
     std::string get_name() const final { return "CG"; }
   };
 
   /**
    * Binding to Eigen's GMRES solver
    */
-  class SolverGMRESEigen : public SolverEigen<SolverGMRESEigen> {
+  class KrylovSolverGMRESEigen
+      : public KrylovSolverEigen<KrylovSolverGMRESEigen> {
    public:
-    using SolverEigen<SolverGMRESEigen>::SolverEigen;
+    using KrylovSolverEigen<KrylovSolverGMRESEigen>::KrylovSolverEigen;
     std::string get_name() const final { return "GMRES"; }
   };
 
   /**
    * Binding to Eigen's BiCGSTAB solver
    */
-  class SolverBiCGSTABEigen : public SolverEigen<SolverBiCGSTABEigen> {
+  class KrylovSolverBiCGSTABEigen
+      : public KrylovSolverEigen<KrylovSolverBiCGSTABEigen> {
    public:
-    using SolverEigen<SolverBiCGSTABEigen>::SolverEigen;
-    //! Solver's name
+    using KrylovSolverEigen<KrylovSolverBiCGSTABEigen>::KrylovSolverEigen;
+    //! KrylovSolver's name
     std::string get_name() const final { return "BiCGSTAB"; }
   };
 
   /**
    * Binding to Eigen's DGMRES solver
    */
-  class SolverDGMRESEigen : public SolverEigen<SolverDGMRESEigen> {
+  class KrylovSolverDGMRESEigen
+      : public KrylovSolverEigen<KrylovSolverDGMRESEigen> {
    public:
-    using SolverEigen<SolverDGMRESEigen>::SolverEigen;
-    //! Solver's name
+    using KrylovSolverEigen<KrylovSolverDGMRESEigen>::KrylovSolverEigen;
+    //! KrylovSolver's name
     std::string get_name() const final { return "DGMRES"; }
   };
 
   /**
    * Binding to Eigen's MINRES solver
    */
-  class SolverMINRESEigen : public SolverEigen<SolverMINRESEigen> {
+  class KrylovSolverMINRESEigen
+      : public KrylovSolverEigen<KrylovSolverMINRESEigen> {
    public:
-    using SolverEigen<SolverMINRESEigen>::SolverEigen;
-    //! Solver's name
+    using KrylovSolverEigen<KrylovSolverMINRESEigen>::KrylovSolverEigen;
+    //! KrylovSolver's name
     std::string get_name() const final { return "MINRES"; }
   };
 
 }  // namespace muSpectre
 
-#endif  // SRC_SOLVER_SOLVER_EIGEN_HH_
+#endif  // SRC_SOLVER_KRYLOV_SOLVER_EIGEN_HH_

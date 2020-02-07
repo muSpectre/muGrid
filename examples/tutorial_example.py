@@ -52,10 +52,10 @@ Del0 = .5*(Del0 + Del0.T)
 maxiter = 50  # for linear cell solver
 
 # Choose a solver for the linear cells. Currently avaliable:
-## SolverCG, SolverCGEigen, SolverBiCGSTABEigen, SolverGMRESEigen,
-# SolverDGMRESEigen, SolverMINRESEigen.
+## KrylovSolverCG, KrylovSolverCGEigen, KrylovSolverBiCGSTABEigen, KrylovSolverGMRESEigen,
+# KrylovSolverDGMRESEigen, KrylovSolverMINRESEigen.
 # See Reference for explanations
-solver = msp.solvers.SolverCGEigen(
+solver = msp.solvers.KrylovSolverCGEigen(
     rve.wrapped_cell, cg_tol, maxiter, verbose=True)
 
 

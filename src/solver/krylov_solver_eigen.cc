@@ -1,5 +1,5 @@
 /**
- * @file   solver_eigen.cc
+ * @file   krylov_solver_eigen.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -33,7 +33,7 @@
  *
  */
 
-#include "solver/solver_eigen.hh"
+#include "solver/krylov_solver_eigen.hh"
 
 #include <iomanip>
 #include <sstream>
@@ -41,23 +41,25 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  template <class SolverType>
-  SolverEigen<SolverType>::SolverEigen(Cell & cell, Real tol, Uint maxiter,
-                                       bool verbose)
+  template <class KrylovSolverType>
+  KrylovSolverEigen<KrylovSolverType>::KrylovSolverEigen(Cell & cell, Real tol,
+                                                         Uint maxiter,
+                                                         bool verbose)
       : Parent(cell, tol, maxiter, verbose), adaptor{cell.get_adaptor()},
         solver{}, result{} {}
 
   /* ---------------------------------------------------------------------- */
-  template <class SolverType>
-  void SolverEigen<SolverType>::initialise() {
+  template <class KrylovSolverType>
+  void KrylovSolverEigen<KrylovSolverType>::initialise() {
     this->solver.setTolerance(this->get_tol());
     this->solver.setMaxIterations(this->get_maxiter());
     this->solver.compute(this->adaptor);
   }
 
   /* ---------------------------------------------------------------------- */
-  template <class SolverType>
-  auto SolverEigen<SolverType>::solve(const ConstVector_ref rhs) -> Vector_map {
+  template <class KrylovSolverType>
+  auto KrylovSolverEigen<KrylovSolverType>::solve(const ConstVector_ref rhs)
+      -> Vector_map {
     this->result = this->solver.solve(rhs);
     this->counter += this->solver.iterations();
 
@@ -72,18 +74,18 @@ namespace muSpectre {
 
     if (this->verbose) {
       std::cout << " After " << this->solver.iterations() << " "
-                << this->get_name()
-                << " steps, |r|/|b| = " << std::setw(15) << this->solver.error()
-                << ", cg_tol = " << this->tol << std::endl;
+                << this->get_name() << " steps, |r|/|b| = " << std::setw(15)
+                << this->solver.error() << ", cg_tol = " << this->tol
+                << std::endl;
     }
     return Vector_map(this->result.data(), this->result.size());
   }
 
   /* ---------------------------------------------------------------------- */
-  template class SolverEigen<SolverCGEigen>;
-  template class SolverEigen<SolverGMRESEigen>;
-  template class SolverEigen<SolverBiCGSTABEigen>;
-  template class SolverEigen<SolverDGMRESEigen>;
-  template class SolverEigen<SolverMINRESEigen>;
+  template class KrylovSolverEigen<KrylovSolverCGEigen>;
+  template class KrylovSolverEigen<KrylovSolverGMRESEigen>;
+  template class KrylovSolverEigen<KrylovSolverBiCGSTABEigen>;
+  template class KrylovSolverEigen<KrylovSolverDGMRESEigen>;
+  template class KrylovSolverEigen<KrylovSolverMINRESEigen>;
 
 }  // namespace muSpectre

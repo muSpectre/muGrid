@@ -107,7 +107,7 @@ newton_tol = 1e-5
 equil_tol = 1e-10
 maxiter = 1000
 
-solver = µ.solvers.SolverCG(rve.wrapped_cell, cg_tol, maxiter, verbose=False)
+solver = µ.solvers.KrylovSolverCG(rve.wrapped_cell, cg_tol, maxiter, verbose=False)
 
 results = µ.solvers.de_geus(
     rve.wrapped_cell, ΔFbars, solver, newton_tol, equil_tol, verbose=2)

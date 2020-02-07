@@ -86,7 +86,7 @@ def build_test_classes(fft):
             maxiter = 100
             verbose = 1
 
-            solver = µ.solvers.SolverCG(self.cell, tol, maxiter, verbose)
+            solver = µ.solvers.KrylovSolverCG(self.cell, tol, maxiter, verbose)
             r = µ.solvers.newton_cg(self.cell, Del0,
                                     solver, tol, tol, verbose)
 

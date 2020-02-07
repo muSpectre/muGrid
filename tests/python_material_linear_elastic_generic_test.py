@@ -90,8 +90,8 @@ class MaterialLinearElasticGeneric_Check(unittest.TestCase):
         maxiter = 100
         verbose = 0
 
-        solver1 = µ.solvers.SolverCG(self.cell1, tol, maxiter, verbose)
-        solver2 = µ.solvers.SolverCG(self.cell2, tol, maxiter, verbose)
+        solver1 = µ.solvers.KrylovSolverCG(self.cell1, tol, maxiter, verbose)
+        solver2 = µ.solvers.KrylovSolverCG(self.cell2, tol, maxiter, verbose)
 
 
         r1 = µ.solvers.de_geus(self.cell1, Del0,

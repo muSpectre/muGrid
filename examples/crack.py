@@ -119,7 +119,7 @@ for i, derivative in enumerate([fourier_gradient, discrete_gradient]):
         else:
             hard.add_pixel(pixel)
             phase[pixel[0], pixel[1]] = 0
-    solver = msp.solvers.SolverCG(rve.wrapped_cell, cg_tol, maxiter, verbose=False)
+    solver = msp.solvers.KrylovSolverCG(rve.wrapped_cell, cg_tol, maxiter, verbose=False)
     result = msp.solvers.newton_cg(rve.wrapped_cell, applied_strain, solver,
                                    newton_tol=newton_tol, equil_tol=equil_tol,
                                    verbose=verbose)

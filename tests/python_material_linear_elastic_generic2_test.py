@@ -89,7 +89,7 @@ class MaterialLinearElasticGeneric2_Check(unittest.TestCase):
         verbose = 0
 
         def solve(cell, grad):
-            solver =µ.solvers.SolverCG(cell, tol, maxiter, verbose)
+            solver =µ.solvers.KrylovSolverCG(cell, tol, maxiter, verbose)
             r = µ.solvers.newton_cg(cell, grad,
                                     solver, tol, tol, verbose)
             return r

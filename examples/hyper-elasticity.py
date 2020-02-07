@@ -76,7 +76,7 @@ def compute():
     test_grad = np.zeros((9, cell.size))
     test_grad[:,:] = dF_bar.reshape(-1,1)
     print(cell.directional_stiffness(test_grad)[:,:3])
-    solver = µ.solvers.SolverCG(cell.wrapped_cell, cg_tol, maxiter, verbose=False);
+    solver = µ.solvers.KrylovSolverCG(cell.wrapped_cell, cg_tol, maxiter, verbose=False);
     optimize_res = µ.solvers.de_geus(
         cell.wrapped_cell, dF_bar, solver, newton_tol, verbose)
     print("nb_cg: {}\n{}".format(optimize_res.nb_fev, optimize_res.grad.T[:2,:]))

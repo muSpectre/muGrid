@@ -35,7 +35,7 @@
 #include "cell/cell_factory.hh"
 #include "materials/material_linear_elastic1.hh"
 #include "solver/solvers.hh"
-#include "solver/solver_cg.hh"
+#include "solver/krylov_solver_cg.hh"
 
 #include <iostream>
 #include <iomanip>
@@ -74,7 +74,7 @@ int main() {
 
   Eigen::MatrixXd dF_bar{Eigen::MatrixXd::Zero(Dim, Dim)};
   dF_bar(0, 1) = 1.;
-  SolverCG cg{cell, cg_tol, maxiter, verbose};
+  KrylovSolverCG cg{cell, cg_tol, maxiter, verbose};
   auto optimize_res = de_geus(cell, dF_bar, cg, newton_tol, equil_tol, verbose);
 
   std::cout << "nb_cg: " << optimize_res.nb_fev << std::endl;

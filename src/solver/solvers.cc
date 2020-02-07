@@ -50,11 +50,10 @@ namespace muSpectre {
                          "]");
 
   //--------------------------------------------------------------------------//
-  std::vector<OptimizeResult> newton_cg(Cell & cell,
-                                        const LoadSteps_t & load_steps,
-                                        SolverBase & solver, Real newton_tol,
-                                        Real equil_tol, Dim_t verbose,
-                                        IsStrainInitialised strain_init) {
+  std::vector<OptimizeResult>
+  newton_cg(Cell & cell, const LoadSteps_t & load_steps,
+            KrylovSolverBase & solver, Real newton_tol, Real equil_tol,
+            Dim_t verbose, IsStrainInitialised strain_init) {
     const auto & comm = cell.get_communicator();
 
     using Matrix_t = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
@@ -306,11 +305,10 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  std::vector<OptimizeResult> de_geus(Cell & cell,
-                                      const LoadSteps_t & load_steps,
-                                      SolverBase & solver, Real newton_tol,
-                                      Real equil_tol, Dim_t verbose,
-                                      IsStrainInitialised strain_init) {
+  std::vector<OptimizeResult>
+  de_geus(Cell & cell, const LoadSteps_t & load_steps,
+          KrylovSolverBase & solver, Real newton_tol, Real equil_tol,
+          Dim_t verbose, IsStrainInitialised strain_init) {
     const auto & comm = cell.get_communicator();
 
     using Matrix_t = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
@@ -482,7 +480,7 @@ namespace muSpectre {
         auto & incrF{incrF_field.get_field()};
         try {
           if (newt_iter == 0) {
-            DeltaF_field.get_map() = macro_strain-previous_macro_strain;
+            DeltaF_field.get_map() = macro_strain - previous_macro_strain;
             // this corresponds to rhs=-G:K:δF
             cell.evaluate_projected_directional_stiffness(DeltaF, rhs);
             F += DeltaF;

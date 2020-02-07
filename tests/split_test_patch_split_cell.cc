@@ -36,7 +36,7 @@
 #include "tests.hh"
 
 #include "solver/solvers.hh"
-#include "solver/solver_cg.hh"
+#include "solver/krylov_solver_cg.hh"
 #include "projection/projection_finite_strain_fast.hh"
 #include "materials/material_linear_elastic1.hh"
 #include "cell/cell_factory.hh"
@@ -120,10 +120,10 @@ namespace muSpectre {
         muGrid::ipow(dim, secondOrder) * 10};
     constexpr bool verbose{false};
 
-    SolverCG cg2{sys_base, cg_tol, maxiter, static_cast<bool>(verbose)};
+    KrylovSolverCG cg2{sys_base, cg_tol, maxiter, static_cast<bool>(verbose)};
     auto && res2{newton_cg(sys_base, delF0, cg2, newton_tol, verbose).grad};
 
-    SolverCG cg1{sys_split, cg_tol, maxiter, static_cast<bool>(verbose)};
+    KrylovSolverCG cg1{sys_split, cg_tol, maxiter, static_cast<bool>(verbose)};
     auto && res1{newton_cg(sys_split, delF0, cg1, newton_tol, verbose).grad};
     auto && diff{(res1 - res2).eval()};
 

@@ -108,7 +108,7 @@ class EigenStrainCheck(unittest.TestCase):
         verbose = 0
 
         def solve(cell, grad):
-            solver = µ.solvers.SolverCG(
+            solver = µ.solvers.KrylovSolverCG(
                 cell, tol, maxiter, verbose)
             r = µ.solvers.newton_cg(cell, grad,
                                     solver, tol, tol, verbose)
