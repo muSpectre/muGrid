@@ -38,7 +38,7 @@
 #define SRC_PROJECTION_PROJECTION_FINITE_STRAIN_FAST_HH_
 
 #include <libmugrid/field_collection.hh>
-#include <libmugrid/field_map_static.hh>
+#include <libmugrid/mapped_field.hh>
 
 #include <libmufft/derivative.hh>
 
@@ -63,11 +63,6 @@ namespace muSpectre {
     using Rcoord = Rcoord_t<DimS>;  //!< spatial coordinates type
     //! Real space second order tensor fields (to be projected)
     using Field_t = muGrid::TypedFieldBase<Real>;
-    //! Fourier-space field containing the projection operator itself
-    using Proj_t = muGrid::ComplexField;
-    //! iterable form of the operator
-    using Proj_map = muGrid::MatrixFieldMap<Complex, Mapping::Mut, DimS, 1,
-                                            muGrid::Iteration::Pixel>;
     //! iterable Fourier-space second-order tensor field
     using Grad_map = muGrid::MatrixFieldMap<Complex, Mapping::Mut, DimS, DimS,
                                             muGrid::Iteration::Pixel>;
@@ -132,8 +127,9 @@ namespace muSpectre {
     const Gradient_t & get_gradient() const { return this->gradient; }
 
    protected:
-    Proj_t & xi_field;  //!< field of normalised wave vectors
-    Proj_map xis;       //!< iterable normalised wave vectors
+    //! field of normalised wave vectors
+    muGrid::MappedT1Field<Complex, Mapping::Mut, DimS> xi_field;
+
     /**
      * gradient (nabla) operator, can be computed using Fourier interpolation
      * or through a weighted residual

@@ -46,9 +46,8 @@ namespace muSpectre {
       muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths,
       Gradient_t gradient)
       : Parent{std::move(engine), lengths, Formulation::finite_strain},
-        xi_field{this->projection_container.register_complex_field(
-            "Projection Operator", DimS)},
-        xis(xi_field), gradient{gradient} {
+        xi_field{"Projection Operator", this->projection_container},
+        gradient{gradient} {
     for (auto res : this->fft_engine->get_nb_domain_grid_pts()) {
       if (res % 2 == 0) {
         throw ProjectionError(
@@ -83,7 +82,7 @@ namespace muSpectre {
     FFTFreqs_t fft_freqs(nb_domain_grid_pts);
     for (auto && tup : akantu::zip(this->fft_engine->get_pixels()
                                        .template get_dimensioned_pixels<DimS>(),
-                                   this->xis)) {
+                                   this->xi_field.get_map())) {
       const auto & ccoord = std::get<0>(tup);
       auto & xi = std::get<1>(tup);
 
@@ -104,7 +103,7 @@ namespace muSpectre {
     if (this->fft_engine->is_active()) {
       // locations are also zero if the engine is not active
       if (this->get_subdomain_locations() == Ccoord{}) {
-        this->xis[0].setZero();
+        this->xi_field.get_map()[0].setZero();
       }
     }
   }
@@ -114,7 +113,7 @@ namespace muSpectre {
   void ProjectionFiniteStrainFast<DimS>::apply_projection(Field_t & field) {
     Grad_map field_map{this->fft_engine->fft(field)};
     Real factor = this->fft_engine->normalisation();
-    for (auto && tup : akantu::zip(this->xis, field_map)) {
+    for (auto && tup : akantu::zip(this->xi_field.get_map(), field_map)) {
       auto & xi{std::get<0>(tup)};
       auto & f{std::get<1>(tup)};
       f = factor * ((f * xi).eval() * xi.adjoint());
@@ -125,7 +124,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS>
   Eigen::Map<MatrixXXc> ProjectionFiniteStrainFast<DimS>::get_operator() {
-    return this->xi_field.eigen_pixel();
+    return this->xi_field.get_field().eigen_pixel();
   }
 
   /* ---------------------------------------------------------------------- */
