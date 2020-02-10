@@ -174,8 +174,8 @@ function(license_add_subdirectory DIR LICENSETEST)
 
   set(LICENSETEST_EXC ${PYTHON_EXECUTABLE} ${LICENSETEST})
   # create relative path to the directory
-
-  string(REGEX REPLACE "/" "." TEST_NAME ${DIR})
+  string(REGEX REPLACE "/home" "home" TEST_NAME_TEMP ${DIR})
+  string(REGEX REPLACE "/" "." TEST_NAME ${TEST_NAME_TEMP})
 
   # perform license check
   set(TARGET_NAME ${LICENSETEST_TARGET}.${TEST_NAME})

@@ -73,8 +73,7 @@ def header_license_test(source_dirs, lic_paras):
         for r, d, f in walklevel(source_dir, 0):
             print("source_dir = {}, r,d,f = {}".format(source_dir, (r, d, f)))
             for file in f:
-                if ('.hh' in file and '.hh~' not in file and '#'
-                        not in file and 'iterators.hh' not in file):
+                if (file.endswith('.hh') and 'iterators.hh' not in file):
                     header_files.append(os.path.join(r, file))
 
         for header_file in header_files:
@@ -82,6 +81,18 @@ def header_license_test(source_dirs, lic_paras):
             file_text = file_obj.read()
             license_text = re.split("#ifndef", file_text, 2)[0]
             lines_text = re.split("\*\n", license_text)
+            msg = ""
+            if (len(lines_text) == 1):
+                msg = test_case._formatMessage(
+                    msg,
+                    "\nThe file "
+                    "\n{}:1:1:\n"
+                    " does not have license."
+                    " please add the licnese"
+                    " (most conveniently form the µSpectre snippets)"
+                    .format(os.path.join(r, header_file)))
+                msg_list = msg_list + msg
+                continue
             file_name_line = lines_text[1]
             file_name_line = re.sub(' +', '', file_name_line)
             file_name_line = re.sub('\n', '', file_name_line)
@@ -91,7 +102,7 @@ def header_license_test(source_dirs, lic_paras):
             msg = ""
             msg = test_case._formatMessage(
                 msg,
-                "The name supplied in the first "
+                "\nThe name supplied in the first "
                 "line of the license should match "
                 "file name\n {}:1:1:\n"
                 .format(os.path.join(r, header_file)))
@@ -112,7 +123,7 @@ def header_license_test(source_dirs, lic_paras):
                 if (mu_license_text_lines_new[num] != lic_para):
                     msg = test_case._formatMessage(
                         msg,
-                        "the paragraph number {} of"
+                        "\n The paragraph number {} of"
                         "the license in file"
                         "\n{}:1:1:\n"
                         "is not correct. It should "
@@ -133,7 +144,7 @@ def source_license_test(source_dirs, lic_paras):
         source_files = []
         for r, d, f in walklevel(source_dir, 0):
             for file in f:
-                if file.endswith('.cc'):
+                if (file.endswith('.cc')):
                     source_files.append(os.path.join(r, file))
 
         for source_file in source_files:
@@ -141,6 +152,18 @@ def source_license_test(source_dirs, lic_paras):
             file_text = file_obj.read()
             license_text = re.split("#include", file_text, 2)[0]
             lines_text = re.split("\*\n", license_text)
+            msg = ""
+            if (len(lines_text) == 1):
+                msg = test_case._formatMessage(
+                    msg,
+                    "\nThe file "
+                    "\n{}:1:1:\n"
+                    " does not have license."
+                    " please add the licnese"
+                    " (most conveniently form the µSpectre snippets)"
+                    .format(os.path.join(r, source_file)))
+                msg_list = msg_list + msg
+                continue
             file_name_line = lines_text[1]
             file_name_line = re.sub(' +', '', file_name_line)
             file_name_line = re.sub('\n', '', file_name_line)
@@ -150,7 +173,7 @@ def source_license_test(source_dirs, lic_paras):
             msg = ""
             msg = test_case._formatMessage(
                 msg,
-                "The name supplied in the first "
+                "\n The name supplied in the first "
                 "line of the license should match "
                 "file name\n {}:1:1:"
                 .format(os.path.join(r,
@@ -172,7 +195,7 @@ def source_license_test(source_dirs, lic_paras):
                 if mu_license_text_lines_new[num] != lic_para:
                     msg = test_case._formatMessage(
                         msg,
-                        "the paragraph number {} of"
+                        "\n The paragraph number {} of"
                         "the license in file"
                         "\n{}:1:1:\n"
                         "is not correct. It should "
@@ -193,28 +216,65 @@ def python_license_test(source_dirs, py_lic_paras):
         python_files = []
         for r, d, f in walklevel(source_dir, 0):
             for file in f:
-                if ('.py' in file and '.py~' not in file and '#'
-                        not in file and 'pyc' not in file):
+                if (file.endswith('.py') and not file.startswith('#') and
+                    'pyc' not in file):
                     python_files.append(os.path.join(r, file))
 
         for python_file in python_files:
             file_obj = open(python_file, "r")
             file_text = file_obj.read()
+            msg = ""
+            if ("\"\"\"" not in file_text):
+                msg = test_case._formatMessage(
+                    msg,
+                    "\n The file "
+                    "\n{}:1:1:\n"
+                    "does not have license/hash bang."
+                    " please add it(them)"
+                    .format(os.path.join(r, python_file)))
+                msg_list = msg_list + msg
+                continue
+
             hash_bang_text = re.split("\"\"\"", file_text, 3)[0]
             msg = ""
+            print(len(hash_bang_text))
+            if (len(hash_bang_text) == 0):
+                msg = test_case._formatMessage(
+                    msg,
+                    "the file "
+                    "\n{}:1:1:\n"
+                    "does not have hash bang."
+                    " please add it\n"
+                    "#!/usr/bin/env python3\n"
+                    "# -*- coding:utf-8 -*-"
+                    .format(os.path.join(r, python_file)))
+                msg_list = msg_list + msg
+                continue
             license_text = re.split("\"\"\"", file_text, 3)[1]
             lines_text = re.split("\n\n", license_text)
+            msg = ""
+            if (len(lines_text) == 1):
+                msg = test_case._formatMessage(
+                    msg,
+                    "\n The file "
+                    "\n{}:1:1:\n"
+                    "does not have license."
+                    "please add the licnese."
+                    .format(os.path.join(r, python_file)))
+                msg_list = msg_list + msg
+                continue
             file_name_line = lines_text[0]
             file_name_line = re.sub(' +', '', file_name_line)
             file_name_line = re.sub('\n', '', file_name_line)
             file_name = re.sub('\@file', '', file_name_line)
             python_file_name = re.split('\/', python_file)[-1]
             python_file_name = re.sub(' +', '', python_file_name)
+            print("the length of lines_text ={}".format(len(lines_text)))
             msg = ""
             msg = test_case._formatMessage(
-                msg, "The has_bang of file:"
+                msg, "\n The has_bang of file:"
                 "\n{}:1:1\n is incorrect"
-                "it should be:\n"
+                " it should be:\n"
                 "#!/usr/bin/env python3\n"
                 "# -*- coding:utf-8 -*-\n"
                 .format(os.path.join(r, python_file_name)))
@@ -226,7 +286,7 @@ def python_license_test(source_dirs, py_lic_paras):
             msg = ""
             msg = test_case._formatMessage(
                 msg,
-                "The name supplied in the first "
+                "\n The name supplied in the first "
                 "line of the license should match "
                 "file name\n {}:1:1:"
                 .format(os.path.join(r,
@@ -241,7 +301,7 @@ def python_license_test(source_dirs, py_lic_paras):
                 if lines_text[num] != lic_para:
                     msg = test_case._formatMessage(
                         msg,
-                        "the paragraph number {} of"
+                        "\n The paragraph number {} of"
                         "the license in file"
                         "\n{}:1:1:\n"
                         "is not correct. It should "
