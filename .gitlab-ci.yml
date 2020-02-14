@@ -69,6 +69,17 @@ build:testing_gcc_split:
     - cmake -DCMAKE_BUILD_TYPE:STRING=Release -DSPLIT_CELL=ON ..
     - make
 
+build:test_documention:
+  stage: build
+  image: registry.gitlab.com/muspectre/muspectre:debian_stable
+  script:
+    - cd build
+    - cmake -DMUSPECTRE_MAKE_DOC_TARGET=ON ..
+    - make dev_doc
+  artifacts:
+    paths:
+    - build/doc/html
+
 .tests:
   stage: test
   script:
@@ -131,3 +142,16 @@ test:testing_gcc_split:
  dependencies:
     - build:testing_gcc_split
 
+pages:
+  stage: deploy
+  image: registry.gitlab.com/muspectre/muspectre:debian_stable
+  script:
+    - cd build
+    - cmake -DMUSPECTRE_MAKE_DOC_TARGET=ON ..
+    - make dev_doc
+    - mv doc/html ../public
+  artifacts:
+    paths:
+    - public
+  only:
+    - master

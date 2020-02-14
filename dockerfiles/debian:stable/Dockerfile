@@ -8,6 +8,7 @@ RUN apt-get -qq update && apt-get -y -qq install \
     cmake \
     curl \
     doxygen \
+    graphviz \
     g++ \
     git \
     libboost-test-dev \

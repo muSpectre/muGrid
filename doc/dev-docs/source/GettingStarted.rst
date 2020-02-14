@@ -110,7 +110,7 @@ bindings. The following simple example computes the response of a
 two-dimensional stretched periodic RVE cell. The cell consist of a soft matrix
 with a circular hard inclusion.
 
-.. literalinclude:: ../../../bin/tutorial_example.py
+.. literalinclude:: ../../../examples/tutorial_example.py
    :language: python
 
 More examples both python and c++ executables can be found in the ``/examples``
