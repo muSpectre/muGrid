@@ -134,7 +134,7 @@ not copied around or free'd so that :ref:`field maps<field_map>` always remain
 valid and unambiguously linked to a field.
 
 Fields give access to their bulk memory in form of an
-:cpp:class:`Eigen:Map`. This is useful for instance for accessing the global
+:cpp:class:`Eigen::Map`. This is useful for instance for accessing the global
 strain, stress, and tangent moduli fields in the solver.
 
 Example: Using fields as global arrays:
