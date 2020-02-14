@@ -108,7 +108,7 @@ namespace muFFT {
   //! lightweight abstraction for the MPI communicator object
   class Communicator {
    public:
-    explicit Communicator(MPI_Comm comm = MPI_COMM_NULL) : comm{*comm} {};
+    explicit Communicator(MPI_Comm comm = MPI_COMM_NULL) : comm{comm} {};
     ~Communicator() {}
 
     //! get rank of present process
@@ -118,7 +118,7 @@ namespace muFFT {
       // a version compiled with MPI for serial calculations.
       // Note that the difference between MPI_COMM_NULL and MPI_COMM_SELF is
       // that the latter actually executes the library function.
-      if (&comm == MPI_COMM_NULL)
+      if (comm == MPI_COMM_NULL)
         return 0;
       int res;
       MPI_Comm_rank(this->comm, &res);
@@ -127,7 +127,7 @@ namespace muFFT {
 
     //! get total number of processes
     int size() const {
-      if (&comm == MPI_COMM_NULL)
+      if (comm == MPI_COMM_NULL)
         return 1;
       int res;
       MPI_Comm_size(this->comm, &res);
@@ -137,7 +137,7 @@ namespace muFFT {
     //! sum reduction on scalar types
     template <typename T>
     T sum(const T & arg) const {
-      if (&comm == MPI_COMM_NULL)
+      if (comm == MPI_COMM_NULL)
         return arg;
       T res;
       MPI_Allreduce(&arg, &res, 1, mpi_type<T>(), MPI_SUM, this->comm);
