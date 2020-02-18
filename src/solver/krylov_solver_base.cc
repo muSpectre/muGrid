@@ -39,7 +39,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   KrylovSolverBase::KrylovSolverBase(Cell & cell, Real tol, Uint maxiter,
-                                     bool verbose)
+                                     Verbosity verbose)
       : cell(cell), tol{tol}, maxiter{maxiter}, verbose{verbose} {}
 
   /* ---------------------------------------------------------------------- */

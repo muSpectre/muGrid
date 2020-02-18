@@ -113,16 +113,16 @@ namespace muSpectre {
     delF0 << 1e-4, 5e-5, 5e-5, 0;  //, 0, 0, 0, 0, 0;
     constexpr Real cg_tol{1e-8}, newton_tol{1e-5}, equil_tol{1e-5};
     const Uint maxiter{10};
-    constexpr bool verbose{false};
+    constexpr Verbosity verbose{Verbosity::Silent};
 
     LoadSteps_t grads;
     grads.push_back(delF0);
-    KrylovSolverCG cg_lin(sys_lin, cg_tol, maxiter, static_cast<bool>(verbose));
+    KrylovSolverCG cg_lin(sys_lin, cg_tol, maxiter, verbose);
     Eigen::ArrayXXd res2{
         newton_cg(sys_lin, grads, cg_lin, newton_tol, equil_tol, verbose)[0]
             .grad};
 
-    KrylovSolverCG cg_non{sys_non, cg_tol, maxiter, static_cast<bool>(verbose)};
+    KrylovSolverCG cg_non{sys_non, cg_tol, maxiter, verbose};
     Eigen::ArrayXXd res1{
         newton_cg(sys_non, grads, cg_non, newton_tol, equil_tol, verbose)[0]
             .grad};
@@ -200,15 +200,15 @@ namespace muSpectre {
     delF0 << 1e-4, 5e-5, 5e-5, 0, 0, 0, 0, 0, 0;
     constexpr Real cg_tol{1e-8}, newton_tol{1e-5}, equil_tol{1e-5};
     const Uint maxiter{10};
-    constexpr bool verbose{false};
+    constexpr Verbosity verbose{Verbosity::Silent};
 
     LoadSteps_t grads;
     grads.push_back(delF0);
-    KrylovSolverCG cg_lin{sys_lin, cg_tol, maxiter, static_cast<bool>(verbose)};
+    KrylovSolverCG cg_lin{sys_lin, cg_tol, maxiter, verbose};
     Eigen::ArrayXXd res2{
         newton_cg(sys_lin, delF0, cg_lin, newton_tol, equil_tol, verbose).grad};
 
-    KrylovSolverCG cg_non{sys_non, cg_tol, maxiter, static_cast<bool>(verbose)};
+    KrylovSolverCG cg_non{sys_non, cg_tol, maxiter, verbose};
     Eigen::ArrayXXd res1{
         newton_cg(sys_non, delF0, cg_non, newton_tol, equil_tol, verbose).grad};
 

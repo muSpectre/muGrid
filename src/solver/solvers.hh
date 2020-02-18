@@ -61,7 +61,7 @@ namespace muSpectre {
   std::vector<OptimizeResult>
   newton_cg(Cell & cell, const LoadSteps_t & load_steps,
             KrylovSolverBase & solver, Real newton_tol, Real equil_tol,
-            Dim_t verbose = 0,
+            Verbosity verbose = Verbosity::Silent,
             IsStrainInitialised strain_init = IsStrainInitialised::False);
 
   /**
@@ -71,7 +71,7 @@ namespace muSpectre {
   inline OptimizeResult
   newton_cg(Cell & cell, const Eigen::Ref<Eigen::MatrixXd> load_step,
             KrylovSolverBase & solver, Real newton_tol, Real equil_tol,
-            Dim_t verbose = 0,
+            Verbosity verbose = Verbosity::Silent,
             IsStrainInitialised strain_init = IsStrainInitialised::False) {
     LoadSteps_t load_steps{load_step};
     return newton_cg(cell, load_steps, solver, newton_tol, equil_tol, verbose,
@@ -89,7 +89,7 @@ namespace muSpectre {
   std::vector<OptimizeResult>
   de_geus(Cell & cell, const LoadSteps_t & load_steps,
           KrylovSolverBase & solver, Real newton_tol, Real equil_tol,
-          Dim_t verbose = 0,
+          Verbosity verbose = Verbosity::Silent,
           IsStrainInitialised strain_init = IsStrainInitialised::False);
 
   /* ---------------------------------------------------------------------- */
@@ -100,7 +100,7 @@ namespace muSpectre {
   inline OptimizeResult
   de_geus(Cell & cell, const Eigen::Ref<Eigen::MatrixXd> load_step,
           KrylovSolverBase & solver, Real newton_tol, Real equil_tol,
-          Dim_t verbose = 0,
+          Verbosity verbose = Verbosity::Silent,
           IsStrainInitialised strain_init = IsStrainInitialised::False) {
     return de_geus(cell, LoadSteps_t{load_step}, solver, newton_tol, equil_tol,
                    verbose, strain_init)[0];

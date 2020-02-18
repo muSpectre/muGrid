@@ -45,7 +45,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   KrylovSolverCG::KrylovSolverCG(Cell & cell, Real tol, Uint maxiter,
-                                 bool verbose)
+                                 Verbosity verbose)
       : Parent(cell, tol, maxiter, verbose), r_k(cell.get_nb_dof()),
         p_k(cell.get_nb_dof()), Ap_k(cell.get_nb_dof()),
         x_k(cell.get_nb_dof()) {}
@@ -69,7 +69,7 @@ namespace muSpectre {
     Real tol2 = muGrid::ipow(this->tol, 2) * rhs_norm2;
 
     size_t count_width{};  // for output formatting in verbose case
-    if (this->verbose) {
+    if (verbose > Verbosity::Silent) {
       count_width = size_t(std::log10(this->maxiter)) + 1;
     }
 
@@ -86,7 +86,7 @@ namespace muSpectre {
       Real beta = new_rdr / rdr;
       rdr = new_rdr;
 
-      if (this->verbose && comm.rank() == 0) {
+      if (verbose > Verbosity::Silent && comm.rank() == 0) {
         std::cout << "  at CG step " << std::setw(count_width) << i
                   << ": |r|/|b| = " << std::setw(15)
                   << std::sqrt(rdr / rhs_norm2) << ", cg_tol = " << this->tol

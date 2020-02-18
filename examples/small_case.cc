@@ -68,14 +68,15 @@ int main() {
   rve.initialise();
 
   Real tol{1e-6};
+  Real equi_tol{0};
   Eigen::MatrixXd Del0(Dim, Dim);
   Del0 << 0, .1, 0, 0;
 
   Uint maxiter{31};
-  Dim_t verbose{3};
+  Verbosity verbose{Verbosity::Detailed};
 
-  KrylovSolverCG cg{rve, tol, maxiter, static_cast<bool>(verbose)};
-  auto res = de_geus(rve, Del0, cg, tol, verbose);
+  KrylovSolverCG cg{rve, tol, maxiter, verbose};
+  auto res = de_geus(rve, Del0, cg, tol, equi_tol, verbose);
   std::cout << res.grad.transpose() << std::endl;
   return 0;
 }

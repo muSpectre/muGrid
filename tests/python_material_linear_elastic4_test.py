@@ -70,7 +70,7 @@ class MaterialLinearElastic4_Check(unittest.TestCase):
         Del0 = np.array([[0, 0.025],
                          [0.025,  0]])
         maxiter = 100
-        verbose = False
+        verbose = µ.Verbosity.Silent
 
         solver = µ.solvers.KrylovSolverCG(
             cell, tol, maxiter, verbose)
@@ -100,7 +100,7 @@ class MaterialLinearElastic4_Check(unittest.TestCase):
         Del0 = np.array([[0.1, 0.05],
                          [0.05,  -0.02]])
         maxiter = 100
-        verbose = False
+        verbose = µ.Verbosity.Silent
 
         solver = µ.solvers.KrylovSolverCG(cell, tol, maxiter, verbose)
         r = µ.solvers.newton_cg(cell   , Del0,

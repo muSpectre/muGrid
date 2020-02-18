@@ -46,6 +46,8 @@
 
 namespace muSpectre {
 
+  using muGrid::Verbosity;
+
   /**
    * emulates scipy.optimize.OptimizeResult
    */

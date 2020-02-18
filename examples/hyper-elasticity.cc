@@ -70,7 +70,7 @@ int main() {
   cell.initialise();
   constexpr Real cg_tol{1e-8}, newton_tol{1e-5}, equil_tol{1e-8};
   constexpr Dim_t maxiter{200};
-  constexpr Dim_t verbose{1};
+  constexpr Verbosity verbose{Verbosity::Some};
 
   Eigen::MatrixXd dF_bar{Eigen::MatrixXd::Zero(Dim, Dim)};
   dF_bar(0, 1) = 1.;

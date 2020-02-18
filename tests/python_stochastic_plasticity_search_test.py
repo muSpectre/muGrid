@@ -146,7 +146,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         self.cg_tol           = 1e-6 #tolerance for cg algo
         self.newton_equil_tol = 1e-6 #tolerance for equilibrium
         self.maxiter          = 100
-        self.verbose          = 0
+        self.verbose          = µ.Verbosity.Silent
 
         #stochastic plasticity maximum and accuracy parameters
         self.yield_surface_accuracy = 1e-6

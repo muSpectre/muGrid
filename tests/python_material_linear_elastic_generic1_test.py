@@ -88,7 +88,7 @@ class MaterialLinearElasticGeneric1_Check(unittest.TestCase):
         tol = 1e-6
         equil_tol = tol
         maxiter = 100
-        verbose = 0
+        verbose = µ.Verbosity.Silent
 
         solver1 = µ.solvers.KrylovSolverCG(self.cell1, tol, maxiter, verbose)
         solver2 = µ.solvers.KrylovSolverCG(self.cell2, tol, maxiter, verbose)

@@ -44,7 +44,7 @@ namespace muSpectre {
   template <class KrylovSolverType>
   KrylovSolverEigen<KrylovSolverType>::KrylovSolverEigen(Cell & cell, Real tol,
                                                          Uint maxiter,
-                                                         bool verbose)
+                                                         Verbosity verbose)
       : Parent(cell, tol, maxiter, verbose), adaptor{cell.get_adaptor()},
         solver{}, result{} {}
 
@@ -72,7 +72,7 @@ namespace muSpectre {
       throw ConvergenceError(err.str());
     }
 
-    if (this->verbose) {
+    if (verbose > Verbosity::Silent) {
       std::cout << " After " << this->solver.iterations() << " "
                 << this->get_name() << " steps, |r|/|b| = " << std::setw(15)
                 << this->solver.error() << ", cg_tol = " << this->tol

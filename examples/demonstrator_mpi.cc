@@ -141,11 +141,11 @@ int main(int argc, char * argv[]) {
 
     Eigen::MatrixXd DeltaF{Eigen::MatrixXd::Zero(dim, dim)};
     DeltaF(0, 1) = .1;
-    Dim_t verbose{1};
+    Verbosity verbose{Verbosity::Some};
 
     auto start = std::chrono::high_resolution_clock::now();
     LoadSteps_t grads{DeltaF};
-    KrylovSolverCG cg{cell, cg_tol, maxiter, static_cast<bool>(verbose)};
+    KrylovSolverCG cg{cell, cg_tol, maxiter, verbose};
     de_geus(cell, grads, cg, newton_tol, verbose);
     std::chrono::duration<Real> dur =
         std::chrono::high_resolution_clock::now() - start;

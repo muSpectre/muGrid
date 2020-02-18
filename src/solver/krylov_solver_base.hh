@@ -65,7 +65,8 @@ namespace muSpectre {
      * Constructor takes a Cell, tolerance, max number of iterations
      * and verbosity flag as input
      */
-    KrylovSolverBase(Cell & cell, Real tol, Uint maxiter, bool verbose = false);
+    KrylovSolverBase(Cell & cell, Real tol, Uint maxiter,
+                     Verbosity verbose = Verbosity::Silent);
 
     //! Copy constructor
     KrylovSolverBase(const KrylovSolverBase & other) = delete;
@@ -111,7 +112,7 @@ namespace muSpectre {
     Cell & cell;            //!< reference to the problem's cell
     Real tol;               //!< convergence tolerance
     Uint maxiter;           //!< maximum allowed number of iterations
-    bool verbose;           //!< whether to write information to the stdout
+    Verbosity verbose;      //!< how much information is written to the stdout
     Uint counter{0};        //!< iteration counter
     bool converged{false};  //!< whether the solver has converged
   };

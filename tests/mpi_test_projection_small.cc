@@ -152,7 +152,7 @@ namespace muFFT {
     fix::projector.initialise(FFT_PlanFlags::estimate);
     fix::projector.apply_projection(f_var);
 
-    constexpr bool verbose{false};
+    constexpr Verbosity verbose{Verbosity::Silent};
     for (auto && tup : akantu::zip(fields.get_pixels(), grad, var)) {
       auto & ccoord = std::get<0>(tup);
       auto & g = std::get<1>(tup);
@@ -162,7 +162,7 @@ namespace muFFT {
                       fix::projector.get_nb_domain_grid_pts());
       Real error = (g - v).norm();
       BOOST_CHECK_LT(error, tol);
-      if ((error >= tol) || verbose) {
+      if ((error >= tol) || verbose > Verbosity::Silent) {
         std::cout << std::endl << "grad_ref :" << std::endl << g << std::endl;
         std::cout << std::endl << "grad_proj :" << std::endl << v << std::endl;
         std::cout << std::endl

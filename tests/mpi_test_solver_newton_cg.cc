@@ -91,17 +91,15 @@ namespace muSpectre {
     constexpr Real cg_tol{1e-8}, newton_tol{1e-5};
     constexpr Uint maxiter{muGrid::CcoordOps::get_size(nb_grid_pts) *
                            muGrid::ipow(dim, secondOrder) * 10};
-    constexpr bool verbose{false};
+    constexpr Verbosity verbose{Verbosity::Silent};
 
     GradIncrements<dim> grads;
     grads.push_back(delF0);
-    DeprecatedSolverCG<dim> cg{sys, cg_tol, maxiter,
-                               static_cast<bool>(verbose)};
+    DeprecatedSolverCG<dim> cg{sys, cg_tol, maxiter, verbose};
     Eigen::ArrayXXd res1{
         deprecated_de_geus(sys, grads, cg, newton_tol, verbose)[0].grad};
 
-    DeprecatedSolverCG<dim> cg2{sys, cg_tol, maxiter,
-                                static_cast<bool>(verbose)};
+    DeprecatedSolverCG<dim> cg2{sys, cg_tol, maxiter, verbose};
     Eigen::ArrayXXd res2{
         deprecated_newton_cg(sys, grads, cg2, newton_tol, verbose)[0].grad};
     BOOST_CHECK_LE(abs(res1 - res2).mean(), cg_tol);
@@ -150,13 +148,12 @@ namespace muSpectre {
 
     constexpr Real cg_tol{1e-8}, newton_tol{1e-5}, equil_tol{1e-10};
     constexpr Uint maxiter{dim * 10};
-    constexpr Dim_t verbose{0};
+    constexpr Verbosity verbose{Verbosity::Silent};
 
-    DeprecatedSolverCGEigen<dim> cg{sys, cg_tol, maxiter,
-                                    static_cast<bool>(verbose)};
+    DeprecatedSolverCGEigen<dim> cg{sys, cg_tol, maxiter, verbose};
     auto result =
         deprecated_de_geus(sys, delEps0, cg, newton_tol, equil_tol, verbose);
-    if (verbose) {
+    if (verbose > Verbosity::Silent) {
       std::cout << "result:" << std::endl << result.grad << std::endl;
       std::cout << "mean strain = " << std::endl
                 << sys.get_strain().get_map().mean() << std::endl;
@@ -179,7 +176,7 @@ namespace muSpectre {
                           nb_lays / Real(nb_grid_pts[0])};
     constexpr Real eps_soft{eps0 / factor};
     constexpr Real eps_hard{eps_soft / contrast};
-    if (verbose) {
+    if (verbose > Verbosity::Silent) {
       std::cout << "εₕ = " << eps_hard << ", εₛ = " << eps_soft << std::endl;
       std::cout << "ε = εₕ Nₕ/Nₜₒₜ + εₛ (Nₜₒₜ-Nₕ)/Nₜₒₜ" << std::endl;
     }
@@ -202,8 +199,7 @@ namespace muSpectre {
     delEps0 = Grad_t<dim>::Zero();
     delEps0(0, 1) = delEps0(1, 0) = eps0;
 
-    DeprecatedSolverCG<dim> cg2{sys, cg_tol, maxiter,
-                                static_cast<bool>(verbose)};
+    DeprecatedSolverCG<dim> cg2{sys, cg_tol, maxiter, verbose};
     result =
         deprecated_newton_cg(sys, delEps0, cg2, newton_tol, equil_tol, verbose);
     Eps_hard << 0, eps_hard, eps_hard, 0;

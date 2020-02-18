@@ -180,12 +180,12 @@ int small_sym(int argc, char * argv[]) {
   Eigen::MatrixXd DeltaF{Eigen::MatrixXd::Zero(Dim, Dim)};
   DeltaF(0, 1) = .1;
   DeltaF(1, 0) = .1;
-  Dim_t verbose{1};
+  Verbosity verbose{Verbosity::Some};
 
   auto start = std::chrono::high_resolution_clock::now();
   LoadSteps_t loads{DeltaF};
 
-  KrylovSolverCG cg{cell, cg_tol, maxiter, static_cast<bool>(verbose)};
+  KrylovSolverCG cg{cell, cg_tol, maxiter, verbose};
   newton_cg(cell, loads, cg, newton_tol, stress_tol, verbose);
 
   std::chrono::duration<Real> dur =

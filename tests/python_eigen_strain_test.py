@@ -105,7 +105,8 @@ class EigenStrainCheck(unittest.TestCase):
         Del0_1 = grad
         Del0_2 = np.zeros_like(grad)
         maxiter = 2
-        verbose = 0
+        verbose = µ.Verbosity.Silent
+
 
         def solve(cell, grad):
             solver = µ.solvers.KrylovSolverCG(

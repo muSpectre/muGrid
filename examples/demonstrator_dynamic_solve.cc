@@ -130,16 +130,17 @@ int main(int argc, char * argv[]) {
 
   constexpr Real newton_tol{1e-4};
   constexpr Real cg_tol{1e-7};
+  constexpr Real equi_tol{0};
   const Uint maxiter = nb_dofs;
 
   Eigen::MatrixXd DeltaF{Eigen::MatrixXd::Zero(Dim, Dim)};
   DeltaF(0, 1) = .1;
-  Dim_t verbose{1};
+  constexpr Verbosity verbose{Verbosity::Some};
 
   auto start = std::chrono::high_resolution_clock::now();
   LoadSteps_t loads{DeltaF};
-  KrylovSolverCG cg{cell, cg_tol, maxiter, static_cast<bool>(verbose)};
-  newton_cg(cell, loads, cg, newton_tol, verbose);
+  KrylovSolverCG cg{cell, cg_tol, maxiter, verbose};
+  newton_cg(cell, loads, cg, newton_tol, equi_tol, verbose);
   std::chrono::duration<Real> dur =
       std::chrono::high_resolution_clock::now() - start;
   std::cout << "Resolution time = " << dur.count() << "s" << std::endl;

@@ -53,7 +53,7 @@ namespace muSpectre {
   std::vector<OptimizeResult>
   newton_cg(Cell & cell, const LoadSteps_t & load_steps,
             KrylovSolverBase & solver, Real newton_tol, Real equil_tol,
-            Dim_t verbose, IsStrainInitialised strain_init) {
+            Verbosity verbose, IsStrainInitialised strain_init) {
     const auto & comm = cell.get_communicator();
 
     using Matrix_t = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
@@ -76,7 +76,7 @@ namespace muSpectre {
     size_t count_width{};
     const auto form{cell.get_formulation()};
     std::string strain_symb{};
-    if (verbose > 0 && comm.rank() == 0) {
+    if (verbose > Verbosity::Silent && comm.rank() == 0) {
       // setup of algorithm 5.2 in Nocedal, Numerical Optimization (p. 111)
       std::cout << "Newton-" << solver.get_name() << " for ";
       switch (form) {
@@ -117,12 +117,12 @@ namespace muSpectre {
         default_strain_val = Matrix_t::Identity(shape[0], shape[1]);
         cell.set_uniform_strain(default_strain_val);
 
-        if (verbose > 0 && comm.rank() == 0) {
+        if (verbose > Verbosity::Silent && comm.rank() == 0) {
           std::cout << "\nThe strain is initialised by default to the identity "
                        "matrix!\n"
                     << std::endl;
         }
-      } else if (verbose > 0 && comm.rank() == 0 &&
+      } else if (verbose > Verbosity::Silent && comm.rank() == 0 &&
                  strain_init == IsStrainInitialised::True) {
         std::cout << "\nThe strain was initialised by the user!\n" << std::endl;
       }
@@ -145,12 +145,12 @@ namespace muSpectre {
         // strain
         default_strain_val = Matrix_t::Zero(shape[0], shape[1]);
         cell.set_uniform_strain(default_strain_val);
-        if (verbose > 0 && comm.rank() == 0) {
+        if (verbose > Verbosity::Silent && comm.rank() == 0) {
           std::cout << "\nThe strain is initialised by default to the zero "
                        "matrix!\n"
                     << std::endl;
         }
-      } else if (verbose > 0 && comm.rank() == 0 &&
+      } else if (verbose > Verbosity::Silent && comm.rank() == 0 &&
                  strain_init == IsStrainInitialised::True) {
         std::cout << "\nThe strain was initialised by the user!\n" << std::endl;
       }
@@ -186,7 +186,7 @@ namespace muSpectre {
     for (const auto & tup : akantu::enumerate(load_steps)) {
       const auto & strain_step{std::get<0>(tup)};
       const auto & macro_strain{std::get<1>(tup)};
-      if ((verbose > 0) and (comm.rank() == 0)) {
+      if ((verbose > Verbosity::Silent) and (comm.rank() == 0)) {
         std::cout << "at Load step " << std::setw(count_width)
                   << strain_step + 1 << std::endl;
       }
@@ -261,17 +261,17 @@ namespace muSpectre {
         incr_norm = std::sqrt(comm.sum(incrF.eigen_vec().squaredNorm()));
         grad_norm = std::sqrt(comm.sum(F.eigen_vec().squaredNorm()));
 
-        if ((verbose > 1) and (comm.rank() == 0)) {
+        if ((verbose >= Verbosity::Detailed) and (comm.rank() == 0)) {
           std::cout << "at Newton step " << std::setw(count_width) << newt_iter
                     << ", |δ" << strain_symb << "|/|Δ" << strain_symb
                     << "| = " << std::setw(17) << incr_norm / grad_norm
                     << ", tol = " << newton_tol << std::endl;
 
-          if (verbose - 1 > 1) {
             using StrainMap_t = muGrid::FieldMap<Real, Mapping::Const>;
-            std::cout << "<" << strain_symb << "> =" << std::endl
+            if (verbose > Verbosity::Detailed) {
+              std::cout << "<" << strain_symb << "> =" << std::endl
                       << StrainMap_t{F, shape[0]}.mean() << std::endl;
-          }
+            }
         }
         convergence_test();
       }
@@ -308,7 +308,7 @@ namespace muSpectre {
   std::vector<OptimizeResult>
   de_geus(Cell & cell, const LoadSteps_t & load_steps,
           KrylovSolverBase & solver, Real newton_tol, Real equil_tol,
-          Dim_t verbose, IsStrainInitialised strain_init) {
+          Verbosity verbose, IsStrainInitialised strain_init) {
     const auto & comm = cell.get_communicator();
 
     using Matrix_t = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
@@ -335,7 +335,7 @@ namespace muSpectre {
     size_t count_width{};
     const auto form{cell.get_formulation()};
     std::string strain_symb{};
-    if (verbose > 0 && comm.rank() == 0) {
+    if (verbose > Verbosity::Silent && comm.rank() == 0) {
       // setup of algorithm 5.2 in Nocedal, Numerical Optimization (p. 111)
       std::cout << "de Geus-" << solver.get_name() << " for ";
       switch (form) {
@@ -376,7 +376,12 @@ namespace muSpectre {
         // of finite strain
         default_strain_val = Matrix_t::Identity(shape[0], shape[1]);
         cell.set_uniform_strain(default_strain_val);
-      } else if (verbose > 0 && comm.rank() == 0 &&
+        if (verbose > Verbosity::Silent && comm.rank() == 0) {
+          std::cout << "\nThe strain is initialised by default to the identity "
+                       "matrix!\n"
+                    << std::endl;
+        }
+      } else if (verbose > Verbosity::Silent && comm.rank() == 0 &&
                  strain_init == IsStrainInitialised::True) {
         std::cout << "\nThe strain was initialised by the user!\n" << std::endl;
       }
@@ -402,7 +407,12 @@ namespace muSpectre {
         // strain
         default_strain_val = Matrix_t::Zero(shape[0], shape[1]);
         cell.set_uniform_strain(default_strain_val);
-      } else if (verbose > 0 && comm.rank() == 0 &&
+        if (verbose > Verbosity::Silent && comm.rank() == 0) {
+          std::cout << "\nThe strain is initialised by default to the zero "
+                       "matrix!\n"
+                    << std::endl;
+        }
+      } else if (verbose > Verbosity::Silent && comm.rank() == 0 &&
                  strain_init == IsStrainInitialised::True) {
         std::cout << "\nThe strain was initialised by the user!\n" << std::endl;
       }
@@ -441,7 +451,7 @@ namespace muSpectre {
     for (const auto & tup : akantu::enumerate(load_steps)) {
       const auto & strain_step{std::get<0>(tup)};
       const auto & macro_strain{std::get<1>(tup)};
-      if ((verbose > 0) and (comm.rank() == 0)) {
+      if ((verbose > Verbosity::Silent) and (comm.rank() == 0)) {
         std::cout << "at Load step " << std::setw(count_width)
                   << strain_step + 1 << ", " << strain_symb << " =" << std::endl
                   << (macro_strain + default_strain_val).format(format)
@@ -526,13 +536,13 @@ namespace muSpectre {
         incr_norm = std::sqrt(comm.sum(incrF.eigen_vec().squaredNorm()));
         grad_norm = std::sqrt(comm.sum(F.eigen_vec().squaredNorm()));
 
-        if ((verbose > 0) and (comm.rank() == 0)) {
+        if ((verbose >= Verbosity::Detailed) and (comm.rank() == 0)) {
           std::cout << "at Newton step " << std::setw(count_width) << newt_iter
                     << ", |δ" << strain_symb << "|/|Δ" << strain_symb
                     << "| = " << std::setw(17) << incr_norm / grad_norm
                     << ", tol = " << newton_tol << std::endl;
 
-          if (verbose - 1 > 1) {
+          if (verbose > Verbosity::Detailed) {
             using StrainMap_t = muGrid::FieldMap<Real, Mapping::Const>;
             std::cout << "<" << strain_symb << "> =" << std::endl
                       << StrainMap_t{F, shape[0]}.mean() << std::endl;

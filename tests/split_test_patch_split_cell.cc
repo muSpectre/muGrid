@@ -114,17 +114,19 @@ namespace muSpectre {
 
     Grad_t<dim> delF0{Grad_t<dim>::Zero()};
     delF0 << 0, 1, 0, 0;
-    constexpr Real cg_tol{1e-8}, newton_tol{1e-5};
+    constexpr Real cg_tol{1e-8}, newton_tol{1e-5}, equi_tol{0};
     auto && maxiter{
         (unsigned int)muGrid::CcoordOps::get_size(nb_grid_pts_split) *
         muGrid::ipow(dim, secondOrder) * 10};
-    constexpr bool verbose{false};
+    constexpr Verbosity verbose{Verbosity::Silent};
 
-    KrylovSolverCG cg2{sys_base, cg_tol, maxiter, static_cast<bool>(verbose)};
-    auto && res2{newton_cg(sys_base, delF0, cg2, newton_tol, verbose).grad};
+    KrylovSolverCG cg2{sys_base, cg_tol, maxiter, verbose};
+    auto && res2{newton_cg(sys_base, delF0, cg2, newton_tol, equi_tol,
+                           verbose).grad};
 
-    KrylovSolverCG cg1{sys_split, cg_tol, maxiter, static_cast<bool>(verbose)};
-    auto && res1{newton_cg(sys_split, delF0, cg1, newton_tol, verbose).grad};
+    KrylovSolverCG cg1{sys_split, cg_tol, maxiter, verbose};
+    auto && res1{newton_cg(sys_split, delF0, cg1, newton_tol, equi_tol,
+                           verbose).grad};
     auto && diff{(res1 - res2).eval()};
 
     BOOST_CHECK_LE(abs(diff).mean(), cg_tol);

@@ -131,7 +131,7 @@ namespace muSpectre {
 
     //! Constructor with cell and solver parameters.
     KrylovSolverEigen(Cell & cell, Real tol, Uint maxiter = 0,
-                      bool verbose = false);
+                      Verbosity verbose = Verbosity::Silent);
 
     //! Copy constructor
     KrylovSolverEigen(const KrylovSolverEigen & other) = delete;

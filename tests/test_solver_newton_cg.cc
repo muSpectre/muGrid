@@ -103,9 +103,9 @@ namespace muSpectre {
 
     constexpr Real cg_tol{1e-8}, newton_tol{1e-5}, equil_tol{1e-10};
     constexpr Uint maxiter{Dim * 10};
-    constexpr Dim_t verbose{0};
+    constexpr Verbosity verbose{Verbosity::Silent};
 
-    type cg{cell, cg_tol, maxiter, static_cast<bool>(verbose)};
+    type cg{cell, cg_tol, maxiter, verbose};
     auto result = newton_cg(cell, delEps0, cg, newton_tol, equil_tol, verbose);
   }
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(small_strain_patch_dynamic_solver, Fix,
@@ -149,12 +149,12 @@ namespace muSpectre {
 
     constexpr Real cg_tol{1e-8}, newton_tol{1e-5}, equil_tol{1e-10};
     constexpr Uint maxiter{Dim * 10};
-    constexpr Dim_t verbose{0};
+    constexpr Verbosity verbose{Verbosity::Silent};
 
     using KrylovSolver_t = typename Fix::type;
-    KrylovSolver_t cg{cell, cg_tol, maxiter, static_cast<bool>(verbose)};
+    KrylovSolver_t cg{cell, cg_tol, maxiter, verbose};
     auto result = newton_cg(cell, delEps0, cg, newton_tol, equil_tol, verbose);
-    if (verbose) {
+    if (verbose > Verbosity::Silent) {
       std::cout << "result:" << std::endl << result.grad << std::endl;
       std::cout << "mean strain = " << std::endl
                 << cell.get_strain().get_quad_pt_map().mean() << std::endl;
@@ -177,7 +177,7 @@ namespace muSpectre {
                       nb_lays / Real(nb_grid_pts[0])};
     const Real eps_soft{eps0 / factor};
     const Real eps_hard{eps_soft / contrast};
-    if (verbose) {
+    if (verbose > Verbosity::Silent) {
       std::cout << "εₕ = " << eps_hard << ", εₛ = " << eps_soft << std::endl;
       std::cout << "ε = εₕ Nₕ/Nₜₒₜ + εₛ (Nₜₒₜ-Nₕ)/Nₜₒₜ" << std::endl;
     }
@@ -205,7 +205,7 @@ namespace muSpectre {
     delEps0 = Grad_t<Dim>::Zero();
     delEps0(0, 1) = delEps0(1, 0) = eps0;
 
-    KrylovSolver_t cg2{cell, cg_tol, maxiter, static_cast<bool>(verbose)};
+    KrylovSolver_t cg2{cell, cg_tol, maxiter, verbose};
     result = de_geus(cell, delEps0, cg2, newton_tol, equil_tol, verbose);
     Eps_hard << 0, eps_hard, eps_hard, 0;
     Eps_soft << 0, eps_soft, eps_soft, 0;
@@ -267,12 +267,12 @@ namespace muSpectre {
 
     constexpr Real cg_tol{1e-8}, newton_tol{1e-5}, equil_tol{1e-10};
     constexpr Uint maxiter{Dim * 10};
-    constexpr Dim_t verbose{0};
+    constexpr Verbosity verbose{Verbosity::Silent};
 
     using KrylovSolver_t = typename Fix::type;
-    KrylovSolver_t cg{cell, cg_tol, maxiter, static_cast<bool>(verbose)};
+    KrylovSolver_t cg{cell, cg_tol, maxiter, verbose};
     auto result = newton_cg(cell, delEps0, cg, newton_tol, equil_tol, verbose);
-    if (verbose) {
+    if (verbose > Verbosity::Silent) {
       std::cout << "result:" << std::endl << result.grad << std::endl;
       std::cout << "mean strain = " << std::endl
                 << cell.get_strain().get_quad_pt_map().mean() << std::endl;
@@ -295,7 +295,7 @@ namespace muSpectre {
                       nb_lays / Real(nb_grid_pts[0])};
     const Real eps_soft{eps0 / factor};
     const Real eps_hard{eps_soft / contrast};
-    if (verbose) {
+    if (verbose > Verbosity::Silent) {
       std::cout << "εₕ = " << eps_hard << ", εₛ = " << eps_soft << std::endl;
       std::cout << "ε = εₕ Nₕ/Nₜₒₜ + εₛ (Nₜₒₜ-Nₕ)/Nₜₒₜ" << std::endl;
     }
@@ -325,7 +325,7 @@ namespace muSpectre {
     delEps0 = Grad_t<Dim>::Zero();
     delEps0(0, 1) = delEps0(1, 0) = eps0;
 
-    KrylovSolver_t cg2{cell, cg_tol, maxiter, static_cast<bool>(verbose)};
+    KrylovSolver_t cg2{cell, cg_tol, maxiter, verbose};
     result = de_geus(cell, delEps0, cg2, newton_tol, equil_tol, verbose);
     Eps_hard << 0, eps_hard, eps_hard, 0;
     Eps_soft << 0, eps_soft, eps_soft, 0;

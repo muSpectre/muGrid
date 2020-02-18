@@ -66,6 +66,7 @@ set(mugrid_HDRS
 
 set(mugrid_SRCS
   exception.cc
+  grid_common.cc
   ccoord_operations.cc
   field_collection.cc
   field_collection_global.cc

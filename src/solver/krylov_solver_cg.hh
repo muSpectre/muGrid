@@ -71,7 +71,8 @@ namespace muSpectre {
      * Constructor takes a Cell, tolerance, max number of iterations
      * and verbosity flag as input
      */
-    KrylovSolverCG(Cell & cell, Real tol, Uint maxiter, bool verbose = false);
+    KrylovSolverCG(Cell & cell, Real tol, Uint maxiter,
+                   Verbosity verbose = Verbosity::Silent);
 
     //! Move constructor
     KrylovSolverCG(KrylovSolverCG && other) = default;

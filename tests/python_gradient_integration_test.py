@@ -141,9 +141,9 @@ class GradientIntegration_Check(unittest.TestCase):
             for pixel in cell.pixel_indices:
                 mat.add_pixel(pixel)
             solver = µ.solvers.KrylovSolverCG(cell, tol, maxiter=100,
-                                        verbose=0)
+                                              verbose=µ.Verbosity.Silent)
             r = µ.solvers.newton_cg(cell, DelF[:n, :n], solver,
-                                    tol, tol, verbose=0)
+                                    tol, tol, verbose=µ.Verbosity.Silent)
             grad = µ.gradient_integration.reshape_gradient(r.grad, list(res[:n]))
             grad_theo = (DelF[:n, :n] + one[:n, :n]).reshape((n, n,) + (1,)*n)
             self.assertEqual(grad.shape, (n, n,) + tuple(res[:n]))
@@ -340,9 +340,10 @@ class GradientIntegration_Check(unittest.TestCase):
 
         # µSpectre solution
         solver = µ.solvers.KrylovSolverCG(cell, tol=1e-6, maxiter=100,
-                                    verbose=0)
+                                          verbose=µ.Verbosity.Silent)
         result = µ.solvers.newton_cg(cell, DelF, solver,
-                                     newton_tol=1e-6, equil_tol=1e-6, verbose=0)
+                                     newton_tol=1e-6, equil_tol=1e-6,
+                                     verbose=µ.Verbosity.Silent)
         F = µ.gradient_integration.reshape_gradient(result.grad, res)
 
         # muSpectre Fourier integration
@@ -535,9 +536,11 @@ class GradientIntegration_Check(unittest.TestCase):
 
         # µSpectre solution
         fourier_gradient = [µ.FourierDerivative(dim, i) for i in range(dim)]
-        solver = µ.solvers.KrylovSolverCG(cell, tol=1e-6, maxiter=100, verbose=0)
-        result = µ.solvers.newton_cg(cell, DelF, solver,
-                                     newton_tol=1e-6, equil_tol=1e-6, verbose=0)
+        solver = µ.solvers.KrylovSolverCG(cell, tol=1e-6, maxiter=100,
+                                          verbose=µ.Verbosity.Silent)
+        result = µ.solvers.newton_cg(cell, DelF, solver, newton_tol=1e-6,
+                                     equil_tol=1e-6,
+                                     verbose=µ.Verbosity.Silent)
         result_reshaped = µ.gradient_integration.reshape_gradient(
             result.grad, res).flatten()
         for r in [result, result_reshaped]:
@@ -599,7 +602,7 @@ class GradientIntegration_Check(unittest.TestCase):
                 cg_tol = 1e-8  # tolerance for cg algo
                 equil_tol = 1e-8  # tolerance for equilibrium
                 maxiter = 1000
-                verbose = 0
+                verbose = µ.Verbosity.Silent
 
                 solver = µ.solvers.KrylovSolverCG(cell, cg_tol, maxiter,
                                             verbose)

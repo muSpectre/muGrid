@@ -294,10 +294,24 @@ namespace muGrid {
     std::array<T, MaxDim> long_array;
   };
 
-  //! usually, we should not need omre than three dimensions
+  //! usually, we should not need more than three dimensions
   using DynCcoord_t = DynCcoord<threeD>;
-  //! usually, we should not need omre than three dimensions
+  //! usually, we should not need more than three dimensions
   using DynRcoord_t = DynCcoord<threeD, Real>;
+
+  /**
+   * Enum class for verbose-flag
+   */
+  enum class Verbosity { Silent = 0, Some = 1, Detailed = 2, Full = 3 };
+
+  /**
+   * comparison operators for Verbosity-class
+   */
+  bool operator< (const Verbosity v1, const Verbosity v2);
+  bool operator> (const Verbosity v1, const Verbosity v2);
+  bool operator<= (const Verbosity v1, const Verbosity v2);
+  bool operator>= (const Verbosity v1, const Verbosity v2);
+
 
   /**
    * return a Eigen representation of the data stored in a std::array (e.g., for

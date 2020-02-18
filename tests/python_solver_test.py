@@ -66,7 +66,7 @@ class SolverCheck(unittest.TestCase):
         Del0 = np.array([[0, .1],
                          [0,  0]])
         maxiter = 100
-        verbose = 0
+        verbose = µ.Verbosity.Silent
 
         P, K = self.cell.evaluate_stress_tangent(self.cell.strain)
 
