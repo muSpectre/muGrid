@@ -1,13 +1,11 @@
 ## Most of the following is copied from https://github.com/tdegeus/GooseFFT (MIT license)
 
+import sys
 import numpy as np
 import scipy.sparse.linalg as sp
 import itertools
 
-import os
-import sys
-sys.path.append(os.path.join(os.getcwd(), "language_bindings/python"))
-import muSpectre as µ
+from python_example_imports import muSpectre as µ
 
 
 # ----------------------------------- GRID ------------------------------------
@@ -16,10 +14,13 @@ ndim   = 2            # number of dimensions
 N      = 31 #31  # number of voxels (assumed equal for all directions)
 offset = 3 #9
 ndof   = ndim**2*N**2 # number of degrees-of-freedom
+nb_grid_pts = [N, N]
+lengths = [1. , 1.]
+formulation = µ.Formulation.small_strain
 
-cell = µ.Cell(µ.get_2d_cube(N),
-              µ.get_2d_cube(1.),
-              µ.Formulation.small_strain)
+cell = µ.Cell(nb_grid_pts, lengths, formulation)
+center = np.array([r // 2 for r in nb_grid_pts])
+incl = nb_grid_pts[0] // 5
 
 # ---------------------- PROJECTION, TENSORS, OPERATIONS ----------------------
 
@@ -80,10 +81,10 @@ G_K_deps = lambda depsm: G(K_deps(depsm))
 E2, E1 = 75e10, 70e9
 poisson = .33
 
-hard = µ.material.MaterialHooke2d.make(cell.wrapped_cell, "hard",
-                                       E2, poisson)
-soft = µ.material.MaterialHooke2d.make(cell.wrapped_cell, "soft",
-                                       E1, poisson)
+hard = µ.material.MaterialLinearElastic1_2d.make(cell, "hard",
+                                                 E2, poisson)
+soft = µ.material.MaterialLinearElastic1_2d.make(cell, "soft",
+                                                 E1, poisson)
 
 #for pixel in cell:
 #    if ((pixel[0] >= N-offset) and
@@ -96,14 +97,14 @@ phase  = np.zeros(shape); phase[-offset:,:offset,] = 1.
 phase  = np.zeros(shape); phase[0,:] = 1.
 
 phase  = np.zeros(shape);
-for i, j in itertools.product(range(N),   repeat=ndim):
+
+for i, pixel in cell.pixels.enumerate():
     c = N//2
-    if (i-c)**2 + (j-c)**2 < (N//5)**2:
-    #if j<10:
-        phase[i,j] = 1.
-        hard.add_pixel([i,j])
+    if np.linalg.norm(center - np.array(pixel), 2) < incl:
+        phase[pixel[0],pixel[1]] = 1.
+        hard.add_pixel(i)
     else:
-        soft.add_pixel([i,j])
+        soft.add_pixel(i)
 # material parameters + function to convert to grid of scalars
 param  = lambda M0,M1: M0*np.ones(shape)*(1.-phase)+M1*np.ones(shape)*phase
 # K      = param(0.833,8.33)  # bulk  modulus                   [grid of scalars]
@@ -131,10 +132,9 @@ DE[0,1] += 0.01
 DE[1,0] += 0.01
 delEps0 = DE[:ndim, :ndim, 0, 0]
 
-µDE = np.zeros([ndim**2, cell.size()])
+µDE = np.zeros([ndim**2, cell.nb_pixels])
+µDE = np.zeros ((ndim, ndim) + (N, N))
 cell.evaluate_stress_tangent(µDE);
-µDE[:,:] = DE[:,:,0,0].reshape([-1, 1])
-
 
 # initial residual: distribute "DE" over grid using "K4"
 b        = -G_K_deps(DE)
@@ -158,21 +158,29 @@ class accumul(object):
 
 acc = accumul()
 cg_tol = 1e-8
+tol = 1e-5
+equi_tol = 1e-5
 maxiter = 60
-solver = µ.solvers.KrylovSolverCGEigen(cell.wrapped_cell, cg_tol, maxiter, verbose=True)
-solver = µ.solvers.KrylovSolverCG(cell.wrapped_cell, cg_tol, maxiter, verbose=True)
+solver = µ.solvers.KrylovSolverCGEigen(cell, cg_tol, maxiter,
+                                       verbose=µ.Verbosity.Silent)
+# solver = µ.solvers.KrylovSolverCG(cell, cg_tol, maxiter, verbose=True)
+print(delEps0.shape)
 try:
-    r = µ.solvers.newton_cg(cell.wrapped_cell, delEps0, solver, 1e-5, verbose=True)
+    r = µ.solvers.newton_cg(cell, delEps0, solver, tol, equi_tol,
+                            verbose=µ.Verbosity.Silent)
 except Exception as err:
     print(err)
+
 while True:
     depsm,_ = sp.cg(tol=cg_tol,
-                    A = sp.LinearOperator(shape=(ndof,ndof),matvec=G_K_deps,dtype='float'),
+                    A = sp.LinearOperator(shape=(ndof,ndof),matvec=G_K_deps,
+                                          dtype='float'),
                     b = b,
                     callback=acc
     )                                     # solve linear cell using CG
     #depsm2,_ = sp.cg(tol=1.e-8,
-    #                 A = sp.LinearOperator(shape=(ndof,ndof),matvec=G_K_deps2,dtype='float'),
+    #                 A = sp.LinearOperator(shape=(ndof,ndof),
+    #                                       matvec=G_K_deps2,dtype='float'),
     #                 b = b2,
     #                 callback=acc
     #)                                     # solve linear cell using CG
@@ -186,43 +194,42 @@ while True:
 
 print("nb_cg: {0}".format(acc.counter))
 
-import matplotlib.pyplot as plt
-
-
-s11 = sig[0,0, :,:]
-s22 = sig[1,1, :,:]
-s21_2 = sig[0,1, :, :]*sig[1,0,:, :]
-vonM1 = np.sqrt(.5*((s11-s22)**2) + s11**2 + s22**2 + 6*s21_2)
-
-#vonM1 = np.sqrt(sig[0, 0, :, :]**2 + sig[1, 1, :, :]**2 - sig[0, 0, :, :] * sig[1, 1, :, :] + 3 * sig[0,1]**2)
-
-plt.figure()
-img = plt.pcolormesh(vonM1)#eps[0,1,:,:])
-plt.title("goose")
-plt.colorbar(img)
-
-try:
-    print(r.stress.shape)
-    arr = r.stress.T.reshape(N, N, ndim, ndim)
-    s11 = arr[:,:,0,0]
-    s22 = arr[:,:,1,1]
-    s21_2 = arr[:,:,0,1]*arr[:,:,1,0]
-    vonM2 = np.sqrt(.5*((s11-s22)**2) + s11**2 + s22**2 + 6*s21_2)
+# prevent visual output during ctest
+if len(sys.argv[:]) == 2:
+    if sys.argv[1] != 1:
+        pass
+else:
+    import matplotlib.pyplot as plt
+    s11 = sig[0,0, :,:]
+    s22 = sig[1,1, :,:]
+    s21_2 = sig[0,1, :, :]*sig[1,0,:, :]
+    vonM1 = np.sqrt(.5*((s11-s22)**2) + s11**2 + s22**2 + 6*s21_2)
 
     plt.figure()
-    plt.title("µSpectre")
-    img = plt.pcolormesh(vonM2)#eps[0,1,:,:])
+    img = plt.pcolormesh(vonM1)#eps[0,1,:,:])
+    plt.title("goose")
     plt.colorbar(img)
-    print("err = {}".format (np.linalg.norm(vonM1-vonM2)))
-    print("err2 = {}".format (np.linalg.norm(vonM1-vonM1.T)))
-    print("err3 = {}".format (np.linalg.norm(vonM2-vonM2.T)))
 
-    plt.figure()
-    plt.title("diff")
-    img = plt.pcolormesh(vonM1-vonM2.T)#eps[0,1,:,:])
-    plt.colorbar(img)
-except Exception as err:
-    print(err)
+    try:
+        print(r.stress.shape)
+        arr = r.stress.T.reshape(N, N, ndim, ndim)
+        s11 = arr[:,:,0,0]
+        s22 = arr[:,:,1,1]
+        s21_2 = arr[:,:,0,1]*arr[:,:,1,0]
+        vonM2 = np.sqrt(.5*((s11-s22)**2) + s11**2 + s22**2 + 6*s21_2)
 
+        plt.figure()
+        plt.title("µSpectre")
+        img = plt.pcolormesh(vonM2)#eps[0,1,:,:])
+        plt.colorbar(img)
+        print("err = {}".format (np.linalg.norm(vonM1-vonM2)))
+        print("err2 = {}".format (np.linalg.norm(vonM1-vonM1.T)))
+        print("err3 = {}".format (np.linalg.norm(vonM2-vonM2.T)))
 
-plt.show()
+        plt.figure()
+        plt.title("diff")
+        img = plt.pcolormesh(vonM1-vonM2.T)#eps[0,1,:,:])
+        plt.colorbar(img)
+    except Exception as err:
+        print(err)
+        plt.show()

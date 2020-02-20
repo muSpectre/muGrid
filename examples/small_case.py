@@ -34,21 +34,12 @@ with proprietary FFT implementations or numerical libraries, containing parts
 covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
-import sys
-
-import os
-
-from python_test_imports import µ
-
-
-
+from python_example_imports import muSpectre as µ
 import numpy as np
 
-sys.path.append(os.path.join(os.getcwd(), "language_bindings/python"))
-sys.path.append(os.path.join(os.getcwd(), "language_bindings/libmufft/python"))
 
 
-nb_grid_pts = [51, 51]
+nb_grid_pts = [31, 31]
 center = np.array([r//2 for r in nb_grid_pts])
 incl = nb_grid_pts[0]//5
 
@@ -70,8 +61,9 @@ for i, pixel in rve.pixels.enumerate():
     else:
         soft.add_pixel(i)
 
-tol = 1e-5
+newton_tol = 1e-5
 cg_tol = 1e-8
+equil_tol = 1e-8
 
 Del0 = np.array([[.0, .0],
                  [0,  .03]])
@@ -83,19 +75,21 @@ verbose = 2
 for solvclass in (µ.solvers.KrylovSolverCG,
                   µ.solvers.KrylovSolverCGEigen,
                   µ.solvers.KrylovSolverBiCGSTABEigen,
-                  µ.solvers.KrylovSolverGMRESEigen,
+                  #µ.solvers.KrylovSolverGMRESEigen,
                   µ.solvers.KrylovSolverDGMRESEigen,
                   µ.solvers.KrylovSolverMINRESEigen):
     print()
     try:
-        solver = solvclass(rve, cg_tol, maxiter, verbose=False)
-        r = µ.solvers.newton_cg(rve, Del0, solver, tol, verbose)
+        solver = solvclass(rve, cg_tol, maxiter, verbose=µ.Verbosity.Silent)
+        r = µ.solvers.newton_cg(rve, Del0, solver, newton_tol,
+                                equil_tol, verbose=µ.Verbosity.Detailed)
         print("nb of {} iterations: {}".format(solver.name, r.nb_fev))
     except RuntimeError as err:
         print(err)
     try:
-        solver = solvclass(rve, cg_tol, maxiter, verbose=False)
-        r = µ.solvers.de_geus(rve, Del0, solver, tol, verbose)
+        solver = solvclass(rve, cg_tol, maxiter, verbose=µ.Verbosity.Silent)
+        r = µ.solvers.de_geus(rve, Del0, solver, newton_tol,
+                              equil_tol, verbose=µ.Verbosity.Some)
         print("nb of {} iterations: {}".format(solver.name, r.nb_fev))
     except RuntimeError as err:
         print(err)

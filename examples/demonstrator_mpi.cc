@@ -136,6 +136,7 @@ int main(int argc, char * argv[]) {
     cell.initialise(muFFT::FFT_PlanFlags::measure);
 
     constexpr Real newton_tol{1e-4};
+    constexpr Real equil_tol{1e-7};
     constexpr Real cg_tol{1e-7};
     const Uint maxiter = nb_dofs;
 
@@ -146,7 +147,7 @@ int main(int argc, char * argv[]) {
     auto start = std::chrono::high_resolution_clock::now();
     LoadSteps_t grads{DeltaF};
     KrylovSolverCG cg{cell, cg_tol, maxiter, verbose};
-    de_geus(cell, grads, cg, newton_tol, verbose);
+    de_geus(cell, grads, cg, newton_tol, equil_tol, verbose);
     std::chrono::duration<Real> dur =
         std::chrono::high_resolution_clock::now() - start;
     if (comm.rank() == 0) {

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
-@file   visualisation_example.py
+@file   visualisation_example_finite_strain.py
 
 @author Richard Leute <richard.leute@imtek.uni-freiburg.de>
 
@@ -37,10 +37,9 @@ covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
 
-
-import muSpectre.vtk_export as vt_ex
-import muSpectre.gradient_integration as gi
-import muSpectre as µ
+from python_example_imports import muSpectre_vtk_export as vt_ex
+from python_example_imports import muSpectre_gradient_integration as gi
+from python_example_imports import muSpectre as µ
 import numpy as np
 import sys
 import os
@@ -50,8 +49,25 @@ sys.path.append("language_bindings/python/")
 ### Input parameters ###
 #----------------------#
 # general
-nb_grid_pts = [71, 71, 3]
-lengths = [1.0, 1.0, 0.2]
+if len(sys.argv) == 4:
+    nb_grid_pts = [int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])]
+    print("\nYour input grid is: ", nb_grid_pts)
+elif len(sys.argv) == 1:
+    nb_grid_pts = [51, 51, 3]
+    print("\nYou can give a different grid size as input parameters:\n"
+          "$ python3 visualisation_example_finite_strain.py nx ny nz\n"
+          "Where nx, ny and nz are the number of gridpoints in the spatial"
+          "directions x,y,z.\nCaution nx, ny > 5 is required for this example.")
+else:
+    print("\nYou can either run this example with no input parameters or\n"
+          "you can give a 3D grid size as input parameters:\n"
+          "$ python3 visualisation_example_finite_strain.py nx ny nz\n"
+          "e.g.:\n",
+          "$ python3 visualisation_example_finite_strain.py 51 51 3\n"
+          "Where nx, ny and nz are the number of gridpoints in the spatial"
+          "directions x,y,z.\nCaution nx, ny > 9 is required for this example.")
+lengths = [1.0, 1.0, 1.0]
+dim = len(nb_grid_pts)
 Nx, Ny, Nz = nb_grid_pts
 formulation = µ.Formulation.finite_strain
 Young = [10, 20]  # Youngs modulus for each phase
@@ -65,9 +81,9 @@ maxiter = 100
 verbose = 0
 
 # sinusoidal bump
-d = 10  # thickness of the phase with higher elasticity in pixles
+d = int(nb_grid_pts[1]*0.2) #thickness of the phase with higher elasticity in pixles
 l = Nx//3  # length of bump
-h = Ny//4  # height of bump
+h = Ny//5  # height of bump
 
 low_y = (Ny-d)//2  # lower y-boundary of phase
 high_y = low_y+d  # upper y-boundary of phase
@@ -88,27 +104,28 @@ phase[left_x:right_x, high_y:high_y+h, :] = xy_bump
 
 ### Run muSpectre ###
 #-------------------#
-cell = µ.Cell(nb_grid_pts,
-              lengths,
-              formulation)
-mat = µ.material.MaterialLinearElastic4_3d.make(cell.wrapped_cell, "material")
+fourier_gradient = [µ.FourierDerivative(dim , i) for i in range(dim)]
+cell = µ.Cell(nb_grid_pts, lengths, formulation, fourier_gradient)
+mat = µ.material.MaterialLinearElastic4_3d.make(cell, "material")
 
-for i, pixel in enumerate(cell):
+for pixel_id, pixel in cell.pixels.enumerate():
     # add Young and Poisson depending on the material index
-    m_i = phase.flatten(order='F')[i]  # m_i = material index / phase index
-    mat.add_pixel(pixel, Young[m_i], Poisson[m_i])
+    m_i = phase.flatten(order='F')[pixel_id]  # m_i = material index/phase index
+    mat.add_pixel(pixel_id, Young[m_i], Poisson[m_i])
 
 cell.initialise()  # initialization of fft to make faster fft
 DelF = np.array([[0, 0.7, 0],
                  [0, 0, 0],
                  [0, 0, 0]])
 
-solver_newton = µ.solvers.KrylovSolverCG(cell.wrapped_cell, cg_tol, maxiter, verbose)
-result = µ.solvers.newton_cg(cell.wrapped_cell, DelF, solver_newton,
-                             newton_tol, equil_tol, verbose)
+solver_newton = µ.solvers.KrylovSolverCG(cell, cg_tol, maxiter,
+                                         verbose=µ.Verbosity.Silent)
+result = µ.solvers.newton_cg(cell, DelF, solver_newton,
+                             newton_tol, equil_tol,
+                             verbose=µ.Verbosity.Silent)
 
 # print solver results
-print('\n\nstatus messages of OptimizeResults:')
+print('\nstatus messages of optimizeresults:')
 print('-----------------------------------')
 print('success:            ', result.success)
 print('status:             ', result.status)
@@ -118,45 +135,49 @@ print('# cell evaluations: ', result.nb_fev)
 print('formulation:        ', result.formulation)
 
 
-### Visualisation ###
+### visualisation ###
 #-------------------#
 # integration of the deformation gradient field
-placement_n, x = gi.compute_placement(result, lengths, nb_grid_pts, order=0)
+placement_n, x = gi.compute_placement(result, lengths,
+                                      nb_grid_pts, fourier_gradient,
+                                      formulation = formulation)
 
 # some fields which can be added to the visualisation
 # 2-tensor field containing the first Piola Kirchhoff stress
 PK1 = gi.reshape_gradient(result.stress, nb_grid_pts)
+F   = gi.reshape_gradient(result.grad, nb_grid_pts)
+
 # scalar field containing the distance to the origin O
-distance_O = np.linalg.norm(placement_n, axis=-1)
+distance_O = np.linalg.norm(placement_n, axis=0)
 
 # random fields
 # shape of the center point grid
-center_shape = tuple(np.array(x.shape[:-1])-1)
-dim = len(nb_grid_pts)
+center_shape = tuple(np.array(x.shape[1:])-1)
 scalar_c = np.random.random(center_shape)
-vector_c = np.random.random(center_shape + (dim,))
-tensor2_c = np.random.random(center_shape + (dim, dim))
-scalar_n = np.random.random(x.shape[:-1])
-vector_n = np.random.random(x.shape[:-1] + (dim,))
-tensor2_n = np.random.random(x.shape[:-1] + (dim, dim))
+vector_c = np.random.random((dim,) + center_shape)
+tensor2_c = np.random.random((dim, dim) + center_shape)
+scalar_n = np.random.random(x.shape[1:])
+vector_n = np.random.random((dim,) + x.shape[1:])
+tensor2_n = np.random.random((dim, dim) + x.shape[1:])
 
 # write dictionaries with cell data and point data
 c_data = {"scalar field": scalar_c,
           "vector field": vector_c,
           "2-tensor field": tensor2_c,
           "PK1 stress": PK1,
+          "F deformation gradient": F,
           "phase": phase}
 p_data = {"scalar field": scalar_n,
           "vector field": vector_n,
           "2-tensor field": tensor2_n,
           "distance_O": distance_O}
 
-vt_ex.vtk_export(fpath="visualisation_example",
+vt_ex.vtk_export(fpath="visualisation_example_finite_strain",
                  x_n=x,
                  placement=placement_n,
                  point_data=p_data,
                  cell_data=c_data)
 
-print("The file 'visualisation_example.vtr' was successfully written!\n"
+print("\nThe file 'visualisation_example_finite_strain.vtr' was successfully written!\n"
       "You can open it for example with paraview or some other software:\n"
-      "paraview visualisation_example.vtr")
+      "$ paraview visualisation_example_finite_strain.vtr")

@@ -425,7 +425,7 @@ void add_cell_split_helper(py::module & mod) {
             cell.make_automatic_precipitate_split_pixels(precipitate_vertices,
                                                          mat);
           },
-          "material"_a, "vertices"_a)
+          "vertices"_a, "material"_a)
 
       .def(
           "complete_material_assignment",

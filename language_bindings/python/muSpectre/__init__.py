@@ -57,7 +57,7 @@ from _muSpectre import (version,
 
 from muGrid import get_domain_ccoord, get_domain_index
 from _muGrid import Verbosity
-from muFFT import Communicator, FourierDerivative, FFT_PlanFlags
+from muFFT import Communicator, FourierDerivative, DiscreteDerivative, FFT_PlanFlags
 import muSpectre.gradient_integration
 import muSpectre.stochastic_plasticity_search
 from . import vtk_export

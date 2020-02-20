@@ -75,8 +75,12 @@ void add_material_linear_elastic1_helper(py::module & mod) {
           "Poisson"_a)
       .def_static(
           "make_free",
-          [](std::string n, size_t nb_quad_pts, Real e, Real p) -> Mat_ptr {
-            Mat_ptr ret_mat{std::make_shared<Mat_t>(n, dim, nb_quad_pts, e, p)};
+          [](Cell & cell, std::string name, Real Young,
+             Real Poisson) -> Mat_ptr {
+            auto && sdim{cell.get_spatial_dim()};
+            auto && nb_quad_pts{cell.get_nb_quad_pts()};
+            Mat_ptr ret_mat{std::make_shared<Mat_t>(name, sdim, nb_quad_pts,
+                                                    Young, Poisson)};
             return ret_mat;
           },
           "name"_a, "nb_quad_pts"_a, "Young"_a, "Poisson"_a)

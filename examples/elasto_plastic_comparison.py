@@ -33,13 +33,10 @@ with proprietary FFT implementations or numerical libraries, containing parts
 covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
-import muSpectre as µ
-import sys
-import os
+
 import numpy as np
 from mpi4py import MPI
-
-sys.path.append(os.path.join(os.getcwd(), "language_bindings/python"))
+from python_example_imports import muSpectre as µ
 
 
 # set up of the microstructure (omit the slice operator at the end to

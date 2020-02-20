@@ -35,37 +35,33 @@ covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
 
-import sys
-import os
 import numpy as np
 import argparse
 
-sys.path.append(os.path.join(os.getcwd(), "language_bindings/python"))
-import muSpectre as µ
+from python_example_imports import muSpectre as µ
 
 def compute():
-    N = [11, 11, 11]
+    N = [7, 7, 7]
     lens = [1., 1., 1.]
     incl_size = 3
+    inclusion_center = np.array(N)//2
 
     formulation = µ.Formulation.finite_strain
     cell = µ.Cell(N, lens, formulation)
-    hard = µ.material.MaterialLinearElastic1_3d.make(cell.wrapped_cell, "hard",
-                                           210.e9, .33)
-    soft = µ.material.MaterialLinearElastic1_3d.make(cell.wrapped_cell, "soft",
-                                            70.e9, .33)
-    for  pixel in cell:
+    hard = µ.material.MaterialLinearElastic1_3d.make(cell, "hard", 210.e9, .33)
+    soft = µ.material.MaterialLinearElastic1_3d.make(cell, "soft", 70.e9, .33)
+    for pixel_id, pixel_coord in cell.pixels.enumerate():
         # if ((pixel[0] >= N[0]-incl_size) and
         #     (pixel[1] < incl_size) and
         #     (pixel[2] >= N[2]-incl_size)):
-        if (pixel[0] < 1):
-            hard.add_pixel(pixel)
+        if (((inclusion_center - np.array(pixel_coord))**2).sum() < incl_size**2):
+            hard.add_pixel(pixel_id)
         else:
-            soft.add_pixel(pixel)
+            soft.add_pixel(pixel_id)
 
     print("{} pixels in the inclusion".format(hard.size()))
     cell.initialise();
-    cg_tol, newton_tol = 1e-8, 1e-5
+    cg_tol, newton_tol, equil_tol = 1e-8, 1e-5, 1e-8
     maxiter = 40
     verbose = 3
     dF_bar = np.array([[0, .02, 0], [0, 0, 0], [0, 0, 0]])
@@ -73,13 +69,17 @@ def compute():
     if formulation == µ.Formulation.small_strain:
         dF_bar = .5*(dF_bar + dF_bar.T)
 
-    test_grad = np.zeros((9, cell.size))
-    test_grad[:,:] = dF_bar.reshape(-1,1)
-    print(cell.directional_stiffness(test_grad)[:,:3])
-    solver = µ.solvers.KrylovSolverCG(cell.wrapped_cell, cg_tol, maxiter, verbose=False);
-    optimize_res = µ.solvers.de_geus(
-        cell.wrapped_cell, dF_bar, solver, newton_tol, verbose)
-    print("nb_cg: {}\n{}".format(optimize_res.nb_fev, optimize_res.grad.T[:2,:]))
+
+    test_grad = np.zeros((3,3) + tuple(cell.nb_domain_grid_pts))
+    test_grad[:,:] = dF_bar.reshape((3,3,1,1,1))
+    solver = µ.solvers.KrylovSolverCG(cell, cg_tol, maxiter,
+                                      verbose=µ.Verbosity.Silent)
+    optimize_res = µ.solvers.de_geus(cell, dF_bar, solver, newton_tol,
+                                     equil_tol, verbose=µ.Verbosity.Full)
+    print("nb_cg: {}\nF:\n{}".format(optimize_res.nb_fev,
+          µ.gradient_integration.reshape_gradient(optimize_res.grad,
+          cell.nb_domain_grid_pts)[:,:,0,0,0]))
+
 
 def main():
     compute()

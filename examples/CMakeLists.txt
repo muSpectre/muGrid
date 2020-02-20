@@ -34,9 +34,10 @@
 # Program grant you additional permission to convey the resulting work.
 # =============================================================================
 
-#compile executables
+find_package(PythonInterp ${MUSPECTRE_PYTHON_MAJOR_VERSION} REQUIRED)
+find_package(Boost COMPONENTS unit_test_framework REQUIRED)
 
-#TODO: reactivate
+#compile executables
 set(binaries
   demonstrator_dynamic_solve.cc
   hyper-elasticity.cc
@@ -44,6 +45,7 @@ set(binaries
   projection_comparison.cc
   )
 
+#TODO(Pastewka): reactivate
 # if(${MUSPECTRE_MPI_PARALLEL})
 #   list(APPEND binaries
 #     demonstrator_mpi.cc
@@ -54,7 +56,6 @@ foreach(binaryfile ${binaries})
   get_filename_component(binaryname  ${binaryfile} NAME_WE)
   add_executable(${binaryname} ${binaryfile})
   target_link_libraries(${binaryname} PRIVATE ${MUSPECTRE_NAMESPACE}muSpectre cxxopts)
-
   muTools_move_to_project(${binaryname})
 endforeach()
 
@@ -64,7 +65,7 @@ foreach(pyexample ${pyexamples})
   get_filename_component(binaryname  ${pyexample} NAME_WE)
   configure_file(
     ${pyexample}
-    "${CMAKE_BINARY_DIR}/${binaryname}.py"
+    "${CMAKE_BINARY_DIR}/examples/${binaryname}.py"
     COPYONLY)
 endforeach()
 
@@ -76,6 +77,79 @@ foreach(file_for_copy ${FILES_FOR_COPY})
   get_filename_component(binaryname  ${file_for_copy} NAME)
   configure_file(
     ${file_for_copy}
-    "${PROJECT_BINARY_DIR}/${binaryname}"
+    "${PROJECT_BINARY_DIR}/examples/${binaryname}"
     COPYONLY)
 endforeach()
+
+
+######### Test examples ##########
+set(muspectre_examples)
+
+macro(muSpectre_add_example)
+  muTools_add_test(${ARGN} LINK_LIBRARIES ${MUSPECTRE_NAMESPACE}muSpectre TEST_LIST muspectre_examples)
+endmacro()
+
+muSpectre_add_example(small_case_cc_example
+  SOURCES small_case.cc TYPE BOOST
+  --report_level=detailed)
+
+muSpectre_add_example(hyper-elasticity_cc_example
+  SOURCES hyper-elasticity.cc TYPE BOOST
+  --report_level=detailed)
+
+muSpectre_add_example(demonstrator_dynamic_solve_cc_example
+  SOURCES demonstrator_dynamic_solve.cc
+  TYPE BOOST 5)
+
+muSpectre_add_example(projection_comparison_cc_example
+  SOURCES  projection_comparison.cc
+  TYPE BOOST 5 0)
+
+#TODO(Pastewka): reactivate
+# if(${MUSPECTRE_MPI_PARALLEL})
+# muSpectre_add_example(demonstrator_mpi_cc_example
+#   SOURCES demonstrator_mpi.cc
+#   TYPE BOOST MPI_NB_PROCS 1  5 )
+# muSpectre_add_example(demonstrator_mpi_cc_example
+#   SOURCES demonstrator_mpi.cc
+#   TYPE BOOST MPI_NB_PROCS 2  5 )
+# endif()
+
+################## Pyhton examples ###################
+if(${SPLIT_CELL})
+muSpectre_add_example(circle_gibbs_ringing_simple_split_laminate_py_example
+  TYPE PYTHON  circle_gibbs_ringing_simple_split_laminate.py 1)
+endif()
+
+muSpectre_add_example(crack_py_example
+  TYPE PYTHON crack.py 1)
+
+muSpectre_add_example(hyper-elasticity_py_example
+  TYPE PYTHON hyper-elasticity.py)
+
+# muSpectre_add_example(projection_comparison_py_example
+#   TYPE PYTHON projection_comparison.py)
+
+muSpectre_add_example(small_case_py_example
+  TYPE PYTHON small_case.py)
+
+# muSpectre_add_example(small_elasto_plastic_case_py_example
+#   TYPE PYTHON small_elasto_plastic_case.py)
+
+muSpectre_add_example(tutorial_example_py_example
+  TYPE PYTHON tutorial_example.py 1)
+
+muSpectre_add_example(visualisation_example_finite_py_example
+  TYPE PYTHON visualisation_example_finite_strain.py 7 7 1)
+
+muSpectre_add_example(direct_comparison_small_strain_py_example
+  TYPE PYTHON  direct_comparison_small_strain.py 1)
+
+
+# TODO Pastewka: reactivate
+# if(${MUSPECTRE_MPI_PARALLEL})
+# muSpectre_add_example(elasto_plastic_comparison_py_example
+#   TYPE PYTHON MPI_NB_PROCS 1 elasto_plastic_comparison.py 1)
+# muSpectre_add_example(elasto_plastic_comparison_py_example
+#   TYPE PYTHON MPI_NB_PROCS 2 elasto_plastic_comparison.py 1)
+# endif()

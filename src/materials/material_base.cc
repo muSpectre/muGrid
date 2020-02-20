@@ -93,9 +93,7 @@ namespace muSpectre {
   void MaterialBase::get_assigned_ratios(
       std::vector<Real> & quad_pt_assigned_ratios) {
     quad_pt_assigned_ratios.reserve(
-            this->assigned_ratio->get_field().get_nb_dof_per_quad_pt());
-    // for (auto && tup : akantu::zip(this->get_quad_pt_indices(),
-    //                                this->assigned_ratio->get_map())) {
+        this->assigned_ratio->get_field().get_nb_dof_per_quad_pt());
     for (auto && tup : this->assigned_ratio->get_map().enumerate_indices()) {
       const auto & index = std::get<0>(tup);
       const auto & val = std::get<1>(tup);
@@ -151,12 +149,10 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  bool MaterialBase::has_native_stress() const {
-    return false;
-  }
+  bool MaterialBase::has_native_stress() const { return false; }
 
   /* ---------------------------------------------------------------------- */
-  muGrid::RealField& MaterialBase::get_native_stress() {
+  muGrid::RealField & MaterialBase::get_native_stress() {
     throw std::runtime_error("Not implemented for this material");
   }
 

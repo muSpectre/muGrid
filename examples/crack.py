@@ -37,14 +37,8 @@ Program grant you additional permission to convey the resulting work.
 """
 
 import sys
-import os
-sys.path.insert(0, os.path.join(os.getcwd(), "language_bindings/python"))
-sys.path.insert(0, os.path.join(os.getcwd(), "language_bindings/libmufft/python"))
-
 import numpy as np
-import matplotlib.pyplot as plt
-
-import muSpectre as msp
+from python_example_imports import muSpectre as msp
 print(msp.__file__)
 
 ###
@@ -109,49 +103,57 @@ phase = -np.ones(nb_domain_grid_pts, dtype=int)
 for i, derivative in enumerate([fourier_gradient, discrete_gradient]):
     rve = msp.Cell(nb_domain_grid_pts, domain_lengths,
                    msp.Formulation.finite_strain, derivative)
-    hard = msp.material.MaterialLinearElastic1_2d.make(rve.wrapped_cell, "hard", 1., .33)
-    vacuum = msp.material.MaterialLinearElastic1_2d.make(rve.wrapped_cell, "vacuum", 0., 0.)
-    for pixel in rve:
+    hard = msp.material.MaterialLinearElastic1_2d.make(rve, "hard", 1., .33)
+    vacuum = msp.material.MaterialLinearElastic1_2d.make(rve, "vacuum", 0., 0.)
+    for j, pixel in rve.pixels.enumerate():
         if pixel[1] == center[1] and \
             abs(pixel[0] - center[0]) < crack_length//2:
-            vacuum.add_pixel(pixel)
+            vacuum.add_pixel(j)
             phase[pixel[0], pixel[1]] = 2
         else:
-            hard.add_pixel(pixel)
+            hard.add_pixel(j)
             phase[pixel[0], pixel[1]] = 0
-    solver = msp.solvers.KrylovSolverCG(rve.wrapped_cell, cg_tol, maxiter, verbose=False)
-    result = msp.solvers.newton_cg(rve.wrapped_cell, applied_strain, solver,
+    solver = msp.solvers.KrylovSolverCG(rve, cg_tol, maxiter,
+                                        verbose=msp.Verbosity.Silent)
+    result = msp.solvers.newton_cg(rve, applied_strain, solver,
                                    newton_tol=newton_tol, equil_tol=equil_tol,
-                                   verbose=verbose)
+                                   verbose=msp.Verbosity.Silent)
     stress[i] = result.stress.T.reshape(*nb_domain_grid_pts, 2, 2)
     grad[i] = result.grad.T.reshape(*nb_domain_grid_pts, 2, 2)
 
-fac = 1
-plt.figure()
-plt.subplot(321, aspect=1)
-plt.title('Fourier')
-plt.pcolormesh(grad[0][:, :, 1, 0].T)
-plt.colorbar()
-plt.subplot(322, aspect=1)
-plt.title('discrete')
-plt.pcolormesh(fac*grad[1][:, :, 1, 0].T)
-plt.colorbar()
-plt.subplot(323, aspect=1)
-plt.title('Fourier-discrete')
-plt.pcolormesh(grad[0][:, :, 1, 0].T - fac*grad[1][:, :, 1, 0].T)
-plt.colorbar()
-plt.subplot(324, aspect=1)
-plt.pcolormesh(phase.T)
-plt.colorbar()
-plt.subplot(325)
-plt.title('Fourier')
-plt.plot(grad[0][4, :, 1, 0], 'x-')
-plt.plot(grad[0][5, :, 1, 0], 'x-')
-plt.plot(grad[0][6, :, 1, 0], 'x-')
-plt.subplot(326)
-plt.title('discrete')
-plt.plot(fac*grad[1][4, :, 1, 0], 'x-')
-plt.plot(fac*grad[1][5, :, 1, 0], 'x-')
-plt.plot(fac*grad[1][6, :, 1, 0], 'x-')
-plt.tight_layout()
-plt.show()
+
+# prevent visual output during ctest
+if len(sys.argv[:]) == 2:
+    if sys.argv[1] != 1:
+        pass
+else:
+    import matplotlib.pyplot as plt
+    fac = 1
+    plt.figure()
+    plt.subplot(321, aspect=1)
+    plt.title('Fourier')
+    plt.pcolormesh(grad[0][:, :, 1, 0].T)
+    plt.colorbar()
+    plt.subplot(322, aspect=1)
+    plt.title('discrete')
+    plt.pcolormesh(fac*grad[1][:, :, 1, 0].T)
+    plt.colorbar()
+    plt.subplot(323, aspect=1)
+    plt.title('Fourier-discrete')
+    plt.pcolormesh(grad[0][:, :, 1, 0].T - fac*grad[1][:, :, 1, 0].T)
+    plt.colorbar()
+    plt.subplot(324, aspect=1)
+    plt.pcolormesh(phase.T)
+    plt.colorbar()
+    plt.subplot(325)
+    plt.title('Fourier')
+    plt.plot(grad[0][4, :, 1, 0], 'x-')
+    plt.plot(grad[0][5, :, 1, 0], 'x-')
+    plt.plot(grad[0][6, :, 1, 0], 'x-')
+    plt.subplot(326)
+    plt.title('discrete')
+    plt.plot(fac*grad[1][4, :, 1, 0], 'x-')
+    plt.plot(fac*grad[1][5, :, 1, 0], 'x-')
+    plt.plot(fac*grad[1][6, :, 1, 0], 'x-')
+    plt.tight_layout()
+    plt.show()

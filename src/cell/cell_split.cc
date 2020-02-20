@@ -49,7 +49,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
 
   std::vector<Real> CellSplit::get_assigned_ratios() {
-    auto nb_pixels{muGrid::CcoordOps::get_size(
+    auto && nb_pixels{muGrid::CcoordOps::get_size(
         this->get_projection().get_nb_subdomain_grid_pts())};
     std::vector<Real> pixel_assigned_ratios(nb_pixels, 0.0);
     for (auto && mat : this->materials) {
@@ -251,10 +251,14 @@ namespace muSpectre {
     return *this->materials.back();
   }
 
-  /* ----------------------------------------------------------------------
-   */
+  /* ----------------------------------------------------------------------*/
 
   void CellSplit::complete_material_assignment(MaterialBase & material) {
+    for (auto && mat : this->materials) {
+      if (mat->get_name() != material.get_name()) {
+        mat->initialise();
+      }
+    }
     std::vector<Real> pixel_assigned_ratio(this->get_assigned_ratios());
     for (auto && tup : akantu::enumerate(this->get_pixel_indices())) {
       auto && pixel{std::get<1>(tup)};

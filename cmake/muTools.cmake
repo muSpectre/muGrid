@@ -72,12 +72,14 @@ function(muTools_add_test test_name)
   set(_mat_flags
     HEADER_ONLY
     )
+
   set(_mat_one_variables
     TYPE
     MPI_NB_PROCS
     TARGET
     TEST_LIST
     )
+
   set(_mat_multi_variables
     SOURCES
     ARG_LIST
@@ -179,6 +181,7 @@ function(license_add_subdirectory DIR LICENSETEST)
 
   # perform license check
   set(TARGET_NAME ${LICENSETEST_TARGET}.${TEST_NAME})
+
   add_custom_target(${TARGET_NAME}
     COMMAND
     ${LICENSETEST_EXC}

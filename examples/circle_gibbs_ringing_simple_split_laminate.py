@@ -4,7 +4,7 @@ file   small_case.py
 
 @author Ali Falsafi <ali.falsafi@epfl.ch>
 
-@date   12 Jun 2019
+@DATE   12 Jun 2019
 
 @brief  This is a working example of how to use CellSPlit / MaterialLaminate
 for a simple precipitate problem which is here is circular stiff inclusion
@@ -38,22 +38,16 @@ Program grant you additional permission to convey the resulting work.
 """
 
 import sys
-import os
 import numpy as np
-sys.path.insert(0, os.path.join(os.getcwd(), "../language_bindings/python"))
-sys.path.insert(0, os.path.join(os.getcwd(), "../language_bindings/libmufft/python"))
-import muSpectre as msp
-import matplotlib.pyplot as plt
-#from IPython.core.debugger import set_trace;
+from python_example_imports import muSpectre as msp
 np.set_printoptions(linewidth=500, precision=2)
-from matplotlib import cm
-import muSpectre.gradient_integration as gi
-import muSpectre.vtk_export as vt_ex
+from python_example_imports import muSpectre_gradient_integration as gi
+from python_example_imports import muSpectre_vtk_export as vt_ex
 
-nb_grid_pt = 283
-length = 201
-num = 100
-radius = 70.5
+nb_grid_pt = 17
+length = 12
+num_vertices = 20
+radius = 4.23
 conv = nb_grid_pt / length;
 
 nb_grid_pts = [nb_grid_pt, nb_grid_pt]
@@ -64,6 +58,7 @@ incl = nb_grid_pt//4
 
 formulation = msp.Formulation.finite_strain
 tol = 1e-5
+equil_tol = 1e-7
 cg_tol = 1e-7
 maxiter = 4010
 verbose = 2
@@ -79,21 +74,25 @@ def rve_constructor(res, lens, form, inclusion, Del0, maxiter=401,
         rve, "hard", contrast*e, .33)
     soft = msp.material.MaterialLinearElastic1_2d.make(
         rve, "soft",  e, .33)
-    for i, pixel in enumerate(rve):
-        if inclusion(pixel ):
-            hard.add_pixel(pixel)
+    for i, pixel in rve.pixels.enumerate():
+        if inclusion(pixel):
+            hard.add_pixel(i)
         else:
-            soft.add_pixel(pixel)
+            soft.add_pixel(i)
 
     if verbose:
         print("{} pixels in the inclusion".format(hard.size()))
-    tol = 1e-5
+        print("{} pixels out of the inclusion".format(soft.size()))
 
+    tol = 1e-5
     if formulation == msp.Formulation.small_strain:
         Del0 = .5*(Del0 + Del0.T)
 
-    solver = solver_type(rve, cg_tol, maxiter, verbose=True)
+    solver = solver_type(rve, cg_tol, maxiter, verbose=msp.Verbosity.Silent)
     r = msp.solvers.newton_cg(rve, Del0, solver, tol, 1)
+    if verbose:
+        print("{} pixels in the inclusion initilised".format(hard.size()))
+        print("{} pixels out of the inclusion initilised".format(soft.size()))
     return r
 
 
@@ -104,25 +103,27 @@ def split_rve_constructor(res, lens, form, inclusions, Del0, maxiter=401,
                    lengths,
                    formulation, None, 'fftw', None,
                    msp.SplitCell.split)
-    rve.set_splitness(msp.SplitCell.split)
+    # rve.set_splitness(msp.SplitCell.split)
     e = 70e9
     hard = msp.material.MaterialLinearElastic1_2d.make(
         rve, "hard", contrast*e, .33)
-    soft = msp.material.MaterialLinearElastic1_2d.make(
-        rve, "soft",  e, .33)
 
     for i, inclusion in enumerate(inclusions):
         rve.make_precipitate(hard, inclusion)
+
+    soft = msp.material.MaterialLinearElastic1_2d.make(
+        rve, "soft",  e, .33)
     rve.complete_material_assignment(soft)
     if formulation == msp.Formulation.small_strain:
         Del0 = .5*(Del0 + Del0.T)
 
-    solver = solver_type(rve, cg_tol, maxiter, verbose=True)
-    r = msp.solvers.newton_cg(rve, Del0, solver, tol, 1)
+    solver = solver_type(rve, cg_tol, maxiter, verbose=msp.Verbosity.Silent)
+    r = msp.solvers.newton_cg(rve, Del0, solver, tol, equil_tol,
+                              verbose=msp.Verbosity.Silent)
     return r
 
 
-def rve_constructor_lam_mat(res, lens, form, inclusions,
+def lam_mat_rve_constructor(res, lens, form, inclusions,
                             Del0, maxiter=401, verbose=2,
                             solver_type=msp.solvers.KrylovSolverCGEigen,
                             contrast=10, cg_tol=1e-8):
@@ -132,10 +133,10 @@ def rve_constructor_lam_mat(res, lens, form, inclusions,
                    formulation)
 
     mat_hard_laminate = msp.material.MaterialLinearElastic1_2d.make_free(
-        "hard_free", contrast * e, 0.33)
+        rve, "hard_free", contrast * e, 0.33)
 
     mat_soft_laminate = msp.material.MaterialLinearElastic1_2d.make_free(
-        "soft_free", e, 0.33)
+        rve, "soft_free", e, 0.33)
 
     mat_hard = msp.material.MaterialLinearElastic1_2d.make(
         rve, "hard", contrast*e, .33)
@@ -153,14 +154,16 @@ def rve_constructor_lam_mat(res, lens, form, inclusions,
 
     if formulation == msp.Formulation.small_strain:
         Del0 = .5*(Del0 + Del0.T)
-    solver = solver_type(rve, cg_tol, maxiter, verbose=True)
-    r = msp.solvers.newton_cg(rve, Del0, solver, tol, 1)
+
+    solver = solver_type(rve, cg_tol, maxiter, verbose=msp.Verbosity.Silent)
+    r = msp.solvers.newton_cg(rve, Del0, solver, tol, equil_tol,
+                              verbose=msp.Verbosity.Silent)
     return r
 
 
-points = np.ndarray(shape=(num-1, 2))
-for j, tetha in enumerate(np.linspace(0, 2*np.pi, num)):
-    if j != num-1:
+points = np.ndarray(shape=(num_vertices-1, 2))
+for j, tetha in enumerate(np.linspace(0, 2*np.pi, num_vertices)):
+    if j != num_vertices-1:
         points[j, 0] = center[0] + radius*np.cos(tetha)
         points[j, 1] = center[1] + radius*np.sin(tetha)
 
@@ -172,20 +175,19 @@ Del0 = np.array([[1e-3, .0],
 
 
 print(center*0.5)
-circle = lambda pixel: (np.linalg.norm( center*conv-np.array(pixel), 2) < radius*conv)
+circle = lambda pixel:\
+    (np.linalg.norm(center*conv-np.array(pixel), 2) < radius*conv)
 
-circle_r = rve_constructor(nb_grid_pts, lengths, formulation,
-                           circle, Del0)
+circle_r = rve_constructor(nb_grid_pts, lengths,
+                           formulation, circle, Del0)
 
 
 circle_r_split = split_rve_constructor(nb_grid_pts, lengths, formulation,
-                                       a, Del0,
-                                       cg_tol=1e-8, maxiter=2000)
+                                       a, Del0, cg_tol=1e-8, maxiter=2000)
 
 
-circle_r_laminate = rve_constructor_lam_mat(nb_grid_pts, lengths,
-                                            formulation,
-                                            a, Del0,
+circle_r_laminate = lam_mat_rve_constructor(nb_grid_pts, lengths,
+                                            formulation, a, Del0,
                                             cg_tol=1e-8, maxiter=2000)
 
 
@@ -241,7 +243,7 @@ def mises_plot_contour(r, zoom=[0, 0, 1, 1]):
     x, y = np.mgrid[xslice, yslice]
     ax.locator_params(nbins=4)
     # C = ax.contour(x, y, vm[xslice, yslice], colors='k', origin='lower')
-    C = ax.contour(x, y, vm[xslice, yslice], levels=[150.0, 160.0, 170.0, 180.0, 190.0, 200.0, 210.0, 220.0])
+    C = ax.contour(x, y, vm[xslice, yslice])
     plt.clabel(C, inline=True, fontsize=8)
     # C.set_clim(160, 270)
     # bar = plt.colorbar(C)
@@ -265,10 +267,14 @@ def component_plot_contour(r, zoom=[0, 0, 1, 1], component=[0, 0]):
     ax.locator_params(nbins=4)
     # C = ax.contour(x, y, vm[xslice, yslice], colors='k', origin='lower')
     if component[0] == component[1]:
-        C = ax.contour(x, y, vm[xslice, yslice], levels = [150.0, 160.0, 170.0, 180.0, 190.0, 200.0, 210.0, 220.0])
+        C = ax.contour(x, y, vm[xslice, yslice],
+                       levels = [150.0, 160.0, 170.0, 180.0,
+                                 190.0, 200.0, 210.0, 220.0])
         plt.clabel(C, inline=True, fontsize=8)
     elif component[0] != component[1]:
-        C = ax.contour(x, y, vm[xslice, yslice], levels = [5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0])
+        C = ax.contour(x, y, vm[xslice, yslice],
+                       levels = [5.0, 10.0, 15.0, 20.0,
+                                 25.0, 30.0, 35.0])
         plt.clabel(C, inline=True, fontsize=8)
     # C.set_clim(160, 270)
     # bar = plt.colorbar(C)
@@ -279,75 +285,91 @@ def component_plot_contour(r, zoom=[0, 0, 1, 1], component=[0, 0]):
 
     return fig
 
+# prevent visual output during ctest
+if len(sys.argv[:]) == 2:
+    if sys.argv[1] != 1:
+        pass
+else:
+    import matplotlib.pyplot as plt
+    from matplotlib import cm
+    mises_plot(circle_r).savefig("gibbs_circle_simple.pdf", dpi=300)
+    mises_plot(circle_r,
+               zoom=[.55, .55, .25, .25]).savefig("gibbs_circle_simple_zoom_1.pdf",
+                                                  dpi=300)
+    mises_plot(circle_r,
+               zoom=[.59, .59, .15, .15]).savefig("gibbs_circle_simple_zoom_2.pdf",
+                                                  dpi=300)
 
-mises_plot(circle_r).savefig("gibbs_circle_simple.pdf", dpi=300)
-mises_plot(circle_r,
-           zoom=[.55, .55, .25, .25]).savefig("gibbs_circle_simple_zoom_1.pdf",
-                                              dpi=300)
-mises_plot(circle_r,
-           zoom=[.59, .59, .15, .15]).savefig("gibbs_circle_simple_zoom_2.pdf",
-                                              dpi=300)
+    mises_plot_contour(circle_r).savefig("gibbs_circle_contour.pdf", dpi=300)
+    component_plot_contour(
+        circle_r,component =[0, 0]).savefig("gibbs_circle_simple_contour"
+                                            "_normal.pdf",
+                                            dpi=300)
 
-mises_plot_contour(circle_r).savefig("gibbs_circle_contour.pdf", dpi=300)
-component_plot_contour(circle_r,component =[0, 0]).savefig("gibbs_circle_simple_contour_normal.pdf",
-                                                      dpi=300)
+    component_plot_contour(
+        circle_r,component =[0, 1]).savefig("gibbs_circle_simple_contour"
+                                            "_shear.pdf",
+                                            dpi=300)
+    mises_plot_contour(circle_r,
+                       zoom=[.55, .55, .25, .25]).savefig(
+                           "gibbs_circle_simple_zoom_1_contour.pdf", dpi=300)
+    mises_plot_contour(circle_r,
+                       zoom=[.59, .59, .15, .15]).savefig(
+                           "gibbs_circle_simple_zoom_2_contour.pdf", dpi=300)
 
-component_plot_contour(circle_r,component =[0, 1]).savefig("gibbs_circle_simple_contour_shear.pdf",
-                                                      dpi=300)
-mises_plot_contour(circle_r,
-                   zoom=[.55, .55, .25, .25]).savefig(
-                       "gibbs_circle_simple_zoom_1_contour.pdf", dpi=300)
-mises_plot_contour(circle_r,
-                   zoom=[.59, .59, .15, .15]).savefig(
-                       "gibbs_circle_simple_zoom_2_contour.pdf", dpi=300)
+    mises_plot(circle_r_split).savefig("gibbs_circle_split.pdf", dpi=300)
+    mises_plot(circle_r_split,
+               zoom=[.55, .55, .25, .25]).savefig("gibbs_circle_zoom_1_split"
+                                                  ".pdf",
+                                                  dpi=300)
+    mises_plot(circle_r_split,
+               zoom=[.59, .59, .15, .15]).savefig("gibbs_circle_zoom_2_split.pdf",
+                                                  dpi=300)
 
+    mises_plot_contour(circle_r_split).savefig("gibbs_circle_split_contour.pdf",
+                                               dpi=300)
 
-mises_plot(circle_r_split).savefig("gibbs_circle_split.pdf", dpi=300)
-mises_plot(circle_r_split,
-           zoom=[.55, .55, .25, .25]).savefig("gibbs_circle_zoom_1_split.pdf",
-                                              dpi=300)
-mises_plot(circle_r_split,
-           zoom=[.59, .59, .15, .15]).savefig("gibbs_circle_zoom_2_split.pdf",
-                                              dpi=300)
+    component_plot_contour(
+        circle_r_split,component =\
+        [0, 0]).savefig("gibbs_circle_split_contour_normal.pdf",
+                        dpi=300)
 
-mises_plot_contour(circle_r_split).savefig("gibbs_circle_split_contour.pdf",
-                                           dpi=300)
-
-component_plot_contour(circle_r_split,component =[0, 0]).savefig("gibbs_circle_split_contour_normal.pdf",
-                                                      dpi=300)
-
-component_plot_contour(circle_r_split,component = [0, 1]).savefig("gibbs_circle_split_contour_shear.pdf",
-                                                      dpi=300)
-
-
-mises_plot_contour(circle_r_split,
-                   zoom=[.55, .55, .25, .25]).savefig(
-                       "gibbs_circle_zoom_1_split_contour.pdf", dpi=300)
-mises_plot_contour(circle_r_split,
-                   zoom=[.59, .59, .15, .15]).savefig(
-                       "gibbs_circle_zoom_2_split_contour.pdf", dpi=300)
+    component_plot_contour(
+        circle_r_split,component =\
+        [0, 1]).savefig("gibbs_circle_split_contour_shear.pdf",
+                        dpi=300)
 
 
-mises_plot(circle_r_laminate).savefig("gibbs_circle_laminate.pdf", dpi=300)
-mises_plot(circle_r_laminate,
-           zoom=[.55, .55, .25, .25]).savefig(
-               "gibbs_circle_zoom_1_laminate.pdf", dpi=300)
-mises_plot(circle_r_laminate,
-           zoom=[.59, .59, .15, .15]).savefig(
-               "gibbs_circle_zoom_2_laminate.pdf", dpi=300)
+    mises_plot_contour(circle_r_split,
+                       zoom=[.55, .55, .25, .25]).savefig(
+                           "gibbs_circle_zoom_1_split_contour.pdf", dpi=300)
+    mises_plot_contour(circle_r_split,
+                       zoom=[.59, .59, .15, .15]).savefig(
+                           "gibbs_circle_zoom_2_split_contour.pdf", dpi=300)
 
-mises_plot_contour(circle_r_laminate).savefig(
-    "gibbs_circle_laminate_contour.pdf", dpi=300)
 
-component_plot_contour(circle_r_laminate,component =[0, 0]).savefig("gibbs_circle_laminate_contour_normal.pdf",
-                                                      dpi=300)
+    mises_plot(circle_r_laminate).savefig("gibbs_circle_laminate.pdf", dpi=300)
+    mises_plot(circle_r_laminate,
+               zoom=[.55, .55, .25, .25]).savefig(
+                   "gibbs_circle_zoom_1_laminate.pdf", dpi=300)
+    mises_plot(circle_r_laminate,
+               zoom=[.59, .59, .15, .15]).savefig(
+                   "gibbs_circle_zoom_2_laminate.pdf", dpi=300)
 
-component_plot_contour(circle_r_laminate,component =[0, 1]).savefig("gibbs_circle_laminate_contour_shear.pdf",
-                                                      dpi=300)
-mises_plot_contour(circle_r_laminate,
-                   zoom=[.55, .55, .25, .25]).savefig(
-                       "gibbs_circle_zoom_1_laminate_contour.pdf", dpi=300)
-mises_plot_contour(circle_r_laminate,
-                   zoom=[.59, .59, .15, .15]).savefig(
-                       "gibbs_circle_zoom_2_laminate_contour.pdf", dpi=300)
+    mises_plot_contour(circle_r_laminate).savefig(
+        "gibbs_circle_laminate_contour.pdf", dpi=300)
+    component_plot_contour(
+        circle_r_laminate,component =\
+        [0, 0]).savefig("gibbs_circle_laminate_contour_normal.pdf",
+                        dpi=300)
 
+    component_plot_contour(
+        circle_r_laminate,component =\
+        [0, 1]).savefig("gibbs_circle_laminate_contour_shear.pdf",
+                        dpi=300)
+    mises_plot_contour(circle_r_laminate,
+                       zoom=[.55, .55, .25, .25]).savefig(
+                           "gibbs_circle_zoom_1_laminate_contour.pdf", dpi=300)
+    mises_plot_contour(circle_r_laminate,
+                       zoom=[.59, .59, .15, .15]).savefig(
+                           "gibbs_circle_zoom_2_laminate_contour.pdf", dpi=300)

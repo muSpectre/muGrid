@@ -1,11 +1,7 @@
 #!/usr/bin/env python3
 
-import sys
-
-import os
-
-from python_test_imports import µ
-from python_test_imports import muFFT
+from python_example_imports import muSpectre as µ
+from python_example_imports import muFFT
 import numpy as np
 
 

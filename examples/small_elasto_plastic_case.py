@@ -35,54 +35,61 @@ covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
 
-import muSpectre as µ
-import sys
-import os
 import numpy as np
+from python_example_imports import muSpectre as µ
 
-sys.path.append(os.path.join(os.getcwd(), "language_bindings/python"))
+nb_grid_pts = [5, 5]
+center = np.array([r // 2 for r in nb_grid_pts])
+incl = nb_grid_pts[0] // 5
 
-
-nb_grid_pts = [3, 3]
-center = np.array([r//2 for r in nb_grid_pts])
-incl = nb_grid_pts[0]//5
-
+# Domain dimensions
 lengths = [7., 5.]
+
+# formulation (small_strain or finite_strain)
 formulation = µ.Formulation.finite_strain
 
+# Material constants
 K = .833
 mu = .386
 H = .004
 tauy0 = .006
-Young = 9*K*mu/(3*K + mu)
-Poisson = (3*K-2*mu)/(2*(3*K+mu))
+Young = 9 * K * mu / (3 * K + mu)
+Poisson = (3 * K - 2 * mu) / (2 * (3 * K + mu))
+
+# RVE definition
 rve = µ.Cell(nb_grid_pts, lengths, formulation)
+
+# define the material properties of the matrix and inclusion
 hard = µ.material.MaterialHyperElastoPlastic1_2d.make(
-    rve.wrapped_cell, "hard", Young, Poisson, 2*tauy0, h=2*H)
+    rve, "hard", Young, Poisson, 2 * tauy0, h=2 * H)
 soft = µ.material.MaterialHyperElastoPlastic1_2d.make(
-    rve.wrapped_cell, "soft", Young, Poisson,   tauy0, h=H)
+    rve, "soft", Young, Poisson, tauy0, h=H)
 
-
-for i, pixel in enumerate(rve):
-    # if np.linalg.norm(center - np.array(pixel),2)<incl:
-    i, j = pixel
-    if (i, j) == (1, 1):
-        hard.add_pixel(pixel)
+# assign each pixel to exactly one material
+for pixel_id, pixel_coord in rve.pixels.enumerate():
+    if tuple(pixel_coord) == (1, 1):
+        hard.add_pixel(pixel_id)
     else:
-        soft.add_pixel(pixel)
+        soft.add_pixel(pixel_id)
 
+# define the convergence tolerance for the Newton-Raphson increment
 tol = 1e-5
+# tolerance for the solver of the linear cell
 cg_tol = 1e-5
 equil_tol = 1e-5
 
+# Macroscopic strain
 Del0 = np.array([[.0, .0],
-                 [0,  3e-2]])
+                 [0, 3e-2]])
 if formulation == µ.Formulation.small_strain:
-    Del0 = .5*(Del0 + Del0.T)
+    Del0 = .5 * (Del0 + Del0.T)
+
 maxiter = 401
 verbose = 2
 
-solver = µ.solvers.KrylovSolverCG(rve.wrapped_cell, cg_tol, maxiter, verbose=True)
-r = µ.solvers.newton_cg(rve.wrapped_cell, Del0, solver,
-                        tol, equil_tol, verbose)
+
+solver = µ.solvers.KrylovSolverCG(rve, cg_tol, maxiter, verbose=False)
+r = µ.solvers.de_geus(rve, Del0, solver,
+                      tol, equil_tol, verbose)
+
 print("nb of {} iterations: {}".format(solver.name(), r.nb_fev))

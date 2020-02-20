@@ -40,6 +40,8 @@ Program grant you additional permission to convey the resulting work.
 import sys
 
 import numpy as np
+import itertools
+from scipy import linalg
 
 import muFFT
 
@@ -90,11 +92,13 @@ def reshape_gradient(F, nb_grid_pts):
     Returns:
     np.ndarray of the shape [dim, dim] + nb_grid_pts
     """
-
-    dim = len(nb_grid_pts)
     if not isinstance(nb_grid_pts, list):
-        raise Exception("nb_grid_pts needs to be in list form, " +
-                        "for concatenation")
+        try:
+            nb_grid_pts = list(nb_grid_pts)
+        except:
+            raise Exception("nb_grid_pts needs to be in list form, " +
+                            "for concatenation")
+    dim = len(nb_grid_pts)
     expected_input_shape = [np.prod(nb_grid_pts) * dim**2]
     output_shape = list(reversed(nb_grid_pts)) + [dim, dim]
     if not ((F.shape[0] == expected_input_shape[0]) and
@@ -223,6 +227,138 @@ def integrate_tensor_2(grad, fft_vec, fft_mat, gradient_op, grid_spacing):
 
     return fluctuation + homogeneous
 
+def full_to_Voigt_strain(strain_matrix):
+    """
+    Takes the strain in the full notation (tensor notation) and returns
+    the coressponding Voigt notation of the strain
+
+    Keyword Arguments:
+    strain_matrix     -- np.ndarray of shape [dim, dim] containing
+                         full notation (tensor notation) of strain
+
+    Returns:
+    np.ndarray of shape [dim * (dim-1) / 2] containing the voigt nitation of the
+    input strain
+    """
+    strain_matrix = np.asarray(strain_matrix)
+    if strain_matrix.shape[0] == 2 and strain_matrix.shape[1] == 2:
+        return np.transpose([strain_matrix[0,0,...],
+                             strain_matrix[1,1,...],
+                             strain_matrix[0,1,...] + strain_matrix[1,0,...]])
+    elif strain_matrix.shape[0] == 3 and strain_matrix.shape[1] == 3:
+        return np.transpose([strain_matrix[0,0,...] ,
+                             strain_matrix[1,1,...] ,
+                             strain_matrix[2,2,...] ,
+                             strain_matrix[1,2,...] + strain_matrix[2,1,...],
+                             strain_matrix[0,2,...] + strain_matrix[2,0,...],
+                             strain_matrix[0,1,...] + strain_matrix[1,0,...]])
+    else:
+        raise RuntimeError("Invalid Strain tensor"
+                           "The Strain tensor in full notation should be"
+                           "either 2x2 or 3x3")
+
+def integrate_tensor_2_small_strain(strain, fft_vec,
+                                    fft_mat, grid_spacing):
+    """
+    This function solves the following equation for obtaining the displacements
+    in 2D (or extension for 3D):
+     --    —-   —-  —-   —-    —-
+     |k₁  0 |   | u₁ |   |  ε₁₁ |
+    i|0   k₂| × |    | = |  ε₂₂ |    ***
+     |k₂  k₁|   | u₂ |   | 2ε₁₂ |
+     —-    —-   —-  —-   —-    —-
+    which is overdetermined and least square will be utilized ofr solving.
+
+    Keyword Arguments:
+    grad           -- np.ndarray of shape [dim, dim] + nb_grid_pts_per_dim
+                      containing the second-rank gradient to be integrated
+    fft_vec        -- µFFT FFT object performing the FFT for a vector on the cell
+    fft_mat        -- µFFT FFT object performing the FFT for a matrix on the cell
+    gradient_op    -- µSpectre DerivativeBase class representing the gradient
+                      operator.
+    grid_spacing   -- np.array of grid spacing in each spatial direction of
+                      shape (dim,).
+
+    Returns:
+    np.ndarray containing the integrated field
+    """
+    dim = len(grid_spacing)
+    nb_grid_pts = np.array(strain.shape[-dim:])
+    lengths = nb_grid_pts * grid_spacing
+    x = make_grid(lengths, nb_grid_pts)[0]
+    # aplying Fourier transform on strain field
+    strain_k = (fft_mat.fft(strain)  * fft_mat.normalisation)
+    # wave vectors :
+    wv = fft_mat.fftfreq
+    # making shift vectors from the center of the gird to the corners
+    shift = np.exp(-1j*np.pi*np.sum(wv, axis=0))
+    strain_k_0 = strain_k[np.s_[:, :] + (0,)*dim]
+    # Solving the *** equations (independently for each Fourier componenet)
+    if dim == 2:
+        # the periods (ω) of the wave vectors
+        wf = 2 * np.pi  * wv / (grid_spacing)[:,np.newaxis,np.newaxis]
+        # constructing internal variables for the function (TODO:fix for 3d)
+        u_k = np.zeros((dim,)+ (int(nb_grid_pts[0]*0.5)+1, nb_grid_pts[1]),
+                       dtype = np.cdouble)
+        for i, j in itertools.product(range(int(nb_grid_pts[0]*0.5)+1),
+                                      range(nb_grid_pts[1])):
+            if (i!=0 or j!=0):
+                # known matrix in the equation *** in 2D
+                strain_k_vec_loc = full_to_Voigt_strain(strain_k[...,i,j])
+                # coefficient matrix in the equation *** in 2D
+                A_loc = \
+                    1j*(np.array([[wf[0,i,j], 0],
+                                  [0        , wf[1,i,j]],
+                                  [wf[1,i,j], wf[0,i,j]]]))
+                u_k[...,i,j]= \
+                    np.linalg.solve(np.matmul(A_loc.T ,A_loc),
+                                    np.matmul(A_loc.T ,strain_k_vec_loc))
+    elif dim == 3:
+        # the periods (ω) of the wave vectors
+        wf = 2 * np.pi  * wv / (grid_spacing)[:,np.newaxis,
+                                              np.newaxis,
+                                              np.newaxis]
+        u_k = np.zeros((dim,)+ (int(nb_grid_pts[0]*0.5)+1
+                                , nb_grid_pts[1]
+                                , nb_grid_pts[2]),
+                       dtype = np.cdouble)
+        for i, j, k in itertools.product(range(int(nb_grid_pts[0]*0.5)+1),
+                                         range(nb_grid_pts[1]),
+                                         range(nb_grid_pts[2])):
+            if (i!=0 or j!=0 or k!=0):
+                # known matrix in the equation *** in 3D
+                strain_k_vec_loc = full_to_Voigt_strain(strain_k[...,i,j,k])
+                # coefficient matrix in the equation *** in 3D
+                A_loc = \
+                    1j*np.array([[wf[0,i,j,k], 0           , 0           ],
+                                 [0          ,  wf[1,i,j,k], 0           ],
+                                 [0          , 0           ,  wf[2,i,j,k]],
+                                 [0          ,  wf[2,i,j,k],  wf[1,i,j,k]],
+                                 [wf[2,i,j,k], 0           ,  wf[0,i,j,k]],
+                                 [wf[1,i,j,k],  wf[0,i,j,k], 0           ]])
+                u_k[...,i,j,k]= \
+                    np.linalg.solve(np.matmul(A_loc.T ,A_loc),
+                                    np.matmul(A_loc.T ,strain_k_vec_loc))
+
+    # shifting the results from the center of the grid to the corners
+    u_k_shifted = np.zeros_like(u_k)
+    for i, _grid_spacing in enumerate(grid_spacing):
+        u_k_shifted[i,...] = u_k[i,...] * shift #* _grid_spacing
+
+    # Applying inverse Fourier transform to on=btain the displacement field in
+    # Real space
+    flauctuation_non_pbe = fft_vec.ifft(u_k_shifted)
+    if np.linalg.norm(flauctuation_non_pbe.imag) > 1e-10:
+        raise RuntimeError("Integrate_tensor_2() computed complex placements, "
+                           "probably there went something wrong.\n"
+                           "Please inform the developers about this bug!")
+
+    # adding and extra row/column due to periodic boundary condition
+    flauctuation = complement_periodically(flauctuation_non_pbe.real, dim)
+
+    # The homogeneous integration computes the affine part of the deformation
+    homogeneous = np.einsum("ij,j...->i...", strain_k_0.real, x)
+    return flauctuation + homogeneous
 
 def integrate_vector(grad, fft_sca, fft_vec, gradient_op, grid_spacing):
     """Integrates a first-rank tensor gradient field, given on the center
@@ -262,7 +398,6 @@ def integrate_vector(grad, fft_sca, fft_vec, gradient_op, grid_spacing):
 
     return fluctuation + homogeneous
 
-
 def compute_placement(result, lengths, nb_grid_pts, gradient_op,
                       fft=None, formulation=None):
     """computes the placement (the sum of original position and
@@ -301,13 +436,15 @@ def compute_placement(result, lengths, nb_grid_pts, gradient_op,
         if formulation == None:
             # exit the program, if the formulation is unknown!
             raise ValueError('\n'
-                             'You have to specify your continuum mechanics description.\n'
+                             'You have to specify your continuum mechanics'
+                             'description.\n'
                              'Either you use a formulation="small_strain" or '
                              '"finite_strain" description.\n'
-                             'Otherwise you can give a result=OptimiseResult object, which '
+                             'Otherwise you can give a result=OptimiseResult'
+                             ' object, which '
                              'tells me the formulation.')
         form = formulation
-        grad = result.reshape((len(nb_grid_pts),)*2 + tuple(nb_grid_pts))
+        strain = result.reshape((len(nb_grid_pts),)*2 + tuple(nb_grid_pts))
     else:
         form = result.formulation
         if form != formulation and formulation != None:
@@ -315,17 +452,9 @@ def compute_placement(result, lengths, nb_grid_pts, gradient_op,
             raise ValueError('\nThe given formulation "{}" differs from the '
                              'one saved in your result "{}"!'
                              .format(formulation, form))
-        grad = reshape_gradient(result.grad, nb_grid_pts.tolist())
-
-    # reshape the gradient depending on the formulation
-    if form == Formulation.small_strain:
-        raise NotImplementedError('\nIntegration of small strains'
-                                  'is not implemented yet!')
-    elif form == Formulation.finite_strain:
-        grad = grad
-    else:
-        raise ValueError('\nThe formulation: "{}" is unknown!'
-                         .format(formulation))
+        elif formulation == None:
+            formulation = form
+        strain = reshape_gradient(result.grad, nb_grid_pts.tolist())
 
     # load or initialise muFFT.FFT engine
     if fft is None:
@@ -335,7 +464,14 @@ def compute_placement(result, lengths, nb_grid_pts, gradient_op,
     # compute the placement
     nodal_positions, _ = make_grid(lengths, nb_grid_pts)
     grid_spacing = np.array(lengths / nb_grid_pts)
-    placement = integrate_tensor_2(grad, fft_vec, fft_mat,
-                                   gradient_op, grid_spacing)
-
-    return placement, nodal_positions
+    if formulation == Formulation.finite_strain:
+        placement = integrate_tensor_2(strain, fft_vec, fft_mat,
+                                          gradient_op, grid_spacing)
+        return placement, nodal_positions
+    elif formulation == Formulation.small_strain:
+        displacement = integrate_tensor_2_small_strain(strain, fft_vec, fft_mat,
+                                                       grid_spacing)
+        return displacement + nodal_positions, nodal_positions
+    else:
+        raise ValueError('\nThe formulation: "{}" is unknown!'
+                         .format(formulation))

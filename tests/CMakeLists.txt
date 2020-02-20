@@ -73,6 +73,7 @@ muSpectre_add_test(mattb_test
   SOURCES main_test_suite.cc test_materials_toolbox.cc
   TYPE BOOST --report_level=detailed)
 
+
 ##############################################################################
 # build py_comparison tests
 file(GLOB PY_COMP_TEST_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/py_comparison_*.cc")
@@ -103,7 +104,7 @@ foreach(pytest ${PY_TEST_SRCS})
     "${CMAKE_CURRENT_BINARY_DIR}/${pytest_name}"
     COPYONLY)
 endforeach(pytest ${PY_TEST_SRCS})
-muSpectre_add_test(python_binding_test TYPE PYTHON python_binding_tests.py)
+muSpectre_add_test(python_binding_tests TYPE PYTHON python_binding_tests.py)
 
 # copy reference files
 file(GLOB REFERENCE_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/*.ref.vtr")
@@ -123,12 +124,14 @@ if(${MUSPECTRE_MPI_PARALLEL})
     SOURCES mpi_main_test_suite.cc ${TEST_SRCS}
     TARGET mpi_main_test_suite
     TYPE BOOST MPI_NB_PROCS 1 --report_level=detailed)
+
   muSpectre_add_test(mpi_main_test_suite2
     TARGET mpi_main_test_suite
     TYPE BOOST MPI_NB_PROCS 2 --report_level=detailed)
 
   muSpectre_add_test(python_mpi_binding_test1 TYPE PYTHON MPI_NB_PROCS 1
     python_mpi_binding_tests.py)
+
   muSpectre_add_test(python_mpi_binding_test2 TYPE PYTHON MPI_NB_PROCS 2
     python_mpi_binding_tests.py)
 endif()

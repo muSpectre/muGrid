@@ -116,9 +116,13 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   void Cell::complete_material_assignment_simple(MaterialBase & material) {
+    for (auto && mat : this->materials) {
+      if (mat->get_name() != material.get_name()) {
+        mat->initialise();
+      }
+    }
     auto nb_pixels = muGrid::CcoordOps::get_size(
         this->get_projection().get_nb_subdomain_grid_pts());
-
     std::vector<bool> assignments(nb_pixels, false);
     for (auto & mat : this->materials) {
       for (auto & index : mat->get_pixel_indices()) {

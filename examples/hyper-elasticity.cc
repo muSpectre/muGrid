@@ -78,5 +78,5 @@ int main() {
   auto optimize_res = de_geus(cell, dF_bar, cg, newton_tol, equil_tol, verbose);
 
   std::cout << "nb_cg: " << optimize_res.nb_fev << std::endl;
-  std::cout << optimize_res.grad.transpose().block(0, 0, 10, 9) << std::endl;
+  std::cout << optimize_res.grad.transpose().block(0, 0, 1, 1) << std::endl;
   return 0;}

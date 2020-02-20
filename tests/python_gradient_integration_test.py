@@ -42,7 +42,8 @@ import numpy as np
 import scipy.misc as sm
 import itertools
 import time
-
+# np.set_printoptions(precision=2)
+# np.set_printoptions(suppress=True)
 ### Helper functions
 def init_X_F_Chi(lens, res, rank=2):
     """
@@ -251,6 +252,7 @@ class GradientIntegration_Check(unittest.TestCase):
               [0. - 0.j, -0.16666667+0.09622504j,  0. + 0.19245009j]]])
         self.assertLess(np.linalg.norm(integrator-int_ana), 1e-7)
 
+
     def test_fourier_integrate_tensor_2(self):
         """
         Test the correct integration of a second-rank tensor gradient field,
@@ -259,7 +261,7 @@ class GradientIntegration_Check(unittest.TestCase):
         # cosinus, diagonal deformation gradient 2D
         res = np.array([36, 14])
         lens = np.array([7, 1.4])
-        delta_x, dim, x_n, x_c, F, _ = init_X_F_Chi(lens, res)
+        delta_x, dim, x_n, x_c, F, u_n = init_X_F_Chi(lens, res)
         for i in range(dim):
             F[i, i, :, :] = 0.8*np.pi/lens[i]*np.cos(2*np.pi * x_c[i]/lens[i])
         Chi_n = 0.4 * np.sin(2*np.pi*x_n/lens.reshape((dim,)+(1,)*dim))
@@ -272,6 +274,7 @@ class GradientIntegration_Check(unittest.TestCase):
             F, fft_vec, fft_mat, fourier_gradient, delta_x)
 
         self.assertLess(np.linalg.norm(Chi_n - placement_n), self.norm_tol)
+
 
         # cosinus, diagonal deformation gradient 3D
         res = np.array([36, 14, 15])
@@ -292,7 +295,7 @@ class GradientIntegration_Check(unittest.TestCase):
         self.assertLess(np.linalg.norm(Chi_n - placement_n), self.norm_tol)
 
         # cosinus, non diagonal deformation gradient
-        res = [31, 31, 31]
+        res = [31, 19, 13]
         lens = [7, 1.4, 3]
         delta_x, dim, x_n, x_c, F, Chi_n = init_X_F_Chi(lens, res)
 
@@ -377,10 +380,12 @@ class GradientIntegration_Check(unittest.TestCase):
         placement_ana_n[0, :, :h+1] = shear_strain_soft/2 * x_n[1, :, :h+1]
         placement_ana_c[0, :, :h] = shear_strain_soft/2 * x_c[1, :, :h]
         # hard material
-        placement_ana_n[0, :, h+1:] = shear_strain_hard/2 * (x_n[1, :, h+1:]-l_soft)\
-            + shear_strain_soft/2 * l_soft
-        placement_ana_c[0, :, h:] = shear_strain_hard/2 * (x_c[1, :, h:]-l_soft)\
-            + shear_strain_soft/2 * l_soft
+        placement_ana_n[0, :, h+1:] =\
+            (shear_strain_hard/2 * (x_n[1, :, h+1:]-l_soft) +
+             shear_strain_soft/2 * l_soft)
+        placement_ana_c[0, :, h:] = \
+            (shear_strain_hard/2 * (x_c[1, :, h:]-l_soft) +
+             shear_strain_soft/2 * l_soft)
         # y-coordinate
         placement_ana_n[1, :, :] = 0
         placement_ana_c[1, :, :] = 0
@@ -390,19 +395,106 @@ class GradientIntegration_Check(unittest.TestCase):
         F_homo = (1./(np.prod(res)) * F.sum(axis=tuple(-(np.arange(dim)+1))
                                             )).reshape((dim,)*2 + (1,)*dim)
         # integration constant = integral of the nonaffine deformation gradient/N
-        int_const = - ((placement_ana_c[0, :, :] - F_homo[0, 1, :, :] * x_c[1, :, :])
+        int_const =\
+            - ((placement_ana_c[0, :, :] - F_homo[0, 1, :, :] * x_c[1, :, :])
                        .sum(axis=1))[0] / res[1]
         ana_sol_n = placement_ana_n + x_n + \
             np.array([int_const, 0]).reshape((dim,) + (1,)*dim)
 
         # check the numeric vs the analytic solution
-        norm_n = np.linalg.norm(placement_n - ana_sol_n)\
-            / np.prod(np.array(res))
+        norm_n = \
+            (np.linalg.norm(placement_n - ana_sol_n)/
+             np.prod(np.array(res)))
         self.assertLess(norm_n, 1.17e-5)
         norm_n_disc = \
-            np.linalg.norm(placement_n_disc - ana_sol_n)\
-            / np.prod(np.array(res))
+            (np.linalg.norm(placement_n_disc - ana_sol_n)/
+             np.prod(np.array(res)))
         self.assertLess(norm_n_disc, 3.89e-6)
+
+
+
+    def test_fourier_integrate_tensor_2_small_strain(self):
+        """
+        Test the correct integration of a second-rank tensor gradient field,
+        like the deformation gradient, using fourier integration.
+        """
+        strain_amp = 1e-4
+        # cosinus, diagonal deformation gradient 2D
+        res = np.array([35, 19])
+        lens = np.array([0.53, 1.42])
+        delta_x, dim, x_n, x_c, E, _ = init_X_F_Chi(lens, res)
+        for i in range(dim):
+            E[i, i, :, :] = \
+                (strain_amp * (2*np.pi/lens[i])
+                 * np.cos(2*np.pi * x_c[i]/lens[i]))
+            u_n =\
+                strain_amp * np.sin(2*np.pi*x_n/(lens.reshape((dim,)+(1,)*dim)))
+        fft_vec = muFFT.FFT(list(res), dim)
+        fft_mat = muFFT.FFT(list(res), dim*dim)
+        u_integrated_n = µ.gradient_integration.integrate_tensor_2_small_strain(
+            E, fft_vec, fft_mat, delta_x)
+        self.assertLess(np.linalg.norm(u_n - u_integrated_n), self.norm_tol)
+
+        #### Non Diagonal 2D:
+        delta_x, dim, x_n, x_c, E, u_n = init_X_F_Chi(lens, res)
+        for i in range(dim):
+            u_n[i, :, :] = strain_amp * (np.sin(2*np.pi*x_n[i]/lens[i]) +
+                                         np.sin(2*np.pi*x_n[0]/lens[0]))
+        E[0, 0, :, :] = \
+            strain_amp * 4 * np.pi/lens[0]*np.cos(2*np.pi/lens[0]*x_c[0])
+        E[1, 1, :, :] =\
+            strain_amp * 2 * np.pi/lens[1]*np.cos(2*np.pi/lens[1]*x_c[1])
+        E[1, 0, :, :] =\
+            strain_amp * np.pi/lens[0]*np.cos(2*np.pi/lens[0]*x_c[0])
+        E[0, 1, :, :] =\
+            strain_amp * np.pi/lens[0]*np.cos(2*np.pi/lens[0]*x_c[0])
+
+        u_integrated_n = µ.gradient_integration.integrate_tensor_2_small_strain(
+            E, fft_vec, fft_mat, delta_x)
+        self.assertLess(np.linalg.norm(u_n - u_integrated_n), self.norm_tol)
+
+        # cosinus, diagonal deformation gradient 3D
+        res = np.array([37, 13, 15])
+        lens = np.array([7, 1.4, 3])
+        delta_x, dim, x_n, x_c, E, _ = init_X_F_Chi(lens, res)
+        for i in range(dim):
+            E[i, i, :, :] = \
+                (strain_amp * (2*np.pi/lens[i])
+                 *np.cos(2*np.pi * x_c[i]/lens[i]))
+            u_n = \
+                strain_amp * np.sin(2*np.pi*x_n/(lens.reshape((dim,)+(1,)*dim)))
+        fft_vec = muFFT.FFT(list(res), dim)
+        fft_mat = muFFT.FFT(list(res), dim*dim)
+        u_integrated_n = µ.gradient_integration.integrate_tensor_2_small_strain(
+            E, fft_vec, fft_mat, delta_x)
+        self.assertLess(np.linalg.norm(u_n - u_integrated_n), self.norm_tol)
+
+        #### Non Diagonal 2D:
+        delta_x, dim, x_n, x_c, E, u_n = init_X_F_Chi(lens, res)
+        for i in range(dim):
+            u_n[i, :, :] = strain_amp * (np.sin(2*np.pi*x_n[i]/lens[i]) +
+                                         np.sin(2*np.pi*x_n[0]/lens[0]))
+        E[0, 0, :, :] = \
+            strain_amp * 4 * np.pi/lens[0]*np.cos(2*np.pi/lens[0]*x_c[0])
+        E[1, 1, :, :] =\
+            strain_amp * 2 * np.pi/lens[1]*np.cos(2*np.pi/lens[1]*x_c[1])
+        E[2, 2, :, :] =\
+            strain_amp * 2 * np.pi/lens[2]*np.cos(2*np.pi/lens[2]*x_c[2])
+        E[1, 0, :, :] =\
+            strain_amp * np.pi/lens[0]*np.cos(2*np.pi/lens[0]*x_c[0])
+        E[0, 1, :, :] =\
+            strain_amp * np.pi/lens[0]*np.cos(2*np.pi/lens[0]*x_c[0])
+        E[0, 2, :, :] =\
+            strain_amp * np.pi/lens[0]*np.cos(2*np.pi/lens[0]*x_c[0])
+        E[2, 0, :, :] =\
+            strain_amp * np.pi/lens[0]*np.cos(2*np.pi/lens[0]*x_c[0])
+
+        fft_vec = muFFT.FFT(list(res), dim)
+        fft_mat = muFFT.FFT(list(res), dim*dim)
+        u_integrated_n = µ.gradient_integration.integrate_tensor_2_small_strain(
+            E, fft_vec, fft_mat, delta_x)
+        self.assertLess(np.linalg.norm(u_n - u_integrated_n), self.norm_tol)
+
 
     def test_discrete_integrate_tensor_2(self):
         """
@@ -422,7 +514,8 @@ class GradientIntegration_Check(unittest.TestCase):
             x[i] -= x[i].mean()  # mean of random field should be zero
         x = µ.gradient_integration.complement_periodically(x, 3)
         # Create grid positions
-        nodal_positions, center_positions = µ.gradient_integration.make_grid(np.array(lens), np.array(res))
+        nodal_positions, center_positions = \
+            µ.gradient_integration.make_grid(np.array(lens), np.array(res))
         # The displacement field lives on the corners
         x += np.einsum('ij,jxyz->ixyz', F0, nodal_positions)
         # Deformation gradient
@@ -460,7 +553,8 @@ class GradientIntegration_Check(unittest.TestCase):
         x = np.random.random(res)-0.5
         x -= x.mean()
         # Create grid positions
-        x_n, x_c = µ.gradient_integration.make_grid(np.array(lens), np.array(res))
+        x_n, x_c = \
+            µ.gradient_integration.make_grid(np.array(lens), np.array(res))
         # Gradient
         g = np.zeros([dim] + res)
         for i in range(dim):
@@ -552,6 +646,154 @@ class GradientIntegration_Check(unittest.TestCase):
                                            placement), 1e-12)
             self.assertTrue((x_n == x).all())
 
+
+    def test_compute_placement_small_strain(self):
+        """Test the computation of placements and the original positions."""
+        ### shear of a homogeneous material ###
+        res = [3, 11]  # nb_grid_pts
+        lens = [10, 12]  # lengths
+        dim = len(res)  # dimension
+        x_n = µ.gradient_integration.make_grid(np.array(lens), np.array(res))[0]
+
+        # finite strain
+        formulation = µ.Formulation.small_strain
+        cell = µ.Cell(res, lens, formulation)
+        mat = µ.material.MaterialLinearElastic1_2d.make(cell, "material",
+                                                        Young=10, Poisson=0.3)
+        for pixel_id in cell.pixel_indices:
+            mat.add_pixel(pixel_id)
+        cell.initialise()
+        DelE = 1e-4 * np.array([[0   , 0.05],
+                                [0.05, 0   ]])
+
+        # analytic
+        placement_ana = np.copy(x_n)
+        placement_ana[0, :, :] += DelE[0, 1] * x_n[1, :, :]
+        placement_ana[1, :, :] += DelE[1, 0] * x_n[0, :, :]
+
+        # µSpectre solution
+        fourier_gradient = [µ.FourierDerivative(dim, i) for i in range(dim)]
+        solver = \
+            µ.solvers.KrylovSolverCG(cell, tol=1e-6, maxiter=100,
+                                     verbose=µ.Verbosity.Silent)
+        result = µ.solvers.newton_cg(cell, DelE, solver,
+                                     newton_tol=1e-6, equil_tol=1e-6,
+                                     verbose=µ.Verbosity.Silent)
+        result_reshaped = µ.gradient_integration.reshape_gradient(
+            result.grad, res).flatten()
+        for r in [result, result_reshaped]:
+            # check input of result=OptimiseResult and result=np.ndarray
+            u_n, x = µ.gradient_integration.compute_placement(
+                r, lens, res, fourier_gradient,
+                formulation=µ.Formulation.small_strain)
+            self.assertLess(np.linalg.norm(placement_ana -
+                                           u_n), 1e-12)
+            self.assertTrue((x_n == x).all())
+
+
+    def test_compare_small_strain_finite_strain(self):
+        """Tests the equality of the displacement field obtained from
+        integration of small strain field Vs. finite strain field of a cell."""
+        F_amp = 1e-4
+        lengths = [1.0, 1.0, 1.0]
+        nb_grid_pts = [11, 11, 3]
+        dim = len(nb_grid_pts)
+        Nx, Ny, Nz = nb_grid_pts
+        formulation = µ.Formulation.small_strain
+        Young = [10, 20]  # Youngs modulus for each phase
+        Poisson = [0.3, 0.4]  # Poissons ratio for each phase
+
+        # solver
+        newton_tol = 1e-8  # tolerance for newton algo
+        cg_tol = 1e-10  # tolerance for cg algo
+        equil_tol = 1e-8  # tolerance for equilibrium
+        maxiter = 1000
+        verbose = verbose=µ.Verbosity.Silent
+
+        # sinusoidal bump
+        d = int(nb_grid_pts[1]*0.2)
+        l = Nx//3  # length of bump
+        h = Ny//5  # height of bump
+        low_y = (Ny-d)//2  # lower y-boundary of phase
+        high_y = low_y+d  # upper y-boundary of phase
+        left_x = (Nx-l)//2  # boundaries in x direction left
+        right_x = left_x + l  # boundaries in x direction right
+        x = np.arange(l)
+        p_y = h*np.sin(np.pi/(l-1)*x)  # bump function
+        xy_bump = np.ones((l, h, Nz))  # grid representing bumpx
+
+        for i, threshold in enumerate(np.round(p_y)):
+            xy_bump[i, int(threshold):, :] = 0
+
+        phase = np.zeros(nb_grid_pts, dtype=int)  # 0 for surrounding matrix
+        phase[:, low_y:high_y, :] = 1
+        phase[left_x:right_x, high_y:high_y+h, :] = xy_bump
+
+        ### Run muSpectre ###
+        #-------------------#
+        fourier_gradient =\
+            [µ.FourierDerivative(dim , i) for i in range(dim)]
+        ######finite strain:
+        DelF = F_amp * np.array([[+0.50, +0.20, +0.00],
+                                 [+0.00, -0.03, +0.15],
+                                 [+0.00, +0.15, +0.40]])
+        F = np.identity(DelF.shape[0]) + DelF
+
+        cell_finite =\
+            µ.Cell(nb_grid_pts, lengths, µ.Formulation.finite_strain,
+                   fourier_gradient)
+        mat_finite =\
+            µ.material.MaterialLinearElastic4_3d.make(cell_finite,
+                                                      "material_finite")
+        for pixel_id, pixel in cell_finite.pixels.enumerate():
+            # add Young and Poisson depending on the material index
+            m_i = phase.flatten(order='F')[pixel_id]
+            mat_finite.add_pixel(pixel_id, Young[m_i], Poisson[m_i])
+
+        cell_finite.initialise()  # initialization of fft to make faster fft
+
+        solver_newton_finite = \
+            µ.solvers.KrylovSolverCG(cell_finite, cg_tol, maxiter, verbose)
+        result_finite = µ.solvers.newton_cg(cell_finite, DelF,
+                                            solver_newton_finite,
+                                            newton_tol, equil_tol, verbose)
+        ######small strain:
+        DelE = 0.5 * ((F.T).dot(F) - np.identity(DelF.shape[0]))
+
+        cell_small =\
+            µ.Cell(nb_grid_pts, lengths, µ.Formulation.small_strain,
+                   fourier_gradient)
+        mat_small =\
+            µ.material.MaterialLinearElastic4_3d.make(cell_small,
+                                                      "material_small")
+        for pixel_id, pixel in cell_small.pixels.enumerate():
+            # add Young and Poisson depending on the material index
+            m_i = phase.flatten(order='F')[pixel_id]
+            mat_small.add_pixel(pixel_id, Young[m_i], Poisson[m_i])
+
+        cell_small.initialise()  # initialization of fft to make faster fft
+        solver_newton_small = \
+            µ.solvers.KrylovSolverCG(cell_small, cg_tol, maxiter, verbose)
+        result_small = µ.solvers.newton_cg(cell_small, DelE,
+                                           solver_newton_small,
+                                           newton_tol, equil_tol, verbose)
+
+        #-------------------#
+        # integration of the deformation gradient field
+        placement_n_finite, x = \
+            µ.gradient_integration.compute_placement(
+                result_finite, lengths, nb_grid_pts, fourier_gradient,
+                formulation = result_finite.formulation)
+
+        placement_n_small, x = \
+            µ.gradient_integration.compute_placement(
+                result_small, lengths, nb_grid_pts, fourier_gradient,
+                formulation = result_small.formulation)
+
+        err_norm = np.linalg.norm(placement_n_small - placement_n_finite)
+        self.assertLess(err_norm, F_amp * 5)
+
+
     def test_vacuum(self):
         form = µ.Formulation.finite_strain
         Poisson = 0.3
@@ -585,7 +827,8 @@ class GradientIntegration_Check(unittest.TestCase):
             lengths = [1.]*dim
             nb_grid_pts = [nb_pts]*dim
 
-            for k, gradient_op in enumerate([fourier_gradient, discrete_gradient]):
+            for k, gradient_op in enumerate([fourier_gradient,
+                                             discrete_gradient]):
                 cell = µ.Cell(nb_grid_pts, lengths, form, gradient_op)
 
                 mat_vac = mat.make(cell, "vacuum", 0, 0)
@@ -615,7 +858,6 @@ class GradientIntegration_Check(unittest.TestCase):
                     result.grad, list(cell.nb_subdomain_grid_pts))
                 PK1 = µ.gradient_integration.reshape_gradient(
                     result.stress, list(cell.nb_subdomain_grid_pts))
-
                 displ, r = µ.gradient_integration.compute_placement(
                     F, lengths, nb_grid_pts, gradient_op,
                     formulation=µ.Formulation.finite_strain)
@@ -648,6 +890,9 @@ class GradientIntegration_Check(unittest.TestCase):
                             z[0, 0, -1] - z[0, 0, -2],
                             1.5-(nb_pts-1)/nb_pts*(1 + Poisson*0.1*dim),
                             delta=0.05)
+
+
+
 
 if __name__ == '__main__':
     unittest.main()
