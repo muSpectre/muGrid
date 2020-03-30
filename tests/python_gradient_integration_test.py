@@ -563,7 +563,7 @@ class GradientIntegration_Check(unittest.TestCase):
         fft_sca = muFFT.FFT(res)
         fft_vec = muFFT.FFT(res, dim)
         dy = muFFT.DiscreteDerivative([0, 0], [[-1, 1]])
-        dx = dy.rollaxes(1)
+        dx = dy.rollaxes(-1)
         discrete_gradient = [dx, dy]
         int_x = µ.gradient_integration.integrate_vector(
             g, fft_sca, fft_vec, discrete_gradient, delta_x)
@@ -864,32 +864,32 @@ class GradientIntegration_Check(unittest.TestCase):
 
                 if dim == 2:
                     x, y = displ
-                    if k == 1:
+                    if k == 0:
                         # Fourier gradient
+                        self.assertAlmostEqual(
+                            y[0, -1] - y[0, -2],
+                            1.5-(nb_pts-1)/nb_pts*(1 + Poisson*0.1*dim),
+                            delta=0.05)
+                    else:
+                        # discrete gradient
                         self.assertAlmostEqual(
                             y[0, -1] - y[0, -2],
                             1.5-(nb_pts-1)/nb_pts*(1 + Poisson*0.1*dim),
                             delta=0.03)
-                    else:
-                        # discrete gradient
-                        self.assertAlmostEqual(
-                            y[0, -1] - y[0, -2],
-                            1.5-(nb_pts-1)/nb_pts*(1 + Poisson*0.1*dim),
-                            delta=0.05)
                 else:
                     x, y, z = displ
-                    if k == 1:
+                    if k == 0:
                         # Fourier gradient
                         self.assertAlmostEqual(
                             z[0, 0, -1] - z[0, 0, -2],
                             1.5-(nb_pts-1)/nb_pts*(1 + Poisson*0.1*dim),
-                            delta=0.015)
+                            delta=0.05)
                     else:
                         # discrete gradient
                         self.assertAlmostEqual(
                             z[0, 0, -1] - z[0, 0, -2],
                             1.5-(nb_pts-1)/nb_pts*(1 + Poisson*0.1*dim),
-                            delta=0.05)
+                            delta=0.015)
 
 
 

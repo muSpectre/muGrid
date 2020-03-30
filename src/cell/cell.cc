@@ -56,12 +56,16 @@ namespace muSpectre {
       : projection{std::move(projection)},
         fields{std::make_unique<muGrid::GlobalFieldCollection>(
             this->get_spatial_dim(), this->get_nb_quad_pts())},
+        // We request the DOFs for a single quadrature point, since quadrature
+        // points are handled by the field.
         strain{this->fields->register_real_field(
             "strain", dof_for_formulation(this->get_formulation(),
-                                          this->get_material_dim()))},
+                                          this->get_material_dim(),
+                                          OneQuadPt))},
         stress{this->fields->register_real_field(
             "stress", dof_for_formulation(this->get_formulation(),
-                                          this->get_material_dim()))},
+                                          this->get_material_dim(),
+                                          OneQuadPt))},
         is_cell_split{is_cell_split} {
     this->fields->initialise(this->projection->get_nb_subdomain_grid_pts(),
                              this->projection->get_subdomain_locations());
@@ -265,7 +269,8 @@ namespace muSpectre {
         this->tangent = this->fields->register_real_field(
             "Tangent_stiffness",
             muGrid::ipow(dof_for_formulation(this->get_formulation(),
-                                             this->get_material_dim()),
+                                             this->get_material_dim(),
+                                             OneQuadPt),
                          2));
       } else {
         throw RuntimeError("Tangent has not been created");

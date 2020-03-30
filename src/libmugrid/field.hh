@@ -110,6 +110,15 @@ namespace muGrid {
     //! return the number of components stored per quadrature point
     const Dim_t & get_nb_dof_per_quad_pt() const;
 
+    //! return the number of quadrature points per pixel
+    const Dim_t & get_nb_quad_pts() const;
+
+    //! return the number of components stored per pixel
+    Dim_t get_nb_dof_per_pixel() const;
+
+    //! return the number of pixels
+    Dim_t get_nb_pixels() const;
+
     /**
      * evaluate and return the overall shape of the field (for passing the
      * field to generic multidimensional array objects such as numpy.ndarray)

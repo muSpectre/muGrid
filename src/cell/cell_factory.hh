@@ -65,18 +65,45 @@ namespace muSpectre {
         const DynCcoord_t & nb_grid_pts, const DynRcoord_t & lengths,
         const Formulation & form, muFFT::Gradient_t gradient,
         const muFFT::Communicator & comm = muFFT::Communicator()) {
-      // TODO(pastewka) the number of quad points should be deducible from the
-      // gradient, right?
+      if (static_cast<Dim_t>(gradient.size()) % nb_grid_pts.get_dim() != 0) {
+        std::stringstream error{};
+        error << "There are " << gradient.size() << " derivative operators in "
+              << "the gradient. This number must be divisible by the system "
+              << "dimension " << nb_grid_pts.get_dim() << ".";
+        throw std::runtime_error(error.str());
+      }
+      // Deduce number of quad points from the gradient
+      Dim_t nb_quad_pts = gradient.size() / nb_grid_pts.get_dim();
       auto fft_ptr{std::make_unique<FFTEngine>(
-          nb_grid_pts, dof_for_formulation(form, DimS), comm)};
+          nb_grid_pts, dof_for_formulation(form, DimS, nb_quad_pts), comm)};
       switch (form) {
       case Formulation::finite_strain: {
-        using Projection = ProjectionFiniteStrainFast<DimS>;
-        return std::make_unique<Projection>(std::move(fft_ptr), lengths,
-                                            gradient);
+        if (nb_quad_pts == OneQuadPt) {
+          using Projection = ProjectionFiniteStrainFast<DimS, OneQuadPt>;
+          return std::make_unique<Projection>(std::move(fft_ptr), lengths,
+                                              gradient);
+        } else if (nb_quad_pts == TwoQuadPts) {
+          using Projection = ProjectionFiniteStrainFast<DimS, TwoQuadPts>;
+          return std::make_unique<Projection>(std::move(fft_ptr), lengths,
+                                              gradient);
+        } else if (nb_quad_pts == FourQuadPts) {
+          using Projection = ProjectionFiniteStrainFast<DimS, FourQuadPts>;
+          return std::make_unique<Projection>(std::move(fft_ptr), lengths,
+                                              gradient);
+        } else {
+          std::stringstream error;
+          error << nb_quad_pts << " quadrature points are presently "
+                << "unsupported.";
+          throw std::runtime_error(error.str());
+        }
         break;
       }
       case Formulation::small_strain: {
+        if (nb_quad_pts != OneQuadPt) {
+          throw std::runtime_error("The small strain formation can presently "
+                                   "only be used with a single quadrature "
+                                   "point.");
+        }
         using Projection = ProjectionSmallStrain<DimS>;
         return std::make_unique<Projection>(std::move(fft_ptr), lengths,
                                             gradient);

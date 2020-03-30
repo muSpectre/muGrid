@@ -56,7 +56,7 @@ namespace muSpectre {
 
     using FC_t = muGrid::GlobalFieldCollection;
     FC_t globalfields{Fix::MaterialDimension(), muGrid::Unknown};
-    globalfields.set_nb_quad(Fix::NbQuadPts);
+    globalfields.set_nb_quad_pts(Fix::NbQuadPts);
     globalfields.initialise(cube, loc);
     globalfields.register_real_field("Transformation Gradient", mdim * mdim);
     auto & P1 = globalfields.register_real_field(

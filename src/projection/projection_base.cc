@@ -41,10 +41,16 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   ProjectionBase::ProjectionBase(muFFT::FFTEngine_ptr engine,
-                                 DynRcoord_t domain_lengths, Formulation form)
+                                 DynRcoord_t domain_lengths,
+                                 Dim_t nb_quad_pts,
+                                 Formulation form)
       : fft_engine{std::move(engine)}, domain_lengths{domain_lengths},
-        form{form}, projection_container{
-                        this->fft_engine->get_field_collection()} {
+        nb_quad_pts{nb_quad_pts}, form{form},
+        projection_container{this->fft_engine->get_field_collection()} {
+    if (nb_quad_pts <= 0) {
+      throw std::runtime_error("Number of quadrature points must be larger "
+                               "than zero.");
+    }
     if (this->domain_lengths.get_dim() != this->fft_engine->get_spatial_dim()) {
       std::stringstream error{};
       error << "The domain lengths supplied are "
@@ -58,12 +64,12 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   void ProjectionBase::initialise(const muFFT::FFT_PlanFlags & flags) {
     if (this->get_nb_dof_per_pixel() * this->get_nb_quad_pts() !=
-        fft_engine->get_nb_dof_per_pixel()) {
+        this->fft_engine->get_nb_dof_per_pixel()) {
       std::stringstream error;
       error << "Incompatible number of components per pixel. The projection "
-            << "operator expects " << this->get_nb_dof_per_pixel() << " for "
-            << this->get_nb_quad_pts() << " quadrature points, "
-            << "but the FFT engine reported "
+            << "operator expects " << this->get_nb_dof_per_pixel()
+            << " components for " << this->get_nb_quad_pts() << " quadrature "
+            << "points, but the FFT engine reported "
             << fft_engine->get_nb_dof_per_pixel() << " degrees of freedom.";
       throw ProjectionError(error.str());
     }
@@ -80,7 +86,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   const Dim_t & ProjectionBase::get_nb_quad_pts() const {
-    return this->fft_engine->get_nb_quad_pts();
+    return this->nb_quad_pts;
   }
 
   /* ---------------------------------------------------------------------- */

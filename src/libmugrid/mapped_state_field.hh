@@ -123,7 +123,7 @@ namespace muGrid {
         break;
       }
       case Iteration::Pixel: {
-        if (not collection.has_nb_quad()) {
+        if (not collection.has_nb_quad_pts()) {
           throw FieldMapError("Can't create a pixel map for state field '" +
                                unique_prefix +
                                "' before the number of quadrature points has "

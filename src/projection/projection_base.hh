@@ -92,7 +92,7 @@ namespace muSpectre {
 
     //! Constructor with cell sizes
     ProjectionBase(muFFT::FFTEngine_ptr engine, DynRcoord_t domain_lengths,
-                   Formulation form);
+                   Dim_t nb_quad_pts, Formulation form);
 
     //! Copy constructor
     ProjectionBase(const ProjectionBase & other) = delete;
@@ -187,6 +187,7 @@ namespace muSpectre {
     //! handle on the fft_engine used
     muFFT::FFTEngine_ptr fft_engine;
     DynRcoord_t domain_lengths;  //!< physical sizes of the cell
+    Dim_t nb_quad_pts;
     /**
      * formulation this projection can be applied to (determines
      * whether the projection enforces gradients, small strain tensor

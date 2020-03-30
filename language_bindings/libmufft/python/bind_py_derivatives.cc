@@ -134,7 +134,7 @@ void add_discrete_derivative(py::module & mod, std::string name) {
              DerivativeBase                        // base class
              >(mod, name.c_str())
       .def(py::init([](const DynCcoord_t & lbounds,
-                       py::array_t<Real, py::array::c_style> stencil) {
+                       py::array_t<Real, py::array::f_style> stencil) {
              const py::buffer_info & info = stencil.request();
              if (info.ndim != lbounds.get_dim()) {
                std::stringstream s;
@@ -152,7 +152,12 @@ void add_discrete_derivative(py::module & mod, std::string name) {
            }),
            "lbounds"_a, "stencil"_a)
       .def("rollaxes", &DiscreteDerivative::rollaxes,
-           "distance"_a = 1);
+           "distance"_a = 1)
+      .def_property_readonly("stencil", [](const DiscreteDerivative & self) {
+        const Eigen::ArrayXd & stencil = self.get_stencil();
+        return py::array_t<double, py::array::f_style>(
+            self.get_nb_pts(), stencil.data());
+      });
 }
 
 void add_derivatives(py::module & mod) {

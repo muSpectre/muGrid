@@ -158,7 +158,6 @@ def get_integrator(fft, gradient_op, grid_spacing):
     np.ndarray containing the fourier coefficients of the integrator
     """
     dim = len(grid_spacing)
-    nb_grid_pts = np.asarray(fft.nb_domain_grid_pts)
 
     phase = fft.fftfreq
     # The shift is needed to move the Fourier integration from the cell center
@@ -169,7 +168,8 @@ def get_integrator(fft, gradient_op, grid_spacing):
         shift = np.exp(1j*np.pi*np.sum(phase, axis=0))
 
     xi = np.zeros(phase.shape, dtype=complex)
-    for i, (_derivative, _grid_spacing) in enumerate(zip(gradient_op, grid_spacing)):
+    for i, (_derivative, _grid_spacing) in \
+            enumerate(zip(gradient_op, grid_spacing)):
         if _derivative.__class__.__name__.startswith('Fourier'):
             # Shift to cell edges.
             xi[i] = _derivative.fourier(phase) * shift / _grid_spacing

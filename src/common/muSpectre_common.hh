@@ -59,6 +59,8 @@ namespace muSpectre {
   using muGrid::twoD;
 
   using muGrid::OneQuadPt;
+  using muGrid::TwoQuadPts;
+  using muGrid::FourQuadPts;
 
   using muGrid::firstOrder;
   using muGrid::fourthOrder;
@@ -138,15 +140,13 @@ namespace muSpectre {
 
   //! compute the number of degrees of freedom to store for the strain
   //! tensor given dimension dim
-  constexpr Dim_t dof_for_formulation(const Formulation form, const Dim_t dim) {
+  constexpr Dim_t dof_for_formulation(const Formulation form, const Dim_t dim,
+                                      const Dim_t nb_quad_pts) {
     switch (form) {
-    case Formulation::small_strain_sym: {
-      return vsize(dim);
-      break;
-    }
+    case Formulation::small_strain_sym:
+      return vsize(dim) * nb_quad_pts;
     default:
-      return muGrid::ipow(dim, 2);
-      break;
+      return muGrid::ipow(dim, 2) * nb_quad_pts;
     }
   }
 

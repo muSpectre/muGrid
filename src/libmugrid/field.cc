@@ -59,6 +59,21 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
+  const Dim_t & Field::get_nb_quad_pts() const {
+    return this->collection.get_nb_quad_pts();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  Dim_t Field::get_nb_dof_per_pixel() const {
+    return this->get_nb_dof_per_quad_pt() * this->get_nb_quad_pts();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  Dim_t Field::get_nb_pixels() const {
+    return this->collection.get_nb_pixels();
+  }
+
+  /* ---------------------------------------------------------------------- */
   std::vector<Dim_t> Field::get_shape(Iteration iter_type) const {
     std::vector<Dim_t> shape;
 

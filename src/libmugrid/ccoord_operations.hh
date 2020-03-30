@@ -93,6 +93,12 @@ namespace muGrid {
       }
     }  // namespace internal
 
+    //! modulo operator that can handle negative values
+    template <typename T>
+    inline T modulo(const T & a, const T & b) {
+      return (b + (a % b)) % b;
+    }
+
     //-----------------------------------------------------------------------//
     //! returns a grid of equal number of grid points in each direction
     template <size_t dim, typename T>
@@ -333,7 +339,7 @@ namespace muGrid {
     }
 
     //------------------------------------------------------------------------//
-    //! get the linear index of a pixel in a given grid
+    //! get the linear index of a pixel in a column-major grid
     template <size_t dim>
     constexpr Dim_t get_index(const Ccoord_t<dim> & nb_grid_pts,
                               const Ccoord_t<dim> & locations,
@@ -349,7 +355,7 @@ namespace muGrid {
       return retval;
     }
 
-    //! get the linear index of a pixel in a given grid
+    //! get the linear index of a pixel in a column-major grid
     Dim_t get_index(const DynCcoord_t & nb_grid_pts,
                     const DynCcoord_t & locations, const DynCcoord_t & ccoord);
 
@@ -364,12 +370,14 @@ namespace muGrid {
     //! get the linear index of a pixel given a set of strides
     template <size_t dim>
     constexpr Dim_t get_index_from_strides(const Ccoord_t<dim> & strides,
+                                           const Ccoord_t<dim> & locations,
                                            const Ccoord_t<dim> & ccoord) {
       Dim_t retval{0};
-      for (const auto & tup : akantu::zip(strides, ccoord)) {
+      for (const auto & tup : akantu::zip(strides, locations, ccoord)) {
         const auto & stride = std::get<0>(tup);
-        const auto & ccord_ = std::get<1>(tup);
-        retval += stride * ccord_;
+        const auto & location = std::get<1>(tup);
+        const auto & coord = std::get<2>(tup);
+        retval += stride * (coord - location);
       }
       return retval;
     }
@@ -377,12 +385,14 @@ namespace muGrid {
     //! get the linear index of a pixel given a set of strides
     template <size_t MaxDim>
     Dim_t get_index_from_strides(const DynCcoord<MaxDim> & strides,
+                                 const DynCcoord<MaxDim> & locations,
                                  const DynCcoord<MaxDim> & ccoord) {
       Dim_t retval{0};
-      for (const auto & tup : akantu::zip(strides, ccoord)) {
+      for (const auto & tup : akantu::zip(strides, locations, ccoord)) {
         const auto & stride = std::get<0>(tup);
-        const auto & ccord_ = std::get<1>(tup);
-        retval += stride * ccord_;
+        const auto & location = std::get<1>(tup);
+        const auto & coord = std::get<2>(tup);
+        retval += stride * (coord - location);
       }
       return retval;
     }
@@ -473,7 +483,8 @@ namespace muGrid {
 
       //! evaluate and return the linear index corresponding to dynamic `ccoord`
       Dim_t get_index(const DynCcoord_t & ccoord) const {
-        return get_index_from_strides(this->strides, ccoord);
+        return get_index_from_strides(
+            this->strides, this->subdomain_locations, ccoord);
       }
 
       //! evaluate and return the linear index corresponding to `ccoord`
@@ -483,7 +494,7 @@ namespace muGrid {
           throw RuntimeError("dimension mismatch");
         }
         return get_index_from_strides(this->strides.template get<Dim>(),
-                                      ccoord);
+            this->subdomain_locations.template get<Dim>(), ccoord);
       }
 
       /**
@@ -631,7 +642,7 @@ namespace muGrid {
         std::tuple<Dim_t, Parent::value_type> operator*() const {
           auto && pixel{this->Parent::operator*()};
           return std::tuple<Dim_t, Parent::value_type>{
-              get_index_from_strides(this->pixels.strides, pixel), pixel};
+              this->pixels.get_index(pixel), pixel};
         }
       };
 

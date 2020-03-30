@@ -55,7 +55,7 @@ namespace muGrid {
               "test", NbMemory(), NbComponents())} {
       this->fc.add_pixel(4);
       this->fc.add_pixel(8);
-      this->fc.set_nb_quad(2);
+      this->fc.set_nb_quad_pts(2);
       this->fc.initialise();
     }
     TypedStateField<Real> & state_field;

@@ -43,6 +43,7 @@
 
 #include <Eigen/Dense>
 
+using muGrid::Iteration;
 using muFFT::DiscreteDerivative;
 
 namespace muSpectre {
@@ -51,14 +52,20 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   using fixlist = boost::mpl::list<
-      ProjectionFixture<twoD, twoD, Squares<twoD>, DiscreteGradient<twoD>,
+      ProjectionFixture<twoD, twoD, Squares<twoD>,
+                        DiscreteGradient<twoD>,
                         ProjectionFiniteStrain<twoD>>,
       ProjectionFixture<threeD, threeD, Squares<threeD>,
                         DiscreteGradient<threeD>,
                         ProjectionFiniteStrain<threeD>>,
 
-      ProjectionFixture<twoD, twoD, Squares<twoD>, DiscreteGradient<twoD>,
+      ProjectionFixture<twoD, twoD, Squares<twoD>,
+                        DiscreteGradient<twoD>,
                         ProjectionFiniteStrainFast<twoD>>,
+      ProjectionFixture<twoD, twoD, Squares<twoD>,
+                        DiscreteGradient<twoD, TwoQuadPts>,
+                        ProjectionFiniteStrainFast<twoD, TwoQuadPts>,
+                        TwoQuadPts>,
       ProjectionFixture<threeD, threeD, Squares<threeD>,
                         DiscreteGradient<threeD>,
                         ProjectionFiniteStrainFast<threeD>>>;
@@ -305,7 +312,7 @@ namespace muSpectre {
         stencil4.fourier(
                     (DiscreteDerivative::Vector(twoD) << 0.5, 0).finished())
                 .real() -
-            -2.,
+            0.,
         tol);
     BOOST_CHECK_SMALL(
         stencil4.fourier(
@@ -315,6 +322,18 @@ namespace muSpectre {
         tol);
     BOOST_CHECK_SMALL(
         stencil4.fourier(
+                (DiscreteDerivative::Vector(twoD) << 0, 0.5).finished())
+            .real() -
+        -2.,
+        tol);
+    BOOST_CHECK_SMALL(
+        stencil4.fourier(
+                (DiscreteDerivative::Vector(twoD) << 0, 0.5).finished())
+            .imag() -
+        0.,
+        tol);
+    BOOST_CHECK_SMALL(
+        stencil4.fourier(
                     (DiscreteDerivative::Vector(twoD) << 0.5, 0.5).finished())
                 .real() -
             0.,
@@ -324,12 +343,12 @@ namespace muSpectre {
                     (DiscreteDerivative::Vector(twoD) << 0.5, 0.5).finished())
                 .imag() -
             0.,
-        tol);
+            tol);
     BOOST_CHECK_SMALL(
         stencil4.fourier(
                     (DiscreteDerivative::Vector(twoD) << 0.5, 1).finished())
                 .real() -
-            -2.,
+            0.,
         tol);
     BOOST_CHECK_SMALL(
         stencil4.fourier(
@@ -341,15 +360,27 @@ namespace muSpectre {
         stencil4.fourier(
                     (DiscreteDerivative::Vector(twoD) << 0.25, 0).finished())
                 .real() -
-            -1.,
+            0.,
         tol);
     BOOST_CHECK_SMALL(
         stencil4.fourier(
                     (DiscreteDerivative::Vector(twoD) << 0.25, 0).finished())
                 .imag() -
-            1.,
+            0.,
         tol);
-  }
+    BOOST_CHECK_SMALL(
+        stencil4.fourier(
+                (DiscreteDerivative::Vector(twoD) << 1, 0.25).finished())
+            .real() -
+        -1.,
+        tol);
+    BOOST_CHECK_SMALL(
+        stencil4.fourier(
+                (DiscreteDerivative::Vector(twoD) << 1, 0.25).finished())
+            .imag() -
+        1.,
+        tol);
+    }
 
   /* ---------------------------------------------------------------------- */
   BOOST_AUTO_TEST_CASE(even_grid_test) {
@@ -365,17 +396,22 @@ namespace muSpectre {
                                    fix) {
     // create a first order central difference gradient field with a zero mean
     // gradient and verify that the projection preserves it.
-    constexpr Dim_t dim{fix::sdim}, sdim{fix::sdim}, mdim{fix::mdim};
+    constexpr Dim_t dim{fix::sdim}, sdim{fix::sdim}, mdim{fix::mdim},
+        nb_quad{fix::nb_quad};
     static_assert(
         dim == fix::mdim,
         "These tests assume that the material and spatial dimension are "
         "identical");
     using Fields = muGrid::GlobalFieldCollection;
-    using FieldMap = muGrid::MatrixFieldMap<Real, Mapping::Mut, mdim, mdim>;
+    using FieldMap = muGrid::MatrixFieldMap<Real, Mapping::Mut,
+                                            mdim, mdim * nb_quad,
+                                            Iteration::Pixel>;
     using FieldMap1D = muGrid::MatrixFieldMap<Real, Mapping::Mut, 1, mdim>;
     using Vector = Eigen::Matrix<Real, dim, 1>;
 
-    Fields fields{sdim, OneQuadPt};
+    Gradient_t gradient{fix::GradientGiver::get_gradient()};
+
+    Fields fields{sdim, nb_quad};
     // displacement field
     muGrid::RealField & f_disp{
         fields.register_real_field("displacement", mdim)};
@@ -420,36 +456,26 @@ namespace muSpectre {
 
     BOOST_TEST_CHECKPOINT("displacement field filled");
 
-    // compute the gradient field
-    for (auto && tup : akantu::zip(
-             fields.get_pixels().template get_dimensioned_pixels<mdim>(), grad,
-             var)) {
-      auto & ccoord = std::get<0>(tup);
-      auto & g = std::get<1>(tup);
-      auto & v = std::get<2>(tup);
-
-      // compute first order central difference derivative
-      Ccoord_t<sdim> ccoord_min;
-      ccoord_min.fill(0);
-      Ccoord_t<sdim> ccoord_max;
-      ccoord_max = fix::projector.get_nb_domain_grid_pts();
-      for (Dim_t j = 0; j < dim; j++) {
-        auto ccoord_minus_delta = ccoord;
-        auto ccoord_plus_delta = ccoord;
-        ccoord_minus_delta[j] -= 1;
-        ccoord_plus_delta[j] += 1;
-        // fix for periodic boundary conditions
-        if (ccoord_minus_delta[j] < ccoord_min[j]) {
-          ccoord_minus_delta[j] = ccoord_max[j] - 1;
+    // compute the gradient field in real space
+    for (Dim_t quad{0}; quad < nb_quad; ++quad) {
+      for (Dim_t i{0}; i < dim; ++i) {
+        Dim_t k{quad * dim + i};
+        for (Dim_t j{0}; j < dim; ++j) {
+          auto derivative_op{
+              std::dynamic_pointer_cast<muFFT::DiscreteDerivative>(
+                  gradient[k])};
+          // Storage order of gradient fields: We want to be able to iterate
+          // over a gradient field using either QuadPts or Pixels iterators.
+          // A quadrature point iterator returns a dim x dim matrix. A pixels
+          // iterator must return a dim x dim * nb_quad matrix, since every-
+          // thing is column major this matrix is just two dim x dim matrices
+          // that are stored consecutive in memory. This means the components of
+          // the displacement field, not the components of the gradient, must be
+          // stored consecutive in memory and are the first index.
+          derivative_op->apply(f_disp, j, f_grad, j + dim * k, 1.0/delta_x[i]);
+          derivative_op->apply(f_disp, j, f_var, j + dim * k, 1.0/delta_x[i]);
         }
-        if (ccoord_plus_delta[j] >= ccoord_max[j]) {
-          ccoord_plus_delta[j] = ccoord_min[j];
-        }
-        g.col(j) = (disp[fields.get_index(ccoord_plus_delta)] -
-                    disp[fields.get_index(ccoord_minus_delta)]) /
-                   (2 * delta_x[j]);
       }
-      v = g;
     }
 
     BOOST_TEST_CHECKPOINT("gradient field computed");
@@ -476,6 +502,9 @@ namespace muSpectre {
         std::cout << std::endl
                   << "vector :" << std::endl
                   << vec.transpose() << std::endl;
+        std::cout << std::endl << "nb_grid_pts :" << std::endl;
+        muGrid::operator<<(
+            std::cout, fix::projector.get_nb_subdomain_grid_pts()) << std::endl;
       }
     }
   }
@@ -484,12 +513,13 @@ namespace muSpectre {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(idempotent_test, fix, fixlist, fix) {
     // check if the discrete projection operator is still a projection operator.
     // Thus it has to be idempotent, G^2=G or G:G:test_field = G:test_field.
-    constexpr Dim_t dim{fix::sdim}, sdim{fix::sdim}, mdim{fix::mdim};
+    constexpr Dim_t dim{fix::sdim}, sdim{fix::sdim}, mdim{fix::mdim},
+        nb_quad{fix::nb_quad};
     using Fields = muGrid::GlobalFieldCollection;
     using FieldMap = muGrid::MatrixFieldMap<Real, Mapping::Mut, mdim, mdim>;
     using Vector = Eigen::Matrix<Real, dim, 1>;
 
-    Fields fields{sdim, OneQuadPt};
+    Fields fields{sdim, nb_quad};
     muGrid::RealField & f_grad{
         fields.register_real_field("gradient", mdim * mdim)};
     muGrid::RealField & f_grad_test{

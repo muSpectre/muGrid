@@ -78,7 +78,8 @@ namespace muGrid {
     UintField & scalar_field{
         fc.register_uint_field("Scalar unsigned integer", 1)};
     ComplexField & matrix_field{fc.register_complex_field(
-        "Matrixfield Complex sdim × nb_quad", SpatialDimension * NbQuadPts)};
+        "Matrixfield Complex sdim × nb_quad_pts",
+        SpatialDimension * NbQuadPts)};
   };
   using mult_collections = boost::mpl::list<
       FC_multi_fixture<twoD, FieldCollection::ValidityDomain::Global,
@@ -147,7 +148,7 @@ namespace muGrid {
     }
     CcoordOps::Pixels<Fix::spatial_dimension()> pixels{nb_grid_pts};
     BOOST_CHECK_THROW(Fix::fc.initialise(nb_grid_pts), FieldCollectionError);
-    Fix::fc.set_nb_quad(NbQuad);
+    Fix::fc.set_nb_quad_pts(NbQuad);
     BOOST_CHECK(not Fix::fc.is_initialised());
     BOOST_CHECK_NO_THROW(Fix::fc.initialise(nb_grid_pts));
     BOOST_CHECK(Fix::fc.is_initialised());
@@ -170,12 +171,12 @@ namespace muGrid {
     constexpr Dim_t NbQuad{3};
     std::array<Dim_t, NbPixels> indices{0, 12, 46, 548, 6877, 54862};
     BOOST_CHECK_THROW(fc.initialise(), FieldCollectionError);
-    BOOST_CHECK_EQUAL(fc.has_nb_quad(), false);
+    BOOST_CHECK_EQUAL(fc.has_nb_quad_pts(), false);
     for (const auto & index : indices) {
       fc.add_pixel(index);
     }
-    fc.set_nb_quad(NbQuad);
-    BOOST_CHECK_EQUAL(fc.has_nb_quad(), true);
+    fc.set_nb_quad_pts(NbQuad);
+    BOOST_CHECK_EQUAL(fc.has_nb_quad_pts(), true);
     BOOST_CHECK_NO_THROW(fc.initialise());
     BOOST_CHECK_THROW(fc.initialise(), FieldCollectionError);
     BOOST_CHECK_EQUAL(NbPixels * NbQuad, fc.get_nb_entries());
@@ -196,7 +197,7 @@ namespace muGrid {
       nb_grid_pts[i] = nb_grid;
       nb_pixels *= nb_grid;
     }
-    Fix::fc.set_nb_quad(NbQuad);
+    Fix::fc.set_nb_quad_pts(NbQuad);
     Fix::fc.initialise(nb_grid_pts);
 
     for (auto && tup : akantu::enumerate(Fix::fc.get_pixel_indices())) {
@@ -225,7 +226,7 @@ namespace muGrid {
     for (const auto & index : pixel_indices) {
       fc.add_pixel(index);
     }
-    fc.set_nb_quad(NbQuad);
+    fc.set_nb_quad_pts(NbQuad);
 
     for (auto && tup : akantu::zip(fc.get_pixel_indices(), pixel_indices)) {
       auto && stored_id{std::get<0>(tup)};
@@ -249,7 +250,7 @@ namespace muGrid {
       nb_grid_pts[i] = nb_grid;
       nb_pixels *= nb_grid;
     }
-    Fix::fc.set_nb_quad(NbQuad);
+    Fix::fc.set_nb_quad_pts(NbQuad);
     Fix::fc.initialise(nb_grid_pts);
 
     auto fc2{Fix::fc.get_empty_clone()};
@@ -267,7 +268,7 @@ namespace muGrid {
     for (const auto & index : pixel_indices) {
       fc.add_pixel(index);
     }
-    fc.set_nb_quad(NbQuad);
+    fc.set_nb_quad_pts(NbQuad);
 
     auto fc2{fc.get_empty_clone()};
     BOOST_CHECK_EQUAL(fc2.get_nb_quad_pts(), fc.get_nb_quad_pts());

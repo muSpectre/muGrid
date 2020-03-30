@@ -171,7 +171,7 @@ namespace muGrid {
           "push_back() makes no sense on global fields (you can't "
           "add individual pixels");
     }
-    if (not this->collection.has_nb_quad()) {
+    if (not this->collection.has_nb_quad_pts()) {
       throw FieldError("Cannot push_back into a field before the number of "
                         "quadrature points has bee set for the collection");
     }
@@ -195,7 +195,7 @@ namespace muGrid {
           "push_back() makes no sense on global fields (you can't "
           "add individual pixels");
     }
-    if (not this->collection.has_nb_quad()) {
+    if (not this->collection.has_nb_quad_pts()) {
       throw FieldError("Cannot push_back into a field before the number of "
                         "quadrature points has bee set for the collection");
     }

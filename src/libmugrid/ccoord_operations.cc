@@ -59,9 +59,9 @@ namespace muGrid {
       }
       Dim_t retval{0};
       Dim_t factor{1};
-      for (Dim_t i = dim - 1; i >= 0; --i) {
+      for (Dim_t i = 0; i < dim; ++i) {
         retval += (ccoord[i] - locations[i]) * factor;
-        if (i != 0) {
+        if (i != dim - 1) {
           factor *= nb_grid_pts[i];
         }
       }

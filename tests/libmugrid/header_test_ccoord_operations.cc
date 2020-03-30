@@ -99,7 +99,8 @@ namespace muGrid {
     for (size_t i{0}; i < nb_pix; ++i) {
       BOOST_CHECK_EQUAL(
           i, CcoordOps::get_index_from_strides(
-                 stride, CcoordOps::get_ccoord(sizes, locations, i)));
+                 stride, Ccoord{},
+                 CcoordOps::get_ccoord(sizes, locations, i)));
     }
   }
 

@@ -78,10 +78,10 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         form = µ.Formulation.finite_strain
         # use e.g. average upwind differences
         dz = muFFT.DiscreteDerivative([0, 0, 0],
-                                      [[[-0.25, -0.25], [-0.25, -0.25]],
-                                       [[0.25,  0.25], [0.25,  0.25]]])
-        dx = dz.rollaxes(1)
-        dy = dx.rollaxes(1)
+                                      [[[-0.25, 0.25], [-0.25, 0.25]],
+                                       [[-0.25, 0.25], [-0.25, 0.25]]])
+        dy = dz.rollaxes(-1)
+        dx = dy.rollaxes(-1)
         discrete_gradient = [dx, dy, dz]
 
         cell = µ.Cell(nb_grid_pts, lens, form, discrete_gradient, fft)
@@ -90,9 +90,10 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         # stores a hyper elasto plastic 1 material for each pixel
         mat_hpl1_array = np.empty((3, 3, 3), dtype=object)
         for index, mat in np.ndenumerate(mat_hpl1_array):
-            mat_hpl1_array[index] = µ.material.MaterialHyperElastoPlastic1_3d.make(
-                cell, "3d-small", E[index], Poisson,
-                yield_crit[index], hardening)
+            mat_hpl1_array[index] = \
+                µ.material.MaterialHyperElastoPlastic1_3d.make(
+                    cell, "3d-small", E[index], Poisson,
+                    yield_crit[index], hardening)
 
         mat_hpl2 = µ.material.MaterialHyperElastoPlastic2_3d.make(
             cell2, "3d-hpl")
@@ -116,10 +117,11 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         solver2 = µ.solvers.KrylovSolverCG(cell2, cg_tol, maxiter, verbose)
         cell2.initialise()
 
-        # total deformation
+        # total deformation. The factor of 0.85 is to achieve convergence. This
+        # is the largest strain for which the solver converges.
         DelF = np.array([[-0.05,  0.10,  0.00],
                          [0.00, -0.05,  0.00],
-                         [0.00,  0.00,  0.00]])
+                         [0.00,  0.00,  0.00]])*0.85
 
         ### Start muSpectre ###
         #---------------------#
@@ -160,8 +162,8 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         dz = muFFT.DiscreteDerivative([0, 0, 0],
                                       [[[-0.25, 0.25], [-0.25, 0.25]],
                                        [[-0.25, 0.25], [-0.25, 0.25]]])
-        dx = dz.rollaxes(1)
-        dy = dx.rollaxes(1)
+        dy = dz.rollaxes(-1)
+        dx = dy.rollaxes(-1)
         discrete_gradient = [dx, dy, dz]
 
         cell = µ.Cell(nb_grid_pts, lens, form, discrete_gradient, fft)

@@ -120,14 +120,14 @@ namespace muGrid {
      * entry
      */
     explicit FieldMap(Field_t & field,
-                       Iteration iter_type = Iteration::QuadPt);
+                      Iteration iter_type = Iteration::QuadPt);
 
     /**
      * Constructor from a field with explicitly chosen shape of iterate. (the
      * number of columns is inferred).
      */
     FieldMap(Field_t & field, Dim_t nb_rows,
-              Iteration iter_type = Iteration::QuadPt);
+             Iteration iter_type = Iteration::QuadPt);
 
     //! Copy constructor
     FieldMap(const FieldMap & other) = delete;
@@ -217,14 +217,14 @@ namespace muGrid {
      */
     size_t size() const;
 
-    //! random acces operator
+    //! random access operator
     Return_t<Mutability> operator[](size_t index) {
       assert(this->is_initialised);
       return Return_t<Mutability>{this->data_ptr + index * this->stride,
                                   this->nb_rows, this->nb_cols};
     }
 
-    //! random const acces operator
+    //! random const access operator
     Return_t<Mapping::Const> operator[](size_t index) const {
       assert(this->is_initialised);
       return Return_t<Mapping::Const>{this->data_ptr + index * this->stride,

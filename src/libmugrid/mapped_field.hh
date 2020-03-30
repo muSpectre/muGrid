@@ -144,6 +144,9 @@ namespace muGrid {
     //! return a reference to the map
     FieldMapType & get_map() { return this->map; }
 
+    //! return number of components
+    const Dim_t & get_nb_components() const { return this->nb_components; }
+
    protected:
     /**
      * evaluate and return the number of components the dynamically mapped field
@@ -167,7 +170,7 @@ namespace muGrid {
         break;
       }
       case Iteration::Pixel: {
-        if (not collection.has_nb_quad()) {
+        if (not collection.has_nb_quad_pts()) {
           throw FieldMapError("Can't create a pixel map for field '" +
                                unique_name +
                                "' before the number of quadrature points has "
@@ -209,7 +212,7 @@ namespace muGrid {
         break;
       }
       case Iteration::Pixel: {
-        if (not collection.has_nb_quad()) {
+        if (not collection.has_nb_quad_pts()) {
           throw FieldMapError("Can't create a pixel map for field '" +
                                unique_name +
                                "' before the number of quadrature points has "

@@ -58,7 +58,7 @@ namespace muGrid {
   void LocalFieldCollection::initialise() {
     if (this->initialised) {
       throw FieldCollectionError("double initialisation");
-    } else if (not this->has_nb_quad()) {
+    } else if (not this->has_nb_quad_pts()) {
       throw FieldCollectionError(
           "The number of quadrature points has not been set.");
     }

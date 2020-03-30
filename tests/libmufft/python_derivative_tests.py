@@ -47,6 +47,41 @@ class DerivativeCheck2d(unittest.TestCase):
         self.fft = muFFT.FFT(self.nb_pts)
         self.fourier_field = self.fft.fft(self.field)
 
+    def test_rollaxis(self):
+        dz = muFFT.DiscreteDerivative([0, 0, 0], [[[-1, 1]]])
+        self.assertTrue(dz.stencil.flags.owndata)
+        self.assertTrue(np.allclose(dz.stencil[0, 0, :], [-1, 1]))
+
+        dy = dz.rollaxes(-1)
+        self.assertTrue(np.allclose(dy.stencil[0, :, 0], [-1, 1]))
+        self.assertTrue(np.allclose(dy.stencil, [[[-1], [1]]]))
+
+        dx = dy.rollaxes(-1)
+        self.assertTrue(np.allclose(dx.stencil[:, 0, 0], [-1, 1]))
+        self.assertTrue(np.allclose(dx.stencil, [[[-1]], [[1]]]))
+
+        dx = muFFT.DiscreteDerivative([0, 0], [[-0.5, 0.5],
+                                               [-0.5, 0.5]])
+        dy = dx.rollaxes(-1)
+        self.assertTrue(np.allclose(dy.stencil.reshape((2, 2)),
+                                    [[-0.5, -0.5],
+                                     [ 0.5,  0.5]]))
+
+        dz = muFFT.DiscreteDerivative([0, 0, 0],
+                                      [[[-0.25, 0.25], [-0.25, 0.25]],
+                                       [[-0.25, 0.25], [-0.25, 0.25]]])
+        self.assertTrue(np.allclose(dz.stencil[0, 0, :], [-0.25, 0.25]))
+        dy = dz.rollaxes(-1)
+        self.assertTrue(np.allclose(dy.stencil[0, :, 0], [-0.25, 0.25]))
+        dx = dy.rollaxes(-1)
+        self.assertTrue(np.allclose(dx.stencil[:, 0, 0], [-0.25, 0.25]))
+        self.assertTrue(np.allclose(dy.stencil.reshape((2, 2, 2)),
+                                    [[[-0.25, -0.25], [0.25, 0.25]],
+                                     [[-0.25, -0.25], [0.25, 0.25]]]))
+        self.assertTrue(np.allclose(dx.stencil.reshape((2, 2, 2)),
+                                    [[[-0.25, -0.25], [-0.25, -0.25]],
+                                     [[ 0.25,  0.25], [ 0.25,  0.25]]]))
+
     def test_fourier_derivative(self):
         diffop = muFFT.FourierDerivative(2, 0)
         q = self.fft.fftfreq
@@ -63,7 +98,7 @@ class DerivativeCheck2d(unittest.TestCase):
             for y in range(ny):
                 self.assertAlmostEqual(diff_field[x,y], ndiff[x,y])
 
-    def test_upwind_differences(self):
+    def test_upwind_differences_y(self):
         diffop = muFFT.DiscreteDerivative([0, 0], [[-1, 1]])
         q = self.fft.fftfreq
         d = diffop.fourier(q)
@@ -77,7 +112,37 @@ class DerivativeCheck2d(unittest.TestCase):
                 ndiff = np.squeeze(ndiff)
                 self.assertAlmostEqual(diff_field[x, y], ndiff)
 
-    def test_averaged_upwind_differences(self):
+    def test_upwind_differences_y2(self):
+        diffop = muFFT.DiscreteDerivative([0, 0], [[-1, 1],
+                                                   [ 0, 0]])
+        q = self.fft.fftfreq
+        d = diffop.fourier(q)
+        diff_field = self.fft.ifft(d * self.fourier_field) * \
+                     self.fft.normalisation
+        nx, ny = self.nb_pts
+        diff_field = np.squeeze(diff_field)
+        for x in range(nx):
+            for y in range(ny):
+                ndiff = self.field[x, (y+1)%ny] - self.field[x, y]
+                ndiff = np.squeeze(ndiff)
+                self.assertAlmostEqual(diff_field[x, y], ndiff)
+
+    def test_shifted_upwind_differences_y(self):
+        diffop = muFFT.DiscreteDerivative([0, 0], [[ 0, 0],
+                                                   [-1, 1]])
+        q = self.fft.fftfreq
+        d = diffop.fourier(q)
+        diff_field = self.fft.ifft(d * self.fourier_field) * \
+            self.fft.normalisation
+        nx, ny = self.nb_pts
+        diff_field = np.squeeze(diff_field)
+        for x in range(nx):
+            for y in range(ny):
+                ndiff = self.field[(x+1)%nx, (y+1)%ny] - self.field[(x+1)%nx, y]
+                ndiff = np.squeeze(ndiff)
+                self.assertAlmostEqual(diff_field[x, y], ndiff)
+
+    def test_averaged_upwind_differences_y(self):
         diffop = muFFT.DiscreteDerivative([0, 0], [[-0.5, 0.5],
                                                    [-0.5, 0.5]])
         q = self.fft.fftfreq
@@ -183,9 +248,8 @@ class DerivativeCheck3d(unittest.TestCase):
 
     def test_averaged_upwind_differences_x(self):
         diffop = muFFT.DiscreteDerivative([0, 0, 0],
-                                          [[[-0.25, 0.25], [-0.25, 0.25]],
-                                           [[-0.25, 0.25], [-0.25, 0.25]]]) \
-                      .rollaxes(-1).rollaxes(-1)
+                                          [[[-0.25, -0.25], [-0.25, -0.25]],
+                                           [[ 0.25,  0.25], [ 0.25,  0.25]]])
         q = self.fft.fftfreq
         d = diffop.fourier(q)
         diff_field = self.fft.ifft(d * self.fourier_field) * \
@@ -204,9 +268,8 @@ class DerivativeCheck3d(unittest.TestCase):
 
     def test_averaged_upwind_differences_y(self):
         diffop = muFFT.DiscreteDerivative([0, 0, 0],
-                                          [[[-0.25, 0.25], [-0.25, 0.25]],
-                                           [[-0.25, 0.25], [-0.25, 0.25]]]) \
-                      .rollaxes(-1)
+                                          [[[-0.25, -0.25], [0.25, 0.25]],
+                                           [[-0.25, -0.25], [0.25, 0.25]]])
         q = self.fft.fftfreq
         d = diffop.fourier(q)
         diff_field = self.fft.ifft(d * self.fourier_field) * \

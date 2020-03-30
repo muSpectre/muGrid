@@ -39,9 +39,10 @@
 #include "derivative.hh"
 
 using muGrid::pi;
-using muGrid::CcoordOps::DynamicPixels;
 using muGrid::CcoordOps::get_index;
 using muGrid::CcoordOps::get_size;
+using muGrid::CcoordOps::modulo;
+using muGrid::CcoordOps::DynamicPixels;
 
 namespace muFFT {
 
@@ -67,7 +68,7 @@ namespace muFFT {
   DiscreteDerivative::DiscreteDerivative(DynCcoord_t nb_pts,
                                          DynCcoord_t lbounds,
                                          const std::vector<Real> & stencil)
-      : Parent{nb_pts.get_dim()}, nb_pts{nb_pts}, lbounds{lbounds},
+      : Parent{nb_pts.get_dim()}, pixels{nb_pts, lbounds},
         stencil{
             Eigen::Map<const Eigen::ArrayXd>(stencil.data(), stencil.size())} {
     if (get_size(nb_pts) != stencil.size()) {
@@ -87,8 +88,7 @@ namespace muFFT {
   DiscreteDerivative::DiscreteDerivative(DynCcoord_t nb_pts,
                                          DynCcoord_t lbounds,
                                          const Eigen::ArrayXd & stencil)
-      : Parent{nb_pts.get_dim()}, nb_pts{nb_pts}, lbounds{lbounds},
-        stencil{stencil} {
+      : Parent{nb_pts.get_dim()}, pixels{nb_pts, lbounds}, stencil{stencil} {
     if (get_size(nb_pts) != static_cast<size_t>(this->stencil.size())) {
       std::stringstream s;
       s << "Stencil is supposed to have " << nb_pts << " (=" << get_size(nb_pts)
@@ -103,12 +103,6 @@ namespace muFFT {
     }
   }
 
-  //! module operator that can handle negative values
-  template <typename T>
-  T modulo(T a, T b) {
-    return (b + (a % b)) % b;
-  }
-
   /* ---------------------------------------------------------------------- */
   DiscreteDerivative DiscreteDerivative::rollaxes(int distance) const {
     DynCcoord_t new_nb_pts(this->spatial_dimension),
@@ -117,22 +111,23 @@ namespace muFFT {
 
     for (Dim_t dim = 0; dim < this->spatial_dimension; ++dim) {
       Dim_t rolled_dim = modulo(dim + distance, this->spatial_dimension);
-      new_nb_pts[rolled_dim] = this->nb_pts[dim];
-      new_lbounds[rolled_dim] = this->lbounds[dim];
+      new_nb_pts[rolled_dim] = this->pixels.get_nb_subdomain_grid_pts()[dim];
+      new_lbounds[rolled_dim] = this->pixels.get_subdomain_locations()[dim];
     }
 
-    for (auto && pixel : DynamicPixels(this->nb_pts, this->lbounds)) {
+    for (auto && pixel : this->pixels) {
       DynCcoord_t rolled_pixel(this->spatial_dimension);
       for (Dim_t dim = 0; dim < this->spatial_dimension; ++dim) {
         Dim_t rolled_dim = modulo(dim + distance, this->spatial_dimension);
         rolled_pixel[rolled_dim] =
-            pixel[dim] - this->lbounds[dim] + new_lbounds[dim];
+            pixel[dim] - this->pixels.get_subdomain_locations()[dim] +
+            new_lbounds[dim];
       }
       stencil[get_index(new_nb_pts, new_lbounds, rolled_pixel)] =
           this->operator()(pixel);
     }
 
-    return DiscreteDerivative(new_nb_pts, lbounds, stencil);
+    return DiscreteDerivative(new_nb_pts, new_lbounds, stencil);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -153,7 +148,8 @@ namespace muFFT {
   }
 
   /* ---------------------------------------------------------------------- */
-  Gradient_t make_fourier_gradient(const Dim_t & spatial_dimension) {
+  Gradient_t make_fourier_gradient(
+      const Dim_t & spatial_dimension) {
     Gradient_t && g{};
     for (Dim_t dim = 0; dim < spatial_dimension; ++dim) {
       g.push_back(std::make_shared<FourierDerivative>(spatial_dimension, dim));

@@ -45,7 +45,8 @@ except ImportError:
 
 # We need to import muGrid, otherwise DynCcoord_t and other types won't be
 # registered and implicitly convertible.
-import muGrid
+import _muGrid
+
 import _muFFT
 from _muFFT import (version, FourierDerivative, DiscreteDerivative,
                     FFT_PlanFlags, get_nb_hermitian_grid_pts)

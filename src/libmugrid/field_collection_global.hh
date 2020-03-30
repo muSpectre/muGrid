@@ -93,7 +93,12 @@ namespace muGrid {
     //! Return the pixels class that allows to iterator over pixels
     const DynamicPixels & get_pixels() const;
 
-    //! Return index for a ccoord
+    //! evaluate and return the linear index corresponding to dynamic `ccoord`
+    Dim_t get_index(const DynCcoord_t & ccoord) const {
+      return this->get_pixels().get_index(ccoord);
+    }
+
+    //! evaluate and return the linear index corresponding to `ccoord`
     template <size_t Dim>
     Dim_t get_index(const Ccoord_t<Dim> & ccoord) const {
       return this->get_pixels().get_index(ccoord);

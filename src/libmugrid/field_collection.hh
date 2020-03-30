@@ -296,19 +296,19 @@ namespace muGrid {
     const Dim_t & get_nb_entries() const;
 
     //! returns the number of pixels present in the collection
-    size_t get_nb_pixels() const;
+    Dim_t get_nb_pixels() const;
 
     /**
      * check whether the number of quadrature points per pixel/voxel has ben
      * set
      */
-    bool has_nb_quad() const;
+    bool has_nb_quad_pts() const;
 
     /**
      * set the number of quadrature points per pixel/voxel. Can only be done
      * once.
      */
-    void set_nb_quad(Dim_t nb_quad_pts_per_pixel);
+    void set_nb_quad_pts(Dim_t nb_quad_pts_per_pixel);
 
     /**
      * return the number of quadrature points per pixel

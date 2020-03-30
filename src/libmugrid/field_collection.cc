@@ -209,19 +209,20 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  size_t FieldCollection::get_nb_pixels() const {
+  Dim_t FieldCollection::get_nb_pixels() const {
     assert(this->initialised);
     return this->nb_entries / this->nb_quad_pts;
   }
 
   /* ---------------------------------------------------------------------- */
-  bool FieldCollection::has_nb_quad() const {
+  bool FieldCollection::has_nb_quad_pts() const {
     return not(this->nb_quad_pts == Unknown);
   }
 
   /* ---------------------------------------------------------------------- */
-  void FieldCollection::set_nb_quad(Dim_t nb_quad_pts_per_pixel) {
-    if (this->has_nb_quad() and (this->nb_quad_pts != nb_quad_pts_per_pixel)) {
+  void FieldCollection::set_nb_quad_pts(Dim_t nb_quad_pts_per_pixel) {
+    if (this->has_nb_quad_pts() and
+        (this->nb_quad_pts != nb_quad_pts_per_pixel)) {
       std::stringstream error{};
       error << "The number of quadrature points per pixel has already been set "
                "to "

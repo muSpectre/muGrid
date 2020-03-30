@@ -44,10 +44,11 @@ namespace muSpectre {
                                              DynRcoord_t lengths,
                                              Gradient_t gradient,
                                              Formulation form)
-      : Parent{std::move(engine), lengths, form},
+      : Parent{std::move(engine), lengths,
+               static_cast<Dim_t>(gradient.size())/lengths.get_dim(), form},
         Gfield{this->projection_container.register_complex_field(
             "Projection Operator", DimS * DimS * DimS * DimS)},
-        Ghat{Gfield}, gradient(gradient) {}
+        Ghat{Gfield}, gradient{gradient} {}
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS>

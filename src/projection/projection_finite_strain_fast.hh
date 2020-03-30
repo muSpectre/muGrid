@@ -53,7 +53,7 @@ namespace muSpectre {
    * have a very good reason not to (and tell me (author) about it,
    * I'd be interested to hear it).
    */
-  template <Dim_t DimS>
+  template <Dim_t DimS, Dim_t NbQuadPts = OneQuadPt>
   class ProjectionFiniteStrainFast : public ProjectionBase {
    public:
     using Parent = ProjectionBase;  //!< base class
@@ -63,8 +63,15 @@ namespace muSpectre {
     using Rcoord = Rcoord_t<DimS>;  //!< spatial coordinates type
     //! Real space second order tensor fields (to be projected)
     using Field_t = muGrid::TypedFieldBase<Real>;
+    //! Fourier-space field containing the projection operator itself
+    using Proj_t = muGrid::ComplexField;
+    //! iterable form of the operator
+    using Proj_map = muGrid::MatrixFieldMap<Complex, Mapping::Mut,
+                                            DimS * NbQuadPts, 1,
+                                            muGrid::Iteration::Pixel>;
     //! iterable Fourier-space second-order tensor field
-    using Grad_map = muGrid::MatrixFieldMap<Complex, Mapping::Mut, DimS, DimS,
+    using Grad_map = muGrid::MatrixFieldMap<Complex, Mapping::Mut, DimS,
+                                            DimS * NbQuadPts,
                                             muGrid::Iteration::Pixel>;
 
     //! Default constructor
@@ -73,7 +80,7 @@ namespace muSpectre {
     //! Constructor with FFT engine
     ProjectionFiniteStrainFast(muFFT::FFTEngine_ptr engine,
                                const DynRcoord_t & lengths,
-                               Gradient_t gradient);
+                               const Gradient_t & gradient);
 
     //! Constructor with FFT engine and default (Fourier) gradient
     ProjectionFiniteStrainFast(muFFT::FFTEngine_ptr engine,
@@ -98,13 +105,17 @@ namespace muSpectre {
     operator=(ProjectionFiniteStrainFast && other) = default;
 
     //! initialises the fft engine (plan the transform)
-    void initialise(const muFFT::FFT_PlanFlags & flags =
-                        muFFT::FFT_PlanFlags::estimate) final;
+    void initialise(
+        const muFFT::FFT_PlanFlags &flags = muFFT::FFT_PlanFlags::estimate)
+        final;
 
     //! apply the projection operator to a field
     void apply_projection(Field_t & field) final;
 
     Eigen::Map<MatrixXXc> get_operator();
+
+    //! return the gradient operator
+    const Gradient_t & get_gradient() const;
 
     /**
      * returns the number of rows and cols for the strain matrix type
@@ -124,11 +135,9 @@ namespace muSpectre {
     //! c++)
     std::unique_ptr<ProjectionBase> clone() const final;
 
-    const Gradient_t & get_gradient() const { return this->gradient; }
-
    protected:
     //! field of normalised wave vectors
-    muGrid::MappedT1Field<Complex, Mapping::Mut, DimS> xi_field;
+    muGrid::MappedT1Field<Complex, Mapping::Mut, DimS * NbQuadPts> xi_field;
 
     /**
      * gradient (nabla) operator, can be computed using Fourier interpolation

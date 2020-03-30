@@ -63,6 +63,8 @@ namespace muGrid {
   constexpr Dim_t secondOrder{2};  //!< constant second-order tensors
   constexpr Dim_t fourthOrder{4};  //!< constant fourth-order tensors
   constexpr Dim_t OneQuadPt{1};    //!< constant for 1 quadrature point/pixel
+  constexpr Dim_t TwoQuadPts{2};   //!< constant for 2 quadrature point/pixel
+  constexpr Dim_t FourQuadPts{4};  //!< constant for 4 quadrature point/pixel
 
   using Uint = unsigned int;  //!< type to use in math for unsigned integers
   using Int = int;            //!< type to use in math for signed integers
@@ -293,6 +295,34 @@ namespace muGrid {
     //! storage for coordinate components
     std::array<T, MaxDim> long_array;
   };
+
+  //! addition of two DynCcoords
+  template <size_t MaxDim, typename T>
+  DynCcoord<MaxDim, T> operator+(const DynCcoord<MaxDim, T> & A,
+                                 const DynCcoord<MaxDim, T> & B) {
+    if (A.get_dim() != B.get_dim()) {
+      throw RuntimeError("Dimension mismatch");
+    }
+    DynCcoord<MaxDim, T> result{A.get_dim()};
+    for (Dim_t dim{0}; dim < A.get_dim(); ++dim) {
+      result[dim] = A[dim] + B[dim];
+    }
+    return result;
+  }
+
+  //! subtracttion of two DynCcoords
+  template <size_t MaxDim, typename T>
+  DynCcoord<MaxDim, T> operator-(const DynCcoord<MaxDim, T> & A,
+                                 const DynCcoord<MaxDim, T> & B) {
+    if (A.get_dim() != B.get_dim()) {
+      throw RuntimeError("Dimension mismatch");
+    }
+    DynCcoord<MaxDim, T> result{A.get_dim()};
+    for (Dim_t i{0}; i < A.get_dim(); ++i) {
+      result[i] = A[i] - B[i];
+    }
+    return result;
+  }
 
   //! usually, we should not need more than three dimensions
   using DynCcoord_t = DynCcoord<threeD>;

@@ -72,8 +72,10 @@ namespace py = pybind11;
 class ProjectionBaseUnclonable : public ProjectionBase {
  public:
   ProjectionBaseUnclonable(muFFT::FFTEngine_ptr engine,
-                           DynRcoord_t domain_lengths, Formulation form)
-      : ProjectionBase(engine, domain_lengths, form) {}
+                           DynRcoord_t domain_lengths,
+                           Dim_t nb_quad_pts,
+                           Formulation form)
+      : ProjectionBase(engine, domain_lengths, nb_quad_pts, form) {}
 
   std::unique_ptr<ProjectionBase> clone() const final {
     throw RuntimeError(
@@ -96,8 +98,8 @@ class PyProjectionBase : public ProjectionBaseUnclonable {
   using StrainShape_t = std::array<Dim_t, 2>;
 
   PyProjectionBase(muFFT::FFTEngine_ptr engine, DynRcoord_t domain_lengths,
-                   Formulation form)
-      : ProjectionBaseUnclonable(engine, domain_lengths, form) {}
+                   Dim_t nb_quad_pts, Formulation form)
+      : ProjectionBaseUnclonable(engine, domain_lengths, nb_quad_pts, form) {}
 
   void apply_projection(Field_t & field) override {
     PYBIND11_OVERLOAD_PURE(void, Parent, apply_projection, field);
@@ -121,7 +123,7 @@ void add_projection_base(py::module & mod) {
              std::shared_ptr<ProjectionBase>,  // holder
              PyProjectionBase                  // trampoline base
              >(mod, "ProjectionBase")
-      .def(py::init<muFFT::FFTEngine_ptr, DynRcoord_t, Formulation>());
+      .def(py::init<muFFT::FFTEngine_ptr, DynRcoord_t, Dim_t, Formulation>());
 }
 
 template <class Proj, Dim_t DimS>

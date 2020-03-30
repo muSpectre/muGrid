@@ -56,6 +56,8 @@ from _muSpectre import (version,
                         ProjectionFiniteStrainFast_3d)
 
 from muGrid import get_domain_ccoord, get_domain_index
+from muFFT import (Communicator, DiscreteDerivative, FourierDerivative,
+                   FFT_PlanFlags)
 from _muGrid import Verbosity
 from muFFT import Communicator, FourierDerivative, DiscreteDerivative, FFT_PlanFlags
 import muSpectre.gradient_integration

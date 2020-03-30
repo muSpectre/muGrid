@@ -82,7 +82,7 @@ namespace muGrid {
     scalar_mat.setZero();
     BOOST_CHECK_THROW(scalar_field.push_back(scalar_mat.array()), FieldError);
 
-    fc.set_nb_quad(NbQuadPts);
+    fc.set_nb_quad_pts(NbQuadPts);
     scalar_field.push_back(Real{3});
     scalar_field.push_back(scalar_mat.array());
 
@@ -118,7 +118,7 @@ namespace muGrid {
 
   BOOST_FIXTURE_TEST_CASE(set_zero, LocalFieldBasicFixture) {
     constexpr Dim_t NbQuadPts{3}, NbComponents{4};
-    fc.set_nb_quad(NbQuadPts);
+    fc.set_nb_quad_pts(NbQuadPts);
     auto & scalar_field{
         fc.register_field<Real>("scalar_field", 1)};
     auto & vector_field{
@@ -158,7 +158,7 @@ namespace muGrid {
 
   BOOST_FIXTURE_TEST_CASE(eigen_maps, LocalFieldBasicFixture) {
     constexpr Dim_t NbQuadPts{2}, NbComponents{3};
-    fc.set_nb_quad(NbQuadPts);
+    fc.set_nb_quad_pts(NbQuadPts);
     auto & vector_field{
         fc.register_field<Real>("vector_field", NbComponents)};
     const auto & cvector_field{vector_field};
