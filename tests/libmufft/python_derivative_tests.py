@@ -98,6 +98,47 @@ class DerivativeCheck2d(unittest.TestCase):
             for y in range(ny):
                 self.assertAlmostEqual(diff_field[x,y], ndiff[x,y])
 
+    def test_fourier_derivative_2_corner(self):
+        #shift the fourier derivative into the lower left shift=[-1/6, -1/6]
+        #corner. (Here the grid spacing is 1 in each direction, otherwise one
+        #should consider it to give the real space shift correct.)
+        shift = np.array([-1/6, -1/6])
+        diffop = muFFT.FourierDerivative(2, 0, shift)
+        q = self.fft.fftfreq
+        d = diffop.fourier(q)
+        fourier_field_copy = np.copy(self.fourier_field)
+        diff_field = self.fft.ifft(d * self.fourier_field) * \
+            self.fft.normalisation
+        ndiff = self.fft.ifft(1j*2*np.pi*q[0] *
+                              np.exp(1j*2*np.pi*np.einsum("i,i...->...", shift, q)) *
+                              fourier_field_copy) * self.fft.normalisation
+        nx, ny = self.nb_pts
+        diff_field = np.squeeze(diff_field)
+        ndiff = np.squeeze(ndiff)
+        for x in range(nx):
+            for y in range(ny):
+                self.assertAlmostEqual(diff_field[x,y], ndiff[x,y])
+
+    def test_fourier_derivative_2_full(self):
+        #shift the fourier derivative by one grid point in x- and y-direction
+        #shift=[1, 1]. (Here the grid spacing is 1 in each direction, otherwise
+        #one should consider it to give the real space shift correct.)
+        shift = np.array([1, 1])
+        diffop = muFFT.FourierDerivative(2, 0, shift)
+        q = self.fft.fftfreq
+        d = diffop.fourier(q)
+        fourier_field_copy = np.copy(self.fourier_field)
+        diff_field = self.fft.ifft(d * self.fourier_field) * \
+            self.fft.normalisation
+        ndiff = self.fft.ifft(1j*2*np.pi*q[0] * fourier_field_copy) * \
+            self.fft.normalisation
+        nx, ny = self.nb_pts
+        diff_field = np.squeeze(diff_field)
+        ndiff = np.squeeze(ndiff)
+        for x in range(nx):
+            for y in range(ny):
+                self.assertAlmostEqual(diff_field[x,y], ndiff[(x+1)%nx, (y+1)%ny])
+
     def test_upwind_differences_y(self):
         diffop = muFFT.DiscreteDerivative([0, 0], [[-1, 1]])
         q = self.fft.fftfreq

@@ -124,8 +124,31 @@ void add_fourier_derivative(py::module & mod, std::string name) {
              std::shared_ptr<FourierDerivative>,  // holder
              DerivativeBase                       // base class
              >(mod, name.c_str())
-      .def(py::init<Dim_t, Dim_t>(),
-           "spatial_dimension"_a, "direction"_a);
+      .def(py::init<Dim_t, Dim_t>(), "spatial_dimension"_a, "direction"_a)
+      .def(py::init(
+               [](Dim_t spatial_dimension, Dim_t direction,
+                  const Eigen::ArrayXd & shift) {
+                 // Default: shift = vector (of correct dimension) filled with
+                 // zeros
+                 if ((shift.size() == 1) and (shift(0, 0) == 0)) {
+                   Eigen::VectorXd default_shift{
+                       Eigen::ArrayXd::Zero(spatial_dimension)};
+                   return new FourierDerivative(spatial_dimension, direction,
+                                                default_shift);
+                 }
+                 // is the shift vector correctly given?
+                 if (shift.size() != spatial_dimension) {
+                   std::stringstream s;
+                   s << "The real space shift has " << shift.size()
+                     << " entries, "
+                     << "but the Fourier derivative is " << spatial_dimension
+                     << "D.";
+                   throw muGrid::RuntimeError(s.str());
+                 }
+                 return new FourierDerivative(spatial_dimension, direction,
+                                              shift);
+               }),
+           "spatial_dimension"_a, "direction"_a, "shift"_a = 0);
 }
 
 void add_discrete_derivative(py::module & mod, std::string name) {
@@ -140,7 +163,7 @@ void add_discrete_derivative(py::module & mod, std::string name) {
                std::stringstream s;
                s << "Stencil bounds have " << lbounds.get_dim() << " entries, "
                  << "but stencil itself is " << info.ndim << "-dimensional.";
-               throw std::logic_error(s.str());
+               throw muGrid::RuntimeError(s.str());
              }
              DynCcoord_t nb_pts(info.ndim);
              for (int i = 0; i < info.ndim; ++i) {

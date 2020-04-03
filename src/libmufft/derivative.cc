@@ -55,7 +55,20 @@ namespace muFFT {
 
   /* ---------------------------------------------------------------------- */
   FourierDerivative::FourierDerivative(Dim_t spatial_dimension, Dim_t direction)
-      : Parent{spatial_dimension}, direction{direction} {
+      : Parent{spatial_dimension}, direction{direction},
+        shift{Eigen::ArrayXd::Zero(spatial_dimension)} {
+    if (direction < 0 || direction >= spatial_dimension) {
+      throw DerivativeError("Derivative direction is a Cartesian "
+                            "direction. It must be larger than or "
+                            "equal to zero and smaller than the spatial "
+                            "dimension.");
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  FourierDerivative::FourierDerivative(Dim_t spatial_dimension, Dim_t direction,
+                                       const Eigen::ArrayXd & shift)
+    : Parent{spatial_dimension}, direction{direction}, shift{shift} {
     if (direction < 0 || direction >= spatial_dimension) {
       throw DerivativeError("Derivative direction is a Cartesian "
                             "direction. It must be larger than or "

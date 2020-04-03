@@ -115,6 +115,10 @@ namespace muFFT {
     //! Constructor with raw FourierDerivative information
     explicit FourierDerivative(Dim_t spatial_dimension, Dim_t direction);
 
+    //! Constructor with raw FourierDerivative information and shift info
+    explicit FourierDerivative(Dim_t spatial_dimension, Dim_t direction,
+                               const Eigen::ArrayXd & shift);
+
     //! Copy constructor
     FourierDerivative(const FourierDerivative & other) = default;
 
@@ -131,17 +135,23 @@ namespace muFFT {
     FourierDerivative & operator=(FourierDerivative && other) = delete;
 
     /**
-     * Return Fourier representation of the Fourier interpolated derivative.
-     * This here simply returns I*2*pi*phase. (I*2*pi*wavevector is the
-     * Fourier representation of the derivative.)
-     */
+     * Return Fourier representation of the Fourier interpolated derivative
+     * shifted to the new position of the derivative. This here simply returns
+     * I*2*pi*phase * e^(I*2*pi*shift*phase). (I*2*pi*wavevector is the
+     * Fourier representation of the derivative and e^(I*2*pi*shift*phase)
+     * shifts the derivative to its new position.)
+     **/
     virtual Complex fourier(const Vector & phase) const {
-      return Complex(0, 2 * muGrid::pi * phase[this->direction]);
+      return Complex(0, 2 * muGrid::pi * phase[this->direction]) *
+             std::exp(
+                 Complex(0, 2 * muGrid::pi * this->shift.matrix().dot(phase)));
     }
 
    protected:
     //! spatial direction in which to perform differentiation
     Dim_t direction;
+    //! real space shift from the position of the center of the cell.
+    const Eigen::ArrayXd shift;
   };
 
   /**
