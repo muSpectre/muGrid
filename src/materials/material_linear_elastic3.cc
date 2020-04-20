@@ -45,21 +45,22 @@ namespace muSpectre {
       const std::string & name, const Dim_t & spatial_dimension,
       const Dim_t & nb_quad_pts)
       : Parent{name, spatial_dimension, nb_quad_pts},
-        C_field{"local stiffness tensor", this->internal_fields} {}
+        C_field{this->get_prefix() + "local stiffness tensor",
+                *this->internal_fields} {}
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimM>
-  void MaterialLinearElastic3<DimM>::add_pixel(
-      const size_t & /*pixel*/) {
+  void MaterialLinearElastic3<DimM>::add_pixel(const size_t & /*pixel*/) {
     throw muGrid::RuntimeError(
         "this material needs pixels with Youngs modulus and Poisson ratio.");
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimM>
-  void MaterialLinearElastic3<DimM>::add_pixel(
-      const size_t & pixel, const Real & Young, const Real & Poisson) {
-    this->internal_fields.add_pixel(pixel);
+  void MaterialLinearElastic3<DimM>::add_pixel(const size_t & pixel,
+                                               const Real & Young,
+                                               const Real & Poisson) {
+    this->internal_fields->add_pixel(pixel);
     Real lambda = Hooke::compute_lambda(Young, Poisson);
     Real mu = Hooke::compute_mu(Young, Poisson);
     auto C_tensor = Hooke::compute_C(lambda, mu);

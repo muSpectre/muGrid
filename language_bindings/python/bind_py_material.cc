@@ -229,7 +229,8 @@ void add_material_base_helper(py::module & mod) {
   py::class_<Material, MaterialTrampoline /* <--- trampoline*/,
              std::shared_ptr<Material>>(mod, name.c_str())
       .def(py::init<const std::string &, const Dim_t &, const Dim_t &,
-                    const Dim_t &>())
+                    const Dim_t &,
+                    std::shared_ptr<muGrid::LocalFieldCollection>>())
       .def("save_history_variables", &Material::save_history_variables)
       .def("list_fields", &Material::list_fields)
       .def("size", &Material::size)

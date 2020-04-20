@@ -63,6 +63,23 @@ namespace muSpectre {
     Mat_t mat;
   };
 
+  template <class Mat1_t, class Mat2_t>
+  struct MaterialPairFixture {
+    using Mat1 = Mat1_t;
+    using Mat2 = Mat2_t;
+    constexpr static Dim_t mdim() { return Mat1_t::MaterialDimension(); }
+    constexpr static Dim_t sdim() { return mdim(); }
+    constexpr static Dim_t NbQuadPts() { return 2; }
+
+    MaterialPairFixture()
+        : mat1("Name", mdim(), NbQuadPts()), mat2("Name", mdim(), NbQuadPts()) {
+    }
+
+    Mat1_t mat1;
+    Mat2_t mat2;
+  };
+
+  /* ---------------------------------------------------------------------- */
   using mats =
       boost::mpl::list<MaterialFixture<MaterialHyperElastoPlastic2<twoD>>,
                        MaterialFixture<MaterialHyperElastoPlastic2<threeD>>>;
@@ -431,29 +448,6 @@ namespace muSpectre {
       std::cout << "Post Cycle" << std::endl;
       std::cout << "C₄  =" << std::endl << stiffness << std::endl;
     }
-  }
-
-  /* ---------------------------------------------------------------------- */
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(stress_strain_test, Fix, mats, Fix) {
-    // Test if the implementation of material_hyper_elasto_plastic_2 gives the
-    // same results as material_hyper_elasto_plastic_1
-
-    // // initialise pixel
-    // constexpr static Real K{.833};       // bulk modulus
-    // constexpr static Real mu{.386};      // shear modulus
-    // constexpr static Real H{.004};       // hardening modulus
-    // constexpr static Real tau_y0{.003};  // initial yield stress
-    // constexpr static Real young{MatTB::convert_elastic_modulus<
-    //     ElasticModulus::Young, ElasticModulus::Bulk, ElasticModulus::Shear>(
-    //     K, mu)};
-    // constexpr static Real poisson{MatTB::convert_elastic_modulus<
-    //     ElasticModulus::Poisson, ElasticModulus::Bulk,
-    //     ElasticModulus::Shear>( K, mu)};
-    // constexpr static Real lambda{MatTB::convert_elastic_modulus<
-    //     ElasticModulus::lambda, ElasticModulus::Bulk, ElasticModulus::Shear>(
-    //     K, mu)};
-    // Fix::mat.add_pixel({0}, young, poisson, tau_y0, H);
-    // Fix::mat.initialise();
   }
 
   BOOST_AUTO_TEST_SUITE_END();

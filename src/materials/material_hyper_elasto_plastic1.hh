@@ -107,11 +107,12 @@ namespace muSpectre {
     MaterialHyperElastoPlastic1() = delete;
 
     //! Constructor with name and material properties
-    MaterialHyperElastoPlastic1(const std::string & name,
-                                const Dim_t & spatial_dimension,
-                                const Dim_t & nb_quad_pts, const Real & young,
-                                const Real & poisson, const Real & tau_y0,
-                                const Real & H);
+    MaterialHyperElastoPlastic1(
+        const std::string & name, const Dim_t & spatial_dimension,
+        const Dim_t & nb_quad_pts, const Real & young, const Real & poisson,
+        const Real & tau_y0, const Real & H,
+        const std::shared_ptr<muGrid::LocalFieldCollection> &
+            parent_field_collection = nullptr);
 
     //! Copy constructor
     MaterialHyperElastoPlastic1(const MaterialHyperElastoPlastic1 & other) =
@@ -136,8 +137,10 @@ namespace muSpectre {
      * Fₜ, the previous Gradient Fₜ₋₁ and the cumulated plastic flow
      * εₚ
      */
+
     T2_t evaluate_stress(const T2_t & F, T2StRef_t F_prev, T2StRef_t be_prev,
-                         ScalarStRef_t plast_flow);
+                         ScalarStRef_t plast_flow, const Real & lambda,
+                         const Real & mu, const Real & tau_y0, const Real & H);
     /**
      * evaluates Kirchhoff stress given the local placement gradient and pixel
      * id.
@@ -146,16 +149,20 @@ namespace muSpectre {
       auto && F_prev{this->F_prev_field[quad_pt_index]};
       auto && be_prev{this->be_prev_field[quad_pt_index]};
       auto && plast_flow{this->plast_flow_field[quad_pt_index]};
-      return this->evaluate_stress(F, F_prev, be_prev, plast_flow);
+      return this->evaluate_stress(F, F_prev, be_prev, plast_flow, this->lambda,
+                                   this->mu, this->tau_y0, this->H);
     }
     /**
      * evaluates Kirchhoff stress and tangent moduli given the current placement
      * gradient Fₜ, the previous Gradient Fₜ₋₁ and the cumulated plastic flow εₚ
      */
-    std::tuple<T2_t, T4_t> evaluate_stress_tangent(const T2_t & F,
-                                                   T2StRef_t F_prev,
-                                                   T2StRef_t be_prev,
-                                                   ScalarStRef_t plast_flow);
+
+    std::tuple<T2_t, T4_t> evaluate_stress_tangent(
+        const T2_t & F, T2StRef_t F_prev, T2StRef_t be_prev,
+        ScalarStRef_t plast_flow, const Real & lambda, const Real & mu,
+        const Real & tau_y0, const Real & H, const Real & K,
+        const Eigen::Ref<const muGrid::T4Mat<Real, DimM>> & C);
+
     /**
      * evaluates Kirchhoff stressstiffness and tangent moduli given the local
      * placement gradient and pixel id.
@@ -165,7 +172,9 @@ namespace muSpectre {
       auto && F_prev{this->F_prev_field[quad_pt_index]};
       auto && be_prev{this->be_prev_field[quad_pt_index]};
       auto && plast_flow{this->plast_flow_field[quad_pt_index]};
-      return this->evaluate_stress_tangent(F, F_prev, be_prev, plast_flow);
+      return this->evaluate_stress_tangent(F, F_prev, be_prev, plast_flow,
+                                           this->lambda, this->mu, this->tau_y0,
+                                           this->H, this->K, this->C);
     }
 
     /**
@@ -194,7 +203,6 @@ namespace muSpectre {
       return this->be_prev_field;
     }
 
-   protected:
     /**
      * result type of the stress calculation with intermediate results for
      * tangent moduli calculation
@@ -208,9 +216,14 @@ namespace muSpectre {
 
     Worker_t stress_n_internals_worker(const T2_t & F, T2StRef_t & F_prev,
                                        T2StRef_t & be_prev,
-                                       ScalarStRef_t & plast_flow);
+                                       ScalarStRef_t & plast_flow,
+                                       const Real & lambda, const Real & mu,
+                                       const Real & tau_y0, const Real & H);
+
+   protected:
     //! storage for cumulated plastic flow εₚ
     muGrid::MappedScalarStateField<Real, Mapping::Mut> plast_flow_field;
+
     //! storage for previous gradient Fᵗ
     muGrid::MappedT2StateField<Real, Mapping::Mut, DimM> F_prev_field;
 

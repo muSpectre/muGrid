@@ -2,8 +2,9 @@
  * @file   material_hyper_elasto_plastic2.hh
  *
  * @author Richard Leute <richard.leute@imtek.uni-freiburg.de>
+ * @author Ali Falsafi <ali.falsafi@epfl.ch>
  *
- * @date   08 Jul 2019
+ * @date   08 Apr 2020
  *
  * @brief  copy of material_hyper_elasto_plastic1 with Young, Poisson, yield
  *         criterion and  hardening modulus per pixel. As defined in de Geus
@@ -127,22 +128,20 @@ namespace muSpectre {
     operator=(MaterialHyperElastoPlastic2 && other) = delete;
 
     /**
-     * evaluates Kirchhoff stress given the current placement gradient
-     * Fₜ, the previous Gradient Fₜ₋₁ and the cumulated plastic flow
-     * εₚ
-     */
-    T2_t evaluate_stress(const T2_t & F, PrevStrain_ref F_prev,
-                         PrevStrain_ref be_prev, FlowField_ref plast_flow,
-                         const Real lambda, const Real mu, const Real tau_y0,
-                         const Real H);
-    /**
      * evaluates Kirchhoff stress given the local placement gradient and pixel
      * id.
      */
+
+    T2_t evaluate_stress(const T2_t & F, PrevStrain_ref F_prev,
+                         PrevStrain_ref be_prev, FlowField_ref eps_p,
+                         const Real lambda, const Real mu, const Real tau_y0,
+                         const Real H);
+
     T2_t evaluate_stress(const T2_t & F, const size_t & pixel_index) {
-      auto && F_prev{this->F_prev_field[pixel_index]};
-      auto && be_prev{this->be_prev_field[pixel_index]};
-      auto && plast_flow{this->plast_flow_field[pixel_index]};
+      auto && F_prev{this->material_child.get_F_prev_field()[pixel_index]};
+      auto && be_prev{this->material_child.get_be_prev_field()[pixel_index]};
+      auto && plast_flow{
+          this->material_child.get_plast_flow_field()[pixel_index]};
       auto && lambda{this->lambda_field[pixel_index]};
       auto && mu{this->mu_field[pixel_index]};
       auto && tau_y0{this->tau_y0_field[pixel_index]};
@@ -150,26 +149,23 @@ namespace muSpectre {
       return this->evaluate_stress(F, F_prev, be_prev, plast_flow, lambda, mu,
                                    tau_y0, H);
     }
-    /**
-     * evaluates Kirchhoff stress and tangent moduli given the current placement
-     * gradient Fₜ, the previous Gradient Fₜ₋₁ and the cumulated plastic flow εₚ
-     */
-    // TODO(junge): Switch to PrevStrain_ref & (requires the iterator to hold a
-    // dereferenced iterate
-    std::tuple<T2_t, T4_t>
-    evaluate_stress_tangent(const T2_t & F, PrevStrain_ref F_prev,
-                            PrevStrain_ref be_prev, FlowField_ref plast_flow,
-                            const Real lambda, const Real mu, const Real tau_y0,
-                            const Real H, const Real K);
+
     /**
      * evaluates Kirchhoff stressstiffness and tangent moduli given the local
      * placement gradient and pixel id.
      */
+    std::tuple<T2_t, T4_t>
+    evaluate_stress_tangent(const T2_t & F, PrevStrain_ref F_prev,
+                            PrevStrain_ref be_prev, FlowField_ref eps_p,
+                            const Real lambda, const Real mu, const Real tau_y0,
+                            const Real H, const Real K);
+
     std::tuple<T2_t, T4_t> evaluate_stress_tangent(const T2_t & F,
                                                    const size_t & pixel_index) {
-      auto && F_prev{this->F_prev_field[pixel_index]};
-      auto && be_prev{this->be_prev_field[pixel_index]};
-      auto && plast_flow{this->plast_flow_field[pixel_index]};
+      auto && F_prev{this->material_child.get_F_prev_field()[pixel_index]};
+      auto && be_prev{this->material_child.get_be_prev_field()[pixel_index]};
+      auto && plast_flow{
+          this->material_child.get_plast_flow_field()[pixel_index]};
       auto && lambda{this->lambda_field[pixel_index]};
       auto && mu{this->mu_field[pixel_index]};
       auto && tau_y0{this->tau_y0_field[pixel_index]};
@@ -202,40 +198,28 @@ namespace muSpectre {
                    const Real & H);
 
     //! getter for internal variable field εₚ
-    muGrid::MappedScalarStateField<Real, Mapping::Mut> &
-    get_plast_flow_field() {
-      return this->plast_flow_field;
+    FlowField_t & get_plast_flow_field() {
+      return this->material_child.get_plast_flow_field();
     }
 
     //! getter for previous gradient field Fᵗ
-    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM> & get_F_prev_field() {
-      return this->F_prev_field;
+    PrevStrain_t & get_F_prev_field() {
+      return this->material_child.get_F_prev_field();
     }
 
-    //! getterfor elastic left Cauchy-Green deformation tensor bₑᵗ
-    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM> & get_be_prev_field() {
-      return this->be_prev_field;
+    //! getter for elastic left Cauchy-Green deformation tensor bₑᵗ
+    PrevStrain_t & get_be_prev_field() {
+      return this->material_child.get_be_prev_field();
+    }
+
+    //! getter for the child material
+    MaterialHyperElastoPlastic1<DimM> & get_material_child() {
+      return this->material_child;
     }
 
    protected:
-    /**
-     * worker function computing stresses and internal variables
-     */
-    using Worker_t = std::tuple<T2_t, Real, Real, T2_t, bool,
-                                muGrid::SelfAdjointDecomp_t<DimM>>;
-
-    Worker_t stress_n_internals_worker(const T2_t & F, PrevStrain_ref & F_prev,
-                                       PrevStrain_ref & be_prev,
-                                       FlowField_ref & plast_flow,
-                                       const Real lambda, const Real mu,
-                                       const Real tau_y0, const Real H);
-    //! storage for cumulated plastic flow εₚ
-    FlowField_t plast_flow_field;
-    //! storage for previous gradient Fᵗ
-    PrevStrain_t F_prev_field;
-
-    //! storage for elastic left Cauchy-Green deformation tensor bₑᵗ
-    PrevStrain_t be_prev_field;
+    // Childern material (used as a worker for evaluating stress and tangent)
+    MaterialHyperElastoPlastic1<DimM> material_child;
 
     //! storage for first Lamé constant λ
     Field_t lambda_field;

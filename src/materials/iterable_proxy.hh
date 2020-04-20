@@ -90,7 +90,7 @@ namespace muSpectre {
   //! this iterator class is a default for simple laws that just take a
   //! strain
   template <class Strains_t, class Stresses_t,
-            SplitCell is_cell_split = SplitCell::no>
+            SplitCell IsCellSplit = SplitCell::no>
   class iterable_proxy {
    public:
     //! Default constructor

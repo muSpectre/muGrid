@@ -38,21 +38,24 @@
 
 namespace muSpectre {
   template <Dim_t DimM>
-  MaterialLaminate<DimM>::MaterialLaminate(const std::string & name,
-                                           const Dim_t & spatial_dimension,
-                                           const Dim_t & nb_quad_pts)
-      : Parent(name, spatial_dimension, DimM, nb_quad_pts),
-        normal_vector_field{"normal vector", this->internal_fields},
-        volume_ratio_field{"volume ratio", this->internal_fields} {}
+  MaterialLaminate<DimM>::MaterialLaminate(
+      const std::string & name, const Dim_t & spatial_dimension,
+      const Dim_t & nb_quad_pts,
+      std::shared_ptr<muGrid::LocalFieldCollection> parent_field)
+      : Parent(name, spatial_dimension, DimM, nb_quad_pts, parent_field),
+        normal_vector_field{this->get_prefix() + "normal vector",
+                            *this->internal_fields},
+        volume_ratio_field{this->get_prefix() + "volume ratio",
+                           *this->internal_fields} {}
   /* ----------------------------------------------------------------------
    */
   template <Dim_t DimM>
   void MaterialLaminate<DimM>::add_pixel(const size_t & /*pixel_id*/) {
     throw muGrid::RuntimeError("This material needs two material "
-                             "(shared)pointers making the layers of "
-                             "lamiante, "
-                             "their volume fraction, "
-                             "and normal vector for adding pixel");
+                               "(shared)pointers making the layers of "
+                               "lamiante, "
+                               "their volume fraction, "
+                               "and normal vector for adding pixel");
   }
   /* ----------------------------------------------------------------------
    */
@@ -61,7 +64,7 @@ namespace muSpectre {
       const size_t & pixel_id, MatPtr_t mat1, MatPtr_t mat2, const Real & ratio,
       const Eigen::Ref<const Eigen::Matrix<Real, Eigen::Dynamic, 1>> &
           normal_vector) {
-    this->internal_fields.add_pixel(pixel_id);
+    this->internal_fields->add_pixel(pixel_id);
 
     this->material_left_vector.push_back(mat1);
     this->material_right_vector.push_back(mat2);

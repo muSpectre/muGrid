@@ -107,8 +107,10 @@ namespace muSpectre {
     MaterialLaminate() = delete;
 
     //! Constructor with name and material properties
-    MaterialLaminate(const std::string & name, const Dim_t & spatial_dimension,
-                     const Dim_t & nb_quad_pts);
+    MaterialLaminate(
+        const std::string & name, const Dim_t & spatial_dimension,
+        const Dim_t & nb_quad_pts,
+        std::shared_ptr<muGrid::LocalFieldCollection> parent_field = nullptr);
 
     //! Copy constructor
     MaterialLaminate(const MaterialLaminate & other) = delete;

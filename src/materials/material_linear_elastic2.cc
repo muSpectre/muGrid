@@ -44,7 +44,8 @@ namespace muSpectre {
       const Dim_t & nb_quad_pts, Real young, Real poisson)
       : Parent{name, spatial_dimension, nb_quad_pts},
         material{name, spatial_dimension, nb_quad_pts, young, poisson},
-        eigen_strains{"Eigenstrain", this->internal_fields} {}
+        eigen_strains{this->get_prefix() + "Eigenstrain",
+                      *this->internal_fields} {}
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimM>
@@ -56,7 +57,7 @@ namespace muSpectre {
   template <Dim_t DimM>
   void MaterialLinearElastic2<DimM>::add_pixel(const size_t & pixel_index,
                                                const StrainTensor & E_eig) {
-    this->internal_fields.add_pixel(pixel_index);
+    this->internal_fields->add_pixel(pixel_index);
     Eigen::Map<const Eigen::Array<Real, DimM * DimM, 1>> strain_array(
         E_eig.data());
     this->eigen_strains.get_field().push_back(strain_array);

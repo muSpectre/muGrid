@@ -112,10 +112,11 @@ namespace muSpectre {
     //! Default constructor
     MaterialMuSpectre() = delete;
 
-    //! Construct by name
-    explicit MaterialMuSpectre(const std::string & name,
-                               const Dim_t & spatial_dimension,
-                               const Dim_t & nb_quad_pts);
+    //! Construct by nameg
+    MaterialMuSpectre(const std::string & name, const Dim_t & spatial_dimension,
+                      const Dim_t & nb_quad_pts,
+                      const std::shared_ptr<muGrid::LocalFieldCollection> &
+                          parent_field_collection = nullptr);
 
     //! Copy constructor
     MaterialMuSpectre(const MaterialMuSpectre & other) = delete;
@@ -235,9 +236,13 @@ namespace muSpectre {
   template <class Material, Dim_t DimM>
   MaterialMuSpectre<Material, DimM>::MaterialMuSpectre(
       const std::string & name, const Dim_t & spatial_dimension,
-      const Dim_t & nb_quad_pts)
-      : Parent(name, spatial_dimension, DimM, nb_quad_pts),
-        native_stress{this->internal_fields, "native_stress"} {
+      const Dim_t & nb_quad_pts,
+      const std::shared_ptr<muGrid::LocalFieldCollection> &
+          parent_field_collection)
+      : Parent(name, spatial_dimension, DimM, nb_quad_pts,
+               parent_field_collection),
+        native_stress{*this->internal_fields,
+                      this->get_prefix() + "native_stress"} {
     static_assert(
         std::is_same<typename traits::StressMap_t::Scalar, Real>::value,
         "The stress map needs to be of type Real");

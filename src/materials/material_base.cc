@@ -41,12 +41,18 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  MaterialBase::MaterialBase(const std::string & name,
-                             const Dim_t & spatial_dimension,
-                             const Dim_t & material_dimension,
-                             const Dim_t & nb_quad_pts)
-      : name(name), internal_fields{spatial_dimension, nb_quad_pts},
-        material_dimension{material_dimension} {
+  MaterialBase::MaterialBase(
+      const std::string & name, const Dim_t & spatial_dimension,
+      const Dim_t & material_dimension, const Dim_t & nb_quad_pts,
+      const std::shared_ptr<muGrid::LocalFieldCollection> &
+          parent_field_collection)
+      : name(name),
+        internal_fields{parent_field_collection == nullptr
+                            ? std::make_shared<muGrid::LocalFieldCollection>(
+                                  spatial_dimension, nb_quad_pts)
+                            : parent_field_collection},
+        material_dimension{material_dimension},
+        prefix{parent_field_collection == nullptr ? "" : name + "::"} {
     if (not((this->material_dimension == oneD) ||
             (this->material_dimension == twoD) ||
             (this->material_dimension == threeD))) {
@@ -59,7 +65,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   void MaterialBase::add_pixel(const size_t & global_index) {
-    this->internal_fields.add_pixel(global_index);
+    this->internal_fields->add_pixel(global_index);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -86,7 +92,7 @@ namespace muSpectre {
     if (is_cell_split == SplitCell::simple) {
       this->assigned_ratio = std::make_unique<
           muGrid::MappedScalarField<Real, muGrid::Mapping::Mut>>(
-          "ratio", this->internal_fields);
+          "ratio", *this->internal_fields);
     }
   }
   /* ---------------------------------------------------------------------- */
@@ -103,7 +109,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   Real MaterialBase::get_assigned_ratio(const size_t & pixel_id) {
-    auto id{this->internal_fields.get_global_to_local_index_map()[pixel_id]};
+    auto id{this->internal_fields->get_global_to_local_index_map()[pixel_id]};
     auto && tmp{this->assigned_ratio->get_map()};
     return tmp[id];
   }
@@ -129,23 +135,23 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   auto MaterialBase::get_pixel_indices() const ->
       typename muGrid::LocalFieldCollection::PixelIndexIterable {
-    return this->internal_fields.get_pixel_indices_fast();
+    return this->internal_fields->get_pixel_indices_fast();
   }
 
   /* ---------------------------------------------------------------------- */
   auto MaterialBase::get_quad_pt_indices() const ->
       typename muGrid::LocalFieldCollection::IndexIterable {
-    return this->internal_fields.get_quad_pt_indices();
+    return this->internal_fields->get_quad_pt_indices();
   }
 
   /* ---------------------------------------------------------------------- */
   std::vector<std::string> MaterialBase::list_fields() const {
-    return this->internal_fields.list_fields();
+    return this->internal_fields->list_fields();
   }
 
   /* ---------------------------------------------------------------------- */
   muGrid::LocalFieldCollection & MaterialBase::get_collection() {
-    return this->internal_fields;
+    return *this->internal_fields;
   }
 
   /* ---------------------------------------------------------------------- */
@@ -159,7 +165,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   void MaterialBase::initialise() {
     if (!this->is_initialised) {
-      this->internal_fields.initialise();
+      this->internal_fields->initialise();
       this->is_initialised = true;
     }
   }

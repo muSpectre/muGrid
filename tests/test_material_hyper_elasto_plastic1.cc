@@ -56,19 +56,36 @@ namespace muSpectre {
     const Real mu{.386};      // shear modulus
     const Real H{.004};       // hardening modulus
     const Real tau_y0{.003};  // initial yield stress
+    const Real lambda{MatTB::convert_elastic_modulus<
+        ElasticModulus::lambda, ElasticModulus::Bulk, ElasticModulus::Shear>(
+        K, mu)};
     const Real young{MatTB::convert_elastic_modulus<
         ElasticModulus::Young, ElasticModulus::Bulk, ElasticModulus::Shear>(
         K, mu)};
     const Real poisson{MatTB::convert_elastic_modulus<
         ElasticModulus::Poisson, ElasticModulus::Bulk, ElasticModulus::Shear>(
         K, mu)};
-    MaterialFixture()
-        : mat("Name", mdim(), NbQuadPts(), young, poisson, tau_y0, H) {}
+
     constexpr static Dim_t mdim() { return Mat_t::MaterialDimension(); }
     constexpr static Dim_t sdim() { return mdim(); }
     constexpr static Dim_t NbQuadPts() { return 2; }
 
+    using Hooke =
+        typename MatTB::Hooke<mdim(),
+                              typename Mat_t::traits::StrainMap_t::reference,
+                              typename Mat_t::traits::TangentMap_t::reference>;
+
+    MaterialFixture()
+        : mat("Name", mdim(), NbQuadPts(), young, poisson, tau_y0, H),
+          C_holder{std::make_unique<const muGrid::T4Mat<Real, mdim()>>(
+              0.5 * Hooke::compute_C_T4(lambda, mu))},
+          C{*this->C_holder} {}
+
     Mat_t mat;
+    std::unique_ptr<const muGrid::T4Mat<Real, mdim()>>
+        C_holder;  //!< stiffness tensor
+    //! ref to elastic tensor
+    const muGrid::T4Mat<Real, mdim()> & C;
   };
 
   using mats =
@@ -98,12 +115,12 @@ namespace muSpectre {
     coll.add_pixel({0});
     coll.initialise();
 
-    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim> F_{
-        "previous gradient", coll};
+    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim> F_{"previous gradient",
+                                                            coll};
     muGrid::MappedT2StateField<Real, Mapping::Mut, mdim> be_{
         "previous elastic strain", coll};
     muGrid::MappedScalarStateField<Real, Mapping::Mut> eps_{"plastic flow",
-                                                             coll};
+                                                            coll};
 
     auto & F_prev{F_.get_map()};
     F_prev[0].current() = Strain_t::Identity();
@@ -118,8 +135,9 @@ namespace muSpectre {
     F_.get_state_field().cycle();
     be_.get_state_field().cycle();
     eps_.get_state_field().cycle();
-    Strain_t stress{
-        Fix::mat.evaluate_stress(F, F_prev[0], be_prev[0], eps_prev[0])};
+    Strain_t stress{Fix::mat.evaluate_stress(F, F_prev[0], be_prev[0],
+                                             eps_prev[0], Fix::lambda, Fix::mu,
+                                             Fix::tau_y0, Fix::H)};
 
     if (has_precomputed_values) {
       Strain_t tau_ref{};
@@ -153,7 +171,9 @@ namespace muSpectre {
 
     // plastic deformation
     F(0, 1) = .2;
-    stress = Fix::mat.evaluate_stress(F, F_prev[0], be_prev[0], eps_prev[0]);
+    stress =
+        Fix::mat.evaluate_stress(F, F_prev[0], be_prev[0], eps_prev[0],
+                                 Fix::lambda, Fix::mu, Fix::tau_y0, Fix::H);
 
     if (has_precomputed_values) {
       Strain_t tau_ref{};
@@ -205,12 +225,12 @@ namespace muSpectre {
     coll.add_pixel({0});
     coll.initialise();
 
-    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim> F_{
-        "previous gradient", coll};
+    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim> F_{"previous gradient",
+                                                            coll};
     muGrid::MappedT2StateField<Real, Mapping::Mut, mdim> be_{
         "previous elastic strain", coll};
     muGrid::MappedScalarStateField<Real, Mapping::Mut> eps_{"plastic flow",
-                                                             coll};
+                                                            coll};
 
     auto & F_prev{F_.get_map()};
     F_prev[0].current() = Strain_t::Identity();
@@ -228,8 +248,9 @@ namespace muSpectre {
     Strain_t stress{};
     Stiffness_t stiffness{};
 
-    std::tie(stress, stiffness) =
-        Fix::mat.evaluate_stress_tangent(F, F_prev[0], be_prev[0], eps_prev[0]);
+    std::tie(stress, stiffness) = Fix::mat.evaluate_stress_tangent(
+        F, F_prev[0], be_prev[0], eps_prev[0], Fix::lambda, Fix::mu,
+        Fix::tau_y0, Fix::H, Fix::K, Fix::C);
 
     if (has_precomputed_values) {
       Strain_t tau_ref{};
@@ -290,8 +311,9 @@ namespace muSpectre {
 
     // plastic deformation
     F(0, 1) = .2;
-    std::tie(stress, stiffness) =
-        Fix::mat.evaluate_stress_tangent(F, F_prev[0], be_prev[0], eps_prev[0]);
+    std::tie(stress, stiffness) = Fix::mat.evaluate_stress_tangent(
+        F, F_prev[0], be_prev[0], eps_prev[0], Fix::lambda, Fix::mu,
+        Fix::tau_y0, Fix::H, Fix::K, Fix::C);
 
     if (has_precomputed_values) {
       Strain_t tau_ref{};

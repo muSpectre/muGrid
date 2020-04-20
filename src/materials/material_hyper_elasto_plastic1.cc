@@ -46,12 +46,17 @@ namespace muSpectre {
   MaterialHyperElastoPlastic1<DimM>::MaterialHyperElastoPlastic1(
       const std::string & name, const Dim_t & spatial_dimension,
       const Dim_t & nb_quad_pts, const Real & young, const Real & poisson,
-      const Real & tau_y0, const Real & H)
-      : Parent{name, spatial_dimension, nb_quad_pts},
-        plast_flow_field{"cumulated plastic flow εₚ", this->internal_fields},
-        F_prev_field{"Previous placement gradient Fᵗ", this->internal_fields},
-        be_prev_field{"Previous left Cauchy-Green deformation bₑᵗ",
-                      this->internal_fields},
+      const Real & tau_y0, const Real & H,
+      const std::shared_ptr<muGrid::LocalFieldCollection> &
+          parent_field_collection)
+      : Parent{name, spatial_dimension, nb_quad_pts, parent_field_collection},
+        plast_flow_field{this->get_prefix() + "cumulated plastic flow εₚ",
+                         *this->internal_fields},
+        F_prev_field{this->get_prefix() + "Previous placement gradient Fᵗ",
+                     *this->internal_fields},
+        be_prev_field{this->get_prefix() +
+                          "Previous left Cauchy-Green deformation bₑᵗ",
+                      *this->internal_fields},
         young{young}, poisson{poisson}, lambda{Hooke::compute_lambda(young,
                                                                      poisson)},
         mu{Hooke::compute_mu(young, poisson)},
@@ -84,7 +89,8 @@ namespace muSpectre {
   template <Dim_t DimM>
   auto MaterialHyperElastoPlastic1<DimM>::stress_n_internals_worker(
       const T2_t & F, T2StRef_t & F_prev, T2StRef_t & be_prev,
-      ScalarStRef_t & eps_p) -> Worker_t {
+      ScalarStRef_t & eps_p, const Real & lambda, const Real & mu,
+      const Real & tau_y0, const Real & H) -> Worker_t {
     // the notation in this function follows Geers 2003
     // (https://doi.org/10.1016/j.cma.2003.07.014).
 
@@ -96,8 +102,7 @@ namespace muSpectre {
     const muGrid::SelfAdjointDecomp_t<DimM> spectral_decomp{
         muGrid::spectral_decomposition(be_star)};
     Mat_t ln_be_star{muGrid::logm_alt(spectral_decomp)};
-    Mat_t tau_star{.5 *
-                   Hooke::evaluate_stress(this->lambda, this->mu, ln_be_star)};
+    Mat_t tau_star{.5 * Hooke::evaluate_stress(lambda, mu, ln_be_star)};
     // deviatoric part of Kirchhoff stress
     Mat_t tau_d_star{tau_star - tau_star.trace() / DimM * tau_star.Identity()};
     Real tau_eq_star{std::sqrt(
@@ -107,12 +112,11 @@ namespace muSpectre {
     Real division_safe_tau_eq_star{tau_eq_star + Real(tau_eq_star == 0.)};
     Mat_t N_star{3 * .5 * tau_d_star / division_safe_tau_eq_star};
     // this is eq (27), and the std::max enforces the Kuhn-Tucker relation (16)
-    Real phi_star{
-        std::max(tau_eq_star - this->tau_y0 - this->H * eps_p.old(), 0.)};
+    Real phi_star{std::max(tau_eq_star - tau_y0 - H * eps_p.old(), 0.)};
 
     // return mapping
-    Real Del_gamma{phi_star / (this->H + 3 * this->mu)};
-    Mat_t tau{tau_star - 2 * Del_gamma * this->mu * N_star};
+    Real Del_gamma{phi_star / (H + 3 * mu)};
+    Mat_t tau{tau_star - 2 * Del_gamma * mu * N_star};
 
     // update the previous values to the new ones
     F_prev.current() = F;
@@ -128,15 +132,15 @@ namespace muSpectre {
 
   //--------------------------------------------------------------------------//
   template <Dim_t DimM>
-  auto MaterialHyperElastoPlastic1<DimM>::evaluate_stress(const T2_t & F,
-                                                          T2StRef_t F_prev,
-                                                          T2StRef_t be_prev,
-                                                          ScalarStRef_t eps_p)
+  auto MaterialHyperElastoPlastic1<DimM>::evaluate_stress(
+      const T2_t & F, T2StRef_t F_prev, T2StRef_t be_prev, ScalarStRef_t eps_p,
+      const Real & lambda, const Real & mu, const Real & tau_y0, const Real & H)
       -> T2_t {
     Eigen::Matrix<Real, DimM, DimM> tau;
     std::tie(tau, std::ignore, std::ignore, std::ignore, std::ignore,
              std::ignore) =
-        this->stress_n_internals_worker(F, F_prev, be_prev, eps_p);
+        this->stress_n_internals_worker(F, F_prev, be_prev, eps_p, lambda, mu,
+                                        tau_y0, H);
 
     return tau;
   }
@@ -144,10 +148,13 @@ namespace muSpectre {
   //--------------------------------------------------------------------------//
   template <Dim_t DimM>
   auto MaterialHyperElastoPlastic1<DimM>::evaluate_stress_tangent(
-      const T2_t & F, T2StRef_t F_prev, T2StRef_t be_prev, ScalarStRef_t eps_p)
+      const T2_t & F, T2StRef_t F_prev, T2StRef_t be_prev, ScalarStRef_t eps_p,
+      const Real & lambda, const Real & mu, const Real & tau_y0, const Real & H,
+      const Real & K, const Eigen::Ref<const muGrid::T4Mat<Real, DimM>> & C)
       -> std::tuple<T2_t, T4_t> {
     //! after the stress computation, all internals are up to date
-    auto && vals{this->stress_n_internals_worker(F, F_prev, be_prev, eps_p)};
+    auto && vals{this->stress_n_internals_worker(F, F_prev, be_prev, eps_p,
+                                                 lambda, mu, tau_y0, H)};
     auto & tau{std::get<0>(vals)};
     auto & tau_eq_star{std::get<1>(vals)};
     auto & Del_gamma{std::get<2>(vals)};
@@ -158,15 +165,13 @@ namespace muSpectre {
     using Vec_t = Eigen::Matrix<Real, DimM, 1>;
     using T4_t = muGrid::T4Mat<Real, DimM>;
 
-    auto && a0 = Del_gamma * this->mu / tau_eq_star;
-    auto && a1 = this->mu / (this->H + 3 * this->mu);
+    auto && a0 = Del_gamma * mu / tau_eq_star;
+    auto && a1 = mu / (H + 3 * mu);
     T4_t mat_tangent{
-        is_plastic
-            ? ((this->K / 2. - this->mu / 3 + a0 * this->mu) *
-                   Matrices::Itrac<DimM>() +
-               (1 - 3 * a0) * this->mu * Matrices::Isymm<DimM>() +
-               2 * this->mu * (a0 - a1) * Matrices::outer(N_star, N_star))
-            : this->C};
+        is_plastic ? ((K / 2. - mu / 3 + a0 * mu) * Matrices::Itrac<DimM>() +
+                      (1 - 3 * a0) * mu * Matrices::Isymm<DimM>() +
+                      2 * mu * (a0 - a1) * Matrices::outer(N_star, N_star))
+                   : C};
 
     // compute derivative ∂ln(be_star)/∂be_star, see (77) through (80)
     T4_t dlnbe_dbe{T4_t::Zero()};
