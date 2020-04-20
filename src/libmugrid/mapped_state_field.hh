@@ -125,12 +125,12 @@ namespace muGrid {
       case Iteration::Pixel: {
         if (not collection.has_nb_quad_pts()) {
           throw FieldMapError("Can't create a pixel map for state field '" +
-                               unique_prefix +
-                               "' before the number of quadrature points has "
-                               "been set for the field collection.");
+                              unique_prefix +
+                              "' before the number of quadrature points has "
+                              "been set for the field collection.");
         }
         return StateFieldMapType::StaticFieldMap_t::Stride() /
-                collection.get_nb_quad_pts();
+               collection.get_nb_quad_pts();
         break;
       }
       default:
@@ -141,7 +141,7 @@ namespace muGrid {
 
     Dim_t nb_components;  //!< number of components stored per quadrature point
     TypedStateField<Scalar> & state_field;  //!< ref to mapped state field
-    StateFieldMapType map;                   //!< associated field map
+    StateFieldMapType map;                  //!< associated field map
   };
 
   /**
@@ -163,7 +163,7 @@ namespace muGrid {
             size_t NbMemory = 1, Iteration IterationType = Iteration::QuadPt>
   using MappedMatrixStateField =
       MappedStateField<MatrixStateFieldMap<T, Mutability, NbRow, NbCol,
-                                            NbMemory, IterationType>>;
+                                           NbMemory, IterationType>>;
 
   /**
    * Alias of `muGrid::MappedStateField` for a map with corresponding
@@ -182,9 +182,8 @@ namespace muGrid {
    */
   template <typename T, Mapping Mutability, Dim_t NbRow, Dim_t NbCol,
             size_t NbMemory = 1, Iteration IterationType = Iteration::QuadPt>
-  using MappedArrayStateField =
-      MappedStateField<ArrayStateFieldMap<T, Mutability, NbRow, NbCol,
-                                           NbMemory, IterationType>>;
+  using MappedArrayStateField = MappedStateField<
+      ArrayStateFieldMap<T, Mutability, NbRow, NbCol, NbMemory, IterationType>>;
 
   /**
    * Alias of `muGrid::MappedStateField` for a map of scalars with corresponding

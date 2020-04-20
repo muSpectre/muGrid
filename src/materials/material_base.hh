@@ -79,7 +79,9 @@ namespace muSpectre {
      * @param nb_quad_pts is the number of quadrature points per grid cell
      */
     MaterialBase(const std::string & name, const Dim_t & spatial_dimension,
-                 const Dim_t & material_dimension, const Dim_t & nb_quad_pts);
+                 const Dim_t & material_dimension, const Dim_t & nb_quad_pts,
+                 const std::shared_ptr<muGrid::LocalFieldCollection> &
+                     parent_field_collection);
 
     //! Copy constructor
     MaterialBase(const MaterialBase & other) = delete;
@@ -187,7 +189,9 @@ namespace muSpectre {
     muGrid::LocalFieldCollection::IndexIterable get_quad_pt_indices() const;
 
     //! number of quadrature points assigned to this material
-    inline Dim_t size() const { return this->internal_fields.get_nb_entries(); }
+    inline Dim_t size() const {
+      return this->internal_fields->get_nb_entries();
+    }
 
     /**
      * list the names of all internal fields
@@ -219,10 +223,19 @@ namespace muSpectre {
      */
     virtual muGrid::RealField & get_native_stress();
 
+    /**
+     * returns the prefix for amending to internal fileds' names if the
+     * material is nested
+     *
+     */
+    const std::string & get_prefix() { return this->prefix; }
+
    protected:
     const std::string name;  //!< material's name (for output and debugging)
-    muGrid::LocalFieldCollection
+
+    std::shared_ptr<muGrid::LocalFieldCollection>
         internal_fields;  //!< storage for internal variables
+
     //! spatial dimension of the material
     Dim_t material_dimension;
 
@@ -231,6 +244,8 @@ namespace muSpectre {
         assigned_ratio{nullptr};
 
     bool is_initialised{false};
+
+    const std::string prefix;
   };
 }  // namespace muSpectre
 

@@ -172,9 +172,9 @@ namespace muGrid {
       case Iteration::Pixel: {
         if (not collection.has_nb_quad_pts()) {
           throw FieldMapError("Can't create a pixel map for field '" +
-                               unique_name +
-                               "' before the number of quadrature points has "
-                               "been set for the field collection.");
+                              unique_name +
+                              "' before the number of quadrature points has "
+                              "been set for the field collection.");
         }
         const auto & nb_quad{collection.get_nb_quad_pts()};
         if ((dof_per_quad_pt / nb_quad) * nb_quad != dof_per_quad_pt) {
@@ -214,9 +214,9 @@ namespace muGrid {
       case Iteration::Pixel: {
         if (not collection.has_nb_quad_pts()) {
           throw FieldMapError("Can't create a pixel map for field '" +
-                               unique_name +
-                               "' before the number of quadrature points has "
-                               "been set for the field collection.");
+                              unique_name +
+                              "' before the number of quadrature points has "
+                              "been set for the field collection.");
         }
         return FieldMapType::Stride() / collection.get_nb_quad_pts();
         break;
@@ -229,7 +229,7 @@ namespace muGrid {
 
     Dim_t nb_components;  //!< number of components stored per quadrature point
     TypedField<Scalar> & field;  //!< reference to mapped field
-    FieldMapType map;             //!< associated field map
+    FieldMapType map;            //!< associated field map
   };
 
   /**

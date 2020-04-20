@@ -49,12 +49,17 @@ namespace muSpectre {
       const std::string & name, const Dim_t & spatial_dimension,
       const Dim_t & nb_quad_pts)
       : Parent{name, spatial_dimension, nb_quad_pts},
-        lambda_field{"local first Lame constant", this->internal_fields},
-        mu_field{"local second Lame constant(shear modulus)",
-                 this->internal_fields},
-        plastic_increment_field{"plastic increment", this->internal_fields},
-        stress_threshold_field{"threshold", this->internal_fields},
-        eigen_strain_field{"eigen strain", this->internal_fields} {}
+        lambda_field{this->get_prefix() + "local first Lame constant",
+                     *this->internal_fields},
+        mu_field{this->get_prefix() +
+                     "local second Lame constant(shear modulus)",
+                 *this->internal_fields},
+        plastic_increment_field{this->get_prefix() + "plastic increment",
+                                *this->internal_fields},
+        stress_threshold_field{this->get_prefix() + "threshold",
+                               *this->internal_fields},
+        eigen_strain_field{this->get_prefix() + "eigen strain",
+                           *this->internal_fields} {}
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimM>
@@ -80,7 +85,7 @@ namespace muSpectre {
             << std::to_string(DimM) << "×" << std::to_string(DimM);
       throw muGrid::RuntimeError(error.str());
     }
-    this->internal_fields.add_pixel(pixel);
+    this->internal_fields->add_pixel(pixel);
     // store the first(lambda) and second(mu) Lame constant in the field
     Real lambda = Hooke::compute_lambda(Young_modulus, Poisson_ratio);
     Real mu = Hooke::compute_mu(Young_modulus, Poisson_ratio);

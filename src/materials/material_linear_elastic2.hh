@@ -146,8 +146,7 @@ namespace muSpectre {
   template <Dim_t DimM>
   template <class s_t>
   auto MaterialLinearElastic2<DimM>::evaluate_stress(
-      s_t && E, const size_t & quad_pt_index)
-      -> decltype(auto) {
+      s_t && E, const size_t & quad_pt_index) -> decltype(auto) {
     auto && E_eig = this->eigen_strains[quad_pt_index];
     return this->material.evaluate_stress(E - E_eig, quad_pt_index);
   }

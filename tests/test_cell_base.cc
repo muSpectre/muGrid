@@ -69,7 +69,7 @@ namespace muSpectre {
     constexpr static Formulation formulation{form};
     CellFixture()
         : Cell{std::move(cell_input(Sizes<DimS>::get_nb_grid_pts(),
-                                     Sizes<DimS>::get_lengths(), form))} {}
+                                    Sizes<DimS>::get_lengths(), form))} {}
   };
 
   using fixlist =
@@ -137,8 +137,7 @@ namespace muSpectre {
 
     auto res_tup{fix::evaluate_stress_tangent()};
     muGrid::T2FieldMap<Real, Mapping::Const, dim> stress{std::get<0>(res_tup)};
-    muGrid::T4FieldMap<Real, Mapping::Const, dim> tangent{
-        std::get<1>(res_tup)};
+    muGrid::T4FieldMap<Real, Mapping::Const, dim> tangent{std::get<1>(res_tup)};
 
     auto tup = muGrid::testGoodies::objective_hooke_explicit(
         lambda, mu, Matrices::I2<dim>());
@@ -167,10 +166,8 @@ namespace muSpectre {
     const Real mu{Young / (2 * (1 + Poisson))};
     const Real contrast{.5};
 
-    auto & material_hard{
-        Mat_t::make(*this, "hard", Young, Poisson)};
-    auto & material_soft{
-        Mat_t::make(*this, "soft", contrast * Young, Poisson)};
+    auto & material_hard{Mat_t::make(*this, "hard", Young, Poisson)};
+    auto & material_soft{Mat_t::make(*this, "soft", contrast * Young, Poisson)};
 
     for (const auto & pixel_id : this->get_pixel_indices()) {
       static_cast<bool>(pixel_id % 2) ? material_hard.add_pixel(pixel_id)
@@ -193,8 +190,7 @@ namespace muSpectre {
 
     auto res_tup{fix::evaluate_stress_tangent()};
     muGrid::T2FieldMap<Real, Mapping::Const, dim> stress{std::get<0>(res_tup)};
-    muGrid::T4FieldMap<Real, Mapping::Const, dim> tangent{
-        std::get<1>(res_tup)};
+    muGrid::T4FieldMap<Real, Mapping::Const, dim> tangent{std::get<1>(res_tup)};
 
     auto tup_hard{muGrid::testGoodies::objective_hooke_explicit(
         lambda, mu, Matrices::I2<dim>())};

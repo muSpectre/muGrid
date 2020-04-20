@@ -107,12 +107,12 @@ namespace muSpectre {
     coll.add_pixel({0});
     coll.initialise();
 
-    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim> F_{
-        "previous gradient", coll};
+    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim> F_{"previous gradient",
+                                                            coll};
     muGrid::MappedT2StateField<Real, Mapping::Mut, mdim> be_{
         "previous elastic strain", coll};
     muGrid::MappedScalarStateField<Real, Mapping::Mut> eps_{"plastic flow",
-                                                             coll};
+                                                            coll};
 
     auto & F_prev{F_.get_map()};
     F_prev[0].current() = Strain_t::Identity();
@@ -232,12 +232,12 @@ namespace muSpectre {
     coll.add_pixel({0});
     coll.initialise();
 
-    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim> F_{
-        "previous gradient", coll};
+    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim> F_{"previous gradient",
+                                                            coll};
     muGrid::MappedT2StateField<Real, Mapping::Mut, mdim> be_{
         "previous elastic strain", coll};
     muGrid::MappedScalarStateField<Real, Mapping::Mut> eps_{"plastic flow",
-                                                             coll};
+                                                            coll};
 
     auto & F_prev{F_.get_map()};
     F_prev[0].current() = Strain_t::Identity();

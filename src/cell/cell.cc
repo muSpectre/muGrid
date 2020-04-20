@@ -59,13 +59,13 @@ namespace muSpectre {
         // We request the DOFs for a single quadrature point, since quadrature
         // points are handled by the field.
         strain{this->fields->register_real_field(
-            "strain", dof_for_formulation(this->get_formulation(),
-                                          this->get_material_dim(),
-                                          OneQuadPt))},
+            "strain",
+            dof_for_formulation(this->get_formulation(),
+                                this->get_material_dim(), OneQuadPt))},
         stress{this->fields->register_real_field(
-            "stress", dof_for_formulation(this->get_formulation(),
-                                          this->get_material_dim(),
-                                          OneQuadPt))},
+            "stress",
+            dof_for_formulation(this->get_formulation(),
+                                this->get_material_dim(), OneQuadPt))},
         is_cell_split{is_cell_split} {
     this->fields->initialise(this->projection->get_nb_subdomain_grid_pts(),
                              this->projection->get_subdomain_locations());
@@ -376,7 +376,7 @@ namespace muSpectre {
       muGrid::TypedFieldBase<Real> & del_stress) {
     if (not this->tangent) {
       throw RuntimeError("evaluate_projected_directional_stiffness "
-                               "requires the tangent moduli");
+                         "requires the tangent moduli");
     }
     if (delta_strain.get_nb_dof_per_quad_pt() != this->get_strain_size()) {
       std::stringstream err{};
@@ -510,8 +510,8 @@ namespace muSpectre {
           if (coll.field_exists(unique_name)) {
             auto & field{coll.get_field(unique_name)};
             err_str << field.get_nb_dof_per_quad_pt()
-                    << " components in material '" << mat->get_name()
-                    << "'" << std::endl;
+                    << " components in material '" << mat->get_name() << "'"
+                    << std::endl;
           }
         }
       } else {

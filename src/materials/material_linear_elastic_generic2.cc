@@ -46,21 +46,23 @@ namespace muSpectre {
                                                              spatial_dimension,
                                                              nb_quad_pts,
                                                              C_voigt},
-        eigen_field{"Eigenstrain", this->internal_fields} {}
+        eigen_field{this->get_prefix() + "Eigenstrain",
+                    *this->internal_fields} {}
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimM>
-  void MaterialLinearElasticGeneric2<DimM>::add_pixel(
-      const size_t & /*pixel*/) {
+  void
+  MaterialLinearElasticGeneric2<DimM>::add_pixel(const size_t & /*pixel*/) {
     throw muGrid::RuntimeError(
         "this material needs pixels with and eigenstrain");
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimM>
-  void MaterialLinearElasticGeneric2<DimM>::add_pixel(
-      const size_t & pixel_index, const StrainTensor & E_eig) {
-    this->internal_fields.add_pixel(pixel_index);
+  void
+  MaterialLinearElasticGeneric2<DimM>::add_pixel(const size_t & pixel_index,
+                                                 const StrainTensor & E_eig) {
+    this->internal_fields->add_pixel(pixel_index);
     Eigen::Map<const Eigen::Array<Real, DimM * DimM, 1>> strain_array(
         E_eig.data());
     this->eigen_field.get_field().push_back(strain_array);
