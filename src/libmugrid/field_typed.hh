@@ -80,8 +80,9 @@ namespace muGrid {
      * @param collection reference to the holding field collection.
      */
     TypedFieldBase(const std::string & unique_name,
-                    FieldCollection & collection, Dim_t nb_components)
-        : Parent{unique_name, collection, nb_components} {}
+                   FieldCollection & collection, Dim_t nb_components,
+                   const Unit & unit = Unit::unitless())
+      : Parent{unique_name, collection, nb_components, unit} {}
 
    public:
     //! stored scalar type

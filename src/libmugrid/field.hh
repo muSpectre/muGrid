@@ -38,6 +38,7 @@
 
 #include "exception.hh"
 #include "grid_common.hh"
+#include "units.hh"
 
 #include <string>
 #include <typeinfo>
@@ -80,7 +81,7 @@ namespace muGrid {
      * @param collection reference to the holding field collection.
      */
     Field(const std::string & unique_name, FieldCollection & collection,
-           Dim_t nb_dof_per_quad_pt);
+          Dim_t nb_dof_per_quad_pt, const Unit & unit);
 
    public:
     //! Default constructor
@@ -204,6 +205,9 @@ namespace muGrid {
 
     //! size of padding region at end of buffer
     size_t pad_size{};
+
+    //! Physical unit of the values stored in this field
+    Unit unit;
   };
 
 }  // namespace muGrid

@@ -62,6 +62,7 @@ set(mugrid_HDRS
   field_collection.hh
   ccoord_operations.hh
   state_field_map.hh
+  units.hh
   )
 
 set(mugrid_SRCS
@@ -76,6 +77,7 @@ set(mugrid_SRCS
   field_map.cc
   state_field.cc
   state_field_map.cc
+  units.cc
   )
 
 add_library(muGrid "")

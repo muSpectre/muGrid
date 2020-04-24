@@ -228,7 +228,8 @@ namespace muGrid {
      * machine precision.
      */
     template <typename T, bool IsArithmetic = std::is_arithmetic<T>::value>
-    std::enable_if_t<IsArithmetic, T> rel_error(const T & a, const T & b) {
+    inline std::enable_if_t<IsArithmetic, T> rel_error(const T & a,
+                                                       const T & b) {
       static_assert(IsArithmetic == std::is_arithmetic<T>::value,
                     "IsArithmetic is a SFINAE parameter, do not set manually");
       Real comp(std::abs(a) + std::abs(b));
@@ -243,7 +244,7 @@ namespace muGrid {
      * machine precision.
      */
     template <typename DerivedA, typename DerivedB>
-    Real rel_error(const Eigen::MatrixBase<DerivedA> & a,
+    inline Real rel_error(const Eigen::MatrixBase<DerivedA> & a,
                    const Eigen::MatrixBase<DerivedB> & b) {
       Real comp(a.norm() + b.norm());
       if (comp == 0.) {
@@ -257,10 +258,17 @@ namespace muGrid {
      * machine precision.
      */
     template <typename DerivedA, typename DerivedB>
-    Real rel_error(const Eigen::ArrayBase<DerivedA> & a,
+    inline Real rel_error(const Eigen::ArrayBase<DerivedA> & a,
                    const Eigen::ArrayBase<DerivedB> & b) {
       return rel_error(a.matrix(), b.matrix());
     }
+
+    /**
+     * generates a list of prime numbers in the range [lower, upper[. This is
+     * not very efficient, so use sparingly, with reasonable ranges. Uses the
+     * Sieve of Eratosthenes
+     */
+    std::vector<Int> generate_primes(const Uint & lower, const Uint & upper);
   }  // namespace testGoodies
 
 }  // namespace muGrid

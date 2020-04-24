@@ -41,9 +41,9 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   Field::Field(const std::string & unique_name, FieldCollection & collection,
-               Dim_t nb_dof_per_quad_pt)
-      : name{unique_name}, collection{collection}, nb_dof_per_quad_pt{
-          nb_dof_per_quad_pt} {}
+               Dim_t nb_dof_per_quad_pt, const Unit & unit)
+      : name{unique_name}, collection{collection},
+        nb_dof_per_quad_pt{nb_dof_per_quad_pt}, unit{unit} {}
   /* ---------------------------------------------------------------------- */
   const std::string & Field::get_name() const { return this->name; }
 
