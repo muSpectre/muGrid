@@ -87,7 +87,7 @@ namespace muSpectre {
 
     // these two functions return the indices in column major strain and stress
     // tensors that the behavior is either serial or parallel concerning
-    // combining the laminate layers as we know some indices in a lmainate
+    // combining the laminate layers as we know some indices in a laminate
     // structure act like the two phases are in serial and some others act like
     // two phases are parralell to each other
     inline static constexpr Parallel_index_t get_parallel_indices();
@@ -204,7 +204,7 @@ namespace muSpectre {
                     const Function_t & mat_1_stress_eval,
                     const Function_t & mat_2_stress_eval, const Real & ratio,
                     const Eigen::Ref<Vec_t> & normal_vec,
-                    const Real tol = 1e-10, const Dim_t max_iter = 1000);
+                    const Real & tol = 1e-10, const Dim_t & max_iter = 1000);
 
     /* ---------------------------------------------------------------------- */
     static Stress_t evaluate_stress(const Eigen::Ref<Strain_t> & strain_coord,
@@ -212,16 +212,16 @@ namespace muSpectre {
                                     const Function_t & mat_2_stress_eval,
                                     const Real & ratio,
                                     const Eigen::Ref<Vec_t> & normal_vec,
-                                    const Real tol = 1e-10,
-                                    const Dim_t max_iter = 1000);
+                                    const Real & tol = 1e-10,
+                                    const Dim_t & max_iter = 1000);
 
     /* ---------------------------------------------------------------------- */
     static std::tuple<Stress_t, Stiffness_t> evaluate_stress_tangent(
         const Eigen::Ref<Strain_t> & strain_coord,
         const Function_t & mat_1_stress_eval,
         const Function_t & mat_2_stress_eval, const Real & ratio,
-        const Eigen::Ref<Vec_t> & normal_vec, const Real tol = 1e-10,
-        const Dim_t max_iter = 1000);
+        const Eigen::Ref<Vec_t> & normal_vec, const Real & tol = 1e-10,
+        const Dim_t & max_iter = 1000);
   };  // LamHomogen
 
   /* ---------------------------------------------------------------------- */
@@ -272,6 +272,16 @@ namespace muSpectre {
     return Equation_index_t{{{0, 0}, {0, 1}}};
   }
   template <>
+  constexpr auto LamHomogen<threeD, Formulation::native>::get_equation_indices()
+      -> Equation_index_t {
+    return Equation_index_t{{{0, 0}, {0, 1}, {0, 2}}};
+  }
+  template <>
+  constexpr auto LamHomogen<twoD, Formulation::native>::get_equation_indices()
+      -> Equation_index_t {
+    return Equation_index_t{{{0, 0}, {0, 1}}};
+  }
+  template <>
   constexpr auto
   LamHomogen<threeD, Formulation::finite_strain>::get_equation_indices()
       -> Equation_index_t {
@@ -293,6 +303,17 @@ namespace muSpectre {
   template <>
   constexpr auto
   LamHomogen<twoD, Formulation::small_strain>::get_parallel_indices()
+      -> Parallel_index_t {
+    return Parallel_index_t{{{1, 1}}};
+  }
+
+  template <>
+  constexpr auto LamHomogen<threeD, Formulation::native>::get_parallel_indices()
+      -> Parallel_index_t {
+    return Parallel_index_t{{{1, 1}, {1, 2}, {2, 1}, {2, 2}}};
+  }
+  template <>
+  constexpr auto LamHomogen<twoD, Formulation::native>::get_parallel_indices()
       -> Parallel_index_t {
     return Parallel_index_t{{{1, 1}}};
   }

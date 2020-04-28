@@ -97,6 +97,12 @@ namespace muSpectre {
   MaterialLaminate<DimM>::make(Cell & cell, const std::string & name) {
     auto mat{std::make_unique<MaterialLaminate<DimM>>(
         name, cell.get_spatial_dim(), cell.get_nb_quad_pts())};
+    using traits = MaterialMuSpectre_traits<MaterialLaminate<DimM>>;
+    auto && Form = cell.get_formulation();
+    constexpr StrainMeasure expected_strain_m{traits::strain_measure};
+    if (Form == Formulation::small_strain) {
+      check_small_strain_capability(expected_strain_m);
+    }
     auto & mat_ref{*mat};
     auto is_cell_split{cell.get_splitness()};
     mat_ref.allocate_optional_fields(is_cell_split);
@@ -143,6 +149,24 @@ namespace muSpectre {
       }
       case (SplitCell::simple): {
         this->compute_stresses_worker<Formulation::small_strain,
+                                      SplitCell::simple>(F, P);
+        break;
+      }
+      default:
+        throw muGrid::RuntimeError("Unknown Splitness status");
+      }
+      break;
+    }
+    case Formulation::native: {
+      switch (is_cell_split) {
+      case (SplitCell::no):
+      case (SplitCell::laminate): {
+        this->compute_stresses_worker<Formulation::native, SplitCell::no>(
+            F, P);
+        break;
+      }
+      case (SplitCell::simple): {
+        this->compute_stresses_worker<Formulation::native,
                                       SplitCell::simple>(F, P);
         break;
       }
@@ -198,6 +222,24 @@ namespace muSpectre {
       case (SplitCell::simple): {
         this->compute_stresses_worker<Formulation::small_strain,
                                       SplitCell::simple>(F, P, K);
+        break;
+      }
+      default:
+        throw muGrid::RuntimeError("Unknown Splitness status");
+      }
+      break;
+    }
+    case Formulation::native: {
+      switch (is_cell_split) {
+      case (SplitCell::no):
+      case (SplitCell::laminate): {
+        this->compute_stresses_worker<Formulation::native, SplitCell::no>(F, P,
+                                                                          K);
+        break;
+      }
+      case (SplitCell::simple): {
+        this->compute_stresses_worker<Formulation::native, SplitCell::simple>(
+            F, P, K);
         break;
       }
       default:

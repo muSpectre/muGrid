@@ -170,4 +170,20 @@ namespace muSpectre {
     }
   }
 
+  /* ---------------------------------------------------------------------- */
+  void MaterialBase::check_small_strain_capability(
+      const StrainMeasure & expected_strain_measure) {
+    if (expected_strain_measure != StrainMeasure::GreenLagrange) {
+      std::stringstream err_str{};
+      err_str
+          << "The material expected strain measure is: "
+          << expected_strain_measure
+          << ", while in small strain the required strain measure is "
+             "Infitismal whose equivalent in finite strain is Greenlagrange"
+          << " Acccordingly, this material is not meant to be utilized in "
+             "small strain formulation"
+          << std::endl;
+      throw(muGrid::RuntimeError(err_str.str()));
+    }
+  }
 }  // namespace muSpectre

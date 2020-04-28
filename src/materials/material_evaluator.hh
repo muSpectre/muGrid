@@ -190,18 +190,12 @@ namespace muSpectre {
   template <Dim_t DimM>
   auto
   MaterialEvaluator<DimM>::evaluate_stress(const Eigen::Ref<const T2_t> & grad,
-                                           const Formulation & form_in)
+                                           const Formulation & form)
       -> T2_const_map {
     this->check_init();
     this->strain.get_map()[0] = grad;
-    Formulation form_out{Formulation::finite_strain};
-    if (form_in == Formulation::native) {
-      form_out = Formulation::small_strain;
-    } else {
-      form_out = form_in;
-    }
     this->material->compute_stresses(this->strain.get_field(),
-                                     this->stress.get_field(), form_out);
+                                     this->stress.get_field(), form);
     return T2_const_map(this->stress.get_map()[0].data());
   }
 

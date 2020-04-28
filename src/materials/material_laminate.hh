@@ -287,6 +287,12 @@ namespace muSpectre {
           mat_r_evaluate_stress_tangent_func, ratio, normal_vec);
       break;
     }
+    case Formulation::native: {
+      return LamHomogen<DimM, Formulation::native>::evaluate_stress(
+          E_eval, mat_l_evaluate_stress_tangent_func,
+          mat_r_evaluate_stress_tangent_func, ratio, normal_vec);
+      break;
+    }
     default: {
       throw muGrid::RuntimeError("Unknown formualtion");
     }
@@ -336,6 +342,12 @@ namespace muSpectre {
                                   normal_vec);
       break;
     }
+    case Formulation::native: {
+      return LamHomogen<DimM, Formulation::native>::evaluate_stress_tangent(
+          E_eval, mat_l_evaluate_stress_tangent_func,
+          mat_r_evaluate_stress_tangent_func, ratio, normal_vec);
+      break;
+    }
     default: {
       throw muGrid::RuntimeError("Unknown formualtion");
     }
@@ -356,6 +368,9 @@ namespace muSpectre {
        The internal_variables tuple contains whatever internal variables
        Material declared (e.g., eigenstrain, strain rate, etc.)
     */
+
+    using traits = MaterialMuSpectre_traits<MaterialLaminate<DimM>>;
+
     using iterable_proxy_t = iterable_proxy<
         std::tuple<typename traits::StrainMap_t>,
         std::tuple<typename traits::StressMap_t, typename traits::TangentMap_t>,
@@ -414,6 +429,7 @@ namespace muSpectre {
        F contains the transformation gradient for finite strain calculations and
        the infinitesimal strain tensor in small strain problems
     */
+    using traits = MaterialMuSpectre_traits<MaterialLaminate<DimM>>;
 
     using iterable_proxy_t =
         iterable_proxy<std::tuple<typename traits::StrainMap_t>,
@@ -667,6 +683,7 @@ namespace muSpectre {
     return internal::MaterialStressTangentEvaluator<Form>::compute(
         *this, strains, stresses, quad_pt_id, operation_assignment);
   }
+
   /* ---------------------------------------------------------------------- */
 }  // namespace muSpectre
 #endif  // SRC_MATERIALS_MATERIAL_LAMINATE_HH_

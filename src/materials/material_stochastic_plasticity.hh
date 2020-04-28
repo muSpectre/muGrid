@@ -365,7 +365,7 @@ namespace muSpectre {
       const auto & stress_map_pixel{stress_map[pixel]};
       Eigen::Matrix<Real, DimM, DimM> stress_matrix_pixel = stress_map_pixel;
       const Eigen::Matrix<Real, DimM, DimM> deviatoric_stress{
-          MatTB::compute_deviatoric_stress(stress_matrix_pixel)};
+          MatTB::compute_deviatoric(stress_matrix_pixel)};
       const Real equivalent_stress{
           MatTB::compute_equivalent_von_Mises_stress(stress_map_pixel)};
       const Eigen::Matrix<Real, DimM, DimM> plastic_strain_direction{

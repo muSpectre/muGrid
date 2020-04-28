@@ -213,9 +213,18 @@ namespace muSpectre {
     constitutive_law_dynamic(const Eigen::Ref<const DynMatrix_t> & strain,
                              const size_t & quad_pt_index,
                              const Formulation & form) = 0;
+    /**
+     * setting time-step for materials needing it. (Doing nothing by deafult
+     * because for materials without time  step it should be idle)
+     */
+    virtual void set_time_step(const Real & /*dt*/) {}
 
     //! returns whether or not a field with native stress has been stored
     virtual bool has_native_stress() const;
+
+    //! checks the possibility of using the material in finite strain
+    static void check_small_strain_capability(
+        const StrainMeasure & exapected_strain_measure);
 
     /**
      * returns the stored native stress field. Throws a runtime error if native

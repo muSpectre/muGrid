@@ -413,7 +413,7 @@ namespace muSpectre {
     if (verbose) {
       std::cout << "stress:\n" << stress << std::endl;
     }
-    T2_t sigma_dev{MatTB::compute_deviatoric_stress<Dim>(stress)};
+    T2_t sigma_dev{MatTB::compute_deviatoric<Dim>(stress)};
     T2_t sigma_dev_analytic{Eigen::Matrix<Real, Dim, Dim>::Zero()};
     sigma_dev_analytic(0, 0) = -1;
     sigma_dev_analytic(0, 1) = 0.2;

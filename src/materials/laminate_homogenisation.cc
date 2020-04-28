@@ -670,8 +670,6 @@ namespace muSpectre {
   template class LamHomogen<threeD, Formulation::finite_strain>;
   template class LamHomogen<twoD, Formulation::small_strain>;
   template class LamHomogen<threeD, Formulation::small_strain>;
-  template class LamHomogen<twoD, Formulation::native>;
-  template class LamHomogen<threeD, Formulation::native>;
 
   template class LamCombination<twoD>;
   template class LamCombination<threeD>;

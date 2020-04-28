@@ -34,7 +34,6 @@
  */
 
 #include "common/muSpectre_common.hh"
-#include "materials/stress_transformations_Kirchhoff.hh"
 #include "materials/material_hyper_elasto_plastic1.hh"
 
 #include <libmugrid/T4_map_proxy.hh>
@@ -136,7 +135,7 @@ namespace muSpectre {
       const T2_t & F, T2StRef_t F_prev, T2StRef_t be_prev, ScalarStRef_t eps_p,
       const Real & lambda, const Real & mu, const Real & tau_y0, const Real & H)
       -> T2_t {
-    Eigen::Matrix<Real, DimM, DimM> tau;
+    Eigen::Matrix<Real, DimM, DimM> tau{};
     std::tie(tau, std::ignore, std::ignore, std::ignore, std::ignore,
              std::ignore) =
         this->stress_n_internals_worker(F, F_prev, be_prev, eps_p, lambda, mu,

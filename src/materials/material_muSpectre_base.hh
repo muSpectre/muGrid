@@ -262,6 +262,13 @@ namespace muSpectre {
                                           ConstructorArgs &&... args) {
     auto mat = std::make_unique<Material>(name, cell.get_spatial_dim(),
                                           cell.get_nb_quad_pts(), args...);
+    using traits = MaterialMuSpectre_traits<Material>;
+    auto && Form = cell.get_formulation();
+    constexpr StrainMeasure expected_strain_m{traits::strain_measure};
+    if (Form == Formulation::small_strain) {
+      check_small_strain_capability(expected_strain_m);
+    }
+
     auto & mat_ref = *mat;
     auto is_cell_split{cell.get_splitness()};
     mat_ref.allocate_optional_fields(is_cell_split);
@@ -385,7 +392,7 @@ namespace muSpectre {
     case Formulation::small_strain: {
       switch (is_cell_split) {
       case (SplitCell::no):
-        // fall-through; laminate and whole pixels treated same at this point
+        // fall-through;  laminate and whole pixels treated same at this point
       case (SplitCell::laminate): {
         this->compute_stresses_dispatch1<Formulation::small_strain,
                                          SplitCell::no>(store_native_stress, F,
@@ -394,6 +401,26 @@ namespace muSpectre {
       }
       case (SplitCell::simple): {
         this->compute_stresses_dispatch1<Formulation::small_strain,
+                                         SplitCell::simple>(store_native_stress,
+                                                            F, P);
+        break;
+      }
+      default:
+        throw muGrid::RuntimeError("Unknown Splitness status");
+      }
+      break;
+    }
+    case Formulation::native: {
+      switch (is_cell_split) {
+      case (SplitCell::no):
+        // fall-through; laminate and whole pixels treated same at this point
+      case (SplitCell::laminate): {
+        this->compute_stresses_dispatch1<Formulation::native, SplitCell::no>(
+            store_native_stress, F, P);
+        break;
+      }
+      case (SplitCell::simple): {
+        this->compute_stresses_dispatch1<Formulation::native,
                                          SplitCell::simple>(store_native_stress,
                                                             F, P);
         break;
@@ -456,6 +483,25 @@ namespace muSpectre {
       }
       break;
     }
+    case Formulation::native: {
+      switch (is_cell_split) {
+      case (SplitCell::no):
+      case (SplitCell::laminate): {
+        this->compute_stresses_dispatch1<Formulation::native, SplitCell::no>(
+            store_native_stress, F, P, K);
+        break;
+      }
+      case (SplitCell::simple): {
+        this->compute_stresses_dispatch1<Formulation::native,
+                                         SplitCell::simple>(store_native_stress,
+                                                            F, P, K);
+        break;
+      }
+      default:
+        throw muGrid::RuntimeError("Unknown Splitness status");
+      }
+      break;
+    }
     default:
       throw muGrid::RuntimeError("Unknown formulation");
       break;
@@ -477,8 +523,12 @@ namespace muSpectre {
        The internal_variables tuple contains whatever internal variables
        Material declared (e.g., eigenstrain, strain rate, etc.)
     */
-    auto & this_mat = static_cast<Material &>(*this);
+    auto && this_mat {static_cast<Material &>(*this)};
     using traits = MaterialMuSpectre_traits<Material>;
+    constexpr StrainMeasure expected_strain_m{traits::strain_measure};
+    if (Form == Formulation::small_strain) {
+      check_small_strain_capability(expected_strain_m);
+    }
 
     using iterable_proxy_t = iterable_proxy<
         std::tuple<typename traits::StrainMap_t>,
@@ -596,6 +646,11 @@ namespace muSpectre {
        the infinitesimal strain tensor in small strain problems
     */
     auto & this_mat = static_cast<Material &>(*this);
+    using traits = MaterialMuSpectre_traits<Material>;
+    constexpr StrainMeasure expected_strain_m{traits::strain_measure};
+    if (Form == Formulation::small_strain) {
+      check_small_strain_capability(expected_strain_m);
+    }
 
     using iterable_proxy_t =
         iterable_proxy<std::tuple<typename traits::StrainMap_t>,

@@ -152,7 +152,8 @@ namespace muGrid {
      *    0123     01   23
      */
     template <typename T1, typename T2>
-    constexpr inline decltype(auto) outer(T1 && A, T2 && B) {
+    constexpr inline decltype(auto) outer(const Eigen::MatrixBase<T1> & A,
+                                          const Eigen::MatrixBase<T2> & B) {
       // Just make sure that the right type of parameters have been given
       constexpr Dim_t dim{EigenCheck::tensor_dim<T1>::value};
       static_assert((dim == EigenCheck::tensor_dim<T2>::value),
@@ -206,7 +207,9 @@ namespace muGrid {
      *    0231     01   23 <- this defines the shuffle order
      */
     template <typename T1, typename T2>
-    constexpr inline decltype(auto) outer_over(T1 && A, T2 && B) {
+    constexpr inline decltype(auto)
+    outer_over(const Eigen::MatrixBase<T1> & A,
+               const Eigen::MatrixBase<T2> & B) {
       // Just make sure that the right type of parameters have been given
       constexpr Dim_t dim{EigenCheck::tensor_dim<T1>::value};
       static_assert((dim == EigenCheck::tensor_dim<T2>::value),
@@ -283,6 +286,12 @@ namespace muGrid {
       return 0.5 * (outer_under(I, I) + outer_over(I, I));
     }
 
+    //! compile-time fourth-order asymmetriser
+    template <Dim_t dim>
+    constexpr inline Tens4_t<dim> Iasymm() {
+      return Matrices::Isymm<dim>() - (1.0 / 3.0) * Matrices::Itrac<dim>();
+    }
+
     namespace internal {
 
       /* ----------------------------------------------------------------------
@@ -298,7 +307,8 @@ namespace muGrid {
       struct Dotter<Dim, secondOrder, fourthOrder> {
         //! raison d'être
         template <class T1, class T2>
-        static constexpr decltype(auto) dot(T1 && t1, T2 && t2) {
+        static constexpr decltype(auto) dot(const Eigen::MatrixBase<T1> & t1,
+                                            const Eigen::MatrixBase<T2> & t2) {
           using T4_t = T4Mat<typename std::remove_reference_t<T1>::Scalar, Dim>;
           T4_t ret_val{T4_t::Zero()};
           for (Int i = 0; i < Dim; ++i) {
@@ -324,7 +334,8 @@ namespace muGrid {
       struct Dotter<Dim, fourthOrder, secondOrder> {
         //! raison d'être
         template <class T4, class T2>
-        static constexpr decltype(auto) dot(T4 && t4, T2 && t2) {
+        static constexpr decltype(auto) dot(const Eigen::MatrixBase<T4> & t4,
+                                            const Eigen::MatrixBase<T2> & t2) {
           using T4_t = T4Mat<typename std::remove_reference_t<T4>::Scalar, Dim>;
           T4_t ret_val{T4_t::Zero()};
           for (Int i = 0; i < Dim; ++i) {
@@ -350,7 +361,8 @@ namespace muGrid {
       struct Dotter<Dim, fourthOrder, fourthOrder> {
         //! raison d'être
         template <class T1, class T2>
-        static constexpr decltype(auto) ddot(T1 && t1, T2 && t2) {
+        static constexpr decltype(auto) ddot(const Eigen::MatrixBase<T1> & t1,
+                                             const Eigen::MatrixBase<T2> & t2) {
           return t1 * t2;
         }
       };
@@ -363,7 +375,8 @@ namespace muGrid {
       struct Dotter<Dim, secondOrder, secondOrder> {
         //! raison d'être
         template <class T1, class T2>
-        static constexpr decltype(auto) ddot(T1 && t1, T2 && t2) {
+        static constexpr decltype(auto) ddot(const Eigen::MatrixBase<T1> & t1,
+                                             const Eigen::MatrixBase<T2> & t2) {
           return (t1 * t2.transpose()).trace();
         }
       };
@@ -371,30 +384,107 @@ namespace muGrid {
     }  // namespace internal
 
     /**
-     * simple contraction between two tensors. The result depends on the rank of
-     * the tesnors, see documentation for `muGrid::internal::Dotter`
+     * simple contraction between two tensors. The result depends on the rank
+     * of the tesnors, see documentation for `muGrid::internal::Dotter`
      */
     template <Dim_t Dim, class T1, class T2>
-    decltype(auto) dot(T1 && t1, T2 && t2) {
+    decltype(auto) dot(const Eigen::MatrixBase<T1> & t1,
+                       const Eigen::MatrixBase<T2> & t2) {
       using EigenCheck::tensor_rank;
       constexpr Dim_t rank1{tensor_rank<T1, Dim>::value};
       constexpr Dim_t rank2{tensor_rank<T2, Dim>::value};
-      return internal::Dotter<Dim, rank1, rank2>::dot(std::forward<T1>(t1),
-                                                      std::forward<T2>(t2));
+      return internal::Dotter<Dim, rank1, rank2>::dot(t1, t2);
     }
 
     /**
-     * double contraction between two tensors. The result depends on the rank of
-     * the tesnors, see documentation for `muGrid::internal::Dotter`
+     * double contraction between two tensors. The result depends on the rank
+     * of the tesnors, see documentation for `muGrid::internal::Dotter`
      */
     template <Dim_t Dim, class T1, class T2>
-    decltype(auto) ddot(T1 && t1, T2 && t2) {
+    decltype(auto) ddot(const Eigen::MatrixBase<T1> & t1,
+                        const Eigen::MatrixBase<T2> & t2) {
       using EigenCheck::tensor_rank;
       constexpr Dim_t rank1{tensor_rank<T1, Dim>::value};
       constexpr Dim_t rank2{tensor_rank<T2, Dim>::value};
-      return internal::Dotter<Dim, rank1, rank2>::ddot(std::forward<T1>(t1),
-                                                       std::forward<T2>(t2));
+      return internal::Dotter<Dim, rank1, rank2>::ddot(t1, t2);
     }
+
+    /* ---------------------------------------------------------------------- */
+    template <Dim_t Rank>
+    struct AxisTransform {};
+
+    template <>
+    struct AxisTransform<firstOrder> {
+      template <class T1, class T2>
+      inline static decltype(auto)
+      push_forward(const Eigen::MatrixBase<T1> & t1,
+                   const Eigen::MatrixBase<T2> & F) {
+        constexpr Dim_t dim{EigenCheck::tensor_dim<T1>::value};
+        using T2_t =
+            Eigen::Matrix<typename std::remove_reference_t<T2>::Scalar, dim, 1>;
+        T2_t ret_val{F * t1};
+        return ret_val;
+      }
+
+      template <class T1, class T2>
+      inline static decltype(auto) pull_back(const Eigen::MatrixBase<T1> & t1,
+                                             const Eigen::MatrixBase<T2> & F) {
+        constexpr Dim_t dim{EigenCheck::tensor_dim<T1>::value};
+        using T2_t = Eigen::Matrix<typename std::remove_reference_t<T2>::Scalar,
+                                   dim, dim>;
+        T2_t && F_inv{F.inverse()};
+        push_forward<dim>(t1, std::move(F_inv));
+      }
+    };
+
+    template <>
+    struct AxisTransform<secondOrder> {
+      template <class T2, class T2_F>
+      inline static decltype(auto)
+      push_forward(const Eigen::MatrixBase<T2> & t2,
+                   const Eigen::MatrixBase<T2_F> & F) {
+        constexpr Dim_t dim{EigenCheck::tensor_dim<T2>::value};
+        using T2_t = Eigen::Matrix<typename std::remove_reference_t<T2>::Scalar,
+                                   dim, dim>;
+        T2_t ret_val{F * t2 * F.transpose()};
+        return ret_val;
+      }
+
+      template <class T2, class T2_F>
+      inline static decltype(auto)
+      pull_back(const Eigen::MatrixBase<T2> & t2,
+                const Eigen::MatrixBase<T2_F> & F) {
+        constexpr Dim_t dim{EigenCheck::tensor_dim<T2>::value};
+        using T2_t = Eigen::Matrix<typename std::remove_reference_t<T2>::Scalar,
+                                   dim, dim>;
+        T2_t && F_inv{F.inverse()};
+        return push_forward<dim>(t2, std::move(F_inv));
+      }
+    };
+
+    template <>
+    struct AxisTransform<fourthOrder> {
+      template <class T4, class T2>
+      inline static decltype(auto)
+      push_forward(const Eigen::MatrixBase<T4> & t4,
+                   const Eigen::MatrixBase<T2> & F) {
+        constexpr Dim_t dim{EigenCheck::tensor_dim<T2>::value};
+        Tens4_t<dim> ret_val{
+            muGrid::Matrices::outer_under(F, F) * t4 *
+            muGrid::Matrices::outer_under(F.transpose(), F.transpose())};
+        return ret_val;
+      }
+
+      template <class T4, class T2>
+      inline static decltype(auto) pull_back(const Eigen::MatrixBase<T4> & t4,
+                                             const Eigen::MatrixBase<T2> & F) {
+        constexpr Dim_t dim{EigenCheck::tensor_dim<T2>::value};
+        using T2_t = Eigen::Matrix<typename std::remove_reference_t<T2>::Scalar,
+                                   dim, dim>;
+        T2_t && F_inv{F.inverse()};
+        return push_forward<dim>(t4, std::move(F_inv));
+      }
+    };
 
   }  // namespace Matrices
 }  // namespace muGrid
