@@ -138,10 +138,9 @@ namespace muSpectre {
                          const Real H);
 
     T2_t evaluate_stress(const T2_t & F, const size_t & pixel_index) {
-      auto && F_prev{this->material_child.get_F_prev_field()[pixel_index]};
-      auto && be_prev{this->material_child.get_be_prev_field()[pixel_index]};
-      auto && plast_flow{
-          this->material_child.get_plast_flow_field()[pixel_index]};
+      auto && F_prev{this->get_F_prev_field()[pixel_index]};
+      auto && be_prev{this->get_be_prev_field()[pixel_index]};
+      auto && plast_flow{this->get_plast_flow_field()[pixel_index]};
       auto && lambda{this->lambda_field[pixel_index]};
       auto && mu{this->mu_field[pixel_index]};
       auto && tau_y0{this->tau_y0_field[pixel_index]};
@@ -162,10 +161,9 @@ namespace muSpectre {
 
     std::tuple<T2_t, T4_t> evaluate_stress_tangent(const T2_t & F,
                                                    const size_t & pixel_index) {
-      auto && F_prev{this->material_child.get_F_prev_field()[pixel_index]};
-      auto && be_prev{this->material_child.get_be_prev_field()[pixel_index]};
-      auto && plast_flow{
-          this->material_child.get_plast_flow_field()[pixel_index]};
+      auto && F_prev{this->get_F_prev_field()[pixel_index]};
+      auto && be_prev{this->get_be_prev_field()[pixel_index]};
+      auto && plast_flow{this->get_plast_flow_field()[pixel_index]};
       auto && lambda{this->lambda_field[pixel_index]};
       auto && mu{this->mu_field[pixel_index]};
       auto && tau_y0{this->tau_y0_field[pixel_index]};

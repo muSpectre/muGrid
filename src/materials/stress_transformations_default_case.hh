@@ -61,7 +61,7 @@ namespace muSpectre {
                         "The requested Stress conversion is not implemented. "
                         "You either made a programming mistake or need to "
                         "implement it as a specialisation of this function. "
-                        "See PK2stress<PK1,T1, T2> for an example.");
+                        "See PK2_stress<PK1,T1> for an example.");
         }
 
         //! returns the converted stress and stiffness
@@ -79,6 +79,7 @@ namespace muSpectre {
         }
       };
 
+      // ----------------------------------------------------------------------
       /** Structure for functions returning PK2 stress from other stress
        *measures
        **/
@@ -94,7 +95,7 @@ namespace muSpectre {
                         "The requested Stress conversion is not implemented. "
                         "You either made a programming mistake or need to "
                         "implement it as a specialisation of this function. "
-                        "See PK1stress<PK2,T1, T2> for an example.");
+                        "See PK1_stress<PK2,T1> for an example.");
         }
 
         //! returns the converted stress and stiffness
@@ -108,10 +109,11 @@ namespace muSpectre {
                         "The requested Stress conversion is not implemented. "
                         "You either made a programming mistake or need to "
                         "implement it as a specialisation of this function. "
-                        "See PK1stress<PK2,T1, T2> for an example.");
+                        "See PK1_stress<PK2,T1, T2> for an example.");
         }
       };
 
+      // ----------------------------------------------------------------------
       /** Structure for functions returning Kirchhoff stress from other stress
        *  measures
        **/

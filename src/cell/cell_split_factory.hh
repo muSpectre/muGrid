@@ -52,8 +52,8 @@
 namespace muSpectre {
   template <typename Cell_t = CellSplit, class FFTEngine = muFFT::FFTWEngine>
   inline Cell_t
-  make_cell_split(DynCcoord_t nb_grid_pts, DynRcoord_t lengths,
-                  Formulation form, muFFT::Gradient_t gradient,
+  make_cell_split(const DynCcoord_t & nb_grid_pts, const DynRcoord_t & lengths,
+                  const Formulation & form, muFFT::Gradient_t gradient,
                   const muFFT::Communicator & comm = muFFT::Communicator()) {
     auto && input{
         cell_input<FFTEngine>(nb_grid_pts, lengths, form, gradient, comm)};
