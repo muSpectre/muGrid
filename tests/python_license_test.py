@@ -75,7 +75,9 @@ def header_license_test(source_dirs, lic_paras):
             for file in f:
                 if (file.endswith('.hh')
                     and 'iterators.hh' not in file
-                    and '#' not in file):
+                        and '#' not in file):
+                    # The files containing # are temp files created by emacs.
+                    # Therefore, they need to be excluded.
                     header_files.append(os.path.join(r, file))
 
         for header_file in header_files:
@@ -147,7 +149,9 @@ def source_license_test(source_dirs, lic_paras):
         for r, d, f in walklevel(source_dir, 0):
             for file in f:
                 if (file.endswith('.cc')
-                    and '#' not in file):
+                        and '#' not in file):
+                    # The files containing # are temp files created by emacs.
+                    # Therefore, they need to be excluded.
                     source_files.append(os.path.join(r, file))
 
         for source_file in source_files:
@@ -222,7 +226,9 @@ def python_license_test(source_dirs, py_lic_paras):
                 if (file.endswith('.py')
                     and not file.startswith('#')
                     and 'pyc' not in file
-                    and 'direct_comparison_small_strain.py' not in file):
+                        and 'direct_comparison_small_strain.py' not in file):
+                    # The files containing # are temp files created by emacs.
+                    # Therefore, they need to be excluded.
                     python_files.append(os.path.join(r, file))
 
         for python_file in python_files:

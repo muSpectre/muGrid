@@ -40,7 +40,6 @@
 
 #include "materials/material_muSpectre_base.hh"
 #include "materials/materials_toolbox.hh"
-#include "materials/stress_transformations_Kirchhoff.hh"
 
 #include <libmugrid/eigen_tools.hh>
 #include <libmugrid/mapped_field.hh>

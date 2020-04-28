@@ -214,8 +214,8 @@ namespace muSpectre {
                              const size_t & quad_pt_index,
                              const Formulation & form) = 0;
     /**
-     * setting time-step for materials needing it. (Doing nothing by deafult
-     * because for materials without time  step it should be idle)
+     * setting time step for materials needing it. (Doing nothing by deafult
+     * because most materials have now time dependence)
      */
     virtual void set_time_step(const Real & /*dt*/) {}
 

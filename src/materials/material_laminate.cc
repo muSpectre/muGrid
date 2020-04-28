@@ -98,9 +98,9 @@ namespace muSpectre {
     auto mat{std::make_unique<MaterialLaminate<DimM>>(
         name, cell.get_spatial_dim(), cell.get_nb_quad_pts())};
     using traits = MaterialMuSpectre_traits<MaterialLaminate<DimM>>;
-    auto && Form = cell.get_formulation();
+    auto && form = cell.get_formulation();
     constexpr StrainMeasure expected_strain_m{traits::strain_measure};
-    if (Form == Formulation::small_strain) {
+    if (form == Formulation::small_strain) {
       check_small_strain_capability(expected_strain_m);
     }
     auto & mat_ref{*mat};
@@ -124,6 +124,7 @@ namespace muSpectre {
     case Formulation::finite_strain: {
       switch (is_cell_split) {
       case (SplitCell::no):
+        // fall-through;  laminate and whole pixels treated same at this point
       case (SplitCell::laminate): {
         this->compute_stresses_worker<Formulation::finite_strain,
                                       SplitCell::no>(F, P);
@@ -142,6 +143,7 @@ namespace muSpectre {
     case Formulation::small_strain: {
       switch (is_cell_split) {
       case (SplitCell::no):
+        // fall-through;  laminate and whole pixels treated same at this point
       case (SplitCell::laminate): {
         this->compute_stresses_worker<Formulation::small_strain, SplitCell::no>(
             F, P);
@@ -160,14 +162,14 @@ namespace muSpectre {
     case Formulation::native: {
       switch (is_cell_split) {
       case (SplitCell::no):
+        // fall-through;  laminate and whole pixels treated same at this point
       case (SplitCell::laminate): {
-        this->compute_stresses_worker<Formulation::native, SplitCell::no>(
-            F, P);
+        this->compute_stresses_worker<Formulation::native, SplitCell::no>(F, P);
         break;
       }
       case (SplitCell::simple): {
-        this->compute_stresses_worker<Formulation::native,
-                                      SplitCell::simple>(F, P);
+        this->compute_stresses_worker<Formulation::native, SplitCell::simple>(
+            F, P);
         break;
       }
       default:
@@ -196,6 +198,7 @@ namespace muSpectre {
     case Formulation::finite_strain: {
       switch (is_cell_split) {
       case (SplitCell::no):
+        // fall-through;  laminate and whole pixels treated same at this point
       case (SplitCell::laminate): {
         this->compute_stresses_worker<Formulation::finite_strain,
                                       SplitCell::no>(F, P, K);
@@ -214,6 +217,7 @@ namespace muSpectre {
     case Formulation::small_strain: {
       switch (is_cell_split) {
       case (SplitCell::no):
+        // fall-through;  laminate and whole pixels treated same at this point
       case (SplitCell::laminate): {
         this->compute_stresses_worker<Formulation::small_strain, SplitCell::no>(
             F, P, K);
@@ -232,6 +236,7 @@ namespace muSpectre {
     case Formulation::native: {
       switch (is_cell_split) {
       case (SplitCell::no):
+        // fall-through;  laminate and whole pixels treated same at this point
       case (SplitCell::laminate): {
         this->compute_stresses_worker<Formulation::native, SplitCell::no>(F, P,
                                                                           K);

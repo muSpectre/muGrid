@@ -218,6 +218,28 @@ namespace muSpectre {
                              const size_t & pixel_index,
                              const Formulation & form) final;
 
+    /**
+     * @brief      wrapper around the evaluate_tress function to handle the
+     * operation on the the evaluated stress and tangent by the material(s)
+     */
+    template <Formulation Form, class Strain, class Stress, class Op,
+              class NativeTreat>
+    void evaluate_material_stress(Strain && strain, Stress & stress,
+                                  const size_t & quad_pt_id,
+                                  const Op & operation,
+                                  NativeTreat & native_stress_treatment);
+    /**
+     * @brief      wrapper around the evaluate_tress function to handle the
+     * operation on the the evaluated stress and tangent by the material(s)
+     */
+
+    template <Formulation Form, class Strain, class Stress, class Stiffness,
+              class Op, class NativeTreat>
+    void evaluate_material_stress_tangent(
+        Strain && strain, std::tuple<Stress, Stiffness> & stress_stiffness,
+        const size_t & quad_pt_id, const Op & operation,
+        NativeTreat & native_stress_treatment);
+
    protected:
     MappedVectorField_t
         normal_vector_field;  //!< field holding the normal vector
@@ -525,165 +547,179 @@ namespace muSpectre {
   }
 
   /* ----------------------------------------------------------------------*/
-  namespace internal {
+  template <Dim_t DimM>
+  template <Formulation Form, class Strain, class Stress, class Op,
+            class NativeTreat>
+  void MaterialLaminate<DimM>::evaluate_material_stress(
+      Strain && strain, Stress & stress, const size_t & quad_pt_id,
+      const Op & operation, NativeTreat & native_stress_treatment) {
+    using traits = MaterialMuSpectre_traits<MaterialLaminate<DimM>>;
 
-    template <Formulation Form>
-    struct MaterialStressEvaluator {
-      template <class Material, class Strain, class Stress, class Op>
-      decltype(auto) static compute(Material & mat, const Strain & strain,
-                                    Stress & stress, const size_t & quad_pt_id,
-                                    const Op & operation) {
-        using traits = MaterialMuSpectre_traits<Material>;
+    constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
+    constexpr StrainMeasure expected_strain_m{
+        get_formulation_strain_type(Form, traits::strain_measure)};
 
-        constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
-        constexpr StrainMeasure expected_strain_m{
-            get_formulation_strain_type(Form, traits::strain_measure)};
+    switch (Form) {
+    case Formulation::small_strain: {
+      auto && eps{MatTB::convert_strain<stored_strain_m, expected_strain_m>(
+          std::get<0>(strain))};
 
-        auto && eps{MatTB::convert_strain<stored_strain_m, expected_strain_m>(
-            std::get<0>(strain))};
+      auto && stress_result{this->evaluate_stress(eps, quad_pt_id, Form)};
+      // the following is a no-op if store_native_stress in not 'yes'
+      native_stress_treatment(stress_result);
 
-        operation(mat.evaluate_stress(std::move(eps), quad_pt_id,
-                                      Formulation::small_strain),
-                  stress);
-      }
-    };
+      // stress evaluation:
+      operation(stress_result, stress);
+      break;
+    }
+    case Formulation::finite_strain: {
+      auto && grad{std::get<0>(strain)};
+      auto && E{
+          MatTB::convert_strain<stored_strain_m, expected_strain_m>(grad)};
+      auto && stress_result{
+          this->evaluate_stress(std::move(E), quad_pt_id, Form)};
 
-    template <>
-    struct MaterialStressEvaluator<Formulation::finite_strain> {
-      template <class Material, class Strain, class Stress, class Op>
-      decltype(auto) static compute(Material & mat, const Strain & strain,
-                                    Stress & stress, const size_t & quad_pt_id,
-                                    const Op & operation) {
-        constexpr static Formulation Form{Formulation::finite_strain};
-        using traits = MaterialMuSpectre_traits<Material>;
+      // the following is a no-op if store_native_stress in not 'yes'
+      native_stress_treatment(stress_result);
 
-        constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
-        constexpr StrainMeasure expected_strain_m{
-            get_formulation_strain_type(Form, traits::strain_measure)};
+      operation(::muSpectre::MatTB::PK1_stress<traits::stress_measure,
+                                               traits::strain_measure>(
+                    std::move(grad), std::move(stress_result)),
+                stress);
+      break;
+    }
+    case Formulation::native: {
+      auto && strain_converted{
+          MatTB::convert_strain<stored_strain_m, expected_strain_m>(
+              std::get<0>(strain))};
 
-        auto && grad{std::get<0>(strain)};
-        auto && E{
-            MatTB::convert_strain<stored_strain_m, expected_strain_m>(grad)};
-        auto && stress_mat{mat.evaluate_stress(std::move(E), quad_pt_id,
-                                               Formulation::finite_strain)};
-        // However , for the moment not doing it causes memory issue.
-        operation(::muSpectre::MatTB::PK1_stress<traits::stress_measure,
-                                                 traits::strain_measure>(
-                      std::move(grad), std::move(stress_mat))
-                      .eval(),
-                  stress);
-      }
-    };
-  }  // namespace internal
+      operation(
+          this->evaluate_stress(std::move(strain_converted), quad_pt_id, Form),
+          stress);
+      break;
+    }
+    default:
+      throw muGrid::RuntimeError("Unknown formulation");
+      break;
+    }
+  }
 
   /* ----------------------------------------------------------------------*/
   template <Dim_t DimM>
   template <Formulation Form, class Strains, class Stresses>
   void MaterialLaminate<DimM>::constitutive_law(const Strains & strains,
-                                                Stresses & stress,
+                                                Stresses & stresses,
                                                 const size_t & quad_pt_id,
                                                 const Real & ratio) {
     MatTB::OperationAddition operation_addition(ratio);
-    return internal::MaterialStressEvaluator<Form>::compute(
-        *this, strains, stress, quad_pt_id, operation_addition);
+    MatTB::NativeStressTreatment<StoreNativeStress::no> stress_treatment{};
+    this->evaluate_material_stress<Form>(strains, stresses, quad_pt_id,
+                                         operation_addition, stress_treatment);
   }
 
-  /* ----------------------------------------------------------------------*/
+  /* ---------------------------------------------------------------------- */
   template <Dim_t DimM>
   template <Formulation Form, class Strains, class Stresses>
   void MaterialLaminate<DimM>::constitutive_law(const Strains & strains,
-                                                Stresses & stress,
+                                                Stresses & stresses,
                                                 const size_t & quad_pt_id) {
     MatTB::OperationAssignment operation_assignment;
-    return internal::MaterialStressEvaluator<Form>::compute(
-        *this, strains, stress, quad_pt_id, operation_assignment);
+    MatTB::NativeStressTreatment<StoreNativeStress::no> stress_treatment{};
+    this->evaluate_material_stress<Form>(
+        strains, stresses, quad_pt_id, operation_assignment, stress_treatment);
   }
 
   /* ----------------------------------------------------------------------*/
-  namespace internal {
 
-    template <Formulation Form>
-    struct MaterialStressTangentEvaluator {
-      template <class Material, class Strain, class Stress, class Stiffness,
-                class Op>
-      decltype(auto) static compute(
-          Material & mat, const Strain & strain,
-          std::tuple<Stress, Stiffness> & stress_stiffness,
-          const size_t & quad_pt_id, const Op & operation) {
-        using traits = MaterialMuSpectre_traits<Material>;
+  template <Dim_t DimM>
+  template <Formulation Form, class Strain, class Stress, class Stiffness,
+            class Op, class NativeTreat>
+  void MaterialLaminate<DimM>::evaluate_material_stress_tangent(
+      Strain && strain, std::tuple<Stress, Stiffness> & stress_stiffness,
+      const size_t & quad_pt_id, const Op & operation,
+      NativeTreat & native_stress_treatment) {
+    using traits = MaterialMuSpectre_traits<MaterialLaminate<DimM>>;
 
-        constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
-        constexpr StrainMeasure expected_strain_m{
-            get_formulation_strain_type(Form, traits::strain_measure)};
+    constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
+    constexpr StrainMeasure expected_strain_m{
+        get_formulation_strain_type(Form, traits::strain_measure)};
+    switch (Form) {
+    case Formulation::small_strain: {
+      auto && eps{MatTB::convert_strain<stored_strain_m, expected_strain_m>(
+          std::get<0>(strain))};
 
-        auto && eps{MatTB::convert_strain<stored_strain_m, expected_strain_m>(
-            std::get<0>(strain))};
-        auto && stress_stiffness_mat{mat.evaluate_stress_tangent(
-            std::move(eps), quad_pt_id, Formulation::small_strain)};
-        operation(std::get<0>(stress_stiffness_mat),
-                  std::get<0>(stress_stiffness));
-        operation(std::get<1>(stress_stiffness_mat),
-                  std::get<1>(stress_stiffness));
-      }
-    };
+      auto && stress_stiffness_mat{
+          this->evaluate_stress_tangent(std::move(eps), quad_pt_id, Form)};
+      // the following is a no-op if store_native_stress in not 'yes'
+      native_stress_treatment(std::get<0>(stress_stiffness_mat));
+      operation(std::get<0>(stress_stiffness_mat),
+                std::get<0>(stress_stiffness));
+      operation(std::get<1>(stress_stiffness_mat),
+                std::get<1>(stress_stiffness));
+      break;
+    }
+    case Formulation::finite_strain: {
+      auto && grad{std::get<0>(strain)};
+      auto E{MatTB::convert_strain<stored_strain_m, expected_strain_m>(grad)};
+      auto && stress_stiffness_mat{
+          this->evaluate_stress_tangent(std::move(E), quad_pt_id, Form)};
 
-    template <>
-    struct MaterialStressTangentEvaluator<Formulation::finite_strain> {
-      template <class Material, class Strain, class Stress, class Stiffness,
-                class Op>
-      decltype(auto) static compute(
-          Material & mat, const Strain & strain,
-          std::tuple<Stress, Stiffness> & stress_stiffness,
-          const size_t & quad_pt_id, const Op & operation) {
-        constexpr static Formulation Form{Formulation::finite_strain};
-        using traits = MaterialMuSpectre_traits<Material>;
+      // the following is a no-op if store_native_stress in not 'yes'
+      native_stress_treatment(std::get<0>(stress_stiffness_mat));
+      auto && stress_stiffness_mat_converted{
+          ::muSpectre::MatTB::PK1_stress<traits::stress_measure,
+                                         traits::strain_measure>(
+              std::move(grad), std::move(std::get<0>(stress_stiffness_mat)),
+              std::move(std::get<1>(stress_stiffness_mat)))};
 
-        constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
-        constexpr StrainMeasure expected_strain_m{
-            get_formulation_strain_type(Form, traits::strain_measure)};
+      operation(std::get<0>(stress_stiffness_mat_converted),
+                std::get<0>(stress_stiffness));
+      operation(std::get<1>(stress_stiffness_mat_converted),
+                std::get<1>(stress_stiffness));
+      break;
+    }
+    case Formulation::native: {
+      auto && strain_converted{
+          MatTB::convert_strain<stored_strain_m, expected_strain_m>(
+              std::get<0>(strain))};
+      auto && stress_stiffness_mat{this->evaluate_stress_tangent(
+          std::move(strain_converted), quad_pt_id, Form)};
+      native_stress_treatment(std::get<0>(stress_stiffness_mat));
 
-        auto && grad{std::get<0>(strain)};
-        auto && E{
-            MatTB::convert_strain<stored_strain_m, expected_strain_m>(grad)};
-        auto && stress_stiffness_mat{mat.evaluate_stress_tangent(
-            std::move(E), quad_pt_id, Formulation::finite_strain)};
+      operation(std::get<0>(stress_stiffness_mat),
+                std::get<0>(stress_stiffness));
+      operation(std::get<1>(stress_stiffness_mat),
+                std::get<1>(stress_stiffness));
+      break;
+    }
+    default:
+      throw muGrid::RuntimeError("Unknown formualtion");
+      break;
+    }
+  }
 
-        auto && stress_stiffness_mat_converted{
-            ::muSpectre::MatTB::PK1_stress<traits::stress_measure,
-                                           traits::strain_measure>(
-                std::move(grad), std::move(std::get<0>(stress_stiffness_mat)),
-                std::move(std::get<1>(stress_stiffness_mat)))};
-
-        operation(std::get<0>(stress_stiffness_mat_converted),
-                  std::get<0>(stress_stiffness));
-        operation(std::get<1>(stress_stiffness_mat_converted),
-                  std::get<1>(stress_stiffness));
-      }
-    };
-
-  }  // namespace internal
-
-  /*----------------------------------------------------------------------*/
+  /* ---------------------------------------------------------------------- */
   template <Dim_t DimM>
   template <Formulation Form, class Strains, class Stresses>
   void MaterialLaminate<DimM>::constitutive_law_tangent(
       const Strains & strains, Stresses & stresses, const size_t & quad_pt_id,
       const Real & ratio) {
     MatTB::OperationAddition operation_addition(ratio);
-    return internal::MaterialStressTangentEvaluator<Form>::compute(
-        *this, strains, stresses, quad_pt_id, operation_addition);
+    MatTB::NativeStressTreatment<StoreNativeStress::no> stress_treatment{};
+    this->evaluate_material_stress_tangent<Form>(
+        strains, stresses, quad_pt_id, operation_addition, stress_treatment);
   }
 
-  /*----------------------------------------------------------------------*/
+  /* ---------------------------------------------------------------------- */
   template <Dim_t DimM>
   template <Formulation Form, class Strains, class Stresses>
   void MaterialLaminate<DimM>::constitutive_law_tangent(
       const Strains & strains, Stresses & stresses, const size_t & quad_pt_id) {
     MatTB::OperationAssignment operation_assignment;
-    return internal::MaterialStressTangentEvaluator<Form>::compute(
-        *this, strains, stresses, quad_pt_id, operation_assignment);
+    MatTB::NativeStressTreatment<StoreNativeStress::no> stress_treatment{};
+    this->evaluate_material_stress_tangent<Form>(
+        strains, stresses, quad_pt_id, operation_assignment, stress_treatment);
   }
-
   /* ---------------------------------------------------------------------- */
 }  // namespace muSpectre
 #endif  // SRC_MATERIALS_MATERIAL_LAMINATE_HH_

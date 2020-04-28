@@ -372,6 +372,7 @@ namespace muSpectre {
     case Formulation::finite_strain: {
       switch (is_cell_split) {
       case (SplitCell::no):
+        // fall-through;  laminate and whole pixels treated same at this point
       case (SplitCell::laminate): {
         this->compute_stresses_dispatch1<Formulation::finite_strain,
                                          SplitCell::no>(store_native_stress, F,
@@ -446,6 +447,7 @@ namespace muSpectre {
     case Formulation::finite_strain: {
       switch (is_cell_split) {
       case (SplitCell::no):
+        // fall-through;  laminate and whole pixels treated same at this point
       case (SplitCell::laminate): {
         this->compute_stresses_dispatch1<Formulation::finite_strain,
                                          SplitCell::no>(store_native_stress, F,
@@ -466,6 +468,7 @@ namespace muSpectre {
     case Formulation::small_strain: {
       switch (is_cell_split) {
       case (SplitCell::no):
+        // fall-through;  laminate and whole pixels treated same at this point
       case (SplitCell::laminate): {
         this->compute_stresses_dispatch1<Formulation::small_strain,
                                          SplitCell::no>(store_native_stress, F,
@@ -523,7 +526,7 @@ namespace muSpectre {
        The internal_variables tuple contains whatever internal variables
        Material declared (e.g., eigenstrain, strain rate, etc.)
     */
-    auto && this_mat {static_cast<Material &>(*this)};
+    auto & this_mat {static_cast<Material &>(*this)};
     using traits = MaterialMuSpectre_traits<Material>;
     constexpr StrainMeasure expected_strain_m{traits::strain_measure};
     if (Form == Formulation::small_strain) {

@@ -145,6 +145,12 @@ muSpectre_add_example(visualisation_example_finite_py_example
 muSpectre_add_example(comparison_small_strain_py_example
   TYPE PYTHON  comparison_small_strain.py 1)
 
+muSpectre_add_example(visco_py_example
+  TYPE PYTHON  visco_example.py 1)
+
+muSpectre_add_example(visco_damage_py_example
+  TYPE PYTHON  visco_example_damage.py 1)
+
 
 # TODO Pastewka: reactivate
 # if(${MUSPECTRE_MPI_PARALLEL})
