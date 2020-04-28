@@ -1,5 +1,10 @@
-## Most of the following is copied from https://github.com/tdegeus/GooseFFT (MIT license)
+#!/usr/bin/env python3
+# -*- coding:utf-8 -*-
 
+"""
+Most of the following is copied from:
+https://github.com/tdegeus/GooseFFT (MIT license)
+"""
 import sys
 import numpy as np
 import scipy.sparse.linalg as sp

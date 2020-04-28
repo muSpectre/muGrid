@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
-@file   odd_comparison.py
+@file   elasto_plastic_comparison.py
 
 @author Till Junge <till.junge@altermail.ch>
 
@@ -12,14 +12,14 @@
 Copyright © 2018 Till Junge
 
 µSpectre is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Lesser Public License as
+modify it under the terms of the GNU Lesser General Public License as
 published by the Free Software Foundation, either version 3, or (at
 your option) any later version.
 
 µSpectre is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-General Public License for more details.
+Lesser General Public License for more details.
 
 You should have received a copy of the GNU Lesser General Public License
 along with µSpectre; see the file COPYING. If not, write to the

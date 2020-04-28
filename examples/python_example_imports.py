@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
-@file   python_test_imports.py
+@file   python_example_imports.py
 
 @author Till Junge <till.junge@altermail.ch>
 

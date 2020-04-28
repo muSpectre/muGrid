@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
+# -*- coding:utf-8 -*-
 """
-file   hyper-elasticity.py
+@file   hyper-elasticity.py
 
 @author Till Junge <till.junge@epfl.ch>
 
 @date   16 Jan 2018
 
 @brief  Recreation of GooseFFT's hyper-elasticity.py calculation
-
-@section LICENSE
 
 Copyright © 2018 Till Junge
 
@@ -20,7 +19,7 @@ your option) any later version.
 µSpectre is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-General Public License for more details.
+Lesser General Public License for more details.
 
 You should have received a copy of the GNU Lesser General Public License
 along with µSpectre; see the file COPYING. If not, write to the

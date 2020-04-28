@@ -73,7 +73,9 @@ def header_license_test(source_dirs, lic_paras):
         for r, d, f in walklevel(source_dir, 0):
             print("source_dir = {}, r,d,f = {}".format(source_dir, (r, d, f)))
             for file in f:
-                if (file.endswith('.hh') and 'iterators.hh' not in file):
+                if (file.endswith('.hh')
+                    and 'iterators.hh' not in file
+                    and '#' not in file):
                     header_files.append(os.path.join(r, file))
 
         for header_file in header_files:
@@ -144,7 +146,8 @@ def source_license_test(source_dirs, lic_paras):
         source_files = []
         for r, d, f in walklevel(source_dir, 0):
             for file in f:
-                if (file.endswith('.cc')):
+                if (file.endswith('.cc')
+                    and '#' not in file):
                     source_files.append(os.path.join(r, file))
 
         for source_file in source_files:
@@ -216,8 +219,10 @@ def python_license_test(source_dirs, py_lic_paras):
         python_files = []
         for r, d, f in walklevel(source_dir, 0):
             for file in f:
-                if (file.endswith('.py') and not file.startswith('#') and
-                    'pyc' not in file):
+                if (file.endswith('.py')
+                    and not file.startswith('#')
+                    and 'pyc' not in file
+                    and 'direct_comparison_small_strain.py' not in file):
                     python_files.append(os.path.join(r, file))
 
         for python_file in python_files:

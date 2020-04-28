@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
+# -*- coding:utf-8 -*-
 """
-file   small_case.py
+@file  circle_gibbs_ringing_simple_split_laminate.py
 
 @author Ali Falsafi <ali.falsafi@epfl.ch>
 
@@ -8,9 +9,7 @@ file   small_case.py
 
 @brief  This is a working example of how to use CellSPlit / MaterialLaminate
 for a simple precipitate problem which is here is circular stiff inclusion
- inside a periodic media
-
-@section LICENSE
+inside a periodic media
 
 Copyright © 2018 Till Junge
 
@@ -22,7 +21,7 @@ your option) any later version.
 µSpectre is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-General Public License for more details.
+Lesser General Public License for more details.
 
 You should have received a copy of the GNU Lesser General Public License
 along with µSpectre; see the file COPYING. If not, write to the
@@ -36,13 +35,13 @@ with proprietary FFT implementations or numerical libraries, containing parts
 covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
-
+from python_example_imports import muSpectre_gradient_integration as gi
+from python_example_imports import muSpectre_vtk_export as vt_ex
 import sys
 import numpy as np
 from python_example_imports import muSpectre as msp
 np.set_printoptions(linewidth=500, precision=2)
-from python_example_imports import muSpectre_gradient_integration as gi
-from python_example_imports import muSpectre_vtk_export as vt_ex
+
 
 nb_grid_pt = 17
 length = 12

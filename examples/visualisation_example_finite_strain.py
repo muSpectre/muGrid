@@ -10,21 +10,19 @@
 @brief  small example of how one can use the visualisation tools:
         gradient_integration() and vtk_export()
 
-@section LICENSE
-
 Copyright © 2019 Till Junge, Richard Leute
 
 µSpectre is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License as
+modify it under the terms of the GNU Lesser General Public License as
 published by the Free Software Foundation, either version 3, or (at
 your option) any later version.
 
 µSpectre is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-General Public License for more details.
+Lesser General Public License for more details.
 
-You should have received a copy of the GNU General Public License
+You should have received a copy of the GNU Lesser General Public License
 along with µSpectre; see the file COPYING. If not, write to the
 Free Software Foundation, Inc., 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.
@@ -178,6 +176,7 @@ vt_ex.vtk_export(fpath="visualisation_example_finite_strain",
                  point_data=p_data,
                  cell_data=c_data)
 
-print("\nThe file 'visualisation_example_finite_strain.vtr' was successfully written!\n"
+print("\nThe file 'visualisation_example_finite_strain.vtr' was successfully"
+      " written!\n"
       "You can open it for example with paraview or some other software:\n"
       "$ paraview visualisation_example_finite_strain.vtr")
