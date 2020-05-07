@@ -169,18 +169,24 @@ add_custom_target(${LICENSETEST_TARGET})
 
 function(license_add_subdirectory DIR LICENSETEST)
   if(LICENSETEST)
-    message(STATUS "license parser: ${LICENSETEST}")
   else()
     message(FATAL_ERROR "license script: NOT FOUND!")
   endif()
 
   set(LICENSETEST_EXC ${PYTHON_EXECUTABLE} ${LICENSETEST})
   # create relative path to the directory
-  string(REGEX REPLACE "/home" "home" TEST_NAME_TEMP ${DIR})
-  string(REGEX REPLACE "/" "." TEST_NAME ${TEST_NAME_TEMP})
+  file(RELATIVE_PATH TEST_NAME ${CMAKE_SOURCE_DIR} ${DIR})
+  string(REGEX REPLACE "/" "." TEST_NAME ${TEST_NAME})
 
   # perform license check
   set(TARGET_NAME ${LICENSETEST_TARGET}.${TEST_NAME})
+  string(LENGTH ${TARGET_NAME} NAME_LENGTH)
+  if (${NAME_LENGTH} GREATER 39)
+    string(SUBSTRING ${TARGET_NAME} 0 15 START)
+    math(EXPR START_ID "${NAME_LENGTH} - 21")
+    string(SUBSTRING ${TARGET_NAME} ${START_ID} ${NAME_LENGTH} END)
+    string(CONCAT TARGET_NAME ${START} "..." ${END})
+  endif(${NAME_LENGTH} GREATER  39)
 
   add_custom_target(${TARGET_NAME}
     COMMAND

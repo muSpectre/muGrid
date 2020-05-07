@@ -142,8 +142,8 @@ muSpectre_add_example(tutorial_example_py_example
 muSpectre_add_example(visualisation_example_finite_py_example
   TYPE PYTHON visualisation_example_finite_strain.py 7 7 1)
 
-muSpectre_add_example(direct_comparison_small_strain_py_example
-  TYPE PYTHON  direct_comparison_small_strain.py 1)
+muSpectre_add_example(comparison_small_strain_py_example
+  TYPE PYTHON  comparison_small_strain.py 1)
 
 
 # TODO Pastewka: reactivate
