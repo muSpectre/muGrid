@@ -43,20 +43,32 @@ namespace muGrid {
   struct InitialiserBase {
     constexpr static Dim_t DimS{twoD};
     constexpr static Dim_t NbRow{2}, NbCol{3};
-    constexpr static Dim_t NbQuad() { return 2; }
-    constexpr static size_t NbMemory() { return 1; }
-    GlobalFieldCollection fc{DimS, NbQuad()};
+    constexpr static Dim_t NbQuad{2};
+    constexpr static Dim_t NbNode{1};
+    constexpr static size_t NbMemory{1};
+    GlobalFieldCollection fc{DimS, NbQuad, NbNode};
     InitialiserBase() { this->fc.initialise(Ccoord_t<twoD>{2, 3}); }
   };
+  constexpr Dim_t InitialiserBase::DimS;
+  constexpr Dim_t InitialiserBase::NbRow;
+  constexpr Dim_t InitialiserBase::NbCol;
+  constexpr Dim_t InitialiserBase::NbQuad;
+  constexpr Dim_t InitialiserBase::NbNode;
+  constexpr size_t InitialiserBase::NbMemory;
 
   struct MappedStateFieldFixture : public InitialiserBase {
-    MappedMatrixStateField<Real, Mapping::Mut, NbRow, NbCol, NbMemory()>
+    MappedMatrixStateField<Real, Mapping::Mut, NbRow, NbCol,
+                           PixelSubDiv::QuadPt, NbMemory>
         mapped_matrix;
-    MappedArrayStateField<Real, Mapping::Mut, NbRow, NbCol, NbMemory()>
+    MappedArrayStateField<Real, Mapping::Mut, NbRow, NbCol, PixelSubDiv::QuadPt,
+                          NbMemory>
         mapped_array;
-    MappedScalarStateField<Real, Mapping::Mut, NbMemory()> mapped_scalar;
-    MappedT2StateField<Real, Mapping::Mut, DimS, NbMemory()> mapped_t2;
-    MappedT4StateField<Real, Mapping::Mut, DimS, NbMemory()> mapped_t4;
+    MappedScalarStateField<Real, Mapping::Mut, PixelSubDiv::QuadPt, NbMemory>
+        mapped_scalar;
+    MappedT2StateField<Real, Mapping::Mut, DimS, PixelSubDiv::QuadPt, NbMemory>
+        mapped_t2;
+    MappedT4StateField<Real, Mapping::Mut, DimS, PixelSubDiv::QuadPt, NbMemory>
+        mapped_t4;
 
     MappedStateFieldFixture()
         : InitialiserBase{}, mapped_matrix{"matrix", this->fc},
@@ -71,8 +83,8 @@ namespace muGrid {
     for (auto && iterate : this->mapped_matrix) {
       iterate.current().setRandom();
     }
-    this->mapped_array.get_state_field().current().eigen_quad_pt() =
-        this->mapped_matrix.get_state_field().current().eigen_quad_pt();
+    this->mapped_array.get_state_field().current().eigen_sub_pt() =
+        this->mapped_matrix.get_state_field().current().eigen_sub_pt();
     for (auto && tup : akantu::zip(this->mapped_matrix, this->mapped_array)) {
       const auto & matrix{std::get<0>(tup).current()};
       const auto & array{std::get<1>(tup).current()};

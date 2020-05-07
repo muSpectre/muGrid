@@ -40,6 +40,7 @@
 #include <pybind11/stl.h>
 
 #include "libmugrid/ccoord_operations.hh"
+#include "libmugrid/units.hh"
 
 using muGrid::Dim_t;
 using muGrid::DynCcoord;
@@ -51,16 +52,18 @@ using pybind11::literals::operator""_a;
 namespace py = pybind11;
 
 void add_enums(py::module & mod) {
-  py::enum_<muGrid::Iteration>(mod, "Iteration")
-      .value("Pixel", muGrid::Iteration::Pixel)
-      .value("QuadPt", muGrid::Iteration::QuadPt)
+  py::enum_<muGrid::PixelSubDiv>(mod, "PixelSubDiv")
+      .value("Pixel", muGrid::PixelSubDiv::Pixel)
+      .value("QuadPt", muGrid::PixelSubDiv::QuadPt)
+      .value("NodalPt", muGrid::PixelSubDiv::NodalPt)
+      .value("FreePt", muGrid::PixelSubDiv::FreePt)
       .export_values();
 
   py::enum_<Verbosity>(mod, "Verbosity")
-    .value("Silent", Verbosity::Silent)
-    .value("Some", Verbosity::Some)
-    .value("Detailed", Verbosity::Detailed)
-    .value("Full", Verbosity::Full);
+      .value("Silent", Verbosity::Silent)
+      .value("Some", Verbosity::Some)
+      .value("Detailed", Verbosity::Detailed)
+      .value("Full", Verbosity::Full);
 }
 
 template <size_t MaxDim, typename T = Dim_t>
@@ -119,13 +122,14 @@ void add_get_cube(py::module & mod) {
 template <Dim_t dim>
 void add_get_index_helper(py::module & mod) {
   using Ccoord = muGrid::Ccoord_t<dim>;
-  mod.def("get_domain_index",
-          [](Ccoord sizes, Ccoord ccoord) {
-            return muGrid::CcoordOps::get_index<dim>(sizes, Ccoord{}, ccoord);
-          },
-          "sizes"_a, "ccoord"_a,
-          "return the linear index corresponding to grid point 'ccoord' in a "
-          "grid of size 'sizes'");
+  mod.def(
+      "get_domain_index",
+      [](Ccoord sizes, Ccoord ccoord) {
+        return muGrid::CcoordOps::get_index<dim>(sizes, Ccoord{}, ccoord);
+      },
+      "sizes"_a, "ccoord"_a,
+      "return the linear index corresponding to grid point 'ccoord' in a "
+      "grid of size 'sizes'");
 }
 
 void add_get_index(py::module & mod) {
@@ -162,6 +166,18 @@ void add_Pixels(py::module & mod) {
   add_Pixels_helper<muGrid::threeD>(mod);
 }
 
+void add_unit(py::module & mod) {
+  py::class_<muGrid::Unit>(mod, "Unit")
+      .def("unitless", &muGrid::Unit::unitless)
+      .def("length", &muGrid::Unit::length)
+      .def("mass", &muGrid::Unit::mass)
+      .def("time", &muGrid::Unit::time)
+      .def("temperature", &muGrid::Unit::temperature)
+      .def("current", &muGrid::Unit::current)
+      .def("luminous_intensity", &muGrid::Unit::luminous_intensity)
+      .def("amount", &muGrid::Unit::amount);
+}
+
 void add_common(py::module & mod) {
   add_enums(mod);
 
@@ -171,6 +187,8 @@ void add_common(py::module & mod) {
   add_get_cube(mod);
 
   add_Pixels(mod);
+
+  add_unit(mod);
 
   add_get_index(mod);
 }

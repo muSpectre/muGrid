@@ -175,12 +175,12 @@ void add_engine_helper(py::module & mod, std::string name) {
             // want to transfer possession of storage to Python without a copy
             // operation.
             std::vector<Dim_t> shape;
-            Dim_t nb_components = 1;
+            Dim_t nb_dof_per_sub_pt{1};
             for (auto && n : components_shape) {
               shape.push_back(n);
-              nb_components *= n;
+              nb_dof_per_sub_pt *= n;
             }
-            Dim_t size = nb_components;
+            Dim_t size = nb_dof_per_sub_pt;
             for (auto && n : eng.get_nb_subdomain_grid_pts()) {
               shape.push_back(n);
               size *= n;

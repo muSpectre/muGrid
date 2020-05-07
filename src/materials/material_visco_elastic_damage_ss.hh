@@ -67,11 +67,14 @@ namespace muSpectre {
   template <Dim_t DimM>
   struct MaterialMuSpectre_traits<MaterialViscoElasticDamageSS<DimM>> {
     //! expected map type for strain fields
-    using StrainMap_t = muGrid::T2FieldMap<Real, Mapping::Const, DimM>;
+    using StrainMap_t =
+        muGrid::T2FieldMap<Real, Mapping::Const, DimM, PixelSubDiv::QuadPt>;
     //! expected map type for stress fields
-    using StressMap_t = muGrid::T2FieldMap<Real, Mapping::Mut, DimM>;
+    using StressMap_t =
+        muGrid::T2FieldMap<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>;
     //! expected map type for tangent stiffness fields
-    using TangentMap_t = muGrid::T4FieldMap<Real, Mapping::Mut, DimM>;
+    using TangentMap_t =
+        muGrid::T4FieldMap<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>;
 
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
@@ -107,13 +110,16 @@ namespace muSpectre {
 
     //! type in which the previous strain state is referenced
     using T2StRef_t =
-        typename muGrid::MappedT2StateField<Real, Mapping::Mut, DimM>::Return_t;
+        typename muGrid::MappedT2StateField<Real, Mapping::Mut, DimM,
+                                            PixelSubDiv::QuadPt>::Return_t;
 
     using ScalarStRef_t =
-        typename muGrid::MappedScalarStateField<Real, Mapping::Mut>::Return_t;
+        typename muGrid::MappedScalarStateField<Real, Mapping::Mut,
+                                                PixelSubDiv::QuadPt>::Return_t;
 
     using ScalarRef_t =
-        typename muGrid::MappedScalarField<Real, Mapping::Mut>::Return_t;
+        typename muGrid::MappedScalarField<Real, Mapping::Mut,
+                                           PixelSubDiv::QuadPt>::Return_t;
 
     //! Default constructor
     MaterialViscoElasticDamageSS() = delete;
@@ -215,22 +221,24 @@ namespace muSpectre {
     void initialise() final;
 
     //! getter for internal variable field History Integral
-    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM> &
+    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt> &
     get_history_integral();
 
     //! getter for internal variable field of Elastic stress
-    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM> &
+    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt> &
     get_s_null_prev_field();
 
     //! getter for internal variable field of Elastic stress
-    muGrid::MappedScalarStateField<Real, Mapping::Mut> & get_kappa_prev_field();
+    muGrid::MappedScalarStateField<Real, Mapping::Mut, PixelSubDiv::QuadPt> &
+    get_kappa_prev_field();
 
    protected:
     //! Child material (used as a worker for evaluating stress and tangent)
     MaterialViscoElasticSS<DimM> material_child;
 
     //! storage for damage variable
-    muGrid::MappedScalarStateField<Real, Mapping::Mut> kappa_prev_field;
+    muGrid::MappedScalarStateField<Real, Mapping::Mut, PixelSubDiv::QuadPt>
+        kappa_prev_field;
 
     //! damage evolution parameters:
     const Real kappa_init;

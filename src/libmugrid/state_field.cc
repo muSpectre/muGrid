@@ -44,8 +44,13 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   StateField::StateField(const std::string & unique_prefix,
-                         FieldCollection & collection, Dim_t nb_memory)
-      : prefix{unique_prefix}, collection{collection}, nb_memory{nb_memory} {
+                         FieldCollection & collection, const Dim_t & nb_memory,
+                         const Dim_t & nb_dof_per_sub_pt,
+                         const PixelSubDiv & sub_division, const Unit & unit,
+                         const Dim_t & nb_sub_pts)
+      : prefix{unique_prefix}, collection{collection}, nb_memory{nb_memory},
+        nb_dof_per_sub_pt{nb_dof_per_sub_pt},
+        sub_division{sub_division}, unit{unit}, nb_sub_pts{nb_sub_pts} {
     if (nb_memory < 1) {
       throw FieldError("State fields must have a memory size of at least 1.");
     }
@@ -84,13 +89,19 @@ namespace muGrid {
   template <typename T>
   TypedStateField<T>::TypedStateField(const std::string & unique_prefix,
                                       FieldCollection & collection,
-                                      Dim_t nb_memory, Dim_t nb_components)
-      : Parent{unique_prefix, collection, nb_memory} {
+                                      const Dim_t & nb_memory,
+                                      const Dim_t & nb_components,
+                                      const PixelSubDiv & sub_division,
+                                      const Unit & unit,
+                                      const Dim_t & nb_sub_pts)
+      : Parent{unique_prefix, collection, nb_memory, nb_components,
+               sub_division,  unit,       nb_sub_pts} {
     for (Dim_t i{0}; i < nb_memory + 1; ++i) {
       std::stringstream unique_name_stream{};
       unique_name_stream << this->prefix << ", sub_field index " << i;
       this->fields.push_back(this->collection.template register_field<T>(
-          unique_name_stream.str(), nb_components));
+          unique_name_stream.str(), nb_components, sub_division, unit,
+          nb_sub_pts));
     }
   }
 

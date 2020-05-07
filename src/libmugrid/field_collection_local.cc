@@ -38,9 +38,11 @@
 namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
-  LocalFieldCollection::LocalFieldCollection(Dim_t spatial_dimension,
-                                             Dim_t nb_quad_pts)
-      : Parent{ValidityDomain::Local, spatial_dimension, nb_quad_pts} {}
+  LocalFieldCollection::LocalFieldCollection(const Dim_t & spatial_dimension,
+                                             const Dim_t & nb_quad_pts,
+                                             const Dim_t & nb_nodal_pts)
+      : Parent{ValidityDomain::Local, spatial_dimension, nb_quad_pts,
+               nb_nodal_pts} {}
 
   /* ---------------------------------------------------------------------- */
   void LocalFieldCollection::add_pixel(const size_t & global_index) {
@@ -49,7 +51,7 @@ namespace muGrid {
           "Cannot add pixels once the collection has been initialised (because "
           "the fields all have been allocated)");
     }
-    global_to_local_index_map.insert(
+    this->global_to_local_index_map.insert(
         std::make_pair(global_index, pixel_indices.size()));
     this->pixel_indices.emplace_back(global_index);
   }
@@ -58,11 +60,8 @@ namespace muGrid {
   void LocalFieldCollection::initialise() {
     if (this->initialised) {
       throw FieldCollectionError("double initialisation");
-    } else if (not this->has_nb_quad_pts()) {
-      throw FieldCollectionError(
-          "The number of quadrature points has not been set.");
     }
-    this->nb_entries = this->pixel_indices.size() * this->nb_quad_pts;
+    this->nb_pixels = this->pixel_indices.size();
     this->allocate_fields();
     this->initialised = true;
     this->initialise_maps();  // yes, this has to be after the previous line
@@ -71,7 +70,8 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   LocalFieldCollection LocalFieldCollection::get_empty_clone() const {
     LocalFieldCollection ret_val{this->get_spatial_dim(),
-                                     this->get_nb_quad_pts()};
+                                 this->get_nb_quad_pts(),
+                                 this->get_nb_quad_pts()};
     for (const auto & pixel_id : this->get_pixel_indices_fast()) {
       ret_val.add_pixel(pixel_id);
     }

@@ -138,15 +138,16 @@ void add_cell_helper(py::module & mod) {
   using DynRcoord_t = muGrid::DynRcoord_t;
 #endif
   auto NumpyT2Proxy{
-      [](Cell & cell,
-         py::array_t<Real, py::array::f_style> & tensor2) -> NumpyProxy<Real> {
+      [](Cell & cell, py::array_t<Real, py::array::f_style> & tensor2,
+         const muGrid::PixelSubDiv & sub_division) -> NumpyProxy<Real> {
         auto && strain_shape{cell.get_strain_shape()};
         auto & proj{cell.get_projection()};
         return NumpyProxy<Real>{proj.get_nb_subdomain_grid_pts(),
                                 proj.get_subdomain_locations(),
                                 proj.get_nb_quad_pts(),
                                 {strain_shape[0], strain_shape[1]},
-                                tensor2};
+                                tensor2,
+                                sub_division};
       }};
   py::class_<Cell>(mod, "Cell")
       .def(py::init([](const muSpectre::ProjectionBase & projection) {
@@ -169,16 +170,18 @@ void add_cell_helper(py::module & mod) {
             const std::string out_name{"temp output for directional stiffness"};
             if (not fields.field_exists(out_name)) {
               auto && strain_shape{cell.get_strain_shape()};
-              auto && nb_components{strain_shape[0] * strain_shape[1]};
-              fields.register_real_field(out_name, nb_components);
+              auto && nb_dof_per_sub_pt{strain_shape[0] * strain_shape[1]};
+              fields.register_real_field(out_name, nb_dof_per_sub_pt,
+                                         muGrid::PixelSubDiv::QuadPt);
             }
             auto & delta_stress{
                 dynamic_cast<muGrid::RealField &>(fields.get_field(out_name))};
-            auto delta_strain_array{NumpyT2Proxy(cell, delta_strain)};
+            auto delta_strain_array{
+                NumpyT2Proxy(cell, delta_strain, muGrid::PixelSubDiv::QuadPt)};
             cell.evaluate_projected_directional_stiffness(
                 delta_strain_array.get_field(), delta_stress);
             const Dim_t dim{cell.get_spatial_dim()};
-            if (delta_stress.get_nb_dof_per_quad_pt() == dim * dim) {
+            if (delta_stress.get_nb_dof_per_sub_pt() == dim * dim) {
               std::vector<Dim_t> shape{dim, dim, 1};
               return numpy_wrap(delta_stress, shape);
             } else {
@@ -198,15 +201,18 @@ void add_cell_helper(py::module & mod) {
             const std::string out_name{"temp output for projection"};
             if (not fields.field_exists(out_name)) {
               auto && strain_shape{cell.get_strain_shape()};
-              auto && nb_components{strain_shape[0] * strain_shape[1]};
-              fields.register_real_field(out_name, nb_components);
+              auto && nb_dof_per_sub_pt{strain_shape[0] * strain_shape[1]};
+              fields.register_real_field(out_name, nb_dof_per_sub_pt,
+                                         muGrid::PixelSubDiv::QuadPt);
             }
             auto & strain_field{
                 dynamic_cast<muGrid::RealField &>(fields.get_field(out_name))};
-            strain_field = NumpyT2Proxy(cell, strain).get_field();
+            strain_field =
+                NumpyT2Proxy(cell, strain, muGrid::PixelSubDiv::QuadPt)
+                    .get_field();
             cell.apply_projection(strain_field);
             const Dim_t dim{cell.get_spatial_dim()};
-            if (strain_field.get_nb_dof_per_quad_pt() == dim * dim) {
+            if (strain_field.get_nb_dof_per_sub_pt() == dim * dim) {
               std::vector<Dim_t> shape{dim, dim, 1};
               return numpy_wrap(strain_field, shape);
             } else {
@@ -225,7 +231,8 @@ void add_cell_helper(py::module & mod) {
           "evaluate_stress_tangent",
           [&NumpyT2Proxy](Cell & cell,
                           py::array_t<Real, py::array::f_style> & strain) {
-            auto strain_array{NumpyT2Proxy(cell, strain)};
+            auto strain_array{
+                NumpyT2Proxy(cell, strain, muGrid::PixelSubDiv::QuadPt)};
 
             cell.get_strain() = strain_array.get_field();
             auto && stress_tgt{cell.evaluate_stress_tangent()};
@@ -233,7 +240,7 @@ void add_cell_helper(py::module & mod) {
             auto && tangent{std::get<1>(stress_tgt)};
 
             const Dim_t dim{cell.get_spatial_dim()};
-            if (stress.get_nb_dof_per_quad_pt() == dim * dim) {
+            if (stress.get_nb_dof_per_sub_pt() == dim * dim) {
               std::vector<Dim_t> shape{dim, dim, 1};
               auto && numpy_stress{numpy_wrap(stress, shape)};
               shape.back() = dim;
@@ -258,7 +265,7 @@ void add_cell_helper(py::module & mod) {
             auto && tangent{std::get<1>(stress_tgt)};
 
             const Dim_t dim{cell.get_spatial_dim()};
-            if (stress.get_nb_dof_per_quad_pt() == dim * dim) {
+            if (stress.get_nb_dof_per_sub_pt() == dim * dim) {
               std::vector<Dim_t> shape{dim, dim, 1};
               auto && numpy_stress{numpy_wrap(stress, shape)};
               shape.back() = dim;
@@ -278,12 +285,13 @@ void add_cell_helper(py::module & mod) {
           "evaluate_stress",
           [&NumpyT2Proxy](Cell & cell,
                           py::array_t<Real, py::array::f_style> & strain) {
-            auto strain_array{NumpyT2Proxy(cell, strain)};
+            auto strain_array{
+                NumpyT2Proxy(cell, strain, muGrid::PixelSubDiv::QuadPt)};
 
             cell.get_strain() = strain_array.get_field();
             auto && stress{cell.evaluate_stress()};
             const Dim_t dim{cell.get_spatial_dim()};
-            if (stress.get_nb_dof_per_quad_pt() == dim * dim) {
+            if (stress.get_nb_dof_per_sub_pt() == dim * dim) {
               std::vector<Dim_t> shape{dim, dim, 1};
               return numpy_wrap(stress, shape);
             } else {

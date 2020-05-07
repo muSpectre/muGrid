@@ -68,10 +68,10 @@ namespace muGrid {
     //! Constructor with name and collection
     MappedStateField(const std::string & unique_name,
                      FieldCollection & collection)
-        : nb_components{compute_nb_components(unique_name, collection)},
+        : nb_components{StateFieldMapType::StaticFieldMap_t::Stride()},
           state_field(collection.register_state_field<Scalar>(
               unique_name, StateFieldMapType::GetNbMemory(),
-              this->nb_components)),
+              this->nb_components, StateFieldMapType::GetIterationType())),
           map{this->state_field} {}
 
     //! Copy constructor
@@ -111,35 +111,7 @@ namespace muGrid {
     StateFieldMapType & get_map() { return this->map; }
 
    protected:
-    /**
-     * evaluate and return the number of components the statically mapped state
-     * field needs to store per quadrature point
-     */
-    static Dim_t compute_nb_components(const std::string & unique_prefix,
-                                       FieldCollection & collection) {
-      switch (StateFieldMapType::GetIterationType()) {
-      case Iteration::QuadPt: {
-        return StateFieldMapType::StaticFieldMap_t::Stride();
-        break;
-      }
-      case Iteration::Pixel: {
-        if (not collection.has_nb_quad_pts()) {
-          throw FieldMapError("Can't create a pixel map for state field '" +
-                              unique_prefix +
-                              "' before the number of quadrature points has "
-                              "been set for the field collection.");
-        }
-        return StateFieldMapType::StaticFieldMap_t::Stride() /
-               collection.get_nb_quad_pts();
-        break;
-      }
-      default:
-        throw FieldMapError("unknown iteration type");
-        break;
-      }
-    }
-
-    Dim_t nb_components;  //!< number of components stored per quadrature point
+    size_t nb_components;  //!< number of components stored per quadrature point
     TypedStateField<Scalar> & state_field;  //!< ref to mapped state field
     StateFieldMapType map;                  //!< associated field map
   };
@@ -156,11 +128,11 @@ namespace muGrid {
    * the field
    * @tparam NbRow number of rows of the iterate
    * @tparam NbCol number of columns of the iterate
+   * @tparam IterationType describes the pixel-subdivision
    * @tparam NbMemory number of previous values to store
-   * @tparam IterationType whether to iterate over pixels or quadrature points
    */
   template <typename T, Mapping Mutability, Dim_t NbRow, Dim_t NbCol,
-            size_t NbMemory = 1, Iteration IterationType = Iteration::QuadPt>
+            PixelSubDiv IterationType, size_t NbMemory = 1>
   using MappedMatrixStateField =
       MappedStateField<MatrixStateFieldMap<T, Mutability, NbRow, NbCol,
                                            NbMemory, IterationType>>;
@@ -177,11 +149,11 @@ namespace muGrid {
    * the field
    * @tparam NbRow number of rows of the iterate
    * @tparam NbCol number of columns of the iterate
+   * @tparam IterationType describes the pixel-subdivision
    * @tparam NbMemory number of previous values to store
-   * @tparam IterationType whether to iterate over pixels or quadrature points
    */
   template <typename T, Mapping Mutability, Dim_t NbRow, Dim_t NbCol,
-            size_t NbMemory = 1, Iteration IterationType = Iteration::QuadPt>
+            PixelSubDiv IterationType, size_t NbMemory = 1>
   using MappedArrayStateField = MappedStateField<
       ArrayStateFieldMap<T, Mutability, NbRow, NbCol, NbMemory, IterationType>>;
 
@@ -194,11 +166,13 @@ namespace muGrid {
    * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
    * @tparam Mutability whether or not the map allows to modify the content of
    * the field
+   * @tparam IterationType describes the pixel-subdivision
    * @tparam NbMemory number of previous values to store
    */
-  template <typename T, Mapping Mutability, size_t NbMemory = 1>
-  using MappedScalarStateField =
-      MappedStateField<ScalarStateFieldMap<T, Mutability, NbMemory>>;
+  template <typename T, Mapping Mutability, PixelSubDiv IterationType,
+            size_t NbMemory = 1>
+  using MappedScalarStateField = MappedStateField<
+      ScalarStateFieldMap<T, Mutability, NbMemory, IterationType>>;
 
   /**
    * Alias of `muGrid::MappedStateField` for a map of first-rank with
@@ -210,11 +184,13 @@ namespace muGrid {
    * @tparam Mutability whether or not the map allows to modify the content of
    * the field
    * @tparam Dim spatial dimension of the tensors
+   * @tparam IterationType describes the pixel-subdivision
    * @tparam NbMemory number of previous values to store
    */
-  template <typename T, Mapping Mutability, Dim_t Dim, size_t NbMemory = 1>
-  using MappedT1StateNField =
-      MappedStateField<T1StateNFieldMap<T, Mutability, Dim, NbMemory>>;
+  template <typename T, Mapping Mutability, Dim_t Dim,
+            PixelSubDiv IterationType, size_t NbMemory = 1>
+  using MappedT1StateNField = MappedStateField<
+      T1StateFieldMap<T, Mutability, Dim, NbMemory, IterationType>>;
 
   /**
    * Alias of `muGrid::MappedStateField` for a map of second-rank with
@@ -226,11 +202,13 @@ namespace muGrid {
    * @tparam Mutability whether or not the map allows to modify the content of
    * the field
    * @tparam Dim spatial dimension of the tensors
+   * @tparam IterationType describes the pixel-subdivision
    * @tparam NbMemory number of previous values to store
    */
-  template <typename T, Mapping Mutability, Dim_t Dim, size_t NbMemory = 1>
-  using MappedT2StateField =
-      MappedStateField<T2StateFieldMap<T, Mutability, Dim, NbMemory>>;
+  template <typename T, Mapping Mutability, Dim_t Dim,
+            PixelSubDiv IterationType, size_t NbMemory = 1>
+  using MappedT2StateField = MappedStateField<
+      T2StateFieldMap<T, Mutability, Dim, NbMemory, IterationType>>;
 
   /**
    * Alias of `muGrid::MappedStateField` for a map of fourth-rank with
@@ -242,11 +220,13 @@ namespace muGrid {
    * @tparam Mutability whether or not the map allows to modify the content of
    * the field
    * @tparam Dim spatial dimension of the tensors
+   * @tparam IterationType describes the pixel-subdivision
    * @tparam NbMemory number of previous values to store
    */
-  template <typename T, Mapping Mutability, Dim_t Dim, size_t NbMemory = 1>
-  using MappedT4StateField =
-      MappedStateField<T4StateFieldMap<T, Mutability, Dim, NbMemory>>;
+  template <typename T, Mapping Mutability, Dim_t Dim,
+            PixelSubDiv IterationType, size_t NbMemory = 1>
+  using MappedT4StateField = MappedStateField<
+      T4StateFieldMap<T, Mutability, Dim, NbMemory, IterationType>>;
 
 }  // namespace muGrid
 

@@ -38,6 +38,6 @@ import numpy as np
 
 import _muGrid
 from _muGrid import (get_domain_ccoord, get_domain_index, Pixel, QuadPt,
-                     DynCcoord, DynRcoord,
-                     GlobalFieldCollection, LocalFieldCollection)
+                     DynCcoord, DynRcoord, PixelSubDiv, Verbosity,
+                     GlobalFieldCollection, LocalFieldCollection, Unit)
 

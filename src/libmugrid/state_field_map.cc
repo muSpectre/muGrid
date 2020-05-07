@@ -68,21 +68,20 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T, Mapping Mutability>
-  StateFieldMap<T, Mutability>::StateFieldMap(
-      TypedStateField<T> & state_field, Iteration iter_type)
+  StateFieldMap<T, Mutability>::StateFieldMap(TypedStateField<T> & state_field,
+                                              PixelSubDiv iter_type)
       : state_field{state_field}, iteration{iter_type},
-        nb_rows{(iter_type == Iteration::QuadPt)
-                    ? state_field.current().get_nb_dof_per_quad_pt()
-                    : state_field.current().get_nb_dof_per_quad_pt() *
-                          state_field.current().get_collection()
-                                .get_nb_quad_pts()},
+        nb_rows{iter_type == PixelSubDiv::Pixel
+                    ? state_field.current().get_nb_dof_per_sub_pt() *
+                          state_field.current().get_nb_sub_pts()
+                    : state_field.current().get_nb_dof_per_sub_pt()},
         maps(this->make_maps(state_field.get_fields())),
         cmaps(this->make_cmaps(state_field.get_fields())) {}
 
   /* ---------------------------------------------------------------------- */
   template <typename T, Mapping Mutability>
   StateFieldMap<T, Mutability>::StateFieldMap(
-      TypedStateField<T> & state_field, Dim_t nb_rows, Iteration iter_type)
+      TypedStateField<T> & state_field, Dim_t nb_rows, PixelSubDiv iter_type)
       : state_field{state_field}, iteration{iter_type}, nb_rows{nb_rows},
         maps(this->make_maps(state_field.get_fields())),
         cmaps(this->make_cmaps(state_field.get_fields())) {
@@ -128,7 +127,7 @@ namespace muGrid {
   template <typename T, Mapping Mutability>
   size_t StateFieldMap<T, Mutability>::size() const {
     const auto & field{this->state_field.current()};
-    return (this->iteration == Iteration::QuadPt)
+    return (this->iteration == PixelSubDiv::QuadPt)
                ? field.size()
                : field.get_collection().get_nb_pixels();
   }

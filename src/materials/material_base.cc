@@ -47,10 +47,11 @@ namespace muSpectre {
       const std::shared_ptr<muGrid::LocalFieldCollection> &
           parent_field_collection)
       : name(name),
-        internal_fields{parent_field_collection == nullptr
-                            ? std::make_shared<muGrid::LocalFieldCollection>(
-                                  spatial_dimension, nb_quad_pts)
-                            : parent_field_collection},
+        internal_fields{
+            parent_field_collection == nullptr
+                ? std::make_shared<muGrid::LocalFieldCollection>(
+                      spatial_dimension, nb_quad_pts, muGrid::Unknown)
+                : parent_field_collection},
         material_dimension{material_dimension},
         prefix{parent_field_collection == nullptr ? "" : name + "::"} {
     if (not((this->material_dimension == oneD) ||
@@ -81,8 +82,9 @@ namespace muSpectre {
       const SplitCell & is_cell_split,
       const StoreNativeStress & store_native_stress) {
     const auto t2_dim{muGrid::ipow(this->material_dimension, 2)};
-    const auto & real_F{muGrid::RealField::safe_cast(F, t2_dim)};
-    auto & real_P{muGrid::RealField::safe_cast(P, t2_dim)};
+    const auto & real_F{
+        muGrid::RealField::safe_cast(F, t2_dim, PixelSubDiv::QuadPt)};
+    auto & real_P{muGrid::RealField::safe_cast(P, t2_dim, PixelSubDiv::QuadPt)};
     this->compute_stresses(real_F, real_P, form, is_cell_split,
                            store_native_stress);
   }
@@ -90,16 +92,17 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   void MaterialBase::allocate_optional_fields(SplitCell is_cell_split) {
     if (is_cell_split == SplitCell::simple) {
-      this->assigned_ratio = std::make_unique<
-          muGrid::MappedScalarField<Real, muGrid::Mapping::Mut>>(
-          "ratio", *this->internal_fields);
+      this->assigned_ratio =
+          std::make_unique<muGrid::MappedScalarField<Real, muGrid::Mapping::Mut,
+                                                     PixelSubDiv::QuadPt>>(
+              "ratio", *this->internal_fields);
     }
   }
   /* ---------------------------------------------------------------------- */
   void MaterialBase::get_assigned_ratios(
       std::vector<Real> & quad_pt_assigned_ratios) {
     quad_pt_assigned_ratios.reserve(
-        this->assigned_ratio->get_field().get_nb_dof_per_quad_pt());
+        this->assigned_ratio->get_field().get_nb_dof_per_sub_pt());
     for (auto && tup : this->assigned_ratio->get_map().enumerate_indices()) {
       const auto & index = std::get<0>(tup);
       const auto & val = std::get<1>(tup);
@@ -125,9 +128,11 @@ namespace muSpectre {
       const Formulation & form, const SplitCell & is_cell_split,
       const StoreNativeStress & store_native_stress) {
     const auto t2_dim{muGrid::ipow(this->material_dimension, 2)};
-    const auto & real_F{muGrid::RealField::safe_cast(F, t2_dim)};
-    auto & real_P{muGrid::RealField::safe_cast(P, t2_dim)};
-    auto & real_K{muGrid::RealField::safe_cast(K, muGrid::ipow(t2_dim, 2))};
+    const auto & real_F{
+        muGrid::RealField::safe_cast(F, t2_dim, PixelSubDiv::QuadPt)};
+    auto & real_P{muGrid::RealField::safe_cast(P, t2_dim, PixelSubDiv::QuadPt)};
+    auto & real_K{muGrid::RealField::safe_cast(K, muGrid::ipow(t2_dim, 2),
+                                               PixelSubDiv::QuadPt)};
     this->compute_stresses_tangent(real_F, real_P, real_K, form, is_cell_split,
                                    store_native_stress);
   }

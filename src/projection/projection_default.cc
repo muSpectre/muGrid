@@ -45,9 +45,10 @@ namespace muSpectre {
                                              Gradient_t gradient,
                                              Formulation form)
       : Parent{std::move(engine), lengths,
-               static_cast<Dim_t>(gradient.size())/lengths.get_dim(), form},
+               static_cast<Dim_t>(gradient.size()) / lengths.get_dim(), form},
         Gfield{this->projection_container.register_complex_field(
-            "Projection Operator", DimS * DimS * DimS * DimS)},
+            "Projection Operator", DimS * DimS * DimS * DimS,
+            PixelSubDiv::QuadPt)},
         Ghat{Gfield}, gradient{gradient} {}
 
   /* ---------------------------------------------------------------------- */

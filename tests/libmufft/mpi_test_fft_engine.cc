@@ -90,6 +90,9 @@ namespace muFFT {
     Engine engine;
   };
 
+  template <typename Engine>
+  constexpr Dim_t FFTW_fixture_python_segfault<Engine>::sdim;
+
   using fixlist = boost::mpl::list<
 #ifdef WITH_FFTWMPI
       FFTW_fixture<FFTWMPIEngine, twoD, 3>,
@@ -99,10 +102,8 @@ namespace muFFT {
       FFTW_fixture_python_segfault<FFTWMPIEngine>,
 #endif
 #ifdef WITH_PFFT
-      FFTW_fixture<PFFTEngine, twoD, 3>,
-      FFTW_fixture<PFFTEngine, threeD, 3>,
-      FFTW_fixture<PFFTEngine, twoD, 4>,
-      FFTW_fixture<PFFTEngine, threeD, 4>,
+      FFTW_fixture<PFFTEngine, twoD, 3>, FFTW_fixture<PFFTEngine, threeD, 3>,
+      FFTW_fixture<PFFTEngine, twoD, 4>, FFTW_fixture<PFFTEngine, threeD, 4>,
       FFTW_fixture_python_segfault<PFFTEngine>,
 #endif
       FFTW_fixture<FFTWEngine, twoD, 3, true>>;
@@ -128,16 +129,19 @@ namespace muFFT {
       Fix::engine.initialise(FFT_PlanFlags::estimate);
     }
     using FC_t = muGrid::GlobalFieldCollection;
-    FC_t fc{Fix::sdim, OneQuadPt};
-    auto & input{fc.register_real_field("input", Fix::sdim*Fix::sdim)};
-    auto & ref{fc.register_real_field("reference", Fix::sdim*Fix::sdim)};
-    auto & result{fc.register_real_field("result", Fix::sdim*Fix::sdim)};
+    FC_t fc{Fix::sdim, OneQuadPt, muGrid::Unknown};
+    auto & input{fc.register_real_field("input", Fix::sdim * Fix::sdim,
+                                        PixelSubDiv::QuadPt)};
+    auto & ref{fc.register_real_field("reference", Fix::sdim * Fix::sdim,
+                                      PixelSubDiv::QuadPt)};
+    auto & result{fc.register_real_field("result", Fix::sdim * Fix::sdim,
+                                         PixelSubDiv::QuadPt)};
 
     fc.initialise(Fix::engine.get_nb_subdomain_grid_pts(),
                   Fix::engine.get_subdomain_locations());
 
-    using map_t = muGrid::MatrixFieldMap<
-        Real, Mapping::Mut, Fix::sdim, Fix::sdim>;
+    using map_t = muGrid::MatrixFieldMap<Real, Mapping::Mut, Fix::sdim,
+                                         Fix::sdim, PixelSubDiv::QuadPt>;
     map_t inmap{input};
     auto refmap{map_t{ref}};
     auto resultmap{map_t{result}};
@@ -150,8 +154,8 @@ namespace muFFT {
       ref_ = in_;
     }
     auto & complex_field = Fix::engine.fft(input);
-    using cmap_t =
-        muGrid::MatrixFieldMap<Complex, Mapping::Mut, Fix::sdim, Fix::sdim>;
+    using cmap_t = muGrid::MatrixFieldMap<Complex, Mapping::Mut, Fix::sdim,
+                                          Fix::sdim, PixelSubDiv::QuadPt>;
     cmap_t complex_map(complex_field);
     if (Fix::engine.get_subdomain_locations() ==
         muGrid::CcoordOps::get_cube<Fix::sdim>(0)) {
@@ -219,8 +223,7 @@ namespace muFFT {
     const auto nb_rows{send_mat.rows()};
     for (int row{0}; row < nb_rows; row++) {
       for (int col{0}; col < nb_cols; col++) {
-        BOOST_CHECK_EQUAL(res(row, col),
-                          (row * nb_cols + col + 1) * nb_cores);
+        BOOST_CHECK_EQUAL(res(row, col), (row * nb_cols + col + 1) * nb_cores);
       }
     }
   }

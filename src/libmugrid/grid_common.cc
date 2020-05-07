@@ -38,24 +38,50 @@
 #include "grid_common.hh"
 namespace muGrid {
   /* ---------------------------------------------------------------------- */
-  bool operator< (const Verbosity v1, const Verbosity v2) {
+  bool operator<(const Verbosity v1, const Verbosity v2) {
     using T = std::underlying_type_t<Verbosity>;
     return static_cast<T>(v1) < static_cast<T>(v2);
   }
 
-  bool operator> (const Verbosity v1, const Verbosity v2) {
+  bool operator>(const Verbosity v1, const Verbosity v2) {
     using T = std::underlying_type_t<Verbosity>;
     return static_cast<T>(v1) > static_cast<T>(v2);
   }
 
-  bool operator<= (const Verbosity v1, const Verbosity v2) {
+  bool operator<=(const Verbosity v1, const Verbosity v2) {
     using T = std::underlying_type_t<Verbosity>;
     return static_cast<T>(v1) <= static_cast<T>(v2);
   }
 
-  bool operator>= (const Verbosity v1, const Verbosity v2) {
+  bool operator>=(const Verbosity v1, const Verbosity v2) {
     using T = std::underlying_type_t<Verbosity>;
     return static_cast<T>(v1) >= static_cast<T>(v2);
+  }
+
+  std::ostream & operator<<(std::ostream & os,
+                            const PixelSubDiv & sub_division) {
+    switch (sub_division) {
+    case PixelSubDiv::FreePt: {
+      os << "free number of points";
+      break;
+    }
+    case PixelSubDiv::QuadPt: {
+      os << "quadrature point";
+      break;
+    }
+    case PixelSubDiv::NodalPt: {
+      os << "nodal point";
+      break;
+    }
+    case PixelSubDiv::Pixel: {
+      os << "pixel";
+      break;
+    }
+    default:
+      throw RuntimeError("unknown pixel subdivision scheme");
+      break;
+    }
+    return os;
   }
 
 }  // namespace muGrid

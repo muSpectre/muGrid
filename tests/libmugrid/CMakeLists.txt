@@ -52,14 +52,14 @@ foreach(header_test ${HEADER_TEST_SRCS})
   get_test_name(test_name ${header_test} ".*_test")
 
   muGrid_add_test(${test_name}
-    SOURCES main_test_suite.cc test_goodies.cc ${header_test}
+    SOURCES main_test_suite.cc test_goodies.cc field_test_fixtures.cc ${header_test}
     TYPE BOOST --report_level=detailed)
 endforeach(header_test ${HEADER_TEST_SRCS})
 
 # build library tests
 file(GLOB TEST_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/test_*.cc")
 muGrid_add_test(main_mugrid_test_suite
-  SOURCES main_test_suite.cc test_goodies.cc ${TEST_SRCS}
+  SOURCES main_test_suite.cc test_goodies.cc field_test_fixtures.cc ${TEST_SRCS}
   TYPE BOOST --report_level=detailed)
 
 ##############################################################################

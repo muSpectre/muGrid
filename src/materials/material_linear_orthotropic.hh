@@ -53,11 +53,14 @@ namespace muSpectre {
   template <Dim_t DimM>
   struct MaterialMuSpectre_traits<MaterialLinearOrthotropic<DimM>> {
     //! expected map type for strain fields
-    using StrainMap_t = muGrid::T2FieldMap<Real, Mapping::Const, DimM>;
+    using StrainMap_t =
+        muGrid::T2FieldMap<Real, Mapping::Const, DimM, PixelSubDiv::QuadPt>;
     //! expected map type for stress fields
-    using StressMap_t = muGrid::T2FieldMap<Real, Mapping::Mut, DimM>;
+    using StressMap_t =
+        muGrid::T2FieldMap<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>;
     //! expected map type for tangent stiffness fields
-    using TangentMap_t = muGrid::T4FieldMap<Real, Mapping::Mut, DimM>;
+    using TangentMap_t =
+        muGrid::T4FieldMap<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>;
 
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::GreenLagrange};

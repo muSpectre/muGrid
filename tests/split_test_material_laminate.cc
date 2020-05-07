@@ -113,6 +113,16 @@ namespace muSpectre {
     Real ratio;
   };
 
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM, int c1, int c2, bool RndVec,
+            bool RndRatio>
+  constexpr Dim_t MaterialFixture<DimS, DimM, c1, c2, RndVec, RndRatio>::mdim;
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM, int c1, int c2, bool RndVec,
+            bool RndRatio>
+  constexpr Dim_t MaterialFixture<DimS, DimM, c1, c2, RndVec, RndRatio>::sdim;
+
   template <Dim_t DimS, Dim_t DimM, int c1, int c2, bool RndVec = false,
             bool RndRatio = false>
   struct MaterialFixture_with_ortho_ref
@@ -236,21 +246,21 @@ namespace muSpectre {
     using Mat_t = Eigen::Matrix<Real, Fix::mdim, Fix::mdim>;
     using FC_t = muGrid::GlobalFieldCollection;
     // using Ccoord = Ccoord_t<Fix::sdim>;
-    FC_t globalfields{Fix::mdim, Fix::NbQuadPts()};
+    FC_t globalfields{Fix::mdim, Fix::NbQuadPts(), muGrid::Unknown};
     globalfields.initialise(cube, loc);
-    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim> F1_f{
-        "Transformation Gradient 1", globalfields};
-    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim> P1_f{
-        "Nominal Stress 1", globalfields};
-    muGrid::MappedT4Field<Real, Mapping::Mut, Fix::mdim> K1_f{
-        "Tangent Moduli 1", globalfields};
+    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim, PixelSubDiv::QuadPt>
+        F1_f{"Transformation Gradient 1", globalfields};
+    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim, PixelSubDiv::QuadPt>
+        P1_f{"Nominal Stress 1", globalfields};
+    muGrid::MappedT4Field<Real, Mapping::Mut, Fix::mdim, PixelSubDiv::QuadPt>
+        K1_f{"Tangent Moduli 1", globalfields};
 
-    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim> F2_f{
-        "Transformation Gradient 2", globalfields};
-    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim> P2_f{
-        "Nominal Stress 2", globalfields};
-    muGrid::MappedT4Field<Real, Mapping::Mut, Fix::mdim> K2_f{
-        "Tangent Moduli 2", globalfields};
+    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim, PixelSubDiv::QuadPt>
+        F2_f{"Transformation Gradient 2", globalfields};
+    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim, PixelSubDiv::QuadPt>
+        P2_f{"Nominal Stress 2", globalfields};
+    muGrid::MappedT4Field<Real, Mapping::Mut, Fix::mdim, PixelSubDiv::QuadPt>
+        K2_f{"Tangent Moduli 2", globalfields};
 
     Mat_t zero{Mat_t::Zero()};
     Mat_t F{Mat_t::Random() / 10000 + Mat_t::Identity()};
@@ -317,21 +327,21 @@ namespace muSpectre {
     constexpr auto cube{muGrid::CcoordOps::get_cube<Fix::sdim>(nb_pixel)};
     constexpr auto loc{muGrid::CcoordOps::get_cube<Fix::sdim>(0)};
 
-    FC_t globalfields{Fix::mdim, Fix::NbQuadPts()};
+    FC_t globalfields{Fix::mdim, Fix::NbQuadPts(), muGrid::Unknown};
     globalfields.initialise(cube, loc);
-    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim> F1_f{
-        "Transformation Gradient 1", globalfields};
-    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim> P1_f{
-        "Nominal Stress 1", globalfields};
-    muGrid::MappedT4Field<Real, Mapping::Mut, Fix::mdim> K1_f{
-        "Tangent Moduli 1", globalfields};
+    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim, PixelSubDiv::QuadPt>
+        F1_f{"Transformation Gradient 1", globalfields};
+    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim, PixelSubDiv::QuadPt>
+        P1_f{"Nominal Stress 1", globalfields};
+    muGrid::MappedT4Field<Real, Mapping::Mut, Fix::mdim, PixelSubDiv::QuadPt>
+        K1_f{"Tangent Moduli 1", globalfields};
 
-    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim> F2_f{
-        "Transformation Gradient 2", globalfields};
-    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim> P2_f{
-        "Nominal Stress 2", globalfields};
-    muGrid::MappedT4Field<Real, Mapping::Mut, Fix::mdim> K2_f{
-        "Tangent Moduli 2", globalfields};
+    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim, PixelSubDiv::QuadPt>
+        F2_f{"Transformation Gradient 2", globalfields};
+    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim, PixelSubDiv::QuadPt>
+        P2_f{"Nominal Stress 2", globalfields};
+    muGrid::MappedT4Field<Real, Mapping::Mut, Fix::mdim, PixelSubDiv::QuadPt>
+        K2_f{"Tangent Moduli 2", globalfields};
 
     Mat_t zero{Mat_t::Zero()};
     Mat_t F{1e-6 * Mat_t::Random() + Mat_t::Identity()};

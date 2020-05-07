@@ -61,7 +61,9 @@ namespace muGrid {
      * or Unknown
      * @param nb_quad_pts number of quadrature points per pixel/voxel
      */
-    GlobalFieldCollection(Dim_t spatial_dimension, Dim_t nb_quad_pts);
+    GlobalFieldCollection(const Dim_t & spatial_dimension,
+                          const Dim_t & nb_quad_pts,
+                          const Dim_t & nb_nodal_pts);
 
     /**
      * Constructor with initialization
@@ -73,9 +75,10 @@ namespace muGrid {
      * @param subdomain_locations location of the current subdomain within the
      * global grid
      */
-    GlobalFieldCollection(Dim_t spatial_dimension, Dim_t nb_quad_pts,
-                           const DynCcoord_t & nb_subdomain_grid_pts,
-                           const DynCcoord_t & subdomain_locations = {});
+    GlobalFieldCollection(const Dim_t & spatial_dimension,
+                          const Dim_t & nb_quad_pts, const Dim_t & nb_nodal_pts,
+                          const DynCcoord_t & nb_subdomain_grid_pts,
+                          const DynCcoord_t & subdomain_locations = {});
 
     /**
      * Constructor with initialisation

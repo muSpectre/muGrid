@@ -117,14 +117,14 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimM>
-  muGrid::MappedT2StateField<Real, Mapping::Mut, DimM> &
+  muGrid::MappedT2StateField<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt> &
   MaterialViscoElasticSS<DimM>::get_history_integral() {
     return this->h_prev_field;
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimM>
-  muGrid::MappedT2StateField<Real, Mapping::Mut, DimM> &
+  muGrid::MappedT2StateField<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt> &
   MaterialViscoElasticSS<DimM>::get_s_null_prev_field() {
     return this->s_null_prev_field;
   }

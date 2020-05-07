@@ -14,7 +14,7 @@
       - build
     expire_in: 1 day
 
-.build:testing_gcc_mpi:
+build:testing_gcc_mpi:
   extends: .builds
 
   image: registry.gitlab.com/muspectre/muspectre:debian_testing
@@ -102,7 +102,7 @@ build:test_documention:
       - build/tests/libmufft/test_results*.xml
       - build/tests/libmugrid/test_results*.xml
 
-.test:testing_gcc_mpi:
+test:testing_gcc_mpi:
   image: registry.gitlab.com/muspectre/muspectre:debian_testing
   extends: .tests
   dependencies:

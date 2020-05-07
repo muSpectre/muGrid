@@ -38,6 +38,7 @@
 
 #include "exception.hh"
 #include "grid_common.hh"
+#include "units.hh"
 
 #include <map>
 #include <string>
@@ -81,8 +82,7 @@ namespace muGrid {
     explicit FieldCollectionError(const std::string & what)
         : RuntimeError(what) {}
     //! constructor
-    explicit FieldCollectionError(const char * what)
-        : RuntimeError(what) {}
+    explicit FieldCollectionError(const char * what) : RuntimeError(what) {}
   };
 
   /**
@@ -115,9 +115,10 @@ namespace muGrid {
      *                    muGrid::Unknown, e.g., in the case of the local fields
      *                    for storing internal material variables)
      * @param nb_quad_pts number of quadrature points per pixel/voxel
+     * @param nb_nodal_pts number of nodes per pixel/voxel
      */
-    FieldCollection(ValidityDomain domain,
-                    const Dim_t & spatial_dimension, const Dim_t & nb_quad_pts);
+    FieldCollection(ValidityDomain domain, const Dim_t & spatial_dimension,
+                    const Dim_t & nb_quad_pts, const Dim_t & nb_nodal_pts = 1);
 
    public:
     //! Default constructor
@@ -142,17 +143,21 @@ namespace muGrid {
      * place a new field in the responsibility of this collection (Note, because
      * fields have protected constructors, users can't create them
      * @param unique_name unique identifier for this field
-     * @param nb_dof_per_quad_pt number of components to be stored per quadrature
+     * @param nb_dof_per_sub_pt number of components to be stored per quadrature
      * point (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a
      * scalar field)
      */
     template <typename T>
     TypedField<T> & register_field(const std::string & unique_name,
-                                   const Dim_t & nb_dof_per_quad_pt) {
+                                   const Dim_t & nb_dof_per_sub_pt,
+                                   const PixelSubDiv & sub_division,
+                                   const Unit & unit = Unit::unitless(),
+                                   const Dim_t & nb_sub_pts = Unknown) {
       static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
                     "You can only register fields templated with one of the "
                     "numeric types Real, Complex, Int, or UInt");
-      return this->register_field_helper<T>(unique_name, nb_dof_per_quad_pt);
+      return this->register_field_helper<T>(unique_name, nb_dof_per_sub_pt,
+                                            sub_division, unit, nb_sub_pts);
     }
 
     /**
@@ -160,46 +165,56 @@ namespace muGrid {
      * (Note, because fields have protected constructors, users can't create
      * them
      * @param unique_name unique identifier for this field
-     * @param nb_dof_per_quad_pt number of components to be stored per quadrature
+     * @param nb_dof_per_sub_pt number of components to be stored per quadrature
      * point (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a
      * scalar field)
      */
     TypedField<Real> & register_real_field(const std::string & unique_name,
-                                           const Dim_t & nb_dof_per_quad_pt);
+                                           const Dim_t & nb_dof_per_sub_pt,
+                                           const PixelSubDiv & sub_division,
+                                           const Unit & unit = Unit::unitless(),
+                                           const Dim_t & nb_sub_pts = Unknown);
     /**
      * place a new complex-valued field  in the responsibility of this
      * collection (Note, because fields have protected constructors, users can't
      * create them
      * @param unique_name unique identifier for this field
-     * @param nb_dof_per_quad_pt number of components to be stored per quadrature
+     * @param nb_dof_per_sub_pt number of components to be stored per quadrature
      * point (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a
      * scalar field)
      */
-    TypedField<Complex> &
-    register_complex_field(const std::string & unique_name,
-                           const Dim_t & nb_dof_per_quad_pt);
+    TypedField<Complex> & register_complex_field(
+        const std::string & unique_name, const Dim_t & nb_dof_per_sub_pt,
+        const PixelSubDiv & sub_division, const Unit & unit = Unit::unitless(),
+        const Dim_t & nb_sub_pts = Unknown);
     /**
      * place a new integer-valued field  in the responsibility of this
      * collection (Note, because fields have protected constructors, users can't
      * create them
      * @param unique_name unique identifier for this field
-     * @param nb_dof_per_quad_pt number of components to be stored per quadrature
+     * @param nb_dof_per_sub_pt number of components to be stored per quadrature
      * point (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a
      * scalar field)
      */
     TypedField<Int> & register_int_field(const std::string & unique_name,
-                                         const Dim_t & nb_dof_per_quad_pt);
+                                         const Dim_t & nb_dof_per_sub_pt,
+                                         const PixelSubDiv & sub_division,
+                                         const Unit & unit = Unit::unitless(),
+                                         const Dim_t & nb_sub_pts = Unknown);
     /**
      * place a new unsigned integer-valued field  in the responsibility of this
      * collection (Note, because fields have protected constructors, users can't
      * create them
      * @param unique_name unique identifier for this field
-     * @param nb_dof_per_quad_pt number of components to be stored per quadrature
+     * @param nb_dof_per_sub_pt number of components to be stored per quadrature
      * point (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a
      * scalar field)
      */
     TypedField<Uint> & register_uint_field(const std::string & unique_name,
-                                           const Dim_t & nb_dof_per_quad_pt);
+                                           const Dim_t & nb_dof_per_sub_pt,
+                                           const PixelSubDiv & sub_division,
+                                           const Unit & unit = Unit::unitless(),
+                                           const Dim_t & nb_sub_pts = Unknown);
 
     /**
      * place a new state field in the responsibility of this collection (Note,
@@ -207,15 +222,17 @@ namespace muGrid {
      */
     template <typename T>
     TypedStateField<T> & register_state_field(
-        const std::string & unique_prefix,
-        const Dim_t & nb_memory,
-        const Dim_t & nb_dof_per_quad_pt) {
+        const std::string & unique_prefix, const Dim_t & nb_memory,
+        const Dim_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
+        const Unit & unit = Unit::unitless(),
+        const Dim_t & nb_sub_pts = Unknown) {
       static_assert(
           std::is_scalar<T>::value or std::is_same<T, Complex>::value,
           "You can only register state fields templated with one of the "
           "numeric types Real, Complex, Int, or UInt");
-      return this->register_state_field_helper<T>(unique_prefix, nb_memory,
-                                                  nb_dof_per_quad_pt);
+      return this->register_state_field_helper<T>(
+          unique_prefix, nb_memory, nb_dof_per_sub_pt, sub_division, unit,
+          nb_sub_pts);
     }
 
     /**
@@ -225,13 +242,14 @@ namespace muGrid {
      *
      * @param unique_prefix unique idendifier for this state field
      * @param nb_memory number of previous values of this field to store
-     * @param nb_dof_per_quad_pt number of scalar components to store per quadrature
-     * point
+     * @param nb_dof_per_sub_pt number of scalar components to store per
+     * quadrature point
      */
-    TypedStateField<Real> &
-    register_real_state_field(const std::string & unique_prefix,
-                              const Dim_t & nb_memory,
-                              const Dim_t & nb_dof_per_quad_pt);
+    TypedStateField<Real> & register_real_state_field(
+        const std::string & unique_prefix, const Dim_t & nb_memory,
+        const Dim_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
+        const Unit & unit = Unit::unitless(),
+        const Dim_t & nb_sub_pts = Unknown);
 
     /**
      * place a new complex-valued state field in the responsibility of this
@@ -240,13 +258,14 @@ namespace muGrid {
      *
      * @param unique_prefix unique idendifier for this state field
      * @param nb_memory number of previous values of this field to store
-     * @param nb_dof_per_quad_pt number of scalar components to store per quadrature
-     * point
+     * @param nb_dof_per_sub_pt number of scalar components to store per
+     * quadrature point
      */
-    TypedStateField<Complex> &
-    register_complex_state_field(const std::string & unique_prefix,
-                                 const Dim_t & nb_memory,
-                                 const Dim_t & nb_dof_per_quad_pt);
+    TypedStateField<Complex> & register_complex_state_field(
+        const std::string & unique_prefix, const Dim_t & nb_memory,
+        const Dim_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
+        const Unit & unit = Unit::unitless(),
+        const Dim_t & nb_sub_pts = Unknown);
 
     /**
      * place a new integer-valued state field in the responsibility of this
@@ -255,13 +274,14 @@ namespace muGrid {
      *
      * @param unique_prefix unique idendifier for this state field
      * @param nb_memory number of previous values of this field to store
-     * @param nb_dof_per_quad_pt number of scalar components to store per quadrature
-     * point
+     * @param nb_dof_per_sub_pt number of scalar components to store per
+     * quadrature point
      */
-    TypedStateField<Int> &
-    register_int_state_field(const std::string & unique_prefix,
-                             const Dim_t & nb_memory,
-                             const Dim_t & nb_dof_per_quad_pt);
+    TypedStateField<Int> & register_int_state_field(
+        const std::string & unique_prefix, const Dim_t & nb_memory,
+        const Dim_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
+        const Unit & unit = Unit::unitless(),
+        const Dim_t & nb_sub_pts = Unknown);
 
     /**
      * place a new unsigned integer-valued state field in the responsibility of
@@ -270,13 +290,14 @@ namespace muGrid {
      *
      * @param unique_prefix unique idendifier for this state field
      * @param nb_memory number of previous values of this field to store
-     * @param nb_dof_per_quad_pt number of scalar components to store per quadrature
-     * point
+     * @param nb_dof_per_sub_pt number of scalar components to store per
+     * quadrature point
      */
-    TypedStateField<Uint> &
-    register_uint_state_field(const std::string & unique_prefix,
-                              const Dim_t & nb_memory,
-                              const Dim_t & nb_dof_per_quad_pt);
+    TypedStateField<Uint> & register_uint_state_field(
+        const std::string & unique_prefix, const Dim_t & nb_memory,
+        const Dim_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
+        const Unit & unit = Unit::unitless(),
+        const Dim_t & nb_sub_pts = Unknown);
 
     //! check whether a field of name 'unique_name' has already been
     //! registered
@@ -286,34 +307,42 @@ namespace muGrid {
     //! registered
     bool state_field_exists(const std::string & unique_prefix) const;
 
-    /**
-     * returns the number of entries held by any given field in this
-     * collection. This corresponds to nb_pixels × nb_quad_pts, (I.e., a scalar
-     * field field and a vector field sharing the the same collection have the
-     * same number of entries, even though the vector field has more scalar
-     * values.)
-     */
-    const Dim_t & get_nb_entries() const;
-
     //! returns the number of pixels present in the collection
     Dim_t get_nb_pixels() const;
 
     /**
-     * check whether the number of quadrature points per pixel/voxel has ben
+     * check whether the number of quadrature points per pixel/voxel has been
      * set
      */
     bool has_nb_quad_pts() const;
 
     /**
+     * check whether the number of nodal points per pixel/voxel has been
+     * set
+     */
+    bool has_nb_nodal_pts() const;
+
+    /**
      * set the number of quadrature points per pixel/voxel. Can only be done
      * once.
      */
-    void set_nb_quad_pts(Dim_t nb_quad_pts_per_pixel);
+    void set_nb_quad_pts(const Dim_t & nb_quad_pts_per_pixel);
+
+    /**
+     * set the number of nodal points per pixel/voxel. Can only be done
+     * once.
+     */
+    void set_nb_nodal_pts(const Dim_t &  nb_quad_pts_per_pixel);
 
     /**
      * return the number of quadrature points per pixel
      */
     const Dim_t & get_nb_quad_pts() const;
+
+    /**
+     * return the number of nodal points per pixel
+     */
+    const Dim_t & get_nb_nodal_pts() const;
 
     /**
      * return the spatial dimension of the underlying discretisation grid
@@ -372,18 +401,43 @@ namespace muGrid {
     //! preregister a map for latent initialisation
     void preregister_map(std::shared_ptr<std::function<void()>> & call_back);
 
+    /**
+     * run-time checker for nb_sub_pts: checks whether the number of sub-points
+     * (e.g., quadrature points) is compatible with the sub-division scheme).
+     * Attention: this does allow `Unknown`  as valid values for
+     * `PixelSubDiv::QuadPt` and `PixelSubDiv::NodalPt`, since these values can
+     * be specified for the entire FieldCollection at a later point, before
+     * initialisation. Hence, this function cannot be used for checking
+     * nb_sub_pts for iterators, which need a known value. Use
+     * `check_initialised_nb_sub_pts()` instead for that.
+     */
+    Dim_t check_nb_sub_pts(const Dim_t & nb_sub_pts,
+                           const PixelSubDiv & iteration_type) const;
+
+    /**
+     * run-time checker for nb_sub_pts: checks whether the number of sub-points
+     * (e.g., quadrature points) is compatible with the sub-division scheme),
+     * and set to a positive integer value (i.e., not `Unknown`).
+     */
+    size_t
+    check_initialised_nb_sub_pts(const Dim_t & nb_sub_pts,
+                                 const PixelSubDiv & iteration_type) const;
+
    protected:
     //! internal worker function called by register_<T>_field
     template <typename T>
     TypedField<T> & register_field_helper(const std::string & unique_name,
-                                          const Dim_t & nb_dof_per_quad_pt);
+                                          const Dim_t & nb_dof_per_sub_pt,
+                                          const PixelSubDiv & sub_division,
+                                          const Unit & unit,
+                                          const Dim_t & nb_sub_pts);
 
     //! internal worker function called by register_<T>_state_field
     template <typename T>
-    TypedStateField<T> &
-    register_state_field_helper(const std::string & unique_prefix,
-                                const Dim_t & nb_memory,
-                                const Dim_t & nb_dof_per_quad_pt);
+    TypedStateField<T> & register_state_field_helper(
+        const std::string & unique_prefix, const Dim_t & nb_memory,
+        const Dim_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
+        const Unit & unit, const Dim_t & nb_sub_pts);
 
     /**
      * loop through all fields and allocate their memory. Is exclusively
@@ -409,8 +463,10 @@ namespace muGrid {
     Dim_t spatial_dim;
     //! number of quadrature points per pixel/voxel
     Dim_t nb_quad_pts;
-    //! total number of entries
-    Dim_t nb_entries{Unknown};
+    //! number of quadrature points per pixel/voxel
+    Dim_t nb_nodal_pts;
+    //! total number of pixels
+    Dim_t nb_pixels{Unknown};
     //! keeps track of whether the collection has already been initialised
     bool initialised{false};
     /**
@@ -418,7 +474,7 @@ namespace muGrid {
      * collection. Note that these are not truly global indices, but rather
      * absolute indices within the domain of the local processor. I.e., they
      * are universally valid to address any quadrature point on the local
-     * processor, and not for any quadrature point located on anothe
+     * processor, and not for any quadrature point located on another
      * processor.
      */
     std::vector<size_t> pixel_indices{};
@@ -508,16 +564,6 @@ namespace muGrid {
 
    protected:
     /**
-     * evaluate and return the stride with with the fast index of the iterators
-     * over the indices of this collection rotate
-     */
-    Dim_t get_stride() const {
-      return (this->iteration_type == Iteration::QuadPt)
-                 ? this->collection.get_nb_quad_pts()
-                 : 1;
-    }
-
-    /**
      * allow the field collection to create
      * `muGrid::FieldCollection::IndexIterable`s
      */
@@ -525,13 +571,17 @@ namespace muGrid {
     //! Constructor is protected, because no one ever need to construct this
     //! except the fieldcollection
     IndexIterable(const FieldCollection & collection,
-                  const Iteration & iteration_type);
+                  const PixelSubDiv & iteration_type,
+                  const Dim_t & stride = Unknown);
 
     //! reference back to the proxied collection
     const FieldCollection & collection;
 
     //! whether to iterate over pixels or quadrature points
-    const Iteration iteration_type;
+    const PixelSubDiv iteration_type;
+
+    //! stride for the slow moving index
+    size_t stride;
   };
 
   /**
@@ -557,12 +607,6 @@ namespace muGrid {
 
     //! Destructor
     ~iterator() = default;
-
-    //! Copy assignment operator
-    iterator & operator=(const iterator & other) = default;
-
-    //! Move assignment operator
-    iterator & operator=(iterator && other) = default;
 
     //! pre-increment
     iterator & operator++() {
@@ -591,7 +635,9 @@ namespace muGrid {
 
    protected:
     //! stride for the slow moving index
-    size_t stride;
+    size_t stride;  // store the value rather than the const ref in order
+                    //  to allow the IndexIterable to be destroyed and still use
+                    //  the iterator
     //! fast-moving index
     size_t offset{};
     //! iterator of slow moving index

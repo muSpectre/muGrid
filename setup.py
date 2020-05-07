@@ -214,17 +214,18 @@ if verbose:
     print('=== DETECTING FFT LIBRARIES ===')
 
 mugrid_sources = [
+    'src/libmugrid/ccoord_operations.cc',
     'src/libmugrid/exception.cc',
-    'src/libmugrid/units.cc',
     'src/libmugrid/field.cc',
-    'src/libmugrid/field_typed.cc',
-    'src/libmugrid/field_map.cc',
-    'src/libmugrid/state_field.cc',
-    'src/libmugrid/state_field_map.cc',
     'src/libmugrid/field_collection.cc',
     'src/libmugrid/field_collection_global.cc',
     'src/libmugrid/field_collection_local.cc',
-    'src/libmugrid/ccoord_operations.cc',
+    'src/libmugrid/field_map.cc',
+    'src/libmugrid/field_typed.cc',
+    'src/libmugrid/grid_common.cc',
+    'src/libmugrid/state_field.cc',
+    'src/libmugrid/state_field_map.cc',
+    'src/libmugrid/units.cc',
 ]
 pymugrid_sources = [
     'language_bindings/libmugrid/python/bind_py_module.cc',

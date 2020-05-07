@@ -57,11 +57,14 @@ namespace muSpectre {
   template <Dim_t DimM>
   struct MaterialMuSpectre_traits<MaterialLinearAnisotropic<DimM>> {
     //! expected map type for strain fields
-    using StrainMap_t = muGrid::T2FieldMap<Real, Mapping::Const, DimM>;
+    using StrainMap_t =
+        muGrid::T2FieldMap<Real, Mapping::Const, DimM, PixelSubDiv::QuadPt>;
     //! expected map type for stress fields
-    using StressMap_t = muGrid::T2FieldMap<Real, Mapping::Mut, DimM>;
+    using StressMap_t =
+        muGrid::T2FieldMap<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>;
     //! expected map type for tangent stiffness fields
-    using TangentMap_t = muGrid::T4FieldMap<Real, Mapping::Mut, DimM>;
+    using TangentMap_t =
+        muGrid::T4FieldMap<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>;
 
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
@@ -156,9 +159,8 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimM>
   template <class s_t>
-  auto MaterialLinearAnisotropic<DimM>::evaluate_stress(s_t && E,
-                                                              const size_t &
-                                                              /*pixel_index*/)
+  auto MaterialLinearAnisotropic<DimM>::evaluate_stress(s_t && E, const size_t &
+                                                        /*pixel_index*/)
       -> decltype(auto) {
     return MaterialLinearAnisotropic<DimM>::evaluate_stress(E);
   }
@@ -166,8 +168,10 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimM>
   template <class s_t>
-  auto MaterialLinearAnisotropic<DimM>::evaluate_stress_tangent(
-      s_t && E, const size_t & /*pixel_index*/) -> decltype(auto) {
+  auto MaterialLinearAnisotropic<DimM>::evaluate_stress_tangent(s_t && E,
+                                                                const size_t &
+                                                                /*pixel_index*/)
+      -> decltype(auto) {
     return MaterialLinearAnisotropic<DimM>::evaluate_stress_tangent(E);
   }
 

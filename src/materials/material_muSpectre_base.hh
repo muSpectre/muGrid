@@ -197,7 +197,8 @@ namespace muSpectre {
      * returns a map on stored native stress field. Throws a runtime error if
      * native stress has not been stored
      */
-    inline muGrid::MappedT2Field<Real, Mapping::Mut, DimM> &
+    inline muGrid::MappedT2Field<Real, Mapping::Mut, DimM,
+                                 PixelSubDiv::QuadPt> &
     get_mapped_native_stress();
 
    protected:
@@ -228,7 +229,8 @@ namespace muSpectre {
                                         muGrid::RealField & K)
         __attribute__((visibility("default")));
 
-    muGrid::OptionalMappedField<muGrid::MappedT2Field<Real, Mapping::Mut, DimM>>
+    muGrid::OptionalMappedField<
+        muGrid::MappedT2Field<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>>
         native_stress;
   };
 
@@ -332,7 +334,8 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <class Material, Dim_t DimM>
   auto MaterialMuSpectre<Material, DimM>::get_mapped_native_stress()
-      -> muGrid::MappedT2Field<Real, Mapping::Mut, DimM> & {
+      -> muGrid::MappedT2Field<Real, Mapping::Mut, DimM,
+                               PixelSubDiv::QuadPt> & {
     if (not this->native_stress.has_value()) {
       throw muGrid::RuntimeError("native stress has not been evaluated");
     }

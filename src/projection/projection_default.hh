@@ -68,10 +68,12 @@ namespace muSpectre {
     //! fourier-space field containing the projection operator itself
     using Proj_t = muGrid::ComplexField;
     //! iterable form of the operator
-    using Proj_map = muGrid::T4FieldMap<Complex, Mapping::Mut, DimS>;
+    using Proj_map =
+        muGrid::T4FieldMap<Complex, Mapping::Mut, DimS, PixelSubDiv::QuadPt>;
     //! vectorized version of the Fourier-space second-order tensor field
     using Vector_map =
-        muGrid::MatrixFieldMap<Complex, Mapping::Mut, DimS * DimS, 1>;
+        muGrid::MatrixFieldMap<Complex, Mapping::Mut, DimS * DimS, 1,
+                               PixelSubDiv::QuadPt>;
     //! Default constructor
     ProjectionDefault() = delete;
 

@@ -58,8 +58,12 @@ namespace muFFT {
   using muGrid::twoD;
 
   using muGrid::OneQuadPt;
+  using muGrid::TwoQuadPts;
+  using muGrid::FourQuadPts;
+  using muGrid::OneNode;
 
   using muGrid::Mapping;
+  using muGrid::PixelSubDiv;
 
   /**
    * Planner flags for FFT (follows FFTW, hopefully this choice will

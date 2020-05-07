@@ -65,11 +65,14 @@ namespace muSpectre {
   template <Dim_t DimM>
   struct MaterialMuSpectre_traits<MaterialViscoElasticSS<DimM>> {
     //! expected map type for strain fields
-    using StrainMap_t = muGrid::T2FieldMap<Real, Mapping::Const, DimM>;
+    using StrainMap_t =
+        muGrid::T2FieldMap<Real, Mapping::Const, DimM, PixelSubDiv::QuadPt>;
     //! expected map type for stress fields
-    using StressMap_t = muGrid::T2FieldMap<Real, Mapping::Mut, DimM>;
+    using StressMap_t =
+        muGrid::T2FieldMap<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>;
     //! expected map type for tangent stiffness fields
-    using TangentMap_t = muGrid::T4FieldMap<Real, Mapping::Mut, DimM>;
+    using TangentMap_t =
+        muGrid::T4FieldMap<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>;
 
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
@@ -105,7 +108,8 @@ namespace muSpectre {
 
     //! type in which the previous strain state is referenced
     using T2StRef_t =
-        typename muGrid::MappedT2StateField<Real, Mapping::Mut, DimM>::Return_t;
+        typename muGrid::MappedT2StateField<Real, Mapping::Mut, DimM,
+                                            PixelSubDiv::QuadPt>::Return_t;
 
     //! Default constructor
     MaterialViscoElasticSS() = delete;
@@ -207,18 +211,20 @@ namespace muSpectre {
     void initialise() final;
 
     //! getter for internal variable field History Integral
-    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM> &
+    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt> &
     get_history_integral();
 
     //! getter for internal variable field of Elastic stress
-    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM> &
+    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt> &
     get_s_null_prev_field();
 
    protected:
     //! storage for previous history intgral()
-    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM> s_null_prev_field;
+    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>
+        s_null_prev_field;
     //! storage for previous history intgral()
-    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM> h_prev_field;
+    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>
+        h_prev_field;
     const Real young_inf;  //!< Young's modulus (E∞)
     const Real young_v;    //!< Young's modulus (Eᵥ)
     const Real eta_v;      //!< viscosity of the linear dashpot(ηᵥ)

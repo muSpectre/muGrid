@@ -92,8 +92,8 @@ namespace muSpectre {
      * constructor with a shared pointer to a Material
      */
     explicit MaterialEvaluator(std::shared_ptr<MaterialBase> material)
-        : material{material}, collection{std::make_unique<FieldColl_t>(DimM,
-                                                                       1)},
+        : material{material}, collection{std::make_unique<FieldColl_t>(
+                                  DimM, OneQuadPt, muGrid::Unknown)},
           strain("gradient", *this->collection),
           stress{"stress", *this->collection}, tangent{"tangent",
                                                        *this->collection} {
@@ -174,13 +174,14 @@ namespace muSpectre {
     std::unique_ptr<FieldColl_t> collection;
 
     //! strain field (independent variable)
-    muGrid::MappedT2Field<Real, Mapping::Mut, DimM> strain;
+    muGrid::MappedT2Field<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt> strain;
 
     //! stress field (result)
-    muGrid::MappedT2Field<Real, Mapping::Mut, DimM> stress;
+    muGrid::MappedT2Field<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt> stress;
 
     //! field of tangent moduli (result)
-    muGrid::MappedT4Field<Real, Mapping::Mut, DimM> tangent;
+    muGrid::MappedT4Field<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>
+        tangent;
 
     //! whether the evaluator has been initialised
     bool is_initialised{false};

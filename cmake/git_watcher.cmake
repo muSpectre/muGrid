@@ -169,7 +169,6 @@ function(GetGitState _working_dir)
     endif()
 
     RunGitCommand(describe --tags --dirty --always)
-    message("OUTPUT = ${output}")
     if(exit_code EQUAL 0)
         set(ENV{GIT_COMMIT_DESCRIBE} "${output}")
     endif()

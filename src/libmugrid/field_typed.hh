@@ -76,13 +76,16 @@ namespace muGrid {
      * ensure this. Fields are instantiated through the `register_field`
      * methods FieldCollection.
      * @param unique_name unique field name (unique within a collection)
-     * @param nb_components number of components to store per quadrature point
+     * @param nb_dof_per_sub_pt number of components to store per quadrature
+     *        point
      * @param collection reference to the holding field collection.
      */
     TypedFieldBase(const std::string & unique_name,
-                   FieldCollection & collection, Dim_t nb_components,
-                   const Unit & unit = Unit::unitless())
-      : Parent{unique_name, collection, nb_components, unit} {}
+                   FieldCollection & collection, Dim_t nb_dof_per_sub_pt,
+                   const PixelSubDiv & sub_division, const Unit & unit,
+                   const Dim_t & nb_sub_pts = Unknown)
+        : Parent{unique_name, collection,   nb_dof_per_sub_pt,
+                 nb_sub_pts,  sub_division, unit} {}
 
    public:
     //! stored scalar type
@@ -144,12 +147,12 @@ namespace muGrid {
      * return a matrix map onto the underlying data with one column per
      * quadrature point
      */
-    Eigen_map eigen_quad_pt();
+    Eigen_map eigen_sub_pt();
     /**
      * return a const matrix map onto the underlying data with one column per
      * quadrature point
      */
-    Eigen_cmap eigen_quad_pt() const;
+    Eigen_cmap eigen_sub_pt() const;
 
     /**
      * return a matrix map onto the underlying data with one column per
@@ -169,8 +172,8 @@ namespace muGrid {
      * convenience function returns a map of this field, iterable per pixel.
      *
      * @param nb_rows optional specification of the number of rows for the
-     * iterate. If left to default value, a matrix of shape `nb_components` ×
-     * `nb_quad_pts` is used
+     * iterate. If left to default value, a matrix of shape `nb_dof_per_sub_pt`
+     * × `nb_quad_pts` is used
      */
     FieldMap<T, Mapping::Mut> get_pixel_map(const Dim_t & nb_rows = Unknown);
 
@@ -179,8 +182,8 @@ namespace muGrid {
      * pixel.
      *
      * @param nb_rows optional specification of the number of rows for the
-     * iterate. If left to default value, a matrix of shape `nb_components` ×
-     * `nb_quad_pts` is used
+     * iterate. If left to default value, a matrix of shape `nb_dof_per_sub_pt`
+     * × `nb_quad_pts` is used
      */
     FieldMap<T, Mapping::Const>
     get_pixel_map(const Dim_t & nb_rows = Unknown) const;
@@ -247,12 +250,16 @@ namespace muGrid {
      * held by a FieldCollection. The `Field` constructor is protected to
      * ensure this.
      * @param unique_name unique field name (unique within a collection)
-     * @param nb_components number of components to store per quadrature point
+     * @param nb_dof_per_sub_pt number of components to store per quadrature
+     * point
      * @param collection reference to the holding field collection.
      */
     TypedField(const std::string & unique_name, FieldCollection & collection,
-                Dim_t nb_components)
-        : Parent{unique_name, collection, nb_components} {}
+               const Dim_t & nb_dof_per_sub_pt,
+               const PixelSubDiv & sub_division, const Unit & unit,
+               const Dim_t & nb_sub_pts = Unknown)
+        : Parent{unique_name,  collection, nb_dof_per_sub_pt,
+                 sub_division, unit,       nb_sub_pts} {}
 
    public:
     //! base class
@@ -289,7 +296,7 @@ namespace muGrid {
     TypedField & operator=(const EigenRep_t & other);
 
     void set_zero() final;
-    void set_pad_size(size_t pad_size) final;
+    void set_pad_size(const size_t & pad_size) final;
 
     //! cast a reference to a base type to this type, with full checks
     static TypedField & safe_cast(Field & other);
@@ -301,14 +308,17 @@ namespace muGrid {
      * cast a reference to a base type to this type safely, plus check whether
      * it has the right number of components
      */
-    static TypedField & safe_cast(Field & other, const Dim_t & nb_components);
+    static TypedField & safe_cast(Field & other,
+                                  const Dim_t & nb_dof_per_sub_pt,
+                                  const PixelSubDiv & sub_division);
 
     /**
      * cast a const reference to a base type to this type safely, plus check
      * whether it has the right number of components
      */
     static const TypedField & safe_cast(const Field & other,
-                                         const Dim_t & nb_components);
+                                        const Dim_t & nb_dof_per_sub_pt,
+                                        const PixelSubDiv & sub_division);
 
     size_t buffer_size() const final;
 
@@ -330,7 +340,7 @@ namespace muGrid {
     friend FieldCollection;
 
    protected:
-    void resize(size_t size) final;
+    void resize() final;
 
     //! storage of the raw field data
     std::vector<T> values{};
@@ -353,17 +363,23 @@ namespace muGrid {
     /**
      * constructor from a raw pointer. Typically, this would be a reference
      * to a numpy array from the python bindings.
+     * the @param nb_sub_pts is only required if sub_division is
+     * `PixelSubDiv::FreePt`
      */
-    WrappedField(const std::string & unique_name,
-                  FieldCollection & collection, Dim_t nb_components,
-                  size_t size, T *ptr);
+    WrappedField(const std::string & unique_name, FieldCollection & collection,
+                 const Dim_t & nb_dof_per_sub_pt, const size_t & size, T * ptr,
+                 const PixelSubDiv & sub_division, const Unit & unit,
+                 const Dim_t & nb_sub_pts = Unknown);
 
     /**
-     * constructor from an eigen array ref.
+     * constructor from an eigen array ref. the @param nb_sub_pts is only
+     * required if sub_division is `PixelSubDiv::FreePt`
      */
-    WrappedField(const std::string & unique_name,
-                  FieldCollection & collection, Dim_t nb_components,
-                  Eigen::Ref<EigenRep_t> values);
+    WrappedField(const std::string & unique_name, FieldCollection & collection,
+                 const Dim_t & nb_dof_per_sub_pt, Eigen::Ref<EigenRep_t> values,
+                 const PixelSubDiv & sub_division,
+                 const Unit & unit = Unit::unitless(),
+                 const Dim_t & nb_sub_pts = Unknown);
 
     //! Default constructor
     WrappedField() = delete;
@@ -383,13 +399,18 @@ namespace muGrid {
     //! Move assignment operator
     WrappedField & operator=(WrappedField && other) = delete;
 
-    //! Emulation of a const constructor
-    static std::unique_ptr<const WrappedField>
-    make_const(const std::string & unique_name, FieldCollection & collection,
-               Dim_t nb_components, const Eigen::Ref<const EigenRep_t> values);
+    /**
+     * Emulation of a const constructor. @param nb_sub_pts is only required if
+     * sub_division is `PixelSubDiv::FreePt`
+     */
+    static std::unique_ptr<const WrappedField> make_const(
+        const std::string & unique_name, FieldCollection & collection,
+        Dim_t nb_dof_per_sub_pt, const Eigen::Ref<const EigenRep_t> values,
+        const PixelSubDiv & sub_division, const Unit & unit = Unit::unitless(),
+        const Dim_t & nb_sub_pts = Unknown);
 
     void set_zero() final;
-    void set_pad_size(size_t pad_size) final;
+    void set_pad_size(const size_t & pad_size) final;
 
     size_t buffer_size() const final;
 
@@ -397,7 +418,7 @@ namespace muGrid {
     friend FieldCollection;
 
    protected:
-    void resize(size_t size) final;
+    void resize() final;
 
     //! size of the wrapped buffer
     size_t size;

@@ -132,14 +132,14 @@ namespace muSpectre {
     auto & mat_lin_init{Fix::mat_lin_init};
 
     // create statefields
-    muGrid::LocalFieldCollection coll{sdim, Fix::NbQuadPts()};
+    muGrid::LocalFieldCollection coll{sdim, Fix::NbQuadPts(), muGrid::Unknown};
     coll.add_pixel({0});
     coll.initialise();
 
-    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim> h_{"history intgral",
-                                                            coll};
-    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim> s_null_{
-        "Pure elastic stress", coll};
+    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim, PixelSubDiv::QuadPt>
+        h_{"history intgral", coll};
+    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim, PixelSubDiv::QuadPt>
+        s_null_{"Pure elastic stress", coll};
 
     auto & h_prev{h_.get_map()};
     h_prev[0].current() = Strain_t::Identity();
@@ -183,14 +183,14 @@ namespace muSpectre {
     auto & mat_lin_init{Fix::mat_lin_init};
 
     // create statefields
-    muGrid::LocalFieldCollection coll{sdim, Fix::NbQuadPts()};
+    muGrid::LocalFieldCollection coll{sdim, Fix::NbQuadPts(), muGrid::Unknown};
     coll.add_pixel({0});
     coll.initialise();
 
-    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim> h_{"history intgral",
-                                                            coll};
-    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim> s_null_{
-        "Pure elastic stress", coll};
+    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim, PixelSubDiv::QuadPt>
+        h_{"history intgral", coll};
+    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim, PixelSubDiv::QuadPt>
+        s_null_{"Pure elastic stress", coll};
 
     auto & h_prev{h_.get_map()};
     h_prev[0].current() = Strain_t::Identity();
@@ -254,14 +254,14 @@ namespace muSpectre {
     auto & mat_lin_init{Fix::mat_lin_init};
 
     // create statefields
-    muGrid::LocalFieldCollection coll{sdim, Fix::NbQuadPts()};
+    muGrid::LocalFieldCollection coll{sdim, Fix::NbQuadPts(), muGrid::Unknown};
     coll.add_pixel({0});
     coll.initialise();
 
-    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim> h_{"history intgral",
-                                                            coll};
-    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim> s_null_{
-        "Pure elastic stress", coll};
+    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim, PixelSubDiv::QuadPt>
+        h_{"history intgral", coll};
+    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim, PixelSubDiv::QuadPt>
+        s_null_{"Pure elastic stress", coll};
 
     auto & h_prev{h_.get_map()};
     h_prev[0].current() = Strain_t::Identity();

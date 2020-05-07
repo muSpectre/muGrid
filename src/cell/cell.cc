@@ -57,17 +57,20 @@ namespace muSpectre {
   Cell::Cell(Projection_ptr projection, SplitCell is_cell_split)
       : projection{std::move(projection)},
         fields{std::make_unique<muGrid::GlobalFieldCollection>(
-            this->get_spatial_dim(), this->get_nb_quad_pts())},
+            this->get_spatial_dim(), this->get_nb_quad_pts(),
+            this->get_nb_nodal_pts())},
         // We request the DOFs for a single quadrature point, since quadrature
         // points are handled by the field.
         strain{this->fields->register_real_field(
             "strain",
             dof_for_formulation(this->get_formulation(),
-                                this->get_material_dim(), OneQuadPt))},
+                                this->get_material_dim(), OneQuadPt),
+            PixelSubDiv::QuadPt)},
         stress{this->fields->register_real_field(
             "stress",
             dof_for_formulation(this->get_formulation(),
-                                this->get_material_dim(), OneQuadPt))},
+                                this->get_material_dim(), OneQuadPt),
+            PixelSubDiv::QuadPt)},
         is_cell_split{is_cell_split} {
     this->fields->initialise(this->projection->get_nb_subdomain_grid_pts(),
                              this->projection->get_subdomain_locations());
@@ -189,6 +192,12 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
+  const Dim_t & Cell::get_nb_nodal_pts() const {
+    // this true for Cells only capable of projection-based solution
+    return OneNode;
+  }
+
+  /* ---------------------------------------------------------------------- */
   void Cell::check_material_coverage() const {
     auto nb_pixels{muGrid::CcoordOps::get_size(
         this->projection->get_nb_subdomain_grid_pts())};
@@ -273,7 +282,8 @@ namespace muSpectre {
             muGrid::ipow(dof_for_formulation(this->get_formulation(),
                                              this->get_material_dim(),
                                              OneQuadPt),
-                         2));
+                         2),
+            PixelSubDiv::QuadPt);
       } else {
         throw RuntimeError("Tangent has not been created");
       }
@@ -406,11 +416,12 @@ namespace muSpectre {
       const muGrid::TypedFieldBase<Real> & delta_strain,
       const muGrid::TypedFieldBase<Real> & tangent,
       muGrid::TypedFieldBase<Real> & delta_stress) {
-    muGrid::T2FieldMap<Real, muGrid::Mapping::Const, DimM> strain_map{
-        delta_strain};
-    muGrid::T4FieldMap<Real, muGrid::Mapping::Const, DimM> tangent_map{tangent};
-    muGrid::T2FieldMap<Real, muGrid::Mapping::Mut, DimM> stress_map{
-        delta_stress};
+    muGrid::T2FieldMap<Real, muGrid::Mapping::Const, DimM, PixelSubDiv::QuadPt>
+        strain_map{delta_strain};
+    muGrid::T4FieldMap<Real, muGrid::Mapping::Const, DimM, PixelSubDiv::QuadPt>
+        tangent_map{tangent};
+    muGrid::T2FieldMap<Real, muGrid::Mapping::Mut, DimM, PixelSubDiv::QuadPt>
+        stress_map{delta_stress};
     for (auto && tup : akantu::zip(strain_map, tangent_map, stress_map)) {
       auto & df = std::get<0>(tup);
       auto & k = std::get<1>(tup);
@@ -427,20 +438,19 @@ namespace muSpectre {
       throw RuntimeError("evaluate_projected_directional_stiffness "
                          "requires the tangent moduli");
     }
-    if (delta_strain.get_nb_dof_per_quad_pt() != this->get_strain_size()) {
+    if (delta_strain.get_nb_dof_per_sub_pt() != this->get_strain_size()) {
       std::stringstream err{};
       err << "The input field should have " << this->get_strain_size()
           << " components per quadrature point, but has "
-          << delta_strain.get_nb_dof_per_quad_pt() << " components.";
+          << delta_strain.get_nb_dof_per_sub_pt() << " components.";
       throw RuntimeError(err.str());
     }
-    if (delta_strain.get_collection().get_nb_quad_pts() !=
-        this->get_strain().get_collection().get_nb_quad_pts()) {
+    if (delta_strain.get_nb_sub_pts() != this->get_strain().get_nb_sub_pts()) {
       std::stringstream err{};
       err << "The input field should have "
-          << this->get_strain().get_collection().get_nb_quad_pts()
+          << this->get_strain().get_nb_sub_pts()
           << " quadrature point per pixel, but has "
-          << delta_strain.get_collection().get_nb_quad_pts() << " points.";
+          << delta_strain.get_nb_sub_pts() << " points.";
       throw RuntimeError(err.str());
     }
     if (delta_strain.get_collection().get_nb_pixels() !=
@@ -478,11 +488,12 @@ namespace muSpectre {
       const muGrid::TypedFieldBase<Real> & delta_strain,
       const muGrid::TypedFieldBase<Real> & tangent, const Real & alpha,
       muGrid::TypedFieldBase<Real> & delta_stress) {
-    muGrid::T2FieldMap<Real, muGrid::Mapping::Const, DimM> strain_map{
-        delta_strain};
-    muGrid::T4FieldMap<Real, muGrid::Mapping::Const, DimM> tangent_map{tangent};
-    muGrid::T2FieldMap<Real, muGrid::Mapping::Mut, DimM> stress_map{
-        delta_stress};
+    muGrid::T2FieldMap<Real, muGrid::Mapping::Const, DimM, PixelSubDiv::QuadPt>
+        strain_map{delta_strain};
+    muGrid::T4FieldMap<Real, muGrid::Mapping::Const, DimM, PixelSubDiv::QuadPt>
+        tangent_map{tangent};
+    muGrid::T2FieldMap<Real, muGrid::Mapping::Mut, DimM, PixelSubDiv::QuadPt>
+        stress_map{delta_stress};
     for (auto && tup : akantu::zip(strain_map, tangent_map, stress_map)) {
       auto & df = std::get<0>(tup);
       auto & k = std::get<1>(tup);
@@ -495,9 +506,11 @@ namespace muSpectre {
                                                  const Real & alpha,
                                                  EigenVec_t del_stress) {
     auto delta_strain_field_ptr{muGrid::WrappedField<Real>::make_const(
-        "delta_strain", *this->fields, this->get_strain_size(), delta_strain)};
+        "delta_strain", *this->fields, this->get_strain_size(), delta_strain,
+        PixelSubDiv::QuadPt)};
     muGrid::WrappedField<Real> del_stress_field{
-        "delta_stress", *this->fields, this->get_strain_size(), del_stress};
+        "delta_stress", *this->fields, this->get_strain_size(), del_stress,
+        PixelSubDiv::QuadPt};
     switch (this->get_material_dim()) {
     case twoD: {
       this->template add_projected_directional_stiffness_helper<twoD>(
@@ -540,7 +553,7 @@ namespace muSpectre {
         auto && field{muGrid::TypedField<T>::safe_cast(
             collection.get_field(unique_name))};
         local_fields.push_back(field);
-        nb_component_categories.insert(field.get_nb_dof_per_quad_pt());
+        nb_component_categories.insert(field.get_nb_dof_per_sub_pt());
       }
     }
 
@@ -558,7 +571,7 @@ namespace muSpectre {
           auto & coll = mat->get_collection();
           if (coll.field_exists(unique_name)) {
             auto & field{coll.get_field(unique_name)};
-            err_str << field.get_nb_dof_per_quad_pt()
+            err_str << field.get_nb_dof_per_sub_pt()
                     << " components in material '" << mat->get_name() << "'"
                     << std::endl;
           }
@@ -573,8 +586,8 @@ namespace muSpectre {
     const Dim_t nb_components{*nb_component_categories.begin()};
 
     // get and prepare the field
-    auto & global_field{
-        this->fields->template register_field<T>(unique_name, nb_components)};
+    auto & global_field{this->fields->template register_field<T>(
+        unique_name, nb_components, PixelSubDiv::QuadPt)};
     global_field.set_zero();
 
     auto global_map{global_field.get_pixel_map()};
@@ -609,7 +622,7 @@ namespace muSpectre {
         auto && field_old{
             muGrid::TypedField<T>::safe_cast(state_field.old(nb_steps_ago))};
         local_fields_old.push_back(field_old);
-        nb_component_categories.insert(field_old.get_nb_dof_per_quad_pt());
+        nb_component_categories.insert(field_old.get_nb_dof_per_sub_pt());
       }
     }
 
@@ -627,7 +640,7 @@ namespace muSpectre {
           auto && coll{mat->get_collection()};
           if (coll.state_field_exists(unique_name)) {
             auto && field{coll.get_state_field(unique_name).old(nb_steps_ago)};
-            err_str << field.get_nb_dof_per_quad_pt()
+            err_str << field.get_nb_dof_per_sub_pt()
                     << " components in material '" << mat->get_name() << "'"
                     << std::endl;
           }
@@ -640,8 +653,8 @@ namespace muSpectre {
       throw RuntimeError(err_str.str());
     }
     const Dim_t nb_components{*nb_component_categories.begin()};
-    auto & global_field{
-        this->fields->template register_field<T>(unique_name, nb_components)};
+    auto & global_field{this->fields->template register_field<T>(
+        unique_name, nb_components, PixelSubDiv::QuadPt)};
     global_field.set_zero();
 
     auto global_map{global_field.get_pixel_map()};
@@ -675,7 +688,7 @@ namespace muSpectre {
         auto && field_current(
             muGrid::TypedField<T>::safe_cast(state_field.current()));
         local_fields_current.push_back(field_current);
-        nb_component_categories.insert(field_current.get_nb_dof_per_quad_pt());
+        nb_component_categories.insert(field_current.get_nb_dof_per_sub_pt());
       }
     }
 
@@ -693,7 +706,7 @@ namespace muSpectre {
           auto && coll{mat->get_collection()};
           if (coll.state_field_exists(unique_name)) {
             auto && field{coll.get_state_field(unique_name).current()};
-            err_str << field.get_nb_dof_per_quad_pt()
+            err_str << field.get_nb_dof_per_sub_pt()
                     << " components in material '" << mat->get_name() << "'"
                     << std::endl;
           }
@@ -706,8 +719,8 @@ namespace muSpectre {
       throw RuntimeError(err_str.str());
     }
     const Dim_t nb_components{*nb_component_categories.begin()};
-    auto & global_field{
-        this->fields->template register_field<T>(unique_name, nb_components)};
+    auto & global_field{this->fields->template register_field<T>(
+        unique_name, nb_components, PixelSubDiv::QuadPt)};
     global_field.set_zero();
 
     auto global_map{global_field.get_pixel_map()};

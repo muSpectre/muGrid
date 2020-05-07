@@ -76,7 +76,9 @@ namespace muGrid {
      * Protected constructor
      */
     StateField(const std::string & unique_prefix, FieldCollection & collection,
-               Dim_t nb_memory = 1);
+               const Dim_t & nb_memory, const Dim_t & nb_dof_per_sub_pt,
+               const PixelSubDiv & sub_division, const Unit & unit,
+               const Dim_t & nb_sub_pts);
 
    public:
     //! Default constructor
@@ -141,6 +143,28 @@ namespace muGrid {
      * number of old states to store, defaults to 1
      */
     const Dim_t nb_memory;
+
+    /**
+     * number of dof_per_sub_pt stored per sub-point (e.g., 3 for a
+     * three-dimensional vector, or 9 for a three-dimensional second-rank
+     * tensor)
+     */
+    const Dim_t nb_dof_per_sub_pt;
+
+    /**
+     * Pixel subdivision kind (determines how many datapoints to store per
+     * pixel)
+     */
+    PixelSubDiv sub_division;
+
+    //! Physical unit of the values stored in this field
+    Unit unit;
+
+    /**
+     * number of pixel subdivisions. Will depend on sub_division
+     */
+    Dim_t nb_sub_pts;
+
     //! the current (historically accurate) ordering of the fields
     std::vector<size_t> indices{};
 
@@ -163,11 +187,13 @@ namespace muGrid {
      * protected constructor, to avoid the creation of unregistered fields.
      * Users should create fields through the
      * `muGrid::FieldCollection::register_real_field()` (or `int`, `uint`,
-     * `compplex`) factory functions.
+     * `complex`) factory functions.
      */
     TypedStateField(const std::string & unique_prefix,
-                    FieldCollection & collection, Dim_t nb_memory,
-                    Dim_t nb_components);
+                    FieldCollection & collection, const Dim_t & nb_memory,
+                    const Dim_t & nb_dof_per_sub_pt,
+                    const PixelSubDiv & sub_division, const Unit & unit,
+                    const Dim_t & nb_sub_pts);
 
    public:
     //! base class

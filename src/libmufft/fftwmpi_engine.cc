@@ -233,11 +233,11 @@ namespace muFFT {
             << " of the (sub)domain handled by FFTWMPIEngine.";
       throw RuntimeError(error.str());
     }
-    if (field.get_nb_dof_per_quad_pt() * field.get_nb_quad_pts() !=
+    if (field.get_nb_dof_per_sub_pt() * field.get_nb_sub_pts() !=
         this->get_nb_dof_per_pixel()) {
       std::stringstream error;
-      error << "The field reports " << field.get_nb_dof_per_quad_pt() << " "
-            << "components per quadrature point and " << field.get_nb_quad_pts()
+      error << "The field reports " << field.get_nb_dof_per_sub_pt() << " "
+            << "components per quadrature point and " << field.get_nb_sub_pts()
             << " quadrature points, while this FFT engine was set up to handle "
             << this->get_nb_dof_per_pixel() << " DOFs per pixel.";
       throw RuntimeError(error.str());
@@ -279,11 +279,11 @@ namespace muFFT {
             << " of the (sub)domain handled by FFTWEngine.";
       throw RuntimeError(error.str());
     }
-    if (field.get_nb_dof_per_quad_pt() * field.get_nb_quad_pts() !=
+    if (field.get_nb_dof_per_sub_pt() * field.get_nb_sub_pts() !=
         this->get_nb_dof_per_pixel()) {
       std::stringstream error;
-      error << "The field reports " << field.get_nb_dof_per_quad_pt() << " "
-            << "components per quadrature point and " << field.get_nb_quad_pts()
+      error << "The field reports " << field.get_nb_dof_per_sub_pt() << " "
+            << "components per quadrature point and " << field.get_nb_sub_pts()
             << " quadrature points, while this FFT engine was set up to handle "
             << this->get_nb_dof_per_pixel() << " DOFs per pixel.";
       throw RuntimeError(error.str());

@@ -136,6 +136,10 @@ endif()
 
 if(MUCHOICE MATCHES "muFFT")
   add_subdirectory(${CMAKE_SOURCE_DIR}/language_bindings/libmufft)
+  add_subdirectory(${CMAKE_SOURCE_DIR}/language_bindings/libmugrid)
+endif()
+if(MUCHOICE MATCHES "muGrid")
+  add_subdirectory(${CMAKE_SOURCE_DIR}/language_bindings/libmugrid)
 endif()
 
 if (${MUSPECTRE_MAKE_DOC_TARGET})

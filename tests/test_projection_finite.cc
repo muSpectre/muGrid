@@ -93,14 +93,15 @@ namespace muSpectre {
         "These tests assume that the material and spatial dimension are "
         "identical");
     using Fields = muGrid::GlobalFieldCollection;
-    using FieldMap = muGrid::MatrixFieldMap<Real, Mapping::Mut, mdim, mdim>;
+    using FieldMap = muGrid::MatrixFieldMap<Real, Mapping::Mut, mdim, mdim,
+                                            PixelSubDiv::QuadPt>;
     using Vector = Eigen::Matrix<Real, dim, 1>;
 
-    Fields fields{sdim, OneQuadPt};
-    muGrid::RealField & f_grad{
-        fields.register_real_field("gradient", mdim * mdim)};
-    muGrid::RealField & f_var{
-        fields.register_real_field("working field", mdim * mdim)};
+    Fields fields{sdim, OneQuadPt, muGrid::Unknown};
+    muGrid::RealField & f_grad{fields.register_real_field(
+        "gradient", mdim * mdim, PixelSubDiv::QuadPt)};
+    muGrid::RealField & f_var{fields.register_real_field(
+        "working field", mdim * mdim, PixelSubDiv::QuadPt)};
 
     FieldMap grad(f_grad);
     FieldMap var(f_var);
@@ -173,12 +174,14 @@ namespace muSpectre {
     constexpr Dim_t sdim{fix::sdim}, mdim{fix::mdim};
     using Fields = muGrid::GlobalFieldCollection;
     using FieldT = muGrid::TypedField<Real>;
-    using FieldMap = muGrid::MatrixFieldMap<Real, Mapping::Mut, mdim, mdim>;
+    using FieldMap = muGrid::MatrixFieldMap<Real, Mapping::Mut, mdim, mdim,
+                                            PixelSubDiv::QuadPt>;
 
-    Fields fields{sdim, OneQuadPt};
-    FieldT & f_grad{fields.register_real_field("gradient", mdim * mdim)};
-    FieldT & f_grad_test{
-        fields.register_real_field("gradient_test", mdim * mdim)};
+    Fields fields{sdim, OneQuadPt, muGrid::Unknown};
+    FieldT & f_grad{fields.register_real_field("gradient", mdim * mdim,
+                                               PixelSubDiv::QuadPt)};
+    FieldT & f_grad_test{fields.register_real_field(
+        "gradient_test", mdim * mdim, PixelSubDiv::QuadPt)};
     FieldMap grad(f_grad);
     FieldMap grad_test(f_grad_test);
 

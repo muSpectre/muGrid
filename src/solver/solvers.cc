@@ -64,12 +64,13 @@ namespace muSpectre {
     auto field_collection{cell.get_fields().get_empty_clone()};
     // Corresponds to symbol δF or δε
     muGrid::MappedField<muGrid::FieldMap<Real, Mapping::Mut>> incrF_field{
-        "incrF", shape[0], shape[1], muGrid::Iteration::QuadPt,
+        "incrF", shape[0], shape[1], muGrid::PixelSubDiv::QuadPt,
         field_collection};
 
     // field to store the rhs for cg calculations
     muGrid::MappedField<muGrid::FieldMap<Real, Mapping::Mut>> rhs_field{
-        "rhs", shape[0], shape[1], muGrid::Iteration::QuadPt, field_collection};
+        "rhs", shape[0], shape[1], muGrid::PixelSubDiv::QuadPt,
+        field_collection};
 
     solver.initialise();
 
@@ -193,7 +194,7 @@ namespace muSpectre {
       // updating cell strain with the difference of the current and previous
       // strain input.
       for (auto && strain : muGrid::FieldMap<Real, Mapping::Mut>(
-               F, shape[0], muGrid::Iteration::QuadPt)) {
+               F, shape[0], muGrid::PixelSubDiv::QuadPt)) {
         strain += macro_strain - previous_macro_strain;
       }
 
@@ -267,11 +268,11 @@ namespace muSpectre {
                     << "| = " << std::setw(17) << incr_norm / grad_norm
                     << ", tol = " << newton_tol << std::endl;
 
-            using StrainMap_t = muGrid::FieldMap<Real, Mapping::Const>;
-            if (verbose > Verbosity::Detailed) {
-              std::cout << "<" << strain_symb << "> =" << std::endl
+          using StrainMap_t = muGrid::FieldMap<Real, Mapping::Const>;
+          if (verbose > Verbosity::Detailed) {
+            std::cout << "<" << strain_symb << "> =" << std::endl
                       << StrainMap_t{F, shape[0]}.mean() << std::endl;
-            }
+          }
         }
         convergence_test();
       }
@@ -319,17 +320,18 @@ namespace muSpectre {
     auto field_collection{cell.get_fields().get_empty_clone()};
     // Corresponds to symbol δF or δε
     muGrid::MappedField<muGrid::FieldMap<Real, Mapping::Mut>> incrF_field{
-        "incrF", shape[0], shape[1], muGrid::Iteration::QuadPt,
+        "incrF", shape[0], shape[1], muGrid::PixelSubDiv::QuadPt,
         field_collection};
 
     // Corresponds to symbol ΔF or Δε
     muGrid::MappedField<muGrid::FieldMap<Real, Mapping::Mut>> DeltaF_field{
-        "DeltaF", shape[0], shape[1], muGrid::Iteration::QuadPt,
+        "DeltaF", shape[0], shape[1], muGrid::PixelSubDiv::QuadPt,
         field_collection};
 
     // field to store the rhs for cg calculations
     muGrid::MappedField<muGrid::FieldMap<Real, Mapping::Mut>> rhs_field{
-        "rhs", shape[0], shape[1], muGrid::Iteration::QuadPt, field_collection};
+        "rhs", shape[0], shape[1], muGrid::PixelSubDiv::QuadPt,
+        field_collection};
     solver.initialise();
 
     size_t count_width{};

@@ -34,6 +34,8 @@
  */
 
 #include "tests.hh"
+#include "field_test_fixtures.hh"
+
 #include "libmugrid/field_collection_global.hh"
 #include "libmugrid/field_collection_local.hh"
 #include "libmugrid/mapped_field.hh"
@@ -45,17 +47,25 @@ namespace muGrid {
   struct InitialiserBase {
     constexpr static Dim_t DimS{twoD};
     constexpr static Dim_t NbRow{2}, NbCol{3};
-    constexpr static Dim_t NbQuad() { return 2; }
-    GlobalFieldCollection fc{DimS, NbQuad()};
+    constexpr static Dim_t NbQuad{2};
+    constexpr static Dim_t NbNode{4};
+    GlobalFieldCollection fc{DimS, NbQuad, NbNode};
     InitialiserBase() { this->fc.initialise(Ccoord_t<twoD>{2, 3}); }
   };
+  constexpr Dim_t InitialiserBase::DimS;
+  constexpr Dim_t InitialiserBase::NbRow;
+  constexpr Dim_t InitialiserBase::NbCol;
+  constexpr Dim_t InitialiserBase::NbQuad;
+  constexpr Dim_t InitialiserBase::NbNode;
 
   struct MappedFieldFixture : public InitialiserBase {
-    MappedMatrixField<Real, Mapping::Mut, NbRow, NbCol> mapped_matrix;
-    MappedArrayField<Real, Mapping::Mut, NbRow, NbCol> mapped_array;
-    MappedScalarField<Real, Mapping::Mut> mapped_scalar;
-    MappedT2Field<Real, Mapping::Mut, DimS> mapped_t2;
-    MappedT4Field<Real, Mapping::Mut, DimS> mapped_t4;
+    MappedMatrixField<Real, Mapping::Mut, NbRow, NbCol, PixelSubDiv::QuadPt>
+        mapped_matrix;
+    MappedArrayField<Real, Mapping::Mut, NbRow, NbCol, PixelSubDiv::QuadPt>
+        mapped_array;
+    MappedScalarField<Real, Mapping::Mut, PixelSubDiv::QuadPt> mapped_scalar;
+    MappedT2Field<Real, Mapping::Mut, DimS, PixelSubDiv::QuadPt> mapped_t2;
+    MappedT4Field<Real, Mapping::Mut, DimS, PixelSubDiv::QuadPt> mapped_t4;
 
     MappedFieldFixture()
         : InitialiserBase{}, mapped_matrix{"matrix", this->fc},
@@ -71,8 +81,8 @@ namespace muGrid {
     for (auto && iterate : this->mapped_matrix) {
       iterate.setRandom();
     }
-    this->mapped_array.get_field().eigen_quad_pt() =
-        this->mapped_matrix.get_field().eigen_quad_pt();
+    this->mapped_array.get_field().eigen_sub_pt() =
+        this->mapped_matrix.get_field().eigen_sub_pt();
     for (auto && tup : akantu::zip(this->mapped_matrix, this->mapped_array)) {
       const auto & matrix{std::get<0>(tup)};
       const auto & array{std::get<1>(tup)};
@@ -85,18 +95,20 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   BOOST_AUTO_TEST_CASE(DynamicMappedField) {
     constexpr Dim_t NbQuad{3};
+    constexpr Dim_t NbNode{2};
     constexpr Dim_t NbRow{4};
     constexpr Dim_t NbCol{5};
-    GlobalFieldCollection collection{twoD, NbQuad};
+    GlobalFieldCollection collection{twoD, NbQuad, NbNode};
     collection.initialise({2, 2});
     using Mapped_t = MappedField<FieldMap<Real, Mapping::Mut>>;
-    Mapped_t mapped_field{"name", NbRow, NbCol, Iteration::QuadPt, collection};
+    Mapped_t mapped_field{"name", NbRow, NbCol, PixelSubDiv::QuadPt,
+                          collection};
 
     BOOST_CHECK_THROW(
-        Mapped_t("name", NbRow, NbCol, Iteration::Pixel, collection),
-        FieldMapError);
+        Mapped_t("name", NbRow, NbCol, PixelSubDiv::Pixel, collection),
+        FieldCollectionError);
 
-    MatrixFieldMap<Real, Mapping::Const, NbRow, NbCol, Iteration::QuadPt>
+    MatrixFieldMap<Real, Mapping::Const, NbRow, NbCol, PixelSubDiv::QuadPt>
         static_map(mapped_field.get_field());
 
     for (auto && tup : akantu::zip(mapped_field.get_map(), static_map)) {
@@ -121,9 +133,10 @@ namespace muGrid {
     using FieldColl_t =
         std::conditional_t<Validity == ValidityDomain::Global,
                            GlobalFieldCollection, LocalFieldCollection>;
-    using TField_t = MappedT2Field<Real, Mapping::Mut, MDim>;
+    using TField_t =
+        MappedT2Field<Real, Mapping::Mut, MDim, PixelSubDiv::QuadPt>;
     using MField_t =
-        MappedMatrixField<Real, Mapping::Mut, SDim, MDim, Iteration::QuadPt>;
+        MappedMatrixField<Real, Mapping::Mut, SDim, MDim, PixelSubDiv::QuadPt>;
     using DField_t = RealField;
 
     FieldFixture()
@@ -132,14 +145,14 @@ namespace muGrid {
           dynamic_field1{this->fc.register_real_field(
               "Dynamically sized field with correct number of"
               " components",
-              NbComponents)},
+              NbComponents, PixelSubDiv::QuadPt)},
           dynamic_field2{this->fc.register_real_field(
               "Dynamically sized field with incorrect number"
               " of components",
-              NbComponents + 1)} {}
+              NbComponents + 1, PixelSubDiv::QuadPt)} {}
     ~FieldFixture() = default;
 
-    FieldColl_t fc{SDim, OneQuadPt};
+    FieldColl_t fc{SDim, OneQuadPt, OneNode};
     TField_t tensor_field;
     MField_t matrix_field;
     DField_t & dynamic_field1;
@@ -148,6 +161,8 @@ namespace muGrid {
 
   template <ValidityDomain Validity>
   constexpr Dim_t FieldFixture<Validity>::NbComponents;
+  template <ValidityDomain Validity>
+  constexpr Dim_t FieldFixture<Validity>::SDim;
 
   using field_fixtures = boost::mpl::list<FieldFixture<ValidityDomain::Local>,
                                           FieldFixture<ValidityDomain::Global>>;
@@ -238,16 +253,26 @@ namespace muGrid {
     BOOST_CHECK_EQUAL(dynamic_field2.size(), nb_pixels);
 
     // check that the buffer size is correct
-    BOOST_CHECK_EQUAL(
-        tensor_field.get_field().buffer_size(),
-        nb_pixels * tensor_field.get_field().get_nb_dof_per_quad_pt() +
-        pad_size);
+    BOOST_CHECK_EQUAL(tensor_field.get_field().buffer_size(),
+                      nb_pixels *
+                              tensor_field.get_field().get_nb_dof_per_sub_pt() +
+                          pad_size);
     BOOST_CHECK_EQUAL(dynamic_field1.buffer_size(),
-                      nb_pixels * dynamic_field1.get_nb_dof_per_quad_pt() +
-                      pad_size);
+                      nb_pixels * dynamic_field1.get_nb_dof_per_sub_pt() +
+                          pad_size);
     BOOST_CHECK_EQUAL(dynamic_field2.buffer_size(),
-                      nb_pixels * dynamic_field2.get_nb_dof_per_quad_pt() +
-                      pad_size);
+                      nb_pixels * dynamic_field2.get_nb_dof_per_sub_pt() +
+                          pad_size);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  BOOST_FIXTURE_TEST_CASE(mapped_fields_subdivision, SubDivisionFixture) {
+    MappedArrayField<Real, Mapping::Mut, NbComponent, 1, PixelSubDiv::Pixel>
+        pixel{"pixel", this->fc};
+    MappedArrayField<Real, Mapping::Mut, NbComponent, 1, PixelSubDiv::QuadPt>
+        quad_pt{"quad_pt", this->fc};
+    MappedArrayField<Real, Mapping::Mut, NbComponent, 1, PixelSubDiv::NodalPt>
+        nodal_pt{"nodal_pt", this->fc};
   }
 
   BOOST_AUTO_TEST_SUITE_END();

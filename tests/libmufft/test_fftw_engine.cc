@@ -63,6 +63,8 @@ namespace muFFT {
     FFTW_fixture() : engine{DynCcoord_t(res()), DimM * DimM} {}
     FFTWEngine engine;
   };
+  template <Dim_t DimS, Dim_t DimM, Dim_t NbGridPts>
+  constexpr Dim_t FFTW_fixture<DimS, DimM, NbGridPts>::sdim;
 
   struct FFTW_fixture_python_segfault {
     constexpr static Dim_t dim{twoD};
@@ -73,6 +75,7 @@ namespace muFFT {
     FFTW_fixture_python_segfault() : engine{DynCcoord_t(res()), mdim * mdim} {}
     FFTWEngine engine;
   };
+  constexpr Dim_t FFTW_fixture_python_segfault::sdim;
 
   using fixlist = boost::mpl::list<
       FFTW_fixture<twoD, twoD, 3>, FFTW_fixture<twoD, threeD, 3>,
@@ -91,14 +94,17 @@ namespace muFFT {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(fft_test, Fix, fixlist, Fix) {
     Fix::engine.initialise(FFT_PlanFlags::estimate);
     using FC_t = muGrid::GlobalFieldCollection;
-    FC_t fc(Fix::sdim, OneQuadPt);
-    auto & input{fc.register_real_field("input", Fix::mdim * Fix::mdim)};
-    auto & ref{fc.register_real_field("reference", Fix::mdim * Fix::mdim)};
-    auto & result{fc.register_real_field("result", Fix::mdim * Fix::mdim)};
+    FC_t fc(Fix::sdim, muGrid::Unknown, muGrid::Unknown);
+    auto & input{fc.register_real_field("input", Fix::mdim * Fix::mdim,
+                                        PixelSubDiv::Pixel)};
+    auto & ref{fc.register_real_field("reference", Fix::mdim * Fix::mdim,
+                                      PixelSubDiv::Pixel)};
+    auto & result{fc.register_real_field("result", Fix::mdim * Fix::mdim,
+                                         PixelSubDiv::Pixel)};
     fc.initialise(Fix::res(), Fix::loc());
 
-    using map_t =
-        muGrid::MatrixFieldMap<Real, Mapping::Mut, Fix::mdim, Fix::mdim>;
+    using map_t = muGrid::MatrixFieldMap<Real, Mapping::Mut, Fix::mdim,
+                                         Fix::mdim, PixelSubDiv::Pixel>;
     map_t inmap{input};
     auto refmap{map_t{ref}};
     auto resultmap{map_t{result}};
@@ -111,8 +117,8 @@ namespace muFFT {
       ref_ = in_;
     }
     auto & complex_field = Fix::engine.fft(input);
-    using cmap_t =
-        muGrid::MatrixFieldMap<Complex, Mapping::Mut, Fix::mdim, Fix::mdim>;
+    using cmap_t = muGrid::MatrixFieldMap<Complex, Mapping::Mut, Fix::mdim,
+                                          Fix::mdim, PixelSubDiv::Pixel>;
     cmap_t complex_map(complex_field);
     Real error = complex_map[0].imag().norm();
     BOOST_CHECK_LT(error, tol);

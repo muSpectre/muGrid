@@ -62,6 +62,8 @@ namespace muSpectre {
   using muGrid::TwoQuadPts;
   using muGrid::FourQuadPts;
 
+  using muGrid::OneNode;
+
   using muGrid::firstOrder;
   using muGrid::fourthOrder;
   using muGrid::secondOrder;
@@ -82,6 +84,7 @@ namespace muSpectre {
   using muGrid::T4MatMap;
 
   using muGrid::Mapping;
+  using muGrid::PixelSubDiv;
 
   namespace Tensors = ::muGrid::Tensors;
   namespace Matrices = ::muGrid::Matrices;

@@ -60,11 +60,14 @@ namespace muSpectre {
   template <Dim_t DimM>
   struct MaterialMuSpectre_traits<MaterialHyperElastoPlastic2<DimM>> {
     //! expected map type for strain fields
-    using StrainMap_t = muGrid::T2FieldMap<Real, Mapping::Const, DimM>;
+    using StrainMap_t =
+        muGrid::T2FieldMap<Real, Mapping::Const, DimM, PixelSubDiv::QuadPt>;
     //! expected map type for stress fields
-    using StressMap_t = muGrid::T2FieldMap<Real, Mapping::Mut, DimM>;
+    using StressMap_t =
+        muGrid::T2FieldMap<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>;
     //! expected map type for tangent stiffness fields
-    using TangentMap_t = muGrid::T4FieldMap<Real, Mapping::Mut, DimM>;
+    using TangentMap_t =
+        muGrid::T4FieldMap<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>;
 
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::Gradient};
@@ -88,17 +91,20 @@ namespace muSpectre {
     using traits = MaterialMuSpectre_traits<MaterialHyperElastoPlastic2>;
 
     //! storage type for scalar material constant fields
-    using Field_t = muGrid::MappedScalarField<Real, Mapping::Const>;
+    using Field_t =
+        muGrid::MappedScalarField<Real, Mapping::Const, PixelSubDiv::QuadPt>;
 
     //! Hooke's law implementation
     using Hooke =
         typename MatTB::Hooke<DimM, typename traits::StrainMap_t::reference,
                               typename traits::TangentMap_t::reference>;
 
-    using FlowField_t = muGrid::MappedScalarStateField<Real, Mapping::Mut>;
+    using FlowField_t =
+        muGrid::MappedScalarStateField<Real, Mapping::Mut, PixelSubDiv::QuadPt>;
     using FlowField_ref = typename FlowField_t::Return_t;
 
-    using PrevStrain_t = muGrid::MappedT2StateField<Real, Mapping::Mut, DimM>;
+    using PrevStrain_t = muGrid::MappedT2StateField<Real, Mapping::Mut, DimM,
+                                                    PixelSubDiv::QuadPt>;
     using PrevStrain_ref = typename PrevStrain_t::Return_t;
 
     //! Default constructor

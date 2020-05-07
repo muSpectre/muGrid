@@ -51,56 +51,79 @@ namespace muGrid {
   template <Dim_t DimS>
   struct GlobalFCFixture {
     constexpr static Dim_t spatial_dimension() { return DimS; }
-    GlobalFieldCollection fc{DimS, Unknown};
+    GlobalFieldCollection fc{DimS, Unknown, Unknown};
   };
 
   using GlobalFCFixtures =
       boost::mpl::list<GlobalFCFixture<twoD>, GlobalFCFixture<threeD>>;
 
   struct LocalFCFixture {
-    LocalFieldCollection fc{Unknown, Unknown};
+    LocalFieldCollection fc{Unknown, Unknown, Unknown};
   };
 
+  /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, FieldCollection::ValidityDomain Domain,
-            Dim_t NbQuadPts_>
+            Dim_t NbQuadPts_, Dim_t NbNodalPts_>
   struct FC_multi_fixture {
     using FC_t =
         std::conditional_t<(Domain == FieldCollection::ValidityDomain::Global),
                            GlobalFieldCollection, LocalFieldCollection>;
     static constexpr Dim_t SpatialDimension{DimS};
-    static constexpr Dim_t NbQuadPts{NbQuadPts_};
+    constexpr static Dim_t NbQuadPts{NbQuadPts_};
+    static constexpr Dim_t NbNodalPts{NbNodalPts_};
 
-    FC_t fc{DimS, NbQuadPts};
-    RealField & t4_field{fc.register_real_field("Tensorfield real o4",
-                                                 ipow(SpatialDimension, 4))};
+    FC_t fc{DimS, NbQuadPts, NbNodalPts};
+
+    RealField & t4_field{fc.register_real_field(
+        "Tensorfield real o4", ipow(SpatialDimension, 4), PixelSubDiv::QuadPt)};
     IntField & t2_field{fc.register_int_field("Tensorfield integer o2",
-                                               ipow(SpatialDimension, 2))};
-    UintField & scalar_field{
-        fc.register_uint_field("Scalar unsigned integer", 1)};
+                                              ipow(SpatialDimension, 2),
+                                              PixelSubDiv::QuadPt)};
+    UintField & scalar_field{fc.register_uint_field("Scalar unsigned integer",
+                                                    1, PixelSubDiv::QuadPt)};
     ComplexField & matrix_field{fc.register_complex_field(
-        "Matrixfield Complex sdim × nb_quad_pts",
-        SpatialDimension * NbQuadPts)};
+        "Matrixfield Complex sdim × nb_quad_pts", SpatialDimension * NbQuadPts,
+        PixelSubDiv::QuadPt)};
   };
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, FieldCollection::ValidityDomain Domain,
+            Dim_t NbQuadPts_, Dim_t NbNodalPts_>
+  constexpr Dim_t
+      FC_multi_fixture<DimS, Domain, NbQuadPts_, NbNodalPts_>::SpatialDimension;
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, FieldCollection::ValidityDomain Domain,
+            Dim_t NbQuadPts_, Dim_t NbNodalPts_>
+  constexpr Dim_t
+      FC_multi_fixture<DimS, Domain, NbQuadPts_, NbNodalPts_>::NbQuadPts;
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, FieldCollection::ValidityDomain Domain,
+            Dim_t NbQuadPts_, Dim_t NbNodalPts_>
+  constexpr Dim_t
+      FC_multi_fixture<DimS, Domain, NbQuadPts_, NbNodalPts_>::NbNodalPts;
+
   using mult_collections = boost::mpl::list<
       FC_multi_fixture<twoD, FieldCollection::ValidityDomain::Global,
-                       OneQuadPt>,
+                       OneQuadPt, OneNode>,
       FC_multi_fixture<threeD, FieldCollection::ValidityDomain::Global,
-                       OneQuadPt>,
+                       OneQuadPt, OneNode>,
       FC_multi_fixture<twoD, FieldCollection::ValidityDomain::Local,
-                       OneQuadPt>>;
+                       OneQuadPt, OneNode>>;
   using mult_collections_global = boost::mpl::list<
       FC_multi_fixture<twoD, FieldCollection::ValidityDomain::Global,
-                       OneQuadPt>,
+                       OneQuadPt, OneNode>,
       FC_multi_fixture<threeD, FieldCollection::ValidityDomain::Global,
-                       OneQuadPt>>;
+                       OneQuadPt, OneNode>>;
 
   using mult_collections_local = boost::mpl::list<FC_multi_fixture<
-      twoD, FieldCollection::ValidityDomain::Local, OneQuadPt>>;
+      twoD, FieldCollection::ValidityDomain::Local, OneQuadPt, OneNode>>;
 
   BOOST_AUTO_TEST_CASE(FieldCollection_construction) {
-    BOOST_CHECK_NO_THROW(LocalFieldCollection(Unknown, Unknown));
+    BOOST_CHECK_NO_THROW(LocalFieldCollection(Unknown, Unknown, Unknown));
     using GlobalFieldCollection2d = GlobalFieldCollection;
-    BOOST_CHECK_NO_THROW(GlobalFieldCollection2d(twoD, Unknown));
+    BOOST_CHECK_NO_THROW(GlobalFieldCollection2d(twoD, Unknown, Unknown));
   }
 
   // the following test only tests members of the FieldCollection base class,
@@ -111,29 +134,32 @@ namespace muGrid {
     BOOST_CHECK(Fix::fc.get_domain() ==
                 FieldCollection::ValidityDomain::Global);
     const std::string right_name{"right name"}, wrong_name{"wrong name"};
-    Fix::fc.register_real_field(right_name, OneQuadPt);
+    auto & field{Fix::fc.register_real_field(right_name, OneQuadPt,
+                                             PixelSubDiv::QuadPt)};
     const bool should_be_true{Fix::fc.field_exists(right_name)};
     const bool should_be_false{Fix::fc.field_exists(wrong_name)};
     BOOST_CHECK_EQUAL(true, should_be_true);
     BOOST_CHECK_EQUAL(false, should_be_false);
-    BOOST_CHECK_EQUAL(Unknown, Fix::fc.get_nb_entries());
-    BOOST_CHECK_THROW(Fix::fc.register_real_field(right_name, 24),
-                      FieldCollectionError);
+    BOOST_CHECK_EQUAL(Unknown, field.get_nb_entries());
+    BOOST_CHECK_THROW(
+        Fix::fc.register_real_field(right_name, 24, PixelSubDiv::QuadPt),
+        FieldCollectionError);
   }
 
   // the following test only tests members of the FieldCollection base class,
   // so it is not necessary to test it on both LocalFieldCollection
   // GlobalFieldCollection
   BOOST_AUTO_TEST_CASE(local_registration_test) {
-    LocalFieldCollection fc{Unknown, Unknown};
+    LocalFieldCollection fc{Unknown, Unknown, Unknown};
     BOOST_CHECK(fc.get_domain() == FieldCollection::ValidityDomain::Local);
     const std::string right_name{"right name"}, wrong_name{"wrong name"};
-    fc.template register_field<Real>(right_name, OneQuadPt);
+    auto & field{fc.template register_field<Real>(right_name, OneQuadPt,
+                                                  PixelSubDiv::QuadPt)};
     const bool should_be_true{fc.field_exists(right_name)};
     const bool should_be_false{fc.field_exists(wrong_name)};
     BOOST_CHECK_EQUAL(true, should_be_true);
     BOOST_CHECK_EQUAL(false, should_be_false);
-    BOOST_CHECK_EQUAL(Unknown, fc.get_nb_entries());
+    BOOST_CHECK_EQUAL(Unknown, field.get_nb_entries());
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(initialisation_test_global, Fix,
@@ -141,18 +167,18 @@ namespace muGrid {
     Ccoord_t<Fix::spatial_dimension()> nb_grid_pts{};
     Dim_t nb_pixels{1};
     constexpr Dim_t NbQuad{3};
+    constexpr Dim_t NbNodalPts{2};
     for (int i{0}; i < Fix::spatial_dimension(); ++i) {
       const auto nb_grid{2 * i + 1};
       nb_grid_pts[i] = nb_grid;
       nb_pixels *= nb_grid;
     }
     CcoordOps::Pixels<Fix::spatial_dimension()> pixels{nb_grid_pts};
-    BOOST_CHECK_THROW(Fix::fc.initialise(nb_grid_pts), FieldCollectionError);
     Fix::fc.set_nb_quad_pts(NbQuad);
+    Fix::fc.set_nb_nodal_pts(NbNodalPts);
     BOOST_CHECK(not Fix::fc.is_initialised());
     BOOST_CHECK_NO_THROW(Fix::fc.initialise(nb_grid_pts));
     BOOST_CHECK(Fix::fc.is_initialised());
-    BOOST_CHECK_EQUAL(nb_pixels * NbQuad, Fix::fc.get_nb_entries());
 
     //! double initialisation is forbidden
     BOOST_CHECK_THROW(Fix::fc.initialise(nb_grid_pts), FieldCollectionError);
@@ -169,17 +195,19 @@ namespace muGrid {
   BOOST_FIXTURE_TEST_CASE(initialisation_test_local, LocalFCFixture) {
     constexpr Dim_t NbPixels{6};
     constexpr Dim_t NbQuad{3};
+    constexpr Dim_t NbNodalPts{2};
     std::array<Dim_t, NbPixels> indices{0, 12, 46, 548, 6877, 54862};
-    BOOST_CHECK_THROW(fc.initialise(), FieldCollectionError);
     BOOST_CHECK_EQUAL(fc.has_nb_quad_pts(), false);
     for (const auto & index : indices) {
       fc.add_pixel(index);
     }
     fc.set_nb_quad_pts(NbQuad);
+    fc.set_nb_nodal_pts(NbNodalPts);
+    auto & field = fc.register_int_field("intfield", 1, PixelSubDiv::QuadPt);
     BOOST_CHECK_EQUAL(fc.has_nb_quad_pts(), true);
     BOOST_CHECK_NO_THROW(fc.initialise());
     BOOST_CHECK_THROW(fc.initialise(), FieldCollectionError);
-    BOOST_CHECK_EQUAL(NbPixels * NbQuad, fc.get_nb_entries());
+    BOOST_CHECK_EQUAL(NbPixels * NbQuad, field.get_nb_entries());
     for (auto && tup : akantu::zip(fc.get_pixel_indices(), indices)) {
       auto && stored_id{std::get<0>(tup)};
       auto && ref_id{std::get<1>(tup)};
@@ -198,6 +226,7 @@ namespace muGrid {
       nb_pixels *= nb_grid;
     }
     Fix::fc.set_nb_quad_pts(NbQuad);
+    Fix::fc.set_nb_nodal_pts(NbQuad);
     Fix::fc.initialise(nb_grid_pts);
 
     for (auto && tup : akantu::enumerate(Fix::fc.get_pixel_indices())) {
@@ -251,11 +280,14 @@ namespace muGrid {
       nb_pixels *= nb_grid;
     }
     Fix::fc.set_nb_quad_pts(NbQuad);
+    Fix::fc.set_nb_nodal_pts(NbQuad);
     Fix::fc.initialise(nb_grid_pts);
 
     auto fc2{Fix::fc.get_empty_clone()};
-    BOOST_CHECK_EQUAL(fc2.get_nb_quad_pts(), Fix::fc.get_nb_quad_pts());
-    BOOST_CHECK_EQUAL(fc2.get_nb_entries(), Fix::fc.get_nb_entries());
+    BOOST_CHECK_EQUAL(fc2.get_nb_quad_pts(),
+                      Fix::fc.get_nb_quad_pts());
+    BOOST_CHECK_EQUAL(fc2.get_nb_nodal_pts(),
+                      Fix::fc.get_nb_nodal_pts());
     BOOST_CHECK_EQUAL(fc2.get_spatial_dim(), Fix::fc.get_spatial_dim());
     BOOST_CHECK_EQUAL(fc2.get_nb_pixels(), Fix::fc.get_nb_pixels());
   }
@@ -271,29 +303,32 @@ namespace muGrid {
     fc.set_nb_quad_pts(NbQuad);
 
     auto fc2{fc.get_empty_clone()};
-    BOOST_CHECK_EQUAL(fc2.get_nb_quad_pts(), fc.get_nb_quad_pts());
-    BOOST_CHECK_EQUAL(fc2.get_nb_entries(), fc.get_nb_entries());
+    BOOST_CHECK_EQUAL(fc2.get_nb_quad_pts(),
+                      fc.get_nb_quad_pts());
+    BOOST_CHECK_EQUAL(fc2.get_nb_pixels(), fc.get_nb_pixels());
     BOOST_CHECK_EQUAL(fc2.get_spatial_dim(), fc.get_spatial_dim());
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(multi_field_test, F, mult_collections, F) {
     // possible maptypes for Real T4 fields
 
-    using T_TFM1_t = T4FieldMap<Real, Mapping::Const, F::SpatialDimension>;
+    using T_TFM1_t = T4FieldMap<Real, Mapping::Const, F::SpatialDimension,
+                                PixelSubDiv::QuadPt>;
     using T_TFM2_t =
-        T2FieldMap<Real, Mapping::Const, ipow(F::SpatialDimension, 2)>;
+        T2FieldMap<Real, Mapping::Const, ipow(F::SpatialDimension, 2),
+                   PixelSubDiv::QuadPt>;
     using T4_Map_t =
         MatrixFieldMap<Real, Mapping::Mut, ipow(F::SpatialDimension, 4),
-                        F::NbQuadPts, Iteration::Pixel>;
+                       F::NbQuadPts, PixelSubDiv::Pixel>;
 
     // impossible maptypes for Real tensor fields
-    using T_SFM_t = ScalarFieldMap<Real, Mapping::Mut>;
+    using T_SFM_t = ScalarFieldMap<Real, Mapping::Mut, PixelSubDiv::QuadPt>;
     using T_MFM_t =
         MatrixFieldMap<Real, Mapping::Mut, ipow(F::SpatialDimension, 4),
-                        F::NbQuadPts + 1, Iteration::Pixel>;
+                       F::NbQuadPts + 1, PixelSubDiv::Pixel>;
     using T_MFMw1_t =
         MatrixFieldMap<Int, Mapping::Mut, ipow(F::SpatialDimension, 4),
-                        F::NbQuadPts, Iteration::Pixel>;
+                       F::NbQuadPts, PixelSubDiv::Pixel>;
     const std::string T_name{"Tensorfield real o4"};
     const std::string T_name_w{"TensorField Real o4 wrongname"};
 
@@ -305,8 +340,7 @@ namespace muGrid {
                       FieldCollectionError);
     BOOST_CHECK_THROW(T_MFM_t(F::fc.get_field(T_name)), FieldMapError);
     BOOST_CHECK_THROW(T_MFMw1_t(F::fc.get_field(T_name)), FieldError);
-    BOOST_CHECK_THROW(T_SFM_t(F::fc.get_field(T_name_w)),
-                      FieldCollectionError);
+    BOOST_CHECK_THROW(T_SFM_t(F::fc.get_field(T_name_w)), FieldCollectionError);
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(init_test_loca_with_push_back, F,
@@ -315,7 +349,8 @@ namespace muGrid {
     testGoodies::RandRange<Int> rng{};
     using stype = Eigen::Array<Real, ipow(F::SpatialDimension, 4), 1>;
     auto & field{RealField::safe_cast(F::fc.get_field("Tensorfield real o4"),
-                                       ipow(F::SpatialDimension, 4))};
+                                      ipow(F::SpatialDimension, 4),
+                                      PixelSubDiv::QuadPt)};
     field.push_back(stype());
     for (int i = 0; i < nb_pix; ++i) {
       F::fc.add_pixel(rng.randval(0, nb_pix));

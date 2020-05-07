@@ -52,8 +52,7 @@ namespace muSpectre {
 
   template <Dim_t Dim>
   struct MaterialFixture {
-    using MatVisDam =
-        MaterialViscoElasticDamageSS<Dim>;
+    using MatVisDam = MaterialViscoElasticDamageSS<Dim>;
     using MatVis = MaterialViscoElasticSS<Dim>;
     using MatLin = MaterialLinearElastic1<Dim>;
     const Real young_inf{1.0e4};
@@ -144,16 +143,17 @@ namespace muSpectre {
     auto & mat_lin_init{Fix::mat_lin_init};
 
     // create statefields
-    muGrid::LocalFieldCollection coll{sdim, Fix::NbQuadPts()};
+    muGrid::LocalFieldCollection coll{sdim, Fix::NbQuadPts(), muGrid::Unknown};
     coll.add_pixel({0});
     coll.initialise();
 
-    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim> h_{"history intgral ",
-                                                            coll};
-    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim> s_null_{
-        "Pure elastic stress", coll};
+    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim, PixelSubDiv::QuadPt>
+        h_{"history intgral ", coll};
+    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim, PixelSubDiv::QuadPt>
+        s_null_{"Pure elastic stress", coll};
 
-    muGrid::MappedScalarStateField<Real, Mapping::Mut> kappa_{"Kappa", coll};
+    muGrid::MappedScalarStateField<Real, Mapping::Mut, PixelSubDiv::QuadPt>
+        kappa_{"Kappa", coll};
 
     auto & h_prev{h_.get_map()};
     h_prev[0].current() = Strain_t::Identity();
@@ -204,21 +204,22 @@ namespace muSpectre {
     auto & mat_vis{Fix::mat_vis};
 
     // create statefields
-    muGrid::LocalFieldCollection coll{sdim, Fix::NbQuadPts()};
+    muGrid::LocalFieldCollection coll{sdim, Fix::NbQuadPts(), muGrid::Unknown};
     coll.add_pixel({0});
     coll.initialise();
 
-    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim> h_{"history intgral ",
-                                                            coll};
-    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim> s_null_{
-        "Pure elastic stress ", coll};
+    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim, PixelSubDiv::QuadPt>
+        h_{"history intgral ", coll};
+    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim, PixelSubDiv::QuadPt>
+        s_null_{"Pure elastic stress ", coll};
 
-    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim> h_none{
-        "history intgral non", coll};
-    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim> s_null_none{
-        "Pure elastic stress non", coll};
+    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim, PixelSubDiv::QuadPt>
+        h_none{"history intgral non", coll};
+    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim, PixelSubDiv::QuadPt>
+        s_null_none{"Pure elastic stress non", coll};
 
-    muGrid::MappedScalarStateField<Real, Mapping::Mut> kappa_{"Kappa", coll};
+    muGrid::MappedScalarStateField<Real, Mapping::Mut, PixelSubDiv::QuadPt>
+        kappa_{"Kappa", coll};
 
     auto & h_prev{h_.get_map()};
     h_prev[0].current() = Strain_t::Identity();

@@ -116,18 +116,29 @@ namespace muGrid {
 
     /**
      * Constructor from a field. The default case is a map iterating over
-     * quadrature points with a matrix of shape (nb_components × 1) per field
+     * sub-division points with a matrix of shape (nb_components × 1) per field
      * entry
      */
-    explicit FieldMap(Field_t & field,
-                      Iteration iter_type = Iteration::QuadPt);
+    explicit FieldMap(Field_t & field);
+
+    /**
+     * Constructor from a field. The iter_type can be the natural sub-division
+     * of the field, or `muGrid::PixelSubDiv::Pixel
+     */
+    FieldMap(Field_t & field, const PixelSubDiv & iter_type);
 
     /**
      * Constructor from a field with explicitly chosen shape of iterate. (the
      * number of columns is inferred).
      */
-    FieldMap(Field_t & field, Dim_t nb_rows,
-             Iteration iter_type = Iteration::QuadPt);
+    FieldMap(Field_t & field, Dim_t nb_rows);
+
+    /**
+     * Constructor from a field with explicitly chosen shape of iterate. (the
+     * number of columns is inferred). The iter_type can be the natural
+     * sub-division of the field, or `muGrid::PixelSubDiv::Pixel
+     */
+    FieldMap(Field_t & field, Dim_t nb_rows, const PixelSubDiv & iter_type);
 
     //! Copy constructor
     FieldMap(const FieldMap & other) = delete;
@@ -165,8 +176,7 @@ namespace muGrid {
 
     //! Assign a scalar value to every entry
     template <bool IsMutableField = Mutability == Mapping::Mut>
-    std::enable_if_t<IsMutableField, FieldMap> &
-    operator=(const Scalar & val) {
+    std::enable_if_t<IsMutableField, FieldMap> & operator=(const Scalar & val) {
       if (not(this->nb_rows == 1 && this->nb_cols == 1)) {
         std::stringstream error_str{};
         error_str << "Expected an array/matrix with shape (" << this->nb_rows
@@ -253,10 +263,10 @@ namespace muGrid {
    protected:
     //! mapped field. Needed for query at initialisations
     const Field_t & field;
-    const Iteration iteration;  //!< type of map iteration
-    const Dim_t stride;         //!< precomputed stride
-    const Dim_t nb_rows;        //!< number of rows of the iterate
-    const Dim_t nb_cols;        //!< number of columns fo the iterate
+    const PixelSubDiv iteration;  //!< type of map iteration
+    const Dim_t stride;           //!< precomputed stride
+    const Dim_t nb_rows;          //!< number of rows of the iterate
+    const Dim_t nb_cols;          //!< number of columns fo the iterate
 
     /**
      * Pointer to mapped data; is also unknown at construction and set in the
@@ -275,8 +285,8 @@ namespace muGrid {
   class FieldMap<T, Mutability>::Iterator {
    public:
     //! convenience alias
-    using FieldMap_t = std::conditional_t<MutIter == Mapping::Const,
-                                           const FieldMap, FieldMap>;
+    using FieldMap_t =
+        std::conditional_t<MutIter == Mapping::Const, const FieldMap, FieldMap>;
     //! stl
     using value_type =
         typename FieldMap<T, Mutability>::template Return_t<MutIter>;

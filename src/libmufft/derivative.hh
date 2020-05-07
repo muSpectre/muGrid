@@ -266,9 +266,9 @@ namespace muFFT {
 
       // construct maps
       muGrid::FieldMap<Real, Mapping::Const> in_map{
-          in_field, muGrid::Iteration::Pixel};
+          in_field, muGrid::PixelSubDiv::Pixel};
       muGrid::FieldMap<Real, Mapping::Mut> out_map{
-          out_field, muGrid::Iteration::Pixel};
+          out_field, muGrid::PixelSubDiv::Pixel};
       // loop over field pixel iterator
       Dim_t ndim{in_collection.get_spatial_dim()};
       auto & nb_grid_pts{

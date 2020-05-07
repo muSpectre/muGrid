@@ -96,12 +96,15 @@ namespace muSpectre {
         "identical");
     using Fields = muGrid::GlobalFieldCollection;
     using FieldT = muGrid::RealField;
-    using FieldMap = muGrid::MatrixFieldMap<Real, Mapping::Mut, mdim, mdim>;
+    using FieldMap = muGrid::MatrixFieldMap<Real, Mapping::Mut, mdim, mdim,
+                                            PixelSubDiv::QuadPt>;
     using Vector = Eigen::Matrix<Real, dim, 1>;
 
-    Fields fields{sdim, OneQuadPt};
-    FieldT & f_grad{fields.register_real_field("strain", mdim * mdim)};
-    FieldT & f_var{fields.register_real_field("working field", mdim * mdim)};
+    Fields fields{sdim, OneQuadPt, muGrid::Unknown};
+    FieldT & f_grad{fields.register_real_field("strain", mdim * mdim,
+                                            PixelSubDiv::QuadPt)};
+    FieldT & f_var{fields.register_real_field("working field", mdim * mdim,
+                                            PixelSubDiv::QuadPt)};
 
     FieldMap grad(f_grad);
     FieldMap var(f_var);

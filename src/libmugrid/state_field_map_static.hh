@@ -52,7 +52,7 @@ namespace muGrid {
    * capabilities, with much more efficient statically sized iterates.
    */
   template <typename T, Mapping Mutability, class MapType, size_t NbMemory,
-            Iteration IterationType = Iteration::QuadPt>
+            PixelSubDiv IterationType = PixelSubDiv::QuadPt>
   class StaticStateFieldMap : public StateFieldMap<T, Mutability> {
     static_assert(MapType::IsValidStaticMapType(),
                   "The MapType you chose is not compatible");
@@ -85,7 +85,7 @@ namespace muGrid {
     constexpr static Mapping FieldMutability() { return Mutability; }
 
     //! determine the map's iteration type (pixels vs quad pts) at compile time
-    constexpr static Iteration GetIterationType() { return IterationType; }
+    constexpr static PixelSubDiv GetIterationType() { return IterationType; }
 
     //! Deleted default constructor
     StaticStateFieldMap() = delete;
@@ -108,8 +108,7 @@ namespace muGrid {
     virtual ~StaticStateFieldMap() = default;
 
     //! Copy assignment operator
-    StaticStateFieldMap &
-    operator=(const StaticStateFieldMap & other) = delete;
+    StaticStateFieldMap & operator=(const StaticStateFieldMap & other) = delete;
 
     //! Move assignment operator
     StaticStateFieldMap & operator=(StaticStateFieldMap && other) = default;
@@ -279,11 +278,10 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T, Mapping Mutability, class MapType, size_t NbMemory,
-            Iteration IterationType>
+            PixelSubDiv IterationType>
   template <Mapping MutIter, size_t... I>
-  auto
-  StaticStateFieldMap<T, Mutability, MapType, NbMemory,
-                       IterationType>::map_helper(std::index_sequence<I...>)
+  auto StaticStateFieldMap<T, Mutability, MapType, NbMemory,
+                           IterationType>::map_helper(std::index_sequence<I...>)
       -> HelperRet_t<MutIter> {
     using Array_t =
         std::conditional_t<MutIter == Mapping::Const, CMapArray_t, MapArray_t>;
@@ -295,10 +293,11 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T, Mapping Mutability, class MapType, size_t NbMemory,
-            Iteration IterationType>
+            PixelSubDiv IterationType>
   auto StaticStateFieldMap<T, Mutability, MapType, NbMemory,
-                            IterationType>::make_maps() -> MapArray_t {
-    if (this->state_field.get_nb_memory() != NbMemory) {
+                           IterationType>::make_maps() -> MapArray_t {
+    auto && nb_memory{ this->state_field.get_nb_memory()};
+    if (nb_memory != NbMemory) {
       std::stringstream error{};
       error << "You ar trying to map a state field with a memory size of "
             << this->state_field.get_nb_memory()
@@ -312,24 +311,24 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T, Mapping Mutability, class MapType, size_t NbMemory,
-            Iteration IterationType>
+            PixelSubDiv IterationType>
   auto StaticStateFieldMap<T, Mutability, MapType, NbMemory,
-                            IterationType>::make_cmaps() -> CMapArray_t {
+                           IterationType>::make_cmaps() -> CMapArray_t {
     return this->map_helper<Mapping::Const>(
         std::make_index_sequence<NbMemory + 1>{});
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T, Mapping Mutability, class MapType, size_t NbMemory,
-            Iteration IterationType>
+            PixelSubDiv IterationType>
   template <Mapping MutIter>
   class StaticStateFieldMap<T, Mutability, MapType, NbMemory,
-                             IterationType>::Iterator {
+                            IterationType>::Iterator {
    public:
     //! const correct iterated map
     using StaticStateFieldMap_t =
-        std::conditional_t<MutIter == Mapping::Const,
-                           const StaticStateFieldMap, StaticStateFieldMap>;
+        std::conditional_t<MutIter == Mapping::Const, const StaticStateFieldMap,
+                           StaticStateFieldMap>;
     //! convenience alias to dererencing return type
     using StateWrapper_t =
         typename StaticStateFieldMap::template StaticStateWrapper<MutIter>;
@@ -399,10 +398,10 @@ namespace muGrid {
    * @tparam IterationType whether to iterate over pixels or quadrature points
    */
   template <typename T, Mapping Mutability, Dim_t NbRow, Dim_t NbCol,
-            size_t NbMemory, Iteration IterationType = Iteration::QuadPt>
+            size_t NbMemory, PixelSubDiv IterationType = PixelSubDiv::QuadPt>
   using MatrixStateFieldMap =
       StaticStateFieldMap<T, Mutability, internal::MatrixMap<T, NbRow, NbCol>,
-                           NbMemory, IterationType>;
+                          NbMemory, IterationType>;
 
   /**
    * Alias of `muGrid::StaticStateFieldMap` you wish to iterate over pixel by
@@ -416,13 +415,13 @@ namespace muGrid {
    * @tparam NbRow number of rows of the iterate
    * @tparam NbCol number of columns of the iterate
    * @tparam NbMemory number of previous values to store
-   * @tparam IterationType whether to iterate over pixels or quadrature points
+   * @tparam IterationType describes the pixel-subdivision
    */
   template <typename T, Mapping Mutability, Dim_t NbRow, Dim_t NbCol,
-            size_t NbMemory, Iteration IterationType = Iteration::QuadPt>
+            size_t NbMemory, PixelSubDiv IterationType>
   using ArrayStateFieldMap =
       StaticStateFieldMap<T, Mutability, internal::ArrayMap<T, NbRow, NbCol>,
-                           NbMemory, IterationType>;
+                          NbMemory, IterationType>;
 
   /**
    * Alias of `muGrid::StaticStateFieldMap` over a scalar field you wish to
@@ -433,11 +432,13 @@ namespace muGrid {
    * @tparam Mutability whether or not the map allows to modify the content of
    * the field
    * @tparam NbMemory number of previous values to store
+   * @tparam IterationType describes the pixel-subdivision
    */
-  template <typename T, Mapping Mutability, size_t NbMemory>
+  template <typename T, Mapping Mutability, size_t NbMemory,
+            PixelSubDiv IterationType>
   using ScalarStateFieldMap =
       StaticStateFieldMap<T, Mutability, internal::ScalarMap<T>, NbMemory,
-                           Iteration::QuadPt>;
+                          IterationType>;
 
   /**
    * Alias of `muGrid::StaticStateNFieldMap` over a first-rank tensor field you
@@ -449,11 +450,13 @@ namespace muGrid {
    * the field
    * @tparam Dim spatial dimension of the tensor
    * @tparam NbMemory number of previous values to store
+   * @tparam IterationType describes the pixel-subdivision
    */
-  template <typename T, Mapping Mutability, Dim_t Dim, size_t NbMemory>
-  using T1StateNFieldMap =
+  template <typename T, Mapping Mutability, Dim_t Dim, size_t NbMemory,
+            PixelSubDiv IterationType>
+  using T1StateFieldMap =
       StaticStateFieldMap<T, Mutability, internal::MatrixMap<T, Dim, 1>,
-                           NbMemory, Iteration::QuadPt>;
+                          NbMemory, IterationType>;
 
   /**
    * Alias of `muGrid::StaticStateNFieldMap` over a second-rank tensor field you
@@ -465,11 +468,13 @@ namespace muGrid {
    * the field
    * @tparam Dim spatial dimension of the tensor
    * @tparam NbMemory number of previous values to store
+   * @tparam IterationType describes the pixel-subdivision
    */
-  template <typename T, Mapping Mutability, Dim_t Dim, size_t NbMemory>
+  template <typename T, Mapping Mutability, Dim_t Dim, size_t NbMemory,
+            PixelSubDiv IterationType>
   using T2StateFieldMap =
       StaticStateFieldMap<T, Mutability, internal::MatrixMap<T, Dim, Dim>,
-                           NbMemory, Iteration::QuadPt>;
+                          NbMemory, IterationType>;
 
   /**
    * Alias of `muGrid::StaticStateFieldMap` over a fourth-rank tensor field you
@@ -481,12 +486,14 @@ namespace muGrid {
    * the field
    * @tparam Dim spatial dimension of the tensor
    * @tparam NbMemory number of previous values to store
+   * @tparam IterationType describes the pixel-subdivision
    */
-  template <typename T, Mapping Mutability, Dim_t Dim, size_t NbMemory>
+  template <typename T, Mapping Mutability, Dim_t Dim, size_t NbMemory,
+            PixelSubDiv IterationType>
   using T4StateFieldMap =
       StaticStateFieldMap<T, Mutability,
-                           internal::MatrixMap<T, Dim * Dim, Dim * Dim>,
-                           NbMemory, Iteration::QuadPt>;
+                          internal::MatrixMap<T, Dim * Dim, Dim * Dim>,
+                          NbMemory, PixelSubDiv::QuadPt>;
 }  // namespace muGrid
 
 #endif  // SRC_LIBMUGRID_STATE_FIELD_MAP_STATIC_HH_

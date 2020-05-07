@@ -66,13 +66,13 @@ namespace muSpectre {
     //! Fourier-space field containing the projection operator itself
     using Proj_t = muGrid::ComplexField;
     //! iterable form of the operator
-    using Proj_map = muGrid::MatrixFieldMap<Complex, Mapping::Mut,
-                                            DimS * NbQuadPts, 1,
-                                            muGrid::Iteration::Pixel>;
+    using Proj_map =
+        muGrid::MatrixFieldMap<Complex, Mapping::Mut, DimS * NbQuadPts, 1,
+                               muGrid::PixelSubDiv::Pixel>;
     //! iterable Fourier-space second-order tensor field
-    using Grad_map = muGrid::MatrixFieldMap<Complex, Mapping::Mut, DimS,
-                                            DimS * NbQuadPts,
-                                            muGrid::Iteration::Pixel>;
+    using Grad_map =
+        muGrid::MatrixFieldMap<Complex, Mapping::Mut, DimS, DimS * NbQuadPts,
+                               muGrid::PixelSubDiv::Pixel>;
 
     //! Default constructor
     ProjectionFiniteStrainFast() = delete;
@@ -105,9 +105,8 @@ namespace muSpectre {
     operator=(ProjectionFiniteStrainFast && other) = default;
 
     //! initialises the fft engine (plan the transform)
-    void initialise(
-        const muFFT::FFT_PlanFlags &flags = muFFT::FFT_PlanFlags::estimate)
-        final;
+    void initialise(const muFFT::FFT_PlanFlags & flags =
+                        muFFT::FFT_PlanFlags::estimate) final;
 
     //! apply the projection operator to a field
     void apply_projection(Field_t & field) final;
@@ -137,7 +136,9 @@ namespace muSpectre {
 
    protected:
     //! field of normalised wave vectors
-    muGrid::MappedT1Field<Complex, Mapping::Mut, DimS * NbQuadPts> xi_field;
+    muGrid::MappedT1Field<Complex, Mapping::Mut, DimS * NbQuadPts,
+                          PixelSubDiv::QuadPt>
+        xi_field;
 
     /**
      * gradient (nabla) operator, can be computed using Fourier interpolation

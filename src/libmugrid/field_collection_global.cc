@@ -38,17 +38,19 @@
 namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
-  GlobalFieldCollection::GlobalFieldCollection(Dim_t spatial_dimension,
-                                               Dim_t nb_quad_pts)
-      : Parent{ValidityDomain::Global, spatial_dimension, nb_quad_pts} {}
+  GlobalFieldCollection::GlobalFieldCollection(const Dim_t & spatial_dimension,
+                                               const Dim_t & nb_quad_pts,
+                                               const Dim_t & nb_nodal_pts)
+      : Parent{ValidityDomain::Global, spatial_dimension, nb_quad_pts,
+               nb_nodal_pts} {}
 
   /* ---------------------------------------------------------------------- */
   GlobalFieldCollection::GlobalFieldCollection(
-      Dim_t spatial_dimension, Dim_t nb_quad_pts,
-      const DynCcoord_t & nb_subdomain_grid_pts,
+      const Dim_t & spatial_dimension, const Dim_t & nb_quad_pts,
+      const Dim_t & nb_nodal_pts, const DynCcoord_t & nb_subdomain_grid_pts,
       const DynCcoord_t & subdomain_locations)
-          : Parent{ValidityDomain::Global, spatial_dimension,
-                   nb_quad_pts} {
+      : Parent{ValidityDomain::Global, spatial_dimension, nb_quad_pts,
+               nb_nodal_pts} {
     this->initialise(nb_subdomain_grid_pts, subdomain_locations);
   }
 
@@ -70,18 +72,14 @@ namespace muGrid {
       const DynCcoord_t & strides) {
     if (this->initialised) {
       throw FieldCollectionError("double initialisation");
-    } else if (not this->has_nb_quad_pts()) {
-      throw FieldCollectionError(
-          "The number of quadrature points has not been set.");
     }
 
     this->pixels = CcoordOps::DynamicPixels(
             nb_subdomain_grid_pts, subdomain_locations, strides);
-    this->nb_entries = CcoordOps::get_size(nb_subdomain_grid_pts)
-            * this->nb_quad_pts;
+    this->nb_pixels = CcoordOps::get_size(nb_subdomain_grid_pts);
     this->allocate_fields();
-    this->pixel_indices.resize(this->nb_entries);
-    for (int i{0}; i < this->nb_entries; ++i) {
+    this->pixel_indices.resize(this->nb_pixels);
+    for (int i{0}; i < this->nb_pixels; ++i) {
       this->pixel_indices[i] = i;
     }
     // needs to be here, or initialise_maps will fail (by design)
@@ -114,7 +112,8 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   GlobalFieldCollection GlobalFieldCollection::get_empty_clone() const {
     GlobalFieldCollection ret_val{this->get_spatial_dim(),
-                                  this->get_nb_quad_pts()};
+                                  this->get_nb_quad_pts(),
+                                  this->get_nb_nodal_pts()};
     ret_val.initialise(
             this->pixels.get_nb_subdomain_grid_pts(),
             this->pixels.get_subdomain_locations());

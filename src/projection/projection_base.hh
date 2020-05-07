@@ -173,6 +173,11 @@ namespace muSpectre {
      */
     const Dim_t & get_nb_quad_pts() const;
 
+    /**
+     * returns the number of nodal points
+     */
+    const Dim_t & get_nb_nodal_pts() const;
+
     //! return a reference to the fft_engine
     muFFT::FFTEngineBase & get_fft_engine();
 

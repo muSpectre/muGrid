@@ -65,6 +65,7 @@ namespace muGrid {
   constexpr Dim_t OneQuadPt{1};    //!< constant for 1 quadrature point/pixel
   constexpr Dim_t TwoQuadPts{2};   //!< constant for 2 quadrature point/pixel
   constexpr Dim_t FourQuadPts{4};  //!< constant for 4 quadrature point/pixel
+  constexpr Dim_t OneNode{1};      //!< constant for 1 node per pixel
 
   using Uint = unsigned int;  //!< type to use in math for unsigned integers
   using Int = int;            //!< type to use in math for signed integers
@@ -73,10 +74,20 @@ namespace muGrid {
       std::complex<Real>;  //!< type to use in math for complex numbers
 
   /**
-   * Used to specify whether to iterate over pixels or quadrature points in
-   * field maps
+   * Dual use enum. Used in `Field`s to specify whether data is stored relative
+   * to pixels, quadrature points, or nodal points. Uised in `FieldMap`s  to
+   * specify whether to iterate over pixels, quadrature points, or nodal points
    */
-  enum class Iteration { Pixel, QuadPt };
+  enum class PixelSubDiv {
+    Pixel,    //!< dofs relative to a pixel/voxel, no subdivision
+    QuadPt,   //!< dofs relative to material points (e.g. quadrature points)
+    NodalPt,  //!< dofs relative to discretisation nodes
+    FreePt    //!< dofs relative to some custom subdivision
+  };
+
+  //! inserts `muGrid::PixelSubDiv` into `std::ostream`s
+  std::ostream & operator<<(std::ostream & os,
+                            const PixelSubDiv & sub_division);
 
   /**
    * Maps can give constant or mutable access to the mapped field through their

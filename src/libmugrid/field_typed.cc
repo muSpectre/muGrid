@@ -82,9 +82,9 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  void TypedField<T>::set_pad_size(size_t pad_size) {
+  void TypedField<T>::set_pad_size(const size_t & pad_size) {
     this->pad_size = pad_size;
-    this->resize(this->size());
+    this->resize();
   }
 
   /* ---------------------------------------------------------------------- */
@@ -120,13 +120,22 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   template <typename T>
   TypedField<T> & TypedField<T>::safe_cast(Field & other,
-                                             const Dim_t & nb_components) {
-    if (other.get_nb_dof_per_quad_pt() != nb_components) {
-      std::stringstream error{};
-      error << "Cannot cast field'" << other.get_name() << "', because it has "
-            << other.get_nb_dof_per_quad_pt() << " compoments, rather than the "
-            << nb_components << " components which are requested.";
-      throw FieldError(error.str());
+                                           const Dim_t & nb_dof_per_sub_pt,
+                                           const PixelSubDiv & sub_division) {
+    if (other.get_nb_dof_per_sub_pt() != nb_dof_per_sub_pt) {
+      std::stringstream err_msg{};
+      err_msg << "Cannot cast field'" << other.get_name()
+              << "', because it has " << other.get_nb_dof_per_sub_pt()
+              << " degrees of freedom per sub-point, rather than the "
+              << nb_dof_per_sub_pt << " components which are requested.";
+      throw FieldError(err_msg.str());
+    }
+    if (other.get_sub_division() != sub_division) {
+      std::stringstream err_msg{};
+      err_msg << "Cannot cast field'" << other.get_name()
+              << "', because it's subdivision is '" << other.get_sub_division()
+              << "', rather than " << sub_division << ", which are requested.";
+      throw FieldError(err_msg.str());
     }
     return TypedField::safe_cast(other);
   }
@@ -134,23 +143,42 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   template <typename T>
   const TypedField<T> &
-  TypedField<T>::safe_cast(const Field & other, const Dim_t & nb_components) {
-    if (other.get_nb_dof_per_quad_pt() != nb_components) {
-      std::stringstream error{};
-      error << "Cannot cast field'" << other.get_name() << "', because it has "
-            << other.get_nb_dof_per_quad_pt() << " compoments, rather than the "
-            << nb_components << " components which are requested.";
-      throw FieldError(error.str());
+  TypedField<T>::safe_cast(const Field & other, const Dim_t & nb_dof_per_sub_pt,
+                           const PixelSubDiv & sub_division) {
+    if (other.get_nb_dof_per_sub_pt() != nb_dof_per_sub_pt) {
+      std::stringstream err_msg{};
+      err_msg << "Cannot cast field'" << other.get_name()
+              << "', because it has " << other.get_nb_dof_per_sub_pt()
+              << " degrees of freedom per sub-point, rather than the "
+              << nb_dof_per_sub_pt << " components which are requested.";
+      throw FieldError(err_msg.str());
+    }
+    if (other.get_sub_division() != sub_division) {
+      std::stringstream err_msg{};
+      err_msg << "Cannot cast field'" << other.get_name()
+              << "', because it's subdivision is '" << other.get_sub_division()
+              << "', rather than " << sub_division << ", which are requested.";
+      throw FieldError(err_msg.str());
     }
     return TypedField::safe_cast(other);
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  void TypedField<T>::resize(size_t size) {
-    const auto expected_size{size * this->get_nb_dof_per_quad_pt()
-        + this->pad_size};
-    if (this->values.size() != expected_size or this->current_size != size) {
+  void TypedField<T>::resize() {
+    if (not this->has_nb_sub_pts()) {
+      std::stringstream error_message{};
+      error_message
+          << "Can't compute the size of field '" << this->get_name()
+          << "' because the number of points per pixel is not yet known.";
+      throw FieldError(error_message.str());
+    }
+
+    auto && size{this->get_nb_entries()};
+    const auto expected_size{size * this->get_nb_dof_per_sub_pt() +
+                             this->pad_size};
+    if (this->values.size() != expected_size or
+        static_cast<Dim_t>(this->current_size) != size) {
       this->current_size = size;
       this->values.resize(expected_size);
     }
@@ -167,20 +195,19 @@ namespace muGrid {
   template <typename T>
   void TypedField<T>::push_back(const T & value) {
     if (this->is_global()) {
-      throw FieldError(
-          "push_back() makes no sense on global fields (you can't "
-          "add individual pixels");
+      throw FieldError("push_back() makes no sense on global fields (you can't "
+                       "add individual pixels");
     }
-    if (not this->collection.has_nb_quad_pts()) {
+    if (not this->has_nb_sub_pts()) {
       throw FieldError("Cannot push_back into a field before the number of "
-                        "quadrature points has bee set for the collection");
+                       "sub-division points has been set for it");
     }
-    if (this->nb_dof_per_quad_pt != 1) {
+    if (this->nb_dof_per_sub_pt != 1) {
       throw FieldError("This is not a scalar field. push_back an array.");
     }
-    const auto & nb_quad{this->collection.get_nb_quad_pts()};
-    this->current_size += nb_quad;
-    for (Dim_t quad_pt_id{0}; quad_pt_id < nb_quad; ++quad_pt_id) {
+    const auto & nb_sub{this->get_nb_sub_pts()};
+    this->current_size += nb_sub;
+    for (Dim_t sub_pt_id{0}; sub_pt_id < nb_sub; ++sub_pt_id) {
       this->values.push_back(value);
     }
   }
@@ -191,25 +218,24 @@ namespace muGrid {
       const Eigen::Ref<const Eigen::Array<T, Eigen::Dynamic, Eigen::Dynamic>> &
           value) {
     if (this->is_global()) {
-      throw FieldError(
-          "push_back() makes no sense on global fields (you can't "
-          "add individual pixels");
+      throw FieldError("push_back() makes no sense on global fields (you can't "
+                       "add individual pixels");
     }
-    if (not this->collection.has_nb_quad_pts()) {
+    if (not this->has_nb_sub_pts()) {
       throw FieldError("Cannot push_back into a field before the number of "
-                        "quadrature points has bee set for the collection");
+                       "sub-division points has bee set for.");
     }
-    if (this->nb_dof_per_quad_pt != value.size()) {
+    if (this->nb_dof_per_sub_pt != value.size()) {
       std::stringstream error{};
       error << "You are trying to push an array with " << value.size()
-            << "components into a field with " << this->nb_dof_per_quad_pt
+            << "components into a field with " << this->nb_dof_per_sub_pt
             << " components.";
       throw FieldError(error.str());
     }
-    const auto & nb_quad{this->collection.get_nb_quad_pts()};
-    this->current_size += nb_quad;
-    for (Dim_t quad_pt_id{0}; quad_pt_id < nb_quad; ++quad_pt_id) {
-      for (Dim_t i{0}; i < this->nb_dof_per_quad_pt; ++i) {
+    const auto & nb_sub{this->get_nb_sub_pts()};
+    this->current_size += nb_sub;
+    for (Dim_t sub_pt_id{0}; sub_pt_id < nb_sub; ++sub_pt_id) {
+      for (Dim_t i{0}; i < this->nb_dof_per_sub_pt; ++i) {
         this->values.push_back(value.data()[i]);
       }
     }
@@ -218,7 +244,7 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   template <typename T>
   auto TypedFieldBase<T>::eigen_map(const Dim_t & nb_rows,
-                                     const Dim_t & nb_cols) -> Eigen_map {
+                                    const Dim_t & nb_cols) -> Eigen_map {
     if (not this->collection.is_initialised()) {
       std::stringstream error{};
       error << "The FieldCollection for field '" << this->name
@@ -231,8 +257,7 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   template <typename T>
   auto TypedFieldBase<T>::eigen_map(const Dim_t & nb_rows,
-                                     const Dim_t & nb_cols) const
-      -> Eigen_cmap {
+                                    const Dim_t & nb_cols) const -> Eigen_cmap {
     if (not this->collection.is_initialised()) {
       std::stringstream error{};
       error << "The FieldCollection for field '" << this->name
@@ -244,8 +269,8 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  TypedFieldBase<T> & TypedFieldBase<T>::
-  operator=(const TypedFieldBase & other) {
+  TypedFieldBase<T> &
+  TypedFieldBase<T>::operator=(const TypedFieldBase & other) {
     this->eigen_vec() = other.eigen_vec();
     return *this;
   }
@@ -272,16 +297,16 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  TypedFieldBase<T> & TypedFieldBase<T>::
-  operator+=(const TypedFieldBase & other) {
+  TypedFieldBase<T> &
+  TypedFieldBase<T>::operator+=(const TypedFieldBase & other) {
     this->eigen_vec() += other.eigen_vec();
     return *this;
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  TypedFieldBase<T> & TypedFieldBase<T>::
-  operator-=(const TypedFieldBase & other) {
+  TypedFieldBase<T> &
+  TypedFieldBase<T>::operator-=(const TypedFieldBase & other) {
     this->eigen_vec() -= other.eigen_vec();
     return *this;
   }
@@ -289,41 +314,41 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   template <typename T>
   auto TypedFieldBase<T>::eigen_vec() -> Eigen_map {
-    return this->eigen_map(this->size() * this->nb_dof_per_quad_pt, 1);
+    return this->eigen_map(this->size() * this->nb_dof_per_sub_pt, 1);
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
   auto TypedFieldBase<T>::eigen_vec() const -> Eigen_cmap {
-    return this->eigen_map(this->size() * this->nb_dof_per_quad_pt, 1);
+    return this->eigen_map(this->size() * this->nb_dof_per_sub_pt, 1);
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  auto TypedFieldBase<T>::eigen_quad_pt() -> Eigen_map {
-    return this->eigen_map(this->nb_dof_per_quad_pt, this->size());
+  auto TypedFieldBase<T>::eigen_sub_pt() -> Eigen_map {
+    return this->eigen_map(this->nb_dof_per_sub_pt, this->size());
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  auto TypedFieldBase<T>::eigen_quad_pt() const -> Eigen_cmap {
-    return this->eigen_map(this->nb_dof_per_quad_pt, this->size());
+  auto TypedFieldBase<T>::eigen_sub_pt() const -> Eigen_cmap {
+    return this->eigen_map(this->nb_dof_per_sub_pt, this->size());
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
   auto TypedFieldBase<T>::eigen_pixel() -> Eigen_map {
-    const auto & nb_quad{this->collection.get_nb_quad_pts()};
-    return this->eigen_map(this->nb_dof_per_quad_pt * nb_quad,
-                           this->size() / nb_quad);
+    const auto & nb_sub{this->get_nb_sub_pts()};
+    return this->eigen_map(this->nb_dof_per_sub_pt * nb_sub,
+                           this->size() / nb_sub);
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
   auto TypedFieldBase<T>::eigen_pixel() const -> Eigen_cmap {
-    const auto & nb_quad{this->collection.get_nb_quad_pts()};
-    return this->eigen_map(this->nb_dof_per_quad_pt * nb_quad,
-                           this->size() / nb_quad);
+    const auto & nb_sub{this->get_nb_sub_pts()};
+    return this->eigen_map(this->nb_dof_per_sub_pt * nb_sub,
+                           this->size() / nb_sub);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -331,8 +356,8 @@ namespace muGrid {
   auto TypedFieldBase<T>::get_pixel_map(const Dim_t & nb_rows)
       -> FieldMap<T, Mapping::Mut> {
     return (nb_rows == -1)
-               ? FieldMap<T, Mapping::Mut>{*this, Iteration::Pixel}
-               : FieldMap<T, Mapping::Mut>{*this, nb_rows, Iteration::Pixel};
+               ? FieldMap<T, Mapping::Mut>{*this, PixelSubDiv::Pixel}
+               : FieldMap<T, Mapping::Mut>{*this, nb_rows, PixelSubDiv::Pixel};
   }
 
   /* ---------------------------------------------------------------------- */
@@ -340,8 +365,9 @@ namespace muGrid {
   auto TypedFieldBase<T>::get_pixel_map(const Dim_t & nb_rows) const
       -> FieldMap<T, Mapping::Const> {
     return (nb_rows == -1)
-               ? FieldMap<T, Mapping::Const>{*this, Iteration::Pixel}
-               : FieldMap<T, Mapping::Const>{*this, nb_rows, Iteration::Pixel};
+               ? FieldMap<T, Mapping::Const>{*this, PixelSubDiv::Pixel}
+               : FieldMap<T, Mapping::Const>{*this, nb_rows,
+                                             PixelSubDiv::Pixel};
   }
 
   /* ---------------------------------------------------------------------- */
@@ -349,8 +375,8 @@ namespace muGrid {
   auto TypedFieldBase<T>::get_quad_pt_map(const Dim_t & nb_rows)
       -> FieldMap<T, Mapping::Mut> {
     return (nb_rows == -1)
-               ? FieldMap<T, Mapping::Mut>{*this, Iteration::QuadPt}
-               : FieldMap<T, Mapping::Mut>{*this, nb_rows, Iteration::QuadPt};
+               ? FieldMap<T, Mapping::Mut>{*this, PixelSubDiv::QuadPt}
+               : FieldMap<T, Mapping::Mut>{*this, nb_rows, PixelSubDiv::QuadPt};
   }
 
   /* ---------------------------------------------------------------------- */
@@ -358,36 +384,39 @@ namespace muGrid {
   auto TypedFieldBase<T>::get_quad_pt_map(const Dim_t & nb_rows) const
       -> FieldMap<T, Mapping::Const> {
     return (nb_rows == -1)
-               ? FieldMap<T, Mapping::Const>{*this, Iteration::QuadPt}
+               ? FieldMap<T, Mapping::Const>{*this, PixelSubDiv::QuadPt}
                : FieldMap<T, Mapping::Const>{*this, nb_rows,
-                                              Iteration::QuadPt};
+                                             PixelSubDiv::QuadPt};
   }
 
   template <typename T>
   WrappedField<T>::WrappedField(const std::string & unique_name,
-                                  FieldCollection & collection,
-                                  Dim_t nb_components, size_t size, T * ptr)
-      : Parent{unique_name, collection, nb_components}, size{
-                                                            static_cast<size_t>(
-                                                                size)} {
-    this->current_size = size / this->nb_dof_per_quad_pt;
+                                FieldCollection & collection,
+                                const Dim_t & nb_dof_per_sub_pt,
+                                const size_t & size, T * ptr,
+                                const PixelSubDiv & sub_division,
+                                const Unit & unit, const Dim_t & nb_sub_pts)
+      : Parent{unique_name,  collection, nb_dof_per_sub_pt,
+               sub_division, unit,       nb_sub_pts},
+        size{static_cast<size_t>(size)} {
+    this->current_size = size / this->nb_dof_per_sub_pt;
 
-    if (size != this->nb_dof_per_quad_pt * this->current_size) {
+    if (size != this->nb_dof_per_sub_pt * this->current_size) {
       std::stringstream error{};
       error << "Size mismatch: the provided array has a size of " << size
             << " which is not a multiple of the specified number of components "
-               "(nb_components = "
-            << this->nb_dof_per_quad_pt << ").";
+               "(nb_dof_per_sub_pt = "
+            << this->nb_dof_per_sub_pt << ").";
       throw FieldError(error.str());
     }
-    if (this->collection.get_nb_entries() != Dim_t(this->current_size)) {
+    if (this->get_nb_entries() != Dim_t(this->current_size)) {
       std::stringstream error{};
       error << "Size mismatch: This field should store "
-            << this->nb_dof_per_quad_pt
-            << " component(s) on " << this->collection.get_nb_pixels()
-            << " pixels/voxels with " << this->collection.get_nb_quad_pts()
-            << " quadrature point(s) each, i.e. with a total of "
-            << this->collection.get_nb_entries() * this->nb_dof_per_quad_pt
+            << this->nb_dof_per_sub_pt << " component(s) on "
+            << this->collection.get_nb_pixels() << " pixels/voxels with "
+            << this->get_nb_sub_pts()
+            << " sub point(s) each, i.e. with a total of "
+            << this->collection.get_nb_pixels() * this->nb_dof_per_sub_pt
             << " scalar values, but you supplied an array of size " << size
             << '.';
       throw FieldError(error.str());
@@ -397,52 +426,38 @@ namespace muGrid {
 
   template <typename T>
   WrappedField<T>::WrappedField(const std::string & unique_name,
-                                  FieldCollection & collection,
-                                  Dim_t nb_components,
-                                  Eigen::Ref<EigenRep_t> values)
-      : Parent{unique_name, collection, nb_components},
-        size{static_cast<size_t>(values.size())} {
-    this->current_size = values.size() / this->nb_dof_per_quad_pt;
-
-    if (values.size() != Dim_t(this->nb_dof_per_quad_pt * this->current_size)) {
-      std::stringstream error{};
-      error << "Size mismatch: the provided array has a size of "
-            << values.size()
-            << " which is not a multiple of the specified number of components "
-               "(nb_components = "
-            << this->nb_dof_per_quad_pt << ").";
-      throw FieldError(error.str());
-    }
-    if (this->collection.get_nb_entries() != Dim_t(this->current_size)) {
-      std::stringstream error{};
-      error << "Size mismatch: This field should store "
-            << this->nb_dof_per_quad_pt
-            << " component(s) on " << this->collection.get_nb_pixels()
-            << " pixels/voxels with " << this->collection.get_nb_quad_pts()
-            << " quadrature point(s) each, i.e. with a total of "
-            << this->collection.get_nb_entries() * this->nb_dof_per_quad_pt
-            << " scalar values, but you supplied an array of size "
-            << values.size() << '.';
-      throw FieldError(error.str());
-    }
-    this->set_data_ptr(values.data());
-  }
+                                FieldCollection & collection,
+                                const Dim_t & nb_dof_per_sub_pt,
+                                Eigen::Ref<EigenRep_t> values,
+                                const PixelSubDiv & sub_division,
+                                const Unit & unit, const Dim_t & nb_sub_pts)
+      : WrappedField{unique_name,
+                     collection,
+                     nb_dof_per_sub_pt,
+                     static_cast<size_t>(values.size()),
+                     values.data(),
+                     sub_division,
+                     unit,
+                     nb_sub_pts} {}
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
   auto WrappedField<T>::make_const(const std::string & unique_name,
-                                    FieldCollection & collection,
-                                    Dim_t nb_components,
-                                    Eigen::Ref<const EigenRep_t> values)
+                                   FieldCollection & collection,
+                                   Dim_t nb_dof_per_sub_pt,
+                                   Eigen::Ref<const EigenRep_t> values,
+                                   const PixelSubDiv & sub_division,
+                                   const Unit & unit, const Dim_t & nb_sub_pts)
       -> std::unique_ptr<const WrappedField> {
     Eigen::Map<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>> map{
         const_cast<T *>(values.data()), values.rows(), values.cols()};
     return std::make_unique<WrappedField>(unique_name, collection,
-                                           nb_components, map);
+                                          nb_dof_per_sub_pt, map, sub_division,
+                                          unit, nb_sub_pts);
   }
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  void WrappedField<T>::set_pad_size(size_t pad_size) {
+  void WrappedField<T>::set_pad_size(const size_t & pad_size) {
     std::stringstream error;
     error << "Setting pad size to " << pad_size << " not possible for "
           << "wrapped fields.";
@@ -458,9 +473,10 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  void WrappedField<T>::resize(size_t size) {
-    const auto expected_size{size * this->get_nb_dof_per_quad_pt()
-        + this->pad_size};
+  void WrappedField<T>::resize() {
+    auto && size{this->get_nb_entries()};
+    const auto expected_size{size * this->get_nb_dof_per_sub_pt() +
+                             this->pad_size};
     if (expected_size != this->buffer_size()) {
       std::stringstream error{};
       error << "Wrapped fields cannot be resized. The current wrapped size is "

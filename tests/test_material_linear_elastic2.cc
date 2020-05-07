@@ -63,6 +63,8 @@ namespace muSpectre {
 
     Mat_t mat;
   };
+  template <class Mat_t>
+  constexpr Dim_t MaterialFixture<Mat_t>::sdim;
 
   using mat_list =
       boost::mpl::list<MaterialFixture<MaterialLinearElastic2<twoD>>,
@@ -100,7 +102,7 @@ namespace muSpectre {
 
     using Mat_t = Eigen::Matrix<Real, Fix::mdim(), Fix::mdim()>;
     using FC_t = muGrid::GlobalFieldCollection;
-    FC_t globalfields{Fix::mdim(), Fix::NbQuadPts()};
+    FC_t globalfields{Fix::mdim(), Fix::NbQuadPts(), muGrid::Unknown};
     globalfields.initialise(cube, loc);
 
     Mat_t zero{Mat_t::Zero()};
@@ -114,12 +116,12 @@ namespace muSpectre {
     mat.add_pixel(pix1, strain);
     mat.initialise();
 
-    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim()> F_f{
-        "Transformation Gradient", globalfields};
-    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim()> P1_f{
-        "Nominal Stress1", globalfields};  // to be computed alone
-    muGrid::MappedT4Field<Real, Mapping::Mut, Fix::mdim()> K_f{
-        "Tangent Moduli", globalfields};  // to be computed with tangent
+    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim(), PixelSubDiv::QuadPt>
+        F_f{"Transformation Gradient", globalfields};
+    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim(), PixelSubDiv::QuadPt>
+        P1_f{"Nominal Stress1", globalfields};  // to be computed alone
+    muGrid::MappedT4Field<Real, Mapping::Mut, Fix::mdim(), PixelSubDiv::QuadPt>
+        K_f{"Tangent Moduli", globalfields};  // to be computed with tangent
     for (Dim_t quad_id{0}; quad_id < Fix::NbQuadPts(); ++quad_id) {
       F_f.get_map()[pix0 * Fix::NbQuadPts() + quad_id] = -strain;
       F_f.get_map()[pix1 * Fix::NbQuadPts() + quad_id] = zero;
@@ -173,22 +175,25 @@ namespace muSpectre {
     auto & mat{Fix::mat};
 
     using FC_t = muGrid::GlobalFieldCollection;
-    FC_t globalfields{Fix::sdim, Fix::NbQuadPts()};
+    FC_t globalfields{Fix::sdim, Fix::NbQuadPts(), muGrid::Unknown};
     globalfields.register_real_field("Transformation Gradient",
-                                     Fix::mdim() * Fix::mdim());
+                                     Fix::mdim() * Fix::mdim(),
+                                     PixelSubDiv::QuadPt);
     globalfields.register_real_field(
-        "Nominal Stress1", Fix::mdim() * Fix::mdim());  // to be computed alone
+        "Nominal Stress1", Fix::mdim() * Fix::mdim(),
+        PixelSubDiv::QuadPt);  // to be computed alone
     globalfields.register_real_field(
-        "Nominal Stress2",
-        Fix::mdim() * Fix::mdim());  // to be computed with tangent
+        "Nominal Stress2", Fix::mdim() * Fix::mdim(),
+        PixelSubDiv::QuadPt);  // to be computed with tangent
     globalfields.register_real_field(
-        "Tangent Moduli",
-        muGrid::ipow(Fix::mdim(), 4));  // to be computed with tangent
+        "Tangent Moduli", muGrid::ipow(Fix::mdim(), 4),
+        PixelSubDiv::QuadPt);  // to be computed with tangent
     globalfields.register_real_field("Nominal Stress reference",
-                                     muGrid::ipow(Fix::mdim(), 2));
+                                     muGrid::ipow(Fix::mdim(), 2),
+                                     PixelSubDiv::QuadPt);
     globalfields.register_real_field(
-        "Tangent Moduli reference",
-        muGrid::ipow(Fix::mdim(), 4));  // to be computed with tangent
+        "Tangent Moduli reference", muGrid::ipow(Fix::mdim(), 4),
+        PixelSubDiv::QuadPt);  // to be computed with tangent
 
     globalfields.initialise(cube, loc);
 

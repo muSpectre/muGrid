@@ -59,7 +59,6 @@ set(CPPLINT_PROJECT_ROOT ${PROJECT_SOURCE_DIR} CACHE STRING "Project ROOT direct
 # find cpplint.py script
 find_file(CPPLINT name "cpplint.py" PATHS ${PROJECT_SOURCE_DIR}/external)
 if(CPPLINT)
-    message(STATUS "cpplint parser: ${CPPLINT}")
 else()
     message(FATAL_ERROR "cpplint script: NOT FOUND! "
                         "Please install cpplint as described on https://pypi.python.org/pypi/cpplint. "

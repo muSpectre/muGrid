@@ -47,7 +47,7 @@ namespace muGrid {
   BOOST_AUTO_TEST_SUITE(state_field_maps_tests);
 
   struct LocalFieldBasicFixture {
-    LocalFieldCollection fc{Unknown, Unknown};
+    LocalFieldCollection fc{Unknown, Unknown, Unknown};
   };
 
   template <Dim_t NbMemoryChoice>
@@ -55,17 +55,20 @@ namespace muGrid {
     static constexpr Dim_t NbMemory() { return NbMemoryChoice; }
     static constexpr Dim_t NbComponents() { return twoD * twoD; }
     static constexpr Dim_t NbQuad() { return 2; }
+    static constexpr Dim_t NbNodes() { return 3; }
 
     LocalFieldBasicFixtureFilled()
-        : array_field{fc.register_state_field<Int>("test", NbMemory(),
-                                                   NbComponents())},
-          scalar_field{
-              fc.register_state_field<Int>("test scalar", NbMemory(), 1)},
-          t4_field{fc.register_state_field<Int>(
-              "test_t4", NbMemory(), NbComponents() * NbComponents())} {
+        : array_field{fc.register_state_field<Int>(
+              "test", NbMemory(), NbComponents(), PixelSubDiv::QuadPt)},
+          scalar_field{fc.register_state_field<Int>("test scalar", NbMemory(),
+                                                    1, PixelSubDiv::QuadPt)},
+          t4_field{fc.register_state_field<Int>("test_t4", NbMemory(),
+                                                NbComponents() * NbComponents(),
+                                                PixelSubDiv::QuadPt)} {
       this->fc.add_pixel(4);
       this->fc.add_pixel(8);
       this->fc.set_nb_quad_pts(NbQuad());
+      this->fc.set_nb_nodal_pts(NbNodes());
       this->fc.initialise();
     }
     TypedStateField<Int> & array_field;
@@ -93,17 +96,23 @@ namespace muGrid {
           t4_map{this->t4_field}, scalar_map{this->scalar_field} {}
     using Parent = LocalFieldBasicFixtureFilled<NbMemoryChoice>;
     ArrayStateFieldMap<Int, Mapping::Mut, Parent::NbComponents(), 1,
-                        Parent::NbMemory()>
+                       Parent::NbMemory(), PixelSubDiv::QuadPt>
         static_array_field_map;
     ArrayStateFieldMap<Int, Mapping::Const, Parent::NbComponents(), 1,
-                        Parent::NbMemory()>
+                       Parent::NbMemory(), PixelSubDiv::QuadPt>
         static_const_array_field_map;
     ArrayStateFieldMap<Int, Mapping::Mut, Parent::NbComponents(),
-                        Parent::NbQuad(), Parent::NbMemory(), Iteration::Pixel>
+                       Parent::NbQuad(), Parent::NbMemory(), PixelSubDiv::Pixel>
         pixel_map;
-    T2StateFieldMap<Int, Mapping::Mut, twoD, Parent::NbMemory()> t2_map;
-    T4StateFieldMap<Int, Mapping::Mut, twoD, Parent::NbMemory()> t4_map;
-    ScalarStateFieldMap<Int, Mapping::Mut, Parent::NbMemory()> scalar_map;
+    T2StateFieldMap<Int, Mapping::Mut, twoD, Parent::NbMemory(),
+                    PixelSubDiv::QuadPt>
+        t2_map;
+    T4StateFieldMap<Int, Mapping::Mut, twoD, Parent::NbMemory(),
+                    PixelSubDiv::QuadPt>
+        t4_map;
+    ScalarStateFieldMap<Int, Mapping::Mut, Parent::NbMemory(),
+                        PixelSubDiv::QuadPt>
+        scalar_map;
   };
 
   using StateFieldMapFixtures =
@@ -147,40 +156,43 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(static_size_test, Fix,
-                                   StateFieldMapFixtures, Fix) {
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(static_size_test, Fix, StateFieldMapFixtures,
+                                   Fix) {
     using Type1 = ArrayStateFieldMap<Int, Mapping::Mut, Fix::NbComponents(), 1,
-                                      Fix::NbMemory(), Iteration::QuadPt>;
+                                     Fix::NbMemory(), PixelSubDiv::QuadPt>;
     BOOST_CHECK_NO_THROW(Type1{this->array_field};);
     using Type2 = ArrayStateFieldMap<Int, Mapping::Const, Fix::NbComponents(),
-                                      1, Fix::NbMemory(), Iteration::QuadPt>;
+                                     1, Fix::NbMemory(), PixelSubDiv::QuadPt>;
     BOOST_CHECK_NO_THROW(Type2{this->array_field});
     using WrongSize_t =
         ArrayStateFieldMap<Int, Mapping::Mut, Fix::NbComponents(),
-                            Fix::NbComponents(), Fix::NbMemory(),
-                            Iteration::QuadPt>;
+                           Fix::NbComponents(), Fix::NbMemory(),
+                           PixelSubDiv::QuadPt>;
     BOOST_CHECK_THROW(WrongSize_t{this->array_field}, FieldMapError);
 
     using WrongNbMemory_t =
         ArrayStateFieldMap<Int, Mapping::Mut, 1, Fix::NbComponents(),
-                            Fix::NbMemory() + 1, Iteration::QuadPt>;
+                           Fix::NbMemory() + 1, PixelSubDiv::QuadPt>;
     BOOST_CHECK_THROW(WrongNbMemory_t{this->array_field}, FieldMapError);
 
     using Pixel_t =
         ArrayStateFieldMap<Int, Mapping::Mut, Fix::NbComponents(),
-                            Fix::NbQuad(), Fix::NbMemory(), Iteration::Pixel>;
+                           Fix::NbQuad(), Fix::NbMemory(), PixelSubDiv::Pixel>;
     BOOST_CHECK_NO_THROW(Pixel_t{this->array_field});
 
     using Matrix_t =
         MatrixStateFieldMap<Int, Mapping::Mut, Fix::NbComponents(), 1,
-                             Fix::NbMemory(), Iteration::QuadPt>;
+                            Fix::NbMemory(), PixelSubDiv::QuadPt>;
     BOOST_CHECK_NO_THROW(Matrix_t{this->array_field});
 
-    using T2_t = T2StateFieldMap<Int, Mapping::Mut, twoD, Fix::NbMemory()>;
+    using T2_t = T2StateFieldMap<Int, Mapping::Mut, twoD, Fix::NbMemory(),
+                                 PixelSubDiv::QuadPt>;
     BOOST_CHECK_NO_THROW(T2_t{this->array_field});
-    using T4_t = T4StateFieldMap<Int, Mapping::Mut, twoD, Fix::NbMemory()>;
+    using T4_t = T4StateFieldMap<Int, Mapping::Mut, twoD, Fix::NbMemory(),
+                                 PixelSubDiv::QuadPt>;
     BOOST_CHECK_NO_THROW(T4_t{this->t4_field});
-    using Scalar_t = ScalarStateFieldMap<Int, Mapping::Mut, Fix::NbMemory()>;
+    using Scalar_t = ScalarStateFieldMap<Int, Mapping::Mut, Fix::NbMemory(),
+                                         PixelSubDiv::QuadPt>;
     BOOST_CHECK_NO_THROW(Scalar_t{this->scalar_field});
   }
 
@@ -188,7 +200,7 @@ namespace muGrid {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(static_iteration_test, Fix,
                                    StaticStateFieldMapFixtures, Fix) {
     size_t counter{0};
-    ScalarFieldMap<Int, Mapping::Mut> & current{
+    ScalarFieldMap<Int, Mapping::Mut, PixelSubDiv::QuadPt> & current{
         this->scalar_map.get_current_static()};
     BOOST_CHECK_NO_THROW(current[0]++);
     static_assert(

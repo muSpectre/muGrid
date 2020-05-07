@@ -56,11 +56,14 @@ namespace muSpectre {
   template <Dim_t DimM>
   struct MaterialMuSpectre_traits<MaterialLaminate<DimM>> {
     //! expected map type for strain fields
-    using StrainMap_t = muGrid::T2FieldMap<Real, Mapping::Const, DimM>;
+    using StrainMap_t =
+        muGrid::T2FieldMap<Real, Mapping::Const, DimM, PixelSubDiv::QuadPt>;
     //! expected map type for stress fields
-    using StressMap_t = muGrid::T2FieldMap<Real, Mapping::Mut, DimM>;
+    using StressMap_t =
+        muGrid::T2FieldMap<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>;
     //! expected map type for tangent stiffness fields
-    using TangentMap_t = muGrid::T4FieldMap<Real, Mapping::Mut, DimM>;
+    using TangentMap_t =
+        muGrid::T4FieldMap<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>;
 
     constexpr static auto strain_measure{StrainMeasure::Gradient};
     //! declare what type of stress measure your law yields as output
@@ -82,12 +85,16 @@ namespace muSpectre {
     using T4_t = muGrid::T4Mat<Real, DimM>;
 
     using VectorField_t = muGrid::RealField;
-    using MappedVectorField_t = muGrid::MappedT1Field<Real, Mapping::Mut, DimM>;
-    using VectorFieldMap_t = muGrid::T1FieldMap<Real, Mapping::Mut, DimM>;
+    using MappedVectorField_t =
+        muGrid::MappedT1Field<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>;
+    using VectorFieldMap_t =
+        muGrid::T1FieldMap<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>;
 
     using ScalarField_t = muGrid::RealField;
-    using MappedScalarField_t = muGrid::MappedScalarField<Real, Mapping::Mut>;
-    using ScalarFieldMap_t = muGrid::ScalarFieldMap<Real, Mapping::Mut>;
+    using MappedScalarField_t =
+        muGrid::MappedScalarField<Real, Mapping::Mut, PixelSubDiv::QuadPt>;
+    using ScalarFieldMap_t =
+        muGrid::ScalarFieldMap<Real, Mapping::Mut, PixelSubDiv::QuadPt>;
 
     using Strain_t = Eigen::Matrix<Real, DimM, DimM>;
     using Stress_t = Strain_t;

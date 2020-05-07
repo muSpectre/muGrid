@@ -58,11 +58,14 @@ namespace muSpectre {
   template <Dim_t DimM>
   struct MaterialMuSpectre_traits<MaterialHyperElastoPlastic1<DimM>> {
     //! expected map type for strain fields
-    using StrainMap_t = muGrid::T2FieldMap<Real, Mapping::Const, DimM>;
+    using StrainMap_t =
+        muGrid::T2FieldMap<Real, Mapping::Const, DimM, PixelSubDiv::QuadPt>;
     //! expected map type for stress fields
-    using StressMap_t = muGrid::T2FieldMap<Real, Mapping::Mut, DimM>;
+    using StressMap_t =
+        muGrid::T2FieldMap<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>;
     //! expected map type for tangent stiffness fields
-    using TangentMap_t = muGrid::T4FieldMap<Real, Mapping::Mut, DimM>;
+    using TangentMap_t =
+        muGrid::T4FieldMap<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>;
 
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::Gradient};
@@ -98,10 +101,12 @@ namespace muSpectre {
 
     //! type in which the previous strain state is referenced
     using T2StRef_t =
-        typename muGrid::MappedT2StateField<Real, Mapping::Mut, DimM>::Return_t;
+        typename muGrid::MappedT2StateField<Real, Mapping::Mut, DimM,
+                                            PixelSubDiv::QuadPt>::Return_t;
     //! type in which the previous plastic flow is referenced
     using ScalarStRef_t =
-        typename muGrid::MappedScalarStateField<Real, Mapping::Mut>::Return_t;
+        typename muGrid::MappedScalarStateField<Real, Mapping::Mut,
+                                                PixelSubDiv::QuadPt>::Return_t;
 
     //! Default constructor
     MaterialHyperElastoPlastic1() = delete;
@@ -188,18 +193,20 @@ namespace muSpectre {
     void initialise() final;
 
     //! getter for internal variable field εₚ
-    muGrid::MappedScalarStateField<Real, Mapping::Mut> &
+    muGrid::MappedScalarStateField<Real, Mapping::Mut, PixelSubDiv::QuadPt> &
     get_plast_flow_field() {
       return this->plast_flow_field;
     }
 
     //! getter for previous gradient field Fᵗ
-    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM> & get_F_prev_field() {
+    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt> &
+    get_F_prev_field() {
       return this->F_prev_field;
     }
 
     //! getterfor elastic left Cauchy-Green deformation tensor bₑᵗ
-    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM> & get_be_prev_field() {
+    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt> &
+    get_be_prev_field() {
       return this->be_prev_field;
     }
 
@@ -222,13 +229,16 @@ namespace muSpectre {
 
    protected:
     //! storage for cumulated plastic flow εₚ
-    muGrid::MappedScalarStateField<Real, Mapping::Mut> plast_flow_field;
+    muGrid::MappedScalarStateField<Real, Mapping::Mut, PixelSubDiv::QuadPt>
+        plast_flow_field;
 
     //! storage for previous gradient Fᵗ
-    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM> F_prev_field;
+    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>
+        F_prev_field;
 
     //! storage for elastic left Cauchy-Green deformation tensor bₑᵗ
-    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM> be_prev_field;
+    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>
+        be_prev_field;
 
     // material properties
     const Real young;    //!< Young's modulus
