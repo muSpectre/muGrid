@@ -23,11 +23,11 @@ you additional permission to convey the resulting work.
 
 
 This README contains only a small quick start guide. Please refer to the [full
-documentation](https://muspectre.readthedocs.io) for more help.
+documentation](https://muspectre.gitlab.io/muspectre) for more help.
 
 ## Building µSpectre
 For the first installation of µSpectre, please refer to the 
-[full documentation - getting started](https://muspectre.readthedocs.io/en/master/GettingStarted.html#)
+[full documentation - getting started](https://muspectre.gitlab.io/muspectre/GettingStarted.html#)
 for more information.
 
 µSpectre is a CMake project that uses C++14. It depends on the Boost unit test
