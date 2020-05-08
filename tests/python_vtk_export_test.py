@@ -38,7 +38,6 @@ import unittest
 import numpy as np
 import tempfile
 import os
-import filecmp
 from python_test_imports import µ
 import muFFT
 
@@ -78,7 +77,8 @@ class XmlTree():
         Compares two xml etrees
         :param x_ref: the first tree (reference tree)
         :param x_comp: the second tree (tree to compare with reference)
-        :param excludes: list of string of attributes to exclude from comparison
+        :param excludes: list of string of attributes to exclude from
+                         comparison
         :return:
             True if both files match
         """
@@ -110,7 +110,7 @@ class XmlTree():
         i = 0
         for c1 in cl_ref:
             i += 1
-            if not c1.tag in excludes:
+            if c1.tag not in excludes:
                 # compare the right children with each other,
                 # they should have the "names" and belonging "values"
                 j = 0
@@ -131,9 +131,10 @@ class XmlTree():
                                                 write_log=True)
                     self.attribute_value_compare(c1, c2, excludes,
                                                  write_log=True)
-                    self.logger.debug('children %i, can not find a matching %s '
-                                      'with same names and belonging values in '
-                                      'the file for comparison.' % (i, c1.tag))
+                    self.logger.debug('children %i, can not find a matching %s'
+                                      ' with same names and belonging values '
+                                      'in the file for comparison.'
+                                      % (i, c1.tag))
                     return False
 
         return True
@@ -161,13 +162,14 @@ class XmlTree():
         Compare the attribute names of two xml etrees
         :param x_ref:  xml etree one (reference etree)
         :param t_comp: xml etree two (etree for comparison)
-        :param excludes: list of string of attributes to exclude from comparison
+        :param excludes: list of string of attributes to exclude from
+                         comparison
         :param write_log: bool, if True log file is written (default = False)
         :return:
             True if all names match
         """
         for name in x_comp.attrib.keys():
-            if not name in excludes:
+            if name not in excludes:
                 if name not in x_ref.attrib:
                     if write_log:
                         self.logger.debug('x_comp has an attribute x_ref is '
@@ -177,18 +179,20 @@ class XmlTree():
         if not write_log:
             return True
 
-    def attribute_value_compare(self, x_ref, x_comp, excludes, write_log=False):
+    def attribute_value_compare(
+            self, x_ref, x_comp, excludes, write_log=False):
         """
         Compare the attribute values of two xml etrees
         :param x_ref:  xml etree one (reference etree)
         :param t_comp: xml etree two (etree for comparison)
-        :param excludes: list of string of attributes to exclude from comparison
+        :param excludes: list of string of attributes to exclude from
+                         comparison
         :param write_log: bool, if True log file is written (default = False)
         :return:
             True if all values match
         """
         for name, value in x_ref.attrib.items():
-            if not name in excludes:
+            if name not in excludes:
                 if x_comp.attrib.get(name) != value:
                     if write_log:
                         self.logger.debug(
@@ -245,8 +249,9 @@ class VtkExport_Check(unittest.TestCase):
             gradient_op = [µ.FourierDerivative(dim, i) for i in range(dim)]
             fft_vec = muFFT.FFT(list(self.nb_grid_pts[:dim]), dim)
             fft_mat = muFFT.FFT(list(self.nb_grid_pts[:dim]), dim*dim)
-            placement_n = µ.gradient_integration.integrate_tensor_2(F, fft_vec,
-                                                                    fft_mat, gradient_op, list(self.grid_spacing[:dim]))
+            placement_n = µ.gradient_integration.integrate_tensor_2(
+                F, fft_vec, fft_mat, gradient_op,
+                list(self.grid_spacing[:dim]))
 
             p_d = {'scalar': np.random.random(x_n.shape[1:]),
                    'vector': np.random.random((dim,) + x_n.shape[1:]),
@@ -265,7 +270,8 @@ class VtkExport_Check(unittest.TestCase):
                     "vtk_export() was not able to write the {}D output file "\
                     "'{}.vtr'.".format(dim, file_name)
                 cmp_data = file_name + '.vtr'
-                ref_data = '../' + file_name + '.ref.vtr'
+                ref_data = '../reference_computations/' \
+                           + file_name + '.ref.vtr'
                 ref_tree = XmlTree.binary_file_to_tree(ref_data)
                 cmp_tree = XmlTree.binary_file_to_tree(cmp_data)
                 with XmlTree() as comparator:

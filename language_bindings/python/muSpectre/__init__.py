@@ -63,6 +63,7 @@ from muFFT import Communicator, FourierDerivative, DiscreteDerivative, FFT_PlanF
 import muSpectre.gradient_integration
 import muSpectre.stochastic_plasticity_search
 from . import vtk_export
+from . import eshelby_slow
 from . import _muSpectre
 
 _factories = {'fftw': ('CellFactory', False),
