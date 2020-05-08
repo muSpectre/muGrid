@@ -78,11 +78,11 @@ namespace muGrid {
   };
 
   /**
-   * Runtime representation of a rational exponent for base units. This can be
+   * Run-time representation of a rational exponent for base units. This can be
    * used to compose any unit. e.g., speed would be  length per time, i.e.
    * length¹ · time⁻¹. Note that the rational exponent allows to express more
    * exotic units such as for instance the 1/√length in fracture toughness
-   * (length^(⁻¹/₂)). The rational exponent is alway reduced to the simplest
+   * (length^(⁻¹/₂)). The rational exponent is always reduced to the simplest
    * form with a positive denominator. A zero denominator results in a UnitError
    * being thrown.
    */
@@ -152,35 +152,42 @@ namespace muGrid {
    */
   class Unit {
    public:
-    //! constructor from subunits
+    /**
+     * constructor from subunits ond optional integer tag can be used to handle
+     * cases of additional incompatibilities, e.g., for species. Imagine a
+     * coupled diffusion calculation, where one constitutive law handles a
+     * concentration of mol·Na/l, and another one a concentration of mol·Ka/l.
+     * Both have the same SI unit, but are not compatible. Use different tags
+     * for units that need to be mutually incompatible for whatever reason
+     */
     Unit(const UnitExponent & length, const UnitExponent & mass,
          const UnitExponent & time, const UnitExponent & temperature,
          const UnitExponent & current, const UnitExponent & luminous_intensity,
-         const UnitExponent & amount);
+         const UnitExponent & amount, const Int & tag = 0);
 
     //! factory function for base unit length
-    static Unit unitless();
+    static Unit unitless(const Int & tag = 0);
 
     //! factory function for base unit length
-    static Unit length();
+    static Unit length(const Int & tag = 0);
 
     //! factory function for base unit mass
-    static Unit mass();
+    static Unit mass(const Int & tag = 0);
 
     //! factory function for base unit time
-    static Unit time();
+    static Unit time(const Int & tag = 0);
 
     //! factory function for base unit temperature
-    static Unit temperature();
+    static Unit temperature(const Int & tag = 0);
 
     //! factory function for base unit current
-    static Unit current();
+    static Unit current(const Int & tag = 0);
 
     //! factory function for base unit luminous intensity
-    static Unit luminous_intensity();
+    static Unit luminous_intensity(const Int & tag = 0);
 
     //! factory function for base unit amount of matter
-    static Unit amount();
+    static Unit amount(const Int & tag = 0);
 
     //! returns a const reference to length
     const UnitExponent & get_length() const;
@@ -260,11 +267,16 @@ namespace muGrid {
     //! returns a  reference to amount of matter
     UnitExponent & get_amount();
 
-    static constexpr int nb_units{7};
-    //! Default constructor
-    Unit();
+    //! Throws a UnitError if *this and other have mismatched tags
+    void check_tags(const Unit & other) const;
 
-    std::array<UnitExponent, nb_units> units{};
+    static constexpr int NbUnits{7};
+
+    //! tagged almost-default constructor
+    explicit Unit(const Int & tag);
+
+    std::array<UnitExponent, NbUnits> units{};
+    Int tag;
   };
 
   /* ---------------------------------------------------------------------- */

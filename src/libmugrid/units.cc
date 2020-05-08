@@ -253,58 +253,62 @@ namespace muGrid {
              const UnitExponent & time, const UnitExponent & temperature,
              const UnitExponent & current,
              const UnitExponent & luminous_intensity,
-             const UnitExponent & amount)
+             const UnitExponent & amount, const Int & tag)
       : units{length, mass, time, temperature, current, luminous_intensity,
-              amount} {}
+              amount},
+        tag{tag} {}
 
   /* ---------------------------------------------------------------------- */
-  Unit Unit::unitless() { return Unit(); }
+  Unit Unit::unitless(const Int & new_tag) {
+    Unit tmp{new_tag};
+    return tmp;
+  }
 
   /* ---------------------------------------------------------------------- */
-  Unit Unit::length() {
-    Unit tmp{};
+  Unit Unit::length(const Int & new_tag) {
+    Unit tmp{new_tag};
     tmp.get_length() = UnitExponent(1);
     return tmp;
   }
 
   /* ---------------------------------------------------------------------- */
-  Unit Unit::mass() {
-    Unit tmp{};
+  Unit Unit::mass(const Int & new_tag) {
+    Unit tmp{new_tag};
     tmp.get_mass() = UnitExponent(1);
     return tmp;
   }
 
   /* ---------------------------------------------------------------------- */
-  Unit Unit::time() {
-    Unit tmp{};
+  Unit Unit::time(const Int & new_tag) {
+    Unit tmp{new_tag};
     tmp.get_time() = UnitExponent(1);
     return tmp;
   }
 
   /* ---------------------------------------------------------------------- */
-  Unit Unit::temperature() {
-    Unit tmp{};
+  Unit Unit::temperature(const Int & new_tag) {
+    Unit tmp{new_tag};
     tmp.get_temperature() = UnitExponent(1);
     return tmp;
   }
 
   /* ---------------------------------------------------------------------- */
-  Unit Unit::current() {
-    Unit tmp{};
+  Unit Unit::current(const Int & new_tag) {
+    Unit tmp{new_tag};
     tmp.get_current() = UnitExponent(1);
     return tmp;
   }
 
   /* ---------------------------------------------------------------------- */
-  Unit Unit::luminous_intensity() {
-    Unit tmp{};
+  Unit Unit::luminous_intensity(const Int & new_tag) {
+    Unit tmp{new_tag};
     tmp.get_luminous_intensity() = UnitExponent(1);
     return tmp;
   }
 
   /* ---------------------------------------------------------------------- */
-  Unit Unit::amount() {
-    Unit tmp{};
+  Unit Unit::amount(const Int & new_tag) {
+    Unit tmp{new_tag};
     tmp.get_amount() = UnitExponent(1);
     return tmp;
   }
@@ -342,20 +346,37 @@ namespace muGrid {
   UnitExponent & Unit::get_amount() { return this->units[6]; }
 
   /* ---------------------------------------------------------------------- */
+  void Unit::check_tags(const Unit & other) const {
+    if (this->tag != other.tag) {
+      std::stringstream error_message{};
+      error_message << "Mismatched tags! The left-hand side unit '" << *this
+                    << "' is tagged " << this->tag
+                    << " but the right-hand side unit '" << other
+                    << "' is tagged " << other.tag;
+      throw UnitError(error_message.str());
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
   bool Unit::operator==(const Unit & other) const {
-    return this->units == other.units;
+    return this->tag == other.tag and this->units == other.units;
   }
 
   /* ---------------------------------------------------------------------- */
   bool Unit::operator<(const Unit & other) const {
-    return this->units < other.units;
+    if (this->tag != other.tag) {
+      return this->tag < other.tag;
+    } else {
+      return this->units < other.units;
+    }
   }
 
   /* ---------------------------------------------------------------------- */
   Unit Unit::operator+(const Unit & other) const {
-    Unit tmp{};
+    this->check_tags(other);
+    Unit tmp{this->tag};
     try {
-      for (int i{0}; i < nb_units; ++i) {
+      for (int i{0}; i < NbUnits; ++i) {
         tmp.units[i] = this->units[i] + other.units[i];
       }
     } catch (const UnitError & error) {
@@ -369,9 +390,10 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   Unit Unit::operator-(const Unit & other) const {
-    Unit tmp{};
+    this->check_tags(other);
+    Unit tmp{this->tag};
     try {
-      for (int i{0}; i < nb_units; ++i) {
+      for (int i{0}; i < NbUnits; ++i) {
         tmp.units[i] = this->units[i] - other.units[i];
       }
     } catch (const UnitError & error) {
@@ -385,8 +407,9 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   Unit Unit::operator*(const Unit & other) const {
-    Unit tmp{};
-    for (int i{0}; i < nb_units; ++i) {
+    this->check_tags(other);
+    Unit tmp{this->tag};
+    for (int i{0}; i < NbUnits; ++i) {
       tmp.units[i] = this->units[i] * other.units[i];
     }
     return tmp;
@@ -394,20 +417,22 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   Unit Unit::operator/(const Unit & other) const {
-    Unit tmp{};
-    for (int i{0}; i < nb_units; ++i) {
+    this->check_tags(other);
+    Unit tmp{this->tag};
+    for (int i{0}; i < NbUnits; ++i) {
       tmp.units[i] = this->units[i] / other.units[i];
     }
     return tmp;
   }
 
   /* ---------------------------------------------------------------------- */
-  Unit::Unit()
+  Unit::Unit(const Int & tag)
       : units{[]() {
-          std::array<UnitExponent, nb_units> tmp{};
+          std::array<UnitExponent, NbUnits> tmp{};
           tmp.fill(UnitExponent(0));
           return tmp;
-        }()} {}
+        }()},
+        tag{tag} {}
 
   /* ---------------------------------------------------------------------- */
   std::ostream & operator<<(std::ostream & os, const Unit & unit) {
@@ -425,6 +450,9 @@ namespace muGrid {
         }
         os << name << val;
       }
+    }
+    if (unit.tag) {
+      os << ", tag(" << unit.tag << ')';
     }
     return os;
   }

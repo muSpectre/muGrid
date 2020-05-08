@@ -183,6 +183,23 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
+  BOOST_AUTO_TEST_CASE(tag_discrimination) {
+    constexpr Int SomeTag{24};
+    const Unit l1{Unit::length()};
+    const Unit l2{Unit::length(SomeTag)};
+    const Unit t1{Unit::time()};
+    const Unit t2{Unit::time(SomeTag)};
+
+    BOOST_CHECK_THROW(l1 + l2, UnitError);
+    BOOST_CHECK_THROW(l1 * l2, UnitError);
+    BOOST_CHECK_THROW(t1 * l2, UnitError);
+    BOOST_CHECK_THROW(t2 + l2, UnitError);
+
+    BOOST_CHECK_NO_THROW(l2 * l2);
+    BOOST_CHECK_NO_THROW(t2 * l2);
+  }
+
+  /* ---------------------------------------------------------------------- */
   BOOST_AUTO_TEST_CASE(hashability_test) {
     std::map<Unit, int> map{};
     map[Unit::length()] = 24;
