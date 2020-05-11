@@ -40,9 +40,10 @@ import numpy as np
 
 from python_test_imports import µ
 
+
 class MaterialLinearElasticGeneric1_Check(unittest.TestCase):
     def setUp(self):
-        self.nb_grid_pts = [5,7,5]
+        self.nb_grid_pts = [5, 7, 5]
         self.dim = len(self.nb_grid_pts)
         self.lengths = [5.2, 8.3, 2.7]
         self.formulation = µ.Formulation.small_strain
@@ -54,17 +55,17 @@ class MaterialLinearElasticGeneric1_Check(unittest.TestCase):
         self.mat1 = µ.material.MaterialLinearElastic1_3d.make(
             self.cell1, "material", self.Young, self.Poisson)
         self.matO1 = µ.material.MaterialLinearElastic1_3d.make(
-            self.cell1, "material", 2* self.Young, self.Poisson)
+            self.cell1, "material", 2 * self.Young, self.Poisson)
 
         E, nu = self.Young, self.Poisson
         lam, mu = E*nu/((1+nu)*(1-2*nu)), E/(2*(1+nu))
 
         C = np.array([[2 * mu + lam,          lam,          lam,  0,  0,  0],
-                      [         lam, 2 * mu + lam,          lam,  0,  0,  0],
-                      [         lam,          lam, 2 * mu + lam,  0,  0,  0],
-                      [           0,            0,            0, mu,  0,  0],
-                      [           0,            0,            0,  0, mu,  0],
-                      [           0,            0,            0,  0,  0, mu]])
+                      [lam, 2 * mu + lam,          lam,  0,  0,  0],
+                      [lam,          lam, 2 * mu + lam,  0,  0,  0],
+                      [0,            0,            0, mu,  0,  0],
+                      [0,            0,            0,  0, mu,  0],
+                      [0,            0,            0,  0,  0, mu]])
 
         self.cell2 = µ.Cell(self.nb_grid_pts,
                             self.lengths,
@@ -72,10 +73,10 @@ class MaterialLinearElasticGeneric1_Check(unittest.TestCase):
         self.mat2 = µ.material.MaterialLinearElasticGeneric1_3d.make(
             self.cell2, "material", C)
         self.matO2 = µ.material.MaterialLinearElastic1_3d.make(
-            self.cell2, "material", 2* self.Young, self.Poisson)
+            self.cell2, "material", 2 * self.Young, self.Poisson)
 
     def test_equivalence(self):
-        sym = lambda x: .5*(x + x.T)
+        def sym(x): return .5*(x + x.T)
         Del0 = sym((np.random.random((self.dim, self.dim))-.5)/10)
         for pix_id, pixel in self.cell1.pixels.enumerate():
             if pixel[0] == 0:
@@ -93,16 +94,13 @@ class MaterialLinearElasticGeneric1_Check(unittest.TestCase):
         solver1 = µ.solvers.KrylovSolverCG(self.cell1, tol, maxiter, verbose)
         solver2 = µ.solvers.KrylovSolverCG(self.cell2, tol, maxiter, verbose)
 
+        r1 = µ.solvers.newton_cg(self.cell1, Del0,
+                                 solver1, tol, equil_tol, verbose)
 
-        r1 = µ.solvers.de_geus(self.cell1, Del0,
-                               solver1, tol, equil_tol, verbose)
-
-
-        r2 = µ.solvers.de_geus(self.cell2, Del0,
-                               solver2, tol, equil_tol, verbose)
+        r2 = µ.solvers.newton_cg(self.cell2, Del0,
+                                 solver2, tol, equil_tol, verbose)
 
         error = (np.linalg.norm(r1.stress - r2.stress) /
                  np.linalg.norm(r1.stress + r2.stress))
 
         self.assertLess(error, 1e-13)
-

@@ -45,7 +45,14 @@
 #include <sstream>
 #include <string>
 
-using namespace muSpectre;  // NOLINT // TODO(junge): figure this out
+using muSpectre::Cell;
+using muSpectre::Dim_t;
+using muSpectre::MaterialBase;
+using muSpectre::MaterialLinearElasticGeneric1;
+using muSpectre::MaterialLinearElasticGeneric2;
+using muSpectre::Real;
+using muSpectre::threeD;
+using muSpectre::twoD;
 namespace py = pybind11;
 using namespace pybind11::literals;  // NOLINT: recommended usage
 

@@ -36,11 +36,23 @@
 #ifndef LANGUAGE_BINDINGS_LIBMUGRID_PYTHON_BIND_PY_DECLARATIONS_HH_
 #define LANGUAGE_BINDINGS_LIBMUGRID_PYTHON_BIND_PY_DECLARATIONS_HH_
 
+#include "libmugrid/field.hh"
+#include "libmugrid/field_typed.hh"
+
 #include <pybind11/pybind11.h>
+#include <pybind11/numpy.h>
+
 namespace py = pybind11;
 
 void add_common(py::module & mod);
 void add_field_classes(py::module & mod);
 void add_field_collection_classes(py::module & mod);
+
+namespace muGrid {
+  template <class T>
+  py::array_t<T, py::array::f_style>
+  array_computer(TypedFieldBase<T> & self, const std::vector<Dim_t> & shape,
+                 const muGrid::PixelSubDiv & it);
+}
 
 #endif  // LANGUAGE_BINDINGS_LIBMUGRID_PYTHON_BIND_PY_DECLARATIONS_HH_

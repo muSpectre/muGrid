@@ -33,11 +33,14 @@
  *
  */
 
+#include "bind_py_declarations.hh"
 #include "libmugrid/exception.hh"
 #include "libmugrid/field.hh"
 #include "libmugrid/field_typed.hh"
 #include "libmugrid/field_collection.hh"
 #include "libmugrid/field_collection_global.hh"
+#include "libmugrid/grid_common.hh"
+#include "libmugrid/numpy_tools.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>

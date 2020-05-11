@@ -33,12 +33,17 @@
  *
  */
 
+#include "bind_py_declarations.hh"
 #include "common/muSpectre_common.hh"
 #include "solver/solvers.hh"
 #include "solver/krylov_solver_cg.hh"
 #include "solver/krylov_solver_eigen.hh"
 
+#include <libmugrid/numpy_tools.hh>
+
 #include <pybind11/pybind11.h>
+#include <pybind11/functional.h>
+#include <functional>
 #include <pybind11/stl.h>
 #include <pybind11/eigen.h>
 
@@ -50,6 +55,7 @@ using pybind11::literals::operator""_a;
 using muSpectre::IsStrainInitialised;
 using muSpectre::Verbosity;
 namespace py = pybind11;
+using muGrid::NumpyProxy;
 
 /**
  * Solvers instanciated for cells with equal spatial and material dimension
@@ -85,6 +91,10 @@ void add_newton_cg_helper(py::module & mod) {
   using solver = muSpectre::KrylovSolverBase;
   using grad = py::EigenDRef<Eigen::MatrixXd>;
   using grad_vec = muSpectre::LoadSteps_t;
+  // using PyField_t = py::array_t<Real, py::array::f_style>;
+
+  // using Func_py_t = std::function<void(const size_t &, PyField_t &)>;
+  using Func_t = std::function<void(const size_t &, muGrid::RealField &)>;
 
   py::enum_<IsStrainInitialised>(mod, "IsStrainInitialised")
       .value("Yes", IsStrainInitialised::True)
@@ -93,9 +103,30 @@ void add_newton_cg_helper(py::module & mod) {
   mod.def(
       name,
       [](muSpectre::Cell & s, const grad & g, solver & so, Real nt, Real eqt,
+         Verbosity verb, IsStrainInitialised strain_init,
+         py::function & pyfunc) -> OptimizeResult {
+        Eigen::MatrixXd tmp{g};
+
+        Func_t func{[&pyfunc, &s](const size_t & step_nb,
+                                  muGrid::RealField & eigen_strain_field) {
+          auto && strain_shape{s.get_strain_shape()};
+          pyfunc(step_nb,
+                 muGrid::array_computer<muGrid::Real>(
+                     eigen_strain_field, {strain_shape[0], strain_shape[1]},
+                     muGrid::PixelSubDiv::QuadPt));
+        }};
+        return newton_cg(s, tmp, so, nt, eqt, verb, strain_init, func);
+      },
+      "cell"_a, "ΔF₀"_a, "solver"_a, "newton_tol"_a, "equil_tol"_a,
+      "verbose"_a = Verbosity::Silent,
+      "IsStrainInitialised"_a = IsStrainInitialised::False,
+      "eigen strain func"_a = nullptr);
+  mod.def(
+      name,
+      [](muSpectre::Cell & s, const grad & g, solver & so, Real nt, Real eqt,
          Verbosity verb, IsStrainInitialised strain_init) -> OptimizeResult {
         Eigen::MatrixXd tmp{g};
-        return newton_cg(s, tmp, so, nt, eqt, verb, strain_init);
+        return newton_cg(s, tmp, so, nt, eqt, verb, strain_init, nullptr);
       },
       "cell"_a, "ΔF₀"_a, "solver"_a, "newton_tol"_a, "equil_tol"_a,
       "verbose"_a = Verbosity::Silent,
@@ -103,11 +134,30 @@ void add_newton_cg_helper(py::module & mod) {
   mod.def(
       name,
       [](muSpectre::Cell & s, const grad_vec & g, solver & so, Real nt,
+         Real eqt, Verbosity verb, IsStrainInitialised strain_init,
+         const py::function & pyfunc) -> std::vector<OptimizeResult> {
+        Func_t func{[&pyfunc, &s](const size_t & step_nb,
+                                  muGrid::RealField & eigen_strain_field) {
+          auto && strain_shape{s.get_strain_shape()};
+          pyfunc(step_nb,
+                 muGrid::array_computer<muGrid::Real>(
+                     eigen_strain_field, {strain_shape[0], strain_shape[1]},
+                     muGrid::PixelSubDiv::QuadPt));
+        }};
+        return newton_cg(s, g, so, nt, eqt, verb, strain_init, func);
+      },
+      "cell"_a, "ΔF₀"_a, "solver"_a, "newton_tol"_a, "equil_tol"_a,
+      "verbose"_a = Verbosity::Silent,
+      "IsStrainInitialised"_a = IsStrainInitialised::False,
+      "eigen strain func"_a = nullptr);
+  mod.def(
+      name,
+      [](muSpectre::Cell & s, const grad_vec & g, solver & so, Real nt,
          Real eqt, Verbosity verb,
          IsStrainInitialised strain_init) -> std::vector<OptimizeResult> {
-        return newton_cg(s, g, so, nt, eqt, verb, strain_init);
+        return newton_cg(s, g, so, nt, eqt, verb, strain_init, nullptr);
       },
-      "cell"_a, "ΔF₀"_a, "solver"_a, "newton_tol"_a, "equilibrium_tol"_a,
+      "cell"_a, "ΔF₀"_a, "solver"_a, "newton_tol"_a, "equil_tol"_a,
       "verbose"_a = Verbosity::Silent,
       "IsStrainInitialised"_a = IsStrainInitialised::False);
 }

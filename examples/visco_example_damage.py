@@ -78,11 +78,13 @@ def compute_visco_elastic_damage(N, lens, max_iter, cg_tol, newton_tol,
 
     solver = µ.solvers.KrylovSolverCG(cell, cg_tol, max_iter,
                                       verbose=µ.Verbosity.Silent)
-    res = µ.solvers.de_geus(cell, dF_steps, solver, newton_tol,
-                            equil_tol, verbose=µ.Verbosity.Silent)
-    print("nb_cg: {}\nF:\n{}".format(res[-1].nb_fev,
-                                     µ.gradient_integration.reshape_gradient(res[-1].grad,
-                                                                             cell.nb_domain_grid_pts)[:, :, 0, 0]))
+    res = µ.solvers.newton_cg(cell, dF_steps, solver, newton_tol,
+                              equil_tol, verbose=µ.Verbosity.Silent)
+    print("nb_cg: {}\nF:\n{}".format(
+        res[-1].nb_fev,
+        µ.gradient_integration.reshape_gradient(
+            res[-1].grad,
+            cell.nb_domain_grid_pts)[:, :, 0, 0]))
     xy = np.zeros((len(res)))
     xx = np.zeros((len(res)))
     yy = np.zeros((len(res)))

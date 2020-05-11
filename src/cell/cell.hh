@@ -386,7 +386,7 @@ namespace muSpectre {
 
     //! Check if either the material or the strain formulation introduces
     // nonlinearities into the problem
-    bool is_non_linear() const;
+    bool was_last_eval_non_linear() const;
 
    protected:
     //! statically dimensioned worker for evaluating the tangent operator
@@ -430,8 +430,9 @@ namespace muSpectre {
 
     //! handle for the global fields associated with this cell
     std::unique_ptr<muGrid::GlobalFieldCollection> fields;
-    muGrid::RealField & strain;  //!< ref to strain field
+    muGrid::RealField & strain;  //!< ref to strain field (compatible)
     muGrid::RealField & stress;  //!< ref to stress field
+
     //! Tangent field might not even be required; so this is an
     //! optional ref_wrapper instead of a ref
     optional<std::reference_wrapper<muGrid::RealField>> tangent{};

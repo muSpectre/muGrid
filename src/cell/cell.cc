@@ -69,7 +69,7 @@ namespace muSpectre {
             "stress",
             dof_for_formulation(this->get_formulation(),
                                 this->get_material_dim(), OneQuadPt),
-            QuadPtTag)},
+            PixelSubDiv::QuadPt)},
         is_cell_split{is_cell_split} {
     this->fields->set_nb_sub_pts(QuadPtTag, this->get_nb_quad_pts());
     this->fields->set_nb_sub_pts(NodalPtTag, this->get_nb_nodal_pts());
@@ -856,7 +856,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  bool Cell::is_non_linear() const {
+  bool Cell::was_last_eval_non_linear() const {
     if (this->get_formulation() == Formulation::finite_strain) {
       return true;
     }

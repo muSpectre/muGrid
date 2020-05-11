@@ -42,6 +42,7 @@ from python_test_imports import µ, muFFT
 from python_goose_ref import SmallStrainProjectionGooseFFT, FiniteStrainProjectionGooseFFT
 import _muSpectre
 
+
 def build_test_classes(Projection, RefProjection, name):
     class ProjectionCheck(unittest.TestCase):
         def __init__(self, methodName='runTest'):
@@ -55,7 +56,8 @@ def build_test_classes(Projection, RefProjection, name):
             self.shape = list((self.nb_grid_pts for _ in range(self.ndim)))
             self.fft = muFFT.FFT(self.shape)
             self.fft.initialise(self.ndim * self.ndim)
-            self.projection = Projection(self.fft, [float(x) for x in self.shape])
+            self.projection = Projection(
+                self.fft, [float(x) for x in self.shape])
             self.projection.initialise()
             self.tol = 1e-12*np.prod(self.shape)
 
@@ -73,8 +75,8 @@ def build_test_classes(Projection, RefProjection, name):
             msp_sizes = muFFT.get_nb_hermitian_grid_pts(self.shape)
             hermitian_size = np.prod(msp_sizes)
             mspG = self.projection.operator
-            #this test only makes sense for fully stored ghats (i.e.,
-            #not for the faster alternative implementation
+            # this test only makes sense for fully stored ghats (i.e.,
+            # not for the faster alternative implementation
             if mspG.size != hermitian_size*self.ndim**4:
                 return
 
@@ -88,13 +90,16 @@ def build_test_classes(Projection, RefProjection, name):
                 # de Geus acting on the the transpose of the gradient.
                 order = np.arange(self.ndim**2).reshape(
                     self.ndim, self.ndim).T.reshape(-1)
-                msp_g = mspG[:, msp_id].reshape(self.ndim**2, self.ndim**2)[order, :]
+                msp_g = mspG[:, msp_id].reshape(
+                    self.ndim**2, self.ndim**2)[order, :]
                 error = np.linalg.norm(refG[:, :, ref_id] -
                                        msp_g)
                 condition = error < self.tol
                 if not condition:
-                    print("G_µ{}, at index {} =\n{}".format(coord, msp_id, msp_g))
-                    print("G_g{}, at index {} =\n{}".format(coord, ref_id, refG[:, :, ref_id]))
+                    print("G_µ{}, at index {} =\n{}".format(
+                        coord, msp_id, msp_g))
+                    print("G_g{}, at index {} =\n{}".format(
+                        coord, ref_id, refG[:, :, ref_id]))
                 self.assertTrue(condition)
 
         def test_projection_result(self):
@@ -109,14 +114,19 @@ def build_test_classes(Projection, RefProjection, name):
             b_µ = self.projection.apply_projection(strain)
 
             assert np.allclose(b_g, b_µ)
-
-
     return ProjectionCheck
 
-get_goose = lambda ndim, proj_type: proj_type(
+
+def get_goose(ndim, proj_type): return proj_type(
     ndim, 5, 2, 70e9, .33, 3.)
-get_finite_goose = lambda ndim: get_goose(ndim, FiniteStrainProjectionGooseFFT)
-get_small_goose  = lambda ndim: get_goose(ndim,  SmallStrainProjectionGooseFFT)
+
+
+def get_finite_goose(ndim): return get_goose(
+    ndim, FiniteStrainProjectionGooseFFT)
+
+
+def get_small_goose(ndim): return get_goose(
+    ndim,  SmallStrainProjectionGooseFFT)
 
 
 small_default_3 = build_test_classes(_muSpectre.ProjectionSmallStrain_3d,

@@ -42,6 +42,7 @@
 
 #include <vector>
 #include <string>
+#include <functional>
 
 namespace muSpectre {
 
@@ -49,6 +50,11 @@ namespace muSpectre {
    * Input type for specifying a load regime
    */
   using LoadSteps_t = std::vector<Eigen::MatrixXd>;
+
+  using MappedField_t =
+      muGrid::MappedField<muGrid::FieldMap<Real, Mapping::Mut>>;
+
+  using Func_t = std::function<void(const size_t &, muGrid::RealField &)>;
 
   enum class IsStrainInitialised { True, False };
 
@@ -58,24 +64,26 @@ namespace muSpectre {
    * Formulation::small_strain and H (=F-I) for Formulation::finite_strain).
    * The initial macroscopic strain state is set to zero in cell initialisation.
    */
-  std::vector<OptimizeResult>
-  newton_cg(Cell & cell, const LoadSteps_t & load_steps,
-            KrylovSolverBase & solver, Real newton_tol, Real equil_tol,
-            Verbosity verbose = Verbosity::Silent,
-            IsStrainInitialised strain_init = IsStrainInitialised::False);
+  std::vector<OptimizeResult> newton_cg(
+      Cell & cell, const LoadSteps_t & load_steps, KrylovSolverBase & solver,
+      const Real & newton_tol, const Real & equil_tol,
+      const Verbosity & verbose = Verbosity::Silent,
+      const IsStrainInitialised & strain_init = IsStrainInitialised::False,
+      const Func_t & eigen_strain_func = nullptr);
 
   /**
    * Uses the Newton-conjugate Gradient method to find the static
    * equilibrium of a cell given a mean applied strain.
    */
-  inline OptimizeResult
-  newton_cg(Cell & cell, const Eigen::Ref<Eigen::MatrixXd> load_step,
-            KrylovSolverBase & solver, Real newton_tol, Real equil_tol,
-            Verbosity verbose = Verbosity::Silent,
-            IsStrainInitialised strain_init = IsStrainInitialised::False) {
+  inline OptimizeResult newton_cg(
+      Cell & cell, const Eigen::Ref<Eigen::MatrixXd> load_step,
+      KrylovSolverBase & solver, const Real & newton_tol,
+      const Real & equil_tol, const Verbosity & verbose = Verbosity::Silent,
+      const IsStrainInitialised & strain_init = IsStrainInitialised::False,
+      const Func_t & eigen_strain_func = nullptr) {
     LoadSteps_t load_steps{load_step};
     return newton_cg(cell, load_steps, solver, newton_tol, equil_tol, verbose,
-                     strain_init)
+                     strain_init, eigen_strain_func)
         .front();
   }
 

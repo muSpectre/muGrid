@@ -71,7 +71,10 @@ class SolverCheck(unittest.TestCase):
         P, K = self.cell.evaluate_stress_tangent(self.cell.strain)
 
         solver = µ.solvers.KrylovSolverCG(self.cell, cg_tol, maxiter, verbose)
-        r = µ.solvers.de_geus(self.cell, Del0, solver, newton_tol, equil_tol, verbose)
+        r = µ.solvers.de_geus(self.cell, Del0, solver,
+                              newton_tol, equil_tol, verbose)
         # print(r)
+
+
 if __name__ == '__main__':
     unittest.main()

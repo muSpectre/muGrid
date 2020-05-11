@@ -44,7 +44,7 @@ import scipy
 import itertools
 
 np.set_printoptions(linewidth=180)
-comparator_nb_cols=9
+comparator_nb_cols = 9
 
 scipy_version = tuple((int(i) for i in scipy.__version__.split('.')))
 if scipy_version < (1, 2, 0):
@@ -58,8 +58,8 @@ else:
 f = np.asfortranarray
 # ----------------------------------- GRID ------------------------------------
 
-ndim   = 2   # number of dimensions
-N      = 3  # number of voxels (assumed equal for all directions)
+ndim = 2   # number of dimensions
+N = 3  # number of voxels (assumed equal for all directions)
 
 Nx = Ny = Nz = N
 
@@ -67,67 +67,112 @@ Nx = Ny = Nz = N
 
 # tensor operations/products: np.einsum enables index notation, avoiding loops
 # e.g. ddot42 performs $C_ij = A_ijkl B_lk$ for the entire grid
-trans2 = lambda A2   : np.einsum('ijpxy          ->jipxy  ',A2   )
-ddot42 = lambda A4,B2: np.einsum('ijklpxy,lkpxy  ->ijpxy  ',A4,B2)
-ddot44 = lambda A4,B4: np.einsum('ijklpxy,lkmnpxy->ijmnpxy',A4,B4)
-dot22  = lambda A2,B2: np.einsum('ijpxy  ,jkpxy  ->ikpxy  ',A2,B2)
-dot24  = lambda A2,B4: np.einsum('ijpxy  ,jkmnpxy->ikmnpxy',A2,B4)
-dot42  = lambda A4,B2: np.einsum('ijklpxy,lmpxy  ->ijkmpxy',A4,B2)
-dyad22 = lambda A2,B2: np.einsum('ijpxy  ,klpxy  ->ijklpxy',A2,B2)
+
+
+def trans2(A2): return np.einsum('ijpxy          ->jipxy  ', A2)
+
+
+def ddot42(A4, B2): return np.einsum('ijklpxy,lkpxy  ->ijpxy  ', A4, B2)
+
+
+def ddot44(A4, B4): return np.einsum('ijklpxy,lkmnpxy->ijmnpxy', A4, B4)
+
+
+def dot22(A2, B2): return np.einsum('ijpxy  ,jkpxy  ->ikpxy  ', A2, B2)
+
+
+def dot24(A2, B4): return np.einsum('ijpxy  ,jkmnpxy->ikmnpxy', A2, B4)
+
+
+def dot42(A4, B2): return np.einsum('ijklpxy,lmpxy  ->ijkmpxy', A4, B2)
+
+
+def dyad22(A2, B2): return np.einsum('ijpxy  ,klpxy  ->ijklpxy', A2, B2)
+
 
 # identity tensor                                               [single tensor]
-i      = f(np.eye(ndim))
+i = f(np.eye(ndim))
 # identity tensors                                            [grid of tensors]
-I      = f(np.einsum('ij,pxy'           ,                  i   ,np.ones([1, N,N])))
-I4     = f(np.einsum('ijkl,pxy->ijklpxy',np.einsum('il,jk',i,i),np.ones([1, N,N])))
-I4rt   = f(np.einsum('ijkl,pxy->ijklpxy',np.einsum('ik,jl',i,i),np.ones([1, N,N])))
-I4s    = (I4+I4rt)/2.
-II     = dyad22(I,I)
+I = f(np.einsum('ij,pxy',                  i, np.ones([1, N, N])))
+I4 = f(np.einsum('ijkl,pxy->ijklpxy',
+                 np.einsum('il,jk', i, i), np.ones([1, N, N])))
+I4rt = f(np.einsum('ijkl,pxy->ijklpxy',
+                   np.einsum('ik,jl', i, i), np.ones([1, N, N])))
+I4s = (I4+I4rt)/2.
+II = dyad22(I, I)
 
 # projection operator                                         [grid of tensors]
 # NB can be vectorized (faster, less readable), see: "elasto-plasticity.py"
 # - support function / look-up list / zero initialize
-delta  = lambda i,j: np.float(i==j)            # Dirac delta function
-freq   = np.arange(-(N-1)/2.,+(N+1)/2.)        # coordinate axis -> freq. axis
-Ghat4  = np.zeros([ndim,ndim,ndim,ndim,1,N,N], order="F") # zero initialize
+
+
+def delta(i, j): return np.float(i == j)            # Dirac delta function
+
+
+freq = np.arange(-(N-1)/2., +(N+1)/2.)        # coordinate axis -> freq. axis
+Ghat4 = np.zeros([ndim, ndim, ndim, ndim, 1, N, N],
+                 order="F")  # zero initialize
 # - compute
-for i,j,l,m in itertools.product(range(ndim),repeat=4):
-    for x,y    in itertools.product(range(N),   repeat=2):
+for i, j, l, m in itertools.product(range(ndim), repeat=4):
+    for x, y in itertools.product(range(N),   repeat=2):
         q = np.array([freq[x], freq[y]])  # frequency vector
         if not q.dot(q) == 0:                      # zero freq. -> mean
-            Ghat4[i,j,l,m,0, x,y] = delta(i,m)*q[j]*q[l]/(q.dot(q))
+            Ghat4[i, j, l, m, 0, x, y] = delta(i, m)*q[j]*q[l]/(q.dot(q))
 
 # (inverse) Fourier transform (for each tensor component in each direction)
-fft    = lambda x  : np.fft.fftshift(np.fft.fftn (np.fft.ifftshift(x),[N,N]))
-ifft   = lambda x  : np.fft.fftshift(np.fft.ifftn(np.fft.ifftshift(x),[N,N]))
+
+
+def fft(x): return np.fft.fftshift(np.fft.fftn(np.fft.ifftshift(x), [N, N]))
+
+
+def ifft(x): return np.fft.fftshift(np.fft.ifftn(np.fft.ifftshift(x), [N, N]))
+
 
 # functions for the projection 'G', and the product 'G : K^LT : (delta F)^T'
-G      = lambda A2 : np.real( ifft( ddot42(Ghat4,fft(A2)) ) ).reshape(-1)
-Gfull  = lambda A2 : np.real( ifft( ddot42(Ghat4,fft(A2)) ) )
-K_dF   = lambda dFm: trans2(ddot42(K4,trans2(dFm.reshape(ndim,ndim,1,N,N))))
-G_K_dF = lambda dFm: G(K_dF(dFm))
-Gfull_K_dF = lambda dFm: Gfull(K_dF(dFm))
+def G(A2): return np.real(ifft(ddot42(Ghat4, fft(A2)))).reshape(-1)
+
+
+def Gfull(A2): return np.real(ifft(ddot42(Ghat4, fft(A2))))
+
+
+def K_dF(dFm): return trans2(
+    ddot42(K4, trans2(dFm.reshape(ndim, ndim, 1, N, N))))
+
+
+def G_K_dF(dFm): return G(K_dF(dFm))
+
+
+def Gfull_K_dF(dFm): return Gfull(K_dF(dFm))
 
 # ------------------- PROBLEM DEFINITION / CONSTITIVE MODEL -------------------
 
+
 # phase indicator: cubical inclusion of volume fraction (9**3)/(31**3)
-phase  = np.zeros([N,N], order="F"); phase[:2,:2] = 1.
+phase = np.zeros([N, N], order="F")
+phase[:2, :2] = 1.
 # material parameters + function to convert to grid of scalars
-param  = lambda M0,M1: M0*np.ones([N,N], order="F")*(1.-phase)+M1*np.ones([N,N], order="F")*phase
-K      = param(0.833,8.33)  # bulk  modulus                   [grid of scalars]
-mu     = param(0.386,3.86)  # shear modulus                   [grid of scalars]
+
+
+def param(M0, M1): return M0 * \
+    np.ones([N, N], order="F")*(1.-phase)+M1*np.ones([N, N], order="F")*phase
+
+
+K = param(0.833, 8.33)  # bulk  modulus                   [grid of scalars]
+mu = param(0.386, 3.86)  # shear modulus                   [grid of scalars]
 
 # constitutive model: grid of "F" -> grid of "P", "K4"        [grid of tensors]
+
+
 def constitutive(F):
     C4 = K*II+2.*mu*(I4s-1./3*II)
-    S  = ddot42(C4,.5*(dot22(trans2(F),F)-I))
-    P  = dot22(F,S)
-    K4 = dot24(S,I4)+ddot44(ddot44(I4rt,dot42(dot24(F,C4),trans2(F))),I4rt)
-    return P,K4
+    S = ddot42(C4, .5*(dot22(trans2(F), F)-I))
+    P = dot22(F, S)
+    K4 = dot24(S, I4)+ddot44(ddot44(I4rt, dot42(dot24(F, C4), trans2(F))), I4rt)
+    return P, K4
 
 
-F     = np.array(I,copy=True, order="F")
-P,K4  = constitutive(F)
+F = np.array(I, copy=True, order="F")
+P, K4 = constitutive(F)
 
 
 class Counter(object):
@@ -144,25 +189,26 @@ class Counter(object):
     def __call__(self, dummy):
         self.count += 1
 
+
 class LinearElastic_Check(unittest.TestCase):
     def setUp(self):
         self.rel_tol = 1e-13
-        #---------------------------- µSpectre init -----------------------------------
+        # ---------------------------- µSpectre init -----------------------------------
         nb_grid_pts = list(phase.shape)
         dim = len(nb_grid_pts)
-        self.dim=dim
+        self.dim = dim
 
         center = np.array([r//2 for r in nb_grid_pts])
         incl = nb_grid_pts[0]//5
 
-
-        ## Domain dimensions
+        # Domain dimensions
         lengths = [float(r) for r in nb_grid_pts]
         ## formulation (small_strain or finite_strain)
         formulation = µ.Formulation.finite_strain
 
-        ## build a computational domain
+        # build a computational domain
         self.rve = µ.Cell(nb_grid_pts, lengths, formulation)
+
         def get_E_nu(bulk, shear):
             Young = 9*bulk*shear/(3*bulk + shear)
             Poisson = Young/(2*shear) - 1
@@ -190,11 +236,10 @@ class LinearElastic_Check(unittest.TestCase):
             ref = norm(a)
         error = norm(a-b)/ref
 
-        if not error < tol :
+        if not error < tol:
             print("g{0} =\n{1}\nµ{0} =\n{2}".format(name, a, b))
         self.assertLess(error, tol)
         return error
-
 
     def test_constitutive_law(self):
         # define some random strain
@@ -217,7 +262,7 @@ class LinearElastic_Check(unittest.TestCase):
         # define some random strain
         self.rve.evaluate_stress_tangent(I)
         dF = (np.random.random(I.shape)-.5)*1e-3
-
+        print("\nThe shape of T is: \n {}".format(I.shape))
         gG = Gfull_K_dF(dF)
         µG = self.rve.directional_stiffness(dF)
 
@@ -225,7 +270,6 @@ class LinearElastic_Check(unittest.TestCase):
         if not error < self.rel_tol:
             print("gG =\n{}\nµG =\n{}".format(gG, µG))
         self.assertLess(error, self.rel_tol)
-
 
     def test_solve(self):
         before_cg_tol = 1e-11
@@ -237,45 +281,44 @@ class LinearElastic_Check(unittest.TestCase):
         F[:] = I
         self.rve.evaluate_stress_tangent(F)
         # set macroscopic loading
-        DbarF = np.zeros([ndim,ndim,1, N,N], order='F')
-        DbarF[0,1] = 1.0
+        DbarF = np.zeros([ndim, ndim, 1, N, N], order='F')
+        DbarF[0, 1] = 1.0
 
         # initial residual: distribute "barF" over grid using "K4"
-        b     = -G_K_dF(DbarF)
-        µG_K_dF = lambda x: self.rve.directional_stiffness(x.reshape(F.shape)).reshape(-1)
+        b = -G_K_dF(DbarF)
+        def µG_K_dF(x): return self.rve.directional_stiffness(
+            x.reshape(F.shape)).reshape(-1)
         µb = -µG_K_dF(DbarF)
-        µG = lambda x: self.rve.project(x.reshape(F.shape)).reshape(-1)
+        def µG(x): return self.rve.project(x.reshape(F.shape)).reshape(-1)
 
         self.comparator(b, µb, 'b')
-        F    +=         DbarF
-        µF    = F.copy()
-        Fn    = np.linalg.norm(F)
+        F += DbarF
+        µF = F.copy()
+        Fn = np.linalg.norm(F)
         iiter = 0
 
-        P,K4  = constitutive(F)
+        P, K4 = constitutive(F)
         µP, µK = self.rve.evaluate_stress_tangent(µF)
 
         self.comparator(P, µP, "P")
-        self.comparator(K4.transpose(1,0,2,3,4,5,6), µK, "K")
-
-
+        self.comparator(K4.transpose(1, 0, 2, 3, 4, 5, 6), µK, "K")
 
         # iterate as long as the iterative update does not vanish
         while True:
             # solve linear system using CG
             g_counter = Counter()
-            dFm,_ = cg(tol=cg_tol,
-                       A = sp.LinearOperator(shape=(F.size,F.size),
-                                             matvec=G_K_dF,dtype='float'),
-                       b = b,
-                       callback=g_counter, atol=0
-            )
+            dFm, _ = cg(tol=cg_tol,
+                        A=sp.LinearOperator(shape=(F.size, F.size),
+                                            matvec=G_K_dF, dtype='float'),
+                        b=b,
+                        callback=g_counter, atol=0
+                        )
             µ_counter = Counter()
-            µdFm,_ = cg(tol=cg_tol,
-                        A =  sp.LinearOperator(shape=(F.size,F.size),
-                                               matvec=µG_K_dF,dtype='float'),
-                        b = µb,
-                        callback=µ_counter, atol=0)
+            µdFm, _ = cg(tol=cg_tol,
+                         A=sp.LinearOperator(shape=(F.size, F.size),
+                                             matvec=µG_K_dF, dtype='float'),
+                         b=µb,
+                         callback=µ_counter, atol=0)
 
             err = g_counter.get()-µ_counter.get()
 
@@ -294,33 +337,32 @@ class LinearElastic_Check(unittest.TestCase):
                     print("|dFm| = {}".format(norm(dFm)))
                     print("|µdFm - dFm| = {}".format(norm(µdFm-dFm)))
                     print("AssertionWarning: {} is not less than {}".format(err,
-                                                                        after_cg_tol))
+                                                                            after_cg_tol))
                 self.assertLess(err, after_cg_tol)
 
             # update DOFs (array -> tens.grid)
-            F    += dFm.reshape(F.shape)
-            µF   += µdFm.reshape(F.shape)
+            F += dFm.reshape(F.shape)
+            µF += µdFm.reshape(F.shape)
             # new residual stress and tangent
-            P,K4  = constitutive(F)
+            P, K4 = constitutive(F)
             µP, µK = self.rve.evaluate_stress_tangent(µF)
 
             self.comparator(P, µP, "P", tol=after_cg_tol)
-            self.comparator(K4.transpose(1,0,2,3,4,5,6), µK, "K", tol=after_cg_tol)
+            self.comparator(K4.transpose(1, 0, 2, 3, 4, 5, 6),
+                            µK, "K", tol=after_cg_tol)
 
             # convert res.stress to residual
-            b     = -G(P)
-            µb    = -µG(µP)
+            b = -G(P)
+            µb = -µG(µP)
             self.comparator(b, µb, 'b', tol=after_cg_tol, ref=Fn)
 
-            print('Goose:    %10.15e'%(np.linalg.norm(dFm)/Fn))
-            print('µSpectre: %10.15e'%(np.linalg.norm(µdFm)/Fn))
-            if np.linalg.norm(dFm)/Fn<newton_tol and iiter>0:
-                break # check convergence
+            print('Goose:    %10.15e' % (np.linalg.norm(dFm)/Fn))
+            print('µSpectre: %10.15e' % (np.linalg.norm(µdFm)/Fn))
+            if np.linalg.norm(dFm)/Fn < newton_tol and iiter > 0:
+                break  # check convergence
             iiter += 1
 
-
         print("done")
-
 
 
 if __name__ == '__main__':

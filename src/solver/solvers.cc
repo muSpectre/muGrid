@@ -52,8 +52,10 @@ namespace muSpectre {
   //--------------------------------------------------------------------------//
   std::vector<OptimizeResult>
   newton_cg(Cell & cell, const LoadSteps_t & load_steps,
-            KrylovSolverBase & solver, Real newton_tol, Real equil_tol,
-            Verbosity verbose, IsStrainInitialised strain_init) {
+            KrylovSolverBase & solver, const Real & newton_tol,
+            const Real & equil_tol, const Verbosity & verbose,
+            const IsStrainInitialised & strain_init,
+            const Func_t & eigen_strain_func) {
     const auto & comm = cell.get_communicator();
 
     using Matrix_t = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
@@ -71,6 +73,27 @@ namespace muSpectre {
     muGrid::MappedField<muGrid::FieldMap<Real, Mapping::Mut>> rhs_field{
         "rhs",    shape[0], shape[1], IterUnit::SubPt, field_collection,
         QuadPtTag};
+
+    // Standard strain field without the eigen strain: typically the strain
+    // field given to the cell for stress/tangent evaluation, but in case of
+    // presence of eigen strain, it is the strain field before adding the eigen
+    // strain
+    muGrid::TypedFieldBase<Real> & general_strain_field{
+        [&cell, &field_collection,
+         &eigen_strain_func]() -> muGrid::TypedFieldBase<Real> & {
+          if (not(eigen_strain_func == nullptr)) {
+            // general strain field
+            muGrid::RealField & general_strain_field{
+                field_collection.register_real_field(
+                    "general strain",
+                    dof_for_formulation(cell.get_formulation(),
+                                        cell.get_material_dim(), OneQuadPt),
+                    muGrid::PixelSubDiv::QuadPt)};
+            return general_strain_field;
+          } else {
+            return cell.get_strain();
+          }
+        }()};
 
     solver.initialise();
 
@@ -182,7 +205,9 @@ namespace muSpectre {
     // storage for the previous mean strain (to compute ΔF or Δε )
     Matrix_t previous_macro_strain{load_steps.back().Zero(shape[0], shape[1])};
 
-    auto & F{cell.get_strain()};
+    // strain field used by the cell for evaluating stresses/tangents.
+    auto & eval_strain_field{cell.get_strain()};
+
     //! incremental loop
     for (const auto & tup : akantu::enumerate(load_steps)) {
       const auto & strain_step{std::get<0>(tup)};
@@ -191,11 +216,13 @@ namespace muSpectre {
         std::cout << "at Load step " << std::setw(count_width)
                   << strain_step + 1 << std::endl;
       }
+
       // updating cell strain with the difference of the current and previous
       // strain input.
-      for (auto && strain : muGrid::FieldMap<Real, Mapping::Mut>(
-               F, shape[0], muGrid::IterUnit::SubPt)) {
-        strain += macro_strain - previous_macro_strain;
+      auto && F_general_map{muGrid::FieldMap<Real, Mapping::Mut>(
+          general_strain_field, shape[0], muGrid::PixelSubDiv::QuadPt)};
+      for (auto && strain_general : F_general_map) {
+        strain_general += macro_strain - previous_macro_strain;
       }
 
       // define the number of newton iteration (initially equal to 0)
@@ -203,43 +230,62 @@ namespace muSpectre {
       std::string message{"Has not converged"};
       Real incr_norm{2 * newton_tol}, grad_norm{1};
       Real stress_norm{2 * equil_tol};
+      bool has_converged{false};
 
       //! Checks two loop breaking criteria (newton tolerance and equilibrium
       //! tolerance)
-      auto convergence_test = [&incr_norm, &grad_norm, &newton_tol,
-                               &stress_norm, &equil_tol, &message]() {
-        bool incr_test = incr_norm / grad_norm <= newton_tol;
-        bool stress_test = stress_norm < equil_tol;
+      auto && early_convergence_test{[&incr_norm, &grad_norm, &newton_tol,
+                                      &stress_norm, &equil_tol, &message,
+                                      &has_converged]() {
+        bool incr_test{incr_norm / grad_norm <= newton_tol};
+        bool stress_test{stress_norm < equil_tol};
+
         if (incr_test) {
           message = "Residual  tolerance reached";
         } else if (stress_test) {
           message = "Reached stress divergence tolerance";
         }
-        return incr_test || stress_test;
-      };
+        has_converged = incr_test or stress_test;
+        return has_converged;
+      }};
 
-      //! carries out a single newton_cg solving step
-      auto iterate_solve = [&cell, &rhs_field, &incrF_field, &F, &stress_norm,
-                            &incr_norm, &grad_norm, &comm, &convergence_test,
-                            &solver, &strain_step, &load_steps, &macro_strain,
-                            &previous_macro_strain, &newt_iter, &strain_symb,
-                            &verbose, &count_width, &newton_tol, &shape]() {
-        // obtain material response
+      //! Checks all convergence criteria, including detection of linear
+      //! problems
+      auto && full_convergence_test{
+          [&early_convergence_test, &cell, &has_converged, &message]() {
+            bool last_step_linear{not cell.was_last_eval_non_linear()};
+            if (last_step_linear) {
+              message = "Linear problem, no more iteration necessary";
+            }
+            has_converged = early_convergence_test() or last_step_linear;
+            return has_converged;
+          }};
+
+      // Iterative update for the non-linear case
+      for (; newt_iter < solver.get_maxiter() && !has_converged; ++newt_iter) {
+        // updating the strain fields with the  eigen_strain field calculated by
+        // the functor called eigen_strain_func
+
+        if (not(eigen_strain_func == nullptr)) {
+          eval_strain_field = general_strain_field;
+          eigen_strain_func(strain_step, eval_strain_field);
+        }
         auto res_tup{cell.evaluate_stress_tangent()};
         auto & P{std::get<0>(res_tup)};
+
         auto & rhs{rhs_field.get_field()};
 
         rhs = -P;
         cell.apply_projection(rhs);
         stress_norm = std::sqrt(comm.sum(rhs.eigen_vec().squaredNorm()));
 
-        if (convergence_test()) {
-          return true;
+        if (early_convergence_test()) {
+          break;
         }
-        // calling solver for solving the current (iteratively approximated)
+
+        // calling sovler for solving the current (iteratively approximated)
         // linear equilibrium problem
         auto & incrF{incrF_field.get_field()};
-
         try {
           incrF = solver.solve(rhs.eigen_vec());
         } catch (ConvergenceError & error) {
@@ -259,12 +305,13 @@ namespace muSpectre {
 
         // updating cell strain with the periodic (non-constant) solution
         // resulted from imposing the new macro_strain
-        F += incrF;
+        general_strain_field += incrF;
 
         // updating the incremental differences for checking the termination
         // criteria
         incr_norm = std::sqrt(comm.sum(incrF.eigen_vec().squaredNorm()));
-        grad_norm = std::sqrt(comm.sum(F.eigen_vec().squaredNorm()));
+        grad_norm =
+            std::sqrt(comm.sum(eval_strain_field.eigen_vec().squaredNorm()));
 
         if ((verbose >= Verbosity::Detailed) and (comm.rank() == 0)) {
           std::cout << "at Newton step " << std::setw(count_width) << newt_iter
@@ -275,47 +322,35 @@ namespace muSpectre {
           using StrainMap_t = muGrid::FieldMap<Real, Mapping::Const>;
           if (verbose > Verbosity::Detailed) {
             std::cout << "<" << strain_symb << "> =" << std::endl
-                      << StrainMap_t{F, shape[0]}.mean() << std::endl;
+                      << StrainMap_t{eval_strain_field, shape[0]}.mean()
+                      << std::endl;
           }
         }
-        return convergence_test();
-      };
+        full_convergence_test();
+      }
 
-      if (cell.is_non_linear()) {
-        // Iterative update for the non-linear case
-        for (; newt_iter < solver.get_maxiter(); ++newt_iter) {
-          bool converged{iterate_solve()};
-          if (converged) {
-            break;
-          }
-        }
-        // throwing meaningful error message if the number of iterations for
-        // newton_cg is exploited
-        if (newt_iter == solver.get_maxiter()) {
-          std::stringstream err{};
-          err << "Failure at load step " << strain_step + 1 << " of "
-              << load_steps.size() << ". Newton-Raphson failed to converge. "
-              << "The applied boundary condition is Δ" << strain_symb << " ="
-              << std::endl
-              << macro_strain << std::endl
-              << "and the load increment is Δ" << strain_symb << " ="
-              << std::endl
-              << macro_strain - previous_macro_strain << std::endl;
-          throw ConvergenceError(err.str());
-        }
-      } else {
-        // Single strain update for the linear case
-        iterate_solve();
+      // throwing meaningful error message if the number of iterations for
+      // newton_cg is exploited
+      if (newt_iter == solver.get_maxiter()) {
+        std::stringstream err{};
+        err << "Failure at load step " << strain_step + 1 << " of "
+            << load_steps.size() << ". Newton-Raphson failed to converge. "
+            << "The applied boundary condition is Δ" << strain_symb << " ="
+            << std::endl
+            << macro_strain << std::endl
+            << "and the load increment is Δ" << strain_symb << " =" << std::endl
+            << macro_strain - previous_macro_strain << std::endl;
+        throw ConvergenceError(err.str());
       }
 
       // update previous macroscopic strain
       previous_macro_strain = macro_strain;
 
       // store results
-      ret_val.emplace_back(
-          OptimizeResult{F.eigen_vec(), cell.get_stress().eigen_vec(),
-                         convergence_test(), Int(convergence_test()), message,
-                         newt_iter, solver.get_counter(), form});
+      ret_val.emplace_back(OptimizeResult{
+          general_strain_field.eigen_vec(), cell.get_stress().eigen_vec(),
+          full_convergence_test(), Int(full_convergence_test()), message,
+          newt_iter, solver.get_counter(), form});
 
       // store history variables for next load increment
       cell.save_history_variables();
@@ -468,6 +503,7 @@ namespace muSpectre {
     // initialization of F (F in Formulation::finite_strain and ε in
     // Formuation::samll_strain)
     auto & F{cell.get_strain()};
+
     //! incremental loop
     for (const auto & tup : akantu::enumerate(load_steps)) {
       const auto & strain_step{std::get<0>(tup)};
@@ -484,22 +520,38 @@ namespace muSpectre {
       Real stress_norm{2 * equil_tol};
       bool has_converged{false};
 
-      auto convergence_test = [&incr_norm, &grad_norm, &newton_tol,
-                               &stress_norm, &equil_tol, &message,
-                               &has_converged]() {
-        bool incr_test = incr_norm / grad_norm <= newton_tol;
-        bool stress_test = stress_norm < equil_tol;
+      //! Checks two loop breaking criteria (newton tolerance and equilibrium
+      //! tolerance)
+      auto && early_convergence_test{[&incr_norm, &grad_norm, &newton_tol,
+                                      &stress_norm, &equil_tol, &message,
+                                      &has_converged]() {
+        bool incr_test{incr_norm / grad_norm <= newton_tol};
+        bool stress_test{stress_norm < equil_tol};
+
         if (incr_test) {
           message = "Residual  tolerance reached";
         } else if (stress_test) {
           message = "Reached stress divergence tolerance";
         }
-        has_converged = incr_test || stress_test;
+        has_converged = incr_test or stress_test;
         return has_converged;
-      };
+      }};
+
+      //! Checks all convergence criteria, including detection of linear
+      //! problems
+      auto && full_convergence_test{
+          [&early_convergence_test, &cell, &has_converged, &message]() {
+            bool last_step_linear{not cell.was_last_eval_non_linear()};
+            if (last_step_linear) {
+              message = "Linear problem, no more iteration necessary";
+            }
+            has_converged = early_convergence_test() or last_step_linear;
+            return has_converged;
+          }};
+
       Uint newt_iter{0};
 
-      if (cell.is_non_linear()) {
+      if (cell.was_last_eval_non_linear()) {
         // Iterative update in the nonlinear case
         for (; ((newt_iter < solver.get_maxiter()) and (!has_converged)) or
                (newt_iter < 2);
@@ -572,7 +624,7 @@ namespace muSpectre {
                         << StrainMap_t{F, shape[0]}.mean() << std::endl;
             }
           }
-          convergence_test();
+          full_convergence_test();
         }
         if (newt_iter == solver.get_maxiter()) {
           std::stringstream err{};
@@ -591,8 +643,10 @@ namespace muSpectre {
 
         // updating cell strain with the difference of the current and previous
         // strain input.
-        for (auto && strain : muGrid::FieldMap<Real, Mapping::Mut>(
-                 F, shape[0], muGrid::IterUnit::SubPt)) {
+        auto && F_map{muGrid::FieldMap<Real, Mapping::Mut>(
+            F, shape[0], muGrid::PixelSubDiv::QuadPt)};
+
+        for (auto && strain : F_map) {
           strain += macro_strain - previous_macro_strain;
         }
 
@@ -606,7 +660,7 @@ namespace muSpectre {
         cell.apply_projection(rhs);
         stress_norm = std::sqrt(comm.sum(rhs.eigen_vec().squaredNorm()));
 
-        if (!convergence_test()) {
+        if (!early_convergence_test()) {
           // calling sovler for solving the current (iteratively approximated)
           // linear equilibrium problem
           auto & incrF{incrF_field.get_field()};
@@ -648,6 +702,7 @@ namespace muSpectre {
                         << StrainMap_t{F, shape[0]}.mean() << std::endl;
             }
           }
+          full_convergence_test();
         }
       }
 
@@ -657,8 +712,8 @@ namespace muSpectre {
       // store results
       ret_val.emplace_back(
           OptimizeResult{F.eigen_vec(), cell.get_stress().eigen_vec(),
-                         convergence_test(), Int(convergence_test()), message,
-                         newt_iter, solver.get_counter(), form});
+                         full_convergence_test(), Int(full_convergence_test()),
+                         message, newt_iter, solver.get_counter(), form});
 
       // store history variables for next load increment
       cell.save_history_variables();
