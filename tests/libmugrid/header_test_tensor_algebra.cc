@@ -44,6 +44,7 @@
 #include <iostream>
 
 namespace muGrid {
+
   BOOST_AUTO_TEST_SUITE(tensor_algebra)
   auto TerrNorm = [](auto && t) {
     return Eigen::Tensor<Real, 0>(t.abs().sum())();
@@ -293,6 +294,48 @@ namespace muGrid {
     BOOST_CHECK_LT(error, tol);
   }
 
+  /* ---------------------------------------------------------------------- */
+
+  template <Dim_t Dim>
+  struct MatricesFixture {
+    using M1_t = Eigen::Matrix<Real, Dim, 1>;
+    using M2_t = Eigen::Matrix<Real, Dim, Dim>;
+    using M4_t = Eigen::Matrix<Real, Dim * Dim, Dim * Dim>;
+    MatricesFixture()
+        : F{M2_t::Identity() + 1.0e-1 * M2_t::Random()}, m1{M1_t::Random()},
+          m2{M2_t::Random()}, m4{M4_t::Random()} {}
+    M2_t F;
+    M1_t m1;
+    M2_t m2;
+    M4_t m4;
+    Real tol{1e-6};
+  };
+
+  using matrices =
+      boost::mpl::list<MatricesFixture<twoD>, MatricesFixture<threeD>>;
+
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_axis_transformation, Fix, matrices,
+                                   Fix) {
+    namespace Transform = Matrices::AxisTransform;
+
+
+    auto && m1_forwarded{Transform::push_forward(Fix::m1, Fix::F)};
+    auto && m2_forwarded{Transform::push_forward(Fix::m2, Fix::F)};
+    auto && m4_forwarded{Transform::push_forward(Fix::m4, Fix::F)};
+
+    auto && m1_back{Transform::pull_back(m1_forwarded, Fix::F)};
+    auto && m2_back{Transform::pull_back(m2_forwarded, Fix::F)};
+    auto && m4_back{Transform::pull_back(m4_forwarded, Fix::F)};
+
+    auto && err_1{testGoodies::rel_error(Fix::m1, m1_back)};
+    BOOST_CHECK_LT(err_1, Fix::tol);
+
+    auto && err_2{testGoodies::rel_error(Fix::m2, m2_back)};
+    BOOST_CHECK_LT(err_2, Fix::tol);
+
+    auto && err_4{testGoodies::rel_error(Fix::m4, m4_back)};
+    BOOST_CHECK_LT(err_4, Fix::tol);
+  }
   BOOST_AUTO_TEST_SUITE_END();
 
 }  // namespace muGrid

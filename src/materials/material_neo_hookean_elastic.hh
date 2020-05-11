@@ -212,8 +212,7 @@ namespace muSpectre {
     // they result in wrong answer(memory bug) if I choose auto && for their
     // types
     Stiffness_t c_bar{
-        ::muGrid::Matrices::AxisTransform<fourthOrder>::push_forward(
-            this->C_linear, F)};
+        muGrid::Matrices::AxisTransform::push_forward(this->C_linear, F)};
     Stiffness_t c{
         c_bar - ((2.0 / 3.0) * (Matrices::outer(tau_bar, Stress_t::Identity()) +
                                 Matrices::outer(Stress_t::Identity(), tau_bar) -

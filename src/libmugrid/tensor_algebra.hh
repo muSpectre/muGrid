@@ -409,88 +409,130 @@ namespace muGrid {
       return internal::Dotter<Dim, rank1, rank2>::ddot(t1, t2);
     }
 
-    /* ---------------------------------------------------------------------- */
-    template <Dim_t Rank>
-    struct AxisTransform {};
+    namespace internal {
 
-    template <>
-    struct AxisTransform<firstOrder> {
-      template <class T1, class T2>
+      /* -------------------------------------------------------------------- */
+      template <Dim_t Rank>
+      struct AxisTransformer {};
+
+      /* -------------------------------------------------------------------- */
+      template <>
+      struct AxisTransformer<firstOrder> {
+        template <class T1, class T2>
+        inline static decltype(auto)
+        push_forward(const Eigen::MatrixBase<T1> & t1,
+                     const Eigen::MatrixBase<T2> & F) {
+          // returning without copy make results wrong(most probably because of
+          // memory issue). The return values in some cases are fully zeros
+          // matrices.
+          constexpr Dim_t Dim{EigenCheck::tensor_dim<T2>::value};
+          using T1_t =
+              Eigen::Matrix<typename std::remove_reference_t<T2>::Scalar, Dim,
+                            1>;
+          T1_t ret_val{F * t1};
+          return ret_val;
+        }
+
+        template <class T1, class T2>
+        inline static decltype(auto)
+        pull_back(const Eigen::MatrixBase<T1> & t1,
+                  const Eigen::MatrixBase<T2> & F) {
+          constexpr Dim_t Dim{EigenCheck::tensor_dim<T2>::value};
+          using T2_t =
+              Eigen::Matrix<typename std::remove_reference_t<T2>::Scalar, Dim,
+                            Dim>;
+          T2_t F_inv{F.inverse()};
+          return push_forward(t1, F_inv);
+        }
+      };
+
+      template <>
+      struct AxisTransformer<secondOrder> {
+        template <class T2, class T2_F>
+        inline static decltype(auto)
+        push_forward(const Eigen::MatrixBase<T2> & t2,
+                     const Eigen::MatrixBase<T2_F> & F) {
+          // returning without copy make results wrong(most probably because of
+          // memory issue). The return values in some cases are fully zeros
+          // matrices.
+          constexpr Dim_t Dim{EigenCheck::tensor_dim<T2_F>::value};
+          using T2_t =
+              Eigen::Matrix<typename std::remove_reference_t<T2>::Scalar, Dim,
+                            Dim>;
+          T2_t ret_val{F * t2 * F.transpose()};
+          return ret_val;
+        }
+
+        template <class T2, class T2_F>
+        inline static decltype(auto)
+        pull_back(const Eigen::MatrixBase<T2> & t2,
+                  const Eigen::MatrixBase<T2_F> & F) {
+          constexpr Dim_t Dim{EigenCheck::tensor_dim<T2_F>::value};
+          using T2_t =
+              Eigen::Matrix<typename std::remove_reference_t<T2>::Scalar, Dim,
+                            Dim>;
+          T2_t F_inv{F.inverse()};
+          return push_forward(t2, F_inv);
+        }
+      };
+
+      /* -------------------------------------------------------------------- */
+      template <>
+      struct AxisTransformer<fourthOrder> {
+        template <class T4, class T2>
+        inline static decltype(auto)
+        push_forward(const Eigen::MatrixBase<T4> & t4,
+                     const Eigen::MatrixBase<T2> & F) {
+          // returning without copy make results wrong(most probably because of
+          // memory issue). The return values in some cases are fully zeros
+          // matrices. This function is used in MaterialNeoHookeanElastic and
+          // its use without copying the return value made the returned value
+          // zero-filed matrix.
+          constexpr Dim_t Dim{EigenCheck::tensor_dim<T2>::value};
+          Tens4_t<Dim> ret_val{
+              muGrid::Matrices::outer_under(F, F) * t4 *
+              muGrid::Matrices::outer_under(F.transpose(), F.transpose())};
+
+          return ret_val;
+        }
+
+        template <class T4, class T2>
+        inline static decltype(auto)
+        pull_back(const Eigen::MatrixBase<T4> & t4,
+                  const Eigen::MatrixBase<T2> & F) {
+          constexpr Dim_t Dim{EigenCheck::tensor_dim<T2>::value};
+          using T2_t =
+              Eigen::Matrix<typename std::remove_reference_t<T2>::Scalar, Dim,
+                            Dim>;
+          T2_t F_inv{F.inverse()};
+          return push_forward(t4, F_inv);
+        }
+      };
+
+    }  // namespace internal
+
+    namespace AxisTransform {
+
+      /* -------------------------------------------------------------------- */
+      template <class T_in, class T2>
       inline static decltype(auto)
-      push_forward(const Eigen::MatrixBase<T1> & t1,
+      push_forward(const Eigen::MatrixBase<T_in> & t,
                    const Eigen::MatrixBase<T2> & F) {
-        // returning without copy make results wrong(most probably because of
-        // memory issue). The return values in some cases are fully zeros
-        // matrices.
-        constexpr Dim_t dim{EigenCheck::tensor_dim<T1>::value};
-        using T1_t =
-            Eigen::Matrix<typename std::remove_reference_t<T2>::Scalar, dim, 1>;
-        T1_t ret_val{F * t1};
-        return ret_val;
+        constexpr Dim_t Dim{EigenCheck::tensor_dim<T2>::value};
+        constexpr Dim_t Order{EigenCheck::tensor_rank<T_in, Dim>::value};
+        return internal::AxisTransformer<Order>::push_forward(t, F);
       }
 
-      template <class T1, class T2>
-      inline static decltype(auto) pull_back(const Eigen::MatrixBase<T1> & t1,
+      /* -------------------------------------------------------------------- */
+      template <class T_in, class T2>
+      inline static decltype(auto) pull_back(const Eigen::MatrixBase<T_in> & t,
                                              const Eigen::MatrixBase<T2> & F) {
-        constexpr Dim_t dim{EigenCheck::tensor_dim<T1>::value};
-        auto && F_inv{F.inverse()};
-        return push_forward<dim>(t1, F_inv);
-      }
-    };
-
-    template <>
-    struct AxisTransform<secondOrder> {
-      template <class T2, class T2_F>
-      inline static decltype(auto)
-      push_forward(const Eigen::MatrixBase<T2> & t2,
-                   const Eigen::MatrixBase<T2_F> & F) {
-        // returning without copy make results wrong(most probably because of
-        // memory issue). The return values in some cases are fully zeros
-        // matrices.
-        constexpr Dim_t dim{EigenCheck::tensor_dim<T2>::value};
-        using T2_t = Eigen::Matrix<typename std::remove_reference_t<T2>::Scalar,
-                                   dim, dim>;
-        T2_t ret_val{F * t2 * F.transpose()};
-        return ret_val;
+        constexpr Dim_t Dim{EigenCheck::tensor_dim<T2>::value};
+        constexpr Dim_t Order{EigenCheck::tensor_rank<T_in, Dim>::value};
+        return internal::AxisTransformer<Order>::pull_back(t, F);
       }
 
-      template <class T2, class T2_F>
-      inline static decltype(auto)
-      pull_back(const Eigen::MatrixBase<T2> & t2,
-                const Eigen::MatrixBase<T2_F> & F) {
-        constexpr Dim_t dim{EigenCheck::tensor_dim<T2>::value};
-        auto && F_inv{F.inverse()};
-        return push_forward<dim>(t2, F_inv);
-      }
-    };
-
-    template <>
-    struct AxisTransform<fourthOrder> {
-      template <class T4, class T2>
-      inline static decltype(auto)
-      push_forward(const Eigen::MatrixBase<T4> & t4,
-                   const Eigen::MatrixBase<T2> & F) {
-        // returning without copy make results wrong(most probably because of
-        // memory issue). The return values in some cases are fully zeros
-        // matrices. This function is used in MaterialNeoHookeanElastic and
-        // its use without copying the return value made the returned value
-        // zero-filed matrix.
-        constexpr Dim_t dim{EigenCheck::tensor_dim<T2>::value};
-        Tens4_t<dim> ret_val{
-            muGrid::Matrices::outer_under(F, F) * t4 *
-            muGrid::Matrices::outer_under(F.transpose(), F.transpose())};
-
-        return ret_val;
-      }
-
-      template <class T4, class T2>
-      inline static decltype(auto) pull_back(const Eigen::MatrixBase<T4> & t4,
-                                             const Eigen::MatrixBase<T2> & F) {
-        constexpr Dim_t dim{EigenCheck::tensor_dim<T4>::value};
-        T2 F_inv{F.inverse()};
-        return push_forward<dim>(t4, F_inv);
-      }
-    };
+    }  // namespace AxisTransform
 
   }  // namespace Matrices
 }  // namespace muGrid
