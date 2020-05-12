@@ -276,6 +276,71 @@ namespace muSpectre {
     muGrid::ComplexField &
     globalise_complex_internal_field(const std::string & unique_name);
 
+    /**
+     * collect the real-valued fields of name `unique_name` of each material in
+     * the cell and write their values into a global field of same type and name
+     */
+    muGrid::RealField &
+    globalise_real_current_field(const std::string & unique_name);
+
+    /**
+     * collect the integer-valued fields of name `unique_name` of each material
+     * in the cell and write their values into a global field of same type and
+     * name
+     */
+    muGrid::IntField &
+    globalise_int_current_field(const std::string & unique_name);
+
+    /**
+     * collect the unsigned integer-valued fields of name `unique_name` of each
+     * material in the cell and write their values into a global field of same
+     * type and name
+     */
+    muGrid::UintField &
+    globalise_uint_current_field(const std::string & unique_name);
+
+    /**
+     * collect the complex-valued fields of name `unique_name` of each material
+     * in the cell and write their values into a global field of same type and
+     * name
+     */
+    muGrid::ComplexField &
+    globalise_complex_current_field(const std::string & unique_name);
+
+    /**
+     * collect the real-valued fields of name `unique_name` of each material in
+     * the cell and write their values into a global field of same type and name
+     */
+    muGrid::RealField &
+    globalise_real_old_field(const std::string & unique_name,
+                             const size_t & nb_stpes_ago);
+
+    /**
+     * collect the integer-valued fields of name `unique_name` of each material
+     * in the cell and write their values into a global field of same type and
+     * name
+     */
+    muGrid::IntField & globalise_int_old_field(const std::string & unique_name,
+                                               const size_t & nb_stpes_ago);
+
+    /**
+     * collect the unsigned integer-valued fields of name `unique_name` of each
+     * material in the cell and write their values into a global field of same
+     * type and name
+     */
+    muGrid::UintField &
+    globalise_uint_old_field(const std::string & unique_name,
+                             const size_t & nb_stpes_ago);
+
+    /**
+     * collect the complex-valued fields of name `unique_name` of each material
+     * in the cell and write their values into a global field of same type and
+     * name
+     */
+    muGrid::ComplexField &
+    globalise_complex_old_field(const std::string & unique_name,
+                                const size_t & nb_stpes_ago);
+
     //! return a reference to the cell's global fields
     muGrid::GlobalFieldCollection & get_fields();
 
@@ -336,7 +401,19 @@ namespace muSpectre {
     template <typename T>
     muGrid::TypedField<T> &
     globalise_internal_field(const std::string & unique_name);
+
+    //! helper function for the globalise_<T>_current_field() functions
+    template <typename T>
+    muGrid::TypedField<T> &
+    globalise_current_field(const std::string & unique_name);
+
+    //! helper function for the globalise_<T>_old_field() functions
+    template <typename T>
+    muGrid::TypedField<T> & globalise_old_field(const std::string & unique_name,
+                                                const size_t & nb_steps_ago);
+
     bool initialised{false};  //!< to handle double initialisations right
+
     //! container of the materials present in the cell
     std::vector<Material_ptr> materials{};
 

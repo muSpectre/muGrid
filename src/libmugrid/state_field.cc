@@ -44,7 +44,7 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   StateField::StateField(const std::string & unique_prefix,
-                           FieldCollection & collection, Dim_t nb_memory)
+                         FieldCollection & collection, Dim_t nb_memory)
       : prefix{unique_prefix}, collection{collection}, nb_memory{nb_memory} {
     if (nb_memory < 1) {
       throw FieldError("State fields must have a memory size of at least 1.");
@@ -76,22 +76,21 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  const Field & StateField::old(size_t nb_steps_ago) const {
+  const Field & StateField::old(const size_t & nb_steps_ago) const {
     return this->fields[this->indices.at(nb_steps_ago)];
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
   TypedStateField<T>::TypedStateField(const std::string & unique_prefix,
-                                        FieldCollection & collection,
-                                        Dim_t nb_memory, Dim_t nb_components)
+                                      FieldCollection & collection,
+                                      Dim_t nb_memory, Dim_t nb_components)
       : Parent{unique_prefix, collection, nb_memory} {
     for (Dim_t i{0}; i < nb_memory + 1; ++i) {
       std::stringstream unique_name_stream{};
       unique_name_stream << this->prefix << ", sub_field index " << i;
-      this->fields.push_back(
-          this->collection.template register_field<T>(
-              unique_name_stream.str(), nb_components));
+      this->fields.push_back(this->collection.template register_field<T>(
+          unique_name_stream.str(), nb_components));
     }
   }
 

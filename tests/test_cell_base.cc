@@ -40,6 +40,8 @@
 #include "libmugrid/test_goodies.hh"
 
 #include <libmugrid/iterators.hh>
+#include <libmugrid/field_typed.hh>
+#include <libmugrid/state_field.hh>
 #include <libmugrid/field_map.hh>
 #include <cell/cell_factory.hh>
 #include <materials/material_linear_elastic1.hh>
@@ -336,6 +338,171 @@ namespace muSpectre {
 
     col_hard.register_int_field(wrong_scalar_name, Dim);
     BOOST_CHECK_THROW(this->globalise_real_internal_field(wrong_scalar_name),
+                      std::runtime_error);
+  }
+
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_globalised_current_state_fields, Fix,
+                                   fixlist, Fix) {
+    constexpr Dim_t Dim{Fix::sdim};
+    const size_t nb_steps_to_save{1};
+    const size_t nb_dof{1};
+    using Mat_t = MaterialLinearElastic1<Dim>;
+    auto & material_soft{Mat_t::make(*this, "soft", 70e9, .3)};
+    auto & material_hard{Mat_t::make(*this, "hard", 210e9, .3)};
+
+    for (const auto & pixel_id : this->get_pixel_indices()) {
+      if (pixel_id % 2) {
+        material_soft.add_pixel(pixel_id);
+      } else {
+        material_hard.add_pixel(pixel_id);
+      }
+    }
+    material_soft.initialise();
+    material_hard.initialise();
+
+    auto & col_soft{material_soft.get_collection()};
+    auto & col_hard{material_hard.get_collection()};
+
+    // compatible fields:
+    const std::string compatible_name{"compatible"};
+    auto & compatible_soft{col_soft.register_real_state_field(
+        compatible_name, nb_steps_to_save, nb_dof)};
+    auto & compatible_hard{col_hard.register_real_state_field(
+        compatible_name, nb_steps_to_save, nb_dof)};
+
+    auto pixler = [](auto & state_field) {
+      auto & field_current(
+          muGrid::TypedField<Real>::safe_cast(state_field.current()));
+      auto map{field_current.get_quad_pt_map()};
+      for (auto && tup : map.enumerate_indices()) {
+        const auto & quad_pt_id{std::get<0>(tup)};
+        auto & val{std::get<1>(tup)};
+        val(0) = quad_pt_id;
+      }
+    };
+
+    pixler(compatible_soft);
+    pixler(compatible_hard);
+
+    auto & global_compatible_field_current{
+        this->globalise_real_current_field(compatible_name)};
+
+    auto glo_map_current{global_compatible_field_current.get_quad_pt_map()};
+
+    for (auto && tup : glo_map_current.enumerate_indices()) {
+      const auto & quad_pt_id{std::get<0>(tup)};
+      const auto & val(std::get<1>(tup));
+
+      Real err{(val(0) - quad_pt_id)};
+      BOOST_CHECK_LT(err, tol);
+    }
+
+    // incompatible fields:
+    const std::string incompatible_name{"incompatible"};
+    col_soft.register_real_state_field(incompatible_name, nb_steps_to_save,
+                                       Dim);
+
+    col_hard.register_real_state_field(incompatible_name, nb_steps_to_save,
+                                       Dim + 1);
+    BOOST_CHECK_THROW(this->globalise_real_current_field(incompatible_name),
+                      std::runtime_error);
+
+    // wrong name/ inexistant field
+    const std::string wrong_name{"wrong_name"};
+    BOOST_CHECK_THROW(this->globalise_real_current_field(wrong_name),
+                      std::runtime_error);
+
+    // wrong scalar type:
+    const std::string wrong_scalar_name{"wrong_scalar"};
+    col_soft.register_real_state_field(wrong_scalar_name, nb_steps_to_save,
+                                       Dim);
+
+    col_hard.register_int_state_field(wrong_scalar_name, nb_steps_to_save, Dim);
+    BOOST_CHECK_THROW(this->globalise_real_current_field(wrong_scalar_name),
+                      std::runtime_error);
+  }
+
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_globalised_old_state_fields, Fix,
+                                   fixlist, Fix) {
+    constexpr Dim_t Dim{Fix::sdim};
+    const size_t nb_steps_to_save{1};
+    const size_t nb_dof{1};
+    using Mat_t = MaterialLinearElastic1<Dim>;
+    auto & material_soft{Mat_t::make(*this, "soft", 70e9, .3)};
+    auto & material_hard{Mat_t::make(*this, "hard", 210e9, .3)};
+
+    for (const auto & pixel_id : this->get_pixel_indices()) {
+      if (pixel_id % 2) {
+        material_soft.add_pixel(pixel_id);
+      } else {
+        material_hard.add_pixel(pixel_id);
+      }
+    }
+    material_soft.initialise();
+    material_hard.initialise();
+
+    auto & col_soft{material_soft.get_collection()};
+    auto & col_hard{material_hard.get_collection()};
+
+    // compatible fields:
+    const std::string compatible_name{"compatible"};
+    auto & compatible_soft{col_soft.register_real_state_field(
+        compatible_name, nb_steps_to_save, nb_dof)};
+    auto & compatible_hard{col_hard.register_real_state_field(
+        compatible_name, nb_steps_to_save, nb_dof)};
+
+    auto pixler = [](auto & state_field) {
+      auto & field_old(
+          muGrid::TypedField<Real>::safe_cast(state_field.current()));
+      auto map{field_old.get_quad_pt_map()};
+      for (auto && tup : map.enumerate_indices()) {
+        const auto & quad_pt_id{std::get<0>(tup)};
+        auto & val{std::get<1>(tup)};
+        val(0) = quad_pt_id;
+      }
+    };
+
+    pixler(compatible_soft);
+    pixler(compatible_hard);
+
+    compatible_hard.cycle();
+    compatible_soft.cycle();
+
+    auto & global_compatible_field_old{
+        this->globalise_real_old_field(compatible_name, nb_steps_to_save)};
+
+    auto glo_map_old{global_compatible_field_old.get_quad_pt_map()};
+
+    for (auto && tup : glo_map_old.enumerate_indices()) {
+      const auto & quad_pt_id{std::get<0>(tup)};
+      const auto & val(std::get<1>(tup));
+
+      Real err{(val(0) - quad_pt_id)};
+      BOOST_CHECK_LT(err, tol);
+    }
+
+    // incompatible fields:
+    const std::string incompatible_name{"incompatible"};
+    col_soft.register_real_state_field(incompatible_name, nb_steps_to_save,
+                                       Dim);
+    col_hard.register_real_state_field(incompatible_name, nb_steps_to_save,
+                                       Dim + 1);
+
+    BOOST_CHECK_THROW(this->globalise_real_old_field(incompatible_name, 1),
+                      std::runtime_error);
+
+    // wrong name/ inexistant field
+    const std::string wrong_name{"wrong_name"};
+    BOOST_CHECK_THROW(this->globalise_real_old_field(wrong_name, 1),
+                      std::runtime_error);
+
+    // wrong scalar type:
+    const std::string wrong_scalar_name{"wrong_scalar"};
+    col_soft.register_real_state_field(wrong_scalar_name, nb_steps_to_save,
+                                       Dim);
+    col_hard.register_int_state_field(wrong_scalar_name, nb_steps_to_save, Dim);
+
+    BOOST_CHECK_THROW(this->globalise_real_old_field(wrong_scalar_name, 1),
                       std::runtime_error);
   }
 

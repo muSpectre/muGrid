@@ -59,6 +59,7 @@ namespace muGrid {
 
   //! forward declaration of the `muGrid::FieldCollection`
   class FieldCollection;
+
   //! forward declaration of the `muGrid::Field`
   class Field;
 
@@ -74,8 +75,8 @@ namespace muGrid {
     /**
      * Protected constructor
      */
-    StateField(const std::string & unique_prefix,
-                FieldCollection & collection, Dim_t nb_memory = 1);
+    StateField(const std::string & unique_prefix, FieldCollection & collection,
+               Dim_t nb_memory = 1);
 
    public:
     //! Default constructor
@@ -120,7 +121,7 @@ namespace muGrid {
      * return a reference to the field holding the values which were current
      * `nb_steps_ago` ago
      */
-    const Field & old(size_t nb_steps_ago = 1) const;
+    const Field & old(const size_t & nb_steps_ago = 1) const;
 
     /**
      * get the current ordering of the fields (inlineable because called in hot
@@ -165,8 +166,8 @@ namespace muGrid {
      * `compplex`) factory functions.
      */
     TypedStateField(const std::string & unique_prefix,
-                     FieldCollection & collection, Dim_t nb_memory,
-                     Dim_t nb_components);
+                    FieldCollection & collection, Dim_t nb_memory,
+                    Dim_t nb_components);
 
    public:
     //! base class

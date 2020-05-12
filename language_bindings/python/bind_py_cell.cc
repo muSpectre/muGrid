@@ -75,7 +75,6 @@ using muSpectre::Rcoord_t;
 using pybind11::literals::operator""_a;
 namespace py = pybind11;
 
-
 /**
  * the cell factory is only bound for default template parameters
  */
@@ -116,14 +115,15 @@ void add_cell_factory(py::module & mod) {
 void add_split_cell_factory_helper(py::module & mod) {
   using DynCcoord_t = muGrid::DynCcoord_t;
   using DynRcoord_t = muGrid::DynRcoord_t;
-  mod.def("CellFactorySplit",
-          [](DynCcoord_t res, DynRcoord_t lens, Formulation form,
-             Gradient_t gradient) {
-            return make_cell_split(std::move(res), std::move(lens),
-                                   std::move(form), std::move(gradient));
-          },
-          "resolutions"_a, "lengths"_a,
-          "formulation"_a = Formulation::finite_strain, "gradient"_a);
+  mod.def(
+      "CellFactorySplit",
+      [](DynCcoord_t res, DynRcoord_t lens, Formulation form,
+         Gradient_t gradient) {
+        return make_cell_split(std::move(res), std::move(lens), std::move(form),
+                               std::move(gradient));
+      },
+      "resolutions"_a, "lengths"_a,
+      "formulation"_a = Formulation::finite_strain, "gradient"_a);
 }
 #endif
 
@@ -212,7 +212,8 @@ void add_cell_helper(py::module & mod) {
             } else {
               return numpy_wrap(strain_field);
             }
-           }, "strain"_a)
+          },
+          "strain"_a)
       .def_property("strain", &Cell::get_strain,
                     [](Cell & cell, muGrid::TypedFieldBase<Real> & strain) {
                       cell.get_strain() = strain;
@@ -337,29 +338,40 @@ void add_cell_helper(py::module & mod) {
            "least one material must have such a field, or an "
            "Exception is raised.",
            py::return_value_policy::reference_internal)
-      .def(
-          "get_globalised_current_real_field",
-          [](Cell & cell, const std::string & unique_prefix)
-              -> muGrid::TypedFieldBase<Real> & {
-            auto current_name{cell.get_fields()
-                                  .get_state_field(unique_prefix)
-                                  .current()
-                                  .get_name()};
-            return cell.globalise_real_internal_field(current_name);
-          },
-          "unique_prefix"_a, py::return_value_policy::reference_internal)
-      .def(
-          "get_globalised_old_real_field",
-          [](Cell & cell, const std::string & unique_prefix,
-             const size_t & nb_steps_ago) -> muGrid::TypedFieldBase<Real> & {
-            auto old_name{cell.get_fields()
-                              .get_state_field(unique_prefix)
-                              .old(nb_steps_ago)
-                              .get_name()};
-            return cell.globalise_real_internal_field(old_name);
-          },
-          "unique_prefix"_a, "nb_steps_ago"_a = 1,
-          py::return_value_policy::reference_internal)
+      .def("get_globalised_current_real_field",
+           &Cell::globalise_real_current_field, "unique_name"_a,
+           "Convenience function to copy local (internal) fields of "
+           "materials into a global field. At least one of the materials in "
+           "the cell needs to contain an internal field named "
+           "`unique_name`. If multiple materials contain such a field, they "
+           "all need to be of same scalar type and same number of "
+           "components. This does not work for split pixel cells or "
+           "laminate pixel cells, as they can have multiple entries for the "
+           "same pixel. Pixels for which no field named `unique_name` "
+           "exists get an array of zeros."
+           "\n"
+           "Parameters:\n"
+           "unique_name: fieldname to fill the global field with. At "
+           "least one material must have such a field, or an "
+           "Exception is raised.",
+           py::return_value_policy::reference_internal)
+      .def("get_globalised_old_real_field", &Cell::globalise_real_old_field,
+           "unique_name"_a, "nb_steps_ago"_a = 1,
+           "Convenience function to copy local (internal) fields of "
+           "materials into a global field. At least one of the materials in "
+           "the cell needs to contain an internal field named "
+           "`unique_name`. If multiple materials contain such a field, they "
+           "all need to be of same scalar type and same number of "
+           "components. This does not work for split pixel cells or "
+           "laminate pixel cells, as they can have multiple entries for the "
+           "same pixel. Pixels for which no field named `unique_name` "
+           "exists get an array of zeros."
+           "\n"
+           "Parameters:\n"
+           "unique_name: fieldname to fill the global field with. At "
+           "least one material must have such a field, or an "
+           "Exception is raised.",
+           py::return_value_policy::reference_internal)
       .def_property_readonly("pixels", &Cell::get_pixels)
       .def_property_readonly("pixel_indices", &Cell::get_pixel_indices)
       .def_property_readonly("quad_pt_indices", &Cell::get_quad_pt_indices)
