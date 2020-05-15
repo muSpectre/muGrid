@@ -43,8 +43,8 @@ sys.path.insert(0, os.path.join(os.getcwd(), "../language_bindings/libmufft/pyth
 sys.path.insert(0, os.path.join(os.getcwd(), "../language_bindings/libmugrid/python"))
 # Path of the library when compiling with Xcode
 sys.path.insert(0, os.path.join(os.getcwd(), "../language_bindings/python/Debug"))
-sys.path.insert(0, os.path.join(os.getcwd(), "../language_bindings/libmufft/python"))
-sys.path.insert(0, os.path.join(os.getcwd(), "../language_bindings/libmugrid/python"))
+sys.path.insert(0, os.path.join(os.getcwd(), "../language_bindings/libmufft/python/Debug"))
+sys.path.insert(0, os.path.join(os.getcwd(), "../language_bindings/libmugrid/python/Debug"))
 
 import muFFT
 import muSpectre as µ

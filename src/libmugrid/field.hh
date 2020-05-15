@@ -141,6 +141,13 @@ namespace muGrid {
     virtual std::vector<Dim_t> get_components_shape(Iteration iter_type) const;
 
     /**
+     * evaluate and return the overall strides of the pixels portion of the field
+     * (for passing the field to generic multidimensional array objects such as
+     * numpy.ndarray)
+     */
+    std::vector<Dim_t> get_pixels_strides() const;
+
+    /**
      * evaluate and return the number of components in an iterate when iterating
      * over this field
      */

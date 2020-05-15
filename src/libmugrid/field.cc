@@ -104,6 +104,21 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
+  std::vector<Dim_t> Field::get_pixels_strides() const {
+    std::vector<Dim_t> strides;
+    if (this->is_global()) {
+      auto & coll = dynamic_cast<const GlobalFieldCollection &>(
+          this->collection);
+      for (auto && s : coll.get_pixels().get_strides()) {
+        strides.push_back(s);
+      }
+    } else {
+      strides.push_back(1);
+    }
+    return strides;
+  }
+
+  /* ---------------------------------------------------------------------- */
   std::vector<Dim_t> Field::get_components_shape(Iteration iter_type) const {
     std::vector<Dim_t> shape;
 

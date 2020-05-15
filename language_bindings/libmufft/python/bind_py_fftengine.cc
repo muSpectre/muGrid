@@ -88,19 +88,19 @@ class PyFFTEngineBase : public FFTEngineBaseUnclonable {
   //! base class
   using Parent = FFTEngineBase;
   //! field type on which projection is applied
-  using Field_t = typename Parent::Field_t;
+  using RealField_t = typename Parent::RealField_t;
   //! workspace type
-  using Workspace_t = typename Parent::Workspace_t;
+  using FourierField_t = typename Parent::FourierField_t;
 
   PyFFTEngineBase(DynCcoord_t nb_grid_pts, Dim_t nb_dof_per_pixel,
                   Communicator comm)
       : FFTEngineBaseUnclonable(nb_grid_pts, nb_dof_per_pixel, comm) {}
 
-  Workspace_t & fft(Field_t & field) override {
-    PYBIND11_OVERLOAD_PURE(Workspace_t &, Parent, fft, field);
+  FourierField_t & fft(RealField_t & field) override {
+    PYBIND11_OVERLOAD_PURE(FourierField_t &, Parent, fft, field);
   }
 
-  void ifft(Field_t & field) const override {
+  void ifft(RealField_t & field) const override {
     PYBIND11_OVERLOAD_PURE(void, Parent, ifft, field);
   }
 };
@@ -138,12 +138,14 @@ void add_engine_helper(py::module & mod, std::string name) {
            "communicator"_a = size_t(MPI_COMM_SELF))
 #endif
       // Interface for passing Fields directly
-      .def("fft", &Engine::fft)
+      .def_property_readonly("fourier_field", &Engine::get_fourier_field,
+                             py::return_value_policy::reference_internal)
+      .def("fft", &Engine::fft, py::return_value_policy::reference_internal)
       .def("ifft", &Engine::ifft)
       // Interface for passing numpy arrays
       .def(
           "fft",
-          [](Engine & eng, py::array_t<Real, py::array::f_style> array) {
+          [](Engine & eng, py::array_t<Real, py::array::f_style> & array) {
             // We need to tie the lifetime of the return value to the lifetime
             // of the engine object, because we are returning the internal work
             // space buffer that is managed by the engine;
@@ -156,17 +158,18 @@ void add_engine_helper(py::module & mod, std::string name) {
             return numpy_wrap(eng.fft(proxy.get_field()),
                               proxy.get_components_shape());
           },
-          "array"_a, py::return_value_policy::reference_internal,
+          "array"_a,
+          py::keep_alive<0, 1>(),
           "Perform forward FFT on the input array. The method returns an array "
           "containing the Fourier-transformed field, but this array is "
           "borrowed from a buffer internal to the FFT engine object. (A second "
           "call to the forward FFT will override this array.)")
       .def(
           "ifft",
-          [](Engine & eng, py::array_t<Complex, py::array::f_style> array) {
+          [](Engine & eng, py::array_t<Complex, py::array::f_style> & array) {
             // Copy the input array to the FFT work space.
             std::vector<Dim_t> components_shape{
-                numpy_copy(eng.get_work_space(), array)};
+                numpy_copy(eng.get_fourier_field(), array)};
             // Create an numpy array that will hold the result of the inverse
             // FFT. We don't want the storage managed by a field because we
             // want to transfer possession of storage to Python without a copy
@@ -217,6 +220,12 @@ void add_engine_helper(py::module & mod, std::string name) {
           },
           py::return_value_policy::reference)
       .def_property_readonly(
+          "subdomain_strides",
+          [](const Engine & eng) {
+            return to_tuple(eng.get_subdomain_strides());
+          },
+          py::return_value_policy::reference)
+      .def_property_readonly(
           "nb_fourier_grid_pts",
           [](const Engine & eng) {
             return to_tuple(eng.get_nb_fourier_grid_pts());
@@ -226,6 +235,12 @@ void add_engine_helper(py::module & mod, std::string name) {
           "fourier_locations",
           [](const Engine & eng) {
             return to_tuple(eng.get_fourier_locations());
+          },
+          py::return_value_policy::reference)
+      .def_property_readonly(
+          "fourier_strides",
+          [](const Engine & eng) {
+            return to_tuple(eng.get_fourier_strides());
           },
           py::return_value_policy::reference)
       .def_property_readonly(
@@ -261,19 +276,24 @@ void add_engine_helper(py::module & mod, std::string name) {
       .def_property_readonly(
           "fftfreq",
           [](const Engine & eng) {
-            std::vector<Dim_t> shape;
-            Dim_t dim = eng.get_spatial_dim();
+            std::vector<Dim_t> shape{}, strides{};
+            Dim_t dim{eng.get_spatial_dim()};
             shape.push_back(dim);
+            strides.push_back(sizeof(Real));
             for (auto && n : eng.get_nb_fourier_grid_pts()) {
               shape.push_back(n);
             }
-            py::array_t<Real, py::array::f_style> fftfreqs(shape);
-            Real *ptr = static_cast<Real*>(fftfreqs.request().ptr);
-            auto & nb_grid_pts = eng.get_nb_domain_grid_pts();
+            for (auto && s : eng.get_pixels().get_strides()) {
+              strides.push_back(s*dim*sizeof(Real));
+            }
+            py::array_t<Real> fftfreqs(shape, strides);
+            Real *ptr{static_cast<Real*>(fftfreqs.request().ptr)};
+            auto & nb_domain_grid_pts{eng.get_nb_domain_grid_pts()};
             for (auto && pix : eng.get_pixels()) {
               for (int i = 0; i < dim; ++i) {
-                ptr[i] = static_cast<Real>(fft_freq(pix[i], nb_grid_pts[i]))
-                    / nb_grid_pts[i];
+                ptr[i] =
+                    static_cast<Real>(fft_freq(pix[i], nb_domain_grid_pts[i]))
+                    / nb_domain_grid_pts[i];
               }
               ptr += dim;
             }

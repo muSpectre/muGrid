@@ -46,7 +46,7 @@ namespace muSpectre {
                                  Formulation form)
       : fft_engine{std::move(engine)}, domain_lengths{domain_lengths},
         nb_quad_pts{nb_quad_pts}, form{form},
-        projection_container{this->fft_engine->get_field_collection()} {
+        projection_container{this->fft_engine->get_fourier_field_collection()} {
     if (nb_quad_pts <= 0) {
       throw std::runtime_error("Number of quadrature points must be larger "
                                "than zero.");

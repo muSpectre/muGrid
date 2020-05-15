@@ -76,7 +76,7 @@ namespace muGrid {
     constexpr Ccoord cube = CcoordOps::get_cube<dim>(size);
     constexpr Ccoord stride = CcoordOps::get_default_strides(cube);
 
-    BOOST_CHECK_EQUAL(CcoordOps::get_size_from_strides(cube, stride),
+    BOOST_CHECK_EQUAL(CcoordOps::get_buffer_size(cube, stride),
                       ipow(size, dim));
   }
 

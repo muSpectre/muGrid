@@ -108,8 +108,11 @@ namespace muFFT {
   //! lightweight abstraction for the MPI communicator object
   class Communicator {
    public:
-    explicit Communicator(MPI_Comm comm = MPI_COMM_NULL) : comm{comm} {};
-    ~Communicator() {}
+    explicit Communicator(MPI_Comm comm = MPI_COMM_NULL);
+    Communicator(const Communicator & other);
+    ~Communicator();
+
+    Communicator & operator=(const Communicator & other);
 
     //! get rank of present process
     int rank() const {

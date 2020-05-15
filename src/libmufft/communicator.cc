@@ -43,6 +43,18 @@ using muGrid::RuntimeError;
 
 namespace muFFT {
 
+  Communicator::Communicator(MPI_Comm comm) : comm{comm} {}
+
+  Communicator::Communicator(const muFFT::Communicator & other)
+      : comm(other.comm) {}
+
+  Communicator::~Communicator() {}
+
+  Communicator & Communicator::operator=(const Communicator &other) {
+    this->comm = other.comm;
+    return *this;
+  }
+
   //! sum reduction on EigenMatrix types
   template <typename T>
   auto Communicator::sum_mat(const Eigen::Ref<Matrix_t<T>> & arg) const

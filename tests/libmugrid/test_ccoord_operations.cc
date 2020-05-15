@@ -91,6 +91,33 @@ namespace muGrid {
     }
   }
 
+  BOOST_AUTO_TEST_CASE(test_is_buffer_contiguous) {
+    DynCcoord_t nb_grid_pts2({2, 3});
+    DynCcoord_t column_major2({1, 2});
+    DynCcoord_t row_major2({3, 1});
+    BOOST_CHECK(CcoordOps::is_buffer_contiguous(
+        nb_grid_pts2, CcoordOps::get_default_strides(nb_grid_pts2)));
+    BOOST_CHECK(CcoordOps::is_buffer_contiguous(nb_grid_pts2, column_major2));
+    BOOST_CHECK(CcoordOps::is_buffer_contiguous(nb_grid_pts2, row_major2));
+    DynCcoord_t non_contiguous2({6, 1});
+    BOOST_CHECK(!CcoordOps::is_buffer_contiguous(nb_grid_pts2,
+                                                 non_contiguous2));
+
+    DynCcoord_t nb_grid_pts3({5, 3, 4});
+    DynCcoord_t column_major3({1, 5, 15});
+    DynCcoord_t row_major3({12, 4, 1});
+    BOOST_CHECK(CcoordOps::is_buffer_contiguous(
+        nb_grid_pts3, CcoordOps::get_default_strides(nb_grid_pts3)));
+    BOOST_CHECK(CcoordOps::is_buffer_contiguous(nb_grid_pts3, column_major3));
+    BOOST_CHECK(CcoordOps::is_buffer_contiguous(nb_grid_pts3, row_major3));
+    DynCcoord_t partial_transpose3({1, 20, 5});
+    BOOST_CHECK(CcoordOps::is_buffer_contiguous(nb_grid_pts3,
+                                               partial_transpose3));
+    DynCcoord_t non_contiguous3({6, 5, 15});
+    BOOST_CHECK(!CcoordOps::is_buffer_contiguous(nb_grid_pts3,
+                                                 non_contiguous3));
+  }
+
   BOOST_AUTO_TEST_SUITE_END();
 
 }  // namespace muGrid

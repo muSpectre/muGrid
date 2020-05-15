@@ -73,18 +73,18 @@ class NumpyProxy {
    *    1. (8, 3, 3)
    *    2. (2, 4, 3, 3)
    *    3. (2, 2, 2, 3, 3)
-   * The method `get_components_shape` return the shape of the component part
+   * The method `get_components_shape` returns the shape of the component part
    * of the field in this case. For the above examples, it would return:
    *    1. (8,)
    *    2. (2, 4)
    *    3. (2, 2, 2)
    * Note that a field with a single component can be passed either with a
-   * shaping having leading dimension of one or without any leading dimension.
+   * shape having leading dimension of one or without any leading dimension.
    * In the latter case, `get_component_shape` will return a vector of size 0.
    * The same applies for fields with a single quadrature point, whose
    * dimension can be omitted. In general, the shape of the field needs to
    * look like this:
-   *    (component_1, component:2, quad_pt, grid_x, grid_y, grid_z)
+   *    (component_1, component_2, quad_pt, grid_x, grid_y, grid_z)
    * where the number of components and grid indices can be arbitrary.
    */
   NumpyProxy(DynCcoord_t nb_subdomain_grid_pts,
@@ -136,7 +136,7 @@ class NumpyProxy {
    * returns exactly the shape passed to this constructor.
    *
    * In general, the shape of the field needs to look like this:
-   *    (component_1, component:2, quad_pt, grid_x, grid_y, grid_z)
+   *    (component_1, component_2, quad_pt, grid_x, grid_y, grid_z)
    * where the number of components and grid indices can be arbitrary. The
    * quad_pt dimension can be omitted if there is only a single quad_pt.
    */
@@ -233,14 +233,14 @@ numpy_copy(const TypedFieldBase<T> & field,
       << "array must equal the grid size in its last dimensions.";
     throw NumpyError(s.str());
   }
-  Dim_t nb_array_components = 1;
+  Dim_t nb_components = 1;
   std::vector<Dim_t> components_shape;
   for (auto n = buffer.shape.begin();
        n != buffer.shape.end() - pixels_shape.size(); ++n) {
     components_shape.push_back(*n);
-    nb_array_components *= *n;
+    nb_components *= *n;
   }
-  if (nb_array_components != field.get_nb_dof_per_quad_pt()) {
+  if (nb_components != field.get_nb_dof_per_quad_pt()) {
     std::stringstream s;
     s << "The numpy array has shape " << buffer.shape << ", but the muGrid "
       << "field reports " << field.get_nb_dof_per_quad_pt() << " components "
@@ -249,21 +249,46 @@ numpy_copy(const TypedFieldBase<T> & field,
     throw NumpyError(s.str());
   }
 
-  std::copy(static_cast<T*>(buffer.ptr),
-            static_cast<T*>(buffer.ptr) + buffer.size,
-            field.data());
+  auto array_ptr = static_cast<T *>(buffer.ptr);
+  auto field_ptr = field.data();
+
+  if (pixels_shape.size() == 1) {
+    // This is a local field collection, we just copy the data straight.
+    std::copy(array_ptr, array_ptr + buffer.size, field_ptr);
+  } else {
+    // The array is contiguous and column major, but we have to take care about
+    // the storage order of the field.
+    auto & coll = dynamic_cast<const GlobalFieldCollection &>(
+        field.get_collection());
+    const auto & pixels = coll.get_pixels();
+    const auto & nb_subdomain_grid_pts = pixels.get_nb_subdomain_grid_pts();
+    const auto & subdomain_locations = pixels.get_subdomain_locations();
+    // TODO(pastewka): Rethink looping over fields with weird strides. This
+    // here is certainly not super-efficient.
+    // See also issue 115: https://gitlab.com/muspectre/muspectre/-/issues/115
+    for (const auto && ccoord : pixels) {
+      auto field_index = nb_components*pixels.get_index(ccoord);
+      auto array_index = nb_components*muGrid::CcoordOps::get_index(
+          nb_subdomain_grid_pts, subdomain_locations, ccoord);
+      std::copy(array_ptr + array_index,
+                array_ptr + array_index + nb_components,
+                field_ptr + field_index);
+    }
+  }
 
   return components_shape;
 }
 
-/* Wrap a field into a numpy array, without copying the data */
+/* Wrap a column-major field into a numpy array, without copying the data */
 template <typename T>
 pybind11::array_t<T, pybind11::array::f_style>
 numpy_wrap(const TypedFieldBase<T> & field,
            std::vector<Dim_t> components_shape = std::vector<Dim_t>{}) {
-  std::vector<Dim_t> shape{};
+  std::vector<Dim_t> shape{}, strides{};
+  Dim_t nb_dof_per_quad_pt = field.get_nb_dof_per_quad_pt();
+  Dim_t stride = sizeof(T);
   if (components_shape.size() != 0) {
-    if (field.get_nb_dof_per_quad_pt() != std::accumulate(
+    if (nb_dof_per_quad_pt != std::accumulate(
         components_shape.begin(), components_shape.end(), 1,
         std::multiplies<Dim_t>())) {
       std::stringstream s;
@@ -273,14 +298,28 @@ numpy_wrap(const TypedFieldBase<T> & field,
       throw NumpyError(s.str());
     }
     shape = components_shape;
-  } else {
-    shape.push_back(field.get_nb_dof_per_quad_pt());
+    for (auto && s : components_shape) {
+      strides.push_back(stride);
+      stride *= s;
+    }
+  } else if (nb_dof_per_quad_pt != 1) {
+    shape.push_back(nb_dof_per_quad_pt);
+    strides.push_back(stride);
+    stride *= nb_dof_per_quad_pt;
+  }
+  if (field.get_nb_quad_pts() != 1) {
+    shape.push_back(field.get_nb_quad_pts());
+    strides.push_back(stride);
+    stride *= field.get_nb_quad_pts();
   }
   for (auto && n : field.get_pixels_shape()) {
     shape.push_back(n);
   }
+  for (auto && s : field.get_pixels_strides()) {
+    strides.push_back(stride * s);
+  }
   return pybind11::array_t<T, pybind11::array::f_style>(
-      shape, field.data(), pybind11::capsule([]() {}));
+      shape, strides, field.data(), pybind11::capsule([]() {}));
 }
 
 /* Turn any type that can be enumerated into a tuple */

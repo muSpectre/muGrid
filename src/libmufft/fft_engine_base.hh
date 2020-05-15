@@ -54,18 +54,18 @@ namespace muFFT {
     //! global FieldCollection
     using GFieldCollection_t = muGrid::GlobalFieldCollection;
     //! pixel iterator
-    using Pixels = typename GFieldCollection_t::DynamicPixels;
+    using Pixels_t = typename GFieldCollection_t::DynamicPixels;
     /**
      * Field type on which to apply the projection.
      * This is a TypedFieldBase because it need to be able to hold
      * either TypedField or a WrappedField.
      */
-    using Field_t = muGrid::TypedFieldBase<Real>;
+    using RealField_t = muGrid::TypedFieldBase<Real>;
     /**
      * Field type holding a Fourier-space representation of a
      * real-valued second-order tensor field
      */
-    using Workspace_t = muGrid::ComplexField;
+    using FourierField_t = muGrid::ComplexField;
     /**
      * iterator over Fourier-space discretisation point
      */
@@ -100,10 +100,10 @@ namespace muFFT {
     virtual void initialise(FFT_PlanFlags /*plan_flags*/);
 
     //! forward transform (dummy for interface)
-    virtual Workspace_t & fft(Field_t & /*field*/) = 0;
+    virtual FourierField_t & fft(RealField_t & /*field*/) = 0;
 
     //! inverse transform (dummy for interface)
-    virtual void ifft(Field_t & /*field*/) const = 0;
+    virtual void ifft(RealField_t & /*field*/) const = 0;
 
     //! return whether this engine is active
     virtual bool is_active() const { return true; }
@@ -112,7 +112,7 @@ namespace muFFT {
      * iterators over only those pixels that exist in frequency space
      * (i.e. about half of all pixels, see rfft)
      */
-    const Pixels & get_pixels() const;
+    const Pixels_t & get_pixels() const;
 
     //! nb of pixels (mostly for debugging)
     size_t size() const;
@@ -132,8 +132,7 @@ namespace muFFT {
       return this->nb_subdomain_grid_pts;
     }
     /**
-     * returns the process-local number of grid points in each direction of the
-     * cell
+     * returns the global number of grid points in each direction of the cell
      */
     const DynCcoord_t & get_nb_domain_grid_pts() const {
       return this->nb_domain_grid_pts;
@@ -142,6 +141,11 @@ namespace muFFT {
     const DynCcoord_t & get_subdomain_locations() const {
       return this->subdomain_locations;
     }
+    //! returns the data layout of the process-local grid
+    const DynCcoord_t & get_subdomain_strides() const {
+      return this->subdomain_strides;
+    }
+
     /**
      * returns the process-local number of grid points in each direction of the
      * cell in Fourier space
@@ -153,13 +157,18 @@ namespace muFFT {
     const DynCcoord_t & get_fourier_locations() const {
       return this->fourier_locations;
     }
-
-    //! only required for testing and debugging
-    GFieldCollection_t & get_field_collection() {
-      return this->work_space_container;
+    //! returns the data layout of the cell in Fourier space
+    const DynCcoord_t & get_fourier_strides() const {
+      return this->fourier_strides;
     }
-    //! only required for testing and debugging
-    Workspace_t & get_work_space() { return this->work; }
+
+    //! returns the field collection handling fields in Fourier space
+    GFieldCollection_t & get_fourier_field_collection() {
+      return this->fourier_field_collection;
+    }
+    //! return the internal buffer holding the Fourier field (this is also
+    //! returned by the fft method)
+    FourierField_t & get_fourier_field() { return this->fourier_field; }
 
     //! factor by which to multiply projection before inverse transform (this is
     //! typically 1/nb_pixels for so-called unnormalized transforms (see,
@@ -198,21 +207,32 @@ namespace muFFT {
      */
     Communicator comm;  //!< communicator
     //! Field collection to store the fft workspace
-    GFieldCollection_t work_space_container;
-    DynCcoord_t nb_subdomain_grid_pts;  //!< nb_grid_pts of the process-local
-                                        //!< (subdomain) portion of the cell
-    DynCcoord_t subdomain_locations;    //!< location of the process-local
-                                        //!< (subdomain) portion of the cell
-    DynCcoord_t
-        nb_fourier_grid_pts;  //!< nb_grid_pts of the process-local (subdomain)
-                              //!< portion of the Fourier transformed data
-    DynCcoord_t
-        fourier_locations;  //!< location of the process-local (subdomain)
-                            //!< portion of the Fourier transformed data
-    const DynCcoord_t
-        nb_domain_grid_pts;  //!< nb_grid_pts of the full domain of the cell
-    Workspace_t & work;      //!< field to store the Fourier transform of P
-    const Real norm_factor;  //!< normalisation coefficient of fourier transform
+    GFieldCollection_t fourier_field_collection;
+
+    //! nb_grid_pts of the full domain of the cell
+    const DynCcoord_t nb_domain_grid_pts;
+
+    //!< nb_grid_pts of the process-local (subdomain) portion of the cell
+    DynCcoord_t nb_subdomain_grid_pts;
+    //!< location of the process-local (subdomain) portion of the cell
+    DynCcoord_t subdomain_locations;
+    //!< data layout of the porcess-local portion of the cell
+    DynCcoord_t subdomain_strides;
+    //!< nb_grid_pts of the process-local (subdomain) portion of the Fourier
+    //!< transformed data
+    DynCcoord_t nb_fourier_grid_pts;
+    //!< location of the process-local (subdomain) portion of the Fourier
+    //!< transformed data
+    DynCcoord_t fourier_locations;
+    //!< data layout of the process-local (subdomain) portion of the Fourier
+    //!< transformed data
+    DynCcoord_t fourier_strides;
+
+    //!< field to store the Fourier transform of P
+    FourierField_t & fourier_field;
+
+    //!< normalisation coefficient of fourier transform
+    const Real norm_factor;
     //! number of degrees of freedom per pixel. Corresponds to the number of
     //! quadrature points per pixel multiplied by the number of components per
     //! quadrature point

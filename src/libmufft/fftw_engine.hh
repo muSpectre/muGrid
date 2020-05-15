@@ -50,9 +50,9 @@ namespace muFFT {
    public:
     using Parent = FFTEngineBase;  //!< base class
     //! field for Fourier transform of second-order tensor
-    using Workspace_t = typename Parent::Workspace_t;
+    using FourierField_t = typename Parent::FourierField_t;
     //! real-valued second-order tensor
-    using Field_t = typename Parent::Field_t;
+    using RealField_t = typename Parent::RealField_t;
     //! Default constructor
     FFTWEngine() = delete;
 
@@ -82,10 +82,10 @@ namespace muFFT {
     void initialise(FFT_PlanFlags plan_flags) override;
 
     //! forward transform
-    Workspace_t & fft(Field_t & field) override;
+    FourierField_t & fft(RealField_t & field) override;
 
     //! inverse transform
-    void ifft(Field_t & field) const override;
+    void ifft(RealField_t & field) const override;
 
     //! perform a deep copy of the engine (this should never be necessary in
     //! c++)

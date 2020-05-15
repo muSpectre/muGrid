@@ -81,7 +81,8 @@ namespace muFFT {
         nullptr;  // nembed are tricky: they refer to physical layout
     int istride = howmany;
     int idist = 1;
-    fftw_complex * out = reinterpret_cast<fftw_complex *>(this->work.data());
+    fftw_complex * out = reinterpret_cast<fftw_complex *>(
+        this->fourier_field.data());
     const int * const onembed = nullptr;
     int ostride = istride;
     int odist = idist;
@@ -112,7 +113,8 @@ namespace muFFT {
       throw RuntimeError("Plan failed");
     }
 
-    fftw_complex * i_in = reinterpret_cast<fftw_complex *>(this->work.data());
+    fftw_complex * i_in = reinterpret_cast<fftw_complex *>(
+        this->fourier_field.data());
     Real * i_out = r_work_space;
 
     this->plan_ifft =
@@ -138,7 +140,7 @@ namespace muFFT {
   }
 
   /* ---------------------------------------------------------------------- */
-  typename FFTWEngine::Workspace_t & FFTWEngine::fft(Field_t & field) {
+  typename FFTWEngine::FourierField_t & FFTWEngine::fft(RealField_t & field) {
     if (this->plan_fft == nullptr) {
       throw RuntimeError("fft plan not initialised");
     }
@@ -150,7 +152,7 @@ namespace muFFT {
             << " and does not match the size "
             << muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)
             << " of the (sub)domain handled by FFTWEngine.";
-      throw std::runtime_error(error.str());
+      throw RuntimeError(error.str());
     }
     if (field.get_nb_dof_per_quad_pt() * field.get_nb_quad_pts() !=
         this->get_nb_dof_per_pixel()) {
@@ -162,12 +164,12 @@ namespace muFFT {
       throw RuntimeError(error.str());
     }
     fftw_execute_dft_r2c(this->plan_fft, field.data(),
-                         reinterpret_cast<fftw_complex *>(this->work.data()));
-    return this->work;
+        reinterpret_cast<fftw_complex *>(this->fourier_field.data()));
+    return this->fourier_field;
   }
 
   /* ---------------------------------------------------------------------- */
-  void FFTWEngine::ifft(Field_t & field) const {
+  void FFTWEngine::ifft(RealField_t & field) const {
     if (this->plan_ifft == nullptr) {
       throw RuntimeError("ifft plan not initialised");
     }
@@ -179,7 +181,7 @@ namespace muFFT {
             << " and does not match the size "
             << muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)
             << " of the (sub)domain handled by FFTWEngine.";
-      throw std::runtime_error(error.str());
+      throw RuntimeError(error.str());
     }
     if (field.get_nb_dof_per_quad_pt() * field.get_nb_quad_pts() !=
         this->get_nb_dof_per_pixel()) {
@@ -191,8 +193,8 @@ namespace muFFT {
       throw RuntimeError(error.str());
     }
     fftw_execute_dft_c2r(this->plan_ifft,
-                         reinterpret_cast<fftw_complex *>(this->work.data()),
-                         field.data());
+        reinterpret_cast<fftw_complex *>(this->fourier_field.data()),
+        field.data());
   }
 
   std::unique_ptr<FFTEngineBase> FFTWEngine::clone() const {

@@ -366,6 +366,13 @@ namespace muGrid {
 
     Real compute_pixel_volume(const DynCcoord_t & nb_grid_pts,
                               const DynRcoord_t & lenghts);
+
+    //! check whether strides represent a contiguous buffer
+    bool is_buffer_contiguous(const DynCcoord_t & nb_grid_pts,
+                              const DynCcoord_t & strides);
+
+    //-----------------------------------------------------------------------//
+    //-----------------------------------------------------------------------//
     //-----------------------------------------------------------------------//
     //! get the linear index of a pixel given a set of strides
     template <size_t dim>
@@ -421,11 +428,18 @@ namespace muGrid {
     }
 
     //-----------------------------------------------------------------------//
-    //! get the number of pixels in a grid given its strides
+    //! get the buffer size required to store a grid given its strides
     template <size_t dim>
-    constexpr size_t get_size_from_strides(const Ccoord_t<dim> & nb_grid_pts,
-                                           const Ccoord_t<dim> & strides) {
-      return nb_grid_pts[dim - 1] * strides[dim - 1];
+    constexpr size_t get_buffer_size(const Ccoord_t<dim> & nb_grid_pts,
+                                     const Ccoord_t<dim> & strides) {
+      size_t buffer_size = 0;
+      // We need to loop over the dimensions because the largest stride can
+      // occur anywhere. (It depends on the storage order.)
+      for (size_t i = 0; i < dim; ++i) {
+        buffer_size = std::max(buffer_size,
+            static_cast<size_t>(nb_grid_pts[i] * strides[i]));
+      }
+      return buffer_size;
     }
 
     //! forward declaration
@@ -434,7 +448,7 @@ namespace muGrid {
 
     /**
      * Iteration over square (or cubic) discretisation grids. Duplicates
-     * capabilities of `muGrid::Ccoordops::Pixels` without needing to be
+     * capabilities of `muGrid::CcoordOps::Pixels` without needing to be
      * templated with the spatial dimension. Iteration is slower, though.
      */
     class DynamicPixels {
@@ -495,6 +509,12 @@ namespace muGrid {
         }
         return get_index_from_strides(this->strides.template get<Dim>(),
             this->subdomain_locations.template get<Dim>(), ccoord);
+      }
+
+      //! return coordinates of the i-th pixel
+      DynCcoord_t get_ccoord(const Dim_t & index) const {
+        return get_ccoord_from_strides(this->nb_subdomain_grid_pts,
+            this->subdomain_locations, this->strides, index);
       }
 
       /**
@@ -584,9 +604,7 @@ namespace muGrid {
 
       //! dereferencing
       inline value_type operator*() const {
-        return get_ccoord_from_strides(this->pixels.nb_subdomain_grid_pts,
-                                       this->pixels.subdomain_locations,
-                                       this->pixels.strides, this->index);
+        return this->pixels.get_ccoord(this->index);
       }
 
       //! pre-increment
@@ -594,6 +612,7 @@ namespace muGrid {
         ++this->index;
         return *this;
       }
+
       //! inequality
       bool operator!=(const iterator & other) const {
         return this->index != other.index;
@@ -690,6 +709,15 @@ namespace muGrid {
                                             this->get_location(), ccoord);
       }
 
+      //! return coordinates of the i-th pixel
+      Ccoord get_ccoord(const Dim_t & index) const {
+        return get_ccoord_from_strides(
+            this->nb_subdomain_grid_pts.template get<Dim>(),
+            this->subdomain_locations.template get<Dim>(),
+            this->strides.template get<Dim>(),
+            index);
+      }
+
       /**
        * iterators over `Pixels` dereferences to cell coordinates
        */
@@ -750,9 +778,7 @@ namespace muGrid {
     template <size_t Dim>
     typename Pixels<Dim>::iterator::value_type Pixels<Dim>::iterator::
     operator*() const {
-      return get_ccoord_from_strides(this->pixels.get_nb_grid_pts(),
-                                     this->pixels.get_subdomain_locations(),
-                                     this->pixels.get_strides(), this->index);
+      return this->pixels.get_ccoord(this->index);
     }
 
     /* ----------------------------------------------------------------------

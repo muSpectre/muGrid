@@ -72,7 +72,6 @@ class FieldCollection_Check(unittest.TestCase):
         self.assertRaises(Exception, collection.get_uint_field, field_name)
         eigen_strain_field = collection.get_real_field(field_name)
 
-        print(eigen_strain_field.array().T)
         for i, row in enumerate(eigen_strain_field.array().T):
             error = np.linalg.norm(i/len(self.cell.pixels)*eigen_strain -
                                    row.reshape(eigen_strain.shape).T)

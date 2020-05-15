@@ -76,29 +76,30 @@ void add_typed_field(py::module & mod, std::string name) {
   auto && array_computer = [](TypedFieldBase<T> & self,
                               const std::vector<Dim_t> & shape,
                               const muGrid::Iteration & it) {
-    // py_class will be passed as the `base` class to the array
-    // constructors below. This ties the lifetime of the array that does
-    // not own its own data to the field object. (Without this
-    // parameter, the constructor makes a copy of the array.)
-    std::vector<size_t> return_shape;
+    std::vector<size_t> return_shape{}, return_strides{};
     const size_t dim{shape.size()};
 
     // If shape is given, then we return a field of tensors of this
     // shape
-    Dim_t ntotal{1};
+    Dim_t ntotal{1}, stride{sizeof(T)};
     if (dim != 0) {
       for (auto & n : shape) {
         return_shape.push_back(n);
+        return_strides.push_back(stride);
         ntotal *= n;
+        stride *= n;
       }
     }
 
     const auto nb_quad{self.get_collection().get_nb_quad_pts()};
+    const auto nb_dof_per_quad_pt{self.get_nb_dof_per_quad_pt()};
     if (it == muGrid::Iteration::QuadPt) {
       // If shape is not given, we just return column vectors with the
       // components
       if (dim == 0) {
-        return_shape.push_back(self.get_nb_dof_per_quad_pt());
+        return_shape.push_back(nb_dof_per_quad_pt);
+        return_strides.push_back(stride);
+        stride *= nb_dof_per_quad_pt;
       } else if (ntotal != self.get_nb_dof_per_quad_pt()) {
         std::stringstream error{};
         error << "Field has " << self.get_nb_dof_per_quad_pt() << " components "
@@ -108,11 +109,15 @@ void add_typed_field(py::module & mod, std::string name) {
         throw RuntimeError(error.str());
       }
       return_shape.push_back(nb_quad);
+      return_strides.push_back(stride);
+      stride *= nb_quad;
     } else {
       // If shape is not given, we just return column vectors with the
       // components
       if (dim == 0) {
-        return_shape.push_back(self.get_nb_dof_per_quad_pt() * nb_quad);
+        return_shape.push_back(nb_dof_per_quad_pt * nb_quad);
+        return_strides.push_back(stride);
+        stride *= nb_dof_per_quad_pt * nb_quad;
       } else if (ntotal != self.get_nb_dof_per_quad_pt() * nb_quad) {
         std::stringstream error{};
         error << "Field has " << self.get_nb_dof_per_quad_pt() * nb_quad
@@ -132,17 +137,22 @@ void add_typed_field(py::module & mod, std::string name) {
           dynamic_cast<const GlobalFieldCollection &>(coll);
       const auto & nb_grid_pts{
           global_coll.get_pixels().get_nb_subdomain_grid_pts()};
-      for (auto & n : nb_grid_pts) {
+      const auto & strides{global_coll.get_pixels().get_strides()};
+      for (const auto & tup : akantu::zip(nb_grid_pts, strides)) {
+        const auto n = std::get<0>(tup);
+        const auto s = std::get<1>(tup);
         return_shape.push_back(n);
+        return_strides.push_back(stride*s);
       }
     } else {
       if (not coll.is_initialised()) {
         throw RuntimeError("Field collection isn't initialised yet");
       }
       return_shape.push_back(coll.get_nb_pixels());
+      return_strides.push_back(stride);
     }
-    return py::array_t<T, py::array::f_style>(return_shape, self.data(),
-                                              py::capsule([]() {}));
+    return py::array_t<T, py::array::f_style>(
+        return_shape, return_strides, self.data(), py::capsule([]() {}));
   };
 
   py::class_<TypedFieldBase<T>, Field>(mod, (name + "Base").c_str(),
@@ -164,7 +174,7 @@ void add_typed_field(py::module & mod, std::string name) {
       })
       .def("array", array_computer, "shape"_a = std::vector<Dim_t>{},
            "iteration_type"_a = muGrid::Iteration::QuadPt,
-           py::return_value_policy::reference_internal)
+           py::keep_alive<0, 1>())
       .def(
           "array",
           [&array_computer](TypedFieldBase<T> & self,
@@ -172,7 +182,7 @@ void add_typed_field(py::module & mod, std::string name) {
             return array_computer(self, std::vector<Dim_t>{}, it);
           },
           "iteration_type"_a = muGrid::Iteration::QuadPt,
-          py::return_value_policy::reference_internal);
+          py::keep_alive<0, 1>());
 
   py::class_<TypedField<T>, TypedFieldBase<T>>(mod, name.c_str());
 }

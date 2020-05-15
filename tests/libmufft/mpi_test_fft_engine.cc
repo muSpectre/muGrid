@@ -139,11 +139,8 @@ namespace muFFT {
     using map_t = muGrid::MatrixFieldMap<
         Real, Mapping::Mut, Fix::sdim, Fix::sdim>;
     map_t inmap{input};
-    inmap.initialise();
     auto refmap{map_t{ref}};
-    refmap.initialise();
     auto resultmap{map_t{result}};
-    resultmap.initialise();
     size_t cntr{0};
     for (auto tup : akantu::zip(inmap, refmap)) {
       cntr++;
@@ -156,7 +153,6 @@ namespace muFFT {
     using cmap_t =
         muGrid::MatrixFieldMap<Complex, Mapping::Mut, Fix::sdim, Fix::sdim>;
     cmap_t complex_map(complex_field);
-    complex_map.initialise();
     if (Fix::engine.get_subdomain_locations() ==
         muGrid::CcoordOps::get_cube<Fix::sdim>(0)) {
       // Check that 0,0 location has no imaginary part.

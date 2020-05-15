@@ -56,3 +56,4 @@ sys.path.insert(0, os.path.join(project_home,
                                 "language_bindings/libmufft/python/Debug"))
 
 import muFFT
+import muGrid

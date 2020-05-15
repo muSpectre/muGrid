@@ -85,12 +85,13 @@ def get_version_from_git():
     """
     git_describe = subprocess.run(
         ['git', 'describe', '--tags', '--dirty', '--always'],
-        capture_output=True)
+        stdout=subprocess.PIPE)
     if git_describe.returncode != 0:
         raise RuntimeError('git execution failed')
     version = git_describe.stdout.decode('latin-1').strip()
     git_hash = subprocess.run(
-        ['git', 'show', '-s', '--format=%H'], capture_output=True)
+        ['git', 'show', '-s', '--format=%H'],
+        stdout=subprocess.PIPE)
     if git_hash.returncode != 0:
         raise Runtimeerror('git execution failed')
     hash = git_hash.stdout.decode('latin-1').strip()
@@ -213,8 +214,8 @@ if verbose:
     print('=== DETECTING FFT LIBRARIES ===')
 
 mugrid_sources = [
-    'src/libmugrid/ccoord_operations.cc',
     'src/libmugrid/exception.cc',
+    'src/libmugrid/units.cc',
     'src/libmugrid/field.cc',
     'src/libmugrid/field_typed.cc',
     'src/libmugrid/field_map.cc',
@@ -223,7 +224,7 @@ mugrid_sources = [
     'src/libmugrid/field_collection.cc',
     'src/libmugrid/field_collection_global.cc',
     'src/libmugrid/field_collection_local.cc',
-    'src/libmugrid/units.cc',
+    'src/libmugrid/ccoord_operations.cc',
 ]
 pymugrid_sources = [
     'language_bindings/libmugrid/python/bind_py_module.cc',
@@ -293,6 +294,15 @@ if mpi:
         print('  * C++-compiler: {}'.format(os.environ['CXX']))
     mufft_sources += ['src/libmufft/communicator.cc']
 
+# extra_link_args is required to search for shared libraries relative to the
+# library's location. Specifically, muGrid.so and muFFT.so are placed in the
+# install directory under 'site-packages', and the Python wrappers _muGrid and
+# _muFFT need be able to find those.
+# Note: -Wl,--no-as-needed -lmuFFT -lmuGrid is a dirty hack to circumvent the recent
+# addition of -Wl,-as-needed as a default. This leads to muFFT.so and muGrid.so not
+# being linked to the extension modules.
+extra_link_args = ['-Wl,-rpath,${ORIGIN}'] 
+
 # We compile two shared libraries, libmuGrid.so and libmuFFT.so. These libraries
 # do not contain the Python interface.
 
@@ -301,7 +311,8 @@ ext_libraries = [
      dict(sources=mugrid_sources,
           macros=macros,
           include_dirs=include_dirs,
-          language='c++')
+          language='c++',
+          extra_link_args=extra_link_args)
     ),
     ('muFFT',
      dict(sources=mufft_sources,
@@ -309,18 +320,14 @@ ext_libraries = [
           include_dirs=include_dirs,
           libraries=fft_libraries + ['muGrid'],
           library_dirs=fft_library_dirs,
-          language='c++')
+          language='c++',
+          extra_link_args=extra_link_args)
     ),
 ]
 
 # We compile two Python interfaces, _muGrid and _muFFT that use the above shared
 # libraries.
 
-# extra_link_args is required to search for shared libraries relative to the
-# library's location. Specifically, muGrid.so and muFFT.so are placed in the
-# install directory under 'site-packages', and the Python wrappers _muGrid and
-# _muFFT need be able to find those.
-extra_link_args = ['-Wl,-rpath,${ORIGIN}'] 
 ext_modules = [
     Extension(
         '_muGrid',
@@ -371,34 +378,75 @@ def cpp_flag(compiler):
                            'is needed!')
 
 
-class build_ext_custom(build_ext):
-    """A custom build extension for adding compiler-specific options."""
+def compiler_options(compiler, version):
     c_opts = {
         'msvc': ['/EHsc'],
-        'unix': [],
+        'unix': ['-Werror', '-Wno-deprecated-declarations'],
     }
 
-    if sys.platform == 'darwin':
-        c_opts['unix'] += ['-stdlib=libc++', '-mmacosx-version-min=10.7']
+    ct = compiler.compiler_type
+    opts = c_opts.get(ct, [])
 
-    def build_extensions(self):
-        ct = self.compiler.compiler_type
-        opts = self.c_opts.get(ct, [])
-        if ct == 'unix':
-            opts.append('-DVERSION_INFO="%s"' % self.distribution.get_version())
-            opts.append(cpp_flag(self.compiler))
-            if has_flag(self.compiler, '-fvisibility=hidden'):
-                opts.append('-fvisibility=hidden')
-        elif ct == 'msvc':
-            opts.append('/DVERSION_INFO=\\"%s\\"' % self.distribution.get_version())
-        opts.append('-Werror')
-        opts.append('-Wno-deprecated-declarations')
-        for ext in self.extensions:
-            ext.extra_compile_args = opts
-        build_ext.build_extensions(self)
+    if ct == 'unix':
+        opts.append('-DVERSION_INFO="%s"' % version)
+        opts.append(cpp_flag(compiler))
+    elif ct == 'msvc':
+        opts.append('/DVERSION_INFO=\\"%s\\"' % version)
+    return opts
+
+
+def linker_options(compiler):
+    opts = [cpp_flag(compiler)] # Not sure if this is necessary
+    if sys.platform == 'darwin':
+        opts += ['-stdlib=libc++', '-mmacosx-version-min=10.7']
+    return opts
+
+
+class build_ext_custom(build_ext):
+    """A custom build extension for adding compiler-specific options."""
+    def build_extension(self, ext):
+        sources = ext.sources
+
+        ext_path = self.get_ext_fullpath(ext.name)
+        language = ext.language or self.compiler.detect_language(sources)
+
+        copts = compiler_options(self.compiler,
+                                 self.distribution.get_version())
+        extra_args = (ext.extra_compile_args or []) + copts
+
+        macros = ext.define_macros[:]
+        for undef in ext.undef_macros:
+            macros.append((undef,))
+
+        objects = self.compiler.compile(sources,
+                                        output_dir=self.build_temp,
+                                        macros=macros,
+                                        include_dirs=ext.include_dirs,
+                                        debug=self.debug,
+                                        extra_postargs=extra_args,
+                                        depends=ext.depends)
+
+        self._built_objects = objects[:]
+
+        if ext.extra_objects:
+            objects.extend(ext.extra_objects)
+        lopts = linker_options(self.compiler)
+        extra_args = (ext.extra_link_args or []) + lopts
+
+        self.compiler.link_shared_object(
+            objects, ext_path,
+            libraries=self.get_libraries(ext),
+            library_dirs=ext.library_dirs,
+            runtime_library_dirs=ext.runtime_library_dirs,
+            extra_postargs=extra_args,
+            export_symbols=self.get_export_symbols(ext),
+            debug=self.debug,
+            build_temp=self.build_temp,
+            target_lang=language)
 
 
 class build_clib_dyn(build_clib):
+    """A custom build extension for adding compiler-specific options."""
     def finalize_options(self):
         self.set_undefined_options('build',
                                    ('build_lib', 'build_clib'),
@@ -415,6 +463,9 @@ class build_clib_dyn(build_clib):
             self.include_dirs = self.include_dirs.split(os.pathsep)
 
     def build_libraries(self, libraries):
+        copts = compiler_options(self.compiler,
+                                 self.distribution.get_version())
+        lopts = linker_options(self.compiler)
         for (lib_name, build_info) in libraries:
             sources = build_info.get('sources')
             if sources is None or not isinstance(sources, (list, tuple)):
@@ -423,23 +474,35 @@ class build_clib_dyn(build_clib):
                        "'sources' must be present and must be "
                        "a list of source filenames" % lib_name)
             sources = list(sources)
+
+            language = build_info.get('language') or \
+                self.compiler.detect_language(sources)
+
             macros = build_info.get('macros')
             include_dirs = build_info.get('include_dirs')
+
+            extra_args = (build_info.get('extra_compile_args') or []) + copts
+
             objects = self.compiler.compile(sources,
                                             output_dir=self.build_temp,
                                             macros=macros,
                                             include_dirs=include_dirs,
+                                            extra_postargs=extra_args,
                                             debug=self.debug)
-            library_dirs = [self.build_clib]
-            if build_info.get('library_dirs') is not None:
-                library_dirs += build_info.get('library_dirs')
+            library_dirs = (build_info.get('library_dirs') or []) + \
+                [self.build_clib]
+
+            extra_args = (build_info.get('extra_link_args') or []) + lopts
+
             self.compiler.link_shared_object(
                 objects,
                 self.compiler.library_filename(lib_name, lib_type="shared"),
                 libraries=build_info.get('libraries'),
                 library_dirs=library_dirs,
                 output_dir=self.build_clib,
-                debug=self.debug)
+                extra_postargs=extra_args,
+                debug=self.debug,
+                target_lang=language)
 
 requirements = ['numpy']
 if mpi:

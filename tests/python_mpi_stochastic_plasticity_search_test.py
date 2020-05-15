@@ -60,7 +60,7 @@ def init_mat(cell, young, poisson, yield_stress, plastic_increment, eigen_strain
     mat = µ.material.MaterialStochasticPlasticity_3d.make(cell,
                                                           'test_mat')
     #init pixels
-    for pixel in cell:
+    for pixel in cell.pixel_indices:
         mat.add_pixel(pixel, young, poisson, plastic_increment,
                       yield_stress[tuple(pixel)], eigen_strain)
     return mat

@@ -88,6 +88,29 @@ namespace muGrid {
       }
       return vol;
     }
+
+    //-----------------------------------------------------------------------//
+    bool is_buffer_contiguous(const DynCcoord_t & nb_grid_pts,
+                              const DynCcoord_t & strides) {
+      auto & dim{nb_grid_pts.get_dim()};
+      if (strides.get_dim() != dim) {
+        throw RuntimeError("Mismatch between dimensions of nb_grid_pts and "
+                           "strides");
+      }
+      std::vector<Dim_t> axes(dim);
+      std::iota(axes.begin(), axes.end(), 0);
+      std::sort(axes.begin(), axes.end(), [strides](Dim_t a, Dim_t b) {
+        return strides[a] < strides[b];
+      });
+      Dim_t stride = 1;
+      bool is_contiguous = true;
+      for (Dim_t i = 0; i < dim; ++i) {
+        is_contiguous &= strides[axes[i]] == stride;
+        stride *= nb_grid_pts[axes[i]];
+      }
+      return is_contiguous;
+    }
+
     /* ---------------------------------------------------------------------- */
     DynamicPixels::DynamicPixels()
         : dim{}, nb_subdomain_grid_pts{}, subdomain_locations{}, strides{} {}
@@ -120,6 +143,9 @@ namespace muGrid {
         throw RuntimeError(
             "dimension mismatch between locations and strides.");
       }
+      if (!is_buffer_contiguous(nb_subdomain_grid_pts, strides)) {
+        throw RuntimeError("DynamicPixels only supports contiguous buffers.");
+      }
     }
 
     /* ---------------------------------------------------------------------- */
@@ -136,7 +162,12 @@ namespace muGrid {
                                  const Ccoord_t<Dim> & subdomain_locations,
                                  const Ccoord_t<Dim> & strides)
         : dim(Dim), nb_subdomain_grid_pts(nb_subdomain_grid_pts),
-          subdomain_locations(subdomain_locations), strides{strides} {}
+          subdomain_locations(subdomain_locations), strides{strides} {
+      if (!is_buffer_contiguous(DynCcoord_t{nb_subdomain_grid_pts},
+                                DynCcoord_t{strides})) {
+        throw RuntimeError("DynamicPixels only supports contiguous buffers.");
+      }
+    }
 
     /* ---------------------------------------------------------------------- */
     auto DynamicPixels::begin() const -> iterator { return iterator(*this, 0); }

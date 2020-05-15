@@ -64,6 +64,7 @@
 #include <sstream>
 #include <memory>
 
+using muFFT::Communicator;
 using muFFT::Gradient_t;
 using muGrid::numpy_wrap;
 using muGrid::NumpyProxy;
@@ -74,47 +75,6 @@ using muSpectre::Rcoord_t;
 using pybind11::literals::operator""_a;
 namespace py = pybind11;
 
-/**
- * cell factory for specific FFT engine
- */
-#ifdef WITH_MPI
-template <Dim_t dim, class FFTEngine>
-void add_parallel_cell_factory_helper(py::module & mod, const char * name) {
-  using Ccoord = Ccoord_t<dim>;
-  using Rcoord = Rcoord_t<dim>;
-  using Gradient = Gradient_t<dim>;
-
-  mod.def(
-      name,
-      [](Ccoord nb_grid_pts, Rcoord lens, Formulation form, Gradient gradient,
-         muFFT::Communicator & comm) {
-        // Initialize with muFFT Communicator object
-        return muSpectre::make_cell<dim, dim, muSpectre::CellBase<dim, dim>,
-                                    FFTEngine>(
-            std::move(nb_grid_pts), std::move(lens), std::move(form),
-            std::move(gradient), std::move(comm));
-      },
-      "nb_grid_pts"_a, "lengths"_a = muGrid::CcoordOps::get_cube<dim>(1.),
-      "formulation"_a = Formulation::finite_strain,
-      "gradient"_a = muSpectre::make_fourier_gradient<dim>(),
-      "communicator"_a = muFFT::Communicator(MPI_COMM_SELF));
-}
-#endif
-
-#ifdef WITH_SPLIT
-void add_split_cell_factory_helper(py::module & mod) {
-  using DynCcoord_t = muGrid::DynCcoord_t;
-  using DynRcoord_t = muGrid::DynRcoord_t;
-  mod.def("CellFactorySplit",
-          [](DynCcoord_t res, DynRcoord_t lens, Formulation form,
-             Gradient_t gradient) {
-            return make_cell_split(std::move(res), std::move(lens),
-                                   std::move(form), std::move(gradient));
-          },
-          "resolutions"_a, "lengths"_a,
-          "formulation"_a = Formulation::finite_strain, "gradient"_a);
-}
-#endif
 
 /**
  * the cell factory is only bound for default template parameters
@@ -122,6 +82,17 @@ void add_split_cell_factory_helper(py::module & mod) {
 void add_cell_factory(py::module & mod) {
   using DynCcoord_t = muGrid::DynCcoord_t;
   using DynRcoord_t = muGrid::DynRcoord_t;
+
+  mod.def(
+      "CellFactory",
+      [](DynCcoord_t res, DynRcoord_t lens, Formulation form,
+         Gradient_t gradient, Communicator comm) {
+        return muSpectre::make_cell(std::move(res), std::move(lens),
+                                    std::move(form), std::move(gradient),
+                                    std::move(comm));
+      },
+      "nb_grid_pts"_a, "lengths"_a, "formulation"_a, "gradient"_a,
+      "communicator"_a);
 
   mod.def(
       "CellFactory",
@@ -139,17 +110,22 @@ void add_cell_factory(py::module & mod) {
                                     std::move(form));
       },
       "nb_grid_pts"_a, "lengths"_a, "formulation"_a);
-
-#ifdef WITH_FFTWMPI
-  add_parallel_cell_factory_helper<dim, muFFT::FFTWMPIEngine<dim>>(
-      mod, "FFTWMPICellFactory");
-#endif
-
-#ifdef WITH_PFFT
-  add_parallel_cell_factory_helper<dim, muFFT::PFFTEngine<dim>>(
-      mod, "PFFTCellFactory");
-#endif
 }
+
+#ifdef WITH_SPLIT
+void add_split_cell_factory_helper(py::module & mod) {
+  using DynCcoord_t = muGrid::DynCcoord_t;
+  using DynRcoord_t = muGrid::DynRcoord_t;
+  mod.def("CellFactorySplit",
+          [](DynCcoord_t res, DynRcoord_t lens, Formulation form,
+             Gradient_t gradient) {
+            return make_cell_split(std::move(res), std::move(lens),
+                                   std::move(form), std::move(gradient));
+          },
+          "resolutions"_a, "lengths"_a,
+          "formulation"_a = Formulation::finite_strain, "gradient"_a);
+}
+#endif
 
 /**
  * CellBase for which the material and spatial dimension are identical
@@ -209,7 +185,7 @@ void add_cell_helper(py::module & mod) {
               return numpy_wrap(delta_stress);
             }
           },
-          "delta_strain"_a, py::return_value_policy::reference_internal)
+          "delta_strain"_a, py::keep_alive<0, 1>())
       .def("project", &Cell::apply_projection, "strain"_a)
       .def(
           "project",
@@ -313,7 +289,7 @@ void add_cell_helper(py::module & mod) {
               return numpy_wrap(stress);
             }
           },
-          "strain"_a, py::return_value_policy::reference_internal)
+          "strain"_a, py::keep_alive<0, 1>())
       .def_property_readonly("projection", &Cell::get_projection)
       .def_property_readonly("communicator", &Cell::get_communicator)
       .def_property_readonly(

@@ -68,10 +68,30 @@ namespace muGrid {
      * @param spatial_dimension number of spatial dimensions, must be 1, 2, 3,
      * or Unknown
      * @param nb_quad_pts number of quadrature points per pixel/voxel
+     * @param nb_subdomain_grid_pts number of grid points on the current MPI
+     * process (subdomain)
+     * @param subdomain_locations location of the current subdomain within the
+     * global grid
      */
     GlobalFieldCollection(Dim_t spatial_dimension, Dim_t nb_quad_pts,
                            const DynCcoord_t & nb_subdomain_grid_pts,
                            const DynCcoord_t & subdomain_locations = {});
+
+    /**
+     * Constructor with initialisation
+     * @param spatial_dimension number of spatial dimensions, must be 1, 2, 3,
+     * or Unknown
+     * @param nb_quad_pts number of quadrature points per pixel/voxel
+     * @param nb_subdomain_grid_pts number of grid points on the current MPI
+     * process (subdomain)
+     * @param subdomain_locations location of the current subdomain within the
+     * global grid
+     * @param strides strides specifying memory layout
+     */
+    GlobalFieldCollection(Dim_t spatial_dimension, Dim_t nb_quad_pts,
+                          const DynCcoord_t & nb_subdomain_grid_pts,
+                          const DynCcoord_t & subdomain_locations,
+                          const DynCcoord_t & strides);
 
     //! Copy constructor
     GlobalFieldCollection(const GlobalFieldCollection & other) = delete;
@@ -101,15 +121,12 @@ namespace muGrid {
     //! evaluate and return the linear index corresponding to `ccoord`
     template <size_t Dim>
     Dim_t get_index(const Ccoord_t<Dim> & ccoord) const {
-      return this->get_pixels().get_index(ccoord);
+      return this->pixels.get_index(ccoord);
     }
 
     //! return coordinates of the i-th pixel
     DynCcoord_t get_ccoord(const Dim_t & index) const {
-      return CcoordOps::get_ccoord_from_strides(
-              this->pixels.get_nb_subdomain_grid_pts(),
-              this->pixels.get_subdomain_locations(),
-              this->pixels.get_strides(), index);
+      return this->pixels.get_ccoord(index);
     }
 
     /**
