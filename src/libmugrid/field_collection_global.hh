@@ -92,6 +92,7 @@ namespace muGrid {
      * @param strides strides specifying memory layout
      */
     GlobalFieldCollection(Dim_t spatial_dimension, Dim_t nb_quad_pts,
+                          const Dim_t & nb_nodal_pts,
                           const DynCcoord_t & nb_subdomain_grid_pts,
                           const DynCcoord_t & subdomain_locations,
                           const DynCcoord_t & strides);
@@ -180,6 +181,9 @@ namespace muGrid {
      * obtain a new field collection with the same domain and pixels
      */
     GlobalFieldCollection get_empty_clone() const;
+
+    //! returns the strides of the pixel layout in memory
+    const DynCcoord_t & get_strides() const;
 
    protected:
     DynamicPixels pixels{};  //!< helper to iterate over the grid

@@ -144,7 +144,12 @@ namespace muGrid {
             "dimension mismatch between locations and strides.");
       }
       if (!is_buffer_contiguous(nb_subdomain_grid_pts, strides)) {
-        throw RuntimeError("DynamicPixels only supports contiguous buffers.");
+        std::stringstream message{};
+        message << "DynamicPixels only supports contiguous buffers. You "
+                   "specified a grid of shape "
+                << nb_subdomain_grid_pts << " with non-contiguous strides "
+                << strides << ".";
+        throw RuntimeError{message.str()};
       }
     }
 
@@ -165,7 +170,12 @@ namespace muGrid {
           subdomain_locations(subdomain_locations), strides{strides} {
       if (!is_buffer_contiguous(DynCcoord_t{nb_subdomain_grid_pts},
                                 DynCcoord_t{strides})) {
-        throw RuntimeError("DynamicPixels only supports contiguous buffers.");
+        std::stringstream message{};
+        message << "DynamicPixels only supports contiguous buffers. You "
+                   "specified a grid of shape "
+                << nb_subdomain_grid_pts << " with non-contiguous strides "
+                << strides << ".";
+        throw RuntimeError{message.str()};
       }
     }
 

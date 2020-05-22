@@ -120,7 +120,7 @@ int small_sym(int argc, char * argv[]) {
   auto && C_ref(muGrid::Matrices::Iiden<Dim>());
 
   auto && fft_pointer(
-      std::make_unique<muFFT::FFTWEngine>(DynCcoord_t(nb_grid_pts), Dim * Dim));
+      std::make_unique<muFFT::FFTWEngine>(DynCcoord_t(nb_grid_pts)));
 
   std::unique_ptr<ProjectionBase> projection_ptr{};
 

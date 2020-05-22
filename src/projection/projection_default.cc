@@ -45,24 +45,34 @@ namespace muSpectre {
                                              Gradient_t gradient,
                                              Formulation form)
       : Parent{std::move(engine), lengths,
-               static_cast<Dim_t>(gradient.size()) / lengths.get_dim(), form},
+               static_cast<Dim_t>(gradient.size()) / lengths.get_dim(),
+               DimS * DimS, form},
         Gfield{this->projection_container.register_complex_field(
             "Projection Operator", DimS * DimS * DimS * DimS,
             PixelSubDiv::QuadPt)},
-        Ghat{Gfield}, gradient{gradient} {}
+        Ghat{Gfield}, gradient{gradient} {
+    if (this->get_dim() != DimS) {
+      std::stringstream message{};
+      message << "Dimension mismatch: this projection is templated with "
+                 "the spatial dimension "
+              << DimS << ", but the FFT engine has the spatial dimension "
+              << this->get_dim() << ".";
+      throw ProjectionError{message.str()};
+    }
+  }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS>
   void ProjectionDefault<DimS>::apply_projection(Field_t & field) {
-    auto & work_space{this->fft_engine->fft(field)};
-    Vector_map field_map{work_space};
+    this->fft_engine->fft(field, this->work_space);
+    Vector_map field_map{this->work_space};
     Real factor = this->fft_engine->normalisation();
     for (auto && tup : akantu::zip(this->Ghat, field_map)) {
       auto & G{std::get<0>(tup)};
       auto & f{std::get<1>(tup)};
       f = factor * (G * f).eval();
     }
-    this->fft_engine->ifft(field);
+    this->fft_engine->ifft(this->work_space, field);
   }
 
   /* ---------------------------------------------------------------------- */

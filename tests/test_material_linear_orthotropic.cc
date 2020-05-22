@@ -59,14 +59,14 @@ namespace muSpectre {
     const DynCcoord_t resolutions{5, 5};
     const DynRcoord_t lengths{5, 5};
     auto fft_ptr_non{
-        std::make_unique<muFFT::FFTWEngine>(resolutions, muGrid::ipow(Dim, 2))};
+        std::make_unique<muFFT::FFTWEngine>(resolutions)};
 
     auto proj_ptr_non{std::make_unique<ProjectionFiniteStrainFast<Dim>>(
         std::move(fft_ptr_non), lengths)};
     Cell sys_non(std::move(proj_ptr_non));
 
     auto fft_ptr_lin{
-        std::make_unique<muFFT::FFTWEngine>(resolutions, muGrid::ipow(Dim, 2))};
+        std::make_unique<muFFT::FFTWEngine>(resolutions)};
     auto proj_ptr_lin{std::make_unique<ProjectionFiniteStrainFast<Dim>>(
         std::move(fft_ptr_lin), lengths)};
     Cell sys_lin(std::move(proj_ptr_lin));
@@ -137,13 +137,13 @@ namespace muSpectre {
     const DynCcoord_t resolutions{5, 5, 5};
     const DynRcoord_t lengths{5, 5, 5};
     auto fft_ptr_non{
-        std::make_unique<muFFT::FFTWEngine>(resolutions, muGrid::ipow(Dim, 2))};
+        std::make_unique<muFFT::FFTWEngine>(resolutions)};
     auto proj_ptr_non{std::make_unique<ProjectionFiniteStrainFast<Dim>>(
         std::move(fft_ptr_non), lengths)};
     Cell sys_non(std::move(proj_ptr_non));
 
     auto fft_ptr_lin{
-        std::make_unique<muFFT::FFTWEngine>(resolutions, muGrid::ipow(Dim, 2))};
+        std::make_unique<muFFT::FFTWEngine>(resolutions)};
     auto proj_ptr_lin{std::make_unique<ProjectionFiniteStrainFast<Dim>>(
         std::move(fft_ptr_lin), lengths)};
     Cell sys_lin(std::move(proj_ptr_lin));

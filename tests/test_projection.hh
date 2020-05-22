@@ -95,18 +95,16 @@ namespace muSpectre {
   template <>
   struct FourierGradient<twoD> {
     static Gradient_t get_gradient() {
-      return Gradient_t{
-        std::make_shared<muFFT::FourierDerivative>(twoD, 0),
-        std::make_shared<muFFT::FourierDerivative>(twoD, 1)};
+      return Gradient_t{std::make_shared<muFFT::FourierDerivative>(twoD, 0),
+                        std::make_shared<muFFT::FourierDerivative>(twoD, 1)};
     }
   };
   template <>
   struct FourierGradient<threeD> {
     static Gradient_t get_gradient() {
-      return Gradient_t{
-        std::make_shared<muFFT::FourierDerivative>(threeD, 0),
-        std::make_shared<muFFT::FourierDerivative>(threeD, 1),
-        std::make_shared<muFFT::FourierDerivative>(threeD, 2)};
+      return Gradient_t{std::make_shared<muFFT::FourierDerivative>(threeD, 0),
+                        std::make_shared<muFFT::FourierDerivative>(threeD, 1),
+                        std::make_shared<muFFT::FourierDerivative>(threeD, 2)};
     }
   };
   template <Dim_t DimS, Dim_t NbQuadPts = OneQuadPt>
@@ -114,31 +112,28 @@ namespace muSpectre {
   template <>
   struct DiscreteGradient<twoD, OneQuadPt> {
     static Gradient_t get_gradient() {
-      return Gradient_t{
-        std::make_shared<muFFT::DiscreteDerivative>(
-            DynCcoord_t{2, 2}, DynCcoord_t{0, 0},
-            std::vector<Real>{-0.5, -0.5, 0.5, 0.5}),
-        std::make_shared<muFFT::DiscreteDerivative>(
-            DynCcoord_t{2, 2}, DynCcoord_t{0, 0},
-            std::vector<Real>{-0.5, 0.5, -0.5, 0.5})};
+      return Gradient_t{std::make_shared<muFFT::DiscreteDerivative>(
+                            DynCcoord_t{2, 2}, DynCcoord_t{0, 0},
+                            std::vector<Real>{-0.5, -0.5, 0.5, 0.5}),
+                        std::make_shared<muFFT::DiscreteDerivative>(
+                            DynCcoord_t{2, 2}, DynCcoord_t{0, 0},
+                            std::vector<Real>{-0.5, 0.5, -0.5, 0.5})};
     }
   };
   template <>
   struct DiscreteGradient<twoD, TwoQuadPts> {
     static Gradient_t get_gradient() {
       return Gradient_t{
-        std::make_shared<muFFT::DiscreteDerivative>(
-            DynCcoord_t{2, 1}, DynCcoord_t{0, 0},
-            std::vector<Real>{-1, 1}),
-        std::make_shared<muFFT::DiscreteDerivative>(
-            DynCcoord_t{1, 2}, DynCcoord_t{0, 0},
-            std::vector<Real>{-1, 1}),
-        std::make_shared<muFFT::DiscreteDerivative>(
-            DynCcoord_t{2, 2}, DynCcoord_t{0, 0},
-            std::vector<Real>{0, 0, -1, 1}),
-        std::make_shared<muFFT::DiscreteDerivative>(
-            DynCcoord_t{2, 2}, DynCcoord_t{0, 0},
-            std::vector<Real>{0, -1, 0, 1})};
+          std::make_shared<muFFT::DiscreteDerivative>(
+              DynCcoord_t{2, 1}, DynCcoord_t{0, 0}, std::vector<Real>{-1, 1}),
+          std::make_shared<muFFT::DiscreteDerivative>(
+              DynCcoord_t{1, 2}, DynCcoord_t{0, 0}, std::vector<Real>{-1, 1}),
+          std::make_shared<muFFT::DiscreteDerivative>(
+              DynCcoord_t{2, 2}, DynCcoord_t{0, 0},
+              std::vector<Real>{0, 0, -1, 1}),
+          std::make_shared<muFFT::DiscreteDerivative>(
+              DynCcoord_t{2, 2}, DynCcoord_t{0, 0},
+              std::vector<Real>{0, -1, 0, 1})};
     }
   };
   template <>
@@ -170,11 +165,9 @@ namespace muSpectre {
     constexpr static Dim_t nb_quad{NbQuadPts};
     ProjectionFixture()
         : projector(std::make_unique<Engine>(
-                        DynCcoord_t(SizeGiver::get_nb_grid_pts()),
-                        mdim * mdim * nb_quad),
+                        DynCcoord_t(SizeGiver::get_nb_grid_pts())),
                     DynRcoord_t(SizeGiver::get_lengths()),
-                    Gradient_t(GradientGiver::get_gradient())) {
-    }
+                    Gradient_t(GradientGiver::get_gradient())) {}
     Parent projector;
   };
 

@@ -76,6 +76,11 @@ namespace muFFT {
     patient    //!< very expensive plan for fastest execution
   };
 
+  /**
+   * used by the lazy-evaluated FFTExpression class ;
+   */
+  enum class FFTDirection { Forward, Inverse };
+
   namespace version {
 
     /**

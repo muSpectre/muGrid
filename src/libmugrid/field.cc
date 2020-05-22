@@ -98,6 +98,51 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
+  std::vector<Dim_t> Field::get_strides(const PixelSubDiv & iter_type,
+                                        const Dim_t & multiplier) const {
+    std::vector<Dim_t> strides;
+
+    auto && use_iter_type{this->get_nb_sub_pts() == 1 ? PixelSubDiv::Pixel
+                                                      : iter_type};
+    for (auto && n : this->get_components_strides(use_iter_type)) {
+      strides.push_back(n * multiplier);
+    }
+    for (auto && n : this->get_pixels_strides()) {
+      strides.push_back(n * this->get_nb_dof_per_pixel() * multiplier);
+    }
+    return strides;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  std::vector<Dim_t>
+  Field::get_strides(const std::vector<Dim_t> & custom_component_shape,
+                     const Dim_t & multiplier) const {
+    std::vector<Dim_t> strides;
+
+    //! check compatibility of component_shape
+    auto && nb_components{std::accumulate(custom_component_shape.begin(),
+                                          custom_component_shape.end(), 1,
+                                          std::multiplies<Dim_t>())};
+    if (nb_components != this->get_nb_dof_per_pixel()) {
+      std::stringstream message{};
+      message << "The component shape " << custom_component_shape << " has "
+              << nb_components << " entries, but this field has "
+              << this->get_nb_dof_per_pixel()
+              << " degrees of freedom per pixel.";
+      throw FieldError{message.str()};
+    }
+        Dim_t accumulator{multiplier};
+    for (auto && n : custom_component_shape) {
+      strides.push_back(accumulator);
+      accumulator *= n;
+    }
+    for (auto && n : this->get_pixels_strides()) {
+      strides.push_back(n * this->get_nb_dof_per_pixel() * multiplier);
+    }
+    return strides;
+  }
+
+  /* ---------------------------------------------------------------------- */
   std::vector<Dim_t> Field::get_pixels_shape() const {
     std::vector<Dim_t> shape;
     if (this->is_global()) {
@@ -116,13 +161,25 @@ namespace muGrid {
   std::vector<Dim_t> Field::get_pixels_strides() const {
     std::vector<Dim_t> strides;
     if (this->is_global()) {
-      auto & coll = dynamic_cast<const GlobalFieldCollection &>(
-          this->collection);
+      auto & coll{
+          dynamic_cast<const GlobalFieldCollection &>(this->collection)};
       for (auto && s : coll.get_pixels().get_strides()) {
         strides.push_back(s);
       }
     } else {
       strides.push_back(1);
+    }
+    return strides;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  std::vector<Dim_t>
+  Field::get_components_strides(const PixelSubDiv & iter_type) const {
+    std::vector<Dim_t> strides{};
+    Dim_t accumulator{1};
+    for (auto && n : this->get_components_shape(iter_type)) {
+      strides.push_back(accumulator);
+      accumulator *= n;
     }
     return strides;
   }
@@ -184,7 +241,7 @@ namespace muGrid {
           throw FieldError(message.str());
         }
         auto && nb_sub_pts{this->get_collection().get_nb_quad_pts()};
-        auto && stride{this->get_nb_dof_per_pixel()/nb_sub_pts};
+        auto && stride{this->get_nb_dof_per_pixel() / nb_sub_pts};
         if (stride * nb_sub_pts != this->get_nb_dof_per_pixel()) {
           std::stringstream message{};
           message << " The number of " << iter_type
@@ -208,7 +265,7 @@ namespace muGrid {
           throw FieldError(message.str());
         }
         auto && nb_sub_pts{this->get_collection().get_nb_nodal_pts()};
-        auto && stride{this->get_nb_dof_per_pixel()/nb_sub_pts};
+        auto && stride{this->get_nb_dof_per_pixel() / nb_sub_pts};
         if (stride * nb_sub_pts != this->get_nb_dof_per_pixel()) {
           std::stringstream message{};
           message << " The number of " << iter_type

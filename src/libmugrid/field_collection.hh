@@ -88,7 +88,7 @@ namespace muGrid {
   /**
    * Base class for both `muGrid::GlobalFieldCollection` and
    * `muGrid::LocalFieldCollection`. Manages the a group of fields with the
-   * same domain of validitiy (i.e., global fields, or local fields defined on
+   * same domain of validity (i.e., global fields, or local fields defined on
    * the same pixels).
    */
   class FieldCollection {

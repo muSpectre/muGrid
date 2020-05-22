@@ -184,15 +184,13 @@ void add_typed_field(py::module & mod, std::string name) {
           throw RuntimeError("Field collection isn't initialised yet");
         }
         return py::buffer_info(
-            self.data(),
-            {static_cast<size_t>(coll.get_nb_pixels()),
-             static_cast<size_t>(self.get_nb_sub_pts()),
-             static_cast<size_t>(self.get_nb_dof_per_sub_pt())},
-            {sizeof(T) * static_cast<size_t>(self.get_nb_dof_per_sub_pt() *
-                                             self.get_nb_sub_pts()),
-             sizeof(T) * static_cast<size_t>(self.get_nb_dof_per_sub_pt()),
-             sizeof(T)});
+            self.data(), self.get_shape(self.get_sub_division()),
+            self.get_strides(self.get_sub_division(), sizeof(T)));
       })
+      .def_property_readonly("shape",
+                             [](TypedFieldBase<T> & field) {
+                               return field.get_shape(field.get_sub_division());
+                             })
       .def("array", array_computer, "shape"_a = std::vector<Dim_t>{},
            "iteration_type"_a = muGrid::PixelSubDiv::QuadPt,
            py::keep_alive<0, 1>())

@@ -66,16 +66,15 @@ namespace muSpectre {
 
     DynCcoord_t nb_grid_pts_split{3, 3};
     DynRcoord_t lengths_split{3, 3};
-    auto && fft_ptr_split{std::make_unique<muFFT::FFTWEngine>(
-        nb_grid_pts_split, muGrid::ipow(dim, 2))};
+    auto && fft_ptr_split{
+        std::make_unique<muFFT::FFTWEngine>(nb_grid_pts_split)};
     auto && proj_ptr_split{std::make_unique<ProjectionFiniteStrainFast<dim>>(
         std::move(fft_ptr_split), lengths_split)};
     CellSplit sys_split(std::move(proj_ptr_split));
 
     DynCcoord_t nb_grid_pts_base{3, 3};
     DynRcoord_t lengths_base{3, 3};
-    auto && fft_ptr_base{std::make_unique<muFFT::FFTWEngine>(
-        nb_grid_pts_base, muGrid::ipow(dim, 2))};
+    auto && fft_ptr_base{std::make_unique<muFFT::FFTWEngine>(nb_grid_pts_base)};
     auto && proj_ptr_base{std::make_unique<ProjectionFiniteStrainFast<dim>>(
         std::move(fft_ptr_base), lengths_base)};
     Cell sys_base(std::move(proj_ptr_base));

@@ -78,7 +78,7 @@ def _find_fft_engines():
 fft_engines = _find_fft_engines()
 
 
-def FFT(nb_grid_pts, nb_dof_per_pixel=1, fft='fftw', communicator=None):
+def FFT(nb_grid_pts, fft='fftw', communicator=None):
     """
     The FFT class handles forward and inverse transforms and instantiates
     the correct engine object to carry out the transform.
@@ -122,6 +122,5 @@ def FFT(nb_grid_pts, nb_dof_per_pixel=1, fft='fftw', communicator=None):
     except KeyError:
         raise KeyError("FFT engine '{}' has not been compiled into the "
                        "muFFT library.".format(factory_name))
-    engine = factory(nb_grid_pts, nb_dof_per_pixel, communicator)
-    engine.initialise()
+    engine = factory(nb_grid_pts, communicator)
     return engine

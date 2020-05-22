@@ -268,16 +268,18 @@ class GradientIntegration_Check(unittest.TestCase):
 
         # Fourier Derivative
         fourier_gradient = [µ.FourierDerivative(dim, i) for i in range(dim)]
-        fft_vec = muFFT.FFT(list(res), dim)
-        fft_mat = muFFT.FFT(list(res), dim*dim)
+        fft_engine = muFFT.FFT(list(res))
+        fft_engine.initialise(dim)
+        fft_engine.initialise(dim * dim)
         placement_n = µ.gradient_integration.integrate_tensor_2(
-            F, fft_vec, fft_mat, fourier_gradient, delta_x)
+            F, fft_engine, fourier_gradient, delta_x)
 
         self.assertLess(np.linalg.norm(Chi_n - placement_n), self.norm_tol)
 
 
         # cosinus, diagonal deformation gradient 3D
         res = np.array([36, 14, 15])
+        fft_engine = muFFT.FFT(list(res)) # new engine is now 3d
         lens = np.array([7, 1.4, 3])
         delta_x, dim, x_n, x_c, F, _ = init_X_F_Chi(lens, res)
         for i in range(dim):
@@ -287,10 +289,11 @@ class GradientIntegration_Check(unittest.TestCase):
 
         # Fourier Derivative
         fourier_gradient = [µ.FourierDerivative(dim, i) for i in range(dim)]
-        fft_vec = muFFT.FFT(list(res), dim)
-        fft_mat = muFFT.FFT(list(res), dim*dim)
+
+        fft_engine.initialise(dim)
+        fft_engine.initialise(dim * dim)
         placement_n = µ.gradient_integration.integrate_tensor_2(
-            F, fft_vec, fft_mat, fourier_gradient, delta_x)
+            F, fft_engine, fourier_gradient, delta_x)
 
         self.assertLess(np.linalg.norm(Chi_n - placement_n), self.norm_tol)
 
@@ -310,10 +313,12 @@ class GradientIntegration_Check(unittest.TestCase):
 
         # Fourier Derivative
         fourier_gradient = [µ.FourierDerivative(dim, i) for i in range(dim)]
-        fft_vec = muFFT.FFT(res, dim)
-        fft_mat = muFFT.FFT(res, dim*dim)
+
+        fft_engine = muFFT.FFT(res)
+        fft_engine.initialise(dim)
+        fft_engine.initialise(dim * dim)
         placement_n = µ.gradient_integration.integrate_tensor_2(
-            F, fft_vec, fft_mat, fourier_gradient, delta_x)
+            F, fft_engine, fourier_gradient, delta_x)
         self.assertLess(np.linalg.norm(Chi_n - placement_n), self.norm_tol)
 
     def test_shear_composite(self):
@@ -351,17 +356,19 @@ class GradientIntegration_Check(unittest.TestCase):
 
         # muSpectre Fourier integration
         fourier_gradient = [µ.FourierDerivative(dim, i) for i in range(dim)]
-        fft_vec = muFFT.FFT(res, dim)
-        fft_mat = muFFT.FFT(res, dim*dim)
+        fft_engine = muFFT.FFT(res)
+        fft_engine.initialise(dim)
+        fft_engine.initialise(dim * dim)
+
         placement_n = µ.gradient_integration.integrate_tensor_2(
-            F, fft_vec, fft_mat, fourier_gradient, delta_x)
+            F, fft_engine, fourier_gradient, delta_x)
         # muSpectre "discrete" integration (forward upwind scheme)
         dy = muFFT.DiscreteDerivative([0, 0], [[-0.5, 0.5],
                                                [-0.5, 0.5]])
         dx = dy.rollaxes(-1)
         discrete_gradient = [dx, dy]
         placement_n_disc = µ.gradient_integration.integrate_tensor_2(
-            F, fft_vec, fft_mat, discrete_gradient, delta_x)
+            F, fft_engine, discrete_gradient, delta_x)
 
         # analytic solution, "placement_ana" (node and center)
         l_soft = delta_x[1] * h  # height soft material
@@ -429,10 +436,11 @@ class GradientIntegration_Check(unittest.TestCase):
                  * np.cos(2*np.pi * x_c[i]/lens[i]))
             u_n =\
                 strain_amp * np.sin(2*np.pi*x_n/(lens.reshape((dim,)+(1,)*dim)))
-        fft_vec = muFFT.FFT(list(res), dim)
-        fft_mat = muFFT.FFT(list(res), dim*dim)
+        fft_engine = muFFT.FFT(list(res))
+        fft_engine.initialise(dim)
+        fft_engine.initialise(dim * dim)
         u_integrated_n = µ.gradient_integration.integrate_tensor_2_small_strain(
-            E, fft_vec, fft_mat, delta_x)
+            E, fft_engine, delta_x)
         self.assertLess(np.linalg.norm(u_n - u_integrated_n), self.norm_tol)
 
         #### Non Diagonal 2D:
@@ -450,7 +458,7 @@ class GradientIntegration_Check(unittest.TestCase):
             strain_amp * np.pi/lens[0]*np.cos(2*np.pi/lens[0]*x_c[0])
 
         u_integrated_n = µ.gradient_integration.integrate_tensor_2_small_strain(
-            E, fft_vec, fft_mat, delta_x)
+            E, fft_engine, delta_x)
         self.assertLess(np.linalg.norm(u_n - u_integrated_n), self.norm_tol)
 
         # cosinus, diagonal deformation gradient 3D
@@ -463,10 +471,11 @@ class GradientIntegration_Check(unittest.TestCase):
                  *np.cos(2*np.pi * x_c[i]/lens[i]))
             u_n = \
                 strain_amp * np.sin(2*np.pi*x_n/(lens.reshape((dim,)+(1,)*dim)))
-        fft_vec = muFFT.FFT(list(res), dim)
-        fft_mat = muFFT.FFT(list(res), dim*dim)
+        fft_engine = muFFT.FFT(list(res))
+        fft_engine.initialise(dim)
+        fft_engine.initialise(dim*dim)
         u_integrated_n = µ.gradient_integration.integrate_tensor_2_small_strain(
-            E, fft_vec, fft_mat, delta_x)
+            E, fft_engine, delta_x)
         self.assertLess(np.linalg.norm(u_n - u_integrated_n), self.norm_tol)
 
         #### Non Diagonal 2D:
@@ -489,10 +498,8 @@ class GradientIntegration_Check(unittest.TestCase):
         E[2, 0, :, :] =\
             strain_amp * np.pi/lens[0]*np.cos(2*np.pi/lens[0]*x_c[0])
 
-        fft_vec = muFFT.FFT(list(res), dim)
-        fft_mat = muFFT.FFT(list(res), dim*dim)
         u_integrated_n = µ.gradient_integration.integrate_tensor_2_small_strain(
-            E, fft_vec, fft_mat, delta_x)
+            E, fft_engine, delta_x)
         self.assertLess(np.linalg.norm(u_n - u_integrated_n), self.norm_tol)
 
 
@@ -527,14 +534,15 @@ class GradientIntegration_Check(unittest.TestCase):
 
         self.assertTrue(np.allclose(np.mean(F, axis=(2, 3, 4)), F0))
 
-        fft_vec = muFFT.FFT(res, dim)
-        fft_mat = muFFT.FFT(res, dim*dim)
+        fft_engine = muFFT.FFT(res)
+        fft_engine.initialise(dim)
+        fft_engine.initialise(dim * dim)
         dz = muFFT.DiscreteDerivative([0, 0, 0], [[[-1, 1]]])
         dy = dz.rollaxes(-1)
         dx = dy.rollaxes(-1)
         discrete_gradient = [dx, dy, dz]
         placement_c = µ.gradient_integration.integrate_tensor_2(
-            F, fft_vec, fft_mat, discrete_gradient, delta_x)
+            F, fft_engine, discrete_gradient, delta_x)
 
         for i in range(dim):
             self.assertTrue(np.allclose(x[i], placement_c[i, :, :, :]))
@@ -560,15 +568,16 @@ class GradientIntegration_Check(unittest.TestCase):
         for i in range(dim):
             g[i, :, :] = (np.roll(x, -1, axis=i) - x)/delta_x[i]
 
-        fft_sca = muFFT.FFT(res)
-        fft_vec = muFFT.FFT(res, dim)
+        fft_engine = muFFT.FFT(res)
+        fft_engine.initialise(dim**0)
+        fft_engine.initialise(dim**1)
         dy = muFFT.DiscreteDerivative([0, 0], [[-1, 1]])
         dx = dy.rollaxes(-1)
         discrete_gradient = [dx, dy]
         int_x = µ.gradient_integration.integrate_vector(
-            g, fft_sca, fft_vec, discrete_gradient, delta_x)
+            g, fft_engine, discrete_gradient, delta_x)
 
-        self.assertTrue(np.allclose(x, int_x[:-1, :-1]))
+        self.assertTrue(np.allclose(x, int_x[0,:-1, :-1]))
 
     def test_discrete_integrate_vector_3d(self):
         """
@@ -595,14 +604,15 @@ class GradientIntegration_Check(unittest.TestCase):
             g[i, :, :, :] = (np.roll(x, -1, axis=i) -
                              x)[:-1, :-1, :-1]/delta_x[i]
 
-        fft_sca = muFFT.FFT(res)
-        fft_vec = muFFT.FFT(res, dim)
+        fft_engine = muFFT.FFT(res)
+        fft_engine.initialise(dim**0)
+        fft_engine.initialise(dim**1)
         dz = muFFT.DiscreteDerivative([0, 0, 0], [[[-1, 1]]])
         dy = dz.rollaxes(-1)
         dx = dy.rollaxes(-1)
         discrete_gradient = [dx, dy, dz]
         int_x = µ.gradient_integration.integrate_vector(
-            g, fft_sca, fft_vec, discrete_gradient, delta_x)
+            g, fft_engine, discrete_gradient, delta_x)
 
         self.assertTrue(np.allclose(x, int_x))
 

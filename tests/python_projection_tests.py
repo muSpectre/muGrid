@@ -53,7 +53,8 @@ def build_test_classes(Projection, RefProjection, name):
             self.nb_grid_pts = self.ref.nb_grid_pts
             self.ndim = self.ref.ndim
             self.shape = list((self.nb_grid_pts for _ in range(self.ndim)))
-            self.fft = muFFT.FFT(self.shape, self.ndim*self.ndim)
+            self.fft = muFFT.FFT(self.shape)
+            self.fft.initialise(self.ndim * self.ndim)
             self.projection = Projection(self.fft, [float(x) for x in self.shape])
             self.projection.initialise()
             self.tol = 1e-12*np.prod(self.shape)

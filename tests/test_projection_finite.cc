@@ -77,7 +77,9 @@ namespace muSpectre {
   BOOST_AUTO_TEST_CASE(even_grid_test) {
     using Engine = muFFT::FFTWEngine;
     using proj = ProjectionFiniteStrainFast<twoD>;
-    auto engine = std::make_unique<Engine>(DynCcoord_t{2, 3}, 2 * 2);
+    auto nb_dof{2 * 2};
+    auto engine = std::make_unique<Engine>(DynCcoord_t{2, 3});
+    engine->initialise(nb_dof, muFFT::FFT_PlanFlags::estimate);
     BOOST_CHECK_THROW(proj(std::move(engine), DynRcoord_t{4.3, 4.3}),
                       std::runtime_error);
   }

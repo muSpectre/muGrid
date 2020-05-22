@@ -56,7 +56,7 @@ namespace muSpectre {
     DynCcoord_t nb_pixels{1, 1, 1};
     DynRcoord_t lengths{1.0, 1.0, 1.0};
     constexpr Real corkpp_precision{1e-5};
-    auto fft_ptr{std::make_unique<muFFT::FFTWEngine>(nb_pixels, 1)};
+    auto fft_ptr{std::make_unique<muFFT::FFTWEngine>(nb_pixels)};
     auto proj_ptr{std::make_unique<ProjectionFiniteStrainFast<dim>>(
         std::move(fft_ptr), lengths)};
     Cell sys_1(std::move(proj_ptr));
@@ -109,7 +109,7 @@ namespace muSpectre {
     DynRcoord_t lengths{1.0, 1.0};
     constexpr Real corkpp_precision{1e-4};
 
-    auto fft_ptr_split{std::make_unique<muFFT::FFTWEngine>(nb_pixels, 1)};
+    auto fft_ptr_split{std::make_unique<muFFT::FFTWEngine>(nb_pixels)};
     auto proj_ptr_split{std::make_unique<ProjectionFiniteStrainFast<dim>>(
         std::move(fft_ptr_split), lengths)};
     CellSplit sys_split{std::move(proj_ptr_split)};

@@ -52,8 +52,8 @@ target_link_libraries(muFFT PUBLIC version)
 
 set(mufft_SRCS
   derivative.cc
-  fft_utils.cc
   fft_engine_base.cc
+  fft_utils.cc
   fftw_engine.cc
   )
 

@@ -86,7 +86,7 @@ namespace muSpectre {
     DynCcoord_t nb_grid_pts{3, 3};
     DynRcoord_t lengths{2.3, 2.7};
     Formulation form{Formulation::finite_strain};
-    auto fft_ptr{std::make_unique<muFFT::FFTWEngine>(nb_grid_pts, dim * dim)};
+    auto fft_ptr{std::make_unique<muFFT::FFTWEngine>(nb_grid_pts)};
     auto proj_ptr{std::make_unique<ProjectionFiniteStrainFast<dim>>(
         std::move(fft_ptr), lengths)};
     Cell sys{std::move(proj_ptr)};

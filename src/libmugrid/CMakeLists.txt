@@ -61,6 +61,7 @@ set(mugrid_HDRS
   field.hh
   field_collection.hh
   ccoord_operations.hh
+  raw_memory_operations.hh
   state_field_map.hh
   units.hh
   )
@@ -75,6 +76,7 @@ set(mugrid_SRCS
   field.cc
   field_typed.cc
   field_map.cc
+  raw_memory_operations.cc
   state_field.cc
   state_field_map.cc
   units.cc

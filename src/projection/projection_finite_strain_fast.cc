@@ -47,6 +47,7 @@ namespace muSpectre {
       const Gradient_t & gradient)
       : Parent{std::move(engine), lengths,
                static_cast<Dim_t>(gradient.size())/lengths.get_dim(),
+               DimS*DimS,
                Formulation::finite_strain},
         xi_field{"Projection Operator", this->projection_container},
         gradient{gradient} {
@@ -82,17 +83,6 @@ namespace muSpectre {
   void ProjectionFiniteStrainFast<DimS, NbQuadPts>::initialise(
       const muFFT::FFT_PlanFlags & flags) {
     Parent::initialise(flags);
-
-    if (this->fft_engine->get_nb_dof_per_pixel() != DimS * DimS * NbQuadPts) {
-      std::stringstream error;
-      error << "This projection operator handles " << DimS << " spatial "
-            << "dimensions and " << NbQuadPts << " quadrature points. This "
-            << "means " << DimS * DimS * NbQuadPts << " degrees of freedom for "
-            << "the deformation gradient, but the FFT engine handles "
-            << this->fft_engine->get_nb_dof_per_pixel() << " degrees of "
-            << "freedom.";
-      throw ProjectionError(error.str());
-    }
 
     using FFTFreqs_t = muFFT::FFT_freqs<DimS>;
     using Vector_t = typename FFTFreqs_t::Vector;
@@ -147,14 +137,15 @@ namespace muSpectre {
     // memory. This means the components of the displacement field, not the
     // components of the gradient, must be stored consecutive in memory and are
     // the first index.
-    Grad_map field_map{this->fft_engine->fft(field)};
+    this->fft_engine->fft(field, this->work_space);
+    Grad_map field_map{this->work_space};
     Real factor = this->fft_engine->normalisation();
     for (auto && tup : akantu::zip(this->xi_field.get_map(), field_map)) {
       auto & xi{std::get<0>(tup)};
       auto & f{std::get<1>(tup)};
       f = factor * ((f * xi).eval() * xi.adjoint());
     }
-    this->fft_engine->ifft(field);
+    this->fft_engine->ifft(this->work_space, field);
   }
 
   /* ---------------------------------------------------------------------- */

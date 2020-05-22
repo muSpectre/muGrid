@@ -64,18 +64,20 @@ namespace muFFT {
     constexpr static Dim_t serial_engine{serial};
     constexpr static Real BoxLength{4.5};
     constexpr static Dim_t sdim{dim};
-    constexpr static Dim_t nb_components{sdim * sdim};
+    constexpr static Dim_t NbComponents{sdim * sdim};
     static DynCcoord_t res() {
       return muGrid::CcoordOps::get_cube(sdim, BoxNbGridPts);
     }
-    FFTW_fixture()
-        : engine(res(), nb_components, MPIContext::get_context().comm) {}
+    FFTW_fixture() : engine(res(), MPIContext::get_context().comm) {}
     Engine engine;
   };
+
   template <typename Engine, Dim_t dim, Dim_t NbGridPts, bool serial>
   constexpr Dim_t FFTW_fixture<Engine, dim, NbGridPts, serial>::BoxNbGridPts;
   template <typename Engine, Dim_t dim, Dim_t NbGridPts, bool serial>
   constexpr Dim_t FFTW_fixture<Engine, dim, NbGridPts, serial>::sdim;
+  template <typename Engine, Dim_t dim, Dim_t NbGridPts, bool serial>
+  constexpr Dim_t FFTW_fixture<Engine, dim, NbGridPts, serial>::NbComponents;
 
   template <typename Engine>
   struct FFTW_fixture_python_segfault {
@@ -83,15 +85,17 @@ namespace muFFT {
     constexpr static Dim_t dim{twoD};
     constexpr static Dim_t sdim{twoD};
     constexpr static Dim_t mdim{twoD};
-    constexpr static Dim_t nb_components{sdim * sdim};
+    constexpr static Dim_t NbComponents{sdim * sdim};
     static DynCcoord_t res() { return {6, 4}; }
     FFTW_fixture_python_segfault()
-        : engine{res(), nb_components, MPIContext::get_context().comm} {}
+        : engine{res(), MPIContext::get_context().comm} {}
     Engine engine;
   };
 
   template <typename Engine>
   constexpr Dim_t FFTW_fixture_python_segfault<Engine>::sdim;
+  template <typename Engine>
+  constexpr Dim_t FFTW_fixture_python_segfault<Engine>::NbComponents;
 
   using fixlist = boost::mpl::list<
 #ifdef WITH_FFTWMPI
@@ -114,7 +118,8 @@ namespace muFFT {
     if (Fix::serial_engine && comm.size() > 1) {
       return;
     } else {
-      BOOST_CHECK_NO_THROW(Fix::engine.initialise(FFT_PlanFlags::estimate));
+      BOOST_CHECK_NO_THROW(
+          Fix::engine.initialise(Fix::NbComponents, FFT_PlanFlags::estimate));
     }
     BOOST_CHECK_EQUAL(comm.sum(Fix::engine.size()),
                       muGrid::CcoordOps::get_size(Fix::res()));
@@ -126,7 +131,7 @@ namespace muFFT {
       // dont test serial engies in parallel
       return;
     } else {
-      Fix::engine.initialise(FFT_PlanFlags::estimate);
+      Fix::engine.initialise(Fix::NbComponents, FFT_PlanFlags::estimate);
     }
     using FC_t = muGrid::GlobalFieldCollection;
     FC_t fc{Fix::sdim, OneQuadPt, muGrid::Unknown};
@@ -153,10 +158,26 @@ namespace muFFT {
       in_.setRandom();
       ref_ = in_;
     }
-    auto & complex_field = Fix::engine.fft(input);
+    auto & complex_field{Fix::engine.register_fourier_space_field(
+        "complex field", Fix::NbComponents)};
+    BOOST_TEST_CHECKPOINT("reached");
+    Fix::engine.get_fourier_field_collection().set_nb_quad_pts(OneQuadPt);
+
+    auto && rank{Fix::engine.get_communicator().rank()};
+    std::cout << "Rank " << rank
+              << ", Fourier_field_collection.nb_subdomain_grid_pts: "
+              << Fix::engine.get_nb_fourier_grid_pts() << std::endl;
+    std::cout << "engine.nb_domain_grid_pts: "
+              << Fix::engine.get_nb_domain_grid_pts() << std::endl;
+    std::cout << "engine.nb_subdomain_grid_pts: "
+              << Fix::engine.get_nb_subdomain_grid_pts() << std::endl;
+    BOOST_TEST_CHECKPOINT("reached1");
+    Fix::engine.fft(input, complex_field);
+    BOOST_TEST_CHECKPOINT("reached2");
     using cmap_t = muGrid::MatrixFieldMap<Complex, Mapping::Mut, Fix::sdim,
                                           Fix::sdim, PixelSubDiv::QuadPt>;
     cmap_t complex_map(complex_field);
+    BOOST_TEST_CHECKPOINT("reached3");
     if (Fix::engine.get_subdomain_locations() ==
         muGrid::CcoordOps::get_cube<Fix::sdim>(0)) {
       // Check that 0,0 location has no imaginary part.
@@ -172,15 +193,15 @@ namespace muFFT {
     }
 
     /* make sure that the ifft of fft returns the original*/
-    Fix::engine.ifft(result);
+    Fix::engine.ifft(complex_field, result);
     for (auto && tup : akantu::zip(resultmap, refmap)) {
-      Real error{
-          (std::get<0>(tup) * Fix::engine.normalisation() - std::get<1>(tup))
-              .norm()};
+      auto && result{std::get<0>(tup)};
+      auto && reference{std::get<1>(tup)};
+      auto && normalisation{Fix::engine.normalisation()};
+      Real error{(result * normalisation - reference).norm()};
       BOOST_CHECK_LT(error, tol);
       if (error > tol) {
-        std::cout << std::get<0>(tup).array() / std::get<1>(tup).array()
-                  << std::endl
+        std::cout << result.array() / reference.array() << std::endl
                   << std::endl;
       }
     }

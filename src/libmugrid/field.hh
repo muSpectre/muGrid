@@ -138,6 +138,21 @@ namespace muGrid {
     std::vector<Dim_t> get_shape(const PixelSubDiv & iter_type) const;
 
     /**
+     * evaluate and return the overall strides field (for passing the field to
+     * generic multidimensional array objects such as numpy.ndarray). The
+     * multiplier can be used e.g., if strides are needed in bytes, rather than
+     * in pointer offsets.
+     */
+    std::vector<Dim_t> get_strides(const PixelSubDiv & iter_type,
+                                   const Dim_t & multiplier = 1) const;
+
+    /**
+     * Evaluate and return the overall strides assuming the per-pixel layout
+     * specified in component_shape
+     */
+    std::vector<Dim_t> get_strides(const std::vector<Dim_t> & component_shape,
+                                   const Dim_t & multiplier = 1) const;
+    /**
      * evaluate and return the overall shape of the pixels portion of the field
      * (for passing the field to generic multidimensional array objects such as
      * numpy.ndarray)
@@ -151,6 +166,14 @@ namespace muGrid {
      */
     virtual std::vector<Dim_t>
     get_components_shape(const PixelSubDiv & iter_type) const;
+
+    /**
+     * evaluate and return the strides of the degrees of freedom per pixel
+     * portion of the field (for passing the field to generic multidimensional
+     * array objects such as numpy.ndarray)
+     */
+    virtual std::vector<Dim_t>
+    get_components_strides(const PixelSubDiv & iter_type) const;
 
     /**
      * evaluate and return the overall strides of the pixels portion of the field

@@ -432,8 +432,7 @@ namespace muSpectre {
     DynCcoord_t nb_grid_pts{grid, grid};
     DynRcoord_t lengths{length_cell, length_cell};
 
-    auto fft_ptr{std::make_unique<muFFT::FFTWEngine>(nb_grid_pts,
-                                                     muGrid::ipow(sdim, 2))};
+    auto fft_ptr{std::make_unique<muFFT::FFTWEngine>(nb_grid_pts)};
     auto proj_ptr{std::make_unique<ProjectionFiniteStrainFast<sdim>>(
         std::move(fft_ptr), lengths)};
     Cell sys(std::move(proj_ptr));

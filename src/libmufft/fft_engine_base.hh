@@ -43,7 +43,21 @@
 #include "communicator.hh"
 #include "mufft_common.hh"
 
+#include <set>
+
 namespace muFFT {
+
+  /**
+   * base class for FFTEngine-related exceptions
+   */
+  class FFTEngineError : public muGrid::RuntimeError {
+   public:
+    //! constructor
+    explicit FFTEngineError(const std::string & what)
+        : muGrid::RuntimeError(what) {}
+    //! constructor
+    explicit FFTEngineError(const char * what) : muGrid::RuntimeError(what) {}
+  };
 
   /**
    * Virtual base class for FFT engines. To be implemented by all
@@ -65,7 +79,7 @@ namespace muFFT {
      * Field type holding a Fourier-space representation of a
      * real-valued second-order tensor field
      */
-    using FourierField_t = muGrid::ComplexField;
+    using FourierField_t = muGrid::TypedFieldBase<Complex>;
     /**
      * iterator over Fourier-space discretisation point
      */
@@ -75,10 +89,10 @@ namespace muFFT {
     FFTEngineBase() = delete;
 
     /**
-     * Constructor with the domain's number of grid points in each direciton,
-     * the number of components to transform, and the communicator
+     * Constructor with the domain's number of grid points in each direction and
+     * the communicator
      */
-    FFTEngineBase(DynCcoord_t nb_grid_pts, Dim_t nb_dof_per_pixel,
+    FFTEngineBase(const DynCcoord_t & nb_grid_pts,
                   Communicator comm = Communicator());
 
     //! Copy constructor
@@ -96,14 +110,42 @@ namespace muFFT {
     //! Move assignment operator
     FFTEngineBase & operator=(FFTEngineBase && other) = delete;
 
-    //! compute the plan, etc
-    virtual void initialise(FFT_PlanFlags /*plan_flags*/);
+    /**
+     * prepare a plan for a transform with nb_dof_per_pixel entries per pixel.
+     * Needs to be called for every different sized transform
+     */
+    virtual void initialise(const Dim_t & /*nb_dof_per_pixel*/,
+                            const FFT_PlanFlags & /*plan_flags*/) = 0;
 
-    //! forward transform (dummy for interface)
-    virtual FourierField_t & fft(RealField_t & /*field*/) = 0;
+    /**
+     * forward transform (dummy for interface) A suitably sized fourier-space
+     * field can conveniently be obtained using
+     * `muFFT::FFTEngineBase::register_fourier_space_field`
+     */
+    virtual void fft(const RealField_t & /*input_field*/,
+                     FourierField_t & /*output_field*/) const = 0;
 
     //! inverse transform (dummy for interface)
-    virtual void ifft(RealField_t & /*field*/) const = 0;
+    virtual void ifft(const FourierField_t & /*input_field*/,
+                      RealField_t & /*output_field*/) const = 0;
+
+    /**
+     * Create a field with the ideal strides and dimensions for this engine.
+     * Fields created this way are meant to be reused again and again, and they
+     * will stay in the memory of the `muFFT::FFTEngineBase`'s field collection
+     * until the engine is destroyed.
+     */
+    virtual FourierField_t &
+    register_fourier_space_field(const std::string & unique_name,
+                                 const Dim_t & nb_dof_per_pixel);
+    /**
+     * Fetches a field with the ideal strides and dimensions for this engine. If
+     * the field does not exist, it is created using
+     * `register_fourier_space_field`.
+     */
+    FourierField_t &
+    fetch_or_register_fourier_space_field(const std::string & unique_name,
+                                          const Dim_t & nb_dof_per_pixel);
 
     //! return whether this engine is active
     virtual bool is_active() const { return true; }
@@ -166,9 +208,6 @@ namespace muFFT {
     GFieldCollection_t & get_fourier_field_collection() {
       return this->fourier_field_collection;
     }
-    //! return the internal buffer holding the Fourier field (this is also
-    //! returned by the fft method)
-    FourierField_t & get_fourier_field() { return this->fourier_field; }
 
     //! factor by which to multiply projection before inverse transform (this is
     //! typically 1/nb_pixels for so-called unnormalized transforms (see,
@@ -180,9 +219,6 @@ namespace muFFT {
     //! projection operator (where no additional loop is required)
     inline Real normalisation() const { return norm_factor; }
 
-    //! return the number of components per pixel
-    const Dim_t & get_nb_dof_per_pixel() const;
-
     //! return the number of spatial dimensions
     const Dim_t & get_spatial_dim() const;
 
@@ -191,12 +227,18 @@ namespace muFFT {
      */
     const Dim_t & get_nb_quad_pts() const;
 
-    //! has this engine been initialised?
-    bool is_initialised() const { return this->initialised; }
-
     //! perform a deep copy of the engine (this should never be necessary in
     //! c++)
     virtual std::unique_ptr<FFTEngineBase> clone() const = 0;
+
+    //! check whether a plan for nb_dof_per_pixel exists
+    bool has_plan_for(const Dim_t & nb_dof_per_pixel) const;
+
+    /**
+     * Returns the required pad size. Helpful when calling fft with wrapped
+     * fields
+     */
+    virtual Dim_t get_required_pad_size(const Dim_t & nb_dof_per_pixel) const;
 
    protected:
     //! spatial dimension of the grid
@@ -228,16 +270,12 @@ namespace muFFT {
     //!< transformed data
     DynCcoord_t fourier_strides;
 
-    //!< field to store the Fourier transform of P
-    FourierField_t & fourier_field;
-
     //!< normalisation coefficient of fourier transform
     const Real norm_factor;
-    //! number of degrees of freedom per pixel. Corresponds to the number of
-    //! quadrature points per pixel multiplied by the number of components per
-    //! quadrature point
-    Dim_t nb_dof_per_pixel;
-    bool initialised{false};  //!< to prevent double initialisation
+    //! number of degrees of freedom per pixel for which this field collection
+    //! has been primed. Can be queried. Corresponds to the number of sub-points
+    //! per pixel multiplied by the number of components per sub-point
+    std::set<Dim_t> planned_nb_dofs{};
   };
 
   //! reference to fft engine is safely managed through a `std::shared_ptr`

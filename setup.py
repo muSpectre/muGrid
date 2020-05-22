@@ -223,6 +223,7 @@ mugrid_sources = [
     'src/libmugrid/field_map.cc',
     'src/libmugrid/field_typed.cc',
     'src/libmugrid/grid_common.cc',
+    'src/libmugrid/raw_memory_operations.cc',
     'src/libmugrid/state_field.cc',
     'src/libmugrid/state_field_map.cc',
     'src/libmugrid/units.cc',

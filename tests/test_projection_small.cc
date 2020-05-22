@@ -71,7 +71,7 @@ namespace muSpectre {
     // create a Green operator projector
 
     auto && fft_pointer{std::make_unique<muFFT::FFTWEngine>(
-        DynCcoord_t(fix::SizeGiver::get_nb_grid_pts()), fix::mdim * fix::mdim)};
+        DynCcoord_t(fix::SizeGiver::get_nb_grid_pts()))};
 
     ProjectionApproxGreenOperator<fix::mdim> green_projection{
         std::move(fft_pointer), DynRcoord_t(fix::SizeGiver::get_lengths()),

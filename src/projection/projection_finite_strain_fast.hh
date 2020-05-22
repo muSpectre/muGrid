@@ -125,7 +125,7 @@ namespace muSpectre {
     std::array<Dim_t, 2> get_strain_shape() const final;
 
     //! get number of components to project per pixel
-    constexpr static Dim_t NbComponents() { return DimS * DimS * OneQuadPt; }
+    constexpr static Dim_t NbComponents() { return DimS * DimS * NbQuadPts; }
 
     //! get number of components to project per pixel
     virtual Dim_t get_nb_dof_per_pixel() const { return NbComponents(); }

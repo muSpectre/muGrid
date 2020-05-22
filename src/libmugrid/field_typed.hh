@@ -368,7 +368,8 @@ namespace muGrid {
      */
     WrappedField(const std::string & unique_name, FieldCollection & collection,
                  const Dim_t & nb_dof_per_sub_pt, const size_t & size, T * ptr,
-                 const PixelSubDiv & sub_division, const Unit & unit,
+                 const PixelSubDiv & sub_division,
+                 const Unit & unit = Unit::unitless(),
                  const Dim_t & nb_sub_pts = Unknown);
 
     /**
@@ -393,11 +394,11 @@ namespace muGrid {
     //! Destructor
     virtual ~WrappedField() = default;
 
-    //! Copy assignment operator
-    WrappedField & operator=(const WrappedField & other) = delete;
-
     //! Move assignment operator
     WrappedField & operator=(WrappedField && other) = delete;
+
+    //! Copy assignment operator
+    WrappedField & operator=(const Parent & other);
 
     /**
      * Emulation of a const constructor. @param nb_sub_pts is only required if

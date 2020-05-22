@@ -66,8 +66,10 @@ namespace muSpectre {
 
     Real rdr = comm.sum(this->r_k.dot(this->r_k));
     Real rhs_norm2 = comm.sum(rhs.squaredNorm());
-    std::cout << "Norm of rhs in krylov_solver_cg.cc = " << rhs_norm2
-              << std::endl;
+    if (verbose > Verbosity::Silent && comm.rank() == 0) {
+      std::cout << "Norm of rhs in krylov_solver_cg.cc = " << rhs_norm2
+                << std::endl;
+    }
     // Multiplication with the norm of the right hand side to get a relative
     // convergence criterion
     Real rel_tol2 = muGrid::ipow(this->tol, 2) * rhs_norm2;

@@ -100,12 +100,13 @@ for inc, lam in zip(range(1, ninc+1), stretch[:40]):
     pass
 
 
-cg_tol = 1e-8
+cg_tol = 1e-6
 newton_tol = 1e-5
-equil_tol = 1e-10
+equil_tol = 1e-8
 maxiter = 1000
+verbosity = µ.Verbosity.Full
 
-solver = µ.solvers.KrylovSolverCG(rve, cg_tol, maxiter)
+solver = µ.solvers.KrylovSolverCG(rve, cg_tol, maxiter, verbosity)
 
 results = µ.solvers.de_geus(
-    rve, ΔFbars, solver, newton_tol, equil_tol)
+    rve, ΔFbars, solver, newton_tol, equil_tol, verbosity)

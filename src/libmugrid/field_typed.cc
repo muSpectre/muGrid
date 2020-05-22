@@ -38,6 +38,7 @@
 #include "field_typed.hh"
 #include "field_collection.hh"
 #include "field_map.hh"
+#include "raw_memory_operations.hh"
 
 namespace muGrid {
 
@@ -56,6 +57,12 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   template <typename T>
   TypedField<T> & TypedField<T>::operator=(const Parent & other) {
+    Parent::operator=(other);
+    return *this;
+  }
+
+  template <typename T>
+  WrappedField<T> & WrappedField<T>::operator=(const Parent & other) {
     Parent::operator=(other);
     return *this;
   }
@@ -271,7 +278,27 @@ namespace muGrid {
   template <typename T>
   TypedFieldBase<T> &
   TypedFieldBase<T>::operator=(const TypedFieldBase & other) {
-    this->eigen_vec() = other.eigen_vec();
+    switch (this->collection.get_domain()) {
+    case FieldCollection::ValidityDomain::Local: {
+      this->eigen_vec() = other.eigen_vec();
+      break;
+    }
+    case FieldCollection::ValidityDomain::Global: {
+      auto && my_strides{this->get_strides(PixelSubDiv::Pixel)};
+      auto && other_strides{other.get_strides(PixelSubDiv::Pixel)};
+      if (my_strides == other_strides) {
+        this->eigen_vec() = other.eigen_vec();
+      } else {
+        raw_mem_ops::strided_copy(this->get_shape(PixelSubDiv::Pixel),
+                                  my_strides, other_strides, other.data(),
+                                  this->data_ptr);
+      }
+      break;
+    }
+    default:
+      throw FieldError("Unknown ValidityDomain type");
+      break;
+    }
     return *this;
   }
 
@@ -455,6 +482,7 @@ namespace muGrid {
                                           nb_dof_per_sub_pt, map, sub_division,
                                           unit, nb_sub_pts);
   }
+
   /* ---------------------------------------------------------------------- */
   template <typename T>
   void WrappedField<T>::set_pad_size(const size_t & pad_size) {

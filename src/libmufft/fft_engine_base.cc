@@ -33,36 +33,56 @@
  *
  */
 
-#include <libmugrid/ccoord_operations.hh>
-
 #include "fft_engine_base.hh"
-
 #include "fft_utils.hh"
+
+#include <libmugrid/ccoord_operations.hh>
 
 using muGrid::CcoordOps::get_default_strides;
 
 namespace muFFT {
 
   /* ---------------------------------------------------------------------- */
-  FFTEngineBase::FFTEngineBase(DynCcoord_t nb_grid_pts, Dim_t nb_dof_per_pixel,
+  FFTEngineBase::FFTEngineBase(const DynCcoord_t & nb_grid_pts,
                                Communicator comm)
       : spatial_dimension{nb_grid_pts.get_dim()}, comm{comm},
-        fourier_field_collection{this->spatial_dimension, OneQuadPt, OneNode},
+        fourier_field_collection{this->spatial_dimension, muGrid::Unknown,
+                                 muGrid::Unknown},
         nb_domain_grid_pts{nb_grid_pts}, nb_subdomain_grid_pts{nb_grid_pts},
         subdomain_locations(spatial_dimension),
         subdomain_strides{get_default_strides(nb_grid_pts)},
         nb_fourier_grid_pts{get_nb_hermitian_grid_pts(nb_grid_pts)},
         fourier_locations(spatial_dimension),
         fourier_strides{get_default_strides(nb_fourier_grid_pts)},
-        fourier_field{fourier_field_collection.register_complex_field(
-            "work space", nb_dof_per_pixel, PixelSubDiv::Pixel)},
-        norm_factor{1. / muGrid::CcoordOps::get_size(nb_grid_pts)},
-        nb_dof_per_pixel{nb_dof_per_pixel} {}
+        norm_factor{1. / muGrid::CcoordOps::get_size(nb_grid_pts)} {}
 
   /* ---------------------------------------------------------------------- */
-  void FFTEngineBase::initialise(FFT_PlanFlags /*plan_flags*/) {
-    this->fourier_field_collection.initialise(this->nb_fourier_grid_pts,
-        this->fourier_locations, this->fourier_strides);
+  auto
+  FFTEngineBase::register_fourier_space_field(const std::string & unique_name,
+                                              const Dim_t & nb_dof_per_pixel)
+      -> FourierField_t & {
+    return this->fourier_field_collection.register_complex_field(
+        unique_name, nb_dof_per_pixel, PixelSubDiv::Pixel);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  auto FFTEngineBase::fetch_or_register_fourier_space_field(
+      const std::string & unique_name, const Dim_t & nb_dof_per_pixel)
+      -> FourierField_t & {
+    if (this->fourier_field_collection.field_exists(unique_name)) {
+      auto & field{dynamic_cast<FourierField_t &>(
+          this->fourier_field_collection.get_field(unique_name))};
+      if (field.get_nb_dof_per_pixel() != nb_dof_per_pixel) {
+        std::stringstream message{};
+        message << "Field '" << unique_name << "' exists, but it has "
+                << field.get_nb_dof_per_pixel()
+                << " degrees of freedom per pixel instead of the requested "
+                << nb_dof_per_pixel;
+        throw muGrid::FieldCollectionError{message.str()};
+      }
+      return field;
+    }
+    return this->register_fourier_space_field(unique_name, nb_dof_per_pixel);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -86,11 +106,6 @@ namespace muFFT {
   }
 
   /* ---------------------------------------------------------------------- */
-  const Dim_t & FFTEngineBase::get_nb_dof_per_pixel() const {
-    return this->nb_dof_per_pixel;
-  }
-
-  /* ---------------------------------------------------------------------- */
   const Dim_t & FFTEngineBase::get_spatial_dim() const {
     return this->spatial_dimension;
   }
@@ -98,6 +113,17 @@ namespace muFFT {
   /* ---------------------------------------------------------------------- */
   const Dim_t & FFTEngineBase::get_nb_quad_pts() const {
     return this->fourier_field_collection.get_nb_quad_pts();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  bool FFTEngineBase::has_plan_for(const Dim_t & nb_dof_per_pixel) const {
+    return static_cast<bool>(this->planned_nb_dofs.count(nb_dof_per_pixel));
+  }
+
+  /* ---------------------------------------------------------------------- */
+  Dim_t FFTEngineBase::get_required_pad_size(
+      const Dim_t & /*nb_dof_per_pixel*/) const {
+    return 0;
   }
 
 }  // namespace muFFT

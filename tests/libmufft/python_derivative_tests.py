@@ -43,9 +43,14 @@ class DerivativeCheck2d(unittest.TestCase):
     def setUp(self):
         self.nb_pts = [23, 27]
         np.random.seed(7)
-        self.field = np.random.random(self.nb_pts)
+        self.field = np.empty(self.nb_pts, order='f')
+        self.field[:] = np.random.random(self.nb_pts)
         self.fft = muFFT.FFT(self.nb_pts)
-        self.fourier_field = self.fft.fft(self.field)
+        self.nb_dof = 1
+        self.fft.initialise(self.nb_dof)
+        self.fourier_field = self.fft.register_fourier_space_field(
+            "fft_workspace", self.nb_dof)
+        self.fft.fft(self.field, self.fourier_field)
 
     def test_rollaxis(self):
         dz = muFFT.DiscreteDerivative([0, 0, 0], [[[-1, 1]]])
@@ -87,10 +92,12 @@ class DerivativeCheck2d(unittest.TestCase):
         q = self.fft.fftfreq
         d = diffop.fourier(q)
         fourier_field_copy = np.copy(self.fourier_field)
-        diff_field = self.fft.ifft(d * self.fourier_field) * \
-            self.fft.normalisation
-        ndiff = self.fft.ifft(1j*2*np.pi*q[0] * fourier_field_copy) * \
-            self.fft.normalisation
+        diff_field = np.zeros_like(self.field)
+        ndiff = np.zeros_like(self.field)
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
+        self.fft.ifft(1j*2*np.pi*q[0] * fourier_field_copy, ndiff)
+        ndiff *=  self.fft.normalisation
         nx, ny = self.nb_pts
         diff_field = np.squeeze(diff_field)
         ndiff = np.squeeze(ndiff)
@@ -107,11 +114,14 @@ class DerivativeCheck2d(unittest.TestCase):
         q = self.fft.fftfreq
         d = diffop.fourier(q)
         fourier_field_copy = np.copy(self.fourier_field)
-        diff_field = self.fft.ifft(d * self.fourier_field) * \
-            self.fft.normalisation
-        ndiff = self.fft.ifft(1j*2*np.pi*q[0] *
+        diff_field = np.zeros_like(self.field)
+        ndiff = np.zeros_like(self.field)
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
+        self.fft.ifft(1j*2*np.pi*q[0] *
                               np.exp(1j*2*np.pi*np.einsum("i,i...->...", shift, q)) *
-                              fourier_field_copy) * self.fft.normalisation
+                              fourier_field_copy, ndiff)
+        ndiff *= self.fft.normalisation
         nx, ny = self.nb_pts
         diff_field = np.squeeze(diff_field)
         ndiff = np.squeeze(ndiff)
@@ -128,10 +138,12 @@ class DerivativeCheck2d(unittest.TestCase):
         q = self.fft.fftfreq
         d = diffop.fourier(q)
         fourier_field_copy = np.copy(self.fourier_field)
-        diff_field = self.fft.ifft(d * self.fourier_field) * \
-            self.fft.normalisation
-        ndiff = self.fft.ifft(1j*2*np.pi*q[0] * fourier_field_copy) * \
-            self.fft.normalisation
+        diff_field = np.zeros_like(self.field)
+        ndiff = np.zeros_like(self.field)
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
+        self.fft.ifft(1j*2*np.pi*q[0] * fourier_field_copy, ndiff)
+        ndiff *= self.fft.normalisation
         nx, ny = self.nb_pts
         diff_field = np.squeeze(diff_field)
         ndiff = np.squeeze(ndiff)
@@ -143,8 +155,9 @@ class DerivativeCheck2d(unittest.TestCase):
         diffop = muFFT.DiscreteDerivative([0, 0], [[-1, 1]])
         q = self.fft.fftfreq
         d = diffop.fourier(q)
-        diff_field = self.fft.ifft(d * self.fourier_field) * \
-            self.fft.normalisation
+        diff_field = np.zeros_like(self.field)
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
         nx, ny = self.nb_pts
         diff_field = np.squeeze(diff_field)
         for x in range(nx):
@@ -158,8 +171,10 @@ class DerivativeCheck2d(unittest.TestCase):
                                                    [ 0, 0]])
         q = self.fft.fftfreq
         d = diffop.fourier(q)
-        diff_field = self.fft.ifft(d * self.fourier_field) * \
-                     self.fft.normalisation
+        diff_field = np.zeros_like(self.field)
+        ndiff = np.zeros_like(self.field)
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
         nx, ny = self.nb_pts
         diff_field = np.squeeze(diff_field)
         for x in range(nx):
@@ -173,8 +188,10 @@ class DerivativeCheck2d(unittest.TestCase):
                                                    [-1, 1]])
         q = self.fft.fftfreq
         d = diffop.fourier(q)
-        diff_field = self.fft.ifft(d * self.fourier_field) * \
-            self.fft.normalisation
+        diff_field = np.zeros_like(self.field)
+        ndiff = np.zeros_like(self.field)
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
         nx, ny = self.nb_pts
         diff_field = np.squeeze(diff_field)
         for x in range(nx):
@@ -188,8 +205,11 @@ class DerivativeCheck2d(unittest.TestCase):
                                                    [-0.5, 0.5]])
         q = self.fft.fftfreq
         d = diffop.fourier(q)
-        diff_field = self.fft.ifft(d * self.fourier_field) * \
-            self.fft.normalisation
+        diff_field = np.zeros_like(self.field)
+
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
+
         nx, ny = self.nb_pts
         diff_field = np.squeeze(diff_field)
         for x in range(nx):
@@ -203,8 +223,10 @@ class DerivativeCheck2d(unittest.TestCase):
         diffop = muFFT.DiscreteDerivative([-1, 0], [[-0.5], [0], [0.5]])
         q = self.fft.fftfreq
         d = diffop.fourier(q)
-        diff_field = self.fft.ifft(d * self.fourier_field) * \
-            self.fft.normalisation
+        diff_field = np.zeros_like(self.field)
+        ndiff = np.zeros_like(self.field)
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
         nx, ny = self.nb_pts
         diff_field = np.squeeze(diff_field)
         for x in range(nx):
@@ -219,8 +241,10 @@ class DerivativeCheck2d(unittest.TestCase):
                                             3/4, -3/20, 1/60]])
         q = self.fft.fftfreq
         d = diffop.fourier(q)
-        diff_field = self.fft.ifft(d * self.fourier_field) * \
-            self.fft.normalisation
+        diff_field = np.zeros_like(self.field)
+        ndiff = np.zeros_like(self.field)
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
         nx, ny = self.nb_pts
         diff_field = np.squeeze(diff_field)
         for x in range(nx):
@@ -239,15 +263,21 @@ class DerivativeCheck3d(unittest.TestCase):
         self.nb_pts = [23, 23, 17]
         self.field = np.random.random(self.nb_pts)
         self.fft = muFFT.FFT(self.nb_pts)
-        self.fourier_field = self.fft.fft(self.field)
+        self.nb_dof = 1
+        self.fft.initialise(self.nb_dof)
+        self.fourier_field = self.fft.register_fourier_space_field(
+            "fft_workspace", self.nb_dof)
+        self.fft.fft(self.field, self.fourier_field)
 
     def test_upwind_differences_x(self):
         diffop = muFFT.DiscreteDerivative([0, 0, 0], [[[-1, 1]]]) \
                       .rollaxes(-1).rollaxes(-1)
         q = self.fft.fftfreq
         d = diffop.fourier(q)
-        diff_field = self.fft.ifft(d * self.fourier_field) * \
-            self.fft.normalisation
+        diff_field = np.zeros_like(self.field, order='f')
+        ndiff = np.zeros_like(self.field)
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
         nx, ny, nz = self.nb_pts
         diff_field = np.squeeze(diff_field)
         for x in range(nx):
@@ -261,8 +291,10 @@ class DerivativeCheck3d(unittest.TestCase):
         diffop = muFFT.DiscreteDerivative([0, 0, 0], [[[-1, 1]]]).rollaxes(-1)
         q = self.fft.fftfreq
         d = diffop.fourier(q)
-        diff_field = self.fft.ifft(d * self.fourier_field) * \
-            self.fft.normalisation
+        diff_field = np.zeros_like(self.field, order='f')
+        ndiff = np.zeros_like(self.field)
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
         nx, ny, nz = self.nb_pts
         diff_field = np.squeeze(diff_field)
         for x in range(nx):
@@ -276,8 +308,10 @@ class DerivativeCheck3d(unittest.TestCase):
         diffop = muFFT.DiscreteDerivative([0, 0, 0], [[[-1, 1]]])
         q = self.fft.fftfreq
         d = diffop.fourier(q)
-        diff_field = self.fft.ifft(d * self.fourier_field) * \
-            self.fft.normalisation
+        diff_field = np.zeros_like(self.field, order='f')
+        ndiff = np.zeros_like(self.field)
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
         nx, ny, nz = self.nb_pts
         diff_field = np.squeeze(diff_field)
         for x in range(nx):
@@ -293,8 +327,10 @@ class DerivativeCheck3d(unittest.TestCase):
                                            [[ 0.25,  0.25], [ 0.25,  0.25]]])
         q = self.fft.fftfreq
         d = diffop.fourier(q)
-        diff_field = self.fft.ifft(d * self.fourier_field) * \
-            self.fft.normalisation
+        diff_field = np.zeros_like(self.field, order='f')
+        ndiff = np.zeros_like(self.field)
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
         nx, ny, nz = self.nb_pts
         diff_field = np.squeeze(diff_field)
         for x in range(nx):
@@ -313,8 +349,10 @@ class DerivativeCheck3d(unittest.TestCase):
                                            [[-0.25, -0.25], [0.25, 0.25]]])
         q = self.fft.fftfreq
         d = diffop.fourier(q)
-        diff_field = self.fft.ifft(d * self.fourier_field) * \
-            self.fft.normalisation
+        diff_field = np.zeros_like(self.field, order='f')
+        ndiff = np.zeros_like(self.field)
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
         nx, ny, nz = self.nb_pts
         diff_field = np.squeeze(diff_field)
         for x in range(nx):
@@ -333,8 +371,10 @@ class DerivativeCheck3d(unittest.TestCase):
                                            [[-0.25, 0.25], [-0.25, 0.25]]])
         q = self.fft.fftfreq
         d = diffop.fourier(q)
-        diff_field = self.fft.ifft(d * self.fourier_field) * \
-            self.fft.normalisation
+        diff_field = np.zeros_like(self.field, order='f')
+        ndiff = np.zeros_like(self.field)
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
         nx, ny, nz = self.nb_pts
         diff_field = np.squeeze(diff_field)
         for x in range(nx):

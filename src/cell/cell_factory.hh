@@ -65,17 +65,18 @@ namespace muSpectre {
         const DynCcoord_t & nb_grid_pts, const DynRcoord_t & lengths,
         const Formulation & form, muFFT::Gradient_t gradient,
         const muFFT::Communicator & comm = muFFT::Communicator()) {
-      if (static_cast<Dim_t>(gradient.size()) % nb_grid_pts.get_dim() != 0) {
+      auto && dim{nb_grid_pts.get_dim()};
+      if (static_cast<Dim_t>(gradient.size()) % dim != 0) {
         std::stringstream error{};
         error << "There are " << gradient.size() << " derivative operators in "
               << "the gradient. This number must be divisible by the system "
-              << "dimension " << nb_grid_pts.get_dim() << ".";
+              << "dimension " << dim << ".";
         throw std::runtime_error(error.str());
       }
       // Deduce number of quad points from the gradient
-      Dim_t nb_quad_pts = gradient.size() / nb_grid_pts.get_dim();
+      const auto nb_quad_pts{gradient.size() / dim};
       auto fft_ptr{std::make_unique<FFTEngine>(
-          nb_grid_pts, dof_for_formulation(form, DimS, nb_quad_pts), comm)};
+          nb_grid_pts, comm)};
       switch (form) {
       case Formulation::finite_strain: {
         if (nb_quad_pts == OneQuadPt) {

@@ -37,6 +37,8 @@
 
 #include <libmugrid/exception.hh>
 #include <libmugrid/numpy_tools.hh>
+#include <libmugrid/field_typed.hh>
+#include <libmugrid/raw_memory_operations.hh>
 
 #include <libmufft/fft_utils.hh>
 #include <libmufft/fftw_engine.hh>
@@ -53,29 +55,28 @@
 
 using muGrid::numpy_wrap;
 using muGrid::operator<<;
+using muFFT::Communicator;
+using muFFT::fft_freq;
+using muFFT::FFTEngineBase;
 using muGrid::Complex;
 using muGrid::Dim_t;
 using muGrid::DynCcoord_t;
 using muGrid::GlobalFieldCollection;
-using muGrid::RuntimeError;
 using muGrid::NumpyProxy;
 using muGrid::OneQuadPt;
 using muGrid::Real;
+using muGrid::RuntimeError;
 using muGrid::WrappedField;
-using muFFT::fft_freq;
-using muFFT::FFTEngineBase;
-using muFFT::Communicator;
 using pybind11::literals::operator""_a;
 namespace py = pybind11;
 
 class FFTEngineBaseUnclonable : public FFTEngineBase {
  public:
-  FFTEngineBaseUnclonable(DynCcoord_t nb_grid_pts, Dim_t nb_dof_per_pixel,
-                          Communicator comm)
-      : FFTEngineBase(nb_grid_pts, nb_dof_per_pixel, comm) {}
+  FFTEngineBaseUnclonable(DynCcoord_t nb_grid_pts, Communicator comm)
+      : FFTEngineBase(nb_grid_pts, comm) {}
 
   std::unique_ptr<FFTEngineBase> clone() const final {
-    throw RuntimeError("Python version of FFTEngine cannot be cloned");
+    throw muFFT::FFTEngineError("Python version of FFTEngine cannot be cloned");
   }
 };
 /**
@@ -92,16 +93,23 @@ class PyFFTEngineBase : public FFTEngineBaseUnclonable {
   //! workspace type
   using FourierField_t = typename Parent::FourierField_t;
 
-  PyFFTEngineBase(DynCcoord_t nb_grid_pts, Dim_t nb_dof_per_pixel,
-                  Communicator comm)
-      : FFTEngineBaseUnclonable(nb_grid_pts, nb_dof_per_pixel, comm) {}
+  PyFFTEngineBase(DynCcoord_t nb_grid_pts, Communicator comm)
+      : FFTEngineBaseUnclonable(nb_grid_pts, comm) {}
 
-  FourierField_t & fft(RealField_t & field) override {
-    PYBIND11_OVERLOAD_PURE(FourierField_t &, Parent, fft, field);
+  void fft(const RealField_t & input_field,
+           FourierField_t & output_field) const override {
+    PYBIND11_OVERLOAD_PURE(void, Parent, fft, input_field, output_field);
   }
 
-  void ifft(RealField_t & field) const override {
-    PYBIND11_OVERLOAD_PURE(void, Parent, ifft, field);
+  void ifft(const FourierField_t & input_field,
+            RealField_t & output_field) const override {
+    PYBIND11_OVERLOAD_PURE(void, Parent, ifft, input_field, output_field);
+  }
+
+  void initialise(const Dim_t & nb_dof_per_pixel,
+                  const muFFT::FFT_PlanFlags & plan_flags) override {
+    PYBIND11_OVERLOAD_PURE(void, Parent, initialise, nb_dof_per_pixel,
+                           plan_flags);
   }
 };
 
@@ -110,101 +118,69 @@ void add_fft_engine_base(py::module & mod) {
              std::shared_ptr<FFTEngineBase>,  // holder
              PyFFTEngineBase                  // trampoline base
              >(mod, "FFTEngineBase")
-      .def(py::init<DynCcoord_t, Dim_t, Communicator>());
+      .def(py::init<DynCcoord_t, Communicator>());
 }
 
 template <class Engine>
-void add_engine_helper(py::module & mod, std::string name) {
+void add_engine_helper(py::module & mod, const std::string & name,
+                       const bool & fourier_space_arrays_are_col_major) {
   py::class_<Engine,                   // class
              std::shared_ptr<Engine>,  // holder
              FFTEngineBase             // trampoline base
-             >(mod, name.c_str())
-      .def(py::init([](std::vector<Dim_t> nb_grid_pts, Dim_t nb_dof_per_pixel,
-                       muFFT::Communicator & comm) {
-             // Initialize with muFFT Communicator object
-             return new Engine(DynCcoord_t(nb_grid_pts), nb_dof_per_pixel,
-                               comm);
-           }),
-           "nb_grid_pts"_a, "nb_dof_per_pixel"_a,
-           "communicator"_a = muFFT::Communicator())
+             >
+      fft_engine(mod, name.c_str());
+  fft_engine
+      .def(py::init(
+               [](std::vector<Dim_t> nb_grid_pts, muFFT::Communicator & comm) {
+                 // Initialise with muFFT Communicator object
+                 return new Engine(DynCcoord_t(nb_grid_pts), comm);
+               }),
+           "nb_grid_pts"_a, "communicator"_a = muFFT::Communicator())
 #ifdef WITH_MPI
-      .def(py::init([](std::vector<Dim_t> nb_grid_pts, Dim_t nb_dof_per_pixel,
-                       size_t comm) {
-             // Initialize with bare MPI handle
-             return new Engine(DynCcoord_t(nb_grid_pts), nb_dof_per_pixel,
+      .def(py::init([](std::vector<Dim_t> nb_grid_pts, size_t comm) {
+             // Initialise with bare MPI handle
+             return new Engine(DynCcoord_t(nb_grid_pts),
                                std::move(muFFT::Communicator(MPI_Comm(comm))));
            }),
-           "nb_grid_pts"_a, "nb_dof_per_pixel"_a,
-           "communicator"_a = size_t(MPI_COMM_SELF))
+           "nb_grid_pts"_a, "communicator"_a = size_t(MPI_COMM_SELF))
 #endif
-      // Interface for passing Fields directly
-      .def_property_readonly("fourier_field", &Engine::get_fourier_field,
-                             py::return_value_policy::reference_internal)
-      .def("fft", &Engine::fft, py::return_value_policy::reference_internal)
+      .def("fft", &Engine::fft)
       .def("ifft", &Engine::ifft)
-      // Interface for passing numpy arrays
       .def(
-          "fft",
-          [](Engine & eng, py::array_t<Real, py::array::f_style> & array) {
-            // We need to tie the lifetime of the return value to the lifetime
-            // of the engine object, because we are returning the internal work
-            // space buffer that is managed by the engine;
-            // see return_value_policy below.
-            NumpyProxy<Real> proxy(
-                eng.get_nb_subdomain_grid_pts(),
-                eng.get_subdomain_locations(),
-                eng.get_nb_dof_per_pixel(),
-                array);
-            return numpy_wrap(eng.fft(proxy.get_field()),
-                              proxy.get_components_shape());
+          "initialise",
+          [](Engine & engine, const Dim_t & nb_dof_per_pixel,
+             const muFFT::FFT_PlanFlags & plan_flags) {
+            engine.initialise(nb_dof_per_pixel, plan_flags);
           },
-          "array"_a,
-          py::keep_alive<0, 1>(),
-          "Perform forward FFT on the input array. The method returns an array "
-          "containing the Fourier-transformed field, but this array is "
-          "borrowed from a buffer internal to the FFT engine object. (A second "
-          "call to the forward FFT will override this array.)")
+          "nb_dof_per_pixel"_a, "flags"_a = muFFT::FFT_PlanFlags::estimate)
+      .def("register_fourier_space_field",
+           &muFFT::FFTEngineBase::register_fourier_space_field, "unique_name"_a,
+           "nb_dof_per_pixel"_a, py::return_value_policy::reference_internal)
       .def(
-          "ifft",
-          [](Engine & eng, py::array_t<Complex, py::array::f_style> & array) {
-            // Copy the input array to the FFT work space.
-            std::vector<Dim_t> components_shape{
-                numpy_copy(eng.get_fourier_field(), array)};
-            // Create an numpy array that will hold the result of the inverse
-            // FFT. We don't want the storage managed by a field because we
-            // want to transfer possession of storage to Python without a copy
-            // operation.
-            std::vector<Dim_t> shape;
-            Dim_t nb_dof_per_sub_pt{1};
-            for (auto && n : components_shape) {
-              shape.push_back(n);
-              nb_dof_per_sub_pt *= n;
+          "create_or_fetch_fourier_space_field",
+          [](Engine & engine, const std::string & unique_name,
+             const Dim_t & nb_dof_per_pixel) ->
+          typename Engine::FourierField_t & {
+            auto && collection{engine.get_fourier_field_collection()};
+            if (collection.field_exists(unique_name)) {
+              auto & field{dynamic_cast<typename Engine::FourierField_t &>(
+                  collection.get_field(unique_name))};
+              if (field.get_nb_dof_per_pixel() != nb_dof_per_pixel) {
+                std::stringstream message{};
+                message << "There is already a field named '" << unique_name
+                        << "', but it holds " << field.get_nb_dof_per_pixel()
+                        << " degrees of freedom per pixel, and not "
+                        << nb_dof_per_pixel << ", as requested";
+                throw muFFT::FFTEngineError{message.str()};
+              }
+              return field;
+            } else {
+              return engine.register_fourier_space_field(unique_name,
+                                                       nb_dof_per_pixel);
             }
-            Dim_t size = nb_dof_per_sub_pt;
-            for (auto && n : eng.get_nb_subdomain_grid_pts()) {
-              shape.push_back(n);
-              size *= n;
-            }
-            // Create the numpy array that holds the output data.
-            py::array_t<Real, py::array::f_style> result(shape);
-            // Wrap the numpy array into a proxy field that does not manage
-            // its own data.
-            NumpyProxy<Real> output_proxy(
-                eng.get_nb_subdomain_grid_pts(),
-                eng.get_subdomain_locations(),
-                eng.get_nb_dof_per_pixel(),
-                result);
-            eng.ifft(output_proxy.get_field());
-            // We can safely transfer possession to Python since the py::array
-            // is not tied to the engine object; see return_value_policy below.
-            return result;
           },
-          "array"_a, py::return_value_policy::move,
-          "Perform inverse FFT on the input array. The method returns an array "
-          "containing the transformed field. Unlike the forward FFT, this "
-          "array is *not* borrowed but belongs to the caller.")
-      .def("initialise", &Engine::initialise,
-           "flags"_a = muFFT::FFT_PlanFlags::estimate)
+          "unique_name"_a, "nb_dof_per_pixel"_a,
+          py::return_value_policy::reference_internal)
       .def_property_readonly("normalisation", &Engine::normalisation)
       .def_property_readonly("communicator", &Engine::get_communicator)
       .def_property_readonly(
@@ -273,41 +249,261 @@ void add_engine_helper(py::module & mod, std::string name) {
             return t;
           },
           py::return_value_policy::reference)
-      .def_property_readonly(
-          "fftfreq",
-          [](const Engine & eng) {
-            std::vector<Dim_t> shape{}, strides{};
-            Dim_t dim{eng.get_spatial_dim()};
-            shape.push_back(dim);
-            strides.push_back(sizeof(Real));
-            for (auto && n : eng.get_nb_fourier_grid_pts()) {
-              shape.push_back(n);
-            }
-            for (auto && s : eng.get_pixels().get_strides()) {
-              strides.push_back(s*dim*sizeof(Real));
-            }
-            py::array_t<Real> fftfreqs(shape, strides);
-            Real *ptr{static_cast<Real*>(fftfreqs.request().ptr)};
-            auto & nb_domain_grid_pts{eng.get_nb_domain_grid_pts()};
-            for (auto && pix : eng.get_pixels()) {
-              for (int i = 0; i < dim; ++i) {
-                ptr[i] =
-                    static_cast<Real>(fft_freq(pix[i], nb_domain_grid_pts[i]))
-                    / nb_domain_grid_pts[i];
+      .def_property_readonly("spatial_dim", &Engine::get_spatial_dim)
+      .def("has_plan_for", &Engine::has_plan_for, "nb_dof_per_pixel"_a)
+      .def_property_readonly("fftfreq", [](const Engine & eng) {
+        std::vector<Dim_t> shape{}, strides{};
+        Dim_t dim{eng.get_spatial_dim()};
+        shape.push_back(dim);
+        strides.push_back(sizeof(Real));
+        for (auto && n : eng.get_nb_fourier_grid_pts()) {
+          shape.push_back(n);
+        }
+        for (auto && s : eng.get_pixels().get_strides()) {
+          strides.push_back(s * dim * sizeof(Real));
+        }
+        py::array_t<Real> fftfreqs(shape, strides);
+        Real * ptr{static_cast<Real *>(fftfreqs.request().ptr)};
+        auto & nb_domain_grid_pts{eng.get_nb_domain_grid_pts()};
+        for (auto && pix : eng.get_pixels()) {
+          for (int i = 0; i < dim; ++i) {
+            ptr[i] =
+                static_cast<Real>(fft_freq(pix[i], nb_domain_grid_pts[i])) /
+                nb_domain_grid_pts[i];
+          }
+          ptr += dim;
+        }
+        return fftfreqs;
+      });
+  if (fourier_space_arrays_are_col_major) {
+    fft_engine  // Interface for passing numpy arrays
+        .def(
+            "fft",
+            [](Engine & eng,
+               py::array_t<Real, py::array::f_style> & input_array,
+               py::array_t<Complex> & output_array) {
+              if (not(output_array.flags() & py::detail::npy_api::constants::
+                                                 NPY_ARRAY_F_CONTIGUOUS_)) {
+                throw muFFT::FFTEngineError(
+                    "Can't use row_major output arrays, as the result would be "
+                    "written into a temporary copy.");
               }
-              ptr += dim;
-            }
-            return fftfreqs;
-          });
+              auto && nb_dof_per_pixel{input_array.size() / eng.size()};
+              if (nb_dof_per_pixel * eng.size() !=
+                  static_cast<size_t>(input_array.size())) {
+                std::stringstream message{};
+                message
+                    << "Cannot determine the number of degrees of freedom per "
+                       "pixel: The supplied input array's size ("
+                    << input_array.size()
+                    << ") is not an integer multiple of the number of pixels ("
+                    << eng.size() << " = " << input_array.size() << " / "
+                    << Real(input_array.size()) / eng.size() << ".";
+                throw muFFT::FFTEngineError{message.str()};
+              }
+
+              NumpyProxy<Real> input_proxy(eng.get_nb_subdomain_grid_pts(),
+                                           eng.get_subdomain_locations(),
+                                           nb_dof_per_pixel, input_array);
+              auto info{output_array.request()};
+              NumpyProxy<Complex> output_proxy(eng.get_nb_fourier_grid_pts(),
+                                               eng.get_fourier_locations(),
+                                               nb_dof_per_pixel, output_array);
+              auto && input_proxy_field{input_proxy.get_field()};
+              eng.fft(input_proxy_field, output_proxy.get_field());
+            },
+            "real_input_array"_a, "complex_output_array"_a,
+            "Perform forward FFT of the input array into the output array")
+        .def(
+            "ifft",
+            [](Engine & eng,
+               py::array_t<Complex, py::array::f_style> & input_array,
+               py::array_t<Real> & output_array) {
+              if (not(output_array.flags() & py::detail::npy_api::constants::
+                                                 NPY_ARRAY_F_CONTIGUOUS_)) {
+                throw muFFT::FFTEngineError(
+                    "Can't use row_major output arrays, as the result would be "
+                    "written into a temporary copy.");
+              }
+              auto && nb_dof_per_pixel{output_array.size() / eng.size()};
+              if (nb_dof_per_pixel * eng.size() !=
+                  static_cast<size_t>(output_array.size())) {
+                std::stringstream message{};
+                message
+                    << "Cannot determine the number of degrees of freedom per "
+                       "pixel: The supplied output array's size ("
+                    << output_array.size()
+                    << ") is not an integer multiple of the number of pixels ("
+                    << eng.size() << " = " << output_array.size() << " / "
+                    << Real(output_array.size()) / eng.size() << ".";
+                throw muFFT::FFTEngineError{message.str()};
+              }
+
+              NumpyProxy<Complex> input_proxy(eng.get_nb_fourier_grid_pts(),
+                                              eng.get_fourier_locations(),
+                                              nb_dof_per_pixel, input_array);
+
+              NumpyProxy<Real> output_proxy(eng.get_nb_subdomain_grid_pts(),
+                                            eng.get_subdomain_locations(),
+                                            nb_dof_per_pixel, output_array);
+
+              eng.ifft(input_proxy.get_field(), output_proxy.get_field());
+            },
+            "fourier_input_array"_a, "real_output_array"_a,
+            "Perform inverse FFT of the input array into the output array.");
+  } else {
+    fft_engine  // Interface for passing numpy arrays
+        .def(
+            "fft",
+            [](Engine & eng,
+               py::array_t<Real, py::array::f_style> & input_array,
+               py::array_t<Complex> & output_array) {
+              auto && nb_dof_per_pixel{input_array.size() / eng.size()};
+              if (nb_dof_per_pixel * eng.size() !=
+                  static_cast<size_t>(input_array.size())) {
+                std::stringstream message{};
+                message
+                    << "Cannot determine the number of degrees of freedom per "
+                       "pixel: The supplied input array's size ("
+                    << input_array.size()
+                    << ") is not an integer multiple of the number of pixels ("
+                    << eng.size() << " = " << input_array.size() << " / "
+                    << Real(input_array.size()) / eng.size() << ".";
+                throw muFFT::FFTEngineError{message.str()};
+              }
+
+              NumpyProxy<Real> input_proxy(eng.get_nb_subdomain_grid_pts(),
+                                           eng.get_subdomain_locations(),
+                                           nb_dof_per_pixel, input_array);
+
+              py::buffer_info info{output_array.request()};
+              NumpyProxy<Complex> output_proxy(eng.get_nb_fourier_grid_pts(),
+                                               eng.get_fourier_locations(),
+                                               nb_dof_per_pixel, output_array);
+              auto && input_proxy_field{input_proxy.get_field()};
+              // create or fetch a temporary output buffer with proper memory
+              // layout
+              std::stringstream identifier{};
+              identifier << "temporary_fourier_field_nb_dof_"
+                         << nb_dof_per_pixel;
+              auto & temp_output{eng.fetch_or_register_fourier_space_field(
+                  identifier.str(), nb_dof_per_pixel)};
+              eng.fft(input_proxy_field, temp_output);
+              output_proxy.get_field() = temp_output;
+            },
+            "real_input_array"_a, "complex_output_array"_a,
+            "Perform forward FFT of the input array into the output array")
+        .def(
+            "ifft",
+            [](Engine & eng, py::array_t<Complex> & input_array,
+               py::array_t<Real> & output_array) {
+              auto && nb_dof_per_pixel{output_array.size() / eng.size()};
+              if (nb_dof_per_pixel * eng.size() !=
+                  static_cast<size_t>(output_array.size())) {
+                std::stringstream message{};
+                message
+                    << "Cannot determine the number of degrees of freedom per "
+                       "pixel: The supplied output array's size ("
+                    << output_array.size()
+                    << ") is not an integer multiple of the number of pixels ("
+                    << eng.size() << " = " << output_array.size() << " / "
+                    << Real(output_array.size()) / eng.size() << ".";
+                throw muFFT::FFTEngineError{message.str()};
+              }
+
+              GlobalFieldCollection collection(eng.get_spatial_dim(),
+                                               muGrid::Unknown, muGrid::Unknown,
+                                               eng.get_nb_subdomain_grid_pts(),
+                                               eng.get_subdomain_locations());
+              // static variable in order to make it reusable
+              thread_local std::vector<Real> temp_output_data{};
+              temp_output_data.resize(eng.size() * nb_dof_per_pixel);
+              muGrid::WrappedField<Real> temp_output_field{
+                  "output",
+                  collection,
+                  static_cast<Dim_t>(nb_dof_per_pixel),
+                  nb_dof_per_pixel * collection.get_nb_pixels(),
+                  temp_output_data.data(),
+                  muGrid::PixelSubDiv::Pixel};
+
+              // create or fetch a temporary output buffer with proper memory
+              // layout
+              std::stringstream identifier{};
+              identifier << "temporary_fourier_field_nb_dof_"
+                         << nb_dof_per_pixel;
+              auto & temp_input{eng.fetch_or_register_fourier_space_field(
+                  identifier.str(), nb_dof_per_pixel)};
+              {
+                auto && info{input_array.request()};
+                auto && np_strides{info.strides};
+                std::vector<Dim_t> input_strides{};
+                input_strides.reserve(np_strides.size());
+                for (auto && val : np_strides) {
+                  input_strides.push_back(val / info.itemsize);
+                }
+                std::vector<Dim_t> shape{};
+                shape.reserve(info.shape.size());
+                for (auto && val : info.shape) {
+                  shape.push_back(val);
+                }
+                // the first entries of the shape can be chosen by the user
+                std::vector<Dim_t> component_shape {};
+                for (size_t i{0}; i < shape.size()-eng.get_spatial_dim(); ++i) {
+                  component_shape.push_back(shape[i]);
+                }
+
+                auto && field_strides{
+                  temp_input.get_strides(component_shape)};
+                muGrid::raw_mem_ops::strided_copy(
+                    shape, input_strides, field_strides, info.ptr,
+                    temp_input.data(), sizeof(Complex));
+                eng.ifft(temp_input, temp_output_field);
+              }
+
+              // compute strides from numpy strides
+              {
+                auto && info{output_array.request()};
+                auto && np_strides{info.strides};
+                std::vector<Dim_t> return_strides{};
+                return_strides.reserve(np_strides.size());
+                for (auto && val : np_strides) {
+                  return_strides.push_back(val / info.itemsize);
+                }
+                std::vector<Dim_t> shape{};
+                shape.reserve(info.shape.size());
+                for (auto && val : info.shape) {
+                  shape.push_back(val);
+                }
+                // the first entries of the shape can be chosen by the user
+                std::vector<Dim_t> component_shape {};
+                for (size_t i{0}; i < shape.size()-eng.get_spatial_dim(); ++i) {
+                  component_shape.push_back(shape[i]);
+                }
+                auto && field_strides{
+                    temp_output_field.get_strides(component_shape)};
+                muGrid::raw_mem_ops::strided_copy(
+                    shape,
+                    field_strides,
+                    return_strides, temp_output_data.data(), info.ptr,
+                    sizeof(Real));
+              }
+            },
+            "fourier_input_array"_a, "real_output_array"_a,
+            "Perform inverse FFT of the input array into the output array.");
+  }
 }
 
 void add_fft_engines(py::module & mod) {
   add_fft_engine_base(mod);
-  add_engine_helper<muFFT::FFTWEngine>(mod, "FFTW");
+  constexpr bool col_major{true};
+#if defined WITH_FFTWMPI || defined WITH_PFFT
+  constexpr bool not_col_major{false};
+#endif
+  add_engine_helper<muFFT::FFTWEngine>(mod, "FFTW", col_major);
 #ifdef WITH_FFTWMPI
-  add_engine_helper<muFFT::FFTWMPIEngine>(mod, "FFTWMPI");
+  add_engine_helper<muFFT::FFTWMPIEngine>(mod, "FFTWMPI", not_col_major);
 #endif
 #ifdef WITH_PFFT
-  add_engine_helper<muFFT::PFFTEngine>(mod, "PFFT");
+  add_engine_helper<muFFT::PFFTEngine>(mod, "PFFT", not_col_major);
 #endif
 }

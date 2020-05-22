@@ -63,7 +63,7 @@ def make_grid(lengths, nb_grid_pts):
     """
     nodal_positions = np.array(np.meshgrid(
         *[np.linspace(0, l, r+1) for l, r in zip(lengths, nb_grid_pts)],
-        indexing="ij"))
+        indexing="ij"), order='f')
 
     dx = lengths/nb_grid_pts
     dim = len(dx)
@@ -187,7 +187,7 @@ def get_integrator(fft, gradient_op, grid_spacing):
     return integrator
 
 
-def integrate_tensor_2(grad, fft_vec, fft_mat, gradient_op, grid_spacing):
+def integrate_tensor_2(grad, fft_engine, gradient_op, grid_spacing):
     """Integrates a second-rank tensor gradient field, given on the center
     positions of the grid, by a compatible integration operator derived from
     the gradient operator. The integrated field is returned on the node
@@ -196,9 +196,7 @@ def integrate_tensor_2(grad, fft_vec, fft_mat, gradient_op, grid_spacing):
     Keyword Arguments:
     grad           -- np.ndarray of shape [dim, dim] + nb_grid_pts_per_dim
                       containing the second-rank gradient to be integrated
-    fft_vec        -- µFFT FFT object performing the FFT for a vector on the
-                      cell
-    fft_mat        -- µFFT FFT object performing the FFT for a matrix on the
+    fft_engine     -- µFFT FFT object performing the FFT for a matrix on the
                       cell
     gradient_op    -- µSpectre DerivativeBase class representing the gradient
                       operator.
@@ -212,14 +210,19 @@ def integrate_tensor_2(grad, fft_vec, fft_mat, gradient_op, grid_spacing):
     nb_grid_pts = np.array(grad.shape[-dim:])
     lengths = nb_grid_pts * grid_spacing
     x = make_grid(lengths, nb_grid_pts)[0]
-    integrator = get_integrator(fft_mat, gradient_op, grid_spacing)
-    grad_k = (fft_mat.fft(grad) * fft_mat.normalisation)
+    integrator = get_integrator(fft_engine, gradient_op, grid_spacing)
+    grad_k_field = fft_engine.create_or_fetch_fourier_space_field("grad_k", dim * dim)
+    fft_engine.fft(grad, grad_k_field)
+    grad_k = grad_k_field.array([dim, dim])
+    grad_k *= fft_engine.normalisation
     f_k = np.einsum("j...,ij...->i...", integrator, grad_k)
-    grad_k_0 = grad_k[np.s_[:, :] + (0,)*dim]
+    grad_k_0 = grad_k[np.s_[:, :] + (0,)*(dim+1)]
     # The homogeneous integration computes the affine part of the deformation
     homogeneous = np.einsum("ij,j...->i...", grad_k_0.real, x)
 
-    fluctuation_non_pbe = fft_vec.ifft(f_k)
+    fluctuation_non_pbe = np.empty([dim, *fft_engine.nb_subdomain_grid_pts],
+                                   order="f")
+    fft_engine.ifft(f_k, fluctuation_non_pbe)
     if np.linalg.norm(fluctuation_non_pbe.imag) > 1e-10:
         raise RuntimeError("Integrate_tensor_2() computed complex placements, "
                            "probably there went something wrong.\n"
@@ -312,8 +315,7 @@ def Voigt_vector_to_full_matrix(voigt_vector, order="voigt"):
     return A
 
 
-def integrate_tensor_2_small_strain(strain, fft_vec,
-                                    fft_mat, grid_spacing):
+def integrate_tensor_2_small_strain(strain, fft_engine, grid_spacing):
     """
     This function solves the following equation for obtaining the displacements
     in 2D (or extension for 3D):
@@ -327,9 +329,7 @@ def integrate_tensor_2_small_strain(strain, fft_vec,
     Keyword Arguments:
     grad           -- np.ndarray of shape [dim, dim] + nb_grid_pts_per_dim
                       containing the second-rank gradient to be integrated
-    fft_vec        -- µFFT FFT object performing the FFT for a vector on the
-                      cell
-    fft_mat        -- µFFT FFT object performing the FFT for a matrix on the
+    fft_engine     -- µFFT FFT object performing the FFT for a matrix on the
                       cell
     gradient_op    -- µSpectre DerivativeBase class representing the gradient
                       operator.
@@ -344,12 +344,16 @@ def integrate_tensor_2_small_strain(strain, fft_vec,
     lengths = nb_grid_pts * grid_spacing
     x = make_grid(lengths, nb_grid_pts)[0]
     # aplying Fourier transform on strain field
-    strain_k = (fft_mat.fft(strain) * fft_mat.normalisation)
+    strain_k_field = fft_engine.create_or_fetch_fourier_space_field(
+        "strain_k", dim * dim)
+    fft_engine.fft(strain, strain_k_field)
+    strain_k = strain_k_field.array([dim, dim])
+    strain_k *= fft_engine.normalisation
     # wave vectors :
-    wv = fft_mat.fftfreq
+    wv = fft_engine.fftfreq
     # making shift vectors from the center of the gird to the corners
     shift = np.exp(-1j*np.pi*np.sum(wv, axis=0))
-    strain_k_0 = strain_k[np.s_[:, :] + (0,)*dim]
+    strain_k_0 = strain_k[np.s_[:, :] + (0,)*(dim+1)]
     # Solving the *** equations (independently for each Fourier componenet)
     if dim == 2:
         # the periods (ω) of the wave vectors
@@ -361,8 +365,9 @@ def integrate_tensor_2_small_strain(strain, fft_vec,
                                       range(nb_grid_pts[1])):
             if (i != 0 or j != 0):
                 # known matrix in the equation *** in 2D
-                strain_k_vec_loc = \
-                    full_matrix_to_Voigt_vector(strain_k[..., i, j])
+                strain_k_vec_loc = np.squeeze(
+                    full_matrix_to_Voigt_vector(strain_k[..., i, j]))
+
                 # coefficient matrix in the equation *** in 2D
                 A_loc = \
                     1j*(np.array([[wf[0, i, j], 0],
@@ -384,8 +389,8 @@ def integrate_tensor_2_small_strain(strain, fft_vec,
                                          range(nb_grid_pts[2])):
             if (i != 0 or j != 0 or k != 0):
                 # known matrix in the equation *** in 3D
-                strain_k_vec_loc = full_matrix_to_Voigt_vector(
-                    strain_k[..., i, j, k])
+                strain_k_vec_loc = np.squeeze(full_matrix_to_Voigt_vector(
+                    strain_k[..., i, j, k]))
                 # coefficient matrix in the equation *** in 3D
                 A_loc = \
                     1j*np.array([[wf[0, i, j, k], 0, 0],
@@ -405,21 +410,23 @@ def integrate_tensor_2_small_strain(strain, fft_vec,
 
     # Applying inverse Fourier transform to on=btain the displacement field in
     # Real space
-    flauctuation_non_pbe = fft_vec.ifft(u_k_shifted)
-    if np.linalg.norm(flauctuation_non_pbe.imag) > 1e-10:
+    fluctuation_non_pbe = np.empty([dim, *fft_engine.nb_subdomain_grid_pts],
+                                    order="f")
+    fft_engine.ifft(u_k_shifted, fluctuation_non_pbe)
+    if np.linalg.norm(fluctuation_non_pbe.imag) > 1e-10:
         raise RuntimeError("Integrate_tensor_2() computed complex placements, "
                            "probably there went something wrong.\n"
                            "Please inform the developers about this bug!")
 
     # adding and extra row/column due to periodic boundary condition
-    flauctuation = complement_periodically(flauctuation_non_pbe.real, dim)
+    fluctuation = complement_periodically(fluctuation_non_pbe.real, dim)
 
     # The homogeneous integration computes the affine part of the deformation
     homogeneous = np.einsum("ij,j...->i...", strain_k_0.real, x)
-    return flauctuation + homogeneous
+    return fluctuation + homogeneous
 
 
-def integrate_vector(grad, fft_sca, fft_vec, gradient_op, grid_spacing):
+def integrate_vector(grad, fft_engine, gradient_op, grid_spacing):
     """Integrates a first-rank tensor gradient field, given on the center
     positions of the grid, by a compatible integration operator derived from
     the gradient operator. The integrated field is returned on the node
@@ -429,9 +436,7 @@ def integrate_vector(grad, fft_sca, fft_vec, gradient_op, grid_spacing):
     grad           -- np.ndarray of shape [dim] + nb_grid_pts_per_dim
                       containing the first-rank tensor gradient to be
                       integrated.
-    fft_sca        -- µFFT FFT object performing the FFT for a scalar on the
-                      cell
-    fft_vec        -- µFFT FFT object performing the FFT for a vector on the
+    fft_engine        -- µFFT FFT object performing the FFT for a vector on the
                       cell
     gradient_op    -- µSpectre DerivativeBase class representing the gradient
                       operator.
@@ -445,14 +450,19 @@ def integrate_vector(grad, fft_sca, fft_vec, gradient_op, grid_spacing):
     nb_grid_pts = np.array(grad.shape[-dim:])
     lengths = nb_grid_pts * grid_spacing
     x = make_grid(lengths, nb_grid_pts)[0]
-    integrator = get_integrator(fft_vec, gradient_op, grid_spacing)
-    grad_k = (fft_vec.fft(grad) * fft_vec.normalisation)
+    integrator = get_integrator(fft_engine, gradient_op, grid_spacing)
+    grad_k_field = fft_engine.register_fourier_space_field('grad_k', dim)
+    fft_engine.fft(grad, grad_k_field)
+    grad_k = grad_k_field.array([dim])
+    grad_k *=  fft_engine.normalisation
     f_k = np.einsum("j...,j...->...", integrator, grad_k)
-    grad_k_0 = grad_k[np.s_[:, ] + (0,)*dim]
+    grad_k_0 = grad_k[np.s_[:, ] + (0,)*(dim+1)]
     # The homogeneous integration computes the affine part of the deformation
     homogeneous = np.einsum("j,j...->...", grad_k_0.real, x)
 
-    fluctuation_non_pbe = fft_sca.ifft(f_k)
+    fluctuation_non_pbe = np.empty([1, *fft_engine.nb_subdomain_grid_pts],
+                                   order="f")
+    fft_engine.ifft(f_k, fluctuation_non_pbe)
     if np.linalg.norm(fluctuation_non_pbe.imag) > 1e-10:
         raise RuntimeError("Integrate_tensor_2() computed complex placements, "
                            "probably there went something wrong.\n"
@@ -524,18 +534,19 @@ def compute_placement(result, lengths, nb_grid_pts, gradient_op,
     # load or initialise muFFT.FFT engine
     if fft is None:
         dim = len(nb_grid_pts)
-        fft_mat = muFFT.FFT(nb_grid_pts, dim*dim)  # FFT for (dim,dim) matrix
-        fft_vec = muFFT.FFT(nb_grid_pts, dim)  # FFT for (dim) vector
+        fft_engine = muFFT.FFT(nb_grid_pts)
+        fft_engine.initialise(dim * dim)# FFT for (dim,dim) matrix
+        fft_engine.initialise(dim)  # FFT for (dim) vector
     # compute the placement
     nodal_positions, _ = make_grid(lengths, nb_grid_pts)
     grid_spacing = np.array(lengths / nb_grid_pts)
     if formulation == Formulation.finite_strain:
-        placement = integrate_tensor_2(strain, fft_vec, fft_mat,
+        placement = integrate_tensor_2(strain, fft_engine,
                                        gradient_op, grid_spacing)
         return placement, nodal_positions
     elif formulation == Formulation.small_strain:
         displacement = integrate_tensor_2_small_strain(
-            strain, fft_vec, fft_mat, grid_spacing)
+            strain, fft_engine, grid_spacing)
         return displacement + nodal_positions, nodal_positions
     else:
         raise ValueError('\nThe formulation: "{}" is unknown!'

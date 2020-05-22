@@ -102,7 +102,8 @@ def get_projectors(microstructure, mat1_prop, mat2_prop, ):
         projection_green_type = µ.ProjectionApproxGreenOperator_3d
         projection_classic_type = µ.ProjectionSmallStrain_3d
 
-    projection_classic = projection_classic_type(muFFT.FFT(nb_grid_pts, nb_dof_per_pixel=dim * dim), lengths.tolist())
+    projection_classic = projection_classic_type(
+        muFFT.FFT(nb_grid_pts), lengths.tolist())
 
     rve = µ._muSpectre.cell.Cell(projection_classic)
 
@@ -111,8 +112,9 @@ def get_projectors(microstructure, mat1_prop, mat2_prop, ):
     volume_fraction = microstructure.astype(float).mean()
     C_ref = volume_fraction * mat1.C + (1 - volume_fraction) * mat2.C
 
-    projection_green = projection_green_type(muFFT.FFT(nb_grid_pts, nb_dof_per_pixel=dim * dim), lengths.tolist(),
-                                             C_ref)
+    projection_green = projection_green_type(
+        muFFT.FFT(nb_grid_pts), lengths.tolist(),
+        C_ref)
 
     return projection_classic, projection_green
 

@@ -57,10 +57,10 @@ namespace muFFT {
     FFTWMPIEngine() = delete;
 
     /**
-     * Constructor with the domain's number of grid points in each direciton,
-     * the number of components to transform, and the communicator
+     * Constructor with the domain's number of grid points in each direction and
+     * the communicator
      */
-    FFTWMPIEngine(DynCcoord_t nb_grid_pts, Dim_t nb_dof_per_pixel,
+    FFTWMPIEngine(const DynCcoord_t & nb_grid_pts,
                   Communicator comm = Communicator());
 
     //! Copy constructor
@@ -79,31 +79,56 @@ namespace muFFT {
     FFTWMPIEngine & operator=(FFTWMPIEngine && other) = delete;
 
     // compute the plan, etc
-    void initialise(FFT_PlanFlags plan_flags) override;
+    void initialise(const Dim_t & nb_dof_per_pixel,
+                    const FFT_PlanFlags & plan_flags) override;
 
     //! forward transform
-    FourierField_t & fft(RealField_t & field) override;
+    void fft(const RealField_t & field,
+             FourierField_t & output_field) const override;
 
     //! inverse transform
-    void ifft(RealField_t & field) const override;
+    void ifft(const FourierField_t & input_field,
+              RealField_t & output_field) const override;
 
-    //! return whether this engine is active
+    /**
+     * return whether this engine is active (an engine is active if it has more
+     * than zero grid points. FFTWMPI sometimes assigns zero grid points)
+     */
     bool is_active() const override { return this->active; }
 
     //! perform a deep copy of the engine (this should never be necessary in
     //! c++)
     std::unique_ptr<FFTEngineBase> clone() const final;
 
+    /**
+     * need to override this method here, since FFTWMPI requires field padding
+     */
+    FourierField_t &
+    register_fourier_space_field(const std::string & unique_name,
+                                 const Dim_t & nb_dof_per_pixel) final;
+
+    /**
+     * Returns the required pad size. Helpful when calling fftwmpi with wrapped
+     * fields
+     */
+    Dim_t get_required_pad_size(const Dim_t & nb_dof_per_pixel) const final;
+
    protected:
-    static int
-        nb_engines;        //!< number of times this engine has been instatiated
-    fftw_plan plan_fft{};  //!< holds the plan for forward fourier transform
-    fftw_plan plan_ifft{};  //!< holds the plan for inverse fourier transform
-    ptrdiff_t
-        workspace_size{};     //!< size of workspace buffer returned by planner
-    Real * real_workspace{};  //!< temporary real workspace that is correctly
-                              //!< padded
-    bool active{true};        //!< FFTWMPI sometimes assigns zero grid points
+    static int nb_engines;  //!< number of times this engine has
+                            //!< been instatiated
+    //! holds the plans for forward fourier transforms
+    std::map<Dim_t, fftw_plan> fft_plans{};
+    //! holds the plans for inversefourier transforms
+    std::map<Dim_t, fftw_plan> ifft_plans{};
+    //! holds the fourier field sizes including padding for different transforms
+    std::map<Dim_t, Dim_t> required_workspace_sizes{};
+    //! maximum size of workspace buffer (returned by planner)
+    ptrdiff_t workspace_size{0};
+    //! temporary real workspace for correctly padded copy of real input
+    Real * real_workspace{nullptr};
+    bool active{true};  //!< FFTWMPI sometimes assigns zero grid points
+    //! Input to local_size_many_transposed
+    std::vector<ptrdiff_t> nb_fourier_non_transposed{};
   };
 }  // namespace muFFT
 

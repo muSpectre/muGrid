@@ -60,11 +60,13 @@ namespace muFFT {
     constexpr static Ccoord_t<sdim> loc() {
       return muGrid::CcoordOps::get_cube<DimS>(0);
     }
-    FFTW_fixture() : engine{DynCcoord_t(res()), DimM * DimM} {}
+    FFTW_fixture() : engine{DynCcoord_t(res())} {}
     FFTWEngine engine;
   };
   template <Dim_t DimS, Dim_t DimM, Dim_t NbGridPts>
   constexpr Dim_t FFTW_fixture<DimS, DimM, NbGridPts>::sdim;
+  template <Dim_t DimS, Dim_t DimM, Dim_t NbGridPts>
+  constexpr Dim_t FFTW_fixture<DimS, DimM, NbGridPts>::mdim;
 
   struct FFTW_fixture_python_segfault {
     constexpr static Dim_t dim{twoD};
@@ -72,10 +74,11 @@ namespace muFFT {
     constexpr static Dim_t mdim{twoD};
     constexpr static Ccoord_t<sdim> res() { return {6, 4}; }
     constexpr static Ccoord_t<sdim> loc() { return {0, 0}; }
-    FFTW_fixture_python_segfault() : engine{DynCcoord_t(res()), mdim * mdim} {}
+    FFTW_fixture_python_segfault() : engine{DynCcoord_t(res())} {}
     FFTWEngine engine;
   };
   constexpr Dim_t FFTW_fixture_python_segfault::sdim;
+  constexpr Dim_t FFTW_fixture_python_segfault::mdim;
 
   using fixlist = boost::mpl::list<
       FFTW_fixture<twoD, twoD, 3>, FFTW_fixture<twoD, threeD, 3>,
@@ -85,14 +88,15 @@ namespace muFFT {
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(Constructor_test, Fix, fixlist, Fix) {
-    BOOST_CHECK_NO_THROW(Fix::engine.initialise(FFT_PlanFlags::estimate));
+    BOOST_CHECK_NO_THROW(Fix::engine.initialise(this->mdim * this->mdim,
+                                                FFT_PlanFlags::estimate));
     BOOST_CHECK_EQUAL(Fix::engine.size(),
                       muGrid::CcoordOps::get_size(Fix::res()));
   }
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(fft_test, Fix, fixlist, Fix) {
-    Fix::engine.initialise(FFT_PlanFlags::estimate);
+    Fix::engine.initialise(this->mdim * this->mdim, FFT_PlanFlags::estimate);
     using FC_t = muGrid::GlobalFieldCollection;
     FC_t fc(Fix::sdim, muGrid::Unknown, muGrid::Unknown);
     auto & input{fc.register_real_field("input", Fix::mdim * Fix::mdim,
@@ -116,7 +120,9 @@ namespace muFFT {
       in_.setRandom();
       ref_ = in_;
     }
-    auto & complex_field = Fix::engine.fft(input);
+    auto & complex_field{Fix::engine.register_fourier_space_field(
+        "fourier work space", Fix::mdim * Fix::mdim)};
+    Fix::engine.fft(input, complex_field);
     using cmap_t = muGrid::MatrixFieldMap<Complex, Mapping::Mut, Fix::mdim,
                                           Fix::mdim, PixelSubDiv::Pixel>;
     cmap_t complex_map(complex_field);
@@ -131,7 +137,7 @@ namespace muFFT {
     }
 
     /* make sure that the ifft of fft returns the original*/
-    Fix::engine.ifft(result);
+    Fix::engine.ifft(complex_field, result);
     for (auto && tup : akantu::zip(resultmap, refmap)) {
       Real error{
           (std::get<0>(tup) * Fix::engine.normalisation() - std::get<1>(tup))

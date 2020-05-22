@@ -33,6 +33,8 @@
  *
  */
 
+#include "exception.hh"
+
 #include <Eigen/Dense>
 
 #include <array>
@@ -42,8 +44,6 @@
 #include <initializer_list>
 #include <algorithm>
 #include <vector>
-
-#include "exception.hh"
 
 #ifndef SRC_LIBMUGRID_GRID_COMMON_HH_
 #define SRC_LIBMUGRID_GRID_COMMON_HH_

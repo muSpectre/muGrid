@@ -71,11 +71,13 @@ namespace py = pybind11;
 
 class ProjectionBaseUnclonable : public ProjectionBase {
  public:
-  ProjectionBaseUnclonable(muFFT::FFTEngine_ptr engine,
-                           DynRcoord_t domain_lengths,
-                           Dim_t nb_quad_pts,
-                           Formulation form)
-      : ProjectionBase(engine, domain_lengths, nb_quad_pts, form) {}
+  ProjectionBaseUnclonable(const muFFT::FFTEngine_ptr & engine,
+                           const DynRcoord_t & domain_lengths,
+                           const Dim_t & nb_quad_pts,
+                           const Dim_t & nb_dof_per_sub_pt,
+                           const Formulation & form)
+      : ProjectionBase(engine, domain_lengths, nb_quad_pts,
+                       nb_dof_per_sub_pt, form) {}
 
   std::unique_ptr<ProjectionBase> clone() const final {
     throw RuntimeError(
@@ -97,9 +99,12 @@ class PyProjectionBase : public ProjectionBaseUnclonable {
   //! shortcut fo strain shape
   using StrainShape_t = std::array<Dim_t, 2>;
 
-  PyProjectionBase(muFFT::FFTEngine_ptr engine, DynRcoord_t domain_lengths,
-                   Dim_t nb_quad_pts, Formulation form)
-      : ProjectionBaseUnclonable(engine, domain_lengths, nb_quad_pts, form) {}
+  PyProjectionBase(const muFFT::FFTEngine_ptr & engine,
+                   const DynRcoord_t & domain_lengths,
+                   const Dim_t & nb_quad_pts, const Dim_t & nb_dof_per_sub_pt,
+                   const Formulation & form)
+      : ProjectionBaseUnclonable(engine, domain_lengths, nb_quad_pts,
+                                 nb_dof_per_sub_pt, form) {}
 
   void apply_projection(Field_t & field) override {
     PYBIND11_OVERLOAD_PURE(void, Parent, apply_projection, field);
@@ -123,7 +128,8 @@ void add_projection_base(py::module & mod) {
              std::shared_ptr<ProjectionBase>,  // holder
              PyProjectionBase                  // trampoline base
              >(mod, "ProjectionBase")
-      .def(py::init<muFFT::FFTEngine_ptr, DynRcoord_t, Dim_t, Formulation>());
+      .def(py::init<const muFFT::FFTEngine_ptr &, const DynRcoord_t &,
+                    const Dim_t &, const Dim_t &, const Formulation &>());
 }
 
 template <class Proj, Dim_t DimS>

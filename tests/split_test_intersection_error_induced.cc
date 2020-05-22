@@ -72,9 +72,9 @@ namespace muSpectre {
     DynCcoord_t resolutions_split_low_res{low_res, low_res};
 
     auto fft_ptr_split_high_res{std::make_unique<muFFT::FFTWEngine>(
-        resolutions_split_high_res, muGrid::ipow(dim, 2))};
+        resolutions_split_high_res)};
     auto fft_ptr_split_low_res{std::make_unique<muFFT::FFTWEngine>(
-        resolutions_split_low_res, muGrid::ipow(dim, 2))};
+        resolutions_split_low_res)};
 
     auto proj_ptr_split_high_res{
         std::make_unique<ProjectionFiniteStrainFast<dim>>(

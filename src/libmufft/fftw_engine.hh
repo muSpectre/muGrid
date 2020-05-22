@@ -60,7 +60,7 @@ namespace muFFT {
      * Constructor with the domain's number of grid points in each direciton,
      * the number of components to transform, and the communicator
      */
-    FFTWEngine(const DynCcoord_t & nb_grid_pts, Dim_t nb_dof_per_pixel,
+    FFTWEngine(const DynCcoord_t & nb_grid_pts,
                Communicator comm = Communicator());
 
     //! Copy constructor
@@ -79,21 +79,26 @@ namespace muFFT {
     FFTWEngine & operator=(FFTWEngine && other) = delete;
 
     // compute the plan, etc
-    void initialise(FFT_PlanFlags plan_flags) override;
+    void initialise(const Dim_t & nb_dof_per_pixel,
+                    const FFT_PlanFlags & plan_flags) override;
 
     //! forward transform
-    FourierField_t & fft(RealField_t & field) override;
+    void fft(const RealField_t & input_field,
+             FourierField_t & output_field) const override;
 
     //! inverse transform
-    void ifft(RealField_t & field) const override;
+    void ifft(const FourierField_t & input_field,
+              RealField_t & output_field) const override;
 
     //! perform a deep copy of the engine (this should never be necessary in
     //! c++)
     std::unique_ptr<FFTEngineBase> clone() const final;
 
    protected:
-    fftw_plan plan_fft{};   //!< holds the plan for forward fourier transform
-    fftw_plan plan_ifft{};  //!< holds the plan for inverse fourier transform
+    //! holds the plans for forward fourier transforms
+    std::map<Dim_t, fftw_plan> fft_plans{};
+    //! holds the plans for inversefourier transforms
+    std::map<Dim_t, fftw_plan> ifft_plans{};
   };
 
 }  // namespace muFFT
