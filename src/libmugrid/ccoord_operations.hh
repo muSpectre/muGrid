@@ -408,7 +408,7 @@ namespace muGrid {
     //! get the number of pixels in a grid
     template <size_t dim>
     constexpr size_t get_size(const Ccoord_t<dim> & nb_grid_pts) {
-      Dim_t retval{1};
+      size_t retval{1};
       for (size_t i = 0; i < dim; ++i) {
         retval *= nb_grid_pts[i];
       }
@@ -419,7 +419,7 @@ namespace muGrid {
     //! get the number of pixels in a grid
     template <size_t MaxDim>
     size_t get_size(const DynCcoord<MaxDim> & nb_grid_pts) {
-      Dim_t retval{1};
+      size_t retval{1};
       Dim_t dim{nb_grid_pts.get_dim()};
       for (Dim_t i = 0; i < dim; ++i) {
         retval *= nb_grid_pts[i];

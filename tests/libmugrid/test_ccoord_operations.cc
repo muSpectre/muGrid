@@ -118,6 +118,12 @@ namespace muGrid {
                                                  non_contiguous3));
   }
 
+  BOOST_AUTO_TEST_CASE(test_get_size_large) {
+    muGrid::DynCcoord_t nb_grid_pts{65536, 65536}, nb_grid_pts2{131072, 131072};
+    BOOST_CHECK(CcoordOps::get_size(nb_grid_pts) == 65536L*65536L);
+    BOOST_CHECK(CcoordOps::get_size(nb_grid_pts2) == 131072L*131072L);
+  }
+
   BOOST_AUTO_TEST_SUITE_END();
 
 }  // namespace muGrid
