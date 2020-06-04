@@ -59,9 +59,9 @@ using muFFT::Communicator;
 using muFFT::fft_freq;
 using muFFT::FFTEngineBase;
 using muGrid::Complex;
-using muGrid::Dim_t;
 using muGrid::DynCcoord_t;
 using muGrid::GlobalFieldCollection;
+using muGrid::Index_t;
 using muGrid::NumpyProxy;
 using muGrid::OneQuadPt;
 using muGrid::Real;
@@ -106,7 +106,7 @@ class PyFFTEngineBase : public FFTEngineBaseUnclonable {
     PYBIND11_OVERLOAD_PURE(void, Parent, ifft, input_field, output_field);
   }
 
-  void initialise(const Dim_t & nb_dof_per_pixel,
+  void initialise(const Index_t & nb_dof_per_pixel,
                   const muFFT::FFT_PlanFlags & plan_flags) override {
     PYBIND11_OVERLOAD_PURE(void, Parent, initialise, nb_dof_per_pixel,
                            plan_flags);
@@ -130,14 +130,14 @@ void add_engine_helper(py::module & mod, const std::string & name,
              >
       fft_engine(mod, name.c_str());
   fft_engine
-      .def(py::init(
-               [](std::vector<Dim_t> nb_grid_pts, muFFT::Communicator & comm) {
-                 // Initialise with muFFT Communicator object
-                 return new Engine(DynCcoord_t(nb_grid_pts), comm);
-               }),
+      .def(py::init([](std::vector<Index_t> nb_grid_pts,
+                       muFFT::Communicator & comm) {
+             // Initialise with muFFT Communicator object
+             return new Engine(DynCcoord_t(nb_grid_pts), comm);
+           }),
            "nb_grid_pts"_a, "communicator"_a = muFFT::Communicator())
 #ifdef WITH_MPI
-      .def(py::init([](std::vector<Dim_t> nb_grid_pts, size_t comm) {
+      .def(py::init([](std::vector<Index_t> nb_grid_pts, size_t comm) {
              // Initialise with bare MPI handle
              return new Engine(DynCcoord_t(nb_grid_pts),
                                std::move(muFFT::Communicator(MPI_Comm(comm))));
@@ -148,7 +148,7 @@ void add_engine_helper(py::module & mod, const std::string & name,
       .def("ifft", &Engine::ifft)
       .def(
           "initialise",
-          [](Engine & engine, const Dim_t & nb_dof_per_pixel,
+          [](Engine & engine, const Index_t & nb_dof_per_pixel,
              const muFFT::FFT_PlanFlags & plan_flags) {
             engine.initialise(nb_dof_per_pixel, plan_flags);
           },
@@ -159,7 +159,7 @@ void add_engine_helper(py::module & mod, const std::string & name,
       .def(
           "create_or_fetch_fourier_space_field",
           [](Engine & engine, const std::string & unique_name,
-             const Dim_t & nb_dof_per_pixel) ->
+             const Index_t & nb_dof_per_pixel) ->
           typename Engine::FourierField_t & {
             auto && collection{engine.get_fourier_field_collection()};
             if (collection.field_exists(unique_name)) {
@@ -176,7 +176,7 @@ void add_engine_helper(py::module & mod, const std::string & name,
               return field;
             } else {
               return engine.register_fourier_space_field(unique_name,
-                                                       nb_dof_per_pixel);
+                                                         nb_dof_per_pixel);
             }
           },
           "unique_name"_a, "nb_dof_per_pixel"_a,
@@ -231,7 +231,7 @@ void add_engine_helper(py::module & mod, const std::string & name,
             auto & nb_pts = eng.get_nb_subdomain_grid_pts();
             auto & locs = eng.get_subdomain_locations();
             py::tuple t(eng.get_spatial_dim());
-            for (Dim_t dim = 0; dim < eng.get_spatial_dim(); ++dim) {
+            for (Index_t dim = 0; dim < eng.get_spatial_dim(); ++dim) {
               t[dim] = py::slice(locs[dim], locs[dim] + nb_pts[dim], 1);
             }
             return t;
@@ -243,7 +243,7 @@ void add_engine_helper(py::module & mod, const std::string & name,
             auto & nb_pts = eng.get_nb_fourier_grid_pts();
             auto & locs = eng.get_fourier_locations();
             py::tuple t(eng.get_spatial_dim());
-            for (Dim_t dim = 0; dim < eng.get_spatial_dim(); ++dim) {
+            for (Index_t dim = 0; dim < eng.get_spatial_dim(); ++dim) {
               t[dim] = py::slice(locs[dim], locs[dim] + nb_pts[dim], 1);
             }
             return t;
@@ -252,8 +252,8 @@ void add_engine_helper(py::module & mod, const std::string & name,
       .def_property_readonly("spatial_dim", &Engine::get_spatial_dim)
       .def("has_plan_for", &Engine::has_plan_for, "nb_dof_per_pixel"_a)
       .def_property_readonly("fftfreq", [](const Engine & eng) {
-        std::vector<Dim_t> shape{}, strides{};
-        Dim_t dim{eng.get_spatial_dim()};
+        std::vector<Index_t> shape{}, strides{};
+        Index_t dim{eng.get_spatial_dim()};
         shape.push_back(dim);
         strides.push_back(sizeof(Real));
         for (auto && n : eng.get_nb_fourier_grid_pts()) {
@@ -421,7 +421,7 @@ void add_engine_helper(py::module & mod, const std::string & name,
               muGrid::WrappedField<Real> temp_output_field{
                   "output",
                   collection,
-                  static_cast<Dim_t>(nb_dof_per_pixel),
+                  static_cast<Index_t>(nb_dof_per_pixel),
                   nb_dof_per_pixel * collection.get_nb_pixels(),
                   temp_output_data.data(),
                   muGrid::PixelSubDiv::Pixel};
@@ -436,24 +436,24 @@ void add_engine_helper(py::module & mod, const std::string & name,
               {
                 auto && info{input_array.request()};
                 auto && np_strides{info.strides};
-                std::vector<Dim_t> input_strides{};
+                std::vector<Index_t> input_strides{};
                 input_strides.reserve(np_strides.size());
                 for (auto && val : np_strides) {
                   input_strides.push_back(val / info.itemsize);
                 }
-                std::vector<Dim_t> shape{};
+                std::vector<Index_t> shape{};
                 shape.reserve(info.shape.size());
                 for (auto && val : info.shape) {
                   shape.push_back(val);
                 }
                 // the first entries of the shape can be chosen by the user
-                std::vector<Dim_t> component_shape {};
-                for (size_t i{0}; i < shape.size()-eng.get_spatial_dim(); ++i) {
+                std::vector<Index_t> component_shape{};
+                for (size_t i{0}; i < shape.size() - eng.get_spatial_dim();
+                     ++i) {
                   component_shape.push_back(shape[i]);
                 }
 
-                auto && field_strides{
-                  temp_input.get_strides(component_shape)};
+                auto && field_strides{temp_input.get_strides(component_shape)};
                 muGrid::raw_mem_ops::strided_copy(
                     shape, input_strides, field_strides, info.ptr,
                     temp_input.data(), sizeof(Complex));
@@ -464,28 +464,27 @@ void add_engine_helper(py::module & mod, const std::string & name,
               {
                 auto && info{output_array.request()};
                 auto && np_strides{info.strides};
-                std::vector<Dim_t> return_strides{};
+                std::vector<Index_t> return_strides{};
                 return_strides.reserve(np_strides.size());
                 for (auto && val : np_strides) {
                   return_strides.push_back(val / info.itemsize);
                 }
-                std::vector<Dim_t> shape{};
+                std::vector<Index_t> shape{};
                 shape.reserve(info.shape.size());
                 for (auto && val : info.shape) {
                   shape.push_back(val);
                 }
                 // the first entries of the shape can be chosen by the user
-                std::vector<Dim_t> component_shape {};
-                for (size_t i{0}; i < shape.size()-eng.get_spatial_dim(); ++i) {
+                std::vector<Index_t> component_shape{};
+                for (size_t i{0}; i < shape.size() - eng.get_spatial_dim();
+                     ++i) {
                   component_shape.push_back(shape[i]);
                 }
                 auto && field_strides{
                     temp_output_field.get_strides(component_shape)};
                 muGrid::raw_mem_ops::strided_copy(
-                    shape,
-                    field_strides,
-                    return_strides, temp_output_data.data(), info.ptr,
-                    sizeof(Real));
+                    shape, field_strides, return_strides,
+                    temp_output_data.data(), info.ptr, sizeof(Real));
               }
             },
             "fourier_input_array"_a, "real_output_array"_a,

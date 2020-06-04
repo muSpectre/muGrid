@@ -59,7 +59,7 @@ namespace muFFT {
   /* ---------------------------------------------------------------------- */
   auto
   FFTEngineBase::register_fourier_space_field(const std::string & unique_name,
-                                              const Dim_t & nb_dof_per_pixel)
+                                              const Index_t & nb_dof_per_pixel)
       -> FourierField_t & {
     return this->fourier_field_collection.register_complex_field(
         unique_name, nb_dof_per_pixel, PixelSubDiv::Pixel);
@@ -67,7 +67,7 @@ namespace muFFT {
 
   /* ---------------------------------------------------------------------- */
   auto FFTEngineBase::fetch_or_register_fourier_space_field(
-      const std::string & unique_name, const Dim_t & nb_dof_per_pixel)
+      const std::string & unique_name, const Index_t & nb_dof_per_pixel)
       -> FourierField_t & {
     if (this->fourier_field_collection.field_exists(unique_name)) {
       auto & field{dynamic_cast<FourierField_t &>(
@@ -106,23 +106,23 @@ namespace muFFT {
   }
 
   /* ---------------------------------------------------------------------- */
-  const Dim_t & FFTEngineBase::get_spatial_dim() const {
+  const Index_t & FFTEngineBase::get_spatial_dim() const {
     return this->spatial_dimension;
   }
 
   /* ---------------------------------------------------------------------- */
-  const Dim_t & FFTEngineBase::get_nb_quad_pts() const {
+  const Index_t & FFTEngineBase::get_nb_quad_pts() const {
     return this->fourier_field_collection.get_nb_quad_pts();
   }
 
   /* ---------------------------------------------------------------------- */
-  bool FFTEngineBase::has_plan_for(const Dim_t & nb_dof_per_pixel) const {
+  bool FFTEngineBase::has_plan_for(const Index_t & nb_dof_per_pixel) const {
     return static_cast<bool>(this->planned_nb_dofs.count(nb_dof_per_pixel));
   }
 
   /* ---------------------------------------------------------------------- */
-  Dim_t FFTEngineBase::get_required_pad_size(
-      const Dim_t & /*nb_dof_per_pixel*/) const {
+  Index_t FFTEngineBase::get_required_pad_size(
+      const Index_t & /*nb_dof_per_pixel*/) const {
     return 0;
   }
 

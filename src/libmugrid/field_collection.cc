@@ -53,18 +53,18 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   FieldCollection::FieldCollection(ValidityDomain domain,
-                                   const Dim_t & spatial_dimension,
-                                   const Dim_t & nb_quad_pts,
-                                   const Dim_t & nb_nodal_pts)
+                                   const Index_t & spatial_dimension,
+                                   const Index_t & nb_quad_pts,
+                                   const Index_t & nb_nodal_pts)
       : domain{domain}, spatial_dim{spatial_dimension},
         nb_quad_pts{nb_quad_pts}, nb_nodal_pts{nb_nodal_pts} {}
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
   TypedField<T> & FieldCollection::register_field_helper(
-      const std::string & unique_name, const Dim_t & nb_dof_per_sub_pt,
+      const std::string & unique_name, const Index_t & nb_dof_per_sub_pt,
       const PixelSubDiv & sub_division, const Unit & unit,
-      const Dim_t & nb_sub_pts) {
+      const Index_t & nb_sub_pts) {
     static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
                   "You can only register fields templated with one of the "
                   "numeric types Real, Complex, Int, or UInt");
@@ -97,36 +97,36 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   TypedField<Real> & FieldCollection::register_real_field(
-      const std::string & unique_name, const Dim_t & nb_dof_per_sub_pt,
+      const std::string & unique_name, const Index_t & nb_dof_per_sub_pt,
       const PixelSubDiv & sub_division, const Unit & unit,
-      const Dim_t & nb_sub_pts) {
+      const Index_t & nb_sub_pts) {
     return this->register_field_helper<Real>(unique_name, nb_dof_per_sub_pt,
                                              sub_division, unit, nb_sub_pts);
   }
 
   /* ---------------------------------------------------------------------- */
   TypedField<Complex> & FieldCollection::register_complex_field(
-      const std::string & unique_name, const Dim_t & nb_dof_per_sub_pt,
+      const std::string & unique_name, const Index_t & nb_dof_per_sub_pt,
       const PixelSubDiv & sub_division, const Unit & unit,
-      const Dim_t & nb_sub_pts) {
+      const Index_t & nb_sub_pts) {
     return this->register_field_helper<Complex>(unique_name, nb_dof_per_sub_pt,
                                                 sub_division, unit, nb_sub_pts);
   }
 
   /* ---------------------------------------------------------------------- */
   TypedField<Int> & FieldCollection::register_int_field(
-      const std::string & unique_name, const Dim_t & nb_dof_per_sub_pt,
+      const std::string & unique_name, const Index_t & nb_dof_per_sub_pt,
       const PixelSubDiv & sub_division, const Unit & unit,
-      const Dim_t & nb_sub_pts) {
+      const Index_t & nb_sub_pts) {
     return this->register_field_helper<Int>(unique_name, nb_dof_per_sub_pt,
                                             sub_division, unit, nb_sub_pts);
   }
 
   /* ---------------------------------------------------------------------- */
   TypedField<Uint> & FieldCollection::register_uint_field(
-      const std::string & unique_name, const Dim_t & nb_dof_per_sub_pt,
+      const std::string & unique_name, const Index_t & nb_dof_per_sub_pt,
       const PixelSubDiv & sub_division, const Unit & unit,
-      const Dim_t & nb_sub_pts) {
+      const Index_t & nb_sub_pts) {
     return this->register_field_helper<Uint>(unique_name, nb_dof_per_sub_pt,
                                              sub_division, unit, nb_sub_pts);
   }
@@ -134,9 +134,9 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   template <typename T>
   TypedStateField<T> & FieldCollection::register_state_field_helper(
-      const std::string & unique_prefix, const Dim_t & nb_memory,
-      const Dim_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
-      const Unit & unit, const Dim_t & nb_sub_pts) {
+      const std::string & unique_prefix, const Index_t & nb_memory,
+      const Index_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
+      const Unit & unit, const Index_t & nb_sub_pts) {
     static_assert(
         std::is_scalar<T>::value or std::is_same<T, Complex>::value,
         "You can only register state fields templated with one of the "
@@ -168,9 +168,9 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   TypedStateField<Real> & FieldCollection::register_real_state_field(
-      const std::string & unique_name, const Dim_t & nb_memory,
-      const Dim_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
-      const Unit & unit, const Dim_t & nb_sub_pts) {
+      const std::string & unique_name, const Index_t & nb_memory,
+      const Index_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
+      const Unit & unit, const Index_t & nb_sub_pts) {
     return this->register_state_field_helper<Real>(
         unique_name, nb_memory, nb_dof_per_sub_pt, sub_division, unit,
         nb_sub_pts);
@@ -178,9 +178,9 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   TypedStateField<Complex> & FieldCollection::register_complex_state_field(
-      const std::string & unique_name, const Dim_t & nb_memory,
-      const Dim_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
-      const Unit & unit, const Dim_t & nb_sub_pts) {
+      const std::string & unique_name, const Index_t & nb_memory,
+      const Index_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
+      const Unit & unit, const Index_t & nb_sub_pts) {
     return this->register_state_field_helper<Complex>(
         unique_name, nb_memory, nb_dof_per_sub_pt, sub_division, unit,
         nb_sub_pts);
@@ -188,9 +188,9 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   TypedStateField<Int> & FieldCollection::register_int_state_field(
-      const std::string & unique_name, const Dim_t & nb_memory,
-      const Dim_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
-      const Unit & unit, const Dim_t & nb_sub_pts) {
+      const std::string & unique_name, const Index_t & nb_memory,
+      const Index_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
+      const Unit & unit, const Index_t & nb_sub_pts) {
     return this->register_state_field_helper<Int>(
         unique_name, nb_memory, nb_dof_per_sub_pt, sub_division, unit,
         nb_sub_pts);
@@ -198,9 +198,9 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   TypedStateField<Uint> & FieldCollection::register_uint_state_field(
-      const std::string & unique_name, const Dim_t & nb_memory,
-      const Dim_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
-      const Unit & unit, const Dim_t & nb_sub_pts) {
+      const std::string & unique_name, const Index_t & nb_memory,
+      const Index_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
+      const Unit & unit, const Index_t & nb_sub_pts) {
     return this->register_state_field_helper<Uint>(
         unique_name, nb_memory, nb_dof_per_sub_pt, sub_division, unit,
         nb_sub_pts);
@@ -218,7 +218,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  Dim_t FieldCollection::get_nb_pixels() const { return this->nb_pixels; }
+  Index_t FieldCollection::get_nb_pixels() const { return this->nb_pixels; }
 
   /* ---------------------------------------------------------------------- */
   bool FieldCollection::has_nb_quad_pts() const {
@@ -231,7 +231,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  void FieldCollection::set_nb_quad_pts(const Dim_t & nb_quad_pts_per_pixel) {
+  void FieldCollection::set_nb_quad_pts(const Index_t & nb_quad_pts_per_pixel) {
     if (this->has_nb_quad_pts() and
         (this->nb_quad_pts != nb_quad_pts_per_pixel)) {
       std::stringstream error{};
@@ -257,7 +257,8 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  void FieldCollection::set_nb_nodal_pts(const Dim_t & nb_nodal_pts_per_pixel) {
+  void
+  FieldCollection::set_nb_nodal_pts(const Index_t & nb_nodal_pts_per_pixel) {
     if (this->has_nb_nodal_pts() and
         (this->nb_nodal_pts != nb_nodal_pts_per_pixel)) {
       std::stringstream error{};
@@ -282,17 +283,17 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  const Dim_t & FieldCollection::get_nb_quad_pts() const {
+  const Index_t & FieldCollection::get_nb_quad_pts() const {
     return this->nb_quad_pts;
   }
 
   /* ---------------------------------------------------------------------- */
-  const Dim_t & FieldCollection::get_nb_nodal_pts() const {
+  const Index_t & FieldCollection::get_nb_nodal_pts() const {
     return this->nb_nodal_pts;
   }
 
   /* ---------------------------------------------------------------------- */
-  const Dim_t & FieldCollection::get_spatial_dim() const {
+  const Index_t & FieldCollection::get_spatial_dim() const {
     return this->spatial_dim;
   }
   /* ---------------------------------------------------------------------- */
@@ -397,24 +398,24 @@ namespace muGrid {
    * are compiled.
    */
   template TypedField<Real> &
-  FieldCollection::register_field<Real>(const std::string &, const Dim_t &,
+  FieldCollection::register_field<Real>(const std::string &, const Index_t &,
                                         const PixelSubDiv &, const Unit &,
-                                        const Dim_t &);
+                                        const Index_t &);
 
   template TypedField<Complex> &
-  FieldCollection::register_field<Complex>(const std::string &, const Dim_t &,
+  FieldCollection::register_field<Complex>(const std::string &, const Index_t &,
                                            const PixelSubDiv &, const Unit &,
-                                           const Dim_t &);
+                                           const Index_t &);
 
   template TypedField<Int> &
-  FieldCollection::register_field<Int>(const std::string &, const Dim_t &,
+  FieldCollection::register_field<Int>(const std::string &, const Index_t &,
                                        const PixelSubDiv &, const Unit &,
-                                       const Dim_t &);
+                                       const Index_t &);
 
   template TypedField<Uint> &
-  FieldCollection::register_field<Uint>(const std::string &, const Dim_t &,
+  FieldCollection::register_field<Uint>(const std::string &, const Index_t &,
                                         const PixelSubDiv &, const Unit &,
-                                        const Dim_t &);
+                                        const Index_t &);
 
   /* ---------------------------------------------------------------------- */
   FieldCollection::PixelIndexIterable::PixelIndexIterable(
@@ -437,8 +438,8 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  Dim_t
-  FieldCollection::check_nb_sub_pts(const Dim_t & nb_sub_pts,
+  Index_t
+  FieldCollection::check_nb_sub_pts(const Index_t & nb_sub_pts,
                                     const PixelSubDiv & iteration_type) const {
     switch (iteration_type) {
     case PixelSubDiv::QuadPt: {
@@ -495,7 +496,7 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   size_t FieldCollection::check_initialised_nb_sub_pts(
-      const Dim_t & nb_sub_pts, const PixelSubDiv & iteration_type) const {
+      const Index_t & nb_sub_pts, const PixelSubDiv & iteration_type) const {
     switch (iteration_type) {
     case PixelSubDiv::QuadPt: {
       if (not this->has_nb_quad_pts()) {
@@ -537,7 +538,7 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   FieldCollection::IndexIterable::IndexIterable(
       const FieldCollection & collection, const PixelSubDiv & iteration_type,
-      const Dim_t & nb_sub_pts)
+      const Index_t & nb_sub_pts)
       : collection{collection}, iteration_type{iteration_type},
         stride{collection.check_initialised_nb_sub_pts(nb_sub_pts,
                                                        iteration_type)} {}

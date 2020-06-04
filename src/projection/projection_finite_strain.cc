@@ -45,7 +45,7 @@
 
 namespace muSpectre {
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
+  template <Index_t DimS>
   ProjectionFiniteStrain<DimS>::ProjectionFiniteStrain(
       muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths,
       Gradient_t gradient)
@@ -60,7 +60,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
+  template <Index_t DimS>
   ProjectionFiniteStrain<DimS>::ProjectionFiniteStrain(
       muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths)
       : ProjectionFiniteStrain{
@@ -68,7 +68,7 @@ namespace muSpectre {
             muFFT::make_fourier_gradient(lengths.get_dim())} {}
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
+  template <Index_t DimS>
   void
   ProjectionFiniteStrain<DimS>::initialise(const muFFT::FFT_PlanFlags & flags) {
     Parent::initialise(flags);
@@ -116,7 +116,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
+  template <Index_t DimS>
   std::unique_ptr<ProjectionBase> ProjectionFiniteStrain<DimS>::clone() const {
     return std::make_unique<ProjectionFiniteStrain>(
         this->get_fft_engine().clone(), this->get_domain_lengths(),

@@ -49,7 +49,7 @@ namespace muGrid {
 
     template <Dim_t Dim>
     struct dimFixture {
-      constexpr static Dim_t dim{Dim};
+      constexpr static Index_t dim{Dim};
     };
 
     using dimlist = boost::mpl::list<dimFixture<oneD>, dimFixture<twoD>,

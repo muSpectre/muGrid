@@ -87,10 +87,10 @@ int main(int argc, char * argv[]) {
   banner("demonstrator1", 2018, "Till Junge <till.junge@epfl.ch>");
   auto options{parse_args(argc, argv)};
   auto & opt{*options};
-  const Dim_t size{opt["N0"].as<int>()};
+  const Index_t size{opt["N0"].as<int>()};
   constexpr Real fsize{1.};
-  constexpr Dim_t Dim{3};
-  const Dim_t nb_dofs{ipow(size, Dim) * ipow(Dim, 2)};
+  constexpr Index_t Dim{3};
+  const Index_t nb_dofs{ipow(size, Dim) * ipow(Dim, 2)};
   std::cout << "Number of dofs: " << nb_dofs << std::endl;
 
   constexpr Formulation form{Formulation::finite_strain};
@@ -113,7 +113,7 @@ int main(int argc, char * argv[]) {
     const auto & pixel_index{std::get<0>(id_pixel)};
     const auto & pixel{std::get<1>(id_pixel)};
     int sum{0};
-    for (Dim_t i = 0; i < Dim; ++i) {
+    for (Index_t i = 0; i < Dim; ++i) {
       sum += pixel[i] * 2 / nb_grid_pts[i];
     }
 

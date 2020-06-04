@@ -50,7 +50,7 @@ namespace muSpectre {
    * simulations", Int. J. Numer. Meth. Engng 2017; 111
    * :903–926)
    */
-  template <Dim_t DimS>
+  template <Index_t DimS>
   class ProjectionSmallStrain : public ProjectionDefault<DimS> {
    public:
     using Parent = ProjectionDefault<DimS>;  //!< base class

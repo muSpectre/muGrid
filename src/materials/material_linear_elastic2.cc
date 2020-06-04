@@ -38,10 +38,10 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   MaterialLinearElastic2<DimM>::MaterialLinearElastic2(
-      const std::string & name, const Dim_t & spatial_dimension,
-      const Dim_t & nb_quad_pts, Real young, Real poisson)
+      const std::string & name, const Index_t & spatial_dimension,
+      const Index_t & nb_quad_pts, Real young, Real poisson)
       : Parent{name, spatial_dimension, nb_quad_pts},
         material{name, spatial_dimension, nb_quad_pts, young, poisson},
         eigen_strains{this->get_prefix() + "Eigenstrain",
@@ -50,13 +50,13 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   void MaterialLinearElastic2<DimM>::add_pixel(const size_t & /*pixel_index*/) {
     throw std::runtime_error("this material needs pixels with an eigenstrain");
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   void MaterialLinearElastic2<DimM>::add_pixel(const size_t & pixel_index,
                                                const StrainTensor & E_eig) {
     this->internal_fields->add_pixel(pixel_index);

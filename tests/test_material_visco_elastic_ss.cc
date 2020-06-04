@@ -48,7 +48,7 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE(material_linear_visco_elastic_deviatoric_small_strain)
 
-  template <Dim_t Dim>
+  template <Index_t Dim>
   struct MaterialFixture {
     using MatVis = MaterialViscoElasticSS<Dim>;
     using MatLin = MaterialLinearElastic1<Dim>;
@@ -63,20 +63,20 @@ namespace muSpectre {
         : mat_vis("Vis", mdim(), NbQuadPts(), young_inf, young_v, eta_v,
                   poisson, dt),
           mat_lin_inf("Lin", mdim(), NbQuadPts(), young_inf, poisson) {}
-    constexpr static Dim_t mdim() { return Dim; }
-    constexpr static Dim_t sdim() { return mdim(); }
-    constexpr static Dim_t NbQuadPts() { return 1; }
+    constexpr static Index_t mdim() { return Dim; }
+    constexpr static Index_t sdim() { return mdim(); }
+    constexpr static Index_t NbQuadPts() { return 1; }
 
     MatVis mat_vis;
     MatLin mat_lin_inf;
   };
 
-  template <Dim_t Dim>
+  template <Index_t Dim>
   struct MaterialFixtureFilled : public MaterialFixture<Dim> {
     using Parent = MaterialFixture<Dim>;
     using MatVis = typename Parent::MatVis;
     using MatLin = typename Parent::MatLin;
-    constexpr static Dim_t box_size{1};
+    constexpr static Index_t box_size{1};
     MaterialFixtureFilled()
         : Parent(),
           mat_vis("Vis", mdim(), Parent::NbQuadPts(), Parent::young_inf,
@@ -102,8 +102,8 @@ namespace muSpectre {
     const Real tol_fin{10 * Parent::dt};
     Real get_tol_init() { return tol_init; }
     Real get_tol_fin() { return tol_fin; }
-    constexpr static Dim_t mdim() { return MatVis::MaterialDimension(); }
-    constexpr static Dim_t sdim() { return mdim(); }
+    constexpr static Index_t mdim() { return MatVis::MaterialDimension(); }
+    constexpr static Index_t sdim() { return mdim(); }
 
     MatVis mat_vis;  //<<! The viscoelastic material instance to be checked
     MatLin
@@ -124,7 +124,7 @@ namespace muSpectre {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_evaluate_stress_pure_volumetric, Fix,
                                    mats_fill, Fix) {
-    constexpr Dim_t mdim{Fix::mdim()}, sdim{Fix::sdim()};
+    constexpr Index_t mdim{Fix::mdim()}, sdim{Fix::sdim()};
     using Strain_t = Eigen::Matrix<Real, mdim, mdim>;
 
     auto & mat_vis{Fix::mat_vis};
@@ -174,7 +174,7 @@ namespace muSpectre {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_evaluate_stress_pure_shear_test, Fix,
                                    mats_fill, Fix) {
-    constexpr Dim_t mdim{Fix::mdim()}, sdim{Fix::sdim()};
+    constexpr Index_t mdim{Fix::mdim()}, sdim{Fix::sdim()};
     using Strain_t = Eigen::Matrix<Real, mdim, mdim>;
     using muGrid::Matrices::ddot;
 
@@ -246,7 +246,7 @@ namespace muSpectre {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_evaluate_shear_test, Fix, mats_fill,
                                    Fix) {
-    constexpr Dim_t mdim{Fix::mdim()}, sdim{Fix::sdim()};
+    constexpr Index_t mdim{Fix::mdim()}, sdim{Fix::sdim()};
     using Strain_t = Eigen::Matrix<Real, mdim, mdim>;
 
     auto & mat_vis{Fix::mat_vis};
@@ -303,15 +303,15 @@ namespace muSpectre {
     Strain_t S_vis_init_vol{S_vis_init};
     Strain_t S_lin_init_vol{S_lin_init};
 
-    for (Dim_t i{0}; i < sdim; ++i) {
+    for (Index_t i{0}; i < sdim; ++i) {
       S_vis_fin_dev(i, i) = 0.0;
       S_vis_init_dev(i, i) = 0.0;
       S_lin_fin_dev(i, i) = 0.0;
       S_lin_init_dev(i, i) = 0.0;
     }
 
-    for (Dim_t i{0}; i < sdim; ++i) {
-      for (Dim_t j{0}; j < sdim; ++j) {
+    for (Index_t i{0}; i < sdim; ++i) {
+      for (Index_t j{0}; j < sdim; ++j) {
         if (not(i == j)) {
           S_vis_fin_vol(i, j) = 0.0;
           S_vis_init_vol(i, j) = 0.0;

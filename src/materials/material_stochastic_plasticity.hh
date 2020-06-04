@@ -49,13 +49,13 @@
 
 namespace muSpectre {
 
-  template <Dim_t DimM>
+  template <Index_t DimM>
   class MaterialStochasticPlasticity;
 
   /**
    * traits for stochastic plasticity with eigenstrain
    */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   struct MaterialMuSpectre_traits<MaterialStochasticPlasticity<DimM>> {
     //! expected map type for strain fields
     using StrainMap_t =
@@ -79,7 +79,7 @@ namespace muSpectre {
    * implements stochastic plasticity with an eigenstrain, Lame constants and
    * plastic flow per pixel.
    */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   class MaterialStochasticPlasticity
       : public MaterialMuSpectre<MaterialStochasticPlasticity<DimM>, DimM> {
    public:
@@ -104,8 +104,8 @@ namespace muSpectre {
 
     //! Construct by name
     explicit MaterialStochasticPlasticity(const std::string & name,
-                                          const Dim_t & spatial_dimension,
-                                          const Dim_t & nb_quad_pts);
+                                          const Index_t & spatial_dimension,
+                                          const Index_t & nb_quad_pts);
 
     //! Copy constructor
     MaterialStochasticPlasticity(const MaterialStochasticPlasticity & other) =
@@ -287,7 +287,7 @@ namespace muSpectre {
   };
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   template <class s_t>
   auto MaterialStochasticPlasticity<DimM>::evaluate_stress(
       s_t && E, const Real & lambda, const Real & mu,
@@ -296,7 +296,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   template <class s_t>
   auto MaterialStochasticPlasticity<DimM>::evaluate_stress_tangent(
       s_t && E, const Real & lambda, const Real & mu,
@@ -309,7 +309,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   decltype(auto)  // TypedField<GlobalFieldCollection<DimS>, Real> &
   MaterialStochasticPlasticity<DimM>::identify_overloaded_quad_pts(
       Cell & cell, Eigen::Ref<Vector_t> & stress_numpy_array) {
@@ -320,7 +320,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   std::vector<size_t> &
   MaterialStochasticPlasticity<DimM>::identify_overloaded_quad_pts(
       const muGrid::TypedFieldBase<Real> & stress_field) {
@@ -349,7 +349,7 @@ namespace muSpectre {
   //! Updates the eigen strain field of all overloaded pixels by doing a plastic
   //! increment into the deviatoric stress direction by an absolute value given
   //! by the plastic_increment_field
-  template <Dim_t DimM>
+  template <Index_t DimM>
   decltype(auto) MaterialStochasticPlasticity<DimM>::update_eigen_strain_field(
       Cell & cell, Eigen::Ref<Vector_t> & stress_numpy_array) {
     muGrid::WrappedField<Real> stress_field{
@@ -358,7 +358,7 @@ namespace muSpectre {
     return this->update_eigen_strain_field(stress_field);
   }
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   void MaterialStochasticPlasticity<DimM>::update_eigen_strain_field(
       const muGrid::TypedFieldBase<Real> & stress_field) {
     muGrid::T2FieldMap<Real, Mapping::Const, DimM, PixelSubDiv::QuadPt>
@@ -392,7 +392,7 @@ namespace muSpectre {
   //! archive_overloaded_quad_pts(), archives the overloaded pixels saved in
   //! this->overloaded_quad_pts to the input vector avalanche_history and
   //! empties overloaded_quad_pts.
-  template <Dim_t DimM>
+  template <Index_t DimM>
   void MaterialStochasticPlasticity<DimM>::archive_overloaded_quad_pts(
       std::list<std::vector<size_t>> & avalanche_history) {
     //!  1.) archive overloaded_quad_pts in avalanche_history

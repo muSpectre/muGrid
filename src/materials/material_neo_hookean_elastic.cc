@@ -38,10 +38,10 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   MaterialNeoHookeanElastic<DimM>::MaterialNeoHookeanElastic(
-      const std::string & name, const Dim_t & spatial_dimension,
-      const Dim_t & nb_quad_pts, const Real & young, const Real & poisson)
+      const std::string & name, const Index_t & spatial_dimension,
+      const Index_t & nb_quad_pts, const Real & young, const Real & poisson)
       : Parent{name, spatial_dimension, nb_quad_pts}, young{young},
         poisson{poisson}, lambda{Hooke::compute_lambda(young, poisson)},
         mu{Hooke::compute_mu(young, poisson)}, K{Hooke::compute_K(young,

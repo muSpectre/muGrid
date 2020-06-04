@@ -50,11 +50,11 @@ namespace muGrid {
         Eigen::Matrix<Int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
     using FMatrix =
         Eigen::Matrix<Int, Eigen::Dynamic, Eigen::Dynamic>;
-    const Dim_t nb_row{3}, nb_col{2};
-    const std::vector<Dim_t> logical_shape{nb_row, nb_col};
-    const Dim_t skip_i{2}, skip_j{2};
+    const Index_t nb_row{3}, nb_col{2};
+    const std::vector<Index_t> logical_shape{nb_row, nb_col};
+    const Index_t skip_i{2}, skip_j{2};
 
-    const std::vector<Dim_t> large_shape{skip_i * nb_row, skip_j * nb_col};
+    const std::vector<Index_t> large_shape{skip_i * nb_row, skip_j * nb_col};
     CMatrix a(large_shape[0], large_shape[1]);
     a <<      53,  92,  59, 107,
               25,  69, 126, 112,
@@ -62,17 +62,17 @@ namespace muGrid {
               25,  82,  26,  19,
               14,  48,  71,  54,
               88,  68,  73,  12;
-    std::vector<Dim_t> a_strides{skip_i*large_shape[1], skip_j};
+    std::vector<Index_t> a_strides{skip_i*large_shape[1], skip_j};
     CMatrix b(nb_row, nb_col);
       b <<    53, 59,
              121, 15,
               14, 71;
-    std::vector<Dim_t> b_strides{skip_j, 1};
+    std::vector<Index_t> b_strides{skip_j, 1};
     FMatrix b_out(3, 2);
     b_out <<  53, 59,
              121, 15,
               14, 71;
-    std::vector<Dim_t> b_out_strides{1, skip_j};
+    std::vector<Index_t> b_out_strides{1, skip_j};
 
     CMatrix test_rowmaj_b{CMatrix::Zero(nb_row, nb_col)};
     FMatrix test_colmaj_b{FMatrix::Zero(nb_row, nb_col)};
@@ -95,12 +95,12 @@ namespace muGrid {
         Eigen::Matrix<Int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
     using FMatrix =
         Eigen::Matrix<Int, Eigen::Dynamic, Eigen::Dynamic>;
-    const Dim_t nb_row{3}, nb_col{2};
-    const std::vector<Dim_t> logical_shape{nb_row, nb_col};
-    const Dim_t skip_i{2}, skip_j{3};
+    const Index_t nb_row{3}, nb_col{2};
+    const std::vector<Index_t> logical_shape{nb_row, nb_col};
+    const Index_t skip_i{2}, skip_j{3};
     // warning, the following is a tricky case, as the skip_j is not a divisor
     // of the large array's nb of cols
-    const std::vector<Dim_t> large_shape{skip_i * nb_row, 2 * nb_col};
+    const std::vector<Index_t> large_shape{skip_i * nb_row, 2 * nb_col};
     CMatrix a(large_shape[0], large_shape[1]);
     a <<      53,  92,  59, 107,
               25,  69, 126, 112,
@@ -108,17 +108,17 @@ namespace muGrid {
               25,  82,  26,  19,
               14,  48,  71,  54,
               88,  68,  73,  12;
-    std::vector<Dim_t> a_strides{skip_i*large_shape[1], skip_j};
+    std::vector<Index_t> a_strides{skip_i*large_shape[1], skip_j};
     CMatrix b(nb_row, nb_col);
       b <<    53, 107,
              121,  43,
               14,  54;
-    std::vector<Dim_t> b_strides{skip_i, 1};
+    std::vector<Index_t> b_strides{skip_i, 1};
     FMatrix b_out(3, 2);
     b_out <<  53, 107,
              121,  43,
               14,  54;
-    std::vector<Dim_t> b_out_strides{1, skip_j};
+    std::vector<Index_t> b_out_strides{1, skip_j};
 
     CMatrix test_rowmaj_b{CMatrix::Zero(nb_row, nb_col)};
     FMatrix test_colmaj_b{FMatrix::Zero(nb_row, nb_col)};

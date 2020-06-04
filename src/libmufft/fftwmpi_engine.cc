@@ -56,7 +56,7 @@ namespace muFFT {
 
     const int dim{this->nb_fourier_grid_pts.get_dim()};
     this->nb_fourier_non_transposed.resize(dim);
-    for (Dim_t i = 0; i < dim; ++i) {
+    for (Index_t i = 0; i < dim; ++i) {
       this->nb_fourier_non_transposed[i] =
           this->nb_fourier_grid_pts[dim - 1 - i];
     }
@@ -97,7 +97,7 @@ namespace muFFT {
     // Note: This information is presently not used
     if (dim > 1) {
       this->subdomain_strides[1] = 2 * this->nb_fourier_grid_pts[0];
-      for (Dim_t i = 2; i < dim; ++i) {
+      for (Index_t i = 2; i < dim; ++i) {
         this->subdomain_strides[i] =
             this->subdomain_strides[i - 1] * this->nb_subdomain_grid_pts[i - 1];
       }
@@ -109,7 +109,7 @@ namespace muFFT {
     // the proper (transposed or untransposed) coordinates.
     if (dim > 1) {
       // cumulative strides over first dimensions
-      Dim_t s = this->fourier_strides[dim - 2];
+      Index_t s = this->fourier_strides[dim - 2];
       this->fourier_strides[dim - 1] = s;
       this->fourier_strides[dim - 2] = this->nb_fourier_grid_pts[dim - 1] * s;
     }
@@ -130,7 +130,7 @@ namespace muFFT {
   }
 
   /* ---------------------------------------------------------------------- */
-  void FFTWMPIEngine::initialise(const Dim_t & nb_dof_per_pixel,
+  void FFTWMPIEngine::initialise(const Index_t & nb_dof_per_pixel,
                                  const FFT_PlanFlags & plan_flags) {
     if (this->has_plan_for(nb_dof_per_pixel)) {
       // plan already exists, we can bail
@@ -144,7 +144,7 @@ namespace muFFT {
       return;
     }
 
-    int howmany{nb_dof_per_pixel};
+    int howmany{static_cast<int>(nb_dof_per_pixel)};
     ptrdiff_t res0{}, loc0{}, res1{}, loc1{};
     // find how large a workspace this transform needs
     // this needs the fourier grid points as input
@@ -198,7 +198,7 @@ namespace muFFT {
     // Reverse the order of the array dimensions, because FFTW expects a
     // row-major array and the arrays used in muSpectre are column-major
     std::vector<ptrdiff_t> narr(dim);
-    for (Dim_t i = 0; i < dim; ++i) {
+    for (Index_t i = 0; i < dim; ++i) {
       narr[i] = this->nb_domain_grid_pts[dim - 1 - i];
     }
     // this needs the domain grid points as input narr
@@ -428,7 +428,7 @@ namespace muFFT {
   /* ---------------------------------------------------------------------- */
   auto
   FFTWMPIEngine::register_fourier_space_field(const std::string & unique_name,
-                                              const Dim_t & nb_dof_per_pixel)
+                                              const Index_t & nb_dof_per_pixel)
       -> FourierField_t & {
     if (not this->has_plan_for(nb_dof_per_pixel)) {
       std::stringstream message{};
@@ -455,8 +455,8 @@ namespace muFFT {
   }
 
   /* ---------------------------------------------------------------------- */
-  Dim_t
-  FFTWMPIEngine::get_required_pad_size(const Dim_t & nb_dof_per_pixel) const {
+  Index_t
+  FFTWMPIEngine::get_required_pad_size(const Index_t & nb_dof_per_pixel) const {
     auto && required_workspace_size{
         this->required_workspace_sizes.at(nb_dof_per_pixel)};
     return required_workspace_size - nb_dof_per_pixel * this->fourier_size();

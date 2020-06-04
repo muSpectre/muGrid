@@ -46,13 +46,13 @@
 #include <iostream>
 
 namespace muSpectre {
-  template <Dim_t DimM>
+  template <Index_t DimM>
   class MaterialNeoHookeanElastic;
 
   /**
    * traits for objective linear Neo-Hookean material
    */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   struct MaterialMuSpectre_traits<MaterialNeoHookeanElastic<DimM>> {
     //! expected map type for strain fields
     using StrainMap_t =
@@ -70,7 +70,7 @@ namespace muSpectre {
     constexpr static auto stress_measure{StressMeasure::Kirchhoff};
   };
 
-  template <Dim_t DimM>
+  template <Index_t DimM>
   class MaterialNeoHookeanElastic
       : public MaterialMuSpectre<MaterialNeoHookeanElastic<DimM>, DimM> {
    public:
@@ -98,8 +98,8 @@ namespace muSpectre {
 
     //! Construct by name, Young's modulus and Poisson's ratio
     MaterialNeoHookeanElastic(const std::string & name,
-                              const Dim_t & spatial_dimension,
-                              const Dim_t & nb_quad_pts, const Real & young,
+                              const Index_t & spatial_dimension,
+                              const Index_t & nb_quad_pts, const Real & young,
                               const Real & poisson);
 
     //! Move constructor
@@ -166,7 +166,7 @@ namespace muSpectre {
     const Stiffness_t & C_linear;  //!< ref to stiffness tensor
   };
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   template <class Derived>
   auto MaterialNeoHookeanElastic<DimM>::evaluate_stress(
       const Eigen::MatrixBase<Derived> & F, const size_t &
@@ -188,7 +188,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   template <class Derived>
   auto MaterialNeoHookeanElastic<DimM>::evaluate_stress_tangent(
       const Eigen::MatrixBase<Derived> & F, const size_t &
@@ -239,7 +239,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   Real MaterialNeoHookeanElastic<DimM>::evaluate_elastic_volumetric_stress(
       const Real & J) {
     // U(Θ) = [K/4]* [(Θ-1)² + ln(Θ)²] ⇒
@@ -252,7 +252,7 @@ namespace muSpectre {
 
   /* ----------------------------------------------------------------------
    */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   auto MaterialNeoHookeanElastic<DimM>::evaluate_elastic_deviatoric_stress(
       const Eigen::Ref<const Stress_t> & E_dev) -> Stress_t {
     return (2 * this->mu * MatTB::compute_deviatoric<DimM>(E_dev));

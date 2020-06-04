@@ -42,8 +42,8 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   ProjectionBase::ProjectionBase(muFFT::FFTEngine_ptr engine,
                                  const DynRcoord_t & domain_lengths,
-                                 const Dim_t & nb_quad_pts,
-                                 const Dim_t & nb_dof_per_sub_pt,
+                                 const Index_t & nb_quad_pts,
+                                 const Index_t & nb_dof_per_sub_pt,
                                  const Formulation & form)
       : fft_engine{std::move(engine)}, domain_lengths{domain_lengths},
         nb_quad_pts{nb_quad_pts},
@@ -74,12 +74,12 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  const Dim_t & ProjectionBase::get_dim() const {
+  const Index_t & ProjectionBase::get_dim() const {
     return this->fft_engine->get_spatial_dim();
   }
 
   /* ---------------------------------------------------------------------- */
-  const Dim_t & ProjectionBase::get_nb_quad_pts() const {
+  const Index_t & ProjectionBase::get_nb_quad_pts() const {
     return this->nb_quad_pts;
   }
 

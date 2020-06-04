@@ -37,10 +37,10 @@
 
 namespace muSpectre {
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   MaterialLinearAnisotropic<DimM>::MaterialLinearAnisotropic(
-      const std::string & name, const Dim_t & spatial_dimension,
-      const Dim_t & nb_quad_pts, const std::vector<Real> & input_c)
+      const std::string & name, const Index_t & spatial_dimension,
+      const Index_t & nb_quad_pts, const std::vector<Real> & input_c)
       : Parent{name, spatial_dimension, nb_quad_pts},
         C_holder{std::make_unique<Stiffness_t>(c_maker(input_c))},
         C{*this->C_holder} {
@@ -48,11 +48,11 @@ namespace muSpectre {
   };
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   auto MaterialLinearAnisotropic<DimM>::c_maker(std::vector<Real> input)
       -> Stiffness_t {
     // the correct size of the input according to the dimension
-    std::array<Dim_t, 2> constexpr input_size{6, 21};
+    std::array<Index_t, 2> constexpr input_size{6, 21};
 
     // stiffness_matrix
     Stiffness_t C4{Stiffness_t::Zero()};
@@ -67,7 +67,7 @@ namespace muSpectre {
       throw muGrid::RuntimeError(err_str.str());
     }
 
-    constexpr Dim_t v_diff{DimM * DimM - vsize(DimM)};
+    constexpr Index_t v_diff{DimM * DimM - vsize(DimM)};
 
     // memory order voigt -> col major
     using t_t = VoigtConversion<DimM>;

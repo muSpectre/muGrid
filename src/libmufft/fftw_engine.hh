@@ -79,7 +79,7 @@ namespace muFFT {
     FFTWEngine & operator=(FFTWEngine && other) = delete;
 
     // compute the plan, etc
-    void initialise(const Dim_t & nb_dof_per_pixel,
+    void initialise(const Index_t & nb_dof_per_pixel,
                     const FFT_PlanFlags & plan_flags) override;
 
     //! forward transform
@@ -96,9 +96,9 @@ namespace muFFT {
 
    protected:
     //! holds the plans for forward fourier transforms
-    std::map<Dim_t, fftw_plan> fft_plans{};
+    std::map<Index_t, fftw_plan> fft_plans{};
     //! holds the plans for inversefourier transforms
-    std::map<Dim_t, fftw_plan> ifft_plans{};
+    std::map<Index_t, fftw_plan> ifft_plans{};
   };
 
 }  // namespace muFFT

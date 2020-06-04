@@ -50,10 +50,10 @@
 
 #include <vector>
 namespace muSpectre {
-  template <Dim_t DimM>
+  template <Index_t DimM>
   class MaterialLaminate;
 
-  template <Dim_t DimM>
+  template <Index_t DimM>
   struct MaterialMuSpectre_traits<MaterialLaminate<DimM>> {
     //! expected map type for strain fields
     using StrainMap_t =
@@ -70,7 +70,7 @@ namespace muSpectre {
     constexpr static auto stress_measure{StressMeasure::PK1};
   };
 
-  template <Dim_t DimM>
+  template <Index_t DimM>
   class MaterialLaminate : public MaterialBase {
    public:
     //! base class
@@ -115,8 +115,8 @@ namespace muSpectre {
 
     //! Constructor with name and material properties
     MaterialLaminate(
-        const std::string & name, const Dim_t & spatial_dimension,
-        const Dim_t & nb_quad_pts,
+        const std::string & name, const Index_t & spatial_dimension,
+        const Index_t & nb_quad_pts,
         std::shared_ptr<muGrid::LocalFieldCollection> parent_field = nullptr);
 
     //! Copy constructor
@@ -215,7 +215,7 @@ namespace muSpectre {
      */
     void add_pixels_precipitate(
         const std::vector<Ccoord_t<DimM>> & intersected_pixels,
-        const std::vector<Dim_t> & intersected_pixels_id,
+        const std::vector<Index_t> & intersected_pixels_id,
         const std::vector<Real> & intersection_ratios,
         const std::vector<Eigen::Matrix<Real, DimM, 1>> & intersection_normals,
         MatPtr_t mat1, MatPtr_t mat2);
@@ -275,7 +275,7 @@ namespace muSpectre {
   };
 
   /* ----------------------------------------------------------------------*/
-  template <Dim_t DimM>
+  template <Index_t DimM>
   template <class Strain>
   decltype(auto)
   MaterialLaminate<DimM>::evaluate_stress(const Eigen::MatrixBase<Strain> & E,
@@ -329,7 +329,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   template <class Strain>
   decltype(auto) MaterialLaminate<DimM>::evaluate_stress_tangent(
       const Eigen ::MatrixBase<Strain> & E, const size_t & pixel_index,
@@ -384,7 +384,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   template <Formulation Form, SplitCell IsCellSplit>
   void MaterialLaminate<DimM>::compute_stresses_worker(const RealField & F,
                                                        RealField & P,
@@ -449,7 +449,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   template <Formulation Form, SplitCell IsCellSplit>
   void MaterialLaminate<DimM>::compute_stresses_worker(const RealField & F,
                                                        RealField & P) {
@@ -501,12 +501,12 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   template <class... ConstructorArgs>
   std::tuple<std::shared_ptr<MaterialLaminate<DimM>>, MaterialEvaluator<DimM>>
   MaterialLaminate<DimM>::make_evaluator(ConstructorArgs &&... args) {
-    constexpr Dim_t SpatialDimension{DimM};
-    constexpr Dim_t NbQuadPts{1};
+    constexpr Index_t SpatialDimension{DimM};
+    constexpr Index_t NbQuadPts{1};
     auto mat{std::make_shared<MaterialLaminate<DimM>>("name", SpatialDimension,
                                                       NbQuadPts, args...)};
     using Ret_t = std::tuple<std::shared_ptr<MaterialLaminate<DimM>>,
@@ -515,7 +515,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   auto MaterialLaminate<DimM>::constitutive_law_dynamic(
       const Eigen::Ref<const DynMatrix_t> & strain,
       const size_t & quad_pt_index, const Formulation & form)
@@ -554,7 +554,7 @@ namespace muSpectre {
   }
 
   /* ----------------------------------------------------------------------*/
-  template <Dim_t DimM>
+  template <Index_t DimM>
   template <Formulation Form, class Strain, class Stress, class Op,
             class NativeTreat>
   void MaterialLaminate<DimM>::evaluate_material_stress(
@@ -612,7 +612,7 @@ namespace muSpectre {
   }
 
   /* ----------------------------------------------------------------------*/
-  template <Dim_t DimM>
+  template <Index_t DimM>
   template <Formulation Form, class Strains, class Stresses>
   void MaterialLaminate<DimM>::constitutive_law(const Strains & strains,
                                                 Stresses & stresses,
@@ -625,7 +625,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   template <Formulation Form, class Strains, class Stresses>
   void MaterialLaminate<DimM>::constitutive_law(const Strains & strains,
                                                 Stresses & stresses,
@@ -638,7 +638,7 @@ namespace muSpectre {
 
   /* ----------------------------------------------------------------------*/
 
-  template <Dim_t DimM>
+  template <Index_t DimM>
   template <Formulation Form, class Strain, class Stress, class Stiffness,
             class Op, class NativeTreat>
   void MaterialLaminate<DimM>::evaluate_material_stress_tangent(
@@ -706,7 +706,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   template <Formulation Form, class Strains, class Stresses>
   void MaterialLaminate<DimM>::constitutive_law_tangent(
       const Strains & strains, Stresses & stresses, const size_t & quad_pt_id,
@@ -718,7 +718,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   template <Formulation Form, class Strains, class Stresses>
   void MaterialLaminate<DimM>::constitutive_law_tangent(
       const Strains & strains, Stresses & stresses, const size_t & quad_pt_id) {

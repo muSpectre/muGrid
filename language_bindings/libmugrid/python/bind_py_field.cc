@@ -46,7 +46,7 @@
 #include <sstream>
 #include <stdexcept>
 
-using muGrid::Dim_t;
+using muGrid::Index_t;
 using muGrid::Field;
 using muGrid::FieldCollection;
 using muGrid::GlobalFieldCollection;
@@ -75,7 +75,7 @@ void add_field(py::module & mod) {
 template <class T>
 void add_typed_field(py::module & mod, std::string name) {
   auto && array_computer = [](TypedFieldBase<T> & self,
-                              const std::vector<Dim_t> & shape,
+                              const std::vector<Index_t> & shape,
                               const muGrid::PixelSubDiv & it) {
     // py_class will be passed as the `base` class to the array
     // constructors below. This ties the lifetime of the array that does
@@ -86,7 +86,7 @@ void add_typed_field(py::module & mod, std::string name) {
 
     // If shape is given, then we return a field of tensors of this
     // shape
-    Dim_t ntotal{1}, stride{sizeof(T)};
+    Index_t ntotal{1}, stride{sizeof(T)};
     if (dim != 0) {
       for (auto & n : shape) {
         return_shape.push_back(n);
@@ -191,14 +191,14 @@ void add_typed_field(py::module & mod, std::string name) {
                              [](TypedFieldBase<T> & field) {
                                return field.get_shape(field.get_sub_division());
                              })
-      .def("array", array_computer, "shape"_a = std::vector<Dim_t>{},
+      .def("array", array_computer, "shape"_a = std::vector<Index_t>{},
            "iteration_type"_a = muGrid::PixelSubDiv::QuadPt,
            py::keep_alive<0, 1>())
       .def(
           "array",
           [&array_computer](TypedFieldBase<T> & self,
                             const muGrid::PixelSubDiv & it) {
-            return array_computer(self, std::vector<Dim_t>{}, it);
+            return array_computer(self, std::vector<Index_t>{}, it);
           },
           "iteration_type"_a = muGrid::PixelSubDiv::QuadPt,
           py::keep_alive<0, 1>());

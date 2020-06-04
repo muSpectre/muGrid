@@ -79,7 +79,7 @@ namespace muFFT {
     FFTWMPIEngine & operator=(FFTWMPIEngine && other) = delete;
 
     // compute the plan, etc
-    void initialise(const Dim_t & nb_dof_per_pixel,
+    void initialise(const Index_t & nb_dof_per_pixel,
                     const FFT_PlanFlags & plan_flags) override;
 
     //! forward transform
@@ -105,23 +105,23 @@ namespace muFFT {
      */
     FourierField_t &
     register_fourier_space_field(const std::string & unique_name,
-                                 const Dim_t & nb_dof_per_pixel) final;
+                                 const Index_t & nb_dof_per_pixel) final;
 
     /**
      * Returns the required pad size. Helpful when calling fftwmpi with wrapped
      * fields
      */
-    Dim_t get_required_pad_size(const Dim_t & nb_dof_per_pixel) const final;
+    Index_t get_required_pad_size(const Index_t & nb_dof_per_pixel) const final;
 
    protected:
     static int nb_engines;  //!< number of times this engine has
                             //!< been instatiated
     //! holds the plans for forward fourier transforms
-    std::map<Dim_t, fftw_plan> fft_plans{};
+    std::map<Index_t, fftw_plan> fft_plans{};
     //! holds the plans for inversefourier transforms
-    std::map<Dim_t, fftw_plan> ifft_plans{};
+    std::map<Index_t, fftw_plan> ifft_plans{};
     //! holds the fourier field sizes including padding for different transforms
-    std::map<Dim_t, Dim_t> required_workspace_sizes{};
+    std::map<Index_t, Index_t> required_workspace_sizes{};
     //! maximum size of workspace buffer (returned by planner)
     ptrdiff_t workspace_size{0};
     //! temporary real workspace for correctly padded copy of real input

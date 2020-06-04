@@ -63,8 +63,9 @@ namespace muGrid {
      * @param nb_quad_pts number of quadrature points per pixel/voxel
      * @param nb_nodal_pts number of nodal points per pixel/voxel
      */
-    LocalFieldCollection(const Dim_t & spatial_dimension,
-                         const Dim_t & nb_quad_pts, const Dim_t & nb_nodal_pts);
+    LocalFieldCollection(const Index_t & spatial_dimension,
+                         const Index_t & nb_quad_pts,
+                         const Index_t & nb_nodal_pts);
 
     //! Copy constructor
     LocalFieldCollection(const LocalFieldCollection & other) = delete;

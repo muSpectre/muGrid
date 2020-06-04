@@ -73,14 +73,14 @@ namespace muGrid {
      * field entry
      */
     StateFieldMap(TypedStateField<T> & state_field,
-                   PixelSubDiv iter_type = PixelSubDiv::QuadPt);
+                  PixelSubDiv iter_type = PixelSubDiv::QuadPt);
 
     /**
      * Constructor from a state field with explicitly chosen shape of iterate.
      * (the number of columns is inferred).
      */
-    StateFieldMap(TypedStateField<T> & state_field, Dim_t nb_rows,
-                   PixelSubDiv iter_type = PixelSubDiv::QuadPt);
+    StateFieldMap(TypedStateField<T> & state_field, Index_t nb_rows,
+                  PixelSubDiv iter_type = PixelSubDiv::QuadPt);
 
     StateFieldMap(const StateFieldMap & other) = delete;
 
@@ -95,7 +95,6 @@ namespace muGrid {
 
     //! Move assignment operator
     StateFieldMap & operator=(StateFieldMap && other) = delete;
-
 
     //! iterator type
     template <Mapping MutIter>
@@ -118,7 +117,7 @@ namespace muGrid {
     const TypedStateField<T> & get_state_field() const;
 
     //! return the number of rows the iterates have
-    const Dim_t & get_nb_rows() const;
+    const Index_t & get_nb_rows() const;
 
     /**
      * returns the number of iterates produced by this map (corresponds to
@@ -149,9 +148,9 @@ namespace muGrid {
       //! constructor (should never have to be called by user)
       StateWrapper(StateFieldMap_t & state_field_map, size_t index)
           : current_val{state_field_map.get_current()[index]} {
-        const Dim_t nb_memory{state_field_map.state_field.get_nb_memory()};
+        const Index_t nb_memory{state_field_map.state_field.get_nb_memory()};
         this->old_vals.reserve(nb_memory);
-        for (Dim_t i{1}; i < nb_memory + 1; ++i) {
+        for (Index_t i{1}; i < nb_memory + 1; ++i) {
           this->old_vals.emplace_back(
               std::move(state_field_map.get_old(i))[index]);
         }
@@ -201,7 +200,7 @@ namespace muGrid {
     //! mapped state field. Needed for query at initialisations
     TypedStateField<T> & state_field;
     const PixelSubDiv iteration;  //!< type of map iteration
-    const Dim_t nb_rows;        //!< number of rows of the iterate
+    const Index_t nb_rows;        //!< number of rows of the iterate
 
     /**
      * maps over nb_memory + 1 possibly mutable maps. current points to one of

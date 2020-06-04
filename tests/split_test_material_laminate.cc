@@ -57,11 +57,11 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE(material_laminate);
 
-  template <Dim_t DimS, Dim_t DimM, int c1, int c2, bool RndVec = true,
+  template <Index_t DimS, Index_t DimM, int c1, int c2, bool RndVec = true,
             bool RndRatio = true>
   struct MaterialFixture {
-    constexpr static Dim_t sdim{DimS};
-    constexpr static Dim_t mdim{DimM};
+    constexpr static Index_t sdim{DimS};
+    constexpr static Index_t mdim{DimM};
 
     using Vec_t = Eigen::Matrix<Real, DimM, 1>;
     using MaterialLam_t = MaterialLaminate<DimM>;
@@ -100,7 +100,7 @@ namespace muSpectre {
       }
     }
 
-    constexpr static Dim_t NbQuadPts() { return 1; }
+    constexpr static Index_t NbQuadPts() { return 1; }
 
    protected:
     Real young;
@@ -114,16 +114,16 @@ namespace muSpectre {
   };
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM, int c1, int c2, bool RndVec,
+  template <Index_t DimS, Index_t DimM, int c1, int c2, bool RndVec,
             bool RndRatio>
-  constexpr Dim_t MaterialFixture<DimS, DimM, c1, c2, RndVec, RndRatio>::mdim;
+  constexpr Index_t MaterialFixture<DimS, DimM, c1, c2, RndVec, RndRatio>::mdim;
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM, int c1, int c2, bool RndVec,
+  template <Index_t DimS, Index_t DimM, int c1, int c2, bool RndVec,
             bool RndRatio>
-  constexpr Dim_t MaterialFixture<DimS, DimM, c1, c2, RndVec, RndRatio>::sdim;
+  constexpr Index_t MaterialFixture<DimS, DimM, c1, c2, RndVec, RndRatio>::sdim;
 
-  template <Dim_t DimS, Dim_t DimM, int c1, int c2, bool RndVec = false,
+  template <Index_t DimS, Index_t DimM, int c1, int c2, bool RndVec = false,
             bool RndRatio = false>
   struct MaterialFixture_with_ortho_ref
       : public MaterialFixture<DimS, DimM, c1, c2, RndVec, RndRatio> {
@@ -222,8 +222,8 @@ namespace muSpectre {
     auto & normal_vec{Fix::normal_vec};
     muGrid::testGoodies::RandRange<size_t> rng;
 
-    const Dim_t nb_pixel{7};
-    for (Dim_t i = 0; i < nb_pixel; ++i) {
+    const Index_t nb_pixel{7};
+    for (Index_t i = 0; i < nb_pixel; ++i) {
       auto && j{rng.randval(0, nb_pixel)};
       BOOST_CHECK_NO_THROW(mat.add_pixel(j, mat1, mat2, ratio, normal_vec));
     }
@@ -239,9 +239,9 @@ namespace muSpectre {
     auto & ratio{Fix::ratio};
     auto & normal_vec{Fix::normal_vec};
 
-    const Dim_t nb_pixel{1};
+    const Index_t nb_pixel{1};
     constexpr auto cube{muGrid::CcoordOps::get_cube<Fix::sdim>(nb_pixel)};
-    constexpr auto loc{muGrid::CcoordOps::get_cube<Fix::sdim>(0)};
+    constexpr auto loc{muGrid::CcoordOps::get_cube<Fix::sdim>(Index_t{0})};
 
     using Mat_t = Eigen::Matrix<Real, Fix::mdim, Fix::mdim>;
     using FC_t = muGrid::GlobalFieldCollection;
@@ -266,7 +266,7 @@ namespace muSpectre {
     Mat_t F{Mat_t::Random() / 10000 + Mat_t::Identity()};
     Mat_t strain{0.5 * ((F * F.transpose()) - Mat_t::Identity())};
 
-    Dim_t pix0{0};
+    Index_t pix0{0};
     Real error{0.0};
     Real tol{1e-12};
 
@@ -323,9 +323,9 @@ namespace muSpectre {
     using Mat_t = Eigen::Matrix<Real, Fix::mdim, Fix::mdim>;
     using FC_t = muGrid::GlobalFieldCollection;
 
-    const Dim_t nb_pixel{1};
+    const Index_t nb_pixel{1};
     constexpr auto cube{muGrid::CcoordOps::get_cube<Fix::sdim>(nb_pixel)};
-    constexpr auto loc{muGrid::CcoordOps::get_cube<Fix::sdim>(0)};
+    constexpr auto loc{muGrid::CcoordOps::get_cube<Fix::sdim>(Index_t{0})};
 
     FC_t globalfields{Fix::mdim, Fix::NbQuadPts(), muGrid::Unknown};
     globalfields.initialise(cube, loc);
@@ -348,7 +348,7 @@ namespace muSpectre {
     Mat_t strain{0.5 * ((F * F.transpose()) - Mat_t::Identity())};
 
     // using Ccoord = Ccoord_t<Fix::sdim>;
-    Dim_t pix0{0};
+    Index_t pix0{0};
     Real error{0.0};
     Real tol{1e-12};
 
@@ -425,7 +425,7 @@ namespace muSpectre {
 
     auto & mat_precipitate{Fix::mat_precipitate_ptr};
     auto & mat_matrix{Fix::mat_matrix_ptr};
-    constexpr Dim_t grid{15};
+    constexpr Index_t grid{15};
     constexpr Real length_pixel{1.0};
     constexpr Real length_cell{grid * length_pixel};
 

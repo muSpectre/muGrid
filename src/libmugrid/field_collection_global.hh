@@ -61,9 +61,9 @@ namespace muGrid {
      * or Unknown
      * @param nb_quad_pts number of quadrature points per pixel/voxel
      */
-    GlobalFieldCollection(const Dim_t & spatial_dimension,
-                          const Dim_t & nb_quad_pts,
-                          const Dim_t & nb_nodal_pts);
+    GlobalFieldCollection(const Index_t & spatial_dimension,
+                          const Index_t & nb_quad_pts,
+                          const Index_t & nb_nodal_pts);
 
     /**
      * Constructor with initialization
@@ -75,8 +75,9 @@ namespace muGrid {
      * @param subdomain_locations location of the current subdomain within the
      * global grid
      */
-    GlobalFieldCollection(const Dim_t & spatial_dimension,
-                          const Dim_t & nb_quad_pts, const Dim_t & nb_nodal_pts,
+    GlobalFieldCollection(const Index_t & spatial_dimension,
+                          const Index_t & nb_quad_pts,
+                          const Index_t & nb_nodal_pts,
                           const DynCcoord_t & nb_subdomain_grid_pts,
                           const DynCcoord_t & subdomain_locations = {});
 
@@ -91,8 +92,8 @@ namespace muGrid {
      * global grid
      * @param strides strides specifying memory layout
      */
-    GlobalFieldCollection(Dim_t spatial_dimension, Dim_t nb_quad_pts,
-                          const Dim_t & nb_nodal_pts,
+    GlobalFieldCollection(Index_t spatial_dimension, Index_t nb_quad_pts,
+                          const Index_t & nb_nodal_pts,
                           const DynCcoord_t & nb_subdomain_grid_pts,
                           const DynCcoord_t & subdomain_locations,
                           const DynCcoord_t & strides);
@@ -111,25 +112,24 @@ namespace muGrid {
     operator=(const GlobalFieldCollection & other) = delete;
 
     //! Move assignment operator
-    GlobalFieldCollection &
-    operator=(GlobalFieldCollection && other) = delete;
+    GlobalFieldCollection & operator=(GlobalFieldCollection && other) = delete;
 
     //! Return the pixels class that allows to iterator over pixels
     const DynamicPixels & get_pixels() const;
 
     //! evaluate and return the linear index corresponding to dynamic `ccoord`
-    Dim_t get_index(const DynCcoord_t & ccoord) const {
+    Index_t get_index(const DynCcoord_t & ccoord) const {
       return this->get_pixels().get_index(ccoord);
     }
 
     //! evaluate and return the linear index corresponding to `ccoord`
     template <size_t Dim>
-    Dim_t get_index(const Ccoord_t<Dim> & ccoord) const {
+    Index_t get_index(const Ccoord_t<Dim> & ccoord) const {
       return this->pixels.get_index(ccoord);
     }
 
     //! return coordinates of the i-th pixel
-    DynCcoord_t get_ccoord(const Dim_t & index) const {
+    DynCcoord_t get_ccoord(const Index_t & index) const {
       return this->pixels.get_ccoord(index);
     }
 
@@ -149,9 +149,8 @@ namespace muGrid {
     template <size_t Dim>
     void initialise(const Ccoord_t<Dim> & nb_subdomain_grid_pts,
                     const Ccoord_t<Dim> & subdomain_locations = {}) {
-      this->initialise(
-              DynCcoord_t{nb_subdomain_grid_pts},
-              DynCcoord_t{subdomain_locations});
+      this->initialise(DynCcoord_t{nb_subdomain_grid_pts},
+                       DynCcoord_t{subdomain_locations});
     }
 
     /**
@@ -173,8 +172,7 @@ namespace muGrid {
                     const Ccoord_t<Dim> & subdomain_locations,
                     const Ccoord_t<Dim> & strides) {
       this->initialise(DynCcoord_t{nb_subdomain_grid_pts},
-              DynCcoord_t{subdomain_locations},
-              DynCcoord_t{strides});
+                       DynCcoord_t{subdomain_locations}, DynCcoord_t{strides});
     }
 
     /**

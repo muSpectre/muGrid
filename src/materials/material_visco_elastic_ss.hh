@@ -56,13 +56,13 @@
 #include <libmugrid/mapped_state_field.hh>
 
 namespace muSpectre {
-  template <Dim_t DimM>
+  template <Index_t DimM>
   class MaterialViscoElasticSS;
 
   /**
    * traits for objective linear visco_elasticity
    */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   struct MaterialMuSpectre_traits<MaterialViscoElasticSS<DimM>> {
     //! expected map type for strain fields
     using StrainMap_t =
@@ -85,7 +85,7 @@ namespace muSpectre {
    * implements objective linear visco_elasticity
    */
 
-  template <Dim_t DimM>
+  template <Index_t DimM>
   class MaterialViscoElasticSS
       : public MaterialMuSpectre<MaterialViscoElasticSS<DimM>, DimM> {
    public:
@@ -119,8 +119,8 @@ namespace muSpectre {
 
     //! Construct by name, Young's modulus and Poisson's ratio
     MaterialViscoElasticSS(const std::string & name,
-                           const Dim_t & spatial_dimension,
-                           const Dim_t & nb_quad_pts, const Real & young_inf,
+                           const Index_t & spatial_dimension,
+                           const Index_t & nb_quad_pts, const Real & young_inf,
                            const Real & young_v, const Real & eta_v,
                            const Real & poisson, const Real & dt,
                            const std::shared_ptr<muGrid::LocalFieldCollection> &
@@ -251,7 +251,7 @@ namespace muSpectre {
   };
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   auto MaterialViscoElasticSS<DimM>::evaluate_elastic_stress(
       const Eigen::Ref<const T2_t> & E) -> T2_t {
     return Hooke::evaluate_stress(this->lambda_tot, this->mu_tot, E);
@@ -259,7 +259,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   auto MaterialViscoElasticSS<DimM>::evaluate_elastic_volumetric_stress(
       const Eigen::Ref<const T2_t> & E) -> T2_t {
     return (E.trace() * (this->lambda_tot + (2 * this->mu_tot / DimM))) *
@@ -268,7 +268,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   auto MaterialViscoElasticSS<DimM>::evaluate_elastic_deviatoric_stress(
       const Eigen::Ref<const T2_t> & e) -> T2_t {
     return 2 * this->mu_tot * e;

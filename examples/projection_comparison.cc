@@ -102,12 +102,12 @@ int small_sym(int argc, char * argv[]) {
   auto options{parse_args2(argc, argv)};
   auto & opt{*options};
 
-  const Dim_t size{opt["N0"].as<int>()};
+  const Index_t size{opt["N0"].as<int>()};
   const int operator_kind{opt["proj"].as<int>()};
 
   constexpr Real fsize{1.};
-  constexpr Dim_t Dim{3};
-  const Dim_t nb_dofs{ipow(size, Dim) * ipow(Dim, 2)};
+  constexpr Index_t Dim{3};
+  const Index_t nb_dofs{ipow(size, Dim) * ipow(Dim, 2)};
 
   std::cout << "Projection operator : " << opt["proj"].as<int>() << std::endl;
   std::cout << "Number of dofs: " << nb_dofs << std::endl;
@@ -148,7 +148,7 @@ int small_sym(int argc, char * argv[]) {
     const auto & pixel_index{std::get<0>(id_pixel)};
     const auto & pixel{std::get<1>(id_pixel)};
     int sum{0};
-    for (Dim_t i = 0; i < Dim; ++i) {
+    for (Index_t i = 0; i < Dim; ++i) {
       sum += pixel[i] * 2 / nb_grid_pts[i];
     }
 

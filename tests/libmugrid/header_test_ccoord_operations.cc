@@ -45,9 +45,9 @@ namespace muGrid {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_cube, Fix, testGoodies::dimlist, Fix) {
     constexpr auto dim{Fix::dim};
     using Ccoord = Ccoord_t<dim>;
-    constexpr Dim_t size{5};
+    constexpr Index_t size{5};
 
-    constexpr Ccoord cube = CcoordOps::get_cube<dim>(size);
+    constexpr Ccoord cube{CcoordOps::get_cube<dim>(size)};
     Ccoord ref_cube;
     for (Dim_t i = 0; i < dim; ++i) {
       ref_cube[i] = size;
@@ -60,9 +60,9 @@ namespace muGrid {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_size, Fix, testGoodies::dimlist, Fix) {
     constexpr auto dim{Fix::dim};
     using Ccoord = Ccoord_t<dim>;
-    constexpr Dim_t size{5};
+    constexpr Index_t size{5};
 
-    constexpr Ccoord cube = CcoordOps::get_cube<dim>(size);
+    constexpr Ccoord cube{CcoordOps::get_cube<dim>(size)};
 
     BOOST_CHECK_EQUAL(CcoordOps::get_size(cube), ipow(size, dim));
   }
@@ -71,10 +71,10 @@ namespace muGrid {
                                    Fix) {
     constexpr auto dim{Fix::dim};
     using Ccoord = Ccoord_t<dim>;
-    constexpr Dim_t size{5};
+    constexpr Index_t size{5};
 
-    constexpr Ccoord cube = CcoordOps::get_cube<dim>(size);
-    constexpr Ccoord stride = CcoordOps::get_default_strides(cube);
+    constexpr Ccoord cube{CcoordOps::get_cube<dim>(size)};
+    constexpr Ccoord stride{CcoordOps::get_default_strides(cube)};
 
     BOOST_CHECK_EQUAL(CcoordOps::get_buffer_size(cube, stride),
                       ipow(size, dim));

@@ -48,37 +48,37 @@ namespace muFFT {
   BOOST_AUTO_TEST_SUITE(fftw_engine);
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t DimM, Dim_t NbGridPts>
+  template <Index_t DimS, Index_t DimM, Index_t NbGridPts>
   struct FFTW_fixture {
-    constexpr static Dim_t BoxNbGridPts{NbGridPts};
+    constexpr static Index_t BoxNbGridPts{NbGridPts};
     constexpr static Real Boxlength{4.5};
-    constexpr static Dim_t sdim{DimS};
-    constexpr static Dim_t mdim{DimM};
+    constexpr static Index_t sdim{DimS};
+    constexpr static Index_t mdim{DimM};
     constexpr static Ccoord_t<sdim> res() {
       return muGrid::CcoordOps::get_cube<DimS>(BoxNbGridPts);
     }
     constexpr static Ccoord_t<sdim> loc() {
-      return muGrid::CcoordOps::get_cube<DimS>(0);
+      return muGrid::CcoordOps::get_cube<DimS>(Index_t{0});
     }
     FFTW_fixture() : engine{DynCcoord_t(res())} {}
     FFTWEngine engine;
   };
-  template <Dim_t DimS, Dim_t DimM, Dim_t NbGridPts>
-  constexpr Dim_t FFTW_fixture<DimS, DimM, NbGridPts>::sdim;
-  template <Dim_t DimS, Dim_t DimM, Dim_t NbGridPts>
-  constexpr Dim_t FFTW_fixture<DimS, DimM, NbGridPts>::mdim;
+  template <Index_t DimS, Index_t DimM, Index_t NbGridPts>
+  constexpr Index_t FFTW_fixture<DimS, DimM, NbGridPts>::sdim;
+  template <Index_t DimS, Index_t DimM, Index_t NbGridPts>
+  constexpr Index_t FFTW_fixture<DimS, DimM, NbGridPts>::mdim;
 
   struct FFTW_fixture_python_segfault {
-    constexpr static Dim_t dim{twoD};
-    constexpr static Dim_t sdim{twoD};
-    constexpr static Dim_t mdim{twoD};
+    constexpr static Index_t dim{twoD};
+    constexpr static Index_t sdim{twoD};
+    constexpr static Index_t mdim{twoD};
     constexpr static Ccoord_t<sdim> res() { return {6, 4}; }
     constexpr static Ccoord_t<sdim> loc() { return {0, 0}; }
     FFTW_fixture_python_segfault() : engine{DynCcoord_t(res())} {}
     FFTWEngine engine;
   };
-  constexpr Dim_t FFTW_fixture_python_segfault::sdim;
-  constexpr Dim_t FFTW_fixture_python_segfault::mdim;
+  constexpr Index_t FFTW_fixture_python_segfault::sdim;
+  constexpr Index_t FFTW_fixture_python_segfault::mdim;
 
   using fixlist = boost::mpl::list<
       FFTW_fixture<twoD, twoD, 3>, FFTW_fixture<twoD, threeD, 3>,

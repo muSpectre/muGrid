@@ -47,44 +47,44 @@
 #include <string>
 
 using muGrid::RuntimeError;
-using muSpectre::Dim_t;
+using muSpectre::Index_t;
 using muSpectre::Real;
 using pybind11::literals::operator""_a;
 namespace py = pybind11;
 
 /* ---------------------------------------------------------------------- */
-template <Dim_t Dim>
+template <Index_t Dim>
 void add_material_linear_elastic_generic1_helper(py::module & mod);
 /* ---------------------------------------------------------------------- */
-template <Dim_t Dim>
+template <Index_t Dim>
 void add_material_linear_elastic_generic2_helper(py::module & mod);
 
 /**
  * python binding for the optionally objective form of Hooke's law
  */
-template <Dim_t Dim>
+template <Index_t Dim>
 void add_material_linear_elastic1_helper(py::module & mod);
-template <Dim_t Dim>
+template <Index_t Dim>
 void add_material_linear_elastic2_helper(py::module & mod);
-template <Dim_t Dim>
+template <Index_t Dim>
 void add_material_linear_elastic3_helper(py::module & mod);
-template <Dim_t Dim>
+template <Index_t Dim>
 void add_material_linear_elastic4_helper(py::module & mod);
-template <Dim_t Dim>
+template <Index_t Dim>
 void add_material_hyper_elasto_plastic1_helper(py::module & mod);
-template <Dim_t Dim>
+template <Index_t Dim>
 void add_material_hyper_elasto_plastic2_helper(py::module & mod);
-template <Dim_t Dim>
+template <Index_t Dim>
 void add_material_stochastic_plasticity_helper(py::module & mod);
-template <Dim_t Dim>
+template <Index_t Dim>
 void add_material_visco_elastic_ss_helper(py::module & mod);
-template <Dim_t Dim>
+template <Index_t Dim>
 void add_material_visco_elastic_damage_ss_helper(py::module & mod);
-template <Dim_t Dim>
+template <Index_t Dim>
 void add_material_neo_hookean_elastic_helper(py::module & mod);
 
 #ifdef WITH_SPLIT
-template <Dim_t Dim>
+template <Index_t Dim>
 void add_material_laminate_helper(py::module & mod);
 #endif
 
@@ -153,7 +153,7 @@ class PyMaterialBase : public muSpectre::MaterialBase {
   }
 };
 
-template <Dim_t Dim>
+template <Index_t Dim>
 void add_material_evaluator(py::module & mod) {
   std::stringstream name_stream{};
   name_stream << "MaterialEvaluator_" << Dim << "d";
@@ -234,8 +234,8 @@ void add_material_base_helper(py::module & mod) {
 
   py::class_<Material, MaterialTrampoline /* <--- trampoline*/,
              std::shared_ptr<Material>>(mod, name.c_str())
-      .def(py::init<const std::string &, const Dim_t &, const Dim_t &,
-                    const Dim_t &,
+      .def(py::init<const std::string &, const Index_t &, const Index_t &,
+                    const Index_t &,
                     std::shared_ptr<muGrid::LocalFieldCollection>>())
       .def("save_history_variables", &Material::save_history_variables)
       .def("list_fields", &Material::list_fields)
@@ -251,7 +251,7 @@ void add_material_base_helper(py::module & mod) {
           "fields of this material");
 }
 
-template <Dim_t Dim>
+template <Index_t Dim>
 void add_material_helper(py::module & mod) {
   add_material_linear_elastic1_helper<Dim>(mod);
   add_material_linear_elastic2_helper<Dim>(mod);

@@ -209,7 +209,7 @@ namespace muFFT {
       return xi / xi.norm();
     }
 
-    inline Dim_t get_nb_grid_pts(Dim_t i) const {
+    inline Index_t get_nb_grid_pts(Index_t i) const {
       return this->freqs[i].size();
     }
 
@@ -222,7 +222,7 @@ namespace muFFT {
   typename FFT_freqs<dim>::Vector
   FFT_freqs<dim>::get_xi(const Ccoord_t<dim> ccoord) const {
     Vector retval{};
-    for (Dim_t i = 0; i < dim; ++i) {
+    for (Index_t i = 0; i < dim; ++i) {
       retval(i) = this->freqs[i][ccoord[i]];
     }
     return retval;

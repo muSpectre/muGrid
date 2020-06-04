@@ -38,16 +38,16 @@
 namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
-  GlobalFieldCollection::GlobalFieldCollection(const Dim_t & spatial_dimension,
-                                               const Dim_t & nb_quad_pts,
-                                               const Dim_t & nb_nodal_pts)
+  GlobalFieldCollection::GlobalFieldCollection(
+      const Index_t & spatial_dimension, const Index_t & nb_quad_pts,
+      const Index_t & nb_nodal_pts)
       : Parent{ValidityDomain::Global, spatial_dimension, nb_quad_pts,
                nb_nodal_pts} {}
 
   /* ---------------------------------------------------------------------- */
   GlobalFieldCollection::GlobalFieldCollection(
-      const Dim_t & spatial_dimension, const Dim_t & nb_quad_pts,
-      const Dim_t & nb_nodal_pts, const DynCcoord_t & nb_subdomain_grid_pts,
+      const Index_t & spatial_dimension, const Index_t & nb_quad_pts,
+      const Index_t & nb_nodal_pts, const DynCcoord_t & nb_subdomain_grid_pts,
       const DynCcoord_t & subdomain_locations)
       : Parent{ValidityDomain::Global, spatial_dimension, nb_quad_pts,
                nb_nodal_pts} {
@@ -56,8 +56,8 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   GlobalFieldCollection::GlobalFieldCollection(
-      Dim_t spatial_dimension, Dim_t nb_quad_pts, const Dim_t & nb_nodal_pts,
-      const DynCcoord_t & nb_subdomain_grid_pts,
+      Index_t spatial_dimension, Index_t nb_quad_pts,
+      const Index_t & nb_nodal_pts, const DynCcoord_t & nb_subdomain_grid_pts,
       const DynCcoord_t & subdomain_locations, const DynCcoord_t & strides)
       : Parent{ValidityDomain::Global, spatial_dimension, nb_quad_pts,
                nb_nodal_pts} {
@@ -65,16 +65,16 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  void GlobalFieldCollection::initialise(
-      const DynCcoord_t & nb_subdomain_grid_pts,
-      const DynCcoord_t & subdomain_locations,
-      const DynCcoord_t & strides) {
+  void
+  GlobalFieldCollection::initialise(const DynCcoord_t & nb_subdomain_grid_pts,
+                                    const DynCcoord_t & subdomain_locations,
+                                    const DynCcoord_t & strides) {
     if (this->initialised) {
       throw FieldCollectionError("double initialisation");
     }
 
-    this->pixels = CcoordOps::DynamicPixels(
-            nb_subdomain_grid_pts, subdomain_locations, strides);
+    this->pixels = CcoordOps::DynamicPixels(nb_subdomain_grid_pts,
+                                            subdomain_locations, strides);
     this->nb_pixels = CcoordOps::get_size(nb_subdomain_grid_pts);
     this->allocate_fields();
     this->pixel_indices.resize(this->nb_pixels);
@@ -87,15 +87,15 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  void GlobalFieldCollection::initialise(
-          const DynCcoord_t & nb_subdomain_grid_pts,
-          const DynCcoord_t & subdomain_locations) {
+  void
+  GlobalFieldCollection::initialise(const DynCcoord_t & nb_subdomain_grid_pts,
+                                    const DynCcoord_t & subdomain_locations) {
     this->initialise(
         nb_subdomain_grid_pts,
         ((subdomain_locations.get_dim() == 0)
-            ? DynCcoord_t(nb_subdomain_grid_pts.get_dim())
-            : subdomain_locations),
-         muGrid::CcoordOps::get_default_strides(nb_subdomain_grid_pts));
+             ? DynCcoord_t(nb_subdomain_grid_pts.get_dim())
+             : subdomain_locations),
+        muGrid::CcoordOps::get_default_strides(nb_subdomain_grid_pts));
   }
 
   /* ---------------------------------------------------------------------- */
@@ -113,9 +113,8 @@ namespace muGrid {
     GlobalFieldCollection ret_val{this->get_spatial_dim(),
                                   this->get_nb_quad_pts(),
                                   this->get_nb_nodal_pts()};
-    ret_val.initialise(
-            this->pixels.get_nb_subdomain_grid_pts(),
-            this->pixels.get_subdomain_locations());
+    ret_val.initialise(this->pixels.get_nb_subdomain_grid_pts(),
+                       this->pixels.get_subdomain_locations());
     return ret_val;
   }
 

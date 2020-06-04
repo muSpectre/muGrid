@@ -39,7 +39,7 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
+  template <Index_t DimS>
   ProjectionSmallStrain<DimS>::ProjectionSmallStrain(
       muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths,
       Gradient_t gradient)
@@ -54,7 +54,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
+  template <Index_t DimS>
   ProjectionSmallStrain<DimS>::ProjectionSmallStrain(
       muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths)
       : ProjectionSmallStrain{std::move(engine), lengths,
@@ -62,7 +62,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
+  template <Index_t DimS>
   void
   ProjectionSmallStrain<DimS>::initialise(const muFFT::FFT_PlanFlags & flags) {
     using muGrid::get;
@@ -101,7 +101,7 @@ namespace muSpectre {
     }
   }
 
-  template <Dim_t DimS>
+  template <Index_t DimS>
   std::unique_ptr<ProjectionBase> ProjectionSmallStrain<DimS>::clone() const {
     return std::make_unique<ProjectionSmallStrain>(
         this->get_fft_engine().clone(), this->get_domain_lengths(),

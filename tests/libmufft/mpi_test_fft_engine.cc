@@ -179,7 +179,7 @@ namespace muFFT {
     cmap_t complex_map(complex_field);
     BOOST_TEST_CHECKPOINT("reached3");
     if (Fix::engine.get_subdomain_locations() ==
-        muGrid::CcoordOps::get_cube<Fix::sdim>(0)) {
+        muGrid::CcoordOps::get_cube<Fix::sdim>(Index_t{0})) {
       // Check that 0,0 location has no imaginary part.
       Real error = complex_map[0].imag().norm();
       BOOST_CHECK_LT(error, tol);

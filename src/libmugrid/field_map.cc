@@ -68,12 +68,12 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T, Mapping Mutability>
-  FieldMap<T, Mutability>::FieldMap(Field_t & field, Dim_t nb_rows_)
+  FieldMap<T, Mutability>::FieldMap(Field_t & field, Index_t nb_rows_)
       : FieldMap{field, nb_rows_, field.get_sub_division()} {}
 
   /* ---------------------------------------------------------------------- */
   template <typename T, Mapping Mutability>
-  FieldMap<T, Mutability>::FieldMap(Field_t & field, Dim_t nb_rows_,
+  FieldMap<T, Mutability>::FieldMap(Field_t & field, Index_t nb_rows_,
                                     const PixelSubDiv & iter_type)
       : field{field}, iteration{iter_type}, stride{this->field.get_stride(
                                                 iter_type)},

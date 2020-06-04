@@ -42,7 +42,7 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
+  template <Index_t DimS>
   ProjectionApproxGreenOperator<DimS>::ProjectionApproxGreenOperator(
       muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths,
       const Eigen::Ref<Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>> &
@@ -66,7 +66,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
+  template <Index_t DimS>
   ProjectionApproxGreenOperator<DimS>::ProjectionApproxGreenOperator(
       muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths,
       const Eigen::Ref<Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>> &
@@ -76,14 +76,14 @@ namespace muSpectre {
             muFFT::make_fourier_gradient(lengths.get_dim())} {}
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
+  template <Index_t DimS>
   void ProjectionApproxGreenOperator<DimS>::initialise(
       const muFFT::FFT_PlanFlags & flags) {
     Parent::initialise(flags);
     ProjectionApproxGreenOperator<DimS>::reinitialise(this->C_ref);
   }
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
+  template <Index_t DimS>
   void ProjectionApproxGreenOperator<DimS>::reinitialise(
       const Eigen::Ref<Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>> &
           C_ref_new) {
@@ -137,7 +137,7 @@ namespace muSpectre {
     }
   }
 
-  template <Dim_t DimS>
+  template <Index_t DimS>
   std::unique_ptr<ProjectionBase>
   ProjectionApproxGreenOperator<DimS>::clone() const {
     return std::make_unique<ProjectionApproxGreenOperator>(

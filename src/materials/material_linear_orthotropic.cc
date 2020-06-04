@@ -40,14 +40,14 @@
 
 namespace muSpectre {
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   MaterialLinearOrthotropic<DimM>::MaterialLinearOrthotropic(
-      const std::string & name, const Dim_t & spatial_dimension,
-      const Dim_t & nb_quad_pts, const std::vector<Real> & input)
+      const std::string & name, const Index_t & spatial_dimension,
+      const Index_t & nb_quad_pts, const std::vector<Real> & input)
       : Parent{name, spatial_dimension, nb_quad_pts, input_c_maker(input)} {}
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   MaterialLinearOrthotropic<DimM> &
   MaterialLinearOrthotropic<DimM>::make(Cell & cell, const std::string & name,
                                         const std::vector<Real> & input) {
@@ -59,11 +59,11 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   std::vector<Real> MaterialLinearOrthotropic<DimM>::input_c_maker(
       const std::vector<Real> & input) {
-    std::array<Dim_t, 2> constexpr input_size{4, 9};
-    std::array<Dim_t, 2> constexpr output_size{6, 21};
+    std::array<Index_t, 2> constexpr input_size{4, 9};
+    std::array<Index_t, 2> constexpr output_size{6, 21};
     std::vector<Real> retval{};
     // in case the length of the input is inconsistnent:
     if (input.size() != size_t(input_size[DimM - 2])) {
@@ -72,9 +72,9 @@ namespace muSpectre {
               << std::endl;
       throw std::runtime_error(err_str.str());
     }
-    Dim_t S{output_size[DimM - 2]};
-    Dim_t counter{0};
-    for (Dim_t i = 0; i < S; ++i) {
+    Index_t S{output_size[DimM - 2]};
+    Index_t counter{0};
+    for (Index_t i = 0; i < S; ++i) {
       if (this->ret_flag[i]) {
         retval.push_back(input[counter]);
         counter++;

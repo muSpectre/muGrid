@@ -49,20 +49,21 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   /* ---------------------------------------------------------------------- */
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim, Formulation Form>
+  template <Index_t Dim, Formulation Form>
   auto LamHomogen<Dim, Form>::laminate_solver(
       const Eigen::Ref<Strain_t> & strain_coord,
       const Function_t & mat_1_stress_eval,
       const Function_t & mat_2_stress_eval, const Real & ratio,
       const Eigen::Ref<Vec_t> & normal_vec, const Real & tol,
-      const Dim_t & max_iter) -> std::tuple<Dim_t, Real, Strain_t, Strain_t> {
+      const Index_t & max_iter)
+      -> std::tuple<Index_t, Real, Strain_t, Strain_t> {
     /*
      * here we rotate the strain such that the laminate intersection normal
      * would align with the x-axis. strain_lam is the total strain in the new
      * coordinates.
      */
     Real del_energy;
-    Dim_t iter{0};
+    Index_t iter{0};
     RotatorNormal<Dim> rotator(normal_vec);
 
     Strain_t strain_1{strain_coord}, strain_2{strain_coord};
@@ -141,13 +142,13 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim, Formulation Form>
+  template <Index_t Dim, Formulation Form>
   auto LamHomogen<Dim, Form>::evaluate_stress(
       const Eigen::Ref<Strain_t> & strain_coord,
       const Function_t & mat_1_stress_eval,
       const Function_t & mat_2_stress_eval, const Real & ratio,
       const Eigen::Ref<Vec_t> & normal_vec, const Real & tol,
-      const Dim_t & max_iter) -> Stress_t {
+      const Index_t & max_iter) -> Stress_t {
     RotatorNormal<Dim> rotator(normal_vec);
     // Using laminate solve to find out the strains in each layer of the
     // lamiante
@@ -171,13 +172,13 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim, Formulation Form>
+  template <Index_t Dim, Formulation Form>
   auto LamHomogen<Dim, Form>::evaluate_stress_tangent(
       const Eigen::Ref<Strain_t> & strain_coord,
       const Function_t & mat_1_stress_eval,
       const Function_t & mat_2_stress_eval, const Real & ratio,
       const Eigen::Ref<Vec_t> & normal_vec, const Real & tol,
-      const Dim_t & max_iter) -> std::tuple<Stress_t, Stiffness_t> {
+      const Index_t & max_iter) -> std::tuple<Stress_t, Stiffness_t> {
     RotatorNormal<Dim> rotator(normal_vec);
     // Using laminate solve to find out the strains in each layer of the
     // lamiante
@@ -217,7 +218,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim, Formulation Form>
+  template <Index_t Dim, Formulation Form>
   template <class Derived1, class Derived2>
   auto LamHomogen<Dim, Form>::make_total_strain(
       const Eigen::MatrixBase<Derived1> & E_eq,
@@ -244,7 +245,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim, Formulation Form>
+  template <Index_t Dim, Formulation Form>
   template <class Derived>
   auto LamHomogen<Dim, Form>::get_equation_stiffness(
       const Eigen::MatrixBase<Derived> & C) -> Equation_stiffness_t {
@@ -303,7 +304,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   // this function recieves the strain in general corrdinate and returns ths
   // delta_stress and the jacobian in rotated coordinates
-  template <Dim_t Dim, Formulation Form>
+  template <Index_t Dim, Formulation Form>
   template <class Derived1, class Derived2>
   auto LamHomogen<Dim, Form>::delta_equation_stress_stiffness_eval(
       const Function_t & mat_1_stress_eval,
@@ -349,7 +350,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim, Formulation Form>
+  template <Index_t Dim, Formulation Form>
   template <class Derived1, class Derived2>
   auto LamHomogen<Dim, Form>::delta_equation_stress_stiffness_eval_strain_1(
       const Function_t & mat_1_stress_eval,
@@ -394,7 +395,7 @@ namespace muSpectre {
    *transform stress to PK2 in order to be able to use it
    */
 
-  template <Dim_t Dim, Formulation Form>
+  template <Index_t Dim, Formulation Form>
   template <class Derived1, class Derived2>
   auto LamHomogen<Dim, Form>::lam_stress_combine(
       const Eigen::MatrixBase<Derived1> & stress_1,
@@ -403,7 +404,7 @@ namespace muSpectre {
     return LamCombination<Dim>::lam_S_combine(stress_1, stress_2, ratio);
   }
 
-  template <Dim_t Dim, Formulation Form>
+  template <Index_t Dim, Formulation Form>
   auto LamHomogen<Dim, Form>::lam_stiffness_combine(
       const Eigen::Ref<Stiffness_t> & stiffness_1,
       const Eigen::Ref<Stiffness_t> & stiffness_2, const Real & ratio,

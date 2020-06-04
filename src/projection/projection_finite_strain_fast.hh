@@ -53,7 +53,7 @@ namespace muSpectre {
    * have a very good reason not to (and tell me (author) about it,
    * I'd be interested to hear it).
    */
-  template <Dim_t DimS, Dim_t NbQuadPts = OneQuadPt>
+  template <Index_t DimS, Index_t NbQuadPts = OneQuadPt>
   class ProjectionFiniteStrainFast : public ProjectionBase {
    public:
     using Parent = ProjectionBase;  //!< base class
@@ -122,13 +122,13 @@ namespace muSpectre {
      * material_dim matrices, but in symmetriy storage, it is a column
      * vector)
      */
-    std::array<Dim_t, 2> get_strain_shape() const final;
+    std::array<Index_t, 2> get_strain_shape() const final;
 
     //! get number of components to project per pixel
-    constexpr static Dim_t NbComponents() { return DimS * DimS * NbQuadPts; }
+    constexpr static Index_t NbComponents() { return DimS * DimS * NbQuadPts; }
 
     //! get number of components to project per pixel
-    virtual Dim_t get_nb_dof_per_pixel() const { return NbComponents(); }
+    virtual Index_t get_nb_dof_per_pixel() const { return NbComponents(); }
 
     //! perform a deep copy of the projector (this should never be necessary in
     //! c++)

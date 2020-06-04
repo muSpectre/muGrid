@@ -110,7 +110,7 @@ namespace muSpectre {
     bool is_initialised() const;
 
     //! returns the number of degrees of freedom in the cell
-    Dim_t get_nb_dof() const;
+    Index_t get_nb_dof() const;
 
     //! number of pixels on this processor
     size_t get_nb_pixels() const;
@@ -126,7 +126,7 @@ namespace muSpectre {
     /**
      * returns the material dimension of the problem
      */
-    Dim_t get_material_dim() const;
+    Index_t get_material_dim() const;
 
     /**
      * set uniform strain (typically used to initialise problems
@@ -154,7 +154,7 @@ namespace muSpectre {
         MaterialBase & mat_laminate, MaterialBase & mat_precipitate_cell,
         Material_sptr mat_precipitate, Material_sptr mat_matrix);
 
-    template <Dim_t Dim>
+    template <Index_t Dim>
     void make_pixels_precipitate_for_laminate_material_helper(
         const std::vector<DynRcoord_t> & precipitate_vertices,
         MaterialBase & mat_laminate, MaterialBase & mat_precipitate_cell,
@@ -174,7 +174,7 @@ namespace muSpectre {
      * material_dim matrices, but in symmetric storage, it is a column
      * vector)
      */
-    std::array<Dim_t, 2> get_strain_shape() const;
+    std::array<Index_t, 2> get_strain_shape() const;
 
     /**
      * returns the number of components for the strain matrix type
@@ -182,16 +182,16 @@ namespace muSpectre {
      * material_dim matrices, but in symmetric storage, it is a column
      * vector)
      */
-    Dim_t get_strain_size() const;
+    Index_t get_strain_size() const;
 
     //! return the spatial dimension of the discretisation grid
-    const Dim_t & get_spatial_dim() const;
+    const Index_t & get_spatial_dim() const;
 
     //! return the number of quadrature points stored per pixel
-    const Dim_t & get_nb_quad_pts() const;
+    const Index_t & get_nb_quad_pts() const;
 
     //! return the number of nodal points stored per pixel
-    const Dim_t & get_nb_nodal_pts() const;
+    const Index_t & get_nb_nodal_pts() const;
 
     //! makes sure every pixel has been assigned to exactly one material
     virtual void check_material_coverage() const;
@@ -388,7 +388,7 @@ namespace muSpectre {
 
    protected:
     //! statically dimensioned worker for evaluating the tangent operator
-    template <Dim_t DimM>
+    template <Index_t DimM>
     static void apply_directional_stiffness(
         const muGrid::TypedFieldBase<Real> & delta_strain,
         const muGrid::TypedFieldBase<Real> & tangent,
@@ -398,7 +398,7 @@ namespace muSpectre {
      * statically dimensioned worker for evaluating the incremental tangent
      * operator
      */
-    template <Dim_t DimM>
+    template <Index_t DimM>
     static void add_projected_directional_stiffness_helper(
         const muGrid::TypedFieldBase<Real> & delta_strain,
         const muGrid::TypedFieldBase<Real> & tangent, const Real & alpha,

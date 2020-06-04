@@ -58,13 +58,13 @@
 #include <libmugrid/mapped_state_field.hh>
 
 namespace muSpectre {
-  template <Dim_t DimM>
+  template <Index_t DimM>
   class MaterialViscoElasticDamageSS;
 
   /**
    * traits for objective linear visco_elasticity
    */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   struct MaterialMuSpectre_traits<MaterialViscoElasticDamageSS<DimM>> {
     //! expected map type for strain fields
     using StrainMap_t =
@@ -87,7 +87,7 @@ namespace muSpectre {
    * implements objective linear visco_elasticity
    */
 
-  template <Dim_t DimM>
+  template <Index_t DimM>
   class MaterialViscoElasticDamageSS
       : public MaterialMuSpectre<MaterialViscoElasticDamageSS<DimM>, DimM> {
    public:
@@ -130,8 +130,8 @@ namespace muSpectre {
 
     //! Construct by name, Young's modulus and Poisson's ratio
     MaterialViscoElasticDamageSS(const std::string & name,
-                                 const Dim_t & spatial_dimension,
-                                 const Dim_t & nb_quad_pts,
+                                 const Index_t & spatial_dimension,
+                                 const Index_t & nb_quad_pts,
                                  const Real & young_inf, const Real & young_v,
                                  const Real & eta_v, const Real & poisson,
                                  const Real & kappa_init, const Real & alpha,
@@ -247,7 +247,7 @@ namespace muSpectre {
   };                   // namespace muSpectre
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   template <class Derived>
   decltype(auto) MaterialViscoElasticDamageSS<DimM>::evaluate_stress(
       const Eigen::MatrixBase<Derived> & E, const size_t & quad_pt_index) {
@@ -258,7 +258,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   template <class Derived>
   decltype(auto) MaterialViscoElasticDamageSS<DimM>::evaluate_stress_tangent(
       const Eigen::MatrixBase<Derived> & E, const size_t & quad_pt_index) {

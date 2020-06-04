@@ -382,7 +382,7 @@ namespace muGrid {
       }
 
       //! return the nb of components of the iterate (known at compile time)
-      constexpr static Dim_t stride() { return PlainType::SizeAtCompileTime; }
+      constexpr static Index_t stride() { return PlainType::SizeAtCompileTime; }
 
       //! return the iterate's shape as text, mostly for error messages
       static_assert(stride() > 0,
@@ -393,7 +393,7 @@ namespace muGrid {
                      << PlainType::ColsAtCompileTime;
         return shape_stream.str();
       }
-      constexpr static Dim_t NbRow() { return PlainType::RowsAtCompileTime; }
+      constexpr static Index_t NbRow() { return PlainType::RowsAtCompileTime; }
     };
 
     /**
@@ -485,11 +485,11 @@ namespace muGrid {
       }
 
       //! return the nb of components of the iterate (known at compile time)
-      constexpr static Dim_t stride() { return 1; }
+      constexpr static Index_t stride() { return 1; }
 
       //! return the iterate's shape as text, mostly for error messages
       static std::string shape() { return "scalar"; }
-      constexpr static Dim_t NbRow() { return 1; }
+      constexpr static Index_t NbRow() { return 1; }
     };
 
   }  // namespace internal

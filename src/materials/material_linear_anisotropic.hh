@@ -50,11 +50,11 @@
 
 namespace muSpectre {
 
-  template <Dim_t DimM>
+  template <Index_t DimM>
   class MaterialLinearAnisotropic;
 
   // traits for anisotropic material
-  template <Dim_t DimM>
+  template <Index_t DimM>
   struct MaterialMuSpectre_traits<MaterialLinearAnisotropic<DimM>> {
     //! expected map type for strain fields
     using StrainMap_t =
@@ -75,7 +75,7 @@ namespace muSpectre {
   /**
    * Material implementation for anisotropic constitutive law
    */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   class MaterialLinearAnisotropic
       : public MaterialMuSpectre<MaterialLinearAnisotropic<DimM>, DimM> {
    public:
@@ -99,8 +99,8 @@ namespace muSpectre {
     // a std::vector is utilized as the input of the constructor to
     // enable us to check its length so to prevent user mistake
     MaterialLinearAnisotropic(const std::string & name,
-                              const Dim_t & spatial_dimension,
-                              const Dim_t & nb_quad_pts,
+                              const Index_t & spatial_dimension,
+                              const Index_t & nb_quad_pts,
                               const std::vector<Real> & input_c);
 
     //! Copy constructor
@@ -141,7 +141,7 @@ namespace muSpectre {
   };
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   template <class s_t>
   auto MaterialLinearAnisotropic<DimM>::evaluate_stress(s_t && E)
       -> decltype(auto) {
@@ -149,7 +149,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   template <class s_t>
   auto MaterialLinearAnisotropic<DimM>::evaluate_stress_tangent(s_t && E)
       -> decltype(auto) {
@@ -157,7 +157,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   template <class s_t>
   auto MaterialLinearAnisotropic<DimM>::evaluate_stress(s_t && E, const size_t &
                                                         /*pixel_index*/)
@@ -166,7 +166,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   template <class s_t>
   auto MaterialLinearAnisotropic<DimM>::evaluate_stress_tangent(s_t && E,
                                                                 const size_t &

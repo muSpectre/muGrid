@@ -38,10 +38,10 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   MaterialLinearElasticGeneric2<DimM>::MaterialLinearElasticGeneric2(
-      const std::string & name, const Dim_t & spatial_dimension,
-      const Dim_t & nb_quad_pts, const CInput_t & C_voigt)
+      const std::string & name, const Index_t & spatial_dimension,
+      const Index_t & nb_quad_pts, const CInput_t & C_voigt)
       : Parent{name, spatial_dimension, nb_quad_pts}, worker{name,
                                                              spatial_dimension,
                                                              nb_quad_pts,
@@ -52,7 +52,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   void
   MaterialLinearElasticGeneric2<DimM>::add_pixel(const size_t & /*pixel*/) {
     throw muGrid::RuntimeError(
@@ -60,7 +60,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   void
   MaterialLinearElasticGeneric2<DimM>::add_pixel(const size_t & pixel_index,
                                                  const StrainTensor & E_eig) {

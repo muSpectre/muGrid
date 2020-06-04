@@ -45,10 +45,10 @@ using namespace muSpectre;
 using namespace muGrid;
 
 int main() {
-  constexpr Dim_t Dim{3};
-  DynCcoord_t N{CcoordOps::get_cube<Dim>(11)};
+  constexpr Index_t Dim{3};
+  DynCcoord_t N{CcoordOps::get_cube<Dim>(Index_t{11})};
   DynRcoord_t lens{CcoordOps::get_cube<Dim>(1.)};
-  constexpr Dim_t incl_size{3};
+  constexpr Index_t incl_size{3};
 
   auto cell{make_cell(N, lens, Formulation::finite_strain)};
 
@@ -70,7 +70,7 @@ int main() {
   std::cout << hard.size() << " pixels in the inclusion" << std::endl;
   cell.initialise();
   constexpr Real cg_tol{1e-8}, newton_tol{1e-5}, equil_tol{1e-8};
-  constexpr Dim_t maxiter{200};
+  constexpr Index_t maxiter{200};
   constexpr Verbosity verbose{Verbosity::Some};
 
   Eigen::MatrixXd dF_bar{Eigen::MatrixXd::Zero(Dim, Dim)};

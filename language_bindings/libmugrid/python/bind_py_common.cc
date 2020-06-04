@@ -42,7 +42,7 @@
 #include "libmugrid/ccoord_operations.hh"
 #include "libmugrid/units.hh"
 
-using muGrid::Dim_t;
+using muGrid::Index_t;
 using muGrid::DynCcoord;
 using muGrid::Real;
 using muGrid::threeD;
@@ -66,14 +66,14 @@ void add_enums(py::module & mod) {
       .value("Full", Verbosity::Full);
 }
 
-template <size_t MaxDim, typename T = Dim_t>
+template <size_t MaxDim, typename T = Index_t>
 void add_dyn_ccoord_helper(py::module & mod, std::string name) {
   py::class_<DynCcoord<MaxDim, T>>(mod, name.c_str())
       .def(py::init<const std::vector<T>>())
-      .def(py::init<Dim_t>())
+      .def(py::init<Index_t>())
       .def("__len__", &DynCcoord<MaxDim, T>::get_dim)
       .def("__getitem__", [](const DynCcoord<MaxDim, T> & self,
-                             const Dim_t & index) {
+                             const Index_t & index) {
         if (index < 0 || index >= self.get_dim()) {
           std::stringstream s;
           s << "index " << index << " out of range 0.." << self.get_dim() - 1;
@@ -85,7 +85,7 @@ void add_dyn_ccoord_helper(py::module & mod, std::string name) {
   py::implicitly_convertible<py::tuple, DynCcoord<MaxDim, T>>();
 }
 
-template <Dim_t dim, typename T>
+template <Index_t dim, typename T>
 void add_get_cube_helper(py::module & mod) {
   std::stringstream name{};
   name << "get_" << dim << "d_cube";
@@ -93,12 +93,12 @@ void add_get_cube_helper(py::module & mod) {
           "return a Ccoord with the value 'size' repeated in each dimension");
 }
 
-template <Dim_t dim>
+template <Index_t dim>
 void add_get_ccoord_helper(py::module & mod) {
   using Ccoord = muGrid::Ccoord_t<dim>;
   mod.def(
       "get_domain_ccoord",
-      [](Ccoord nb_grid_pts, Dim_t index) {
+      [](Ccoord nb_grid_pts, Index_t index) {
         return muGrid::CcoordOps::get_ccoord<dim>(nb_grid_pts, Ccoord{}, index);
       },
       "nb_grid_pts"_a, "i"_a,
@@ -107,11 +107,11 @@ void add_get_ccoord_helper(py::module & mod) {
 }
 
 void add_get_cube(py::module & mod) {
-  add_get_cube_helper<muGrid::oneD, Dim_t>(mod);
+  add_get_cube_helper<muGrid::oneD, Index_t>(mod);
   add_get_cube_helper<muGrid::oneD, muGrid::Real>(mod);
-  add_get_cube_helper<muGrid::twoD, Dim_t>(mod);
+  add_get_cube_helper<muGrid::twoD, Index_t>(mod);
   add_get_cube_helper<muGrid::twoD, muGrid::Real>(mod);
-  add_get_cube_helper<muGrid::threeD, Dim_t>(mod);
+  add_get_cube_helper<muGrid::threeD, Index_t>(mod);
   add_get_cube_helper<muGrid::threeD, muGrid::Real>(mod);
 
   add_get_ccoord_helper<muGrid::oneD>(mod);
@@ -119,7 +119,7 @@ void add_get_cube(py::module & mod) {
   add_get_ccoord_helper<muGrid::threeD>(mod);
 }
 
-template <Dim_t dim>
+template <Index_t dim>
 void add_get_index_helper(py::module & mod) {
   using Ccoord = muGrid::Ccoord_t<dim>;
   mod.def(
@@ -138,7 +138,7 @@ void add_get_index(py::module & mod) {
   add_get_index_helper<muGrid::threeD>(mod);
 }
 
-template <Dim_t dim>
+template <Index_t dim>
 void add_Pixels_helper(py::module & mod) {
   std::stringstream name{};
   name << "Pixels" << dim << "d";
@@ -181,7 +181,7 @@ void add_unit(py::module & mod) {
 void add_common(py::module & mod) {
   add_enums(mod);
 
-  add_dyn_ccoord_helper<threeD, Dim_t>(mod, "DynCcoord");
+  add_dyn_ccoord_helper<threeD, Index_t>(mod, "DynCcoord");
   add_dyn_ccoord_helper<threeD, Real>(mod, "DynRcoord");
 
   add_get_cube(mod);

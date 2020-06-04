@@ -41,12 +41,12 @@
 
 namespace muSpectre {
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t NbQuadPts>
+  template <Index_t DimS, Index_t NbQuadPts>
   ProjectionFiniteStrainFast<DimS, NbQuadPts>::ProjectionFiniteStrainFast(
       muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths,
       const Gradient_t & gradient)
       : Parent{std::move(engine), lengths,
-               static_cast<Dim_t>(gradient.size())/lengths.get_dim(),
+               static_cast<Index_t>(gradient.size())/lengths.get_dim(),
                DimS*DimS,
                Formulation::finite_strain},
         xi_field{"Projection Operator", this->projection_container},
@@ -66,7 +66,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t NbQuadPts>
+  template <Index_t DimS, Index_t NbQuadPts>
   ProjectionFiniteStrainFast<DimS, NbQuadPts>::ProjectionFiniteStrainFast(
       muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths)
       : ProjectionFiniteStrainFast{
@@ -79,7 +79,7 @@ namespace muSpectre {
           }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t NbQuadPts>
+  template <Index_t DimS, Index_t NbQuadPts>
   void ProjectionFiniteStrainFast<DimS, NbQuadPts>::initialise(
       const muFFT::FFT_PlanFlags & flags) {
     Parent::initialise(flags);
@@ -105,9 +105,9 @@ namespace muSpectre {
           (fft_freqs.get_xi(ccoord).array() /
            eigen(Ccoord(nb_domain_grid_pts)).template cast<Real>().array())
               .matrix()};
-      for (Dim_t quad = 0; quad < NbQuadPts; ++quad) {
-        for (Dim_t dim = 0; dim < DimS; ++dim) {
-          Dim_t i = quad * DimS + dim;
+      for (Index_t quad = 0; quad < NbQuadPts; ++quad) {
+        for (Index_t dim = 0; dim < DimS; ++dim) {
+          Index_t i = quad * DimS + dim;
           xi[i] = this->gradient[i]->fourier(phase) / grid_spacing[dim];
         }
       }
@@ -126,7 +126,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t NbQuadPts>
+  template <Index_t DimS, Index_t NbQuadPts>
   void ProjectionFiniteStrainFast<DimS, NbQuadPts>::apply_projection(
       Field_t & field) {
     // Storage order of gradient fields: We want to be able to iterate over a
@@ -149,27 +149,27 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t NbQuadPts>
+  template <Index_t DimS, Index_t NbQuadPts>
   Eigen::Map<MatrixXXc>
   ProjectionFiniteStrainFast<DimS, NbQuadPts>::get_operator() {
     return this->xi_field.get_field().eigen_pixel();
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t NbQuadPts>
+  template <Index_t DimS, Index_t NbQuadPts>
   const muFFT::Gradient_t &
   ProjectionFiniteStrainFast<DimS, NbQuadPts>::get_gradient() const {
     return this->gradient;
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS, Dim_t NbQuadPts>
-  std::array<Dim_t, 2>
+  template <Index_t DimS, Index_t NbQuadPts>
+  std::array<Index_t, 2>
   ProjectionFiniteStrainFast<DimS, NbQuadPts>::get_strain_shape() const {
-    return std::array<Dim_t, 2>{DimS, DimS * OneQuadPt};
+    return std::array<Index_t, 2>{DimS, DimS * OneQuadPt};
   }
 
-  template <Dim_t DimS, Dim_t NbQuadPts>
+  template <Index_t DimS, Index_t NbQuadPts>
   std::unique_ptr<ProjectionBase>
   ProjectionFiniteStrainFast<DimS, NbQuadPts>::clone() const {
     return std::make_unique<ProjectionFiniteStrainFast>(

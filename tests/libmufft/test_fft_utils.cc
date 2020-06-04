@@ -46,10 +46,10 @@ namespace muFFT {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_hermitian, Fix, dimlist, Fix) {
     constexpr auto dim{Fix::dim};
     using Ccoord = Ccoord_t<dim>;
-    constexpr Dim_t size{5};
+    constexpr Index_t size{5};
 
-    constexpr Ccoord cube = muGrid::CcoordOps::get_cube<dim>(size);
-    constexpr Ccoord herm = get_nb_hermitian_grid_pts(cube);
+    constexpr Ccoord cube{muGrid::CcoordOps::get_cube<dim>(size)};
+    constexpr Ccoord herm{get_nb_hermitian_grid_pts(cube)};
     Ccoord ref_cube = cube;
     ref_cube.front() = (cube.front() + 1) / 2;
 

@@ -76,9 +76,9 @@ namespace muGrid {
      * Protected constructor
      */
     StateField(const std::string & unique_prefix, FieldCollection & collection,
-               const Dim_t & nb_memory, const Dim_t & nb_dof_per_sub_pt,
+               const Index_t & nb_memory, const Index_t & nb_dof_per_sub_pt,
                const PixelSubDiv & sub_division, const Unit & unit,
-               const Dim_t & nb_sub_pts);
+               const Index_t & nb_sub_pts);
 
    public:
     //! Default constructor
@@ -102,7 +102,7 @@ namespace muGrid {
     /**
      * returns number of old states that are stored
      */
-    const Dim_t & get_nb_memory() const;
+    const Index_t & get_nb_memory() const;
 
     //! return type_id of stored type
     virtual const std::type_info & get_stored_typeid() const = 0;
@@ -142,14 +142,14 @@ namespace muGrid {
     /**
      * number of old states to store, defaults to 1
      */
-    const Dim_t nb_memory;
+    const Index_t nb_memory;
 
     /**
      * number of dof_per_sub_pt stored per sub-point (e.g., 3 for a
      * three-dimensional vector, or 9 for a three-dimensional second-rank
      * tensor)
      */
-    const Dim_t nb_dof_per_sub_pt;
+    const Index_t nb_dof_per_sub_pt;
 
     /**
      * Pixel subdivision kind (determines how many datapoints to store per
@@ -163,7 +163,7 @@ namespace muGrid {
     /**
      * number of pixel subdivisions. Will depend on sub_division
      */
-    Dim_t nb_sub_pts;
+    Index_t nb_sub_pts;
 
     //! the current (historically accurate) ordering of the fields
     std::vector<size_t> indices{};
@@ -190,10 +190,10 @@ namespace muGrid {
      * `complex`) factory functions.
      */
     TypedStateField(const std::string & unique_prefix,
-                    FieldCollection & collection, const Dim_t & nb_memory,
-                    const Dim_t & nb_dof_per_sub_pt,
+                    FieldCollection & collection, const Index_t & nb_memory,
+                    const Index_t & nb_dof_per_sub_pt,
                     const PixelSubDiv & sub_division, const Unit & unit,
-                    const Dim_t & nb_sub_pts);
+                    const Index_t & nb_sub_pts);
 
    public:
     //! base class

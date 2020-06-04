@@ -80,7 +80,7 @@ namespace muSpectre {
   bool Cell::is_initialised() const { return this->initialised; }
 
   /* ---------------------------------------------------------------------- */
-  Dim_t Cell::get_nb_dof() const {
+  Index_t Cell::get_nb_dof() const {
     const auto & strain_shape{this->get_strain_shape()};
     return this->get_nb_pixels() * this->get_nb_quad_pts() * strain_shape[0] *
            strain_shape[1];
@@ -100,7 +100,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  Dim_t Cell::get_material_dim() const { return this->get_spatial_dim(); }
+  Index_t Cell::get_material_dim() const { return this->get_spatial_dim(); }
 
   /* ---------------------------------------------------------------------- */
   void
@@ -108,7 +108,7 @@ namespace muSpectre {
     if (not this->initialised) {
       this->initialise();
     }
-    Dim_t && dim{this->get_material_dim()};
+    Index_t && dim{this->get_material_dim()};
     muGrid::FieldMap<Real, Mapping::Mut>(this->strain, dim) = uniform_strain;
   }
 
@@ -157,15 +157,15 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  std::array<Dim_t, 2> Cell::get_strain_shape() const {
+  std::array<Index_t, 2> Cell::get_strain_shape() const {
     switch (this->get_formulation()) {
     case Formulation::finite_strain: {
-      return std::array<Dim_t, 2>{this->get_material_dim(),
+      return std::array<Index_t, 2>{this->get_material_dim(),
                                   this->get_material_dim()};
       break;
     }
     case Formulation::small_strain: {
-      return std::array<Dim_t, 2>{this->get_material_dim(),
+      return std::array<Index_t, 2>{this->get_material_dim(),
                                   this->get_material_dim()};
       break;
     }
@@ -176,23 +176,23 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  Dim_t Cell::get_strain_size() const {
+  Index_t Cell::get_strain_size() const {
     auto && shape{this->get_strain_shape()};
     return shape[0] * shape[1];
   }
 
   /* ---------------------------------------------------------------------- */
-  const Dim_t & Cell::get_spatial_dim() const {
+  const Index_t & Cell::get_spatial_dim() const {
     return this->projection->get_dim();
   }
 
   /* ---------------------------------------------------------------------- */
-  const Dim_t & Cell::get_nb_quad_pts() const {
+  const Index_t & Cell::get_nb_quad_pts() const {
     return this->projection->get_nb_quad_pts();
   }
 
   /* ---------------------------------------------------------------------- */
-  const Dim_t & Cell::get_nb_nodal_pts() const {
+  const Index_t & Cell::get_nb_nodal_pts() const {
     // this true for Cells only capable of projection-based solution
     return OneNode;
   }
@@ -411,7 +411,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   void Cell::apply_directional_stiffness(
       const muGrid::TypedFieldBase<Real> & delta_strain,
       const muGrid::TypedFieldBase<Real> & tangent,
@@ -483,7 +483,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   void Cell::add_projected_directional_stiffness_helper(
       const muGrid::TypedFieldBase<Real> & delta_strain,
       const muGrid::TypedFieldBase<Real> & tangent, const Real & alpha,
@@ -544,7 +544,7 @@ namespace muSpectre {
   Cell::globalise_internal_field(const std::string & unique_name) {
     // start by checking that the field exists at least once, and that
     // it always has th same number of components
-    std::set<Dim_t> nb_component_categories{};
+    std::set<Index_t> nb_component_categories{};
     std::vector<std::reference_wrapper<const muGrid::Field>> local_fields;
 
     for (auto & mat : this->materials) {
@@ -583,7 +583,7 @@ namespace muSpectre {
       throw RuntimeError(err_str.str());
     }
 
-    const Dim_t nb_components{*nb_component_categories.begin()};
+    const Index_t nb_components{*nb_component_categories.begin()};
 
     // get and prepare the field
     auto & global_field{this->fields->template register_field<T>(
@@ -612,7 +612,7 @@ namespace muSpectre {
                             const size_t & nb_steps_ago) {
     // start by checking that the field exists at least once, and that
     // it always has th same number of components
-    std::set<Dim_t> nb_component_categories{};
+    std::set<Index_t> nb_component_categories{};
     std::vector<std::reference_wrapper<const muGrid::Field>> local_fields_old;
 
     for (auto & mat : this->materials) {
@@ -652,7 +652,7 @@ namespace muSpectre {
       }
       throw RuntimeError(err_str.str());
     }
-    const Dim_t nb_components{*nb_component_categories.begin()};
+    const Index_t nb_components{*nb_component_categories.begin()};
     auto & global_field{this->fields->template register_field<T>(
         unique_name, nb_components, PixelSubDiv::QuadPt)};
     global_field.set_zero();
@@ -678,7 +678,7 @@ namespace muSpectre {
   Cell::globalise_current_field(const std::string & unique_name) {
     // start by checking that the field exists at least once, and that
     // it always has th same number of components
-    std::set<Dim_t> nb_component_categories{};
+    std::set<Index_t> nb_component_categories{};
     std::vector<std::reference_wrapper<const muGrid::Field>>
         local_fields_current;
     for (auto & mat : this->materials) {
@@ -718,7 +718,7 @@ namespace muSpectre {
       }
       throw RuntimeError(err_str.str());
     }
-    const Dim_t nb_components{*nb_component_categories.begin()};
+    const Index_t nb_components{*nb_component_categories.begin()};
     auto & global_field{this->fields->template register_field<T>(
         unique_name, nb_components, PixelSubDiv::QuadPt)};
     global_field.set_zero();
@@ -741,7 +741,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   bool Cell::is_point_inside(const DynRcoord_t & point) const {
     auto length_pixels = this->get_projection().get_domain_lengths();
-    Dim_t counter = 0;
+    Index_t counter = 0;
 
     for (int i = 0; i < this->get_spatial_dim(); i++) {
       if (point[i] <= length_pixels[i]) {
@@ -754,7 +754,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   bool Cell::is_pixel_inside(const DynCcoord_t & pixel) const {
     auto nb_pixels = this->get_projection().get_nb_domain_grid_pts();
-    Dim_t counter = 0;
+    Index_t counter = 0;
     for (int i = 0; i < this->get_spatial_dim(); i++) {
       if (pixel[i] < nb_pixels[i]) {
         counter++;
@@ -801,7 +801,7 @@ namespace muSpectre {
     }
   }
 
-  template <Dim_t Dim>
+  template <Index_t Dim>
   void Cell::make_pixels_precipitate_for_laminate_material_helper(
       const std::vector<DynRcoord_t> & precipitate_vertices,
       MaterialBase & mat_laminate, MaterialBase & mat_precipitate_cell,

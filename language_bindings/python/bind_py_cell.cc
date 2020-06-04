@@ -70,7 +70,7 @@ using muGrid::numpy_wrap;
 using muGrid::NumpyProxy;
 using muSpectre::Ccoord_t;
 using muSpectre::Cell;
-using muSpectre::Dim_t;
+using muSpectre::Index_t;
 using muSpectre::Formulation;
 using muSpectre::Rcoord_t;
 using pybind11::literals::operator""_a;
@@ -221,9 +221,9 @@ void add_cell_helper(py::module & mod) {
                 NumpyT2Proxy(cell, delta_strain, muGrid::PixelSubDiv::QuadPt)};
             cell.evaluate_projected_directional_stiffness(
                 delta_strain_array.get_field(), delta_stress);
-            const Dim_t dim{cell.get_spatial_dim()};
+            const Index_t dim{cell.get_spatial_dim()};
             if (delta_stress.get_nb_dof_per_sub_pt() == dim * dim) {
-              std::vector<Dim_t> shape{dim, dim, 1};
+              std::vector<Index_t> shape{dim, dim, 1};
               return numpy_wrap(delta_stress, shape);
             } else {
               return numpy_wrap(delta_stress);
@@ -252,9 +252,9 @@ void add_cell_helper(py::module & mod) {
                 NumpyT2Proxy(cell, strain, muGrid::PixelSubDiv::QuadPt)
                     .get_field();
             cell.apply_projection(strain_field);
-            const Dim_t dim{cell.get_spatial_dim()};
+            const Index_t dim{cell.get_spatial_dim()};
             if (strain_field.get_nb_dof_per_sub_pt() == dim * dim) {
-              std::vector<Dim_t> shape{dim, dim, 1};
+              std::vector<Index_t> shape{dim, dim, 1};
               return numpy_wrap(strain_field, shape);
             } else {
               return numpy_wrap(strain_field);
@@ -280,9 +280,9 @@ void add_cell_helper(py::module & mod) {
             auto && stress{std::get<0>(stress_tgt)};
             auto && tangent{std::get<1>(stress_tgt)};
 
-            const Dim_t dim{cell.get_spatial_dim()};
+            const Index_t dim{cell.get_spatial_dim()};
             if (stress.get_nb_dof_per_sub_pt() == dim * dim) {
-              std::vector<Dim_t> shape{dim, dim, 1};
+              std::vector<Index_t> shape{dim, dim, 1};
               auto && numpy_stress{numpy_wrap(stress, shape)};
               shape.back() = dim;
               shape.push_back(dim);
@@ -305,9 +305,9 @@ void add_cell_helper(py::module & mod) {
             auto && stress{std::get<0>(stress_tgt)};
             auto && tangent{std::get<1>(stress_tgt)};
 
-            const Dim_t dim{cell.get_spatial_dim()};
+            const Index_t dim{cell.get_spatial_dim()};
             if (stress.get_nb_dof_per_sub_pt() == dim * dim) {
-              std::vector<Dim_t> shape{dim, dim, 1};
+              std::vector<Index_t> shape{dim, dim, 1};
               auto && numpy_stress{numpy_wrap(stress, shape)};
               shape.back() = dim;
               shape.push_back(dim);
@@ -331,9 +331,9 @@ void add_cell_helper(py::module & mod) {
 
             cell.get_strain() = strain_array.get_field();
             auto && stress{cell.evaluate_stress()};
-            const Dim_t dim{cell.get_spatial_dim()};
+            const Index_t dim{cell.get_spatial_dim()};
             if (stress.get_nb_dof_per_sub_pt() == dim * dim) {
-              std::vector<Dim_t> shape{dim, dim, 1};
+              std::vector<Index_t> shape{dim, dim, 1};
               return numpy_wrap(stress, shape);
             } else {
               return numpy_wrap(stress);

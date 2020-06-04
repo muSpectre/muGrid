@@ -45,13 +45,13 @@
 #include <libmugrid/field_map_static.hh>
 
 namespace muSpectre {
-  template <Dim_t DimM>
+  template <Index_t DimM>
   class MaterialLinearElastic1;
 
   /**
    * traits for objective linear elasticity
    */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   struct MaterialMuSpectre_traits<MaterialLinearElastic1<DimM>> {
     //! expected map type for strain fields
     using StrainMap_t =
@@ -73,7 +73,7 @@ namespace muSpectre {
   /**
    * implements objective linear elasticity
    */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   class MaterialLinearElastic1
       : public MaterialMuSpectre<MaterialLinearElastic1<DimM>, DimM> {
    public:
@@ -99,8 +99,8 @@ namespace muSpectre {
 
     //! Construct by name, Young's modulus and Poisson's ratio
     MaterialLinearElastic1(const std::string & name,
-                           const Dim_t & spatial_dimension,
-                           const Dim_t & nb_quad_pts, const Real & young,
+                           const Index_t & spatial_dimension,
+                           const Index_t & nb_quad_pts, const Real & young,
                            const Real & poisson);
 
     //! Move constructor
@@ -160,7 +160,7 @@ namespace muSpectre {
   };
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   template <class Derived>
   decltype(auto) MaterialLinearElastic1<DimM>::evaluate_stress(
       const Eigen::MatrixBase<Derived> & E, const size_t &
@@ -169,7 +169,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   template <class Derived>
   decltype(auto) MaterialLinearElastic1<DimM>::evaluate_stress_tangent(
       const Eigen::MatrixBase<Derived> & E, const size_t &

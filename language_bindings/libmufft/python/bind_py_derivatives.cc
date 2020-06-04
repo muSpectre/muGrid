@@ -42,15 +42,15 @@
 
 #include "libmufft/derivative.hh"
 
-using muGrid::Real;
-using muGrid::Complex;
-using muGrid::Dim_t;
-using muGrid::twoD;
-using muGrid::threeD;
-using muGrid::DynCcoord_t;
 using muFFT::DerivativeBase;
-using muFFT::FourierDerivative;
 using muFFT::DiscreteDerivative;
+using muFFT::FourierDerivative;
+using muGrid::Complex;
+using muGrid::DynCcoord_t;
+using muGrid::Index_t;
+using muGrid::Real;
+using muGrid::threeD;
+using muGrid::twoD;
 using pybind11::literals::operator""_a;
 namespace py = pybind11;
 
@@ -66,7 +66,7 @@ class PyDerivativeBase : public DerivativeBase {
   //! coordinate field
   using Vector = typename Parent::Vector;
 
-  explicit PyDerivativeBase(Dim_t spatial_dimension)
+  explicit PyDerivativeBase(Index_t spatial_dimension)
       : DerivativeBase(spatial_dimension) {}
 
   virtual Complex fourier(const Vector & wavevec) const {
@@ -79,44 +79,43 @@ void add_derivative_base(py::module & mod, std::string name) {
              std::shared_ptr<DerivativeBase>,  // holder
              PyDerivativeBase                  // trampoline base
              >(mod, name.c_str())
-      .def(py::init<Dim_t>())
-      .def("fourier", &DerivativeBase::fourier,
-           "wavevec"_a,
+      .def(py::init<Index_t>())
+      .def("fourier", &DerivativeBase::fourier, "wavevec"_a,
            "return Fourier representation of the derivative operator for a "
            "certain wavevector")
-      .def("fourier",
-           [](DerivativeBase & derivative,
-              py::array_t<Real, py::array::f_style> wavevectors) {
-             py::buffer_info wavevectors_buffer = wavevectors.request();
-             std::vector<ssize_t> output_shape;
-             // The first dimension contains the components of The wavevector.
-             // This is equal to the dimension of space.
-             ssize_t nb_dof_per_sub_pt{wavevectors_buffer.shape[0]};
-             // The next dimensions simply hold entries and we don't care about
-             // the shape. The return array should have the same shape, minus
-             // the first dimension.
-             ssize_t nb_entries = 1;
-             for (int i = 1; i < wavevectors_buffer.ndim; ++i) {
-               output_shape.push_back(wavevectors_buffer.shape[i]);
-               nb_entries *= wavevectors_buffer.shape[i];
-             }
-             // Create output array with appropriate shape.
-             py::array_t<Complex, py::array::f_style> factors(output_shape);
-             py::buffer_info factors_buffer = factors.request();
-             // Loop over all entries and call fourier method.
-             auto wavevector = static_cast<const Real*>(wavevectors_buffer.ptr);
-             for (ssize_t i = 0; i < nb_entries; ++i) {
-               static_cast<Complex*>(factors_buffer.ptr)[i] =
-                   derivative.fourier(
-                     Eigen::Map<const DerivativeBase::Vector>(
-                     wavevector, nb_dof_per_sub_pt));
-               wavevector += nb_dof_per_sub_pt;
-             }
-             return factors;
-           },
-           "wavevectors"_a,
-           "return Fourier representation of the derivative operator for a "
-           "certain wavevector");
+      .def(
+          "fourier",
+          [](DerivativeBase & derivative,
+             py::array_t<Real, py::array::f_style> wavevectors) {
+            py::buffer_info wavevectors_buffer = wavevectors.request();
+            std::vector<ssize_t> output_shape;
+            // The first dimension contains the components of The wavevector.
+            // This is equal to the dimension of space.
+            ssize_t nb_dof_per_sub_pt{wavevectors_buffer.shape[0]};
+            // The next dimensions simply hold entries and we don't care about
+            // the shape. The return array should have the same shape, minus
+            // the first dimension.
+            ssize_t nb_entries = 1;
+            for (int i = 1; i < wavevectors_buffer.ndim; ++i) {
+              output_shape.push_back(wavevectors_buffer.shape[i]);
+              nb_entries *= wavevectors_buffer.shape[i];
+            }
+            // Create output array with appropriate shape.
+            py::array_t<Complex, py::array::f_style> factors(output_shape);
+            py::buffer_info factors_buffer = factors.request();
+            // Loop over all entries and call fourier method.
+            auto wavevector = static_cast<const Real *>(wavevectors_buffer.ptr);
+            for (ssize_t i = 0; i < nb_entries; ++i) {
+              static_cast<Complex *>(factors_buffer.ptr)[i] =
+                  derivative.fourier(Eigen::Map<const DerivativeBase::Vector>(
+                      wavevector, nb_dof_per_sub_pt));
+              wavevector += nb_dof_per_sub_pt;
+            }
+            return factors;
+          },
+          "wavevectors"_a,
+          "return Fourier representation of the derivative operator for a "
+          "certain wavevector");
 }
 
 void add_fourier_derivative(py::module & mod, std::string name) {
@@ -124,30 +123,27 @@ void add_fourier_derivative(py::module & mod, std::string name) {
              std::shared_ptr<FourierDerivative>,  // holder
              DerivativeBase                       // base class
              >(mod, name.c_str())
-      .def(py::init<Dim_t, Dim_t>(), "spatial_dimension"_a, "direction"_a)
-      .def(py::init(
-               [](Dim_t spatial_dimension, Dim_t direction,
-                  const Eigen::ArrayXd & shift) {
-                 // Default: shift = vector (of correct dimension) filled with
-                 // zeros
-                 if ((shift.size() == 1) and (shift(0, 0) == 0)) {
-                   Eigen::VectorXd default_shift{
-                       Eigen::ArrayXd::Zero(spatial_dimension)};
-                   return new FourierDerivative(spatial_dimension, direction,
-                                                default_shift);
-                 }
-                 // is the shift vector correctly given?
-                 if (shift.size() != spatial_dimension) {
-                   std::stringstream s;
-                   s << "The real space shift has " << shift.size()
-                     << " entries, "
-                     << "but the Fourier derivative is " << spatial_dimension
-                     << "D.";
-                   throw muGrid::RuntimeError(s.str());
-                 }
-                 return new FourierDerivative(spatial_dimension, direction,
-                                              shift);
-               }),
+      .def(py::init<Index_t, Index_t>(), "spatial_dimension"_a, "direction"_a)
+      .def(py::init([](Index_t spatial_dimension, Index_t direction,
+                       const Eigen::ArrayXd & shift) {
+             // Default: shift = vector (of correct dimension) filled with
+             // zeros
+             if ((shift.size() == 1) and (shift(0, 0) == 0)) {
+               Eigen::VectorXd default_shift{
+                   Eigen::ArrayXd::Zero(spatial_dimension)};
+               return new FourierDerivative(spatial_dimension, direction,
+                                            default_shift);
+             }
+             // is the shift vector correctly given?
+             if (shift.size() != spatial_dimension) {
+               std::stringstream s;
+               s << "The real space shift has " << shift.size() << " entries, "
+                 << "but the Fourier derivative is " << spatial_dimension
+                 << "D.";
+               throw muGrid::RuntimeError(s.str());
+             }
+             return new FourierDerivative(spatial_dimension, direction, shift);
+           }),
            "spatial_dimension"_a, "direction"_a, "shift"_a = 0);
 }
 
@@ -169,17 +165,17 @@ void add_discrete_derivative(py::module & mod, std::string name) {
              for (int i = 0; i < info.ndim; ++i) {
                nb_pts[i] = info.shape[i];
              }
-             return new DiscreteDerivative(nb_pts, lbounds,
-                 Eigen::Map<Eigen::ArrayXd>(static_cast<double*>(info.ptr),
+             return new DiscreteDerivative(
+                 nb_pts, lbounds,
+                 Eigen::Map<Eigen::ArrayXd>(static_cast<double *>(info.ptr),
                                             info.size));
            }),
            "lbounds"_a, "stencil"_a)
-      .def("rollaxes", &DiscreteDerivative::rollaxes,
-           "distance"_a = 1)
+      .def("rollaxes", &DiscreteDerivative::rollaxes, "distance"_a = 1)
       .def_property_readonly("stencil", [](const DiscreteDerivative & self) {
         const Eigen::ArrayXd & stencil = self.get_stencil();
-        return py::array_t<double, py::array::f_style>(
-            self.get_nb_pts(), stencil.data());
+        return py::array_t<double, py::array::f_style>(self.get_nb_pts(),
+                                                       stencil.data());
       });
 }
 

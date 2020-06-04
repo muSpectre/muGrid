@@ -39,11 +39,11 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM, StrainMeasure StrainM, StressMeasure StressM>
+  template <Index_t DimM, StrainMeasure StrainM, StressMeasure StressM>
   STMaterialLinearElasticGeneric1<DimM, StrainM, StressM>::
       STMaterialLinearElasticGeneric1(const std::string & name,
-                                      const Dim_t & spatial_dimension,
-                                      const Dim_t & nb_quad_pts,
+                                      const Index_t & spatial_dimension,
+                                      const Index_t & nb_quad_pts,
                                       const CInput_t & C_voigt)
       : Parent{name, spatial_dimension, nb_quad_pts},
         C_holder{std::make_unique<Stiffness_t>()}, C{*this->C_holder},
@@ -54,12 +54,12 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM, StrainMeasure StrainM, StressMeasure StressM>
+  template <Index_t DimM, StrainMeasure StrainM, StressMeasure StressM>
   auto STMaterialLinearElasticGeneric1<DimM, StrainM, StressM>::make_evaluator(
       const CInput_t & C_voigt)
       -> std::tuple<Material_sptr, MaterialEvaluator<DimM>> {
-    constexpr Dim_t SpatialDimension{DimM};
-    constexpr Dim_t NbQuadPts{1};
+    constexpr Index_t SpatialDimension{DimM};
+    constexpr Index_t NbQuadPts{1};
     auto mat{std::make_shared<STMaterialLinearElasticGeneric1>(
         "name", SpatialDimension, NbQuadPts, C_voigt)};
 

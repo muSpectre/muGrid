@@ -131,14 +131,14 @@ namespace muGrid {
      * Constructor from a field with explicitly chosen shape of iterate. (the
      * number of columns is inferred).
      */
-    FieldMap(Field_t & field, Dim_t nb_rows);
+    FieldMap(Field_t & field, Index_t nb_rows);
 
     /**
      * Constructor from a field with explicitly chosen shape of iterate. (the
      * number of columns is inferred). The iter_type can be the natural
      * sub-division of the field, or `muGrid::PixelSubDiv::Pixel
      */
-    FieldMap(Field_t & field, Dim_t nb_rows, const PixelSubDiv & iter_type);
+    FieldMap(Field_t & field, Index_t nb_rows, const PixelSubDiv & iter_type);
 
     //! Copy constructor
     FieldMap(const FieldMap & other) = delete;
@@ -264,9 +264,9 @@ namespace muGrid {
     //! mapped field. Needed for query at initialisations
     const Field_t & field;
     const PixelSubDiv iteration;  //!< type of map iteration
-    const Dim_t stride;           //!< precomputed stride
-    const Dim_t nb_rows;          //!< number of rows of the iterate
-    const Dim_t nb_cols;          //!< number of columns fo the iterate
+    const Index_t stride;           //!< precomputed stride
+    const Index_t nb_rows;          //!< number of rows of the iterate
+    const Index_t nb_cols;          //!< number of columns fo the iterate
 
     /**
      * Pointer to mapped data; is also unknown at construction and set in the

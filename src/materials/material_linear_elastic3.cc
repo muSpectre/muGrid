@@ -40,10 +40,10 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   MaterialLinearElastic3<DimM>::MaterialLinearElastic3(
-      const std::string & name, const Dim_t & spatial_dimension,
-      const Dim_t & nb_quad_pts)
+      const std::string & name, const Index_t & spatial_dimension,
+      const Index_t & nb_quad_pts)
       : Parent{name, spatial_dimension, nb_quad_pts},
         C_field{this->get_prefix() + "local stiffness tensor",
                 *this->internal_fields} {
@@ -51,14 +51,14 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   void MaterialLinearElastic3<DimM>::add_pixel(const size_t & /*pixel*/) {
     throw muGrid::RuntimeError(
         "this material needs pixels with Youngs modulus and Poisson ratio.");
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   void MaterialLinearElastic3<DimM>::add_pixel(const size_t & pixel,
                                                const Real & Young,
                                                const Real & Poisson) {

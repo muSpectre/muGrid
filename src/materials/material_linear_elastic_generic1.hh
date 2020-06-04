@@ -52,13 +52,13 @@ namespace muSpectre {
   /**
    * forward declaration
    */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   class MaterialLinearElasticGeneric1;
 
   /**
    * traits for use by MaterialMuSpectre for crtp
    */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   struct MaterialMuSpectre_traits<MaterialLinearElasticGeneric1<DimM>> {
     //! global field collection
 
@@ -86,7 +86,7 @@ namespace muSpectre {
    * and methods directly without any interference of
    * MaterialLinearElasticGeneric1.
    */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   class MaterialLinearElasticGeneric1
       : public MaterialMuSpectre<MaterialLinearElasticGeneric1<DimM>, DimM> {
    public:
@@ -109,8 +109,8 @@ namespace muSpectre {
      * @param C_voigt elastic tensor in Voigt notation
      */
     MaterialLinearElasticGeneric1(const std::string & name,
-                                  const Dim_t & spatial_dimension,
-                                  const Dim_t & nb_quad_pts,
+                                  const Index_t & spatial_dimension,
+                                  const Index_t & nb_quad_pts,
                                   const CInput_t & C_voigt);
 
     //! Copy constructor
@@ -179,7 +179,7 @@ namespace muSpectre {
   };
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   template <class Derived>
   auto MaterialLinearElasticGeneric1<DimM>::evaluate_stress(
       const Eigen::MatrixBase<Derived> & E, const size_t & /*quad_pt_index*/)
@@ -190,7 +190,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   template <class Derived>
   auto MaterialLinearElasticGeneric1<DimM>::evaluate_stress_tangent(
       const Eigen::MatrixBase<Derived> & E, const size_t & /*quad_pt_index*/)

@@ -51,21 +51,28 @@
 namespace muGrid {
 
   /**
-   * Eigen uses signed integers for dimensions. For consistency, µGrid uses them
-   * througout the code. Needs to represent -1 for Eigen
+   * Eigen uses signed integers for static dimensions. For consistency, µGrid
+   * uses them througout the code. Needs to represent -1 for Eigen
    */
   using Dim_t = int;
 
-  constexpr Dim_t oneD{1};         //!< constant for a one-dimensional problem
-  constexpr Dim_t twoD{2};         //!< constant for a two-dimensional problem
-  constexpr Dim_t threeD{3};       //!< constant for a three-dimensional problem
-  constexpr Dim_t firstOrder{1};   //!< constant for vectors
-  constexpr Dim_t secondOrder{2};  //!< constant second-order tensors
-  constexpr Dim_t fourthOrder{4};  //!< constant fourth-order tensors
-  constexpr Dim_t OneQuadPt{1};    //!< constant for 1 quadrature point/pixel
-  constexpr Dim_t TwoQuadPts{2};   //!< constant for 2 quadrature point/pixel
-  constexpr Dim_t FourQuadPts{4};  //!< constant for 4 quadrature point/pixel
-  constexpr Dim_t OneNode{1};      //!< constant for 1 node per pixel
+  /**
+   * Large arrays (e.g., 65536 × 65536) have more indices that can be counted
+   * with Dim_t (it overflows). For consistency with Eigen, we use Eigen::Index
+   * for size-related values.
+   */
+  using Index_t = Eigen::Index;
+
+  constexpr Index_t oneD{1};    //!< constant for a one-dimensional problem
+  constexpr Index_t twoD{2};    //!< constant for a two-dimensional problem
+  constexpr Index_t threeD{3};  //!< constant for a three-dimensional problem
+  constexpr Index_t firstOrder{1};   //!< constant for vectors
+  constexpr Index_t secondOrder{2};  //!< constant second-order tensors
+  constexpr Index_t fourthOrder{4};  //!< constant fourth-order tensors
+  constexpr Index_t OneQuadPt{1};    //!< constant for 1 quadrature point/pixel
+  constexpr Index_t TwoQuadPts{2};   //!< constant for 2 quadrature point/pixel
+  constexpr Index_t FourQuadPts{4};  //!< constant for 4 quadrature point/pixel
+  constexpr Index_t OneNode{1};      //!< constant for 1 node per pixel
 
   using Uint = unsigned int;  //!< type to use in math for unsigned integers
   using Int = int;            //!< type to use in math for signed integers
@@ -99,7 +106,7 @@ namespace muGrid {
   //@{
   //! Ccoord_t are cell coordinates, i.e. integer coordinates
   template <size_t Dim>
-  using Ccoord_t = std::array<Dim_t, Dim>;
+  using Ccoord_t = std::array<Index_t, Dim>;
   //! Real space coordinates
   template <size_t Dim>
   using Rcoord_t = std::array<Real, Dim>;
@@ -111,7 +118,7 @@ namespace muGrid {
    * `muGrid::Rcoord_t &` references. These are used when templating with the
    * spatial dimension of the problem is undesireable/impossible.
    */
-  template <size_t MaxDim, typename T = Dim_t>
+  template <size_t MaxDim, typename T = Index_t>
   class DynCcoord {
     template <size_t Dim, size_t... Indices>
     constexpr static std::array<T, MaxDim>
@@ -177,8 +184,8 @@ namespace muGrid {
       if (this->dim > Dim_t(MaxDim)) {
         std::stringstream error{};
         error << "The maximum dimension representable by this dynamic array is "
-              << MaxDim << ". You supplied a vector with "
-              << ccoord.size() << " entries.";
+              << MaxDim << ". You supplied a vector with " << ccoord.size()
+              << " entries.";
         throw RuntimeError(error.str());
       }
       std::copy(ccoord.begin(), ccoord.end(), this->long_array.begin());
@@ -348,11 +355,10 @@ namespace muGrid {
   /**
    * comparison operators for Verbosity-class
    */
-  bool operator< (const Verbosity v1, const Verbosity v2);
-  bool operator> (const Verbosity v1, const Verbosity v2);
-  bool operator<= (const Verbosity v1, const Verbosity v2);
-  bool operator>= (const Verbosity v1, const Verbosity v2);
-
+  bool operator<(const Verbosity v1, const Verbosity v2);
+  bool operator>(const Verbosity v1, const Verbosity v2);
+  bool operator<=(const Verbosity v1, const Verbosity v2);
+  bool operator>=(const Verbosity v1, const Verbosity v2);
 
   /**
    * return a Eigen representation of the data stored in a std::array (e.g., for
@@ -400,8 +406,7 @@ namespace muGrid {
    * Allows inserting `std::vector` into `std::ostream`s
    */
   template <typename T>
-  std::ostream & operator<<(std::ostream & os,
-                            const std::vector<T> & values) {
+  std::ostream & operator<<(std::ostream & os, const std::vector<T> & values) {
     os << "(";
     for (size_t i = 0; i < values.size() - 1; ++i) {
       os << values[i] << ", ";
@@ -412,7 +417,6 @@ namespace muGrid {
     os << ")";
     return os;
   }
-
 
   /**
    * Allows inserting `muGrid::Ccoord_t` and `muGrid::Rcoord_t`

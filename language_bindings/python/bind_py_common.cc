@@ -38,7 +38,7 @@
 
 #include <pybind11/pybind11.h>
 
-using muSpectre::Dim_t;
+using muSpectre::Index_t;
 using muSpectre::Formulation;
 using muSpectre::Real;
 using muSpectre::StoreNativeStress;

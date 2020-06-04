@@ -48,8 +48,8 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   BOOST_AUTO_TEST_CASE(simple_creation) {
-    constexpr Dim_t SDim{twoD};
-    constexpr Dim_t MDim{twoD};
+    constexpr Index_t SDim{twoD};
+    constexpr Index_t MDim{twoD};
     using FC_t = GlobalFieldCollection;
     FC_t fc{SDim, OneQuadPt, OneNode};
 
@@ -58,7 +58,7 @@ namespace muGrid {
 
     // check that fields are initialised with empty vector
     BOOST_CHECK_EQUAL(field.size(), 0);
-    Dim_t len{2};
+    Index_t len{2};
     fc.initialise(CcoordOps::get_cube<SDim>(len), {});
     // check that returned size is correct
     BOOST_CHECK_EQUAL(field.size(), ipow(len, SDim));
@@ -68,12 +68,12 @@ namespace muGrid {
   }
 
   BOOST_AUTO_TEST_CASE(sub_divisions_with_known) {
-    constexpr Dim_t SDim{twoD};
-    constexpr Dim_t MDim{twoD};
-    constexpr Dim_t NbQuad{OneQuadPt};
-    constexpr Dim_t NbNode{OneNode};
-    constexpr Dim_t NbComponent{MDim};
-    constexpr Dim_t NbFreeSubDiv{5};
+    constexpr Index_t SDim{twoD};
+    constexpr Index_t MDim{twoD};
+    constexpr Index_t NbQuad{OneQuadPt};
+    constexpr Index_t NbNode{OneNode};
+    constexpr Index_t NbComponent{MDim};
+    constexpr Index_t NbFreeSubDiv{5};
     using FC_t = GlobalFieldCollection;
     FC_t fc{SDim, NbQuad, NbNode};
 
@@ -86,8 +86,8 @@ namespace muGrid {
     auto & free_field{fc.register_real_field("Free", NbComponent,
                                              PixelSubDiv::FreePt,
                                              Unit::unitless(), NbFreeSubDiv)};
-    Dim_t len{2};
-    Dim_t nb_pix{ipow(len, SDim)};
+    Index_t len{2};
+    Index_t nb_pix{ipow(len, SDim)};
     fc.initialise(CcoordOps::get_cube<SDim>(len), {});
 
     BOOST_CHECK_EQUAL(pixel_field.size(), nb_pix);

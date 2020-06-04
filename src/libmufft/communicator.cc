@@ -85,7 +85,7 @@ namespace muFFT {
       -> Matrix_t<T> {
     if (this->comm == MPI_COMM_NULL)
       return arg;
-    Dim_t send_buf_size(arg.size());
+    Index_t send_buf_size(arg.size());
 
     int comm_size = this->size();
     int arg_sizes[comm_size] = {};

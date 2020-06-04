@@ -63,8 +63,7 @@ namespace muSpectre {
     explicit ProjectionError(const std::string & what)
         : muGrid::RuntimeError(what) {}
     //! constructor
-    explicit ProjectionError(const char * what)
-        : muGrid::RuntimeError(what) {}
+    explicit ProjectionError(const char * what) : muGrid::RuntimeError(what) {}
   };
 
   /**
@@ -93,8 +92,8 @@ namespace muSpectre {
     //! Constructor with cell sizes
     ProjectionBase(muFFT::FFTEngine_ptr engine,
                    const DynRcoord_t & domain_lengths,
-                   const Dim_t & nb_quad_pts, const Dim_t & nb_dof_per_sub_pt,
-                   const Formulation & form);
+                   const Index_t & nb_quad_pts,
+                   const Index_t & nb_dof_per_sub_pt, const Formulation & form);
 
     //! Copy constructor
     ProjectionBase(const ProjectionBase & other) = delete;
@@ -162,23 +161,23 @@ namespace muSpectre {
      * material_dim matrices, but in symmetric storage, it is a column
      * vector)
      */
-    virtual std::array<Dim_t, 2> get_strain_shape() const = 0;
+    virtual std::array<Index_t, 2> get_strain_shape() const = 0;
 
     //! get number of components to project per pixel
-    virtual Dim_t get_nb_dof_per_pixel() const = 0;
+    virtual Index_t get_nb_dof_per_pixel() const = 0;
 
     //! return the number of spatial dimensions
-    const Dim_t & get_dim() const;
+    const Index_t & get_dim() const;
 
     /**
      * returns the number of quadrature points
      */
-    const Dim_t & get_nb_quad_pts() const;
+    const Index_t & get_nb_quad_pts() const;
 
     /**
      * returns the number of nodal points
      */
-    const Dim_t & get_nb_nodal_pts() const;
+    const Index_t & get_nb_nodal_pts() const;
 
     //! return a reference to the fft_engine
     muFFT::FFTEngineBase & get_fft_engine();
@@ -194,8 +193,8 @@ namespace muSpectre {
     //! handle on the fft_engine used
     muFFT::FFTEngine_ptr fft_engine;
     DynRcoord_t domain_lengths;  //!< physical sizes of the cell
-    Dim_t nb_quad_pts;
-    Dim_t nb_dof_per_sub_pt;
+    Index_t nb_quad_pts;
+    Index_t nb_dof_per_sub_pt;
     /**
      * formulation this projection can be applied to (determines
      * whether the projection enforces gradients, small strain tensor

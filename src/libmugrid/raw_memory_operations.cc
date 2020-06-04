@@ -43,7 +43,7 @@ namespace muGrid {
   namespace raw_mem_ops {
     /* ---------------------------------------------------------------------- */
     std::ostream & operator<<(std::ostream & os,
-                              const std::vector<Dim_t> & vec) {
+                              const std::vector<Index_t> & vec) {
       os << "(";
       for (size_t i{0}; i < vec.size() - 1; ++i) {
         os << vec[i] << ", ";
@@ -53,14 +53,14 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
-    size_t prod(const std::vector<Dim_t> & vec) {
+    size_t prod(const std::vector<Index_t> & vec) {
       return std::accumulate(vec.begin(), vec.end(), 1,
-                             std::multiplies<Dim_t>());
+                             std::multiplies<Index_t>());
     }
 
     /* ---------------------------------------------------------------------- */
-    size_t linear_index(const std::vector<Dim_t> & index,
-                        const std::vector<Dim_t> & strides) {
+    size_t linear_index(const std::vector<Index_t> & index,
+                        const std::vector<Index_t> & strides) {
       return std::inner_product(index.begin(), index.end(), strides.begin(),
                                 size_t{});
     }
@@ -71,7 +71,7 @@ namespace muGrid {
       CartesianContainer() = delete;
 
       //! Constructor from shape
-      explicit CartesianContainer(const std::vector<Dim_t> & shape)
+      explicit CartesianContainer(const std::vector<Index_t> & shape)
           : shape{shape} {}
 
       //! Copy constructor
@@ -89,7 +89,7 @@ namespace muGrid {
       //! Move assignment operator
       CartesianContainer & operator=(CartesianContainer && other) = default;
 
-      Dim_t get_nb_dim() const { return this->shape.size(); }
+      Index_t get_nb_dim() const { return this->shape.size(); }
 
       class iterator {
        public:
@@ -112,7 +112,7 @@ namespace muGrid {
           return *this;
         }
 
-        const std::vector<Dim_t> & operator*() const { return this->index; }
+        const std::vector<Index_t> & operator*() const { return this->index; }
 
         bool operator!=(const iterator & other) const {
           return this->counter != other.counter;
@@ -120,7 +120,7 @@ namespace muGrid {
 
        protected:
         const CartesianContainer & container;
-        std::vector<Dim_t> index;
+        std::vector<Index_t> index;
         size_t counter{0};
       };
 
@@ -128,13 +128,13 @@ namespace muGrid {
       iterator end() const { return iterator{*this, prod(this->shape)}; }
 
      protected:
-      std::vector<Dim_t> shape;
+      std::vector<Index_t> shape;
     };
 
     /* ---------------------------------------------------------------------- */
-    void strided_copy(const std::vector<Dim_t> & logical_shape,
-                      const std::vector<Dim_t> & input_strides,
-                      const std::vector<Dim_t> & output_strides,
+    void strided_copy(const std::vector<Index_t> & logical_shape,
+                      const std::vector<Index_t> & input_strides,
+                      const std::vector<Index_t> & output_strides,
                       const void * input_data, void * output_data,
                       const size_t & size) {
       if (logical_shape.size() != input_strides.size()) {

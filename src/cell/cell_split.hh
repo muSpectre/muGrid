@@ -121,7 +121,7 @@ namespace muSpectre {
 
     // This function returns the index of the pixels whose material
     // assignemnt are not complete
-    std::vector<int> get_index_incomplete_pixels() const;
+    std::vector<Index_t> get_index_incomplete_pixels() const;
 
     // This function returns the Ccoord of the pixels whose material
     // assignemnt are not complete
@@ -146,7 +146,8 @@ namespace muSpectre {
         using value_type = std::tuple<DynCcoord_t, Real>;  //!< stl conformance
 
         //! constructor
-        iterator(const IncompletePixels & pixels, Dim_t dim, bool begin = true);
+        iterator(const IncompletePixels & pixels, Index_t dim,
+                 bool begin = true);
 
         // deconstructor
         virtual ~iterator() = default;
@@ -154,7 +155,7 @@ namespace muSpectre {
         //! dereferencing
         value_type operator*() const;
 
-        template <Dim_t DimS>
+        template <Index_t DimS>
         value_type deref_helper() const;
 
         //! pre-increment
@@ -168,7 +169,7 @@ namespace muSpectre {
 
        protected:
         const IncompletePixels & incomplete_pixels;
-        Dim_t dim;
+        Index_t dim;
         size_t index;
       };
 
@@ -191,7 +192,7 @@ namespace muSpectre {
      protected:
       const CellSplit & cell;
       std::vector<Real> incomplete_assigned_ratios;
-      std::vector<Dim_t> index_incomplete_pixels;
+      std::vector<Index_t> index_incomplete_pixels;
     };
 
     IncompletePixels make_incomplete_pixels();

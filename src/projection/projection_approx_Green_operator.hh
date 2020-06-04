@@ -40,7 +40,7 @@
 
 namespace muSpectre {
 
-  template <Dim_t DimS>
+  template <Index_t DimS>
   class ProjectionApproxGreenOperator : public ProjectionDefault<DimS> {
    public:
     using Parent = ProjectionDefault<DimS>;  //!< base class

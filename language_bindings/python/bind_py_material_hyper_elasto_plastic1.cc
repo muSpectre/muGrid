@@ -45,7 +45,7 @@
 #include <sstream>
 #include <string>
 
-using muSpectre::Dim_t;
+using muSpectre::Index_t;
 using muSpectre::Real;
 using pybind11::literals::operator""_a;
 namespace py = pybind11;
@@ -54,7 +54,7 @@ namespace py = pybind11;
  * python binding for the optionally objective form of Hooke's law
  * with per-pixel elastic properties
  */
-template <Dim_t Dim>
+template <Index_t Dim>
 void add_material_hyper_elasto_plastic1_helper(py::module & mod) {
   std::stringstream name_stream{};
   name_stream << "MaterialHyperElastoPlastic1_" << Dim << "d";

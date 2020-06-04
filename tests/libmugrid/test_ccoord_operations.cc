@@ -46,8 +46,8 @@ namespace muGrid {
                                    testGoodies::dimlist, Fix) {
     constexpr auto Dim{Fix::dim};
     using Ccoord = Ccoord_t<Dim>;
-    constexpr Dim_t size{5};
-    Ccoord nb_grid_pts = CcoordOps::get_cube<Dim>(size);
+    constexpr Index_t size{5};
+    Ccoord nb_grid_pts{CcoordOps::get_cube<Dim>(size)};
     for (int i{0}; i < Dim; ++i) {
       nb_grid_pts[i] += i;
     }
@@ -69,8 +69,8 @@ namespace muGrid {
                                    Fix) {
     constexpr auto Dim{Fix::dim};
     using Ccoord = Ccoord_t<Dim>;
-    constexpr Dim_t size{5};
-    Ccoord nb_grid_pts = CcoordOps::get_cube<Dim>(size);
+    constexpr Index_t size{5};
+    Ccoord nb_grid_pts{CcoordOps::get_cube<Dim>(size)};
     for (int i{0}; i < Dim; ++i) {
       nb_grid_pts[i] += i;
     }

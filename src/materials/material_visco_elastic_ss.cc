@@ -39,10 +39,10 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   MaterialViscoElasticSS<DimM>::MaterialViscoElasticSS(
-      const std::string & name, const Dim_t & spatial_dimension,
-      const Dim_t & nb_quad_pts, const Real & young_inf, const Real & young_v,
+      const std::string & name, const Index_t & spatial_dimension,
+      const Index_t & nb_quad_pts, const Real & young_inf, const Real & young_v,
       const Real & eta_v, const Real & poisson, const Real & dt,
       const std::shared_ptr<muGrid::LocalFieldCollection> &
           parent_field_collection)
@@ -70,14 +70,14 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   void MaterialViscoElasticSS<DimM>::save_history_variables() {
     this->h_prev_field.get_state_field().cycle();
     this->s_null_prev_field.get_state_field().cycle();
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   void MaterialViscoElasticSS<DimM>::initialise() {
     Parent::initialise();
     this->h_prev_field.get_map().get_current() =
@@ -88,7 +88,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   auto MaterialViscoElasticSS<DimM>::evaluate_stress(
       const Eigen::Ref<const T2_t> & E, T2StRef_t h_prev, T2StRef_t s_null_prev)
       -> T2_t {
@@ -103,7 +103,7 @@ namespace muSpectre {
   }
 
   /* ----------------------------------------------------------------------*/
-  template <Dim_t DimM>
+  template <Index_t DimM>
   auto MaterialViscoElasticSS<DimM>::evaluate_stress_tangent(
       const Eigen::Ref<const T2_t> & F, T2StRef_t h_prev, T2StRef_t s_null_prev)
       -> std::tuple<T2_t, T4_t> {
@@ -116,14 +116,14 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   muGrid::MappedT2StateField<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt> &
   MaterialViscoElasticSS<DimM>::get_history_integral() {
     return this->h_prev_field;
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   muGrid::MappedT2StateField<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt> &
   MaterialViscoElasticSS<DimM>::get_s_null_prev_field() {
     return this->s_null_prev_field;

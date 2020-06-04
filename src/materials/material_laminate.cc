@@ -37,10 +37,10 @@
 #include "material_laminate.hh"
 
 namespace muSpectre {
-  template <Dim_t DimM>
+  template <Index_t DimM>
   MaterialLaminate<DimM>::MaterialLaminate(
-      const std::string & name, const Dim_t & spatial_dimension,
-      const Dim_t & nb_quad_pts,
+      const std::string & name, const Index_t & spatial_dimension,
+      const Index_t & nb_quad_pts,
       std::shared_ptr<muGrid::LocalFieldCollection> parent_field)
     : Parent(name, spatial_dimension, DimM, nb_quad_pts,
              parent_field),
@@ -50,7 +50,7 @@ namespace muSpectre {
                            *this->internal_fields} {}
   /* ----------------------------------------------------------------------
    */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   void MaterialLaminate<DimM>::add_pixel(const size_t & /*pixel_id*/) {
     throw muGrid::RuntimeError("This material needs two material "
                                "(shared)pointers making the layers of "
@@ -60,7 +60,7 @@ namespace muSpectre {
   }
   /* ----------------------------------------------------------------------
    */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   void MaterialLaminate<DimM>::add_pixel(
       const size_t & pixel_id, MatPtr_t mat1, MatPtr_t mat2, const Real & ratio,
       const Eigen::Ref<const Eigen::Matrix<Real, Eigen::Dynamic, 1>> &
@@ -75,10 +75,10 @@ namespace muSpectre {
   }
   /* ----------------------------------------------------------------------
    */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   void MaterialLaminate<DimM>::add_pixels_precipitate(
       const std::vector<Ccoord_t<DimM>> & intersected_pixels,
-      const std::vector<Dim_t> & intersected_pixels_id,
+      const std::vector<Index_t> & intersected_pixels_id,
       const std::vector<Real> & intersection_ratios,
       const std::vector<Eigen::Matrix<Real, DimM, 1>> & intersection_normals,
       MatPtr_t mat1, MatPtr_t mat2) {
@@ -93,7 +93,7 @@ namespace muSpectre {
   }
 
   /* ----------------------------------------------------------------------*/
-  template <Dim_t DimM>
+  template <Index_t DimM>
   MaterialLaminate<DimM> &
   MaterialLaminate<DimM>::make(Cell & cell, const std::string & name) {
     auto mat{std::make_unique<MaterialLaminate<DimM>>(
@@ -112,7 +112,7 @@ namespace muSpectre {
   }
   /* ----------------------------------------------------------------------
    */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   void MaterialLaminate<DimM>::compute_stresses(
       const RealField & F, RealField & P, const Formulation & form,
       const SplitCell & is_cell_split,
@@ -186,7 +186,7 @@ namespace muSpectre {
 
   /* ----------------------------------------------------------------------
    */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   void MaterialLaminate<DimM>::compute_stresses_tangent(
       const RealField & F, RealField & P, RealField & K,
       const Formulation & form, const SplitCell & is_cell_split,

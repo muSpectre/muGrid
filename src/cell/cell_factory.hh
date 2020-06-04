@@ -66,7 +66,7 @@ namespace muSpectre {
         const Formulation & form, muFFT::Gradient_t gradient,
         const muFFT::Communicator & comm = muFFT::Communicator()) {
       auto && dim{nb_grid_pts.get_dim()};
-      if (static_cast<Dim_t>(gradient.size()) % dim != 0) {
+      if (static_cast<Index_t>(gradient.size()) % dim != 0) {
         std::stringstream error{};
         error << "There are " << gradient.size() << " derivative operators in "
               << "the gradient. This number must be divisible by the system "
@@ -137,7 +137,7 @@ namespace muSpectre {
   cell_input(const DynCcoord_t & nb_grid_pts, const DynRcoord_t & lengths,
              const Formulation & form, muFFT::Gradient_t gradient,
              const muFFT::Communicator & comm = muFFT::Communicator()) {
-    const Dim_t dim{nb_grid_pts.get_dim()};
+    const Index_t dim{nb_grid_pts.get_dim()};
     if (dim != lengths.get_dim()) {
       std::stringstream error{};
       error << "Dimension mismatch between nb_grid_pts (dim = " << dim
@@ -183,7 +183,7 @@ namespace muSpectre {
   cell_input(const DynCcoord_t & nb_grid_pts, const DynRcoord_t & lengths,
              const Formulation & form,
              const muFFT::Communicator & comm = muFFT::Communicator()) {
-    const Dim_t dim{nb_grid_pts.get_dim()};
+    const Index_t dim{nb_grid_pts.get_dim()};
     return cell_input<FFTEngine>(nb_grid_pts, lengths, form,
                                  muFFT::make_fourier_gradient(dim), comm);
   }
@@ -226,7 +226,7 @@ namespace muSpectre {
   inline Cell_t
   make_cell(DynCcoord_t nb_grid_pts, DynRcoord_t lengths, Formulation form,
             const muFFT::Communicator & comm = muFFT::Communicator()) {
-    const Dim_t dim{nb_grid_pts.get_dim()};
+    const Index_t dim{nb_grid_pts.get_dim()};
     return make_cell<Cell_t, FFTEngine>(
         nb_grid_pts, lengths, form, muFFT::make_fourier_gradient(dim), comm);
   }

@@ -38,9 +38,9 @@
 namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
-  LocalFieldCollection::LocalFieldCollection(const Dim_t & spatial_dimension,
-                                             const Dim_t & nb_quad_pts,
-                                             const Dim_t & nb_nodal_pts)
+  LocalFieldCollection::LocalFieldCollection(const Index_t & spatial_dimension,
+                                             const Index_t & nb_quad_pts,
+                                             const Index_t & nb_nodal_pts)
       : Parent{ValidityDomain::Local, spatial_dimension, nb_quad_pts,
                nb_nodal_pts} {}
 

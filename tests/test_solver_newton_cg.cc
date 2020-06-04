@@ -66,13 +66,13 @@ namespace muSpectre {
 
   BOOST_FIXTURE_TEST_CASE(small_strain_convergence_test,
                           KrylovSolverFixture<KrylovSolverCG>) {
-    constexpr Dim_t Dim{twoD};
-    const DynCcoord_t nb_grid_pts{muGrid::CcoordOps::get_cube<Dim>(3)};
+    constexpr Index_t Dim{twoD};
+    const DynCcoord_t nb_grid_pts{muGrid::CcoordOps::get_cube<Dim>(Index_t{3})};
     const DynRcoord_t lengths{muGrid::CcoordOps::get_cube<Dim>(1.)};
     constexpr Formulation form{Formulation::small_strain};
 
     // number of layers in the hard material
-    constexpr Dim_t nb_lays{1};
+    constexpr Index_t nb_lays{1};
     constexpr Real contrast{2};
     if (not(nb_lays < nb_grid_pts[0])) {
       throw std::runtime_error(
@@ -110,13 +110,14 @@ namespace muSpectre {
   }
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(small_strain_patch_dynamic_solver, Fix,
                                    KrylovSolverList, Fix) {
-    constexpr Dim_t Dim{twoD};
-    const DynCcoord_t nb_grid_pts{muGrid::CcoordOps::get_cube<Dim>(3)};
+    constexpr Index_t Dim{twoD};
+    const Index_t grid_size{3};
+    const DynCcoord_t nb_grid_pts{muGrid::CcoordOps::get_cube<Dim>(grid_size)};
     const DynRcoord_t lengths{muGrid::CcoordOps::get_cube<Dim>(1.)};
     constexpr Formulation form{Formulation::small_strain};
 
     // number of layers in the hard material
-    constexpr Dim_t nb_lays{1};
+    constexpr Index_t nb_lays{1};
     constexpr Real contrast{2};
     if (not(nb_lays < nb_grid_pts[0])) {
       throw std::runtime_error(
@@ -134,7 +135,7 @@ namespace muSpectre {
     for (const auto && index_pixel : akantu::enumerate(cell.get_pixels())) {
       auto && index{std::get<0>(index_pixel)};
       auto && pixel{std::get<1>(index_pixel)};
-      if (pixel[0] < Dim_t(nb_lays)) {
+      if (pixel[0] < Index_t(nb_lays)) {
         material_hard.add_pixel(index);
       } else {
         material_soft.add_pixel(index);
@@ -191,7 +192,7 @@ namespace muSpectre {
          akantu::zip(cell.get_pixel_indices(), cell.get_pixels())) {
       auto && index{std::get<0>(index_pixel)};
       auto && pixel{std::get<1>(index_pixel)};
-      if (pixel[0] < Dim_t(nb_lays)) {
+      if (pixel[0] < Index_t(nb_lays)) {
         BOOST_CHECK_LE(
             (Eps_hard - cell.get_strain().get_pixel_map(Dim)[index]).norm(),
             tol);
@@ -216,7 +217,7 @@ namespace muSpectre {
       auto && index{std::get<0>(index_pixel)};
       auto && pixel{std::get<1>(index_pixel)};
       auto && strain = cell.get_strain().get_pixel_map(Dim)[index];
-      if (pixel[0] < Dim_t(nb_lays)) {
+      if (pixel[0] < Index_t(nb_lays)) {
         BOOST_CHECK_LE((Eps_hard - strain).norm(), tol);
       } else {
         BOOST_CHECK_LE((Eps_soft - strain).norm(), tol);
@@ -226,15 +227,16 @@ namespace muSpectre {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(finite_strain_patch_dynamic_solver, Fix,
                                    KrylovSolverList, Fix) {
-    constexpr Dim_t Dim{twoD};
-    const DynCcoord_t nb_grid_pts{muGrid::CcoordOps::get_cube<Dim>(3)};
+    constexpr Index_t Dim{twoD};
+    constexpr Index_t GridSize{3};
+    const DynCcoord_t nb_grid_pts{muGrid::CcoordOps::get_cube<Dim>(GridSize)};
     const DynRcoord_t lengths{muGrid::CcoordOps::get_cube<Dim>(1.)};
     constexpr Formulation form{Formulation::finite_strain};
     // because we compare finitie strain results to small strain predictions
     constexpr Real loose_tol(1e-6);
 
     // number of layers in the hard material
-    constexpr Dim_t nb_lays{1};
+    constexpr Index_t nb_lays{1};
     constexpr Real contrast{2};
     if (not(nb_lays < nb_grid_pts[0])) {
       throw std::runtime_error(
@@ -252,7 +254,7 @@ namespace muSpectre {
     for (const auto && index_pixel : cell.get_pixels().enumerate()) {
       auto && index{std::get<0>(index_pixel)};
       auto && pixel{std::get<1>(index_pixel)};
-      if (pixel[0] < Dim_t(nb_lays)) {
+      if (pixel[0] < Index_t(nb_lays)) {
         material_hard.add_pixel(index);
       } else {
         material_soft.add_pixel(index);
@@ -309,7 +311,7 @@ namespace muSpectre {
          akantu::zip(cell.get_pixel_indices(), cell.get_pixels())) {
       auto && index{std::get<0>(index_pixel)};
       auto && pixel{std::get<1>(index_pixel)};
-      if (pixel[0] < Dim_t(nb_lays)) {
+      if (pixel[0] < Index_t(nb_lays)) {
         BOOST_CHECK_LE((Eps_hard + Eps_hard.Identity() -
                         cell.get_strain().get_pixel_map(Dim)[index])
                            .norm(),
@@ -339,7 +341,7 @@ namespace muSpectre {
       Eigen::Matrix<Real, Dim, Dim> E{
           .5 * (strain.transpose() * strain - strain.Identity(Dim, Dim))};
       Real error{};
-      if (pixel[0] < Dim_t(nb_lays)) {
+      if (pixel[0] < Index_t(nb_lays)) {
         error = (Eps_hard - E).norm();
       } else {
         error = (Eps_soft - E).norm();

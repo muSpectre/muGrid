@@ -71,7 +71,7 @@ namespace muFFT {
     DerivativeBase() = delete;
 
     //! constructor with spatial dimension
-    explicit DerivativeBase(Dim_t spatial_dimension);
+    explicit DerivativeBase(Index_t spatial_dimension);
 
     //! Copy constructor
     DerivativeBase(const DerivativeBase & other) = default;
@@ -97,7 +97,7 @@ namespace muFFT {
 
    protected:
     //! spatial dimension of the problem
-    Dim_t spatial_dimension;
+    Index_t spatial_dimension;
   };
 
   /**
@@ -113,10 +113,10 @@ namespace muFFT {
     FourierDerivative() = delete;
 
     //! Constructor with raw FourierDerivative information
-    explicit FourierDerivative(Dim_t spatial_dimension, Dim_t direction);
+    explicit FourierDerivative(Index_t spatial_dimension, Index_t direction);
 
     //! Constructor with raw FourierDerivative information and shift info
-    explicit FourierDerivative(Dim_t spatial_dimension, Dim_t direction,
+    explicit FourierDerivative(Index_t spatial_dimension, Index_t direction,
                                const Eigen::ArrayXd & shift);
 
     //! Copy constructor
@@ -149,7 +149,7 @@ namespace muFFT {
 
    protected:
     //! spatial direction in which to perform differentiation
-    Dim_t direction;
+    Index_t direction;
     //! real space shift from the position of the center of the cell.
     const Eigen::ArrayXd shift;
   };
@@ -224,8 +224,8 @@ namespace muFFT {
      * `fourier` method. Currently this method is only used in the serial tests.
      */
     template <typename T>
-    void apply(const muGrid::TypedField<T> & in_field, Dim_t in_dof,
-               muGrid::TypedField<T> & out_field, Dim_t out_dof,
+    void apply(const muGrid::TypedField<T> & in_field, Index_t in_dof,
+               muGrid::TypedField<T> & out_field, Index_t out_dof,
                Real fac = 1.0) const {
       // check whether fields are global
       if (!in_field.is_global()) {
@@ -251,11 +251,11 @@ namespace muFFT {
       }
       // get global field collections
       const auto & in_collection{
-        dynamic_cast<const muGrid::GlobalFieldCollection &>(
-            in_field.get_collection())};
+          dynamic_cast<const muGrid::GlobalFieldCollection &>(
+              in_field.get_collection())};
       const auto & out_collection{
-        dynamic_cast<const muGrid::GlobalFieldCollection &>(
-            in_field.get_collection())};
+          dynamic_cast<const muGrid::GlobalFieldCollection &>(
+              in_field.get_collection())};
       if (in_collection.get_nb_pixels() != out_collection.get_nb_pixels()) {
         std::stringstream ss{};
         ss << "Input fields lives on a " << in_collection.get_nb_pixels()
@@ -265,15 +265,15 @@ namespace muFFT {
       }
 
       // construct maps
-      muGrid::FieldMap<Real, Mapping::Const> in_map{
-          in_field, muGrid::PixelSubDiv::Pixel};
-      muGrid::FieldMap<Real, Mapping::Mut> out_map{
-          out_field, muGrid::PixelSubDiv::Pixel};
+      muGrid::FieldMap<Real, Mapping::Const> in_map{in_field,
+                                                    muGrid::PixelSubDiv::Pixel};
+      muGrid::FieldMap<Real, Mapping::Mut> out_map{out_field,
+                                                   muGrid::PixelSubDiv::Pixel};
       // loop over field pixel iterator
-      Dim_t ndim{in_collection.get_spatial_dim()};
+      Index_t ndim{in_collection.get_spatial_dim()};
       auto & nb_grid_pts{
           in_collection.get_pixels().get_nb_subdomain_grid_pts()};
-          in_collection.get_pixels().get_nb_subdomain_grid_pts();
+      in_collection.get_pixels().get_nb_subdomain_grid_pts();
       for (const auto && coord : in_collection.get_pixels()) {
         T derivative{};
         // loop over stencil
@@ -282,12 +282,12 @@ namespace muFFT {
           // TODO(pastewka): This only works in serial. For this to work
           //  properly in (MPI) parallel, we need ghost buffers (which will
           //  affect large parts of the code).
-          for (Dim_t dim{0}; dim < ndim; ++dim) {
+          for (Index_t dim{0}; dim < ndim; ++dim) {
             coord2[dim] =
                 muGrid::CcoordOps::modulo(coord2[dim], nb_grid_pts[dim]);
           }
           derivative += this->stencil[this->pixels.get_index(dcoord)] *
-              in_map[in_collection.get_index(coord2)](in_dof);
+                        in_map[in_collection.get_index(coord2)](in_dof);
         }
         out_map[out_collection.get_index(coord)](out_dof) = fac * derivative;
       }
@@ -301,8 +301,7 @@ namespace muFFT {
      */
     virtual Complex fourier(const Vector & phase) const {
       Complex s{0, 0};
-      for (auto && dcoord :
-           muGrid::CcoordOps::DynamicPixels(
+      for (auto && dcoord : muGrid::CcoordOps::DynamicPixels(
                this->pixels.get_nb_subdomain_grid_pts(),
                this->pixels.get_subdomain_locations())) {
         const Real arg{phase.matrix().dot(eigen(dcoord).template cast<Real>())};
@@ -325,13 +324,11 @@ namespace muFFT {
     DiscreteDerivative rollaxes(int distance = 1) const;
 
     //! return the stencil data
-    const Eigen::ArrayXd & get_stencil() const {
-      return this->stencil;
-    }
+    const Eigen::ArrayXd & get_stencil() const { return this->stencil; }
 
    protected:
     muGrid::CcoordOps::DynamicPixels pixels{};  //!< iterate over the stencil
-    const Eigen::ArrayXd stencil;  //!< Finite-differences stencil
+    const Eigen::ArrayXd stencil;               //!< Finite-differences stencil
   };
 
   /**
@@ -349,7 +346,7 @@ namespace muFFT {
    *
    * @param spatial_dimension number of spatial dimensions
    */
-  Gradient_t make_fourier_gradient(const Dim_t & spatial_dimension);
+  Gradient_t make_fourier_gradient(const Index_t & spatial_dimension);
 }  // namespace muFFT
 
 #endif  // SRC_LIBMUFFT_DERIVATIVE_HH_

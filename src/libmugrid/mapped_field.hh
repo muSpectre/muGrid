@@ -99,11 +99,11 @@ namespace muGrid {
      */
     template <bool StaticConstructor = IsStatic(),
               std::enable_if_t<not StaticConstructor, int> = 0>
-    MappedField(const std::string & unique_name, const Dim_t & nb_rows,
-                const Dim_t & nb_cols, const PixelSubDiv & iter_type,
+    MappedField(const std::string & unique_name, const Index_t & nb_rows,
+                const Index_t & nb_cols, const PixelSubDiv & iter_type,
                 FieldCollection & collection,
                 const Unit & unit = Unit::unitless(),
-                const Dim_t & nb_sub_pts = Unknown)
+                const Index_t & nb_sub_pts = Unknown)
         : field{collection.register_field<Scalar>(
               unique_name, nb_rows * nb_cols, iter_type, unit, nb_sub_pts)},
           map{this->field, nb_rows, iter_type} {
@@ -149,96 +149,6 @@ namespace muGrid {
     FieldMapType & get_map() { return this->map; }
 
    protected:
-    // /**
-    //  * evaluate and return the number of components the dynamically mapped
-    //  field
-    //  * needs to store per sub-point
-    //  */
-    // template <bool StaticConstructor = IsStatic(),
-    //           std::enable_if_t<not StaticConstructor, int> = 0>
-    // static Dim_t compute_nb_components_dynamic(const Dim_t & nb_rows,
-    //                                            const Dim_t & nb_cols,
-    //                                            const PixelSubDiv & iter_type,
-    //                                            const std::string &
-    //                                            unique_name, const Dim_t &
-    //                                            nb_sub_pts, FieldCollection &
-    //                                            collection) {
-    //   static_assert(
-    //       StaticConstructor == IsStatic(),
-    //       "StaticConstructor is a SFINAE parameter, do not touch it.");
-
-    //   const Dim_t dof_per_quad_pt{nb_rows * nb_cols};
-    //   switch (iter_type) {
-    //   case PixelSubDiv::NodalPt: {
-    //     //fall-through, same treatment as PixelSubDiv::QuadPt
-    //   }
-    //   case PixelSubDiv::QuadPt: {
-    //     return dof_per_quad_pt;
-    //     break;
-    //   }
-    //   case PixelSubDiv::Pixel: {
-    //     if (not collection.has_nb_quad_pts()) {
-    //       throw FieldMapError("Can't create a pixel map for field '" +
-    //                           unique_name +
-    //                           "' before the number of quadrature points has "
-    //                           "been set for the field collection.");
-    //     }
-    //     const auto & nb_quad{collection.get_nb_quad_pts()};
-    //     if ((dof_per_quad_pt / nb_quad) * nb_quad != dof_per_quad_pt) {
-    //       std::stringstream error{};
-    //       error << "Inconsistent input to create a mapped field: the number
-    //       of "
-    //                "components per iterate ("
-    //             << dof_per_quad_pt << " = " << nb_rows << " × " << nb_cols
-    //             << ") is not a multiple of the number of quad points ("
-    //             << nb_quad << ").";
-    //       throw FieldMapError(error.str());
-    //     }
-    //     return dof_per_quad_pt / collection.get_nb_quad_pts();
-    //     break;
-    //   }
-    //   default:
-    //     throw FieldMapError("unknown iteration type");
-    //     break;
-    //   }
-    // }
-
-    // /**
-    //  * evaluate and return the number of components the statically mapped
-    //  field
-    //  * needs to store per quadrature point
-    //  */
-    // template <bool StaticConstructor = IsStatic(),
-    //           std::enable_if_t<StaticConstructor, int> = 0>
-    // static Dim_t compute_nb_components_static(const std::string &
-    // unique_name,
-    //                                           FieldCollection & collection) {
-    //   static_assert(
-    //       StaticConstructor == IsStatic(),
-    //       "StaticConstructor is a SFINAE parameter, do not touch it.");
-    //   switch (FieldMapType::GetIterationType()) {
-    //   case PixelSubDiv::QuadPt: {
-    //     return FieldMapType::Stride();
-    //     break;
-    //   }
-    //   case PixelSubDiv::Pixel: {
-    //     if (not collection.has_nb_quad_pts()) {
-    //       throw FieldMapError("Can't create a pixel map for field '" +
-    //                           unique_name +
-    //                           "' before the number of quadrature points has "
-    //                           "been set for the field collection.");
-    //     }
-    //     return FieldMapType::Stride() / collection.get_nb_quad_pts();
-    //     break;
-    //   }
-    //   default:
-    //     throw FieldMapError("unknown iteration type");
-    //     break;
-    //   }
-    // }
-
-    // Dim_t nb_components;  //!< number of components stored per quadrature
-    // point
     TypedField<Scalar> & field;  //!< reference to mapped field
     FieldMapType map;            //!< associated field map
   };

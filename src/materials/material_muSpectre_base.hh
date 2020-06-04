@@ -84,13 +84,13 @@ namespace muSpectre {
    *                     in finite-strain computations
    */
 
-  template <class Material, Dim_t DimM>
+  template <class Material, Index_t DimM>
   class MaterialMuSpectre;
 
   /**
    * Base class for most convenient implementation of materials
    */
-  template <class Material, Dim_t DimM>
+  template <class Material, Index_t DimM>
   class MaterialMuSpectre : public MaterialBase {
    public:
     /**
@@ -113,8 +113,9 @@ namespace muSpectre {
     MaterialMuSpectre() = delete;
 
     //! Construct by name
-    MaterialMuSpectre(const std::string & name, const Dim_t & spatial_dimension,
-                      const Dim_t & nb_quad_pts,
+    MaterialMuSpectre(const std::string & name,
+                      const Index_t & spatial_dimension,
+                      const Index_t & nb_quad_pts,
                       const std::shared_ptr<muGrid::LocalFieldCollection> &
                           parent_field_collection = nullptr);
 
@@ -178,7 +179,7 @@ namespace muSpectre {
                                  StoreNativeStress::no) final;
 
     //! return the material dimension at compile time
-    constexpr static Dim_t MaterialDimension() { return DimM; }
+    constexpr static Index_t MaterialDimension() { return DimM; }
 
     inline std::tuple<DynMatrix_t, DynMatrix_t>
     constitutive_law_dynamic(const Eigen::Ref<const DynMatrix_t> & strain,
@@ -235,10 +236,10 @@ namespace muSpectre {
   };
 
   /* ---------------------------------------------------------------------- */
-  template <class Material, Dim_t DimM>
+  template <class Material, Index_t DimM>
   MaterialMuSpectre<Material, DimM>::MaterialMuSpectre(
-      const std::string & name, const Dim_t & spatial_dimension,
-      const Dim_t & nb_quad_pts,
+      const std::string & name, const Index_t & spatial_dimension,
+      const Index_t & nb_quad_pts,
       const std::shared_ptr<muGrid::LocalFieldCollection> &
           parent_field_collection)
       : Parent(name, spatial_dimension, DimM, nb_quad_pts,
@@ -257,7 +258,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <class Material, Dim_t DimM>
+  template <class Material, Index_t DimM>
   template <class... ConstructorArgs>
   Material &
   MaterialMuSpectre<Material, DimM>::make(Cell & cell, const std::string & name,
@@ -279,7 +280,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <class Material, Dim_t DimM>
+  template <class Material, Index_t DimM>
   template <class... InternalArgs>
   void MaterialMuSpectre<Material, DimM>::add_pixel_split(
       const size_t & pixel_id, Real ratio, InternalArgs... args) {
@@ -289,7 +290,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <class Material, Dim_t DimM>
+  template <class Material, Index_t DimM>
   void MaterialMuSpectre<Material, DimM>::add_split_pixels_precipitate(
       const std::vector<size_t> & intersected_pixels,
       const std::vector<Real> & intersection_ratios) {
@@ -302,13 +303,13 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <class Material, Dim_t DimM>
+  template <class Material, Index_t DimM>
   template <class... ConstructorArgs>
   std::tuple<std::shared_ptr<Material>, MaterialEvaluator<DimM>>
   MaterialMuSpectre<Material, DimM>::make_evaluator(
       ConstructorArgs &&... args) {
-    constexpr Dim_t SpatialDimension{DimM};
-    constexpr Dim_t NbQuadPts{1};
+    constexpr Index_t SpatialDimension{DimM};
+    constexpr Index_t NbQuadPts{1};
     auto mat = std::make_shared<Material>("name", SpatialDimension, NbQuadPts,
                                           args...);
     using Ret_t =
@@ -317,13 +318,13 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <class Material, Dim_t DimM>
+  template <class Material, Index_t DimM>
   bool MaterialMuSpectre<Material, DimM>::has_native_stress() const {
     return this->native_stress.has_value();
   }
 
   /* ---------------------------------------------------------------------- */
-  template <class Material, Dim_t DimM>
+  template <class Material, Index_t DimM>
   muGrid::RealField & MaterialMuSpectre<Material, DimM>::get_native_stress() {
     if (not this->native_stress.has_value()) {
       throw muGrid::RuntimeError("native stress has not been evaluated");
@@ -332,7 +333,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <class Material, Dim_t DimM>
+  template <class Material, Index_t DimM>
   auto MaterialMuSpectre<Material, DimM>::get_mapped_native_stress()
       -> muGrid::MappedT2Field<Real, Mapping::Mut, DimM,
                                PixelSubDiv::QuadPt> & {
@@ -343,7 +344,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <class Material, Dim_t DimM>
+  template <class Material, Index_t DimM>
   template <Formulation Form, SplitCell IsSplit, class... Args>
   void MaterialMuSpectre<Material, DimM>::compute_stresses_dispatch1(
       const StoreNativeStress store_native_stress, Args &&... args) {
@@ -366,7 +367,7 @@ namespace muSpectre {
     }
   }
 
-  template <class Material, Dim_t DimM>
+  template <class Material, Index_t DimM>
   void MaterialMuSpectre<Material, DimM>::compute_stresses(
       const muGrid::RealField & F, muGrid::RealField & P,
       const Formulation & form, const SplitCell & is_cell_split,
@@ -441,7 +442,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <class Material, Dim_t DimM>
+  template <class Material, Index_t DimM>
   void MaterialMuSpectre<Material, DimM>::compute_stresses_tangent(
       const muGrid::RealField & F, muGrid::RealField & P, muGrid::RealField & K,
       const Formulation & form, const SplitCell & is_cell_split,
@@ -515,7 +516,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <class Material, Dim_t DimM>
+  template <class Material, Index_t DimM>
   template <Formulation Form, SplitCell IsCellSplit,
             StoreNativeStress DoStoreNative>
   void MaterialMuSpectre<Material, DimM>::compute_stresses_worker(
@@ -529,7 +530,7 @@ namespace muSpectre {
        The internal_variables tuple contains whatever internal variables
        Material declared (e.g., eigenstrain, strain rate, etc.)
     */
-    auto & this_mat {static_cast<Material &>(*this)};
+    auto & this_mat{static_cast<Material &>(*this)};
     using traits = MaterialMuSpectre_traits<Material>;
     constexpr StrainMeasure expected_strain_m{traits::strain_measure};
     if (Form == Formulation::small_strain) {
@@ -641,7 +642,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <class Material, Dim_t DimM>
+  template <class Material, Index_t DimM>
   template <Formulation Form, SplitCell IsCellSplit,
             StoreNativeStress DoStoreNative>
   void MaterialMuSpectre<Material, DimM>::compute_stresses_worker(
@@ -752,7 +753,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <class Material, Dim_t DimM>
+  template <class Material, Index_t DimM>
   auto MaterialMuSpectre<Material, DimM>::constitutive_law_dynamic(
       const Eigen::Ref<const DynMatrix_t> & strain,
       const size_t & quad_pt_index, const Formulation & form)

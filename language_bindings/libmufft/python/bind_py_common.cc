@@ -57,7 +57,7 @@ void add_version(py::module & mod) {
       .def("is_dirty", &muFFT::version::is_dirty);
 }
 
-template <muGrid::Dim_t dim>
+template <muGrid::Index_t dim>
 void add_get_nb_hermitian_grid_pts_helper(py::module & mod) {
   mod.def(
       "get_nb_hermitian_grid_pts",
@@ -68,14 +68,14 @@ void add_get_nb_hermitian_grid_pts_helper(py::module & mod) {
       "return the hermitian sizes corresponding to the true sizes");
 }
 
-template <muGrid::Dim_t dim>
+template <muGrid::Index_t dim>
 void add_fft_freqs_helper(py::module & mod) {
   using Ccoord = muGrid::Ccoord_t<dim>;
   using FFTFreqs = muFFT::FFT_freqs<dim>;
   using ArrayXDd =
       Eigen::Array<muGrid::Real, dim, Eigen::Dynamic, Eigen::RowMajor>;
   using ArrayXDi =
-      Eigen::Array<muGrid::Dim_t, dim, Eigen::Dynamic, Eigen::RowMajor>;
+      Eigen::Array<muGrid::Index_t, dim, Eigen::Dynamic, Eigen::RowMajor>;
   std::stringstream name{};
   name << "FFTFreqs_" << dim << "d";
   py::class_<FFTFreqs>(mod, name.str().c_str())
@@ -112,7 +112,7 @@ void add_get_nb_hermitian(py::module & mod) {
   add_get_nb_hermitian_grid_pts_helper<muGrid::threeD>(mod);
 }
 
-template <muGrid::Dim_t dim>
+template <muGrid::Index_t dim>
 void add_get_index_helper(py::module & mod) {
   using Ccoord = muGrid::Ccoord_t<dim>;
   mod.def(

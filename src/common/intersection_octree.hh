@@ -56,27 +56,27 @@ namespace muSpectre {
 
    public:
     //! constructor
-    explicit Vectors_t(const Dim_t & dim) : dim{dim} {}
+    explicit Vectors_t(const Index_t & dim) : dim{dim} {}
 
     //! constructor
-    Vectors_t(const std::vector<Real> & data, const Dim_t & dim)
+    Vectors_t(const std::vector<Real> & data, const Index_t & dim)
         : data{data}, dim{dim} {}
 
     //! access operator:
-    Eigen::Map<const Vector_t> operator[](const Dim_t & id) const {
+    Eigen::Map<const Vector_t> operator[](const Index_t & id) const {
       return Eigen::Map<const Vector_t>(&this->data.data()[this->dim * id],
                                         this->dim, 1);
     }
 
     //! access operator:
-    Eigen::Map<Vector_t> operator[](const Dim_t & id) {
+    Eigen::Map<Vector_t> operator[](const Index_t & id) {
       return Eigen::Map<Vector_t>(&this->data.data()[this->dim * id], this->dim,
                                   1);
     }
 
     //! access to staic sized map of the vectors:
-    template <Dim_t DimS>
-    Eigen::Map<Eigen::Matrix<Real, DimS, 1>> at(const Dim_t & id) {
+    template <Index_t DimS>
+    Eigen::Map<Eigen::Matrix<Real, DimS, 1>> at(const Index_t & id) {
       return Eigen::Map<Eigen::Matrix<Real, DimS, 1>>(
           &this->data.data()[DimS * id], this->dim, 1);
     }
@@ -109,15 +109,15 @@ namespace muSpectre {
       }
     }
 
-    inline std::vector<Real> get_a_vector(const Dim_t & id) {
+    inline std::vector<Real> get_a_vector(const Index_t & id) {
       std::vector<Real> ret(this->dim);
-      for (int i{id * dim}; i < this->dim * (id + 1); ++i) {
+      for (Index_t i{id * dim}; i < this->dim * (id + 1); ++i) {
         ret.push_back(this->data[i]);
       }
       return ret;
     }
 
-    inline const Dim_t & get_dim() { return this->dim; }
+    inline const Index_t & get_dim() { return this->dim; }
 
     /* --------------------------------------------------------------------- */
     // be careful that the index increments with DimS instead of one make
@@ -127,7 +127,7 @@ namespace muSpectre {
       using value_type = Eigen::Map<Vector_t>;
       using value_type_const = Eigen::Map<const Vector_t>;
       //! constructor
-      explicit iterator(const Vectors_t & data, const Dim_t & dim,
+      explicit iterator(const Vectors_t & data, const Index_t & dim,
                         bool begin = true)
           : vectors(data), dim{dim}, index{begin ? 0
                                                  : this->vectors.data.size()} {}
@@ -161,7 +161,7 @@ namespace muSpectre {
 
      protected:
       const Vectors_t & vectors;
-      Dim_t dim;
+      Index_t dim;
       size_t index;
     };
 
@@ -176,7 +176,7 @@ namespace muSpectre {
     /* --------------------------------------------------------------------- */
    protected:
     std::vector<Real> data{};
-    Dim_t dim;
+    Index_t dim;
   };
 
   template <SplitCell IsSplit>
@@ -189,9 +189,9 @@ namespace muSpectre {
     Node() = delete;
 
     // Construct by origin, lenghts, and depth
-    Node(const Dim_t & dim, const DynRcoord_t & new_origin,
-         const DynCcoord_t & new_lenghts, const Dim_t & depth,
-         const Dim_t & max_depth, RootNode_t & root, const bool & is_root);
+    Node(const Index_t & dim, const DynRcoord_t & new_origin,
+         const DynCcoord_t & new_lenghts, const Index_t & depth,
+         const Index_t & max_depth, RootNode_t & root, const bool & is_root);
 
     // This function is put here as a comment, so we could add a octree by
     // giving a cell as its input that seems to be of possible use in the future
@@ -209,7 +209,7 @@ namespace muSpectre {
 
     // This function checks the status of the node and orders its devision into
     // smaller nodes or asssign material to it
-    template <Dim_t DimS>
+    template <Index_t DimS>
     void check_node_helper();
 
     void check_node();
@@ -217,11 +217,11 @@ namespace muSpectre {
     // This function gives the ratio of the node which happens to be inside the
     // precipitate and assign materila to it if node is a pixel or divide it
     // furhter if it is not
-    template <Dim_t DimS>
+    template <Index_t DimS>
     void split_node_helper(const Real & ratio,
                            const corkpp::IntersectionState & state);
 
-    template <Dim_t DimS>
+    template <Index_t DimS>
     void split_node_helper(const Real & intersection_ratio,
                            const corkpp::vector_t & normal_vector,
                            const corkpp::IntersectionState & state);
@@ -232,20 +232,20 @@ namespace muSpectre {
                     const corkpp::vector_t & normal_vector,
                     const corkpp::IntersectionState & state);
 
-    template <Dim_t DimS>
+    template <Index_t DimS>
     void divide_node_helper();
     // this function constructs children of a node
     void divide_node();
 
    protected:
     //
-    Dim_t dim;
+    Index_t dim;
     RootNode_t & root_node;
     DynRcoord_t origin, Rlengths{};
     DynCcoord_t Clengths{};
-    int depth;
+    Index_t depth;
     bool is_pixel;
-    int children_no;
+    Index_t children_no;
     std::vector<Node> children{};
   };
 
@@ -301,10 +301,10 @@ namespace muSpectre {
     }
 
     // Returns the maximum of the nb_grid_pts in all directions
-    Dim_t make_max_resolution(const Cell & cell) const;
+    Index_t make_max_resolution(const Cell & cell) const;
 
     // Retruns the maximum depth of the branches in the OctTree
-    Dim_t make_max_depth(const Cell & cell) const;
+    Index_t make_max_depth(const Cell & cell) const;
 
     // checking rootnode:
     void check_root_node();
@@ -322,8 +322,9 @@ namespace muSpectre {
     DynRcoord_t cell_length;      //! The Real size of the cell
     DynRcoord_t pixel_lengths;    //! The Real size of each pixel
     DynCcoord_t cell_resolution;  //! The nb_grid_pts for the
-    int max_resolution;  //! The maximum of the nb_grid_pts in all directions
-    int max_depth;       //! The maximum depth of the branches in the OctTree
+    Index_t
+        max_resolution;  //! The maximum of the nb_grid_pts in all directions
+    Index_t max_depth;   //! The maximum depth of the branches in the OctTree
     std::vector<DynRcoord_t>
         precipitate_vertices{};  //! The coordinates of the vertices of the
                                  //! perticpiate

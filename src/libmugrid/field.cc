@@ -41,7 +41,7 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   Field::Field(const std::string & unique_name, FieldCollection & collection,
-               const Dim_t & nb_dof_per_sub_pt, const Dim_t & nb_sub_pts,
+               const Index_t & nb_dof_per_sub_pt, const Index_t & nb_sub_pts,
                const PixelSubDiv & sub_division, const Unit & unit)
       : name{unique_name}, collection{collection},
         nb_dof_per_sub_pt{nb_dof_per_sub_pt},
@@ -57,25 +57,25 @@ namespace muGrid {
   size_t Field::size() const { return this->current_size; }
 
   /* ---------------------------------------------------------------------- */
-  const Dim_t & Field::get_nb_dof_per_sub_pt() const {
+  const Index_t & Field::get_nb_dof_per_sub_pt() const {
     return this->nb_dof_per_sub_pt;
   }
 
   /* ---------------------------------------------------------------------- */
-  const Dim_t & Field::get_nb_sub_pts() const { return this->nb_sub_pts; }
+  const Index_t & Field::get_nb_sub_pts() const { return this->nb_sub_pts; }
 
   /* ---------------------------------------------------------------------- */
-  Dim_t Field::get_nb_dof_per_pixel() const {
+  Index_t Field::get_nb_dof_per_pixel() const {
     return this->get_nb_dof_per_sub_pt() * this->get_nb_sub_pts();
   }
 
   /* ---------------------------------------------------------------------- */
-  Dim_t Field::get_nb_pixels() const {
+  Index_t Field::get_nb_pixels() const {
     return this->collection.get_nb_pixels();
   }
 
   /* ---------------------------------------------------------------------- */
-  Dim_t Field::get_nb_entries() const {
+  Index_t Field::get_nb_entries() const {
     if (not this->has_nb_sub_pts()) {
       return Unknown;
     }
@@ -83,8 +83,8 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  std::vector<Dim_t> Field::get_shape(const PixelSubDiv & iter_type) const {
-    std::vector<Dim_t> shape;
+  std::vector<Index_t> Field::get_shape(const PixelSubDiv & iter_type) const {
+    std::vector<Index_t> shape;
 
     auto && use_iter_type{this->get_nb_sub_pts() == 1 ? PixelSubDiv::Pixel
                                                       : iter_type};
@@ -98,9 +98,9 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  std::vector<Dim_t> Field::get_strides(const PixelSubDiv & iter_type,
-                                        const Dim_t & multiplier) const {
-    std::vector<Dim_t> strides;
+  std::vector<Index_t> Field::get_strides(const PixelSubDiv & iter_type,
+                                          const Index_t & multiplier) const {
+    std::vector<Index_t> strides;
 
     auto && use_iter_type{this->get_nb_sub_pts() == 1 ? PixelSubDiv::Pixel
                                                       : iter_type};
@@ -114,15 +114,15 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  std::vector<Dim_t>
-  Field::get_strides(const std::vector<Dim_t> & custom_component_shape,
-                     const Dim_t & multiplier) const {
-    std::vector<Dim_t> strides;
+  std::vector<Index_t>
+  Field::get_strides(const std::vector<Index_t> & custom_component_shape,
+                     const Index_t & multiplier) const {
+    std::vector<Index_t> strides;
 
     //! check compatibility of component_shape
     auto && nb_components{std::accumulate(custom_component_shape.begin(),
                                           custom_component_shape.end(), 1,
-                                          std::multiplies<Dim_t>())};
+                                          std::multiplies<Index_t>())};
     if (nb_components != this->get_nb_dof_per_pixel()) {
       std::stringstream message{};
       message << "The component shape " << custom_component_shape << " has "
@@ -131,7 +131,7 @@ namespace muGrid {
               << " degrees of freedom per pixel.";
       throw FieldError{message.str()};
     }
-        Dim_t accumulator{multiplier};
+    Index_t accumulator{multiplier};
     for (auto && n : custom_component_shape) {
       strides.push_back(accumulator);
       accumulator *= n;
@@ -143,8 +143,8 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  std::vector<Dim_t> Field::get_pixels_shape() const {
-    std::vector<Dim_t> shape;
+  std::vector<Index_t> Field::get_pixels_shape() const {
+    std::vector<Index_t> shape;
     if (this->is_global()) {
       auto & coll =
           dynamic_cast<const GlobalFieldCollection &>(this->collection);
@@ -158,8 +158,8 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  std::vector<Dim_t> Field::get_pixels_strides() const {
-    std::vector<Dim_t> strides;
+  std::vector<Index_t> Field::get_pixels_strides() const {
+    std::vector<Index_t> strides;
     if (this->is_global()) {
       auto & coll{
           dynamic_cast<const GlobalFieldCollection &>(this->collection)};
@@ -173,10 +173,10 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  std::vector<Dim_t>
+  std::vector<Index_t>
   Field::get_components_strides(const PixelSubDiv & iter_type) const {
-    std::vector<Dim_t> strides{};
-    Dim_t accumulator{1};
+    std::vector<Index_t> strides{};
+    Index_t accumulator{1};
     for (auto && n : this->get_components_shape(iter_type)) {
       strides.push_back(accumulator);
       accumulator *= n;
@@ -185,9 +185,9 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  std::vector<Dim_t>
+  std::vector<Index_t>
   Field::get_components_shape(const PixelSubDiv & iter_type) const {
-    std::vector<Dim_t> shape;
+    std::vector<Index_t> shape;
 
     if (this->get_nb_sub_pts() == 1 || iter_type == PixelSubDiv::Pixel) {
       shape.push_back(this->nb_dof_per_sub_pt * this->get_nb_sub_pts());
@@ -199,7 +199,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  Dim_t Field::get_stride(const PixelSubDiv & iter_type) const {
+  Index_t Field::get_stride(const PixelSubDiv & iter_type) const {
     // make sure that the requested itertype is either
     //
     // * the field's natural type,
@@ -292,12 +292,12 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  Dim_t Field::get_default_nb_rows(const PixelSubDiv & /*iter_type*/) const {
+  Index_t Field::get_default_nb_rows(const PixelSubDiv & /*iter_type*/) const {
     return this->get_nb_dof_per_sub_pt();
   }
 
   /* ---------------------------------------------------------------------- */
-  Dim_t Field::get_default_nb_cols(const PixelSubDiv & iter_type) const {
+  Index_t Field::get_default_nb_cols(const PixelSubDiv & iter_type) const {
     return (iter_type == PixelSubDiv::Pixel ? this->get_nb_sub_pts() : 1);
   }
   /* ---------------------------------------------------------------------- */
@@ -318,7 +318,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  void Field::set_nb_sub_pts(const Dim_t & nb_sub_pts_per_pixel) {
+  void Field::set_nb_sub_pts(const Index_t & nb_sub_pts_per_pixel) {
     this->nb_sub_pts = nb_sub_pts_per_pixel;
   }
 

@@ -117,8 +117,9 @@ namespace muGrid {
      * @param nb_quad_pts number of quadrature points per pixel/voxel
      * @param nb_nodal_pts number of nodes per pixel/voxel
      */
-    FieldCollection(ValidityDomain domain, const Dim_t & spatial_dimension,
-                    const Dim_t & nb_quad_pts, const Dim_t & nb_nodal_pts = 1);
+    FieldCollection(ValidityDomain domain, const Index_t & spatial_dimension,
+                    const Index_t & nb_quad_pts,
+                    const Index_t & nb_nodal_pts = 1);
 
    public:
     //! Default constructor
@@ -149,10 +150,10 @@ namespace muGrid {
      */
     template <typename T>
     TypedField<T> & register_field(const std::string & unique_name,
-                                   const Dim_t & nb_dof_per_sub_pt,
+                                   const Index_t & nb_dof_per_sub_pt,
                                    const PixelSubDiv & sub_division,
                                    const Unit & unit = Unit::unitless(),
-                                   const Dim_t & nb_sub_pts = Unknown) {
+                                   const Index_t & nb_sub_pts = Unknown) {
       static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
                     "You can only register fields templated with one of the "
                     "numeric types Real, Complex, Int, or UInt");
@@ -169,11 +170,10 @@ namespace muGrid {
      * point (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a
      * scalar field)
      */
-    TypedField<Real> & register_real_field(const std::string & unique_name,
-                                           const Dim_t & nb_dof_per_sub_pt,
-                                           const PixelSubDiv & sub_division,
-                                           const Unit & unit = Unit::unitless(),
-                                           const Dim_t & nb_sub_pts = Unknown);
+    TypedField<Real> & register_real_field(
+        const std::string & unique_name, const Index_t & nb_dof_per_sub_pt,
+        const PixelSubDiv & sub_division, const Unit & unit = Unit::unitless(),
+        const Index_t & nb_sub_pts = Unknown);
     /**
      * place a new complex-valued field  in the responsibility of this
      * collection (Note, because fields have protected constructors, users can't
@@ -184,9 +184,9 @@ namespace muGrid {
      * scalar field)
      */
     TypedField<Complex> & register_complex_field(
-        const std::string & unique_name, const Dim_t & nb_dof_per_sub_pt,
+        const std::string & unique_name, const Index_t & nb_dof_per_sub_pt,
         const PixelSubDiv & sub_division, const Unit & unit = Unit::unitless(),
-        const Dim_t & nb_sub_pts = Unknown);
+        const Index_t & nb_sub_pts = Unknown);
     /**
      * place a new integer-valued field  in the responsibility of this
      * collection (Note, because fields have protected constructors, users can't
@@ -197,10 +197,10 @@ namespace muGrid {
      * scalar field)
      */
     TypedField<Int> & register_int_field(const std::string & unique_name,
-                                         const Dim_t & nb_dof_per_sub_pt,
+                                         const Index_t & nb_dof_per_sub_pt,
                                          const PixelSubDiv & sub_division,
                                          const Unit & unit = Unit::unitless(),
-                                         const Dim_t & nb_sub_pts = Unknown);
+                                         const Index_t & nb_sub_pts = Unknown);
     /**
      * place a new unsigned integer-valued field  in the responsibility of this
      * collection (Note, because fields have protected constructors, users can't
@@ -210,11 +210,10 @@ namespace muGrid {
      * point (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a
      * scalar field)
      */
-    TypedField<Uint> & register_uint_field(const std::string & unique_name,
-                                           const Dim_t & nb_dof_per_sub_pt,
-                                           const PixelSubDiv & sub_division,
-                                           const Unit & unit = Unit::unitless(),
-                                           const Dim_t & nb_sub_pts = Unknown);
+    TypedField<Uint> & register_uint_field(
+        const std::string & unique_name, const Index_t & nb_dof_per_sub_pt,
+        const PixelSubDiv & sub_division, const Unit & unit = Unit::unitless(),
+        const Index_t & nb_sub_pts = Unknown);
 
     /**
      * place a new state field in the responsibility of this collection (Note,
@@ -222,10 +221,10 @@ namespace muGrid {
      */
     template <typename T>
     TypedStateField<T> & register_state_field(
-        const std::string & unique_prefix, const Dim_t & nb_memory,
-        const Dim_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
+        const std::string & unique_prefix, const Index_t & nb_memory,
+        const Index_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
         const Unit & unit = Unit::unitless(),
-        const Dim_t & nb_sub_pts = Unknown) {
+        const Index_t & nb_sub_pts = Unknown) {
       static_assert(
           std::is_scalar<T>::value or std::is_same<T, Complex>::value,
           "You can only register state fields templated with one of the "
@@ -246,10 +245,10 @@ namespace muGrid {
      * quadrature point
      */
     TypedStateField<Real> & register_real_state_field(
-        const std::string & unique_prefix, const Dim_t & nb_memory,
-        const Dim_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
+        const std::string & unique_prefix, const Index_t & nb_memory,
+        const Index_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
         const Unit & unit = Unit::unitless(),
-        const Dim_t & nb_sub_pts = Unknown);
+        const Index_t & nb_sub_pts = Unknown);
 
     /**
      * place a new complex-valued state field in the responsibility of this
@@ -262,10 +261,10 @@ namespace muGrid {
      * quadrature point
      */
     TypedStateField<Complex> & register_complex_state_field(
-        const std::string & unique_prefix, const Dim_t & nb_memory,
-        const Dim_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
+        const std::string & unique_prefix, const Index_t & nb_memory,
+        const Index_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
         const Unit & unit = Unit::unitless(),
-        const Dim_t & nb_sub_pts = Unknown);
+        const Index_t & nb_sub_pts = Unknown);
 
     /**
      * place a new integer-valued state field in the responsibility of this
@@ -278,10 +277,10 @@ namespace muGrid {
      * quadrature point
      */
     TypedStateField<Int> & register_int_state_field(
-        const std::string & unique_prefix, const Dim_t & nb_memory,
-        const Dim_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
+        const std::string & unique_prefix, const Index_t & nb_memory,
+        const Index_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
         const Unit & unit = Unit::unitless(),
-        const Dim_t & nb_sub_pts = Unknown);
+        const Index_t & nb_sub_pts = Unknown);
 
     /**
      * place a new unsigned integer-valued state field in the responsibility of
@@ -294,10 +293,10 @@ namespace muGrid {
      * quadrature point
      */
     TypedStateField<Uint> & register_uint_state_field(
-        const std::string & unique_prefix, const Dim_t & nb_memory,
-        const Dim_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
+        const std::string & unique_prefix, const Index_t & nb_memory,
+        const Index_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
         const Unit & unit = Unit::unitless(),
-        const Dim_t & nb_sub_pts = Unknown);
+        const Index_t & nb_sub_pts = Unknown);
 
     //! check whether a field of name 'unique_name' has already been
     //! registered
@@ -308,7 +307,7 @@ namespace muGrid {
     bool state_field_exists(const std::string & unique_prefix) const;
 
     //! returns the number of pixels present in the collection
-    Dim_t get_nb_pixels() const;
+    Index_t get_nb_pixels() const;
 
     /**
      * check whether the number of quadrature points per pixel/voxel has been
@@ -326,28 +325,28 @@ namespace muGrid {
      * set the number of quadrature points per pixel/voxel. Can only be done
      * once.
      */
-    void set_nb_quad_pts(const Dim_t & nb_quad_pts_per_pixel);
+    void set_nb_quad_pts(const Index_t & nb_quad_pts_per_pixel);
 
     /**
      * set the number of nodal points per pixel/voxel. Can only be done
      * once.
      */
-    void set_nb_nodal_pts(const Dim_t &  nb_quad_pts_per_pixel);
+    void set_nb_nodal_pts(const Index_t & nb_quad_pts_per_pixel);
 
     /**
      * return the number of quadrature points per pixel
      */
-    const Dim_t & get_nb_quad_pts() const;
+    const Index_t & get_nb_quad_pts() const;
 
     /**
      * return the number of nodal points per pixel
      */
-    const Dim_t & get_nb_nodal_pts() const;
+    const Index_t & get_nb_nodal_pts() const;
 
     /**
      * return the spatial dimension of the underlying discretisation grid
      */
-    const Dim_t & get_spatial_dim() const;
+    const Index_t & get_spatial_dim() const;
 
     /**
      * return the domain of validity (i.e., wher the fields are defined globally
@@ -411,8 +410,8 @@ namespace muGrid {
      * nb_sub_pts for iterators, which need a known value. Use
      * `check_initialised_nb_sub_pts()` instead for that.
      */
-    Dim_t check_nb_sub_pts(const Dim_t & nb_sub_pts,
-                           const PixelSubDiv & iteration_type) const;
+    Index_t check_nb_sub_pts(const Index_t & nb_sub_pts,
+                             const PixelSubDiv & iteration_type) const;
 
     /**
      * run-time checker for nb_sub_pts: checks whether the number of sub-points
@@ -420,24 +419,24 @@ namespace muGrid {
      * and set to a positive integer value (i.e., not `Unknown`).
      */
     size_t
-    check_initialised_nb_sub_pts(const Dim_t & nb_sub_pts,
+    check_initialised_nb_sub_pts(const Index_t & nb_sub_pts,
                                  const PixelSubDiv & iteration_type) const;
 
    protected:
     //! internal worker function called by register_<T>_field
     template <typename T>
     TypedField<T> & register_field_helper(const std::string & unique_name,
-                                          const Dim_t & nb_dof_per_sub_pt,
+                                          const Index_t & nb_dof_per_sub_pt,
                                           const PixelSubDiv & sub_division,
                                           const Unit & unit,
-                                          const Dim_t & nb_sub_pts);
+                                          const Index_t & nb_sub_pts);
 
     //! internal worker function called by register_<T>_state_field
     template <typename T>
     TypedStateField<T> & register_state_field_helper(
-        const std::string & unique_prefix, const Dim_t & nb_memory,
-        const Dim_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
-        const Unit & unit, const Dim_t & nb_sub_pts);
+        const std::string & unique_prefix, const Index_t & nb_memory,
+        const Index_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
+        const Unit & unit, const Index_t & nb_sub_pts);
 
     /**
      * loop through all fields and allocate their memory. Is exclusively
@@ -460,13 +459,13 @@ namespace muGrid {
     //! domain of validity
     ValidityDomain domain;
     //! spatial dimension
-    Dim_t spatial_dim;
+    Index_t spatial_dim;
     //! number of quadrature points per pixel/voxel
-    Dim_t nb_quad_pts;
+    Index_t nb_quad_pts;
     //! number of quadrature points per pixel/voxel
-    Dim_t nb_nodal_pts;
+    Index_t nb_nodal_pts;
     //! total number of pixels
-    Dim_t nb_pixels{Unknown};
+    Index_t nb_pixels{Unknown};
     //! keeps track of whether the collection has already been initialised
     bool initialised{false};
     /**
@@ -572,7 +571,7 @@ namespace muGrid {
     //! except the fieldcollection
     IndexIterable(const FieldCollection & collection,
                   const PixelSubDiv & iteration_type,
-                  const Dim_t & stride = Unknown);
+                  const Index_t & stride = Unknown);
 
     //! reference back to the proxied collection
     const FieldCollection & collection;

@@ -47,14 +47,14 @@ namespace muSpectre {
   /**
    * forward declaration
    */
-  template <Dim_t DimM, StrainMeasure StrainM, StressMeasure StressM>
+  template <Index_t DimM, StrainMeasure StrainM, StressMeasure StressM>
   class STMaterialLinearElasticGeneric1;
 
   /**
    * traits for use by MaterialMuSpectre for crtp
    */
 
-  template <Dim_t DimM, StrainMeasure StrainMIn, StressMeasure StressMOut>
+  template <Index_t DimM, StrainMeasure StrainMIn, StressMeasure StressMOut>
   struct MaterialMuSpectre_traits<
       STMaterialLinearElasticGeneric1<DimM, StrainMIn, StressMOut>> {
     //! expected map type for strain fields
@@ -77,7 +77,7 @@ namespace muSpectre {
    * Linear elastic law defined by a full stiffness tensor with the ability to
    * compile and work for different strain/stress measures
    */
-  template <Dim_t DimM, StrainMeasure StrainM, StressMeasure StressM>
+  template <Index_t DimM, StrainMeasure StrainM, StressMeasure StressM>
   class STMaterialLinearElasticGeneric1
       : public MaterialMuSpectre<
             STMaterialLinearElasticGeneric1<DimM, StrainM, StressM>, DimM> {
@@ -109,8 +109,8 @@ namespace muSpectre {
      * @param C_voigt elastic tensor in Voigt notation
      */
     STMaterialLinearElasticGeneric1(const std::string & name,
-                                    const Dim_t & spatial_dimension,
-                                    const Dim_t & nb_quad_pts,
+                                    const Index_t & spatial_dimension,
+                                    const Index_t & nb_quad_pts,
                                     const CInput_t & C_voigt);
 
     //! Copy constructor
@@ -186,7 +186,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
 
-  template <Dim_t DimM, StrainMeasure StrainM, StressMeasure StressM>
+  template <Index_t DimM, StrainMeasure StrainM, StressMeasure StressM>
   template <class Derived>
   auto STMaterialLinearElasticGeneric1<DimM, StrainM, StressM>::evaluate_stress(
       const Eigen::MatrixBase<Derived> & strain, const size_t &
@@ -252,7 +252,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM, StrainMeasure StrainM, StressMeasure StressM>
+  template <Index_t DimM, StrainMeasure StrainM, StressMeasure StressM>
   template <class Derived>
   auto STMaterialLinearElasticGeneric1<DimM, StrainM, StressM>::
       evaluate_stress_tangent(const Eigen::MatrixBase<Derived> & strain,

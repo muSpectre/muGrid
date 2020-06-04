@@ -44,11 +44,11 @@ namespace muSpectre {
   template <class Mat_t>
   struct MaterialFixture : public Mat_t {
     using Mat = Mat_t;
-    constexpr static Dim_t NbQuadPts{1};
+    constexpr static Index_t NbQuadPts{1};
     constexpr static Real lambda{2}, mu{1.5};
     constexpr static Real young{mu * (3 * lambda + 2 * mu) / (lambda + mu)};
     constexpr static Real poisson{lambda / (2 * (lambda + mu))};
-    constexpr static Dim_t mdim{Mat_t::MaterialDimension()};
+    constexpr static Index_t mdim{Mat_t::MaterialDimension()};
 
     MaterialFixture() : Mat("Name", mdim, NbQuadPts, young, poisson) {}
   };
@@ -57,16 +57,16 @@ namespace muSpectre {
   template <class Mat_t>
   constexpr Real MaterialFixture<Mat_t>::young;
   template <class Mat_t>
-  constexpr Dim_t MaterialFixture<Mat_t>::NbQuadPts;
+  constexpr Index_t MaterialFixture<Mat_t>::NbQuadPts;
   template <class Mat_t>
-  constexpr Dim_t MaterialFixture<Mat_t>::mdim;
+  constexpr Index_t MaterialFixture<Mat_t>::mdim;
 
   template <class Mat_t>
   struct has_internals {
     constexpr static bool value{false};
   };
 
-  template <Dim_t DimM>
+  template <Index_t DimM>
   struct has_internals<MaterialLinearElastic2<DimM>> {
     constexpr static bool value{true};
   };
@@ -82,7 +82,7 @@ namespace muSpectre {
   template <class Mat_t>
   struct MaterialFixtureFilled : public MaterialFixture<Mat_t> {
     using Mat = Mat_t;
-    constexpr static Dim_t box_size{3};
+    constexpr static Index_t box_size{3};
     MaterialFixtureFilled()
         : MaterialFixture<Mat_t>(), mat("Mat Name", Mat::MaterialDimension(),
                                         OneQuadPt, this->young, this->poisson) {

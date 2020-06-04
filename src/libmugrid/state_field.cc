@@ -44,10 +44,11 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   StateField::StateField(const std::string & unique_prefix,
-                         FieldCollection & collection, const Dim_t & nb_memory,
-                         const Dim_t & nb_dof_per_sub_pt,
+                         FieldCollection & collection,
+                         const Index_t & nb_memory,
+                         const Index_t & nb_dof_per_sub_pt,
                          const PixelSubDiv & sub_division, const Unit & unit,
-                         const Dim_t & nb_sub_pts)
+                         const Index_t & nb_sub_pts)
       : prefix{unique_prefix}, collection{collection}, nb_memory{nb_memory},
         nb_dof_per_sub_pt{nb_dof_per_sub_pt},
         sub_division{sub_division}, unit{unit}, nb_sub_pts{nb_sub_pts} {
@@ -57,13 +58,13 @@ namespace muGrid {
     this->indices.reserve(nb_memory + 1);
     this->fields.reserve(nb_memory + 1);
 
-    for (Dim_t i{0}; i < nb_memory + 1; ++i) {
+    for (Index_t i{0}; i < nb_memory + 1; ++i) {
       indices.push_back((nb_memory + 1 - i) & nb_memory);
     }
   }
 
   /* ---------------------------------------------------------------------- */
-  const Dim_t & StateField::get_nb_memory() const { return this->nb_memory; }
+  const Index_t & StateField::get_nb_memory() const { return this->nb_memory; }
 
   /* ---------------------------------------------------------------------- */
   void StateField::cycle() {
@@ -89,14 +90,14 @@ namespace muGrid {
   template <typename T>
   TypedStateField<T>::TypedStateField(const std::string & unique_prefix,
                                       FieldCollection & collection,
-                                      const Dim_t & nb_memory,
-                                      const Dim_t & nb_components,
+                                      const Index_t & nb_memory,
+                                      const Index_t & nb_components,
                                       const PixelSubDiv & sub_division,
                                       const Unit & unit,
-                                      const Dim_t & nb_sub_pts)
+                                      const Index_t & nb_sub_pts)
       : Parent{unique_prefix, collection, nb_memory, nb_components,
                sub_division,  unit,       nb_sub_pts} {
-    for (Dim_t i{0}; i < nb_memory + 1; ++i) {
+    for (Index_t i{0}; i < nb_memory + 1; ++i) {
       std::stringstream unique_name_stream{};
       unique_name_stream << this->prefix << ", sub_field index " << i;
       this->fields.push_back(this->collection.template register_field<T>(

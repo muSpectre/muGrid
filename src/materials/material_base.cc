@@ -42,8 +42,8 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   MaterialBase::MaterialBase(
-      const std::string & name, const Dim_t & spatial_dimension,
-      const Dim_t & material_dimension, const Dim_t & nb_quad_pts,
+      const std::string & name, const Index_t & spatial_dimension,
+      const Index_t & material_dimension, const Index_t & nb_quad_pts,
       const std::shared_ptr<muGrid::LocalFieldCollection> &
           parent_field_collection)
       : name(name),

@@ -46,13 +46,13 @@
 
 namespace muSpectre {
 
-  template <Dim_t DimM>
+  template <Index_t DimM>
   class MaterialLinearElastic4;
 
   /**
    * traits for objective linear elasticity with eigenstrain
    */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   struct MaterialMuSpectre_traits<MaterialLinearElastic4<DimM>> {
     //! expected map type for strain fields
     using StrainMap_t =
@@ -73,7 +73,7 @@ namespace muSpectre {
   /**
    * implements objective linear elasticity with an eigenstrain per pixel
    */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   class MaterialLinearElastic4
       : public MaterialMuSpectre<MaterialLinearElastic4<DimM>, DimM> {
    public:
@@ -107,8 +107,8 @@ namespace muSpectre {
 
     //! Construct by name
     explicit MaterialLinearElastic4(const std::string & name,
-                                    const Dim_t & spatial_dimension,
-                                    const Dim_t & nb_quad_pts);
+                                    const Index_t & spatial_dimension,
+                                    const Index_t & nb_quad_pts);
 
     //! Copy constructor
     MaterialLinearElastic4(const MaterialLinearElastic4 & other) = delete;
@@ -193,7 +193,7 @@ namespace muSpectre {
   };
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   template <class Derived>
   auto MaterialLinearElastic4<DimM>::evaluate_stress(
       const Eigen::MatrixBase<Derived> & E, const Real & lambda,
@@ -203,7 +203,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   template <class Derived>
   auto MaterialLinearElastic4<DimM>::evaluate_stress_tangent(
       const Eigen::MatrixBase<Derived> & E, const Real & lambda,

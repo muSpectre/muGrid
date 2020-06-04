@@ -52,7 +52,7 @@ using namespace pybind11::literals;  // NOLINT: recommended usage
 /**
  * python binding for the generic linear elastic material
  */
-template <Dim_t Dim>
+template <Index_t Dim>
 void add_material_linear_elastic_generic1_helper(py::module & mod) {
   std::stringstream name_stream{};
   name_stream << "MaterialLinearElasticGeneric1_" << Dim << "d";
@@ -76,7 +76,7 @@ void add_material_linear_elastic_generic1_helper(py::module & mod) {
           "The elastic tensor has to be specified in Voigt notation.")
       .def(
           "add_pixel",
-          [](Mat_t & mat, Dim_t pixel_index) { mat.add_pixel(pixel_index); },
+          [](Mat_t & mat, Index_t pixel_index) { mat.add_pixel(pixel_index); },
           "pixel"_a,
           "Register a new pixel to this material. subsequent evaluations of "
           "the "
@@ -96,7 +96,7 @@ void add_material_linear_elastic_generic1_helper(py::module & mod) {
 /**
  * python binding for the generic linear elastic material with eigenstcain
  */
-template <Dim_t Dim>
+template <Index_t Dim>
 void add_material_linear_elastic_generic2_helper(py::module & mod) {
   std::stringstream name_stream{};
   name_stream << "MaterialLinearElasticGeneric2_" << Dim << "d";

@@ -44,7 +44,7 @@
 #include <sstream>
 #include <string>
 
-using muSpectre::Dim_t;
+using muSpectre::Index_t;
 using muSpectre::Real;
 using pybind11::literals::operator""_a;
 namespace py = pybind11;
@@ -53,7 +53,7 @@ namespace py = pybind11;
  * python binding for the material with viscoelatic behavior under deviatoric
  * loading in small strain
  */
-template <Dim_t Dim>
+template <Index_t Dim>
 void add_material_visco_elastic_ss_helper(py::module & mod) {
   std::stringstream name_stream{};
   name_stream << "MaterialViscoElasticSS_" << Dim << "d";

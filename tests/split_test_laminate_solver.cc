@@ -56,24 +56,24 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE(laminate_homogenisation);
 
-  constexpr Dim_t OneContrast{
+  constexpr Index_t OneContrast{
       1};  //! The values used to introduce material contrast
-  constexpr Dim_t TwoContrast{
+  constexpr Index_t TwoContrast{
       2};  //! The values used to introduce material contrast
-  constexpr Dim_t ThreeContrast{
+  constexpr Index_t ThreeContrast{
       3};  //! The values used to introduce material contrast
-  constexpr Dim_t SevenContrast{
+  constexpr Index_t SevenContrast{
       7};  //! The values used to introduce material contrast
 
   constexpr Real Tol{1e-8};
   constexpr Real MaxIter{100};
 
-  template <class Mat_t, Dim_t Dim, Dim_t c>
+  template <class Mat_t, Index_t Dim, Index_t c>
   struct MaterialFixture;
 
   /*--------------------------------------------------------------------------*/
   //! Material orthotropic fixture
-  template <Dim_t Dim, Dim_t c>
+  template <Index_t Dim, Index_t c>
   struct MaterialFixture<MaterialLinearAnisotropic<Dim>, Dim, c> {
     MaterialFixture() : mat("Name_aniso", Dim, OneQuadPt, aniso_inp_maker()) {}
 
@@ -102,7 +102,7 @@ namespace muSpectre {
 
   /*--------------------------------------------------------------------------*/
   //! Material orthotropic fixture
-  template <Dim_t Dim, Dim_t c>
+  template <Index_t Dim, Index_t c>
   struct MaterialFixture<MaterialLinearOrthotropic<Dim>, Dim, c> {
     MaterialFixture() : mat("Name_ortho", Dim, OneQuadPt, ortho_inp_maker()) {}
     std::vector<Real> ortho_inp_maker() {
@@ -128,7 +128,7 @@ namespace muSpectre {
 
   /*--------------------------------------------------------------------------*/
   //! Material linear elastic fixture
-  template <Dim_t Dim, Dim_t c>
+  template <Index_t Dim, Index_t c>
   struct MaterialFixture<MaterialLinearElastic1<Dim>, Dim, c> {
     MaterialFixture()
         : mat("Name_LinElastic1", Dim, OneQuadPt, young_maker(),
@@ -150,7 +150,7 @@ namespace muSpectre {
 
   /*--------------------------------------------------------------------------*/
   //! Material pair fixture
-  template <class Mat1_t, class Mat2_t, Dim_t Dim, Dim_t c1, Dim_t c2>
+  template <class Mat1_t, class Mat2_t, Index_t Dim, Index_t c1, Index_t c2>
   struct MaterialPairFixture {
     using Vec_t = Eigen::Matrix<Real, Dim, 1>;
     using Strain_t = Eigen::Matrix<Real, Dim, Dim>;
@@ -168,7 +168,7 @@ namespace muSpectre {
       this->normal_vec = this->normal_vec / this->normal_vec.norm();
     }
 
-    constexpr Dim_t get_dim() { return Dim; }
+    constexpr Index_t get_dim() { return Dim; }
 
    protected:
     MaterialFixture<Mat1_t, Dim, c1> mat_fix_1{};
@@ -178,7 +178,7 @@ namespace muSpectre {
     Vec_t & normal_vec;
 
     Real ratio{0.5 + 0.5 * static_cast<double>(std::rand() / (RAND_MAX))};
-    static constexpr Dim_t fix_dim{Dim};
+    static constexpr Index_t fix_dim{Dim};
   };
 
   /*--------------------------------------------------------------------------*/

@@ -81,7 +81,7 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   template <typename T, Mapping Mutability>
   StateFieldMap<T, Mutability>::StateFieldMap(
-      TypedStateField<T> & state_field, Dim_t nb_rows, PixelSubDiv iter_type)
+      TypedStateField<T> & state_field, Index_t nb_rows, PixelSubDiv iter_type)
       : state_field{state_field}, iteration{iter_type}, nb_rows{nb_rows},
         maps(this->make_maps(state_field.get_fields())),
         cmaps(this->make_cmaps(state_field.get_fields())) {
@@ -119,7 +119,7 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T, Mapping Mutability>
-  const Dim_t & StateFieldMap<T, Mutability>::get_nb_rows() const {
+  const Index_t & StateFieldMap<T, Mutability>::get_nb_rows() const {
     return this->nb_rows;
   }
 
@@ -156,60 +156,8 @@ namespace muGrid {
     return this->state_field.get_fields();
   }
 
-  // /*
-  // ----------------------------------------------------------------------
-  // */ template <typename T, Mapping Mutability> auto StateFieldMap<T,
-  // Mutability>::get_current() const
-  //     -> std::unique_ptr<FieldMap_t> {
-  //   return std::make_unique<FieldMap_t>(this->state_field.current(),
-  //                                        this->nb_rows, this->iteration);
-  // }
 
-  // /*
-  // ----------------------------------------------------------------------
-  // */ template <typename T, Mapping Mutability> auto StateFieldMap<T,
-  // Mutability>::get_olds() const
-  //     -> std::vector<CFieldMap_t> {
-  //   std::vector<FieldMap<T, true>> ret_val{};
-  //   const Dim_t nb_memory{this->state_field.get_nb_memory()};
-
-  //   ret_val.reserve(nb_memory);
-
-  //   for (Dim_t nb_steps_ago{1}; nb_steps_ago < nb_memory + 1;
-  //   ++nb_steps_ago)
-  //   {
-  //     ret_val.emplace_back(this->state_field.old(nb_steps_ago),
-  //     this->nb_rows);
-  //   }
-  //   return ret_val;
-  // }
-
-  // /*
-  // ----------------------------------------------------------------------
-  // */ template <typename T, Mapping Mutability> auto StateFieldMap<T,
-  // Mutability>::get_current_it(bool end)
-  //     -> CurrentIteratort {
-  //   this->current = std::move(this->get_current());
-  //   return end ? this->current->end() : this->current->begin();
-  // }
-
-  // /*
-  // ----------------------------------------------------------------------
-  // */ template <typename T, Mapping Mutability> auto StateFieldMap<T,
-  // Mutability>::get_old_its(bool end)
-  //     -> std::vector<OldIteratort> {
-  //   this->olds = this->get_olds();
-  //   std::vector<OldIteratort> ret_val{};
-  //   ret_val.reserve(this->state_field.get_nb_memory());
-  //   for (auto && old_field_map : this->olds) {
-  //     ret_val.push_back(end ? old_field_map.end() :
-  //     old_field_map.begin());
-  //   }
-  //   return ret_val;
-  // }
-
-  /* ----------------------------------------------------------------------
-   */
+  /* ---------------------------------------------------------------------- */
   template <typename T, Mapping Mutability>
   template <Mapping MutIter>
   StateFieldMap<T, Mutability>::Iterator<MutIter>::Iterator(

@@ -39,13 +39,13 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
+  template <Index_t DimS>
   ProjectionDefault<DimS>::ProjectionDefault(muFFT::FFTEngine_ptr engine,
                                              DynRcoord_t lengths,
                                              Gradient_t gradient,
                                              Formulation form)
       : Parent{std::move(engine), lengths,
-               static_cast<Dim_t>(gradient.size()) / lengths.get_dim(),
+               static_cast<Index_t>(gradient.size()) / lengths.get_dim(),
                DimS * DimS, form},
         Gfield{this->projection_container.register_complex_field(
             "Projection Operator", DimS * DimS * DimS * DimS,
@@ -62,7 +62,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
+  template <Index_t DimS>
   void ProjectionDefault<DimS>::apply_projection(Field_t & field) {
     this->fft_engine->fft(field, this->work_space);
     Vector_map field_map{this->work_space};
@@ -76,15 +76,15 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
+  template <Index_t DimS>
   Eigen::Map<MatrixXXc> ProjectionDefault<DimS>::get_operator() {
     return this->Gfield.eigen_pixel();
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
-  std::array<Dim_t, 2> ProjectionDefault<DimS>::get_strain_shape() const {
-    return std::array<Dim_t, 2>{DimS, DimS};
+  template <Index_t DimS>
+  std::array<Index_t, 2> ProjectionDefault<DimS>::get_strain_shape() const {
+    return std::array<Index_t, 2>{DimS, DimS};
   }
 
   /* ---------------------------------------------------------------------- */

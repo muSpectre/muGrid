@@ -114,7 +114,7 @@ namespace muFFT {
      * prepare a plan for a transform with nb_dof_per_pixel entries per pixel.
      * Needs to be called for every different sized transform
      */
-    virtual void initialise(const Dim_t & /*nb_dof_per_pixel*/,
+    virtual void initialise(const Index_t & /*nb_dof_per_pixel*/,
                             const FFT_PlanFlags & /*plan_flags*/) = 0;
 
     /**
@@ -137,7 +137,7 @@ namespace muFFT {
      */
     virtual FourierField_t &
     register_fourier_space_field(const std::string & unique_name,
-                                 const Dim_t & nb_dof_per_pixel);
+                                 const Index_t & nb_dof_per_pixel);
     /**
      * Fetches a field with the ideal strides and dimensions for this engine. If
      * the field does not exist, it is created using
@@ -145,7 +145,7 @@ namespace muFFT {
      */
     FourierField_t &
     fetch_or_register_fourier_space_field(const std::string & unique_name,
-                                          const Dim_t & nb_dof_per_pixel);
+                                          const Index_t & nb_dof_per_pixel);
 
     //! return whether this engine is active
     virtual bool is_active() const { return true; }
@@ -220,29 +220,30 @@ namespace muFFT {
     inline Real normalisation() const { return norm_factor; }
 
     //! return the number of spatial dimensions
-    const Dim_t & get_spatial_dim() const;
+    const Index_t & get_spatial_dim() const;
 
     /**
      * returns the number of quadrature points
      */
-    const Dim_t & get_nb_quad_pts() const;
+    const Index_t & get_nb_quad_pts() const;
 
     //! perform a deep copy of the engine (this should never be necessary in
     //! c++)
     virtual std::unique_ptr<FFTEngineBase> clone() const = 0;
 
     //! check whether a plan for nb_dof_per_pixel exists
-    bool has_plan_for(const Dim_t & nb_dof_per_pixel) const;
+    bool has_plan_for(const Index_t & nb_dof_per_pixel) const;
 
     /**
      * Returns the required pad size. Helpful when calling fft with wrapped
      * fields
      */
-    virtual Dim_t get_required_pad_size(const Dim_t & nb_dof_per_pixel) const;
+    virtual Index_t
+    get_required_pad_size(const Index_t & nb_dof_per_pixel) const;
 
    protected:
     //! spatial dimension of the grid
-    Dim_t spatial_dimension;
+    Index_t spatial_dimension;
     /**
      * Field collection in which to store fields associated with
      * Fourier-space points
@@ -275,7 +276,7 @@ namespace muFFT {
     //! number of degrees of freedom per pixel for which this field collection
     //! has been primed. Can be queried. Corresponds to the number of sub-points
     //! per pixel multiplied by the number of components per sub-point
-    std::set<Dim_t> planned_nb_dofs{};
+    std::set<Index_t> planned_nb_dofs{};
   };
 
   //! reference to fft engine is safely managed through a `std::shared_ptr`

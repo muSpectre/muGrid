@@ -47,13 +47,13 @@
 namespace muSpectre {
 
   using muGrid::Ccoord_t;
-  using muGrid::Dim_t;
+  using muGrid::Index_t;
   using muGrid::DynCcoord_t;
   using muGrid::DynRcoord_t;
   using muGrid::Rcoord_t;
   using muGrid::Real;
 
-  template <Dim_t DimS>
+  template <Index_t DimS>
   class Correction {
    public:
     static Rcoord_t<3> correct_origin(const Rcoord_t<DimS> & array);
@@ -102,7 +102,7 @@ namespace muSpectre {
   };
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
+  template <Index_t DimS>
   class PrecipitateIntersectBase {
    public:
     static std::tuple<std::vector<corkpp::point_t>,
@@ -120,7 +120,7 @@ namespace muSpectre {
   };
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
+  template <Index_t DimS>
   std::tuple<std::vector<corkpp::point_t>, std::vector<corkpp::point_t>>
   PrecipitateIntersectBase<DimS>::correct_dimension(
       const std::vector<Rcoord_t<DimS>> & convex_poly_vertices,
@@ -136,7 +136,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
+  template <Index_t DimS>
   corkpp::VolNormStateIntersection
   PrecipitateIntersectBase<DimS>::intersect_precipitate(
       const std::vector<DynRcoord_t> & convex_poly_vertices,

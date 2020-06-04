@@ -46,7 +46,7 @@
 #include "libmugrid/state_field.hh"
 
 using muGrid::Complex;
-using muGrid::Dim_t;
+using muGrid::Index_t;
 using muGrid::DynCcoord_t;
 using muGrid::FieldCollection;
 using muGrid::GlobalFieldCollection;
@@ -64,10 +64,10 @@ void add_field_collection(py::module & mod) {
       .def(
           "register_real_field",
           [](FieldCollection & collection, const std::string & unique_name,
-             const Dim_t & nb_dof_per_sub_pt,
+             const Index_t & nb_dof_per_sub_pt,
              const muGrid::PixelSubDiv & sub_division,
              const muGrid::Unit & unit,
-             const Dim_t & nb_sub_pts) -> muGrid::TypedField<Real> & {
+             const Index_t & nb_sub_pts) -> muGrid::TypedField<Real> & {
             return collection.register_real_field(
                 unique_name, nb_dof_per_sub_pt, sub_division, unit, nb_sub_pts);
           },
@@ -77,10 +77,10 @@ void add_field_collection(py::module & mod) {
       .def(
           "register_complex_field",
           [](FieldCollection & collection, const std::string & unique_name,
-             const Dim_t & nb_dof_per_sub_pt,
+             const Index_t & nb_dof_per_sub_pt,
              const muGrid::PixelSubDiv & sub_division,
              const muGrid::Unit & unit,
-             const Dim_t & nb_sub_pts) -> muGrid::TypedField<Complex> & {
+             const Index_t & nb_sub_pts) -> muGrid::TypedField<Complex> & {
             return collection.register_complex_field(
                 unique_name, nb_dof_per_sub_pt, sub_division, unit, nb_sub_pts);
           },
@@ -90,10 +90,10 @@ void add_field_collection(py::module & mod) {
       .def(
           "register_uint_field",
           [](FieldCollection & collection, const std::string & unique_name,
-             const Dim_t & nb_dof_per_sub_pt,
+             const Index_t & nb_dof_per_sub_pt,
              const muGrid::PixelSubDiv & sub_division,
              const muGrid::Unit & unit,
-             const Dim_t & nb_sub_pts) -> muGrid::TypedField<Uint> & {
+             const Index_t & nb_sub_pts) -> muGrid::TypedField<Uint> & {
             return collection.register_uint_field(
                 unique_name, nb_dof_per_sub_pt, sub_division, unit, nb_sub_pts);
           },
@@ -103,10 +103,10 @@ void add_field_collection(py::module & mod) {
       .def(
           "register_int_field",
           [](FieldCollection & collection, const std::string & unique_name,
-             const Dim_t & nb_dof_per_sub_pt,
+             const Index_t & nb_dof_per_sub_pt,
              const muGrid::PixelSubDiv & sub_division,
              const muGrid::Unit & unit,
-             const Dim_t & nb_sub_pts) -> muGrid::TypedField<Int> & {
+             const Index_t & nb_sub_pts) -> muGrid::TypedField<Int> & {
             return collection.register_int_field(
                 unique_name, nb_dof_per_sub_pt, sub_division, unit, nb_sub_pts);
           },
@@ -182,7 +182,7 @@ void add_field_collection(py::module & mod) {
 void add_global_field_collection(py::module & mod) {
   py::class_<GlobalFieldCollection, FieldCollection>(mod,
                                                      "GlobalFieldCollection")
-      .def(py::init<const Dim_t &, const Dim_t &, const Dim_t &>())
+      .def(py::init<const Index_t &, const Index_t &, const Index_t &>())
       .def("initialise",
            [](GlobalFieldCollection & self, const DynCcoord_t & nb_grid_pts) {
              self.initialise(nb_grid_pts);

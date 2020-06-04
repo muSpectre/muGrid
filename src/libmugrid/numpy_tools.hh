@@ -61,30 +61,31 @@ namespace muGrid {
   };
 
   namespace internal {
-    inline Dim_t eval_quad_pts(const PixelSubDiv & sub_division,
-                               const Dim_t & nb_sub_pts) {
+    inline Index_t eval_quad_pts(const PixelSubDiv & sub_division,
+                                 const Index_t & nb_sub_pts) {
       return sub_division == PixelSubDiv::QuadPt ? nb_sub_pts : Unknown;
     }
-    inline Dim_t eval_nodal_pts(const PixelSubDiv & sub_division,
-                                const Dim_t & nb_sub_pts) {
+    inline Index_t eval_nodal_pts(const PixelSubDiv & sub_division,
+                                  const Index_t & nb_sub_pts) {
       return sub_division == PixelSubDiv::NodalPt ? nb_sub_pts : Unknown;
     }
 
     template <typename T>
-    DynCcoord_t get_strides(const Dim_t & dim, const Dim_t & nb_dof_per_pixel,
+    DynCcoord_t get_strides(const Index_t & dim,
+                            const Index_t & nb_dof_per_pixel,
                             pybind11::array_t<T> & array) {
       auto && info{array.request()};
       auto && np_strides{info.strides};
       DynCcoord_t retval(dim);
-      Dim_t nb_excess_entries{static_cast<Dim_t>(np_strides.size()) - dim};
-      Dim_t min_val{std::numeric_limits<Dim_t>::max()};
+      Index_t nb_excess_entries{static_cast<Index_t>(np_strides.size()) - dim};
+      Index_t min_val{std::numeric_limits<Index_t>::max()};
       //! check whether the first dimensions are likely to be contiguous
-      Dim_t stride_prod{1};
-      for (Dim_t i{0}; i < nb_excess_entries; ++i) {
+      Index_t stride_prod{1};
+      for (Index_t i{0}; i < nb_excess_entries; ++i) {
         stride_prod *= np_strides[i] / sizeof(T);
       }
       if (stride_prod > nb_dof_per_pixel) {
-        std::vector<Dim_t> simple_strides{};
+        std::vector<Index_t> simple_strides{};
         for (auto && val : np_strides) {
           simple_strides.push_back(val / sizeof(T));
         }
@@ -95,10 +96,10 @@ namespace muGrid {
                 << " degrees of freedom per pixel suggest that this field "
                    "violates this assumption. Did you pass a row-major n-dim "
                    "array?";
-        std::cout<< message.str();
+        std::cout << message.str();
         // throw FieldError{message.str()};
       }
-      for (Dim_t i{0}; i < dim; ++i) {
+      for (Index_t i{0}; i < dim; ++i) {
         auto && stride{np_strides[nb_excess_entries + i]};
         if (stride < min_val) {
           min_val = stride;
@@ -161,7 +162,7 @@ namespace muGrid {
      * where the number of components and grid indices can be arbitrary.
      */
     NumpyProxy(DynCcoord_t nb_subdomain_grid_pts,
-               DynCcoord_t subdomain_locations, Dim_t nb_components,
+               DynCcoord_t subdomain_locations, Index_t nb_components,
                pybind11::array_t<T> & array)
         : collection(nb_subdomain_grid_pts.get_dim(), OneQuadPt, OneNode,
                      nb_subdomain_grid_pts, subdomain_locations,
@@ -177,7 +178,7 @@ namespace muGrid {
           sub_pt_shape{0}, components_shape{} {
       // Note: There is a check on the global array size in the constructor of
       // WrappedField, which will fail before the sanity checks below.
-      Dim_t dim = nb_subdomain_grid_pts.get_dim();
+      Index_t dim = nb_subdomain_grid_pts.get_dim();
       pybind11::buffer_info buffer = array.request();
       if (!std::equal(nb_subdomain_grid_pts.begin(),
                       nb_subdomain_grid_pts.end(), buffer.shape.end() - dim)) {
@@ -188,7 +189,7 @@ namespace muGrid {
           << "dimensions.";
         throw NumpyError(s.str());
       }
-      Dim_t nb_array_components = 1;
+      Index_t nb_array_components = 1;
       for (auto n = buffer.shape.begin(); n != buffer.shape.end() - dim; ++n) {
         this->components_shape.push_back(*n);
         nb_array_components *= *n;
@@ -226,7 +227,7 @@ namespace muGrid {
      * where the number of components and grid indices can be arbitrary.
      */
     NumpyProxy(DynCcoord_t nb_subdomain_grid_pts,
-               DynCcoord_t subdomain_locations, Dim_t nb_components,
+               DynCcoord_t subdomain_locations, Index_t nb_components,
                pybind11::array_t<T, pybind11::array::f_style> & array)
         : collection{nb_subdomain_grid_pts.get_dim(), OneQuadPt, OneNode,
                      nb_subdomain_grid_pts, subdomain_locations},
@@ -240,7 +241,7 @@ namespace muGrid {
           sub_pt_shape{0}, components_shape{} {
       // Note: There is a check on the global array size in the constructor of
       // WrappedField, which will fail before the sanity checks below.
-      Dim_t dim = nb_subdomain_grid_pts.get_dim();
+      Index_t dim{nb_subdomain_grid_pts.get_dim()};
       pybind11::buffer_info buffer = array.request();
       if (!std::equal(nb_subdomain_grid_pts.begin(),
                       nb_subdomain_grid_pts.end(), buffer.shape.end() - dim)) {
@@ -251,8 +252,8 @@ namespace muGrid {
           << "dimensions.";
         throw NumpyError(s.str());
       }
-      Dim_t nb_array_components = 1;
-      for (auto n = buffer.shape.begin(); n != buffer.shape.end() - dim; ++n) {
+      Index_t nb_array_components{1};
+      for (auto n{buffer.shape.begin()}; n != buffer.shape.end() - dim; ++n) {
         this->components_shape.push_back(*n);
         nb_array_components *= *n;
       }
@@ -278,8 +279,8 @@ namespace muGrid {
      * quad_pt dimension can be omitted if there is only a single quad_pt.
      */
     NumpyProxy(DynCcoord_t nb_subdomain_grid_pts,
-               DynCcoord_t subdomain_locations, Dim_t nb_sub_pts,
-               std::vector<Dim_t> components_shape,
+               DynCcoord_t subdomain_locations, Index_t nb_sub_pts,
+               std::vector<Index_t> components_shape,
                pybind11::array_t<T, pybind11::array::f_style> array,
                const PixelSubDiv & sub_division,
                const Unit & unit = Unit::unitless())
@@ -291,7 +292,7 @@ namespace muGrid {
                 collection,
                 std::accumulate(components_shape.begin(),
                                 components_shape.end(), 1,
-                                std::multiplies<Dim_t>()),
+                                std::multiplies<Index_t>()),
                 static_cast<size_t>(array.request().size),
                 static_cast<T *>(array.request().ptr),
                 sub_division,
@@ -300,9 +301,9 @@ namespace muGrid {
           sub_pt_shape{nb_sub_pts}, components_shape{components_shape} {
       // Note: There is a check on the global array size in the constructor of
       // WrappedField, which will fail before the sanity checks below.
-      Dim_t dim = nb_subdomain_grid_pts.get_dim();
-      pybind11::buffer_info buffer = array.request();
-      bool shape_matches = false;
+      Index_t dim{nb_subdomain_grid_pts.get_dim()};
+      pybind11::buffer_info buffer{array.request()};
+      bool shape_matches{false};
       if (dim + components_shape.size() + 1 == buffer.shape.size()) {
         shape_matches =
             std::equal(nb_subdomain_grid_pts.begin(),
@@ -338,12 +339,12 @@ namespace muGrid {
 
     WrappedField<T> & get_field() { return this->field; }
 
-    const std::vector<Dim_t> & get_components_shape() const {
+    const std::vector<Index_t> & get_components_shape() const {
       return this->components_shape;
     }
 
-    std::vector<Dim_t> get_components_and_quad_pt_shape() const {
-      std::vector<Dim_t> shape;
+    std::vector<Index_t> get_components_and_quad_pt_shape() const {
+      std::vector<Index_t> shape;
       for (auto && n : this->components_shape) {
         shape.push_back(n);
       }
@@ -356,16 +357,16 @@ namespace muGrid {
    protected:
     Collection_t collection;
     WrappedField<T> field;
-    Dim_t sub_pt_shape;                   //! number of quad pts, omit if zero
-    std::vector<Dim_t> components_shape;  //! shape of the components
+    Index_t sub_pt_shape;                   //! number of quad pts, omit if zero
+    std::vector<Index_t> components_shape;  //! shape of the components
   };
 
   /* Copy a numpy array into an existing field while checking the shapes */
   template <typename T>
-  std::vector<Dim_t>
+  std::vector<Index_t>
   numpy_copy(const TypedFieldBase<T> & field,
              pybind11::array_t<T, pybind11::array::f_style> array) {
-    std::vector<Dim_t> pixels_shape{field.get_pixels_shape()};
+    std::vector<Index_t> pixels_shape{field.get_pixels_shape()};
     pybind11::buffer_info buffer = array.request();
     if (!std::equal(pixels_shape.begin(), pixels_shape.end(),
                     buffer.shape.end() - pixels_shape.size())) {
@@ -375,8 +376,8 @@ namespace muGrid {
         << "array must equal the grid size in its last dimensions.";
       throw NumpyError(s.str());
     }
-    Dim_t nb_components = 1;
-    std::vector<Dim_t> components_shape;
+    Index_t nb_components = 1;
+    std::vector<Index_t> components_shape;
     for (auto n = buffer.shape.begin();
          n != buffer.shape.end() - pixels_shape.size(); ++n) {
       components_shape.push_back(*n);
@@ -427,14 +428,14 @@ namespace muGrid {
   template <typename T>
   pybind11::array_t<T, pybind11::array::f_style>
   numpy_wrap(const TypedFieldBase<T> & field,
-             std::vector<Dim_t> components_shape = std::vector<Dim_t>{}) {
-    std::vector<Dim_t> shape{}, strides{};
-    Dim_t nb_dof_per_sub_pt = field.get_nb_dof_per_sub_pt();
-    Dim_t stride = sizeof(T);
+             std::vector<Index_t> components_shape = std::vector<Index_t>{}) {
+    std::vector<Index_t> shape{}, strides{};
+    Index_t nb_dof_per_sub_pt = field.get_nb_dof_per_sub_pt();
+    Index_t stride = sizeof(T);
     if (components_shape.size() != 0) {
       if (nb_dof_per_sub_pt != std::accumulate(components_shape.begin(),
                                                components_shape.end(), 1,
-                                               std::multiplies<Dim_t>())) {
+                                               std::multiplies<Index_t>())) {
         std::stringstream s;
         s << "Unable to wrap field with " << field.get_nb_dof_per_sub_pt()
           << " components into a numpy array with " << components_shape

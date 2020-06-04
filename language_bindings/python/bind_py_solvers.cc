@@ -42,7 +42,7 @@
 #include <pybind11/stl.h>
 #include <pybind11/eigen.h>
 
-using muSpectre::Dim_t;
+using muSpectre::Index_t;
 using muSpectre::OptimizeResult;
 using muSpectre::Real;
 using muSpectre::Uint;

@@ -44,9 +44,9 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
 
   template <SplitCell IsSplit>
-  Node<IsSplit>::Node(const Dim_t & dim, const DynRcoord_t & new_origin,
-                      const DynCcoord_t & new_lengths, const Dim_t & depth,
-                      const Dim_t & max_depth, RootNode_t & root,
+  Node<IsSplit>::Node(const Index_t & dim, const DynRcoord_t & new_origin,
+                      const DynCcoord_t & new_lengths, const Index_t & depth,
+                      const Index_t & max_depth, RootNode_t & root,
                       const bool & is_root)
       : dim{dim}, root_node{root}, origin{new_origin}, Clengths{new_lengths},
         depth{depth}, is_pixel{depth == max_depth},
@@ -83,7 +83,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <SplitCell IsSplit>
-  template <Dim_t DimS>
+  template <Index_t DimS>
   void Node<IsSplit>::check_node_helper() {
     Real intersection_ratio = 0.0;
 
@@ -170,7 +170,7 @@ namespace muSpectre {
   }
   /* ---------------------------------------------------------------------- */
   template <SplitCell IsSplit>
-  template <Dim_t DimS>
+  template <Index_t DimS>
   void
   Node<IsSplit>::split_node_helper(const Real & intersection_ratio,
                                    const corkpp::IntersectionState & state) {
@@ -223,7 +223,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <SplitCell IsSplit>
-  template <Dim_t DimS>
+  template <Index_t DimS>
   void
   Node<IsSplit>::split_node_helper(const Real & intersection_ratio,
                                    const corkpp::vector_t & normal_vector,
@@ -293,13 +293,13 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <SplitCell IsSplit>
-  template <Dim_t DimS>
+  template <Index_t DimS>
   void Node<IsSplit>::divide_node_helper() {
     DynRcoord_t new_origin;
     DynCcoord_t new_length;
     // this->children.reserve(children_no);
     muGrid::CcoordOps::Pixels<DimS> sub_nodes(
-        muGrid::CcoordOps::get_cube<DimS>(2));
+        muGrid::CcoordOps::get_cube<DimS>(Index_t{2}));
     for (auto && sub_node : sub_nodes) {
       for (int i{0}; i < this->dim; i++) {
         new_length[i] = std::round(this->Clengths[i] * 0.5);
@@ -319,7 +319,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <SplitCell IsSplit>
-  Dim_t RootNode<IsSplit>::make_max_resolution(const Cell & cell) const {
+  Index_t RootNode<IsSplit>::make_max_resolution(const Cell & cell) const {
     auto && max_grid_size_at{
         std::max_element(cell.get_projection().get_nb_domain_grid_pts().begin(),
                          cell.get_projection().get_nb_domain_grid_pts().end())};
@@ -330,7 +330,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <SplitCell IsSplit>
-  Dim_t RootNode<IsSplit>::make_max_depth(const Cell & cell) const {
+  Index_t RootNode<IsSplit>::make_max_depth(const Cell & cell) const {
     auto && max_grid_size_at{
         std::max_element(cell.get_projection().get_nb_domain_grid_pts().begin(),
                          cell.get_projection().get_nb_domain_grid_pts().end())};
@@ -351,7 +351,7 @@ namespace muSpectre {
                DynCcoord_t{muGrid::CcoordOps::get_cube(
                    cell.get_spatial_dim(),
                    this->compute_squared_circum_square(cell))},
-               0, make_max_depth(cell), *this, true),
+               Index_t{0}, make_max_depth(cell), *this, true),
         cell{cell}, cell_length{cell.get_projection().get_domain_lengths()},
         pixel_lengths{cell.get_projection().get_pixel_lengths()},
         cell_resolution{cell.get_projection().get_nb_domain_grid_pts()},

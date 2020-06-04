@@ -57,8 +57,8 @@
 #endif
 
 using muFFT::Gradient_t;
-using muGrid::Dim_t;
 using muGrid::DynRcoord_t;
+using muGrid::Index_t;
 using muGrid::numpy_wrap;
 using muGrid::NumpyProxy;
 using muGrid::Real;
@@ -73,11 +73,11 @@ class ProjectionBaseUnclonable : public ProjectionBase {
  public:
   ProjectionBaseUnclonable(const muFFT::FFTEngine_ptr & engine,
                            const DynRcoord_t & domain_lengths,
-                           const Dim_t & nb_quad_pts,
-                           const Dim_t & nb_dof_per_sub_pt,
+                           const Index_t & nb_quad_pts,
+                           const Index_t & nb_dof_per_sub_pt,
                            const Formulation & form)
-      : ProjectionBase(engine, domain_lengths, nb_quad_pts,
-                       nb_dof_per_sub_pt, form) {}
+      : ProjectionBase(engine, domain_lengths, nb_quad_pts, nb_dof_per_sub_pt,
+                       form) {}
 
   std::unique_ptr<ProjectionBase> clone() const final {
     throw RuntimeError(
@@ -97,12 +97,12 @@ class PyProjectionBase : public ProjectionBaseUnclonable {
   //! field type on which projection is applied
   using Field_t = typename Parent::Field_t;
   //! shortcut fo strain shape
-  using StrainShape_t = std::array<Dim_t, 2>;
+  using StrainShape_t = std::array<Index_t, 2>;
 
   PyProjectionBase(const muFFT::FFTEngine_ptr & engine,
                    const DynRcoord_t & domain_lengths,
-                   const Dim_t & nb_quad_pts, const Dim_t & nb_dof_per_sub_pt,
-                   const Formulation & form)
+                   const Index_t & nb_quad_pts,
+                   const Index_t & nb_dof_per_sub_pt, const Formulation & form)
       : ProjectionBaseUnclonable(engine, domain_lengths, nb_quad_pts,
                                  nb_dof_per_sub_pt, form) {}
 
@@ -118,8 +118,8 @@ class PyProjectionBase : public ProjectionBaseUnclonable {
     PYBIND11_OVERLOAD_PURE(StrainShape_t, Parent, get_strain_shape);
   }
 
-  Dim_t get_nb_dof_per_pixel() const override {
-    PYBIND11_OVERLOAD_PURE(Dim_t, Parent, get_nb_dof_per_pixel);
+  Index_t get_nb_dof_per_pixel() const override {
+    PYBIND11_OVERLOAD_PURE(Index_t, Parent, get_nb_dof_per_pixel);
   }
 };
 
@@ -129,10 +129,10 @@ void add_projection_base(py::module & mod) {
              PyProjectionBase                  // trampoline base
              >(mod, "ProjectionBase")
       .def(py::init<const muFFT::FFTEngine_ptr &, const DynRcoord_t &,
-                    const Dim_t &, const Dim_t &, const Formulation &>());
+                    const Index_t &, const Index_t &, const Formulation &>());
 }
 
-template <class Proj, Dim_t DimS>
+template <class Proj, Index_t DimS>
 void add_proj_helper(py::module & mod, std::string name_start) {
   std::stringstream name{};
   name << name_start << '_' << DimS << 'd';
@@ -184,7 +184,7 @@ void add_proj_helper(py::module & mod, std::string name_start) {
       .def_property_readonly("domain_lengths", &Proj::get_nb_domain_grid_pts);
 }
 
-template <class Proj, Dim_t DimS>
+template <class Proj, Index_t DimS>
 void add_green_proj_helper(py::module & mod, std::string name_start) {
   std::stringstream name{};
   name << name_start << '_' << DimS << 'd';

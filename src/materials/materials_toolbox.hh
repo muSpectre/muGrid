@@ -575,8 +575,8 @@ namespace muSpectre {
           "one second-rank tensor as input and returning a "
           "second-rank tensor");
 
-      static_assert(Dim_t(T2_t::SizeAtCompileTime) ==
-                        Dim_t(T2_vec::SizeAtCompileTime),
+      static_assert(Index_t(T2_t::SizeAtCompileTime) ==
+                        Index_t(T2_vec::SizeAtCompileTime),
                     "wrong map size");
       return internal::NumericalTangentHelper<Dim, FinDif>::compute(
           std::forward<FunType>(fun), strain, delta);

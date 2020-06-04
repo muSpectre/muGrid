@@ -60,8 +60,8 @@ namespace muSpectre {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_add_pixel, Fix, mat_list, Fix) {
     muGrid::testGoodies::RandRange<size_t> rng;
 
-    const Dim_t nb_pixel{7}, box_size{17};
-    for (Dim_t i = 0; i < nb_pixel; ++i) {
+    const Index_t nb_pixel{7}, box_size{17};
+    for (Index_t i = 0; i < nb_pixel; ++i) {
       auto && c =
           rng.randval(0, muGrid::ipow(box_size, Fix::MaterialDimension()));
       if (!has_internals<typename Fix::Mat>::value) {
@@ -97,7 +97,7 @@ namespace muSpectre {
     constexpr auto cube{
         muGrid::CcoordOps::get_cube<Fix::MaterialDimension()>(Fix::box_size)};
     constexpr auto loc{
-        muGrid::CcoordOps::get_cube<Fix::MaterialDimension()>(0)};
+        muGrid::CcoordOps::get_cube<Fix::MaterialDimension()>(Index_t{0})};
 
     muGrid::GlobalFieldCollection globalfields{Fix::mdim, Fix::NbQuadPts,
                                                muGrid::Unknown};
@@ -152,9 +152,9 @@ namespace muSpectre {
     constexpr auto cube{
         muGrid::CcoordOps::get_cube<Fix::MaterialDimension()>(Fix::box_size)};
     constexpr auto loc{
-        muGrid::CcoordOps::get_cube<Fix::MaterialDimension()>(0)};
+        muGrid::CcoordOps::get_cube<Fix::MaterialDimension()>(Index_t{0})};
 
-    constexpr Dim_t mdim{Fix::MaterialDimension()};
+    constexpr Index_t mdim{Fix::MaterialDimension()};
     auto & mat{Fix::mat};
 
     using FC_t = muGrid::GlobalFieldCollection;

@@ -44,7 +44,7 @@
 #include <sstream>
 #include <string>
 
-using muSpectre::Dim_t;
+using muSpectre::Index_t;
 using muSpectre::Real;
 using pybind11::literals::operator""_a;
 namespace py = pybind11;
@@ -53,7 +53,7 @@ namespace py = pybind11;
  * python binding for the optionally objective form of Hooke's law
  * with per-pixel elastic properties
  */
-template <Dim_t Dim>
+template <Index_t Dim>
 void add_material_stochastic_plasticity_helper(py::module & mod) {
   std::stringstream name_stream{};
   name_stream << "MaterialStochasticPlasticity_" << Dim << 'd';
@@ -76,7 +76,7 @@ void add_material_stochastic_plasticity_helper(py::module & mod) {
           "cell"_a, "name"_a, py::return_value_policy::reference_internal)
       .def(
           "add_pixel",
-          [](Mat_t & mat, Dim_t pix_id, Real Young, Real Poisson,
+          [](Mat_t & mat, Index_t pix_id, Real Young, Real Poisson,
              Real plastic_increment, Real stress_threshold,
              Eigen::Ref<
                  const Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>>

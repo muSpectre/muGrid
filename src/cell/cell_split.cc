@@ -83,11 +83,11 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
 
-  std::vector<int> CellSplit::get_index_incomplete_pixels() const {
+  std::vector<Index_t> CellSplit::get_index_incomplete_pixels() const {
     auto nb_pixels{muGrid::CcoordOps::get_size(
         this->get_projection().get_nb_subdomain_grid_pts())};
     std::vector<Real> pixel_assigned_ratios(nb_pixels, 0.0);
-    std::vector<Dim_t> index_unassigned_pixels;
+    std::vector<Index_t> index_unassigned_pixels;
     for (auto && mat : this->materials) {
       mat->get_assigned_ratios(pixel_assigned_ratios);
     }
@@ -283,7 +283,7 @@ namespace muSpectre {
 
   /* ----------------------------------------------------------------------*/
   CellSplit::IncompletePixels::iterator::iterator(
-      const IncompletePixels & pixels, Dim_t dim, bool begin)
+      const IncompletePixels & pixels, Index_t dim, bool begin)
       : incomplete_pixels(pixels), dim{dim},
         index{begin ? 0
                     : this->incomplete_pixels.index_incomplete_pixels.size()} {}
@@ -322,7 +322,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------*/
-  template <Dim_t DimS>
+  template <Index_t DimS>
   auto CellSplit::IncompletePixels::iterator::deref_helper() const
       -> value_type {
     DynCcoord_t ccoord{muGrid::CcoordOps::get_ccoord<DimS>(

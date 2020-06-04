@@ -49,9 +49,9 @@ namespace muSpectre {
     constexpr auto cube{
         muGrid::CcoordOps::get_cube<Fix::MaterialDimension()>(Fix::box_size)};
     constexpr auto loc{
-        muGrid::CcoordOps::get_cube<Fix::MaterialDimension()>(0)};
+        muGrid::CcoordOps::get_cube<Fix::MaterialDimension()>(Index_t{0})};
 
-    constexpr Dim_t mdim{Fix::MaterialDimension()};
+    constexpr Index_t mdim{Fix::MaterialDimension()};
     auto & mat{Fix::mat};
 
     using FC_t = muGrid::GlobalFieldCollection;

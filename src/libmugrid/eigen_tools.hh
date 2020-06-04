@@ -188,7 +188,7 @@ namespace muGrid {
                     "The type of t is not understood as an Eigen::Matrix");
       static_assert(is_square<T>::value, "t's matrix isn't square");
       //! evaluated dimension
-      constexpr static Dim_t value{T::RowsAtCompileTime};
+      constexpr static Index_t value{T::RowsAtCompileTime};
     };
 
     //! computes the dimension from a fourth order tensor represented
@@ -201,7 +201,7 @@ namespace muGrid {
                     "The type of t is not understood as an Eigen::Matrix");
       static_assert(is_square<T>::value, "t's matrix isn't square");
       //! evaluated dimension
-      constexpr static Dim_t value{ct_sqrt(T::RowsAtCompileTime)};
+      constexpr static Index_t value{ct_sqrt(T::RowsAtCompileTime)};
       static_assert(value * value == T::RowsAtCompileTime,
                     "This is not a fourth-order tensor mapped on a square "
                     "matrix");
@@ -261,103 +261,103 @@ namespace muGrid {
     //! of log(Tensor) following Jog, C.S. J Elasticity (2008) 93:
     //! 141. https://doi.org/10.1007/s10659-008-9169-x
     /* ---------------------------------------------------------------------- */
-    template <Dim_t dim, Dim_t i, Dim_t j = dim - 1>
+    template <Dim_t Dim, Dim_t I, Dim_t J = Dim - 1>
     struct Proj {
       //! wrapped function (raison d'être)
-      static inline decltype(auto) compute(const Vec_t<dim> & eigs,
-                                           const Mat_t<dim> & T) {
-        static_assert(dim > 0, "only works for positive dimensions");
-        return 1. / (eigs(i) - eigs(j)) *
-               (T - eigs(j) * Mat_t<dim>::Identity()) *
-               Proj<dim, i, j - 1>::compute(eigs, T);
+      static inline decltype(auto) compute(const Vec_t<Dim> & eigs,
+                                           const Mat_t<Dim> & T) {
+        static_assert(Dim > 0, "only works for positive dimensions");
+        return 1. / (eigs(I) - eigs(J)) *
+               (T - eigs(J) * Mat_t<Dim>::Identity()) *
+               Proj<Dim, I, J - 1>::compute(eigs, T);
       }
     };
 
     //! catch the case when there's nothing to do
-    template <Dim_t dim, Dim_t other>
-    struct Proj<dim, other, other> {
+    template <Dim_t Dim, Dim_t Other>
+    struct Proj<Dim, Other, Other> {
       //! wrapped function (raison d'être)
-      static inline decltype(auto) compute(const Vec_t<dim> & eigs,
-                                           const Mat_t<dim> & T) {
-        static_assert(dim > 0, "only works for positive dimensions");
-        return Proj<dim, other, other - 1>::compute(eigs, T);
+      static inline decltype(auto) compute(const Vec_t<Dim> & eigs,
+                                           const Mat_t<Dim> & T) {
+        static_assert(Dim > 0, "only works for positive dimensions");
+        return Proj<Dim, Other, Other - 1>::compute(eigs, T);
       }
     };
 
     //! catch the normal tail case
-    template <Dim_t dim, Dim_t i>
-    struct Proj<dim, i, 0> {
+    template <Dim_t Dim, Dim_t I>
+    struct Proj<Dim, I, 0> {
       static constexpr Dim_t j{0};  //!< short-hand
       //! wrapped function (raison d'être)
-      static inline decltype(auto) compute(const Vec_t<dim> & eigs,
-                                           const Mat_t<dim> & T) {
-        static_assert(dim > 0, "only works for positive dimensions");
-        return 1. / (eigs(i) - eigs(j)) *
-               (T - eigs(j) * Mat_t<dim>::Identity());
+      static inline decltype(auto) compute(const Vec_t<Dim> & eigs,
+                                           const Mat_t<Dim> & T) {
+        static_assert(Dim > 0, "only works for positive dimensions");
+        return 1. / (eigs(I) - eigs(j)) *
+               (T - eigs(j) * Mat_t<Dim>::Identity());
       }
     };
 
     //! catch the tail case when the last dimension is i
-    template <Dim_t dim>
-    struct Proj<dim, 0, 1> {
-      static constexpr Dim_t i{0};  //!< short-hand
-      static constexpr Dim_t j{1};  //!< short-hand
+    template <Dim_t Dim>
+    struct Proj<Dim, 0, 1> {
+      static constexpr Dim_t I{0};  //!< short-hand
+      static constexpr Dim_t J{1};  //!< short-hand
 
       //! wrapped function (raison d'être)
-      static inline decltype(auto) compute(const Vec_t<dim> & eigs,
-                                           const Mat_t<dim> & T) {
-        static_assert(dim > 0, "only works for positive dimensions");
-        return 1. / (eigs(i) - eigs(j)) *
-               (T - eigs(j) * Mat_t<dim>::Identity());
+      static inline decltype(auto) compute(const Vec_t<Dim> & eigs,
+                                           const Mat_t<Dim> & T) {
+        static_assert(Dim > 0, "only works for positive dimensions");
+        return 1. / (eigs(I) - eigs(J)) *
+               (T - eigs(J) * Mat_t<Dim>::Identity());
       }
     };
 
     //! catch the general tail case
     template <>
     struct Proj<1, 0, 0> {
-      static constexpr Dim_t dim{1};  //!< short-hand
-      static constexpr Dim_t i{0};    //!< short-hand
-      static constexpr Dim_t j{0};    //!< short-hand
+      static constexpr Dim_t Dim{1};  //!< short-hand
+      static constexpr Dim_t I{0};    //!< short-hand
+      static constexpr Dim_t J{0};    //!< short-hand
 
       //! wrapped function (raison d'être)
-      static inline decltype(auto) compute(const Vec_t<dim> & /*eigs*/,
-                                           const Mat_t<dim> & /*T*/) {
-        return Mat_t<dim>::Identity();
+      static inline decltype(auto) compute(const Vec_t<Dim> & /*eigs*/,
+                                           const Mat_t<Dim> & /*T*/) {
+        return Mat_t<Dim>::Identity();
       }
     };
 
     //! Product term
-    template <Dim_t dim, Dim_t i>
-    inline decltype(auto) P(const Vec_t<dim> & eigs, const Mat_t<dim> & T) {
-      return Proj<dim, i>::compute(eigs, T);
+    template <Dim_t Dim, Dim_t I>
+    inline decltype(auto) P(const Vec_t<Dim> & eigs, const Mat_t<Dim> & T) {
+      return Proj<Dim, I>::compute(eigs, T);
     }
 
     //! sum term
-    template <Dim_t dim, Dim_t i = dim - 1>
+    template <Dim_t Dim, Dim_t I = Dim - 1>
     struct Summand {
       //! wrapped function (raison d'être)
-      static inline decltype(auto) compute(const Vec_t<dim> & eigs,
-                                           const Mat_t<dim> & T) {
-        return std::log(eigs(i)) * P<dim, i>(eigs, T) +
-               Summand<dim, i - 1>::compute(eigs, T);
+      static inline decltype(auto) compute(const Vec_t<Dim> & eigs,
+                                           const Mat_t<Dim> & T) {
+        return std::log(eigs(I)) * P<Dim, I>(eigs, T) +
+               Summand<Dim, I - 1>::compute(eigs, T);
       }
     };
 
     //! sum term
-    template <Dim_t dim>
-    struct Summand<dim, 0> {
-      static constexpr Dim_t i{0};  //!< short-hand
+    template <Dim_t Dim>
+    struct Summand<Dim, 0> {
+      static constexpr Dim_t I{0};  //!< short-hand
       //! wrapped function (raison d'être)
-      static inline decltype(auto) compute(const Vec_t<dim> & eigs,
-                                           const Mat_t<dim> & T) {
-        return std::log(eigs(i)) * P<dim, i>(eigs, T);
+      static inline decltype(auto) compute(const Vec_t<Dim> & eigs,
+                                           const Mat_t<Dim> & T) {
+        return std::log(eigs(I)) * P<Dim, I>(eigs, T);
       }
     };
 
     //! sum implementation
-    template <Dim_t dim>
-    inline decltype(auto) Sum(const Vec_t<dim> & eigs, const Mat_t<dim> & T) {
-      return Summand<dim>::compute(eigs, T);
+    template <Dim_t Dim>
+    inline decltype(auto) Sum(const Vec_t<Dim> & eigs, const Mat_t<Dim> & T) {
+      return Summand<Dim>::compute(eigs, T);
     }
 
   }  // namespace log_comp
@@ -373,9 +373,9 @@ namespace muGrid {
    * a diagonizable tensor. For larger tensors, better use the direct
    * eigenvalue/vector computation
    */
-  template <Dim_t dim>
-  inline decltype(auto) logm(const log_comp::Mat_t<dim> & mat) {
-    using Mat_t = Eigen::Matrix<Real, dim, dim>;
+  template <Dim_t Dim>
+  inline decltype(auto) logm(const log_comp::Mat_t<Dim> & mat) {
+    using Mat_t = Eigen::Matrix<Real, Dim, Dim>;
     Eigen::SelfAdjointEigenSolver<Mat_t> Solver{};
     Solver.computeDirect(mat, Eigen::EigenvaluesOnly);
     return Mat_t{log_comp::Sum(Solver.eigenvalues(), mat)};
@@ -394,8 +394,8 @@ namespace muGrid {
                   "works only for static matrices");
     static_assert(Derived::RowsAtCompileTime == Derived::ColsAtCompileTime,
                   "works only for square matrices");
-    constexpr Dim_t dim{Derived::RowsAtCompileTime};
-    using Mat_t = Eigen::Matrix<Real, dim, dim>;
+    constexpr Dim_t Dim{Derived::RowsAtCompileTime};
+    using Mat_t = Eigen::Matrix<Real, Dim, Dim>;
     DecompType<Mat_t> Solver{};
     Solver.computeDirect(mat, Eigen::ComputeEigenvectors);
     return Solver;
@@ -411,9 +411,9 @@ namespace muGrid {
   logm_alt(const DecompType<Matrix_t<Dim>> & spectral_decomp) {
     using Mat_t = Eigen::Matrix<Real, Dim, Dim>;
     Mat_t retval{Mat_t::Zero()};
-    for (Dim_t i = 0; i < Dim; ++i) {
-      const Real & val = spectral_decomp.eigenvalues()(i);
-      auto & vec = spectral_decomp.eigenvectors().col(i);
+    for (Dim_t i{0}; i < Dim; ++i) {
+      const Real & val{spectral_decomp.eigenvalues()(i)};
+      auto & vec{spectral_decomp.eigenvectors().col(i)};
       retval += std::log(val) * vec * vec.transpose();
     }
     return retval;
@@ -429,8 +429,8 @@ namespace muGrid {
                   "works only for static matrices");
     static_assert(Derived::RowsAtCompileTime == Derived::ColsAtCompileTime,
                   "works only for square matrices");
-    constexpr Dim_t dim{Derived::RowsAtCompileTime};
-    using Mat_t = Eigen::Matrix<Real, dim, dim>;
+    constexpr Dim_t Dim{Derived::RowsAtCompileTime};
+    using Mat_t = Eigen::Matrix<Real, Dim, Dim>;
     using Decomp_t = Eigen::SelfAdjointEigenSolver<Mat_t>;
 
     Decomp_t decomp{spectral_decomposition(mat)};
@@ -452,9 +452,9 @@ namespace muGrid {
   expm(const DecompType<Matrix_t<Dim>> & spectral_decomp) {
     using Mat_t = Matrix_t<Dim>;
     Mat_t retval{Mat_t::Zero()};
-    for (Dim_t i = 0; i < Dim; ++i) {
-      const Real & val = spectral_decomp.eigenvalues()(i);
-      auto & vec = spectral_decomp.eigenvectors().col(i);
+    for (Dim_t i{0}; i < Dim; ++i) {
+      const Real & val{spectral_decomp.eigenvalues()(i)};
+      auto & vec{spectral_decomp.eigenvectors().col(i)};
       retval += std::exp(val) * vec * vec.transpose();
     }
     return retval;

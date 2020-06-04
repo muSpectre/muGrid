@@ -44,9 +44,9 @@
 
 namespace muGrid {
   namespace raw_mem_ops {
-    void strided_copy(const std::vector<Dim_t> & logical_shape,
-                      const std::vector<Dim_t> & input_strides,
-                      const std::vector<Dim_t> & output_strides,
+    void strided_copy(const std::vector<Index_t> & logical_shape,
+                      const std::vector<Index_t> & input_strides,
+                      const std::vector<Index_t> & output_strides,
                       const void * input_data, void * output_data,
                       const size_t & size);
     /**
@@ -55,9 +55,9 @@ namespace muGrid {
      * storage
      */
     template <typename T>
-    void strided_copy(const std::vector<Dim_t> & logical_shape,
-                      const std::vector<Dim_t> & input_strides,
-                      const std::vector<Dim_t> & output_strides,
+    void strided_copy(const std::vector<Index_t> & logical_shape,
+                      const std::vector<Index_t> & input_strides,
+                      const std::vector<Index_t> & output_strides,
                       const T * input_data, T * output_data) {
       strided_copy(logical_shape, input_strides, output_strides, input_data,
                    output_data, sizeof(T));

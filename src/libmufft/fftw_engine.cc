@@ -52,7 +52,7 @@ namespace muFFT {
   }
 
   /* ---------------------------------------------------------------------- */
-  void FFTWEngine::initialise(const Dim_t & nb_dof_per_pixel,
+  void FFTWEngine::initialise(const Index_t & nb_dof_per_pixel,
                               const FFT_PlanFlags & plan_flags) {
     if (this->has_plan_for(nb_dof_per_pixel)) {
       // plan already exists, we can bail
@@ -70,11 +70,11 @@ namespace muFFT {
     std::vector<int> narr(rank);
     // Reverse the order of the array dimensions, because FFTW expects a
     // row-major array and the arrays used in muSpectre are column-major
-    for (Dim_t i = 0; i < rank; ++i) {
+    for (Index_t i{0}; i < rank; ++i) {
       narr[i] = this->nb_subdomain_grid_pts[rank - 1 - i];
     }
     const int * const n{&narr[0]};
-    int howmany{nb_dof_per_pixel};
+    int howmany{static_cast<int>(nb_dof_per_pixel)};
     // temporary buffer for plan
     size_t alloc_size{muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts) *
                       howmany};

@@ -52,7 +52,7 @@ namespace muSpectre {
    * operator that is stored in form of a fourth-order tensor of real
    * values per k-grid point
    */
-  template <Dim_t DimS>
+  template <Index_t DimS>
   class ProjectionDefault : public ProjectionBase {
    public:
     using Parent = ProjectionBase;               //!< base class
@@ -107,13 +107,13 @@ namespace muSpectre {
      * material_dim matrices, but in symmetriy storage, it is a column
      * vector)
      */
-    std::array<Dim_t, 2> get_strain_shape() const final;
+    std::array<Index_t, 2> get_strain_shape() const final;
 
     //! get number of components to project per pixel
-    constexpr static Dim_t NbComponents() { return DimS * DimS; }
+    constexpr static Index_t NbComponents() { return DimS * DimS; }
 
     //! get number of components to project per pixel
-    virtual Dim_t get_nb_dof_per_pixel() const { return NbComponents(); }
+    virtual Index_t get_nb_dof_per_pixel() const { return NbComponents(); }
 
     const Gradient_t & get_gradient() const { return this->gradient; }
 

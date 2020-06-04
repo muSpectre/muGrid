@@ -53,10 +53,10 @@
 
 namespace muSpectre {
 
-  template <Dim_t Dim>
+  template <Index_t Dim>
   class LamCombination;
 
-  template <Dim_t Dim, Formulation Form>
+  template <Index_t Dim, Formulation Form>
   class LamHomogen {
    public:
     //! typedefs for data handled by this interface
@@ -66,15 +66,15 @@ namespace muSpectre {
     using Strain_t = Eigen::Matrix<Real, Dim, Dim>;
     using Stress_t = Strain_t;
 
-    using Equation_index_t = std::array<std::array<Dim_t, 2>, Dim>;
+    using Equation_index_t = std::array<std::array<Index_t, 2>, Dim>;
     using Equation_stiffness_t = Eigen::Matrix<Real, Dim, Dim>;
     using Equation_strain_t = Eigen::Matrix<Real, Dim, 1>;
     using Equation_stress_t = Equation_strain_t;
 
     using Parallel_index_t = std::conditional_t<
         Form == Formulation::finite_strain,
-        std::array<std::array<Dim_t, 2>, Dim *(Dim - 1)>,
-        std::array<std::array<Dim_t, 2>, (Dim - 1) * (Dim - 1)>>;
+        std::array<std::array<Index_t, 2>, Dim *(Dim - 1)>,
+        std::array<std::array<Index_t, 2>, (Dim - 1) * (Dim - 1)>>;
 
     using Parallel_strain_t =
         std::conditional_t<Form == Formulation::finite_strain,
@@ -199,12 +199,12 @@ namespace muSpectre {
      * tolerance error for the internal solution of the laminate pixel 7- the
      * maximum iterations for the internal solution of the laminate pixel
      */
-    static std::tuple<Dim_t, Real, Strain_t, Strain_t>
+    static std::tuple<Index_t, Real, Strain_t, Strain_t>
     laminate_solver(const Eigen::Ref<Strain_t> & strain_coord,
                     const Function_t & mat_1_stress_eval,
                     const Function_t & mat_2_stress_eval, const Real & ratio,
                     const Eigen::Ref<Vec_t> & normal_vec,
-                    const Real & tol = 1e-10, const Dim_t & max_iter = 1000);
+                    const Real & tol = 1e-10, const Index_t & max_iter = 1000);
 
     /* ---------------------------------------------------------------------- */
     static Stress_t evaluate_stress(const Eigen::Ref<Strain_t> & strain_coord,
@@ -213,7 +213,7 @@ namespace muSpectre {
                                     const Real & ratio,
                                     const Eigen::Ref<Vec_t> & normal_vec,
                                     const Real & tol = 1e-10,
-                                    const Dim_t & max_iter = 1000);
+                                    const Index_t & max_iter = 1000);
 
     /* ---------------------------------------------------------------------- */
     static std::tuple<Stress_t, Stiffness_t> evaluate_stress_tangent(
@@ -221,11 +221,11 @@ namespace muSpectre {
         const Function_t & mat_1_stress_eval,
         const Function_t & mat_2_stress_eval, const Real & ratio,
         const Eigen::Ref<Vec_t> & normal_vec, const Real & tol = 1e-10,
-        const Dim_t & max_iter = 1000);
+        const Index_t & max_iter = 1000);
   };  // LamHomogen
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim>
+  template <Index_t Dim>
   class LamCombination {
    public:
     using Stiffness_t =
@@ -332,7 +332,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim, Formulation Form>
+  template <Index_t Dim, Formulation Form>
   template <class Derived>
   auto LamHomogen<Dim, Form>::get_equation_stress(
       const Eigen::MatrixBase<Derived> & S_total) -> Equation_stress_t {
@@ -340,7 +340,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim, Formulation Form>
+  template <Index_t Dim, Formulation Form>
   template <class Derived>
   auto LamHomogen<Dim, Form>::get_parallel_stress(
       const Eigen::MatrixBase<Derived> & S_total) -> Parallel_stress_t {
@@ -349,7 +349,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
 
-  template <Dim_t Dim, Formulation Form>
+  template <Index_t Dim, Formulation Form>
   template <class Derived>
   auto LamHomogen<Dim, Form>::get_parallel_strain(
       const Eigen::MatrixBase<Derived> & E_total) -> Parallel_strain_t {
@@ -364,7 +364,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim, Formulation Form>
+  template <Index_t Dim, Formulation Form>
   template <class Derived>
   auto LamHomogen<Dim, Form>::get_equation_strain(
       const Eigen::MatrixBase<Derived> & E_total) -> Equation_strain_t {
@@ -383,7 +383,7 @@ namespace muSpectre {
   // linear equation are solved in the rotated coordiantes to obtain strain_2
   // form known strain_1 and then these two are passed to calculate
   // stress in the general corrdinates
-  template <Dim_t Dim, Formulation Form>
+  template <Index_t Dim, Formulation Form>
   template <class Derived1, class Derived2>
   auto
   LamHomogen<Dim, Form>::linear_eqs(const Real & ratio,
@@ -394,7 +394,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim, Formulation Form>
+  template <Index_t Dim, Formulation Form>
   template <class Derived1, class Derived2>
   auto LamHomogen<Dim, Form>::make_total_stress(
       const Eigen::MatrixBase<Derived1> & S_eq,
@@ -404,7 +404,7 @@ namespace muSpectre {
 
   /* ----------------------------------------------------------------------
    */
-  template <Dim_t Dim>
+  template <Index_t Dim>
   template <class Derived1, class Derived2>
   auto
   LamCombination<Dim>::lam_S_combine(const Eigen::MatrixBase<Derived1> & S_1,

@@ -51,13 +51,13 @@
 
 namespace muSpectre {
 
-  template <Dim_t DimM>
+  template <Index_t DimM>
   class MaterialHyperElastoPlastic2;
 
   /**
    * traits for hyper-elastoplastic material
    */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   struct MaterialMuSpectre_traits<MaterialHyperElastoPlastic2<DimM>> {
     //! expected map type for strain fields
     using StrainMap_t =
@@ -78,7 +78,7 @@ namespace muSpectre {
   /**
    * material implementation for hyper-elastoplastic constitutive law.
    */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   class MaterialHyperElastoPlastic2
       : public MaterialMuSpectre<MaterialHyperElastoPlastic2<DimM>, DimM> {
    public:
@@ -112,8 +112,8 @@ namespace muSpectre {
 
     //! Constructor with name
     MaterialHyperElastoPlastic2(const std::string & name,
-                                const Dim_t & spatial_dimension,
-                                const Dim_t & nb_quad_pts);
+                                const Index_t & spatial_dimension,
+                                const Index_t & nb_quad_pts);
 
     //! Copy constructor
     MaterialHyperElastoPlastic2(const MaterialHyperElastoPlastic2 & other) =

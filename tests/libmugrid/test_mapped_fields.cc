@@ -176,7 +176,7 @@ namespace muGrid {
     BOOST_CHECK_EQUAL(dynamic_field2.size(), 0);
 
     // check that returned size is correct
-    Dim_t len{2};
+    Index_t len{2};
     auto sizes{CcoordOps::get_cube<SDim>(len)};
     fc.initialise(sizes, {});
 
@@ -185,7 +185,7 @@ namespace muGrid {
     BOOST_CHECK_EQUAL(dynamic_field1.size(), nb_pixels);
     BOOST_CHECK_EQUAL(dynamic_field2.size(), nb_pixels);
 
-    constexpr Dim_t pad_size{3};
+    constexpr Index_t pad_size{3};
     tensor_field.get_field().set_pad_size(pad_size);
     dynamic_field1.set_pad_size(pad_size);
     dynamic_field2.set_pad_size(pad_size);
@@ -205,16 +205,16 @@ namespace muGrid {
     BOOST_CHECK_EQUAL(dynamic_field2.size(), 0);
 
     // check that returned size is correct
-    Dim_t nb_pixels{3};
+    Index_t nb_pixels{3};
 
     Eigen::Array<Real, NbComponents, 1> new_elem;
     Eigen::Array<Real, 1, NbComponents + 1> wrong_elem;
-    for (Dim_t i{0}; i < NbComponents; ++i) {
+    for (Index_t i{0}; i < NbComponents; ++i) {
       new_elem(i) = i;
       wrong_elem(i) = .1 * i;
     }
 
-    for (Dim_t i{0}; i < nb_pixels; ++i) {
+    for (Index_t i{0}; i < nb_pixels; ++i) {
       tensor_field.get_field().push_back(new_elem);
       dynamic_field1.push_back(new_elem);
       BOOST_CHECK_THROW(dynamic_field1.push_back(wrong_elem), FieldError);
@@ -224,7 +224,7 @@ namespace muGrid {
     BOOST_CHECK_EQUAL(dynamic_field1.size(), nb_pixels);
     BOOST_CHECK_EQUAL(dynamic_field2.size(), 0);
 
-    for (Dim_t i{0}; i < nb_pixels; ++i) {
+    for (Index_t i{0}; i < nb_pixels; ++i) {
       fc.add_pixel(i);
     }
 
@@ -238,7 +238,7 @@ namespace muGrid {
     BOOST_CHECK_EQUAL(dynamic_field1.get_pad_size(), 0);
     BOOST_CHECK_EQUAL(dynamic_field2.get_pad_size(), 0);
 
-    constexpr Dim_t pad_size{3};
+    constexpr Index_t pad_size{3};
     tensor_field.get_field().set_pad_size(pad_size);
     dynamic_field1.set_pad_size(pad_size);
     dynamic_field2.set_pad_size(pad_size);

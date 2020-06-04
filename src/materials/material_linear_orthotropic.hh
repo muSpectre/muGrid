@@ -46,11 +46,11 @@
 
 namespace muSpectre {
 
-  template <Dim_t DimM>
+  template <Index_t DimM>
   class MaterialLinearOrthotropic;
 
   // traits for orthotropic material
-  template <Dim_t DimM>
+  template <Index_t DimM>
   struct MaterialMuSpectre_traits<MaterialLinearOrthotropic<DimM>> {
     //! expected map type for strain fields
     using StrainMap_t =
@@ -70,7 +70,7 @@ namespace muSpectre {
   /**
    * Material implementation for orthotropic constitutive law
    */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   class MaterialLinearOrthotropic : public MaterialLinearAnisotropic<DimM> {
    public:
     //! base class
@@ -87,8 +87,8 @@ namespace muSpectre {
     // a std::vector is utilized as the input of the constructor to
     // enable us to check its length so to prevent user mistake
     MaterialLinearOrthotropic(const std::string & name,
-                              const Dim_t & spatial_dimension,
-                              const Dim_t & nb_quad_pts,
+                              const Index_t & spatial_dimension,
+                              const Index_t & nb_quad_pts,
                               const std::vector<Real> & input);
 
     //! Copy constructor

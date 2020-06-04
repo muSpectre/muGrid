@@ -61,7 +61,7 @@ namespace muSpectre {
    *
    * \tparam DimM Dimensionality of the material
    */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   class MaterialEvaluator {
    public:
     //! shorthand for second-rank tensors
@@ -97,8 +97,8 @@ namespace muSpectre {
           strain("gradient", *this->collection),
           stress{"stress", *this->collection}, tangent{"tangent",
                                                        *this->collection} {
-      this->collection->initialise(muGrid::CcoordOps::get_cube<DimM>(1),
-                                   Ccoord_t<DimM>{});
+      this->collection->initialise(
+          muGrid::CcoordOps::get_cube<DimM>(Index_t{1}), Ccoord_t<DimM>{});
     }
 
     //! Copy constructor
@@ -188,7 +188,7 @@ namespace muSpectre {
   };
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   auto
   MaterialEvaluator<DimM>::evaluate_stress(const Eigen::Ref<const T2_t> & grad,
                                            const Formulation & form)
@@ -201,7 +201,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   auto MaterialEvaluator<DimM>::evaluate_stress_tangent(
       const Eigen::Ref<const T2_t> & grad, const Formulation & form)
       -> std::tuple<T2_const_map, T4_const_map> {
@@ -215,7 +215,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   void MaterialEvaluator<DimM>::check_init() {
     if (not this->is_initialised) {
       this->initialise();
@@ -235,7 +235,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   auto MaterialEvaluator<DimM>::estimate_tangent(
       const Eigen::Ref<const T2_t> & grad, const Formulation & form,
       const Real delta, const FiniteDiff diff_type) -> T4_t {
@@ -256,7 +256,7 @@ namespace muSpectre {
                       Int(T2_t::SizeAtCompileTime),
                   "wrong column size");
 
-    for (Dim_t i{}; i < DimM * DimM; ++i) {
+    for (Index_t i{}; i < DimM * DimM; ++i) {
       T2_t strain2{grad};
       T2_vec strain2_vec{strain2.data()};
 
@@ -312,7 +312,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   void MaterialEvaluator<DimM>::initialise() {
     this->material->initialise();
     this->is_initialised = true;

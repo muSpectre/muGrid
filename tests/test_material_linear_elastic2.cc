@@ -56,15 +56,15 @@ namespace muSpectre {
     constexpr static Real lambda{2}, mu{1.5};
     constexpr static Real young{mu * (3 * lambda + 2 * mu) / (lambda + mu)};
     constexpr static Real poisson{lambda / (2 * (lambda + mu))};
-    constexpr static Dim_t NbQuadPts() { return 2; }
-    constexpr static Dim_t sdim{twoD};
-    constexpr static Dim_t mdim() { return Mat_t::MaterialDimension(); }
+    constexpr static Index_t NbQuadPts() { return 2; }
+    constexpr static Index_t sdim{twoD};
+    constexpr static Index_t mdim() { return Mat_t::MaterialDimension(); }
     MaterialFixture() : mat("Name", mdim(), NbQuadPts(), young, poisson) {}
 
     Mat_t mat;
   };
   template <class Mat_t>
-  constexpr Dim_t MaterialFixture<Mat_t>::sdim;
+  constexpr Index_t MaterialFixture<Mat_t>::sdim;
 
   using mat_list =
       boost::mpl::list<MaterialFixture<MaterialLinearElastic2<twoD>>,
@@ -81,8 +81,8 @@ namespace muSpectre {
     auto & mat{Fix::mat};
     muGrid::testGoodies::RandRange<size_t> rng;
 
-    const Dim_t nb_pixel{7}, box_size{17};
-    for (Dim_t i = 0; i < nb_pixel; ++i) {
+    const Index_t nb_pixel{7}, box_size{17};
+    for (Index_t i = 0; i < nb_pixel; ++i) {
       const size_t c{rng.randval(0, box_size)};
       Eigen::Matrix<Real, Fix::mdim(), Fix::mdim()> Zero =
           Eigen::Matrix<Real, Fix::mdim(), Fix::mdim()>::Zero();
@@ -96,9 +96,9 @@ namespace muSpectre {
                                    Fix) {
     auto & mat{Fix::mat};
 
-    const Dim_t nb_pixel{2};
+    const Index_t nb_pixel{2};
     constexpr auto cube{muGrid::CcoordOps::get_cube<Fix::sdim>(nb_pixel)};
-    constexpr auto loc{muGrid::CcoordOps::get_cube<Fix::sdim>(0)};
+    constexpr auto loc{muGrid::CcoordOps::get_cube<Fix::sdim>(Index_t{0})};
 
     using Mat_t = Eigen::Matrix<Real, Fix::mdim(), Fix::mdim()>;
     using FC_t = muGrid::GlobalFieldCollection;
@@ -109,8 +109,8 @@ namespace muSpectre {
     Mat_t F{Mat_t::Random() / 100 + Mat_t::Identity()};
     Mat_t strain{-.5 * (F + F.transpose()) - Mat_t::Identity()};
 
-    Dim_t pix0{0};
-    Dim_t pix1{1};
+    Index_t pix0{0};
+    Index_t pix1{1};
 
     mat.add_pixel(pix0, zero);
     mat.add_pixel(pix1, strain);
@@ -122,7 +122,7 @@ namespace muSpectre {
         P1_f{"Nominal Stress1", globalfields};  // to be computed alone
     muGrid::MappedT4Field<Real, Mapping::Mut, Fix::mdim(), PixelSubDiv::QuadPt>
         K_f{"Tangent Moduli", globalfields};  // to be computed with tangent
-    for (Dim_t quad_id{0}; quad_id < Fix::NbQuadPts(); ++quad_id) {
+    for (Index_t quad_id{0}; quad_id < Fix::NbQuadPts(); ++quad_id) {
       F_f.get_map()[pix0 * Fix::NbQuadPts() + quad_id] = -strain;
       F_f.get_map()[pix1 * Fix::NbQuadPts() + quad_id] = zero;
     }
@@ -150,7 +150,7 @@ namespace muSpectre {
   struct MaterialFixtureFilled : public MaterialFixture<Mat_t> {
     using Par = MaterialFixture<Mat_t>;
     using Mat = Mat_t;
-    constexpr static Dim_t box_size{3};
+    constexpr static Index_t box_size{3};
     MaterialFixtureFilled() : MaterialFixture<Mat_t>() {
       using Ccoord = Ccoord_t<Par::sdim>;
       Ccoord cube{muGrid::CcoordOps::get_cube<Par::sdim>(box_size)};
@@ -171,7 +171,7 @@ namespace muSpectre {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_evaluate_law, Fix, mat_fill, Fix) {
     constexpr auto cube{muGrid::CcoordOps::get_cube<Fix::sdim>(Fix::box_size)};
-    constexpr auto loc{muGrid::CcoordOps::get_cube<Fix::sdim>(0)};
+    constexpr auto loc{muGrid::CcoordOps::get_cube<Fix::sdim>(Index_t{0})};
     auto & mat{Fix::mat};
 
     using FC_t = muGrid::GlobalFieldCollection;

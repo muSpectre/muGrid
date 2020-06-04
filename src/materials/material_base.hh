@@ -79,8 +79,9 @@ namespace muSpectre {
      * strain or stress problems)
      * @param nb_quad_pts is the number of quadrature points per grid cell
      */
-    MaterialBase(const std::string & name, const Dim_t & spatial_dimension,
-                 const Dim_t & material_dimension, const Dim_t & nb_quad_pts,
+    MaterialBase(const std::string & name, const Index_t & spatial_dimension,
+                 const Index_t & material_dimension,
+                 const Index_t & nb_quad_pts,
                  const std::shared_ptr<muGrid::LocalFieldCollection> &
                      parent_field_collection);
 
@@ -129,7 +130,7 @@ namespace muSpectre {
     const std::string & get_name() const;
 
     //! material dimension for  inheritance
-    Dim_t get_material_dimension() { return this->material_dimension; }
+    Index_t get_material_dimension() { return this->material_dimension; }
 
     //! computes stress
     virtual void
@@ -191,7 +192,7 @@ namespace muSpectre {
     muGrid::LocalFieldCollection::IndexIterable get_quad_pt_indices() const;
 
     //! number of quadrature points assigned to this material
-    inline Dim_t size() const {
+    inline Index_t size() const {
       return this->internal_fields->get_nb_pixels() *
              this->internal_fields->get_nb_quad_pts();
     }
@@ -252,7 +253,7 @@ namespace muSpectre {
         internal_fields;  //!< storage for internal variables
 
     //! spatial dimension of the material
-    Dim_t material_dimension;
+    Index_t material_dimension;
 
     //! NonLinearity flag
     bool last_step_was_nonlinear{true};

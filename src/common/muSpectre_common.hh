@@ -48,6 +48,7 @@
 namespace muSpectre {
 
   using muGrid::Dim_t;
+  using muGrid::Index_t;
 
   using muGrid::Complex;
   using muGrid::Int;

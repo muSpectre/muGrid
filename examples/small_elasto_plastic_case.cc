@@ -46,7 +46,7 @@
 using namespace muSpectre;
 
 int main() {
-  constexpr Dim_t Dim{twoD};
+  constexpr Index_t Dim{twoD};
 
   DynCcoord_t nb_grid_pts{5, 5};
 

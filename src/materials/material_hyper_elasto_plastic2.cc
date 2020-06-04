@@ -43,10 +43,10 @@
 #include <libmugrid/T4_map_proxy.hh>
 
 namespace muSpectre {
-  template <Dim_t DimM>
+  template <Index_t DimM>
   MaterialHyperElastoPlastic2<DimM>::MaterialHyperElastoPlastic2(
-      const std::string & name, const Dim_t & spatial_dimension,
-      const Dim_t & nb_quad_pts)
+      const std::string & name, const Index_t & spatial_dimension,
+      const Index_t & nb_quad_pts)
       : Parent{name, spatial_dimension, nb_quad_pts},
         material_child(name + "_child", spatial_dimension, nb_quad_pts, 0.0,
                        0.0, 0.0, 0.0, this->internal_fields),
@@ -63,19 +63,19 @@ namespace muSpectre {
                 *this->internal_fields) {}
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   void MaterialHyperElastoPlastic2<DimM>::save_history_variables() {
     this->material_child.save_history_variables();
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   void MaterialHyperElastoPlastic2<DimM>::initialise() {
     this->material_child.initialise();
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   void
   MaterialHyperElastoPlastic2<DimM>::add_pixel(const size_t & /*pixel_id*/) {
     throw muGrid::RuntimeError(
@@ -84,7 +84,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   void MaterialHyperElastoPlastic2<DimM>::add_pixel(const size_t & pixel_id,
                                                     const Real & Youngs_modulus,
                                                     const Real & Poisson_ratio,
@@ -104,7 +104,7 @@ namespace muSpectre {
   }
 
   //--------------------------------------------------------------------------//
-  template <Dim_t DimM>
+  template <Index_t DimM>
   auto MaterialHyperElastoPlastic2<DimM>::evaluate_stress(
       const T2_t & F, PrevStrain_ref F_prev, PrevStrain_ref be_prev,
       FlowField_ref eps_p, const Real lambda, const Real mu, const Real tau_y0,
@@ -114,7 +114,7 @@ namespace muSpectre {
   }
 
   //--------------------------------------------------------------------------//
-  template <Dim_t DimM>
+  template <Index_t DimM>
   auto MaterialHyperElastoPlastic2<DimM>::evaluate_stress_tangent(
       const T2_t & F, PrevStrain_ref F_prev, PrevStrain_ref be_prev,
       FlowField_ref eps_p, const Real lambda, const Real mu, const Real tau_y0,

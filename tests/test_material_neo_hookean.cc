@@ -46,7 +46,7 @@ namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE(material_neo_hookean_elastic)
 
-  template <Dim_t Dim>
+  template <Index_t Dim>
   struct MaterialFixture {
     using MatNeo = MaterialNeoHookeanElastic<Dim>;
     using MatLin = MaterialLinearElastic1<Dim>;
@@ -56,20 +56,20 @@ namespace muSpectre {
     MaterialFixture()
         : mat_neo("Neo", mdim(), NbQuadPts(), young, poisson),
           mat_lin("Lin", mdim(), NbQuadPts(), young, poisson) {}
-    constexpr static Dim_t mdim() { return Dim; }
-    constexpr static Dim_t sdim() { return mdim(); }
-    constexpr static Dim_t NbQuadPts() { return 1; }
+    constexpr static Index_t mdim() { return Dim; }
+    constexpr static Index_t sdim() { return mdim(); }
+    constexpr static Index_t NbQuadPts() { return 1; }
 
     MatNeo mat_neo;
     MatLin mat_lin;
   };
 
-  template <Dim_t Dim>
+  template <Index_t Dim>
   struct MaterialFixtureFilled : public MaterialFixture<Dim> {
     using Parent = MaterialFixture<Dim>;
     using MatNeo = typename Parent::MatNeo;
     using MatLin = typename Parent::MatLin;
-    constexpr static Dim_t box_size{1};
+    constexpr static Index_t box_size{1};
     MaterialFixtureFilled()
         : Parent(), mat_neo("Neo", Parent::mdim(), Parent::NbQuadPts(),
                             Parent::young, Parent::poisson),
@@ -88,8 +88,8 @@ namespace muSpectre {
       this->mat_lin.initialise();
     }
     const Real tol{Parent::amp};
-    constexpr static Dim_t mdim() { return MatNeo::MaterialDimension(); }
-    constexpr static Dim_t sdim() { return mdim(); }
+    constexpr static Index_t mdim() { return MatNeo::MaterialDimension(); }
+    constexpr static Index_t sdim() { return mdim(); }
 
     MatNeo mat_neo;
     MatLin mat_lin;
@@ -108,7 +108,7 @@ namespace muSpectre {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_evaluate_stress_pure_volumetric, Fix,
                                    mats_fill, Fix) {
-    constexpr Dim_t mdim{Fix::mdim()};
+    constexpr Index_t mdim{Fix::mdim()};
     using Strain_t = Eigen::Matrix<Real, mdim, mdim>;
 
     auto & mat_neo{Fix::mat_neo};
@@ -138,7 +138,7 @@ namespace muSpectre {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_evaluate_stress_tangent_pure_volumetric,
                                    Fix, mats_fill, Fix) {
-    constexpr Dim_t mdim{Fix::mdim()};
+    constexpr Index_t mdim{Fix::mdim()};
     using Strain_t = Eigen::Matrix<Real, mdim, mdim>;
 
     auto & mat_neo{Fix::mat_neo};

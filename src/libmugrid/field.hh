@@ -82,7 +82,7 @@ namespace muGrid {
      * @param collection reference to the holding field collection.
      */
     Field(const std::string & unique_name, FieldCollection & collection,
-          const Dim_t & nb_dof_per_sub_pt, const Dim_t & nb_sub_pts,
+          const Index_t & nb_dof_per_sub_pt, const Index_t & nb_sub_pts,
           const PixelSubDiv & subdivision, const Unit & unit);
 
    public:
@@ -111,16 +111,16 @@ namespace muGrid {
     FieldCollection & get_collection() const;
 
     //! return the number of components stored per quadrature point
-    const Dim_t & get_nb_dof_per_sub_pt() const;
+    const Index_t & get_nb_dof_per_sub_pt() const;
 
     //! return the number of sub points per pixel
-    const Dim_t & get_nb_sub_pts() const;
+    const Index_t & get_nb_sub_pts() const;
 
     //! return the number of components stored per pixel
-    Dim_t get_nb_dof_per_pixel() const;
+    Index_t get_nb_dof_per_pixel() const;
 
     //! return the number of pixels
-    Dim_t get_nb_pixels() const;
+    Index_t get_nb_pixels() const;
 
     /**
      * returns the number of entries held by any given field in this
@@ -129,13 +129,13 @@ namespace muGrid {
      * same number of entries, even though the vector field has more scalar
      * values.)
      */
-    Dim_t get_nb_entries() const;
+    Index_t get_nb_entries() const;
 
     /**
      * evaluate and return the overall shape of the field (for passing the
      * field to generic multidimensional array objects such as numpy.ndarray)
      */
-    std::vector<Dim_t> get_shape(const PixelSubDiv & iter_type) const;
+    std::vector<Index_t> get_shape(const PixelSubDiv & iter_type) const;
 
     /**
      * evaluate and return the overall strides field (for passing the field to
@@ -143,28 +143,29 @@ namespace muGrid {
      * multiplier can be used e.g., if strides are needed in bytes, rather than
      * in pointer offsets.
      */
-    std::vector<Dim_t> get_strides(const PixelSubDiv & iter_type,
-                                   const Dim_t & multiplier = 1) const;
+    std::vector<Index_t> get_strides(const PixelSubDiv & iter_type,
+                                     const Index_t & multiplier = 1) const;
 
     /**
      * Evaluate and return the overall strides assuming the per-pixel layout
      * specified in component_shape
      */
-    std::vector<Dim_t> get_strides(const std::vector<Dim_t> & component_shape,
-                                   const Dim_t & multiplier = 1) const;
+    std::vector<Index_t>
+    get_strides(const std::vector<Index_t> & component_shape,
+                const Index_t & multiplier = 1) const;
     /**
      * evaluate and return the overall shape of the pixels portion of the field
      * (for passing the field to generic multidimensional array objects such as
      * numpy.ndarray)
      */
-    std::vector<Dim_t> get_pixels_shape() const;
+    std::vector<Index_t> get_pixels_shape() const;
 
     /**
      * evaluate and return the shape of the data contained in a single pixel or
      * sub-point (e.g. quadrature point) (for passing the field to generic
      * multidimensional array objects such as numpy.ndarray)
      */
-    virtual std::vector<Dim_t>
+    virtual std::vector<Index_t>
     get_components_shape(const PixelSubDiv & iter_type) const;
 
     /**
@@ -172,21 +173,21 @@ namespace muGrid {
      * portion of the field (for passing the field to generic multidimensional
      * array objects such as numpy.ndarray)
      */
-    virtual std::vector<Dim_t>
+    virtual std::vector<Index_t>
     get_components_strides(const PixelSubDiv & iter_type) const;
 
     /**
-     * evaluate and return the overall strides of the pixels portion of the field
-     * (for passing the field to generic multidimensional array objects such as
-     * numpy.ndarray)
+     * evaluate and return the overall strides of the pixels portion of the
+     * field (for passing the field to generic multidimensional array objects
+     * such as numpy.ndarray)
      */
-    std::vector<Dim_t> get_pixels_strides() const;
+    std::vector<Index_t> get_pixels_strides() const;
 
     /**
      * evaluate and return the number of components in an iterate when iterating
      * over this field
      */
-    Dim_t get_stride(const PixelSubDiv & iter_type) const;
+    Index_t get_stride(const PixelSubDiv & iter_type) const;
 
     /**
      * evaluate and return the number of rows of a default iterate over this
@@ -194,7 +195,7 @@ namespace muGrid {
      * that the user called `get_stride` before, that all checks have been
      * performed there, and that rechecking would be a waste of time)
      */
-    Dim_t get_default_nb_rows(const PixelSubDiv & iter_type) const;
+    Index_t get_default_nb_rows(const PixelSubDiv & iter_type) const;
 
     /**
      * evaluate and return the number of cols of a default iterate over this
@@ -202,7 +203,7 @@ namespace muGrid {
      * that the user called `get_stride` before, that all checks have been
      * performed there, and that rechecking would be a waste of time)
      */
-    Dim_t get_default_nb_cols(const PixelSubDiv & iter_type) const;
+    Index_t get_default_nb_cols(const PixelSubDiv & iter_type) const;
 
     /**
      * return the type information of the stored scalar (for compatibility
@@ -236,7 +237,6 @@ namespace muGrid {
      */
     bool is_global() const;
 
-
     //! check wether the number of pixel sub-divisions has been set
     bool has_nb_sub_pts() const;
 
@@ -248,8 +248,7 @@ namespace muGrid {
     friend FieldCollection;
 
     //! sets the number of sub points per pixel
-    void set_nb_sub_pts(const Dim_t & nb_quad_pts_per_pixel);
-
+    void set_nb_sub_pts(const Index_t & nb_quad_pts_per_pixel);
 
     /**
      * maintains a tally of the current size, as it cannot be reliably
@@ -270,7 +269,7 @@ namespace muGrid {
      * three-dimensional vector, or 9 for a three-dimensional second-rank
      * tensor)
      */
-    const Dim_t nb_dof_per_sub_pt;
+    const Index_t nb_dof_per_sub_pt;
 
     //! size of padding region at end of buffer
     size_t pad_size{};
@@ -278,7 +277,7 @@ namespace muGrid {
     /**
      * number of pixel subdivisions. Will depend on sub_division
      */
-    Dim_t nb_sub_pts;
+    Index_t nb_sub_pts;
 
     /**
      * Pixel subdivision kind (determines how many datapoints to store per

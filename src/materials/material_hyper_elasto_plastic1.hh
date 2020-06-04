@@ -49,13 +49,13 @@
 
 namespace muSpectre {
 
-  template <Dim_t DimM>
+  template <Index_t DimM>
   class MaterialHyperElastoPlastic1;
 
   /**
    * traits for hyper-elastoplastic material
    */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   struct MaterialMuSpectre_traits<MaterialHyperElastoPlastic1<DimM>> {
     //! expected map type for strain fields
     using StrainMap_t =
@@ -78,7 +78,7 @@ namespace muSpectre {
    * developpers: this law is tested against a reference python implementation
    * in `py_comparison_test_material_hyper_elasto_plastic1.py`
    */
-  template <Dim_t DimM>
+  template <Index_t DimM>
   class MaterialHyperElastoPlastic1
       : public MaterialMuSpectre<MaterialHyperElastoPlastic1<DimM>, DimM> {
    public:
@@ -113,8 +113,8 @@ namespace muSpectre {
 
     //! Constructor with name and material properties
     MaterialHyperElastoPlastic1(
-        const std::string & name, const Dim_t & spatial_dimension,
-        const Dim_t & nb_quad_pts, const Real & young, const Real & poisson,
+        const std::string & name, const Index_t & spatial_dimension,
+        const Index_t & nb_quad_pts, const Real & young, const Real & poisson,
         const Real & tau_y0, const Real & H,
         const std::shared_ptr<muGrid::LocalFieldCollection> &
             parent_field_collection = nullptr);

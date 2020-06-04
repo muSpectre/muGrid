@@ -45,7 +45,7 @@ namespace muSpectre {
   /**
    * Implements the discrete finite strain gradient projection operator
    */
-  template <Dim_t DimS>
+  template <Index_t DimS>
   class ProjectionFiniteStrain : public ProjectionDefault<DimS> {
    public:
     using Parent = ProjectionDefault<DimS>;  //!< base class
