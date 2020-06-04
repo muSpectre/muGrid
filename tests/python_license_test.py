@@ -226,7 +226,7 @@ def python_license_test(source_dirs, py_lic_paras):
                 if (file.endswith('.py')
                     and not file.startswith('#')
                     and 'pyc' not in file
-                        and 'direct_comparison_small_strain.py' not in file):
+                        and 'comparison_small_strain.py' not in file):
                     # The files containing # are temp files created by emacs.
                     # Therefore, they need to be excluded.
                     python_files.append(os.path.join(r, file))

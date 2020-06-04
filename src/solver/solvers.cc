@@ -198,14 +198,16 @@ namespace muSpectre {
         strain += macro_strain - previous_macro_strain;
       }
 
+      // define the number of newton iteration (initially equal to 0)
+      Uint newt_iter{0};
       std::string message{"Has not converged"};
       Real incr_norm{2 * newton_tol}, grad_norm{1};
       Real stress_norm{2 * equil_tol};
-      bool has_converged{false};
 
+      //! Checks two loop breaking criteria (newton tolerance and equilibrium
+      //! tolerance)
       auto convergence_test = [&incr_norm, &grad_norm, &newton_tol,
-                               &stress_norm, &equil_tol, &message,
-                               &has_converged]() {
+                               &stress_norm, &equil_tol, &message]() {
         bool incr_test = incr_norm / grad_norm <= newton_tol;
         bool stress_test = stress_norm < equil_tol;
         if (incr_test) {
@@ -213,16 +215,18 @@ namespace muSpectre {
         } else if (stress_test) {
           message = "Reached stress divergence tolerance";
         }
-        has_converged = incr_test || stress_test;
-        return has_converged;
+        return incr_test || stress_test;
       };
-      Uint newt_iter{0};
 
-      for (; newt_iter < solver.get_maxiter() && !has_converged; ++newt_iter) {
+      //! carries out a single newton_cg solving step
+      auto iterate_solve = [&cell, &rhs_field, &incrF_field, &F, &stress_norm,
+                            &incr_norm, &grad_norm, &comm, &convergence_test,
+                            &solver, &strain_step, &load_steps, &macro_strain,
+                            &previous_macro_strain, &newt_iter, &strain_symb,
+                            &verbose, &count_width, &newton_tol, &shape]() {
         // obtain material response
         auto res_tup{cell.evaluate_stress_tangent()};
         auto & P{std::get<0>(res_tup)};
-
         auto & rhs{rhs_field.get_field()};
 
         rhs = -P;
@@ -230,12 +234,12 @@ namespace muSpectre {
         stress_norm = std::sqrt(comm.sum(rhs.eigen_vec().squaredNorm()));
 
         if (convergence_test()) {
-          break;
+          return true;
         }
-
-        // calling sovler for solving the current (iteratively approximated)
+        // calling solver for solving the current (iteratively approximated)
         // linear equilibrium problem
         auto & incrF{incrF_field.get_field()};
+
         try {
           incrF = solver.solve(rhs.eigen_vec());
         } catch (ConvergenceError & error) {
@@ -274,19 +278,34 @@ namespace muSpectre {
                       << StrainMap_t{F, shape[0]}.mean() << std::endl;
           }
         }
-        convergence_test();
-      }
+        return convergence_test();
+      };
 
-      if (newt_iter == solver.get_maxiter()) {
-        std::stringstream err{};
-        err << "Failure at load step " << strain_step + 1 << " of "
-            << load_steps.size() << ". Newton-Raphson failed to converge. "
-            << "The applied boundary condition is Δ" << strain_symb << " ="
-            << std::endl
-            << macro_strain << std::endl
-            << "and the load increment is Δ" << strain_symb << " =" << std::endl
-            << macro_strain - previous_macro_strain << std::endl;
-        throw ConvergenceError(err.str());
+      if (cell.is_non_linear()) {
+        // Iterative update for the non-linear case
+        for (; newt_iter < solver.get_maxiter(); ++newt_iter) {
+          bool converged{iterate_solve()};
+          if (converged) {
+            break;
+          }
+        }
+        // throwing meaningful error message if the number of iterations for
+        // newton_cg is exploited
+        if (newt_iter == solver.get_maxiter()) {
+          std::stringstream err{};
+          err << "Failure at load step " << strain_step + 1 << " of "
+              << load_steps.size() << ". Newton-Raphson failed to converge. "
+              << "The applied boundary condition is Δ" << strain_symb << " ="
+              << std::endl
+              << macro_strain << std::endl
+              << "and the load increment is Δ" << strain_symb << " ="
+              << std::endl
+              << macro_strain - previous_macro_strain << std::endl;
+          throw ConvergenceError(err.str());
+        }
+      } else {
+        // Single strain update for the linear case
+        iterate_solve();
       }
 
       // update previous macroscopic strain
@@ -379,13 +398,13 @@ namespace muSpectre {
         default_strain_val = Matrix_t::Identity(shape[0], shape[1]);
         cell.set_uniform_strain(default_strain_val);
         if (verbose > Verbosity::Silent && comm.rank() == 0) {
-          std::cout << "\nThe strain is initialised by default to the identity "
-                       "matrix!\n"
+          std::cout << "The strain is initialised by default to the identity "
+                       "matrix!"
                     << std::endl;
         }
       } else if (verbose > Verbosity::Silent && comm.rank() == 0 &&
                  strain_init == IsStrainInitialised::True) {
-        std::cout << "\nThe strain was initialised by the user!\n" << std::endl;
+        std::cout << "The strain was initialised by the user!" << std::endl;
       }
 
       // Checking the consistancy of input load_steps and cell shape
@@ -410,13 +429,13 @@ namespace muSpectre {
         default_strain_val = Matrix_t::Zero(shape[0], shape[1]);
         cell.set_uniform_strain(default_strain_val);
         if (verbose > Verbosity::Silent && comm.rank() == 0) {
-          std::cout << "\nThe strain is initialised by default to the zero "
-                       "matrix!\n"
+          std::cout << "The strain is initialised by default to the zero "
+                       "matrix!"
                     << std::endl;
         }
       } else if (verbose > Verbosity::Silent && comm.rank() == 0 &&
                  strain_init == IsStrainInitialised::True) {
-        std::cout << "\nThe strain was initialised by the user!\n" << std::endl;
+        std::cout << "The strain was initialised by the user!" << std::endl;
       }
 
       // Checking the consistancy of input load_steps and cell shape
@@ -480,46 +499,85 @@ namespace muSpectre {
       };
       Uint newt_iter{0};
 
-      for (; ((newt_iter < solver.get_maxiter()) and (!has_converged)) or
-             (newt_iter < 2);
-           ++newt_iter) {
-        // obtain material response
-        auto res_tup{cell.evaluate_stress_tangent()};
-        auto & P{std::get<0>(res_tup)};
+      if (cell.is_non_linear()) {
+        // Iterative update in the nonlinear case
+        for (; ((newt_iter < solver.get_maxiter()) and (!has_converged)) or
+               (newt_iter < 2);
+             ++newt_iter) {
+          // obtain material response
+          auto res_tup{cell.evaluate_stress_tangent()};
+          auto & P{std::get<0>(res_tup)};
 
-        auto & rhs{rhs_field.get_field()};
-        auto & DeltaF{DeltaF_field.get_field()};
-        auto & incrF{incrF_field.get_field()};
-        try {
-          if (newt_iter == 0) {
-            DeltaF_field.get_map() = macro_strain - previous_macro_strain;
-            // this corresponds to rhs=-G:K:δF
-            cell.evaluate_projected_directional_stiffness(DeltaF, rhs);
-            F += DeltaF;
-            stress_norm =
-                std::sqrt(comm.sum(rhs.eigen_vec().matrix().squaredNorm()));
-            if (stress_norm < equil_tol) {
-              incrF.set_zero();
+          auto & rhs{rhs_field.get_field()};
+          auto & DeltaF{DeltaF_field.get_field()};
+          auto & incrF{incrF_field.get_field()};
+          try {
+            if (newt_iter == 0) {
+              DeltaF_field.get_map() = macro_strain - previous_macro_strain;
+              // this corresponds to rhs=-G:K:δF
+              cell.evaluate_projected_directional_stiffness(DeltaF, rhs);
+              F += DeltaF;
+              stress_norm =
+                  std::sqrt(comm.sum(rhs.eigen_vec().matrix().squaredNorm()));
+              if (stress_norm < equil_tol) {
+                incrF.set_zero();
+              } else {
+                incrF = -solver.solve(rhs.eigen_vec());
+              }
             } else {
-              incrF = -solver.solve(rhs.eigen_vec());
+              rhs = -P;
+              cell.apply_projection(rhs);
+              stress_norm =
+                  std::sqrt(comm.sum(rhs.eigen_vec().matrix().squaredNorm()));
+              if (stress_norm < equil_tol) {
+                incrF.set_zero();
+              } else {
+                incrF = solver.solve(rhs.eigen_vec());
+              }
             }
-          } else {
-            rhs = -P;
-            cell.apply_projection(rhs);
-            stress_norm =
-                std::sqrt(comm.sum(rhs.eigen_vec().matrix().squaredNorm()));
-            if (stress_norm < equil_tol) {
-              incrF.set_zero();
-            } else {
-              incrF = solver.solve(rhs.eigen_vec());
+          } catch (ConvergenceError & error) {
+            std::stringstream err{};
+            err << "Failure at load step " << strain_step + 1 << " of "
+                << load_steps.size() << ". In Newton-Raphson step " << newt_iter
+                << ":" << std::endl
+                << error.what() << std::endl
+                << "The applied boundary condition is Δ" << strain_symb << " ="
+                << std::endl
+                << macro_strain << std::endl
+                << "and the load increment is Δ" << strain_symb << " ="
+                << std::endl
+                << macro_strain - previous_macro_strain << std::endl;
+            throw ConvergenceError(err.str());
+          }
+
+          // updating cell strain with the periodic (non-constant) solution
+          // resulted from imposing the new macro_strain
+          F += incrF;
+
+          // updating the incremental differences for checking the termination
+          // criteria
+          incr_norm = std::sqrt(comm.sum(incrF.eigen_vec().squaredNorm()));
+          grad_norm = std::sqrt(comm.sum(F.eigen_vec().squaredNorm()));
+
+          if ((verbose >= Verbosity::Detailed) and (comm.rank() == 0)) {
+            std::cout << "at Newton step " << std::setw(count_width)
+                      << newt_iter << ", |δ" << strain_symb << "|/|Δ"
+                      << strain_symb << "| = " << std::setw(17)
+                      << incr_norm / grad_norm << ", tol = " << newton_tol
+                      << std::endl;
+
+            if (verbose > Verbosity::Detailed) {
+              using StrainMap_t = muGrid::FieldMap<Real, Mapping::Const>;
+              std::cout << "<" << strain_symb << "> =" << std::endl
+                        << StrainMap_t{F, shape[0]}.mean() << std::endl;
             }
           }
-        } catch (ConvergenceError & error) {
+          convergence_test();
+        }
+        if (newt_iter == solver.get_maxiter()) {
           std::stringstream err{};
           err << "Failure at load step " << strain_step + 1 << " of "
-              << load_steps.size() << ". In Newton-Raphson step " << newt_iter
-              << ":" << std::endl
-              << error.what() << std::endl
+              << load_steps.size() << ". Newton-Raphson failed to converge. "
               << "The applied boundary condition is Δ" << strain_symb << " ="
               << std::endl
               << macro_strain << std::endl
@@ -528,40 +586,69 @@ namespace muSpectre {
               << macro_strain - previous_macro_strain << std::endl;
           throw ConvergenceError(err.str());
         }
+      } else {
+        // Single strain update in the linear case
 
-        // updating cell strain with the periodic (non-constant) solution
-        // resulted from imposing the new macro_strain
-        F += incrF;
+        // updating cell strain with the difference of the current and previous
+        // strain input.
+        for (auto && strain : muGrid::FieldMap<Real, Mapping::Mut>(
+                 F, shape[0], muGrid::PixelSubDiv::QuadPt)) {
+          strain += macro_strain - previous_macro_strain;
+        }
 
-        // updating the incremental differences for checking the termination
-        // criteria
-        incr_norm = std::sqrt(comm.sum(incrF.eigen_vec().squaredNorm()));
-        grad_norm = std::sqrt(comm.sum(F.eigen_vec().squaredNorm()));
+        // obtain material response
+        auto res_tup{cell.evaluate_stress_tangent()};
+        auto & P{std::get<0>(res_tup)};
 
-        if ((verbose >= Verbosity::Detailed) and (comm.rank() == 0)) {
-          std::cout << "at Newton step " << std::setw(count_width) << newt_iter
-                    << ", |δ" << strain_symb << "|/|Δ" << strain_symb
-                    << "| = " << std::setw(17) << incr_norm / grad_norm
-                    << ", tol = " << newton_tol << std::endl;
+        auto & rhs{rhs_field.get_field()};
 
-          if (verbose > Verbosity::Detailed) {
+        rhs = -P;
+        cell.apply_projection(rhs);
+        stress_norm = std::sqrt(comm.sum(rhs.eigen_vec().squaredNorm()));
+
+        if (!convergence_test()) {
+          // calling sovler for solving the current (iteratively approximated)
+          // linear equilibrium problem
+          auto & incrF{incrF_field.get_field()};
+          try {
+            incrF = solver.solve(rhs.eigen_vec());
+          } catch (ConvergenceError & error) {
+            std::stringstream err{};
+            err << "Failure at load step " << strain_step + 1 << " of "
+                << load_steps.size() << ". In Newton-Raphson step " << newt_iter
+                << ":" << std::endl
+                << error.what() << std::endl
+                << "The applied boundary condition is Δ" << strain_symb << " ="
+                << std::endl
+                << macro_strain << std::endl
+                << "and the load increment is Δ" << strain_symb << " ="
+                << std::endl
+                << macro_strain - previous_macro_strain << std::endl;
+            throw ConvergenceError(err.str());
+          }
+          // updating cell strain with the periodic (non-constant) solution
+          // resulted from imposing the new macro_strain
+          F += incrF;
+
+          // updating the incremental differences for checking the termination
+          // criteria
+          incr_norm = std::sqrt(comm.sum(incrF.eigen_vec().squaredNorm()));
+          grad_norm = std::sqrt(comm.sum(F.eigen_vec().squaredNorm()));
+
+          if ((verbose >= Verbosity::Detailed) and (comm.rank() == 0)) {
+            std::cout << "at Newton step " << std::setw(count_width)
+                      << newt_iter << ", |δ" << strain_symb << "|/|Δ"
+                      << strain_symb << "| = " << std::setw(17)
+                      << incr_norm / grad_norm << ", tol = " << newton_tol
+                      << std::endl;
+
             using StrainMap_t = muGrid::FieldMap<Real, Mapping::Const>;
-            std::cout << "<" << strain_symb << "> =" << std::endl
-                      << StrainMap_t{F, shape[0]}.mean() << std::endl;
+            if (verbose > Verbosity::Detailed) {
+              std::cout << "<" << strain_symb << "> =" << std::endl
+                        << StrainMap_t{F, shape[0]}.mean() << std::endl;
+            }
           }
         }
-        convergence_test();
-      }
-      if (newt_iter == solver.get_maxiter()) {
-        std::stringstream err{};
-        err << "Failure at load step " << strain_step + 1 << " of "
-            << load_steps.size() << ". Newton-Raphson failed to converge. "
-            << "The applied boundary condition is Δ" << strain_symb << " ="
-            << std::endl
-            << macro_strain << std::endl
-            << "and the load increment is Δ" << strain_symb << " =" << std::endl
-            << macro_strain - previous_macro_strain << std::endl;
-        throw ConvergenceError(err.str());
       }
 
       // update previous macroscopic strain

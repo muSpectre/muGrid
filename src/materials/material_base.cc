@@ -180,15 +180,20 @@ namespace muSpectre {
       const StrainMeasure & expected_strain_measure) {
     if (expected_strain_measure != StrainMeasure::GreenLagrange) {
       std::stringstream err_str{};
-      err_str
-          << "The material expected strain measure is: "
-          << expected_strain_measure
-          << ", while in small strain the required strain measure is "
-             "Infinitesimal whose equivalent in finite strain is Greenlagrange"
-          << " Accordingly, this material is not meant to be utilized in "
-             "small strain formulation"
-          << std::endl;
+      err_str << "The material expected strain measure is: "
+              << expected_strain_measure
+              << ", while in small strain the required strain measure is "
+                 "Infinitesimal whose equivalent in finite strain is "
+                 "Greenlagrange"
+              << " Accordingly, this material is not meant to be utilized in "
+                 "small strain formulation"
+              << std::endl;
       throw(muGrid::RuntimeError(err_str.str()));
     }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  bool MaterialBase::was_last_step_nonlinear() const {
+    return this->last_step_was_nonlinear;
   }
 }  // namespace muSpectre

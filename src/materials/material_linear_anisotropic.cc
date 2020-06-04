@@ -43,7 +43,9 @@ namespace muSpectre {
       const Dim_t & nb_quad_pts, const std::vector<Real> & input_c)
       : Parent{name, spatial_dimension, nb_quad_pts},
         C_holder{std::make_unique<Stiffness_t>(c_maker(input_c))},
-        C{*this->C_holder} {};
+        C{*this->C_holder} {
+    this->last_step_was_nonlinear = false;
+  };
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimM>

@@ -69,11 +69,16 @@ using muFFT::Gradient_t;
 using muGrid::numpy_wrap;
 using muGrid::NumpyProxy;
 using muSpectre::Ccoord_t;
+using muSpectre::Cell;
 using muSpectre::Dim_t;
 using muSpectre::Formulation;
 using muSpectre::Rcoord_t;
 using pybind11::literals::operator""_a;
 namespace py = pybind11;
+
+#ifdef WITH_FFTWMPI
+using muFFT::FFTWMPIEngine;
+#endif
 
 /**
  * the cell factory is only bound for default template parameters
@@ -110,6 +115,42 @@ void add_cell_factory(py::module & mod) {
       },
       "nb_grid_pts"_a, "lengths"_a, "formulation"_a);
 }
+
+#ifdef WITH_FFTWMPI
+void add_fftwmpi_cell_factory(py::module & mod) {
+  using DynCcoord_t = muGrid::DynCcoord_t;
+  using DynRcoord_t = muGrid::DynRcoord_t;
+
+  mod.def(
+      "FFTWMPICellFactory",
+      [](DynCcoord_t res, DynRcoord_t lens, Formulation form,
+         Gradient_t gradient, Communicator comm) {
+        return muSpectre::make_cell<Cell, FFTWMPIEngine>(
+            std::move(res), std::move(lens), std::move(form),
+            std::move(gradient), std::move(comm));
+      },
+      "nb_grid_pts"_a, "lengths"_a, "formulation"_a, "gradient"_a,
+      "communicator"_a);
+
+  mod.def(
+      "FFTWMPICellFactory",
+      [](DynCcoord_t res, DynRcoord_t lens, Formulation form,
+         Gradient_t gradient) {
+        return muSpectre::make_cell<Cell, FFTWMPIEngine>(
+            std::move(res), std::move(lens), std::move(form),
+            std::move(gradient));
+      },
+      "nb_grid_pts"_a, "lengths"_a, "formulation"_a, "gradient"_a);
+
+  mod.def(
+      "FFTWMPICellFactory",
+      [](DynCcoord_t res, DynRcoord_t lens, Formulation form) {
+        return muSpectre::make_cell<Cell, FFTWMPIEngine>(
+            std::move(res), std::move(lens), std::move(form));
+      },
+      "nb_grid_pts"_a, "lengths"_a, "formulation"_a);
+}
+#endif
 
 #ifdef WITH_SPLIT
 void add_split_cell_factory_helper(py::module & mod) {
@@ -445,5 +486,9 @@ void add_cell(py::module & mod) {
   add_cell_split_helper(cell);
 #else
   add_cell_helper(cell);
+#endif
+
+#ifdef WITH_FFTWMPI
+  add_fftwmpi_cell_factory(mod);
 #endif
 }

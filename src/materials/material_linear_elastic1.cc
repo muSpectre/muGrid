@@ -47,11 +47,13 @@ namespace muSpectre {
         mu{Hooke::compute_mu(young, poisson)},
         C_holder{
             std::make_unique<Stiffness_t>(Hooke::compute_C_T4(lambda, mu))},
-        C{*C_holder} {}
+        C{*C_holder} {
+    this->last_step_was_nonlinear = false;
+  }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimM>
-  auto MaterialLinearElastic1<DimM>::get_C() const -> const Stiffness_t& {
+  auto MaterialLinearElastic1<DimM>::get_C() const -> const Stiffness_t & {
     return this->C;
   }
   template class MaterialLinearElastic1<twoD>;

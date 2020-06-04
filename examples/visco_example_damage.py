@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
-@file my_example.py
+@file visco_example_damage.py
 
 @author Ali Falsafi <afalsafi@epfl.ch>
 
@@ -42,6 +42,7 @@ from python_example_imports import muSpectre_vtk_export as vt_ex
 from python_example_imports import muSpectre_gradient_integration as gi
 from python_example_imports import muSpectre as µ
 
+
 def comp_component(r, component):
     res2 = r.stress.size/4
     res = int(round(np.sqrt(res2), 0))
@@ -50,7 +51,7 @@ def comp_component(r, component):
 
 
 def compute_visco_elastic_damage(N, lens, max_iter, cg_tol, newton_tol,
-                                 equil_tol,nb_steps, Ev, Einf, eta, kappa,
+                                 equil_tol, nb_steps, Ev, Einf, eta, kappa,
                                  alpha, beta, dt, dF_bar):
     formulation = µ.Formulation.small_strain
     cell = µ.Cell(N, lens, formulation)
@@ -65,7 +66,7 @@ def compute_visco_elastic_damage(N, lens, max_iter, cg_tol, newton_tol,
         else:
             hard.add_pixel(pixel_id)
 
-    cell.initialise();
+    cell.initialise()
 
     dF_steps = [np.copy(dF_bar)] * nb_steps
     for i in range(len(dF_steps)):
@@ -80,23 +81,23 @@ def compute_visco_elastic_damage(N, lens, max_iter, cg_tol, newton_tol,
     res = µ.solvers.de_geus(cell, dF_steps, solver, newton_tol,
                             equil_tol, verbose=µ.Verbosity.Silent)
     print("nb_cg: {}\nF:\n{}".format(res[-1].nb_fev,
-          µ.gradient_integration.reshape_gradient(res[-1].grad,
-          cell.nb_domain_grid_pts)[:,:,0,0]))
-    xy =np.zeros((len(res)))
-    xx =np.zeros((len(res)))
-    yy =np.zeros((len(res)))
+                                     µ.gradient_integration.reshape_gradient(res[-1].grad,
+                                                                             cell.nb_domain_grid_pts)[:, :, 0, 0]))
+    xy = np.zeros((len(res)))
+    xx = np.zeros((len(res)))
+    yy = np.zeros((len(res)))
     for i, r in enumerate(res):
-        xy[i] = comp_component(r, [0,1])[5,5]
-        xx[i] = comp_component(r, [0,0])[5,5]
-        yy[i] = comp_component(r, [1,1])[5,5]
+        xy[i] = comp_component(r, [0, 1])[5, 5]
+        xx[i] = comp_component(r, [0, 0])[5, 5]
+        yy[i] = comp_component(r, [1, 1])[5, 5]
     dim = 2
-    fourier_gradient = [µ.FourierDerivative(dim , i) for i in range(dim)]
+    fourier_gradient = [µ.FourierDerivative(dim, i) for i in range(dim)]
     for i, re in enumerate(res):
         placement_n, x = gi.compute_placement(re, lens,
                                               N, fourier_gradient,
-                                              formulation = formulation)
+                                              formulation=formulation)
         PK1 = gi.reshape_gradient(re.stress, N)
-        F   = gi.reshape_gradient(re.grad, N)
+        F = gi.reshape_gradient(re.grad, N)
         c_data = {"PK1 stress": PK1,
                   "F deformation gradient": F}
         p_data = {}
@@ -107,8 +108,9 @@ def compute_visco_elastic_damage(N, lens, max_iter, cg_tol, newton_tol,
                          cell_data=c_data)
     return xx, yy, xy
 
+
 def compute_visco_elastic(N, lens, max_iter, cg_tol, newton_tol,
-                          equil_tol,nb_steps, Ev, Einf, eta, dt, dF_bar):
+                          equil_tol, nb_steps, Ev, Einf, eta, dt, dF_bar):
     formulation = µ.Formulation.small_strain
     cell = µ.Cell(N, lens, formulation)
     hard = µ.material.MaterialViscoElasticSS_2d.make(
@@ -116,7 +118,7 @@ def compute_visco_elastic(N, lens, max_iter, cg_tol, newton_tol,
     for pixel_id, pixel_coord in cell.pixels.enumerate():
         hard.add_pixel(pixel_id)
 
-    cell.initialise();
+    cell.initialise()
 
     dF_steps = [np.copy(dF_bar)] * nb_steps
     for i in range(len(dF_steps)):
@@ -125,33 +127,37 @@ def compute_visco_elastic(N, lens, max_iter, cg_tol, newton_tol,
     if formulation == µ.Formulation.small_strain:
         for i in range(len(dF_steps)):
             dF_steps[i] = .5 * (dF_steps[i] + dF_steps[i].T)
+    # dF_steps = dF_steps[1:]
 
     solver = µ.solvers.KrylovSolverCG(cell, cg_tol, max_iter,
                                       verbose=µ.Verbosity.Silent)
     res = µ.solvers.de_geus(cell, dF_steps, solver, newton_tol,
                             equil_tol, verbose=µ.Verbosity.Silent)
-    print("nb_cg: {}\nF:\n{}".format(res[-1].nb_fev,
-          µ.gradient_integration.reshape_gradient(res[-1].grad,
-          cell.nb_domain_grid_pts)[:,:,0,0]))
-    xy =np.zeros((len(res)))
-    xx =np.zeros((len(res)))
-    yy =np.zeros((len(res)))
+    print("nb_cg: {}\nF:\n{}".format(
+        res[-1].nb_fev,
+        µ.gradient_integration.reshape_gradient(
+            res[-1].grad,
+            cell.nb_domain_grid_pts)[:, :, 0, 0]))
+    xy = np.zeros((len(res)))
+    xx = np.zeros((len(res)))
+    yy = np.zeros((len(res)))
     for i, r in enumerate(res):
-        xy[i] = comp_component(r, [0,1])[2,2]
-        xx[i] = comp_component(r, [0,0])[2,2]
-        yy[i] = comp_component(r, [1,1])[2,2]
+        xy[i] = comp_component(r, [0, 1])[2, 2]
+        xx[i] = comp_component(r, [0, 0])[2, 2]
+        yy[i] = comp_component(r, [1, 1])[2, 2]
     return xx, yy, xy
 
+
 def compute():
-    dF_bar=   np.array([[-0.1005179, +0.500],
-                        [+0.500    , +0.3005179]]) * 4e-1
+    dF_bar = np.array([[-0.1005179, +0.500],
+                       [+0.500, +0.3005179]]) * 4e-1
     # a = np.sqrt(1. / np.linalg.det(dF_bar+np.identity(2)) )
     a = 1.0
     F_bar = (dF_bar+np.identity(2)) * a
     J = np.linalg.det(F_bar)
     dF_bar = F_bar - np.identity(2)
     dE = 0.5 * (((dF_bar+np.identity(2)).T).dot(dF_bar + np.identity(2))
-                -np.identity(2))
+                - np.identity(2))
     print("dE is\n {}".format(dE))
     print("J is\n {}".format(J))
     N = [11, 11]
@@ -161,7 +167,7 @@ def compute():
     Ev = 2.859448e5
     Einf = 1.2876e5
     eta = 1.34e3
-    kappa = 1.0;
+    kappa = 1.0
     alpha = 1.0
     beta = 0.1
     cg_tol, newton_tol, equil_tol = 1e-8, 1e-5, 1e-10
@@ -181,10 +187,10 @@ def compute():
         if sys.argv[1] == 1:
             pass
     else:
-        import  matplotlib.pyplot as plt
+        import matplotlib.pyplot as plt
         from matplotlib import cm
         from matplotlib import rc
-        font = {'size'   : 16}
+        font = {'size': 16}
         rc('font', **font)
         rc('text', usetex=True)
         fig = plt.figure()
@@ -192,23 +198,25 @@ def compute():
         box = ax.get_position()
         ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
 
-        ax.plot(+xy_vis ,'b-.', linewidth = 3, label = '$P_{xy}^{vis}$')
-        ax.plot(+xx_vis ,'b-' , linewidth = 3, label = '$P_{xx}^{vis}$')
-        ax.plot(+yy_vis ,'b--', linewidth = 3, label = '$P_{yy}^{vis}$')
+        ax.plot(+xy_vis, 'b-.', linewidth=3, label='$P_{xy}^{vis}$')
+        ax.plot(+xx_vis, 'b-', linewidth=3, label='$P_{xx}^{vis}$')
+        ax.plot(+yy_vis, 'b--', linewidth=3, label='$P_{yy}^{vis}$')
 
-        ax.plot(+xy_vis_dam ,'y-.', linewidth = 2, label = '$P_{xy}^{vis}$')
-        ax.plot(+xx_vis_dam ,'y-' , linewidth = 2, label = '$P_{xx}^{vis}$')
-        ax.plot(+yy_vis_dam ,'y--', linewidth = 2, label = '$P_{yy}^{vis}$')
+        ax.plot(+xy_vis_dam, 'y-.', linewidth=2, label='$P_{xy}^{vis}$')
+        ax.plot(+xx_vis_dam, 'y-', linewidth=2, label='$P_{xx}^{vis}$')
+        ax.plot(+yy_vis_dam, 'y--', linewidth=2, label='$P_{yy}^{vis}$')
 
         # Put a legend to the right of the current axis
-        ax.legend(loc='center left', bbox_to_anchor=(1.05, 0.5), ncol = 2)
+        ax.legend(loc='center left', bbox_to_anchor=(1.05, 0.5), ncol=2)
 
         ax.set_xlabel('time')
         ax.set_ylabel('stress')
         plt.show()
 
+
 def main():
     compute()
+
 
 if __name__ == "__main__":
     main()

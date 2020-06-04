@@ -66,14 +66,18 @@ namespace muSpectre {
 
     Real rdr = comm.sum(this->r_k.dot(this->r_k));
     Real rhs_norm2 = comm.sum(rhs.squaredNorm());
-    Real tol2 = muGrid::ipow(this->tol, 2) * rhs_norm2;
+    std::cout << "Norm of rhs in krylov_solver_cg.cc = " << rhs_norm2
+              << std::endl;
+    // Multiplication with the norm of the right hand side to get a relative
+    // convergence criterion
+    Real rel_tol2 = muGrid::ipow(this->tol, 2) * rhs_norm2;
 
     size_t count_width{};  // for output formatting in verbose case
     if (verbose > Verbosity::Silent) {
       count_width = size_t(std::log10(this->maxiter)) + 1;
     }
 
-    for (Uint i = 0; i < this->maxiter && (rdr > tol2 || i == 0);
+    for (Uint i = 0; i < this->maxiter && rdr > rel_tol2;
          ++i, ++this->counter) {
       this->Ap_k = this->cell.get_adaptor() * this->p_k;
 
@@ -96,7 +100,7 @@ namespace muSpectre {
       this->p_k = -this->r_k + beta * this->p_k;
     }
 
-    if (rdr < tol2) {
+    if (rdr < rel_tol2) {
       this->converged = true;
     } else {
       std::stringstream err{};

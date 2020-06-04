@@ -44,7 +44,7 @@ namespace muSpectre {
       const Dim_t & nb_quad_pts, const Real & young_inf, const Real & young_v,
       const Real & eta_v, const Real & poisson, const Real & kappa_init,
       const Real & alpha, const Real & beta, const Real & dt)
-      : Parent{name, spatial_dimension, nb_quad_pts},
+    : Parent{name, spatial_dimension, nb_quad_pts},
         material_child(name + "_child", spatial_dimension, nb_quad_pts,
                        young_inf, young_v, eta_v, poisson, dt,
                        this->internal_fields),

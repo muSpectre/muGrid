@@ -100,8 +100,6 @@ verbose = 1
 # Choose a solution strategy. Currently available:
 # de_geus: is discribed in de Geus et al. see Ref above
 # newton_cg: classical Newton-Conjugate Gradient solver. Recommended
-print(rve)
-print(Del0)
 result = msp.solvers.newton_cg(rve, Del0, solver, tol, equi_tol,
                                verbose=msp.Verbosity.Silent)
 

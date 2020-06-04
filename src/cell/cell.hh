@@ -382,6 +382,10 @@ namespace muSpectre {
     //! check if the point is inside of the cell
     bool is_pixel_inside(const DynCcoord_t & pixel) const;
 
+    //! Check if either the material or the strain formulation introduces
+    // nonlinearities into the problem
+    bool is_non_linear() const;
+
    protected:
     //! statically dimensioned worker for evaluating the tangent operator
     template <Dim_t DimM>

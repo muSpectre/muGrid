@@ -38,8 +38,6 @@ import numpy as np
 from python_example_imports import muSpectre as µ
 
 nb_grid_pts = [5, 5]
-center = np.array([r // 2 for r in nb_grid_pts])
-incl = nb_grid_pts[0] // 5
 
 # Domain dimensions
 lengths = [7., 5.]
@@ -50,7 +48,7 @@ formulation = µ.Formulation.finite_strain
 # Material constants
 K = .833
 mu = .386
-H = .004
+H = .04 # Low values of H worsen the condition number of the stiffness-matrix
 tauy0 = .006
 Young = 9 * K * mu / (3 * K + mu)
 Poisson = (3 * K - 2 * mu) / (2 * (3 * K + mu))
@@ -66,10 +64,12 @@ soft = µ.material.MaterialHyperElastoPlastic1_2d.make(
 
 # assign each pixel to exactly one material
 for pixel_id, pixel_coord in rve.pixels.enumerate():
-    if tuple(pixel_coord) == (1, 1):
+    if pixel_id < 3:
         hard.add_pixel(pixel_id)
     else:
         soft.add_pixel(pixel_id)
+
+rve.initialise()
 
 # define the convergence tolerance for the Newton-Raphson increment
 tol = 1e-5
@@ -84,11 +84,12 @@ if formulation == µ.Formulation.small_strain:
     Del0 = .5 * (Del0 + Del0.T)
 
 maxiter = 401
-verbose = 2
+verbose = µ.Verbosity.Detailed
 
 
-solver = µ.solvers.KrylovSolverCG(rve, cg_tol, maxiter, verbose=False)
+solver = µ.solvers.KrylovSolverCG(rve, cg_tol, maxiter,
+                                  verbose=verbose)
 r = µ.solvers.de_geus(rve, Del0, solver,
                       tol, equil_tol, verbose)
 
-print("nb of {} iterations: {}".format(solver.name(), r.nb_fev))
+print("nb of {} iterations: {}".format(solver.name, r.nb_fev))

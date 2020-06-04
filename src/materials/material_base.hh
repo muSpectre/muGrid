@@ -59,6 +59,7 @@ namespace muSpectre {
     explicit MaterialError(const char * what) : muGrid::RuntimeError(what) {}
   };
 
+  /* ---------------------------------------------------------------------- */
   /**
    * base class for materials
    */
@@ -129,6 +130,7 @@ namespace muSpectre {
 
     //! material dimension for  inheritance
     Dim_t get_material_dimension() { return this->material_dimension; }
+
     //! computes stress
     virtual void
     compute_stresses(const muGrid::RealField & F, muGrid::RealField & P,
@@ -205,6 +207,9 @@ namespace muSpectre {
 
     using DynMatrix_t = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
 
+    //! Returns wether the stiffness matrix has changed during the last step
+    bool was_last_step_nonlinear() const;
+
     /**
      * evaluates both second Piola-Kirchhoff stress and stiffness given
      * the Green-Lagrange strain (or Cauchy stress and stiffness if
@@ -248,6 +253,9 @@ namespace muSpectre {
 
     //! spatial dimension of the material
     Dim_t material_dimension;
+
+    //! NonLinearity flag
+    bool last_step_was_nonlinear{true};
 
     //!< field holding the assigned ratios of the material
     std::unique_ptr<muGrid::MappedScalarField<Real, muGrid::Mapping::Mut,

@@ -50,6 +50,7 @@ namespace muSpectre {
         F_holder{std::make_unique<Strain_t>(Strain_t::Identity())},
         F{*this->F_holder}, F_is_set{false} {
     MatTB::make_C_from_C_voigt<DimM>(C_voigt, *this->C_holder);
+    this->last_step_was_nonlinear = false;
   }
 
   /* ---------------------------------------------------------------------- */

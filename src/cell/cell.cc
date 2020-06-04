@@ -764,6 +764,19 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
+  bool Cell::is_non_linear() const {
+    if (this->get_formulation() == Formulation::finite_strain) {
+      return true;
+    }
+    for (auto & mat : this->materials) {
+      if (mat->was_last_step_nonlinear()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /* ---------------------------------------------------------------------- */
 #ifdef WITH_SPLIT
   void Cell::make_pixels_precipitate_for_laminate_material(
       const std::vector<DynRcoord_t> & precipitate_vertices,

@@ -63,18 +63,19 @@ Poisson = (3 * K - 2 * mu) / (2 * (3 * K + mu))
 # set up system
 rve = µ.Cell(nb_grid_pts, lengths, formulation, fft='fftwmpi',
              communicator=MPI.COMM_WORLD)
-hard = Mat.make(rve.wrapped_cell, "hard", Young, Poisson, tauy0_hard, H_hard)
-soft = Mat.make(rve.wrapped_cell, "soft", Young, Poisson, tauy0_soft, H_soft)
+hard = Mat.make(rve, "hard", Young, Poisson, tauy0_hard, H_hard)
+soft = Mat.make(rve, "soft", Young, Poisson, tauy0_soft, H_soft)
 
 
-for pixel in rve:
-    if phase[tuple(pixel)] == 1:
-        hard.add_pixel(pixel)
-    elif phase[tuple(pixel)] == 0:
-        soft.add_pixel(pixel)
+for pixel_id, pixel_coord in rve.pixels.enumerate():
+    print(pixel_coord)
+    if phase[tuple(pixel_coord)] == 1:
+        hard.add_pixel(pixel_id)
+    elif phase[tuple(pixel_coord)] == 0:
+        soft.add_pixel(pixel_id)
     else:
         raise Exception("phase '{}' should not exist".format(
-            phase[tuple(pixel)]))
+            phase[tuple(pixel_coord)]))
     pass
 
 rve.initialise(flags=µ.FFT_PlanFlags.patient)
@@ -104,7 +105,7 @@ newton_tol = 1e-5
 equil_tol = 1e-10
 maxiter = 1000
 
-solver = µ.solvers.KrylovSolverCG(rve.wrapped_cell, cg_tol, maxiter, verbose=False)
+solver = µ.solvers.KrylovSolverCG(rve, cg_tol, maxiter)
 
 results = µ.solvers.de_geus(
-    rve.wrapped_cell, ΔFbars, solver, newton_tol, equil_tol, verbose=2)
+    rve, ΔFbars, solver, newton_tol, equil_tol)

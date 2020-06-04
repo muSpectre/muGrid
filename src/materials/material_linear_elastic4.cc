@@ -50,7 +50,9 @@ namespace muSpectre {
                      *this->internal_fields},
         mu_field(this->get_prefix() +
                      "local second Lame constant(shear modulus)",
-                 *this->internal_fields) {}
+                 *this->internal_fields) {
+    this->last_step_was_nonlinear = false;
+  }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimM>

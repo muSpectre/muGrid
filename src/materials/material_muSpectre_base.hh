@@ -112,7 +112,7 @@ namespace muSpectre {
     //! Default constructor
     MaterialMuSpectre() = delete;
 
-    //! Construct by nameg
+    //! Construct by name
     MaterialMuSpectre(const std::string & name, const Dim_t & spatial_dimension,
                       const Dim_t & nb_quad_pts,
                       const std::shared_ptr<muGrid::LocalFieldCollection> &

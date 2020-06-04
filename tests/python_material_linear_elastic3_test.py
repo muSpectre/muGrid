@@ -74,6 +74,7 @@ class MaterialLinearElastic3_Check(unittest.TestCase):
         solver=µ.solvers.KrylovSolverCG(self.cell, tol, maxiter, verbose)
         r = µ.solvers.newton_cg(self.cell, Del0,
                                 solver, tol, tol, verbose)
+        print('Solver has successfully been called')
 
         #compare the computed stress with the trivial by hand computed stress
         mu = (Young/(2*(1+Poisson)))
@@ -81,3 +82,6 @@ class MaterialLinearElastic3_Check(unittest.TestCase):
 
         self.assertLess(np.linalg.norm(r.stress.reshape(-1, self.dim**2) -
                                        stress.reshape(1, self.dim**2)), 1e-8)
+
+if __name__ == '__main__':
+    unittest.main()

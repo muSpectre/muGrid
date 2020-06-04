@@ -46,7 +46,9 @@ namespace muSpectre {
       const Dim_t & nb_quad_pts)
       : Parent{name, spatial_dimension, nb_quad_pts},
         C_field{this->get_prefix() + "local stiffness tensor",
-                *this->internal_fields} {}
+                *this->internal_fields} {
+    this->last_step_was_nonlinear = false;
+  }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimM>

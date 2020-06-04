@@ -302,6 +302,7 @@ namespace muSpectre {
       s_t && E, const Real & lambda, const Real & mu,
       const EigenStrainArg_t & eigen_strain) -> decltype(auto) {
     muGrid::T4Mat<Real, DimM> C = Hooke::compute_C_T4(lambda, mu);
+    this->last_step_was_nonlinear = false;
     return std::make_tuple(
         this->evaluate_stress(std::forward<s_t>(E), lambda, mu, eigen_strain),
         C);
@@ -381,6 +382,9 @@ namespace muSpectre {
       //!  2.) update eigen_strain_field
       eigen_strain_map[pixel] +=
           plastic_strain_direction * plastic_increment_map[pixel];
+    }
+    if (this->overloaded_quad_pts.size() > 0) {
+      this->last_step_was_nonlinear = true;
     }
   }
 

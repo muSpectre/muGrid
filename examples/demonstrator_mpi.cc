@@ -41,7 +41,7 @@
 #include "cell/cell_factory.hh"
 #include "materials/material_linear_elastic1.hh"
 #include "solver/solvers.hh"
-#include "solver/krylov_solvercg.hh"
+#include "solver/krylov_solver_cg.hh"
 
 #include <libmugrid/ccoord_operations.hh>
 
@@ -82,6 +82,8 @@ opt_ptr parse_args(int argc, char ** argv) {
   return options;
 }
 
+using muFFT::make_fourier_gradient;
+using muFFT::FFTWMPIEngine;
 using namespace muSpectre;
 
 int main(int argc, char * argv[]) {
@@ -96,39 +98,43 @@ int main(int argc, char * argv[]) {
 
   constexpr Formulation form{Formulation::finite_strain};
 
-  const Rcoord_t<dim> lengths{muGrid::CcoordOps::get_cube<dim>(fsize)};
-  const Ccoord_t<dim> nb_grid_pts{muGrid::CcoordOps::get_cube<dim>(size)};
+  const DynRcoord_t lengths{muGrid::CcoordOps::get_cube<dim>(fsize)};
+  const DynCcoord_t nb_grid_pts{muGrid::CcoordOps::get_cube<dim>(size)};
 
   {
     muFFT::Communicator comm{MPI_COMM_WORLD};
     MPI_Init(&argc, &argv);
 
-    auto cell{make_cell<dim, dim>(nb_grid_pts, lengths, form,
-                                  make_fourier_gradient<dim>(), comm)};
+    auto cell{make_cell<Cell, FFTWMPIEngine>(
+        nb_grid_pts, lengths, form, make_fourier_gradient(dim), comm)};
 
     constexpr Real E{1.0030648180242636};
     constexpr Real nu{0.29930675909878679};
 
-    using Material_t = MaterialLinearElastic1<dim, dim>;
-    auto Material_soft{std::make_unique<Material_t>("soft", E, nu)};
-    auto Material_hard{std::make_unique<Material_t>("hard", 10 * E, nu)};
+    using Material_t = MaterialLinearElastic1<dim>;
+    auto Material_soft{std::make_unique<Material_t>(
+        "soft", dim, OneQuadPt, E, nu)};
+    auto Material_hard{std::make_unique<Material_t>(
+        "hard", dim, OneQuadPt, 10 * E, nu)};
 
     int counter{0};
-    for (const auto && pixel : cell) {
+    for (const auto && tup : cell.get_pixels().enumerate()) {
+      auto & pixel_index{std::get<0>(tup)};
+      auto & pixel{std::get<1>(tup)};
       int sum = 0;
       for (Dim_t i = 0; i < dim; ++i) {
         sum += pixel[i] * 2 / nb_grid_pts[i];
       }
 
       if (sum == 0) {
-        Material_hard->add_pixel(pixel);
+        Material_hard->add_pixel(pixel_index);
         counter++;
       } else {
-        Material_soft->add_pixel(pixel);
+        Material_soft->add_pixel(pixel_index);
       }
     }
     if (comm.rank() == 0) {
-      std::cout << counter << " Pixel out of " << cell.size()
+      std::cout << counter << " Pixel out of " << cell.get_nb_pixels()
                 << " are in the hard material" << std::endl;
     }
 

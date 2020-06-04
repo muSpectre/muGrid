@@ -56,7 +56,7 @@ namespace muFFT {
 
     int dim = this->nb_fourier_grid_pts.get_dim();
     std::vector<ptrdiff_t> narr(dim);
-    for (Dim_t i = 0; i < dim ; ++i) {
+    for (Dim_t i = 0; i < dim; ++i) {
       narr[i] = this->nb_fourier_grid_pts[dim - 1 - i];
     }
     // Reverse the order of the array dimensions, because FFTW expects a
@@ -64,8 +64,8 @@ namespace muFFT {
     ptrdiff_t res0{}, loc0{}, res1{}, loc1{};
     this->workspace_size = fftw_mpi_local_size_many_transposed(
         dim, narr.data(), this->nb_dof_per_pixel, FFTW_MPI_DEFAULT_BLOCK,
-        FFTW_MPI_DEFAULT_BLOCK, this->comm.get_mpi_comm(), &res0, &loc0,
-        &res1, &loc1);
+        FFTW_MPI_DEFAULT_BLOCK, this->comm.get_mpi_comm(), &res0, &loc0, &res1,
+        &loc1);
     // A factor of two is required because we are using the c2r/r2c DFTs.
     // See:
     // http://www.fftw.org/fftw3_doc/Multi_002ddimensional-MPI-DFTs-of-Real-Data.html
@@ -92,7 +92,7 @@ namespace muFFT {
       this->subdomain_strides[1] = 2 * this->nb_fourier_grid_pts[0];
       for (Dim_t i = 2; i < dim; ++i) {
         this->subdomain_strides[i] =
-            this->subdomain_strides[i-1] * this->nb_subdomain_grid_pts[i-1];
+            this->subdomain_strides[i - 1] * this->nb_subdomain_grid_pts[i - 1];
       }
     }
     // Set the strides for the Fourier domain. Since we are omitted the last
@@ -126,10 +126,14 @@ namespace muFFT {
     }
 
     /*
-     * Initialize parent after the local number of grid points in each direction
+     * Initialise parent after the local number of grid points in each direction
      * have been determined and work space has been initialized
      */
     Parent::initialise(plan_flags);
+
+    if (not this->is_active()) {
+      return;
+    }
 
     this->real_workspace = fftw_alloc_real(this->workspace_size);
     /*
@@ -139,9 +143,9 @@ namespace muFFT {
      */
     if (static_cast<int>(this->fourier_field.size() * this->nb_dof_per_pixel) <
         this->workspace_size) {
-      this->fourier_field.set_pad_size(
-          this->workspace_size -
-          this->nb_dof_per_pixel * this->fourier_field.size());
+      this->fourier_field.set_pad_size(this->workspace_size -
+                                       this->nb_dof_per_pixel *
+                                           this->fourier_field.size());
     }
 
     unsigned int flags;
@@ -178,11 +182,17 @@ namespace muFFT {
         FFTW_MPI_DEFAULT_BLOCK, in, out, this->comm.get_mpi_comm(),
         FFTW_MPI_TRANSPOSED_OUT | flags);
     if (this->plan_fft == nullptr) {
-      if (dim == 1)
+      if (dim == 1) {
         throw RuntimeError("r2c plan failed; MPI parallel FFTW does not "
-                                 "support 1D r2c FFTs");
-      else
-        throw RuntimeError("r2c plan failed");
+                           "support 1D r2c FFTs");
+      } else {
+        std::stringstream message{};
+        message << "Rank " << this->comm.rank() << ": r2c plan failed. "
+                << "nb_subdomain_grid_pts = "
+                << this->get_nb_subdomain_grid_pts()
+                << ", nb_domain_grid_pts = " << this->get_nb_domain_grid_pts();
+        throw RuntimeError{message.str()};
+      }
     }
 
     fftw_complex * i_in =
@@ -194,11 +204,12 @@ namespace muFFT {
         FFTW_MPI_DEFAULT_BLOCK, i_in, i_out, this->comm.get_mpi_comm(),
         FFTW_MPI_TRANSPOSED_IN | flags);
     if (this->plan_ifft == nullptr) {
-      if (dim == 1)
+      if (dim == 1) {
         throw RuntimeError("c2r plan failed; MPI parallel FFTW does not "
-                                 "support 1D c2r FFTs");
-      else
+                           "support 1D c2r FFTs");
+      } else {
         throw RuntimeError("c2r plan failed");
+      }
     }
     this->initialised = true;
   }
@@ -220,6 +231,10 @@ namespace muFFT {
   /* ---------------------------------------------------------------------- */
   typename FFTWMPIEngine::FourierField_t &
   FFTWMPIEngine::fft(RealField_t & field) {
+    if (not this->is_active()) {
+      return this->fourier_field;
+    }
+
     if (this->plan_fft == nullptr) {
       throw RuntimeError("fft plan not initialised");
     }
@@ -247,8 +262,8 @@ namespace muFFT {
     // M x N x 2*(L/2+1).
     ptrdiff_t fstride =
         (this->nb_dof_per_pixel * this->nb_subdomain_grid_pts[0]);
-    ptrdiff_t wstride = (this->nb_dof_per_pixel * 2 *
-                         (this->nb_subdomain_grid_pts[0] / 2 + 1));
+    ptrdiff_t wstride =
+        (this->nb_dof_per_pixel * 2 * (this->nb_subdomain_grid_pts[0] / 2 + 1));
     ptrdiff_t n = field.size() / this->nb_subdomain_grid_pts[0];
 
     auto fdata = field.data();
@@ -259,13 +274,17 @@ namespace muFFT {
       wdata += wstride;
     }
     // Compute FFT
-    fftw_mpi_execute_dft_r2c(this->plan_fft, this->real_workspace,
+    fftw_mpi_execute_dft_r2c(
+        this->plan_fft, this->real_workspace,
         reinterpret_cast<fftw_complex *>(this->fourier_field.data()));
     return this->fourier_field;
   }
 
   /* ---------------------------------------------------------------------- */
   void FFTWMPIEngine::ifft(RealField_t & field) const {
+    if (not this->is_active()) {
+      return;
+    }
     if (this->plan_ifft == nullptr) {
       throw RuntimeError("ifft plan not initialised");
     }
@@ -289,14 +308,14 @@ namespace muFFT {
       throw RuntimeError(error.str());
     }
     // Compute inverse FFT
-    fftw_mpi_execute_dft_c2r(this->plan_ifft,
+    fftw_mpi_execute_dft_c2r(
+        this->plan_ifft,
         reinterpret_cast<fftw_complex *>(this->fourier_field.data()),
         this->real_workspace);
     // Copy non-padded field to padded real_workspace.
     // Transposed output of M x N x L transform for >= 3 dimensions is padded
     // M x N x 2*(L/2+1).
-    ptrdiff_t fstride{this->nb_dof_per_pixel *
-                      this->nb_subdomain_grid_pts[0]};
+    ptrdiff_t fstride{this->nb_dof_per_pixel * this->nb_subdomain_grid_pts[0]};
     ptrdiff_t wstride{this->nb_dof_per_pixel * 2 *
                       (this->nb_subdomain_grid_pts[0] / 2 + 1)};
     ptrdiff_t n(field.size() / this->nb_subdomain_grid_pts[0]);

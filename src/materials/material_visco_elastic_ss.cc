@@ -92,9 +92,9 @@ namespace muSpectre {
   auto MaterialViscoElasticSS<DimM>::evaluate_stress(
       const Eigen::Ref<const T2_t> & E, T2StRef_t h_prev, T2StRef_t s_null_prev)
       -> T2_t {
-    T2_t && e{MatTB::compute_deviatoric<DimM>(E)};
-    T2_t && s_null{this->evaluate_elastic_deviatoric_stress(e)};
-    T2_t && h{std::exp(-dt / this->tau_v) * h_prev.old() +
+    T2_t e{MatTB::compute_deviatoric<DimM>(E)};
+    T2_t s_null{this->evaluate_elastic_deviatoric_stress(e)};
+    T2_t h{std::exp(-dt / this->tau_v) * h_prev.old() +
               std::exp(-dt / (2 * this->tau_v)) * (s_null - s_null_prev.old())};
     h_prev.current() = h;
     s_null_prev.current() = s_null;
@@ -107,11 +107,11 @@ namespace muSpectre {
   auto MaterialViscoElasticSS<DimM>::evaluate_stress_tangent(
       const Eigen::Ref<const T2_t> & F, T2StRef_t h_prev, T2StRef_t s_null_prev)
       -> std::tuple<T2_t, T4_t> {
-    T4_t && Iasymm{Matrices::Isymm<DimM>() -
+    T4_t Iasymm{Matrices::Isymm<DimM>() -
                    (1.0 / 3.0) * Matrices::Itrac<DimM>()};
-    T4_t && C_null_bar{2 * this->mu_tot * Iasymm};
+    T4_t  C_null_bar{2 * this->mu_tot * Iasymm};
     Real && g_star{gamma_inf + gamma_v * std::exp(-dt / (2 * this->tau_v))};
-    T4_t && C{this->lambda_tot * Matrices::Itrac<DimM>() + g_star * C_null_bar};
+    T4_t C{this->lambda_tot * Matrices::Itrac<DimM>() + g_star * C_null_bar};
     return std::make_tuple(this->evaluate_stress(F, h_prev, s_null_prev), C);
   }
 

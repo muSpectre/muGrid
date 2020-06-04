@@ -42,22 +42,16 @@ set(binaries
   demonstrator_dynamic_solve.cc
   hyper-elasticity.cc
   small_case.cc
+  small_elasto_plastic_case.cc
   projection_comparison.cc
   )
 
-#TODO(Pastewka): reactivate
-# if(${MUSPECTRE_MPI_PARALLEL})
-#   list(APPEND binaries
-#     demonstrator_mpi.cc
-#     )
-# endif()
+if(${MUSPECTRE_MPI_PARALLEL})
+  list(APPEND binaries
+    demonstrator_mpi.cc
+    )
+endif()
 
-foreach(binaryfile ${binaries})
-  get_filename_component(binaryname  ${binaryfile} NAME_WE)
-  add_executable(${binaryname} ${binaryfile})
-  target_link_libraries(${binaryname} PRIVATE ${MUSPECTRE_NAMESPACE}muSpectre cxxopts)
-  muTools_move_to_project(${binaryname})
-endforeach()
 
 # or copy them
 file(GLOB pyexamples "${CMAKE_SOURCE_DIR}/examples/*.py")
@@ -69,17 +63,6 @@ foreach(pyexample ${pyexamples})
     COPYONLY)
 endforeach()
 
-# additional files to copy
-set(FILES_FOR_COPY
-  ${CMAKE_CURRENT_SOURCE_DIR}/odd_image.npz)
-
-foreach(file_for_copy ${FILES_FOR_COPY})
-  get_filename_component(binaryname  ${file_for_copy} NAME)
-  configure_file(
-    ${file_for_copy}
-    "${PROJECT_BINARY_DIR}/examples/${binaryname}"
-    COPYONLY)
-endforeach()
 
 
 ######### Test examples ##########
@@ -105,20 +88,23 @@ muSpectre_add_example(projection_comparison_cc_example
   SOURCES  projection_comparison.cc
   TYPE BOOST 5 0)
 
-#TODO(Pastewka): reactivate
-# if(${MUSPECTRE_MPI_PARALLEL})
-# muSpectre_add_example(demonstrator_mpi_cc_example
-#   SOURCES demonstrator_mpi.cc
-#   TYPE BOOST MPI_NB_PROCS 1  5 )
-# muSpectre_add_example(demonstrator_mpi_cc_example
-#   SOURCES demonstrator_mpi.cc
-#   TYPE BOOST MPI_NB_PROCS 2  5 )
-# endif()
+muSpectre_add_example(small_elasto_plastic_case_cc_example
+  SOURCES  small_elasto_plastic_case.cc
+  TYPE BOOST --report_level=detailed)
+
+if(${MUSPECTRE_MPI_PARALLEL})
+  muSpectre_add_example(demonstrator_mpi_cc_example1
+    SOURCES demonstrator_mpi.cc
+    TYPE BOOST MPI_NB_PROCS 1  5 )
+  muSpectre_add_example(demonstrator_mpi_cc_example2
+    SOURCES demonstrator_mpi.cc
+    TYPE BOOST MPI_NB_PROCS 2  5 )
+endif()
 
 ################## Pyhton examples ###################
 if(${SPLIT_CELL})
-muSpectre_add_example(circle_gibbs_ringing_simple_split_laminate_py_example
-  TYPE PYTHON  circle_gibbs_ringing_simple_split_laminate.py 1)
+  muSpectre_add_example(circle_gibbs_ringing_simple_split_laminate_py_example
+    TYPE PYTHON  circle_gibbs_ringing_simple_split_laminate.py 1)
 endif()
 
 muSpectre_add_example(crack_py_example
@@ -127,14 +113,14 @@ muSpectre_add_example(crack_py_example
 muSpectre_add_example(hyper-elasticity_py_example
   TYPE PYTHON hyper-elasticity.py)
 
-# muSpectre_add_example(projection_comparison_py_example
-#   TYPE PYTHON projection_comparison.py)
+muSpectre_add_example(projection_comparison_py_example
+  TYPE PYTHON projection_comparison.py)
 
 muSpectre_add_example(small_case_py_example
   TYPE PYTHON small_case.py)
 
-# muSpectre_add_example(small_elasto_plastic_case_py_example
-#   TYPE PYTHON small_elasto_plastic_case.py)
+muSpectre_add_example(small_elasto_plastic_case_py_example
+  TYPE PYTHON small_elasto_plastic_case.py)
 
 muSpectre_add_example(tutorial_example_py_example
   TYPE PYTHON tutorial_example.py 1)
@@ -151,11 +137,12 @@ muSpectre_add_example(visco_py_example
 muSpectre_add_example(visco_damage_py_example
   TYPE PYTHON  visco_example_damage.py 1)
 
-
-# TODO Pastewka: reactivate
-# if(${MUSPECTRE_MPI_PARALLEL})
-# muSpectre_add_example(elasto_plastic_comparison_py_example
-#   TYPE PYTHON MPI_NB_PROCS 1 elasto_plastic_comparison.py 1)
-# muSpectre_add_example(elasto_plastic_comparison_py_example
-#   TYPE PYTHON MPI_NB_PROCS 2 elasto_plastic_comparison.py 1)
-# endif()
+if(${MUSPECTRE_MPI_PARALLEL})
+  # additional files to copy
+  file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/odd_image.npz
+    DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
+ muSpectre_add_example(elasto_plastic_comparison_py_example1
+   TYPE PYTHON MPI_NB_PROCS 1 elasto_plastic_comparison.py 1)
+ muSpectre_add_example(elasto_plastic_comparison_py_example2
+   TYPE PYTHON MPI_NB_PROCS 2 elasto_plastic_comparison.py 1)
+endif()

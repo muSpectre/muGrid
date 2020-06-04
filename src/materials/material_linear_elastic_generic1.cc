@@ -47,6 +47,7 @@ namespace muSpectre {
         C_holder{std::make_unique<muGrid::T4Mat<Real, DimM>>()},
         C{*this->C_holder} {
     MatTB::make_C_from_C_voigt<DimM>(C_voigt, *this->C_holder);
+    this->last_step_was_nonlinear = false;
   }
 
   /* ---------------------------------------------------------------------- */

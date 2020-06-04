@@ -49,7 +49,8 @@ namespace muSpectre {
       const Real & tau_y0, const Real & H,
       const std::shared_ptr<muGrid::LocalFieldCollection> &
           parent_field_collection)
-      : Parent{name, spatial_dimension, nb_quad_pts, parent_field_collection},
+      : Parent{name, spatial_dimension, nb_quad_pts,
+      parent_field_collection},
         plast_flow_field{this->get_prefix() + "cumulated plastic flow εₚ",
                          *this->internal_fields},
         F_prev_field{this->get_prefix() + "Previous placement gradient Fᵗ",

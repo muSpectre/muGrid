@@ -46,4 +46,6 @@ if(MUCHOICE MATCHES "muSpectre")
     ${LICENSETEST_MUSPECTRE}  )
   license_add_subdirectory("${CMAKE_SOURCE_DIR}/language_bindings/python/muSpectre"
     ${LICENSETEST_MUSPECTRE}  )
+    license_add_subdirectory("${CMAKE_SOURCE_DIR}/examples"
+    ${LICENSETEST_MUSPECTRE}  )
 endif()

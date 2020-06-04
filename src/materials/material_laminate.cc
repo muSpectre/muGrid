@@ -42,7 +42,8 @@ namespace muSpectre {
       const std::string & name, const Dim_t & spatial_dimension,
       const Dim_t & nb_quad_pts,
       std::shared_ptr<muGrid::LocalFieldCollection> parent_field)
-      : Parent(name, spatial_dimension, DimM, nb_quad_pts, parent_field),
+    : Parent(name, spatial_dimension, DimM, nb_quad_pts,
+             parent_field),
         normal_vector_field{this->get_prefix() + "normal vector",
                             *this->internal_fields},
         volume_ratio_field{this->get_prefix() + "volume ratio",
@@ -194,6 +195,7 @@ namespace muSpectre {
       throw muGrid::RuntimeError(
           "native stress is not defined for laminate materials");
     }
+    this->last_step_was_nonlinear = false;
     switch (form) {
     case Formulation::finite_strain: {
       switch (is_cell_split) {
@@ -255,6 +257,12 @@ namespace muSpectre {
     default:
       throw muGrid::RuntimeError("Unknown formulation");
       break;
+    }
+    for (auto && mat : this->material_left_vector) {
+      this->last_step_was_nonlinear |= mat->was_last_step_nonlinear();
+    }
+    for (auto && mat : this->material_right_vector) {
+      this->last_step_was_nonlinear |= mat->was_last_step_nonlinear();
     }
   }
   /* ----------------------------------------------------------------------*/
