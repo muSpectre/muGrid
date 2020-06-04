@@ -1,6 +1,5 @@
 .builds:
   stage: build
-  allow_failure: true
   script:
     - echo "free -h"
     - free -h
@@ -9,10 +8,19 @@
     - cd build
     - cmake -DCMAKE_BUILD_TYPE:STRING=Release -DMUSPECTRE_RUNNING_IN_CI=ON ..
     - make -k
+    - ctest --output-on-failure
+    - make test
   artifacts:
+    when: always
     paths:
-      - build
-    expire_in: 1 day
+      - build/tests/test_results*.xml
+      - build/tests/libmufft/test_results*.xml
+      - build/tests/libmugrid/test_results*.xml
+    reports:
+      junit:
+      - build/tests/test_results*.xml
+      - build/tests/libmufft/test_results*.xml
+      - build/tests/libmugrid/test_results*.xml
 
 build:testing_gcc_mpi:
   extends: .builds
@@ -26,6 +34,8 @@ build:testing_gcc_mpi:
     - cd build
     - cmake -DCMAKE_BUILD_TYPE:STRING=Release -DMUSPECTRE_MPI_PARALLEL=ON -DMPIEXEC_MAX_NUMPROCS=2 -DMPIEXEC_PREFLAGS="--oversubscribe;--allow-run-as-root" -DMUSPECTRE_RUNNING_IN_CI=ON ..
     - make -k
+    - ctest --output-on-failure
+    - make test
 
 build:testing_gcc_setuptools:
   extends: .builds
@@ -36,6 +46,9 @@ build:testing_gcc_setuptools:
     - echo "grep -c ^processor /proc/cpuinfo"
     - grep -c ^processor /proc/cpuinfo
     - python3 setup.py build --disable-mpi --verbose
+    - python3 setup.py install --user --disable-mpi --verbose
+    - cd tests/libmufft
+    - python3 python_binding_tests.py
 
 build:testing_clang:
   extends: .builds
@@ -48,6 +61,8 @@ build:testing_clang:
     - cd build
     - CXX=clang++ cmake -DCMAKE_BUILD_TYPE:STRING=Release -DMUSPECTRE_RUNNING_IN_CI=ON ..
     - make -k
+    - ctest --output-on-failure
+    - make test
 
 build:stable_gcc:
   extends: .builds
@@ -68,6 +83,8 @@ build:testing_gcc_split:
     - cd build
     - cmake -DCMAKE_BUILD_TYPE:STRING=Release -DSPLIT_CELL=ON ..
     - make
+    - ctest --output-on-failure
+    - make test
 
 build:test_documention:
   stage: build
@@ -79,68 +96,6 @@ build:test_documention:
   artifacts:
     paths:
     - build/doc/html
-
-.tests:
-  stage: test
-  script:
-    - ls
-    - cd build
-    - ls -a
-    - ctest --output-on-failure
-    - make test
-    - ls -ltr
-    - ls Testing
-  artifacts:
-    when: always
-    paths:
-      - build/tests/test_results*.xml
-      - build/tests/libmufft/test_results*.xml
-      - build/tests/libmugrid/test_results*.xml
-    reports:
-      junit:
-      - build/tests/test_results*.xml
-      - build/tests/libmufft/test_results*.xml
-      - build/tests/libmugrid/test_results*.xml
-
-test:testing_gcc_mpi:
-  image: registry.gitlab.com/muspectre/muspectre:debian_testing
-  extends: .tests
-  dependencies:
-    - build:testing_gcc_mpi
-
-test:testing_gcc_setuptools:
-  image: registry.gitlab.com/muspectre/muspectre:debian_testing
-  extends: .tests
-  dependencies:
-    - build:testing_gcc_setuptools
-  script:
-    - python3 setup.py install --user --disable-mpi --verbose
-    - cd tests/libmufft
-    - python3 python_binding_tests.py
-
-test:testing_clang:
-  image: registry.gitlab.com/muspectre/muspectre:debian_testing
-  extends: .tests
-  dependencies:
-    - build:testing_clang
-
-test:stable_gcc:
-  image: registry.gitlab.com/muspectre/muspectre:debian_stable
-  extends: .tests
-  dependencies:
-    - build:stable_gcc
-
-test:ubuntu16.04_gcc:
-  image: registry.gitlab.com/muspectre/muspectre:ubuntu16.04
-  extends: .tests
-  dependencies:
-    - build:ubuntu16.04_gcc
-
-test:testing_gcc_split:
- image: registry.gitlab.com/muspectre/muspectre:debian_testing
- extends: .tests
- dependencies:
-    - build:testing_gcc_split
 
 pages:
   stage: deploy
