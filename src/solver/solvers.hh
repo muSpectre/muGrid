@@ -54,23 +54,30 @@ namespace muSpectre {
   using MappedField_t =
       muGrid::MappedField<muGrid::FieldMap<Real, Mapping::Mut>>;
 
-  using Func_t = std::function<void(const size_t &, muGrid::RealField &)>;
+  using EigenStrainFunc_t = typename std::function<void(
+      const size_t &, muGrid::TypedFieldBase<Real> &)>;
 
+#ifdef NO_EXPERIMENTAL
+  using EigenStrainOptFunc_ptr = typename muGrid::optional<EigenStrainFunc_t &>;
+#else
+  using EigenStrainOptFunc_ptr =
+      typename muGrid::optional<std::reference_wrapper<EigenStrainFunc_t>>;
+#endif
   enum class IsStrainInitialised { True, False };
 
   /**
-   * Uses the Newton-conjugate Gradient method to find the static equilibrium of
-   * a cell given a series of mean applied strain(ε for
+   * Uses the Newton-conjugate Gradient method to find the static
+   * equilibrium of a cell given a series of mean applied strain(ε for
    * Formulation::small_strain and H (=F-I) for Formulation::finite_strain).
-   * The initial macroscopic strain state is set to zero in cell initialisation.
+   * The initial macroscopic strain state is set to zero in cell
+   * initialisation.
    */
   std::vector<OptimizeResult> newton_cg(
       Cell & cell, const LoadSteps_t & load_steps, KrylovSolverBase & solver,
       const Real & newton_tol, const Real & equil_tol,
       const Verbosity & verbose = Verbosity::Silent,
       const IsStrainInitialised & strain_init = IsStrainInitialised::False,
-      const Func_t & eigen_strain_func = nullptr);
-
+      EigenStrainOptFunc_ptr eigen_strain_func = muGrid::nullopt);
   /**
    * Uses the Newton-conjugate Gradient method to find the static
    * equilibrium of a cell given a mean applied strain.
@@ -80,11 +87,12 @@ namespace muSpectre {
       KrylovSolverBase & solver, const Real & newton_tol,
       const Real & equil_tol, const Verbosity & verbose = Verbosity::Silent,
       const IsStrainInitialised & strain_init = IsStrainInitialised::False,
-      const Func_t & eigen_strain_func = nullptr) {
+      EigenStrainOptFunc_ptr eigen_strain_func = muGrid::nullopt) {
     LoadSteps_t load_steps{load_step};
-    return newton_cg(cell, load_steps, solver, newton_tol, equil_tol, verbose,
-                     strain_init, eigen_strain_func)
-        .front();
+    auto ret_val{newton_cg(cell, load_steps, solver, newton_tol, equil_tol,
+                           verbose, strain_init, eigen_strain_func)
+                     .front()};
+    return ret_val;
   }
 
   /* ---------------------------------------------------------------------- */

@@ -69,7 +69,7 @@ namespace muSpectre {
             "stress",
             dof_for_formulation(this->get_formulation(),
                                 this->get_material_dim(), OneQuadPt),
-            PixelSubDiv::QuadPt)},
+            QuadPtTag)},
         is_cell_split{is_cell_split} {
     this->fields->set_nb_sub_pts(QuadPtTag, this->get_nb_quad_pts());
     this->fields->set_nb_sub_pts(NodalPtTag, this->get_nb_nodal_pts());

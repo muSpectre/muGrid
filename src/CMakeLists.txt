@@ -69,13 +69,12 @@ std::experimental::optional<double> A{};
     HAS_STD_OPTIONAL)
 
 if(NOT HAS_STD_OPTIONAL)
-  target_compile_definitions(muSpectre PUBLIC -DNO_EXPERIMENTAL)
-endif()
-
-# Do not trust old gcc. the std::optional has memory bugs
-if(${CMAKE_COMPILER_IS_GNUCC})
-  if(${CMAKE_CXX_COMPILER_VERSION} VERSION_LESS 6.0.0)
-    add_definitions(-DNO_EXPERIMENTAL)
+    target_compile_definitions(muSpectre PUBLIC -DNO_EXPERIMENTAL)
+    # Do not trust old gcc. the std::optional has memory bugs
+    if(${CMAKE_COMPILER_IS_GNUCC})
+      if(${CMAKE_CXX_COMPILER_VERSION} VERSION_LESS 6.0.0)
+        add_definitions(-DNO_EXPERIMENTAL)
+    endif()
   endif()
 endif()
 

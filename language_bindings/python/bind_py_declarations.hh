@@ -36,8 +36,6 @@
 #ifndef LANGUAGE_BINDINGS_PYTHON_BIND_PY_DECLARATIONS_HH_
 #define LANGUAGE_BINDINGS_PYTHON_BIND_PY_DECLARATIONS_HH_
 
-#include "../language_bindings/libmugrid/python/bind_py_declarations.hh"
-
 #include <pybind11/pybind11.h>
 namespace py = pybind11;
 

@@ -47,6 +47,7 @@
 
 using muSpectre::Cell;
 using muSpectre::Dim_t;
+using muSpectre::Index_t;
 using muSpectre::MaterialBase;
 using muSpectre::MaterialLinearElasticGeneric1;
 using muSpectre::MaterialLinearElasticGeneric2;

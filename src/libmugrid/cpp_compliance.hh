@@ -181,8 +181,12 @@ namespace muGrid {
   template <class T>
 #ifdef NO_EXPERIMENTAL
   using optional = typename boost::optional<T>;
+  using nullopt_t = boost::none_t;
+  const nullopt_t nullopt{boost::none};
 #else
   using optional = typename std::experimental::optional<T>;
+  using nullopt_t = std::experimental::fundamentals_v1::nullopt_t;
+  constexpr nullopt_t nullopt{std::experimental::fundamentals_v1::nullopt};
 #endif
 
 #else

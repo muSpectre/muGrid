@@ -42,6 +42,7 @@
 
 #include <iomanip>
 #include <iostream>
+#include <algorithm>
 
 namespace muSpectre {
 
@@ -55,7 +56,7 @@ namespace muSpectre {
             KrylovSolverBase & solver, const Real & newton_tol,
             const Real & equil_tol, const Verbosity & verbose,
             const IsStrainInitialised & strain_init,
-            const Func_t & eigen_strain_func) {
+            EigenStrainOptFunc_ptr eigen_strain_func) {
     const auto & comm = cell.get_communicator();
 
     using Matrix_t = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
@@ -81,14 +82,14 @@ namespace muSpectre {
     muGrid::TypedFieldBase<Real> & general_strain_field{
         [&cell, &field_collection,
          &eigen_strain_func]() -> muGrid::TypedFieldBase<Real> & {
-          if (not(eigen_strain_func == nullptr)) {
+          if (not(eigen_strain_func == muGrid::nullopt)) {
             // general strain field
             muGrid::RealField & general_strain_field{
                 field_collection.register_real_field(
                     "general strain",
                     dof_for_formulation(cell.get_formulation(),
                                         cell.get_material_dim(), OneQuadPt),
-                    muGrid::PixelSubDiv::QuadPt)};
+                    QuadPtTag)};
             return general_strain_field;
           } else {
             return cell.get_strain();
@@ -220,7 +221,7 @@ namespace muSpectre {
       // updating cell strain with the difference of the current and previous
       // strain input.
       auto && F_general_map{muGrid::FieldMap<Real, Mapping::Mut>(
-          general_strain_field, shape[0], muGrid::PixelSubDiv::QuadPt)};
+          general_strain_field, shape[0], muGrid::IterUnit::SubPt)};
       for (auto && strain_general : F_general_map) {
         strain_general += macro_strain - previous_macro_strain;
       }
@@ -266,9 +267,9 @@ namespace muSpectre {
         // updating the strain fields with the  eigen_strain field calculated by
         // the functor called eigen_strain_func
 
-        if (not(eigen_strain_func == nullptr)) {
+        if (not(eigen_strain_func == muGrid::nullopt)) {
           eval_strain_field = general_strain_field;
-          eigen_strain_func(strain_step, eval_strain_field);
+          (eigen_strain_func.value())(strain_step, eval_strain_field);
         }
         auto res_tup{cell.evaluate_stress_tangent()};
         auto & P{std::get<0>(res_tup)};
@@ -355,7 +356,6 @@ namespace muSpectre {
       // store history variables for next load increment
       cell.save_history_variables();
     }
-
     return ret_val;
   }
 
@@ -644,7 +644,7 @@ namespace muSpectre {
         // updating cell strain with the difference of the current and previous
         // strain input.
         auto && F_map{muGrid::FieldMap<Real, Mapping::Mut>(
-            F, shape[0], muGrid::PixelSubDiv::QuadPt)};
+            F, shape[0], muGrid::IterUnit::SubPt)};
 
         for (auto && strain : F_map) {
           strain += macro_strain - previous_macro_strain;
@@ -721,4 +721,7 @@ namespace muSpectre {
 
     return ret_val;
   }
+
+  /* ---------------------------------------------------------------------- */
+
 }  // namespace muSpectre

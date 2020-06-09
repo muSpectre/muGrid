@@ -473,12 +473,12 @@ namespace muGrid {
     return t;
   }
 
-/* ---------------------------------------------------------------------- */
-namespace py = pybind11;
-template <class T>
+  /* ---------------------------------------------------------------------- */
+  namespace py = pybind11;
+  template <class T>
   py::array_t<T, py::array::f_style>
-  array_computer(TypedFieldBase<T> & self, const std::vector<Dim_t> & shape,
-                 const muGrid::PixelSubDiv & it) {
+  array_computer(TypedFieldBase<T> & self, const std::vector<Index_t> & shape,
+                 const muGrid::IterUnit & it) {
     // py_class will be passed as the `base` class to the array
     // constructors below. This ties the lifetime of the array that does
     // not own its own data to the field object. (Without this
@@ -488,7 +488,7 @@ template <class T>
 
     // If shape is given, then we return a field of tensors of this
     // shape
-    Dim_t ntotal{1}, stride{sizeof(T)};
+    Index_t ntotal{1}, stride{sizeof(T)};
     if (dim != 0) {
       for (auto & n : shape) {
         return_shape.push_back(n);
@@ -502,13 +502,7 @@ template <class T>
     auto && nb_dof_per_sub_pt{self.get_nb_dof_per_sub_pt()};
 
     switch (it) {
-    case muGrid::PixelSubDiv::FreePt: {
-      // fall-through, treatment like all subdivided pixels
-    }
-    case muGrid::PixelSubDiv::QuadPt: {
-      // fall-through, treatment like all subdivided pixels
-    }
-    case muGrid::PixelSubDiv::NodalPt: {
+    case muGrid::IterUnit::SubPt: {
       // If shape is not given, we just return column vectors with the
       // components
       if (dim == 0) {
@@ -528,7 +522,7 @@ template <class T>
       stride *= nb_sub_pts;
       break;
     }
-    case muGrid::PixelSubDiv::Pixel: {
+    case muGrid::IterUnit::Pixel: {
       // If shape is not given, we just return column vectors with the
       // components
       if (dim == 0) {

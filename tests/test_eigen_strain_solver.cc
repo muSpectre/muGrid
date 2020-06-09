@@ -53,16 +53,19 @@
 #include <functional>
 
 namespace muSpectre {
+
+  using muGrid::testGoodies::rel_error;
+
   BOOST_AUTO_TEST_SUITE(eigen_strain_hendling_solvers);
 
   BOOST_AUTO_TEST_CASE(twoD_test) {
-    constexpr Dim_t Dim{twoD};
+    constexpr Index_t Dim{twoD};
 
     using Mat1_t = MaterialLinearElastic1<Dim>;
     using Mat2_t = MaterialLinearElastic2<Dim>;
     using Matrix_t = Eigen::Matrix<Real, Dim, Dim>;
 
-    const DynCcoord_t nb_grid_pts{muGrid::CcoordOps::get_cube<Dim>(3)};
+    const DynCcoord_t nb_grid_pts{muGrid::CcoordOps::get_cube<Dim>(Index_t{3})};
     const DynRcoord_t lengths{muGrid::CcoordOps::get_cube<Dim>(1.)};
     constexpr Formulation form{Formulation::small_strain};
 
@@ -88,30 +91,31 @@ namespace muSpectre {
 
     for (const auto && index_pixel : cell_material.get_pixels().enumerate()) {
       auto && index{std::get<0>(index_pixel)};
-      if (index == cell_material.get_nb_pixels() / 2) {
-        std::cout << "the index is : " << index << std::endl;
+      if (index == Index_t(cell_material.get_nb_pixels() / 2)) {
         material_2_material.add_pixel(index, F_eigen);
       } else {
         material_1_material.add_pixel(index);
       }
     }
 
-    using Func_t = std::function<void(const size_t &, muGrid::RealField &)>;
+    using Func_t =
+        std::function<void(const size_t &, muGrid::TypedFieldBase<Real> &)>;
+
     // The function which is responsible for assigning eigen strain
-    const Func_t & eigen_func = [&cell_material,
-                                 &F_eigen](const size_t & /*step*/,
-                                           muGrid::RealField & eval_field) {
-      auto shape{cell_material.get_strain_shape()};
-      auto && eigen_field_map{muGrid::FieldMap<Real, Mapping::Mut>(
-          eval_field, shape[0], muGrid::PixelSubDiv::QuadPt)};
-      for (auto && tup : eigen_field_map.enumerate_indices()) {
-        auto && index{std::get<0>(tup)};
-        auto && eigen{std::get<1>(tup)};
-        if (index == cell_material.get_nb_pixels() / 2) {
-          eigen -= F_eigen;
-        }
-      }
-    };
+    Func_t eigen_func{
+        [&cell_material, &F_eigen](const size_t & /*step*/,
+                                   muGrid::TypedFieldBase<Real> & eval_field) {
+          auto shape{cell_material.get_strain_shape()};
+          auto && eigen_field_map{muGrid::FieldMap<Real, Mapping::Mut>(
+                eval_field, shape[0], muGrid::IterUnit::SubPt)};
+          for (auto && tup : eigen_field_map.enumerate_indices()) {
+            auto && index{std::get<0>(tup)};
+            auto && eigen{std::get<1>(tup)};
+            if (index == cell_material.get_nb_pixels() / 2) {
+              eigen -= F_eigen;
+            }
+          }
+        }};
 
     cell_material.initialise();
     cell_solver.initialise();
@@ -139,11 +143,12 @@ namespace muSpectre {
     auto && strain_solver{res_solver.grad};
     auto && strain_material{res_material.grad};
 
-    auto && diff_stress{(stress_solver - stress_material).eval()};
-    auto && diff_strain{(strain_solver - strain_material).eval()};
-    std::cout << strain_solver - strain_material << std::endl;
-    BOOST_CHECK_LE(abs(diff_stress).mean(), -cg_tol);
-    BOOST_CHECK_LE(abs(diff_strain).mean(), cg_tol);
+    auto && diff_stress{rel_error(stress_solver, stress_material)};
+    auto && diff_strain{rel_error(strain_solver, strain_material)};
+
+    BOOST_CHECK_LE(diff_stress, cg_tol);
+    BOOST_CHECK_LE(diff_strain, cg_tol);
+    std::cout << "I am here" << std::endl;
   }
 
   BOOST_AUTO_TEST_SUITE_END();

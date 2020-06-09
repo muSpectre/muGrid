@@ -77,7 +77,7 @@ int main() {
   Verbosity verbose{Verbosity::Detailed};
 
   KrylovSolverCG cg{rve, tol, maxiter, verbose};
-  auto res = newton_cg(rve, Del0, cg, tol, equi_tol, verbose);
+  auto res{newton_cg(rve, Del0, cg, tol, equi_tol, verbose)};
   std::cout << res.grad.transpose() << std::endl;
   return 0;
 }
