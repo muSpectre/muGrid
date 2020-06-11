@@ -195,14 +195,15 @@ namespace muSpectre {
     const Index_t nb_pixel{1};
     auto cube{muGrid::CcoordOps::get_cube<Fix::sdim()>(nb_pixel)};
 
-    FC_t globalfields{Fix::mdim(), Fix::NbQuadPts(), muGrid::Unknown};
+    FC_t globalfields{Fix::mdim()};
+    globalfields.set_nb_sub_pts(QuadPtTag, Fix::NbQuadPts());
     globalfields.initialise(cube, {});
-    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim(), PixelSubDiv::QuadPt>
-        F1_f{"Transformation Gradient 1", globalfields};
-    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim(), PixelSubDiv::QuadPt>
-        P1_f{"Nominal Stress 1", globalfields};
-    muGrid::MappedT4Field<Real, Mapping::Mut, Fix::mdim(), PixelSubDiv::QuadPt>
-        K1_f{"Tangent Moduli 1", globalfields};
+    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim(), IterUnit::SubPt>
+        F1_f{"Transformation Gradient 1", globalfields, QuadPtTag};
+    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim(), IterUnit::SubPt>
+        P1_f{"Nominal Stress 1", globalfields, QuadPtTag};
+    muGrid::MappedT4Field<Real, Mapping::Mut, Fix::mdim(), IterUnit::SubPt>
+        K1_f{"Tangent Moduli 1", globalfields, QuadPtTag};
 
     BOOST_CHECK_THROW(mat.compute_stresses_tangent(
                           globalfields.get_field("Transformation Gradient 1"),

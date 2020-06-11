@@ -51,17 +51,17 @@ add_dependencies(version check_git)
 target_link_libraries(muFFT PUBLIC version)
 
 set(mufft_SRCS
-  derivative.cc
-  fft_engine_base.cc
-  fft_utils.cc
-  fftw_engine.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/derivative.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/fft_engine_base.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/fft_utils.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/fftw_engine.cc
   )
 
 set(fft_engine_FFTWMPI_SRCS
-  fftwmpi_engine.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/fftwmpi_engine.cc
   )
 set(fft_engine_PFFT_SRCS
-  pfft_engine.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/pfft_engine.cc
   )
 
 find_package(FFTW3 COMPONENTS double REQUIRED)

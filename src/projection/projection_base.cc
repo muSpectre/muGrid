@@ -50,9 +50,8 @@ namespace muSpectre {
         nb_dof_per_sub_pt{nb_dof_per_sub_pt}, form{form},
         projection_container{this->fft_engine->get_fourier_field_collection()},
         work_space{this->projection_container.register_complex_field(
-            "work_space", this->nb_dof_per_sub_pt * this->nb_quad_pts,
-            muGrid::PixelSubDiv::Pixel)} {
-    this->projection_container.set_nb_quad_pts(nb_quad_pts);
+            "work_space", this->nb_dof_per_sub_pt * this->nb_quad_pts)} {
+    this->projection_container.set_nb_sub_pts(QuadPtTag, nb_quad_pts);
     if (nb_quad_pts <= 0) {
       throw std::runtime_error("Number of quadrature points must be larger "
                                "than zero.");

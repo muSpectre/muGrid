@@ -59,22 +59,14 @@ namespace muGrid {
   }
 
   std::ostream & operator<<(std::ostream & os,
-                            const PixelSubDiv & sub_division) {
+                            const IterUnit & sub_division) {
     switch (sub_division) {
-    case PixelSubDiv::FreePt: {
+    case IterUnit::Pixel: {
       os << "free number of points";
       break;
     }
-    case PixelSubDiv::QuadPt: {
-      os << "quadrature point";
-      break;
-    }
-    case PixelSubDiv::NodalPt: {
-      os << "nodal point";
-      break;
-    }
-    case PixelSubDiv::Pixel: {
-      os << "pixel";
+    case IterUnit::SubPt: {
+      os << "Sub point";
       break;
     }
     default:

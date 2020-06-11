@@ -98,17 +98,14 @@ namespace muFFT {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(fft_test, Fix, fixlist, Fix) {
     Fix::engine.initialise(this->mdim * this->mdim, FFT_PlanFlags::estimate);
     using FC_t = muGrid::GlobalFieldCollection;
-    FC_t fc(Fix::sdim, muGrid::Unknown, muGrid::Unknown);
-    auto & input{fc.register_real_field("input", Fix::mdim * Fix::mdim,
-                                        PixelSubDiv::Pixel)};
-    auto & ref{fc.register_real_field("reference", Fix::mdim * Fix::mdim,
-                                      PixelSubDiv::Pixel)};
-    auto & result{fc.register_real_field("result", Fix::mdim * Fix::mdim,
-                                         PixelSubDiv::Pixel)};
+    FC_t fc(Fix::sdim);
+    auto & input{fc.register_real_field("input", Fix::mdim * Fix::mdim)};
+    auto & ref{fc.register_real_field("reference", Fix::mdim * Fix::mdim)};
+    auto & result{fc.register_real_field("result", Fix::mdim * Fix::mdim)};
     fc.initialise(Fix::res(), Fix::loc());
 
     using map_t = muGrid::MatrixFieldMap<Real, Mapping::Mut, Fix::mdim,
-                                         Fix::mdim, PixelSubDiv::Pixel>;
+                                         Fix::mdim, IterUnit::Pixel>;
     map_t inmap{input};
     auto refmap{map_t{ref}};
     auto resultmap{map_t{result}};
@@ -124,7 +121,7 @@ namespace muFFT {
         "fourier work space", Fix::mdim * Fix::mdim)};
     Fix::engine.fft(input, complex_field);
     using cmap_t = muGrid::MatrixFieldMap<Complex, Mapping::Mut, Fix::mdim,
-                                          Fix::mdim, PixelSubDiv::Pixel>;
+                                          Fix::mdim, IterUnit::Pixel>;
     cmap_t complex_map(complex_field);
     Real error = complex_map[0].imag().norm();
     BOOST_CHECK_LT(error, tol);

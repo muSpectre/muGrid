@@ -51,21 +51,21 @@
 #include <vector>
 
 namespace muSpectre {
-  template <Dim_t DimM, Formulation Form>
+  template <Index_t DimM, Formulation Form>
   class MaterialLaminate;
 
-  template <Dim_t DimM>
+  template <Index_t DimM>
   struct MaterialMuSpectre_traits<
       MaterialLaminate<DimM, Formulation::finite_strain>> {
     //! expected map type for strain fields
     using StrainMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Const, DimM, PixelSubDiv::QuadPt>;
+        muGrid::T2FieldMap<Real, Mapping::Const, DimM, IterUnit::SubPt>;
     //! expected map type for stress fields
     using StressMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>;
+        muGrid::T2FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
     //! expected map type for tangent stiffness fields
     using TangentMap_t =
-        muGrid::T4FieldMap<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>;
+        muGrid::T4FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
 
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::Gradient};
@@ -73,18 +73,18 @@ namespace muSpectre {
     constexpr static auto stress_measure{StressMeasure::PK1};
   };
 
-  template <Dim_t DimM>
+  template <Index_t DimM>
   struct MaterialMuSpectre_traits<
       MaterialLaminate<DimM, Formulation::small_strain>> {
     //! expected map type for strain fields
     using StrainMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Const, DimM, PixelSubDiv::QuadPt>;
+        muGrid::T2FieldMap<Real, Mapping::Const, DimM, IterUnit::SubPt>;
     //! expected map type for stress fields
     using StressMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>;
+        muGrid::T2FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
     //! expected map type for tangent stiffness fields
     using TangentMap_t =
-        muGrid::T4FieldMap<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>;
+        muGrid::T4FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
 
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
@@ -92,7 +92,7 @@ namespace muSpectre {
     constexpr static auto stress_measure{StressMeasure::PK2};
   };
 
-  template <Dim_t DimM, Formulation Form>
+  template <Index_t DimM, Formulation Form>
   class MaterialLaminate
       : public MaterialMuSpectre<MaterialLaminate<DimM, Form>, DimM> {
    public:
@@ -105,9 +105,9 @@ namespace muSpectre {
     using T4_t = muGrid::T4Mat<Real, DimM>;
 
     using MappedVectorField_t =
-        muGrid::MappedT1Field<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>;
+        muGrid::MappedT1Field<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
     using MappedScalarField_t =
-        muGrid::MappedScalarField<Real, Mapping::Mut, PixelSubDiv::QuadPt>;
+        muGrid::MappedScalarField<Real, Mapping::Mut, IterUnit::SubPt>;
 
     /**
      * type used to determine whether the
@@ -124,8 +124,8 @@ namespace muSpectre {
 
     //! Constructor with name and material properties
     MaterialLaminate(
-        const std::string & name, const Dim_t & spatial_dimension,
-        const Dim_t & nb_quad_pts,
+        const std::string & name, const Index_t & spatial_dimension,
+        const Index_t & nb_quad_pts,
         std::shared_ptr<muGrid::LocalFieldCollection> parent_field = nullptr);
 
     //! Copy constructor
@@ -174,7 +174,7 @@ namespace muSpectre {
      */
     void add_pixels_precipitate(
         const std::vector<Ccoord_t<DimM>> & intersected_pixels,
-        const std::vector<Dim_t> & intersected_pixels_id,
+        const std::vector<Index_t> & intersected_pixels_id,
         const std::vector<Real> & intersection_ratios,
         const std::vector<Eigen::Matrix<Real, DimM, 1>> & intersection_normals,
         MatPtr_t mat1, MatPtr_t mat2);

@@ -61,14 +61,6 @@ namespace muGrid {
   };
 
   namespace internal {
-    inline Index_t eval_quad_pts(const PixelSubDiv & sub_division,
-                                 const Index_t & nb_sub_pts) {
-      return sub_division == PixelSubDiv::QuadPt ? nb_sub_pts : Unknown;
-    }
-    inline Index_t eval_nodal_pts(const PixelSubDiv & sub_division,
-                                  const Index_t & nb_sub_pts) {
-      return sub_division == PixelSubDiv::NodalPt ? nb_sub_pts : Unknown;
-    }
 
     template <typename T>
     DynCcoord_t get_strides(const Index_t & dim,
@@ -164,8 +156,8 @@ namespace muGrid {
     NumpyProxy(DynCcoord_t nb_subdomain_grid_pts,
                DynCcoord_t subdomain_locations, Index_t nb_components,
                pybind11::array_t<T> & array)
-        : collection(nb_subdomain_grid_pts.get_dim(), OneQuadPt, OneNode,
-                     nb_subdomain_grid_pts, subdomain_locations,
+        : collection(nb_subdomain_grid_pts.get_dim(), nb_subdomain_grid_pts,
+                     subdomain_locations,
                      internal::get_strides(nb_subdomain_grid_pts.get_dim(),
                                            nb_components, array)),
           field{"proxy_field",
@@ -173,7 +165,7 @@ namespace muGrid {
                 nb_components,
                 static_cast<size_t>(array.request().size),
                 static_cast<T *>(array.request().ptr),
-                PixelSubDiv::Pixel,
+                PixelTag,
                 Unit::unitless()},
           sub_pt_shape{0}, components_shape{} {
       // Note: There is a check on the global array size in the constructor of
@@ -229,14 +221,14 @@ namespace muGrid {
     NumpyProxy(DynCcoord_t nb_subdomain_grid_pts,
                DynCcoord_t subdomain_locations, Index_t nb_components,
                pybind11::array_t<T, pybind11::array::f_style> & array)
-        : collection{nb_subdomain_grid_pts.get_dim(), OneQuadPt, OneNode,
-                     nb_subdomain_grid_pts, subdomain_locations},
+        : collection{nb_subdomain_grid_pts.get_dim(), nb_subdomain_grid_pts,
+                     subdomain_locations},
           field{"proxy_field",
                 collection,
                 nb_components,
                 static_cast<size_t>(array.request().size),
                 static_cast<T *>(array.request().ptr),
-                PixelSubDiv::Pixel,
+                PixelTag,
                 Unit::unitless()},
           sub_pt_shape{0}, components_shape{} {
       // Note: There is a check on the global array size in the constructor of
@@ -282,12 +274,14 @@ namespace muGrid {
                DynCcoord_t subdomain_locations, Index_t nb_sub_pts,
                std::vector<Index_t> components_shape,
                pybind11::array_t<T, pybind11::array::f_style> array,
-               const PixelSubDiv & sub_division,
                const Unit & unit = Unit::unitless())
-        : collection{nb_subdomain_grid_pts.get_dim(),
-                     internal::eval_quad_pts(sub_division, nb_sub_pts),
-                     internal::eval_nodal_pts(sub_division, nb_sub_pts),
-                     nb_subdomain_grid_pts, subdomain_locations},
+        : collection{nb_subdomain_grid_pts.get_dim(), nb_subdomain_grid_pts,
+                     subdomain_locations,
+                     [&nb_sub_pts]() {
+                       FieldCollection::SubPtMap_t map{};
+                       map["subpt"] = nb_sub_pts;
+                       return map;
+                     }()},
           field{"proxy_field",
                 collection,
                 std::accumulate(components_shape.begin(),
@@ -295,9 +289,8 @@ namespace muGrid {
                                 std::multiplies<Index_t>()),
                 static_cast<size_t>(array.request().size),
                 static_cast<T *>(array.request().ptr),
-                sub_division,
-                unit,
-                nb_sub_pts},
+                "subpt",
+                unit},
           sub_pt_shape{nb_sub_pts}, components_shape{components_shape} {
       // Note: There is a check on the global array size in the constructor of
       // WrappedField, which will fail before the sanity checks below.

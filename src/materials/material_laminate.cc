@@ -43,20 +43,21 @@
 #include "common/intersection_octree.hh"
 
 namespace muSpectre {
-  template <Dim_t DimM, Formulation Form>
+  template <Index_t DimM, Formulation Form>
   MaterialLaminate<DimM, Form>::MaterialLaminate(
-      const std::string & name, const Dim_t & spatial_dimension,
-      const Dim_t & nb_quad_pts,
+      const std::string & name, const Index_t & spatial_dimension,
+      const Index_t & nb_quad_pts,
       std::shared_ptr<muGrid::LocalFieldCollection> parent_field)
       : Parent(name, spatial_dimension, nb_quad_pts, parent_field),
         normal_vector_field{this->get_prefix() + "normal vector",
-                            *this->internal_fields},
+                            *this->internal_fields, QuadPtTag},
         volume_ratio_field{this->get_prefix() + "volume ratio",
-                           *this->internal_fields} {}
+                           *this->internal_fields, QuadPtTag} {}
 
-  /* --------------------------------------------------------------------*/
-  template <Dim_t DimM, Formulation Form>
-  void MaterialLaminate<DimM, Form>::add_pixel(const size_t & /*pixel_id*/) {
+  /* ---------------------------------------------------------------------- */
+  template <Index_t DimM, Formulation Form>
+  void MaterialLaminate<DimM, Form>::add_pixel(
+      const size_t & /*pixel_id*/) {
     throw muGrid::RuntimeError("This material needs two material "
                                "(shared) pointers for making the layers of "
                                "a laminate pixel, in addition to  their volume"
@@ -65,7 +66,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------*/
-  template <Dim_t DimM, Formulation Form>
+  template <Index_t DimM, Formulation Form>
   void MaterialLaminate<DimM, Form>::add_pixel(
       const size_t & pixel_id, MatPtr_t mat1, MatPtr_t mat2, const Real & ratio,
       const Eigen::Ref<const Eigen::Matrix<Real, DimM, 1>> & normal_vector) {
@@ -79,10 +80,10 @@ namespace muSpectre {
   }
 
   /* --------------------------------------------------------------------*/
-  template <Dim_t DimM, Formulation Form>
+  template <Index_t DimM, Formulation Form>
   void MaterialLaminate<DimM, Form>::add_pixels_precipitate(
       const std::vector<Ccoord_t<DimM>> & intersected_pixels,
-      const std::vector<Dim_t> & intersected_pixels_id,
+      const std::vector<Index_t> & intersected_pixels_id,
       const std::vector<Real> & intersection_ratios,
       const std::vector<Eigen::Matrix<Real, DimM, 1>> & intersection_normals,
       MatPtr_t mat1, MatPtr_t mat2) {
@@ -97,7 +98,7 @@ namespace muSpectre {
   }
 
   /* ----------------------------------------------------------------------*/
-  template <Dim_t DimM, Formulation Form>
+  template <Index_t DimM, Formulation Form>
   template <class Strain>
   auto MaterialLaminate<DimM, Form>::evaluate_stress(
       const Eigen::MatrixBase<Strain> & E, const size_t & pixel_index) -> T2_t {
@@ -129,7 +130,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM, Formulation Form>
+  template <Index_t DimM, Formulation Form>
   template <class Strain>
   auto MaterialLaminate<DimM, Form>::evaluate_stress_tangent(
       const Eigen ::MatrixBase<Strain> & E, const size_t & pixel_index)

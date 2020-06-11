@@ -167,7 +167,7 @@ int small_sym(int argc, char * argv[]) {
 
   cell.get_strain().set_zero();
   cell.evaluate_stress_tangent();
-  auto Cref{cell.get_tangent().get_quad_pt_map(Dim * Dim).mean()};
+  auto Cref{cell.get_tangent().get_sub_pt_map(Dim * Dim).mean()};
   if (operator_kind == 0) {
     projector_ptr->reinitialise(Cref);
   }

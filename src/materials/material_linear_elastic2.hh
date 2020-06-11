@@ -56,13 +56,13 @@ namespace muSpectre {
   struct MaterialMuSpectre_traits<MaterialLinearElastic2<DimM>> {
     //! expected map type for strain fields
     using StrainMap_t =
-        muGrid::T2FieldMap<double, Mapping::Const, DimM, PixelSubDiv::QuadPt>;
+        muGrid::T2FieldMap<double, Mapping::Const, DimM, IterUnit::SubPt>;
     //! expected map type for stress fields
     using StressMap_t =
-        muGrid::T2FieldMap<double, Mapping::Mut, DimM, PixelSubDiv::QuadPt>;
+        muGrid::T2FieldMap<double, Mapping::Mut, DimM, IterUnit::SubPt>;
     //! expected map type for tangent stiffness fields
     using TangentMap_t =
-        muGrid::T4FieldMap<double, Mapping::Mut, DimM, PixelSubDiv::QuadPt>;
+        muGrid::T4FieldMap<double, Mapping::Mut, DimM, IterUnit::SubPt>;
 
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
@@ -143,7 +143,7 @@ namespace muSpectre {
     //! linear material without eigenstrain used to compute response
     MaterialLinearElastic1<DimM> material;
     //! storage for eigenstrain
-    muGrid::MappedT2Field<Real, Mapping::Const, DimM, PixelSubDiv::QuadPt>
+    muGrid::MappedT2Field<Real, Mapping::Const, DimM, IterUnit::SubPt>
         eigen_strains;
   };
 

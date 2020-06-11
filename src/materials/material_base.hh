@@ -194,7 +194,7 @@ namespace muSpectre {
     //! number of quadrature points assigned to this material
     inline Index_t size() const {
       return this->internal_fields->get_nb_pixels() *
-             this->internal_fields->get_nb_quad_pts();
+             this->internal_fields->get_nb_sub_pts(QuadPtTag);
     }
 
     /**
@@ -260,7 +260,7 @@ namespace muSpectre {
 
     //!< field holding the assigned ratios of the material
     std::unique_ptr<muGrid::MappedScalarField<Real, muGrid::Mapping::Mut,
-                                              PixelSubDiv::QuadPt>>
+                                              IterUnit::SubPt>>
         assigned_ratio{nullptr};
 
     bool is_initialised{false};

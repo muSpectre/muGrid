@@ -111,16 +111,17 @@ namespace muSpectre {
     using Strain_t = Eigen::Matrix<Real, mdim, mdim>;
 
     // create statefields
-    muGrid::LocalFieldCollection coll{sdim, Fix::NbQuadPts(), muGrid::Unknown};
+    muGrid::LocalFieldCollection coll{sdim};
+    coll.set_nb_sub_pts(QuadPtTag, Fix::NbQuadPts());
     coll.add_pixel({0});
     coll.initialise();
 
-    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim, PixelSubDiv::QuadPt>
-        F_{"previous gradient", coll};
-    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim, PixelSubDiv::QuadPt>
-        be_{"previous elastic strain", coll};
-    muGrid::MappedScalarStateField<Real, Mapping::Mut, PixelSubDiv::QuadPt>
-        eps_{"plastic flow", coll};
+    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim, IterUnit::SubPt> F_{
+        "previous gradient", coll, QuadPtTag};
+    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim, IterUnit::SubPt>
+        be_{"previous elastic strain", coll, QuadPtTag};
+    muGrid::MappedScalarStateField<Real, Mapping::Mut, IterUnit::SubPt> eps_{
+        "plastic flow", coll, QuadPtTag};
 
     auto & F_prev{F_.get_map()};
     F_prev[0].current() = Strain_t::Identity();
@@ -221,16 +222,17 @@ namespace muSpectre {
     using Stiffness_t = muGrid::T4Mat<Real, mdim>;
 
     // create statefields
-    muGrid::LocalFieldCollection coll{sdim, Fix::NbQuadPts(), muGrid::Unknown};
+    muGrid::LocalFieldCollection coll{sdim};
+    coll.set_nb_sub_pts(QuadPtTag, Fix::NbQuadPts());
     coll.add_pixel({0});
     coll.initialise();
 
-    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim, PixelSubDiv::QuadPt>
-        F_{"previous gradient", coll};
-    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim, PixelSubDiv::QuadPt>
-        be_{"previous elastic strain", coll};
-    muGrid::MappedScalarStateField<Real, Mapping::Mut, PixelSubDiv::QuadPt>
-        eps_{"plastic flow", coll};
+    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim, IterUnit::SubPt> F_{
+        "previous gradient", coll, QuadPtTag};
+    muGrid::MappedT2StateField<Real, Mapping::Mut, mdim, IterUnit::SubPt>
+        be_{"previous elastic strain", coll, QuadPtTag};
+    muGrid::MappedScalarStateField<Real, Mapping::Mut, IterUnit::SubPt> eps_{
+        "plastic flow", coll, QuadPtTag};
 
     auto & F_prev{F_.get_map()};
     F_prev[0].current() = Strain_t::Identity();

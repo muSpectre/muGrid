@@ -64,13 +64,13 @@ namespace muSpectre {
     auto field_collection{cell.get_fields().get_empty_clone()};
     // Corresponds to symbol δF or δε
     muGrid::MappedField<muGrid::FieldMap<Real, Mapping::Mut>> incrF_field{
-        "incrF", shape[0], shape[1], muGrid::PixelSubDiv::QuadPt,
-        field_collection};
+        "incrF",          shape[0], shape[1], IterUnit::SubPt,
+        field_collection, QuadPtTag};
 
     // field to store the rhs for cg calculations
     muGrid::MappedField<muGrid::FieldMap<Real, Mapping::Mut>> rhs_field{
-        "rhs", shape[0], shape[1], muGrid::PixelSubDiv::QuadPt,
-        field_collection};
+        "rhs",    shape[0], shape[1], IterUnit::SubPt, field_collection,
+        QuadPtTag};
 
     solver.initialise();
 
@@ -194,7 +194,7 @@ namespace muSpectre {
       // updating cell strain with the difference of the current and previous
       // strain input.
       for (auto && strain : muGrid::FieldMap<Real, Mapping::Mut>(
-               F, shape[0], muGrid::PixelSubDiv::QuadPt)) {
+               F, shape[0], muGrid::IterUnit::SubPt)) {
         strain += macro_strain - previous_macro_strain;
       }
 
@@ -339,18 +339,18 @@ namespace muSpectre {
     auto field_collection{cell.get_fields().get_empty_clone()};
     // Corresponds to symbol δF or δε
     muGrid::MappedField<muGrid::FieldMap<Real, Mapping::Mut>> incrF_field{
-        "incrF", shape[0], shape[1], muGrid::PixelSubDiv::QuadPt,
-        field_collection};
+        "incrF",          shape[0], shape[1], IterUnit::SubPt,
+        field_collection, QuadPtTag};
 
     // Corresponds to symbol ΔF or Δε
     muGrid::MappedField<muGrid::FieldMap<Real, Mapping::Mut>> DeltaF_field{
-        "DeltaF", shape[0], shape[1], muGrid::PixelSubDiv::QuadPt,
-        field_collection};
+        "DeltaF",           shape[0],         shape[1],
+        IterUnit::SubPt, field_collection, QuadPtTag};
 
     // field to store the rhs for cg calculations
     muGrid::MappedField<muGrid::FieldMap<Real, Mapping::Mut>> rhs_field{
-        "rhs", shape[0], shape[1], muGrid::PixelSubDiv::QuadPt,
-        field_collection};
+        "rhs",    shape[0], shape[1], IterUnit::SubPt, field_collection,
+        QuadPtTag};
     solver.initialise();
 
     size_t count_width{};
@@ -592,7 +592,7 @@ namespace muSpectre {
         // updating cell strain with the difference of the current and previous
         // strain input.
         for (auto && strain : muGrid::FieldMap<Real, Mapping::Mut>(
-                 F, shape[0], muGrid::PixelSubDiv::QuadPt)) {
+                 F, shape[0], muGrid::IterUnit::SubPt)) {
           strain += macro_strain - previous_macro_strain;
         }
 

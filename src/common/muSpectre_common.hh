@@ -85,7 +85,11 @@ namespace muSpectre {
   using muGrid::T4MatMap;
 
   using muGrid::Mapping;
-  using muGrid::PixelSubDiv;
+  using muGrid::IterUnit;
+
+  using muGrid::PixelTag;
+  const std::string QuadPtTag{"quad_point"};
+  const std::string NodalPtTag{"nodal_point"};
 
   namespace Tensors = ::muGrid::Tensors;
   namespace Matrices = ::muGrid::Matrices;

@@ -138,9 +138,9 @@ namespace muSpectre {
     }
 
     auto res_tup{fix::evaluate_stress_tangent()};
-    muGrid::T2FieldMap<Real, Mapping::Const, dim, PixelSubDiv::QuadPt> stress{
+    muGrid::T2FieldMap<Real, Mapping::Const, dim, IterUnit::SubPt> stress{
         std::get<0>(res_tup)};
-    muGrid::T4FieldMap<Real, Mapping::Const, dim, PixelSubDiv::QuadPt> tangent{
+    muGrid::T4FieldMap<Real, Mapping::Const, dim, IterUnit::SubPt> tangent{
         std::get<1>(res_tup)};
 
     auto tup = muGrid::testGoodies::objective_hooke_explicit(
@@ -193,9 +193,9 @@ namespace muSpectre {
     }
 
     auto res_tup{fix::evaluate_stress_tangent()};
-    muGrid::T2FieldMap<Real, Mapping::Const, dim, PixelSubDiv::QuadPt> stress{
+    muGrid::T2FieldMap<Real, Mapping::Const, dim, IterUnit::SubPt> stress{
         std::get<0>(res_tup)};
-    muGrid::T4FieldMap<Real, Mapping::Const, dim, PixelSubDiv::QuadPt> tangent{
+    muGrid::T4FieldMap<Real, Mapping::Const, dim, IterUnit::SubPt> tangent{
         std::get<1>(res_tup)};
 
     auto tup_hard{muGrid::testGoodies::objective_hooke_explicit(
@@ -298,12 +298,12 @@ namespace muSpectre {
     // compatible fields:
     const std::string compatible_name{"compatible"};
     auto & compatible_soft{
-        col_soft.register_real_field(compatible_name, 1, PixelSubDiv::QuadPt)};
+        col_soft.register_real_field(compatible_name, 1, QuadPtTag)};
     auto & compatible_hard{
-        col_hard.register_real_field(compatible_name, 1, PixelSubDiv::QuadPt)};
+        col_hard.register_real_field(compatible_name, 1, QuadPtTag)};
 
     auto pixler = [](auto & field) {
-      auto map{field.get_quad_pt_map()};
+      auto map{field.get_sub_pt_map()};
       for (auto && tup : map.enumerate_indices()) {
         const auto & quad_pt_id{std::get<0>(tup)};
         auto & val{std::get<1>(tup)};
@@ -316,7 +316,7 @@ namespace muSpectre {
     auto & global_compatible_field{
         this->globalise_real_internal_field(compatible_name)};
 
-    auto glo_map{global_compatible_field.get_quad_pt_map()};
+    auto glo_map{global_compatible_field.get_sub_pt_map()};
     for (auto && tup : glo_map.enumerate_indices()) {
       const auto & quad_pt_id{std::get<0>(tup)};
       const auto & val(std::get<1>(tup));
@@ -327,10 +327,10 @@ namespace muSpectre {
 
     // incompatible fields:
     const std::string incompatible_name{"incompatible"};
-    col_soft.register_real_field(incompatible_name, Dim, PixelSubDiv::QuadPt);
+    col_soft.register_real_field(incompatible_name, Dim, QuadPtTag);
 
     col_hard.register_real_field(incompatible_name, Dim + 1,
-                                 PixelSubDiv::QuadPt);
+                                 QuadPtTag);
     BOOST_CHECK_THROW(this->globalise_real_internal_field(incompatible_name),
                       std::runtime_error);
 
@@ -341,9 +341,9 @@ namespace muSpectre {
 
     // wrong scalar type:
     const std::string wrong_scalar_name{"wrong_scalar"};
-    col_soft.register_real_field(wrong_scalar_name, Dim, PixelSubDiv::QuadPt);
+    col_soft.register_real_field(wrong_scalar_name, Dim, QuadPtTag);
 
-    col_hard.register_int_field(wrong_scalar_name, Dim, PixelSubDiv::QuadPt);
+    col_hard.register_int_field(wrong_scalar_name, Dim, QuadPtTag);
     BOOST_CHECK_THROW(this->globalise_real_internal_field(wrong_scalar_name),
                       std::runtime_error);
   }
@@ -373,14 +373,14 @@ namespace muSpectre {
     // compatible fields:
     const std::string compatible_name{"compatible"};
     auto & compatible_soft{col_soft.register_real_state_field(
-        compatible_name, nb_steps_to_save, nb_dof, PixelSubDiv::QuadPt)};
+        compatible_name, nb_steps_to_save, nb_dof, QuadPtTag)};
     auto & compatible_hard{col_hard.register_real_state_field(
-        compatible_name, nb_steps_to_save, nb_dof, PixelSubDiv::QuadPt)};
+        compatible_name, nb_steps_to_save, nb_dof, QuadPtTag)};
 
     auto pixler = [](auto & state_field) {
       auto & field_current(
           muGrid::TypedField<Real>::safe_cast(state_field.current()));
-      auto map{field_current.get_quad_pt_map()};
+      auto map{field_current.get_sub_pt_map()};
       for (auto && tup : map.enumerate_indices()) {
         const auto & quad_pt_id{std::get<0>(tup)};
         auto & val{std::get<1>(tup)};
@@ -394,7 +394,7 @@ namespace muSpectre {
     auto & global_compatible_field_current{
         this->globalise_real_current_field(compatible_name)};
 
-    auto glo_map_current{global_compatible_field_current.get_quad_pt_map()};
+    auto glo_map_current{global_compatible_field_current.get_sub_pt_map()};
 
     for (auto && tup : glo_map_current.enumerate_indices()) {
       const auto & quad_pt_id{std::get<0>(tup)};
@@ -407,10 +407,10 @@ namespace muSpectre {
     // incompatible fields:
     const std::string incompatible_name{"incompatible"};
     col_soft.register_real_state_field(incompatible_name, nb_steps_to_save, Dim,
-                                       PixelSubDiv::QuadPt);
+                                       QuadPtTag);
 
     col_hard.register_real_state_field(incompatible_name, nb_steps_to_save,
-                                       Dim + 1, PixelSubDiv::QuadPt);
+                                       Dim + 1, QuadPtTag);
     BOOST_CHECK_THROW(this->globalise_real_current_field(incompatible_name),
                       std::runtime_error);
 
@@ -422,10 +422,10 @@ namespace muSpectre {
     // wrong scalar type:
     const std::string wrong_scalar_name{"wrong_scalar"};
     col_soft.register_real_state_field(wrong_scalar_name, nb_steps_to_save, Dim,
-                                       PixelSubDiv::QuadPt);
+                                       QuadPtTag);
 
     col_hard.register_int_state_field(wrong_scalar_name, nb_steps_to_save, Dim,
-                                      PixelSubDiv::QuadPt);
+                                      QuadPtTag);
     BOOST_CHECK_THROW(this->globalise_real_current_field(wrong_scalar_name),
                       std::runtime_error);
   }
@@ -455,14 +455,14 @@ namespace muSpectre {
     // compatible fields:
     const std::string compatible_name{"compatible"};
     auto & compatible_soft{col_soft.register_real_state_field(
-        compatible_name, nb_steps_to_save, nb_dof, PixelSubDiv::QuadPt)};
+        compatible_name, nb_steps_to_save, nb_dof, QuadPtTag)};
     auto & compatible_hard{col_hard.register_real_state_field(
-        compatible_name, nb_steps_to_save, nb_dof, PixelSubDiv::QuadPt)};
+        compatible_name, nb_steps_to_save, nb_dof, QuadPtTag)};
 
     auto pixler = [](auto & state_field) {
       auto & field_old(
           muGrid::TypedField<Real>::safe_cast(state_field.current()));
-      auto map{field_old.get_quad_pt_map()};
+      auto map{field_old.get_sub_pt_map()};
       for (auto && tup : map.enumerate_indices()) {
         const auto & quad_pt_id{std::get<0>(tup)};
         auto & val{std::get<1>(tup)};
@@ -479,7 +479,7 @@ namespace muSpectre {
     auto & global_compatible_field_old{
         this->globalise_real_old_field(compatible_name, nb_steps_to_save)};
 
-    auto glo_map_old{global_compatible_field_old.get_quad_pt_map()};
+    auto glo_map_old{global_compatible_field_old.get_sub_pt_map()};
 
     for (auto && tup : glo_map_old.enumerate_indices()) {
       const auto & quad_pt_id{std::get<0>(tup)};
@@ -492,9 +492,9 @@ namespace muSpectre {
     // incompatible fields:
     const std::string incompatible_name{"incompatible"};
     col_soft.register_real_state_field(incompatible_name, nb_steps_to_save, Dim,
-                                       PixelSubDiv::QuadPt);
+                                       QuadPtTag);
     col_hard.register_real_state_field(incompatible_name, nb_steps_to_save,
-                                       Dim + 1, PixelSubDiv::QuadPt);
+                                       Dim + 1, QuadPtTag);
 
     BOOST_CHECK_THROW(this->globalise_real_old_field(incompatible_name, 1),
                       std::runtime_error);
@@ -508,9 +508,9 @@ namespace muSpectre {
     // wrong scalar type:
     const std::string wrong_scalar_name{"wrong_scalar"};
     col_soft.register_real_state_field(wrong_scalar_name, nb_steps_to_save, Dim,
-                                       PixelSubDiv::QuadPt);
+                                       QuadPtTag);
     col_hard.register_int_state_field(wrong_scalar_name, nb_steps_to_save, Dim,
-                                      PixelSubDiv::QuadPt);
+                                      QuadPtTag);
 
     BOOST_CHECK_THROW(this->globalise_real_old_field(wrong_scalar_name, 1),
                       std::runtime_error);

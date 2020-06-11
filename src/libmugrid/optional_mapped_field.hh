@@ -55,8 +55,10 @@ namespace muGrid {
 
     //! constructor
     OptionalMappedField(FieldCollection & collection,
-                        const std::string & unique_name)
-        : collection{collection}, unique_name{unique_name} {}
+                        const std::string & unique_name,
+                        const std::string & sub_division_tag)
+        : collection{collection}, unique_name{unique_name},
+          sub_division_tag{sub_division_tag} {}
 
     //! Copy constructor
     OptionalMappedField(const OptionalMappedField & other) = delete;
@@ -82,8 +84,8 @@ namespace muGrid {
      */
     MappedField & get() {
       if (not this->field_exists) {
-        this->mapped_field =
-            std::make_unique<MappedField>(this->unique_name, this->collection);
+        this->mapped_field = std::make_unique<MappedField>(
+            this->unique_name, this->collection, this->sub_division_tag);
         this->field_exists = true;
       }
       return *this->mapped_field;
@@ -94,6 +96,7 @@ namespace muGrid {
 
     FieldCollection & collection;
     std::string unique_name;
+    std::string sub_division_tag;
 
     std::unique_ptr<MappedField> mapped_field{nullptr};
   };

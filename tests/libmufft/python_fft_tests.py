@@ -221,10 +221,9 @@ class FFT_Check(unittest.TestCase):
                 global_out_ref = np.fft.fftn(global_in_arr.T, axes=axes).T
                 out_ref = global_out_ref[(..., *engine.fourier_slices)]
 
-                fc = muGrid.GlobalFieldCollection(len(nb_grid_pts), 1, 1)
+                fc = muGrid.GlobalFieldCollection(len(nb_grid_pts))
                 fc.initialise(tuple(engine.nb_subdomain_grid_pts))
-                in_field = fc.register_real_field('in_field', np.prod(dims),
-                                                  muGrid.PixelSubDiv.QuadPt)
+                in_field = fc.register_real_field('in_field', np.prod(dims))
                 in_field.array(dims, muGrid.Pixel)[...] = global_in_arr[
                     (..., *engine.subdomain_slices)]
 
@@ -280,10 +279,9 @@ class FFT_Check(unittest.TestCase):
                 fourier_field.array(dims, muGrid.Pixel)[...] = \
                     global_in_arr[(..., *engine.fourier_slices)]
 
-                fc = muGrid.GlobalFieldCollection(len(nb_grid_pts), 1, 1)
+                fc = muGrid.GlobalFieldCollection(len(nb_grid_pts))
                 fc.initialise(tuple(engine.nb_subdomain_grid_pts))
-                out_field = fc.register_real_field('out_field', np.prod(dims),
-                                                   muGrid.PixelSubDiv.Pixel)
+                out_field = fc.register_real_field('out_field', np.prod(dims))
 
                 # Separately test convenience interface
                 engine.ifft(fourier_field, out_field)

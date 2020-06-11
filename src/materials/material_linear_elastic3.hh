@@ -55,14 +55,14 @@ namespace muSpectre {
   struct MaterialMuSpectre_traits<MaterialLinearElastic3<DimM>> {
     //! expected map type for strain fields
     using StrainMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Const, DimM, PixelSubDiv::QuadPt>;
+        muGrid::T2FieldMap<Real, Mapping::Const, DimM, IterUnit::SubPt>;
     //! expected map type for stress fields
     using StressMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>;
+        muGrid::T2FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
 
     //! expected map type for tangent stiffness fields
     using TangentMap_t =
-        muGrid::T4FieldMap<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>;
+        muGrid::T4FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
 
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
@@ -97,7 +97,7 @@ namespace muSpectre {
 
     //! short hand for storage type of elastic tensors
     using StiffnessField_t =
-        muGrid::MappedT4Field<Real, Mapping::Const, DimM, PixelSubDiv::QuadPt>;
+        muGrid::MappedT4Field<Real, Mapping::Const, DimM, IterUnit::SubPt>;
 
     //! Default constructor
     MaterialLinearElastic3() = delete;

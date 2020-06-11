@@ -201,10 +201,10 @@ namespace muSpectre {
                 std::remove_cv_t<StressFieldTup>(proxy.stress_tup))},
             index{begin ? 0 : size_t(proxy.material.size())},
             quad_pt_iter{begin ? proxy.material.get_collection()
-                                     .get_quad_pt_indices()
+                                     .get_sub_pt_indices(QuadPtTag)
                                      .begin()
                                : proxy.material.get_collection()
-                                     .get_quad_pt_indices()
+                                     .get_sub_pt_indices(QuadPtTag)
                                      .end()} {}
 
       //! Copy constructor

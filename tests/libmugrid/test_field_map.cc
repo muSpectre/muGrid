@@ -74,7 +74,7 @@ namespace muGrid {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(static_size_test, Fix, Maps, Fix) {
     using StaticMap_t = MatrixFieldMap<typename Fix::type, Mapping::Const,
-                                       Fix::Dim, Fix::Dim, PixelSubDiv::QuadPt>;
+                                       Fix::Dim, Fix::Dim, IterUnit::SubPt>;
     StaticMap_t static_map{Fix::matrix_field};
     for (auto && iterate : Fix::matrix_pixel) {
       iterate.setRandom();
@@ -89,7 +89,7 @@ namespace muGrid {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(static_size_test_pixels, Fix, Maps, Fix) {
     using StaticMatrixMap_t =
         MatrixFieldMap<typename Fix::type, Mapping::Const, Fix::Dim,
-                       Fix::Dim * Fix::NbQuadPts, PixelSubDiv::Pixel>;
+                       Fix::Dim * Fix::NbQuadPts, IterUnit::Pixel>;
     StaticMatrixMap_t static_map{Fix::matrix_field};
     for (auto && iterate : Fix::matrix_pixel) {
       iterate.setRandom();
@@ -101,7 +101,7 @@ namespace muGrid {
     }
 
     using ScalarMap_t =
-        ScalarFieldMap<typename Fix::type, Mapping::Mut, PixelSubDiv::QuadPt>;
+        ScalarFieldMap<typename Fix::type, Mapping::Mut, IterUnit::SubPt>;
     ScalarMap_t scalar_map{Fix::scalar_field};
 
     for (auto && tup : akantu::zip(Fix::scalar_quad, scalar_map)) {
@@ -119,10 +119,10 @@ namespace muGrid {
     // testing array map and t2 map
     using StaticArrayMap_t =
         ArrayFieldMap<typename Fix::type, Mapping::Const, Fix::Dim, Fix::Dim,
-                      PixelSubDiv::QuadPt>;
+                      IterUnit::SubPt>;
     StaticArrayMap_t array_map{Fix::matrix_field};
     using T2Map_t = T2FieldMap<typename Fix::type, Mapping::Const, Fix::Dim,
-                               PixelSubDiv::QuadPt>;
+                               IterUnit::SubPt>;
     T2Map_t t2_map{Fix::matrix_field};
 
     for (auto && tup : akantu::zip(array_map, t2_map)) {
@@ -133,11 +133,11 @@ namespace muGrid {
     // testing t4 map
     using StaticMatrix4Map_t =
         MatrixFieldMap<typename Fix::type, Mapping::Const, Fix::Dim * Fix::Dim,
-                       Fix::Dim * Fix::Dim, PixelSubDiv::QuadPt>;
+                       Fix::Dim * Fix::Dim, IterUnit::SubPt>;
     StaticMatrix4Map_t matrix4_map{Fix::T4_field};
 
     using T4Map_t = T4FieldMap<typename Fix::type, Mapping::Mut, Fix::Dim,
-                               PixelSubDiv::QuadPt>;
+                               IterUnit::SubPt>;
     T4Map_t t4_map{Fix::T4_field};
     Fix::T4_field.eigen_vec().setRandom();
 
@@ -165,7 +165,8 @@ namespace muGrid {
                       FieldMapError);
 
     for (auto && tup :
-         akantu::zip(Fix::fc.get_quad_pt_indices(), Fix::scalar_quad)) {
+         akantu::zip(Fix::fc.get_sub_pt_indices(this->sub_division_tag()),
+                     Fix::scalar_quad)) {
       const auto & i{std::get<0>(tup)};
       auto iterate{std::get<1>(tup)};
       iterate(0, 0) = i;
@@ -190,10 +191,10 @@ namespace muGrid {
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(static_enumeration_test, Fix, Maps, Fix) {
-    ScalarFieldMap<typename Fix::type, Mapping::Const, PixelSubDiv::QuadPt>
+    ScalarFieldMap<typename Fix::type, Mapping::Const, IterUnit::SubPt>
         static_scalar_quad{Fix::scalar_field};
     MatrixFieldMap<typename Fix::type, Mapping::Const, Fix::NbQuadPts, 1,
-                   PixelSubDiv::Pixel>
+                   IterUnit::Pixel>
         static_scalar_pixel{Fix::scalar_field};
     for (auto && tup :
          akantu::zip(Fix::fc.get_pixel_indices(), Fix::scalar_pixel)) {
@@ -208,7 +209,8 @@ namespace muGrid {
     }
 
     for (auto && tup :
-         akantu::zip(Fix::fc.get_quad_pt_indices(), Fix::scalar_quad)) {
+         akantu::zip(Fix::fc.get_sub_pt_indices(this->sub_division_tag()),
+                     Fix::scalar_quad)) {
       const auto & i{std::get<0>(tup)};
       auto iterate{std::get<1>(tup)};
       iterate(0, 0) = i;
@@ -239,17 +241,11 @@ namespace muGrid {
     const auto nb_pix{this->fc.get_nb_pixels()};
     BOOST_CHECK_EQUAL(this->pixel_field.size(), nb_pix);
     BOOST_CHECK_EQUAL(this->quad_pt_field.size(),
-                      nb_pix * this->fc.get_nb_quad_pts());
-    BOOST_CHECK_EQUAL(this->nodal_pt_field.size(),
-                      nb_pix * this->fc.get_nb_nodal_pts());
-    BOOST_CHECK_EQUAL(this->free_pt_field.size(), nb_pix * this->NbFreeSubDiv);
-
+                      nb_pix * this->fc.get_nb_sub_pts(sub_division_tag()));
     BOOST_CHECK_EQUAL(this->pixel_quad_pt_map.size(), nb_pix);
-    BOOST_CHECK_EQUAL(this->pixel_nodal_pt_map.size(), nb_pix);
-    BOOST_CHECK_EQUAL(this->pixel_free_pt_map.size(), nb_pix);
 
     FieldMap<Real, Mapping::Mut> new_pix_quad{this->quad_pt_field,
-                                              PixelSubDiv::Pixel};
+                                              IterUnit::Pixel};
     std::cout << new_pix_quad.size();
 
     // check correctness of random access
@@ -272,48 +268,6 @@ namespace muGrid {
       const auto && quad_id{i / this->NbComponent};
       const auto && quad_i{i % this->NbComponent};
       BOOST_CHECK_EQUAL(eigen_quad(i), this->quad_pt_map[quad_id](quad_i));
-    }
-
-    auto && eigen_node{this->nodal_pt_field.eigen_vec()};
-    eigen_node.setRandom();
-    BOOST_CHECK_EQUAL(this->pixel_nodal_pt_map[0].rows(), this->NbComponent);
-    BOOST_CHECK_EQUAL(this->pixel_nodal_pt_map[0].cols(), this->NbNodalPts);
-    BOOST_CHECK_EQUAL(this->nodal_pt_map[0].rows(), this->NbComponent);
-    BOOST_CHECK_EQUAL(this->nodal_pt_map[0].cols(), 1);
-    for (Dim_t i{0}; i < nb_pix * this->NbNodalPts * this->NbComponent; ++i) {
-      const auto && pix_id{i / (this->NbNodalPts * this->NbComponent)};
-      const auto && pix_id_with_array{i %
-                                      (this->NbNodalPts * this->NbComponent)};
-      const auto && pix_i{pix_id_with_array % this->NbComponent};
-      const auto && pix_j{pix_id_with_array / this->NbComponent};
-      Eigen::MatrixXd pix_val{this->pixel_nodal_pt_map[pix_id]};
-
-      BOOST_CHECK_EQUAL(eigen_node(i), pix_val(pix_i, pix_j));
-
-      const auto && node_id{i / this->NbComponent};
-      const auto && node_i{i % this->NbComponent};
-      BOOST_CHECK_EQUAL(eigen_node(i), this->nodal_pt_map[node_id](node_i));
-    }
-
-    auto && eigen_free{this->free_pt_field.eigen_vec()};
-    eigen_free.setRandom();
-    BOOST_CHECK_EQUAL(this->pixel_free_pt_map[0].rows(), this->NbComponent);
-    BOOST_CHECK_EQUAL(this->pixel_free_pt_map[0].cols(), this->NbFreeSubDiv);
-    BOOST_CHECK_EQUAL(this->free_pt_map[0].rows(), this->NbComponent);
-    BOOST_CHECK_EQUAL(this->free_pt_map[0].cols(), 1);
-    for (Dim_t i{0}; i < nb_pix * this->NbFreeSubDiv * this->NbComponent; ++i) {
-      const auto && pix_id{i / (this->NbFreeSubDiv * this->NbComponent)};
-      const auto && pix_id_with_array{i %
-                                      (this->NbFreeSubDiv * this->NbComponent)};
-      const auto && pix_i{pix_id_with_array % this->NbComponent};
-      const auto && pix_j{pix_id_with_array / this->NbComponent};
-      Eigen::MatrixXd pix_val{this->pixel_free_pt_map[pix_id]};
-
-      BOOST_CHECK_EQUAL(eigen_free(i), pix_val(pix_i, pix_j));
-
-      const auto && free_id{i / this->NbComponent};
-      const auto && free_i{i % this->NbComponent};
-      BOOST_CHECK_EQUAL(eigen_free(i), this->free_pt_map[free_id](free_i));
     }
   }
 

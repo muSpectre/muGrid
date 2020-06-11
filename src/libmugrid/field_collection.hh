@@ -95,6 +95,8 @@ namespace muGrid {
    public:
     //! unique_ptr for holding fields
     using Field_ptr = std::unique_ptr<Field, FieldDestructor<Field>>;
+    //! map to hold nb_sub_pts by tag
+    using SubPtMap_t = std::map<std::string, Index_t>;
     //! unique_ptr for holding state fields
     using StateField_ptr =
         std::unique_ptr<StateField, FieldDestructor<StateField>>;
@@ -114,12 +116,9 @@ namespace muGrid {
      * @param spatial_dimension spatial dimension of the field (can be
      *                    muGrid::Unknown, e.g., in the case of the local fields
      *                    for storing internal material variables)
-     * @param nb_quad_pts number of quadrature points per pixel/voxel
-     * @param nb_nodal_pts number of nodes per pixel/voxel
      */
     FieldCollection(ValidityDomain domain, const Index_t & spatial_dimension,
-                    const Index_t & nb_quad_pts,
-                    const Index_t & nb_nodal_pts = 1);
+                    const SubPtMap_t & nb_sub_pts);
 
    public:
     //! Default constructor
@@ -149,16 +148,16 @@ namespace muGrid {
      * scalar field)
      */
     template <typename T>
-    TypedField<T> & register_field(const std::string & unique_name,
-                                   const Index_t & nb_dof_per_sub_pt,
-                                   const PixelSubDiv & sub_division,
-                                   const Unit & unit = Unit::unitless(),
-                                   const Index_t & nb_sub_pts = Unknown) {
+    TypedField<T> &
+    register_field(const std::string & unique_name,
+                   const Index_t & nb_dof_per_sub_pt,
+                   const std::string & sub_division_tag = PixelTag,
+                   const Unit & unit = Unit::unitless()) {
       static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
                     "You can only register fields templated with one of the "
                     "numeric types Real, Complex, Int, or UInt");
       return this->register_field_helper<T>(unique_name, nb_dof_per_sub_pt,
-                                            sub_division, unit, nb_sub_pts);
+                                            sub_division_tag, unit);
     }
 
     /**
@@ -170,10 +169,11 @@ namespace muGrid {
      * point (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a
      * scalar field)
      */
-    TypedField<Real> & register_real_field(
-        const std::string & unique_name, const Index_t & nb_dof_per_sub_pt,
-        const PixelSubDiv & sub_division, const Unit & unit = Unit::unitless(),
-        const Index_t & nb_sub_pts = Unknown);
+    TypedField<Real> &
+    register_real_field(const std::string & unique_name,
+                        const Index_t & nb_dof_per_sub_pt,
+                        const std::string & sub_division_tag = PixelTag,
+                        const Unit & unit = Unit::unitless());
     /**
      * place a new complex-valued field  in the responsibility of this
      * collection (Note, because fields have protected constructors, users can't
@@ -183,10 +183,11 @@ namespace muGrid {
      * point (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a
      * scalar field)
      */
-    TypedField<Complex> & register_complex_field(
-        const std::string & unique_name, const Index_t & nb_dof_per_sub_pt,
-        const PixelSubDiv & sub_division, const Unit & unit = Unit::unitless(),
-        const Index_t & nb_sub_pts = Unknown);
+    TypedField<Complex> &
+    register_complex_field(const std::string & unique_name,
+                           const Index_t & nb_dof_per_sub_pt,
+                           const std::string & sub_division_tag = PixelTag,
+                           const Unit & unit = Unit::unitless());
     /**
      * place a new integer-valued field  in the responsibility of this
      * collection (Note, because fields have protected constructors, users can't
@@ -196,11 +197,11 @@ namespace muGrid {
      * point (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a
      * scalar field)
      */
-    TypedField<Int> & register_int_field(const std::string & unique_name,
-                                         const Index_t & nb_dof_per_sub_pt,
-                                         const PixelSubDiv & sub_division,
-                                         const Unit & unit = Unit::unitless(),
-                                         const Index_t & nb_sub_pts = Unknown);
+    TypedField<Int> &
+    register_int_field(const std::string & unique_name,
+                       const Index_t & nb_dof_per_sub_pt,
+                       const std::string & sub_division_tag = PixelTag,
+                       const Unit & unit = Unit::unitless());
     /**
      * place a new unsigned integer-valued field  in the responsibility of this
      * collection (Note, because fields have protected constructors, users can't
@@ -210,28 +211,29 @@ namespace muGrid {
      * point (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a
      * scalar field)
      */
-    TypedField<Uint> & register_uint_field(
-        const std::string & unique_name, const Index_t & nb_dof_per_sub_pt,
-        const PixelSubDiv & sub_division, const Unit & unit = Unit::unitless(),
-        const Index_t & nb_sub_pts = Unknown);
+    TypedField<Uint> &
+    register_uint_field(const std::string & unique_name,
+                        const Index_t & nb_dof_per_sub_pt,
+                        const std::string & sub_division_tag = PixelTag,
+                        const Unit & unit = Unit::unitless());
 
     /**
      * place a new state field in the responsibility of this collection (Note,
      * because state fields have protected constructors, users can't create them
      */
     template <typename T>
-    TypedStateField<T> & register_state_field(
-        const std::string & unique_prefix, const Index_t & nb_memory,
-        const Index_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
-        const Unit & unit = Unit::unitless(),
-        const Index_t & nb_sub_pts = Unknown) {
+    TypedStateField<T> &
+    register_state_field(const std::string & unique_prefix,
+                         const Index_t & nb_memory,
+                         const Index_t & nb_dof_per_sub_pt,
+                         const std::string & sub_division_tag = PixelTag,
+                         const Unit & unit = Unit::unitless()) {
       static_assert(
           std::is_scalar<T>::value or std::is_same<T, Complex>::value,
           "You can only register state fields templated with one of the "
           "numeric types Real, Complex, Int, or UInt");
       return this->register_state_field_helper<T>(
-          unique_prefix, nb_memory, nb_dof_per_sub_pt, sub_division, unit,
-          nb_sub_pts);
+          unique_prefix, nb_memory, nb_dof_per_sub_pt, sub_division_tag, unit);
     }
 
     /**
@@ -244,11 +246,12 @@ namespace muGrid {
      * @param nb_dof_per_sub_pt number of scalar components to store per
      * quadrature point
      */
-    TypedStateField<Real> & register_real_state_field(
-        const std::string & unique_prefix, const Index_t & nb_memory,
-        const Index_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
-        const Unit & unit = Unit::unitless(),
-        const Index_t & nb_sub_pts = Unknown);
+    TypedStateField<Real> &
+    register_real_state_field(const std::string & unique_prefix,
+                              const Index_t & nb_memory,
+                              const Index_t & nb_dof_per_sub_pt,
+                              const std::string & sub_division_tag = PixelTag,
+                              const Unit & unit = Unit::unitless());
 
     /**
      * place a new complex-valued state field in the responsibility of this
@@ -262,9 +265,9 @@ namespace muGrid {
      */
     TypedStateField<Complex> & register_complex_state_field(
         const std::string & unique_prefix, const Index_t & nb_memory,
-        const Index_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
-        const Unit & unit = Unit::unitless(),
-        const Index_t & nb_sub_pts = Unknown);
+        const Index_t & nb_dof_per_sub_pt,
+        const std::string & sub_division_tag = PixelTag,
+        const Unit & unit = Unit::unitless());
 
     /**
      * place a new integer-valued state field in the responsibility of this
@@ -276,11 +279,12 @@ namespace muGrid {
      * @param nb_dof_per_sub_pt number of scalar components to store per
      * quadrature point
      */
-    TypedStateField<Int> & register_int_state_field(
-        const std::string & unique_prefix, const Index_t & nb_memory,
-        const Index_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
-        const Unit & unit = Unit::unitless(),
-        const Index_t & nb_sub_pts = Unknown);
+    TypedStateField<Int> &
+    register_int_state_field(const std::string & unique_prefix,
+                             const Index_t & nb_memory,
+                             const Index_t & nb_dof_per_sub_pt,
+                             const std::string & sub_division_tag = PixelTag,
+                             const Unit & unit = Unit::unitless());
 
     /**
      * place a new unsigned integer-valued state field in the responsibility of
@@ -292,11 +296,12 @@ namespace muGrid {
      * @param nb_dof_per_sub_pt number of scalar components to store per
      * quadrature point
      */
-    TypedStateField<Uint> & register_uint_state_field(
-        const std::string & unique_prefix, const Index_t & nb_memory,
-        const Index_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
-        const Unit & unit = Unit::unitless(),
-        const Index_t & nb_sub_pts = Unknown);
+    TypedStateField<Uint> &
+    register_uint_state_field(const std::string & unique_prefix,
+                              const Index_t & nb_memory,
+                              const Index_t & nb_dof_per_sub_pt,
+                              const std::string & sub_division_tag = PixelTag,
+                              const Unit & unit = Unit::unitless());
 
     //! check whether a field of name 'unique_name' has already been
     //! registered
@@ -310,38 +315,27 @@ namespace muGrid {
     Index_t get_nb_pixels() const;
 
     /**
-     * check whether the number of quadrature points per pixel/voxel has been
-     * set
+     * Check whether the number of subdivision points peir pixel/voxel has been
+     * set for a given tags
      */
-    bool has_nb_quad_pts() const;
+    bool has_nb_sub_pts(const std::string & tag) const;
 
     /**
-     * check whether the number of nodal points per pixel/voxel has been
-     * set
+     * set the number of sub points per pixel/voxel for a given tag. Can only be
+     * done once per tag
      */
-    bool has_nb_nodal_pts() const;
+
+    void set_nb_sub_pts(const std::string & tag,
+                        const Index_t & nb_sub_pts_per_pixel);
 
     /**
-     * set the number of quadrature points per pixel/voxel. Can only be done
-     * once.
+     * return the number of subpoints per pixel/voxel for a given tag
      */
-    void set_nb_quad_pts(const Index_t & nb_quad_pts_per_pixel);
-
+    const Index_t & get_nb_sub_pts(const std::string & tag);
     /**
-     * set the number of nodal points per pixel/voxel. Can only be done
-     * once.
+     * return the number of subpoints per pixel/voxel for a given tag
      */
-    void set_nb_nodal_pts(const Index_t & nb_quad_pts_per_pixel);
-
-    /**
-     * return the number of quadrature points per pixel
-     */
-    const Index_t & get_nb_quad_pts() const;
-
-    /**
-     * return the number of nodal points per pixel
-     */
-    const Index_t & get_nb_nodal_pts() const;
+    const Index_t & get_nb_sub_pts(const std::string & tag) const;
 
     /**
      * return the spatial dimension of the underlying discretisation grid
@@ -377,7 +371,7 @@ namespace muGrid {
      * return an iterable proxy to the collection which allows to iterate over
      * the indices fo the collection's quadrature points
      */
-    IndexIterable get_quad_pt_indices() const;
+    IndexIterable get_sub_pt_indices(const std::string & tag) const;
 
     std::vector<size_t> get_pixel_ids() { return this->pixel_indices; }
 
@@ -404,39 +398,39 @@ namespace muGrid {
      * run-time checker for nb_sub_pts: checks whether the number of sub-points
      * (e.g., quadrature points) is compatible with the sub-division scheme).
      * Attention: this does allow `Unknown`  as valid values for
-     * `PixelSubDiv::QuadPt` and `PixelSubDiv::NodalPt`, since these values can
+     * `IterUnit::SubPt`, if the tag is defined, since these values can
      * be specified for the entire FieldCollection at a later point, before
      * initialisation. Hence, this function cannot be used for checking
      * nb_sub_pts for iterators, which need a known value. Use
      * `check_initialised_nb_sub_pts()` instead for that.
      */
     Index_t check_nb_sub_pts(const Index_t & nb_sub_pts,
-                             const PixelSubDiv & iteration_type) const;
+                             const IterUnit & iteration_type,
+                             const std::string & tag) const;
 
     /**
      * run-time checker for nb_sub_pts: checks whether the number of sub-points
      * (e.g., quadrature points) is compatible with the sub-division scheme),
      * and set to a positive integer value (i.e., not `Unknown`).
      */
-    size_t
-    check_initialised_nb_sub_pts(const Index_t & nb_sub_pts,
-                                 const PixelSubDiv & iteration_type) const;
+    size_t check_initialised_nb_sub_pts(const Index_t & nb_sub_pts,
+                                        const IterUnit & iteration_type,
+                                        const std::string & tag) const;
 
    protected:
     //! internal worker function called by register_<T>_field
     template <typename T>
     TypedField<T> & register_field_helper(const std::string & unique_name,
                                           const Index_t & nb_dof_per_sub_pt,
-                                          const PixelSubDiv & sub_division,
-                                          const Unit & unit,
-                                          const Index_t & nb_sub_pts);
+                                          const std::string & sub_division_tag,
+                                          const Unit & unit);
 
     //! internal worker function called by register_<T>_state_field
     template <typename T>
     TypedStateField<T> & register_state_field_helper(
         const std::string & unique_prefix, const Index_t & nb_memory,
-        const Index_t & nb_dof_per_sub_pt, const PixelSubDiv & sub_division,
-        const Unit & unit, const Index_t & nb_sub_pts);
+        const Index_t & nb_dof_per_sub_pt, const std::string & sub_division_tag,
+        const Unit & unit);
 
     /**
      * loop through all fields and allocate their memory. Is exclusively
@@ -460,10 +454,10 @@ namespace muGrid {
     ValidityDomain domain;
     //! spatial dimension
     Index_t spatial_dim;
-    //! number of quadrature points per pixel/voxel
-    Index_t nb_quad_pts;
-    //! number of quadrature points per pixel/voxel
-    Index_t nb_nodal_pts;
+
+    //! number of subpoints per pixel/voxel, stored by tag
+    SubPtMap_t nb_sub_pts;
+
     //! total number of pixels
     Index_t nb_pixels{Unknown};
     //! keeps track of whether the collection has already been initialised
@@ -567,17 +561,26 @@ namespace muGrid {
      * `muGrid::FieldCollection::IndexIterable`s
      */
     friend FieldCollection;
-    //! Constructor is protected, because no one ever need to construct this
-    //! except the fieldcollection
-    IndexIterable(const FieldCollection & collection,
-                  const PixelSubDiv & iteration_type,
+
+    /**
+     * Constructor is protected, because no one ever need to construct this
+     * except the fieldcollection. Constructor for sub_point iteration
+     */
+    IndexIterable(const FieldCollection & collection, const std::string & tag,
                   const Index_t & stride = Unknown);
+
+    /**
+     * Constructor is protected, because no one ever need to construct this
+     * except the fieldcollection. Constructor for pixel iteration
+     */
+    explicit IndexIterable(const FieldCollection & collection,
+                           const Index_t & stride = Unknown);
 
     //! reference back to the proxied collection
     const FieldCollection & collection;
 
     //! whether to iterate over pixels or quadrature points
-    const PixelSubDiv iteration_type;
+    const IterUnit iteration_type;
 
     //! stride for the slow moving index
     size_t stride;

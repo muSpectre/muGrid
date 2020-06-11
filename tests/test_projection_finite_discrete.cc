@@ -44,7 +44,7 @@
 #include <Eigen/Dense>
 
 using muFFT::DiscreteDerivative;
-using muGrid::PixelSubDiv;
+using muGrid::IterUnit;
 
 namespace muSpectre {
 
@@ -403,23 +403,24 @@ namespace muSpectre {
         "identical");
     using Fields = muGrid::GlobalFieldCollection;
     using FieldMap = muGrid::MatrixFieldMap<Real, Mapping::Mut, mdim,
-                                            mdim * nb_quad, PixelSubDiv::Pixel>;
-    using FieldMap1D = muGrid::MatrixFieldMap<Real, Mapping::Mut, 1, mdim,
-                                              PixelSubDiv::QuadPt>;
+                                            mdim * nb_quad, IterUnit::Pixel>;
+    using FieldMap1D =
+        muGrid::MatrixFieldMap<Real, Mapping::Mut, 1, mdim, IterUnit::SubPt>;
     using Vector = Eigen::Matrix<Real, dim, 1>;
 
     Gradient_t gradient{fix::GradientGiver::get_gradient()};
 
-    Fields fields{sdim, nb_quad, muGrid::Unknown};
+    Fields fields{sdim};
+    fields.set_nb_sub_pts(QuadPtTag, nb_quad);
     // displacement field
     muGrid::RealField & f_disp{
-        fields.register_real_field("displacement", mdim, PixelSubDiv::QuadPt)};
+        fields.register_real_field("displacement", mdim, QuadPtTag)};
     // gradient of the displacement field
-    muGrid::RealField & f_grad{fields.register_real_field(
-        "gradient", mdim * mdim, PixelSubDiv::QuadPt)};
+    muGrid::RealField & f_grad{
+        fields.register_real_field("gradient", mdim * mdim, QuadPtTag)};
     // field for comparision
-    muGrid::RealField & f_var{fields.register_real_field(
-        "working field", mdim * mdim, PixelSubDiv::QuadPt)};
+    muGrid::RealField & f_var{
+        fields.register_real_field("working field", mdim * mdim, QuadPtTag)};
 
     FieldMap1D disp(f_disp);
     FieldMap grad(f_grad);
@@ -518,15 +519,15 @@ namespace muSpectre {
         nb_quad{fix::nb_quad};
     using Fields = muGrid::GlobalFieldCollection;
     using FieldMap = muGrid::MatrixFieldMap<Real, Mapping::Mut, mdim, mdim,
-                                            PixelSubDiv::QuadPt>;
+                                            IterUnit::SubPt>;
     using Vector = Eigen::Matrix<Real, dim, 1>;
 
-    Fields fields{sdim, nb_quad, muGrid::Unknown};
+    Fields fields{sdim};
+    fields.set_nb_sub_pts(QuadPtTag, nb_quad);
     muGrid::RealField & f_grad{
-        fields.register_real_field("gradient", mdim * mdim,
-                                            PixelSubDiv::QuadPt)};
-    muGrid::RealField & f_grad_test{fields.register_real_field(
-        "gradient_test", mdim * mdim, PixelSubDiv::QuadPt)};
+        fields.register_real_field("gradient", mdim * mdim, QuadPtTag)};
+    muGrid::RealField & f_grad_test{
+        fields.register_real_field("gradient_test", mdim * mdim, QuadPtTag)};
     FieldMap grad(f_grad);
     FieldMap grad_test(f_grad_test);
 

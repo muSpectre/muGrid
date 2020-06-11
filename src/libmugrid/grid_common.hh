@@ -85,16 +85,19 @@ namespace muGrid {
    * to pixels, quadrature points, or nodal points. Uised in `FieldMap`s  to
    * specify whether to iterate over pixels, quadrature points, or nodal points
    */
-  enum class PixelSubDiv {
+  enum class IterUnit {
     Pixel,    //!< dofs relative to a pixel/voxel, no subdivision
-    QuadPt,   //!< dofs relative to material points (e.g. quadrature points)
-    NodalPt,  //!< dofs relative to discretisation nodes
-    FreePt    //!< dofs relative to some custom subdivision
+    SubPt     //!< dofs relative to sub-points (e.g. quadrature points)
   };
 
-  //! inserts `muGrid::PixelSubDiv` into `std::ostream`s
-  std::ostream & operator<<(std::ostream & os,
-                            const PixelSubDiv & sub_division);
+  /**
+   * this tag is always defined to one in every field collection 
+   */
+  const std::string PixelTag{"pixel"};
+
+  //! inserts `muGrid::IterUnit` into `std::ostream`s
+  std::ostream &
+  operator<<(std::ostream & os, const IterUnit & sub_division);
 
   /**
    * Maps can give constant or mutable access to the mapped field through their

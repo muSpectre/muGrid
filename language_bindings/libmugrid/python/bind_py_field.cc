@@ -76,7 +76,7 @@ template <class T>
 void add_typed_field(py::module & mod, std::string name) {
   auto && array_computer = [](TypedFieldBase<T> & self,
                               const std::vector<Index_t> & shape,
-                              const muGrid::PixelSubDiv & it) {
+                              const muGrid::IterUnit & it) {
     // py_class will be passed as the `base` class to the array
     // constructors below. This ties the lifetime of the array that does
     // not own its own data to the field object. (Without this
@@ -100,13 +100,7 @@ void add_typed_field(py::module & mod, std::string name) {
     auto && nb_dof_per_sub_pt{self.get_nb_dof_per_sub_pt()};
 
     switch (it) {
-    case muGrid::PixelSubDiv::FreePt: {
-      // fall-through, treatment like all subdivided pixels
-    }
-    case muGrid::PixelSubDiv::QuadPt: {
-      // fall-through, treatment like all subdivided pixels
-    }
-    case muGrid::PixelSubDiv::NodalPt: {
+    case muGrid::IterUnit::SubPt: {
       // If shape is not given, we just return column vectors with the
       // components
       if (dim == 0) {
@@ -126,7 +120,7 @@ void add_typed_field(py::module & mod, std::string name) {
       stride *= nb_sub_pts;
       break;
     }
-    case muGrid::PixelSubDiv::Pixel: {
+    case muGrid::IterUnit::Pixel: {
       // If shape is not given, we just return column vectors with the
       // components
       if (dim == 0) {
@@ -183,24 +177,26 @@ void add_typed_field(py::module & mod, std::string name) {
         if (not coll.is_initialised()) {
           throw RuntimeError("Field collection isn't initialised yet");
         }
+        auto subdivision{muGrid::IterUnit::SubPt};
         return py::buffer_info(
-            self.data(), self.get_shape(self.get_sub_division()),
-            self.get_strides(self.get_sub_division(), sizeof(T)));
+            self.data(), self.get_shape(subdivision),
+            self.get_strides(subdivision, sizeof(T)));
       })
       .def_property_readonly("shape",
                              [](TypedFieldBase<T> & field) {
-                               return field.get_shape(field.get_sub_division());
+                               return field.get_shape(
+                                   muGrid::IterUnit::SubPt);
                              })
       .def("array", array_computer, "shape"_a = std::vector<Index_t>{},
-           "iteration_type"_a = muGrid::PixelSubDiv::QuadPt,
+           "iteration_type"_a = muGrid::IterUnit::SubPt,
            py::keep_alive<0, 1>())
       .def(
           "array",
           [&array_computer](TypedFieldBase<T> & self,
-                            const muGrid::PixelSubDiv & it) {
+                            const muGrid::IterUnit & it) {
             return array_computer(self, std::vector<Index_t>{}, it);
           },
-          "iteration_type"_a = muGrid::PixelSubDiv::QuadPt,
+          "iteration_type"_a = muGrid::IterUnit::SubPt,
           py::keep_alive<0, 1>());
 
   py::class_<TypedField<T>, TypedFieldBase<T>>(mod, name.c_str());

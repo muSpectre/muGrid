@@ -49,6 +49,7 @@ namespace muGrid {
    public:
     //! alias of base class
     using Parent = FieldCollection;
+    using Parent::SubPtMap_t;
     //! pixel iterator
     using DynamicPixels = CcoordOps::DynamicPixels;
 
@@ -62,8 +63,7 @@ namespace muGrid {
      * @param nb_quad_pts number of quadrature points per pixel/voxel
      */
     GlobalFieldCollection(const Index_t & spatial_dimension,
-                          const Index_t & nb_quad_pts,
-                          const Index_t & nb_nodal_pts);
+                          const SubPtMap_t & nb_sub_pts = {});
 
     /**
      * Constructor with initialization
@@ -76,27 +76,25 @@ namespace muGrid {
      * global grid
      */
     GlobalFieldCollection(const Index_t & spatial_dimension,
-                          const Index_t & nb_quad_pts,
-                          const Index_t & nb_nodal_pts,
                           const DynCcoord_t & nb_subdomain_grid_pts,
-                          const DynCcoord_t & subdomain_locations = {});
+                          const DynCcoord_t & subdomain_locations = {},
+                          const SubPtMap_t & nb_sub_pts = {});
 
     /**
      * Constructor with initialisation
      * @param spatial_dimension number of spatial dimensions, must be 1, 2, 3,
      * or Unknown
-     * @param nb_quad_pts number of quadrature points per pixel/voxel
      * @param nb_subdomain_grid_pts number of grid points on the current MPI
      * process (subdomain)
      * @param subdomain_locations location of the current subdomain within the
      * global grid
      * @param strides strides specifying memory layout
      */
-    GlobalFieldCollection(Index_t spatial_dimension, Index_t nb_quad_pts,
-                          const Index_t & nb_nodal_pts,
+    GlobalFieldCollection(Index_t spatial_dimension,
                           const DynCcoord_t & nb_subdomain_grid_pts,
                           const DynCcoord_t & subdomain_locations,
-                          const DynCcoord_t & strides);
+                          const DynCcoord_t & strides,
+                          const SubPtMap_t & nb_sub_pts = {});
 
     //! Copy constructor
     GlobalFieldCollection(const GlobalFieldCollection & other) = delete;

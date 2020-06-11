@@ -47,7 +47,7 @@ namespace muSpectre {
                                                              nb_quad_pts,
                                                              C_voigt},
         eigen_field{this->get_prefix() + "Eigenstrain",
-                    *this->internal_fields} {
+                    *this->internal_fields, QuadPtTag} {
     this->last_step_was_nonlinear = false;
   }
 

@@ -46,15 +46,16 @@ namespace muFFT {
   FFTEngineBase::FFTEngineBase(const DynCcoord_t & nb_grid_pts,
                                Communicator comm)
       : spatial_dimension{nb_grid_pts.get_dim()}, comm{comm},
-        fourier_field_collection{this->spatial_dimension, muGrid::Unknown,
-                                 muGrid::Unknown},
+        fourier_field_collection{this->spatial_dimension},
         nb_domain_grid_pts{nb_grid_pts}, nb_subdomain_grid_pts{nb_grid_pts},
         subdomain_locations(spatial_dimension),
         subdomain_strides{get_default_strides(nb_grid_pts)},
         nb_fourier_grid_pts{get_nb_hermitian_grid_pts(nb_grid_pts)},
         fourier_locations(spatial_dimension),
         fourier_strides{get_default_strides(nb_fourier_grid_pts)},
-        norm_factor{1. / muGrid::CcoordOps::get_size(nb_grid_pts)} {}
+        norm_factor{1. / muGrid::CcoordOps::get_size(nb_grid_pts)} {
+          fourier_field_collection.set_nb_sub_pts(PixelTag, 1);
+        }
 
   /* ---------------------------------------------------------------------- */
   auto
@@ -62,7 +63,7 @@ namespace muFFT {
                                               const Index_t & nb_dof_per_pixel)
       -> FourierField_t & {
     return this->fourier_field_collection.register_complex_field(
-        unique_name, nb_dof_per_pixel, PixelSubDiv::Pixel);
+        unique_name, nb_dof_per_pixel, PixelTag);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -108,11 +109,6 @@ namespace muFFT {
   /* ---------------------------------------------------------------------- */
   const Index_t & FFTEngineBase::get_spatial_dim() const {
     return this->spatial_dimension;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  const Index_t & FFTEngineBase::get_nb_quad_pts() const {
-    return this->fourier_field_collection.get_nb_quad_pts();
   }
 
   /* ---------------------------------------------------------------------- */

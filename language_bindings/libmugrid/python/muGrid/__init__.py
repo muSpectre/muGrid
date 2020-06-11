@@ -37,7 +37,7 @@ Program grant you additional permission to convey the resulting work.
 import numpy as np
 
 import _muGrid
-from _muGrid import (get_domain_ccoord, get_domain_index, Pixel, QuadPt,
-                     DynCcoord, DynRcoord, PixelSubDiv, Verbosity,
+from _muGrid import (get_domain_ccoord, get_domain_index, Pixel, SubPt,
+                     DynCcoord, DynRcoord, IterUnit, Verbosity,
                      GlobalFieldCollection, LocalFieldCollection, Unit)
 

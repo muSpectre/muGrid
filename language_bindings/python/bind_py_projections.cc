@@ -166,8 +166,7 @@ void add_proj_helper(py::module & mod, std::string name_start) {
              NumpyProxy<Real> proxy(
                  proj.get_nb_subdomain_grid_pts(),
                  proj.get_subdomain_locations(), proj.get_nb_quad_pts(),
-                 {strain_shape[0], strain_shape[1]}, proj_vector_field,
-                 muGrid::PixelSubDiv::QuadPt);
+                 {strain_shape[0], strain_shape[1]}, proj_vector_field);
              proj.apply_projection(proxy.get_field());
              return proj_vector_field;
            })

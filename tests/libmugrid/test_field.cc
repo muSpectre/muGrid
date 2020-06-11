@@ -43,7 +43,8 @@ namespace muGrid {
   BOOST_AUTO_TEST_SUITE(field_test);
 
   struct LocalFieldBasicFixture {
-    LocalFieldCollection fc{Unknown, Unknown, Unknown};
+    LocalFieldCollection fc{Unknown};
+    static std::string SubDivision() { return "quad"; }
   };
 
   /* ---------------------------------------------------------------------- */
@@ -51,10 +52,10 @@ namespace muGrid {
     constexpr Index_t SDim{twoD};
     constexpr Index_t MDim{twoD};
     using FC_t = GlobalFieldCollection;
-    FC_t fc{SDim, OneQuadPt, OneNode};
+    FC_t fc{SDim};
+    fc.set_nb_sub_pts("quad", OneQuadPt);
 
-    auto & field{fc.register_real_field("TensorField 1", MDim * MDim,
-                                        PixelSubDiv::QuadPt)};
+    auto & field{fc.register_real_field("TensorField 1", MDim * MDim, "quad")};
 
     // check that fields are initialised with empty vector
     BOOST_CHECK_EQUAL(field.size(), 0);
@@ -68,24 +69,22 @@ namespace muGrid {
   }
 
   BOOST_AUTO_TEST_CASE(sub_divisions_with_known) {
+    static const std::string quad{"quad"};
+    static const std::string nodal{"nodal"};
     constexpr Index_t SDim{twoD};
     constexpr Index_t MDim{twoD};
     constexpr Index_t NbQuad{OneQuadPt};
     constexpr Index_t NbNode{OneNode};
     constexpr Index_t NbComponent{MDim};
-    constexpr Index_t NbFreeSubDiv{5};
     using FC_t = GlobalFieldCollection;
-    FC_t fc{SDim, NbQuad, NbNode};
+    FC_t fc{SDim};
+    fc.set_nb_sub_pts(quad, NbQuad);
+    fc.set_nb_sub_pts(nodal, NbNode);
 
-    auto & pixel_field{
-        fc.register_real_field("Pixel", NbComponent, PixelSubDiv::Pixel)};
-    auto & nodal_field{
-        fc.register_real_field("Nodal", NbComponent, PixelSubDiv::NodalPt)};
-    auto & quad_field{
-        fc.register_real_field("Quad", NbComponent, PixelSubDiv::QuadPt)};
-    auto & free_field{fc.register_real_field("Free", NbComponent,
-                                             PixelSubDiv::FreePt,
-                                             Unit::unitless(), NbFreeSubDiv)};
+    auto & pixel_field{fc.register_real_field("Pixel", NbComponent, PixelTag)};
+    auto & nodal_field{fc.register_real_field("Nodal", NbComponent, nodal)};
+    auto & quad_field{fc.register_real_field("Quad", NbComponent, quad)};
+
     Index_t len{2};
     Index_t nb_pix{ipow(len, SDim)};
     fc.initialise(CcoordOps::get_cube<SDim>(len), {});
@@ -93,34 +92,17 @@ namespace muGrid {
     BOOST_CHECK_EQUAL(pixel_field.size(), nb_pix);
     BOOST_CHECK_EQUAL(nodal_field.size(), nb_pix * NbNode);
     BOOST_CHECK_EQUAL(quad_field.size(), nb_pix * NbQuad);
-    BOOST_CHECK_EQUAL(free_field.size(), nb_pix * NbFreeSubDiv);
-
-    // now, with wrong numbers of subdivs
-    BOOST_CHECK_THROW(fc.register_real_field("Wrong Pixel", NbComponent,
-                                             PixelSubDiv::Pixel,
-                                             Unit::unitless(), 2),
-                      FieldCollectionError);
-    BOOST_CHECK_THROW(fc.register_real_field("Wrong Nodal", NbComponent,
-                                             PixelSubDiv::NodalPt,
-                                             Unit::unitless(), NbNode + 1),
-                      FieldCollectionError);
-    BOOST_CHECK_THROW(fc.register_real_field("Wrong quad", NbComponent,
-                                             PixelSubDiv::QuadPt,
-                                             Unit::unitless(), NbQuad + 1),
-                      FieldCollectionError);
-    BOOST_CHECK_THROW(fc.register_real_field("Wrong Free", NbComponent,
-                                             PixelSubDiv::FreePt,
-                                             Unit::unitless(), Unknown),
-                      FieldCollectionError);
   }
 
   BOOST_AUTO_TEST_CASE(TypedField_local_filling) {
-    LocalFieldCollection fc{Unknown, Unknown, Unknown};
+    static const std::string pixel{"pixel"};
+    static const std::string quad{"quad"};
+    static const std::string nodal{"nodal"};
+    LocalFieldCollection fc{Unknown};
     constexpr Dim_t NbComponents{3}, NbQuadPts{4};
-    auto & scalar_field{
-        fc.register_field<Real>("scalar_field", 1, PixelSubDiv::QuadPt)};
-    auto & vector_field{fc.register_field<Real>("vector_field", NbComponents,
-                                                PixelSubDiv::QuadPt)};
+    auto & scalar_field{fc.register_field<Real>("scalar_field", 1, quad)};
+    auto & vector_field{
+        fc.register_field<Real>("vector_field", NbComponents, quad)};
     const bool is_same_type{scalar_field.get_stored_typeid() == typeid(Real)};
     BOOST_CHECK(is_same_type);
 
@@ -129,7 +111,7 @@ namespace muGrid {
     scalar_mat.setZero();
     BOOST_CHECK_THROW(scalar_field.push_back(scalar_mat.array()), FieldError);
 
-    fc.set_nb_quad_pts(NbQuadPts);
+    fc.set_nb_sub_pts(quad, NbQuadPts);
     scalar_field.push_back(Real{3});
     scalar_field.push_back(scalar_mat.array());
 
@@ -150,12 +132,12 @@ namespace muGrid {
   }
 
   BOOST_AUTO_TEST_CASE(TypedField_globel_not_filling) {
-    GlobalFieldCollection fc{twoD, Unknown, Unknown};
+    GlobalFieldCollection fc{twoD};
+    const std::string quad{"quad"};
     constexpr Dim_t NbComponents{3};
-    auto & scalar_field{
-        fc.register_field<Real>("scalar_field", 1, PixelSubDiv::QuadPt)};
-    auto & vector_field{fc.register_field<Real>("vector_field", NbComponents,
-                                                PixelSubDiv::QuadPt)};
+    auto & scalar_field{fc.register_field<Real>("scalar_field", 1, quad)};
+    auto & vector_field{
+        fc.register_field<Real>("vector_field", NbComponents, quad)};
 
     BOOST_CHECK_THROW(scalar_field.push_back(3.7), FieldError);
     Eigen::Matrix<Real, NbComponents, 1> vector_mat{};
@@ -164,13 +146,12 @@ namespace muGrid {
   }
 
   BOOST_FIXTURE_TEST_CASE(set_zero, LocalFieldBasicFixture) {
-    constexpr Dim_t NbQuadPts{3}, NbComponents{4};
-    fc.set_nb_quad_pts(NbQuadPts);
-    fc.set_nb_nodal_pts(OneNode);
+    constexpr Dim_t NbSubPts{3}, NbComponents{4};
+    fc.set_nb_sub_pts(SubDivision(), NbSubPts);
     auto & scalar_field{
-        fc.register_field<Real>("scalar_field", 1, PixelSubDiv::QuadPt)};
-    auto & vector_field{fc.register_field<Real>("vector_field", NbComponents,
-                                                PixelSubDiv::QuadPt)};
+        fc.register_field<Real>("scalar_field", 1, SubDivision())};
+    auto & vector_field{
+        fc.register_field<Real>("vector_field", NbComponents, SubDivision())};
     scalar_field.push_back(1);
     vector_field.push_back(Eigen::Array<Real, NbComponents, 1>::Ones());
     fc.add_pixel(24);
@@ -205,11 +186,10 @@ namespace muGrid {
   }
 
   BOOST_FIXTURE_TEST_CASE(eigen_maps, LocalFieldBasicFixture) {
-    constexpr Dim_t NbQuadPts{2}, NbComponents{3};
-    fc.set_nb_quad_pts(NbQuadPts);
-    fc.set_nb_nodal_pts(OneNode);
+    constexpr Dim_t NbSubPts{2}, NbComponents{3};
+    fc.set_nb_sub_pts(SubDivision(), NbSubPts);
     auto & vector_field{fc.register_field<Real>("vector_field", NbComponents,
-                                                PixelSubDiv::QuadPt)};
+                                                SubDivision())};
     const auto & cvector_field{vector_field};
     fc.add_pixel(0);
     fc.add_pixel(1);
@@ -242,12 +222,12 @@ namespace muGrid {
     Map_t pixel_map{vector_field.eigen_pixel()};
     CMap_t pixel_cmap{cvector_field.eigen_pixel()};
     BOOST_CHECK_EQUAL(pixel_cmap.cols(),
-                      cvector_field.get_nb_entries() / NbQuadPts);
-    BOOST_CHECK_EQUAL(pixel_cmap.rows(), NbComponents * NbQuadPts);
+                      cvector_field.get_nb_entries() / NbSubPts);
+    BOOST_CHECK_EQUAL(pixel_cmap.rows(), NbComponents * NbSubPts);
     for (int i{0}; i < pixel_cmap.rows(); ++i) {
       for (int j{0}; j < pixel_cmap.cols(); ++j) {
         BOOST_CHECK_EQUAL(pixel_map(i, j), pixel_cmap(i, j));
-        BOOST_CHECK_EQUAL(pixel_map(i, j), i + NbComponents * NbQuadPts * j);
+        BOOST_CHECK_EQUAL(pixel_map(i, j), i + NbComponents * NbSubPts * j);
       }
     }
   }

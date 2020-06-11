@@ -49,7 +49,7 @@ namespace muSpectre {
                static_cast<Index_t>(gradient.size())/lengths.get_dim(),
                DimS*DimS,
                Formulation::finite_strain},
-        xi_field{"Projection Operator", this->projection_container},
+        xi_field{"Projection Operator", this->projection_container, PixelTag},
         gradient{gradient} {
     if (this->nb_quad_pts != NbQuadPts) {
       std::stringstream error;

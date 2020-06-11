@@ -59,15 +59,15 @@ namespace muSpectre {
   struct MaterialMuSpectre_traits<MaterialStochasticPlasticity<DimM>> {
     //! expected map type for strain fields
     using StrainMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Const, DimM, PixelSubDiv::QuadPt>;
+        muGrid::T2FieldMap<Real, Mapping::Const, DimM, IterUnit::SubPt>;
 
     //! expected map type for stress fields
     using StressMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>;
+        muGrid::T2FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
 
     //! expected map type for tangent stiffness fields
     using TangentMap_t =
-        muGrid::T4FieldMap<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>;
+        muGrid::T4FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
 
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
@@ -274,9 +274,9 @@ namespace muSpectre {
     //! and a vector of overloaded (stress>stress_threshold) pixel
     //! coordinates
     using Field_t =
-        muGrid::MappedScalarField<Real, Mapping::Mut, PixelSubDiv::QuadPt>;
+        muGrid::MappedScalarField<Real, Mapping::Mut, IterUnit::SubPt>;
     using LTensor_Field_t =
-        muGrid::MappedT2Field<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>;
+        muGrid::MappedT2Field<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
 
     Field_t lambda_field;
     Field_t mu_field;
@@ -315,7 +315,7 @@ namespace muSpectre {
       Cell & cell, Eigen::Ref<Vector_t> & stress_numpy_array) {
     muGrid::WrappedField<Real> stress_field{
         "temp input for stress field", cell.get_fields(), DimM * DimM,
-        stress_numpy_array, PixelSubDiv::QuadPt};
+        stress_numpy_array, QuadPtTag};
     return this->identify_overloaded_quad_pts(stress_field);
   }
 
@@ -326,7 +326,7 @@ namespace muSpectre {
       const muGrid::TypedFieldBase<Real> & stress_field) {
     auto & threshold_map{this->stress_threshold_field.get_map()};
 
-    muGrid::T2FieldMap<Real, Mapping::Const, DimM, PixelSubDiv::QuadPt>
+    muGrid::T2FieldMap<Real, Mapping::Const, DimM, IterUnit::SubPt>
         stress_map{stress_field};
     std::vector<size_t> & overloaded_quad_pts_ref{this->overloaded_quad_pts};
 
@@ -354,14 +354,14 @@ namespace muSpectre {
       Cell & cell, Eigen::Ref<Vector_t> & stress_numpy_array) {
     muGrid::WrappedField<Real> stress_field{
         "temp input for stress field", cell.get_fields(), DimM * DimM,
-        stress_numpy_array, PixelSubDiv::QuadPt};
+        stress_numpy_array, QuadPtTag};
     return this->update_eigen_strain_field(stress_field);
   }
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
   void MaterialStochasticPlasticity<DimM>::update_eigen_strain_field(
       const muGrid::TypedFieldBase<Real> & stress_field) {
-    muGrid::T2FieldMap<Real, Mapping::Const, DimM, PixelSubDiv::QuadPt>
+    muGrid::T2FieldMap<Real, Mapping::Const, DimM, IterUnit::SubPt>
         stress_map{stress_field};
     //! initialise strain
     auto && eigen_strain_map{this->eigen_strain_field.get_map()};

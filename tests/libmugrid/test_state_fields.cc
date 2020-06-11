@@ -43,21 +43,20 @@ namespace muGrid {
   BOOST_AUTO_TEST_SUITE(state_field_tests);
 
   struct LocalFieldBasicFixture {
-    LocalFieldCollection fc{Unknown, Unknown, Unknown};
+    LocalFieldCollection fc{Unknown};
+    static std::string SubDivision() { return "quad"; }
   };
 
   struct LocalFieldBasicFixtureFilled : public LocalFieldBasicFixture {
     static constexpr Dim_t NbMemory() { return 3; }
     static constexpr Dim_t NbComponents() { return 21; }
-    static constexpr PixelSubDiv SubDivision() { return PixelSubDiv::QuadPt; }
 
     LocalFieldBasicFixtureFilled()
         : state_field{fc.register_state_field<Real>(
               "test", NbMemory(), NbComponents(), SubDivision())} {
       this->fc.add_pixel(4);
       this->fc.add_pixel(8);
-      this->fc.set_nb_quad_pts(2);
-      this->fc.set_nb_nodal_pts(2);
+      this->fc.set_nb_sub_pts(SubDivision(), 2);
       this->fc.initialise();
     }
     TypedStateField<Real> & state_field;
@@ -66,13 +65,13 @@ namespace muGrid {
   BOOST_FIXTURE_TEST_CASE(construction_test, LocalFieldBasicFixture) {
     constexpr Dim_t NbMemory{1}, NbComponents{21};
     auto & state_field{fc.register_state_field<Real>(
-        "test", NbMemory, NbComponents, PixelSubDiv::QuadPt)};
+        "test", NbMemory, NbComponents, SubDivision())};
 
     state_field.current();
     BOOST_CHECK(fc.state_field_exists("test"));
 
     BOOST_CHECK_THROW(fc.register_state_field<Real>(
-                          "test", NbMemory, NbComponents, PixelSubDiv::QuadPt),
+                          "test", NbMemory, NbComponents, SubDivision()),
                       FieldCollectionError);
   }
 

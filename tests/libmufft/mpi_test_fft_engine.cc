@@ -134,19 +134,16 @@ namespace muFFT {
       Fix::engine.initialise(Fix::NbComponents, FFT_PlanFlags::estimate);
     }
     using FC_t = muGrid::GlobalFieldCollection;
-    FC_t fc{Fix::sdim, OneQuadPt, muGrid::Unknown};
-    auto & input{fc.register_real_field("input", Fix::sdim * Fix::sdim,
-                                        PixelSubDiv::QuadPt)};
-    auto & ref{fc.register_real_field("reference", Fix::sdim * Fix::sdim,
-                                      PixelSubDiv::QuadPt)};
-    auto & result{fc.register_real_field("result", Fix::sdim * Fix::sdim,
-                                         PixelSubDiv::QuadPt)};
+    FC_t fc{Fix::sdim};
+    auto & input{fc.register_real_field("input", Fix::sdim * Fix::sdim)};
+    auto & ref{fc.register_real_field("reference", Fix::sdim * Fix::sdim)};
+    auto & result{fc.register_real_field("result", Fix::sdim * Fix::sdim)};
 
     fc.initialise(Fix::engine.get_nb_subdomain_grid_pts(),
                   Fix::engine.get_subdomain_locations());
 
     using map_t = muGrid::MatrixFieldMap<Real, Mapping::Mut, Fix::sdim,
-                                         Fix::sdim, PixelSubDiv::QuadPt>;
+                                         Fix::sdim, IterUnit::Pixel>;
     map_t inmap{input};
     auto refmap{map_t{ref}};
     auto resultmap{map_t{result}};
@@ -161,7 +158,6 @@ namespace muFFT {
     auto & complex_field{Fix::engine.register_fourier_space_field(
         "complex field", Fix::NbComponents)};
     BOOST_TEST_CHECKPOINT("reached");
-    Fix::engine.get_fourier_field_collection().set_nb_quad_pts(OneQuadPt);
 
     auto && rank{Fix::engine.get_communicator().rank()};
     std::cout << "Rank " << rank
@@ -175,7 +171,7 @@ namespace muFFT {
     Fix::engine.fft(input, complex_field);
     BOOST_TEST_CHECKPOINT("reached2");
     using cmap_t = muGrid::MatrixFieldMap<Complex, Mapping::Mut, Fix::sdim,
-                                          Fix::sdim, PixelSubDiv::QuadPt>;
+                                          Fix::sdim, IterUnit::Pixel>;
     cmap_t complex_map(complex_field);
     BOOST_TEST_CHECKPOINT("reached3");
     if (Fix::engine.get_subdomain_locations() ==

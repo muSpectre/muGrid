@@ -57,21 +57,22 @@ namespace muSpectre {
   Cell::Cell(Projection_ptr projection, SplitCell is_cell_split)
       : projection{std::move(projection)},
         fields{std::make_unique<muGrid::GlobalFieldCollection>(
-            this->get_spatial_dim(), this->get_nb_quad_pts(),
-            this->get_nb_nodal_pts())},
+            this->get_spatial_dim())},
         // We request the DOFs for a single quadrature point, since quadrature
         // points are handled by the field.
         strain{this->fields->register_real_field(
             "strain",
             dof_for_formulation(this->get_formulation(),
                                 this->get_material_dim(), OneQuadPt),
-            PixelSubDiv::QuadPt)},
+            QuadPtTag)},
         stress{this->fields->register_real_field(
             "stress",
             dof_for_formulation(this->get_formulation(),
                                 this->get_material_dim(), OneQuadPt),
-            PixelSubDiv::QuadPt)},
+            QuadPtTag)},
         is_cell_split{is_cell_split} {
+    this->fields->set_nb_sub_pts(QuadPtTag, this->get_nb_quad_pts());
+    this->fields->set_nb_sub_pts(NodalPtTag, this->get_nb_nodal_pts());
     this->fields->initialise(this->projection->get_nb_subdomain_grid_pts(),
                              this->projection->get_subdomain_locations());
   }
@@ -161,12 +162,12 @@ namespace muSpectre {
     switch (this->get_formulation()) {
     case Formulation::finite_strain: {
       return std::array<Index_t, 2>{this->get_material_dim(),
-                                  this->get_material_dim()};
+                                    this->get_material_dim()};
       break;
     }
     case Formulation::small_strain: {
       return std::array<Index_t, 2>{this->get_material_dim(),
-                                  this->get_material_dim()};
+                                    this->get_material_dim()};
       break;
     }
     default:
@@ -258,7 +259,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   auto Cell::get_quad_pt_indices() const
       -> muGrid::FieldCollection::IndexIterable {
-    return this->fields->get_quad_pt_indices();
+    return this->fields->get_sub_pt_indices(QuadPtTag);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -283,7 +284,7 @@ namespace muSpectre {
                                              this->get_material_dim(),
                                              OneQuadPt),
                          2),
-            PixelSubDiv::QuadPt);
+            QuadPtTag);
       } else {
         throw RuntimeError("Tangent has not been created");
       }
@@ -416,11 +417,11 @@ namespace muSpectre {
       const muGrid::TypedFieldBase<Real> & delta_strain,
       const muGrid::TypedFieldBase<Real> & tangent,
       muGrid::TypedFieldBase<Real> & delta_stress) {
-    muGrid::T2FieldMap<Real, muGrid::Mapping::Const, DimM, PixelSubDiv::QuadPt>
+    muGrid::T2FieldMap<Real, muGrid::Mapping::Const, DimM, IterUnit::SubPt>
         strain_map{delta_strain};
-    muGrid::T4FieldMap<Real, muGrid::Mapping::Const, DimM, PixelSubDiv::QuadPt>
+    muGrid::T4FieldMap<Real, muGrid::Mapping::Const, DimM, IterUnit::SubPt>
         tangent_map{tangent};
-    muGrid::T2FieldMap<Real, muGrid::Mapping::Mut, DimM, PixelSubDiv::QuadPt>
+    muGrid::T2FieldMap<Real, muGrid::Mapping::Mut, DimM, IterUnit::SubPt>
         stress_map{delta_stress};
     for (auto && tup : akantu::zip(strain_map, tangent_map, stress_map)) {
       auto & df = std::get<0>(tup);
@@ -488,11 +489,11 @@ namespace muSpectre {
       const muGrid::TypedFieldBase<Real> & delta_strain,
       const muGrid::TypedFieldBase<Real> & tangent, const Real & alpha,
       muGrid::TypedFieldBase<Real> & delta_stress) {
-    muGrid::T2FieldMap<Real, muGrid::Mapping::Const, DimM, PixelSubDiv::QuadPt>
+    muGrid::T2FieldMap<Real, muGrid::Mapping::Const, DimM, IterUnit::SubPt>
         strain_map{delta_strain};
-    muGrid::T4FieldMap<Real, muGrid::Mapping::Const, DimM, PixelSubDiv::QuadPt>
+    muGrid::T4FieldMap<Real, muGrid::Mapping::Const, DimM, IterUnit::SubPt>
         tangent_map{tangent};
-    muGrid::T2FieldMap<Real, muGrid::Mapping::Mut, DimM, PixelSubDiv::QuadPt>
+    muGrid::T2FieldMap<Real, muGrid::Mapping::Mut, DimM, IterUnit::SubPt>
         stress_map{delta_stress};
     for (auto && tup : akantu::zip(strain_map, tangent_map, stress_map)) {
       auto & df = std::get<0>(tup);
@@ -507,10 +508,10 @@ namespace muSpectre {
                                                  EigenVec_t del_stress) {
     auto delta_strain_field_ptr{muGrid::WrappedField<Real>::make_const(
         "delta_strain", *this->fields, this->get_strain_size(), delta_strain,
-        PixelSubDiv::QuadPt)};
-    muGrid::WrappedField<Real> del_stress_field{
-        "delta_stress", *this->fields, this->get_strain_size(), del_stress,
-        PixelSubDiv::QuadPt};
+        QuadPtTag)};
+    muGrid::WrappedField<Real> del_stress_field{"delta_stress", *this->fields,
+                                                this->get_strain_size(),
+                                                del_stress, QuadPtTag};
     switch (this->get_material_dim()) {
     case twoD: {
       this->template add_projected_directional_stiffness_helper<twoD>(
@@ -543,8 +544,9 @@ namespace muSpectre {
   muGrid::TypedField<T> &
   Cell::globalise_internal_field(const std::string & unique_name) {
     // start by checking that the field exists at least once, and that
-    // it always has th same number of components
+    // it always has th same number of components, and the same subdivision tag
     std::set<Index_t> nb_component_categories{};
+    std::set<std::string> tag_categories{};
     std::vector<std::reference_wrapper<const muGrid::Field>> local_fields;
 
     for (auto & mat : this->materials) {
@@ -554,6 +556,7 @@ namespace muSpectre {
             collection.get_field(unique_name))};
         local_fields.push_back(field);
         nb_component_categories.insert(field.get_nb_dof_per_sub_pt());
+        tag_categories.insert(field.get_sub_division_tag());
       }
     }
 
@@ -585,9 +588,36 @@ namespace muSpectre {
 
     const Index_t nb_components{*nb_component_categories.begin()};
 
+    // reject if the field appears with differing subdivision tags
+    if (tag_categories.size() != 1) {
+      const auto & nb_match{tag_categories.size()};
+      std::stringstream err_str{};
+      if (nb_match > 1) {
+        err_str
+            << "The fields named '" << unique_name << "' do not have the "
+            << "same sub-division in every material, which is a "
+            << "requirement for globalising them! The following values were "
+            << "found by material:" << std::endl;
+        for (auto & mat : this->materials) {
+          auto & coll = mat->get_collection();
+          if (coll.field_exists(unique_name)) {
+            auto & field{coll.get_field(unique_name)};
+            err_str << "tag '" << field.get_sub_division_tag()
+                    << "' in material '" << mat->get_name() << "'" << std::endl;
+          }
+        }
+      } else {
+        err_str << "The field named '" << unique_name << "' does not exist in "
+                << "any of the materials and can therefore not be globalised!";
+      }
+      throw RuntimeError(err_str.str());
+    }
+
+    const std::string tag{*tag_categories.begin()};
+
     // get and prepare the field
     auto & global_field{this->fields->template register_field<T>(
-        unique_name, nb_components, PixelSubDiv::QuadPt)};
+        unique_name, nb_components, tag)};
     global_field.set_zero();
 
     auto global_map{global_field.get_pixel_map()};
@@ -613,6 +643,7 @@ namespace muSpectre {
     // start by checking that the field exists at least once, and that
     // it always has th same number of components
     std::set<Index_t> nb_component_categories{};
+    std::set<std::string> tag_categories{};
     std::vector<std::reference_wrapper<const muGrid::Field>> local_fields_old;
 
     for (auto & mat : this->materials) {
@@ -623,6 +654,7 @@ namespace muSpectre {
             muGrid::TypedField<T>::safe_cast(state_field.old(nb_steps_ago))};
         local_fields_old.push_back(field_old);
         nb_component_categories.insert(field_old.get_nb_dof_per_sub_pt());
+        tag_categories.insert(field_old.get_sub_division_tag());
       }
     }
 
@@ -652,9 +684,38 @@ namespace muSpectre {
       }
       throw RuntimeError(err_str.str());
     }
+
     const Index_t nb_components{*nb_component_categories.begin()};
+
+    // reject if the field appears with differing subdivision tags
+    if (tag_categories.size() != 1) {
+      const auto & nb_match{tag_categories.size()};
+      std::stringstream err_str{};
+      if (nb_match > 1) {
+        err_str
+            << "The fields named '" << unique_name << "' do not have the "
+            << "same sub-division in every material, which is a "
+            << "requirement for globalising them! The following values were "
+            << "found by material:" << std::endl;
+        for (auto & mat : this->materials) {
+          auto & coll = mat->get_collection();
+          if (coll.field_exists(unique_name)) {
+            auto & field{coll.get_field(unique_name)};
+            err_str << "tag '" << field.get_sub_division_tag()
+                    << "' in material '" << mat->get_name() << "'" << std::endl;
+          }
+        }
+      } else {
+        err_str << "The field named '" << unique_name << "' does not exist in "
+                << "any of the materials and can therefore not be globalised!";
+      }
+      throw RuntimeError(err_str.str());
+    }
+
+    const std::string tag{*tag_categories.begin()};
+
     auto & global_field{this->fields->template register_field<T>(
-        unique_name, nb_components, PixelSubDiv::QuadPt)};
+        unique_name, nb_components, tag)};
     global_field.set_zero();
 
     auto global_map{global_field.get_pixel_map()};
@@ -679,6 +740,8 @@ namespace muSpectre {
     // start by checking that the field exists at least once, and that
     // it always has th same number of components
     std::set<Index_t> nb_component_categories{};
+    std::set<std::string> tag_categories{};
+
     std::vector<std::reference_wrapper<const muGrid::Field>>
         local_fields_current;
     for (auto & mat : this->materials) {
@@ -689,6 +752,7 @@ namespace muSpectre {
             muGrid::TypedField<T>::safe_cast(state_field.current()));
         local_fields_current.push_back(field_current);
         nb_component_categories.insert(field_current.get_nb_dof_per_sub_pt());
+        tag_categories.insert(field_current.get_sub_division_tag());
       }
     }
 
@@ -718,9 +782,37 @@ namespace muSpectre {
       }
       throw RuntimeError(err_str.str());
     }
+
     const Index_t nb_components{*nb_component_categories.begin()};
+
+    // reject if the field appears with differing subdivision tags
+    if (tag_categories.size() != 1) {
+      const auto & nb_match{tag_categories.size()};
+      std::stringstream err_str{};
+      if (nb_match > 1) {
+        err_str
+            << "The fields named '" << unique_name << "' do not have the "
+            << "same sub-division in every material, which is a "
+            << "requirement for globalising them! The following values were "
+            << "found by material:" << std::endl;
+        for (auto & mat : this->materials) {
+          auto & coll = mat->get_collection();
+          if (coll.field_exists(unique_name)) {
+            auto & field{coll.get_field(unique_name)};
+            err_str << "tag '" << field.get_sub_division_tag()
+                    << "' in material '" << mat->get_name() << "'" << std::endl;
+          }
+        }
+      } else {
+        err_str << "The field named '" << unique_name << "' does not exist in "
+                << "any of the materials and can therefore not be globalised!";
+      }
+      throw RuntimeError(err_str.str());
+    }
+    const std::string tag{*tag_categories.begin()};
+
     auto & global_field{this->fields->template register_field<T>(
-        unique_name, nb_components, PixelSubDiv::QuadPt)};
+        unique_name, nb_components, tag)};
     global_field.set_zero();
 
     auto global_map{global_field.get_pixel_map()};

@@ -412,7 +412,6 @@ void add_engine_helper(py::module & mod, const std::string & name,
               }
 
               GlobalFieldCollection collection(eng.get_spatial_dim(),
-                                               muGrid::Unknown, muGrid::Unknown,
                                                eng.get_nb_subdomain_grid_pts(),
                                                eng.get_subdomain_locations());
               // static variable in order to make it reusable
@@ -424,7 +423,7 @@ void add_engine_helper(py::module & mod, const std::string & name,
                   static_cast<Index_t>(nb_dof_per_pixel),
                   nb_dof_per_pixel * collection.get_nb_pixels(),
                   temp_output_data.data(),
-                  muGrid::PixelSubDiv::Pixel};
+                  muFFT::PixelTag};
 
               // create or fetch a temporary output buffer with proper memory
               // layout

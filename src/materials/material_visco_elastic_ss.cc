@@ -48,9 +48,9 @@ namespace muSpectre {
           parent_field_collection)
       : Parent{name, spatial_dimension, nb_quad_pts, parent_field_collection},
         s_null_prev_field{this->get_prefix() + "Pure elastic stress",
-                          *this->internal_fields},
+                          *this->internal_fields, QuadPtTag},
         h_prev_field{this->get_prefix() + "history intgral",
-                     *this->internal_fields},
+                     *this->internal_fields, QuadPtTag},
         young_inf{young_inf}, young_v{young_v}, eta_v{eta_v}, poisson{poisson},
         lambda_inf{Hooke::compute_lambda(young_inf, poisson)},
         mu_inf{Hooke::compute_mu(young_inf, poisson)}, K_inf{Hooke::compute_K(
@@ -117,14 +117,14 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
-  muGrid::MappedT2StateField<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt> &
+  muGrid::MappedT2StateField<Real, Mapping::Mut, DimM, IterUnit::SubPt> &
   MaterialViscoElasticSS<DimM>::get_history_integral() {
     return this->h_prev_field;
   }
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
-  muGrid::MappedT2StateField<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt> &
+  muGrid::MappedT2StateField<Real, Mapping::Mut, DimM, IterUnit::SubPt> &
   MaterialViscoElasticSS<DimM>::get_s_null_prev_field() {
     return this->s_null_prev_field;
   }

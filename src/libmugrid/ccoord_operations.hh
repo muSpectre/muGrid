@@ -166,7 +166,7 @@ namespace muGrid {
     template <size_t Dim, size_t MaxDim, typename T>
     Eigen::Matrix<T, Dim, 1> get_vector(const Ccoord_t<Dim> & ccoord,
                                         const DynCcoord<MaxDim, T> & pix_size) {
-      assert(dim == pix_size.get_dim());
+      assert(Dim == pix_size.get_dim());
       Eigen::Matrix<T, Dim, 1> retval{};
       for (size_t i{0}; i < Dim; ++i) {
         retval[i] = pix_size[i] * ccoord[i];
@@ -179,7 +179,7 @@ namespace muGrid {
     template <size_t Dim>
     Eigen::Matrix<Real, Dim, 1> get_vector(const DynCcoord_t & ccoord,
                                            Real pix_size = 1.) {
-      assert(dim == ccoord.get_dim());
+      assert(Dim == ccoord.get_dim());
       Eigen::Matrix<Real, Dim, 1> retval;
       for (size_t i{0}; i < Dim; ++i) {
         retval[i] = pix_size * ccoord[i];
@@ -193,7 +193,7 @@ namespace muGrid {
     Eigen::Matrix<T, Dim, 1>
     get_vector(const DynCcoord_t ccoord,
                Eigen::Matrix<T, Dim_t(Dim), 1> pix_size) {
-      assert(dim == ccoord.get_dim());
+      assert(Dim == ccoord.get_dim());
       Eigen::Matrix<T, Dim, 1> retval = pix_size;
       for (size_t i{0}; i < Dim; ++i) {
         retval[i] *= ccoord[i];
@@ -206,7 +206,7 @@ namespace muGrid {
     template <size_t Dim, typename T>
     Eigen::Matrix<T, Dim, 1> get_vector(const DynCcoord_t ccoord,
                                         const std::array<T, Dim> & pix_size) {
-      assert(dim == ccoord.get_dim());
+      assert(Dim == ccoord.get_dim());
       Eigen::Matrix<T, Dim, 1> retval{};
       for (size_t i{0}; i < Dim; ++i) {
         retval[i] = pix_size[i] * ccoord[i];

@@ -41,39 +41,44 @@ namespace muGrid {
 
   BOOST_AUTO_TEST_SUITE(mapped_state_fields);
   struct InitialiserBase {
-    constexpr static Dim_t DimS{twoD};
-    constexpr static Dim_t NbRow{2}, NbCol{3};
-    constexpr static Dim_t NbQuad{2};
-    constexpr static Dim_t NbNode{1};
+    constexpr static Index_t DimS{twoD};
+    constexpr static Index_t NbRow{2}, NbCol{3};
+    constexpr static Index_t NbSubPt{2};
     constexpr static size_t NbMemory{1};
-    GlobalFieldCollection fc{DimS, NbQuad, NbNode};
-    InitialiserBase() { this->fc.initialise(Ccoord_t<twoD>{2, 3}); }
+    static const std::string sub_division_tag() { return "sub_pt"; }
+    GlobalFieldCollection fc{DimS};
+    InitialiserBase() {
+      this->fc.initialise(Ccoord_t<twoD>{2, 3});
+      this->fc.set_nb_sub_pts(sub_division_tag(), NbSubPt);
+      }
   };
-  constexpr Dim_t InitialiserBase::DimS;
-  constexpr Dim_t InitialiserBase::NbRow;
-  constexpr Dim_t InitialiserBase::NbCol;
-  constexpr Dim_t InitialiserBase::NbQuad;
-  constexpr Dim_t InitialiserBase::NbNode;
+  constexpr Index_t InitialiserBase::DimS;
+  constexpr Index_t InitialiserBase::NbRow;
+  constexpr Index_t InitialiserBase::NbCol;
+  constexpr Index_t InitialiserBase::NbSubPt;
   constexpr size_t InitialiserBase::NbMemory;
 
   struct MappedStateFieldFixture : public InitialiserBase {
     MappedMatrixStateField<Real, Mapping::Mut, NbRow, NbCol,
-                           PixelSubDiv::QuadPt, NbMemory>
+                           IterUnit::SubPt, NbMemory>
         mapped_matrix;
-    MappedArrayStateField<Real, Mapping::Mut, NbRow, NbCol, PixelSubDiv::QuadPt,
+    MappedArrayStateField<Real, Mapping::Mut, NbRow, NbCol, IterUnit::SubPt,
                           NbMemory>
         mapped_array;
-    MappedScalarStateField<Real, Mapping::Mut, PixelSubDiv::QuadPt, NbMemory>
+    MappedScalarStateField<Real, Mapping::Mut, IterUnit::SubPt, NbMemory>
         mapped_scalar;
-    MappedT2StateField<Real, Mapping::Mut, DimS, PixelSubDiv::QuadPt, NbMemory>
+    MappedT2StateField<Real, Mapping::Mut, DimS, IterUnit::SubPt, NbMemory>
         mapped_t2;
-    MappedT4StateField<Real, Mapping::Mut, DimS, PixelSubDiv::QuadPt, NbMemory>
+    MappedT4StateField<Real, Mapping::Mut, DimS, IterUnit::SubPt, NbMemory>
         mapped_t4;
 
     MappedStateFieldFixture()
-        : InitialiserBase{}, mapped_matrix{"matrix", this->fc},
-          mapped_array{"array", this->fc}, mapped_scalar{"scalar", this->fc},
-          mapped_t2{"t2", this->fc}, mapped_t4{"t4", this->fc} {};
+        : InitialiserBase{}, mapped_matrix{"matrix", this->fc,
+                                           sub_division_tag()},
+          mapped_array{"array", this->fc, sub_division_tag()},
+          mapped_scalar{"scalar", this->fc, sub_division_tag()},
+          mapped_t2{"t2", this->fc, sub_division_tag()},
+          mapped_t4{"t4", this->fc, sub_division_tag()} {};
   };
 
   BOOST_FIXTURE_TEST_CASE(access_and_iteration_test, MappedStateFieldFixture) {

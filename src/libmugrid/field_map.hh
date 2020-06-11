@@ -115,30 +115,21 @@ namespace muGrid {
     FieldMap() = delete;
 
     /**
-     * Constructor from a field. The default case is a map iterating over
-     * sub-division points with a matrix of shape (nb_components × 1) per field
-     * entry
-     */
-    explicit FieldMap(Field_t & field);
-
-    /**
      * Constructor from a field. The iter_type can be the natural sub-division
-     * of the field, or `muGrid::PixelSubDiv::Pixel
+     * of the field, or `muGrid::IterUnit::Pixel. The default case is a map
+     * iterating over sub-division points with a matrix of shape (nb_components
+     * × 1) per field entry
      */
-    FieldMap(Field_t & field, const PixelSubDiv & iter_type);
-
-    /**
-     * Constructor from a field with explicitly chosen shape of iterate. (the
-     * number of columns is inferred).
-     */
-    FieldMap(Field_t & field, Index_t nb_rows);
+    explicit FieldMap(Field_t & field,
+                      const IterUnit & iter_type = IterUnit::SubPt);
 
     /**
      * Constructor from a field with explicitly chosen shape of iterate. (the
      * number of columns is inferred). The iter_type can be the natural
-     * sub-division of the field, or `muGrid::PixelSubDiv::Pixel
+     * sub-division of the field, or `muGrid::IterUnit::Pixel
      */
-    FieldMap(Field_t & field, Index_t nb_rows, const PixelSubDiv & iter_type);
+    FieldMap(Field_t & field, Index_t nb_rows,
+             const IterUnit & iter_type = IterUnit::SubPt);
 
     //! Copy constructor
     FieldMap(const FieldMap & other) = delete;
@@ -222,7 +213,7 @@ namespace muGrid {
 
     /**
      * returns the number of iterates produced by this map (corresponds to the
-     * number of field entries if Iteration::Quadpt, or the number of
+     * number of field entries if Iteration::Subpt, or the number of
      * pixels/voxels if Iteration::Pixel);
      */
     size_t size() const;
@@ -263,10 +254,10 @@ namespace muGrid {
    protected:
     //! mapped field. Needed for query at initialisations
     const Field_t & field;
-    const PixelSubDiv iteration;  //!< type of map iteration
-    const Index_t stride;           //!< precomputed stride
-    const Index_t nb_rows;          //!< number of rows of the iterate
-    const Index_t nb_cols;          //!< number of columns fo the iterate
+    const IterUnit iteration;  //!< type of map iteration
+    const Index_t stride;         //!< precomputed stride
+    const Index_t nb_rows;        //!< number of rows of the iterate
+    const Index_t nb_cols;        //!< number of columns fo the iterate
 
     /**
      * Pointer to mapped data; is also unknown at construction and set in the

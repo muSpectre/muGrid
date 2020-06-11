@@ -64,7 +64,7 @@ namespace muFFT {
   using muGrid::OneNode;
 
   using muGrid::Mapping;
-  using muGrid::PixelSubDiv;
+  using muGrid::IterUnit;
 
   /**
    * Planner flags for FFT (follows FFTW, hopefully this choice will
@@ -76,6 +76,12 @@ namespace muFFT {
     measure,   //!< more expensive plan for fast execution
     patient    //!< very expensive plan for fastest execution
   };
+
+  /**
+   * used to tag all fields (libµgrid allows for pixel-sub-divisions, which
+   * libµFFt does not use.
+   */
+  using muGrid::PixelTag;
 
   /**
    * used by the lazy-evaluated FFTExpression class ;

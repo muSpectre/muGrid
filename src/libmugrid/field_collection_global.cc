@@ -39,28 +39,24 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   GlobalFieldCollection::GlobalFieldCollection(
-      const Index_t & spatial_dimension, const Index_t & nb_quad_pts,
-      const Index_t & nb_nodal_pts)
-      : Parent{ValidityDomain::Global, spatial_dimension, nb_quad_pts,
-               nb_nodal_pts} {}
+      const Index_t & spatial_dimension, const SubPtMap_t & nb_sub_pts)
+      : Parent{ValidityDomain::Global, spatial_dimension, nb_sub_pts} {}
 
   /* ---------------------------------------------------------------------- */
   GlobalFieldCollection::GlobalFieldCollection(
-      const Index_t & spatial_dimension, const Index_t & nb_quad_pts,
-      const Index_t & nb_nodal_pts, const DynCcoord_t & nb_subdomain_grid_pts,
-      const DynCcoord_t & subdomain_locations)
-      : Parent{ValidityDomain::Global, spatial_dimension, nb_quad_pts,
-               nb_nodal_pts} {
+      const Index_t & spatial_dimension,
+      const DynCcoord_t & nb_subdomain_grid_pts,
+      const DynCcoord_t & subdomain_locations, const SubPtMap_t & nb_sub_pts)
+      : Parent{ValidityDomain::Global, spatial_dimension, nb_sub_pts} {
     this->initialise(nb_subdomain_grid_pts, subdomain_locations);
   }
 
   /* ---------------------------------------------------------------------- */
   GlobalFieldCollection::GlobalFieldCollection(
-      Index_t spatial_dimension, Index_t nb_quad_pts,
-      const Index_t & nb_nodal_pts, const DynCcoord_t & nb_subdomain_grid_pts,
-      const DynCcoord_t & subdomain_locations, const DynCcoord_t & strides)
-      : Parent{ValidityDomain::Global, spatial_dimension, nb_quad_pts,
-               nb_nodal_pts} {
+      Index_t spatial_dimension, const DynCcoord_t & nb_subdomain_grid_pts,
+      const DynCcoord_t & subdomain_locations, const DynCcoord_t & strides,
+      const SubPtMap_t & nb_sub_pts)
+      : Parent{ValidityDomain::Global, spatial_dimension, nb_sub_pts} {
     this->initialise(nb_subdomain_grid_pts, subdomain_locations, strides);
   }
 
@@ -110,9 +106,7 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   GlobalFieldCollection GlobalFieldCollection::get_empty_clone() const {
-    GlobalFieldCollection ret_val{this->get_spatial_dim(),
-                                  this->get_nb_quad_pts(),
-                                  this->get_nb_nodal_pts()};
+    GlobalFieldCollection ret_val{this->get_spatial_dim(), this->nb_sub_pts};
     ret_val.initialise(this->pixels.get_nb_subdomain_grid_pts(),
                        this->pixels.get_subdomain_locations());
     return ret_val;

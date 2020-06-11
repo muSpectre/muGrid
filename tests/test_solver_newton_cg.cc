@@ -158,7 +158,7 @@ namespace muSpectre {
     if (verbose > Verbosity::Silent) {
       std::cout << "result:" << std::endl << result.grad << std::endl;
       std::cout << "mean strain = " << std::endl
-                << cell.get_strain().get_quad_pt_map().mean() << std::endl;
+                << cell.get_strain().get_sub_pt_map().mean() << std::endl;
     }
 
     /**
@@ -277,7 +277,7 @@ namespace muSpectre {
     if (verbose > Verbosity::Silent) {
       std::cout << "result:" << std::endl << result.grad << std::endl;
       std::cout << "mean strain = " << std::endl
-                << cell.get_strain().get_quad_pt_map().mean() << std::endl;
+                << cell.get_strain().get_sub_pt_map().mean() << std::endl;
     }
 
     /**

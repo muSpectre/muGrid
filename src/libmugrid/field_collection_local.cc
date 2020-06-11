@@ -39,10 +39,8 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   LocalFieldCollection::LocalFieldCollection(const Index_t & spatial_dimension,
-                                             const Index_t & nb_quad_pts,
-                                             const Index_t & nb_nodal_pts)
-      : Parent{ValidityDomain::Local, spatial_dimension, nb_quad_pts,
-               nb_nodal_pts} {}
+                                             const SubPtMap_t & nb_sub_pts)
+    : Parent{ValidityDomain::Local, spatial_dimension, nb_sub_pts} {}
 
   /* ---------------------------------------------------------------------- */
   void LocalFieldCollection::add_pixel(const size_t & global_index) {
@@ -69,9 +67,7 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   LocalFieldCollection LocalFieldCollection::get_empty_clone() const {
-    LocalFieldCollection ret_val{this->get_spatial_dim(),
-                                 this->get_nb_quad_pts(),
-                                 this->get_nb_quad_pts()};
+    LocalFieldCollection ret_val{this->get_spatial_dim(), this->nb_sub_pts};
     for (const auto & pixel_id : this->get_pixel_indices_fast()) {
       ret_val.add_pixel(pixel_id);
     }

@@ -99,22 +99,20 @@ namespace muSpectre {
     constexpr auto loc{
         muGrid::CcoordOps::get_cube<Fix::MaterialDimension()>(Index_t{0})};
 
-    muGrid::GlobalFieldCollection globalfields{Fix::mdim, Fix::NbQuadPts,
-                                               muGrid::Unknown};
+    muGrid::GlobalFieldCollection globalfields{Fix::mdim};
+    globalfields.set_nb_sub_pts(QuadPtTag, Fix::NbQuadPts);
     auto & F{globalfields.register_real_field(
         "Transformation Gradient",
-        muGrid::ipow(Fix::MaterialDimension(), secondOrder),
-        PixelSubDiv::QuadPt)};
+        muGrid::ipow(Fix::MaterialDimension(), secondOrder), QuadPtTag)};
     auto & F_rate{globalfields.register_real_field(
         "Transformation Gradient Rate",
-        muGrid::ipow(Fix::MaterialDimension(), secondOrder),
-        PixelSubDiv::QuadPt)};
+        muGrid::ipow(Fix::MaterialDimension(), secondOrder), QuadPtTag)};
     auto & P{globalfields.register_real_field(
         "Nominal Stress1", muGrid::ipow(Fix::MaterialDimension(), secondOrder),
-        PixelSubDiv::QuadPt)};  // to be computed alone
+        QuadPtTag)};  // to be computed alone
     auto & K{globalfields.register_real_field(
         "Tangent Moduli", muGrid::ipow(Fix::MaterialDimension(), fourthOrder),
-        PixelSubDiv::QuadPt)};  // to be computed with tangent
+        QuadPtTag)};  // to be computed with tangent
     globalfields.initialise(cube, loc);
 
     using traits = MaterialMuSpectre_traits<
@@ -158,26 +156,23 @@ namespace muSpectre {
     auto & mat{Fix::mat};
 
     using FC_t = muGrid::GlobalFieldCollection;
-    FC_t globalfields{Fix::MaterialDimension(), muGrid::Unknown,
-                      muGrid::Unknown};
-    globalfields.set_nb_quad_pts(Fix::NbQuadPts);
+    FC_t globalfields{Fix::MaterialDimension()};
+    globalfields.set_nb_sub_pts(QuadPtTag, Fix::NbQuadPts);
     globalfields.initialise(cube, loc);
     globalfields.register_real_field("Transformation Gradient", mdim * mdim,
-                                     PixelSubDiv::QuadPt);
-    auto & P1 = globalfields.register_real_field(
-        "Nominal Stress1", mdim * mdim,
-        PixelSubDiv::QuadPt);  // to be computed alone
-    globalfields.register_real_field(
-        "Nominal Stress2", mdim * mdim,
-        PixelSubDiv::QuadPt);  // to be computed with tangent
-    globalfields.register_real_field(
-        "Tangent Moduli", muGrid::ipow(mdim, 4),
-        PixelSubDiv::QuadPt);  // to be computed with tangent
+                                     QuadPtTag);
+    auto & P1 =
+        globalfields.register_real_field("Nominal Stress1", mdim * mdim,
+                                         QuadPtTag);  // to be computed alone
+    globalfields.register_real_field("Nominal Stress2", mdim * mdim,
+                                     QuadPtTag);  // to be computed with tangent
+    globalfields.register_real_field("Tangent Moduli", muGrid::ipow(mdim, 4),
+                                     QuadPtTag);  // to be computed with tangent
     globalfields.register_real_field("Nominal Stress reference", mdim * mdim,
-                                     PixelSubDiv::QuadPt);
-    globalfields.register_real_field(
-        "Tangent Moduli reference", muGrid::ipow(mdim, 4),
-        PixelSubDiv::QuadPt);  // to be computed with tangent
+                                     QuadPtTag);
+    globalfields.register_real_field("Tangent Moduli reference",
+                                     muGrid::ipow(mdim, 4),
+                                     QuadPtTag);  // to be computed with tangent
 
     static_assert(std::is_same<decltype(P1), muGrid::RealField &>::value,
                   "oh oh");

@@ -51,16 +51,16 @@ namespace muSpectre {
         material_child(name + "_child", spatial_dimension, nb_quad_pts, 0.0,
                        0.0, 0.0, 0.0, this->internal_fields),
         lambda_field{this->get_prefix() + "local first Lame constant",
-                     *this->internal_fields},
+                     *this->internal_fields, QuadPtTag},
         mu_field(this->get_prefix() +
                      "local second Lame constant(shear modulus)",
-                 *this->internal_fields),
+                 *this->internal_fields, QuadPtTag),
         tau_y0_field{this->get_prefix() + "local initial yield stress",
-                     *this->internal_fields},
+                     *this->internal_fields, QuadPtTag},
         H_field{this->get_prefix() + "local hardening modulus",
-                *this->internal_fields},
+                *this->internal_fields, QuadPtTag},
         K_field(this->get_prefix() + "local Bulk modulus",
-                *this->internal_fields) {}
+                *this->internal_fields, QuadPtTag) {}
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>

@@ -38,7 +38,6 @@
 namespace muGrid {
 
   constexpr Dim_t BaseFixture::NbQuadPts;
-  constexpr Dim_t BaseFixture::NbNodalPts;
   constexpr Dim_t BaseFixture::Dim;
 
   /* ---------------------------------------------------------------------- */

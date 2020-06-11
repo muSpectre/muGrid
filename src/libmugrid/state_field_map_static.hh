@@ -52,7 +52,7 @@ namespace muGrid {
    * capabilities, with much more efficient statically sized iterates.
    */
   template <typename T, Mapping Mutability, class MapType, size_t NbMemory,
-            PixelSubDiv IterationType = PixelSubDiv::QuadPt>
+            IterUnit IterationType = IterUnit::SubPt>
   class StaticStateFieldMap : public StateFieldMap<T, Mutability> {
     static_assert(MapType::IsValidStaticMapType(),
                   "The MapType you chose is not compatible");
@@ -85,7 +85,7 @@ namespace muGrid {
     constexpr static Mapping FieldMutability() { return Mutability; }
 
     //! determine the map's iteration type (pixels vs quad pts) at compile time
-    constexpr static PixelSubDiv GetIterationType() { return IterationType; }
+    constexpr static IterUnit GetIterationType() { return IterationType; }
 
     //! Deleted default constructor
     StaticStateFieldMap() = delete;
@@ -278,7 +278,7 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T, Mapping Mutability, class MapType, size_t NbMemory,
-            PixelSubDiv IterationType>
+            IterUnit IterationType>
   template <Mapping MutIter, size_t... I>
   auto StaticStateFieldMap<T, Mutability, MapType, NbMemory,
                            IterationType>::map_helper(std::index_sequence<I...>)
@@ -293,7 +293,7 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T, Mapping Mutability, class MapType, size_t NbMemory,
-            PixelSubDiv IterationType>
+            IterUnit IterationType>
   auto StaticStateFieldMap<T, Mutability, MapType, NbMemory,
                            IterationType>::make_maps() -> MapArray_t {
     auto && nb_memory{ this->state_field.get_nb_memory()};
@@ -311,7 +311,7 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T, Mapping Mutability, class MapType, size_t NbMemory,
-            PixelSubDiv IterationType>
+            IterUnit IterationType>
   auto StaticStateFieldMap<T, Mutability, MapType, NbMemory,
                            IterationType>::make_cmaps() -> CMapArray_t {
     return this->map_helper<Mapping::Const>(
@@ -320,7 +320,7 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T, Mapping Mutability, class MapType, size_t NbMemory,
-            PixelSubDiv IterationType>
+            IterUnit IterationType>
   template <Mapping MutIter>
   class StaticStateFieldMap<T, Mutability, MapType, NbMemory,
                             IterationType>::Iterator {
@@ -398,7 +398,7 @@ namespace muGrid {
    * @tparam IterationType whether to iterate over pixels or quadrature points
    */
   template <typename T, Mapping Mutability, Dim_t NbRow, Dim_t NbCol,
-            size_t NbMemory, PixelSubDiv IterationType = PixelSubDiv::QuadPt>
+            size_t NbMemory, IterUnit IterationType = IterUnit::SubPt>
   using MatrixStateFieldMap =
       StaticStateFieldMap<T, Mutability, internal::MatrixMap<T, NbRow, NbCol>,
                           NbMemory, IterationType>;
@@ -418,7 +418,7 @@ namespace muGrid {
    * @tparam IterationType describes the pixel-subdivision
    */
   template <typename T, Mapping Mutability, Dim_t NbRow, Dim_t NbCol,
-            size_t NbMemory, PixelSubDiv IterationType>
+            size_t NbMemory, IterUnit IterationType>
   using ArrayStateFieldMap =
       StaticStateFieldMap<T, Mutability, internal::ArrayMap<T, NbRow, NbCol>,
                           NbMemory, IterationType>;
@@ -435,7 +435,7 @@ namespace muGrid {
    * @tparam IterationType describes the pixel-subdivision
    */
   template <typename T, Mapping Mutability, size_t NbMemory,
-            PixelSubDiv IterationType>
+            IterUnit IterationType>
   using ScalarStateFieldMap =
       StaticStateFieldMap<T, Mutability, internal::ScalarMap<T>, NbMemory,
                           IterationType>;
@@ -453,7 +453,7 @@ namespace muGrid {
    * @tparam IterationType describes the pixel-subdivision
    */
   template <typename T, Mapping Mutability, Dim_t Dim, size_t NbMemory,
-            PixelSubDiv IterationType>
+            IterUnit IterationType>
   using T1StateFieldMap =
       StaticStateFieldMap<T, Mutability, internal::MatrixMap<T, Dim, 1>,
                           NbMemory, IterationType>;
@@ -471,7 +471,7 @@ namespace muGrid {
    * @tparam IterationType describes the pixel-subdivision
    */
   template <typename T, Mapping Mutability, Dim_t Dim, size_t NbMemory,
-            PixelSubDiv IterationType>
+            IterUnit IterationType>
   using T2StateFieldMap =
       StaticStateFieldMap<T, Mutability, internal::MatrixMap<T, Dim, Dim>,
                           NbMemory, IterationType>;
@@ -489,11 +489,11 @@ namespace muGrid {
    * @tparam IterationType describes the pixel-subdivision
    */
   template <typename T, Mapping Mutability, Dim_t Dim, size_t NbMemory,
-            PixelSubDiv IterationType>
+            IterUnit IterationType>
   using T4StateFieldMap =
       StaticStateFieldMap<T, Mutability,
                           internal::MatrixMap<T, Dim * Dim, Dim * Dim>,
-                          NbMemory, PixelSubDiv::QuadPt>;
+                          NbMemory, IterationType>;
 }  // namespace muGrid
 
 #endif  // SRC_LIBMUGRID_STATE_FIELD_MAP_STATIC_HH_

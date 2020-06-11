@@ -49,7 +49,7 @@ namespace muSpectre {
                DimS * DimS, form},
         Gfield{this->projection_container.register_complex_field(
             "Projection Operator", DimS * DimS * DimS * DimS,
-            PixelSubDiv::QuadPt)},
+            QuadPtTag)},
         Ghat{Gfield}, gradient{gradient} {
     if (this->get_dim() != DimS) {
       std::stringstream message{};

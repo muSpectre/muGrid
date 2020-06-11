@@ -47,28 +47,26 @@
 namespace muGrid {
   struct BaseFixture {
     constexpr static Dim_t NbQuadPts{2};
-    constexpr static Dim_t NbNodalPts{3};
     constexpr static Dim_t Dim{threeD};
+    static std::string sub_division_tag() { return "sub_div_tag"; }
   };
 
   struct GlobalFieldCollectionFixture : public BaseFixture {
-    GlobalFieldCollectionFixture()
-        : fc{BaseFixture::Dim, BaseFixture::NbQuadPts,
-             BaseFixture::NbNodalPts} {
+    GlobalFieldCollectionFixture() : fc{BaseFixture::Dim} {
       Ccoord_t<BaseFixture::Dim> nb_grid_pts{2, 2, 3};
       this->fc.initialise(nb_grid_pts);
+      this->fc.set_nb_sub_pts(sub_division_tag(), NbQuadPts);
     }
     GlobalFieldCollection fc;
     constexpr static Dim_t size{12};
   };
 
   struct LocalFieldCollectionFixture : public BaseFixture {
-    LocalFieldCollectionFixture()
-        : fc{BaseFixture::Dim, BaseFixture::NbQuadPts,
-             BaseFixture::NbNodalPts} {
+    LocalFieldCollectionFixture() : fc{BaseFixture::Dim} {
       this->fc.add_pixel(0);
       this->fc.add_pixel(11);
       this->fc.add_pixel(102);
+      this->fc.set_nb_sub_pts(sub_division_tag(), NbQuadPts);
       this->fc.initialise();
     }
     LocalFieldCollection fc;
@@ -80,20 +78,22 @@ namespace muGrid {
     using type = T;
     FieldMapFixture()
         : CollectionFixture{}, scalar_field{this->fc.template register_field<T>(
-                                   "scalar_field", 1, PixelSubDiv::QuadPt)},
+                                   "scalar_field", 1,
+                                   this->sub_division_tag())},
           vector_field{this->fc.template register_field<T>(
-              "vector_field", BaseFixture::Dim, PixelSubDiv::QuadPt)},
+              "vector_field", BaseFixture::Dim, this->sub_division_tag())},
           matrix_field{this->fc.template register_field<T>(
               "matrix_field", BaseFixture::Dim * BaseFixture::Dim,
-              PixelSubDiv::QuadPt)},
+              this->sub_division_tag())},
           T4_field{this->fc.template register_field<T>(
-              "tensor4_field", ipow(BaseFixture::Dim, 4), PixelSubDiv::QuadPt)},
-          scalar_quad{scalar_field, PixelSubDiv::QuadPt},
-          scalar_pixel{scalar_field, PixelSubDiv::Pixel},
-          vector_quad{vector_field, PixelSubDiv::QuadPt},
-          vector_pixel{vector_field, PixelSubDiv::Pixel},
-          matrix_quad{matrix_field, BaseFixture::Dim, PixelSubDiv::QuadPt},
-          matrix_pixel{matrix_field, BaseFixture::Dim, PixelSubDiv::Pixel} {}
+              "tensor4_field", ipow(BaseFixture::Dim, 4),
+              this->sub_division_tag())},
+          scalar_quad{scalar_field, IterUnit::SubPt},
+          scalar_pixel{scalar_field, IterUnit::Pixel},
+          vector_quad{vector_field, IterUnit::SubPt},
+          vector_pixel{vector_field, IterUnit::Pixel},
+          matrix_quad{matrix_field, BaseFixture::Dim, IterUnit::SubPt},
+          matrix_pixel{matrix_field, BaseFixture::Dim, IterUnit::Pixel} {}
     TypedField<T> & scalar_field;
     TypedField<T> & vector_field;
     TypedField<T> & matrix_field;
@@ -114,37 +114,22 @@ namespace muGrid {
     SubDivisionFixture()
         : GlobalFieldCollectionFixture{},
           pixel_field{this->fc.register_real_field("pixel_field", NbComponent,
-                                                   PixelSubDiv::Pixel)},
+                                                   PixelTag)},
           quad_pt_field{this->fc.register_real_field(
-              "quad_pt_field", NbComponent, PixelSubDiv::QuadPt)},
-          nodal_pt_field{this->fc.register_real_field(
-              "nodal_pt_field", NbComponent, PixelSubDiv::NodalPt)},
-          free_pt_field{this->fc.register_real_field(
-              "free_pt_field", NbComponent, PixelSubDiv::FreePt,
-              Unit::unitless(), NbFreeSubDiv)},
+              "quad_pt_field", NbComponent, sub_division_tag())},
           pixel_map{pixel_field}, quad_pt_map{quad_pt_field},
-          nodal_pt_map{nodal_pt_field}, free_pt_map{free_pt_field},
-          pixel_quad_pt_map{quad_pt_field, PixelSubDiv::Pixel},
-          pixel_nodal_pt_map{nodal_pt_field, PixelSubDiv::Pixel},
-          pixel_free_pt_map{free_pt_field, PixelSubDiv::Pixel} {};
+          pixel_quad_pt_map{quad_pt_field, IterUnit::Pixel} {};
 
     RealField & pixel_field;
     RealField & quad_pt_field;
-    RealField & nodal_pt_field;
-    RealField & free_pt_field;
 
     // mapping over their natural subdivision
     FieldMap<Real, Mapping::Mut> pixel_map;
     FieldMap<Real, Mapping::Mut> quad_pt_map;
-    FieldMap<Real, Mapping::Mut> nodal_pt_map;
-    FieldMap<Real, Mapping::Mut> free_pt_map;
 
     // mapping over their pixel-aggregate view
     FieldMap<Real, Mapping::Mut> pixel_quad_pt_map;
-    FieldMap<Real, Mapping::Mut> pixel_nodal_pt_map;
-    FieldMap<Real, Mapping::Mut> pixel_free_pt_map;
   };
-
 }  // namespace muGrid
 
 #endif  // TESTS_LIBMUGRID_FIELD_TEST_FIXTURES_HH_

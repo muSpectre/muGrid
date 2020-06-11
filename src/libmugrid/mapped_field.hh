@@ -75,10 +75,10 @@ namespace muGrid {
     template <bool StaticConstructor = IsStatic(),
               std::enable_if_t<StaticConstructor, int> = 0>
     MappedField(const std::string & unique_name, FieldCollection & collection,
+                const std::string & sub_division_tag,
                 const Unit & unit = Unit::unitless())
         : field(collection.register_field<Scalar>(
-              unique_name, FieldMapType::Stride(),
-              FieldMapType::GetIterationType(), unit)),
+              unique_name, FieldMapType::Stride(), sub_division_tag, unit)),
           map{this->field} {
       static_assert(
           StaticConstructor == IsStatic(),
@@ -95,17 +95,17 @@ namespace muGrid {
      * @param collection collection where the field is to be registered
      * @param unit physical units of mapped field
      * @param nb_sub_pts number of subpoints per pixel. Specify only if
-     *                   iter_type is `muGrid::PixelSubDiv::FreePt`
+     *                   iter_type is `muGrid::IterUnit::FreePt`
      */
     template <bool StaticConstructor = IsStatic(),
               std::enable_if_t<not StaticConstructor, int> = 0>
     MappedField(const std::string & unique_name, const Index_t & nb_rows,
-                const Index_t & nb_cols, const PixelSubDiv & iter_type,
+                const Index_t & nb_cols, const IterUnit & iter_type,
                 FieldCollection & collection,
-                const Unit & unit = Unit::unitless(),
-                const Index_t & nb_sub_pts = Unknown)
+                const std::string & sub_division_tag,
+                const Unit & unit = Unit::unitless())
         : field{collection.register_field<Scalar>(
-              unique_name, nb_rows * nb_cols, iter_type, unit, nb_sub_pts)},
+              unique_name, nb_rows * nb_cols, sub_division_tag, unit)},
           map{this->field, nb_rows, iter_type} {
       static_assert(
           StaticConstructor == IsStatic(),
@@ -167,7 +167,7 @@ namespace muGrid {
    * @tparam IterationType describes the pixel-subdivision
    */
   template <typename T, Mapping Mutability, Dim_t NbRow, Dim_t NbCol,
-            PixelSubDiv IterationType>
+            IterUnit IterationType>
   using MappedMatrixField =
       MappedField<MatrixFieldMap<T, Mutability, NbRow, NbCol, IterationType>>;
 
@@ -185,7 +185,7 @@ namespace muGrid {
    * @tparam IterationType describes the pixel-subdivision
    */
   template <typename T, Mapping Mutability, Dim_t NbRow, Dim_t NbCol,
-            PixelSubDiv IterationType>
+            IterUnit IterationType>
   using MappedArrayField =
       MappedField<ArrayFieldMap<T, Mutability, NbRow, NbCol, IterationType>>;
 
@@ -200,7 +200,7 @@ namespace muGrid {
    * the field
    * @tparam IterationType describes the pixel-subdivision
    */
-  template <typename T, Mapping Mutability, PixelSubDiv IterationType>
+  template <typename T, Mapping Mutability, IterUnit IterationType>
   using MappedScalarField =
       MappedField<ScalarFieldMap<T, Mutability, IterationType>>;
 
@@ -217,7 +217,7 @@ namespace muGrid {
    * @tparam IterationType describes the pixel-subdivision
    */
   template <typename T, Mapping Mutability, Dim_t Dim,
-            PixelSubDiv IterationType>
+            IterUnit IterationType>
   using MappedT1Field =
       MappedField<T1FieldMap<T, Mutability, Dim, IterationType>>;
 
@@ -234,7 +234,7 @@ namespace muGrid {
    * @tparam IterationType describes the pixel-subdivision
    */
   template <typename T, Mapping Mutability, Dim_t Dim,
-            PixelSubDiv IterationType>
+            IterUnit IterationType>
   using MappedT2Field =
       MappedField<T2FieldMap<T, Mutability, Dim, IterationType>>;
 
@@ -251,7 +251,7 @@ namespace muGrid {
    * @tparam IterationType describes the pixel-subdivision
    */
   template <typename T, Mapping Mutability, Dim_t Dim,
-            PixelSubDiv IterationType>
+            IterUnit IterationType>
   using MappedT4Field =
       MappedField<T4FieldMap<T, Mutability, Dim, IterationType>>;
 

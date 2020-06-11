@@ -50,16 +50,16 @@ namespace muSpectre {
       const Index_t & nb_quad_pts)
       : Parent{name, spatial_dimension, nb_quad_pts},
         lambda_field{this->get_prefix() + "local first Lame constant",
-                     *this->internal_fields},
+                     *this->internal_fields, QuadPtTag},
         mu_field{this->get_prefix() +
                      "local second Lame constant(shear modulus)",
-                 *this->internal_fields},
+                 *this->internal_fields, QuadPtTag},
         plastic_increment_field{this->get_prefix() + "plastic increment",
-                                *this->internal_fields},
+                                *this->internal_fields, QuadPtTag},
         stress_threshold_field{this->get_prefix() + "threshold",
-                               *this->internal_fields},
+                               *this->internal_fields, QuadPtTag},
         eigen_strain_field{this->get_prefix() + "eigen strain",
-                           *this->internal_fields} {}
+                           *this->internal_fields, QuadPtTag} {}
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>

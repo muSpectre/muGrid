@@ -82,8 +82,8 @@ namespace muGrid {
      * @param collection reference to the holding field collection.
      */
     Field(const std::string & unique_name, FieldCollection & collection,
-          const Index_t & nb_dof_per_sub_pt, const Index_t & nb_sub_pts,
-          const PixelSubDiv & subdivision, const Unit & unit);
+          const Index_t & nb_dof_per_sub_pt, const std::string & sub_div_tag,
+          const Unit & unit);
 
    public:
     //! Default constructor
@@ -135,7 +135,7 @@ namespace muGrid {
      * evaluate and return the overall shape of the field (for passing the
      * field to generic multidimensional array objects such as numpy.ndarray)
      */
-    std::vector<Index_t> get_shape(const PixelSubDiv & iter_type) const;
+    std::vector<Index_t> get_shape(const IterUnit & iter_type) const;
 
     /**
      * evaluate and return the overall strides field (for passing the field to
@@ -143,7 +143,7 @@ namespace muGrid {
      * multiplier can be used e.g., if strides are needed in bytes, rather than
      * in pointer offsets.
      */
-    std::vector<Index_t> get_strides(const PixelSubDiv & iter_type,
+    std::vector<Index_t> get_strides(const IterUnit & iter_type,
                                      const Index_t & multiplier = 1) const;
 
     /**
@@ -166,7 +166,7 @@ namespace muGrid {
      * multidimensional array objects such as numpy.ndarray)
      */
     virtual std::vector<Index_t>
-    get_components_shape(const PixelSubDiv & iter_type) const;
+    get_components_shape(const IterUnit & iter_type) const;
 
     /**
      * evaluate and return the strides of the degrees of freedom per pixel
@@ -174,7 +174,7 @@ namespace muGrid {
      * array objects such as numpy.ndarray)
      */
     virtual std::vector<Index_t>
-    get_components_strides(const PixelSubDiv & iter_type) const;
+    get_components_strides(const IterUnit & iter_type) const;
 
     /**
      * evaluate and return the overall strides of the pixels portion of the
@@ -187,7 +187,7 @@ namespace muGrid {
      * evaluate and return the number of components in an iterate when iterating
      * over this field
      */
-    Index_t get_stride(const PixelSubDiv & iter_type) const;
+    Index_t get_stride(const IterUnit & iter_type) const;
 
     /**
      * evaluate and return the number of rows of a default iterate over this
@@ -195,7 +195,7 @@ namespace muGrid {
      * that the user called `get_stride` before, that all checks have been
      * performed there, and that rechecking would be a waste of time)
      */
-    Index_t get_default_nb_rows(const PixelSubDiv & iter_type) const;
+    Index_t get_default_nb_rows(const IterUnit & iter_type) const;
 
     /**
      * evaluate and return the number of cols of a default iterate over this
@@ -203,7 +203,7 @@ namespace muGrid {
      * that the user called `get_stride` before, that all checks have been
      * performed there, and that rechecking would be a waste of time)
      */
-    Index_t get_default_nb_cols(const PixelSubDiv & iter_type) const;
+    Index_t get_default_nb_cols(const IterUnit & iter_type) const;
 
     /**
      * return the type information of the stored scalar (for compatibility
@@ -241,7 +241,7 @@ namespace muGrid {
     bool has_nb_sub_pts() const;
 
     //! returns a const ref to the field's pixel sub-division type
-    const PixelSubDiv & get_sub_division() const;
+    const std::string & get_sub_division_tag() const;
 
    protected:
     //! gives field collections the ability to resize() fields
@@ -275,7 +275,9 @@ namespace muGrid {
     size_t pad_size{};
 
     /**
-     * number of pixel subdivisions. Will depend on sub_division
+     * number of pixel subdivisions. Will depend on sub_division. This value
+     * depends on the field collection and might or might not exist at
+     * construction time (it would be `muGrid::Unknown` if not yes set
      */
     Index_t nb_sub_pts;
 
@@ -283,7 +285,7 @@ namespace muGrid {
      * Pixel subdivision kind (determines how many datapoints to store per
      * pixel)
      */
-    PixelSubDiv sub_division;
+    std::string sub_division_tag;
 
     //! Physical unit of the values stored in this field
     Unit unit;

@@ -73,14 +73,14 @@ namespace muGrid {
      * field entry
      */
     StateFieldMap(TypedStateField<T> & state_field,
-                  PixelSubDiv iter_type = PixelSubDiv::QuadPt);
+                  IterUnit iter_type = IterUnit::SubPt);
 
     /**
      * Constructor from a state field with explicitly chosen shape of iterate.
      * (the number of columns is inferred).
      */
     StateFieldMap(TypedStateField<T> & state_field, Index_t nb_rows,
-                  PixelSubDiv iter_type = PixelSubDiv::QuadPt);
+                  IterUnit iter_type = IterUnit::SubPt);
 
     StateFieldMap(const StateFieldMap & other) = delete;
 
@@ -199,7 +199,7 @@ namespace muGrid {
 
     //! mapped state field. Needed for query at initialisations
     TypedStateField<T> & state_field;
-    const PixelSubDiv iteration;  //!< type of map iteration
+    const IterUnit iteration;  //!< type of map iteration
     const Index_t nb_rows;        //!< number of rows of the iterate
 
     /**

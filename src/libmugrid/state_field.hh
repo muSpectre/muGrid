@@ -77,8 +77,7 @@ namespace muGrid {
      */
     StateField(const std::string & unique_prefix, FieldCollection & collection,
                const Index_t & nb_memory, const Index_t & nb_dof_per_sub_pt,
-               const PixelSubDiv & sub_division, const Unit & unit,
-               const Index_t & nb_sub_pts);
+               const std::string & sub_division, const Unit & unit);
 
    public:
     //! Default constructor
@@ -155,7 +154,7 @@ namespace muGrid {
      * Pixel subdivision kind (determines how many datapoints to store per
      * pixel)
      */
-    PixelSubDiv sub_division;
+    std::string sub_division_tag;
 
     //! Physical unit of the values stored in this field
     Unit unit;
@@ -192,8 +191,7 @@ namespace muGrid {
     TypedStateField(const std::string & unique_prefix,
                     FieldCollection & collection, const Index_t & nb_memory,
                     const Index_t & nb_dof_per_sub_pt,
-                    const PixelSubDiv & sub_division, const Unit & unit,
-                    const Index_t & nb_sub_pts);
+                    const std::string & sub_division, const Unit & unit);
 
    public:
     //! base class

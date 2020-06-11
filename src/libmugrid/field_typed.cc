@@ -128,7 +128,7 @@ namespace muGrid {
   template <typename T>
   TypedField<T> & TypedField<T>::safe_cast(Field & other,
                                            const Index_t & nb_dof_per_sub_pt,
-                                           const PixelSubDiv & sub_division) {
+                                           const std::string & sub_division) {
     if (other.get_nb_dof_per_sub_pt() != nb_dof_per_sub_pt) {
       std::stringstream err_msg{};
       err_msg << "Cannot cast field'" << other.get_name()
@@ -137,11 +137,12 @@ namespace muGrid {
               << nb_dof_per_sub_pt << " components which are requested.";
       throw FieldError(err_msg.str());
     }
-    if (other.get_sub_division() != sub_division) {
+    if (other.get_sub_division_tag() != sub_division) {
       std::stringstream err_msg{};
       err_msg << "Cannot cast field'" << other.get_name()
-              << "', because it's subdivision is '" << other.get_sub_division()
-              << "', rather than " << sub_division << ", which are requested.";
+              << "', because it's subdivision is '"
+              << other.get_sub_division_tag() << "', rather than "
+              << sub_division << ", which are requested.";
       throw FieldError(err_msg.str());
     }
     return TypedField::safe_cast(other);
@@ -152,7 +153,7 @@ namespace muGrid {
   const TypedField<T> &
   TypedField<T>::safe_cast(const Field & other,
                            const Index_t & nb_dof_per_sub_pt,
-                           const PixelSubDiv & sub_division) {
+                           const std::string & sub_division) {
     if (other.get_nb_dof_per_sub_pt() != nb_dof_per_sub_pt) {
       std::stringstream err_msg{};
       err_msg << "Cannot cast field'" << other.get_name()
@@ -161,11 +162,12 @@ namespace muGrid {
               << nb_dof_per_sub_pt << " components which are requested.";
       throw FieldError(err_msg.str());
     }
-    if (other.get_sub_division() != sub_division) {
+    if (other.get_sub_division_tag() != sub_division) {
       std::stringstream err_msg{};
       err_msg << "Cannot cast field'" << other.get_name()
-              << "', because it's subdivision is '" << other.get_sub_division()
-              << "', rather than " << sub_division << ", which are requested.";
+              << "', because it's subdivision is '"
+              << other.get_sub_division_tag() << "', rather than "
+              << sub_division << ", which are requested.";
       throw FieldError(err_msg.str());
     }
     return TypedField::safe_cast(other);
@@ -176,9 +178,10 @@ namespace muGrid {
   void TypedField<T>::resize() {
     if (not this->has_nb_sub_pts()) {
       std::stringstream error_message{};
-      error_message
-          << "Can't compute the size of field '" << this->get_name()
-          << "' because the number of points per pixel is not yet known.";
+      error_message << "Can't compute the size of field '" << this->get_name()
+                    << "' because the number of points per pixel for "
+                       "subdivisions tagged '"
+                    << this->get_sub_division_tag() << "' is not yet known.";
       throw FieldError(error_message.str());
     }
 
@@ -286,12 +289,12 @@ namespace muGrid {
       break;
     }
     case FieldCollection::ValidityDomain::Global: {
-      auto && my_strides{this->get_strides(PixelSubDiv::Pixel)};
-      auto && other_strides{other.get_strides(PixelSubDiv::Pixel)};
+      auto && my_strides{this->get_strides(IterUnit::Pixel)};
+      auto && other_strides{other.get_strides(IterUnit::Pixel)};
       if (my_strides == other_strides) {
         this->eigen_vec() = other.eigen_vec();
       } else {
-        raw_mem_ops::strided_copy(this->get_shape(PixelSubDiv::Pixel),
+        raw_mem_ops::strided_copy(this->get_shape(IterUnit::Pixel),
                                   my_strides, other_strides, other.data(),
                                   this->data_ptr);
       }
@@ -385,8 +388,8 @@ namespace muGrid {
   auto TypedFieldBase<T>::get_pixel_map(const Index_t & nb_rows)
       -> FieldMap<T, Mapping::Mut> {
     return (nb_rows == -1)
-               ? FieldMap<T, Mapping::Mut>{*this, PixelSubDiv::Pixel}
-               : FieldMap<T, Mapping::Mut>{*this, nb_rows, PixelSubDiv::Pixel};
+               ? FieldMap<T, Mapping::Mut>{*this, IterUnit::Pixel}
+               : FieldMap<T, Mapping::Mut>{*this, nb_rows, IterUnit::Pixel};
   }
 
   /* ---------------------------------------------------------------------- */
@@ -394,28 +397,28 @@ namespace muGrid {
   auto TypedFieldBase<T>::get_pixel_map(const Index_t & nb_rows) const
       -> FieldMap<T, Mapping::Const> {
     return (nb_rows == -1)
-               ? FieldMap<T, Mapping::Const>{*this, PixelSubDiv::Pixel}
+               ? FieldMap<T, Mapping::Const>{*this, IterUnit::Pixel}
                : FieldMap<T, Mapping::Const>{*this, nb_rows,
-                                             PixelSubDiv::Pixel};
+                                             IterUnit::Pixel};
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  auto TypedFieldBase<T>::get_quad_pt_map(const Index_t & nb_rows)
+  auto TypedFieldBase<T>::get_sub_pt_map(const Index_t & nb_rows)
       -> FieldMap<T, Mapping::Mut> {
-    return (nb_rows == -1)
-               ? FieldMap<T, Mapping::Mut>{*this, PixelSubDiv::QuadPt}
-               : FieldMap<T, Mapping::Mut>{*this, nb_rows, PixelSubDiv::QuadPt};
+    return (nb_rows == Unknown)
+               ? FieldMap<T, Mapping::Mut>{*this, IterUnit::SubPt}
+               : FieldMap<T, Mapping::Mut>{*this, nb_rows, IterUnit::SubPt};
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  auto TypedFieldBase<T>::get_quad_pt_map(const Index_t & nb_rows) const
+  auto TypedFieldBase<T>::get_sub_pt_map(const Index_t & nb_rows) const
       -> FieldMap<T, Mapping::Const> {
     return (nb_rows == -1)
-               ? FieldMap<T, Mapping::Const>{*this, PixelSubDiv::QuadPt}
+               ? FieldMap<T, Mapping::Const>{*this, IterUnit::SubPt}
                : FieldMap<T, Mapping::Const>{*this, nb_rows,
-                                             PixelSubDiv::QuadPt};
+                                             IterUnit::SubPt};
   }
 
   template <typename T>
@@ -423,10 +426,10 @@ namespace muGrid {
                                 FieldCollection & collection,
                                 const Index_t & nb_dof_per_sub_pt,
                                 const size_t & size, T * ptr,
-                                const PixelSubDiv & sub_division,
-                                const Unit & unit, const Index_t & nb_sub_pts)
-      : Parent{unique_name,  collection, nb_dof_per_sub_pt,
-               sub_division, unit,       nb_sub_pts},
+                                const std::string & sub_division_tag,
+                                const Unit & unit)
+      : Parent{unique_name, collection, nb_dof_per_sub_pt, sub_division_tag,
+               unit},
         size{static_cast<size_t>(size)} {
     this->current_size = size / this->nb_dof_per_sub_pt;
 
@@ -458,16 +461,15 @@ namespace muGrid {
                                 FieldCollection & collection,
                                 const Index_t & nb_dof_per_sub_pt,
                                 Eigen::Ref<EigenRep_t> values,
-                                const PixelSubDiv & sub_division,
-                                const Unit & unit, const Index_t & nb_sub_pts)
+                                const std::string & sub_division_tag,
+                                const Unit & unit)
       : WrappedField{unique_name,
                      collection,
                      nb_dof_per_sub_pt,
                      static_cast<size_t>(values.size()),
                      values.data(),
-                     sub_division,
-                     unit,
-                     nb_sub_pts} {}
+                     sub_division_tag,
+                     unit} {}
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
@@ -475,15 +477,13 @@ namespace muGrid {
                                    FieldCollection & collection,
                                    Index_t nb_dof_per_sub_pt,
                                    Eigen::Ref<const EigenRep_t> values,
-                                   const PixelSubDiv & sub_division,
-                                   const Unit & unit,
-                                   const Index_t & nb_sub_pts)
+                                   const std::string & sub_division,
+                                   const Unit & unit)
       -> std::unique_ptr<const WrappedField> {
     Eigen::Map<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>> map{
         const_cast<T *>(values.data()), values.rows(), values.cols()};
-    return std::make_unique<WrappedField>(unique_name, collection,
-                                          nb_dof_per_sub_pt, map, sub_division,
-                                          unit, nb_sub_pts);
+    return std::make_unique<WrappedField>(
+        unique_name, collection, nb_dof_per_sub_pt, map, sub_division, unit);
   }
 
   /* ---------------------------------------------------------------------- */

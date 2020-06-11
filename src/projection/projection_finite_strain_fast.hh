@@ -68,11 +68,11 @@ namespace muSpectre {
     //! iterable form of the operator
     using Proj_map =
         muGrid::MatrixFieldMap<Complex, Mapping::Mut, DimS * NbQuadPts, 1,
-                               muGrid::PixelSubDiv::Pixel>;
+                               muGrid::IterUnit::Pixel>;
     //! iterable Fourier-space second-order tensor field
     using Grad_map =
         muGrid::MatrixFieldMap<Complex, Mapping::Mut, DimS, DimS * NbQuadPts,
-                               muGrid::PixelSubDiv::Pixel>;
+                               muGrid::IterUnit::Pixel>;
 
     //! Default constructor
     ProjectionFiniteStrainFast() = delete;
@@ -137,7 +137,7 @@ namespace muSpectre {
    protected:
     //! field of normalised wave vectors
     muGrid::MappedT1Field<Complex, Mapping::Mut, DimS * NbQuadPts,
-                          PixelSubDiv::QuadPt>
+                          IterUnit::SubPt>
         xi_field;
 
     /**

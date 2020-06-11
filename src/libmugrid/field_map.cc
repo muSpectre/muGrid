@@ -45,13 +45,8 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T, Mapping Mutability>
-  FieldMap<T, Mutability>::FieldMap(Field_t & field)
-      : FieldMap{field, field.get_sub_division()} {}
-
-  /* ---------------------------------------------------------------------- */
-  template <typename T, Mapping Mutability>
-  FieldMap<T, Mutability>::FieldMap(Field_t & field,
-                                    const PixelSubDiv & iter_type)
+  FieldMap<T, Mutability>::FieldMap(
+      Field_t & field, const IterUnit & iter_type)
       : field{field}, iteration{iter_type}, stride{this->field.get_stride(
                                                 iter_type)},
         nb_rows{this->field.get_default_nb_rows(iter_type)},
@@ -68,13 +63,8 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T, Mapping Mutability>
-  FieldMap<T, Mutability>::FieldMap(Field_t & field, Index_t nb_rows_)
-      : FieldMap{field, nb_rows_, field.get_sub_division()} {}
-
-  /* ---------------------------------------------------------------------- */
-  template <typename T, Mapping Mutability>
   FieldMap<T, Mutability>::FieldMap(Field_t & field, Index_t nb_rows_,
-                                    const PixelSubDiv & iter_type)
+                                    const IterUnit & iter_type)
       : field{field}, iteration{iter_type}, stride{this->field.get_stride(
                                                 iter_type)},
         nb_rows{nb_rows_}, nb_cols{this->stride / nb_rows_} {
@@ -166,7 +156,7 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   template <typename T, Mapping Mutability>
   size_t FieldMap<T, Mutability>::size() const {
-    return (this->iteration == PixelSubDiv::QuadPt)
+    return (this->iteration == IterUnit::SubPt)
                ? this->field.size()
                : this->field.get_collection().get_nb_pixels();
   }
@@ -186,7 +176,7 @@ namespace muGrid {
   template <typename T, Mapping Mutability>
   auto FieldMap<T, Mutability>::enumerate_pixel_indices_fast()
       -> PixelEnumeration_t {
-    if (this->iteration != PixelSubDiv::Pixel) {
+    if (this->iteration != IterUnit::Pixel) {
       throw FieldMapError("Cannot enumerate pixels unless the iteration mode "
                           "of this map is Iteration::Pixels.");
     }
@@ -197,7 +187,8 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   template <typename T, Mapping Mutability>
   auto FieldMap<T, Mutability>::enumerate_indices() -> Enumeration_t {
-    return akantu::zip(this->field.get_collection().get_quad_pt_indices(),
+    return akantu::zip(this->field.get_collection().get_sub_pt_indices(
+                           this->field.get_sub_division_tag()),
                        *this);
   }
 

@@ -49,7 +49,7 @@ namespace muSpectre {
                        young_inf, young_v, eta_v, poisson, dt,
                        this->internal_fields),
         kappa_prev_field{this->get_prefix() + "strain measure",
-                         *this->internal_fields},
+                         *this->internal_fields, QuadPtTag},
         kappa_init{kappa_init}, alpha{alpha}, beta{beta} {}
 
   /* ---------------------------------------------------------------------- */
@@ -136,21 +136,21 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
-  muGrid::MappedT2StateField<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt> &
+  muGrid::MappedT2StateField<Real, Mapping::Mut, DimM, IterUnit::SubPt> &
   MaterialViscoElasticDamageSS<DimM>::get_history_integral() {
     return this->material_child.get_history_integral();
   }
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
-  muGrid::MappedT2StateField<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt> &
+  muGrid::MappedT2StateField<Real, Mapping::Mut, DimM, IterUnit::SubPt> &
   MaterialViscoElasticDamageSS<DimM>::get_s_null_prev_field() {
     return this->material_child.get_s_null_prev_field();
   }
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
-  muGrid::MappedScalarStateField<Real, Mapping::Mut, PixelSubDiv::QuadPt> &
+  muGrid::MappedScalarStateField<Real, Mapping::Mut, IterUnit::SubPt> &
   MaterialViscoElasticDamageSS<DimM>::get_kappa_prev_field() {
     return this->kappa_prev_field;
   }

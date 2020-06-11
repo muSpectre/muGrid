@@ -61,13 +61,13 @@ namespace muSpectre {
   struct MaterialMuSpectre_traits<MaterialHyperElastoPlastic2<DimM>> {
     //! expected map type for strain fields
     using StrainMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Const, DimM, PixelSubDiv::QuadPt>;
+        muGrid::T2FieldMap<Real, Mapping::Const, DimM, IterUnit::SubPt>;
     //! expected map type for stress fields
     using StressMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>;
+        muGrid::T2FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
     //! expected map type for tangent stiffness fields
     using TangentMap_t =
-        muGrid::T4FieldMap<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>;
+        muGrid::T4FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
 
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::Gradient};
@@ -92,7 +92,7 @@ namespace muSpectre {
 
     //! storage type for scalar material constant fields
     using Field_t =
-        muGrid::MappedScalarField<Real, Mapping::Const, PixelSubDiv::QuadPt>;
+        muGrid::MappedScalarField<Real, Mapping::Const, IterUnit::SubPt>;
 
     //! Hooke's law implementation
     using Hooke =
@@ -100,11 +100,11 @@ namespace muSpectre {
                               typename traits::TangentMap_t::reference>;
 
     using FlowField_t =
-        muGrid::MappedScalarStateField<Real, Mapping::Mut, PixelSubDiv::QuadPt>;
+        muGrid::MappedScalarStateField<Real, Mapping::Mut, IterUnit::SubPt>;
     using FlowField_ref = typename FlowField_t::Return_t;
 
     using PrevStrain_t = muGrid::MappedT2StateField<Real, Mapping::Mut, DimM,
-                                                    PixelSubDiv::QuadPt>;
+                                                    IterUnit::SubPt>;
     using PrevStrain_ref = typename PrevStrain_t::Return_t;
 
     //! Default constructor

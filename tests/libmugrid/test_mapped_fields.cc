@@ -49,8 +49,12 @@ namespace muGrid {
     constexpr static Dim_t NbRow{2}, NbCol{3};
     constexpr static Dim_t NbQuad{2};
     constexpr static Dim_t NbNode{4};
-    GlobalFieldCollection fc{DimS, NbQuad, NbNode};
-    InitialiserBase() { this->fc.initialise(Ccoord_t<twoD>{2, 3}); }
+    GlobalFieldCollection fc{DimS};
+    static std::string division_tag() { return "tag"; }
+    InitialiserBase() {
+      this->fc.initialise(Ccoord_t<twoD>{2, 3});
+      this->fc.set_nb_sub_pts(division_tag(), NbQuad);
+    }
   };
   constexpr Dim_t InitialiserBase::DimS;
   constexpr Dim_t InitialiserBase::NbRow;
@@ -59,18 +63,22 @@ namespace muGrid {
   constexpr Dim_t InitialiserBase::NbNode;
 
   struct MappedFieldFixture : public InitialiserBase {
-    MappedMatrixField<Real, Mapping::Mut, NbRow, NbCol, PixelSubDiv::QuadPt>
+    MappedMatrixField<Real, Mapping::Mut, NbRow, NbCol, IterUnit::SubPt>
         mapped_matrix;
-    MappedArrayField<Real, Mapping::Mut, NbRow, NbCol, PixelSubDiv::QuadPt>
+    MappedArrayField<Real, Mapping::Mut, NbRow, NbCol, IterUnit::SubPt>
         mapped_array;
-    MappedScalarField<Real, Mapping::Mut, PixelSubDiv::QuadPt> mapped_scalar;
-    MappedT2Field<Real, Mapping::Mut, DimS, PixelSubDiv::QuadPt> mapped_t2;
-    MappedT4Field<Real, Mapping::Mut, DimS, PixelSubDiv::QuadPt> mapped_t4;
+    MappedScalarField<Real, Mapping::Mut, IterUnit::SubPt> mapped_scalar;
+    MappedT2Field<Real, Mapping::Mut, DimS, IterUnit::SubPt> mapped_t2;
+    MappedT4Field<Real, Mapping::Mut, DimS, IterUnit::SubPt> mapped_t4;
+
 
     MappedFieldFixture()
-        : InitialiserBase{}, mapped_matrix{"matrix", this->fc},
-          mapped_array{"array", this->fc}, mapped_scalar{"scalar", this->fc},
-          mapped_t2{"t2", this->fc}, mapped_t4{"t4", this->fc} {};
+        : InitialiserBase{}, mapped_matrix{"matrix", this->fc, division_tag()},
+          mapped_array{"array", this->fc, division_tag()},
+          mapped_scalar{"scalar", this->fc, division_tag()},
+          mapped_t2{"t2", this->fc, division_tag()}, mapped_t4{
+                                                         "t4", this->fc,
+                                                         division_tag()} {};
   };
 
   /* ---------------------------------------------------------------------- */
@@ -95,20 +103,21 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   BOOST_AUTO_TEST_CASE(DynamicMappedField) {
     constexpr Dim_t NbQuad{3};
-    constexpr Dim_t NbNode{2};
     constexpr Dim_t NbRow{4};
     constexpr Dim_t NbCol{5};
-    GlobalFieldCollection collection{twoD, NbQuad, NbNode};
+    const std::string division_tag{"tag"};
+    GlobalFieldCollection collection{twoD};
+    collection.set_nb_sub_pts(division_tag, NbQuad);
     collection.initialise({2, 2});
     using Mapped_t = MappedField<FieldMap<Real, Mapping::Mut>>;
-    Mapped_t mapped_field{"name", NbRow, NbCol, PixelSubDiv::QuadPt,
-                          collection};
+    Mapped_t mapped_field{"name", NbRow, NbCol, IterUnit::SubPt,
+                          collection, division_tag};
 
-    BOOST_CHECK_THROW(
-        Mapped_t("name", NbRow, NbCol, PixelSubDiv::Pixel, collection),
-        FieldCollectionError);
+    BOOST_CHECK_THROW(Mapped_t("name", NbRow, NbCol, IterUnit::Pixel,
+                               collection, division_tag),
+                      FieldCollectionError);
 
-    MatrixFieldMap<Real, Mapping::Const, NbRow, NbCol, PixelSubDiv::QuadPt>
+    MatrixFieldMap<Real, Mapping::Const, NbRow, NbCol, IterUnit::SubPt>
         static_map(mapped_field.get_field());
 
     for (auto && tup : akantu::zip(mapped_field.get_map(), static_map)) {
@@ -130,29 +139,32 @@ namespace muGrid {
     constexpr static Dim_t SDim{twoD};
     constexpr static Dim_t MDim{threeD};
     constexpr static Dim_t NbComponents{ipow(MDim, Order)};
+    static const std::string subdivision_tag() { return "quad"; }
     using FieldColl_t =
         std::conditional_t<Validity == ValidityDomain::Global,
                            GlobalFieldCollection, LocalFieldCollection>;
     using TField_t =
-        MappedT2Field<Real, Mapping::Mut, MDim, PixelSubDiv::QuadPt>;
+        MappedT2Field<Real, Mapping::Mut, MDim, IterUnit::SubPt>;
     using MField_t =
-        MappedMatrixField<Real, Mapping::Mut, SDim, MDim, PixelSubDiv::QuadPt>;
+        MappedMatrixField<Real, Mapping::Mut, SDim, MDim, IterUnit::SubPt>;
     using DField_t = RealField;
 
     FieldFixture()
-        : tensor_field{"TensorField", this->fc}, matrix_field{"MatrixField",
-                                                              this->fc},
+        : tensor_field{"TensorField", this->fc, subdivision_tag()},
+          matrix_field{"MatrixField", this->fc, subdivision_tag()},
           dynamic_field1{this->fc.register_real_field(
               "Dynamically sized field with correct number of"
               " components",
-              NbComponents, PixelSubDiv::QuadPt)},
+              NbComponents, subdivision_tag())},
           dynamic_field2{this->fc.register_real_field(
               "Dynamically sized field with incorrect number"
               " of components",
-              NbComponents + 1, PixelSubDiv::QuadPt)} {}
+              NbComponents + 1, subdivision_tag())} {
+      fc.set_nb_sub_pts(subdivision_tag(), OneQuadPt);
+    }
     ~FieldFixture() = default;
 
-    FieldColl_t fc{SDim, OneQuadPt, OneNode};
+    FieldColl_t fc{SDim};
     TField_t tensor_field;
     MField_t matrix_field;
     DField_t & dynamic_field1;
@@ -267,12 +279,10 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE(mapped_fields_subdivision, SubDivisionFixture) {
-    MappedArrayField<Real, Mapping::Mut, NbComponent, 1, PixelSubDiv::Pixel>
-        pixel{"pixel", this->fc};
-    MappedArrayField<Real, Mapping::Mut, NbComponent, 1, PixelSubDiv::QuadPt>
-        quad_pt{"quad_pt", this->fc};
-    MappedArrayField<Real, Mapping::Mut, NbComponent, 1, PixelSubDiv::NodalPt>
-        nodal_pt{"nodal_pt", this->fc};
+    MappedArrayField<Real, Mapping::Mut, NbComponent, 1, IterUnit::Pixel>
+      pixel{"pixel", this->fc, PixelTag};
+    MappedArrayField<Real, Mapping::Mut, NbComponent, 1, IterUnit::SubPt>
+        quad_pt{"quad_pt", this->fc, sub_division_tag()};
   }
 
   BOOST_AUTO_TEST_SUITE_END();

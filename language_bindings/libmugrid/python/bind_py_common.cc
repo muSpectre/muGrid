@@ -52,11 +52,9 @@ using pybind11::literals::operator""_a;
 namespace py = pybind11;
 
 void add_enums(py::module & mod) {
-  py::enum_<muGrid::PixelSubDiv>(mod, "PixelSubDiv")
-      .value("Pixel", muGrid::PixelSubDiv::Pixel)
-      .value("QuadPt", muGrid::PixelSubDiv::QuadPt)
-      .value("NodalPt", muGrid::PixelSubDiv::NodalPt)
-      .value("FreePt", muGrid::PixelSubDiv::FreePt)
+  py::enum_<muGrid::IterUnit>(mod, "IterUnit")
+      .value("Pixel", muGrid::IterUnit::Pixel)
+      .value("SubPt", muGrid::IterUnit::SubPt)
       .export_values();
 
   py::enum_<Verbosity>(mod, "Verbosity")

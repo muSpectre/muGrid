@@ -45,7 +45,7 @@ namespace muSpectre {
       : Parent{name, spatial_dimension, nb_quad_pts},
         material{name, spatial_dimension, nb_quad_pts, young, poisson},
         eigen_strains{this->get_prefix() + "Eigenstrain",
-                      *this->internal_fields} {
+                      *this->internal_fields, QuadPtTag} {
     this->last_step_was_nonlinear = false;
   }
 

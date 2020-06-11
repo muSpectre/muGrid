@@ -47,11 +47,12 @@ namespace muGrid {
                          FieldCollection & collection,
                          const Index_t & nb_memory,
                          const Index_t & nb_dof_per_sub_pt,
-                         const PixelSubDiv & sub_division, const Unit & unit,
-                         const Index_t & nb_sub_pts)
+                         const std::string & sub_division_tag,
+                         const Unit & unit)
       : prefix{unique_prefix}, collection{collection}, nb_memory{nb_memory},
         nb_dof_per_sub_pt{nb_dof_per_sub_pt},
-        sub_division{sub_division}, unit{unit}, nb_sub_pts{nb_sub_pts} {
+        sub_division_tag{sub_division_tag}, unit{unit},
+        nb_sub_pts{collection.get_nb_sub_pts(sub_division_tag)} {
     if (nb_memory < 1) {
       throw FieldError("State fields must have a memory size of at least 1.");
     }
@@ -92,17 +93,15 @@ namespace muGrid {
                                       FieldCollection & collection,
                                       const Index_t & nb_memory,
                                       const Index_t & nb_components,
-                                      const PixelSubDiv & sub_division,
-                                      const Unit & unit,
-                                      const Index_t & nb_sub_pts)
-      : Parent{unique_prefix, collection, nb_memory, nb_components,
-               sub_division,  unit,       nb_sub_pts} {
+                                      const std::string & sub_division_tag,
+                                      const Unit & unit)
+      : Parent{unique_prefix, collection,       nb_memory,
+               nb_components, sub_division_tag, unit} {
     for (Index_t i{0}; i < nb_memory + 1; ++i) {
       std::stringstream unique_name_stream{};
       unique_name_stream << this->prefix << ", sub_field index " << i;
       this->fields.push_back(this->collection.template register_field<T>(
-          unique_name_stream.str(), nb_components, sub_division, unit,
-          nb_sub_pts));
+          unique_name_stream.str(), nb_components, sub_division_tag, unit));
     }
   }
 

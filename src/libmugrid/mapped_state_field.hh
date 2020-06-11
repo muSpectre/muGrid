@@ -67,11 +67,12 @@ namespace muGrid {
 
     //! Constructor with name and collection
     MappedStateField(const std::string & unique_name,
-                     FieldCollection & collection)
+                     FieldCollection & collection,
+                     const std::string & sub_division_tag)
         : nb_components{StateFieldMapType::StaticFieldMap_t::Stride()},
           state_field(collection.register_state_field<Scalar>(
               unique_name, StateFieldMapType::GetNbMemory(),
-              this->nb_components, StateFieldMapType::GetIterationType())),
+              this->nb_components, sub_division_tag)),
           map{this->state_field} {}
 
     //! Copy constructor
@@ -132,7 +133,7 @@ namespace muGrid {
    * @tparam NbMemory number of previous values to store
    */
   template <typename T, Mapping Mutability, Dim_t NbRow, Dim_t NbCol,
-            PixelSubDiv IterationType, size_t NbMemory = 1>
+            IterUnit IterationType, size_t NbMemory = 1>
   using MappedMatrixStateField =
       MappedStateField<MatrixStateFieldMap<T, Mutability, NbRow, NbCol,
                                            NbMemory, IterationType>>;
@@ -153,7 +154,7 @@ namespace muGrid {
    * @tparam NbMemory number of previous values to store
    */
   template <typename T, Mapping Mutability, Dim_t NbRow, Dim_t NbCol,
-            PixelSubDiv IterationType, size_t NbMemory = 1>
+            IterUnit IterationType, size_t NbMemory = 1>
   using MappedArrayStateField = MappedStateField<
       ArrayStateFieldMap<T, Mutability, NbRow, NbCol, NbMemory, IterationType>>;
 
@@ -169,7 +170,7 @@ namespace muGrid {
    * @tparam IterationType describes the pixel-subdivision
    * @tparam NbMemory number of previous values to store
    */
-  template <typename T, Mapping Mutability, PixelSubDiv IterationType,
+  template <typename T, Mapping Mutability, IterUnit IterationType,
             size_t NbMemory = 1>
   using MappedScalarStateField = MappedStateField<
       ScalarStateFieldMap<T, Mutability, NbMemory, IterationType>>;
@@ -188,7 +189,7 @@ namespace muGrid {
    * @tparam NbMemory number of previous values to store
    */
   template <typename T, Mapping Mutability, Dim_t Dim,
-            PixelSubDiv IterationType, size_t NbMemory = 1>
+            IterUnit IterationType, size_t NbMemory = 1>
   using MappedT1StateNField = MappedStateField<
       T1StateFieldMap<T, Mutability, Dim, NbMemory, IterationType>>;
 
@@ -206,7 +207,7 @@ namespace muGrid {
    * @tparam NbMemory number of previous values to store
    */
   template <typename T, Mapping Mutability, Dim_t Dim,
-            PixelSubDiv IterationType, size_t NbMemory = 1>
+            IterUnit IterationType, size_t NbMemory = 1>
   using MappedT2StateField = MappedStateField<
       T2StateFieldMap<T, Mutability, Dim, NbMemory, IterationType>>;
 
@@ -224,7 +225,7 @@ namespace muGrid {
    * @tparam NbMemory number of previous values to store
    */
   template <typename T, Mapping Mutability, Dim_t Dim,
-            PixelSubDiv IterationType, size_t NbMemory = 1>
+            IterUnit IterationType, size_t NbMemory = 1>
   using MappedT4StateField = MappedStateField<
       T4StateFieldMap<T, Mutability, Dim, NbMemory, IterationType>>;
 

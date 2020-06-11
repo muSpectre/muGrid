@@ -60,12 +60,9 @@ namespace muGrid {
      * @param spatial_dimension spatial dimension of the field (can be
      *                    muGrid::Unknown, e.g., in the case of the local fields
      *                    for storing internal material variables)
-     * @param nb_quad_pts number of quadrature points per pixel/voxel
-     * @param nb_nodal_pts number of nodal points per pixel/voxel
      */
     LocalFieldCollection(const Index_t & spatial_dimension,
-                         const Index_t & nb_quad_pts,
-                         const Index_t & nb_nodal_pts);
+                         const SubPtMap_t & nb_sub_pts = {});
 
     //! Copy constructor
     LocalFieldCollection(const LocalFieldCollection & other) = delete;

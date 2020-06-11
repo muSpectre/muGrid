@@ -82,10 +82,12 @@ namespace muGrid {
      */
     TypedFieldBase(const std::string & unique_name,
                    FieldCollection & collection, Index_t nb_dof_per_sub_pt,
-                   const PixelSubDiv & sub_division, const Unit & unit,
-                   const Index_t & nb_sub_pts = Unknown)
-        : Parent{unique_name, collection,   nb_dof_per_sub_pt,
-                 nb_sub_pts,  sub_division, unit} {}
+                   const std::string & sub_division, const Unit & unit)
+        : Parent{unique_name,
+                 collection,
+                 nb_dof_per_sub_pt,
+                 sub_division,
+                 unit} {}
 
    public:
     //! stored scalar type
@@ -196,7 +198,7 @@ namespace muGrid {
      * iterate. If left to default value, a column vector is used
      */
     FieldMap<T, Mapping::Mut>
-    get_quad_pt_map(const Index_t & nb_rows = Unknown);
+    get_sub_pt_map(const Index_t & nb_rows = Unknown);
 
     /**
      * convenience function returns a const  map of this field, iterable per
@@ -206,7 +208,7 @@ namespace muGrid {
      * iterate. If left to default value, a column vector is used
      */
     FieldMap<T, Mapping::Const>
-    get_quad_pt_map(const Index_t & nb_rows = Unknown) const;
+    get_sub_pt_map(const Index_t & nb_rows = Unknown) const;
 
     //! get the raw data ptr. don't use unless interfacing with external libs
     T * data() const;
@@ -258,10 +260,9 @@ namespace muGrid {
      */
     TypedField(const std::string & unique_name, FieldCollection & collection,
                const Index_t & nb_dof_per_sub_pt,
-               const PixelSubDiv & sub_division, const Unit & unit,
-               const Index_t & nb_sub_pts = Unknown)
-        : Parent{unique_name,  collection, nb_dof_per_sub_pt,
-                 sub_division, unit,       nb_sub_pts} {}
+               const std::string & sub_division, const Unit & unit)
+        : Parent{unique_name, collection, nb_dof_per_sub_pt, sub_division,
+                 unit} {}
 
    public:
     //! base class
@@ -312,7 +313,7 @@ namespace muGrid {
      */
     static TypedField & safe_cast(Field & other,
                                   const Index_t & nb_dof_per_sub_pt,
-                                  const PixelSubDiv & sub_division);
+                                  const std::string & sub_division);
 
     /**
      * cast a const reference to a base type to this type safely, plus check
@@ -320,7 +321,7 @@ namespace muGrid {
      */
     static const TypedField & safe_cast(const Field & other,
                                         const Index_t & nb_dof_per_sub_pt,
-                                        const PixelSubDiv & sub_division);
+                                        const std::string & sub_division);
 
     size_t buffer_size() const final;
 
@@ -365,25 +366,20 @@ namespace muGrid {
     /**
      * constructor from a raw pointer. Typically, this would be a reference
      * to a numpy array from the python bindings.
-     * the @param nb_sub_pts is only required if sub_division is
-     * `PixelSubDiv::FreePt`
      */
     WrappedField(const std::string & unique_name, FieldCollection & collection,
                  const Index_t & nb_dof_per_sub_pt, const size_t & size,
-                 T * ptr, const PixelSubDiv & sub_division,
-                 const Unit & unit = Unit::unitless(),
-                 const Index_t & nb_sub_pts = Unknown);
+                 T * ptr, const std::string & sub_division,
+                 const Unit & unit = Unit::unitless());
 
     /**
-     * constructor from an eigen array ref. the @param nb_sub_pts is only
-     * required if sub_division is `PixelSubDiv::FreePt`
+     * constructor from an eigen array ref. 
      */
     WrappedField(const std::string & unique_name, FieldCollection & collection,
                  const Index_t & nb_dof_per_sub_pt,
                  Eigen::Ref<EigenRep_t> values,
-                 const PixelSubDiv & sub_division,
-                 const Unit & unit = Unit::unitless(),
-                 const Index_t & nb_sub_pts = Unknown);
+                 const std::string & sub_division,
+                 const Unit & unit = Unit::unitless());
 
     //! Default constructor
     WrappedField() = delete;
@@ -404,14 +400,12 @@ namespace muGrid {
     WrappedField & operator=(const Parent & other);
 
     /**
-     * Emulation of a const constructor. @param nb_sub_pts is only required if
-     * sub_division is `PixelSubDiv::FreePt`
+     * Emulation of a const constructor
      */
     static std::unique_ptr<const WrappedField> make_const(
         const std::string & unique_name, FieldCollection & collection,
         Index_t nb_dof_per_sub_pt, const Eigen::Ref<const EigenRep_t> values,
-        const PixelSubDiv & sub_division, const Unit & unit = Unit::unitless(),
-        const Index_t & nb_sub_pts = Unknown);
+        const std::string & sub_division, const Unit & unit = Unit::unitless());
 
     void set_zero() final;
     void set_pad_size(const size_t & pad_size) final;

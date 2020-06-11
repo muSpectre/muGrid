@@ -52,7 +52,7 @@ namespace muGrid {
    * efficiently.
    */
   template <typename T, Mapping Mutability, class MapType,
-            PixelSubDiv IterationType = PixelSubDiv::QuadPt>
+            IterUnit IterationType = IterUnit::SubPt>
   class StaticFieldMap : public FieldMap<T, Mutability> {
     static_assert(MapType::IsValidStaticMapType(),
                   "The MapType you chose is not compatible");
@@ -81,7 +81,7 @@ namespace muGrid {
      * determine at compile time  whether pixels or quadrature points are
      * iterater over
      */
-    constexpr static PixelSubDiv GetIterationType() { return IterationType; }
+    constexpr static IterUnit GetIterationType() { return IterationType; }
     //! determine the number of components in the iterate at compile time
     constexpr static size_t Stride() { return MapType::stride(); }
     //! determine whether this map has statically sized iterates at compile time
@@ -92,7 +92,7 @@ namespace muGrid {
      * stored values simultaneously
      */
     using Enumeration_t = akantu::containers::ZipContainer<
-        std::conditional_t<(IterationType == PixelSubDiv::QuadPt),
+        std::conditional_t<(IterationType == IterUnit::SubPt),
                            FieldCollection::IndexIterable,
                            FieldCollection::PixelIndexIterable>,
         StaticFieldMap &>;
@@ -216,23 +216,24 @@ namespace muGrid {
     const_iterator end() const { return const_iterator{*this, true}; }
 
     //! iterate over pixel/quad point indices and stored values simultaneously
-    template <bool IsPixelIterable = (IterationType == PixelSubDiv::Pixel)>
+    template <bool IsPixelIterable = (IterationType == IterUnit::Pixel)>
     std::enable_if_t<IsPixelIterable, Enumeration_t> enumerate_indices() {
-      static_assert(IsPixelIterable == (IterationType == PixelSubDiv::Pixel),
+      static_assert(IsPixelIterable == (IterationType == IterUnit::Pixel),
                     "IsPixelIterable is a SFINAE parameter, do not touch it.");
       return akantu::zip(this->field.get_collection().get_pixel_indices_fast(),
                          *this);
     }
 
     //! iterate over pixel/quad point indices and stored values simultaneously
-    template <PixelSubDiv Iter = PixelSubDiv::QuadPt,
+    template <IterUnit Iter = IterUnit::SubPt,
               class Dummy = std::enable_if_t<IterationType == Iter, bool>>
     Enumeration_t enumerate_indices() {
-      static_assert(Iter == PixelSubDiv::QuadPt,
+      static_assert(Iter == IterUnit::SubPt,
                     "Iter is a SFINAE parameter, do not touch it.");
       static_assert(std::is_same<Dummy, bool>::value,
                     "Dummy is a SFINAE parameter, do not touch it.");
-      return akantu::zip(this->field.get_collection().get_quad_pt_indices(),
+      return akantu::zip(this->field.get_collection().get_sub_pt_indices(
+                             this->field.get_sub_division_tag()),
                          *this);
     }
   };
@@ -241,7 +242,7 @@ namespace muGrid {
    * Iterator class for `muGrid::StaticFieldMap`
    */
   template <typename T, Mapping Mutability, class MapType,
-            PixelSubDiv IterationType>
+            IterUnit IterationType>
   template <Mapping MutIter>
   class StaticFieldMap<T, Mutability, MapType, IterationType>::Iterator {
    public:
@@ -496,7 +497,7 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T, Mapping Mutability, class MapType,
-            PixelSubDiv IterationType>
+            IterUnit IterationType>
   typename StaticFieldMap<T, Mutability, MapType, IterationType>::PlainType
   StaticFieldMap<T, Mutability, MapType, IterationType>::mean() const {
     PlainType mean{PlainType::Zero()};
@@ -521,7 +522,7 @@ namespace muGrid {
    * @tparam IterationType describes the pixel-subdivision
    */
   template <typename T, Mapping Mutability, Dim_t NbRow, Dim_t NbCol,
-            PixelSubDiv IterationType>
+            IterUnit IterationType>
   using MatrixFieldMap =
       StaticFieldMap<T, Mutability, internal::MatrixMap<T, NbRow, NbCol>,
                      IterationType>;
@@ -540,7 +541,7 @@ namespace muGrid {
    * @tparam IterationType describes the pixel-subdivisionuadrature points
    */
   template <typename T, Mapping Mutability, Dim_t NbRow, Dim_t NbCol,
-            PixelSubDiv IterationType>
+            IterUnit IterationType>
   using ArrayFieldMap =
       StaticFieldMap<T, Mutability, internal::ArrayMap<T, NbRow, NbCol>,
                      IterationType>;
@@ -555,7 +556,7 @@ namespace muGrid {
    * the field
    * @tparam IterationType describes the pixel-subdivision
    */
-  template <typename T, Mapping Mutability, PixelSubDiv IterationType>
+  template <typename T, Mapping Mutability, IterUnit IterationType>
   using ScalarFieldMap =
       StaticFieldMap<T, Mutability, internal::ScalarMap<T>, IterationType>;
 
@@ -571,7 +572,7 @@ namespace muGrid {
    * @tparam IterationType describes the pixel-subdivision
    */
   template <typename T, Mapping Mutability, Dim_t Dim,
-            PixelSubDiv IterationType>
+            IterUnit IterationType>
   using T1NFieldMap =
       StaticFieldMap<T, Mutability, internal::MatrixMap<T, Dim, 1>,
                      IterationType>;
@@ -588,7 +589,7 @@ namespace muGrid {
    * @tparam IterationType describes the pixel-subdivision
    */
   template <typename T, Mapping Mutability, Dim_t Dim,
-            PixelSubDiv IterationType>
+            IterUnit IterationType>
   using T1FieldMap =
       StaticFieldMap<T, Mutability, internal::MatrixMap<T, Dim, 1>,
                      IterationType>;
@@ -605,7 +606,7 @@ namespace muGrid {
    * @tparam IterationType describes the pixel-subdivision
    */
   template <typename T, Mapping Mutability, Dim_t Dim,
-            PixelSubDiv IterationType>
+            IterUnit IterationType>
   using T2FieldMap =
       StaticFieldMap<T, Mutability, internal::MatrixMap<T, Dim, Dim>,
                      IterationType>;
@@ -622,7 +623,7 @@ namespace muGrid {
    * @tparam IterationType describes the pixel-subdivision
    */
   template <typename T, Mapping Mutability, Dim_t Dim,
-            PixelSubDiv IterationType>
+            IterUnit IterationType>
   using T4FieldMap =
       StaticFieldMap<T, Mutability,
                      internal::MatrixMap<T, Dim * Dim, Dim * Dim>,

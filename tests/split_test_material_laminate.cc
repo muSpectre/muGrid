@@ -279,21 +279,22 @@ namespace muSpectre {
     using Mat_t = Eigen::Matrix<Real, Fix::mdim, Fix::mdim>;
     using FC_t = muGrid::GlobalFieldCollection;
     // using Ccoord = Ccoord_t<Fix::sdim>;
-    FC_t globalfields{Fix::mdim, Fix::NbQuadPts(), muGrid::Unknown};
+    FC_t globalfields{Fix::mdim};
+    globalfields.set_nb_sub_pts(QuadPtTag, Fix::NbQuadPts());
     globalfields.initialise(cube, loc);
-    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim, PixelSubDiv::QuadPt>
-        F1_f{"Transformation Gradient 1", globalfields};
-    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim, PixelSubDiv::QuadPt>
-        P1_f{"Nominal Stress 1", globalfields};
-    muGrid::MappedT4Field<Real, Mapping::Mut, Fix::mdim, PixelSubDiv::QuadPt>
-        K1_f{"Tangent Moduli 1", globalfields};
+    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim, IterUnit::SubPt>
+        F1_f{"Transformation Gradient 1", globalfields, QuadPtTag};
+    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim, IterUnit::SubPt>
+        P1_f{"Nominal Stress 1", globalfields, QuadPtTag};
+    muGrid::MappedT4Field<Real, Mapping::Mut, Fix::mdim, IterUnit::SubPt>
+        K1_f{"Tangent Moduli 1", globalfields, QuadPtTag};
 
-    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim, PixelSubDiv::QuadPt>
-        F2_f{"Transformation Gradient 2", globalfields};
-    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim, PixelSubDiv::QuadPt>
-        P2_f{"Nominal Stress 2", globalfields};
-    muGrid::MappedT4Field<Real, Mapping::Mut, Fix::mdim, PixelSubDiv::QuadPt>
-        K2_f{"Tangent Moduli 2", globalfields};
+    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim, IterUnit::SubPt>
+        F2_f{"Transformation Gradient 2", globalfields, QuadPtTag};
+    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim, IterUnit::SubPt>
+        P2_f{"Nominal Stress 2", globalfields, QuadPtTag};
+    muGrid::MappedT4Field<Real, Mapping::Mut, Fix::mdim, IterUnit::SubPt>
+        K2_f{"Tangent Moduli 2", globalfields, QuadPtTag};
 
     Mat_t zero{Mat_t::Zero()};
     Mat_t F{1e-6 * Mat_t::Random() + Mat_t::Identity()};
@@ -351,21 +352,22 @@ namespace muSpectre {
     constexpr auto cube{muGrid::CcoordOps::get_cube<Fix::sdim>(nb_pixel)};
     constexpr auto loc{muGrid::CcoordOps::get_cube<Fix::sdim>(Index_t{0})};
 
-    FC_t globalfields{Fix::mdim, Fix::NbQuadPts(), muGrid::Unknown};
+    FC_t globalfields{Fix::mdim};
+    globalfields.set_nb_sub_pts(QuadPtTag, Fix::NbQuadPts());
     globalfields.initialise(cube, loc);
-    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim, PixelSubDiv::QuadPt>
-        F1_f{"Transformation Gradient 1", globalfields};
-    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim, PixelSubDiv::QuadPt>
-        P1_f{"Nominal Stress 1", globalfields};
-    muGrid::MappedT4Field<Real, Mapping::Mut, Fix::mdim, PixelSubDiv::QuadPt>
-        K1_f{"Tangent Moduli 1", globalfields};
+    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim, IterUnit::SubPt>
+        F1_f{"Transformation Gradient 1", globalfields, QuadPtTag};
+    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim, IterUnit::SubPt>
+        P1_f{"Nominal Stress 1", globalfields, QuadPtTag};
+    muGrid::MappedT4Field<Real, Mapping::Mut, Fix::mdim, IterUnit::SubPt>
+        K1_f{"Tangent Moduli 1", globalfields, QuadPtTag};
 
-    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim, PixelSubDiv::QuadPt>
-        F2_f{"Transformation Gradient 2", globalfields};
-    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim, PixelSubDiv::QuadPt>
-        P2_f{"Nominal Stress 2", globalfields};
-    muGrid::MappedT4Field<Real, Mapping::Mut, Fix::mdim, PixelSubDiv::QuadPt>
-        K2_f{"Tangent Moduli 2", globalfields};
+    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim, IterUnit::SubPt>
+        F2_f{"Transformation Gradient 2", globalfields, QuadPtTag};
+    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim, IterUnit::SubPt>
+        P2_f{"Nominal Stress 2", globalfields, QuadPtTag};
+    muGrid::MappedT4Field<Real, Mapping::Mut, Fix::mdim, IterUnit::SubPt>
+        K2_f{"Tangent Moduli 2", globalfields, QuadPtTag};
 
     Mat_t zero{Mat_t::Zero()};
     Mat_t F{1e-6 * Mat_t::Random() + Mat_t::Identity()};

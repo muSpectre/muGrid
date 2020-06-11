@@ -41,12 +41,12 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   Field::Field(const std::string & unique_name, FieldCollection & collection,
-               const Index_t & nb_dof_per_sub_pt, const Index_t & nb_sub_pts,
-               const PixelSubDiv & sub_division, const Unit & unit)
+               const Index_t & nb_dof_per_sub_pt,
+               const std::string & sub_division_tag, const Unit & unit)
       : name{unique_name}, collection{collection},
         nb_dof_per_sub_pt{nb_dof_per_sub_pt},
-        nb_sub_pts{collection.check_nb_sub_pts(nb_sub_pts, sub_division)},
-        sub_division{sub_division}, unit{unit} {}
+        nb_sub_pts{collection.get_nb_sub_pts(sub_division_tag)},
+        sub_division_tag{sub_division_tag}, unit{unit} {}
   /* ---------------------------------------------------------------------- */
   const std::string & Field::get_name() const { return this->name; }
 
@@ -83,10 +83,10 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  std::vector<Index_t> Field::get_shape(const PixelSubDiv & iter_type) const {
+  std::vector<Index_t> Field::get_shape(const IterUnit & iter_type) const {
     std::vector<Index_t> shape;
 
-    auto && use_iter_type{this->get_nb_sub_pts() == 1 ? PixelSubDiv::Pixel
+    auto && use_iter_type{this->get_nb_sub_pts() == 1 ? IterUnit::Pixel
                                                       : iter_type};
     for (auto && n : this->get_components_shape(use_iter_type)) {
       shape.push_back(n);
@@ -98,11 +98,11 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  std::vector<Index_t> Field::get_strides(const PixelSubDiv & iter_type,
+  std::vector<Index_t> Field::get_strides(const IterUnit & iter_type,
                                           const Index_t & multiplier) const {
     std::vector<Index_t> strides;
 
-    auto && use_iter_type{this->get_nb_sub_pts() == 1 ? PixelSubDiv::Pixel
+    auto && use_iter_type{this->get_nb_sub_pts() == 1 ? IterUnit::Pixel
                                                       : iter_type};
     for (auto && n : this->get_components_strides(use_iter_type)) {
       strides.push_back(n * multiplier);
@@ -174,7 +174,7 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   std::vector<Index_t>
-  Field::get_components_strides(const PixelSubDiv & iter_type) const {
+  Field::get_components_strides(const IterUnit & iter_type) const {
     std::vector<Index_t> strides{};
     Index_t accumulator{1};
     for (auto && n : this->get_components_shape(iter_type)) {
@@ -186,10 +186,10 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   std::vector<Index_t>
-  Field::get_components_shape(const PixelSubDiv & iter_type) const {
+  Field::get_components_shape(const IterUnit & iter_type) const {
     std::vector<Index_t> shape;
 
-    if (this->get_nb_sub_pts() == 1 || iter_type == PixelSubDiv::Pixel) {
+    if (this->get_nb_sub_pts() == 1 || iter_type == IterUnit::Pixel) {
       shape.push_back(this->nb_dof_per_sub_pt * this->get_nb_sub_pts());
     } else {
       shape.push_back(this->nb_dof_per_sub_pt);
@@ -199,106 +199,34 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  Index_t Field::get_stride(const PixelSubDiv & iter_type) const {
-    // make sure that the requested itertype is either
-    //
-    // * the field's natural type,
-    // * pixel,
-    // * either NodalPt or QuatPt *AND* the number of nodal/quadrature points is
-    //   compatible with (i.e., an integer divisor of) the number of dofs per
-    //   pixel
-    //
-    // (There is no general way of mapping quadrature point fields on nodal
-    // fields.).
-
-    if (iter_type == PixelSubDiv::Pixel) {
-      return this->get_nb_dof_per_sub_pt() * this->get_nb_sub_pts();
-    } else if (iter_type == this->get_sub_division()) {
-      return this->get_nb_dof_per_sub_pt();
-    } else if (this->get_sub_division() == PixelSubDiv::Pixel) {
-      switch (iter_type) {
-      case PixelSubDiv::FreePt: {
+  Index_t Field::get_stride(const IterUnit & iter_type) const {
+    if (iter_type == IterUnit::Pixel) {
+      if (not this->get_collection().has_nb_sub_pts(
+              this->get_sub_division_tag())) {
         std::stringstream message{};
-        message << "you are trying to map a " << iter_type << " map onto the "
-                << this->get_sub_division() << " field '" << this->get_name()
-                << "'. This is ambiguous, please explicitly choose the "
-                   "iteration type or choose a different sub-division for the "
-                   "unterlying field.";
+        message
+            << "You are trying to map a pixel map onto the '"
+            << this->get_sub_division_tag() << "' field '" << this->get_name()
+            << "', but the number of sub points is unknown to the "
+               "field collection. Please use FieldCollection::set_nb_sub_pts(\""
+            << this->get_sub_division_tag()
+            << "\") before this call to fix the situation.";
         throw FieldError(message.str());
-
-        break;
       }
-      case PixelSubDiv::QuadPt: {
-        if (not this->get_collection().has_nb_quad_pts()) {
-          std::stringstream message{};
-          message << "You are trying to map a quadrature point map onto the "
-                     "pixel field '"
-                  << this->get_name()
-                  << "', but the number of quadrature points is unknown to the "
-                     "field collection. Please use "
-                     "FieldCollection::set_nb_quad_pts() before this call to "
-                     "fix the situation.";
-          throw FieldError(message.str());
-        }
-        auto && nb_sub_pts{this->get_collection().get_nb_quad_pts()};
-        auto && stride{this->get_nb_dof_per_pixel() / nb_sub_pts};
-        if (stride * nb_sub_pts != this->get_nb_dof_per_pixel()) {
-          std::stringstream message{};
-          message << " The number of " << iter_type
-                  << "s is not an integer divisor of the number of degrees of "
-                     "freedom per pixel in field '"
-                  << this->get_name() << "'.";
-          throw FieldError(message.str());
-        }
-        return stride;
-      }
-      case PixelSubDiv::NodalPt: {
-        if (not this->get_collection().has_nb_nodal_pts()) {
-          std::stringstream message{};
-          message << "You are trying to map a nodal point map onto the "
-                     "pixel field '"
-                  << this->get_name()
-                  << "', but the number of nodal points is unknown to the "
-                     "field collection. Please use "
-                     "FieldCollection::set_nb_nodal_pts() before this call to "
-                     "fix the situation.";
-          throw FieldError(message.str());
-        }
-        auto && nb_sub_pts{this->get_collection().get_nb_nodal_pts()};
-        auto && stride{this->get_nb_dof_per_pixel() / nb_sub_pts};
-        if (stride * nb_sub_pts != this->get_nb_dof_per_pixel()) {
-          std::stringstream message{};
-          message << " The number of " << iter_type
-                  << "s is not an integer divisor of the number of degrees of "
-                     "freedom per pixel in field '"
-                  << this->get_name() << "'.";
-          throw FieldError(message.str());
-        }
-        return stride;
-        break;
-      }
-
-      default:
-        throw FieldError("Unknown iter_type");
-        break;
-      }
+      return this->get_nb_dof_per_sub_pt() * this->get_nb_sub_pts();
     } else {
-      std::stringstream message{};
-      message << "you are trying to map a " << iter_type << " map onto a "
-              << this->get_sub_division()
-              << " field. I don't know how to do that";
-      throw FieldError(message.str());
+      return this->get_nb_dof_per_sub_pt();
     }
   }
 
   /* ---------------------------------------------------------------------- */
-  Index_t Field::get_default_nb_rows(const PixelSubDiv & /*iter_type*/) const {
+  Index_t Field::get_default_nb_rows(const IterUnit & /*iter_type*/) const {
     return this->get_nb_dof_per_sub_pt();
   }
 
   /* ---------------------------------------------------------------------- */
-  Index_t Field::get_default_nb_cols(const PixelSubDiv & iter_type) const {
-    return (iter_type == PixelSubDiv::Pixel ? this->get_nb_sub_pts() : 1);
+  Index_t Field::get_default_nb_cols(const IterUnit & iter_type) const {
+    return (iter_type == IterUnit::Pixel ? this->get_nb_sub_pts() : 1);
   }
   /* ---------------------------------------------------------------------- */
   const size_t & Field::get_pad_size() const { return this->pad_size; }
@@ -313,8 +241,8 @@ namespace muGrid {
   bool Field::has_nb_sub_pts() const { return this->nb_sub_pts != Unknown; }
 
   /* ---------------------------------------------------------------------- */
-  const PixelSubDiv & Field::get_sub_division() const {
-    return this->sub_division;
+  const std::string & Field::get_sub_division_tag() const {
+    return this->sub_division_tag;
   }
 
   /* ---------------------------------------------------------------------- */

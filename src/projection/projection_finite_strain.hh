@@ -56,11 +56,11 @@ namespace muSpectre {
     using Gradient_t = typename Parent::Gradient_t;
     //! Field type on which to apply the projection
     using Proj_map =
-        muGrid::T4FieldMap<Real, Mapping::Mut, DimS, PixelSubDiv::QuadPt>;
+        muGrid::T4FieldMap<Real, Mapping::Mut, DimS, IterUnit::SubPt>;
     //! iterable vectorised version of the Fourier-space tensor field
     using Vector_map =
         muGrid::MatrixFieldMap<Complex, Mapping::Mut, DimS * DimS, 1,
-                               PixelSubDiv::QuadPt>;
+                               IterUnit::SubPt>;
 
     //! Default constructor
     ProjectionFiniteStrain() = delete;

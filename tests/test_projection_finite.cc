@@ -96,14 +96,15 @@ namespace muSpectre {
         "identical");
     using Fields = muGrid::GlobalFieldCollection;
     using FieldMap = muGrid::MatrixFieldMap<Real, Mapping::Mut, mdim, mdim,
-                                            PixelSubDiv::QuadPt>;
+                                            IterUnit::SubPt>;
     using Vector = Eigen::Matrix<Real, dim, 1>;
 
-    Fields fields{sdim, OneQuadPt, muGrid::Unknown};
+    Fields fields{sdim};
+    fields.set_nb_sub_pts(QuadPtTag, OneQuadPt);
     muGrid::RealField & f_grad{fields.register_real_field(
-        "gradient", mdim * mdim, PixelSubDiv::QuadPt)};
+        "gradient", mdim * mdim, QuadPtTag)};
     muGrid::RealField & f_var{fields.register_real_field(
-        "working field", mdim * mdim, PixelSubDiv::QuadPt)};
+        "working field", mdim * mdim, QuadPtTag)};
 
     FieldMap grad(f_grad);
     FieldMap var(f_var);
@@ -177,13 +178,14 @@ namespace muSpectre {
     using Fields = muGrid::GlobalFieldCollection;
     using FieldT = muGrid::TypedField<Real>;
     using FieldMap = muGrid::MatrixFieldMap<Real, Mapping::Mut, mdim, mdim,
-                                            PixelSubDiv::QuadPt>;
+                                            IterUnit::SubPt>;
 
-    Fields fields{sdim, OneQuadPt, muGrid::Unknown};
+    Fields fields{sdim};
+    fields.set_nb_sub_pts(QuadPtTag, OneQuadPt);
     FieldT & f_grad{fields.register_real_field("gradient", mdim * mdim,
-                                               PixelSubDiv::QuadPt)};
+                                               QuadPtTag)};
     FieldT & f_grad_test{fields.register_real_field(
-        "gradient_test", mdim * mdim, PixelSubDiv::QuadPt)};
+        "gradient_test", mdim * mdim, QuadPtTag)};
     FieldMap grad(f_grad);
     FieldMap grad_test(f_grad_test);
 

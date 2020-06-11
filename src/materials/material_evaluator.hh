@@ -93,10 +93,17 @@ namespace muSpectre {
      */
     explicit MaterialEvaluator(std::shared_ptr<MaterialBase> material)
         : material{material}, collection{std::make_unique<FieldColl_t>(
-                                  DimM, OneQuadPt, muGrid::Unknown)},
-          strain("gradient", *this->collection),
-          stress{"stress", *this->collection}, tangent{"tangent",
-                                                       *this->collection} {
+                                  DimM,
+                                  []() {
+                                    muGrid::FieldCollection::SubPtMap_t map{};
+                                    map[QuadPtTag] = OneQuadPt;
+                                    return map;
+                                  }())},
+          strain{"gradient", *this->collection, QuadPtTag},
+          stress{"stress", *this->collection, QuadPtTag}, tangent{
+                                                              "tangent",
+                                                              *this->collection,
+                                                              QuadPtTag} {
       this->collection->initialise(
           muGrid::CcoordOps::get_cube<DimM>(Index_t{1}), Ccoord_t<DimM>{});
     }
@@ -174,14 +181,13 @@ namespace muSpectre {
     std::unique_ptr<FieldColl_t> collection;
 
     //! strain field (independent variable)
-    muGrid::MappedT2Field<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt> strain;
+    muGrid::MappedT2Field<Real, Mapping::Mut, DimM, IterUnit::SubPt> strain;
 
     //! stress field (result)
-    muGrid::MappedT2Field<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt> stress;
+    muGrid::MappedT2Field<Real, Mapping::Mut, DimM, IterUnit::SubPt> stress;
 
     //! field of tangent moduli (result)
-    muGrid::MappedT4Field<Real, Mapping::Mut, DimM, PixelSubDiv::QuadPt>
-        tangent;
+    muGrid::MappedT4Field<Real, Mapping::Mut, DimM, IterUnit::SubPt> tangent;
 
     //! whether the evaluator has been initialised
     bool is_initialised{false};

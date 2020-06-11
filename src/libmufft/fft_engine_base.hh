@@ -222,10 +222,6 @@ namespace muFFT {
     //! return the number of spatial dimensions
     const Index_t & get_spatial_dim() const;
 
-    /**
-     * returns the number of quadrature points
-     */
-    const Index_t & get_nb_quad_pts() const;
 
     //! perform a deep copy of the engine (this should never be necessary in
     //! c++)

@@ -62,11 +62,11 @@ namespace muSpectre {
     using Proj_t = muGrid::RealField;
     //! iterable operator
     using Proj_map =
-        muGrid::T4FieldMap<Real, Mapping::Mut, DimS, PixelSubDiv::QuadPt>;
+        muGrid::T4FieldMap<Real, Mapping::Mut, DimS, IterUnit::SubPt>;
     //! iterable vectorised version of the Fourier-space tensor field
     using Vector_map =
         muGrid::MatrixFieldMap<Complex, Mapping::Mut, DimS * DimS, 1,
-                               PixelSubDiv::QuadPt>;
+                               IterUnit::SubPt>;
 
     //! Default constructor
     ProjectionSmallStrain() = delete;

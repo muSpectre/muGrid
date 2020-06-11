@@ -55,23 +55,22 @@ namespace muSpectre {
     auto & mat{Fix::mat};
 
     using FC_t = muGrid::GlobalFieldCollection;
-    FC_t globalfields{Fix::MaterialDimension(), muGrid::Unknown,
-                      muGrid::Unknown};
-    globalfields.set_nb_quad_pts(Fix::NbQuadPts);
+    FC_t globalfields{Fix::MaterialDimension()};
+    globalfields.set_nb_sub_pts(QuadPtTag, Fix::NbQuadPts);
     globalfields.initialise(cube, loc);
     globalfields.register_real_field("Transformation Gradient", mdim * mdim,
-                                     PixelSubDiv::QuadPt);
+                                     QuadPtTag);
     auto & P1 = globalfields.register_real_field(
         "Nominal Stress1", mdim * mdim,
-        PixelSubDiv::QuadPt);  // to be computed alone
+        QuadPtTag);  // to be computed alone
     globalfields.register_real_field(
         "Nominal Stress2", mdim * mdim,
-        PixelSubDiv::QuadPt);  // to be computed with tangent
+        QuadPtTag);  // to be computed with tangent
     globalfields.register_real_field(
         "Tangent Moduli", muGrid::ipow(mdim, 4),
-        PixelSubDiv::QuadPt);  // to be computed with tangent
+        QuadPtTag);  // to be computed with tangent
     globalfields.register_real_field("Material stress (PK2) reference",
-                                     mdim * mdim, PixelSubDiv::QuadPt);
+                                     mdim * mdim, QuadPtTag);
 
     static_assert(std::is_same<decltype(P1), muGrid::RealField &>::value,
                   "oh oh");
