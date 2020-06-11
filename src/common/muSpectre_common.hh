@@ -59,9 +59,9 @@ namespace muSpectre {
   using muGrid::threeD;
   using muGrid::twoD;
 
+  using muGrid::FourQuadPts;
   using muGrid::OneQuadPt;
   using muGrid::TwoQuadPts;
-  using muGrid::FourQuadPts;
 
   using muGrid::OneNode;
 
@@ -178,16 +178,29 @@ namespace muSpectre {
   enum class StrainMeasure {
     Gradient,       //!< placement gradient (δy/δx)
     Infinitesimal,  //!< small strain tensor .5(∇u + ∇uᵀ)
-    GreenLagrange,  //!< Green-Lagrange strain .5(Fᵀ·F - I)
-    Biot,           //!< Biot strain
-    Log,            //!< logarithmic strain
-    Almansi,        //!< Almansi strain
-    RCauchyGreen,   //!< Right Cauchy-Green tensor
-    LCauchyGreen,   //!< Left Cauchy-Green tensor
+    GreenLagrange,  //!< Green-Lagrange strain .5(Fᵀ·F - I) = .5(U² - I)
+    Biot,           //!< Biot strain (U - I and F = RU)
+    Log,            //!< logarithmic strain (log U and F = RU)
+    Almansi,        //!< Almansi strain .5 (I - F⁻ᵀ. F⁻¹)
+    RCauchyGreen,   //!< Right Cauchy-Green tensor (Fᵀ.F)
+    LCauchyGreen,   //!< Left Cauchy-Green tensor(F.Fᵀ)
     no_strain_      //!< only for triggering static_assert
   };
+
   //! inserts `muSpectre::StrainMeasure`s into `std::ostream`s
   std::ostream & operator<<(std::ostream & os, StrainMeasure s);
+
+  /* ---------------------------------------------------------------------- */
+  /**
+   * Returns either a bool expressing that whether a strain measure is objective
+   * or not
+   */
+
+  constexpr bool is_objective(const StrainMeasure & measure) {
+    // for the moment all the existing strain measures in the code are objective
+    // except Gradient
+    return (measure != StrainMeasure::Gradient);
+  }
 
   /* ---------------------------------------------------------------------- */
   /**
@@ -220,6 +233,7 @@ namespace muSpectre {
   constexpr inline bool operator<(ElasticModulus A, ElasticModulus B) {
     return static_cast<int>(A) < static_cast<int>(B);
   }
+
   /* ---------------------------------------------------------------------- */
   /** Compile-time function to g strain measure stored by muSpectre
       depending on the formulation
@@ -240,6 +254,7 @@ namespace muSpectre {
     }
   }
 
+  /* ---------------------------------------------------------------------- */
   /** Compile-time function to g stress measure stored by muSpectre
       depending on the formulation
    **/
@@ -275,6 +290,7 @@ namespace muSpectre {
       break;
     }
     case Formulation::small_strain: {
+      // return expected;
       return get_stored_strain_type(form);
       break;
     }

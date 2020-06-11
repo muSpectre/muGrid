@@ -47,7 +47,7 @@ nb_grid_pt = 17
 length = 12
 num_vertices = 20
 radius = 4.23
-conv = nb_grid_pt / length;
+conv = nb_grid_pt / length
 
 nb_grid_pts = [nb_grid_pt, nb_grid_pt]
 lengths = [length, length]
@@ -61,6 +61,7 @@ equil_tol = 1e-7
 cg_tol = 1e-7
 maxiter = 4010
 verbose = 2
+
 
 def rve_constructor(res, lens, form, inclusion, Del0, maxiter=401,
                     verbose=2, solver_type=msp.solvers.KrylovSolverCGEigen,
@@ -142,7 +143,7 @@ def lam_mat_rve_constructor(res, lens, form, inclusions,
     mat_soft = msp.material.MaterialLinearElastic1_2d.make(
         rve, "soft",  e, .33)
 
-    mat_lam = msp.material.MaterialLaminate_2d.make(rve, "lamiante")
+    mat_lam = msp.material.MaterialLaminate_fs_2d.make(rve, "laminate")
 
     for i, inclusion in enumerate(inclusions):
         rve.make_precipitate_laminate(mat_lam, mat_hard,
@@ -174,8 +175,11 @@ Del0 = np.array([[1e-3, .0],
 
 
 print(center*0.5)
-circle = lambda pixel:\
+
+
+def circle(pixel): return \
     (np.linalg.norm(center*conv-np.array(pixel), 2) < radius*conv)
+
 
 circle_r = rve_constructor(nb_grid_pts, lengths,
                            formulation, circle, Del0)
@@ -267,13 +271,13 @@ def component_plot_contour(r, zoom=[0, 0, 1, 1], component=[0, 0]):
     # C = ax.contour(x, y, vm[xslice, yslice], colors='k', origin='lower')
     if component[0] == component[1]:
         C = ax.contour(x, y, vm[xslice, yslice],
-                       levels = [150.0, 160.0, 170.0, 180.0,
-                                 190.0, 200.0, 210.0, 220.0])
+                       levels=[150.0, 160.0, 170.0, 180.0,
+                               190.0, 200.0, 210.0, 220.0])
         plt.clabel(C, inline=True, fontsize=8)
     elif component[0] != component[1]:
         C = ax.contour(x, y, vm[xslice, yslice],
-                       levels = [5.0, 10.0, 15.0, 20.0,
-                                 25.0, 30.0, 35.0])
+                       levels=[5.0, 10.0, 15.0, 20.0,
+                               25.0, 30.0, 35.0])
         plt.clabel(C, inline=True, fontsize=8)
     # C.set_clim(160, 270)
     # bar = plt.colorbar(C)
@@ -283,6 +287,7 @@ def component_plot_contour(r, zoom=[0, 0, 1, 1], component=[0, 0]):
     plt.tight_layout()
 
     return fig
+
 
 # prevent visual output during ctest
 if len(sys.argv[:]) == 2:
@@ -301,12 +306,12 @@ else:
 
     mises_plot_contour(circle_r).savefig("gibbs_circle_contour.pdf", dpi=300)
     component_plot_contour(
-        circle_r,component =[0, 0]).savefig("gibbs_circle_simple_contour"
+        circle_r, component=[0, 0]).savefig("gibbs_circle_simple_contour"
                                             "_normal.pdf",
                                             dpi=300)
 
     component_plot_contour(
-        circle_r,component =[0, 1]).savefig("gibbs_circle_simple_contour"
+        circle_r, component=[0, 1]).savefig("gibbs_circle_simple_contour"
                                             "_shear.pdf",
                                             dpi=300)
     mises_plot_contour(circle_r,
@@ -329,15 +334,12 @@ else:
                                                dpi=300)
 
     component_plot_contour(
-        circle_r_split,component =\
-        [0, 0]).savefig("gibbs_circle_split_contour_normal.pdf",
-                        dpi=300)
+        circle_r_split, component=[0, 0]).savefig("gibbs_circle_split_contour_normal.pdf",
+                                                  dpi=300)
 
     component_plot_contour(
-        circle_r_split,component =\
-        [0, 1]).savefig("gibbs_circle_split_contour_shear.pdf",
-                        dpi=300)
-
+        circle_r_split, component=[0, 1]).savefig("gibbs_circle_split_contour_shear.pdf",
+                                                  dpi=300)
 
     mises_plot_contour(circle_r_split,
                        zoom=[.55, .55, .25, .25]).savefig(
@@ -345,7 +347,6 @@ else:
     mises_plot_contour(circle_r_split,
                        zoom=[.59, .59, .15, .15]).savefig(
                            "gibbs_circle_zoom_2_split_contour.pdf", dpi=300)
-
 
     mises_plot(circle_r_laminate).savefig("gibbs_circle_laminate.pdf", dpi=300)
     mises_plot(circle_r_laminate,
@@ -358,14 +359,12 @@ else:
     mises_plot_contour(circle_r_laminate).savefig(
         "gibbs_circle_laminate_contour.pdf", dpi=300)
     component_plot_contour(
-        circle_r_laminate,component =\
-        [0, 0]).savefig("gibbs_circle_laminate_contour_normal.pdf",
-                        dpi=300)
+        circle_r_laminate, component=[0, 0]).savefig("gibbs_circle_laminate_contour_normal.pdf",
+                                                     dpi=300)
 
     component_plot_contour(
-        circle_r_laminate,component =\
-        [0, 1]).savefig("gibbs_circle_laminate_contour_shear.pdf",
-                        dpi=300)
+        circle_r_laminate, component=[0, 1]).savefig("gibbs_circle_laminate_contour_shear.pdf",
+                                                     dpi=300)
     mises_plot_contour(circle_r_laminate,
                        zoom=[.55, .55, .25, .25]).savefig(
                            "gibbs_circle_zoom_1_laminate_contour.pdf", dpi=300)

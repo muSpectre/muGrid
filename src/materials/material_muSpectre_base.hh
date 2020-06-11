@@ -266,9 +266,9 @@ namespace muSpectre {
     auto mat = std::make_unique<Material>(name, cell.get_spatial_dim(),
                                           cell.get_nb_quad_pts(), args...);
     using traits = MaterialMuSpectre_traits<Material>;
-    auto && Form = cell.get_formulation();
+    auto && form = cell.get_formulation();
     constexpr StrainMeasure expected_strain_m{traits::strain_measure};
-    if (Form == Formulation::small_strain) {
+    if (form == Formulation::small_strain) {
       check_small_strain_capability(expected_strain_m);
     }
 
@@ -367,11 +367,15 @@ namespace muSpectre {
     }
   }
 
+  /* ---------------------------------------------------------------------- */
   template <class Material, Index_t DimM>
   void MaterialMuSpectre<Material, DimM>::compute_stresses(
       const muGrid::RealField & F, muGrid::RealField & P,
       const Formulation & form, const SplitCell & is_cell_split,
       const StoreNativeStress & store_native_stress) {
+    using traits = MaterialMuSpectre_traits<Material>;
+    constexpr StrainMeasure expected_strain_m{traits::strain_measure};
+
     switch (form) {
     case Formulation::finite_strain: {
       switch (is_cell_split) {
@@ -395,6 +399,7 @@ namespace muSpectre {
       break;
     }
     case Formulation::small_strain: {
+      check_small_strain_capability(expected_strain_m);
       switch (is_cell_split) {
       case (SplitCell::no):
         // fall-through;  laminate and whole pixels treated same at this point
@@ -447,6 +452,9 @@ namespace muSpectre {
       const muGrid::RealField & F, muGrid::RealField & P, muGrid::RealField & K,
       const Formulation & form, const SplitCell & is_cell_split,
       const StoreNativeStress & store_native_stress) {
+    using traits = MaterialMuSpectre_traits<Material>;
+    constexpr StrainMeasure expected_strain_m{traits::strain_measure};
+
     switch (form) {
     case Formulation::finite_strain: {
       switch (is_cell_split) {
@@ -470,6 +478,7 @@ namespace muSpectre {
       break;
     }
     case Formulation::small_strain: {
+      check_small_strain_capability(expected_strain_m);
       switch (is_cell_split) {
       case (SplitCell::no):
         // fall-through;  laminate and whole pixels treated same at this point
@@ -653,11 +662,6 @@ namespace muSpectre {
        the infinitesimal strain tensor in small strain problems
     */
     auto & this_mat = static_cast<Material &>(*this);
-    using traits = MaterialMuSpectre_traits<Material>;
-    constexpr StrainMeasure expected_strain_m{traits::strain_measure};
-    if (Form == Formulation::small_strain) {
-      check_small_strain_capability(expected_strain_m);
-    }
 
     using iterable_proxy_t =
         iterable_proxy<std::tuple<typename traits::StrainMap_t>,
@@ -759,9 +763,7 @@ namespace muSpectre {
       const size_t & quad_pt_index, const Formulation & form)
       -> std::tuple<DynMatrix_t, DynMatrix_t> {
     auto & this_mat = static_cast<Material &>(*this);
-
     Eigen::Map<const Strain_t> F(strain.data());
-
     std::tuple<Stress_t, Stiffness_t> PK{};
 
     if (strain.cols() != DimM or strain.rows() != DimM) {

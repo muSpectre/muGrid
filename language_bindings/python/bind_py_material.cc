@@ -84,7 +84,7 @@ template <Index_t Dim>
 void add_material_neo_hookean_elastic_helper(py::module & mod);
 
 #ifdef WITH_SPLIT
-template <Index_t Dim>
+template <Index_t Dim, muSpectre::Formulation Form>
 void add_material_laminate_helper(py::module & mod);
 #endif
 
@@ -265,12 +265,12 @@ void add_material_helper(py::module & mod) {
   add_material_visco_elastic_ss_helper<Dim>(mod);
   add_material_visco_elastic_damage_ss_helper<Dim>(mod);
   add_material_neo_hookean_elastic_helper<Dim>(mod);
+  add_material_evaluator<Dim>(mod);
 
 #ifdef WITH_SPLIT
-  add_material_laminate_helper<Dim>(mod);
+  add_material_laminate_helper<Dim, muSpectre::Formulation::finite_strain>(mod);
+  add_material_laminate_helper<Dim, muSpectre::Formulation::small_strain>(mod);
 #endif
-
-  add_material_evaluator<Dim>(mod);
 }
 
 void add_material(py::module & mod) {

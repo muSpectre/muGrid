@@ -72,7 +72,7 @@ namespace muSpectre {
 
   template <Index_t DimM>
   class MaterialNeoHookeanElastic
-      : public MaterialMuSpectre<MaterialNeoHookeanElastic<DimM>, DimM> {
+    : public MaterialMuSpectre<MaterialNeoHookeanElastic<DimM>, DimM> {
    public:
     //! base class
     using Parent = MaterialMuSpectre<MaterialNeoHookeanElastic<DimM>, DimM>;

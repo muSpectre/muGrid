@@ -2,13 +2,12 @@
  * @file   material_laminate.cc
  *
  * @author Ali Falsafi <ali.falsafi@epfl.ch>
- * @author Till Junge <till.junge@altermail.ch>
  *
- * @date    04 Jun 2018
+ * @date   18 May 2020
  *
- * @brief material that uses laminae homogenisation
+ * @brief  implementation of MaterialLaminate class
  *
- * Copyright © 2018 Ali Falsafi
+ * Copyright © 2020 Ali Falsafi
  *
  * µSpectre is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
@@ -23,7 +22,7 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with µSpectre; see the file COPYING. If not, write to the
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * * Boston, MA 02111-1307, USA.
+ * Boston, MA 02111-1307, USA.
  *
  * Additional permission under GNU GPL version 3 section 7
  *
@@ -34,37 +33,42 @@
  *
  */
 
-#include "material_laminate.hh"
+#include "materials/material_laminate.hh"
+#include "materials/materials_toolbox.hh"
+#include "materials/material_evaluator.hh"
+#include "materials/laminate_homogenisation.hh"
+#include "materials/stress_transformations_PK2.hh"
+#include "materials/stress_transformations_PK1.hh"
+
+#include "common/intersection_octree.hh"
 
 namespace muSpectre {
-  template <Index_t DimM>
-  MaterialLaminate<DimM>::MaterialLaminate(
-      const std::string & name, const Index_t & spatial_dimension,
-      const Index_t & nb_quad_pts,
+  template <Dim_t DimM, Formulation Form>
+  MaterialLaminate<DimM, Form>::MaterialLaminate(
+      const std::string & name, const Dim_t & spatial_dimension,
+      const Dim_t & nb_quad_pts,
       std::shared_ptr<muGrid::LocalFieldCollection> parent_field)
-    : Parent(name, spatial_dimension, DimM, nb_quad_pts,
-             parent_field),
+      : Parent(name, spatial_dimension, nb_quad_pts, parent_field),
         normal_vector_field{this->get_prefix() + "normal vector",
                             *this->internal_fields},
         volume_ratio_field{this->get_prefix() + "volume ratio",
                            *this->internal_fields} {}
-  /* ----------------------------------------------------------------------
-   */
-  template <Index_t DimM>
-  void MaterialLaminate<DimM>::add_pixel(const size_t & /*pixel_id*/) {
+
+  /* --------------------------------------------------------------------*/
+  template <Dim_t DimM, Formulation Form>
+  void MaterialLaminate<DimM, Form>::add_pixel(const size_t & /*pixel_id*/) {
     throw muGrid::RuntimeError("This material needs two material "
-                               "(shared)pointers making the layers of "
-                               "lamiante, "
-                               "their volume fraction, "
-                               "and normal vector for adding pixel");
+                               "(shared) pointers for making the layers of "
+                               "a laminate pixel, in addition to  their volume"
+                               " fraction, and normal vector at their interface"
+                               " for adding pixel");
   }
-  /* ----------------------------------------------------------------------
-   */
-  template <Index_t DimM>
-  void MaterialLaminate<DimM>::add_pixel(
+
+  /* ---------------------------------------------------------------------*/
+  template <Dim_t DimM, Formulation Form>
+  void MaterialLaminate<DimM, Form>::add_pixel(
       const size_t & pixel_id, MatPtr_t mat1, MatPtr_t mat2, const Real & ratio,
-      const Eigen::Ref<const Eigen::Matrix<Real, Eigen::Dynamic, 1>> &
-          normal_vector) {
+      const Eigen::Ref<const Eigen::Matrix<Real, DimM, 1>> & normal_vector) {
     this->internal_fields->add_pixel(pixel_id);
 
     this->material_left_vector.push_back(mat1);
@@ -73,12 +77,12 @@ namespace muSpectre {
     this->volume_ratio_field.get_field().push_back(ratio);
     this->normal_vector_field.get_field().push_back(normal_vector);
   }
-  /* ----------------------------------------------------------------------
-   */
-  template <Index_t DimM>
-  void MaterialLaminate<DimM>::add_pixels_precipitate(
+
+  /* --------------------------------------------------------------------*/
+  template <Dim_t DimM, Formulation Form>
+  void MaterialLaminate<DimM, Form>::add_pixels_precipitate(
       const std::vector<Ccoord_t<DimM>> & intersected_pixels,
-      const std::vector<Index_t> & intersected_pixels_id,
+      const std::vector<Dim_t> & intersected_pixels_id,
       const std::vector<Real> & intersection_ratios,
       const std::vector<Eigen::Matrix<Real, DimM, 1>> & intersection_normals,
       MatPtr_t mat1, MatPtr_t mat2) {
@@ -93,180 +97,74 @@ namespace muSpectre {
   }
 
   /* ----------------------------------------------------------------------*/
-  template <Index_t DimM>
-  MaterialLaminate<DimM> &
-  MaterialLaminate<DimM>::make(Cell & cell, const std::string & name) {
-    auto mat{std::make_unique<MaterialLaminate<DimM>>(
-        name, cell.get_spatial_dim(), cell.get_nb_quad_pts())};
-    using traits = MaterialMuSpectre_traits<MaterialLaminate<DimM>>;
-    auto && form = cell.get_formulation();
-    constexpr StrainMeasure expected_strain_m{traits::strain_measure};
-    if (form == Formulation::small_strain) {
-      check_small_strain_capability(expected_strain_m);
-    }
-    auto & mat_ref{*mat};
-    auto is_cell_split{cell.get_splitness()};
-    mat_ref.allocate_optional_fields(is_cell_split);
-    cell.add_material(std::move(mat));
-    return mat_ref;
-  }
-  /* ----------------------------------------------------------------------
-   */
-  template <Index_t DimM>
-  void MaterialLaminate<DimM>::compute_stresses(
-      const RealField & F, RealField & P, const Formulation & form,
-      const SplitCell & is_cell_split,
-      const StoreNativeStress & store_native_stress) {
-    if (store_native_stress != StoreNativeStress::no) {
-      throw muGrid::RuntimeError(
-          "native stress is not defined for laminate materials");
-    }
-    switch (form) {
-    case Formulation::finite_strain: {
-      switch (is_cell_split) {
-      case (SplitCell::no):
-        // fall-through;  laminate and whole pixels treated same at this point
-      case (SplitCell::laminate): {
-        this->compute_stresses_worker<Formulation::finite_strain,
-                                      SplitCell::no>(F, P);
-        break;
-      }
-      case (SplitCell::simple): {
-        this->compute_stresses_worker<Formulation::finite_strain,
-                                      SplitCell::simple>(F, P);
-        break;
-      }
-      default:
-        throw muGrid::RuntimeError("Unknown Splitness status");
-      }
-      break;
-    }
-    case Formulation::small_strain: {
-      switch (is_cell_split) {
-      case (SplitCell::no):
-        // fall-through;  laminate and whole pixels treated same at this point
-      case (SplitCell::laminate): {
-        this->compute_stresses_worker<Formulation::small_strain, SplitCell::no>(
-            F, P);
-        break;
-      }
-      case (SplitCell::simple): {
-        this->compute_stresses_worker<Formulation::small_strain,
-                                      SplitCell::simple>(F, P);
-        break;
-      }
-      default:
-        throw muGrid::RuntimeError("Unknown Splitness status");
-      }
-      break;
-    }
-    case Formulation::native: {
-      switch (is_cell_split) {
-      case (SplitCell::no):
-        // fall-through;  laminate and whole pixels treated same at this point
-      case (SplitCell::laminate): {
-        this->compute_stresses_worker<Formulation::native, SplitCell::no>(F, P);
-        break;
-      }
-      case (SplitCell::simple): {
-        this->compute_stresses_worker<Formulation::native, SplitCell::simple>(
-            F, P);
-        break;
-      }
-      default:
-        throw muGrid::RuntimeError("Unknown Splitness status");
-      }
-      break;
-    }
-    default:
-      throw muGrid::RuntimeError("Unknown formulation");
-      break;
-    }
+  template <Dim_t DimM, Formulation Form>
+  template <class Strain>
+  auto MaterialLaminate<DimM, Form>::evaluate_stress(
+      const Eigen::MatrixBase<Strain> & E, const size_t & pixel_index) -> T2_t {
+    using Output_t = std::tuple<T2_t, T4_t>;
+    using Function_t = std::function<Output_t(const Eigen::Ref<const T2_t> &)>;
+    auto && mat_l{material_left_vector[pixel_index]};
+    auto && mat_r{material_right_vector[pixel_index]};
+
+    T2_t E_eval(E);
+
+    const Function_t mat_l_evaluate_stress_tangent_func{
+        [&mat_l, &pixel_index](const Eigen::Ref<const T2_t> & E) {
+          return mat_l->constitutive_law_dynamic(std::move(E), pixel_index,
+                                                 Form);
+        }};
+
+    const Function_t mat_r_evaluate_stress_tangent_func{
+        [&mat_r, &pixel_index](const Eigen::Ref<const T2_t> & E) {
+          return mat_r->constitutive_law_dynamic(std::move(E), pixel_index,
+                                                 Form);
+        }};
+
+    auto && ratio{this->volume_ratio_field[pixel_index]};
+    auto && normal_vec{this->normal_vector_field[pixel_index]};
+
+    return LamHomogen<DimM, Form>::evaluate_stress(
+        E_eval, mat_l_evaluate_stress_tangent_func,
+        mat_r_evaluate_stress_tangent_func, ratio, normal_vec);
   }
 
-  /* ----------------------------------------------------------------------
-   */
-  template <Index_t DimM>
-  void MaterialLaminate<DimM>::compute_stresses_tangent(
-      const RealField & F, RealField & P, RealField & K,
-      const Formulation & form, const SplitCell & is_cell_split,
-      const StoreNativeStress & store_native_stress) {
-    if (store_native_stress != StoreNativeStress::no) {
-      throw muGrid::RuntimeError(
-          "native stress is not defined for laminate materials");
-    }
-    this->last_step_was_nonlinear = false;
-    switch (form) {
-    case Formulation::finite_strain: {
-      switch (is_cell_split) {
-      case (SplitCell::no):
-        // fall-through;  laminate and whole pixels treated same at this point
-      case (SplitCell::laminate): {
-        this->compute_stresses_worker<Formulation::finite_strain,
-                                      SplitCell::no>(F, P, K);
-        break;
-      }
-      case (SplitCell::simple): {
-        this->compute_stresses_worker<Formulation::finite_strain,
-                                      SplitCell::simple>(F, P, K);
-        break;
-      }
-      default:
-        throw muGrid::RuntimeError("Unknown Splitness status");
-      }
-      break;
-    }
-    case Formulation::small_strain: {
-      switch (is_cell_split) {
-      case (SplitCell::no):
-        // fall-through;  laminate and whole pixels treated same at this point
-      case (SplitCell::laminate): {
-        this->compute_stresses_worker<Formulation::small_strain, SplitCell::no>(
-            F, P, K);
-        break;
-      }
-      case (SplitCell::simple): {
-        this->compute_stresses_worker<Formulation::small_strain,
-                                      SplitCell::simple>(F, P, K);
-        break;
-      }
-      default:
-        throw muGrid::RuntimeError("Unknown Splitness status");
-      }
-      break;
-    }
-    case Formulation::native: {
-      switch (is_cell_split) {
-      case (SplitCell::no):
-        // fall-through;  laminate and whole pixels treated same at this point
-      case (SplitCell::laminate): {
-        this->compute_stresses_worker<Formulation::native, SplitCell::no>(F, P,
-                                                                          K);
-        break;
-      }
-      case (SplitCell::simple): {
-        this->compute_stresses_worker<Formulation::native, SplitCell::simple>(
-            F, P, K);
-        break;
-      }
-      default:
-        throw muGrid::RuntimeError("Unknown Splitness status");
-      }
-      break;
-    }
-    default:
-      throw muGrid::RuntimeError("Unknown formulation");
-      break;
-    }
-    for (auto && mat : this->material_left_vector) {
-      this->last_step_was_nonlinear |= mat->was_last_step_nonlinear();
-    }
-    for (auto && mat : this->material_right_vector) {
-      this->last_step_was_nonlinear |= mat->was_last_step_nonlinear();
-    }
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimM, Formulation Form>
+  template <class Strain>
+  auto MaterialLaminate<DimM, Form>::evaluate_stress_tangent(
+      const Eigen ::MatrixBase<Strain> & E, const size_t & pixel_index)
+      -> std::tuple<T2_t, T4_t> {
+    using Output_t = std::tuple<T2_t, T4_t>;
+    using Function_t = std::function<Output_t(const Eigen::Ref<const T2_t> &)>;
+    auto && mat_l{material_left_vector[pixel_index]};
+    auto && mat_r{material_right_vector[pixel_index]};
+    T2_t E_eval(E);
+
+    Function_t mat_l_evaluate_stress_tangent_func{
+        [&mat_l, &pixel_index](const Eigen::Ref<const T2_t> & E) {
+          return mat_l->constitutive_law_dynamic(std::move(E), pixel_index,
+                                                 Form);
+        }};
+
+    Function_t mat_r_evaluate_stress_tangent_func{
+        [&mat_r, &pixel_index](const Eigen::Ref<const T2_t> & E) {
+          return mat_r->constitutive_law_dynamic(std::move(E), pixel_index,
+                                                 Form);
+        }};
+
+    std::tuple<T2_t, T4_t> ret_stress_stiffness{};
+    auto && ratio{this->volume_ratio_field[pixel_index]};
+    auto && normal_vec{this->normal_vector_field[pixel_index]};
+
+    return LamHomogen<DimM, Form>::evaluate_stress_tangent(
+        E_eval, mat_l_evaluate_stress_tangent_func,
+        mat_r_evaluate_stress_tangent_func, ratio, normal_vec);
   }
+
   /* ----------------------------------------------------------------------*/
-  template class MaterialLaminate<twoD>;
-  template class MaterialLaminate<threeD>;
+  template class MaterialLaminate<twoD, Formulation::finite_strain>;
+  template class MaterialLaminate<threeD, Formulation::finite_strain>;
+  template class MaterialLaminate<twoD, Formulation::small_strain>;
+  template class MaterialLaminate<threeD, Formulation::small_strain>;
 
 }  // namespace muSpectre

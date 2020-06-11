@@ -143,18 +143,20 @@ namespace muSpectre {
      * untouched(not-assigned) pixels to that material
      */
     void complete_material_assignment_simple(MaterialBase & material);
+
     /**
      * Given the vertices of polygonal/Polyhedral precipitate, this function
      * assign pixels 1. inside precipitate->mat_precipitate_cell, material at
      * the interface of precipitae-> to mat_precipitate & mat_matrix according
      * to the intersection of pixels with the precipitate
      */
+
     void make_pixels_precipitate_for_laminate_material(
         const std::vector<DynRcoord_t> & precipitate_vertices,
         MaterialBase & mat_laminate, MaterialBase & mat_precipitate_cell,
         Material_sptr mat_precipitate, Material_sptr mat_matrix);
 
-    template <Index_t Dim>
+    template <Index_t Dim, Formulation From>
     void make_pixels_precipitate_for_laminate_material_helper(
         const std::vector<DynRcoord_t> & precipitate_vertices,
         MaterialBase & mat_laminate, MaterialBase & mat_precipitate_cell,

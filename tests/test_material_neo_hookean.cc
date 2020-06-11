@@ -40,6 +40,8 @@
 #include "materials/material_linear_elastic1.hh"
 #include "materials/iterable_proxy.hh"
 
+#include <libmugrid/ccoord_operations.hh>
+
 namespace muSpectre {
 
   using muGrid::testGoodies::rel_error;
@@ -183,6 +185,37 @@ namespace muSpectre {
 
     BOOST_CHECK_LT(err_S, Fix::tol);
     BOOST_CHECK_LT(err_C, Fix::tol);
+  }
+
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_objectivity_test, Fix, mats_fill, Fix) {
+    using FC_t = muGrid::GlobalFieldCollection;
+
+    auto & mat{Fix::mat_neo};
+
+    const Index_t nb_pixel{1};
+    auto cube{muGrid::CcoordOps::get_cube<Fix::sdim()>(nb_pixel)};
+
+    FC_t globalfields{Fix::mdim(), Fix::NbQuadPts(), muGrid::Unknown};
+    globalfields.initialise(cube, {});
+    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim(), PixelSubDiv::QuadPt>
+        F1_f{"Transformation Gradient 1", globalfields};
+    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim(), PixelSubDiv::QuadPt>
+        P1_f{"Nominal Stress 1", globalfields};
+    muGrid::MappedT4Field<Real, Mapping::Mut, Fix::mdim(), PixelSubDiv::QuadPt>
+        K1_f{"Tangent Moduli 1", globalfields};
+
+    BOOST_CHECK_THROW(mat.compute_stresses_tangent(
+                          globalfields.get_field("Transformation Gradient 1"),
+                          globalfields.get_field("Nominal Stress 1"),
+                          globalfields.get_field("Tangent Moduli 1"),
+                          Formulation::small_strain),
+                      std::runtime_error);
+
+    BOOST_CHECK_THROW(mat.compute_stresses(
+                          globalfields.get_field("Transformation Gradient 1"),
+                          globalfields.get_field("Nominal Stress 1"),
+                          Formulation::small_strain),
+                      std::runtime_error);
   }
 
   BOOST_AUTO_TEST_SUITE_END()

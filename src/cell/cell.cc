@@ -1,4 +1,3 @@
-
 /**
  * @file   cell.cc
  *
@@ -41,6 +40,7 @@
 
 #ifdef WITH_SPLIT
 #include "materials/material_laminate.hh"
+#include "common/intersection_octree.hh"
 #endif
 
 #include <libmugrid/state_field.hh>
@@ -782,68 +782,98 @@ namespace muSpectre {
       const std::vector<DynRcoord_t> & precipitate_vertices,
       MaterialBase & mat_laminate, MaterialBase & mat_precipitate_cell,
       Material_sptr mat_precipitate, Material_sptr mat_matrix) {
-    switch (this->get_spatial_dim()) {
-    case twoD: {
-      this->make_pixels_precipitate_for_laminate_material_helper<twoD>(
-          precipitate_vertices, mat_laminate, mat_precipitate_cell,
-          mat_precipitate, mat_matrix);
+    switch (this->get_formulation()) {
+    case Formulation::small_strain: {
+      switch (this->get_spatial_dim()) {
+      case twoD: {
+        this->make_pixels_precipitate_for_laminate_material_helper<
+            twoD, Formulation::small_strain>(precipitate_vertices, mat_laminate,
+                                             mat_precipitate_cell,
+                                             mat_precipitate, mat_matrix);
+        break;
+      }
+      case threeD: {
+        this->make_pixels_precipitate_for_laminate_material_helper<
+            threeD, Formulation::small_strain>(
+            precipitate_vertices, mat_laminate, mat_precipitate_cell,
+            mat_precipitate, mat_matrix);
+        break;
+      }
+      default:
+        throw RuntimeError("Invalid dimension");
+        break;
+      }
       break;
     }
-    case threeD: {
-      this->make_pixels_precipitate_for_laminate_material_helper<threeD>(
-          precipitate_vertices, mat_laminate, mat_precipitate_cell,
-          mat_precipitate, mat_matrix);
-      break;
+    case Formulation::finite_strain: {
+      switch (this->get_spatial_dim()) {
+      case twoD: {
+        this->make_pixels_precipitate_for_laminate_material_helper<
+            twoD, Formulation::finite_strain>(
+            precipitate_vertices, mat_laminate, mat_precipitate_cell,
+            mat_precipitate, mat_matrix);
+        break;
+      }
+      case threeD: {
+        this->make_pixels_precipitate_for_laminate_material_helper<
+            threeD, Formulation::finite_strain>(
+            precipitate_vertices, mat_laminate, mat_precipitate_cell,
+            mat_precipitate, mat_matrix);
+        break;
+      }
+      default:
+        throw RuntimeError("Invalid dimension");
+        break;
+      }
       break;
     }
     default:
+      throw RuntimeError("Invalid formulation");
       break;
     }
   }
 
-  template <Index_t Dim>
+  /* ---------------------------------------------------------------------- */
+  template <Index_t Dim, Formulation Form>
   void Cell::make_pixels_precipitate_for_laminate_material_helper(
       const std::vector<DynRcoord_t> & precipitate_vertices,
       MaterialBase & mat_laminate, MaterialBase & mat_precipitate_cell,
       Material_sptr mat_precipitate, Material_sptr mat_matrix) {
-    auto & mat_lam_cast = static_cast<MaterialLaminate<Dim> &>(mat_laminate);
+    if (not(Form == Formulation::finite_strain or
+            Form == Formulation::small_strain)) {
+      std::stringstream err_str{};
+      err_str << "Material laminate is not defined for " << Form << std::endl;
+      throw RuntimeError(err_str.str());
+    }
+    using MaterialLaminate_t =
+        std::conditional_t<Form == Formulation::small_strain,
+                           MaterialLaminate<Dim, Formulation::small_strain>,
+                           MaterialLaminate<Dim, Formulation::finite_strain>>;
+
+    auto && mat_lam_cast{static_cast<MaterialLaminate_t &>(mat_laminate)};
 
     RootNode<SplitCell::laminate> precipitate(*this, precipitate_vertices);
-    auto && precipitate_intersects = precipitate.get_intersected_pixels();
-    auto && precipitate_intersects_id = precipitate.get_intersected_pixels_id();
-    auto && precipitate_intersection_ratios =
-        precipitate.get_intersection_ratios();
-    auto && precipitate_intersection_normals =
-        precipitate.get_intersection_normals();
-    auto && precipitate_intersection_states =
-        precipitate.get_intersection_status();
+    auto && precipitate_intersects{precipitate.get_intersected_pixels()};
+    auto && precipitate_intersects_id{precipitate.get_intersected_pixels_id()};
+    auto && precipitate_intersection_ratios{
+        precipitate.get_intersection_ratios()};
+    auto && precipitate_intersection_normals{
+        precipitate.get_intersection_normals()};
+    auto && precipitate_intersection_states{
+        precipitate.get_intersection_status()};
     bool if_print{false};
 
-    // for (auto && tup : akantu::zip(
-    //          precipitate_intersects_id, precipitate_intersects,
-    //          precipitate_intersection_states,
-    //          precipitate_intersection_normals,
-    //          precipitate_intersection_ratios)) {
-    //   auto pix_id{std::get<0>(tup)};
-    //   auto pix{std::get<1>(tup)};
-    //   auto state{std::get<2>(tup)};
-    //   auto normal{std::get<3>(tup)};
-    //   auto ratio{std::get<4>(tup)};
-
     for (auto && tup : akantu::enumerate(precipitate_intersects_id)) {
-      auto counter{std::get<0>(tup)};
-      auto pix_id{std::get<1>(tup)};
-      auto pix{precipitate_intersects[counter]};
-
-      auto state{precipitate_intersection_states[counter]};
-
-      auto normal = precipitate_intersection_normals[counter];
-      auto ratio = precipitate_intersection_ratios[counter];
+      auto && counter{std::get<0>(tup)};
+      auto && pix_id{std::get<1>(tup)};
+      auto && pix{precipitate_intersects[counter]};
+      auto && state{precipitate_intersection_states[counter]};
+      auto && normal{precipitate_intersection_normals[counter]};
+      auto && ratio{precipitate_intersection_ratios[counter]};
 
       // these outputs are used for debugging:
       if (if_print) {
         if (state != corkpp::IntersectionState::enclosing) {
-          normal.normalize();
           std::cout
               << pix[0] << ", " << pix[1] << ", "
               << "s: "
@@ -854,17 +884,17 @@ namespace muSpectre {
               << std::endl;
         }
       }
-      //
 
       if (state == corkpp::IntersectionState::enclosing) {
         mat_precipitate_cell.add_pixel(pix_id);
       } else if (state == corkpp::IntersectionState::intersecting) {
-        normal.normalize();
         mat_lam_cast.add_pixel(pix_id, mat_precipitate, mat_matrix, ratio,
                                normal);
       }
     }
   }
+
+/* ---------------------------------------------------------------------- */
 #endif
-  /* ---------------------------------------------------------------------- */
+
 }  // namespace muSpectre

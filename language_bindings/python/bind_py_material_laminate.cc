@@ -5,7 +5,7 @@
  *
  * @date   19 Jun 2019
  *
- * @brief  python bindings for MaterialLinearElastic1
+ * @brief  python bindings for MaterialLaminate (both FS and SS)
  *
  * Copyright © 2018 Till Junge
  *
@@ -35,6 +35,9 @@
 
 #include "common/muSpectre_common.hh"
 #include "materials/material_laminate.hh"
+#include "materials/stress_transformations_PK2.hh"
+#include "materials/stress_transformations_PK1.hh"
+
 #include "cell/cell.hh"
 
 #include <pybind11/pybind11.h>
@@ -52,13 +55,28 @@ namespace py = pybind11;
 /**
  * python binding for the optionally objective form of Hooke's law
  */
-template <Index_t dim>
+template <Index_t dim, muSpectre::Formulation Form>
 void add_material_laminate_helper(py::module & mod) {
   std::stringstream name_stream{};
-  name_stream << "MaterialLaminate_" << dim << 'd';
+  switch (Form) {
+  case muSpectre::Formulation::finite_strain: {
+    name_stream << "MaterialLaminate_fs_" << dim << 'd';
+    break;
+  }
+  case muSpectre::Formulation::small_strain: {
+    name_stream << "MaterialLaminate_ss_" << dim << 'd';
+    break;
+  }
+  default:
+    throw std::runtime_error(
+        "The laminate material can only be made via MaterialLaminate_ss_dim_d "
+        "or  MaterialLaminate_fs_dim_d.");
+    break;
+  }
+
   const auto name{name_stream.str()};
 
-  using Mat_t = muSpectre::MaterialLaminate<dim>;
+  using Mat_t = muSpectre::MaterialLaminate<dim, Form>;
   using Sys_t = muSpectre::Cell;
   py::class_<Mat_t, muSpectre::MaterialBase, std::shared_ptr<Mat_t>>(
       mod, name.c_str())
@@ -71,5 +89,12 @@ void add_material_laminate_helper(py::module & mod) {
       .def_static("make_evaluator", []() { return Mat_t::make_evaluator(); });
 }
 
-template void add_material_laminate_helper<muSpectre::twoD>(py::module &);
-template void add_material_laminate_helper<muSpectre::threeD>(py::module &);
+template void add_material_laminate_helper<
+    muSpectre::twoD, muSpectre::Formulation::finite_strain>(py::module &);
+template void add_material_laminate_helper<
+    muSpectre::threeD, muSpectre::Formulation::finite_strain>(py::module &);
+
+template void add_material_laminate_helper<
+    muSpectre::twoD, muSpectre::Formulation::small_strain>(py::module &);
+template void add_material_laminate_helper<
+    muSpectre::threeD, muSpectre::Formulation::small_strain>(py::module &);
