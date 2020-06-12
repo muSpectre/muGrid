@@ -115,6 +115,7 @@ namespace muSpectre {
         break;
       }
       }
+      return nullptr;  // required by g++5.4 in debug mode only
     }
 
   }  // namespace internal
