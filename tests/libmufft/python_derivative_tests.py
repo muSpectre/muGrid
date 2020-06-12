@@ -92,8 +92,8 @@ class DerivativeCheck2d(unittest.TestCase):
         q = self.fft.fftfreq
         d = diffop.fourier(q)
         fourier_field_copy = np.copy(self.fourier_field)
-        diff_field = np.zeros_like(self.field)
-        ndiff = np.zeros_like(self.field)
+        diff_field = np.zeros_like(self.field, order='f')
+        ndiff = np.zeros_like(self.field, order='f')
         self.fft.ifft(d * self.fourier_field, diff_field)
         diff_field *= self.fft.normalisation
         self.fft.ifft(1j*2*np.pi*q[0] * fourier_field_copy, ndiff)
@@ -114,8 +114,8 @@ class DerivativeCheck2d(unittest.TestCase):
         q = self.fft.fftfreq
         d = diffop.fourier(q)
         fourier_field_copy = np.copy(self.fourier_field)
-        diff_field = np.zeros_like(self.field)
-        ndiff = np.zeros_like(self.field)
+        diff_field = np.zeros_like(self.field, order='f')
+        ndiff = np.zeros_like(self.field, order='f')
         self.fft.ifft(d * self.fourier_field, diff_field)
         diff_field *= self.fft.normalisation
         self.fft.ifft(1j*2*np.pi*q[0] *
@@ -138,8 +138,8 @@ class DerivativeCheck2d(unittest.TestCase):
         q = self.fft.fftfreq
         d = diffop.fourier(q)
         fourier_field_copy = np.copy(self.fourier_field)
-        diff_field = np.zeros_like(self.field)
-        ndiff = np.zeros_like(self.field)
+        diff_field = np.zeros_like(self.field, order='f')
+        ndiff = np.zeros_like(self.field, order='f')
         self.fft.ifft(d * self.fourier_field, diff_field)
         diff_field *= self.fft.normalisation
         self.fft.ifft(1j*2*np.pi*q[0] * fourier_field_copy, ndiff)
@@ -151,11 +151,26 @@ class DerivativeCheck2d(unittest.TestCase):
             for y in range(ny):
                 self.assertAlmostEqual(diff_field[x,y], ndiff[(x+1)%nx, (y+1)%ny])
 
-    def test_upwind_differences_y(self):
-        diffop = muFFT.DiscreteDerivative([0, 0], [[-1, 1]])
+    def test_upwind_differences_x(self):
+        diffop = muFFT.Stencils2D.upwind_x
         q = self.fft.fftfreq
         d = diffop.fourier(q)
-        diff_field = np.zeros_like(self.field)
+        diff_field = np.zeros_like(self.field, order='f')
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
+        nx, ny = self.nb_pts
+        diff_field = np.squeeze(diff_field)
+        for x in range(nx):
+            for y in range(ny):
+                ndiff = self.field[(x+1)%nx, y] - self.field[x, y]
+                ndiff = np.squeeze(ndiff)
+                self.assertAlmostEqual(diff_field[x, y], ndiff)
+
+    def test_upwind_differences_y(self):
+        diffop = muFFT.Stencils2D.upwind_y
+        q = self.fft.fftfreq
+        d = diffop.fourier(q)
+        diff_field = np.zeros_like(self.field, order='f')
         self.fft.ifft(d * self.fourier_field, diff_field)
         diff_field *= self.fft.normalisation
         nx, ny = self.nb_pts
@@ -166,13 +181,42 @@ class DerivativeCheck2d(unittest.TestCase):
                 ndiff = np.squeeze(ndiff)
                 self.assertAlmostEqual(diff_field[x, y], ndiff)
 
+    def test_d_11_01(self):
+        diffop = muFFT.Stencils2D.d_11_01
+        q = self.fft.fftfreq
+        d = diffop.fourier(q)
+        diff_field = np.zeros_like(self.field, order='f')
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
+        nx, ny = self.nb_pts
+        diff_field = np.squeeze(diff_field)
+        for x in range(nx):
+            for y in range(ny):
+                ndiff = self.field[(x+1)%nx, (y+1)%ny] - self.field[x, (y+1)%ny]
+                ndiff = np.squeeze(ndiff)
+                self.assertAlmostEqual(diff_field[x, y], ndiff)
+
+    def test_d_11_10(self):
+        diffop = muFFT.Stencils2D.d_11_10
+        q = self.fft.fftfreq
+        d = diffop.fourier(q)
+        diff_field = np.zeros_like(self.field, order='f')
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
+        nx, ny = self.nb_pts
+        diff_field = np.squeeze(diff_field)
+        for x in range(nx):
+            for y in range(ny):
+                ndiff = self.field[(x+1)%nx, (y+1)%ny] - self.field[(x+1)%nx, y]
+                ndiff = np.squeeze(ndiff)
+                self.assertAlmostEqual(diff_field[x, y], ndiff)
+
     def test_upwind_differences_y2(self):
         diffop = muFFT.DiscreteDerivative([0, 0], [[-1, 1],
                                                    [ 0, 0]])
         q = self.fft.fftfreq
         d = diffop.fourier(q)
-        diff_field = np.zeros_like(self.field)
-        ndiff = np.zeros_like(self.field)
+        diff_field = np.zeros_like(self.field, order='f')
         self.fft.ifft(d * self.fourier_field, diff_field)
         diff_field *= self.fft.normalisation
         nx, ny = self.nb_pts
@@ -188,8 +232,7 @@ class DerivativeCheck2d(unittest.TestCase):
                                                    [-1, 1]])
         q = self.fft.fftfreq
         d = diffop.fourier(q)
-        diff_field = np.zeros_like(self.field)
-        ndiff = np.zeros_like(self.field)
+        diff_field = np.zeros_like(self.field, order='f')
         self.fft.ifft(d * self.fourier_field, diff_field)
         diff_field *= self.fft.normalisation
         nx, ny = self.nb_pts
@@ -200,13 +243,27 @@ class DerivativeCheck2d(unittest.TestCase):
                 ndiff = np.squeeze(ndiff)
                 self.assertAlmostEqual(diff_field[x, y], ndiff)
 
-    def test_averaged_upwind_differences_y(self):
-        diffop = muFFT.DiscreteDerivative([0, 0], [[-0.5, 0.5],
-                                                   [-0.5, 0.5]])
+    def test_averaged_upwind_differences_x(self):
+        diffop = muFFT.Stencils2D.averaged_upwind_x
         q = self.fft.fftfreq
         d = diffop.fourier(q)
-        diff_field = np.zeros_like(self.field)
+        diff_field = np.zeros_like(self.field, order='f')
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
+        nx, ny = self.nb_pts
+        diff_field = np.squeeze(diff_field)
+        for x in range(nx):
+            for y in range(ny):
+                ndiff = (self.field[(x+1)%nx, y] - self.field[x, y] \
+                         + self.field[(x+1)%nx, (y+1)%ny] - self.field[x, (y+1)%ny])/2
+                ndiff = np.squeeze(ndiff)
+                self.assertAlmostEqual(diff_field[x, y], ndiff)
 
+    def test_averaged_upwind_differences_y(self):
+        diffop = muFFT.Stencils2D.averaged_upwind_y
+        q = self.fft.fftfreq
+        d = diffop.fourier(q)
+        diff_field = np.zeros_like(self.field, order='f')
         self.fft.ifft(d * self.fourier_field, diff_field)
         diff_field *= self.fft.normalisation
 
@@ -219,12 +276,11 @@ class DerivativeCheck2d(unittest.TestCase):
                 ndiff = np.squeeze(ndiff)
                 self.assertAlmostEqual(diff_field[x, y], ndiff)
 
-    def test_central_differences(self):
-        diffop = muFFT.DiscreteDerivative([-1, 0], [[-0.5], [0], [0.5]])
+    def test_central_differences_x(self):
+        diffop = muFFT.Stencils2D.central_x
         q = self.fft.fftfreq
         d = diffop.fourier(q)
-        diff_field = np.zeros_like(self.field)
-        ndiff = np.zeros_like(self.field)
+        diff_field = np.zeros_like(self.field, order='f')
         self.fft.ifft(d * self.fourier_field, diff_field)
         diff_field *= self.fft.normalisation
         nx, ny = self.nb_pts
@@ -235,14 +291,28 @@ class DerivativeCheck2d(unittest.TestCase):
                 ndiff = np.squeeze(ndiff)
                 self.assertAlmostEqual(diff_field[x, y], ndiff)
 
+    def test_central_differences_y(self):
+        diffop = muFFT.Stencils2D.central_y
+        q = self.fft.fftfreq
+        d = diffop.fourier(q)
+        diff_field = np.zeros_like(self.field, order='f')
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
+        nx, ny = self.nb_pts
+        diff_field = np.squeeze(diff_field)
+        for x in range(nx):
+            for y in range(ny):
+                ndiff = (self.field[x, (y+1)%ny] - self.field[x, (y-1)%ny])/2
+                ndiff = np.squeeze(ndiff)
+                self.assertAlmostEqual(diff_field[x, y], ndiff)
+
     def test_sixth_order_central_differences(self):
         diffop = muFFT.DiscreteDerivative([0, -3],
                                           [[-1/60, 3/20, -3/4, 0,
                                             3/4, -3/20, 1/60]])
         q = self.fft.fftfreq
         d = diffop.fourier(q)
-        diff_field = np.zeros_like(self.field)
-        ndiff = np.zeros_like(self.field)
+        diff_field = np.zeros_like(self.field, order='f')
         self.fft.ifft(d * self.fourier_field, diff_field)
         diff_field *= self.fft.normalisation
         nx, ny = self.nb_pts
@@ -270,12 +340,10 @@ class DerivativeCheck3d(unittest.TestCase):
         self.fft.fft(self.field, self.fourier_field)
 
     def test_upwind_differences_x(self):
-        diffop = muFFT.DiscreteDerivative([0, 0, 0], [[[-1, 1]]]) \
-                      .rollaxes(-1).rollaxes(-1)
+        diffop = muFFT.Stencils3D.upwind_x
         q = self.fft.fftfreq
         d = diffop.fourier(q)
         diff_field = np.zeros_like(self.field, order='f')
-        ndiff = np.zeros_like(self.field)
         self.fft.ifft(d * self.fourier_field, diff_field)
         diff_field *= self.fft.normalisation
         nx, ny, nz = self.nb_pts
@@ -288,11 +356,10 @@ class DerivativeCheck3d(unittest.TestCase):
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
     def test_upwind_differences_y(self):
-        diffop = muFFT.DiscreteDerivative([0, 0, 0], [[[-1, 1]]]).rollaxes(-1)
+        diffop = muFFT.Stencils3D.upwind_y
         q = self.fft.fftfreq
         d = diffop.fourier(q)
         diff_field = np.zeros_like(self.field, order='f')
-        ndiff = np.zeros_like(self.field)
         self.fft.ifft(d * self.fourier_field, diff_field)
         diff_field *= self.fft.normalisation
         nx, ny, nz = self.nb_pts
@@ -305,11 +372,10 @@ class DerivativeCheck3d(unittest.TestCase):
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
     def test_upwind_differences_z(self):
-        diffop = muFFT.DiscreteDerivative([0, 0, 0], [[[-1, 1]]])
+        diffop = muFFT.Stencils3D.upwind_z
         q = self.fft.fftfreq
         d = diffop.fourier(q)
         diff_field = np.zeros_like(self.field, order='f')
-        ndiff = np.zeros_like(self.field)
         self.fft.ifft(d * self.fourier_field, diff_field)
         diff_field *= self.fft.normalisation
         nx, ny, nz = self.nb_pts
@@ -321,14 +387,204 @@ class DerivativeCheck3d(unittest.TestCase):
                     ndiff = np.squeeze(ndiff)
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
-    def test_averaged_upwind_differences_x(self):
-        diffop = muFFT.DiscreteDerivative([0, 0, 0],
-                                          [[[-0.25, -0.25], [-0.25, -0.25]],
-                                           [[ 0.25,  0.25], [ 0.25,  0.25]]])
+    def test_d_100_000(self):
+        diffop = muFFT.Stencils3D.d_100_000
         q = self.fft.fftfreq
         d = diffop.fourier(q)
         diff_field = np.zeros_like(self.field, order='f')
-        ndiff = np.zeros_like(self.field)
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
+        nx, ny, nz = self.nb_pts
+        diff_field = np.squeeze(diff_field)
+        for x in range(nx):
+            for y in range(ny):
+                for z in range(nz):
+                    ndiff = self.field[(x+1)%nx, y, z] - self.field[x, y, z]
+                    ndiff = np.squeeze(ndiff)
+                    self.assertAlmostEqual(diff_field[x, y, z], ndiff)
+
+    def test_d_110_010(self):
+        diffop = muFFT.Stencils3D.d_110_010
+        q = self.fft.fftfreq
+        d = diffop.fourier(q)
+        diff_field = np.zeros_like(self.field, order='f')
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
+        nx, ny, nz = self.nb_pts
+        diff_field = np.squeeze(diff_field)
+        for x in range(nx):
+            for y in range(ny):
+                for z in range(nz):
+                    ndiff = self.field[(x+1)%nx, (y+1)%ny, z] - self.field[x, (y+1)%ny, z]
+                    ndiff = np.squeeze(ndiff)
+                    self.assertAlmostEqual(diff_field[x, y, z], ndiff)
+
+    def test_d_111_011(self):
+        diffop = muFFT.Stencils3D.d_111_011
+        q = self.fft.fftfreq
+        d = diffop.fourier(q)
+        diff_field = np.zeros_like(self.field, order='f')
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
+        nx, ny, nz = self.nb_pts
+        diff_field = np.squeeze(diff_field)
+        for x in range(nx):
+            for y in range(ny):
+                for z in range(nz):
+                    ndiff = self.field[(x+1)%nx, (y+1)%ny, (z+1)%nz] - self.field[x, (y+1)%ny, (z+1)%nz]
+                    ndiff = np.squeeze(ndiff)
+                    self.assertAlmostEqual(diff_field[x, y, z], ndiff)
+
+    def test_d_101_001(self):
+        diffop = muFFT.Stencils3D.d_101_001
+        q = self.fft.fftfreq
+        d = diffop.fourier(q)
+        diff_field = np.zeros_like(self.field, order='f')
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
+        nx, ny, nz = self.nb_pts
+        diff_field = np.squeeze(diff_field)
+        for x in range(nx):
+            for y in range(ny):
+                for z in range(nz):
+                    ndiff = self.field[(x+1)%nx, y, (z+1)%nz] - self.field[x, y, (z+1)%nz]
+                    ndiff = np.squeeze(ndiff)
+                    self.assertAlmostEqual(diff_field[x, y, z], ndiff)
+
+    def test_d_010_000(self):
+        diffop = muFFT.Stencils3D.d_010_000
+        q = self.fft.fftfreq
+        d = diffop.fourier(q)
+        diff_field = np.zeros_like(self.field, order='f')
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
+        nx, ny, nz = self.nb_pts
+        diff_field = np.squeeze(diff_field)
+        for x in range(nx):
+            for y in range(ny):
+                for z in range(nz):
+                    ndiff = self.field[x, (y+1)%ny, z] - self.field[x, y, z]
+                    ndiff = np.squeeze(ndiff)
+                    self.assertAlmostEqual(diff_field[x, y, z], ndiff)
+
+    def test_d_110_100(self):
+        diffop = muFFT.Stencils3D.d_110_100
+        q = self.fft.fftfreq
+        d = diffop.fourier(q)
+        diff_field = np.zeros_like(self.field, order='f')
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
+        nx, ny, nz = self.nb_pts
+        diff_field = np.squeeze(diff_field)
+        for x in range(nx):
+            for y in range(ny):
+                for z in range(nz):
+                    ndiff = self.field[(x+1)%nx, (y+1)%ny, z] - self.field[(x+1)%nx, y, z]
+                    ndiff = np.squeeze(ndiff)
+                    self.assertAlmostEqual(diff_field[x, y, z], ndiff)
+
+
+    def test_d_111_101(self):
+        diffop = muFFT.Stencils3D.d_111_101
+        q = self.fft.fftfreq
+        d = diffop.fourier(q)
+        diff_field = np.zeros_like(self.field, order='f')
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
+        nx, ny, nz = self.nb_pts
+        diff_field = np.squeeze(diff_field)
+        for x in range(nx):
+            for y in range(ny):
+                for z in range(nz):
+                    ndiff = self.field[(x+1)%nx, (y+1)%ny, (z+1)%nz] - self.field[(x+1)%nx, y, (z+1)%nz]
+                    ndiff = np.squeeze(ndiff)
+                    self.assertAlmostEqual(diff_field[x, y, z], ndiff)
+
+    def test_d_011_001(self):
+        diffop = muFFT.Stencils3D.d_011_001
+        q = self.fft.fftfreq
+        d = diffop.fourier(q)
+        diff_field = np.zeros_like(self.field, order='f')
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
+        nx, ny, nz = self.nb_pts
+        diff_field = np.squeeze(diff_field)
+        for x in range(nx):
+            for y in range(ny):
+                for z in range(nz):
+                    ndiff = self.field[x, (y+1)%ny, (z+1)%nz] - self.field[x, y, (z+1)%nz]
+                    ndiff = np.squeeze(ndiff)
+                    self.assertAlmostEqual(diff_field[x, y, z], ndiff)
+
+    def test_d_001_000(self):
+        diffop = muFFT.Stencils3D.d_001_000
+        q = self.fft.fftfreq
+        d = diffop.fourier(q)
+        diff_field = np.zeros_like(self.field, order='f')
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
+        nx, ny, nz = self.nb_pts
+        diff_field = np.squeeze(diff_field)
+        for x in range(nx):
+            for y in range(ny):
+                for z in range(nz):
+                    ndiff = self.field[x, y, (z+1)%nz] - self.field[x, y, z]
+                    ndiff = np.squeeze(ndiff)
+                    self.assertAlmostEqual(diff_field[x, y, z], ndiff)
+
+    def test_d_101_100(self):
+        diffop = muFFT.Stencils3D.d_101_100
+        q = self.fft.fftfreq
+        d = diffop.fourier(q)
+        diff_field = np.zeros_like(self.field, order='f')
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
+        nx, ny, nz = self.nb_pts
+        diff_field = np.squeeze(diff_field)
+        for x in range(nx):
+            for y in range(ny):
+                for z in range(nz):
+                    ndiff = self.field[(x+1)%nx, y, (z+1)%nz] - self.field[(x+1)%nx, y, z]
+                    ndiff = np.squeeze(ndiff)
+                    self.assertAlmostEqual(diff_field[x, y, z], ndiff)
+
+    def test_d_111_110(self):
+        diffop = muFFT.Stencils3D.d_111_110
+        q = self.fft.fftfreq
+        d = diffop.fourier(q)
+        diff_field = np.zeros_like(self.field, order='f')
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
+        nx, ny, nz = self.nb_pts
+        diff_field = np.squeeze(diff_field)
+        for x in range(nx):
+            for y in range(ny):
+                for z in range(nz):
+                    ndiff = self.field[(x+1)%nx, (y+1)%ny, (z+1)%nz] - self.field[(x+1)%nx, (y+1)%ny, z]
+                    ndiff = np.squeeze(ndiff)
+                    self.assertAlmostEqual(diff_field[x, y, z], ndiff)
+
+    def test_d_011_010(self):
+        diffop = muFFT.Stencils3D.d_011_010
+        q = self.fft.fftfreq
+        d = diffop.fourier(q)
+        diff_field = np.zeros_like(self.field, order='f')
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
+        nx, ny, nz = self.nb_pts
+        diff_field = np.squeeze(diff_field)
+        for x in range(nx):
+            for y in range(ny):
+                for z in range(nz):
+                    ndiff = self.field[x, (y+1)%ny, (z+1)%nz] - self.field[x, (y+1)%ny, z]
+                    ndiff = np.squeeze(ndiff)
+                    self.assertAlmostEqual(diff_field[x, y, z], ndiff)
+
+    def test_averaged_upwind_differences_x(self):
+        diffop = muFFT.Stencils3D.averaged_upwind_x
+        q = self.fft.fftfreq
+        d = diffop.fourier(q)
+        diff_field = np.zeros_like(self.field, order='f')
         self.fft.ifft(d * self.fourier_field, diff_field)
         diff_field *= self.fft.normalisation
         nx, ny, nz = self.nb_pts
@@ -344,13 +600,10 @@ class DerivativeCheck3d(unittest.TestCase):
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
     def test_averaged_upwind_differences_y(self):
-        diffop = muFFT.DiscreteDerivative([0, 0, 0],
-                                          [[[-0.25, -0.25], [0.25, 0.25]],
-                                           [[-0.25, -0.25], [0.25, 0.25]]])
+        diffop = muFFT.Stencils3D.averaged_upwind_y
         q = self.fft.fftfreq
         d = diffop.fourier(q)
         diff_field = np.zeros_like(self.field, order='f')
-        ndiff = np.zeros_like(self.field)
         self.fft.ifft(d * self.fourier_field, diff_field)
         diff_field *= self.fft.normalisation
         nx, ny, nz = self.nb_pts
@@ -366,13 +619,10 @@ class DerivativeCheck3d(unittest.TestCase):
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
     def test_averaged_upwind_differences_z(self):
-        diffop = muFFT.DiscreteDerivative([0, 0, 0],
-                                          [[[-0.25, 0.25], [-0.25, 0.25]],
-                                           [[-0.25, 0.25], [-0.25, 0.25]]])
+        diffop = muFFT.Stencils3D.averaged_upwind_z
         q = self.fft.fftfreq
         d = diffop.fourier(q)
         diff_field = np.zeros_like(self.field, order='f')
-        ndiff = np.zeros_like(self.field)
         self.fft.ifft(d * self.fourier_field, diff_field)
         diff_field *= self.fft.normalisation
         nx, ny, nz = self.nb_pts
@@ -384,6 +634,54 @@ class DerivativeCheck3d(unittest.TestCase):
                              + self.field[(x+1)%nx, y, (z+1)%nz] - self.field[(x+1)%nx, y, z] \
                              + self.field[x, (y+1)%ny, (z+1)%nz] - self.field[x, (y+1)%ny, z] \
                              + self.field[(x+1)%nx, (y+1)%ny, (z+1)%nz] - self.field[(x+1)%nx, (y+1)%ny, z])/4
+                    ndiff = np.squeeze(ndiff)
+                    self.assertAlmostEqual(diff_field[x, y, z], ndiff)
+
+    def test_central_differences_x(self):
+        diffop = muFFT.Stencils3D.central_x
+        q = self.fft.fftfreq
+        d = diffop.fourier(q)
+        diff_field = np.zeros_like(self.field, order='f')
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
+        nx, ny, nz = self.nb_pts
+        diff_field = np.squeeze(diff_field)
+        for x in range(nx):
+            for y in range(ny):
+                for z in range(nz):
+                    ndiff = (self.field[(x+1)%nx, y, z] - self.field[(x-1)%nx, y, z])/2
+                    ndiff = np.squeeze(ndiff)
+                    self.assertAlmostEqual(diff_field[x, y, z], ndiff)
+
+    def test_central_differences_y(self):
+        diffop = muFFT.Stencils3D.central_y
+        q = self.fft.fftfreq
+        d = diffop.fourier(q)
+        diff_field = np.zeros_like(self.field, order='f')
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
+        nx, ny, nz = self.nb_pts
+        diff_field = np.squeeze(diff_field)
+        for x in range(nx):
+            for y in range(ny):
+                for z in range(nz):
+                    ndiff = (self.field[x, (y+1)%ny, z] - self.field[x, (y-1)%ny, z])/2
+                    ndiff = np.squeeze(ndiff)
+                    self.assertAlmostEqual(diff_field[x, y, z], ndiff)
+
+    def test_central_differences_z(self):
+        diffop = muFFT.Stencils3D.central_z
+        q = self.fft.fftfreq
+        d = diffop.fourier(q)
+        diff_field = np.zeros_like(self.field, order='f')
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
+        nx, ny, nz = self.nb_pts
+        diff_field = np.squeeze(diff_field)
+        for x in range(nx):
+            for y in range(ny):
+                for z in range(nz):
+                    ndiff = (self.field[x, y, (z+1)%nz] - self.field[x, y, (z-1)%nz])/2
                     ndiff = np.squeeze(ndiff)
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
