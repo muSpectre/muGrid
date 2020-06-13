@@ -58,9 +58,9 @@ namespace muSpectre {
       const size_t &, muGrid::TypedFieldBase<Real> &)>;
 
 #ifdef NO_EXPERIMENTAL
-  using EigenStrainOptFunc_ptr = typename muGrid::optional<EigenStrainFunc_t &>;
+  using EigenStrainOptFunc_ref = typename muGrid::optional<EigenStrainFunc_t &>;
 #else
-  using EigenStrainOptFunc_ptr =
+  using EigenStrainOptFunc_ref =
       typename muGrid::optional<std::reference_wrapper<EigenStrainFunc_t>>;
 #endif
   enum class IsStrainInitialised { True, False };
@@ -77,7 +77,7 @@ namespace muSpectre {
       const Real & newton_tol, const Real & equil_tol,
       const Verbosity & verbose = Verbosity::Silent,
       const IsStrainInitialised & strain_init = IsStrainInitialised::False,
-      EigenStrainOptFunc_ptr eigen_strain_func = muGrid::nullopt);
+      EigenStrainOptFunc_ref eigen_strain_func = muGrid::nullopt);
   /**
    * Uses the Newton-conjugate Gradient method to find the static
    * equilibrium of a cell given a mean applied strain.
@@ -87,7 +87,7 @@ namespace muSpectre {
       KrylovSolverBase & solver, const Real & newton_tol,
       const Real & equil_tol, const Verbosity & verbose = Verbosity::Silent,
       const IsStrainInitialised & strain_init = IsStrainInitialised::False,
-      EigenStrainOptFunc_ptr eigen_strain_func = muGrid::nullopt) {
+      EigenStrainOptFunc_ref eigen_strain_func = muGrid::nullopt) {
     LoadSteps_t load_steps{load_step};
     auto ret_val{newton_cg(cell, load_steps, solver, newton_tol, equil_tol,
                            verbose, strain_init, eigen_strain_func)

@@ -56,7 +56,7 @@ namespace muSpectre {
             KrylovSolverBase & solver, const Real & newton_tol,
             const Real & equil_tol, const Verbosity & verbose,
             const IsStrainInitialised & strain_init,
-            EigenStrainOptFunc_ptr eigen_strain_func) {
+            EigenStrainOptFunc_ref eigen_strain_func) {
     const auto & comm = cell.get_communicator();
 
     using Matrix_t = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
@@ -209,7 +209,7 @@ namespace muSpectre {
     // strain field used by the cell for evaluating stresses/tangents.
     auto & eval_strain_field{cell.get_strain()};
 
-    //! incremental loop
+    //! incremental loop (load steps)
     for (const auto & tup : akantu::enumerate(load_steps)) {
       const auto & strain_step{std::get<0>(tup)};
       const auto & macro_strain{std::get<1>(tup)};

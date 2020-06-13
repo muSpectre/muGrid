@@ -75,8 +75,7 @@ namespace muSpectre {
       }
       // Deduce number of quad points from the gradient
       const auto nb_quad_pts{gradient.size() / dim};
-      auto fft_ptr{std::make_unique<FFTEngine>(
-          nb_grid_pts, comm)};
+      auto fft_ptr{std::make_unique<FFTEngine>(nb_grid_pts, comm)};
       switch (form) {
       case Formulation::finite_strain: {
         if (nb_quad_pts == OneQuadPt) {
