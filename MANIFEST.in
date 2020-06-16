@@ -1,0 +1,7 @@
+include LICENSE
+include GPLv3
+include CHANGELOG.md
+include src/libmugrid/*.hh
+include src/libmufft/*.hh
+include language_bindings/libmugrid/python/*.hh
+include language_bindings/libmufft/python/*.hh
