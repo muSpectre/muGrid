@@ -30,11 +30,20 @@ import re
 import sys
 import setuptools
 import subprocess
+from subprocess import PIPE
 
+from distutils import sysconfig
 from distutils.spawn import find_executable
 from setuptools import setup, Extension
 from setuptools.command.build_clib import build_clib
 from setuptools.command.build_ext import build_ext
+
+###
+
+# Replace hard-wired bundle option on macOS
+if sys.platform == 'darwin':
+   vars = sysconfig.get_config_vars()
+   vars['LDSHARED'] = vars['LDSHARED'].replace('-bundle', '-dynamiclib')
 
 ###
 
@@ -255,32 +264,65 @@ include_dirs = [get_eigen_include(), # Path to pybind11 headers
 fft_libraries = []
 fft_library_dirs = []
 
-mpi = False
+# Did we manually disable MPI?
+if disable_mpi:
+    mpi = False
+    print('MPI disabled with command line argument --disable-mpi.')
+else:
+    # We only enable MPI if mpicc is in the path
+    try:
+        mpicc = os.environ['MPICC']
+    except KeyError:
+        mpicc = 'mpicc'
+    try:
+        mpicxx = os.environ['MPICXX']
+    except KeyError:
+        mpicxx = 'mpicxx'
+
+    # Test if we can execute mpicc and mpicxx
+    try:
+        mpicc_successful = subprocess.run(
+            [mpicc, '--version'], stdout=PIPE, stderr=PIPE).returncode == 0
+        mpicc_successful &= subprocess.run(
+            [mpicxx, '--version'], stdout=PIPE, stderr=PIPE).returncode == 0
+    except FileNotFoundError:
+        mpicc_successful = False
+    if not mpicc_successful:
+        print('MPI disabled because MPI compiler wrappers were not '
+              'found or could not be executed.')
+    mpi = mpicc_successful
+
+has_mpi_enabled_fft = False
 for info, _sources in [(fftw_info, ['src/libmufft/fftw_engine.cc']),
                        (fftwmpi_info, ['src/libmufft/fftwmpi_engine.cc']),
                        (pfft_info, ['src/libmufft/pfft_engine.cc'])]:
     lib = detect_library(info)
     if lib is not None:
         _include_dirs, _libraries, _library_dirs = lib
-        if 'mpi' not in info or not info['mpi'] or not disable_mpi:
+        # Only include this library if it is serial or if MPI is
+        # enabled
+        if not info['mpi'] or mpi:
             mufft_sources += _sources
             if 'define_macro' in info:
                 macros += [(info['define_macro'], None)]
             include_dirs += _include_dirs
             fft_libraries += _libraries
             fft_library_dirs += _library_dirs
-            if 'mpi' in info:
-                mpi = mpi or info['mpi']
-        else:
-            if verbose:
-                print('  ! Library detected but --disable-mpi is present')
+        if info['mpi']:
+            has_mpi_enabled_fft = True
+
+if mpi and not has_mpi_enabled_fft:
+    print('MPI disabled because no MPI-enabled FFT library was '
+          'found.')
+    mpi = False
 
 if mpi:
-    if verbose:
-        print('At least one of the FFT libraries is MPI-parallel. Using the MPI '
-              'compiler wrapper.')
-        print('(You can specify the compiler wrapper through the MPICC and MPICXX '
-              'environment variables.)')
+    print('ENABLING MPI: At least one of the FFT libraries is '
+          'MPI-parallel and the MPI compiler wrappers were found '
+          'in the path.')
+    print('(You can specify the compiler wrappers through the MPICC '
+          'and MPICXX environment variables.)')
+
     macros += [('WITH_MPI', None)]
     # FIXME! This is a brute-force override.
     try:
@@ -400,7 +442,7 @@ def compiler_options(compiler, version):
 def linker_options(compiler):
     opts = [cpp_flag(compiler)] # Not sure if this is necessary
     if sys.platform == 'darwin':
-        opts += ['-stdlib=libc++', '-mmacosx-version-min=10.7']
+        opts += ['-stdlib=libc++']
     return opts
 
 

@@ -88,9 +88,10 @@ namespace muFFT {
     Index_t send_buf_size(arg.size());
 
     int comm_size = this->size();
-    int arg_sizes[comm_size] = {};
-    auto message{MPI_Allgather(&send_buf_size, 1, mpi_type<int>(), arg_sizes, 1,
-                               mpi_type<int>(), this->comm)};
+    std::vector<int> arg_sizes{comm_size};
+    auto message{MPI_Allgather(&send_buf_size, 1, mpi_type<int>(),
+                               arg_sizes.data(), 1, mpi_type<int>(),
+                               this->comm)};
     if (message != 0) {
       std::stringstream error{};
       error << "MPI_Allgather failed with " << message << " on rank "
@@ -98,7 +99,7 @@ namespace muFFT {
       throw RuntimeError(error.str());
     }
 
-    int displs[comm_size] = {};
+    std::vector<int> displs{comm_size};
     displs[0] = 0;
     for (auto i = 0; i < comm_size - 1; ++i) {
       displs[i + 1] = displs[i] + arg_sizes[i];
@@ -114,7 +115,8 @@ namespace muFFT {
 
     message =
         MPI_Allgatherv(arg.data(), send_buf_size, mpi_type<T>(), res.data(),
-                       arg_sizes, displs, mpi_type<T>(), this->comm);
+                       arg_sizes.data(), displs.data(), mpi_type<T>(),
+                       this->comm);
     if (message != 0) {
       std::stringstream error{};
       error << "MPI_Allgatherv failed with " << message << " on rank "
