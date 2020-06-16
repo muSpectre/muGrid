@@ -51,13 +51,13 @@ namespace muFFT {
   /**
    * base class for projection related exceptions
    */
-  class DerivativeError : public muGrid::RuntimeError {
+  class DerivativeError : public RuntimeError {
    public:
     //! constructor
     explicit DerivativeError(const std::string & what)
-        : muGrid::RuntimeError(what) {}
+        : RuntimeError(what) {}
     //! constructor
-    explicit DerivativeError(const char * what) : muGrid::RuntimeError(what) {}
+    explicit DerivativeError(const char * what) : RuntimeError(what) {}
   };
 
   /**

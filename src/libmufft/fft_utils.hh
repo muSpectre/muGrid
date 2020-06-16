@@ -91,7 +91,7 @@ namespace muFFT {
       break;
     }
     default:
-      throw muGrid::RuntimeError(
+      throw RuntimeError(
           "One 1, 2, and 3-dimensional cases are allowed");
       break;
     }

@@ -38,7 +38,7 @@
 
 #include "pfft_engine.hh"
 
-using muGrid::RuntimeError;
+using RuntimeError;
 
 namespace muFFT {
 

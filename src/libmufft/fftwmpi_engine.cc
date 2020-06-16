@@ -40,8 +40,6 @@
 
 #include "fft_utils.hh"
 
-using muGrid::RuntimeError;
-
 namespace muFFT {
 
   int FFTWMPIEngine::nb_engines{0};

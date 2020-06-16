@@ -50,13 +50,13 @@ namespace muFFT {
   /**
    * base class for FFTEngine-related exceptions
    */
-  class FFTEngineError : public muGrid::RuntimeError {
+  class FFTEngineError : public RuntimeError {
    public:
     //! constructor
     explicit FFTEngineError(const std::string & what)
-        : muGrid::RuntimeError(what) {}
+        : RuntimeError(what) {}
     //! constructor
-    explicit FFTEngineError(const char * what) : muGrid::RuntimeError(what) {}
+    explicit FFTEngineError(const char * what) : RuntimeError(what) {}
   };
 
   /**

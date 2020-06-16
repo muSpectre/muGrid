@@ -47,6 +47,8 @@ namespace muFFT {
   using muGrid::Real;
   using muGrid::Uint;
 
+  using muGrid::RuntimeError;
+
   using muGrid::Ccoord_t;
   using muGrid::DynCcoord_t;
   using muGrid::DynRcoord_t;

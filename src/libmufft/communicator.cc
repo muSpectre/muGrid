@@ -39,8 +39,6 @@
 
 #include "communicator.hh"
 
-using muGrid::RuntimeError;
-
 namespace muFFT {
 
   Communicator::Communicator(MPI_Comm comm) : comm{comm} {}

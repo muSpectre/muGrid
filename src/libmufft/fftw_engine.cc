@@ -40,8 +40,6 @@
 
 #include "fftw_engine.hh"
 
-using muGrid::RuntimeError;
-
 namespace muFFT {
 
   FFTWEngine::FFTWEngine(const DynCcoord_t & nb_grid_pts, Communicator comm)
