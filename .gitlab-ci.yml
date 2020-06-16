@@ -45,8 +45,8 @@ build:testing_gcc_setuptools:
     - free -h
     - echo "grep -c ^processor /proc/cpuinfo"
     - grep -c ^processor /proc/cpuinfo
-    - python3 setup.py build --disable-mpi --verbose
-    - python3 setup.py install --user --disable-mpi --verbose
+    - python3 setup.py sdist
+    - pip install --user dist/*.tar.gz
     - cd tests/libmufft
     - python3 python_binding_tests.py
 
