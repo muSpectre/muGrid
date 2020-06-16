@@ -36,11 +36,7 @@
 #ifndef LANGUAGE_BINDINGS_LIBMUGRID_PYTHON_BIND_PY_DECLARATIONS_HH_
 #define LANGUAGE_BINDINGS_LIBMUGRID_PYTHON_BIND_PY_DECLARATIONS_HH_
 
-#include "libmugrid/field.hh"
-#include "libmugrid/field_typed.hh"
-
 #include <pybind11/pybind11.h>
-#include <pybind11/numpy.h>
 
 namespace py = pybind11;
 

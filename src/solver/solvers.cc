@@ -50,6 +50,33 @@ namespace muSpectre {
   Eigen::IOFormat format(Eigen::FullPrecision, 0, ", ", ",\n", "[", "]", "[",
                          "]");
 
+  /* ---------------------------------------------------------------------- */
+  ConvergenceCriterion::ConvergenceCriterion()
+      : was_last_step_linear_test{false}, equil_tol_test{false},
+        newton_tol_test{false} {}
+
+  /* ---------------------------------------------------------------------- */
+  bool & ConvergenceCriterion::get_was_last_step_linear_test() {
+    return this->was_last_step_linear_test;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  bool & ConvergenceCriterion::get_equil_tol_test() {
+    return this->equil_tol_test;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  bool & ConvergenceCriterion::get_newton_tol_test() {
+    return this->newton_tol_test;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void ConvergenceCriterion::reset() {
+    this->was_last_step_linear_test = false;
+    this->equil_tol_test = false;
+    this->newton_tol_test = false;
+  }
+
   //--------------------------------------------------------------------------//
   std::vector<OptimizeResult>
   newton_cg(Cell & cell, const LoadSteps_t & load_steps,
@@ -60,20 +87,21 @@ namespace muSpectre {
     const auto & comm = cell.get_communicator();
 
     using Matrix_t = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
-
     auto shape{cell.get_strain_shape()};
+
+    ConvergenceCriterion convergence_crtiterion;
 
     // create a field collection to store workspaces
     auto field_collection{cell.get_fields().get_empty_clone()};
     // Corresponds to symbol δF or δε
     muGrid::MappedField<muGrid::FieldMap<Real, Mapping::Mut>> incrF_field{
-        "incrF",          shape[0], shape[1], IterUnit::SubPt,
-        field_collection, QuadPtTag};
+        "incrF",         shape[0],         shape[1],
+        IterUnit::SubPt, field_collection, QuadPtTag};
 
     // field to store the rhs for cg calculations
     muGrid::MappedField<muGrid::FieldMap<Real, Mapping::Mut>> rhs_field{
-        "rhs",    shape[0], shape[1], IterUnit::SubPt, field_collection,
-        QuadPtTag};
+        "rhs",           shape[0],         shape[1],
+        IterUnit::SubPt, field_collection, QuadPtTag};
 
     // Standard strain field without the eigen strain: typically the strain
     // field given to the cell for stress/tangent evaluation, but in case of
@@ -235,32 +263,38 @@ namespace muSpectre {
 
       //! Checks two loop breaking criteria (newton tolerance and equilibrium
       //! tolerance)
-      auto && early_convergence_test{[&incr_norm, &grad_norm, &newton_tol,
-                                      &stress_norm, &equil_tol, &message,
-                                      &has_converged]() {
-        bool incr_test{incr_norm / grad_norm <= newton_tol};
-        bool stress_test{stress_norm < equil_tol};
+      auto && early_convergence_test{
+          [&incr_norm, &grad_norm, &newton_tol, &stress_norm, &equil_tol,
+           &message, &has_converged, &convergence_crtiterion]() {
+            convergence_crtiterion.get_newton_tol_test() =
+                (incr_norm / grad_norm) <= newton_tol;
+            convergence_crtiterion.get_equil_tol_test() =
+                stress_norm < equil_tol;
 
-        if (incr_test) {
-          message = "Residual  tolerance reached";
-        } else if (stress_test) {
-          message = "Reached stress divergence tolerance";
-        }
-        has_converged = incr_test or stress_test;
-        return has_converged;
-      }};
+            if (convergence_crtiterion.get_newton_tol_test()) {
+              message = "Residual  tolerance reached";
+            } else if (convergence_crtiterion.get_equil_tol_test()) {
+              message = "Reached stress divergence tolerance";
+            }
+            has_converged = convergence_crtiterion.get_newton_tol_test() or
+                            convergence_crtiterion.get_equil_tol_test();
+            return has_converged;
+          }};
 
       //! Checks all convergence criteria, including detection of linear
       //! problems
-      auto && full_convergence_test{
-          [&early_convergence_test, &cell, &has_converged, &message]() {
-            bool last_step_linear{not cell.was_last_eval_non_linear()};
-            if (last_step_linear) {
-              message = "Linear problem, no more iteration necessary";
-            }
-            has_converged = early_convergence_test() or last_step_linear;
-            return has_converged;
-          }};
+      auto && full_convergence_test{[&early_convergence_test, &cell,
+                                     &has_converged, &message,
+                                     &convergence_crtiterion]() {
+        convergence_crtiterion.get_was_last_step_linear_test() =
+            not cell.was_last_eval_non_linear();
+        if (convergence_crtiterion.get_was_last_step_linear_test()) {
+          message = "Linear problem, no more iteration necessary";
+        }
+        has_converged = early_convergence_test() or
+                        convergence_crtiterion.get_was_last_step_linear_test();
+        return has_converged;
+      }};
 
       // Iterative update for the non-linear case
       for (; newt_iter < solver.get_maxiter() && !has_converged; ++newt_iter) {
@@ -347,6 +381,17 @@ namespace muSpectre {
       // update previous macroscopic strain
       previous_macro_strain = macro_strain;
 
+      // re-evaluate cell in case the loop was terminated because of linearity
+      if (convergence_crtiterion.get_was_last_step_linear_test() and
+          not(convergence_crtiterion.get_newton_tol_test() or
+              convergence_crtiterion.get_equil_tol_test())) {
+        if (not(eigen_strain_func == muGrid::nullopt)) {
+          eval_strain_field = general_strain_field;
+          (eigen_strain_func.value())(strain_step, eval_strain_field);
+        }
+        cell.evaluate_stress_tangent();
+      }
+
       // store results
       ret_val.emplace_back(OptimizeResult{
           general_strain_field.eigen_vec(), cell.get_stress().eigen_vec(),
@@ -355,6 +400,7 @@ namespace muSpectre {
 
       // store history variables for next load increment
       cell.save_history_variables();
+      convergence_crtiterion.reset();
     }
     return ret_val;
   }
@@ -367,25 +413,26 @@ namespace muSpectre {
     const auto & comm = cell.get_communicator();
 
     using Matrix_t = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
-
     auto shape{cell.get_strain_shape()};
+
+    ConvergenceCriterion convergence_crtiterion;
 
     // create a field collection to store workspaces
     auto field_collection{cell.get_fields().get_empty_clone()};
     // Corresponds to symbol δF or δε
     muGrid::MappedField<muGrid::FieldMap<Real, Mapping::Mut>> incrF_field{
-        "incrF",          shape[0], shape[1], IterUnit::SubPt,
-        field_collection, QuadPtTag};
+        "incrF",         shape[0],         shape[1],
+        IterUnit::SubPt, field_collection, QuadPtTag};
 
     // Corresponds to symbol ΔF or Δε
     muGrid::MappedField<muGrid::FieldMap<Real, Mapping::Mut>> DeltaF_field{
-        "DeltaF",           shape[0],         shape[1],
+        "DeltaF",        shape[0],         shape[1],
         IterUnit::SubPt, field_collection, QuadPtTag};
 
     // field to store the rhs for cg calculations
     muGrid::MappedField<muGrid::FieldMap<Real, Mapping::Mut>> rhs_field{
-        "rhs",    shape[0], shape[1], IterUnit::SubPt, field_collection,
-        QuadPtTag};
+        "rhs",           shape[0],         shape[1],
+        IterUnit::SubPt, field_collection, QuadPtTag};
     solver.initialise();
 
     size_t count_width{};
@@ -522,32 +569,38 @@ namespace muSpectre {
 
       //! Checks two loop breaking criteria (newton tolerance and equilibrium
       //! tolerance)
-      auto && early_convergence_test{[&incr_norm, &grad_norm, &newton_tol,
-                                      &stress_norm, &equil_tol, &message,
-                                      &has_converged]() {
-        bool incr_test{incr_norm / grad_norm <= newton_tol};
-        bool stress_test{stress_norm < equil_tol};
+      auto && early_convergence_test{
+          [&incr_norm, &grad_norm, &newton_tol, &stress_norm, &equil_tol,
+           &message, &has_converged, &convergence_crtiterion]() {
+            convergence_crtiterion.get_newton_tol_test() =
+                (incr_norm / grad_norm) <= newton_tol;
+            convergence_crtiterion.get_equil_tol_test() =
+                stress_norm < equil_tol;
 
-        if (incr_test) {
-          message = "Residual  tolerance reached";
-        } else if (stress_test) {
-          message = "Reached stress divergence tolerance";
-        }
-        has_converged = incr_test or stress_test;
-        return has_converged;
-      }};
+            if (convergence_crtiterion.get_newton_tol_test()) {
+              message = "Residual  tolerance reached";
+            } else if (convergence_crtiterion.get_equil_tol_test()) {
+              message = "Reached stress divergence tolerance";
+            }
+            has_converged = convergence_crtiterion.get_newton_tol_test() or
+                            convergence_crtiterion.get_equil_tol_test();
+            return has_converged;
+          }};
 
       //! Checks all convergence criteria, including detection of linear
       //! problems
-      auto && full_convergence_test{
-          [&early_convergence_test, &cell, &has_converged, &message]() {
-            bool last_step_linear{not cell.was_last_eval_non_linear()};
-            if (last_step_linear) {
-              message = "Linear problem, no more iteration necessary";
-            }
-            has_converged = early_convergence_test() or last_step_linear;
-            return has_converged;
-          }};
+      auto && full_convergence_test{[&early_convergence_test, &cell,
+                                     &has_converged, &message,
+                                     &convergence_crtiterion]() {
+        convergence_crtiterion.get_was_last_step_linear_test() =
+            not cell.was_last_eval_non_linear();
+        if (convergence_crtiterion.get_was_last_step_linear_test()) {
+          message = "Linear problem, no more iteration necessary";
+        }
+        has_converged = early_convergence_test() or
+                        convergence_crtiterion.get_was_last_step_linear_test();
+        return has_converged;
+      }};
 
       Uint newt_iter{0};
 
@@ -709,6 +762,12 @@ namespace muSpectre {
       // update previous macroscopic strain
       previous_macro_strain = macro_strain;
 
+      if (convergence_crtiterion.get_was_last_step_linear_test() and
+          not(convergence_crtiterion.get_newton_tol_test() or
+              convergence_crtiterion.get_equil_tol_test())) {
+        cell.evaluate_stress_tangent();
+      }
+
       // store results
       ret_val.emplace_back(
           OptimizeResult{F.eigen_vec(), cell.get_stress().eigen_vec(),
@@ -717,6 +776,7 @@ namespace muSpectre {
 
       // store history variables for next load increment
       cell.save_history_variables();
+      convergence_crtiterion.reset();
     }
 
     return ret_val;

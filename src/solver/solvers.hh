@@ -66,6 +66,35 @@ namespace muSpectre {
   enum class IsStrainInitialised { True, False };
 
   /**
+   * This class contains bool variables used to store the termination
+   * criteria of the newton-cg solver
+   */
+  class ConvergenceCriterion {
+   public:
+    // constructor
+    ConvergenceCriterion();
+    // destructor
+    virtual ~ConvergenceCriterion() = default;
+
+    //! getter for was_last_step_linear_test
+    bool & get_was_last_step_linear_test();
+
+    //! getter for equil_tol_test
+    bool & get_equil_tol_test();
+
+    //! getter for newton_tol_test
+    bool & get_newton_tol_test();
+
+    //! reset the bool members of the ConvergenceCriterion to false
+    void reset();
+
+   protected:
+    bool was_last_step_linear_test;  //!< the linearity termination criterion
+    bool equil_tol_test;             //!< the equilibrium termination criterion
+    bool newton_tol_test;            //!< the change in strain criterion
+  };
+
+  /**
    * Uses the Newton-conjugate Gradient method to find the static
    * equilibrium of a cell given a series of mean applied strain(ε for
    * Formulation::small_strain and H (=F-I) for Formulation::finite_strain).

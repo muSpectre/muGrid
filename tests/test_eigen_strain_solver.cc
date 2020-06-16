@@ -120,7 +120,7 @@ namespace muSpectre {
 
     Matrix_t F_eigen{Fix::F_eigen};
     Matrix_t delF0{Fix::F0};
-    constexpr Real cg_tol{1e-8}, newton_tol{1e-5}, equi_tol{0};
+    constexpr Real cg_tol{1e-8}, newton_tol{1e-5}, equi_tol{1e-8};
     constexpr Dim_t maxiter{100};
     constexpr Verbosity verbose{Verbosity::Silent};
 
@@ -142,7 +142,7 @@ namespace muSpectre {
                                    muGrid::TypedFieldBase<Real> & eval_field) {
           auto shape{cell_material.get_strain_shape()};
           auto && eigen_field_map{muGrid::FieldMap<Real, Mapping::Mut>(
-                eval_field, shape[0], muGrid::IterUnit::SubPt)};
+              eval_field, shape[0], muGrid::IterUnit::SubPt)};
           for (auto && tup : eigen_field_map.enumerate_indices()) {
             auto && index{std::get<0>(tup)};
             auto && eigen{std::get<1>(tup)};
@@ -229,14 +229,15 @@ namespace muSpectre {
     Func_t eigen_func{
         [&cell_material, &F_eigen](const size_t & step,
                                    muGrid::TypedFieldBase<Real> & eval_field) {
+          auto && stress_ratio{step + 1};
           auto shape{cell_material.get_strain_shape()};
           auto && eval_field_map{muGrid::FieldMap<Real, Mapping::Mut>(
-              eval_field, shape[0], muGrid::PixelSubDiv::QuadPt)};
+              eval_field, shape[0], muGrid::IterUnit::SubPt)};
           for (auto && tup : eval_field_map.enumerate_indices()) {
             auto && index{std::get<0>(tup)};
             auto && eval{std::get<1>(tup)};
             if (index == cell_material.get_nb_pixels() / 2) {
-              eval -= (step + 1) * (F_eigen);
+              eval -= (stress_ratio) * (F_eigen);
             }
           }
         }};
@@ -263,27 +264,25 @@ namespace muSpectre {
                                   equi_tol, verbose, IsStrainInitialised::False,
                                   eigen_func)};
 
-    auto && res_solver_0{ress_solver[0]};
     int step_out{0};
     for (auto && tup : akantu::zip(ress_solver, ress_material)) {
-      if (step_out > 0) {
-        auto && res_solver{std::get<0>(tup)};
-        auto && res_material{std::get<1>(tup)};
-        auto stress_ratio{step_out};
+      auto && res_solver{std::get<0>(tup)};
+      auto && res_material{std::get<1>(tup)};
+      auto && stress_ratio{step_out + 1};
 
-        auto && stress_solver{res_solver.stress - res_solver_0.stress};
-        auto && strain_solver{res_solver.grad};
-        auto && stress_material{res_material.stress};
-        auto && strain_material{res_material.grad};
+      auto && stress_solver{res_solver.stress};
+      auto && strain_solver{res_solver.grad};
+      auto && stress_material{res_material.stress};
+      auto && strain_material{res_material.grad};
 
-        auto && diff_stress{
-            rel_error(stress_solver, stress_ratio * stress_material)};
-        auto && diff_strain{
-            rel_error(strain_solver, (step_out + 1) * strain_material)};
-        std::cout << " The step is : " << step_out << std::endl;
-        BOOST_CHECK_LE(diff_stress, -cg_tol);
-        BOOST_CHECK_LE(diff_strain, cg_tol);
-      }
+      auto && diff_stress{
+          rel_error(stress_solver, stress_ratio * stress_material)};
+      auto && diff_strain{
+          rel_error(strain_solver, stress_ratio * strain_material)};
+
+      BOOST_CHECK_LE(diff_strain, cg_tol);
+      BOOST_CHECK_LE(diff_stress, cg_tol);
+      step_out++;
     }
   }
 
