@@ -115,8 +115,9 @@ def get_version_from_cc(fn):
     text = open(fn, 'r').read()
     dirty = bool(re.search('constexpr bool git_dirty{(true|false)};',
                            text).group(1))
-    version = re.search('constexpr char git_describe\[\]{"([A-Za-z0-9_.-]*)"};',
-                        text).group(1)
+    version = re.search(
+        'constexpr char git_describe\[\]{"([A-Za-z0-9_.-]*)"};', text
+    ).group(1)
     hash = re.search('constexpr char git_hash\[\]{"([A-Za-z0-9_.-]*)"};',
                      text).group(1)
 
@@ -145,14 +146,17 @@ def detect_library(info):
         import ctypes.util
         full_libname = ctypes.util.find_library(libname)
         if full_libname is not None:
-            # This mechanism does not give us the location of the library
+            # This mechanism does not give us the location of the
+            # library
             found = True
     if not found and 'command' in info:
         if verbose:
-            print("  * Looking for executable '{}'".format(info['command']))
+            print("  * Looking for executable '{}'"
+                  .format(info['command']))
         command_path = find_executable(info['command'])
         if command_path is not None:
-            root = os.path.abspath(os.path.dirname(command_path) + '/../lib')
+            root = os.path.abspath(os.path.dirname(command_path) +
+                                   '/../lib')
         if verbose:
             print("  * Attempting to load library '{}' in path '{}'"
                 .format(libname, root))
@@ -172,8 +176,8 @@ def detect_library(info):
 
         if verbose:
             if root is None:
-                print("  * Detected library '{}' in standard library search path"
-                    .format(info['name']))
+                print("  * Detected library '{}' in standard library "
+                      "search path".format(info['name']))
             else:
                 print("  * Detected library '{}' in path '{}'"
                     .format(info['name'], root))
@@ -186,35 +190,42 @@ def detect_library(info):
 
     else:
         if verbose:
-            print("  ! Could not detect library '{}'".format(info['name']))
+            print("  ! Could not detect library '{}'"
+                  .format(info['name']))
         return None
 
     return include_dirs, libraries, library_dirs
 
 
 def get_eigen_include(eigen_version='3.3.5'):
-    """Helper function to download and install eigen and return include path.
+    """
+    Helper function to download and install eigen and return include
+    path.
     """
     root = os.path.abspath(os.path.dirname(__file__))
     eigen_path = '{}/depend/eigen-{}'.format(root, eigen_version)
     if not os.path.exists(eigen_path):
         os.makedirs(eigen_path, exist_ok=True)
-        os.system('curl -L http://bitbucket.org/eigen/eigen/get/{}.tar.bz2 | '
-                  'tar -jx -C {} --strip-components 1'
-                  .format(eigen_version, eigen_path))
+        os.system(
+            'curl -L http://bitbucket.org/eigen/eigen/get/{}.tar.bz2'
+            ' | tar -jx -C {} --strip-components 1'
+            .format(eigen_version, eigen_path))
     return(eigen_path)
 
 
 def get_pybind11_include(pybind11_version='2.2.3'):
-    """Helper function to download and install pybind and return include path.
+    """
+    Helper function to download and install pybind and return include
+    path.
     """
     root = os.path.abspath(os.path.dirname(__file__))
     pybind11_path = '{}/depend/pybind11-{}'.format(root, pybind11_version)
     if not os.path.exists(pybind11_path):
         os.makedirs(pybind11_path, exist_ok=True)
-        os.system('curl -L https://github.com/pybind/pybind11/archive/v{}.tar'
-                  '.gz | tar -zx -C {} --strip-components 1'
-                  .format(pybind11_version, pybind11_path))
+        os.system(
+            'curl -L https://github.com/pybind/pybind11/archive/v{}'
+            '.tar.gz | tar -zx -C {} --strip-components 1'
+            .format(pybind11_version, pybind11_path))
     return('{}/include'.format(pybind11_path))
 
 ###
@@ -282,9 +293,11 @@ else:
     # Test if we can execute mpicc and mpicxx
     try:
         mpicc_successful = subprocess.run(
-            [mpicc, '--version'], stdout=PIPE, stderr=PIPE).returncode == 0
+            [mpicc, '--version'],
+            stdout=PIPE, stderr=PIPE).returncode == 0
         mpicc_successful &= subprocess.run(
-            [mpicxx, '--version'], stdout=PIPE, stderr=PIPE).returncode == 0
+            [mpicxx, '--version'],
+            stdout=PIPE, stderr=PIPE).returncode == 0
     except FileNotFoundError:
         mpicc_successful = False
     if not mpicc_successful:
@@ -338,17 +351,14 @@ if mpi:
         print('  * C++-compiler: {}'.format(os.environ['CXX']))
     mufft_sources += ['src/libmufft/communicator.cc']
 
-# extra_link_args is required to search for shared libraries relative to the
-# library's location. Specifically, muGrid.so and muFFT.so are placed in the
-# install directory under 'site-packages', and the Python wrappers _muGrid and
-# _muFFT need be able to find those.
-# Note: -Wl,--no-as-needed -lmuFFT -lmuGrid is a dirty hack to circumvent the recent
-# addition of -Wl,-as-needed as a default. This leads to muFFT.so and muGrid.so not
-# being linked to the extension modules.
-extra_link_args = ['-Wl,-rpath,${ORIGIN}'] 
+# extra_link_args is required to search for shared libraries relative
+# to the library's location. Specifically, muGrid.so and muFFT.so are
+# placed in the install directory under 'site-packages', and the
+# Python wrappers _muGrid and _muFFT need be able to find those.
+extra_link_args = ['-Wl,-rpath,${ORIGIN}']
 
-# We compile two shared libraries, libmuGrid.so and libmuFFT.so. These libraries
-# do not contain the Python interface.
+# We compile two shared libraries, libmuGrid.so and libmuFFT.so.
+# These libraries do not contain the Python interface.
 
 ext_libraries = [
     ('muGrid',
@@ -369,8 +379,8 @@ ext_libraries = [
     ),
 ]
 
-# We compile two Python interfaces, _muGrid and _muFFT that use the above shared
-# libraries.
+# We compile two Python interfaces, _muGrid and _muFFT that use the
+# above shared libraries.
 
 ext_modules = [
     Extension(
@@ -418,8 +428,8 @@ def cpp_flag(compiler):
     elif has_flag(compiler, '-std=c++11'):
         return '-std=c++11'
     else:
-        raise RuntimeError('Unsupported compiler -- at least C++11 support '
-                           'is needed!')
+        raise RuntimeError('Unsupported compiler -- at least C++11 '
+                           'support is needed!')
 
 
 def compiler_options(compiler, version):
@@ -447,7 +457,9 @@ def linker_options(compiler):
 
 
 class build_ext_custom(build_ext):
-    """A custom build extension for adding compiler-specific options."""
+    """
+    A custom build extension for adding compiler-specific options.
+    """
     def build_extension(self, ext):
         sources = ext.sources
 
@@ -490,7 +502,9 @@ class build_ext_custom(build_ext):
 
 
 class build_clib_dyn(build_clib):
-    """A custom build extension for adding compiler-specific options."""
+    """
+    A custom build extension for adding compiler-specific options.
+    """
     def finalize_options(self):
         self.set_undefined_options('build',
                                    ('build_lib', 'build_clib'),
@@ -525,7 +539,8 @@ class build_clib_dyn(build_clib):
             macros = build_info.get('macros')
             include_dirs = build_info.get('include_dirs')
 
-            extra_args = (build_info.get('extra_compile_args') or []) + copts
+            extra_args = (build_info.get('extra_compile_args') or []) + \
+                         copts
 
             objects = self.compiler.compile(sources,
                                             output_dir=self.build_temp,
@@ -555,8 +570,8 @@ if mpi:
 ### Discover version and write version.cc
 
 try:
-    # Get version from git. If we get this from git, then we need to check
-    # whether we have to refresh the version.cc file.
+    # Get version from git. If we get this from git, then we need to
+    # check whether we have to refresh the version.cc file.
     dirty, version, hash = get_version_from_git()
     try:
         cc_dirty, cc_version, cc_hash = \
@@ -576,11 +591,12 @@ try:
 except:
     # Detection via git failed. Get version from version.cc file.
     try:
-        dirty, version, hash = get_version_from_cc('src/libmufft/version.cc')
+        dirty, version, hash = \
+            get_version_from_cc('src/libmufft/version.cc')
     except:
-        raise RuntimeError('Version detection failed. This is not a git '
-                           'repository and src/libmufft/version.cc does not '
-                           'exist.')
+        raise RuntimeError('Version detection failed. This is not a '
+                           'git repository and src/libmufft/version.cc '
+                           'does not exist.')
 
 setup(
     name='muFFT',
@@ -588,15 +604,18 @@ setup(
     author='Till Junge',
     author_email='till.junge@altermail.ch',
     url='https://gitlab.com/muspectre/muspectre',
-    description='muFFT is a wrapper for common FFT libraries with support '
-                'for MPI parallelization',
+    description='muFFT is a wrapper for common FFT libraries with '
+                'support for MPI parallelization',
     long_description='',
     packages = ['muFFT', 'muGrid'],
-    package_dir = {'muFFT': 'language_bindings/libmufft/python/muFFT',
-                   'muGrid': 'language_bindings/libmugrid/python/muGrid'},
+    package_dir = {
+        'muFFT': 'language_bindings/libmufft/python/muFFT',
+        'muGrid': 'language_bindings/libmugrid/python/muGrid'
+    },
     libraries=ext_libraries,
     ext_modules=ext_modules,
-    cmdclass={'build_clib': build_clib_dyn, 'build_ext': build_ext_custom},
+    cmdclass={'build_clib': build_clib_dyn,
+              'build_ext': build_ext_custom},
     zip_safe=False,
     test_suite='tests',
     setup_requires=requirements,
