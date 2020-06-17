@@ -1,8 +1,13 @@
 Change log for µSpectre
-===========================
+=======================
 
-0.9.0
------
+0.9.1 (17Jun20)
+---------------
+- Bug fix: Packaging with sdist only included FFT engines present during
+  the packaging process
+
+0.9.0 (17Jun20)
+---------------
 - Initial release of µSpectre
   * FFT based micromechanical homogeneization
   * Arbitrary constitutive laws in small and finite strain
