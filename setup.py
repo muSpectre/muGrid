@@ -34,16 +34,14 @@ from subprocess import PIPE
 
 from distutils import sysconfig
 from distutils.spawn import find_executable
+from distutils.sysconfig import customize_compiler, get_config_var
 from setuptools import setup, Extension
 from setuptools.command.build_clib import build_clib
 from setuptools.command.build_ext import build_ext
 
-###
-
-# Replace hard-wired bundle option on macOS
-if sys.platform == 'darwin':
-   vars = sysconfig.get_config_vars()
-   vars['LDSHARED'] = vars['LDSHARED'].replace('-bundle', '-dynamiclib')
+# make sure _config_vars is initialized
+get_config_var("LDSHARED")
+from distutils.sysconfig import _config_vars as _CONFIG_VARS
 
 ###
 
@@ -230,6 +228,25 @@ def get_pybind11_include(pybind11_version='2.2.3'):
 
 ###
 
+def _customize_compiler_for_shlib(compiler):
+    if sys.platform == "darwin":
+        # building .dylib requires additional compiler flags on OSX; here we
+        # temporarily substitute the pyconfig.h variables so that distutils'
+        # 'customize_compiler' uses them before we build the shared libraries.
+        tmp = _CONFIG_VARS.copy()
+        try:
+            _CONFIG_VARS['LDSHARED'] = (
+                "gcc -Wl,-x -dynamiclib -undefined dynamic_lookup")
+            _CONFIG_VARS['SHLIB_SUFFIX'] = ".dylib"
+            customize_compiler(compiler)
+        finally:
+            _CONFIG_VARS.clear()
+            _CONFIG_VARS.update(tmp)
+    else:
+        customize_compiler(compiler)
+
+###
+
 if verbose:
     print('=== DETECTING FFT LIBRARIES ===')
 
@@ -355,7 +372,9 @@ if mpi:
 # to the library's location. Specifically, muGrid.so and muFFT.so are
 # placed in the install directory under 'site-packages', and the
 # Python wrappers _muGrid and _muFFT need be able to find those.
-extra_link_args = ['-Wl,-rpath,${ORIGIN}']
+extra_link_args = []
+if sys.platform != 'darwin':
+    extra_link_args += ['-Wl,-rpath,${ORIGIN}']
 
 # We compile two shared libraries, libmuGrid.so and libmuFFT.so.
 # These libraries do not contain the Python interface.
@@ -521,6 +540,7 @@ class build_clib_dyn(build_clib):
             self.include_dirs = self.include_dirs.split(os.pathsep)
 
     def build_libraries(self, libraries):
+        _customize_compiler_for_shlib(self.compiler)
         copts = compiler_options(self.compiler,
                                  self.distribution.get_version())
         lopts = linker_options(self.compiler)
@@ -551,11 +571,17 @@ class build_clib_dyn(build_clib):
             library_dirs = (build_info.get('library_dirs') or []) + \
                 [self.build_clib]
 
-            extra_args = (build_info.get('extra_link_args') or []) + lopts
+            library_filename = self.compiler.library_filename(
+                lib_name, lib_type="shared")
+
+            if sys.platform == 'darwin':
+                extra_args = (build_info.get('extra_link_args') or []) + \
+                    lopts + ['-Wl,-install_name,@loader_path/{}'
+                             .format(library_filename)]
 
             self.compiler.link_shared_object(
                 objects,
-                self.compiler.library_filename(lib_name, lib_type="shared"),
+                library_filename,
                 libraries=build_info.get('libraries'),
                 library_dirs=library_dirs,
                 output_dir=self.build_clib,
