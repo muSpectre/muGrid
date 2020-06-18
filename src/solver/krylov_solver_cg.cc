@@ -64,8 +64,25 @@ namespace muSpectre {
     this->p_k = -this->r_k;
     this->converged = false;
 
-    Real rdr = comm.sum(this->r_k.dot(this->r_k));
+    Real rdr = comm.sum(r_k.squaredNorm());
     Real rhs_norm2 = comm.sum(rhs.squaredNorm());
+
+    if (rhs_norm2 == 0) {
+      std::stringstream msg{};
+      msg << "You are invoking conjugate gradient"
+          << "solver with absolute zero RHS.\n"
+          << "Please check the load steps of your problem "
+          << "to ensure nothing is missed.\n"
+          << "You might need to set equilibrium tolerance to a positive "
+          << "small value to avoid calling the conjugate gradient solver in "
+          << "case of having zero RHS (relatively small RHS).\n"
+          << std::endl;
+      std::cout << "WARNING: ";
+      std::cout << msg.str();
+      this->converged = true;
+      return Vector_map(this->x_k.data(), this->x_k.size());
+    }
+
     if (verbose > Verbosity::Silent && comm.rank() == 0) {
       std::cout << "Norm of rhs in krylov_solver_cg.cc = " << rhs_norm2
                 << std::endl;
