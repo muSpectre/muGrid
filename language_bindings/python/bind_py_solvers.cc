@@ -104,18 +104,21 @@ void add_newton_cg_helper(py::module & mod) {
       name,
       [](muSpectre::Cell & s, const grad & g, solver & so, Real nt, Real eqt,
          Verbosity verb, IsStrainInitialised strain_init,
-         py::function & pyfunc) -> OptimizeResult {
+         py::function & eigen_strain_pyfunc) -> OptimizeResult {
         const grad_vec & g_vec{g};
-        Func_t func{
-            [&pyfunc, &s](const size_t & step_nb,
-                          muGrid::TypedFieldBase<Real> & eigen_strain_field) {
+        Func_t eigen_strain_cpp_func{
+            [&eigen_strain_pyfunc,
+             &s](const size_t & step_nb,
+                 muGrid::TypedFieldBase<Real> & eigen_strain_field) {
               auto && strain_shape{s.get_strain_shape()};
-              pyfunc(step_nb,
-                     muGrid::array_computer<muGrid::Real>(
-                         eigen_strain_field, {strain_shape[0], strain_shape[1]},
-                         muGrid::IterUnit::SubPt));
+              eigen_strain_pyfunc(step_nb,
+                                  muGrid::array_computer<muGrid::Real>(
+                                      eigen_strain_field,
+                                      {strain_shape[0], strain_shape[1]},
+                                      muGrid::IterUnit::SubPt));
             }};
-        return newton_cg(s, g_vec, so, nt, eqt, verb, strain_init, func)
+        return newton_cg(s, g_vec, so, nt, eqt, verb, strain_init,
+                         eigen_strain_cpp_func)
             .front();
       },
       "cell"_a, "ΔF₀"_a, "solver"_a, "newton_tol"_a, "equil_tol"_a,
@@ -136,17 +139,21 @@ void add_newton_cg_helper(py::module & mod) {
       name,
       [](muSpectre::Cell & s, const grad_vec & g, solver & so, Real nt,
          Real eqt, Verbosity verb, IsStrainInitialised strain_init,
-         const py::function & pyfunc) -> std::vector<OptimizeResult> {
-        Func_t func{
-            [&pyfunc, &s](const size_t & step_nb,
-                          muGrid::TypedFieldBase<Real> & eigen_strain_field) {
+         const py::function & eigen_strain_pyfunc)
+          -> std::vector<OptimizeResult> {
+        Func_t eigen_strain_cpp_func{
+            [&eigen_strain_pyfunc,
+             &s](const size_t & step_nb,
+                 muGrid::TypedFieldBase<Real> & eigen_strain_field) {
               auto && strain_shape{s.get_strain_shape()};
-              pyfunc(step_nb,
-                     muGrid::array_computer<muGrid::Real>(
-                         eigen_strain_field, {strain_shape[0], strain_shape[1]},
-                         muGrid::IterUnit::SubPt));
+              eigen_strain_pyfunc(step_nb,
+                                  muGrid::array_computer<muGrid::Real>(
+                                      eigen_strain_field,
+                                      {strain_shape[0], strain_shape[1]},
+                                      muGrid::IterUnit::SubPt));
             }};
-        return newton_cg(s, g, so, nt, eqt, verb, strain_init, func);
+        return newton_cg(s, g, so, nt, eqt, verb, strain_init,
+                         eigen_strain_cpp_func);
       },
       "cell"_a, "ΔF₀"_a, "solver"_a, "newton_tol"_a, "equil_tol"_a,
       "verbose"_a = Verbosity::Silent,

@@ -38,35 +38,28 @@ import unittest
 import numpy as np
 from python_test_imports import µ
 
+eigen = np.array([[1.0e-3, 2.0e-4],
+                  [2.0e-4, 2.5e-3]])
 
-def eigen_strain_func(step_nb):
-    ndim = 2   # number of dimensions
-    N = 3  # number of voxels (assumed equal for all directions)
-    Nx = Ny = N
-    # identity tensor                  [single tensor]
-    i = np.asfortranarray(np.zeros([ndim, ndim]))
 
-    # identity tensors
-    identities = np.asfortranarray(
-        np.einsum('ij,pxy', i, np.ones([1, N, N])))
-
-    eigen = np.array([[1e-3, 1e-4],
-                      [1e-4, 2e-3]])
-    eigens = identities
-    eigens[:, :, 0, 1, 1] = eigen
-    for i in range(3):
-        for j in range(2):
-            print("\ni: {}, j: {}\n".format(i, j))
-            print(eigens[:, :, 0, i, j])
-
-    return eigens
+def eigen_strain_func(step_nb, eigens):
+    eigens[:, :, 0, 1, 1] -= eigen
 
 
 class EigenStrainSolverCheck(unittest.TestCase):
     def setUp(self):
+        self.cg_tol = 1e-8
+        self.newton_tol = 1e-6
+        self.equil_tol = 1e-8
+
+        self.Del0 = np.zeros((2, 2))
+        self.maxiter = 100
+        self.verbose = µ.Verbosity.Silent
+
         self.nb_grid_pts = [3, 3]  # [5,7]
         self.lengths = [3., 3.]  # [5.2, 8.3]
         self.formulation = µ.Formulation.small_strain
+
         self.cell_material = µ.Cell(self.nb_grid_pts,
                                     self.lengths,
                                     self.formulation)
@@ -84,17 +77,7 @@ class EigenStrainSolverCheck(unittest.TestCase):
         self.ndim = 2   # number of dimensions
         self.N = 3  # number of voxels (assumed equal for all directions)
         self.Nx = self.Ny = self.N
-        # identity tensor                  [single tensor]
-        self.i = np.asfortranarray(np.eye(self.ndim))
-
-        # identity tensors
-        self.identities = np.asfortranarray(
-            np.einsum('ij,pxy', self.i, np.ones([1, self.N, self.N])))
-
-        self.eigen = np.array([[1e-3, 1e-4],
-                               [1e-4, 2e-3]])
-        self.eigens = self.identities
-        self.eigens[:, :, 0, 1, 1] = self.eigen
+        self.eigen = eigen
 
     def test_eigen_strain_solve(self):
         for pix_id in self.cell_material.pixel_indices:
@@ -109,32 +92,26 @@ class EigenStrainSolverCheck(unittest.TestCase):
         self.cell_material.initialise()
         self.cell_solver.initialise()
 
-        cg_tol = 1e-8
-        newton_tol = 1e-6
-        equil_tol = 0.
-        Del0 = np.array([[2.5e-3, 1.00e-3],
-                         [1.0e-3, 0.00e-3]])
-        maxiter = 100
-        verbose = µ.Verbosity.Silent
-
         solver_solver = µ.solvers.KrylovSolverCG(
-            self.cell_solver, cg_tol, maxiter, verbose)
+            self.cell_solver, self.cg_tol, self.maxiter, self.verbose)
 
         solver_material = µ.solvers.KrylovSolverCG(
-            self.cell_material, cg_tol, maxiter, verbose)
+            self.cell_material, self.cg_tol, self.maxiter, self.verbose)
 
-        r_solver = µ.solvers.newton_cg(self.cell_solver, Del0,
+        r_solver = µ.solvers.newton_cg(self.cell_solver, self.Del0,
                                        solver_solver,
-                                       newton_tol, equil_tol, verbose,
+                                       self.newton_tol, self.equil_tol,
+                                       self.verbose,
                                        μ.solvers.IsStrainInitialised.No,
                                        eigen_strain_func)
 
-        r_material = µ.solvers.newton_cg(self.cell_material, Del0,
+        r_material = µ.solvers.newton_cg(self.cell_material, self.Del0,
                                          solver_material,
-                                         newton_tol, equil_tol, verbose)
+                                         self.newton_tol, self.equil_tol,
+                                         self.verbose)
+
+        self.assertTrue((r_material.grad == r_solver.grad).all())
         self.assertTrue((r_material.stress == r_solver.stress).all())
-        # self.assertTrue((r_material.grad == r_solver.grad).all())
-        # print(r_material.grad-r_solver.grad)
 
 
 if __name__ == '__main__':

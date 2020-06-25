@@ -61,10 +61,9 @@ class XmlTree():
         self.hdlr.setFormatter(self.formatter)
         self.logger.addHandler(self.hdlr)
 
-
         # save the offsets of AppendedData, here x_, y_, z_coordinates
-        self.ref_offsets  = {} # store x-off, y-off, z-off in a dictonary
-        self.comp_offsets = {} # store x-off, y-off, z-off in a dictonary
+        self.ref_offsets = {}  # store x-off, y-off, z-off in a dictionary
+        self.comp_offsets = {}  # store x-off, y-off, z-off in a dictionary
 
     def __enter__(self):
         return self
@@ -299,10 +298,10 @@ class VtkExport_Check(unittest.TestCase):
         self.grid_spacing = self.lengths / self.nb_grid_pts
 
         self.temporary = True  # decides whether the compared files are written
-                               # in a temporary folder and deleted after
-                               # comaprison (True), or if they are written into
-                               # the afterwards existing folder
-                               # 'vtr-test-folder' (False)
+        # in a temporary folder and deleted after
+        # comaprison (True), or if they are written into
+        # the afterwards existing folder
+        # 'vtr-test-folder' (False)
 
     def test_vtk_export(self):
         """

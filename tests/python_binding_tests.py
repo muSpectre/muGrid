@@ -45,7 +45,8 @@ from python_material_linear_elastic_generic1_test import \
 from python_material_linear_elastic_generic2_test import \
     MaterialLinearElasticGeneric2_Check
 from python_comparison_test_material_linear_elastic1 import MatTest as MatTest1
-from python_material_hyper_elasto_plastic2_test import MaterialHyperElastoPlastic2_Check
+from python_material_hyper_elasto_plastic2_test import \
+    MaterialHyperElastoPlastic2_Check
 from python_field_tests import FieldCollection_Check
 
 from python_exact_reference_elastic_test import LinearElastic_Check
@@ -58,7 +59,7 @@ from python_eshelby_slow_test import MuSpectre_Eshelby_Slow_Check
 from python_material_evaluator_test import MaterialEvaluator_Check
 
 # FIXME: @Richard L. - please fix parallel stochastic plasticity model
-#from python_stochastic_plasticity_search_test import \
+# from python_stochastic_plasticity_search_test import \
 #    StochasticPlasticitySearch_Check
 
 
@@ -66,6 +67,7 @@ from python_projection_tests import *
 
 from python_cell_tests import CellCheck
 from python_eigen_strain_test import EigenStrainCheck
+from python_eigen_strain_solver_test import EigenStrainSolverCheck
 from python_solver_test import SolverCheck
 
 
