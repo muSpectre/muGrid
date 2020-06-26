@@ -37,7 +37,7 @@ Dependencies of *µ*\Spectre
 - `git <https://git-scm.com/>`_
 - `Python3 <https://www.python.org/>`_ including the header files
 - `numpy <http://www.numpy.org/>`_ and `scipy <https://scipy.org/>`_
-- `UVW <https://c4science.ch/source/uvw/>`_ for the visualization
+- `UVW <https://c4science.ch/source/uvw/>`_ (0.3.1 or higher) for the visualization
 - `pybind11 <https://pybind11.readthedocs.io/en/stable/>`_ (2.2.4 or higher)
 - `NetCDF4 <https://unidata.github.io/netcdf4-python/netCDF4/index.html>`_ 
 
