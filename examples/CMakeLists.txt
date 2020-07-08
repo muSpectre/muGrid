@@ -137,6 +137,9 @@ muSpectre_add_example(visco_py_example
 muSpectre_add_example(visco_damage_py_example
   TYPE PYTHON  visco_example_damage.py 1)
 
+muSpectre_add_example(field_extraction_py_example
+  TYPE PYTHON  field_extraction_example.py)
+
 if(${MUSPECTRE_MPI_PARALLEL})
   # additional files to copy
   file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/odd_image.npz

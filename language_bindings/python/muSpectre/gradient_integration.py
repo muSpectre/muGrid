@@ -108,6 +108,7 @@ def reshape_gradient(F, nb_grid_pts):
     new_order = []
     new_order[0:2] = reversed(order[-2:])
     new_order[2:] = reversed(order[0:dim])
+
     return F.reshape(output_shape).transpose(*new_order)
 
 
@@ -211,7 +212,8 @@ def integrate_tensor_2(grad, fft_engine, gradient_op, grid_spacing):
     lengths = nb_grid_pts * grid_spacing
     x = make_grid(lengths, nb_grid_pts)[0]
     integrator = get_integrator(fft_engine, gradient_op, grid_spacing)
-    grad_k_field = fft_engine.create_or_fetch_fourier_space_field("grad_k", dim * dim)
+    grad_k_field = fft_engine.create_or_fetch_fourier_space_field(
+        "grad_k", dim * dim)
     fft_engine.fft(grad, grad_k_field)
     grad_k = grad_k_field.array([dim, dim])
     grad_k *= fft_engine.normalisation
@@ -411,7 +413,7 @@ def integrate_tensor_2_small_strain(strain, fft_engine, grid_spacing):
     # Applying inverse Fourier transform to on=btain the displacement field in
     # Real space
     fluctuation_non_pbe = np.empty([dim, *fft_engine.nb_subdomain_grid_pts],
-                                    order="f")
+                                   order="f")
     fft_engine.ifft(u_k_shifted, fluctuation_non_pbe)
     if np.linalg.norm(fluctuation_non_pbe.imag) > 1e-10:
         raise RuntimeError("Integrate_tensor_2() computed complex placements, "
@@ -454,7 +456,7 @@ def integrate_vector(grad, fft_engine, gradient_op, grid_spacing):
     grad_k_field = fft_engine.register_fourier_space_field('grad_k', dim)
     fft_engine.fft(grad, grad_k_field)
     grad_k = grad_k_field.array([dim])
-    grad_k *=  fft_engine.normalisation
+    grad_k *= fft_engine.normalisation
     f_k = np.einsum("j...,j...->...", integrator, grad_k)
     grad_k_0 = grad_k[np.s_[:, ] + (0,)*(dim+1)]
     # The homogeneous integration computes the affine part of the deformation
@@ -535,7 +537,7 @@ def compute_placement(result, lengths, nb_grid_pts, gradient_op,
     if fft is None:
         dim = len(nb_grid_pts)
         fft_engine = muFFT.FFT(nb_grid_pts)
-        fft_engine.initialise(dim * dim)# FFT for (dim,dim) matrix
+        fft_engine.initialise(dim * dim)  # FFT for (dim,dim) matrix
         fft_engine.initialise(dim)  # FFT for (dim) vector
     # compute the placement
     nodal_positions, _ = make_grid(lengths, nb_grid_pts)

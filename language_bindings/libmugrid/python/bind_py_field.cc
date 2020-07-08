@@ -70,7 +70,8 @@ void add_field(py::module & mod) {
       .def_property_readonly("collection", &Field::get_collection)
       .def_property_readonly("nb_dof_per_sub_pt", &Field::get_nb_dof_per_sub_pt)
       .def_property_readonly("nb_entries", &Field::get_nb_entries)
-      .def_property_readonly("is_global", &Field::is_global);
+      .def_property_readonly("is_global", &Field::is_global)
+      .def_property_readonly("sub_division", &Field::get_sub_division_tag);
 }
 
 template <class T>
@@ -97,8 +98,7 @@ void add_typed_field(py::module & mod, std::string name) {
           [](TypedFieldBase<T> & self, const muGrid::IterUnit & it) {
             return muGrid::array_computer(self, std::vector<Index_t>{}, it);
           },
-          "iteration_type"_a = muGrid::IterUnit::SubPt,
-          py::keep_alive<0, 1>())
+          "iteration_type"_a = muGrid::IterUnit::SubPt, py::keep_alive<0, 1>())
       .def(
           "array",
           [](TypedFieldBase<T> & self, std::vector<Index_t> shape,
@@ -106,10 +106,11 @@ void add_typed_field(py::module & mod, std::string name) {
             return muGrid::array_computer(self, shape, it);
           },
           "shape"_a = std::vector<Index_t>{},
-          "iteration_type"_a = muGrid::IterUnit::SubPt,
-          py::keep_alive<0, 1>());
+          "iteration_type"_a = muGrid::IterUnit::SubPt, py::keep_alive<0, 1>());
 
-  py::class_<TypedField<T>, TypedFieldBase<T>>(mod, name.c_str());
+  py::class_<TypedField<T>, TypedFieldBase<T>>(mod, name.c_str())
+      .def("clone", &TypedField<T>::clone, "new_name"_a,
+           "allow_overwrite"_a, py::return_value_policy::reference_internal);
 }
 
 void add_field_classes(py::module & mod) {

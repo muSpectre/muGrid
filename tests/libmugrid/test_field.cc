@@ -34,6 +34,7 @@
  */
 
 #include "tests.hh"
+#include "test_goodies.hh"
 #include "libmugrid/field_typed.hh"
 #include "libmugrid/field_collection_local.hh"
 #include "libmugrid/field_collection_global.hh"
@@ -66,6 +67,32 @@ namespace muGrid {
     // check that setting pad size won't change logical size
     field.set_pad_size(24);
     BOOST_CHECK_EQUAL(field.size(), ipow(len, SDim));
+  }
+
+  /* ---------------------------------------------------------------------- */
+  BOOST_AUTO_TEST_CASE(clone) {
+    constexpr Index_t SDim{twoD};
+    constexpr Index_t MDim{twoD};
+    using FC_t = GlobalFieldCollection;
+    FC_t fc{SDim};
+    fc.set_nb_sub_pts("quad", OneQuadPt);
+
+    auto & field{fc.register_real_field("TensorField 1", MDim * MDim, "quad")};
+
+    constexpr Index_t len{2};
+    fc.initialise(CcoordOps::get_cube<SDim>(len), {});
+    field.eigen_vec().setRandom();
+
+    auto & clone{field.clone("clone")};
+    auto && error{
+        testGoodies::rel_error(field.eigen_pixel(), clone.eigen_pixel())};
+    BOOST_CHECK_EQUAL(error, 0);
+
+    // check that overwriting throws an error
+    BOOST_CHECK_THROW(field.clone("clone"), FieldError);
+    BOOST_CHECK_NO_THROW(field.clone("clone_other_name"));
+
+    BOOST_CHECK_NO_THROW(field.clone("clone", true));
   }
 
   BOOST_AUTO_TEST_CASE(sub_divisions_with_known) {

@@ -316,6 +316,11 @@ namespace muSpectre {
     auto & global_compatible_field{
         this->globalise_real_internal_field(compatible_name)};
 
+    // make sure we get the same field again
+    auto & global_compatible_field_again{
+        this->globalise_real_internal_field(compatible_name)};
+    BOOST_CHECK_EQUAL(&global_compatible_field, &global_compatible_field_again);
+
     auto glo_map{global_compatible_field.get_sub_pt_map()};
     for (auto && tup : glo_map.enumerate_indices()) {
       const auto & quad_pt_id{std::get<0>(tup)};
@@ -393,6 +398,12 @@ namespace muSpectre {
 
     auto & global_compatible_field_current{
         this->globalise_real_current_field(compatible_name)};
+
+    // make sure we get the same field again
+    auto & global_compatible_field_again{
+        this->globalise_real_current_field(compatible_name)};
+    BOOST_CHECK_EQUAL(&global_compatible_field_current,
+                      &global_compatible_field_again);
 
     auto glo_map_current{global_compatible_field_current.get_sub_pt_map()};
 
@@ -478,6 +489,12 @@ namespace muSpectre {
 
     auto & global_compatible_field_old{
         this->globalise_real_old_field(compatible_name, nb_steps_to_save)};
+
+    // make sure we get the same field again
+    auto & global_compatible_field_again{
+        this->globalise_real_old_field(compatible_name, nb_steps_to_save)};
+    BOOST_CHECK_EQUAL(&global_compatible_field_old,
+                      &global_compatible_field_again);
 
     auto glo_map_old{global_compatible_field_old.get_sub_pt_map()};
 

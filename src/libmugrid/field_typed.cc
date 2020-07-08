@@ -56,11 +56,19 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
+  TypedField<T> & TypedField<T>::operator=(const TypedField & other) {
+    Parent::operator=(other);
+    return *this;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
   TypedField<T> & TypedField<T>::operator=(const Parent & other) {
     Parent::operator=(other);
     return *this;
   }
 
+  /* ---------------------------------------------------------------------- */
   template <typename T>
   WrappedField<T> & WrappedField<T>::operator=(const Parent & other) {
     Parent::operator=(other);
@@ -254,6 +262,32 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
+  TypedField<T> & TypedField<T>::clone(const std::string & new_name,
+                                       const bool & allow_overwrite) const {
+    const bool field_exists{this->get_collection().field_exists(new_name)};
+
+    if (field_exists and not allow_overwrite) {
+      std::stringstream err_msg{};
+      err_msg << "The field '" << new_name
+              << "' already exists, and you did not set 'allow_overwrite' "
+                 "to true";
+      throw FieldError{err_msg.str()};
+    }
+
+    TypedField<T> & other{
+        field_exists
+            ? this->safe_cast(this->get_collection().get_field(new_name),
+                              this->nb_dof_per_sub_pt, this->sub_division_tag)
+            : this->get_collection().template register_field<T>(
+                  new_name, this->nb_dof_per_sub_pt, this->sub_division_tag,
+                  this->unit)};
+
+    other = *this;
+    return other;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
   auto TypedFieldBase<T>::eigen_map(const Index_t & nb_rows,
                                     const Index_t & nb_cols) -> Eigen_map {
     if (not this->collection.is_initialised()) {
@@ -294,9 +328,8 @@ namespace muGrid {
       if (my_strides == other_strides) {
         this->eigen_vec() = other.eigen_vec();
       } else {
-        raw_mem_ops::strided_copy(this->get_shape(IterUnit::Pixel),
-                                  my_strides, other_strides, other.data(),
-                                  this->data_ptr);
+        raw_mem_ops::strided_copy(this->get_shape(IterUnit::Pixel), my_strides,
+                                  other_strides, other.data(), this->data_ptr);
       }
       break;
     }
@@ -398,8 +431,7 @@ namespace muGrid {
       -> FieldMap<T, Mapping::Const> {
     return (nb_rows == -1)
                ? FieldMap<T, Mapping::Const>{*this, IterUnit::Pixel}
-               : FieldMap<T, Mapping::Const>{*this, nb_rows,
-                                             IterUnit::Pixel};
+               : FieldMap<T, Mapping::Const>{*this, nb_rows, IterUnit::Pixel};
   }
 
   /* ---------------------------------------------------------------------- */
@@ -417,8 +449,7 @@ namespace muGrid {
       -> FieldMap<T, Mapping::Const> {
     return (nb_rows == -1)
                ? FieldMap<T, Mapping::Const>{*this, IterUnit::SubPt}
-               : FieldMap<T, Mapping::Const>{*this, nb_rows,
-                                             IterUnit::SubPt};
+               : FieldMap<T, Mapping::Const>{*this, nb_rows, IterUnit::SubPt};
   }
 
   template <typename T>

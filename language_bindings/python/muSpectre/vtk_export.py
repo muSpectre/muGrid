@@ -37,6 +37,7 @@ Program grant you additional permission to convey the resulting work.
 import numpy as np
 from uvw import RectilinearGrid, DataArray
 
+
 def vtk_export(fpath, x_n, placement, point_data=None, cell_data=None):
     """write a vtr file for visualisation of µSpectre results.
 
@@ -79,9 +80,9 @@ def vtk_export(fpath, x_n, placement, point_data=None, cell_data=None):
     res_c = [max(1, r-1) for r in res_n]
 
     # setting up the geometric grid
-    x_coordinates = x_n[0,:,0] if dim == 2 else x_n[0,:,0,0]
-    y_coordinates = x_n[1,0,:] if dim == 2 else x_n[1,0,:,0]
-    z_coordinates = np.zeros_like([1]) if dim == 2 else x_n[2,0,0,:]
+    x_coordinates = x_n[0, :, 0] if dim == 2 else x_n[0, :, 0, 0]
+    y_coordinates = x_n[1, 0, :] if dim == 2 else x_n[1, 0, :, 0]
+    z_coordinates = np.zeros_like([1]) if dim == 2 else x_n[2, 0, 0, :]
     path = fpath + ".vtr"
     uvw_obj = RectilinearGrid(path, [np.copy(x_coordinates),
                                      np.copy(y_coordinates),
@@ -122,8 +123,8 @@ def vtk_export(fpath, x_n, placement, point_data=None, cell_data=None):
         data_array = DataArray(value, np.arange(2, len(value.shape)), name)
         add_data(data_array, point)
 
-    adders = {()        : add_scalar,
-              (dim,)    : add_vector,
+    adders = {(): add_scalar,
+              (dim,): add_vector,
               (dim, dim): add_tensor}
 
     def shape_checker(value, reference):
@@ -132,7 +133,7 @@ def vtk_export(fpath, x_n, placement, point_data=None, cell_data=None):
         appropriate function to add them to the output file
         """
         res = value.shape[-dim:]
-        shape = value.shape[:-dim]
+        shape = tuple(value.shape[:-dim])
         if not res == tuple(reference[:dim]):
             raise Exception(
                 ("The last {} dimensions of dataset '{}' have the wrong size,"
@@ -140,8 +141,9 @@ def vtk_export(fpath, x_n, placement, point_data=None, cell_data=None):
                      dim, key, reference[:dim], res))
         if not shape in (adders.keys()):
             raise Exception(
-                ("Can only handle scalar, vectorial, and tensorial fields, but "
-                 "got a field of shape {}").format(shape))
+                ("Can only handle scalar [{}], vectorial [{}],"
+                 " or second order tensorial fields [{},{}], but "
+                 "got a field of shape {}").format(1, dim, dim, dim, shape))
         return res, shape, adders[shape]
 
     # add point data

@@ -278,7 +278,7 @@ namespace muGrid {
     TypedField() = delete;
 
     //! Copy constructor
-    // TypedField(const TypedField & other) = delete;
+    TypedField(const TypedField & other) = delete;
 
     //! Move constructor
     TypedField(TypedField && other) = delete;
@@ -288,6 +288,9 @@ namespace muGrid {
 
     //! Move assignment operator
     TypedField & operator=(TypedField && other) = delete;
+
+    //! Copy assignment operator
+    TypedField & operator=(const TypedField & other);
 
     //! Copy assignment operator
     TypedField & operator=(const Parent & other);
@@ -338,6 +341,16 @@ namespace muGrid {
     void
     push_back(const Eigen::Ref<
               const Eigen::Array<T, Eigen::Dynamic, Eigen::Dynamic>> & value);
+
+    /**
+     * perform a full copy of a field
+     * @param new_name the name under which the new field will be stored
+     * @param allow_overwrite by default, this function throws an error if the
+     * destination field already exists to avoid accidental clobbering of
+     * fields. If set to true, the copy will be made into the existing field.
+     */
+    TypedField & clone(const std::string & new_name,
+                       const bool & allow_overwrite = false) const;
 
     //! give access to collections
     friend FieldCollection;

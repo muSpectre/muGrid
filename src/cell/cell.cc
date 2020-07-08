@@ -616,8 +616,12 @@ namespace muSpectre {
     const std::string tag{*tag_categories.begin()};
 
     // get and prepare the field
-    auto & global_field{this->fields->template register_field<T>(
-        unique_name, nb_components, tag)};
+    muGrid::TypedField<T> & global_field{
+        this->fields->field_exists(unique_name)
+            ? dynamic_cast<muGrid::TypedField<T> &>(
+                  this->fields->get_field(unique_name))
+            : this->fields->template register_field<T>(unique_name,
+                                                       nb_components, tag)};
     global_field.set_zero();
 
     auto global_map{global_field.get_pixel_map()};
@@ -638,7 +642,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <typename T>
   muGrid::TypedField<T> &
-  Cell::globalise_old_field(const std::string & unique_name,
+  Cell::globalise_old_field(const std::string & unique_prefix,
                             const size_t & nb_steps_ago) {
     // start by checking that the field exists at least once, and that
     // it always has th same number of components
@@ -648,8 +652,8 @@ namespace muSpectre {
 
     for (auto & mat : this->materials) {
       auto && collection{mat->get_collection()};
-      if (collection.state_field_exists(unique_name)) {
-        auto && state_field{collection.get_state_field(unique_name)};
+      if (collection.state_field_exists(unique_prefix)) {
+        auto && state_field{collection.get_state_field(unique_prefix)};
         auto && field_old{
             muGrid::TypedField<T>::safe_cast(state_field.old(nb_steps_ago))};
         local_fields_old.push_back(field_old);
@@ -664,21 +668,23 @@ namespace muSpectre {
       std::stringstream err_str{};
       if (nb_match > 1) {
         err_str
-            << "The state fields named '" << unique_name << "' do not have the "
+            << "The state fields named '" << unique_prefix
+            << "' do not have the "
             << "same number of components in every material, which is a "
             << "requirement for globalising them! The following values were "
             << "found by material:" << std::endl;
         for (auto & mat : this->materials) {
           auto && coll{mat->get_collection()};
-          if (coll.state_field_exists(unique_name)) {
-            auto && field{coll.get_state_field(unique_name).old(nb_steps_ago)};
+          if (coll.state_field_exists(unique_prefix)) {
+            auto && field{
+                coll.get_state_field(unique_prefix).old(nb_steps_ago)};
             err_str << field.get_nb_dof_per_sub_pt()
                     << " components in material '" << mat->get_name() << "'"
                     << std::endl;
           }
         }
       } else {
-        err_str << "The state field named '" << unique_name
+        err_str << "The state field named '" << unique_prefix
                 << " does not exist in "
                 << "any of the materials and can therefore not be globalised!";
       }
@@ -693,20 +699,21 @@ namespace muSpectre {
       std::stringstream err_str{};
       if (nb_match > 1) {
         err_str
-            << "The fields named '" << unique_name << "' do not have the "
+            << "The fields named '" << unique_prefix << "' do not have the "
             << "same sub-division in every material, which is a "
             << "requirement for globalising them! The following values were "
             << "found by material:" << std::endl;
         for (auto & mat : this->materials) {
           auto & coll = mat->get_collection();
-          if (coll.field_exists(unique_name)) {
-            auto & field{coll.get_field(unique_name)};
+          if (coll.field_exists(unique_prefix)) {
+            auto & field{coll.get_field(unique_prefix)};
             err_str << "tag '" << field.get_sub_division_tag()
                     << "' in material '" << mat->get_name() << "'" << std::endl;
           }
         }
       } else {
-        err_str << "The field named '" << unique_name << "' does not exist in "
+        err_str << "The field named '" << unique_prefix
+                << "' does not exist in "
                 << "any of the materials and can therefore not be globalised!";
       }
       throw RuntimeError(err_str.str());
@@ -714,8 +721,12 @@ namespace muSpectre {
 
     const std::string tag{*tag_categories.begin()};
 
-    auto & global_field{this->fields->template register_field<T>(
-        unique_name, nb_components, tag)};
+    muGrid::TypedField<T> & global_field{
+        this->fields->field_exists(unique_prefix)
+            ? dynamic_cast<muGrid::TypedField<T> &>(
+                  this->fields->get_field(unique_prefix))
+            : this->fields->template register_field<T>(unique_prefix,
+                                                       nb_components, tag)};
     global_field.set_zero();
 
     auto global_map{global_field.get_pixel_map()};
@@ -736,7 +747,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <typename T>
   muGrid::TypedField<T> &
-  Cell::globalise_current_field(const std::string & unique_name) {
+  Cell::globalise_current_field(const std::string & unique_prefix) {
     // start by checking that the field exists at least once, and that
     // it always has th same number of components
     std::set<Index_t> nb_component_categories{};
@@ -746,8 +757,8 @@ namespace muSpectre {
         local_fields_current;
     for (auto & mat : this->materials) {
       auto && collection{mat->get_collection()};
-      if (collection.state_field_exists(unique_name)) {
-        auto && state_field{collection.get_state_field(unique_name)};
+      if (collection.state_field_exists(unique_prefix)) {
+        auto && state_field{collection.get_state_field(unique_prefix)};
         auto && field_current(
             muGrid::TypedField<T>::safe_cast(state_field.current()));
         local_fields_current.push_back(field_current);
@@ -762,21 +773,22 @@ namespace muSpectre {
       std::stringstream err_str{};
       if (nb_match > 1) {
         err_str
-            << "The state fields named '" << unique_name << "' do not have the "
+            << "The state fields named '" << unique_prefix
+            << "' do not have the "
             << "same number of components in every material, which is a "
             << "requirement for globalising them! The following values were "
             << "found by material:" << std::endl;
         for (auto & mat : this->materials) {
           auto && coll{mat->get_collection()};
-          if (coll.state_field_exists(unique_name)) {
-            auto && field{coll.get_state_field(unique_name).current()};
+          if (coll.state_field_exists(unique_prefix)) {
+            auto && field{coll.get_state_field(unique_prefix).current()};
             err_str << field.get_nb_dof_per_sub_pt()
                     << " components in material '" << mat->get_name() << "'"
                     << std::endl;
           }
         }
       } else {
-        err_str << "The state field named '" << unique_name
+        err_str << "The state field named '" << unique_prefix
                 << "' does not exist in "
                 << "any of the materials and can therefore not be globalised!";
       }
@@ -791,28 +803,33 @@ namespace muSpectre {
       std::stringstream err_str{};
       if (nb_match > 1) {
         err_str
-            << "The fields named '" << unique_name << "' do not have the "
+            << "The fields named '" << unique_prefix << "' do not have the "
             << "same sub-division in every material, which is a "
             << "requirement for globalising them! The following values were "
             << "found by material:" << std::endl;
         for (auto & mat : this->materials) {
           auto & coll = mat->get_collection();
-          if (coll.field_exists(unique_name)) {
-            auto & field{coll.get_field(unique_name)};
+          if (coll.field_exists(unique_prefix)) {
+            auto & field{coll.get_field(unique_prefix)};
             err_str << "tag '" << field.get_sub_division_tag()
                     << "' in material '" << mat->get_name() << "'" << std::endl;
           }
         }
       } else {
-        err_str << "The field named '" << unique_name << "' does not exist in "
+        err_str << "The field named '" << unique_prefix
+                << "' does not exist in "
                 << "any of the materials and can therefore not be globalised!";
       }
       throw RuntimeError(err_str.str());
     }
     const std::string tag{*tag_categories.begin()};
 
-    auto & global_field{this->fields->template register_field<T>(
-        unique_name, nb_components, tag)};
+    muGrid::TypedField<T> & global_field{
+        this->fields->field_exists(unique_prefix)
+            ? dynamic_cast<muGrid::TypedField<T> &>(
+                  this->fields->get_field(unique_prefix))
+            : this->fields->template register_field<T>(unique_prefix,
+                                                       nb_components, tag)};
     global_field.set_zero();
 
     auto global_map{global_field.get_pixel_map()};

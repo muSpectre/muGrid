@@ -49,7 +49,7 @@ namespace muSpectre {
       : Parent{name, spatial_dimension, nb_quad_pts, parent_field_collection},
         s_null_prev_field{this->get_prefix() + "Pure elastic stress",
                           *this->internal_fields, QuadPtTag},
-        h_prev_field{this->get_prefix() + "history intgral",
+        h_prev_field{this->get_prefix() + "history integral",
                      *this->internal_fields, QuadPtTag},
         young_inf{young_inf}, young_v{young_v}, eta_v{eta_v}, poisson{poisson},
         lambda_inf{Hooke::compute_lambda(young_inf, poisson)},

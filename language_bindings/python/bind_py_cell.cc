@@ -423,6 +423,7 @@ void add_cell_helper(py::module & mod) {
       .def_property_readonly("pixels", &Cell::get_pixels)
       .def_property_readonly("pixel_indices", &Cell::get_pixel_indices)
       .def_property_readonly("quad_pt_indices", &Cell::get_quad_pt_indices)
+      .def_property_readonly("fields", &Cell::get_fields)
 
 #ifdef WITH_SPLIT
       .def(
