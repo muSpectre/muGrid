@@ -19,6 +19,7 @@ RUN apt-get -qq update && apt-get -y -qq install \
     libgmp-dev \
     libhdf5-mpi-dev \
     libpnetcdf-dev \
+    libnetcdf-dev \
     locales \
     m4 \
     python3-breathe \
