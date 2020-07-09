@@ -120,8 +120,22 @@ namespace muGrid {
 
   BOOST_AUTO_TEST_CASE(test_get_size_large) {
     muGrid::DynCcoord_t nb_grid_pts{65536, 65536}, nb_grid_pts2{131072, 131072};
-    BOOST_CHECK(CcoordOps::get_size(nb_grid_pts) == 65536L*65536L);
-    BOOST_CHECK(CcoordOps::get_size(nb_grid_pts2) == 131072L*131072L);
+    BOOST_CHECK(CcoordOps::get_size(nb_grid_pts) == 65536L * 65536L);
+    BOOST_CHECK(CcoordOps::get_size(nb_grid_pts2) == 131072L * 131072L);
+  }
+
+  BOOST_AUTO_TEST_CASE(arithmetic_operators) {
+    DynCcoord_t a{3, 4};
+    DynCcoord_t b{1, 2};
+    DynCcoord_t sum{4, 6};
+    DynCcoord_t diff{2, 2};
+
+    DynCcoord_t c{a + b};
+
+    BOOST_CHECK_EQUAL(sum, c);
+
+    c = a - b;
+    BOOST_CHECK_EQUAL(diff, c);
   }
 
   BOOST_AUTO_TEST_SUITE_END();

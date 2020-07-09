@@ -324,7 +324,9 @@ namespace muGrid {
     if (A.get_dim() != B.get_dim()) {
       throw RuntimeError("Dimension mismatch");
     }
-    DynCcoord<MaxDim, T> result{A.get_dim()};
+    // this needs to be parens, *not* curly braces
+    DynCcoord<MaxDim, T> result(A.get_dim());
+    assert(result.get_dim() == A.get_dim());
     for (Dim_t dim{0}; dim < A.get_dim(); ++dim) {
       result[dim] = A[dim] + B[dim];
     }
@@ -338,7 +340,9 @@ namespace muGrid {
     if (A.get_dim() != B.get_dim()) {
       throw RuntimeError("Dimension mismatch");
     }
-    DynCcoord<MaxDim, T> result{A.get_dim()};
+    // this needs to be parens, *not* curly braces
+    DynCcoord<MaxDim, T> result(A.get_dim());
+    assert(result.get_dim() == A.get_dim());
     for (Dim_t i{0}; i < A.get_dim(); ++i) {
       result[i] = A[i] - B[i];
     }
