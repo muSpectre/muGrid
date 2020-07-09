@@ -97,7 +97,7 @@ class DerivativeCheck2d(unittest.TestCase):
         self.fft.ifft(d * self.fourier_field, diff_field)
         diff_field *= self.fft.normalisation
         self.fft.ifft(1j*2*np.pi*q[0] * fourier_field_copy, ndiff)
-        ndiff *=  self.fft.normalisation
+        ndiff *= self.fft.normalisation
         nx, ny = self.nb_pts
         diff_field = np.squeeze(diff_field)
         ndiff = np.squeeze(ndiff)
