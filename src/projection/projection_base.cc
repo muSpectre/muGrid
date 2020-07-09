@@ -70,6 +70,7 @@ namespace muSpectre {
   void ProjectionBase::initialise(const muFFT::FFT_PlanFlags & flags) {
     auto && nb_dof{this->get_nb_dof_per_pixel()};
     fft_engine->initialise(nb_dof, flags);
+    this->initialised = true;
   }
 
   /* ---------------------------------------------------------------------- */

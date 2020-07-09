@@ -64,6 +64,10 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Index_t DimS>
   void ProjectionDefault<DimS>::apply_projection(Field_t & field) {
+    if (!this->initialised) {
+      throw ProjectionError("Applying a projection without having initialised "
+                            "the projector is not supported.");
+    }
     this->fft_engine->fft(field, this->work_space);
     Vector_map field_map{this->work_space};
     Real factor = this->fft_engine->normalisation();

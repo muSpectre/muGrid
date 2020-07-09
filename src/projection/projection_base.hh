@@ -211,6 +211,8 @@ namespace muSpectre {
      */
     GFieldCollection_t & projection_container;
     muGrid::TypedFieldBase<Complex> & work_space;
+
+    bool initialised{false}; //! has the projection been initialised?
   };
 
 }  // namespace muSpectre

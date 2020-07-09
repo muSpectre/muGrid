@@ -129,6 +129,10 @@ namespace muSpectre {
   template <Index_t DimS, Index_t NbQuadPts>
   void ProjectionFiniteStrainFast<DimS, NbQuadPts>::apply_projection(
       Field_t & field) {
+    if (!this->initialised) {
+      throw ProjectionError("Applying a projection without having initialised "
+                            "the projector is not supported.");
+    }
     // Storage order of gradient fields: We want to be able to iterate over a
     // gradient field using either QuadPts or Pixels iterators. A quadrature
     // point iterator returns a dim x dim matrix. A pixels iterator must return
