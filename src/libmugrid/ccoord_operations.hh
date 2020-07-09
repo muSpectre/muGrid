@@ -387,6 +387,19 @@ namespace muGrid {
     Index_t get_index_from_strides(const DynCcoord<MaxDim> & strides,
                                    const DynCcoord<MaxDim> & locations,
                                    const DynCcoord<MaxDim> & ccoord) {
+      const Dim_t dim{strides.get_dim()};
+      if (locations.get_dim() != dim) {
+        std::stringstream error{};
+        error << "Dimension mismatch between strides (dim = " << dim
+              << ") and locations (dim = " << locations.get_dim() << ")";
+        throw RuntimeError(error.str());
+      }
+      if (ccoord.get_dim() != dim) {
+        std::stringstream error{};
+        error << "Dimension mismatch between strides (dim = " << dim
+              << ") and ccoord (dim = " << ccoord.get_dim() << ")";
+        throw RuntimeError(error.str());
+      }
       Index_t retval{0};
       for (const auto & tup : akantu::zip(strides, locations, ccoord)) {
         const auto & stride = std::get<0>(tup);
