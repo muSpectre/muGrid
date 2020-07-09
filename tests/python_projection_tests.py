@@ -36,12 +36,12 @@ Program grant you additional permission to convey the resulting work.
 
 import unittest
 import numpy as np
-import itertools
 
-from python_test_imports import µ, muFFT
+from python_test_imports import µ, muFFT, muGrid
 from python_goose_ref import SmallStrainProjectionGooseFFT, FiniteStrainProjectionGooseFFT
 import _muSpectre
 
+from muFFT import Stencils2D
 
 def build_test_classes(Projection, RefProjection, name):
     class ProjectionCheck(unittest.TestCase):
@@ -115,6 +115,53 @@ def build_test_classes(Projection, RefProjection, name):
 
             assert np.allclose(b_g, b_µ)
     return ProjectionCheck
+
+
+class ProjectionMultipleQuadPts(unittest.TestCase):
+    def setUp(self):
+        self.nb_grid_pts = [3, 3]
+
+    def test_single_quad_pts(self):
+        def compute_gradient():
+            for dim in range(nb_dim):
+                for dir in range(nb_dim):
+                    gradient[dir].apply(in_field, dim, out_field,
+                                        dim + nb_dim * dir)
+
+        nb_dim = len(self.nb_grid_pts)
+        gradient = [Stencils2D.upwind_x, Stencils2D.upwind_y]
+
+        coll = muGrid.GlobalFieldCollection(nb_dim)
+        coll.initialise(self.nb_grid_pts)
+
+        in_field = coll.register_real_field("in", 2)
+        in_arr = in_field.array(muGrid.Pixel)
+        in_arr[0, 0, 0] = 1.0
+
+        out_field = coll.register_real_field("out", 4)
+        out_arr = out_field.array(muGrid.Pixel)
+        compute_gradient()
+        ref_field = coll.register_real_field("ref", 4)
+        ref_arr = ref_field.array(muGrid.Pixel)
+        ref_arr[...] = out_arr[...]
+
+        self.assertTrue(np.allclose(out_arr[0], [[-1, 0, 0],
+                                                 [0, 0, 0],
+                                                 [1, 0, 0]]))
+        self.assertTrue(np.allclose(out_arr[1], np.zeros_like(out_arr[1])))
+        self.assertTrue(np.allclose(out_arr[2], [[-1, 0, 1],
+                                                 [0, 0, 0],
+                                                 [0, 0, 0]]))
+        self.assertTrue(np.allclose(out_arr[3], np.zeros_like(out_arr[3])))
+
+        fft = muFFT.FFT(self.nb_grid_pts)
+        projection = µ.ProjectionFiniteStrainFast_2d(fft, [float(x) for x in
+                                                           self.nb_grid_pts],
+                                                     gradient)
+        projection.initialise()
+        projection.apply_projection(out_field)
+
+        self.assertTrue(np.allclose(out_arr, ref_arr))
 
 
 def get_goose(ndim, proj_type): return proj_type(
