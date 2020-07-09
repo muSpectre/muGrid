@@ -472,7 +472,8 @@ namespace muSpectre {
           // that are stored consecutive in memory. This means the components of
           // the displacement field, not the components of the gradient, must be
           // stored consecutive in memory and are the first index.
-          derivative_op->apply(f_disp, j, f_grad, j + dim * k, 1.0 / delta_x[i]);
+          derivative_op->apply(f_disp, j, f_grad, j + dim * k,
+                               1.0 / delta_x[i]);
           derivative_op->apply(f_disp, j, f_var, j + dim * k, 1.0 / delta_x[i]);
         }
       }
