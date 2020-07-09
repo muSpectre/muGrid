@@ -136,6 +136,15 @@ namespace muGrid {
 
     c = a - b;
     BOOST_CHECK_EQUAL(diff, c);
+
+    DynRcoord_t c1{1, 2, 3};
+    DynRcoord_t c2{1.3, 2.8, 5.7};
+
+    DynRcoord_t c1pc2{c1[0] + c2[0], c1[1] + c2[1], c1[2] + c2[2]};
+    DynRcoord_t c1mc2{c1[0] - c2[0], c1[1] - c2[1], c1[2] - c2[2]};
+
+    BOOST_CHECK_EQUAL(c1 + c2, c1pc2);
+    BOOST_CHECK_EQUAL(c1 - c2, c1mc2);
   }
 
   BOOST_AUTO_TEST_SUITE_END();
