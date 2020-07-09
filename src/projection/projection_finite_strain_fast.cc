@@ -139,15 +139,15 @@ namespace muSpectre {
     // a dim x dim * nb_quad matrix, since every-thing is column major this
     // matrix is just two dim x dim matrices that are stored consecutive in
     // memory. This means the components of the displacement field, not the
-    // components of the gradient, must be stored consecutive in memory and are
-    // the first index.
+    // gradient direction, must be stored consecutive in memory and are the
+    // first index.
     this->fft_engine->fft(field, this->work_space);
     Grad_map field_map{this->work_space};
     Real factor = this->fft_engine->normalisation();
     for (auto && tup : akantu::zip(this->xi_field.get_map(), field_map)) {
       auto & xi{std::get<0>(tup)};
       auto & f{std::get<1>(tup)};
-      f = factor * ((f * xi).eval() * xi.adjoint());
+      f = factor * ((f * xi.conjugate()).eval() * xi.transpose());
     }
     this->fft_engine->ifft(this->work_space, field);
   }
