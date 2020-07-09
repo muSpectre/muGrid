@@ -33,6 +33,9 @@
  * Program grant you additional permission to convey the resulting work.
  *
  */
+
+#include <random>
+
 #include <libmufft/fft_utils.hh>
 #include <libmufft/fft_engine_base.hh>
 
@@ -57,12 +60,13 @@ namespace muSpectre {
       ProjectionFixture<threeD, threeD, Squares<threeD>,
                         DiscreteGradient<threeD>,
                         ProjectionFiniteStrain<threeD>>,
-
       ProjectionFixture<twoD, twoD, Squares<twoD>, DiscreteGradient<twoD>,
                         ProjectionFiniteStrainFast<twoD>>,
+      /*
       ProjectionFixture<
           twoD, twoD, Squares<twoD>, DiscreteGradient<twoD, TwoQuadPts>,
           ProjectionFiniteStrainFast<twoD, TwoQuadPts>, TwoQuadPts>,
+          */
       ProjectionFixture<threeD, threeD, Squares<threeD>,
                         DiscreteGradient<threeD>,
                         ProjectionFiniteStrainFast<threeD>>>;
@@ -439,19 +443,17 @@ namespace muSpectre {
     Rcoord_t<mdim> delta_x{(fix::projector.get_domain_lengths() /
                             fix::projector.get_nb_domain_grid_pts())
                                .template get<mdim>()};
-    // fill the displacement field
-    for (auto && tup : akantu::zip(
-             fields.get_pixels().template get_dimensioned_pixels<mdim>(),
-             disp)) {
-      auto & ccoord = std::get<0>(tup);
-      auto & d = std::get<1>(tup);
-      Vector vec = muGrid::CcoordOps::get_vector(ccoord, delta_x);
-      Vector devided;
-      for (int k = 0; k < dim; k++) {
-        devided[k] = vec[k] / fix::projector.get_nb_domain_grid_pts()[k];
+
+    // fill the displacement field with random numbers
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<> dis(-1.0, 1.0);
+    for (auto && d : disp) {
+      Vector u;
+      for (int k{0}; k < dim; ++k) {
+        u[k] = dis(gen);
       }
-      d.row(0) =
-          1.0 / (2.0 * muGrid::pi) * (2.0 * muGrid::pi * devided.array()).sin();
+      d.row(0) = u;
     }
 
     BOOST_TEST_CHECKPOINT("displacement field filled");
@@ -472,8 +474,7 @@ namespace muSpectre {
           // that are stored consecutive in memory. This means the components of
           // the displacement field, not the components of the gradient, must be
           // stored consecutive in memory and are the first index.
-          derivative_op->apply(f_disp, j, f_grad, j + dim * k,
-                               1.0 / delta_x[i]);
+          derivative_op->apply(f_disp, j, f_grad, j + dim * k, 1.0 / delta_x[i]);
           derivative_op->apply(f_disp, j, f_var, j + dim * k, 1.0 / delta_x[i]);
         }
       }
