@@ -53,7 +53,9 @@ from _muSpectre import (version,
                         ProjectionSmallStrain_2d,
                         ProjectionSmallStrain_3d,
                         ProjectionFiniteStrainFast_2d,
-                        ProjectionFiniteStrainFast_3d)
+                        ProjectionFiniteStrainFast_3d,
+                        ProjectionFiniteStrainFast_2q_2d,
+                        ProjectionFiniteStrainFast_2q_3d)
 
 from muGrid import get_domain_ccoord, get_domain_index
 from muFFT import (Communicator, DiscreteDerivative, FourierDerivative,

@@ -239,6 +239,13 @@ void add_projections(py::module & mod) {
   add_proj_helper<muSpectre::ProjectionFiniteStrainFast<muGrid::threeD>,
                   muGrid::threeD>(mod, "ProjectionFiniteStrainFast");
 
+  add_proj_helper<
+      muSpectre::ProjectionFiniteStrainFast<muGrid::twoD, muGrid::TwoQuadPts>,
+      muGrid::twoD>(mod, "ProjectionFiniteStrainFast_2q");
+  add_proj_helper<
+      muSpectre::ProjectionFiniteStrainFast<muGrid::threeD, muGrid::TwoQuadPts>,
+      muGrid::threeD>(mod, "ProjectionFiniteStrainFast_2q");
+
   add_green_proj_helper<muSpectre::ProjectionApproxGreenOperator<muGrid::twoD>,
                         muGrid::twoD>(mod, "ProjectionApproxGreenOperator");
   add_green_proj_helper<
