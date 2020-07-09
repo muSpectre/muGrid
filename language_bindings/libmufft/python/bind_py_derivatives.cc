@@ -172,6 +172,8 @@ void add_discrete_derivative(py::module & mod, std::string name) {
            }),
            "lbounds"_a, "stencil"_a)
       .def("rollaxes", &DiscreteDerivative::rollaxes, "distance"_a = 1)
+      .def("apply", &DiscreteDerivative::apply<Real>, "in_field"_a, "in_dof"_a,
+           "out_field"_a, "out_dof"_a, "fac"_a = 1.0)
       .def_property_readonly("stencil", [](const DiscreteDerivative & self) {
         const Eigen::ArrayXd & stencil = self.get_stencil();
         return py::array_t<double, py::array::f_style>(self.get_nb_pts(),
