@@ -183,9 +183,9 @@ namespace muGrid {
   BOOST_FIXTURE_TEST_CASE(size_check_global,
                           FieldFixture<ValidityDomain::Global>) {
     // check that fields are initialised with empty vector
-    BOOST_CHECK_EQUAL(tensor_field.get_field().size(), 0);
-    BOOST_CHECK_EQUAL(dynamic_field1.size(), 0);
-    BOOST_CHECK_EQUAL(dynamic_field2.size(), 0);
+    BOOST_CHECK_EQUAL(tensor_field.get_field().get_nb_entries(), Unknown);
+    BOOST_CHECK_EQUAL(dynamic_field1.get_nb_entries(), Unknown);
+    BOOST_CHECK_EQUAL(dynamic_field2.get_nb_entries(), Unknown);
 
     // check that returned size is correct
     Index_t len{2};
@@ -193,9 +193,10 @@ namespace muGrid {
     fc.initialise(sizes, {});
 
     auto nb_pixels{CcoordOps::get_size(sizes)};
-    BOOST_CHECK_EQUAL(tensor_field.get_field().size(), nb_pixels);
-    BOOST_CHECK_EQUAL(dynamic_field1.size(), nb_pixels);
-    BOOST_CHECK_EQUAL(dynamic_field2.size(), nb_pixels);
+    BOOST_CHECK_EQUAL(tensor_field.get_field().get_nb_entries(),
+                      nb_pixels);
+    BOOST_CHECK_EQUAL(dynamic_field1.get_nb_entries(), nb_pixels);
+    BOOST_CHECK_EQUAL(dynamic_field2.get_nb_entries(), nb_pixels);
 
     constexpr Index_t pad_size{3};
     tensor_field.get_field().set_pad_size(pad_size);
@@ -203,18 +204,19 @@ namespace muGrid {
     dynamic_field2.set_pad_size(pad_size);
 
     // check that setting pad size won't change logical size
-    BOOST_CHECK_EQUAL(tensor_field.get_field().size(), nb_pixels);
-    BOOST_CHECK_EQUAL(dynamic_field1.size(), nb_pixels);
-    BOOST_CHECK_EQUAL(dynamic_field2.size(), nb_pixels);
+    BOOST_CHECK_EQUAL(tensor_field.get_field().get_nb_entries(),
+                      nb_pixels);
+    BOOST_CHECK_EQUAL(dynamic_field1.get_nb_entries(), nb_pixels);
+    BOOST_CHECK_EQUAL(dynamic_field2.get_nb_entries(), nb_pixels);
   }
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE(size_check_local,
                           FieldFixture<ValidityDomain::Local>) {
     // check that fields are initialised with empty vector
-    BOOST_CHECK_EQUAL(tensor_field.get_field().size(), 0);
-    BOOST_CHECK_EQUAL(dynamic_field1.size(), 0);
-    BOOST_CHECK_EQUAL(dynamic_field2.size(), 0);
+    BOOST_CHECK_EQUAL(tensor_field.get_field().get_nb_entries(), Unknown);
+    BOOST_CHECK_EQUAL(dynamic_field1.get_nb_entries(), Unknown);
+    BOOST_CHECK_EQUAL(dynamic_field2.get_nb_entries(), Unknown);
 
     // check that returned size is correct
     Index_t nb_pixels{3};
@@ -232,9 +234,9 @@ namespace muGrid {
       BOOST_CHECK_THROW(dynamic_field1.push_back(wrong_elem), FieldError);
       BOOST_CHECK_THROW(dynamic_field2.push_back(new_elem), FieldError);
     }
-    BOOST_CHECK_EQUAL(tensor_field.get_field().size(), nb_pixels);
-    BOOST_CHECK_EQUAL(dynamic_field1.size(), nb_pixels);
-    BOOST_CHECK_EQUAL(dynamic_field2.size(), 0);
+    BOOST_CHECK_EQUAL(tensor_field.get_field().get_nb_entries(), Unknown);
+    BOOST_CHECK_EQUAL(dynamic_field1.get_nb_entries(), Unknown);
+    BOOST_CHECK_EQUAL(dynamic_field2.get_nb_entries(), Unknown);
 
     for (Index_t i{0}; i < nb_pixels; ++i) {
       fc.add_pixel(i);
@@ -242,9 +244,9 @@ namespace muGrid {
 
     fc.initialise();
 
-    BOOST_CHECK_EQUAL(tensor_field.get_field().size(), nb_pixels);
-    BOOST_CHECK_EQUAL(dynamic_field1.size(), nb_pixels);
-    BOOST_CHECK_EQUAL(dynamic_field2.size(), nb_pixels);
+    BOOST_CHECK_EQUAL(tensor_field.get_field().get_nb_entries(), nb_pixels);
+    BOOST_CHECK_EQUAL(dynamic_field1.get_nb_entries(), nb_pixels);
+    BOOST_CHECK_EQUAL(dynamic_field2.get_nb_entries(), nb_pixels);
 
     BOOST_CHECK_EQUAL(tensor_field.get_field().get_pad_size(), 0);
     BOOST_CHECK_EQUAL(dynamic_field1.get_pad_size(), 0);
@@ -260,20 +262,19 @@ namespace muGrid {
     BOOST_CHECK_EQUAL(dynamic_field2.get_pad_size(), pad_size);
 
     // check that setting pad size won't change logical size
-    BOOST_CHECK_EQUAL(tensor_field.get_field().size(), nb_pixels);
-    BOOST_CHECK_EQUAL(dynamic_field1.size(), nb_pixels);
-    BOOST_CHECK_EQUAL(dynamic_field2.size(), nb_pixels);
+    BOOST_CHECK_EQUAL(tensor_field.get_field().get_nb_entries(), nb_pixels);
+    BOOST_CHECK_EQUAL(dynamic_field1.get_nb_entries(), nb_pixels);
+    BOOST_CHECK_EQUAL(dynamic_field2.get_nb_entries(), nb_pixels);
 
     // check that the buffer size is correct
-    BOOST_CHECK_EQUAL(tensor_field.get_field().buffer_size(),
-                      nb_pixels *
-                              tensor_field.get_field().get_nb_dof_per_sub_pt() +
+    BOOST_CHECK_EQUAL(tensor_field.get_field().get_buffer_size(),
+                      nb_pixels * tensor_field.get_field().get_nb_components() +
                           pad_size);
-    BOOST_CHECK_EQUAL(dynamic_field1.buffer_size(),
-                      nb_pixels * dynamic_field1.get_nb_dof_per_sub_pt() +
+    BOOST_CHECK_EQUAL(dynamic_field1.get_buffer_size(),
+                      nb_pixels * dynamic_field1.get_nb_components() +
                           pad_size);
-    BOOST_CHECK_EQUAL(dynamic_field2.buffer_size(),
-                      nb_pixels * dynamic_field2.get_nb_dof_per_sub_pt() +
+    BOOST_CHECK_EQUAL(dynamic_field2.get_buffer_size(),
+                      nb_pixels * dynamic_field2.get_nb_components() +
                           pad_size);
   }
 

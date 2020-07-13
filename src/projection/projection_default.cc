@@ -47,9 +47,10 @@ namespace muSpectre {
       : Parent{std::move(engine), lengths,
                static_cast<Index_t>(gradient.size()) / lengths.get_dim(),
                DimS * DimS, form},
-        Gfield{this->projection_container.register_complex_field(
-            "Projection Operator", DimS * DimS * DimS * DimS,
-            QuadPtTag)},
+        Gfield{this->fft_engine->get_fourier_field_collection()
+                   .register_complex_field("Projection Operator",
+                                           DimS * DimS * DimS * DimS,
+                                           QuadPtTag)},
         Ghat{Gfield}, gradient{gradient} {
     if (this->get_dim() != DimS) {
       std::stringstream message{};

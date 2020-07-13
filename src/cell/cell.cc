@@ -57,25 +57,25 @@ namespace muSpectre {
   Cell::Cell(Projection_ptr projection, SplitCell is_cell_split)
       : projection{std::move(projection)},
         fields{std::make_unique<muGrid::GlobalFieldCollection>(
-            this->get_spatial_dim())},
+            this->get_spatial_dim(),
+            this->projection->get_nb_subdomain_grid_pts(),
+            this->projection->get_subdomain_locations(),
+            muGrid::FieldCollection::SubPtMap_t{
+                {QuadPtTag, this->get_nb_quad_pts()},
+                {NodalPtTag, this->get_nb_nodal_pts()}})},
         // We request the DOFs for a single quadrature point, since quadrature
         // points are handled by the field.
         strain{this->fields->register_real_field(
             "strain",
-            dof_for_formulation(this->get_formulation(),
-                                this->get_material_dim(), OneQuadPt),
+            shape_for_formulation(this->get_formulation(),
+                                  this->get_material_dim()),
             QuadPtTag)},
         stress{this->fields->register_real_field(
             "stress",
-            dof_for_formulation(this->get_formulation(),
-                                this->get_material_dim(), OneQuadPt),
+            shape_for_formulation(this->get_formulation(),
+                                  this->get_material_dim()),
             QuadPtTag)},
-        is_cell_split{is_cell_split} {
-    this->fields->set_nb_sub_pts(QuadPtTag, this->get_nb_quad_pts());
-    this->fields->set_nb_sub_pts(NodalPtTag, this->get_nb_nodal_pts());
-    this->fields->initialise(this->projection->get_nb_subdomain_grid_pts(),
-                             this->projection->get_subdomain_locations());
-  }
+        is_cell_split{is_cell_split} {}
 
   /* ---------------------------------------------------------------------- */
   bool Cell::is_initialised() const { return this->initialised; }
@@ -158,16 +158,16 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  std::array<Index_t, 2> Cell::get_strain_shape() const {
+  Shape_t Cell::get_strain_shape() const {
     switch (this->get_formulation()) {
     case Formulation::finite_strain: {
-      return std::array<Index_t, 2>{this->get_material_dim(),
-                                    this->get_material_dim()};
+      return Shape_t{this->get_material_dim(),
+                     this->get_material_dim()};
       break;
     }
     case Formulation::small_strain: {
-      return std::array<Index_t, 2>{this->get_material_dim(),
-                                    this->get_material_dim()};
+      return Shape_t{this->get_material_dim(),
+                     this->get_material_dim()};
       break;
     }
     default:
@@ -240,14 +240,14 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  void Cell::initialise(muFFT::FFT_PlanFlags flags) {
+  void Cell::initialise() {
     // check that all pixels have been assigned exactly one material
     for (auto && mat : this->materials) {
       mat->initialise();
     }
     this->check_material_coverage();
     // initialise the projection and compute the fft plan
-    this->projection->initialise(flags);
+    this->projection->initialise();
     this->initialised = true;
   }
 
@@ -280,10 +280,8 @@ namespace muSpectre {
       if (do_create) {
         this->tangent = this->fields->register_real_field(
             "Tangent_stiffness",
-            muGrid::ipow(dof_for_formulation(this->get_formulation(),
-                                             this->get_material_dim(),
-                                             OneQuadPt),
-                         2),
+            t4shape_for_formulation(this->get_formulation(),
+                                    this->get_material_dim()),
             QuadPtTag);
       } else {
         throw RuntimeError("Tangent has not been created");
@@ -406,6 +404,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   muGrid::GlobalFieldCollection & Cell::get_fields() { return *this->fields; }
 
+  using muGrid::operator<<;
   /* ---------------------------------------------------------------------- */
   void Cell::apply_projection(muGrid::TypedFieldBase<Real> & field) {
     this->projection->apply_projection(field);
@@ -439,11 +438,11 @@ namespace muSpectre {
       throw RuntimeError("evaluate_projected_directional_stiffness "
                          "requires the tangent moduli");
     }
-    if (delta_strain.get_nb_dof_per_sub_pt() != this->get_strain_size()) {
+    if (delta_strain.get_nb_components() != this->get_strain_size()) {
       std::stringstream err{};
       err << "The input field should have " << this->get_strain_size()
           << " components per quadrature point, but has "
-          << delta_strain.get_nb_dof_per_sub_pt() << " components.";
+          << delta_strain.get_nb_components() << " components.";
       throw RuntimeError(err.str());
     }
     if (delta_strain.get_nb_sub_pts() != this->get_strain().get_nb_sub_pts()) {
@@ -555,7 +554,7 @@ namespace muSpectre {
         auto && field{muGrid::TypedField<T>::safe_cast(
             collection.get_field(unique_name))};
         local_fields.push_back(field);
-        nb_component_categories.insert(field.get_nb_dof_per_sub_pt());
+        nb_component_categories.insert(field.get_nb_components());
         tag_categories.insert(field.get_sub_division_tag());
       }
     }
@@ -574,7 +573,7 @@ namespace muSpectre {
           auto & coll = mat->get_collection();
           if (coll.field_exists(unique_name)) {
             auto & field{coll.get_field(unique_name)};
-            err_str << field.get_nb_dof_per_sub_pt()
+            err_str << field.get_nb_components()
                     << " components in material '" << mat->get_name() << "'"
                     << std::endl;
           }
@@ -657,7 +656,7 @@ namespace muSpectre {
         auto && field_old{
             muGrid::TypedField<T>::safe_cast(state_field.old(nb_steps_ago))};
         local_fields_old.push_back(field_old);
-        nb_component_categories.insert(field_old.get_nb_dof_per_sub_pt());
+        nb_component_categories.insert(field_old.get_nb_components());
         tag_categories.insert(field_old.get_sub_division_tag());
       }
     }
@@ -678,7 +677,7 @@ namespace muSpectre {
           if (coll.state_field_exists(unique_prefix)) {
             auto && field{
                 coll.get_state_field(unique_prefix).old(nb_steps_ago)};
-            err_str << field.get_nb_dof_per_sub_pt()
+            err_str << field.get_nb_components()
                     << " components in material '" << mat->get_name() << "'"
                     << std::endl;
           }
@@ -762,7 +761,7 @@ namespace muSpectre {
         auto && field_current(
             muGrid::TypedField<T>::safe_cast(state_field.current()));
         local_fields_current.push_back(field_current);
-        nb_component_categories.insert(field_current.get_nb_dof_per_sub_pt());
+        nb_component_categories.insert(field_current.get_nb_components());
         tag_categories.insert(field_current.get_sub_division_tag());
       }
     }
@@ -782,7 +781,7 @@ namespace muSpectre {
           auto && coll{mat->get_collection()};
           if (coll.state_field_exists(unique_prefix)) {
             auto && field{coll.get_state_field(unique_prefix).current()};
-            err_str << field.get_nb_dof_per_sub_pt()
+            err_str << field.get_nb_components()
                     << " components in material '" << mat->get_name() << "'"
                     << std::endl;
           }

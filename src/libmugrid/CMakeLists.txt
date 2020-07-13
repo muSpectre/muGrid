@@ -70,13 +70,13 @@ set(mugrid_SRCS
   exception.cc
   grid_common.cc
   ccoord_operations.cc
+  raw_memory_operations.cc
   field_collection.cc
   field_collection_global.cc
   field_collection_local.cc
   field.cc
   field_typed.cc
   field_map.cc
-  raw_memory_operations.cc
   state_field.cc
   state_field_map.cc
   units.cc

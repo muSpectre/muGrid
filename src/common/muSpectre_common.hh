@@ -71,6 +71,7 @@ namespace muSpectre {
 
   using muGrid::Ccoord_t;
   using muGrid::Rcoord_t;
+  using muGrid::Shape_t;
 
   using muGrid::DynCcoord_t;
   using muGrid::DynRcoord_t;
@@ -155,6 +156,28 @@ namespace muSpectre {
       return vsize(dim) * nb_quad_pts;
     default:
       return muGrid::ipow(dim, 2) * nb_quad_pts;
+    }
+  }
+
+  //! compute the shape of the strain tensor given dimension dim
+  inline Shape_t shape_for_formulation(const Formulation form,
+                                          const Dim_t dim) {
+    switch (form) {
+      case Formulation::small_strain_sym:
+        return Shape_t({vsize(dim)});
+      default:
+        return Shape_t({dim, dim});
+    }
+  }
+
+  //! compute the shape of the tangent tensor given dimension dim
+  inline Shape_t t4shape_for_formulation(const Formulation form,
+                                            const Dim_t dim) {
+    switch (form) {
+      case Formulation::small_strain_sym:
+        return Shape_t({vsize(dim), vsize(dim)});
+      default:
+        return Shape_t({dim, dim, dim, dim});
     }
   }
 

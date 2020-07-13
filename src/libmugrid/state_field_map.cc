@@ -72,9 +72,9 @@ namespace muGrid {
                                               IterUnit iter_type)
       : state_field{state_field}, iteration{iter_type},
         nb_rows{iter_type == IterUnit::Pixel
-                    ? state_field.current().get_nb_dof_per_sub_pt() *
+                    ? state_field.current().get_nb_components() *
                           state_field.current().get_nb_sub_pts()
-                    : state_field.current().get_nb_dof_per_sub_pt()},
+                    : state_field.current().get_nb_components()},
         maps(this->make_maps(state_field.get_fields())),
         cmaps(this->make_cmaps(state_field.get_fields())) {}
 
@@ -128,7 +128,7 @@ namespace muGrid {
   size_t StateFieldMap<T, Mutability>::size() const {
     const auto & field{this->state_field.current()};
     return (this->iteration == IterUnit::SubPt)
-               ? field.size()
+               ? field.get_nb_entries()
                : field.get_collection().get_nb_pixels();
   }
 

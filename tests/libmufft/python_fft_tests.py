@@ -75,7 +75,7 @@ class FFT_Check(unittest.TestCase):
                     nb_dof = 6
                     engine = muFFT.FFT([6*s, 4*s], fft=engine_str,
                                        communicator=MPI.COMM_WORLD)
-                    engine.initialise(nb_dof)
+                    engine.create_plan(nb_dof)
                 except AttributeError:
                     # This FFT engine has not been compiled into the code. Skip
                     # test.
@@ -86,7 +86,7 @@ class FFT_Check(unittest.TestCase):
             engine = muFFT.FFT([6*s, 4*s],
                                fft=engine_str,
                                communicator=self.communicator)
-            engine.initialise(nb_dof)
+            engine.create_plan(nb_dof)
             self.assertEqual(
                 self.communicator.sum(np.prod(engine.nb_subdomain_grid_pts)),
                 np.prod(engine.nb_domain_grid_pts),
@@ -102,12 +102,11 @@ class FFT_Check(unittest.TestCase):
             for nb_grid_pts, dims in self.grids:
                 s = self.communicator.size
                 nb_grid_pts = s*np.array(nb_grid_pts)
-
                 try:
                     engine = muFFT.FFT(nb_grid_pts,
                                        fft=engine_str,
                                        communicator=self.communicator)
-                    engine.initialise(np.prod(dims))
+                    engine.create_plan(np.prod(dims))
                 except AttributeError:
                     # This FFT engine has not been compiled into the code. Skip
                     # test.
@@ -132,11 +131,10 @@ class FFT_Check(unittest.TestCase):
                 tol = 1e-14 * np.prod(nb_grid_pts)
 
                 # Separately test convenience interface
-                out_msp = engine.register_fourier_space_field("out_msp",
-                                                            np.prod(dims))
+                out_msp = np.empty([*dims, *engine.nb_fourier_grid_pts],
+                                   dtype=complex, order='f')
                 engine.fft(in_arr, out_msp)
-                out_array = np.array(out_msp).reshape(out_ref.shape, order='f')
-                err = np.linalg.norm(out_ref - out_array)
+                err = np.linalg.norm(out_ref - out_msp)
                 self.assertLess(err, tol, msg='{} engine'.format(engine_str))
 
     def test_reverse_transform(self):
@@ -149,7 +147,7 @@ class FFT_Check(unittest.TestCase):
                     engine = muFFT.FFT(nb_grid_pts,
                                        fft=engine_str,
                                        communicator=self.communicator)
-                    engine.initialise(np.prod(dims))
+                    engine.create_plan(np.prod(dims))
                 except AttributeError:
                     # This FFT engine has not been compiled into the code. Skip
                     # test.
@@ -180,11 +178,8 @@ class FFT_Check(unittest.TestCase):
 
                 # Separately test convenience interface
                 out_msp = np.empty([*dims, *engine.nb_subdomain_grid_pts],
-                                   dtype=float, order='f')
-                try:
-                    engine.ifft(in_arr, out_msp)
-                except Exception as err:
-                    self.assertEqual("a", in_arr.shape)
+                                   dtype=float)
+                engine.ifft(in_arr, out_msp)
 
                 out_msp *= engine.normalisation
                 err = np.linalg.norm(out_ref - out_msp)
@@ -200,7 +195,7 @@ class FFT_Check(unittest.TestCase):
                     engine = muFFT.FFT(nb_grid_pts,
                                        fft=engine_str,
                                        communicator=self.communicator)
-                    engine.initialise(np.prod(dims))
+                    engine.create_plan(np.prod(dims))
                 except AttributeError:
                     # This FFT engine has not been compiled into the code. Skip
                     # test.
@@ -247,7 +242,7 @@ class FFT_Check(unittest.TestCase):
                     engine = muFFT.FFT(nb_grid_pts,
                                        fft=engine_str,
                                        communicator=self.communicator)
-                    engine.initialise(np.prod(dims))
+                    engine.create_plan(np.prod(dims))
                 except AttributeError:
                     # This FFT engine has not been compiled into the code. Skip
                     # test.
@@ -289,6 +284,7 @@ class FFT_Check(unittest.TestCase):
                     out_ref -
                     out_field.array(dims, muGrid.Pixel)*engine.normalisation)
                 self.assertLess(err, tol, msg='{} engine'.format(engine_str))
+
     def test_nb_components1_forward_transform(self):
         for engine_str in self.engines:
             for nb_grid_pts, dims in self.grids:
@@ -299,7 +295,7 @@ class FFT_Check(unittest.TestCase):
                     engine = muFFT.FFT(nb_grid_pts,
                                        fft=engine_str,
                                        communicator=self.communicator)
-                    engine.initialise(np.prod(dims))
+                    engine.create_plan(np.prod(dims))
                 except AttributeError:
                     # This FFT engine has not been compiled into the code. Skip
                     # test.
@@ -321,7 +317,6 @@ class FFT_Check(unittest.TestCase):
                     "{} not equal to {}".format(out_msp.shape,
                                                 engine.nb_fourier_grid_pts)
 
-
     def test_nb_components1_forward_transform(self):
         for engine_str in self.engines:
             for nb_grid_pts, dims in self.grids:
@@ -332,7 +327,7 @@ class FFT_Check(unittest.TestCase):
                     engine = muFFT.FFT(nb_grid_pts,
                                        fft=engine_str,
                                        communicator=self.communicator)
-                    engine.initialise(np.prod(dims))
+                    engine.create_plan(np.prod(dims))
                 except AttributeError:
                     # This FFT engine has not been compiled into the code. Skip
                     # test.
@@ -346,7 +341,7 @@ class FFT_Check(unittest.TestCase):
 
                 # Separately test convenience interface
                 out_msp = engine.register_fourier_space_field('out_msp',
-                                                            np.prod(dims))
+                                                              np.prod(dims))
                 engine.fft(in_arr, out_msp)
 
                 # Check that the output array does not have a unit first dimension
@@ -372,7 +367,7 @@ class FFT_Check(unittest.TestCase):
                     engine = muFFT.FFT(nb_grid_pts,
                                        fft=engine_str,
                                        communicator=self.communicator)
-                    engine.initialise(np.prod(dims))
+                    engine.create_plan(np.prod(dims))
                 except AttributeError:
                     # This FFT engine has not been compiled into the code. Skip
                     # test.
@@ -403,11 +398,13 @@ class FFT_Check(unittest.TestCase):
         engine = muFFT.FFT(nb_grid_pts, fft='fftw')
 
         nb_dof = 1
-        engine.initialise(nb_dof)
+        engine.create_plan(nb_dof)
         arr = np.random.random(nb_grid_pts * nb_dof)
 
         fft_arr_ref = np.fft.rfft(arr)
-        fft_arr = engine.register_fourier_space_field("fourier work space", nb_dof)
+        fft_arr = engine.register_fourier_space_field("fourier work space",
+                                                      nb_dof)
+        self.assertEqual(fft_arr.shape, [nb_grid_pts[0]//2+1])
         engine.fft(arr, fft_arr)
         self.assertTrue(np.allclose(fft_arr_ref, fft_arr))
 
@@ -447,7 +444,7 @@ class FFT_Check(unittest.TestCase):
         nx, ny = nb_grid_pts
         nb_dof = 1
         engine = muFFT.FFT(nb_grid_pts, fft='serial')
-        engine.initialise(nb_dof)
+        engine.create_plan(nb_dof)
         qx, qy = engine.fftfreq
 
         qarr = np.zeros(engine.nb_fourier_grid_pts, dtype=complex)
@@ -475,7 +472,7 @@ class FFT_Check(unittest.TestCase):
         # to an *internal* buffer of the object, garbage collection should
         # be deferred until `tested` is destroyed.
         engine = muFFT.FFT(res, fft="serial")
-        engine.initialise(1)
+        engine.create_plan(1)
         f_data = engine.register_fourier_space_field("fourier work space", 1)
         engine.fft(data, f_data)
         tested = f_data.array()
@@ -490,7 +487,7 @@ class FFT_Check(unittest.TestCase):
             try:
                 engine = muFFT.FFT([3, 5, 7], fft=engine_str,
                                    communicator=self.communicator)
-                engine.initialise(1)
+                engine.create_plan(1)
             except AttributeError:
                 # This FFT engine has not been compiled into the code. Skip
                 # test.
@@ -503,6 +500,18 @@ class FFT_Check(unittest.TestCase):
                 assert engine.subdomain_strides == (1, 4, 20) # padding in first dimension
                 assert engine.fourier_strides == (1, 14, 2) # transposed output
 
+    def test_raises_incompatible_buffer(self):
+        """
+        asserts that the output is of shape ( , ) and not ( , , 1)
+        """
+        engine = muFFT.FFT([3, 2],
+                           fft='fftw', allow_temporary_buffer=False)
+        engine.create_plan(1)
+
+        in_data = np.random.random(engine.nb_subdomain_grid_pts)
+        out_data = np.zeros(engine.nb_fourier_grid_pts, dtype=complex)
+        with self.assertRaises(RuntimeError):
+            engine.fft(in_data, out_data)
 
 if __name__ == '__main__':
     unittest.main()

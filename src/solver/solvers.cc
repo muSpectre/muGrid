@@ -84,6 +84,10 @@ namespace muSpectre {
             const Real & equil_tol, const Verbosity & verbose,
             const IsStrainInitialised & strain_init,
             EigenStrainOptFunc_ref eigen_strain_func) {
+    if (load_steps.size() == 0) {
+      throw SolverError("No load steps specified.");
+    }
+
     const auto & comm = cell.get_communicator();
 
     using Matrix_t = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
@@ -115,8 +119,8 @@ namespace muSpectre {
             muGrid::RealField & general_strain_field{
                 field_collection.register_real_field(
                     "general strain",
-                    dof_for_formulation(cell.get_formulation(),
-                                        cell.get_material_dim(), OneQuadPt),
+                    shape_for_formulation(cell.get_formulation(),
+                                          cell.get_material_dim()),
                     QuadPtTag)};
             return general_strain_field;
           } else {
@@ -410,6 +414,10 @@ namespace muSpectre {
   de_geus(Cell & cell, const LoadSteps_t & load_steps,
           KrylovSolverBase & solver, Real newton_tol, Real equil_tol,
           Verbosity verbose, IsStrainInitialised strain_init) {
+    if (load_steps.size() == 0) {
+      throw SolverError("No load steps specified.");
+    }
+
     const auto & comm = cell.get_communicator();
 
     using Matrix_t = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;

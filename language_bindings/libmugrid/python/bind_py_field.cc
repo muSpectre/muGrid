@@ -61,15 +61,20 @@ namespace py = pybind11;
 
 void add_field(py::module & mod) {
   py::class_<Field>(mod, "Field")
-      .def("buffer_size", &Field::buffer_size)
       .def("set_zero", &Field::set_zero)
-      .def("stride", &Field::get_stride)
-      .def_property_readonly("size", &Field::size)
+      .def_property_readonly("buffer_size", &Field::get_buffer_size)
+      .def_property_readonly("shape",
+                             [](Field & field) {
+                               return field.get_shape(
+                                   muGrid::IterUnit::SubPt);
+                             })
+      .def_property_readonly("stride", &Field::get_stride)
       .def_property_readonly("pad_size", &Field::get_pad_size)
       .def_property_readonly("name", &Field::get_name)
       .def_property_readonly("collection", &Field::get_collection)
-      .def_property_readonly("nb_dof_per_sub_pt", &Field::get_nb_dof_per_sub_pt)
+      .def_property_readonly("nb_components", &Field::get_nb_components)
       .def_property_readonly("nb_entries", &Field::get_nb_entries)
+      .def_property_readonly("nb_buffer_entries", &Field::get_nb_buffer_entries)
       .def_property_readonly("is_global", &Field::is_global)
       .def_property_readonly("sub_division", &Field::get_sub_division_tag);
 }
@@ -88,11 +93,6 @@ void add_typed_field(py::module & mod, std::string name) {
             self.data(), self.get_shape(subdivision),
             self.get_strides(subdivision, sizeof(T)));
       })
-      .def_property_readonly("shape",
-                             [](TypedFieldBase<T> & field) {
-                               return field.get_shape(
-                                   muGrid::IterUnit::SubPt);
-                             })
       .def(
           "array",
           [](TypedFieldBase<T> & self, const muGrid::IterUnit & it) {

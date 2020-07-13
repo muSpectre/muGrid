@@ -61,14 +61,14 @@ Young = (9 * K * mu) / (3 * K + mu)
 Poisson = (3 * K - 2 * mu) / (2 * (3 * K + mu))
 
 # set up system
-rve = µ.Cell(nb_grid_pts, lengths, formulation, fft='fftwmpi',
+rve = µ.Cell(nb_grid_pts, lengths, formulation,
+             fft='fftw' if MPI.COMM_WORLD.Get_size() == 1 else 'fftwmpi',
              communicator=MPI.COMM_WORLD)
 hard = Mat.make(rve, "hard", Young, Poisson, tauy0_hard, H_hard)
 soft = Mat.make(rve, "soft", Young, Poisson, tauy0_soft, H_soft)
 
 
 for pixel_id, pixel_coord in rve.pixels.enumerate():
-    print(pixel_coord)
     if phase[tuple(pixel_coord)] == 1:
         hard.add_pixel(pixel_id)
     elif phase[tuple(pixel_coord)] == 0:
@@ -78,7 +78,7 @@ for pixel_id, pixel_coord in rve.pixels.enumerate():
             phase[tuple(pixel_coord)]))
     pass
 
-rve.initialise(flags=µ.FFT_PlanFlags.patient)
+rve.initialise()
 
 # number if load increments
 ninc = 250

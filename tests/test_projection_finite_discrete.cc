@@ -72,7 +72,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(constructor_test, fix, fixlist, fix) {
     BOOST_CHECK_NO_THROW(
-        fix::projector.initialise(muFFT::FFT_PlanFlags::estimate));
+        fix::projector.initialise());
   }
 
   /* ---------------------------------------------------------------------- */
@@ -387,7 +387,7 @@ namespace muSpectre {
     using proj = ProjectionFiniteStrain<twoD>;
     auto nb_dof{2 * 2};
     auto engine = std::make_unique<Engine>(DynCcoord_t{2, 3});
-    engine->initialise(nb_dof, muFFT::FFT_PlanFlags::estimate);
+    engine->create_plan(nb_dof);
     BOOST_CHECK_THROW(proj(std::move(engine), DynRcoord_t{4.3, 4.3}),
                       std::runtime_error);
   }
@@ -481,7 +481,7 @@ namespace muSpectre {
 
     BOOST_TEST_CHECKPOINT("gradient field computed");
 
-    fix::projector.initialise(muFFT::FFT_PlanFlags::estimate);
+    fix::projector.initialise();
     fix::projector.apply_projection(f_var);
 
     BOOST_TEST_CHECKPOINT("projection applied");
@@ -548,7 +548,7 @@ namespace muSpectre {
       gt.row(0) = g.row(0);
     }
 
-    fix::projector.initialise(muFFT::FFT_PlanFlags::estimate);
+    fix::projector.initialise();
     // apply projection once; G:f_grad
     fix::projector.apply_projection(f_grad);
 

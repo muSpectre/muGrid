@@ -127,7 +127,7 @@ int main(int argc, char * argv[]) {
   std::cout << counter << " Pixel out of " << cell.get_nb_pixels()
             << " are in the hard material" << std::endl;
 
-  cell.initialise(FFT_PlanFlags::measure);
+  cell.initialise();
 
   constexpr Real newton_tol{1e-4};
   constexpr Real cg_tol{1e-7};

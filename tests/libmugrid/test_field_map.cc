@@ -239,8 +239,8 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE(sub_divisions, SubDivisionFixture) {
     const auto nb_pix{this->fc.get_nb_pixels()};
-    BOOST_CHECK_EQUAL(this->pixel_field.size(), nb_pix);
-    BOOST_CHECK_EQUAL(this->quad_pt_field.size(),
+    BOOST_CHECK_EQUAL(this->pixel_field.get_nb_entries(), nb_pix);
+    BOOST_CHECK_EQUAL(this->quad_pt_field.get_nb_entries(),
                       nb_pix * this->fc.get_nb_sub_pts(sub_division_tag()));
     BOOST_CHECK_EQUAL(this->pixel_quad_pt_map.size(), nb_pix);
 

@@ -269,8 +269,8 @@ class GradientIntegration_Check(unittest.TestCase):
         # Fourier Derivative
         fourier_gradient = [µ.FourierDerivative(dim, i) for i in range(dim)]
         fft_engine = muFFT.FFT(list(res))
-        fft_engine.initialise(dim)
-        fft_engine.initialise(dim * dim)
+        fft_engine.create_plan(dim)
+        fft_engine.create_plan(dim * dim)
         placement_n = µ.gradient_integration.integrate_tensor_2(
             F, fft_engine, fourier_gradient, delta_x)
 
@@ -290,8 +290,8 @@ class GradientIntegration_Check(unittest.TestCase):
         # Fourier Derivative
         fourier_gradient = [µ.FourierDerivative(dim, i) for i in range(dim)]
 
-        fft_engine.initialise(dim)
-        fft_engine.initialise(dim * dim)
+        fft_engine.create_plan(dim)
+        fft_engine.create_plan(dim * dim)
         placement_n = µ.gradient_integration.integrate_tensor_2(
             F, fft_engine, fourier_gradient, delta_x)
 
@@ -315,8 +315,8 @@ class GradientIntegration_Check(unittest.TestCase):
         fourier_gradient = [µ.FourierDerivative(dim, i) for i in range(dim)]
 
         fft_engine = muFFT.FFT(res)
-        fft_engine.initialise(dim)
-        fft_engine.initialise(dim * dim)
+        fft_engine.create_plan(dim)
+        fft_engine.create_plan(dim * dim)
         placement_n = µ.gradient_integration.integrate_tensor_2(
             F, fft_engine, fourier_gradient, delta_x)
         self.assertLess(np.linalg.norm(Chi_n - placement_n), self.norm_tol)
@@ -357,8 +357,8 @@ class GradientIntegration_Check(unittest.TestCase):
         # muSpectre Fourier integration
         fourier_gradient = [µ.FourierDerivative(dim, i) for i in range(dim)]
         fft_engine = muFFT.FFT(res)
-        fft_engine.initialise(dim)
-        fft_engine.initialise(dim * dim)
+        fft_engine.create_plan(dim)
+        fft_engine.create_plan(dim * dim)
 
         placement_n = µ.gradient_integration.integrate_tensor_2(
             F, fft_engine, fourier_gradient, delta_x)
@@ -437,8 +437,8 @@ class GradientIntegration_Check(unittest.TestCase):
             u_n =\
                 strain_amp * np.sin(2*np.pi*x_n/(lens.reshape((dim,)+(1,)*dim)))
         fft_engine = muFFT.FFT(list(res))
-        fft_engine.initialise(dim)
-        fft_engine.initialise(dim * dim)
+        fft_engine.create_plan(dim)
+        fft_engine.create_plan(dim * dim)
         u_integrated_n = µ.gradient_integration.integrate_tensor_2_small_strain(
             E, fft_engine, delta_x)
         self.assertLess(np.linalg.norm(u_n - u_integrated_n), self.norm_tol)
@@ -472,8 +472,8 @@ class GradientIntegration_Check(unittest.TestCase):
             u_n = \
                 strain_amp * np.sin(2*np.pi*x_n/(lens.reshape((dim,)+(1,)*dim)))
         fft_engine = muFFT.FFT(list(res))
-        fft_engine.initialise(dim)
-        fft_engine.initialise(dim*dim)
+        fft_engine.create_plan(dim)
+        fft_engine.create_plan(dim*dim)
         u_integrated_n = µ.gradient_integration.integrate_tensor_2_small_strain(
             E, fft_engine, delta_x)
         self.assertLess(np.linalg.norm(u_n - u_integrated_n), self.norm_tol)
@@ -535,8 +535,8 @@ class GradientIntegration_Check(unittest.TestCase):
         self.assertTrue(np.allclose(np.mean(F, axis=(2, 3, 4)), F0))
 
         fft_engine = muFFT.FFT(res)
-        fft_engine.initialise(dim)
-        fft_engine.initialise(dim * dim)
+        fft_engine.create_plan(dim)
+        fft_engine.create_plan(dim * dim)
         dz = muFFT.DiscreteDerivative([0, 0, 0], [[[-1, 1]]])
         dy = dz.rollaxes(-1)
         dx = dy.rollaxes(-1)
@@ -569,8 +569,8 @@ class GradientIntegration_Check(unittest.TestCase):
             g[i, :, :] = (np.roll(x, -1, axis=i) - x)/delta_x[i]
 
         fft_engine = muFFT.FFT(res)
-        fft_engine.initialise(dim**0)
-        fft_engine.initialise(dim**1)
+        fft_engine.create_plan(dim**0)
+        fft_engine.create_plan(dim**1)
         dy = muFFT.DiscreteDerivative([0, 0], [[-1, 1]])
         dx = dy.rollaxes(-1)
         discrete_gradient = [dx, dy]
@@ -605,8 +605,8 @@ class GradientIntegration_Check(unittest.TestCase):
                              x)[:-1, :-1, :-1]/delta_x[i]
 
         fft_engine = muFFT.FFT(res)
-        fft_engine.initialise(dim**0)
-        fft_engine.initialise(dim**1)
+        fft_engine.create_plan(dim**0)
+        fft_engine.create_plan(dim**1)
         dz = muFFT.DiscreteDerivative([0, 0, 0], [[[-1, 1]]])
         dy = dz.rollaxes(-1)
         dx = dy.rollaxes(-1)

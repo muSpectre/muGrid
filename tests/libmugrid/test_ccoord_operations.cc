@@ -96,7 +96,7 @@ namespace muGrid {
     DynCcoord_t column_major2({1, 2});
     DynCcoord_t row_major2({3, 1});
     BOOST_CHECK(CcoordOps::is_buffer_contiguous(
-        nb_grid_pts2, CcoordOps::get_default_strides(nb_grid_pts2)));
+        nb_grid_pts2, CcoordOps::get_col_major_strides(nb_grid_pts2)));
     BOOST_CHECK(CcoordOps::is_buffer_contiguous(nb_grid_pts2, column_major2));
     BOOST_CHECK(CcoordOps::is_buffer_contiguous(nb_grid_pts2, row_major2));
     DynCcoord_t non_contiguous2({6, 1});
@@ -107,7 +107,7 @@ namespace muGrid {
     DynCcoord_t column_major3({1, 5, 15});
     DynCcoord_t row_major3({12, 4, 1});
     BOOST_CHECK(CcoordOps::is_buffer_contiguous(
-        nb_grid_pts3, CcoordOps::get_default_strides(nb_grid_pts3)));
+        nb_grid_pts3, CcoordOps::get_col_major_strides(nb_grid_pts3)));
     BOOST_CHECK(CcoordOps::is_buffer_contiguous(nb_grid_pts3, column_major3));
     BOOST_CHECK(CcoordOps::is_buffer_contiguous(nb_grid_pts3, row_major3));
     DynCcoord_t partial_transpose3({1, 20, 5});

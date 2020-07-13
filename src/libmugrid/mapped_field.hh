@@ -105,7 +105,7 @@ namespace muGrid {
                 const std::string & sub_division_tag,
                 const Unit & unit = Unit::unitless())
         : field{collection.register_field<Scalar>(
-              unique_name, nb_rows * nb_cols, sub_division_tag, unit)},
+              unique_name, {nb_rows, nb_cols}, sub_division_tag, unit)},
           map{this->field, nb_rows, iter_type} {
       static_assert(
           StaticConstructor == IsStatic(),

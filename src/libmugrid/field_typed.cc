@@ -35,6 +35,7 @@
 
 #include <sstream>
 
+#include "ccoord_operations.hh"
 #include "field_typed.hh"
 #include "field_collection.hh"
 #include "field_map.hh"
@@ -135,14 +136,14 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   template <typename T>
   TypedField<T> & TypedField<T>::safe_cast(Field & other,
-                                           const Index_t & nb_dof_per_sub_pt,
+                                           const Index_t & nb_components,
                                            const std::string & sub_division) {
-    if (other.get_nb_dof_per_sub_pt() != nb_dof_per_sub_pt) {
+    if (other.get_nb_components() != nb_components) {
       std::stringstream err_msg{};
       err_msg << "Cannot cast field'" << other.get_name()
-              << "', because it has " << other.get_nb_dof_per_sub_pt()
+              << "', because it has " << other.get_nb_components()
               << " degrees of freedom per sub-point, rather than the "
-              << nb_dof_per_sub_pt << " components which are requested.";
+              << nb_components << " components which are requested.";
       throw FieldError(err_msg.str());
     }
     if (other.get_sub_division_tag() != sub_division) {
@@ -160,14 +161,14 @@ namespace muGrid {
   template <typename T>
   const TypedField<T> &
   TypedField<T>::safe_cast(const Field & other,
-                           const Index_t & nb_dof_per_sub_pt,
+                           const Index_t & nb_components,
                            const std::string & sub_division) {
-    if (other.get_nb_dof_per_sub_pt() != nb_dof_per_sub_pt) {
+    if (other.get_nb_components() != nb_components) {
       std::stringstream err_msg{};
       err_msg << "Cannot cast field'" << other.get_name()
-              << "', because it has " << other.get_nb_dof_per_sub_pt()
+              << "', because it has " << other.get_nb_components()
               << " degrees of freedom per sub-point, rather than the "
-              << nb_dof_per_sub_pt << " components which are requested.";
+              << nb_components << " components which are requested.";
       throw FieldError(err_msg.str());
     }
     if (other.get_sub_division_tag() != sub_division) {
@@ -193,12 +194,12 @@ namespace muGrid {
       throw FieldError(error_message.str());
     }
 
-    auto && size{this->get_nb_entries()};
-    const auto expected_size{size * this->get_nb_dof_per_sub_pt() +
+    auto && size{this->nb_sub_pts * this->get_nb_pixels()};
+    const auto expected_size{size * this->get_nb_components() +
                              this->pad_size};
     if (this->values.size() != expected_size or
-        static_cast<Index_t>(this->current_size) != size) {
-      this->current_size = size;
+        static_cast<Index_t>(this->current_nb_entries) != size) {
+      this->current_nb_entries = size;
       this->values.resize(expected_size);
     }
     this->set_data_ptr(this->values.data());
@@ -206,7 +207,7 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  size_t TypedField<T>::buffer_size() const {
+  size_t TypedField<T>::get_buffer_size() const {
     return this->values.size();
   }
 
@@ -221,11 +222,11 @@ namespace muGrid {
       throw FieldError("Cannot push_back into a field before the number of "
                        "sub-division points has been set for it");
     }
-    if (this->nb_dof_per_sub_pt != 1) {
+    if (this->nb_components != 1) {
       throw FieldError("This is not a scalar field. push_back an array.");
     }
     const auto & nb_sub{this->get_nb_sub_pts()};
-    this->current_size += nb_sub;
+    this->current_nb_entries += nb_sub;
     for (Index_t sub_pt_id{0}; sub_pt_id < nb_sub; ++sub_pt_id) {
       this->values.push_back(value);
     }
@@ -244,17 +245,17 @@ namespace muGrid {
       throw FieldError("Cannot push_back into a field before the number of "
                        "sub-division points has bee set for.");
     }
-    if (this->nb_dof_per_sub_pt != value.size()) {
+    if (this->nb_components != value.size()) {
       std::stringstream error{};
       error << "You are trying to push an array with " << value.size()
-            << "components into a field with " << this->nb_dof_per_sub_pt
+            << "components into a field with " << this->nb_components
             << " components.";
       throw FieldError(error.str());
     }
     const auto & nb_sub{this->get_nb_sub_pts()};
-    this->current_size += nb_sub;
+    this->current_nb_entries += nb_sub;
     for (Index_t sub_pt_id{0}; sub_pt_id < nb_sub; ++sub_pt_id) {
-      for (Index_t i{0}; i < this->nb_dof_per_sub_pt; ++i) {
+      for (Index_t i{0}; i < this->nb_components; ++i) {
         this->values.push_back(value.data()[i]);
       }
     }
@@ -277,9 +278,9 @@ namespace muGrid {
     TypedField<T> & other{
         field_exists
             ? this->safe_cast(this->get_collection().get_field(new_name),
-                              this->nb_dof_per_sub_pt, this->sub_division_tag)
+                              this->nb_components, this->sub_division_tag)
             : this->get_collection().template register_field<T>(
-                  new_name, this->nb_dof_per_sub_pt, this->sub_division_tag,
+                  new_name, this->nb_components, this->sub_division_tag,
                   this->unit)};
 
     other = *this;
@@ -296,6 +297,11 @@ namespace muGrid {
             << "' has not been initialised";
       throw FieldError(error.str());
     }
+    if (not CcoordOps::is_buffer_contiguous(this->get_pixels_shape(),
+                                            this->get_pixels_strides())) {
+      throw FieldError("Eigen representation is only available for fields with "
+                       "contiguous storage.");
+    }
     return Eigen_map(this->data_ptr, nb_rows, nb_cols);
   }
 
@@ -310,6 +316,11 @@ namespace muGrid {
             << "' has not been initialised";
       throw FieldError(error.str());
     }
+    if (not CcoordOps::is_buffer_contiguous(this->get_pixels_shape(),
+                                            this->get_pixels_strides())) {
+      throw FieldError("Eigen representation is only available for fields with "
+                       "contiguous storage.");
+    }
     return Eigen_cmap(this->data_ptr, nb_rows, nb_cols);
   }
 
@@ -323,14 +334,18 @@ namespace muGrid {
       break;
     }
     case FieldCollection::ValidityDomain::Global: {
-      auto && my_strides{this->get_strides(IterUnit::Pixel)};
-      auto && other_strides{other.get_strides(IterUnit::Pixel)};
-      if (my_strides == other_strides) {
-        this->eigen_vec() = other.eigen_vec();
-      } else {
-        raw_mem_ops::strided_copy(this->get_shape(IterUnit::Pixel), my_strides,
-                                  other_strides, other.data(), this->data_ptr);
+      auto && my_shape{this->get_shape(IterUnit::SubPt)};
+      auto && other_shape{other.get_shape(IterUnit::SubPt)};
+      if (my_shape != other_shape) {
+        std::stringstream s;
+        s << "Shape mismatch: Copying a field with shape " << other_shape
+          << " onto a field with shape " << my_shape << " is not supported.";
+        throw FieldError(s.str());
       }
+      auto && my_strides{this->get_strides(IterUnit::SubPt)};
+      auto && other_strides{other.get_strides(IterUnit::SubPt)};
+      raw_mem_ops::strided_copy(my_shape, other_strides, my_strides,
+                                other.data(), this->data_ptr);
       break;
     }
     default:
@@ -379,41 +394,59 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   template <typename T>
   auto TypedFieldBase<T>::eigen_vec() -> Eigen_map {
-    return this->eigen_map(this->size() * this->nb_dof_per_sub_pt, 1);
+    if (this->get_nb_entries() == Unknown) {
+      throw FieldError("Field has unknown number of entries");
+    }
+    return this->eigen_map(this->get_nb_entries() * this->nb_components, 1);
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
   auto TypedFieldBase<T>::eigen_vec() const -> Eigen_cmap {
-    return this->eigen_map(this->size() * this->nb_dof_per_sub_pt, 1);
+    if (this->get_nb_entries() == Unknown) {
+      throw FieldError("Field has unknown number of entries");
+    }
+    return this->eigen_map(this->get_nb_entries() * this->nb_components, 1);
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
   auto TypedFieldBase<T>::eigen_sub_pt() -> Eigen_map {
-    return this->eigen_map(this->nb_dof_per_sub_pt, this->size());
+    if (this->get_nb_entries() == Unknown) {
+      throw FieldError("Field has unknown number of entries");
+    }
+    return this->eigen_map(this->nb_components, this->get_nb_entries());
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
   auto TypedFieldBase<T>::eigen_sub_pt() const -> Eigen_cmap {
-    return this->eigen_map(this->nb_dof_per_sub_pt, this->size());
+    if (this->get_nb_entries() == Unknown) {
+      throw FieldError("Field has unknown number of entries");
+    }
+    return this->eigen_map(this->nb_components, this->get_nb_entries());
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
   auto TypedFieldBase<T>::eigen_pixel() -> Eigen_map {
+    if (this->get_nb_entries() == Unknown) {
+      throw FieldError("Field has unknown number of entries");
+    }
     const auto & nb_sub{this->get_nb_sub_pts()};
-    return this->eigen_map(this->nb_dof_per_sub_pt * nb_sub,
-                           this->size() / nb_sub);
+    return this->eigen_map(this->nb_components * nb_sub,
+                           this->get_nb_entries() / nb_sub);
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
   auto TypedFieldBase<T>::eigen_pixel() const -> Eigen_cmap {
+    if (this->get_nb_entries() == Unknown) {
+      throw FieldError("Field has unknown number of entries");
+    }
     const auto & nb_sub{this->get_nb_sub_pts()};
-    return this->eigen_map(this->nb_dof_per_sub_pt * nb_sub,
-                           this->size() / nb_sub);
+    return this->eigen_map(this->nb_components * nb_sub,
+                           this->get_nb_entries() / nb_sub);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -455,33 +488,39 @@ namespace muGrid {
   template <typename T>
   WrappedField<T>::WrappedField(const std::string & unique_name,
                                 FieldCollection & collection,
-                                const Index_t & nb_dof_per_sub_pt,
+                                const Index_t & nb_components,
                                 const size_t & size, T * ptr,
                                 const std::string & sub_division_tag,
-                                const Unit & unit)
-      : Parent{unique_name, collection, nb_dof_per_sub_pt, sub_division_tag,
+                                const Unit & unit,
+                                const Shape_t & strides)
+      : Parent{unique_name, collection, nb_components, sub_division_tag,
                unit},
-        size{static_cast<size_t>(size)} {
-    this->current_size = size / this->nb_dof_per_sub_pt;
+        size{size},
+        strides{strides} {
+    this->current_nb_entries = size / this->nb_components;
 
-    if (size != this->nb_dof_per_sub_pt * this->current_size) {
+    if (static_cast<Index_t>(size) !=
+        this->nb_components * this->current_nb_entries) {
       std::stringstream error{};
       error << "Size mismatch: the provided array has a size of " << size
             << " which is not a multiple of the specified number of components "
-               "(nb_dof_per_sub_pt = "
-            << this->nb_dof_per_sub_pt << ").";
+               "(nb_components = "
+            << this->nb_components << ").";
       throw FieldError(error.str());
     }
-    if (this->get_nb_entries() != Index_t(this->current_size)) {
+    if (this->get_nb_entries() !=
+        static_cast<Index_t>(this->current_nb_entries)) {
       std::stringstream error{};
       error << "Size mismatch: This field should store "
-            << this->nb_dof_per_sub_pt << " component(s) on "
-            << this->collection.get_nb_pixels() << " pixels/voxels with "
+            << this->nb_components << " component(s) on "
+            << this->collection.get_nb_pixels() << " pixels ("
+            << this->get_pixels_shape() << " grid) with "
             << this->get_nb_sub_pts()
-            << " sub point(s) each, i.e. with a total of "
-            << this->collection.get_nb_pixels() * this->nb_dof_per_sub_pt
+            << " sub-point(s) each (sub-point tag '" << sub_division_tag
+            << "'), i.e. with a total of "
+            << this->get_nb_entries() * this->nb_components
             << " scalar values, but you supplied an array of size " << size
-            << '.';
+            << ".";
       throw FieldError(error.str());
     }
     this->set_data_ptr(ptr);
@@ -490,31 +529,93 @@ namespace muGrid {
   template <typename T>
   WrappedField<T>::WrappedField(const std::string & unique_name,
                                 FieldCollection & collection,
-                                const Index_t & nb_dof_per_sub_pt,
+                                const Shape_t & components_shape,
+                                const size_t & size, T * ptr,
+                                const std::string & sub_division_tag,
+                                const Unit & unit,
+                                const Shape_t & strides)
+      : Parent{unique_name, collection, components_shape, sub_division_tag,
+               unit},
+        size{size},
+        strides{strides} {
+    this->current_nb_entries = size / this->nb_components;
+
+    if (static_cast<Index_t>(size) !=
+        this->nb_components * this->current_nb_entries) {
+      std::stringstream error{};
+      error << "Size mismatch: the provided array has a size of " << size
+            << " which is not a multiple of the specified number of components "
+               "(nb_components = "
+            << this->nb_components << ").";
+      throw FieldError(error.str());
+    }
+    if (this->get_nb_entries() != Index_t(this->current_nb_entries)) {
+      std::stringstream error{};
+      error << "Size mismatch: This field should store "
+            << this->nb_components << " component(s) (shape "
+            << this->components_shape << ") on "
+            << this->collection.get_nb_pixels() << " pixels ("
+            << this->get_pixels_shape() << " grid) with "
+            << this->get_nb_sub_pts()
+            << " sub-point(s) each (sub-point tag '" << sub_division_tag
+            << "'), i.e. with a total of "
+            << this->get_nb_entries() * this->nb_components
+            << " scalar values, but you supplied an array of size " << size
+            << ".";
+      throw FieldError(error.str());
+    }
+    this->set_data_ptr(ptr);
+  }
+
+  template <typename T>
+  WrappedField<T>::WrappedField(const std::string & unique_name,
+                                FieldCollection & collection,
+                                const Index_t & nb_components,
                                 Eigen::Ref<EigenRep_t> values,
                                 const std::string & sub_division_tag,
-                                const Unit & unit)
+                                const Unit & unit,
+                                const Shape_t & strides)
       : WrappedField{unique_name,
                      collection,
-                     nb_dof_per_sub_pt,
+                     nb_components,
                      static_cast<size_t>(values.size()),
                      values.data(),
                      sub_division_tag,
-                     unit} {}
+                     unit,
+                     strides} {}
+
+  template <typename T>
+  WrappedField<T>::WrappedField(const std::string & unique_name,
+                                FieldCollection & collection,
+                                const Shape_t & components_shape,
+                                Eigen::Ref<EigenRep_t> values,
+                                const std::string & sub_division_tag,
+                                const Unit & unit,
+                                const Shape_t & strides)
+      : WrappedField{unique_name,
+                     collection,
+                     components_shape,
+                     static_cast<size_t>(values.size()),
+                     values.data(),
+                     sub_division_tag,
+                     unit,
+                     strides} {}
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
   auto WrappedField<T>::make_const(const std::string & unique_name,
                                    FieldCollection & collection,
-                                   Index_t nb_dof_per_sub_pt,
+                                   const Index_t & nb_components,
                                    Eigen::Ref<const EigenRep_t> values,
                                    const std::string & sub_division,
-                                   const Unit & unit)
+                                   const Unit & unit,
+                                   const Shape_t & strides)
       -> std::unique_ptr<const WrappedField> {
     Eigen::Map<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>> map{
         const_cast<T *>(values.data()), values.rows(), values.cols()};
     return std::make_unique<WrappedField>(
-        unique_name, collection, nb_dof_per_sub_pt, map, sub_division, unit);
+        unique_name, collection, nb_components, map, sub_division, unit,
+        strides);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -537,12 +638,12 @@ namespace muGrid {
   template <typename T>
   void WrappedField<T>::resize() {
     auto && size{this->get_nb_entries()};
-    const auto expected_size{size * this->get_nb_dof_per_sub_pt() +
+    const auto expected_size{size * this->get_nb_components() +
                              this->pad_size};
-    if (expected_size != this->buffer_size()) {
+    if (expected_size != this->get_buffer_size()) {
       std::stringstream error{};
       error << "Wrapped fields cannot be resized. The current wrapped size is "
-            << this->buffer_size() << ". Resize to " << expected_size
+            << this->get_buffer_size() << ". Resize to " << expected_size
             << " was attempted.";
       throw FieldError(error.str());
     }
@@ -550,7 +651,33 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  size_t WrappedField<T>::buffer_size() const {
+  Shape_t WrappedField<T>::get_strides(const IterUnit & iter_type,
+                                       Index_t element_size) const {
+    if (this->strides.size() > 0) {
+      if (iter_type == IterUnit::SubPt) {
+        return this->strides;
+      } else {
+        throw FieldError("Pixel iteration is not supported for wrapped fields "
+                         "with arbitrary strides.");
+      }
+    } else {
+      return Parent::get_strides(iter_type, element_size);
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
+  StorageOrder WrappedField<T>::get_storage_order() const {
+    if (this->strides.size() > 0) {
+      return StorageOrder::Unknown;
+    } else {
+      return Parent::get_storage_order();
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
+  size_t WrappedField<T>::get_buffer_size() const {
     return this->size;
   }
 

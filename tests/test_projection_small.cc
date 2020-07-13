@@ -60,12 +60,12 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(constructor_test, fix, fixlist, fix) {
     BOOST_CHECK_NO_THROW(
-        fix::projector.initialise(muFFT::FFT_PlanFlags::estimate));
+        fix::projector.initialise());
   }
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(green_test, fix, fixlist, fix) {
-    fix::projector.initialise(muFFT::FFT_PlanFlags::estimate);
+    fix::projector.initialise();
     // create a C_ref function as 4T symetrisation
     auto && C_ref(muGrid::Matrices::Isymm<fix::sdim>());
     // create a Green operator projector
@@ -141,7 +141,7 @@ namespace muSpectre {
       v = g;
     }
 
-    fix::projector.initialise(muFFT::FFT_PlanFlags::estimate);
+    fix::projector.initialise();
     fix::projector.apply_projection(f_var);
 
     using muGrid::operator/;

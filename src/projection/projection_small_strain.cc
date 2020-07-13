@@ -64,9 +64,9 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Index_t DimS>
   void
-  ProjectionSmallStrain<DimS>::initialise(const muFFT::FFT_PlanFlags & flags) {
+  ProjectionSmallStrain<DimS>::initialise() {
     using muGrid::get;
-    Parent::initialise(flags);
+    Parent::initialise();
 
     muFFT::FFT_freqs<DimS> fft_freqs(
         Ccoord(this->fft_engine->get_nb_domain_grid_pts()),

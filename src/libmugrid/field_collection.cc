@@ -54,15 +54,17 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   FieldCollection::FieldCollection(ValidityDomain domain,
                                    const Index_t & spatial_dimension,
-                                   const SubPtMap_t & nb_sub_pts)
-      : domain{domain}, spatial_dim{spatial_dimension}, nb_sub_pts{nb_sub_pts} {
+                                   const SubPtMap_t & nb_sub_pts,
+                                   StorageOrder storage_order)
+      : domain{domain}, spatial_dim{spatial_dimension}, nb_sub_pts{nb_sub_pts},
+        storage_order{storage_order} {
     this->set_nb_sub_pts(PixelTag, 1);
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
   TypedField<T> & FieldCollection::register_field_helper(
-      const std::string & unique_name, const Index_t & nb_dof_per_sub_pt,
+      const std::string & unique_name, const Index_t & nb_components,
       const std::string & sub_division_tag, const Unit & unit) {
     static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
                   "You can only register fields templated with one of the "
@@ -84,7 +86,42 @@ namespace muGrid {
     //! following line, please check whether you are creating a TypedField with
     //! the number of components specified in 'int' rather than 'size_t'.
     TypedField<T> * raw_ptr{new TypedField<T>{
-        unique_name, *this, nb_dof_per_sub_pt, sub_division_tag, unit}};
+        unique_name, *this, nb_components, sub_division_tag, unit}};
+    TypedField<T> & retref{*raw_ptr};
+    Field_ptr field{raw_ptr};
+    if (this->initialised) {
+      retref.resize();
+    }
+    this->fields[unique_name] = std::move(field);
+    return retref;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
+  TypedField<T> & FieldCollection::register_field_helper(
+      const std::string & unique_name, const Shape_t & components_shape,
+      const std::string & sub_division_tag, const Unit & unit) {
+    static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
+                  "You can only register fields templated with one of the "
+                  "numeric types Real, Complex, Int, or UInt");
+    if (this->field_exists(unique_name)) {
+      std::stringstream error{};
+      error << "A Field of name '" << unique_name
+            << "' is already registered in this field collection. "
+            << "Currently registered fields: ";
+      std::string prelude{""};
+      for (const auto & name_field_pair : this->fields) {
+        error << prelude << '\'' << name_field_pair.first << '\'';
+        prelude = ", ";
+      }
+      throw FieldCollectionError(error.str());
+    }
+
+    //! If you get a compiler warning about narrowing conversion on the
+    //! following line, please check whether you are creating a TypedField with
+    //! the number of components specified in 'int' rather than 'size_t'.
+    TypedField<T> * raw_ptr{new TypedField<T>{
+        unique_name, *this, components_shape, sub_division_tag, unit}};
     TypedField<T> & retref{*raw_ptr};
     Field_ptr field{raw_ptr};
     if (this->initialised) {
@@ -96,33 +133,65 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   TypedField<Real> & FieldCollection::register_real_field(
-      const std::string & unique_name, const Index_t & nb_dof_per_sub_pt,
+      const std::string & unique_name, const Index_t & nb_components,
       const std::string & sub_division_tag, const Unit & unit) {
-    return this->register_field_helper<Real>(unique_name, nb_dof_per_sub_pt,
+    return this->register_field_helper<Real>(unique_name, nb_components,
+                                             sub_division_tag, unit);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  TypedField<Real> & FieldCollection::register_real_field(
+      const std::string & unique_name, const Shape_t & components_shape,
+      const std::string & sub_division_tag, const Unit & unit) {
+    return this->register_field_helper<Real>(unique_name, components_shape,
                                              sub_division_tag, unit);
   }
 
   /* ---------------------------------------------------------------------- */
   TypedField<Complex> & FieldCollection::register_complex_field(
-      const std::string & unique_name, const Index_t & nb_dof_per_sub_pt,
+      const std::string & unique_name, const Index_t & nb_components,
       const std::string & sub_division_tag, const Unit & unit) {
-    return this->register_field_helper<Complex>(unique_name, nb_dof_per_sub_pt,
+    return this->register_field_helper<Complex>(unique_name, nb_components,
+                                                sub_division_tag, unit);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  TypedField<Complex> & FieldCollection::register_complex_field(
+      const std::string & unique_name, const Shape_t & components_shape,
+      const std::string & sub_division_tag, const Unit & unit) {
+    return this->register_field_helper<Complex>(unique_name, components_shape,
                                                 sub_division_tag, unit);
   }
 
   /* ---------------------------------------------------------------------- */
   TypedField<Int> & FieldCollection::register_int_field(
-      const std::string & unique_name, const Index_t & nb_dof_per_sub_pt,
+      const std::string & unique_name, const Index_t & nb_components,
       const std::string & sub_division_tag, const Unit & unit) {
-    return this->register_field_helper<Int>(unique_name, nb_dof_per_sub_pt,
+    return this->register_field_helper<Int>(unique_name, nb_components,
+                                            sub_division_tag, unit);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  TypedField<Int> & FieldCollection::register_int_field(
+      const std::string & unique_name, const Shape_t & components_shape,
+      const std::string & sub_division_tag, const Unit & unit) {
+    return this->register_field_helper<Int>(unique_name, components_shape,
                                             sub_division_tag, unit);
   }
 
   /* ---------------------------------------------------------------------- */
   TypedField<Uint> & FieldCollection::register_uint_field(
-      const std::string & unique_name, const Index_t & nb_dof_per_sub_pt,
+      const std::string & unique_name, const Index_t & nb_components,
       const std::string & sub_division_tag, const Unit & unit) {
-    return this->register_field_helper<Uint>(unique_name, nb_dof_per_sub_pt,
+    return this->register_field_helper<Uint>(unique_name, nb_components,
+                                             sub_division_tag, unit);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  TypedField<Uint> & FieldCollection::register_uint_field(
+      const std::string & unique_name, const Shape_t & components_shape,
+      const std::string & sub_division_tag, const Unit & unit) {
+    return this->register_field_helper<Uint>(unique_name, components_shape,
                                              sub_division_tag, unit);
   }
 
@@ -130,7 +199,7 @@ namespace muGrid {
   template <typename T>
   TypedStateField<T> & FieldCollection::register_state_field_helper(
       const std::string & unique_prefix, const Index_t & nb_memory,
-      const Index_t & nb_dof_per_sub_pt, const std::string & sub_division_tag,
+      const Index_t & nb_components, const std::string & sub_division_tag,
       const Unit & unit) {
     static_assert(
         std::is_scalar<T>::value or std::is_same<T, Complex>::value,
@@ -154,7 +223,7 @@ namespace muGrid {
     //! with the number of components specified in 'int' rather than 'size_t'.
     TypedStateField<T> * raw_ptr{
         new TypedStateField<T>{unique_prefix, *this, nb_memory,
-                               nb_dof_per_sub_pt, sub_division_tag, unit}};
+                               nb_components, sub_division_tag, unit}};
     TypedStateField<T> & retref{*raw_ptr};
     StateField_ptr field{raw_ptr};
     this->state_fields[unique_prefix] = std::move(field);
@@ -164,37 +233,37 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   TypedStateField<Real> & FieldCollection::register_real_state_field(
       const std::string & unique_name, const Index_t & nb_memory,
-      const Index_t & nb_dof_per_sub_pt, const std::string & sub_division_tag,
+      const Index_t & nb_components, const std::string & sub_division_tag,
       const Unit & unit) {
     return this->register_state_field_helper<Real>(
-        unique_name, nb_memory, nb_dof_per_sub_pt, sub_division_tag, unit);
+        unique_name, nb_memory, nb_components, sub_division_tag, unit);
   }
 
   /* ---------------------------------------------------------------------- */
   TypedStateField<Complex> & FieldCollection::register_complex_state_field(
       const std::string & unique_name, const Index_t & nb_memory,
-      const Index_t & nb_dof_per_sub_pt, const std::string & sub_division_tag,
+      const Index_t & nb_components, const std::string & sub_division_tag,
       const Unit & unit) {
     return this->register_state_field_helper<Complex>(
-        unique_name, nb_memory, nb_dof_per_sub_pt, sub_division_tag, unit);
+        unique_name, nb_memory, nb_components, sub_division_tag, unit);
   }
 
   /* ---------------------------------------------------------------------- */
   TypedStateField<Int> & FieldCollection::register_int_state_field(
       const std::string & unique_name, const Index_t & nb_memory,
-      const Index_t & nb_dof_per_sub_pt, const std::string & sub_division_tag,
+      const Index_t & nb_components, const std::string & sub_division_tag,
       const Unit & unit) {
     return this->register_state_field_helper<Int>(
-        unique_name, nb_memory, nb_dof_per_sub_pt, sub_division_tag, unit);
+        unique_name, nb_memory, nb_components, sub_division_tag, unit);
   }
 
   /* ---------------------------------------------------------------------- */
   TypedStateField<Uint> & FieldCollection::register_uint_state_field(
       const std::string & unique_name, const Index_t & nb_memory,
-      const Index_t & nb_dof_per_sub_pt, const std::string & sub_division_tag,
+      const Index_t & nb_components, const std::string & sub_division_tag,
       const Unit & unit) {
     return this->register_state_field_helper<Uint>(
-        unique_name, nb_memory, nb_dof_per_sub_pt, sub_division_tag, unit);
+        unique_name, nb_memory, nb_components, sub_division_tag, unit);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -210,6 +279,11 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   Index_t FieldCollection::get_nb_pixels() const { return this->nb_pixels; }
+
+  /* ---------------------------------------------------------------------- */
+  Index_t FieldCollection::get_nb_buffer_pixels() const {
+    return this->nb_buffer_pixels;
+  }
 
   /* ---------------------------------------------------------------------- */
   bool FieldCollection::has_nb_sub_pts(const std::string & tag) const {
@@ -268,9 +342,24 @@ namespace muGrid {
   const Index_t & FieldCollection::get_spatial_dim() const {
     return this->spatial_dim;
   }
+
   /* ---------------------------------------------------------------------- */
   auto FieldCollection::get_domain() const -> const ValidityDomain & {
     return this->domain;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  const StorageOrder & FieldCollection::get_storage_order() const {
+    return this->storage_order;
+  }
+
+  //! check whether two field collections have the same memory layout
+  bool
+  FieldCollection::has_same_memory_layout(const FieldCollection & other) const {
+    return
+        this->get_pixels_shape() == other.get_pixels_shape() and
+        this->get_storage_order() == other.get_storage_order() and
+        this->get_pixels_strides() == other.get_pixels_strides();
   }
 
   /* ---------------------------------------------------------------------- */
@@ -296,9 +385,9 @@ namespace muGrid {
   void FieldCollection::allocate_fields() {
     for (auto && item : this->fields) {
       auto && field{*item.second};
-      const auto field_size{field.size()};
+      const auto field_size{field.get_current_nb_entries()};
       if ((field_size != 0) and
-          (field_size != size_t(field.get_nb_entries()))) {
+          (field_size != field.get_nb_entries())) {
         std::stringstream err_stream{};
         err_stream << "Field '" << field.get_name() << "' contains "
                    << field_size << " entries, but the field collection "

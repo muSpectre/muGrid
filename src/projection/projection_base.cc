@@ -43,19 +43,19 @@ namespace muSpectre {
   ProjectionBase::ProjectionBase(muFFT::FFTEngine_ptr engine,
                                  const DynRcoord_t & domain_lengths,
                                  const Index_t & nb_quad_pts,
-                                 const Index_t & nb_dof_per_sub_pt,
+                                 const Index_t & nb_components,
                                  const Formulation & form)
       : fft_engine{std::move(engine)}, domain_lengths{domain_lengths},
         nb_quad_pts{nb_quad_pts},
-        nb_dof_per_sub_pt{nb_dof_per_sub_pt}, form{form},
-        projection_container{this->fft_engine->get_fourier_field_collection()},
-        work_space{this->projection_container.register_complex_field(
-            "work_space", this->nb_dof_per_sub_pt * this->nb_quad_pts)} {
-    this->projection_container.set_nb_sub_pts(QuadPtTag, nb_quad_pts);
+        nb_components{nb_components}, form{form},
+        work_space{this->fft_engine->register_fourier_space_field(
+            "work_space", this->nb_components * this->nb_quad_pts)} {
     if (nb_quad_pts <= 0) {
       throw std::runtime_error("Number of quadrature points must be larger "
                                "than zero.");
     }
+    this->fft_engine->get_fourier_field_collection().set_nb_sub_pts(
+        QuadPtTag, nb_quad_pts);
     if (this->domain_lengths.get_dim() != this->fft_engine->get_spatial_dim()) {
       std::stringstream error{};
       error << "The domain lengths supplied are "
@@ -67,9 +67,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  void ProjectionBase::initialise(const muFFT::FFT_PlanFlags & flags) {
-    auto && nb_dof{this->get_nb_dof_per_pixel()};
-    fft_engine->initialise(nb_dof, flags);
+  void ProjectionBase::initialise() {
     this->initialised = true;
   }
 

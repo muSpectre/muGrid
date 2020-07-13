@@ -91,6 +91,21 @@ namespace muGrid {
   };
 
   /**
+   * Specify the storage order of the components portion of the field
+   */
+  enum class StorageOrder {
+    ColMajor,    //!< column-major storage order (first index is fast)
+    ArrayOfStructures = ColMajor,  //!< components are consecutive in memory
+    RowMajor,    //!< row-major storage order (last index is fast)
+    StructurOfArrays = RowMajor,  //< pixels are consecutive in memory
+    Unknown,     //!< storage order is unknown, only for `WrappedField`
+    Automatic    //!< inherit storage order from `FieldCollection`
+  };
+
+  //! Type used for shapes and strides
+  using Shape_t = std::vector<Index_t>;
+
+  /**
    * this tag is always defined to one in every field collection 
    */
   const std::string PixelTag{"pixel"};
@@ -98,6 +113,10 @@ namespace muGrid {
   //! inserts `muGrid::IterUnit` into `std::ostream`s
   std::ostream &
   operator<<(std::ostream & os, const IterUnit & sub_division);
+
+  //! inserts `muGrid::StorageOrder` into `std::ostream`s
+  std::ostream &
+  operator<<(std::ostream & os, const StorageOrder & storage_order);
 
   /**
    * Maps can give constant or mutable access to the mapped field through their
@@ -107,10 +126,15 @@ namespace muGrid {
 
   //! \addtogroup Coordinates Coordinate types
   //@{
-  //! Ccoord_t are cell coordinates, i.e. integer coordinates
+  /**
+   * Cell coordinates, i.e. up to three integer numbers with fixed dimension
+   */
   template <size_t Dim>
   using Ccoord_t = std::array<Index_t, Dim>;
-  //! Real space coordinates
+  /**
+   * Real space coordinates, i.e. up to three floating point numbers with fixed
+   * dimension
+   */
   template <size_t Dim>
   using Rcoord_t = std::array<Real, Dim>;
 
@@ -261,6 +285,15 @@ namespace muGrid {
       return this->long_array[index];
     }
 
+    //! push element to the end
+    void push_back(const T & value) {
+      if (static_cast<size_t>(this->dim) >= MaxDim) {
+        throw RuntimeError("Dimension bounds exceeded");
+      }
+      this->long_array[this->dim] = value;
+      this->dim++;
+    }
+
     //! conversion operator
     template <size_t Dim>
     operator std::array<T, Dim>() const {
@@ -288,6 +321,18 @@ namespace muGrid {
 
     //! return the spatial dimension of this coordinate
     const Dim_t & get_dim() const { return this->dim; }
+
+    //! return the spatial dimension of this coordinate, STL compatibility
+    const Dim_t & size() const { return this->dim; }
+
+    //! convert into a vector
+    explicit operator std::vector<T>() const {
+      std::vector<T> v;
+      for (auto && el : *this) {
+        v.push_back(el);
+      }
+      return v;
+    }
 
     //! iterator to the first entry for iterating over only the valid entries
     iterator begin() { return this->long_array.begin(); }
@@ -349,9 +394,15 @@ namespace muGrid {
     return result;
   }
 
-  //! usually, we should not need more than three dimensions
+  /**
+   * Cell coordinates, i.e. up to three integer numbers with dynamic (determined
+   * during runtime) dimension
+   */
   using DynCcoord_t = DynCcoord<threeD>;
-  //! usually, we should not need more than three dimensions
+  /**
+   * Real space coordinates, i.e. up to three floating point numbers with
+   * dynamic (determined during runtime) dimension
+   */
   using DynRcoord_t = DynCcoord<threeD, Real>;
 
   /**
@@ -415,10 +466,10 @@ namespace muGrid {
   template <typename T>
   std::ostream & operator<<(std::ostream & os, const std::vector<T> & values) {
     os << "(";
-    for (size_t i = 0; i < values.size() - 1; ++i) {
-      os << values[i] << ", ";
-    }
     if (values.size() > 0) {
+      for (size_t i = 0; i < values.size() - 1; ++i) {
+        os << values[i] << ", ";
+      }
       os << values.back();
     }
     os << ")";
@@ -447,10 +498,10 @@ namespace muGrid {
   std::ostream & operator<<(std::ostream & os,
                             const DynCcoord<MaxDim, T> & values) {
     os << "(";
-    for (Dim_t i = 0; i < values.get_dim() - 1; ++i) {
-      os << values[i] << ", ";
-    }
     if (values.get_dim() > 0) {
+      for (Dim_t i = 0; i < values.get_dim() - 1; ++i) {
+        os << values[i] << ", ";
+      }
       os << values.back();
     }
     os << ")";

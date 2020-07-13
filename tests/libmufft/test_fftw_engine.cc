@@ -88,15 +88,14 @@ namespace muFFT {
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(Constructor_test, Fix, fixlist, Fix) {
-    BOOST_CHECK_NO_THROW(Fix::engine.initialise(this->mdim * this->mdim,
-                                                FFT_PlanFlags::estimate));
+    BOOST_CHECK_NO_THROW(Fix::engine.create_plan(this->mdim * this->mdim));
     BOOST_CHECK_EQUAL(Fix::engine.size(),
                       muGrid::CcoordOps::get_size(Fix::res()));
   }
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(fft_test, Fix, fixlist, Fix) {
-    Fix::engine.initialise(this->mdim * this->mdim, FFT_PlanFlags::estimate);
+    Fix::engine.create_plan(this->mdim * this->mdim);
     using FC_t = muGrid::GlobalFieldCollection;
     FC_t fc(Fix::sdim);
     auto & input{fc.register_real_field("input", Fix::mdim * Fix::mdim)};

@@ -47,7 +47,7 @@ class DerivativeCheck2d(unittest.TestCase):
         self.field[:] = np.random.random(self.nb_pts)
         self.fft = muFFT.FFT(self.nb_pts)
         self.nb_dof = 1
-        self.fft.initialise(self.nb_dof)
+        self.fft.create_plan(self.nb_dof)
         self.fourier_field = self.fft.register_fourier_space_field(
             "fft_workspace", self.nb_dof)
         self.fft.fft(self.field, self.fourier_field)
@@ -334,7 +334,7 @@ class DerivativeCheck3d(unittest.TestCase):
         self.field = np.random.random(self.nb_pts)
         self.fft = muFFT.FFT(self.nb_pts)
         self.nb_dof = 1
-        self.fft.initialise(self.nb_dof)
+        self.fft.create_plan(self.nb_dof)
         self.fourier_field = self.fft.register_fourier_space_field(
             "fft_workspace", self.nb_dof)
         self.fft.fft(self.field, self.fourier_field)

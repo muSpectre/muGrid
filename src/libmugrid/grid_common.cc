@@ -76,4 +76,30 @@ namespace muGrid {
     return os;
   }
 
+  std::ostream & operator<<(std::ostream & os,
+                            const StorageOrder & storage_order) {
+    switch (storage_order) {
+    case StorageOrder::ColMajor: {
+      os << "column-major";
+      break;
+    }
+    case StorageOrder::RowMajor: {
+      os << "row-major";
+      break;
+    }
+    case StorageOrder::Unknown: {
+      os << "unknown";
+      break;
+    }
+    case StorageOrder::Automatic: {
+      os << "automatic";
+      break;
+    }
+    default:
+      throw RuntimeError("unknown storage order specification");
+      break;
+    }
+    return os;
+  }
+
 }  // namespace muGrid

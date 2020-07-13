@@ -111,7 +111,7 @@ namespace muSpectre {
   void MaterialBase::get_assigned_ratios(
       std::vector<Real> & quad_pt_assigned_ratios) {
     quad_pt_assigned_ratios.reserve(
-        this->assigned_ratio->get_field().get_nb_dof_per_sub_pt());
+        this->assigned_ratio->get_field().get_nb_components());
     for (auto && tup : this->assigned_ratio->get_map().enumerate_indices()) {
       const auto & index = std::get<0>(tup);
       const auto & val = std::get<1>(tup);

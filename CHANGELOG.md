@@ -1,6 +1,22 @@
 Change log for µSpectre
 =======================
 
+0.10.0 (not yet released)
+-------------------------
+- Support for more flexible strides in fields: full column-major, row-major and
+  strided pixels portion (#103)
+- User control over buffer copies in muFFT with option to avoid them completely 
+
+0.9.3 (28Jun20)
+---------------
+- Bug fix: Packaging with sdist did not remove dirty flag which lead to a
+  broken PyPI package
+
+0.9.2 (28Jun20)
+---------------
+- Bug fix: operator= of TypedFieldBase passed wrong strides during strided
+  copy; this broke the MPI-parallel FFTW forward transform (#130)
+
 0.9.1 (17Jun20)
 ---------------
 - Bug fix: Packaging with sdist only included FFT engines present during

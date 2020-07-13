@@ -74,34 +74,10 @@ namespace muGrid {
     constexpr Index_t size{5};
 
     constexpr Ccoord cube{CcoordOps::get_cube<dim>(size)};
-    constexpr Ccoord stride{CcoordOps::get_default_strides(cube)};
+    constexpr Ccoord stride{CcoordOps::get_col_major_strides(cube)};
 
     BOOST_CHECK_EQUAL(CcoordOps::get_buffer_size(cube, stride),
                       ipow(size, dim));
-  }
-
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_get_ccoord, Fix, testGoodies::dimlist,
-                                   Fix) {
-    constexpr auto dim{Fix::dim};
-    using Ccoord = Ccoord_t<dim>;
-
-    testGoodies::RandRange<Dim_t> rng;
-
-    Ccoord sizes{};
-    for (Dim_t i{0}; i < dim; ++i) {
-      sizes[i] = rng.randval(2, 5);
-    }
-    Ccoord stride = CcoordOps::get_default_strides(sizes);
-    Ccoord locations{};
-
-    const size_t nb_pix{CcoordOps::get_size(sizes)};
-
-    for (size_t i{0}; i < nb_pix; ++i) {
-      BOOST_CHECK_EQUAL(
-          i, CcoordOps::get_index_from_strides(
-                 stride, Ccoord{},
-                 CcoordOps::get_ccoord(sizes, locations, i)));
-    }
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_index, Fix, testGoodies::dimlist, Fix) {
@@ -125,6 +101,141 @@ namespace muGrid {
     }
   }
 
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_index_col_major, Fix,
+                                   testGoodies::dimlist, Fix) {
+    constexpr auto dim{Fix::dim};
+    using Ccoord = Ccoord_t<dim>;
+
+    testGoodies::RandRange<Dim_t> rng;
+
+    Ccoord sizes{};
+    for (Dim_t i{0}; i < dim; ++i) {
+      sizes[i] = rng.randval(2, 5);
+    }
+    Ccoord strides{CcoordOps::get_col_major_strides(sizes)};
+    Ccoord locations{};
+
+    const size_t nb_pix{CcoordOps::get_size(sizes)};
+
+    for (size_t i{0}; i < nb_pix; ++i) {
+      BOOST_CHECK_EQUAL(
+          i, CcoordOps::get_index_from_strides(
+                 strides, Ccoord{},
+                 CcoordOps::get_ccoord(sizes, locations, i)));
+    }
+
+    for (size_t i{0}; i < nb_pix; ++i) {
+      BOOST_CHECK_EQUAL(
+          i, CcoordOps::get_index(
+          sizes, Ccoord{},
+          CcoordOps::get_ccoord_from_strides(sizes, locations, strides, i)));
+    }
+  }
+
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_index_row_major, Fix,
+                                   testGoodies::dimlist, Fix) {
+    constexpr auto dim{Fix::dim};
+    using Ccoord = Ccoord_t<dim>;
+
+    testGoodies::RandRange<Dim_t> rng;
+
+    Ccoord sizes{};
+    for (Dim_t i{0}; i < dim; ++i) {
+      sizes[i] = rng.randval(2, 5);
+    }
+    Ccoord strides{CcoordOps::get_row_major_strides(sizes)};
+    Ccoord locations{};
+
+    const size_t nb_pix{CcoordOps::get_size(sizes)};
+
+    for (size_t i{0}; i < nb_pix; ++i) {
+      BOOST_CHECK_EQUAL(
+          i, CcoordOps::get_index_from_strides(
+          strides, Ccoord{},
+          CcoordOps::get_ccoord_from_strides(sizes, locations, strides, i)));
+    }
+  }
+
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_index_non_contiguous_strides, Fix,
+                                 testGoodies::dimlist, Fix) {
+    constexpr auto dim{Fix::dim};
+    using Ccoord = Ccoord_t<dim>;
+
+    testGoodies::RandRange<Dim_t> rng;
+
+    Ccoord sizes{};
+    for (Dim_t i{0}; i < dim; ++i) {
+      sizes[i] = rng.randval(2, 5);
+    }
+    Ccoord strides{CcoordOps::get_col_major_strides(sizes)};
+    strides[dim-1] += 13;
+    Ccoord locations{};
+
+    const size_t nb_pix{CcoordOps::get_size(sizes)};
+
+    for (size_t i{0}; i < nb_pix; ++i) {
+      auto coord{CcoordOps::get_ccoord(sizes, locations, i)};
+      auto j{CcoordOps::get_index_from_strides(strides, Ccoord{}, coord)};
+      auto coord2{
+          CcoordOps::get_ccoord_from_strides(sizes, Ccoord{}, strides, j)};
+      for (Dim_t k{0}; k < dim; ++k) {
+        BOOST_CHECK_EQUAL(coord[k], coord2[k]);
+      }
+    }
+  }
+
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_index_transposed_strides, Fix,
+                                   testGoodies::dimlist, Fix) {
+    constexpr auto dim{Fix::dim};
+    using Ccoord = Ccoord_t<dim>;
+
+    testGoodies::RandRange<Dim_t> rng;
+
+    Ccoord sizes{};
+    for (Dim_t i{0}; i < dim; ++i) {
+      sizes[i] = rng.randval(2, 5);
+    }
+    Ccoord strides{CcoordOps::get_col_major_strides(sizes)};
+    if (dim > 2) {
+      strides[dim - 1] = strides[dim - 3] * sizes[dim - 3];
+    } else {
+      strides[dim - 1] = 1;
+    }
+    strides[dim - 2] = strides[dim - 1] * sizes[dim - 1];
+    Ccoord locations{};
+
+    const size_t nb_pix{CcoordOps::get_size(sizes)};
+
+    for (size_t i{0}; i < nb_pix; ++i) {
+      auto coord{CcoordOps::get_ccoord(sizes, locations, i)};
+      auto j{CcoordOps::get_index_from_strides(strides, Ccoord{}, coord)};
+      auto coord2{
+          CcoordOps::get_ccoord_from_strides(sizes, Ccoord{}, strides, j)};
+      for (Dim_t k{0}; k < dim; ++k) {
+        BOOST_CHECK_EQUAL(coord[k], coord2[k]);
+      }
+    }
+  }
+
+  BOOST_AUTO_TEST_CASE(test_ccoord_unit_grid_pts) {
+    DynCcoord_t nb_grid_pts1{1, 2};
+    DynCcoord_t strides1{1, 1};
+    DynCcoord_t ccoord1{0, 1};
+    BOOST_CHECK_EQUAL(CcoordOps::get_ccoord_from_strides(
+                          nb_grid_pts1, DynCcoord_t{}, strides1, 1), ccoord1);
+
+    DynCcoord_t nb_grid_pts2{1, 1, 2};
+    DynCcoord_t strides2{1, 1, 1};
+    DynCcoord_t ccoord2{0, 0, 1};
+    BOOST_CHECK_EQUAL(CcoordOps::get_ccoord_from_strides(
+                          nb_grid_pts2, DynCcoord_t{}, strides2, 1), ccoord2);
+
+    DynCcoord_t nb_grid_pts3{1, 2, 1};
+    DynCcoord_t strides3{1, 1, 1};
+    DynCcoord_t ccoord3{0, 1, 0};
+    BOOST_CHECK_EQUAL(CcoordOps::get_ccoord_from_strides(
+                          nb_grid_pts3, DynCcoord_t{}, strides3, 1), ccoord3);
+  }
 
   BOOST_AUTO_TEST_CASE(vector_test) {
     constexpr Ccoord_t<threeD> c3{1, 2, 3};

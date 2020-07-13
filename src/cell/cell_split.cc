@@ -194,7 +194,8 @@ namespace muSpectre {
       this->initialise();
     }
     //! High level compatibility checks
-    if (strain.size() != this->strain.size()) {
+    if (strain.get_nb_entries() == muGrid::Unknown or
+        strain.get_nb_entries() != this->strain.get_nb_entries()) {
       throw RuntimeError("Size mismatch");
     }
     constexpr bool create_tangent{true};

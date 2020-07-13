@@ -46,11 +46,11 @@ namespace muGrid {
   StateField::StateField(const std::string & unique_prefix,
                          FieldCollection & collection,
                          const Index_t & nb_memory,
-                         const Index_t & nb_dof_per_sub_pt,
+                         const Index_t & nb_components,
                          const std::string & sub_division_tag,
                          const Unit & unit)
       : prefix{unique_prefix}, collection{collection}, nb_memory{nb_memory},
-        nb_dof_per_sub_pt{nb_dof_per_sub_pt},
+        nb_components{nb_components},
         sub_division_tag{sub_division_tag}, unit{unit},
         nb_sub_pts{collection.get_nb_sub_pts(sub_division_tag)} {
     if (nb_memory < 1) {

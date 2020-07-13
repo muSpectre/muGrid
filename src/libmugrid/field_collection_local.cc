@@ -60,6 +60,7 @@ namespace muGrid {
       throw FieldCollectionError("double initialisation");
     }
     this->nb_pixels = this->pixel_indices.size();
+    this->nb_buffer_pixels = this->nb_pixels;
     this->allocate_fields();
     this->initialised = true;
     this->initialise_maps();  // yes, this has to be after the previous line
@@ -72,5 +73,15 @@ namespace muGrid {
       ret_val.add_pixel(pixel_id);
     }
     return ret_val;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  Shape_t LocalFieldCollection::get_pixels_shape() const {
+    return Shape_t{this->nb_pixels};
+  }
+
+  /* ---------------------------------------------------------------------- */
+  Shape_t LocalFieldCollection::get_pixels_strides(Index_t element_size) const {
+    return Shape_t{element_size};
   }
 }  // namespace muGrid

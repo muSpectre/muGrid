@@ -57,11 +57,20 @@ namespace muFFT {
     FFTWEngine() = delete;
 
     /**
-     * Constructor with the domain's number of grid points in each direciton,
-     * the number of components to transform, and the communicator
+     * Constructor with the domain's number of grid points in each direction and
+     * the communicator
+     * @param nb_grid_pts number of grid points of the global grid
+     * @param allow_temporary_buffer allow the creation of temporary buffers
+     *        if the input buffer has the wrong memory layout
+     * @param allow_destroy_input allow that the input buffers are invalidated
+     *        during the FFT
+     * @comm MPI communicator object
      */
     FFTWEngine(const DynCcoord_t & nb_grid_pts,
-               Communicator comm = Communicator());
+               Communicator comm = Communicator(),
+               const FFT_PlanFlags & plan_flags = FFT_PlanFlags::estimate,
+               bool allow_temporary_buffer = true,
+               bool allow_destroy_input = false);
 
     //! Copy constructor
     FFTWEngine(const FFTWEngine & other) = delete;
@@ -79,22 +88,21 @@ namespace muFFT {
     FFTWEngine & operator=(FFTWEngine && other) = delete;
 
     // compute the plan, etc
-    void initialise(const Index_t & nb_dof_per_pixel,
-                    const FFT_PlanFlags & plan_flags) override;
-
-    //! forward transform
-    void fft(const RealField_t & input_field,
-             FourierField_t & output_field) const override;
-
-    //! inverse transform
-    void ifft(const FourierField_t & input_field,
-              RealField_t & output_field) const override;
+    void create_plan(const Index_t & nb_dof_per_pixel) override;
 
     //! perform a deep copy of the engine (this should never be necessary in
     //! c++)
     std::unique_ptr<FFTEngineBase> clone() const final;
 
    protected:
+    //! forward transform
+    void compute_fft(const RealField_t & input_field,
+                     FourierField_t & output_field) const override;
+
+    //! inverse transform
+    void compute_ifft(const FourierField_t & input_field,
+                      RealField_t & output_field) const override;
+
     //! holds the plans for forward fourier transforms
     std::map<Index_t, fftw_plan> fft_plans{};
     //! holds the plans for inversefourier transforms

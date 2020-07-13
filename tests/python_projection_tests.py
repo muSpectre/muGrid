@@ -38,7 +38,8 @@ import unittest
 import numpy as np
 
 from python_test_imports import µ, muFFT, muGrid
-from python_goose_ref import SmallStrainProjectionGooseFFT, FiniteStrainProjectionGooseFFT
+from python_goose_ref import SmallStrainProjectionGooseFFT,\
+    FiniteStrainProjectionGooseFFT
 import _muSpectre
 
 from muFFT import Stencils2D
@@ -55,7 +56,7 @@ def build_test_classes(Projection, RefProjection, name):
             self.ndim = self.ref.ndim
             self.shape = list((self.nb_grid_pts for _ in range(self.ndim)))
             self.fft = muFFT.FFT(self.shape)
-            self.fft.initialise(self.ndim * self.ndim)
+            self.fft.create_plan(self.ndim * self.ndim)
             self.projection = Projection(
                 self.fft, [float(x) for x in self.shape])
             self.projection.initialise()
@@ -131,37 +132,38 @@ class ProjectionMultipleQuadPts(unittest.TestCase):
         nb_dim = len(self.nb_grid_pts)
         gradient = [Stencils2D.upwind_x, Stencils2D.upwind_y]
 
-        coll = muGrid.GlobalFieldCollection(nb_dim)
-        coll.initialise(self.nb_grid_pts)
+        for Proj in [µ.ProjectionFiniteStrain_2d,
+                     µ.ProjectionFiniteStrainFast_2d]:
+            coll = muGrid.GlobalFieldCollection(nb_dim)
+            coll.initialise(self.nb_grid_pts)
 
-        in_field = coll.register_real_field("in", 2)
-        in_arr = in_field.array(muGrid.Pixel)
-        in_arr[0, 0, 0] = 1.0
+            in_field = coll.register_real_field("in", 2)
+            in_arr = in_field.array(muGrid.Pixel)
+            in_arr[0, 0, 0] = 1.0
 
-        out_field = coll.register_real_field("out", 4)
-        out_arr = out_field.array(muGrid.Pixel)
-        compute_gradient()
-        ref_field = coll.register_real_field("ref", 4)
-        ref_arr = ref_field.array(muGrid.Pixel)
-        ref_arr[...] = out_arr[...]
+            out_field = coll.register_real_field("out", 4)
+            out_arr = out_field.array(muGrid.Pixel)
+            compute_gradient()
+            ref_field = coll.register_real_field("ref", 4)
+            ref_arr = ref_field.array(muGrid.Pixel)
+            ref_arr[...] = out_arr[...]
 
-        self.assertTrue(np.allclose(out_arr[0], [[-1, 0, 0],
-                                                 [0, 0, 0],
-                                                 [1, 0, 0]]))
-        self.assertTrue(np.allclose(out_arr[1], np.zeros_like(out_arr[1])))
-        self.assertTrue(np.allclose(out_arr[2], [[-1, 0, 1],
-                                                 [0, 0, 0],
-                                                 [0, 0, 0]]))
-        self.assertTrue(np.allclose(out_arr[3], np.zeros_like(out_arr[3])))
+            self.assertTrue(np.allclose(out_arr[0], [[-1, 0, 0],
+                                                     [0, 0, 0],
+                                                     [1, 0, 0]]))
+            self.assertTrue(np.allclose(out_arr[1], np.zeros_like(out_arr[1])))
+            self.assertTrue(np.allclose(out_arr[2], [[-1, 0, 1],
+                                                     [0, 0, 0],
+                                                     [0, 0, 0]]))
+            self.assertTrue(np.allclose(out_arr[3], np.zeros_like(out_arr[3])))
 
-        fft = muFFT.FFT(self.nb_grid_pts)
-        projection = µ.ProjectionFiniteStrainFast_2d(fft, [float(x) for x in
-                                                           self.nb_grid_pts],
-                                                     gradient)
-        projection.initialise()
-        projection.apply_projection(out_field)
+            fft = muFFT.FFT(self.nb_grid_pts)
+            projection = Proj(fft, [float(x) for x in self.nb_grid_pts],
+                              gradient)
+            projection.initialise()
+            projection.apply_projection(out_field)
 
-        self.assertTrue(np.allclose(out_arr, ref_arr))
+            self.assertTrue(np.allclose(out_arr, ref_arr))
 
     def test_double_quad_pts(self):
         def compute_gradient():

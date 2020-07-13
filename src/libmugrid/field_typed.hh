@@ -70,22 +70,43 @@ namespace muGrid {
       //! field on which the unary '-' was applied
       const TypedFieldBase & field;
     };
+
     /**
      * `Field`s are supposed to only exist in the form of `std::unique_ptr`s
      * held by a `FieldCollection. The `Field` constructor is protected to
      * ensure this. Fields are instantiated through the `register_field`
      * methods FieldCollection.
      * @param unique_name unique field name (unique within a collection)
-     * @param nb_dof_per_sub_pt number of components to store per quadrature
-     *        point
      * @param collection reference to the holding field collection.
+     * @param nb_components number of components to store per quadrature
+     *        point
      */
     TypedFieldBase(const std::string & unique_name,
-                   FieldCollection & collection, Index_t nb_dof_per_sub_pt,
+                   FieldCollection & collection, Index_t nb_components,
                    const std::string & sub_division, const Unit & unit)
         : Parent{unique_name,
                  collection,
-                 nb_dof_per_sub_pt,
+                 nb_components,
+                 sub_division,
+                 unit} {}
+
+    /**
+     * `Field`s are supposed to only exist in the form of `std::unique_ptr`s
+     * held by a `FieldCollection. The `Field` constructor is protected to
+     * ensure this. Fields are instantiated through the `register_field`
+     * methods FieldCollection.
+     * @param unique_name unique field name (unique within a collection)
+     * @param collection reference to the holding field collection.
+     * @param components_shape number of components to store per quadrature
+     * point
+     */
+    TypedFieldBase(const std::string & unique_name,
+                   FieldCollection & collection,
+                   const Shape_t & components_shape,
+                   const std::string & sub_division, const Unit & unit)
+        : Parent{unique_name,
+                 collection,
+                 components_shape,
                  sub_division,
                  unit} {}
 
@@ -174,7 +195,7 @@ namespace muGrid {
      * convenience function returns a map of this field, iterable per pixel.
      *
      * @param nb_rows optional specification of the number of rows for the
-     * iterate. If left to default value, a matrix of shape `nb_dof_per_sub_pt`
+     * iterate. If left to default value, a matrix of shape `nb_components`
      * × `nb_quad_pts` is used
      */
     FieldMap<T, Mapping::Mut> get_pixel_map(const Index_t & nb_rows = Unknown);
@@ -184,7 +205,7 @@ namespace muGrid {
      * pixel.
      *
      * @param nb_rows optional specification of the number of rows for the
-     * iterate. If left to default value, a matrix of shape `nb_dof_per_sub_pt`
+     * iterate. If left to default value, a matrix of shape `nb_components`
      * × `nb_quad_pts` is used
      */
     FieldMap<T, Mapping::Const>
@@ -254,14 +275,30 @@ namespace muGrid {
      * held by a FieldCollection. The `Field` constructor is protected to
      * ensure this.
      * @param unique_name unique field name (unique within a collection)
-     * @param nb_dof_per_sub_pt number of components to store per quadrature
+     * @param nb_components number of components to store per quadrature
      * point
      * @param collection reference to the holding field collection.
      */
     TypedField(const std::string & unique_name, FieldCollection & collection,
-               const Index_t & nb_dof_per_sub_pt,
+               const Index_t & nb_components,
                const std::string & sub_division, const Unit & unit)
-        : Parent{unique_name, collection, nb_dof_per_sub_pt, sub_division,
+        : Parent{unique_name, collection, nb_components, sub_division,
+                 unit} {}
+
+    /**
+     * `Field`s are supposed to only exist in the form of `std::unique_ptr`s
+     * held by a FieldCollection. The `Field` constructor is protected to
+     * ensure this.
+     * @param unique_name unique field name (unique within a collection)
+     * @param collection reference to the holding field collection.
+     * @param components_shape number of components to store per quadrature
+     * point
+     * @param storage_oder in-memory storage order of the components
+     */
+    TypedField(const std::string & unique_name, FieldCollection & collection,
+               const Shape_t & components_shape,
+               const std::string & sub_division, const Unit & unit)
+        : Parent{unique_name, collection, components_shape, sub_division,
                  unit} {}
 
    public:
@@ -315,7 +352,7 @@ namespace muGrid {
      * it has the right number of components
      */
     static TypedField & safe_cast(Field & other,
-                                  const Index_t & nb_dof_per_sub_pt,
+                                  const Index_t & nb_components,
                                   const std::string & sub_division);
 
     /**
@@ -323,10 +360,10 @@ namespace muGrid {
      * whether it has the right number of components
      */
     static const TypedField & safe_cast(const Field & other,
-                                        const Index_t & nb_dof_per_sub_pt,
+                                        const Index_t & nb_components,
                                         const std::string & sub_division);
 
-    size_t buffer_size() const final;
+    size_t get_buffer_size() const final;
 
     /**
      * add a new scalar value at the end of the field (incurs runtime cost, do
@@ -381,18 +418,39 @@ namespace muGrid {
      * to a numpy array from the python bindings.
      */
     WrappedField(const std::string & unique_name, FieldCollection & collection,
-                 const Index_t & nb_dof_per_sub_pt, const size_t & size,
-                 T * ptr, const std::string & sub_division,
-                 const Unit & unit = Unit::unitless());
+                 const Index_t & nb_components, const size_t & size, T * ptr,
+                 const std::string & sub_division,
+                 const Unit & unit = Unit::unitless(),
+                 const Shape_t & strides = {});
 
     /**
-     * constructor from an eigen array ref. 
+     * constructor from a raw pointer. Typically, this would be a reference
+     * to a numpy array from the python bindings.
      */
     WrappedField(const std::string & unique_name, FieldCollection & collection,
-                 const Index_t & nb_dof_per_sub_pt,
+                 const Shape_t & components_shape, const size_t & size, T * ptr,
+                 const std::string & sub_division,
+                 const Unit & unit = Unit::unitless(),
+                 const Shape_t & strides = {});
+
+    /**
+     * constructor from an eigen array ref.
+     */
+    WrappedField(const std::string & unique_name, FieldCollection & collection,
+                 const Index_t & nb_components, Eigen::Ref<EigenRep_t> values,
+                 const std::string & sub_division,
+                 const Unit & unit = Unit::unitless(),
+                 const Shape_t & strides = {});
+
+    /**
+     * constructor from an eigen array ref.
+     */
+    WrappedField(const std::string & unique_name, FieldCollection & collection,
+                 const Shape_t & components_shape,
                  Eigen::Ref<EigenRep_t> values,
                  const std::string & sub_division,
-                 const Unit & unit = Unit::unitless());
+                 const Unit & unit = Unit::unitless(),
+                 const Shape_t & strides = {});
 
     //! Default constructor
     WrappedField() = delete;
@@ -417,13 +475,20 @@ namespace muGrid {
      */
     static std::unique_ptr<const WrappedField> make_const(
         const std::string & unique_name, FieldCollection & collection,
-        Index_t nb_dof_per_sub_pt, const Eigen::Ref<const EigenRep_t> values,
-        const std::string & sub_division, const Unit & unit = Unit::unitless());
+        const Index_t & nb_components,
+        const Eigen::Ref<const EigenRep_t> values,
+        const std::string & sub_division, const Unit & unit = Unit::unitless(),
+        const Shape_t & strides = {});
 
     void set_zero() final;
     void set_pad_size(const size_t & pad_size) final;
 
-    size_t buffer_size() const final;
+    size_t get_buffer_size() const final;
+
+    Shape_t get_strides(
+        const IterUnit & iter_type, Index_t element_size = 1) const final;
+
+    StorageOrder get_storage_order() const final;
 
     //! give access to collections
     friend FieldCollection;
@@ -433,6 +498,13 @@ namespace muGrid {
 
     //! size of the wrapped buffer
     size_t size;
+
+    /**
+     * Strides of the wrapped field when iterating over sub-points, they are
+     * decoupled from the underlying `FieldCollection`. If they are empty,
+     * then the natural muGrid storage order applies.
+     */
+    Shape_t strides;
   };
 
   //! Alias for real-valued fields

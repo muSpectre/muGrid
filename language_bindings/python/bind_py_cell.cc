@@ -90,13 +90,14 @@ void add_cell_factory(py::module & mod) {
   mod.def(
       "CellFactory",
       [](DynCcoord_t res, DynRcoord_t lens, Formulation form,
-         Gradient_t gradient, Communicator comm) {
+         Gradient_t gradient, Communicator comm,
+         const muFFT::FFT_PlanFlags & flags) {
         return muSpectre::make_cell(std::move(res), std::move(lens),
                                     std::move(form), std::move(gradient),
-                                    std::move(comm));
+                                    std::move(comm), std::move(flags));
       },
       "nb_grid_pts"_a, "lengths"_a, "formulation"_a, "gradient"_a,
-      "communicator"_a);
+      "communicator"_a, "flags"_a = muFFT::FFT_PlanFlags::estimate);
 
   mod.def(
       "CellFactory",
@@ -180,21 +181,22 @@ void add_cell_helper(py::module & mod) {
 #endif
   auto NumpyT2Proxy{
       [](Cell & cell,
-         py::array_t<Real, py::array::f_style> & tensor2) -> NumpyProxy<Real> {
+         py::array_t<Real, py::array::f_style> & tensor2)
+          -> NumpyProxy<Real, py::array::f_style> {
         auto && strain_shape{cell.get_strain_shape()};
         auto & proj{cell.get_projection()};
-        return NumpyProxy<Real>{proj.get_nb_subdomain_grid_pts(),
-                                proj.get_subdomain_locations(),
-                                proj.get_nb_quad_pts(),
-                                {strain_shape[0], strain_shape[1]},
-                                tensor2};
+        return NumpyProxy<Real, py::array::f_style>{
+            proj.get_nb_subdomain_grid_pts(),
+            proj.get_subdomain_locations(),
+            proj.get_nb_quad_pts(),
+            {strain_shape[0], strain_shape[1]},
+            tensor2};
       }};
   py::class_<Cell>(mod, "Cell")
       .def(py::init([](const muSpectre::ProjectionBase & projection) {
         return Cell{projection.clone()};
       }))
-      .def("initialise", &Cell::initialise,
-           "flags"_a = muFFT::FFT_PlanFlags::estimate)
+      .def("initialise", &Cell::initialise)
       .def(
           "is_initialised", [](Cell & s) { return s.is_initialised(); },
           py::return_value_policy::reference_internal)
@@ -209,9 +211,7 @@ void add_cell_helper(py::module & mod) {
             auto & fields{cell.get_fields()};
             const std::string out_name{"temp output for directional stiffness"};
             if (not fields.field_exists(out_name)) {
-              auto && strain_shape{cell.get_strain_shape()};
-              auto && nb_dof_per_sub_pt{strain_shape[0] * strain_shape[1]};
-              fields.register_real_field(out_name, nb_dof_per_sub_pt,
+              fields.register_real_field(out_name, cell.get_strain_shape(),
                                          muSpectre::QuadPtTag);
             }
             auto & delta_stress{
@@ -220,13 +220,7 @@ void add_cell_helper(py::module & mod) {
                 NumpyT2Proxy(cell, delta_strain)};
             cell.evaluate_projected_directional_stiffness(
                 delta_strain_array.get_field(), delta_stress);
-            const Index_t dim{cell.get_spatial_dim()};
-            if (delta_stress.get_nb_dof_per_sub_pt() == dim * dim) {
-              std::vector<Index_t> shape{dim, dim, 1};
-              return numpy_wrap(delta_stress, shape);
-            } else {
-              return numpy_wrap(delta_stress);
-            }
+            return numpy_wrap(delta_stress);
           },
           "delta_strain"_a, py::keep_alive<0, 1>())
       .def("project", &Cell::apply_projection, "strain"_a)
@@ -240,9 +234,7 @@ void add_cell_helper(py::module & mod) {
             auto & fields{cell.get_fields()};
             const std::string out_name{"temp output for projection"};
             if (not fields.field_exists(out_name)) {
-              auto && strain_shape{cell.get_strain_shape()};
-              auto && nb_dof_per_sub_pt{strain_shape[0] * strain_shape[1]};
-              fields.register_real_field(out_name, nb_dof_per_sub_pt,
+              fields.register_real_field(out_name, cell.get_strain_shape(),
                                          muSpectre::QuadPtTag);
             }
             auto & strain_field{
@@ -251,13 +243,7 @@ void add_cell_helper(py::module & mod) {
                 NumpyT2Proxy(cell, strain)
                     .get_field();
             cell.apply_projection(strain_field);
-            const Index_t dim{cell.get_spatial_dim()};
-            if (strain_field.get_nb_dof_per_sub_pt() == dim * dim) {
-              std::vector<Index_t> shape{dim, dim, 1};
-              return numpy_wrap(strain_field, shape);
-            } else {
-              return numpy_wrap(strain_field);
-            }
+            return numpy_wrap(strain_field);
           },
           "strain"_a)
       .def_property("strain", &Cell::get_strain,
@@ -276,24 +262,9 @@ void add_cell_helper(py::module & mod) {
 
             cell.get_strain() = strain_array.get_field();
             auto && stress_tgt{cell.evaluate_stress_tangent()};
-            auto && stress{std::get<0>(stress_tgt)};
-            auto && tangent{std::get<1>(stress_tgt)};
-
-            const Index_t dim{cell.get_spatial_dim()};
-            if (stress.get_nb_dof_per_sub_pt() == dim * dim) {
-              std::vector<Index_t> shape{dim, dim, 1};
-              auto && numpy_stress{numpy_wrap(stress, shape)};
-              shape.back() = dim;
-              shape.push_back(dim);
-              shape.push_back(1);
-              auto && numpy_tangent{numpy_wrap(tangent, shape)};
-              return py::make_tuple(numpy_stress, numpy_tangent);
-
-            } else {
-              auto && numpy_stress{numpy_wrap(stress)};
-              auto && numpy_tangent{numpy_wrap(tangent)};
-              return py::make_tuple(numpy_stress, numpy_tangent);
-            }
+            auto && numpy_stress{numpy_wrap(std::get<0>(stress_tgt))};
+            auto && numpy_tangent{numpy_wrap(std::get<1>(stress_tgt))};
+            return py::make_tuple(numpy_stress, numpy_tangent);
           },
           "strain"_a, py::return_value_policy::reference_internal)
       .def(
@@ -301,24 +272,9 @@ void add_cell_helper(py::module & mod) {
           [](Cell & cell, muGrid::TypedFieldBase<Real> & strain) {
             cell.get_strain() = strain;
             auto && stress_tgt{cell.evaluate_stress_tangent()};
-            auto && stress{std::get<0>(stress_tgt)};
-            auto && tangent{std::get<1>(stress_tgt)};
-
-            const Index_t dim{cell.get_spatial_dim()};
-            if (stress.get_nb_dof_per_sub_pt() == dim * dim) {
-              std::vector<Index_t> shape{dim, dim, 1};
-              auto && numpy_stress{numpy_wrap(stress, shape)};
-              shape.back() = dim;
-              shape.push_back(dim);
-              shape.push_back(1);
-              auto && numpy_tangent{numpy_wrap(tangent, shape)};
-              return py::make_tuple(numpy_stress, numpy_tangent);
-
-            } else {
-              auto && numpy_stress{numpy_wrap(stress)};
-              auto && numpy_tangent{numpy_wrap(tangent)};
-              return py::make_tuple(numpy_stress, numpy_tangent);
-            }
+            auto && numpy_stress{numpy_wrap(std::get<0>(stress_tgt))};
+            auto && numpy_tangent{numpy_wrap(std::get<1>(stress_tgt))};
+            return py::make_tuple(numpy_stress, numpy_tangent);
           },
           "strain"_a, py::return_value_policy::reference_internal)
       .def(
@@ -329,14 +285,7 @@ void add_cell_helper(py::module & mod) {
                 NumpyT2Proxy(cell, strain)};
 
             cell.get_strain() = strain_array.get_field();
-            auto && stress{cell.evaluate_stress()};
-            const Index_t dim{cell.get_spatial_dim()};
-            if (stress.get_nb_dof_per_sub_pt() == dim * dim) {
-              std::vector<Index_t> shape{dim, dim, 1};
-              return numpy_wrap(stress, shape);
-            } else {
-              return numpy_wrap(stress);
-            }
+            return numpy_wrap(cell.evaluate_stress());
           },
           "strain"_a, py::keep_alive<0, 1>())
       .def_property_readonly("projection", &Cell::get_projection)

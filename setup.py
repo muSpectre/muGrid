@@ -605,7 +605,7 @@ try:
         cc_found = True
     except:
         cc_found = False
-    if not cc_found or cc_hash != hash:
+    if not cc_found or cc_hash != hash or cc_version != version:
         # Write a new version.cc file
         if verbose:
             print('  * Writing new src/libmufft/version.cc')

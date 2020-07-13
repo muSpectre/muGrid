@@ -59,14 +59,25 @@ namespace muGrid {
     auto & field{fc.register_real_field("TensorField 1", MDim * MDim, "quad")};
 
     // check that fields are initialised with empty vector
-    BOOST_CHECK_EQUAL(field.size(), 0);
     Index_t len{2};
     fc.initialise(CcoordOps::get_cube<SDim>(len), {});
     // check that returned size is correct
-    BOOST_CHECK_EQUAL(field.size(), ipow(len, SDim));
+    BOOST_CHECK_EQUAL(field.get_nb_entries(), ipow(len, SDim));
     // check that setting pad size won't change logical size
     field.set_pad_size(24);
-    BOOST_CHECK_EQUAL(field.size(), ipow(len, SDim));
+    BOOST_CHECK_EQUAL(field.get_nb_entries(), ipow(len, SDim));
+    // check the shape returned by the field
+    auto shape{field.get_shape(IterUnit::Pixel)};
+    BOOST_CHECK_EQUAL(shape.size(), 3);
+    BOOST_CHECK_EQUAL(shape[0], MDim * MDim);
+    BOOST_CHECK_EQUAL(shape[1], len);
+    BOOST_CHECK_EQUAL(shape[2], len);
+    // check the strides returned by the field
+    auto strides{field.get_strides(IterUnit::Pixel)};
+    BOOST_CHECK_EQUAL(strides.size(), 3);
+    BOOST_CHECK_EQUAL(strides[0], 1);
+    BOOST_CHECK_EQUAL(strides[1], MDim * MDim);
+    BOOST_CHECK_EQUAL(strides[2], MDim * MDim * len);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -100,8 +111,8 @@ namespace muGrid {
     static const std::string nodal{"nodal"};
     constexpr Index_t SDim{twoD};
     constexpr Index_t MDim{twoD};
-    constexpr Index_t NbQuad{OneQuadPt};
-    constexpr Index_t NbNode{OneNode};
+    constexpr Index_t NbQuad{TwoQuadPts};
+    constexpr Index_t NbNode{4};
     constexpr Index_t NbComponent{MDim};
     using FC_t = GlobalFieldCollection;
     FC_t fc{SDim};
@@ -116,9 +127,92 @@ namespace muGrid {
     Index_t nb_pix{ipow(len, SDim)};
     fc.initialise(CcoordOps::get_cube<SDim>(len), {});
 
-    BOOST_CHECK_EQUAL(pixel_field.size(), nb_pix);
-    BOOST_CHECK_EQUAL(nodal_field.size(), nb_pix * NbNode);
-    BOOST_CHECK_EQUAL(quad_field.size(), nb_pix * NbQuad);
+    BOOST_CHECK_EQUAL(pixel_field.get_nb_entries(), nb_pix);
+    BOOST_CHECK_EQUAL(nodal_field.get_nb_entries(), nb_pix * NbNode);
+    BOOST_CHECK_EQUAL(quad_field.get_nb_entries(), nb_pix * NbQuad);
+
+    // check the shape returned by the field, Pixel iterator
+    auto shape{pixel_field.get_shape(IterUnit::Pixel)};
+    BOOST_CHECK_EQUAL(shape.size(), 3);
+    BOOST_CHECK_EQUAL(shape[0], NbComponent);
+    BOOST_CHECK_EQUAL(shape[1], len);
+    BOOST_CHECK_EQUAL(shape[2], len);
+    shape = nodal_field.get_shape(IterUnit::Pixel);
+    BOOST_CHECK_EQUAL(shape.size(), 3);
+    BOOST_CHECK_EQUAL(shape[0], NbComponent * NbNode);
+    BOOST_CHECK_EQUAL(shape[1], len);
+    BOOST_CHECK_EQUAL(shape[2], len);
+    shape = quad_field.get_shape(IterUnit::Pixel);
+    BOOST_CHECK_EQUAL(shape.size(), 3);
+    BOOST_CHECK_EQUAL(shape[0], NbComponent * NbQuad);
+    BOOST_CHECK_EQUAL(shape[1], len);
+    BOOST_CHECK_EQUAL(shape[2], len);
+
+    // check the strides returned by the field, Pixel iterator
+    auto strides{pixel_field.get_strides(IterUnit::Pixel)};
+    BOOST_CHECK_EQUAL(strides.size(), 3);
+    BOOST_CHECK_EQUAL(strides[0], 1);
+    BOOST_CHECK_EQUAL(strides[1], NbComponent);
+    BOOST_CHECK_EQUAL(strides[2], NbComponent * len);
+    strides = nodal_field.get_strides(IterUnit::Pixel);
+    BOOST_CHECK_EQUAL(strides.size(), 3);
+    BOOST_CHECK_EQUAL(strides[0], 1);
+    BOOST_CHECK_EQUAL(strides[1], NbComponent * NbNode);
+    BOOST_CHECK_EQUAL(strides[2], NbComponent * NbNode * len);
+    strides = quad_field.get_strides(IterUnit::Pixel);
+    BOOST_CHECK_EQUAL(strides.size(), 3);
+    BOOST_CHECK_EQUAL(strides[0], 1);
+    BOOST_CHECK_EQUAL(strides[1], NbComponent * NbQuad);
+    BOOST_CHECK_EQUAL(strides[2], NbComponent * NbQuad * len);
+
+    // check the shape returned by the field, SubPt iterator
+    shape = pixel_field.get_shape(IterUnit::SubPt);
+    BOOST_CHECK_EQUAL(shape.size(), 4);
+    BOOST_CHECK_EQUAL(shape[0], NbComponent);
+    BOOST_CHECK_EQUAL(shape[1], 1);
+    BOOST_CHECK_EQUAL(shape[2], len);
+    BOOST_CHECK_EQUAL(shape[3], len);
+    shape = nodal_field.get_shape(IterUnit::SubPt);
+    BOOST_CHECK_EQUAL(shape.size(), 4);
+    BOOST_CHECK_EQUAL(shape[0], NbComponent);
+    BOOST_CHECK_EQUAL(shape[1], NbNode);
+    BOOST_CHECK_EQUAL(shape[2], len);
+    BOOST_CHECK_EQUAL(shape[3], len);
+    shape = quad_field.get_shape(IterUnit::SubPt);
+    BOOST_CHECK_EQUAL(shape.size(), 4);
+    BOOST_CHECK_EQUAL(shape[0], NbComponent);
+    BOOST_CHECK_EQUAL(shape[1], NbQuad);
+    BOOST_CHECK_EQUAL(shape[2], len);
+    BOOST_CHECK_EQUAL(shape[3], len);
+
+    // check the strides returned by the field, SubPt iterator
+    strides = pixel_field.get_strides(IterUnit::SubPt);
+    BOOST_CHECK_EQUAL(strides.size(), 4);
+    BOOST_CHECK_EQUAL(strides[0], 1);
+    BOOST_CHECK_EQUAL(strides[1], NbComponent);
+    BOOST_CHECK_EQUAL(strides[2], NbComponent);
+    BOOST_CHECK_EQUAL(strides[3], NbComponent * len);
+    strides = nodal_field.get_strides(IterUnit::SubPt);
+    BOOST_CHECK_EQUAL(strides.size(), 4);
+    BOOST_CHECK_EQUAL(strides[0], 1);
+    BOOST_CHECK_EQUAL(strides[1], NbComponent);
+    BOOST_CHECK_EQUAL(strides[2], NbComponent * NbNode);
+    BOOST_CHECK_EQUAL(strides[3], NbComponent * NbNode * len);
+    strides = quad_field.get_strides(IterUnit::SubPt);
+    BOOST_CHECK_EQUAL(strides.size(), 4);
+    BOOST_CHECK_EQUAL(strides[0], 1);
+    BOOST_CHECK_EQUAL(strides[1], NbComponent);
+    BOOST_CHECK_EQUAL(strides[2], NbComponent * NbQuad);
+    BOOST_CHECK_EQUAL(strides[3], NbComponent * NbQuad * len);
+
+    // check element size option
+    constexpr size_t elsize{5};
+    strides = quad_field.get_strides(IterUnit::SubPt, elsize);
+    BOOST_CHECK_EQUAL(strides.size(), 4);
+    BOOST_CHECK_EQUAL(strides[0], elsize);
+    BOOST_CHECK_EQUAL(strides[1], NbComponent * elsize);
+    BOOST_CHECK_EQUAL(strides[2], NbComponent * NbQuad * elsize);
+    BOOST_CHECK_EQUAL(strides[3], NbComponent * NbQuad * len * elsize);
   }
 
   BOOST_AUTO_TEST_CASE(TypedField_local_filling) {
@@ -150,7 +244,8 @@ namespace muGrid {
     vector_field.push_back(vector_mat.Ones().array());
 
     BOOST_CHECK_THROW(fc.initialise(), FieldCollectionError);
-    BOOST_CHECK_EQUAL(vector_field.size(), scalar_field.size());
+    BOOST_CHECK_EQUAL(vector_field.get_nb_entries(),
+                      scalar_field.get_nb_entries());
     BOOST_CHECK_THROW(fc.initialise(), FieldCollectionError);
     fc.add_pixel(0);
     BOOST_CHECK_THROW(fc.initialise(), FieldCollectionError);

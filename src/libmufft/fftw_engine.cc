@@ -42,16 +42,23 @@
 
 namespace muFFT {
 
-  FFTWEngine::FFTWEngine(const DynCcoord_t & nb_grid_pts, Communicator comm)
-      : Parent{nb_grid_pts, comm} {
+  FFTWEngine::FFTWEngine(const DynCcoord_t & nb_grid_pts,
+                         Communicator comm,
+                         const FFT_PlanFlags & plan_flags,
+                         bool allow_temporary_buffer,
+                         bool allow_destroy_input)
+      : Parent{nb_grid_pts, comm, plan_flags, allow_temporary_buffer,
+               allow_destroy_input} {
+    this->real_field_collection.initialise(this->nb_subdomain_grid_pts,
+                                           this->subdomain_locations,
+                                           this->subdomain_strides);
     this->fourier_field_collection.initialise(this->nb_fourier_grid_pts,
                                               this->fourier_locations,
                                               this->fourier_strides);
   }
 
   /* ---------------------------------------------------------------------- */
-  void FFTWEngine::initialise(const Index_t & nb_dof_per_pixel,
-                              const FFT_PlanFlags & plan_flags) {
+  void FFTWEngine::create_plan(const Index_t & nb_dof_per_pixel) {
     if (this->has_plan_for(nb_dof_per_pixel)) {
       // plan already exists, we can bail
       return;
@@ -95,7 +102,7 @@ namespace muFFT {
     int odist{idist};
 
     unsigned int flags;
-    switch (plan_flags) {
+    switch (this->plan_flags) {
     case FFT_PlanFlags::estimate: {
       flags = FFTW_ESTIMATE;
       break;
@@ -115,7 +122,8 @@ namespace muFFT {
 
     this->fft_plans[nb_dof_per_pixel] = fftw_plan_many_dft_r2c(
         rank, n, howmany, in, inembed, istride, idist, out, onembed, ostride,
-        odist, FFTW_PRESERVE_INPUT | flags);
+        odist, (this->allow_destroy_input
+                    ? FFTW_DESTROY_INPUT : FFTW_PRESERVE_INPUT) | flags);
     if (this->fft_plans.at(nb_dof_per_pixel) == nullptr) {
       throw FFTEngineError("Plan failed");
     }
@@ -124,8 +132,9 @@ namespace muFFT {
     Real * i_out {r_work_space};
 
     this->ifft_plans[nb_dof_per_pixel] =
-        fftw_plan_many_dft_c2r(rank, n, howmany, i_in, inembed, istride, idist,
-                               i_out, onembed, ostride, odist, flags);
+        fftw_plan_many_dft_c2r(
+            rank, n, howmany, i_in, inembed, istride, idist,
+            i_out, onembed, ostride, odist, flags);
 
     if (this->ifft_plans.at(nb_dof_per_pixel) == nullptr) {
       throw FFTEngineError("Plan failed");
@@ -151,102 +160,29 @@ namespace muFFT {
   }
 
   /* ---------------------------------------------------------------------- */
-  void FFTWEngine::fft(const RealField_t & input_field,
-                       FourierField_t & output_field) const {
-    auto && nb_dofs_per_pixel{input_field.get_nb_dof_per_pixel()};
-    if (not this->has_plan_for(nb_dofs_per_pixel)) {
-      std::stringstream message{};
-      message << "No plan has been created for " << nb_dofs_per_pixel
-              << " degrees of freedom per pixel. Use "
-                 "`muFFT::FFTEngineBase::initialise` to prepare a plan.";
-      throw FFTEngineError{message.str()};
-    }
-    if (static_cast<size_t>(input_field.get_nb_pixels()) !=
-        muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)) {
-      std::stringstream error{};
-      error << "The number of pixels of the field '" << input_field.get_name()
-            << "' passed to the forward FFT is " << input_field.get_nb_pixels()
-            << " and does not match the size "
-            << muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)
-            << " of the (sub)domain handled by FFTWEngine.";
-      throw FFTEngineError(error.str());
-    }
-    if (static_cast<size_t>(output_field.get_nb_pixels()) !=
-        muGrid::CcoordOps::get_size(this->nb_fourier_grid_pts)) {
-      std::stringstream error{};
-      error << "The number of pixels of the field '" << output_field.get_name()
-            << "' passed to the forward FFT is " << output_field.get_nb_pixels()
-            << " and does not match the size "
-            << muGrid::CcoordOps::get_size(this->nb_fourier_grid_pts)
-            << " of the (sub)domain handled by FFTWEngine.";
-      throw FFTEngineError(error.str());
-    }
-    if (input_field.get_nb_dof_per_sub_pt() * input_field.get_nb_sub_pts() !=
-        input_field.get_nb_dof_per_sub_pt() * input_field.get_nb_sub_pts()) {
-      std::stringstream error;
-      error << "The input field reports " << input_field.get_nb_dof_per_sub_pt()
-            << " components per sub-point and " << input_field.get_nb_sub_pts()
-            << " sub-points, while the output field reports "
-            << output_field.get_nb_dof_per_sub_pt()
-            << " components per sub-point and " << output_field.get_nb_sub_pts()
-            << " sub-points.";
-      throw FFTEngineError(error.str());
-    }
-    fftw_execute_dft_r2c(this->fft_plans.at(nb_dofs_per_pixel),
+  void FFTWEngine::compute_fft(const RealField_t & input_field,
+                               FourierField_t & output_field) const {
+    fftw_execute_dft_r2c(this->fft_plans.at(
+                             input_field.get_nb_dof_per_pixel()),
                          input_field.data(),
                          reinterpret_cast<fftw_complex *>(output_field.data()));
   }
 
   /* ---------------------------------------------------------------------- */
-  void FFTWEngine::ifft(const FourierField_t & input_field,
-                        RealField_t & output_field) const {
-    auto && nb_dofs_per_pixel{input_field.get_nb_dof_per_pixel()};
-    if (not this->has_plan_for(nb_dofs_per_pixel)) {
-      std::stringstream message{};
-      message << "No plan has been created for " << nb_dofs_per_pixel
-              << " degrees of freedom per pixel. Use "
-                 "`muFFT::FFTEngineBase::initialise` to prepare a plan.";
-      throw FFTEngineError{message.str()};
-    }
-    if (static_cast<size_t>(input_field.get_nb_pixels()) !=
-        muGrid::CcoordOps::get_size(this->nb_fourier_grid_pts)) {
-      std::stringstream error;
-      error << "The number of pixels of the field '" << input_field.get_name()
-            << "' passed to the inverse FFT is " << input_field.get_nb_pixels()
-            << " and does not match the size "
-            << muGrid::CcoordOps::get_size(this->nb_fourier_grid_pts)
-            << " of the (sub)domain handled by FFTWEngine.";
-      throw FFTEngineError(error.str());
-    }
-    if (static_cast<size_t>(output_field.get_nb_pixels()) !=
-        muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)) {
-      std::stringstream error;
-      error << "The number of pixels of the field '" << output_field.get_name()
-            << "' passed to the inverse FFT is " << output_field.get_nb_pixels()
-            << " and does not match the size "
-            << muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)
-            << " of the (sub)domain handled by FFTWEngine.";
-      throw FFTEngineError(error.str());
-    }
-    if (input_field.get_nb_dof_per_sub_pt() * input_field.get_nb_sub_pts() !=
-        output_field.get_nb_dof_per_sub_pt() * output_field.get_nb_sub_pts()) {
-      std::stringstream error;
-      error << "The input field reports " << input_field.get_nb_dof_per_sub_pt()
-            << " components per sub-point and " << input_field.get_nb_sub_pts()
-            << " sub-points, while the output field reports "
-            << output_field.get_nb_dof_per_sub_pt()
-            << " components per sub-point and " << output_field.get_nb_sub_pts()
-            << " sub-points.";
-      throw FFTEngineError(error.str());
-    }
-    fftw_execute_dft_c2r(this->ifft_plans.at(nb_dofs_per_pixel),
+  void FFTWEngine::compute_ifft(const FourierField_t & input_field,
+                                RealField_t & output_field) const {
+    fftw_execute_dft_c2r(this->ifft_plans.at(
+                             input_field.get_nb_dof_per_pixel()),
                          reinterpret_cast<fftw_complex *>(input_field.data()),
                          output_field.data());
   }
 
   std::unique_ptr<FFTEngineBase> FFTWEngine::clone() const {
     return std::make_unique<FFTWEngine>(this->get_nb_domain_grid_pts(),
-                                        this->get_communicator());
+                                        this->get_communicator(),
+                                        this->plan_flags,
+                                        this->allow_temporary_buffer,
+                                        this->allow_destroy_input);
   }
 
 }  // namespace muFFT

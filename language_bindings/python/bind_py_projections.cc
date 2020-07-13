@@ -74,9 +74,9 @@ class ProjectionBaseUnclonable : public ProjectionBase {
   ProjectionBaseUnclonable(const muFFT::FFTEngine_ptr & engine,
                            const DynRcoord_t & domain_lengths,
                            const Index_t & nb_quad_pts,
-                           const Index_t & nb_dof_per_sub_pt,
+                           const Index_t & nb_components,
                            const Formulation & form)
-      : ProjectionBase(engine, domain_lengths, nb_quad_pts, nb_dof_per_sub_pt,
+      : ProjectionBase(engine, domain_lengths, nb_quad_pts, nb_components,
                        form) {}
 
   std::unique_ptr<ProjectionBase> clone() const final {
@@ -102,9 +102,9 @@ class PyProjectionBase : public ProjectionBaseUnclonable {
   PyProjectionBase(const muFFT::FFTEngine_ptr & engine,
                    const DynRcoord_t & domain_lengths,
                    const Index_t & nb_quad_pts,
-                   const Index_t & nb_dof_per_sub_pt, const Formulation & form)
+                   const Index_t & nb_components, const Formulation & form)
       : ProjectionBaseUnclonable(engine, domain_lengths, nb_quad_pts,
-                                 nb_dof_per_sub_pt, form) {}
+                                 nb_components, form) {}
 
   void apply_projection(Field_t & field) override {
     PYBIND11_OVERLOAD_PURE(void, Parent, apply_projection, field);
@@ -146,8 +146,7 @@ void add_proj_helper(py::module & mod, std::string name_start) {
       .def(py::init<muFFT::FFTEngine_ptr, const DynRcoord_t &>(),
            "fft_engine"_a, "domain_lengths"_a)
       .def("initialise", &Proj::initialise,
-           "flags"_a = muFFT::FFT_PlanFlags::estimate,
-           "initialises the fft engine (plan the transform)")
+           "initialises the projection operator")
       // apply_projection that takes Fields
       .def("apply_projection", &Proj::apply_projection)
       // apply_projection that takes numpy arrays
@@ -163,7 +162,7 @@ void add_proj_helper(py::module & mod, std::string name_start) {
                        static_cast<Real *>(proj_buffer.ptr));
 
              auto strain_shape = proj.get_strain_shape();
-             NumpyProxy<Real> proxy(
+             NumpyProxy<Real, py::array::f_style> proxy(
                  proj.get_nb_subdomain_grid_pts(),
                  proj.get_subdomain_locations(), proj.get_nb_quad_pts(),
                  {strain_shape[0], strain_shape[1]}, proj_vector_field);
@@ -204,8 +203,7 @@ void add_green_proj_helper(py::module & mod, std::string name_start) {
         return Proj(std::move(fft_engine), domain_lenghts, tmp);
       }))
       .def("initialise", &Proj::initialise,
-           "flags"_a = muFFT::FFT_PlanFlags::estimate,
-           "initialises the fft engine (plan the transform)")
+           "initialises the projection operator")
       // apply_projection that takes Fields
       .def("apply_projection", &Proj::apply_projection)
 

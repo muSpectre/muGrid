@@ -91,8 +91,7 @@ namespace muSpectre {
     operator=(ProjectionFiniteStrain && other) = default;
 
     //! initialises the fft engine (plan the transform)
-    void initialise(const muFFT::FFT_PlanFlags & flags =
-                        muFFT::FFT_PlanFlags::estimate) final;
+    void initialise() final;
     //! perform a deep copy of the projector (this should never be necessary in
     //! c++)
     std::unique_ptr<ProjectionBase> clone() const final;

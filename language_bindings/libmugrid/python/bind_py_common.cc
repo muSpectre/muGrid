@@ -52,6 +52,11 @@ using pybind11::literals::operator""_a;
 namespace py = pybind11;
 
 void add_enums(py::module & mod) {
+  py::enum_<muGrid::StorageOrder>(mod, "StorageOrder")
+      .value("ColMajor", muGrid::StorageOrder::ColMajor)
+      .value("RowMajor", muGrid::StorageOrder::RowMajor)
+      .export_values();
+
   py::enum_<muGrid::IterUnit>(mod, "IterUnit")
       .value("Pixel", muGrid::IterUnit::Pixel)
       .value("SubPt", muGrid::IterUnit::SubPt)

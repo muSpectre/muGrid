@@ -59,9 +59,18 @@ namespace muFFT {
     /**
      * Constructor with the domain's number of grid points in each direction and
      * the communicator
+     * @param nb_grid_pts number of grid points of the global grid
+     * @param allow_temporary_buffer allow the creation of temporary buffers
+     *        if the input buffer has the wrong memory layout
+     * @param allow_destroy_input allow that the input buffers are invalidated
+     *        during the FFT
+     * @comm MPI communicator object
      */
     FFTWMPIEngine(const DynCcoord_t & nb_grid_pts,
-                  Communicator comm = Communicator());
+                  Communicator comm = Communicator(),
+                  const FFT_PlanFlags & plan_flags = FFT_PlanFlags::estimate,
+                  bool allow_temporary_buffer = true,
+                  bool allow_destroy_input = false);
 
     //! Copy constructor
     FFTWMPIEngine(const FFTWMPIEngine & other) = delete;
@@ -79,16 +88,7 @@ namespace muFFT {
     FFTWMPIEngine & operator=(FFTWMPIEngine && other) = delete;
 
     // compute the plan, etc
-    void initialise(const Index_t & nb_dof_per_pixel,
-                    const FFT_PlanFlags & plan_flags) override;
-
-    //! forward transform
-    void fft(const RealField_t & field,
-             FourierField_t & output_field) const override;
-
-    //! inverse transform
-    void ifft(const FourierField_t & input_field,
-              RealField_t & output_field) const override;
+    void create_plan(const Index_t & nb_dof_per_pixel) override;
 
     /**
      * return whether this engine is active (an engine is active if it has more
@@ -103,17 +103,32 @@ namespace muFFT {
     /**
      * need to override this method here, since FFTWMPI requires field padding
      */
+    RealField_t &
+    register_real_space_field(const std::string & unique_name,
+                              const Index_t & nb_dof_per_pixel) final;
+
+    /**
+     * need to override this method here, since FFTWMPI requires field padding
+     */
     FourierField_t &
     register_fourier_space_field(const std::string & unique_name,
                                  const Index_t & nb_dof_per_pixel) final;
 
-    /**
-     * Returns the required pad size. Helpful when calling fftwmpi with wrapped
-     * fields
-     */
-    Index_t get_required_pad_size(const Index_t & nb_dof_per_pixel) const final;
-
    protected:
+    //! forward transform
+    void compute_fft(const RealField_t & field,
+                     FourierField_t & output_field) const override;
+
+    //! inverse transform
+    void compute_ifft(const FourierField_t & input_field,
+                      RealField_t & output_field) const override;
+
+    //! check whether real-space buffer has the correct memory layout
+    bool check_real_space_field(const RealField_t & field) const final;
+
+    //! check whether Fourier-space buffer has the correct memory layout
+    bool check_fourier_space_field(const FourierField_t & field) const final;
+
     static int nb_engines;  //!< number of times this engine has
                             //!< been instatiated
     //! holds the plans for forward fourier transforms
@@ -122,10 +137,6 @@ namespace muFFT {
     std::map<Index_t, fftw_plan> ifft_plans{};
     //! holds the fourier field sizes including padding for different transforms
     std::map<Index_t, Index_t> required_workspace_sizes{};
-    //! maximum size of workspace buffer (returned by planner)
-    ptrdiff_t workspace_size{0};
-    //! temporary real workspace for correctly padded copy of real input
-    Real * real_workspace{nullptr};
     bool active{true};  //!< FFTWMPI sometimes assigns zero grid points
     //! Input to local_size_many_transposed
     std::vector<ptrdiff_t> nb_fourier_non_transposed{};

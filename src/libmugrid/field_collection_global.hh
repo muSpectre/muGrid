@@ -63,7 +63,9 @@ namespace muGrid {
      * @param nb_quad_pts number of quadrature points per pixel/voxel
      */
     GlobalFieldCollection(const Index_t & spatial_dimension,
-                          const SubPtMap_t & nb_sub_pts = {});
+                          const SubPtMap_t & nb_sub_pts = {},
+                          StorageOrder storage_order =
+                              StorageOrder::ArrayOfStructures);
 
     /**
      * Constructor with initialization
@@ -78,7 +80,9 @@ namespace muGrid {
     GlobalFieldCollection(const Index_t & spatial_dimension,
                           const DynCcoord_t & nb_subdomain_grid_pts,
                           const DynCcoord_t & subdomain_locations = {},
-                          const SubPtMap_t & nb_sub_pts = {});
+                          const SubPtMap_t & nb_sub_pts = {},
+                          StorageOrder storage_order =
+                              StorageOrder::ArrayOfStructures);
 
     /**
      * Constructor with initialisation
@@ -88,13 +92,53 @@ namespace muGrid {
      * process (subdomain)
      * @param subdomain_locations location of the current subdomain within the
      * global grid
-     * @param strides strides specifying memory layout
+     * @param pixels_strides strides specifying memory layout of the pixels
+     * @param storage_order Storage order of the pixels vs subdivision portion
+     *                    of the field. In a column-major storage order, the
+     *                    pixel subdivision (i.e. the components of the field)
+     *                    are stored next to each other in memory, file in a
+     *                    row-major storage order for each component the
+     *                    pixels are stored next to each other in memory.
+     *                    (This is also sometimes called the array of structures
+     *                    vs. structure of arrays storage order.)
+     *                    Important: The pixels or subpoints have their own
+     *                    storage order that is not affected by this setting.
      */
     GlobalFieldCollection(Index_t spatial_dimension,
                           const DynCcoord_t & nb_subdomain_grid_pts,
                           const DynCcoord_t & subdomain_locations,
-                          const DynCcoord_t & strides,
-                          const SubPtMap_t & nb_sub_pts = {});
+                          const DynCcoord_t & pixels_strides,
+                          const SubPtMap_t & nb_sub_pts = {},
+                          StorageOrder storage_order =
+                              StorageOrder::ArrayOfStructures);
+
+    /**
+     * Constructor with initialisation
+     * @param spatial_dimension number of spatial dimensions, must be 1, 2, 3,
+     * or Unknown
+     * @param nb_subdomain_grid_pts number of grid points on the current MPI
+     * process (subdomain)
+     * @param subdomain_locations location of the current subdomain within the
+     * global grid
+     * @param pixels_storage_order Storage order of the pixels
+     * @param storage_order Storage order of the pixels vs subdivision portion
+     *                    of the field. In a column-major storage order, the
+     *                    pixel subdivision (i.e. the components of the field)
+     *                    are stored next to each other in memory, file in a
+     *                    row-major storage order for each component the
+     *                    pixels are stored next to each other in memory.
+     *                    (This is also sometimes called the array of structures
+     *                    vs. structure of arrays storage order.)
+     *                    Important: The pixels or subpoints have their own
+     *                    storage order that is not affected by this setting.
+     */
+    GlobalFieldCollection(Index_t spatial_dimension,
+                          const DynCcoord_t & nb_subdomain_grid_pts,
+                          const DynCcoord_t & subdomain_locations,
+                          StorageOrder pixels_storage_order,
+                          const SubPtMap_t & nb_sub_pts = {},
+                          StorageOrder storage_order =
+                              StorageOrder::ArrayOfStructures);
 
     //! Copy constructor
     GlobalFieldCollection(const GlobalFieldCollection & other) = delete;
@@ -137,28 +181,8 @@ namespace muGrid {
      * upon construction.
      */
     void initialise(const DynCcoord_t & nb_subdomain_grid_pts,
-                    const DynCcoord_t & subdomain_locations = {});
-
-    /**
-     * freeze the problem size and allocate memory for all fields of the
-     * collection. Fields added later on will have their memory allocated
-     * upon construction.
-     */
-    template <size_t Dim>
-    void initialise(const Ccoord_t<Dim> & nb_subdomain_grid_pts,
-                    const Ccoord_t<Dim> & subdomain_locations = {}) {
-      this->initialise(DynCcoord_t{nb_subdomain_grid_pts},
-                       DynCcoord_t{subdomain_locations});
-    }
-
-    /**
-     * freeze the problem size and allocate memory for all fields of the
-     * collection. Fields added later on will have their memory allocated
-     * upon construction.
-     */
-    void initialise(const DynCcoord_t & nb_subdomain_grid_pts,
                     const DynCcoord_t & subdomain_locations,
-                    const DynCcoord_t & strides);
+                    const DynCcoord_t & pixels_strides);
 
     /**
      * freeze the problem size and allocate memory for all fields of the
@@ -168,9 +192,35 @@ namespace muGrid {
     template <size_t Dim>
     void initialise(const Ccoord_t<Dim> & nb_subdomain_grid_pts,
                     const Ccoord_t<Dim> & subdomain_locations,
-                    const Ccoord_t<Dim> & strides) {
+                    const Ccoord_t<Dim> & pixels_strides) {
       this->initialise(DynCcoord_t{nb_subdomain_grid_pts},
-                       DynCcoord_t{subdomain_locations}, DynCcoord_t{strides});
+                       DynCcoord_t{subdomain_locations},
+                       DynCcoord_t{pixels_strides});
+    }
+
+    /**
+     * freeze the problem size and allocate memory for all fields of the
+     * collection. Fields added later on will have their memory allocated
+     * upon construction.
+     */
+    void initialise(const DynCcoord_t & nb_subdomain_grid_pts,
+                    const DynCcoord_t & subdomain_locations = {},
+                    StorageOrder pixels_storage_order =
+                        StorageOrder::Automatic);
+
+    /**
+     * freeze the problem size and allocate memory for all fields of the
+     * collection. Fields added later on will have their memory allocated
+     * upon construction.
+     */
+    template <size_t Dim>
+    void initialise(const Ccoord_t<Dim> & nb_subdomain_grid_pts,
+                    const Ccoord_t<Dim> & subdomain_locations = {},
+                    StorageOrder pixels_storage_order =
+                        StorageOrder::Automatic) {
+      this->initialise(DynCcoord_t{nb_subdomain_grid_pts},
+                       DynCcoord_t{subdomain_locations},
+                       pixels_storage_order);
     }
 
     /**
@@ -178,8 +228,11 @@ namespace muGrid {
      */
     GlobalFieldCollection get_empty_clone() const;
 
-    //! returns the strides of the pixel layout in memory
-    const DynCcoord_t & get_strides() const;
+    //! return shape of the pixels
+    virtual Shape_t get_pixels_shape() const;
+
+    //! return strides of the pixels
+    virtual Shape_t get_pixels_strides(Index_t element_size = 1) const;
 
    protected:
     DynamicPixels pixels{};  //!< helper to iterate over the grid

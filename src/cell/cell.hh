@@ -176,7 +176,7 @@ namespace muSpectre {
      * material_dim matrices, but in symmetric storage, it is a column
      * vector)
      */
-    std::array<Index_t, 2> get_strain_shape() const;
+    Shape_t get_strain_shape() const;
 
     /**
      * returns the number of components for the strain matrix type
@@ -199,8 +199,7 @@ namespace muSpectre {
     virtual void check_material_coverage() const;
 
     //! initialise the projection, the materials and the global fields
-    void
-    initialise(muFFT::FFT_PlanFlags flags = muFFT::FFT_PlanFlags::estimate);
+    void initialise();
 
     //! return a const reference to the grids pixels iterator
     const muGrid::CcoordOps::DynamicPixels & get_pixels() const;

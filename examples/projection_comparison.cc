@@ -160,7 +160,7 @@ int small_sym(int argc, char * argv[]) {
     }
   }
 
-  cell.initialise(FFT_PlanFlags::measure);
+  cell.initialise();
 
   std::cout << counter << " Pixel out of " << cell.get_nb_pixels()
             << " are in the hard material" << std::endl;

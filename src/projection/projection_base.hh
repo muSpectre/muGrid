@@ -93,7 +93,7 @@ namespace muSpectre {
     ProjectionBase(muFFT::FFTEngine_ptr engine,
                    const DynRcoord_t & domain_lengths,
                    const Index_t & nb_quad_pts,
-                   const Index_t & nb_dof_per_sub_pt, const Formulation & form);
+                   const Index_t & nb_components, const Formulation & form);
 
     //! Copy constructor
     ProjectionBase(const ProjectionBase & other) = delete;
@@ -111,8 +111,7 @@ namespace muSpectre {
     ProjectionBase & operator=(ProjectionBase && other) = delete;
 
     //! initialises the fft engine (plan the transform)
-    virtual void initialise(
-        const muFFT::FFT_PlanFlags & flags = muFFT::FFT_PlanFlags::estimate);
+    virtual void initialise();
 
     //! apply the projection operator to a field
     virtual void apply_projection(Field_t & field) = 0;
@@ -194,7 +193,7 @@ namespace muSpectre {
     muFFT::FFTEngine_ptr fft_engine;
     DynRcoord_t domain_lengths;  //!< physical sizes of the cell
     Index_t nb_quad_pts;
-    Index_t nb_dof_per_sub_pt;
+    Index_t nb_components;
     /**
      * formulation this projection can be applied to (determines
      * whether the projection enforces gradients, small strain tensor
@@ -202,14 +201,13 @@ namespace muSpectre {
      */
     Formulation form;
     /**
-     * A local `muSpectre::FieldCollection` to store the projection
-     * operator per k-space point. This is a local rather than a
-     * global collection, since the pixels considered depend on the
-     * FFT implementation. See
+     * A local `muSpectre::Field` to store the Fourier space representation of
+     * the projected field per k-space point. This field is obtained from the
+     * FFT engine, since the pixels considered depend on the FFT implementation.
+     * See
      * http://www.fftw.org/fftw3_doc/Multi_002dDimensional-DFTs-of-Real-Data.html#Multi_002dDimensional-DFTs-of-Real-Data
      * for an example
      */
-    GFieldCollection_t & projection_container;
     muGrid::TypedFieldBase<Complex> & work_space;
 
     bool initialised{false};  //! has the projection been initialised?

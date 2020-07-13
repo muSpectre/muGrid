@@ -116,9 +116,24 @@ namespace muGrid {
      * @param spatial_dimension spatial dimension of the field (can be
      *                    muGrid::Unknown, e.g., in the case of the local fields
      *                    for storing internal material variables)
+     * @param nb_sub_pts Specification of pixel subdivision. This is a map that
+     *                    of a string (the name of the subdivision scheme) to
+     *                    the number of subdivisions
+     * @param storage_order Storage order of the pixels vs subdivision portion
+     *                    of the field. In a column-major storage order, the
+     *                    pixel subdivision (i.e. the components of the field)
+     *                    are stored next to each other in memory, file in a
+     *                    row-major storage order for each component the
+     *                    pixels are stored next to each other in memory.
+     *                    (This is also sometimes called the array of structures
+     *                    vs. structure of arrays storage order.)
+     *                    Important: The pixels or subpoints have their own
+     *                    storage order that is not affected by this setting.
      */
     FieldCollection(ValidityDomain domain, const Index_t & spatial_dimension,
-                    const SubPtMap_t & nb_sub_pts);
+                    const SubPtMap_t & nb_sub_pts,
+                    StorageOrder storage_order =
+                        StorageOrder::ArrayOfStructures);
 
    public:
     //! Default constructor
@@ -143,21 +158,46 @@ namespace muGrid {
      * place a new field in the responsibility of this collection (Note, because
      * fields have protected constructors, users can't create them
      * @param unique_name unique identifier for this field
-     * @param nb_dof_per_sub_pt number of components to be stored per quadrature
-     * point (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a
-     * scalar field)
+     * @param nb_components number of components to be stored per sub-point
+     * (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a scalar
+     * field)
+     * @param sub_division_tag unique identifier of the subdivision scheme
+     * @param unit phyiscal unit of this field
      */
     template <typename T>
     TypedField<T> &
     register_field(const std::string & unique_name,
-                   const Index_t & nb_dof_per_sub_pt,
+                   const Index_t & nb_components,
                    const std::string & sub_division_tag = PixelTag,
                    const Unit & unit = Unit::unitless()) {
       static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
                     "You can only register fields templated with one of the "
                     "numeric types Real, Complex, Int, or UInt");
-      return this->register_field_helper<T>(unique_name, nb_dof_per_sub_pt,
+      return this->register_field_helper<T>(unique_name, nb_components,
                                             sub_division_tag, unit);
+    }
+
+    /**
+     * place a new field in the responsibility of this collection (Note, because
+     * fields have protected constructors, users can't create them
+     * @param unique_name unique identifier for this field
+     * @param components_shape number of components to store per quadrature
+     * point
+     * @param sub_division_tag unique identifier of the subdivision scheme
+     * @param unit phyiscal unit of this field
+     * @param storage_oder in-memory storage order of the components
+     */
+    template <typename T>
+    TypedField<T> &
+    register_field(const std::string & unique_name,
+                   const Shape_t & components_shape,
+                   const std::string & sub_division_tag = PixelTag,
+                   const Unit & unit = Unit::unitless()) {
+      static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
+                    "You can only register fields templated with one of the "
+                    "numeric types Real, Complex, Int, or UInt");
+      return this->register_field_helper<T>(
+          unique_name, components_shape, sub_division_tag, unit);
     }
 
     /**
@@ -165,55 +205,130 @@ namespace muGrid {
      * (Note, because fields have protected constructors, users can't create
      * them
      * @param unique_name unique identifier for this field
-     * @param nb_dof_per_sub_pt number of components to be stored per quadrature
-     * point (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a
-     * scalar field)
+     * @param nb_components number of components to be stored per sub-point
+     * (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a scalar
+     * field)
+     * @param sub_division_tag unique identifier of the subdivision scheme
+     * @param unit phyiscal unit of this field
      */
     TypedField<Real> &
     register_real_field(const std::string & unique_name,
-                        const Index_t & nb_dof_per_sub_pt,
+                        const Index_t & nb_components,
                         const std::string & sub_division_tag = PixelTag,
                         const Unit & unit = Unit::unitless());
+
     /**
-     * place a new complex-valued field  in the responsibility of this
-     * collection (Note, because fields have protected constructors, users can't
-     * create them
+     * place a new field in the responsibility of this collection (Note, because
+     * fields have protected constructors, users can't create them
      * @param unique_name unique identifier for this field
-     * @param nb_dof_per_sub_pt number of components to be stored per quadrature
-     * point (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a
-     * scalar field)
+     * @param components_shape number of components to store per quadrature
+     * point
+     * @param sub_division_tag unique identifier of the subdivision scheme
+     * @param unit phyiscal unit of this field
+     * @param storage_oder in-memory storage order of the components
+     */
+    TypedField<Real> &
+    register_real_field(const std::string & unique_name,
+                        const Shape_t & components_shape,
+                        const std::string & sub_division_tag = PixelTag,
+                        const Unit & unit = Unit::unitless());
+
+      /**
+       * place a new complex-valued field  in the responsibility of this
+       * collection (Note, because fields have protected constructors, users can't
+       * create them
+       * @param unique_name unique identifier for this field
+       * @param nb_components number of components to be stored per sub-point
+       * (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a scalar
+       * field)
+       * @param sub_division_tag unique identifier of the subdivision scheme
+       * @param unit phyiscal unit of this field
+       */
+    TypedField<Complex> &
+    register_complex_field(const std::string & unique_name,
+                           const Index_t & nb_components,
+                           const std::string & sub_division_tag = PixelTag,
+                           const Unit & unit = Unit::unitless());
+
+    /**
+     * place a new field in the responsibility of this collection (Note, because
+     * fields have protected constructors, users can't create them
+     * @param unique_name unique identifier for this field
+     * @param components_shape number of components to store per quadrature
+     * point
+     * @param sub_division_tag unique identifier of the subdivision scheme
+     * @param unit phyiscal unit of this field
+     * @param storage_oder in-memory storage order of the components
      */
     TypedField<Complex> &
     register_complex_field(const std::string & unique_name,
-                           const Index_t & nb_dof_per_sub_pt,
+                           const Shape_t & components_shape,
                            const std::string & sub_division_tag = PixelTag,
                            const Unit & unit = Unit::unitless());
+
     /**
      * place a new integer-valued field  in the responsibility of this
      * collection (Note, because fields have protected constructors, users can't
      * create them
      * @param unique_name unique identifier for this field
-     * @param nb_dof_per_sub_pt number of components to be stored per quadrature
-     * point (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a
-     * scalar field)
+     * @param nb_components number of components to be stored per sub-point
+     * (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a scalar
+     * field)
+     * @param sub_division_tag unique identifier of the subdivision scheme
+     * @param unit phyiscal unit of this field
      */
     TypedField<Int> &
     register_int_field(const std::string & unique_name,
-                       const Index_t & nb_dof_per_sub_pt,
+                       const Index_t & nb_components,
                        const std::string & sub_division_tag = PixelTag,
                        const Unit & unit = Unit::unitless());
+
+    /**
+     * place a new field in the responsibility of this collection (Note, because
+     * fields have protected constructors, users can't create them
+     * @param unique_name unique identifier for this field
+     * @param components_shape number of components to store per quadrature
+     * point
+     * @param sub_division_tag unique identifier of the subdivision scheme
+     * @param unit phyiscal unit of this field
+     * @param storage_oder in-memory storage order of the components
+     */
+    TypedField<Int> &
+    register_int_field(const std::string & unique_name,
+                       const Shape_t & components_shape,
+                       const std::string & sub_division_tag = PixelTag,
+                       const Unit & unit = Unit::unitless());
+
     /**
      * place a new unsigned integer-valued field  in the responsibility of this
      * collection (Note, because fields have protected constructors, users can't
      * create them
      * @param unique_name unique identifier for this field
-     * @param nb_dof_per_sub_pt number of components to be stored per quadrature
-     * point (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a
-     * scalar field)
+     * @param nb_components number of components to be stored per sub-point
+     * (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a scalar
+     * field)
+     * @param sub_division_tag unique identifier of the subdivision scheme
+     * @param unit phyiscal unit of this field
      */
     TypedField<Uint> &
     register_uint_field(const std::string & unique_name,
-                        const Index_t & nb_dof_per_sub_pt,
+                        const Index_t & nb_components,
+                        const std::string & sub_division_tag = PixelTag,
+                        const Unit & unit = Unit::unitless());
+
+    /**
+     * place a new field in the responsibility of this collection (Note, because
+     * fields have protected constructors, users can't create them
+     * @param unique_name unique identifier for this field
+     * @param components_shape number of components to store per quadrature
+     * point
+     * @param sub_division_tag unique identifier of the subdivision scheme
+     * @param unit phyiscal unit of this field
+     * @param storage_oder in-memory storage order of the components
+     */
+    TypedField<Uint> &
+    register_uint_field(const std::string & unique_name,
+                        const Shape_t & components_shape,
                         const std::string & sub_division_tag = PixelTag,
                         const Unit & unit = Unit::unitless());
 
@@ -225,7 +340,7 @@ namespace muGrid {
     TypedStateField<T> &
     register_state_field(const std::string & unique_prefix,
                          const Index_t & nb_memory,
-                         const Index_t & nb_dof_per_sub_pt,
+                         const Index_t & nb_components,
                          const std::string & sub_division_tag = PixelTag,
                          const Unit & unit = Unit::unitless()) {
       static_assert(
@@ -233,7 +348,7 @@ namespace muGrid {
           "You can only register state fields templated with one of the "
           "numeric types Real, Complex, Int, or UInt");
       return this->register_state_field_helper<T>(
-          unique_prefix, nb_memory, nb_dof_per_sub_pt, sub_division_tag, unit);
+          unique_prefix, nb_memory, nb_components, sub_division_tag, unit);
     }
 
     /**
@@ -243,13 +358,13 @@ namespace muGrid {
      *
      * @param unique_prefix unique idendifier for this state field
      * @param nb_memory number of previous values of this field to store
-     * @param nb_dof_per_sub_pt number of scalar components to store per
+     * @param nb_components number of scalar components to store per
      * quadrature point
      */
     TypedStateField<Real> &
     register_real_state_field(const std::string & unique_prefix,
                               const Index_t & nb_memory,
-                              const Index_t & nb_dof_per_sub_pt,
+                              const Index_t & nb_components,
                               const std::string & sub_division_tag = PixelTag,
                               const Unit & unit = Unit::unitless());
 
@@ -260,12 +375,12 @@ namespace muGrid {
      *
      * @param unique_prefix unique idendifier for this state field
      * @param nb_memory number of previous values of this field to store
-     * @param nb_dof_per_sub_pt number of scalar components to store per
+     * @param nb_components number of scalar components to store per
      * quadrature point
      */
     TypedStateField<Complex> & register_complex_state_field(
         const std::string & unique_prefix, const Index_t & nb_memory,
-        const Index_t & nb_dof_per_sub_pt,
+        const Index_t & nb_components,
         const std::string & sub_division_tag = PixelTag,
         const Unit & unit = Unit::unitless());
 
@@ -276,13 +391,13 @@ namespace muGrid {
      *
      * @param unique_prefix unique idendifier for this state field
      * @param nb_memory number of previous values of this field to store
-     * @param nb_dof_per_sub_pt number of scalar components to store per
+     * @param nb_components number of scalar components to store per
      * quadrature point
      */
     TypedStateField<Int> &
     register_int_state_field(const std::string & unique_prefix,
                              const Index_t & nb_memory,
-                             const Index_t & nb_dof_per_sub_pt,
+                             const Index_t & nb_components,
                              const std::string & sub_division_tag = PixelTag,
                              const Unit & unit = Unit::unitless());
 
@@ -293,13 +408,13 @@ namespace muGrid {
      *
      * @param unique_prefix unique idendifier for this state field
      * @param nb_memory number of previous values of this field to store
-     * @param nb_dof_per_sub_pt number of scalar components to store per
+     * @param nb_components number of scalar components to store per
      * quadrature point
      */
     TypedStateField<Uint> &
     register_uint_state_field(const std::string & unique_prefix,
                               const Index_t & nb_memory,
-                              const Index_t & nb_dof_per_sub_pt,
+                              const Index_t & nb_components,
                               const std::string & sub_division_tag = PixelTag,
                               const Unit & unit = Unit::unitless());
 
@@ -313,6 +428,12 @@ namespace muGrid {
 
     //! returns the number of pixels present in the collection
     Index_t get_nb_pixels() const;
+
+    /**
+     * returns the number of (virtual) pixels required to store the underlying
+     * data that may involve padding regions
+     */
+    Index_t get_nb_buffer_pixels() const;
 
     /**
      * Check whether the number of subdivision points peir pixel/voxel has been
@@ -348,6 +469,18 @@ namespace muGrid {
      * (`muGrid::FieldCollection::ValidityDomain::Local`)
      */
     const ValidityDomain & get_domain() const;
+
+    //! return shape of the pixels
+    virtual Shape_t get_pixels_shape() const = 0;
+
+    //! return strides of the pixels
+    virtual Shape_t get_pixels_strides(Index_t element_size = 1) const = 0;
+
+    //! return the storage order of the pixels vs. subpoints
+    const StorageOrder & get_storage_order() const;
+
+    //! check whether two field collections have the same memory layout
+    bool has_same_memory_layout(const FieldCollection & other) const;
 
     /**
      * whether the collection has been properly initialised (i.e., it knows the
@@ -421,7 +554,14 @@ namespace muGrid {
     //! internal worker function called by register_<T>_field
     template <typename T>
     TypedField<T> & register_field_helper(const std::string & unique_name,
-                                          const Index_t & nb_dof_per_sub_pt,
+                                          const Index_t & nb_components,
+                                          const std::string & sub_division_tag,
+                                          const Unit & unit);
+
+    //! internal worker function called by register_<T>_field
+    template <typename T>
+    TypedField<T> & register_field_helper(const std::string & unique_name,
+                                          const Shape_t & components_shape,
                                           const std::string & sub_division_tag,
                                           const Unit & unit);
 
@@ -429,7 +569,7 @@ namespace muGrid {
     template <typename T>
     TypedStateField<T> & register_state_field_helper(
         const std::string & unique_prefix, const Index_t & nb_memory,
-        const Index_t & nb_dof_per_sub_pt, const std::string & sub_division_tag,
+        const Index_t & nb_components, const std::string & sub_division_tag,
         const Unit & unit);
 
     /**
@@ -460,6 +600,13 @@ namespace muGrid {
 
     //! total number of pixels
     Index_t nb_pixels{Unknown};
+
+    //! total number of pixels for the buffer (including padding regions)
+    Index_t nb_buffer_pixels{Unknown};
+
+    //! storage oder
+    StorageOrder storage_order;
+
     //! keeps track of whether the collection has already been initialised
     bool initialised{false};
     /**

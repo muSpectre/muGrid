@@ -99,6 +99,12 @@ namespace muGrid {
      */
     LocalFieldCollection get_empty_clone() const;
 
+    //! return shape of the pixels
+    virtual Shape_t get_pixels_shape() const;
+
+    //! return strides of the pixels
+    virtual Shape_t get_pixels_strides(Index_t element_size = 1) const;
+
     std::map<size_t, size_t> & get_global_to_local_index_map() {
       return this->global_to_local_index_map;
     }

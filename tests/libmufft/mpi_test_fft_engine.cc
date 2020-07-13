@@ -119,7 +119,7 @@ namespace muFFT {
       return;
     } else {
       BOOST_CHECK_NO_THROW(
-          Fix::engine.initialise(Fix::NbComponents, FFT_PlanFlags::estimate));
+          Fix::engine.create_plan(Fix::NbComponents));
     }
     BOOST_CHECK_EQUAL(comm.sum(Fix::engine.size()),
                       muGrid::CcoordOps::get_size(Fix::res()));
@@ -131,7 +131,7 @@ namespace muFFT {
       // dont test serial engies in parallel
       return;
     } else {
-      Fix::engine.initialise(Fix::NbComponents, FFT_PlanFlags::estimate);
+      Fix::engine.create_plan(Fix::NbComponents);
     }
     using FC_t = muGrid::GlobalFieldCollection;
     FC_t fc{Fix::sdim};

@@ -336,8 +336,8 @@ class VtkExport_Check(unittest.TestCase):
             x_n, x_c = µ.gradient_integration.make_grid(lens[:dim], res[:dim])
             gradient_op = [µ.FourierDerivative(dim, i) for i in range(dim)]
             fft_engine = muFFT.FFT(list(self.nb_grid_pts[:dim]))
-            fft_engine.initialise(dim)
-            fft_engine.initialise(dim * dim)
+            fft_engine.create_plan(dim)
+            fft_engine.create_plan(dim * dim)
             placement_n = µ.gradient_integration.integrate_tensor_2(
                 F, fft_engine, gradient_op,
                 list(self.grid_spacing[:dim]))

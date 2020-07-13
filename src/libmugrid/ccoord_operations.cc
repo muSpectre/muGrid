@@ -47,14 +47,14 @@ namespace muGrid {
       const Dim_t dim{nb_grid_pts.get_dim()};
       if (locations.get_dim() != dim) {
         std::stringstream error{};
-        error << "Dimension mismatch between nb_grid_pts (dim = " << dim
-              << ") and locations (dim = " << locations.get_dim() << ")";
+        error << "Dimension mismatch between nb_grid_pts (= " << nb_grid_pts
+              << ") and locations (= " << locations << ")";
         throw RuntimeError(error.str());
       }
       if (ccoord.get_dim() != dim) {
         std::stringstream error{};
-        error << "Dimension mismatch between nb_grid_pts (dim = " << dim
-              << ") and ccoord (dim = " << ccoord.get_dim() << ")";
+        error << "Dimension mismatch between nb_grid_pts (= " << nb_grid_pts
+              << ") and locations (= " << locations << ")";
         throw RuntimeError(error.str());
       }
       Dim_t retval{0};
@@ -89,42 +89,67 @@ namespace muGrid {
       return vol;
     }
 
-    //-----------------------------------------------------------------------//
-    bool is_buffer_contiguous(const DynCcoord_t & nb_grid_pts,
-                              const DynCcoord_t & strides) {
-      auto & dim{nb_grid_pts.get_dim()};
+    size_t get_buffer_size(const DynCcoord_t & nb_grid_pts,
+                           const DynCcoord_t & strides) {
+      const Dim_t & dim{nb_grid_pts.get_dim()};
       if (strides.get_dim() != dim) {
-        throw RuntimeError("Mismatch between dimensions of nb_grid_pts and "
-                           "strides");
+        std::stringstream error{};
+        error << "Dimension mismatch between nb_grid_pts (= " << nb_grid_pts
+              << ") and strides (= " << strides << ")";
+        throw RuntimeError(error.str());
       }
-      std::vector<Dim_t> axes(dim);
-      std::iota(axes.begin(), axes.end(), 0);
-      std::sort(axes.begin(), axes.end(), [strides](Dim_t a, Dim_t b) {
-        return strides[a] < strides[b];
-      });
-      Dim_t stride = 1;
-      bool is_contiguous = true;
-      for (Dim_t i = 0; i < dim; ++i) {
-        is_contiguous &= strides[axes[i]] == stride;
-        stride *= nb_grid_pts[axes[i]];
+      size_t buffer_size{0};
+      // We need to loop over the dimensions because the largest stride can
+      // occur anywhere. (It depends on the storage order.)
+      for (Dim_t i{0}; i < dim; ++i) {
+        buffer_size = std::max(
+            buffer_size, static_cast<size_t>(nb_grid_pts[i] * strides[i]));
       }
-      return is_contiguous;
+      return buffer_size;
+    }
+
+    size_t get_buffer_size(const Shape_t & nb_grid_pts,
+                           const Shape_t & strides) {
+      const size_t & dim{nb_grid_pts.size()};
+      if (strides.size() != dim) {
+        std::stringstream error{};
+        error << "Dimension mismatch between nb_grid_pts (= " << nb_grid_pts
+              << ") and strides (= " << strides << ")";
+        throw RuntimeError(error.str());
+      }
+      size_t buffer_size{0};
+      // We need to loop over the dimensions because the largest stride can
+      // occur anywhere. (It depends on the storage order.)
+      for (size_t i{0}; i < dim; ++i) {
+        buffer_size = std::max(
+            buffer_size, static_cast<size_t>(nb_grid_pts[i] * strides[i]));
+      }
+      return buffer_size;
     }
 
     /* ---------------------------------------------------------------------- */
     DynamicPixels::DynamicPixels()
-        : dim{}, nb_subdomain_grid_pts{}, subdomain_locations{}, strides{} {}
+        : dim{}, nb_subdomain_grid_pts{}, subdomain_locations{}, strides{},
+          axes_order{}, contiguous{false} {}
 
     /* ---------------------------------------------------------------------- */
     DynamicPixels::DynamicPixels(const DynCcoord_t & nb_subdomain_grid_pts,
                                  const DynCcoord_t & subdomain_locations)
         : dim(nb_subdomain_grid_pts.get_dim()),
           nb_subdomain_grid_pts(nb_subdomain_grid_pts),
-          subdomain_locations(subdomain_locations),
-          strides(get_default_strides(nb_subdomain_grid_pts)) {
+          subdomain_locations{
+              subdomain_locations.get_dim() == 0
+                  ? DynCcoord_t(nb_subdomain_grid_pts.get_dim())
+                  : subdomain_locations},
+          strides(get_col_major_strides(nb_subdomain_grid_pts)),
+          axes_order{compute_axes_order(nb_subdomain_grid_pts, this->strides)},
+          contiguous{true} {
       if (this->dim != this->subdomain_locations.get_dim()) {
-        throw RuntimeError(
-            "dimension mismatch between locations and nb_grid_pts.");
+        std::stringstream error{};
+        error << "Dimension mismatch between nb_subdomain_grid_pts (= "
+              << nb_subdomain_grid_pts << ") and subdomain_locations (= "
+              << subdomain_locations << ")";
+        throw RuntimeError(error.str());
       }
     }
 
@@ -134,22 +159,26 @@ namespace muGrid {
                                  const DynCcoord_t & strides)
         : dim(nb_subdomain_grid_pts.get_dim()),
           nb_subdomain_grid_pts(nb_subdomain_grid_pts),
-          subdomain_locations(subdomain_locations), strides{strides} {
+          subdomain_locations{
+              subdomain_locations.get_dim() == 0
+              ? DynCcoord_t(nb_subdomain_grid_pts.get_dim())
+              : subdomain_locations},
+          strides{strides},
+          axes_order{compute_axes_order(nb_subdomain_grid_pts, strides)},
+          contiguous{is_buffer_contiguous(nb_subdomain_grid_pts,
+                                          strides)} {
       if (this->dim != this->subdomain_locations.get_dim()) {
-        throw RuntimeError(
-            "dimension mismatch between locations and nb_grid_pts.");
+        std::stringstream error{};
+        error << "Dimension mismatch between nb_subdomain_grid_pts (= "
+              << nb_subdomain_grid_pts << ") and subdomain_locations (= "
+              << subdomain_locations << ")";
+        throw RuntimeError(error.str());
       }
       if (this->dim != this->strides.get_dim()) {
-        throw RuntimeError(
-            "dimension mismatch between locations and strides.");
-      }
-      if (!is_buffer_contiguous(nb_subdomain_grid_pts, strides)) {
-        std::stringstream message{};
-        message << "DynamicPixels only supports contiguous buffers. You "
-                   "specified a grid of shape "
-                << nb_subdomain_grid_pts << " with non-contiguous strides "
-                << strides << ".";
-        throw RuntimeError{message.str()};
+        std::stringstream error{};
+        error << "Dimension mismatch between subdomain_locations (= "
+              << subdomain_locations << ") and strides (= " << strides << ")";
+        throw RuntimeError(error.str());
       }
     }
 
@@ -159,7 +188,10 @@ namespace muGrid {
                                  const Ccoord_t<Dim> & subdomain_locations)
         : dim(Dim), nb_subdomain_grid_pts(nb_subdomain_grid_pts),
           subdomain_locations(subdomain_locations),
-          strides(get_default_strides(nb_subdomain_grid_pts)) {}
+          strides(get_col_major_strides(nb_subdomain_grid_pts)),
+          axes_order{compute_axes_order(DynCcoord_t{nb_subdomain_grid_pts},
+                                        this->strides)},
+          contiguous{true} {}
 
     /* ---------------------------------------------------------------------- */
     template <size_t Dim>
@@ -167,20 +199,16 @@ namespace muGrid {
                                  const Ccoord_t<Dim> & subdomain_locations,
                                  const Ccoord_t<Dim> & strides)
         : dim(Dim), nb_subdomain_grid_pts(nb_subdomain_grid_pts),
-          subdomain_locations(subdomain_locations), strides{strides} {
-      if (!is_buffer_contiguous(DynCcoord_t{nb_subdomain_grid_pts},
-                                DynCcoord_t{strides})) {
-        std::stringstream message{};
-        message << "DynamicPixels only supports contiguous buffers. You "
-                   "specified a grid of shape "
-                << nb_subdomain_grid_pts << " with non-contiguous strides "
-                << strides << ".";
-        throw RuntimeError{message.str()};
-      }
-    }
+          subdomain_locations(subdomain_locations), strides{strides},
+          axes_order{compute_axes_order(DynCcoord_t{nb_subdomain_grid_pts},
+                                        DynCcoord_t{strides})},
+          contiguous{is_buffer_contiguous(DynCcoord_t{nb_subdomain_grid_pts},
+                                          DynCcoord_t{strides})} {}
 
     /* ---------------------------------------------------------------------- */
-    auto DynamicPixels::begin() const -> iterator { return iterator(*this, 0); }
+    auto DynamicPixels::begin() const -> iterator {
+      return iterator(*this, 0);
+    }
 
     /* ---------------------------------------------------------------------- */
     auto DynamicPixels::end() const -> iterator {

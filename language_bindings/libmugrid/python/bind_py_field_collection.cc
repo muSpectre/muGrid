@@ -53,6 +53,7 @@ using muGrid::Index_t;
 using muGrid::Int;
 using muGrid::LocalFieldCollection;
 using muGrid::Real;
+using muGrid::StorageOrder;
 using muGrid::Uint;
 using pybind11::literals::operator""_a;
 
@@ -64,52 +65,105 @@ void add_field_collection(py::module & mod) {
       .def(
           "register_real_field",
           [](FieldCollection & collection, const std::string & unique_name,
-             const Index_t & nb_dof_per_sub_pt,
+             const Index_t & nb_components,
              const std::string & sub_division,
              const muGrid::Unit & unit) -> muGrid::TypedField<Real> & {
             return collection.register_real_field(
-                unique_name, nb_dof_per_sub_pt, sub_division, unit);
+                unique_name, nb_components, sub_division, unit);
           },
-          "unique_name"_a, "nb_dof_per_sub_pt"_a,
+          "unique_name"_a, "nb_components"_a,
+          "sub_division"_a = muGrid::PixelTag,
+          "unit"_a = muGrid::Unit::unitless(),
+          py::return_value_policy::reference_internal)
+      .def(
+          "register_real_field",
+          [](FieldCollection & collection, const std::string & unique_name,
+             const muGrid::Shape_t & components_shape,
+             const std::string & sub_division,
+             const muGrid::Unit & unit) -> muGrid::TypedField<Real> & {
+            return collection.register_real_field(
+                unique_name, components_shape, sub_division, unit);
+          },
+          "unique_name"_a, "components_shape"_a,
           "sub_division"_a = muGrid::PixelTag,
           "unit"_a = muGrid::Unit::unitless(),
           py::return_value_policy::reference_internal)
       .def(
           "register_complex_field",
           [](FieldCollection & collection, const std::string & unique_name,
-             const Index_t & nb_dof_per_sub_pt,
+             const Index_t & nb_components,
              const std::string & sub_division,
              const muGrid::Unit & unit) -> muGrid::TypedField<Complex> & {
             return collection.register_complex_field(
-                unique_name, nb_dof_per_sub_pt, sub_division, unit);
+                unique_name, nb_components, sub_division, unit);
           },
-          "unique_name"_a, "nb_dof_per_sub_pt"_a,
+          "unique_name"_a, "nb_components"_a,
+          "sub_division"_a = muGrid::PixelTag,
+          "unit"_a = muGrid::Unit::unitless(),
+          py::return_value_policy::reference_internal)
+      .def(
+          "register_complex_field",
+          [](FieldCollection & collection, const std::string & unique_name,
+             const muGrid::Shape_t & components_shape,
+             const std::string & sub_division,
+             const muGrid::Unit & unit)
+              -> muGrid::TypedField<Complex> & {
+            return collection.register_complex_field(
+                unique_name, components_shape, sub_division, unit);
+          },
+          "unique_name"_a, "components_shape"_a,
           "sub_division"_a = muGrid::PixelTag,
           "unit"_a = muGrid::Unit::unitless(),
           py::return_value_policy::reference_internal)
       .def(
           "register_uint_field",
           [](FieldCollection & collection, const std::string & unique_name,
-             const Index_t & nb_dof_per_sub_pt,
+             const Index_t & nb_components,
              const std::string & sub_division,
              const muGrid::Unit & unit) -> muGrid::TypedField<Uint> & {
             return collection.register_uint_field(
-                unique_name, nb_dof_per_sub_pt, sub_division, unit);
+                unique_name, nb_components, sub_division, unit);
           },
-          "unique_name"_a, "nb_dof_per_sub_pt"_a,
+          "unique_name"_a, "nb_components"_a,
+          "sub_division"_a = muGrid::PixelTag,
+          "unit"_a = muGrid::Unit::unitless(),
+          py::return_value_policy::reference_internal)
+      .def(
+          "register_uint_field",
+          [](FieldCollection & collection, const std::string & unique_name,
+             const muGrid::Shape_t & components_shape,
+             const std::string & sub_division,
+             const muGrid::Unit & unit) -> muGrid::TypedField<Uint> & {
+            return collection.register_uint_field(
+                unique_name, components_shape, sub_division, unit);
+          },
+          "unique_name"_a, "components_shape"_a,
           "sub_division"_a = muGrid::PixelTag,
           "unit"_a = muGrid::Unit::unitless(),
           py::return_value_policy::reference_internal)
       .def(
           "register_int_field",
           [](FieldCollection & collection, const std::string & unique_name,
-             const Index_t & nb_dof_per_sub_pt,
+             const Index_t & nb_components,
              const std::string & sub_division,
              const muGrid::Unit & unit) -> muGrid::TypedField<Int> & {
-            return collection.register_int_field(unique_name, nb_dof_per_sub_pt,
+            return collection.register_int_field(unique_name, nb_components,
                                                  sub_division, unit);
           },
-          "unique_name"_a, "nb_dof_per_sub_pt"_a,
+          "unique_name"_a, "nb_components"_a,
+          "sub_division"_a = muGrid::PixelTag,
+          "unit"_a = muGrid::Unit::unitless(),
+          py::return_value_policy::reference_internal)
+      .def(
+          "register_int_field",
+          [](FieldCollection & collection, const std::string & unique_name,
+             const muGrid::Shape_t & components_shape,
+             const std::string & sub_division,
+             const muGrid::Unit & unit) -> muGrid::TypedField<Int> & {
+            return collection.register_int_field(
+                unique_name, components_shape, sub_division, unit);
+          },
+          "unique_name"_a, "components_shape"_a,
           "sub_division"_a = muGrid::PixelTag,
           "unit"_a = muGrid::Unit::unitless(),
           py::return_value_policy::reference_internal)
@@ -188,18 +242,40 @@ void add_field_collection(py::module & mod) {
 void add_global_field_collection(py::module & mod) {
   py::class_<GlobalFieldCollection, FieldCollection>(mod,
                                                      "GlobalFieldCollection")
-      .def(py::init<const Index_t &>())
-      .def("initialise",
-           [](GlobalFieldCollection & self, const DynCcoord_t & nb_grid_pts) {
-             self.initialise(nb_grid_pts);
-           })
-      .def("initialise", (void (GlobalFieldCollection::*)(  // NOLINT
-                             const DynCcoord_t &, const DynCcoord_t &)) &
-                             GlobalFieldCollection::initialise)
+      .def(py::init<const Index_t &>(), "spatial_dimension"_a)
+      .def(py::init<const Index_t &, const FieldCollection::SubPtMap_t &,
+                    StorageOrder>(),
+           "spatial_dimension"_a, "sub_pts"_a,
+           "storage_order"_a = StorageOrder::ColMajor)
+      .def(py::init<const Index_t &, const DynCcoord_t &, const DynCcoord_t &,
+                    const FieldCollection::SubPtMap_t &, StorageOrder>(),
+           "spatial_dimension"_a, "nb_subdomain_grid_pts"_a,
+           "subdomain_locations"_a, "sub_pts"_a,
+           "storage_order"_a = StorageOrder::ColMajor)
+      .def(py::init<const Index_t &, const DynCcoord_t &, const DynCcoord_t &,
+                    const DynCcoord_t &, const FieldCollection::SubPtMap_t &,
+                    StorageOrder>(),
+           "spatial_dimension"_a, "nb_subdomain_grid_pts"_a,
+           "subdomain_locations"_a, "pixels_strides"_a, "sub_pts"_a,
+           "storage_order"_a = StorageOrder::ColMajor)
+      .def(py::init<const Index_t &, const DynCcoord_t &, const DynCcoord_t &,
+               StorageOrder, const FieldCollection::SubPtMap_t &,
+               StorageOrder>(),
+           "spatial_dimension"_a, "nb_subdomain_grid_pts"_a,
+           "subdomain_locations"_a, "pixels_storage_order"_a, "sub_pts"_a,
+           "storage_order"_a = StorageOrder::ColMajor)
       .def("initialise",
            (void (GlobalFieldCollection::*)(  // NOLINT
                const DynCcoord_t &, const DynCcoord_t &, const DynCcoord_t &)) &
-               GlobalFieldCollection::initialise)
+               GlobalFieldCollection::initialise,
+           "nb_subdomain_grid_pts"_a, "subdomain_locations"_a,
+           "pixels_strides"_a)
+      .def("initialise",
+           (void (GlobalFieldCollection::*)(  // NOLINT
+               const DynCcoord_t &, const DynCcoord_t &, StorageOrder)) &
+               GlobalFieldCollection::initialise,
+           "nb_subdomain_grid_pts"_a, "subdomain_locations"_a = DynCcoord_t{},
+           "pixels_storage_order"_a = StorageOrder::Automatic)
       .def_property_readonly("pixels", &GlobalFieldCollection::get_pixels);
 }
 

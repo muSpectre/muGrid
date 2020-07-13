@@ -34,10 +34,6 @@ covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
 
-import numpy as np
-
-# from muFFT.NetCDF import NCStructuredGrid
-
 try:
     from mpi4py import MPI
 except ImportError:
@@ -80,14 +76,14 @@ def _find_fft_engines():
 fft_engines = _find_fft_engines()
 
 
-def FFT(nb_grid_pts, fft='fftw', communicator=None):
+def FFT(nb_grid_pts, fft='fftw', communicator=None, **kwargs):
     """
     The FFT class handles forward and inverse transforms and instantiates
     the correct engine object to carry out the transform.
 
     The class holds the plan for the transform. It can only carry out
     transforms of the size specified upon instantiation. All transforms are
-    real-to-complex.
+    real-to-complex. if
 
     Parameters
     ----------
@@ -124,5 +120,5 @@ def FFT(nb_grid_pts, fft='fftw', communicator=None):
     except KeyError:
         raise KeyError("FFT engine '{}' has not been compiled into the "
                        "muFFT library.".format(factory_name))
-    engine = factory(nb_grid_pts, communicator)
+    engine = factory(nb_grid_pts, communicator, **kwargs)
     return engine

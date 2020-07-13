@@ -49,7 +49,8 @@ namespace muSpectre {
                static_cast<Index_t>(gradient.size())/lengths.get_dim(),
                DimS*DimS,
                Formulation::finite_strain},
-        xi_field{"Projection Operator", this->projection_container, PixelTag},
+        xi_field{"Projection Operator",
+                 this->fft_engine->get_fourier_field_collection(), PixelTag},
         gradient{gradient} {
     if (this->nb_quad_pts != NbQuadPts) {
       std::stringstream error;
@@ -80,9 +81,8 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimS, Index_t NbQuadPts>
-  void ProjectionFiniteStrainFast<DimS, NbQuadPts>::initialise(
-      const muFFT::FFT_PlanFlags & flags) {
-    Parent::initialise(flags);
+  void ProjectionFiniteStrainFast<DimS, NbQuadPts>::initialise() {
+    Parent::initialise();
 
     using FFTFreqs_t = muFFT::FFT_freqs<DimS>;
     using Vector_t = typename FFTFreqs_t::Vector;

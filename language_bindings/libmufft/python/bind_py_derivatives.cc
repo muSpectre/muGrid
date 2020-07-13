@@ -91,7 +91,7 @@ void add_derivative_base(py::module & mod, std::string name) {
             std::vector<ssize_t> output_shape;
             // The first dimension contains the components of The wavevector.
             // This is equal to the dimension of space.
-            ssize_t nb_dof_per_sub_pt{wavevectors_buffer.shape[0]};
+            ssize_t nb_components{wavevectors_buffer.shape[0]};
             // The next dimensions simply hold entries and we don't care about
             // the shape. The return array should have the same shape, minus
             // the first dimension.
@@ -108,8 +108,8 @@ void add_derivative_base(py::module & mod, std::string name) {
             for (ssize_t i = 0; i < nb_entries; ++i) {
               static_cast<Complex *>(factors_buffer.ptr)[i] =
                   derivative.fourier(Eigen::Map<const DerivativeBase::Vector>(
-                      wavevector, nb_dof_per_sub_pt));
-              wavevector += nb_dof_per_sub_pt;
+                      wavevector, nb_components));
+              wavevector += nb_components;
             }
             return factors;
           },

@@ -51,6 +51,12 @@ namespace muGrid {
                                                 iter_type)},
         nb_rows{this->field.get_default_nb_rows(iter_type)},
         nb_cols{this->field.get_default_nb_cols(iter_type)} {
+    if (field.get_storage_order() != StorageOrder::ColMajor) {
+      std::stringstream s;
+      s << "FieldMap requires column-major storage order, but storage order is "
+        << field.get_storage_order();
+      throw RuntimeError(s.str());
+    }
     auto & collection{this->field.get_collection()};
     if (collection.is_initialised()) {
       this->set_data_ptr();
@@ -68,6 +74,12 @@ namespace muGrid {
       : field{field}, iteration{iter_type}, stride{this->field.get_stride(
                                                 iter_type)},
         nb_rows{nb_rows_}, nb_cols{this->stride / nb_rows_} {
+    if (field.get_storage_order() != StorageOrder::ColMajor) {
+      std::stringstream s;
+      s << "FieldMap requires column-major storage order, but storage order is "
+        << field.get_storage_order();
+      throw RuntimeError(s.str());
+    }
     auto & collection{this->field.get_collection()};
     if (collection.is_initialised()) {
       this->set_data_ptr();
@@ -92,6 +104,12 @@ namespace muGrid {
       : field{other.field}, iteration{other.iteration}, stride{other.stride},
         nb_rows{other.nb_rows}, nb_cols{other.nb_cols},
         data_ptr{other.data_ptr}, is_initialised{other.is_initialised} {
+    if (field.get_storage_order() != StorageOrder::ColMajor) {
+      std::stringstream s;
+      s << "FieldMap requires column-major storage order, but storage order is "
+        << field.get_storage_order();
+      throw RuntimeError(s.str());
+    }
     auto & collection{this->field.get_collection()};
     if (not collection.is_initialised()) {
       this->callback = std::make_shared<std::function<void()>>(
@@ -157,7 +175,7 @@ namespace muGrid {
   template <typename T, Mapping Mutability>
   size_t FieldMap<T, Mutability>::size() const {
     return (this->iteration == IterUnit::SubPt)
-               ? this->field.size()
+               ? this->field.get_current_nb_entries()
                : this->field.get_collection().get_nb_pixels();
   }
 

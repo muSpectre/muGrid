@@ -76,7 +76,7 @@ namespace muGrid {
      * Protected constructor
      */
     StateField(const std::string & unique_prefix, FieldCollection & collection,
-               const Index_t & nb_memory, const Index_t & nb_dof_per_sub_pt,
+               const Index_t & nb_memory, const Index_t & nb_components,
                const std::string & sub_division, const Unit & unit);
 
    public:
@@ -148,7 +148,7 @@ namespace muGrid {
      * three-dimensional vector, or 9 for a three-dimensional second-rank
      * tensor)
      */
-    const Index_t nb_dof_per_sub_pt;
+    const Index_t nb_components;
 
     /**
      * Pixel subdivision kind (determines how many datapoints to store per
@@ -190,7 +190,7 @@ namespace muGrid {
      */
     TypedStateField(const std::string & unique_prefix,
                     FieldCollection & collection, const Index_t & nb_memory,
-                    const Index_t & nb_dof_per_sub_pt,
+                    const Index_t & nb_components,
                     const std::string & sub_division, const Unit & unit);
 
    public:

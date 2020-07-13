@@ -91,9 +91,18 @@ namespace muFFT {
     /**
      * Constructor with the domain's number of grid points in each direction and
      * the communicator
+     * @param nb_grid_pts number of grid points of the global grid
+     * @comm MPI communicator object
+     * @param allow_temporary_buffer allow the creation of temporary buffers
+     *        if the input buffer has the wrong memory layout
+     * @param allow_destroy_input allow that the input buffers are invalidated
+     *        during the FFT
      */
     FFTEngineBase(const DynCcoord_t & nb_grid_pts,
-                  Communicator comm = Communicator());
+                  Communicator comm = Communicator(),
+                  const FFT_PlanFlags & plan_flags = FFT_PlanFlags::estimate,
+                  bool allow_temporary_buffer = true,
+                  bool allow_destroy_input = false);
 
     //! Copy constructor
     FFTEngineBase(const FFTEngineBase & other) = delete;
@@ -114,38 +123,53 @@ namespace muFFT {
      * prepare a plan for a transform with nb_dof_per_pixel entries per pixel.
      * Needs to be called for every different sized transform
      */
-    virtual void initialise(const Index_t & /*nb_dof_per_pixel*/,
-                            const FFT_PlanFlags & /*plan_flags*/) = 0;
+    virtual void create_plan(const Index_t & nb_dof_per_pixel) = 0;
+
+    //! forward transform, performs copy of buffer if required
+    void fft(const RealField_t & input_field,
+             FourierField_t & output_field);
+
+    //! inverse transform, performs copy of buffer if required
+    void ifft(const FourierField_t & input_field,
+              RealField_t & output_field);
 
     /**
-     * forward transform (dummy for interface) A suitably sized fourier-space
-     * field can conveniently be obtained using
-     * `muFFT::FFTEngineBase::register_fourier_space_field`
-     */
-    virtual void fft(const RealField_t & /*input_field*/,
-                     FourierField_t & /*output_field*/) const = 0;
-
-    //! inverse transform (dummy for interface)
-    virtual void ifft(const FourierField_t & /*input_field*/,
-                      RealField_t & /*output_field*/) const = 0;
-
-    /**
-     * Create a field with the ideal strides and dimensions for this engine.
-     * Fields created this way are meant to be reused again and again, and they
-     * will stay in the memory of the `muFFT::FFTEngineBase`'s field collection
-     * until the engine is destroyed.
+     * Create a Fourier-space field with the ideal strides and dimensions for
+     * this engine. Fields created this way are meant to be reused again and
+     * again, and they will stay in the memory of the `muFFT::FFTEngineBase`'s
+     * field collection until the engine is destroyed.
      */
     virtual FourierField_t &
     register_fourier_space_field(const std::string & unique_name,
                                  const Index_t & nb_dof_per_pixel);
+
     /**
-     * Fetches a field with the ideal strides and dimensions for this engine. If
-     * the field does not exist, it is created using
+     * Fetches a Fourier-space field with the ideal strides and dimensions for
+     * this engine. If the field does not exist, it is created using
      * `register_fourier_space_field`.
      */
     FourierField_t &
     fetch_or_register_fourier_space_field(const std::string & unique_name,
                                           const Index_t & nb_dof_per_pixel);
+
+    /**
+     * Create a real-space field with the ideal strides and dimensions for this
+     * engine. Fields created this way are meant to be reused again and again,
+     * and they will stay in the memory of the `muFFT::FFTEngineBase`'s field
+     * collection until the engine is destroyed.
+     */
+    virtual RealField_t &
+    register_real_space_field(const std::string & unique_name,
+                              const Index_t & nb_dof_per_pixel);
+
+    /**
+     * Fetches a real-space field with the ideal strides and dimensions for this
+     * engine. If the field does not exist, it is created using
+     * `register_real_space_field`.
+     */
+    RealField_t &
+    fetch_or_register_real_space_field(const std::string & unique_name,
+                                       const Index_t & nb_dof_per_pixel);
 
     //! return whether this engine is active
     virtual bool is_active() const { return true; }
@@ -204,6 +228,11 @@ namespace muFFT {
       return this->fourier_strides;
     }
 
+    //! returns the field collection handling fields in real space
+    GFieldCollection_t & get_real_field_collection() {
+      return this->real_field_collection;
+    }
+
     //! returns the field collection handling fields in Fourier space
     GFieldCollection_t & get_fourier_field_collection() {
       return this->fourier_field_collection;
@@ -230,14 +259,21 @@ namespace muFFT {
     //! check whether a plan for nb_dof_per_pixel exists
     bool has_plan_for(const Index_t & nb_dof_per_pixel) const;
 
-    /**
-     * Returns the required pad size. Helpful when calling fft with wrapped
-     * fields
-     */
-    virtual Index_t
-    get_required_pad_size(const Index_t & nb_dof_per_pixel) const;
-
    protected:
+    //! forward transform, assumes that the buffer has the correct memory layout
+    virtual void compute_fft(const RealField_t & input_field,
+                             FourierField_t & output_field) const = 0;
+
+    //! inverse transform, assumes that the buffer has the correct memory layout
+    virtual void compute_ifft(const FourierField_t & input_field,
+                              RealField_t & output_field) const = 0;
+
+    //! check whether real-space buffer has the correct memory layout
+    virtual bool check_real_space_field(const RealField_t & field) const;
+
+    //! check whether Fourier-space buffer has the correct memory layout
+    virtual bool check_fourier_space_field(const FourierField_t & field) const;
+
     //! spatial dimension of the grid
     Index_t spatial_dimension;
     /**
@@ -245,7 +281,9 @@ namespace muFFT {
      * Fourier-space points
      */
     Communicator comm;  //!< communicator
-    //! Field collection to store the fft workspace
+    //! Field collection for real-space fields
+    GFieldCollection_t real_field_collection;
+    //! Field collection for Fourier-space fields
     GFieldCollection_t fourier_field_collection;
 
     //! nb_grid_pts of the full domain of the cell
@@ -267,8 +305,18 @@ namespace muFFT {
     //!< transformed data
     DynCcoord_t fourier_strides;
 
+    //! allow the FFTEngine to create temporary copies
+    bool allow_temporary_buffer;
+
+    //! allow the FFTEngine to destroy input buffers
+    bool allow_destroy_input;
+
     //!< normalisation coefficient of fourier transform
     const Real norm_factor;
+
+    //!< FFT planner flags
+    const FFT_PlanFlags plan_flags;
+
     //! number of degrees of freedom per pixel for which this field collection
     //! has been primed. Can be queried. Corresponds to the number of sub-points
     //! per pixel multiplied by the number of components per sub-point

@@ -39,12 +39,13 @@ import numpy as np
 
 from python_test_imports import muGrid
 
+
 class FieldCheck(unittest.TestCase):
     def setUp(self):
         self.nb_grid_pts = (10, 11, 21)
 
     def test_buffer_size_one_quad_pt(self):
-        fc = muGrid.GlobalFieldCollection(len(self.nb_grid_pts), 1)
+        fc = muGrid.GlobalFieldCollection(len(self.nb_grid_pts))
         fc.initialise(self.nb_grid_pts)
         # Single component
         f = fc.register_real_field("test-field", 1)
@@ -60,47 +61,102 @@ class FieldCheck(unittest.TestCase):
         # Check strides
         self.assertEqual(f.stride(muGrid.Pixel), 1)
         self.assertEqual(f2.stride(muGrid.Pixel), 4)
-        self.assertEqual(f.stride(muGrid.QuadPt), 1)
-        self.assertEqual(f2.stride(muGrid.QuadPt), 4)
+        self.assertEqual(f.stride(muGrid.SubPt), 1)
+        self.assertEqual(f2.stride(muGrid.SubPt), 4)
 
     def test_buffer_size_four_quad_pt(self):
-        fc = muGrid.GlobalFieldCollection(len(self.nb_grid_pts), 4)
+        fc = muGrid.GlobalFieldCollection(len(self.nb_grid_pts), {'quad': 4})
         fc.initialise(self.nb_grid_pts)
         # Single component
-        f = fc.register_real_field("test-field", 1)
+        f = fc.register_real_field("test-field", 1, 'quad')
         self.assertEqual(f.array(muGrid.Pixel).shape,
                          (4,) + self.nb_grid_pts)
-        self.assertEqual(f.array(muGrid.QuadPt).shape,
+        self.assertEqual(f.array(muGrid.SubPt).shape,
                          (1, 4) + self.nb_grid_pts)
         # Four components
-        f2 = fc.register_real_field("test-field2", 3)
+        f2 = fc.register_real_field("test-field2", 3, 'quad')
         self.assertEqual(f2.array(muGrid.Pixel).shape,
-                         (4*3,) + self.nb_grid_pts)
-        self.assertEqual(f2.array(muGrid.QuadPt).shape,
+                         (4 * 3,) + self.nb_grid_pts)
+        self.assertEqual(f2.array(muGrid.SubPt).shape,
                          (3, 4) + self.nb_grid_pts)
         # Check that we get those fields back
         self.assertEqual(fc.get_field('test-field'), f)
         self.assertEqual(fc.get_field('test-field2'), f2)
         # Check strides
         self.assertEqual(f.stride(muGrid.Pixel), 4)
-        self.assertEqual(f2.stride(muGrid.Pixel), 3*4)
-        self.assertEqual(f.stride(muGrid.QuadPt), 1)
-        self.assertEqual(f2.stride(muGrid.QuadPt), 3)
+        self.assertEqual(f2.stride(muGrid.Pixel), 3 * 4)
+        self.assertEqual(f.stride(muGrid.SubPt), 1)
+        self.assertEqual(f2.stride(muGrid.SubPt), 3)
 
     def test_buffer_access(self):
-        fc = muGrid.GlobalFieldCollection(len(self.nb_grid_pts), 4)
+        fc = muGrid.GlobalFieldCollection(len(self.nb_grid_pts), {'quad': 4})
         fc.initialise(self.nb_grid_pts)
         # Single component
-        f = fc.register_real_field("test-field", 1)
+        f = fc.register_real_field("test-field", 1, 'quad')
         arr1 = np.array(f, copy=False)
         self.assertFalse(arr1.flags.owndata)
-        self.assertTrue(arr1.flags.c_contiguous)
-        arr2 = f.array(muGrid.QuadPt)
+        self.assertTrue(arr1.flags.f_contiguous)
+        arr2 = f.array(muGrid.Pixel)
         self.assertFalse(arr2.flags.owndata)
         self.assertTrue(arr2.flags.f_contiguous)
 
-        arr1[2, 1, 0] = 10 # c-contiguous
-        self.assertEqual(arr2[0, 1, 2, 0, 0], 10) # f-contiguous
+        arr1[0, 0, 2, 1, 0] = 10  # f-contiguous
+        self.assertEqual(arr2[0, 2, 1, 0], 10)  # f-contiguous
+
+    def test_col_major(self):
+        dims = (3, 4)
+        fc = muGrid.GlobalFieldCollection(len(self.nb_grid_pts),
+                                          self.nb_grid_pts,
+                                          (0,) * len(self.nb_grid_pts),
+                                          {})
+        f = fc.register_real_field("test-field", dims)
+        a = np.array(f)
+        self.assertTrue(a.flags.f_contiguous)
+        self.assertEqual(a.shape, tuple(list(dims) + list(self.nb_grid_pts)))
+        strides = np.append([1], np.cumprod(dims))
+        strides = np.append(strides,
+                            strides[-1] * np.cumprod(self.nb_grid_pts))
+        strides = 8 * strides[:-1]
+        self.assertEqual(a.strides, tuple(strides))
+
+    def test_row_major(self):
+        # We need to specify the storage order twice and they mean different
+        # things.
+        dims = (3, 4)
+        fc = muGrid.GlobalFieldCollection(
+            len(self.nb_grid_pts), self.nb_grid_pts,
+            [0] * len(self.nb_grid_pts),
+            muGrid.StorageOrder.RowMajor, {}, muGrid.StorageOrder.RowMajor)
+        f = fc.register_real_field("test-field", dims,
+                                   storage_order=muGrid.StorageOrder.RowMajor)
+        a = np.array(f)
+        self.assertTrue(a.flags.c_contiguous)
+        self.assertEqual(a.shape, tuple(list(dims) + list(self.nb_grid_pts)))
+        strides = np.append([1], np.cumprod(self.nb_grid_pts[::-1]))
+        strides = np.append(strides, strides[-1] * np.cumprod(dims[::-1]))
+        strides = 8 * strides[-2::-1]
+        self.assertEqual(a.strides, tuple(strides))
+
+    def test_mixed_storage(self):
+        # We need to specify the storage order twice and they mean different
+        # things.
+        dims = (3, 4)
+        fc = muGrid.GlobalFieldCollection(
+            len(self.nb_grid_pts), self.nb_grid_pts,
+            [0] * len(self.nb_grid_pts),
+            muGrid.StorageOrder.RowMajor, {}, muGrid.StorageOrder.ColMajor)
+        f = fc.register_real_field("test-field", dims,
+                                   storage_order=muGrid.StorageOrder.RowMajor)
+        a = np.array(f)
+        self.assertFalse(a.flags.c_contiguous)
+        self.assertFalse(a.flags.f_contiguous)
+        self.assertEqual(a.shape, tuple(list(dims) + list(self.nb_grid_pts)))
+        strides = np.append([1], np.cumprod(dims[::-1]))[::-1]
+        strides = np.append(strides, strides[0] *
+                            np.cumprod(self.nb_grid_pts[::-1])[-2::-1])
+        strides = 8 * np.roll(strides, -1)
+        self.assertEqual(a.strides, tuple(strides))
+
 
 if __name__ == "__main__":
     unittest.main()

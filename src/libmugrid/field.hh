@@ -69,21 +69,44 @@ namespace muGrid {
    * points per pixel/voxel of a regular grid.
    * Fields defined on the same domains are grouped within
    * `muGrid::FieldCollection`s.
+   *
+   * To understand the interface, it is important to clarify the following
+   * nomenclature:
+   * - `Pixels` are the grid dimensions for global fields or a single linear
+   * dimension for local fields
+   * - `SubPts` specify the number of (tensor) quantities held per pixel. These
+   * could for example be quadrature points.
+   * - `Components` are the components of the physical tensor quantity
+   * represented by the field.
    */
   class Field {
    protected:
     /**
      * `Field`s are supposed to only exist in the form of `std::unique_ptr`s
      * held by a FieldCollection. The `Field` constructor is protected to
-     * ensure this.
+     * ensure this. This constructor initializes a field that does not know
+     * the shape and storage order of its components.
      * @param unique_name unique field name (unique within a collection)
-     * @param nb_dof_per_sub_pt number of components to store per quadrature
-     * point
+     * @param nb_components number of components to store per sub-point
      * @param collection reference to the holding field collection.
      */
     Field(const std::string & unique_name, FieldCollection & collection,
-          const Index_t & nb_dof_per_sub_pt, const std::string & sub_div_tag,
+          const Index_t & nb_components, const std::string & sub_div_tag,
           const Unit & unit);
+
+    /**
+     * `Field`s are supposed to only exist in the form of `std::unique_ptr`s
+     * held by a FieldCollection. The `Field` constructor is protected to
+     * ensure this.
+     * @param unique_name unique field name (unique within a collection)
+     * @param collection reference to the holding field collection.
+     * @param components_shape number of components to store per quadrature
+     * point
+     * @param storage_oder in-memory storage order of the components
+     */
+    Field(const std::string & unique_name, FieldCollection & collection,
+          const Shape_t & components_shape,
+          const std::string & sub_div_tag, const Unit & unit);
 
    public:
     //! Default constructor
@@ -110,8 +133,8 @@ namespace muGrid {
     //! return a const reference to the field's collection
     FieldCollection & get_collection() const;
 
-    //! return the number of components stored per quadrature point
-    const Index_t & get_nb_dof_per_sub_pt() const;
+    //! return the number of components stored per sub-point point
+    const Index_t & get_nb_components() const;
 
     //! return the number of sub points per pixel
     const Index_t & get_nb_sub_pts() const;
@@ -123,19 +146,55 @@ namespace muGrid {
     Index_t get_nb_pixels() const;
 
     /**
-     * returns the number of entries held by any given field in this
-     * collection. This corresponds to nb_pixels × nb_sub_pts, (I.e., a scalar
-     * field field and a vector field sharing the the same collection have the
-     * same number of entries, even though the vector field has more scalar
-     * values.)
+     * return the number of pixels that are required for the buffer. This can
+     * be larger than get_nb_pixels if the buffer contains padding regions.
+     */
+    Index_t get_nb_buffer_pixels() const;
+
+    /**
+     * returns the number of entries held by this field. This corresponds to
+     * nb_pixels × nb_sub_pts, (I.e., a scalar field and a vector field sharing
+     * the the same collection and subdivision tag have the same number of entries, even though the
+     * vector field has more scalar values.)
      */
     Index_t get_nb_entries() const;
+
+    /**
+     * returns the number of entries held by the buffer of this field. This
+     * corresponds to nb_buffer_pixels × nb_sub_pts, (I.e., a scalar field and
+     * a vector field sharing the the same collection have the same number of
+     * entries, even though the vector field has more scalar values.)
+     */
+    Index_t get_nb_buffer_entries() const;
+
+    /**
+     * evaluate and return the shape of the data contained in a single sub-point
+     * (e.g. quadrature point) (for passing the field to generic
+     * multidimensional array objects such as numpy.ndarray)
+     */
+    Shape_t get_components_shape() const;
+
+    void reshape(const Shape_t & components_shape);
+
+    /**
+     * evaluate and return the shape of the data contained in a single pixel
+     * (for passing the field to generic multidimensional array objects such as
+     * numpy.ndarray)
+     */
+    Shape_t get_sub_pt_shape(const IterUnit & iter_type) const;
+
+    /**
+     * evaluate and return the overall shape of the pixels portion of the field
+     * (for passing the field to generic multidimensional array objects such as
+     * numpy.ndarray)
+     */
+    Shape_t get_pixels_shape() const;
 
     /**
      * evaluate and return the overall shape of the field (for passing the
      * field to generic multidimensional array objects such as numpy.ndarray)
      */
-    std::vector<Index_t> get_shape(const IterUnit & iter_type) const;
+    Shape_t get_shape(const IterUnit & iter_type) const;
 
     /**
      * evaluate and return the overall strides field (for passing the field to
@@ -143,51 +202,22 @@ namespace muGrid {
      * multiplier can be used e.g., if strides are needed in bytes, rather than
      * in pointer offsets.
      */
-    std::vector<Index_t> get_strides(const IterUnit & iter_type,
-                                     const Index_t & multiplier = 1) const;
+    virtual Shape_t get_strides(const IterUnit & iter_type,
+                                Index_t element_size = 1) const;
 
     /**
-     * Evaluate and return the overall strides assuming the per-pixel layout
-     * specified in component_shape
+     * Return the storage order
      */
-    std::vector<Index_t>
-    get_strides(const std::vector<Index_t> & component_shape,
-                const Index_t & multiplier = 1) const;
-    /**
-     * evaluate and return the overall shape of the pixels portion of the field
-     * (for passing the field to generic multidimensional array objects such as
-     * numpy.ndarray)
-     */
-    std::vector<Index_t> get_pixels_shape() const;
-
-    /**
-     * evaluate and return the shape of the data contained in a single pixel or
-     * sub-point (e.g. quadrature point) (for passing the field to generic
-     * multidimensional array objects such as numpy.ndarray)
-     */
-    virtual std::vector<Index_t>
-    get_components_shape(const IterUnit & iter_type) const;
-
-    /**
-     * evaluate and return the strides of the degrees of freedom per pixel
-     * portion of the field (for passing the field to generic multidimensional
-     * array objects such as numpy.ndarray)
-     */
-    virtual std::vector<Index_t>
-    get_components_strides(const IterUnit & iter_type) const;
-
-    /**
-     * evaluate and return the overall strides of the pixels portion of the
-     * field (for passing the field to generic multidimensional array objects
-     * such as numpy.ndarray)
-     */
-    std::vector<Index_t> get_pixels_strides() const;
+    virtual StorageOrder get_storage_order() const;
 
     /**
      * evaluate and return the number of components in an iterate when iterating
      * over this field
      */
     Index_t get_stride(const IterUnit & iter_type) const;
+
+    //! check whether two fields have the same memory layout
+    bool has_same_memory_layout(const Field & other) const;
 
     /**
      * evaluate and return the number of rows of a default iterate over this
@@ -212,10 +242,10 @@ namespace muGrid {
     virtual const std::type_info & get_stored_typeid() const = 0;
 
     //! number of entries in the field (= nb_pixel × nb_sub_pts)
-    size_t size() const;
+    Index_t get_current_nb_entries() const;
 
     //! size of the internal buffer including the pad region (in scalars)
-    virtual size_t buffer_size() const = 0;
+    virtual size_t get_buffer_size() const = 0;
 
     /**
      * add a pad region to the end of the field buffer; required for using this
@@ -251,10 +281,32 @@ namespace muGrid {
     void set_nb_sub_pts(const Index_t & nb_quad_pts_per_pixel);
 
     /**
-     * maintains a tally of the current size, as it cannot be reliably
-     * determined from either `values` or `alt_values` alone.
+     * evaluate and return the strides of the sub-point portion of the field
+     * (for passing the field to generic multidimensional array objects such
+     * as numpy.ndarray)
      */
-    size_t current_size{};
+    Shape_t get_components_strides(Index_t element_size = 1) const;
+
+    /**
+     * evaluate and return the strides of the pixels
+     * portion of the field (for passing the field to generic multidimensional
+     * array objects such as numpy.ndarray)
+     */
+    Shape_t get_sub_pt_strides(const IterUnit & iter_type,
+                               Index_t element_size = 1) const;
+
+    /**
+     * evaluate and return the overall strides of the pixels portion of the
+     * field (for passing the field to generic multidimensional array objects
+     * such as numpy.ndarray)
+     */
+    Shape_t get_pixels_strides(Index_t element_size = 1) const;
+
+    /**
+     * maintains a tally of the current size, as it cannot be reliably
+     * determined from `values` alone.
+     */
+    Index_t current_nb_entries{};
 
     //! resizes the field to the given size
     virtual void resize() = 0;
@@ -269,7 +321,13 @@ namespace muGrid {
      * three-dimensional vector, or 9 for a three-dimensional second-rank
      * tensor)
      */
-    const Index_t nb_dof_per_sub_pt;
+    const Index_t nb_components;
+
+    /**
+     * shape of the data stored per sub-point (e.g., 3, 3 for a
+     * three-dimensional second-rank tensor)
+     */
+    Shape_t components_shape;
 
     //! size of padding region at end of buffer
     size_t pad_size{};

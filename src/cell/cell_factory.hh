@@ -64,7 +64,8 @@ namespace muSpectre {
     inline std::unique_ptr<ProjectionBase> cell_input_helper(
         const DynCcoord_t & nb_grid_pts, const DynRcoord_t & lengths,
         const Formulation & form, muFFT::Gradient_t gradient,
-        const muFFT::Communicator & comm = muFFT::Communicator()) {
+        const muFFT::Communicator & comm = muFFT::Communicator(),
+        const muFFT::FFT_PlanFlags & flags = muFFT::FFT_PlanFlags::estimate) {
       auto && dim{nb_grid_pts.get_dim()};
       if (static_cast<Index_t>(gradient.size()) % dim != 0) {
         std::stringstream error{};
@@ -75,7 +76,7 @@ namespace muSpectre {
       }
       // Deduce number of quad points from the gradient
       const auto nb_quad_pts{gradient.size() / dim};
-      auto fft_ptr{std::make_unique<FFTEngine>(nb_grid_pts, comm)};
+      auto fft_ptr{std::make_unique<FFTEngine>(nb_grid_pts, comm, flags)};
       switch (form) {
       case Formulation::finite_strain: {
         if (nb_quad_pts == OneQuadPt) {
@@ -133,10 +134,11 @@ namespace muSpectre {
    * @param comm communicator used for solving distributed problems
    */
   template <class FFTEngine = muFFT::FFTWEngine>
-  inline std::unique_ptr<ProjectionBase>
-  cell_input(const DynCcoord_t & nb_grid_pts, const DynRcoord_t & lengths,
-             const Formulation & form, muFFT::Gradient_t gradient,
-             const muFFT::Communicator & comm = muFFT::Communicator()) {
+  inline std::unique_ptr<ProjectionBase> cell_input(
+      const DynCcoord_t & nb_grid_pts, const DynRcoord_t & lengths,
+      const Formulation & form, muFFT::Gradient_t gradient,
+      const muFFT::Communicator & comm = muFFT::Communicator(),
+      const muFFT::FFT_PlanFlags & flags = muFFT::FFT_PlanFlags::estimate) {
     const Index_t dim{nb_grid_pts.get_dim()};
     if (dim != lengths.get_dim()) {
       std::stringstream error{};
@@ -146,18 +148,18 @@ namespace muSpectre {
     }
     switch (dim) {
     case oneD: {
-      return internal::cell_input_helper<oneD, FFTEngine>(nb_grid_pts, lengths,
-                                                          form, gradient, comm);
+      return internal::cell_input_helper<oneD, FFTEngine>(
+          nb_grid_pts, lengths, form, gradient, comm, flags);
       break;
     }
     case twoD: {
-      return internal::cell_input_helper<twoD, FFTEngine>(nb_grid_pts, lengths,
-                                                          form, gradient, comm);
+      return internal::cell_input_helper<twoD, FFTEngine>(
+          nb_grid_pts, lengths, form, gradient, comm, flags);
       break;
     }
     case threeD: {
       return internal::cell_input_helper<threeD, FFTEngine>(
-          nb_grid_pts, lengths, form, gradient, comm);
+          nb_grid_pts, lengths, form, gradient, comm, flags);
       break;
     }
     default:
@@ -179,13 +181,15 @@ namespace muSpectre {
    * @param comm communicator used for solving distributed problems
    */
   template <class FFTEngine = muFFT::FFTWEngine>
-  inline std::unique_ptr<ProjectionBase>
-  cell_input(const DynCcoord_t & nb_grid_pts, const DynRcoord_t & lengths,
-             const Formulation & form,
-             const muFFT::Communicator & comm = muFFT::Communicator()) {
+  inline std::unique_ptr<ProjectionBase> cell_input(
+      const DynCcoord_t & nb_grid_pts, const DynRcoord_t & lengths,
+      const Formulation & form,
+      const muFFT::Communicator & comm = muFFT::Communicator(),
+      const muFFT::FFT_PlanFlags & flags = muFFT::FFT_PlanFlags::estimate) {
     const Index_t dim{nb_grid_pts.get_dim()};
     return cell_input<FFTEngine>(nb_grid_pts, lengths, form,
-                                 muFFT::make_fourier_gradient(dim), comm);
+                                 muFFT::make_fourier_gradient(dim), comm,
+                                 flags);
   }
 
   /**
@@ -201,12 +205,13 @@ namespace muSpectre {
    * @param comm communicator used for solving distributed problems
    */
   template <typename Cell_t = Cell, class FFTEngine = muFFT::FFTWEngine>
-  inline Cell_t
-  make_cell(DynCcoord_t nb_grid_pts, DynRcoord_t lengths, Formulation form,
-            muFFT::Gradient_t gradient,
-            const muFFT::Communicator & comm = muFFT::Communicator()) {
-    auto && input =
-        cell_input<FFTEngine>(nb_grid_pts, lengths, form, gradient, comm);
+  inline Cell_t make_cell(
+      DynCcoord_t nb_grid_pts, DynRcoord_t lengths, Formulation form,
+      muFFT::Gradient_t gradient,
+      const muFFT::Communicator & comm = muFFT::Communicator(),
+      const muFFT::FFT_PlanFlags & flags = muFFT::FFT_PlanFlags::estimate) {
+    auto && input = cell_input<FFTEngine>(nb_grid_pts, lengths, form, gradient,
+                                          comm, flags);
     auto cell{Cell_t{std::move(input)}};
     return cell;
   }
@@ -223,12 +228,14 @@ namespace muSpectre {
    * @param comm communicator used for solving distributed problems
    */
   template <typename Cell_t = Cell, class FFTEngine = muFFT::FFTWEngine>
-  inline Cell_t
-  make_cell(DynCcoord_t nb_grid_pts, DynRcoord_t lengths, Formulation form,
-            const muFFT::Communicator & comm = muFFT::Communicator()) {
+  inline Cell_t make_cell(
+      DynCcoord_t nb_grid_pts, DynRcoord_t lengths, Formulation form,
+      const muFFT::Communicator & comm = muFFT::Communicator(),
+      const muFFT::FFT_PlanFlags & flags = muFFT::FFT_PlanFlags::estimate) {
     const Index_t dim{nb_grid_pts.get_dim()};
-    return make_cell<Cell_t, FFTEngine>(
-        nb_grid_pts, lengths, form, muFFT::make_fourier_gradient(dim), comm);
+    return make_cell<Cell_t, FFTEngine>(nb_grid_pts, lengths, form,
+                                        muFFT::make_fourier_gradient(dim), comm,
+                                        flags);
   }
 
 }  // namespace muSpectre

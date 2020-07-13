@@ -140,7 +140,7 @@ int main(int argc, char * argv[]) {
 
     cell.add_material(std::move(Material_soft));
     cell.add_material(std::move(Material_hard));
-    cell.initialise(muFFT::FFT_PlanFlags::measure);
+    cell.initialise();
 
     constexpr Real newton_tol{1e-4};
     constexpr Real equil_tol{1e-7};

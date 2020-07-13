@@ -77,9 +77,8 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimS>
-  void ProjectionApproxGreenOperator<DimS>::initialise(
-      const muFFT::FFT_PlanFlags & flags) {
-    Parent::initialise(flags);
+  void ProjectionApproxGreenOperator<DimS>::initialise() {
+    Parent::initialise();
     ProjectionApproxGreenOperator<DimS>::reinitialise(this->C_ref);
   }
   /* ---------------------------------------------------------------------- */
