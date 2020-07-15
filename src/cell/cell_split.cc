@@ -175,7 +175,7 @@ namespace muSpectre {
     // want to add up contribution
     // of the partial influence of different materials assigend to each pixel.
     // Therefore, this values should be
-    // initiialised as zero filled tensors
+    // initialised as zero filled tensors
     this->stress.set_zero();
     for (auto & mat : this->materials) {
       mat->compute_stresses(this->strain, this->stress,
@@ -255,9 +255,17 @@ namespace muSpectre {
   /* ----------------------------------------------------------------------*/
 
   void CellSplit::complete_material_assignment(MaterialBase & material) {
-    for (auto && mat : this->materials) {
-      if (mat->get_name() != material.get_name()) {
-        mat->initialise();
+    if (this->is_initialised()) {
+      throw RuntimeError(
+          "The cell is already initialised. Therefore, it is not "
+          "possible to complete material assignemnt for it");
+    } else {
+      for (auto && mat : this->materials) {
+        if (mat->get_name() != material.get_name()) {
+          if (!mat->get_is_initialised()) {
+            mat->initialise();
+          }
+        }
       }
     }
     std::vector<Real> pixel_assigned_ratio(this->get_assigned_ratios());
@@ -296,8 +304,8 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------*/
-  bool CellSplit::IncompletePixels::iterator::
-  operator!=(const iterator & other) {
+  bool
+  CellSplit::IncompletePixels::iterator::operator!=(const iterator & other) {
     return (this->index != other.index);
   }
 

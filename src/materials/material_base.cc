@@ -38,6 +38,8 @@
 #include <libmugrid/field.hh>
 #include <libmugrid/field_typed.hh>
 
+using muGrid::RuntimeError;
+
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
@@ -172,7 +174,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   muGrid::RealField & MaterialBase::get_native_stress() {
-    throw std::runtime_error("Not implemented for this material");
+    throw RuntimeError("Not implemented for this material");
   }
 
   /* ---------------------------------------------------------------------- */
@@ -180,6 +182,12 @@ namespace muSpectre {
     if (!this->is_initialised) {
       this->internal_fields->initialise();
       this->is_initialised = true;
+    } else {
+      std::stringstream err_str{};
+      err_str << "The material " << this->name
+              << " has been already initialised."
+              << "Therefore, it cannot be initialised again" << std::endl;
+      throw RuntimeError(err_str.str());
     }
   }
 
@@ -204,4 +212,10 @@ namespace muSpectre {
   bool MaterialBase::was_last_step_nonlinear() const {
     return this->last_step_was_nonlinear;
   }
+
+  /* ---------------------------------------------------------------------- */
+  const bool & MaterialBase::get_is_initialised() {
+    return this->is_initialised;
+  }
+
 }  // namespace muSpectre

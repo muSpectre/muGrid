@@ -46,7 +46,7 @@ namespace muSpectre {
 
   using muGrid::testGoodies::rel_error;
 
-  BOOST_AUTO_TEST_SUITE(material_linear_visco_elastic_deviatoric_small_strain)
+  BOOST_AUTO_TEST_SUITE(material_visco_elastic_ss)
 
   template <Index_t Dim>
   struct MaterialFixture {

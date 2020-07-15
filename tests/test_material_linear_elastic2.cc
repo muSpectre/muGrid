@@ -34,6 +34,7 @@
  * Program grant you additional permission to convey the resulting work.
  *
  */
+
 #include "tests.hh"
 #include "libmugrid/test_goodies.hh"
 
@@ -258,6 +259,7 @@ namespace muSpectre {
         globalfields.get_field("Nominal Stress2"));
     typename traits::TangentMap_t Kmap(
         globalfields.get_field("Tangent Moduli"));
+
     for (auto tup : akantu::zip(Pmap_ref, Pmap_2, Kmap_ref, Kmap)) {
       auto P_r = std::get<0>(tup);
       auto P = std::get<1>(tup);

@@ -101,7 +101,9 @@ namespace muSpectre {
     MaterialLinearElastic1(const std::string & name,
                            const Index_t & spatial_dimension,
                            const Index_t & nb_quad_pts, const Real & young,
-                           const Real & poisson);
+                           const Real & poisson,
+                           const std::shared_ptr<muGrid::LocalFieldCollection> &
+                               parent_field_collection = nullptr);
 
     //! Move constructor
     MaterialLinearElastic1(MaterialLinearElastic1 && other) = delete;

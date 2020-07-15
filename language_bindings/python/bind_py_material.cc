@@ -55,7 +55,7 @@ namespace py = pybind11;
 /* ---------------------------------------------------------------------- */
 template <Index_t Dim>
 void add_material_linear_elastic_generic1_helper(py::module & mod);
-/* ---------------------------------------------------------------------- */
+
 template <Index_t Dim>
 void add_material_linear_elastic_generic2_helper(py::module & mod);
 
@@ -71,6 +71,10 @@ void add_material_linear_elastic3_helper(py::module & mod);
 template <Index_t Dim>
 void add_material_linear_elastic4_helper(py::module & mod);
 template <Index_t Dim>
+void add_material_linear_elastic_damage1_helper(py::module & mod);
+template <Index_t Dim>
+void add_material_linear_elastic_damage2_helper(py::module & mod);
+template <Index_t Dim>
 void add_material_hyper_elasto_plastic1_helper(py::module & mod);
 template <Index_t Dim>
 void add_material_hyper_elasto_plastic2_helper(py::module & mod);
@@ -79,7 +83,9 @@ void add_material_stochastic_plasticity_helper(py::module & mod);
 template <Index_t Dim>
 void add_material_visco_elastic_ss_helper(py::module & mod);
 template <Index_t Dim>
-void add_material_visco_elastic_damage_ss_helper(py::module & mod);
+void add_material_visco_elastic_damage_ss1_helper(py::module & mod);
+template <Index_t Dim>
+void add_material_visco_elastic_damage_ss2_helper(py::module & mod);
 template <Index_t Dim>
 void add_material_neo_hookean_elastic_helper(py::module & mod);
 
@@ -164,67 +170,67 @@ void add_material_evaluator(py::module & mod) {
       .def(py::init<std::shared_ptr<muSpectre::MaterialBase>>())
       .def("save_history_variables", &MatEval_t::save_history_variables,
            "for materials with state variables")
-      .def("evaluate_stress",
-           [](MatEval_t & mateval, py::EigenDRef<Eigen::MatrixXd> & grad,
-              muSpectre::Formulation form) {
-             if ((grad.cols() != Dim) or (grad.rows() != Dim)) {
-               std::stringstream err{};
-               err << "need matrix of shape (" << Dim << "×" << Dim
-                   << ") but got (" << grad.rows() << "×" << grad.cols()
-                   << ").";
-               throw RuntimeError(err.str());
-             }
-             return mateval.evaluate_stress(grad, form);
-           },
-           "strain"_a, "formulation"_a,
-           "Evaluates stress for a given strain and formulation "
-           "(Piola-Kirchhoff 1 stress as a function of the placement gradient "
-           "P = P(F) for formulation=Formulation.finite_strain and Cauchy "
-           "stress as a function of the infinitesimal strain tensor σ = σ(ε) "
-           "for formulation=Formulation.small_strain)",
-           py::return_value_policy::reference_internal)
-      .def("evaluate_stress_tangent",
-           [](MatEval_t & mateval, py::EigenDRef<Eigen::MatrixXd> & grad,
-              muSpectre::Formulation form) {
-             if ((grad.cols() != Dim) or (grad.rows() != Dim)) {
-               std::stringstream err{};
-               err << "need matrix of shape (" << Dim << "×" << Dim
-                   << ") but got (" << grad.rows() << "×" << grad.cols()
-                   << ").";
-               throw RuntimeError(err.str());
-             }
-             return mateval.evaluate_stress_tangent(grad, form);
-           },
-           "strain"_a, "formulation"_a,
-           "Evaluates stress and tangent moduli for a given strain and "
-           "formulation (Piola-Kirchhoff 1 stress as a function of the "
-           "placement gradient P = P(F) for "
-           "formulation=Formulation.finite_strain and Cauchy stress as a "
-           "function of the infinitesimal strain tensor σ = σ(ε) for "
-           "formulation=Formulation.small_strain). The tangent moduli are K = "
-           "∂P/∂F for formulation=Formulation.finite_strain and C = ∂σ/∂ε for "
-           "formulation=Formulation.small_strain.",
-           py::return_value_policy::reference_internal)
-      .def("estimate_tangent",
-           [](MatEval_t & evaluator, py::EigenDRef<Eigen::MatrixXd> & grad,
-              muSpectre::Formulation form, const Real step,
-              const muSpectre::FiniteDiff diff_type) {
-             if ((grad.cols() != Dim) or (grad.rows() != Dim)) {
-               std::stringstream err{};
-               err << "need matrix of shape (" << Dim << "×" << Dim
-                   << ") but got (" << grad.rows() << "×" << grad.cols()
-                   << ").";
-               throw RuntimeError(err.str());
-             }
-             return evaluator.estimate_tangent(grad, form, step, diff_type);
-           },
-           "strain"_a, "formulation"_a, "Delta_x"_a,
-           "difference_type"_a = muSpectre::FiniteDiff::centred,
-           "Numerical estimate of the tangent modulus using finite "
-           "differences. The finite difference scheme as well as the finite "
-           "step size can be chosen. If there are no special circumstances, "
-           "the default scheme of centred finite differences yields the most "
-           "accurate results at an increased computational cost.");
+      .def(
+          "evaluate_stress",
+          [](MatEval_t & mateval, py::EigenDRef<Eigen::MatrixXd> & grad,
+             muSpectre::Formulation form) {
+            if ((grad.cols() != Dim) or (grad.rows() != Dim)) {
+              std::stringstream err{};
+              err << "need matrix of shape (" << Dim << "×" << Dim
+                  << ") but got (" << grad.rows() << "×" << grad.cols() << ").";
+              throw RuntimeError(err.str());
+            }
+            return mateval.evaluate_stress(grad, form);
+          },
+          "strain"_a, "formulation"_a,
+          "Evaluates stress for a given strain and formulation "
+          "(Piola-Kirchhoff 1 stress as a function of the placement gradient "
+          "P = P(F) for formulation=Formulation.finite_strain and Cauchy "
+          "stress as a function of the infinitesimal strain tensor σ = σ(ε) "
+          "for formulation=Formulation.small_strain)",
+          py::return_value_policy::reference_internal)
+      .def(
+          "evaluate_stress_tangent",
+          [](MatEval_t & mateval, py::EigenDRef<Eigen::MatrixXd> & grad,
+             muSpectre::Formulation form) {
+            if ((grad.cols() != Dim) or (grad.rows() != Dim)) {
+              std::stringstream err{};
+              err << "need matrix of shape (" << Dim << "×" << Dim
+                  << ") but got (" << grad.rows() << "×" << grad.cols() << ").";
+              throw RuntimeError(err.str());
+            }
+            return mateval.evaluate_stress_tangent(grad, form);
+          },
+          "strain"_a, "formulation"_a,
+          "Evaluates stress and tangent moduli for a given strain and "
+          "formulation (Piola-Kirchhoff 1 stress as a function of the "
+          "placement gradient P = P(F) for "
+          "formulation=Formulation.finite_strain and Cauchy stress as a "
+          "function of the infinitesimal strain tensor σ = σ(ε) for "
+          "formulation=Formulation.small_strain). The tangent moduli are K = "
+          "∂P/∂F for formulation=Formulation.finite_strain and C = ∂σ/∂ε for "
+          "formulation=Formulation.small_strain.",
+          py::return_value_policy::reference_internal)
+      .def(
+          "estimate_tangent",
+          [](MatEval_t & evaluator, py::EigenDRef<Eigen::MatrixXd> & grad,
+             muSpectre::Formulation form, const Real step,
+             const muSpectre::FiniteDiff diff_type) {
+            if ((grad.cols() != Dim) or (grad.rows() != Dim)) {
+              std::stringstream err{};
+              err << "need matrix of shape (" << Dim << "×" << Dim
+                  << ") but got (" << grad.rows() << "×" << grad.cols() << ").";
+              throw RuntimeError(err.str());
+            }
+            return evaluator.estimate_tangent(grad, form, step, diff_type);
+          },
+          "strain"_a, "formulation"_a, "Delta_x"_a,
+          "difference_type"_a = muSpectre::FiniteDiff::centred,
+          "Numerical estimate of the tangent modulus using finite "
+          "differences. The finite difference scheme as well as the finite "
+          "step size can be chosen. If there are no special circumstances, "
+          "the default scheme of centred finite differences yields the most "
+          "accurate results at an increased computational cost.");
 }
 
 void add_material_base_helper(py::module & mod) {
@@ -240,8 +246,9 @@ void add_material_base_helper(py::module & mod) {
       .def("save_history_variables", &Material::save_history_variables)
       .def("list_fields", &Material::list_fields)
       .def("size", &Material::size)
-      .def("add_pixel", [](Material & mat, size_t pix) { mat.add_pixel(pix); },
-           "pixel"_a)
+      .def(
+          "add_pixel", [](Material & mat, size_t pix) { mat.add_pixel(pix); },
+          "pixel"_a)
       .def_property_readonly(
           "collection",
           [](Material & material) -> muGrid::FieldCollection & {
@@ -257,13 +264,16 @@ void add_material_helper(py::module & mod) {
   add_material_linear_elastic2_helper<Dim>(mod);
   add_material_linear_elastic3_helper<Dim>(mod);
   add_material_linear_elastic4_helper<Dim>(mod);
+  add_material_linear_elastic_damage1_helper<Dim>(mod);
+  add_material_linear_elastic_damage2_helper<Dim>(mod);
   add_material_hyper_elasto_plastic1_helper<Dim>(mod);
   add_material_hyper_elasto_plastic2_helper<Dim>(mod);
   add_material_linear_elastic_generic1_helper<Dim>(mod);
   add_material_linear_elastic_generic2_helper<Dim>(mod);
   add_material_stochastic_plasticity_helper<Dim>(mod);
   add_material_visco_elastic_ss_helper<Dim>(mod);
-  add_material_visco_elastic_damage_ss_helper<Dim>(mod);
+  add_material_visco_elastic_damage_ss1_helper<Dim>(mod);
+  add_material_visco_elastic_damage_ss2_helper<Dim>(mod);
   add_material_neo_hookean_elastic_helper<Dim>(mod);
   add_material_evaluator<Dim>(mod);
 

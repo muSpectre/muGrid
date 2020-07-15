@@ -140,6 +140,20 @@ muSpectre_add_example(visco_damage_py_example
 muSpectre_add_example(field_extraction_py_example
   TYPE PYTHON  field_extraction_example.py)
 
+muSpectre_add_example(first_conc_py_example
+  TYPE PYTHON  first_concrete_example.py 1)
+
+muSpectre_add_example(sec_conc_py_example
+  TYPE PYTHON  second_concrete_example.py 1)
+
+# additional file(s) to copy
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/concrete_micro_structure.npy
+  DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
+
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/random_field.npy
+    DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
+
+
 if(${MUSPECTRE_MPI_PARALLEL})
   # additional files to copy
   file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/odd_image.npz

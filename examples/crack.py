@@ -7,7 +7,7 @@
 
 @date   05 Jun 2019
 
-@brief  
+@brief  crack example
 
 Copyright © 2019 Till Junge
 
@@ -46,27 +46,27 @@ nx, ny = nb_domain_grid_pts
 center = np.array([r//2 for r in nb_domain_grid_pts])
 crack_length = 11
 
-## Domain dimensions
+# Domain dimensions
 #domain_lengths = [7., 5.]
 domain_lengths = [float(r) for r in nb_domain_grid_pts]
 
-## define the convergence tolerance for the Newton-Raphson increment
+# define the convergence tolerance for the Newton-Raphson increment
 newton_tol = 1e-8
 equil_tol = newton_tol
-## tolerance for the solver of the linear cell
+# tolerance for the solver of the linear cell
 cg_tol = 1e-14
 
-## Macroscopic strain
+# Macroscopic strain
 applied_strain = np.array([[.1, 0.],
                            [0., .1]])
 #applied_strain = .5*(applied_strain + applied_strain.T)
 
 
-maxiter = 1000 ## for linear cell solver
+maxiter = 1000  # for linear cell solver
 
-## Verbosity levels:
-## 0: silent,
-## 1: info about Newton-Raphson loop,
+# Verbosity levels:
+# 0: silent,
+# 1: info about Newton-Raphson loop,
 verbose = 1
 
 ###
@@ -84,10 +84,10 @@ dy = msp.DiscreteDerivative([0, 0], [[-0.5, 0.5], [-0.5, 0.5]])
 # This is the fourth order central differences stencil
 #dy = msp.DiscreteDerivative([0, -2], [[1/12, -2/3, 0, 2/3, -1/12]])
 # This is the sixth order central differences stencil
-#dy = msp.DiscreteDerivative([0, -3], [[-1/60, 3/20, -3/4, 0,
+# dy = msp.DiscreteDerivative([0, -3], [[-1/60, 3/20, -3/4, 0,
 #                                       3/4, -3/20, 1/60]])
 # This is the eigth order central differences stencil
-#dy = msp.DiscreteDerivative([0, -4], [[1/280, -4/105, 1/5, -4/5, 0,
+# dy = msp.DiscreteDerivative([0, -4], [[1/280, -4/105, 1/5, -4/5, 0,
 #                                       4/5, -1/5, 4/105, -1/280]])
 # Rotate stencil for the derivative in the other direction
 dx = dy.rollaxes()
@@ -105,7 +105,7 @@ for i, derivative in enumerate([fourier_gradient, discrete_gradient]):
     vacuum = msp.material.MaterialLinearElastic1_2d.make(rve, "vacuum", 0., 0.)
     for j, pixel in rve.pixels.enumerate():
         if pixel[1] == center[1] and \
-            abs(pixel[0] - center[0]) < crack_length//2:
+                abs(pixel[0] - center[0]) < crack_length//2:
             vacuum.add_pixel(j)
             phase[pixel[0], pixel[1]] = 2
         else:

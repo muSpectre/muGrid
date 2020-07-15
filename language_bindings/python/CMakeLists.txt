@@ -54,8 +54,11 @@ set (PY_BINDING_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_linear_elastic2.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_linear_elastic3.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_linear_elastic4.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_linear_elastic_damage1.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_linear_elastic_damage2.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_visco_elastic_ss.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_visco_elastic_damage_ss.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_visco_elastic_damage_ss1.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_visco_elastic_damage_ss2.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_neo_hookean_elastic.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_hyper_elasto_plastic1.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_hyper_elasto_plastic2.cc

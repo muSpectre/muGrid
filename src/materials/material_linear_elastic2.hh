@@ -50,7 +50,7 @@ namespace muSpectre {
   class MaterialLinearElastic2;
 
   /**
-   * traits for objective linear elasticity with eigenstrain
+   * traits for objective linear elasticity with per pixel strength
    */
   template <Index_t DimM>
   struct MaterialMuSpectre_traits<MaterialLinearElastic2<DimM>> {
@@ -71,7 +71,7 @@ namespace muSpectre {
   };
 
   /**
-   * implements objective linear elasticity with an eigenstrain per pixel
+   * implements objective linear elasticity with damage an  per pixel strength
    */
   template <Index_t DimM>
   class MaterialLinearElastic2

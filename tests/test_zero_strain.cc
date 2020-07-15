@@ -132,6 +132,7 @@ namespace muSpectre {
     auto && res{newton_cg(cell_material, delF0, cg_material, newton_tol,
                           equi_tol, verbose, IsStrainInitialised::False)};
     auto && counter_after{cg_material.get_counter()};
+    BOOST_CHECK(res.success);
     BOOST_CHECK_EQUAL(counter_before, counter_after);
   }
 

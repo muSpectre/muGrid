@@ -109,6 +109,32 @@ namespace muSpectre {
     BOOST_CHECK_NO_THROW(fix::add_material(std::move(Material_hard)));
   }
 
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(double_initialisation_test, fix, fixlist,
+                                   fix) {
+    constexpr Dim_t dim{fix::sdim};
+    using Material_t = MaterialLinearElastic1<dim>;
+    auto material_hard =
+        std::make_unique<Material_t>("hard", dim, OneQuadPt, 210e9, 0.33);
+    for (const auto & pixel_id : this->get_pixel_indices()) {
+      material_hard->add_pixel(pixel_id);
+    }
+    fix::add_material(std::move(material_hard));
+    fix::initialise();
+    BOOST_CHECK_THROW(fix::initialise(), std::runtime_error);
+  }
+
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(double_material_initialisation_testt, fix,
+                                   fixlist, fix) {
+    constexpr Dim_t Dim{fix::sdim};
+    using Mat_t = MaterialLinearElastic1<Dim>;
+    auto & material_hard{Mat_t::make(*this, "hard", 210e9, .3)};
+    for (const auto & pixel_id : this->get_pixel_indices()) {
+      material_hard.add_pixel(pixel_id);
+    }
+    material_hard.initialise();
+    BOOST_CHECK_THROW(material_hard.initialise(), std::runtime_error);
+  }
+
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(simple_evaluation_test, fix, fixlist, fix) {
     constexpr Dim_t dim{fix::sdim};
     constexpr Formulation form{fix::formulation};
@@ -518,9 +544,8 @@ namespace muSpectre {
 
     // wrong name/ inexistant field
     const std::string wrong_name{"wrong_name"};
-    BOOST_CHECK_THROW(
-        this->globalise_real_old_field(wrong_name, 1),
-        std::runtime_error);
+    BOOST_CHECK_THROW(this->globalise_real_old_field(wrong_name, 1),
+                      std::runtime_error);
 
     // wrong scalar type:
     const std::string wrong_scalar_name{"wrong_scalar"};

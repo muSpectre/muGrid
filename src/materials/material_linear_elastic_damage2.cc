@@ -1,14 +1,13 @@
 /**
- * @file   material_linear_elastic2.cc
+ * @file   material_linear_elastic_damage2.cc
  *
- * @author Till Junge <till.junge@altermail.ch>
  * @author Ali Falsafi <ali.falsafi@epfl.ch>
  *
- * @date   04 Feb 2018
+ * @date   04 May 2020
  *
- * @brief  implementation for linear elastic material with eigenstrain
+ * @brief  implementation of MaterialLinearElasticDamage2
  *
- * Copyright © 2018 Till Junge
+ * Copyright © 2020 Ali Falsafi
  *
  * µSpectre is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
@@ -34,39 +33,54 @@
  *
  */
 
-#include "materials/material_linear_elastic2.hh"
+#include "materials/material_linear_elastic_damage2.hh"
 
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
-  MaterialLinearElastic2<DimM>::MaterialLinearElastic2(
+  MaterialLinearElasticDamage2<DimM>::MaterialLinearElasticDamage2(
       const std::string & name, const Index_t & spatial_dimension,
-      const Index_t & nb_quad_pts, Real young, Real poisson)
+      const Index_t & nb_quad_pts, const Real & young, const Real & poisson,
+      const Real & kappa_init, const Real & alpha, const Real & beta)
       : Parent{name, spatial_dimension, nb_quad_pts},
-        material{name, spatial_dimension, nb_quad_pts, young, poisson},
-        eigen_strains{this->get_prefix() + "Eigenstrain",
-                      *this->internal_fields, QuadPtTag} {
-    this->last_step_was_nonlinear = false;
-  }
+        material_child(name + "_child", spatial_dimension, nb_quad_pts, young,
+                       poisson, kappa_init, alpha, beta,
+                       this->internal_fields) {}
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
-  void MaterialLinearElastic2<DimM>::add_pixel(const size_t & /*pixel_index*/) {
-    throw std::runtime_error("this material needs pixels with an eigenstrain");
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <Index_t DimM>
-  void MaterialLinearElastic2<DimM>::add_pixel(const size_t & pixel_index,
-                                               const StrainTensor & E_eig) {
+  void
+  MaterialLinearElasticDamage2<DimM>::add_pixel(const size_t & pixel_index) {
     this->internal_fields->add_pixel(pixel_index);
-    Eigen::Map<const Eigen::Array<Real, DimM * DimM, 1>> strain_array(
-        E_eig.data());
-    this->eigen_strains.get_field().push_back(strain_array);
   }
 
-  template class MaterialLinearElastic2<twoD>;
-  template class MaterialLinearElastic2<threeD>;
+  /* ---------------------------------------------------------------------- */
+  template <Index_t DimM>
+  void
+  MaterialLinearElasticDamage2<DimM>::add_pixel(const size_t & pixel_index,
+                                                const Real & kappa_variation) {
+    this->internal_fields->add_pixel(pixel_index);
+    this->get_kappa_field().get_state_field().current().push_back(
+        this->material_child.get_kappa_init() + kappa_variation);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Index_t DimM>
+  void MaterialLinearElasticDamage2<DimM>::save_history_variables() {
+    this->get_kappa_field().get_state_field().cycle();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Index_t DimM>
+  void MaterialLinearElasticDamage2<DimM>::initialise() {
+    Parent::initialise();
+    this->save_history_variables();
+  }
+
+  /* ---------------------------------------------------------------------- */
+
+  template class MaterialLinearElasticDamage2<twoD>;
+  template class MaterialLinearElasticDamage2<threeD>;
 
 }  // namespace muSpectre

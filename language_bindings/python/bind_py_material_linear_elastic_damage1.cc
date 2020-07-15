@@ -1,11 +1,11 @@
 /**
- * @file bind_py_material_visco_elastic_damage_ss.cc
+ * @file bind_py_material_linear_elastic_damage1.cc
  *
  * @author Ali Falsafi <ali.falsafi@epfl.ch>
  *
  * @date   30 Jan 2020
  *
- * @brief python binding of MaterialLinearViscoElasticDeviatoricDamageSmallStrai
+ * @brief python binding of MaterialLinearElasticDamage1
  *
  * Copyright © 2020 Ali Falsafi
  *
@@ -34,7 +34,7 @@
  */
 
 #include "common/muSpectre_common.hh"
-#include "materials/material_visco_elastic_damage_ss.hh"
+#include "materials/material_linear_elastic_damage1.hh"
 #include "cell/cell.hh"
 
 #include <pybind11/pybind11.h>
@@ -54,44 +54,33 @@ namespace py = pybind11;
  * loading and damage
  */
 template <Index_t Dim>
-void add_material_visco_elastic_damage_ss_helper(
-    py::module & mod) {
+void add_material_linear_elastic_damage1_helper(py::module & mod) {
   std::stringstream name_stream{};
-  name_stream << "MaterialViscoElasticDamageSS_" << Dim
-              << "d";
+  name_stream << "MaterialLinearElasticDamage1_" << Dim << "d";
   const auto name{name_stream.str()};
 
-  using Mat_t =
-      muSpectre::MaterialViscoElasticDamageSS<Dim>;
+  using Mat_t = muSpectre::MaterialLinearElasticDamage1<Dim>;
   using Cell_t = muSpectre::Cell;
 
   py::class_<Mat_t, muSpectre::MaterialBase, std::shared_ptr<Mat_t>>(
       mod, name.c_str())
       .def_static(
           "make",
-          [](Cell_t & cell, std::string name, Real young_inf, Real young_v,
-             Real eta_v, Real poisson, Real kappa, Real alpha, Real beta,
-             Real dt = 0.0) -> Mat_t & {
-            return Mat_t::make(cell, name, young_inf, young_v, eta_v, poisson,
-                               kappa, alpha, beta, dt);
+          [](Cell_t & cell, std::string name, Real young, Real poisson,
+             Real kappa, Real alpha, Real beta) -> Mat_t & {
+            return Mat_t::make(cell, name, young, poisson, kappa, alpha, beta);
           },
-          "cell"_a, "name"_a, "YoungModulusInf"_a, "YoungModulusV"_a, "EtaV"_a,
-          "PoissonRatio"_a, "Kappa"_a, "Alpha"_a, "Beta"_a, "dt"_a,
-          py::return_value_policy::reference_internal)
+          "cell"_a, "name"_a, "YoungModulus"_a, "PoissonRatio"_a, "Kappa"_a,
+          "Alpha"_a, "Beta"_a, py::return_value_policy::reference_internal)
       .def_static(
           "make_evaluator",
-          [](Real young_inf, Real young_v, Real eta_v, Real poisson, Real kappa,
-             Real alpha, Real beta, Real dt = 0.0) {
-            return Mat_t::make_evaluator(young_inf, young_v, eta_v, poisson,
-                                         kappa, alpha, beta, dt);
+          [](Real young, Real poisson, Real kappa, Real alpha, Real beta) {
+            return Mat_t::make_evaluator(young, poisson, kappa, alpha, beta);
           },
-          "YoungModulusInf"_a, "YoungModulusV"_a, "EtaV"_a, "PoissonRatio"_a,
-          "Kappa"_a, "Alpha"_a, "Beta"_a, "dt"_a);
+          "YoungModulus"_a, "PoissonRatio"_a, "Kappa"_a, "Alpha"_a, "Beta"_a);
 }
 
 template void
-add_material_visco_elastic_damage_ss_helper<
-    muSpectre::twoD>(py::module &);
+add_material_linear_elastic_damage1_helper<muSpectre::twoD>(py::module &);
 template void
-add_material_visco_elastic_damage_ss_helper<
-    muSpectre::threeD>(py::module &);
+add_material_linear_elastic_damage1_helper<muSpectre::threeD>(py::module &);

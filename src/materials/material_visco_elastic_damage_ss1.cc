@@ -1,11 +1,12 @@
 /**
- * @file material_visco_elastic_damage_ss.cc
+ * @file material_visco_elastic_damage_ss1.cc
  *
  * @author Ali Falsafi <ali.falsafi@epfl.ch>
  *
  * @date   20 Dec 2019
  *
- * @brief  The implementation of the methods of the MaterialViscoElasticDamageSS
+ * @brief  The implementation of the methods of the
+ * MaterialViscoElasticDamageSS1
  *
  * Copyright © 2019 Ali Falsafi
  *
@@ -33,52 +34,54 @@
  *
  */
 
-#include "materials/material_visco_elastic_damage_ss.hh"
+#include "materials/material_visco_elastic_damage_ss1.hh"
 
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
-  MaterialViscoElasticDamageSS<DimM>::MaterialViscoElasticDamageSS(
+  MaterialViscoElasticDamageSS1<DimM>::MaterialViscoElasticDamageSS1(
       const std::string & name, const Index_t & spatial_dimension,
       const Index_t & nb_quad_pts, const Real & young_inf, const Real & young_v,
       const Real & eta_v, const Real & poisson, const Real & kappa_init,
-      const Real & alpha, const Real & beta, const Real & dt)
-    : Parent{name, spatial_dimension, nb_quad_pts},
+      const Real & alpha, const Real & beta, const Real & dt,
+      const std::shared_ptr<muGrid::LocalFieldCollection> &
+          parent_field_collection)
+      : Parent{name, spatial_dimension, nb_quad_pts, parent_field_collection},
         material_child(name + "_child", spatial_dimension, nb_quad_pts,
                        young_inf, young_v, eta_v, poisson, dt,
                        this->internal_fields),
-        kappa_prev_field{this->get_prefix() + "strain measure",
+        kappa_field{this->get_prefix() + "strain measure",
                          *this->internal_fields, QuadPtTag},
         kappa_init{kappa_init}, alpha{alpha}, beta{beta} {}
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
-  void MaterialViscoElasticDamageSS<DimM>::save_history_variables() {
+  void MaterialViscoElasticDamageSS1<DimM>::save_history_variables() {
     this->get_history_integral().get_state_field().cycle();
     this->get_s_null_prev_field().get_state_field().cycle();
-    this->get_kappa_prev_field().get_state_field().cycle();
+    this->get_kappa_field().get_state_field().cycle();
   }
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
-  void MaterialViscoElasticDamageSS<DimM>::initialise() {
+  void MaterialViscoElasticDamageSS1<DimM>::initialise() {
     Parent::initialise();
     this->get_history_integral().get_map().get_current() =
         Eigen::Matrix<Real, DimM, DimM>::Identity();
     this->get_s_null_prev_field().get_map().get_current() =
         Eigen::Matrix<Real, DimM, DimM>::Identity();
-    this->kappa_prev_field.get_map().get_current() = this->kappa_init;
+    this->kappa_field.get_map().get_current() = this->kappa_init;
     this->save_history_variables();
   }
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
-  auto MaterialViscoElasticDamageSS<DimM>::evaluate_stress(
+  auto MaterialViscoElasticDamageSS1<DimM>::evaluate_stress(
       const Eigen::Ref<const T2_t> & E, T2StRef_t h_prev, T2StRef_t s_null_prev,
-      ScalarStRef_t kappa_prev) -> T2_t {
-    this->update_damage_measure(E, kappa_prev);
-    auto && damage{this->compute_damage_measure(kappa_prev.current())};
+      ScalarStRef_t kappa) -> T2_t {
+    this->update_damage_measure(E, kappa);
+    auto && damage{this->compute_damage_measure(kappa.current())};
     auto && S{damage *
               this->material_child.evaluate_stress(E, h_prev, s_null_prev)};
     return S;
@@ -86,11 +89,11 @@ namespace muSpectre {
 
   /* ----------------------------------------------------------------------*/
   template <Index_t DimM>
-  auto MaterialViscoElasticDamageSS<DimM>::evaluate_stress_tangent(
+  auto MaterialViscoElasticDamageSS1<DimM>::evaluate_stress_tangent(
       const Eigen::Ref<const T2_t> & E, T2StRef_t h_prev, T2StRef_t s_null_prev,
-      ScalarStRef_t kappa_prev) -> std::tuple<T2_t, T4_t> {
-    this->update_damage_measure(E, kappa_prev);
-    auto && damage{this->compute_damage_measure(kappa_prev.current())};
+      ScalarStRef_t kappa) -> std::tuple<T2_t, T4_t> {
+    this->update_damage_measure(E, kappa);
+    auto && damage{this->compute_damage_measure(kappa.current())};
     auto && SC_pristine{
         this->material_child.evaluate_stress_tangent(E, h_prev, s_null_prev)};
     auto && S{damage * std::get<0>(SC_pristine)};
@@ -100,63 +103,75 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
-  void MaterialViscoElasticDamageSS<DimM>::update_damage_measure(
-      const Eigen::Ref<const T2_t> & E, ScalarStRef_t kappa_prev) {
-    auto kappa_current{this->compute_strain_measure(E)};
-    auto kappa_old{kappa_prev.old()};
+  void MaterialViscoElasticDamageSS1<DimM>::update_damage_measure(
+      const Eigen::Ref<const T2_t> & E, ScalarStRef_t kappa) {
+    auto && kappa_current{this->compute_strain_measure(E)};
+    auto && kappa_old{kappa.old()};
 
     if (kappa_current > kappa_old) {
-      kappa_prev.current() = kappa_current;
+      kappa.current() = kappa_current;
     } else {
-      kappa_prev.current() = kappa_prev.old();
+      kappa.current() = kappa.old();
     }
-    kappa_current = kappa_prev.current();
-    kappa_old = kappa_prev.old();
   }
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
   template <class Derived>
-  Real MaterialViscoElasticDamageSS<DimM>::compute_strain_measure(
+  Real MaterialViscoElasticDamageSS1<DimM>::compute_strain_measure(
       const Eigen::MatrixBase<Derived> & E) {
     auto && elastic_stress{this->material_child.evaluate_elastic_stress(E)};
-    auto && measure{sqrt(::muGrid::Matrices::ddot<DimM>(
-        std::move(elastic_stress), std::move(E)))};
-    return measure;
+    // Different strain measures can be considered here.
+    // In this material, the considered strain measure is a strain energy
+    // measure = √(Sₑₗₐ : E) →
+    return sqrt(muGrid::Matrices::ddot<DimM>(elastic_stress, E));
   }
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
-  Real MaterialViscoElasticDamageSS<DimM>::compute_damage_measure(
+  Real MaterialViscoElasticDamageSS1<DimM>::compute_damage_measure(
       const Real & kappa) {
-    return this->beta +
-           (1.0 - this->beta) *
-               ((1.0 - std::exp(-kappa / this->alpha)) / (kappa / this->alpha));
+    auto && damage_measure{
+        this->beta +
+        (1.0 - this->beta) *
+            ((1.0 - std::exp(-(kappa - this->kappa_init) / this->alpha)) /
+             ((kappa - this->kappa_init) / this->alpha))};
+    if (std::isnan(damage_measure) or damage_measure < 0.0) {
+      return 1.0;
+    } else {
+      return damage_measure;
+    }
   }
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
   muGrid::MappedT2StateField<Real, Mapping::Mut, DimM, IterUnit::SubPt> &
-  MaterialViscoElasticDamageSS<DimM>::get_history_integral() {
+  MaterialViscoElasticDamageSS1<DimM>::get_history_integral() {
     return this->material_child.get_history_integral();
   }
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
   muGrid::MappedT2StateField<Real, Mapping::Mut, DimM, IterUnit::SubPt> &
-  MaterialViscoElasticDamageSS<DimM>::get_s_null_prev_field() {
+  MaterialViscoElasticDamageSS1<DimM>::get_s_null_prev_field() {
     return this->material_child.get_s_null_prev_field();
   }
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
   muGrid::MappedScalarStateField<Real, Mapping::Mut, IterUnit::SubPt> &
-  MaterialViscoElasticDamageSS<DimM>::get_kappa_prev_field() {
-    return this->kappa_prev_field;
+  MaterialViscoElasticDamageSS1<DimM>::get_kappa_field() {
+    return this->kappa_field;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Index_t DimM>
+  const Real & MaterialViscoElasticDamageSS1<DimM>::get_kappa_init() {
+    return this->kappa_init;
   }
 
   /* ----------------------------------------------------------------------*/
-  template class MaterialViscoElasticDamageSS<twoD>;
-  template class MaterialViscoElasticDamageSS<threeD>;
+  template class MaterialViscoElasticDamageSS1<twoD>;
+  template class MaterialViscoElasticDamageSS1<threeD>;
 
 }  // namespace muSpectre

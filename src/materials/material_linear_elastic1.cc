@@ -41,9 +41,12 @@ namespace muSpectre {
   template <Index_t DimM>
   MaterialLinearElastic1<DimM>::MaterialLinearElastic1(
       const std::string & name, const Index_t & spatial_dimension,
-      const Index_t & nb_quad_pts, const Real & young, const Real & poisson)
-      : Parent{name, spatial_dimension, nb_quad_pts}, young{young},
-        poisson{poisson}, lambda{Hooke::compute_lambda(young, poisson)},
+      const Index_t & nb_quad_pts, const Real & young, const Real & poisson,
+      const std::shared_ptr<muGrid::LocalFieldCollection> &
+          parent_field_collection)
+      : Parent{name, spatial_dimension, nb_quad_pts, parent_field_collection},
+        young{young}, poisson{poisson}, lambda{Hooke::compute_lambda(young,
+                                                                     poisson)},
         mu{Hooke::compute_mu(young, poisson)},
         C_holder{
             std::make_unique<Stiffness_t>(Hooke::compute_C_T4(lambda, mu))},

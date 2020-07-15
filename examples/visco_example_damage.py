@@ -34,6 +34,7 @@ with proprietary FFT implementations or numerical libraries, containing parts
 covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
+
 import sys
 import numpy as np
 import argparse
@@ -55,13 +56,13 @@ def compute_visco_elastic_damage(N, lens, max_iter, cg_tol, newton_tol,
                                  alpha, beta, dt, dF_bar):
     formulation = µ.Formulation.small_strain
     cell = µ.Cell(N, lens, formulation)
-    soft = µ.material.MaterialViscoElasticDamageSS_2d.make(
+    soft = µ.material.MaterialViscoElasticDamageSS1_2d.make(
         cell, "hard", Einf, Ev, eta, .33, kappa, alpha, beta, dt)
     hard = µ.material.MaterialViscoElasticSS_2d.make(
         cell, "hard", Einf, Ev, eta, .33, dt)
 
     for pixel_id, pixel_coord in cell.pixels.enumerate():
-        if pixel_id == 60 or pixel_id == 61 or pixel_id == 59:
+        if pixel_id in (59, 60, 61):
             soft.add_pixel(pixel_id)
         else:
             hard.add_pixel(pixel_id)
@@ -88,26 +89,33 @@ def compute_visco_elastic_damage(N, lens, max_iter, cg_tol, newton_tol,
     xy = np.zeros((len(res)))
     xx = np.zeros((len(res)))
     yy = np.zeros((len(res)))
+
     for i, r in enumerate(res):
         xy[i] = comp_component(r, [0, 1])[5, 5]
         xx[i] = comp_component(r, [0, 0])[5, 5]
         yy[i] = comp_component(r, [1, 1])[5, 5]
-    dim = 2
-    fourier_gradient = [µ.FourierDerivative(dim, i) for i in range(dim)]
-    for i, re in enumerate(res):
-        placement_n, x = gi.compute_placement(re, lens,
-                                              N, fourier_gradient,
-                                              formulation=formulation)
-        PK1 = gi.reshape_gradient(re.stress, N)
-        F = gi.reshape_gradient(re.grad, N)
-        c_data = {"PK1 stress": PK1,
-                  "F deformation gradient": F}
-        p_data = {}
-        vt_ex.vtk_export(fpath="vico_damage_example_{}".format(i),
-                         x_n=x,
-                         placement=placement_n,
-                         point_data=p_data,
-                         cell_data=c_data)
+
+    print("the length is {}".format(len(sys.argv[:])))
+    if len(sys.argv[:]) == 2:
+        if sys.argv[1] == 1:
+            pass
+    else:
+        dim = 2
+        fourier_gradient = [µ.FourierDerivative(dim, i) for i in range(dim)]
+        for i, re in enumerate(res):
+            placement_n, x = gi.compute_placement(re, lens,
+                                                  N, fourier_gradient,
+                                                  formulation=formulation)
+            PK1 = gi.reshape_gradient(re.stress, N)
+            F = gi.reshape_gradient(re.grad, N)
+            c_data = {"σ": PK1,
+                      "ε": F}
+            p_data = {}
+            vt_ex.vtk_export(fpath="vico_damage_example_{}".format(i),
+                             x_n=x,
+                             placement=placement_n,
+                             point_data=p_data,
+                             cell_data=c_data)
     return xx, yy, xy
 
 
@@ -115,14 +123,17 @@ def compute_visco_elastic(N, lens, max_iter, cg_tol, newton_tol,
                           equil_tol, nb_steps, Ev, Einf, eta, dt, dF_bar):
     formulation = µ.Formulation.small_strain
     cell = µ.Cell(N, lens, formulation)
-    hard = µ.material.MaterialViscoElasticSS_2d.make(
-        cell, "hard", Einf, Ev, eta, .33, dt)
+
+    hard = µ.material.MaterialViscoElasticSS_2d.make(cell, "hard", Einf,
+                                                     Ev, eta, .33, dt)
+
     for pixel_id, pixel_coord in cell.pixels.enumerate():
         hard.add_pixel(pixel_id)
 
     cell.initialise()
 
     dF_steps = [np.copy(dF_bar)] * nb_steps
+
     for i in range(len(dF_steps)):
         dF_steps[i] = dF_steps[i] * i / len(dF_steps)
 
@@ -133,6 +144,7 @@ def compute_visco_elastic(N, lens, max_iter, cg_tol, newton_tol,
 
     solver = µ.solvers.KrylovSolverCG(cell, cg_tol, max_iter,
                                       verbose=µ.Verbosity.Silent)
+
     res = µ.solvers.de_geus(cell, dF_steps, solver, newton_tol,
                             equil_tol, verbose=µ.Verbosity.Silent)
     print("nb_cg: {}\nF:\n{}".format(
@@ -143,16 +155,40 @@ def compute_visco_elastic(N, lens, max_iter, cg_tol, newton_tol,
     xy = np.zeros((len(res)))
     xx = np.zeros((len(res)))
     yy = np.zeros((len(res)))
+
     for i, r in enumerate(res):
         xy[i] = comp_component(r, [0, 1])[2, 2]
         xx[i] = comp_component(r, [0, 0])[2, 2]
         yy[i] = comp_component(r, [1, 1])[2, 2]
+
+    if len(sys.argv[:]) == 2:
+        if sys.argv[1] == 1:
+            pass
+    else:
+        dim = 2
+        fourier_gradient = [µ.FourierDerivative(dim, i) for i in range(dim)]
+        for i, re in enumerate(res):
+            placement_n, x = gi.compute_placement(re, lens,
+                                                  N, fourier_gradient,
+                                                  formulation=formulation)
+
+            PK1 = gi.reshape_gradient(re.stress, N)
+            F = gi.reshape_gradient(re.grad, N)
+            c_data = {"σ": PK1,
+                      "ε": F}
+            p_data = {}
+            vt_ex.vtk_export(fpath="vico_example_{}".format(i),
+                             x_n=x,
+                             placement=placement_n,
+                             point_data=p_data,
+                             cell_data=c_data)
+
     return xx, yy, xy
 
 
 def compute():
-    dF_bar = np.array([[-0.1005179, +0.500],
-                       [+0.500, +0.3005179]]) * 4e-1
+    dF_bar = np.array([[+0.1005179, +0.500],
+                       [+0.500, +0.3005179]]) * 4e-4
     # a = np.sqrt(1. / np.linalg.det(dF_bar+np.identity(2)) )
     a = 1.0
     F_bar = (dF_bar+np.identity(2)) * a
@@ -160,18 +196,19 @@ def compute():
     dF_bar = F_bar - np.identity(2)
     dE = 0.5 * (((dF_bar+np.identity(2)).T).dot(dF_bar + np.identity(2))
                 - np.identity(2))
+
     print("dE is\n {}".format(dE))
     print("J is\n {}".format(J))
     N = [11, 11]
     lens = [1., 1.]
-    nb_steps = 10
-    dt = 1.0e-5
-    Ev = 2.859448e5
-    Einf = 1.2876e5
-    eta = 1.34e3
+    nb_steps = 100
+    dt = 1.0e-3
+    Ev = 2.859448e10
+    Einf = 1.2876e10
+    eta = 1.34e8
     kappa = 1.0
-    alpha = 1.0
-    beta = 0.1
+    alpha = 0.014
+    beta = 0.34
     cg_tol, newton_tol, equil_tol = 1e-8, 1e-5, 1e-10
     max_iter = 40
     xx_vis, yy_vis, xy_vis = \
@@ -183,20 +220,18 @@ def compute():
         compute_visco_elastic_damage(N, lens, max_iter, cg_tol, newton_tol,
                                      equil_tol, nb_steps, Ev, Einf, eta, kappa,
                                      alpha, beta, dt, dE)
-    print(len(sys.argv[:]))
     if len(sys.argv[:]) == 2:
         print(sys.argv[1])
         if sys.argv[1] == 1:
             pass
     else:
         import matplotlib.pyplot as plt
-        from matplotlib import cm
         from matplotlib import rc
         font = {'size': 16}
         rc('font', **font)
         rc('text', usetex=True)
         fig = plt.figure()
-        ax = plt.subplot(111)
+        ax = fig.subplot(111)
         box = ax.get_position()
         ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
 
@@ -204,9 +239,9 @@ def compute():
         ax.plot(+xx_vis, 'b-', linewidth=3, label='$P_{xx}^{vis}$')
         ax.plot(+yy_vis, 'b--', linewidth=3, label='$P_{yy}^{vis}$')
 
-        ax.plot(+xy_vis_dam, 'y-.', linewidth=2, label='$P_{xy}^{vis}$')
-        ax.plot(+xx_vis_dam, 'y-', linewidth=2, label='$P_{xx}^{vis}$')
-        ax.plot(+yy_vis_dam, 'y--', linewidth=2, label='$P_{yy}^{vis}$')
+        ax.plot(+xy_vis_dam, 'y-.', linewidth=2, label='$P_{xy}^{vis,dam}$')
+        ax.plot(+xx_vis_dam, 'y-', linewidth=2, label='$P_{xx}^{vis,dam}$')
+        ax.plot(+yy_vis_dam, 'y--', linewidth=2, label='$P_{yy}^{vis,dam}$')
 
         # Put a legend to the right of the current axis
         ax.legend(loc='center left', bbox_to_anchor=(1.05, 0.5), ncol=2)

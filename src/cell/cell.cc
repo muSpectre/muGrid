@@ -126,11 +126,20 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   void Cell::complete_material_assignment_simple(MaterialBase & material) {
-    for (auto && mat : this->materials) {
-      if (mat->get_name() != material.get_name()) {
-        mat->initialise();
+    if (this->is_initialised()) {
+      throw RuntimeError(
+          "The cell is already initialised. Therefore, it is not "
+          "possible to complete material assignemnt for it");
+    } else {
+      for (auto && mat : this->materials) {
+        if (mat->get_name() != material.get_name()) {
+          if (!mat->get_is_initialised()) {
+            mat->initialise();
+          }
+        }
       }
     }
+
     auto nb_pixels = muGrid::CcoordOps::get_size(
         this->get_projection().get_nb_subdomain_grid_pts());
     std::vector<bool> assignments(nb_pixels, false);
@@ -205,7 +214,6 @@ namespace muSpectre {
     std::vector<MaterialBase *> assignments(nb_pixels, nullptr);
 
     for (auto & mat : this->materials) {
-      mat->initialise();
       for (auto & index : mat->get_pixel_indices()) {
         auto & assignment{assignments.at(index)};
         if (assignment != nullptr) {
@@ -242,8 +250,16 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   void Cell::initialise() {
     // check that all pixels have been assigned exactly one material
-    for (auto && mat : this->materials) {
-      mat->initialise();
+    if (this->is_initialised()) {
+      throw RuntimeError(
+          "The cell is already initialised. Therefore, it is not "
+          "possible to complete material assignemnt for it");
+    } else {
+      for (auto && mat : this->materials) {
+        if (!mat->get_is_initialised()) {
+          mat->initialise();
+        }
+      }
     }
     this->check_material_coverage();
     // initialise the projection and compute the fft plan

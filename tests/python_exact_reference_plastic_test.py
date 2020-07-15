@@ -606,7 +606,7 @@ class ElastoPlastic_Check(unittest.TestCase):
             if inc == 1:
                 self.assertLess(linalg.norm(µb), strict_tol)
 
-            global_be_t = self.rve.get_globalised_current_real_array(
+            global_be_t = self.rggve.get_globalised_current_real_field(
                 "Previous left Cauchy-Green deformation bₑᵗ")
 
             # iterate as long as the iterative update does not vanish
@@ -653,11 +653,11 @@ class ElastoPlastic_Check(unittest.TestCase):
                     F, F_t, be_t, ep_t)
                 µP, µK = self.rve.evaluate_stress_tangent(µF)
                 err = rel_error_t2(µP, P, strict_tol)
-                µbe = self.rve.get_globalised_current_real_array(
+                µbe = self.rve.get_globalised_current_real_field(
                     "Previous left Cauchy-Green deformation bₑᵗ")
                 err = rel_error_t2(µbe, be, strict_tol)
 
-                µep = self.rve.get_globalised_current_real_array(
+                µep = self.rve.get_globalised_current_real_field(
                     "cumulated plastic flow εₚ")
                 err = rel_error_scalar(µep, ep, strict_tol)
 

@@ -487,8 +487,6 @@ namespace muSpectre {
         mat_matrix);
     sys.complete_material_assignment_simple(mat_matrix_cell);
     sys.initialise();
-    mat_lam.initialise();
-    mat_precipitate_cell.initialise();
 
     BOOST_CHECK_EQUAL(mat_lam.size(),
                       2 * ((top_y - bottom_y) + (right_x - left_x) - 2));

@@ -81,8 +81,8 @@ namespace muSpectre {
   };
 
   /**
-   * DimM material_dimension (dimension of constitutive law)
    * implements objective linear visco_elasticity
+   * DimM material_dimension (dimension of constitutive law)
    */
 
   template <Index_t DimM>
@@ -158,7 +158,8 @@ namespace muSpectre {
      * evaluates Kirchhoff stress given the local placement gradient and pixel
      * id.
      */
-    T2_t evaluate_stress(const Eigen::Ref<const T2_t> & E,
+    template <class Derived>
+    T2_t evaluate_stress(const Eigen::MatrixBase<Derived> & E,
                          const size_t & quad_pt_index) {
       auto && h_prev{this->h_prev_field[quad_pt_index]};
       auto && s_null_prev{this->s_null_prev_field[quad_pt_index]};
@@ -168,19 +169,24 @@ namespace muSpectre {
     /**
      * evaluates the volumetric part of the elastic stress
      */
-    inline T2_t evaluate_elastic_stress(const Eigen::Ref<const T2_t> & E);
+    template <class Derived>
+
+    inline T2_t evaluate_elastic_stress(const Eigen::MatrixBase<Derived> & E);
 
     /**
      * evaluates the volumetric part of the elastic stress
      */
+    template <class Derived>
+
     inline T2_t
-    evaluate_elastic_volumetric_stress(const Eigen::Ref<const T2_t> & E);
+    evaluate_elastic_volumetric_stress(const Eigen::MatrixBase<Derived> & E);
 
     /**
      * evaluates the deviatoric part of the elastic stress
      */
+    template <class Derived>
     inline T2_t
-    evaluate_elastic_deviatoric_stress(const Eigen::Ref<const T2_t> & e);
+    evaluate_elastic_deviatoric_stress(const Eigen::MatrixBase<Derived> & e);
     /**
      * evaluates Kirchhoff stress and tangent moduli given the current placement
      * gradient Fₜ, the previous Gradient Fₜ₋₁ and the cumulated plastic flow εₚ
@@ -189,11 +195,12 @@ namespace muSpectre {
     evaluate_stress_tangent(const Eigen::Ref<const T2_t> & E, T2StRef_t h_prev,
                             T2StRef_t s_null_prev);
     /**
-     * evaluates Kirchhoff stressstiffness and tangent moduli given the local
+     * evaluates Kirchhoff stress  and tangent moduli given the local
      * placement gradient and pixel id.
      */
+    template <class Derived>
     std::tuple<T2_t, T4_t>
-    evaluate_stress_tangent(const Eigen::Ref<const T2_t> & E,
+    evaluate_stress_tangent(const Eigen::MatrixBase<Derived> & E,
                             const size_t & quad_pt_index) {
       auto && h_prev{this->h_prev_field[quad_pt_index]};
       auto && s_null_prev{this->s_null_prev_field[quad_pt_index]};
@@ -217,6 +224,12 @@ namespace muSpectre {
     //! getter for internal variable field of Elastic stress
     muGrid::MappedT2StateField<Real, Mapping::Mut, DimM, IterUnit::SubPt> &
     get_s_null_prev_field();
+
+    //! getter for returning the λₜₒₜ:
+    Real get_lambda_tot() { return this->lambda_tot; }
+
+    //! getter for returning the μₜₒₜ:
+    Real get_mu_tot() { return this->mu_tot; }
 
    protected:
     //! storage for previous history intgral()
@@ -252,16 +265,9 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
-  auto MaterialViscoElasticSS<DimM>::evaluate_elastic_stress(
-      const Eigen::Ref<const T2_t> & E) -> T2_t {
-    return Hooke::evaluate_stress(this->lambda_tot, this->mu_tot, E);
-    // return E.trace() * (K_tot)*T2_t::Identity();
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <Index_t DimM>
+  template <class Derived>
   auto MaterialViscoElasticSS<DimM>::evaluate_elastic_volumetric_stress(
-      const Eigen::Ref<const T2_t> & E) -> T2_t {
+      const Eigen::MatrixBase<Derived> & E) -> T2_t {
     return (E.trace() * (this->lambda_tot + (2 * this->mu_tot / DimM))) *
            T2_t::Identity();
     // return E.trace() * (K_tot)*T2_t::Identity();
@@ -269,9 +275,21 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
+  template <class Derived>
   auto MaterialViscoElasticSS<DimM>::evaluate_elastic_deviatoric_stress(
-      const Eigen::Ref<const T2_t> & e) -> T2_t {
+      const Eigen::MatrixBase<Derived> & e) -> T2_t {
     return 2 * this->mu_tot * e;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Index_t DimM>
+  template <class Derived>
+  auto MaterialViscoElasticSS<DimM>::evaluate_elastic_stress(
+      const Eigen::MatrixBase<Derived> & E) -> T2_t {
+    auto && e{MatTB::compute_deviatoric<DimM>(E)};
+    return 2 * this->mu_tot * e +
+           (E.trace() * (this->lambda_tot + (2 * this->mu_tot / DimM))) *
+               T2_t::Identity();
   }
   /* ---------------------------------------------------------------------- */
 

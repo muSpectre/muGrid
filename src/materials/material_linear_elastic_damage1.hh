@@ -1,27 +1,13 @@
 /**
- * @file material_visco_elastic_damage_ss.hh
+ * @file   material_linear_elastic_damage1.hh
  *
  * @author Ali Falsafi <ali.falsafi@epfl.ch>
  *
- * @date   20 Dec 2019
+ * @date   04 May 2020
  *
- * @brief this material constitutive law is inspired by the standard linear
- * viscos solid described in Chapter 10 of "Computational inelasticity"
- * by J. Simo et al. Besides, the damage part in taken from
- * "ON A FULLY THREE-DIMENSIONAL FINITE-STRAIN VISCOELASTIC DAMAGE MODEL:
- * FORMULATION AND COMPUTATIONAL ASPECTS" by J. Simo.
- * Note: it is assumed that the viscous effect merely exists on the deviatoric
- * contribution of the response by performing a stress multiplicative split.
- * The schematic of the rheological model is:
-                  E∞
-         ------|\/\/\|-------
-        |                    |
-     ---|                    |---
-        |                    |
-         ----|\/\/\|---[]----
-                Eᵥ     ηᵥ
+ * @brief  The linear elastic material with damage
  *
- * Copyright © 2019 Ali Falsafi
+ * Copyright © 2020 Ali Falsafi
  *
  * µSpectre is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
@@ -47,10 +33,10 @@
  *
  */
 
-#ifndef SRC_MATERIALS_MATERIAL_VISCO_ELASTIC_DAMAGE_SS_HH_
-#define SRC_MATERIALS_MATERIAL_VISCO_ELASTIC_DAMAGE_SS_HH_
+#ifndef SRC_MATERIALS_MATERIAL_LINEAR_ELASTIC_DAMAGE1_HH_
+#define SRC_MATERIALS_MATERIAL_LINEAR_ELASTIC_DAMAGE1_HH_
 
-#include "materials/material_visco_elastic_ss.hh"
+#include "materials/material_linear_elastic1.hh"
 #include "materials/material_muSpectre_base.hh"
 #include "materials/materials_toolbox.hh"
 #include "materials/stress_transformations_PK2.hh"
@@ -59,13 +45,13 @@
 
 namespace muSpectre {
   template <Index_t DimM>
-  class MaterialViscoElasticDamageSS;
+  class MaterialLinearElasticDamage1;
 
   /**
    * traits for objective linear visco_elasticity
    */
   template <Index_t DimM>
-  struct MaterialMuSpectre_traits<MaterialViscoElasticDamageSS<DimM>> {
+  struct MaterialMuSpectre_traits<MaterialLinearElasticDamage1<DimM>> {
     //! expected map type for strain fields
     using StrainMap_t =
         muGrid::T2FieldMap<Real, Mapping::Const, DimM, IterUnit::SubPt>;
@@ -82,17 +68,17 @@ namespace muSpectre {
     constexpr static auto stress_measure{StressMeasure::PK2};
   };
 
-  //! DimM material_dimension (dimension of constitutive law)
   /**
-   * implements objective linear visco_elasticity
+   * implements objective linear material with damage
+   * DimM material_dimension (dimension of constitutive law)
    */
 
   template <Index_t DimM>
-  class MaterialViscoElasticDamageSS
-      : public MaterialMuSpectre<MaterialViscoElasticDamageSS<DimM>, DimM> {
+  class MaterialLinearElasticDamage1
+      : public MaterialMuSpectre<MaterialLinearElasticDamage1<DimM>, DimM> {
    public:
     //! base class
-    using Parent = MaterialMuSpectre<MaterialViscoElasticDamageSS, DimM>;
+    using Parent = MaterialMuSpectre<MaterialLinearElasticDamage1, DimM>;
 
     //! short-hand for second-rank tensors
     using T2_t = Eigen::Matrix<Real, DimM, DimM>;
@@ -101,7 +87,7 @@ namespace muSpectre {
     using T4_t = muGrid::T4Mat<Real, DimM>;
 
     //! traits of this material
-    using traits = MaterialMuSpectre_traits<MaterialViscoElasticDamageSS>;
+    using traits = MaterialMuSpectre_traits<MaterialLinearElasticDamage1>;
 
     //! Hooke's law implementation
     using Hooke =
@@ -121,43 +107,44 @@ namespace muSpectre {
         typename muGrid::MappedScalarField<Real, Mapping::Mut,
                                            IterUnit::SubPt>::Return_t;
 
+    //! Type for the child material
+    using MatChild_t = MaterialLinearElastic1<DimM>;
+
     //! Default constructor
-    MaterialViscoElasticDamageSS() = delete;
+    MaterialLinearElasticDamage1() = delete;
 
     //! Copy constructor
-    MaterialViscoElasticDamageSS(const MaterialViscoElasticDamageSS & other) =
+    MaterialLinearElasticDamage1(const MaterialLinearElasticDamage1 & other) =
         delete;
 
     //! Construct by name, Young's modulus and Poisson's ratio
-    MaterialViscoElasticDamageSS(const std::string & name,
-                                 const Index_t & spatial_dimension,
-                                 const Index_t & nb_quad_pts,
-                                 const Real & young_inf, const Real & young_v,
-                                 const Real & eta_v, const Real & poisson,
-                                 const Real & kappa_init, const Real & alpha,
-                                 const Real & beta, const Real & dt);
+    MaterialLinearElasticDamage1(
+        const std::string & name, const Index_t & spatial_dimension,
+        const Index_t & nb_quad_pts, const Real & young, const Real & poisson,
+        const Real & kappa_init, const Real & alpha, const Real & beta,
+        const std::shared_ptr<muGrid::LocalFieldCollection> &
+            parent_field_collection = nullptr);
 
     //! Move constructor
-    MaterialViscoElasticDamageSS(MaterialViscoElasticDamageSS && other) =
+    MaterialLinearElasticDamage1(MaterialLinearElasticDamage1 && other) =
         delete;
 
     //! Destructor
-    virtual ~MaterialViscoElasticDamageSS() = default;
+    virtual ~MaterialLinearElasticDamage1() = default;
 
     //! Copy assignment operator
-    MaterialViscoElasticDamageSS &
-    operator=(const MaterialViscoElasticDamageSS & other) = delete;
+    MaterialLinearElasticDamage1 &
+    operator=(const MaterialLinearElasticDamage1 & other) = delete;
 
     //! Move assignment operator
-    MaterialViscoElasticDamageSS &
-    operator=(MaterialViscoElasticDamageSS && other) = delete;
+    MaterialLinearElasticDamage1 &
+    operator=(MaterialLinearElasticDamage1 && other) = delete;
 
     /**
      * evaluates Kirchhoff stress given the current placement gradient
      * Fₜ,
      */
-    T2_t evaluate_stress(const Eigen::Ref<const T2_t> & E, T2StRef_t h_prev,
-                         T2StRef_t s_null_prev, ScalarStRef_t kappa_prev);
+    T2_t evaluate_stress(const Eigen::Ref<const T2_t> & E, ScalarStRef_t kappa);
 
     /**
      * evaluates Kirchhoff stress given the local placement gradient and pixel
@@ -172,17 +159,17 @@ namespace muSpectre {
      * evaluation
      */
     void update_damage_measure(const Eigen::Ref<const T2_t> & E,
-                               ScalarStRef_t kappa_prev);
+                               ScalarStRef_t kappa);
 
     /**
      * evaluates Kirchhoff stress and tangent moduli given the ...
      */
     std::tuple<T2_t, T4_t>
-    evaluate_stress_tangent(const Eigen::Ref<const T2_t> & E, T2StRef_t h_prev,
-                            T2StRef_t s_null_prev, ScalarStRef_t kappa_prev);
+    evaluate_stress_tangent(const Eigen::Ref<const T2_t> & E,
+                            ScalarStRef_t kappa);
 
     /**
-     * evaluates Kirchhoff stressstiffness and tangent moduli given the local
+     * evaluates Kirchhoff stress and tangent moduli given the local
      * placement gradient and pixel id.
      */
     template <class Derived>
@@ -191,7 +178,7 @@ namespace muSpectre {
                             const size_t & quad_pt_index);
 
     /**
-     * @brief      computes the damage_measure driving measure(it can be the
+     * @brief      computes the damage_measure driving measure (it can be the
      * norm of strain or elastic strain energy or etc.)
      *
      * @param      Strain (T2_t)
@@ -220,55 +207,48 @@ namespace muSpectre {
      */
     void initialise() final;
 
-    //! getter for internal variable field History Integral
-    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM, IterUnit::SubPt> &
-    get_history_integral();
+    //! getter for internal variable field of strain measure
+    inline muGrid::MappedScalarStateField<Real, Mapping::Mut, IterUnit::SubPt> &
+    get_kappa_field() {
+      return this->kappa_field;
+    }
 
-    //! getter for internal variable field of Elastic stress
-    muGrid::MappedT2StateField<Real, Mapping::Mut, DimM, IterUnit::SubPt> &
-    get_s_null_prev_field();
-
-    //! getter for internal variable field of Elastic stress
-    muGrid::MappedScalarStateField<Real, Mapping::Mut, IterUnit::SubPt> &
-    get_kappa_prev_field();
+    //! getter for kappa_init
+    inline Real get_kappa_init() { return this->kappa_init; }
 
    protected:
-    //! Child material (used as a worker for evaluating stress and tangent)
-    MaterialViscoElasticSS<DimM> material_child;
+    // Child material (used as a worker for evaluating stress and tangent)
+    MatChild_t material_child;
 
     //! storage for damage variable
     muGrid::MappedScalarStateField<Real, Mapping::Mut, IterUnit::SubPt>
-        kappa_prev_field;
+        kappa_field;
 
-    //! damage evolution parameters:
-    const Real kappa_init;
-    const Real alpha;  //!< damage evaluation parameter([0,∞])
-    const Real beta;   //!< age evaluation parameter([0,1])
-  };                   // namespace muSpectre
+    // damage evolution parameters:
+    const Real kappa_init;  //!< threshold of damage (strength)
+    const Real alpha;       //! damage evaluation parameter([0, ∞])
+    const Real beta;        //! age evaluation parameter([0, 1])
+  };
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
   template <class Derived>
-  decltype(auto) MaterialViscoElasticDamageSS<DimM>::evaluate_stress(
+  decltype(auto) MaterialLinearElasticDamage1<DimM>::evaluate_stress(
       const Eigen::MatrixBase<Derived> & E, const size_t & quad_pt_index) {
-    auto && h_prev{this->get_history_integral()[quad_pt_index]};
-    auto && s_null_prev{this->get_s_null_prev_field()[quad_pt_index]};
-    auto && kappa_prev{this->get_kappa_prev_field()[quad_pt_index]};
-    return this->evaluate_stress(E, h_prev, s_null_prev, kappa_prev);
+    auto && kappa{this->get_kappa_field()[quad_pt_index]};
+    return this->evaluate_stress(std::move(E), kappa);
   }
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
   template <class Derived>
-  decltype(auto) MaterialViscoElasticDamageSS<DimM>::evaluate_stress_tangent(
+  decltype(auto) MaterialLinearElasticDamage1<DimM>::evaluate_stress_tangent(
       const Eigen::MatrixBase<Derived> & E, const size_t & quad_pt_index) {
-    auto && h_prev{this->get_history_integral()[quad_pt_index]};
-    auto && s_null_prev{this->get_s_null_prev_field()[quad_pt_index]};
-    auto && kappa_prev{this->get_kappa_prev_field()[quad_pt_index]};
-    return this->evaluate_stress_tangent(E, h_prev, s_null_prev, kappa_prev);
+    auto && kappa{this->get_kappa_field()[quad_pt_index]};
+    return this->evaluate_stress_tangent(std::move(E), kappa);
   }
 
   /* ---------------------------------------------------------------------- */
 }  // namespace muSpectre
 
-#endif  // SRC_MATERIALS_MATERIAL_VISCO_ELASTIC_DAMAGE_SS_HH_
+#endif  // SRC_MATERIALS_MATERIAL_LINEAR_ELASTIC_DAMAGE1_HH_

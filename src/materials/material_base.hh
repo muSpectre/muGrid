@@ -246,6 +246,11 @@ namespace muSpectre {
      */
     const std::string & get_prefix() { return this->prefix; }
 
+    /**
+     * returns the is_initialised state of the material
+     */
+    const bool & get_is_initialised();
+
    protected:
     const std::string name;  //!< material's name (for output and debugging)
 

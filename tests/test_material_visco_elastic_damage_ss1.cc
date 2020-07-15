@@ -1,11 +1,11 @@
 /**
- * @file   test_material_visco_elastic_damage_ss.cc
+ * @file   test_material_visco_elastic_damage_ss1.cc
  *
  * @author Ali Falsafi <ali.falsafi@epfl.ch>
  *
  * @date   30 Jan 2020
  *
- * @brief  Testing the MaterialViscoElasticDamageSS
+ * @brief  Testing the MaterialViscoElasticDamageSS1
  *
  * Copyright © 2020 Ali Falsafi
  *
@@ -36,9 +36,7 @@
 #include "tests.hh"
 #include "libmugrid/test_goodies.hh"
 
-// #include
-// "materials/material_linear_visco_elastic_deviatoric_damage_small_strain.hh"
-#include "materials/material_visco_elastic_damage_ss.hh"
+#include "materials/material_visco_elastic_damage_ss1.hh"
 #include "materials/material_visco_elastic_ss.hh"
 #include "materials/material_linear_elastic1.hh"
 #include "materials/iterable_proxy.hh"
@@ -52,7 +50,7 @@ namespace muSpectre {
 
   template <Index_t Dim>
   struct MaterialFixture {
-    using MatVisDam = MaterialViscoElasticDamageSS<Dim>;
+    using MatVisDam = MaterialViscoElasticDamageSS1<Dim>;
     using MatVis = MaterialViscoElasticSS<Dim>;
     using MatLin = MaterialLinearElastic1<Dim>;
     const Real young_inf{1.0e4};
@@ -124,7 +122,8 @@ namespace muSpectre {
   };
 
   using mats = boost::mpl::list<MaterialFixture<twoD>, MaterialFixture<threeD>>;
-  using mats_fill = boost::mpl::list<MaterialFixtureFilled<twoD>>;
+  using mats_fill = boost::mpl::list<MaterialFixtureFilled<twoD>,
+                                     MaterialFixtureFilled<threeD>>;
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_constructor, Fix, mats, Fix) {
     BOOST_CHECK_EQUAL("VisDam", Fix::mat_vis_dam.get_name());
@@ -139,7 +138,6 @@ namespace muSpectre {
     using Strain_t = Eigen::Matrix<Real, mdim, mdim>;
 
     auto & mat_vis_dam{Fix::mat_vis_dam};
-    // auto & mat_lin_inf{Fix::mat_lin_inf};
     auto & mat_lin_init{Fix::mat_lin_init};
 
     // create statefields
@@ -160,8 +158,8 @@ namespace muSpectre {
     h_prev[0].current() = Strain_t::Identity();
     auto & s_null_prev{s_null_.get_map()};
     s_null_prev[0].current() = Strain_t::Identity();
-    auto & kappa_prev{kappa_.get_map()};
-    kappa_prev[0].current() = Fix::kappa;
+    auto & kappa{kappa_.get_map()};
+    kappa[0].current() = Fix::kappa;
 
     Strain_t E_fin{Strain_t::Zero()};
     E_fin(0, 0) = 0.1e-1;
@@ -233,8 +231,8 @@ namespace muSpectre {
     auto & s_null_prev_non{s_null_none.get_map()};
     s_null_prev_non[0].current() = Strain_t::Identity();
 
-    auto & kappa_prev{kappa_.get_map()};
-    kappa_prev[0].current() = Fix::kappa;
+    auto & kappa{kappa_.get_map()};
+    kappa[0].current() = Fix::kappa;
 
     // Real && tau_v{Fix::eta_v / Fix::young_v};
 
