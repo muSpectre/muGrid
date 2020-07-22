@@ -64,6 +64,7 @@ using muGrid::NumpyProxy;
 using muGrid::OneQuadPt;
 using muGrid::Real;
 using muGrid::RuntimeError;
+using muGrid::Shape_t;
 using muGrid::WrappedField;
 using muFFT::Communicator;
 using muFFT::fft_freq;
@@ -168,28 +169,55 @@ void add_engine_helper(py::module & mod, const std::string & name) {
 #endif
       .def("fft", &Engine::fft)
       .def("ifft", &Engine::ifft)
-      .def(
-          "create_plan",
-          [](Engine & engine, const Index_t & nb_dof_per_pixel) {
-            engine.create_plan(nb_dof_per_pixel);
-          },
-          "nb_dof_per_pixel"_a)
+      .def("create_plan", &Engine::create_plan, "nb_dof_per_pixel"_a)
       .def("register_real_space_field",
-           &FFTEngineBase::register_real_space_field, "unique_name"_a,
-           "nb_dof_per_pixel"_a, py::return_value_policy::reference_internal)
-      .def(
-          "fetch_or_register_real_space_field",
-          &FFTEngineBase::fetch_or_register_real_space_field,
-          "unique_name"_a, "nb_dof_per_pixel"_a,
-          py::return_value_policy::reference_internal)
+           (FFTEngineBase::RealField_t &
+            (Engine::*)(const std::string &, const Index_t &)) &
+               Engine::register_real_space_field,
+           "unique_name"_a, "nb_dof_per_pixel"_a,
+           py::return_value_policy::reference_internal)
+      .def("register_real_space_field",
+           (FFTEngineBase::RealField_t &
+            (Engine::*)(const std::string &, const Shape_t &)) &
+               Engine::register_real_space_field,
+           "unique_name"_a, "shape"_a,
+           py::return_value_policy::reference_internal)
+      .def("fetch_or_register_real_space_field",
+           (FFTEngineBase::RealField_t &
+            (Engine::*)(const std::string &, const Index_t &)) &
+               Engine::fetch_or_register_real_space_field,
+           "unique_name"_a, "nb_dof_per_pixel"_a,
+           py::return_value_policy::reference_internal)
+      .def("fetch_or_register_real_space_field",
+           (FFTEngineBase::RealField_t &
+            (Engine::*)(const std::string &, const Shape_t &)) &
+               Engine::fetch_or_register_real_space_field,
+           "unique_name"_a, "shape"_a,
+           py::return_value_policy::reference_internal)
       .def("register_fourier_space_field",
-           &FFTEngineBase::register_fourier_space_field, "unique_name"_a,
-           "nb_dof_per_pixel"_a, py::return_value_policy::reference_internal)
-      .def(
-          "fetch_or_register_fourier_space_field",
-          &FFTEngineBase::fetch_or_register_fourier_space_field,
-          "unique_name"_a, "nb_dof_per_pixel"_a,
-          py::return_value_policy::reference_internal)
+           (FFTEngineBase::FourierField_t &
+            (Engine::*)(const std::string &, const Index_t &)) &
+               Engine::register_fourier_space_field,
+           "unique_name"_a, "nb_dof_per_pixel"_a,
+           py::return_value_policy::reference_internal)
+      .def("register_fourier_space_field",
+           (FFTEngineBase::FourierField_t &
+            (Engine::*)(const std::string &, const Shape_t &)) &
+               Engine::register_fourier_space_field,
+           "unique_name"_a, "shape"_a,
+           py::return_value_policy::reference_internal)
+      .def("fetch_or_register_fourier_space_field",
+           (FFTEngineBase::FourierField_t &
+            (Engine::*)(const std::string &, const Index_t &)) &
+               Engine::fetch_or_register_fourier_space_field,
+           "unique_name"_a, "nb_dof_per_pixel"_a,
+           py::return_value_policy::reference_internal)
+      .def("fetch_or_register_fourier_space_field",
+           (FFTEngineBase::FourierField_t &
+            (Engine::*)(const std::string &, const Shape_t &)) &
+               Engine::fetch_or_register_fourier_space_field,
+           "unique_name"_a, "shape"_a,
+           py::return_value_policy::reference_internal)
       .def_property_readonly("normalisation", &Engine::normalisation)
       .def_property_readonly("communicator", &Engine::get_communicator)
       .def_property_readonly(

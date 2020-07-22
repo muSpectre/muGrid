@@ -1,11 +1,12 @@
 Change log for µSpectre
 =======================
 
-0.10.0 (not yet released)
--------------------------
+0.10.0 (22Jul20)
+----------------
 - Support for more flexible strides in fields: full column-major, row-major and
   strided pixels portion (#103)
 - User control over buffer copies in muFFT with option to avoid them completely 
+- Gradient integration for multiple quadrature points
 
 0.9.3 (28Jun20)
 ---------------

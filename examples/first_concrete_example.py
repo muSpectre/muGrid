@@ -34,9 +34,7 @@ covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
 
-import sys
 import numpy as np
-import argparse
 import random
 
 
@@ -155,8 +153,8 @@ def compute_response(N, lens, max_iter, cg_tol, newton_tol,
         placement_n, x = gi.compute_placement(
             re, lens, N, fourier_gradient, formulation=formulation)
 
-        PK1 = gi.reshape_gradient(re.stress, N)
-        F = gi.reshape_gradient(re.grad, N)
+        PK1 = re.stress.reshape((dim, dim) + tuple(N), order='f')
+        F = re.grad.reshape((dim, dim) + tuple(N), order='f')
 
         c_data = {"σ": PK1,
                   "ε": F,

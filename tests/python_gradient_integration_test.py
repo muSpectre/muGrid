@@ -35,15 +35,15 @@ Program grant you additional permission to convey the resulting work.
 """
 
 from python_test_imports import µ
+import muGrid
 import muFFT
+from muFFT import Stencils2D
 
 import unittest
 import numpy as np
-import scipy.misc as sm
 import itertools
 import time
-# np.set_printoptions(precision=2)
-# np.set_printoptions(suppress=True)
+
 ### Helper functions
 def init_X_F_Chi(lens, res, rank=2):
     """
@@ -117,38 +117,6 @@ class GradientIntegration_Check(unittest.TestCase):
             s = (np.s_[:n],) + (np.s_[:],)*n + (0,)*(3-n)
             self.assertLess(np.linalg.norm(x_c - grid_c[s]), self.norm_tol)
             self.assertLess(np.linalg.norm(x_n - grid_n[s]), self.norm_tol)
-
-    def test_reshape_gradient(self):
-        """
-        Test if reshape gradient transforms a flattend second order tensor in
-        the right way to a shape [dim, dim] + nb_grid_pts.
-        """
-        lens = list(self.lengths)
-        res = list(self.nb_grid_pts)
-        tol = 1e-5
-        formulation = µ.Formulation.finite_strain
-        DelF = np.array([[0   , 0.01, 0.02],
-                         [0.03, 0   , 0.04],
-                         [0.05, 0.06, 0   ]])
-        one  = np.eye(3, 3)
-        for n in range(2, 4):
-            cell = µ.Cell(res[:n], lens[:n], formulation)
-            if n == 2:
-                mat = µ.material.MaterialLinearElastic1_2d.make(
-                    cell, "material", 10, 0.3)
-            if n == 3:
-                mat = µ.material.MaterialLinearElastic1_3d.make(
-                    cell, "material", 10, 0.3)
-            for pixel in cell.pixel_indices:
-                mat.add_pixel(pixel)
-            solver = µ.solvers.KrylovSolverCG(cell, tol, maxiter=100,
-                                              verbose=µ.Verbosity.Silent)
-            r = µ.solvers.newton_cg(cell, DelF[:n, :n], solver,
-                                    tol, tol, verbose=µ.Verbosity.Silent)
-            grad = µ.gradient_integration.reshape_gradient(r.grad, list(res[:n]))
-            grad_theo = (DelF[:n, :n] + one[:n, :n]).reshape((n, n,) + (1,)*n)
-            self.assertEqual(grad.shape, (n, n,) + tuple(res[:n]))
-            self.assertLess(np.linalg.norm(grad - grad_theo), self.norm_tol)
 
     def test_complement_periodically(self):
         """
@@ -352,7 +320,7 @@ class GradientIntegration_Check(unittest.TestCase):
         result = µ.solvers.newton_cg(cell, DelF, solver,
                                      newton_tol=1e-6, equil_tol=1e-6,
                                      verbose=µ.Verbosity.Silent)
-        F = µ.gradient_integration.reshape_gradient(result.grad, res)
+        F = cell.strain.array(muGrid.IterUnit.Pixel)
 
         # muSpectre Fourier integration
         fourier_gradient = [µ.FourierDerivative(dim, i) for i in range(dim)]
@@ -645,16 +613,17 @@ class GradientIntegration_Check(unittest.TestCase):
         result = µ.solvers.newton_cg(cell, DelF, solver, newton_tol=1e-6,
                                      equil_tol=1e-6,
                                      verbose=µ.Verbosity.Silent)
-        result_reshaped = µ.gradient_integration.reshape_gradient(
-            result.grad, res).flatten()
-        for r in [result, result_reshaped]:
+        for rr in [(cell.strain.array(), 'using cell.strain'),
+                   (result, 'using OptimizeResult'),
+                   (result.grad, 'using gradient')]:
+            r, msg = rr
             # check input of result=OptimiseResult and result=np.ndarray
             placement, x = µ.gradient_integration.compute_placement(
                 r, lens, res, fourier_gradient,
                 formulation=µ.Formulation.finite_strain)
             self.assertLess(np.linalg.norm(placement_ana -
-                                           placement), 1e-12)
-            self.assertTrue((x_n == x).all())
+                                           placement), 1e-12, msg=msg)
+            self.assertTrue((x_n == x).all(), msg=msg)
 
 
     def test_compute_placement_small_strain(self):
@@ -689,9 +658,7 @@ class GradientIntegration_Check(unittest.TestCase):
         result = µ.solvers.newton_cg(cell, DelE, solver,
                                      newton_tol=1e-6, equil_tol=1e-6,
                                      verbose=µ.Verbosity.Silent)
-        result_reshaped = µ.gradient_integration.reshape_gradient(
-            result.grad, res).flatten()
-        for r in [result, result_reshaped]:
+        for r in [result, result.grad]:
             # check input of result=OptimiseResult and result=np.ndarray
             u_n, x = µ.gradient_integration.compute_placement(
                 r, lens, res, fourier_gradient,
@@ -718,7 +685,7 @@ class GradientIntegration_Check(unittest.TestCase):
         cg_tol = 1e-10  # tolerance for cg algo
         equil_tol = 1e-8  # tolerance for equilibrium
         maxiter = 1000
-        verbose = verbose=µ.Verbosity.Silent
+        verbose = µ.Verbosity.Silent
 
         # sinusoidal bump
         d = int(nb_grid_pts[1]*0.2)
@@ -808,16 +775,16 @@ class GradientIntegration_Check(unittest.TestCase):
         form = µ.Formulation.finite_strain
         Poisson = 0.3
         nb_pts = 9
+        delF_lat = -0.10
+        delF_surf = 0.50
 
         for dim in [2, 3]:
             if dim == 2:
-                dy = muFFT.DiscreteDerivative([0, 0], [[-0.5, 0.5],
-                                                       [-0.5, 0.5]])
-                dx = dy.rollaxes(-1)
-                discrete_gradient = [dx, dy]
+                discrete_gradient = [Stencils2D.d_10_00, Stencils2D.d_01_00,
+                                     Stencils2D.d_11_01, Stencils2D.d_11_10]
                 # We are compressing 10% in lateral and 50% in normal direction
-                DelF = np.array([[-0.10, 0.0],
-                                 [0.0,  0.50]])
+                DelF = np.array([[delF_lat, 0.0],
+                                 [0.0, delF_surf]])
                 mat = µ.material.MaterialLinearElastic1_2d
             else:
                 dz = muFFT.DiscreteDerivative([0, 0, 0],
@@ -827,9 +794,9 @@ class GradientIntegration_Check(unittest.TestCase):
                 dx = dy.rollaxes(-1)
                 discrete_gradient = [dx, dy, dz]
                 # We are compressing 10% in lateral and 50% in normal direction
-                DelF = np.array([[-0.10,  0.0,  0.0],
-                                 [0.0,  -0.10,  0.0],
-                                 [0.0,  0.0,   0.50]])
+                DelF = np.array([[delF_lat, 0.0, 0.0],
+                                 [0.0, delF_lat, 0.0],
+                                 [0.0, 0.0, delF_surf]])
                 mat = µ.material.MaterialLinearElastic1_3d
 
             fourier_gradient = [µ.FourierDerivative(dim, d) for d in range(dim)]
@@ -856,24 +823,35 @@ class GradientIntegration_Check(unittest.TestCase):
                 equil_tol = 1e-8  # tolerance for equilibrium
                 maxiter = 1000
                 verbose = µ.Verbosity.Silent
+                #verbose = µ.Verbosity.Full
 
                 solver = µ.solvers.KrylovSolverCG(cell, cg_tol, maxiter,
-                                            verbose)
+                                                  verbose)
                 cell.initialise()
 
                 result = µ.solvers.newton_cg(cell, DelF, solver,
                                              newton_tol, equil_tol, verbose)
 
-                F = µ.gradient_integration.reshape_gradient(
-                    result.grad, list(cell.nb_subdomain_grid_pts))
-                PK1 = µ.gradient_integration.reshape_gradient(
-                    result.stress, list(cell.nb_subdomain_grid_pts))
+                F = cell.strain.array(muGrid.IterUnit.Pixel)
+                self.assertTrue(np.allclose(F[0, 0], 1+delF_lat))
+                self.assertTrue(np.allclose(F[1, 0], 0))
+                self.assertTrue(np.allclose(F[0, 1], 0))
+                if dim == 3:
+                    self.assertTrue(np.allclose(F[1, 1], 1+delF_lat))
+                    self.assertTrue(np.allclose(F[2, 0], 0))
+                    self.assertTrue(np.allclose(F[0, 2], 0))
+                    self.assertTrue(np.allclose(F[2, 1], 0))
+                    self.assertTrue(np.allclose(F[1, 2], 0))
+
                 displ, r = µ.gradient_integration.compute_placement(
                     F, lengths, nb_grid_pts, gradient_op,
                     formulation=µ.Formulation.finite_strain)
 
                 if dim == 2:
                     x, y = displ
+                    self.assertTrue(np.allclose(x,
+                                                np.arange(nb_pts + 1).reshape(
+                                                    -1, 1) / (nb_pts + 1)))
                     if k == 0:
                         # Fourier gradient
                         self.assertAlmostEqual(
@@ -888,6 +866,12 @@ class GradientIntegration_Check(unittest.TestCase):
                             delta=0.03)
                 else:
                     x, y, z = displ
+                    self.assertTrue(np.allclose(x,
+                                                np.arange(nb_pts + 1).reshape(
+                                                    -1, 1, 1) / (nb_pts + 1)))
+                    self.assertTrue(np.allclose(y,
+                                                np.arange(nb_pts + 1).reshape(
+                                                    1, -1, 1) / (nb_pts + 1)))
                     if k == 0:
                         # Fourier gradient
                         self.assertAlmostEqual(

@@ -103,13 +103,12 @@ class MaterialLinearElastic4_Check(unittest.TestCase):
         verbose = µ.Verbosity.Silent
 
         solver = µ.solvers.KrylovSolverCG(cell, tol, maxiter, verbose)
-        r = µ.solvers.newton_cg(cell   , Del0,
+        r = µ.solvers.newton_cg(cell, Del0,
                                 solver, tol, tol, verbose)
 
         ### Compute tangent through a finite differences approximation
 
-        ndim = 2
-        F = cell.strain.array((ndim, ndim))
+        F = cell.strain.array()
         stress, tangent = cell.evaluate_stress_tangent(F)
 
         numerical_tangent = np.zeros_like(tangent)

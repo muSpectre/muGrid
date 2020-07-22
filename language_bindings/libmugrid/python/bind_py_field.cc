@@ -73,6 +73,7 @@ void add_field(py::module & mod) {
       .def_property_readonly("name", &Field::get_name)
       .def_property_readonly("collection", &Field::get_collection)
       .def_property_readonly("nb_components", &Field::get_nb_components)
+      .def_property_readonly("components_shape", &Field::get_components_shape)
       .def_property_readonly("nb_entries", &Field::get_nb_entries)
       .def_property_readonly("nb_buffer_entries", &Field::get_nb_buffer_entries)
       .def_property_readonly("is_global", &Field::is_global)
@@ -96,16 +97,8 @@ void add_typed_field(py::module & mod, std::string name) {
       .def(
           "array",
           [](TypedFieldBase<T> & self, const muGrid::IterUnit & it) {
-            return muGrid::array_computer(self, std::vector<Index_t>{}, it);
+            return muGrid::numpy_wrap(self, it);
           },
-          "iteration_type"_a = muGrid::IterUnit::SubPt, py::keep_alive<0, 1>())
-      .def(
-          "array",
-          [](TypedFieldBase<T> & self, std::vector<Index_t> shape,
-             const muGrid::IterUnit & it) {
-            return muGrid::array_computer(self, shape, it);
-          },
-          "shape"_a = std::vector<Index_t>{},
           "iteration_type"_a = muGrid::IterUnit::SubPt, py::keep_alive<0, 1>());
 
   py::class_<TypedField<T>, TypedFieldBase<T>>(mod, name.c_str())

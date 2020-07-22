@@ -34,6 +34,7 @@ with proprietary FFT implementations or numerical libraries, containing parts
 covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
+
 import sys
 import numpy as np
 import argparse
@@ -70,11 +71,8 @@ def compute_neo_elastic(N, lens, max_iter, cg_tol, newton_tol, equil_tol,
                                       verbose=µ.Verbosity.Silent)
     optimize_res = µ.solvers.de_geus(cell, dF_steps, solver, newton_tol,
                                      equil_tol, verbose=µ.Verbosity.Silent)
-    print("nb_cg: {}\nF:\n{}".format(
-        optimize_res[-1].nb_fev,
-        µ.gradient_integration.reshape_gradient(
-            optimize_res[-1].grad,
-            cell.nb_domain_grid_pts)[:, :, 0, 0]))
+    print("nb_cg: {}\nF:\n{}".format(optimize_res[-1].nb_fev,
+        optimize_res[-1].grad.reshape(cell.strain.shape, order='f')))
     xy = np.zeros((len(optimize_res)))
     xx = np.zeros((len(optimize_res)))
     yy = np.zeros((len(optimize_res)))
@@ -108,9 +106,7 @@ def compute_visco_elastic(N, lens, max_iter, cg_tol, newton_tol, equil_tol,
                                      equil_tol, verbose=µ.Verbosity.Silent)
     print("nb_cg: {}\nF:\n{}".format(
         optimize_res[-1].nb_fev,
-        µ.gradient_integration.reshape_gradient(
-            optimize_res[-1].grad,
-            cell.nb_domain_grid_pts)[:, :, 0, 0]))
+        optimize_res[-1].grad.reshape(cell.strain.shape, order='f')))
     xy = np.zeros((len(optimize_res)))
     xx = np.zeros((len(optimize_res)))
     yy = np.zeros((len(optimize_res)))

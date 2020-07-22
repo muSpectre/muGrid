@@ -125,6 +125,12 @@ namespace muFFT {
      */
     virtual void create_plan(const Index_t & nb_dof_per_pixel) = 0;
 
+    /**
+     * prepare a plan for a transform with shape entries per pixel.
+     * Needs to be called for every different sized transform
+     */
+    void create_plan(const Shape_t & shape);
+
     //! forward transform, performs copy of buffer if required
     void fft(const RealField_t & input_field,
              FourierField_t & output_field);
@@ -144,6 +150,16 @@ namespace muFFT {
                                  const Index_t & nb_dof_per_pixel);
 
     /**
+     * Create a Fourier-space field with the ideal strides and dimensions for
+     * this engine. Fields created this way are meant to be reused again and
+     * again, and they will stay in the memory of the `muFFT::FFTEngineBase`'s
+     * field collection until the engine is destroyed.
+     */
+    virtual FourierField_t &
+    register_fourier_space_field(const std::string & unique_name,
+                                 const Shape_t & shape);
+
+    /**
      * Fetches a Fourier-space field with the ideal strides and dimensions for
      * this engine. If the field does not exist, it is created using
      * `register_fourier_space_field`.
@@ -151,6 +167,15 @@ namespace muFFT {
     FourierField_t &
     fetch_or_register_fourier_space_field(const std::string & unique_name,
                                           const Index_t & nb_dof_per_pixel);
+
+    /**
+     * Fetches a Fourier-space field with the ideal strides and dimensions for
+     * this engine. If the field does not exist, it is created using
+     * `register_fourier_space_field`.
+     */
+    FourierField_t &
+    fetch_or_register_fourier_space_field(const std::string & unique_name,
+                                          const Shape_t & shape);
 
     /**
      * Create a real-space field with the ideal strides and dimensions for this
@@ -163,6 +188,16 @@ namespace muFFT {
                               const Index_t & nb_dof_per_pixel);
 
     /**
+     * Create a real-space field with the ideal strides and dimensions for this
+     * engine. Fields created this way are meant to be reused again and again,
+     * and they will stay in the memory of the `muFFT::FFTEngineBase`'s field
+     * collection until the engine is destroyed.
+     */
+    virtual RealField_t &
+    register_real_space_field(const std::string & unique_name,
+                              const Shape_t & shape);
+
+    /**
      * Fetches a real-space field with the ideal strides and dimensions for this
      * engine. If the field does not exist, it is created using
      * `register_real_space_field`.
@@ -170,6 +205,15 @@ namespace muFFT {
     RealField_t &
     fetch_or_register_real_space_field(const std::string & unique_name,
                                        const Index_t & nb_dof_per_pixel);
+
+    /**
+     * Fetches a real-space field with the ideal strides and dimensions for this
+     * engine. If the field does not exist, it is created using
+     * `register_real_space_field`.
+     */
+    RealField_t &
+    fetch_or_register_real_space_field(const std::string & unique_name,
+                                       const Shape_t & shape);
 
     //! return whether this engine is active
     virtual bool is_active() const { return true; }

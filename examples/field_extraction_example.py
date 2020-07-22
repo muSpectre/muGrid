@@ -98,7 +98,8 @@ def compute_response(N, lens, max_iter, cg_tol, newton_tol, equil_tol,
     PK1_reshape = (res[-1].stress.reshape(list(reversed(N)) + [len(N), len(N)]
                                           )).transpose(*new_order)
 
-    PK1_gi = gi.reshape_gradient(res[-1].stress, N)
+    dim = len(N)
+    PK1_gi = res[-1].stress.reshape((dim, dim) + tuple(N), order='f')
     c_data = {"history": h0,
               "history_before": h1,
               "history_after": h2,

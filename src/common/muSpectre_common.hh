@@ -147,21 +147,9 @@ namespace muSpectre {
     }
   }
 
-  //! compute the number of degrees of freedom to store for the strain
-  //! tensor given dimension dim
-  constexpr Dim_t dof_for_formulation(const Formulation form, const Dim_t dim,
-                                      const Dim_t nb_quad_pts) {
-    switch (form) {
-    case Formulation::small_strain_sym:
-      return vsize(dim) * nb_quad_pts;
-    default:
-      return muGrid::ipow(dim, 2) * nb_quad_pts;
-    }
-  }
-
   //! compute the shape of the strain tensor given dimension dim
   inline Shape_t shape_for_formulation(const Formulation form,
-                                          const Dim_t dim) {
+                                       const Dim_t dim) {
     switch (form) {
       case Formulation::small_strain_sym:
         return Shape_t({vsize(dim)});
@@ -172,7 +160,7 @@ namespace muSpectre {
 
   //! compute the shape of the tangent tensor given dimension dim
   inline Shape_t t4shape_for_formulation(const Formulation form,
-                                            const Dim_t dim) {
+                                         const Dim_t dim) {
     switch (form) {
       case Formulation::small_strain_sym:
         return Shape_t({vsize(dim), vsize(dim)});

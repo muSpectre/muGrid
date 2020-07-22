@@ -75,43 +75,6 @@ def make_grid(lengths, nb_grid_pts):
     return nodal_positions, center_positions
 
 
-def reshape_gradient(F, nb_grid_pts):
-    """reshapes a flattened second-rank tensor into a multidimensional array of
-    shape [dim, dim] + nb_grid_pts.
-
-    Note: this reshape entails a copy, because of the column-major to
-    row-major transposition between Eigen and numpy
-
-    Keyword Arguments:
-    F           -- flattenen array of gradients as in OptimizeResult
-    nb_grid_pts -- np.ndarray of length dim with the nb_grid_pts in each
-                   spatial dimension (dtype = int)
-
-    Returns:
-    np.ndarray of the shape [dim, dim] + nb_grid_pts
-    """
-    if not isinstance(nb_grid_pts, list):
-        try:
-            nb_grid_pts = list(nb_grid_pts)
-        except:
-            raise Exception("nb_grid_pts needs to be in list form, " +
-                            "for concatenation")
-    dim = len(nb_grid_pts)
-    expected_input_shape = [np.prod(nb_grid_pts) * dim**2]
-    output_shape = list(reversed(nb_grid_pts)) + [dim, dim]
-    if not ((F.shape[0] == expected_input_shape[0]) and
-            (F.size == expected_input_shape[0])):
-        raise Exception("expected gradient of shape {}, got {}".format(
-            expected_input_shape, F.shape))
-
-    order = list(range(dim+2))
-    new_order = []
-    new_order[0:2] = reversed(order[-2:])
-    new_order[2:] = reversed(order[0:dim])
-
-    return F.reshape(output_shape).transpose(*new_order)
-
-
 def complement_periodically(array, dim):
     """Takes an arbitrary multidimensional array of at least dimension dim
     and returns an augmented copy with periodic copies of the
@@ -157,6 +120,7 @@ def get_integrator(fft, gradient_op, grid_spacing):
     np.ndarray containing the fourier coefficients of the integrator
     """
     dim = len(grid_spacing)
+    nb_der = len(gradient_op)
 
     phase = fft.fftfreq
     # The shift is needed to move the Fourier integration from the cell center
@@ -166,23 +130,23 @@ def get_integrator(fft, gradient_op, grid_spacing):
             for _derivative in gradient_op]):
         shift = np.exp(1j*np.pi*np.sum(phase, axis=0))
 
-    xi = np.zeros(phase.shape, dtype=complex)
-    for i, (_derivative, _grid_spacing) in \
-            enumerate(zip(gradient_op, grid_spacing)):
+    xi = np.zeros((nb_der,) + fft.nb_fourier_grid_pts, dtype=complex)
+    for i, _derivative in enumerate(gradient_op):
+        d = i % dim
         if _derivative.__class__.__name__.startswith('Fourier'):
             # Shift to cell edges.
-            xi[i] = _derivative.fourier(phase) * shift / _grid_spacing
+            xi[i] = _derivative.fourier(phase) * shift / grid_spacing[d]
         else:
-            xi[i] = _derivative.fourier(phase) / _grid_spacing
+            xi[i] = _derivative.fourier(phase) / grid_spacing[d]
     # Corrects the denominator to avoid division by zero for freqs = 0
-    for i in range(dim):
+    for i in range(nb_der):
         xi[i][(0,) * dim] = 1
     # The following is the integrator because taking its derivative should
     # be the unit operation. Taking the derivative is simply a dot product
     # with xi.
     integrator = xi.conj() / (xi*xi.conj()).sum(axis=0)
     # Correct integrator for freqs = 0
-    for i in range(dim):
+    for i in range(nb_der):
         integrator[i][(0,) * dim] = 0
 
     return integrator
@@ -208,19 +172,20 @@ def integrate_tensor_2(grad, fft_engine, gradient_op, grid_spacing):
     np.ndarray containing the integrated field
     """
     dim = len(grid_spacing)
+    nb_der = len(gradient_op)
     nb_grid_pts = np.array(grad.shape[-dim:])
     lengths = nb_grid_pts * grid_spacing
-    x = make_grid(lengths, nb_grid_pts)[0]
+    x = np.vstack((make_grid(lengths, nb_grid_pts)[0],)*(nb_der//dim))
     integrator = get_integrator(fft_engine, gradient_op, grid_spacing)
-    grad_k_field = fft_engine.fetch_or_register_fourier_space_field("grad_k",
-                                                                    dim * dim)
+    grad_k_field = fft_engine.fetch_or_register_fourier_space_field(
+        "grad_k", (dim, nb_der))
     fft_engine.fft(grad, grad_k_field)
-    grad_k = grad_k_field.array([dim, dim])
+    grad_k = grad_k_field.array()
     grad_k *= fft_engine.normalisation
     f_k = np.einsum("j...,ij...->i...", integrator, grad_k)
     grad_k_0 = grad_k[np.s_[:, :] + (0,)*(dim+1)]
     # The homogeneous integration computes the affine part of the deformation
-    homogeneous = np.einsum("ij,j...->i...", grad_k_0.real, x)
+    homogeneous = np.einsum("ij,j...->i...", grad_k_0.real, x) * dim / nb_der
 
     fluctuation_non_pbe = np.empty([dim, *fft_engine.nb_subdomain_grid_pts],
                                    order="f")
@@ -347,9 +312,9 @@ def integrate_tensor_2_small_strain(strain, fft_engine, grid_spacing):
     x = make_grid(lengths, nb_grid_pts)[0]
     # aplying Fourier transform on strain field
     strain_k_field = fft_engine.fetch_or_register_fourier_space_field(
-        "strain_k", dim * dim)
+        "strain_k", (dim, dim))
     fft_engine.fft(strain, strain_k_field)
-    strain_k = strain_k_field.array([dim, dim])
+    strain_k = strain_k_field.array()
     strain_k *= fft_engine.normalisation
     # wave vectors :
     wv = fft_engine.fftfreq
@@ -455,7 +420,7 @@ def integrate_vector(grad, fft_engine, gradient_op, grid_spacing):
     integrator = get_integrator(fft_engine, gradient_op, grid_spacing)
     grad_k_field = fft_engine.register_fourier_space_field('grad_k', dim)
     fft_engine.fft(grad, grad_k_field)
-    grad_k = grad_k_field.array([dim])
+    grad_k = grad_k_field.array()
     grad_k *= fft_engine.normalisation
     f_k = np.einsum("j...,j...->...", integrator, grad_k)
     grad_k_0 = grad_k[np.s_[:, ] + (0,)*(dim+1)]
@@ -483,9 +448,8 @@ def compute_placement(result, lengths, nb_grid_pts, gradient_op,
     strain description)
 
     Keyword Arguments:
-    result      -- OptimiseResult, or just the reshaped(using
-                   reshape_gradient()) and afterwards flattend gradient field
-                   from an OptimizeResult.
+    result      -- OptimiseResult, or just the gradient field from an
+                   OptimizeResult.
     lengths     -- np.ndarray of length dim with the edge lengths in each
                    spatial dimension (dtype = float)
     nb_grid_pts -- np.ndarray of length dim with the nb_grid_pts in each
@@ -507,6 +471,8 @@ def compute_placement(result, lengths, nb_grid_pts, gradient_op,
     """
     lengths = np.array(lengths)
     nb_grid_pts = np.array(nb_grid_pts)
+    dim = len(nb_grid_pts)
+    nb_der = len(gradient_op)
 
     # Check whether result is a np.array or an OptimiseResult object
     if isinstance(result, np.ndarray):
@@ -520,8 +486,7 @@ def compute_placement(result, lengths, nb_grid_pts, gradient_op,
                              'Otherwise you can give a result=OptimiseResult'
                              ' object, which '
                              'tells me the formulation.')
-        form = formulation
-        strain = result.reshape((len(nb_grid_pts),)*2 + tuple(nb_grid_pts))
+        strain = result.reshape((dim, nb_der) + tuple(nb_grid_pts), order='F')
     else:
         form = result.formulation
         if form != formulation and formulation is not None:
@@ -531,11 +496,11 @@ def compute_placement(result, lengths, nb_grid_pts, gradient_op,
                              .format(formulation, form))
         elif formulation is None:
             formulation = form
-        strain = reshape_gradient(result.grad, nb_grid_pts.tolist())
+        strain = result.grad.reshape((dim, nb_der) + tuple(nb_grid_pts),
+                                     order='F')
 
     # load or initialise muFFT.FFT engine
     if fft is None:
-        dim = len(nb_grid_pts)
         fft_engine = muFFT.FFT(nb_grid_pts)
         fft_engine.create_plan(dim * dim)  # FFT for (dim,dim) matrix
         fft_engine.create_plan(dim)  # FFT for (dim) vector

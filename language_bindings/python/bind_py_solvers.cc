@@ -107,14 +107,12 @@ void add_newton_cg_helper(py::module & mod) {
          py::function & eigen_strain_pyfunc) -> OptimizeResult {
         const grad_vec & g_vec{g};
         Func_t eigen_strain_cpp_func{
-            [&eigen_strain_pyfunc,
-             &s](const size_t & step_nb,
-                 muGrid::TypedFieldBase<Real> & eigen_strain_field) {
-              auto && strain_shape{s.get_strain_shape()};
+            [&eigen_strain_pyfunc](
+                const size_t & step_nb,
+                muGrid::TypedFieldBase<Real> & eigen_strain_field) {
               eigen_strain_pyfunc(step_nb,
-                                  muGrid::array_computer<muGrid::Real>(
+                                  numpy_wrap(
                                       eigen_strain_field,
-                                      {strain_shape[0], strain_shape[1]},
                                       muGrid::IterUnit::SubPt));
             }};
         return newton_cg(s, g_vec, so, nt, eqt, verb, strain_init,
@@ -142,14 +140,12 @@ void add_newton_cg_helper(py::module & mod) {
          const py::function & eigen_strain_pyfunc)
           -> std::vector<OptimizeResult> {
         Func_t eigen_strain_cpp_func{
-            [&eigen_strain_pyfunc,
-             &s](const size_t & step_nb,
-                 muGrid::TypedFieldBase<Real> & eigen_strain_field) {
-              auto && strain_shape{s.get_strain_shape()};
+            [&eigen_strain_pyfunc](
+                const size_t & step_nb,
+                muGrid::TypedFieldBase<Real> & eigen_strain_field) {
               eigen_strain_pyfunc(step_nb,
-                                  muGrid::array_computer<muGrid::Real>(
+                                  muGrid::numpy_wrap(
                                       eigen_strain_field,
-                                      {strain_shape[0], strain_shape[1]},
                                       muGrid::IterUnit::SubPt));
             }};
         return newton_cg(s, g, so, nt, eqt, verb, strain_init,

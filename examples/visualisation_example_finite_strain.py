@@ -142,8 +142,8 @@ placement_n, x = gi.compute_placement(result, lengths,
 
 # some fields which can be added to the visualisation
 # 2-tensor field containing the first Piola Kirchhoff stress
-PK1 = gi.reshape_gradient(result.stress, nb_grid_pts)
-F   = gi.reshape_gradient(result.grad, nb_grid_pts)
+PK1 = result.stress.reshape((dim, dim) + tuple(nb_grid_pts), order='f')
+F   = result.grad.reshape((dim, dim) + tuple(nb_grid_pts), order='f')
 
 # scalar field containing the distance to the origin O
 distance_O = np.linalg.norm(placement_n, axis=0)

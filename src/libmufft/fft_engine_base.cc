@@ -40,6 +40,7 @@
 
 using muGrid::CcoordOps::get_col_major_strides;
 using muGrid::GlobalFieldCollection;
+using muGrid::operator<<;
 
 namespace muFFT {
 
@@ -218,7 +219,7 @@ namespace muFFT {
 
     bool input_copy_necessary{not this->check_fourier_space_field(input_field)};
     bool output_copy_necessary{not this->check_real_space_field(output_field)};
-    if (this->allow_temporary_buffer &&
+    if (this->allow_temporary_buffer and
         (input_copy_necessary or output_copy_necessary)) {
       if (input_copy_necessary and output_copy_necessary) {
         std::stringstream iname, oname;
@@ -276,6 +277,16 @@ namespace muFFT {
   }
 
   /* ---------------------------------------------------------------------- */
+  auto
+  FFTEngineBase::register_fourier_space_field(const std::string & unique_name,
+                                              const Shape_t & shape)
+  -> FourierField_t & {
+    this->create_plan(shape);
+    return this->fourier_field_collection.register_complex_field(
+        unique_name, shape, PixelTag);
+  }
+
+  /* ---------------------------------------------------------------------- */
   auto FFTEngineBase::fetch_or_register_fourier_space_field(
       const std::string & unique_name, const Index_t & nb_dof_per_pixel)
       -> FourierField_t & {
@@ -288,12 +299,32 @@ namespace muFFT {
         message << "Field '" << unique_name << "' exists, but it has "
                 << field.get_nb_dof_per_pixel()
                 << " degrees of freedom per pixel instead of the requested "
-                << nb_dof_per_pixel;
+                << nb_dof_per_pixel << ".";
         throw muGrid::FieldCollectionError{message.str()};
       }
       return field;
     }
     return this->register_fourier_space_field(unique_name, nb_dof_per_pixel);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  auto FFTEngineBase::fetch_or_register_fourier_space_field(
+      const std::string & unique_name, const Shape_t & shape)
+  -> FourierField_t & {
+    this->create_plan(shape);
+    if (this->fourier_field_collection.field_exists(unique_name)) {
+      auto & field{dynamic_cast<FourierField_t &>(
+                       this->fourier_field_collection.get_field(unique_name))};
+      if (field.get_components_shape() != shape) {
+        std::stringstream message{};
+        message << "Field '" << unique_name << "' exists, but it has shape of "
+                << field.get_components_shape() << " instead of the requested "
+                << shape << ".";
+        throw muGrid::FieldCollectionError{message.str()};
+      }
+      return field;
+    }
+    return this->register_fourier_space_field(unique_name, shape);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -304,6 +335,16 @@ namespace muFFT {
     this->create_plan(nb_dof_per_pixel);
     return this->real_field_collection.register_real_field(
         unique_name, nb_dof_per_pixel, PixelTag);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  auto
+  FFTEngineBase::register_real_space_field(const std::string & unique_name,
+                                           const Shape_t & shape)
+  -> RealField_t & {
+    this->create_plan(shape);
+    return this->real_field_collection.register_real_field(
+        unique_name, shape, PixelTag);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -319,12 +360,38 @@ namespace muFFT {
         message << "Field '" << unique_name << "' exists, but it has "
                 << field.get_nb_dof_per_pixel()
                 << " degrees of freedom per pixel instead of the requested "
-                << nb_dof_per_pixel;
+                << nb_dof_per_pixel << ".";
         throw muGrid::FieldCollectionError{message.str()};
       }
       return field;
     }
     return this->register_real_space_field(unique_name, nb_dof_per_pixel);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  auto FFTEngineBase::fetch_or_register_real_space_field(
+      const std::string & unique_name, const Shape_t & shape)
+  -> RealField_t & {
+    this->create_plan(shape);
+    if (this->real_field_collection.field_exists(unique_name)) {
+      auto & field{dynamic_cast<RealField_t &>(
+                       this->real_field_collection.get_field(unique_name))};
+      if (field.get_components_shape() != shape) {
+        std::stringstream message{};
+        message << "Field '" << unique_name << "' exists, but it has shape of "
+                << field.get_components_shape() << " instead of the requested "
+                << shape << ".";
+        throw muGrid::FieldCollectionError{message.str()};
+      }
+      return field;
+    }
+    return this->register_real_space_field(unique_name, shape);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void FFTEngineBase::create_plan(const Shape_t & shape) {
+    this->create_plan(std::accumulate(shape.begin(), shape.end(), 1,
+                                      std::multiplies<Index_t>()));
   }
 
   /* ---------------------------------------------------------------------- */

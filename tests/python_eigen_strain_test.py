@@ -67,7 +67,7 @@ class EigenStrainCheck(unittest.TestCase):
         self.cell2.initialise()
         glo_eigenstrain = self.cell2.get_globalised_internal_real_field(
             "Eigenstrain")
-        error = np.linalg.norm(glo_eigenstrain.array([self.dim, self.dim])-1)
+        error = np.linalg.norm(glo_eigenstrain.array()-1)
         self.assertEqual(error, 0)
 
     def test_globalisation(self):
@@ -80,9 +80,8 @@ class EigenStrainCheck(unittest.TestCase):
         # 2D eigen arrays from muSpectre (To be changed) -> Reshape loc_eigenstrain
         glo_eigenstrain = self.cell2.get_globalised_internal_real_field(
             "Eigenstrain")
-        shape = [self.dim, self.dim]
-        error = np.linalg.norm(loc_eigenstrain.array(shape).ravel(order='A') -
-                               glo_eigenstrain.array(shape).ravel(order='A'))
+        error = np.linalg.norm(loc_eigenstrain.array().ravel(order='A') -
+                               glo_eigenstrain.array().ravel(order='A'))
         self.assertEqual(error, 0)
 
     def test_solve(self):

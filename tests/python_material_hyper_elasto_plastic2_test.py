@@ -204,7 +204,7 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
                                      newton_tol, equil_tol, verbose)
 
         # Finite differences evaluation of the tangent
-        F = cell.strain.array((dim, dim))
+        F = cell.strain.array()
         stress, tangent = cell.evaluate_stress_tangent(F)
 
         numerical_tangent = np.zeros_like(tangent)
@@ -230,7 +230,7 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
                                      newton_tol, equil_tol, verbose)
 
         # Finite differences evaluation of the tangent
-        F = cell.strain.array((dim, dim))
+        F = cell.strain.array()
         stress, tangent = cell.evaluate_stress_tangent(F)
 
         stress = stress.copy()

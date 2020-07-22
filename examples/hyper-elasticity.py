@@ -76,8 +76,7 @@ def compute():
     optimize_res = µ.solvers.de_geus(cell, dF_bar, solver, newton_tol,
                                      equil_tol, verbose=µ.Verbosity.Full)
     print("nb_cg: {}\nF:\n{}".format(optimize_res.nb_fev,
-          µ.gradient_integration.reshape_gradient(optimize_res.grad,
-          cell.nb_domain_grid_pts)[:,:,0,0,0]))
+                                     cell.strain.array()[:,:,0,0,0]))
 
 
 def main():

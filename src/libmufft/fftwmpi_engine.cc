@@ -298,10 +298,30 @@ namespace muFFT {
 
   /* ---------------------------------------------------------------------- */
   auto
+  FFTWMPIEngine::register_real_space_field(
+      const std::string & unique_name,
+      const Shape_t & shape) -> RealField_t & {
+    auto & field{
+        Parent::register_real_space_field(unique_name, shape)};
+    /*
+     * We need to check whether the fourier field provided is large
+     * enough. MPI parallel FFTW may request a workspace size larger than the
+     * nominal size of the complex buffer.
+     */
+    auto nb_dof_per_pixel{std::accumulate(shape.begin(), shape.end(), 1,
+                                          std::multiplies<Index_t>())};
+    auto && required_workspace_size{
+        2*this->required_workspace_sizes.at(nb_dof_per_pixel)};
+    field.set_pad_size(required_workspace_size -
+                       nb_dof_per_pixel * field.get_nb_buffer_pixels());
+    return field;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  auto
   FFTWMPIEngine::register_fourier_space_field(
       const std::string & unique_name,
       const Index_t & nb_dof_per_pixel) -> FourierField_t & {
-    this->create_plan(nb_dof_per_pixel);
     auto & field{
         Parent::register_fourier_space_field(unique_name, nb_dof_per_pixel)};
     /*
@@ -319,7 +339,31 @@ namespace muFFT {
     return field;
   }
 
-    /* ---------------------------------------------------------------------- */
+  /* ---------------------------------------------------------------------- */
+  auto
+  FFTWMPIEngine::register_fourier_space_field(
+      const std::string & unique_name,
+      const Shape_t & shape) -> FourierField_t & {
+    auto & field{
+        Parent::register_fourier_space_field(unique_name, shape)};
+    /*
+     * We need to check whether the fourier field provided is large
+     * enough. MPI parallel FFTW may request a workspace size larger than the
+     * nominal size of the complex buffer.
+     */
+    auto nb_dof_per_pixel{std::accumulate(shape.begin(), shape.end(), 1,
+                                          std::multiplies<Index_t>())};
+    auto && required_workspace_size{
+        this->required_workspace_sizes.at(nb_dof_per_pixel)};
+    if (static_cast<int>(field.get_nb_entries() * nb_dof_per_pixel) <
+        required_workspace_size) {
+      field.set_pad_size(required_workspace_size -
+                         nb_dof_per_pixel * field.get_nb_buffer_pixels());
+    }
+    return field;
+  }
+
+  /* ---------------------------------------------------------------------- */
   bool
   FFTWMPIEngine::check_real_space_field(const RealField_t & field) const {
     auto nb_dof_per_pixel{field.get_nb_dof_per_pixel()};

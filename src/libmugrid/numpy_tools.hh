@@ -427,7 +427,7 @@ namespace muGrid {
              IterUnit iter_type = IterUnit::SubPt) {
     Shape_t shape{field.get_shape(iter_type)};
     Shape_t strides{field.get_strides(iter_type, sizeof(T))};
-    return pybind11::array_t<T>(
+    return pybind11::array_t<T, py::array::f_style>(
         shape, strides, field.data(), pybind11::capsule([]() {}));
   }
 
@@ -441,104 +441,6 @@ namespace muGrid {
       i++;
     }
     return t;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <class T>
-  py::array_t<T, py::array::f_style>
-  array_computer(TypedFieldBase<T> & self, const Shape_t & shape,
-                 const muGrid::IterUnit & it) {
-    // py_class will be passed as the `base` class to the array
-    // constructors below. This ties the lifetime of the array that does
-    // not own its own data to the field object. (Without this
-    // parameter, the constructor makes a copy of the array.)
-    std::vector<size_t> return_shape, return_strides{};
-    const size_t dim{shape.size()};
-
-    // If shape is given, then we return a field of tensors of this
-    // shape
-    Index_t ntotal{1}, stride{sizeof(T)};
-    if (dim != 0) {
-      for (auto & n : shape) {
-        return_shape.push_back(n);
-        return_strides.push_back(stride);
-        ntotal *= n;
-        stride *= n;
-      }
-    }
-
-    auto && nb_sub_pts{self.get_nb_sub_pts()};
-    auto && nb_components{self.get_nb_components()};
-
-    switch (it) {
-    case muGrid::IterUnit::SubPt: {
-      // If shape is not given, we just return column vectors with the
-      // components
-      if (dim == 0) {
-        return_shape.push_back(nb_components);
-        return_strides.push_back(stride);
-        stride *= nb_components;
-      } else if (ntotal != self.get_nb_components()) {
-        std::stringstream error{};
-        error << "Field has " << nb_components << " components "
-              << "per quadrature point, but shape requested would "
-                 "require "
-              << ntotal << " components.";
-        throw RuntimeError(error.str());
-      }
-      return_shape.push_back(nb_sub_pts);
-      return_strides.push_back(stride);
-      stride *= nb_sub_pts;
-      break;
-    }
-    case muGrid::IterUnit::Pixel: {
-      // If shape is not given, we just return column vectors with the
-      // components
-      if (dim == 0) {
-        return_shape.push_back(nb_components * nb_sub_pts);
-        return_strides.push_back(stride);
-        stride *= nb_components * nb_sub_pts;
-      } else if (ntotal != nb_components * nb_sub_pts) {
-        std::stringstream error{};
-        error << "Field has " << nb_components * nb_sub_pts
-              << " components per pixel, but shape requested would "
-                 "require "
-              << ntotal << " components.";
-        throw RuntimeError(error.str());
-      }
-
-      break;
-    }
-    default:
-      throw RuntimeError{"unknown pixel sub-division"};
-      break;
-    }
-
-    const auto & coll{self.get_collection()};
-    if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
-      // We have a global field collection and can return array that
-      // have the correct shape corresponding to the grid (on the local
-      // MPI process).
-      const GlobalFieldCollection & global_coll =
-          dynamic_cast<const GlobalFieldCollection &>(coll);
-      const auto & nb_grid_pts{
-          global_coll.get_pixels().get_nb_subdomain_grid_pts()};
-      const auto & strides{global_coll.get_pixels().get_strides()};
-      for (const auto & tup : akantu::zip(nb_grid_pts, strides)) {
-        const auto n = std::get<0>(tup);
-        const auto s = std::get<1>(tup);
-        return_shape.push_back(n);
-        return_strides.push_back(stride * s);
-      }
-    } else {
-      if (not coll.is_initialised()) {
-        throw RuntimeError("Field collection isn't initialised yet");
-      }
-      return_shape.push_back(coll.get_nb_pixels());
-      return_strides.push_back(stride);
-    }
-    return py::array_t<T, py::array::f_style>(
-        return_shape, return_strides, self.data(), py::capsule([]() {}));
   }
 
 }  // namespace muGrid

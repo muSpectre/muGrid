@@ -218,18 +218,20 @@ class FFT_Check(unittest.TestCase):
 
                 fc = muGrid.GlobalFieldCollection(len(nb_grid_pts))
                 fc.initialise(tuple(engine.nb_subdomain_grid_pts))
-                in_field = fc.register_real_field('in_field', np.prod(dims))
-                in_field.array(dims, muGrid.Pixel)[...] = global_in_arr[
+                in_field = fc.register_real_field('in_field', dims)
+                self.assertFalse(in_field.array().flags.owndata)
+                in_field.array(muGrid.Pixel)[...] = global_in_arr[
                     (..., *engine.subdomain_slices)]
 
                 tol = 1e-14 * np.prod(nb_grid_pts)
 
                 # Separately test convenience interface
                 out_field = engine.register_fourier_space_field("out_field",
-                                                              np.prod(dims))
+                                                                dims)
+                self.assertFalse(out_field.array().flags.owndata)
                 engine.fft(in_field, out_field)
                 err = np.linalg.norm(out_ref -
-                                     out_field.array(dims, muGrid.Pixel))
+                                     out_field.array(muGrid.Pixel))
                 self.assertLess(err, tol, msg='{} engine'.format(engine_str))
 
     def test_reverse_transform_field_interface(self):
@@ -270,19 +272,19 @@ class FFT_Check(unittest.TestCase):
                 tol = 1e-14 * np.prod(nb_grid_pts)
 
                 fourier_field = engine.register_fourier_space_field(
-                    "fourier_field", np.prod(dims))
-                fourier_field.array(dims, muGrid.Pixel)[...] = \
+                    "fourier_field", dims)
+                self.assertFalse(fourier_field.array().flags.owndata)
+                fourier_field.array(muGrid.Pixel)[...] = \
                     global_in_arr[(..., *engine.fourier_slices)]
 
-                fc = muGrid.GlobalFieldCollection(len(nb_grid_pts))
-                fc.initialise(tuple(engine.nb_subdomain_grid_pts))
-                out_field = fc.register_real_field('out_field', np.prod(dims))
+                out_field = engine.register_real_space_field('out_field', dims)
+                self.assertFalse(out_field.array().flags.owndata)
 
                 # Separately test convenience interface
                 engine.ifft(fourier_field, out_field)
                 err = np.linalg.norm(
                     out_ref -
-                    out_field.array(dims, muGrid.Pixel)*engine.normalisation)
+                    out_field.array(muGrid.Pixel)*engine.normalisation)
                 self.assertLess(err, tol, msg='{} engine'.format(engine_str))
 
     def test_nb_components1_forward_transform(self):
@@ -309,7 +311,8 @@ class FFT_Check(unittest.TestCase):
 
                 # Separately test convenience interface
                 out_msp = engine.register_fourier_space_field("out_msp",
-                                                            np.prod(dims))
+                                                              dims)
+                self.assertFalse(out_msp.array().flags.owndata)
                 engine.fft(in_arr, out_msp)
 
                 # Check that the output array does not have a unit first dimension
@@ -341,7 +344,8 @@ class FFT_Check(unittest.TestCase):
 
                 # Separately test convenience interface
                 out_msp = engine.register_fourier_space_field('out_msp',
-                                                              np.prod(dims))
+                                                              dims)
+                self.assertFalse(out_msp.array().flags.owndata)
                 engine.fft(in_arr, out_msp)
 
                 # Check that the output array does not have a unit first dimension
@@ -404,6 +408,7 @@ class FFT_Check(unittest.TestCase):
         fft_arr_ref = np.fft.rfft(arr)
         fft_arr = engine.register_fourier_space_field("fourier work space",
                                                       nb_dof)
+        self.assertFalse(fft_arr.array().flags.owndata)
         self.assertEqual(fft_arr.shape, [nb_grid_pts[0]//2+1])
         engine.fft(arr, fft_arr)
         self.assertTrue(np.allclose(fft_arr_ref, fft_arr))
@@ -474,6 +479,7 @@ class FFT_Check(unittest.TestCase):
         engine = muFFT.FFT(res, fft="serial")
         engine.create_plan(1)
         f_data = engine.register_fourier_space_field("fourier work space", 1)
+        self.assertFalse(f_data.array().flags.owndata)
         engine.fft(data, f_data)
         tested = f_data.array()
         gc.collect()

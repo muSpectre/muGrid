@@ -119,8 +119,8 @@ class XmlTree():
         if not self.text_compare(x_ref.tail, x_comp.tail):
             self.logger.debug('tail: %r != %r' % (x_ref.tail, x_comp.tail))
             return False
-        cl_ref = x_ref.getchildren()
-        cl_comp = x_comp.getchildren()
+        cl_ref = list(x_ref)
+        cl_comp = list(x_comp)
         if len(cl_ref) != len(cl_comp):
             self.logger.debug('children length differs, %i != %i'
                               % (len(cl_ref), len(cl_comp)))
@@ -297,7 +297,7 @@ class VtkExport_Check(unittest.TestCase):
         self.nb_grid_pts = np.array([3, 5, 7])
         self.grid_spacing = self.lengths / self.nb_grid_pts
 
-        self.temporary = True  # decides whether the compared files are written
+        self.temporary = False  # decides whether the compared files are written
         # in a temporary folder and deleted after
         # comaprison (True), or if they are written into
         # the afterwards existing folder

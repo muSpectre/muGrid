@@ -83,9 +83,7 @@ def compute_visco_elastic_damage(N, lens, max_iter, cg_tol, newton_tol,
                               equil_tol, verbose=µ.Verbosity.Silent)
     print("nb_cg: {}\nF:\n{}".format(
         res[-1].nb_fev,
-        µ.gradient_integration.reshape_gradient(
-            res[-1].grad,
-            cell.nb_domain_grid_pts)[:, :, 0, 0]))
+        res[-1].grad.reshape(cell.strain.shape, order='f')))
     xy = np.zeros((len(res)))
     xx = np.zeros((len(res)))
     yy = np.zeros((len(res)))
@@ -106,8 +104,8 @@ def compute_visco_elastic_damage(N, lens, max_iter, cg_tol, newton_tol,
             placement_n, x = gi.compute_placement(re, lens,
                                                   N, fourier_gradient,
                                                   formulation=formulation)
-            PK1 = gi.reshape_gradient(re.stress, N)
-            F = gi.reshape_gradient(re.grad, N)
+            PK1 = re.stress.reshape(cell.stress.shape, order='f')
+            F = re.grad.reshape(cell.strain.shape, order='f')
             c_data = {"σ": PK1,
                       "ε": F}
             p_data = {}
@@ -149,9 +147,7 @@ def compute_visco_elastic(N, lens, max_iter, cg_tol, newton_tol,
                             equil_tol, verbose=µ.Verbosity.Silent)
     print("nb_cg: {}\nF:\n{}".format(
         res[-1].nb_fev,
-        µ.gradient_integration.reshape_gradient(
-            res[-1].grad,
-            cell.nb_domain_grid_pts)[:, :, 0, 0]))
+        res[-1].grad.reshape(cell.strain.shape, order='f')))
     xy = np.zeros((len(res)))
     xx = np.zeros((len(res)))
     yy = np.zeros((len(res)))
@@ -172,8 +168,8 @@ def compute_visco_elastic(N, lens, max_iter, cg_tol, newton_tol,
                                                   N, fourier_gradient,
                                                   formulation=formulation)
 
-            PK1 = gi.reshape_gradient(re.stress, N)
-            F = gi.reshape_gradient(re.grad, N)
+            PK1 = re.stress.reshape(cell.stress.shape, order='f')
+            F = re.grad.reshape(cell.strain.shape, order='f')
             c_data = {"σ": PK1,
                       "ε": F}
             p_data = {}
