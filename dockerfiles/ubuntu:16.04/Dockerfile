@@ -25,6 +25,7 @@ RUN apt-get -qq update && apt-get -y -qq install \
     m4 \
     python3-breathe \
     python3-dev \
+    python3-mpi4py \
     python3-numpy \
     python3-pip \
     python3-pytest \
