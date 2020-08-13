@@ -63,7 +63,8 @@ from muGrid import get_domain_ccoord, get_domain_index
 from muFFT import (Communicator, DiscreteDerivative, FourierDerivative,
                    FFT_PlanFlags)
 from _muGrid import Verbosity
-from muFFT import Communicator, FourierDerivative, DiscreteDerivative, FFT_PlanFlags
+from muFFT import Communicator, FourierDerivative, DiscreteDerivative, FFT, \
+    FFT_PlanFlags
 import muSpectre.gradient_integration
 import muSpectre.stochastic_plasticity_search
 from . import vtk_export
@@ -81,7 +82,7 @@ _projections = {
 
 
 def Cell(nb_grid_pts, domain_lengths, formulation=Formulation.finite_strain,
-         gradient=None, fft='fftw', communicator=None,
+         gradient=None, fft='serial', communicator=None,
          is_cell_split=SplitCell.non_split):
     """
     Instantiate a muSpectre Cell class.
@@ -102,8 +103,10 @@ def Cell(nb_grid_pts, domain_lengths, formulation=Formulation.finite_strain,
         construct the projection operator. The default is FourierDerivative for
         each direction.
     fft: string
-        FFT engine to use. Options are 'fftw', 'fftwmpi', 'pfft' and 'p3dfft'.
-        Default is 'fftw'.
+        FFT engine to use. Use 'mpi' if you want a parallel engine and 'serial'
+        if you need a serial engine. It is also possible to specifically
+        choose 'fftw', 'fftwmpi', 'pfft' or 'p3dfft'.
+        Default: 'serial'.
     communicator: mpi4py or muFFT communicator
         communicator object passed to parallel FFT engines. Note that
         the default 'fftw' engine does not support parallel execution.
@@ -114,10 +117,17 @@ def Cell(nb_grid_pts, domain_lengths, formulation=Formulation.finite_strain,
     cell: object
         Return a muSpectre Cell object.
     """
-    if communicator is not None:
-        communicator = Communicator(communicator)
-    else:
-        communicator = Communicator()
+    fft = 'fftw' if fft == 'serial' else fft
+
+    communicator = Communicator(communicator)
+
+    # 'mpi' is a convenience setting that falls back to 'fftw' for single
+    # process jobs and to 'fftwmpi' for multi-process jobs
+    if fft == 'mpi':
+        if communicator.size > 1:
+            fft = 'fftwmpi'
+        else:
+            fft = 'fftw'
 
     if gradient is None:
         dims = len(nb_grid_pts)
@@ -146,7 +156,7 @@ def Cell(nb_grid_pts, domain_lengths, formulation=Formulation.finite_strain,
 def Projection(nb_grid_pts, lengths,
                formulation=Formulation.finite_strain,
                gradient=None,
-               fft='fftw', communicator=None):
+               fft='serial', communicator=None):
     """
     Instantiate a muSpectre Projection class.
 
@@ -154,14 +164,18 @@ def Projection(nb_grid_pts, lengths,
     ----------
     nb_grid_pts: list
         Grid nb_grid_pts in the Cartesian directions.
+    lengths: list
+        Physical length of the Cartesian direction.
     formulation: muSpectre.Formulation
         Determines whether to use finite or small strain formulation.
     gradient: list of subclasses of DerivativeBase
         Type of the derivative operator used for the projection for each
         Cartesian direction. Default is FourierDerivative for each direction.
     fft: string
-        FFT engine to use. Options are 'fftw', 'fftwmpi', 'pfft' and 'p3dfft'.
-        Default is 'fftw'.
+        FFT engine to use. Use 'mpi' if you want a parallel engine and 'serial'
+        if you need a serial engine. It is also possible to specifically
+        choose 'fftw', 'fftwmpi', 'pfft' or 'p3dfft'.
+        Default: 'serial'.
     communicator: mpi4py or muFFT communicator
         communicator object passed to parallel FFT engines. Note that
         the default 'fftw' engine does not support parallel execution.
@@ -172,21 +186,24 @@ def Projection(nb_grid_pts, lengths,
     projection: object
         Return a muSpectre Projection object.
     """
-    communicator = Communicator(communicator)
+    fft = FFT(nb_grid_pts, fft=fft, communicator=communicator)
 
+    dims = len(nb_grid_pts)
     if gradient is None:
-        dims = len(nb_grid_pts)
         gradient = [FourierDerivative(dims, i) for i in range(dims)]
 
-    class_name = 'Projection{}_{}d'.format(
-        _projections[formulation],
-        len(nb_grid_pts))
+    nb_quad_pts = len(gradient)//dims
+    if nb_quad_pts == 1:
+        class_name = 'Projection{}_{}d'.format(
+            _projections[formulation], len(nb_grid_pts))
+    else:
+        class_name = 'Projection{}_{}q_{}d'.format(
+            _projections[formulation], nb_quad_pts, len(nb_grid_pts))
+
     try:
         factory = _muSpectre.__dict__[class_name]
     except KeyError:
         raise KeyError("Projection engine '{}' has not been compiled into the "
                        "muSpectre library.".format(class_name))
-    if communicator.size == 1:
-        return factory(nb_grid_pts, lengths, gradient, fft)
-    else:
-        return factory(nb_grid_pts, lengths, gradient, fft, communicator)
+    return factory(fft, lengths, gradient)
+

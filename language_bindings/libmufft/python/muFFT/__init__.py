@@ -76,7 +76,7 @@ def _find_fft_engines():
 fft_engines = _find_fft_engines()
 
 
-def FFT(nb_grid_pts, fft='fftw', communicator=None, **kwargs):
+def FFT(nb_grid_pts, fft='serial', communicator=None, **kwargs):
     """
     The FFT class handles forward and inverse transforms and instantiates
     the correct engine object to carry out the transform.
@@ -92,8 +92,10 @@ def FFT(nb_grid_pts, fft='fftw', communicator=None, **kwargs):
     nb_dof_per_pixel: int
         Number of degrees of freedom per pixel in the transform. Default: 1
     fft: string
-        FFT engine to use. Options are 'fftw', 'fftwmpi', 'pfft' and 'p3dfft'.
-        Default: 'fftw'.
+        FFT engine to use. Use 'mpi' if you want a parallel engine and 'serial'
+        if you need a serial engine. It is also possible to specifically
+        choose 'fftw', 'fftwmpi', 'pfft' or 'p3dfft'.
+        Default: 'serial'.
     communicator: mpi4py or muFFT communicator
         communicator object passed to parallel FFT engines. Note that
         the default 'fftw' engine does not support parallel execution.

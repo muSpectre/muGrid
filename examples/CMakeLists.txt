@@ -162,4 +162,8 @@ if(${MUSPECTRE_MPI_PARALLEL})
    TYPE PYTHON MPI_NB_PROCS 1 elasto_plastic_comparison.py 1)
  muSpectre_add_example(elasto_plastic_comparison_py_example2
    TYPE PYTHON MPI_NB_PROCS 2 elasto_plastic_comparison.py 1)
+  muSpectre_add_example(crack_py_example1
+          TYPE PYTHON MPI_NB_PROCS 1 crack.py 1)
+  muSpectre_add_example(crack_py_example2
+          TYPE PYTHON MPI_NB_PROCS 2 crack.py 1)
 endif()

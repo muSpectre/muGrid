@@ -128,11 +128,17 @@ namespace muFFT {
         oname << "temp_fourier_space_" << output_field.get_nb_dof_per_pixel();
         RealField_t & tmp_ifield{this->fetch_or_register_real_space_field(
             iname.str(), input_field.get_nb_dof_per_pixel())};
-        tmp_ifield.reshape(input_field.get_components_shape());
+        tmp_ifield.get_collection().set_nb_sub_pts(
+            input_field.get_sub_division_tag(), input_field.get_nb_sub_pts());
+        tmp_ifield.reshape(input_field.get_components_shape(),
+                           input_field.get_sub_division_tag());
         tmp_ifield = input_field;
         FourierField_t & tmp_ofield{this->fetch_or_register_fourier_space_field(
             oname.str(), output_field.get_nb_dof_per_pixel())};
-        tmp_ofield.reshape(output_field.get_components_shape());
+        tmp_ofield.get_collection().set_nb_sub_pts(
+            output_field.get_sub_division_tag(), output_field.get_nb_sub_pts());
+        tmp_ofield.reshape(output_field.get_components_shape(),
+                           output_field.get_sub_division_tag());
         this->compute_fft(tmp_ifield, tmp_ofield);
         output_field = tmp_ofield;
       } else if (input_copy_necessary) {
@@ -140,7 +146,10 @@ namespace muFFT {
         iname << "temp_real_space_" << input_field.get_nb_dof_per_pixel();
         RealField_t & tmp_ifield{this->fetch_or_register_real_space_field(
             iname.str(), input_field.get_nb_dof_per_pixel())};
-        tmp_ifield.reshape(input_field.get_components_shape());
+        tmp_ifield.get_collection().set_nb_sub_pts(
+            input_field.get_sub_division_tag(), input_field.get_nb_sub_pts());
+        tmp_ifield.reshape(input_field.get_components_shape(),
+                           input_field.get_sub_division_tag());
         tmp_ifield = input_field;
         this->compute_fft(tmp_ifield, output_field);
       } else {  // output_copy_necessary
@@ -148,7 +157,10 @@ namespace muFFT {
         oname << "temp_fourier_space_" << output_field.get_nb_dof_per_pixel();
         FourierField_t & tmp_ofield{this->fetch_or_register_fourier_space_field(
             oname.str(), output_field.get_nb_dof_per_pixel())};
-        tmp_ofield.reshape(output_field.get_components_shape());
+        tmp_ofield.get_collection().set_nb_sub_pts(
+            output_field.get_sub_division_tag(), output_field.get_nb_sub_pts());
+        tmp_ofield.reshape(output_field.get_components_shape(),
+                           output_field.get_sub_division_tag());
         this->compute_fft(input_field, tmp_ofield);
         output_field = tmp_ofield;
       }
@@ -227,11 +239,17 @@ namespace muFFT {
         oname << "temp_real_space_" << output_field.get_nb_dof_per_pixel();
         FourierField_t & tmp_ifield{this->fetch_or_register_fourier_space_field(
             iname.str(), input_field.get_nb_dof_per_pixel())};
-        tmp_ifield.reshape(input_field.get_components_shape());
+        tmp_ifield.get_collection().set_nb_sub_pts(
+            input_field.get_sub_division_tag(), input_field.get_nb_sub_pts());
+        tmp_ifield.reshape(input_field.get_components_shape(),
+                           input_field.get_sub_division_tag());
         tmp_ifield = input_field;
         RealField_t & tmp_ofield{this->fetch_or_register_real_space_field(
             oname.str(), output_field.get_nb_dof_per_pixel())};
-        tmp_ofield.reshape(output_field.get_components_shape());
+        tmp_ofield.get_collection().set_nb_sub_pts(
+            output_field.get_sub_division_tag(), output_field.get_nb_sub_pts());
+        tmp_ofield.reshape(output_field.get_components_shape(),
+                           output_field.get_sub_division_tag());
         this->compute_ifft(tmp_ifield, tmp_ofield);
         output_field = tmp_ofield;
       } else if (input_copy_necessary) {
@@ -239,7 +257,10 @@ namespace muFFT {
         iname << "temp_fourier_space_" << input_field.get_nb_dof_per_pixel();
         FourierField_t & tmp_ifield{this->fetch_or_register_fourier_space_field(
             iname.str(), input_field.get_nb_dof_per_pixel())};
-        tmp_ifield.reshape(input_field.get_components_shape());
+        tmp_ifield.get_collection().set_nb_sub_pts(
+            input_field.get_sub_division_tag(), input_field.get_nb_sub_pts());
+        tmp_ifield.reshape(input_field.get_components_shape(),
+                           input_field.get_sub_division_tag());
         tmp_ifield = input_field;
         this->compute_ifft(tmp_ifield, output_field);
       } else {  // output_copy_necessary
@@ -247,7 +268,10 @@ namespace muFFT {
         oname << "temp_real_space_" << output_field.get_nb_dof_per_pixel();
         RealField_t & tmp_ofield{this->fetch_or_register_real_space_field(
             oname.str(), output_field.get_nb_dof_per_pixel())};
-        tmp_ofield.reshape(output_field.get_components_shape());
+        tmp_ofield.get_collection().set_nb_sub_pts(
+            output_field.get_sub_division_tag(), output_field.get_nb_sub_pts());
+        tmp_ofield.reshape(output_field.get_components_shape(),
+                           output_field.get_sub_division_tag());
         this->compute_ifft(input_field, tmp_ofield);
         output_field = tmp_ofield;
       }

@@ -174,7 +174,18 @@ namespace muGrid {
      */
     Shape_t get_components_shape() const;
 
+    /**
+     * Reshape the components part of the field. The total number of degrees
+     * of freedom per pixel must remain the same.
+     */
     void reshape(const Shape_t & components_shape);
+
+    /**
+     * Reshape component and sub-point parts of the field. The total number of
+     * degrees of freedom per pixel must remain the same.
+     */
+    void reshape(const Shape_t & components_shape,
+                 const std::string & sub_div_tag);
 
     /**
      * evaluate and return the shape of the data contained in a single pixel
@@ -321,7 +332,7 @@ namespace muGrid {
      * three-dimensional vector, or 9 for a three-dimensional second-rank
      * tensor)
      */
-    const Index_t nb_components;
+    Index_t nb_components;
 
     /**
      * shape of the data stored per sub-point (e.g., 3, 3 for a

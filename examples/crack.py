@@ -35,6 +35,7 @@ Program grant you additional permission to convey the resulting work.
 """
 
 import numpy as np
+from mpi4py import MPI
 
 try:
     import matplotlib.pyplot as plt
@@ -106,7 +107,8 @@ discrete_gradient = Stencils2D.averaged_upwind
 discrete_gradient2 = [Stencils2D.d_10_00, Stencils2D.d_01_00,
                       Stencils2D.d_11_01, Stencils2D.d_11_10]
 
-gradients = [fourier_gradient, discrete_gradient, discrete_gradient2]
+#gradients = [fourier_gradient, discrete_gradient, discrete_gradient2]
+gradients = [discrete_gradient2]
 
 ###
 
@@ -115,7 +117,8 @@ grad = {}
 phase = -np.ones(nb_domain_grid_pts, dtype=int)
 for i, gradient in enumerate(gradients):
     rve = msp.Cell(nb_domain_grid_pts, domain_lengths,
-                   msp.Formulation.finite_strain, gradient)
+                   msp.Formulation.finite_strain, gradient,
+                   fft='mpi', communicator=MPI.COMM_WORLD)
     hard = msp.material.MaterialLinearElastic1_2d.make(
         rve, "hard", 1., .33)
     vacuum = msp.material.MaterialLinearElastic1_2d.make(
@@ -134,12 +137,12 @@ for i, gradient in enumerate(gradients):
         rve, applied_strain, solver, newton_tol=newton_tol,
         equil_tol=equil_tol, verbose=verbose)
     stress[i] = result.stress.reshape(
-        (dim, dim, len(gradient)//dim, *nb_domain_grid_pts), order='f')
+        (dim, dim, len(gradient)//dim, *rve.nb_subdomain_grid_pts), order='f')
     grad[i] = result.grad.reshape(
-        (dim, dim, len(gradient)//dim, *nb_domain_grid_pts), order='f')
+        (dim, dim, len(gradient)//dim, *rve.nb_subdomain_grid_pts), order='f')
 
 
-if matplotlib_found:
+if matplotlib_found and MPI.COMM_WORLD.Get_size() == 1:
     plt.figure()
 
     phase = np.stack((phase, phase), axis=0)
@@ -178,4 +181,7 @@ if matplotlib_found:
     plt.tight_layout()
     plt.show()
 else:
-    print('Plotting disabled because matplotlib is not found.')
+    if MPI.COMM_WORLD.Get_size() != 1:
+        print('Plotting disabled because we are running MPI-parallel.')
+    else:
+        print('Plotting disabled because matplotlib is not found.')

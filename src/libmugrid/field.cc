@@ -129,6 +129,35 @@ namespace muGrid {
       throw FieldError(message.str());
     }
     this->components_shape = new_components_shape;
+    this->nb_components = std::accumulate(this->components_shape.begin(),
+                                          this->components_shape.end(), 1,
+                                          std::multiplies<Index_t>());
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void Field::reshape(const Shape_t & new_components_shape,
+                      const std::string & sub_div_tag) {
+    auto new_nb_sub_pts{collection.get_nb_sub_pts(sub_div_tag)};
+    if (std::accumulate(new_components_shape.begin(),
+                        new_components_shape.end(),
+                        1, std::multiplies<Index_t>()) * new_nb_sub_pts !=
+        this->get_nb_dof_per_pixel()) {
+      std::stringstream message{};
+      message << "This field was set up for " << this->get_nb_components()
+              << " components and " << this->nb_sub_pts << " sub-points. "
+              << "Setting the component shape to " << new_components_shape
+              << " and the number of sub-points to " << new_nb_sub_pts
+              << " (sub-point tag '" << sub_div_tag << "') is not supported "
+              << "because it would change the total number of degrees of "
+              << "freedom per pixel.";
+      throw FieldError(message.str());
+    }
+    this->components_shape = new_components_shape;
+    this->nb_components = std::accumulate(this->components_shape.begin(),
+                                          this->components_shape.end(), 1,
+                                          std::multiplies<Index_t>());
+    this->nb_sub_pts = new_nb_sub_pts;
+    this->sub_division_tag = sub_div_tag;
   }
 
   /* ---------------------------------------------------------------------- */
