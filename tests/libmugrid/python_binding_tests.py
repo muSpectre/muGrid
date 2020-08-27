@@ -39,8 +39,13 @@ import unittest
 from python_test_imports import muGrid
 
 from python_common_tests import *
+
 from python_communicator_tests import *
 from python_field_tests import *
+
+RUN_NETCDF_TESTS = @RUN_NETCDF_TESTS@
+if RUN_NETCDF_TESTS:
+    from python_file_io_test import FileIOTest
 
 if 'FileIONetCDF' in dir(muGrid):
     from python_file_io_test import FileIOTest

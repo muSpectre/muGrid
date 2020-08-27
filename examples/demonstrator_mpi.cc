@@ -105,8 +105,9 @@ int main(int argc, char * argv[]) {
     muFFT::Communicator comm{MPI_COMM_WORLD};
     MPI_Init(&argc, &argv);
 
-    auto cell{make_cell<Cell, FFTWMPIEngine>(
-        nb_grid_pts, lengths, form, make_fourier_gradient(dim), comm)};
+    auto cell{make_cell<Cell, FFTWMPIEngine>(nb_grid_pts, lengths, form,
+                                             make_fourier_gradient(dim), comm,
+                                             muFFT::FFT_PlanFlags::measure)};
 
     constexpr Real E{1.0030648180242636};
     constexpr Real nu{0.29930675909878679};
@@ -118,7 +119,7 @@ int main(int argc, char * argv[]) {
         "hard", dim, OneQuadPt, 10 * E, nu)};
 
     int counter{0};
-    for (const auto && tup : cell.get_pixels().enumerate()) {
+    for (const auto && tup : cell->get_pixels().enumerate()) {
       auto & pixel_index{std::get<0>(tup)};
       auto & pixel{std::get<1>(tup)};
       int sum = 0;
@@ -134,13 +135,13 @@ int main(int argc, char * argv[]) {
       }
     }
     if (comm.rank() == 0) {
-      std::cout << counter << " Pixel out of " << cell.get_nb_pixels()
+      std::cout << counter << " Pixel out of " << cell->get_nb_pixels()
                 << " are in the hard material" << std::endl;
     }
 
-    cell.add_material(std::move(Material_soft));
-    cell.add_material(std::move(Material_hard));
-    cell.initialise();
+    cell->add_material(std::move(Material_soft));
+    cell->add_material(std::move(Material_hard));
+    cell->initialise();
 
     constexpr Real newton_tol{1e-4};
     constexpr Real equil_tol{1e-7};

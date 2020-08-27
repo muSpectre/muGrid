@@ -61,17 +61,6 @@ namespace muGrid {
 
    protected:
     /**
-     * Simple structure used to allow for lazy evaluation of the unary '-' sign.
-     * When assiging the the negative of a field to another, as in field_a =
-     * -field_b, this structure allows to implement this operation without
-     * needing a temporary object holding the negative value of field_b.
-     */
-    struct Negative {
-      //! field on which the unary '-' was applied
-      const TypedFieldBase & field;
-    };
-
-    /**
      * `Field`s are supposed to only exist in the form of `std::unique_ptr`s
      * held by a `FieldCollection. The `Field` constructor is protected to
      * ensure this. Fields are instantiated through the `register_field`
@@ -111,6 +100,16 @@ namespace muGrid {
                  unit} {}
 
    public:
+    /**
+     * Simple structure used to allow for lazy evaluation of the unary '-' sign.
+     * When assiging the the negative of a field to another, as in field_a =
+     * -field_b, this structure allows to implement this operation without
+     * needing a temporary object holding the negative value of field_b.
+     */
+    struct Negative {
+      //! field on which the unary '-' was applied
+      const TypedFieldBase & field;
+    };
     //! stored scalar type
     using Scalar = T;
 

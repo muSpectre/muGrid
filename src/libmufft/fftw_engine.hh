@@ -57,8 +57,8 @@ namespace muFFT {
     FFTWEngine() = delete;
 
     /**
-     * Constructor with the domain's number of grid points in each direction and
-     * the communicator
+     * Constructor with the domain's number of grid points in each direction,
+     * the communicator, and fft planner flags
      * @param nb_grid_pts number of grid points of the global grid
      * @param allow_temporary_buffer allow the creation of temporary buffers
      *        if the input buffer has the wrong memory layout
@@ -69,6 +69,20 @@ namespace muFFT {
     FFTWEngine(const DynCcoord_t & nb_grid_pts,
                Communicator comm = Communicator(),
                const FFT_PlanFlags & plan_flags = FFT_PlanFlags::estimate,
+               bool allow_temporary_buffer = true,
+               bool allow_destroy_input = false);
+    /**
+     * Constructor with the domain's number of grid points in each direction and
+     * the fft planner flags
+     * @param nb_grid_pts number of grid points of the global grid
+     * @param allow_temporary_buffer allow the creation of temporary buffers
+     *        if the input buffer has the wrong memory layout
+     * @param allow_destroy_input allow that the input buffers are invalidated
+     *        during the FFT
+     * @comm MPI communicator object
+     */
+    FFTWEngine(const DynCcoord_t & nb_grid_pts,
+               const FFT_PlanFlags & plan_flags,
                bool allow_temporary_buffer = true,
                bool allow_destroy_input = false);
 

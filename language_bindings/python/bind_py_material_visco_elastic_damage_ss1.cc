@@ -69,9 +69,10 @@ void add_material_visco_elastic_damage_ss1_helper(
       mod, name.c_str())
       .def_static(
           "make",
-          [](Cell_t & cell, std::string name, Real young_inf, Real young_v,
-             Real eta_v, Real poisson, Real kappa, Real alpha, Real beta,
-             Real dt = 0.0) -> Mat_t & {
+          [](std::shared_ptr<Cell_t> cell, const std::string & name,
+             const Real & young_inf, const Real & young_v, const Real & eta_v,
+             const Real & poisson, const Real & kappa, const Real & alpha,
+             const Real & beta, const Real & dt = 0.0) -> Mat_t & {
             return Mat_t::make(cell, name, young_inf, young_v, eta_v, poisson,
                                kappa, alpha, beta, dt);
           },
@@ -80,8 +81,9 @@ void add_material_visco_elastic_damage_ss1_helper(
           py::return_value_policy::reference_internal)
       .def_static(
           "make_evaluator",
-          [](Real young_inf, Real young_v, Real eta_v, Real poisson, Real kappa,
-             Real alpha, Real beta, Real dt = 0.0) {
+          [](const Real & young_inf, const Real & young_v, const Real & eta_v,
+             const Real & poisson, const Real & kappa, const Real & alpha,
+             const Real & beta, const Real & dt = 0.0) {
             return Mat_t::make_evaluator(young_inf, young_v, eta_v, poisson,
                                          kappa, alpha, beta, dt);
           },

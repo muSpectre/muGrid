@@ -37,7 +37,7 @@
 #define SRC_MATERIALS_MATERIAL_LINEAR_ORTHOTROPIC_HH_
 #include "stress_transformations_PK2.hh"
 #include "material_base.hh"
-#include "material_muSpectre_base.hh"
+#include "material_muSpectre_mechanics.hh"
 #include "material_linear_anisotropic.hh"
 #include "common/muSpectre_common.hh"
 #include "cell/cell.hh"
@@ -51,22 +51,9 @@ namespace muSpectre {
 
   // traits for orthotropic material
   template <Index_t DimM>
-  struct MaterialMuSpectre_traits<MaterialLinearOrthotropic<DimM>> {
-    //! expected map type for strain fields
-    using StrainMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Const, DimM, IterUnit::SubPt>;
-    //! expected map type for stress fields
-    using StressMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
-    //! expected map type for tangent stiffness fields
-    using TangentMap_t =
-        muGrid::T4FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
-
-    //! declare what type of strain measure your law takes as input
-    constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
-    //! declare what type of stress measure your law yields as output
-    constexpr static auto stress_measure{StressMeasure::PK2};
-  };
+  struct MaterialMuSpectre_traits<MaterialLinearOrthotropic<DimM>>
+      : public DefaultMechanics_traits<DimM, StrainMeasure::GreenLagrange,
+                                       StressMeasure::PK2> {};
   /**
    * Material implementation for orthotropic constitutive law
    */
@@ -104,10 +91,20 @@ namespace muSpectre {
      * make function needs to be overloaded, because this class does not
      * directly inherit from MaterialMuSpectre. If this overload is not made,
      * calls to make for MaterialLinearOrthotropic would call the constructor
+     * for MaterialLinmateearAnisotropic
+     */
+    static MaterialLinearOrthotropic<DimM> &
+    make(std::shared_ptr<Cell> cell, const std::string & name,
+         const std::vector<Real> & input);
+
+        /**
+     * make function needs to be overloaded, because this class does not
+     * directly inherit from MaterialMuSpectre. If this overload is not made,
+     * calls to make for MaterialLinearOrthotropic would call the constructor
      * for MaterialLinearAnisotropic
      */
     static MaterialLinearOrthotropic<DimM> &
-    make(Cell & cell, const std::string & name,
+    make(std::shared_ptr<CellData> cell, const std::string & name,
          const std::vector<Real> & input);
 
    protected:

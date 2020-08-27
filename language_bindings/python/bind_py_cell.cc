@@ -192,10 +192,11 @@ void add_cell_helper(py::module & mod) {
             {strain_shape[0], strain_shape[1]},
             tensor2};
       }};
-  py::class_<Cell>(mod, "Cell")
-      .def(py::init([](const muSpectre::ProjectionBase & projection) {
-        return Cell{projection.clone()};
-      }))
+  py::class_<Cell, muSpectre::MatrixAdaptable, std::shared_ptr<Cell>> tmp(
+      mod, "Cell");
+  tmp.def(py::init([](const muSpectre::ProjectionBase & projection) {
+       return Cell{projection.clone()};
+     }))
       .def("initialise", &Cell::initialise)
       .def(
           "is_initialised", [](Cell & s) { return s.is_initialised(); },
@@ -216,8 +217,7 @@ void add_cell_helper(py::module & mod) {
             }
             auto & delta_stress{
                 dynamic_cast<muGrid::RealField &>(fields.get_field(out_name))};
-            auto delta_strain_array{
-                NumpyT2Proxy(cell, delta_strain)};
+            auto delta_strain_array{NumpyT2Proxy(cell, delta_strain)};
             cell.evaluate_projected_directional_stiffness(
                 delta_strain_array.get_field(), delta_stress);
             return numpy_wrap(delta_stress);
@@ -239,9 +239,7 @@ void add_cell_helper(py::module & mod) {
             }
             auto & strain_field{
                 dynamic_cast<muGrid::RealField &>(fields.get_field(out_name))};
-            strain_field =
-                NumpyT2Proxy(cell, strain)
-                    .get_field();
+            strain_field = NumpyT2Proxy(cell, strain).get_field();
             cell.apply_projection(strain_field);
             return numpy_wrap(strain_field);
           },
@@ -257,8 +255,7 @@ void add_cell_helper(py::module & mod) {
           "evaluate_stress_tangent",
           [&NumpyT2Proxy](Cell & cell,
                           py::array_t<Real, py::array::f_style> & strain) {
-            auto strain_array{
-                NumpyT2Proxy(cell, strain)};
+            auto strain_array{NumpyT2Proxy(cell, strain)};
 
             cell.get_strain() = strain_array.get_field();
             auto && stress_tgt{cell.evaluate_stress_tangent()};
@@ -281,8 +278,7 @@ void add_cell_helper(py::module & mod) {
           "evaluate_stress",
           [&NumpyT2Proxy](Cell & cell,
                           py::array_t<Real, py::array::f_style> & strain) {
-            auto strain_array{
-                NumpyT2Proxy(cell, strain)};
+            auto strain_array{NumpyT2Proxy(cell, strain)};
 
             cell.get_strain() = strain_array.get_field();
             return numpy_wrap(cell.evaluate_stress());
@@ -388,7 +384,10 @@ void add_cell_helper(py::module & mod) {
              std::vector<DynRcoord_t> precipitate_vertices) {
             cell.make_pixels_precipitate_for_laminate_material(
                 precipitate_vertices, mat_lam, mat_precipitate_cell,
-                mat_precipitate, mat_matrix);
+                std::dynamic_pointer_cast<muSpectre::MaterialMechanicsBase>(
+                    mat_precipitate),
+                std::dynamic_pointer_cast<muSpectre::MaterialMechanicsBase>(
+                    mat_matrix));
           },
           "material_laminate"_a, "mat_precipitate_cell"_a,
           "material_precipitate"_a, "material_matrix"_a, "vertices"_a)
@@ -408,7 +407,8 @@ void add_cell_split_helper(py::module & mod) {
   using CellSplit_t = muSpectre::CellSplit;
   using Cell_t = muSpectre::Cell;
   using Mat_t = muSpectre::MaterialBase;
-  py::class_<CellSplit_t, Cell_t>(mod, "CellSplit")
+  py::class_<CellSplit_t, Cell_t, std::shared_ptr<CellSplit_t>>(mod,
+                                                                "CellSplit")
       .def(
           "make_precipitate",
           [](CellSplit_t & cell, Mat_t & mat,

@@ -70,7 +70,7 @@ int main() {
   auto & soft{MaterialHyperElastoPlastic1<Dim>::make(rve, "soft", Young,
                                                      Poisson, tauy0, H)};
 
-  for (auto && i : rve.get_pixel_indices()) {
+  for (auto && i : rve->get_pixel_indices()) {
     if (i < 3) {
       hard.add_pixel(i);
     } else {
@@ -78,7 +78,7 @@ int main() {
       }
   }
 
-  rve.initialise();
+  rve->initialise();
 
   Real tol{1e-5};
   Real equi_tol{1e-5};

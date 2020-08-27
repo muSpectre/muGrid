@@ -35,8 +35,8 @@
 
 #include <libmugrid/exception.hh>
 
-#include "cell_adaptor.hh"
 #include "cell.hh"
+#include "materials/material_mechanics_base.hh"
 
 #ifdef WITH_SPLIT
 #include "materials/material_laminate.hh"
@@ -57,8 +57,7 @@ namespace muSpectre {
   Cell::Cell(Projection_ptr projection, SplitCell is_cell_split)
       : projection{std::move(projection)},
         fields{std::make_unique<muGrid::GlobalFieldCollection>(
-            this->get_spatial_dim(),
-            this->projection->get_nb_domain_grid_pts(),
+            this->get_spatial_dim(), this->projection->get_nb_domain_grid_pts(),
             this->projection->get_nb_subdomain_grid_pts(),
             this->projection->get_subdomain_locations(),
             muGrid::FieldCollection::SubPtMap_t{
@@ -134,7 +133,7 @@ namespace muSpectre {
     } else {
       for (auto && mat : this->materials) {
         if (mat->get_name() != material.get_name()) {
-          if (!mat->get_is_initialised()) {
+          if (not mat->is_initialised()) {
             mat->initialise();
           }
         }
@@ -152,13 +151,19 @@ namespace muSpectre {
     for (auto && tup : akantu::enumerate(assignments)) {
       auto && index{std::get<0>(tup)};
       auto && is_assigned{std::get<1>(tup)};
-      if (!is_assigned) {
+      if (not is_assigned) {
         material.add_pixel(index);
       }
     }
   }
+
   /* ---------------------------------------------------------------------- */
-  CellAdaptor<Cell> Cell::get_adaptor() { return CellAdaptor<Cell>(*this); }
+  auto Cell::get_adaptor() -> Adaptor { return Adaptor(*this); }
+
+  /* ---------------------------------------------------------------------- */
+  auto Cell::get_shared_adaptor() -> std::shared_ptr<Adaptor> {
+    return std::make_shared<Adaptor>(*this);
+  }
 
   /* ---------------------------------------------------------------------- */
   void Cell::save_history_variables() {
@@ -171,13 +176,11 @@ namespace muSpectre {
   Shape_t Cell::get_strain_shape() const {
     switch (this->get_formulation()) {
     case Formulation::finite_strain: {
-      return Shape_t{this->get_material_dim(),
-                     this->get_material_dim()};
+      return Shape_t{this->get_material_dim(), this->get_material_dim()};
       break;
     }
     case Formulation::small_strain: {
-      return Shape_t{this->get_material_dim(),
-                     this->get_material_dim()};
+      return Shape_t{this->get_material_dim(), this->get_material_dim()};
       break;
     }
     default:
@@ -251,16 +254,9 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   void Cell::initialise() {
     // check that all pixels have been assigned exactly one material
-    if (this->is_initialised()) {
-      throw RuntimeError(
-          "The cell is already initialised. Therefore, it is not "
-          "possible to complete material assignemnt for it");
-    } else {
-      for (auto && mat : this->materials) {
-        if (!mat->get_is_initialised()) {
-          mat->initialise();
-        }
-      }
+    for (auto && mat : this->materials) {
+      mat->initialise();
+      mat->set_formulation(this->get_formulation());
     }
     this->check_material_coverage();
     // initialise the projection and compute the fft plan
@@ -313,8 +309,15 @@ namespace muSpectre {
       this->initialise();
     }
     for (auto & mat : this->materials) {
-      mat->compute_stresses(this->strain, this->stress,
-                            this->get_formulation());
+      if (mat->get_formulation() != this->get_formulation()) {
+        std::stringstream error_stream{};
+        error_stream << "The material '" << mat->get_name()
+                     << "', has formulation " << mat->get_formulation()
+                     << ", but this cell has the formulation "
+                     << this->get_formulation() << ".";
+        throw MaterialError{error_stream.str()};
+      }
+      mat->compute_stresses(this->strain, this->stress);
     }
     return this->stress;
   }
@@ -335,9 +338,18 @@ namespace muSpectre {
     this->get_tangent(create_tangent);
 
     for (auto & mat : this->materials) {
+      if (dynamic_cast<MaterialMechanicsBase &>(*mat).get_formulation() !=
+          this->get_formulation()) {
+        std::stringstream error_stream{};
+        error_stream
+            << "The material '" << mat->get_name() << "', has formulation "
+            << dynamic_cast<MaterialMechanicsBase &>(*mat).get_formulation()
+            << ", but this cell has the formulation " << this->get_formulation()
+            << ".";
+        throw MaterialError{error_stream.str()};
+      }
       mat->compute_stresses_tangent(this->strain, this->stress,
-                                    this->tangent.value(),
-                                    this->get_formulation());
+                                    this->tangent.value());
     }
     return std::tie(this->stress, this->tangent.value());
   }
@@ -560,7 +572,8 @@ namespace muSpectre {
   muGrid::TypedField<T> &
   Cell::globalise_internal_field(const std::string & unique_name) {
     // start by checking that the field exists at least once, and that
-    // it always has th same number of components, and the same subdivision tag
+    // it always has th same number of components, and the same subdivision
+    // tag
     std::set<Index_t> nb_component_categories{};
     std::set<std::string> tag_categories{};
     std::vector<std::reference_wrapper<const muGrid::Field>> local_fields;
@@ -590,9 +603,8 @@ namespace muSpectre {
           auto & coll = mat->get_collection();
           if (coll.field_exists(unique_name)) {
             auto & field{coll.get_field(unique_name)};
-            err_str << field.get_nb_components()
-                    << " components in material '" << mat->get_name() << "'"
-                    << std::endl;
+            err_str << field.get_nb_components() << " components in material '"
+                    << mat->get_name() << "'" << std::endl;
           }
         }
       } else {
@@ -694,9 +706,8 @@ namespace muSpectre {
           if (coll.state_field_exists(unique_prefix)) {
             auto && field{
                 coll.get_state_field(unique_prefix).old(nb_steps_ago)};
-            err_str << field.get_nb_components()
-                    << " components in material '" << mat->get_name() << "'"
-                    << std::endl;
+            err_str << field.get_nb_components() << " components in material '"
+                    << mat->get_name() << "'" << std::endl;
           }
         }
       } else {
@@ -798,9 +809,8 @@ namespace muSpectre {
           auto && coll{mat->get_collection()};
           if (coll.state_field_exists(unique_prefix)) {
             auto && field{coll.get_state_field(unique_prefix).current()};
-            err_str << field.get_nb_components()
-                    << " components in material '" << mat->get_name() << "'"
-                    << std::endl;
+            err_str << field.get_nb_components() << " components in material '"
+                    << mat->get_name() << "'" << std::endl;
           }
         }
       } else {
@@ -1021,5 +1031,13 @@ namespace muSpectre {
 
 /* ---------------------------------------------------------------------- */
 #endif
+
+  /* ---------------------------------------------------------------------- */
+  Cell::operator Adaptor() { return this->get_adaptor(); }
+
+  /* ---------------------------------------------------------------------- */
+  Cell::operator std::shared_ptr<Adaptor>() {
+    return std::make_shared<CellAdaptor<Cell>>(*this);
+  }
 
 }  // namespace muSpectre

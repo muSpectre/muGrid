@@ -184,8 +184,11 @@ namespace muGrid {
     }
   }
 
+  /**
+   * transposed strides only make sense for multi-dimensional cases
+   */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_index_transposed_strides, Fix,
-                                   testGoodies::dimlist, Fix) {
+                                   testGoodies::multidimlist, Fix) {
     constexpr auto dim{Fix::dim};
     using Ccoord = Ccoord_t<dim>;
 

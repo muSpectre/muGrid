@@ -52,39 +52,18 @@ namespace muSpectre {
    * traits for objective linear elasticity with eigenstrain
    */
   template <Index_t DimM>
-  struct MaterialMuSpectre_traits<MaterialLinearElastic3<DimM>> {
-    //! expected map type for strain fields
-    using StrainMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Const, DimM, IterUnit::SubPt>;
-    //! expected map type for stress fields
-    using StressMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
-
-    //! expected map type for tangent stiffness fields
-    using TangentMap_t =
-        muGrid::T4FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
-
-    //! declare what type of strain measure your law takes as input
-    constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
-    //! declare what type of stress measure your law yields as output
-    constexpr static auto stress_measure{StressMeasure::PK2};
-  };
-
+  struct MaterialMuSpectre_traits<MaterialLinearElastic3<DimM>>
+      : public DefaultMechanics_traits<DimM, StrainMeasure::GreenLagrange,
+                                       StressMeasure::PK2> {};
   /**
    * implements objective linear elasticity with an eigenstrain per pixel
    */
   template <Index_t DimM>
   class MaterialLinearElastic3
-      : public MaterialMuSpectre<MaterialLinearElastic3<DimM>, DimM> {
+      : public MaterialMuSpectreMechanics<MaterialLinearElastic3<DimM>, DimM> {
    public:
     //! base class
-    using Parent = MaterialMuSpectre<MaterialLinearElastic3, DimM>;
-    /**
-     * type used to determine whether the
-     * `muSpectre::MaterialMuSpectre::iterable_proxy` evaluate only
-     * stresses or also tangent stiffnesses
-     */
-    using NeedTangent = typename Parent::NeedTangent;
+    using Parent = MaterialMuSpectreMechanics<MaterialLinearElastic3, DimM>;
     //! global field collection
 
     //! traits of this material

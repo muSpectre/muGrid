@@ -38,6 +38,7 @@ set (materials_SRC
   ${CMAKE_CURRENT_SOURCE_DIR}/material_base.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/material_linear_anisotropic.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/material_linear_orthotropic.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/material_linear_diffusion.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/material_linear_elastic1.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/material_linear_elastic2.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/material_linear_elastic3.cc
@@ -46,6 +47,7 @@ set (materials_SRC
   ${CMAKE_CURRENT_SOURCE_DIR}/material_linear_elastic_damage2.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/material_linear_elastic_generic1.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/material_linear_elastic_generic2.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/material_mechanics_base.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/material_visco_elastic_ss.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/material_visco_elastic_damage_ss1.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/material_visco_elastic_damage_ss2.cc

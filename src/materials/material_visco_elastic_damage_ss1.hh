@@ -51,7 +51,7 @@
 #define SRC_MATERIALS_MATERIAL_VISCO_ELASTIC_DAMAGE_SS1_HH_
 
 #include "materials/material_visco_elastic_ss.hh"
-#include "materials/material_muSpectre_base.hh"
+#include "materials/material_muSpectre_mechanics.hh"
 #include "materials/materials_toolbox.hh"
 #include "materials/stress_transformations_PK2.hh"
 
@@ -65,22 +65,9 @@ namespace muSpectre {
    * traits for objective linear visco_elasticity with damage
    */
   template <Index_t DimM>
-  struct MaterialMuSpectre_traits<MaterialViscoElasticDamageSS1<DimM>> {
-    //! expected map type for strain fields
-    using StrainMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Const, DimM, IterUnit::SubPt>;
-    //! expected map type for stress fields
-    using StressMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
-    //! expected map type for tangent stiffness fields
-    using TangentMap_t =
-        muGrid::T4FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
-
-    //! declare what type of strain measure your law takes as input
-    constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
-    //! declare what type of stress measure your law yields as output
-    constexpr static auto stress_measure{StressMeasure::PK2};
-  };
+  struct MaterialMuSpectre_traits<MaterialViscoElasticDamageSS1<DimM>>
+      : public DefaultMechanics_traits<DimM, StrainMeasure::GreenLagrange,
+                                       StressMeasure::PK2> {};
 
   /**
    * implements objective linear visco_elasticity with damage
@@ -88,10 +75,12 @@ namespace muSpectre {
    */
   template <Index_t DimM>
   class MaterialViscoElasticDamageSS1
-      : public MaterialMuSpectre<MaterialViscoElasticDamageSS1<DimM>, DimM> {
+      : public MaterialMuSpectreMechanics<MaterialViscoElasticDamageSS1<DimM>,
+                                          DimM> {
    public:
     //! base class
-    using Parent = MaterialMuSpectre<MaterialViscoElasticDamageSS1, DimM>;
+    using Parent =
+        MaterialMuSpectreMechanics<MaterialViscoElasticDamageSS1, DimM>;
 
     //! short-hand for second-rank tensors
     using T2_t = Eigen::Matrix<Real, DimM, DimM>;

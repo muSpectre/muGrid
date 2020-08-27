@@ -36,8 +36,9 @@
 #ifndef SRC_CELL_CELL_HH_
 #define SRC_CELL_CELL_HH_
 
+#include "solver/matrix_adaptor.hh"
 #include "common/muSpectre_common.hh"
-#include "materials/material_base.hh"
+#include "materials/material_mechanics_base.hh"
 #include "projection/projection_base.hh"
 
 #include <libmugrid/ccoord_operations.hh>
@@ -58,11 +59,11 @@ namespace muSpectre {
    * (optionally) tangent moduli fields of the problem, maintains the list of
    * materials present, as well as the projection operator.
    */
-  class Cell {
+  class Cell : public MatrixAdaptable {
    public:
     //! materials handled through `std::unique_ptr`s
-    using Material_ptr = std::unique_ptr<MaterialBase>;
-    using Material_sptr = std::shared_ptr<MaterialBase>;
+    using Material_ptr = std::unique_ptr<MaterialMechanicsBase>;
+    using Material_sptr = std::shared_ptr<MaterialMechanicsBase>;
     //! projections handled through `std::unique_ptr`s
     using Projection_ptr = std::unique_ptr<ProjectionBase>;
 
@@ -110,13 +111,13 @@ namespace muSpectre {
     bool is_initialised() const;
 
     //! returns the number of degrees of freedom in the cell
-    Index_t get_nb_dof() const;
+    Index_t get_nb_dof() const final;
 
     //! number of pixels on this processor
     size_t get_nb_pixels() const;
 
     //! return the communicator object
-    const muFFT::Communicator & get_communicator() const;
+    const muFFT::Communicator & get_communicator() const final;
 
     /**
      * formulation is hard set by the choice of the projection class
@@ -165,6 +166,12 @@ namespace muSpectre {
     //! get a sparse matrix view on the cell
     Adaptor get_adaptor();
 
+    //! get a sparse matrix view on the cell
+    std::shared_ptr<Adaptor> get_shared_adaptor();
+
+    operator Adaptor();
+    operator std::shared_ptr<Adaptor>();
+
     /**
      * freezes all the history variables of the materials
      */
@@ -201,7 +208,7 @@ namespace muSpectre {
     //! initialise the projection, the materials and the global fields
     void initialise();
 
-    //! return a const reference to the grids pixels iterator
+    //! return a const reference to the grid's pixels iterator
     const muGrid::CcoordOps::DynamicPixels & get_pixels() const;
 
     /**
@@ -371,6 +378,12 @@ namespace muSpectre {
     void add_projected_directional_stiffness(EigenCVec_t delta_strain,
                                              const Real & alpha,
                                              EigenVec_t del_stress);
+    void stiffness_action_increment(EigenCVec_t delta_strain,
+                                    const Real & alpha,
+                                    EigenVec_t del_stress) const override {
+      return const_cast<Cell *>(this)->add_projected_directional_stiffness(
+          delta_strain, alpha, del_stress);
+    }
 
     //! transitional function, use discouraged
     SplitCell get_splitness() const { return this->is_cell_split; }
@@ -440,5 +453,7 @@ namespace muSpectre {
   };
 
 }  // namespace muSpectre
+
+#include "cell_adaptor.hh"
 
 #endif  // SRC_CELL_CELL_HH_

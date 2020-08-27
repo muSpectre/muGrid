@@ -34,6 +34,7 @@
  */
 
 #include "common/muSpectre_common.hh"
+#include "solver/matrix_adaptor.hh"
 #include "solver/solvers.hh"
 #include "solver/krylov_solver_cg.hh"
 #include "solver/krylov_solver_eigen.hh"
@@ -63,10 +64,10 @@ using muGrid::NumpyProxy;
 
 template <class KrylovSolver>
 void add_krylov_solver_helper(py::module & mod, std::string name) {
-  py::class_<KrylovSolver, typename KrylovSolver::Parent>(mod,
-                                                                 name.c_str())
-      .def(py::init<muSpectre::Cell &, Real, Uint, Verbosity>(), "cell"_a,
-           "tol"_a, "maxiter"_a, "verbose"_a = Verbosity::Silent)
+  py::class_<KrylovSolver, typename KrylovSolver::Parent>(mod, name.c_str())
+      .def(py::init<std::shared_ptr<muSpectre::MatrixAdaptable>, Real, Uint,
+                    Verbosity>(),
+           "cell"_a, "tol"_a, "maxiter"_a, "verbose"_a = Verbosity::Silent)
       .def("initialise", &KrylovSolver::initialise)
       .def("solve", &KrylovSolver::solve, "rhs"_a)
       .def_property_readonly("counter", &KrylovSolver::get_counter)
@@ -77,10 +78,10 @@ void add_krylov_solver_helper(py::module & mod, std::string name) {
 
 template <class KrylovSolver>
 void add_krylov_solver_trust_region_helper(py::module & mod, std::string name) {
-  py::class_<KrylovSolver, typename KrylovSolver::Parent>(mod,
-                                                                 name.c_str())
-      .def(py::init<muSpectre::Cell &, Real, Uint, Real, Verbosity>(), "cell"_a,
-           "tol"_a = -1.0, "maxiter"_a = 1000, "trust_region"_a = 1.0,
+  py::class_<KrylovSolver, typename KrylovSolver::Parent>(mod, name.c_str())
+      .def(py::init<std::shared_ptr<muSpectre::MatrixAdaptable>, Real, Uint,
+                    Real, Verbosity>(),
+           "cell"_a, "tol"_a = -1.0, "maxiter"_a = 1000, "trust_region"_a = 1.0,
            "verbose"_a = Verbosity::Silent)
       .def("initialise", &KrylovSolver::initialise)
       .def("solve", &KrylovSolver::solve, "rhs"_a)
@@ -94,6 +95,9 @@ void add_krylov_solver_trust_region_helper(py::module & mod, std::string name) {
 }
 
 void add_krylov_solver(py::module & mod) {
+  py::class_<muSpectre::MatrixAdaptable,
+             std::shared_ptr<muSpectre::MatrixAdaptable>>(mod,
+                                                          "MatrixAdaptable");
   std::stringstream name{};
   name << "KrylovSolverBase";
   py::class_<muSpectre::KrylovSolverBase>(mod, name.str().c_str());
@@ -140,7 +144,9 @@ void add_newton_cg_helper(py::module & mod) {
               eigen_strain_pyfunc(step_nb, numpy_wrap(eigen_strain_field,
                                                       muGrid::IterUnit::SubPt));
             }};
-        return newton_cg(s, g_vec, so, nt, eqt, verb, strain_init,
+        auto cell_ptr{
+            std::dynamic_pointer_cast<muSpectre::Cell>(s.shared_from_this())};
+        return newton_cg(cell_ptr, g_vec, so, nt, eqt, verb, strain_init,
                          eigen_strain_cpp_func)
             .front();
       },
@@ -150,8 +156,9 @@ void add_newton_cg_helper(py::module & mod) {
       "eigen strain func"_a = nullptr);
   mod.def(
       name,
-      [](muSpectre::Cell & s, const grad & g, solver & so, Real nt, Real eqt,
-         Verbosity verb, IsStrainInitialised strain_init) -> OptimizeResult {
+      [](std::shared_ptr<muSpectre::Cell> s, const grad & g, solver & so,
+         Real nt, Real eqt, Verbosity verb,
+         IsStrainInitialised strain_init) -> OptimizeResult {
         const grad_vec & g_vec{g};
         return newton_cg(s, g_vec, so, nt, eqt, verb, strain_init).front();
       },
@@ -160,8 +167,8 @@ void add_newton_cg_helper(py::module & mod) {
       "IsStrainInitialised"_a = IsStrainInitialised::False);
   mod.def(
       name,
-      [](muSpectre::Cell & s, const grad_vec & g, solver & so, Real nt,
-         Real eqt, Verbosity verb, IsStrainInitialised strain_init,
+      [](std::shared_ptr<muSpectre::Cell> s, const grad_vec & g, solver & so,
+         Real nt, Real eqt, Verbosity verb, IsStrainInitialised strain_init,
          const py::function & eigen_strain_pyfunc)
           -> std::vector<OptimizeResult> {
         Func_t eigen_strain_cpp_func{
@@ -181,8 +188,8 @@ void add_newton_cg_helper(py::module & mod) {
       "eigen strain func"_a = nullptr);
   mod.def(
       name,
-      [](muSpectre::Cell & s, const grad_vec & g, solver & so, Real nt,
-         Real eqt, Verbosity verb,
+      [](std::shared_ptr<muSpectre::Cell> s, const grad_vec & g, solver & so,
+         Real nt, Real eqt, Verbosity verb,
          IsStrainInitialised strain_init) -> std::vector<OptimizeResult> {
         return newton_cg(s, g, so, nt, eqt, verb, strain_init);
       },
@@ -199,8 +206,8 @@ void add_de_geus_helper(py::module & mod) {
 
   mod.def(
       name,
-      [](muSpectre::Cell & s, const grad & g, solver & so, Real nt, Real eqt,
-         Verbosity verb) -> OptimizeResult {
+      [](std::shared_ptr<muSpectre::Cell> s, const grad & g, solver & so,
+         Real nt, Real eqt, Verbosity verb) -> OptimizeResult {
         Eigen::MatrixXd tmp{g};
         return de_geus(s, tmp, so, nt, eqt, verb);
       },
@@ -208,8 +215,8 @@ void add_de_geus_helper(py::module & mod) {
       "verbose"_a = Verbosity::Silent);
   mod.def(
       name,
-      [](muSpectre::Cell & s, const grad_vec & g, solver & so, Real nt,
-         Real eqt, Verbosity verb) -> std::vector<OptimizeResult> {
+      [](std::shared_ptr<muSpectre::Cell> s, const grad_vec & g, solver & so,
+         Real nt, Real eqt, Verbosity verb) -> std::vector<OptimizeResult> {
         return de_geus(s, g, so, nt, eqt, verb);
       },
       "cell"_a, "ΔF₀"_a, "solver"_a, "newton_tol"_a, "equilibrium_tol"_a,

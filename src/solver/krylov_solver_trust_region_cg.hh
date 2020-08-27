@@ -69,9 +69,21 @@ namespace muSpectre {
      * and verbosity flag as input. A negative value for the tolerance tells
      * the solver to automatically adjust it.
      */
-    KrylovSolverTrustRegionCG(Cell & cell, Real tol = -1.0, Uint maxiter = 1000,
-                              Real trust_region = 1.0,
-                              Verbosity verbose = Verbosity::Silent);
+    KrylovSolverTrustRegionCG(std::shared_ptr<MatrixAdaptable> matrix_holder,
+                              const Real & tol = -1.0,
+                              const Uint & maxiter = 1000,
+                              const Real & trust_region = 1.0,
+                              const Verbosity & verbose = Verbosity::Silent);
+
+    /**
+     * Constructor without matrix adaptable. The adaptable has to be supplied
+     * using KrylovSolverBase::set_matrix(...) before initialisation for this
+     * solver to be usable
+     */
+    KrylovSolverTrustRegionCG(const Real & tol = -1.0,
+                              const Uint & maxiter = 1000,
+                              const Real & trust_region = 1.0,
+                              const Verbosity & verbose = Verbosity::Silent);
 
     //! Move constructor
     KrylovSolverTrustRegionCG(KrylovSolverTrustRegionCG && other) = default;
@@ -80,12 +92,12 @@ namespace muSpectre {
     virtual ~KrylovSolverTrustRegionCG() = default;
 
     //! Copy assignment operator
-    KrylovSolverTrustRegionCG & operator=(
-        const KrylovSolverTrustRegionCG & other) = delete;
+    KrylovSolverTrustRegionCG &
+    operator=(const KrylovSolverTrustRegionCG & other) = delete;
 
     //! Move assignment operator
-    KrylovSolverTrustRegionCG & operator=(
-        KrylovSolverTrustRegionCG && other) = delete;
+    KrylovSolverTrustRegionCG &
+    operator=(KrylovSolverTrustRegionCG && other) = delete;
 
     //! initialisation does not need to do anything in this case
     void initialise() final{};
@@ -96,14 +108,18 @@ namespace muSpectre {
     //! set size of the trust region
     void set_trust_region(Real new_trust_region) final;
 
+    //! set the matrix
+    void set_matrix(std::shared_ptr<MatrixAdaptable> matrix_adaptable) final;
+
     //! the actual solver
     Vector_map solve(const ConstVector_ref rhs) final;
 
    protected:
+    muFFT::Communicator comm{};
     //! find the minimzer on the trust region bound
     Vector_map bound(const ConstVector_ref rhs);
 
-    Real trust_region;   //!< size of trust region
+    Real trust_region;  //!< size of trust region
 
     Vector_t r_k;   //!< residual
     Vector_t p_k;   //!< search direction

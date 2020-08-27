@@ -1,18 +1,14 @@
 /**
- * @file   material_muSpectre_base.hh
+ * @file   material_muSpectre_mechanics.hh
  *
- * @author Till Junge <till.junge@epfl.ch>
+ * @author Till Junge <till.junge@altermail.ch>
  *
- * @date   25 Oct 2017
+ * @date   16 Jun 2020
  *
- * @brief  Base class for materials written for µSpectre specifically. These
- *         can take full advantage of the configuration-change utilities of
- *         µSpectre. The user can inherit from them to define new constitutive
- *         laws and is merely required to provide the methods for computing the
- *         second Piola-Kirchhoff stress and Tangent. This class uses the
- *         "curiously recurring template parameter" to avoid virtual calls.
+ * @brief  abstraction for mechanics materials. Handles the complexities of
+ *         stress- and strain conversions, as well as storage of native stress
  *
- * Copyright © 2017 Till Junge
+ * Copyright © 2020 Till Junge
  *
  * µSpectre is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
@@ -38,125 +34,99 @@
  *
  */
 
-#ifndef SRC_MATERIALS_MATERIAL_MUSPECTRE_BASE_HH_
-#define SRC_MATERIALS_MATERIAL_MUSPECTRE_BASE_HH_
+#ifndef SRC_MATERIALS_MATERIAL_MUSPECTRE_MECHANICS_HH_
+#define SRC_MATERIALS_MATERIAL_MUSPECTRE_MECHANICS_HH_
 
-#include "common/muSpectre_common.hh"
-#include "materials/material_base.hh"
-#include "materials/materials_toolbox.hh"
-#include "materials/material_evaluator.hh"
-#include "materials/iterable_proxy.hh"
-
-#include "cell/cell.hh"
-
-#include "libmugrid/field_map_static.hh"
-
-#include <tuple>
-#include <type_traits>
-#include <iterator>
-#include <stdexcept>
-#include <functional>
-#include <utility>
-#include "sstream"
-
+#include "material_muSpectre.hh"
 namespace muSpectre {
 
   /**
-   * material traits are used by `muSpectre::MaterialMuSpectre` to
-   * break the circular dependence created by the curiously recurring
-   * template parameter. These traits must define
-   * - these `muSpectre::FieldMap`s:
-   *   - `StrainMap_t`: typically a `muSpectre::MatrixFieldMap` for a
-   *                    constant second-order `muSpectre::TensorField`
-   *   - `StressMap_t`: typically a `muSpectre::MatrixFieldMap` for a
-   *                    writable secord-order `muSpectre::TensorField`
-   *   - `TangentMap_t`: typically a `muSpectre::T4MatrixFieldMap` for a
-   *                     writable fourth-order `muSpectre::TensorField`
-   * - `strain_measure`: the expected strain type (will be replaced by the
-   *                     small-strain tensor ε
-   *                     `muspectre::StrainMeasure::Infinitesimal` in small
-   *                     strain computations)
-   * - `stress_measure`: the measure of the returned stress. Is used by
-   *                     `muspectre::MaterialMuSpectre` to transform it into
-   *                     Cauchy stress (`muspectre::StressMeasure::Cauchy`) in
-   *                     small-strain computations and into first
-   *                     Piola-Kirchhoff stress `muspectre::StressMeasure::PK1`
-   *                     in finite-strain computations
+   * default traits class, should work with most, if not all constitutive laws
+   * for solid mechanics
    */
+  template <Index_t DimM, StrainMeasure Strain, StressMeasure Stress>
+  struct DefaultMechanics_traits {
+    //! expected map type for strain fields
+    using StrainMap_t =
+        muGrid::T2FieldMap<Real, Mapping::Const, DimM, IterUnit::SubPt>;
+    //! expected map type for stress fields
+    using StressMap_t =
+        muGrid::T2FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
+    //! expected map type for tangent stiffness fields
+    using TangentMap_t =
+        muGrid::T4FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
 
-  template <class Material, Index_t DimM>
-  class MaterialMuSpectre;
+    //! declare what type of strain measure your law takes as input
+    constexpr static StrainMeasure strain_measure{Strain};
+    //! declare what type of stress measure your law yields as output
+    constexpr static StressMeasure stress_measure{Stress};
+
+    /**
+     * Tensorial rank of this problem and physical units of  input/output fields
+     */
+    static muGrid::PhysicsDomain get_physics_domain() {
+      return muGrid::PhysicsDomain{
+          secondOrder, muGrid::Unit::unitless(),
+          muGrid::Unit::mass() / (muGrid::Unit::length() *
+                                  muGrid::Unit::time() * muGrid::Unit::time())};
+    }
+
+    // plain type for strain representation
+    using Strain_t = Eigen::Matrix<Real, DimM, DimM>;
+    // plain type for stress representation
+    using Stress_t = Strain_t;
+    // plain type for tangent representation
+    using Tangent_t = muGrid::T4Mat<Real, DimM>;
+  };
+
+  template <Index_t DimM, StrainMeasure Strain, StressMeasure Stress>
+  constexpr StrainMeasure
+      DefaultMechanics_traits<DimM, Strain, Stress>::strain_measure;
+  template <Index_t DimM, StrainMeasure Strain, StressMeasure Stress>
+  constexpr StressMeasure
+      DefaultMechanics_traits<DimM, Strain, Stress>::stress_measure;
 
   /**
-   * Base class for most convenient implementation of materials
+   * Base class for most convenient implementation of constitutive laws solid
+   * mechanics
    */
   template <class Material, Index_t DimM>
-  class MaterialMuSpectre : public MaterialBase {
+  class MaterialMuSpectreMechanics
+      : public MaterialMuSpectre<Material, DimM, MaterialMechanicsBase> {
    public:
-    /**
-     * type used to determine whether the
-     * `muSpectre::MaterialBase::iterable_proxy` evaluate only
-     * stresses or also tangent stiffnesses
-     */
-    using NeedTangent = MatTB::NeedTangent;
-    using Parent = MaterialBase;  //!< base class
+    using Parent = MaterialMuSpectre<Material, DimM, MaterialMechanicsBase>;
 
     //! traits for the CRTP subclass
     using traits = MaterialMuSpectre_traits<Material>;
-    using DynMatrix_t = Parent::DynMatrix_t;
+    using DynMatrix_t = typename Parent::DynMatrix_t;
 
-    using Strain_t = Eigen::Matrix<Real, DimM, DimM>;
-    using Stress_t = Strain_t;
-    using Stiffness_t = muGrid::T4Mat<Real, DimM>;
+    using Strain_t = typename Parent::Strain_t;
+    using Stress_t = typename Parent::Stress_t;
+    using Tangent_t = typename Parent::Tangent_t;
+
+    // just use MaterialMuSpectre's constructors, this class is interface-only
+    using Parent::Parent;
 
     //! Default constructor
-    MaterialMuSpectre() = delete;
-
-    //! Construct by name
-    MaterialMuSpectre(const std::string & name,
-                      const Index_t & spatial_dimension,
-                      const Index_t & nb_quad_pts,
-                      const std::shared_ptr<muGrid::LocalFieldCollection> &
-                          parent_field_collection = nullptr);
+    MaterialMuSpectreMechanics() = delete;
 
     //! Copy constructor
-    MaterialMuSpectre(const MaterialMuSpectre & other) = delete;
+    MaterialMuSpectreMechanics(const MaterialMuSpectreMechanics & other) =
+        delete;
 
     //! Move constructor
-    MaterialMuSpectre(MaterialMuSpectre && other) = delete;
+    MaterialMuSpectreMechanics(MaterialMuSpectreMechanics && other) = delete;
 
     //! Destructor
-    virtual ~MaterialMuSpectre() = default;
-
-    //! Factory. The ConstructorArgs refer the arguments after `name`
-    template <class... ConstructorArgs>
-    inline static Material & make(Cell & cell, const std::string & name,
-                                  ConstructorArgs &&... args);
-    /** Factory
-     * takes all arguments after the name of the underlying
-     * Material's constructor. E.g., if the underlying material is a
-     * `muSpectre::MaterialLinearElastic1<threeD>`, these would be Young's
-     * modulus and Poisson's ratio.
-     */
-    template <class... ConstructorArgs>
-    inline static std::tuple<std::shared_ptr<Material>, MaterialEvaluator<DimM>>
-    make_evaluator(ConstructorArgs &&... args);
+    virtual ~MaterialMuSpectreMechanics() = default;
 
     //! Copy assignment operator
-    MaterialMuSpectre & operator=(const MaterialMuSpectre & other) = delete;
+    MaterialMuSpectreMechanics &
+    operator=(const MaterialMuSpectreMechanics & other) = delete;
 
     //! Move assignment operator
-    MaterialMuSpectre & operator=(MaterialMuSpectre && other) = delete;
-
-    // this fucntion is speicalized to assign partial material to a pixel
-    template <class... InternalArgs>
-    inline void add_pixel_split(const size_t & pixel_id, Real ratio,
-                                InternalArgs... args);
-
-    // add pixels intersecting to material to the material
-    inline void add_split_pixels_precipitate(
-        const std::vector<size_t> & intersected_pixel_ids,
-        const std::vector<Real> & intersection_ratios);
+    MaterialMuSpectreMechanics &
+    operator=(MaterialMuSpectreMechanics && other) = delete;
 
     //! computes stress
     using Parent::compute_stresses;
@@ -165,7 +135,6 @@ namespace muSpectre {
     //! computes stress
     inline void
     compute_stresses(const muGrid::RealField & F, muGrid::RealField & P,
-                     const Formulation & form,
                      const SplitCell & is_cell_split = SplitCell::no,
                      const StoreNativeStress & store_native_stress =
                          StoreNativeStress::no) final;
@@ -173,34 +142,43 @@ namespace muSpectre {
     //! computes stress and tangent modulus
     inline void
     compute_stresses_tangent(const muGrid::RealField & F, muGrid::RealField & P,
-                             muGrid::RealField & K, const Formulation & form,
+                             muGrid::RealField & K,
                              const SplitCell & is_cell_split = SplitCell::no,
                              const StoreNativeStress & store_native_stress =
                                  StoreNativeStress::no) final;
 
-    //! return the material dimension at compile time
-    constexpr static Index_t MaterialDimension() { return DimM; }
-
     inline std::tuple<DynMatrix_t, DynMatrix_t>
     constitutive_law_dynamic(const Eigen::Ref<const DynMatrix_t> & strain,
-                             const size_t & pixel_index,
-                             const Formulation & form) final;
-    //! returns whether or not a field with native stress has been stored
-    inline bool has_native_stress() const final;
+                             const size_t & pixel_index) final;
 
     /**
-     * returns the stored native stress field. Throws a runtime error if native
-     * stress has not been stored
+     * returns a reference to the currently set formulation
      */
-    inline muGrid::RealField & get_native_stress() final;
+    const Formulation & get_formulation() const final { return this->form; }
 
     /**
-     * returns a map on stored native stress field. Throws a runtime error if
-     * native stress has not been stored
+     * set the formulation
      */
-    inline muGrid::MappedT2Field<Real, Mapping::Mut, DimM,
-                                 IterUnit::SubPt> &
-    get_mapped_native_stress();
+    void set_formulation(const Formulation & form) override {
+      this->form = form;
+    }
+
+    //! checks whether this material can be used in small strain formulation
+    inline static void check_small_strain_capability();
+
+    /**
+     * returns the expected strain measure of the material
+     */
+    StrainMeasure get_expected_strain_measure() const final {
+      return traits::strain_measure;
+    }
+
+    using Parent::make;
+    //! Factory. The ConstructorArgs refer the arguments after `name`
+    template <class... ConstructorArgs>
+    inline static Material & make(std::shared_ptr<Cell> cell,
+                                  const std::string & name,
+                                  ConstructorArgs &&... args);
 
    protected:
     //! dispatches the correct compute_stresses worker
@@ -230,123 +208,12 @@ namespace muSpectre {
                                         muGrid::RealField & K)
         __attribute__((visibility("default")));
 
-    muGrid::OptionalMappedField<
-        muGrid::MappedT2Field<Real, Mapping::Mut, DimM, IterUnit::SubPt>>
-        native_stress;
+    Formulation form{Formulation::not_set};
   };
-
-  /* ---------------------------------------------------------------------- */
-  template <class Material, Index_t DimM>
-  MaterialMuSpectre<Material, DimM>::MaterialMuSpectre(
-      const std::string & name, const Index_t & spatial_dimension,
-      const Index_t & nb_quad_pts,
-      const std::shared_ptr<muGrid::LocalFieldCollection> &
-          parent_field_collection)
-      : Parent(name, spatial_dimension, DimM, nb_quad_pts,
-               parent_field_collection),
-        native_stress{*this->internal_fields,
-                      this->get_prefix() + "native_stress", QuadPtTag} {
-    static_assert(
-        std::is_same<typename traits::StressMap_t::Scalar, Real>::value,
-        "The stress map needs to be of type Real");
-    static_assert(
-        std::is_same<typename traits::StrainMap_t::Scalar, Real>::value,
-        "The strain map needs to be of type Real");
-    static_assert(
-        std::is_same<typename traits::TangentMap_t::Scalar, Real>::value,
-        "The tangent map needs to be of type Real");
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <class Material, Index_t DimM>
-  template <class... ConstructorArgs>
-  Material &
-  MaterialMuSpectre<Material, DimM>::make(Cell & cell, const std::string & name,
-                                          ConstructorArgs &&... args) {
-    auto mat = std::make_unique<Material>(name, cell.get_spatial_dim(),
-                                          cell.get_nb_quad_pts(), args...);
-    using traits = MaterialMuSpectre_traits<Material>;
-    auto && form = cell.get_formulation();
-    constexpr StrainMeasure expected_strain_m{traits::strain_measure};
-    if (form == Formulation::small_strain) {
-      check_small_strain_capability(expected_strain_m);
-    }
-
-    auto & mat_ref = *mat;
-    auto is_cell_split{cell.get_splitness()};
-    mat_ref.allocate_optional_fields(is_cell_split);
-    cell.add_material(std::move(mat));
-    return mat_ref;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <class Material, Index_t DimM>
-  template <class... InternalArgs>
-  void MaterialMuSpectre<Material, DimM>::add_pixel_split(
-      const size_t & pixel_id, Real ratio, InternalArgs... args) {
-    auto & this_mat = static_cast<Material &>(*this);
-    this_mat.add_pixel(pixel_id, args...);
-    this->assigned_ratio->get_field().push_back(ratio);
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <class Material, Index_t DimM>
-  void MaterialMuSpectre<Material, DimM>::add_split_pixels_precipitate(
-      const std::vector<size_t> & intersected_pixels,
-      const std::vector<Real> & intersection_ratios) {
-    // assign precipitate materials:
-    for (auto && tup : akantu::zip(intersected_pixels, intersection_ratios)) {
-      auto pix = std::get<0>(tup);
-      auto ratio = std::get<1>(tup);
-      this->add_pixel_split(pix, ratio);
-    }
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <class Material, Index_t DimM>
-  template <class... ConstructorArgs>
-  std::tuple<std::shared_ptr<Material>, MaterialEvaluator<DimM>>
-  MaterialMuSpectre<Material, DimM>::make_evaluator(
-      ConstructorArgs &&... args) {
-    constexpr Index_t SpatialDimension{DimM};
-    constexpr Index_t NbQuadPts{1};
-    auto mat = std::make_shared<Material>("name", SpatialDimension, NbQuadPts,
-                                          args...);
-    using Ret_t =
-        std::tuple<std::shared_ptr<Material>, MaterialEvaluator<DimM>>;
-    return Ret_t(mat, MaterialEvaluator<DimM>{mat});
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <class Material, Index_t DimM>
-  bool MaterialMuSpectre<Material, DimM>::has_native_stress() const {
-    return this->native_stress.has_value();
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <class Material, Index_t DimM>
-  muGrid::RealField & MaterialMuSpectre<Material, DimM>::get_native_stress() {
-    if (not this->native_stress.has_value()) {
-      throw muGrid::RuntimeError("native stress has not been evaluated");
-    }
-    return this->native_stress.get().get_field();
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <class Material, Index_t DimM>
-  auto MaterialMuSpectre<Material, DimM>::get_mapped_native_stress()
-      -> muGrid::MappedT2Field<Real, Mapping::Mut, DimM,
-                               IterUnit::SubPt> & {
-    if (not this->native_stress.has_value()) {
-      throw muGrid::RuntimeError("native stress has not been evaluated");
-    }
-    return this->native_stress.get();
-  }
-
   /* ---------------------------------------------------------------------- */
   template <class Material, Index_t DimM>
   template <Formulation Form, SplitCell IsSplit, class... Args>
-  void MaterialMuSpectre<Material, DimM>::compute_stresses_dispatch1(
+  void MaterialMuSpectreMechanics<Material, DimM>::compute_stresses_dispatch1(
       const StoreNativeStress store_native_stress, Args &&... args) {
     switch (store_native_stress) {
     case StoreNativeStress::yes: {
@@ -366,17 +233,252 @@ namespace muSpectre {
       break;
     }
   }
+  namespace MatTB {
+    /* ----------------------------------------------------------------------*/
+    /* ----------------------------------------------------------------------*/
+    template <Formulation Form, class Material, class Strain, class Stress,
+              class Op, class NativeTreat>
+    void evaluate_material_stress(Material & mat, Strain && strain,
+                                  Stress & stress, const size_t & quad_pt_id,
+                                  const Op & operation,
+                                  NativeTreat & native_stress_treatment) {
+      using traits = MaterialMuSpectre_traits<Material>;
+
+      constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
+      constexpr StrainMeasure expected_strain_m{
+          get_formulation_strain_type(Form, traits::strain_measure)};
+
+      switch (Form) {
+      case Formulation::small_strain: {
+        auto && eps{MatTB::convert_strain<stored_strain_m, expected_strain_m>(
+            std::get<0>(strain))};
+
+        auto && stress_result{mat.evaluate_stress(eps, quad_pt_id)};
+        // the following is a no-op if store_native_stress in not 'yes'
+        native_stress_treatment(stress_result);
+
+        // stress evaluation:
+        operation(stress_result, stress);
+        break;
+      }
+      case Formulation::finite_strain: {
+        auto && grad{std::get<0>(strain)};
+        auto && E{
+            MatTB::convert_strain<stored_strain_m, expected_strain_m>(grad)};
+        auto && stress_result{mat.evaluate_stress(std::move(E), quad_pt_id)};
+
+        // the following is a no-op if store_native_stress in not 'yes'
+        native_stress_treatment(stress_result);
+
+        operation(::muSpectre::MatTB::PK1_stress<traits::stress_measure,
+                                                 traits::strain_measure>(
+                      std::move(grad), std::move(stress_result)),
+                  stress);
+        break;
+      }
+      case Formulation::native: {
+        auto && strain_converted{
+            MatTB::convert_strain<stored_strain_m, expected_strain_m>(
+                std::get<0>(strain))};
+
+        operation(mat.evaluate_stress(std::move(strain_converted), quad_pt_id),
+                  stress);
+        break;
+      }
+      default:
+        throw muGrid::RuntimeError("Unknown formulation");
+        break;
+      }
+    }
+
+    /* ----------------------------------------------------------------------*/
+    template <Formulation Form, class Material, class Strains, class Stresses>
+    void constitutive_law(Material & mat, Strains && strains,
+                          Stresses & stresses, const size_t & quad_pt_id,
+                          const Real & ratio) {
+      OperationAddition operation_addition(ratio);
+      NativeStressTreatment<StoreNativeStress::no> stress_treatment{};
+      evaluate_material_stress<Form>(mat, strains, stresses, quad_pt_id,
+                                     operation_addition, stress_treatment);
+    }
+
+    /* ----------------------------------------------------------------------*/
+    template <Formulation Form, class Material, class Strains, class Stresses>
+    void constitutive_law(Material & mat, Strains && strains,
+                          Stresses & stresses, const size_t & quad_pt_id) {
+      OperationAssignment operation_assignment;
+      NativeStressTreatment<StoreNativeStress::no> stress_treatment{};
+      evaluate_material_stress<Form>(mat, strains, stresses, quad_pt_id,
+                                     operation_assignment, stress_treatment);
+    }
+
+    /* ----------------------------------------------------------------------*/
+    template <Formulation Form, class Material, class Strains, class Stresses,
+              Dim_t Dim>  // Dim_t is used on purpose, as it is inferred
+    void constitutive_law(
+        Material & mat, Strains && strains, Stresses & stresses,
+        const size_t & quad_pt_id, const Real & ratio,
+        Eigen::Map<Eigen::Matrix<Real, Dim, Dim>> & native_stress) {
+      static_assert(Dim == Material::MaterialDimension(),
+                    "Dim is a SFINAE parameter, do not set it");
+      OperationAddition operation_addition(ratio);
+      NativeStressTreatment<StoreNativeStress::yes, Dim> stress_treatment{
+          native_stress};
+      evaluate_material_stress<Form>(mat, strains, stresses, quad_pt_id,
+                                     operation_addition, stress_treatment);
+    }
+
+    /* ----------------------------------------------------------------------*/
+    template <Formulation Form, class Material, class Strains, class Stresses>
+    void constitutive_law(
+        Material & mat, Strains && strains, Stresses & stresses,
+        const size_t & quad_pt_id,
+        Eigen::Map<Eigen::Matrix<Real, Material::MaterialDimension(),
+                                 Material::MaterialDimension()>> &
+            native_stress) {
+      constexpr Index_t Dim{Material::MaterialDimension()};
+      OperationAssignment operation_assignment;
+      NativeStressTreatment<StoreNativeStress::yes, Dim> stress_treatment{
+          native_stress};
+      evaluate_material_stress<Form>(mat, strains, stresses, quad_pt_id,
+                                     operation_assignment, stress_treatment);
+    }
+
+    /* ---------------------------------------------------------------------- */
+    template <Formulation Form, class Material, class Strain, class Stress,
+              class Stiffness, class Op, class NativeTreat>
+    void evaluate_material_stress_tangent(
+        Material & mat, Strain && strain,
+        std::tuple<Stress, Stiffness> & stress_stiffness,
+        const size_t & quad_pt_id, const Op & operation,
+        NativeTreat & native_stress_treatment) {
+      using traits = MaterialMuSpectre_traits<Material>;
+
+      constexpr StrainMeasure stored_strain_m{get_stored_strain_type(Form)};
+      constexpr StrainMeasure expected_strain_m{
+          get_formulation_strain_type(Form, traits::strain_measure)};
+      switch (Form) {
+      case Formulation::small_strain: {
+        auto && eps{MatTB::convert_strain<stored_strain_m, expected_strain_m>(
+            std::get<0>(strain))};
+
+        auto && stress_stiffness_mat{
+            mat.evaluate_stress_tangent(std::move(eps), quad_pt_id)};
+        // the following is a no-op if store_native_stress in not 'yes'
+        native_stress_treatment(std::get<0>(stress_stiffness_mat));
+        operation(std::get<0>(stress_stiffness_mat),
+                  std::get<0>(stress_stiffness));
+        operation(std::get<1>(stress_stiffness_mat),
+                  std::get<1>(stress_stiffness));
+        break;
+      }
+      case Formulation::finite_strain: {
+        auto && grad{std::get<0>(strain)};
+        auto E{MatTB::convert_strain<stored_strain_m, expected_strain_m>(grad)};
+        auto && stress_stiffness_mat{
+            mat.evaluate_stress_tangent(std::move(E), quad_pt_id)};
+
+        // the following is a no-op if store_native_stress in not 'yes'
+        native_stress_treatment(std::get<0>(stress_stiffness_mat));
+        auto && stress_stiffness_mat_converted{
+            ::muSpectre::MatTB::PK1_stress<traits::stress_measure,
+                                           traits::strain_measure>(
+                std::move(grad), std::move(std::get<0>(stress_stiffness_mat)),
+                std::move(std::get<1>(stress_stiffness_mat)))};
+
+        operation(std::get<0>(stress_stiffness_mat_converted),
+                  std::get<0>(stress_stiffness));
+        operation(std::get<1>(stress_stiffness_mat_converted),
+                  std::get<1>(stress_stiffness));
+        break;
+      }
+      case Formulation::native: {
+        auto && strain_converted{
+            MatTB::convert_strain<stored_strain_m, expected_strain_m>(
+                std::get<0>(strain))};
+        auto && stress_stiffness_mat{mat.evaluate_stress_tangent(
+            std::move(strain_converted), quad_pt_id)};
+        native_stress_treatment(std::get<0>(stress_stiffness_mat));
+
+        operation(std::get<0>(stress_stiffness_mat),
+                  std::get<0>(stress_stiffness));
+        operation(std::get<1>(stress_stiffness_mat),
+                  std::get<1>(stress_stiffness));
+        break;
+      }
+      default:
+        throw muGrid::RuntimeError("Unknown formualtion");
+        break;
+      }
+    }
+
+    /* ----------------------------------------------------------------------*/
+    template <Formulation Form, class Material, class Strains, class Stresses>
+    void constitutive_law_tangent(Material & mat, Strains && strains,
+                                  Stresses & stresses,
+                                  const size_t & quad_pt_id) {
+      OperationAssignment operation_assignment{};
+      NativeStressTreatment<StoreNativeStress::no> stress_treatment{};
+      evaluate_material_stress_tangent<Form>(mat, strains, stresses, quad_pt_id,
+                                             operation_assignment,
+                                             stress_treatment);
+    }
+
+    /* ----------------------------------------------------------------------*/
+    template <Formulation Form, class Material, class Strains, class Stresses,
+              Dim_t Dim>  // Dim_t is used on purpose, as it is inferred
+    void constitutive_law_tangent(
+        Material & mat, Strains && strains, Stresses & stresses,
+        const size_t & quad_pt_id,
+        Eigen::Map<Eigen::Matrix<Real, Dim, Dim>> & native_stress) {
+      static_assert(Dim == Material::MaterialDimension(),
+                    "Dim is a SFINAE parameter, do not touch it");
+      OperationAssignment operation_assignment{};
+      NativeStressTreatment<StoreNativeStress::yes, Dim> stress_treatment{
+          native_stress};
+      evaluate_material_stress_tangent<Form>(mat, strains, stresses, quad_pt_id,
+                                             operation_assignment,
+                                             stress_treatment);
+    }
+
+    /*----------------------------------------------------------------------*/
+    template <Formulation Form, class Material, class Strains, class Stresses>
+    void constitutive_law_tangent(Material & mat, Strains && strains,
+                                  Stresses & stresses,
+                                  const size_t & quad_pt_id,
+                                  const Real & ratio) {
+      OperationAddition operation_addition{ratio};
+      NativeStressTreatment<StoreNativeStress::no> stress_treatment{};
+      evaluate_material_stress_tangent<Form>(mat, strains, stresses, quad_pt_id,
+                                             operation_addition,
+                                             stress_treatment);
+    }
+
+    /*----------------------------------------------------------------------*/
+    template <Formulation Form, class Material, class Strains, class Stresses,
+              Dim_t Dim>  // Dim_t is used on purpose, as it is inferred
+    void constitutive_law_tangent(
+        Material & mat, Strains && strains, Stresses & stresses,
+        const size_t & quad_pt_id, const Real & ratio,
+        Eigen::Map<Eigen::Matrix<Real, Dim, Dim>> & native_stress) {
+      static_assert(Dim == Material::MaterialDimension(),
+                    "Dim is a SFINAE parameter, do not touch it");
+      OperationAddition operation_addition{ratio};
+      NativeStressTreatment<StoreNativeStress::yes, Dim> stress_treatment{
+          native_stress};
+      evaluate_material_stress_tangent<Form>(mat, strains, stresses, quad_pt_id,
+                                             operation_addition,
+                                             stress_treatment);
+    }
+  }  // namespace MatTB
 
   /* ---------------------------------------------------------------------- */
   template <class Material, Index_t DimM>
-  void MaterialMuSpectre<Material, DimM>::compute_stresses(
+  void MaterialMuSpectreMechanics<Material, DimM>::compute_stresses(
       const muGrid::RealField & F, muGrid::RealField & P,
-      const Formulation & form, const SplitCell & is_cell_split,
+      const SplitCell & is_cell_split,
       const StoreNativeStress & store_native_stress) {
-    using traits = MaterialMuSpectre_traits<Material>;
-    constexpr StrainMeasure expected_strain_m{traits::strain_measure};
-
-    switch (form) {
+    switch (this->get_formulation()) {
     case Formulation::finite_strain: {
       switch (is_cell_split) {
       case (SplitCell::no):
@@ -399,7 +501,7 @@ namespace muSpectre {
       break;
     }
     case Formulation::small_strain: {
-      check_small_strain_capability(expected_strain_m);
+      this->check_small_strain_capability();
       switch (is_cell_split) {
       case (SplitCell::no):
         // fall-through;  laminate and whole pixels treated same at this point
@@ -448,14 +550,11 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <class Material, Index_t DimM>
-  void MaterialMuSpectre<Material, DimM>::compute_stresses_tangent(
+  void MaterialMuSpectreMechanics<Material, DimM>::compute_stresses_tangent(
       const muGrid::RealField & F, muGrid::RealField & P, muGrid::RealField & K,
-      const Formulation & form, const SplitCell & is_cell_split,
+      const SplitCell & is_cell_split,
       const StoreNativeStress & store_native_stress) {
-    using traits = MaterialMuSpectre_traits<Material>;
-    constexpr StrainMeasure expected_strain_m{traits::strain_measure};
-
-    switch (form) {
+    switch (this->get_formulation()) {
     case Formulation::finite_strain: {
       switch (is_cell_split) {
       case (SplitCell::no):
@@ -478,7 +577,7 @@ namespace muSpectre {
       break;
     }
     case Formulation::small_strain: {
-      check_small_strain_capability(expected_strain_m);
+      this->check_small_strain_capability();
       switch (is_cell_split) {
       case (SplitCell::no):
         // fall-through;  laminate and whole pixels treated same at this point
@@ -528,7 +627,7 @@ namespace muSpectre {
   template <class Material, Index_t DimM>
   template <Formulation Form, SplitCell IsCellSplit,
             StoreNativeStress DoStoreNative>
-  void MaterialMuSpectre<Material, DimM>::compute_stresses_worker(
+  void MaterialMuSpectreMechanics<Material, DimM>::compute_stresses_worker(
       const muGrid::RealField & F, muGrid::RealField & P,
       muGrid::RealField & K) {
     /* These lambdas are executed for every integration point.
@@ -540,10 +639,8 @@ namespace muSpectre {
        Material declared (e.g., eigenstrain, strain rate, etc.)
     */
     auto & this_mat{static_cast<Material &>(*this)};
-    using traits = MaterialMuSpectre_traits<Material>;
-    constexpr StrainMeasure expected_strain_m{traits::strain_measure};
     if (Form == Formulation::small_strain) {
-      check_small_strain_capability(expected_strain_m);
+      this->check_small_strain_capability();
     }
 
     using iterable_proxy_t = iterable_proxy<
@@ -654,7 +751,7 @@ namespace muSpectre {
   template <class Material, Index_t DimM>
   template <Formulation Form, SplitCell IsCellSplit,
             StoreNativeStress DoStoreNative>
-  void MaterialMuSpectre<Material, DimM>::compute_stresses_worker(
+  void MaterialMuSpectreMechanics<Material, DimM>::compute_stresses_worker(
       const muGrid::RealField & F, muGrid::RealField & P) {
     /* These lambdas are executed for every integration point.
 
@@ -758,13 +855,13 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <class Material, Index_t DimM>
-  auto MaterialMuSpectre<Material, DimM>::constitutive_law_dynamic(
+  auto MaterialMuSpectreMechanics<Material, DimM>::constitutive_law_dynamic(
       const Eigen::Ref<const DynMatrix_t> & strain,
-      const size_t & quad_pt_index, const Formulation & form)
-      -> std::tuple<DynMatrix_t, DynMatrix_t> {
+      const size_t & quad_pt_index) -> std::tuple<DynMatrix_t, DynMatrix_t> {
     auto & this_mat = static_cast<Material &>(*this);
     Eigen::Map<const Strain_t> F(strain.data());
-    std::tuple<Stress_t, Stiffness_t> PK{};
+
+    std::tuple<Stress_t, Tangent_t> PK{};
 
     if (strain.cols() != DimM or strain.rows() != DimM) {
       std::stringstream error{};
@@ -774,7 +871,7 @@ namespace muSpectre {
       throw MaterialError(error.str());
     }
 
-    switch (form) {
+    switch (this->get_formulation()) {
     case Formulation::finite_strain: {
       MatTB::constitutive_law_tangent<Formulation::finite_strain>(
           this_mat, std::make_tuple(F), PK, quad_pt_index);
@@ -793,6 +890,44 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
+  template <class Material, Index_t DimM>
+  template <class... ConstructorArgs>
+  Material &
+  MaterialMuSpectreMechanics<Material, DimM>::make(std::shared_ptr<Cell> cell,
+                                                   const std::string & name,
+                                                   ConstructorArgs &&... args) {
+    auto mat{std::make_unique<Material>(name, cell->get_spatial_dim(),
+                                        cell->get_nb_quad_pts(), args...)};
+    auto && form{cell->get_formulation()};
+    if (form == Formulation::small_strain) {
+      Material::check_small_strain_capability();
+    }
+
+    auto & mat_ref{*mat};
+    auto is_cell_split{cell->get_splitness()};
+    mat_ref.allocate_optional_fields(is_cell_split);
+    cell->add_material(std::move(mat));
+    return mat_ref;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <class Material, Index_t DimM>
+  void
+  MaterialMuSpectreMechanics<Material, DimM>::check_small_strain_capability() {
+    if (not(is_objective(traits::strain_measure))) {
+      std::stringstream err_str{};
+      err_str
+          << "The material expected strain measure is: "
+          << traits::strain_measure
+          << ", while in small strain the required strain measure should be "
+             "objective (in order to be obtainable from infinitesimal strain)."
+          << " Accordingly, this material is not meant to be utilized in "
+             "small strain formulation"
+          << std::endl;
+      throw(muGrid::RuntimeError(err_str.str()));
+    }
+  }
+
 }  // namespace muSpectre
 
-#endif  // SRC_MATERIALS_MATERIAL_MUSPECTRE_BASE_HH_
+#endif  // SRC_MATERIALS_MATERIAL_MUSPECTRE_MECHANICS_HH_

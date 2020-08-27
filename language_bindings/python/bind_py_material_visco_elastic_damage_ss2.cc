@@ -67,9 +67,9 @@ void add_material_visco_elastic_damage_ss2_helper(py::module & mod) {
 
       .def_static(
           "make",
-          [](Cell_t & cell, std::string name, Real young_inf, Real young_v,
-             Real eta_v, Real poisson, Real kappa, Real alpha, Real beta,
-             Real dt = 0.0) -> Mat_t & {
+          [](std::shared_ptr<Cell_t> cell, std::string name, Real young_inf,
+             Real young_v, Real eta_v, Real poisson, Real kappa, Real alpha,
+             Real beta, Real dt = 0.0) -> Mat_t & {
             return Mat_t::make(cell, name, young_inf, young_v, eta_v, poisson,
                                kappa, alpha, beta, dt);
           },

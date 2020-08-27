@@ -42,11 +42,9 @@
 
 namespace muFFT {
 
-  FFTWEngine::FFTWEngine(const DynCcoord_t & nb_grid_pts,
-                         Communicator comm,
+  FFTWEngine::FFTWEngine(const DynCcoord_t & nb_grid_pts, Communicator comm,
                          const FFT_PlanFlags & plan_flags,
-                         bool allow_temporary_buffer,
-                         bool allow_destroy_input)
+                         bool allow_temporary_buffer, bool allow_destroy_input)
       : Parent{nb_grid_pts, comm, plan_flags, allow_temporary_buffer,
                allow_destroy_input} {
     this->real_field_collection.initialise(this->nb_domain_grid_pts,
@@ -58,6 +56,13 @@ namespace muFFT {
                                               this->fourier_locations,
                                               this->fourier_strides);
   }
+
+  /* ---------------------------------------------------------------------- */
+  FFTWEngine::FFTWEngine(const DynCcoord_t & nb_grid_pts,
+                         const FFT_PlanFlags & plan_flags,
+                         bool allow_temporary_buffer, bool allow_destroy_input)
+      : FFTWEngine{nb_grid_pts, Communicator(), plan_flags,
+                   allow_temporary_buffer, allow_destroy_input} {}
 
   /* ---------------------------------------------------------------------- */
   void FFTWEngine::create_plan(const Index_t & nb_dof_per_pixel) {
@@ -124,19 +129,19 @@ namespace muFFT {
 
     this->fft_plans[nb_dof_per_pixel] = fftw_plan_many_dft_r2c(
         rank, n, howmany, in, inembed, istride, idist, out, onembed, ostride,
-        odist, (this->allow_destroy_input
-                    ? FFTW_DESTROY_INPUT : FFTW_PRESERVE_INPUT) | flags);
+        odist,
+        (this->allow_destroy_input ? FFTW_DESTROY_INPUT : FFTW_PRESERVE_INPUT) |
+            flags);
     if (this->fft_plans.at(nb_dof_per_pixel) == nullptr) {
       throw FFTEngineError("Plan failed");
     }
 
-    fftw_complex * i_in {out};
-    Real * i_out {r_work_space};
+    fftw_complex * i_in{out};
+    Real * i_out{r_work_space};
 
     this->ifft_plans[nb_dof_per_pixel] =
-        fftw_plan_many_dft_c2r(
-            rank, n, howmany, i_in, inembed, istride, idist,
-            i_out, onembed, ostride, odist, flags);
+        fftw_plan_many_dft_c2r(rank, n, howmany, i_in, inembed, istride, idist,
+                               i_out, onembed, ostride, odist, flags);
 
     if (this->ifft_plans.at(nb_dof_per_pixel) == nullptr) {
       throw FFTEngineError("Plan failed");
@@ -164,8 +169,7 @@ namespace muFFT {
   /* ---------------------------------------------------------------------- */
   void FFTWEngine::compute_fft(const RealField_t & input_field,
                                FourierField_t & output_field) const {
-    fftw_execute_dft_r2c(this->fft_plans.at(
-                             input_field.get_nb_dof_per_pixel()),
+    fftw_execute_dft_r2c(this->fft_plans.at(input_field.get_nb_dof_per_pixel()),
                          input_field.data(),
                          reinterpret_cast<fftw_complex *>(output_field.data()));
   }
@@ -173,18 +177,17 @@ namespace muFFT {
   /* ---------------------------------------------------------------------- */
   void FFTWEngine::compute_ifft(const FourierField_t & input_field,
                                 RealField_t & output_field) const {
-    fftw_execute_dft_c2r(this->ifft_plans.at(
-                             input_field.get_nb_dof_per_pixel()),
-                         reinterpret_cast<fftw_complex *>(input_field.data()),
-                         output_field.data());
+    fftw_execute_dft_c2r(
+        this->ifft_plans.at(input_field.get_nb_dof_per_pixel()),
+        reinterpret_cast<fftw_complex *>(input_field.data()),
+        output_field.data());
   }
 
   std::unique_ptr<FFTEngineBase> FFTWEngine::clone() const {
-    return std::make_unique<FFTWEngine>(this->get_nb_domain_grid_pts(),
-                                        this->get_communicator(),
-                                        this->plan_flags,
-                                        this->allow_temporary_buffer,
-                                        this->allow_destroy_input);
+    return std::make_unique<FFTWEngine>(
+        this->get_nb_domain_grid_pts(), this->get_communicator(),
+        this->plan_flags, this->allow_temporary_buffer,
+        this->allow_destroy_input);
   }
 
 }  // namespace muFFT

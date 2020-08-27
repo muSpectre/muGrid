@@ -98,7 +98,7 @@ namespace muSpectre {
       this->mat_lin_inf.initialise();
       this->mat_lin_init.initialise();
     }
-    const Real tol_init{60 * Parent::dt};
+    const Real tol_init{120 * Parent::dt};
     const Real tol_fin{10 * Parent::dt};
     Real get_tol_init() { return tol_init; }
     Real get_tol_fin() { return tol_fin; }

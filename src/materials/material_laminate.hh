@@ -42,7 +42,7 @@
 #define SRC_MATERIALS_MATERIAL_LAMINATE_HH_
 
 #include "common/muSpectre_common.hh"
-#include "materials/material_muSpectre_base.hh"
+#include "materials/material_muSpectre_mechanics.hh"
 
 #include "cell/cell.hh"
 
@@ -54,50 +54,24 @@ namespace muSpectre {
   template <Index_t DimM, Formulation Form>
   class MaterialLaminate;
 
-  template <Index_t DimM>
-  struct MaterialMuSpectre_traits<
-      MaterialLaminate<DimM, Formulation::finite_strain>> {
-    //! expected map type for strain fields
-    using StrainMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Const, DimM, IterUnit::SubPt>;
-    //! expected map type for stress fields
-    using StressMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
-    //! expected map type for tangent stiffness fields
-    using TangentMap_t =
-        muGrid::T4FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
-
-    //! declare what type of strain measure your law takes as input
-    constexpr static auto strain_measure{StrainMeasure::Gradient};
-    //! declare what type of stress measure your law yields as output
-    constexpr static auto stress_measure{StressMeasure::PK1};
-  };
+  template <Index_t DimM, Formulation Form>
+  struct MaterialMuSpectre_traits<MaterialLaminate<DimM, Form>>
+      : public DefaultMechanics_traits<DimM, StrainMeasure::Gradient,
+                                       StressMeasure::PK1> {};
 
   template <Index_t DimM>
   struct MaterialMuSpectre_traits<
-      MaterialLaminate<DimM, Formulation::small_strain>> {
-    //! expected map type for strain fields
-    using StrainMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Const, DimM, IterUnit::SubPt>;
-    //! expected map type for stress fields
-    using StressMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
-    //! expected map type for tangent stiffness fields
-    using TangentMap_t =
-        muGrid::T4FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
-
-    //! declare what type of strain measure your law takes as input
-    constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
-    //! declare what type of stress measure your law yields as output
-    constexpr static auto stress_measure{StressMeasure::PK2};
-  };
+      MaterialLaminate<DimM, Formulation::small_strain>>
+      : public DefaultMechanics_traits<DimM, StrainMeasure::GreenLagrange,
+                                       StressMeasure::PK2> {};
 
   template <Index_t DimM, Formulation Form>
   class MaterialLaminate
-      : public MaterialMuSpectre<MaterialLaminate<DimM, Form>, DimM> {
+      : public MaterialMuSpectreMechanics<MaterialLaminate<DimM, Form>, DimM> {
    public:
     //! base class
-    using Parent = MaterialMuSpectre<MaterialLaminate<DimM, Form>, DimM>;
+    using Parent =
+        MaterialMuSpectreMechanics<MaterialLaminate<DimM, Form>, DimM>;
     //
     using MatPtr_t = std::shared_ptr<MaterialBase>;
 
@@ -178,6 +152,10 @@ namespace muSpectre {
         const std::vector<Real> & intersection_ratios,
         const std::vector<Eigen::Matrix<Real, DimM, 1>> & intersection_normals,
         MatPtr_t mat1, MatPtr_t mat2);
+
+    void set_formulation(const Formulation & form) final;
+
+    void initialise() final;
 
    protected:
     MappedVectorField_t

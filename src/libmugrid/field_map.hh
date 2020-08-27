@@ -165,6 +165,25 @@ namespace muGrid {
       return *this;
     }
 
+    //! Addition-assign a matrix-like value to every entry
+    template <bool IsMutableField = Mutability == Mapping::Mut>
+    std::enable_if_t<IsMutableField, FieldMap> &
+    operator+=(const EigenRef & val) {
+      if (not((val.rows() == this->nb_rows) and
+              (val.cols() == this->nb_cols))) {
+        std::stringstream error_str{};
+        error_str << "Expected an array/matrix with shape (" << this->nb_rows
+                  << " × " << this->nb_cols
+                  << "), but received a value of shape (" << val.rows() << " × "
+                  << val.cols() << ").";
+        throw FieldMapError(error_str.str());
+      }
+      for (auto && entry : *this) {
+        entry += val;
+      }
+      return *this;
+    }
+
     //! Assign a scalar value to every entry
     template <bool IsMutableField = Mutability == Mapping::Mut>
     std::enable_if_t<IsMutableField, FieldMap> & operator=(const Scalar & val) {
@@ -177,6 +196,23 @@ namespace muGrid {
       }
       for (auto && entry : *this) {
         entry(0, 0) = val;
+      }
+      return *this;
+    }
+
+    //! Addition-assign a scalar value to every entry
+    template <bool IsMutableField = Mutability == Mapping::Mut>
+    std::enable_if_t<IsMutableField, FieldMap> &
+    operator+=(const Scalar & val) {
+      if (not(this->nb_rows == 1 && this->nb_cols == 1)) {
+        std::stringstream error_str{};
+        error_str << "Expected an array/matrix with shape (" << this->nb_rows
+                  << " × " << this->nb_cols
+                  << "), but received a scalar value.";
+        throw FieldMapError(error_str.str());
+      }
+      for (auto && entry : *this) {
+        entry(0, 0) += val;
       }
       return *this;
     }
@@ -250,6 +286,9 @@ namespace muGrid {
 
     //! evaluate and return the mean value of the map
     PlainType mean() const;
+
+    //! return const reference to the mapped field
+    const Field_t & get_field() const;
 
    protected:
     //! mapped field. Needed for query at initialisations

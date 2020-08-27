@@ -47,14 +47,33 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  KrylovSolverTrustRegionCG::KrylovSolverTrustRegionCG(Cell & cell,
-                                                       Real tol,
-                                                       Uint maxiter,
-                                                       Real trust_region,
-                                                       Verbosity verbose)
-      : Parent(cell, tol, maxiter, verbose), trust_region{trust_region},
-        r_k(cell.get_nb_dof()), p_k(cell.get_nb_dof()), Ap_k(cell.get_nb_dof()),
-        x_k(cell.get_nb_dof()) {}
+  KrylovSolverTrustRegionCG::KrylovSolverTrustRegionCG(
+      std::shared_ptr<MatrixAdaptable> matrix_holder, const Real & tol,
+      const Uint & maxiter, const Real & trust_region,
+      const Verbosity & verbose)
+      : Parent{matrix_holder, tol, maxiter, verbose},
+        comm{matrix_holder->get_communicator()}, trust_region{trust_region},
+        r_k(this->get_nb_dof()), p_k(this->get_nb_dof()),
+        Ap_k(this->get_nb_dof()), x_k(this->get_nb_dof()) {}
+
+  /* ---------------------------------------------------------------------- */
+  KrylovSolverTrustRegionCG::KrylovSolverTrustRegionCG(
+      const Real & tol, const Uint & maxiter, const Real & trust_region,
+      const Verbosity & verbose)
+      : Parent{tol, maxiter, verbose},
+        trust_region{trust_region}, r_k{}, p_k{}, Ap_k{}, x_k{} {}
+
+  /* ---------------------------------------------------------------------- */
+  void KrylovSolverTrustRegionCG::set_matrix(
+      std::shared_ptr<MatrixAdaptable> matrix_adaptable) {
+    Parent::set_matrix(matrix_adaptable);
+    this->comm = this->matrix_holder->get_communicator();
+    auto && nb_dof{matrix_adaptable->get_nb_dof()};
+    this->r_k.resize(nb_dof);
+    this->p_k.resize(nb_dof);
+    this->Ap_k.resize(nb_dof);
+    this->x_k.resize(nb_dof);
+  }
 
   /* ---------------------------------------------------------------------- */
   void KrylovSolverTrustRegionCG::set_trust_region(Real new_trust_region) {
@@ -65,21 +84,19 @@ namespace muSpectre {
   auto KrylovSolverTrustRegionCG::solve(const ConstVector_ref rhs)
       -> Vector_map {
     this->x_k.setZero();
-    const auto & comm = this->cell.get_communicator();
-
     Real trust_region2{this->trust_region * this->trust_region};
 
     // Following implementation of Steihaug's CG, algorithm 7.2 in Nocedal's
     // Numerical Optimization (p. 171)
 
     // initialisation of algorithm
-    this->r_k = this->cell.get_adaptor() * this->x_k - rhs;
+    this->r_k = this->matrix * this->x_k - rhs;
 
     this->p_k = -this->r_k;
     this->convergence = Convergence::DidNotConverge;
 
-    Real rdr = comm.sum(r_k.squaredNorm());
-    Real rhs_norm2 = comm.sum(rhs.squaredNorm());
+    Real rdr = this->comm.sum(r_k.squaredNorm());
+    Real rhs_norm2 = this->comm.sum(rhs.squaredNorm());
 
     if (rhs_norm2 == 0) {
       std::stringstream msg{};
@@ -118,9 +135,9 @@ namespace muSpectre {
       count_width = static_cast<size_t>(std::log10(this->maxiter)) + 1;
     }
 
-    for (Uint i = 0;
-         i < this->maxiter && rdr > rel_tol2; ++i, ++this->counter) {
-      this->Ap_k = this->cell.get_adaptor() * this->p_k;
+    for (Uint i = 0; i < this->maxiter && rdr > rel_tol2;
+         ++i, ++this->counter) {
+      this->Ap_k = this->matrix * this->p_k;
 
       Real pdAp{comm.sum(this->p_k.dot(this->Ap_k))};
       if (pdAp <= 0) {
@@ -128,7 +145,8 @@ namespace muSpectre {
         // region bound
         if (verbose > Verbosity::Silent && comm.rank() == 0) {
           std::cout << "  CG finished, reason: Hessian is not positive "
-                       "definite" << std::endl;
+                       "definite"
+                    << std::endl;
         }
         this->convergence = Convergence::HessianNotPositiveDefinite;
         return this->bound(rhs);
@@ -142,7 +160,8 @@ namespace muSpectre {
         // region bound
         if (verbose > Verbosity::Silent && comm.rank() == 0) {
           std::cout << "  CG finished, reason: step exceeded trust region "
-                       "bounds" << std::endl;
+                       "bounds"
+                    << std::endl;
         }
         this->convergence = Convergence::ExceededTrustRegionBound;
         return this->bound(rhs);
@@ -157,8 +176,8 @@ namespace muSpectre {
       if (verbose > Verbosity::Silent && comm.rank() == 0) {
         std::cout << "  at CG step " << std::setw(count_width) << i
                   << ": |r|/|b| = " << std::setw(15)
-                  << std::sqrt(rdr / rhs_norm2) << ", cg_tol = "
-                  << tol << std::endl;
+                  << std::sqrt(rdr / rhs_norm2) << ", cg_tol = " << tol
+                  << std::endl;
       }
 
       this->p_k = -this->r_k + beta * this->p_k;
@@ -173,8 +192,7 @@ namespace muSpectre {
       std::stringstream err{};
       err << " After " << this->counter << " steps, the solver "
           << " FAILED with  |r|/|b| = " << std::setw(15)
-          << std::sqrt(rdr / rhs_norm2) << ", cg_tol = " << tol
-          << std::endl;
+          << std::sqrt(rdr / rhs_norm2) << ", cg_tol = " << tol << std::endl;
       throw ConvergenceError("Conjugate gradient has not converged." +
                              err.str());
     }
@@ -183,23 +201,21 @@ namespace muSpectre {
 
   auto KrylovSolverTrustRegionCG::bound(const ConstVector_ref rhs)
       -> Vector_map {
-    const auto & comm = this->cell.get_communicator();
-
     Real trust_region2{this->trust_region * this->trust_region};
 
-    Real pdp{comm.sum(this->p_k.squaredNorm())};
-    Real xdx{comm.sum(this->x_k.squaredNorm())};
-    Real pdx{comm.sum(this->p_k.dot(this->x_k))};
+    Real pdp{this->comm.sum(this->p_k.squaredNorm())};
+    Real xdx{this->comm.sum(this->x_k.squaredNorm())};
+    Real pdx{this->comm.sum(this->p_k.dot(this->x_k))};
     Real tmp{sqrt(pdx * pdx - pdp * (xdx - trust_region2))};
     Real tau1{-(pdx + tmp) / pdp};
     Real tau2{-(pdx - tmp) / pdp};
 
     this->x_k += tau1 * this->p_k;
     Real m1{-rhs.dot(this->x_k) +
-            0.5 * this->x_k.dot(this->cell.get_adaptor() * this->x_k)};
+            0.5 * this->x_k.dot(this->matrix * this->x_k)};
     this->x_k += (tau2 - tau1) * this->p_k;
     Real m2{-rhs.dot(this->x_k) +
-            0.5 * this->x_k.dot(this->cell.get_adaptor() * this->x_k)};
+            0.5 * this->x_k.dot(this->matrix * this->x_k)};
 
     // check which direction is the minimizer
     if (m2 < m1) {

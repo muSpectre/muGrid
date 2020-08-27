@@ -113,7 +113,7 @@ namespace muSpectre {
     auto & material_1_solver{
         Mat1_t::make(cell_solver, "material_1_solver", Young, Poisson)};
 
-    for (const auto && index_pixel : cell_solver.get_pixels().enumerate()) {
+    for (const auto && index_pixel : cell_solver->get_pixels().enumerate()) {
       auto && index{std::get<0>(index_pixel)};
       material_1_solver.add_pixel(index);
     }
@@ -124,9 +124,9 @@ namespace muSpectre {
     constexpr Dim_t maxiter{100};
     constexpr Verbosity verbose{Verbosity::Silent};
 
-    for (const auto && index_pixel : cell_material.get_pixels().enumerate()) {
+    for (const auto && index_pixel : cell_material->get_pixels().enumerate()) {
       auto && index{std::get<0>(index_pixel)};
-      if (index == Index_t(cell_material.get_nb_pixels() / 2 + 1)) {
+      if (index == Index_t(cell_material->get_nb_pixels() / 2 + 1)) {
         material_2_material.add_pixel(index, F_eigen);
       } else {
         material_1_material.add_pixel(index);
@@ -140,20 +140,20 @@ namespace muSpectre {
     Func_t eigen_func{
         [&cell_material, &F_eigen](const size_t & /*step*/,
                                    muGrid::TypedFieldBase<Real> & eval_field) {
-          auto shape{cell_material.get_strain_shape()};
+          auto shape{cell_material->get_strain_shape()};
           auto && eigen_field_map{muGrid::FieldMap<Real, Mapping::Mut>(
               eval_field, shape[0], muGrid::IterUnit::SubPt)};
           for (auto && tup : eigen_field_map.enumerate_indices()) {
             auto && index{std::get<0>(tup)};
             auto && eigen{std::get<1>(tup)};
-            if (index == cell_material.get_nb_pixels() / 2 + 1) {
+            if (index == cell_material->get_nb_pixels() / 2 + 1) {
               eigen -= F_eigen;
             }
           }
         }};
 
-    cell_material.initialise();
-    cell_solver.initialise();
+    cell_material->initialise();
+    cell_solver->initialise();
 
     KrylovSolverCGEigen cg_material{cell_material, cg_tol, maxiter, verbose};
     KrylovSolverCGEigen cg_solver{cell_solver, cg_tol, maxiter, verbose};
@@ -208,14 +208,14 @@ namespace muSpectre {
     auto & material_1_solver{
         Mat1_t::make(cell_solver, "material_1_solver", Young, Poisson)};
 
-    for (const auto && index_pixel : cell_solver.get_pixels().enumerate()) {
+    for (const auto && index_pixel : cell_solver->get_pixels().enumerate()) {
       auto && index{std::get<0>(index_pixel)};
       material_1_solver.add_pixel(index);
     }
 
-    for (const auto && index_pixel : cell_material.get_pixels().enumerate()) {
+    for (const auto && index_pixel : cell_material->get_pixels().enumerate()) {
       auto && index{std::get<0>(index_pixel)};
-      if (index == Index_t(cell_material.get_nb_pixels() / 2)) {
+      if (index == Index_t(cell_material->get_nb_pixels() / 2)) {
         material_2_material.add_pixel(index, F_eigen);
       } else {
         material_1_material.add_pixel(index);
@@ -230,20 +230,20 @@ namespace muSpectre {
         [&cell_material, &F_eigen](const size_t & step,
                                    muGrid::TypedFieldBase<Real> & eval_field) {
           auto && stress_ratio{step + 1};
-          auto shape{cell_material.get_strain_shape()};
+          auto shape{cell_material->get_strain_shape()};
           auto && eval_field_map{muGrid::FieldMap<Real, Mapping::Mut>(
               eval_field, shape[0], muGrid::IterUnit::SubPt)};
           for (auto && tup : eval_field_map.enumerate_indices()) {
             auto && index{std::get<0>(tup)};
             auto && eval{std::get<1>(tup)};
-            if (index == cell_material.get_nb_pixels() / 2) {
+            if (index == cell_material->get_nb_pixels() / 2) {
               eval -= (stress_ratio) * (F_eigen);
             }
           }
         }};
 
-    cell_material.initialise();
-    cell_solver.initialise();
+    cell_material->initialise();
+    cell_solver->initialise();
 
     KrylovSolverCG cg_material{cell_material, cg_tol, maxiter, verbose};
     KrylovSolverCG cg_solver{cell_solver, cg_tol, maxiter, verbose};

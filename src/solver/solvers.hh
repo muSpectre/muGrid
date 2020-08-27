@@ -102,9 +102,9 @@ namespace muSpectre {
    * initialisation.
    */
   std::vector<OptimizeResult> newton_cg(
-      Cell & cell, const LoadSteps_t & load_steps, KrylovSolverBase & solver,
-      const Real & newton_tol, const Real & equil_tol,
-      const Verbosity & verbose = Verbosity::Silent,
+      std::shared_ptr<Cell> cell, const LoadSteps_t & load_steps,
+      KrylovSolverBase & solver, const Real & newton_tol,
+      const Real & equil_tol, const Verbosity & verbose = Verbosity::Silent,
       const IsStrainInitialised & strain_init = IsStrainInitialised::False,
       EigenStrainOptFunc_ref eigen_strain_func = muGrid::nullopt);
   /**
@@ -112,7 +112,8 @@ namespace muSpectre {
    * equilibrium of a cell given a mean applied strain.
    */
   inline OptimizeResult newton_cg(
-      Cell & cell, const Eigen::Ref<Eigen::MatrixXd> load_step,
+      std::shared_ptr<Cell> cell,
+      const Eigen::Ref<const Eigen::MatrixXd> load_step,
       KrylovSolverBase & solver, const Real & newton_tol,
       const Real & equil_tol, const Verbosity & verbose = Verbosity::Silent,
       const IsStrainInitialised & strain_init = IsStrainInitialised::False,
@@ -132,7 +133,7 @@ namespace muSpectre {
    * strain state is set to zero in cell initialisation.
    */
   std::vector<OptimizeResult>
-  de_geus(Cell & cell, const LoadSteps_t & load_steps,
+  de_geus(std::shared_ptr<Cell> cell, const LoadSteps_t & load_steps,
           KrylovSolverBase & solver, Real newton_tol, Real equil_tol,
           Verbosity verbose = Verbosity::Silent,
           IsStrainInitialised strain_init = IsStrainInitialised::False);
@@ -143,7 +144,8 @@ namespace muSpectre {
    * equilibrium of a cell given a mean applied strain.
    */
   inline OptimizeResult
-  de_geus(Cell & cell, const Eigen::Ref<Eigen::MatrixXd> load_step,
+  de_geus(std::shared_ptr<Cell> cell,
+          const Eigen::Ref<const Eigen::MatrixXd> load_step,
           KrylovSolverBase & solver, Real newton_tol, Real equil_tol,
           Verbosity verbose = Verbosity::Silent,
           IsStrainInitialised strain_init = IsStrainInitialised::False) {

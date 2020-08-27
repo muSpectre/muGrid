@@ -70,21 +70,21 @@ namespace muSpectre {
         std::make_unique<muFFT::FFTWEngine>(nb_grid_pts_split)};
     auto && proj_ptr_split{std::make_unique<ProjectionFiniteStrainFast<dim>>(
         std::move(fft_ptr_split), lengths_split)};
-    CellSplit sys_split(std::move(proj_ptr_split));
+    auto sys_split{std::make_shared<CellSplit>(std::move(proj_ptr_split))};
 
     DynCcoord_t nb_grid_pts_base{3, 3};
     DynRcoord_t lengths_base{3, 3};
     auto && fft_ptr_base{std::make_unique<muFFT::FFTWEngine>(nb_grid_pts_base)};
     auto && proj_ptr_base{std::make_unique<ProjectionFiniteStrainFast<dim>>(
         std::move(fft_ptr_base), lengths_base)};
-    Cell sys_base(std::move(proj_ptr_base));
+    auto sys_base { std::make_shared<Cell>(std::move(proj_ptr_base))};
 
     auto & Material_hard_split{
         Mat_t::make(sys_split, "hard", Young_hard, Poisson)};
     auto & Material_soft_split{
         Mat_t::make(sys_split, "soft", Young_soft, Poisson)};
 
-    for (auto && tup : sys_split.get_pixels().enumerate()) {
+    for (auto && tup : sys_split->get_pixels().enumerate()) {
       auto && pixel_id{std::get<0>(tup)};
       auto && pixel{std::get<1>(tup)};
       if (pixel[0] < 2) {
@@ -101,7 +101,7 @@ namespace muSpectre {
         Mat_t::make(sys_base, "hard", Young_hard, Poisson)};
     auto & Material_mix_base{Mat_t::make(sys_base, "mix", Young_mix, Poisson)};
 
-    for (auto && tup : sys_base.get_pixels().enumerate()) {
+    for (auto && tup : sys_base->get_pixels().enumerate()) {
       auto && pixel_id{std::get<0>(tup)};
       auto && pixel{std::get<1>(tup)};
       if (pixel[0] < 2) {

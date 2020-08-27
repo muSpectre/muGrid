@@ -98,7 +98,7 @@ int main(int argc, char * argv[]) {
   const DynRcoord_t lengths{CcoordOps::get_cube<Dim>(fsize)};
   const DynCcoord_t nb_grid_pts{CcoordOps::get_cube<Dim>(size)};
 
-  auto cell{make_cell(nb_grid_pts, lengths, form)};
+  auto cell{make_cell(nb_grid_pts, lengths, form, FFT_PlanFlags::measure)};
 
   constexpr Real E{1.0030648180242636};
   constexpr Real nu{0.29930675909878679};
@@ -109,7 +109,7 @@ int main(int argc, char * argv[]) {
 
   int counter{0};
   for (auto && id_pixel :
-       akantu::zip(cell.get_pixel_indices(), cell.get_pixels())) {
+       akantu::zip(cell->get_pixel_indices(), cell->get_pixels())) {
     const auto & pixel_index{std::get<0>(id_pixel)};
     const auto & pixel{std::get<1>(id_pixel)};
     int sum{0};
@@ -124,10 +124,10 @@ int main(int argc, char * argv[]) {
       material_soft.add_pixel(pixel_index);
     }
   }
-  std::cout << counter << " Pixel out of " << cell.get_nb_pixels()
+  std::cout << counter << " Pixel out of " << cell->get_nb_pixels()
             << " are in the hard material" << std::endl;
 
-  cell.initialise();
+  cell->initialise();
 
   constexpr Real newton_tol{1e-4};
   constexpr Real cg_tol{1e-7};

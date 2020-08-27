@@ -222,6 +222,12 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
+  template <typename T, Mapping Mutability>
+  auto FieldMap<T, Mutability>::get_field() const -> const Field_t & {
+    return this->field;
+  }
+
+  /* ---------------------------------------------------------------------- */
   template class FieldMap<Real, Mapping::Const>;
   template class FieldMap<Real, Mapping::Mut>;
   template class FieldMap<Complex, Mapping::Const>;

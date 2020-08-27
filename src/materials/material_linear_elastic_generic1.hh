@@ -40,7 +40,7 @@
 
 #include "common/muSpectre_common.hh"
 #include "materials/stress_transformations_PK2.hh"
-#include "materials/material_muSpectre_base.hh"
+#include "materials/material_muSpectre_mechanics.hh"
 
 #include <libmugrid/T4_map_proxy.hh>
 #include <libmugrid/field_map_static.hh>
@@ -59,24 +59,9 @@ namespace muSpectre {
    * traits for use by MaterialMuSpectre for crtp
    */
   template <Index_t DimM>
-  struct MaterialMuSpectre_traits<MaterialLinearElasticGeneric1<DimM>> {
-    //! global field collection
-
-    //! expected map type for strain fields
-    using StrainMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Const, DimM, IterUnit::SubPt>;
-    //! expected map type for stress fields
-    using StressMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
-    //! expected map type for tangent stiffness fields
-    using TangentMap_t =
-        muGrid::T4FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
-
-    //! declare what type of strain measure your law takes as input
-    constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
-    //! declare what type of stress measure your law yields as output
-    constexpr static auto stress_measure{StressMeasure::PK2};
-  };
+  struct MaterialMuSpectre_traits<MaterialLinearElasticGeneric1<DimM>>
+      : public DefaultMechanics_traits<DimM, StrainMeasure::GreenLagrange,
+                                       StressMeasure::PK2> {};
   /**
    * Linear elastic law defined by a full stiffness tensor. Very
    * generic, but not most efficient. Note: it is template by ImpMaterial to
@@ -88,10 +73,12 @@ namespace muSpectre {
    */
   template <Index_t DimM>
   class MaterialLinearElasticGeneric1
-      : public MaterialMuSpectre<MaterialLinearElasticGeneric1<DimM>, DimM> {
+      : public MaterialMuSpectreMechanics<MaterialLinearElasticGeneric1<DimM>,
+                                          DimM> {
    public:
     //! parent type
-    using Parent = MaterialMuSpectre<MaterialLinearElasticGeneric1<DimM>, DimM>;
+    using Parent =
+        MaterialMuSpectreMechanics<MaterialLinearElasticGeneric1<DimM>, DimM>;
     //! generic input tolerant to python input
     using CInput_t =
         Eigen::Ref<Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>, 0,

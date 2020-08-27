@@ -41,7 +41,7 @@
 #include "materials/material_linear_orthotropic.hh"
 #include "cell/cell.hh"
 #include "projection/projection_finite_strain_fast.hh"
-#include "common/muSpectre_common.hh"
+#include "projection/projection_small_strain.hh"
 
 #include <libmufft/fftw_engine.hh>
 
@@ -134,13 +134,13 @@ namespace muSpectre {
       MaterialFixture<DimS, DimM, c1, c2, Form, RndVec, RndRatio>::sdim;
 
   /* ---------------------------------------------------------------------- */
-
-  template <Dim_t DimS, Dim_t DimM, int c1, int c2, Formulation Form,
+  template <Dim_t DimS, Dim_t DimM, int c1, int c2, Formulation Form_,
             bool RndVec = false, bool RndRatio = false>
   struct MaterialFixture_with_ortho_ref
-      : public MaterialFixture<DimS, DimM, c1, c2, Form, RndVec, RndRatio> {
-    using Parent = MaterialFixture<DimS, DimM, c1, c2, Form, RndVec, RndRatio>;
+      : public MaterialFixture<DimS, DimM, c1, c2, Form_, RndVec, RndRatio> {
+    using Parent = MaterialFixture<DimS, DimM, c1, c2, Form_, RndVec, RndRatio>;
     using MaterialRef_t = MaterialLinearOrthotropic<DimM>;
+    constexpr static Formulation Form{Form_};
 
     // Constructor
     MaterialFixture_with_ortho_ref()
@@ -203,6 +203,12 @@ namespace muSpectre {
 
     MaterialRef_t material_ref;
   };
+
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimS, Dim_t DimM, int c1, int c2, Formulation Form_,
+            bool RndVec, bool RndRatio>
+  constexpr Formulation MaterialFixture_with_ortho_ref<
+      DimS, DimM, c1, c2, Form_, RndVec, RndRatio>::Form;
 
   /* ---------------------------------------------------------------------- */
   using mat_list = boost::mpl::list<
@@ -326,15 +332,19 @@ namespace muSpectre {
     mat.initialise();
     mat_precipitate->initialise();
 
+    BOOST_TEST_CHECKPOINT("intermediate");
+
+    mat.set_formulation(Fix::get_form());
+    mat_precipitate->set_formulation(Fix::get_form());
     mat.compute_stresses_tangent(
         globalfields.get_field("Transformation Gradient 1"),
         globalfields.get_field("Nominal Stress 1"),
-        globalfields.get_field("Tangent Moduli 1"), Fix::get_form());
+        globalfields.get_field("Tangent Moduli 1"));
 
     mat_precipitate->compute_stresses_tangent(
         globalfields.get_field("Transformation Gradient 2"),
         globalfields.get_field("Nominal Stress 2"),
-        globalfields.get_field("Tangent Moduli 2"), Fix::get_form());
+        globalfields.get_field("Tangent Moduli 2"));
 
     typename traits::StressMap_t Pmap_1(
         globalfields.get_field("Nominal Stress 1"));
@@ -421,14 +431,16 @@ namespace muSpectre {
         globalfields.get_field("Transformation Gradient 2"));
     grad_map_2[0] = strain;
 
+    mat.set_formulation(Fix::get_form());
+    mat_ref.set_formulation(Fix::get_form());
     mat.compute_stresses_tangent(
         globalfields.get_field("Transformation Gradient 1"),
         globalfields.get_field("Nominal Stress 1"),
-        globalfields.get_field("Tangent Moduli 1"), Fix::get_form());
+        globalfields.get_field("Tangent Moduli 1"));
     mat_ref.compute_stresses_tangent(
         globalfields.get_field("Transformation Gradient 2"),
         globalfields.get_field("Nominal Stress 2"),
-        globalfields.get_field("Tangent Moduli 2"), Fix::get_form());
+        globalfields.get_field("Tangent Moduli 2"));
 
     typename traits::StressMap_t Pmap_1(
         globalfields.get_field("Nominal Stress 1"));
@@ -448,12 +460,12 @@ namespace muSpectre {
     error = rel_error(Kmap_1[pix0], Kmap_2[pix0]);
     BOOST_CHECK_LT(error, tol);
 
+    mat.set_formulation(Fix::get_form());
     mat.compute_stresses(globalfields.get_field("Transformation Gradient 1"),
-                         globalfields.get_field("Nominal Stress 1"),
-                         Fix::get_form());
+                         globalfields.get_field("Nominal Stress 1"));
     mat_ref.compute_stresses(
         globalfields.get_field("Transformation Gradient 2"),
-        globalfields.get_field("Nominal Stress 2"), Fix::get_form());
+        globalfields.get_field("Nominal Stress 2"));
 
     auto a{Pmap_1[pix0]};
     auto b{Pmap_2[pix0]};
@@ -462,16 +474,7 @@ namespace muSpectre {
     BOOST_CHECK_LT(error, tol);
 
     if (Fix::get_form() == Formulation::finite_strain) {
-      BOOST_CHECK_THROW(mat.compute_stresses_tangent(
-                            globalfields.get_field("Transformation Gradient 1"),
-                            globalfields.get_field("Nominal Stress 1"),
-                            globalfields.get_field("Tangent Moduli 1"),
-                            Formulation::small_strain),
-                        std::runtime_error);
-      BOOST_CHECK_THROW(mat.compute_stresses(
-                            globalfields.get_field("Transformation Gradient 1"),
-                            globalfields.get_field("Nominal Stress 1"),
-                            Formulation::small_strain),
+      BOOST_CHECK_THROW(mat.set_formulation(Formulation::small_strain),
                         std::runtime_error);
     }
   }
@@ -491,12 +494,13 @@ namespace muSpectre {
     DynRcoord_t lengths{length_cell, length_cell};
 
     auto fft_ptr{std::make_unique<muFFT::FFTWEngine>(nb_grid_pts)};
-    auto proj_ptr{std::make_unique<ProjectionFiniteStrainFast<sdim>>(
-        std::move(fft_ptr), lengths)};
-    Cell sys(std::move(proj_ptr));
+    using Proj_t = std::conditional_t<Fix::Form == Formulation::finite_strain,
+                                      ProjectionFiniteStrainFast<sdim>,
+                                      ProjectionSmallStrain<sdim>>;
+    auto proj_ptr{std::make_unique<Proj_t>(std::move(fft_ptr), lengths)};
+    auto sys{std::make_shared<Cell>(std::move(proj_ptr))};
 
-    auto & mat_lam = MaterialLaminate<sdim, Formulation::small_strain>::make(
-        sys, "laminate");
+    auto & mat_lam = MaterialLaminate<sdim, Fix::Form>::make(sys, "laminate");
     auto & mat_precipitate_cell =
         MaterialLinearElastic1<sdim>::make(sys, "preciptiate", 2.5, 0.4);
     auto & mat_matrix_cell =
@@ -521,11 +525,19 @@ namespace muSpectre {
     precipitate_vertices.push_back({x_center - x_length, y_center + y_length});
     precipitate_vertices.push_back({x_center + x_length, y_center + y_length});
 
-    sys.make_pixels_precipitate_for_laminate_material(
+    sys->make_pixels_precipitate_for_laminate_material(
         precipitate_vertices, mat_lam, mat_precipitate_cell, mat_precipitate,
         mat_matrix);
-    sys.complete_material_assignment_simple(mat_matrix_cell);
-    sys.initialise();
+    sys->complete_material_assignment_simple(mat_matrix_cell);
+
+    std::stringstream form_msg{};
+    form_msg << "System with formulation '" << sys->get_formulation() << "'";
+
+    BOOST_TEST_CHECKPOINT(form_msg.str());
+    std::cout << form_msg.str() << std::endl;
+    sys->initialise();
+    mat_lam.initialise();
+    mat_precipitate_cell.initialise();
 
     BOOST_CHECK_EQUAL(mat_lam.size(),
                       2 * ((top_y - bottom_y) + (right_x - left_x) - 2));

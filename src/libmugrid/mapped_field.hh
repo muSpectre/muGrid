@@ -127,6 +127,31 @@ namespace muGrid {
     //! Move assignment operator
     MappedField & operator=(MappedField && other) = default;
 
+    //! subtraction assignment
+    MappedField & operator-=(const MappedField & other) {
+      this->get_field() -= other.get_field();
+      return *this;
+    }
+
+    //! addition assignment
+    MappedField & operator+=(const MappedField & other) {
+      this->get_field() += other.get_field();
+      return *this;
+    }
+
+    //! Copy assignment operator
+    MappedField & operator=(const TypedFieldBase<Scalar> & other) {
+      this->get_field() = other;
+      return *this;
+    }
+
+    //! Copy assignment operator
+    MappedField &
+    operator=(const typename TypedFieldBase<Scalar>::Negative & other) {
+      this->get_field() = other;
+      return *this;
+    }
+
     //! random access operator
     Return_t operator[](size_t index) { return this->map[index]; }
 
@@ -145,6 +170,9 @@ namespace muGrid {
     //! return a reference to the mapped field
     TypedField<Scalar> & get_field() { return this->field; }
 
+    //! return a reference to the mapped field
+    const TypedField<Scalar> & get_field() const { return this->field; }
+
     //! return a reference to the map
     FieldMapType & get_map() { return this->map; }
 
@@ -152,6 +180,21 @@ namespace muGrid {
     TypedField<Scalar> & field;  //!< reference to mapped field
     FieldMapType map;            //!< associated field map
   };
+
+  /**
+   * Alias of `muGrid::MappedField` for a map with corresponding
+   * `muSpectre::Field` you wish to iterate over pixel by pixel or quadrature
+   * point by quadrature point with a chosen, statically sized plain `Eigen`
+   * type
+   *
+   * @tparam EigenPlain a statically sized `Eigen::Array` or `Eigen::Matrix`
+   * @tparam Mutability whether or not the map allows to modify the content of
+   * the field
+   * @tparam IterationType describes the pixel-subdivision
+   */
+  template <class EigenPlain, Mapping Mutability, IterUnit IterationType>
+  using MappedEigenField =
+      MappedField<EigenFieldMap<EigenPlain, Mutability, IterationType>>;
 
   /**
    * Alias of `muGrid::MappedField` for a map with corresponding
@@ -216,8 +259,7 @@ namespace muGrid {
    * @tparam Dim spatial dimension of the tensors
    * @tparam IterationType describes the pixel-subdivision
    */
-  template <typename T, Mapping Mutability, Dim_t Dim,
-            IterUnit IterationType>
+  template <typename T, Mapping Mutability, Dim_t Dim, IterUnit IterationType>
   using MappedT1Field =
       MappedField<T1FieldMap<T, Mutability, Dim, IterationType>>;
 
@@ -233,8 +275,7 @@ namespace muGrid {
    * @tparam Dim spatial dimension of the tensors
    * @tparam IterationType describes the pixel-subdivision
    */
-  template <typename T, Mapping Mutability, Dim_t Dim,
-            IterUnit IterationType>
+  template <typename T, Mapping Mutability, Dim_t Dim, IterUnit IterationType>
   using MappedT2Field =
       MappedField<T2FieldMap<T, Mutability, Dim, IterationType>>;
 
@@ -250,8 +291,7 @@ namespace muGrid {
    * @tparam Dim spatial dimension of the tensors
    * @tparam IterationType describes the pixel-subdivision
    */
-  template <typename T, Mapping Mutability, Dim_t Dim,
-            IterUnit IterationType>
+  template <typename T, Mapping Mutability, Dim_t Dim, IterUnit IterationType>
   using MappedT4Field =
       MappedField<T4FieldMap<T, Mutability, Dim, IterationType>>;
 

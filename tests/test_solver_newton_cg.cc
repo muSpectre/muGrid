@@ -87,14 +87,14 @@ namespace muSpectre {
     auto & material_hard{Mat_t::make(cell, "hard", contrast * Young, Poisson)};
     auto & material_soft{Mat_t::make(cell, "soft", Young, Poisson)};
 
-    for (const auto & pixel_index : cell.get_pixel_indices()) {
+    for (const auto & pixel_index : cell->get_pixel_indices()) {
       if (pixel_index) {
         material_hard.add_pixel(pixel_index);
       } else {
         material_soft.add_pixel(pixel_index);
       }
     }
-    cell.initialise();
+    cell->initialise();
 
     Grad_t<Dim> delEps0{Grad_t<Dim>::Zero()};
     constexpr Real eps0 = 1.;
@@ -108,6 +108,8 @@ namespace muSpectre {
     type cg{cell, cg_tol, maxiter, verbose};
     auto result = newton_cg(cell, delEps0, cg, newton_tol, equil_tol, verbose);
   }
+
+  /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(small_strain_patch_dynamic_solver, Fix,
                                    KrylovSolverList, Fix) {
     constexpr Index_t Dim{twoD};
@@ -132,7 +134,7 @@ namespace muSpectre {
     auto & material_hard{Mat_t::make(cell, "hard", contrast * Young, Poisson)};
     auto & material_soft{Mat_t::make(cell, "soft", Young, Poisson)};
 
-    for (const auto && index_pixel : akantu::enumerate(cell.get_pixels())) {
+    for (const auto && index_pixel : akantu::enumerate(cell->get_pixels())) {
       auto && index{std::get<0>(index_pixel)};
       auto && pixel{std::get<1>(index_pixel)};
       if (pixel[0] < Index_t(nb_lays)) {
@@ -141,7 +143,7 @@ namespace muSpectre {
         material_soft.add_pixel(index);
       }
     }
-    cell.initialise();
+    cell->initialise();
 
     Grad_t<Dim> delEps0{Grad_t<Dim>::Zero()};
     constexpr Real eps0 = 1.;
@@ -158,7 +160,7 @@ namespace muSpectre {
     if (verbose > Verbosity::Silent) {
       std::cout << "result:" << std::endl << result.grad << std::endl;
       std::cout << "mean strain = " << std::endl
-                << cell.get_strain().get_sub_pt_map().mean() << std::endl;
+                << cell->get_strain().get_sub_pt_map().mean() << std::endl;
     }
 
     /**
@@ -189,16 +191,16 @@ namespace muSpectre {
 
     // verify uniaxial tension patch test
     for (const auto & index_pixel :
-         akantu::zip(cell.get_pixel_indices(), cell.get_pixels())) {
+         akantu::zip(cell->get_pixel_indices(), cell->get_pixels())) {
       auto && index{std::get<0>(index_pixel)};
       auto && pixel{std::get<1>(index_pixel)};
       if (pixel[0] < Index_t(nb_lays)) {
         BOOST_CHECK_LE(
-            (Eps_hard - cell.get_strain().get_pixel_map(Dim)[index]).norm(),
+            (Eps_hard - cell->get_strain().get_pixel_map(Dim)[index]).norm(),
             tol);
       } else {
         BOOST_CHECK_LE(
-            (Eps_soft - cell.get_strain().get_pixel_map(Dim)[index]).norm(),
+            (Eps_soft - cell->get_strain().get_pixel_map(Dim)[index]).norm(),
             tol);
       }
     }
@@ -213,10 +215,10 @@ namespace muSpectre {
 
     // verify pure shear patch test
     for (const auto & index_pixel :
-         akantu::zip(cell.get_pixel_indices(), cell.get_pixels())) {
+         akantu::zip(cell->get_pixel_indices(), cell->get_pixels())) {
       auto && index{std::get<0>(index_pixel)};
       auto && pixel{std::get<1>(index_pixel)};
-      auto && strain = cell.get_strain().get_pixel_map(Dim)[index];
+      auto && strain = cell->get_strain().get_pixel_map(Dim)[index];
       if (pixel[0] < Index_t(nb_lays)) {
         BOOST_CHECK_LE((Eps_hard - strain).norm(), tol);
       } else {
@@ -251,7 +253,7 @@ namespace muSpectre {
     auto & material_hard{Mat_t::make(cell, "hard", contrast * Young, Poisson)};
     auto & material_soft{Mat_t::make(cell, "soft", Young, Poisson)};
 
-    for (const auto && index_pixel : cell.get_pixels().enumerate()) {
+    for (const auto && index_pixel : cell->get_pixels().enumerate()) {
       auto && index{std::get<0>(index_pixel)};
       auto && pixel{std::get<1>(index_pixel)};
       if (pixel[0] < Index_t(nb_lays)) {
@@ -260,7 +262,7 @@ namespace muSpectre {
         material_soft.add_pixel(index);
       }
     }
-    cell.initialise();
+    cell->initialise();
 
     Grad_t<Dim> delEps0{Grad_t<Dim>::Zero()};
     constexpr Real eps0 = 1.e-4;
@@ -277,7 +279,7 @@ namespace muSpectre {
     if (verbose > Verbosity::Silent) {
       std::cout << "result:" << std::endl << result.grad << std::endl;
       std::cout << "mean strain = " << std::endl
-                << cell.get_strain().get_sub_pt_map().mean() << std::endl;
+                << cell->get_strain().get_sub_pt_map().mean() << std::endl;
     }
 
     /**
@@ -308,17 +310,17 @@ namespace muSpectre {
 
     // verify uniaxial tension patch test
     for (const auto & index_pixel :
-         akantu::zip(cell.get_pixel_indices(), cell.get_pixels())) {
+         akantu::zip(cell->get_pixel_indices(), cell->get_pixels())) {
       auto && index{std::get<0>(index_pixel)};
       auto && pixel{std::get<1>(index_pixel)};
       if (pixel[0] < Index_t(nb_lays)) {
         BOOST_CHECK_LE((Eps_hard + Eps_hard.Identity() -
-                        cell.get_strain().get_pixel_map(Dim)[index])
+                        cell->get_strain().get_pixel_map(Dim)[index])
                            .norm(),
                        loose_tol);
       } else {
         BOOST_CHECK_LE((Eps_soft + Eps_hard.Identity() -
-                        cell.get_strain().get_pixel_map(Dim)[index])
+                        cell->get_strain().get_pixel_map(Dim)[index])
                            .norm(),
                        loose_tol);
       }
@@ -334,10 +336,10 @@ namespace muSpectre {
 
     // verify pure shear patch test
     for (const auto & index_pixel :
-         akantu::zip(cell.get_pixel_indices(), cell.get_pixels())) {
+         akantu::zip(cell->get_pixel_indices(), cell->get_pixels())) {
       auto && index{std::get<0>(index_pixel)};
       auto && pixel{std::get<1>(index_pixel)};
-      auto strain{cell.get_strain().get_pixel_map(Dim)[index]};
+      auto strain{cell->get_strain().get_pixel_map(Dim)[index]};
       Eigen::Matrix<Real, Dim, Dim> E{
           .5 * (strain.transpose() * strain - strain.Identity(Dim, Dim))};
       Real error{};

@@ -38,6 +38,7 @@
 
 #include "common/muSpectre_common.hh"
 #include "materials/materials_toolbox.hh"
+#include "materials/material_mechanics_base.hh"
 
 #include <libmugrid/T4_map_proxy.hh>
 #include <libmugrid/ccoord_operations.hh>
@@ -202,8 +203,9 @@ namespace muSpectre {
       -> T2_const_map {
     this->check_init();
     this->strain.get_map()[0] = grad;
+    dynamic_cast<MaterialMechanicsBase&>(*this->material).set_formulation(form);
     this->material->compute_stresses(this->strain.get_field(),
-                                     this->stress.get_field(), form);
+                                     this->stress.get_field());
     return T2_const_map(this->stress.get_map()[0].data());
   }
 
@@ -214,9 +216,11 @@ namespace muSpectre {
       -> std::tuple<T2_const_map, T4_const_map> {
     this->check_init();
     this->strain.get_map()[0] = grad;
+    dynamic_cast<MaterialMechanicsBase &>(*this->material).
+        set_formulation(form);
     this->material->compute_stresses_tangent(this->strain.get_field(),
                                              this->stress.get_field(),
-                                             this->tangent.get_field(), form);
+                                             this->tangent.get_field());
     return std::make_tuple(T2_const_map(this->stress.get_map()[0].data()),
                            T4_const_map(this->tangent.get_map()[0].data()));
   }

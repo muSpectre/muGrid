@@ -38,7 +38,7 @@
 
 #include "materials/stress_transformations_PK2.hh"
 #include "materials/material_base.hh"
-#include "materials/material_muSpectre_base.hh"
+#include "materials/material_muSpectre_mechanics.hh"
 #include "materials/materials_toolbox.hh"
 #include "common/muSpectre_common.hh"
 #include "common/voigt_conversion.hh"
@@ -55,32 +55,20 @@ namespace muSpectre {
 
   // traits for anisotropic material
   template <Index_t DimM>
-  struct MaterialMuSpectre_traits<MaterialLinearAnisotropic<DimM>> {
-    //! expected map type for strain fields
-    using StrainMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Const, DimM, IterUnit::SubPt>;
-    //! expected map type for stress fields
-    using StressMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
-    //! expected map type for tangent stiffness fields
-    using TangentMap_t =
-        muGrid::T4FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
-
-    //! declare what type of strain measure your law takes as input
-    constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
-    //! declare what type of stress measure your law yields as output
-    constexpr static auto stress_measure{StressMeasure::PK2};
-  };
+  struct MaterialMuSpectre_traits<MaterialLinearAnisotropic<DimM>>
+      : public DefaultMechanics_traits<DimM, StrainMeasure::GreenLagrange,
+                                       StressMeasure::PK2> {};
 
   /**
    * Material implementation for anisotropic constitutive law
    */
   template <Index_t DimM>
   class MaterialLinearAnisotropic
-      : public MaterialMuSpectre<MaterialLinearAnisotropic<DimM>, DimM> {
+      : public MaterialMuSpectreMechanics<MaterialLinearAnisotropic<DimM>,
+                                          DimM> {
    public:
     //! base class
-    using Parent = MaterialMuSpectre<MaterialLinearAnisotropic, DimM>;
+    using Parent = MaterialMuSpectreMechanics<MaterialLinearAnisotropic, DimM>;
 
     using Stiffness_t = muGrid::T4Mat<Real, DimM>;
 

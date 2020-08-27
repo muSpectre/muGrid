@@ -143,6 +143,14 @@ namespace muGrid {
       return *this;
     }
 
+    //! Addition-assign a matrix-like value with dynamic size to every entry
+    template <bool IsMutableField = Mutability == Mapping::Mut>
+    std::enable_if_t<IsMutableField, StaticFieldMap> &
+    operator+=(const typename Parent::EigenRef & val) {
+      dynamic_cast<Parent &>(*this) += val;
+      return *this;
+    }
+
     //! Assign a matrix-like value with static size to every entry
     template <bool IsMutableField = Mutability == Mapping::Mut>
     std::enable_if_t<IsMutableField && !MapType::IsScalarMapType(),
@@ -154,20 +162,35 @@ namespace muGrid {
       return *this;
     }
 
+    //! Addition-assign a matrix-like value with static size to every entry
+    template <bool IsMutableField = Mutability == Mapping::Mut>
+    std::enable_if_t<IsMutableField && !MapType::IsScalarMapType(),
+                     StaticFieldMap<T, Mutability, MapType, IterationType>> &
+    operator+=(const reference & val) {
+      for (auto && entry : *this) {
+        entry += val;
+      }
+      return *this;
+    }
+
     //! Assign a scalar value to every entry
     template <bool IsMutableField = Mutability == Mapping::Mut>
     std::enable_if_t<IsMutableField && MapType::IsScalarMapType(),
                      StaticFieldMap<T, Mutability, MapType, IterationType>> &
     operator=(const Scalar & val) {
-      if (not(this->nb_rows == 1 && this->nb_cols == 1)) {
-        std::stringstream error_str{};
-        error_str << "Expected an array/matrix with shape (" << this->nb_rows
-                  << " × " << this->nb_cols
-                  << "), but received a scalar value.";
-        throw FieldMapError(error_str.str());
-      }
       for (auto && entry : *this) {
         entry = val;
+      }
+      return *this;
+    }
+
+    //! Assign a scalar value to every entry
+    template <bool IsMutableField = Mutability == Mapping::Mut>
+    std::enable_if_t<IsMutableField && MapType::IsScalarMapType(),
+                     StaticFieldMap<T, Mutability, MapType, IterationType>> &
+    operator+=(const Scalar & val) {
+      for (auto && entry : *this) {
+        entry += val;
       }
       return *this;
     }
@@ -510,6 +533,22 @@ namespace muGrid {
 
   /**
    * Alias of `muGrid::StaticFieldMap` you wish to iterate over pixel by pixel
+   * or quadrature point by quadrature point with a chosen, statically sized
+   * plain `Eigen` type
+   *
+   * @tparam EigenPlain a statically sized `Eigen::Array` or `Eigen::Matrix`
+   * @tparam Mutability whether or not the map allows to modify the content of
+   * the field
+   * @tparam IterationType describes the pixel-subdivision
+   */
+  template <class EigenPlain, Mapping Mutability, IterUnit IterationType>
+  using EigenFieldMap = StaticFieldMap<
+      typename EigenPlain::Scalar, Mutability,
+      internal::EigenMap<typename EigenPlain::Scalar, EigenPlain>,
+      IterationType>;
+
+  /**
+   * Alias of `muGrid::StaticFieldMap` you wish to iterate over pixel by pixel
    * or quadrature point by quadrature point with statically sized
    * `Eigen::Matrix` iterates
    *
@@ -571,8 +610,7 @@ namespace muGrid {
    * @tparam Dim spatial dimension of the tensor
    * @tparam IterationType describes the pixel-subdivision
    */
-  template <typename T, Mapping Mutability, Dim_t Dim,
-            IterUnit IterationType>
+  template <typename T, Mapping Mutability, Dim_t Dim, IterUnit IterationType>
   using T1NFieldMap =
       StaticFieldMap<T, Mutability, internal::MatrixMap<T, Dim, 1>,
                      IterationType>;
@@ -588,8 +626,7 @@ namespace muGrid {
    * @tparam Dim spatial dimension of the tensor
    * @tparam IterationType describes the pixel-subdivision
    */
-  template <typename T, Mapping Mutability, Dim_t Dim,
-            IterUnit IterationType>
+  template <typename T, Mapping Mutability, Dim_t Dim, IterUnit IterationType>
   using T1FieldMap =
       StaticFieldMap<T, Mutability, internal::MatrixMap<T, Dim, 1>,
                      IterationType>;
@@ -605,8 +642,7 @@ namespace muGrid {
    * @tparam Dim spatial dimension of the tensor
    * @tparam IterationType describes the pixel-subdivision
    */
-  template <typename T, Mapping Mutability, Dim_t Dim,
-            IterUnit IterationType>
+  template <typename T, Mapping Mutability, Dim_t Dim, IterUnit IterationType>
   using T2FieldMap =
       StaticFieldMap<T, Mutability, internal::MatrixMap<T, Dim, Dim>,
                      IterationType>;
@@ -622,8 +658,7 @@ namespace muGrid {
    * @tparam Dim spatial dimension of the tensor
    * @tparam IterationType describes the pixel-subdivision
    */
-  template <typename T, Mapping Mutability, Dim_t Dim,
-            IterUnit IterationType>
+  template <typename T, Mapping Mutability, Dim_t Dim, IterUnit IterationType>
   using T4FieldMap =
       StaticFieldMap<T, Mutability,
                      internal::MatrixMap<T, Dim * Dim, Dim * Dim>,

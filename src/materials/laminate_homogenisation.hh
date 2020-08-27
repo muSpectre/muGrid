@@ -47,7 +47,7 @@
 #include "libmugrid/field_map.hh"
 #include "material_linear_anisotropic.hh"
 #include "materials_toolbox.hh"
-#include "material_muSpectre_base.hh"
+#include "material_muSpectre_mechanics.hh"
 
 #include <tuple>
 

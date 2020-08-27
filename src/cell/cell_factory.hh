@@ -205,14 +205,14 @@ namespace muSpectre {
    * @param comm communicator used for solving distributed problems
    */
   template <typename Cell_t = Cell, class FFTEngine = muFFT::FFTWEngine>
-  inline Cell_t make_cell(
+  inline std::shared_ptr<Cell_t> make_cell(
       DynCcoord_t nb_grid_pts, DynRcoord_t lengths, Formulation form,
       muFFT::Gradient_t gradient,
       const muFFT::Communicator & comm = muFFT::Communicator(),
       const muFFT::FFT_PlanFlags & flags = muFFT::FFT_PlanFlags::estimate) {
     auto && input = cell_input<FFTEngine>(nb_grid_pts, lengths, form, gradient,
                                           comm, flags);
-    auto cell{Cell_t{std::move(input)}};
+    auto cell{std::make_shared<Cell_t>(std::move(input))};
     return cell;
   }
 
@@ -228,7 +228,7 @@ namespace muSpectre {
    * @param comm communicator used for solving distributed problems
    */
   template <typename Cell_t = Cell, class FFTEngine = muFFT::FFTWEngine>
-  inline Cell_t make_cell(
+  inline std::shared_ptr<Cell_t> make_cell(
       DynCcoord_t nb_grid_pts, DynRcoord_t lengths, Formulation form,
       const muFFT::Communicator & comm = muFFT::Communicator(),
       const muFFT::FFT_PlanFlags & flags = muFFT::FFT_PlanFlags::estimate) {
@@ -236,6 +236,27 @@ namespace muSpectre {
     return make_cell<Cell_t, FFTEngine>(nb_grid_pts, lengths, form,
                                         muFFT::make_fourier_gradient(dim), comm,
                                         flags);
+  }
+
+  /**
+   * convenience function to create a cell with default communicator (avoids
+   * having to build and move the chain of unique_ptrs. Uses the "exact" fourier
+   * derivation operator for calculating gradients
+   *
+   * @param nb_grid_pts resolution of the discretisation grid in each spatial
+   * directional
+   * @param lengths length of the computational domain in each spatial direction
+   * @param form problem formulation (small vs finite strain)
+   * @param comm communicator used for solving distributed problems
+   */
+  template <typename Cell_t = Cell, class FFTEngine = muFFT::FFTWEngine>
+  inline std::shared_ptr<Cell_t> make_cell(
+      DynCcoord_t nb_grid_pts, DynRcoord_t lengths, Formulation form,
+      const muFFT::FFT_PlanFlags & flags) {
+    const Index_t dim{nb_grid_pts.get_dim()};
+    return make_cell<Cell_t, FFTEngine>(nb_grid_pts, lengths, form,
+                                        muFFT::make_fourier_gradient(dim),
+                                        muFFT::Communicator(), flags);
   }
 
 }  // namespace muSpectre

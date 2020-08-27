@@ -66,7 +66,7 @@ void add_material_linear_elastic4_helper(py::module & mod) {
       mod, name.c_str())
       .def_static(
           "make",
-          [](Cell_t & cell, std::string n) -> Mat_t & {
+          [](std::shared_ptr<Cell_t> & cell, std::string n) -> Mat_t & {
             return Mat_t::make(cell, n);
           },
           "cell"_a, "name"_a, py::return_value_policy::reference,

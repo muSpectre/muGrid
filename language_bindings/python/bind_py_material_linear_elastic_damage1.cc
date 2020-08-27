@@ -66,8 +66,8 @@ void add_material_linear_elastic_damage1_helper(py::module & mod) {
       mod, name.c_str())
       .def_static(
           "make",
-          [](Cell_t & cell, std::string name, Real young, Real poisson,
-             Real kappa, Real alpha, Real beta) -> Mat_t & {
+          [](std::shared_ptr<Cell_t> cell, std::string name, Real young,
+             Real poisson, Real kappa, Real alpha, Real beta) -> Mat_t & {
             return Mat_t::make(cell, name, young, poisson, kappa, alpha, beta);
           },
           "cell"_a, "name"_a, "YoungModulus"_a, "PoissonRatio"_a, "Kappa"_a,

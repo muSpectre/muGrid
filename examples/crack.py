@@ -155,12 +155,16 @@ if matplotlib_found and MPI.COMM_WORLD.Get_size() == 1:
         tri = make_triangles(displ)
 
         g = stress[i]
-        if i < 2:
-            g = np.stack((g, g), axis=2).reshape(
-                dim, dim, 2, *nb_domain_grid_pts)
+        print("g.shape = {}, (dim, dim, 2, *nb_domain_grid_pts) = {}".format(
+            g.shape, (dim, dim, 2, *nb_domain_grid_pts)))
+        # if i < 2:
+        #     g = np.stack((g, g), axis=2).reshape(
+        #         dim, dim, 2, *nb_domain_grid_pts)
 
         plt.subplot(3, len(gradients), 1 + i, aspect=1)
         plt.title(names[i])
+        print("g[0, 1].shape", g[0, 1].shape)
+        print("tri", tri)
         plt.tripcolor(tri, g[0, 1].reshape(-1))
         plt.colorbar()
         plt.subplot(3, len(gradients), 1 + len(gradients) + i, aspect=1)

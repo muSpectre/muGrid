@@ -47,6 +47,7 @@
 #include <string>
 
 using muGrid::RuntimeError;
+using muGrid::PhysicsDomain;
 using muSpectre::Index_t;
 using muSpectre::Real;
 using pybind11::literals::operator""_a;
@@ -119,34 +120,38 @@ class PyMaterialBase : public muSpectre::MaterialBase {
 
   void compute_stresses(
       const muGrid::RealField & F, muGrid::RealField & P,
-      const muSpectre::Formulation & form,
       const muSpectre::SplitCell & is_cell_split,
       const muSpectre::StoreNativeStress & store_native_stress) override {
     PYBIND11_OVERLOAD_PURE(
         void,              // Return type
         Parent,            // Parent class
         compute_stresses,  // Name of function in C++ (must match Python name)
-        F, P, form, is_cell_split, store_native_stress);
+        F, P, is_cell_split, store_native_stress);
+  }
+
+  PhysicsDomain get_physics_domain() const override {
+    PYBIND11_OVERLOAD_PURE(
+        PhysicsDomain,        // Return Type
+        Parent,               // Parent class
+        get_physics_domain);  // Name of function in C++ (must match Python name
   }
 
   void compute_stresses_tangent(
       const muGrid::RealField & F, muGrid::RealField & P, muGrid::RealField & K,
-      const muSpectre::Formulation & form,
       const muSpectre::SplitCell & is_cell_split,
       const muSpectre::StoreNativeStress & store_native_stress) override {
     PYBIND11_OVERLOAD_PURE(
         void,              // Return type
         Parent,            // Parent class
         compute_stresses,  // Name of function in C++ (must match Python name)
-        F, P, K, form, is_cell_split, store_native_stress);
+        F, P, K, is_cell_split, store_native_stress);
   }
 
   using DynMatrix_t = typename Parent::DynMatrix_t;
   using StressTangent_t = std::tuple<DynMatrix_t, DynMatrix_t>;
   std::tuple<DynMatrix_t, DynMatrix_t>
   constitutive_law_dynamic(const Eigen::Ref<const DynMatrix_t> & strain,
-                           const size_t & quad_pt_index,
-                           const muSpectre::Formulation & form) override {
+                           const size_t & quad_pt_index) override {
     PYBIND11_OVERLOAD_PURE(
         // Return type
         StressTangent_t,
@@ -155,7 +160,7 @@ class PyMaterialBase : public muSpectre::MaterialBase {
         // Name of function in C++ (must match Python name)
         constitutive_law_dynamic,
         // arguments
-        strain, quad_pt_index, form);
+        strain, quad_pt_index);
   }
 };
 

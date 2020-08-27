@@ -38,7 +38,9 @@
 #ifndef SRC_CELL_CELL_ADAPTOR_HH_
 #define SRC_CELL_CELL_ADAPTOR_HH_
 
-#include <common/muSpectre_common.hh>
+#include "common/muSpectre_common.hh"
+
+#include "solver/matrix_adaptor.hh"
 
 #include <Eigen/IterativeLinearSolvers>
 
@@ -67,7 +69,7 @@ namespace muSpectre {
    * interpreted as a sparse matrix by Eigen solvers
    */
   template <class Cell>
-  class CellAdaptor : public Eigen::EigenBase<CellAdaptor<Cell>> {
+  class CellAdaptor : public MatrixAdaptable {
    public:
     using Scalar = double;      //!< sparse matrix traits
     using RealScalar = double;  //!< sparse matrix traits
@@ -82,10 +84,24 @@ namespace muSpectre {
 
     //! constructor
     explicit CellAdaptor(Cell & cell) : cell{cell} {}
-    //! returns the number of logical rows
-    Eigen::Index rows() const { return this->cell.get_nb_dof(); }
-    //! returns the number of logical columns
-    Eigen::Index cols() const { return this->rows(); }
+
+    //! returns the number of degrees of freedom
+    Index_t get_nb_dof() const final { return this->cell.get_nb_dof(); }
+
+    /**
+     * evaluates the directional stiffness action contribution and increments
+     * the flux field (this corresponds to G:K:δF (note the negative sign in de
+     * Geus 2017, http://dx.doi.org/10.1016/j.cma.2016.12.032). and then adds it
+     * do the values already in del_flux, scaled by alpha (i.e., del_flux +=
+     * alpha*Q:K:δgrad. This function should not be used directly, as it does
+     * absolutely no input checking. Rather, it is meant to be called by the
+     * scaleAndAddTo function in the in Eigen solvers
+     */
+    void stiffness_action_increment(EigenCVec_t del_grad, const Real & alpha,
+                                    EigenVec_t del_flux) const final {
+      return this->cell.add_projected_directional_stiffness(del_grad, alpha,
+                                                            del_flux);
+    }
 
     //! implementation of the evaluation
     template <typename Rhs>
@@ -94,6 +110,12 @@ namespace muSpectre {
       return Eigen::Product<CellAdaptor, Rhs, Eigen::AliasFreeProduct>(
           *this, x.derived());
     }
+
+    //! return the communicator object
+    const muGrid::Communicator & get_communicator() const final {
+      return this->cell.get_communicator();
+    }
+
     Cell & cell;  //!< ref to the cell
   };
 }  // namespace muSpectre

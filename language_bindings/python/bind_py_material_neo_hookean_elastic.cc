@@ -65,8 +65,10 @@ void add_material_neo_hookean_elastic_helper(py::module & mod) {
       mod, name.c_str())
       .def_static(
           "make",
-          [](Cell & cell, std::string name, Real Young, Real Poisson)
-              -> Mat_t & { return Mat_t::make(cell, name, Young, Poisson); },
+          [](std::shared_ptr<Cell> & cell, std::string name, Real Young,
+             Real Poisson) -> Mat_t & {
+            return Mat_t::make(cell, name, Young, Poisson);
+          },
           "cell"_a, "name"_a, "Young"_a, "Poisson"_a,
           py::return_value_policy::reference_internal)
       .def_static(

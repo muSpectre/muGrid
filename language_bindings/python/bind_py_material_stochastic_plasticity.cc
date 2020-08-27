@@ -69,7 +69,7 @@ void add_material_stochastic_plasticity_helper(py::module & mod) {
            "name"_a, "spatial_dimension"_a, "nb_quad_pts"_a)
       .def_static(
           "make",
-          [](Cell_t & cell, std::string n) -> Mat_t & {
+          [](std::shared_ptr<Cell_t> cell, std::string n) -> Mat_t & {
             return Mat_t::make(cell, n);
           },
           "cell"_a, "name"_a, py::return_value_policy::reference_internal)

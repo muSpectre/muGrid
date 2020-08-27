@@ -72,7 +72,7 @@ void add_material_linear_elastic_generic1_helper(py::module & mod) {
   py::class_<Mat_t, MaterialBase, std::shared_ptr<Mat_t>>(mod, name.c_str())
       .def_static(
           "make",
-          [](Cell_t & cell, std::string name,
+          [](std::shared_ptr<Cell_t> cell, std::string name,
              const py::EigenDRef<
                  Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>> &
                  elastic_tensor) -> Mat_t & {
@@ -116,7 +116,7 @@ void add_material_linear_elastic_generic2_helper(py::module & mod) {
   py::class_<Mat_t, MaterialBase, std::shared_ptr<Mat_t>>(mod, name.c_str())
       .def_static(
           "make",
-          [](Cell_t & cell, std::string name,
+          [](std::shared_ptr<Cell_t> cell, std::string name,
              const py::EigenDRef<
                  Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>> &
                  elastic_tensor) -> Mat_t & {

@@ -43,6 +43,7 @@
 #include <libmugrid/field_typed.hh>
 #include <libmugrid/mapped_field.hh>
 #include <libmugrid/optional_mapped_field.hh>
+#include <libmugrid/physics_domain.hh>
 
 #include <string>
 #include <tuple>
@@ -118,6 +119,9 @@ namespace muSpectre {
     //! allocate memory, etc, but also: wipe history variables!
     virtual void initialise();
 
+    //! check whether this material has been initialised
+    const bool & is_initialised() const;
+
     /**
      * for materials with state variables, these typically need to be
      * saved/updated an the end of each load increment, the virtual
@@ -135,7 +139,6 @@ namespace muSpectre {
     //! computes stress
     virtual void
     compute_stresses(const muGrid::RealField & F, muGrid::RealField & P,
-                     const Formulation & form,
                      const SplitCell & is_cell_split = SplitCell::no,
                      const StoreNativeStress & store_native_stress =
                          StoreNativeStress::no) = 0;
@@ -147,14 +150,14 @@ namespace muSpectre {
      * version with strongly typed field references
      */
     void compute_stresses(
-        const muGrid::Field & F, muGrid::Field & P, const Formulation & form,
+        const muGrid::Field & F, muGrid::Field & P,
         const SplitCell & is_cell_split = SplitCell::no,
         const StoreNativeStress & store_native_stress = StoreNativeStress::no);
 
     //! computes stress and tangent moduli
     virtual void
     compute_stresses_tangent(const muGrid::RealField & F, muGrid::RealField & P,
-                             muGrid::RealField & K, const Formulation & form,
+                             muGrid::RealField & K,
                              const SplitCell & is_cell_split = SplitCell::no,
                              const StoreNativeStress & store_native_stress =
                                  StoreNativeStress::no) = 0;
@@ -168,7 +171,6 @@ namespace muSpectre {
 
     void compute_stresses_tangent(
         const muGrid::Field & F, muGrid::Field & P, muGrid::Field & K,
-        const Formulation & form,
         const SplitCell & is_cell_split = SplitCell::no,
         const StoreNativeStress & store_native_stress = StoreNativeStress::no);
 
@@ -218,8 +220,7 @@ namespace muSpectre {
      */
     virtual std::tuple<DynMatrix_t, DynMatrix_t>
     constitutive_law_dynamic(const Eigen::Ref<const DynMatrix_t> & strain,
-                             const size_t & quad_pt_index,
-                             const Formulation & form) = 0;
+                             const size_t & quad_pt_index) = 0;
     /**
      * setting time step for materials needing it. (Doing nothing by deafult
      * because most materials have now time dependence)
@@ -229,9 +230,6 @@ namespace muSpectre {
     //! returns whether or not a field with native stress has been stored
     virtual bool has_native_stress() const;
 
-    //! checks the possibility of using the material in finite strain
-    static void check_small_strain_capability(
-        const StrainMeasure & exapected_strain_measure);
 
     /**
      * returns the stored native stress field. Throws a runtime error if native
@@ -246,10 +244,10 @@ namespace muSpectre {
      */
     const std::string & get_prefix() { return this->prefix; }
 
-    /**
-     * returns the is_initialised state of the material
-     */
-    const bool & get_is_initialised();
+    //! returns the tensorial rank of the input/output fields
+    //    virtual Index_t get_tensor_rank() const = 0;
+
+    virtual muGrid::PhysicsDomain get_physics_domain() const = 0;
 
    protected:
     const std::string name;  //!< material's name (for output and debugging)
@@ -264,11 +262,11 @@ namespace muSpectre {
     bool last_step_was_nonlinear{true};
 
     //!< field holding the assigned ratios of the material
-    std::unique_ptr<muGrid::MappedScalarField<Real, muGrid::Mapping::Mut,
-                                              IterUnit::SubPt>>
+    std::unique_ptr<
+        muGrid::MappedScalarField<Real, muGrid::Mapping::Mut, IterUnit::SubPt>>
         assigned_ratio{nullptr};
 
-    bool is_initialised{false};
+    bool is_initialised_flag{false};
 
     const std::string prefix;
   };

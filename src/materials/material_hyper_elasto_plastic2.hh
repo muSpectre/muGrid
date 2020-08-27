@@ -40,7 +40,7 @@
 #ifndef SRC_MATERIALS_MATERIAL_HYPER_ELASTO_PLASTIC2_HH_
 #define SRC_MATERIALS_MATERIAL_HYPER_ELASTO_PLASTIC2_HH_
 
-#include "materials/material_muSpectre_base.hh"
+#include "materials/material_muSpectre_mechanics.hh"
 #include "materials/materials_toolbox.hh"
 #include "materials/material_hyper_elasto_plastic1.hh"
 
@@ -58,32 +58,21 @@ namespace muSpectre {
    * traits for hyper-elastoplastic material
    */
   template <Index_t DimM>
-  struct MaterialMuSpectre_traits<MaterialHyperElastoPlastic2<DimM>> {
-    //! expected map type for strain fields
-    using StrainMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Const, DimM, IterUnit::SubPt>;
-    //! expected map type for stress fields
-    using StressMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
-    //! expected map type for tangent stiffness fields
-    using TangentMap_t =
-        muGrid::T4FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
-
-    //! declare what type of strain measure your law takes as input
-    constexpr static auto strain_measure{StrainMeasure::Gradient};
-    //! declare what type of stress measure your law yields as output
-    constexpr static auto stress_measure{StressMeasure::Kirchhoff};
-  };
+  struct MaterialMuSpectre_traits<MaterialHyperElastoPlastic2<DimM>>
+      : public DefaultMechanics_traits<DimM, StrainMeasure::Gradient,
+                                       StressMeasure::Kirchhoff> {};
 
   /**
    * material implementation for hyper-elastoplastic constitutive law.
    */
   template <Index_t DimM>
   class MaterialHyperElastoPlastic2
-      : public MaterialMuSpectre<MaterialHyperElastoPlastic2<DimM>, DimM> {
+      : public MaterialMuSpectreMechanics<MaterialHyperElastoPlastic2<DimM>,
+                                          DimM> {
    public:
     //! base class
-    using Parent = MaterialMuSpectre<MaterialHyperElastoPlastic2<DimM>, DimM>;
+    using Parent =
+        MaterialMuSpectreMechanics<MaterialHyperElastoPlastic2<DimM>, DimM>;
     using T2_t = Eigen::Matrix<Real, DimM, DimM>;
     using T4_t = muGrid::T4Mat<Real, DimM>;
 
@@ -103,8 +92,8 @@ namespace muSpectre {
         muGrid::MappedScalarStateField<Real, Mapping::Mut, IterUnit::SubPt>;
     using FlowField_ref = typename FlowField_t::Return_t;
 
-    using PrevStrain_t = muGrid::MappedT2StateField<Real, Mapping::Mut, DimM,
-                                                    IterUnit::SubPt>;
+    using PrevStrain_t =
+        muGrid::MappedT2StateField<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
     using PrevStrain_ref = typename PrevStrain_t::Return_t;
 
     //! Default constructor

@@ -57,42 +57,9 @@ namespace muSpectre {
    * traits for stochastic plasticity with eigenstrain
    */
   template <Index_t DimM>
-  struct MaterialMuSpectre_traits<MaterialStochasticPlasticity<DimM>> {
-    //! expected map type for strain fields
-    using StrainMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Const, DimM, IterUnit::SubPt>;
-
-    //! expected map type for stress fields
-    using StressMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
-
-    //! expected map type for tangent stiffness fields
-    using TangentMap_t =
-        muGrid::T4FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
-
-    /*
-    //! local field_collections used for internals
-    // using LFieldColl_t = muGrid::LocalFieldCollection;
-    //! local Lame constant, plastic increment, stress threshold type
-    // using ScalarMap_t = muGrid::internal::ScalarMap<Real>;
-    using ScalarMap_t =
-        muGrid::MappedScalarField<Real, Mapping::Mut, IterUnit::SubPt>;
-
-    //! storage type for eigen strain (is updated from outside)
-    // using EigenStrainMap_t =
-    //     muGrid::MatrixFieldMap<LFieldColl_t, Real, DimM, DimM>;
-
-    //! stochastic plasticity internal variables (Lame 1, Lame 2, eigen strain,
-    //! overloaded_pixels)
-    using InternalVariables =
-        std::tuple<ScalarMap_t, ScalarMap_t, StrainMap_t>;
-    */
-
-    //! declare what type of strain measure your law takes as input
-    constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
-    //! declare what type of stress measure your law yields as output
-    constexpr static auto stress_measure{StressMeasure::PK2};
-  };
+  struct MaterialMuSpectre_traits<MaterialStochasticPlasticity<DimM>>
+      : public DefaultMechanics_traits<DimM, StrainMeasure::GreenLagrange,
+                                       StressMeasure::PK2> {};
 
   /**
    * implements stochastic plasticity with an eigenstrain, Lameconstants and
@@ -100,10 +67,12 @@ namespace muSpectre {
    */
   template <Index_t DimM>
   class MaterialStochasticPlasticity
-      : public MaterialMuSpectre<MaterialStochasticPlasticity<DimM>, DimM> {
+      : public MaterialMuSpectreMechanics<MaterialStochasticPlasticity<DimM>,
+                                          DimM> {
    public:
     //! base class
-    using Parent = MaterialMuSpectre<MaterialStochasticPlasticity, DimM>;
+    using Parent =
+        MaterialMuSpectreMechanics<MaterialStochasticPlasticity, DimM>;
 
     //! dynamic vector type for interactions with numpy/scipy/solvers etc.
     using Vector_t = Eigen::Matrix<Real, Eigen::Dynamic, 1>;

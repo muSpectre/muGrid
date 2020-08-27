@@ -37,6 +37,7 @@
 
 #include <libmugrid/grid_common.hh>
 #include <libmugrid/tensor_algebra.hh>
+#include <libmugrid/exception.hh>
 
 #include <libmufft/mufft_common.hh>
 
@@ -77,6 +78,7 @@ namespace muSpectre {
   using muGrid::DynRcoord_t;
   using muGrid::eigen;
   using muGrid::operator/;
+  using muGrid::operator<<;
 
   using muGrid::apply;
   using muGrid::optional;
@@ -85,8 +87,8 @@ namespace muSpectre {
   using muGrid::T4Mat;
   using muGrid::T4MatMap;
 
-  using muGrid::Mapping;
   using muGrid::IterUnit;
+  using muGrid::Mapping;
 
   using muGrid::PixelTag;
   const std::string QuadPtTag{"quad_point"};
@@ -116,6 +118,7 @@ namespace muSpectre {
 
   //! continuum mechanics flags
   enum class Formulation {
+    not_set,           //!< causes comput_stresses to throw an error
     finite_strain,     //!< causes evaluation in PK1(F)
     small_strain,      //!< causes evaluation in   σ(ε)
     small_strain_sym,  //!< symmetric storage as vector ε
@@ -144,6 +147,18 @@ namespace muSpectre {
       return (dim * (dim - 1) / 2 + dim);
     } else {
       return dim * dim;
+    }
+  }
+
+  //! compute the number of degrees of freedom to store for the strain
+  //! tensor given dimension dim
+  constexpr Dim_t dof_for_formulation(const Formulation form, const Dim_t dim,
+                                      const Dim_t nb_quad_pts) {
+    switch (form) {
+    case Formulation::small_strain_sym:
+      return vsize(dim) * nb_quad_pts;
+    default:
+      return muGrid::ipow(dim, 2) * nb_quad_pts;
     }
   }
 
@@ -312,6 +327,66 @@ namespace muSpectre {
     default:
       return StrainMeasure::no_strain_;
       break;
+    }
+  }
+
+  //! gradient (or strain) shape for solvers. Always mapped onto a Matrix
+  constexpr std::array<Index_t, 2>
+  gradient_shape(Index_t rank, Index_t dim, bool is_mechanics = false,
+                 Formulation formulation = Formulation::not_set) {
+    if (is_mechanics) {
+      if (rank != 2) {
+        // dummy formulation is a workaround for GCC bug
+        // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=67371
+        bool dummy{true};
+        dummy ? throw muGrid::RuntimeError(
+                    "Cannot determine gradient shape. I only "
+                    "know how to handle rank-2 "
+                    "mechanics problems")
+              : false;
+      }
+      switch (formulation) {
+      case Formulation::small_strain_sym: {
+        return {vsize(dim), 1};
+        break;
+      }
+      case Formulation::not_set: {
+        bool dummy{true};
+        dummy ? throw muGrid::RuntimeError(
+                    "Cannot determinge gradient shape unless "
+                    "the formulation has been set.")
+              : false;
+        return {0, 0};
+        break;
+      }
+      default:
+        return {dim, dim};
+        break;
+      }
+    } else {
+      switch (rank) {
+      case 0: {
+        return {1, 1};
+        break;
+      }
+      case 1: {
+        return {dim, 1};
+        break;
+      }
+      case 2: {
+        return {dim, dim};
+        break;
+      }
+      default: {
+        bool dummy{true};
+        dummy ? throw muGrid::RuntimeError(
+                    "Cannot determine gradient shape. I only "
+                    "know how to handle ranks 0, 1, or 2")
+              : false;
+        return {0, 0};
+        break;
+      }
+      }
     }
   }
 

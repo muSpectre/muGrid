@@ -68,7 +68,7 @@ void add_material_hyper_elasto_plastic2_helper(py::module & mod) {
       mod, name.c_str())
       .def_static(
           "make",
-          [](Cell_t & cell, std::string name) -> Mat_t & {
+          [](std::shared_ptr<Cell_t> cell, std::string name) -> Mat_t & {
             return Mat_t::make(cell, name);
           },
           "cell"_a, "name"_a, py::return_value_policy::reference_internal)

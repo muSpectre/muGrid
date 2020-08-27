@@ -50,14 +50,16 @@ int main() {
   DynRcoord_t lens{CcoordOps::get_cube<Dim>(1.)};
   constexpr Index_t incl_size{3};
 
-  auto cell{make_cell(N, lens, Formulation::finite_strain)};
+  const Formulation form{Formulation::finite_strain};
+
+  auto cell{make_cell(N, lens, form)};
 
   Real ex{1e-5};
   using Mat_t = MaterialLinearElastic1<Dim>;
   auto & hard{Mat_t::make(cell, "hard", 210. * ex, .33)};
   auto & soft{Mat_t::make(cell, "soft", 70. * ex, .33)};
 
-  for (auto && index_pixel : cell.get_pixels().enumerate()) {
+  for (auto && index_pixel : cell->get_pixels().enumerate()) {
     auto && index{std::get<0>(index_pixel)};
     auto && pixel{std::get<1>(index_pixel)};
     if ((pixel[0] >= N[0] - incl_size) && (pixel[1] < incl_size) &&
@@ -68,7 +70,7 @@ int main() {
     }
   }
   std::cout << hard.size() << " pixels in the inclusion" << std::endl;
-  cell.initialise();
+  cell->initialise();
   constexpr Real cg_tol{1e-8}, newton_tol{1e-5}, equil_tol{1e-8};
   constexpr Index_t maxiter{200};
   constexpr Verbosity verbose{Verbosity::Some};
@@ -80,4 +82,5 @@ int main() {
 
   std::cout << "nb_cg: " << optimize_res.nb_fev << std::endl;
   std::cout << optimize_res.grad.transpose().block(0, 0, 1, 1) << std::endl;
-  return 0;}
+  return 0;
+}

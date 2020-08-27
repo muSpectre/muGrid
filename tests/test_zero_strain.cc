@@ -77,12 +77,12 @@ namespace muSpectre {
     auto & material_1{
         Mat1_t::make(cell_material, "material_1_material", Young, Poisson)};
 
-    for (const auto && index_pixel : cell_material.get_pixels().enumerate()) {
+    for (const auto && index_pixel : cell_material->get_pixels().enumerate()) {
       auto && index{std::get<0>(index_pixel)};
       material_1.add_pixel(index);
     }
 
-    cell_material.initialise();
+    cell_material->initialise();
 
     constexpr Real cg_tol{1e-8}, newton_tol{1e-5}, equi_tol{1e-8};
     constexpr Dim_t maxiter{100};
@@ -113,12 +113,12 @@ namespace muSpectre {
     auto & material_1{
         Mat1_t::make(cell_material, "material_1_material", Young, Poisson)};
 
-    for (const auto && index_pixel : cell_material.get_pixels().enumerate()) {
+    for (const auto && index_pixel : cell_material->get_pixels().enumerate()) {
       auto && index{std::get<0>(index_pixel)};
       material_1.add_pixel(index);
     }
 
-    cell_material.initialise();
+    cell_material->initialise();
 
     constexpr Real cg_tol{1e-8}, newton_tol{1e-5}, equi_tol{0};
     constexpr Dim_t maxiter{100};

@@ -38,7 +38,7 @@
 #ifndef SRC_MATERIALS_MATERIAL_HYPER_ELASTO_PLASTIC1_HH_
 #define SRC_MATERIALS_MATERIAL_HYPER_ELASTO_PLASTIC1_HH_
 
-#include "materials/material_muSpectre_base.hh"
+#include "materials/material_muSpectre_mechanics.hh"
 #include "materials/materials_toolbox.hh"
 
 #include <libmugrid/eigen_tools.hh>
@@ -56,22 +56,9 @@ namespace muSpectre {
    * traits for hyper-elastoplastic material
    */
   template <Index_t DimM>
-  struct MaterialMuSpectre_traits<MaterialHyperElastoPlastic1<DimM>> {
-    //! expected map type for strain fields
-    using StrainMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Const, DimM, IterUnit::SubPt>;
-    //! expected map type for stress fields
-    using StressMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
-    //! expected map type for tangent stiffness fields
-    using TangentMap_t =
-        muGrid::T4FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
-
-    //! declare what type of strain measure your law takes as input
-    constexpr static auto strain_measure{StrainMeasure::Gradient};
-    //! declare what type of stress measure your law yields as output
-    constexpr static auto stress_measure{StressMeasure::Kirchhoff};
-  };
+  struct MaterialMuSpectre_traits<MaterialHyperElastoPlastic1<DimM>>
+      : public DefaultMechanics_traits<DimM, StrainMeasure::Gradient,
+                                       StressMeasure::Kirchhoff> {};
 
   /**
    * material implementation for hyper-elastoplastic constitutive law. Note for
@@ -80,10 +67,12 @@ namespace muSpectre {
    */
   template <Index_t DimM>
   class MaterialHyperElastoPlastic1
-      : public MaterialMuSpectre<MaterialHyperElastoPlastic1<DimM>, DimM> {
+      : public MaterialMuSpectreMechanics<MaterialHyperElastoPlastic1<DimM>,
+                                          DimM> {
    public:
     //! base class
-    using Parent = MaterialMuSpectre<MaterialHyperElastoPlastic1<DimM>, DimM>;
+    using Parent =
+        MaterialMuSpectreMechanics<MaterialHyperElastoPlastic1<DimM>, DimM>;
 
     //! short-hand for second-rank tensors
     using T2_t = Eigen::Matrix<Real, DimM, DimM>;

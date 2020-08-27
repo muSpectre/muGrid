@@ -205,7 +205,15 @@ namespace muSpectre {
                                      .begin()
                                : proxy.material.get_collection()
                                      .get_sub_pt_indices(QuadPtTag)
-                                     .end()} {}
+                                     .end()} {
+              if (not proxy.material.is_initialised()) {
+                std::stringstream error_msg{};
+                error_msg << "Cannot create an iteratable proxy for material '"
+                          << proxy.material.get_name()
+                          << "', as it has not yet been initialised!";
+                throw MaterialError{error_msg.str()};
+              }
+            }
 
       //! Copy constructor
       iterator(const iterator & other) = default;
@@ -278,12 +286,28 @@ namespace muSpectre {
   auto iterable_proxy<Strains_t, Stresses_t, IsCellSplit>::iterator::operator*()
       -> value_type {
     const auto & quad_pt_id{*this->quad_pt_iter};
-
     auto && strains = apply(
         [&quad_pt_id](auto &&... strain_and_rate) {
           return std::make_tuple(strain_and_rate[quad_pt_id]...);
         },
         this->strain_map);
+
+    // switch this on for debugging help
+    constexpr bool verbose{false};
+    if (verbose) {
+      auto printer{[&quad_pt_id](auto && map) {
+        std::cout << map.get_field().get_name() << ":" << std::endl
+                  << map[quad_pt_id] << std::endl;
+      }};
+      std::cout << "quad_pt_id = " << quad_pt_id << std::endl;
+      printer(std::get<0>(strain_map));
+      printer(std::get<0>(stress_map));
+      constexpr Dim_t max_index{
+          std::tuple_size<decltype(this->stress_map)>::value - 1};
+      if (max_index > 0) {
+        printer(std::get<max_index>(this->stress_map));
+      }
+    }
 
     auto && ratio = 1.0;
     if (IsCellSplit != SplitCell::no) {

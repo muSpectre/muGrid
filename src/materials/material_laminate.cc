@@ -56,8 +56,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM, Formulation Form>
-  void MaterialLaminate<DimM, Form>::add_pixel(
-      const size_t & /*pixel_id*/) {
+  void MaterialLaminate<DimM, Form>::add_pixel(const size_t & /*pixel_id*/) {
     throw muGrid::RuntimeError("This material needs two material "
                                "(shared) pointers for making the layers of "
                                "a laminate pixel, in addition to  their volume"
@@ -71,6 +70,9 @@ namespace muSpectre {
       const size_t & pixel_id, MatPtr_t mat1, MatPtr_t mat2, const Real & ratio,
       const Eigen::Ref<const Eigen::Matrix<Real, DimM, 1>> & normal_vector) {
     this->internal_fields->add_pixel(pixel_id);
+
+    dynamic_cast<MaterialMechanicsBase &>(*mat1).set_formulation(Form);
+    dynamic_cast<MaterialMechanicsBase &>(*mat2).set_formulation(Form);
 
     this->material_left_vector.push_back(mat1);
     this->material_right_vector.push_back(mat2);
@@ -111,14 +113,12 @@ namespace muSpectre {
 
     const Function_t mat_l_evaluate_stress_tangent_func{
         [&mat_l, &pixel_index](const Eigen::Ref<const T2_t> & E) {
-          return mat_l->constitutive_law_dynamic(std::move(E), pixel_index,
-                                                 Form);
+          return mat_l->constitutive_law_dynamic(std::move(E), pixel_index);
         }};
 
     const Function_t mat_r_evaluate_stress_tangent_func{
         [&mat_r, &pixel_index](const Eigen::Ref<const T2_t> & E) {
-          return mat_r->constitutive_law_dynamic(std::move(E), pixel_index,
-                                                 Form);
+          return mat_r->constitutive_law_dynamic(std::move(E), pixel_index);
         }};
 
     auto && ratio{this->volume_ratio_field[pixel_index]};
@@ -143,14 +143,12 @@ namespace muSpectre {
 
     Function_t mat_l_evaluate_stress_tangent_func{
         [&mat_l, &pixel_index](const Eigen::Ref<const T2_t> & E) {
-          return mat_l->constitutive_law_dynamic(std::move(E), pixel_index,
-                                                 Form);
+          return mat_l->constitutive_law_dynamic(std::move(E), pixel_index);
         }};
 
     Function_t mat_r_evaluate_stress_tangent_func{
         [&mat_r, &pixel_index](const Eigen::Ref<const T2_t> & E) {
-          return mat_r->constitutive_law_dynamic(std::move(E), pixel_index,
-                                                 Form);
+          return mat_r->constitutive_law_dynamic(std::move(E), pixel_index);
         }};
 
     std::tuple<T2_t, T4_t> ret_stress_stiffness{};
@@ -162,6 +160,24 @@ namespace muSpectre {
         mat_r_evaluate_stress_tangent_func, ratio, normal_vec);
   }
 
+  /* ---------------------------------------------------------------------- */
+  template <Index_t DimM, Formulation Form>
+  void MaterialLaminate<DimM, Form>::set_formulation(const Formulation & form) {
+    if (Form != form) {
+      std::stringstream msg{};
+      msg << "You cannot set the formulation to '" << form
+          << "' as the formulation for this laminate is templated to '" << Form
+          << "'";
+      throw MaterialError{msg.str()};
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Index_t DimM, Formulation Form>
+  void MaterialLaminate<DimM, Form>::initialise() {
+    Parent::initialise();
+    Parent::set_formulation(Form);
+  }
   /* ----------------------------------------------------------------------*/
   template class MaterialLaminate<twoD, Formulation::finite_strain>;
   template class MaterialLaminate<threeD, Formulation::finite_strain>;

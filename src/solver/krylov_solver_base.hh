@@ -72,8 +72,17 @@ namespace muSpectre {
      * Constructor takes a Cell, tolerance, max number of iterations
      * and verbosity flag as input
      */
-    KrylovSolverBase(Cell & cell, Real tol, Uint maxiter,
-                     Verbosity verbose = Verbosity::Silent);
+    KrylovSolverBase(std::shared_ptr<MatrixAdaptable> matrix_adaptable,
+                     const Real & tol, const Uint & maxiter,
+                     const Verbosity & verbose = Verbosity::Silent);
+
+    /**
+     * Constructor without matrix adaptable. The adaptable has to be supplied
+     * usinge KrylovSolverBase::set_matrix(...) before initialisation for this
+     * solver to be usable
+     */
+    KrylovSolverBase(const Real & tol, const Uint & maxiter,
+                     const Verbosity & verbose = Verbosity::Silent);
 
     //! Copy constructor
     KrylovSolverBase(const KrylovSolverBase & other) = delete;
@@ -92,6 +101,9 @@ namespace muSpectre {
 
     //! Allocate fields used during the solution
     virtual void initialise() = 0;
+
+    //! set the matrix
+    virtual void set_matrix(std::shared_ptr<MatrixAdaptable> matrix_adaptable);
 
     //! returns whether the solver has converged
     Convergence get_convergence() const;
@@ -118,12 +130,15 @@ namespace muSpectre {
     //! run the solve operation
     virtual Vector_map solve(const ConstVector_ref rhs) = 0;
 
+    Index_t get_nb_dof() const;
+
    protected:
-    Cell & cell;            //!< reference to the problem's cell
-    Real tol;               //!< convergence tolerance
-    Uint maxiter;           //!< maximum allowed number of iterations
-    Verbosity verbose;      //!< how much information is written to the stdout
-    Uint counter{0};        //!< iteration counter
+    std::shared_ptr<MatrixAdaptable> matrix_holder{nullptr};  //!< system matrix
+    MatrixAdaptor matrix{};  //!< matrix ref for convenience
+    Real tol;                //!< convergence tolerance
+    Uint maxiter;            //!< maximum allowed number of iterations
+    Verbosity verbose;       //!< how much information is written to the stdout
+    Uint counter{0};         //!< iteration counter
     Convergence convergence{
         Convergence::DidNotConverge};  //!< whether the solver has converged
   };

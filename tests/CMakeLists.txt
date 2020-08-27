@@ -69,6 +69,11 @@ muSpectre_add_test(main_test_suite
   SOURCES main_test_suite.cc ${TEST_SRCS}
   TYPE BOOST --report_level=detailed)
 
+muSpectre_add_test(solverclass_test_suite
+  SOURCES main_test_suite.cc
+  ${CMAKE_SOURCE_DIR}/tests/test_solver_newton_cg_class.cc
+  TYPE BOOST --report_level=detailed)
+
 muSpectre_add_test(mattb_test
   SOURCES main_test_suite.cc test_materials_toolbox.cc
   TYPE BOOST --report_level=detailed)

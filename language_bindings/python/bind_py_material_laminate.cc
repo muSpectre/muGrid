@@ -82,7 +82,7 @@ void add_material_laminate_helper(py::module & mod) {
       mod, name.c_str())
       .def_static(
           "make",
-          [](Sys_t & sys, std::string n) -> Mat_t & {
+          [](std::shared_ptr<Sys_t> sys, std::string n) -> Mat_t & {
             return Mat_t::make(sys, n);
           },
           "cell"_a, "name"_a, py::return_value_policy::reference_internal)

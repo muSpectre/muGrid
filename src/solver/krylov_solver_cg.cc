@@ -44,28 +44,43 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  KrylovSolverCG::KrylovSolverCG(Cell & cell, Real tol, Uint maxiter,
-                                 Verbosity verbose)
-      : Parent(cell, tol, maxiter, verbose),
-        r_k(cell.get_nb_dof()), p_k(cell.get_nb_dof()), Ap_k(cell.get_nb_dof()),
-        x_k(cell.get_nb_dof()) {}
+  KrylovSolverCG::KrylovSolverCG(std::shared_ptr<MatrixAdaptable> matrix_holder,
+                                 Real tol, Uint maxiter, Verbosity verbose)
+      : Parent{matrix_holder, tol, maxiter, verbose},
+        comm{matrix_holder->get_communicator()}, r_k(this->get_nb_dof()),
+        p_k(this->get_nb_dof()), Ap_k(this->get_nb_dof()),
+        x_k(this->get_nb_dof()) {}
+
+  /* ---------------------------------------------------------------------- */
+  KrylovSolverCG::KrylovSolverCG(Real tol, Uint maxiter, Verbosity verbose)
+      : Parent{tol, maxiter, verbose}, r_k{}, p_k{}, Ap_k{}, x_k{} {}
+
+  /* ---------------------------------------------------------------------- */
+  void KrylovSolverCG::set_matrix(
+      std::shared_ptr<MatrixAdaptable> matrix_adaptable) {
+    Parent::set_matrix(matrix_adaptable);
+    this->comm = this->matrix_holder->get_communicator();
+    auto && nb_dof{matrix_adaptable->get_nb_dof()};
+    this->r_k.resize(nb_dof);
+    this->p_k.resize(nb_dof);
+    this->Ap_k.resize(nb_dof);
+    this->x_k.resize(nb_dof);
+  }
 
   /* ---------------------------------------------------------------------- */
   auto KrylovSolverCG::solve(const ConstVector_ref rhs) -> Vector_map {
     this->x_k.setZero();
-    const auto & comm = this->cell.get_communicator();
-
     // Following implementation of algorithm 5.2 in Nocedal's
     // Numerical Optimization (p. 112)
 
     // initialisation of algorithm
-    this->r_k = this->cell.get_adaptor() * this->x_k - rhs;
+    this->r_k = this->matrix * this->x_k - rhs;
 
     this->p_k = -this->r_k;
     this->convergence = Convergence::DidNotConverge;
 
-    Real rdr = comm.sum(r_k.squaredNorm());
-    Real rhs_norm2 = comm.sum(rhs.squaredNorm());
+    Real rdr = this->comm.sum(r_k.squaredNorm());
+    Real rhs_norm2 = this->comm.sum(rhs.squaredNorm());
 
     if (rhs_norm2 == 0) {
       std::stringstream msg{};
@@ -83,7 +98,7 @@ namespace muSpectre {
       return Vector_map(this->x_k.data(), this->x_k.size());
     }
 
-    if (verbose > Verbosity::Silent && comm.rank() == 0) {
+    if (this->verbose > Verbosity::Silent && this->comm.rank() == 0) {
       std::cout << "Norm of rhs in krylov_solver_cg.cc = " << rhs_norm2
                 << std::endl;
     }
@@ -98,7 +113,7 @@ namespace muSpectre {
 
     for (Uint i = 0;
          i < this->maxiter && rdr > rel_tol2; ++i, ++this->counter) {
-      this->Ap_k = this->cell.get_adaptor() * this->p_k;
+      this->Ap_k = this->matrix * this->p_k;
 
       Real pdAp{comm.sum(this->p_k.dot(this->Ap_k))};
       if (pdAp <= 0) {
@@ -110,11 +125,11 @@ namespace muSpectre {
       this->x_k += alpha * this->p_k;
       this->r_k += alpha * this->Ap_k;
 
-      Real new_rdr{comm.sum(this->r_k.dot(this->r_k))};
+      Real new_rdr{comm.sum(this->r_k.squaredNorm())};
       Real beta{new_rdr / rdr};
       rdr = new_rdr;
 
-      if (verbose > Verbosity::Silent && comm.rank() == 0) {
+      if (this->verbose > Verbosity::Silent && this->comm.rank() == 0) {
         std::cout << "  at CG step " << std::setw(count_width) << i
                   << ": |r|/|b| = " << std::setw(15)
                   << std::sqrt(rdr / rhs_norm2) << ", cg_tol = "

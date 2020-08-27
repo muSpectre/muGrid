@@ -42,18 +42,23 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <class KrylovSolverType>
-  KrylovSolverEigen<KrylovSolverType>::KrylovSolverEigen(Cell & cell, Real tol,
-                                                         Uint maxiter,
-                                                         Verbosity verbose)
-      : Parent(cell, tol, maxiter, verbose), adaptor{cell.get_adaptor()},
-        solver{}, result{} {}
+  KrylovSolverEigen<KrylovSolverType>::KrylovSolverEigen(
+      std::shared_ptr<MatrixAdaptable> matrix_holder, const Real & tol,
+      const Uint & maxiter, const Verbosity & verbose)
+      : Parent{matrix_holder, tol, maxiter, verbose}, solver{}, result{} {}
+
+  /* ---------------------------------------------------------------------- */
+  template <class KrylovSolverType>
+  KrylovSolverEigen<KrylovSolverType>::KrylovSolverEigen(
+      const Real & tol, const Uint & maxiter, const Verbosity & verbose)
+      : Parent{tol, maxiter, verbose}, solver{}, result{} {}
 
   /* ---------------------------------------------------------------------- */
   template <class KrylovSolverType>
   void KrylovSolverEigen<KrylovSolverType>::initialise() {
     this->solver.setTolerance(this->get_tol());
     this->solver.setMaxIterations(this->get_maxiter());
-    this->solver.compute(this->adaptor);
+    this->solver.compute(this->matrix);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -72,7 +77,7 @@ namespace muSpectre {
       throw ConvergenceError(err.str());
     }
 
-    if (verbose > Verbosity::Silent) {
+    if (this->verbose > Verbosity::Silent) {
       std::cout << " After " << this->solver.iterations() << " "
                 << this->get_name() << " steps, |r|/|b| = " << std::setw(15)
                 << this->solver.error() << ", cg_tol = " << this->tol

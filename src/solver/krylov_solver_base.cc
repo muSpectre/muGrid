@@ -1,13 +1,13 @@
 /**
  * @file   krylov_solver_base.cc
  *
- * @author Till Junge <till.junge@epfl.ch>
+ * @author Till Junge <till.junge@altermail.ch>
  *
- * @date   24 Apr 2018
+ * @date   31 Jul 2020
  *
- * @brief  implementation of KrylovSolverBase
+ * @brief  Implementation for KrylovSolverBase
  *
- * Copyright © 2018 Till Junge
+ * Copyright © 2020 Till Junge
  *
  * µSpectre is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
@@ -22,7 +22,7 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with µSpectre; see the file COPYING. If not, write to the
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * * Boston, MA 02111-1307, USA.
+ * Boston, MA 02111-1307, USA.
  *
  * Additional permission under GNU GPL version 3 section 7
  *
@@ -33,14 +33,30 @@
  *
  */
 
-#include "solver/krylov_solver_base.hh"
+#include "krylov_solver_base.hh"
 
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  KrylovSolverBase::KrylovSolverBase(Cell & cell, Real tol, Uint maxiter,
-                                     Verbosity verbose)
-      : cell(cell), tol{tol}, maxiter{maxiter}, verbose{verbose} {}
+  KrylovSolverBase::KrylovSolverBase(
+      std::shared_ptr<MatrixAdaptable> matrix_adaptable, const Real & tol,
+      const Uint & maxiter, const Verbosity & verbose)
+      : matrix_holder{matrix_adaptable},
+        matrix{matrix_adaptable->get_adaptor()}, tol{tol}, maxiter{maxiter},
+        verbose{verbose} {}
+
+  /* ---------------------------------------------------------------------- */
+  KrylovSolverBase::KrylovSolverBase(const Real & tol, const Uint & maxiter,
+                                     const Verbosity & verbose)
+      : tol{tol}, maxiter{maxiter},
+        verbose{verbose} {}
+
+  /* ---------------------------------------------------------------------- */
+  void KrylovSolverBase::set_matrix(
+      std::shared_ptr<MatrixAdaptable> matrix_adaptable) {
+    this->matrix_holder = matrix_adaptable;
+    this->matrix = this->matrix_holder->get_adaptor();
+  }
 
   /* ---------------------------------------------------------------------- */
   KrylovSolverBase::Convergence KrylovSolverBase::get_convergence() const {
@@ -66,9 +82,14 @@ namespace muSpectre {
   Uint KrylovSolverBase::get_counter() const { return this->counter; }
 
   /* ---------------------------------------------------------------------- */
+  Uint KrylovSolverBase::get_maxiter() const { return this->maxiter; }
+
+  /* ---------------------------------------------------------------------- */
   Real KrylovSolverBase::get_tol() const { return this->tol; }
 
   /* ---------------------------------------------------------------------- */
-  Uint KrylovSolverBase::get_maxiter() const { return this->maxiter; }
+  Index_t KrylovSolverBase::get_nb_dof() const {
+    return this->matrix_holder->get_nb_dof();
+  }
 
 }  // namespace muSpectre

@@ -54,6 +54,7 @@ namespace muGrid {
 
     using dimlist = boost::mpl::list<dimFixture<oneD>, dimFixture<twoD>,
                                      dimFixture<threeD>>;
+    using multidimlist = boost::mpl::list<dimFixture<twoD>, dimFixture<threeD>>;
 
     /* ---------------------------------------------------------------------- */
     template <typename T>
@@ -228,15 +229,15 @@ namespace muGrid {
      * machine precision.
      */
     template <typename T, bool IsArithmetic = std::is_arithmetic<T>::value>
-    inline std::enable_if_t<IsArithmetic, T> rel_error(const T & a,
-                                                       const T & b) {
+    inline std::enable_if_t<IsArithmetic, T> rel_error(const T & value,
+                                                       const T & reference) {
       static_assert(IsArithmetic == std::is_arithmetic<T>::value,
                     "IsArithmetic is a SFINAE parameter, do not set manually");
-      Real comp(std::abs(a) + std::abs(b));
+      Real comp(std::abs(reference));
       if (comp == 0.) {
-        return std::abs(a-b);
+        return std::abs(value-reference);
       }
-      return std::abs(a-b)/comp;
+      return std::abs(value-reference)/comp;
     }
 
     /**
@@ -244,13 +245,13 @@ namespace muGrid {
      * machine precision.
      */
     template <typename DerivedA, typename DerivedB>
-    inline Real rel_error(const Eigen::MatrixBase<DerivedA> & a,
-                   const Eigen::MatrixBase<DerivedB> & b) {
-      Real comp(a.norm() + b.norm());
+    inline Real rel_error(const Eigen::MatrixBase<DerivedA> & value,
+                   const Eigen::MatrixBase<DerivedB> & reference) {
+      Real comp(reference.norm());
       if (comp == 0.) {
-        return (a-b).norm();
+        return (value-reference).norm();
       }
-      return (a-b).norm()/comp;
+      return (value-reference).norm()/comp;
     }
 
     /**
@@ -258,9 +259,9 @@ namespace muGrid {
      * machine precision.
      */
     template <typename DerivedA, typename DerivedB>
-    inline Real rel_error(const Eigen::ArrayBase<DerivedA> & a,
-                   const Eigen::ArrayBase<DerivedB> & b) {
-      return rel_error(a.matrix(), b.matrix());
+    inline Real rel_error(const Eigen::ArrayBase<DerivedA> & value,
+                   const Eigen::ArrayBase<DerivedB> & reference) {
+      return rel_error(value.matrix(), reference.matrix());
     }
 
     /**

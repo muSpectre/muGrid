@@ -39,7 +39,7 @@
 
 #include "common/muSpectre_common.hh"
 #include "materials/stress_transformations_PK2.hh"
-#include "materials/material_muSpectre_base.hh"
+#include "materials/material_muSpectre_mechanics.hh"
 #include "materials/materials_toolbox.hh"
 #include "materials/stress_transformations_Kirchhoff.hh"
 
@@ -53,29 +53,18 @@ namespace muSpectre {
    * traits for objective linear Neo-Hookean material
    */
   template <Index_t DimM>
-  struct MaterialMuSpectre_traits<MaterialNeoHookeanElastic<DimM>> {
-    //! expected map type for strain fields
-    using StrainMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Const, DimM, IterUnit::SubPt>;
-    //! expected map type for stress fields
-    using StressMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
-    //! expected map type for tangent stiffness fields
-    using TangentMap_t =
-        muGrid::T4FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
-
-    //! declare what type of strain measure your law takes as input
-    constexpr static auto strain_measure{StrainMeasure::Gradient};
-    //! declare what type of stress measure your law yields as output
-    constexpr static auto stress_measure{StressMeasure::Kirchhoff};
-  };
+  struct MaterialMuSpectre_traits<MaterialNeoHookeanElastic<DimM>>
+      : public DefaultMechanics_traits<DimM, StrainMeasure::Gradient,
+                                       StressMeasure::Kirchhoff> {};
 
   template <Index_t DimM>
   class MaterialNeoHookeanElastic
-    : public MaterialMuSpectre<MaterialNeoHookeanElastic<DimM>, DimM> {
+      : public MaterialMuSpectreMechanics<MaterialNeoHookeanElastic<DimM>,
+                                          DimM> {
    public:
     //! base class
-    using Parent = MaterialMuSpectre<MaterialNeoHookeanElastic<DimM>, DimM>;
+    using Parent =
+        MaterialMuSpectreMechanics<MaterialNeoHookeanElastic<DimM>, DimM>;
 
     //! short hand for the type of the elastic tensor
     using Stiffness_t = T4Mat<Real, DimM>;

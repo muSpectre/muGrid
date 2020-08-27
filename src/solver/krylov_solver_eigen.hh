@@ -37,8 +37,7 @@
 #define SRC_SOLVER_KRYLOV_SOLVER_EIGEN_HH_
 
 #include "solver/krylov_solver_base.hh"
-#include "cell/cell.hh"
-#include "cell/cell_adaptor.hh"
+#include "matrix_adaptor.hh"
 
 #include <Eigen/IterativeLinearSolvers>
 #include <iostream>
@@ -69,8 +68,7 @@ namespace muSpectre {
     struct KrylovSolver_traits<KrylovSolverCGEigen> {
       //! Eigen Iterative KrylovSolver
       using KrylovSolver =
-          Eigen::ConjugateGradient<typename Cell::Adaptor,
-                                   Eigen::Lower | Eigen::Upper,
+          Eigen::ConjugateGradient<MatrixAdaptor, Eigen::Lower | Eigen::Upper,
                                    Eigen::IdentityPreconditioner>;
     };
 
@@ -79,15 +77,15 @@ namespace muSpectre {
     struct KrylovSolver_traits<KrylovSolverGMRESEigen> {
       //! Eigen Iterative KrylovSolver
       using KrylovSolver =
-          Eigen::GMRES<typename Cell::Adaptor, Eigen::IdentityPreconditioner>;
+          Eigen::GMRES<MatrixAdaptor, Eigen::IdentityPreconditioner>;
     };
 
     //! traits for the Eigen BiCGSTAB solver
     template <>
     struct KrylovSolver_traits<KrylovSolverBiCGSTABEigen> {
       //! Eigen Iterative KrylovSolver
-      using KrylovSolver = Eigen::BiCGSTAB<typename Cell::Adaptor,
-                                           Eigen::IdentityPreconditioner>;
+      using KrylovSolver =
+          Eigen::BiCGSTAB<MatrixAdaptor, Eigen::IdentityPreconditioner>;
     };
 
     //! traits for the Eigen DGMRES solver
@@ -95,7 +93,7 @@ namespace muSpectre {
     struct KrylovSolver_traits<KrylovSolverDGMRESEigen> {
       //! Eigen Iterative KrylovSolver
       using KrylovSolver =
-          Eigen::DGMRES<typename Cell::Adaptor, Eigen::IdentityPreconditioner>;
+          Eigen::DGMRES<MatrixAdaptor, Eigen::IdentityPreconditioner>;
     };
 
     //! traits for the Eigen MINRES solver
@@ -103,7 +101,7 @@ namespace muSpectre {
     struct KrylovSolver_traits<KrylovSolverMINRESEigen> {
       //! Eigen Iterative KrylovSolver
       using KrylovSolver =
-          Eigen::MINRES<typename Cell::Adaptor, Eigen::Lower | Eigen::Upper,
+          Eigen::MINRES<MatrixAdaptor, Eigen::Lower | Eigen::Upper,
                         Eigen::IdentityPreconditioner>;
     };
 
@@ -120,18 +118,27 @@ namespace muSpectre {
     using KrylovSolver =
         typename internal::KrylovSolver_traits<KrylovSolverType>::KrylovSolver;
     //! Input vectors for solver
-    using ConstVector_ref = Parent::ConstVector_ref;
+    using ConstVector_ref = typename Parent::ConstVector_ref;
     //! Output vector for solver
-    using Vector_map = Parent::Vector_map;
+    using Vector_map = typename Parent::Vector_map;
     //! storage for output vector
-    using Vector_t = Parent::Vector_t;
+    using Vector_t = typename Parent::Vector_t;
 
     //! Default constructor
     KrylovSolverEigen() = delete;
 
     //! Constructor with cell and solver parameters.
-    KrylovSolverEigen(Cell & cell, Real tol, Uint maxiter = 0,
-                      Verbosity verbose = Verbosity::Silent);
+    KrylovSolverEigen(std::shared_ptr<MatrixAdaptable> matrix_holder,
+                      const Real & tol, const Uint & maxiter = 0,
+                      const Verbosity & verbose = Verbosity::Silent);
+
+    /**
+     * Constructor without matrix adaptable. The adaptable has to be supplied
+     * usinge KrylovSolverBase::set_matrix(...) before initialisation for this
+     * solver to be usable
+     */
+    KrylovSolverEigen(const Real & tol, const Uint & maxiter = 0,
+                      const Verbosity & verbose = Verbosity::Silent);
 
     //! Copy constructor
     KrylovSolverEigen(const KrylovSolverEigen & other) = delete;
@@ -155,9 +162,8 @@ namespace muSpectre {
     Vector_map solve(const ConstVector_ref rhs) final;
 
    protected:
-    Cell::Adaptor adaptor;  //!< cell handle
-    KrylovSolver solver;    //!< Eigen's Iterative solver
-    Vector_t result;        //!< storage for result
+    KrylovSolver solver;  //!< Eigen's Iterative solver
+    Vector_t result;      //!< storage for result
   };
 
   /**

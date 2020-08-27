@@ -66,8 +66,8 @@ void add_material_visco_elastic_ss_helper(py::module & mod) {
       mod, name.c_str())
       .def_static(
           "make",
-          [](Cell_t & cell, std::string name, Real young_inf, Real young_v,
-             Real eta_v, Real poisson, Real dt = 0.0) -> Mat_t & {
+          [](std::shared_ptr<Cell_t> cell, std::string name, Real young_inf,
+             Real young_v, Real eta_v, Real poisson, Real dt = 0.0) -> Mat_t & {
             return Mat_t::make(cell, name, young_inf, young_v, eta_v, poisson,
                                dt);
           },

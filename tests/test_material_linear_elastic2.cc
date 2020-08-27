@@ -134,8 +134,8 @@ namespace muSpectre {
     const auto & F_field{F_f.get_field()};
     auto & P_field{P1_f.get_field()};
     auto & K_field{K_f.get_field()};
-    mat.compute_stresses_tangent(F_field, P_field, K_field,
-                                 Formulation::small_strain);
+    mat.set_formulation(Formulation::small_strain);
+    mat.compute_stresses_tangent(F_field, P_field, K_field);
 
     Real error{(P1_f.get_map()[pix0] - P1_f.get_map()[pix1]).norm()};
 
@@ -213,22 +213,21 @@ namespace muSpectre {
     }
 
     // compute stresses using material
+    mat.set_formulation(Formulation::finite_strain);
     mat.compute_stresses(globalfields.get_field("Transformation Gradient"),
-                         globalfields.get_field("Nominal Stress1"),
-                         Formulation::finite_strain);
+                         globalfields.get_field("Nominal Stress1"));
 
     // compute stresses and tangent moduli using material
     BOOST_CHECK_THROW(mat.compute_stresses_tangent(
                           globalfields.get_field("Transformation Gradient"),
                           globalfields.get_field("Nominal Stress2"),
-                          globalfields.get_field("Nominal Stress2"),
-                          Formulation::finite_strain),
+                          globalfields.get_field("Nominal Stress2")),
                       std::runtime_error);
 
     mat.compute_stresses_tangent(
         globalfields.get_field("Transformation Gradient"),
         globalfields.get_field("Nominal Stress2"),
-        globalfields.get_field("Tangent Moduli"), Formulation::finite_strain);
+        globalfields.get_field("Tangent Moduli"));
 
     typename traits::StrainMap_t Fmap(
         globalfields.get_field("Transformation Gradient"));

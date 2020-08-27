@@ -51,6 +51,7 @@ int main() {
 
   DynRcoord_t lengths{
       muGrid::CcoordOps::get_cube<Dim>(11.)};  // {5.2e-9, 8.3e-9, 8.3e-9};
+
   Formulation form{Formulation::finite_strain};
 
   auto rve{make_cell(nb_grid_pts, lengths, form)};
@@ -58,7 +59,7 @@ int main() {
   auto & hard{MaterialLinearElastic1<Dim>::make(rve, "hard", 210., .33)};
   auto & soft{MaterialLinearElastic1<Dim>::make(rve, "soft", 70., .33)};
 
-  for (auto && i : rve.get_pixel_indices()) {
+  for (auto && i : rve->get_pixel_indices()) {
     if (i < 3) {
       hard.add_pixel(i);
     } else {
@@ -66,7 +67,7 @@ int main() {
     }
   }
 
-  rve.initialise();
+  rve->initialise();
 
   Real tol{1e-6};
   Real equi_tol{0};

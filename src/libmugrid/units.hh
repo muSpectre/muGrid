@@ -165,7 +165,7 @@ namespace muGrid {
          const UnitExponent & current, const UnitExponent & luminous_intensity,
          const UnitExponent & amount, const Int & tag = 0);
 
-    //! factory function for base unit length
+    //! factory function for base unit pure number
     static Unit unitless(const Int & tag = 0);
 
     //! factory function for base unit length
@@ -188,6 +188,15 @@ namespace muGrid {
 
     //! factory function for base unit amount of matter
     static Unit amount(const Int & tag = 0);
+
+    //! factory function for mechanical stress
+    static Unit force(const Int & tag = 0);
+
+    //! factory function for mechanical stress
+    static Unit stress(const Int & tag = 0);
+
+    //! factory function for mechanical strain
+    static Unit strain(const Int & tag = 0);
 
     //! returns a const reference to length
     const UnitExponent & get_length() const;
@@ -227,6 +236,9 @@ namespace muGrid {
 
     //! comparison operator
     bool operator==(const Unit & other) const;
+
+    //! comparison operator
+    bool operator!=(const Unit & other) const;
 
     //! comparison (required for use as key in std::map)
     bool operator<(const Unit & other) const;

@@ -205,17 +205,16 @@ namespace muSpectre {
     muGrid::MappedT4Field<Real, Mapping::Mut, Fix::mdim(), IterUnit::SubPt>
         K1_f{"Tangent Moduli 1", globalfields, QuadPtTag};
 
+    mat.set_formulation(Formulation::small_strain);
     BOOST_CHECK_THROW(mat.compute_stresses_tangent(
                           globalfields.get_field("Transformation Gradient 1"),
                           globalfields.get_field("Nominal Stress 1"),
-                          globalfields.get_field("Tangent Moduli 1"),
-                          Formulation::small_strain),
+                          globalfields.get_field("Tangent Moduli 1")),
                       std::runtime_error);
 
     BOOST_CHECK_THROW(mat.compute_stresses(
                           globalfields.get_field("Transformation Gradient 1"),
-                          globalfields.get_field("Nominal Stress 1"),
-                          Formulation::small_strain),
+                          globalfields.get_field("Nominal Stress 1")),
                       std::runtime_error);
   }
 

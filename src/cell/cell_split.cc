@@ -178,8 +178,7 @@ namespace muSpectre {
     // initialised as zero filled tensors
     this->stress.set_zero();
     for (auto & mat : this->materials) {
-      mat->compute_stresses(this->strain, this->stress,
-                            this->get_formulation());
+      mat->compute_stresses(this->strain, this->stress);
     }
     return this->stress;
   }
@@ -211,7 +210,7 @@ namespace muSpectre {
     // retruned by this function
     for (auto & mat : this->materials) {
       mat->compute_stresses_tangent(strain, this->stress, this->tangent.value(),
-                                    this->get_formulation(), SplitCell::simple);
+                                    SplitCell::simple);
     }
     return std::tie(this->stress, this->tangent.value());
   }
@@ -238,8 +237,7 @@ namespace muSpectre {
     }
   }
 
-  /* ----------------------------------------------------------------------
-   */
+  /* ---------------------------------------------------------------------- */
   MaterialBase & CellSplit::add_material(Material_ptr mat) {
     if (mat->get_material_dimension() != this->get_spatial_dim()) {
       throw RuntimeError(
@@ -262,7 +260,7 @@ namespace muSpectre {
     } else {
       for (auto && mat : this->materials) {
         if (mat->get_name() != material.get_name()) {
-          if (!mat->get_is_initialised()) {
+          if (not mat->is_initialised()) {
             mat->initialise();
           }
         }
@@ -276,6 +274,7 @@ namespace muSpectre {
         material.add_pixel_split(pixel, 1.0 - pixel_assigned_ratio[iterator]);
       }
     }
+    material.initialise();
   }
 
   /* ----------------------------------------------------------------------*/

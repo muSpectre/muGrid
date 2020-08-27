@@ -72,6 +72,7 @@ namespace muSpectre {
   template <Index_t DimM>
   void MaterialHyperElastoPlastic2<DimM>::initialise() {
     this->material_child.initialise();
+    this->is_initialised_flag = this->material_child.is_initialised();
   }
 
   /* ---------------------------------------------------------------------- */

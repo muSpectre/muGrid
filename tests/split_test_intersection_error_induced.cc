@@ -71,10 +71,10 @@ namespace muSpectre {
     DynCcoord_t resolutions_split_high_res{high_res, high_res};
     DynCcoord_t resolutions_split_low_res{low_res, low_res};
 
-    auto fft_ptr_split_high_res{std::make_unique<muFFT::FFTWEngine>(
-        resolutions_split_high_res)};
-    auto fft_ptr_split_low_res{std::make_unique<muFFT::FFTWEngine>(
-        resolutions_split_low_res)};
+    auto fft_ptr_split_high_res{
+        std::make_unique<muFFT::FFTWEngine>(resolutions_split_high_res)};
+    auto fft_ptr_split_low_res{
+        std::make_unique<muFFT::FFTWEngine>(resolutions_split_low_res)};
 
     auto proj_ptr_split_high_res{
         std::make_unique<ProjectionFiniteStrainFast<dim>>(
@@ -83,8 +83,10 @@ namespace muSpectre {
         std::make_unique<ProjectionFiniteStrainFast<dim>>(
             std::move(fft_ptr_split_low_res), lengths_split)};
 
-    CellSplit sys_split_high_res(std::move(proj_ptr_split_high_res));
-    CellSplit sys_split_low_res(std::move(proj_ptr_split_low_res));
+    auto sys_split_high_res{
+        std::make_shared<CellSplit>(std::move(proj_ptr_split_high_res))};
+    auto sys_split_low_res{
+        std::make_shared<CellSplit>(std::move(proj_ptr_split_low_res))};
 
     auto & Material_hard_split_high_res{Mat_t::make(
         sys_split_high_res, "hard high res", Young_hard, Poisson_hard)};
@@ -111,7 +113,7 @@ namespace muSpectre {
         {center[0] + width[1], center[1] + height[1]});
 
     // analyzing the intersection of the preicipitate with the pixels
-    RootNode<SplitCell::simple> precipitate_low_res(sys_split_low_res,
+    RootNode<SplitCell::simple> precipitate_low_res(*sys_split_low_res,
                                                     precipitate_vertices);
     // Extracting the intersected pixels and their correspondent intersection
     // ratios:
@@ -134,22 +136,22 @@ namespace muSpectre {
     Material_hard_split_low_res.initialise();
     // assign material to the rest of the pixels:
     std::vector<Real> assigned_ratio_low_res =
-        sys_split_low_res.get_assigned_ratios();
-    for (auto && pix_id : sys_split_low_res.get_pixel_indices()) {
+        sys_split_low_res->get_assigned_ratios();
+    for (auto && pix_id : sys_split_low_res->get_pixel_indices()) {
       if (assigned_ratio_low_res[pix_id] < 1.0) {
         Material_soft_split_low_res.add_pixel_split(
             pix_id, 1.0 - assigned_ratio_low_res[pix_id]);
       }
     }
     Material_soft_split_low_res.initialise();
-    sys_split_low_res.initialise();
+    sys_split_low_res->initialise();
 
     // Calculating the area of the precipitate from the intersected pixels:
     Real area_preticipitate_low_res{0.0};
     Real area_preticipitate_high_res{0.0};
     Real pixel_volume_low_res{muGrid::CcoordOps::compute_pixel_volume(
-        sys_split_low_res.get_projection().get_nb_domain_grid_pts(),
-        sys_split_low_res.get_projection().get_domain_lengths())};
+        sys_split_low_res->get_projection().get_nb_domain_grid_pts(),
+        sys_split_low_res->get_projection().get_domain_lengths())};
     for (auto && precipitate_area_low_res :
          precipitate_low_res_intersection_ratios) {
       area_preticipitate_low_res +=
@@ -157,7 +159,7 @@ namespace muSpectre {
     }
 
     // analyzing the intersection of the precipitate with the pixels
-    RootNode<SplitCell::simple> precipitate_high_res(sys_split_high_res,
+    RootNode<SplitCell::simple> precipitate_high_res(*sys_split_high_res,
                                                      precipitate_vertices);
     // Extracting the intersected pixels and their correspondent intersection
     // ratios:
@@ -177,20 +179,20 @@ namespace muSpectre {
     Material_hard_split_high_res.initialise();
     // assign material to the rest of the pixels:
     std::vector<Real> assigned_ratio_high_res{
-        sys_split_high_res.get_assigned_ratios()};
+        sys_split_high_res->get_assigned_ratios()};
 
-    for (auto && pix_id : sys_split_high_res.get_pixel_indices()) {
+    for (auto && pix_id : sys_split_high_res->get_pixel_indices()) {
       if (assigned_ratio_high_res[pix_id] < 1.0) {
         Material_soft_split_high_res.add_pixel_split(
             pix_id, 1.0 - assigned_ratio_high_res[pix_id]);
       }
     }
     Material_soft_split_high_res.initialise();
-    sys_split_high_res.initialise();
+    sys_split_high_res->initialise();
 
     auto pixel_volume_high_res{muGrid::CcoordOps::compute_pixel_volume(
-        sys_split_high_res.get_projection().get_nb_domain_grid_pts(),
-        sys_split_high_res.get_projection().get_domain_lengths())};
+        sys_split_high_res->get_projection().get_nb_domain_grid_pts(),
+        sys_split_high_res->get_projection().get_domain_lengths())};
     for (auto && precipitate_area_high_res :
          precipitate_high_res_intersection_ratios) {
       area_preticipitate_high_res +=

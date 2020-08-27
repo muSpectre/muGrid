@@ -49,7 +49,7 @@
 #ifndef SRC_MATERIALS_MATERIAL_VISCO_ELASTIC_SS_HH_
 #define SRC_MATERIALS_MATERIAL_VISCO_ELASTIC_SS_HH_
 
-#include "materials/material_muSpectre_base.hh"
+#include "materials/material_muSpectre_mechanics.hh"
 #include "materials/materials_toolbox.hh"
 #include "materials/stress_transformations_PK2.hh"
 
@@ -63,22 +63,9 @@ namespace muSpectre {
    * traits for objective linear visco_elasticity
    */
   template <Index_t DimM>
-  struct MaterialMuSpectre_traits<MaterialViscoElasticSS<DimM>> {
-    //! expected map type for strain fields
-    using StrainMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Const, DimM, IterUnit::SubPt>;
-    //! expected map type for stress fields
-    using StressMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
-    //! expected map type for tangent stiffness fields
-    using TangentMap_t =
-        muGrid::T4FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
-
-    //! declare what type of strain measure your law takes as input
-    constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
-    //! declare what type of stress measure your law yields as output
-    constexpr static auto stress_measure{StressMeasure::PK2};
-  };
+  struct MaterialMuSpectre_traits<MaterialViscoElasticSS<DimM>>
+      : public DefaultMechanics_traits<DimM, StrainMeasure::GreenLagrange,
+                                       StressMeasure::PK2> {};
 
   /**
    * implements objective linear visco_elasticity
@@ -87,10 +74,10 @@ namespace muSpectre {
 
   template <Index_t DimM>
   class MaterialViscoElasticSS
-      : public MaterialMuSpectre<MaterialViscoElasticSS<DimM>, DimM> {
+      : public MaterialMuSpectreMechanics<MaterialViscoElasticSS<DimM>, DimM> {
    public:
     //! base class
-    using Parent = MaterialMuSpectre<MaterialViscoElasticSS, DimM>;
+    using Parent = MaterialMuSpectreMechanics<MaterialViscoElasticSS, DimM>;
 
     //! short-hand for second-rank tensors
     using T2_t = Eigen::Matrix<Real, DimM, DimM>;

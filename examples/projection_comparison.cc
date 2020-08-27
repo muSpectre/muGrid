@@ -119,8 +119,8 @@ int small_sym(int argc, char * argv[]) {
 
   auto && C_ref(muGrid::Matrices::Iiden<Dim>());
 
-  auto && fft_pointer(
-      std::make_unique<muFFT::FFTWEngine>(DynCcoord_t(nb_grid_pts)));
+  auto && fft_pointer(std::make_unique<muFFT::FFTWEngine>(
+      DynCcoord_t(nb_grid_pts), FFT_PlanFlags::measure));
 
   std::unique_ptr<ProjectionBase> projection_ptr{};
 
@@ -135,7 +135,7 @@ int small_sym(int argc, char * argv[]) {
   ProjectionApproxGreenOperator<Dim> * projector_ptr{
       dynamic_cast<ProjectionApproxGreenOperator<Dim> *>(projection_ptr.get())};
 
-  Cell cell(std::move(projection_ptr));
+  auto cell{std::make_shared<Cell>(std::move(projection_ptr))};
 
   using Material_t = MaterialLinearElastic1<Dim>;
   auto & material_soft{Material_t::make(cell, "soft", E, nu)};
@@ -144,7 +144,7 @@ int small_sym(int argc, char * argv[]) {
   int counter{0};
 
   for (auto && id_pixel :
-       akantu::zip(cell.get_pixel_indices(), cell.get_pixels())) {
+       akantu::zip(cell->get_pixel_indices(), cell->get_pixels())) {
     const auto & pixel_index{std::get<0>(id_pixel)};
     const auto & pixel{std::get<1>(id_pixel)};
     int sum{0};
@@ -160,14 +160,14 @@ int small_sym(int argc, char * argv[]) {
     }
   }
 
-  cell.initialise();
+  cell->initialise();
 
-  std::cout << counter << " Pixel out of " << cell.get_nb_pixels()
+  std::cout << counter << " Pixel out of " << cell->get_nb_pixels()
             << " are in the hard material" << std::endl;
 
-  cell.get_strain().set_zero();
-  cell.evaluate_stress_tangent();
-  auto Cref{cell.get_tangent().get_sub_pt_map(Dim * Dim).mean()};
+  cell->get_strain().set_zero();
+  cell->evaluate_stress_tangent();
+  auto Cref{cell->get_tangent().get_sub_pt_map(Dim * Dim).mean()};
   if (operator_kind == 0) {
     projector_ptr->reinitialise(Cref);
   }

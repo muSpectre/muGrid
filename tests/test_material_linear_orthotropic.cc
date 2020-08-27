@@ -63,13 +63,13 @@ namespace muSpectre {
 
     auto proj_ptr_non{std::make_unique<ProjectionFiniteStrainFast<Dim>>(
         std::move(fft_ptr_non), lengths)};
-    Cell sys_non(std::move(proj_ptr_non));
+    auto sys_non{std::make_shared<Cell>(std::move(proj_ptr_non))};
 
     auto fft_ptr_lin{
         std::make_unique<muFFT::FFTWEngine>(resolutions)};
     auto proj_ptr_lin{std::make_unique<ProjectionFiniteStrainFast<Dim>>(
         std::move(fft_ptr_lin), lengths)};
-    Cell sys_lin(std::move(proj_ptr_lin));
+    auto sys_lin{std::make_shared<Cell>(std::move(proj_ptr_lin))};
 
     using Mat_t_non = MaterialLinearOrthotropic<Dim>;
     using Mat_t_lin = MaterialLinearElastic1<Dim>;
@@ -99,7 +99,7 @@ namespace muSpectre {
     auto & Material_soft{Mat_t_non::make(sys_non, "soft", input_soft)};
     auto & Material_hard{Mat_t_non::make(sys_non, "hard", input_hard)};
 
-    for (const auto & pixel_id : sys_non.get_pixel_indices()) {
+    for (const auto & pixel_id : sys_non->get_pixel_indices()) {
       if (pixel_id == 0) {
         Material_soft.add_pixel(pixel_id);
         Material_soft_lin.add_pixel(pixel_id);
@@ -140,13 +140,13 @@ namespace muSpectre {
         std::make_unique<muFFT::FFTWEngine>(resolutions)};
     auto proj_ptr_non{std::make_unique<ProjectionFiniteStrainFast<Dim>>(
         std::move(fft_ptr_non), lengths)};
-    Cell sys_non(std::move(proj_ptr_non));
+    auto sys_non{std::make_shared<Cell>(std::move(proj_ptr_non))};
 
     auto fft_ptr_lin{
         std::make_unique<muFFT::FFTWEngine>(resolutions)};
     auto proj_ptr_lin{std::make_unique<ProjectionFiniteStrainFast<Dim>>(
         std::move(fft_ptr_lin), lengths)};
-    Cell sys_lin(std::move(proj_ptr_lin));
+    auto sys_lin{std::make_shared<Cell>(std::move(proj_ptr_lin))};
 
     using Mat_t_non = MaterialLinearOrthotropic<Dim>;
     using Mat_t_lin = MaterialLinearElastic1<Dim>;
@@ -186,7 +186,7 @@ namespace muSpectre {
     auto & Material_soft{Mat_t_non::make(sys_non, "soft", input_soft)};
     auto & Material_hard{Mat_t_non::make(sys_non, "hard", input_hard)};
 
-    for (const auto & pixel_id : sys_non.get_pixel_indices()) {
+    for (const auto & pixel_id : sys_non->get_pixel_indices()) {
       if (pixel_id == 0) {
         Material_soft.add_pixel(pixel_id);
         Material_soft_lin.add_pixel(pixel_id);

@@ -67,9 +67,8 @@ void add_material_linear_elastic2_helper(py::module & mod) {
       mod, name.c_str())
       .def_static(
           "make",
-          [](Cell_t & cell, std::string n, Real e, Real p) -> Mat_t & {
-            return Mat_t::make(cell, n, e, p);
-          },
+          [](std::shared_ptr<Cell_t> & cell, std::string n, Real e,
+             Real p) -> Mat_t & { return Mat_t::make(cell, n, e, p); },
           "cell"_a, "name"_a, "Young"_a, "Poisson"_a,
           py::return_value_policy::reference_internal)
       .def(

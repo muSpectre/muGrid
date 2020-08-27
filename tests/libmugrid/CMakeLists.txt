@@ -38,13 +38,19 @@ macro(muGrid_add_test)
   muTools_add_test(${ARGN} LINK_LIBRARIES ${MUGRID_NAMESPACE}muGrid TEST_LIST mugrid_tests)
 endmacro()
 
+if (${NETCDF_IO})
+  set(RUN_NETCDF_TESTS "True")
+else()
+  set(RUN_NETCDF_TESTS "False")
+endif(${NETCDF_IO})
+
 file(GLOB PY_TEST_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/python_*.py")
 foreach(pytest ${PY_TEST_SRCS})
   get_filename_component(pytest_name ${pytest} NAME)
   configure_file(
     ${pytest}
     "${CMAKE_CURRENT_BINARY_DIR}/${pytest_name}"
-    COPYONLY)
+    @ONLY)
 endforeach(pytest ${PY_TEST_SRCS})
 
 file(GLOB HEADER_TEST_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/header*.cc")

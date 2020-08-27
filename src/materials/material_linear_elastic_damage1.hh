@@ -37,7 +37,7 @@
 #define SRC_MATERIALS_MATERIAL_LINEAR_ELASTIC_DAMAGE1_HH_
 
 #include "materials/material_linear_elastic1.hh"
-#include "materials/material_muSpectre_base.hh"
+#include "materials/material_muSpectre.hh"
 #include "materials/materials_toolbox.hh"
 #include "materials/stress_transformations_PK2.hh"
 
@@ -51,22 +51,9 @@ namespace muSpectre {
    * traits for objective linear visco_elasticity
    */
   template <Index_t DimM>
-  struct MaterialMuSpectre_traits<MaterialLinearElasticDamage1<DimM>> {
-    //! expected map type for strain fields
-    using StrainMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Const, DimM, IterUnit::SubPt>;
-    //! expected map type for stress fields
-    using StressMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
-    //! expected map type for tangent stiffness fields
-    using TangentMap_t =
-        muGrid::T4FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
-
-    //! declare what type of strain measure your law takes as input
-    constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
-    //! declare what type of stress measure your law yields as output
-    constexpr static auto stress_measure{StressMeasure::PK2};
-  };
+  struct MaterialMuSpectre_traits<MaterialLinearElasticDamage1<DimM>>
+      : public DefaultMechanics_traits<DimM, StrainMeasure::GreenLagrange,
+                                       StressMeasure::PK2> {};
 
   /**
    * implements objective linear material with damage
@@ -75,10 +62,12 @@ namespace muSpectre {
 
   template <Index_t DimM>
   class MaterialLinearElasticDamage1
-      : public MaterialMuSpectre<MaterialLinearElasticDamage1<DimM>, DimM> {
+      : public MaterialMuSpectreMechanics<MaterialLinearElasticDamage1<DimM>,
+                                          DimM> {
    public:
     //! base class
-    using Parent = MaterialMuSpectre<MaterialLinearElasticDamage1, DimM>;
+    using Parent =
+        MaterialMuSpectreMechanics<MaterialLinearElasticDamage1, DimM>;
 
     //! short-hand for second-rank tensors
     using T2_t = Eigen::Matrix<Real, DimM, DimM>;

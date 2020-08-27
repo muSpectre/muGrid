@@ -81,7 +81,7 @@ namespace muSpectre {
 
   //--------------------------------------------------------------------------//
   std::vector<OptimizeResult>
-  newton_cg(Cell & cell, const LoadSteps_t & load_steps,
+  newton_cg(std::shared_ptr<Cell> cell, const LoadSteps_t & load_steps,
             KrylovSolverBase & solver, const Real & newton_tol,
             const Real & equil_tol, const Verbosity & verbose,
             const IsStrainInitialised & strain_init,
@@ -90,15 +90,15 @@ namespace muSpectre {
       throw SolverError("No load steps specified.");
     }
 
-    const auto & comm = cell.get_communicator();
+    const auto & comm = cell->get_communicator();
 
     using Matrix_t = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
-    auto shape{cell.get_strain_shape()};
+    auto shape{cell->get_strain_shape()};
 
     ConvergenceCriterion convergence_criterion;
 
     // create a field collection to store workspaces
-    auto field_collection{cell.get_fields().get_empty_clone()};
+    auto field_collection{cell->get_fields().get_empty_clone()};
     // Corresponds to symbol δF or δε
     muGrid::MappedField<muGrid::FieldMap<Real, Mapping::Mut>> incrF_field{
         "incrF",         shape[0],         shape[1],
@@ -121,19 +121,19 @@ namespace muSpectre {
             muGrid::RealField & general_strain_field{
                 field_collection.register_real_field(
                     "general strain",
-                    shape_for_formulation(cell.get_formulation(),
-                                          cell.get_material_dim()),
+                    shape_for_formulation(cell->get_formulation(),
+                                          cell->get_material_dim()),
                     QuadPtTag)};
             return general_strain_field;
           } else {
-            return cell.get_strain();
+            return cell->get_strain();
           }
         }()};
 
     solver.initialise();
 
     size_t count_width{};
-    const auto form{cell.get_formulation()};
+    const auto form{cell->get_formulation()};
     std::string strain_symb{};
     if (verbose > Verbosity::Silent && comm.rank() == 0) {
       // setup of algorithm 5.2 in Nocedal, Numerical Optimization (p. 111)
@@ -174,7 +174,7 @@ namespace muSpectre {
         // initilasing cell placement gradient (F) with identity matrix in
         // case of finite strain
         default_strain_val = Matrix_t::Identity(shape[0], shape[1]);
-        cell.set_uniform_strain(default_strain_val);
+        cell->set_uniform_strain(default_strain_val);
 
         if (verbose > Verbosity::Silent && comm.rank() == 0) {
           std::cout << "\nThe strain is initialised by default to the identity "
@@ -203,7 +203,7 @@ namespace muSpectre {
         // initilasing cell strain (ε) with zero-filled matrix in case of small
         // strain
         default_strain_val = Matrix_t::Zero(shape[0], shape[1]);
-        cell.set_uniform_strain(default_strain_val);
+        cell->set_uniform_strain(default_strain_val);
         if (verbose > Verbosity::Silent && comm.rank() == 0) {
           std::cout << "\nThe strain is initialised by default to the zero "
                        "matrix!\n"
@@ -241,7 +241,7 @@ namespace muSpectre {
     Matrix_t previous_macro_strain{load_steps.back().Zero(shape[0], shape[1])};
 
     // strain field used by the cell for evaluating stresses/tangents.
-    auto & eval_strain_field{cell.get_strain()};
+    auto & eval_strain_field{cell->get_strain()};
 
     //! incremental loop (load steps)
     for (const auto & tup : akantu::enumerate(load_steps)) {
@@ -293,7 +293,7 @@ namespace muSpectre {
                                      &has_converged, &message,
                                      &convergence_criterion]() {
         convergence_criterion.get_was_last_step_linear_test() =
-            not cell.was_last_eval_non_linear();
+            not cell->was_last_eval_non_linear();
         if (convergence_criterion.get_was_last_step_linear_test()) {
           message = "Linear problem, no more iteration necessary";
         }
@@ -311,20 +311,20 @@ namespace muSpectre {
           eval_strain_field = general_strain_field;
           (eigen_strain_func.value())(strain_step, eval_strain_field);
         }
-        auto res_tup{cell.evaluate_stress_tangent()};
+        auto res_tup{cell->evaluate_stress_tangent()};
         auto & P{std::get<0>(res_tup)};
 
         auto & rhs{rhs_field.get_field()};
 
         rhs = -P;
-        cell.apply_projection(rhs);
+        cell->apply_projection(rhs);
         stress_norm = std::sqrt(comm.sum(rhs.eigen_vec().squaredNorm()));
 
         if (early_convergence_test()) {
           break;
         }
 
-        // calling sovler for solving the current (iteratively approximated)
+        // calling solver for solving the current (iteratively approximated)
         // linear equilibrium problem
         auto & incrF{incrF_field.get_field()};
         try {
@@ -352,7 +352,7 @@ namespace muSpectre {
         // criteria
         incr_norm = std::sqrt(comm.sum(incrF.eigen_vec().squaredNorm()));
         grad_norm =
-            std::sqrt(comm.sum(eval_strain_field.eigen_vec().squaredNorm()));
+            std::sqrt(comm.sum(general_strain_field.eigen_vec().squaredNorm()));
 
         if ((verbose >= Verbosity::Detailed) and (comm.rank() == 0)) {
           std::cout << "at Newton step " << std::setw(count_width) << newt_iter
@@ -395,17 +395,17 @@ namespace muSpectre {
           eval_strain_field = general_strain_field;
           (eigen_strain_func.value())(strain_step, eval_strain_field);
         }
-        cell.evaluate_stress_tangent();
+        cell->evaluate_stress_tangent();
       }
 
       // store results
       ret_val.emplace_back(OptimizeResult{
-          general_strain_field.eigen_vec(), cell.get_stress().eigen_vec(),
+          general_strain_field.eigen_vec(), cell->get_stress().eigen_vec(),
           full_convergence_test(), Int(full_convergence_test()), message,
           newt_iter, solver.get_counter(), form});
 
       // store history variables for next load increment
-      cell.save_history_variables();
+      cell->save_history_variables();
       convergence_criterion.reset();
     }
     return ret_val;
@@ -413,22 +413,21 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   std::vector<OptimizeResult>
-  de_geus(Cell & cell, const LoadSteps_t & load_steps,
+  de_geus(std::shared_ptr<Cell> cell, const LoadSteps_t & load_steps,
           KrylovSolverBase & solver, Real newton_tol, Real equil_tol,
           Verbosity verbose, IsStrainInitialised strain_init) {
     if (load_steps.size() == 0) {
       throw SolverError("No load steps specified.");
     }
-
-    const auto & comm = cell.get_communicator();
+    const auto & comm = cell->get_communicator();
 
     using Matrix_t = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
-    auto shape{cell.get_strain_shape()};
+    auto shape{cell->get_strain_shape()};
 
     ConvergenceCriterion convergence_criterion;
 
     // create a field collection to store workspaces
-    auto field_collection{cell.get_fields().get_empty_clone()};
+    auto field_collection{cell->get_fields().get_empty_clone()};
     // Corresponds to symbol δF or δε
     muGrid::MappedField<muGrid::FieldMap<Real, Mapping::Mut>> incrF_field{
         "incrF",         shape[0],         shape[1],
@@ -446,7 +445,7 @@ namespace muSpectre {
     solver.initialise();
 
     size_t count_width{};
-    const auto form{cell.get_formulation()};
+    const auto form{cell->get_formulation()};
     std::string strain_symb{};
     if (verbose > Verbosity::Silent && comm.rank() == 0) {
       // setup of algorithm 5.2 in Nocedal, Numerical Optimization (p. 111)
@@ -488,7 +487,7 @@ namespace muSpectre {
         // initilasing cell placement gradient (F) with identity matrix in case
         // of finite strain
         default_strain_val = Matrix_t::Identity(shape[0], shape[1]);
-        cell.set_uniform_strain(default_strain_val);
+        cell->set_uniform_strain(default_strain_val);
         if (verbose > Verbosity::Silent && comm.rank() == 0) {
           std::cout << "The strain is initialised by default to the identity "
                        "matrix!"
@@ -519,7 +518,7 @@ namespace muSpectre {
         // initilasing cell strain (ε) with zero-filled matrix in case of small
         // strain
         default_strain_val = Matrix_t::Zero(shape[0], shape[1]);
-        cell.set_uniform_strain(default_strain_val);
+        cell->set_uniform_strain(default_strain_val);
         if (verbose > Verbosity::Silent && comm.rank() == 0) {
           std::cout << "The strain is initialised by default to the zero "
                        "matrix!"
@@ -559,7 +558,7 @@ namespace muSpectre {
 
     // initialization of F (F in Formulation::finite_strain and ε in
     // Formuation::samll_strain)
-    auto & F{cell.get_strain()};
+    auto & F{cell->get_strain()};
 
     //! incremental loop
     for (const auto & tup : akantu::enumerate(load_steps)) {
@@ -603,7 +602,7 @@ namespace muSpectre {
                                      &has_converged, &message,
                                      &convergence_criterion]() {
         convergence_criterion.get_was_last_step_linear_test() =
-            not cell.was_last_eval_non_linear();
+            not cell->was_last_eval_non_linear();
         if (convergence_criterion.get_was_last_step_linear_test()) {
           message = "Linear problem, no more iteration necessary";
         }
@@ -614,13 +613,13 @@ namespace muSpectre {
 
       Uint newt_iter{0};
 
-      if (cell.was_last_eval_non_linear()) {
+      if (cell->was_last_eval_non_linear()) {
         // Iterative update in the nonlinear case
         for (; ((newt_iter < solver.get_maxiter()) and (!has_converged)) or
                (newt_iter < 2);
              ++newt_iter) {
           // obtain material response
-          auto res_tup{cell.evaluate_stress_tangent()};
+          auto res_tup{cell->evaluate_stress_tangent()};
           auto & P{std::get<0>(res_tup)};
 
           auto & rhs{rhs_field.get_field()};
@@ -630,7 +629,7 @@ namespace muSpectre {
             if (newt_iter == 0) {
               DeltaF_field.get_map() = macro_strain - previous_macro_strain;
               // this corresponds to rhs=-G:K:δF
-              cell.evaluate_projected_directional_stiffness(DeltaF, rhs);
+              cell->evaluate_projected_directional_stiffness(DeltaF, rhs);
               F += DeltaF;
               stress_norm =
                   std::sqrt(comm.sum(rhs.eigen_vec().matrix().squaredNorm()));
@@ -641,7 +640,7 @@ namespace muSpectre {
               }
             } else {
               rhs = -P;
-              cell.apply_projection(rhs);
+              cell->apply_projection(rhs);
               stress_norm =
                   std::sqrt(comm.sum(rhs.eigen_vec().matrix().squaredNorm()));
               if (stress_norm < equil_tol) {
@@ -714,13 +713,13 @@ namespace muSpectre {
         }
 
         // obtain material response
-        auto res_tup{cell.evaluate_stress_tangent()};
+        auto res_tup{cell->evaluate_stress_tangent()};
         auto & P{std::get<0>(res_tup)};
 
         auto & rhs{rhs_field.get_field()};
 
         rhs = -P;
-        cell.apply_projection(rhs);
+        cell->apply_projection(rhs);
         stress_norm = std::sqrt(comm.sum(rhs.eigen_vec().squaredNorm()));
 
         if (!early_convergence_test()) {
@@ -775,17 +774,17 @@ namespace muSpectre {
       if (convergence_criterion.get_was_last_step_linear_test() and
           not(convergence_criterion.get_newton_tol_test() or
               convergence_criterion.get_equil_tol_test())) {
-        cell.evaluate_stress_tangent();
+        cell->evaluate_stress_tangent();
       }
 
       // store results
       ret_val.emplace_back(
-          OptimizeResult{F.eigen_vec(), cell.get_stress().eigen_vec(),
+          OptimizeResult{F.eigen_vec(), cell->get_stress().eigen_vec(),
                          full_convergence_test(), Int(full_convergence_test()),
                          message, newt_iter, solver.get_counter(), form});
 
       // store history variables for next load increment
-      cell.save_history_variables();
+      cell->save_history_variables();
       convergence_criterion.reset();
     }
 
@@ -828,7 +827,7 @@ namespace muSpectre {
 
     // field to store the predicted rhs from linear model calculations
     muGrid::MappedField<muGrid::FieldMap<Real, Mapping::Mut>> lin_rhs_field{
-        "lin_rhs",           shape[0],         shape[1],
+        "lin_rhs",       shape[0],         shape[1],
         IterUnit::SubPt, field_collection, QuadPtTag};
 
     // Standard strain field without the eigen strain: typically the strain
@@ -837,7 +836,7 @@ namespace muSpectre {
     // strain
     muGrid::TypedFieldBase<Real> & general_strain_field{
         [&cell, &field_collection,
-            &eigen_strain_func]() -> muGrid::TypedFieldBase<Real> & {
+         &eigen_strain_func]() -> muGrid::TypedFieldBase<Real> & {
           if (not(eigen_strain_func == muGrid::nullopt)) {
             // general strain field
             muGrid::RealField & general_strain_field{
@@ -994,7 +993,7 @@ namespace muSpectre {
       //! tolerance)
       auto && early_convergence_test{
           [&incr_norm, &grad_norm, &newton_tol, &stress_norm, &equil_tol,
-              &message, &has_converged, &convergence_criterion]() {
+           &message, &has_converged, &convergence_criterion]() {
             convergence_criterion.get_newton_tol_test() =
                 (incr_norm / grad_norm) <= newton_tol;
             convergence_criterion.get_equil_tol_test() =
@@ -1013,8 +1012,8 @@ namespace muSpectre {
       //! Checks all convergence criteria, including detection of linear
       //! problems
       auto && full_convergence_test{[&early_convergence_test, &cell,
-                                        &has_converged, &message,
-                                        &convergence_criterion]() {
+                                     &has_converged, &message,
+                                     &convergence_criterion]() {
         convergence_criterion.get_was_last_step_linear_test() =
             not cell.was_last_eval_non_linear();
         if (convergence_criterion.get_was_last_step_linear_test()) {
@@ -1025,15 +1024,11 @@ namespace muSpectre {
         return has_converged;
       }};
 
-
       if ((verbose >= Verbosity::Detailed) and (comm.rank() == 0)) {
-        std::cout << std::setw(count_width) << "STEP"
-                  << std::setw(17) << "CG STATUS"
-                  << std::setw(17) << "ACTION"
-                  << std::setw(17) << "TRUST REGION"
-                  << std::setw(17) << "|GP|"
-                  << std::setw(17) << "|GP - (GP)_lin|"
-                  << std::setw(19)
+        std::cout << std::setw(count_width) << "STEP" << std::setw(17)
+                  << "CG STATUS" << std::setw(17) << "ACTION" << std::setw(17)
+                  << "TRUST REGION" << std::setw(17) << "|GP|" << std::setw(17)
+                  << "|GP - (GP)_lin|" << std::setw(19)
                   << ("|δ" + strain_symb + "|/|Δ" + strain_symb + "|")
                   << " (tol)" << std::endl;
       }
@@ -1057,10 +1052,10 @@ namespace muSpectre {
             solver.get_convergence() ==
                     KrylovSolverBase::Convergence::ReachedTolerance
                 ? "newton"
-            : solver.get_convergence() ==
-              KrylovSolverBase::Convergence::HessianNotPositiveDefinite
-              ? "neg. Hessian"
-              : "tr exceeded"};
+                : solver.get_convergence() == KrylovSolverBase::Convergence::
+                                                  HessianNotPositiveDefinite
+                      ? "neg. Hessian"
+                      : "tr exceeded"};
 
         auto & rhs{rhs_field.get_field()};
         auto & lin_rhs{lin_rhs_field.get_field()};
@@ -1105,13 +1100,12 @@ namespace muSpectre {
 
           if ((verbose >= Verbosity::Detailed) and (comm.rank() == 0)) {
             std::cout << std::setw(count_width) << (newt_iter - 1)
-                      << std::setw(17) << accept_str
-                      << std::setw(17) << action_str
-                      << std::setw(17) << trust_region
-                      << std::setw(17) << stress_norm
-                      << std::setw(17) << stress_diff_norm
-                      << std::setw(17) << incr_norm / grad_norm << " ("
-                      << newton_tol << ")" << std::endl;
+                      << std::setw(17) << accept_str << std::setw(17)
+                      << action_str << std::setw(17) << trust_region
+                      << std::setw(17) << stress_norm << std::setw(17)
+                      << stress_diff_norm << std::setw(17)
+                      << incr_norm / grad_norm << " (" << newton_tol << ")"
+                      << std::endl;
           }
         }
 
@@ -1127,7 +1121,8 @@ namespace muSpectre {
           incrF = solver.solve(rhs_vec);
           KrylovSolverBase::ConstVector_ref incrF_vec{incrF.eigen_vec()};
           auto lin_rhs_vec{lin_rhs.eigen_vec()};
-          lin_rhs_vec = rhs_vec - cell.get_adaptor() * incrF_vec;
+          lin_rhs_vec =
+              rhs_vec - cell.get_shared_adaptor()->get_adaptor() * incrF_vec;
         } catch (ConvergenceError & error) {
           std::stringstream err{};
           err << "Failure at load step " << strain_step + 1 << " of "

@@ -77,9 +77,9 @@ namespace muSpectre {
     Eigen::Matrix<Real, Fix::mdim, Fix::mdim> I{
         Eigen::Matrix<Real, Fix::mdim, Fix::mdim>::Identity() +
         0.1 * Eigen::Matrix<Real, Fix::mdim, Fix::mdim>::Random()};
-    auto origin_eval_func_result = Fix::evaluate_stress_tangent(I, 0);
-    auto base_eval_func_result =
-        Fix::constitutive_law_dynamic(I, 0, Formulation::small_strain);
+    this->set_formulation(Formulation::small_strain);
+    auto origin_eval_func_result{Fix::evaluate_stress_tangent(I, 0)};
+    auto base_eval_func_result{Fix::constitutive_law_dynamic(I, 0)};
     Real error{(std::get<0>(origin_eval_func_result) -
                 std::get<0>(base_eval_func_result))
                    .norm() /
@@ -188,22 +188,21 @@ namespace muSpectre {
     }
 
     // compute stresses using material
+    mat.set_formulation(Formulation::finite_strain);
     mat.compute_stresses(globalfields.get_field("Transformation Gradient"),
-                         globalfields.get_field("Nominal Stress1"),
-                         Formulation::finite_strain);
+                         globalfields.get_field("Nominal Stress1"));
 
     // compute stresses and tangent moduli using material
     BOOST_CHECK_THROW(mat.compute_stresses_tangent(
                           globalfields.get_field("Transformation Gradient"),
                           globalfields.get_field("Nominal Stress2"),
-                          globalfields.get_field("Nominal Stress2"),
-                          Formulation::finite_strain),
+                          globalfields.get_field("Nominal Stress2")),
                       muGrid::FieldError);
 
     mat.compute_stresses_tangent(
         globalfields.get_field("Transformation Gradient"),
         globalfields.get_field("Nominal Stress2"),
-        globalfields.get_field("Tangent Moduli"), Formulation::finite_strain);
+        globalfields.get_field("Tangent Moduli"));
 
     typename traits::StrainMap_t Fmap(
         globalfields.get_field("Transformation Gradient"));

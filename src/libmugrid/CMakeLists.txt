@@ -39,49 +39,51 @@ if(POLICY CMP0076)
 endif()
 
 set(mugrid_HDRS
-  exception.hh
-  numpy_tools.hh
-  tensor_algebra.hh
-  T4_map_proxy.hh
-  mapped_state_field.hh
-  cpp_compliance.hh
-  eigen_tools.hh
-  mapped_field.hh
-  ref_array.hh
-  field_map_static.hh
-  ref_vector.hh
-  field_map.hh
-  grid_common.hh
-  iterators.hh
-  state_field.hh
-  field_collection_local.hh
-  state_field_map_static.hh
-  field_collection_global.hh
-  field_typed.hh
-  field.hh
-  field_collection.hh
-  file_io_base.hh
-  ccoord_operations.hh
-  raw_memory_operations.hh
-  state_field_map.hh
-  units.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/exception.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/numpy_tools.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/tensor_algebra.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/T4_map_proxy.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/mapped_state_field.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/cpp_compliance.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/eigen_tools.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/mapped_field.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/ref_array.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/field_map_static.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/ref_vector.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/field_map.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/grid_common.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/iterators.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/state_field.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/field_collection_local.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/state_field_map_static.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/physics_domain.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/field_collection_global.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/field_typed.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/field.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/field_collection.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/file_io_base.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/ccoord_operations.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/raw_memory_operations.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/state_field_map.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/units.hh
   )
 
 set(mugrid_SRCS
-  exception.cc
-  grid_common.cc
-  ccoord_operations.cc
-  raw_memory_operations.cc
-  field_collection.cc
-  field_collection_global.cc
-  field_collection_local.cc
-  field.cc
-  field_typed.cc
-  field_map.cc
-  file_io_base.cc
-  state_field.cc
-  state_field_map.cc
-  units.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/exception.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/grid_common.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/ccoord_operations.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/field_collection.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/field_collection_global.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/field_collection_local.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/file_io_base.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/field.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/field_typed.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/field_map.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/physics_domain.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/raw_memory_operations.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/state_field.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/state_field_map.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/units.cc
   )
 
 set(file_io_NETCDF_HDRS

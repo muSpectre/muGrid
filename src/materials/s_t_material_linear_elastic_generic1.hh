@@ -56,22 +56,8 @@ namespace muSpectre {
 
   template <Index_t DimM, StrainMeasure StrainMIn, StressMeasure StressMOut>
   struct MaterialMuSpectre_traits<
-      STMaterialLinearElasticGeneric1<DimM, StrainMIn, StressMOut>> {
-    //! expected map type for strain fields
-    using StrainMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Const, DimM, IterUnit::SubPt>;
-    //! expected map type for stress fields
-    using StressMap_t =
-        muGrid::T2FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
-    //! expected map type for tangent stiffness fields
-    using TangentMap_t =
-        muGrid::T4FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
-
-    //! declare what type of strain measure your law takes as input
-    constexpr static auto strain_measure{StrainMIn};
-    //! declare what type of stress measure your law yields as output
-    constexpr static auto stress_measure{StressMOut};
-  };
+      STMaterialLinearElasticGeneric1<DimM, StrainMIn, StressMOut>>
+      : public DefaultMechanics_traits<DimM, StrainMIn, StressMOut> {};
 
   /**
    * Linear elastic law defined by a full stiffness tensor with the ability to
@@ -79,11 +65,11 @@ namespace muSpectre {
    */
   template <Index_t DimM, StrainMeasure StrainM, StressMeasure StressM>
   class STMaterialLinearElasticGeneric1
-      : public MaterialMuSpectre<
+      : public MaterialMuSpectreMechanics<
             STMaterialLinearElasticGeneric1<DimM, StrainM, StressM>, DimM> {
    public:
     //! base class:
-    using Parent = MaterialMuSpectre<
+    using Parent = MaterialMuSpectreMechanics<
         STMaterialLinearElasticGeneric1<DimM, StrainM, StressM>, DimM>;
 
     using CInput_t = Eigen::Ref<Eigen::MatrixXd>;

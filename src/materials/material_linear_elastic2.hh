@@ -53,32 +53,19 @@ namespace muSpectre {
    * traits for objective linear elasticity with per pixel strength
    */
   template <Index_t DimM>
-  struct MaterialMuSpectre_traits<MaterialLinearElastic2<DimM>> {
-    //! expected map type for strain fields
-    using StrainMap_t =
-        muGrid::T2FieldMap<double, Mapping::Const, DimM, IterUnit::SubPt>;
-    //! expected map type for stress fields
-    using StressMap_t =
-        muGrid::T2FieldMap<double, Mapping::Mut, DimM, IterUnit::SubPt>;
-    //! expected map type for tangent stiffness fields
-    using TangentMap_t =
-        muGrid::T4FieldMap<double, Mapping::Mut, DimM, IterUnit::SubPt>;
-
-    //! declare what type of strain measure your law takes as input
-    constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
-    //! declare what type of stress measure your law yields as output
-    constexpr static auto stress_measure{StressMeasure::PK2};
-  };
+  struct MaterialMuSpectre_traits<MaterialLinearElastic2<DimM>>
+      : public DefaultMechanics_traits<DimM, StrainMeasure::GreenLagrange,
+                                       StressMeasure::PK2> {};
 
   /**
    * implements objective linear elasticity with damage an  per pixel strength
    */
   template <Index_t DimM>
   class MaterialLinearElastic2
-      : public MaterialMuSpectre<MaterialLinearElastic2<DimM>, DimM> {
+      : public MaterialMuSpectreMechanics<MaterialLinearElastic2<DimM>, DimM> {
    public:
     //! base class
-    using Parent = MaterialMuSpectre<MaterialLinearElastic2, DimM>;
+    using Parent = MaterialMuSpectreMechanics<MaterialLinearElastic2, DimM>;
 
     //! traits of this material
     using traits = MaterialMuSpectre_traits<MaterialLinearElastic2>;

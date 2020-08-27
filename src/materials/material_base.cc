@@ -93,14 +93,13 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   void MaterialBase::compute_stresses(
-      const muGrid::Field & F, muGrid::Field & P, const Formulation & form,
+      const muGrid::Field & F, muGrid::Field & P,
       const SplitCell & is_cell_split,
       const StoreNativeStress & store_native_stress) {
     const auto t2_dim{muGrid::ipow(this->material_dimension, 2)};
     const auto & real_F{muGrid::RealField::safe_cast(F, t2_dim, QuadPtTag)};
     auto & real_P{muGrid::RealField::safe_cast(P, t2_dim, QuadPtTag)};
-    this->compute_stresses(real_F, real_P, form, is_cell_split,
-                           store_native_stress);
+    this->compute_stresses(real_F, real_P, is_cell_split, store_native_stress);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -140,14 +139,14 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   void MaterialBase::compute_stresses_tangent(
       const muGrid::Field & F, muGrid::Field & P, muGrid::Field & K,
-      const Formulation & form, const SplitCell & is_cell_split,
+      const SplitCell & is_cell_split,
       const StoreNativeStress & store_native_stress) {
     const auto t2_dim{muGrid::ipow(this->material_dimension, 2)};
     const auto & real_F{muGrid::RealField::safe_cast(F, t2_dim, QuadPtTag)};
     auto & real_P{muGrid::RealField::safe_cast(P, t2_dim, QuadPtTag)};
     auto & real_K{
         muGrid::RealField::safe_cast(K, muGrid::ipow(t2_dim, 2), QuadPtTag)};
-    this->compute_stresses_tangent(real_F, real_P, real_K, form, is_cell_split,
+    this->compute_stresses_tangent(real_F, real_P, real_K, is_cell_split,
                                    store_native_stress);
   }
 
@@ -183,43 +182,20 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   void MaterialBase::initialise() {
-    if (!this->is_initialised) {
+    if (not this->is_initialised_flag) {
       this->internal_fields->initialise();
-      this->is_initialised = true;
-    } else {
-      std::stringstream err_str{};
-      err_str << "The material " << this->name
-              << " has been already initialised."
-              << "Therefore, it cannot be initialised again" << std::endl;
-      throw RuntimeError(err_str.str());
+      this->is_initialised_flag = true;
     }
   }
 
   /* ---------------------------------------------------------------------- */
-  void MaterialBase::check_small_strain_capability(
-      const StrainMeasure & expected_strain_measure) {
-    if (not(is_objective(expected_strain_measure))) {
-      std::stringstream err_str{};
-      err_str
-          << "The material expected strain measure is: "
-          << expected_strain_measure
-          << ", while in small strain the required strain measure should be "
-             "objective (in order to be obtainable from infinitesimal strain)."
-          << " Accordingly, this material is not meant to be utilized in "
-             "small strain formulation"
-          << std::endl;
-      throw(muGrid::RuntimeError(err_str.str()));
-    }
+  const bool & MaterialBase::is_initialised() const {
+    return this->is_initialised_flag;
   }
 
   /* ---------------------------------------------------------------------- */
   bool MaterialBase::was_last_step_nonlinear() const {
     return this->last_step_was_nonlinear;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  const bool & MaterialBase::get_is_initialised() {
-    return this->is_initialised;
   }
 
 }  // namespace muSpectre

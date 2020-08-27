@@ -60,15 +60,13 @@ namespace muSpectre {
     globalfields.initialise(cube, cube, loc);
     globalfields.register_real_field("Transformation Gradient", mdim * mdim,
                                      QuadPtTag);
-    auto & P1 = globalfields.register_real_field(
-        "Nominal Stress1", mdim * mdim,
-        QuadPtTag);  // to be computed alone
-    globalfields.register_real_field(
-        "Nominal Stress2", mdim * mdim,
-        QuadPtTag);  // to be computed with tangent
-    globalfields.register_real_field(
-        "Tangent Moduli", muGrid::ipow(mdim, 4),
-        QuadPtTag);  // to be computed with tangent
+    auto & P1 =
+        globalfields.register_real_field("Nominal Stress1", mdim * mdim,
+                                         QuadPtTag);  // to be computed alone
+    globalfields.register_real_field("Nominal Stress2", mdim * mdim,
+                                     QuadPtTag);  // to be computed with tangent
+    globalfields.register_real_field("Tangent Moduli", muGrid::ipow(mdim, 4),
+                                     QuadPtTag);  // to be computed with tangent
     globalfields.register_real_field("Material stress (PK2) reference",
                                      mdim * mdim, QuadPtTag);
 
@@ -86,10 +84,10 @@ namespace muSpectre {
     }
 
     // compute stresses using material
+    mat.set_formulation(Formulation::finite_strain);
     mat.compute_stresses(globalfields.get_field("Transformation Gradient"),
                          globalfields.get_field("Nominal Stress1"),
-                         Formulation::finite_strain, SplitCell::no,
-                         StoreNativeStress::yes);
+                         SplitCell::no, StoreNativeStress::yes);
 
     typename traits::StrainMap_t Fmap(
         globalfields.get_field("Transformation Gradient"));
@@ -119,11 +117,12 @@ namespace muSpectre {
       }
     }
 
+    mat.set_formulation(Formulation::finite_strain);
     mat.compute_stresses_tangent(
         globalfields.get_field("Transformation Gradient"),
         globalfields.get_field("Nominal Stress2"),
-        globalfields.get_field("Tangent Moduli"), Formulation::finite_strain,
-        SplitCell::no, StoreNativeStress::yes);
+        globalfields.get_field("Tangent Moduli"), SplitCell::no,
+        StoreNativeStress::yes);
 
     for (auto tup : akantu::zip(Smap_ref, native_stress)) {
       auto P_r{std::get<0>(tup)};

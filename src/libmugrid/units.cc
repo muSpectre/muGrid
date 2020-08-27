@@ -314,6 +314,21 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
+  Unit Unit::force(const Int & new_tag) {
+    return mass(new_tag) * length(new_tag) / time(new_tag) / time(new_tag);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  Unit Unit::stress(const Int & new_tag) {
+    return force(new_tag) / length(new_tag) / length(new_tag);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  Unit Unit::strain(const Int & new_tag) {
+    return unitless(new_tag);
+  }
+
+  /* ---------------------------------------------------------------------- */
   const UnitExponent & Unit::get_length() const { return this->units[0]; }
   /* ---------------------------------------------------------------------- */
   const UnitExponent & Unit::get_mass() const { return this->units[1]; }
@@ -361,6 +376,9 @@ namespace muGrid {
   bool Unit::operator==(const Unit & other) const {
     return this->tag == other.tag and this->units == other.units;
   }
+
+  /* ---------------------------------------------------------------------- */
+  bool Unit::operator!=(const Unit & other) const { return !(*this == other); }
 
   /* ---------------------------------------------------------------------- */
   bool Unit::operator<(const Unit & other) const {
