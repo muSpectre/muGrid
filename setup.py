@@ -205,8 +205,8 @@ def get_eigen_include(eigen_version='3.3.5'):
     if not os.path.exists(eigen_path):
         os.makedirs(eigen_path, exist_ok=True)
         os.system(
-            'curl -L http://bitbucket.org/eigen/eigen/get/{}.tar.bz2'
-            ' | tar -jx -C {} --strip-components 1'
+            'curl -L https://gitlab.com/libeigen/eigen/-/archive/{0}/eigen-{0}'
+            '.tar.bz2 | tar -jx -C {1} --strip-components 1'
             .format(eigen_version, eigen_path))
     return(eigen_path)
 
