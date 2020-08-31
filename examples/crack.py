@@ -36,6 +36,7 @@ Program grant you additional permission to convey the resulting work.
 
 import numpy as np
 from mpi4py import MPI
+import sys
 
 try:
     import matplotlib.pyplot as plt
@@ -107,8 +108,7 @@ discrete_gradient = Stencils2D.averaged_upwind
 discrete_gradient2 = [Stencils2D.d_10_00, Stencils2D.d_01_00,
                       Stencils2D.d_11_01, Stencils2D.d_11_10]
 
-#gradients = [fourier_gradient, discrete_gradient, discrete_gradient2]
-gradients = [discrete_gradient2]
+gradients = [fourier_gradient, discrete_gradient, discrete_gradient2]
 
 ###
 
@@ -179,7 +179,15 @@ if matplotlib_found and MPI.COMM_WORLD.Get_size() == 1:
             plt.plot(g[0, 1, 0, center[0]+1, :], 'bx-')
 
     plt.tight_layout()
-    plt.show()
+
+    if len(sys.argv[:]) == 2:
+        if sys.argv[1] == 1:
+            print("I skip the ploting of the results because you gave '1' as "
+                  "first argument.")
+            pass
+    else:
+        plt.show()
+
 else:
     if MPI.COMM_WORLD.Get_size() != 1:
         print('Plotting disabled because we are running MPI-parallel.')
