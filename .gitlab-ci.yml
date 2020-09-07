@@ -113,6 +113,7 @@ pages:
 
 pypi:
   stage: deploy
+  image: registry.gitlab.com/muspectre/muspectre:debian_stable
   script:
     - python3 -m pip install twine
     - python3 setup.py sdist

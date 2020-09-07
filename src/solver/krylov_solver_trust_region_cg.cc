@@ -1,11 +1,12 @@
 /**
- * @file   krylov_solver_cg.cc
+ * @file   krylov_solver_trust_region_cg.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
+ *         Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
- * @date   24 Apr 2018
+ * @date   25 July 2020
  *
- * @brief  implements KrylovSolverCG
+ * @brief  Conjugate-gradient solver with a trust region
  *
  * Copyright © 2018 Till Junge
  *
@@ -33,9 +34,11 @@
  *
  */
 
-#include "solver/krylov_solver_cg.hh"
-#include "cell/cell_adaptor.hh"
 #include <libmufft/communicator.hh>
+
+#include "cell/cell_adaptor.hh"
+
+#include "solver/krylov_solver_trust_region_cg.hh"
 
 #include <iomanip>
 #include <sstream>
@@ -44,19 +47,30 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  KrylovSolverCG::KrylovSolverCG(Cell & cell, Real tol, Uint maxiter,
-                                 Verbosity verbose)
-      : Parent(cell, tol, maxiter, verbose),
+  KrylovSolverTrustRegionCG::KrylovSolverTrustRegionCG(Cell & cell,
+                                                       Real tol,
+                                                       Uint maxiter,
+                                                       Real trust_region,
+                                                       Verbosity verbose)
+      : Parent(cell, tol, maxiter, verbose), trust_region{trust_region},
         r_k(cell.get_nb_dof()), p_k(cell.get_nb_dof()), Ap_k(cell.get_nb_dof()),
         x_k(cell.get_nb_dof()) {}
 
   /* ---------------------------------------------------------------------- */
-  auto KrylovSolverCG::solve(const ConstVector_ref rhs) -> Vector_map {
+  void KrylovSolverTrustRegionCG::set_trust_region(Real new_trust_region) {
+    this->trust_region = new_trust_region;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  auto KrylovSolverTrustRegionCG::solve(const ConstVector_ref rhs)
+      -> Vector_map {
     this->x_k.setZero();
     const auto & comm = this->cell.get_communicator();
 
-    // Following implementation of algorithm 5.2 in Nocedal's
-    // Numerical Optimization (p. 112)
+    Real trust_region2{this->trust_region * this->trust_region};
+
+    // Following implementation of Steihaug's CG, algorithm 7.2 in Nocedal's
+    // Numerical Optimization (p. 171)
 
     // initialisation of algorithm
     this->r_k = this->cell.get_adaptor() * this->x_k - rhs;
@@ -84,12 +98,20 @@ namespace muSpectre {
     }
 
     if (verbose > Verbosity::Silent && comm.rank() == 0) {
-      std::cout << "Norm of rhs in krylov_solver_cg.cc = " << rhs_norm2
+      std::cout << "Norm of rhs in (trust region) Steihaug CG = " << rhs_norm2
                 << std::endl;
     }
+
     // Multiplication with the norm of the right hand side to get a relative
     // convergence criterion
-    Real rel_tol2 = muGrid::ipow(this->tol, 2) * rhs_norm2;
+    Real tol = this->tol;
+
+    // Negative tolerance tells the solver to automatically adjust it
+    if (tol < 0.0) {
+      // See Nocedal, page 169
+      tol = std::min(0.5, sqrt(sqrt(rhs_norm2)));
+    }
+    Real rel_tol2 = muGrid::ipow(tol, 2) * rhs_norm2;
 
     size_t count_width{};  // for output formatting in verbose case
     if (verbose > Verbosity::Silent) {
@@ -102,15 +124,33 @@ namespace muSpectre {
 
       Real pdAp{comm.sum(this->p_k.dot(this->Ap_k))};
       if (pdAp <= 0) {
-        // Hessian is not positive definite
-        throw SolverError("Hessian is not positive definite");
+        // Hessian is not positive definite, the minimizer is on the trust
+        // region bound
+        if (verbose > Verbosity::Silent && comm.rank() == 0) {
+          std::cout << "  CG finished, reason: Hessian is not positive "
+                       "definite" << std::endl;
+        }
+        this->convergence = Convergence::HessianNotPositiveDefinite;
+        return this->bound(rhs);
       }
+
       Real alpha{rdr / pdAp};
 
       this->x_k += alpha * this->p_k;
+      if (this->x_k.squaredNorm() >= trust_region2) {
+        // we are exceeding the trust region, the minimizer is on the trust
+        // region bound
+        if (verbose > Verbosity::Silent && comm.rank() == 0) {
+          std::cout << "  CG finished, reason: step exceeded trust region "
+                       "bounds" << std::endl;
+        }
+        this->convergence = Convergence::ExceededTrustRegionBound;
+        return this->bound(rhs);
+      }
+
       this->r_k += alpha * this->Ap_k;
 
-      Real new_rdr{comm.sum(this->r_k.dot(this->r_k))};
+      Real new_rdr{comm.sum(this->r_k.squaredNorm())};
       Real beta{new_rdr / rdr};
       rdr = new_rdr;
 
@@ -118,24 +158,56 @@ namespace muSpectre {
         std::cout << "  at CG step " << std::setw(count_width) << i
                   << ": |r|/|b| = " << std::setw(15)
                   << std::sqrt(rdr / rhs_norm2) << ", cg_tol = "
-                  << this->tol << std::endl;
+                  << tol << std::endl;
       }
 
       this->p_k = -this->r_k + beta * this->p_k;
     }
 
     if (rdr < rel_tol2) {
+      if (verbose > Verbosity::Silent && comm.rank() == 0) {
+        std::cout << "  CG finished, reason: reached tolerance" << std::endl;
+      }
       this->convergence = Convergence::ReachedTolerance;
     } else {
       std::stringstream err{};
       err << " After " << this->counter << " steps, the solver "
           << " FAILED with  |r|/|b| = " << std::setw(15)
-          << std::sqrt(rdr / rhs_norm2) << ", cg_tol = " << this->tol
+          << std::sqrt(rdr / rhs_norm2) << ", cg_tol = " << tol
           << std::endl;
       throw ConvergenceError("Conjugate gradient has not converged." +
                              err.str());
     }
     return Vector_map(this->x_k.data(), this->x_k.size());
+  }
+
+  auto KrylovSolverTrustRegionCG::bound(const ConstVector_ref rhs)
+      -> Vector_map {
+    const auto & comm = this->cell.get_communicator();
+
+    Real trust_region2{this->trust_region * this->trust_region};
+
+    Real pdp{comm.sum(this->p_k.squaredNorm())};
+    Real xdx{comm.sum(this->x_k.squaredNorm())};
+    Real pdx{comm.sum(this->p_k.dot(this->x_k))};
+    Real tmp{sqrt(pdx * pdx - pdp * (xdx - trust_region2))};
+    Real tau1{-(pdx + tmp) / pdp};
+    Real tau2{-(pdx - tmp) / pdp};
+
+    this->x_k += tau1 * this->p_k;
+    Real m1{-rhs.dot(this->x_k) +
+            0.5 * this->x_k.dot(this->cell.get_adaptor() * this->x_k)};
+    this->x_k += (tau2 - tau1) * this->p_k;
+    Real m2{-rhs.dot(this->x_k) +
+            0.5 * this->x_k.dot(this->cell.get_adaptor() * this->x_k)};
+
+    // check which direction is the minimizer
+    if (m2 < m1) {
+      return Vector_map(this->x_k.data(), this->x_k.size());
+    } else {
+      this->x_k += (tau1 - tau2) * this->p_k;
+      return Vector_map(this->x_k.data(), this->x_k.size());
+    }
   }
 
 }  // namespace muSpectre

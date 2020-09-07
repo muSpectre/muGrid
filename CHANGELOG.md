@@ -1,9 +1,15 @@
 Change log for µSpectre
 =======================
 
+0.11.0 (07Sep20)
+----------------
+
+- Trust-Region Newton-CG solver for nonlinear problems with instabilities
+- Updated Eigen archive URL which broke installation via pip
+
 0.10.0 (22Jul20)
 ----------------
-- Support for more flexible strides in fields: full column-major, row-major and
+- Support for more flexible strideste in fields: full column-major, row-major and
   strided pixels portion (#103)
 - User control over buffer copies in muFFT with option to avoid them completely 
 - Gradient integration for multiple quadrature points

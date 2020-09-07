@@ -43,12 +43,23 @@ namespace muSpectre {
       : cell(cell), tol{tol}, maxiter{maxiter}, verbose{verbose} {}
 
   /* ---------------------------------------------------------------------- */
-  bool KrylovSolverBase::has_converged() const { return this->converged; }
+  KrylovSolverBase::Convergence KrylovSolverBase::get_convergence() const {
+    return this->convergence;
+  }
 
   /* ---------------------------------------------------------------------- */
   void KrylovSolverBase::reset_counter() {
     this->counter = 0;
-    this->converged = false;
+    this->convergence = Convergence::DidNotConverge;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void KrylovSolverBase::set_trust_region(Real new_trust_region) {
+    std::stringstream s;
+    s << "Setting a trust region is not supported by the " << this->get_name()
+      << " solver. (The desired trust region value was " << new_trust_region
+      << ".)";
+    throw SolverError(s.str());
   }
 
   /* ---------------------------------------------------------------------- */

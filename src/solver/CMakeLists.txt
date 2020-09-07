@@ -39,6 +39,7 @@ set (solvers_SRC
   ${CMAKE_CURRENT_SOURCE_DIR}/krylov_solver_base.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/solvers.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/krylov_solver_cg.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/krylov_solver_trust_region_cg.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/krylov_solver_eigen.cc
   )
 

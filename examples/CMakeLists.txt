@@ -110,6 +110,9 @@ endif()
 muSpectre_add_example(crack_py_example
   TYPE PYTHON crack.py 1)
 
+muSpectre_add_example(buckling_py_example
+  TYPE PYTHON buckling.py 1)
+
 muSpectre_add_example(hyper-elasticity_py_example
   TYPE PYTHON hyper-elasticity.py)
 

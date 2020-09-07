@@ -56,7 +56,14 @@ namespace muSpectre {
     //! Input vector for solvers
     using ConstVector_ref = Eigen::Ref<const Vector_t>;
     //! Output vector for solvers
-    using Vector_map = Eigen::Map<Vector_t>;
+    using Vector_map = Eigen::Map<const Vector_t>;
+    //! Resons for convergence
+    enum class Convergence {
+      DidNotConverge,
+      ReachedTolerance,
+      HessianNotPositiveDefinite,
+      ExceededTrustRegionBound
+    };
 
     //! Default constructor
     KrylovSolverBase() = delete;
@@ -87,10 +94,13 @@ namespace muSpectre {
     virtual void initialise() = 0;
 
     //! returns whether the solver has converged
-    bool has_converged() const;
+    Convergence get_convergence() const;
 
     //! reset the iteration counter to zero
     void reset_counter();
+
+    //! set size of trust region, exception if not supported
+    virtual void set_trust_region(Real new_trust_region);
 
     //! get the count of how many solve steps have been executed since
     //! construction of most recent counter reset
@@ -114,7 +124,8 @@ namespace muSpectre {
     Uint maxiter;           //!< maximum allowed number of iterations
     Verbosity verbose;      //!< how much information is written to the stdout
     Uint counter{0};        //!< iteration counter
-    bool converged{false};  //!< whether the solver has converged
+    Convergence convergence{
+        Convergence::DidNotConverge};  //!< whether the solver has converged
   };
 
 }  // namespace muSpectre

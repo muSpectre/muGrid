@@ -37,6 +37,7 @@
 #include "solver/solvers.hh"
 #include "solver/krylov_solver_cg.hh"
 #include "solver/krylov_solver_eigen.hh"
+#include "solver/krylov_solver_trust_region_cg.hh"
 
 #include <libmugrid/numpy_tools.hh>
 
@@ -57,15 +58,39 @@ namespace py = pybind11;
 using muGrid::NumpyProxy;
 
 /**
- * Solvers instanciated for cells with equal spatial and material dimension
+ * Solvers instantiated for cells with equal spatial and material dimension
  */
 
 template <class KrylovSolver>
 void add_krylov_solver_helper(py::module & mod, std::string name) {
-  py::class_<KrylovSolver, typename KrylovSolver::Parent>(mod, name.c_str())
+  py::class_<KrylovSolver, typename KrylovSolver::Parent>(mod,
+                                                                 name.c_str())
       .def(py::init<muSpectre::Cell &, Real, Uint, Verbosity>(), "cell"_a,
            "tol"_a, "maxiter"_a, "verbose"_a = Verbosity::Silent)
-      .def_property_readonly("name", &KrylovSolver::get_name);
+      .def("initialise", &KrylovSolver::initialise)
+      .def("solve", &KrylovSolver::solve, "rhs"_a)
+      .def_property_readonly("counter", &KrylovSolver::get_counter)
+      .def_property_readonly("maxiter", &KrylovSolver::get_maxiter)
+      .def_property_readonly("name", &KrylovSolver::get_name)
+      .def_property_readonly("tol", &KrylovSolver::get_tol);
+}
+
+template <class KrylovSolver>
+void add_krylov_solver_trust_region_helper(py::module & mod, std::string name) {
+  py::class_<KrylovSolver, typename KrylovSolver::Parent>(mod,
+                                                                 name.c_str())
+      .def(py::init<muSpectre::Cell &, Real, Uint, Real, Verbosity>(), "cell"_a,
+           "tol"_a = -1.0, "maxiter"_a = 1000, "trust_region"_a = 1.0,
+           "verbose"_a = Verbosity::Silent)
+      .def("initialise", &KrylovSolver::initialise)
+      .def("solve", &KrylovSolver::solve, "rhs"_a)
+      .def("set_trust_region",
+           &muSpectre::KrylovSolverTrustRegionCG::set_trust_region,
+           "new_trust_region"_a)
+      .def_property_readonly("counter", &KrylovSolver::get_counter)
+      .def_property_readonly("maxiter", &KrylovSolver::get_maxiter)
+      .def_property_readonly("name", &KrylovSolver::get_name)
+      .def_property_readonly("tol", &KrylovSolver::get_tol);
 }
 
 void add_krylov_solver(py::module & mod) {
@@ -73,6 +98,8 @@ void add_krylov_solver(py::module & mod) {
   name << "KrylovSolverBase";
   py::class_<muSpectre::KrylovSolverBase>(mod, name.str().c_str());
   add_krylov_solver_helper<muSpectre::KrylovSolverCG>(mod, "KrylovSolverCG");
+  add_krylov_solver_trust_region_helper<muSpectre::KrylovSolverTrustRegionCG>(
+      mod, "KrylovSolverTrustRegionCG");
   add_krylov_solver_helper<muSpectre::KrylovSolverCGEigen>(
       mod, "KrylovSolverCGEigen");
   add_krylov_solver_helper<muSpectre::KrylovSolverGMRESEigen>(
@@ -110,10 +137,8 @@ void add_newton_cg_helper(py::module & mod) {
             [&eigen_strain_pyfunc](
                 const size_t & step_nb,
                 muGrid::TypedFieldBase<Real> & eigen_strain_field) {
-              eigen_strain_pyfunc(step_nb,
-                                  numpy_wrap(
-                                      eigen_strain_field,
-                                      muGrid::IterUnit::SubPt));
+              eigen_strain_pyfunc(step_nb, numpy_wrap(eigen_strain_field,
+                                                      muGrid::IterUnit::SubPt));
             }};
         return newton_cg(s, g_vec, so, nt, eqt, verb, strain_init,
                          eigen_strain_cpp_func)
@@ -144,9 +169,8 @@ void add_newton_cg_helper(py::module & mod) {
                 const size_t & step_nb,
                 muGrid::TypedFieldBase<Real> & eigen_strain_field) {
               eigen_strain_pyfunc(step_nb,
-                                  muGrid::numpy_wrap(
-                                      eigen_strain_field,
-                                      muGrid::IterUnit::SubPt));
+                                  muGrid::numpy_wrap(eigen_strain_field,
+                                                     muGrid::IterUnit::SubPt));
             }};
         return newton_cg(s, g, so, nt, eqt, verb, strain_init,
                          eigen_strain_cpp_func);
@@ -192,9 +216,93 @@ void add_de_geus_helper(py::module & mod) {
       "verbose"_a = Verbosity::Silent);
 }
 
+void add_trust_region_newton_cg_helper(py::module & mod) {
+  const char name[]{"trust_region_newton_cg"};
+  using solver = muSpectre::KrylovSolverBase;
+  using grad = py::EigenDRef<Eigen::MatrixXd>;
+  using grad_vec = muSpectre::LoadSteps_t;
+
+  using Func_t =
+      std::function<void(const size_t &, muGrid::TypedFieldBase<Real> &)>;
+
+  mod.def(
+      name,
+      [](muSpectre::Cell & s, const grad & g, solver & so, Real tr, Real nt,
+         Real eqt, Real it, Real dt, Verbosity verb,
+         IsStrainInitialised strain_init) -> OptimizeResult {
+        const grad_vec & g_vec{g};
+        return trust_region_newton_cg(s, g_vec, so, tr, nt, eqt, it, dt, verb,
+                                      strain_init)
+            .front();
+      },
+      "cell"_a, "ΔF₀"_a, "solver"_a, "trust_region"_a, "newton_tol"_a,
+      "equil_tol"_a, "inc_tr_tol"_a, "dec_tr_tol"_a,
+      "verbose"_a = Verbosity::Silent,
+      "IsStrainInitialised"_a = IsStrainInitialised::False);
+  mod.def(
+      name,
+      [](muSpectre::Cell & s, const grad & g, solver & so, Real tr, Real nt,
+         Real eqt, Real it, Real dt, Verbosity verb,
+         IsStrainInitialised strain_init,
+         py::function & eigen_strain_pyfunc) -> OptimizeResult {
+        const grad_vec & g_vec{g};
+        Func_t eigen_strain_cpp_func{
+            [&eigen_strain_pyfunc](
+                const size_t & step_nb,
+                muGrid::TypedFieldBase<Real> & eigen_strain_field) {
+              eigen_strain_pyfunc(step_nb,
+                                  muGrid::numpy_wrap(eigen_strain_field,
+                                                     muGrid::IterUnit::SubPt));
+            }};
+        return trust_region_newton_cg(s, g_vec, so, tr, nt, eqt, it, dt, verb,
+                                      strain_init, eigen_strain_cpp_func)
+            .front();
+      },
+      "cell"_a, "ΔF₀"_a, "solver"_a, "trust_region"_a, "newton_tol"_a,
+      "equil_tol"_a, "inc_tr_tol"_a, "dec_tr_tol"_a,
+      "verbose"_a = Verbosity::Silent,
+      "IsStrainInitialised"_a = IsStrainInitialised::False,
+      "eigen_strain_func"_a = nullptr);
+  mod.def(
+      name,
+      [](muSpectre::Cell & s, const grad_vec & g, solver & so, Real tr, Real nt,
+         Real eqt, Real it, Real dt, Verbosity verb,
+         IsStrainInitialised strain_init) -> std::vector<OptimizeResult> {
+        return trust_region_newton_cg(s, g, so, tr, nt, eqt, it, dt, verb,
+                                      strain_init);
+      },
+      "cell"_a, "ΔF₀"_a, "solver"_a, "trust_region"_a, "newton_tol"_a,
+      "equil_tol"_a, "inc_tr_tol"_a = 0.0, "dec_tr_tol"_a,
+      "verbose"_a = Verbosity::Silent,
+      "IsStrainInitialised"_a = IsStrainInitialised::False);
+  mod.def(
+      name,
+      [](muSpectre::Cell & s, const grad_vec & g, solver & so, Real tr, Real nt,
+         Real eqt, Real it, Real dt, Verbosity verb,
+         IsStrainInitialised strain_init,
+         py::function & eigen_strain_pyfunc) -> std::vector<OptimizeResult> {
+        Func_t eigen_strain_cpp_func{
+            [&eigen_strain_pyfunc](
+                const size_t & step_nb,
+                muGrid::TypedFieldBase<Real> & eigen_strain_field) {
+              eigen_strain_pyfunc(step_nb,
+                                  muGrid::numpy_wrap(eigen_strain_field,
+                                                     muGrid::IterUnit::SubPt));
+            }};
+        return trust_region_newton_cg(s, g, so, tr, nt, eqt, it, dt, verb,
+                                      strain_init, eigen_strain_cpp_func);
+      },
+      "cell"_a, "ΔF₀"_a, "solver"_a, "trust_region"_a, "newton_tol"_a,
+      "equil_tol"_a, "inc_tr_tol"_a = 0.0, "dec_tr_tol"_a,
+      "verbose"_a = Verbosity::Silent,
+      "IsStrainInitialised"_a = IsStrainInitialised::False,
+      "eigen_strain_func"_a = nullptr);
+}
+
 void add_solver_helper(py::module & mod) {
   add_newton_cg_helper(mod);
   add_de_geus_helper(mod);
+  add_trust_region_newton_cg_helper(mod);
 }
 
 void add_solvers(py::module & mod) {

@@ -151,6 +151,41 @@ namespace muSpectre {
                    verbose, strain_init)[0];
   }
 
+  /* ---------------------------------------------------------------------- */
+  /**
+   * Uses the Newton-conjugate Gradient method to find the static
+   * equilibrium of a cell given a series of mean applied strain(ε for
+   * Formulation::small_strain and H (=F-I) for Formulation::finite_strain).
+   * The initial macroscopic strain state is set to zero in cell
+   * initialisation.
+   */
+  std::vector<OptimizeResult> trust_region_newton_cg(
+      Cell & cell, const LoadSteps_t & load_steps, KrylovSolverBase & solver,
+      const Real & max_trust_region, const Real & newton_tol,
+      const Real & equil_tol, const Real & inc_tr_tol, const Real & dec_tr_tol,
+      const Verbosity & verbose, const IsStrainInitialised & strain_init,
+      EigenStrainOptFunc_ref eigen_strain_func = muGrid::nullopt);
+
+  /**
+   * Uses the Newton-conjugate Gradient method to find the static
+   * equilibrium of a cell given a mean applied strain.
+   */
+  inline OptimizeResult trust_region_newton_cg(
+      Cell & cell, const Eigen::Ref<Eigen::MatrixXd> load_step,
+      KrylovSolverBase & solver, const Real & max_trust_region,
+      const Real & newton_tol, const Real & inc_tr_tol, const Real & dec_tr_tol,
+      const Real & reduction_tol, const Verbosity & verbose = Verbosity::Silent,
+      const IsStrainInitialised & strain_init = IsStrainInitialised::False,
+      EigenStrainOptFunc_ref eigen_strain_func = muGrid::nullopt) {
+    LoadSteps_t load_steps{load_step};
+    auto ret_val{trust_region_newton_cg(cell, load_steps, solver,
+                                        max_trust_region, newton_tol,
+                                        inc_tr_tol, dec_tr_tol, reduction_tol,
+                                        verbose, strain_init, eigen_strain_func)
+                     .front()};
+    return ret_val;
+  }
+
 }  // namespace muSpectre
 
 #endif  // SRC_SOLVER_SOLVERS_HH_
