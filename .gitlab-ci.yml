@@ -117,6 +117,6 @@ pypi:
   script:
     - python3 -m pip install twine
     - python3 setup.py sdist
-    - python3 -m twine upload --non-interactive --username __token__ --password "$PYPI_PASSWORD" dist/*
+    - python3 -m twine upload --non-interactive --username __token__ --password $PYPI_PASSWORD dist/*
   only:
     - tags
