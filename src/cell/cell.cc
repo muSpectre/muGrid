@@ -58,6 +58,7 @@ namespace muSpectre {
       : projection{std::move(projection)},
         fields{std::make_unique<muGrid::GlobalFieldCollection>(
             this->get_spatial_dim(),
+            this->projection->get_nb_domain_grid_pts(),
             this->projection->get_nb_subdomain_grid_pts(),
             this->projection->get_subdomain_locations(),
             muGrid::FieldCollection::SubPtMap_t{

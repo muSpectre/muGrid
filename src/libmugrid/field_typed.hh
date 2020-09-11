@@ -231,8 +231,14 @@ namespace muGrid {
     FieldMap<T, Mapping::Const>
     get_sub_pt_map(const Index_t & nb_rows = Unknown) const;
 
-    //! get the raw data ptr. don't use unless interfacing with external libs
+    //! get the raw data ptr. Don't use unless interfacing with external libs
     T * data() const;
+
+    /**
+     * return a pointer to the raw data. Don't use unless interfacing with
+     * external libs
+     **/
+    void * get_void_data_ptr() const final;
 
    protected:
     //! back-end for the public non-const eigen_XXX functions

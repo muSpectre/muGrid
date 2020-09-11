@@ -44,6 +44,7 @@
 #include <initializer_list>
 #include <algorithm>
 #include <vector>
+#include <cstdint>
 
 #ifndef SRC_LIBMUGRID_GRID_COMMON_HH_
 #define SRC_LIBMUGRID_GRID_COMMON_HH_
@@ -74,9 +75,13 @@ namespace muGrid {
   constexpr Index_t FourQuadPts{4};  //!< constant for 4 quadrature point/pixel
   constexpr Index_t OneNode{1};      //!< constant for 1 node per pixel
 
-  using Uint = unsigned int;  //!< type to use in math for unsigned integers
-  using Int = int;            //!< type to use in math for signed integers
-  using Real = double;        //!< type to use in math for real numbers
+  using Uint = unsigned int;     //!< type to use in math for unsigned integers
+  using Int = int;               //!< type to use in math for signed integers
+  using Uint64 = std::uint64_t;  //!< type to use in math for unsigned integers
+  using Int64 = std::int64_t;    //!< type to use in math for signed integers
+  using Uint16 = std::uint16_t;  //!< type to use in math for unsigned integers
+  using Int16 = std::int16_t;    //!< type to use in math for signed integers
+  using Real = double;           //!< type to use in math for real numbers
   using Complex =
       std::complex<Real>;  //!< type to use in math for complex numbers
 
@@ -86,37 +91,36 @@ namespace muGrid {
    * specify whether to iterate over pixels, quadrature points, or nodal points
    */
   enum class IterUnit {
-    Pixel,    //!< dofs relative to a pixel/voxel, no subdivision
-    SubPt     //!< dofs relative to sub-points (e.g. quadrature points)
+    Pixel,  //!< dofs relative to a pixel/voxel, no subdivision
+    SubPt   //!< dofs relative to sub-points (e.g. quadrature points)
   };
 
   /**
    * Specify the storage order of the components portion of the field
    */
   enum class StorageOrder {
-    ColMajor,    //!< column-major storage order (first index is fast)
+    ColMajor,  //!< column-major storage order (first index is fast)
     ArrayOfStructures = ColMajor,  //!< components are consecutive in memory
-    RowMajor,    //!< row-major storage order (last index is fast)
+    RowMajor,  //!< row-major storage order (last index is fast)
     StructurOfArrays = RowMajor,  //< pixels are consecutive in memory
-    Unknown,     //!< storage order is unknown, only for `WrappedField`
-    Automatic    //!< inherit storage order from `FieldCollection`
+    Unknown,   //!< storage order is unknown, only for `WrappedField`
+    Automatic  //!< inherit storage order from `FieldCollection`
   };
 
   //! Type used for shapes and strides
   using Shape_t = std::vector<Index_t>;
 
   /**
-   * this tag is always defined to one in every field collection 
+   * this tag is always defined to one in every field collection
    */
   const std::string PixelTag{"pixel"};
 
   //! inserts `muGrid::IterUnit` into `std::ostream`s
-  std::ostream &
-  operator<<(std::ostream & os, const IterUnit & sub_division);
+  std::ostream & operator<<(std::ostream & os, const IterUnit & sub_division);
 
   //! inserts `muGrid::StorageOrder` into `std::ostream`s
-  std::ostream &
-  operator<<(std::ostream & os, const StorageOrder & storage_order);
+  std::ostream & operator<<(std::ostream & os,
+                            const StorageOrder & storage_order);
 
   /**
    * Maps can give constant or mutable access to the mapped field through their

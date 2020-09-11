@@ -324,7 +324,7 @@ namespace muFFT {
                 << field.get_nb_dof_per_pixel()
                 << " degrees of freedom per pixel instead of the requested "
                 << nb_dof_per_pixel << ".";
-        throw muGrid::FieldCollectionError{message.str()};
+        throw FFTEngineError{message.str()};
       }
       return field;
     }
@@ -344,7 +344,7 @@ namespace muFFT {
         message << "Field '" << unique_name << "' exists, but it has shape of "
                 << field.get_components_shape() << " instead of the requested "
                 << shape << ".";
-        throw muGrid::FieldCollectionError{message.str()};
+        throw FFTEngineError{message.str()};
       }
       return field;
     }

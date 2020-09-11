@@ -60,6 +60,7 @@ set(mugrid_HDRS
   field_typed.hh
   field.hh
   field_collection.hh
+  file_io_base.hh
   ccoord_operations.hh
   raw_memory_operations.hh
   state_field_map.hh
@@ -77,9 +78,18 @@ set(mugrid_SRCS
   field.cc
   field_typed.cc
   field_map.cc
+  file_io_base.cc
   state_field.cc
   state_field_map.cc
   units.cc
+  )
+
+set(file_io_NETCDF_HDRS
+  file_io_netcdf.hh
+  )
+
+set(file_io_NETCDF_SRCS
+  file_io_netcdf.cc
   )
 
 add_library(muGrid "")
@@ -99,11 +109,36 @@ set_property(TARGET muGrid APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES
 target_compile_features(muGrid PUBLIC
   cxx_auto_type cxx_constexpr cxx_decltype cxx_decltype_auto)
 
+if(${MUSPECTRE_MPI_PARALLEL})
+  find_package(MPI REQUIRED)
+
+  target_link_libraries(muGrid PUBLIC ${MPI_LIBRARIES})
+  target_include_directories(muGrid SYSTEM PUBLIC ${MPI_C_INCLUDE_PATH})
+  target_compile_definitions(muGrid PUBLIC -DWITH_MPI)
+
+  set(mugrid_SRCS ${mugrid_SRCS} ../libmugrid/communicator.cc)
+endif()
+
+if(${NETCDF_IO})
+  if(${MUSPECTRE_MPI_PARALLEL})
+    # find and link PnetCDF
+    find_package(PnetCDF REQUIRED)
+    target_link_libraries(muGrid PUBLIC pnetcdf)
+  else()
+    # find and link NetCDF
+    find_package(NetCDF REQUIRED)
+    target_link_libraries(muGrid PUBLIC netcdf)
+  endif()
+  list(APPEND mugrid_HDRS ${file_io_NETCDF_HDRS})
+  list(APPEND mugrid_SRCS ${file_io_NETCDF_SRCS})
+endif()
+
 target_sources(muGrid PRIVATE ${mugrid_SRCS})
 
 if(MUGRID_NAMESPACE)
   add_library(${MUGRID_NAMESPACE}muGrid ALIAS muGrid)
 endif()
+
 
 # ------------------------------------------------------------------------------
 if(NOT MUGRID_TARGETS_EXPORT)

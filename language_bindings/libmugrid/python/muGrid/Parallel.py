@@ -1,29 +1,28 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
-@file   Communicator.py
+@file   Parallel.py
 
 @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
 
 @date   21 Mar 2018
 
-@brief  Main entry point for muFFT Python module
-
+@brief  muGrid Communicator object
 
 Copyright © 2018 Till Junge
 
-µFFT is free software; you can redistribute it and/or
+µGrid is free software; you can redistribute it and/or
 modify it under the terms of the GNU Lesser General Public License as
 published by the Free Software Foundation, either version 3, or (at
 your option) any later version.
 
-µFFT is distributed in the hope that it will be useful, but
+µGrid is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
 Lesser General Public License for more details.
 
 You should have received a copy of the GNU Lesser General Public License
-along with µFFT; see the file COPYING. If not, write to the
+along with µGrid; see the file COPYING. If not, write to the
 Free Software Foundation, Inc., 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.
 
@@ -35,7 +34,7 @@ covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
 
-import _muFFT
+import _muGrid
 
 try:
     from mpi4py import MPI
@@ -50,16 +49,16 @@ def Communicator(communicator=None):
     Parameters
     ----------
     communicator: mpi4py or muFFT communicator object
-        The bare MPI communicator. (Default: _muFFT.Communicator())
+        The bare MPI communicator. (Default: _muGrid.Communicator())
     """
     # If the communicator is None, we return a communicator that contains just
     # the present process.
     if communicator is None:
-        communicator = _muFFT.Communicator()
+        communicator = _muGrid.Communicator()
 
-    # If the communicator is already an instance if _muFFT.Communicator, just
+    # If the communicator is already an instance if _muGrid.Communicator, just
     # return that communicator.
-    if isinstance(communicator, _muFFT.Communicator):
+    if isinstance(communicator, _muGrid.Communicator):
         return communicator
 
     # Now we need to do some magic. See if the communicator that was passed
@@ -70,14 +69,14 @@ def Communicator(communicator=None):
         # If the size of the communicator group is 1, just return a
         # communicator that contains just the present process.
         if communicator.Get_size() == 1:
-            return _muFFT.Communicator()
+            return _muGrid.Communicator()
         # Otherwise, check if muFFT does actually have MPI support. If yes
         # we assume that the communicator is an mpi4py communicator.
-        elif _muFFT.Communicator.has_mpi:
+        elif _muGrid.Communicator.has_mpi:
             if not MPI:
                 raise RuntimeError('muFFT was compiled with MPI support but '
                                    'mpi4py could not be loaded.')
-            return _muFFT.Communicator(MPI._handleof(communicator))
+            return _muGrid.Communicator(MPI._handleof(communicator))
         else:
             raise RuntimeError('muFFT was compiled without MPI support.')
     else:

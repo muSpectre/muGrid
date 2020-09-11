@@ -58,6 +58,7 @@ option(MUSPECTRE_MAKE_EXAMPLES "If on, the executables in the bin folder will be
 option(MUSPECTRE_MAKE_BENCHMARKS "If on, the benchmarks will be compiled" ON)
 option(MUSPECTRE_MPI_PARALLEL "If on, MPI-parallel solvers become available" OFF)
 option(SPLIT_CELL "If on, split cell, cork and gmp are accessible" OFF)
+option(NETCDF_IO "If on, NETCDF/PNETCDF IO is available" OFF)
 set(MUCHOICE "muSpectre" CACHE STRING "Which µLevel is required")
 set_property(CACHE MUCHOICE PROPERTY STRINGS
   "muGrid"
@@ -111,7 +112,8 @@ endif()
 add_subdirectory(external)
 
 muSpectre_set_global_compile_options()
-# ------------------------------------------------------------------------------
+
+################################################################################x
 if(APPLE)
   include_directories(
     ${CMAKE_INSTALL_PREFIX}/include
@@ -123,6 +125,8 @@ if (${MUSPECTRE_MAKE_TESTS})
   enable_testing()
   add_subdirectory(tests)
 endif()
+
+################################################################################
 
 
 

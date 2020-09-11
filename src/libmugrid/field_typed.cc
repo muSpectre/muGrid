@@ -64,6 +64,12 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
+  void * TypedFieldBase<T>::get_void_data_ptr() const {
+    return static_cast<void *>(this->data_ptr);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
   TypedField<T> & TypedField<T>::operator=(const Parent & other) {
     Parent::operator=(other);
     return *this;
@@ -110,7 +116,7 @@ namespace muGrid {
       return dynamic_cast<TypedField<T> &>(other);
     } catch (const std::bad_cast &) {
       std::stringstream error{};
-      error << "Cannot cast field'" << other.get_name()
+      error << "Can not cast field '" << other.get_name()
             << "' to a typed field of type '" << typeid(T).name()
             << "', because it is of type '" << other.get_stored_typeid().name()
             << "'.";
@@ -125,7 +131,7 @@ namespace muGrid {
       return dynamic_cast<const TypedField<T> &>(other);
     } catch (const std::bad_cast &) {
       std::stringstream error{};
-      error << "Cannot cast field'" << other.get_name()
+      error << "Can not cast field '" << other.get_name()
             << "' to a typed field of type '" << typeid(T).name()
             << "', because it is of type '" << other.get_stored_typeid().name()
             << "'.";
@@ -140,7 +146,7 @@ namespace muGrid {
                                            const std::string & sub_division) {
     if (other.get_nb_components() != nb_components) {
       std::stringstream err_msg{};
-      err_msg << "Cannot cast field'" << other.get_name()
+      err_msg << "Can not cast field '" << other.get_name()
               << "', because it has " << other.get_nb_components()
               << " degrees of freedom per sub-point, rather than the "
               << nb_components << " components which are requested.";
@@ -148,7 +154,7 @@ namespace muGrid {
     }
     if (other.get_sub_division_tag() != sub_division) {
       std::stringstream err_msg{};
-      err_msg << "Cannot cast field'" << other.get_name()
+      err_msg << "Can not cast field '" << other.get_name()
               << "', because it's subdivision is '"
               << other.get_sub_division_tag() << "', rather than "
               << sub_division << ", which are requested.";
@@ -160,12 +166,11 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   template <typename T>
   const TypedField<T> &
-  TypedField<T>::safe_cast(const Field & other,
-                           const Index_t & nb_components,
+  TypedField<T>::safe_cast(const Field & other, const Index_t & nb_components,
                            const std::string & sub_division) {
     if (other.get_nb_components() != nb_components) {
       std::stringstream err_msg{};
-      err_msg << "Cannot cast field'" << other.get_name()
+      err_msg << "Can not cast field '" << other.get_name()
               << "', because it has " << other.get_nb_components()
               << " degrees of freedom per sub-point, rather than the "
               << nb_components << " components which are requested.";
@@ -173,7 +178,7 @@ namespace muGrid {
     }
     if (other.get_sub_division_tag() != sub_division) {
       std::stringstream err_msg{};
-      err_msg << "Cannot cast field'" << other.get_name()
+      err_msg << "Can not cast field '" << other.get_name()
               << "', because it's subdivision is '"
               << other.get_sub_division_tag() << "', rather than "
               << sub_division << ", which are requested.";
@@ -195,8 +200,7 @@ namespace muGrid {
     }
 
     auto && size{this->nb_sub_pts * this->get_nb_pixels()};
-    const auto expected_size{size * this->get_nb_components() +
-                             this->pad_size};
+    const auto expected_size{size * this->get_nb_components() + this->pad_size};
     if (this->values.size() != expected_size or
         static_cast<Index_t>(this->current_nb_entries) != size) {
       this->current_nb_entries = size;
@@ -219,7 +223,7 @@ namespace muGrid {
                        "add individual pixels");
     }
     if (not this->has_nb_sub_pts()) {
-      throw FieldError("Cannot push_back into a field before the number of "
+      throw FieldError("Can not push_back into a field before the number of "
                        "sub-division points has been set for it");
     }
     if (this->nb_components != 1) {
@@ -242,7 +246,7 @@ namespace muGrid {
                        "add individual pixels");
     }
     if (not this->has_nb_sub_pts()) {
-      throw FieldError("Cannot push_back into a field before the number of "
+      throw FieldError("Can not push_back into a field before the number of "
                        "sub-division points has bee set for.");
     }
     if (this->nb_components != value.size()) {
@@ -491,12 +495,9 @@ namespace muGrid {
                                 const Index_t & nb_components,
                                 const size_t & size, T * ptr,
                                 const std::string & sub_division_tag,
-                                const Unit & unit,
-                                const Shape_t & strides)
-      : Parent{unique_name, collection, nb_components, sub_division_tag,
-               unit},
-        size{size},
-        strides{strides} {
+                                const Unit & unit, const Shape_t & strides)
+      : Parent{unique_name, collection, nb_components, sub_division_tag, unit},
+        size{size}, strides{strides} {
     this->current_nb_entries = size / this->nb_components;
 
     if (static_cast<Index_t>(size) !=
@@ -511,13 +512,11 @@ namespace muGrid {
     if (this->get_nb_entries() !=
         static_cast<Index_t>(this->current_nb_entries)) {
       std::stringstream error{};
-      error << "Size mismatch: This field should store "
-            << this->nb_components << " component(s) on "
-            << this->collection.get_nb_pixels() << " pixels ("
-            << this->get_pixels_shape() << " grid) with "
-            << this->get_nb_sub_pts()
-            << " sub-point(s) each (sub-point tag '" << sub_division_tag
-            << "'), i.e. with a total of "
+      error << "Size mismatch: This field should store " << this->nb_components
+            << " component(s) on " << this->collection.get_nb_pixels()
+            << " pixels (" << this->get_pixels_shape() << " grid) with "
+            << this->get_nb_sub_pts() << " sub-point(s) each (sub-point tag '"
+            << sub_division_tag << "'), i.e. with a total of "
             << this->get_nb_entries() * this->nb_components
             << " scalar values, but you supplied an array of size " << size
             << ".";
@@ -532,12 +531,10 @@ namespace muGrid {
                                 const Shape_t & components_shape,
                                 const size_t & size, T * ptr,
                                 const std::string & sub_division_tag,
-                                const Unit & unit,
-                                const Shape_t & strides)
+                                const Unit & unit, const Shape_t & strides)
       : Parent{unique_name, collection, components_shape, sub_division_tag,
                unit},
-        size{size},
-        strides{strides} {
+        size{size}, strides{strides} {
     this->current_nb_entries = size / this->nb_components;
 
     if (static_cast<Index_t>(size) !=
@@ -551,14 +548,12 @@ namespace muGrid {
     }
     if (this->get_nb_entries() != Index_t(this->current_nb_entries)) {
       std::stringstream error{};
-      error << "Size mismatch: This field should store "
-            << this->nb_components << " component(s) (shape "
-            << this->components_shape << ") on "
+      error << "Size mismatch: This field should store " << this->nb_components
+            << " component(s) (shape " << this->components_shape << ") on "
             << this->collection.get_nb_pixels() << " pixels ("
             << this->get_pixels_shape() << " grid) with "
-            << this->get_nb_sub_pts()
-            << " sub-point(s) each (sub-point tag '" << sub_division_tag
-            << "'), i.e. with a total of "
+            << this->get_nb_sub_pts() << " sub-point(s) each (sub-point tag '"
+            << sub_division_tag << "'), i.e. with a total of "
             << this->get_nb_entries() * this->nb_components
             << " scalar values, but you supplied an array of size " << size
             << ".";
@@ -573,16 +568,11 @@ namespace muGrid {
                                 const Index_t & nb_components,
                                 Eigen::Ref<EigenRep_t> values,
                                 const std::string & sub_division_tag,
-                                const Unit & unit,
-                                const Shape_t & strides)
-      : WrappedField{unique_name,
-                     collection,
-                     nb_components,
-                     static_cast<size_t>(values.size()),
-                     values.data(),
-                     sub_division_tag,
-                     unit,
-                     strides} {}
+                                const Unit & unit, const Shape_t & strides)
+      : WrappedField{unique_name,   collection,
+                     nb_components, static_cast<size_t>(values.size()),
+                     values.data(), sub_division_tag,
+                     unit,          strides} {}
 
   template <typename T>
   WrappedField<T>::WrappedField(const std::string & unique_name,
@@ -590,8 +580,7 @@ namespace muGrid {
                                 const Shape_t & components_shape,
                                 Eigen::Ref<EigenRep_t> values,
                                 const std::string & sub_division_tag,
-                                const Unit & unit,
-                                const Shape_t & strides)
+                                const Unit & unit, const Shape_t & strides)
       : WrappedField{unique_name,
                      collection,
                      components_shape,
@@ -608,14 +597,13 @@ namespace muGrid {
                                    const Index_t & nb_components,
                                    Eigen::Ref<const EigenRep_t> values,
                                    const std::string & sub_division,
-                                   const Unit & unit,
-                                   const Shape_t & strides)
+                                   const Unit & unit, const Shape_t & strides)
       -> std::unique_ptr<const WrappedField> {
     Eigen::Map<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>> map{
         const_cast<T *>(values.data()), values.rows(), values.cols()};
-    return std::make_unique<WrappedField>(
-        unique_name, collection, nb_components, map, sub_division, unit,
-        strides);
+    return std::make_unique<WrappedField>(unique_name, collection,
+                                          nb_components, map, sub_division,
+                                          unit, strides);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -638,8 +626,7 @@ namespace muGrid {
   template <typename T>
   void WrappedField<T>::resize() {
     auto && size{this->get_nb_entries()};
-    const auto expected_size{size * this->get_nb_components() +
-                             this->pad_size};
+    const auto expected_size{size * this->get_nb_components() + this->pad_size};
     if (expected_size != this->get_buffer_size()) {
       std::stringstream error{};
       error << "Wrapped fields cannot be resized. The current wrapped size is "
@@ -686,11 +673,13 @@ namespace muGrid {
   template class TypedFieldBase<Complex>;
   template class TypedFieldBase<Int>;
   template class TypedFieldBase<Uint>;
+  template class TypedFieldBase<Index_t>;
 
   template class TypedField<Real>;
   template class TypedField<Complex>;
   template class TypedField<Int>;
   template class TypedField<Uint>;
+  template class TypedField<Index_t>;
 
   template class WrappedField<Real>;
   template class WrappedField<Complex>;

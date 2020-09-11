@@ -41,7 +41,7 @@ PYBIND11_MODULE(_muGrid, mod) {
   mod.doc() = "Python bindings to the µGrid library";
 
   add_common(mod);
-
+  add_communicator(mod);
   add_field_classes(mod);
   add_field_collection_classes(mod);
 }

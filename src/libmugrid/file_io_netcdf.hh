@@ -1,0 +1,848 @@
+/**
+ * @file   file_io_netcdf.hh
+ *
+ * @author Richard Leute <richard.leute@imtek.uni-freiburg.de>
+ *
+ * @date   25 Mai 2020
+ *
+ * @brief  Using the FileIOBase class to implement a serial and parallel I/O
+ *         interface for NetCDF files
+ *
+ * Copyright © 2020 Till Junge
+ *
+ * µGrid is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3, or (at
+ * your option) any later version.
+ *
+ * µGrid is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with µGrid; see the file COPYING. If not, write to the
+ * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+ * Boston, MA 02111-1307, USA.
+ *
+ * Additional permission under GNU GPL version 3 section 7
+ *
+ * If you modify this Program, or any covered work, by linking or combining it
+ * with proprietary FFT implementations or numerical libraries, containing parts
+ * covered by the terms of those libraries' licenses, the licensors of this
+ * Program grant you additional permission to convey the resulting work.
+ *
+ */
+
+#ifndef SRC_LIBMUGRID_FILE_IO_NETCDF_HH_
+#define SRC_LIBMUGRID_FILE_IO_NETCDF_HH_
+
+#include <string>
+#include <memory>
+#include <typeinfo>
+
+#include "communicator.hh"
+#include "field.hh"
+#include "field_collection.hh"
+#include "field_map_static.hh"
+#include "file_io_base.hh"
+
+#ifdef WITH_MPI
+#include <pnetcdf.h>
+const auto ncmu_create = ncmpi_create;
+const auto ncmu_open = ncmpi_open;
+const auto ncmu_enddef = ncmpi_enddef;
+const auto ncmu_redef = ncmpi_redef;
+const auto ncmu_begin_indep_data = ncmpi_begin_indep_data;
+const auto ncmu_end_indep_data = ncmpi_end_indep_data;
+const auto ncmu_close = ncmpi_close;
+const auto ncmu_strerror = ncmpi_strerrno;
+const auto ncmu_def_dim = ncmpi_def_dim;
+const auto ncmu_def_var = ncmpi_def_var;
+const auto ncmu_inq = ncmpi_inq;
+const auto ncmu_inq_varid = ncmpi_inq_varid;
+const auto ncmu_inq_dimlen = ncmpi_inq_dimlen;
+const auto ncmu_inq_dimid = ncmpi_inq_dimid;
+const auto ncmu_inq_unlimdim = ncmpi_inq_unlimdim;
+const auto ncmu_inq_attname = ncmpi_inq_attname;
+const auto ncmu_inq_att = ncmpi_inq_att;
+const auto ncmu_get_vara_all = ncmpi_get_vara_all;
+const auto ncmu_get_varm_all = ncmpi_get_varm_all;
+const auto ncmu_get_varm = ncmpi_get_varm;
+const auto ncmu_get_varn_all = ncmpi_get_varn_all;
+const auto ncmu_get_att = ncmpi_get_att;
+const auto ncmu_put_vara_all = ncmpi_put_vara_all;
+const auto ncmu_put_varm_all = ncmpi_put_varm_all;
+const auto ncmu_put_varm = ncmpi_put_varm;
+const auto ncmu_put_varn_all = ncmpi_put_varn_all;
+const auto ncmu_put_att_text = ncmpi_put_att_text;
+const auto ncmu_put_att = ncmpi_put_att;
+using Datatype_t = MPI_Datatype;
+using IOSize_t = MPI_Offset;
+using IODiff_t = MPI_Offset;
+#else  // WITH_MPI
+#include <netcdf.h>
+const auto ncmu_create = nc_create;
+const auto ncmu_open = nc_open;
+const auto ncmu_enddef = nc_enddef;
+const auto ncmu_redef = nc_redef;
+const auto ncmu_close = nc_close;
+const auto ncmu_strerror = nc_strerror;
+const auto ncmu_def_dim = nc_def_dim;
+const auto ncmu_def_var = nc_def_var;
+const auto ncmu_inq = nc_inq;
+const auto ncmu_inq_varid = nc_inq_varid;
+const auto ncmu_inq_dimlen = nc_inq_dimlen;
+const auto ncmu_inq_dimid = nc_inq_dimid;
+const auto ncmu_inq_unlimdim = nc_inq_unlimdim;
+const auto ncmu_inq_attname = nc_inq_attname;
+const auto ncmu_inq_att = nc_inq_att;
+const auto ncmu_get_vara_all = nc_get_vara;
+const auto ncmu_get_varm_all = nc_get_varm;
+const auto ncmu_get_varm = nc_get_varm;
+const auto ncmu_get_varn_all = nc_get_vara;
+const auto ncmu_get_att = nc_get_att;
+const auto ncmu_put_vara_all = nc_put_vara;
+const auto ncmu_put_varm_all = nc_put_varm;
+const auto ncmu_put_varm = nc_put_varm;
+const auto ncmu_put_varn_all = nc_put_vara;
+const auto ncmu_put_att_text = nc_put_att_text;
+const auto ncmu_put_att = nc_put_att;
+using Datatype_t = nc_type;
+using IOSize_t = size_t;
+using IODiff_t = ptrdiff_t;
+#endif  // WITH_MPI
+
+namespace muGrid {
+  constexpr static muGrid::Int64 GFC_LOCAL_PIXELS_DEFAULT_VALUE{
+      -1};  // default value to fill the global field collection which stores
+            // the offsets of the pixels from a local field collection. As the
+            // offsets are larger or equal than zero a negative value is used
+            // as default. Arbitrary we choose -1.
+  constexpr static int DEFAULT_NETCDFDIM_ID{
+      -1};  // default id value for uninitalised NetCDFDim objects. Valid ids
+            // starting from zero.
+  constexpr static int DEFAULT_NETCDFVAR_ID{
+      -1};  // default id value for uninitalised NetCDFVar objects. Valid ids
+            // starting from zero.
+
+  /**
+   * Class to store the properties of a single NetCDF dimension
+   * (name, id, size, initialised)
+   **/
+  class NetCDFDim {
+   public:
+    //! Default constructor
+    NetCDFDim() = delete;
+
+    /**
+     * Constructor with the dimension name and size
+     */
+    NetCDFDim(const std::string & dim_base_name, const IOSize_t & dim_size);
+
+    //! Copy constructor
+    NetCDFDim(const NetCDFDim & other) = default;
+
+    //! Move constructor
+    NetCDFDim(NetCDFDim && other) = delete;
+
+    //! Destructor
+    ~NetCDFDim() = default;
+
+    //! Copy assignment operator
+    NetCDFDim & operator=(const NetCDFDim & other) = delete;
+
+    //! Move assignment operator
+    NetCDFDim & operator=(NetCDFDim && other) = delete;
+
+    //! get_dimension id
+    const int & get_id() const;
+
+    //! set_dimension id
+    int & set_id();
+
+    //! get_dimension size
+    const IOSize_t & get_size() const;
+
+    //! get_dimension name
+    const std::string & get_name() const;
+
+    //! get the base name of the dimension
+    std::string get_base_name() const;
+
+    //! compute the base name of a given name.
+    static std::string compute_base_name(const std::string & full_name);
+
+    static std::string compute_dim_name(const std::string & dim_base_name,
+                                        const std::string & suffix);
+
+    //! compare the dimension is equal to the given dim_name and size
+    bool equal(const std::string & dim_name, const IOSize_t & dim_size) const;
+
+    //! register dimension id, only possible if the id was not already
+    //! registered (initialised == false).
+    void register_id(const int dim_id);
+
+    //! register unlimited dimension size to NC_UNLIMITED this is only possible
+    //! for the dimension with name "frame".
+    void register_unlimited_dim_size();
+
+   protected:
+    int id{DEFAULT_NETCDFDIM_ID};  //!< location to store the returned dimension
+                                   //!< ID.
+    IOSize_t
+        size{};  //!< Length of dimension; that is, number of values for this
+                 //!< dimension as an index to variables that use it. 0 is
+                 //!< reserved for the unlimited dimension, NC_UNLIMITED.
+    std::string
+        name;  //!< Dimension name. Must be a legal netCDF identifier.
+    bool initialised{
+        false};  //!< bool to check the initialisation status of a dimension
+                 //!< only true if size was correct initialised.
+  };
+
+  /**
+   * Class to store the attributes belonging to a NetCDFVar variable
+   * (att_name, data_type, nelems, value, name_initialised, value_initialised)
+   **/
+  class NetCDFAtt {
+   public:
+    //! Default constructor
+    NetCDFAtt() = delete;
+
+    /**
+     * Constructor with the attribute name and its value (char, short, int,
+     * float, double, unsigned short, unsigned int, muGrid::Int64 and unsigned
+     * muGrid::Int64) the values are represented by std::vector<T> of the
+     * corresponding type 'T'. The type char has an additional convenience
+     * constructor which can take also std::string as input.
+     */
+    // char value
+    NetCDFAtt(const std::string & att_name, const std::vector<char> & value);
+
+    // char value, convenience constructor which can take a std::string value
+    NetCDFAtt(const std::string & att_name, const std::string & value);
+
+    // muGrid::Int16 value
+    NetCDFAtt(const std::string & att_name,
+              const std::vector<muGrid::Int16> & value);
+
+    // int value
+    NetCDFAtt(const std::string & att_name, const std::vector<int> & value);
+
+    // float value
+    NetCDFAtt(const std::string & att_name, const std::vector<float> & value);
+
+    // double value
+    NetCDFAtt(const std::string & att_name, const std::vector<double> & value);
+
+    // muGrid::Uint16 value
+    NetCDFAtt(const std::string & att_name,
+              const std::vector<muGrid::Uint16> & value);
+
+    // unsigned int value
+    NetCDFAtt(const std::string & att_name,
+              const std::vector<unsigned int> & value);
+
+    // muGrid::Int64 value
+    NetCDFAtt(const std::string & att_name,
+              const std::vector<muGrid::Int64> & value);
+
+    // muGrid::Uint64 value
+    NetCDFAtt(const std::string & att_name,
+              const std::vector<muGrid::Uint64> & value);
+
+    /**
+     * Constructor with the attribute name, data_type and nelems
+     */
+    NetCDFAtt(const std::string & att_name, const nc_type & att_data_type,
+              const IOSize_t & att_nelems);
+
+    //! Copy constructor
+    NetCDFAtt(const NetCDFAtt & other) = default;
+
+    //! Move constructor
+    NetCDFAtt(NetCDFAtt && other) = delete;
+
+    //! Destructor
+    ~NetCDFAtt() = default;
+
+    //! Copy assignment operator
+    NetCDFAtt & operator=(const NetCDFAtt & other) = delete;
+
+    //! Move assignment operator
+    NetCDFAtt & operator=(NetCDFAtt && other) = delete;
+
+    //! return attribute name
+    const std::string & get_name() const;
+
+    //! return nc_type data type of attribute value
+    const nc_type & get_data_type() const;
+
+    //! return 'nelems' number of values stored in the attribute value
+    const IOSize_t & get_nelems() const;
+
+    //! return a pointer on the attribute value
+    const void * get_value() const;
+
+    //! return the attribute value as std::string
+    std::string get_value_as_string() const;
+
+    //! converts an input void * value into an std::string under the assumption
+    //! that its data type is equal to the attributes data type and also its
+    //! number of elements corresponds to the attributes number of elements.
+    //! Internal the function get_value_as_string() is used.
+    std::string convert_void_value_to_string(void * value) const;
+
+    //! register the attribute value from a void * on the value it is assumed
+    //! that the value type is the already registered data_type.
+    void register_value(void * value);
+
+    //! reserve enoug space for the value returned from the NetCDF file and
+    //! return a pointer on it
+    void * reserve_value_space();
+
+    //! compares the input void * value with the stored attributes value and
+    //! returns true if they have the same value(s) and otherwise false. The
+    //! function compares the actual stored value(s) and not the pointers.
+    bool equal_value(void * value) const;
+
+    //! return initialisation status of name, data_type and nelems
+    bool is_name_initialised() const;
+
+    //! return initialisation status of the value
+    bool is_value_initialised() const;
+
+   private:
+    std::string att_name;
+    nc_type data_type;
+    IOSize_t nelems{0};
+
+    // possible values are: char, short, int, float, double, unsigned short,
+    // unsigned int, muGrid::Int64 and muGrid::Uint64
+    // Only one of these following vectors can be non zero size. Would be
+    // represented by std::variant in C++17.
+    std::vector<char> value_c{};
+    std::vector<muGrid::Int16> value_si{};
+    std::vector<int> value_i{};
+    std::vector<float> value_f{};
+    std::vector<double> value_d{};
+    std::vector<muGrid::Uint16> value_usi{};
+    std::vector<unsigned int> value_ui{};
+    std::vector<muGrid::Int64> value_lli{};
+    std::vector<muGrid::Uint64> value_ulli{};
+
+    // flags to see whether the attribute was already initialised or not
+    bool name_initialised{
+        false};  // true if name, data_type and nelems was set, else false
+    bool value_initialised{false};  // true if value was set, else false
+  };
+
+  /**
+   * Class to store the properties of a single NetCDF variable
+   * (name, data_type, ndims, id, netcdf_dims, field, netcdf_atts, initialised,
+   *  validity_domain, local_field_name, hidden)
+   **/
+  class NetCDFVar {
+   public:
+    //! Default constructor
+    NetCDFVar() = delete;
+
+    /**
+     * Constructor with the variable name, data type, variable dimensions and a
+     * vector of shared pointers to its associated NetCDFDims.
+     */
+    NetCDFVar(const std::string & var_name, const nc_type & var_data_type,
+              const IOSize_t & var_ndims,
+              const std::vector<std::shared_ptr<NetCDFDim>> & netcdf_var_dims,
+              muGrid::Field & var_field, bool hidden = false);
+
+    //! Copy constructor
+    NetCDFVar(const NetCDFVar & other) = default;
+
+    //! Move constructor
+    NetCDFVar(NetCDFVar && other) = delete;
+
+    //! Destructor
+    ~NetCDFVar() = default;
+
+    //! Copy assignment operator
+    NetCDFVar & operator=(const NetCDFVar & other) = delete;
+
+    //! Move assignment operator
+    NetCDFVar & operator=(NetCDFVar && other) = delete;
+
+    //! get the name of the NetCDF variable
+    const std::string & get_name() const;
+
+    //! get the data type of the NetCDF variable
+    const nc_type & get_data_type() const;
+
+    //! get the number of dimensions of the NetCDF variable
+    const IOSize_t & get_ndims() const;
+
+    //! get the unique id of the NetCDF variable
+    const int & get_id() const;
+
+    //! get a non const reference to the unique id of the NetCDF variable to set
+    //! its value
+    int & set_id();
+
+    //! get a vector of all dimension ids of the NetCDF variable
+    std::vector<int> get_netcdf_dim_ids() const;
+
+    //! get a vector of all dimension names of the NetCDF variable
+    std::vector<std::string> get_netcdf_dim_names() const;
+
+    //! get a reference to the field represented by the NetCDF variable
+    const muGrid::Field & get_field() const;
+
+    //! get a const std::vector<NetCDFAtt> & of all attributes belonging to the
+    //! NetCDFVar
+    const std::vector<NetCDFAtt> & get_netcdf_atts() const;
+
+    //! get a non const std::vector<NetCDFAtt> & of all attributes belonging to
+    //! the NetCDFVar to set the actual values of the attributes
+    std::vector<NetCDFAtt> & set_netcdf_atts();
+
+    //! get a std::vector<std::string> with the names of all attributes
+    std::vector<std::string> get_netcdf_att_names() const;
+
+    //! get the FieldCollection::ValidityDomain & of the NetCDFVar
+    const muGrid::FieldCollection::ValidityDomain & get_validity_domain() const;
+
+    //! get the number of pixels of the local field collection living on the
+    //! current processor
+    IOSize_t get_nb_local_pixels() const;
+
+    //! get a pointer to the raw data for the NetCDF variable
+    void * get_buf() const;
+
+    //! An integer indicates the number of MPI derived data type elements in the
+    //! global variable buffer to be written to a file.
+    IOSize_t get_bufcount_mpi_global() const;
+
+    //! An integer indicates the number of MPI derived data type elements in the
+    //! local variable buffer to be written to a file. (this is the buf count
+    //! for a single pixel)
+    IOSize_t get_bufcount_mpi_local() const;
+
+    //! A data type that describes the memory layout of the variable buffer
+    Datatype_t get_buftype() const;
+
+    //! A vector of IOSize_t values specifying the index in the variable
+    //! where the first of the data values will be written. This function gives
+    //! the start for contiguous global fields written with ncmu_put_varm_all
+    std::vector<IOSize_t> get_start_global(const Index_t & frame) const;
+
+    //! A vector of IOSize_t values specifying the index in the variable
+    //! where the first of the data values will be written. This function gives
+    //! the start for distributed local fields written with ncmu_put_varn_all
+    std::vector<IOSize_t> get_start_local(const Index_t & frame,
+                                          muGrid::Field & local_pixels) const;
+
+    //! A vector of IOSize_t values specifying the edge lengths along each
+    //! dimension of the block of data values to be written. This function gives
+    //! the count for contiguous global fields written with ncmu_put_varm_all
+    std::vector<IOSize_t> get_count_global() const;
+
+    //! A vector of IOSize_t values specifying the edge lengths along each
+    //! dimension of the block of data values to be written. This function gives
+    //! the count for distributed local fields written with ncmu_put_varn_all
+    std::vector<IOSize_t> get_count_local() const;
+
+    // A vector of Size_t integers that specifies the sampling interval
+    // along each dimension of the netCDF variable.
+    std::vector<IODiff_t> get_nc_stride() const;
+
+    // A vector of IOSize_t integers that the mapping between the dimensions of
+    // a NetCDF variable and the in-memory structure of the internal data array.
+    std::vector<IODiff_t> get_nc_imap_global() const;
+
+    std::vector<IODiff_t> get_nc_imap_local() const;
+
+    //! Convert a "std::type_info"  into a NetCDF "nc_type" type.
+    static nc_type typeid_to_nc_type(const std::type_info & type_id);
+
+#ifdef WITH_MPI
+    //! convert a nc_type data_type into a MPI::Datatype
+    static MPI::Datatype nc_type_to_mpi_datatype(const nc_type & data_type);
+#endif  // WITH_MPI
+
+    //! register variable id, only possible if the id was not already
+    //! registered (id=-1).
+    void register_id(const int var_id);
+
+    //! register local_field_name, only possible if the variable belongs to a
+    //! local field collection
+    void register_local_field_name(const std::string & local_field_name);
+
+    //! get the local_field_name, only possible if the variable belongs to a
+    //! local field collection
+    const std::string & get_local_field_name() const;
+
+    //! return the status of the variable whether it is a hidden=true netCDFVar
+    //! which is only used for book keeping of local fields or a normal
+    //! NetCDFVar hidden=false
+    bool get_hidden_status() const;
+
+    //! add an attribute to the variable by its name and value
+    //! the following types are supported:
+    //! T                                    nc_type    data_type in NetCDf file
+    //! ------------------------------------------------------------------------
+    //! std::vector<char>                    NC_CHAR    char *
+    //! std::vector<muGrid::Int16>           NC_SHORT   short int *
+    //! std::vector<int>                     NC_INT     int *
+    //! std::vector<float>                   NC_FLOAT   float *
+    //! std::vector<double>                  NC_DOUBLE  double *
+    //! std::vector<muGrid::Uint16>          NC_USHORT  unsigned short int *
+    //! std::vector<muGrid::Int64>           NC_INT64   long long int *
+    //! std::vector<muGrid::Uint64>          NC_UINT64  unsigned long long int *
+    template <typename T>
+    void add_attribute(const std::string & att_name, const T & value);
+
+    //! register an attribute by its name (att_name), data type (att_data_type)
+    //! and number of elements (att_nelems), afterwards you can read in a value
+    //! of type 'void *' from a NetCDF file by e.g. ncmu_get_att()
+    void register_attribute(const std::string & att_name,
+                            const nc_type & att_data_type,
+                            const IOSize_t & att_nelems);
+
+    //! add the unit of the field as attribute to the variable
+    void add_attribute_unit();
+
+    //! add the name of the associated local pixels field as attribute to the
+    //! variable
+    void add_attribute_local_pixels_field();
+
+    //! increments the input buf pointer "buf_ptr" by n elements
+    //! "increment_nb_elements" and returns the incremented void pointer to the
+    //! new buffer position. This function is made to increment the pointer of
+    //! the variables field. Therefore the variables data_type is assumed to be
+    //! the data type of the input void * buf_ptr. If your input does not have
+    //! the same type the increment will give you wrong results
+    void * increment_buf_ptr(void * buf_ptr,
+                             const IOSize_t & increment_nb_elements) const;
+
+   protected:
+    std::string name;  // Variable name. Must be a legal netCDF identifier.
+    nc_type data_type{NC_NAT};  // One of the predefined netCDF external data
+                                // types. NAT = Not A Type.
+    IOSize_t ndims{};           // Number of dimensions of the variable.
+    int id{DEFAULT_NETCDFVAR_ID};  // location to store the returned NetCDF
+                                   // variable ID. Variable IDs starting at 0.
+    std::vector<std::shared_ptr<NetCDFDim>> netcdf_dims{
+        nullptr};  // list of NetCDFDims belonging to the variable.
+    muGrid::Field &
+        field;  // Reference to the field in which the variable data is stored
+    std::vector<NetCDFAtt> netcdf_atts{};  // vector of all variable attributes
+    bool initialised{
+        false};  //!< bool to check the initialisation status of a variable
+                 //!< only true if ndims was correct initialised.
+    const muGrid::FieldCollection::ValidityDomain
+        validity_domain{};  // stores whether a variable belongs to a global or
+                            // local field.
+    std::string local_field_name{};  // name of the field that is storing the
+                                     // local pixels
+    bool hidden{false};  // internal book keeping variables for the local fields
+                         // are hidden (hidden=true) all other variables are
+                         // treated normal (hidden=false)
+  };
+
+  /**
+   * Class to store the NetCDF dimensions
+   * (dim_vector, global_domain_grid)
+   **/
+  class NetCDFDimensions {
+   public:
+    NetCDFDimensions() = default;
+
+    //! Copy constructor
+    NetCDFDimensions(const NetCDFDimensions & other) = delete;
+
+    //! Move constructor
+    NetCDFDimensions(NetCDFDimensions && other) = delete;
+
+    //! Destructor
+    ~NetCDFDimensions() = default;
+
+    //! Copy assignment operator
+    NetCDFDimensions & operator=(const NetCDFDimensions & other) = delete;
+
+    //! Move assignment operator
+    NetCDFDimensions & operator=(NetCDFDimensions && other) = delete;
+
+    //! Add a Dimension given its base name and size
+    //! returns a std::shared_ptr<NetCDFDim> to the added NetCDFDim object
+    std::shared_ptr<NetCDFDim> add_dim(const std::string & dim_name,
+                                       const IOSize_t & dim_size);
+
+    //! Add all dimensions of a global Field (f, x, y, z, s, n)
+    //! f: frame
+    //! x: number of points in x direction
+    //! y: number of points in y direction
+    //! z: number of points in z direction
+    //! s: number of sub points per point (pixel)
+    //! n: number of DOFs per sub point
+    void add_field_dims_global(
+        const muGrid::Field & field,
+        std::vector<std::shared_ptr<NetCDFDim>> & field_dims);
+
+    //! Add all dimensions of a local Field (f, i, s, n)
+    //! f: frame
+    //! i: total number of points (pixels) in the local field
+    //! s: number of sub points per point (pixel)
+    //! n: number of DOFs per sub point
+    void
+    add_field_dims_local(const muGrid::Field & field,
+                         std::vector<std::shared_ptr<NetCDFDim>> & field_dims,
+                         const Communicator & comm);
+
+    //! find dimension by unique dim_name and size
+    //! returns a std::shared_ptr<NetCDFDim> to the found dimension, if the
+    //! dimension is not found it returns the end of the dim_vector of the
+    //! NetCDFDimensions object and throws a muGrid::FielIOError.
+    std::shared_ptr<NetCDFDim> find_dim(const std::string & dim_name,
+                                        const IOSize_t & dim_size);
+
+    //! find dimension only by the unique dim_name
+    //! returns a std::shared_ptr<NetCDFDim> to the found dimension, if the
+    //! dimension is not found it returns the end of the dim_vector of the
+    //! NetCDFDimensions object and throws a muGrid::FielIOError.
+    std::shared_ptr<NetCDFDim> find_dim(const std::string & dim_name);
+
+    //! return a std::vector<std::shared_ptr<NetCDFDim>> & of all NetCDfDims
+    //! belonging to the NetCDFDimensions
+    const std::vector<std::shared_ptr<NetCDFDim>> & get_dim_vector() const;
+
+   protected:
+    std::vector<std::shared_ptr<NetCDFDim>> dim_vector{};
+    std::vector<Index_t> global_domain_grid{0, 0, 0};
+  };
+
+  /**
+   * Class to store the NetCDF variables
+   **/
+  class NetCDFVariables {
+   public:
+    NetCDFVariables() = default;
+
+    //! Copy constructor
+    NetCDFVariables(const NetCDFVariables & other) = delete;
+
+    //! Move constructor
+    NetCDFVariables(NetCDFVariables && other) = delete;
+
+    //! Destructor
+    ~NetCDFVariables() = default;
+
+    //! Copy assignment operator
+    NetCDFVariables & operator=(const NetCDFVariables & other) = delete;
+
+    //! Move assignment operator
+    NetCDFVariables & operator=(NetCDFVariables && other) = delete;
+
+    //! Add operator for a single NetCDFVar
+    NetCDFVariables & operator+=(NetCDFVar & rhs);
+
+    //! Add a variable given its variable name, NetCDF data type, number of
+    //! dimensions and a vector of all NetCDF dimensions belonging to the
+    //! variable
+    NetCDFVar &
+    add_var(const std::string & var_name, const nc_type & var_data_type,
+            const IOSize_t & var_ndims,
+            const std::vector<std::shared_ptr<NetCDFDim>> & netcdf_var_dims,
+            muGrid::Field & var_field, bool hidden = false);
+
+    //! Add a local or global field as variable and attach the dimensions to it.
+    NetCDFVar &
+    add_field_var(muGrid::Field & field,
+                  const std::vector<std::shared_ptr<NetCDFDim>> & field_dims,
+                  bool hidden = false);
+
+    //! return a const reference on the var_vector which stores all variables
+    const std::vector<NetCDFVar> & get_var_vector() const;
+
+    //! return a non const reference on the var_vector which stores all
+    //! variables to modify the NetCDFVar objects
+    std::vector<NetCDFVar> & set_var_vector();
+
+    //! vector of all variable names (i.e. all field names stored in variables)
+    //! with exception of the book keeping variables for the local fields which
+    //! can be given by get_hidden_names()
+    std::vector<std::string> get_names() const;
+
+    //! vector of all book keeping variables for the registered local fields
+    std::vector<std::string> get_hidden_names() const;
+
+    //! get a NetCDFVar variable from the var_vector by its unique name
+    const NetCDFVar & get_variable(const std::string & var_name) const;
+
+   protected:
+    std::vector<NetCDFVar> var_vector{};
+  };
+
+  /**
+   * FileIO class for netcdf files.
+   */
+  class FileIONetCDF : public FileIOBase {
+   public:
+    constexpr static int MAX_NB_ATTRIBUTES{
+        10};  // maximum number of allowed attributes per variable
+    constexpr static int MAX_LEN_ATTRIBUTE_NAME{
+        20};  // maximum length of an attribute name
+
+    enum class NetCDFMode { UndefinedMode, DefineMode, DataMode };
+    //! Default constructor
+    FileIONetCDF() = delete;
+
+    /**
+     * Constructor with the domain's number of grid points in each direciton,
+     * the number of components to transform, and the communicator
+     */
+    FileIONetCDF(const std::string & file_name,
+                 const FileIOBase::OpenMode & open_mode,
+                 Communicator comm = Communicator());
+
+    //! Copy constructor
+    FileIONetCDF(const FileIONetCDF & other) = delete;
+
+    //! Move constructor
+    FileIONetCDF(FileIONetCDF && other) = delete;
+
+    //! Destructor
+    virtual ~FileIONetCDF();
+
+    //! Copy assignment operator
+    FileIONetCDF & operator=(const FileIONetCDF & other) = delete;
+
+    //! Move assignment operator
+    FileIONetCDF & operator=(FileIONetCDF && other) = delete;
+
+    //! Tell the I/O object about the field collections we want to dump to this
+    //! file before the file is opened
+    //! @parameter field_names -- name of fields from the field collection that
+    //! schould be saved in the NetCDF file. This parameter should be used if
+    //! not all fields from the field collection will be written to the file
+    //! (default case).
+    void register_field_collection(
+        muGrid::FieldCollection & fc,
+        std::vector<std::string> field_names = {}) final;
+
+    //! close file
+    void close() final;
+
+    //! read the fields identified by `field_names` frame from file
+    void read(const Index_t & frame,
+              const std::vector<std::string> & field_names) final;
+
+    //! read the fields in frame from file
+    void read(const Index_t & frame) final;
+
+    //! write contents of all fields within the field collection with the name
+    //! in field_names to the frame in file
+    void write(const Index_t & frame,
+               const std::vector<std::string> & field_names) final;
+
+    //! write contents of all fields within the field collection to the file
+    void write(const Index_t & frame) final;
+
+   protected:
+    //! open file for read/write
+    //! This function is called by the constructor at instantiation.
+    void open() final;
+
+    //! checks if the frame is valid and computes the corresponding positive
+    //! frame value for a negative frame value. Examples:
+    //! a) nb_frames = 5; frame_in = -3; frame_out = 2
+    //! b) nb_frames = 5; frame_in = 3; frame_out = 3
+    //! c) nb_frames = 5; frame_in = 7; Error
+    //! d) nb_frames = 5; frame_in = -6; Error
+    Index_t handle_frame(Index_t frame) const;
+
+    //! register global field collection
+    void register_field_collection_global(
+        muGrid::GlobalFieldCollection & fc_global,
+        const std::vector<std::string> & field_names) final;
+
+    //! register local field collection
+    void register_field_collection_local(
+        muGrid::LocalFieldCollection & fc_local,
+        const std::vector<std::string> & field_names) final;
+
+    //! when registering the first global field collection, I initialise the
+    //! global field collection local_pixels.
+    void initialise_gfc_local_pixels(
+        const muGrid::GlobalFieldCollection & fc_global);
+
+    //! add the global pixels field associated with a local field collection to
+    //! the global field collection which stores the position of the local
+    //! pixels and the offsets to read the data of a local variable in a proper
+    //! way.
+    std::string
+    register_lfc_to_gfc_local_pixels(muGrid::LocalFieldCollection & fc_local);
+
+    //! write contents of all fields within the field collection with the name
+    //! in field_names that have no frame dimension.
+    void write_no_frame(const std::vector<std::string> & field_names);
+
+    //! actual call of NetCDF functions to write a single NetCDFVar
+    void write_netcdfvar(const Index_t & frame_index, const NetCDFVar & var);
+
+    //! actual call of NetCDF functions to read in the data of a single
+    //! NetCDFVar
+    void read_netcdfvar(const Index_t & frame, const NetCDFVar & var);
+
+    //! define the dimensions in the NetCDF file (to write a file)
+    void define_netcdf_dimensions(NetCDFDimensions & dimensions);
+
+    //! define the variables in the NetCDF file (to write a file)
+    void define_netcdf_variables(NetCDFVariables & variables);
+
+    //! define the variables attributes in the NetCDF file (to write a file)
+    void define_netcdf_attributes(NetCDFVariables & variables);
+
+    //! inquiry and register the dimension ids of the NetCDF file (to read or
+    //! append a file)
+    //! @ ndims      : number of dimensions that have to be registered, i.e.
+    //!                computed by ncmu_inq().
+    //! @ unlimdimid : the NetCDF dimension ID of the unlimited dimension, i.e.
+    //!                computed by ncmu_inq().
+    void register_netcdf_dimension_ids(muGrid::Uint64 ndims,
+                                       Index_t unlimdimid);
+
+    //! inquiry and register the variable ids of the NetCDF file (to read or
+    //! append a file)
+    //! @ ndims : number of variables that have to be registered, i.e. computed
+    //!           by ncmu_inq().
+    void register_netcdf_variable_ids(muGrid::Uint64 nvars);
+
+    //! inquiry and register the attribute names of variables from the NetCDF
+    //! file. Here the names are registered because attributes have no unique
+    //! IDs, their numbers can change. (to read or append a file)
+    void register_netcdf_attribute_names();
+
+    //! register the values of all attributes with register names
+    void register_netcdf_attribute_values();
+
+    int netcdf_id{-1};  // the netcdf ID, -1 is an invalid value
+    NetCDFMode netcdf_mode{
+        NetCDFMode::UndefinedMode};  // save the modus of the NetCDF file e.g.
+                                     // after ncmu_create it is in define_mode,
+                                     // thus netcdf_mode = DefineMode.
+
+    NetCDFDimensions dimensions;
+    NetCDFVariables variables;
+
+    // for book keeping of local field collections
+    const std::string pixel{"pixel"};
+    const muGrid::FieldCollection::SubPtMap_t nb_sub_pts;
+    muGrid::GlobalFieldCollection GFC_local_pixels;
+    bool initialised_GFC_local_pixels{false};
+    std::vector<std::string> written_local_pixel_fields{};
+    std::vector<std::string> read_local_pixel_fields{};
+  };
+
+}  // namespace muGrid
+
+#endif  // SRC_LIBMUGRID_FILE_IO_NETCDF_HH_

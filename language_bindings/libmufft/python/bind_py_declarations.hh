@@ -40,7 +40,6 @@
 namespace py = pybind11;
 
 void add_common(py::module & mod);
-void add_communicator(py::module & mod);
 void add_derivatives(py::module & mod);
 void add_fft_engines(py::module & mod);
 

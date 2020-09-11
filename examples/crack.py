@@ -180,6 +180,7 @@ if matplotlib_found and MPI.COMM_WORLD.Get_size() == 1:
 
     plt.tight_layout()
 
+    # prevent visual output during ctest
     if len(sys.argv[:]) == 2:
         if sys.argv[1] == 1:
             print("I skip the ploting of the results because you gave '1' as "

@@ -105,7 +105,7 @@ namespace muSpectre {
     using FC_t = muGrid::GlobalFieldCollection;
     FC_t globalfields{Fix::mdim()};
     globalfields.set_nb_sub_pts(QuadPtTag, Fix::NbQuadPts());
-    globalfields.initialise(cube, loc);
+    globalfields.initialise(cube, cube, loc);
 
     Mat_t zero{Mat_t::Zero()};
     Mat_t F{Mat_t::Random() / 100 + Mat_t::Identity()};
@@ -199,7 +199,7 @@ namespace muSpectre {
                                      muGrid::ipow(Fix::mdim(), 4),
                                      QuadPtTag);  // to be computed with tangent
 
-    globalfields.initialise(cube, loc);
+    globalfields.initialise(cube, cube, loc);
 
     using traits = MaterialMuSpectre_traits<typename Fix::Mat>;
     {  // block to contain not-constant gradient map

@@ -111,7 +111,8 @@ namespace muSpectre {
 
     fix::projector.initialise();
 
-    fields.initialise(fix::projector.get_nb_subdomain_grid_pts(),
+    fields.initialise(fix::projector.get_nb_domain_grid_pts(),
+                      fix::projector.get_nb_subdomain_grid_pts(),
                       fix::projector.get_subdomain_locations());
     fix::projector.apply_projection(f_var);
 
@@ -189,7 +190,8 @@ namespace muSpectre {
     FieldMap grad(f_grad);
     FieldMap grad_test(f_grad_test);
 
-    fields.initialise(fix::projector.get_nb_subdomain_grid_pts(),
+    fields.initialise(fix::projector.get_nb_domain_grid_pts(),
+                      fix::projector.get_nb_subdomain_grid_pts(),
                       fix::projector.get_subdomain_locations());
 
     f_grad.eigen_vec().setRandom();

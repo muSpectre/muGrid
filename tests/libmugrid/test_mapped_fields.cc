@@ -52,7 +52,7 @@ namespace muGrid {
     GlobalFieldCollection fc{DimS};
     static std::string division_tag() { return "tag"; }
     InitialiserBase() {
-      this->fc.initialise(Ccoord_t<twoD>{2, 3});
+      this->fc.initialise(Ccoord_t<twoD>{2, 3}, Ccoord_t<twoD>{2, 3});
       this->fc.set_nb_sub_pts(division_tag(), NbQuad);
     }
   };
@@ -108,7 +108,7 @@ namespace muGrid {
     const std::string division_tag{"tag"};
     GlobalFieldCollection collection{twoD};
     collection.set_nb_sub_pts(division_tag, NbQuad);
-    collection.initialise({2, 2});
+    collection.initialise({2, 2}, {2, 2});
     using Mapped_t = MappedField<FieldMap<Real, Mapping::Mut>>;
     Mapped_t mapped_field{"name", NbRow, NbCol, IterUnit::SubPt,
                           collection, division_tag};
@@ -190,7 +190,7 @@ namespace muGrid {
     // check that returned size is correct
     Index_t len{2};
     auto sizes{CcoordOps::get_cube<SDim>(len)};
-    fc.initialise(sizes, {});
+    fc.initialise(sizes, sizes, {});
 
     auto nb_pixels{CcoordOps::get_size(sizes)};
     BOOST_CHECK_EQUAL(tensor_field.get_field().get_nb_entries(),

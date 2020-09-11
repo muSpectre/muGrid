@@ -35,7 +35,7 @@
 
 #include "solver/krylov_solver_cg.hh"
 #include "cell/cell_adaptor.hh"
-#include <libmufft/communicator.hh>
+#include <libmugrid/communicator.hh>
 
 #include <iomanip>
 #include <sstream>

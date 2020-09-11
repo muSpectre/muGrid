@@ -41,7 +41,6 @@ PYBIND11_MODULE(_muFFT, mod) {
   mod.doc() = "Python bindings to the µFFT library";
 
   add_common(mod);
-  add_communicator(mod);
   add_derivatives(mod);
   add_fft_engines(mod);
 }

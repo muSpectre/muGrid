@@ -39,7 +39,7 @@
 #include <boost/mpl/list.hpp>
 
 #include "tests.hh"
-#include "mpi_context.hh"
+#include "tests/libmugrid/mpi_context.hh"
 #include <libmufft/fftw_engine.hh>
 #ifdef WITH_FFTWMPI
 #include <libmufft/fftwmpi_engine.hh>
@@ -139,7 +139,8 @@ namespace muFFT {
     auto & ref{fc.register_real_field("reference", Fix::sdim * Fix::sdim)};
     auto & result{fc.register_real_field("result", Fix::sdim * Fix::sdim)};
 
-    fc.initialise(Fix::engine.get_nb_subdomain_grid_pts(),
+    fc.initialise(Fix::engine.get_nb_domain_grid_pts(),
+                  Fix::engine.get_nb_subdomain_grid_pts(),
                   Fix::engine.get_subdomain_locations());
 
     using map_t = muGrid::MatrixFieldMap<Real, Mapping::Mut, Fix::sdim,
@@ -243,6 +244,16 @@ namespace muFFT {
         BOOST_CHECK_EQUAL(res(row, col), (row * nb_cols + col + 1) * nb_cores);
       }
     }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  BOOST_AUTO_TEST_CASE(cum_sum_test) {
+    auto & comm{MPIContext::get_context().comm};
+    auto rank{comm.rank()};
+    int send_val{rank + 1};
+    int res{comm.template cum_sum<int>(send_val)};
+    // 1 + 2 + 3 + ... + n = n*(n+1)/2
+    BOOST_CHECK_EQUAL(res, rank * (rank + 1) / 2 + rank + 1);
   }
 
   BOOST_AUTO_TEST_SUITE_END();

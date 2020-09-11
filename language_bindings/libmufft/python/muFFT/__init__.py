@@ -49,9 +49,10 @@ from _muFFT import (version, FourierDerivative, DiscreteDerivative,
 
 import muFFT.Stencils2D
 import muFFT.Stencils3D
-from .Communicator import Communicator
 
-has_mpi = _muFFT.Communicator.has_mpi
+from muGrid import Communicator
+
+has_mpi = _muGrid.Communicator.has_mpi
 
 # This is a list of FFT engines that are potentially available.
 #              |------------------------------- Identifier for 'FFT' class
@@ -89,14 +90,12 @@ def FFT(nb_grid_pts, fft='serial', communicator=None, **kwargs):
     ----------
     nb_grid_pts: list
         Grid nb_grid_pts in the Cartesian directions.
-    nb_dof_per_pixel: int
-        Number of degrees of freedom per pixel in the transform. Default: 1
     fft: string
         FFT engine to use. Use 'mpi' if you want a parallel engine and 'serial'
         if you need a serial engine. It is also possible to specifically
         choose 'fftw', 'fftwmpi', 'pfft' or 'p3dfft'.
         Default: 'serial'.
-    communicator: mpi4py or muFFT communicator
+    communicator: mpi4py or muGrid communicator
         communicator object passed to parallel FFT engines. Note that
         the default 'fftw' engine does not support parallel execution.
         Default: None

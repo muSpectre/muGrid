@@ -430,7 +430,8 @@ namespace muSpectre {
 
     BOOST_TEST_CHECKPOINT("fields and maps constructed");
 
-    fields.initialise(fix::projector.get_nb_subdomain_grid_pts(),
+    fields.initialise(fix::projector.get_nb_domain_grid_pts(),
+                      fix::projector.get_nb_subdomain_grid_pts(),
                       fix::projector.get_subdomain_locations());
 
     BOOST_TEST_CHECKPOINT("fields and maps initialised");
@@ -531,7 +532,8 @@ namespace muSpectre {
     FieldMap grad(f_grad);
     FieldMap grad_test(f_grad_test);
 
-    fields.initialise(fix::projector.get_nb_subdomain_grid_pts(),
+    fields.initialise(fix::projector.get_nb_domain_grid_pts(),
+                      fix::projector.get_nb_subdomain_grid_pts(),
                       fix::projector.get_subdomain_locations());
 
     for (auto && tup : akantu::zip(

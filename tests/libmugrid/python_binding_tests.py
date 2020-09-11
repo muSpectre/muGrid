@@ -41,5 +41,7 @@ from python_test_imports import muGrid
 from python_common_tests import *
 from python_field_tests import *
 
+from python_communicator_tests import Communicator_Check
+
 if __name__ == '__main__':
     unittest.main()

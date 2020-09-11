@@ -163,6 +163,7 @@ void add_proj_helper(py::module & mod, std::string name_start) {
 
              auto strain_shape = proj.get_strain_shape();
              NumpyProxy<Real, py::array::f_style> proxy(
+                 proj.get_nb_domain_grid_pts(),
                  proj.get_nb_subdomain_grid_pts(),
                  proj.get_subdomain_locations(), proj.get_nb_quad_pts(),
                  {strain_shape[0], strain_shape[1]}, proj_vector_field);

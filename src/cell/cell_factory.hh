@@ -45,7 +45,7 @@
 #include <libmufft/fftw_engine.hh>
 
 #ifdef WITH_MPI
-#include <libmufft/communicator.hh>
+#include <libmugrid/communicator.hh>
 #include <libmufft/fftwmpi_engine.hh>
 #endif
 

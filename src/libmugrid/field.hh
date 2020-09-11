@@ -252,6 +252,11 @@ namespace muGrid {
      */
     virtual const std::type_info & get_stored_typeid() const = 0;
 
+    /**
+     * return a pointer to the raw data
+     **/
+    virtual void * get_void_data_ptr() const = 0;
+
     //! number of entries in the field (= nb_pixel × nb_sub_pts)
     Index_t get_current_nb_entries() const;
 
@@ -278,11 +283,19 @@ namespace muGrid {
      */
     bool is_global() const;
 
+    /**
+     * return the spatial dimension of the underlying discretisation grid
+     */
+    const Index_t & get_spatial_dim() const;
+
     //! check wether the number of pixel sub-divisions has been set
     bool has_nb_sub_pts() const;
 
     //! returns a const ref to the field's pixel sub-division type
     const std::string & get_sub_division_tag() const;
+
+    //! returns the physical unit of the values stored in the field
+    const Unit & get_physical_unit() const;
 
    protected:
     //! gives field collections the ability to resize() fields

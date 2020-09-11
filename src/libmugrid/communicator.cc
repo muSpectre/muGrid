@@ -9,18 +9,18 @@
  *
  * Copyright © 2019 Till Junge
  *
- * µFFT is free software; you can redistribute it and/or
+ * µGrid is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
  * published by the Free Software Foundation, either version 3, or (at
  * your option) any later version.
  *
- * µFFT is distributed in the hope that it will be useful, but
+ * µGrid is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
- * along with µFFT; see the file COPYING. If not, write to the
+ * along with µGrid; see the file COPYING. If not, write to the
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
  *
@@ -35,15 +35,15 @@
 
 #include <sstream>
 
-#include <libmugrid/exception.hh>
+#include "exception.hh"
 
 #include "communicator.hh"
 
-namespace muFFT {
+namespace muGrid {
 
   Communicator::Communicator(MPI_Comm comm) : comm{comm} {}
 
-  Communicator::Communicator(const muFFT::Communicator & other)
+  Communicator::Communicator(const Communicator & other)
       : comm(other.comm) {}
 
   Communicator::~Communicator() {}
@@ -55,11 +55,11 @@ namespace muFFT {
 
   //! sum reduction on EigenMatrix types
   template <typename T>
-  auto Communicator::sum_mat(const Eigen::Ref<Matrix_t<T>> & arg) const
-      -> Matrix_t<T> {
+  auto Communicator::sum_mat(const Eigen::Ref<DynMatrix_t<T>> & arg) const
+      -> DynMatrix_t<T> {
     if (this->comm == MPI_COMM_NULL)
       return arg;
-    Matrix_t<T> res(arg.rows(), arg.cols());
+    DynMatrix_t<T> res(arg.rows(), arg.cols());
     res.setZero();
     const auto count{arg.size()};
     MPI_Allreduce(arg.data(), res.data(), count, mpi_type<T>(), MPI_SUM,
@@ -67,20 +67,30 @@ namespace muFFT {
     return res;
   }
 
-  template auto Communicator::sum_mat(const Eigen::Ref<Matrix_t<Real>> &) const
-      -> Matrix_t<Real>;
-  template auto Communicator::sum_mat(const Eigen::Ref<Matrix_t<Int>> &) const
-      -> Matrix_t<int>;
-  template auto Communicator::sum_mat(const Eigen::Ref<Matrix_t<Uint>> &) const
-      -> Matrix_t<Uint>;
   template auto
-  Communicator::sum_mat(const Eigen::Ref<Matrix_t<Complex>> &) const
-      -> Matrix_t<Complex>;
+  Communicator::sum_mat(const Eigen::Ref<DynMatrix_t<Real>> &) const
+      -> DynMatrix_t<Real>;
+  template auto
+  Communicator::sum_mat(const Eigen::Ref<DynMatrix_t<Int>> &) const
+      -> DynMatrix_t<int>;
+  template auto
+  Communicator::sum_mat(const Eigen::Ref<DynMatrix_t<Uint>> &) const
+      -> DynMatrix_t<Uint>;
+  template auto
+  Communicator::sum_mat(const Eigen::Ref<DynMatrix_t<Complex>> &) const
+      -> DynMatrix_t<Complex>;
+
+  //! cumulative sum on scalars
+  template auto Communicator::cumulative_sum(const Int &) const -> Int;
+  template auto Communicator::cumulative_sum(const Real &) const -> Real;
+  template auto Communicator::cumulative_sum(const Uint &) const -> Uint;
+  template auto Communicator::cumulative_sum(const Index_t &) const -> Index_t;
+  template auto Communicator::cumulative_sum(const Complex &) const -> Complex;
 
   //! gather on EigenMatrix types
   template <typename T>
-  auto Communicator::gather(const Eigen::Ref<Matrix_t<T>> & arg) const
-      -> Matrix_t<T> {
+  auto Communicator::gather(const Eigen::Ref<DynMatrix_t<T>> & arg) const
+      -> DynMatrix_t<T> {
     if (this->comm == MPI_COMM_NULL)
       return arg;
     Index_t send_buf_size(arg.size());
@@ -108,7 +118,7 @@ namespace muFFT {
       nb_entries += arg_sizes[i];
     }
 
-    Matrix_t<T> res(arg.rows(), nb_entries / arg.rows());
+    DynMatrix_t<T> res(arg.rows(), nb_entries / arg.rows());
     res.setZero();
 
     message =
@@ -124,14 +134,17 @@ namespace muFFT {
     return res;
   }
 
-  template auto Communicator::gather(const Eigen::Ref<Matrix_t<Real>> &) const
-      -> Matrix_t<Real>;
-  template auto Communicator::gather(const Eigen::Ref<Matrix_t<Int>> &) const
-      -> Matrix_t<int>;
-  template auto Communicator::gather(const Eigen::Ref<Matrix_t<Uint>> &) const
-      -> Matrix_t<Uint>;
   template auto
-  Communicator::gather(const Eigen::Ref<Matrix_t<Complex>> &) const
-      -> Matrix_t<Complex>;
+  Communicator::gather(const Eigen::Ref<DynMatrix_t<Real>> &) const
+      -> DynMatrix_t<Real>;
+  template auto
+  Communicator::gather(const Eigen::Ref<DynMatrix_t<Int>> &) const
+      -> DynMatrix_t<int>;
+  template auto
+  Communicator::gather(const Eigen::Ref<DynMatrix_t<Uint>> &) const
+      -> DynMatrix_t<Uint>;
+  template auto
+  Communicator::gather(const Eigen::Ref<DynMatrix_t<Complex>> &) const
+      -> DynMatrix_t<Complex>;
 
-}  // namespace muFFT
+}  // namespace muGrid

@@ -62,6 +62,24 @@ muGrid_add_test(main_mugrid_test_suite
   SOURCES main_test_suite.cc test_goodies.cc field_test_fixtures.cc ${TEST_SRCS}
   TYPE BOOST --report_level=detailed)
 
+if(${MUSPECTRE_MPI_PARALLEL})
+  # add MPI tests
+  file(GLOB TEST_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/mpi_*.cc")
+
+  muGrid_add_test(mugrid_mpi_main_test_suite1
+          SOURCES main_test_suite.cc ${TEST_SRCS}
+          TARGET mpi_main_test_suite
+          TYPE BOOST MPI_NB_PROCS 1 --report_level=detailed)
+  muGrid_add_test(mugrid_mpi_main_test_suite2
+          TARGET mpi_main_test_suite
+          TYPE BOOST MPI_NB_PROCS 2 --report_level=detailed)
+
+  muGrid_add_test(mugrid_python_mpi_binding_test1 TYPE PYTHON MPI_NB_PROCS 1
+    python_mpi_binding_test.py)
+  muGrid_add_test(mugrid_python_mpi_binding_test2 TYPE PYTHON MPI_NB_PROCS 2
+    python_mpi_binding_test.py)
+endif()
+
 ##############################################################################
 # license test
 

@@ -49,10 +49,12 @@ namespace muFFT {
                          bool allow_destroy_input)
       : Parent{nb_grid_pts, comm, plan_flags, allow_temporary_buffer,
                allow_destroy_input} {
-    this->real_field_collection.initialise(this->nb_subdomain_grid_pts,
+    this->real_field_collection.initialise(this->nb_domain_grid_pts,
+                                           this->nb_subdomain_grid_pts,
                                            this->subdomain_locations,
                                            this->subdomain_strides);
-    this->fourier_field_collection.initialise(this->nb_fourier_grid_pts,
+    this->fourier_field_collection.initialise(this->nb_domain_grid_pts,
+                                              this->nb_fourier_grid_pts,
                                               this->fourier_locations,
                                               this->fourier_strides);
   }

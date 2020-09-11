@@ -161,20 +161,25 @@ namespace muGrid {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(initialisation_test_global, Fix,
                                    GlobalFCFixtures, Fix) {
-    Ccoord_t<Fix::spatial_dimension()> nb_grid_pts{};
+    Ccoord_t<Fix::spatial_dimension()> nb_domain_grid_pts{};
+    Ccoord_t<Fix::spatial_dimension()> nb_subdomain_grid_pts{};
     Dim_t nb_pixels{1};
     for (int i{0}; i < Fix::spatial_dimension(); ++i) {
       const auto nb_grid{2 * i + 1};
-      nb_grid_pts[i] = nb_grid;
+      nb_domain_grid_pts[i] = nb_grid;
+      nb_subdomain_grid_pts[i] = nb_grid;
       nb_pixels *= nb_grid;
     }
-    CcoordOps::Pixels<Fix::spatial_dimension()> pixels{nb_grid_pts};
+    CcoordOps::Pixels<Fix::spatial_dimension()> pixels{nb_subdomain_grid_pts};
     BOOST_CHECK(not Fix::fc.is_initialised());
-    BOOST_CHECK_NO_THROW(Fix::fc.initialise(nb_grid_pts));
+    BOOST_CHECK_NO_THROW(
+        Fix::fc.initialise(nb_domain_grid_pts, nb_subdomain_grid_pts));
     BOOST_CHECK(Fix::fc.is_initialised());
 
     //! double initialisation is forbidden
-    BOOST_CHECK_THROW(Fix::fc.initialise(nb_grid_pts), FieldCollectionError);
+    BOOST_CHECK_THROW(
+        Fix::fc.initialise(nb_domain_grid_pts, nb_subdomain_grid_pts),
+        FieldCollectionError);
 
     for (auto && tup : akantu::zip(Fix::fc.get_pixels(), pixels)) {
       auto && stored_id{std::get<0>(tup)};
@@ -208,16 +213,18 @@ namespace muGrid {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(iteration_test_global, Fix, GlobalFCFixtures,
                                    Fix) {
-    Ccoord_t<Fix::spatial_dimension()> nb_grid_pts{};
+    Ccoord_t<Fix::spatial_dimension()> nb_domain_grid_pts{};
+    Ccoord_t<Fix::spatial_dimension()> nb_subdomain_grid_pts{};
     Dim_t nb_pixels{1};
     constexpr Dim_t NbQuad{3};
     for (int i{0}; i < Fix::spatial_dimension(); ++i) {
       const auto nb_grid{2 * i + 1};
-      nb_grid_pts[i] = nb_grid;
+      nb_domain_grid_pts[i] = nb_grid;
+      nb_subdomain_grid_pts[i] = nb_grid;
       nb_pixels *= nb_grid;
     }
     Fix::fc.set_nb_sub_pts(this->sub_division_tag(), NbQuad);
-    Fix::fc.initialise(nb_grid_pts);
+    Fix::fc.initialise(nb_domain_grid_pts, nb_subdomain_grid_pts);
 
     for (auto && tup : akantu::enumerate(Fix::fc.get_pixel_indices())) {
       auto && counter{std::get<0>(tup)};
@@ -263,16 +270,18 @@ namespace muGrid {
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(global_clone, Fix, GlobalFCFixtures, Fix) {
-    Ccoord_t<Fix::spatial_dimension()> nb_grid_pts{};
+    Ccoord_t<Fix::spatial_dimension()> nb_domain_grid_pts{};
+    Ccoord_t<Fix::spatial_dimension()> nb_subdomain_grid_pts{};
     Dim_t nb_pixels{1};
     constexpr Dim_t NbQuad{3};
     for (int i{0}; i < Fix::spatial_dimension(); ++i) {
       const auto nb_grid{2 * i + 1};
-      nb_grid_pts[i] = nb_grid;
+      nb_domain_grid_pts[i] = nb_grid;
+      nb_subdomain_grid_pts[i] = nb_grid;
       nb_pixels *= nb_grid;
     }
     Fix::fc.set_nb_sub_pts(this->sub_division_tag(), NbQuad);
-    Fix::fc.initialise(nb_grid_pts);
+    Fix::fc.initialise(nb_domain_grid_pts, nb_subdomain_grid_pts);
 
     auto fc2{Fix::fc.get_empty_clone()};
     BOOST_CHECK_EQUAL(fc2.get_nb_sub_pts(this->sub_division_tag()),

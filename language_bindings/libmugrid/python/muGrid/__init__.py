@@ -41,3 +41,6 @@ from _muGrid import (get_domain_ccoord, get_domain_index, Pixel, StorageOrder,
                      SubPt, DynCcoord, DynRcoord, IterUnit, Verbosity,
                      GlobalFieldCollection, LocalFieldCollection, Unit)
 
+from .Parallel import Communicator
+
+has_mpi = _muGrid.Communicator.has_mpi

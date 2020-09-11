@@ -58,7 +58,7 @@ muFFT_add_test(mufft_python_binding_test TYPE
 
 if(${MUSPECTRE_MPI_PARALLEL})
   # add MPI tests
-  file(GLOB TEST_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/mpi_test_*.cc")
+  file(GLOB TEST_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/mpi_*.cc")
 
   muFFT_add_test(mufft_mpi_main_test_suite1
     SOURCES mpi_main_test_suite.cc ${TEST_SRCS}

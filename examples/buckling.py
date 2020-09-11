@@ -35,7 +35,7 @@ Program grant you additional permission to convey the resulting work.
 """
 
 from mpi4py import MPI
-
+import sys
 import numpy as np
 
 try:

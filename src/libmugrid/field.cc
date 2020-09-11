@@ -328,6 +328,10 @@ namespace muGrid {
            FieldCollection::ValidityDomain::Global;
   }
 
+  const Index_t & Field::get_spatial_dim() const {
+    return this->collection.get_spatial_dim();
+  }
+
   /* ---------------------------------------------------------------------- */
   bool Field::has_nb_sub_pts() const { return this->nb_sub_pts != Unknown; }
 
@@ -335,6 +339,9 @@ namespace muGrid {
   const std::string & Field::get_sub_division_tag() const {
     return this->sub_division_tag;
   }
+
+  /* ---------------------------------------------------------------------- */
+  const Unit & Field::get_physical_unit() const { return this->unit; }
 
   /* ---------------------------------------------------------------------- */
   void Field::set_nb_sub_pts(const Index_t & nb_sub_pts_per_pixel) {

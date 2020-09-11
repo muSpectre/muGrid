@@ -40,12 +40,13 @@
 #include <libmugrid/field_collection_global.hh>
 #include <libmugrid/field_typed.hh>
 
-#include "communicator.hh"
+#include "libmugrid/communicator.hh"
 #include "mufft_common.hh"
 
 #include <set>
 
 namespace muFFT {
+  using muGrid::Communicator;
 
   /**
    * base class for FFTEngine-related exceptions
@@ -241,16 +242,19 @@ namespace muFFT {
     const DynCcoord_t & get_nb_subdomain_grid_pts() const {
       return this->nb_subdomain_grid_pts;
     }
+
     /**
      * returns the global number of grid points in each direction of the cell
      */
     const DynCcoord_t & get_nb_domain_grid_pts() const {
       return this->nb_domain_grid_pts;
     }
+
     //! returns the process-local locations of the cell
     const DynCcoord_t & get_subdomain_locations() const {
       return this->subdomain_locations;
     }
+
     //! returns the data layout of the process-local grid
     const DynCcoord_t & get_subdomain_strides() const {
       return this->subdomain_strides;

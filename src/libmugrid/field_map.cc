@@ -230,4 +230,6 @@ namespace muGrid {
   template class FieldMap<Int, Mapping::Mut>;
   template class FieldMap<Uint, Mapping::Const>;
   template class FieldMap<Uint, Mapping::Mut>;
+  template class FieldMap<Index_t, Mapping::Const>;
+  template class FieldMap<Index_t, Mapping::Mut>;
 }  // namespace muGrid

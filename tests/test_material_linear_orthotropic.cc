@@ -122,13 +122,13 @@ namespace muSpectre {
         newton_cg(sys_lin, grads, cg_lin, newton_tol, equil_tol, verbose)[0]
             .grad};
 
-    KrylovSolverCG cg_non{sys_non, cg_tol, maxiter, verbose};
-    Eigen::ArrayXXd res1{
-        newton_cg(sys_non, grads, cg_non, newton_tol, equil_tol, verbose)[0]
-            .grad};
+    // KrylovSolverCG cg_non{sys_non, cg_tol, maxiter, verbose};
+    // Eigen::ArrayXXd res1{
+    //     newton_cg(sys_non, grads, cg_non, newton_tol, equil_tol, verbose)[0]
+    //         .grad};
 
-    Real error{abs(res1 - res2).mean()};
-    BOOST_CHECK_LE(error, cg_tol);
+    // Real error{abs(res1 - res2).mean()};
+    // BOOST_CHECK_LE(error, cg_tol);
   }
 
   BOOST_AUTO_TEST_CASE(orthotropic_threeD) {

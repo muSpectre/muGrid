@@ -84,6 +84,20 @@ pfft_info = {
     'define_macro': 'WITH_PFFT'
 }
 
+netcdf_info = {
+    'name': 'netcdf',
+    'environ': 'NETCDFDIR',
+    'required_libraries': ['netcdf'],
+    'mpi': False
+}
+
+pnetcdf_info = {
+    'name': 'pnetcdf',
+    'environ': 'PNETCDFDIR',
+    'required_libraries': ['pnetcdf'],
+    'mpi': True
+}
+
 ###
 
 def get_version_from_git():
@@ -259,7 +273,9 @@ mugrid_sources = [
     'src/libmugrid/field_collection_local.cc',
     'src/libmugrid/field_map.cc',
     'src/libmugrid/field_typed.cc',
+    'src/libmugrid/file_io_base.cc',
     'src/libmugrid/grid_common.cc',
+    'src/libmugrid/communicator.cc',
     'src/libmugrid/raw_memory_operations.cc',
     'src/libmugrid/state_field.cc',
     'src/libmugrid/state_field_map.cc',
@@ -268,6 +284,7 @@ mugrid_sources = [
 pymugrid_sources = [
     'language_bindings/libmugrid/python/bind_py_module.cc',
     'language_bindings/libmugrid/python/bind_py_common.cc',
+    'language_bindings/libmugrid/python/bind_py_communicator.cc',
     'language_bindings/libmugrid/python/bind_py_field.cc',
     'language_bindings/libmugrid/python/bind_py_field_collection.cc',
 ]
@@ -281,7 +298,6 @@ pymufft_sources = [
     'language_bindings/libmufft/python/bind_py_module.cc',
     'language_bindings/libmufft/python/bind_py_common.cc',
     'language_bindings/libmufft/python/bind_py_derivatives.cc',
-    'language_bindings/libmufft/python/bind_py_communicator.cc',
     'language_bindings/libmufft/python/bind_py_fftengine.cc',
 ]
 
@@ -289,8 +305,8 @@ macros = []
 include_dirs = [get_eigen_include(), # Path to pybind11 headers
                 get_pybind11_include(), # Path to Eigen headers
                 'src']
-fft_libraries = []
-fft_library_dirs = []
+mufft_libraries = []
+mufft_library_dirs = []
 
 # Did we manually disable MPI?
 if disable_mpi:
@@ -336,8 +352,8 @@ for info, _sources in [(fftw_info, ['src/libmufft/fftw_engine.cc']),
             if 'define_macro' in info:
                 macros += [(info['define_macro'], None)]
             include_dirs += _include_dirs
-            fft_libraries += _libraries
-            fft_library_dirs += _library_dirs
+            mufft_libraries += _libraries
+            mufft_library_dirs += _library_dirs
         if info['mpi']:
             has_mpi_enabled_fft = True
 
@@ -366,7 +382,22 @@ if mpi:
     if verbose:
         print('  * C-compiler: {}'.format(os.environ['CC']))
         print('  * C++-compiler: {}'.format(os.environ['CXX']))
-    mufft_sources += ['src/libmufft/communicator.cc']
+
+# Detect NetCDF
+mugrid_libraries = []
+mugrid_library_dirs = []
+for info, _sources in [(netcdf_info, ['src/libmugrid/file_io_netcdf.cc']),
+                       (pnetcdf_info, ['src/libmugrid/file_io_netcdf.cc'])]:
+    if info['mpi'] == mpi:
+        lib = detect_library(info)
+        if lib is not None:
+            _include_dirs, _libraries, _library_dirs = lib
+            mugrid_sources += _sources
+            if 'define_macro' in info:
+                macros += [(info['define_macro'], None)]
+            include_dirs += _include_dirs
+            mugrid_libraries += _libraries
+            mugrid_library_dirs += _library_dirs
 
 # extra_link_args is required to search for shared libraries relative
 # to the library's location. Specifically, muGrid.so and muFFT.so are
@@ -384,6 +415,8 @@ ext_libraries = [
      dict(sources=mugrid_sources,
           macros=macros,
           include_dirs=include_dirs,
+          libraries=mugrid_libraries,
+          library_dirs=mugrid_library_dirs,
           language='c++',
           extra_link_args=extra_link_args)
     ),
@@ -391,8 +424,8 @@ ext_libraries = [
      dict(sources=mufft_sources,
           macros=macros,
           include_dirs=include_dirs,
-          libraries=fft_libraries + ['muGrid'],
-          library_dirs=fft_library_dirs,
+          libraries=mufft_libraries + ['muGrid'],
+          library_dirs=mufft_library_dirs,
           language='c++',
           extra_link_args=extra_link_args)
     ),

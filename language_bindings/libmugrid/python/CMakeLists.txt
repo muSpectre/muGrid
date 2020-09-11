@@ -48,6 +48,7 @@ string(REGEX REPLACE "\n" "" PYTHON_USER_SITE ${PYTHON_USER_SITE})
 set (PY_BINDING_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_module.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_common.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_communicator.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_field.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_field_collection.cc
   )
@@ -67,7 +68,9 @@ set_target_properties(pyMuGridLib PROPERTIES OUTPUT_NAME _muGrid)
 target_include_directories(pyMuGridLib PUBLIC ${PYTHON_INCLUDE_DIRS})
 
 add_custom_target(pyMuGrid ALL SOURCES
-  muGrid/__init__.py)
+  muGrid/__init__.py
+  muGrid/Parallel.py
+  )
 add_custom_command(TARGET pyMuGrid POST_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_directory
                    ${CMAKE_SOURCE_DIR}/language_bindings/libmugrid/python/muGrid

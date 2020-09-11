@@ -206,4 +206,3 @@ def Projection(nb_grid_pts, lengths,
         raise KeyError("Projection engine '{}' has not been compiled into the "
                        "muSpectre library.".format(class_name))
     return factory(fft, lengths, gradient)
-

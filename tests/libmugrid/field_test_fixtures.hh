@@ -53,8 +53,9 @@ namespace muGrid {
 
   struct GlobalFieldCollectionFixture : public BaseFixture {
     GlobalFieldCollectionFixture() : fc{BaseFixture::Dim} {
-      Ccoord_t<BaseFixture::Dim> nb_grid_pts{2, 2, 3};
-      this->fc.initialise(nb_grid_pts);
+      Ccoord_t<BaseFixture::Dim> nb_domain_grid_pts{2, 2, 3};
+      Ccoord_t<BaseFixture::Dim> nb_subdomain_grid_pts{2, 2, 3};
+      this->fc.initialise(nb_domain_grid_pts, nb_subdomain_grid_pts);
       this->fc.set_nb_sub_pts(sub_division_tag(), NbQuadPts);
     }
     GlobalFieldCollection fc;

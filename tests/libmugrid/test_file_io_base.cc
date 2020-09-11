@@ -1,13 +1,13 @@
 /**
- * @file   bind_py_declarations.hh
+ * @file   test_file_io_base.cc
  *
- * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
+ * @author Richard Leute <richard.leute@imtek.uni-freiburg.de>
  *
- * @date   10 Oct 2019
+ * @date   04 Aug 2020
  *
- * @brief  header for python bindings for the common part of µGrid
+ * @brief  description
  *
- * Copyright © 2018 Till Junge
+ * Copyright © 2020 Till Junge
  *
  * µGrid is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
@@ -22,7 +22,7 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with µGrid; see the file COPYING. If not, write to the
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * * Boston, MA 02111-1307, USA.
+ * Boston, MA 02111-1307, USA.
  *
  * Additional permission under GNU GPL version 3 section 7
  *
@@ -33,16 +33,33 @@
  *
  */
 
-#ifndef LANGUAGE_BINDINGS_LIBMUGRID_PYTHON_BIND_PY_DECLARATIONS_HH_
-#define LANGUAGE_BINDINGS_LIBMUGRID_PYTHON_BIND_PY_DECLARATIONS_HH_
+#include <boost/mpl/list.hpp>
 
-#include <pybind11/pybind11.h>
+#include "mpi_context.hh"
 
-namespace py = pybind11;
+#include <tests/libmufft/tests.hh>
+#include <libmugrid/file_io_base.hh>
+#include <libmugrid/file_io_netcdf.hh>
 
-void add_common(py::module & mod);
-void add_communicator(py::module & mod);
-void add_field_classes(py::module & mod);
-void add_field_collection_classes(py::module & mod);
+namespace muGrid {
+  BOOST_AUTO_TEST_SUITE(file_io_base);
 
-#endif  // LANGUAGE_BINDINGS_LIBMUGRID_PYTHON_BIND_PY_DECLARATIONS_HH_
+  BOOST_AUTO_TEST_CASE(FileIOBaseClass) {
+    const std::string file_name{"file_io_base_test"};
+    remove(file_name.c_str());  // remove test_file if it already exists
+    FileIOBase::OpenMode open_mode{FileIOBase::OpenMode::Write};
+    auto & comm{MPIContext::get_context().comm};
+    FileIONetCDF file_io_object(file_name, open_mode, comm);
+
+    BOOST_CHECK_EQUAL(comm.size(), file_io_object.get_communicator().size());
+
+    const FileFrame frame = file_io_object.append_frame();
+    BOOST_CHECK_EQUAL(file_io_object.size(), 1);
+
+    for (const FileFrame & frame_it : file_io_object) {
+      continue;
+    }
+  };
+
+  BOOST_AUTO_TEST_SUITE_END();
+}  // namespace muGrid

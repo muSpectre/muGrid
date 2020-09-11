@@ -47,33 +47,33 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   GlobalFieldCollection::GlobalFieldCollection(
-      const Index_t & spatial_dimension,
+      const Index_t & spatial_dimension, const DynCcoord_t & nb_domain_grid_pts,
       const DynCcoord_t & nb_subdomain_grid_pts,
-      const DynCcoord_t & subdomain_locations,
-      const SubPtMap_t & nb_sub_pts,
+      const DynCcoord_t & subdomain_locations, const SubPtMap_t & nb_sub_pts,
       StorageOrder storage_order)
       : Parent{ValidityDomain::Global, spatial_dimension, nb_sub_pts,
                storage_order} {
-    this->initialise(nb_subdomain_grid_pts, subdomain_locations);
+    this->initialise(nb_domain_grid_pts, nb_subdomain_grid_pts,
+                     subdomain_locations);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  GlobalFieldCollection::GlobalFieldCollection(
+      Index_t spatial_dimension, const DynCcoord_t & nb_domain_grid_pts,
+      const DynCcoord_t & nb_subdomain_grid_pts,
+      const DynCcoord_t & subdomain_locations,
+      const DynCcoord_t & pixels_strides, const SubPtMap_t & nb_sub_pts,
+      StorageOrder storage_order)
+      : Parent{ValidityDomain::Global, spatial_dimension, nb_sub_pts,
+               storage_order} {
+    this->initialise(nb_domain_grid_pts, nb_subdomain_grid_pts,
+                     subdomain_locations, pixels_strides);
   }
 
   /* ---------------------------------------------------------------------- */
   GlobalFieldCollection::GlobalFieldCollection(
       Index_t spatial_dimension,
-      const DynCcoord_t & nb_subdomain_grid_pts,
-      const DynCcoord_t & subdomain_locations,
-      const DynCcoord_t & pixels_strides,
-      const SubPtMap_t & nb_sub_pts,
-      StorageOrder storage_order)
-      : Parent{ValidityDomain::Global, spatial_dimension, nb_sub_pts,
-               storage_order} {
-    this->initialise(nb_subdomain_grid_pts, subdomain_locations,
-                     pixels_strides);
-  }
-
-  /* ---------------------------------------------------------------------- */
-  GlobalFieldCollection::GlobalFieldCollection(
-      Index_t spatial_dimension,
+      const DynCcoord_t & nb_domain_grid_pts,
       const DynCcoord_t & nb_subdomain_grid_pts,
       const DynCcoord_t & subdomain_locations,
       StorageOrder pixels_storage_order,
@@ -81,19 +81,40 @@ namespace muGrid {
       StorageOrder storage_order)
       : Parent{ValidityDomain::Global, spatial_dimension, nb_sub_pts,
                storage_order} {
-    this->initialise(nb_subdomain_grid_pts, subdomain_locations,
-                     pixels_storage_order);
+    this->initialise(nb_domain_grid_pts, nb_subdomain_grid_pts,
+                     subdomain_locations, pixels_storage_order);
   }
 
   /* ---------------------------------------------------------------------- */
   void
-  GlobalFieldCollection::initialise(const DynCcoord_t & nb_subdomain_grid_pts,
+  GlobalFieldCollection::initialise(const DynCcoord_t & nb_domain_grid_pts,
+                                    const DynCcoord_t & nb_subdomain_grid_pts,
                                     const DynCcoord_t & subdomain_locations,
                                     const DynCcoord_t & pixels_strides) {
+    // sanity check 1
+    if (std::accumulate(nb_domain_grid_pts.begin(),
+                        nb_domain_grid_pts.end(),
+                        1, std::multiplies<Index_t>()) <= 0) {
+      std::stringstream s;
+      s << "Invalid nb_domain_grid_pts (=" << nb_domain_grid_pts
+        << ") passed during initialisation.";
+      throw FieldCollectionError(s.str());
+    }
+    // sanity check 2
+    if (std::accumulate(nb_subdomain_grid_pts.begin(),
+                        nb_subdomain_grid_pts.end(),
+                        1, std::multiplies<Index_t>()) <= 0) {
+      std::stringstream s;
+      s << "Invalid nb_subdomain_grid_pts (=" << nb_subdomain_grid_pts
+        << ") passed during initialisation.";
+      throw FieldCollectionError(s.str());
+    }
+
     if (this->initialised) {
       throw FieldCollectionError("double initialisation");
     }
 
+    this->nb_domain_grid_pts = nb_domain_grid_pts;
     this->pixels = CcoordOps::DynamicPixels(nb_subdomain_grid_pts,
                                             subdomain_locations,
                                             pixels_strides);
@@ -112,14 +133,15 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   void
-  GlobalFieldCollection::initialise(const DynCcoord_t & nb_subdomain_grid_pts,
+  GlobalFieldCollection::initialise(const DynCcoord_t & nb_domain_grid_pts,
+                                    const DynCcoord_t & nb_subdomain_grid_pts,
                                     const DynCcoord_t & subdomain_locations,
                                     StorageOrder pixels_storage_order) {
     if (pixels_storage_order == StorageOrder::Automatic) {
       pixels_storage_order = this->get_storage_order();
     }
     this->initialise(
-        nb_subdomain_grid_pts, subdomain_locations,
+        nb_domain_grid_pts, nb_subdomain_grid_pts, subdomain_locations,
         pixels_storage_order == StorageOrder::ColMajor
              ? CcoordOps::get_col_major_strides(nb_subdomain_grid_pts)
              : CcoordOps::get_row_major_strides(nb_subdomain_grid_pts));
@@ -138,7 +160,8 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   GlobalFieldCollection GlobalFieldCollection::get_empty_clone() const {
     GlobalFieldCollection ret_val{this->get_spatial_dim(), this->nb_sub_pts};
-    ret_val.initialise(this->pixels.get_nb_subdomain_grid_pts(),
+    ret_val.initialise(this->nb_domain_grid_pts,
+                       this->pixels.get_nb_subdomain_grid_pts(),
                        this->pixels.get_subdomain_locations());
     return ret_val;
   }

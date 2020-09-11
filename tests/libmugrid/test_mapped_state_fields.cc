@@ -48,7 +48,7 @@ namespace muGrid {
     static const std::string sub_division_tag() { return "sub_pt"; }
     GlobalFieldCollection fc{DimS};
     InitialiserBase() {
-      this->fc.initialise(Ccoord_t<twoD>{2, 3});
+      this->fc.initialise(Ccoord_t<twoD>{2, 3}, Ccoord_t<twoD>{2, 3});
       this->fc.set_nb_sub_pts(sub_division_tag(), NbSubPt);
       }
   };

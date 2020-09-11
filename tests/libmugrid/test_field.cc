@@ -60,7 +60,8 @@ namespace muGrid {
 
     // check that fields are initialised with empty vector
     Index_t len{2};
-    fc.initialise(CcoordOps::get_cube<SDim>(len), {});
+    fc.initialise(CcoordOps::get_cube<SDim>(len),
+                  CcoordOps::get_cube<SDim>(len), {});
     // check that returned size is correct
     BOOST_CHECK_EQUAL(field.get_nb_entries(), ipow(len, SDim));
     // check that setting pad size won't change logical size
@@ -91,7 +92,8 @@ namespace muGrid {
     auto & field{fc.register_real_field("TensorField 1", MDim * MDim, "quad")};
 
     constexpr Index_t len{2};
-    fc.initialise(CcoordOps::get_cube<SDim>(len), {});
+    fc.initialise(CcoordOps::get_cube<SDim>(len),
+                  CcoordOps::get_cube<SDim>(len), {});
     field.eigen_vec().setRandom();
 
     auto & clone{field.clone("clone")};
@@ -125,7 +127,8 @@ namespace muGrid {
 
     Index_t len{2};
     Index_t nb_pix{ipow(len, SDim)};
-    fc.initialise(CcoordOps::get_cube<SDim>(len), {});
+    fc.initialise(CcoordOps::get_cube<SDim>(len),
+                  CcoordOps::get_cube<SDim>(len), {});
 
     BOOST_CHECK_EQUAL(pixel_field.get_nb_entries(), nb_pix);
     BOOST_CHECK_EQUAL(nodal_field.get_nb_entries(), nb_pix * NbNode);

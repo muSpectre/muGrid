@@ -506,7 +506,7 @@ namespace muGrid {
      */
     IndexIterable get_sub_pt_indices(const std::string & tag) const;
 
-    std::vector<size_t> get_pixel_ids() { return this->pixel_indices; }
+    const std::vector<Index_t> & get_pixel_ids() { return this->pixel_indices; }
 
     /**
      * returns a (base-type) reference to the field identified by `unique_name`.
@@ -610,14 +610,13 @@ namespace muGrid {
     //! keeps track of whether the collection has already been initialised
     bool initialised{false};
     /**
-     * Storage for indices of the stored quadrature points in the global field
+     * Storage for indices of the stored pixels in the global field
      * collection. Note that these are not truly global indices, but rather
      * absolute indices within the domain of the local processor. I.e., they
-     * are universally valid to address any quadrature point on the local
-     * processor, and not for any quadrature point located on another
-     * processor.
+     * are universally valid to address any pixel on the local
+     * processor, and not for any pixel located on another processor.
      */
-    std::vector<size_t> pixel_indices{};
+    std::vector<Index_t> pixel_indices{};
   };
 
   /**
@@ -627,7 +626,7 @@ namespace muGrid {
   class FieldCollection::PixelIndexIterable {
    public:
     //! stl
-    using iterator = typename std::vector<size_t>::const_iterator;
+    using iterator = typename std::vector<Index_t>::const_iterator;
     //! Default constructor
     PixelIndexIterable() = delete;
 
@@ -740,7 +739,7 @@ namespace muGrid {
   class FieldCollection::IndexIterable::iterator final {
    public:
     //! convenience alias
-    using PixelIndexIterator_t = typename std::vector<size_t>::const_iterator;
+    using PixelIndexIterator_t = typename std::vector<Index_t>::const_iterator;
     //! Default constructor
     iterator() = delete;
 
@@ -788,12 +787,19 @@ namespace muGrid {
                     //  to allow the IndexIterable to be destroyed and still use
                     //  the iterator
     //! fast-moving index
-    size_t offset{};
+    Index_t offset{};
     //! iterator of slow moving index
     PixelIndexIterator_t pixel_index_iterator;
   };
 
   /* ---------------------------------------------------------------------- */
+  /**
+   * Allows inserting `muGrid::FieldCollection::ValidityDomain` into
+   * `std::ostream`s
+   */
+  std::ostream &
+  operator<<(std::ostream & os,
+             const muGrid::FieldCollection::ValidityDomain & value);
 
 }  // namespace muGrid
 

@@ -40,7 +40,15 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   LocalFieldCollection::LocalFieldCollection(const Index_t & spatial_dimension,
                                              const SubPtMap_t & nb_sub_pts)
-    : Parent{ValidityDomain::Local, spatial_dimension, nb_sub_pts} {}
+      : Parent{ValidityDomain::Local, spatial_dimension, nb_sub_pts},
+        name{std::string{"LocalFieldCollectionName"}} {}
+
+  /* ---------------------------------------------------------------------- */
+  LocalFieldCollection::LocalFieldCollection(const Index_t & spatial_dimension,
+                                             const std::string & name,
+                                             const SubPtMap_t & nb_sub_pts)
+      : Parent{ValidityDomain::Local, spatial_dimension, nb_sub_pts},
+        name{name} {}
 
   /* ---------------------------------------------------------------------- */
   void LocalFieldCollection::add_pixel(const size_t & global_index) {
@@ -67,12 +75,19 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  LocalFieldCollection LocalFieldCollection::get_empty_clone() const {
-    LocalFieldCollection ret_val{this->get_spatial_dim(), this->nb_sub_pts};
+  LocalFieldCollection LocalFieldCollection::get_empty_clone(
+      const std::string & new_name) const {
+    LocalFieldCollection ret_val{this->get_spatial_dim(), new_name,
+                                 this->nb_sub_pts};
     for (const auto & pixel_id : this->get_pixel_indices_fast()) {
       ret_val.add_pixel(pixel_id);
     }
     return ret_val;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  LocalFieldCollection LocalFieldCollection::get_empty_clone() const {
+    return get_empty_clone(this->name);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -83,5 +98,10 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   Shape_t LocalFieldCollection::get_pixels_strides(Index_t element_size) const {
     return Shape_t{element_size};
+  }
+
+  /* ---------------------------------------------------------------------- */
+  const std::string & LocalFieldCollection::get_name() const {
+    return this->name;
   }
 }  // namespace muGrid

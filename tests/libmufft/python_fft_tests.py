@@ -217,7 +217,8 @@ class FFT_Check(unittest.TestCase):
                 out_ref = global_out_ref[(..., *engine.fourier_slices)]
 
                 fc = muGrid.GlobalFieldCollection(len(nb_grid_pts))
-                fc.initialise(tuple(engine.nb_subdomain_grid_pts))
+                fc.initialise(tuple(engine.nb_domain_grid_pts),
+                              tuple(engine.nb_subdomain_grid_pts))
                 in_field = fc.register_real_field('in_field', dims)
                 self.assertFalse(in_field.array().flags.owndata)
                 in_field.array(muGrid.Pixel)[...] = global_in_arr[
@@ -393,7 +394,7 @@ class FFT_Check(unittest.TestCase):
                     "{} not equal to {}".format(out_msp.shape,
                                                 engine.nb_subdomain_grid_pts)
 
-    @unittest.skipIf(muFFT.has_mpi and muFFT.Communicator().size > 1,
+    @unittest.skipIf(muGrid.has_mpi and muGrid.Communicator().size > 1,
                      'MPI parallel FFTs do not support 1D transforms')
     def test_1d_transform(self):
         nb_grid_pts = [128, ]

@@ -60,7 +60,7 @@ namespace muGrid {
      * Constructor
      * @param spatial_dimension number of spatial dimensions, must be 1, 2, 3,
      * or Unknown
-     * @param nb_quad_pts number of quadrature points per pixel/voxel
+     * @param nb_sub_pts number of quadrature points per pixel/voxel
      */
     GlobalFieldCollection(const Index_t & spatial_dimension,
                           const SubPtMap_t & nb_sub_pts = {},
@@ -71,13 +71,14 @@ namespace muGrid {
      * Constructor with initialization
      * @param spatial_dimension number of spatial dimensions, must be 1, 2, 3,
      * or Unknown
-     * @param nb_quad_pts number of quadrature points per pixel/voxel
      * @param nb_subdomain_grid_pts number of grid points on the current MPI
      * process (subdomain)
      * @param subdomain_locations location of the current subdomain within the
      * global grid
+     * @param nb_sub_pts number of quadrature points per pixel/voxel
      */
     GlobalFieldCollection(const Index_t & spatial_dimension,
+                          const DynCcoord_t & nb_domain_grid_pts,
                           const DynCcoord_t & nb_subdomain_grid_pts,
                           const DynCcoord_t & subdomain_locations = {},
                           const SubPtMap_t & nb_sub_pts = {},
@@ -105,6 +106,7 @@ namespace muGrid {
      *                    storage order that is not affected by this setting.
      */
     GlobalFieldCollection(Index_t spatial_dimension,
+                          const DynCcoord_t & nb_domain_grid_pts,
                           const DynCcoord_t & nb_subdomain_grid_pts,
                           const DynCcoord_t & subdomain_locations,
                           const DynCcoord_t & pixels_strides,
@@ -133,6 +135,7 @@ namespace muGrid {
      *                    storage order that is not affected by this setting.
      */
     GlobalFieldCollection(Index_t spatial_dimension,
+                          const DynCcoord_t & nb_domain_grid_pts,
                           const DynCcoord_t & nb_subdomain_grid_pts,
                           const DynCcoord_t & subdomain_locations,
                           StorageOrder pixels_storage_order,
@@ -180,7 +183,8 @@ namespace muGrid {
      * collection. Fields added later on will have their memory allocated
      * upon construction.
      */
-    void initialise(const DynCcoord_t & nb_subdomain_grid_pts,
+    void initialise(const DynCcoord_t & nb_domain_grid_pts,
+                    const DynCcoord_t & nb_subdomain_grid_pts,
                     const DynCcoord_t & subdomain_locations,
                     const DynCcoord_t & pixels_strides);
 
@@ -190,10 +194,12 @@ namespace muGrid {
      * upon construction.
      */
     template <size_t Dim>
-    void initialise(const Ccoord_t<Dim> & nb_subdomain_grid_pts,
+    void initialise(const Ccoord_t<Dim> & nb_domain_grid_pts,
+                    const Ccoord_t<Dim> & nb_subdomain_grid_pts,
                     const Ccoord_t<Dim> & subdomain_locations,
                     const Ccoord_t<Dim> & pixels_strides) {
-      this->initialise(DynCcoord_t{nb_subdomain_grid_pts},
+      this->initialise(DynCcoord_t{nb_domain_grid_pts},
+                       DynCcoord_t{nb_subdomain_grid_pts},
                        DynCcoord_t{subdomain_locations},
                        DynCcoord_t{pixels_strides});
     }
@@ -203,7 +209,8 @@ namespace muGrid {
      * collection. Fields added later on will have their memory allocated
      * upon construction.
      */
-    void initialise(const DynCcoord_t & nb_subdomain_grid_pts,
+    void initialise(const DynCcoord_t & nb_domain_grid_pts,
+                    const DynCcoord_t & nb_subdomain_grid_pts,
                     const DynCcoord_t & subdomain_locations = {},
                     StorageOrder pixels_storage_order =
                         StorageOrder::Automatic);
@@ -214,11 +221,13 @@ namespace muGrid {
      * upon construction.
      */
     template <size_t Dim>
-    void initialise(const Ccoord_t<Dim> & nb_subdomain_grid_pts,
+    void initialise(const Ccoord_t<Dim> & nb_domain_grid_pts,
+                    const Ccoord_t<Dim> & nb_subdomain_grid_pts,
                     const Ccoord_t<Dim> & subdomain_locations = {},
                     StorageOrder pixels_storage_order =
                         StorageOrder::Automatic) {
-      this->initialise(DynCcoord_t{nb_subdomain_grid_pts},
+      this->initialise(DynCcoord_t{nb_domain_grid_pts},
+                       DynCcoord_t{nb_subdomain_grid_pts},
                        DynCcoord_t{subdomain_locations},
                        pixels_storage_order);
     }
@@ -234,8 +243,25 @@ namespace muGrid {
     //! return strides of the pixels
     virtual Shape_t get_pixels_strides(Index_t element_size = 1) const;
 
+    //! returns the global (domain) number of grid points in each direction
+    const DynCcoord_t & get_nb_domain_grid_pts() const {
+      return this->nb_domain_grid_pts;
+    }
+
+    //! returns the process-local (subdomain) number of grid points in each
+    //! direction
+    const DynCcoord_t & get_nb_subdomain_grid_pts() const {
+      return this->get_pixels().get_nb_subdomain_grid_pts();
+    }
+
+    //! returns the process-local (subdomain) locations of subdomain grid
+    const DynCcoord_t & get_subdomain_locations() const {
+      return this->get_pixels().get_subdomain_locations();
+    }
+
    protected:
     DynamicPixels pixels{};  //!< helper to iterate over the grid
+    DynCcoord_t nb_domain_grid_pts{};  // number of domain (global) grid points
   };
 
 }  // namespace muGrid

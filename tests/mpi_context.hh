@@ -36,7 +36,7 @@
 #ifndef TESTS_MPI_CONTEXT_HH_
 #define TESTS_MPI_CONTEXT_HH_
 
-#include <libmufft/communicator.hh>
+#include <libmugrid/communicator.hh>
 
 namespace muFFT {
 

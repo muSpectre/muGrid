@@ -151,7 +151,8 @@ namespace muFFT {
     FieldMap grad(f_grad);
     FieldMap var(f_var);
 
-    fields.initialise(fix::projector.get_nb_subdomain_grid_pts(),
+    fields.initialise(fix::projector.get_nb_domain_grid_pts(),
+                      fix::projector.get_nb_subdomain_grid_pts(),
                       fix::projector.get_subdomain_locations());
     grad.initialise();
     var.initialise();

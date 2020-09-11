@@ -248,7 +248,8 @@ namespace muGrid {
      *    (component_1, component_2, sub_pt, grid_x, grid_y, grid_z)
      * where the number of components and grid indices can be arbitrary.
      */
-    NumpyProxy(DynCcoord_t nb_subdomain_grid_pts,
+    NumpyProxy(DynCcoord_t nb_domain_grid_pts,
+               DynCcoord_t nb_subdomain_grid_pts,
                DynCcoord_t subdomain_locations, Index_t nb_dof_per_pixel,
                pybind11::array_t<T, flags> & array,
                const Unit & unit = Unit::unitless())
@@ -320,8 +321,8 @@ namespace muGrid {
       map["proxy_subpt"] = 1;
       this->collection = std::make_unique<Collection_t>(
           static_cast<Index_t>(nb_subdomain_grid_pts.get_dim()),
-          nb_subdomain_grid_pts, subdomain_locations, pixels_strides, map,
-          fc_storage_order);
+          nb_domain_grid_pts, nb_subdomain_grid_pts, subdomain_locations,
+          pixels_strides, map, fc_storage_order);
       this->field = std::make_unique<WrappedField<T>>(
           "proxy_field", *collection, components_shape,
           static_cast<size_t>(buffer.size),
@@ -340,13 +341,12 @@ namespace muGrid {
      * where the number of components and grid indices can be arbitrary. The
      * sub_pt dimension can be omitted if there is only a single sub-point.
      */
-    NumpyProxy(DynCcoord_t nb_subdomain_grid_pts,
+    NumpyProxy(DynCcoord_t nb_domain_grid_pts,
+               DynCcoord_t nb_subdomain_grid_pts,
                DynCcoord_t subdomain_locations, Index_t nb_sub_pts,
-               Shape_t components_shape,
-               pybind11::array_t<T, flags> & array,
+               Shape_t components_shape, pybind11::array_t<T, flags> & array,
                const Unit & unit = Unit::unitless())
-        : collection{}, field{}
-    {
+        : collection{}, field{} {
       pybind11::buffer_info buffer{array.request()};
 
       // Sanity check: Do the array dimensions agree and shapes agree?
@@ -391,8 +391,8 @@ namespace muGrid {
       map["proxy_subpt"] = nb_sub_pts;
       this->collection = std::make_unique<Collection_t>(
           static_cast<Index_t>(nb_subdomain_grid_pts.get_dim()),
-          nb_subdomain_grid_pts, subdomain_locations, pixels_strides, map,
-          fc_storage_order);
+          nb_domain_grid_pts, nb_subdomain_grid_pts, subdomain_locations,
+          pixels_strides, map, fc_storage_order);
       this->field = std::make_unique<WrappedField<T>>(
           "proxy_field", *collection, components_shape,
           static_cast<size_t>(buffer.size),

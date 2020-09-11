@@ -197,7 +197,7 @@ namespace muSpectre {
 
     FC_t globalfields{Fix::mdim()};
     globalfields.set_nb_sub_pts(QuadPtTag, Fix::NbQuadPts());
-    globalfields.initialise(cube, {});
+    globalfields.initialise(cube, cube, {});
     muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim(), IterUnit::SubPt>
         F1_f{"Transformation Gradient 1", globalfields, QuadPtTag};
     muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim(), IterUnit::SubPt>

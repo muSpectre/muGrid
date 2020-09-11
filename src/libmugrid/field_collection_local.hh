@@ -64,6 +64,18 @@ namespace muGrid {
     LocalFieldCollection(const Index_t & spatial_dimension,
                          const SubPtMap_t & nb_sub_pts = {});
 
+    /**
+     * Constructor with explicit given name for the field collection. This name
+     * can be arbitrary and only has to be unique for all LocalFieldCollections
+     * which are saved to the same NetCDF file through the parallel IO object
+     * 'FileIONetCDF'. If you register two LocalFieldCollections with the same
+     * name in a FileIONetCDF object you will get a
+     * muGrid::FieldCollectionError.
+     */
+    LocalFieldCollection(const Index_t & spatial_dimension,
+                         const std::string & name,
+                         const SubPtMap_t & nb_sub_pts = {});
+
     //! Copy constructor
     LocalFieldCollection(const LocalFieldCollection & other) = delete;
 
@@ -95,9 +107,18 @@ namespace muGrid {
     void initialise();
 
     /**
-     * obtain a new field collection with the same domain and pixels
+     * obtain a new field collection with the same domain and pixels and a
+     * given new name
      */
-    LocalFieldCollection get_empty_clone() const;
+    LocalFieldCollection
+    get_empty_clone(const std::string & new_name) const;
+
+    /**
+     * obtain a new field collection with the same domain and pixels and the
+     * same name
+     */
+    LocalFieldCollection
+    get_empty_clone() const;
 
     //! return shape of the pixels
     virtual Shape_t get_pixels_shape() const;
@@ -105,12 +126,16 @@ namespace muGrid {
     //! return strides of the pixels
     virtual Shape_t get_pixels_strides(Index_t element_size = 1) const;
 
-    std::map<size_t, size_t> & get_global_to_local_index_map() {
+    std::map<Index_t, Index_t> & get_global_to_local_index_map() {
       return this->global_to_local_index_map;
     }
 
+    //! return the unique name of the local field collection
+    const std::string & get_name() const;
+
    protected:
-    std::map<size_t, size_t> global_to_local_index_map{};
+    std::map<Index_t, Index_t> global_to_local_index_map{};
+    std::string name{};
   };
 
 }  // namespace muGrid

@@ -101,7 +101,7 @@ namespace muFFT {
     auto & input{fc.register_real_field("input", Fix::mdim * Fix::mdim)};
     auto & ref{fc.register_real_field("reference", Fix::mdim * Fix::mdim)};
     auto & result{fc.register_real_field("result", Fix::mdim * Fix::mdim)};
-    fc.initialise(Fix::res(), Fix::loc());
+    fc.initialise(Fix::res(), Fix::res(), Fix::loc());
 
     using map_t = muGrid::MatrixFieldMap<Real, Mapping::Mut, Fix::mdim,
                                          Fix::mdim, IterUnit::Pixel>;

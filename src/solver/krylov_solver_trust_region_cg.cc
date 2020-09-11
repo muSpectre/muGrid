@@ -34,7 +34,7 @@
  *
  */
 
-#include <libmufft/communicator.hh>
+#include <libmugrid/communicator.hh>
 
 #include "cell/cell_adaptor.hh"
 

@@ -105,6 +105,7 @@ namespace muSpectre {
                                                               *this->collection,
                                                               QuadPtTag} {
       this->collection->initialise(
+          muGrid::CcoordOps::get_cube<DimM>(Index_t{1}),
           muGrid::CcoordOps::get_cube<DimM>(Index_t{1}), Ccoord_t<DimM>{});
     }
 

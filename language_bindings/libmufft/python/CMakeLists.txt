@@ -47,7 +47,6 @@ string(REGEX REPLACE "\n" "" PYTHON_USER_SITE ${PYTHON_USER_SITE})
 
 set (PY_BINDING_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_module.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_communicator.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_common.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_derivatives.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_fftengine.cc
@@ -77,7 +76,6 @@ target_include_directories(pyMuFFTLib PUBLIC ${PYTHON_INCLUDE_DIRS})
 
 add_custom_target(pyMuFFT ALL SOURCES
   muFFT/__init__.py
-  muFFT/Communicator.py
   muFFT/NetCDF.py)
 add_custom_command(TARGET pyMuFFT POST_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_directory

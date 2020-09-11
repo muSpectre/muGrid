@@ -9,20 +9,20 @@
  *
  * Copyright © 2017 Till Junge
  *
- * µFFT is free software; you can redistribute it and/or
+ * µGrid is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
  * published by the Free Software Foundation, either version 3, or (at
  * your option) any later version.
  *
- * µFFT is distributed in the hope that it will be useful, but
+ * µGrid is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
- * along with µFFT; see the file COPYING. If not, write to the
+ * along with µGrid; see the file COPYING. If not, write to the
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * * Boston, MA 02111-1307, USA.
+ * Boston, MA 02111-1307, USA.
  *
  * Additional permission under GNU GPL version 3 section 7
  *
@@ -33,8 +33,8 @@
  *
  */
 
-#ifndef SRC_LIBMUFFT_COMMUNICATOR_HH_
-#define SRC_LIBMUFFT_COMMUNICATOR_HH_
+#ifndef SRC_LIBMUGRID_COMMUNICATOR_HH_
+#define SRC_LIBMUGRID_COMMUNICATOR_HH_
 
 #include <type_traits>
 
@@ -42,19 +42,20 @@
 #include <mpi.h>
 #endif
 
-#include "mufft_common.hh"
 #include <Eigen/Dense>
 
-namespace muFFT {
+#include "grid_common.hh"
+
+namespace muGrid {
 
   template <typename T>
-  using Matrix_t = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
+  using DynMatrix_t = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
 
 #ifdef WITH_MPI
 
   template <typename T, typename T2 = T>
   inline decltype(auto) mpi_type() {
-    static_assertt(std::is_same<T, T2>::value,
+    static_assert(std::is_same<T, T2>::value,
                    "T2 is a SFINAE parameter, do not touch");
     static_assert(std::is_same<T, T2>::value and not std::is_same<T, T2>::value,
                   "The type you're trying to map has not been declared.");
@@ -75,6 +76,10 @@ namespace muFFT {
   template <>
   inline decltype(auto) mpi_type<long>() {  // NOLINT
     return MPI_LONG;
+  }
+  template <>
+  inline decltype(auto) mpi_type<long long>() {  // NOLINT
+    return MPI_LONG_LONG_INT;
   }
   template <>
   inline decltype(auto) mpi_type<unsigned char>() {
@@ -149,11 +154,27 @@ namespace muFFT {
 
     //! sum reduction on EigenMatrix types
     template <typename T>
-    Matrix_t<T> sum_mat(const Eigen::Ref<Matrix_t<T>> & arg) const;
+    DynMatrix_t<T> sum_mat(const Eigen::Ref<DynMatrix_t<T>> & arg) const;
+
+    //! ordered partial cumulative sum on scalar types. With the nomenclatur p0
+    //! = the processor with rank = 0 and so on the following example
+    //! demonstrates the cumulative sum of arg='a' returned on res='b'
+    //! p0 a=2, b=0;  p1 a=3, b=0;  p2 a=1, b=0;  p3 a=5, b=0
+    //! after computing the cumulative sum we find:
+    //! p0 a=2, b=2,  p1 a=3, b=5,  p2 a=1, b=6,  p3 a=5, b=11
+    template <typename T>
+    T cumulative_sum(const T & arg) const {
+      if (comm == MPI_COMM_NULL) {
+        return arg;
+      }
+      T res;
+      MPI_Scan(&arg, &res, 1, mpi_type<T>(), MPI_SUM, this->comm);
+      return res;
+    }
 
     //! gather on EigenMatrix types
     template <typename T>
-    Matrix_t<T> gather(const Eigen::Ref<Matrix_t<T>> & arg) const;
+    DynMatrix_t<T> gather(const Eigen::Ref<DynMatrix_t<T>> & arg) const;
 
     MPI_Comm get_mpi_comm() { return this->comm; }
 
@@ -165,7 +186,7 @@ namespace muFFT {
     MPI_Comm comm;
   };
 
-#else /* WITH_MPI */
+#else   // WITH_MPI
 
   //! stub communicator object that doesn't communicate anything
   class Communicator {
@@ -187,16 +208,22 @@ namespace muFFT {
 
     //! sum reduction on EigenMatrix types
     template <typename T>
-    Matrix_t<T> sum_mat(const Eigen::Ref<Matrix_t<T>> & arg) const {
+    DynMatrix_t<T> sum_mat(const Eigen::Ref<DynMatrix_t<T>> & arg) const {
+      return arg;
+    }
+
+    //! ordered partial cumulative sum on scalar types. Find more details in the
+    //! doc of the into the parallel implementation.
+    template <typename T>
+    T cumulative_sum(const T & arg) const {
       return arg;
     }
 
     //! gather on EigenMatrix types
     template <typename T>
-    Matrix_t<T> gather(const Eigen::Ref<Matrix_t<T>> & arg) const {
+    DynMatrix_t<T> gather(const Eigen::Ref<DynMatrix_t<T>> & arg) const {
       return arg;
     }
-
 
     //! find whether the underlying communicator is mpi
     // TODO(pastewka) why do we need this?
@@ -205,6 +232,6 @@ namespace muFFT {
 
 #endif
 
-}  // namespace muFFT
+}  // namespace muGrid
 
-#endif  // SRC_LIBMUFFT_COMMUNICATOR_HH_
+#endif  // SRC_LIBMUGRID_COMMUNICATOR_HH_

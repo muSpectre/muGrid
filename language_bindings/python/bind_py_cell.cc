@@ -47,7 +47,7 @@
 
 #include <libmugrid/ccoord_operations.hh>
 #include <libmugrid/numpy_tools.hh>
-#include <libmufft/communicator.hh>
+#include <libmugrid/communicator.hh>
 
 #ifdef WITH_FFTWMPI
 #include "libmufft/fftwmpi_engine.hh"
@@ -180,12 +180,12 @@ void add_cell_helper(py::module & mod) {
   using DynRcoord_t = muGrid::DynRcoord_t;
 #endif
   auto NumpyT2Proxy{
-      [](Cell & cell,
-         py::array_t<Real, py::array::f_style> & tensor2)
+      [](Cell & cell, py::array_t<Real, py::array::f_style> & tensor2)
           -> NumpyProxy<Real, py::array::f_style> {
         auto && strain_shape{cell.get_strain_shape()};
         auto & proj{cell.get_projection()};
         return NumpyProxy<Real, py::array::f_style>{
+            proj.get_nb_domain_grid_pts(),
             proj.get_nb_subdomain_grid_pts(),
             proj.get_subdomain_locations(),
             proj.get_nb_quad_pts(),

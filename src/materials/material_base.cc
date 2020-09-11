@@ -53,6 +53,9 @@ namespace muSpectre {
             parent_field_collection == nullptr
                 ? std::make_shared<muGrid::LocalFieldCollection>(
                       spatial_dimension,
+                      // giving the local field collection the same name as for
+                      // the material
+                      this->name,
                       // setting the map for nb_sub_pts on the fly here to avoid
                       // having to set the number of quadrature points
                       // conditionally in the constructor function body. This
@@ -123,7 +126,8 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   Real MaterialBase::get_assigned_ratio(const size_t & pixel_id) {
-    auto id{this->internal_fields->get_global_to_local_index_map()[pixel_id]};
+    auto id{
+        this->internal_fields->get_global_to_local_index_map().at(pixel_id)};
     auto && tmp{this->assigned_ratio->get_map()};
     return tmp[id];
   }

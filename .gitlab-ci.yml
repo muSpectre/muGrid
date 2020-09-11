@@ -6,7 +6,7 @@
     - echo "grep -c ^processor /proc/cpuinfo"
     - grep -c ^processor /proc/cpuinfo
     - cd build
-    - cmake -DCMAKE_BUILD_TYPE:STRING=Release -DMUSPECTRE_RUNNING_IN_CI=ON ..
+    - cmake -DCMAKE_BUILD_TYPE:STRING=Release -DNETCDF_IO=ON -DMUSPECTRE_RUNNING_IN_CI=ON ..
     - make -k
     - ctest --output-on-failure
     - make test
@@ -32,7 +32,7 @@ build:testing_gcc_mpi:
     - echo "grep -c ^processor /proc/cpuinfo"
     - grep -c ^processor /proc/cpuinfo
     - cd build
-    - cmake -DCMAKE_BUILD_TYPE:STRING=Release -DMUSPECTRE_MPI_PARALLEL=ON -DMPIEXEC_MAX_NUMPROCS=2 -DMPIEXEC_PREFLAGS="--oversubscribe;--allow-run-as-root" -DMUSPECTRE_RUNNING_IN_CI=ON ..
+    - cmake -DCMAKE_BUILD_TYPE:STRING=Release -DMUSPECTRE_MPI_PARALLEL=ON -DNETCDF_IO=ON -DMPIEXEC_MAX_NUMPROCS=2 -DMPIEXEC_PREFLAGS="--oversubscribe;--allow-run-as-root" -DMUSPECTRE_RUNNING_IN_CI=ON ..
     - make -k
     - ctest --output-on-failure
     - make test
@@ -59,7 +59,7 @@ build:testing_clang:
     - echo "grep -c ^processor /proc/cpuinfo"
     - grep -c ^processor /proc/cpuinfo
     - cd build
-    - CXX=clang++ cmake -DCMAKE_BUILD_TYPE:STRING=Release -DMUSPECTRE_RUNNING_IN_CI=ON ..
+    - CXX=clang++ cmake -DCMAKE_BUILD_TYPE:STRING=Release -DNETCDF_IO=ON -DMUSPECTRE_RUNNING_IN_CI=ON ..
     - make -k
     - ctest --output-on-failure
     - make test
@@ -81,7 +81,7 @@ build:testing_gcc_split:
     - echo "grep -c ^processor /proc/cpuinfo"
     - grep -c ^processor /proc/cpuinfo
     - cd build
-    - cmake -DCMAKE_BUILD_TYPE:STRING=Release -DSPLIT_CELL=ON ..
+    - cmake -DCMAKE_BUILD_TYPE:STRING=Release -DSPLIT_CELL=ON -DNETCDF_IO=ON ..
     - make
     - ctest --output-on-failure
     - make test

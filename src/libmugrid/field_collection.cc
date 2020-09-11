@@ -475,6 +475,10 @@ namespace muGrid {
   FieldCollection::register_field<Uint>(const std::string &, const Index_t &,
                                         const std::string &, const Unit &);
 
+  template TypedField<Index_t> &
+  FieldCollection::register_field<Index_t>(const std::string &, const Index_t &,
+                                           const std::string &, const Unit &);
+
   /* ---------------------------------------------------------------------- */
   FieldCollection::PixelIndexIterable::PixelIndexIterable(
       const FieldCollection & collection)
@@ -581,4 +585,22 @@ namespace muGrid {
   FieldCollection::IndexIterable::iterator::iterator(
       const PixelIndexIterator_t & pixel_index_iterator, const size_t & stride)
       : stride{stride}, pixel_index_iterator{pixel_index_iterator} {}
+
+  /* ---------------------------------------------------------------------- */
+  std::ostream &
+  operator<<(std::ostream & os,
+             const muGrid::FieldCollection::ValidityDomain & value) {
+    const char* s = 0;
+    switch (value) {
+    case (muGrid::FieldCollection::ValidityDomain::Global):
+      s = "ValidityDomain::Global";
+      break;
+    case(muGrid::FieldCollection::ValidityDomain::Local):
+      s = "ValidityDomain::Local";
+      break;
+    default:
+      s = "ValidityDomain is not defined";
+    }
+    return os << s;
+  }
 }  // namespace muGrid

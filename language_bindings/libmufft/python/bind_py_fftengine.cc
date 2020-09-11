@@ -318,10 +318,12 @@ void add_engine_helper(py::module & mod, const std::string & name) {
              py::array_t<Real> & input_array,
              py::array_t<Complex> & output_array) {
             auto nb_dof_per_pixel{input_array.size() / eng.size()};
-            NumpyProxy<Real> input_proxy(eng.get_nb_subdomain_grid_pts(),
+            NumpyProxy<Real> input_proxy(eng.get_nb_domain_grid_pts(),
+                                         eng.get_nb_subdomain_grid_pts(),
                                          eng.get_subdomain_locations(),
                                          nb_dof_per_pixel, input_array);
-            NumpyProxy<Complex> output_proxy(eng.get_nb_fourier_grid_pts(),
+            NumpyProxy<Complex> output_proxy(eng.get_nb_domain_grid_pts(),
+                                             eng.get_nb_fourier_grid_pts(),
                                              eng.get_fourier_locations(),
                                              nb_dof_per_pixel, output_array);
             auto && input_proxy_field{input_proxy.get_field()};
@@ -335,10 +337,12 @@ void add_engine_helper(py::module & mod, const std::string & name) {
              py::array_t<Complex> & input_array,
              py::array_t<Real> & output_array) {
             auto nb_dof_per_pixel{output_array.size() / eng.size()};
-            NumpyProxy<Complex> input_proxy(eng.get_nb_fourier_grid_pts(),
+            NumpyProxy<Complex> input_proxy(eng.get_nb_domain_grid_pts(),
+                                            eng.get_nb_fourier_grid_pts(),
                                             eng.get_fourier_locations(),
                                             nb_dof_per_pixel, input_array);
-            NumpyProxy<Real> output_proxy(eng.get_nb_subdomain_grid_pts(),
+            NumpyProxy<Real> output_proxy(eng.get_nb_domain_grid_pts(),
+                                          eng.get_nb_subdomain_grid_pts(),
                                           eng.get_subdomain_locations(),
                                           nb_dof_per_pixel, output_array);
             eng.ifft(input_proxy.get_field(), output_proxy.get_field());

@@ -44,7 +44,8 @@ import _muSpectre
 
 from muFFT import Stencils2D
 
-def build_test_classes(Projection, RefProjection, name):
+def build_test_classes(Projection, RefProjection, name,
+                       formulation, do_factory_test=False):
     class ProjectionCheck(unittest.TestCase):
         def __init__(self, methodName='runTest'):
             super().__init__(methodName)
@@ -61,6 +62,14 @@ def build_test_classes(Projection, RefProjection, name):
                 self.fft, [float(x) for x in self.shape])
             self.projection.initialise()
             self.tol = 1e-12*np.prod(self.shape)
+
+        def test_factory(self):
+            if do_factory_test:
+                projection = µ.Projection(self.shape,
+                                          [float(x) for x in self.shape],
+                                          formulation=formulation)
+                self.assertTrue(
+                    projection.__class__ == self.projection.__class__)
 
         def test_CompareGhat4(self):
             # refG is rowmajor and the dims are i,j,k,l,x,y(,z)
@@ -135,7 +144,7 @@ class ProjectionMultipleQuadPts(unittest.TestCase):
         for Proj in [µ.ProjectionFiniteStrain_2d,
                      µ.ProjectionFiniteStrainFast_2d]:
             coll = muGrid.GlobalFieldCollection(nb_dim)
-            coll.initialise(self.nb_grid_pts)
+            coll.initialise(self.nb_grid_pts, self.nb_grid_pts)
 
             in_field = coll.register_real_field("in", 2)
             in_arr = in_field.array(muGrid.Pixel)
@@ -177,7 +186,7 @@ class ProjectionMultipleQuadPts(unittest.TestCase):
                     Stencils2D.d_11_01, Stencils2D.d_11_10]
 
         coll = muGrid.GlobalFieldCollection(nb_dim)
-        coll.initialise(self.nb_grid_pts)
+        coll.initialise(self.nb_grid_pts, self.nb_grid_pts)
 
         in_field = coll.register_real_field("in", 2)
         in_arr = in_field.array(muGrid.Pixel)
@@ -227,7 +236,7 @@ class ProjectionMultipleQuadPts(unittest.TestCase):
                     Stencils2D.d_11_01, Stencils2D.d_11_10]
 
         coll = muGrid.GlobalFieldCollection(nb_dim)
-        coll.initialise(self.nb_grid_pts)
+        coll.initialise(self.nb_grid_pts, self.nb_grid_pts)
 
         in_field = coll.register_real_field("in", 2)
         in_arr = in_field.array(muGrid.Pixel)
@@ -279,23 +288,35 @@ def get_small_goose(ndim): return get_goose(
 
 small_default_3 = build_test_classes(_muSpectre.ProjectionSmallStrain_3d,
                                      get_small_goose(3),
-                                     "SmallStrainDefaultProjection3d")
+                                     "SmallStrainDefaultProjection3d",
+                                     µ.Formulation.small_strain,
+                                     True)
 small_default_2 = build_test_classes(_muSpectre.ProjectionSmallStrain_2d,
                                      get_small_goose(2),
-                                     "SmallStrainDefaultProjection2d")
+                                     "SmallStrainDefaultProjection2d",
+                                     µ.Formulation.small_strain,
+                                     True)
 
 finite_default_3 = build_test_classes(_muSpectre.ProjectionFiniteStrain_3d,
                                       get_finite_goose(3),
-                                      "FiniteStrainDefaultProjection3d")
+                                      "FiniteStrainDefaultProjection3d",
+                                      µ.Formulation.finite_strain,
+                                      False)
 finite_default_2 = build_test_classes(_muSpectre.ProjectionFiniteStrain_2d,
                                       get_finite_goose(2),
-                                      "FiniteStrainDefaultProjection2d")
+                                      "FiniteStrainDefaultProjection2d",
+                                      µ.Formulation.finite_strain,
+                                      False)
 
 finite_fast_3 = build_test_classes(_muSpectre.ProjectionFiniteStrainFast_3d,
                                    get_finite_goose(3),
-                                   "FiniteStrainFastProjection3d")
+                                   "FiniteStrainFastProjection3d",
+                                   µ.Formulation.finite_strain,
+                                   True)
 finite_fast_2 = build_test_classes(_muSpectre.ProjectionFiniteStrainFast_2d,
                                    get_finite_goose(2),
-                                   "FiniteStrainFastProjection2d")
+                                   "FiniteStrainFastProjection2d",
+                                   µ.Formulation.finite_strain,
+                                   True)
 if __name__ == "__main__":
     unittest.main()

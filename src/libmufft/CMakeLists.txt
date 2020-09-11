@@ -60,6 +60,7 @@ set(mufft_SRCS
 set(fft_engine_FFTWMPI_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/fftwmpi_engine.cc
   )
+
 set(fft_engine_PFFT_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/pfft_engine.cc
   )
@@ -75,7 +76,6 @@ endif()
 
 if(${MUSPECTRE_MPI_PARALLEL})
   find_package(MPI REQUIRED)
-  set(mufft_SRCS ${mufft_SRCS} communicator.cc)
 
   target_link_libraries(muFFT PUBLIC ${MPI_LIBRARIES})
   target_include_directories(muFFT SYSTEM PUBLIC ${MPI_C_INCLUDE_PATH})
@@ -107,6 +107,7 @@ if(${MUSPECTRE_MPI_PARALLEL})
   if(NOT ${_using_mpi})
     message(SEND_ERROR "You activated MPI but turned on none of the MPI-parallel FFT engines")
   endif()
+  ##############################################################################
 endif()
 
 target_sources(muFFT PRIVATE ${mufft_SRCS})

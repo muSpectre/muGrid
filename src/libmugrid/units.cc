@@ -452,7 +452,15 @@ namespace muGrid {
       }
     }
     if (unit.tag) {
-      os << ", tag(" << unit.tag << ')';
+      if (first) {
+        first = false;
+      } else {
+        os << ", tag(" << unit.tag << ')';
+      }
+    }
+    if (first) {
+      // no Unit
+      os << "no unit provided";
     }
     return os;
   }

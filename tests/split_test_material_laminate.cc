@@ -41,6 +41,7 @@
 #include "materials/material_linear_orthotropic.hh"
 #include "cell/cell.hh"
 #include "projection/projection_finite_strain_fast.hh"
+#include "common/muSpectre_common.hh"
 
 #include <libmufft/fftw_engine.hh>
 
@@ -62,6 +63,7 @@ namespace muSpectre {
   struct MaterialFixture {
     constexpr static Index_t sdim{DimS};
     constexpr static Index_t mdim{DimM};
+
     constexpr static Formulation form{Form};
 
     using Vec_t = Eigen::Matrix<Real, DimM, 1>;
@@ -278,23 +280,24 @@ namespace muSpectre {
 
     using Mat_t = Eigen::Matrix<Real, Fix::mdim, Fix::mdim>;
     using FC_t = muGrid::GlobalFieldCollection;
-    // using Ccoord = Ccoord_t<Fix::sdim>;
+
     FC_t globalfields{Fix::mdim};
     globalfields.set_nb_sub_pts(QuadPtTag, Fix::NbQuadPts());
-    globalfields.initialise(cube, loc);
-    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim, IterUnit::SubPt>
-        F1_f{"Transformation Gradient 1", globalfields, QuadPtTag};
-    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim, IterUnit::SubPt>
-        P1_f{"Nominal Stress 1", globalfields, QuadPtTag};
-    muGrid::MappedT4Field<Real, Mapping::Mut, Fix::mdim, IterUnit::SubPt>
-        K1_f{"Tangent Moduli 1", globalfields, QuadPtTag};
+    globalfields.initialise(cube, cube, loc);
 
-    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim, IterUnit::SubPt>
-        F2_f{"Transformation Gradient 2", globalfields, QuadPtTag};
-    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim, IterUnit::SubPt>
-        P2_f{"Nominal Stress 2", globalfields, QuadPtTag};
-    muGrid::MappedT4Field<Real, Mapping::Mut, Fix::mdim, IterUnit::SubPt>
-        K2_f{"Tangent Moduli 2", globalfields, QuadPtTag};
+    globalfields.register_real_field("Transformation Gradient 1",
+                                     Fix::mdim * Fix::mdim, QuadPtTag);
+    globalfields.register_real_field("Nominal Stress 1", Fix::mdim * Fix::mdim,
+                                     QuadPtTag);
+    globalfields.register_real_field("Tangent Moduli 1",
+                                     muGrid::ipow(Fix::mdim, 4), QuadPtTag);
+
+    globalfields.register_real_field("Transformation Gradient 2",
+                                     Fix::mdim * Fix::mdim, QuadPtTag);
+    globalfields.register_real_field("Nominal Stress 2", Fix::mdim * Fix::mdim,
+                                     QuadPtTag);
+    globalfields.register_real_field("Tangent Moduli 2",
+                                     muGrid::ipow(Fix::mdim, 4), QuadPtTag);
 
     Mat_t zero{Mat_t::Zero()};
     Mat_t F{1e-6 * Mat_t::Random() + Mat_t::Identity()};
@@ -306,10 +309,17 @@ namespace muSpectre {
 
     Index_t pix0{0};
     Real error{0.0};
-    Real tol{1e-12};
+    Real tol{1e-9};
 
-    F1_f.get_map()[pix0] = strain;
-    F2_f.get_map()[pix0] = strain;
+    using traits = MaterialMuSpectre_traits<typename Fix::Material_t>;
+
+    typename traits::StressMap_t grad_map_1(
+        globalfields.get_field("Transformation Gradient 1"));
+    grad_map_1[0] = strain;
+
+    typename traits::StressMap_t grad_map_2(
+        globalfields.get_field("Transformation Gradient 2"));
+    grad_map_2[0] = strain;
 
     mat.add_pixel(pix0, mat_precipitate, mat_matrix, ratio, normal_vec);
     mat_precipitate->add_pixel(pix0);
@@ -320,19 +330,30 @@ namespace muSpectre {
         globalfields.get_field("Transformation Gradient 1"),
         globalfields.get_field("Nominal Stress 1"),
         globalfields.get_field("Tangent Moduli 1"), Fix::get_form());
+
     mat_precipitate->compute_stresses_tangent(
         globalfields.get_field("Transformation Gradient 2"),
         globalfields.get_field("Nominal Stress 2"),
         globalfields.get_field("Tangent Moduli 2"), Fix::get_form());
 
-    error = (P1_f.get_map()[pix0] - P2_f.get_map()[pix0]).norm();
+    typename traits::StressMap_t Pmap_1(
+        globalfields.get_field("Nominal Stress 1"));
+
+    typename traits::StressMap_t Pmap_2(
+        globalfields.get_field("Nominal Stress 2"));
+
+    error = rel_error(Pmap_1[pix0], Pmap_2[pix0]);
     BOOST_CHECK_LT(error, tol);
 
-    error = (K1_f.get_map()[pix0] - K2_f.get_map()[pix0]).norm();
-    BOOST_CHECK_LT(error, tol);
+    typename traits::TangentMap_t Kmap_1(
+        globalfields.get_field("Tangent Moduli 1"));
 
-    F1_f.get_map()[pix0] = strain;
-    F2_f.get_map()[pix0] = strain;
+    typename traits::TangentMap_t Kmap_2(
+        globalfields.get_field("Tangent Moduli 2"));
+
+    error = rel_error(Kmap_1[pix0], Kmap_2[pix0]);
+
+    BOOST_CHECK_LT(error, tol);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -354,20 +375,21 @@ namespace muSpectre {
 
     FC_t globalfields{Fix::mdim};
     globalfields.set_nb_sub_pts(QuadPtTag, Fix::NbQuadPts());
-    globalfields.initialise(cube, loc);
-    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim, IterUnit::SubPt>
-        F1_f{"Transformation Gradient 1", globalfields, QuadPtTag};
-    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim, IterUnit::SubPt>
-        P1_f{"Nominal Stress 1", globalfields, QuadPtTag};
-    muGrid::MappedT4Field<Real, Mapping::Mut, Fix::mdim, IterUnit::SubPt>
-        K1_f{"Tangent Moduli 1", globalfields, QuadPtTag};
+    globalfields.initialise(cube, cube, loc);
 
-    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim, IterUnit::SubPt>
-        F2_f{"Transformation Gradient 2", globalfields, QuadPtTag};
-    muGrid::MappedT2Field<Real, Mapping::Mut, Fix::mdim, IterUnit::SubPt>
-        P2_f{"Nominal Stress 2", globalfields, QuadPtTag};
-    muGrid::MappedT4Field<Real, Mapping::Mut, Fix::mdim, IterUnit::SubPt>
-        K2_f{"Tangent Moduli 2", globalfields, QuadPtTag};
+    globalfields.register_real_field("Transformation Gradient 1",
+                                     Fix::mdim * Fix::mdim, QuadPtTag);
+    globalfields.register_real_field("Nominal Stress 1", Fix::mdim * Fix::mdim,
+                                     QuadPtTag);
+    globalfields.register_real_field("Tangent Moduli 1",
+                                     muGrid::ipow(Fix::mdim, 4), QuadPtTag);
+
+    globalfields.register_real_field("Transformation Gradient 2",
+                                     Fix::mdim * Fix::mdim, QuadPtTag);
+    globalfields.register_real_field("Nominal Stress 2", Fix::mdim * Fix::mdim,
+                                     QuadPtTag);
+    globalfields.register_real_field("Tangent Moduli 2",
+                                     muGrid::ipow(Fix::mdim, 4), QuadPtTag);
 
     Mat_t zero{Mat_t::Zero()};
     Mat_t F{1e-6 * Mat_t::Random() + Mat_t::Identity()};
@@ -376,13 +398,10 @@ namespace muSpectre {
     if (Fix::get_form() == Formulation::small_strain) {
       strain = {0.5 * ((F * F.transpose()) - Mat_t::Identity())};
     }
-    // using Ccoord = Ccoord_t<Fix::sdim>;
+
     Index_t pix0{0};
     Real error{0.0};
-    Real tol{1e-12};
-
-    F1_f.get_map()[pix0] = strain;
-    F2_f.get_map()[pix0] = strain;
+    Real tol{1e-6};
 
     mat.add_pixel(pix0, mat_precipitate, mat_matrix, ratio, normal_vec);
     mat_ref.add_pixel(pix0);
@@ -391,8 +410,16 @@ namespace muSpectre {
     mat_ref.initialise();
 
     F = Mat_t::Identity();
-    F1_f.get_map()[pix0] = F;
-    F2_f.get_map()[pix0] = F;
+
+    using traits = MaterialMuSpectre_traits<typename Fix::Material_t>;
+
+    typename traits::StressMap_t grad_map_1(
+        globalfields.get_field("Transformation Gradient 1"));
+    grad_map_1[0] = strain;
+
+    typename traits::StressMap_t grad_map_2(
+        globalfields.get_field("Transformation Gradient 2"));
+    grad_map_2[0] = strain;
 
     mat.compute_stresses_tangent(
         globalfields.get_field("Transformation Gradient 1"),
@@ -403,10 +430,22 @@ namespace muSpectre {
         globalfields.get_field("Nominal Stress 2"),
         globalfields.get_field("Tangent Moduli 2"), Fix::get_form());
 
-    error = rel_error(P1_f.get_map()[pix0], P2_f.get_map()[pix0]);
+    typename traits::StressMap_t Pmap_1(
+        globalfields.get_field("Nominal Stress 1"));
+
+    typename traits::StressMap_t Pmap_2(
+        globalfields.get_field("Nominal Stress 2"));
+
+    error = rel_error(Pmap_1[pix0], Pmap_2[pix0]);
     BOOST_CHECK_LT(error, tol);
 
-    error = rel_error(K1_f.get_map()[pix0], K2_f.get_map()[pix0]);
+    typename traits::TangentMap_t Kmap_1(
+        globalfields.get_field("Tangent Moduli 1"));
+
+    typename traits::TangentMap_t Kmap_2(
+        globalfields.get_field("Tangent Moduli 2"));
+
+    error = rel_error(Kmap_1[pix0], Kmap_2[pix0]);
     BOOST_CHECK_LT(error, tol);
 
     mat.compute_stresses(globalfields.get_field("Transformation Gradient 1"),
@@ -416,8 +455,8 @@ namespace muSpectre {
         globalfields.get_field("Transformation Gradient 2"),
         globalfields.get_field("Nominal Stress 2"), Fix::get_form());
 
-    auto a{P1_f.get_map()[pix0]};
-    auto b{P2_f.get_map()[pix0]};
+    auto a{Pmap_1[pix0]};
+    auto b{Pmap_2[pix0]};
 
     error = rel_error(a, b);
     BOOST_CHECK_LT(error, tol);
