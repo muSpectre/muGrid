@@ -1,5 +1,5 @@
 /**
- * @file   mpi_test_file_io_netcdf.cc
+ * @file   io_mpi_test_file_io_netcdf.cc
  *
  * @author Richard Leute <richard.leute@imtek.uni-freiburg.de>
  *
@@ -39,7 +39,7 @@
 
 #include "mpi_context.hh"
 
-#include "mpi_test_file_io.hh"
+#include "io_mpi_test_file_io.hh"
 
 #include <tests/libmufft/tests.hh>
 
@@ -309,11 +309,11 @@ namespace muGrid {
       muGrid::TypedField<Real> & t2_field_2{global_fc_2.register_real_field(
           "T2_test_field", muGrid::ipow(spatial_dimension, 2))};
       muGrid::T2FieldMap<Real, Mapping::Mut, Dim, muGrid::IterUnit::SubPt>
-        t2_field_map_2{t2_field_2};
+          t2_field_map_2{t2_field_2};
       muGrid::TypedField<Real> & t2_field_1{global_fc_1.register_real_field(
           "T2_test_field", muGrid::ipow(spatial_dimension, 2))};
       muGrid::T2FieldMap<Real, Mapping::Mut, Dim, muGrid::IterUnit::SubPt>
-        t2_field_map_1{t2_field_1};
+          t2_field_map_1{t2_field_1};
 
       // local field collection
       const muGrid::FieldCollection::SubPtMap_t & nb_sub_pts_local{{"quad", 3}};
@@ -342,13 +342,12 @@ namespace muGrid {
       muGrid::TypedField<int> & t1_field_2{local_fc_2.register_field<int>(
           "T1_int_field", muGrid::ipow(spatial_dimension, 1), quad)};
       muGrid::T1FieldMap<int, Mapping::Mut, Dim, muGrid::IterUnit::SubPt>
-        t1_field_map_2{t1_field_2};
+          t1_field_map_2{t1_field_2};
 
       muGrid::TypedField<int> & t1_field_1{local_fc_1.register_field<int>(
           "T1_int_field", muGrid::ipow(spatial_dimension, 1), quad)};
       muGrid::T1FieldMap<int, Mapping::Mut, Dim, muGrid::IterUnit::SubPt>
-        t1_field_map_1{t1_field_1};
-
+          t1_field_map_1{t1_field_1};
 
       // write with comm_2 (two procs) ------------------------------------- //
       if (comm_2.rank() == 0) {
@@ -392,7 +391,6 @@ namespace muGrid {
       file_io_netcdf_w.append_frame().write();  // write frame 0
       file_io_netcdf_w.close();
 
-
       // read with comm_1 (one processor) ---------------------------------- //
       if (comm_2.rank() == 0) {
         std::cout << "read(1p)" << std::endl;
@@ -432,7 +430,6 @@ namespace muGrid {
         file_io_netcdf_r.close();
       }
 
-
       // append with comm_1 (one processor) -------------------------------- //
       if (comm_2.rank() == 0) {
         std::cout << "append(1p)" << std::endl;
@@ -444,7 +441,6 @@ namespace muGrid {
         file_io_netcdf_a.register_field_collection(local_fc_1);
         file_io_netcdf_a.append_frame().write();  // write frame 1
       }
-
 
       // write with comm_1 (one processor) --------------------------------- //
       if (comm_2.rank() == 0) {
@@ -458,7 +454,6 @@ namespace muGrid {
 
       MPI_Barrier(comm_2.get_mpi_comm());
       MPI_Barrier(comm_1.get_mpi_comm());
-
 
       // read with comm_2 (two processors) --------------------------------- //
       if (comm_2.rank() == 0) {
@@ -498,7 +493,6 @@ namespace muGrid {
       }
       file_io_netcdf_r.close();
 
-
       // append with comm_2 (two processors) ------------------------------- //
       if (comm_2.rank() == 0) {
         std::cout << "append(2p)" << std::endl;
@@ -528,7 +522,6 @@ namespace muGrid {
 
       MPI_Barrier(comm_2.get_mpi_comm());
       MPI_Barrier(comm_1.get_mpi_comm());
-
 
       // read with comm_1 (one processor) ---------------------------------- //
       if (comm_2.rank() == 0) {

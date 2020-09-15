@@ -1,5 +1,5 @@
 /**
- * @file   test_file_io_base.cc
+ * @file   io_test_file_io_base.cc
  *
  * @author Richard Leute <richard.leute@imtek.uni-freiburg.de>
  *

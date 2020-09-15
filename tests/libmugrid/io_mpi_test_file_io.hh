@@ -1,5 +1,5 @@
 /**
- * @file   mpi_test_file_io.hh
+ * @file   io_mpi_test_file_io.hh
  *
  * @author Richard Leute <richard.leute@imtek.uni-freiburg.de>
  *
@@ -33,8 +33,8 @@
  *
  */
 
-#ifndef TESTS_LIBMUGRID_MPI_TEST_FILE_IO_HH_
-#define TESTS_LIBMUGRID_MPI_TEST_FILE_IO_HH_
+#ifndef TESTS_LIBMUGRID_IO_MPI_TEST_FILE_IO_HH_
+#define TESTS_LIBMUGRID_IO_MPI_TEST_FILE_IO_HH_
 
 #include "tests/libmufft/tests.hh"
 #include "mpi_context.hh"
@@ -123,4 +123,4 @@ namespace muGrid {
   constexpr Index_t FileIOFixture::spatial_dimension;
 }  // namespace muGrid
 
-#endif  // TESTS_LIBMUGRID_MPI_TEST_FILE_IO_HH_
+#endif  // TESTS_LIBMUGRID_IO_MPI_TEST_FILE_IO_HH_

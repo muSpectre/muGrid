@@ -58,21 +58,26 @@ endforeach(header_test ${HEADER_TEST_SRCS})
 
 # build library tests
 file(GLOB TEST_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/test_*.cc")
+if(${NETCDF_IO})
+  file(GLOB IO_TEST_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/io_test_*.cc")
+endif()
 muGrid_add_test(main_mugrid_test_suite
-  SOURCES main_test_suite.cc test_goodies.cc field_test_fixtures.cc ${TEST_SRCS}
+  SOURCES main_test_suite.cc test_goodies.cc field_test_fixtures.cc ${TEST_SRCS} ${IO_TEST_SRCS}
   TYPE BOOST --report_level=detailed)
 
 if(${MUSPECTRE_MPI_PARALLEL})
   # add MPI tests
   file(GLOB TEST_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/mpi_*.cc")
-
+  if(${NETCDF_IO})
+    file(GLOB IO_TEST_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/io_mpi_*.cc")
+  endif()
   muGrid_add_test(mugrid_mpi_main_test_suite1
-          SOURCES main_test_suite.cc ${TEST_SRCS}
-          TARGET mpi_main_test_suite
-          TYPE BOOST MPI_NB_PROCS 1 --report_level=detailed)
+    SOURCES main_test_suite.cc ${TEST_SRCS} ${IO_TEST_SRCS}
+    TARGET mpi_main_test_suite
+    TYPE BOOST MPI_NB_PROCS 1 --report_level=detailed)
   muGrid_add_test(mugrid_mpi_main_test_suite2
-          TARGET mpi_main_test_suite
-          TYPE BOOST MPI_NB_PROCS 2 --report_level=detailed)
+    TARGET mpi_main_test_suite
+    TYPE BOOST MPI_NB_PROCS 2 --report_level=detailed)
 
   muGrid_add_test(mugrid_python_mpi_binding_test1 TYPE PYTHON MPI_NB_PROCS 1
     python_mpi_binding_test.py)

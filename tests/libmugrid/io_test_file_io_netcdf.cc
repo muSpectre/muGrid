@@ -1,5 +1,5 @@
 /**
- * @file   test_file_io_netcdf.cc
+ * @file   io_test_file_io_netcdf.cc
  *
  * @author Richard Leute <richard.leute@imtek.uni-freiburg.de>
  *
@@ -37,7 +37,7 @@
 
 #include <boost/mpl/list.hpp>
 
-#include "test_file_io.hh"
+#include "io_test_file_io.hh"
 
 #include <libmugrid/file_io_netcdf.hh>
 #include <libmugrid/file_io_base.hh>
@@ -220,7 +220,6 @@ namespace muGrid {
     file_io_netcdf_r.close();  // close file
   };
 
-
   BOOST_FIXTURE_TEST_CASE(FileIONetCDFAppend, FileIOFixture) {
     // fields with other values than in previous write
     for (auto && id_val : this->t4_field_map.enumerate_indices()) {
@@ -316,7 +315,6 @@ namespace muGrid {
     file_io_netcdf_a.close();  // close file
   };
 
-
   BOOST_FIXTURE_TEST_CASE(FileIONetCDFIterator, FileIOFixtureIterator) {
     // write a file with several frames
     const std::string file_name{"test_frames.nc"};
@@ -362,7 +360,6 @@ namespace muGrid {
       // TODO(RLeute): check for equality of read frame!
     }
   };
-
 
   BOOST_FIXTURE_TEST_CASE(LocalFCSameNames, FileIOFixture) {
     const std::string file_name{"LFC_same_names.nc"};
