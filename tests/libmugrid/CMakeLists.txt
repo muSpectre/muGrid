@@ -65,6 +65,8 @@ muGrid_add_test(main_mugrid_test_suite
   SOURCES main_test_suite.cc test_goodies.cc field_test_fixtures.cc ${TEST_SRCS} ${IO_TEST_SRCS}
   TYPE BOOST --report_level=detailed)
 
+muGrid_add_test(mugrid_python_binding_tests TYPE PYTHON python_binding_tests.py)
+
 if(${MUSPECTRE_MPI_PARALLEL})
   # add MPI tests
   file(GLOB TEST_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/mpi_*.cc")

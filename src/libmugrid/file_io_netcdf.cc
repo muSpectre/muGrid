@@ -2188,7 +2188,7 @@ namespace muGrid {
     }
     throw FileIOError("The variable with name '" + var_name +
                       "' was not found. Maybe you forgot to register "
-                      "the corresponding FieldCollection?");
+                      "the corresponding FieldCollection or Field?");
     return var_vector.back();
   }
 

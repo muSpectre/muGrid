@@ -51,6 +51,7 @@ set (PY_BINDING_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_communicator.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_field.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_field_collection.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_file_io.cc
   )
 
 find_package(PythonLibsNew ${MUGRID_PYTHON_MAJOR_VERSION} MODULE REQUIRED)
@@ -66,6 +67,10 @@ target_link_libraries(pyMuGridLib PRIVATE muGrid)
 set_target_properties(pyMuGridLib PROPERTIES OUTPUT_NAME _muGrid)
 
 target_include_directories(pyMuGridLib PUBLIC ${PYTHON_INCLUDE_DIRS})
+
+if(${NETCDF_IO})
+  target_compile_definitions(pyMuGridLib PUBLIC -DWITH_NETCDF_IO)
+endif()
 
 add_custom_target(pyMuGrid ALL SOURCES
   muGrid/__init__.py

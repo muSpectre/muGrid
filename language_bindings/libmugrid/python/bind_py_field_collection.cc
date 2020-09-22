@@ -45,6 +45,8 @@
 #include "libmugrid/field_collection_local.hh"
 #include "libmugrid/state_field.hh"
 
+#include <map>
+
 using muGrid::Complex;
 using muGrid::DynCcoord_t;
 using muGrid::FieldCollection;
@@ -286,8 +288,24 @@ void add_global_field_collection(py::module & mod) {
 }
 
 void add_local_field_collection(py::module & mod) {
-  py::class_<LocalFieldCollection, FieldCollection>(mod,
-                                                    "LocalFieldCollection");
+  py::class_<LocalFieldCollection, FieldCollection> fc_local(
+      mod, "LocalFieldCollection");
+  fc_local
+      .def(py::init<const Index_t &,
+                    const muGrid::FieldCollection::SubPtMap_t &>(),
+           "spatial_dimension"_a,
+           "nb_sub_pts"_a = std::map<std::string, Index_t>{})
+      .def(py::init<const Index_t &, const std::string &,
+                    const muGrid::FieldCollection::SubPtMap_t &>(),
+           "spatial_dimension"_a, "name"_a,
+           "nb_sub_pts"_a = std::map<std::string, Index_t>{})
+      .def("add_pixel",
+           [](LocalFieldCollection & fc_local, const size_t & global_index) {
+             return fc_local.add_pixel(global_index);
+           },
+           "global_index"_a)
+      .def("initialise", &LocalFieldCollection::initialise)
+      .def("get_name", &LocalFieldCollection::get_name);
 }
 
 void add_field_collection_classes(py::module & mod) {

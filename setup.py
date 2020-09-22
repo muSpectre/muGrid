@@ -88,14 +88,16 @@ netcdf_info = {
     'name': 'netcdf',
     'environ': 'NETCDFDIR',
     'required_libraries': ['netcdf'],
-    'mpi': False
+    'mpi': False,
+    'define_macro': 'WITH_NETCDF_IO'
 }
 
 pnetcdf_info = {
     'name': 'pnetcdf',
     'environ': 'PNETCDFDIR',
     'required_libraries': ['pnetcdf'],
-    'mpi': True
+    'mpi': True,
+    'define_macro': 'WITH_NETCDF_IO'
 }
 
 ###
@@ -393,6 +395,8 @@ for info, _sources in [(netcdf_info, ['src/libmugrid/file_io_netcdf.cc']),
         if lib is not None:
             _include_dirs, _libraries, _library_dirs = lib
             mugrid_sources += _sources
+            pymugrid_sources += \
+                ['language_bindings/libmugrid/python/bind_py_file_io.cc']
             if 'define_macro' in info:
                 macros += [(info['define_macro'], None)]
             include_dirs += _include_dirs

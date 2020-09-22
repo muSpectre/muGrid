@@ -45,8 +45,9 @@ class FieldCheck(unittest.TestCase):
         self.nb_grid_pts = (10, 11, 21)
 
     def test_buffer_size_one_quad_pt(self):
+        print("I am executing this test")
         fc = muGrid.GlobalFieldCollection(len(self.nb_grid_pts))
-        fc.initialise(self.nb_grid_pts)
+        fc.initialise(self.nb_grid_pts, self.nb_grid_pts)
         # Single component
         f = fc.register_real_field("test-field", 1)
         self.assertEqual(f.array(muGrid.Pixel).shape,
@@ -66,7 +67,7 @@ class FieldCheck(unittest.TestCase):
 
     def test_buffer_size_four_quad_pt(self):
         fc = muGrid.GlobalFieldCollection(len(self.nb_grid_pts), {'quad': 4})
-        fc.initialise(self.nb_grid_pts)
+        fc.initialise(self.nb_grid_pts, self.nb_grid_pts)
         # Single component
         f = fc.register_real_field("test-field", 1, 'quad')
         self.assertEqual(f.array(muGrid.Pixel).shape,
@@ -90,7 +91,7 @@ class FieldCheck(unittest.TestCase):
 
     def test_buffer_access(self):
         fc = muGrid.GlobalFieldCollection(len(self.nb_grid_pts), {'quad': 4})
-        fc.initialise(self.nb_grid_pts)
+        fc.initialise(self.nb_grid_pts, self.nb_grid_pts)
         # Single component
         f = fc.register_real_field("test-field", 1, 'quad')
         arr1 = np.array(f, copy=False)
@@ -106,7 +107,7 @@ class FieldCheck(unittest.TestCase):
     def test_col_major(self):
         dims = (3, 4)
         fc = muGrid.GlobalFieldCollection(len(self.nb_grid_pts),
-                                          self.nb_grid_pts,
+                                          self.nb_grid_pts, self.nb_grid_pts,
                                           (0,) * len(self.nb_grid_pts),
                                           {})
         f = fc.register_real_field("test-field", dims)
@@ -124,7 +125,7 @@ class FieldCheck(unittest.TestCase):
         # things.
         dims = (3, 4)
         fc = muGrid.GlobalFieldCollection(
-            len(self.nb_grid_pts), self.nb_grid_pts,
+            len(self.nb_grid_pts), self.nb_grid_pts, self.nb_grid_pts,
             [0] * len(self.nb_grid_pts),
             muGrid.StorageOrder.RowMajor, {}, muGrid.StorageOrder.RowMajor)
         f = fc.register_real_field("test-field", dims,
@@ -142,7 +143,7 @@ class FieldCheck(unittest.TestCase):
         # things.
         dims = (3, 4)
         fc = muGrid.GlobalFieldCollection(
-            len(self.nb_grid_pts), self.nb_grid_pts,
+            len(self.nb_grid_pts), self.nb_grid_pts, self.nb_grid_pts,
             [0] * len(self.nb_grid_pts),
             muGrid.StorageOrder.RowMajor, {}, muGrid.StorageOrder.ColMajor)
         f = fc.register_real_field("test-field", dims,
@@ -157,6 +158,17 @@ class FieldCheck(unittest.TestCase):
         strides = 8 * np.roll(strides, -1)
         self.assertEqual(a.strides, tuple(strides))
 
+    def test_local_field_collection(self):
+        lfc_name = "ArbitraryLocalFieldCollectionName"
+        lfc_field_name = "MyLocalField"
+        fc = muGrid.LocalFieldCollection(3, lfc_name)
+        fc.add_pixel(1)  # add pixel with global_index = 1
+        fc.initialise()
+        field = fc.register_real_field(lfc_field_name, 1, 'pixel')
+        field_array = np.array(field, copy=False)
+        field_array[:] = 5  # assigne value 5 to pixel 1
+
+        self.assertEqual(fc.get_name(), lfc_name)
 
 if __name__ == "__main__":
     unittest.main()
