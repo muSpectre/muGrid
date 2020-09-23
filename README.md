@@ -100,3 +100,11 @@ Python interface
 
 You can find more examples using both the python and the c++ interface in the
 [`examples`](./examples) and [`tests`](./tests) folder.
+
+## Funding
+
+This development is funded by the
+[Swiss National Science Foundation](http://www.snf.ch/en)
+within an Ambizione Project and by the
+[European Research Council](erc.europa.eu) within
+[Starting Grant 757343](cordis.europa.eu/project/id/757343).
