@@ -3,7 +3,7 @@
 Summary
 -------
 
-Project *µ*\Spectre aims at providing an open-source platform for efficient FFT-based continuum mesoscale modelling. Its development is funded by the `Swiss National Science Foundation <snf.ch>`_ within an Ambizione Project and by the `European Research Council <erc.europa.eu>`_ within `Starting Grant 757343 <cordis.europa.eu/project/id/757343>`_.
+Project *µ*\Spectre aims at providing an open-source platform for efficient FFT-based continuum mesoscale modelling. Its development is funded by the `Swiss National Science Foundation <https://snf.ch>`_ within an Ambizione Project and by the `European Research Council <https://erc.europa.eu>`_ within `Starting Grant 757343 <https://cordis.europa.eu/project/id/757343>`_.
 
 Computational continuum mesoscale modelling (or computational micromechanical homogenisation) involves computing the overall response of a periodic unit cell of material, a so-called representative volume element (RVE), to a given average (i.e., macroscale) strain. Typically, this is done using the finite-element method, even though it is neither able to leverage its main strength, the trivial handling of complex geometries, nor otherwise particularly well suited for periodic problems. An alternative method for modelling periodic RVE, developed by `Moulinec and Suquet`_, is based on the fast Fourier transform (FFT). This method has evolved substantially over the last two decades, with particularly important and currently underused improvements in the last two years, see `Zeman et al`_, `de Geus et al`_.
 

@@ -104,7 +104,7 @@ You can find more examples using both the python and the c++ interface in the
 ## Funding
 
 This development is funded by the
-[Swiss National Science Foundation](http://www.snf.ch/en)
+[Swiss National Science Foundation](https://www.snf.ch/en)
 within an Ambizione Project and by the
-[European Research Council](erc.europa.eu) within
-[Starting Grant 757343](cordis.europa.eu/project/id/757343).
+[European Research Council](https://erc.europa.eu) within
+[Starting Grant 757343](https://cordis.europa.eu/project/id/757343).
