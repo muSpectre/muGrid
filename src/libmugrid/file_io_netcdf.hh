@@ -465,8 +465,8 @@ namespace muGrid {
     static nc_type typeid_to_nc_type(const std::type_info & type_id);
 
 #ifdef WITH_MPI
-    //! convert a nc_type data_type into a MPI::Datatype
-    static MPI::Datatype nc_type_to_mpi_datatype(const nc_type & data_type);
+    //! convert a nc_type data_type into a MPI_Datatype
+    static MPI_Datatype nc_type_to_mpi_datatype(const nc_type & data_type);
 #endif  // WITH_MPI
 
     //! register variable id, only possible if the id was not already

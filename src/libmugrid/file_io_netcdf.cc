@@ -1587,7 +1587,7 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   Datatype_t NetCDFVar::get_buftype() const {
 #ifdef WITH_MPI
-    MPI::Datatype data_type{this->nc_type_to_mpi_datatype(this->data_type)};
+    MPI_Datatype data_type{this->nc_type_to_mpi_datatype(this->data_type)};
     return data_type;
 #else   // WITH_MPI
     return this->data_type;
@@ -1925,8 +1925,8 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
 #ifdef WITH_MPI
-  MPI::Datatype NetCDFVar::nc_type_to_mpi_datatype(const nc_type & data_type) {
-    MPI::Datatype mpi_type{MPI_DATATYPE_NULL};
+  MPI_Datatype NetCDFVar::nc_type_to_mpi_datatype(const nc_type & data_type) {
+    MPI_Datatype mpi_type{MPI_DATATYPE_NULL};
     switch (data_type) {
     case NC_CHAR:  // char
       mpi_type = MPI_CHAR;
@@ -1957,7 +1957,7 @@ namespace muGrid {
       break;
     default:
       throw FileIOError("The given data_type '" + std::to_string(data_type) +
-                        "' can not be associated with a MPI::Datatype. "
+                        "' can not be associated with a MPI_Datatype. "
                         "Probably this case is not implemented.");
     }
 

@@ -47,7 +47,7 @@
 #include <iostream>
 
 #ifdef WITH_MPI
-using Size_t = MPI::Offset;
+using Size_t = MPI_Offset;
 #else  // WITH_MPI
 using Size_t = size_t;
 #endif  // WITH_MPI
