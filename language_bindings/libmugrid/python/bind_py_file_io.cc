@@ -63,11 +63,11 @@ class PyFileIOBase : public FileIOBase {
   using FileIOBase::FileIOBase;
 
   // Trampoline for virtual functions
-  void
-  register_field_collection(muGrid::FieldCollection & fc,
-                            std::vector<std::string> field_names) override {
+  void register_field_collection(
+      muGrid::FieldCollection & fc, std::vector<std::string> field_names,
+      std::vector<std::string> state_field_unique_prefixes) override {
     PYBIND11_OVERLOAD_PURE(void, FileIOBase, register_field_collection, fc,
-                           field_names);
+                           field_names, state_field_unique_prefixes);
   }
 
   void close() override { PYBIND11_OVERLOAD_PURE(void, FileIOBase, close); }
@@ -90,20 +90,22 @@ class PyFileIOBase : public FileIOBase {
     PYBIND11_OVERLOAD_PURE(void, FileIOBase, write, frame);
   }
 
-  void open() override { PYBIND11_OVERLOAD_PURE(void, FileIOBase, open); }
+  void open() override { PYBIND11_OVERLOAD_PURE(void, FileIOBase, open); };
 
   void register_field_collection_global(
       muGrid::GlobalFieldCollection & fc_global,
-      const std::vector<std::string> & field_names) override {
+      const std::vector<std::string> & field_names,
+      const std::vector<std::string> & state_field_unique_prefixes) override {
     PYBIND11_OVERLOAD_PURE(void, FileIOBase, register_field_collection_global,
-                           fc_global, field_names);
+                           fc_global, field_names, state_field_unique_prefixes);
   }
 
   void register_field_collection_local(
       muGrid::LocalFieldCollection & fc_local,
-      const std::vector<std::string> & field_names) override {
+      const std::vector<std::string> & field_names,
+      const std::vector<std::string> & state_field_unique_prefixes) override {
     PYBIND11_OVERLOAD_PURE(void, FileIOBase, register_field_collection_local,
-                           fc_local, field_names);
+                           fc_local, field_names, state_field_unique_prefixes);
   }
 };
 
@@ -160,7 +162,10 @@ void add_file_io_netcdf(py::module & mod) {
       .def("close", &FileIONetCDF::close)
       .def("register_field_collection",
            &FileIONetCDF::register_field_collection, "field_collection"_a,
-           "field_names"_a = std::vector<std::string>{})
+           "field_names"_a =
+               std::vector<std::string>{muGrid::REGISTER_ALL_FIELDS},
+           "state_field_unique_prefixes"_a =
+               std::vector<std::string>{muGrid::REGISTER_ALL_STATE_FIELDS})
       .def("read",
            [](FileIONetCDF & file_io_object, const Index_t & frame,
               const std::vector<std::string> & field_names) {

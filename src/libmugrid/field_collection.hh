@@ -195,7 +195,7 @@ namespace muGrid {
                    const Unit & unit = Unit::unitless()) {
       static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
                     "You can only register fields templated with one of the "
-                    "numeric types Real, Complex, Int, or UInt");
+                    "numeric types Real, Complex, Int, or Uint");
       return this->register_field_helper<T>(
           unique_name, components_shape, sub_division_tag, unit);
     }
@@ -523,6 +523,10 @@ namespace muGrid {
 
     //! returns a vector of all field names
     std::vector<std::string> list_fields() const;
+
+    //! returns a vector of all unique_prefixes of state fields in the field
+    //! collection
+    std::vector<std::string> list_state_field_unique_prefixes() const;
 
     //! preregister a map for latent initialisation
     void preregister_map(std::shared_ptr<std::function<void()>> & call_back);

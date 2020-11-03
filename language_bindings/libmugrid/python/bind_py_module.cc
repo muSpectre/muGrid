@@ -43,6 +43,7 @@ PYBIND11_MODULE(_muGrid, mod) {
   add_common(mod);
   add_communicator(mod);
   add_field_classes(mod);
+  add_state_field_classes(mod);
   add_field_collection_classes(mod);
 #ifdef WITH_NETCDF_IO
   add_file_io_classes(mod);

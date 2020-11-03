@@ -54,6 +54,18 @@ using Size_t = size_t;
 
 namespace muGrid {
 
+  constexpr static char REGISTER_ALL_FIELDS[] =
+      "REGISTER_ALL_FIELDS";  // default value for parameter field_names in
+                              // register_field_collection() which means all
+                              // fields of the field collection are
+                              // registered
+  constexpr static char REGISTER_ALL_STATE_FIELDS[] =
+      "REGISTER_ALL_STATE_FIELDS";  // default value for parameter
+                                    // state_field_unique_prefixes in
+                                    // register_field_collection() which
+                                    // means all state fields of the field
+                                    // collection are registered
+
   /**
    * base class for FileIO related exceptions
    */
@@ -114,7 +126,9 @@ namespace muGrid {
     //! of the given field collection are registered (default)
     virtual void register_field_collection(
         muGrid::FieldCollection & fc,
-        std::vector<std::string> field_names = {}) = 0;
+        std::vector<std::string> field_names = {REGISTER_ALL_FIELDS},
+        std::vector<std::string> state_field_unique_prefixes = {
+            REGISTER_ALL_STATE_FIELDS}) = 0;
 
     //! close file
     virtual void close() = 0;
@@ -156,12 +170,14 @@ namespace muGrid {
     //! register global field collection
     virtual void register_field_collection_global(
         muGrid::GlobalFieldCollection & fc_global,
-        const std::vector<std::string> & field_names) = 0;
+        const std::vector<std::string> & field_names,
+        const std::vector<std::string> & state_field_unique_prefixes) = 0;
 
     //! register local field collection
     virtual void register_field_collection_local(
         muGrid::LocalFieldCollection & fc_local,
-        const std::vector<std::string> & field_names) = 0;
+        const std::vector<std::string> & field_names,
+        const std::vector<std::string> & state_field_unique_prefixes) = 0;
 
     const std::string file_name;
     const OpenMode open_mode;

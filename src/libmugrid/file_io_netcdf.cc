@@ -62,12 +62,28 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   void FileIONetCDF::register_field_collection(
-      muGrid::FieldCollection & fc,
-      std::vector<std::string> field_names) {
-    // By default register all fields of the field collection if no field_names
-    // are given.
-    if (field_names.size() == 0) {
-      field_names = fc.list_fields();
+      muGrid::FieldCollection & fc, std::vector<std::string> field_names,
+      std::vector<std::string> state_field_unique_prefixes) {
+    // By default register all fields of the field collection if field_names is
+    // the default, field_names == REGISTER_ALL_FIELDS. An empty vector is
+    // preserved to register no fields. This can be usefull if you e.g. only
+    // want to register state fields
+    if (field_names.size() == 1) {
+      if (field_names[0] == std::string(REGISTER_ALL_FIELDS)) {
+        field_names = fc.list_fields();
+      }
+    }
+
+    // By default register all state fields of the field collection if
+    // state_field_unique_prefixes is the default, state_field_unique_prefixes
+    // == REGISTER_ALL_STATE_FIELDS. An empty vector is preserved to register no
+    // state fields. This can be usefull if you e.g. only want to register
+    // fields
+    if (state_field_unique_prefixes.size() == 1) {
+      if (state_field_unique_prefixes[0] ==
+          std::string(REGISTER_ALL_STATE_FIELDS)) {
+        state_field_unique_prefixes = fc.list_state_field_unique_prefixes();
+      }
     }
 
     /* register all field collections */
@@ -75,11 +91,13 @@ namespace muGrid {
     switch (domain) {
     case muGrid::FieldCollection::ValidityDomain::Global:
       register_field_collection_global(
-          dynamic_cast<muGrid::GlobalFieldCollection &>(fc), field_names);
+          dynamic_cast<muGrid::GlobalFieldCollection &>(fc), field_names,
+          state_field_unique_prefixes);
       break;
     case muGrid::FieldCollection::ValidityDomain::Local:
       register_field_collection_local(
-          dynamic_cast<muGrid::LocalFieldCollection &>(fc), field_names);
+          dynamic_cast<muGrid::LocalFieldCollection &>(fc), field_names,
+          state_field_unique_prefixes);
       break;
     default:
       throw FileIOError(
@@ -225,6 +243,18 @@ namespace muGrid {
     // file is either created or opened
     this->netcdf_mode = NetCDFMode::DefineMode;
 
+    // if you run in serial set NetCDF to _NoFill mode to be conform with the
+    // PnetCDF default. We decide to use _NoFill because this is performance
+    // wise better, because it prevents double writing on the same variable
+#ifndef WITH_MPI
+    // From:
+    // https://www.unidata.ucar.edu/software/netcdf/docs/group__datasets.html#ga610e6fadb14a51f294b322a1b8ac1bec //NOLINT
+    // Caution: The use of this feature may not be available (or even needed) in
+    // future releases. Programmers are cautioned against heavy reliance upon
+    // this feature.
+    nc_set_fill(this->netcdf_id, NC_NOFILL, nullptr);
+#endif  // not WITH_MPI
+
     // TODO(RLeute): save all necessary header/meta data in the NetCDF file
     //               e.g. muSpectre version, git hash, date, ...
     //               Do this by global attributes 'NC_GLOBAL'
@@ -246,7 +276,7 @@ namespace muGrid {
                           const std::vector<std::string> & field_names) {
     // read all fields with name in field_names
     for (auto & f_name : field_names) {
-      const NetCDFVar & var{variables.get_variable(f_name)};
+      NetCDFVarBase & var{variables.get_variable(f_name)};
       if (var.get_validity_domain() ==
           muGrid::FieldCollection::ValidityDomain::Local) {
         // read in local_pixels field before you read the local variable
@@ -254,13 +284,14 @@ namespace muGrid {
         if (std::find(read_local_pixel_fields.begin(),
                       read_local_pixel_fields.end(),
                       local_field_name) == read_local_pixel_fields.end()) {
-          const NetCDFVar & local_field_var{
-              variables.get_variable(local_field_name)};
-          read_netcdfvar(frame, local_field_var);
+          variables.get_variable(local_field_name)
+              .read(this->netcdf_id, this->nb_frames, this->GFC_local_pixels,
+                    0);
           this->read_local_pixel_fields.push_back(local_field_name);
         }
       }
-      read_netcdfvar(frame, var);
+      // read the variable
+      var.read(this->netcdf_id, this->nb_frames, this->GFC_local_pixels, frame);
     }
   }
 
@@ -271,94 +302,10 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  void FileIONetCDF::read_netcdfvar(const Index_t & frame_index,
-                                    const NetCDFVar & var) {
-    // check if frame is correct and compute positive frame value
-    Index_t frame{handle_frame(frame_index)};
-
-    int status{};
-    if (var.get_validity_domain() ==
-        muGrid::FieldCollection::ValidityDomain::Global) {
-      /**
-       * Read global field with ncmu_get_varm_all
-       **/
-#ifdef WITH_MPI
-      status = ncmu_get_varm_all(
-          this->netcdf_id, var.get_id(), var.get_start_global(frame).data(),
-          var.get_count_global().data(), var.get_nc_stride().data(),
-          var.get_nc_imap_global().data(), var.get_buf(),
-          var.get_bufcount_mpi_global(), var.get_buftype());
-#else   // WITH_MPI
-      status = ncmu_get_varm_all(
-          this->netcdf_id, var.get_id(), var.get_start_global(frame).data(),
-          var.get_count_global().data(), var.get_nc_stride().data(),
-          var.get_nc_imap_global().data(), var.get_buf());
-#endif  // WITH_MPI
-
-      if (status != NC_NOERR) {
-        throw FileIOError(ncmu_strerror(status));
-      }
-    } else if (var.get_validity_domain() ==
-               muGrid::FieldCollection::ValidityDomain::Local) {
-      /**
-       * Read local field with ncmu_get_varn_all
-       **/
-#ifdef WITH_MPI
-      ncmu_begin_indep_data(this->netcdf_id);
-#endif  // WITH_MPI
-      IOSize_t ndims{var.get_ndims()};  // number of dimensions
-      std::vector<IOSize_t> starts_vec{var.get_start_local(
-          frame, this->GFC_local_pixels.get_field(var.get_local_field_name()))};
-      std::vector<IOSize_t> counts_vec{var.get_count_local()};
-      size_t num_requests{
-          starts_vec.size() /
-          ndims};  // number of subarray requests in ncmu_put_varn_all
-
-      void * buf_ptr{var.get_buf()};
-      IOSize_t nb_points{0};
-      std::vector<IODiff_t> stride{var.get_nc_stride()};
-      std::vector<IODiff_t> imap{var.get_nc_imap_local()};
-#ifdef WITH_MPI
-      IOSize_t buf_count{var.get_bufcount_mpi_local()};
-      Datatype_t buf_type{var.get_buftype()};
-#endif  // WITH_MPI
-
-      for (size_t i = 0; i < num_requests; i++) {
-        std::vector<IOSize_t> starts(starts_vec.begin() + i * ndims,
-                                     starts_vec.begin() + (i + 1) * ndims);
-        std::vector<IOSize_t> counts(counts_vec.begin() + i * ndims,
-                                     counts_vec.begin() + (i + 1) * ndims);
-#ifdef WITH_MPI
-        status = ncmu_get_varm(this->netcdf_id, var.get_id(), starts.data(),
-                               counts.data(), stride.data(), imap.data(),
-                               buf_ptr, buf_count, buf_type);
-#else   // WITH_MPI
-        status =
-            ncmu_get_varm(this->netcdf_id, var.get_id(), starts.data(),
-                          counts.data(), stride.data(), imap.data(), buf_ptr);
-#endif  // WITH_MPI
-        if (status != NC_NOERR) {
-          throw FileIOError(ncmu_strerror(status));
-        }
-        // number of written points in loop step
-        // TODO(RLeute): nb_points is only correct if the buffer is in Fortran
-        // storage order... I have to fix this for at least C storage order or
-        // better an arbitrary case
-        nb_points = std::accumulate(counts.begin(), counts.end(), 1,
-                                    std::multiplies<IOSize_t>());
-        buf_ptr = var.increment_buf_ptr(buf_ptr, nb_points);
-      }
-#ifdef WITH_MPI
-      ncmu_end_indep_data(this->netcdf_id);
-#endif  // WITH_MPI
-    }
-  }
-
-  /* ---------------------------------------------------------------------- */
   void FileIONetCDF::write(const Index_t & frame,
                            const std::vector<std::string> & field_names) {
     for (auto & f_name : field_names) {
-      const NetCDFVar & var{variables.get_variable(f_name)};
+      NetCDFVarBase & var{variables.get_variable(f_name)};
       // write/read the pixels field (hidden variable) for a local variable if
       // necessary
       if (var.get_validity_domain() ==
@@ -370,7 +317,9 @@ namespace muGrid {
                         written_local_pixel_fields.end(),
                         local_field_name) == written_local_pixel_fields.end()) {
             // write the corresponding hidden field
-            write_netcdfvar(0, variables.get_variable(local_field_name));
+            variables.get_variable(local_field_name)
+                .write(this->netcdf_id, this->nb_frames, this->GFC_local_pixels,
+                       0);
             this->written_local_pixel_fields.push_back(local_field_name);
           }
         } else if (this->open_mode == FileIOBase::OpenMode::Append) {
@@ -378,22 +327,24 @@ namespace muGrid {
           if (std::find(read_local_pixel_fields.begin(),
                         read_local_pixel_fields.end(),
                         local_field_name) == read_local_pixel_fields.end()) {
-            const NetCDFVar & local_field_var{
+            NetCDFVarBase & local_field_var{
                 variables.get_variable(local_field_name)};
-            read_netcdfvar(frame, local_field_var);
+            local_field_var.read(this->netcdf_id, this->nb_frames,
+                                 this->GFC_local_pixels, frame);
             this->read_local_pixel_fields.push_back(local_field_name);
           }
         }
       }
       // write the variable
-      write_netcdfvar(frame, var);
+      var.write(this->netcdf_id, this->nb_frames, this->GFC_local_pixels,
+                frame);
     }
   }
 
   /* ---------------------------------------------------------------------- */
-  void FileIONetCDF::write(const Index_t & frame_index) {
+  void FileIONetCDF::write(const Index_t & frame) {
     const std::vector<std::string> field_names{this->variables.get_names()};
-    write(frame_index, field_names);
+    this->write(frame, field_names);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -401,7 +352,7 @@ namespace muGrid {
   FileIONetCDF::write_no_frame(const std::vector<std::string> & field_names) {
     // check if all variables do not have the unlimited dimension "frame"
     for (auto & f_name : field_names) {
-      const NetCDFVar & var{variables.get_variable(f_name)};
+      const NetCDFVarBase & var{variables.get_variable(f_name)};
       std::vector<std::string> dim_names{var.get_netcdf_dim_names()};
       if (std::find(dim_names.begin(), dim_names.end(), "frame") !=
           dim_names.end()) {
@@ -418,105 +369,30 @@ namespace muGrid {
 
     // write all fields with name in field_names
     for (auto & f_name : field_names) {
-      const NetCDFVar & var{variables.get_variable(f_name)};
-      write_netcdfvar(frame, var);
-    }
-  }
-
-  /* ---------------------------------------------------------------------- */
-  void FileIONetCDF::write_netcdfvar(const Index_t & frame_index,
-                                     const NetCDFVar & var) {
-    // check if frame is correct and compute positive frame value
-    Index_t frame{handle_frame(frame_index)};
-
-    int status{};
-    if (var.get_validity_domain() ==
-        muGrid::FieldCollection::ValidityDomain::Global) {
-      /**
-       * Write global field with ncmu_put_varm_all
-       **/
-#ifdef WITH_MPI
-      status = ncmu_put_varm_all(
-          this->netcdf_id, var.get_id(), var.get_start_global(frame).data(),
-          var.get_count_global().data(), var.get_nc_stride().data(),
-          var.get_nc_imap_global().data(), var.get_buf(),
-          var.get_bufcount_mpi_global(), var.get_buftype());
-#else   // WITH_MPI
-      status = ncmu_put_varm_all(
-          this->netcdf_id, var.get_id(), var.get_start_global(frame).data(),
-          var.get_count_global().data(), var.get_nc_stride().data(),
-          var.get_nc_imap_global().data(), var.get_buf());
-#endif  // WITH_MPI
-      if (status != NC_NOERR) {
-        throw FileIOError(ncmu_strerror(status));
-      }
-    } else if (var.get_validity_domain() ==
-               muGrid::FieldCollection::ValidityDomain::Local) {
-      /**
-       * Write local field with ncmu_put_varn_all
-       **/
-      IOSize_t ndims{var.get_ndims()};  // number of dimensions
-      std::vector<IOSize_t> starts_vec{var.get_start_local(
-          frame, this->GFC_local_pixels.get_field(var.get_local_field_name()))};
-      std::vector<IOSize_t> counts_vec{var.get_count_local()};
-      size_t num_requests{
-          starts_vec.size() /
-          ndims};  // number of subarray requests in ncmu_put_varn_all
-
-      void * buf_ptr{var.get_buf()};
-      IOSize_t nb_points{0};
-      std::vector<IODiff_t> stride{var.get_nc_stride()};
-      std::vector<IODiff_t> imap{var.get_nc_imap_local()};
-#ifdef WITH_MPI
-      IOSize_t buf_count{var.get_bufcount_mpi_local()};
-      Datatype_t buf_type{var.get_buftype()};
-      ncmu_begin_indep_data(this->netcdf_id);
-#endif  // WITH_MPI
-
-      for (size_t i = 0; i < num_requests; i++) {
-        std::vector<IOSize_t> starts(starts_vec.begin() + i * ndims,
-                                     starts_vec.begin() + (i + 1) * ndims);
-        std::vector<IOSize_t> counts(counts_vec.begin() + i * ndims,
-                                     counts_vec.begin() + (i + 1) * ndims);
-#ifdef WITH_MPI
-        status = ncmu_put_varm(this->netcdf_id, var.get_id(), starts.data(),
-                               counts.data(), stride.data(), imap.data(),
-                               buf_ptr, buf_count, buf_type);
-#else   // WITH_MPI
-        status =
-            ncmu_put_varm(this->netcdf_id, var.get_id(), starts.data(),
-                          counts.data(), stride.data(), imap.data(), buf_ptr);
-#endif  // WITH_MPI
-        if (status != NC_NOERR) {
-          throw FileIOError(ncmu_strerror(status));
-        }
-        // number of written points in loop step
-        // TODO(RLeute): nb_points is only correct if the buffer is in Fortran
-        // storage order... I have to fix this for at least C storage order or
-        // better an arbitrary case
-        nb_points = std::accumulate(counts.begin(), counts.end(), 1,
-                                    std::multiplies<IOSize_t>());
-        buf_ptr = var.increment_buf_ptr(buf_ptr, nb_points);
-      }
-#ifdef WITH_MPI
-      ncmu_end_indep_data(this->netcdf_id);
-#endif  // WITH_MPI
+      NetCDFVarBase & var{variables.get_variable(f_name)};
+      var.write(this->netcdf_id, this->nb_frames, this->GFC_local_pixels,
+                frame);
     }
   }
 
   /* ---------------------------------------------------------------------- */
   Index_t FileIONetCDF::handle_frame(Index_t frame) const {
+    return this->handle_frame(frame, this->nb_frames);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  Index_t FileIONetCDF::handle_frame(Index_t frame, Index_t tot_nb_frames) {
     if (frame < 0) {
-      frame = this->nb_frames + frame;
+      frame = tot_nb_frames + frame;
     }
-    if (frame >= this->nb_frames) {
-      if (this->nb_frames == 0) {
+    if (frame >= tot_nb_frames) {
+      if (tot_nb_frames == 0) {
         throw FileIOError(
             "The file seems to have no appended frames because the required "
             "frame (" +
             std::to_string(frame) +
             ") is lager than the total number of frames (" +
-            std::to_string(this->nb_frames) +
+            std::to_string(tot_nb_frames) +
             ") of the NetCDFFileIO object. Try to append a frame by calling "
             "'FileIONetCDF::append_frame()' befor calling functions like "
             "'FileIONetCDF::write()'.");
@@ -524,7 +400,7 @@ namespace muGrid {
         throw FileIOError(
             "You inquery frame '" + std::to_string(frame) +
             "' but the NetCDFFileIO object has only the frames 0.." +
-            std::to_string(this->nb_frames - 1));
+            std::to_string(tot_nb_frames - 1));
       }
     }
     return frame;
@@ -533,10 +409,54 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   void FileIONetCDF::register_field_collection_global(
       muGrid::GlobalFieldCollection & fc_global,
-      const std::vector<std::string> & field_names) {
+      const std::vector<std::string> & field_names,
+      const std::vector<std::string> & state_field_unique_prefixes) {
     std::vector<std::string> hidden_var_names{
         this->GFC_local_pixels.list_fields()};
 
+    // register state fields
+    for (auto & unique_prefix : state_field_unique_prefixes) {
+      // check if a variable with the unique_prefix was already registered
+      std::vector<std::string> var_names{variables.get_names()};
+      if (std::find(var_names.begin(), var_names.end(), unique_prefix) !=
+          var_names.end()) {
+        throw FileIOError("A variable with unique_prefix '" + unique_prefix +
+                          "' was already registered. Please register "
+                          "each variable only ones!");
+      }
+      StateField & state_field{fc_global.get_state_field(unique_prefix)};
+
+      std::vector<std::shared_ptr<NetCDFDim>>
+          field_dims;  // dimensions belonging to the variable representing
+                       // the field "field_names"
+
+      // register frame as first dimension
+      field_dims.push_back(dimensions.find_dim(
+          "frame", NC_UNLIMITED));
+      // register history_index as second dim
+      field_dims.push_back(dimensions.add_dim(
+          "history_index__" + std::to_string(state_field.get_nb_memory() + 1),
+          static_cast<IOSize_t>(state_field.get_nb_memory() + 1)));
+
+      // add dimensions (because all fields of the state field are equal in its
+      // dimensions the dimensions of the current field are added)
+      dimensions.add_field_dims_global(state_field.current(), field_dims,
+                                       unique_prefix);
+
+      // add variables
+      NetCDFVarBase & var{
+          variables.add_state_field_var(state_field, field_dims)};
+
+      // add attributes
+      var.add_attribute_unit();
+
+      // add field names from state field fields to state_field_field_names
+      for (const Field & field : state_field.set_fields()) {
+        this->state_field_field_names.push_back(field.get_name());
+      }
+    }
+
+    // register fields
     for (auto & unique_name : field_names) {
       // check if a variable with the name unique_name was already registered
       std::vector<std::string> var_names{variables.get_names()};
@@ -545,6 +465,14 @@ namespace muGrid {
         throw FileIOError("A variable with name '" + unique_name +
                           "' was already registered. Please register "
                           "each variable only ones!");
+      }
+
+      if (std::find(this->state_field_field_names.begin(),
+                    this->state_field_field_names.end(),
+                    unique_name) != this->state_field_field_names.end()) {
+        // This Field was already registered as StateField so the registration
+        // as Field can be skipped.
+        continue;  // go on with registration of next Field
       }
 
       // check if the variable should be a hidden one because the field is out
@@ -569,8 +497,8 @@ namespace muGrid {
                                        field_dims);
 
       // add variables
-      NetCDFVar & var{variables.add_field_var(fc_global.get_field(unique_name),
-                                              field_dims, hidden)};
+      NetCDFVarBase & var{variables.add_field_var(
+          fc_global.get_field(unique_name), field_dims, hidden)};
 
       // add attributes
       var.add_attribute_unit();
@@ -586,11 +514,62 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   void FileIONetCDF::register_field_collection_local(
       muGrid::LocalFieldCollection & fc_local,
-      const std::vector<std::string> & field_names) {
+      const std::vector<std::string> & field_names,
+      const std::vector<std::string> & state_field_unique_prefixes) {
+    // register the global field collection which manages the writing offsets
+    // for the local pixels
     std::vector<std::string> field_name{
         register_lfc_to_gfc_local_pixels(fc_local)};
-    register_field_collection_global(this->GFC_local_pixels, field_name);
+    register_field_collection_global(this->GFC_local_pixels, field_name,
+                                     std::vector<std::string>());
 
+    // register state fields
+    for (auto & unique_prefix : state_field_unique_prefixes) {
+      // check if a variable with the unique_prefix was already registered
+      std::vector<std::string> var_names{variables.get_names()};
+      if (std::find(var_names.begin(), var_names.end(), unique_prefix) !=
+          var_names.end()) {
+        throw FileIOError("A variable with unique_prefix '" + unique_prefix +
+                          "' was already registered. Please register "
+                          "each variable only ones!");
+      }
+      StateField & state_field{fc_local.get_state_field(unique_prefix)};
+
+      std::vector<std::shared_ptr<NetCDFDim>>
+          field_dims;  // dimensions belonging to the variable representing
+                       // the field "field_names"
+
+      // register frame as first dimension
+      field_dims.push_back(dimensions.find_dim(
+          "frame", NC_UNLIMITED));
+      // register history_index as second dim
+      field_dims.push_back(dimensions.add_dim(
+          "history_index__" + std::to_string(state_field.get_nb_memory() + 1),
+          static_cast<IOSize_t>(state_field.get_nb_memory() + 1)));
+
+      // add dimensions (because all fields of the state field are equal in its
+      // dimensions the dimensions of the current field are added)
+      dimensions.add_field_dims_local(state_field.current(), field_dims,
+                                      this->comm, unique_prefix);
+
+      // add variables
+      NetCDFVarBase & var{
+          variables.add_state_field_var(state_field, field_dims)};
+      // book keeping of the associated field in GFC_local_pixels
+      // register the local field name
+      var.register_local_field_name(field_name[0]);
+
+      // add attributes
+      var.add_attribute_unit();
+      var.add_attribute_local_pixels_field();
+
+      // add field names from state field fields to state_field_field_names
+      for (const Field & field : state_field.set_fields()) {
+        this->state_field_field_names.push_back(field.get_name());
+      }
+    }
+
+    // register fields
     for (auto & unique_name : field_names) {
       // check if a variable with the name unique_name was already registered
       std::vector<std::string> var_names{variables.get_names()};
@@ -599,6 +578,14 @@ namespace muGrid {
         throw FileIOError("A variable with name '" + unique_name +
                           "' was already registered. Please register "
                           "each variable only ones!");
+      }
+
+      if (std::find(this->state_field_field_names.begin(),
+                    this->state_field_field_names.end(),
+                    unique_name) != this->state_field_field_names.end()) {
+        // This Field was already registered as StateField so the registration
+        // as Field can be skipped.
+        continue;  // go on with registration of next Field
       }
 
       std::vector<std::shared_ptr<NetCDFDim>>
@@ -612,7 +599,7 @@ namespace muGrid {
                                       field_dims, this->comm);
 
       // add variables
-      NetCDFVar & var{
+      NetCDFVarBase & var{
           variables.add_field_var(fc_local.get_field(unique_name), field_dims)};
       // book keeping of the associated field in GFC_local_pixels
       // register the local field name
@@ -708,14 +695,15 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   void FileIONetCDF::define_netcdf_variables(NetCDFVariables & variables) {
     /* define variables: from name, type, ... (collective) */
-    for (NetCDFVar & netcdf_var : variables.set_var_vector()) {
+    for (std::shared_ptr<NetCDFVarBase> netcdf_var :
+         variables.set_var_vector()) {
       // define a variable only if it was not already defined (thus dim_id
       // == -1)
-      if (netcdf_var.get_id() == DEFAULT_NETCDFVAR_ID) {
+      if (netcdf_var->get_id() == DEFAULT_NETCDFVAR_ID) {
         int status{ncmu_def_var(
-            this->netcdf_id, netcdf_var.get_name().c_str(),
-            netcdf_var.get_data_type(), netcdf_var.get_ndims(),
-            &(netcdf_var.get_netcdf_dim_ids()[0]), &netcdf_var.set_id())};
+            this->netcdf_id, netcdf_var->get_name().c_str(),
+            netcdf_var->get_data_type(), netcdf_var->get_ndims(),
+            &(netcdf_var->get_netcdf_dim_ids()[0]), &netcdf_var->set_id())};
         if (status != NC_NOERR) {
           throw FileIOError(ncmu_strerror(status));
         }
@@ -726,9 +714,10 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   void FileIONetCDF::define_netcdf_attributes(NetCDFVariables & variables) {
     /* define attributes: from name, type, ... (collective) */
-    for (const NetCDFVar & netcdf_var : variables.get_var_vector()) {
-      for (const NetCDFAtt & att : netcdf_var.get_netcdf_atts()) {
-        int status{ncmu_put_att(this->netcdf_id, netcdf_var.get_id(),
+    for (const std::shared_ptr<NetCDFVarBase> netcdf_var :
+         variables.get_var_vector()) {
+      for (const NetCDFAtt & att : netcdf_var->get_netcdf_atts()) {
+        int status{ncmu_put_att(this->netcdf_id, netcdf_var->get_id(),
                                 att.get_name().c_str(), att.get_data_type(),
                                 att.get_nelems(), att.get_value())};
         if (status != NC_NOERR) {
@@ -755,6 +744,11 @@ namespace muGrid {
         int status{
             ncmu_inq_dimid(this->netcdf_id, dim->get_name().data(), &dim_id)};
         if (status != NC_NOERR) {
+          if (status == NC_EBADDIM) {
+            std::cout << "Hint: Do you maybe try to read a variable or "
+                         "dimension which does not exist in the file?"
+                      << std::endl;
+          }
           throw FileIOError(ncmu_strerror(status));
         }
         dim->register_id(dim_id);
@@ -779,30 +773,37 @@ namespace muGrid {
           "It seems like your registered field collection(s) require more "
           "variables than I can find in the given NetCDF file.");
     }
-    for (NetCDFVar & var : this->variables.set_var_vector()) {
+    for (std::shared_ptr<NetCDFVarBase> var :
+         this->variables.set_var_vector()) {
       // define a variable only if it was not already defined (thus dim_id
       // == -1)
-      if (var.get_id() == DEFAULT_NETCDFVAR_ID) {
+      if (var->get_id() == DEFAULT_NETCDFVAR_ID) {
         int var_id{};
         int status{
-            ncmu_inq_varid(this->netcdf_id, var.get_name().data(), &var_id)};
+            ncmu_inq_varid(this->netcdf_id, var->get_name().data(), &var_id)};
         if (status != NC_NOERR) {
+          if (status == NC_ENOTVAR) {
+            std::cout << "Hint: Do you maybe try to read a variable which does "
+                         "not exist in the file?"
+                      << std::endl;
+          }
           throw FileIOError(ncmu_strerror(status));
         }
-        var.register_id(var_id);
+        var->register_id(var_id);
       }
     }
   }
 
   /* ---------------------------------------------------------------------- */
   void FileIONetCDF::register_netcdf_attribute_names() {
-    for (NetCDFVar & var : this->variables.set_var_vector()) {
+    for (std::shared_ptr<NetCDFVarBase> var :
+         this->variables.set_var_vector()) {
       // inquiry attribute names until you reach the last (status == NC_ENOTATT)
       for (int att_num = 0; att_num < MAX_NB_ATTRIBUTES; att_num++) {
         // find attribute name
         char name[MAX_LEN_ATTRIBUTE_NAME];
-        int status_1{
-            ncmu_inq_attname(this->netcdf_id, var.get_id(), att_num, &name[0])};
+        int status_1{ncmu_inq_attname(this->netcdf_id, var->get_id(), att_num,
+                                      &name[0])};
         if (status_1 == NC_ENOTATT) {
           break;  // you reached the last attribute of the variable
         }
@@ -811,27 +812,28 @@ namespace muGrid {
         }
         nc_type att_data_type{};
         IOSize_t att_nelems{};
-        int status_2{ncmu_inq_att(this->netcdf_id, var.get_id(), &name[0],
+        int status_2{ncmu_inq_att(this->netcdf_id, var->get_id(), &name[0],
                                   &att_data_type, &att_nelems)};
         if (status_2 != NC_NOERR) {
           throw FileIOError(ncmu_strerror(status_2));
         }
         std::string att_name(&name[0]);
-        var.register_attribute(att_name, att_data_type, att_nelems);
+        var->register_attribute(att_name, att_data_type, att_nelems);
       }
     }
   }
 
   /* ---------------------------------------------------------------------- */
   void FileIONetCDF::register_netcdf_attribute_values() {
-    for (NetCDFVar & var : this->variables.set_var_vector()) {
-      for (NetCDFAtt & att : var.set_netcdf_atts()) {
+    for (std::shared_ptr<NetCDFVarBase> var :
+         this->variables.set_var_vector()) {
+      for (NetCDFAtt & att : var->set_netcdf_atts()) {
         const std::string & name{att.get_name()};
         // create a void * to a location with enough space to store the
         // returned value
         void * value{att.reserve_value_space()};
         int status{
-            ncmu_get_att(this->netcdf_id, var.get_id(), name.c_str(), value)};
+            ncmu_get_att(this->netcdf_id, var->get_id(), name.c_str(), value)};
         if (status != NC_NOERR) {
           throw FileIOError(ncmu_strerror(status));
         }
@@ -844,7 +846,7 @@ namespace muGrid {
                 "It seems like the registered attribute value originating from "
                 "the registered field collection is not equal to the value "
                 "read from the netcdf file.\nvariable name: " +
-                var.get_name() + "\nattribute name: " + name +
+                var->get_name() + "\nattribute name: " + name +
                 "\nattribute value from field collection: " +
                 att.get_value_as_string() +
                 "\nattribute value from NetCDF file:      " +
@@ -876,7 +878,8 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   void NetCDFDimensions::add_field_dims_global(
       const muGrid::Field & field,
-      std::vector<std::shared_ptr<NetCDFDim>> & field_dims) {
+      std::vector<std::shared_ptr<NetCDFDim>> & field_dims,
+      std::string state_field_name) {
     auto & nb_grid_pts{
         dynamic_cast<muGrid::GlobalFieldCollection &>(field.get_collection())
             .get_nb_domain_grid_pts()};                  // x, y, z
@@ -888,8 +891,14 @@ namespace muGrid {
     // file (frame, subpt_dofs, subpts, nx, ny, nz)
     // the frame was already added before
     if (nb_dof_per_subpt != 1) {
+      // for state fields the field name is corrected by using the state field
+      // name
+      std::string field_name{field.get_name()};
+      if (state_field_name.size() != 0) {
+        field_name = state_field_name;
+      }
       field_dims.push_back(this->add_dim(
-          NetCDFDim::compute_dim_name("subpt_dofs", field.get_name()),
+          NetCDFDim::compute_dim_name("subpt_dofs", field_name),
           nb_dof_per_subpt));
     }
 
@@ -927,7 +936,7 @@ namespace muGrid {
   void NetCDFDimensions::add_field_dims_local(
       const muGrid::Field & field,
       std::vector<std::shared_ptr<NetCDFDim>> & field_dims,
-      const Communicator & comm) {
+      const Communicator & comm, std::string state_field_name) {
     IOSize_t nb_pts{static_cast<IOSize_t>(field.get_nb_pixels())};  // i
     IOSize_t nb_pts_glob{comm.sum(nb_pts)};  // sum of all local nb_pts
     IOSize_t nb_subpts{static_cast<IOSize_t>(field.get_nb_sub_pts())};  // s
@@ -938,8 +947,14 @@ namespace muGrid {
     // file (frame, subpt_dofs, subpts, pts)
     // the frame was already added before
     if (nb_dof_per_subpt != 1) {
+      // for state fields the field name is corrected by using the state field
+      // name
+      std::string field_name{field.get_name()};
+      if (state_field_name.size() != 0) {
+        field_name = state_field_name;
+      }
       field_dims.push_back(this->add_dim(
-          NetCDFDim::compute_dim_name("subpt_dofs", field.get_name()),
+          NetCDFDim::compute_dim_name("subpt_dofs", field_name),
           nb_dof_per_subpt));
     }
     if (nb_subpts != 1 or nb_dof_per_subpt != 1) {
@@ -949,8 +964,14 @@ namespace muGrid {
           NetCDFDim::compute_dim_name("subpts", suffix), nb_subpts));
     }
     if (nb_pts_glob != 0) {
+      // for state fields the field name is corrected by using the state field
+      // name
+      std::string field_name{field.get_name()};
+      if (state_field_name.size() != 0) {
+        field_name = state_field_name;
+      }
       field_dims.push_back(
-          this->add_dim(NetCDFDim::compute_dim_name("pts", field.get_name()),
+          this->add_dim(NetCDFDim::compute_dim_name("pts", field_name),
                         nb_pts_glob));
     }
   }
@@ -1487,33 +1508,35 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  NetCDFVar::NetCDFVar(
+  NetCDFVarBase::NetCDFVarBase(
       const std::string & var_name, const nc_type & var_data_type,
       const IOSize_t & var_ndims,
       const std::vector<std::shared_ptr<NetCDFDim>> & netcdf_var_dims,
-      muGrid::Field & var_field, bool hidden)
+      const muGrid::FieldCollection::ValidityDomain & validity_domain,
+      bool hidden)
       : name{var_name}, data_type{var_data_type}, ndims{var_ndims},
-        netcdf_dims{netcdf_var_dims}, field{var_field}, initialised{true},
-        validity_domain{var_field.get_collection().get_domain()},
-        hidden{hidden} {};
+        netcdf_dims{netcdf_var_dims}, initialised{true},
+        validity_domain{validity_domain}, hidden{hidden} {};
 
   /* ---------------------------------------------------------------------- */
-  const std::string & NetCDFVar::get_name() const { return this->name; }
+  const std::string & NetCDFVarBase::get_name() const { return this->name; }
 
   /* ---------------------------------------------------------------------- */
-  const nc_type & NetCDFVar::get_data_type() const { return this->data_type; }
+  const nc_type & NetCDFVarBase::get_data_type() const {
+    return this->data_type;
+  }
 
   /* ---------------------------------------------------------------------- */
-  const IOSize_t & NetCDFVar::get_ndims() const { return this->ndims; }
+  const IOSize_t & NetCDFVarBase::get_ndims() const { return this->ndims; }
 
   /* ---------------------------------------------------------------------- */
-  const int & NetCDFVar::get_id() const { return this->id; }
+  const int & NetCDFVarBase::get_id() const { return this->id; }
 
   /* ---------------------------------------------------------------------- */
-  int & NetCDFVar::set_id() { return this->id; }
+  int & NetCDFVarBase::set_id() { return this->id; }
 
   /* ---------------------------------------------------------------------- */
-  std::vector<int> NetCDFVar::get_netcdf_dim_ids() const {
+  std::vector<int> NetCDFVarBase::get_netcdf_dim_ids() const {
     std::vector<int> netcdf_dim_ids;
     for (auto & dim : this->netcdf_dims) {
       int dim_id{dim->get_id()};
@@ -1523,7 +1546,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  std::vector<std::string> NetCDFVar::get_netcdf_dim_names() const {
+  std::vector<std::string> NetCDFVarBase::get_netcdf_dim_names() const {
     std::vector<std::string> netcdf_dim_names;
     for (auto & dim : this->netcdf_dims) {
       std::string dim_name{dim->get_name()};
@@ -1533,20 +1556,17 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  const muGrid::Field & NetCDFVar::get_field() const { return this->field; }
-
-  /* ---------------------------------------------------------------------- */
-  const std::vector<NetCDFAtt> & NetCDFVar::get_netcdf_atts() const {
+  const std::vector<NetCDFAtt> & NetCDFVarBase::get_netcdf_atts() const {
     return this->netcdf_atts;
   }
 
   /* ---------------------------------------------------------------------- */
-  std::vector<NetCDFAtt> & NetCDFVar::set_netcdf_atts() {
+  std::vector<NetCDFAtt> & NetCDFVarBase::set_netcdf_atts() {
     return this->netcdf_atts;
   }
 
   /* ---------------------------------------------------------------------- */
-  std::vector<std::string> NetCDFVar::get_netcdf_att_names() const {
+  std::vector<std::string> NetCDFVarBase::get_netcdf_att_names() const {
     std::vector<std::string> netcdf_att_names;
     for (auto & att : this->netcdf_atts) {
       std::string att_name{att.get_name()};
@@ -1557,35 +1577,37 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   const muGrid::FieldCollection::ValidityDomain &
-  NetCDFVar::get_validity_domain() const {
+  NetCDFVarBase::get_validity_domain() const {
     return this->validity_domain;
   }
 
   /* ---------------------------------------------------------------------- */
-  IOSize_t NetCDFVar::get_nb_local_pixels() const {
-    return this->field.get_collection().get_pixel_ids().size();
+  IOSize_t NetCDFVarBase::get_nb_local_pixels() const {
+    return this->get_field().get_collection().get_pixel_ids().size();
   }
 
   /* ---------------------------------------------------------------------- */
-  void * NetCDFVar::get_buf() const { return this->field.get_void_data_ptr(); }
+  void * NetCDFVarBase::get_buf() const {
+    return this->get_field().get_void_data_ptr();
+  }
 
   /* ---------------------------------------------------------------------- */
-  IOSize_t NetCDFVar::get_bufcount_mpi_global() const {
-    Index_t bufcount{this->field.get_nb_pixels() *
-                     this->field.get_nb_sub_pts() *
-                     this->field.get_nb_components()};
+  IOSize_t NetCDFVarBase::get_bufcount_mpi_global() const {
+    Index_t bufcount{this->get_field().get_nb_pixels() *
+                     this->get_field().get_nb_sub_pts() *
+                     this->get_field().get_nb_components()};
     return static_cast<IOSize_t>(bufcount);
   }
 
   /* ---------------------------------------------------------------------- */
-  IOSize_t NetCDFVar::get_bufcount_mpi_local() const {
-    Index_t bufcount{this->field.get_nb_sub_pts() *
-                     this->field.get_nb_components()};
+  IOSize_t NetCDFVarBase::get_bufcount_mpi_local() const {
+    Index_t bufcount{this->get_field().get_nb_sub_pts() *
+                     this->get_field().get_nb_components()};
     return static_cast<IOSize_t>(bufcount);
   }
 
   /* ---------------------------------------------------------------------- */
-  Datatype_t NetCDFVar::get_buftype() const {
+  Datatype_t NetCDFVarBase::get_buftype() const {
 #ifdef WITH_MPI
     MPI_Datatype data_type{this->nc_type_to_mpi_datatype(this->data_type)};
     return data_type;
@@ -1595,121 +1617,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  std::vector<IOSize_t>
-  NetCDFVar::get_start_global(const Index_t & frame) const {
-    if (frame < 0) {
-      throw FileIOError(
-          "Only positive frame values are allowed in "
-          "'NetCDFVar::get_start_global()'. You gave in the value frame = " +
-          std::to_string(frame));
-    }
-
-    std::vector<IOSize_t> starts{};
-
-    const std::string & err_local{
-        "A local grid should not have a grid dimensions in x-, y-, and "
-        "z-direction, it should be a flattend array. Therefore no dimension "
-        "should be named 'n*_grid'."};
-
-    for (auto & dim : this->netcdf_dims) {
-      std::string base_name{dim->get_base_name()};
-      IOSize_t start{0};
-
-      // find the correct start for each dimension from its base_name
-      if (base_name == "frame") {
-        start = static_cast<IOSize_t>(frame);
-      } else if (base_name == "nx") {
-        if (this->field.is_global()) {
-          start = static_cast<IOSize_t>(
-              dynamic_cast<muGrid::GlobalFieldCollection &>(
-                  this->field.get_collection())
-                  .get_pixels()
-                  .get_subdomain_locations()[0]);
-        } else {
-          throw FileIOError(err_local);
-        }
-      } else if (base_name == "ny") {
-        if (this->field.is_global()) {
-          start = static_cast<IOSize_t>(
-              dynamic_cast<muGrid::GlobalFieldCollection &>(
-                  this->field.get_collection())
-                  .get_pixels()
-                  .get_subdomain_locations()[1]);
-        } else {
-          throw FileIOError(err_local);
-        }
-      } else if (base_name == "nz") {
-        if (this->field.is_global()) {
-          start = static_cast<IOSize_t>(
-              dynamic_cast<muGrid::GlobalFieldCollection &>(
-                  this->field.get_collection())
-                  .get_pixels()
-                  .get_subdomain_locations()[2]);
-        } else {
-          throw FileIOError(err_local);
-        }
-      } else if (base_name == "subpts") {
-        start = 0;
-      } else if (base_name == "subpt_dofs") {
-        start = 0;
-      } else {
-        throw FileIOError(
-            "I can not find a start offset for the dimension '" +
-            dim->get_name() + "' with base_name '" + base_name +
-            "'. Probably this case is not implemented.");
-      }
-
-      starts.push_back(start);
-    }
-    return starts;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  std::vector<IOSize_t>
-  NetCDFVar::get_start_local(const Index_t & frame,
-                             muGrid::Field & local_pixels) const {
-    if (frame < 0) {
-      throw FileIOError(
-          "Only positive frame values are allowed in "
-          "'NetCDFVar::get_start_local()'. You gave in the value frame = " +
-          std::to_string(frame));
-    }
-
-    std::vector<IOSize_t>
-        starts{};  // intermediate storage container for starts
-    muGrid::T1FieldMap<muGrid::Int64, Mapping::Mut, 1, muGrid::IterUnit::Pixel>
-        local_pixels_map{local_pixels};
-
-    for (auto & val : local_pixels_map) {
-      auto & offset{val(0)};
-      if (offset != GFC_LOCAL_PIXELS_DEFAULT_VALUE) {
-        IOSize_t start{};
-        for (auto & dim : this->netcdf_dims) {
-          std::string base_name{dim->get_base_name()};
-          if (base_name == "frame") {
-            start = static_cast<IOSize_t>(frame);
-          } else if (base_name == "pts") {
-            start = offset;
-          } else if (base_name == "subpts") {
-            start = 0;
-          } else if (base_name == "subpt_dofs") {
-            start = 0;
-          } else {
-            throw FileIOError(
-                "I can not find a start offset for the dimension '" +
-                dim->get_name() + "' with base_name '" + base_name +
-                "'. Probably this case is not implemented.");
-          }
-
-          starts.push_back(start);
-        }
-      }
-    }
-    return starts;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  std::vector<IOSize_t> NetCDFVar::get_count_global() const {
+  std::vector<IOSize_t> NetCDFVarBase::get_count_global() const {
     std::vector<IOSize_t> counts{};
     for (auto & dim : this->netcdf_dims) {
       std::string base_name{dim->get_base_name()};
@@ -1718,40 +1626,42 @@ namespace muGrid {
       // find the correct count for each dimension from its base_name
       if (base_name == "frame") {
         count = 1;
+      } else if (base_name == "history_index") {
+        count = 1;
       } else if (base_name == "nx") {
-        if (this->field.is_global()) {
+        if (this->get_field().is_global()) {
           count = static_cast<IOSize_t>(
               dynamic_cast<muGrid::GlobalFieldCollection &>(
-                  this->field.get_collection())
+                  this->get_field().get_collection())
                   .get_pixels()
                   .get_nb_subdomain_grid_pts()[0]);
         } else {
           throw FileIOError("err_local");
         }
       } else if (base_name == "ny") {
-        if (this->field.is_global()) {
+        if (this->get_field().is_global()) {
           count = static_cast<IOSize_t>(
               dynamic_cast<muGrid::GlobalFieldCollection &>(
-                  this->field.get_collection())
+                  this->get_field().get_collection())
                   .get_pixels()
                   .get_nb_subdomain_grid_pts()[1]);
         } else {
           throw FileIOError("err_local");
         }
       } else if (base_name == "nz") {
-        if (this->field.is_global()) {
+        if (this->get_field().is_global()) {
           count = static_cast<IOSize_t>(
               dynamic_cast<muGrid::GlobalFieldCollection &>(
-                  this->field.get_collection())
+                  this->get_field().get_collection())
                   .get_pixels()
                   .get_nb_subdomain_grid_pts()[2]);
         } else {
           throw FileIOError("err_local");
         }
       } else if (base_name == "subpts") {
-        count = static_cast<IOSize_t>(this->field.get_nb_sub_pts());
+        count = static_cast<IOSize_t>(this->get_field().get_nb_sub_pts());
       } else if (base_name == "subpt_dofs") {
-        count = static_cast<IOSize_t>(this->field.get_nb_components());
+        count = static_cast<IOSize_t>(this->get_field().get_nb_components());
       } else {
         throw FileIOError(
             "I can not find the number of indices for the dimension '" +
@@ -1765,24 +1675,26 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  std::vector<IOSize_t> NetCDFVar::get_count_local() const {
+  std::vector<IOSize_t> NetCDFVarBase::get_count_local() const {
     std::vector<IOSize_t>
         counts{};  // intermediate storage container for counts
 
     IOSize_t npix{static_cast<IOSize_t>(
-        this->field.get_nb_pixels())};  // number of pixels on proc
+        this->get_field().get_nb_pixels())};  // number of pixels on proc
     for (IOSize_t i = 0; i < npix; i++) {
       IOSize_t count{};
       for (auto & dim : this->netcdf_dims) {
         std::string base_name{dim->get_base_name()};
         if (base_name == "frame") {
           count = 1;
+        } else if (base_name == "history_index") {
+          count = 1;
         } else if (base_name == "pts") {
           count = 1;
         } else if (base_name == "subpts") {
-          count = static_cast<IOSize_t>(this->field.get_nb_sub_pts());
+          count = static_cast<IOSize_t>(this->get_field().get_nb_sub_pts());
         } else if (base_name == "subpt_dofs") {
-          count = static_cast<IOSize_t>(this->field.get_nb_components());
+          count = static_cast<IOSize_t>(this->get_field().get_nb_components());
         } else {
           throw FileIOError(
               "I can not find the number of indices for the dimension '" +
@@ -1798,92 +1710,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  std::vector<IODiff_t> NetCDFVar::get_nc_stride() const {
-    std::vector<IODiff_t> strides{};
-    std::vector<Index_t> s{this->field.get_pixels_shape()};
-    for (auto & dim : this->netcdf_dims) {
-      std::string base_name{dim->get_base_name()};
-      IODiff_t stride{0};
-
-      // find the correct stride for each dimension from its base_name
-      if (base_name == "frame") {
-        stride = 1;
-      } else if (base_name == "nx") {
-        stride = 1;
-      } else if (base_name == "ny") {
-        stride = 1;
-      } else if (base_name == "nz") {
-        stride = 1;
-      } else if (base_name == "pts") {
-        stride = 1;
-      } else if (base_name == "subpts") {
-        stride = 1;
-      } else if (base_name == "subpt_dofs") {
-        stride = 1;
-      } else {
-        throw FileIOError(
-            "I can not find the correct stride for the dimension '" +
-            dim->get_name() + "' with base_name '" + base_name +
-            "'. Probably this case is not implemented.");
-      }
-
-      strides.push_back(stride);
-    }
-    return strides;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  std::vector<IODiff_t> NetCDFVar::get_nc_imap_global() const {
-    // construc imap from field strides
-    const IterUnit iter_type{muGrid::IterUnit::SubPt};
-    std::vector<IODiff_t> imap_strides{
-        this->field.get_nb_pixels() *
-        this->field.get_nb_dof_per_pixel()};  // imap of frame (nb_dofs)
-    auto strides_wrong_type{this->field.get_strides(iter_type)};
-    std::vector<IODiff_t> strides(strides_wrong_type.begin(),
-                                  strides_wrong_type.end());
-    imap_strides.insert(imap_strides.end(), strides.begin(), strides.end());
-
-    // if frame is not a dimension of the variable I have to cut off the
-    // redundant parts
-    std::vector<std::string> names{get_netcdf_dim_names()};
-    if (std::find(names.begin(), names.end(), "frame") == names.end()) {
-      // erase the first N entries
-      int N = imap_strides.size() - get_ndims();
-      std::vector<decltype(imap_strides)::value_type>(imap_strides.begin() + N,
-                                                      imap_strides.end())
-          .swap(imap_strides);
-    }
-    return imap_strides;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  std::vector<IODiff_t> NetCDFVar::get_nc_imap_local() const {
-    // construc imap from field strides
-    const IterUnit iter_type{muGrid::IterUnit::SubPt};
-    std::vector<IODiff_t> imap_strides{
-        this->field.get_nb_pixels() *
-        this->field.get_nb_dof_per_pixel()};  // imap of frame (nb_pix*nb_dofs)
-    auto strides_wrong_type{this->field.get_strides(iter_type)};
-    std::vector<IODiff_t> strides{strides_wrong_type.begin(),
-                                  strides_wrong_type.end()};
-    imap_strides.insert(imap_strides.end(), strides.begin(), strides.end());
-
-    // if frame is not a dimension of the variable I have to cut off the
-    // redundant parts
-    std::vector<std::string> names{get_netcdf_dim_names()};
-    if (std::find(names.begin(), names.end(), "frame") == names.end()) {
-      // erase the first N entries
-      size_t N{imap_strides.size() - get_ndims()};
-      std::vector<decltype(imap_strides)::value_type>{imap_strides.begin() + N,
-                                                      imap_strides.end()}
-          .swap(imap_strides);
-    }
-    return imap_strides;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  nc_type NetCDFVar::typeid_to_nc_type(const std::type_info & type_id) {
+  nc_type NetCDFVarBase::typeid_to_nc_type(const std::type_info & type_id) {
     // possible types:
     // NC_BYTE, NC_CHAR, NC_SHORT, NC_INT, NC_FLOAT and NC_DOUBLE
     // NC_UBYTE, NC_USHORT, NC_UINT, NC_INT64 and NC_UINT64 (for CDF-5)
@@ -1917,7 +1744,7 @@ namespace muGrid {
       throw FileIOError("The given type_id '" + name +
                         "' can not be associated with a NetCDF nc_type. "
                         "Probably this case is not implemented in "
-                        "NetCDFVar::typeid_to_nc_type().");
+                        "NetCDFVarBase::typeid_to_nc_type().");
     }
 
     return type;
@@ -1925,7 +1752,8 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
 #ifdef WITH_MPI
-  MPI_Datatype NetCDFVar::nc_type_to_mpi_datatype(const nc_type & data_type) {
+  MPI_Datatype
+  NetCDFVarBase::nc_type_to_mpi_datatype(const nc_type & data_type) {
     MPI_Datatype mpi_type{MPI_DATATYPE_NULL};
     switch (data_type) {
     case NC_CHAR:  // char
@@ -1967,7 +1795,7 @@ namespace muGrid {
 #endif  // WITH_MPI
 
   /* ---------------------------------------------------------------------- */
-  void NetCDFVar::register_id(const int var_id) {
+  void NetCDFVarBase::register_id(const int var_id) {
     if (this->id != DEFAULT_NETCDFVAR_ID) {
       throw FileIOError(
           "The variable id is " + std::to_string(this->id) +
@@ -1979,8 +1807,8 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  void
-  NetCDFVar::register_local_field_name(const std::string & local_field_name) {
+  void NetCDFVarBase::register_local_field_name(
+      const std::string & local_field_name) {
     if (this->validity_domain ==
         muGrid::FieldCollection::ValidityDomain::Local) {
       this->local_field_name = local_field_name;
@@ -1991,15 +1819,15 @@ namespace muGrid {
       val_os << this->validity_domain;
       val_ss << val_os.rdbuf();
       val = val_ss.str();
-      throw FileIOError(
-          "It is only allowed to register a 'local_field_name'  for NetCDFVars "
-          "representing a local field. The validity_domain of your field is '" +
-          val + "'.");
+      throw FileIOError("It is only allowed to register a 'local_field_name'  "
+                        "for NetCDFVarBases representing a local field. The "
+                        "validity_domain of your field is '" +
+                        val + "'.");
     }
   }
 
   /* ---------------------------------------------------------------------- */
-  const std::string & NetCDFVar::get_local_field_name() const {
+  const std::string & NetCDFVarBase::get_local_field_name() const {
     if (this->validity_domain ==
         muGrid::FieldCollection::ValidityDomain::Local) {
       return this->local_field_name;
@@ -2010,25 +1838,26 @@ namespace muGrid {
       val_os << this->validity_domain;
       val_ss << val_os.rdbuf();
       val = val_ss.str();
-      throw FileIOError(
-          "It is only allowed to inquire the 'local_field_name' for NetCDFVars "
-          "representing a local field. The validity_domain of your field is '" +
-          val + "'.");
+      throw FileIOError("It is only allowed to inquire the 'local_field_name' "
+                        "for NetCDFVarBases representing a local field. The "
+                        "validity_domain of your field is '" +
+                        val + "'.");
     }
   }
 
   /* ---------------------------------------------------------------------- */
-  bool NetCDFVar::get_hidden_status() const { return this->hidden; }
+  bool NetCDFVarBase::get_hidden_status() const { return this->hidden; }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  void NetCDFVar::add_attribute(const std::string & att_name, const T & value) {
+  void NetCDFVarBase::add_attribute(const std::string & att_name,
+                                    const T & value) {
     NetCDFAtt attribute(att_name, value);
     this->netcdf_atts.push_back(attribute);
   }
 
   /* ---------------------------------------------------------------------- */
-  void NetCDFVar::register_attribute(const std::string & att_name,
+  void NetCDFVarBase::register_attribute(const std::string & att_name,
                                      const nc_type & att_data_type,
                                      const IOSize_t & att_nelems) {
     // register a attribute only if it is not already registered
@@ -2043,10 +1872,10 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  void NetCDFVar::add_attribute_unit() {
+  void NetCDFVarBase::add_attribute_unit() {
     std::string att_name{"unit"};
 
-    const muGrid::Unit unit{this->field.get_physical_unit()};
+    const muGrid::Unit unit{this->get_field().get_physical_unit()};
     std::ostringstream stream("");
     std::ostream & tmp(stream);
     tmp << unit;
@@ -2058,7 +1887,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  void NetCDFVar::add_attribute_local_pixels_field() {
+  void NetCDFVarBase::add_attribute_local_pixels_field() {
     std::string att_name{"local_pixels_field"};
     std::vector<char> att_val{this->local_field_name.begin(),
                               this->local_field_name.end()};
@@ -2067,7 +1896,7 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   void *
-  NetCDFVar::increment_buf_ptr(void * buf_ptr,
+  NetCDFVarBase::increment_buf_ptr(void * buf_ptr,
                                const IOSize_t & increment_nb_elements) const {
     void * incremented_buf_ptr{nullptr};
     switch (this->data_type) {
@@ -2111,48 +1940,729 @@ namespace muGrid {
       throw FileIOError(
           "A pointer increment for the variable data_type '" +
           std::to_string(data_type) +
-          "' is not implemented in NetCDFVar::increment_buf_ptr().");
+          "' is not implemented in NetCDFVarBase::increment_buf_ptr().");
     }
     return incremented_buf_ptr;
   }
 
   /* ---------------------------------------------------------------------- */
-  NetCDFVariables & NetCDFVariables::operator+=(NetCDFVar & rhs) {
+  void NetCDFVarBase::write(const int netcdf_id, const Index_t & tot_nb_frames,
+                            GlobalFieldCollection & GFC_local_pixels,
+                            const Index_t & frame_index) {
+    // check if frame is correct and compute positive frame value
+    Index_t frame{FileIONetCDF::handle_frame(frame_index, tot_nb_frames)};
+
+    int status{};
+    if (this->get_validity_domain() ==
+        muGrid::FieldCollection::ValidityDomain::Global) {
+      /**
+       * Write global field with ncmu_put_varm_all
+       **/
+#ifdef WITH_MPI
+      status = ncmu_put_varm_all(
+          netcdf_id, this->get_id(), this->get_start_global(frame).data(),
+          this->get_count_global().data(), this->get_nc_stride().data(),
+          this->get_nc_imap_global().data(), this->get_buf(),
+          this->get_bufcount_mpi_global(), this->get_buftype());
+#else   // WITH_MPI
+      status = ncmu_put_varm_all(
+          netcdf_id, this->get_id(), this->get_start_global(frame).data(),
+          this->get_count_global().data(), this->get_nc_stride().data(),
+          this->get_nc_imap_global().data(), this->get_buf());
+#endif  // WITH_MPI
+      if (status != NC_NOERR) {
+        throw FileIOError(ncmu_strerror(status));
+      }
+    } else if (this->get_validity_domain() ==
+               muGrid::FieldCollection::ValidityDomain::Local) {
+      /**
+       * Write local field with ncmu_put_varn_all
+       **/
+      IOSize_t ndims{this->get_ndims()};  // number of dimensions
+      std::vector<IOSize_t> starts_vec{this->get_start_local(
+          frame, GFC_local_pixels.get_field(this->get_local_field_name()))};
+      std::vector<IOSize_t> counts_vec{this->get_count_local()};
+      size_t num_requests{
+          starts_vec.size() /
+          ndims};  // number of subarray requests in ncmu_put_varn_all
+
+      void * buf_ptr{this->get_buf()};
+      IOSize_t nb_points{0};
+      std::vector<IODiff_t> stride{this->get_nc_stride()};
+      std::vector<IODiff_t> imap{this->get_nc_imap_local()};
+#ifdef WITH_MPI
+      IOSize_t buf_count{this->get_bufcount_mpi_local()};
+      Datatype_t buf_type{this->get_buftype()};
+      ncmu_begin_indep_data(netcdf_id);
+#endif  // WITH_MPI
+
+      for (size_t i = 0; i < num_requests; i++) {
+        std::vector<IOSize_t> starts(starts_vec.begin() + i * ndims,
+                                     starts_vec.begin() + (i + 1) * ndims);
+        std::vector<IOSize_t> counts(counts_vec.begin() + i * ndims,
+                                     counts_vec.begin() + (i + 1) * ndims);
+#ifdef WITH_MPI
+        status = ncmu_put_varm(netcdf_id, this->get_id(), starts.data(),
+                               counts.data(), stride.data(), imap.data(),
+                               buf_ptr, buf_count, buf_type);
+#else   // WITH_MPI
+        status =
+            ncmu_put_varm(netcdf_id, this->get_id(), starts.data(),
+                          counts.data(), stride.data(), imap.data(), buf_ptr);
+#endif  // WITH_MPI
+        if (status != NC_NOERR) {
+          throw FileIOError(ncmu_strerror(status));
+        }
+        // number of written points in loop step
+        // TODO(RLeute): nb_points is only correct if the buffer is in Fortran
+        // storage order... I have to fix this for at least C storage order or
+        // better an arbitrary case
+        nb_points = std::accumulate(counts.begin(), counts.end(), 1,
+                                    std::multiplies<IOSize_t>());
+        buf_ptr = this->increment_buf_ptr(buf_ptr, nb_points);
+      }
+#ifdef WITH_MPI
+      ncmu_end_indep_data(netcdf_id);
+#endif  // WITH_MPI
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void NetCDFVarBase::read(const int netcdf_id, const Index_t & tot_nb_frames,
+                           GlobalFieldCollection & GFC_local_pixels,
+                           const Index_t & frame_index) {
+    // check if frame is correct and compute positive frame value
+    Index_t frame{FileIONetCDF::handle_frame(frame_index, tot_nb_frames)};
+
+    int status{};
+    if (this->get_validity_domain() ==
+        muGrid::FieldCollection::ValidityDomain::Global) {
+      /**
+       * Read global field with ncmu_get_varm_all
+       **/
+#ifdef WITH_MPI
+      status = ncmu_get_varm_all(
+          netcdf_id, this->get_id(), this->get_start_global(frame).data(),
+          this->get_count_global().data(), this->get_nc_stride().data(),
+          this->get_nc_imap_global().data(), this->get_buf(),
+          this->get_bufcount_mpi_global(), this->get_buftype());
+#else   // WITH_MPI
+      status = ncmu_get_varm_all(
+          netcdf_id, this->get_id(), this->get_start_global(frame).data(),
+          this->get_count_global().data(), this->get_nc_stride().data(),
+          this->get_nc_imap_global().data(), this->get_buf());
+#endif  // WITH_MPI
+
+      if (status != NC_NOERR) {
+        throw FileIOError(ncmu_strerror(status));
+      }
+    } else if (this->get_validity_domain() ==
+               muGrid::FieldCollection::ValidityDomain::Local) {
+      /**
+       * Read local field with ncmu_get_varn_all
+       **/
+#ifdef WITH_MPI
+      ncmu_begin_indep_data(netcdf_id);
+#endif  // WITH_MPI
+      IOSize_t ndims{this->get_ndims()};  // number of dimensions
+      std::vector<IOSize_t> starts_vec{this->get_start_local(
+          frame, GFC_local_pixels.get_field(this->get_local_field_name()))};
+      std::vector<IOSize_t> counts_vec{this->get_count_local()};
+      size_t num_requests{
+          starts_vec.size() /
+          ndims};  // number of subarray requests in ncmu_put_varn_all
+
+      void * buf_ptr{this->get_buf()};
+      IOSize_t nb_points{0};
+      std::vector<IODiff_t> stride{this->get_nc_stride()};
+      std::vector<IODiff_t> imap{this->get_nc_imap_local()};
+#ifdef WITH_MPI
+      IOSize_t buf_count{this->get_bufcount_mpi_local()};
+      Datatype_t buf_type{this->get_buftype()};
+#endif  // WITH_MPI
+
+      for (size_t i = 0; i < num_requests; i++) {
+        std::vector<IOSize_t> starts(starts_vec.begin() + i * ndims,
+                                     starts_vec.begin() + (i + 1) * ndims);
+        std::vector<IOSize_t> counts(counts_vec.begin() + i * ndims,
+                                     counts_vec.begin() + (i + 1) * ndims);
+#ifdef WITH_MPI
+        status = ncmu_get_varm(netcdf_id, this->get_id(), starts.data(),
+                               counts.data(), stride.data(), imap.data(),
+                               buf_ptr, buf_count, buf_type);
+#else   // WITH_MPI
+        status =
+            ncmu_get_varm(netcdf_id, this->get_id(), starts.data(),
+                          counts.data(), stride.data(), imap.data(), buf_ptr);
+#endif  // WITH_MPI
+        if (status != NC_NOERR) {
+          throw FileIOError(ncmu_strerror(status));
+        }
+        // number of written points in loop step
+        // TODO(RLeute): nb_points is only correct if the buffer is in Fortran
+        // storage order... I have to fix this for at least C storage order or
+        // better an arbitrary case
+        nb_points = std::accumulate(counts.begin(), counts.end(), 1,
+                                    std::multiplies<IOSize_t>());
+        buf_ptr = this->increment_buf_ptr(buf_ptr, nb_points);
+      }
+#ifdef WITH_MPI
+      ncmu_end_indep_data(netcdf_id);
+#endif  // WITH_MPI
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  NetCDFVarField::NetCDFVarField(
+      const std::string & var_name, const nc_type & var_data_type,
+      const IOSize_t & var_ndims,
+      const std::vector<std::shared_ptr<NetCDFDim>> & netcdf_var_dims,
+      muGrid::Field & var_field, bool hidden)
+      : NetCDFVarBase(var_name, var_data_type, var_ndims, netcdf_var_dims,
+                      var_field.get_collection().get_domain(), hidden),
+        field{var_field} {}
+
+  /* ---------------------------------------------------------------------- */
+  const muGrid::Field & NetCDFVarField::get_field() const {
+    return this->field;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  std::vector<IOSize_t>
+  NetCDFVarField::get_start_global(const Index_t & frame) const {
+    if (frame < 0) {
+      throw FileIOError("Only positive frame values are allowed in "
+                        "'NetCDFVarBase::get_start_global()'. You gave in the "
+                        "value frame = " +
+                        std::to_string(frame));
+    }
+
+    std::vector<IOSize_t> starts{};
+
+    const std::string & err_local{
+        "A local grid should not have a grid dimensions in x-, y-, and "
+        "z-direction, it should be a flattend array. Therefore no dimension "
+        "should be named 'n*_grid'."};
+
+    for (auto & dim : this->netcdf_dims) {
+      std::string base_name{dim->get_base_name()};
+      IOSize_t start{0};
+
+      // find the correct start for each dimension from its base_name
+      if (base_name == "frame") {
+        start = static_cast<IOSize_t>(frame);
+      } else if (base_name == "nx") {
+        if (this->get_field().is_global()) {
+          start = static_cast<IOSize_t>(
+              dynamic_cast<muGrid::GlobalFieldCollection &>(
+                  this->get_field().get_collection())
+                  .get_pixels()
+                  .get_subdomain_locations()[0]);
+        } else {
+          throw FileIOError(err_local);
+        }
+      } else if (base_name == "ny") {
+        if (this->get_field().is_global()) {
+          start = static_cast<IOSize_t>(
+              dynamic_cast<muGrid::GlobalFieldCollection &>(
+                  this->get_field().get_collection())
+                  .get_pixels()
+                  .get_subdomain_locations()[1]);
+        } else {
+          throw FileIOError(err_local);
+        }
+      } else if (base_name == "nz") {
+        if (this->get_field().is_global()) {
+          start = static_cast<IOSize_t>(
+              dynamic_cast<muGrid::GlobalFieldCollection &>(
+                  this->get_field().get_collection())
+                  .get_pixels()
+                  .get_subdomain_locations()[2]);
+        } else {
+          throw FileIOError(err_local);
+        }
+      } else if (base_name == "subpts") {
+        start = 0;
+      } else if (base_name == "subpt_dofs") {
+        start = 0;
+      } else {
+        throw FileIOError(
+            "I can not find a start offset for the dimension '" +
+            dim->get_name() + "' with base_name '" + base_name +
+            "'. Probably this case is not implemented.");
+      }
+
+      starts.push_back(start);
+    }
+    return starts;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  std::vector<IOSize_t>
+  NetCDFVarField::get_start_local(const Index_t & frame,
+                                 muGrid::Field & local_pixels) const {
+    if (frame < 0) {
+      throw FileIOError(
+          "Only positive frame values are allowed in "
+          "'NetCDFVarBase::get_start_local()'. You gave in the value frame = " +
+          std::to_string(frame));
+    }
+
+    std::vector<IOSize_t>
+        starts{};  // intermediate storage container for starts
+    muGrid::T1FieldMap<muGrid::Int64, Mapping::Mut, 1, muGrid::IterUnit::Pixel>
+        local_pixels_map{local_pixels};
+
+    for (auto & val : local_pixels_map) {
+      auto & offset{val(0)};
+      if (offset != GFC_LOCAL_PIXELS_DEFAULT_VALUE) {
+        IOSize_t start{};
+        for (auto & dim : this->netcdf_dims) {
+          std::string base_name{dim->get_base_name()};
+          if (base_name == "frame") {
+            start = static_cast<IOSize_t>(frame);
+          } else if (base_name == "pts") {
+            start = offset;
+          } else if (base_name == "subpts") {
+            start = 0;
+          } else if (base_name == "subpt_dofs") {
+            start = 0;
+          } else {
+            throw FileIOError(
+                "I can not find a start offset for the dimension '" +
+                dim->get_name() + "' with base_name '" + base_name +
+                "'. Probably this case is not implemented.");
+          }
+
+          starts.push_back(start);
+        }
+      }
+    }
+    return starts;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  std::vector<IODiff_t> NetCDFVarField::get_nc_stride() const {
+    std::vector<IODiff_t> strides{};
+    std::vector<Index_t> s{this->get_field().get_pixels_shape()};
+    for (auto & dim : this->netcdf_dims) {
+      std::string base_name{dim->get_base_name()};
+      IODiff_t stride{0};
+
+      // find the correct stride for each dimension from its base_name
+      if (base_name == "frame") {
+        stride = 1;
+      } else if (base_name == "nx") {
+        stride = 1;
+      } else if (base_name == "ny") {
+        stride = 1;
+      } else if (base_name == "nz") {
+        stride = 1;
+      } else if (base_name == "pts") {
+        stride = 1;
+      } else if (base_name == "subpts") {
+        stride = 1;
+      } else if (base_name == "subpt_dofs") {
+        stride = 1;
+      } else {
+        throw FileIOError(
+            "I can not find the correct stride for the dimension '" +
+            dim->get_name() + "' with base_name '" + base_name +
+            "'. Probably this case is not implemented.");
+      }
+
+      strides.push_back(stride);
+    }
+    return strides;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  std::vector<IODiff_t> NetCDFVarField::get_nc_imap_global() const {
+    // construc imap from field strides
+    const IterUnit iter_type{muGrid::IterUnit::SubPt};
+    std::vector<IODiff_t> imap_strides{
+        this->get_field().get_nb_pixels() *
+        this->get_field().get_nb_dof_per_pixel()};  // imap of frame (nb_dofs)
+    auto strides_wrong_type{this->get_field().get_strides(iter_type)};
+    std::vector<IODiff_t> strides(strides_wrong_type.begin(),
+                                  strides_wrong_type.end());
+    imap_strides.insert(imap_strides.end(), strides.begin(), strides.end());
+
+    // if frame is not a dimension of the variable I have to cut off the
+    // redundant parts
+    std::vector<std::string> names{get_netcdf_dim_names()};
+    if (std::find(names.begin(), names.end(), "frame") == names.end()) {
+      // erase the first N entries
+      int N = imap_strides.size() - get_ndims();
+      std::vector<decltype(imap_strides)::value_type>(imap_strides.begin() + N,
+                                                      imap_strides.end())
+          .swap(imap_strides);
+    }
+    return imap_strides;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  std::vector<IODiff_t> NetCDFVarField::get_nc_imap_local() const {
+    // construc imap from field strides
+    const IterUnit iter_type{muGrid::IterUnit::SubPt};
+    std::vector<IODiff_t> imap_strides{
+        this->get_field().get_nb_pixels() *
+        this->get_field()
+            .get_nb_dof_per_pixel()};  // imap of frame (nb_pix*nb_dofs)
+    auto strides_wrong_type{this->get_field().get_strides(iter_type)};
+    std::vector<IODiff_t> strides{strides_wrong_type.begin(),
+                                  strides_wrong_type.end()};
+    imap_strides.insert(imap_strides.end(), strides.begin(), strides.end());
+
+    // if frame is not a dimension of the variable I have to cut off the
+    // redundant parts
+    std::vector<std::string> names{get_netcdf_dim_names()};
+    if (std::find(names.begin(), names.end(), "frame") == names.end()) {
+      // erase the first N entries
+      size_t N{imap_strides.size() - get_ndims()};
+      std::vector<decltype(imap_strides)::value_type>{imap_strides.begin() + N,
+                                                      imap_strides.end()}
+          .swap(imap_strides);
+    }
+    return imap_strides;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void NetCDFVarField::write(const int netcdf_id, const Index_t & tot_nb_frames,
+                             GlobalFieldCollection & GFC_local_pixels,
+                             const Index_t & frame_index) {
+    NetCDFVarBase::write(netcdf_id, tot_nb_frames, GFC_local_pixels,
+                         frame_index);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void NetCDFVarField::read(const int netcdf_id, const Index_t & tot_nb_frames,
+                            GlobalFieldCollection & GFC_local_pixels,
+                            const Index_t & frame_index) {
+    NetCDFVarBase::read(netcdf_id, tot_nb_frames, GFC_local_pixels,
+                        frame_index);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  NetCDFVarStateField::NetCDFVarStateField(
+      const std::string & var_name, const nc_type & var_data_type,
+      const IOSize_t & var_ndims,
+      const std::vector<std::shared_ptr<NetCDFDim>> & netcdf_var_dims,
+      muGrid::StateField & var_state_field)
+      : NetCDFVarBase(var_name, var_data_type, var_ndims, netcdf_var_dims,
+                      var_state_field.get_collection().get_domain(), false),
+        state_field{var_state_field} {}
+
+  /* ---------------------------------------------------------------------- */
+  const muGrid::Field & NetCDFVarStateField::get_field() const {
+    if (this->state_field_index == 0) {
+      return this->state_field.current();
+    } else {
+      return this->state_field.old(this->state_field_index);
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  size_t NetCDFVarStateField::get_nb_fields() const {
+    return static_cast<size_t>(this->state_field.get_nb_memory() + 1);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  std::vector<IOSize_t>
+  NetCDFVarStateField::get_start_global(const Index_t & frame) const {
+    if (frame < 0) {
+      throw FileIOError("Only positive frame values are allowed in "
+                        "'NetCDFVarStateField::get_start_global()'. You gave "
+                        "in the value frame = " +
+                        std::to_string(frame));
+    }
+
+    std::vector<IOSize_t> starts{};
+
+    const std::string & err_local{
+        "A local grid should not have a grid dimensions in x-, y-, and "
+        "z-direction, it should be a flattend array. Therefore no dimension "
+        "should be named 'n*_grid'."};
+
+    for (auto & dim : this->netcdf_dims) {
+      std::string base_name{dim->get_base_name()};
+      IOSize_t start{0};
+
+      // find the correct start for each dimension from its base_name
+      if (base_name == "frame") {
+        start = static_cast<IOSize_t>(frame);
+      } else if (base_name == "history_index") {
+        start = static_cast<IOSize_t>(this->state_field_index);
+      } else if (base_name == "nx") {
+        if (this->get_field().is_global()) {
+          start = static_cast<IOSize_t>(
+              dynamic_cast<muGrid::GlobalFieldCollection &>(
+                  this->get_field().get_collection())
+                  .get_pixels()
+                  .get_subdomain_locations()[0]);
+        } else {
+          throw FileIOError(err_local);
+        }
+      } else if (base_name == "ny") {
+        if (this->get_field().is_global()) {
+          start = static_cast<IOSize_t>(
+              dynamic_cast<muGrid::GlobalFieldCollection &>(
+                  this->get_field().get_collection())
+                  .get_pixels()
+                  .get_subdomain_locations()[1]);
+        } else {
+          throw FileIOError(err_local);
+        }
+      } else if (base_name == "nz") {
+        if (this->get_field().is_global()) {
+          start = static_cast<IOSize_t>(
+              dynamic_cast<muGrid::GlobalFieldCollection &>(
+                  this->get_field().get_collection())
+                  .get_pixels()
+                  .get_subdomain_locations()[2]);
+        } else {
+          throw FileIOError(err_local);
+        }
+      } else if (base_name == "subpts") {
+        start = 0;
+      } else if (base_name == "subpt_dofs") {
+        start = 0;
+      } else {
+        throw FileIOError("I can not find a start offset for the dimension '" +
+                          dim->get_name() + "' with base_name '" + base_name +
+                          "'. Probably this case is not implemented in "
+                          "'NetCDFVarStateField::get_start_global()'.");
+      }
+
+      starts.push_back(start);
+    }
+    return starts;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  std::vector<IOSize_t>
+  NetCDFVarStateField::get_start_local(const Index_t & frame,
+                                       muGrid::Field & local_pixels) const {
+    if (frame < 0) {
+      throw FileIOError("Only positive frame values are allowed in "
+                        "'NetCDFVarStateField::get_start_local()'. You gave in "
+                        "the value frame = " +
+                        std::to_string(frame));
+    }
+
+    std::vector<IOSize_t>
+        starts{};  // intermediate storage container for starts
+    muGrid::T1FieldMap<muGrid::Int64, Mapping::Mut, 1, muGrid::IterUnit::Pixel>
+        local_pixels_map{local_pixels};
+
+    for (auto & val : local_pixels_map) {
+      auto & offset{val(0)};
+      if (offset != GFC_LOCAL_PIXELS_DEFAULT_VALUE) {
+        IOSize_t start{};
+        for (auto & dim : this->netcdf_dims) {
+          std::string base_name{dim->get_base_name()};
+          if (base_name == "frame") {
+            start = static_cast<IOSize_t>(frame);
+          } else if (base_name == "history_index") {
+            start = static_cast<IOSize_t>(this->state_field_index);
+          } else if (base_name == "pts") {
+            start = offset;
+          } else if (base_name == "subpts") {
+            start = 0;
+          } else if (base_name == "subpt_dofs") {
+            start = 0;
+          } else {
+            throw FileIOError(
+                "I can not find a start offset for the dimension '" +
+                dim->get_name() + "' with base_name '" + base_name +
+                "'. Probably this case is not implemented in "
+                "'NetCDFVarStateField::get_start_local()'.");
+          }
+
+          starts.push_back(start);
+        }
+      }
+    }
+    return starts;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  std::vector<IODiff_t> NetCDFVarStateField::get_nc_stride() const {
+    std::vector<IODiff_t> strides{};
+    std::vector<Index_t> s{this->get_field().get_pixels_shape()};
+    for (auto & dim : this->netcdf_dims) {
+      std::string base_name{dim->get_base_name()};
+      IODiff_t stride{0};
+
+      // find the correct stride for each dimension from its base_name
+      if (base_name == "frame") {
+        stride = 1;
+      } else if (base_name == "history_index") {
+        stride = static_cast<IODiff_t>(state_field.get_nb_memory() + 1);
+      } else if (base_name == "nx") {
+        stride = 1;
+      } else if (base_name == "ny") {
+        stride = 1;
+      } else if (base_name == "nz") {
+        stride = 1;
+      } else if (base_name == "pts") {
+        stride = 1;
+      } else if (base_name == "subpts") {
+        stride = 1;
+      } else if (base_name == "subpt_dofs") {
+        stride = 1;
+      } else {
+        throw FileIOError(
+            "I can not find the correct stride for the dimension '" +
+            dim->get_name() + "' with base_name '" + base_name +
+            "'. Probably this case is not implemented in "
+            "'NetCDFVarStateField::get_nc_stride()'.");
+      }
+
+      strides.push_back(stride);
+    }
+    return strides;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  std::vector<IODiff_t> NetCDFVarStateField::get_nc_imap_global() const {
+    // construc imap from field strides
+    const IterUnit iter_type{muGrid::IterUnit::SubPt};
+    IODiff_t nb_history{
+        static_cast<IODiff_t>(this->state_field.get_nb_memory() + 1)};
+    std::vector<IODiff_t> imap_strides{
+        this->get_field().get_nb_pixels() *
+        this->get_field().get_nb_dof_per_pixel() *
+        nb_history};  // imap of frame (nb_dofs * (nb_memory +1))
+    imap_strides.push_back(imap_strides[0] /
+                           nb_history);  // imap of history (nb_dofs)
+    auto strides_wrong_type{this->get_field().get_strides(iter_type)};
+    std::vector<IODiff_t> strides(strides_wrong_type.begin(),
+                                  strides_wrong_type.end());
+    imap_strides.insert(imap_strides.end(), strides.begin(), strides.end());
+
+    // if frame is not a dimension of the variable I have to cut off the
+    // redundant parts
+    std::vector<std::string> names{get_netcdf_dim_names()};
+    if (std::find(names.begin(), names.end(), "frame") == names.end()) {
+      // erase the first N entries
+      int N = imap_strides.size() - get_ndims();
+      std::vector<decltype(imap_strides)::value_type>(imap_strides.begin() + N,
+                                                      imap_strides.end())
+          .swap(imap_strides);
+    }
+    return imap_strides;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  std::vector<IODiff_t> NetCDFVarStateField::get_nc_imap_local() const {
+    // construc imap from field strides
+    const IterUnit iter_type{muGrid::IterUnit::SubPt};
+    IODiff_t nb_history{
+        static_cast<IODiff_t>(this->state_field.get_nb_memory() + 1)};
+    std::vector<IODiff_t> imap_strides{
+        this->get_field().get_nb_pixels() *
+        this->get_field()
+            .get_nb_dof_per_pixel()};  // imap of frame
+                                       // (nb_pix*nb_dofs*nb_history)
+    imap_strides.push_back(imap_strides[0] /
+                           nb_history);  // imap of history (nb_pix*nb_dofs)
+    auto strides_wrong_type{this->get_field().get_strides(iter_type)};
+    std::vector<IODiff_t> strides{strides_wrong_type.begin(),
+                                  strides_wrong_type.end()};
+    imap_strides.insert(imap_strides.end(), strides.begin(), strides.end());
+
+    // if frame is not a dimension of the variable I have to cut off the
+    // redundant parts
+    std::vector<std::string> names{get_netcdf_dim_names()};
+    if (std::find(names.begin(), names.end(), "frame") == names.end()) {
+      // erase the first N entries
+      size_t N{imap_strides.size() - get_ndims()};
+      std::vector<decltype(imap_strides)::value_type>{imap_strides.begin() + N,
+                                                      imap_strides.end()}
+          .swap(imap_strides);
+    }
+    return imap_strides;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void NetCDFVarStateField::write(const int netcdf_id,
+                                  const Index_t & tot_nb_frames,
+                                  GlobalFieldCollection & GFC_local_pixels,
+                                  const Index_t & frame_index) {
+    for (size_t new_state_field_index = 0;
+         new_state_field_index < this->get_nb_fields();
+         new_state_field_index++) {
+      // bring the state_field into the right state (set the state_field_index)
+      this->state_field_index = new_state_field_index;
+      NetCDFVarBase::write(netcdf_id, tot_nb_frames, GFC_local_pixels,
+                           frame_index);
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void NetCDFVarStateField::read(const int netcdf_id,
+                                 const Index_t & tot_nb_frames,
+                                 GlobalFieldCollection & GFC_local_pixels,
+                                 const Index_t & frame_index) {
+    for (size_t new_state_field_index = 0;
+         new_state_field_index < this->get_nb_fields();
+         new_state_field_index++) {
+      // bring the state_field into the right state (set the state_field_index)
+      this->state_field_index = new_state_field_index;
+      NetCDFVarBase::read(netcdf_id, tot_nb_frames, GFC_local_pixels,
+                          frame_index);
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  NetCDFVariables & NetCDFVariables::
+  operator+=(std::shared_ptr<NetCDFVarBase> & rhs) {
     this->var_vector.push_back(rhs);
     return *this;
   }
 
   /* ---------------------------------------------------------------------- */
-  NetCDFVar & NetCDFVariables::add_var(
-      const std::string & var_name, const nc_type & var_data_type,
-      const IOSize_t & var_ndims,
-      const std::vector<std::shared_ptr<NetCDFDim>> & netcdf_var_dims,
-      muGrid::Field & var_field, bool hidden) {
-    NetCDFVar netcdf_var(var_name, var_data_type, var_ndims, netcdf_var_dims,
-                         var_field, hidden);
-    this->var_vector.push_back(netcdf_var);
-    return this->var_vector.back();
+  NetCDFVarBase & NetCDFVariables::add_field_var(
+      muGrid::Field & var_field,
+      const std::vector<std::shared_ptr<NetCDFDim>> & var_dims, bool hidden) {
+    std::string var_name{var_field.get_name()};
+    const std::type_info & type_id{var_field.get_stored_typeid()};
+    nc_type var_data_type{NetCDFVarBase::typeid_to_nc_type(type_id)};
+    IOSize_t var_ndims{static_cast<IOSize_t>(var_dims.size())};
+
+    this->var_vector.push_back(
+        std::make_shared<NetCDFVarField>(var_name, var_data_type, var_ndims,
+                                         var_dims, var_field, hidden));
+
+    return *this->var_vector.back();
   }
 
   /* ---------------------------------------------------------------------- */
-  NetCDFVar & NetCDFVariables::add_field_var(
-      muGrid::Field & field,
-      const std::vector<std::shared_ptr<NetCDFDim>> & field_dims, bool hidden) {
-    std::string var_name{field.get_name()};
-    const std::type_info & type_id{field.get_stored_typeid()};
-    nc_type var_data_type{NetCDFVar::typeid_to_nc_type(type_id)};
-    IOSize_t var_ndims{static_cast<IOSize_t>(field_dims.size())};
-    return this->add_var(var_name, var_data_type, var_ndims, field_dims, field,
-                         hidden);
+  NetCDFVarBase & NetCDFVariables::add_state_field_var(
+      muGrid::StateField & var_state_field,
+      const std::vector<std::shared_ptr<NetCDFDim>> & var_dims) {
+    std::string var_name{var_state_field.get_unique_prefix()};
+    const std::type_info & type_id{
+        var_state_field.current().get_stored_typeid()};
+    nc_type var_data_type{NetCDFVarBase::typeid_to_nc_type(type_id)};
+    IOSize_t var_ndims{static_cast<IOSize_t>(var_dims.size())};
+
+    this->var_vector.push_back(std::make_shared<NetCDFVarStateField>(
+        var_name, var_data_type, var_ndims, var_dims, var_state_field));
+
+    return *this->var_vector.back();
   }
 
   /* ---------------------------------------------------------------------- */
-  const std::vector<NetCDFVar> & NetCDFVariables::get_var_vector() const {
+  const std::vector<std::shared_ptr<NetCDFVarBase>> &
+  NetCDFVariables::get_var_vector() const {
     return this->var_vector;
   }
 
   /* ---------------------------------------------------------------------- */
-  std::vector<NetCDFVar> & NetCDFVariables::set_var_vector() {
+  std::vector<std::shared_ptr<NetCDFVarBase>> &
+  NetCDFVariables::set_var_vector() {
     return this->var_vector;
   }
 
@@ -2160,8 +2670,8 @@ namespace muGrid {
   std::vector<std::string> NetCDFVariables::get_names() const {
     std::vector<std::string> names;
     for (auto & var : this->var_vector) {
-      if (!var.get_hidden_status()) {
-        names.push_back(var.get_name());
+      if (!var->get_hidden_status()) {
+        names.push_back(var->get_name());
       }
     }
     return names;
@@ -2171,25 +2681,38 @@ namespace muGrid {
   std::vector<std::string> NetCDFVariables::get_hidden_names() const {
     std::vector<std::string> names;
     for (auto & var : this->var_vector) {
-      if (var.get_hidden_status()) {
-        names.push_back(var.get_name());
+      if (var->get_hidden_status()) {
+        names.push_back(var->get_name());
       }
     }
     return names;
   }
 
   /* ---------------------------------------------------------------------- */
-  const NetCDFVar &
+  const NetCDFVarBase &
   NetCDFVariables::get_variable(const std::string & var_name) const {
     for (auto & var : this->var_vector) {
-      if (var.get_name() == var_name) {
-        return var;
+      if (var->get_name() == var_name) {
+        return *var;
       }
     }
     throw FileIOError("The variable with name '" + var_name +
                       "' was not found. Maybe you forgot to register "
-                      "the corresponding FieldCollection or Field?");
-    return var_vector.back();
+                      "the corresponding FieldCollection?");
+    return *var_vector.back();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  NetCDFVarBase & NetCDFVariables::get_variable(const std::string & var_name) {
+    for (auto & var : this->var_vector) {
+      if (var->get_name() == var_name) {
+        return *var;
+      }
+    }
+    throw FileIOError("The variable with name '" + var_name +
+                      "' was not found. Maybe you forgot to register "
+                      "the corresponding FieldCollection?");
+    return *var_vector.back();
   }
 
 }  // namespace muGrid

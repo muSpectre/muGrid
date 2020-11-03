@@ -43,6 +43,7 @@ namespace py = pybind11;
 void add_common(py::module & mod);
 void add_communicator(py::module & mod);
 void add_field_classes(py::module & mod);
+void add_state_field_classes(py::module & mod);
 void add_field_collection_classes(py::module & mod);
 void add_file_io_classes(py::module & mod);
 

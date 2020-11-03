@@ -45,7 +45,7 @@ namespace muGrid {
   BOOST_AUTO_TEST_SUITE(file_io_base);
 
   BOOST_AUTO_TEST_CASE(FileIOBaseClass) {
-    const std::string file_name{"file_io_base_test"};
+    const std::string file_name{"file_io_base_test.nc"};
     remove(file_name.c_str());  // remove test_file if it already exists
     FileIOBase::OpenMode open_mode{FileIOBase::OpenMode::Write};
     auto & comm{MPIContext::get_context().comm};

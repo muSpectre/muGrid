@@ -288,6 +288,7 @@ pymugrid_sources = [
     'language_bindings/libmugrid/python/bind_py_common.cc',
     'language_bindings/libmugrid/python/bind_py_communicator.cc',
     'language_bindings/libmugrid/python/bind_py_field.cc',
+    'language_bindings/libmugrid/python/bind_py_state_field.cc',
     'language_bindings/libmugrid/python/bind_py_field_collection.cc',
 ]
 mufft_sources = [

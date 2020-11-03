@@ -446,6 +446,16 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
+  std::vector<std::string>
+  FieldCollection::list_state_field_unique_prefixes() const {
+    std::vector<std::string> unique_prefixes;
+    for (const auto & map : this->state_fields) {
+      unique_prefixes.push_back(std::get<0>(map));
+    }
+    return unique_prefixes;
+  }
+
+  /* ---------------------------------------------------------------------- */
   void FieldCollection::preregister_map(
       std::shared_ptr<std::function<void()>> & call_back) {
     if (this->initialised) {

@@ -88,6 +88,26 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
+  FieldCollection & StateField::get_collection() {
+    return this->collection;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  const std::string & StateField::get_unique_prefix() const {
+    return this->prefix;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  const RefVector<Field> & StateField::get_fields() const {
+    return this->fields;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  RefVector<Field> & StateField::set_fields() {
+    return this->fields;
+  }
+
+  /* ---------------------------------------------------------------------- */
   template <typename T>
   TypedStateField<T>::TypedStateField(const std::string & unique_prefix,
                                       FieldCollection & collection,

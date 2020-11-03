@@ -130,6 +130,19 @@ namespace muGrid {
      */
     const std::vector<size_t> & get_indices() const { return this->indices; }
 
+    //! get the field collection which holds all fields of the state field
+    FieldCollection & get_collection();
+
+    //! get the unique prefix used for the naming of the associated fields and
+    //! can be used like a name for the StateField
+    const std::string & get_unique_prefix() const;
+
+    //! return a const RefVector<Field> of fields belonging to the StateField
+    const RefVector<Field> & get_fields() const;
+
+    //! return a mutable RefVector<Field> of fields belonging to the StateField
+    RefVector<Field> & set_fields();
+
    protected:
     /**
      * the unique prefix is used as the first part of the unique name

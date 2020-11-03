@@ -45,6 +45,7 @@
 #include <libmugrid/field_typed.hh>
 #include <libmugrid/field_map_static.hh>
 #include <libmugrid/field_collection.hh>
+#include <libmugrid/state_field.hh>
 
 #include "tests/libmufft/tests.hh"
 #include "mpi_context.hh"
@@ -383,6 +384,207 @@ namespace muGrid {
 
     BOOST_CHECK_THROW(file_io_netcdf.register_field_collection(local_fc_2),
                       muGrid::FieldCollectionError);
+  }
+
+  BOOST_FIXTURE_TEST_CASE(WriteStateFields, FileIOFixture) {
+    const std::string file_name{"test_statefields.nc"};
+    remove(file_name.c_str());  // remove file if it already exists
+    auto open_mode = muGrid::FileIOBase::OpenMode::Write;
+    FileIONetCDF file_io_netcdf(file_name, open_mode, this->comm);
+
+    // construct a statefield in the global and local field collection
+    const std::string glob_sf_name{"glob_state_field"};
+    const std::string loc_sf_name{"local_state_field"};
+    const Index_t glob_nb_mem{3};
+    const Index_t loc_nb_mem{1};
+    Index_t nb_components{};
+    std::string sub_division{};
+    for (auto & element : this->nb_sub_pts) {
+      nb_components = element.second;
+      sub_division = element.first;
+    }
+    TypedStateField<Real> & glob_state_field{
+        this->global_fc.register_state_field<Real>(
+            glob_sf_name, glob_nb_mem, nb_components, sub_division)};
+
+    TypedStateField<int> & loc_state_field{
+        this->local_fc.register_state_field<int>(
+            loc_sf_name, loc_nb_mem, nb_components, sub_division)};
+
+    for (int i = 1; i <= glob_nb_mem + 1; i++) {
+      // fill values into the global state field
+      TypedField<Real> & current_state_field{glob_state_field.current()};
+      current_state_field.eigen_vec().setConstant(glob_nb_mem + 1 - i);
+      glob_state_field.cycle();
+    }
+    // reorder state field such that its values are increasing in history
+    // (0,1,2,3)
+    glob_state_field.cycle();
+    glob_state_field.cycle();
+    glob_state_field.cycle();
+
+    for (int i = 1; i <= loc_nb_mem + 1; i++) {
+      // fill values into the local state field
+      TypedField<int> & current_state_field{loc_state_field.current()};
+      current_state_field.eigen_vec().setConstant(loc_nb_mem + 1 - i);
+      loc_state_field.cycle();
+    }
+
+    std::vector<std::string> field_names{};
+    std::vector<std::string> state_field_unique_prefixes{glob_sf_name};
+    file_io_netcdf.register_field_collection(this->global_fc, field_names,
+                                             state_field_unique_prefixes);
+    file_io_netcdf.register_field_collection(this->local_fc, field_names);
+
+    // double registration raises error
+    BOOST_CHECK_THROW(file_io_netcdf.register_field_collection(this->global_fc),
+                      muGrid::FileIOError);
+
+    // write frame 0
+    file_io_netcdf.append_frame().write();
+
+    // change values of global and local state field + cycle
+    for (int i = 1; i <= glob_nb_mem + 1; i++) {
+      // fill values into the global state field
+      TypedField<Real> & current_state_field{glob_state_field.current()};
+      current_state_field.eigen_vec().setConstant(glob_nb_mem + 5 - i);
+      glob_state_field.cycle();
+    }
+    glob_state_field.cycle();
+    glob_state_field.cycle();
+    glob_state_field.cycle();
+
+    for (int i = 1; i <= loc_nb_mem + 1; i++) {
+      // fill values into the local state field
+      TypedField<int> & current_state_field{loc_state_field.current()};
+      current_state_field.eigen_vec().setConstant(loc_nb_mem + 3 - i);
+      loc_state_field.cycle();
+    }
+
+    loc_state_field.cycle();
+
+    // write frame 2
+    file_io_netcdf.append_frame().write();
+    file_io_netcdf.close();
+  }
+
+  BOOST_FIXTURE_TEST_CASE(AppendStateFields, FileIOFixture) {
+    const std::string file_name{"test_statefields.nc"};
+    auto open_mode = muGrid::FileIOBase::OpenMode::Append;
+    FileIONetCDF file_io_netcdf(file_name, open_mode, this->comm);
+
+    // construct a statefield in the global and local field collection
+    const std::string glob_sf_name{"glob_state_field"};
+    const std::string loc_sf_name{"local_state_field"};
+    const Index_t glob_nb_mem{3};
+    const Index_t loc_nb_mem{1};
+    Index_t nb_components{};
+    std::string sub_division{};
+    for (auto & element : this->nb_sub_pts) {
+      nb_components = element.second;
+      sub_division = element.first;
+    }
+    TypedStateField<Real> & glob_state_field{
+        this->global_fc.register_state_field<Real>(
+            glob_sf_name, glob_nb_mem, nb_components, sub_division)};
+
+    TypedStateField<int> & loc_state_field{
+        this->local_fc.register_state_field<int>(loc_sf_name, loc_nb_mem,
+                                                 nb_components, sub_division)};
+
+    std::vector<std::string> field_names{};
+    std::vector<std::string> state_field_unique_prefixes{glob_sf_name};
+    file_io_netcdf.register_field_collection(this->global_fc, field_names,
+                                             state_field_unique_prefixes);
+    file_io_netcdf.register_field_collection(this->local_fc, field_names);
+
+    for (int i = 1; i <= glob_nb_mem + 1; i++) {
+      // fill values into the global state field
+      TypedField<Real> & current_state_field{glob_state_field.current()};
+      current_state_field.eigen_vec().setConstant(glob_nb_mem + 9 - i);
+      glob_state_field.cycle();
+    }
+    glob_state_field.cycle();
+
+    for (int i = 1; i <= loc_nb_mem + 1; i++) {
+      // fill values into the local state field
+      TypedField<int> & current_state_field{loc_state_field.current()};
+      current_state_field.eigen_vec().setConstant(loc_nb_mem + 5 - i);
+      loc_state_field.cycle();
+    }
+    loc_state_field.cycle();
+
+    file_io_netcdf.append_frame().write();  // append frame 2
+    file_io_netcdf.close();
+  }
+
+  BOOST_FIXTURE_TEST_CASE(ReadStateFields, FileIOFixture) {
+    const std::string file_name{"test_statefields.nc"};
+    auto open_mode = muGrid::FileIOBase::OpenMode::Read;
+    FileIONetCDF file_io_netcdf(file_name, open_mode, this->comm);
+
+    // construct a statefield in the global and local field collection
+    const std::string glob_sf_name{"glob_state_field"};
+    const std::string loc_sf_name{"local_state_field"};
+    const Index_t glob_nb_mem{3};
+    const Index_t loc_nb_mem{1};
+    Index_t nb_components{};
+    std::string sub_division{};
+    for (auto & element : this->nb_sub_pts) {
+      nb_components = element.second;
+      sub_division = element.first;
+    }
+    TypedStateField<Real> & glob_state_field{
+        this->global_fc.register_state_field<Real>(
+            glob_sf_name, glob_nb_mem, nb_components, sub_division)};
+
+    TypedStateField<int> & loc_state_field{
+        this->local_fc.register_state_field<int>(loc_sf_name, loc_nb_mem,
+                                                 nb_components, sub_division)};
+
+    std::vector<std::string> field_names{};
+    std::vector<std::string> state_field_unique_prefixes{glob_sf_name};
+    file_io_netcdf.register_field_collection(this->global_fc, field_names,
+                                             state_field_unique_prefixes);
+    file_io_netcdf.register_field_collection(this->local_fc, field_names);
+
+    // cycle the global state field to see if it is coorect read in
+    glob_state_field.cycle();
+    glob_state_field.cycle();
+
+    // check reading frame 0
+    std::vector<std::string> read_field_names{glob_sf_name, loc_sf_name};
+    file_io_netcdf.read(0, read_field_names);
+
+    BOOST_CHECK_EQUAL(glob_state_field.current().eigen_vec()(0, 0), 0);
+    BOOST_CHECK_EQUAL(glob_state_field.old(1).eigen_vec()(0, 0), 1);
+    BOOST_CHECK_EQUAL(glob_state_field.old(2).eigen_vec()(0, 0), 2);
+    BOOST_CHECK_EQUAL(glob_state_field.old(3).eigen_vec()(0, 0), 3);
+
+    BOOST_CHECK_EQUAL(loc_state_field.current().eigen_vec()(0, 0), 1);
+    BOOST_CHECK_EQUAL(loc_state_field.old(1).eigen_vec()(0, 0), 0);
+
+    // check reading frame 1
+    file_io_netcdf.read(1);
+    BOOST_CHECK_EQUAL(glob_state_field.current().eigen_vec()(0, 0), 4);
+    BOOST_CHECK_EQUAL(glob_state_field.old(1).eigen_vec()(0, 0), 5);
+    BOOST_CHECK_EQUAL(glob_state_field.old(2).eigen_vec()(0, 0), 6);
+    BOOST_CHECK_EQUAL(glob_state_field.old(3).eigen_vec()(0, 0), 7);
+
+    BOOST_CHECK_EQUAL(loc_state_field.current().eigen_vec()(0, 0), 2);
+    BOOST_CHECK_EQUAL(loc_state_field.old(1).eigen_vec()(0, 0), 3);
+
+    // check reading frame 2
+    file_io_netcdf.read(2);
+    BOOST_CHECK_EQUAL(glob_state_field.current().eigen_vec()(0, 0), 10);
+    BOOST_CHECK_EQUAL(glob_state_field.old(1).eigen_vec()(0, 0), 11);
+    BOOST_CHECK_EQUAL(glob_state_field.old(2).eigen_vec()(0, 0), 8);
+    BOOST_CHECK_EQUAL(glob_state_field.old(3).eigen_vec()(0, 0), 9);
+
+    BOOST_CHECK_EQUAL(loc_state_field.current().eigen_vec()(0, 0), 4);
+    BOOST_CHECK_EQUAL(loc_state_field.old(1).eigen_vec()(0, 0), 5);
+
+    file_io_netcdf.close();
   }
 
   BOOST_AUTO_TEST_SUITE_END();
