@@ -44,8 +44,8 @@ from python_mpi_material_linear_elastic4_test import *
 from python_mpi_projection_tests import *
 
 # FIXME: @Richard L. - please fix parallel stochastic plasticity model
-#from python_mpi_stochastic_plasticity_search_test import \
-#    StochasticPlasticitySearch_Check
+from python_mpi_stochastic_plasticity_search_test import \
+    StochasticPlasticitySearch_Check
 
 if __name__ == '__main__':
     unittest.main()

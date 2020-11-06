@@ -45,13 +45,12 @@ class FieldCheck(unittest.TestCase):
         self.nb_grid_pts = (10, 11, 21)
 
     def test_buffer_size_one_quad_pt(self):
-        print("I am executing this test")
         fc = muGrid.GlobalFieldCollection(len(self.nb_grid_pts))
         fc.initialise(self.nb_grid_pts, self.nb_grid_pts)
         # Single component
         f = fc.register_real_field("test-field", 1)
         self.assertEqual(f.array(muGrid.Pixel).shape,
-                         (1,) + self.nb_grid_pts)
+                         self.nb_grid_pts)
         # Four components
         f2 = fc.register_real_field("test-field2", 4)
         self.assertEqual(f2.array(muGrid.Pixel).shape,
@@ -113,8 +112,9 @@ class FieldCheck(unittest.TestCase):
         f = fc.register_real_field("test-field", dims)
         a = np.array(f)
         self.assertTrue(a.flags.f_contiguous)
-        self.assertEqual(a.shape, tuple(list(dims) + list(self.nb_grid_pts)))
+        self.assertEqual(a.shape, tuple(list(dims) + [1,] + list(self.nb_grid_pts)))
         strides = np.append([1], np.cumprod(dims))
+        strides = np.append(strides, strides[-1])
         strides = np.append(strides,
                             strides[-1] * np.cumprod(self.nb_grid_pts))
         strides = 8 * strides[:-1]
@@ -128,34 +128,14 @@ class FieldCheck(unittest.TestCase):
             len(self.nb_grid_pts), self.nb_grid_pts, self.nb_grid_pts,
             [0] * len(self.nb_grid_pts),
             muGrid.StorageOrder.RowMajor, {}, muGrid.StorageOrder.RowMajor)
-        f = fc.register_real_field("test-field", dims,
-                                   storage_order=muGrid.StorageOrder.RowMajor)
+        f = fc.register_real_field("test-field", dims)
         a = np.array(f)
         self.assertTrue(a.flags.c_contiguous)
-        self.assertEqual(a.shape, tuple(list(dims) + list(self.nb_grid_pts)))
+        self.assertEqual(a.shape, tuple(list(dims) + [1,] + list(self.nb_grid_pts)))
         strides = np.append([1], np.cumprod(self.nb_grid_pts[::-1]))
+        strides = np.append(strides, strides[-1])
         strides = np.append(strides, strides[-1] * np.cumprod(dims[::-1]))
         strides = 8 * strides[-2::-1]
-        self.assertEqual(a.strides, tuple(strides))
-
-    def test_mixed_storage(self):
-        # We need to specify the storage order twice and they mean different
-        # things.
-        dims = (3, 4)
-        fc = muGrid.GlobalFieldCollection(
-            len(self.nb_grid_pts), self.nb_grid_pts, self.nb_grid_pts,
-            [0] * len(self.nb_grid_pts),
-            muGrid.StorageOrder.RowMajor, {}, muGrid.StorageOrder.ColMajor)
-        f = fc.register_real_field("test-field", dims,
-                                   storage_order=muGrid.StorageOrder.RowMajor)
-        a = np.array(f)
-        self.assertFalse(a.flags.c_contiguous)
-        self.assertFalse(a.flags.f_contiguous)
-        self.assertEqual(a.shape, tuple(list(dims) + list(self.nb_grid_pts)))
-        strides = np.append([1], np.cumprod(dims[::-1]))[::-1]
-        strides = np.append(strides, strides[0] *
-                            np.cumprod(self.nb_grid_pts[::-1])[-2::-1])
-        strides = 8 * np.roll(strides, -1)
         self.assertEqual(a.strides, tuple(strides))
 
     def test_local_field_collection(self):

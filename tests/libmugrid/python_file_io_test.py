@@ -38,7 +38,10 @@ import unittest
 
 from python_test_imports import muGrid
 
-from mpi4py import MPI
+try:
+    from mpi4py import MPI
+except ImportError:
+    MPI = None
 import numpy as np
 import os
 
@@ -47,9 +50,12 @@ class FileIOTest(unittest.TestCase):
     def setUp(self):
         self.nb_domain_grid_pts = (3, 3, 3)
         self.nb_subdomain_grid_pts = (3, 3, 3)
-        self.file_f_name = "python_binding_io_field-tests.nc"
+        self.file_f_name = "python_binding_tests.nc"
         self.file_sf_name = "python_binding_io_state-field-tests.nc"
-        self.comm = muGrid.Communicator(MPI.COMM_WORLD)
+        if MPI:
+            self.comm = muGrid.Communicator(MPI.COMM_WORLD)
+        else:
+            self.comm = muGrid.Communicator()
 
         # global field collection
         self.fc_glob = \

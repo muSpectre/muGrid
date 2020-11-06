@@ -631,6 +631,18 @@ namespace muSpectre {
     }
 
     /* ----------------------------------------------------------------------*/
+    /**
+     * Computes the equivalent von Mises stress σ_{eq} on each pixel from a
+     * given deviatoric stress.
+     */
+    template <Dim_t DimM>
+    inline decltype(auto) compute_equivalent_von_Mises_stress(
+        const Eigen::Matrix<Real, DimM, DimM> deviatoric_stress) {
+      return sqrt(3. / 2. *
+                  (deviatoric_stress * deviatoric_stress.transpose()).trace());
+    }
+
+    /* ----------------------------------------------------------------------*/
     struct OperationAddition {
       explicit OperationAddition(const Real & ratio) : ratio{ratio} {};
       const Real & ratio;

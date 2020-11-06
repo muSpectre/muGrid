@@ -35,7 +35,6 @@ Program grant you additional permission to convey the resulting work.
 """
 
 import unittest
-import numpy as np
 
 from python_test_imports import muGrid
 
@@ -49,17 +48,50 @@ class Communicator_Check(unittest.TestCase):
     @unittest.skipIf(not muGrid.has_mpi,
                      'muGrid was compiled without MPI support')
     def test_sum_comm_world(self):
-        from mpi4py import MPI
-        comm = muGrid.Communicator(MPI.COMM_WORLD)
+        try:
+            from mpi4py import MPI
+            comm = muGrid.Communicator(MPI.COMM_WORLD)
+        except ImportError:
+            comm = muGrid.Communicator()
         # 1 + 2 + 3 + ... + n = n*(n+1)/2
         self.assertEqual(comm.sum(comm.rank+3),
                          comm.size*(comm.size+1)/2 + 2*comm.size)
     def test_cum_sum_comm_world(self):
-        from mpi4py import MPI
-        comm = muGrid.Communicator(MPI.COMM_WORLD)
+        try:
+            from mpi4py import MPI
+            comm = muGrid.Communicator(MPI.COMM_WORLD)
+        except ImportError:
+            comm = muGrid.Communicator()
         # 1 + 2 + 3 + ... + n = n*(n+1)/2
         self.assertEqual(comm.cumulative_sum(comm.rank+1),
                          comm.rank*(comm.rank+1)/2 + comm.rank + 1)
+
+    def test_bcast(self):
+        # The default communicator is COMM_SELF, i.e. each process by itself
+        comm = muFFT.Communicator()
+        scalar_arg = comm.rank + 3
+        res = comm.bcast(scalar_arg, 0)
+        self.assertEqual(res, 3)
+
+        scalar_arg = comm.rank + 1
+        res = comm.bcast(scalar_arg = scalar_arg, root = comm.size - 1)
+        self.assertEqual(res, comm.size)
+
+    @unittest.skipIf(not muGrid.has_mpi,
+                     'muFFT was compiled without MPI support')
+    def test_bcast(self):
+        try:
+            from mpi4py import MPI
+            comm = muGrid.Communicator(MPI.COMM_WORLD)
+        except ImportError:
+            comm = muGrid.Communicator()
+        scalar_arg = comm.rank + 3
+        res = comm.bcast(scalar_arg, 0)
+        self.assertEqual(res, 3)
+
+        scalar_arg = comm.rank + 1
+        res = comm.bcast(scalar_arg = scalar_arg, root = comm.size - 1)
+        self.assertEqual(res, comm.size)
 
 if __name__ == '__main__':
     unittest.main()

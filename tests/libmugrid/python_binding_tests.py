@@ -35,16 +35,15 @@ Program grant you additional permission to convey the resulting work.
 """
 
 import unittest
-import numpy as np
 
 from python_test_imports import muGrid
+
 from python_common_tests import *
-# from python_field_tests import *  # currently not running BUG # TODO(RLeute): fix this bug!
-from python_file_io_test import FileIOTest
+from python_communicator_tests import *
+from python_field_tests import *
 
-from python_communicator_tests import Communicator_Check
-
-from python_communicator_tests import Communicator_Check
+if 'FileIONetCDF' in dir(muGrid):
+    from python_file_io_test import FileIOTest
 
 if __name__ == '__main__':
     unittest.main()

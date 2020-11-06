@@ -46,6 +46,7 @@
 #include "cell/cell.hh"
 
 #include <libmugrid/mapped_field.hh>
+#include <libmugrid/field_map_static.hh>
 
 namespace muSpectre {
 
@@ -69,6 +70,24 @@ namespace muSpectre {
     using TangentMap_t =
         muGrid::T4FieldMap<Real, Mapping::Mut, DimM, IterUnit::SubPt>;
 
+    /*
+    //! local field_collections used for internals
+    // using LFieldColl_t = muGrid::LocalFieldCollection;
+    //! local Lame constant, plastic increment, stress threshold type
+    // using ScalarMap_t = muGrid::internal::ScalarMap<Real>;
+    using ScalarMap_t =
+        muGrid::MappedScalarField<Real, Mapping::Mut, IterUnit::SubPt>;
+
+    //! storage type for eigen strain (is updated from outside)
+    // using EigenStrainMap_t =
+    //     muGrid::MatrixFieldMap<LFieldColl_t, Real, DimM, DimM>;
+
+    //! stochastic plasticity internal variables (Lame 1, Lame 2, eigen strain,
+    //! overloaded_pixels)
+    using InternalVariables =
+        std::tuple<ScalarMap_t, ScalarMap_t, StrainMap_t>;
+    */
+
     //! declare what type of strain measure your law takes as input
     constexpr static auto strain_measure{StrainMeasure::GreenLagrange};
     //! declare what type of stress measure your law yields as output
@@ -76,7 +95,7 @@ namespace muSpectre {
   };
 
   /**
-   * implements stochastic plasticity with an eigenstrain, Lame constants and
+   * implements stochastic plasticity with an eigenstrain, Lameconstants and
    * plastic flow per pixel.
    */
   template <Index_t DimM>
@@ -93,6 +112,9 @@ namespace muSpectre {
 
     //! traits of this material
     using traits = MaterialMuSpectre_traits<MaterialStochasticPlasticity>;
+
+    //! Type of container used for storing eigenstrain
+    // using InternalVariables = typename traits::InternalVariables;
 
     //! Hooke's law implementation
     using Hooke =
@@ -176,6 +198,11 @@ namespace muSpectre {
                             const EigenStrainArg_t & eigen_strain);
 
     /**
+     * return the empty internals tuple
+     */
+    // InternalVariables & get_internals() { return this->internal_variables; }
+
+    /**
      * set the plastic_increment on a single quadrature point
      **/
     void set_plastic_increment(const size_t & quad_pt_id,
@@ -231,6 +258,20 @@ namespace muSpectre {
                        Real, Eigen::Dynamic, Eigen::Dynamic>> & eigen_strain);
 
     /**
+     * overload add_pixel to write into local stiffness tensor
+     */
+    // template <Index_t nb_quad_pts_per_pixel>
+    void add_pixel(
+        const size_t & pixel_id, const Real & Youngs_modulus,
+        const Real & Poisson_ratio,
+        const Eigen::Ref<const Eigen::Matrix<Real, Eigen::Dynamic, 1>> &
+            plastic_increment,
+        const Eigen::Ref<const Eigen::Matrix<Real, Eigen::Dynamic, 1>> &
+            stress_threshold,
+        const Eigen::Ref<const Eigen::Matrix<Real, Eigen::Dynamic,
+                                             Eigen::Dynamic>> & eigen_strain);
+
+    /**
      * evaluate how many pixels have a higher stress than their stress threshold
      */
     inline decltype(auto)
@@ -271,8 +312,7 @@ namespace muSpectre {
     //! storage for first Lame constant 'lambda',
     //! second Lame constant(shear modulus) 'mu',
     //! plastic strain epsilon_p,
-    //! and a vector of overloaded (stress>stress_threshold) pixel
-    //! coordinates
+    //! and a vector of overloaded (stress>stress_threshold) pixel coordinates
     using Field_t =
         muGrid::MappedScalarField<Real, Mapping::Mut, IterUnit::SubPt>;
     using LTensor_Field_t =
@@ -284,6 +324,8 @@ namespace muSpectre {
     Field_t stress_threshold_field;
     LTensor_Field_t eigen_strain_field;
     std::vector<size_t> overloaded_quad_pts{};
+    //! tuple for iterable eigen_field
+    // InternalVariables internal_variables;
   };
 
   /* ---------------------------------------------------------------------- */
@@ -302,7 +344,6 @@ namespace muSpectre {
       s_t && E, const Real & lambda, const Real & mu,
       const EigenStrainArg_t & eigen_strain) -> decltype(auto) {
     muGrid::T4Mat<Real, DimM> C = Hooke::compute_C_T4(lambda, mu);
-    this->last_step_was_nonlinear = false;
     return std::make_tuple(
         this->evaluate_stress(std::forward<s_t>(E), lambda, mu, eigen_strain),
         C);
@@ -310,9 +351,9 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
-  decltype(auto)  // TypedField<GlobalFieldCollection<DimS>, Real> &
-  MaterialStochasticPlasticity<DimM>::identify_overloaded_quad_pts(
-      Cell & cell, Eigen::Ref<Vector_t> & stress_numpy_array) {
+  decltype(auto)
+      MaterialStochasticPlasticity<DimM>::identify_overloaded_quad_pts(
+          Cell & cell, Eigen::Ref<Vector_t> & stress_numpy_array) {
     muGrid::WrappedField<Real> stress_field{
         "temp input for stress field", cell.get_fields(), DimM * DimM,
         stress_numpy_array, QuadPtTag};
@@ -332,14 +373,16 @@ namespace muSpectre {
 
     //! loop over all pixels and check if stress overcomes the threshold or not
     for (const auto && pixel_threshold : threshold_map.enumerate_indices()) {
-      const auto & pixel_id{std::get<0>(pixel_threshold)};
+      const auto & pixel{std::get<0>(pixel_threshold)};
       const Real & threshold{std::get<1>(pixel_threshold)};
-      const auto & stress{stress_map[pixel_id]};
+      const auto & stress{stress_map[pixel]};
+      std::cout << "debug purpose overloaded quad pts: " << pixel << ", "
+                << threshold << ", " << stress << std::endl;
       // check if stress is larger than threshold,
       const Real sigma_eq{MatTB::compute_equivalent_von_Mises_stress(stress)};
       // if sigma_eq > threshold write pixel into Ccoord vector
       if ((sigma_eq > threshold) == 1) {  // (sigma_eq > threshold){
-        overloaded_quad_pts_ref.push_back(pixel_id);
+        overloaded_quad_pts_ref.push_back(pixel);
       }
     }
     return overloaded_quad_pts_ref;
@@ -350,13 +393,15 @@ namespace muSpectre {
   //! increment into the deviatoric stress direction by an absolute value given
   //! by the plastic_increment_field
   template <Index_t DimM>
-  decltype(auto) MaterialStochasticPlasticity<DimM>::update_eigen_strain_field(
-      Cell & cell, Eigen::Ref<Vector_t> & stress_numpy_array) {
+  decltype(auto)
+      MaterialStochasticPlasticity<DimM>::update_eigen_strain_field(
+          Cell & cell, Eigen::Ref<Vector_t> & stress_numpy_array) {
     muGrid::WrappedField<Real> stress_field{
         "temp input for stress field", cell.get_fields(), DimM * DimM,
         stress_numpy_array, QuadPtTag};
     return this->update_eigen_strain_field(stress_field);
   }
+
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
   void MaterialStochasticPlasticity<DimM>::update_eigen_strain_field(
@@ -367,7 +412,7 @@ namespace muSpectre {
     auto && eigen_strain_map{this->eigen_strain_field.get_map()};
     //! initialise plastic increment
     auto && plastic_increment_map{this->plastic_increment_field.get_map()};
-    //! loop over all overloaded_quad_pts
+    //! loop over all overloaded_pixels
     for (const auto & pixel : this->overloaded_quad_pts) {
       //!  1.) compute plastic_strain_direction = σ_dev/Abs[σ_dev]
       const auto & stress_map_pixel{stress_map[pixel]};
@@ -389,13 +434,13 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  //! archive_overloaded_quad_pts(), archives the overloaded pixels saved in
-  //! this->overloaded_quad_pts to the input vector avalanche_history and
-  //! empties overloaded_quad_pts.
+  //! archive_overloaded_pixels(), archives the overloaded pixels saved in
+  //! this->overloaded_pixels to the input vector avalanche_history and empties
+  //! overloaded_pixels.
   template <Index_t DimM>
   void MaterialStochasticPlasticity<DimM>::archive_overloaded_quad_pts(
       std::list<std::vector<size_t>> & avalanche_history) {
-    //!  1.) archive overloaded_quad_pts in avalanche_history
+    //!  1.) archive overloaded_pixels in avalanche_history
     avalanche_history.push_back(this->overloaded_quad_pts);
     //!  2.) clear overloaded pixels
     this->overloaded_quad_pts.clear();

@@ -307,6 +307,11 @@ void add_cell_helper(py::module & mod) {
             return cell.get_projection().get_nb_domain_grid_pts();
           })
       .def_property_readonly(
+          "nb_quad_pts",
+          [](Cell & cell) {
+            return cell.get_projection().get_nb_quad_pts();
+          })
+      .def_property_readonly(
           "domain_lengths",
           [](Cell & cell) {
             return cell.get_projection().get_domain_lengths();

@@ -59,7 +59,12 @@ namespace muSpectre {
         stress_threshold_field{this->get_prefix() + "threshold",
                                *this->internal_fields, QuadPtTag},
         eigen_strain_field{this->get_prefix() + "eigen strain",
-                           *this->internal_fields, QuadPtTag} {}
+                           *this->internal_fields, QuadPtTag},
+        overloaded_quad_pts{std::vector<size_t>()} {}
+  /*,
+        internal_variables{lambda_field.get_map(), mu_field.get_map(),
+        eigen_strain_field.get_map()}
+  */
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
@@ -74,6 +79,39 @@ namespace muSpectre {
       const size_t & pixel, const Real & Young_modulus,
       const Real & Poisson_ratio, const Real & plastic_increment,
       const Real & stress_threshold,
+      const Eigen::Ref<const Eigen::Matrix<Real, Eigen::Dynamic,
+                                           Eigen::Dynamic>> & eigen_strain) {
+    // check if the users input eigen strain has the right dimension
+    if (eigen_strain.cols() != DimM || eigen_strain.rows() != DimM) {
+      std::stringstream error{};
+      error << "Got a wrong shape " << std::to_string(eigen_strain.rows())
+            << "×" << std::to_string(eigen_strain.cols())
+            << " for the eigen strain matrix.\nI expected the shape: "
+            << std::to_string(DimM) << "×" << std::to_string(DimM);
+      throw muGrid::RuntimeError(error.str());
+      }
+    this->internal_fields->add_pixel(pixel);
+    // store the first(lambda) and second(mu) Lame constant in the field
+    Real lambda = Hooke::compute_lambda(Young_modulus, Poisson_ratio);
+    Real mu = Hooke::compute_mu(Young_modulus, Poisson_ratio);
+    this->lambda_field.get_field().push_back(lambda);
+    this->mu_field.get_field().push_back(mu);
+    this->plastic_increment_field.get_field().push_back(plastic_increment);
+    this->stress_threshold_field.get_field().push_back(stress_threshold);
+    const Eigen::Map<const Eigen::Array<Real, DimM * DimM, 1>> strain_map(
+        eigen_strain.data());
+    this->eigen_strain_field.get_field().push_back(strain_map);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Index_t DimM>  // , Index_t nb_quad_pts_per_pixel>
+  void MaterialStochasticPlasticity<DimM>::add_pixel(
+      const size_t & pixel, const Real & Young_modulus,
+      const Real & Poisson_ratio,
+      const Eigen::Ref<const Eigen::Matrix<Real, Eigen::Dynamic, 1>> &
+          plastic_increment,
+      const Eigen::Ref<const Eigen::Matrix<Real, Eigen::Dynamic, 1>> &
+          stress_threshold,
       const Eigen::Ref<const Eigen::Matrix<Real, Eigen::Dynamic,
                                            Eigen::Dynamic>> & eigen_strain) {
     // check if the users input eigen strain has the right dimension
@@ -148,6 +186,7 @@ namespace muSpectre {
     return eigen_strain_map[quad_pt_id];
   }
 
+  /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
   void MaterialStochasticPlasticity<DimM>::reset_overloaded_quad_pts() {
     this->overloaded_quad_pts.clear();

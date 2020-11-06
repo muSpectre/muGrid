@@ -120,6 +120,13 @@ if(APPLE)
     ${Boost_INCLUDE_DIR})
 endif()
 
+foreach(pytest ${PY_TEST_SRCS})
+  get_filename_component(pytest_name ${pytest} NAME)
+  configure_file(
+    ${pytest}
+    "${CMAKE_BINARY_DIR}/${pytest_name}"
+    COPYONLY)
+endforeach(pytest ${PY_TEST_SRCS})
 
 if (${MUSPECTRE_MAKE_TESTS})
   enable_testing()

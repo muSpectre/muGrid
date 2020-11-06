@@ -34,7 +34,9 @@
  */
 
 #include "libmugrid/file_io_base.hh"
+#ifdef WITH_NETCDF_IO
 #include "libmugrid/file_io_netcdf.hh"
+#endif
 #include "libmugrid/communicator.hh"
 
 #include <pybind11/pybind11.h>
@@ -43,12 +45,15 @@
 #include <string>
 #include <vector>
 
-using muGrid::FileIONetCDF;
 using muGrid::FileIOBase;
 using muGrid::FileFrame;
 using muGrid::Communicator;
 using muGrid::Index_t;
 using pybind11::literals::operator""_a;
+
+#ifdef WITH_NETCDF_IO
+using muGrid::FileIONetCDF;
+#endif
 
 namespace py = pybind11;
 
@@ -129,6 +134,12 @@ void add_file_io_base(py::module & mod) {
       .def("append_frame", &FileIOBase::append_frame,
            py::return_value_policy::reference_internal)
       .def("get_communicator", &FileIOBase::get_communicator);
+
+  py::enum_<FileIOBase::OpenMode>(file_io_base, "OpenMode")
+      .value("Read", FileIOBase::OpenMode::Read)
+      .value("Write", FileIOBase::OpenMode::Write)
+      .value("Append", FileIOBase::OpenMode::Append)
+      .export_values();
 }
 
 void add_file_frame(py::module & mod) {
@@ -148,6 +159,7 @@ void add_file_frame(py::module & mod) {
       .def("write", [](FileFrame & frame) { return frame.write(); });
 }
 
+#ifdef WITH_NETCDF_IO
 void add_file_io_netcdf(py::module & mod) {
   py::class_<FileIONetCDF, FileIOBase> file_io(mod, "FileIONetCDF");
   file_io
@@ -166,38 +178,39 @@ void add_file_io_netcdf(py::module & mod) {
                std::vector<std::string>{muGrid::REGISTER_ALL_FIELDS},
            "state_field_unique_prefixes"_a =
                std::vector<std::string>{muGrid::REGISTER_ALL_STATE_FIELDS})
-      .def("read",
-           [](FileIONetCDF & file_io_object, const Index_t & frame,
-              const std::vector<std::string> & field_names) {
-             file_io_object.read(frame, field_names);
-           },
-           "frame"_a, "field_names"_a)
-      .def("read",
-           [](FileIONetCDF & file_io_object, const Index_t & frame) {
-             file_io_object.read(frame);
-           },
-           "frame"_a)
-      .def("write",
-           [](FileIONetCDF & file_io_object, const Index_t & frame,
-              const std::vector<std::string> & field_names) {
-             file_io_object.write(frame, field_names);
-           },
-           "frame"_a, "field_names"_a)
-      .def("write",
-           [](FileIONetCDF & file_io_object, const Index_t & frame) {
-             file_io_object.write(frame);
-           },
-           "frame"_a);
-
-  py::enum_<FileIOBase::OpenMode>(file_io, "OpenMode")
-      .value("Read", FileIOBase::OpenMode::Read)
-      .value("Write", FileIOBase::OpenMode::Write)
-      .value("Append", FileIOBase::OpenMode::Append)
-      .export_values();
+      .def(
+          "read",
+          [](FileIONetCDF & file_io_object, const Index_t & frame,
+             const std::vector<std::string> & field_names) {
+            file_io_object.read(frame, field_names);
+          },
+          "frame"_a, "field_names"_a)
+      .def(
+          "read",
+          [](FileIONetCDF & file_io_object, const Index_t & frame) {
+            file_io_object.read(frame);
+          },
+          "frame"_a)
+      .def(
+          "write",
+          [](FileIONetCDF & file_io_object, const Index_t & frame,
+             const std::vector<std::string> & field_names) {
+            file_io_object.write(frame, field_names);
+          },
+          "frame"_a, "field_names"_a)
+      .def(
+          "write",
+          [](FileIONetCDF & file_io_object, const Index_t & frame) {
+            file_io_object.write(frame);
+          },
+          "frame"_a);
 }
+#endif
 
 void add_file_io_classes(py::module & mod) {
   add_file_io_base(mod);
   add_file_frame(mod);
+#ifdef WITH_NETCDF_IO
   add_file_io_netcdf(mod);
+#endif
 }

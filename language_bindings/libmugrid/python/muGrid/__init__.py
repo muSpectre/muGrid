@@ -41,8 +41,8 @@ from _muGrid import (get_domain_ccoord, get_domain_index, Pixel, StorageOrder,
                      SubPt, DynCcoord, DynRcoord, IterUnit, Verbosity,
                      GlobalFieldCollection, LocalFieldCollection, Unit)
 
+# FileIONetCDF is only compiled into the library if NetCDF libraries exist
 try:
-    # only available if compiled with NETCDF_IO
     from _muGrid import FileIONetCDF
 except ImportError:
     pass

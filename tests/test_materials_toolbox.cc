@@ -438,7 +438,7 @@ namespace muSpectre {
     if (verbose) {
       std::cout << "stress:\n" << stress << std::endl;
     }
-    const auto * p = &stress(0, 0);  // pointer to stress
+    const auto *p = &stress(0, 0);  // pointer to stress
     if (verbose) {
       std::cout << "*p: " << p << std::endl;
     }

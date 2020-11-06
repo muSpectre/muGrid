@@ -51,6 +51,9 @@ namespace muGrid {
   template <typename T>
   using DynMatrix_t = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
 
+  // template <typename T>
+  // using Matrix_t = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
+
 #ifdef WITH_MPI
 
   template <typename T, typename T2 = T>
@@ -172,9 +175,28 @@ namespace muGrid {
       return res;
     }
 
+    // //! sum reduction on EigenMatrix types
+    // template <typename T>
+    // DynMatrix_t<T> sum_mat(const Eigen::Ref<Matrix_t<T>> & arg) const;
+
     //! gather on EigenMatrix types
     template <typename T>
     DynMatrix_t<T> gather(const Eigen::Ref<DynMatrix_t<T>> & arg) const;
+
+    //! broadcast of scalar types
+    //! broadcasts arg from root to all processors and additionally returns the
+    //! broadcasted value in res (this is an overhead but usefull for the python
+    //! binding).
+    template <typename T>
+    T bcast(T & arg, const Int & root) {
+      if (comm == MPI_COMM_NULL) {
+        return arg;
+      } else {
+        MPI_Bcast(&arg, 1, mpi_type<T>(), root, this->comm);
+        T res = arg;
+        return res;
+      }
+    }
 
     MPI_Comm get_mpi_comm() { return this->comm; }
 
@@ -227,6 +249,13 @@ namespace muGrid {
 
     //! find whether the underlying communicator is mpi
     // TODO(pastewka) why do we need this?
+
+    //! broadcast of scalar types
+    template <typename T>
+    T bcast(T & arg, const Int &) {
+      return arg;
+    }
+
     static bool has_mpi() { return false; }
   };
 

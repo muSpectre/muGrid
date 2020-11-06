@@ -48,14 +48,19 @@ def init_cell(res, lens, formulation):
 
 def init_material(res, lens, formulation, young, poisson,
                   yield_stress, plastic_increment, eigen_strain):
+    print("init_material:")
     cell = init_cell(res, lens, formulation)
-    mat = µ.material.MaterialStochasticPlasticity_3d.make(cell,
-                                                          'test_mat')
+    mat = µ.material.MaterialStochasticPlasticity_3d.make(cell, 'test_mat')
     #init pixels
     for pixel_id, pixel in cell.pixels.enumerate():
+        print("pixel_id: ", pixel_id, "  pixel: ", tuple(pixel))
         mat.add_pixel(pixel_id, young, poisson, plastic_increment,
                       yield_stress[tuple(pixel)], eigen_strain)
-    cell.initialise()
+        # mat.add_pixel(pixel_id, young, poisson,
+        #               np.array([plastic_increment, plastic_increment]),
+        #               np.array([yield_stress[tuple(pixel)], yield_stress[tuple(pixel)]]),
+        #               eigen_strain)
+    mat.initialise()
     return cell, mat
 
 def stiffness_matrix(young, poisson, dim):
@@ -198,397 +203,511 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         cell, mat = init_material(self.res, self.lens, self.formulation,
                                   self.young, self.poisson, self.yield_stress,
                                   self.plastic_increment, self.eigen_strain)
-        pixel = list(range(self.dim))
+        quad_pt_id = 4
 
-        pixel_id = 0
         #read or set initial eigen strain
-        init_strain = np.copy(mat.get_eigen_strain(pixel_id))
+        init_strain = np.copy(mat.get_eigen_strain(quad_pt_id))
 
         #update eigen strain
         stress = np.zeros((self.dim, self.dim))
         stress_1 = 0.3
         stress[0,1] = stress_1
-        #TODO rleute
-        # sps.update_eigen_strain(mat, pixel, stress, self.dim)
+        sps.update_eigen_strain(mat, quad_pt_id, stress, self.dim)
 
-        # #read out updated eigen strain and proof
-        # updated_strain = mat.get_eigen_strain(pixel)
-        # analytic_strain = init_strain
-        # analytic_strain[0,1] = \
-        #     self.plastic_increment * stress_1 / np.sqrt(3/2 * stress_1**2)
-        # self.assertLess(np.linalg.norm(updated_strain - analytic_strain), 1e-8)
+        #read out updated eigen strain and proof
+        updated_strain = mat.get_eigen_strain(quad_pt_id)
+        analytic_strain = init_strain
+        analytic_strain[0,1] = \
+            self.plastic_increment * stress_1 / np.sqrt(3/2 * stress_1**2)
+        self.assertLess(np.linalg.norm(updated_strain - analytic_strain), 1e-8)
 
-        # #update eigen strain
-        # stress = np.zeros((self.dim, self.dim))
-        # stress_2 = 0.4
-        # stress[1,0] = stress_2
-        # sps.update_eigen_strain(mat, pixel, stress, self.dim)
 
-        # #read out updated eigen strain and proof
-        # updated_strain_2 = mat.get_eigen_strain(pixel)
-        # analytic_strain = updated_strain
-        # analytic_strain[1,0] = \
-        #     self.plastic_increment * stress_2 / np.sqrt(3/2 * stress_2**2)
-        # self.assertLess(
-        #     np.linalg.norm(updated_strain_2 - analytic_strain), 1e-8)
+
+        #update eigen strain
+        stress = np.zeros((self.dim, self.dim))
+        stress_2 = 0.4
+        stress[1,0] = stress_2
+        sps.update_eigen_strain(mat, quad_pt_id, stress, self.dim)
+
+        #read out updated eigen strain and proof
+        updated_strain_2 = mat.get_eigen_strain(quad_pt_id)
+        analytic_strain = updated_strain
+        analytic_strain[1,0] = \
+            self.plastic_increment * stress_2 / np.sqrt(3/2 * stress_2**2)
+        self.assertLess(
+            np.linalg.norm(updated_strain_2 - analytic_strain), 1e-8)
 
     def test_set_new_threshold(self):
         cell, mat = init_material(self.res, self.lens, self.formulation,
                                   self.young, self.poisson, self.yield_stress,
                                   self.plastic_increment, self.eigen_strain)
-        pixel = [0,1,2][:self.dim]
-        pixel_id = 0
+        quad_pt_id = 9
         # uniform distribution on the interval (a,b)
         a = 10
         b = 14
         inv_cum_dist_func = lambda z: a + (b-a)*z
 
-        ### write first time a threshold on the pixel
+        ### write first time a threshold on the quad point
+        np.random.seed()
+        seed = int(np.random.random()*1e8)
+        np.random.seed(seed)
+        sps.set_new_threshold(mat, quad_pt_id,
+                              inverse_cumulative_dist_func = inv_cum_dist_func)
+        np.random.seed(seed)
+        threshold_expected = inv_cum_dist_func(np.random.random())
+        threshold_read = mat.get_stress_threshold(quad_pt_id)
+
+        self.assertLess(threshold_expected - threshold_read, 1e-8)
+
+        ### write second time a threshold on the quad point
         np.random.seed()
         seed = int(np.random.random())
         np.random.seed(seed)
-        #TODO rleute
-        # sps.set_new_threshold(mat, pixel_id
-        #                       inverse_cumulative_dist_func = inv_cum_dist_func)
-        # np.random.seed(seed)
-        # threshold_expected = inv_cum_dist_func(np.random.random())
-        # threshold_read = mat.get_stress_threshold(pixel)
+        sps.set_new_threshold(mat, quad_pt_id,
+                              inverse_cumulative_dist_func = inv_cum_dist_func)
+        np.random.seed(seed)
+        threshold_expected = inv_cum_dist_func(np.random.random())
+        threshold_read = mat.get_stress_threshold(quad_pt_id)
 
-        # self.assertLess(threshold_expected - threshold_read, 1e-8)
+        self.assertLess(threshold_expected - threshold_read, 1e-8)
 
-        # ### write second time a threshold on the pixel
-        # np.random.seed()
-        # seed = int(np.random.random())
-        # np.random.seed(seed)
-        # sps.set_new_threshold(mat, pixel,
-        #                       inverse_cumulative_dist_func = inv_cum_dist_func)
-        # np.random.seed(seed)
-        # threshold_expected = inv_cum_dist_func(np.random.random())
-        # threshold_read = mat.get_stress_threshold(pixel)
+    # def test_propagate_avalanche_step(self):
+    #     """
+    #     Check if a single overloaded quad point breaks, at the right strain load.
+    #     """
+    #     strain_xy = 0.1
+    #     weak_quad_pt_id = 21
+    #     weak_pixel = [0, 1, 2] # corresponding pixel to the weak_quad_pt_id
 
-        # self.assertLess(threshold_expected - threshold_read, 1e-8)
+    #     ### analytic
+    #     #analytic compute the equivalent stress for a given strain 'strain_xy'
+    #     F = np.eye(self.dim)
+    #     F[0,1] = strain_xy
+    #     C = stiffness_matrix(self.young, self.poisson, self.dim)
+    #     E = green_lagrangian_strain_vector(F, self.dim)
+    #     PK2_analytic = PK2_tensor(C, E)
+    #     PK1_analytic = np.dot(F, PK2_analytic)
+    #     eq_stress = sigma_eq(PK1_analytic) #analytic computed equivalent stress
 
-    def test_propagate_avalanche_step(self):
-        """
-        Check if a single overloaded pixel breaks, at the right strain load.
-        """
-        strain_xy = 0.1
-        weak_pixel = (0,)*self.dim
+    #     ### numeric
+    #     #set the analytic computed equivalent stress reduced by a tiny amount as
+    #     #threshold for one "weak quad point" and the other thresholds to a little bit
+    #     #higher values.
+    #     fixed_yield_stress = np.ones(tuple(self.res)) * eq_stress * (1 + 1e-8)
+    #     fixed_yield_stress[weak_pixel] = 1 #eq_stress * (1 - 1e-8)
+    #     #init material
+    #     cell, mat = init_material(self.res, self.lens, self.formulation,
+    #                               self.young, self.poisson, fixed_yield_stress,
+    #                               self.plastic_increment, self.eigen_strain)
+    #     cg_solver = init_cg_solver(cell, self.cg_tol,
+    #                                self.maxiter, self.verbose)
+    #     #set the eigen strain field to the previous fixed deformation 'strain_xy'
+    #     strain_field = cell.strain.array()
+    #     for i in range(self.dim):
+    #         strain_field[i,i,...] = 1.0
+    #     strain_field[0,1,...] = strain_xy
+    #     #check if you can find the yielding quad point
+    #     overloaded_quad_pts = \
+    #         sps.propagate_avalanche_step(mat, cell, self.dim, cg_solver,
+    #                                      self.newton_tol, self.newton_equil_tol,
+    #                                      self.verbose)
 
-        ### analytic
-        #analytic compute the equivalent stress for a given strain 'strain_xy'
-        F = np.eye(self.dim)
-        F[0,1] = strain_xy
-        C = stiffness_matrix(self.young, self.poisson, self.dim)
-        E = green_lagrangian_strain_vector(F, self.dim)
-        PK2_analytic = PK2_tensor(C, E)
-        PK1_analytic = np.dot(F, PK2_analytic)
-        eq_stress = sigma_eq(PK1_analytic) #analytic computed equivalent stress
+    #     print("overloaded quad pts: ", overloaded_quad_pts)
+    #     self.assertTrue(len(overloaded_quad_pts) == 1)
+    #     self.assertTrue(overloaded_quad_pts == weak_quad_pt_id)
 
-        ### numeric
-        #set the analytic computed equivalent stress reduced by a tiny amount as
-        #threshold for one "weak pixel" and the other thresholds to a little bit
-        #higher values.
-        fixed_yield_stress = np.ones(tuple(self.res)) * eq_stress * (1 + 1e-8)
-        fixed_yield_stress[weak_pixel] = eq_stress * (1 - 1e-8)
-        #init material
-        cell, mat = init_material(self.res, self.lens, self.formulation,
-                                  self.young, self.poisson, fixed_yield_stress,
-                                  self.plastic_increment, self.eigen_strain)
-        cg_solver = init_cg_solver(cell, self.cg_tol,
-                                   self.maxiter, self.verbose)
-        #set the eigen strain field to the previous fixed deformation 'strain_xy'
-        strain_field = cell.strain.array((self.dim, self.dim))
-        for i in range(self.dim):
-            strain_field[i,i,...] = 1.0
-        strain_field[0,1,...] = strain_xy
-        #check if you can find the yielding pixel
-        overloaded_pixels = \
-            sps.propagate_avalanche_step(mat, cell, self.dim, cg_solver,
-                                         self.newton_tol, self.newton_equil_tol,
-                                         self.verbose)
+    # def test_reshape_avalanche_history(self):
+    #     """
+    #     Reshapes the nested avalanche history list with nana
+    #     """
+    #     dim = 3
+    #     ava_hist_list = [np.array([[13, 12, 6]]),
+    #                      np.array([[13, 12, 6]]),
+    #                      np.array([[13, 12, 6], [13, 13, 5]])]
+    #     ava_ha = sps.reshape_avalanche_history(ava_hist_list, dim)
 
-        #TODO rleute        # self.assertTrue(len(overloaded_pixels) == 1)
-        # self.assertTrue(overloaded_pixels[0] == list(weak_pixel))
+    #     expected = np.array([[[    13,     12,      6],
+    #                           [np.nan, np.nan, np.nan]],
+    #                          [[    13,     12,      6],
+    #                           [np.nan, np.nan, np.nan]],
+    #                          [[    13,     12,      6],
+    #                           [    13,     13,      5]]])
 
-    def test_reshape_avalanche_history(self):
-        """
-        Reshapes the nested avalanche history list with nana
-        """
-        dim = 3
-        ava_hist_list = [np.array([[13, 12, 6]]),
-                         np.array([[13, 12, 6]]),
-                         np.array([[13, 12, 6], [13, 13, 5]])]
-        ava_ha = sps.reshape_avalanche_history(ava_hist_list, dim)
+    #     self.assertIsInstance(ava_ha, np.ndarray)
+    #     self.assertTrue(((ava_ha == expected) |
+    #                      (np.isnan(ava_ha) & np.isnan(expected))).all())
 
-        expected = np.array([[[    13,     12,      6],
-                              [np.nan, np.nan, np.nan]],
-                             [[    13,     12,      6],
-                              [np.nan, np.nan, np.nan]],
-                             [[    13,     12,      6],
-                              [    13,     13,      5]]])
+    # def test_compute_average_deformation_gradient(self):
+    #     """
+    #     Tests if the "field average" is correctly computed.
+    #     """
+    #     for d in range(2,4):
+    #         ### 1. ###
+    #         one_field = np.ones((d,d) + (4,)*d)
+    #         average = sps.compute_average_deformation_gradient(one_field, d)
+    #         expected_average = np.ones((d,d))
+    #         self.assertTrue((average == expected_average).all())
 
-        self.assertIsInstance(ava_ha, np.ndarray)
-        self.assertTrue(((ava_ha == expected) |
-                         (np.isnan(ava_ha) & np.isnan(expected))).all())
+    #         ### 2. ###
+    #         expected = np.arange(d**2).reshape((d,)*2)
+    #         field = np.tensordot(expected, np.ones(([5,6,7][:d])), axes=0)
+    #         np.random.seed(1568794)
+    #         noise = (np.random.random((d,)*2 + tuple([5,6,7][:d])) - 0.5)*1e-3
+    #         noise_field = field + noise
+    #         average = sps.compute_average_deformation_gradient(noise_field, d)
+    #         self.assertLess(np.linalg.norm(expected-average),
+    #                         [1.6e-4,7.4e-5][d-2])
 
-    def test_compute_average_deformation_gradient(self):
-        """
-        Tests if the "field average" is correctly computed.
-        """
-        for d in range(2,4):
-            ### 1. ###
-            one_field = np.ones((d,d) + (4,)*d)
-            average = sps.compute_average_deformation_gradient(one_field, d)
-            expected_average = np.ones((d,d))
-            self.assertTrue((average == expected_average).all())
+    # def test_bracket_search(self):
+    #     """
+    #     Tests:
+    #     1. Test if bracket search find the exact yield point for one pixel with
+    #        a lower yield threshold than the others.
+    #     2. Test exception for two/n pixels with very close yield criterion. Thus
+    #        they should break together(hence avalanche can start for n>= 2 pixel)
+    #     3. Test if an error is raised when the maximum allowed bracket steps are
+    #        reached.
+    #     """
+    #     ### ------- 1. ------- ###
+    #     # init data
+    #     low_yield_stress = 10.0
+    #     yield_surface_accuracy = 1e-7 #low accuracy for short test times
+    #     n_max_bracket_search   = 4
 
-            ### 2. ###
-            expected = np.arange(d**2).reshape((d,)*2)
-            field = np.tensordot(expected, np.ones(([5,6,7][:d])), axes=0)
-            np.random.seed(1568794)
-            noise = (np.random.random((d,)*2 + tuple([5,6,7][:d])) - 0.5)*1e-3
-            noise_field = field + noise
-            average = sps.compute_average_deformation_gradient(noise_field, d)
-            self.assertLess(np.linalg.norm(expected-average),
-                            [1.6e-4,7.4e-5][d-2])
+    #     g_01 = 0.07268800332367435 #final deformation
+    #     strain_init = np.array([[1, g_01 - yield_surface_accuracy*1.75, 0],
+    #                             [0,  1  ,0],
+    #                             [0,  0  ,1]])
 
-    def test_bracket_search(self):
-        """
-        Tests:
-        1. Test if bracket search find the exact yield point for one pixel with
-           a lower yield threshold than the others.
-        2. Test exception for two/n pixels with very close yield criterion. Thus
-           they should break together(hence avalanche can start for n>= 2 pixel)
-        3. Test if an error is raised when the maximum allowed bracket steps are
-           reached.
-        """
-        ### ------- 1. ------- ###
-        # init data
-        low_yield_stress = 10.0
-        yield_surface_accuracy = 1e-7 #low accuracy for short test times
-        n_max_bracket_search   = 4
+    #     fixed_yield_stress = np.ones(tuple(self.res))*14 #high threshold
+    #     fixed_yield_stress[0,0,0] = low_yield_stress
+    #     cell, mat = init_material(self.res, self.lens, self.formulation,
+    #                               self.young, self.poisson, fixed_yield_stress,
+    #                               self.plastic_increment, self.eigen_strain)
+    #     cg_solver = init_cg_solver(cell, self.cg_tol,
+    #                                self.maxiter, self.verbose)
+    #     DelF_initial = np.zeros((self.dim, self.dim))
+    #     DelF_initial[0,1] = yield_surface_accuracy
 
-        g_01 = 0.07268800332367435 #final deformation
-        strain_init = np.array([[1, g_01 - yield_surface_accuracy*1.75, 0],
-                                [0,  1  ,0],
-                                [0,  0  ,1]])
+    #     #initialize cell with unit-matrix deformation gradient
+    #     cell_strain = cell.strain
+    #     cell_strain = np.tensordot(strain_init,
+    #                                np.ones(cell.nb_subdomain_grid_pts),
+    #                                axes=0)
 
-        fixed_yield_stress = np.ones(tuple(self.res))*14 #high threshold
-        fixed_yield_stress[0,0,0] = low_yield_stress
-        cell, mat = init_material(self.res, self.lens, self.formulation,
-                                  self.young, self.poisson, fixed_yield_stress,
-                                  self.plastic_increment, self.eigen_strain)
-        cg_solver = init_cg_solver(cell, self.cg_tol,
-                                   self.maxiter, self.verbose)
-        DelF_initial = np.zeros((self.dim, self.dim))
-        DelF_initial[0,1] = yield_surface_accuracy
+    #     print("Before test")
+    #     next_DelF_guess, PK2, F, breaking_pixel = \
+    #         sps.bracket_search(mat, cell, cg_solver, self.newton_tol,
+    #                            self.newton_equil_tol, yield_surface_accuracy,
+    #                            n_max_bracket_search, DelF_initial, self.verbose)
+    #     print("After test")
 
-        #initialize cell with unit-matrix deformation gradient
-        cell_strain = cell.strain.array((self.dim, self.dim))
-        np.squeeze(cell_strain)[:] = np.tensordot(
-            strain_init,
-            np.ones(cell.nb_subdomain_grid_pts),
-            axes=0)
+    #     #Is it exactly one breaking pixel and if yes is it pixel [0,0,0]?
+    #     self.assertEqual(len(breaking_pixel), 1)
+    #     self.assertTrue((breaking_pixel[0] == [0, 0, 0]).all())
 
-        #TODO(rleute) Bracket search forever
-        # next_DelF_guess, PK2, F, breaking_pixel = \
-        #     sps.bracket_search(mat, cell, cg_solver, self.newton_tol,
-        #                        self.newton_equil_tol, yield_surface_accuracy,
-        #                        n_max_bracket_search, DelF_initial, self.verbose,
-        #                        test_mode = True)
+    #     ### plug in the numeric result into the analytic formula and see if one
+    #     #   gets out the exact yield stress (low_yield_stress)
+    #     F_numeric = µ.gradient_integration.reshape_gradient(
+    #         F, self.res)[(0,)*self.dim]
+    #     C = stiffness_matrix(self.young, self.poisson, self.dim)
+    #     E = green_lagrangian_strain_vector(F_numeric, self.dim)
+    #     PK2_analytic = PK2_tensor(C, E)
+    #     #TODO(RLeute): change to PK2 if material_stochastic_plasticity returns PK2
+    #     #eq_pk2    = sigma_eq(PK2_analytic)
+    #     #print("eq_stress PK2: ", eq_pk2)
+    #     PK1_analytic = np.dot(F_numeric, PK2_analytic)
+    #     eq_stress = sigma_eq(PK1_analytic)
 
-        # #Is it exactly one breaking pixel and if yes is it pixel [0,0,0]?
-        # self.assertEqual(len(breaking_pixel), 1)
-        # self.assertTrue((breaking_pixel[0] == [0, 0, 0]).all())
+    #     #Is the analytic yield stress equivalent to yield stress of pix(0,0,0)?
+    #     self.assertLess(np.abs(low_yield_stress - eq_stress), 4e-3)
 
-        # ### plug in the numeric result into the analytic formula and see if one
-        # #   gets out the exact yield stress (low_yield_stress)
-        # F_numeric = µ.gradient_integration.reshape_gradient(
-        #     F, self.res)[(0,)*self.dim]
-        # C = stiffness_matrix(self.young, self.poisson, self.dim)
-        # E = green_lagrangian_strain_vector(F_numeric, self.dim)
-        # PK2_analytic = PK2_tensor(C, E)
-        # #TODO(RLeute): change to PK2 if material_stochastic_plasticity returns PK2
-        # #eq_pk2    = sigma_eq(PK2_analytic)
-        # #print("eq_stress PK2: ", eq_pk2)
-        # PK1_analytic = np.dot(F_numeric, PK2_analytic)
-        # eq_stress = sigma_eq(PK1_analytic)
+    #     #Is the computed deformation gradient F_numeric correct?
+    #     F_yield10 = np.array([[1, g_01,0],
+    #                           [0,  1  ,0],
+    #                           [0,  0  ,1]])
+    #     self.assertLess(np.linalg.norm(F_yield10-F_numeric),
+    #                       yield_surface_accuracy)
 
-        # #Is the analytic yield stress equivalent to yield stress of pix(0,0,0)?
-        # self.assertLess(np.abs(low_yield_stress - eq_stress), 4e-3)
+    #     ### ------- 2. ------- ###
+    #     # init data
+    #     low_yield_stress = 10.0
+    #     yield_surface_accuracy = 1e-8 #low accuracy for short test times
+    #     small_yield_difference = \
+    #                 low_yield_stress * yield_surface_accuracy**2 * 1e-2
+    #     #set the initial deformation close to the final deformation to reduce
+    #     #the needed bracket search steps
+    #     g_01 = 0.07268800332367393591 #final deformation
+    #     strain_init = np.array([[1, g_01 - yield_surface_accuracy**2*1.75, 0],
+    #                             [0,  1  ,0],
+    #                             [0,  0  ,1]])
+    #     n_max_bracket_search   = 4
 
-        # #Is the computed deformation gradient F_numeric correct?
-        # F_yield10 = np.array([[1, g_01,0],
-        #                       [0,  1  ,0],
-        #                       [0,  0  ,1]])
-        # self.assertLess(np.linalg.norm(F_yield10-F_numeric),
-        #                   yield_surface_accuracy)
+    #     fixed_yield_stress = np.ones(tuple(self.res))*14 #high threshold
+    #     fixed_yield_stress[0,0,0] = low_yield_stress
+    #     fixed_yield_stress[tuple([i//2 for i in self.res])] = \
+    #         low_yield_stress + small_yield_difference
+    #     cell, mat = init_material(self.res, self.lens, self.formulation,
+    #                               self.young, self.poisson, fixed_yield_stress,
+    #                               self.plastic_increment, self.eigen_strain)
+    #     cg_solver = init_cg_solver(cell, self.cg_tol,
+    #                                self.maxiter, self.verbose)
+    #     DelF_initial = np.zeros((self.dim, self.dim))
+    #     DelF_initial[0,1] = yield_surface_accuracy**2
 
-        # ### ------- 2. ------- ###
-        # # init data
-        # low_yield_stress = 10.0
-        # yield_surface_accuracy = 1e-8 #low accuracy for short test times
-        # small_yield_difference = \
-        #             low_yield_stress * yield_surface_accuracy**2 * 1e-2
-        # #set the initial deformation close to the final deformation to reduce
-        # #the needed bracket search steps
-        # g_01 = 0.07268800332367393591 #final deformation
-        # strain_init = np.array([[1, g_01 - yield_surface_accuracy**2*1.75, 0],
-        #                         [0,  1  ,0],
-        #                         [0,  0  ,1]])
-        # n_max_bracket_search   = 4
+    #     #initialize cell with deformation gradient for fast convergence
+    #     cell_strain = cell.strain
+    #     cell_strain[:] = np.tensordot(strain_init,
+    #                                   np.ones(cell.nb_subdomain_grid_pts),
+    #                                   axes=0)
 
-        # fixed_yield_stress = np.ones(tuple(self.res))*14 #high threshold
-        # fixed_yield_stress[0,0,0] = low_yield_stress
-        # fixed_yield_stress[tuple([i//2 for i in self.res])] = \
-        #     low_yield_stress + small_yield_difference
-        # cell, mat = init_material(self.res, self.lens, self.formulation,
-        #                           self.young, self.poisson, fixed_yield_stress,
-        #                           self.plastic_increment, self.eigen_strain)
-        # cg_solver = init_cg_solver(cell, self.cg_tol,
-        #                            self.maxiter, self.verbose)
-        # DelF_initial = np.zeros((self.dim, self.dim))
-        # DelF_initial[0,1] = yield_surface_accuracy**2
+    #     with warnings.catch_warnings(record=True) as w:
+    #         warnings.simplefilter("always") #all warnings be triggered.
+    #         next_DelF_guess, PK2, F, breaking_pixel = \
+    #             sps.bracket_search(mat, cell, cg_solver, self.newton_tol,
+    #                                self.newton_equil_tol, yield_surface_accuracy,
+    #                                n_max_bracket_search, DelF_initial,
+    #                                self.verbose)
+    #         self.assertTrue(len(w) == 1)
+    #         self.assertTrue(issubclass(w[-1].category, RuntimeWarning))
+    #         self.assertTrue("bracket_search found 2 pixels overcoming their "
+    #                 "yield threshold for the final deformation. To initialise "
+    #                 "the avalanche think about using the parameter 'single_pixel"
+    #                 "_start' of 'propagate_avalanche()' to start the avalanche "
+    #                 "from a single pixel!" == str(w[-1].message))
+    #     #Are there exactly two breaking pixels, [0,0,0] and [nx//2,ny//2,nz//2]?
+    #     self.assertEqual(len(breaking_pixel), 2)
+    #     self.assertTrue(
+    #         (breaking_pixel == [[0,0,0], [i//2 for i in self.res]]).all())
 
-        # #initialize cell with deformation gradient for fast convergence
-        # cell_strain = cell.strain.array((self.dim, self.dim))
-        # np.squeeze(cell_strain)[:] = np.tensordot(strain_init,
-        #                               np.ones(cell.nb_subdomain_grid_pts),
-        #                               axes=0)
+    #     ### ------- 3. ------- ###
+    #     #use the initalization from the last test
+    #     n_max_bracket_search = 2
+    #     DelF_initial = np.zeros((self.dim, self.dim))
+    #     DelF_initial[0,1] = 0.1
+    #     with self.assertRaises(RuntimeError):
+    #         sps.bracket_search(mat, cell, cg_solver,
+    #                            self.newton_tol, self.newton_equil_tol,
+    #                            yield_surface_accuracy, n_max_bracket_search,
+    #                            DelF_initial, self.verbose)
 
-        # with warnings.catch_warnings(record=True) as w:
-        #     warnings.simplefilter("always") #all warnings be triggered.
-        #     next_DelF_guess, PK2, F, breaking_pixel = \
-        #         sps.bracket_search(mat, cell, cg_solver, self.newton_tol,
-        #                            self.newton_equil_tol, yield_surface_accuracy,
-        #                            n_max_bracket_search, DelF_initial,
-        #                            self.verbose, test_mode = True)
-        #     self.assertTrue(len(w) == 1)
-        #     self.assertTrue(issubclass(w[-1].category, RuntimeWarning))
-        #     self.assertTrue("The avalanche starts with 2 initially "
-        #                     "plastically deforming pixels, instead of starting "
-        #                     "with one pixel!" == str(w[-1].message))
-        # #Are there exactly two breaking pixels, [0,0,0] and [nx//2,ny//2,nz//2]?
-        # self.assertEqual(len(breaking_pixel), 2)
-        # self.assertTrue(
-        #     (breaking_pixel == [[0,0,0], [i//2 for i in self.res]]).all())
+    # def test_propagate_avalanche(self):
+    #     """
+    #     Tests:
+    #     1. Test if plastic deformations are done in the right order and at the
+    #        right place!
+    #     2. Test if initially_overloaded_pixels behaves right.
+    #     3. Test the parameter "single_pixel_start"
+    #     """
+    #     ### ------- 1. ------- ###
+    #     ### init parameters
+    #     res  = [5,5,5]
+    #     lens = [1,1,1]
+    #     dim  = len(res)
+    #     strain_xy_1 = 0.01
+    #     plastic_increment = strain_xy_1 * 10
+    #     expected_ava_history = np.array([[[ 3.,  3.,  3.],
+    #                                       [np.nan, np.nan, np.nan]],
+    #                                      [[ 2.,  2.,  3.],
+    #                                       [ 4.,  4.,  3.]]])
 
-        # ### ------- 3. ------- ###
-        # #use the initalization from the last test
-        # n_max_bracket_search = 2
-        # DelF_initial = np.zeros((self.dim, self.dim))
-        # DelF_initial[0,1] = 0.1
-        # with self.assertRaises(RuntimeError):
-        #     sps.bracket_search(mat, cell, cg_solver,
-        #                        self.newton_tol, self.newton_equil_tol,
-        #                        yield_surface_accuracy, n_max_bracket_search,
-        #                        DelF_initial, self.verbose)
+    #     ### analytic compute eq_stress_1 for a given strain 'strain_xy_1'
+    #     F = np.eye(self.dim)
+    #     F[0,1] = strain_xy_1
+    #     C = stiffness_matrix(self.young, self.poisson, self.dim)
+    #     E = green_lagrangian_strain_vector(F, self.dim)
+    #     PK2_analytic = PK2_tensor(C, E)
+    #     PK1_analytic = np.dot(F, PK2_analytic)
+    #     eq_stress = sigma_eq(PK1_analytic) #analytic computed equivalent stress
 
-    def test_propagate_avalanche(self):
-        """
-        Test if plastic deformations are done in the right order and at the
-        right place!
-        """
-        ### init parameters
-        res  = [5,5,5]
-        lens = [1,1,1]
-        dim  = len(res)
-        strain_xy_1 = 0.01
-        plastic_increment = strain_xy_1 * 10
-        expected_ava_history = np.array([[[ 3.,  3.,  3.],
-                                          [np.nan, np.nan, np.nan]],
-                                         [[ 2.,  2.,  3.],
-                                          [ 4.,  4.,  3.]]])
+    #     eq_stress_1 = eq_stress
+    #     eq_stress_2 = eq_stress * 1.05
 
-        ### analytic compute eq_stress_1 for a given strain 'strain_xy_1'
-        F = np.eye(self.dim)
-        F[0,1] = strain_xy_1
-        C = stiffness_matrix(self.young, self.poisson, self.dim)
-        E = green_lagrangian_strain_vector(F, self.dim)
-        PK2_analytic = PK2_tensor(C, E)
-        PK1_analytic = np.dot(F, PK2_analytic)
-        eq_stress = sigma_eq(PK1_analytic) #analytic computed equivalent stress
+    #     ### init material, with fine tuned order of stress thresholds
+    #     fixed_yield_stress = np.ones(tuple(res))*17 #high threshold
+    #     fixed_yield_stress[3,3,3] = eq_stress_1
+    #     fixed_yield_stress[4,4,3] = eq_stress_2
+    #     fixed_yield_stress[2,2,3] = eq_stress_2
+    #     cell, mat = init_material(res, lens, self.formulation,
+    #                               self.young, self.poisson, fixed_yield_stress,
+    #                               plastic_increment, self.eigen_strain)
+    #     cg_solver = init_cg_solver(cell, self.cg_tol,
+    #                                self.maxiter, self.verbose)
 
-        eq_stress_1 = eq_stress
-        eq_stress_2 = eq_stress * 1.05
+    #     ### overload one pixel which breaks and by its plastic increment
+    #     ### overloads two additional pixels.
 
-        ### init material, with fine tuned order of stress thresholds
-        fixed_yield_stress = np.ones(tuple(res))*17 #high threshold
-        fixed_yield_stress[3,3,3] = eq_stress_1
-        fixed_yield_stress[4,4,3] = eq_stress_2
-        fixed_yield_stress[2,2,3] = eq_stress_2
-        cell, mat = init_material(res, lens, self.formulation,
-                                  self.young, self.poisson, fixed_yield_stress,
-                                  plastic_increment, self.eigen_strain)
-        cg_solver = init_cg_solver(cell, self.cg_tol,
-                                   self.maxiter, self.verbose)
+    #     #propagate the avalanche
+    #     yield_surface_accuracy = 1e-8
+    #     n_max_bracket_search = 5
+    #     #set the eigen strain field to the previous fixed deformation 'strain_xy'
+    #     strain_field = cell.get_strain().reshape((dim,)*2+tuple(res))
+    #     for i in range(self.dim):
+    #         strain_field[i,i,...] = 1.0
+    #     strain_field[0,1,...] = strain_xy_1 - yield_surface_accuracy*1.25
+    #     DelF_init = np.zeros((dim, dim))
+    #     DelF_init[0,1] = yield_surface_accuracy
+    #     n_max_avalanche = 10
+    #     i_cdf = lambda z: 17 #constant value
 
-        ### overload one pixel which breaks and by its plastic increment
-        ### overloads two additional pixels.
+    #     DelF, PK2, F, breaking_pixel = \
+    #         sps.bracket_search(mat, cell, cg_solver, self.newton_tol,
+    #                            self.newton_equil_tol, yield_surface_accuracy,
+    #                            n_max_bracket_search, DelF_init, self.verbose)
 
-        #propagate the avalanche
-        yield_surface_accuracy = 1e-8
-        n_max_bracket_search = 5
-        #set the eigen strain field to the previous fixed deformation 'strain_xy'
-        strain_field = cell.strain.array((self.dim, self.dim))
-        for i in range(self.dim):
-            strain_field[i,i,...] = 1.0
-        strain_field[0,1,...] = strain_xy_1 - yield_surface_accuracy*1.25
-        DelF_init = np.zeros((dim, dim))
-        DelF_init[0,1] = yield_surface_accuracy
-        n_max_avalanche = 10
-        i_cdf = lambda z: 17 #constant value
-        def save_and_test_ava(n_strain_loop, ava_history, PK2_initial,
-                              F_initial, PK2_final, F_final, communicator):
-            self.assertTrue(
-                np.isclose(ava_history, expected_ava_history, equal_nan=True)
-                .all())
+    #     def save_and_test_ava(n_strain_loop, ava_history):
+    #         self.assertTrue(
+    #             np.isclose(ava_history, expected_ava_history, equal_nan=True)
+    #             .all())
 
-        # TODO rleute (bracket search forever)
-        # DelF, PK2, F, breaking_pixel = \
-        #     sps.bracket_search(mat, cell, cg_solver, self.newton_tol,
-        #                        self.newton_equil_tol, yield_surface_accuracy,
-        #                        n_max_bracket_search, DelF_init, self.verbose,
-        #                        test_mode = True)
-        # #initial pixel is [3,3,3]
-        # self.assertTrue((breaking_pixel == [[3,3,3]]).all())
+    #     def save_and_test_stress_strain(n_strain_loop, PK2_initial, F_initial,
+    #                                     PK2_final, F_final, cell):
+    #         #check if at least stress and strain have the right dimensions
+    #         self.assertTrue(PK2_initial.shape == tuple(res) + (dim,)*2)
+    #         self.assertTrue(F_initial.shape == tuple(res) + (dim,)*2)
+    #         self.assertTrue(PK2_final.shape == tuple(res) + (dim,)*2)
+    #         self.assertTrue(F_final.shape == tuple(res) + (dim,)*2)
+    #         #check the initial stress and the initial strain
+    #         self.assertTrue(np.array_equal(PK2_initial,
+    #             µ.gradient_integration.reshape_gradient(PK2, res)))
+    #         self.assertTrue(np.array_equal(F_initial,
+    #             µ.gradient_integration.reshape_gradient(F, res)))
 
-        
-        # sps.propagate_avalanche(mat, cell, cg_solver, self.newton_tol,
-        #     self.newton_equil_tol, PK2, F, n_max_avalanche, self.verbose,
-        #     inverse_cumulative_dist_func = i_cdf,
-        #     save_avalanche = save_and_test_ava, n_strain_loop = 0)
+    #     #initial pixel is [3,3,3]
+    #     self.assertTrue((breaking_pixel == [[3,3,3]]).all())
 
+    #     sps.propagate_avalanche(mat, cell, cg_solver, self.newton_tol,
+    #         self.newton_equil_tol, PK2, F, n_max_avalanche, self.verbose,
+    #         inverse_cumulative_dist_func = i_cdf,
+    #         save_avalanche = save_and_test_ava,
+    #         save_stress_strain = save_and_test_stress_strain, n_strain_loop = 0)
 
-    def test_strain_cell(self):
-        """
-        Tests:
-        1. Test if the function reaches the required deformation
-        2. Small deformation with only one avalanche. Check:
-            - avalanche pixel index
-            - PK2, stress field
-            - F, deformation gradient field
-        """
-        ### ------- 1. ------- ###
-        DelF      = np.zeros((self.dim,self.dim))
-        DelF[0,1] = 0.0001
-        F_tot      = np.eye(self.dim)
-        F_tot[0,1] = 0.0002
-        cell, mat = init_material(self.res, self.lens, self.formulation,
-                                  self.young, self.poisson,
-                                  self.yield_stress,
-                                  self.plastic_increment, self.eigen_strain)
-        cg_solver = init_cg_solver(cell, self.cg_tol, self.maxiter,
-                                   self.verbose)
-        #TODO rleute
-        # F_fin = sps.strain_cell(mat, cell, cg_solver, self.newton_tol,
-        #                         self.newton_equil_tol, DelF, F_tot,
-        #                         self.yield_surface_accuracy,
-        #                         self.n_max_strain_loop,
-        #                         self.n_max_bracket_search,
-        #                         self.n_max_avalanche, self.verbose,
-        #                         self.inverse_cumulative_dist_func,
-        #                         save_avalanche = None)
-        # #is the reached deformation larger or almost equal to the required one
-        # self.assertTrue(((F_fin-F_tot) > -1e-16).all())
+    #     ### ------- 2. ------- ###
+    #     cell, mat = init_material(res, lens, self.formulation,
+    #                               self.young, self.poisson, fixed_yield_stress,
+    #                               plastic_increment, self.eigen_strain)
+    #     cg_solver = init_cg_solver(cell, self.cg_tol,
+    #                                self.maxiter, self.verbose)
+    #     #set the eigen strain field to the previous fixed deformation 'strain_xy'
+    #     strain_field = cell.strain
+    #     for i in range(self.dim):
+    #         strain_field[i,i,...] = 1.0
+    #     strain_field[0,1,...] = strain_xy_1 - yield_surface_accuracy*1.25
+
+    #     DelF, PK2, F, breaking_pixel = \
+    #         sps.bracket_search(mat, cell, cg_solver, self.newton_tol,
+    #                            self.newton_equil_tol, yield_surface_accuracy,
+    #                            n_max_bracket_search, DelF_init, self.verbose)
+    #     #initial pixel is [3,3,3]
+    #     self.assertTrue((breaking_pixel == [[3,3,3]]).all())
+
+    #     sps.propagate_avalanche(mat, cell, cg_solver, self.newton_tol,
+    #         self.newton_equil_tol, PK2, F, n_max_avalanche, self.verbose,
+    #         initially_overloaded_pixels = breaking_pixel,
+    #         inverse_cumulative_dist_func = i_cdf,
+    #         save_avalanche = save_and_test_ava,
+    #         save_stress_strain = save_and_test_stress_strain, n_strain_loop = 0)
+
+    #     ### ------- 3. ------- ###
+    #     ### init material, with two pixels of the same yield strength
+    #     fixed_yield_stress = np.ones(tuple(res))*17 #high threshold
+    #     fixed_yield_stress[1,1,1] = eq_stress_1
+    #     fixed_yield_stress[2,2,1] = eq_stress_1
+    #     yield_surface_accuracy = 1e-8
+    #     n_max_bracket_search = 5
+    #     DelF_init = np.zeros((dim, dim))
+    #     DelF_init[0,1] = yield_surface_accuracy**2
+    #     def setup_material():
+    #         #helper function to set up the material which is needed four times
+    #         cell, mat = init_material(res, lens, self.formulation,
+    #                             self.young, self.poisson, fixed_yield_stress,
+    #                             plastic_increment, self.eigen_strain)
+    #         cg_solver = init_cg_solver(cell, self.cg_tol,
+    #                                    self.maxiter, self.verbose)
+
+    #         #set the eigen strain field to the previous fixed deformation
+    #         strain_field = cell.strain
+    #         for i in range(self.dim):
+    #             strain_field[i,i,...] = 1.0
+    #         strain_field[0,1,...] = strain_xy_1 - yield_surface_accuracy**2*1.25
+
+    #         with warnings.catch_warnings():
+    #             #suppress warnings of bracket_search()
+    #             warnings.simplefilter("ignore")
+    #             DelF, PK2, F, breaking_pixel = \
+    #                 sps.bracket_search(mat, cell, cg_solver, self.newton_tol,
+    #                             self.newton_equil_tol, yield_surface_accuracy,
+    #                             n_max_bracket_search, DelF_init, self.verbose)
+    #         return mat, cell, cg_solver, PK2, F, breaking_pixel
+
+    #     def sa_2break(n_strain_loop, ava_history):
+    #         self.assertTrue(ava_history.shape == (1,2,3))
+
+    #     def sa_1break(n_strain_loop, ava_history):
+    #         self.assertTrue(ava_history.shape == (2,1,3))
+
+    #     #Check for all combinations of initially_overloaded_pixels and
+    #     #single_pixel_start
+    #     mat, cell, cg_solver, PK2, F, breaking_pixel = setup_material()
+    #     self.assertTrue((breaking_pixel == [[1,1,1], [2,2,1]]).all())
+    #     sps.propagate_avalanche(mat, cell, cg_solver, self.newton_tol,
+    #         self.newton_equil_tol, PK2, F, n_max_avalanche, self.verbose,
+    #         initially_overloaded_pixels = None, single_pixel_start = False,
+    #         inverse_cumulative_dist_func = i_cdf, save_avalanche = sa_2break,
+    #         save_stress_strain = None, n_strain_loop = 0)
+
+    #     mat, cell, cg_solver, PK2, F, breaking_pixel = setup_material()
+    #     sps.propagate_avalanche(mat, cell, cg_solver, self.newton_tol,
+    #         self.newton_equil_tol, PK2, F, n_max_avalanche, self.verbose,
+    #         initially_overloaded_pixels = breaking_pixel,
+    #         single_pixel_start = False, inverse_cumulative_dist_func = i_cdf,
+    #         save_avalanche = sa_2break, save_stress_strain = None,
+    #         n_strain_loop = 0)
+
+    #     mat, cell, cg_solver, PK2, F, breaking_pixel = setup_material()
+    #     sps.propagate_avalanche(mat, cell, cg_solver, self.newton_tol,
+    #         self.newton_equil_tol, PK2, F, n_max_avalanche, self.verbose,
+    #         initially_overloaded_pixels = breaking_pixel,
+    #         single_pixel_start = True, inverse_cumulative_dist_func = i_cdf,
+    #         save_avalanche = sa_1break, save_stress_strain = None,
+    #         n_strain_loop = 0)
+
+    #     mat, cell, cg_solver, PK2, F, breaking_pixel = setup_material()
+    #     sps.propagate_avalanche(mat, cell, cg_solver, self.newton_tol,
+    #         self.newton_equil_tol, PK2, F, n_max_avalanche, self.verbose,
+    #         initially_overloaded_pixels = None, single_pixel_start = True,
+    #         inverse_cumulative_dist_func = i_cdf, save_avalanche = sa_1break,
+    #         save_stress_strain = None, n_strain_loop = 0)
+
+    # def test_strain_cell(self):
+    #     """
+    #     Tests:
+    #     1. Test if the function reaches the required deformation
+    #     2. Small deformation with only one avalanche. Check:
+    #         - avalanche pixel index
+    #         - PK2, stress field
+    #         - F, deformation gradient field
+    #     """
+    #     ### ------- 1. ------- ###
+    #     DelF      = np.zeros((self.dim,self.dim))
+    #     DelF[0,1] = 0.0001
+    #     F_tot      = np.eye(self.dim)
+    #     F_tot[0,1] = 0.0002
+    #     cell, mat = init_material(self.res, self.lens, self.formulation,
+    #                               self.young, self.poisson,
+    #                               self.yield_stress,
+    #                               self.plastic_increment, self.eigen_strain)
+    #     cg_solver = init_cg_solver(cell, self.cg_tol, self.maxiter,
+    #                                self.verbose)
+    #     F_fin = sps.strain_cell(mat, cell, cg_solver, self.newton_tol,
+    #                             self.newton_equil_tol, DelF, F_tot,
+    #                             self.yield_surface_accuracy,
+    #                             self.n_max_strain_loop,
+    #                             self.n_max_bracket_search,
+    #                             self.n_max_avalanche, self.verbose, False,
+    #                             self.inverse_cumulative_dist_func,
+    #                             save_avalanche = None,
+    #                             save_stress_strain = None,
+    #                             is_strain_initialised = False)
+    #     #is the reached deformation larger or almost equal to the required one
+    #     self.assertTrue(((F_fin-F_tot) > -1e-16).all())

@@ -80,5 +80,30 @@ void add_communicator(py::module & mod) {
       .def("gather", &muGrid::Communicator::gather<Real>)
       .def("gather", &muGrid::Communicator::gather<Int>)
       .def("gather", &muGrid::Communicator::gather<Uint>)
-      .def("gather", &muGrid::Communicator::gather<Complex>);
+      .def("gather", &muGrid::Communicator::gather<Complex>)
+      .def(
+          "bcast",
+          [](muGrid::Communicator & comm, Real & scalar_arg, const Int & root) {
+            return comm.bcast<Real>(scalar_arg, root);
+          },
+          "scalar_arg"_a, "root"_a)
+      .def(
+          "bcast",
+          [](muGrid::Communicator & comm, Int & scalar_arg, const Int & root) {
+            return comm.bcast<Int>(scalar_arg, root);
+          },
+          "scalar_arg"_a, "root"_a)
+      .def(
+          "bcast",
+          [](muGrid::Communicator & comm, Uint & scalar_arg, const Int & root) {
+            return comm.bcast<Uint>(scalar_arg, root);
+          },
+          "scalar_arg"_a, "root"_a)
+      .def(
+          "bcast",
+          [](muGrid::Communicator & comm, Complex & scalar_arg,
+             const Int & root) {
+            return comm.bcast<Complex>(scalar_arg, root);
+          },
+          "scalar_arg"_a, "root"_a);
 }

@@ -33,6 +33,7 @@
  *
  */
 
+
 #include "common/muSpectre_common.hh"
 #include "materials/material_stochastic_plasticity.hh"
 #include "cell/cell.hh"
@@ -49,10 +50,6 @@ using muSpectre::Real;
 using pybind11::literals::operator""_a;
 namespace py = pybind11;
 
-/**
- * python binding for the optionally objective form of Hooke's law
- * with per-pixel elastic properties
- */
 template <Index_t Dim>
 void add_material_stochastic_plasticity_helper(py::module & mod) {
   std::stringstream name_stream{};
@@ -68,6 +65,8 @@ void add_material_stochastic_plasticity_helper(py::module & mod) {
 
   py::class_<Mat_t, muSpectre::MaterialBase, std::shared_ptr<Mat_t>>(
       mod, name.c_str())
+      .def(py::init<const std::string &, const Index_t &, const Index_t &>(),
+           "name"_a, "spatial_dimension"_a, "nb_quad_pts"_a)
       .def_static(
           "make",
           [](Cell_t & cell, std::string n) -> Mat_t & {
@@ -86,9 +85,25 @@ void add_material_stochastic_plasticity_helper(py::module & mod) {
           },
           "pixel_index"_a, "Young"_a, "Poisson"_a, "increment"_a, "threshold"_a,
           "strain"_a)
+      .def(
+          "add_pixel",
+          [](Mat_t & mat, Index_t pix_id, Real Young, Real Poisson,
+             Eigen::Ref<const Eigen::Matrix<Real, Eigen::Dynamic, 1>>
+                 plastic_increment,
+             Eigen::Ref<const Eigen::Matrix<Real, Eigen::Dynamic, 1>>
+                 stress_threshold,
+             Eigen::Ref<
+                 const Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>>
+                 eigen_strain) {
+            mat.add_pixel(pix_id, Young, Poisson, plastic_increment,
+                          stress_threshold, eigen_strain);
+          },
+          "pixel_index"_a, "Young"_a, "Poisson"_a, "increment"_a, "threshold"_a,
+          "strain"_a)
+      .def("initialise", &Mat_t::initialise)
       .def_static("make_evaluator", []() { return Mat_t::make_evaluator(); })
       .def(
-          "identify_overloaded_pixels",
+          "identify_overloaded_quad_pts",
           [](Mat_t & mat, Cell_t & cell, StressField_t & stress) {
             return mat.identify_overloaded_quad_pts(cell, stress);
           },
@@ -111,26 +126,27 @@ void add_material_stochastic_plasticity_helper(py::module & mod) {
              Eigen::Ref<Eigen::Matrix<Real, Dim, Dim>> eigen_strain) {
             return mat.set_eigen_strain(quad_pt_id, eigen_strain);
           },
-          "pixel"_a, "eigen_strain"_a)
+          "quad_pt_id"_a, "eigen_strain"_a)
       .def(
           "get_plastic_increment",
           [](Mat_t & mat, const size_t & quad_pt_id) {
             return mat.get_plastic_increment(quad_pt_id);
           },
-          "pixel"_a)
+          "quad_pt_id"_a)
       .def(
           "get_stress_threshold",
           [](Mat_t & mat, const size_t & quad_pt_id) {
             return mat.get_stress_threshold(quad_pt_id);
           },
-          "pixel"_a)
+          "quad_pt_id"_a)
       .def(
           "get_eigen_strain",
           [](Mat_t & mat, const size_t & quad_pt_id) {
+            std::cout << "in get eigen strain..." << std::endl;
             return mat.get_eigen_strain(quad_pt_id);
           },
-          "pixel"_a)
-      .def("reset_overloaded_pixels",
+          "quad_pt_id"_a)
+      .def("reset_overloaded_quad_pts",
            [](Mat_t & mat) { return mat.reset_overloaded_quad_pts(); });
 }
 

@@ -256,6 +256,28 @@ namespace muFFT {
     BOOST_CHECK_EQUAL(res, rank * (rank + 1) / 2 + rank + 1);
   }
 
+  /* ---------------------------------------------------------------------- */
+  BOOST_AUTO_TEST_CASE(bcast_test) {
+    auto & comm{MPIContext::get_context().comm};
+    auto nb_cores{comm.size()};
+    Int arg = comm.rank();
+    // Check bcast from rank 0
+    if (comm.rank() == 0) {
+      arg = 2;
+    }
+    Int res = comm.template bcast<Int>(arg, 0);
+    BOOST_CHECK_EQUAL(res, 2);
+
+    // Check bcast from rank = size - 1
+    if (nb_cores > 1) {
+      if (comm.rank() == nb_cores - 1) {
+        arg = 8;
+      }
+      Int res = comm.template bcast<Int>(arg, nb_cores - 1);
+      BOOST_CHECK_EQUAL(res, 8);
+    }
+  }
+
   BOOST_AUTO_TEST_SUITE_END();
 
 }  // namespace muFFT

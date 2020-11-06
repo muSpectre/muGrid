@@ -62,13 +62,13 @@ namespace py = pybind11;
 void add_field(py::module & mod) {
   py::class_<Field>(mod, "Field")
       .def("set_zero", &Field::set_zero)
+      .def("stride", &Field::get_stride)
       .def_property_readonly("buffer_size", &Field::get_buffer_size)
       .def_property_readonly("shape",
                              [](Field & field) {
                                return field.get_shape(
                                    muGrid::IterUnit::SubPt);
                              })
-      .def_property_readonly("stride", &Field::get_stride)
       .def_property_readonly("pad_size", &Field::get_pad_size)
       .def_property_readonly("name", &Field::get_name)
       .def_property_readonly("collection", &Field::get_collection)
