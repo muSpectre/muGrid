@@ -1,9 +1,10 @@
 Change log for µSpectre
 =======================
 
-main
-----
+0.12.0 (19Nov20)
+----------------
 
+- muGrid: Parallel I/O via NetCDF
 - muFFT: Derivatives in 1D
 - muFFT: Second derivatives
 
