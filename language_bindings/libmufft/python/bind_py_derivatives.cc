@@ -170,10 +170,17 @@ void add_discrete_derivative(py::module & mod, std::string name) {
                  Eigen::Map<Eigen::ArrayXd>(static_cast<double *>(info.ptr),
                                             info.size));
            }),
-           "lbounds"_a, "stencil"_a)
+           "lbounds"_a, "stencil"_a,
+           "Constructor with raw stencil information\n"
+           "nb_pts: stencil size\n"
+           "lbounds: relative starting point of stencil, e.g. (-2,) means\n"
+           "         that the stencil start two pixels to the left of where\n"
+           "         the derivative should be computed\n"
+           "stencil: stencil coefficients")
       .def("rollaxes", &DiscreteDerivative::rollaxes, "distance"_a = 1)
       .def("apply", &DiscreteDerivative::apply<Real>, "in_field"_a, "in_dof"_a,
            "out_field"_a, "out_dof"_a, "fac"_a = 1.0)
+      .def_property_readonly("lbounds", &DiscreteDerivative::get_lbounds)
       .def_property_readonly("stencil", [](const DiscreteDerivative & self) {
         const Eigen::ArrayXd & stencil = self.get_stencil();
         return py::array_t<double, py::array::f_style>(self.get_nb_pts(),

@@ -170,7 +170,9 @@ namespace muFFT {
     /**
      * Constructor with raw stencil information
      * @param nb_pts: stencil size
-     * @param lbounds: relative starting point of stencil
+     * @param lbounds: relative starting point of stencil, e.g. (-2,) means
+     * that the stencil start two pixels to the left of where the derivative
+     * should be computed
      * @param stencil: stencil coefficients
      */
     DiscreteDerivative(DynCcoord_t nb_pts, DynCcoord_t lbounds,

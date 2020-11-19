@@ -130,14 +130,17 @@ class DerivativeCheck2d(unittest.TestCase):
         dz = muFFT.DiscreteDerivative([0, 0, 0], [[[-1, 1]]])
         self.assertTrue(dz.stencil.flags.owndata)
         self.assertTrue(np.allclose(dz.stencil[0, 0, :], [-1, 1]))
+        self.assertTrue(np.allclose(dz.lbounds, [0, 0, 0]))
 
         dy = dz.rollaxes(-1)
         self.assertTrue(np.allclose(dy.stencil[0, :, 0], [-1, 1]))
         self.assertTrue(np.allclose(dy.stencil, [[[-1], [1]]]))
+        self.assertTrue(np.allclose(dy.lbounds, [0, 0, 0]))
 
         dx = dy.rollaxes(-1)
         self.assertTrue(np.allclose(dx.stencil[:, 0, 0], [-1, 1]))
         self.assertTrue(np.allclose(dx.stencil, [[[-1]], [[1]]]))
+        self.assertTrue(np.allclose(dx.lbounds, [0, 0, 0]))
 
         dx = muFFT.DiscreteDerivative([0, 0], [[-0.5, 0.5],
                                                [-0.5, 0.5]])
@@ -384,6 +387,7 @@ class DerivativeCheck2d(unittest.TestCase):
         diffop = muFFT.DiscreteDerivative([0, -3],
                                           [[-1/60, 3/20, -3/4, 0,
                                             3/4, -3/20, 1/60]])
+        self.assertTrue(np.allclose(diffop.lbounds, [0, -3]))
         q = self.fft.fftfreq
         d = diffop.fourier(q)
         diff_field = np.zeros_like(self.field, order='f')
