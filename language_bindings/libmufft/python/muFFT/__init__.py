@@ -47,6 +47,7 @@ import _muFFT
 from _muFFT import (version, FourierDerivative, DiscreteDerivative,
                     FFT_PlanFlags, get_nb_hermitian_grid_pts)
 
+import muFFT.Stencils1D
 import muFFT.Stencils2D
 import muFFT.Stencils3D
 

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
-@file   Stencils2D.py
+@file   Stencils1D.py
 
 @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
 
-@date   15 May 2020
+@date   15 Nov 2020
 
-@brief  Library of some common stencils for 2D problems
+@brief  Library of some common stencils for 1D problems
 
 Copyright © 2018 Till Junge
 
@@ -37,31 +37,14 @@ Program grant you additional permission to convey the resulting work.
 import muFFT
 
 # First order upwind differences
-upwind_x = muFFT.DiscreteDerivative([0, 0], [[-1], [1]])
-upwind_y = muFFT.DiscreteDerivative([0, 0], [[-1, 1]])
-upwind = (upwind_x, upwind_y)
-
-# d-stencil label the corners used for the derivative
-d_10_00 = upwind_x
-d_01_00 = upwind_y
-d_11_01 = muFFT.DiscreteDerivative([0, 0], [[0, -1],
-                                            [0,  1]])
-d_11_10 = muFFT.DiscreteDerivative([0, 0], [[ 0, 0],
-                                            [-1, 1]])
-
-# First order upwind differences, averaged over neighboring pixels
-averaged_upwind_x = muFFT.DiscreteDerivative([0, 0], [[-0.5, -0.5],
-                                                      [ 0.5,  0.5]])
-averaged_upwind_y = muFFT.DiscreteDerivative([0, 0], [[-0.5, 0.5],
-                                                      [-0.5, 0.5]])
-averaged_upwind = (averaged_upwind_x, averaged_upwind_y)
+upwind = muFFT.DiscreteDerivative([0], [-1, 1])
 
 # Second order central differences
-central_x = muFFT.DiscreteDerivative([-1, 0], [[-0.5], [0], [0.5]])
-central_y = muFFT.DiscreteDerivative([0, -1], [[-0.5, 0, 0.5]])
-central = (central_x, central_y)
+central = muFFT.DiscreteDerivative([-1], [-0.5, 0, 0.5])
+
+# Sixth order central differences
+central6 = muFFT.DiscreteDerivative([-3],
+                                    [-1/60, 3/20, -3/4, 0, 3/4, -3/20, 1/60])
 
 # Fourth order central differences of the second derivative
-central_2nd_x = muFFT.DiscreteDerivative([-1, 0], [[1], [-2], [1]])
-central_2nd_y = muFFT.DiscreteDerivative([0, -1], [[1, -2, 1]])
-central_2nd = (central_2nd_x, central_2nd_y)
+central_2nd = muFFT.DiscreteDerivative([-1], [1, -2, 1])

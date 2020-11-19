@@ -277,7 +277,6 @@ mugrid_sources = [
     'src/libmugrid/field_typed.cc',
     'src/libmugrid/file_io_base.cc',
     'src/libmugrid/grid_common.cc',
-    'src/libmugrid/communicator.cc',
     'src/libmugrid/raw_memory_operations.cc',
     'src/libmugrid/state_field.cc',
     'src/libmugrid/state_field_map.cc',
@@ -340,6 +339,9 @@ else:
         print('MPI disabled because MPI compiler wrappers were not '
               'found or could not be executed.')
     mpi = mpicc_successful
+
+if mpi:
+    mugrid_sources += ['src/libmugrid/communicator.cc']
 
 has_mpi_enabled_fft = False
 for info, _sources in [(fftw_info, ['src/libmufft/fftw_engine.cc']),

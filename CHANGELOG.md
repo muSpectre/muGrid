@@ -1,6 +1,12 @@
 Change log for µSpectre
 =======================
 
+main
+----
+
+- muFFT: Derivatives in 1D
+- muFFT: Second derivatives
+
 0.11.0 (07Sep20)
 ----------------
 
