@@ -157,9 +157,9 @@ if matplotlib_found and MPI.COMM_WORLD.Get_size() == 1:
         g = stress[i]
         print("g.shape = {}, (dim, dim, 2, *nb_domain_grid_pts) = {}".format(
             g.shape, (dim, dim, 2, *nb_domain_grid_pts)))
-        # if i < 2:
-        #     g = np.stack((g, g), axis=2).reshape(
-        #         dim, dim, 2, *nb_domain_grid_pts)
+        if i < 2:
+            g = np.stack((g, g), axis=2).reshape(
+                dim, dim, 2, *nb_domain_grid_pts)
 
         plt.subplot(3, len(gradients), 1 + i, aspect=1)
         plt.title(names[i])

@@ -132,22 +132,25 @@ muSpectre_add_example(visualisation_example_finite_py_example
   TYPE PYTHON visualisation_example_finite_strain.py 7 7 1)
 
 muSpectre_add_example(comparison_small_strain_py_example
-  TYPE PYTHON  comparison_small_strain.py 1)
+  TYPE PYTHON comparison_small_strain.py 1)
 
 muSpectre_add_example(visco_py_example
-  TYPE PYTHON  visco_example.py 1)
+  TYPE PYTHON visco_example.py 1)
 
 muSpectre_add_example(visco_damage_py_example
-  TYPE PYTHON  visco_example_damage.py 1)
+  TYPE PYTHON visco_example_damage.py 1)
 
 muSpectre_add_example(field_extraction_py_example
-  TYPE PYTHON  field_extraction_example.py)
+  TYPE PYTHON field_extraction_example.py)
 
 muSpectre_add_example(first_conc_py_example
-  TYPE PYTHON  first_concrete_example.py 1)
+  TYPE PYTHON first_concrete_example.py 1)
 
 muSpectre_add_example(sec_conc_py_example
-  TYPE PYTHON  second_concrete_example.py 1)
+  TYPE PYTHON second_concrete_example.py 1)
+
+muSpectre_add_example(netcdf_io_use_case
+  TYPE PYTHON netcdf_io_use_case.py)
 
 # additional file(s) to copy
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/concrete_micro_structure.npy
@@ -165,8 +168,12 @@ if(${MUSPECTRE_MPI_PARALLEL})
    TYPE PYTHON MPI_NB_PROCS 1 elasto_plastic_comparison.py 1)
  muSpectre_add_example(elasto_plastic_comparison_py_example2
    TYPE PYTHON MPI_NB_PROCS 2 elasto_plastic_comparison.py 1)
-  muSpectre_add_example(crack_py_example1
-          TYPE PYTHON MPI_NB_PROCS 1 crack.py 1)
-  muSpectre_add_example(crack_py_example2
-          TYPE PYTHON MPI_NB_PROCS 2 crack.py 1)
+ muSpectre_add_example(crack_py_example1
+   TYPE PYTHON MPI_NB_PROCS 1 crack.py 1)
+ muSpectre_add_example(crack_py_example2
+   TYPE PYTHON MPI_NB_PROCS 2 crack.py 1)
+ muSpectre_add_example(netcdf_io_use_case1
+   TYPE PYTHON MPI_NB_PROCS 1 netcdf_io_use_case.py)
+ muSpectre_add_example(netcdf_io_use_case2
+   TYPE PYTHON MPI_NB_PROCS 2 netcdf_io_use_case.py)
 endif()

@@ -82,9 +82,6 @@ namespace muSpectre {
     //! traits of this material
     using traits = MaterialMuSpectre_traits<MaterialStochasticPlasticity>;
 
-    //! Type of container used for storing eigenstrain
-    // using InternalVariables = typename traits::InternalVariables;
-
     //! Hooke's law implementation
     using Hooke =
         typename MatTB::Hooke<DimM, typename traits::StrainMap_t::reference,
@@ -165,11 +162,6 @@ namespace muSpectre {
     inline decltype(auto)
     evaluate_stress_tangent(s_t && E, const Real & lambda, const Real & mu,
                             const EigenStrainArg_t & eigen_strain);
-
-    /**
-     * return the empty internals tuple
-     */
-    // InternalVariables & get_internals() { return this->internal_variables; }
 
     /**
      * set the plastic_increment on a single quadrature point
@@ -293,8 +285,6 @@ namespace muSpectre {
     Field_t stress_threshold_field;
     LTensor_Field_t eigen_strain_field;
     std::vector<size_t> overloaded_quad_pts{};
-    //! tuple for iterable eigen_field
-    // InternalVariables internal_variables;
   };
 
   /* ---------------------------------------------------------------------- */

@@ -250,6 +250,7 @@ void add_material_base_helper(py::module & mod) {
                     std::shared_ptr<muGrid::LocalFieldCollection>>())
       .def("save_history_variables", &Material::save_history_variables)
       .def("list_fields", &Material::list_fields)
+      .def("list_state_fields", &Material::list_state_fields)
       .def("size", &Material::size)
       .def(
           "add_pixel", [](Material & mat, size_t pix) { mat.add_pixel(pix); },

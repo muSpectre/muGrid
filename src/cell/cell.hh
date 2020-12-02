@@ -232,6 +232,10 @@ namespace muSpectre {
     //! return a const reference to the cell's field of tangent moduli
     const muGrid::RealField & get_tangent(bool do_create = false);
 
+    //! return a reference to the global field collection storing stress and
+    //! strain of the cell
+    muGrid::FieldCollection & get_field_collection();
+
     /**
      * evaluates and returns the stress for the currently set strain
      */

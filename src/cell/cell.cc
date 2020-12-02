@@ -304,6 +304,11 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
+  muGrid::FieldCollection & Cell::get_field_collection() {
+    return *this->fields;
+  }
+
+  /* ---------------------------------------------------------------------- */
   const muGrid::RealField & Cell::evaluate_stress() {
     if (this->initialised == false) {
       this->initialise();

@@ -204,6 +204,11 @@ namespace muSpectre {
      */
     std::vector<std::string> list_fields() const;
 
+    /**
+     * list the names of all internal state fields
+     */
+    std::vector<std::string> list_state_fields() const;
+
     //! gives access to internal fields
     // TODO(junge): rename get_collection to get_fields
     muGrid::LocalFieldCollection & get_collection();

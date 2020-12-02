@@ -304,9 +304,7 @@ void add_cell_helper(py::module & mod) {
           })
       .def_property_readonly(
           "nb_quad_pts",
-          [](Cell & cell) {
-            return cell.get_projection().get_nb_quad_pts();
-          })
+          [](Cell & cell) { return cell.get_projection().get_nb_quad_pts(); })
       .def_property_readonly(
           "domain_lengths",
           [](Cell & cell) {
@@ -374,6 +372,11 @@ void add_cell_helper(py::module & mod) {
       .def_property_readonly("pixel_indices", &Cell::get_pixel_indices)
       .def_property_readonly("quad_pt_indices", &Cell::get_quad_pt_indices)
       .def_property_readonly("fields", &Cell::get_fields)
+      .def("get_field_collection", &Cell::get_field_collection,
+           py::return_value_policy::reference_internal)
+      .def("get_field_collection_field_names", [](Cell & cell){
+           return cell.get_field_collection().list_fields();
+           })
 
 #ifdef WITH_SPLIT
       .def(

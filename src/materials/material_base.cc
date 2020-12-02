@@ -168,6 +168,11 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
+  std::vector<std::string> MaterialBase::list_state_fields() const {
+    return this->internal_fields->list_state_field_unique_prefixes();
+  }
+
+  /* ---------------------------------------------------------------------- */
   muGrid::LocalFieldCollection & MaterialBase::get_collection() {
     return *this->internal_fields;
   }

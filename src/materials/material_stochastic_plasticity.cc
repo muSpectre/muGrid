@@ -61,10 +61,6 @@ namespace muSpectre {
         eigen_strain_field{this->get_prefix() + "eigen strain",
                            *this->internal_fields, QuadPtTag},
         overloaded_quad_pts{std::vector<size_t>()} {}
-  /*,
-        internal_variables{lambda_field.get_map(), mu_field.get_map(),
-        eigen_strain_field.get_map()}
-  */
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
