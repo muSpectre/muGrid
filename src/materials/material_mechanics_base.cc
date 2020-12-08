@@ -58,4 +58,13 @@ namespace muSpectre {
     }
   }
 
+  /* ---------------------------------------------------------------------- */
+  const SolverType & MaterialMechanicsBase::get_solver_type() const {
+    return this->solver_type;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void MaterialMechanicsBase::set_solver_type(const SolverType & solver_type) {
+    this->solver_type = solver_type;
+  }
 }  // namespace muSpectre

@@ -116,7 +116,12 @@ namespace muFFT {
         this->active = false;
       }
     }
-    this->initialise_field_collections();
+    this->real_field_collection.initialise(
+        this->nb_domain_grid_pts, this->nb_subdomain_grid_pts,
+        this->subdomain_locations, this->subdomain_strides);
+    this->fourier_field_collection.initialise(
+        this->nb_domain_grid_pts, this->nb_fourier_grid_pts,
+        this->fourier_locations, this->fourier_strides);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -127,6 +132,10 @@ namespace muFFT {
     }
 
     const int dim{this->nb_fourier_grid_pts.get_dim()};
+
+    if (not this->is_active()) {
+      return;
+    }
 
     int howmany{static_cast<int>(nb_dof_per_pixel)};
     ptrdiff_t res0{}, loc0{}, res1{}, loc1{};
@@ -139,7 +148,6 @@ namespace muFFT {
     // A factor of two is required because we are using the c2r/r2c DFTs.
     // See:
     // http://www.fftw.org/fftw3_doc/Multi_002ddimensional-MPI-DFTs-of-Real-Data.html
-
 
     required_workspace_size *= 2;
 
@@ -165,7 +173,7 @@ namespace muFFT {
     }
 
     Real * in{fftw_alloc_real(required_workspace_size)};
-    fftw_complex * out{fftw_alloc_complex(required_workspace_size/2)};
+    fftw_complex * out{fftw_alloc_complex(required_workspace_size / 2)};
 
     // Reverse the order of the array dimensions, because FFTW expects a
     // row-major array and the arrays used in muSpectre are column-major
@@ -178,15 +186,16 @@ namespace muFFT {
         dim, narr.data(), howmany, FFTW_MPI_DEFAULT_BLOCK,
         FFTW_MPI_DEFAULT_BLOCK, in, out, this->comm.get_mpi_comm(),
         FFTW_MPI_TRANSPOSED_OUT |
-            (this->allow_destroy_input
-                 ? FFTW_DESTROY_INPUT : FFTW_PRESERVE_INPUT) | flags);
+            (this->allow_destroy_input ? FFTW_DESTROY_INPUT
+                                       : FFTW_PRESERVE_INPUT) |
+            flags);
 
     if (this->fft_plans[nb_dof_per_pixel] == nullptr) {
       if (dim == 1) {
         throw FFTEngineError("r2c plan failed; MPI parallel FFTW does not "
                              "support 1D r2c FFTs");
       } else {
-         std::stringstream message{};
+        std::stringstream message{};
         message << "Rank " << this->comm.rank() << ": r2c plan failed. "
                 << "nb_subdomain_grid_pts = "
                 << this->get_nb_subdomain_grid_pts()
@@ -202,8 +211,9 @@ namespace muFFT {
         dim, narr.data(), howmany, FFTW_MPI_DEFAULT_BLOCK,
         FFTW_MPI_DEFAULT_BLOCK, i_in, i_out, this->comm.get_mpi_comm(),
         FFTW_MPI_TRANSPOSED_IN |
-            (this->allow_destroy_input
-                 ? FFTW_DESTROY_INPUT : FFTW_PRESERVE_INPUT) | flags);
+            (this->allow_destroy_input ? FFTW_DESTROY_INPUT
+                                       : FFTW_PRESERVE_INPUT) |
+            flags);
     if (this->ifft_plans[nb_dof_per_pixel] == nullptr) {
       if (dim == 1)
         throw FFTEngineError("c2r plan failed; MPI parallel FFTW does not "
@@ -234,36 +244,38 @@ namespace muFFT {
   void FFTWMPIEngine::compute_fft(const RealField_t & input_field,
                                   FourierField_t & output_field) const {
     // Compute FFT
-    fftw_mpi_execute_dft_r2c(this->fft_plans.at(
-        input_field.get_nb_dof_per_pixel()),
-                         input_field.data(),
-                         reinterpret_cast<fftw_complex *>(output_field.data()));
+    fftw_mpi_execute_dft_r2c(
+        this->fft_plans.at(input_field.get_nb_dof_per_pixel()),
+        input_field.data(),
+        reinterpret_cast<fftw_complex *>(output_field.data()));
   }
 
   /* ---------------------------------------------------------------------- */
   void FFTWMPIEngine::compute_ifft(const FourierField_t & input_field,
                                    RealField_t & output_field) const {
-    // Compute inverse FFT
-    fftw_mpi_execute_dft_c2r(this->ifft_plans.at(
-        input_field.get_nb_dof_per_pixel()),
-                         reinterpret_cast<fftw_complex *>(input_field.data()),
-                         output_field.data());
+    if (not this->is_active()) {
+      return;
+    }
+
+    fftw_mpi_execute_dft_c2r(
+        this->ifft_plans.at(input_field.get_nb_dof_per_pixel()),
+        reinterpret_cast<fftw_complex *>(input_field.data()),
+        output_field.data());
   }
 
   /* ---------------------------------------------------------------------- */
   std::unique_ptr<FFTEngineBase> FFTWMPIEngine::clone() const {
-    return std::make_unique<FFTWMPIEngine>(this->get_nb_domain_grid_pts(),
-                                           this->get_communicator(),
-                                           this->plan_flags,
-                                           this->allow_temporary_buffer,
-                                           this->allow_destroy_input);
+    return std::make_unique<FFTWMPIEngine>(
+        this->get_nb_domain_grid_pts(), this->get_communicator(),
+        this->plan_flags, this->allow_temporary_buffer,
+        this->allow_destroy_input);
   }
 
   /* ---------------------------------------------------------------------- */
   auto
-  FFTWMPIEngine::register_real_space_field(
-      const std::string & unique_name,
-      const Index_t & nb_dof_per_pixel) -> RealField_t & {
+  FFTWMPIEngine::register_real_space_field(const std::string & unique_name,
+                                           const Index_t & nb_dof_per_pixel)
+      -> RealField_t & {
     this->create_plan(nb_dof_per_pixel);
     auto & field{
         Parent::register_real_space_field(unique_name, nb_dof_per_pixel)};
@@ -273,20 +285,17 @@ namespace muFFT {
      * nominal size of the complex buffer.
      */
     auto && required_workspace_size{
-        2*this->required_workspace_sizes.at(nb_dof_per_pixel)};
-    auto pad_size{required_workspace_size -
-                  nb_dof_per_pixel * field.get_nb_buffer_pixels()};
-    field.set_pad_size(std::max(0L, pad_size));
+        2 * this->required_workspace_sizes.at(nb_dof_per_pixel)};
+    field.set_pad_size(required_workspace_size -
+                       nb_dof_per_pixel * field.get_nb_buffer_pixels());
     return field;
   }
 
   /* ---------------------------------------------------------------------- */
-  auto
-  FFTWMPIEngine::register_real_space_field(
-      const std::string & unique_name,
-      const Shape_t & shape) -> RealField_t & {
-    auto & field{
-        Parent::register_real_space_field(unique_name, shape)};
+  auto FFTWMPIEngine::register_real_space_field(const std::string & unique_name,
+                                                const Shape_t & shape)
+      -> RealField_t & {
+    auto & field{Parent::register_real_space_field(unique_name, shape)};
     /*
      * We need to check whether the fourier field provided is large
      * enough. MPI parallel FFTW may request a workspace size larger than the
@@ -295,19 +304,15 @@ namespace muFFT {
     auto nb_dof_per_pixel{std::accumulate(shape.begin(), shape.end(), 1,
                                           std::multiplies<Index_t>())};
     auto && required_workspace_size{
-        2*this->required_workspace_sizes.at(nb_dof_per_pixel)};
-
-    auto pad_size{required_workspace_size -
-                  nb_dof_per_pixel * field.get_nb_buffer_pixels()};
-    field.set_pad_size(std::max(0L, pad_size));
+        2 * this->required_workspace_sizes.at(nb_dof_per_pixel)};
+    field.set_pad_size(required_workspace_size -
+                       nb_dof_per_pixel * field.get_nb_buffer_pixels());
     return field;
   }
 
   /* ---------------------------------------------------------------------- */
-  auto
-  FFTWMPIEngine::register_fourier_space_field(
-      const std::string & unique_name,
-      const Index_t & nb_dof_per_pixel) -> FourierField_t & {
+  muGrid::ComplexField & FFTWMPIEngine::register_fourier_space_field(
+      const std::string & unique_name, const Index_t & nb_dof_per_pixel) {
     auto & field{
         Parent::register_fourier_space_field(unique_name, nb_dof_per_pixel)};
     /*
@@ -327,12 +332,10 @@ namespace muFFT {
   }
 
   /* ---------------------------------------------------------------------- */
-  auto
-  FFTWMPIEngine::register_fourier_space_field(
-      const std::string & unique_name,
-      const Shape_t & shape) -> FourierField_t & {
-    auto & field{
-        Parent::register_fourier_space_field(unique_name, shape)};
+  muGrid::ComplexField &
+  FFTWMPIEngine::register_fourier_space_field(const std::string & unique_name,
+                                              const Shape_t & shape) {
+    auto & field{Parent::register_fourier_space_field(unique_name, shape)};
     /*
      * We need to check whether the fourier field provided is large
      * enough. MPI parallel FFTW may request a workspace size larger than the
@@ -352,11 +355,10 @@ namespace muFFT {
   }
 
   /* ---------------------------------------------------------------------- */
-  bool
-  FFTWMPIEngine::check_real_space_field(const RealField_t & field) const {
+  bool FFTWMPIEngine::check_real_space_field(const RealField_t & field) const {
     auto nb_dof_per_pixel{field.get_nb_dof_per_pixel()};
     auto && required_workspace_size{
-        2*this->required_workspace_sizes.at(nb_dof_per_pixel)};
+        2 * this->required_workspace_sizes.at(nb_dof_per_pixel)};
     auto required_pad_size{required_workspace_size -
                            nb_dof_per_pixel * field.get_nb_buffer_pixels()};
     return Parent::check_real_space_field(field) and
@@ -364,8 +366,8 @@ namespace muFFT {
   }
 
   /* ---------------------------------------------------------------------- */
-  bool FFTWMPIEngine::check_fourier_space_field(
-      const FourierField_t & field) const {
+  bool
+  FFTWMPIEngine::check_fourier_space_field(const FourierField_t & field) const {
     auto nb_dof_per_pixel{field.get_nb_dof_per_pixel()};
     auto && required_workspace_size{
         this->required_workspace_sizes.at(nb_dof_per_pixel)};

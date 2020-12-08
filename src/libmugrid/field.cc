@@ -44,8 +44,8 @@ namespace muGrid {
                const Index_t & nb_components,
                const std::string & sub_division_tag, const Unit & unit)
       : name{unique_name}, collection{collection}, nb_components{nb_components},
-        components_shape{nb_components},
-        nb_sub_pts{collection.get_nb_sub_pts(sub_division_tag)},
+        components_shape{nb_components}, nb_sub_pts{collection.get_nb_sub_pts(
+                                             sub_division_tag)},
         sub_division_tag{sub_division_tag}, unit{unit} {}
 
   /* ---------------------------------------------------------------------- */
@@ -54,8 +54,8 @@ namespace muGrid {
                const std::string & sub_division_tag, const Unit & unit)
       : name{unique_name}, collection{collection},
         nb_components{std::accumulate(components_shape.begin(),
-                                      components_shape.end(),
-                                      1, std::multiplies<Index_t>())},
+                                      components_shape.end(), 1,
+                                      std::multiplies<Index_t>())},
         components_shape{components_shape},
         nb_sub_pts{collection.get_nb_sub_pts(sub_division_tag)},
         sub_division_tag{sub_division_tag}, unit{unit} {}
@@ -111,16 +111,13 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  Shape_t Field::get_components_shape() const {
-    return this->components_shape;
-  }
+  Shape_t Field::get_components_shape() const { return this->components_shape; }
 
   /* ---------------------------------------------------------------------- */
   void Field::reshape(const Shape_t & new_components_shape) {
     if (std::accumulate(new_components_shape.begin(),
-                        new_components_shape.end(),
-                        1, std::multiplies<Index_t>()) !=
-        this->nb_components) {
+                        new_components_shape.end(), 1,
+                        std::multiplies<Index_t>()) != this->nb_components) {
       std::stringstream message{};
       message << "This field was set up for " << this->get_nb_components()
               << " components. Setting the component shape to "
@@ -139,8 +136,9 @@ namespace muGrid {
                       const std::string & sub_div_tag) {
     auto new_nb_sub_pts{collection.get_nb_sub_pts(sub_div_tag)};
     if (std::accumulate(new_components_shape.begin(),
-                        new_components_shape.end(),
-                        1, std::multiplies<Index_t>()) * new_nb_sub_pts !=
+                        new_components_shape.end(), 1,
+                        std::multiplies<Index_t>()) *
+            new_nb_sub_pts !=
         this->get_nb_dof_per_pixel()) {
       std::stringstream message{};
       message << "This field was set up for " << this->get_nb_components()
@@ -304,10 +302,10 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   bool Field::has_same_memory_layout(const Field & other) const {
-    return
-      this->get_collection().has_same_memory_layout(other.get_collection()) &&
-      this->get_nb_sub_pts() == other.get_nb_sub_pts() &&
-      this->get_components_strides() == other.get_components_strides();
+    return this->get_collection().has_same_memory_layout(
+               other.get_collection()) &&
+           this->get_nb_sub_pts() == other.get_nb_sub_pts() &&
+           this->get_components_strides() == other.get_components_strides();
   }
 
   /* ---------------------------------------------------------------------- */

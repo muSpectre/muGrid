@@ -69,6 +69,7 @@ namespace muSpectre {
     friend MatrixAdaptable;
     //! Constructor
     explicit MatrixAdaptor(std::shared_ptr<MatrixAdaptable> adaptable);
+    explicit MatrixAdaptor(std::weak_ptr<MatrixAdaptable> adaptable);
 
     //! Copy constructor
     MatrixAdaptor(const MatrixAdaptor & other) = default;
@@ -123,8 +124,8 @@ namespace muSpectre {
      * as it does absolutely no input checking. Rather, it is meant to be
      * called by the scaleAndAddTo function in the in Eigen solvers
      */
-    void stiffness_action_increment(EigenCVec_t delta_grad, const Real & alpha,
-                                    EigenVec_t del_flux) const;
+    void action_increment(EigenCVec_t delta_grad, const Real & alpha,
+                          EigenVec_t del_flux) const;
 
     //! implementation of the evaluation
     template <typename Rhs>
@@ -134,6 +135,7 @@ namespace muSpectre {
           *this, x.derived());
     }
     std::shared_ptr<MatrixAdaptable> adaptable{nullptr};
+    std::weak_ptr<MatrixAdaptable> w_adaptable{};
   };
 
   class MatrixAdaptable : public std::enable_shared_from_this<MatrixAdaptable> {
@@ -174,14 +176,71 @@ namespace muSpectre {
      * absolutely no input checking. Rather, it is meant to be called by the
      * scaleAndAddTo function in the in Eigen solvers
      */
-    virtual void stiffness_action_increment(EigenCVec_t delta_grad,
-                                            const Real & alpha,
-                                            EigenVec_t del_flux) const = 0;
+    virtual void action_increment(EigenCVec_t delta_grad, const Real & alpha,
+                                  EigenVec_t del_flux) = 0;
     //! return the communicator object
     virtual const muGrid::Communicator & get_communicator() const = 0;
 
-    //! create a matrix adaptor satisfying the eigen matrix interface
+    /**
+     * create a matrix adaptor satisfying the eigen matrix interface. The
+     * returned Adaptor keeps this adaptable alive. This can cause shared_ptr
+     * cycles.
+     */
     MatrixAdaptor get_adaptor();
+
+    /**
+     * create a matrix adaptor satisfying the eigen matrix interface. The
+     * returned Adaptor does not keep this adaptable alive. This avoids
+     * shared_ptr cycles, but requires you to guarantee sufficient lifetime of
+     * the Adaptable.
+     */
+    MatrixAdaptor get_weak_adaptor();
+  };
+
+  /**
+   * matrix-adaptor for dense eigen matrix. For debugging and simple testing
+   */
+  class DenseEigenAdaptor : public MatrixAdaptable {
+   public:
+    using Parent = MatrixAdaptable;
+    using EigenVec_t = Parent::EigenVec_t;
+    using EigenCVec_t = Parent::EigenCVec_t;
+    //! Default constructor
+    DenseEigenAdaptor() = default;
+
+    //! constructor from an Eigen matrix
+    explicit DenseEigenAdaptor(const Eigen::Ref<const Eigen::MatrixXd> matrix);
+
+    //! constructor creates a zero matrix
+    explicit DenseEigenAdaptor(const Index_t & nb_dof);
+
+    //! Copy constructor
+    DenseEigenAdaptor(const DenseEigenAdaptor & other) = default;
+
+    //! Move constructor
+    DenseEigenAdaptor(DenseEigenAdaptor && other) = default;
+
+    //! Destructor
+    virtual ~DenseEigenAdaptor() = default;
+
+    //! Copy assignment operator
+    DenseEigenAdaptor & operator=(const DenseEigenAdaptor & other) = delete;
+
+    //! Move assignment operator
+    DenseEigenAdaptor & operator=(DenseEigenAdaptor && other) = delete;
+
+    Index_t get_nb_dof() const final;
+
+    void action_increment(EigenCVec_t delta_grad, const Real & alpha,
+                          EigenVec_t del_flux) final;
+    const muGrid::Communicator & get_communicator() const final;
+
+    Eigen::MatrixXd & get_matrix();
+    const Eigen::MatrixXd & get_matrix() const;
+
+   protected:
+    Eigen::MatrixXd matrix;
+    muGrid::Communicator comm{muGrid::Communicator()};
   };
 
 }  // namespace muSpectre
@@ -208,7 +267,7 @@ namespace Eigen {
         // however, for iterative solvers, alpha is always equal to 1, so
         // let's not bother about it.
         // Here we could simply call dst.noalias() += lhs.my_matrix() * rhs,
-        lhs.stiffness_action_increment(rhs, alpha, dst);
+        lhs.action_increment(rhs, alpha, dst);
       }
     };
   }  // namespace internal

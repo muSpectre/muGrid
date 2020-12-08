@@ -80,6 +80,19 @@ namespace muSpectre {
      * returns the expected strain measure of the material
      */
     virtual StrainMeasure get_expected_strain_measure() const = 0;
+
+    /**
+     * returns a reference to the currently set solver type
+     */
+    const SolverType & get_solver_type() const;
+
+    /**
+     * set the solver type
+     */
+    void set_solver_type(const SolverType & solver_type);
+
+   protected:
+    SolverType solver_type{SolverType::Spectral};
   };
 
 }  // namespace muSpectre

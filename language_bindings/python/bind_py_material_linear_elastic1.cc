@@ -36,6 +36,7 @@
 #include "common/muSpectre_common.hh"
 #include "materials/material_linear_elastic1.hh"
 #include "cell/cell.hh"
+#include "cell/cell_data.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -60,12 +61,21 @@ void add_material_linear_elastic1_helper(py::module & mod) {
 
   using Mat_t = muSpectre::MaterialLinearElastic1<dim>;
   using Cell = muSpectre::Cell;
+  using CellData = muSpectre::CellData;
   using Mat_ptr = std::shared_ptr<Mat_t>;
   py::class_<Mat_t, muSpectre::MaterialBase, std::shared_ptr<Mat_t>>(
       mod, name.c_str())
       .def_static(
           "make",
           [](std::shared_ptr<Cell> cell, std::string name, Real Young,
+             Real Poisson) -> Mat_t & {
+            return Mat_t::make(cell, name, Young, Poisson);
+          },
+          "cell"_a, "name"_a, "Young"_a, "Poisson"_a,
+          py::return_value_policy::reference_internal)
+      .def_static(
+          "make",
+          [](std::shared_ptr<CellData> cell, std::string name, Real Young,
              Real Poisson) -> Mat_t & {
             return Mat_t::make(cell, name, Young, Poisson);
           },

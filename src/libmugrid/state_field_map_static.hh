@@ -425,7 +425,7 @@ namespace muGrid {
 
   /**
    * Alias of `muGrid::StaticStateFieldMap` over a scalar field you wish to
-   * iterate over quadrature point by quadrature point.
+   * iterate over.
    *
    * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
    * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
@@ -442,7 +442,26 @@ namespace muGrid {
 
   /**
    * Alias of `muGrid::StaticStateNFieldMap` over a first-rank tensor field you
-   * wish to iterate over quadrature point by quadrature point.
+   * wish to iterate over.
+   *
+   * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
+   * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
+   * @tparam Mutability whether or not the map allows to modify the content of
+   * the field
+   * @tparam Rank tensorial rank
+   * @tparam Dim spatial dimension of the tensor
+   * @tparam NbMemory number of previous values to store
+   * @tparam IterationType describes the pixel-subdivision
+   */
+  template <typename T, Mapping Mutability, Dim_t Rank, Dim_t Dim,
+            size_t NbMemory, IterUnit IterationType>
+  using TensorStateFieldMap =
+    StaticStateFieldMap<T, Mutability, internal::TensorMap<T, Rank, Dim>,
+                          NbMemory, IterationType>;
+
+  /**
+   * Alias of `muGrid::StaticStateNFieldMap` over a first-rank tensor field you
+   * wish to iterate over.
    *
    * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
    * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
@@ -460,7 +479,7 @@ namespace muGrid {
 
   /**
    * Alias of `muGrid::StaticStateNFieldMap` over a second-rank tensor field you
-   * wish to iterate over quadrature point by quadrature point.
+   * wish to iterate over.
    *
    * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
    * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
@@ -478,7 +497,7 @@ namespace muGrid {
 
   /**
    * Alias of `muGrid::StaticStateFieldMap` over a fourth-rank tensor field you
-   * wish to iterate over quadrature point by quadrature point.
+   * wish to iterate over.
    *
    * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
    * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`

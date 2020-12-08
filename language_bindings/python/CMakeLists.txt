@@ -47,15 +47,21 @@ string(REGEX REPLACE "\n" "" PYTHON_USER_SITE ${PYTHON_USER_SITE})
 
 set (PY_BINDING_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_module.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_common.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_cell.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_cell_data.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_class_solvers.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_common.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_fem_discretisation.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_linear_anisotropic.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_linear_elastic1.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_linear_elastic2.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_linear_elastic3.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_linear_elastic4.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_linear_elastic_damage1.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_linear_elastic_damage2.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_linear_diffusion.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_linear_orthotropic.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_visco_elastic_ss.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_visco_elastic_damage_ss1.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_visco_elastic_damage_ss2.cc
@@ -64,8 +70,9 @@ set (PY_BINDING_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_hyper_elasto_plastic2.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_linear_elastic_generic.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_stochastic_plasticity.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_solvers.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_krylov_solvers.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_projections.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_solvers.cc
   )
 if(${SPLIT_CELL})
   set (PY_BINDING_SRCS

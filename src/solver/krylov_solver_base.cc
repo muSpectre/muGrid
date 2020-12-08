@@ -42,20 +42,38 @@ namespace muSpectre {
       std::shared_ptr<MatrixAdaptable> matrix_adaptable, const Real & tol,
       const Uint & maxiter, const Verbosity & verbose)
       : matrix_holder{matrix_adaptable},
-        matrix{matrix_adaptable->get_adaptor()}, tol{tol}, maxiter{maxiter},
-        verbose{verbose} {}
+        matrix_ptr{matrix_adaptable}, matrix{matrix_adaptable->get_adaptor()},
+        tol{tol}, maxiter{maxiter}, verbose{verbose} {}
+
+  /* ---------------------------------------------------------------------- */
+  KrylovSolverBase::KrylovSolverBase(
+      std::weak_ptr<MatrixAdaptable> matrix_adaptable, const Real & tol,
+      const Uint & maxiter, const Verbosity & verbose)
+      : matrix_ptr{matrix_adaptable},
+        matrix{matrix_adaptable.lock()->get_adaptor()}, tol{tol},
+        maxiter{maxiter}, verbose{verbose} {}
 
   /* ---------------------------------------------------------------------- */
   KrylovSolverBase::KrylovSolverBase(const Real & tol, const Uint & maxiter,
                                      const Verbosity & verbose)
-      : tol{tol}, maxiter{maxiter},
-        verbose{verbose} {}
+      : tol{tol}, maxiter{maxiter}, verbose{verbose} {}
 
   /* ---------------------------------------------------------------------- */
   void KrylovSolverBase::set_matrix(
       std::shared_ptr<MatrixAdaptable> matrix_adaptable) {
+    // just keeping a copy of the pointer keeps the matrix from destruction
     this->matrix_holder = matrix_adaptable;
-    this->matrix = this->matrix_holder->get_adaptor();
+    KrylovSolverBase::set_matrix(
+        std::weak_ptr<MatrixAdaptable>{matrix_adaptable});
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void KrylovSolverBase::set_matrix(
+      std::weak_ptr<MatrixAdaptable> matrix_adaptable) {
+    this->matrix_ptr = matrix_adaptable;
+    this->matrix = this->matrix_holder
+                       ? this->matrix_holder->get_adaptor()
+                       : this->matrix_ptr.lock()->get_weak_adaptor();
   }
 
   /* ---------------------------------------------------------------------- */

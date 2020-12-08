@@ -34,6 +34,7 @@
  */
 
 #include "exception.hh"
+#include "iterators.hh"
 
 #include <Eigen/Dense>
 
@@ -94,6 +95,11 @@ namespace muGrid {
   enum class IterUnit {
     Pixel,  //!< dofs relative to a pixel/voxel, no subdivision
     SubPt   //!< dofs relative to sub-points (e.g. quadrature points)
+  };
+
+  enum class Stencil_t {
+    Triangle,  //!<  isosceles right triangle, linear
+    Rectangle   //!< bilinear Rectangle
   };
 
   /**
@@ -290,6 +296,7 @@ namespace muGrid {
       return this->long_array[index];
     }
 
+
     //! push element to the end
     void push_back(const T & value) {
       if (static_cast<size_t>(this->dim) >= MaxDim) {
@@ -297,6 +304,22 @@ namespace muGrid {
       }
       this->long_array[this->dim] = value;
       this->dim++;
+    }
+
+
+    //! modulo assignment operator (mostly for periodic boundaries stuff)
+    DynCcoord & operator%=(const DynCcoord & other) {
+      for (auto && tup : akantu::zip(*this, other)) {
+        std::get<0>(tup) %= std::get<1>(tup);
+      }
+      return *this;
+    }
+
+    //! modulo operator (mostly for periodic boundaries stuff)
+    DynCcoord operator%(const DynCcoord & other) const {
+      DynCcoord ret_val{*this};
+      ret_val %= other;
+      return ret_val;
     }
 
     //! conversion operator

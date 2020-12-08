@@ -37,6 +37,7 @@
 #include "materials/material_linear_elastic_generic1.hh"
 #include "materials/material_linear_elastic_generic2.hh"
 #include "cell/cell.hh"
+#include "cell/cell_data.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -46,6 +47,7 @@
 #include <string>
 
 using muSpectre::Cell;
+using muSpectre::CellData;
 using muSpectre::Dim_t;
 using muSpectre::Index_t;
 using muSpectre::MaterialBase;
@@ -67,12 +69,23 @@ void add_material_linear_elastic_generic1_helper(py::module & mod) {
   const auto name{name_stream.str()};
 
   using Mat_t = MaterialLinearElasticGeneric1<Dim>;
-  using Cell_t = Cell;
 
   py::class_<Mat_t, MaterialBase, std::shared_ptr<Mat_t>>(mod, name.c_str())
       .def_static(
           "make",
-          [](std::shared_ptr<Cell_t> cell, std::string name,
+          [](std::shared_ptr<Cell> cell, std::string name,
+             const py::EigenDRef<
+                 Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>> &
+                 elastic_tensor) -> Mat_t & {
+            return Mat_t::make(cell, name, elastic_tensor);
+          },
+          "cell"_a, "name"_a, "elastic_tensor"_a,
+          py::return_value_policy::reference_internal,
+          "Factory function returning a MaterialLinearElastic instance. "
+          "The elastic tensor has to be specified in Voigt notation.")
+      .def_static(
+          "make",
+          [](std::shared_ptr<CellData> cell, std::string name,
              const py::EigenDRef<
                  Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>> &
                  elastic_tensor) -> Mat_t & {

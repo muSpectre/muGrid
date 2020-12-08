@@ -201,7 +201,7 @@ namespace muSpectre {
     Stress_t S{Matrices::tensmult(this->C, E)};
     Strain_t F_input{Strain_t::Zero()};
 
-    if (StrainM == StrainMeasure::Gradient) {
+    if (StrainM == StrainMeasure::PlacementGradient) {
       F_input = strain;
     } else {
       F_input = this->F;

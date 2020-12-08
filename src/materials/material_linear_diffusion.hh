@@ -122,6 +122,9 @@ namespace muSpectre {
 
     muGrid::PhysicsDomain get_physics_domain() const final;
 
+    //! returns reference to the tangent moduli
+    const Tangent_t & get_diffusion_coeff() const;
+
    protected:
     //! unique ptr to the conductivity/diffusitivy matrix
     std::unique_ptr<const Tangent_t> A_holder;

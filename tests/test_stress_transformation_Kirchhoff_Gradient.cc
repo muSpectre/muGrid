@@ -39,18 +39,18 @@ namespace muSpectre {
   BOOST_AUTO_TEST_SUITE(stress_transformations_Gradient_Kirchhoff);
 
   using mats_Kirchhoff_Gradient = boost::mpl::list<
-      STMatFixture<twoD, StrainMeasure::Gradient, StressMeasure::Kirchhoff,
-                   PureSphericalStrain>,
-      STMatFixture<twoD, StrainMeasure::Gradient, StressMeasure::Kirchhoff,
-                   PureShearStrain>,
-      STMatFixture<twoD, StrainMeasure::Gradient, StressMeasure::Kirchhoff,
-                   CombinedStrain>,
-      STMatFixture<threeD, StrainMeasure::Gradient, StressMeasure::Kirchhoff,
-                   PureSphericalStrain>,
-      STMatFixture<threeD, StrainMeasure::Gradient, StressMeasure::Kirchhoff,
-                   PureShearStrain>,
-      STMatFixture<threeD, StrainMeasure::Gradient, StressMeasure::Kirchhoff,
-                   CombinedStrain>>;
+      STMatFixture<twoD, StrainMeasure::PlacementGradient,
+                   StressMeasure::Kirchhoff, PureSphericalStrain>,
+      STMatFixture<twoD, StrainMeasure::PlacementGradient,
+                   StressMeasure::Kirchhoff, PureShearStrain>,
+      STMatFixture<twoD, StrainMeasure::PlacementGradient,
+                   StressMeasure::Kirchhoff, CombinedStrain>,
+      STMatFixture<threeD, StrainMeasure::PlacementGradient,
+                   StressMeasure::Kirchhoff, PureSphericalStrain>,
+      STMatFixture<threeD, StrainMeasure::PlacementGradient,
+                   StressMeasure::Kirchhoff, PureShearStrain>,
+      STMatFixture<threeD, StrainMeasure::PlacementGradient,
+                   StressMeasure::Kirchhoff, CombinedStrain>>;
 
   // ----------------------------------------------------------------------
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(Kirchhoff_Gradient, Fix,
@@ -73,8 +73,8 @@ namespace muSpectre {
     auto && C{material.get_C()};
 
     T2_t tau{material.evaluate_stress(F)};
-    T2_t S{MatTB::PK2_stress<StressMeasure::Kirchhoff, StrainMeasure::Gradient>(
-        F, tau)};
+    T2_t S{MatTB::PK2_stress<StressMeasure::Kirchhoff,
+                             StrainMeasure::PlacementGradient>(F, tau)};
 
     T4_t c_estim{
         evaluator.estimate_tangent(F, Formulation::native, nonlin_step)};
@@ -89,8 +89,8 @@ namespace muSpectre {
     T4_t K_closed{I_Finv_T4 * c_estim - tauFinvT_Finv_T4};
 
     auto && P_K_stress_tangent_conversion{
-        MatTB::PK1_stress<StressMeasure::Kirchhoff, StrainMeasure::Gradient>(
-            F, tau, c_estim)};
+        MatTB::PK1_stress<StressMeasure::Kirchhoff,
+                          StrainMeasure::PlacementGradient>(F, tau, c_estim)};
 
     T4_t K_stress_tangent_conversion{
         std::get<1>(P_K_stress_tangent_conversion)};

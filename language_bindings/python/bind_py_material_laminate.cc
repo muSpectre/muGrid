@@ -39,6 +39,7 @@
 #include "materials/stress_transformations_PK1.hh"
 
 #include "cell/cell.hh"
+#include "cell/cell_data.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -77,13 +78,20 @@ void add_material_laminate_helper(py::module & mod) {
   const auto name{name_stream.str()};
 
   using Mat_t = muSpectre::MaterialLaminate<dim, Form>;
-  using Sys_t = muSpectre::Cell;
+  using Cell_t = muSpectre::Cell;
+  using CellData_t = muSpectre::CellData;
   py::class_<Mat_t, muSpectre::MaterialBase, std::shared_ptr<Mat_t>>(
       mod, name.c_str())
       .def_static(
           "make",
-          [](std::shared_ptr<Sys_t> sys, std::string n) -> Mat_t & {
+          [](std::shared_ptr<Cell_t> sys, std::string n) -> Mat_t & {
             return Mat_t::make(sys, n);
+          },
+          "cell"_a, "name"_a, py::return_value_policy::reference_internal)
+      .def_static(
+          "make",
+          [](std::shared_ptr<CellData_t> cell, std::string n) -> Mat_t & {
+            return Mat_t::make(cell, n);
           },
           "cell"_a, "name"_a, py::return_value_policy::reference_internal)
       .def_static("make_evaluator", []() { return Mat_t::make_evaluator(); });

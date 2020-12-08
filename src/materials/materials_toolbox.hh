@@ -92,7 +92,7 @@ namespace muSpectre {
        **/
       template <StrainMeasure In, StrainMeasure Out = In>
       struct ConvertStrain {
-        // static_assert((In == StrainMeasure::Gradient) ||
+        // static_assert((In == StrainMeasure::PlacementGradient) ||
         //                   (In == StrainMeasure::Infinitesimal),
         //               "This situation makes me suspect that you are not using
         //               " "MatTb as intended. Disable this assert only if you
@@ -109,69 +109,125 @@ namespace muSpectre {
         }
       };
 
-      /* ----------------------------------------------------------------------
-       */
-      /** Specialisation for getting Green-Lagrange strain from the
-          transformation gradient
-          E = ¹/₂ (C - I) = ¹/₂ (Fᵀ·F - I)
+      /** Specialisation for getting the placement gradient F from the
+          displacement gradient H
+          F = H + I
       **/
       template <>
-      struct ConvertStrain<StrainMeasure::Gradient,
-                           StrainMeasure::GreenLagrange> {
+      struct ConvertStrain<StrainMeasure::DisplacementGradient,
+                           StrainMeasure::PlacementGradient> {
         //! returns the converted strain
-        template <class Strain_t>
-        inline static decltype(auto) compute(Strain_t && F) {
-          return .5 * (F.transpose() * F - Strain_t::PlainObject::Identity());
+        template <class Derived>
+        inline static decltype(auto)
+        compute(const Eigen::MatrixBase<Derived> & H) {
+          return H + Derived::Identity();
         }
       };
 
-      /* ----------------------------------------------------------------------
-       */
+      /** Specialisation for getting Green-Lagrange strain from the
+          placement gradient
+          E = ¹/₂ (C - I) = ¹/₂ (Fᵀ·F - I)
+      **/
+      template <>
+      struct ConvertStrain<StrainMeasure::PlacementGradient,
+                           StrainMeasure::GreenLagrange> {
+        //! returns the converted strain
+        template <class Derived>
+        inline static decltype(auto)
+        compute(const Eigen::MatrixBase<Derived> & F) {
+          return .5 * (F.transpose() * F - Derived::Identity());
+        }
+      };
+
+      /** Specialisation for getting Green-Lagrange strain from the
+          displacement gradient
+          E = ¹/₂ (C - I) = ¹/₂ (Hᵀ·H  + H + Hᵀ)
+      **/
+      template <>
+      struct ConvertStrain<StrainMeasure::DisplacementGradient,
+                           StrainMeasure::GreenLagrange> {
+        //! returns the converted strain
+        template <class Derived>
+        inline static decltype(auto)
+        compute(const Eigen::MatrixBase<Derived> & H) {
+          return .5 * (H.transpose() * H + H + H.transpose());
+        }
+      };
+
+      /** Specialisation for getting the infinitesimal strain tensor (=
+       *  symmetrised displacement gradient) from the placement gradient
+       *
+       *   ε = ¹/₂ (H + Hᵀ) = ¹/₂ (F + Fᵀ) - I
+       **/
+      template <>
+      struct ConvertStrain<StrainMeasure::PlacementGradient,
+                           StrainMeasure::Infinitesimal> {
+        //! returns the converted strain
+        template <class Derived>
+        inline static decltype(auto)
+        compute(const Eigen::MatrixBase<Derived> & F) {
+          return .5 * (F + F.transpose()) - F.Identity(F.rows(), F.cols());
+        }
+      };
+
+      /** Specialisation for getting the infinitesimal strain tensor (=
+       *  symmetrised displacement gradient) from the displacement gradient
+       *
+       *   ε = ¹/₂ (H + Hᵀ)
+       **/
+      template <>
+      struct ConvertStrain<StrainMeasure::DisplacementGradient,
+                           StrainMeasure::Infinitesimal> {
+        //! returns the converted strain
+        template <class Derived>
+        inline static decltype(auto)
+        compute(const Eigen::MatrixBase<Derived> & H) {
+          return .5 * (H + H.transpose());
+        }
+      };
+
       /** Specialisation for getting Left Cauchy-Green strain from the
-          transformation gradient
+          placement gradient
           B = F·Fᵀ = V²
       **/
       template <>
-      struct ConvertStrain<StrainMeasure::Gradient,
+      struct ConvertStrain<StrainMeasure::PlacementGradient,
                            StrainMeasure::LCauchyGreen> {
         //! returns the converted strain
-        template <class Strain_t>
-        inline static decltype(auto) compute(Strain_t && F) {
+        template <class Derived>
+        inline static decltype(auto)
+        compute(const Eigen::MatrixBase<Derived> & F) {
           return F * F.transpose();
         }
       };
 
-      /* ----------------------------------------------------------------------
-       */
       /** Specialisation for getting Right Cauchy-Green strain from the
-          transformation gradient
+          placement gradient
           C = Fᵀ·F = U²
       **/
       template <>
-      struct ConvertStrain<StrainMeasure::Gradient,
+      struct ConvertStrain<StrainMeasure::PlacementGradient,
                            StrainMeasure::RCauchyGreen> {
         //! returns the converted strain
-        template <class Strain_t>
-        inline static decltype(auto) compute(Strain_t && F) {
+        template <class Derived>
+        inline static decltype(auto)
+        compute(const Eigen::MatrixBase<Derived> & F) {
           return F.transpose() * F;
         }
       };
 
-      /* ----------------------------------------------------------------------
-       */
       /** Specialisation for getting logarithmic (Hencky) strain from the
-          transformation gradient
+          placement gradient
           E₀ = ¹/₂ ln C = ¹/₂ ln (Fᵀ·F)
       **/
       template <>
-      struct ConvertStrain<StrainMeasure::Gradient, StrainMeasure::Log> {
+      struct ConvertStrain<StrainMeasure::PlacementGradient,
+                           StrainMeasure::Log> {
         //! returns the converted strain
-        template <class Strain_t>
-        inline static decltype(auto) compute(Strain_t && F) {
-          constexpr Dim_t dim{muGrid::EigenCheck::tensor_dim<Strain_t>::value};
-          return (.5 * muGrid::logm(
-                           Eigen::Matrix<Real, dim, dim>{F.transpose() * F}))
-              .eval();
+        template <class Derived>
+        inline static decltype(auto)
+        compute(const Eigen::MatrixBase<Derived> & F) {
+          return .5 * muGrid::logm(F.transpose() * F);
         }
       };
 
@@ -180,9 +236,9 @@ namespace muSpectre {
     /* ---------------------------------------------------------------------- */
     //! set of functions returning one strain measure as a function of
     //! another
-    template <StrainMeasure In, StrainMeasure Out, class Strain_t>
-    decltype(auto) convert_strain(Strain_t && strain) {
-      return internal::ConvertStrain<In, Out>::compute(std::move(strain));
+    template <StrainMeasure In, StrainMeasure Out, class Derived>
+    decltype(auto) convert_strain(const Eigen::MatrixBase<Derived> & strain) {
+      return internal::ConvertStrain<In, Out>::compute(strain);
     }
 
     namespace internal {

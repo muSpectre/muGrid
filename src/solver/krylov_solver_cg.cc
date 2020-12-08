@@ -45,22 +45,36 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   KrylovSolverCG::KrylovSolverCG(std::shared_ptr<MatrixAdaptable> matrix_holder,
-                                 Real tol, Uint maxiter, Verbosity verbose)
+                                 const Real & tol, const Uint & maxiter,
+                                 const Verbosity & verbose)
       : Parent{matrix_holder, tol, maxiter, verbose},
         comm{matrix_holder->get_communicator()}, r_k(this->get_nb_dof()),
         p_k(this->get_nb_dof()), Ap_k(this->get_nb_dof()),
         x_k(this->get_nb_dof()) {}
 
   /* ---------------------------------------------------------------------- */
-  KrylovSolverCG::KrylovSolverCG(Real tol, Uint maxiter, Verbosity verbose)
+  KrylovSolverCG::KrylovSolverCG(const Real & tol, const Uint & maxiter,
+                                 const Verbosity & verbose)
       : Parent{tol, maxiter, verbose}, r_k{}, p_k{}, Ap_k{}, x_k{} {}
 
   /* ---------------------------------------------------------------------- */
   void KrylovSolverCG::set_matrix(
       std::shared_ptr<MatrixAdaptable> matrix_adaptable) {
     Parent::set_matrix(matrix_adaptable);
-    this->comm = this->matrix_holder->get_communicator();
-    auto && nb_dof{matrix_adaptable->get_nb_dof()};
+    this->set_internal_arrays();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void
+  KrylovSolverCG::set_matrix(std::weak_ptr<MatrixAdaptable> matrix_adaptable) {
+    Parent::set_matrix(matrix_adaptable);
+    this->set_internal_arrays();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void KrylovSolverCG::set_internal_arrays() {
+    this->comm = this->matrix_ptr.lock()->get_communicator();
+    auto && nb_dof{this->matrix_ptr.lock()->get_nb_dof()};
     this->r_k.resize(nb_dof);
     this->p_k.resize(nb_dof);
     this->Ap_k.resize(nb_dof);
@@ -68,7 +82,16 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
+  std::string KrylovSolverCG::get_name() const { return "CG"; }
+
+  /* ---------------------------------------------------------------------- */
   auto KrylovSolverCG::solve(const ConstVector_ref rhs) -> Vector_map {
+    if (this->matrix_ptr.expired()) {
+      std::stringstream error_message{};
+      error_message << "The system matrix has been destroyed. Did you set the "
+                       "matrix using a weak_ptr instead of a shared_ptr?";
+      throw SolverError{error_message.str()};
+    }
     this->x_k.setZero();
     // Following implementation of algorithm 5.2 in Nocedal's
     // Numerical Optimization (p. 112)
@@ -99,8 +122,7 @@ namespace muSpectre {
     }
 
     if (this->verbose > Verbosity::Silent && this->comm.rank() == 0) {
-      std::cout << "Norm of rhs in krylov_solver_cg.cc = " << rhs_norm2
-                << std::endl;
+      std::cout << "Norm of rhs in CG = " << std::sqrt(rhs_norm2) << std::endl;
     }
 
     // Multiplication with the norm of the right hand side to get a relative
@@ -115,12 +137,15 @@ namespace muSpectre {
     Real rel_tol2 = muGrid::ipow(tol, 2) * rhs_norm2;
 
     size_t count_width{};  // for output formatting in verbose case
-    if (verbose > Verbosity::Silent) {
-      count_width = static_cast<size_t>(std::log10(this->maxiter)) + 1;
+    if (this->verbose > Verbosity::Silent) {
+      count_width = size_t(std::log10(this->maxiter)) + 1;
     }
 
-    for (Uint i = 0;
-         i < this->maxiter && rdr > rel_tol2; ++i, ++this->counter) {
+    // because of the early termination criterion, we never count the last
+    // iteration
+    ++this->counter;
+    for (Uint i{0}; i < this->maxiter && rdr > rel_tol2;
+         ++i, ++this->counter) {
       this->Ap_k = this->matrix * this->p_k;
 
       Real pdAp{comm.sum(this->p_k.dot(this->Ap_k))};
@@ -140,8 +165,11 @@ namespace muSpectre {
       if (this->verbose > Verbosity::Silent && this->comm.rank() == 0) {
         std::cout << "  at CG step " << std::setw(count_width) << i
                   << ": |r|/|b| = " << std::setw(15)
-                  << std::sqrt(rdr / rhs_norm2) << ", cg_tol = "
-                  << this->tol << std::endl;
+                  << std::sqrt(rdr / rhs_norm2) << ", cg_tol = " << this->tol
+                  << std::endl;
+      }
+      if (new_rdr < rel_tol2) {
+        break;
       }
 
       this->p_k = -this->r_k + beta * this->p_k;

@@ -56,7 +56,7 @@ namespace muSpectre {
 
   template <Index_t DimM, Formulation Form>
   struct MaterialMuSpectre_traits<MaterialLaminate<DimM, Form>>
-      : public DefaultMechanics_traits<DimM, StrainMeasure::Gradient,
+      : public DefaultMechanics_traits<DimM, StrainMeasure::PlacementGradient,
                                        StressMeasure::PK1> {};
 
   template <Index_t DimM>

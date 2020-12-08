@@ -152,8 +152,10 @@ muSpectre_add_example(first_conc_py_example
 muSpectre_add_example(sec_conc_py_example
   TYPE PYTHON second_concrete_example.py 1)
 
-muSpectre_add_example(netcdf_io_use_case
-  TYPE PYTHON netcdf_io_use_case.py)
+if (NETCDF_IO)
+  muSpectre_add_example(netcdf_io_use_case
+    TYPE PYTHON netcdf_io_use_case.py)
+endif(NETCDF_IO)
 
 muSpectre_add_example(free_surface_py_example
         TYPE PYTHON free_surface.py)

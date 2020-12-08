@@ -41,6 +41,10 @@ set (projection_SRC
   ${CMAKE_CURRENT_SOURCE_DIR}/projection_small_strain.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/projection_finite_strain_fast.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/projection_approx_Green_operator.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/stiffness_operator.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/fem_stencil.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/discretisation.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/fem_library.cc
   )
 
 target_sources(muSpectre PRIVATE ${projection_SRC})

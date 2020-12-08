@@ -33,12 +33,13 @@
  *
  */
 
+#include "bind_py_declarations.hh"
+
 #include "common/muSpectre_common.hh"
 #include "solver/matrix_adaptor.hh"
 #include "solver/solvers.hh"
 #include "solver/krylov_solver_cg.hh"
 #include "solver/krylov_solver_eigen.hh"
-#include "solver/krylov_solver_trust_region_cg.hh"
 
 #include <libmugrid/numpy_tools.hh>
 
@@ -61,62 +62,6 @@ using muGrid::NumpyProxy;
 /**
  * Solvers instantiated for cells with equal spatial and material dimension
  */
-
-template <class KrylovSolver>
-void add_krylov_solver_helper(py::module & mod, std::string name) {
-  py::class_<KrylovSolver, typename KrylovSolver::Parent>(mod, name.c_str())
-      .def(py::init<std::shared_ptr<muSpectre::MatrixAdaptable>, Real, Uint,
-                    Verbosity>(),
-           "cell"_a, "tol"_a = -1.0, "maxiter"_a = 1000,
-           "verbose"_a = Verbosity::Silent)
-      .def("initialise", &KrylovSolver::initialise)
-      .def("solve", &KrylovSolver::solve, "rhs"_a)
-      .def_property_readonly("counter", &KrylovSolver::get_counter)
-      .def_property_readonly("maxiter", &KrylovSolver::get_maxiter)
-      .def_property_readonly("name", &KrylovSolver::get_name)
-      .def_property_readonly("tol", &KrylovSolver::get_tol);
-}
-
-template <class KrylovSolver>
-void add_krylov_solver_trust_region_helper(py::module & mod, std::string name) {
-  py::class_<KrylovSolver, typename KrylovSolver::Parent>(mod, name.c_str())
-      .def(py::init<std::shared_ptr<muSpectre::MatrixAdaptable>, Real, Uint,
-                    Real, Verbosity>(),
-           "cell"_a, "tol"_a = -1.0, "maxiter"_a = 1000, "trust_region"_a = 1.0,
-           "verbose"_a = Verbosity::Silent)
-      .def("initialise", &KrylovSolver::initialise)
-      .def("solve", &KrylovSolver::solve, "rhs"_a)
-      .def("set_trust_region",
-           &muSpectre::KrylovSolverTrustRegionCG::set_trust_region,
-           "new_trust_region"_a)
-      .def_property_readonly("counter", &KrylovSolver::get_counter)
-      .def_property_readonly("maxiter", &KrylovSolver::get_maxiter)
-      .def_property_readonly("name", &KrylovSolver::get_name)
-      .def_property_readonly("tol", &KrylovSolver::get_tol);
-}
-
-void add_krylov_solver(py::module & mod) {
-  py::class_<muSpectre::MatrixAdaptable,
-             std::shared_ptr<muSpectre::MatrixAdaptable>>(mod,
-                                                          "MatrixAdaptable");
-  std::stringstream name{};
-  name << "KrylovSolverBase";
-  py::class_<muSpectre::KrylovSolverBase>(mod, name.str().c_str());
-  add_krylov_solver_helper<muSpectre::KrylovSolverCG>(mod, "KrylovSolverCG");
-  add_krylov_solver_trust_region_helper<muSpectre::KrylovSolverTrustRegionCG>(
-      mod, "KrylovSolverTrustRegionCG");
-  add_krylov_solver_helper<muSpectre::KrylovSolverCGEigen>(
-      mod, "KrylovSolverCGEigen");
-  add_krylov_solver_helper<muSpectre::KrylovSolverGMRESEigen>(
-      mod, "KrylovSolverGMRESEigen");
-  add_krylov_solver_helper<muSpectre::KrylovSolverBiCGSTABEigen>(
-      mod, "KrylovSolverBiCGSTABEigen");
-  add_krylov_solver_helper<muSpectre::KrylovSolverDGMRESEigen>(
-      mod, "KrylovSolverDGMRESEigen");
-  add_krylov_solver_helper<muSpectre::KrylovSolverMINRESEigen>(
-      mod, "KrylovSolverMINRESEigen");
-}
-
 void add_newton_cg_helper(py::module & mod) {
   const char name[]{"newton_cg"};
   using solver = muSpectre::KrylovSolverBase;
@@ -313,11 +258,8 @@ void add_solver_helper(py::module & mod) {
   add_trust_region_newton_cg_helper(mod);
 }
 
-void add_solvers(py::module & mod) {
-  auto solvers{mod.def_submodule("solvers")};
-  solvers.doc() = "bindings for solvers";
-
-  py::class_<OptimizeResult>(mod, "OptimizeResult")
+void add_solvers(py::module & solvers) {
+  py::class_<OptimizeResult>(solvers, "OptimizeResult")
       .def_readwrite("grad", &OptimizeResult::grad)
       .def_readwrite("stress", &OptimizeResult::stress)
       .def_readwrite("success", &OptimizeResult::success)
@@ -327,7 +269,7 @@ void add_solvers(py::module & mod) {
       .def_readwrite("nb_fev", &OptimizeResult::nb_fev)
       .def_readwrite("formulation", &OptimizeResult::formulation);
 
-  add_krylov_solver(solvers);
+  add_krylov_solvers(solvers);
 
   add_solver_helper(solvers);
 }

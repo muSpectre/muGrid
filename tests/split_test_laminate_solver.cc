@@ -209,18 +209,18 @@ namespace muSpectre {
     using Strain_t = typename Fix::Strain_t;
     Real amp{1.0};
     Strain_t F{Strain_t::Identity() + amp * Strain_t::Random()};
-    Strain_t E{MatTB::convert_strain<StrainMeasure::Gradient,
+    Strain_t E{MatTB::convert_strain<StrainMeasure::PlacementGradient,
                                      StrainMeasure::GreenLagrange>(F)};
     using Function_t = typename Fix::Function_t;
 
-    Function_t mat1_evaluate_stress_func = [&mat1](
-        const Eigen::Ref<const Strain_t> & strain)
+    Function_t mat1_evaluate_stress_func =
+        [&mat1](const Eigen::Ref<const Strain_t> & strain)
         -> std::tuple<typename Fix::Stress_t, typename Fix::Stiffness_t> {
       return mat1.evaluate_stress_tangent(std::move(strain), OneRatio);
     };
 
-    Function_t mat2_evaluate_stress_func = [&mat2](
-        const Eigen::Ref<const Strain_t> & strain)
+    Function_t mat2_evaluate_stress_func =
+        [&mat2](const Eigen::Ref<const Strain_t> & strain)
         -> std::tuple<typename Fix::Stress_t, typename Fix::Stiffness_t> {
       return mat2.evaluate_stress_tangent(std::move(strain), OneRatio);
     };
@@ -294,7 +294,7 @@ namespace muSpectre {
     using Strain_t = typename Fix::Strain_t;
     Real amp{1.0};
     Strain_t F{Strain_t::Identity() + amp * Strain_t::Random()};
-    Strain_t E{MatTB::convert_strain<StrainMeasure::Gradient,
+    Strain_t E{MatTB::convert_strain<StrainMeasure::PlacementGradient,
                                      StrainMeasure::GreenLagrange>(F)};
 
     using Function_t = typename Fix::Function_t;
@@ -351,7 +351,7 @@ namespace muSpectre {
     using Strain_t = typename Fix::Strain_t;
     Real amp{1e-1};
     Strain_t F{Strain_t::Identity() + amp * Strain_t::Random()};
-    Strain_t E{MatTB::convert_strain<StrainMeasure::Gradient,
+    Strain_t E{MatTB::convert_strain<StrainMeasure::PlacementGradient,
                                      StrainMeasure::GreenLagrange>(F)};
     using Function_t = typename Fix::Function_t;
 
@@ -365,7 +365,7 @@ namespace muSpectre {
               typename std::remove_reference_t<decltype(mat1)>::traits;
 
           auto && mat1_strain =
-              MatTB::convert_strain<StrainMeasure::Gradient,
+              MatTB::convert_strain<StrainMeasure::PlacementGradient,
                                     traits::strain_measure>(strain);
 
           auto && mat_stress_tgt =
@@ -389,7 +389,7 @@ namespace muSpectre {
               typename std::remove_reference_t<decltype(mat2)>::traits;
 
           auto && mat2_strain =
-              MatTB::convert_strain<StrainMeasure::Gradient,
+              MatTB::convert_strain<StrainMeasure::PlacementGradient,
                                     traits::strain_measure>(strain);
 
           auto && mat_stress_tgt =
@@ -423,14 +423,14 @@ namespace muSpectre {
     auto && K_lam{std::get<1>(P_K_lam)};
 
     auto && S_C_lam{
-        MatTB::PK2_stress<StressMeasure::PK1, StrainMeasure::Gradient>(F, P_lam,
-                                                                       K_lam)};
+        MatTB::PK2_stress<StressMeasure::PK1, StrainMeasure::PlacementGradient>(
+            F, P_lam, K_lam)};
     auto && S_lam{std::get<0>(S_C_lam)};
     auto && C_lam{std::get<1>(S_C_lam)};
     auto && P_ref_1{std::get<0>(mat1_evaluate_stress_func(F))};
 
     auto && S_ref_1{
-        MatTB::PK2_stress<StressMeasure::PK1, StrainMeasure::Gradient>(
+        MatTB::PK2_stress<StressMeasure::PK1, StrainMeasure::PlacementGradient>(
             F, P_ref_1)};
     auto && S_ref_2{muGrid::Matrices::tensmult(C_lam, E)};
 
@@ -482,11 +482,11 @@ namespace muSpectre {
     Strain_t del_F{amp_del * Strain_t::Random()};
 
     Strain_t F_del{F + del_F};
-    Strain_t E{MatTB::convert_strain<StrainMeasure::Gradient,
+    Strain_t E{MatTB::convert_strain<StrainMeasure::PlacementGradient,
                                      StrainMeasure::GreenLagrange>(F)};
 
     Strain_t E_del{
-        MatTB::convert_strain<StrainMeasure::Gradient,
+        MatTB::convert_strain<StrainMeasure::PlacementGradient,
                               StrainMeasure::GreenLagrange>(F + del_F)};
     auto && del_E{E_del - E};
 
@@ -502,7 +502,7 @@ namespace muSpectre {
               typename std::remove_reference_t<decltype(mat1)>::traits;
 
           auto && mat1_strain =
-              MatTB::convert_strain<StrainMeasure::Gradient,
+              MatTB::convert_strain<StrainMeasure::PlacementGradient,
                                     traits::strain_measure>(strain);
 
           auto && mat_stress_tgt =
@@ -526,7 +526,7 @@ namespace muSpectre {
               typename std::remove_reference_t<decltype(mat2)>::traits;
 
           auto && mat2_strain =
-              MatTB::convert_strain<StrainMeasure::Gradient,
+              MatTB::convert_strain<StrainMeasure::PlacementGradient,
                                     traits::strain_measure>(strain);
 
           auto && mat_stress_tgt =
@@ -565,10 +565,10 @@ namespace muSpectre {
     auto && K_lam_del{std::get<1>(P_K_lam_del)};
 
     auto && S_C_lam{
-        MatTB::PK2_stress<StressMeasure::PK1, StrainMeasure::Gradient>(F, P_lam,
-                                                                       K_lam)};
+        MatTB::PK2_stress<StressMeasure::PK1, StrainMeasure::PlacementGradient>(
+            F, P_lam, K_lam)};
     auto && S_C_lam_del{
-        MatTB::PK2_stress<StressMeasure::PK1, StrainMeasure::Gradient>(
+        MatTB::PK2_stress<StressMeasure::PK1, StrainMeasure::PlacementGradient>(
             F + del_F, P_lam_del, K_lam_del)};
 
     auto && S_lam{std::get<0>(S_C_lam)};

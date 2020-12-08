@@ -160,8 +160,7 @@ namespace muGrid {
 
   /**
    * Alias of `muGrid::MappedStateField` for a map of scalars with corresponding
-   * `muSpectre::StateField` you wish to iterate over quadrature point by
-   * quadrature point.
+   * `muSpectre::StateField` you wish to iterate over.
    *
    * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
    * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
@@ -177,8 +176,25 @@ namespace muGrid {
 
   /**
    * Alias of `muGrid::MappedStateField` for a map of first-rank with
-   * corresponding `muSpectre::StateNField` you wish to iterate over quadrature
-   * point by quadrature point.
+   * corresponding `muSpectre::StateNField` you wish to iterate over.
+   *
+   * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
+   * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
+   * @tparam Mutability whether or not the map allows to modify the content of
+   * the field
+   * @tparam Rank tensorial rank
+   * @tparam Dim spatial dimension of the tensors
+   * @tparam IterationType describes the pixel-subdivision
+   * @tparam NbMemory number of previous values to store
+   */
+  template <typename T, Mapping Mutability, Dim_t Rank, Dim_t Dim,
+            IterUnit IterationType, size_t NbMemory = 1>
+  using MappedTensorStateNField = MappedStateField<
+    TensorStateFieldMap<T, Mutability, Rank, Dim, NbMemory, IterationType>>;
+
+  /**
+   * Alias of `muGrid::MappedStateField` for a map of first-rank with
+   * corresponding `muSpectre::StateNField` you wish to iterate over.
    *
    * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
    * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
@@ -195,8 +211,7 @@ namespace muGrid {
 
   /**
    * Alias of `muGrid::MappedStateField` for a map of second-rank with
-   * corresponding `muSpectre::StateField` you wish to iterate over quadrature
-   * point by quadrature point.
+   * corresponding `muSpectre::StateField` you wish to iterate over.
    *
    * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
    * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
@@ -213,8 +228,7 @@ namespace muGrid {
 
   /**
    * Alias of `muGrid::MappedStateField` for a map of fourth-rank with
-   * corresponding `muSpectre::StateField` you wish to iterate over quadrature
-   * point by quadrature point.
+   * corresponding `muSpectre::StateField` you wish to iterate over.
    *
    * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
    * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`

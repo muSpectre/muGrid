@@ -117,14 +117,14 @@ namespace muFFT {
     /**
      * need to override this method here, since FFTWMPI requires field padding
      */
-    FourierField_t &
+    muGrid::ComplexField &
     register_fourier_space_field(const std::string & unique_name,
                                  const Index_t & nb_dof_per_pixel) final;
 
     /**
      * need to override this method here, since FFTWMPI requires field padding
      */
-    FourierField_t &
+    muGrid::ComplexField &
     register_fourier_space_field(const std::string & unique_name,
                                  const Shape_t & shape) final;
 

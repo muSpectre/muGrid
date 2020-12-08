@@ -37,6 +37,7 @@
 #define SRC_SOLVER_SOLVERS_HH_
 
 #include "solver/krylov_solver_base.hh"
+#include "cell/cell.hh"
 
 #include <Eigen/Dense>
 

@@ -33,15 +33,19 @@
  *
  */
 
+#include "libmugrid/grid_common.hh"
 #include "libmugrid/exception.hh"
 #include "libmugrid/field.hh"
+#include "libmugrid/field_map.hh"
 #include "libmugrid/field_typed.hh"
 #include "libmugrid/field_collection.hh"
 #include "libmugrid/field_collection_global.hh"
+#include "libmugrid/mapped_field.hh"
 #include "libmugrid/numpy_tools.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
+#include <pybind11/eigen.h>
 #include <pybind11/stl.h>
 
 #include <sstream>
@@ -66,8 +70,7 @@ void add_field(py::module & mod) {
       .def_property_readonly("buffer_size", &Field::get_buffer_size)
       .def_property_readonly("shape",
                              [](Field & field) {
-                               return field.get_shape(
-                                   muGrid::IterUnit::SubPt);
+                               return field.get_shape(muGrid::IterUnit::SubPt);
                              })
       .def_property_readonly("pad_size", &Field::get_pad_size)
       .def_property_readonly("name", &Field::get_name)
@@ -90,9 +93,8 @@ void add_typed_field(py::module & mod, std::string name) {
           throw RuntimeError("Field collection isn't initialised yet");
         }
         auto subdivision{muGrid::IterUnit::SubPt};
-        return py::buffer_info(
-            self.data(), self.get_shape(subdivision),
-            self.get_strides(subdivision, sizeof(T)));
+        return py::buffer_info(self.data(), self.get_shape(subdivision),
+                               self.get_strides(subdivision, sizeof(T)));
       })
       .def(
           "array",
@@ -102,8 +104,48 @@ void add_typed_field(py::module & mod, std::string name) {
           "iteration_type"_a = muGrid::IterUnit::SubPt, py::keep_alive<0, 1>());
 
   py::class_<TypedField<T>, TypedFieldBase<T>>(mod, name.c_str())
-      .def("clone", &TypedField<T>::clone, "new_name"_a,
-           "allow_overwrite"_a, py::return_value_policy::reference_internal);
+      .def("clone", &TypedField<T>::clone, "new_name"_a, "allow_overwrite"_a,
+           py::return_value_policy::reference_internal);
+}
+
+template <typename T, muGrid::Mapping Mutability>
+decltype(auto) add_field_map_const(py::module & mod, const std::string & name) {
+  std::string full_name{name +
+                        (Mutability == muGrid::Mapping::Mut ? "Mut" : "Const")};
+  using Map_t = muGrid::FieldMap<T, Mutability>;
+
+  py::class_<Map_t> pyclass(mod, full_name.c_str());
+  pyclass.def("mean", [](const Map_t & map) { return map.mean(); });
+  return pyclass;
+}
+template <typename T>
+void add_field_map(py::module & mod, const std::string & name) {
+  add_field_map_const<T, muGrid::Mapping::Const>(mod, name);
+  add_field_map_const<T, muGrid::Mapping::Mut>(mod, name).def(
+      "set_uniform",
+      [](muGrid::FieldMap<T, muGrid::Mapping::Mut> & map,
+         py::EigenDRef<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>> val) {
+        map = val;
+      },
+      "value"_a);
+}
+
+template <typename T>
+void add_mutable_mapped_field(py::module & mod, const std::string & name) {
+  using MappedField_t =
+      muGrid::MappedField<muGrid::FieldMap<T, muGrid::Mapping::Mut>>;
+
+  py::class_<MappedField_t>(mod, name.c_str())
+      .def_property_readonly("field",
+                             [](MappedField_t & mf) -> muGrid::TypedField<T> & {
+                               return mf.get_field();
+                             })
+      .def_property_readonly(
+          "map",
+          [](MappedField_t & mf)
+              -> muGrid::FieldMap<T, muGrid::Mapping::Mut> & {
+            return mf.get_map();
+          });
 }
 
 void add_field_classes(py::module & mod) {
@@ -113,4 +155,14 @@ void add_field_classes(py::module & mod) {
   add_typed_field<muGrid::Complex>(mod, "ComplexField");
   add_typed_field<muGrid::Int>(mod, "IntField");
   add_typed_field<muGrid::Uint>(mod, "UintField");
+
+  add_field_map<muGrid::Real>(mod, "RealFieldMap");
+  add_field_map<muGrid::Complex>(mod, "ComplexFieldMap");
+  add_field_map<muGrid::Int>(mod, "IntFieldMap");
+  add_field_map<muGrid::Uint>(mod, "UintFieldMap");
+
+  add_mutable_mapped_field<muGrid::Real>(mod, "RealMappedField");
+  add_mutable_mapped_field<muGrid::Complex>(mod, "ComplexMappedField");
+  add_mutable_mapped_field<muGrid::Int>(mod, "IntMappedField");
+  add_mutable_mapped_field<muGrid::Uint>(mod, "UintMappedField");
 }

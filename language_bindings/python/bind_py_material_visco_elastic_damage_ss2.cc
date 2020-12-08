@@ -36,6 +36,7 @@
 #include "common/muSpectre_common.hh"
 #include "materials/material_visco_elastic_damage_ss2.hh"
 #include "cell/cell.hh"
+#include "cell/cell_data.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -61,13 +62,24 @@ void add_material_visco_elastic_damage_ss2_helper(py::module & mod) {
 
   using Mat_t = muSpectre::MaterialViscoElasticDamageSS2<Dim>;
   using Cell_t = muSpectre::Cell;
+  using CellData_t = muSpectre::CellData;
 
   py::class_<Mat_t, muSpectre::MaterialBase, std::shared_ptr<Mat_t>>(
       mod, name.c_str())
-
       .def_static(
           "make",
           [](std::shared_ptr<Cell_t> cell, std::string name, Real young_inf,
+             Real young_v, Real eta_v, Real poisson, Real kappa, Real alpha,
+             Real beta, Real dt = 0.0) -> Mat_t & {
+            return Mat_t::make(cell, name, young_inf, young_v, eta_v, poisson,
+                               kappa, alpha, beta, dt);
+          },
+          "cell"_a, "name"_a, "YoungModulusInf"_a, "YoungModulusV"_a, "EtaV"_a,
+          "PoissonRatio"_a, "Kappa"_a, "Alpha"_a, "Beta"_a, "dt"_a,
+          py::return_value_policy::reference_internal)
+      .def_static(
+          "make",
+          [](std::shared_ptr<CellData_t> cell, std::string name, Real young_inf,
              Real young_v, Real eta_v, Real poisson, Real kappa, Real alpha,
              Real beta, Real dt = 0.0) -> Mat_t & {
             return Mat_t::make(cell, name, young_inf, young_v, eta_v, poisson,

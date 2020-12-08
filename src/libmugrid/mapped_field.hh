@@ -176,6 +176,9 @@ namespace muGrid {
     //! return a reference to the map
     FieldMapType & get_map() { return this->map; }
 
+    //! return a reference to the map
+    const FieldMapType & get_map() const { return this->map; }
+
    protected:
     TypedField<Scalar> & field;  //!< reference to mapped field
     FieldMapType map;            //!< associated field map
@@ -234,8 +237,7 @@ namespace muGrid {
 
   /**
    * Alias of `muGrid::MappedField` for a map of scalars with corresponding
-   * `muSpectre::Field` you wish to iterate over quadrature point by quadrature
-   * point.
+   * `muSpectre::Field` you wish to iterate over.
    *
    * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
    * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
@@ -249,8 +251,24 @@ namespace muGrid {
 
   /**
    * Alias of `muGrid::MappedField` for a map of second-rank with corresponding
-   * `muSpectre::Field` you wish to iterate over quadrature point by quadrature
-   * point.
+   * `muSpectre::Field` you wish to iterate over.
+   *
+   * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
+   * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
+   * @tparam Mutability whether or not the map allows to modify the content of
+   * the field
+   * @tparam Rank tensorial rank
+   * @tparam Dim spatial dimension of the tensors
+   * @tparam IterationType describes the pixel-subdivision
+   */
+  template <typename T, Mapping Mutability, Dim_t Rank, Dim_t Dim,
+            IterUnit IterationType>
+  using MappedTensorField =
+    MappedField<TensorFieldMap<T, Mutability, Rank, Dim, IterationType>>;
+
+  /**
+   * Alias of `muGrid::MappedField` for a map of second-rank with corresponding
+   * `muSpectre::Field` you wish to iterate over.
    *
    * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
    * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
@@ -265,8 +283,7 @@ namespace muGrid {
 
   /**
    * Alias of `muGrid::MappedField` for a map of first-rank with corresponding
-   * `muSpectre::Field` you wish to iterate over quadrature point by quadrature
-   * point.
+   * `muSpectre::Field` you wish to iterate over.
    *
    * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
    * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
@@ -281,8 +298,7 @@ namespace muGrid {
 
   /**
    * Alias of `muGrid::MappedField` for a map of fourth-rank with corresponding
-   * `muSpectre::Field` you wish to iterate over quadrature point by quadrature
-   * point.
+   * `muSpectre::Field` you wish to iterate over.
    *
    * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
    * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`

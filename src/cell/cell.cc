@@ -357,7 +357,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  auto Cell::evaluate_stress_eigen() -> Eigen_cmap {
+  auto Cell::evaluate_stress_eigen() -> EigenVec_cmap {
     return this->evaluate_stress().eigen_vec();
   }
 
@@ -390,9 +390,9 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   auto Cell::evaluate_stress_tangent_eigen()
-      -> std::tuple<const Eigen_cmap, const Eigen_cmap> {
+      -> std::tuple<const EigenVec_cmap, const EigenVec_cmap> {
     auto && fields{this->evaluate_stress_tangent()};
-    return std::tuple<const Eigen_cmap, const Eigen_cmap>(
+    return std::tuple<const EigenVec_cmap, const EigenVec_cmap>(
         std::get<0>(fields).eigen_vec(), std::get<1>(fields).eigen_vec());
   }
 

@@ -35,7 +35,8 @@
 
 #include "common/muSpectre_common.hh"
 #include "materials/material_linear_orthotropic.hh"
-#include "cell/cell_base.hh"
+#include "cell/cell.hh"
+#include "cell/cell_data.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -57,19 +58,29 @@ void add_material_orthotropic_helper(py::module & mod) {
   std::stringstream name_stream{};
   name_stream << "MaterialOrthotropic_" << dim << 'd';
   const auto name{name_stream.str()};
-  using Mat_t = muSpectre::MaterialOrthotropic<dim, dim>;
-  using Sys_t = muSpectre::CellBase<dim, dim>;
-  using MatAniso_t = MaterialLinearAnisotropic<dim, dim>;
+  using Mat_t = muSpectre::MaterialLinearOrthotropic<dim>;
+  using Cell_t = muSpectre::Cell;
+  using CellData_t = muSpectre::CellData;
+  using MatAniso_t = muSpectre::MaterialLinearAnisotropic<dim>;
   py::class_<Mat_t, MatAniso_t>(mod, name.c_str())
       .def_static(
           "make",
-          [](Sys_t & sys, std::string n, std::vector<Real> stiffness_coeffs)
-              -> Mat_t & { return Mat_t::make(sys, n, stiffness_coeffs); },
+          [](Cell_t & cell, std::string n, std::vector<Real> stiffness_coeffs)
+              -> Mat_t & { return Mat_t::make(cell, n, stiffness_coeffs); },
+          "cell"_a, "name"_a, "stiffness_coeffs"_a,
+          py::return_value_policy::reference_internal)
+      .def_static(
+          "make",
+          [](CellData_t & cell, std::string n,
+             std::vector<Real> stiffness_coeffs) -> Mat_t & {
+            return Mat_t::make(cell, n, stiffness_coeffs);
+          },
           "cell"_a, "name"_a, "stiffness_coeffs"_a,
           py::return_value_policy::reference_internal)
       .def(
           "add_pixel",
-          [](Mat_t & mat, Ccoord_t<dim> pix) { mat.add_pixel(pix); }, "pixel"_a)
+          [](Mat_t & mat, size_t pixel_index) { mat.add_pixel(pixel_index); },
+          "pixel_index"_a)
 
       .def("size", &Mat_t::size);
 }

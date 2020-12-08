@@ -221,13 +221,13 @@ void add_engine_helper(py::module & mod, const std::string & name) {
            "unique_name"_a, "shape"_a,
            py::return_value_policy::reference_internal)
       .def("register_fourier_space_field",
-           (FFTEngineBase::FourierField_t &
+           (muGrid::ComplexField &
             (Engine::*)(const std::string &, const Index_t &)) &
                Engine::register_fourier_space_field,
            "unique_name"_a, "nb_dof_per_pixel"_a,
            py::return_value_policy::reference_internal)
       .def("register_fourier_space_field",
-           (FFTEngineBase::FourierField_t &
+           (muGrid::ComplexField &
             (Engine::*)(const std::string &, const Shape_t &)) &
                Engine::register_fourier_space_field,
            "unique_name"_a, "shape"_a,

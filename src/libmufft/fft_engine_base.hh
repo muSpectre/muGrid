@@ -156,7 +156,7 @@ namespace muFFT {
      * again, and they will stay in the memory of the `muFFT::FFTEngineBase`'s
      * field collection until the engine is destroyed.
      */
-    virtual FourierField_t &
+    virtual muGrid::ComplexField &
     register_fourier_space_field(const std::string & unique_name,
                                  const Index_t & nb_dof_per_pixel);
 
@@ -166,7 +166,7 @@ namespace muFFT {
      * again, and they will stay in the memory of the `muFFT::FFTEngineBase`'s
      * field collection until the engine is destroyed.
      */
-    virtual FourierField_t &
+    virtual muGrid::ComplexField &
     register_fourier_space_field(const std::string & unique_name,
                                  const Shape_t & shape);
 

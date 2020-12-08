@@ -43,7 +43,7 @@
 #include "materials/material_linear_elastic1.hh"
 
 #include <cell/cell_factory.hh>
-#include <solver/krylov_solver_cg.hh>
+#include <solver/krylov_solver_eigen.hh>
 
 namespace muSpectre {
 
@@ -54,7 +54,9 @@ namespace muSpectre {
     this->cell_data->set_nb_quad_pts(OneQuadPt);
     MaterialLinearElastic1<Fix::SpatialDim>::make(this->cell_data, "material",
                                                   4, .3);
-    auto krylov_solver{std::make_shared<KrylovSolverCG>(1e-8, 100)};
+    // std::shared_ptr<KrylovSolverCG> krylov_solver{
+    //     std::make_shared<KrylovSolverCG>(1e-8, 100)};
+    std::shared_ptr<KrylovSolverCGEigen> krylov_solver{nullptr};
     auto solver{std::make_shared<SolverNewtonCG>(this->cell_data, krylov_solver,
                                                  muGrid::Verbosity::Full, 1e-10,
                                                  1e-10, 100)};
@@ -98,10 +100,10 @@ namespace muSpectre {
     constexpr Verbosity verbose{Verbosity::Full};
 
     auto krylov_solver{
-        std::make_shared<KrylovSolverCG>(cg_tol, maxiter, verbose)};
-    auto solver{std::make_shared<SolverNewtonCG>(this->cell_data, krylov_solver,
-                                                 verbose, newton_tol, equil_tol,
-                                                 maxiter)};
+        std::make_shared<KrylovSolverCGEigen>(cg_tol, maxiter, verbose)};
+    auto solver{std::make_shared<SolverNewtonCG>(
+        this->cell_data, krylov_solver, verbose, newton_tol, equil_tol,
+        maxiter)};
     auto && symmetric{[](Eigen::MatrixXd mat) -> Eigen::MatrixXd {
       return 0.5 * (mat + mat.transpose());
     }};
@@ -124,7 +126,8 @@ namespace muSpectre {
     auto && new_result{solver->solve_load_increment(strain)};
     BOOST_TEST_CHECKPOINT("after load increment");
 
-    KrylovSolverCG legacy_krylov_solver{legacy_cell, cg_tol, maxiter, verbose};
+    KrylovSolverCGEigen legacy_krylov_solver{legacy_cell, cg_tol, maxiter,
+                                             verbose};
     auto && legacy_result{newton_cg(legacy_cell, strain, legacy_krylov_solver,
                                     newton_tol, equil_tol, verbose)};
 

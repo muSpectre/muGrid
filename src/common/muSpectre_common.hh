@@ -126,6 +126,12 @@ namespace muSpectre {
     native  //! causes the material's native measures to be used in evaluation
   };
 
+  enum class SolverType {
+    Spectral,       //!< spectral framework, unknowns are strain and stress
+    FiniteElements  //!< finite-element framework, unknows are displacement and
+                    //!< force
+  };
+
   //! split cell flags
   enum class SplitCell { laminate, simple, no };
 
@@ -167,10 +173,10 @@ namespace muSpectre {
   inline Shape_t shape_for_formulation(const Formulation form,
                                        const Dim_t dim) {
     switch (form) {
-      case Formulation::small_strain_sym:
-        return Shape_t({vsize(dim)});
-      default:
-        return Shape_t({dim, dim});
+    case Formulation::small_strain_sym:
+      return Shape_t({vsize(dim)});
+    default:
+      return Shape_t({dim, dim});
     }
   }
 
@@ -178,10 +184,10 @@ namespace muSpectre {
   inline Shape_t t4shape_for_formulation(const Formulation form,
                                          const Dim_t dim) {
     switch (form) {
-      case Formulation::small_strain_sym:
-        return Shape_t({vsize(dim), vsize(dim)});
-      default:
-        return Shape_t({dim, dim, dim, dim});
+    case Formulation::small_strain_sym:
+      return Shape_t({vsize(dim), vsize(dim)});
+    default:
+      return Shape_t({dim, dim, dim, dim});
     }
   }
 
@@ -207,8 +213,9 @@ namespace muSpectre {
   //! Material laws can declare which type of strain measure they require and
   //! µSpectre will provide it
   enum class StrainMeasure {
-    Gradient,       //!< placement gradient (δy/δx)
-    Infinitesimal,  //!< small strain tensor .5(∇u + ∇uᵀ)
+    PlacementGradient,     //!< placement gradient (δy/δx)
+    DisplacementGradient,  //!< displacement gradient (δu/δx)
+    Infinitesimal,         //!< small strain tensor .5(∇u + ∇uᵀ)
     GreenLagrange,  //!< Green-Lagrange strain .5(Fᵀ·F - I) = .5(U² - I)
     Biot,           //!< Biot strain (U - I and F = RU)
     Log,            //!< logarithmic strain (log U and F = RU)
@@ -230,7 +237,7 @@ namespace muSpectre {
   constexpr bool is_objective(const StrainMeasure & measure) {
     // for the moment all the existing strain measures in the code are objective
     // except Gradient
-    return (measure != StrainMeasure::Gradient);
+    return (measure != StrainMeasure::PlacementGradient);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -265,23 +272,35 @@ namespace muSpectre {
     return static_cast<int>(A) < static_cast<int>(B);
   }
 
-  /* ---------------------------------------------------------------------- */
   /** Compile-time function to g strain measure stored by muSpectre
       depending on the formulation
    **/
-  constexpr StrainMeasure get_stored_strain_type(Formulation form) {
-    switch (form) {
-    case Formulation::finite_strain: {
-      return StrainMeasure::Gradient;
+  constexpr StrainMeasure get_stored_strain_type(Formulation form,
+                                                 SolverType solver_type) {
+    switch (solver_type) {
+    case SolverType::FiniteElements: {
+      return StrainMeasure::DisplacementGradient;
       break;
     }
-    case Formulation::small_strain: {
-      return StrainMeasure::Infinitesimal;
-      break;
+    case SolverType::Spectral: {
+      switch (form) {
+      case Formulation::small_strain: {
+        return StrainMeasure::Infinitesimal;
+        break;
+      }
+      case Formulation::finite_strain: {
+        return StrainMeasure::PlacementGradient;
+        break;
+      }
+      default:
+        return StrainMeasure::no_strain_;
+        break;
+      }
     }
-    default:
+    default: {
       return StrainMeasure::no_strain_;
       break;
+    }
     }
   }
 
@@ -316,13 +335,15 @@ namespace muSpectre {
   constexpr StrainMeasure get_formulation_strain_type(Formulation form,
                                                       StrainMeasure expected) {
     switch (form) {
+    case Formulation::native: {
+      // fall-through
+    }
     case Formulation::finite_strain: {
       return expected;
       break;
     }
     case Formulation::small_strain: {
-      // return expected;
-      return get_stored_strain_type(form);
+      return StrainMeasure::Infinitesimal;
       break;
     }
     default:

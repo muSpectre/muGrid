@@ -413,12 +413,12 @@ namespace muSpectre {
       const Eigen::Ref<Strain_t> & F, const Eigen::Ref<Stress_t> &
       /*P*/) -> Stiffness_t {
     if (Form == Formulation::finite_strain) {
-      auto S_C_1 =
-          MatTB::PK2_stress<StressMeasure::PK1, StrainMeasure::Gradient>(
-              F_1, P_1, stiffness_1);
-      auto S_C_2 =
-          MatTB::PK2_stress<StressMeasure::PK1, StrainMeasure::Gradient>(
-              F_2, P_2, stiffness_2);
+      auto S_C_1 = MatTB::PK2_stress<StressMeasure::PK1,
+                                     StrainMeasure::PlacementGradient>(
+          F_1, P_1, stiffness_1);
+      auto S_C_2 = MatTB::PK2_stress<StressMeasure::PK1,
+                                     StrainMeasure::PlacementGradient>(
+          F_2, P_2, stiffness_2);
       const Stress_t S_1 = std::get<0>(S_C_1);
       const Stress_t S_2 = std::get<0>(S_C_2);
       Stress_t && S_effective =

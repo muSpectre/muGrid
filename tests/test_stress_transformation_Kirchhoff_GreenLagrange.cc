@@ -73,8 +73,8 @@ namespace muSpectre {
     auto && C{material.get_C()};
 
     T2_t tau{material.evaluate_stress(E)};
-    T2_t S{MatTB::PK2_stress<StressMeasure::Kirchhoff, StrainMeasure::Gradient>(
-        F, tau)};
+    T2_t S{MatTB::PK2_stress<StressMeasure::Kirchhoff,
+                             StrainMeasure::PlacementGradient>(F, tau)};
 
     T4_t c_estim{
         evaluator.estimate_tangent(E, Formulation::native, nonlin_step)};

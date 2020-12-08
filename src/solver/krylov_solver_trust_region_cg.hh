@@ -115,7 +115,7 @@ namespace muSpectre {
     Vector_map solve(const ConstVector_ref rhs) final;
 
    protected:
-    muFFT::Communicator comm{};
+    muGrid::Communicator comm{};
     //! find the minimzer on the trust region bound
     Vector_map bound(const ConstVector_ref rhs);
 

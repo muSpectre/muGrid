@@ -36,8 +36,10 @@
 #ifndef SRC_SOLVER_KRYLOV_SOLVER_BASE_HH_
 #define SRC_SOLVER_KRYLOV_SOLVER_BASE_HH_
 
-#include "solver/solver_common.hh"
-#include "cell/cell.hh"
+#include "solver_common.hh"
+#include "matrix_adaptor.hh"
+
+#include <libmugrid/mapped_field.hh>
 
 #include <Eigen/Dense>
 
@@ -69,16 +71,26 @@ namespace muSpectre {
     KrylovSolverBase() = delete;
 
     /**
-     * Constructor takes a Cell, tolerance, max number of iterations
-     * and verbosity flag as input
+     * Constructor takes a Matrix adaptable, tolerance, max number of iterations
+     * and verbosity flag as input. The solver takes responsibility for keeping
+     * the system matrix from destruction at least until itself is destroyed.
      */
     KrylovSolverBase(std::shared_ptr<MatrixAdaptable> matrix_adaptable,
                      const Real & tol, const Uint & maxiter,
                      const Verbosity & verbose = Verbosity::Silent);
 
     /**
+     * Constructor takes a Matrix adaptable, tolerance, max number of iterations
+     * and verbosity flag as input. The solver does not take any responsibility
+     * for keeping the matrix from destruction
+     */
+    KrylovSolverBase(std::weak_ptr<MatrixAdaptable> matrix_adaptable,
+                     const Real & tol, const Uint & maxiter,
+                     const Verbosity & verbose = Verbosity::Silent);
+
+    /**
      * Constructor without matrix adaptable. The adaptable has to be supplied
-     * usinge KrylovSolverBase::set_matrix(...) before initialisation for this
+     * using KrylovSolverBase::set_matrix(...) before initialisation for this
      * solver to be usable
      */
     KrylovSolverBase(const Real & tol, const Uint & maxiter,
@@ -102,8 +114,17 @@ namespace muSpectre {
     //! Allocate fields used during the solution
     virtual void initialise() = 0;
 
-    //! set the matrix
+    /**
+     * Set the matrix. The solver will take responsibility to keep the matrix
+     * from destruction
+     */
     virtual void set_matrix(std::shared_ptr<MatrixAdaptable> matrix_adaptable);
+
+    /**
+     * Set the matrix. The solver will not take responsibility to keep the
+     * matrix from destruction. Use this to avoid cyclic dependencies
+     */
+    virtual void set_matrix(std::weak_ptr<MatrixAdaptable> matrix_adaptable);
 
     //! returns whether the solver has converged
     Convergence get_convergence() const;
@@ -134,6 +155,7 @@ namespace muSpectre {
 
    protected:
     std::shared_ptr<MatrixAdaptable> matrix_holder{nullptr};  //!< system matrix
+    std::weak_ptr<MatrixAdaptable> matrix_ptr{};  //!< weak ref to matrix
     MatrixAdaptor matrix{};  //!< matrix ref for convenience
     Real tol;                //!< convergence tolerance
     Uint maxiter;            //!< maximum allowed number of iterations

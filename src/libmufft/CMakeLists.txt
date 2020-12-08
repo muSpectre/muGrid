@@ -55,6 +55,7 @@ set(mufft_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/fft_engine_base.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/fft_utils.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/fftw_engine.cc
+        ../projection/discrete_greens_operator.cc
   )
 
 set(fft_engine_FFTWMPI_SRCS

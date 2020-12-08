@@ -59,7 +59,7 @@ namespace muSpectre {
    */
   template <Index_t DimM>
   struct MaterialMuSpectre_traits<MaterialHyperElastoPlastic2<DimM>>
-      : public DefaultMechanics_traits<DimM, StrainMeasure::Gradient,
+      : public DefaultMechanics_traits<DimM, StrainMeasure::PlacementGradient,
                                        StressMeasure::Kirchhoff> {};
 
   /**

@@ -89,7 +89,7 @@ void add_common(py::module & mod) {
       .value("no_stress_", StressMeasure::no_stress_);
 
   py::enum_<StrainMeasure>(mod, "StrainMeasure")
-      .value("Gradient", StrainMeasure::Gradient)
+      .value("Gradient", StrainMeasure::PlacementGradient)
       .value("Infinitesimal", StrainMeasure::Infinitesimal)
       .value("GreenLagrange", StrainMeasure::GreenLagrange)
       .value("Biot", StrainMeasure::Biot)

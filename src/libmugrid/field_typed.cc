@@ -397,20 +397,34 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  auto TypedFieldBase<T>::eigen_vec() -> Eigen_map {
+  auto TypedFieldBase<T>::eigen_vec() -> EigenVec_map {
     if (this->get_nb_entries() == Unknown) {
       throw FieldError("Field has unknown number of entries");
     }
-    return this->eigen_map(this->get_nb_entries() * this->nb_components, 1);
+    if (not this->collection.is_initialised()) {
+      std::stringstream error{};
+      error << "The FieldCollection for field '" << this->name
+            << "' has not been initialised";
+      throw FieldError(error.str());
+    }
+    return EigenVec_map(this->data_ptr,
+                        this->get_nb_entries() * this->nb_components);
   }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  auto TypedFieldBase<T>::eigen_vec() const -> Eigen_cmap {
+  auto TypedFieldBase<T>::eigen_vec() const -> EigenVec_cmap {
+    if (not this->collection.is_initialised()) {
+      std::stringstream error{};
+      error << "The FieldCollection for field '" << this->name
+            << "' has not been initialised";
+      throw FieldError(error.str());
+    }
     if (this->get_nb_entries() == Unknown) {
       throw FieldError("Field has unknown number of entries");
     }
-    return this->eigen_map(this->get_nb_entries() * this->nb_components, 1);
+    return EigenVec_cmap(this->data_ptr,
+                         this->get_nb_entries() * this->nb_components);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -457,7 +471,7 @@ namespace muGrid {
   template <typename T>
   auto TypedFieldBase<T>::get_pixel_map(const Index_t & nb_rows)
       -> FieldMap<T, Mapping::Mut> {
-    return (nb_rows == -1)
+    return (nb_rows == Unknown)
                ? FieldMap<T, Mapping::Mut>{*this, IterUnit::Pixel}
                : FieldMap<T, Mapping::Mut>{*this, nb_rows, IterUnit::Pixel};
   }
@@ -466,7 +480,7 @@ namespace muGrid {
   template <typename T>
   auto TypedFieldBase<T>::get_pixel_map(const Index_t & nb_rows) const
       -> FieldMap<T, Mapping::Const> {
-    return (nb_rows == -1)
+    return (nb_rows == Unknown)
                ? FieldMap<T, Mapping::Const>{*this, IterUnit::Pixel}
                : FieldMap<T, Mapping::Const>{*this, nb_rows, IterUnit::Pixel};
   }
@@ -484,7 +498,7 @@ namespace muGrid {
   template <typename T>
   auto TypedFieldBase<T>::get_sub_pt_map(const Index_t & nb_rows) const
       -> FieldMap<T, Mapping::Const> {
-    return (nb_rows == -1)
+    return (nb_rows == Unknown)
                ? FieldMap<T, Mapping::Const>{*this, IterUnit::SubPt}
                : FieldMap<T, Mapping::Const>{*this, nb_rows, IterUnit::SubPt};
   }
@@ -685,4 +699,5 @@ namespace muGrid {
   template class WrappedField<Complex>;
   template class WrappedField<Int>;
   template class WrappedField<Uint>;
+  template class WrappedField<Index_t>;
 }  // namespace muGrid

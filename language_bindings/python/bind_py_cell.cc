@@ -434,15 +434,12 @@ void add_cell_split_helper(py::module & mod) {
 void add_cell(py::module & mod) {
   add_cell_factory(mod);
 
-  auto cell{mod.def_submodule("cell")};
-  cell.doc() = "bindings for cells and cell factories";
-
 #ifdef WITH_SPLIT
   add_split_cell_factory_helper(mod);
-  add_cell_helper(cell);
-  add_cell_split_helper(cell);
+  add_cell_helper(mod);
+  add_cell_split_helper(mod);
 #else
-  add_cell_helper(cell);
+  add_cell_helper(mod);
 #endif
 
 #ifdef WITH_FFTWMPI

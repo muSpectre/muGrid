@@ -428,6 +428,78 @@ namespace muGrid {
     using MatrixMap = EigenMap<T, Eigen::Matrix<T, NbRow, NbCol>>;
 
     /**
+     * returns number of rows a dim-dimensional tensor of rank rank has in
+     * matrix representation
+     */
+    constexpr Dim_t TensorRows(Dim_t rank, Dim_t dim) {
+      switch (rank) {
+      case 0: {
+        return 1;
+        break;
+      }
+      case 1: {
+        // fall-through
+      }
+      case 2: {
+        return dim;
+        break;
+      }
+      case 4: {
+        return dim * dim;
+        break;
+      }
+      // old gcc fail to compile throw statements in constexpr, but new clang
+      // requires all paths of execution to either return or throw
+#if defined(__llvm__) || __GNUC__  > 5
+      default: {
+        throw RuntimeError("unknown rank");
+        break;
+      }
+#endif
+      }
+    }
+
+    /**
+     * returns number of columns a dim-dimensional tensor of rank rank has in
+     * matrix representation
+     */
+    constexpr Dim_t TensorCols(Dim_t rank, Dim_t dim) {
+      switch (rank) {
+      case 0: {
+        // fall-through
+      }
+      case 1: {
+        return 1;
+        break;
+      }
+      case 2: {
+        return dim;
+        break;
+      }
+      case 4: {
+        return dim * dim;
+        break;
+      }
+      // old gcc fail to compile throw statements in constexpr, but new clang
+      // requires all paths of execution to either return or throw
+#if defined(__llvm__) || __GNUC__ > 5
+      default: {
+        throw RuntimeError("unknown rank");
+        break;
+      }
+#endif
+      }
+    }
+
+    /**
+     * internal convenience alias for creating maps iterating over statically
+     * sized tensors
+     */
+    template <typename T, Dim_t Rank, Dim_t Dim>
+    using TensorMap = EigenMap<
+        T, Eigen::Matrix<T, TensorRows(Rank, Dim), TensorCols(Rank, Dim)>>;
+
+    /**
      * internal convenience alias for creating maps iterating over statically
      * sized `Eigen::Array`s
      */
@@ -587,7 +659,7 @@ namespace muGrid {
 
   /**
    * Alias of `muGrid::StaticFieldMap` over a scalar field you wish to iterate
-   * over quadrature point by quadrature point.
+   * over
    *
    * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
    * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
@@ -600,8 +672,26 @@ namespace muGrid {
       StaticFieldMap<T, Mutability, internal::ScalarMap<T>, IterationType>;
 
   /**
-   * Alias of `muGrid::StaticNFieldMap` over a first-rank tensor field you wish
-   * to iterate over quadrature point by quadrature point.
+   * Alias of `muGrid::StaticNFieldMap` over a tensor field you wish
+   * to iterate over
+   *
+   * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
+   * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
+   * @tparam Mutability whether or not the map allows to modify the content of
+   * the field
+   * @tparam Rank tensorial rank
+   * @tparam Dim spatial dimension of the tensor
+   * @tparam IterationType describes the pixel-subdivision
+   */
+  template <typename T, Mapping Mutability, Dim_t Rank, Dim_t Dim,
+            IterUnit IterationType>
+  using TensorFieldMap =
+      StaticFieldMap<T, Mutability, internal::TensorMap<T, Rank, Dim>,
+                     IterationType>;
+
+  /**
+   * Alias of `muGrid::StaticNFieldMap` over a tensor field you wish
+   * to iterate over
    *
    * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
    * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
@@ -617,7 +707,7 @@ namespace muGrid {
 
   /**
    * Alias of `muGrid::StaticFieldMap` over a second-rank tensor field you wish
-   * to iterate over quadrature point by quadrature point.
+   * to iterate over
    *
    * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
    * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
@@ -633,7 +723,7 @@ namespace muGrid {
 
   /**
    * Alias of `muGrid::StaticFieldMap` over a second-rank tensor field you wish
-   * to iterate over quadrature point by quadrature point.
+   * to iterate over
    *
    * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
    * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
@@ -649,7 +739,7 @@ namespace muGrid {
 
   /**
    * Alias of `muGrid::StaticFieldMap` over a fourth-rank tensor field you wish
-   * to iterate over quadrature point by quadrature point.
+   * to iterate over
    *
    * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
    * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`

@@ -35,6 +35,8 @@
 
 #include "material_linear_diffusion.hh"
 
+#include <Eigen/Eigenvalues>
+
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
@@ -47,7 +49,15 @@ namespace muSpectre {
         A_holder{std::make_unique<Tangent_t>(diffusion_coeff *
                                              Tangent_t::Identity())},
         A{*this->A_holder}, physics_domain{domain} {
-    // TODO(junge): check that diffusion_coeff is positive
+    this->last_step_was_nonlinear = false;
+
+    if (diffusion_coeff < 0.) {
+      std::stringstream error_message{};
+      error_message
+          << "The diffusion coefficient has to be positive, you provided "
+          << diffusion_coeff << ".";
+      throw MaterialError{error_message.str()};
+    }
   }
 
   /* ---------------------------------------------------------------------- */
@@ -60,7 +70,27 @@ namespace muSpectre {
       : Parent{name, spatial_dimension, nb_quad_pts},
         A_holder{std::make_unique<Tangent_t>(diffusion_coeff)},
         A{*this->A_holder}, physics_domain{domain} {
-    // TODO(junge): check that diffusion_coeff is positive-definit and symmetric
+    this->last_step_was_nonlinear = false;
+
+    Eigen::EigenSolver<Tangent_t> eigen_value_solver{
+        this->get_diffusion_coeff()};
+    auto && eigen_values{eigen_value_solver.eigenvalues()};
+
+    for (Dim_t dim{0}; dim < DimM; ++dim) {
+      const Complex & eigen_value{eigen_values(dim)};
+      if (eigen_value.imag() != 0. or eigen_value.real() < 0.) {
+        std::stringstream error_message{};
+        error_message << "The diffusion coefficient matrix has to be positive "
+                         "definite (i.e., only positive and real eigenvalues). "
+                         "The matrix you've provided has the eigenvalues "
+                      << eigen_values.transpose()
+                      << ", the offending eigen value is #" << dim + 1 << ": "
+                      << eigen_value.real() << " + " << eigen_value.imag()
+                      << "j. The matrix is" << std::endl
+                      << this->get_diffusion_coeff();
+        throw MaterialError{error_message.str()};
+      }
+    }
   }
 
   /* ---------------------------------------------------------------------- */
@@ -70,6 +100,15 @@ namespace muSpectre {
     return this->physics_domain;
   }
 
+  /* ---------------------------------------------------------------------- */
+  template <Index_t DimM>
+  auto MaterialLinearDiffusion<DimM>::get_diffusion_coeff() const
+      -> const Tangent_t & {
+    return this->A;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template class MaterialLinearDiffusion<oneD>;
   template class MaterialLinearDiffusion<twoD>;
   template class MaterialLinearDiffusion<threeD>;
 

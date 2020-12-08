@@ -243,7 +243,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  void CellData::set_nb_quad_pts(const Index_t & nb_quad_pts)  {
+  void CellData::set_nb_quad_pts(const Index_t & nb_quad_pts) {
     this->get_fields().set_nb_sub_pts(QuadPtTag, nb_quad_pts);
   }
 
@@ -260,6 +260,17 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   bool CellData::has_nb_nodal_pts() const {
     return this->get_fields().has_nb_sub_pts(NodalPtTag);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  muGrid::FieldCollection::IndexIterable CellData::get_quad_pt_indices() const {
+    return this->fields->get_sub_pt_indices(QuadPtTag);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  muGrid::FieldCollection::PixelIndexIterable
+  CellData::get_pixel_indices() const {
+    return this->fields->get_pixel_indices_fast();
   }
 
   /* ---------------------------------------------------------------------- */

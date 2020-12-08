@@ -201,6 +201,28 @@ namespace muGrid {
     }
 
     /**
+     * create a detached field (i.e., the field collection does not take
+     * responsibility for it, and it is up to the user to make sure that the
+     * field is used only during the life-time of the collection.
+     *
+     * @param unique_name unique identifier for this field
+     *
+     * @param components_shape number of components to store per quadrature
+     * point
+     *
+     * @param sub_division_tag unique identifier of the subdivision scheme
+     *
+     * @param unit phyiscal unit of this field
+     *
+     * @param storage_oder in-memory storage order of the components
+     */
+    template <typename T>
+    std::unique_ptr<TypedField<T>, FieldDestructor<Field>>
+    detached_field(const std::string & unique_name,
+                   const Shape_t & components_shape,
+                   const std::string & sub_division_tag = PixelTag,
+                   const Unit & unit = Unit::unitless());
+    /**
      * place a new real-valued field  in the responsibility of this collection
      * (Note, because fields have protected constructors, users can't create
      * them
@@ -515,6 +537,13 @@ namespace muGrid {
     Field & get_field(const std::string & unique_name);
 
     /**
+     * returns the unique ptr holding the field named unique_name. Warning: note
+     * that this effectively removes the field from the collection. You can use
+     * this to delete fields to free memory
+     */
+    Field_ptr pop_field(const std::string & unique_name);
+
+    /**
      * returns a (base-type) reference to the state field identified by
      * `unique_prefix`. Throws a `muGrid::FieldCollectionError` if the state
      * field does not exist.
@@ -553,6 +582,12 @@ namespace muGrid {
     size_t check_initialised_nb_sub_pts(const Index_t & nb_sub_pts,
                                         const IterUnit & iteration_type,
                                         const std::string & tag) const;
+
+    /**
+     * use this to obtain an unused unique name for a new field to register, if
+     * you do not care about what name you obtain.
+     */
+    std::string generate_unique_name() const;
 
    protected:
     //! internal worker function called by register_<T>_field

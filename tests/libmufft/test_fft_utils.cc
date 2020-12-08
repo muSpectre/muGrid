@@ -33,11 +33,11 @@
  * Program grant you additional permission to convey the resulting work.
  *
  */
-#include <boost/mpl/list.hpp>
-
 #include "tests.hh"
 #include <libmugrid/ccoord_operations.hh>
 #include <libmufft/fft_utils.hh>
+
+#include <boost/mpl/list.hpp>
 
 namespace muFFT {
 

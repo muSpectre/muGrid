@@ -148,7 +148,7 @@ namespace muGrid {
     NetCDFDim(NetCDFDim && other) = delete;
 
     //! Destructor
-    ~NetCDFDim() = default;
+    virtual ~NetCDFDim() = default;
 
     //! Copy assignment operator
     NetCDFDim & operator=(const NetCDFDim & other) = delete;
@@ -266,7 +266,7 @@ namespace muGrid {
     NetCDFAtt(NetCDFAtt && other) = delete;
 
     //! Destructor
-    ~NetCDFAtt() = default;
+    virtual ~NetCDFAtt() = default;
 
     //! Copy assignment operator
     NetCDFAtt & operator=(const NetCDFAtt & other) = delete;
@@ -590,7 +590,7 @@ namespace muGrid {
     NetCDFVarField(NetCDFVarField && other) = delete;
 
     //! Destructor
-    ~NetCDFVarField() = default;
+    virtual ~NetCDFVarField() = default;
 
     //! Copy assignment operator
     NetCDFVarField & operator=(const NetCDFVarField & other) = delete;
@@ -673,7 +673,7 @@ namespace muGrid {
     NetCDFVarStateField(NetCDFVarStateField && other) = delete;
 
     //! Destructor
-    ~NetCDFVarStateField() final = default;
+    virtual ~NetCDFVarStateField() = default;
 
     //! Copy assignment operator
     NetCDFVarStateField & operator=(const NetCDFVarStateField & other) = delete;
@@ -746,7 +746,7 @@ namespace muGrid {
     NetCDFDimensions(NetCDFDimensions && other) = delete;
 
     //! Destructor
-    ~NetCDFDimensions() = default;
+    virtual ~NetCDFDimensions() = default;
 
     //! Copy assignment operator
     NetCDFDimensions & operator=(const NetCDFDimensions & other) = delete;
@@ -820,7 +820,7 @@ namespace muGrid {
     NetCDFVariables(NetCDFVariables && other) = delete;
 
     //! Destructor
-    ~NetCDFVariables() = default;
+    virtual ~NetCDFVariables() = default;
 
     //! Copy assignment operator
     NetCDFVariables & operator=(const NetCDFVariables & other) = delete;

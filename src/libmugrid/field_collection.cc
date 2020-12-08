@@ -85,8 +85,8 @@ namespace muGrid {
     //! If you get a compiler warning about narrowing conversion on the
     //! following line, please check whether you are creating a TypedField with
     //! the number of components specified in 'int' rather than 'size_t'.
-    TypedField<T> * raw_ptr{new TypedField<T>{
-        unique_name, *this, nb_components, sub_division_tag, unit}};
+    TypedField<T> * raw_ptr{new TypedField<T>{unique_name, *this, nb_components,
+                                              sub_division_tag, unit}};
     TypedField<T> & retref{*raw_ptr};
     Field_ptr field{raw_ptr};
     if (this->initialised) {
@@ -129,6 +129,24 @@ namespace muGrid {
     }
     this->fields[unique_name] = std::move(field);
     return retref;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
+  std::unique_ptr<TypedField<T>, FieldDestructor<Field>>
+  FieldCollection::detached_field(const std::string & unique_name,
+                                  const Shape_t & components_shape,
+                                  const std::string & sub_division_tag,
+                                  const Unit & unit) {
+    this->register_field<T>(unique_name, components_shape, sub_division_tag,
+                            unit);
+    auto field_ptr{this->pop_field(unique_name)};
+    // static_cast is safe here, as the type is correct by construction
+    auto * raw_ptr{static_cast<TypedField<T> *>(field_ptr.get())};
+    std::unique_ptr<TypedField<T>, FieldDestructor<Field>> return_ptr{
+        raw_ptr, std::move(field_ptr.get_deleter())};
+    field_ptr.release();
+    return return_ptr;
   }
 
   /* ---------------------------------------------------------------------- */
@@ -222,8 +240,8 @@ namespace muGrid {
     //! following line, please check whether you are creating a TypedField
     //! with the number of components specified in 'int' rather than 'size_t'.
     TypedStateField<T> * raw_ptr{
-        new TypedStateField<T>{unique_prefix, *this, nb_memory,
-                               nb_components, sub_division_tag, unit}};
+        new TypedStateField<T>{unique_prefix, *this, nb_memory, nb_components,
+                               sub_division_tag, unit}};
     TypedStateField<T> & retref{*raw_ptr};
     StateField_ptr field{raw_ptr};
     this->state_fields[unique_prefix] = std::move(field);
@@ -356,10 +374,9 @@ namespace muGrid {
   //! check whether two field collections have the same memory layout
   bool
   FieldCollection::has_same_memory_layout(const FieldCollection & other) const {
-    return
-        this->get_pixels_shape() == other.get_pixels_shape() and
-        this->get_storage_order() == other.get_storage_order() and
-        this->get_pixels_strides() == other.get_pixels_strides();
+    return this->get_pixels_shape() == other.get_pixels_shape() and
+           this->get_storage_order() == other.get_storage_order() and
+           this->get_pixels_strides() == other.get_pixels_strides();
   }
 
   /* ---------------------------------------------------------------------- */
@@ -386,8 +403,7 @@ namespace muGrid {
     for (auto && item : this->fields) {
       auto && field{*item.second};
       const auto field_size{field.get_current_nb_entries()};
-      if ((field_size != 0) and
-          (field_size != field.get_nb_entries())) {
+      if ((field_size != 0) and (field_size != field.get_nb_entries())) {
         std::stringstream err_stream{};
         err_stream << "Field '" << field.get_name() << "' contains "
                    << field_size << " entries, but the field collection "
@@ -423,6 +439,19 @@ namespace muGrid {
       throw FieldCollectionError(err_stream.str());
     }
     return *this->fields[unique_name];
+  }
+
+  /* ---------------------------------------------------------------------- */
+  auto FieldCollection::pop_field(const std::string & unique_name)
+      -> Field_ptr {
+    if (not this->field_exists(unique_name)) {
+      std::stringstream err_stream{};
+      err_stream << "The field '" << unique_name << "' does not exist";
+      throw FieldCollectionError(err_stream.str());
+    }
+    auto field_ptr{std::move(this->fields[unique_name])};
+    this->fields.erase(unique_name);
+    return field_ptr;
   }
 
   /* ---------------------------------------------------------------------- */
@@ -489,6 +518,26 @@ namespace muGrid {
   FieldCollection::register_field<Index_t>(const std::string &, const Index_t &,
                                            const std::string &, const Unit &);
 
+  template std::unique_ptr<TypedField<Real>, FieldDestructor<Field>>
+  FieldCollection::detached_field(const std::string &, const Shape_t &,
+                                  const std::string &, const Unit &);
+
+  template std::unique_ptr<TypedField<Complex>, FieldDestructor<Field>>
+  FieldCollection::detached_field(const std::string &, const Shape_t &,
+                                  const std::string &, const Unit &);
+
+  template std::unique_ptr<TypedField<Int>, FieldDestructor<Field>>
+  FieldCollection::detached_field(const std::string &, const Shape_t &,
+                                  const std::string &, const Unit &);
+
+  template std::unique_ptr<TypedField<Index_t>, FieldDestructor<Field>>
+  FieldCollection::detached_field(const std::string &, const Shape_t &,
+                                  const std::string &, const Unit &);
+
+  template std::unique_ptr<TypedField<Uint>, FieldDestructor<Field>>
+  FieldCollection::detached_field(const std::string &, const Shape_t &,
+                                  const std::string &, const Unit &);
+
   /* ---------------------------------------------------------------------- */
   FieldCollection::PixelIndexIterable::PixelIndexIterable(
       const FieldCollection & collection)
@@ -545,9 +594,10 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  size_t FieldCollection::check_initialised_nb_sub_pts(
-      const Index_t & nb_sub_pts, const IterUnit & iteration_type,
-      const std::string & tag) const {
+  size_t
+  FieldCollection::check_initialised_nb_sub_pts(const Index_t & nb_sub_pts,
+                                                const IterUnit & iteration_type,
+                                                const std::string & tag) const {
     if (iteration_type == IterUnit::SubPt) {
       if (not this->has_nb_sub_pts(tag)) {
         throw FieldCollectionError(
@@ -558,6 +608,20 @@ namespace muGrid {
     // the other cases are handled in the regular(uninitialised) checker
     return static_cast<size_t>(
         this->check_nb_sub_pts(nb_sub_pts, iteration_type, tag));
+  }
+
+  /* ---------------------------------------------------------------------- */
+  std::string FieldCollection::generate_unique_name() const {
+    static Index_t counter{0};
+    bool field_found{false};
+    std::string name{};
+    do {
+      std::stringstream name_stream{};
+      name_stream << "generated_unique_name_" << counter++;
+      name = name_stream.str();
+      field_found = this->field_exists(name);
+    } while (field_found);
+    return name;
   }
 
   /* ---------------------------------------------------------------------- */

@@ -37,6 +37,7 @@
 #include "common/muSpectre_common.hh"
 #include "materials/material_stochastic_plasticity.hh"
 #include "cell/cell.hh"
+#include "cell/cell_data.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -58,6 +59,7 @@ void add_material_stochastic_plasticity_helper(py::module & mod) {
 
   using Mat_t = muSpectre::MaterialStochasticPlasticity<Dim>;
   using Cell_t = muSpectre::Cell;
+  using CellData_t = muSpectre::CellData;
 
   //! dynamic vector type for interactions with numpy/scipy/solvers etc.
   using Vector_t = Eigen::Matrix<Real, Eigen::Dynamic, 1>;
@@ -70,6 +72,12 @@ void add_material_stochastic_plasticity_helper(py::module & mod) {
       .def_static(
           "make",
           [](std::shared_ptr<Cell_t> cell, std::string n) -> Mat_t & {
+            return Mat_t::make(cell, n);
+          },
+          "cell"_a, "name"_a, py::return_value_policy::reference_internal)
+      .def_static(
+          "make",
+          [](std::shared_ptr<CellData_t> cell, std::string n) -> Mat_t & {
             return Mat_t::make(cell, n);
           },
           "cell"_a, "name"_a, py::return_value_policy::reference_internal)

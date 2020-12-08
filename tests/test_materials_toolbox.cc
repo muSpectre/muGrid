@@ -62,7 +62,7 @@ namespace muSpectre {
     // checking Green-Lagrange
     T2 Eref = .5 * (F.transpose() * F - T2::Identity());
 
-    T2 E_tb = MatTB::convert_strain<StrainMeasure::Gradient,
+    T2 E_tb = MatTB::convert_strain<StrainMeasure::PlacementGradient,
                                     StrainMeasure::GreenLagrange>(
         Eigen::Map<Eigen::Matrix<Real, dim, dim>>(F.data()));
 
@@ -71,7 +71,7 @@ namespace muSpectre {
 
     // checking Left Cauchy-Green
     Eref = F * F.transpose();
-    E_tb = MatTB::convert_strain<StrainMeasure::Gradient,
+    E_tb = MatTB::convert_strain<StrainMeasure::PlacementGradient,
                                  StrainMeasure::LCauchyGreen>(F);
 
     error = rel_error(Eref, E_tb);
@@ -79,7 +79,7 @@ namespace muSpectre {
 
     // checking Right Cauchy-Green
     Eref = F.transpose() * F;
-    E_tb = MatTB::convert_strain<StrainMeasure::Gradient,
+    E_tb = MatTB::convert_strain<StrainMeasure::PlacementGradient,
                                  StrainMeasure::RCauchyGreen>(F);
 
     error = rel_error(Eref, E_tb);
@@ -95,15 +95,14 @@ namespace muSpectre {
       Eref += .5 * std::log(val) * vec * vec.transpose();
     }
 
-    E_tb =
-        MatTB::convert_strain<StrainMeasure::Gradient, StrainMeasure::Log>(F);
+    E_tb = MatTB::convert_strain<StrainMeasure::PlacementGradient,
+                                 StrainMeasure::Log>(F);
 
     error = rel_error(Eref, E_tb);
     BOOST_CHECK_LT(error, tol);
 
-    auto F_tb =
-        MatTB::convert_strain<StrainMeasure::Gradient, StrainMeasure::Gradient>(
-            F);
+    auto && F_tb = MatTB::convert_strain<StrainMeasure::PlacementGradient,
+                                         StrainMeasure::PlacementGradient>(F);
 
     error = rel_error(F, F_tb);
     BOOST_CHECK_LT(error, tol);
@@ -148,7 +147,7 @@ namespace muSpectre {
     muGrid::testGoodies::RandRange<Real> rng;
     T2 F = T2::Identity() * 2;
     // F.setRandom();
-    T2 E_tb = MatTB::convert_strain<StrainMeasure::Gradient,
+    T2 E_tb = MatTB::convert_strain<StrainMeasure::PlacementGradient,
                                     StrainMeasure::GreenLagrange>(
         Eigen::Map<Eigen::Matrix<Real, dim, dim>>(F.data()));
     Real lambda = 3;  // rng.randval(1, 2);
@@ -198,7 +197,8 @@ namespace muSpectre {
     BOOST_CHECK_LT(error, tol);
 
     T2 S_back =
-        MatTB::PK2_stress<StressMeasure::PK1, StrainMeasure::Gradient>(F, P);
+        MatTB::PK2_stress<StressMeasure::PK1, StrainMeasure::PlacementGradient>(
+            F, P);
     error = rel_error(S_back, S);
     BOOST_CHECK_LT(error, tol);
 
@@ -219,8 +219,8 @@ namespace muSpectre {
     BOOST_CHECK_LT(error, tol);
 
     auto && stress_tgt_back =
-        MatTB::PK2_stress<StressMeasure::PK1, StrainMeasure::Gradient>(F, P,
-                                                                       K_t);
+        MatTB::PK2_stress<StressMeasure::PK1, StrainMeasure::PlacementGradient>(
+            F, P, K_t);
 
     T2 stress_back = std::move(std::get<0>(stress_tgt_back));
     T4 stiffness_back = std::move(std::get<1>(stress_tgt_back));
@@ -238,7 +238,8 @@ namespace muSpectre {
     BOOST_CHECK_LT(error, tol);
 
     auto && stress_tgt_trivial =
-        MatTB::PK1_stress<StressMeasure::PK1, StrainMeasure::Gradient>(F, P, K);
+        MatTB::PK1_stress<StressMeasure::PK1, StrainMeasure::PlacementGradient>(
+            F, P, K);
     T2 P_u = std::move(std::get<0>(stress_tgt_trivial));
     T4 K_u = std::move(std::get<1>(stress_tgt_trivial));
 

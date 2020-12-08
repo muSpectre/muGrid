@@ -56,7 +56,7 @@ namespace muGrid {
     const FileFrame frame = file_io_object.append_frame();
     BOOST_CHECK_EQUAL(file_io_object.size(), 1);
 
-    for (const FileFrame & frame_it : file_io_object) {
+    for (volatile FileFrame frame_it : file_io_object) {
       continue;
     }
   };

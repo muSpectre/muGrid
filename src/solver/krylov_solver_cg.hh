@@ -68,19 +68,20 @@ namespace muSpectre {
     KrylovSolverCG(const KrylovSolverCG & other) = delete;
 
     /**
-     * Constructor takes a Cell, tolerance, max number of iterations
+     * Constructor takes a sytem matrix, tolerance, max number of iterations
      * and verbosity flag as input
      */
-    KrylovSolverCG(std::shared_ptr<MatrixAdaptable> matrix, Real tol,
-                   Uint maxiter, Verbosity verbose = Verbosity::Silent);
+    KrylovSolverCG(std::shared_ptr<MatrixAdaptable> matrix, const Real & tol,
+                   const Uint & maxiter,
+                   const Verbosity & verbose = Verbosity::Silent);
 
     /**
      * Constructor without matrix adaptable. The adaptable has to be supplied
      * using KrylovSolverBase::set_matrix(...) before initialisation for this
      * solver to be usable
      */
-    KrylovSolverCG(Real tol, Uint maxiter,
-                   Verbosity verbose = Verbosity::Silent);
+    KrylovSolverCG(const Real & tol, const Uint & maxiter,
+                   const Verbosity & verbose = Verbosity::Silent);
 
     //! Move constructor
     KrylovSolverCG(KrylovSolverCG && other) = default;
@@ -100,14 +101,19 @@ namespace muSpectre {
     //! set the matrix
     void set_matrix(std::shared_ptr<MatrixAdaptable> matrix_adaptable) final;
 
+    //! set the matrix
+    void set_matrix(std::weak_ptr<MatrixAdaptable> matrix_adaptable) final;
+
     //! returns the solver's name
-    std::string get_name() const final { return "CG"; }
+    std::string get_name() const final;
 
     //! the actual solver
     Vector_map solve(const ConstVector_ref rhs) final;
 
    protected:
-    muFFT::Communicator comm{};
+    // to be called in set_matrix
+    void set_internal_arrays();
+    muGrid::Communicator comm{};
     Vector_t r_k;   //!< residual
     Vector_t p_k;   //!< search direction
     Vector_t Ap_k;  //!< directional stiffness

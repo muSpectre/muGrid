@@ -74,9 +74,17 @@ muSpectre_add_test(solverclass_test_suite
   ${CMAKE_SOURCE_DIR}/tests/test_solver_newton_cg_class.cc
   TYPE BOOST --report_level=detailed)
 
-muSpectre_add_test(mattb_test
-  SOURCES main_test_suite.cc test_materials_toolbox.cc
+muSpectre_add_test(stiffness_test_suite
+  SOURCES main_test_suite.cc test_stiffness_operator.cc
   TYPE BOOST --report_level=detailed)
+
+muSpectre_add_test(fem_test_suite
+  SOURCES main_test_suite.cc test_solver_fem_newton_cg_class.cc
+  TYPE BOOST --report_level=detailed)
+
+muTools_add_test(mattb_test
+  SOURCES main_test_suite.cc test_materials_toolbox.cc
+  TYPE BOOST --report_level=detailed LINK_LIBRARIES ${MUSPECTRE_NAMESPACE}muGrid TEST_LIST muspectre_test)
 
 
 ##############################################################################

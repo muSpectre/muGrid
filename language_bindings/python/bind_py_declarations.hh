@@ -41,10 +41,14 @@ namespace py = pybind11;
 
 void add_common(py::module & mod);
 void add_cell(py::module & mod);
+void add_cell_data(py::module & mod);
 void add_material(py::module & mod);
 void add_solvers(py::module & mod);
+void add_class_solvers(py::module & mod);
+void add_krylov_solvers(py::module & mod);
 void add_derivatives(py::module & mod);
 void add_projections(py::module & mod);
+void add_fem_discretisation(py::module & mod);
 void add_field_collections(py::module & mod);
 
 #endif  // LANGUAGE_BINDINGS_PYTHON_BIND_PY_DECLARATIONS_HH_

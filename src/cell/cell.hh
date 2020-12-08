@@ -71,9 +71,9 @@ namespace muSpectre {
     using Matrix_t = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
 
     //! ref to constant vector
-    using Eigen_cmap = muGrid::RealField::Eigen_cmap;
+    using EigenVec_cmap = muGrid::RealField::EigenVec_cmap;
     //! ref to  vector
-    using Eigen_map = muGrid::RealField::Eigen_map;
+    using EigenVec_map = muGrid::RealField::EigenVec_map;
 
     //! Ref to input/output vector
     using EigenVec_t = Eigen::Ref<Eigen::Matrix<Real, Eigen::Dynamic, 1>>;
@@ -262,7 +262,7 @@ namespace muSpectre {
     /**
      * evaluates and returns the stress for the currently set strain
      */
-    Eigen_cmap evaluate_stress_eigen();
+    EigenVec_cmap evaluate_stress_eigen();
 
     /**
      * evaluates and returns the stress and tangent moduli for the currently set
@@ -275,7 +275,7 @@ namespace muSpectre {
      * evaluates and returns the stress and tangent moduli for the currently set
      * strain
      */
-    std::tuple<const Eigen_cmap, const Eigen_cmap>
+    std::tuple<const EigenVec_cmap, const EigenVec_cmap>
     evaluate_stress_tangent_eigen();
 
     /**
@@ -400,9 +400,8 @@ namespace muSpectre {
     void add_projected_directional_stiffness(EigenCVec_t delta_strain,
                                              const Real & alpha,
                                              EigenVec_t del_stress);
-    void stiffness_action_increment(EigenCVec_t delta_strain,
-                                    const Real & alpha,
-                                    EigenVec_t del_stress) const override {
+    void action_increment(EigenCVec_t delta_strain, const Real & alpha,
+                          EigenVec_t del_stress) override {
       return const_cast<Cell *>(this)->add_projected_directional_stiffness(
           delta_strain, alpha, del_stress);
     }

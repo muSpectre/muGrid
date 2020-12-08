@@ -71,6 +71,7 @@ from python_cell_tests import CellCheck
 from python_eigen_strain_test import EigenStrainCheck
 from python_eigen_strain_solver_test import EigenStrainSolverCheck
 from python_solver_test import SolverCheck
+from python_solverclass_test import SolverClassCheck
 
 
 if __name__ == '__main__':

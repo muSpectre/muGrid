@@ -36,6 +36,7 @@
 #include "solver_newton_cg.hh"
 #include "projection/projection_finite_strain_fast.hh"
 #include "projection/projection_small_strain.hh"
+#include "materials/material_mechanics_base.hh"
 
 #include <iomanip>
 
@@ -149,7 +150,9 @@ namespace muSpectre {
     this->projection->initialise();
     this->is_initialised = true;
     // here at the end, because set_matrix checks whether this is initialised
-    this->krylov_solver->set_matrix(this->shared_from_this());
+    std::weak_ptr<MatrixAdaptable> w_ptr{this->shared_from_this()};
+    this->krylov_solver->set_matrix(w_ptr);
+    this->krylov_solver->initialise();
   }
 
   /* ---------------------------------------------------------------------- */
@@ -293,7 +296,7 @@ namespace muSpectre {
       if ((this->verbosity >= Verbosity::Detailed) and (comm.rank() == 0)) {
         std::cout << "at Newton step " << std::setw(this->default_count_width)
                   << newt_iter << ", |δ" << strain_symb << "|/|Δ" << strain_symb
-                  << std::setw(17) << incr_norm / grad_norm
+                  << "|" << std::setw(17) << incr_norm / grad_norm
                   << ", tol = " << newton_tol << std::endl;
 
         if (this->verbosity > Verbosity::Detailed) {
@@ -313,9 +316,6 @@ namespace muSpectre {
       stress_norm =
           std::sqrt(comm.sum(this->rhs->get_field().eigen_vec().squaredNorm()));
 
-      if (early_convergence_test()) {
-        break;
-      }
       full_convergence_test();
     }
     // throwing meaningful error message if the number of iterations for
@@ -365,9 +365,9 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  void SolverNewtonCG::stiffness_action_increment(EigenCVec_t delta_grad,
-                                                  const Real & alpha,
-                                                  EigenVec_t del_flux) const {
+  void SolverNewtonCG::action_increment(EigenCVec_t delta_grad,
+                                        const Real & alpha,
+                                        EigenVec_t del_flux) {
     auto && grad_size{this->grad_shape[0] * this->grad_shape[1]};
     auto delta_grad_ptr{muGrid::WrappedField<Real>::make_const(
         "delta Grad", this->cell_data->get_fields(), grad_size, delta_grad,
@@ -379,12 +379,12 @@ namespace muSpectre {
 
     switch (this->cell_data->get_material_dim()) {
     case twoD: {
-      this->template stiffness_action_increment_worker<twoD>(
+      this->template action_increment_worker<twoD>(
           *delta_grad_ptr, this->tangent->get_field(), alpha, del_flux_field);
       break;
     }
     case threeD: {
-      this->template stiffness_action_increment_worker<threeD>(
+      this->template action_increment_worker<threeD>(
           *delta_grad_ptr, this->tangent->get_field(), alpha, del_flux_field);
       break;
     }
@@ -400,7 +400,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimM>
-  void SolverNewtonCG::stiffness_action_increment_worker(
+  void SolverNewtonCG::action_increment_worker(
       const muGrid::TypedFieldBase<Real> & delta_grad,
       const muGrid::TypedFieldBase<Real> & tangent, const Real & alpha,
       muGrid::TypedFieldBase<Real> & delta_flux) {

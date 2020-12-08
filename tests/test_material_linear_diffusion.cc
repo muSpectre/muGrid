@@ -84,8 +84,8 @@ namespace muSpectre {
     static Eigen::MatrixXd DiffCoeff() {
       using M_t = Eigen::Matrix<Real, DimM, DimM>;
       auto symm{[](M_t mat) -> M_t { return mat + mat.transpose(); }};
-      static M_t retval{.5 *
-                        (symm(M_t::Random() + M_t::Ones()) + 2 * M_t::Ones())};
+      static M_t retval{
+          .5 * (symm(M_t::Random() + M_t::Ones()) + 4 * M_t::Identity())};
       return retval;
     }
   };
@@ -94,6 +94,35 @@ namespace muSpectre {
                        AnisotropicFixture<twoD>, AnisotropicFixture<threeD>>;
 
   BOOST_AUTO_TEST_SUITE(linear_diffusion_material_tests);
+
+  BOOST_AUTO_TEST_CASE(negative_coeff) {
+    constexpr auto Dim{twoD};
+    constexpr auto NbQuad{OneQuadPt};
+    constexpr Real NegVal{-1.2};
+    using Material_t = MaterialLinearDiffusion<twoD>;
+    BOOST_CHECK_THROW(Material_t("unimportant name", Dim, NbQuad, NegVal),
+                      MaterialError);
+  }
+
+  BOOST_AUTO_TEST_CASE(not_pos_dev_matrix) {
+    constexpr auto Dim{twoD};
+    constexpr auto NbQuad{OneQuadPt};
+
+    // construct a matrix with a negative eigenvalue:
+    using Vec_t = Eigen::Matrix<Real, Dim, 1>;
+    using Mat_t = Eigen::Matrix<Real, Dim, Dim>;
+    Vec_t eig_vals{(Vec_t{} << 1.2, -1.3).finished()};
+    Vec_t vec{Vec_t::Random()};
+    vec /= vec.norm();
+    Mat_t eig_vecs{};
+    eig_vecs.col(0) = vec;
+    eig_vecs.col(1) << -vec(1), vec(0);
+    Mat_t diffusion{eig_vecs * Eigen::DiagonalMatrix<Real, Dim>{eig_vals} *
+                    eig_vecs.transpose()};
+    using Material_t = MaterialLinearDiffusion<twoD>;
+    BOOST_CHECK_THROW(Material_t("unimportant name", Dim, NbQuad, diffusion),
+                      MaterialError);
+  }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(construction_test, Fix, MatList, Fix) {}
 
@@ -126,8 +155,6 @@ namespace muSpectre {
     using Tangent_t = Eigen::Matrix<Real, Fix::SpatialDim, Fix::SpatialDim>;
     Strain_t random_grad{Strain_t::Random()};
 
-    // muGrid::LocalFieldCollection collection{Fix::SpatialDim,
-    //                                         {{QuadPtTag, Fix::NbQuadPts}}};
     // make a 2×2[×2] grid
     muGrid::GlobalFieldCollection collection{
         Fix::SpatialDim,

@@ -521,7 +521,7 @@ namespace muFFT {
   auto
   FFTEngineBase::register_fourier_space_field(const std::string & unique_name,
                                               const Index_t & nb_dof_per_pixel)
-      -> FourierField_t & {
+      -> muGrid::ComplexField & {
     this->create_plan(nb_dof_per_pixel);
     return this->fourier_field_collection.register_complex_field(
         unique_name, nb_dof_per_pixel, PixelTag);
@@ -531,7 +531,7 @@ namespace muFFT {
   auto
   FFTEngineBase::register_fourier_space_field(const std::string & unique_name,
                                               const Shape_t & shape)
-  -> FourierField_t & {
+      -> muGrid::ComplexField & {
     this->create_plan(shape);
     return this->fourier_field_collection.register_complex_field(
         unique_name, shape, PixelTag);

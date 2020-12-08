@@ -54,7 +54,7 @@ namespace muSpectre {
    */
   template <Index_t DimM>
   struct MaterialMuSpectre_traits<MaterialNeoHookeanElastic<DimM>>
-      : public DefaultMechanics_traits<DimM, StrainMeasure::Gradient,
+      : public DefaultMechanics_traits<DimM, StrainMeasure::PlacementGradient,
                                        StressMeasure::Kirchhoff> {};
 
   template <Index_t DimM>

@@ -130,10 +130,11 @@ def header_license_test(source_dirs, lic_paras):
                         "\n The paragraph number {} of"
                         "the license in file"
                         "\n{}:1:1:\n"
-                        "is not correct. It should "
+                        "is not correct. It reads\n{}\nand should "
                         "be replaced by \n\'{}\'\n"
                         .format(num+1,
                                 os.path.join(r, header_file_name),
+                                mu_license_text_lines_new[num],
                                 lic_para))
                     msg_list = msg_list + msg
 
@@ -205,10 +206,11 @@ def source_license_test(source_dirs, lic_paras):
                         "\n The paragraph number {} of"
                         "the license in file"
                         "\n{}:1:1:\n"
-                        "is not correct. It should "
+                        "is not correct. It reads\n{}\nand should "
                         "be replaced by \n\'{}\'\n"
                         .format(num+1,
                                 os.path.join(r, source_file_name),
+                                mu_license_text_lines_new[num],
                                 lic_para))
                     msg_list = msg_list + msg
 
@@ -315,10 +317,11 @@ def python_license_test(source_dirs, py_lic_paras):
                         "\n The paragraph number {} of"
                         "the license in file"
                         "\n{}:1:1:\n"
-                        "is not correct. It should "
+                        "is not correct. It reads\n{}\nand should "
                         "be replaced by \n\'{}\'"
                         .format(num+1,
                                 os.path.join(r, python_file_name),
+                                lines_text[num],
                                 lic_para))
                     msg_list = msg_list + msg
 

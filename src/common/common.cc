@@ -99,7 +99,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   std::ostream & operator<<(std::ostream & os, StrainMeasure s) {
     switch (s) {
-    case StrainMeasure::Gradient: {
+    case StrainMeasure::PlacementGradient: {
       os << "Gradient";
       break;
     }

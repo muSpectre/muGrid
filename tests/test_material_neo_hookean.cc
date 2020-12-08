@@ -129,8 +129,8 @@ namespace muSpectre {
     E = 0.5 * (F * F.transpose() - Strain_t::Identity());
     auto && tau_neo{mat_neo.evaluate_stress(F, 0)};
     auto && S_neo{
-        MatTB::PK2_stress<StressMeasure::Kirchhoff, StrainMeasure::Gradient>(
-            F, tau_neo)};
+        MatTB::PK2_stress<StressMeasure::Kirchhoff,
+                          StrainMeasure::PlacementGradient>(F, tau_neo)};
     auto && S_lin{mat_lin.evaluate_stress(E, 0)};
 
     Real err{rel_error(S_lin, S_neo)};
@@ -165,8 +165,8 @@ namespace muSpectre {
     auto && c_neo{std::get<1>(tau_c_neo)};
 
     auto && P_K_neo{
-        MatTB::PK1_stress<StressMeasure::Kirchhoff, StrainMeasure::Gradient>(
-            F, tau_neo, c_neo)};
+        MatTB::PK1_stress<StressMeasure::Kirchhoff,
+                          StrainMeasure::PlacementGradient>(F, tau_neo, c_neo)};
 
     auto && P_neo{std::get<0>(P_K_neo)};
     auto && K_neo{std::get<1>(P_K_neo)};

@@ -57,7 +57,8 @@ namespace muSpectre {
        * with respect to Gradient
        */
       template <Dim_t Dim>
-      struct PK1_stress<Dim, StressMeasure::Kirchhoff, StrainMeasure::Gradient>
+      struct PK1_stress<Dim, StressMeasure::Kirchhoff,
+                        StrainMeasure::PlacementGradient>
           : public PK1_stress<Dim, StressMeasure::Kirchhoff,
                               StrainMeasure::no_strain_> {
         //! short-hand

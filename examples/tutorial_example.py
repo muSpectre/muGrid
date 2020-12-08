@@ -58,17 +58,21 @@ rve = msp.Cell(nb_grid_pts, lengths, formulation)
 
 # define the material properties of the matrix and inclusion
 hard = msp.material.MaterialLinearElastic1_2d.make(
-    rve, "hard", 10e9, .33)
+    rve, "hard", 90e9, .3)
 soft = msp.material.MaterialLinearElastic1_2d.make(
-    rve, "soft", 70e9, .33)
+    rve, "soft", 70e7, .3)
 
 # assign each pixel to exactly one material
+material_geometry =np.ndarray(nb_grid_pts)
 for i, pixel in rve.pixels.enumerate():
 
     if np.linalg.norm(center - np.array(pixel), 2) < incl:
-        hard.add_pixel(i)
-    else:
+        material_geometry[np.array(pixel)[0],np.array(pixel)[1]] =1
         soft.add_pixel(i)
+
+    else:
+        material_geometry[np.array(pixel)[0],np.array(pixel)[1]] =0
+        hard.add_pixel(i)
 
 # define the convergence tolerance for the Newton-Raphson increment
 tol = 1e-5
@@ -77,11 +81,11 @@ cg_tol = 1e-8
 equi_tol = 1e-5
 
 # Macroscopic strain
-Del0 = np.array([[.0, .0],
-                 [0, .03]])
+Del0 = np.array([[0.00, .000],
+                 [0.000, .001]])
 Del0 = .5 * (Del0 + Del0.T)
 
-maxiter = 50  # for linear cell solver
+maxiter = 500  # for linear cell solver
 
 # Choose a solver for the linear cells. Currently avaliable:
 ## KrylovSolverCG, KrylovSolverCGEigen, KrylovSolverBiCGSTABEigen, KrylovSolverGMRESEigen,
@@ -109,15 +113,19 @@ print(result)
 stress = result.stress
 # stress is stored in a flatten stress tensor per pixel, i.e., a
 # dim^2 × prod(nb_grid_pts_i) array, so it needs to be reshaped
-stress = stress.T.reshape(*nb_grid_pts, 2, 2)
+stress = stress.reshape(*nb_grid_pts, 2, 2)
 
 
 # prevent visual output during ctest
 if len(sys.argv[:]) == 2:
-    if sys.argv[1] != 1:
+    if sys.argv[1] == '1':
         pass
-else:
-    import matplotlib.pyplot as plt
-    plt.show()
-    plt.pcolormesh(stress[:, :, 1, 1])
-    plt.colorbar()
+    else:
+        import matplotlib.pyplot as plt
+        CS = plt.pcolormesh(-stress[:, :, 1, 0])
+
+        fig = plt.figure()
+        plt.pcolormesh(material_geometry)
+        CS = plt.pcolormesh(material_geometry)
+
+        plt.show()

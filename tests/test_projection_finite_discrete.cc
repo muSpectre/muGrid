@@ -488,8 +488,8 @@ namespace muSpectre {
     BOOST_TEST_CHECKPOINT("projection applied");
 
     for (auto && tup : akantu::zip(
-             fields.get_pixels().template get_dimensioned_pixels<mdim>(), grad,
-             var)) {
+             fields.get_pixels().template get_dimensioned_pixels<mdim>(),
+             grad, var)) {
       auto & ccoord = std::get<0>(tup);
       auto & g = std::get<1>(tup);
       auto & v = std::get<2>(tup);
@@ -497,8 +497,10 @@ namespace muSpectre {
       Real error = (g - v).norm();
       BOOST_CHECK_LT(error, tol);
       if (error >= tol) {
-        std::cout << std::endl << "grad_ref :" << std::endl << g << std::endl;
-        std::cout << std::endl << "grad_proj :" << std::endl << v << std::endl;
+        std::cout << std::endl << "grad_ref :" << std::endl << g
+                  << std::endl;
+        std::cout << std::endl << "grad_proj :" << std::endl << v
+                  << std::endl;
         std::cout << std::endl << "ccoord :" << std::endl;
         muGrid::operator<<(std::cout, ccoord) << std::endl;
         std::cout << std::endl

@@ -683,6 +683,9 @@ namespace muGrid {
                                           index);
       }
 
+      DynCcoord_t get_neighbour(const DynCcoord_t & ccoord,
+                                const DynCcoord_t & offset) const;
+
       /**
        * return a reference to the Pixels object cast into a statically
        * dimensioned grid. the statically dimensioned version duplicates

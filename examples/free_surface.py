@@ -132,7 +132,7 @@ for pixel_index, pixel in enumerate(rve.pixels):
 
 ## use trust-region solver for stability
 solver = msp.solvers.KrylovSolverCG(
-    rve, maxiter=maxiter, verbose=msp.Verbosity.Silent)
+    rve, cg_tol, maxiter=maxiter, verbose=msp.Verbosity.Silent)
 
 for i in range(options.nb_steps):
     print('=== STEP {}/{} ==='.format(i+1, options.nb_steps))

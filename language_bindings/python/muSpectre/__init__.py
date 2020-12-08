@@ -44,7 +44,7 @@ except ImportError:
 import _muGrid
 import _muFFT
 import _muSpectre
-from _muSpectre import SplitCell, Formulation, material, solvers, FiniteDiff
+from _muSpectre import SplitCell, Formulation, material, solvers, FiniteDiff, cell
 from _muSpectre import OneQuadPt, version
 
 from _muSpectre import (version,
@@ -59,7 +59,9 @@ from _muSpectre import (version,
                         ProjectionFiniteStrain_2q_2d,
                         ProjectionFiniteStrain_2q_3d,
                         ProjectionFiniteStrainFast_2q_2d,
-                        ProjectionFiniteStrainFast_2q_3d)
+                        ProjectionFiniteStrainFast_2q_3d,
+                        FEMStencil,
+                        Discretisation)
 
 from muGrid import get_domain_ccoord, get_domain_index
 from muFFT import (Communicator, DiscreteDerivative, FourierDerivative,
@@ -148,7 +150,7 @@ def Cell(nb_grid_pts, domain_lengths, formulation=Formulation.finite_strain,
     if is_cell_split == SplitCell.split:
         factory_name = factory_name + "Split"
     try:
-        factory = _muSpectre.__dict__[factory_name]
+        factory = _muSpectre.cell.__dict__[factory_name]
     except KeyError:
         raise KeyError("FFT engine '{}' has not been compiled into the "
                        "muSpectre library.".format(fft))

@@ -69,7 +69,7 @@ namespace muGrid {
     Mat_t output{};
 
     output << 0, .25 * pi, 0, .25 * pi, 0, 0, 0, 0, 1;
-    auto my_output{logm(input)};
+    Mat_t my_output{logm(input)};
     Real error{(my_output - output).norm() / output.norm()};
 
     BOOST_CHECK_LT(error, log_tol);

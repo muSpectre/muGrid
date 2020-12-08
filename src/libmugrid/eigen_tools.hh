@@ -147,6 +147,11 @@ namespace muGrid {
     };
 
     template <class Derived>
+    struct is_matrix<Eigen::MatrixBase<Eigen::Map<Derived>>> {
+      constexpr static bool value{is_matrix<Derived>::value};
+    };
+
+    template <class Derived>
     struct is_matrix<Eigen::Ref<Derived>> {
       constexpr static bool value{is_matrix<Derived>::value};
     };
@@ -183,10 +188,10 @@ namespace muGrid {
     template <class Derived>
     struct tensor_dim {
       //! raw type for testing
-      using T = std::remove_reference_t<Derived>;
+      using T = std::remove_cv_t<std::remove_reference_t<Derived>>;
       static_assert(is_matrix<T>::value,
-                    "The type of t is not understood as an Eigen::Matrix");
-      static_assert(is_square<T>::value, "t's matrix isn't square");
+                    "The type of T is not understood as an Eigen::Matrix");
+      static_assert(is_square<T>::value, "T's matrix isn't square");
       //! evaluated dimension
       constexpr static Index_t value{T::RowsAtCompileTime};
     };
@@ -264,9 +269,17 @@ namespace muGrid {
     template <Dim_t Dim, Dim_t I, Dim_t J = Dim - 1>
     struct Proj {
       //! wrapped function (raison d'être)
-      static inline decltype(auto) compute(const Vec_t<Dim> & eigs,
-                                           const Mat_t<Dim> & T) {
+      template <class DerivedVec, class DerivedMat>
+      static inline decltype(auto)
+      compute(const Eigen::MatrixBase<DerivedVec> & eigs,
+              const Eigen::MatrixBase<DerivedMat> & T) {
         static_assert(Dim > 0, "only works for positive dimensions");
+        static_assert(Dim == muGrid::EigenCheck::tensor_dim<DerivedMat>::value,
+                      "Dimension of Matrix is wrong");
+        static_assert(DerivedVec::ColsAtCompileTime == 1,
+                      "Vector should be a column vector");
+        static_assert(Dim == DerivedVec::RowsAtCompileTime,
+                      "Vector dimension is wrong");
         return 1. / (eigs(I) - eigs(J)) *
                (T - eigs(J) * Mat_t<Dim>::Identity()) *
                Proj<Dim, I, J - 1>::compute(eigs, T);
@@ -277,9 +290,17 @@ namespace muGrid {
     template <Dim_t Dim, Dim_t Other>
     struct Proj<Dim, Other, Other> {
       //! wrapped function (raison d'être)
-      static inline decltype(auto) compute(const Vec_t<Dim> & eigs,
-                                           const Mat_t<Dim> & T) {
+      template <class DerivedVec, class DerivedMat>
+      static inline decltype(auto)
+      compute(const Eigen::MatrixBase<DerivedVec> & eigs,
+              const Eigen::MatrixBase<DerivedMat> & T) {
         static_assert(Dim > 0, "only works for positive dimensions");
+        static_assert(Dim == muGrid::EigenCheck::tensor_dim<DerivedMat>::value,
+                      "Dimension of Matrix is wrong");
+        static_assert(DerivedVec::ColsAtCompileTime == 1,
+                      "Vector should be a column vector");
+        static_assert(Dim == DerivedVec::RowsAtCompileTime,
+                      "Vector dimension is wrong");
         return Proj<Dim, Other, Other - 1>::compute(eigs, T);
       }
     };
@@ -289,9 +310,17 @@ namespace muGrid {
     struct Proj<Dim, I, 0> {
       static constexpr Dim_t j{0};  //!< short-hand
       //! wrapped function (raison d'être)
-      static inline decltype(auto) compute(const Vec_t<Dim> & eigs,
-                                           const Mat_t<Dim> & T) {
+      template <class DerivedVec, class DerivedMat>
+      static inline decltype(auto)
+      compute(const Eigen::MatrixBase<DerivedVec> & eigs,
+              const Eigen::MatrixBase<DerivedMat> & T) {
         static_assert(Dim > 0, "only works for positive dimensions");
+        static_assert(Dim == muGrid::EigenCheck::tensor_dim<DerivedMat>::value,
+                      "Dimension of Matrix is wrong");
+        static_assert(DerivedVec::ColsAtCompileTime == 1,
+                      "Vector should be a column vector");
+        static_assert(Dim == DerivedVec::RowsAtCompileTime,
+                      "Vector dimension is wrong");
         return 1. / (eigs(I) - eigs(j)) *
                (T - eigs(j) * Mat_t<Dim>::Identity());
       }
@@ -304,9 +333,17 @@ namespace muGrid {
       static constexpr Dim_t J{1};  //!< short-hand
 
       //! wrapped function (raison d'être)
-      static inline decltype(auto) compute(const Vec_t<Dim> & eigs,
-                                           const Mat_t<Dim> & T) {
+      template <class DerivedVec, class DerivedMat>
+      static inline decltype(auto)
+      compute(const Eigen::MatrixBase<DerivedVec> & eigs,
+              const Eigen::MatrixBase<DerivedMat> & T) {
         static_assert(Dim > 0, "only works for positive dimensions");
+        static_assert(Dim == muGrid::EigenCheck::tensor_dim<DerivedMat>::value,
+                      "Dimension of Matrix is wrong");
+        static_assert(DerivedVec::ColsAtCompileTime == 1,
+                      "Vector should be a column vector");
+        static_assert(Dim == DerivedVec::RowsAtCompileTime,
+                      "Vector dimension is wrong");
         return 1. / (eigs(I) - eigs(J)) *
                (T - eigs(J) * Mat_t<Dim>::Identity());
       }
@@ -320,15 +357,25 @@ namespace muGrid {
       static constexpr Dim_t J{0};    //!< short-hand
 
       //! wrapped function (raison d'être)
-      static inline decltype(auto) compute(const Vec_t<Dim> & /*eigs*/,
-                                           const Mat_t<Dim> & /*T*/) {
+      template <class DerivedVec, class DerivedMat>
+      static inline decltype(auto)
+      compute(const Eigen::MatrixBase<DerivedVec> & /*eigs*/,
+              const Eigen::MatrixBase<DerivedMat> & /*T*/) {
+        static_assert(Dim == muGrid::EigenCheck::tensor_dim<DerivedMat>::value,
+                      "Dimension of Matrix is wrong");
+        static_assert(DerivedVec::ColsAtCompileTime == 1,
+                      "Vector should be a column vector");
+        static_assert(Dim == DerivedVec::RowsAtCompileTime,
+                      "Vector dimension is wrong");
         return Mat_t<Dim>::Identity();
       }
     };
 
     //! Product term
-    template <Dim_t Dim, Dim_t I>
-    inline decltype(auto) P(const Vec_t<Dim> & eigs, const Mat_t<Dim> & T) {
+    template <Dim_t I, class DerivedVec, class DerivedMat>
+    inline decltype(auto) P(const Eigen::MatrixBase<DerivedVec> & eigs,
+                            const Eigen::MatrixBase<DerivedMat> & T) {
+      constexpr Dim_t Dim{muGrid::EigenCheck::tensor_dim<DerivedMat>::value};
       return Proj<Dim, I>::compute(eigs, T);
     }
 
@@ -336,9 +383,11 @@ namespace muGrid {
     template <Dim_t Dim, Dim_t I = Dim - 1>
     struct Summand {
       //! wrapped function (raison d'être)
-      static inline decltype(auto) compute(const Vec_t<Dim> & eigs,
-                                           const Mat_t<Dim> & T) {
-        return std::log(eigs(I)) * P<Dim, I>(eigs, T) +
+      template <class DerivedVec, class DerivedMat>
+      static inline decltype(auto)
+      compute(const Eigen::MatrixBase<DerivedVec> & eigs,
+              const Eigen::MatrixBase<DerivedMat> & T) {
+        return std::log(eigs(I)) * P<I>(eigs, T) +
                Summand<Dim, I - 1>::compute(eigs, T);
       }
     };
@@ -348,15 +397,19 @@ namespace muGrid {
     struct Summand<Dim, 0> {
       static constexpr Dim_t I{0};  //!< short-hand
       //! wrapped function (raison d'être)
-      static inline decltype(auto) compute(const Vec_t<Dim> & eigs,
-                                           const Mat_t<Dim> & T) {
-        return std::log(eigs(I)) * P<Dim, I>(eigs, T);
+      template <class DerivedVec, class DerivedMat>
+      static inline decltype(auto)
+      compute(const Eigen::MatrixBase<DerivedVec> & eigs,
+              const Eigen::MatrixBase<DerivedMat> & T) {
+        return std::log(eigs(I)) * P<I>(eigs, T);
       }
     };
 
     //! sum implementation
-    template <Dim_t Dim>
-    inline decltype(auto) Sum(const Vec_t<Dim> & eigs, const Mat_t<Dim> & T) {
+    template <class DerivedVec, class DerivedMat>
+    inline decltype(auto) Sum(const Eigen::MatrixBase<DerivedVec> & eigs,
+                              const Eigen::MatrixBase<DerivedMat> & T) {
+      constexpr Dim_t Dim{muGrid::EigenCheck::tensor_dim<DerivedMat>::value};
       return Summand<Dim>::compute(eigs, T);
     }
 
@@ -368,17 +421,19 @@ namespace muGrid {
   template <Dim_t Dim>
   using SelfAdjointDecomp_t =
       Eigen::SelfAdjointEigenSolver<Eigen::Matrix<Real, Dim, Dim>>;
+
   /**
    * computes the matrix logarithm efficiently for dim=1, 2, or 3 for
    * a diagonizable tensor. For larger tensors, better use the direct
    * eigenvalue/vector computation
    */
-  template <Dim_t Dim>
-  inline decltype(auto) logm(const log_comp::Mat_t<Dim> & mat) {
+  template <class Derived>
+  inline decltype(auto) logm(const Eigen::MatrixBase<Derived> & mat) {
+    constexpr Dim_t Dim{muGrid::EigenCheck::tensor_dim<Derived>::value};
     using Mat_t = Eigen::Matrix<Real, Dim, Dim>;
     Eigen::SelfAdjointEigenSolver<Mat_t> Solver{};
     Solver.computeDirect(mat, Eigen::EigenvaluesOnly);
-    return Mat_t{log_comp::Sum(Solver.eigenvalues(), mat)};
+    return log_comp::Sum(Solver.eigenvalues(), mat);
   }
 
   template <Dim_t Dim>

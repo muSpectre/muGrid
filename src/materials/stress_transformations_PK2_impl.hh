@@ -118,7 +118,8 @@ namespace muSpectre {
        * the placement Gradient (F)
        */
       template <Dim_t Dim>
-      struct PK1_stress<Dim, StressMeasure::PK2, StrainMeasure::Gradient>
+      struct PK1_stress<Dim, StressMeasure::PK2,
+                        StrainMeasure::PlacementGradient>
           : public PK1_stress<Dim, StressMeasure::PK2,
                               StrainMeasure::no_strain_> {
         //! base class

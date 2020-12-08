@@ -39,27 +39,31 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   MatrixAdaptor::MatrixAdaptor(std::shared_ptr<MatrixAdaptable> adaptable)
-      : adaptable{adaptable} {}
+    : adaptable{adaptable}, w_adaptable{adaptable} {}
+
+  /* ---------------------------------------------------------------------- */
+  MatrixAdaptor::MatrixAdaptor(std::weak_ptr<MatrixAdaptable> adaptable)
+      : w_adaptable{adaptable} {}
 
   /* ---------------------------------------------------------------------- */
   Index_t MatrixAdaptor::get_nb_dof() const {
-    if (this->adaptable == nullptr) {
+    if (this->w_adaptable.expired()) {
       throw muGrid::RuntimeError{
           "This matrix adaptor does not belong to any matrix adaptable"};
     }
-    return this->adaptable->get_nb_dof();
+    return this->w_adaptable.lock()->get_nb_dof();
   }
 
   /* ---------------------------------------------------------------------- */
-  void MatrixAdaptor::stiffness_action_increment(EigenCVec_t delta_grad,
-                                                 const Real & alpha,
-                                                 EigenVec_t del_flux) const {
-    if (this->adaptable == nullptr) {
+  void MatrixAdaptor::action_increment(EigenCVec_t delta_grad,
+                                       const Real & alpha,
+                                       EigenVec_t del_flux) const {
+    if (this->w_adaptable.expired()) {
       throw muGrid::RuntimeError{
           "This matrix adaptor does not belong to any matrix adaptable"};
     }
-    return this->adaptable->stiffness_action_increment(delta_grad, alpha,
-                                                       del_flux);
+    return this->w_adaptable.lock()->action_increment(delta_grad, alpha,
+                                                      del_flux);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -71,6 +75,49 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   MatrixAdaptor MatrixAdaptable::get_adaptor() {
     return MatrixAdaptor{this->shared_from_this()};
+  }
+
+  /* ---------------------------------------------------------------------- */
+  MatrixAdaptor MatrixAdaptable::get_weak_adaptor() {
+    return MatrixAdaptor{
+        std::weak_ptr<MatrixAdaptable>{this->shared_from_this()}};
+  }
+
+  /* ---------------------------------------------------------------------- */
+  DenseEigenAdaptor::DenseEigenAdaptor(
+      const Eigen::Ref<const Eigen::MatrixXd> matrix)
+      : matrix{matrix} {
+    if (this->matrix.rows() != this->matrix.cols()) {
+      throw muGrid::RuntimeError(
+          "Only square matrices can be used in adaptors");
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  DenseEigenAdaptor::DenseEigenAdaptor(const Index_t & nb_dof)
+      : matrix{Eigen::MatrixXd::Zero(nb_dof, nb_dof)} {}
+
+  /* ---------------------------------------------------------------------- */
+  Index_t DenseEigenAdaptor::get_nb_dof() const { return this->matrix.rows(); }
+
+  /* ---------------------------------------------------------------------- */
+  void DenseEigenAdaptor::action_increment(EigenCVec_t delta_grad,
+                                           const Real & alpha,
+                                           EigenVec_t del_flux) {
+    del_flux += alpha * this->matrix * delta_grad;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  const muGrid::Communicator & DenseEigenAdaptor::get_communicator() const {
+    return this->comm;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  Eigen::MatrixXd & DenseEigenAdaptor::get_matrix() { return this->matrix; }
+
+  /* ---------------------------------------------------------------------- */
+  const Eigen::MatrixXd & DenseEigenAdaptor::get_matrix() const {
+    return this->matrix;
   }
 
 }  // namespace muSpectre

@@ -41,8 +41,20 @@ PYBIND11_MODULE(_muSpectre, mod) {
   mod.doc() = "Python bindings to the µSpectre library";
 
   add_common(mod);
+  /* ---------------------------------------------------------------------- */
   add_material(mod);
-  add_solvers(mod);
+  /* ---------------------------------------------------------------------- */
+  auto solvers{mod.def_submodule("solvers")};
+  solvers.doc() = "bindings for solvers";
+  add_solvers(solvers);
+  add_class_solvers(solvers);
+  /* ---------------------------------------------------------------------- */
   add_projections(mod);
-  add_cell(mod);
+  /* ---------------------------------------------------------------------- */
+  add_fem_discretisation(mod);
+  /* ---------------------------------------------------------------------- */
+  auto cell{mod.def_submodule("cell")};
+  cell.doc() = "bindings for cells and cell factories";
+  add_cell(cell);
+  add_cell_data(cell);
 }

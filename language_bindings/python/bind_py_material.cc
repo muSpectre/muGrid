@@ -46,8 +46,9 @@
 #include <sstream>
 #include <string>
 
-using muGrid::RuntimeError;
 using muGrid::PhysicsDomain;
+using muGrid::RuntimeError;
+using muSpectre::Dim_t;
 using muSpectre::Index_t;
 using muSpectre::Real;
 using pybind11::literals::operator""_a;
@@ -89,6 +90,9 @@ template <Index_t Dim>
 void add_material_visco_elastic_damage_ss2_helper(py::module & mod);
 template <Index_t Dim>
 void add_material_neo_hookean_elastic_helper(py::module & mod);
+/* ---------------------------------------------------------------------- */
+template <Dim_t Dim>
+void add_material_linear_diffusion_helper(py::module & mod);
 
 #ifdef WITH_SPLIT
 template <Index_t Dim, muSpectre::Formulation Form>
@@ -272,6 +276,7 @@ void add_material_helper(py::module & mod) {
   add_material_linear_elastic4_helper<Dim>(mod);
   add_material_linear_elastic_damage1_helper<Dim>(mod);
   add_material_linear_elastic_damage2_helper<Dim>(mod);
+  add_material_linear_diffusion_helper<Dim>(mod);
   add_material_hyper_elasto_plastic1_helper<Dim>(mod);
   add_material_hyper_elasto_plastic2_helper<Dim>(mod);
   add_material_linear_elastic_generic1_helper<Dim>(mod);

@@ -116,11 +116,20 @@ namespace muGrid {
     //! Eigen type used to represent the field's data
     using EigenRep_t = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
 
+    //! Eigen type used to represent the field's data
+    using EigenVecRep_t = Eigen::Matrix<T, Eigen::Dynamic, 1>;
+
     //! eigen map (handle for EigenRep_t)
     using Eigen_map = Eigen::Map<EigenRep_t>;
 
     //! eigen const map (handle for EigenRep_t)
     using Eigen_cmap = Eigen::Map<const EigenRep_t>;
+
+    //! eigen vector map (handle for EigenVecRep_t)
+    using EigenVec_map = Eigen::Map<EigenVecRep_t>;
+
+    //! eigen vector const map (handle for EigenVecRep_t)
+    using EigenVec_cmap = Eigen::Map<const EigenVecRep_t>;
 
     //! base class
     using Parent = Field;
@@ -161,9 +170,9 @@ namespace muGrid {
     const std::type_info & get_stored_typeid() const final { return typeid(T); }
 
     //! return a vector map onto the underlying data
-    Eigen_map eigen_vec();
+    EigenVec_map eigen_vec();
     //! return a const vector map onto the underlying data
-    Eigen_cmap eigen_vec() const;
+    EigenVec_cmap eigen_vec() const;
 
     /**
      * return a matrix map onto the underlying data with one column per
@@ -245,6 +254,7 @@ namespace muGrid {
     //! back-end for the public const eigen_XXX functions
     Eigen_cmap eigen_map(const Index_t & nb_rows,
                          const Index_t & nb_cols) const;
+
     //! set the data_ptr
     void set_data_ptr(T * ptr);
     /**
@@ -520,6 +530,8 @@ namespace muGrid {
   using IntField = TypedField<Int>;
   //! Alias for unsigned integer-valued fields
   using UintField = TypedField<Uint>;
+  //! Alias for unsigned integer-valued fields
+  using IndexField = TypedField<Index_t>;
 
 }  // namespace muGrid
 

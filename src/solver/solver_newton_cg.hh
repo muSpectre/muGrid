@@ -80,8 +80,8 @@ namespace muSpectre {
     Index_t get_nb_dof() const final;
 
     //! implementation of the action of the stiffness matrix
-    void stiffness_action_increment(EigenCVec_t delta_grad, const Real & alpha,
-                                    EigenVec_t del_flux) const final;
+    void action_increment(EigenCVec_t delta_grad, const Real & alpha,
+                          EigenVec_t del_flux) final;
 
     //! initialise cell data for this solver
     void initialise_cell() final;
@@ -92,7 +92,7 @@ namespace muSpectre {
      * operator
      */
     template <Dim_t DimM>
-    static void stiffness_action_increment_worker(
+    static void action_increment_worker(
         const muGrid::TypedFieldBase<Real> & delta_strain,
         const muGrid::TypedFieldBase<Real> & tangent, const Real & alpha,
         muGrid::TypedFieldBase<Real> & delta_stress);

@@ -76,17 +76,17 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   //! Gradient strain and PK1 Stress
-  template class STMaterialLinearElasticGeneric1<twoD, StrainMeasure::Gradient,
-                                                 StressMeasure::PK1>;
   template class STMaterialLinearElasticGeneric1<
-      threeD, StrainMeasure::Gradient, StressMeasure::PK1>;
+      twoD, StrainMeasure::PlacementGradient, StressMeasure::PK1>;
+  template class STMaterialLinearElasticGeneric1<
+      threeD, StrainMeasure::PlacementGradient, StressMeasure::PK1>;
 
   /* ---------------------------------------------------------------------- */
   //! Gradient strain and Kirchhoff Stress
-  template class STMaterialLinearElasticGeneric1<twoD, StrainMeasure::Gradient,
-                                                 StressMeasure::Kirchhoff>;
   template class STMaterialLinearElasticGeneric1<
-      threeD, StrainMeasure::Gradient, StressMeasure::Kirchhoff>;
+      twoD, StrainMeasure::PlacementGradient, StressMeasure::Kirchhoff>;
+  template class STMaterialLinearElasticGeneric1<
+      threeD, StrainMeasure::PlacementGradient, StressMeasure::Kirchhoff>;
 
   /* ---------------------------------------------------------------------- */
   //! Green-Lagrange strain and Kirchhoff Stress
