@@ -47,6 +47,8 @@ namespace muSpectre {
   class SolverNewtonCG : public SolverSinglePhysics {
     using Parent = SolverSinglePhysics;
 
+    using EigenStrainOptFunc_ref = Parent::EigenStrainOptFunc_ref;
+
    public:
     //! Default constructor
     SolverNewtonCG() = delete;
@@ -74,7 +76,9 @@ namespace muSpectre {
 
     using Parent::solve_load_increment;
     //! solve for a single increment of strain
-    OptimizeResult solve_load_increment(const LoadStep & load_step) final;
+    OptimizeResult solve_load_increment(
+        const LoadStep & load_step,
+        EigenStrainOptFunc_ref eigen_strain_func = muGrid::nullopt) final;
 
     //! return the number of degrees of freedom of the solver problem
     Index_t get_nb_dof() const final;
@@ -86,16 +90,24 @@ namespace muSpectre {
     //! initialise cell data for this solver
     void initialise_cell() final;
 
+    inline void initialise_cell(const bool & with_eigen_strain_inp) {
+      if (with_eigen_strain_inp) {
+        this->with_eigen_strain = true;
+      }
+      this->initialise_cell();
+    }
+
    protected:
     /**
      * statically dimensioned worker for evaluating the incremental tangent
      * operator
      */
     template <Dim_t DimM>
-    static void action_increment_worker(
-        const muGrid::TypedFieldBase<Real> & delta_strain,
-        const muGrid::TypedFieldBase<Real> & tangent, const Real & alpha,
-        muGrid::TypedFieldBase<Real> & delta_stress);
+    static void
+    action_increment_worker(const muGrid::TypedFieldBase<Real> & delta_strain,
+                            const muGrid::TypedFieldBase<Real> & tangent,
+                            const Real & alpha,
+                            muGrid::TypedFieldBase<Real> & delta_stress);
 
     //! create a mechanics projection
     template <Dim_t Dim>
@@ -131,6 +143,8 @@ namespace muSpectre {
     Real newton_tol;
     Real equil_tol;
     Uint max_iter;
+
+    bool with_eigen_strain{false};
   };
 
 }  // namespace muSpectre

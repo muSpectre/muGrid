@@ -95,7 +95,7 @@ namespace muSpectre {
     }
     for (auto && mat : this->cell_data->get_domain_materials().at(domain)) {
       check_material_formulation(mat, this->get_formulation(), domain);
-      mat->compute_stresses(this->grads.at(domain)->get_field(),
+      mat->compute_stresses(this->eval_grads.at(domain)->get_field(),
                             this->fluxes.at(domain)->get_field());
     }
     return *this->fluxes.at(domain);
@@ -109,7 +109,7 @@ namespace muSpectre {
     }
     for (auto && mat : this->cell_data->get_domain_materials().at(domain)) {
       check_material_formulation(mat, this->get_formulation(), domain);
-      mat->compute_stresses_tangent(this->grads.at(domain)->get_field(),
+      mat->compute_stresses_tangent(this->eval_grads.at(domain)->get_field(),
                                     this->fluxes.at(domain)->get_field(),
                                     this->tangents.at(domain)->get_field());
     }

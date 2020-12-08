@@ -144,8 +144,7 @@ namespace muSpectre {
     // because of the early termination criterion, we never count the last
     // iteration
     ++this->counter;
-    for (Uint i{0}; i < this->maxiter && rdr > rel_tol2;
-         ++i, ++this->counter) {
+    for (Uint i{0}; i < this->maxiter && rdr > rel_tol2; ++i, ++this->counter) {
       this->Ap_k = this->matrix * this->p_k;
 
       Real pdAp{comm.sum(this->p_k.dot(this->Ap_k))};
@@ -153,6 +152,7 @@ namespace muSpectre {
         // Hessian is not positive definite
         throw SolverError("Hessian is not positive definite");
       }
+
       Real alpha{rdr / pdAp};
 
       this->x_k += alpha * this->p_k;

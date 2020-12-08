@@ -93,8 +93,18 @@ namespace muSpectre {
     this->grad = std::make_shared<MappedField_t>(
         "grad", this->grad_shape[0], this->grad_shape[1], IterUnit::SubPt,
         field_collection, QuadPtTag);
+
+    if (this->with_eigen_strain) {
+      this->eval_grad = std::make_shared<MappedField_t>(
+          "eval_grad", this->grad_shape[0], this->grad_shape[1],
+          IterUnit::SubPt, field_collection, QuadPtTag);
+    } else {
+      this->eval_grad = this->grad;
+    }
+
+    this->eval_grads[this->domain] = this->eval_grad;
     this->grads[this->domain] = this->grad;
-    this->eval_grad = this->grad;
+
     // Corresponds to symbol P or σ
     this->flux = std::make_shared<MappedField_t>(
         "flux", this->grad_shape[0], this->grad_shape[1], IterUnit::SubPt,
@@ -136,6 +146,7 @@ namespace muSpectre {
           Eigen::MatrixXd::Zero(this->grad_shape[0], this->grad_shape[1]);
     }
     this->grad->get_map() = default_grad_val;
+    this->eval_grad->get_map() = default_grad_val;
 
     this->previous_macro_load.setZero(this->grad_shape[0], this->grad_shape[1]);
 
@@ -156,8 +167,11 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  OptimizeResult
-  SolverNewtonCG::solve_load_increment(const LoadStep & load_step) {
+  OptimizeResult SolverNewtonCG::solve_load_increment(
+      const LoadStep & load_step, EigenStrainOptFunc_ref eigen_strain_func) {
+    if (not(eigen_strain_func == muGrid::nullopt)) {
+      this->with_eigen_strain = true;
+    }
     // check whether this solver's cell has been initialised already
     if (not this->is_initialised) {
       this->initialise_cell();
@@ -245,8 +259,10 @@ namespace muSpectre {
       return has_converged;
     }};
 
-    // TODO(junge): Handle eigenstrain here, see issue #146
-
+    if (not(eigen_strain_func == muGrid::nullopt)) {
+      this->eval_grad->get_field() = this->grad->get_field();
+      (eigen_strain_func.value())(this->eval_grad->get_field());
+    }
     auto res_tup{this->evaluate_stress_tangent()};
     auto & flux{std::get<0>(res_tup)};
 
@@ -305,8 +321,10 @@ namespace muSpectre {
         }
       }
 
-      // TODO(junge): Handle eigenstrain here, see issue #146
-
+      if (not(eigen_strain_func == muGrid::nullopt)) {
+        this->eval_grad->get_field() = this->grad->get_field();
+        (eigen_strain_func.value())(this->eval_grad->get_field());
+      }
       auto res_tup{this->evaluate_stress_tangent()};
       auto & flux{std::get<0>(res_tup)};
 

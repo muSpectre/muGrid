@@ -47,6 +47,9 @@ namespace muSpectre {
   class SolverFEMNewtonCG : public SolverSinglePhysics {
    public:
     using Parent = SolverSinglePhysics;
+
+    using EigenStrainOptFunc_ref = Parent::EigenStrainOptFunc_ref;
+
     //! Default constructor
     SolverFEMNewtonCG() = delete;
 
@@ -74,7 +77,9 @@ namespace muSpectre {
 
     using Parent::solve_load_increment;
     //! solve for a single increment of strain
-    OptimizeResult solve_load_increment(const LoadStep & load_step) final;
+    OptimizeResult solve_load_increment(
+        const LoadStep & load_step,
+        EigenStrainOptFunc_ref eigen_strain_func = muGrid::nullopt) final;
 
     //! return the number of degrees of freedom of the solver problem
     Index_t get_nb_dof() const final;
@@ -95,6 +100,13 @@ namespace muSpectre {
     const MappedField_t & get_tangent() const { return *this->tangent; }
     //! Tangent moduli field
     const MappedField_t & get_flux() const { return *this->flux; }
+
+    inline void initialise_cell(const bool & with_eigen_strain_inp) {
+      if (with_eigen_strain_inp) {
+        this->with_eigen_strain = true;
+      }
+      this->initialise_cell();
+    }
 
    protected:
     using MappedField_t =
@@ -130,6 +142,8 @@ namespace muSpectre {
     Real newton_tol;
     Real equil_tol;
     Uint max_iter;
+
+    bool with_eigen_strain{false};
   };
 
 }  // namespace muSpectre

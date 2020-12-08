@@ -98,6 +98,95 @@ namespace muSpectre {
   using CellDataFixtures =
       boost::mpl::list<CellDataFixture<twoD>, CellDataFixture<threeD>>;
 
+  /* ---------------------------------------------------------------------- */
+  template <Index_t Dim>
+  struct CellDataFixtureEigenStrain {
+    constexpr static Index_t SpatialDim{Dim};
+    using Matrix_t = Eigen::Matrix<Real, Dim, Dim>;
+
+    Matrix_t F_eigen_maker() {
+      const Real eps{1.0e-6};
+      switch (Dim) {
+      case twoD: {
+        return (Matrix_t() << eps, 0.0, 0.0, eps).finished();
+        break;
+      }
+      case threeD: {
+        return (Matrix_t() << eps, 0.0, 0.0, 0.0, eps, 0.0, 0.0, 0.0, eps)
+            .finished();
+        break;
+      }
+      default:
+        throw muGrid::RuntimeError("The dimension is invalid");
+        break;
+      }
+    }
+
+    static DynCcoord_t get_size() {
+      switch (SpatialDim) {
+      case twoD: {
+        return {3, 5};
+        break;
+      }
+      case threeD: {
+        return {3, 5, 7};
+        break;
+      }
+      default:
+        std::stringstream err_msg{};
+        err_msg << "can't give you a size for Dim = " << SpatialDim << ". "
+                << "I can only handle two- and three-dimensional problems.";
+        throw muGrid::RuntimeError{err_msg.str()};
+        break;
+      }
+    }
+
+    static DynRcoord_t get_length() {
+      switch (SpatialDim) {
+      case twoD: {
+        return {1, 2};
+        break;
+      }
+      case threeD: {
+        return {1, 2, 3};
+        break;
+      }
+      default:
+        std::stringstream err_msg{};
+        err_msg << "can't give you a size for Dim = " << SpatialDim << ". "
+                << "I can only handle two- and three-dimensional problems.";
+        throw muGrid::RuntimeError{err_msg.str()};
+        break;
+      }
+    }
+    CellDataFixtureEigenStrain()
+        : cell_data(CellData::make(get_size(), get_length())),
+          cell_data_eigen(CellData::make(get_size(), get_length())),
+          F_eigen_holder{std::make_unique<Matrix_t>(F_eigen_maker())},
+          F_eigen{*F_eigen_holder}, F_0_holder{std::make_unique<Matrix_t>(
+                                        Matrix_t::Zero())},
+          F_0{*F_0_holder}, step_nb{0} {}
+
+    CellData_ptr cell_data;
+    CellData_ptr cell_data_eigen;
+
+    std::unique_ptr<const Matrix_t> F_eigen_holder;  //!< eigen_strain tensor
+    const Matrix_t & F_eigen;  //!< ref to eigen strain tensor
+
+    std::unique_ptr<const Matrix_t> F_0_holder;  //!< eigen_strain tensor
+    const Matrix_t & F_0;                        //!< ref to eigen strain tensor
+
+    size_t step_nb;
+  };
+
+  /* ---------------------------------------------------------------------- */
+  using CellDataFixtureEigenStrains =
+      boost::mpl::list<CellDataFixtureEigenStrain<twoD>,
+                       CellDataFixtureEigenStrain<threeD>>;
+
+  using CellDataFixtureEigenStrains2D =
+      boost::mpl::list<CellDataFixtureEigenStrain<twoD>>;
+
 }  // namespace muSpectre
 
 #endif  // TESTS_TEST_CELL_DATA_HH_

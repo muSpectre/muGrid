@@ -101,9 +101,9 @@ namespace muSpectre {
 
     auto krylov_solver{
         std::make_shared<KrylovSolverCGEigen>(cg_tol, maxiter, verbose)};
-    auto solver{std::make_shared<SolverNewtonCG>(
-        this->cell_data, krylov_solver, verbose, newton_tol, equil_tol,
-        maxiter)};
+    auto solver{std::make_shared<SolverNewtonCG>(this->cell_data, krylov_solver,
+                                                 verbose, newton_tol, equil_tol,
+                                                 maxiter)};
     auto && symmetric{[](Eigen::MatrixXd mat) -> Eigen::MatrixXd {
       return 0.5 * (mat + mat.transpose());
     }};

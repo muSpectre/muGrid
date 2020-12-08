@@ -50,8 +50,20 @@
 
 namespace muSpectre {
 
-  class SolverBase: public MatrixAdaptable {
+  class SolverBase : public MatrixAdaptable {
    public:
+    using EigenStrainFunc_t =
+        typename std::function<void(muGrid::TypedFieldBase<Real> &)>;
+
+#ifdef NO_EXPERIMENTAL
+    using EigenStrainOptFunc_ref =
+        typename muGrid::optional<EigenStrainFunc_t &>;
+
+#else
+    using EigenStrainOptFunc_ref =
+        typename muGrid::optional<std::reference_wrapper<EigenStrainFunc_t>>;
+#endif
+
     using Parent = MatrixAdaptable;
     using MappedField_t =
         muGrid::MappedField<muGrid::FieldMap<Real, Mapping::Mut>>;
@@ -84,10 +96,12 @@ namespace muSpectre {
      * eigen load followed by `solve_load_increment()` (without argument).
      */
     virtual OptimizeResult
-    solve_load_increment(const LoadStep & load_step) = 0;
+    solve_load_increment(const LoadStep & load_step,
+                         EigenStrainOptFunc_ref eigen_strain_func) = 0;
 
     /**
-     * set formulation (small vs finite strain) used for mechanics domain.
+     * set formulation (small vs finite strain) used fo
+r mechanics domain.
      * Setting this is only necessary if at least one Material in the list
      * is a mechanics material.
      */

@@ -46,6 +46,8 @@ namespace muSpectre {
     using Parent = SolverBase;
 
    public:
+    using EigenStrainOptFunc_ref = Parent::EigenStrainOptFunc_ref;
+
     //! Default constructor
     SolverSinglePhysics() = delete;
 
@@ -63,8 +65,7 @@ namespace muSpectre {
     virtual ~SolverSinglePhysics() = default;
 
     //! Copy assignment operator
-    SolverSinglePhysics &
-    operator=(const SolverSinglePhysics & other) = delete;
+    SolverSinglePhysics & operator=(const SolverSinglePhysics & other) = delete;
 
     //! Move assignment operator
     SolverSinglePhysics & operator=(SolverSinglePhysics && other) = delete;
@@ -77,11 +78,12 @@ namespace muSpectre {
      * eigen load followed by `solve_load_increment()` (without argument).
      */
     template <class Derived>
-    OptimizeResult
-    solve_load_increment(const Eigen::MatrixBase<Derived> & load_step) {
+    OptimizeResult solve_load_increment(
+        const Eigen::MatrixBase<Derived> & load_step,
+        EigenStrainOptFunc_ref eigen_strain_func = muGrid::nullopt) {
       LoadStep step{};
       step[this->domain] = load_step;
-      return this->solve_load_increment(step);
+      return this->solve_load_increment(step, eigen_strain_func);
     }
 
     /**

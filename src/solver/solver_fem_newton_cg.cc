@@ -57,8 +57,11 @@ namespace muSpectre {
         newton_tol{newton_tol}, equil_tol{equil_tol}, max_iter{max_iter} {}
 
   /* ---------------------------------------------------------------------- */
-  OptimizeResult
-  SolverFEMNewtonCG::solve_load_increment(const LoadStep & load_step) {
+  OptimizeResult SolverFEMNewtonCG::solve_load_increment(
+      const LoadStep & load_step, EigenStrainOptFunc_ref eigen_strain_func) {
+    if (not(eigen_strain_func == muGrid::nullopt)) {
+      this->with_eigen_strain = true;
+    }
     // check whether this solver's cell has been initialised already
     if (not this->is_initialised) {
       this->initialise_cell();
@@ -143,25 +146,27 @@ namespace muSpectre {
 
     auto & grad_operator{*this->K.get_gradient_operator()};
 
-          this->grad->get_map() = macro_load;
-      grad_operator.apply_gradient_increment(
-          this->disp_fluctuation->get_field(), 1., this->grad->get_field());
-      // TODO(junge): Handle eigenstrain here, see issue #146
+    this->grad->get_map() = macro_load;
+    grad_operator.apply_gradient_increment(this->disp_fluctuation->get_field(),
+                                           1., this->grad->get_field());
+    if (this->with_eigen_strain) {
+      this->eval_grad->get_field() = this->grad->get_field();
+      (eigen_strain_func.value())(this->eval_grad->get_field());
+    }
 
-      // this fills the tangent and flux fields of this solver, using the
-      // eval_grad field as input
-      auto res_tup{this->evaluate_stress_tangent()};
-      auto & flux{std::get<0>(res_tup)};
-      this->K.apply_divergence(flux.get_field(), this->force->get_field());
+    // this fills the tangent and flux fields of this solver, using the
+    // eval_grad field as input
+    auto res_tup{this->evaluate_stress_tangent()};
+    auto & flux{std::get<0>(res_tup)};
+    this->K.apply_divergence(flux.get_field(), this->force->get_field());
 
-      force_norm = std::sqrt(
-          comm.sum(this->force->get_field().eigen_vec().squaredNorm()));
-      *this->rhs = -this->force->get_field();
+    force_norm =
+        std::sqrt(comm.sum(this->force->get_field().eigen_vec().squaredNorm()));
+    *this->rhs = -this->force->get_field();
 
-      if (early_convergence_test()) {
-        has_converged = true;
-      }
-
+    if (early_convergence_test()) {
+      has_converged = true;
+    }
 
     Uint newt_iter{0};
     for (; newt_iter < this->max_iter and not has_converged; ++newt_iter) {
@@ -214,7 +219,11 @@ namespace muSpectre {
       this->grad->get_map() = macro_load;
       grad_operator.apply_gradient_increment(
           this->disp_fluctuation->get_field(), 1., this->grad->get_field());
-      // TODO(junge): Handle eigenstrain here, see issue #146
+
+      if (not(eigen_strain_func == muGrid::nullopt)) {
+        this->eval_grad->get_field() = this->grad->get_field();
+        (eigen_strain_func.value())(this->eval_grad->get_field());
+      }
 
       // this fills the tangent and flux fields of this solver, using the
       // eval_grad field as input
@@ -322,35 +331,50 @@ namespace muSpectre {
 
     //! store solver fields in cell
     auto & field_collection{cell_data->get_fields()};
+
     // Corresponds to symbol δũ
     this->disp_fluctuation_incr = std::make_shared<MappedField_t>(
         "incru", this->displacement_shape[0], this->displacement_shape[1],
         IterUnit::SubPt, field_collection, NodalPtTag);
+
     // Corresponds to symbol ũ
     this->disp_fluctuation = std::make_shared<MappedField_t>(
         "u", this->displacement_shape[0], this->displacement_shape[1],
         IterUnit::SubPt, field_collection, NodalPtTag);
+
     // Corresponds to symbol F or ε
     this->grad = std::make_shared<MappedField_t>(
         "grad", this->grad_shape[0], this->grad_shape[1], IterUnit::SubPt,
         field_collection, QuadPtTag);
+    if (this->with_eigen_strain) {
+      this->eval_grad = std::make_shared<MappedField_t>(
+          "eval_grad", this->grad_shape[0], this->grad_shape[1],
+          IterUnit::SubPt, field_collection, QuadPtTag);
+    } else {
+      this->eval_grad = this->grad;
+    }
+
+    this->eval_grads[this->domain] = this->eval_grad;
     this->grads[this->domain] = this->grad;
-    this->eval_grad = this->grad;
+
     // Corresponds to symbol P or σ
     this->flux = std::make_shared<MappedField_t>(
         "flux", this->grad_shape[0], this->grad_shape[1], IterUnit::SubPt,
         field_collection, QuadPtTag);
     this->fluxes[this->domain] = this->flux;
+
     // Corresponds to symbol f
     this->force = std::make_shared<MappedField_t>(
         "f", this->displacement_shape[0], this->displacement_shape[1],
         IterUnit::SubPt, field_collection, NodalPtTag);
+
     // Corresponds to symbol K or C
     Index_t tangent_size{this->grad_shape[0] * this->grad_shape[1]};
     this->tangent = std::make_shared<MappedField_t>(
         "tangent", tangent_size, tangent_size, IterUnit::SubPt,
         field_collection, QuadPtTag);
     this->tangents[this->domain] = this->tangent;
+
     // field to store the rhs for cg calculations
     this->rhs = std::make_shared<MappedField_t>(
         "rhs", this->displacement_shape[0], this->displacement_shape[1],
