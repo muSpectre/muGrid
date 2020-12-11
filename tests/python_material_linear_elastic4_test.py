@@ -125,5 +125,46 @@ class MaterialLinearElastic4_Check(unittest.TestCase):
 
         self.assertTrue(np.allclose(tangent, numerical_tangent))
 
+    def test_setter_and_getter_functions(self):
+        nb_pts = np.prod(self.nb_grid_pts)
+        Youngs_modulus = np.arange(nb_pts)
+        Poisson_ratio = np.arange(nb_pts) / (2 * nb_pts)
+
+        cell = µ.Cell(self.nb_grid_pts, self.lengths, self.formulation)
+        mat = µ.material.MaterialLinearElastic4_2d.make(cell, "material")
+
+        for i in cell.pixel_indices:
+            mat.add_pixel(i, Youngs_modulus[i], Poisson_ratio[i])
+        cell.initialise()
+
+        random_quad_pt_id_1 = np.random.randint(0, nb_pts)
+        self.assertAlmostEqual(random_quad_pt_id_1/(2*nb_pts),
+                               mat.get_poisson_ratio(random_quad_pt_id_1),
+                               places=8)
+        self.assertAlmostEqual(random_quad_pt_id_1,
+                               mat.get_youngs_modulus(random_quad_pt_id_1),
+                               places=8)
+
+        random_quad_pt_id_2 = np.random.randint(0, nb_pts)
+        new_youngs_modulus = 2 * nb_pts
+        mat.set_youngs_modulus(random_quad_pt_id_2, new_youngs_modulus)
+        self.assertAlmostEqual(random_quad_pt_id_2/(2*nb_pts),
+                               mat.get_poisson_ratio(random_quad_pt_id_2),
+                               places=8)
+        self.assertAlmostEqual(new_youngs_modulus,
+                               mat.get_youngs_modulus(random_quad_pt_id_2),
+                               places=8)
+
+        random_quad_pt_id_3 = np.random.randint(0, nb_pts)
+        new_poisson_ratio = -0.5
+        mat.set_poisson_ratio(random_quad_pt_id_3, new_poisson_ratio)
+        self.assertAlmostEqual(new_poisson_ratio,
+                               mat.get_poisson_ratio(random_quad_pt_id_3),
+                               places=8)
+        self.assertAlmostEqual(random_quad_pt_id_3,
+                               mat.get_youngs_modulus(random_quad_pt_id_3),
+                               places=8)
+
+
 if __name__ == '__main__':
     unittest.main()

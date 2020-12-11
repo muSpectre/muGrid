@@ -74,6 +74,78 @@ namespace muSpectre {
     this->mu_field.get_field().push_back(mu);
   }
 
+  /* ---------------------------------------------------------------------- */
+  template <Index_t DimM>
+  void MaterialLinearElastic4<DimM>::set_youngs_modulus(
+      const size_t & quad_pt_id, const Real & Youngs_modulus) {
+    auto && lambda_map{this->lambda_field.get_map()};
+    auto && mu_map{this->mu_field.get_map()};
+
+    // compute poisson from first and second lame constant (lambda and mu)
+    const Real & lambda_old = lambda_map[quad_pt_id];
+    const Real & mu_old = mu_map[quad_pt_id];
+    const Real Poisson_ratio = Hooke::compute_poisson(lambda_old, mu_old);
+
+    // compute updated first and second lame constant (lambda and mu)
+    const Real lambda_new =
+        Hooke::compute_lambda(Youngs_modulus, Poisson_ratio);
+    const Real mu_new = Hooke::compute_mu(Youngs_modulus, Poisson_ratio);
+
+    // assign new values to fields
+    lambda_map[quad_pt_id] = lambda_new;
+    mu_map[quad_pt_id] = mu_new;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Index_t DimM>
+  void MaterialLinearElastic4<DimM>::set_poisson_ratio(
+      const size_t & quad_pt_id, const Real & Poisson_ratio) {
+    auto && lambda_map{this->lambda_field.get_map()};
+    auto && mu_map{this->mu_field.get_map()};
+
+    // compute young from first and second lame constant (lambda and mu)
+    const Real & lambda_old = lambda_map[quad_pt_id];
+    const Real & mu_old = mu_map[quad_pt_id];
+    const Real Youngs_modulus = Hooke::compute_young(lambda_old, mu_old);
+
+    // compute updated first and second lame constant (lambda and mu)
+    const Real lambda_new =
+        Hooke::compute_lambda(Youngs_modulus, Poisson_ratio);
+    const Real mu_new = Hooke::compute_mu(Youngs_modulus, Poisson_ratio);
+
+    // assign new values to fields
+    lambda_map[quad_pt_id] = lambda_new;
+    mu_map[quad_pt_id] = mu_new;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Index_t DimM>
+  Real
+  MaterialLinearElastic4<DimM>::get_youngs_modulus(const size_t & quad_pt_id) {
+    auto && lambda_map{this->lambda_field.get_map()};
+    auto && mu_map{this->mu_field.get_map()};
+
+    // compute poisson from first and second lame constant (lambda and mu)
+    const Real & lambda = lambda_map[quad_pt_id];
+    const Real & mu = mu_map[quad_pt_id];
+
+    return Hooke::compute_young(lambda, mu);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Index_t DimM>
+  Real
+  MaterialLinearElastic4<DimM>::get_poisson_ratio(const size_t & quad_pt_id) {
+    auto && lambda_map{this->lambda_field.get_map()};
+    auto && mu_map{this->mu_field.get_map()};
+
+    // compute poisson from first and second lame constant (lambda and mu)
+    const Real & lambda = lambda_map[quad_pt_id];
+    const Real & mu = mu_map[quad_pt_id];
+
+    return Hooke::compute_poisson(lambda, mu);
+  }
+
   template class MaterialLinearElastic4<twoD>;
   template class MaterialLinearElastic4<threeD>;
 

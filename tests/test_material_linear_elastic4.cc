@@ -95,5 +95,34 @@ namespace muSpectre {
     }
   };
 
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_setter_and_getter, Fix, mat_list, Fix){
+    Fix::mat.initialise();
+
+    // check if the getter functions return the inital values
+    const size_t quad_point_id{0};
+    const Real read_young{Fix::mat.get_youngs_modulus(quad_point_id)};
+    const Real read_poisson{Fix::mat.get_poisson_ratio(quad_point_id)};
+    std::cout << "Here!" << std::endl;
+    BOOST_CHECK_LT(std::abs(Fix::Youngs_modulus - read_young), tol);
+    BOOST_CHECK_LT(std::abs(Fix::Poisson_ratio - read_poisson), tol);
+
+    // check setter and if setting Young or Poisson influeces the value of the
+    // other parameter
+    const Real new_young{42};
+    Fix::mat.set_youngs_modulus(quad_point_id, new_young);
+    BOOST_CHECK_LT(std::abs(Fix::Poisson_ratio -
+                            Fix::mat.get_poisson_ratio(quad_point_id)),
+                   tol);
+    BOOST_CHECK_LT(
+        std::abs(new_young - Fix::mat.get_youngs_modulus(quad_point_id)), tol);
+
+    const Real new_poisson{0.4};
+    Fix::mat.set_poisson_ratio(quad_point_id, new_poisson);
+    BOOST_CHECK_LT(
+        std::abs(new_poisson - Fix::mat.get_poisson_ratio(quad_point_id)), tol);
+    BOOST_CHECK_LT(
+        std::abs(new_young - Fix::mat.get_youngs_modulus(quad_point_id)), tol);
+  };
+
   BOOST_AUTO_TEST_SUITE_END();
 }  // namespace muSpectre

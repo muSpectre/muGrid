@@ -76,7 +76,7 @@ namespace muSpectre {
 
     //! storage type for Lamé constants
     using Field_t =
-        muGrid::MappedScalarField<Real, Mapping::Const, IterUnit::SubPt>;
+        muGrid::MappedScalarField<Real, Mapping::Mut, IterUnit::SubPt>;
 
     //! Hooke's law implementation
     using Hooke =
@@ -165,6 +165,36 @@ namespace muSpectre {
      */
     void add_pixel(const size_t & pixel_index, const Real & Youngs_modulus,
                    const Real & Poisson_ratio);
+
+    /**
+     * (re)set the Youngs modulus on a quad_point with quad_point_id
+     * The internal stored first and second Lame constants are updated due to
+     * the update of the Youngs modulus.
+     */
+    void set_youngs_modulus(const size_t & quad_pt_id,
+                            const Real & Youngs_modulus);
+
+    /**
+     * (re)set the Poisson ratio on a quad_point with quad_point_id
+     * The internal stored first and second Lame constants are updated due to
+     * the update of the Poisson's ratio.
+     */
+    void set_poisson_ratio(const size_t & quad_pt_id,
+                           const Real & Poisson_ratio);
+
+    /**
+     * get the Youngs modulus on a quad_point with quad_point_id
+     * Youngs modulus is computed from the internal stored first and second
+     * lame constant.
+     */
+    Real get_youngs_modulus(const size_t & quad_pt_id);
+
+    /**
+     * get the Poisson ratio on a quad_point with quad_point_id
+     * Poissons ratio is computed from the internal stored first and second
+     * lame constant.
+     */
+    Real get_poisson_ratio(const size_t & quad_pt_id);
 
    protected:
     //! storage for first Lamé constant λ

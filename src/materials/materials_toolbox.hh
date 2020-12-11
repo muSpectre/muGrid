@@ -328,6 +328,19 @@ namespace muSpectre {
         }
       };
 
+      /**
+       * Specialisation ν(λ, µ)
+       */
+      template <>
+      struct Converter<ElasticModulus::Poisson, ElasticModulus::lambda,
+                       ElasticModulus::Shear> {
+        //! wrapped function (raison d'être)
+        inline constexpr static Real compute(const Real & lambda,
+                                             const Real & G) {
+          return lambda / (2 * (G + lambda));
+        }
+      };
+
     }  // namespace internal
 
     /**
@@ -378,6 +391,30 @@ namespace muSpectre {
         return convert_elastic_modulus<ElasticModulus::Shear,
                                        ElasticModulus::Young,
                                        ElasticModulus::Poisson>(young, poisson);
+      }
+
+      /**
+       * compute Poisson's ratio
+       * @param lambda: Lamé's first constant
+       * @param mu: Lamé's second constant
+       */
+      inline static constexpr Real compute_poisson(const Real & lambda,
+                                                   const Real & mu) {
+        return convert_elastic_modulus<ElasticModulus::Poisson,
+                                       ElasticModulus::lambda,
+                                       ElasticModulus::Shear>(lambda, mu);
+      }
+
+      /**
+       * compute Young's modulus
+       * @param lambda: Lamé's first constant
+       * @param mu: Lamé's second constant
+       */
+      inline static constexpr Real compute_young(const Real & lambda,
+                                                 const Real & mu) {
+        return convert_elastic_modulus<ElasticModulus::Young,
+                                       ElasticModulus::lambda,
+                                       ElasticModulus::Shear>(lambda, mu);
       }
 
       /**

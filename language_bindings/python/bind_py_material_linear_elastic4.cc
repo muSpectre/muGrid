@@ -77,6 +77,30 @@ void add_material_linear_elastic4_helper(py::module & mod) {
             mat.add_pixel(pixel_index, Young, Poisson);
           },
           "pixel"_a, "Young"_a, "Poisson"_a)
+      .def(
+          "set_youngs_modulus",
+          [](Mat_t & mat, const size_t & quad_pt_id, const Real & Young) {
+            return mat.set_youngs_modulus(quad_pt_id, Young);
+          },
+          "quad_pt_id"_a, "Young"_a)
+      .def(
+          "set_poisson_ratio",
+          [](Mat_t & mat, const size_t & quad_pt_id, const Real & Poisson) {
+            return mat.set_poisson_ratio(quad_pt_id, Poisson);
+          },
+          "quad_pt_id"_a, "Poisson"_a)
+      .def(
+          "get_youngs_modulus",
+          [](Mat_t & mat, const size_t & quad_pt_id) {
+            return mat.get_youngs_modulus(quad_pt_id);
+          },
+          "quad_pt_id"_a)
+      .def(
+          "get_poisson_ratio",
+          [](Mat_t & mat, const size_t & quad_pt_id) {
+            return mat.get_poisson_ratio(quad_pt_id);
+          },
+          "quad_pt_id"_a)
       .def_static("make_evaluator", []() { return Mat_t::make_evaluator(); });
 }
 
