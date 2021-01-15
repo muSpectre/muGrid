@@ -454,6 +454,43 @@ namespace muSpectre {
       }
 
       /**
+       * compute the compliance tensor
+       * @param lambda: Lamé's first constant
+       * @param mu: Lamé's second constant (i.e., shear modulus)
+       */
+      inline static T4Mat<Real, Dim> compute_compliance_T4(const Real & lambda,
+                                                           const Real & mu) {
+        return (-lambda / (2 * mu * (Dim * lambda + 2 * mu))) *
+                   Matrices::Itrac<Dim>() +
+               1 / (2 * mu) * Matrices::Isymm<Dim>();
+      }
+
+      /**
+       * return strain
+       * @param Q: compliance tensor (Piola-Kirchhoff 2 (or σ) w.r.t to `E`)
+       * @param S: Second Piola-Kirchhof stress
+       */
+      template <class T_t, class s_t>
+      inline static auto evaluate_strain(const T_t Q, s_t && S)
+          -> decltype(auto) {
+        return Matrices::tensmult(Q, S);
+      }
+
+      /**
+       * return strain
+       * @param lambda: First Lamé's constant
+       * @param mu: Second Lamé's constant (i.e. shear modulus)
+       * @param S: Second Piola-Kirchhof stress
+       */
+      template <class s_t>
+      inline static auto evaluate_strain(const Real & lambda, const Real & mu,
+                                         s_t && S) -> decltype(auto) {
+        return (1.0 / (2 * mu)) * S -
+               (S.trace() * (lambda / (2 * mu * (Dim * lambda + 2 * mu)))) *
+                   Strain_t::Identity();
+      }
+
+      /**
        * return stress
        * @param lambda: First Lamé's constant
        * @param mu: Second Lamé's constant (i.e. shear modulus)

@@ -438,7 +438,7 @@ namespace muSpectre {
     if (verbose) {
       std::cout << "stress:\n" << stress << std::endl;
     }
-    const auto *p = &stress(0, 0);  // pointer to stress
+    const auto * p = stress.data();  // pointer to stress
     if (verbose) {
       std::cout << "*p: " << p << std::endl;
     }
@@ -451,6 +451,96 @@ namespace muSpectre {
     }
     BOOST_CHECK_CLOSE(sigma_eq, sigma_eq_analytic, 1e-8);
   }
+
+  template <Index_t Dim>
+  struct DimFixture {
+    constexpr static Index_t Mdim{Dim};
+    constexpr static Real Young{210e9};
+    constexpr static Real Poisson{.33};
+    using T2_t = Eigen::Matrix<Real, Dim, Dim>;
+    DimFixture() : E_holder{std::make_unique<T2_t>(E_maker())}, E{*E_holder} {}
+    T2_t E_maker() {
+      switch (Mdim) {
+      case twoD: {
+        return (T2_t() << 1.654e-5, 1.231e-6, 1.231e-6, 2.564312e-5).finished();
+        break;
+      }
+      case threeD: {
+        return (T2_t() << 1.564e-5, 1.231e-6, 0, 1.231e-6, 2.6545e-5, 0, 0, 0,
+                3.544321e-5)
+            .finished();
+        break;
+      }
+      default:
+        break;
+      }
+    }
+    // strain
+    std::unique_ptr<const T2_t> E_holder;  //!< Strain tensor
+    const T2_t & E;                        //!< ref to strain tensor
+  };
+
+  using strains = boost::mpl::list<DimFixture<twoD>, DimFixture<threeD>>;
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_complaince_matrix, Fix, strains, Fix) {
+    constexpr Index_t Dim{Fix::Mdim};
+    using T2_t = Eigen::Matrix<Real, Dim, Dim>;
+    using T4_t = muGrid::T4Mat<Real, Dim>;
+    using Hooke = MatTB::Hooke<Dim, T2_t, T4_t>;
+    Real lam{Hooke::compute_lambda(Fix::Young, Fix::Poisson)};
+    Real mu{Hooke::compute_mu(Fix::Young, Fix::Poisson)};
+    //! stiffness matrix
+    T4_t C{Hooke::compute_C_T4(lam, mu)};
+    //! compliance matrix
+    T4_t Q{Hooke::compute_compliance_T4(lam, mu)};
+    T2_t CE{Matrices::tensmult(C, Fix::E)};
+    T2_t QCE{Matrices::tensmult(Q, CE)};
+    auto err{rel_error(Fix::E, QCE)};
+
+    // We check if compliance matrix satisfy all 4 MOORE-PENROSE pseudo inverse
+    // conditions
+    BOOST_CHECK_LT(err, tol);
+    if (err > tol) {
+      std::cout << "ε:\n" << Fix::E << "\n";
+      std::cout << "Q*C::ε:\n" << QCE << "\n";
+    }
+    T2_t QE{Matrices::tensmult(Q, Fix::E)};
+    T2_t CQE{Matrices::tensmult(C, QE)};
+    err = rel_error(Fix::E, CQE);
+    BOOST_CHECK_LT(err, tol);
+    if (err > tol) {
+      std::cout << "ε:\n" << Fix::E << "\n";
+      std::cout << "C*Q::ε:\n" << CQE << "\n";
+    }
+    T4_t QCQ{Q * C * Q};
+    err = rel_error(QCQ, Q);
+    BOOST_CHECK_LT(err, tol);
+    if (err > tol) {
+      std::cout << "Q:\n" << Q << "\n";
+      std::cout << "Q*C*Q:\n" << QCQ << "\n";
+    }
+    T4_t CQC{C * Q * C};
+    err = rel_error(CQC, C);
+    if (err > tol) {
+      std::cout << "C:\n" << Fix::E << "\n";
+      std::cout << "C*Q*C:\n" << CQC << "\n";
+    }
+  }
+
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_evaluate_strain, Fix, strains, Fix) {
+    constexpr Index_t Dim{Fix::Mdim};
+    using T2_t = Eigen::Matrix<Real, Dim, Dim>;
+    using T4_t = muGrid::T4Mat<Real, Dim>;
+    using Hooke = MatTB::Hooke<Dim, T2_t, T4_t>;
+    Real lam{Hooke::compute_lambda(Fix::Young, Fix::Poisson)};
+    Real mu{Hooke::compute_mu(Fix::Young, Fix::Poisson)};
+
+    auto && S{MatTB::Hooke<Dim, T2_t, T4_t>::evaluate_stress(lam, mu, Fix::E)};
+    auto && ret_E{MatTB::Hooke<Dim, T2_t, T4_t>::evaluate_strain(lam, mu, S)};
+
+    auto err{rel_error(Fix::E, ret_E)};
+    BOOST_CHECK_LT(err, tol);
+  }
+
   BOOST_AUTO_TEST_SUITE_END();
 
 }  // namespace muSpectre
