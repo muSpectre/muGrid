@@ -100,10 +100,10 @@ namespace muGrid {
         << ") passed during initialisation.";
       throw FieldCollectionError(s.str());
     }
-    // sanity check 2
+    // sanity check 2 - the subdomain may be empty!
     if (std::accumulate(nb_subdomain_grid_pts.begin(),
                         nb_subdomain_grid_pts.end(),
-                        1, std::multiplies<Index_t>()) <= 0) {
+                        1, std::multiplies<Index_t>()) < 0) {
       std::stringstream s;
       s << "Invalid nb_subdomain_grid_pts (=" << nb_subdomain_grid_pts
         << ") passed during initialisation.";

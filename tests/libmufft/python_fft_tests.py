@@ -520,5 +520,37 @@ class FFT_Check(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             engine.fft(in_data, out_data)
 
+    def test_zero_grid_pts(self):
+        nb_grid_pts = [3, 3] # Gives one CPU with zero points on 4 processes
+        axes = (0, 1)
+
+        try:
+            engine = muFFT.FFT(nb_grid_pts,
+                               fft='fftwmpi',
+                               communicator=self.communicator)
+            engine.create_plan(1)
+        except AttributeError:
+            # This FFT engine has not been compiled into the code. Skip
+            # test.
+            return
+
+        # We need to transpose the input to np.fft because muFFT
+        # uses column-major while np.fft uses row-major storage
+        np.random.seed(1)
+        global_in_arr = np.random.random(nb_grid_pts)
+        global_out_ref = np.fft.fftn(global_in_arr.T, axes=axes).T
+        out_ref = global_out_ref[(..., *engine.fourier_slices)]
+        in_arr = global_in_arr[(..., *engine.subdomain_slices)]
+
+        tol = 1e-14 * np.prod(nb_grid_pts)
+
+        # Separately test convenience interface
+        out_msp = np.empty(engine.nb_fourier_grid_pts,
+                           dtype=complex, order='f')
+        engine.fft(in_arr, out_msp)
+        err = np.linalg.norm(out_ref - out_msp)
+        self.assertLess(err, tol)
+
+
 if __name__ == '__main__':
     unittest.main()

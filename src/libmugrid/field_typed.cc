@@ -199,7 +199,7 @@ namespace muGrid {
       throw FieldError(error_message.str());
     }
 
-    auto && size{this->nb_sub_pts * this->get_nb_pixels()};
+    auto && size{this->nb_sub_pts * this->get_nb_buffer_pixels()};
     const auto expected_size{size * this->get_nb_components() + this->pad_size};
     if (this->values.size() != expected_size or
         static_cast<Index_t>(this->current_nb_entries) != size) {

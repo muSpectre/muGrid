@@ -317,7 +317,11 @@ void add_engine_helper(py::module & mod, const std::string & name) {
           [](Engine & eng,
              py::array_t<Real> & input_array,
              py::array_t<Complex> & output_array) {
-            auto nb_dof_per_pixel{input_array.size() / eng.size()};
+            const py::buffer_info & info = input_array.request();
+            auto & dim{eng.get_pixels().get_dim()};
+            auto nb_dof_per_pixel{
+                std::accumulate(info.shape.begin(), info.shape.end()-dim, 1,
+                                std::multiplies<Index_t>())};
             NumpyProxy<Real> input_proxy(eng.get_nb_domain_grid_pts(),
                                          eng.get_nb_subdomain_grid_pts(),
                                          eng.get_subdomain_locations(),
@@ -336,7 +340,11 @@ void add_engine_helper(py::module & mod, const std::string & name) {
           [](Engine & eng,
              py::array_t<Complex> & input_array,
              py::array_t<Real> & output_array) {
-            auto nb_dof_per_pixel{output_array.size() / eng.size()};
+            const py::buffer_info & info = input_array.request();
+            auto & dim{eng.get_pixels().get_dim()};
+            auto nb_dof_per_pixel{
+                std::accumulate(info.shape.begin(), info.shape.end()-dim, 1,
+                                std::multiplies<Index_t>())};
             NumpyProxy<Complex> input_proxy(eng.get_nb_domain_grid_pts(),
                                             eng.get_nb_fourier_grid_pts(),
                                             eng.get_fourier_locations(),

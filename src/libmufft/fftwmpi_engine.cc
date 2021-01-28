@@ -135,11 +135,6 @@ namespace muFFT {
 
     const int dim{this->nb_fourier_grid_pts.get_dim()};
 
-
-    if (not this->is_active()) {
-      return;
-    }
-
     int howmany{static_cast<int>(nb_dof_per_pixel)};
     ptrdiff_t res0{}, loc0{}, res1{}, loc1{};
     // find how large a workspace this transform needs
@@ -245,10 +240,6 @@ namespace muFFT {
   /* ---------------------------------------------------------------------- */
   void FFTWMPIEngine::compute_fft(const RealField_t & input_field,
                                   FourierField_t & output_field) const {
-    if (not this->is_active()) {
-      return;
-    }
-
     // Compute FFT
     fftw_mpi_execute_dft_r2c(this->fft_plans.at(
         input_field.get_nb_dof_per_pixel()),
@@ -259,10 +250,7 @@ namespace muFFT {
   /* ---------------------------------------------------------------------- */
   void FFTWMPIEngine::compute_ifft(const FourierField_t & input_field,
                                    RealField_t & output_field) const {
-    if (not this->is_active()) {
-      return;
-    }
-
+    // Compute inverse FFT
     fftw_mpi_execute_dft_c2r(this->ifft_plans.at(
         input_field.get_nb_dof_per_pixel()),
                          reinterpret_cast<fftw_complex *>(input_field.data()),
@@ -293,8 +281,9 @@ namespace muFFT {
      */
     auto && required_workspace_size{
         2*this->required_workspace_sizes.at(nb_dof_per_pixel)};
-    field.set_pad_size(required_workspace_size -
-                       nb_dof_per_pixel * field.get_nb_buffer_pixels());
+    auto pad_size{required_workspace_size -
+                  nb_dof_per_pixel * field.get_nb_buffer_pixels()};
+    field.set_pad_size(std::max(0L, pad_size));
     return field;
   }
 
@@ -314,8 +303,10 @@ namespace muFFT {
                                           std::multiplies<Index_t>())};
     auto && required_workspace_size{
         2*this->required_workspace_sizes.at(nb_dof_per_pixel)};
-    field.set_pad_size(required_workspace_size -
-                       nb_dof_per_pixel * field.get_nb_buffer_pixels());
+
+    auto pad_size{required_workspace_size -
+                  nb_dof_per_pixel * field.get_nb_buffer_pixels()};
+    field.set_pad_size(std::max(0L, pad_size));
     return field;
   }
 
@@ -335,8 +326,9 @@ namespace muFFT {
         this->required_workspace_sizes.at(nb_dof_per_pixel)};
     if (static_cast<int>(field.get_nb_entries() * nb_dof_per_pixel) <
         required_workspace_size) {
-      field.set_pad_size(required_workspace_size -
-                         nb_dof_per_pixel * field.get_nb_buffer_pixels());
+      auto pad_size{required_workspace_size -
+                    nb_dof_per_pixel * field.get_nb_buffer_pixels()};
+      field.set_pad_size(std::max(0L, pad_size));
     }
     return field;
   }
@@ -359,8 +351,9 @@ namespace muFFT {
         this->required_workspace_sizes.at(nb_dof_per_pixel)};
     if (static_cast<int>(field.get_nb_entries() * nb_dof_per_pixel) <
         required_workspace_size) {
-      field.set_pad_size(required_workspace_size -
-                         nb_dof_per_pixel * field.get_nb_buffer_pixels());
+      auto pad_size{required_workspace_size -
+                    nb_dof_per_pixel * field.get_nb_buffer_pixels()};
+      field.set_pad_size(std::max(0L, pad_size));
     }
     return field;
   }

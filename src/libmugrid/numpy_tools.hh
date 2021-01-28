@@ -173,8 +173,10 @@ namespace muGrid {
       // to the smallest entry
       Index_t smallest_stride{*std::min_element(pixels_strides.begin(),
                                                 pixels_strides.end())};
-      for (auto && s : pixels_strides) {
-        s /= smallest_stride;
+      if (smallest_stride > 0) {
+        for (auto && s : pixels_strides) {
+          s /= smallest_stride;
+        }
       }
 
       // If we have more than one sub-pt, the field to be wrapped must match

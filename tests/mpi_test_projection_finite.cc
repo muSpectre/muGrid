@@ -122,6 +122,7 @@ namespace muFFT {
     if (fix::is_parallel || fix::projector.get_communicator().size() == 1) {
       BOOST_CHECK_NO_THROW(fix::projector.initialise(FFT_PlanFlags::estimate));
     }
+    std::cout << "Hello world!" << std::endl;
   }
 
   /* ---------------------------------------------------------------------- */

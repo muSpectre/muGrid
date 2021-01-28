@@ -1,6 +1,13 @@
 Change log for µSpectre
 =======================
 
+0.13.0 (28Jan21)
+----------------
+
+- muSpectre: CellData and Solver classes for multiphysics calculations
+- muSpectre: Sensitivity analysis
+- Bug fix (muFFT): Handle cases where MPI processes have no grid points
+
 0.12.0 (19Nov20)
 ----------------
 
