@@ -111,7 +111,7 @@ muSpectre_add_example(crack_py_example
   TYPE PYTHON crack.py 1)
 
 muSpectre_add_example(buckling_py_example
-  TYPE PYTHON buckling.py 1)
+  TYPE PYTHON buckling.py --to-file buckling.png 0.01)
 
 muSpectre_add_example(hyper-elasticity_py_example
   TYPE PYTHON hyper-elasticity.py)
@@ -136,6 +136,9 @@ muSpectre_add_example(comparison_small_strain_py_example
 
 muSpectre_add_example(visco_py_example
   TYPE PYTHON visco_example.py 1)
+
+muSpectre_add_example(sensitivity_analysis_py_example
+  TYPE PYTHON  sensitivity_analysis_example.py)
 
 muSpectre_add_example(visco_damage_py_example
   TYPE PYTHON visco_example_damage.py 1)

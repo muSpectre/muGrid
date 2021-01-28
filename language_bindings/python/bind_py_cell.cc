@@ -198,9 +198,8 @@ void add_cell_helper(py::module & mod) {
        return Cell{projection.clone()};
      }))
       .def("initialise", &Cell::initialise)
-      .def(
-          "is_initialised", [](Cell & s) { return s.is_initialised(); },
-          py::return_value_policy::reference_internal)
+      .def("is_initialised", [](Cell & s) { return s.is_initialised(); },
+           py::return_value_policy::reference_internal)
       .def(
           "directional_stiffness",
           [&NumpyT2Proxy](
@@ -282,9 +281,10 @@ void add_cell_helper(py::module & mod) {
 
             cell.get_strain() = strain_array.get_field();
             return numpy_wrap(cell.evaluate_stress());
-          },
-          "strain"_a, py::keep_alive<0, 1>())
+           },
+           "strain"_a, py::keep_alive<0, 1>())
       .def_property_readonly("projection", &Cell::get_projection)
+      .def_property_readonly("fft_engine", &Cell::get_fft_engine)
       .def_property_readonly("communicator", &Cell::get_communicator)
       .def_property_readonly(
           "nb_subdomain_grid_pts",
@@ -310,12 +310,11 @@ void add_cell_helper(py::module & mod) {
           [](Cell & cell) {
             return cell.get_projection().get_domain_lengths();
           })
-      .def(
-          "set_uniform_strain",
-          [](Cell & cell, py::EigenDRef<Eigen::ArrayXXd> & strain) -> void {
-            cell.set_uniform_strain(strain);
-          },
-          "strain"_a)
+      .def("set_uniform_strain",
+           [](Cell & cell, py::EigenDRef<Eigen::ArrayXXd> & strain) -> void {
+             cell.set_uniform_strain(strain);
+           },
+           "strain"_a)
       .def("save_history_variables", &Cell::save_history_variables)
       .def("get_globalised_internal_real_field",
            &Cell::globalise_real_internal_field, "unique_name"_a,
@@ -377,6 +376,7 @@ void add_cell_helper(py::module & mod) {
       .def("get_field_collection_field_names", [](Cell & cell){
            return cell.get_field_collection().list_fields();
            })
+      .def_property_readonly("formulation", &Cell::get_formulation)
 
 #ifdef WITH_SPLIT
       .def(
@@ -394,12 +394,11 @@ void add_cell_helper(py::module & mod) {
           },
           "material_laminate"_a, "mat_precipitate_cell"_a,
           "material_precipitate"_a, "material_matrix"_a, "vertices"_a)
-      .def(
-          "complete_material_assignemnt_simple",
-          [](Cell & cell, Mat_t & mat_matrix_cell) {
-            cell.complete_material_assignment_simple(mat_matrix_cell);
-          },
-          "material_matrix_cell"_a)
+      .def("complete_material_assignemnt_simple",
+           [](Cell & cell, Mat_t & mat_matrix_cell) {
+             cell.complete_material_assignment_simple(mat_matrix_cell);
+           },
+           "material_matrix_cell"_a)
 #endif
       ;  // NOLINT
 }

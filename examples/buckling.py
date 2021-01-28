@@ -35,6 +35,7 @@ Program grant you additional permission to convey the resulting work.
 """
 
 from mpi4py import MPI
+import optparse
 import sys
 import numpy as np
 
@@ -51,6 +52,15 @@ from muFFT import Stencils2D
 
 print(msp.__file__)
 
+###
+
+parser = optparse.OptionParser()
+
+parser.add_option('-f', '--to-file',
+                  action="store", dest="plot_file",
+                  help="store plot to file instead of showing it on screen")
+
+options, args = parser.parse_args()
 
 ###
 
@@ -100,7 +110,11 @@ cg_tol = 1e-6
 
 ## macroscopic strain
 applied_strain = []
-for s in np.linspace(0, 0.05, 10):
+if len(args) > 0:
+    strain_steps = [float(s) for s in args]
+else:
+    strain_steps = np.linspace(0, 0.05, 10)
+for s in strain_steps:
     applied_strain += [[[2 * s, 0], [0, -s]]]
 
 maxiter = 1000  # for linear cell solver
@@ -152,16 +166,13 @@ if matplotlib_found and MPI.COMM_WORLD.Get_size() == 1:
         tri = make_triangles(displ)
         # plt.subplot(1, len(result), i+1, aspect=1)
         plt.subplot(1, 2, i + 1, aspect=1)
-        plt.tripcolor(tri, phase.reshape(-1), ec='black')
-        plt.colorbar()
+        tpc = plt.tripcolor(tri, phase.reshape(-1), ec='black')
+        plt.colorbar(tpc)
 
     plt.tight_layout()
 
-    if len(sys.argv[:]) == 2:
-        if sys.argv[1] == 1:
-            print("I skip the ploting of the results because you gave '1' as "
-                  "first argument.")
-            pass
+    if options.plot_file is not None:
+        plt.savefig(options.plot_file)
     else:
         plt.show()
 

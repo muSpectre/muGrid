@@ -202,6 +202,11 @@ namespace muFFT {
       return this->stencil[this->pixels.get_index(dcoord)];
     }
 
+    //! Return dimension of the stencil
+    const Dim_t & get_dim() const {
+      return this->pixels.get_dim();
+    }
+
     //! Return number of grid points in stencil
     const DynCcoord_t & get_nb_pts() const {
       return this->pixels.get_nb_subdomain_grid_pts();
@@ -227,8 +232,8 @@ namespace muFFT {
      * `fourier` method. Currently this method is only used in the serial tests.
      */
     template <typename T>
-    void apply(const muGrid::TypedField<T> & in_field, Index_t in_dof,
-               muGrid::TypedField<T> & out_field, Index_t out_dof,
+    void apply(const muGrid::TypedFieldBase<T> & in_field, Index_t in_dof,
+               muGrid::TypedFieldBase<T> & out_field, Index_t out_dof,
                Real fac = 1.0) const {
       // check whether fields are global
       if (!in_field.is_global()) {

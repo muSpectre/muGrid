@@ -107,8 +107,9 @@ namespace muGrid {
       // Determine the storage order of the whole buffer. We first check the
       // order of pixels vs. sub-points storage. This is our first guess for
       // the storage order of the whole buffer.
-      StorageOrder fc_storage_order{StorageOrder::Unknown};
+      StorageOrder fc_storage_order{StorageOrder::ColMajor};
       if (components_strides.size() > 0) {
+        fc_storage_order = StorageOrder::Unknown;
         const auto c{std::minmax_element(components_strides.begin(),
                                          components_strides.end())};
         const auto p{std::minmax_element(pixels_strides.begin(),
@@ -406,6 +407,8 @@ namespace muGrid {
     NumpyProxy(NumpyProxy && other) = default;
 
     WrappedField<T> & get_field() { return *this->field; }
+
+    Collection_t & get_collection() { return *this->collection; }
 
     const Shape_t get_components_shape() const {
       return this->field->get_components_shape();

@@ -96,6 +96,11 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
+  const muFFT::FFTEngineBase & Cell::get_fft_engine() const {
+    return this->projection->get_fft_engine();
+  }
+
+  /* ---------------------------------------------------------------------- */
   const Formulation & Cell::get_formulation() const {
     return this->projection->get_formulation();
   }

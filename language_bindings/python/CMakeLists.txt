@@ -91,8 +91,8 @@ add_custom_target(pyMuSpectre ALL SOURCES
   muSpectre/__init__.py
   muSpectre/gradient_integration.py
   muSpectre/vtk_export.py
-  muSpectre/stochastic_plasticity_search.py)
-
+  muSpectre/stochastic_plasticity_search.py
+  muSpectre/sensitivity_analysis.py)
 add_custom_command(TARGET pyMuSpectre POST_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_directory
                    ${CMAKE_CURRENT_SOURCE_DIR}/muSpectre

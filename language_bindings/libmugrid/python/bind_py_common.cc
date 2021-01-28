@@ -83,7 +83,8 @@ void add_dyn_ccoord_helper(py::module & mod, std::string name) {
           throw std::out_of_range(s.str());
         }
         return self[index];
-      });
+      })
+    .def_property_readonly("dim", &DynCcoord<MaxDim, T>::get_dim);
   py::implicitly_convertible<py::list, DynCcoord<MaxDim, T>>();
   py::implicitly_convertible<py::tuple, DynCcoord<MaxDim, T>>();
 }

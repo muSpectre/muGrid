@@ -54,7 +54,7 @@ namespace muSpectre {
   class CellAdaptor;
 
   /**
-   * Base class for the representation of a homogenisatonion problem in
+   * Base class for the representation of a homogenisation problem in
    * µSpectre. The `muSpectre::Cell` holds the global strain, stress and
    * (optionally) tangent moduli fields of the problem, maintains the list of
    * materials present, as well as the projection operator.
@@ -118,6 +118,9 @@ namespace muSpectre {
 
     //! return the communicator object
     const muFFT::Communicator & get_communicator() const final;
+
+    //! return the FFT object
+    const muFFT::FFTEngineBase & get_fft_engine() const;
 
     /**
      * formulation is hard set by the choice of the projection class

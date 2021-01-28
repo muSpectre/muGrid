@@ -41,6 +41,16 @@
 #include <pybind11/eigen.h>
 
 #include "libmufft/derivative.hh"
+#include <libmugrid/numpy_tools.hh>
+#include "libmugrid/ccoord_operations.hh"
+
+#include <libmufft/fftw_engine.hh>
+#ifdef WITH_FFTWMPI
+#include <libmufft/fftwmpi_engine.hh>
+#endif
+#ifdef WITH_PFFT
+#include <libmufft/pfft_engine.hh>
+#endif
 
 using muFFT::DerivativeBase;
 using muFFT::DiscreteDerivative;
@@ -51,6 +61,8 @@ using muGrid::Index_t;
 using muGrid::Real;
 using muGrid::threeD;
 using muGrid::twoD;
+using muGrid::NumpyProxy;
+using muFFT::FFTEngineBase;
 using pybind11::literals::operator""_a;
 namespace py = pybind11;
 
@@ -180,7 +192,35 @@ void add_discrete_derivative(py::module & mod, std::string name) {
       .def("rollaxes", &DiscreteDerivative::rollaxes, "distance"_a = 1)
       .def("apply", &DiscreteDerivative::apply<Real>, "in_field"_a, "in_dof"_a,
            "out_field"_a, "out_dof"_a, "fac"_a = 1.0)
-      .def_property_readonly("lbounds", &DiscreteDerivative::get_lbounds)
+    .def_property_readonly("lbounds", &DiscreteDerivative::get_lbounds)
+    .def(
+         "apply",
+         [](const DiscreteDerivative & self,
+            py::array_t<Real, py::array::f_style> & input_array) {
+           const py::buffer_info & info = input_array.request();
+           if (info.ndim != self.get_dim()) {
+             std::stringstream s;
+             s << "Stencil is " << self.get_dim() << "-dimensional, "
+               << "but the input array is " << input_array.ndim()
+               << "-dimensional.";
+             throw muGrid::RuntimeError(s.str());
+           }
+           py::array_t<double, py::array::f_style> output_array(info.shape);
+           DynCcoord_t nb_domain_grid_pts{info.shape};
+           DynCcoord_t subdomain_locations(info.ndim);
+           NumpyProxy<Real, py::array::f_style> input_proxy(
+                nb_domain_grid_pts, nb_domain_grid_pts,
+                subdomain_locations, 1, input_array);
+           NumpyProxy<Real, py::array::f_style> output_proxy(
+               nb_domain_grid_pts, nb_domain_grid_pts,
+               subdomain_locations, 1, output_array);
+
+           self.apply(input_proxy.get_field(), 0, output_proxy.get_field(), 0);
+           return output_array;
+         },
+         "input_array"_a,
+         "Apply the discrete derivative stencil to the input array.")
+
       .def_property_readonly("stencil", [](const DiscreteDerivative & self) {
         const Eigen::ArrayXd & stencil = self.get_stencil();
         return py::array_t<double, py::array::f_style>(self.get_nb_pts(),

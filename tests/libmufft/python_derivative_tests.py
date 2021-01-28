@@ -414,10 +414,20 @@ class DerivativeCheck2d(unittest.TestCase):
         self.fft.ifft(d * self.fourier_field, diff_field)
         diff_field *= self.fft.normalisation
         nx, ny = self.nb_pts
+
+    def test_convenience_interface_discrete_deriv(self):
+        assert self.nb_dof == 1
+        diffop = muFFT.Stencils2D.upwind_x
+        field = self.field.reshape(self.nb_pts, order='F')
+        diff_field = diffop.apply(field)
+        print('diff_field[0, 0] (python):', diff_field[0, 0])
         diff_field = np.squeeze(diff_field)
+        nx, ny = self.nb_pts
         for x in range(nx):
             for y in range(ny):
-                ndiff = self.field[(x+1)%nx, y] - 2*self.field[x, y] + self.field[(x-1)%nx, y]
+                ndiff = self.field[(x+1)%nx, y] - self.field[x, y]
+                if x == 0 and y == 0:
+                    print('ndiff:', ndiff)
                 ndiff = np.squeeze(ndiff)
                 self.assertAlmostEqual(diff_field[x, y], ndiff)
 
@@ -786,6 +796,20 @@ class DerivativeCheck3d(unittest.TestCase):
         diff_field *= self.fft.normalisation
         nx, ny, nz = self.nb_pts
         diff_field = np.squeeze(diff_field)
+        for x in range(nx):
+            for y in range(ny):
+                for z in range(nz):
+                    ndiff = (self.field[x, y, (z+1)%nz] - self.field[x, y, (z-1)%nz])/2
+                    ndiff = np.squeeze(ndiff)
+                    self.assertAlmostEqual(diff_field[x, y, z], ndiff)
+
+    def test_convenience_interface_discrete_deriv(self):
+        assert self.nb_dof == 1
+        diffop = muFFT.Stencils3D.central_z
+        field = self.field.reshape([*self.nb_pts], order='F')
+        diff_field = diffop.apply(field)
+        diff_field = np.squeeze(diff_field)
+        nx, ny, nz = self.nb_pts
         for x in range(nx):
             for y in range(ny):
                 for z in range(nz):

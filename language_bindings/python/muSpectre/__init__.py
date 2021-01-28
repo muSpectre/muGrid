@@ -67,6 +67,7 @@ from muFFT import Communicator, FourierDerivative, DiscreteDerivative, FFT, \
     FFT_PlanFlags
 import muSpectre.gradient_integration
 import muSpectre.stochastic_plasticity_search
+import muSpectre.sensitivity_analysis
 from . import vtk_export
 from . import eshelby_slow
 from . import _muSpectre

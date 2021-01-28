@@ -714,7 +714,7 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   void FileIONetCDF::define_netcdf_attributes(NetCDFVariables & variables) {
     /* define attributes: from name, type, ... (collective) */
-    for (const std::shared_ptr<NetCDFVarBase> netcdf_var :
+    for (const std::shared_ptr<NetCDFVarBase> & netcdf_var :
          variables.get_var_vector()) {
       for (const NetCDFAtt & att : netcdf_var->get_netcdf_atts()) {
         int status{ncmu_put_att(this->netcdf_id, netcdf_var->get_id(),

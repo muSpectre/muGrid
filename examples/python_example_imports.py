@@ -53,3 +53,4 @@ import muSpectre as µ
 import muSpectre
 import muSpectre.gradient_integration as muSpectre_gradient_integration
 import muSpectre.vtk_export as muSpectre_vtk_export
+import muSpectre.sensitivity_analysis as muSpectre_sensitivity_analysis
