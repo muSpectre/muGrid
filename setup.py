@@ -511,7 +511,10 @@ def compiler_options(compiler, version):
 def linker_options(compiler):
     opts = [cpp_flag(compiler)] # Not sure if this is necessary
     if sys.platform == 'darwin':
-        opts += ['-stdlib=libc++']
+        if has_flag(compiler, "-stdlib=libc++"):
+            # compiler is clang
+            opts += ['-stdlib=libc++']
+        # else compiler is gcc on Apple
     return opts
 
 

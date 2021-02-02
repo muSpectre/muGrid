@@ -66,6 +66,10 @@ Possible compilers
 
 and using clang-4.0 under MacOS.
 
+Under MacOS 14, it has been successfully compiled using gcc-6.5 shipped with homebrew along with the
+CommandLineTools 11.3.
+:download:`Here <macosx14_bash_profile>` is an example commented bash_profile that lead to the successfull installation.
+
 It does *not* compile on Intel's most recent compiler, as it is still lacking
 some C++14 support. Work-arounds are planned, but will have to wait for someone
 to pick up the `task <https://gitlab.com/muspectre/muspectre/issues/93>`_.
