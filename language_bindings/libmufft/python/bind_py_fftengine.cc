@@ -169,6 +169,8 @@ void add_engine_helper(py::module & mod, const std::string & name) {
 #endif
       .def("fft", &Engine::fft)
       .def("ifft", &Engine::ifft)
+      .def("hcfft", &Engine::hcfft)
+      .def("ihcfft", &Engine::ihcfft)
       .def("create_plan", &Engine::create_plan, "nb_dof_per_pixel"_a)
       .def("register_real_space_field",
            (FFTEngineBase::RealField_t &
@@ -192,6 +194,30 @@ void add_engine_helper(py::module & mod, const std::string & name) {
            (FFTEngineBase::RealField_t &
             (Engine::*)(const std::string &, const Shape_t &)) &
                Engine::fetch_or_register_real_space_field,
+           "unique_name"_a, "shape"_a,
+           py::return_value_policy::reference_internal)
+      .def("register_halfcomplex_field",
+           (FFTEngineBase::RealField_t &
+            (Engine::*)(const std::string &, const Index_t &)) &
+               Engine::register_halfcomplex_field,
+           "unique_name"_a, "nb_dof_per_pixel"_a,
+           py::return_value_policy::reference_internal)
+      .def("register_halfcomplex_field",
+           (FFTEngineBase::RealField_t &
+            (Engine::*)(const std::string &, const Shape_t &)) &
+               Engine::register_halfcomplex_field,
+           "unique_name"_a, "shape"_a,
+           py::return_value_policy::reference_internal)
+      .def("fetch_or_register_halfcomplex_field",
+           (FFTEngineBase::RealField_t &
+            (Engine::*)(const std::string &, const Index_t &)) &
+               Engine::fetch_or_register_halfcomplex_field,
+           "unique_name"_a, "nb_dof_per_pixel"_a,
+           py::return_value_policy::reference_internal)
+      .def("fetch_or_register_halfcomplex_field",
+           (FFTEngineBase::RealField_t &
+            (Engine::*)(const std::string &, const Shape_t &)) &
+               Engine::fetch_or_register_halfcomplex_field,
            "unique_name"_a, "shape"_a,
            py::return_value_policy::reference_internal)
       .def("register_fourier_space_field",
@@ -356,6 +382,43 @@ void add_engine_helper(py::module & mod, const std::string & name) {
             eng.ifft(input_proxy.get_field(), output_proxy.get_field());
           },
           "fourier_input_array"_a, "real_output_array"_a,
+          "Perform inverse FFT of the input array into the output array.")
+      .def(
+          "hcfft",
+          [](Engine & eng,
+             py::array_t<Real> & input_array,
+             py::array_t<Real> & output_array) {
+            auto nb_dof_per_pixel{input_array.size() / eng.size()};
+            NumpyProxy<Real> input_proxy(eng.get_nb_domain_grid_pts(),
+                                         eng.get_nb_subdomain_grid_pts(),
+                                         eng.get_subdomain_locations(),
+                                         nb_dof_per_pixel, input_array);
+            NumpyProxy<Real> output_proxy(eng.get_nb_domain_grid_pts(),
+                                          eng.get_nb_subdomain_grid_pts(),
+                                          eng.get_subdomain_locations(),
+                                          nb_dof_per_pixel, output_array);
+            auto && input_proxy_field{input_proxy.get_field()};
+            eng.hcfft(input_proxy_field, output_proxy.get_field());
+          },
+          "real_input_array"_a, "real_output_array"_a,
+          "Perform forward FFT of the input array into the output array")
+      .def(
+          "ihcfft",
+          [](Engine & eng,
+             py::array_t<Real> & input_array,
+             py::array_t<Real> & output_array) {
+            auto nb_dof_per_pixel{output_array.size() / eng.size()};
+            NumpyProxy<Real> input_proxy(eng.get_nb_domain_grid_pts(),
+                                         eng.get_nb_subdomain_grid_pts(),
+                                         eng.get_subdomain_locations(),
+                                         nb_dof_per_pixel, input_array);
+            NumpyProxy<Real> output_proxy(eng.get_nb_domain_grid_pts(),
+                                          eng.get_nb_subdomain_grid_pts(),
+                                          eng.get_subdomain_locations(),
+                                          nb_dof_per_pixel, output_array);
+            eng.ihcfft(input_proxy.get_field(), output_proxy.get_field());
+          },
+          "real_input_array"_a, "real_output_array"_a,
           "Perform inverse FFT of the input array into the output array.");
 }
 

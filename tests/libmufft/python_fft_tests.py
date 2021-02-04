@@ -551,6 +551,228 @@ class FFT_Check(unittest.TestCase):
         err = np.linalg.norm(out_ref - out_msp)
         self.assertLess(err, tol)
 
+class FFTCheckSerialOnly(unittest.TestCase):
+    def setUp(self):
+        #               v- grid
+        #                      v-components
+        self.grids = [([8, 4], (2, 3)),
+                      ([6, 4], (1,)),
+                      ([6, 4, 5], (2, 3)),
+                      ([6, 4, 4], (1,))]
+
+        if muFFT.has_mpi:
+            from mpi4py import MPI
+            self.communicator = muFFT.Communicator(MPI.COMM_WORLD)
+        else:
+            self.communicator = muFFT.Communicator()
+
+        self.engines = []
+        if muFFT.has_mpi:
+            self.engines = ['fftwmpi', 'pfft']
+        if self.communicator.size == 1:
+            self.engines += ['fftw']
+
+    @unittest.skipIf(muGrid.has_mpi and muGrid.Communicator().size > 1,
+                     'fftw only')
+    def test_rffth2c_2d_sin(self):
+
+        engine = muFFT.FFT([5,5], fft="fftw", 
+            allow_temporary_buffer=False,
+            allow_destroy_input=True)
+
+
+        in_data = np.cos(np.pi * 2 * np.arange(5) / 5).reshape(1,-1) * np.ones((5,1)) 
+        out_data = np.zeros((5,5), dtype=float)
+
+        # Allocate buffers and create plan for one degree of freedom
+        real_buffer = engine.register_halfcomplex_field(
+            "real-space", 1)
+        fourier_buffer = engine.register_halfcomplex_field(
+            "fourier-space", 1)
+
+        real_buffer.array()[...] = np.cos(np.pi * 2 * np.arange(5) / 5).reshape(1,-1) * np.ones((5,1)) 
+
+        engine.hcfft(real_buffer, fourier_buffer)
+
+        expected = np.zeros((5,5))
+        expected[0,1] = 1/2 / engine.normalisation
+        np.testing.assert_allclose(fourier_buffer, expected, atol=1e-14)
+
+        real_buffer.array()[...] = np.sin(np.pi * 2 * np.arange(5) / 5).reshape(1,-1) * np.ones((5,1)) 
+
+        engine.hcfft(real_buffer, fourier_buffer)
+
+        expected = np.zeros((5,5))
+        
+        # The halfcomplex array is:     
+        # r0, r1, r2, ..., rn/2, i(n+1)/2-1, ..., i2, i1
+        # with r, i the real and imaginary parts of the first half of the complex spectrum
+        # Euler formula: 
+        # sin = - i * 1/2 * (e^qx - e^-qx ) 
+        expected[0,-1] = - 1/2 / engine.normalisation
+        np.testing.assert_allclose(fourier_buffer, expected, atol=1e-14)
+
+
+    @unittest.skipIf(muGrid.has_mpi and muGrid.Communicator().size > 1,
+                     'fftw only')
+    def test_rffth2c_2d_roundtrip(self):
+        
+        for nb_grid_pts in [(5,5),(4,4), (4,5),(5,4)]:
+            nx, ny = nb_grid_pts
+
+            engine = muFFT.FFT(nb_grid_pts, fft="fftw", 
+                allow_temporary_buffer=False,
+                allow_destroy_input=True)
+
+            # Allocate buffers and create plan for one degree of freedom
+            real_buffer = engine.register_halfcomplex_field(
+                "real-space", 1)
+            fourier_buffer = engine.register_halfcomplex_field(
+                "fourier-space", 1)
+
+            original = np.random.normal(size=nb_grid_pts)
+            real_buffer.array()[...] = original.copy()
+
+            engine.hcfft(real_buffer, fourier_buffer)
+            engine.ihcfft(fourier_buffer, real_buffer)
+            real_buffer.array()[...] *= engine.normalisation
+            np.testing.assert_allclose(real_buffer, original, atol=1e-14)
+
+    @unittest.skipIf(muGrid.has_mpi and muGrid.Communicator().size > 1,
+                 'fftw only')
+    def test_rffth2c_2d_convenience_interface(self):
+
+        nb_grid_pts = (5,5)
+        nx, ny = nb_grid_pts
+
+        engine = muFFT.FFT(nb_grid_pts, fft="fftw")
+        engine.create_plan(1)
+
+        original = np.random.normal(size=nb_grid_pts)
+        original_backup = original.copy()
+        result_real = np.empty(nb_grid_pts,
+                               dtype=float, order='f')
+        result_fourier = result_real.copy()
+
+        engine.hcfft(original, result_fourier)
+        engine.ihcfft(result_fourier, result_real)
+
+        result_real *= engine.normalisation
+
+        np.testing.assert_allclose(original_backup, original, atol=1e-14)
+        np.testing.assert_allclose(result_real, original, atol=1e-14)
+
+    @unittest.skipIf(muGrid.has_mpi and muGrid.Communicator().size > 1,
+             'fftw only')
+    def test_rffth2c_multiple_dofs(self):
+        for nb_grid_pts, dims in self.grids:
+            s = self.communicator.size
+            nb_grid_pts = s*np.array(nb_grid_pts)
+            try:
+                engine = muFFT.FFT(nb_grid_pts,
+                                   fft="fftw",
+                                   communicator=self.communicator)
+                engine.create_plan(np.prod(dims))
+            except AttributeError:
+                # This FFT engine has not been compiled into the code. Skip
+                # test.
+                continue
+
+            if len(nb_grid_pts) == 2:
+                axes = (0, 1)
+            elif len(nb_grid_pts) == 3:
+                axes = (0, 1, 2)
+            else:
+                raise RuntimeError('Cannot handle {}-dim transforms'
+                                   .format(len(nb_grid_pts)))
+
+            # We need to transpose the input to np.fft because muFFT
+            # uses column-major while np.fft uses row-major storage
+            np.random.seed(1)
+            global_in_arr = np.random.random([*dims, *nb_grid_pts])
+
+            in_arr = global_in_arr[(..., *engine.subdomain_slices)]
+
+            tol = 1e-14 * np.prod(nb_grid_pts)
+
+            # Separately test convenience interface
+            out_msp = global_in_arr.copy()
+            result_real = global_in_arr.copy()
+
+            engine.hcfft(in_arr, out_msp)
+            engine.ihcfft(out_msp, result_real)
+            result_real *= engine.normalisation
+
+            np.testing.assert_allclose(result_real, in_arr, atol=1e-14)
+
+    @unittest.skipIf(muGrid.has_mpi and muGrid.Communicator().size > 1,
+                     'fftw only')
+    def test_rffth2c_1d_roundtrip(self):
+        
+        for nb_grid_pts in [(5,),(4,)]:
+            nx, = nb_grid_pts
+
+            engine = muFFT.FFT(nb_grid_pts, fft="fftw", 
+                allow_temporary_buffer=False,
+                allow_destroy_input=True)
+
+            # Allocate buffers and create plan for one degree of freedom
+            real_buffer = engine.register_halfcomplex_field(
+                "real-space", 1)
+            fourier_buffer = engine.register_halfcomplex_field(
+                "fourier-space", 1)
+
+            original = np.random.normal(size=nb_grid_pts)
+            real_buffer.array()[...] = original.copy()
+
+            engine.hcfft(real_buffer, fourier_buffer)
+            engine.ihcfft(fourier_buffer, real_buffer)
+            real_buffer.array()[...] *= engine.normalisation
+            np.testing.assert_allclose(real_buffer, original, atol=1e-14)
+
+    @unittest.skipIf(muGrid.has_mpi and muGrid.Communicator().size > 1,
+                     'fftw only')
+    def test_rffth2c_3d_roundtrip(self):
+    
+        for nb_grid_pts in [(5,4,5),(4,5,4), (4,4,5) ,(5,5,5), (4,4,4)]:
+
+            engine = muFFT.FFT(nb_grid_pts, fft="fftw", 
+                allow_temporary_buffer=False,
+                allow_destroy_input=True)
+
+            # Allocate buffers and create plan for one degree of freedom
+            real_buffer = engine.register_halfcomplex_field(
+                "real-space", 1)
+            fourier_buffer = engine.register_halfcomplex_field(
+                "fourier-space", 1)
+
+            original = np.random.normal(size=nb_grid_pts)
+            real_buffer.array()[...] = original.copy()
+
+            engine.hcfft(real_buffer, fourier_buffer)
+            engine.ihcfft(fourier_buffer, real_buffer)
+            real_buffer.array()[...] *= engine.normalisation
+            np.testing.assert_allclose(real_buffer, original, atol=1e-14)
+            
+    def test_r2hc_incompatible_engines_raise(self):
+        for engine in self.engines:
+            if engine != "fftw":
+                try:
+                    engine = muFFT.FFT([3,5], fft=engine, 
+                        allow_temporary_buffer=False,
+                        allow_destroy_input=True)
+                except AttributeError: # One of the engines is not installed, skip it
+                    continue 
+                # Allocate buffers and create plan for one degree of freedom
+                real_buffer = engine.register_halfcomplex_field(
+                    "real-space", 1)
+                fourier_buffer = engine.register_halfcomplex_field(
+                    "fourier-space", 1)
+                with self.assertRaises(RuntimeError) as context:
+                    engine.hcfft(real_buffer, fourier_buffer)
+
+                self.assertTrue("not implemented " in str(context.exception), str(context.exception))
+
 
 if __name__ == '__main__':
     unittest.main()

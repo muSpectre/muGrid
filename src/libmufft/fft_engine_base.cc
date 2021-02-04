@@ -1,3 +1,4 @@
+
 /**
  * @file   fft_engine_base.cc
  *
@@ -55,6 +56,9 @@ namespace muFFT {
             this->spatial_dimension,
             GlobalFieldCollection::SubPtMap_t{{PixelTag, 1}}},
         fourier_field_collection{
+            this->spatial_dimension,
+            GlobalFieldCollection::SubPtMap_t{{PixelTag, 1}}},
+        halfcomplex_field_collection{
             this->spatial_dimension,
             GlobalFieldCollection::SubPtMap_t{{PixelTag, 1}}},
         nb_domain_grid_pts{nb_grid_pts}, nb_subdomain_grid_pts{nb_grid_pts},
@@ -290,6 +294,229 @@ namespace muFFT {
     }
   }
 
+  //! forward transform, performs copy of buffer if required
+  void FFTEngineBase::hcfft(const RealField_t & input_field,
+                               RealField_t & output_field) {
+    // Sanity check 1: Do we have a plan?
+    auto && nb_dof_per_pixel{input_field.get_nb_dof_per_pixel()};
+    if (not this->has_plan_for(nb_dof_per_pixel)) {
+      std::stringstream message{};
+      message << "No plan has been created for " << nb_dof_per_pixel
+              << " degrees of freedom per pixel. Use "
+                 "`muFFT::FFTEngineBase::create_plan` to prepare a plan.";
+      throw FFTEngineError{message.str()};
+    }
+
+    // Sanity check 2: Does the input field have the correct number of pixels?
+    if (static_cast<size_t>(input_field.get_nb_pixels()) !=
+        muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)) {
+      std::stringstream error{};
+      error << "The number of pixels of the field '" << input_field.get_name()
+            << "' passed to the forward FFT is " << input_field.get_nb_pixels()
+            << " and does not match the size "
+            << muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)
+            << " of the (sub)domain handled by FFTWEngine.";
+      throw FFTEngineError(error.str());
+    }
+
+    // Sanity check 3: Does the output field have the correct number of pixels?
+    if (static_cast<size_t>(output_field.get_nb_pixels()) !=
+        muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)) {
+      std::stringstream error{};
+      error << "The number of pixels of the field '" << output_field.get_name()
+            << "' passed to the forward FFT is " << output_field.get_nb_pixels()
+            << " and does not match the size "
+            << muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)
+            << " of the (sub)domain handled by FFTWEngine.";
+      throw FFTEngineError(error.str());
+    }
+
+    // Sanity check 4: Do both fields have the same number of DOFs per pixel?
+    if (input_field.get_nb_dof_per_pixel() !=
+        output_field.get_nb_dof_per_pixel()) {
+      std::stringstream error;
+      error << "The input field reports " << input_field.get_nb_components()
+            << " components per sub-point and " << input_field.get_nb_sub_pts()
+            << " sub-points, while the output field reports "
+            << output_field.get_nb_components()
+            << " components per sub-point and " << output_field.get_nb_sub_pts()
+            << " sub-points.";
+      throw FFTEngineError(error.str());
+    }
+
+    bool input_copy_necessary{!this->check_halfcomplex_field(input_field)};
+    bool output_copy_necessary{!this->check_halfcomplex_field(output_field)};
+    if (this->allow_temporary_buffer and
+        (input_copy_necessary or output_copy_necessary)) {
+      if (input_copy_necessary and output_copy_necessary) {
+        std::stringstream iname, oname;
+        iname << "temp_real_space_" << input_field.get_nb_dof_per_pixel();
+        oname << "temp_fourier_space_" << output_field.get_nb_dof_per_pixel();
+        RealField_t & tmp_ifield{this->fetch_or_register_real_space_field(
+            iname.str(), input_field.get_nb_dof_per_pixel())};
+        tmp_ifield.get_collection().set_nb_sub_pts(
+            input_field.get_sub_division_tag(), input_field.get_nb_sub_pts());
+        tmp_ifield.reshape(input_field.get_components_shape(),
+                           input_field.get_sub_division_tag());
+        tmp_ifield = input_field;
+        RealField_t & tmp_ofield{this->fetch_or_register_halfcomplex_field(
+            oname.str(), output_field.get_nb_dof_per_pixel())};
+        tmp_ofield.get_collection().set_nb_sub_pts(
+            output_field.get_sub_division_tag(), output_field.get_nb_sub_pts());
+        tmp_ofield.reshape(output_field.get_components_shape(),
+                           output_field.get_sub_division_tag());
+        this->compute_hcfft(tmp_ifield, tmp_ofield);
+        output_field = tmp_ofield;
+      } else if (input_copy_necessary) {
+        std::stringstream iname;
+        iname << "temp_real_space_" << input_field.get_nb_dof_per_pixel();
+        RealField_t & tmp_ifield{this->fetch_or_register_real_space_field(
+            iname.str(), input_field.get_nb_dof_per_pixel())};
+        tmp_ifield.get_collection().set_nb_sub_pts(
+            input_field.get_sub_division_tag(), input_field.get_nb_sub_pts());
+        tmp_ifield.reshape(input_field.get_components_shape(),
+                           input_field.get_sub_division_tag());
+        tmp_ifield = input_field;
+        this->compute_hcfft(tmp_ifield, output_field);
+      } else {  // output_copy_necessary
+        std::stringstream oname;
+        oname << "temp_fourier_space_" << output_field.get_nb_dof_per_pixel();
+        RealField_t & tmp_ofield{this->fetch_or_register_halfcomplex_field(
+            oname.str(), output_field.get_nb_dof_per_pixel())};
+        tmp_ofield.get_collection().set_nb_sub_pts(
+            output_field.get_sub_division_tag(), output_field.get_nb_sub_pts());
+        tmp_ofield.reshape(output_field.get_components_shape(),
+                           output_field.get_sub_division_tag());
+        this->compute_hcfft(input_field, tmp_ofield);
+        output_field = tmp_ofield;
+      }
+    } else {
+      //! no temporary buffers allowwd
+      if (input_copy_necessary) {
+        throw FFTEngineError("Incompatible memory layout for the real-space "
+                             "field and no temporary copies are allowed.");
+      }
+      if (output_copy_necessary) {
+        throw FFTEngineError("Incompatible memory layout for the "
+                             "Fourier-space field and no temporary copies are "
+                             "allowed.");
+      }
+      this->compute_hcfft(input_field, output_field);
+    }
+  }
+
+  //! inverse transform, performs copy of buffer if required
+  void FFTEngineBase::ihcfft(const RealField_t & input_field,
+                           RealField_t & output_field) {
+    // Sanity check 1: Do we have a plan?
+    auto && nb_dof_per_pixel{input_field.get_nb_dof_per_pixel()};
+    if (not this->has_plan_for(nb_dof_per_pixel)) {
+      std::stringstream message{};
+      message << "No plan has been created for " << nb_dof_per_pixel
+              << " degrees of freedom per pixel. Use "
+                 "`muFFT::FFTEngineBase::create_plan` to prepare a plan.";
+      throw FFTEngineError{message.str()};
+    }
+
+    // Sanity check 2: Does the input field have the correct number of pixels?
+    if (static_cast<size_t>(input_field.get_nb_pixels()) !=
+        muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)) {
+      std::stringstream error;
+      error << "The number of pixels of the field '" << input_field.get_name()
+            << "' passed to the inverse FFT is " << input_field.get_nb_pixels()
+            << " and does not match the size "
+            << muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)
+            << " of the (sub)domain handled by FFTWEngine.";
+      throw FFTEngineError(error.str());
+    }
+
+    // Sanity check 3: Does the output field have the correct number of pixels?
+    if (static_cast<size_t>(output_field.get_nb_pixels()) !=
+        muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)) {
+      std::stringstream error;
+      error << "The number of pixels of the field '" << output_field.get_name()
+            << "' passed to the inverse FFT is " << output_field.get_nb_pixels()
+            << " and does not match the size "
+            << muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)
+            << " of the (sub)domain handled by FFTWEngine.";
+      throw FFTEngineError(error.str());
+    }
+
+    // Sanity check 4: Do both fields have the same number of DOFs per pixel?
+    if (input_field.get_nb_dof_per_pixel() !=
+        output_field.get_nb_dof_per_pixel()) {
+      std::stringstream error;
+      error << "The input field reports " << input_field.get_nb_components()
+            << " components per sub-point and " << input_field.get_nb_sub_pts()
+            << " sub-points, while the output field reports "
+            << output_field.get_nb_components()
+            << " components per sub-point and " << output_field.get_nb_sub_pts()
+            << " sub-points.";
+      throw FFTEngineError(error.str());
+    }
+
+    bool input_copy_necessary{not this->check_halfcomplex_field(input_field)};
+    bool output_copy_necessary{not this->check_real_space_field(output_field)};
+    if (this->allow_temporary_buffer and
+        (input_copy_necessary or output_copy_necessary)) {
+      if (input_copy_necessary and output_copy_necessary) {
+        std::stringstream iname, oname;
+        iname << "temp_fourier_space_" << input_field.get_nb_dof_per_pixel();
+        oname << "temp_real_space_" << output_field.get_nb_dof_per_pixel();
+        RealField_t & tmp_ifield{this->fetch_or_register_halfcomplex_field(
+            iname.str(), input_field.get_nb_dof_per_pixel())};
+        tmp_ifield.get_collection().set_nb_sub_pts(
+            input_field.get_sub_division_tag(), input_field.get_nb_sub_pts());
+        tmp_ifield.reshape(input_field.get_components_shape(),
+                           input_field.get_sub_division_tag());
+        tmp_ifield = input_field;
+        RealField_t & tmp_ofield{this->fetch_or_register_real_space_field(
+            oname.str(), output_field.get_nb_dof_per_pixel())};
+        tmp_ofield.get_collection().set_nb_sub_pts(
+            output_field.get_sub_division_tag(), output_field.get_nb_sub_pts());
+        tmp_ofield.reshape(output_field.get_components_shape(),
+                           output_field.get_sub_division_tag());
+        this->compute_ihcfft(tmp_ifield, tmp_ofield);
+        output_field = tmp_ofield;
+      } else if (input_copy_necessary) {
+        std::stringstream iname;
+        iname << "temp_fourier_space_" << input_field.get_nb_dof_per_pixel();
+        RealField_t & tmp_ifield{this->fetch_or_register_halfcomplex_field(
+            iname.str(), input_field.get_nb_dof_per_pixel())};
+        tmp_ifield.get_collection().set_nb_sub_pts(
+            input_field.get_sub_division_tag(), input_field.get_nb_sub_pts());
+        tmp_ifield.reshape(input_field.get_components_shape(),
+                           input_field.get_sub_division_tag());
+        tmp_ifield = input_field;
+        this->compute_ihcfft(tmp_ifield, output_field);
+      } else {  // output_copy_necessary
+        std::stringstream oname;
+        oname << "temp_real_space_" << output_field.get_nb_dof_per_pixel();
+        RealField_t & tmp_ofield{this->fetch_or_register_real_space_field(
+            oname.str(), output_field.get_nb_dof_per_pixel())};
+        tmp_ofield.get_collection().set_nb_sub_pts(
+            output_field.get_sub_division_tag(), output_field.get_nb_sub_pts());
+        tmp_ofield.reshape(output_field.get_components_shape(),
+                           output_field.get_sub_division_tag());
+        this->compute_ihcfft(input_field, tmp_ofield);
+        output_field = tmp_ofield;
+      }
+    } else {
+      //! no temporary buffers allowwd
+      if (input_copy_necessary) {
+        throw FFTEngineError("Incompatible memory layout for the "
+                             "Fourier-space field and no temporary copies are "
+                             "allowed.");
+      }
+      if (output_copy_necessary) {
+        throw FFTEngineError("Incompatible memory layout for the real-space "
+                             "field and no temporary copies are allowed.");
+      }
+      this->compute_ihcfft(input_field, output_field);
+    }
+  }
+
+
   /* ---------------------------------------------------------------------- */
   auto
   FFTEngineBase::register_fourier_space_field(const std::string & unique_name,
@@ -350,6 +577,68 @@ namespace muFFT {
     }
     return this->register_fourier_space_field(unique_name, shape);
   }
+
+  auto
+  FFTEngineBase::register_halfcomplex_field(const std::string & unique_name,
+                                              const Index_t & nb_dof_per_pixel)
+      -> RealField_t & {
+    this->create_plan(nb_dof_per_pixel);
+    return this->halfcomplex_field_collection.register_real_field(
+        unique_name, nb_dof_per_pixel, PixelTag);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  auto
+  FFTEngineBase::register_halfcomplex_field(const std::string & unique_name,
+                                              const Shape_t & shape)
+  -> RealField_t & {
+    this->create_plan(shape);
+    return this->halfcomplex_field_collection.register_real_field(
+        unique_name, shape, PixelTag);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  auto FFTEngineBase::fetch_or_register_halfcomplex_field(
+      const std::string & unique_name, const Index_t & nb_dof_per_pixel)
+      -> RealField_t & {
+    this->create_plan(nb_dof_per_pixel);
+    if (this->halfcomplex_field_collection.field_exists(unique_name)) {
+      auto & field{dynamic_cast<RealField_t &>(
+          this->halfcomplex_field_collection.get_field(unique_name))};
+      if (field.get_nb_dof_per_pixel() != nb_dof_per_pixel) {
+        std::stringstream message{};
+        message << "Field '" << unique_name << "' exists, but it has "
+                << field.get_nb_dof_per_pixel()
+                << " degrees of freedom per pixel instead of the requested "
+                << nb_dof_per_pixel << ".";
+        throw FFTEngineError{message.str()};
+      }
+      return field;
+    }
+    return this->register_halfcomplex_field(unique_name, nb_dof_per_pixel);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  auto FFTEngineBase::fetch_or_register_halfcomplex_field(
+      const std::string & unique_name, const Shape_t & shape)
+  -> RealField_t & {
+    this->create_plan(shape);
+    if (this->halfcomplex_field_collection.field_exists(unique_name)) {
+      auto & field{dynamic_cast<RealField_t &>(
+        this->halfcomplex_field_collection.get_field(unique_name))};
+      if (field.get_components_shape() != shape) {
+        std::stringstream message{};
+        message << "Field '" << unique_name << "' exists, but it has shape of "
+                << field.get_components_shape() << " instead of the requested "
+                << shape << ".";
+        throw FFTEngineError{message.str()};
+      }
+      return field;
+    }
+    return this->register_halfcomplex_field(unique_name, shape);
+  }
+
+  /* ---------------------------------------------------------------------- */
 
   /* ---------------------------------------------------------------------- */
   auto
@@ -459,6 +748,44 @@ namespace muFFT {
   FFTEngineBase::check_fourier_space_field(const FourierField_t & field) const {
     return field.get_collection().has_same_memory_layout(
         this->fourier_field_collection);
+  }
+
+  bool
+  FFTEngineBase::check_halfcomplex_field(const RealField_t & field) const {
+    return field.get_collection().has_same_memory_layout(
+        this->halfcomplex_field_collection);
+  }
+
+  /* ---------------------------------------------------------------------- */
+
+  /* ---------------------------------------------------------------------- */
+  void FFTEngineBase::compute_hcfft(const RealField_t & /*input_field*/,
+                               RealField_t & /*output_field*/) const {
+    throw FFTEngineError("Real to half-complex"
+      "transform not implemented in this FFTEngine");
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void FFTEngineBase::compute_ihcfft(const RealField_t & /*input_field*/,
+                                RealField_t & /*output_field*/) const {
+    throw FFTEngineError("Real to half-complex "
+      "inverse transform not implemented in this FFTEngine");
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void FFTEngineBase::initialise_field_collections() {
+    this->real_field_collection.initialise(this->nb_domain_grid_pts,
+                                           this->nb_subdomain_grid_pts,
+                                           this->subdomain_locations,
+                                           this->subdomain_strides);
+    this->halfcomplex_field_collection.initialise(this->nb_domain_grid_pts,
+                                         this->nb_subdomain_grid_pts,
+                                         this->subdomain_locations,
+                                         this->subdomain_strides);
+    this->fourier_field_collection.initialise(this->nb_domain_grid_pts,
+                                              this->nb_fourier_grid_pts,
+                                              this->fourier_locations,
+                                              this->fourier_strides);
   }
 
 }  // namespace muFFT

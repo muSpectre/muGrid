@@ -1,6 +1,12 @@
 Change log for µSpectre
 =======================
 
+
+0.14.0 (04Feb21)
+----------------
+
+- muFFT: implement serial wrapper to FFTW hcfft
+
 0.13.0 (28Jan21)
 ----------------
 

@@ -117,10 +117,24 @@ namespace muFFT {
     void compute_ifft(const FourierField_t & input_field,
                       RealField_t & output_field) const override;
 
+    //! forward half complex transform
+    void compute_hcfft(const RealField_t & input_field,
+                 RealField_t & output_field) const override;
+
+    //! inverse half complex transform
+    void compute_ihcfft(const RealField_t & input_field,
+                      RealField_t & output_field) const override;
+
     //! holds the plans for forward fourier transforms
     std::map<Index_t, fftw_plan> fft_plans{};
     //! holds the plans for inversefourier transforms
     std::map<Index_t, fftw_plan> ifft_plans{};
+
+    //! holds the plans for forward half-complex fourier transforms
+    std::map<Index_t, fftw_plan> hcfft_plans{};
+
+    //! holds the plans for inverse half-complex fourier transforms
+    std::map<Index_t, fftw_plan> ihcfft_plans{};
   };
 
 }  // namespace muFFT

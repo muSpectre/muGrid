@@ -140,6 +140,16 @@ namespace muFFT {
     void ifft(const FourierField_t & input_field,
               RealField_t & output_field);
 
+    //! forward transform using half-complex data storage,
+    // performs copy of buffer if required
+    void hcfft(const RealField_t & input_field,
+             RealField_t & output_field);
+
+    //! inverse transform using half-complex data storage,
+    // performs copy of buffer if required
+    void ihcfft(const RealField_t & input_field,
+             RealField_t & output_field);
+
     /**
      * Create a Fourier-space field with the ideal strides and dimensions for
      * this engine. Fields created this way are meant to be reused again and
@@ -177,6 +187,45 @@ namespace muFFT {
     FourierField_t &
     fetch_or_register_fourier_space_field(const std::string & unique_name,
                                           const Shape_t & shape);
+
+    /**
+     * Create a Fourier-space field with the ideal strides and dimensions for
+     * this engine. Fields created this way are meant to be reused again and
+     * again, and they will stay in the memory of the `muFFT::FFTEngineBase`'s
+     * field collection until the engine is destroyed.
+     */
+    virtual RealField_t &
+    register_halfcomplex_field(const std::string & unique_name,
+                                 const Index_t & nb_dof_per_pixel);
+
+    /**
+     * Create a Fourier-space field with the ideal strides and dimensions for
+     * this engine. Fields created this way are meant to be reused again and
+     * again, and they will stay in the memory of the `muFFT::FFTEngineBase`'s
+     * field collection until the engine is destroyed.
+     */
+    virtual RealField_t &
+    register_halfcomplex_field(const std::string & unique_name,
+                                 const Shape_t & shape);
+
+    /**
+     * Fetches a Fourier-space field with the ideal strides and dimensions for
+     * this engine. If the field does not exist, it is created using
+     * `register_fourier_space_field`.
+     */
+    RealField_t &
+    fetch_or_register_halfcomplex_field(const std::string & unique_name,
+                                          const Index_t & nb_dof_per_pixel);
+
+    /**
+     * Fetches a Fourier-space field with the ideal strides and dimensions for
+     * this engine. If the field does not exist, it is created using
+     * `register_fourier_space_field`.
+     */
+    RealField_t &
+    fetch_or_register_halfcomplex_field(const std::string & unique_name,
+                                  const Shape_t & shape);
+
 
     /**
      * Create a real-space field with the ideal strides and dimensions for this
@@ -276,9 +325,16 @@ namespace muFFT {
       return this->fourier_strides;
     }
 
+
     //! returns the field collection handling fields in real space
     GFieldCollection_t & get_real_field_collection() {
       return this->real_field_collection;
+    }
+
+    //! returns the field collection handling fields confirming with
+    // the data layout required for half-complex transforms
+    GFieldCollection_t & get_halfcomplex_field_collection() {
+      return this->halfcomplex_field_collection;
     }
 
     //! returns the field collection handling fields in Fourier space
@@ -307,7 +363,11 @@ namespace muFFT {
     //! check whether a plan for nb_dof_per_pixel exists
     bool has_plan_for(const Index_t & nb_dof_per_pixel) const;
 
+
    protected:
+    //! calls initialize of the real, hc and fourier field collections
+    void initialise_field_collections();
+
     //! forward transform, assumes that the buffer has the correct memory layout
     virtual void compute_fft(const RealField_t & input_field,
                              FourierField_t & output_field) const = 0;
@@ -316,11 +376,22 @@ namespace muFFT {
     virtual void compute_ifft(const FourierField_t & input_field,
                               RealField_t & output_field) const = 0;
 
+    //! forward half complex transform
+    virtual void compute_hcfft(const RealField_t & input_field,
+                                RealField_t & output_field) const;
+
+    //! inverse half complex transform
+    virtual void compute_ihcfft(const RealField_t & input_field,
+                                RealField_t & output_field) const;
+
     //! check whether real-space buffer has the correct memory layout
     virtual bool check_real_space_field(const RealField_t & field) const;
 
     //! check whether Fourier-space buffer has the correct memory layout
     virtual bool check_fourier_space_field(const FourierField_t & field) const;
+
+    //! check whether the half-complex buffer has the correct memory layout
+    virtual bool check_halfcomplex_field(const RealField_t & field) const;
 
     //! spatial dimension of the grid
     Index_t spatial_dimension;
@@ -333,6 +404,12 @@ namespace muFFT {
     GFieldCollection_t real_field_collection;
     //! Field collection for Fourier-space fields
     GFieldCollection_t fourier_field_collection;
+    //! Field collection for half-complex-space fields
+    //! in the r2hc transform real fields and fourier fields
+    //! are identical
+    //! In serial the hc_field is identical to the real field,
+    //! But in parallel, the hc_field has no padding region.
+    GFieldCollection_t halfcomplex_field_collection;
 
     //! nb_grid_pts of the full domain of the cell
     const DynCcoord_t nb_domain_grid_pts;
@@ -352,6 +429,7 @@ namespace muFFT {
     //!< data layout of the process-local (subdomain) portion of the Fourier
     //!< transformed data
     DynCcoord_t fourier_strides;
+
 
     //! allow the FFTEngine to create temporary copies
     bool allow_temporary_buffer;
