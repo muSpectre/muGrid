@@ -120,7 +120,7 @@ namespace muSpectre {
 
     Matrix_t F_eigen{Fix::F_eigen};
     Matrix_t delF0{Fix::F0};
-    constexpr Real cg_tol{1e-8}, newton_tol{1e-5}, equi_tol{1e-8};
+    constexpr Real cg_tol{1e-8}, newton_tol{1e-5}, equi_tol{0.0};
     constexpr Dim_t maxiter{100};
     constexpr Verbosity verbose{Verbosity::Silent};
 
@@ -175,8 +175,8 @@ namespace muSpectre {
     auto && diff_stress{rel_error(stress_solver, stress_material)};
     auto && diff_strain{rel_error(strain_solver, strain_material)};
 
-    BOOST_CHECK_LE(diff_stress, cg_tol);
     BOOST_CHECK_LE(diff_strain, cg_tol);
+    BOOST_CHECK_LE(diff_stress, cg_tol);
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_multiple_step, Fix, strains, Fix) {

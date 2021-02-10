@@ -316,28 +316,26 @@ namespace muSpectre {
         return has_converged;
       }};
 
-      // Iterative update for the non-linear case
-      for (; newt_iter < solver.get_maxiter() && !has_converged; ++newt_iter) {
-        // updating the strain fields with the  eigen_strain field calculated by
-        // the functor called eigen_strain_func
-
-        if (not(eigen_strain_func == muGrid::nullopt)) {
-          eval_strain_field = general_strain_field;
-          (eigen_strain_func.value())(strain_step, eval_strain_field);
-        }
+      // updating the strain fields with the  eigen_strain field calculated by
+      // the functor called eigen_strain_func
+      if (not(eigen_strain_func == muGrid::nullopt)) {
+        eval_strain_field = general_strain_field;
+        (eigen_strain_func.value())(strain_step, eval_strain_field);
+      }
+      auto & rhs{rhs_field.get_field()};
+      {
         auto res_tup{cell->evaluate_stress_tangent()};
         auto & P{std::get<0>(res_tup)};
-
-        auto & rhs{rhs_field.get_field()};
-
         rhs = -P;
         cell->apply_projection(rhs);
         stress_norm = std::sqrt(comm.sum(rhs.eigen_vec().squaredNorm()));
-
         if (early_convergence_test()) {
-          break;
+          has_converged = true;
         }
+      }
 
+      // Iterative update for the non-linear case
+      for (; newt_iter < solver.get_maxiter() && !has_converged; ++newt_iter) {
         // calling solver for solving the current (iteratively approximated)
         // linear equilibrium problem
         auto & incrF{incrF_field.get_field()};
@@ -381,6 +379,20 @@ namespace muSpectre {
                       << std::endl;
           }
         }
+
+        // updating the strain fields with the  eigen_strain field calculated by
+        // the functor called eigen_strain_func
+        if (not(eigen_strain_func == muGrid::nullopt)) {
+          eval_strain_field = general_strain_field;
+          (eigen_strain_func.value())(strain_step, eval_strain_field);
+        }
+        auto res_tup{cell->evaluate_stress_tangent()};
+        auto & P{std::get<0>(res_tup)};
+
+        rhs = -P;
+        cell->apply_projection(rhs);
+        stress_norm = std::sqrt(comm.sum(rhs.eigen_vec().squaredNorm()));
+
         full_convergence_test();
       }
 
@@ -400,17 +412,6 @@ namespace muSpectre {
 
       // update previous macroscopic strain
       previous_macro_strain = macro_strain;
-
-      // re-evaluate cell in case the loop was terminated because of linearity
-      if (convergence_criterion.get_was_last_step_linear_test() and
-          not(convergence_criterion.get_newton_tol_test() or
-              convergence_criterion.get_equil_tol_test())) {
-        if (not(eigen_strain_func == muGrid::nullopt)) {
-          eval_strain_field = general_strain_field;
-          (eigen_strain_func.value())(strain_step, eval_strain_field);
-        }
-        cell->evaluate_stress_tangent();
-      }
 
       // store results
       ret_val.emplace_back(OptimizeResult{
@@ -1069,9 +1070,19 @@ namespace muSpectre {
                   << " (tol)" << std::endl;
       }
 
+      {
+        auto res_tup{cell->evaluate_stress_tangent()};
+        auto & P{std::get<0>(res_tup)};
+        auto & rhs{rhs_field.get_field()};
+        rhs = -P;
+        cell->apply_projection(rhs);
+        stress_norm = std::sqrt(comm.sum(rhs.eigen_vec().squaredNorm()));
+      }
+
       // Iterative update for the non-linear case
       Uint newt_iter{0};
       for (; newt_iter < solver.get_maxiter() && !has_converged; ++newt_iter) {
+        auto & rhs{rhs_field.get_field()};
         // updating the strain fields with the  eigen_strain field calculated by
         // the functor called eigen_strain_func
 
@@ -1079,8 +1090,6 @@ namespace muSpectre {
           eval_strain_field = general_strain_field;
           (eigen_strain_func.value())(strain_step, eval_strain_field);
         }
-        auto res_tup{cell->evaluate_stress_tangent()};
-        auto & P{std::get<0>(res_tup)};
 
         // string descriptor for this step (for printing to screen)
         std::string action_str{""};
@@ -1088,18 +1097,14 @@ namespace muSpectre {
             solver.get_convergence() ==
                     KrylovSolverBase::Convergence::ReachedTolerance
                 ? "newton"
-                : solver.get_convergence() == KrylovSolverBase::Convergence::
-                                                  HessianNotPositiveDefinite
-                      ? "neg. Hessian"
-                      : "tr exceeded"};
+            : solver.get_convergence() ==
+                    KrylovSolverBase::Convergence::HessianNotPositiveDefinite
+                ? "neg. Hessian"
+                : "tr exceeded"};
 
-        auto & rhs{rhs_field.get_field()};
         auto & lin_rhs{lin_rhs_field.get_field()};
         auto & incrF{incrF_field.get_field()};
 
-        rhs = -P;
-        cell->apply_projection(rhs);
-        stress_norm = std::sqrt(comm.sum(rhs.eigen_vec().squaredNorm()));
         auto stress_diff_norm{std::sqrt(
             comm.sum((rhs.eigen_vec() - lin_rhs.eigen_vec()).squaredNorm()))};
 
@@ -1184,6 +1189,13 @@ namespace muSpectre {
         grad_norm =
             std::sqrt(comm.sum(eval_strain_field.eigen_vec().squaredNorm()));
 
+        auto res_tup{cell->evaluate_stress_tangent()};
+        auto & P{std::get<0>(res_tup)};
+
+        rhs = -P;
+        cell->apply_projection(rhs);
+        stress_norm = std::sqrt(comm.sum(rhs.eigen_vec().squaredNorm()));
+
         full_convergence_test();
       }
 
@@ -1203,17 +1215,6 @@ namespace muSpectre {
 
       // update previous macroscopic strain
       previous_macro_strain = macro_strain;
-
-      // re-evaluate cell in case the loop was terminated because of linearity
-      if (convergence_criterion.get_was_last_step_linear_test() and
-          not(convergence_criterion.get_newton_tol_test() or
-              convergence_criterion.get_equil_tol_test())) {
-        if (not(eigen_strain_func == muGrid::nullopt)) {
-          eval_strain_field = general_strain_field;
-          (eigen_strain_func.value())(strain_step, eval_strain_field);
-        }
-        cell->evaluate_stress_tangent();
-      }
 
       // store results
       ret_val.emplace_back(OptimizeResult{

@@ -242,23 +242,23 @@ namespace muSpectre {
       return has_converged;
     }};
 
+    // TODO(junge): Handle eigenstrain here, see issue #146
+
+    auto res_tup{this->evaluate_stress_tangent()};
+    auto & flux{std::get<0>(res_tup)};
+
+    *this->rhs = -flux.get_field();
+    this->projection->apply_projection(this->rhs->get_field());
+
+    stress_norm =
+        std::sqrt(comm.sum(this->rhs->get_field().eigen_vec().squaredNorm()));
+
+    if (early_convergence_test()) {
+      has_converged = true;
+    }
+
     Uint newt_iter{0};
     for (; newt_iter < this->max_iter and not has_converged; ++newt_iter) {
-      // TODO(junge): Handle eigenstrain here, see issue #146
-
-      auto res_tup{this->evaluate_stress_tangent()};
-      auto & flux{std::get<0>(res_tup)};
-
-      *this->rhs = -flux.get_field();
-      this->projection->apply_projection(this->rhs->get_field());
-
-      stress_norm =
-          std::sqrt(comm.sum(this->rhs->get_field().eigen_vec().squaredNorm()));
-
-      if (early_convergence_test()) {
-        break;
-      }
-
       // calling solver for solving the current (iteratively approximated)
       // linear equilibrium problem
       try {
@@ -302,6 +302,20 @@ namespace muSpectre {
         }
       }
 
+      // TODO(junge): Handle eigenstrain here, see issue #146
+
+      auto res_tup{this->evaluate_stress_tangent()};
+      auto & flux{std::get<0>(res_tup)};
+
+      *this->rhs = -flux.get_field();
+      this->projection->apply_projection(this->rhs->get_field());
+
+      stress_norm =
+          std::sqrt(comm.sum(this->rhs->get_field().eigen_vec().squaredNorm()));
+
+      if (early_convergence_test()) {
+        break;
+      }
       full_convergence_test();
     }
     // throwing meaningful error message if the number of iterations for
@@ -320,17 +334,6 @@ namespace muSpectre {
 
     // update previous macroscopic strain
     this->previous_macro_load = macro_load;
-
-    // re-evaluate cell in case the loop was terminated because of linearity
-    if ((not last_step_was_nonlinear) and
-        not(newton_tol_test or equil_tol_test)) {
-      // TODO(junge): Handle Eigenstrain here
-      // if (not(eigen_strain_func == muGrid::nullopt)) {
-      //   eval_strain_field = general_strain_field;
-      //   (eigen_strain_func.value())(strain_step, eval_strain_field);
-      // }
-      this->evaluate_stress_tangent();
-    }
 
     // store results
 
