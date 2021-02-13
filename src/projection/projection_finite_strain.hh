@@ -45,29 +45,23 @@ namespace muSpectre {
   /**
    * Implements the discrete finite strain gradient projection operator
    */
-  template <Index_t DimS>
-  class ProjectionFiniteStrain : public ProjectionDefault<DimS> {
+  template <Index_t DimS, Index_t NbQuadPts = OneQuadPt>
+  class ProjectionFiniteStrain : public ProjectionDefault<DimS, NbQuadPts> {
    public:
-    using Parent = ProjectionDefault<DimS>;  //!< base class
+    using Parent = ProjectionDefault<DimS, NbQuadPts>;  //!< base class
     //! polymorphic pointer to FFT engines
     using Ccoord = typename Parent::Ccoord;  //!< cell coordinates type
     using Rcoord = typename Parent::Rcoord;  //!< spatial coordinates type
     //! gradient, i.e. derivatives in each Cartesian direction
     using Gradient_t = typename Parent::Gradient_t;
-    //! Field type on which to apply the projection
-    using Proj_map =
-        muGrid::T4FieldMap<Real, Mapping::Mut, DimS, IterUnit::SubPt>;
-    //! iterable vectorised version of the Fourier-space tensor field
-    using Vector_map =
-        muGrid::MatrixFieldMap<Complex, Mapping::Mut, DimS * DimS, 1,
-                               IterUnit::SubPt>;
 
     //! Default constructor
     ProjectionFiniteStrain() = delete;
 
     //! Constructor with fft_engine and stencil
     ProjectionFiniteStrain(muFFT::FFTEngine_ptr engine,
-                           const DynRcoord_t & lengths, Gradient_t gradient);
+                           const DynRcoord_t & lengths,
+                           const Gradient_t & gradient);
 
     //! Constructor with fft_engine and default (Fourier) gradient
     ProjectionFiniteStrain(muFFT::FFTEngine_ptr engine,

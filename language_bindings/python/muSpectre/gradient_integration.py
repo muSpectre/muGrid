@@ -104,6 +104,33 @@ def complement_periodically(array, dim):
     return out_arr
 
 
+def get_complemented_positions(rve):
+    """Takes an RVE (Cell) object and returns the deformed and undeformed nodal
+    positions, complemented periodically.
+
+    Arguments:
+    rve -- Cell object
+
+    Returns:
+    np.ndarray with deformed and undeformed nodal positions
+    """
+    cell_coords = np.mgrid[tuple(slice(None, n)
+                                 for n in rve.nb_domain_grid_pts)]
+    node_coords = np.mgrid[tuple(slice(None, n + 1)
+                                 for n in rve.nb_domain_grid_pts)]
+    strain = rve.strain.array()
+    mean_strain = np.mean(
+        strain, axis=tuple(i for i in range(2, len(strain.shape))))
+    positions = rve.projection.integrate(rve.strain).array().squeeze()
+    coords = (np.transpose(cell_coords) * rve.domain_lengths /
+              rve.nb_domain_grid_pts).T
+    displacements = complement_periodically(
+        positions - coords.T.dot(mean_strain.T).T, rve.dim)
+    coords = (np.transpose(node_coords) * rve.domain_lengths /
+              rve.nb_domain_grid_pts).T
+    return coords.T.dot(mean_strain.T).T + displacements + coords, coords
+
+
 def get_integrator(fft, gradient_op, grid_spacing):
     """Returns the discrete Fourier-space integration operator as a function
     of the position grid (used to determine the spatial dimension and number

@@ -45,13 +45,23 @@ upwind = (upwind_x, upwind_y)
 d_10_00 = upwind_x
 d_01_00 = upwind_y
 d_11_01 = muFFT.DiscreteDerivative([0, 0], [[0, -1],
-                                            [0,  1]])
-d_11_10 = muFFT.DiscreteDerivative([0, 0], [[ 0, 0],
+                                            [0, 1]])
+d_11_10 = muFFT.DiscreteDerivative([0, 0], [[0, 0],
                                             [-1, 1]])
+
+# Linear finite elements (each pixel is subdivided into two triangles)
+linear_finite_elements = (
+    # First triangle
+    d_10_00,  # x-derivative
+    d_01_00,  # y-derivative
+    # Second triangle
+    d_11_01,  # x-derivative
+    d_11_10   # y-derivative
+)
 
 # First order upwind differences, averaged over neighboring pixels
 averaged_upwind_x = muFFT.DiscreteDerivative([0, 0], [[-0.5, -0.5],
-                                                      [ 0.5,  0.5]])
+                                                      [0.5, 0.5]])
 averaged_upwind_y = muFFT.DiscreteDerivative([0, 0], [[-0.5, 0.5],
                                                       [-0.5, 0.5]])
 averaged_upwind = (averaged_upwind_x, averaged_upwind_y)

@@ -723,7 +723,14 @@ namespace muFFT {
   }
 
   /* ---------------------------------------------------------------------- */
-  const typename FFTEngineBase::Pixels_t & FFTEngineBase::get_pixels() const {
+  const typename FFTEngineBase::Pixels_t &
+  FFTEngineBase::get_real_pixels() const {
+    return this->real_field_collection.get_pixels();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  const typename FFTEngineBase::Pixels_t &
+  FFTEngineBase::get_fourier_pixels() const {
     return this->fourier_field_collection.get_pixels();
   }
 

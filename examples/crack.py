@@ -105,8 +105,7 @@ verbose = msp.Verbosity.Full
 dim = len(nb_domain_grid_pts)
 fourier_gradient = [msp.FourierDerivative(dim, i) for i in range(dim)]
 discrete_gradient = Stencils2D.averaged_upwind
-discrete_gradient2 = [Stencils2D.d_10_00, Stencils2D.d_01_00,
-                      Stencils2D.d_11_01, Stencils2D.d_11_10]
+discrete_gradient2 = Stencils2D.linear_finite_elements
 
 gradients = [fourier_gradient, discrete_gradient, discrete_gradient2]
 

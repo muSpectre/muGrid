@@ -162,10 +162,11 @@ namespace muSpectre {
    * initialisation.
    */
   std::vector<OptimizeResult> trust_region_newton_cg(
-      Cell & cell, const LoadSteps_t & load_steps, KrylovSolverBase & solver,
-      const Real & max_trust_region, const Real & newton_tol,
-      const Real & equil_tol, const Real & inc_tr_tol, const Real & dec_tr_tol,
-      const Verbosity & verbose, const IsStrainInitialised & strain_init,
+      std::shared_ptr<Cell> cell, const LoadSteps_t & load_steps,
+      KrylovSolverBase & solver, const Real & max_trust_region,
+      const Real & newton_tol, const Real & equil_tol, const Real & inc_tr_tol,
+      const Real & dec_tr_tol, const Verbosity & verbose,
+      const IsStrainInitialised & strain_init,
       EigenStrainOptFunc_ref eigen_strain_func = muGrid::nullopt);
 
   /**
@@ -173,7 +174,7 @@ namespace muSpectre {
    * equilibrium of a cell given a mean applied strain.
    */
   inline OptimizeResult trust_region_newton_cg(
-      Cell & cell, const Eigen::Ref<Eigen::MatrixXd> load_step,
+      std::shared_ptr<Cell> cell, const Eigen::Ref<Eigen::MatrixXd> load_step,
       KrylovSolverBase & solver, const Real & max_trust_region,
       const Real & newton_tol, const Real & inc_tr_tol, const Real & dec_tr_tol,
       const Real & reduction_tol, const Verbosity & verbose = Verbosity::Silent,

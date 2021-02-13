@@ -155,6 +155,9 @@ muSpectre_add_example(sec_conc_py_example
 muSpectre_add_example(netcdf_io_use_case
   TYPE PYTHON netcdf_io_use_case.py)
 
+muSpectre_add_example(free_surface_py_example
+        TYPE PYTHON free_surface.py)
+
 # additional file(s) to copy
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/concrete_micro_structure.npy
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)

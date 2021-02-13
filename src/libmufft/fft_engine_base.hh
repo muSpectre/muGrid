@@ -269,10 +269,15 @@ namespace muFFT {
     virtual bool is_active() const { return true; }
 
     /**
+     * iterators over only those pixels that exist in real space
+     */
+    const Pixels_t & get_real_pixels() const;
+
+    /**
      * iterators over only those pixels that exist in frequency space
      * (i.e. about half of all pixels, see rfft)
      */
-    const Pixels_t & get_pixels() const;
+    const Pixels_t & get_fourier_pixels() const;
 
     //! nb of pixels (mostly for debugging)
     size_t size() const;

@@ -322,13 +322,13 @@ void add_engine_helper(py::module & mod, const std::string & name) {
         for (auto && n : eng.get_nb_fourier_grid_pts()) {
           shape.push_back(n);
         }
-        for (auto && s : eng.get_pixels().get_strides()) {
+        for (auto && s : eng.get_fourier_pixels().get_strides()) {
           strides.push_back(s * dim * sizeof(Real));
         }
         py::array_t<Real> fftfreqs(shape, strides);
         Real * ptr{static_cast<Real *>(fftfreqs.request().ptr)};
         auto & nb_domain_grid_pts{eng.get_nb_domain_grid_pts()};
-        for (auto && pix : eng.get_pixels()) {
+        for (auto && pix : eng.get_fourier_pixels()) {
           for (int i = 0; i < dim; ++i) {
             ptr[i] =
                 static_cast<Real>(fft_freq(pix[i], nb_domain_grid_pts[i])) /
@@ -344,7 +344,7 @@ void add_engine_helper(py::module & mod, const std::string & name) {
              py::array_t<Real> & input_array,
              py::array_t<Complex> & output_array) {
             const py::buffer_info & info = input_array.request();
-            auto & dim{eng.get_pixels().get_dim()};
+            auto & dim{eng.get_fourier_pixels().get_dim()};
             auto nb_dof_per_pixel{
                 std::accumulate(info.shape.begin(), info.shape.end()-dim, 1,
                                 std::multiplies<Index_t>())};
@@ -356,8 +356,7 @@ void add_engine_helper(py::module & mod, const std::string & name) {
                                              eng.get_nb_fourier_grid_pts(),
                                              eng.get_fourier_locations(),
                                              nb_dof_per_pixel, output_array);
-            auto && input_proxy_field{input_proxy.get_field()};
-            eng.fft(input_proxy_field, output_proxy.get_field());
+            eng.fft(input_proxy.get_field(), output_proxy.get_field());
           },
           "real_input_array"_a, "complex_output_array"_a,
           "Perform forward FFT of the input array into the output array")
@@ -367,7 +366,7 @@ void add_engine_helper(py::module & mod, const std::string & name) {
              py::array_t<Complex> & input_array,
              py::array_t<Real> & output_array) {
             const py::buffer_info & info = input_array.request();
-            auto & dim{eng.get_pixels().get_dim()};
+            auto & dim{eng.get_fourier_pixels().get_dim()};
             auto nb_dof_per_pixel{
                 std::accumulate(info.shape.begin(), info.shape.end()-dim, 1,
                                 std::multiplies<Index_t>())};
@@ -382,6 +381,50 @@ void add_engine_helper(py::module & mod, const std::string & name) {
             eng.ifft(input_proxy.get_field(), output_proxy.get_field());
           },
           "fourier_input_array"_a, "real_output_array"_a,
+          "Perform inverse FFT of the input array into the output array.")
+      .def(
+          "fft",
+          [](Engine & eng,
+             py::array_t<Real> & input_array) {
+            const py::buffer_info & info = input_array.request();
+            auto & dim{eng.get_fourier_pixels().get_dim()};
+            auto nb_dof_per_pixel{
+                std::accumulate(info.shape.begin(), info.shape.end()-dim, 1,
+                                std::multiplies<Index_t>())};
+            NumpyProxy<Real> input_proxy(eng.get_nb_domain_grid_pts(),
+                                         eng.get_nb_subdomain_grid_pts(),
+                                         eng.get_subdomain_locations(),
+                                         nb_dof_per_pixel, input_array);
+            auto & output_field{
+                eng.fetch_or_register_fourier_space_field(
+                    "fft return buffer",
+                    input_proxy.get_components_shape())};
+            eng.fft(input_proxy.get_field(), output_field);
+            return numpy_wrap(output_field, IterUnit::Pixel);
+          },
+          "real_input_array"_a,
+          "Perform forward FFT of the input array into the output array")
+      .def(
+          "ifft",
+          [](Engine & eng,
+             py::array_t<Complex> & input_array) {
+            const py::buffer_info & info = input_array.request();
+            auto & dim{eng.get_fourier_pixels().get_dim()};
+            auto nb_dof_per_pixel{
+                std::accumulate(info.shape.begin(), info.shape.end()-dim, 1,
+                                std::multiplies<Index_t>())};
+            NumpyProxy<Complex> input_proxy(eng.get_nb_domain_grid_pts(),
+                                            eng.get_nb_fourier_grid_pts(),
+                                            eng.get_fourier_locations(),
+                                            nb_dof_per_pixel, input_array);
+            auto & output_field{
+                eng.fetch_or_register_real_space_field(
+                    "ifft return buffer",
+                    input_proxy.get_components_shape())};
+            eng.ifft(input_proxy.get_field(), output_field);
+            return numpy_wrap(output_field, IterUnit::Pixel);
+          },
+          "fourier_input_array"_a,
           "Perform inverse FFT of the input array into the output array.")
       .def(
           "hcfft",

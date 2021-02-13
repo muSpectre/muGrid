@@ -114,7 +114,6 @@ namespace muSpectre {
     fields.initialise(fix::projector.get_nb_domain_grid_pts(),
                       fix::projector.get_nb_subdomain_grid_pts(),
                       fix::projector.get_subdomain_locations());
-    fix::projector.apply_projection(f_var);
 
     muFFT::FFT_freqs<dim> freqs{fix::projector.get_nb_domain_grid_pts(),
                                 fix::projector.get_domain_lengths()};
@@ -146,6 +145,8 @@ namespace muSpectre {
       v.row(0) = g.row(0);
     }
     // end_field_iteration_snippet
+
+    fix::projector.apply_projection(f_var);
 
     for (auto && tup :
          akantu::zip(fields.get_pixels().template get_dimensioned_pixels<dim>(),

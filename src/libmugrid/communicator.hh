@@ -155,9 +155,46 @@ namespace muGrid {
       return res;
     }
 
-    //! sum reduction on EigenMatrix types
+    //! sum reduction on Eigen::Matrix types
+    template <typename T, int RowsAtCompileTime, int ColsAtCompileTime>
+    Eigen::Matrix<T, RowsAtCompileTime, ColsAtCompileTime>
+    sum(const Eigen::Matrix<T, RowsAtCompileTime, ColsAtCompileTime> & arg)
+        const {
+      if (this->comm == MPI_COMM_NULL)
+        return arg;
+      Eigen::Matrix<T, RowsAtCompileTime, ColsAtCompileTime> res;
+      res.setZero();
+      const auto count{arg.size()};
+      MPI_Allreduce(arg.data(), res.data(), count, mpi_type<T>(), MPI_SUM,
+                    this->comm);
+      return res;
+    }
+
+    //! sum reduction on Eigen::Matrix types
     template <typename T>
-    DynMatrix_t<T> sum_mat(const Eigen::Ref<DynMatrix_t<T>> & arg) const;
+    DynMatrix_t<T> sum(const DynMatrix_t<T> & arg) const {
+      if (this->comm == MPI_COMM_NULL)
+        return arg;
+      DynMatrix_t<T> res(arg.rows(), arg.cols());
+      res.setZero();
+      const auto count{arg.size()};
+      MPI_Allreduce(arg.data(), res.data(), count, mpi_type<T>(), MPI_SUM,
+                    this->comm);
+      return res;
+    }
+
+    //! sum reduction on Eigen::Matrix types
+    template <typename T>
+    DynMatrix_t<T> sum(const Eigen::Ref<DynMatrix_t<T>> & arg) const {
+      if (this->comm == MPI_COMM_NULL)
+        return arg;
+      DynMatrix_t<T> res(arg.rows(), arg.cols());
+      res.setZero();
+      const auto count{arg.size()};
+      MPI_Allreduce(arg.data(), res.data(), count, mpi_type<T>(), MPI_SUM,
+                    this->comm);
+      return res;
+    }
 
     //! ordered partial cumulative sum on scalar types. With the nomenclatur p0
     //! = the processor with rank = 0 and so on the following example
@@ -175,13 +212,50 @@ namespace muGrid {
       return res;
     }
 
-    // //! sum reduction on EigenMatrix types
-    // template <typename T>
-    // DynMatrix_t<T> sum_mat(const Eigen::Ref<Matrix_t<T>> & arg) const;
-
     //! gather on EigenMatrix types
     template <typename T>
-    DynMatrix_t<T> gather(const Eigen::Ref<DynMatrix_t<T>> & arg) const;
+    DynMatrix_t<T> gather(const Eigen::Ref<DynMatrix_t<T>> & arg) const {
+      if (this->comm == MPI_COMM_NULL)
+        return arg;
+      Index_t send_buf_size(arg.size());
+
+      int comm_size = this->size();
+      std::vector<int> arg_sizes{comm_size};
+      auto message{MPI_Allgather(&send_buf_size, 1, mpi_type<int>(),
+                                 arg_sizes.data(), 1, mpi_type<int>(),
+                                 this->comm)};
+      if (message != 0) {
+        std::stringstream error{};
+        error << "MPI_Allgather failed with " << message << " on rank "
+              << this->rank();
+        throw RuntimeError(error.str());
+      }
+
+      std::vector<int> displs{comm_size};
+      displs[0] = 0;
+      for (auto i = 0; i < comm_size - 1; ++i) {
+        displs[i + 1] = displs[i] + arg_sizes[i];
+      }
+
+      int nb_entries = 0;
+      for (auto i = 0; i < comm_size; ++i) {
+        nb_entries += arg_sizes[i];
+      }
+
+      DynMatrix_t<T> res(arg.rows(), nb_entries / arg.rows());
+      res.setZero();
+
+      message = MPI_Allgatherv(arg.data(), send_buf_size, mpi_type<T>(),
+                               res.data(), arg_sizes.data(), displs.data(),
+                               mpi_type<T>(), this->comm);
+      if (message != 0) {
+        std::stringstream error{};
+        error << "MPI_Allgatherv failed with " << message << " on rank "
+              << this->rank();
+        throw RuntimeError(error.str());
+      }
+      return res;
+    }
 
     //! broadcast of scalar types
     //! broadcasts arg from root to all processors and additionally returns the
@@ -201,7 +275,6 @@ namespace muGrid {
     MPI_Comm get_mpi_comm() { return this->comm; }
 
     //! find whether the underlying communicator is mpi
-    // TODO(pastewka) why do we need this?
     static bool has_mpi() { return true; }
 
    private:
@@ -228,12 +301,6 @@ namespace muGrid {
       return arg;
     }
 
-    //! sum reduction on EigenMatrix types
-    template <typename T>
-    DynMatrix_t<T> sum_mat(const Eigen::Ref<DynMatrix_t<T>> & arg) const {
-      return arg;
-    }
-
     //! ordered partial cumulative sum on scalar types. Find more details in the
     //! doc of the into the parallel implementation.
     template <typename T>
@@ -243,12 +310,9 @@ namespace muGrid {
 
     //! gather on EigenMatrix types
     template <typename T>
-    DynMatrix_t<T> gather(const Eigen::Ref<DynMatrix_t<T>> & arg) const {
+    T gather(const T & arg) const {
       return arg;
     }
-
-    //! find whether the underlying communicator is mpi
-    // TODO(pastewka) why do we need this?
 
     //! broadcast of scalar types
     template <typename T>
@@ -256,6 +320,7 @@ namespace muGrid {
       return arg;
     }
 
+    //! find whether the underlying communicator is mpi
     static bool has_mpi() { return false; }
   };
 

@@ -50,10 +50,10 @@ namespace muSpectre {
    * simulations", Int. J. Numer. Meth. Engng 2017; 111
    * :903–926)
    */
-  template <Index_t DimS>
-  class ProjectionSmallStrain : public ProjectionDefault<DimS> {
+  template <Index_t DimS, Index_t NbQuadPts = OneQuadPt>
+  class ProjectionSmallStrain : public ProjectionDefault<DimS, NbQuadPts> {
    public:
-    using Parent = ProjectionDefault<DimS>;  //!< base class
+    using Parent = ProjectionDefault<DimS, NbQuadPts>;  //!< base class
     //! gradient, i.e. derivatives in each Cartesian direction
     using Gradient_t = typename Parent::Gradient_t;
     using Ccoord = typename Parent::Ccoord;  //!< cell coordinates type
@@ -62,18 +62,16 @@ namespace muSpectre {
     using Proj_t = muGrid::RealField;
     //! iterable operator
     using Proj_map =
-        muGrid::T4FieldMap<Real, Mapping::Mut, DimS, IterUnit::SubPt>;
-    //! iterable vectorised version of the Fourier-space tensor field
-    using Vector_map =
-        muGrid::MatrixFieldMap<Complex, Mapping::Mut, DimS * DimS, 1,
-                               IterUnit::SubPt>;
+        muGrid::T4FieldMap<Real, Mapping::Mut, DimS * NbQuadPts,
+                           IterUnit::SubPt>;
 
     //! Default constructor
     ProjectionSmallStrain() = delete;
 
     //! Constructor with fft_engine
     ProjectionSmallStrain(muFFT::FFTEngine_ptr engine,
-                          const DynRcoord_t & lengths, Gradient_t gradient);
+                          const DynRcoord_t & lengths,
+                          const Gradient_t & gradient);
 
     //! Constructor with fft_engine and default (Fourier) gradient
     ProjectionSmallStrain(muFFT::FFTEngine_ptr engine,

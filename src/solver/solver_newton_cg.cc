@@ -176,7 +176,8 @@ namespace muSpectre {
     }
 
     ++this->get_counter();
-    if (this->verbosity > Verbosity::Silent and comm.rank() == 0) {
+    if (load_step.size() > 1 and this->verbosity > Verbosity::Silent and
+        comm.rank() == 0) {
       std::cout << "at Load step " << std::setw(this->default_count_width)
                 << this->get_counter() << std::endl;
     }

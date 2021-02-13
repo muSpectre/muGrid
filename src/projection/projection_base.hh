@@ -40,6 +40,7 @@
 #include <libmugrid/field_collection.hh>
 #include <libmugrid/field_typed.hh>
 
+#include <libmufft/derivative.hh>
 #include <libmufft/fft_engine_base.hh>
 
 #include "common/muSpectre_common.hh"
@@ -73,6 +74,8 @@ namespace muSpectre {
    public:
     //! Eigen type to replace fields
     using Vector_t = Eigen::Matrix<Real, Eigen::Dynamic, 1>;
+    //! gradient, i.e. derivatives in each Cartesian direction
+    using Gradient_t = muFFT::Gradient_t;
     //! global FieldCollection
     using GFieldCollection_t =
         typename muFFT::FFTEngineBase::GFieldCollection_t;
@@ -93,7 +96,9 @@ namespace muSpectre {
     ProjectionBase(muFFT::FFTEngine_ptr engine,
                    const DynRcoord_t & domain_lengths,
                    const Index_t & nb_quad_pts,
-                   const Index_t & nb_components, const Formulation & form);
+                   const Index_t & nb_components,
+                   const Gradient_t & gradient,
+                   const Formulation & form);
 
     //! Copy constructor
     ProjectionBase(const ProjectionBase & other) = delete;
@@ -115,6 +120,14 @@ namespace muSpectre {
 
     //! apply the projection operator to a field
     virtual void apply_projection(Field_t & field) = 0;
+
+    //! compute the positions of the nodes of the pixels
+    virtual Field_t & integrate(Field_t & strain) {
+      std::stringstream s;
+      s << "`integrate` is not implemented; do not know how to integrate "
+        << "field " << strain.get_name();
+      throw std::logic_error(s.str());
+    }
 
     /**
      * returns the process-local number of grid points in each direction of the
@@ -184,6 +197,8 @@ namespace muSpectre {
     //! return a reference to the fft_engine
     const muFFT::FFTEngineBase & get_fft_engine() const;
 
+    const Gradient_t & get_gradient() const;
+
     //! perform a deep copy of the projector (this should never be necessary in
     //! c++)
     virtual std::unique_ptr<ProjectionBase> clone() const = 0;
@@ -195,9 +210,14 @@ namespace muSpectre {
     Index_t nb_quad_pts;
     Index_t nb_components;
     /**
+     * gradient (nabla) operator, can be computed using Fourier interpolation
+     * or through a weighted residual
+     */
+    Gradient_t gradient;
+    /**
      * formulation this projection can be applied to (determines
      * whether the projection enforces gradients, small strain tensor
-     * or symmetric smal strain tensor
+     * or symmetric small strain tensor
      */
     Formulation form;
     /**

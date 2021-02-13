@@ -73,6 +73,7 @@ namespace muGrid {
   constexpr Index_t OneQuadPt{1};    //!< constant for 1 quadrature point/pixel
   constexpr Index_t TwoQuadPts{2};   //!< constant for 2 quadrature point/pixel
   constexpr Index_t FourQuadPts{4};  //!< constant for 4 quadrature point/pixel
+  constexpr Index_t SixQuadPts{6};  //!< constant for 4 quadrature point/pixel
   constexpr Index_t OneNode{1};      //!< constant for 1 node per pixel
 
   using Uint = unsigned int;     //!< type to use in math for unsigned integers
@@ -382,7 +383,7 @@ namespace muGrid {
     return result;
   }
 
-  //! subtracttion of two DynCcoords
+  //! subtraction of two DynCcoords
   template <size_t MaxDim, typename T>
   DynCcoord<MaxDim, T> operator-(const DynCcoord<MaxDim, T> & A,
                                  const DynCcoord<MaxDim, T> & B) {

@@ -153,17 +153,23 @@ namespace muSpectre {
         throw SolverError("unknown formulation");
         break;
       }
-      std::cout << " strain with" << std::endl
+      std::cout << " strain with "
                 << "newton_tol = " << newton_tol
                 << ", cg_tol = " << solver.get_tol()
-                << " maxiter = " << solver.get_maxiter() << " and "
-                << strain_symb << " from " << strain_symb << "₁ =" << std::endl
-                << load_steps.front() << std::endl
-                << " to " << strain_symb << "ₙ =" << std::endl
-                << load_steps.back() << std::endl
-                << "in increments of Δ" << strain_symb << " =" << std::endl
-                << (load_steps.back() - load_steps.front()) / load_steps.size()
-                << std::endl;
+                << ", maxiter = " << solver.get_maxiter() << " and ";
+      if (load_steps.size() > 1) {
+        std::cout << strain_symb << " from " << strain_symb << "₁ ="
+                  << std::endl << load_steps.front() << std::endl
+                  << " to " << strain_symb << "ₙ =" << std::endl
+                  << load_steps.back() << std::endl
+                  << "in increments of Δ" << strain_symb << " =" << std::endl
+                  << (load_steps.back() - load_steps.front()) /
+                     load_steps.size()
+                  << std::endl;
+      } else {
+        std::cout << "Δ" << strain_symb << " = " << std::endl
+                  << load_steps.front() << std::endl;
+      }
       count_width = static_cast<size_t>(std::log10(solver.get_maxiter())) + 1;
     }
 
@@ -181,9 +187,6 @@ namespace muSpectre {
                        "matrix!\n"
                     << std::endl;
         }
-      } else if (verbose > Verbosity::Silent && comm.rank() == 0 &&
-                 strain_init == IsStrainInitialised::True) {
-        std::cout << "\nThe strain was initialised by the user!\n" << std::endl;
       }
       // Checking the consistancy of input load_steps and cell shape
       for (const auto & delF : load_steps) {
@@ -209,9 +212,6 @@ namespace muSpectre {
                        "matrix!\n"
                     << std::endl;
         }
-      } else if (verbose > Verbosity::Silent && comm.rank() == 0 &&
-                 strain_init == IsStrainInitialised::True) {
-        std::cout << "\nThe strain was initialised by the user!\n" << std::endl;
       }
       // Checking the consistancy of input load_steps and cell shape
       for (const auto & delF : load_steps) {
@@ -237,11 +237,27 @@ namespace muSpectre {
     // initialise return value
     std::vector<OptimizeResult> ret_val{};
 
-    // storage for the previous mean strain (to compute ΔF or Δε )
-    Matrix_t previous_macro_strain{load_steps.back().Zero(shape[0], shape[1])};
+    // map to the current strain field
+    auto && F_general_map{muGrid::FieldMap<Real, Mapping::Mut>(
+        general_strain_field, shape[0], muGrid::IterUnit::SubPt)};
+
+    // we need to compute the current macro strain if the strain field is
+    // user-specified
+    if (strain_init == IsStrainInitialised::True) {
+      // storage for the previous mean strain (to compute ΔF or Δε )
+      Matrix_t initial_macro_strain{F_general_map.mean()};
+      if (verbose > Verbosity::Silent && comm.rank() == 0) {
+        std::cout << "The strain was initialised by the user to a value of "
+                  << "<" << strain_symb << "> =" << std::endl
+                  << initial_macro_strain << std::endl;
+      }
+    }
 
     // strain field used by the cell for evaluating stresses/tangents.
     auto & eval_strain_field{cell->get_strain()};
+
+    // storage for the previous mean strain (to compute ΔF or Δε )
+    Matrix_t previous_macro_strain{load_steps.back().Zero(shape[0], shape[1])};
 
     //! incremental loop (load steps)
     for (const auto & tup : akantu::enumerate(load_steps)) {
@@ -254,8 +270,6 @@ namespace muSpectre {
 
       // updating cell strain with the difference of the current and previous
       // strain input.
-      auto && F_general_map{muGrid::FieldMap<Real, Mapping::Mut>(
-          general_strain_field, shape[0], muGrid::IterUnit::SubPt)};
       for (auto && strain_general : F_general_map) {
         strain_general += macro_strain - previous_macro_strain;
       }
@@ -465,17 +479,23 @@ namespace muSpectre {
         throw SolverError("unknown formulation");
         break;
       }
-      std::cout << " strain with" << std::endl
+      std::cout << " strain with "
                 << "newton_tol = " << newton_tol
                 << ", cg_tol = " << solver.get_tol()
-                << " maxiter = " << solver.get_maxiter() << " and "
-                << strain_symb << " from " << strain_symb << "₁ =" << std::endl
-                << load_steps.front() << std::endl
-                << " to " << strain_symb << "ₙ =" << std::endl
-                << load_steps.back() << std::endl
-                << "in increments of Δ" << strain_symb << " =" << std::endl
-                << (load_steps.back() - load_steps.front()) / load_steps.size()
-                << std::endl;
+                << ", maxiter = " << solver.get_maxiter() << " and ";
+      if (load_steps.size() > 1) {
+        std::cout << strain_symb << " from " << strain_symb << "₁ ="
+                  << std::endl << load_steps.front() << std::endl
+                  << " to " << strain_symb << "ₙ =" << std::endl
+                  << load_steps.back() << std::endl
+                  << "in increments of Δ" << strain_symb << " =" << std::endl
+                  << (load_steps.back() - load_steps.front()) /
+                     load_steps.size()
+                  << std::endl;
+      } else {
+        std::cout << "Δ" << strain_symb << " = " << std::endl
+                  << load_steps.front() << std::endl;
+      }
       count_width = static_cast<size_t>(std::log10(solver.get_maxiter())) + 1;
     }
 
@@ -793,10 +813,11 @@ namespace muSpectre {
 
   //--------------------------------------------------------------------------//
   std::vector<OptimizeResult> trust_region_newton_cg(
-      Cell & cell, const LoadSteps_t & load_steps, KrylovSolverBase & solver,
-      const Real & max_trust_region, const Real & newton_tol,
-      const Real & equil_tol, const Real & inc_tr_tol, const Real & dec_tr_tol,
-      const Verbosity & verbose, const IsStrainInitialised & strain_init,
+      std::shared_ptr<Cell> cell, const LoadSteps_t & load_steps,
+      KrylovSolverBase & solver, const Real & max_trust_region,
+      const Real & newton_tol, const Real & equil_tol, const Real & inc_tr_tol,
+      const Real & dec_tr_tol, const Verbosity & verbose,
+      const IsStrainInitialised & strain_init,
       EigenStrainOptFunc_ref eigen_strain_func) {
     if (load_steps.size() == 0) {
       throw SolverError("No load steps specified.");
@@ -806,15 +827,15 @@ namespace muSpectre {
       throw SolverError("dec_tr_tol must be larger than inc_tr_tol");
     }
 
-    const auto & comm = cell.get_communicator();
+    const auto & comm = cell->get_communicator();
 
-    using Matrix_t = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
-    auto shape{cell.get_strain_shape()};
+    using Matrix_t = muGrid::DynMatrix_t<Real>;
+    auto shape{cell->get_strain_shape()};
 
     ConvergenceCriterion convergence_criterion;
 
     // create a field collection to store workspaces
-    auto field_collection{cell.get_fields().get_empty_clone()};
+    auto field_collection{cell->get_fields().get_empty_clone()};
     // Corresponds to symbol δF or δε
     muGrid::MappedField<muGrid::FieldMap<Real, Mapping::Mut>> incrF_field{
         "incrF",         shape[0],         shape[1],
@@ -842,19 +863,19 @@ namespace muSpectre {
             muGrid::RealField & general_strain_field{
                 field_collection.register_real_field(
                     "general strain",
-                    shape_for_formulation(cell.get_formulation(),
-                                          cell.get_material_dim()),
+                    shape_for_formulation(cell->get_formulation(),
+                                          cell->get_material_dim()),
                     QuadPtTag)};
             return general_strain_field;
           } else {
-            return cell.get_strain();
+            return cell->get_strain();
           }
         }()};
 
     solver.initialise();
 
     size_t count_width{};
-    const auto form{cell.get_formulation()};
+    const auto form{cell->get_formulation()};
     std::string strain_symb{};
     if (verbose > Verbosity::Silent && comm.rank() == 0) {
       // setup of algorithm 5.2 in Nocedal, Numerical Optimization (p. 111)
@@ -874,17 +895,23 @@ namespace muSpectre {
         throw SolverError("unknown formulation");
         break;
       }
-      std::cout << " strain with" << std::endl
+      std::cout << " strain with "
                 << "newton_tol = " << newton_tol
                 << ", cg_tol = " << solver.get_tol()
-                << " maxiter = " << solver.get_maxiter() << " and "
-                << strain_symb << " from " << strain_symb << "₁ =" << std::endl
-                << load_steps.front() << std::endl
-                << " to " << strain_symb << "ₙ =" << std::endl
-                << load_steps.back() << std::endl
-                << "in increments of Δ" << strain_symb << " =" << std::endl
-                << (load_steps.back() - load_steps.front()) / load_steps.size()
-                << std::endl;
+                << ", maxiter = " << solver.get_maxiter() << " and "
+                << strain_symb;
+      if (load_steps.size() > 1) {
+        std::cout << " from " << strain_symb << "₁ =" << std::endl
+                  << load_steps.front() << std::endl
+                  << " to " << strain_symb << "ₙ =" << std::endl
+                  << load_steps.back() << std::endl
+                  << "in increments of Δ" << strain_symb << " =" << std::endl
+                  << (load_steps.back() - load_steps.front()) /
+                     load_steps.size()
+                  << std::endl;
+      } else {
+        std::cout << " = " << std::endl << load_steps.front() << std::endl;
+      }
       count_width = static_cast<size_t>(std::log10(solver.get_maxiter())) + 1;
     }
 
@@ -895,16 +922,13 @@ namespace muSpectre {
         // initialising cell placement gradient (F) with identity matrix in
         // case of finite strain
         default_strain_val = Matrix_t::Identity(shape[0], shape[1]);
-        cell.set_uniform_strain(default_strain_val);
+        cell->set_uniform_strain(default_strain_val);
 
         if (verbose > Verbosity::Silent && comm.rank() == 0) {
           std::cout << "\nThe strain is initialised by default to the identity "
                        "matrix!\n"
                     << std::endl;
         }
-      } else if (verbose > Verbosity::Silent && comm.rank() == 0 &&
-                 strain_init == IsStrainInitialised::True) {
-        std::cout << "\nThe strain was initialised by the user!\n" << std::endl;
       }
       // Checking the consistency of input load_steps and cell shape
       for (const auto & delF : load_steps) {
@@ -924,15 +948,12 @@ namespace muSpectre {
         // initialising cell strain (ε) with zero-filled matrix in case of small
         // strain
         default_strain_val = Matrix_t::Zero(shape[0], shape[1]);
-        cell.set_uniform_strain(default_strain_val);
+        cell->set_uniform_strain(default_strain_val);
         if (verbose > Verbosity::Silent && comm.rank() == 0) {
           std::cout << "\nThe strain is initialised by default to the zero "
                        "matrix!\n"
                     << std::endl;
         }
-      } else if (verbose > Verbosity::Silent && comm.rank() == 0 &&
-                 strain_init == IsStrainInitialised::True) {
-        std::cout << "\nThe strain was initialised by the user!\n" << std::endl;
       }
       // Checking the consistency of input load_steps and cell shape
       for (const auto & delF : load_steps) {
@@ -958,17 +979,34 @@ namespace muSpectre {
     // initialise return value
     std::vector<OptimizeResult> ret_val{};
 
-    // storage for the previous mean strain (to compute ΔF or Δε )
-    Matrix_t previous_macro_strain{load_steps.back().Zero(shape[0], shape[1])};
+    // map to the current strain field
+    auto && F_general_map{muGrid::FieldMap<Real, Mapping::Mut>(
+        general_strain_field, shape[0], muGrid::IterUnit::SubPt)};
+
+    // we need to compute the current macro strain if the strain field is
+    // user-specified
+    if (strain_init == IsStrainInitialised::True) {
+      // storage for the previous mean strain (to compute ΔF or Δε )
+      Matrix_t initial_macro_strain{F_general_map.mean()};
+      if (verbose > Verbosity::Silent && comm.rank() == 0) {
+        std::cout << "The strain was initialised by the user to a value of "
+                  << "<" << strain_symb << "> =" << std::endl
+                  << initial_macro_strain << std::endl;
+      }
+    }
 
     // strain field used by the cell for evaluating stresses/tangents.
-    auto & eval_strain_field{cell.get_strain()};
+    auto & eval_strain_field{cell->get_strain()};
+
+    // storage for the previous mean strain (to compute ΔF or Δε )
+    Matrix_t previous_macro_strain{load_steps.back().Zero(shape[0], shape[1])};
 
     //! incremental loop (load steps)
     for (const auto & tup : akantu::enumerate(load_steps)) {
       const auto & strain_step{std::get<0>(tup)};
       const auto & macro_strain{std::get<1>(tup)};
-      if ((verbose > Verbosity::Silent) and (comm.rank() == 0)) {
+      if ((load_steps.size() > 1) and (verbose > Verbosity::Silent) and
+          (comm.rank() == 0)) {
         std::cout << "at Load step " << std::setw(count_width)
                   << strain_step + 1 << std::endl;
       }
@@ -977,8 +1015,6 @@ namespace muSpectre {
 
       // updating cell strain with the difference of the current and previous
       // strain input.
-      auto && F_general_map{muGrid::FieldMap<Real, Mapping::Mut>(
-          general_strain_field, shape[0], muGrid::IterUnit::SubPt)};
       for (auto && strain_general : F_general_map) {
         strain_general += macro_strain - previous_macro_strain;
       }
@@ -1015,7 +1051,7 @@ namespace muSpectre {
                                      &has_converged, &message,
                                      &convergence_criterion]() {
         convergence_criterion.get_was_last_step_linear_test() =
-            not cell.was_last_eval_non_linear();
+            not cell->was_last_eval_non_linear();
         if (convergence_criterion.get_was_last_step_linear_test()) {
           message = "Linear problem, no more iteration necessary";
         }
@@ -1043,7 +1079,7 @@ namespace muSpectre {
           eval_strain_field = general_strain_field;
           (eigen_strain_func.value())(strain_step, eval_strain_field);
         }
-        auto res_tup{cell.evaluate_stress_tangent()};
+        auto res_tup{cell->evaluate_stress_tangent()};
         auto & P{std::get<0>(res_tup)};
 
         // string descriptor for this step (for printing to screen)
@@ -1062,7 +1098,7 @@ namespace muSpectre {
         auto & incrF{incrF_field.get_field()};
 
         rhs = -P;
-        cell.apply_projection(rhs);
+        cell->apply_projection(rhs);
         stress_norm = std::sqrt(comm.sum(rhs.eigen_vec().squaredNorm()));
         auto stress_diff_norm{std::sqrt(
             comm.sum((rhs.eigen_vec() - lin_rhs.eigen_vec()).squaredNorm()))};
@@ -1083,10 +1119,10 @@ namespace muSpectre {
             // last step.
             general_strain_field -= incrF;
             // We do not need to update P here because it is a reference to the
-            // internal stress field of the cell. Calling
+            // internal stress field of the cell-> Calling
             // evaluate_stress_tangent will simply update the internal buffer.
             // (We still know the rhs from the previous iterations.)
-            cell.evaluate_stress_tangent();
+            cell->evaluate_stress_tangent();
           } else if (
               stress_diff_norm < inc_tr_tol and
               (solver.get_convergence() ==
@@ -1122,7 +1158,7 @@ namespace muSpectre {
           KrylovSolverBase::ConstVector_ref incrF_vec{incrF.eigen_vec()};
           auto lin_rhs_vec{lin_rhs.eigen_vec()};
           lin_rhs_vec =
-              rhs_vec - cell.get_shared_adaptor()->get_adaptor() * incrF_vec;
+              rhs_vec - cell->get_shared_adaptor()->get_adaptor() * incrF_vec;
         } catch (ConvergenceError & error) {
           std::stringstream err{};
           err << "Failure at load step " << strain_step + 1 << " of "
@@ -1176,17 +1212,17 @@ namespace muSpectre {
           eval_strain_field = general_strain_field;
           (eigen_strain_func.value())(strain_step, eval_strain_field);
         }
-        cell.evaluate_stress_tangent();
+        cell->evaluate_stress_tangent();
       }
 
       // store results
       ret_val.emplace_back(OptimizeResult{
-          general_strain_field.eigen_vec(), cell.get_stress().eigen_vec(),
+          general_strain_field.eigen_vec(), cell->get_stress().eigen_vec(),
           full_convergence_test(), Int(full_convergence_test()), message,
           newt_iter, solver.get_counter(), form});
 
       // store history variables for next load increment
-      cell.save_history_variables();
+      cell->save_history_variables();
       convergence_criterion.reset();
     }
     return ret_val;

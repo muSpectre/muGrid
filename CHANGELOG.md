@@ -1,6 +1,14 @@
 Change log for µSpectre
 =======================
 
+0.15.0 (not yet released)
+-------------------------
+
+- muSpectre: All projection operators now have a gradient argument and can
+  work with discrete derivatives
+- muSpectre: Projection classes now have an `integrate` method that
+  reconstructs the node positions
+- muSpectre: Added `linear_finite_elements` to stencil database
 
 0.14.0 (04Feb21)
 ----------------

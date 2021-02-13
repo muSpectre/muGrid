@@ -121,8 +121,7 @@ maxiter = 1000  # for linear cell solver
 trust_region = 100.0
 
 ## numerical derivative, two quadrature points
-gradient = [Stencils2D.d_10_00, Stencils2D.d_01_00,
-            Stencils2D.d_11_01, Stencils2D.d_11_10]
+gradient = Stencils2D.linear_finite_elements
 
 ###
 

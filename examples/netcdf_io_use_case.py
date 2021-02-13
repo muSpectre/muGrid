@@ -79,9 +79,8 @@ nb_grid_pts = [3, 3]  #resolution of the box
 lens = nb_grid_pts #lengths of the box
 dim  = len(nb_grid_pts) #dimension of the problem
 
-#2D
-fd_gradient_2 = [Stencils2D.d_10_00, Stencils2D.d_01_00,
-                 Stencils2D.d_11_01, Stencils2D.d_11_10]
+# 2D
+fd_gradient_2 = Stencils2D.linear_finite_elements
 gradient_op = fd_gradient_2
 cell = msp.Cell(nb_grid_pts, lens, formulation, gradient_op, fft, comm)
 

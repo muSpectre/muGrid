@@ -52,7 +52,7 @@ namespace muSpectre {
    * operator that is stored in form of a fourth-order tensor of real
    * values per k-grid point
    */
-  template <Index_t DimS>
+  template <Index_t DimS, Index_t NbQuadPts = OneQuadPt>
   class ProjectionDefault : public ProjectionBase {
    public:
     using Parent = ProjectionBase;               //!< base class
@@ -63,23 +63,30 @@ namespace muSpectre {
     using Rcoord = Rcoord_t<DimS>;  //!< spatial coordinates type
     //! global field collection
     using GFieldCollection_t = muGrid::GlobalFieldCollection;
-    //! Real space second order tensor fields (to be projected)
-    using Field_t = muGrid::TypedFieldBase<Real>;
-    //! fourier-space field containing the projection operator itself
+    //! Real-space second order tensor fields (to be projected)
+    using Field_t = typename Parent::Field_t;
+    //! Fourier-space field containing the projection operator itself
     using Proj_t = muGrid::ComplexField;
-    //! iterable form of the operator
+    //! Fourier-space field containing the integrator
+    using Integrator_t = muGrid::ComplexField;
+    //! Field type on which to apply the projection
     using Proj_map =
-        muGrid::T4FieldMap<Complex, Mapping::Mut, DimS, IterUnit::SubPt>;
+        muGrid::MatrixFieldMap<Complex, Mapping::Mut, DimS * DimS * NbQuadPts,
+                               DimS * DimS * NbQuadPts, IterUnit::Pixel>;
+    //! iterable form of the integrator
+    using Integrator_map =
+        muGrid::MatrixFieldMap<Complex, Mapping::Mut, DimS,
+                               DimS * DimS * NbQuadPts, IterUnit::Pixel>;
     //! vectorized version of the Fourier-space second-order tensor field
     using Vector_map =
-        muGrid::MatrixFieldMap<Complex, Mapping::Mut, DimS * DimS, 1,
-                               IterUnit::SubPt>;
+        muGrid::T1FieldMap<Complex, Mapping::Mut, DimS * DimS * NbQuadPts,
+                           IterUnit::Pixel>;
     //! Default constructor
     ProjectionDefault() = delete;
 
     //! Constructor with cell sizes and formulation
-    ProjectionDefault(muFFT::FFTEngine_ptr engine, DynRcoord_t lengths,
-                      Gradient_t gradient, Formulation form);
+    ProjectionDefault(muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths,
+                      const Gradient_t & gradient, Formulation form);
 
     //! Copy constructor
     ProjectionDefault(const ProjectionDefault & other) = delete;
@@ -99,6 +106,9 @@ namespace muSpectre {
     //! apply the projection operator to a field
     void apply_projection(Field_t & field) final;
 
+    //! compute the positions of the nodes of the pixels
+    Field_t & integrate(Field_t & strain) final;
+
     Eigen::Map<MatrixXXc> get_operator();
 
     /**
@@ -110,21 +120,16 @@ namespace muSpectre {
     std::array<Index_t, 2> get_strain_shape() const final;
 
     //! get number of components to project per pixel
-    constexpr static Index_t NbComponents() { return DimS * DimS; }
+    constexpr static Index_t NbComponents() { return DimS * DimS * NbQuadPts; }
 
     //! get number of components to project per pixel
     virtual Index_t get_nb_dof_per_pixel() const { return NbComponents(); }
 
-    const Gradient_t & get_gradient() const { return this->gradient; }
-
    protected:
     Proj_t & Gfield;  //!< field holding the operator
     Proj_map Ghat;    //!< iterable version of operator
-    /**
-     * gradient (nabla) operator, can be computed using Fourier interpolation
-     * or through a weighted residual
-     */
-    Gradient_t gradient;
+    Integrator_t & Ifield;  //!< field holding the integrator
+    Integrator_map Ihat;    //!< iterable version of integrator
   };
 
 }  // namespace muSpectre

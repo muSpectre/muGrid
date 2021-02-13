@@ -2,3 +2,4 @@ numpy
 scipy
 setuptools
 uvw
+meshio

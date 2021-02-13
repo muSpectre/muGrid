@@ -110,10 +110,10 @@ namespace muSpectre {
     //! apply the projection operator to a field
     void apply_projection(Field_t & field) final;
 
-    Eigen::Map<MatrixXXc> get_operator();
+    //! compute the positions of the nodes of the pixels
+    Field_t & integrate(Field_t & strain) final;
 
-    //! return the gradient operator
-    const Gradient_t & get_gradient() const;
+    Eigen::Map<MatrixXXc> get_operator();
 
     /**
      * returns the number of rows and cols for the strain matrix type
@@ -134,16 +134,13 @@ namespace muSpectre {
     std::unique_ptr<ProjectionBase> clone() const final;
 
    protected:
-    //! field of normalised wave vectors
+    //! field of projection operators
     muGrid::MappedT1Field<Complex, Mapping::Mut, DimS * NbQuadPts,
-                          IterUnit::SubPt>
-        xi_field;
+                          IterUnit::SubPt> proj_field;
 
-    /**
-     * gradient (nabla) operator, can be computed using Fourier interpolation
-     * or through a weighted residual
-     */
-    Gradient_t gradient;
+    //! field of integration operators
+    muGrid::MappedT1Field<Complex, Mapping::Mut, DimS * NbQuadPts,
+        IterUnit::SubPt> int_field;
   };
 
 }  // namespace muSpectre

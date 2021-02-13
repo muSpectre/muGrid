@@ -44,10 +44,11 @@ namespace muSpectre {
                                  const DynRcoord_t & domain_lengths,
                                  const Index_t & nb_quad_pts,
                                  const Index_t & nb_components,
+                                 const Gradient_t & gradient,
                                  const Formulation & form)
       : fft_engine{std::move(engine)}, domain_lengths{domain_lengths},
-        nb_quad_pts{nb_quad_pts},
-        nb_components{nb_components}, form{form},
+        nb_quad_pts{nb_quad_pts}, nb_components{nb_components},
+        gradient{gradient}, form{form},
         work_space{this->fft_engine->register_fourier_space_field(
             "work_space", this->nb_components * this->nb_quad_pts)} {
     if (nb_quad_pts <= 0) {
@@ -110,6 +111,11 @@ namespace muSpectre {
       ret_val[i] = length_pixels[i] / nb_pixels[i];
     }
     return ret_val;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  const muFFT::Gradient_t & ProjectionBase::get_gradient() const {
+    return this->gradient;
   }
 
 }  // namespace muSpectre

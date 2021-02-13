@@ -39,10 +39,10 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  template <Index_t DimS>
-  ProjectionSmallStrain<DimS>::ProjectionSmallStrain(
+  template <Index_t DimS, Index_t NbQuadPts>
+  ProjectionSmallStrain<DimS, NbQuadPts>::ProjectionSmallStrain(
       muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths,
-      Gradient_t gradient)
+      const Gradient_t & gradient)
       : Parent{std::move(engine), lengths, gradient,
                Formulation::small_strain} {
     for (auto res : this->fft_engine->get_nb_domain_grid_pts()) {
@@ -54,60 +54,130 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Index_t DimS>
-  ProjectionSmallStrain<DimS>::ProjectionSmallStrain(
+  template <Index_t DimS, Index_t NbQuadPts>
+  ProjectionSmallStrain<DimS, NbQuadPts>::ProjectionSmallStrain(
       muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths)
       : ProjectionSmallStrain{std::move(engine), lengths,
                               muFFT::make_fourier_gradient(lengths.get_dim())} {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Index_t DimS>
+  template <Index_t DimS, Index_t NbQuadPts>
   void
-  ProjectionSmallStrain<DimS>::initialise() {
-    using muGrid::get;
+  ProjectionSmallStrain<DimS, NbQuadPts>::initialise() {
     Parent::initialise();
+    using FFTFreqs_t = muFFT::FFT_freqs<DimS>;
+    using Vector_t = typename FFTFreqs_t::Vector;
 
-    muFFT::FFT_freqs<DimS> fft_freqs(
-        Ccoord(this->fft_engine->get_nb_domain_grid_pts()),
-        Rcoord(this->domain_lengths));
-    for (auto && tup : akantu::zip(this->fft_engine->get_pixels()
+    const auto & nb_domain_grid_pts{this->fft_engine->get_nb_domain_grid_pts()};
+    const Vector_t grid_spacing{eigen(
+        (this->domain_lengths / nb_domain_grid_pts).template get<DimS>())};
+
+    muFFT::FFT_freqs<DimS> fft_freqs(nb_domain_grid_pts);
+    for (auto && tup : akantu::zip(this->fft_engine->get_fourier_pixels()
                                        .template get_dimensioned_pixels<DimS>(),
-                                   this->Ghat)) {
+                                   this->Ghat, this->Ihat)) {
       const auto & ccoord = std::get<0>(tup);
-
       auto & G = std::get<1>(tup);
-      auto xi = fft_freqs.get_unit_xi(ccoord);
-      auto kron = [](const Dim_t i, const Dim_t j) -> Real {
-        return (i == j) ? 1. : 0.;
-      };
+      auto & I = std::get<2>(tup);
+
+      const Vector_t xi{(fft_freqs.get_xi(ccoord).array() /
+                         eigen(nb_domain_grid_pts.template get<DimS>())
+                             .array()
+                             .template cast<Real>())
+                            .matrix()};
+
+      // compute derivative operator
+      Eigen::Matrix<Complex, DimS * NbQuadPts, 1> diffop;
+      for (Index_t quad = 0; quad < NbQuadPts; ++quad) {
+        for (Index_t dim = 0; dim < DimS; ++dim) {
+          Index_t i = quad * DimS + dim;
+          diffop[i] = this->gradient[i]->fourier(xi) / grid_spacing[dim];
+        }
+      }
+      const Real norm2{diffop.squaredNorm()};
+
+      // matrices g and h
+      const Eigen::Matrix<Complex, DimS * NbQuadPts, 1> int_vec{
+          diffop.conjugate() / norm2};
+      const Eigen::Matrix<Complex, DimS * NbQuadPts, DimS * NbQuadPts> proj_mat{
+          diffop * int_vec.transpose()};
+
+      Eigen::Matrix<Complex, DimS, DimS> sum_proj_mat;
+      sum_proj_mat.setIdentity();
       for (Dim_t i{0}; i < DimS; ++i) {
         for (Dim_t j{0}; j < DimS; ++j) {
-          for (Dim_t l{0}; l < DimS; ++l) {
-            for (Dim_t m{0}; m < DimS; ++m) {
-              Complex & g = get(G, i, j, l, m);
-              g = 0.5 *
-                      (xi(i) * kron(j, l) * xi(m) + xi(i) * kron(j, m) * xi(l) +
-                       xi(j) * kron(i, l) * xi(m) +
-                       xi(j) * kron(i, m) * xi(l)) -
-                  xi(i) * xi(j) * xi(l) * xi(m);
+          for (Dim_t q{0}; q < NbQuadPts; ++q) {
+            sum_proj_mat(i, j) += proj_mat(i + q * DimS, j + q * DimS);
+          }
+        }
+      }
+      const Eigen::Matrix<Complex, DimS, DimS> h_mat{sum_proj_mat.inverse()};
+
+      // integration
+      I.setZero();
+      for (Dim_t theta{0}; theta < NbQuadPts; ++theta) {
+        for (Dim_t i{0}; i < DimS; ++i) {
+          for (Dim_t j{0}; j < DimS; ++j) {
+            for (Dim_t k{0}; k < DimS; ++k) {
+              I(i, j + (k + theta * DimS) * DimS) =
+                  int_vec(j + theta * DimS) * h_mat(i, k) +
+                  h_mat(i, j) * int_vec(k + theta * DimS);
+            }
+          }
+        }
+      }
+
+      // projection
+      G.setZero();
+      for (Dim_t theta{0}; theta < NbQuadPts; theta++) {
+        for (Dim_t lambda{0}; lambda < NbQuadPts; lambda++) {
+          for (Dim_t i{0}; i < DimS; ++i) {
+            for (Dim_t j{0}; j < DimS; ++j) {
+              for (Dim_t l{0}; l < DimS; ++l) {
+                for (Dim_t m{0}; m < DimS; ++m) {
+                  G(i + (j + theta * DimS) * DimS,
+                    m + (l + lambda * DimS) * DimS) =
+                      0.5 * (
+                          proj_mat(i + theta * DimS,
+                                   l + lambda * DimS) * h_mat(j, m) +
+                          proj_mat(i + theta * DimS,
+                                   m + lambda * DimS) * h_mat(j, l) +
+                          proj_mat(j + theta * DimS,
+                                   l + lambda * DimS) * h_mat(i, m) +
+                          proj_mat(j + theta * DimS,
+                                   m + lambda * DimS) * h_mat(i, l));
+                }
+              }
             }
           }
         }
       }
     }
     if (this->get_subdomain_locations() == Ccoord{}) {
+      this->Ihat[0].setZero();
       this->Ghat[0].setZero();
     }
   }
 
-  template <Index_t DimS>
-  std::unique_ptr<ProjectionBase> ProjectionSmallStrain<DimS>::clone() const {
+  template <Index_t DimS, Index_t NbQuadPts>
+  std::unique_ptr<ProjectionBase>
+  ProjectionSmallStrain<DimS, NbQuadPts>::clone() const {
     return std::make_unique<ProjectionSmallStrain>(
         this->get_fft_engine().clone(), this->get_domain_lengths(),
         this->get_gradient());
   }
-  template class ProjectionSmallStrain<oneD>;
-  template class ProjectionSmallStrain<twoD>;
-  template class ProjectionSmallStrain<threeD>;
+
+  template class ProjectionSmallStrain<oneD, OneQuadPt>;
+  template class ProjectionSmallStrain<oneD, TwoQuadPts>;
+  template class ProjectionSmallStrain<oneD, FourQuadPts>;
+  template class ProjectionSmallStrain<oneD, SixQuadPts>;
+  template class ProjectionSmallStrain<twoD, OneQuadPt>;
+  template class ProjectionSmallStrain<twoD, TwoQuadPts>;
+  template class ProjectionSmallStrain<twoD, FourQuadPts>;
+  template class ProjectionSmallStrain<twoD, SixQuadPts>;
+  template class ProjectionSmallStrain<threeD, OneQuadPt>;
+  template class ProjectionSmallStrain<threeD, TwoQuadPts>;
+  template class ProjectionSmallStrain<threeD, FourQuadPts>;
+  template class ProjectionSmallStrain<threeD, SixQuadPts>;
 }  // namespace muSpectre

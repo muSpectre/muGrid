@@ -205,6 +205,21 @@ namespace muSpectre {
     //! return the number of nodal points stored per pixel
     const Index_t & get_nb_nodal_pts() const;
 
+    /**
+     * returns the process-local number of grid points in each direction of the
+     * cell
+     */
+    const DynCcoord_t & get_nb_subdomain_grid_pts() const;
+
+    //! returns the process-local locations of the cell
+    const DynCcoord_t & get_subdomain_locations() const;
+
+    //! returns the global number of grid points in each direction of the cell
+    const DynCcoord_t & get_nb_domain_grid_pts() const;
+
+    //! returns the physical sizes of the cell
+    const DynRcoord_t & get_domain_lengths() const;
+
     //! makes sure every pixel has been assigned to exactly one material
     virtual void check_material_coverage() const;
 

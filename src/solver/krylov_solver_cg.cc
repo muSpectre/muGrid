@@ -102,9 +102,17 @@ namespace muSpectre {
       std::cout << "Norm of rhs in krylov_solver_cg.cc = " << rhs_norm2
                 << std::endl;
     }
+
     // Multiplication with the norm of the right hand side to get a relative
     // convergence criterion
-    Real rel_tol2 = muGrid::ipow(this->tol, 2) * rhs_norm2;
+    Real tol = this->tol;
+
+    // Negative tolerance tells the solver to automatically adjust it
+    if (tol < 0.0) {
+      // See Nocedal, page 169
+      tol = std::min(0.5, sqrt(sqrt(rhs_norm2)));
+    }
+    Real rel_tol2 = muGrid::ipow(tol, 2) * rhs_norm2;
 
     size_t count_width{};  // for output formatting in verbose case
     if (verbose > Verbosity::Silent) {

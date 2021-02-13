@@ -56,6 +56,8 @@ from _muSpectre import (version,
                         ProjectionFiniteStrain_3d,
                         ProjectionFiniteStrainFast_2d,
                         ProjectionFiniteStrainFast_3d,
+                        ProjectionFiniteStrain_2q_2d,
+                        ProjectionFiniteStrain_2q_3d,
                         ProjectionFiniteStrainFast_2q_2d,
                         ProjectionFiniteStrainFast_2q_3d)
 
@@ -65,11 +67,14 @@ from muFFT import (Communicator, DiscreteDerivative, FourierDerivative,
 from _muGrid import Verbosity
 from muFFT import Communicator, FourierDerivative, DiscreteDerivative, FFT, \
     FFT_PlanFlags
-import muSpectre.gradient_integration
-import muSpectre.stochastic_plasticity_search
-import muSpectre.sensitivity_analysis
-from . import vtk_export
+
 from . import eshelby_slow
+from . import gradient_integration
+from . import stochastic_plasticity_search
+from . import sensitivity_analysis
+from . import vtk_export
+from . import linear_finite_elements
+
 from . import _muSpectre
 
 _factories = {'fftw': ('CellFactory', False),

@@ -64,6 +64,7 @@ namespace muFFT {
   using muGrid::OneQuadPt;
   using muGrid::TwoQuadPts;
   using muGrid::FourQuadPts;
+  using muGrid::SixQuadPts;
   using muGrid::OneNode;
 
   using muGrid::Mapping;

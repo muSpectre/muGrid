@@ -66,12 +66,28 @@ void add_communicator(py::module & mod) {
           "has_mpi", [](py::object) { return muGrid::Communicator::has_mpi(); })
       .def_property_readonly("rank", &muGrid::Communicator::rank)
       .def_property_readonly("size", &muGrid::Communicator::size)
-      .def("sum", &muGrid::Communicator::sum<Int>)
-      .def("sum", &muGrid::Communicator::sum<Real>)
-      .def("sum", &muGrid::Communicator::sum_mat<Real>)
-      .def("sum", &muGrid::Communicator::sum_mat<Int>)
-      .def("sum", &muGrid::Communicator::sum_mat<Uint>)
-      .def("sum", &muGrid::Communicator::sum_mat<Complex>)
+      .def("sum", [](muGrid::Communicator & comm, const int & arg) {
+        return comm.sum(arg);
+      })
+      .def("sum", [](muGrid::Communicator & comm, const Real & arg) {
+        return comm.sum(arg);
+      })
+      .def("sum", [](muGrid::Communicator & comm,
+                     const Eigen::Ref<muGrid::DynMatrix_t<Real>> & arg) {
+        return comm.sum(arg);
+      })
+      .def("sum", [](muGrid::Communicator & comm,
+                     const Eigen::Ref<muGrid::DynMatrix_t<Int>> & arg) {
+        return comm.sum(arg);
+      })
+      .def("sum", [](muGrid::Communicator & comm,
+                     const Eigen::Ref<muGrid::DynMatrix_t<Uint>> & arg) {
+        return comm.sum(arg);
+      })
+      .def("sum", [](muGrid::Communicator & comm,
+                     const Eigen::Ref<muGrid::DynMatrix_t<Complex>> & arg) {
+        return comm.sum(arg);
+      })
       .def("cumulative_sum", &muGrid::Communicator::cumulative_sum<Int>)
       .def("cumulative_sum", &muGrid::Communicator::cumulative_sum<Real>)
       .def("cumulative_sum", &muGrid::Communicator::cumulative_sum<Uint>)

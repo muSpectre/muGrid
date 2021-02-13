@@ -91,7 +91,7 @@ namespace muSpectre {
     muFFT::FFT_freqs<DimS> fft_freqs(
         Ccoord(this->fft_engine->get_nb_domain_grid_pts()),
         Rcoord(this->domain_lengths));
-    for (auto && tup : akantu::zip(this->fft_engine->get_pixels()
+    for (auto && tup : akantu::zip(this->fft_engine->get_fourier_pixels()
                                        .template get_dimensioned_pixels<DimS>(),
                                    this->Ghat)) {
       const auto & ccoord{std::get<0>(tup)};  // pointer to
@@ -120,9 +120,8 @@ namespace muSpectre {
         for (Dim_t j{0}; j < DimS; ++j) {
           for (Dim_t l{0}; l < DimS; ++l) {
             for (Dim_t m{0}; m < DimS; ++m) {
-              Complex & g = get(G, i, j, l, m);
-
-              g = 0.25 * (N(j, m) * xi(i) * xi(l) + N(j, l) * xi(i) * xi(m) +
+              G(i + DimS * j, l + DimS * m) =
+                  0.25 * (N(j, m) * xi(i) * xi(l) + N(j, l) * xi(i) * xi(m) +
                           N(i, m) * xi(j) * xi(l) + N(i, l) * xi(j) * xi(m));
             }
           }

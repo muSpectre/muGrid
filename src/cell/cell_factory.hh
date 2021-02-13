@@ -91,6 +91,10 @@ namespace muSpectre {
           using Projection = ProjectionFiniteStrainFast<DimS, FourQuadPts>;
           return std::make_unique<Projection>(std::move(fft_ptr), lengths,
                                               gradient);
+        } else if (nb_quad_pts == SixQuadPts) {
+          using Projection = ProjectionFiniteStrainFast<DimS, SixQuadPts>;
+          return std::make_unique<Projection>(std::move(fft_ptr), lengths,
+                                              gradient);
         } else {
           std::stringstream error;
           error << nb_quad_pts << " quadrature points are presently "
@@ -100,14 +104,23 @@ namespace muSpectre {
         break;
       }
       case Formulation::small_strain: {
-        if (nb_quad_pts != OneQuadPt) {
-          throw std::runtime_error("The small strain formation can presently "
-                                   "only be used with a single quadrature "
-                                   "point.");
+        if (nb_quad_pts == OneQuadPt) {
+          using Projection = ProjectionSmallStrain<DimS, OneQuadPt>;
+          return std::make_unique<Projection>(std::move(fft_ptr), lengths,
+                                              gradient);
+        } else if (nb_quad_pts == TwoQuadPts) {
+          using Projection = ProjectionSmallStrain<DimS, TwoQuadPts>;
+          return std::make_unique<Projection>(std::move(fft_ptr), lengths,
+                                              gradient);
+        } else if (nb_quad_pts == FourQuadPts) {
+          using Projection = ProjectionSmallStrain<DimS, FourQuadPts>;
+          return std::make_unique<Projection>(std::move(fft_ptr), lengths,
+                                              gradient);
+        } else if (nb_quad_pts == SixQuadPts) {
+          using Projection = ProjectionSmallStrain<DimS, SixQuadPts>;
+          return std::make_unique<Projection>(std::move(fft_ptr), lengths,
+                                              gradient);
         }
-        using Projection = ProjectionSmallStrain<DimS>;
-        return std::make_unique<Projection>(std::move(fft_ptr), lengths,
-                                            gradient);
         break;
       }
       default: {

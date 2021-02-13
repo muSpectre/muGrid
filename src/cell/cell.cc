@@ -217,6 +217,30 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
+  const DynCcoord_t & Cell::get_nb_subdomain_grid_pts() const {
+    // this true for Cells only capable of projection-based solution
+    return this->projection->get_nb_subdomain_grid_pts();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  const DynCcoord_t & Cell::get_subdomain_locations() const {
+    // this true for Cells only capable of projection-based solution
+    return this->projection->get_subdomain_locations();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  const DynCcoord_t & Cell::get_nb_domain_grid_pts() const {
+    // this true for Cells only capable of projection-based solution
+    return this->projection->get_nb_domain_grid_pts();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  const DynRcoord_t & Cell::get_domain_lengths() const {
+    // this true for Cells only capable of projection-based solution
+    return this->projection->get_domain_lengths();
+  }
+
+  /* ---------------------------------------------------------------------- */
   void Cell::check_material_coverage() const {
     auto nb_pixels{muGrid::CcoordOps::get_size(
         this->projection->get_nb_subdomain_grid_pts())};

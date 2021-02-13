@@ -44,7 +44,7 @@ upwind = (upwind_x, upwind_y, upwind_z)
 
 averaged_upwind_x = muFFT.DiscreteDerivative([0, 0, 0],
                                              [[[-0.25, -0.25], [-0.25, -0.25]],
-                                              [[ 0.25,  0.25], [ 0.25,  0.25]]])
+                                              [[0.25,  0.25], [0.25,  0.25]]])
 averaged_upwind_y = muFFT.DiscreteDerivative([0, 0, 0],
                                              [[[-0.25, -0.25], [0.25, 0.25]],
                                               [[-0.25, -0.25], [0.25, 0.25]]])
@@ -60,19 +60,47 @@ central = (central_x, central_y, central_z)
 
 # d-stencil label the corners used for the derivative
 # x-derivatives
-d_100_000 = muFFT.DiscreteDerivative([0, 0, 0], [[[-1]], [[ 1]]])
-d_110_010 = muFFT.DiscreteDerivative([0, 1, 0], [[[-1]], [[ 1]]])
-d_111_011 = muFFT.DiscreteDerivative([0, 1, 1], [[[-1]], [[ 1]]])
-d_101_001 = muFFT.DiscreteDerivative([0, 0, 1], [[[-1]], [[ 1]]])
+d_100_000 = muFFT.DiscreteDerivative([0, 0, 0], [[[-1]], [[1]]])
+d_110_010 = muFFT.DiscreteDerivative([0, 1, 0], [[[-1]], [[1]]])
+d_111_011 = muFFT.DiscreteDerivative([0, 1, 1], [[[-1]], [[1]]])
+d_101_001 = muFFT.DiscreteDerivative([0, 0, 1], [[[-1]], [[1]]])
 
 # y-derivatives
-d_010_000 = muFFT.DiscreteDerivative([0, 0, 0], [[[-1], [ 1]]])
-d_110_100 = muFFT.DiscreteDerivative([1, 0, 0], [[[-1], [ 1]]])
-d_111_101 = muFFT.DiscreteDerivative([1, 0, 1], [[[-1], [ 1]]])
-d_011_001 = muFFT.DiscreteDerivative([0, 0, 1], [[[-1], [ 1]]])
+d_010_000 = muFFT.DiscreteDerivative([0, 0, 0], [[[-1], [1]]])
+d_110_100 = muFFT.DiscreteDerivative([1, 0, 0], [[[-1], [1]]])
+d_111_101 = muFFT.DiscreteDerivative([1, 0, 1], [[[-1], [1]]])
+d_011_001 = muFFT.DiscreteDerivative([0, 0, 1], [[[-1], [1]]])
 
 # z-derivatives
 d_001_000 = muFFT.DiscreteDerivative([0, 0, 0], [[[-1, 1]]])
 d_101_100 = muFFT.DiscreteDerivative([1, 0, 0], [[[-1, 1]]])
 d_111_110 = muFFT.DiscreteDerivative([1, 1, 0], [[[-1, 1]]])
 d_011_010 = muFFT.DiscreteDerivative([0, 1, 0], [[[-1, 1]]])
+
+# Linear finite elements in 3D (each voxel is subdivided into six tetrahedra)
+linear_finite_elements = (
+    # First tetrahedron
+    d_100_000,  # x-derivative
+    d_110_100,  # y-derivative
+    d_111_110,  # z-derivative
+    # Second tetrahedron
+    d_100_000,  # x-derivative
+    d_111_101,  # y-derivative
+    d_101_100,  # z-derivative
+    # Third tetrahedron
+    d_110_010,  # x-derivative
+    d_010_000,  # y-derivative
+    d_111_110,  # z-derivative
+    # Fourth tetrahedron
+    d_111_011,  # x-derivative
+    d_010_000,  # y-derivative
+    d_011_010,  # z-derivative
+    # Fifth tetrahedron
+    d_101_001,  # x-derivative
+    d_111_101,  # y-derivative
+    d_001_000,  # z-derivative
+    # Sixth tetrahedron
+    d_111_011,  # x-derivative
+    d_011_001,  # y-derivative
+    d_001_000   # z-derivative
+)

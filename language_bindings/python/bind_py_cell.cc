@@ -250,6 +250,7 @@ void add_cell_helper(py::module & mod) {
       .def_property_readonly("stress", &Cell::get_stress)
       .def_property_readonly("nb_dof", &Cell::get_nb_dof)
       .def_property_readonly("nb_pixels", &Cell::get_nb_pixels)
+      .def_property_readonly("dim", &Cell::get_spatial_dim)
       .def(
           "evaluate_stress_tangent",
           [&NumpyT2Proxy](Cell & cell,
@@ -289,26 +290,26 @@ void add_cell_helper(py::module & mod) {
       .def_property_readonly(
           "nb_subdomain_grid_pts",
           [](Cell & cell) {
-            return cell.get_projection().get_nb_subdomain_grid_pts();
+            return cell.get_nb_subdomain_grid_pts();
           })
       .def_property_readonly(
           "subdomain_locations",
 
           [](Cell & cell) {
-            return cell.get_projection().get_subdomain_locations();
+            return cell.get_subdomain_locations();
           })
       .def_property_readonly(
           "nb_domain_grid_pts",
           [](Cell & cell) {
-            return cell.get_projection().get_nb_domain_grid_pts();
+            return cell.get_nb_domain_grid_pts();
           })
       .def_property_readonly(
           "nb_quad_pts",
-          [](Cell & cell) { return cell.get_projection().get_nb_quad_pts(); })
+          [](Cell & cell) { return cell.get_nb_quad_pts(); })
       .def_property_readonly(
           "domain_lengths",
           [](Cell & cell) {
-            return cell.get_projection().get_domain_lengths();
+            return cell.get_domain_lengths();
           })
       .def("set_uniform_strain",
            [](Cell & cell, py::EigenDRef<Eigen::ArrayXXd> & strain) -> void {

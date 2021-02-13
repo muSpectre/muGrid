@@ -75,9 +75,10 @@ class ProjectionBaseUnclonable : public ProjectionBase {
                            const DynRcoord_t & domain_lengths,
                            const Index_t & nb_quad_pts,
                            const Index_t & nb_components,
+                           const Gradient_t & gradient,
                            const Formulation & form)
       : ProjectionBase(engine, domain_lengths, nb_quad_pts, nb_components,
-                       form) {}
+                       gradient, form) {}
 
   std::unique_ptr<ProjectionBase> clone() const final {
     throw RuntimeError(
@@ -102,9 +103,11 @@ class PyProjectionBase : public ProjectionBaseUnclonable {
   PyProjectionBase(const muFFT::FFTEngine_ptr & engine,
                    const DynRcoord_t & domain_lengths,
                    const Index_t & nb_quad_pts,
-                   const Index_t & nb_components, const Formulation & form)
+                   const Index_t & nb_components,
+                   const Gradient_t & gradient,
+                   const Formulation & form)
       : ProjectionBaseUnclonable(engine, domain_lengths, nb_quad_pts,
-                                 nb_components, form) {}
+                                 nb_components, gradient, form) {}
 
   void apply_projection(Field_t & field) override {
     PYBIND11_OVERLOAD_PURE(void, Parent, apply_projection, field);
@@ -129,29 +132,13 @@ void add_projection_base(py::module & mod) {
              PyProjectionBase                  // trampoline base
              >(mod, "ProjectionBase")
       .def(py::init<const muFFT::FFTEngine_ptr &, const DynRcoord_t &,
-                    const Index_t &, const Index_t &, const Formulation &>());
-}
-
-template <class Proj, Index_t DimS>
-void add_proj_helper(py::module & mod, std::string name_start) {
-  std::stringstream name{};
-  name << name_start << '_' << DimS << 'd';
-
-  py::class_<Proj,                   // class
-             std::shared_ptr<Proj>,  // holder
-             ProjectionBase          // trampoline base
-             >(mod, name.str().c_str())
-      .def(py::init<muFFT::FFTEngine_ptr, const DynRcoord_t &, Gradient_t>(),
-           "fft_engine"_a, "domain_lengths"_a, "gradient"_a)
-      .def(py::init<muFFT::FFTEngine_ptr, const DynRcoord_t &>(),
-           "fft_engine"_a, "domain_lengths"_a)
-      .def("initialise", &Proj::initialise,
-           "initialises the projection operator")
-      // apply_projection that takes Fields
-      .def("apply_projection", &Proj::apply_projection)
-      // apply_projection that takes numpy arrays
+                    const Index_t &, const Index_t &, const Gradient_t &,
+                    const Formulation &>())
+          // apply_projection that takes Fields
+      .def("apply_projection", &ProjectionBase::apply_projection)
+          // apply_projection that takes numpy arrays
       .def("apply_projection",
-           [](Proj & proj,
+           [](ProjectionBase & proj,
               py::array_t<Real, py::array::f_style> & vector_field) {
              py::buffer_info buffer{vector_field.request()};
              py::array_t<Real, py::array::f_style> proj_vector_field(
@@ -170,6 +157,39 @@ void add_proj_helper(py::module & mod, std::string name_start) {
              proj.apply_projection(proxy.get_field());
              return proj_vector_field;
            })
+          // integrate that takes Fields
+      .def("integrate", &ProjectionBase::integrate,
+           py::return_value_policy::reference_internal)
+          // integrate that takes numpy arrays
+      .def("integrate",
+           [](ProjectionBase & proj,
+              py::array_t<Real, py::array::f_style> & vector_field) {
+             auto strain_shape = proj.get_strain_shape();
+             NumpyProxy<Real, py::array::f_style> proxy(
+                 proj.get_nb_domain_grid_pts(),
+                 proj.get_nb_subdomain_grid_pts(),
+                 proj.get_subdomain_locations(), proj.get_nb_quad_pts(),
+                 {strain_shape[0], strain_shape[1]}, vector_field);
+             return numpy_wrap(proj.integrate(proxy.get_field()));
+           });
+}
+
+template <class Proj, Index_t DimS>
+void add_proj_helper(py::module & mod, std::string name_start) {
+  std::stringstream name{};
+  name << name_start << '_' << DimS << 'd';
+
+  py::class_<Proj,                   // class
+             std::shared_ptr<Proj>,  // holder
+             ProjectionBase          // trampoline base
+             >(mod, name.str().c_str())
+      .def(py::init<muFFT::FFTEngine_ptr, const DynRcoord_t &, Gradient_t>(),
+           "fft_engine"_a, "domain_lengths"_a, "gradient"_a)
+      .def(py::init<muFFT::FFTEngine_ptr, const DynRcoord_t &>(),
+           "fft_engine"_a, "domain_lengths"_a)
+      .def("initialise", &Proj::initialise,
+           "initialises the projection operator")
+      .def_property_readonly("gradient", &Proj::get_gradient)
       .def_property_readonly("operator", &Proj::get_operator)
       .def_property_readonly("formulation", &Proj::get_formulation,
                              "return a Formulation enum indicating whether the "
@@ -208,6 +228,7 @@ void add_green_proj_helper(py::module & mod, std::string name_start) {
       // apply_projection that takes Fields
       .def("apply_projection", &Proj::apply_projection)
 
+      .def_property_readonly("gradient", &Proj::get_gradient)
       .def_property_readonly("operator", &Proj::get_operator)
       .def_property_readonly("formulation", &Proj::get_formulation,
                              "return a Formulation enum indicating whether the "
@@ -237,6 +258,20 @@ void add_projections(py::module & mod) {
                   muGrid::twoD>(mod, "ProjectionFiniteStrainFast");
   add_proj_helper<muSpectre::ProjectionFiniteStrainFast<muGrid::threeD>,
                   muGrid::threeD>(mod, "ProjectionFiniteStrainFast");
+
+  add_proj_helper<
+      muSpectre::ProjectionSmallStrain<muGrid::twoD, muGrid::TwoQuadPts>,
+      muGrid::twoD>(mod, "ProjectionSmallStrain_2q");
+  add_proj_helper<
+      muSpectre::ProjectionSmallStrain<muGrid::threeD, muGrid::TwoQuadPts>,
+      muGrid::threeD>(mod, "ProjectionSmallStrain_2q");
+
+  add_proj_helper<
+      muSpectre::ProjectionFiniteStrain<muGrid::twoD, muGrid::TwoQuadPts>,
+      muGrid::twoD>(mod, "ProjectionFiniteStrain_2q");
+  add_proj_helper<
+      muSpectre::ProjectionFiniteStrain<muGrid::threeD, muGrid::TwoQuadPts>,
+      muGrid::threeD>(mod, "ProjectionFiniteStrain_2q");
 
   add_proj_helper<
       muSpectre::ProjectionFiniteStrainFast<muGrid::twoD, muGrid::TwoQuadPts>,

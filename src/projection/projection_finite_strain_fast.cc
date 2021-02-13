@@ -47,11 +47,19 @@ namespace muSpectre {
       const Gradient_t & gradient)
       : Parent{std::move(engine), lengths,
                static_cast<Index_t>(gradient.size())/lengths.get_dim(),
-               DimS*DimS,
-               Formulation::finite_strain},
-        xi_field{"Projection Operator",
-                 this->fft_engine->get_fourier_field_collection(), PixelTag},
-        gradient{gradient} {
+               DimS*DimS, gradient, Formulation::finite_strain},
+        proj_field{"Projection Operator",
+                   this->fft_engine->get_fourier_field_collection(), PixelTag},
+        int_field{"Integration Operator",
+                  this->fft_engine->get_fourier_field_collection(), PixelTag} {
+    if (this->get_dim() != DimS) {
+      std::stringstream message{};
+      message << "Dimension mismatch: this projection is templated with "
+                 "the spatial dimension "
+              << DimS << ", but the FFT engine has the spatial dimension "
+              << this->get_dim() << ".";
+      throw ProjectionError{message.str()};
+    }
     if (this->nb_quad_pts != NbQuadPts) {
       std::stringstream error;
       error << "Deduced number of quadrature points (= " << this->nb_quad_pts
@@ -94,11 +102,13 @@ namespace muSpectre {
         eigen(Rcoord(this->domain_lengths) / Ccoord(nb_domain_grid_pts))};
 
     FFTFreqs_t fft_freqs(nb_domain_grid_pts);
-    for (auto && tup : akantu::zip(this->fft_engine->get_pixels()
+    for (auto && tup : akantu::zip(this->fft_engine->get_fourier_pixels()
                                        .template get_dimensioned_pixels<DimS>(),
-                                   this->xi_field.get_map())) {
+                                   this->proj_field.get_map(),
+                                   this->int_field.get_map())) {
       const auto & ccoord = std::get<0>(tup);
-      auto & xi = std::get<1>(tup);
+      auto & projop = std::get<1>(tup);
+      auto & intop = std::get<2>(tup);
 
       // compute phase (without the factor of 2 pi)
       const Vector_t phase{
@@ -108,19 +118,23 @@ namespace muSpectre {
       for (Index_t quad = 0; quad < NbQuadPts; ++quad) {
         for (Index_t dim = 0; dim < DimS; ++dim) {
           Index_t i = quad * DimS + dim;
-          xi[i] = this->gradient[i]->fourier(phase) / grid_spacing[dim];
+          projop[i] = this->gradient[i]->fourier(phase) / grid_spacing[dim];
         }
       }
 
-      if (xi.norm() > 0) {
-        xi /= xi.norm();
+      intop = projop.conjugate();
+      auto n{projop.squaredNorm()};
+      if (n > 0) {
+        projop /= sqrt(n);
+        intop /= n;
       }
     }
 
     if (this->fft_engine->is_active()) {
       // locations are also zero if the engine is not active
       if (this->get_subdomain_locations() == Ccoord{}) {
-        this->xi_field.get_map()[0].setZero();
+        this->proj_field.get_map()[0].setZero();
+        this->int_field.get_map()[0].setZero();
       }
     }
   }
@@ -144,26 +158,76 @@ namespace muSpectre {
     this->fft_engine->fft(field, this->work_space);
     Grad_map field_map{this->work_space};
     Real factor = this->fft_engine->normalisation();
-    for (auto && tup : akantu::zip(this->xi_field.get_map(), field_map)) {
-      auto & xi{std::get<0>(tup)};
+    for (auto && tup : akantu::zip(this->proj_field.get_map(), field_map)) {
+      auto & projop{std::get<0>(tup)};
       auto & f{std::get<1>(tup)};
-      f = factor * ((f * xi.conjugate()).eval() * xi.transpose());
+      f = factor * ((f * projop.conjugate()).eval() * projop.transpose());
     }
     this->fft_engine->ifft(this->work_space, field);
   }
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimS, Index_t NbQuadPts>
-  Eigen::Map<MatrixXXc>
-  ProjectionFiniteStrainFast<DimS, NbQuadPts>::get_operator() {
-    return this->xi_field.get_field().eigen_pixel();
+  typename ProjectionFiniteStrainFast<DimS, NbQuadPts>::Field_t &
+  ProjectionFiniteStrainFast<DimS, NbQuadPts>::integrate(Field_t & grad) {
+    //! vectorized version of the Fourier-space potential
+    using FourierPotential_map =
+      muGrid::MatrixFieldMap<Complex, Mapping::Mut, DimS, 1, IterUnit::SubPt>;
+    //! vectorized version of the real-space potential
+    using RealPotential_map =
+      muGrid::T1FieldMap<Real, Mapping::Mut, DimS, IterUnit::SubPt>;
+
+    if (!this->initialised) {
+      throw ProjectionError("Integrating a field without having initialised "
+                            "the projector is not supported.");
+    }
+    // potential in Fourier space
+    auto & potential_work_space{
+        this->fft_engine->fetch_or_register_fourier_space_field(
+            "Node potential (in Fourier space)", DimS)};
+    this->fft_engine->fft(grad, this->work_space);
+    Grad_map grad_map{this->work_space};
+    FourierPotential_map fourier_potential_map{potential_work_space};
+    Real factor = this->fft_engine->normalisation();
+
+    // store average strain
+    Eigen::Matrix<Real, DimS, DimS * NbQuadPts> avg_grad{
+        grad_map[0].real()*factor};
+    if (!(this->get_subdomain_locations() == Ccoord{})) {
+      avg_grad.setZero();
+    }
+    avg_grad = this->get_communicator().sum(avg_grad);
+
+    // apply integrator
+    for (auto && tup : akantu::zip(this->int_field.get_map(), grad_map,
+                                   fourier_potential_map)) {
+      auto & intop{std::get<0>(tup)};
+      auto & g{std::get<1>(tup)};
+      auto & p{std::get<2>(tup)};
+      p = factor * (g * intop).eval();
+    }
+    auto & potential{this->fft_engine->fetch_or_register_real_space_field(
+        "Node potential (in real space)", DimS)};
+    this->fft_engine->ifft(potential_work_space, potential);
+    // add average strain to potential
+    RealPotential_map real_potential_map{potential};
+    auto grid_spacing{this->domain_lengths / this->get_nb_domain_grid_pts()};
+    for (auto && tup : akantu::zip(this->fft_engine->get_real_pixels(),
+                                   real_potential_map)) {
+      auto & c{std::get<0>(tup)};
+      auto & p{std::get<1>(tup)};
+      for (Index_t i{0}; i < DimS; ++i) {
+        p += avg_grad.col(i) * c[i] * grid_spacing[i];
+      }
+    }
+    return potential;
   }
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimS, Index_t NbQuadPts>
-  const muFFT::Gradient_t &
-  ProjectionFiniteStrainFast<DimS, NbQuadPts>::get_gradient() const {
-    return this->gradient;
+  Eigen::Map<MatrixXXc>
+  ProjectionFiniteStrainFast<DimS, NbQuadPts>::get_operator() {
+    return this->proj_field.get_field().eigen_pixel();
   }
 
   /* ---------------------------------------------------------------------- */
@@ -184,10 +248,13 @@ namespace muSpectre {
   template class ProjectionFiniteStrainFast<oneD, OneQuadPt>;
   template class ProjectionFiniteStrainFast<oneD, TwoQuadPts>;
   template class ProjectionFiniteStrainFast<oneD, FourQuadPts>;
+  template class ProjectionFiniteStrainFast<oneD, SixQuadPts>;
   template class ProjectionFiniteStrainFast<twoD, OneQuadPt>;
   template class ProjectionFiniteStrainFast<twoD, TwoQuadPts>;
   template class ProjectionFiniteStrainFast<twoD, FourQuadPts>;
+  template class ProjectionFiniteStrainFast<twoD, SixQuadPts>;
   template class ProjectionFiniteStrainFast<threeD, OneQuadPt>;
   template class ProjectionFiniteStrainFast<threeD, TwoQuadPts>;
   template class ProjectionFiniteStrainFast<threeD, FourQuadPts>;
+  template class ProjectionFiniteStrainFast<threeD, SixQuadPts>;
 }  // namespace muSpectre

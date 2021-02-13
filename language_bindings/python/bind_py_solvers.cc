@@ -67,7 +67,8 @@ void add_krylov_solver_helper(py::module & mod, std::string name) {
   py::class_<KrylovSolver, typename KrylovSolver::Parent>(mod, name.c_str())
       .def(py::init<std::shared_ptr<muSpectre::MatrixAdaptable>, Real, Uint,
                     Verbosity>(),
-           "cell"_a, "tol"_a, "maxiter"_a, "verbose"_a = Verbosity::Silent)
+           "cell"_a, "tol"_a = -1.0, "maxiter"_a = 1000,
+           "verbose"_a = Verbosity::Silent)
       .def("initialise", &KrylovSolver::initialise)
       .def("solve", &KrylovSolver::solve, "rhs"_a)
       .def_property_readonly("counter", &KrylovSolver::get_counter)
@@ -234,8 +235,8 @@ void add_trust_region_newton_cg_helper(py::module & mod) {
 
   mod.def(
       name,
-      [](muSpectre::Cell & s, const grad & g, solver & so, Real tr, Real nt,
-         Real eqt, Real it, Real dt, Verbosity verb,
+      [](std::shared_ptr<muSpectre::Cell> s, const grad & g, solver & so,
+         Real tr, Real nt, Real eqt, Real it, Real dt, Verbosity verb,
          IsStrainInitialised strain_init) -> OptimizeResult {
         const grad_vec & g_vec{g};
         return trust_region_newton_cg(s, g_vec, so, tr, nt, eqt, it, dt, verb,
@@ -248,8 +249,8 @@ void add_trust_region_newton_cg_helper(py::module & mod) {
       "IsStrainInitialised"_a = IsStrainInitialised::False);
   mod.def(
       name,
-      [](muSpectre::Cell & s, const grad & g, solver & so, Real tr, Real nt,
-         Real eqt, Real it, Real dt, Verbosity verb,
+      [](std::shared_ptr<muSpectre::Cell> s, const grad & g, solver & so,
+         Real tr, Real nt, Real eqt, Real it, Real dt, Verbosity verb,
          IsStrainInitialised strain_init,
          py::function & eigen_strain_pyfunc) -> OptimizeResult {
         const grad_vec & g_vec{g};
@@ -272,8 +273,8 @@ void add_trust_region_newton_cg_helper(py::module & mod) {
       "eigen_strain_func"_a = nullptr);
   mod.def(
       name,
-      [](muSpectre::Cell & s, const grad_vec & g, solver & so, Real tr, Real nt,
-         Real eqt, Real it, Real dt, Verbosity verb,
+      [](std::shared_ptr<muSpectre::Cell> s, const grad_vec & g, solver & so,
+         Real tr, Real nt, Real eqt, Real it, Real dt, Verbosity verb,
          IsStrainInitialised strain_init) -> std::vector<OptimizeResult> {
         return trust_region_newton_cg(s, g, so, tr, nt, eqt, it, dt, verb,
                                       strain_init);
@@ -284,8 +285,8 @@ void add_trust_region_newton_cg_helper(py::module & mod) {
       "IsStrainInitialised"_a = IsStrainInitialised::False);
   mod.def(
       name,
-      [](muSpectre::Cell & s, const grad_vec & g, solver & so, Real tr, Real nt,
-         Real eqt, Real it, Real dt, Verbosity verb,
+      [](std::shared_ptr<muSpectre::Cell> s, const grad_vec & g, solver & so,
+         Real tr, Real nt, Real eqt, Real it, Real dt, Verbosity verb,
          IsStrainInitialised strain_init,
          py::function & eigen_strain_pyfunc) -> std::vector<OptimizeResult> {
         Func_t eigen_strain_cpp_func{

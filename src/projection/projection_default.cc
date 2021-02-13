@@ -39,19 +39,26 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  template <Index_t DimS>
-  ProjectionDefault<DimS>::ProjectionDefault(muFFT::FFTEngine_ptr engine,
-                                             DynRcoord_t lengths,
-                                             Gradient_t gradient,
-                                             Formulation form)
+  template <Index_t DimS, Index_t NbQuadPts>
+  ProjectionDefault<DimS, NbQuadPts>::ProjectionDefault(
+      muFFT::FFTEngine_ptr engine,
+      const DynRcoord_t & lengths,
+      const Gradient_t & gradient,
+      Formulation form)
       : Parent{std::move(engine), lengths,
                static_cast<Index_t>(gradient.size()) / lengths.get_dim(),
-               DimS * DimS, form},
+               DimS * DimS, gradient, form},
         Gfield{this->fft_engine->get_fourier_field_collection()
-                   .register_complex_field("Projection Operator",
-                                           DimS * DimS * DimS * DimS,
-                                           QuadPtTag)},
-        Ghat{Gfield}, gradient{gradient} {
+                   .register_complex_field(
+                       "Projection Operator",
+                       DimS * DimS * NbQuadPts * DimS * DimS * NbQuadPts,
+                       PixelTag)},
+        Ghat{Gfield},
+        Ifield{this->fft_engine->get_fourier_field_collection()
+                   .register_complex_field(
+                       "Integration Operator",
+                       DimS * DimS * DimS * NbQuadPts, PixelTag)},
+        Ihat{Ifield} {
     if (this->get_dim() != DimS) {
       std::stringstream message{};
       message << "Dimension mismatch: this projection is templated with "
@@ -60,11 +67,17 @@ namespace muSpectre {
               << this->get_dim() << ".";
       throw ProjectionError{message.str()};
     }
+    if (this->nb_quad_pts != NbQuadPts) {
+      std::stringstream error;
+      error << "Deduced number of quadrature points (= " << this->nb_quad_pts
+            << ") differs from template argument (= " << NbQuadPts << ").";
+      throw ProjectionError(error.str());
+    }
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Index_t DimS>
-  void ProjectionDefault<DimS>::apply_projection(Field_t & field) {
+  template <Index_t DimS, Index_t NbQuadPts>
+  void ProjectionDefault<DimS, NbQuadPts>::apply_projection(Field_t & field) {
     if (!this->initialised) {
       throw ProjectionError("Applying a projection without having initialised "
                             "the projector is not supported.");
@@ -81,19 +94,92 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Index_t DimS>
-  Eigen::Map<MatrixXXc> ProjectionDefault<DimS>::get_operator() {
+  template <Index_t DimS, Index_t NbQuadPts>
+  typename ProjectionDefault<DimS, NbQuadPts>::Field_t &
+  ProjectionDefault<DimS, NbQuadPts>::integrate(Field_t & grad) {
+    //! iterable form of the integrator
+    using Grad_map =
+      muGrid::MatrixFieldMap<Complex, Mapping::Mut, DimS, DimS * NbQuadPts,
+                             IterUnit::Pixel>;
+    //! vectorized version of the Fourier-space positions
+    using FourierPotential_map =
+      muGrid::T1FieldMap<Complex, Mapping::Mut, DimS, IterUnit::Pixel>;
+    //! vectorized version of the real-space positions
+    using RealPotential_map =
+      muGrid::T1FieldMap<Real, Mapping::Mut, DimS, IterUnit::Pixel>;
+
+    if (!this->initialised) {
+      throw ProjectionError("Integrating a field without having initialised "
+                            "the projector is not supported.");
+    }
+
+    // positions in Fourier space
+    auto & potential_work_space{
+        this->fft_engine->fetch_or_register_fourier_space_field(
+            "Node positions (in Fourier space)", DimS)};
+    this->fft_engine->fft(grad, this->work_space);
+
+    // store average strain
+    Grad_map grad_map{this->work_space};
+    Real factor = this->fft_engine->normalisation();
+    Eigen::Matrix<Real, DimS, DimS * NbQuadPts> avg_strain{
+        grad_map[0].real()*factor};
+    if (!(this->get_subdomain_locations() == Ccoord{})) {
+      avg_strain.setZero();
+    }
+    avg_strain = this->get_communicator().sum(avg_strain);
+
+    // apply integrator
+    Vector_map vector_map{this->work_space};
+    FourierPotential_map fourier_positions_map{potential_work_space};
+    for (auto && tup : akantu::zip(this->Ihat, vector_map,
+                                   fourier_positions_map)) {
+      auto & I{std::get<0>(tup)};
+      auto & g{std::get<1>(tup)};
+      auto & p{std::get<2>(tup)};
+      p = factor * (I * g).eval();
+    }
+    auto & potential{this->fft_engine->fetch_or_register_real_space_field(
+        "Node positions (in real space)", DimS)};
+    this->fft_engine->ifft(potential_work_space, potential);
+    // add average strain to positions
+    RealPotential_map real_positions_map{potential};
+    auto grid_spacing{this->domain_lengths / this->get_nb_domain_grid_pts()};
+    for (auto && tup : akantu::zip(this->fft_engine->get_real_pixels(),
+                                   real_positions_map)) {
+      auto & c{std::get<0>(tup)};
+      auto & p{std::get<1>(tup)};
+      for (Index_t i{0}; i < DimS; ++i) {
+        p += avg_strain.col(i) * c[i] * grid_spacing[i];
+      }
+    }
+    return potential;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Index_t DimS, Index_t NbQuadPts>
+  Eigen::Map<MatrixXXc> ProjectionDefault<DimS, NbQuadPts>::get_operator() {
     return this->Gfield.eigen_pixel();
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Index_t DimS>
-  std::array<Index_t, 2> ProjectionDefault<DimS>::get_strain_shape() const {
-    return std::array<Index_t, 2>{DimS, DimS};
+  template <Index_t DimS, Index_t NbQuadPts>
+  std::array<Index_t, 2>
+  ProjectionDefault<DimS, NbQuadPts>::get_strain_shape() const {
+    return std::array<Index_t, 2>{DimS, DimS * NbQuadPts};
   }
 
   /* ---------------------------------------------------------------------- */
-  template class ProjectionDefault<oneD>;
-  template class ProjectionDefault<twoD>;
-  template class ProjectionDefault<threeD>;
+  template class ProjectionDefault<oneD, OneQuadPt>;
+  template class ProjectionDefault<oneD, TwoQuadPts>;
+  template class ProjectionDefault<oneD, FourQuadPts>;
+  template class ProjectionDefault<oneD, SixQuadPts>;
+  template class ProjectionDefault<twoD, OneQuadPt>;
+  template class ProjectionDefault<twoD, TwoQuadPts>;
+  template class ProjectionDefault<twoD, FourQuadPts>;
+  template class ProjectionDefault<twoD, SixQuadPts>;
+  template class ProjectionDefault<threeD, OneQuadPt>;
+  template class ProjectionDefault<threeD, TwoQuadPts>;
+  template class ProjectionDefault<threeD, FourQuadPts>;
+  template class ProjectionDefault<threeD, SixQuadPts>;
 }  // namespace muSpectre
