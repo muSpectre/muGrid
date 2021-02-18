@@ -102,7 +102,7 @@ namespace muSpectre {
     const size_t quad_point_id{0};
     const Real read_young{Fix::mat.get_youngs_modulus(quad_point_id)};
     const Real read_poisson{Fix::mat.get_poisson_ratio(quad_point_id)};
-    std::cout << "Here!" << std::endl;
+
     BOOST_CHECK_LT(std::abs(Fix::Youngs_modulus - read_young), tol);
     BOOST_CHECK_LT(std::abs(Fix::Poisson_ratio - read_poisson), tol);
 

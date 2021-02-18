@@ -48,6 +48,7 @@ namespace muFFT {
       : Parent{nb_grid_pts, comm, plan_flags, allow_temporary_buffer,
                allow_destroy_input} {
     this->initialise_field_collections();
+    ++this->nb_engines;
   }
 
   /* ---------------------------------------------------------------------- */
@@ -55,7 +56,9 @@ namespace muFFT {
                          const FFT_PlanFlags & plan_flags,
                          bool allow_temporary_buffer, bool allow_destroy_input)
       : FFTWEngine{nb_grid_pts, Communicator(), plan_flags,
-                   allow_temporary_buffer, allow_destroy_input} {}
+                   allow_temporary_buffer, allow_destroy_input} {
+    ++this->nb_engines;
+  }
 
   /* ---------------------------------------------------------------------- */
   void FFTWEngine::create_plan(const Index_t & nb_dof_per_pixel) {
@@ -143,34 +146,37 @@ namespace muFFT {
     // r2hc_plans
 
     Real * r_work_space_2{fftw_alloc_real(alloc_size)};
-    Real * r2hc_out {r_work_space_2};
+    Real * r2hc_out{r_work_space_2};
 
     std::vector<fftw_r2r_kind> fft_kinds(rank);
-    for (auto && k : fft_kinds)  k = FFTW_R2HC;
+    for (auto && k : fft_kinds) {
+      k = FFTW_R2HC;
+    }
     std::vector<fftw_r2r_kind> ifft_kinds(rank);
-    for (auto && k : ifft_kinds)  k = FFTW_HC2R;
+    for (auto && k : ifft_kinds) {
+      k = FFTW_HC2R;
+    }
 
     this->hcfft_plans[nb_dof_per_pixel] = fftw_plan_many_r2r(
-        rank, n, howmany, in, inembed,
-        istride, idist, r2hc_out, onembed, ostride,
-        odist, fft_kinds.data(),
-        (this->allow_destroy_input
-                    ? FFTW_DESTROY_INPUT : FFTW_PRESERVE_INPUT) | flags);
+        rank, n, howmany, in, inembed, istride, idist, r2hc_out, onembed,
+        ostride, odist, fft_kinds.data(),
+        (this->allow_destroy_input ? FFTW_DESTROY_INPUT : FFTW_PRESERVE_INPUT) |
+            flags);
     if (this->hcfft_plans.at(nb_dof_per_pixel) == nullptr) {
       throw FFTEngineError("Plan failed");
     }
 
-    Real * ir2hc_in {r_work_space_2};
-    this->ihcfft_plans[nb_dof_per_pixel] =
-        fftw_plan_many_r2r(
-            rank, n, howmany, ir2hc_in, inembed, istride, idist,
-            i_out, onembed, ostride, odist, ifft_kinds.data(), flags);
+    Real * ir2hc_in{r_work_space_2};
+    this->ihcfft_plans[nb_dof_per_pixel] = fftw_plan_many_r2r(
+        rank, n, howmany, ir2hc_in, inembed, istride, idist, i_out, onembed,
+        ostride, odist, ifft_kinds.data(), flags);
 
     if (this->ihcfft_plans.at(nb_dof_per_pixel) == nullptr) {
       throw FFTEngineError("Plan failed");
     }
 
     fftw_free(r_work_space);
+    fftw_free(r_work_space_2);
     fftw_free(out);
     this->planned_nb_dofs.insert(nb_dof_per_pixel);
   }
@@ -179,15 +185,30 @@ namespace muFFT {
   FFTWEngine::~FFTWEngine() noexcept {
     for (auto && nb_dof_per_pixel : this->planned_nb_dofs) {
       auto && fft_plan{this->fft_plans.at(nb_dof_per_pixel)};
-      if (fft_plan != nullptr)
+      if (fft_plan != nullptr) {
         fftw_destroy_plan(fft_plan);
+      }
       auto && ifft_plan{this->ifft_plans.at(nb_dof_per_pixel)};
-      if (ifft_plan != nullptr)
+      if (ifft_plan != nullptr) {
         fftw_destroy_plan(ifft_plan);
+      }
+      auto && hcfft_plan{this->hcfft_plans.at(nb_dof_per_pixel)};
+      if (hcfft_plan != nullptr) {
+        fftw_destroy_plan(hcfft_plan);
+      }
+      auto && ihcfft_plan{this->ihcfft_plans.at(nb_dof_per_pixel)};
+      if (ihcfft_plan != nullptr) {
+        fftw_destroy_plan(ihcfft_plan);
+      }
     }
-    // TODO(Till): We cannot run fftw_cleanup since subsequent FFTW calls will
-    // fail but multiple FFT engines can be active at the same time.
-    // fftw_cleanup();
+    --this->nb_engines;
+    if (this->nb_engines == 0) {
+      // TODO(Pastewka): Check with Lars why this crashes the sequential(!) MPI
+      // tests
+#ifndef WITH_MPI
+       fftw_cleanup();
+#endif
+    }
   }
 
   /* ---------------------------------------------------------------------- */
@@ -207,31 +228,29 @@ namespace muFFT {
         output_field.data());
   }
 
-  // get_nb_fourier_hc_grid_pts
-
   /* ---------------------------------------------------------------------- */
   void FFTWEngine::compute_hcfft(const RealField_t & input_field,
-                               RealField_t & output_field) const {
-    fftw_execute_r2r(this->hcfft_plans.at(
-                                 input_field.get_nb_dof_per_pixel()),
-                             input_field.data(),
-                             output_field.data());
+                                 RealField_t & output_field) const {
+    fftw_execute_r2r(this->hcfft_plans.at(input_field.get_nb_dof_per_pixel()),
+                     input_field.data(), output_field.data());
   }
 
   /* ---------------------------------------------------------------------- */
   void FFTWEngine::compute_ihcfft(const RealField_t & input_field,
-                                RealField_t & output_field) const {
-    fftw_execute_r2r(this->ihcfft_plans.at(
-                             input_field.get_nb_dof_per_pixel()),
-                         input_field.data(),
-                         output_field.data());
+                                  RealField_t & output_field) const {
+    fftw_execute_r2r(this->ihcfft_plans.at(input_field.get_nb_dof_per_pixel()),
+                     input_field.data(), output_field.data());
   }
 
+  /* ---------------------------------------------------------------------- */
   std::unique_ptr<FFTEngineBase> FFTWEngine::clone() const {
     return std::make_unique<FFTWEngine>(
         this->get_nb_domain_grid_pts(), this->get_communicator(),
         this->plan_flags, this->allow_temporary_buffer,
         this->allow_destroy_input);
   }
+
+  /* ---------------------------------------------------------------------- */
+  Index_t FFTWEngine::nb_engines{0};
 
 }  // namespace muFFT

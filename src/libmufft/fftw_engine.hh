@@ -135,6 +135,8 @@ namespace muFFT {
 
     //! holds the plans for inverse half-complex fourier transforms
     std::map<Index_t, fftw_plan> ihcfft_plans{};
+
+    static Index_t nb_engines;
   };
 
 }  // namespace muFFT
