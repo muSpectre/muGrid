@@ -13,6 +13,7 @@
   artifacts:
     when: always
     paths:
+      - build
       - build/tests/test_results*.xml
       - build/tests/libmufft/test_results*.xml
       - build/tests/libmugrid/test_results*.xml
@@ -96,6 +97,24 @@ build:test_documention:
   artifacts:
     paths:
     - build/doc/html
+
+.tests:
+  stage: test
+  script:
+    - cd build
+    - valgrind --track-origins=yes --leak-check=full --error-exitcode=1 ./main_test_suite
+
+test:testing_gcc:
+  extends: .tests
+  image: registry.gitlab.com/muspectre/muspectre:debian_testing
+  dependencies:
+    - build:testing_gcc_mpi
+
+test:testing_clang:
+  extends: .tests
+  image: registry.gitlab.com/muspectre/muspectre:debian_testing
+  dependencies:
+    - build:testing_clang
 
 pages:
   stage: deploy
