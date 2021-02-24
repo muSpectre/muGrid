@@ -119,6 +119,7 @@ test:testing_clang:
 pages:
   stage: deploy
   image: registry.gitlab.com/muspectre/muspectre:debian_stable
+  dependencies: []
   script:
     - cd build
     - cmake -DMUSPECTRE_MAKE_DOC_TARGET=ON ..
