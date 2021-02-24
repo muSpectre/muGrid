@@ -128,6 +128,9 @@ muSpectre_add_example(small_elasto_plastic_case_py_example
 muSpectre_add_example(tutorial_example_py_example
   TYPE PYTHON tutorial_example.py 1)
 
+muSpectre_add_example(tutorial_example_py_example_new
+  TYPE PYTHON tutorial_example.py 1)
+
 muSpectre_add_example(visualisation_example_finite_py_example
   TYPE PYTHON visualisation_example_finite_strain.py 7 7 1)
 
