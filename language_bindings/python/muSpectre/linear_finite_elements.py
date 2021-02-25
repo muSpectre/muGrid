@@ -51,7 +51,7 @@ gradient_2d = muFFT.Stencils2D.linear_finite_elements
 gradient_3d = muFFT.Stencils3D.linear_finite_elements
 
 
-def write_3d(fn, rve):
+def write_3d(file_name, rve, cell_data=None):
     """
     Write results of a 3D calculation that employs a decomposition of each
     voxel in six tetrahedra (using the `gradient_3d` stencil) to a file. The
@@ -60,16 +60,17 @@ def write_3d(fn, rve):
 
     More on `meshio` can be found here: https://github.com/nschloe/meshio
 
-    fn  -- filename
+    file_name  -- filename
     rve -- representative volume element, i.e. the `Cell` object
+    cell_data = dictionary of cell data with corresponding keys
     """
     import meshio
-
     # Size of RVE
     nx, ny, nz = rve.nb_domain_grid_pts
 
     # Positions, periodically complemented
-    x, y, z = get_complemented_positions(rve)
+    [x_def, y_def, z_def], [x_undef, y_undef, z_undef] \
+        = get_complemented_positions(rve)
 
     # Global node indices
     def c2i(xp, yp, zp):
@@ -81,12 +82,12 @@ def write_3d(fn, rve):
     yc = yc.ravel(order='F')
     zc = zc.ravel(order='F')
 
-    x = x.ravel(order='F')
-    y = y.ravel(order='F')
-    z = z.ravel(order='F')
+    x_def = x_def.ravel(order='F')
+    y_def = y_def.ravel(order='F')
+    z_def = z_def.ravel(order='F')
 
     # Construct mesh
-    points = np.transpose([x, y, z])
+    points = np.transpose([x_def, y_def, z_def])
     cells = np.swapaxes(
         [[c2i(xc, yc, zc), c2i(xc+1, yc, zc),
           c2i(xc+1, yc+1, zc), c2i(xc+1, yc+1, zc+1)],
@@ -103,16 +104,96 @@ def write_3d(fn, rve):
         0, 1)
 
     cells = cells.reshape((4, -1), order='F').T
-
     # Get stress
     stress = rve.stress.array() \
         .reshape((3, 3, -1), order='F').T.swapaxes(1, 2)
+    strain = rve.strain.array() \
+        .reshape((3, 3, -1), order='F').T.swapaxes(1, 2)
 
-    # Write mesh to file
-    meshio.write_points_cells(
-        fn,
-        points,
-        {'tetra': cells},
-        cell_data={
-            'stress': np.array([stress])
-        })
+    if cell_data == None:
+        # Write mesh to file
+        meshio.write_points_cells(
+            file_name,
+            points,
+            {"tetra": cells},
+            cell_data={
+                'stress': np.array([stress]),
+                'strain': np.array([strain])
+            })
+    else:
+        # Write mesh to file
+        meshio.write_points_cells(
+            file_name,
+            points,
+            {"tetra": cells},
+            cell_data=cell_data
+        )
+
+
+
+def write_2d(file_name, rve, cell_data=None):
+    """
+    Write results of a 3D calculation that employs a decomposition of each
+    voxel in six tetrahedra (using the `gradient_3d` stencil) to a file. The
+    output is handled by `meshio`, which means all `meshio` formats are
+    supported.
+
+    More on `meshio` can be found here: https://github.com/nschloe/meshio
+
+    file_name  -- filename
+    rve -- representative volume element, i.e. the `Cell` object
+    cell_data = dictionary of cell data with corresponding keys
+    """
+    import meshio
+    # Size of RVE
+    nx, ny = rve.nb_domain_grid_pts
+
+    # Positions, periodically complemented
+    [x_def, y_def], [x_undef, y_undef] \
+        = get_complemented_positions(rve)
+
+    # Global node indices
+    def c2i(xp, yp):
+        return xp + (nx + 1) * yp
+
+    # Integer cell coordinates
+    xc, yc = np.mgrid[:nx, :ny]
+    xc = xc.ravel(order='F')
+    yc = yc.ravel(order='F')
+
+    x_def = x_def.ravel(order='F')
+    y_def = y_def.ravel(order='F')
+
+    # Construct mesh
+    points = np.transpose([x_def, y_def])
+    cells = np.swapaxes(
+        [[c2i(xc, yc), c2i(xc+1, yc), c2i(xc, yc+1)],
+         [c2i(xc, yc+1), c2i(xc+1, yc), c2i(xc+1, yc+1)]],
+        0, 1)
+
+    cells = cells.reshape((3, -1), order='F').T
+    # Get stress
+
+    stress = rve.stress.array() \
+        .reshape((2, 2, -1), order='F').T.swapaxes(1, 2)
+    strain = rve.strain.array() \
+        .reshape((2, 2, -1), order='F').T.swapaxes(1, 2)
+
+    if cell_data == None:
+        # Write mesh to file
+        meshio.write_points_cells(
+            file_name,
+            points,
+            {"triangle": cells},
+            cell_data={
+                'stress': np.array([stress]),
+                'strain': np.array([strain])
+            })
+    else:
+        # Write mesh to file
+        meshio.write_points_cells(
+            file_name,
+            points,
+            {"triangle": cells},
+            cell_data=cell_data
+        )
