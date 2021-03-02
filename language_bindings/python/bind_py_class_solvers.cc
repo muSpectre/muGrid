@@ -69,12 +69,7 @@ void add_solver_base(py::module & mod) {
                              })
       .def_property("formulation", &SolverBase::get_formulation,
                     &SolverBase::set_formulation)
-      .def(
-          "initialise_cell",
-          [](SolverBase & solver, const bool & with_eigen_strain) {
-            solver.initialise_cell(with_eigen_strain);
-          },
-          "with_eigen_strain"_a = false)
+      .def("initialise_cell", &SolverBase::initialise_cell)
       .def_property_readonly("communicator", &SolverBase::get_communicator);
 }
 

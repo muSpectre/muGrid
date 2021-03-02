@@ -58,7 +58,7 @@ class EigenStrainSolverCheck(unittest.TestCase):
 
         self.Del0 = np.zeros((2, 2))
         self.maxiter = 100
-        self.verbose = µ.Verbosity.Full
+        self.verbose = µ.Verbosity.Silent
 
         self.nb_grid_pts = [3, 3]  # [5,7]
         self.lengths = [3., 3.]  # [5.2, 8.3]
@@ -122,7 +122,7 @@ class EigenStrainSolverCheck(unittest.TestCase):
                                                 self.maxiter)
 
         solver_class.formulation = µ.Formulation.small_strain
-        solver_class.initialise_cell(True)
+        solver_class.initialise_cell()
 
         r_solver = µ.solvers.newton_cg(self.cell_solver, self.Del0,
                                        solver_solver,

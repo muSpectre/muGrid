@@ -175,8 +175,7 @@ namespace muSpectre {
         2};
 
     solver->set_formulation(Formulation::small_strain);
-    bool has_eigen_strain_func{true};
-    solver->initialise_cell(has_eigen_strain_func);
+    solver->initialise_cell();
 
     BOOST_TEST_CHECKPOINT("before load increment");
     std::cout << std::endl
@@ -299,8 +298,7 @@ namespace muSpectre {
         2};
 
     solver->set_formulation(Formulation::small_strain);
-    bool has_eigen_strain_func{true};
-    solver->initialise_cell(has_eigen_strain_func);
+    solver->initialise_cell();
 
     BOOST_TEST_CHECKPOINT("before load increment");
     std::cout << std::endl

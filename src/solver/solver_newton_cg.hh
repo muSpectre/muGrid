@@ -88,9 +88,11 @@ namespace muSpectre {
                           EigenVec_t del_flux) final;
 
     //! initialise cell data for this solver
-    void initialise_cell(const bool & with_eigen_strain_inp = false) final;
+    void initialise_cell() final;
 
    protected:
+    void initialise_eigen_strain_storage();
+    bool has_eigen_strain_storage() const;
     /**
      * statically dimensioned worker for evaluating the incremental tangent
      * operator
@@ -136,8 +138,6 @@ namespace muSpectre {
     Real newton_tol;
     Real equil_tol;
     Uint max_iter;
-
-    bool with_eigen_strain{false};
   };
 
 }  // namespace muSpectre

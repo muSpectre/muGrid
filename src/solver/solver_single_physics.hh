@@ -74,7 +74,7 @@ namespace muSpectre {
     /**
      * solve for a single increment without having to specify units. This
      * function cannot handle eigenload. If you have an eigenload problem, use
-     * `apply_load_increment(const LoadStep & load_step)`, thenn apply your
+     * `apply_load_increment(const LoadStep & load_step)`, then apply your
      * eigen load followed by `solve_load_increment()` (without argument).
      */
     template <class Derived>

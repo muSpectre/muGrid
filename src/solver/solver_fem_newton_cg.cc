@@ -59,12 +59,20 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   OptimizeResult SolverFEMNewtonCG::solve_load_increment(
       const LoadStep & load_step, EigenStrainOptFunc_ref eigen_strain_func) {
-    if (not(eigen_strain_func == muGrid::nullopt)) {
-      this->with_eigen_strain = true;
+    if (eigen_strain_func == muGrid::nullopt and
+        this->has_eigen_strain_storage()) {
+      std::stringstream err{};
+      err << "eval_grad is different from the grad field of the cell"
+          << ". Therefore, it does not get updated unless an eigen strain "
+          << "function is passed to solve_load_increment"
+          << "This is probably because you have already called this "
+          << "previously with an eigenstrain function."
+          << std::endl;
+      throw SolverError(err.str());
     }
     // check whether this solver's cell has been initialised already
     if (not this->is_initialised) {
-      this->initialise_cell(this->with_eigen_strain);
+      this->initialise_cell();
     }
 
     auto && comm{this->cell_data->get_communicator()};
@@ -149,7 +157,8 @@ namespace muSpectre {
     this->grad->get_map() = macro_load;
     grad_operator.apply_gradient_increment(this->disp_fluctuation->get_field(),
                                            1., this->grad->get_field());
-    if (this->with_eigen_strain) {
+    if (not(eigen_strain_func == muGrid::nullopt)) {
+      this->initialise_eigen_strain_storage();
       this->eval_grad->get_field() = this->grad->get_field();
       (eigen_strain_func.value())(this->eval_grad->get_field());
     }
@@ -296,10 +305,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  void SolverFEMNewtonCG::initialise_cell(const bool & with_eigen_strain_inp) {
-    if (with_eigen_strain_inp) {
-      this->with_eigen_strain = true;
-    }
+  void SolverFEMNewtonCG::initialise_cell() {
     if (this->is_initialised) {
       return;
     }
@@ -349,13 +355,8 @@ namespace muSpectre {
     this->grad = std::make_shared<MappedField_t>(
         "grad", this->grad_shape[0], this->grad_shape[1], IterUnit::SubPt,
         field_collection, QuadPtTag);
-    if (this->with_eigen_strain) {
-      this->eval_grad = std::make_shared<MappedField_t>(
-          "eval_grad", this->grad_shape[0], this->grad_shape[1],
-          IterUnit::SubPt, field_collection, QuadPtTag);
-    } else {
-      this->eval_grad = this->grad;
-    }
+
+    this->eval_grad = this->grad;
 
     this->eval_grads[this->domain] = this->eval_grad;
     this->grads[this->domain] = this->grad;
@@ -398,6 +399,21 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   Index_t SolverFEMNewtonCG::get_displacement_rank() const {
     return this->domain.rank() - 1;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void SolverFEMNewtonCG::initialise_eigen_strain_storage() {
+    if (not this->has_eigen_strain_storage()) {
+      this->eval_grad = std::make_shared<MappedField_t>(
+          "eval_grad", this->grad_shape[0], this->grad_shape[1],
+          IterUnit::SubPt, this->cell_data->get_fields(), QuadPtTag);
+      this->eval_grads[this->domain] = this->eval_grad;
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  bool SolverFEMNewtonCG::has_eigen_strain_storage() const {
+    return this->eval_grad != this->grad;
   }
 
 }  // namespace muSpectre

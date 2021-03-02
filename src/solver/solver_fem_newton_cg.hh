@@ -89,7 +89,7 @@ namespace muSpectre {
                           EigenVec_t delta_f) final;
 
     //! initialise cell data for this solver
-    void initialise_cell(const bool & with_eigen_strain_inp = false) final;
+    void initialise_cell() final;
 
     //! return the rank of the displacement field for this PhysicsDomain
     Index_t get_displacement_rank() const;
@@ -102,6 +102,8 @@ namespace muSpectre {
     const MappedField_t & get_flux() const { return *this->flux; }
 
    protected:
+    void initialise_eigen_strain_storage();
+    bool has_eigen_strain_storage() const;
     using MappedField_t =
         muGrid::MappedField<muGrid::FieldMap<Real, Mapping::Mut>>;
     //! Newton loop displacement fluctuation increment δũ
@@ -135,8 +137,6 @@ namespace muSpectre {
     Real newton_tol;
     Real equil_tol;
     Uint max_iter;
-
-    bool with_eigen_strain{false};
   };
 
 }  // namespace muSpectre
