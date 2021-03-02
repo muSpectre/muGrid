@@ -64,7 +64,7 @@ namespace muSpectre {
     }
     // check whether this solver's cell has been initialised already
     if (not this->is_initialised) {
-      this->initialise_cell();
+      this->initialise_cell(this->with_eigen_strain);
     }
 
     auto && comm{this->cell_data->get_communicator()};
@@ -296,7 +296,10 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  void SolverFEMNewtonCG::initialise_cell() {
+  void SolverFEMNewtonCG::initialise_cell(const bool & with_eigen_strain_inp) {
+    if (with_eigen_strain_inp) {
+      this->with_eigen_strain = true;
+    }
     if (this->is_initialised) {
       return;
     }

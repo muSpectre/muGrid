@@ -89,7 +89,7 @@ namespace muSpectre {
                           EigenVec_t delta_f) final;
 
     //! initialise cell data for this solver
-    void initialise_cell() final;
+    void initialise_cell(const bool & with_eigen_strain_inp = false) final;
 
     //! return the rank of the displacement field for this PhysicsDomain
     Index_t get_displacement_rank() const;
@@ -100,13 +100,6 @@ namespace muSpectre {
     const MappedField_t & get_tangent() const { return *this->tangent; }
     //! Tangent moduli field
     const MappedField_t & get_flux() const { return *this->flux; }
-
-    inline void initialise_cell(const bool & with_eigen_strain_inp) {
-      if (with_eigen_strain_inp) {
-        this->with_eigen_strain = true;
-      }
-      this->initialise_cell();
-    }
 
    protected:
     using MappedField_t =

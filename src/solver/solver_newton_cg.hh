@@ -88,14 +88,7 @@ namespace muSpectre {
                           EigenVec_t del_flux) final;
 
     //! initialise cell data for this solver
-    void initialise_cell() final;
-
-    inline void initialise_cell(const bool & with_eigen_strain_inp) {
-      if (with_eigen_strain_inp) {
-        this->with_eigen_strain = true;
-      }
-      this->initialise_cell();
-    }
+    void initialise_cell(const bool & with_eigen_strain_inp = false) final;
 
    protected:
     /**

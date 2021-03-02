@@ -38,6 +38,8 @@
 #include "solver/solver_fem_newton_cg.hh"
 #include "solver/solver_fem_newton_pcg.hh"
 
+#include <libmugrid/numpy_tools.hh>
+
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/eigen.h>
@@ -67,13 +69,34 @@ void add_solver_base(py::module & mod) {
                              })
       .def_property("formulation", &SolverBase::get_formulation,
                     &SolverBase::set_formulation)
-      .def("initialise_cell", &SolverBase::initialise_cell)
+      .def(
+          "initialise_cell",
+          [](SolverBase & solver, const bool & with_eigen_strain) {
+            solver.initialise_cell(with_eigen_strain);
+          },
+          "with_eigen_strain"_a = false)
       .def_property_readonly("communicator", &SolverBase::get_communicator);
 }
 
 void add_single_physics_solver(py::module & mod) {
+  using EigenStrainFunc_t = std::function<void(muGrid::TypedFieldBase<Real> &)>;
   py::class_<SolverSinglePhysics, SolverBase,
              std::shared_ptr<SolverSinglePhysics>>(mod, "SolverSinglePhysics")
+      .def(
+          "solve_load_increment",
+          [](SolverSinglePhysics & solver,
+             py::EigenDRef<Eigen::MatrixXd> load_step,
+             py::function & eigen_strain_pyfunc) {
+            EigenStrainFunc_t eigen_strain_cpp_func{
+                [&eigen_strain_pyfunc](
+                    muGrid::TypedFieldBase<Real> & eigen_strain_field) {
+                  eigen_strain_pyfunc(muGrid::numpy_wrap(
+                      eigen_strain_field, muGrid::IterUnit::SubPt));
+                }};
+            return solver.solve_load_increment(load_step,
+                                               eigen_strain_cpp_func);
+          },
+          "load_step"_a, "eigen_strain_func"_a = nullptr)
       .def(
           "solve_load_increment",
           [](SolverSinglePhysics & solver,

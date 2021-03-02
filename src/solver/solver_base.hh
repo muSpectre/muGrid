@@ -129,7 +129,7 @@ r mechanics domain.
     virtual std::tuple<const MappedField_t &, const MappedField_t &>
     evaluate_stress_tangent(const muGrid::PhysicsDomain & domain);
 
-    virtual void initialise_cell() = 0;
+    virtual void initialise_cell(const bool & with_eigen_strain = false) = 0;
 
     const muFFT::Communicator & get_communicator() const;
 

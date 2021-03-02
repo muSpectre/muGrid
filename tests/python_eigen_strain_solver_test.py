@@ -46,6 +46,10 @@ def eigen_strain_func(step_nb, eigens):
     eigens[:, :, 0, 1, 1] -= eigen
 
 
+def eigen_strain_func2(eigens):
+    eigens[:, :, 0, 1, 1] -= eigen
+
+
 class EigenStrainSolverCheck(unittest.TestCase):
     def setUp(self):
         self.cg_tol = 1e-8
@@ -54,7 +58,7 @@ class EigenStrainSolverCheck(unittest.TestCase):
 
         self.Del0 = np.zeros((2, 2))
         self.maxiter = 100
-        self.verbose = µ.Verbosity.Silent
+        self.verbose = µ.Verbosity.Full
 
         self.nb_grid_pts = [3, 3]  # [5,7]
         self.lengths = [3., 3.]  # [5.2, 8.3]
@@ -67,6 +71,10 @@ class EigenStrainSolverCheck(unittest.TestCase):
                                   self.lengths,
                                   self.formulation)
 
+        self.cell_solver_class = µ.cell.CellData.make(self.nb_grid_pts,
+                                                      self.lengths)
+        self.cell_solver_class.nb_quad_pts = 1
+
         self.material_1_material = µ.material.MaterialLinearElastic1_2d.make(
             self.cell_material, "material 1 material", 210e9, .33)
         self.material_2_material = µ.material.MaterialLinearElastic2_2d.make(
@@ -74,6 +82,10 @@ class EigenStrainSolverCheck(unittest.TestCase):
 
         self.material_1_solver = µ.material.MaterialLinearElastic1_2d.make(
             self.cell_solver, "material 1 solver", 210e9, .33)
+
+        self.material_1_solver_calss = µ.material.MaterialLinearElastic1_2d.make(
+            self.cell_solver_class, "material 1 solver", 210e9, .33)
+
         self.ndim = 2   # number of dimensions
         self.N = 3  # number of voxels (assumed equal for all directions)
         self.Nx = self.Ny = self.N
@@ -88,6 +100,7 @@ class EigenStrainSolverCheck(unittest.TestCase):
 
         for pix_id in self.cell_material.pixel_indices:
             self.material_1_solver.add_pixel(pix_id)
+            self.material_1_solver_calss.add_pixel(pix_id)
 
         self.cell_material.initialise()
         self.cell_solver.initialise()
@@ -95,8 +108,21 @@ class EigenStrainSolverCheck(unittest.TestCase):
         solver_solver = µ.solvers.KrylovSolverCG(
             self.cell_solver, self.cg_tol, self.maxiter, self.verbose)
 
+        solver_solver_class = µ.solvers.KrylovSolverCG(
+            self.cg_tol, self.maxiter, self.verbose)
+
         solver_material = µ.solvers.KrylovSolverCG(
             self.cell_material, self.cg_tol, self.maxiter, self.verbose)
+
+        solver_class = µ.solvers.SolverNewtonCG(self.cell_solver_class,
+                                                solver_solver_class,
+                                                self.verbose,
+                                                self.newton_tol,
+                                                self.equil_tol,
+                                                self.maxiter)
+
+        solver_class.formulation = µ.Formulation.small_strain
+        solver_class.initialise_cell(True)
 
         r_solver = µ.solvers.newton_cg(self.cell_solver, self.Del0,
                                        solver_solver,
@@ -110,8 +136,17 @@ class EigenStrainSolverCheck(unittest.TestCase):
                                          self.newton_tol, self.equil_tol,
                                          self.verbose)
 
+        r_solver_class = solver_class.solve_load_increment(self.Del0,
+                                                           eigen_strain_func2)
+
         self.assertTrue((r_material.grad == r_solver.grad).all())
         self.assertTrue((r_material.stress == r_solver.stress).all())
+
+
+        self.assertTrue(
+            (r_material.grad.reshape(-1) == r_solver_class.grad.T.reshape(-1)).all())
+        self.assertTrue(
+            (r_material.stress.reshape(-1) == r_solver_class.stress.T.reshape(-1)).all())
 
 
 if __name__ == '__main__':
