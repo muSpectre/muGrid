@@ -41,6 +41,11 @@ import numpy as np
 
 from python_test_imports import muFFT, muGrid
 
+if muFFT.has_mpi:
+    from mpi4py import MPI
+    communicator = muFFT.Communicator(MPI.COMM_WORLD)
+else:
+    communicator = muFFT.Communicator()
 
 class FFT_Check(unittest.TestCase):
     def setUp(self):
@@ -51,11 +56,7 @@ class FFT_Check(unittest.TestCase):
                       ([6, 4, 5], (2, 3)),
                       ([6, 4, 4], (1,))]
 
-        if muFFT.has_mpi:
-            from mpi4py import MPI
-            self.communicator = muFFT.Communicator(MPI.COMM_WORLD)
-        else:
-            self.communicator = muFFT.Communicator()
+        self.communicator = communicator
 
         self.engines = []
         if muFFT.has_mpi:
@@ -97,7 +98,7 @@ class FFT_Check(unittest.TestCase):
                              comm.size*(comm.size+1)/2 + 3*comm.size,
                              msg='{} engine'.format(engine_str))
 
-    def test_forward_transform(self):
+    def test_forward_transform_numpy_interface(self):
         for engine_str in self.engines:
             for nb_grid_pts, dims in self.grids:
                 s = self.communicator.size
@@ -137,7 +138,7 @@ class FFT_Check(unittest.TestCase):
                 err = np.linalg.norm(out_ref - out_msp)
                 self.assertLess(err, tol, msg='{} engine'.format(engine_str))
 
-    def test_reverse_transform(self):
+    def test_reverse_transform_numpy_interface(self):
         for engine_str in self.engines:
             for nb_grid_pts, dims in self.grids:
                 s = self.communicator.size
@@ -350,7 +351,7 @@ class FFT_Check(unittest.TestCase):
                 engine.fft(in_arr, out_msp)
 
                 # Check that the output array does not have a unit first dimension
-                self.assertEqual(np.squeeze(out_msp).shape, engine.nb_fourier_grid_pts),# \
+                self.assertEqual(tuple(out_msp.shape), engine.nb_fourier_grid_pts),# \
                     #                "{} not equal to {}".format(out_msp.shape,
                 #                                            engine.nb_fourier_grid_pts)
                 # TODO(pastewka): I think this test is out of date. the numpy
@@ -394,7 +395,7 @@ class FFT_Check(unittest.TestCase):
                     "{} not equal to {}".format(out_msp.shape,
                                                 engine.nb_subdomain_grid_pts)
 
-    @unittest.skipIf(muGrid.has_mpi and muGrid.Communicator().size > 1,
+    @unittest.skipIf(communicator.size > 1,
                      'MPI parallel FFTs do not support 1D transforms')
     def test_1d_transform(self):
         nb_grid_pts = [128, ]
@@ -489,6 +490,8 @@ class FFT_Check(unittest.TestCase):
         assert np.allclose(ref.real, tested.real)
         assert np.allclose(ref.imag, tested.imag)
 
+    @unittest.skipIf(communicator.size > 1,
+                     'This test only works on a single MPI process')
     def test_strides(self):
         for engine_str in self.engines:
             try:
@@ -501,12 +504,23 @@ class FFT_Check(unittest.TestCase):
                 continue
 
             if engine_str == 'fftw':
-                assert engine.subdomain_strides == (1, 3, 15) # column-major
-                assert engine.fourier_strides == (1, 2, 10) # column-major
+                assert engine.subdomain_strides == (1, 3, 15),\
+                    '{} - {}'.format(engine_str, engine.subdomain_strides) # column-major
+                assert engine.fourier_strides == (1, 2, 10), \
+                    '{} - {}'.format(engine_str, engine.fourier_strides) # column-major
             elif engine_str == 'fftwmpi':
-                assert engine.subdomain_strides == (1, 4, 20) # padding in first dimension
-                assert engine.fourier_strides == (1, 14, 2) # transposed output
+                assert engine.subdomain_strides == (1, 4, 20), \
+                    '{} - {}'.format(engine_str, engine.subdomain_strides) # padding in first dimension
+                assert engine.fourier_strides == (1, 14, 2), \
+                    '{} - {}'.format(engine_str, engine.fourier_strides) # transposed output
+            elif engine_str == 'pfft':
+                assert engine.subdomain_strides == (1, 4, 20), \
+                    '{} - {}'.format(engine_str, engine.subdomain_strides) # padding in first dimension
+                assert engine.fourier_strides == (7, 14, 1), \
+                    '{} - {}'.format(engine_str, engine.fourier_strides) # transposed output
 
+    @unittest.skipIf(communicator.size > 1,
+                     'This test only works on a single MPI process')
     def test_raises_incompatible_buffer(self):
         """
         asserts that the output is of shape ( , ) and not ( , , 1)
@@ -572,7 +586,7 @@ class FFTCheckSerialOnly(unittest.TestCase):
         if self.communicator.size == 1:
             self.engines += ['fftw']
 
-    @unittest.skipIf(muGrid.has_mpi and muGrid.Communicator().size > 1,
+    @unittest.skipIf(communicator.size > 1,
                      'fftw only')
     def test_rffth2c_2d_sin(self):
 
@@ -613,7 +627,7 @@ class FFTCheckSerialOnly(unittest.TestCase):
         np.testing.assert_allclose(fourier_buffer, expected, atol=1e-14)
 
 
-    @unittest.skipIf(muGrid.has_mpi and muGrid.Communicator().size > 1,
+    @unittest.skipIf(communicator.size > 1,
                      'fftw only')
     def test_rffth2c_2d_roundtrip(self):
         
@@ -638,8 +652,7 @@ class FFTCheckSerialOnly(unittest.TestCase):
             real_buffer.array()[...] *= engine.normalisation
             np.testing.assert_allclose(real_buffer, original, atol=1e-14)
 
-    @unittest.skipIf(muGrid.has_mpi and muGrid.Communicator().size > 1,
-                 'fftw only')
+    @unittest.skipIf(communicator.size > 1, 'fftw only')
     def test_rffth2c_2d_convenience_interface(self):
 
         nb_grid_pts = (5,5)
@@ -662,8 +675,7 @@ class FFTCheckSerialOnly(unittest.TestCase):
         np.testing.assert_allclose(original_backup, original, atol=1e-14)
         np.testing.assert_allclose(result_real, original, atol=1e-14)
 
-    @unittest.skipIf(muGrid.has_mpi and muGrid.Communicator().size > 1,
-             'fftw only')
+    @unittest.skipIf(communicator.size > 1, 'fftw only')
     def test_rffth2c_multiple_dofs(self):
         for nb_grid_pts, dims in self.grids:
             s = self.communicator.size
@@ -705,8 +717,7 @@ class FFTCheckSerialOnly(unittest.TestCase):
 
             np.testing.assert_allclose(result_real, in_arr, atol=1e-14)
 
-    @unittest.skipIf(muGrid.has_mpi and muGrid.Communicator().size > 1,
-                     'fftw only')
+    @unittest.skipIf(communicator.size > 1, 'fftw only')
     def test_rffth2c_1d_roundtrip(self):
         
         for nb_grid_pts in [(5,),(4,)]:
@@ -730,8 +741,7 @@ class FFTCheckSerialOnly(unittest.TestCase):
             real_buffer.array()[...] *= engine.normalisation
             np.testing.assert_allclose(real_buffer, original, atol=1e-14)
 
-    @unittest.skipIf(muGrid.has_mpi and muGrid.Communicator().size > 1,
-                     'fftw only')
+    @unittest.skipIf(communicator.size > 1, 'fftw only')
     def test_rffth2c_3d_roundtrip(self):
     
         for nb_grid_pts in [(5,4,5),(4,5,4), (4,4,5) ,(5,5,5), (4,4,4)]:
@@ -753,7 +763,9 @@ class FFTCheckSerialOnly(unittest.TestCase):
             engine.ihcfft(fourier_buffer, real_buffer)
             real_buffer.array()[...] *= engine.normalisation
             np.testing.assert_allclose(real_buffer, original, atol=1e-14)
-            
+
+    @unittest.skipIf(communicator.size > 1,
+                     'This test only works on a single MPI process')
     def test_r2hc_incompatible_engines_raise(self):
         for engine in self.engines:
             if engine != "fftw":

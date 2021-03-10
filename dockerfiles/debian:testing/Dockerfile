@@ -35,3 +35,13 @@ RUN apt-get -qq update && apt-get -y -qq install \
 # apt-get on one line due to https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#run
 
 RUN python3 -m pip install uvw
+
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
+
+RUN cd /tmp \
+    && git clone https://github.com/mpip/pfft.git \
+    && cd pfft \
+    && ./bootstrap.sh \
+    && CFLAGS="-O2 -march=sandybridge -mno-avx512f" ./configure --disable-fortran --enable-shared --prefix=/usr/local \
+    && make -j 4 \
+    && make install

@@ -72,6 +72,8 @@ if(${MUSPECTRE_MPI_PARALLEL})
     python_mpi_binding_tests.py)
   muFFT_add_test(mufft_python_mpi_binding_test2 TYPE PYTHON MPI_NB_PROCS 2
     python_mpi_binding_tests.py)
+  muFFT_add_test(mufft_python_mpi_binding_test4 TYPE PYTHON MPI_NB_PROCS 4
+    python_mpi_binding_tests.py)
 endif()
 
 ##############################################################################

@@ -60,11 +60,12 @@ namespace muFFT {
      * Constructor with the domain's number of grid points in each direction and
      * the communicator
      * @param nb_grid_pts number of grid points of the global grid
+     * @param comm MPI communicator object
+     * @param plan_flags MPI planner flags
      * @param allow_temporary_buffer allow the creation of temporary buffers
      *        if the input buffer has the wrong memory layout
      * @param allow_destroy_input allow that the input buffers are invalidated
      *        during the FFT
-     * @comm MPI communicator object
      */
     FFTWMPIEngine(const DynCcoord_t & nb_grid_pts,
                   Communicator comm = Communicator(),
@@ -144,7 +145,7 @@ namespace muFFT {
     bool check_fourier_space_field(const FourierField_t & field) const final;
 
     static int nb_engines;  //!< number of times this engine has
-                            //!< been instatiated
+                            //!< been instantiated
     //! holds the plans for forward fourier transforms
     std::map<Index_t, fftw_plan> fft_plans{};
     //! holds the plans for inversefourier transforms

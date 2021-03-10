@@ -102,7 +102,7 @@ namespace muSpectre {
     Mat_t be_star{f * be_prev.old() * f.transpose()};
     const muGrid::SelfAdjointDecomp_t<DimM> spectral_decomp{
         muGrid::spectral_decomposition(be_star)};
-    Mat_t ln_be_star{muGrid::logm_alt(spectral_decomp)};
+    Mat_t ln_be_star{muGrid::logm_alt_spectral(spectral_decomp)};
     Mat_t tau_star{.5 * Hooke::evaluate_stress(lambda, mu, ln_be_star)};
     // deviatoric part of Kirchhoff stress
     Mat_t tau_d_star{tau_star - tau_star.trace() / DimM * tau_star.Identity()};

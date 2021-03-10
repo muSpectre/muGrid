@@ -469,13 +469,16 @@ def has_flag(compiler, flagname):
     the specified compiler.
     """
     import tempfile
-    with tempfile.NamedTemporaryFile('w', suffix='.cpp') as f:
-        f.write('int main (int argc, char **argv) { return 0; }')
-        try:
-            compiler.compile([f.name], extra_postargs=[flagname])
-        except setuptools.distutils.errors.CompileError:
-            return False
-    return True
+    retval = True
+    f = tempfile.NamedTemporaryFile('w', suffix='.cpp', delete=False)
+    f.write('int main (int argc, char **argv) { return 0; }')
+    f.close()
+    try:
+        compiler.compile([f.name], extra_postargs=[flagname])
+    except setuptools.distutils.errors.CompileError:
+        retval = False
+    os.remove(f.name)
+    return retval
 
 
 def cpp_flag(compiler):
@@ -489,6 +492,23 @@ def cpp_flag(compiler):
     else:
         raise RuntimeError('Unsupported compiler -- at least C++11 '
                            'support is needed!')
+
+
+def has_cpp_optional(compiler):
+    """Check whether compiler supports std::optional"""
+    import tempfile
+    retval = True
+    f = tempfile.NamedTemporaryFile('w', suffix='.cpp', delete=False)
+    f.write(
+        '#include <experimental/optional>\nint main() {\n'
+        'std::experimental::optional<double> A{};\n}')
+    f.close()
+    try:
+        compiler.compile([f.name])
+    except setuptools.distutils.errors.CompileError:
+        retval = False
+    os.remove(f.name)
+    return retval
 
 
 def compiler_options(compiler, version):
@@ -505,6 +525,9 @@ def compiler_options(compiler, version):
         opts.append(cpp_flag(compiler))
     elif ct == 'msvc':
         opts.append('/DVERSION_INFO=\\"%s\\"' % version)
+    # Check if compiler has std::optional, use Boost if not
+    if not has_cpp_optional(compiler):
+        opts.append('-DNO_EXPERIMENTAL')
     return opts
 
 
@@ -583,9 +606,12 @@ class build_clib_dyn(build_clib):
             self.include_dirs = self.include_dirs.split(os.pathsep)
 
     def build_libraries(self, libraries):
+        print('build_libraries')
         _customize_compiler_for_shlib(self.compiler)
+        print('A')
         copts = compiler_options(self.compiler,
                                  self.distribution.get_version())
+        print(copts)
         lopts = linker_options(self.compiler)
         for (lib_name, build_info) in libraries:
             sources = build_info.get('sources')

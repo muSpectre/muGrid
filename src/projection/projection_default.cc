@@ -166,7 +166,7 @@ namespace muSpectre {
   template <Index_t DimS, Index_t NbQuadPts>
   std::array<Index_t, 2>
   ProjectionDefault<DimS, NbQuadPts>::get_strain_shape() const {
-    return std::array<Index_t, 2>{DimS, DimS * NbQuadPts};
+    return std::array<Index_t, 2>{DimS, DimS};
   }
 
   /* ---------------------------------------------------------------------- */

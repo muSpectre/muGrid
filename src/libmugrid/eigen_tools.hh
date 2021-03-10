@@ -436,8 +436,6 @@ namespace muGrid {
     return log_comp::Sum(Solver.eigenvalues(), mat);
   }
 
-  template <Dim_t Dim>
-  using Matrix_t = Eigen::Matrix<Real, Dim, Dim>;
   /**
    * compute the spectral decomposition
    */
@@ -463,7 +461,7 @@ namespace muGrid {
   template <Dim_t Dim, template <class Matrix_t>
                        class DecompType = Eigen::SelfAdjointEigenSolver>
   inline decltype(auto)
-  logm_alt(const DecompType<Matrix_t<Dim>> & spectral_decomp) {
+  logm_alt_spectral(const DecompType<Matrix_t<Dim>> & spectral_decomp) {
     using Mat_t = Eigen::Matrix<Real, Dim, Dim>;
     Mat_t retval{Mat_t::Zero()};
     for (Dim_t i{0}; i < Dim; ++i) {
@@ -490,7 +488,7 @@ namespace muGrid {
 
     Decomp_t decomp{spectral_decomposition(mat)};
 
-    return logm_alt(decomp);
+    return logm_alt_spectral(decomp);
   }
 
   /**
@@ -504,7 +502,7 @@ namespace muGrid {
   template <Dim_t Dim, template <class Matrix_t>
                        class DecompType = Eigen::SelfAdjointEigenSolver>
   inline decltype(auto)
-  expm(const DecompType<Matrix_t<Dim>> & spectral_decomp) {
+  expm_spectral(const DecompType<Matrix_t<Dim>> & spectral_decomp) {
     using Mat_t = Matrix_t<Dim>;
     Mat_t retval{Mat_t::Zero()};
     for (Dim_t i{0}; i < Dim; ++i) {
@@ -531,7 +529,7 @@ namespace muGrid {
 
     Decomp_t decomp{spectral_decomposition(mat)};
 
-    return expm(decomp);
+    return expm_spectral(decomp);
   }
 
 }  // namespace muGrid

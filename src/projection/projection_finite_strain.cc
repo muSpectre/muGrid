@@ -51,12 +51,6 @@ namespace muSpectre {
       const Gradient_t & gradient)
       : Parent{std::move(engine), lengths, gradient,
                Formulation::finite_strain} {
-    for (auto res : this->fft_engine->get_nb_domain_grid_pts()) {
-      if (res % 2 == 0) {
-        throw ProjectionError(
-            "Only an odd number of grid points in each direction is supported");
-      }
-    }
   }
 
   /* ---------------------------------------------------------------------- */

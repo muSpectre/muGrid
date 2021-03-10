@@ -284,6 +284,9 @@ namespace muGrid {
      */
     Enumeration_t enumerate_indices();
 
+    //! evaluate and return the sum of the map
+    PlainType sum() const;
+
     //! evaluate and return the mean value of the map
     PlainType mean() const;
 

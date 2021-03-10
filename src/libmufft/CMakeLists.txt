@@ -1,5 +1,5 @@
 # =============================================================================
-# file   CMakeLists.txt
+# @file   CMakeLists.txt
 #
 # @author Nicolas Richart <nicolas.richart@epfl.ch>
 #
@@ -17,7 +17,7 @@
 #
 # µGrid is distributed in the hope that it will be useful, but WITHOUT ANY
 # WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-# A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+# A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more details.
 #
 # You should have received a copy of the GNU Lesser General Public License
 # along with µGrid; see the file COPYING. If not, write to the Free Software
@@ -50,6 +50,24 @@ target_include_directories(version PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 add_dependencies(version check_git)
 target_link_libraries(muFFT PUBLIC version)
 
+if(NOT HAS_STD_OPTIONAL)
+    target_compile_definitions(muFFT PUBLIC -DNO_EXPERIMENTAL)
+    # Do not trust old gcc. the std::optional has memory bugs
+    if(${CMAKE_COMPILER_IS_GNUCC})
+      if(${CMAKE_CXX_COMPILER_VERSION} VERSION_LESS 6.0.0)
+        add_definitions(-DNO_EXPERIMENTAL)
+    endif()
+  endif()
+endif()
+
+set(mufft_HDRS
+  ${CMAKE_CURRENT_SOURCE_DIR}/mufft_common.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/derivative.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/fft_engine_base.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/fft_utils.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/fftw_engine.hh
+  )
+
 set(mufft_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/derivative.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/fft_engine_base.cc
@@ -62,8 +80,16 @@ set(fft_engine_FFTWMPI_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/fftwmpi_engine.cc
   )
 
+set(fft_engine_FFTWMPI_HDRS
+  ${CMAKE_CURRENT_SOURCE_DIR}/fftwmpi_engine.hh
+  )
+
 set(fft_engine_PFFT_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/pfft_engine.cc
+  )
+
+set(fft_engine_PFFT_HDRS
+  ${CMAKE_CURRENT_SOURCE_DIR}/pfft_engine.hh
   )
 
 find_package(FFTW3 COMPONENTS double REQUIRED)
@@ -101,6 +127,7 @@ if(${MUSPECTRE_MPI_PARALLEL})
       target_compile_definitions(muFFT PUBLIC -DWITH_${_fft})
 
       list(APPEND mufft_SRCS ${fft_engine_${_fft}_SRCS})
+      list(APPEND mufft_HDRS ${fft_engine_${_fft}_HDRS})
       set(_using_mpi TRUE)
     endif()
   endforeach()
@@ -131,8 +158,7 @@ endif()
 
 # ------------------------------------------------------------------------------
 if(NOT MUFFT_TARGETS_EXPORT)
-  if ("${MUCHOICE}" STREQUAL muFFT) 
-    set(MUFFT_TARGETS_EXPORT muFFTTargets)
+  set(MUFFT_TARGETS_EXPORT muFFTTargets eigen3)
 endif()
 
 
@@ -145,21 +171,20 @@ install(TARGETS muFFT
   PUBLIC_HEADER
     DESTINATION include/libmufft)
 
+install(FILES ${mufft_HDRS} DESTINATION include/libmufft)
+
 if("${MUFFT_TARGETS_EXPORT}" STREQUAL "muFFTTargets")
   if(MUFFT_NAMESPACE)
     set(_namespace NAMESPACE ${MUFFT_NAMESPACE})
-  else()
-    unset(_namespace)
   endif()
 
-  install(EXPORT ${MUFFT_TARGETS_EXPORT}
-    ${_namespace}
-    DESTINATION share/cmake/${PROJECT_NAME}
-    COMPONENT dev)
+  # install(EXPORT ${MUFFT_TARGETS_EXPORT}
+  #   ${_namespace}
+  #   DESTINATION share/cmake/${PROJECT_NAME}
+  #   COMPONENT dev)
 
-  #Export for build tree
-  export(EXPORT ${MUFFT_TARGETS_EXPORT}
-    ${_namespace}
-    FILE "${CMAKE_BINARY_DIR}/${MUFFT_TARGETS_EXPORT}.cmake")
-  endif()
+  # #Export for build tree
+  # export(EXPORT ${MUFFT_TARGETS_EXPORT}
+  #   ${_namespace}
+  #   FILE "${CMAKE_BINARY_DIR}/${MUFFT_TARGETS_EXPORT}.cmake")
 endif()

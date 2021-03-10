@@ -38,19 +38,19 @@
 
 #include "pfft_engine.hh"
 
-using RuntimeError;
+using muGrid::CcoordOps::get_col_major_strides;
 
 namespace muFFT {
 
-  template <Dim_t DimsS>
-  int PFFTEngine<DimsS>::nb_engines{0};
+  int PFFTEngine::nb_engines{0};
 
-  template <Dim_t DimS>
-  PFFTEngine<DimS>::PFFTEngine(Ccoord nb_grid_pts, Dim_t nb_dof_per_pixel,
-                               Communicator comm)
-      : Parent{nb_grid_pts, nb_dof_per_pixel, comm},
-        mpi_comm{comm.get_mpi_comm()}, plan_fft{nullptr},
-        plan_ifft{nullptr}, real_workspace{nullptr} {
+  PFFTEngine::PFFTEngine(const DynCcoord_t & nb_grid_pts,
+                         Communicator comm,
+                         const FFT_PlanFlags & plan_flags,
+                         bool allow_temporary_buffer,
+                         bool allow_destroy_input)
+      : Parent{nb_grid_pts, comm, plan_flags, allow_temporary_buffer,
+               allow_destroy_input}, mpi_comm{comm.get_mpi_comm()} {
     if (!this->nb_engines)
       pfft_init();
     this->nb_engines++;
@@ -58,92 +58,108 @@ namespace muFFT {
     int size{comm.size()};
     int dim_x{size};
     int dim_y{1};
-    // Note: All TODOs below don't affect the function of the PFFT engine. It
-    // presently uses slab decompositions, the TODOs are what needs to be done
-    // to get stripe decomposition to work - but it does not work yet. Slab
-    // vs stripe decomposition may have an impact on how the code scales.
-    // TODO(pastewka): Enable this to enable 2d process mesh. This does not pass
-    // tests.
-    // if (DimS > 2) {
-    if (false) {
+    const int dim{this->nb_fourier_grid_pts.get_dim()};
+
+    // Determine process mesh for pencil decomposition.
+    if (dim > 2) {
       dim_y = static_cast<int>(sqrt(size));
       while ((size / dim_y) * dim_y != size)
         dim_y--;
       dim_x = size / dim_y;
     }
 
-    // TODO(pastewka): Enable this to enable 2d process mesh. This does not pass
-    // tests.  if (DimS > 2) {
-    if (false) {
+    if (dim > 2) {
       if (pfft_create_procmesh_2d(this->comm.get_mpi_comm(), dim_x, dim_y,
                                   &this->mpi_comm)) {
-        throw RuntimeError("Failed to create 2d PFFT process mesh.");
+        throw FFTEngineError("Failed to create 2d PFFT process mesh.");
       }
     }
 
-    std::array<ptrdiff_t, DimS> narr;
-    for (Dim_t i = 0; i < DimS; ++i) {
-      narr[i] = this->nb_domain_grid_pts[DimS - 1 - i];
+    std::vector<ptrdiff_t> narr(dim);
+    for (Dim_t i = 0; i < dim; ++i) {
+      narr[i] = this->nb_domain_grid_pts[dim - 1 - i];
     }
-    ptrdiff_t res[DimS], loc[DimS], fres[DimS], floc[DimS];
-    this->workspace_size = pfft_local_size_many_dft_r2c(
-        DimS, narr.data(), narr.data(), narr.data(), this->nb_dof_per_pixel,
+    const int nb_dof{1};
+    std::vector<ptrdiff_t> res(dim), loc(dim), fres(dim), floc(dim);
+    pfft_local_size_many_dft_r2c(
+        dim, narr.data(), narr.data(), narr.data(), nb_dof,
         PFFT_DEFAULT_BLOCKS, PFFT_DEFAULT_BLOCKS, this->mpi_comm,
-        PFFT_TRANSPOSED_OUT, res, loc, fres, floc);
-    for (Dim_t i = 0; i < DimS; ++i) {
-      this->nb_subdomain_grid_pts[DimS-1-i] = res[i];
-      this->subdomain_locations[DimS-1-i] = loc[i];
-      this->nb_fourier_grid_pts[DimS-1-i] = fres[i];
-      this->fourier_locations[DimS-1-i] = floc[i];
+        PFFT_PADDED_R2C | PFFT_TRANSPOSED_OUT, res.data(), loc.data(),
+        fres.data(), floc.data());
+    for (Dim_t i = 0; i < dim; ++i) {
+      this->nb_subdomain_grid_pts[dim-1-i] = res[i];
+      this->subdomain_locations[dim-1-i] = loc[i];
+      this->nb_fourier_grid_pts[dim-1-i] = fres[i];
+      this->fourier_locations[dim-1-i] = floc[i];
     }
-    // TODO(pastewka): Enable this to enable 2d process mesh. This does not pass
-    // tests.  for (int i = 0; i < DimS-1; ++i) {
-    if (DimS > 1) {
-      std::swap(this->nb_fourier_grid_pts[DimS - 2],
-                this->nb_fourier_grid_pts[DimS - 1]);
-      std::swap(this->fourier_locations[DimS - 2],
-                this->fourier_locations[DimS - 1]);
+
+    // Set the strides for the real domain which is padded.
+    this->subdomain_strides = get_col_major_strides(
+        this->nb_subdomain_grid_pts);
+
+    // Set the strides for the Fourier domain (which is not padded but
+    // transposed). Since we are omitting the last transpose, these strides
+    // reflect that the grid in the Fourier domain is transposed. This
+    // transpose operation is transparently handled by the Pixels class, which
+    // iterates consecutively of grid locations but returns the proper
+    // (transposed or untransposed) coordinates.
+    if (dim > 1) {
+      // cumulative strides over first dimensions
+      this->fourier_strides[dim - 1] = 1;
+      this->fourier_strides[0] = this->nb_fourier_grid_pts[dim - 1];
+      for (Dim_t i = 1; i < dim - 1; ++i) {
+        this->fourier_strides[i] = this->fourier_strides[i - 1] *
+                                   this->nb_fourier_grid_pts[i - 1];
+      }
     }
+
+    // pfft_local_size_many_dft_r2c returns the *padded* size, not the real size
+    this->nb_subdomain_grid_pts[0] = this->nb_domain_grid_pts[0];
 
     for (auto & n : this->nb_subdomain_grid_pts) {
       if (n == 0) {
-        throw RuntimeError("PFFT planning returned zero grid points. "
-                                 "You may need to run on fewer processes.");
+        this->active = false;
       }
     }
     for (auto & n : this->nb_fourier_grid_pts) {
       if (n == 0) {
-        throw RuntimeError("PFFT planning returned zero Fourier "
-                                 "grid_points. You may need to run on fewer "
-                                 "processes.");
+        this->active = false;
       }
     }
+    this->real_field_collection.initialise(
+        this->nb_domain_grid_pts, this->nb_subdomain_grid_pts,
+        this->subdomain_locations, this->subdomain_strides);
+    this->fourier_field_collection.initialise(
+        this->nb_domain_grid_pts, this->nb_fourier_grid_pts,
+        this->fourier_locations, this->fourier_strides);
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
-  void PFFTEngine<DimS>::initialise(FFT_PlanFlags plan_flags) {
-    if (this->initialised) {
-      throw RuntimeError("double initialisation, will leak memory");
+  void PFFTEngine::create_plan(const Index_t & nb_dof_per_pixel) {
+    if (this->has_plan_for(nb_dof_per_pixel)) {
+      // plan already exists, we can bail
+      return;
     }
 
-    /*
-     * Initialize parent after the local number of grid points in each direction
-     * have been determined and work space has been initialized
-     */
-    Parent::initialise(plan_flags);
+    const int dim{this->nb_fourier_grid_pts.get_dim()};
 
-    this->real_workspace = pfft_alloc_real(2 * this->workspace_size);
-    /*
-     * We need to check whether the workspace provided by our field is large
-     * enough. PFFT may request a workspace size larger than the nominal size of
-     * the complex buffer.
-     */
-    if (static_cast<int>(this->work.size() * this->nb_dof_per_pixel) <
-        this->workspace_size) {
-      this->work.set_pad_size(this->workspace_size -
-                              this->nb_dof_per_pixel * this->work.size());
+    // Reverse the order of the array dimensions, because FFTW expects a
+    // row-major array and the arrays used in muSpectre are column-major
+    std::vector<ptrdiff_t> narr(dim);
+    for (Dim_t i = 0; i < dim; ++i) {
+      narr[i] = this->nb_domain_grid_pts[dim - 1 - i];
     }
+    int howmany{static_cast<int>(nb_dof_per_pixel)};
+    std::vector<ptrdiff_t> res(dim), loc(dim), fres(dim), floc(dim);
+    auto required_workspace_size{pfft_local_size_many_dft_r2c(
+        dim, narr.data(), narr.data(), narr.data(), howmany,
+        PFFT_DEFAULT_BLOCKS, PFFT_DEFAULT_BLOCKS, this->mpi_comm,
+        PFFT_PADDED_R2C | PFFT_TRANSPOSED_OUT, res.data(), loc.data(),
+        fres.data(), floc.data())};
+
+    required_workspace_size *= 2;
+
+    this->required_workspace_sizes[nb_dof_per_pixel] = required_workspace_size;
 
     unsigned int flags;
     switch (plan_flags) {
@@ -160,46 +176,42 @@ namespace muFFT {
       break;
     }
     default:
-      throw RuntimeError("unknown planner flag type");
+      throw FFTEngineError("unknown planner flag type");
       break;
     }
 
-    std::array<ptrdiff_t, DimS> narr;
-    for (Dim_t i = 0; i < DimS; ++i) {
-      narr[i] = this->nb_domain_grid_pts[DimS - 1 - i];
-    }
-    Real * in{this->real_workspace};
-    pfft_complex * out{reinterpret_cast<pfft_complex *>(this->work.data())};
-    this->plan_fft = pfft_plan_many_dft_r2c(
-        DimS, narr.data(), narr.data(), narr.data(), this->nb_dof_per_pixel,
+    Real * in{pfft_alloc_real(required_workspace_size)};
+    pfft_complex * out{pfft_alloc_complex(required_workspace_size / 2)};
+
+    this->fft_plans[nb_dof_per_pixel] = pfft_plan_many_dft_r2c(
+        dim, narr.data(), narr.data(), narr.data(), howmany,
         PFFT_DEFAULT_BLOCKS, PFFT_DEFAULT_BLOCKS, in, out, this->mpi_comm,
-        PFFT_FORWARD, PFFT_TRANSPOSED_OUT | flags);
-    if (this->plan_fft == nullptr) {
-      throw RuntimeError("r2c plan failed");
+        PFFT_FORWARD, PFFT_PADDED_R2C | PFFT_TRANSPOSED_OUT | flags);
+    if (this->fft_plans[nb_dof_per_pixel] == nullptr) {
+      throw FFTEngineError("r2c plan failed");
     }
 
-    pfft_complex * i_in{reinterpret_cast<pfft_complex *>(this->work.data())};
-    Real * i_out{this->real_workspace};
+    pfft_complex * i_in{out};
+    Real * i_out{in};
 
-    this->plan_ifft = pfft_plan_many_dft_c2r(
-        DimS, narr.data(), narr.data(), narr.data(), this->nb_dof_per_pixel,
+    this->ifft_plans[nb_dof_per_pixel] = pfft_plan_many_dft_c2r(
+        dim, narr.data(), narr.data(), narr.data(), howmany,
         PFFT_DEFAULT_BLOCKS, PFFT_DEFAULT_BLOCKS, i_in, i_out, this->mpi_comm,
-        PFFT_BACKWARD, PFFT_TRANSPOSED_IN | flags);
-    if (this->plan_ifft == nullptr) {
-      throw RuntimeError("c2r plan failed");
+        PFFT_BACKWARD, PFFT_PADDED_R2C | PFFT_TRANSPOSED_IN | flags);
+    if (this->ifft_plans[nb_dof_per_pixel] == nullptr) {
+      throw FFTEngineError("c2r plan failed");
     }
-    this->initialised = true;
+    this->planned_nb_dofs.insert(nb_dof_per_pixel);
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
-  PFFTEngine<DimS>::~PFFTEngine<DimS>() noexcept {
-    if (this->real_workspace != nullptr)
-      pfft_free(this->real_workspace);
-    if (this->plan_fft != nullptr)
-      pfft_destroy_plan(this->plan_fft);
-    if (this->plan_ifft != nullptr)
-      pfft_destroy_plan(this->plan_ifft);
+  PFFTEngine::~PFFTEngine() noexcept {
+    for (auto && nb_dof_per_pixel : this->planned_nb_dofs) {
+      if (this->fft_plans[nb_dof_per_pixel] != nullptr)
+        pfft_destroy_plan(this->fft_plans[nb_dof_per_pixel]);
+      if (this->ifft_plans[nb_dof_per_pixel] != nullptr)
+        pfft_destroy_plan(this->ifft_plans[nb_dof_per_pixel]);
+    }
     if (this->mpi_comm != this->comm.get_mpi_comm()) {
       MPI_Comm_free(&this->mpi_comm);
     }
@@ -210,55 +222,136 @@ namespace muFFT {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
-  typename PFFTEngine<DimS>::Workspace_t &
-  PFFTEngine<DimS>::fft(Field_t & field) {
-    if (!this->plan_fft) {
-      throw RuntimeError("fft plan not allocated");
-    }
-    if (field.size() !=
-        muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)) {
-      std::stringstream error;
-      error << "The size of the field passed to the forward FFT is "
-            << field.size() << " and does not match the size "
-            << muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)
-            << " of the (sub)domain handled by PFFTEngine.";
-      throw RuntimeError(error.str());
-    }
-    // Copy field data to workspace buffer. This is necessary because workspace
-    // buffer is larger than field buffer.
-    std::copy(field.data(),
-              field.data() + this->nb_dof_per_pixel * field.size(),
-              this->real_workspace);
-    pfft_execute_dft_r2c(this->plan_fft, this->real_workspace,
-                         reinterpret_cast<pfft_complex *>(this->work.data()));
-    return this->work;
+  void PFFTEngine::compute_fft(const RealField_t & input_field,
+                               FourierField_t & output_field) const {
+    // Compute FFT
+    pfft_execute_dft_r2c(
+        this->fft_plans.at(input_field.get_nb_dof_per_pixel()),
+        input_field.data(),
+        reinterpret_cast<pfft_complex *>(output_field.data()));
   }
 
   /* ---------------------------------------------------------------------- */
-  template <Dim_t DimS>
-  void PFFTEngine<DimS>::ifft(Field_t & field) const {
-    if (!this->plan_ifft) {
-      throw RuntimeError("ifft plan not allocated");
-    }
-    if (field.size() !=
-        muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)) {
-      std::stringstream error;
-      error << "The size of the field passed to the inverse FFT is "
-            << field.size() << " and does not match the size "
-            << muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)
-            << " of the (sub)domain handled by PFFTEngine.";
-      throw RuntimeError(error.str());
-    }
-    pfft_execute_dft_c2r(this->plan_ifft,
-                         reinterpret_cast<pfft_complex *>(this->work.data()),
-                         this->real_workspace);
-    std::copy(this->real_workspace,
-              this->real_workspace + this->nb_dof_per_pixel * field.size(),
-              field.data());
+  void PFFTEngine::compute_ifft(const FourierField_t & input_field,
+                                   RealField_t & output_field) const {
+    pfft_execute_dft_c2r(
+        this->ifft_plans.at(input_field.get_nb_dof_per_pixel()),
+        reinterpret_cast<pfft_complex *>(input_field.data()),
+        output_field.data());
   }
 
-  template class PFFTEngine<oneD>;
-  template class PFFTEngine<twoD>;
-  template class PFFTEngine<threeD>;
+  /* ---------------------------------------------------------------------- */
+  std::unique_ptr<FFTEngineBase> PFFTEngine::clone() const {
+    return std::make_unique<PFFTEngine>(
+        this->get_nb_domain_grid_pts(), this->get_communicator(),
+        this->plan_flags, this->allow_temporary_buffer,
+        this->allow_destroy_input);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  auto
+  PFFTEngine::register_real_space_field(const std::string & unique_name,
+                                           const Index_t & nb_dof_per_pixel)
+  -> RealField_t & {
+    this->create_plan(nb_dof_per_pixel);
+    auto & field{
+        Parent::register_real_space_field(unique_name, nb_dof_per_pixel)};
+    /*
+     * We need to check whether the fourier field provided is large
+     * enough. MPI parallel FFTW may request a workspace size larger than the
+     * nominal size of the complex buffer.
+     */
+    auto && required_workspace_size{
+        2 * this->required_workspace_sizes.at(nb_dof_per_pixel)};
+    field.set_pad_size(required_workspace_size -
+                       nb_dof_per_pixel * field.get_nb_buffer_pixels());
+    return field;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  auto PFFTEngine::register_real_space_field(const std::string & unique_name,
+                                                const Shape_t & shape)
+  -> RealField_t & {
+    auto & field{Parent::register_real_space_field(unique_name, shape)};
+    /*
+     * We need to check whether the fourier field provided is large
+     * enough. MPI parallel FFTW may request a workspace size larger than the
+     * nominal size of the complex buffer.
+     */
+    auto nb_dof_per_pixel{std::accumulate(shape.begin(), shape.end(), 1,
+                                          std::multiplies<Index_t>())};
+    auto && required_workspace_size{
+        2 * this->required_workspace_sizes.at(nb_dof_per_pixel)};
+    field.set_pad_size(required_workspace_size -
+                       nb_dof_per_pixel * field.get_nb_buffer_pixels());
+    return field;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  muGrid::ComplexField & PFFTEngine::register_fourier_space_field(
+      const std::string & unique_name, const Index_t & nb_dof_per_pixel) {
+    auto & field{
+        Parent::register_fourier_space_field(unique_name, nb_dof_per_pixel)};
+    /*
+     * We need to check whether the fourier field provided is large
+     * enough. MPI parallel FFTW may request a workspace size larger than the
+     * nominal size of the complex buffer.
+     */
+    auto && required_workspace_size{
+        this->required_workspace_sizes.at(nb_dof_per_pixel)};
+    if (static_cast<int>(field.get_nb_entries() * nb_dof_per_pixel) <
+        required_workspace_size) {
+      auto pad_size{required_workspace_size -
+                    nb_dof_per_pixel * field.get_nb_buffer_pixels()};
+      field.set_pad_size(std::max(0L, pad_size));
+    }
+    return field;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  muGrid::ComplexField &
+  PFFTEngine::register_fourier_space_field(const std::string & unique_name,
+                                              const Shape_t & shape) {
+    auto & field{Parent::register_fourier_space_field(unique_name, shape)};
+    /*
+     * We need to check whether the fourier field provided is large
+     * enough. MPI parallel FFTW may request a workspace size larger than the
+     * nominal size of the complex buffer.
+     */
+    auto nb_dof_per_pixel{std::accumulate(shape.begin(), shape.end(), 1,
+                                          std::multiplies<Index_t>())};
+    auto && required_workspace_size{
+        this->required_workspace_sizes.at(nb_dof_per_pixel)};
+    if (static_cast<int>(field.get_nb_entries() * nb_dof_per_pixel) <
+        required_workspace_size) {
+      auto pad_size{required_workspace_size -
+                    nb_dof_per_pixel * field.get_nb_buffer_pixels()};
+      field.set_pad_size(std::max(0L, pad_size));
+    }
+    return field;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  bool PFFTEngine::check_real_space_field(const RealField_t & field) const {
+    auto nb_dof_per_pixel{field.get_nb_dof_per_pixel()};
+    auto && required_workspace_size{
+        2 * this->required_workspace_sizes.at(nb_dof_per_pixel)};
+    auto required_pad_size{required_workspace_size -
+                           nb_dof_per_pixel * field.get_nb_buffer_pixels()};
+    return Parent::check_real_space_field(field) and
+           static_cast<Index_t>(field.get_pad_size()) >= required_pad_size;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  bool
+  PFFTEngine::check_fourier_space_field(const FourierField_t & field) const {
+    auto nb_dof_per_pixel{field.get_nb_dof_per_pixel()};
+    auto && required_workspace_size{
+        this->required_workspace_sizes.at(nb_dof_per_pixel)};
+    auto required_pad_size{required_workspace_size -
+                           nb_dof_per_pixel * field.get_nb_buffer_pixels()};
+    return Parent::check_fourier_space_field(field) and
+           static_cast<Index_t>(field.get_pad_size()) >= required_pad_size;
+  }
+
 }  // namespace muFFT

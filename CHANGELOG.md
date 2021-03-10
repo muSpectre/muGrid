@@ -9,6 +9,9 @@ Change log for µSpectre
 - muSpectre: Projection classes now have an `integrate` method that
   reconstructs the node positions
 - muSpectre: Added `linear_finite_elements` to stencil database
+- muSpectre: Enabled even number of grid points for discrete stencils
+- muFFT: PFFT engine works with pencil decomposition
+- all: Fixed installation via CMake and `make install`
 
 0.14.0 (04Feb21)
 ----------------

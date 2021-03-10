@@ -315,7 +315,7 @@ namespace muSpectre {
 
     Index_t pix0{0};
     Real error{0.0};
-    Real tol{1e-9};
+    Real tol{2e-9};
 
     using traits = MaterialMuSpectre_traits<typename Fix::Material_t>;
 

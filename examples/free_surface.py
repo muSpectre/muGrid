@@ -77,7 +77,7 @@ parser.add_option('-f', '--to-file',
 parser.add_option('-g', '--nb-grid-pts',
                   action='store', dest='nb_grid_pts',
                   help='number of grid points',
-                  default='3,3,3')
+                  default='4,4,4')
 
 options, args = parser.parse_args()
 
@@ -142,7 +142,7 @@ for i in range(options.nb_steps):
         equil_tol=equil_tol,
         IsStrainInitialised=msp.solvers.IsStrainInitialised.No \
             if i == 0 else msp.solvers.IsStrainInitialised.Yes,
-        verbose=msp.Verbosity.Full)
+        verbose=msp.Verbosity.Detailed)
 
 if options.filename is not None:
     msp.linear_finite_elements.write_3d(options.filename, rve)

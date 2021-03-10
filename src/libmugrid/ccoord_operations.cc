@@ -69,15 +69,6 @@ namespace muGrid {
     }
 
     //-----------------------------------------------------------------------//
-    Real compute_volume(const DynRcoord_t & lenghts) {
-      Real vol{1.0};
-      for (auto && length : lenghts) {
-        vol *= length;
-      }
-      return vol;
-    }
-
-    //-----------------------------------------------------------------------//
     Real compute_pixel_volume(const DynCcoord_t & nb_grid_pts,
                               const DynRcoord_t & lenghts) {
       Real vol{1.0};

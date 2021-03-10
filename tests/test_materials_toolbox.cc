@@ -456,8 +456,8 @@ namespace muSpectre {
   template <Index_t Dim>
   struct DimFixture {
     constexpr static Index_t Mdim{Dim};
-    constexpr static Real Young{210e9};
-    constexpr static Real Poisson{.33};
+    const Real Young{210e9};
+    const Real Poisson{.33};
     using T2_t = Eigen::Matrix<Real, Dim, Dim>;
     DimFixture() : E_holder{std::make_unique<T2_t>(E_maker())}, E{*E_holder} {}
     T2_t E_maker() {

@@ -34,16 +34,19 @@
 # Program grant you additional permission to convey the resulting work.
 # =============================================================================
 
-# FIXME! The user should have a choice to configure this path.
-execute_process(COMMAND "${PYTHON_EXECUTABLE}" "-m" "site" "--user-site"
-  RESULT_VARIABLE _PYTHON_SUCCESS
-  OUTPUT_VARIABLE PYTHON_USER_SITE
-  ERROR_VARIABLE _PYTHON_ERROR_VALUE)
+# Find install location
+# The `replace` statement circumvents a bug in recent Ubuntu variants
+execute_process(COMMAND "${PYTHON_EXECUTABLE}" "-c"
+        "import sys ; import distutils.sysconfig ; print(distutils.sysconfig.get_python_lib(prefix='${CMAKE_INSTALL_PREFIX}').replace('/python3/', '/python{}.{}/'.format(sys.version_info.major, sys.version_info.minor)))"
+        RESULT_VARIABLE _PYTHON_SUCCESS
+        OUTPUT_VARIABLE PYTHON_USER_SITE
+        ERROR_VARIABLE _PYTHON_ERROR_VALUE)
 if(_PYTHON_SUCCESS GREATER 2)
   message(FATAL_ERROR
           "Python config failure:\n${_PYTHON_ERROR_VALUE}")
 endif()
 string(REGEX REPLACE "\n" "" PYTHON_USER_SITE ${PYTHON_USER_SITE})
+message("-- Installing muFFT Python modules to: ${PYTHON_USER_SITE}")
 
 set (PY_BINDING_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_module.cc
@@ -76,12 +79,16 @@ target_include_directories(pyMuFFTLib PUBLIC ${PYTHON_INCLUDE_DIRS})
 
 add_custom_target(pyMuFFT ALL SOURCES
   muFFT/__init__.py
-  muFFT/NetCDF.py)
+  muFFT/NetCDF.py
+  muFFT/Stencils1D.py
+  muFFT/Stencils2D.py
+  muFFT/Stencils3D.py)
 add_custom_command(TARGET pyMuFFT POST_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_directory
                    ${CMAKE_CURRENT_SOURCE_DIR}/muFFT
                    $<TARGET_FILE_DIR:pyMuFFTLib>/muFFT)
 
 install(TARGETS pyMuFFTLib LIBRARY DESTINATION ${PYTHON_USER_SITE})
-install(FILES muFFT/__init__.py muFFT/Communicator.py muFFT/NetCDF.py
+install(FILES muFFT/__init__.py muFFT/NetCDF.py muFFT/Stencils1D.py
+  muFFT/Stencils2D.py muFFT/Stencils3D.py
   DESTINATION ${PYTHON_USER_SITE}/muFFT)

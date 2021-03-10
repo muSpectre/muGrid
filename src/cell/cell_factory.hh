@@ -51,6 +51,8 @@
 
 #include <memory>
 
+using muGrid::RuntimeError;
+
 namespace muSpectre {
 
   namespace internal {
@@ -72,7 +74,7 @@ namespace muSpectre {
         error << "There are " << gradient.size() << " derivative operators in "
               << "the gradient. This number must be divisible by the system "
               << "dimension " << dim << ".";
-        throw std::runtime_error(error.str());
+        throw RuntimeError(error.str());
       }
       // Deduce number of quad points from the gradient
       const auto nb_quad_pts{gradient.size() / dim};
@@ -98,10 +100,9 @@ namespace muSpectre {
         } else {
           std::stringstream error;
           error << nb_quad_pts << " quadrature points are presently "
-                << "unsupported.";
-          throw std::runtime_error(error.str());
+                << "unsupported for finite strain calculations.";
+          throw RuntimeError(error.str());
         }
-        break;
       }
       case Formulation::small_strain: {
         if (nb_quad_pts == OneQuadPt) {
@@ -120,14 +121,19 @@ namespace muSpectre {
           using Projection = ProjectionSmallStrain<DimS, SixQuadPts>;
           return std::make_unique<Projection>(std::move(fft_ptr), lengths,
                                               gradient);
+        } else {
+          std::stringstream error;
+          error << nb_quad_pts << " quadrature points are presently "
+                << "unsupported for small strain calculations.";
+          throw RuntimeError(error.str());
         }
-        break;
       }
       default: {
-        throw std::runtime_error("Unknown formulation.");
+        throw RuntimeError("Unknown formulation.");
         break;
       }
       }
+      throw RuntimeError("Internal error: At end of cell_input_helper");
       return nullptr;  // required by g++5.4 in debug mode only
     }
 
@@ -157,7 +163,7 @@ namespace muSpectre {
       std::stringstream error{};
       error << "Dimension mismatch between nb_grid_pts (dim = " << dim
             << ") and lengths (dim = " << lengths.get_dim() << ").";
-      throw std::runtime_error(error.str());
+      throw RuntimeError(error.str());
     }
     switch (dim) {
     case oneD: {
@@ -176,9 +182,10 @@ namespace muSpectre {
       break;
     }
     default:
-      throw std::runtime_error("Unknown dimension.");
+      throw RuntimeError("Unknown dimension.");
       break;
     }
+    throw RuntimeError("Internal error: At end of cell_input");
   }
 
   /**
@@ -223,10 +230,9 @@ namespace muSpectre {
       muFFT::Gradient_t gradient,
       const muFFT::Communicator & comm = muFFT::Communicator(),
       const muFFT::FFT_PlanFlags & flags = muFFT::FFT_PlanFlags::estimate) {
-    auto && input = cell_input<FFTEngine>(nb_grid_pts, lengths, form, gradient,
-                                          comm, flags);
-    auto cell{std::make_shared<Cell_t>(std::move(input))};
-    return cell;
+    return std::make_shared<Cell_t>(
+        cell_input<FFTEngine>(nb_grid_pts, lengths, form, gradient, comm,
+                              flags));
   }
 
   /**

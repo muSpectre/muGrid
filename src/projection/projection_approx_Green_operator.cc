@@ -51,12 +51,6 @@ namespace muSpectre {
       : Parent{std::move(engine), lengths, gradient, Formulation::small_strain},
         C_ref_holder{std::make_unique<C_t>(C_ref_)}, C_ref{
                                                          *this->C_ref_holder} {
-    for (auto res : this->fft_engine->get_nb_domain_grid_pts()) {
-      if (res % 2 == 0) {
-        throw ProjectionError(
-            "Only an odd number of gridpoints in each direction is supported");
-      }
-    }
     if (C_ref_.rows() != DimS * DimS) {
       throw ProjectionError("Wrong size C_ref_");
     }

@@ -215,6 +215,16 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T, Mapping Mutability>
+  auto FieldMap<T, Mutability>::sum() const -> PlainType {
+    PlainType sum{PlainType::Zero(this->nb_rows, this->nb_cols)};
+    for (auto && val : *this) {
+      sum += val;
+    }
+    return sum;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T, Mapping Mutability>
   auto FieldMap<T, Mutability>::mean() const -> PlainType {
     PlainType mean{PlainType::Zero(this->nb_rows, this->nb_cols)};
     for (auto && val : *this) {

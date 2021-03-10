@@ -65,7 +65,7 @@ namespace muFFT {
     // Reverse the order of the array dimensions, because FFTW expects a
     // row-major array and the arrays used in muSpectre are column-major
     const int nb_dof{1};
-    ptrdiff_t res0{}, loc0{}, res1{}, loc1{};
+    ptrdiff_t res0{0}, loc0{0}, res1{0}, loc1{0};
     fftw_mpi_local_size_many_transposed(
         dim, this->nb_fourier_non_transposed.data(), nb_dof,
         FFTW_MPI_DEFAULT_BLOCK, FFTW_MPI_DEFAULT_BLOCK,
@@ -133,10 +133,6 @@ namespace muFFT {
 
     const int dim{this->nb_fourier_grid_pts.get_dim()};
 
-    if (not this->is_active()) {
-      return;
-    }
-
     int howmany{static_cast<int>(nb_dof_per_pixel)};
     ptrdiff_t res0{}, loc0{}, res1{}, loc1{};
     // find how large a workspace this transform needs
@@ -168,7 +164,7 @@ namespace muFFT {
       break;
     }
     default:
-      throw RuntimeError("unknown planner flag type");
+      throw FFTEngineError("unknown planner flag type");
       break;
     }
 
@@ -200,7 +196,7 @@ namespace muFFT {
                 << "nb_subdomain_grid_pts = "
                 << this->get_nb_subdomain_grid_pts()
                 << ", nb_domain_grid_pts = " << this->get_nb_domain_grid_pts();
-        throw RuntimeError{message.str()};
+        throw FFTEngineError{message.str()};
       }
     }
 
@@ -253,10 +249,6 @@ namespace muFFT {
   /* ---------------------------------------------------------------------- */
   void FFTWMPIEngine::compute_ifft(const FourierField_t & input_field,
                                    RealField_t & output_field) const {
-    if (not this->is_active()) {
-      return;
-    }
-
     fftw_mpi_execute_dft_c2r(
         this->ifft_plans.at(input_field.get_nb_dof_per_pixel()),
         reinterpret_cast<fftw_complex *>(input_field.data()),

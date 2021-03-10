@@ -55,6 +55,33 @@ namespace muSpectre {
       throw std::runtime_error("Number of quadrature points must be larger "
                                "than zero.");
     }
+    auto nb_dim{this->get_dim()};
+    for (auto tup : akantu::enumerate(
+        this->fft_engine->get_nb_domain_grid_pts())) {
+      auto & dim{std::get<0>(tup)};
+      auto & res{std::get<1>(tup)};
+      if (res % 2 == 0) {
+        for (Dim_t quad{0}; quad < nb_quad_pts; ++quad) {
+          Eigen::VectorXd v(nb_dim);
+          v.setZero();
+          v(dim) = 0.5;
+          // Get Fourier derivative at both boundaries of the Brillouin zone
+          auto p{this->gradient[dim + quad * nb_dim]->fourier(v)};
+          auto m{this->gradient[dim + quad * nb_dim]->fourier(-v)};
+          // This test checks if the Fourier derivative at the Brillouin zon
+          // boundary is zero (e.g. for central difference) or if the Fourier
+          // derivative at left and right boundary are not the same (e.g. for
+          // the Fourier derivative). In both cases, the derivative is
+          // ambiguous and the calculation cannot continue. The division by res
+          // simply adjusts the threshold for what it means to be zero.
+          if (std::abs(p) < 1e-6/res or std::abs(p-m) > 1e-6/res) {
+            throw ProjectionError(
+                "Only an odd number of grid points is supported by this "
+                "stencil");
+          }
+        }
+      }
+    }
     this->fft_engine->get_fourier_field_collection().set_nb_sub_pts(
         QuadPtTag, nb_quad_pts);
     if (this->domain_lengths.get_dim() != this->fft_engine->get_spatial_dim()) {

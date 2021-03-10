@@ -486,9 +486,29 @@ namespace muGrid {
                     const DynCcoord_t & locations, const DynCcoord_t & ccoord);
 
     //-----------------------------------------------------------------------//
-    //! these functions can be used whenever it is necessary to calcluate the
-    //! volume of a cell or each pixle of the cell
-    Real compute_volume(const DynRcoord_t & lenghts);
+    //! these functions can be used whenever it is necessary to calculate the
+    //! volume of a cell or each pixels of the cell
+    template <size_t MaxDim, typename T>
+    T compute_volume(const DynCcoord<MaxDim, T> & lengths) {
+      T vol{};
+      vol++;
+      for (auto && length : lengths) {
+        vol *= length;
+      }
+      return vol;
+    }
+
+    //! these functions can be used whenever it is necessary to calculate the
+    //! volume of a cell or each pixels of the cell
+    template <typename T>
+    T compute_volume(const std::vector<T> & lengths) {
+      T vol{};
+      vol++;
+      for (auto && length : lengths) {
+        vol *= length;
+      }
+      return vol;
+    }
 
     Real compute_pixel_volume(const DynCcoord_t & nb_grid_pts,
                               const DynRcoord_t & lenghts);
@@ -498,6 +518,9 @@ namespace muGrid {
     bool is_buffer_contiguous(const T & nb_grid_pts, const T & strides) {
       Index_t dim{static_cast<Index_t>(nb_grid_pts.size())};
       if (dim == 0) {
+        return true;
+      }
+      if (compute_volume(nb_grid_pts) == 0) {
         return true;
       }
       if (static_cast<Index_t>(strides.size()) != dim) {

@@ -114,14 +114,18 @@ set_property(TARGET muSpectre APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES
 add_library(${MUSPECTRE_NAMESPACE}muSpectre ALIAS muSpectre)
 
 # ------------------------------------------------------------------------------
-# if(NOT MUSPECTRE_TARGETS_EXPORT)
-#   set(MUSPECTRE_TARGETS_EXPORT muSpectreTargets)
-# endif()
+if(NOT MUSPECTRE_TARGETS_EXPORT)
+  set(MUSPECTRE_TARGETS_EXPORT muSpectreTargets eigen3)
+endif()
 
-# install(TARGETS muSpectre
-#   EXPORT ${MUSPECTRE_TARGETS_EXPORT}
-#   LIBRARY DESTINATION lib
-#   PUBLIC_HEADER DESTINATION include/libmuspectre)
+install(TARGETS muSpectre
+  EXPORT ${MUSPECTRE_TARGETS_EXPORT}
+  ARCHIVE
+    DESTINATION lib
+  LIBRARY
+    DESTINATION lib
+  PUBLIC_HEADER
+    DESTINATION include/libmuspectre)
 
 # if("${MUSPECTRE_TARGETS_EXPORT}" STREQUAL "muSpectreTargets")
 #   install(EXPORT ${MUSPECTRE_TARGETS_EXPORT}

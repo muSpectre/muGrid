@@ -66,12 +66,6 @@ namespace muSpectre {
             << ") differs from template argument (= " << NbQuadPts << ").";
       throw ProjectionError(error.str());
     }
-    for (auto res : this->fft_engine->get_nb_domain_grid_pts()) {
-      if (res % 2 == 0) {
-        throw ProjectionError(
-            "Only an odd number of grid points in each direction is supported");
-      }
-    }
   }
 
   /* ---------------------------------------------------------------------- */
@@ -234,7 +228,7 @@ namespace muSpectre {
   template <Index_t DimS, Index_t NbQuadPts>
   std::array<Index_t, 2>
   ProjectionFiniteStrainFast<DimS, NbQuadPts>::get_strain_shape() const {
-    return std::array<Index_t, 2>{DimS, DimS * OneQuadPt};
+    return std::array<Index_t, 2>{DimS, DimS};
   }
 
   template <Index_t DimS, Index_t NbQuadPts>

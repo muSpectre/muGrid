@@ -472,6 +472,6 @@ void add_fft_engines(py::module & mod) {
   add_engine_helper<muFFT::FFTWMPIEngine>(mod, "FFTWMPI");
 #endif
 #ifdef WITH_PFFT
-  add_engine_helper<muFFT::PFFTEngine>(mod, "PFFT", not_col_major);
+  add_engine_helper<muFFT::PFFTEngine>(mod, "PFFT");
 #endif
 }

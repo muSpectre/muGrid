@@ -145,7 +145,7 @@ result = msp.solvers.trust_region_newton_cg(rve, applied_strain, solver,
                                             equil_tol=equil_tol,
                                             dec_tr_tol=dec_tr_tol,
                                             inc_tr_tol=inc_tr_tol,
-                                            verbose=msp.Verbosity.Full)
+                                            verbose=msp.Verbosity.Detailed)
 
 ###
 

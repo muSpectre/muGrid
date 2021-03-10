@@ -73,6 +73,7 @@ from python_eigen_strain_solver_test import EigenStrainSolverCheck
 from python_solver_test import SolverCheck
 from python_solverclass_test import SolverClassCheck
 
+from python_linear_fe_test import *
 
 if __name__ == '__main__':
     unittest.main()

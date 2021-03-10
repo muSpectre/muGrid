@@ -80,8 +80,9 @@ namespace muFFT {
     if (not this->has_plan_for(nb_dof_per_pixel)) {
       std::stringstream message{};
       message << "No plan has been created for " << nb_dof_per_pixel
-              << " degrees of freedom per pixel. Use "
-                 "`muFFT::FFTEngineBase::create_plan` to prepare a plan.";
+              << " degrees of freedom per pixel on MPI rank "
+              << this->comm.rank() << ". Use muFFT::FFTEngineBase::create_plan`"
+              << " to prepare a plan.";
       throw FFTEngineError{message.str()};
     }
 
@@ -191,8 +192,9 @@ namespace muFFT {
     if (not this->has_plan_for(nb_dof_per_pixel)) {
       std::stringstream message{};
       message << "No plan has been created for " << nb_dof_per_pixel
-              << " degrees of freedom per pixel. Use "
-                 "`muFFT::FFTEngineBase::create_plan` to prepare a plan.";
+              << " degrees of freedom per pixel on MPI rank "
+              << this->comm.rank() << ". Use muFFT::FFTEngineBase::create_plan`"
+              << " to prepare a plan.";
       throw FFTEngineError{message.str()};
     }
 
@@ -302,8 +304,9 @@ namespace muFFT {
     if (not this->has_plan_for(nb_dof_per_pixel)) {
       std::stringstream message{};
       message << "No plan has been created for " << nb_dof_per_pixel
-              << " degrees of freedom per pixel. Use "
-                 "`muFFT::FFTEngineBase::create_plan` to prepare a plan.";
+              << " degrees of freedom per pixel on MPI rank "
+              << this->comm.rank() << ". Use muFFT::FFTEngineBase::create_plan`"
+              << " to prepare a plan.";
       throw FFTEngineError{message.str()};
     }
 
@@ -413,8 +416,9 @@ namespace muFFT {
     if (not this->has_plan_for(nb_dof_per_pixel)) {
       std::stringstream message{};
       message << "No plan has been created for " << nb_dof_per_pixel
-              << " degrees of freedom per pixel. Use "
-                 "`muFFT::FFTEngineBase::create_plan` to prepare a plan.";
+              << " degrees of freedom per pixel on MPI rank "
+              << this->comm.rank() << ". Use muFFT::FFTEngineBase::create_plan`"
+              << " to prepare a plan.";
       throw FFTEngineError{message.str()};
     }
 

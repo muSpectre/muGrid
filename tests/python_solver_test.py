@@ -41,20 +41,28 @@ from python_test_imports import µ
 
 class SolverCheck(unittest.TestCase):
     def setUp(self):
-        self.nb_grid_pts = [3, 3]  # [5,7]
+        self.nb_grid_pts = [5, 7]  # [5,7]
         self.lengths = [3., 3.]  # [5.2, 8.3]
         self.formulation = µ.Formulation.finite_strain
-        self.cell = µ.Cell(self.nb_grid_pts,
-                           self.lengths,
-                           self.formulation)
+        try:
+            from mpi4py import MPI
+            self.cell = µ.Cell(self.nb_grid_pts,
+                               self.lengths,
+                               self.formulation,
+                               fft='mpi',
+                               communicator=MPI.COMM_WORLD)
+        except ImportError:
+            self.cell = µ.Cell(self.nb_grid_pts,
+                               self.lengths,
+                               self.formulation)
         self.hard = µ.material.MaterialLinearElastic1_2d.make(
             self.cell, "hard", 210e9, .33)
         self.soft = µ.material.MaterialLinearElastic1_2d.make(
             self.cell, "soft",  70e9, .33)
 
     def test_solve(self):
-        for pix_id in self.cell.pixel_indices:
-            if pix_id < 3:
+        for pix_id, (pix_x, pix_y) in enumerate(self.cell.pixels):
+            if pix_y < 3:
                 self.hard.add_pixel(pix_id)
             else:
                 self.soft.add_pixel(pix_id)
@@ -71,9 +79,17 @@ class SolverCheck(unittest.TestCase):
         P, K = self.cell.evaluate_stress_tangent(self.cell.strain)
 
         solver = µ.solvers.KrylovSolverCG(self.cell, cg_tol, maxiter, verbose)
-        r = µ.solvers.de_geus(self.cell, Del0, solver,
-                              newton_tol, equil_tol, verbose)
-        # print(r)
+
+        for n in range(2):
+            µ.solvers.newton_cg(
+                self.cell, Del0, solver, newton_tol, equil_tol, verbose,
+                IsStrainInitialised=μ.solvers.IsStrainInitialised.No
+                if n == 0 else μ.solvers.IsStrainInitialised.Yes)
+
+            mean_strain = self.cell.communicator.sum(
+                np.sum(self.cell.strain.array(), axis=(2, 3, 4))) / \
+                          np.prod(self.cell.nb_domain_grid_pts)
+            self.assertTrue(np.allclose(mean_strain, np.eye(2) + (n+1)*Del0))
 
 
 if __name__ == '__main__':

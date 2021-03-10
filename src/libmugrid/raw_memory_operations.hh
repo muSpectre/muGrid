@@ -136,7 +136,7 @@ namespace muGrid {
                       const T * input_data, T * output_data) {
       if (logical_shape.size() != input_strides.size()) {
         std::stringstream message{};
-        message << "Dimensions mismatch: The shape " << logical_shape
+        message << "Dimension mismatch: The shape " << logical_shape
                 << " is of dimension " << logical_shape.size()
                 << " but the input_strides " << input_strides
                 << " are of dimension " << input_strides.size() << ".";
@@ -144,7 +144,7 @@ namespace muGrid {
       }
       if (logical_shape.size() != output_strides.size()) {
         std::stringstream message{};
-        message << "Dimensions mismatch: The shape " << logical_shape
+        message << "Dimension mismatch: The shape " << logical_shape
                 << " is of dimension " << logical_shape.size()
                 << " but the output_strides " << output_strides
                 << " are of dimension " << output_strides.size() << ".";

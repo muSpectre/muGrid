@@ -34,8 +34,10 @@
 # Program grant you additional permission to convey the resulting work.
 # =============================================================================
 
-# FIXME! The user should have a choice to configure this path.
-execute_process(COMMAND "${PYTHON_EXECUTABLE}" "-m" "site" "--user-site"
+# Find install location
+# The `replace` statement circumvents a bug in recent Ubuntu variants
+execute_process(COMMAND "${PYTHON_EXECUTABLE}" "-c"
+  "import sys ; import distutils.sysconfig ; print(distutils.sysconfig.get_python_lib(prefix='${CMAKE_INSTALL_PREFIX}').replace('/python3/', '/python{}.{}/'.format(sys.version_info.major, sys.version_info.minor)))"
   RESULT_VARIABLE _PYTHON_SUCCESS
   OUTPUT_VARIABLE PYTHON_USER_SITE
   ERROR_VARIABLE _PYTHON_ERROR_VALUE)
@@ -44,6 +46,7 @@ if(_PYTHON_SUCCESS GREATER 2)
           "Python config failure:\n${_PYTHON_ERROR_VALUE}")
 endif()
 string(REGEX REPLACE "\n" "" PYTHON_USER_SITE ${PYTHON_USER_SITE})
+message("-- Installing muGrid Python modules to: ${PYTHON_USER_SITE}")
 
 set (PY_BINDING_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_module.cc
@@ -96,5 +99,5 @@ add_custom_command(TARGET pyMuGrid POST_BUILD
                    $<TARGET_FILE_DIR:pyMuGridLib>/muGrid)
 
 install(TARGETS pyMuGridLib LIBRARY DESTINATION ${PYTHON_USER_SITE})
-install(FILES muGrid/__init__.py
+install(FILES muGrid/__init__.py muGrid/Parallel.py
   DESTINATION ${PYTHON_USER_SITE}/muGrid)

@@ -170,7 +170,8 @@ namespace muSpectre {
         std::cout << "Δ" << strain_symb << " = " << std::endl
                   << load_steps.front() << std::endl;
       }
-      count_width = static_cast<size_t>(std::log10(solver.get_maxiter())) + 1;
+      count_width = std::max(
+          11UL, static_cast<size_t>(std::log10(solver.get_maxiter())) + 1);
     }
 
     Matrix_t default_strain_val{};
@@ -183,8 +184,8 @@ namespace muSpectre {
         cell->set_uniform_strain(default_strain_val);
 
         if (verbose > Verbosity::Silent && comm.rank() == 0) {
-          std::cout << "\nThe strain is initialised by default to the identity "
-                       "matrix!\n"
+          std::cout << "The strain is initialised by default to the identity "
+                       "matrix!"
                     << std::endl;
         }
       }
@@ -208,8 +209,8 @@ namespace muSpectre {
         default_strain_val = Matrix_t::Zero(shape[0], shape[1]);
         cell->set_uniform_strain(default_strain_val);
         if (verbose > Verbosity::Silent && comm.rank() == 0) {
-          std::cout << "\nThe strain is initialised by default to the zero "
-                       "matrix!\n"
+          std::cout << "The strain is initialised by default to the zero "
+                       "matrix!"
                     << std::endl;
         }
       }
@@ -245,7 +246,8 @@ namespace muSpectre {
     // user-specified
     if (strain_init == IsStrainInitialised::True) {
       // storage for the previous mean strain (to compute ΔF or Δε )
-      Matrix_t initial_macro_strain{F_general_map.mean()};
+      Matrix_t initial_macro_strain{
+          comm.sum(F_general_map.sum()) / comm.sum(F_general_map.size())};
       if (verbose > Verbosity::Silent && comm.rank() == 0) {
         std::cout << "The strain was initialised by the user to a value of "
                   << "<" << strain_symb << "> =" << std::endl
@@ -263,7 +265,8 @@ namespace muSpectre {
     for (const auto & tup : akantu::enumerate(load_steps)) {
       const auto & strain_step{std::get<0>(tup)};
       const auto & macro_strain{std::get<1>(tup)};
-      if ((verbose > Verbosity::Silent) and (comm.rank() == 0)) {
+      if ((load_steps.size() > 1) and (verbose > Verbosity::Silent) and
+          (comm.rank() == 0)) {
         std::cout << "at Load step " << std::setw(count_width)
                   << strain_step + 1 << std::endl;
       }
@@ -316,6 +319,13 @@ namespace muSpectre {
         return has_converged;
       }};
 
+      if ((verbose == Verbosity::Detailed) and (comm.rank() == 0)) {
+        std::cout << std::setw(count_width) << "NEWTON-STEP" << std::setw(17)
+                  << "|GP|" << std::setw(21)
+                  << ("|δ" + strain_symb + "|/|Δ" + strain_symb + "|")
+                  << " (tol)" << std::endl;
+      }
+
       // updating the strain fields with the  eigen_strain field calculated by
       // the functor called eigen_strain_func
       if (not(eigen_strain_func == muGrid::nullopt)) {
@@ -367,16 +377,23 @@ namespace muSpectre {
             std::sqrt(comm.sum(general_strain_field.eigen_vec().squaredNorm()));
 
         if ((verbose >= Verbosity::Detailed) and (comm.rank() == 0)) {
-          std::cout << "at Newton step " << std::setw(count_width) << newt_iter
-                    << ", |δ" << strain_symb << "|/|Δ" << strain_symb
-                    << "| = " << std::setw(17) << incr_norm / grad_norm
-                    << ", tol = " << newton_tol << std::endl;
-
-          using StrainMap_t = muGrid::FieldMap<Real, Mapping::Const>;
           if (verbose > Verbosity::Detailed) {
+            std::cout << std::setw(count_width) << "NEWTON-STEP"
+                      << std::setw(17) << "|GP|" << std::setw(21)
+                      << ("|δ" + strain_symb + "|/|Δ" + strain_symb + "|")
+                      << " (tol)" << std::endl;
+          }
+          std::cout << std::setw(count_width) << newt_iter << std::setw(17)
+                    << stress_norm << std::setw(19) << incr_norm / grad_norm
+                    << " (" << newton_tol << ")" << std::endl;
+        }
+        if (verbose > Verbosity::Detailed) {
+          using StrainMap_t = muGrid::FieldMap<Real, Mapping::Const>;
+          StrainMap_t m{eval_strain_field, shape[0]};
+          Matrix_t mean_strain{comm.sum(m.sum()) / comm.sum(m.size())};
+          if (comm.rank() == 0) {
             std::cout << "<" << strain_symb << "> =" << std::endl
-                      << StrainMap_t{eval_strain_field, shape[0]}.mean()
-                      << std::endl;
+                      << mean_strain << std::endl;
           }
         }
 
@@ -700,11 +717,14 @@ namespace muSpectre {
                       << strain_symb << "| = " << std::setw(17)
                       << incr_norm / grad_norm << ", tol = " << newton_tol
                       << std::endl;
-
-            if (verbose > Verbosity::Detailed) {
-              using StrainMap_t = muGrid::FieldMap<Real, Mapping::Const>;
+          }
+          if (verbose > Verbosity::Detailed) {
+            using StrainMap_t = muGrid::FieldMap<Real, Mapping::Const>;
+            StrainMap_t m{F, shape[0]};
+            Matrix_t mean_strain{comm.sum(m.sum()) / comm.sum(m.size())};
+            if (comm.rank() == 0) {
               std::cout << "<" << strain_symb << "> =" << std::endl
-                        << StrainMap_t{F, shape[0]}.mean() << std::endl;
+                        << mean_strain << std::endl;
             }
           }
           full_convergence_test();
@@ -778,11 +798,14 @@ namespace muSpectre {
                       << strain_symb << "| = " << std::setw(17)
                       << incr_norm / grad_norm << ", tol = " << newton_tol
                       << std::endl;
-
+          }
+          if (verbose > Verbosity::Detailed) {
             using StrainMap_t = muGrid::FieldMap<Real, Mapping::Const>;
-            if (verbose > Verbosity::Detailed) {
+            StrainMap_t m{F, shape[0]};
+            Matrix_t mean_strain{comm.sum(m.sum()) / comm.sum(m.size())};
+            if (comm.rank() == 0) {
               std::cout << "<" << strain_symb << "> =" << std::endl
-                        << StrainMap_t{F, shape[0]}.mean() << std::endl;
+                        << mean_strain << std::endl;
             }
           }
           full_convergence_test();
@@ -913,7 +936,8 @@ namespace muSpectre {
       } else {
         std::cout << " = " << std::endl << load_steps.front() << std::endl;
       }
-      count_width = static_cast<size_t>(std::log10(solver.get_maxiter())) + 1;
+      count_width = std::max(
+          11UL, static_cast<size_t>(std::log10(solver.get_maxiter())) + 1);
     }
 
     Matrix_t default_strain_val{};
@@ -926,8 +950,8 @@ namespace muSpectre {
         cell->set_uniform_strain(default_strain_val);
 
         if (verbose > Verbosity::Silent && comm.rank() == 0) {
-          std::cout << "\nThe strain is initialised by default to the identity "
-                       "matrix!\n"
+          std::cout << "The strain is initialised by default to the identity "
+                       "matrix!"
                     << std::endl;
         }
       }
@@ -951,8 +975,8 @@ namespace muSpectre {
         default_strain_val = Matrix_t::Zero(shape[0], shape[1]);
         cell->set_uniform_strain(default_strain_val);
         if (verbose > Verbosity::Silent && comm.rank() == 0) {
-          std::cout << "\nThe strain is initialised by default to the zero "
-                       "matrix!\n"
+          std::cout << "The strain is initialised by default to the zero "
+                       "matrix!"
                     << std::endl;
         }
       }
@@ -988,7 +1012,8 @@ namespace muSpectre {
     // user-specified
     if (strain_init == IsStrainInitialised::True) {
       // storage for the previous mean strain (to compute ΔF or Δε )
-      Matrix_t initial_macro_strain{F_general_map.mean()};
+      Matrix_t initial_macro_strain{
+          comm.sum(F_general_map.sum()) / comm.sum(F_general_map.size())};
       if (verbose > Verbosity::Silent && comm.rank() == 0) {
         std::cout << "The strain was initialised by the user to a value of "
                   << "<" << strain_symb << "> =" << std::endl
@@ -1061,11 +1086,11 @@ namespace muSpectre {
         return has_converged;
       }};
 
-      if ((verbose >= Verbosity::Detailed) and (comm.rank() == 0)) {
-        std::cout << std::setw(count_width) << "STEP" << std::setw(17)
+      if ((verbose == Verbosity::Detailed) and (comm.rank() == 0)) {
+        std::cout << std::setw(count_width) << "NEWTON-STEP" << std::setw(17)
                   << "CG STATUS" << std::setw(17) << "ACTION" << std::setw(17)
                   << "TRUST REGION" << std::setw(17) << "|GP|" << std::setw(17)
-                  << "|GP - (GP)_lin|" << std::setw(19)
+                  << "|GP - (GP)_lin|" << std::setw(21)
                   << ("|δ" + strain_symb + "|/|Δ" + strain_symb + "|")
                   << " (tol)" << std::endl;
       }
@@ -1140,6 +1165,15 @@ namespace muSpectre {
           }
 
           if ((verbose >= Verbosity::Detailed) and (comm.rank() == 0)) {
+            if (verbose > Verbosity::Detailed) {
+              std::cout << std::setw(count_width) << "NEWTON-STEP"
+                        << std::setw(17) << "CG STATUS" << std::setw(17)
+                        << "ACTION" << std::setw(17) << "TRUST REGION"
+                        << std::setw(17) << "|GP|" << std::setw(17)
+                        << "|GP - (GP)_lin|" << std::setw(21)
+                        << ("|δ" + strain_symb + "|/|Δ" + strain_symb + "|")
+                        << " (tol)" << std::endl;
+            }
             std::cout << std::setw(count_width) << (newt_iter - 1)
                       << std::setw(17) << accept_str << std::setw(17)
                       << action_str << std::setw(17) << trust_region
@@ -1147,6 +1181,15 @@ namespace muSpectre {
                       << stress_diff_norm << std::setw(17)
                       << incr_norm / grad_norm << " (" << newton_tol << ")"
                       << std::endl;
+          }
+          if (verbose > Verbosity::Detailed) {
+            using StrainMap_t = muGrid::FieldMap<Real, Mapping::Const>;
+            StrainMap_t m{general_strain_field, shape[0]};
+            Matrix_t mean_strain{comm.sum(m.sum()) / comm.sum(m.size())};
+            if (comm.rank() == 0) {
+              std::cout << "<" << strain_symb << "> =" << std::endl
+                        << mean_strain << std::endl;
+            }
           }
         }
 

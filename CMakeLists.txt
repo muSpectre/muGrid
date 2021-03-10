@@ -100,7 +100,7 @@ mark_as_advanced_prefix(CPPLINT)
 
 # ------------------------------------------------------------------------------
 add_external_package(Eigen3 VERSION 3.3.0 CONFIG)
-add_external_package(pybind11 VERSION 2.2.4 CONFIG)
+add_external_package(pybind11 VERSION 2.6.2 CONFIG)
 find_package(PythonLibsNew ${MUSPECTRE_PYTHON_MAJOR_VERSION} MODULE REQUIRED)
 
 

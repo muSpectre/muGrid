@@ -6,9 +6,9 @@
  *
  * @date   02 Dec 2019
  *
- * @brief  Convenience functionality for working with (pybind11's) numpy arrays.
+ * @brief  Convenience functionality for working with (py::'s) numpy arrays.
  *         These are implemented header-only, in order to avoid an explicit
- *         dependency on pybind11
+ *         dependency on py::
  *
  * Copyright © 2018 Lars Pastewka, Till Junge
  *
@@ -66,18 +66,19 @@ namespace muGrid {
   namespace internal {
 
     //! convert strides into the storage order description used by muGrid
+    template <typename T, int flags = py::array::forcecast>
     inline std::tuple<StorageOrder, DynCcoord_t, Shape_t>
     detect_storage_order(const DynCcoord_t & nb_subdomain_grid_pts,
                          const Shape_t & components_shape,
                          Index_t nb_sub_pts,
-                         const std::vector<ssize_t> & buffer_strides,
-                         ssize_t element_size) {
+                         py::array_t<T, flags> & array) {
       auto & dim{nb_subdomain_grid_pts.get_dim()};
-      if (dim + components_shape.size() != buffer_strides.size()) {
+      if (static_cast<py::ssize_t>(dim + components_shape.size()) !=
+          array.ndim()) {
         std::stringstream s;
-        s << "Internal error: Strides (= " << buffer_strides
+        s << "Internal error: Array dimension (= " << array.ndim()
           << ") do not match expected number of dimensions (" << dim
-          << " spatial dimensions and components of shape " << components_shape
+          << " spatial dimensions and shape of components " << components_shape
           << ").";
         throw NumpyError(s.str());
       }
@@ -87,21 +88,27 @@ namespace muGrid {
       // the storage order intrinsically supported by muGrid.
       Shape_t strides{};
 
+      auto nb_components{std::accumulate(components_shape.begin(),
+                                         components_shape.end(), 1,
+                                         std::multiplies<Index_t>())};
+
       Shape_t components_strides{};
       DynCcoord_t pixels_strides{};
       for (size_t i = 0; i < components_shape.size(); ++i) {
-        components_strides.push_back(buffer_strides[i]);
-        strides.push_back(buffer_strides[i] / element_size);
+        components_strides.push_back(array.strides(i));
+        if (nb_components > 1) {
+          strides.push_back(array.strides(i) / array.itemsize());
+        }
       }
-      if (components_shape.size() > 0 and nb_sub_pts == 1) {
+      if (nb_components > 1 and !components_shape.empty() and nb_sub_pts == 1) {
         // Insert a token stride for the single sub-point
         strides.push_back(0);
       }
       for (int i = 0; i < dim; ++i) {
         pixels_strides.push_back(
-            buffer_strides[buffer_strides.size() - dim + i]);
+            array.strides(array.ndim() - dim + i));
         strides.push_back(
-            buffer_strides[buffer_strides.size() - dim + i] / element_size);
+            array.strides(array.ndim() - dim + i) / array.itemsize());
       }
 
       // Determine the storage order of the whole buffer. We first check the
@@ -254,29 +261,27 @@ namespace muGrid {
     NumpyProxy(DynCcoord_t nb_domain_grid_pts,
                DynCcoord_t nb_subdomain_grid_pts,
                DynCcoord_t subdomain_locations, Index_t nb_dof_per_pixel,
-               pybind11::array_t<T, flags> & array,
+               py::array_t<T, flags> & array,
                const Unit & unit = Unit::unitless())
         : collection{}, field{}
     {
-      pybind11::buffer_info buffer = array.request();
-
       // Sanity check 1: Are the sizes of array and field equal?
       Index_t size{std::accumulate(
                        nb_subdomain_grid_pts.begin(),
                        nb_subdomain_grid_pts.end(), 1,
                        std::multiplies<Index_t>())*nb_dof_per_pixel};
-      if (size != buffer.size) {
+      if (size != array.size()) {
         std::stringstream s;
-        s << "The numpy array has a size of " << buffer.size << ", but the "
+        s << "The numpy array has a size of " << array.size() << ", but the "
           << "muGrid field reports a size of " << size << " entries.";
         throw NumpyError(s.str());
       }
 
       // Sanity check 2: Has the array a dimension of least the spatial dim?
       Index_t dim{nb_subdomain_grid_pts.get_dim()};
-      if (buffer.shape.size() < static_cast<size_t>(dim)) {
+      if (array.ndim() < dim) {
         std::stringstream s;
-        s << "The numpy array has a dimension of " << buffer.shape.size()
+        s << "The numpy array has a dimension of " << array.ndim()
           << ", but the muGrid field reports a pixels dimension of " << dim
           << ".";
         throw NumpyError(s.str());
@@ -285,10 +290,11 @@ namespace muGrid {
       // Sanity check 3: Do the last three dimensions of the array agree with
       // the size of the grid?
       if (!std::equal(nb_subdomain_grid_pts.begin(),
-                      nb_subdomain_grid_pts.end(), buffer.shape.end() - dim)) {
+                      nb_subdomain_grid_pts.end(),
+                      array.shape() + array.ndim() - dim)) {
         std::stringstream s;
-        s << "The numpy array has shape " << buffer.shape << ", but the muGrid "
-          << "field reports a grid of " << nb_subdomain_grid_pts
+        s << "The numpy array has shape " << array.request().shape << ", but "
+          << "the muGrid field reports a grid of " << nb_subdomain_grid_pts
           << " pixels. The numpy array must equal the grid size in its last "
           << "dimensions.";
         throw NumpyError(s.str());
@@ -296,9 +302,9 @@ namespace muGrid {
 
       Index_t nb_array_components{1};
       Shape_t components_shape{};
-      for (auto n{buffer.shape.begin()}; n != buffer.shape.end() - dim; ++n) {
-        components_shape.push_back(*n);
-        nb_array_components *= *n;
+      for (Dim_t i = 0; i < array.ndim() - dim; ++i) {
+        components_shape.push_back(array.shape(i));
+        nb_array_components *= array.shape(i);
       }
 
       // Sanity check 4: Are the number of array components identical to the
@@ -306,16 +312,15 @@ namespace muGrid {
       // fail if the above tests have not failed.)
       if (nb_array_components != nb_dof_per_pixel) {
         std::stringstream s;
-        s << "The numpy array has shape " << buffer.shape << ", but the muGrid "
-          << "field reports " << nb_dof_per_pixel
+        s << "The numpy array has shape " << array.request().shape << ", but "
+          << "the muGrid field reports " << nb_dof_per_pixel
           << " components. The numpy array "
           << "must equal the number of components in its first dimensions.";
         throw NumpyError(s.str());
       }
 
       auto storage_order{internal::detect_storage_order(
-          nb_subdomain_grid_pts, components_shape, 1, buffer.strides,
-          buffer.itemsize)};
+          nb_subdomain_grid_pts, components_shape, 1, array)};
       auto & fc_storage_order{std::get<0>(storage_order)};
       auto & pixels_strides{std::get<1>(storage_order)};
       auto & strides{std::get<2>(storage_order)};
@@ -326,10 +331,12 @@ namespace muGrid {
           static_cast<Index_t>(nb_subdomain_grid_pts.get_dim()),
           nb_domain_grid_pts, nb_subdomain_grid_pts, subdomain_locations,
           pixels_strides, map, fc_storage_order);
+      // Note: The pointer should be obtained from array.template mutable_data()
+      // but this has a guard if the array is not writeable. We need a constant
+      // WrappedField to clean up this code.
       this->field = std::make_unique<WrappedField<T>>(
           "proxy_field", *collection, components_shape,
-          static_cast<size_t>(buffer.size),
-          static_cast<T *>(buffer.ptr),
+          array.size(), static_cast<T *>(array.request().ptr),
           "proxy_subpt", unit, strides);
     }
 
@@ -347,36 +354,38 @@ namespace muGrid {
     NumpyProxy(DynCcoord_t nb_domain_grid_pts,
                DynCcoord_t nb_subdomain_grid_pts,
                DynCcoord_t subdomain_locations, Index_t nb_sub_pts,
-               Shape_t components_shape, pybind11::array_t<T, flags> & array,
+               Shape_t components_shape, py::array_t<T, flags> & array,
                const Unit & unit = Unit::unitless())
         : collection{}, field{} {
-      pybind11::buffer_info buffer{array.request()};
-
       // Sanity check: Do the array dimensions agree and shapes agree?
       Index_t dim{nb_subdomain_grid_pts.get_dim()};
       bool shape_matches{false};
       Shape_t sub_pt_shape{components_shape};
-      if (dim + components_shape.size() + 1 == buffer.shape.size()) {
+      if (static_cast<py::ssize_t>(dim + components_shape.size() + 1) ==
+          array.ndim()) {
         shape_matches =
             std::equal(nb_subdomain_grid_pts.begin(),
-                       nb_subdomain_grid_pts.end(), buffer.shape.end() - dim) &&
-            nb_sub_pts == buffer.shape[components_shape.size()] &&
+                       nb_subdomain_grid_pts.end(),
+                       array.shape() + array.ndim() - dim) &&
+            nb_sub_pts == array.shape(components_shape.size()) &&
             std::equal(components_shape.begin(), components_shape.end(),
-                       buffer.shape.begin());
+                       array.shape());
         sub_pt_shape.push_back(nb_sub_pts);
-      } else if (dim + components_shape.size() == buffer.shape.size()) {
+      } else if (static_cast<py::ssize_t>(dim + components_shape.size()) ==
+                 array.ndim()) {
         // For a field with a single quad point, we can omit that dimension.
         shape_matches =
             std::equal(nb_subdomain_grid_pts.begin(),
-                       nb_subdomain_grid_pts.end(), buffer.shape.end() - dim) &&
+                       nb_subdomain_grid_pts.end(),
+                       array.shape() + array.ndim() - dim) &&
             nb_sub_pts == 1 &&
             std::equal(components_shape.begin(), components_shape.end(),
-                       buffer.shape.begin());
+                       array.shape());
       }
       if (!shape_matches) {
         std::stringstream s;
-        s << "The numpy array has shape " << buffer.shape << ", but the muGrid "
-          << "field reports a grid of " << nb_subdomain_grid_pts
+        s << "The numpy array has shape " << array.request().shape << ", but "
+          << "the muGrid field reports a grid of " << nb_subdomain_grid_pts
           << " pixels with " << nb_sub_pts << " quadrature "
           << (nb_sub_pts == 1 ? "point" : "points") << " holding a quantity of "
           << "shape " << components_shape << ".";
@@ -384,8 +393,7 @@ namespace muGrid {
       }
 
       auto storage_order{internal::detect_storage_order(
-          nb_subdomain_grid_pts, sub_pt_shape, nb_sub_pts, buffer.strides,
-          buffer.itemsize)};
+          nb_subdomain_grid_pts, sub_pt_shape, nb_sub_pts, array)};
       auto & fc_storage_order{std::get<0>(storage_order)};
       auto & pixels_strides{std::get<1>(storage_order)};
       auto & sub_pt_iter_strides{std::get<2>(storage_order)};
@@ -396,10 +404,12 @@ namespace muGrid {
           static_cast<Index_t>(nb_subdomain_grid_pts.get_dim()),
           nb_domain_grid_pts, nb_subdomain_grid_pts, subdomain_locations,
           pixels_strides, map, fc_storage_order);
+      // Note: The pointer should be obtained from array.template mutable_data()
+      // but this has a guard if the array is not writeable. We need a constant
+      // WrappedField to clean up this code.
       this->field = std::make_unique<WrappedField<T>>(
           "proxy_field", *collection, components_shape,
-          static_cast<size_t>(buffer.size),
-          static_cast<T *>(buffer.ptr),
+          array.size(), static_cast<T *>(array.request().ptr),
           "proxy_subpt", unit, sub_pt_iter_strides);
     }
 
@@ -427,19 +437,19 @@ namespace muGrid {
 
   /* Wrap a column-major field into a numpy array, without copying the data */
   template <typename T>
-  pybind11::array_t<T, pybind11::array::f_style>
+  py::array_t<T, py::array::f_style>
   numpy_wrap(const TypedFieldBase<T> & field,
              IterUnit iter_type = IterUnit::SubPt) {
     Shape_t shape{field.get_shape(iter_type)};
     Shape_t strides{field.get_strides(iter_type, sizeof(T))};
-    return pybind11::array_t<T, py::array::f_style>(
-        shape, strides, field.data(), pybind11::capsule([]() {}));
+    return py::array_t<T, py::array::f_style>(
+        shape, strides, field.data(), py::capsule([]() {}));
   }
 
   /* Turn any type that can be enumerated into a tuple */
   template <typename T>
-  pybind11::tuple to_tuple(T a) {
-    pybind11::tuple t(a.get_dim());
+  py::tuple to_tuple(T a) {
+    py::tuple t(a.get_dim());
     ssize_t i = 0;
     for (auto && v : a) {
       t[i] = v;
