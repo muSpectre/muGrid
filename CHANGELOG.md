@@ -1,8 +1,8 @@
 Change log for µSpectre
 =======================
 
-0.15.0 (not yet released)
--------------------------
+0.15.0 (12Mar21)
+----------------
 
 - muSpectre: All projection operators now have a gradient argument and can
   work with discrete derivatives
@@ -12,6 +12,7 @@ Change log for µSpectre
 - muSpectre: Enabled even number of grid points for discrete stencils
 - muFFT: PFFT engine works with pencil decomposition
 - all: Fixed installation via CMake and `make install`
+- all: Fixed cross platform install of NetCDF I/O
 
 0.14.0 (04Feb21)
 ----------------

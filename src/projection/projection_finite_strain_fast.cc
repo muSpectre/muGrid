@@ -124,7 +124,7 @@ namespace muSpectre {
       }
     }
 
-    if (this->fft_engine->is_active()) {
+    if (this->fft_engine->has_grid_pts()) {
       // locations are also zero if the engine is not active
       if (this->get_subdomain_locations() == Ccoord{}) {
         this->proj_field.get_map()[0].setZero();

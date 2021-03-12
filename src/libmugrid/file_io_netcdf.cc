@@ -634,13 +634,13 @@ namespace muGrid {
     if (initialised_GFC_local_pixels) {
       const std::string pixel{"pixel"};
       const Dim_t Dim{oneD};
-      muGrid::TypedField<muGrid::Int64> & local_pixels{
-          GFC_local_pixels.template register_field<muGrid::Int64>(field_name, 1,
-                                                                  pixel)};
+      muGrid::TypedField<muGrid::Index_t> & local_pixels{
+          GFC_local_pixels.template register_field<muGrid::Index_t>(
+              field_name, 1, pixel)};
       // fill the global fc with the default value -1
       local_pixels.eigen_vec().setConstant(GFC_LOCAL_PIXELS_DEFAULT_VALUE);
 
-      muGrid::T1FieldMap<muGrid::Int64, Mapping::Mut, Dim,
+      muGrid::T1FieldMap<muGrid::Index_t, Mapping::Mut, Dim,
                          muGrid::IterUnit::Pixel>
           local_pixels_map{local_pixels};
       Index_t nb_pixels = local_pixels.get_nb_pixels();
@@ -656,11 +656,12 @@ namespace muGrid {
         for (auto && local_global : akantu::enumerate(pixel_ids_on_proc)) {
           auto && local_pixel_id{std::get<0>(local_global)};
           auto && global_pixel_id{std::get<1>(local_global)};
-          muGrid::Uint64 offset{local_offset + local_pixel_id};
+          std::uint64_t offset{local_offset + local_pixel_id};
           // netcdf offers only int or long long int but not long int
-          muGrid::Int64 offset_lli{static_cast<muGrid::Int64>(offset)};
-          Eigen::Map<Eigen::Matrix<muGrid::Int64, 1, 1>, 0, Eigen::Stride<0, 0>>
-            fill_value(&offset_lli);
+          muGrid::Index_t offset_lli{static_cast<muGrid::Index_t>(offset)};
+          Eigen::Map<
+              Eigen::Matrix<muGrid::Index_t, 1, 1>, 0,
+              Eigen::Stride<0, 0>> fill_value(&offset_lli);
           local_pixels_map[global_pixel_id - global_offset] = fill_value;
         }
       }
@@ -728,7 +729,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  void FileIONetCDF::register_netcdf_dimension_ids(muGrid::Uint64 ndims,
+  void FileIONetCDF::register_netcdf_dimension_ids(std::uint64_t ndims,
                                                    Index_t unlimdimid) {
     if (ndims < this->dimensions.get_dim_vector().size()) {
       throw FileIOError(
@@ -767,7 +768,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  void FileIONetCDF::register_netcdf_variable_ids(muGrid::Uint64 nvars) {
+  void FileIONetCDF::register_netcdf_variable_ids(std::uint64_t nvars) {
     if (nvars < this->variables.get_var_vector().size()) {
       throw FileIOError(
           "It seems like your registered field collection(s) require more "
@@ -1099,14 +1100,14 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   NetCDFAtt::NetCDFAtt(const std::string & att_name,
                        const std::vector<char> & value)
-      : att_name{att_name}, data_type{NC_CHAR}, nelems{static_cast<IOSize_t>(
-                                                    value.size())},
+      : att_name{att_name}, data_type{MU_NC_CHAR},
+        nelems{static_cast<IOSize_t>(value.size())},
         value_c{value}, name_initialised{true}, value_initialised{true} {}
 
   /* ---------------------------------------------------------------------- */
   NetCDFAtt::NetCDFAtt(const std::string & att_name, const std::string & value)
-      : att_name{att_name}, data_type{NC_CHAR}, nelems{static_cast<IOSize_t>(
-                                                    value.size())},
+      : att_name{att_name}, data_type{MU_NC_CHAR},
+        nelems{static_cast<IOSize_t>(value.size())},
         value_c{}, name_initialised{true}, value_initialised{false} {
     char * tmp_char{const_cast<char *>(value.c_str())};
     this->register_value(reinterpret_cast<void *>(tmp_char));
@@ -1114,59 +1115,31 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   NetCDFAtt::NetCDFAtt(const std::string & att_name,
-                       const std::vector<muGrid::Int16> & value)
-      : att_name{att_name}, data_type{NC_SHORT}, nelems{static_cast<IOSize_t>(
-                                                     value.size())},
-        value_si{value}, name_initialised{true}, value_initialised{true} {};
-
-  /* ---------------------------------------------------------------------- */
-  NetCDFAtt::NetCDFAtt(const std::string & att_name,
-                       const std::vector<int> & value)
-      : att_name{att_name}, data_type{NC_INT}, nelems{static_cast<IOSize_t>(
-                                                   value.size())},
+                       const std::vector<muGrid::Int> & value)
+      : att_name{att_name}, data_type{MU_NC_INT},
+        nelems{static_cast<IOSize_t>(value.size())},
         value_i{value}, name_initialised{true}, value_initialised{true} {};
 
   /* ---------------------------------------------------------------------- */
   NetCDFAtt::NetCDFAtt(const std::string & att_name,
-                       const std::vector<float> & value)
-      : att_name{att_name}, data_type{NC_FLOAT}, nelems{static_cast<IOSize_t>(
-                                                     value.size())},
-        value_f{value}, name_initialised{true}, value_initialised{true} {};
-
-  /* ---------------------------------------------------------------------- */
-  NetCDFAtt::NetCDFAtt(const std::string & att_name,
-                       const std::vector<double> & value)
-      : att_name{att_name}, data_type{NC_DOUBLE}, nelems{static_cast<IOSize_t>(
-                                                      value.size())},
-        value_d{value}, name_initialised{true}, value_initialised{true} {};
-
-  /* ---------------------------------------------------------------------- */
-  NetCDFAtt::NetCDFAtt(const std::string & att_name,
-                       const std::vector<muGrid::Uint16> & value)
-      : att_name{att_name}, data_type{NC_USHORT}, nelems{static_cast<IOSize_t>(
-                                                      value.size())},
-        value_usi{value}, name_initialised{true}, value_initialised{true} {};
-
-  /* ---------------------------------------------------------------------- */
-  NetCDFAtt::NetCDFAtt(const std::string & att_name,
-                       const std::vector<unsigned int> & value)
-      : att_name{att_name}, data_type{NC_UINT}, nelems{static_cast<IOSize_t>(
-                                                    value.size())},
+                       const std::vector<muGrid::Uint> & value)
+      : att_name{att_name}, data_type{MU_NC_UINT},
+        nelems{static_cast<IOSize_t>(value.size())},
         value_ui{value}, name_initialised{true}, value_initialised{true} {};
 
   /* ---------------------------------------------------------------------- */
   NetCDFAtt::NetCDFAtt(const std::string & att_name,
-                       const std::vector<muGrid::Int64> & value)
-      : att_name{att_name}, data_type{NC_INT64}, nelems{static_cast<IOSize_t>(
-                                                     value.size())},
-        value_lli{value}, name_initialised{true}, value_initialised{true} {};
+                       const std::vector<muGrid::Index_t> & value)
+      : att_name{att_name}, data_type{MU_NC_INDEX_T},
+        nelems{static_cast<IOSize_t>(value.size())},
+        value_l{value}, name_initialised{true}, value_initialised{true} {};
 
   /* ---------------------------------------------------------------------- */
   NetCDFAtt::NetCDFAtt(const std::string & att_name,
-                       const std::vector<muGrid::Uint64> & value)
-      : att_name{att_name}, data_type{NC_UINT64}, nelems{static_cast<IOSize_t>(
-                                                      value.size())},
-        value_ulli{value}, name_initialised{true}, value_initialised{true} {};
+                       const std::vector<muGrid::Real> & value)
+      : att_name{att_name}, data_type{MU_NC_REAL},
+        nelems{static_cast<IOSize_t>(value.size())},
+        value_d{value}, name_initialised{true}, value_initialised{true} {};
 
   /* ---------------------------------------------------------------------- */
   NetCDFAtt::NetCDFAtt(const std::string & att_name,
@@ -1198,32 +1171,20 @@ namespace muGrid {
   const void * NetCDFAtt::get_value() const {
     const void * val{nullptr};
     switch (this->data_type) {
-    case NC_CHAR:
+    case MU_NC_CHAR:
       val = value_c.data();
       break;
-    case NC_SHORT:
-      val = value_si.data();
-      break;
-    case NC_INT:
+    case MU_NC_INT:
       val = value_i.data();
       break;
-    case NC_FLOAT:
-      val = value_f.data();
-      break;
-    case NC_DOUBLE:
-      val = value_d.data();
-      break;
-    case NC_USHORT:
-      val = value_usi.data();
-      break;
-    case NC_UINT:
+    case MU_NC_UINT:
       val = value_ui.data();
       break;
-    case NC_INT64:
-      val = value_lli.data();
+    case MU_NC_INDEX_T:
+      val = value_l.data();
       break;
-    case NC_UINT64:
-      val = value_ulli.data();
+    case MU_NC_REAL:
+      val = value_d.data();
       break;
     default:
       throw FileIOError(
@@ -1240,32 +1201,20 @@ namespace muGrid {
     std::ostream & val_os{std::cout};
     std::ostringstream val_ss{};
     switch (this->data_type) {
-    case NC_CHAR:
+    case MU_NC_CHAR:
       val_os << value_c;
       break;
-    case NC_SHORT:
-      val_os << value_si;
-      break;
-    case NC_INT:
+    case MU_NC_INT:
       val_os << value_i;
       break;
-    case NC_FLOAT:
-      val_os << value_f;
-      break;
-    case NC_DOUBLE:
-      val_os << value_d;
-      break;
-    case NC_USHORT:
-      val_os << value_usi;
-      break;
-    case NC_UINT:
+    case MU_NC_UINT:
       val_os << value_ui;
       break;
-    case NC_INT64:
-      val_os << value_lli;
+    case MU_NC_INDEX_T:
+      val_os << value_l;
       break;
-    case NC_UINT64:
-      val_os << value_ulli;
+    case MU_NC_REAL:
+      val_os << value_d;
       break;
     default:
       throw FileIOError("Unknown data type of attribute value in "
@@ -1300,62 +1249,34 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   void NetCDFAtt::register_value(void * value) {
     switch (this->data_type) {
-    case NC_CHAR: {
+    case MU_NC_CHAR: {
       char * value_c_ptr{reinterpret_cast<char *>(value)};
       std::vector<char> tmp(value_c_ptr, value_c_ptr + this->nelems);
       this->value_c = tmp;
       break;
     }
-    case NC_SHORT: {
-      muGrid::Int16 * value_si_ptr{reinterpret_cast<muGrid::Int16 *>(value)};
-      std::vector<muGrid::Int16> tmp(value_si_ptr, value_si_ptr + this->nelems);
-      this->value_si = tmp;
-      break;
-    }
-    case NC_INT: {
-      int * value_i_ptr{reinterpret_cast<int *>(value)};
-      std::vector<int> tmp(value_i_ptr, value_i_ptr + this->nelems);
+    case MU_NC_INT: {
+      muGrid::Int * value_i_ptr{reinterpret_cast<muGrid::Int *>(value)};
+      std::vector<muGrid::Int> tmp(value_i_ptr, value_i_ptr + this->nelems);
       this->value_i = tmp;
       break;
     }
-    case NC_FLOAT: {
-      float * value_f_ptr{reinterpret_cast<float *>(value)};
-      std::vector<float> tmp(value_f_ptr, value_f_ptr + this->nelems);
-      this->value_f = tmp;
-      break;
-    }
-    case NC_DOUBLE: {
-      double * value_d_ptr{reinterpret_cast<double *>(value)};
-      std::vector<double> tmp(value_d_ptr, value_d_ptr + this->nelems);
-      this->value_d = tmp;
-      break;
-    }
-    case NC_USHORT: {
-      muGrid::Uint16 * value_usi_ptr{reinterpret_cast<muGrid::Uint16 *>(value)};
-      std::vector<muGrid::Uint16> tmp(value_usi_ptr,
-                                      value_usi_ptr + this->nelems);
-      this->value_usi = tmp;
-      break;
-    }
-    case NC_UINT: {
-      unsigned int * value_ui_ptr{reinterpret_cast<unsigned int *>(value)};
-      std::vector<unsigned int> tmp(value_ui_ptr, value_ui_ptr + this->nelems);
+    case MU_NC_UINT: {
+      unsigned int * value_ui_ptr{reinterpret_cast<muGrid::Uint *>(value)};
+      std::vector<muGrid::Uint> tmp(value_ui_ptr, value_ui_ptr + this->nelems);
       this->value_ui = tmp;
       break;
     }
-    case NC_INT64: {
-      muGrid::Int64 * value_lli_ptr{reinterpret_cast<muGrid::Int64 *>(value)};
-      std::vector<muGrid::Int64> tmp(value_lli_ptr,
-                                     value_lli_ptr + this->nelems);
-      this->value_lli = tmp;
+    case MU_NC_INDEX_T: {
+      muGrid::Index_t * value_l_ptr{reinterpret_cast<muGrid::Index_t *>(value)};
+      std::vector<muGrid::Index_t> tmp(value_l_ptr, value_l_ptr + this->nelems);
+      this->value_l = tmp;
       break;
     }
-    case NC_UINT64: {
-      muGrid::Uint64 * value_ulli_ptr{
-          reinterpret_cast<muGrid::Uint64 *>(value)};
-      std::vector<muGrid::Uint64> tmp(value_ulli_ptr,
-                                      value_ulli_ptr + this->nelems);
-      this->value_ulli = tmp;
+    case MU_NC_REAL: {
+      double * value_d_ptr{reinterpret_cast<muGrid::Real *>(value)};
+      std::vector<double> tmp(value_d_ptr, value_d_ptr + this->nelems);
+      this->value_d = tmp;
       break;
     }
     default:
@@ -1370,58 +1291,34 @@ namespace muGrid {
   void * NetCDFAtt::reserve_value_space() {
     void * value_ptr{nullptr};
     switch (this->data_type) {
-    case NC_CHAR: {
+    case MU_NC_CHAR: {
       std::vector<char> tmp(this->nelems, 0);
       this->value_c = tmp;
       value_ptr = reinterpret_cast<void *>(this->value_c.data());
       break;
     }
-    case NC_SHORT: {
-      std::vector<muGrid::Int16> tmp(this->nelems, 0);
-      this->value_si = tmp;
-      value_ptr = reinterpret_cast<void *>(this->value_si.data());
-      break;
-    }
-    case NC_INT: {
-      std::vector<int> tmp(this->nelems, 0);
+    case MU_NC_INT: {
+      std::vector<muGrid::Int> tmp(this->nelems, 0);
       this->value_i = tmp;
       value_ptr = reinterpret_cast<void *>(this->value_i.data());
       break;
     }
-    case NC_FLOAT: {
-      std::vector<float> tmp(this->nelems, 0);
-      this->value_f = tmp;
-      value_ptr = reinterpret_cast<void *>(this->value_f.data());
-      break;
-    }
-    case NC_DOUBLE: {
-      std::vector<double> tmp(this->nelems, 0);
-      this->value_d = tmp;
-      value_ptr = reinterpret_cast<void *>(this->value_d.data());
-      break;
-    }
-    case NC_USHORT: {
-      std::vector<muGrid::Uint16> tmp(this->nelems, 0);
-      this->value_usi = tmp;
-      value_ptr = reinterpret_cast<void *>(this->value_usi.data());
-      break;
-    }
-    case NC_UINT: {
-      std::vector<unsigned int> tmp(this->nelems, 0);
+    case MU_NC_UINT: {
+      std::vector<muGrid::Uint> tmp(this->nelems, 0);
       this->value_ui = tmp;
       value_ptr = reinterpret_cast<void *>(this->value_ui.data());
       break;
     }
-    case NC_INT64: {
-      std::vector<muGrid::Int64> tmp(this->nelems, 0);
-      this->value_lli = tmp;
-      value_ptr = reinterpret_cast<void *>(this->value_lli.data());
+    case MU_NC_INDEX_T: {
+      std::vector<muGrid::Index_t> tmp(this->nelems, 0);
+      this->value_l = tmp;
+      value_ptr = reinterpret_cast<void *>(this->value_l.data());
       break;
     }
-    case NC_UINT64: {
-      std::vector<muGrid::Uint64> tmp(this->nelems, 0);
-      this->value_ulli = tmp;
-      value_ptr = reinterpret_cast<void *>(this->value_ulli.data());
+    case MU_NC_REAL: {
+      std::vector<muGrid::Real> tmp(this->nelems, 0);
+      this->value_d = tmp;
+      value_ptr = reinterpret_cast<void *>(this->value_d.data());
       break;
     }
     default:
@@ -1434,63 +1331,38 @@ namespace muGrid {
   bool NetCDFAtt::equal_value(void * value) const {
     bool equal{false};
     switch (this->data_type) {
-    case NC_CHAR: {
+    case MU_NC_CHAR: {
       char * comp_value{reinterpret_cast<char *>(value)};
       std::vector<char> comp_value_c(comp_value, comp_value + this->nelems);
       equal = (this->value_c == comp_value_c);
       break;
     }
-    case NC_SHORT: {
-      muGrid::Int16 * comp_value{reinterpret_cast<muGrid::Int16 *>(value)};
-      std::vector<muGrid::Int16> comp_value_si(comp_value,
-                                               comp_value + this->nelems);
-      equal = (this->value_si == comp_value_si);
-      break;
-    }
-    case NC_INT: {
-      int * comp_value{reinterpret_cast<int *>(value)};
-      std::vector<int> comp_value_i(comp_value, comp_value + this->nelems);
+    case MU_NC_INT: {
+      muGrid::Int * comp_value{reinterpret_cast<muGrid::Int *>(value)};
+      std::vector<muGrid::Int> comp_value_i(
+          comp_value, comp_value + this->nelems);
       equal = (this->value_i == comp_value_i);
       break;
     }
-    case NC_FLOAT: {
-      float * comp_value{reinterpret_cast<float *>(value)};
-      std::vector<float> comp_value_f(comp_value, comp_value + this->nelems);
-      equal = (this->value_f == comp_value_f);
-      break;
-    }
-    case NC_DOUBLE: {
-      double * comp_value{reinterpret_cast<double *>(value)};
-      std::vector<double> comp_value_d(comp_value, comp_value + this->nelems);
-      equal = (this->value_d == comp_value_d);
-      break;
-    }
-    case NC_USHORT: {
-      muGrid::Uint16 * comp_value{reinterpret_cast<muGrid::Uint16 *>(value)};
-      std::vector<muGrid::Uint16> comp_value_usi(comp_value,
-                                                 comp_value + this->nelems);
-      equal = (this->value_usi == comp_value_usi);
-      break;
-    }
-    case NC_UINT: {
-      unsigned int * comp_value{reinterpret_cast<unsigned int *>(value)};
-      std::vector<unsigned int> comp_value_ui(comp_value,
-                                              comp_value + this->nelems);
+    case MU_NC_UINT: {
+      muGrid::Uint * comp_value{reinterpret_cast<muGrid::Uint *>(value)};
+      std::vector<muGrid::Uint> comp_value_ui(
+          comp_value, comp_value + this->nelems);
       equal = (this->value_ui == comp_value_ui);
       break;
     }
-    case NC_INT64: {
-      muGrid::Int64 * comp_value{reinterpret_cast<muGrid::Int64 *>(value)};
-      std::vector<muGrid::Int64> comp_value_lli(comp_value,
-                                                comp_value + this->nelems);
-      equal = (this->value_lli == comp_value_lli);
+    case MU_NC_INDEX_T: {
+      muGrid::Index_t * comp_value{reinterpret_cast<muGrid::Index_t *>(value)};
+      std::vector<muGrid::Index_t> comp_value_l(
+          comp_value, comp_value + this->nelems);
+      equal = (this->value_l == comp_value_l);
       break;
     }
-    case NC_UINT64: {
-      muGrid::Uint64 * comp_value{reinterpret_cast<muGrid::Uint64 *>(value)};
-      std::vector<muGrid::Uint64> comp_value_ulli(comp_value,
-                                                  comp_value + this->nelems);
-      equal = (this->value_ulli == comp_value_ulli);
+    case MU_NC_REAL: {
+      muGrid::Real * comp_value{reinterpret_cast<muGrid::Real *>(value)};
+      std::vector<muGrid::Real> comp_value_d(
+          comp_value, comp_value + this->nelems);
+      equal = (this->value_d == comp_value_d);
       break;
     }
     default:
@@ -1720,25 +1592,15 @@ namespace muGrid {
     //   type = NC_BYTE;
     // } else
     if (type_id == typeid(char)) {
-      type = NC_CHAR;
-    } else if (type_id == typeid(muGrid::Int16)) {
-      type = NC_SHORT;
-    } else if (type_id == typeid(int)) {
-      type = NC_INT;
-    } else if (type_id == typeid(float)) {
-      type = NC_FLOAT;
-    } else if (type_id == typeid(double)) {
-      type = NC_DOUBLE;
-      // } else if  (type_id == typeid(unsigned byte)) {
-      //   type = NC_UBYTE;
-    } else if (type_id == typeid(muGrid::Uint16)) {
-      type = NC_USHORT;
-    } else if (type_id == typeid(unsigned int)) {
-      type = NC_UINT;
-    } else if (type_id == typeid(muGrid::Int64)) {
-      type = NC_INT64;
-    } else if (type_id == typeid(muGrid::Uint64)) {
-      type = NC_UINT64;
+      type = MU_NC_CHAR;
+    } else if (type_id == typeid(muGrid::Int)) {
+      type = MU_NC_INT;
+    } else if (type_id == typeid(muGrid::Uint)) {
+      type = MU_NC_UINT;
+    } else if (type_id == typeid(muGrid::Index_t)) {
+      type = MU_NC_INDEX_T;
+    } else if (type_id == typeid(muGrid::Real)) {
+      type = MU_NC_REAL;
     } else {
       std::string name{type_id.name()};
       throw FileIOError("The given type_id '" + name +
@@ -1777,10 +1639,10 @@ namespace muGrid {
     case NC_UINT:  // unsigned int
       mpi_type = MPI_UNSIGNED;
       break;
-    case NC_INT64:  // muGrid::Int64
+    case NC_INT64:  // muGrid::Index_t
       mpi_type = MPI_LONG_LONG_INT;
       break;
-    case NC_UINT64:  // muGrid::Uint64
+    case NC_UINT64:  // std::uint64_t
       mpi_type = MPI_UNSIGNED_LONG_LONG;
       break;
     default:
@@ -1896,45 +1758,29 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   void *
-  NetCDFVarBase::increment_buf_ptr(void * buf_ptr,
-                               const IOSize_t & increment_nb_elements) const {
+  NetCDFVarBase::increment_buf_ptr(
+      void * buf_ptr, const IOSize_t & increment_nb_elements) const {
     void * incremented_buf_ptr{nullptr};
     switch (this->data_type) {
-    case NC_CHAR:  // NC_CHAR
+    case MU_NC_CHAR:  // MU_NC_CHAR
       incremented_buf_ptr = reinterpret_cast<void *>(
           reinterpret_cast<char *>(buf_ptr) + increment_nb_elements);
       break;
-    case NC_SHORT:  // NC_SHORT
+    case MU_NC_INT:  // MU_NC_INT
       incremented_buf_ptr = reinterpret_cast<void *>(
-          reinterpret_cast<muGrid::Int16 *>(buf_ptr) + increment_nb_elements);
+          reinterpret_cast<muGrid::Int *>(buf_ptr) + increment_nb_elements);
       break;
-    case NC_INT:  // NC_INT
+    case MU_NC_UINT:  // MU_NC_UINT
       incremented_buf_ptr = reinterpret_cast<void *>(
-          reinterpret_cast<int *>(buf_ptr) + increment_nb_elements);
+          reinterpret_cast<muGrid::Uint *>(buf_ptr) + increment_nb_elements);
       break;
-    case NC_FLOAT:  // NC_FLOAT
+    case MU_NC_INDEX_T:  // MU_NC_INDEX_T
       incremented_buf_ptr = reinterpret_cast<void *>(
-          reinterpret_cast<float *>(buf_ptr) + increment_nb_elements);
+          reinterpret_cast<muGrid::Index_t *>(buf_ptr) + increment_nb_elements);
       break;
-    case NC_DOUBLE:  // NC_DOUBLE
+    case MU_NC_REAL:  // MU_NC_REAL
       incremented_buf_ptr = reinterpret_cast<void *>(
-          reinterpret_cast<double *>(buf_ptr) + increment_nb_elements);
-      break;
-    case NC_USHORT:  // NC_USHORT
-      incremented_buf_ptr = reinterpret_cast<void *>(
-          reinterpret_cast<muGrid::Uint16 *>(buf_ptr) + increment_nb_elements);
-      break;
-    case NC_UINT:  // NC_UINT
-      incremented_buf_ptr = reinterpret_cast<void *>(
-          reinterpret_cast<unsigned int *>(buf_ptr) + increment_nb_elements);
-      break;
-    case NC_INT64:  // NC_INT64
-      incremented_buf_ptr = reinterpret_cast<void *>(
-          reinterpret_cast<muGrid::Int64 *>(buf_ptr) + increment_nb_elements);
-      break;
-    case NC_UINT64:  // NC_UINT64
-      incremented_buf_ptr = reinterpret_cast<void *>(
-          reinterpret_cast<muGrid::Uint64 *>(buf_ptr) + increment_nb_elements);
+          reinterpret_cast<muGrid::Real *>(buf_ptr) + increment_nb_elements);
       break;
     default:
       throw FileIOError(
@@ -2210,7 +2056,8 @@ namespace muGrid {
 
     std::vector<IOSize_t>
         starts{};  // intermediate storage container for starts
-    muGrid::T1FieldMap<muGrid::Int64, Mapping::Mut, 1, muGrid::IterUnit::Pixel>
+    muGrid::T1FieldMap<
+        muGrid::Index_t, Mapping::Mut, 1, muGrid::IterUnit::Pixel>
         local_pixels_map{local_pixels};
 
     for (auto & val : local_pixels_map) {
@@ -2452,7 +2299,8 @@ namespace muGrid {
 
     std::vector<IOSize_t>
         starts{};  // intermediate storage container for starts
-    muGrid::T1FieldMap<muGrid::Int64, Mapping::Mut, 1, muGrid::IterUnit::Pixel>
+    muGrid::T1FieldMap<
+        muGrid::Index_t, Mapping::Mut, 1, muGrid::IterUnit::Pixel>
         local_pixels_map{local_pixels};
 
     for (auto & val : local_pixels_map) {

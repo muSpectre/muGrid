@@ -66,7 +66,7 @@ namespace muGrid {
           t2_field{this->global_fc.register_real_field(
               names[1], muGrid::ipow(this->spatial_dimension, 2))},
           t2_field_map{this->t2_field},
-          t1_field{this->local_fc.register_field<int>(
+          t1_field{this->local_fc.register_field<muGrid::Int>(
               names[2], muGrid::ipow(this->spatial_dimension, 1), this->quad)},
           t1_field_map{this->t1_field} {
       // add some pixels to the local field collection

@@ -40,6 +40,7 @@
 #include <string>
 #include <memory>
 #include <typeinfo>
+#include <type_traits>
 
 #include "communicator.hh"
 #include "field.hh"
@@ -115,7 +116,91 @@ using IODiff_t = ptrdiff_t;
 #endif  // WITH_MPI
 
 namespace muGrid {
-  constexpr static muGrid::Int64 GFC_LOCAL_PIXELS_DEFAULT_VALUE{
+
+  // We cannot rely on a simple mapping between C++ types and NetCDF type
+  // identifier, e.g. int does not necessarily map to NC_INT. We need to deduce
+  // the NetCDF type identifier from the storage size of the respective data
+  // type, since the actual type depends on the 64-bit data model (LP64, ILP64,
+  // LLP64, etc...) that depends on the hardware architecture and operating
+  // system (Linux, macOS, Windows use different 64-bit data models).
+
+  template <int size>
+  constexpr nc_type netcdf_signed_type() {
+    static_assert(!(size == 1 || size == 2 || size == 4 || size == 8),
+                  "Unsupported integer storage size");
+    return NC_UINT64;
+  }
+  template<>
+  constexpr  nc_type netcdf_signed_type<1>() {
+    return NC_BYTE;
+  }
+  template<>
+  constexpr nc_type netcdf_signed_type<2>() {
+    return NC_SHORT;
+  }
+  template<>
+  constexpr  nc_type netcdf_signed_type<4>() {
+    return NC_INT;
+  }
+  template<>
+  constexpr nc_type netcdf_signed_type<8>() {
+    return NC_INT64;
+  }
+
+  template <int size>
+  constexpr nc_type netcdf_unsigned_type() {
+    static_assert(!(size == 1 || size == 2 || size == 4 || size == 8),
+                  "Unsupported unsigned integer storage size");
+    return NC_UINT64;
+  }
+  template<>
+  constexpr nc_type netcdf_unsigned_type<1>() {
+    return NC_UBYTE;
+  }
+  template<>
+  constexpr nc_type netcdf_unsigned_type<2>() {
+    return NC_USHORT;
+  }
+  template<>
+  constexpr nc_type netcdf_unsigned_type<4>() {
+    return NC_UINT;
+  }
+  template<>
+  constexpr nc_type netcdf_unsigned_type<8>() {
+    return NC_UINT64;
+  }
+
+  template <typename T>
+  constexpr nc_type netcdf_type() {
+    if (std::is_signed<T>()) {
+      return netcdf_signed_type<sizeof(T)>();
+    } else {
+      return netcdf_unsigned_type<sizeof(T)>();
+    }
+  }
+  template <>
+  constexpr nc_type netcdf_type<char>() {
+    return NC_CHAR;
+  }
+  template <>
+  constexpr nc_type netcdf_type<float>() {
+    return NC_FLOAT;
+  }
+  template <>
+  constexpr nc_type netcdf_type<double>() {
+    return NC_DOUBLE;
+  }
+
+  // These are the equivalents of NC_CHAR, NC_INT, NC_DOUBLE etc. but now
+  // correctly determined for the basic muGrid types Int, Uint, Real, ...
+
+  constexpr nc_type MU_NC_CHAR = netcdf_type<char>();
+  constexpr nc_type MU_NC_INT = netcdf_type<muGrid::Int>();
+  constexpr nc_type MU_NC_UINT = netcdf_type<muGrid::Uint>();
+  constexpr nc_type MU_NC_INDEX_T = netcdf_type<muGrid::Index_t>();
+  constexpr nc_type MU_NC_REAL = netcdf_type<muGrid::Real>();
+
+  constexpr static std::int64_t GFC_LOCAL_PIXELS_DEFAULT_VALUE{
       -1};  // default value to fill the global field collection which stores
             // the offsets of the pixels from a local field collection. As the
             // offsets are larger or equal than zero a negative value is used
@@ -212,11 +297,10 @@ namespace muGrid {
     NetCDFAtt() = delete;
 
     /**
-     * Constructor with the attribute name and its value (char, short, int,
-     * float, double, unsigned short, unsigned int, muGrid::Int64 and unsigned
-     * muGrid::Int64) the values are represented by std::vector<T> of the
-     * corresponding type 'T'. The type char has an additional convenience
-     * constructor which can take also std::string as input.
+     * Constructor with the attribute name and its value (char, muGrid::Int,
+     * muGrid::Uint, muGrid::real) the values are represented by std::vector<T>
+     * of the corresponding type 'T'. The type char has an additional
+     * convenience constructor which can take also std::string as input.
      */
     // char value
     NetCDFAtt(const std::string & att_name, const std::vector<char> & value);
@@ -224,34 +308,21 @@ namespace muGrid {
     // char value, convenience constructor which can take a std::string value
     NetCDFAtt(const std::string & att_name, const std::string & value);
 
-    // muGrid::Int16 value
+    // muGrid::Int value
     NetCDFAtt(const std::string & att_name,
-              const std::vector<muGrid::Int16> & value);
+              const std::vector<muGrid::Int> & value);
 
-    // int value
-    NetCDFAtt(const std::string & att_name, const std::vector<int> & value);
-
-    // float value
-    NetCDFAtt(const std::string & att_name, const std::vector<float> & value);
-
-    // double value
-    NetCDFAtt(const std::string & att_name, const std::vector<double> & value);
-
-    // muGrid::Uint16 value
+    // muGrid::Uint value
     NetCDFAtt(const std::string & att_name,
-              const std::vector<muGrid::Uint16> & value);
+              const std::vector<muGrid::Uint> & value);
 
-    // unsigned int value
+    // muGrid::Index_t value
     NetCDFAtt(const std::string & att_name,
-              const std::vector<unsigned int> & value);
+              const std::vector<muGrid::Index_t> & value);
 
-    // muGrid::Int64 value
+    // muGrid::Real value
     NetCDFAtt(const std::string & att_name,
-              const std::vector<muGrid::Int64> & value);
-
-    // muGrid::Uint64 value
-    NetCDFAtt(const std::string & att_name,
-              const std::vector<muGrid::Uint64> & value);
+              const std::vector<muGrid::Real> & value);
 
     /**
      * Constructor with the attribute name, data_type and nelems
@@ -320,18 +391,14 @@ namespace muGrid {
     IOSize_t nelems{0};
 
     // possible values are: char, short, int, float, double, unsigned short,
-    // unsigned int, muGrid::Int64 and muGrid::Uint64
+    // unsigned int, std::int64_t and std::uint64_t
     // Only one of these following vectors can be non zero size. Would be
     // represented by std::variant in C++17.
     std::vector<char> value_c{};
-    std::vector<muGrid::Int16> value_si{};
-    std::vector<int> value_i{};
-    std::vector<float> value_f{};
-    std::vector<double> value_d{};
-    std::vector<muGrid::Uint16> value_usi{};
-    std::vector<unsigned int> value_ui{};
-    std::vector<muGrid::Int64> value_lli{};
-    std::vector<muGrid::Uint64> value_ulli{};
+    std::vector<muGrid::Int> value_i{};
+    std::vector<muGrid::Uint> value_ui{};
+    std::vector<muGrid::Index_t> value_l{};
+    std::vector<muGrid::Real> value_d{};
 
     // flags to see whether the attribute was already initialised or not
     bool name_initialised{
@@ -501,8 +568,8 @@ namespace muGrid {
     //! std::vector<float>                   NC_FLOAT   float *
     //! std::vector<double>                  NC_DOUBLE  double *
     //! std::vector<muGrid::Uint16>          NC_USHORT  unsigned short int *
-    //! std::vector<muGrid::Int64>           NC_INT64   long long int *
-    //! std::vector<muGrid::Uint64>          NC_UINT64  unsigned long long int *
+    //! std::vector<std::int64_t>           NC_INT64   long long int *
+    //! std::vector<std::uint64_t>          NC_UINT64  unsigned long long int *
     template <typename T>
     void add_attribute(const std::string & att_name, const T & value);
 
@@ -997,14 +1064,14 @@ namespace muGrid {
     //!                computed by ncmu_inq().
     //! @ unlimdimid : the NetCDF dimension ID of the unlimited dimension, i.e.
     //!                computed by ncmu_inq().
-    void register_netcdf_dimension_ids(muGrid::Uint64 ndims,
+    void register_netcdf_dimension_ids(std::uint64_t ndims,
                                        Index_t unlimdimid);
 
     //! inquiry and register the variable ids of the NetCDF file (to read or
     //! append a file)
     //! @ ndims : number of variables that have to be registered, i.e. computed
     //!           by ncmu_inq().
-    void register_netcdf_variable_ids(muGrid::Uint64 nvars);
+    void register_netcdf_variable_ids(std::uint64_t nvars);
 
     //! inquiry and register the attribute names of variables from the NetCDF
     //! file. Here the names are registered because attributes have no unique

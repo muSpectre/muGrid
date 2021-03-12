@@ -266,7 +266,7 @@ namespace muFFT {
                                        const Shape_t & shape);
 
     //! return whether this engine is active
-    virtual bool is_active() const { return true; }
+    virtual bool has_grid_pts() const { return true; }
 
     /**
      * iterators over only those pixels that exist in real space

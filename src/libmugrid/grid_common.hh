@@ -79,10 +79,6 @@ namespace muGrid {
 
   using Uint = unsigned int;     //!< type to use in math for unsigned integers
   using Int = int;               //!< type to use in math for signed integers
-  using Uint64 = std::uint64_t;  //!< type to use in math for unsigned integers
-  using Int64 = std::int64_t;    //!< type to use in math for signed integers
-  using Uint16 = std::uint16_t;  //!< type to use in math for unsigned integers
-  using Int16 = std::int16_t;    //!< type to use in math for signed integers
   using Real = double;           //!< type to use in math for real numbers
   using Complex =
       std::complex<Real>;  //!< type to use in math for complex numbers

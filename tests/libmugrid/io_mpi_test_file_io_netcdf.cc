@@ -339,13 +339,15 @@ namespace muGrid {
         local_fc_1.initialise();
       }
 
-      muGrid::TypedField<int> & t1_field_2{local_fc_2.register_field<int>(
-          "T1_int_field", muGrid::ipow(spatial_dimension, 1), quad)};
+      muGrid::TypedField<int> & t1_field_2
+          {local_fc_2.register_field<muGrid::Int>(
+              "T1_int_field", muGrid::ipow(spatial_dimension, 1), quad)};
       muGrid::T1FieldMap<int, Mapping::Mut, Dim, muGrid::IterUnit::SubPt>
           t1_field_map_2{t1_field_2};
 
-      muGrid::TypedField<int> & t1_field_1{local_fc_1.register_field<int>(
-          "T1_int_field", muGrid::ipow(spatial_dimension, 1), quad)};
+      muGrid::TypedField<int> & t1_field_1{
+          local_fc_1.register_field<muGrid::Int>(
+              "T1_int_field", muGrid::ipow(spatial_dimension, 1), quad)};
       muGrid::T1FieldMap<int, Mapping::Mut, Dim, muGrid::IterUnit::SubPt>
           t1_field_map_1{t1_field_1};
 

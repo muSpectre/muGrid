@@ -95,7 +95,7 @@ namespace muFFT {
      * return whether this engine is active (an engine is active if it has more
      * than zero grid points. FFTWMPI sometimes assigns zero grid points)
      */
-    bool is_active() const override { return this->active; }
+    bool has_grid_pts() const override { return this->active; }
 
     //! perform a deep copy of the engine (this should never be necessary in
     //! c++)
