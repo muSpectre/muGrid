@@ -68,14 +68,15 @@ namespace muGrid {
   constexpr Index_t oneD{1};    //!< constant for a one-dimensional problem
   constexpr Index_t twoD{2};    //!< constant for a two-dimensional problem
   constexpr Index_t threeD{3};  //!< constant for a three-dimensional problem
-  constexpr Index_t firstOrder{1};   //!< constant for vectors
-  constexpr Index_t secondOrder{2};  //!< constant second-order tensors
-  constexpr Index_t fourthOrder{4};  //!< constant fourth-order tensors
-  constexpr Index_t OneQuadPt{1};    //!< constant for 1 quadrature point/pixel
-  constexpr Index_t TwoQuadPts{2};   //!< constant for 2 quadrature point/pixel
-  constexpr Index_t FourQuadPts{4};  //!< constant for 4 quadrature point/pixel
-  constexpr Index_t SixQuadPts{6};  //!< constant for 4 quadrature point/pixel
-  constexpr Index_t OneNode{1};      //!< constant for 1 node per pixel
+  constexpr Index_t firstOrder{1};    //!< constant for vectors
+  constexpr Index_t secondOrder{2};   //!< constant second-order tensors
+  constexpr Index_t fourthOrder{4};   //!< constant fourth-order tensors
+  constexpr Index_t OneQuadPt{1};     //!< constant for 1 quadrature point/pixel
+  constexpr Index_t TwoQuadPts{2};    //!< constant for 2 quadrature point/pixel
+  constexpr Index_t FourQuadPts{4};   //!< constant for 4 quadrature point/pixel
+  constexpr Index_t SixQuadPts{6};    //!< constant for 6 quadrature point/pixel
+  constexpr Index_t EightQuadPts{8};  //!< constant for 8 quadrature point/pixel
+  constexpr Index_t OneNode{1};       //!< constant for 1 node per pixel
 
   using Uint = unsigned int;     //!< type to use in math for unsigned integers
   using Int = int;               //!< type to use in math for signed integers
@@ -95,7 +96,7 @@ namespace muGrid {
 
   enum class Stencil_t {
     Triangle,  //!<  isosceles right triangle, linear
-    Rectangle   //!< bilinear Rectangle
+    Rectangle  //!< bilinear Rectangle
   };
 
   /**
@@ -292,7 +293,6 @@ namespace muGrid {
       return this->long_array[index];
     }
 
-
     //! push element to the end
     void push_back(const T & value) {
       if (static_cast<size_t>(this->dim) >= MaxDim) {
@@ -301,7 +301,6 @@ namespace muGrid {
       this->long_array[this->dim] = value;
       this->dim++;
     }
-
 
     //! modulo assignment operator (mostly for periodic boundaries stuff)
     DynCcoord & operator%=(const DynCcoord & other) {

@@ -185,6 +185,130 @@ namespace muSpectre {
     }
   }
 
+  BOOST_FIXTURE_TEST_CASE(solver_test_3d, CellDataFixture<threeD>) {
+    constexpr Formulation Form{Formulation::small_strain};
+    using Fix = CellDataFixture<threeD>;
+    const Real young_soft{4};
+    const Real young_hard{8};
+    const Real poisson{.3};
+    using Mat_t = MaterialLinearElastic1<Fix::SpatialDim>;
+    auto stencil{FEMLibrary::trilinear_hexahedron(this->cell_data)};
+    BOOST_TEST_CHECKPOINT("after stencil creation");
+    auto discretisation{std::make_shared<Discretisation>(stencil)};
+
+    BOOST_TEST_CHECKPOINT("after discretisation creation");
+    auto & soft{Mat_t::make(this->cell_data, "soft", young_soft, poisson)};
+    auto & hard{Mat_t::make(this->cell_data, "hard", young_hard, poisson)};
+
+    auto legacy_cell{make_cell(this->cell_data->get_nb_domain_grid_pts(),
+                               this->cell_data->get_domain_lengths(), Form)};
+    auto & legacy_soft{Mat_t::make(legacy_cell, "soft", young_soft, poisson)};
+    auto & legacy_hard{Mat_t::make(legacy_cell, "hard", young_hard, poisson)};
+
+    BOOST_TEST_CHECKPOINT("after legacy cell creation");
+    {
+      Index_t nb_hard{this->cell_data->get_nb_domain_grid_pts()[0] *
+                      this->cell_data->get_nb_domain_grid_pts()[1]};
+      for (auto && index_pixel : this->cell_data->get_pixels().enumerate()) {
+        auto && index{std::get<0>(index_pixel)};
+        if (nb_hard) {
+          --nb_hard;
+          hard.add_pixel(index);
+          legacy_hard.add_pixel(index);
+        } else {
+          soft.add_pixel(index);
+          legacy_soft.add_pixel(index);
+        }
+      }
+    }
+
+    BOOST_TEST_CHECKPOINT("after material assignment");
+
+    constexpr Real cg_tol{1e-8}, newton_tol{1e-5}, equil_tol{1e-10};
+    const Uint maxiter{static_cast<Uint>(this->cell_data->get_spatial_dim()) *
+                       20};
+    constexpr Verbosity verbose{Verbosity::Silent};
+
+    auto krylov_solver{
+        std::make_shared<KrylovSolverCG>(cg_tol, maxiter, verbose)};
+    auto solver{std::make_shared<SolverFEMNewtonCG>(
+        discretisation, krylov_solver, verbose, newton_tol, equil_tol,
+        maxiter)};
+
+    auto strain_maker = [](auto && spatial_dim,
+                           auto && formulation) -> Eigen::MatrixXd {
+      Eigen::MatrixXd retval{Eigen::MatrixXd::Random(spatial_dim, spatial_dim)};
+      switch (formulation) {
+      case Formulation::finite_strain: {
+        return retval;
+        break;
+      }
+      case Formulation::small_strain: {
+        return .5 * (retval + retval.transpose());
+        break;
+      }
+      default:
+        throw std::runtime_error("bad formulation");
+        break;
+      }
+    };
+
+    const Eigen::MatrixXd grad{strain_maker(Fix::SpatialDim, Form)};
+
+    solver->set_formulation(Form);
+    solver->initialise_cell();
+
+    BOOST_TEST_CHECKPOINT("before load increment");
+
+    KrylovSolverCG legacy_krylov_solver{legacy_cell, cg_tol, maxiter, verbose};
+    auto && legacy_result{newton_cg(legacy_cell, grad, legacy_krylov_solver,
+                                    newton_tol, equil_tol, verbose)};
+    std::cout << "Done with legacy solver" << std::endl;
+    std::cout << "legacy Newton-CG converged in "
+              << legacy_krylov_solver.get_counter() << " CG steps and "
+              << legacy_result.nb_it << " Newton Steps." << std::endl;
+
+    auto && new_result{solver->solve_load_increment(grad)};
+    std::cout << "Newton-CG converged in " << krylov_solver->get_counter()
+              << " CG steps and " << new_result.nb_it << " Newton steps."
+              << std::endl;
+    BOOST_TEST_CHECKPOINT("after load increment");
+    Index_t nb_quad{stencil->get_gradient_operator()->get_nb_pixel_quad_pts()};
+    Eigen::Map<Eigen::ArrayXXd> legacy_stress_map{
+        legacy_result.stress.data(), grad.size(),
+        legacy_result.stress.size() / grad.size()};
+    // all pixels have uniform strain, so the stress can be stored per pixel for
+    // comparison with legacy stress
+    Eigen::ArrayXXd new_stress_pixel{legacy_stress_map.rows(),
+                                     legacy_stress_map.cols()};
+    for (Index_t i{0}; i < legacy_stress_map.cols(); ++i) {
+      Eigen::VectorXd col_stress{Eigen::VectorXd::Zero(grad.size())};
+      for (Index_t j{1}; j < nb_quad; ++j) {
+        Real error{muGrid::testGoodies::rel_error(
+            new_result.stress.col(i * nb_quad),
+            new_result.stress.col(i * nb_quad + j))};
+        BOOST_CHECK_LE(error, tol);
+      }
+      new_stress_pixel.col(i) = new_result.stress.col(i * nb_quad);
+    }
+    auto && error{
+        muGrid::testGoodies::rel_error(new_stress_pixel, legacy_stress_map)};
+
+    BOOST_CHECK_LE(error, tol);
+    if (not(error < tol)) {
+      std::cout << "legacy stress result" << std::endl
+                << legacy_stress_map.transpose() << std::endl;
+      std::cout << "new stress result" << std::endl
+                << new_result.stress.transpose() << std::endl;
+
+      for (Index_t i{0}; i < new_result.stress.cols(); ++i) {
+        std::cout << "E = " << new_result.grad.col(i).transpose() << std::endl;
+        std::cout << "P = " << new_result.stress.col(i).transpose() << std::endl
+                  << std::endl;
+      }
+    }
+  }
+
   BOOST_FIXTURE_TEST_CASE(solver_test_preconditioned, CellDataFixture<twoD>) {
     using Fix = CellDataFixture<twoD>;
     const Real young_soft{4};

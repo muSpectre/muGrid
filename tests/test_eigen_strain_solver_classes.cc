@@ -149,11 +149,11 @@ namespace muSpectre {
         }};
 
     // The function which is responsible for assigning eigen strain
-    Func_new_t eigen_func_new{[this, &F_eigen, &eigen_func_legacy](
-                                  muGrid::TypedFieldBase<Real> & eval_field) {
-      size_t step{this->step_nb};
-      eigen_func_legacy(step, eval_field);
-    }};
+    Func_new_t eigen_func_new{
+        [this, &eigen_func_legacy](muGrid::TypedFieldBase<Real> & eval_field) {
+          size_t step{this->step_nb};
+          eigen_func_legacy(step, eval_field);
+        }};
 
     BOOST_TEST_CHECKPOINT("after material assignment");
 
@@ -272,11 +272,11 @@ namespace muSpectre {
           }
         }};
 
-    Func_new_t eigen_func_new{[this, &F_eigen, &eigen_func_legacy](
-                                  muGrid::TypedFieldBase<Real> & eval_field) {
-      size_t step{this->step_nb};
-      eigen_func_legacy(step, eval_field);
-    }};
+    Func_new_t eigen_func_new{
+        [this, &eigen_func_legacy](muGrid::TypedFieldBase<Real> & eval_field) {
+          size_t step{this->step_nb};
+          eigen_func_legacy(step, eval_field);
+        }};
 
     BOOST_TEST_CHECKPOINT("after material assignment");
 
@@ -424,11 +424,11 @@ namespace muSpectre {
           }
         }};
 
-    Func_new_t eigen_func_new{[this, &F_eigen, &eigen_func_legacy](
-                                  muGrid::TypedFieldBase<Real> & eval_field) {
-      size_t step{this->step_nb};
-      eigen_func_legacy(step, eval_field);
-    }};
+    Func_new_t eigen_func_new{
+        [this, &eigen_func_legacy](muGrid::TypedFieldBase<Real> & eval_field) {
+          size_t step{this->step_nb};
+          eigen_func_legacy(step, eval_field);
+        }};
 
     BOOST_TEST_CHECKPOINT("after material assignment");
 
@@ -460,7 +460,7 @@ namespace muSpectre {
               << "symmetric(strain):" << std::endl
               << symmetric(strain) << std::endl
               << std::endl;
-    auto && new_result{solver->solve_load_increment(strain, eigen_func_new)};
+    solver->solve_load_increment(strain, eigen_func_new);
     BOOST_TEST_CHECKPOINT("after load increment");
 
     using LoadSteps_t = std::vector<Eigen::MatrixXd>;
@@ -550,7 +550,7 @@ namespace muSpectre {
 
     // The function which is responsible for assigning eigen strain
     Func_t eigen_func_legacy{
-        [this, &F_eigen](const size_t & step,
+        [&F_eigen](const size_t & step,
                          muGrid::TypedFieldBase<Real> & eval_field) {
           auto && stress_coeff{step + 1};
           auto && eigen_field_map{muGrid::FieldMap<Real, Mapping::Mut>(
@@ -562,8 +562,7 @@ namespace muSpectre {
         }};
 
     Func_eigen_t eigen_func_eigen{
-        [this, &F_eigen,
-         &eigen_func_legacy](muGrid::TypedFieldBase<Real> & eval_field) {
+        [this, &eigen_func_legacy](muGrid::TypedFieldBase<Real> & eval_field) {
           size_t step{this->step_nb};
           eigen_func_legacy(step, eval_field);
         }};

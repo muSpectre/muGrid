@@ -59,6 +59,12 @@ namespace muSpectre {
     std::shared_ptr<FEMStencilBase>
     bilinear_quadrangle(std::shared_ptr<CellData> cell);
 
+    /**
+     * Finite-element discretisation in trilinear hexahedra
+     */
+    std::shared_ptr<FEMStencilBase>
+    trilinear_hexahedron(std::shared_ptr<CellData> cell);
+
   }  // namespace FEMLibrary
 }  // namespace muSpectre
 
