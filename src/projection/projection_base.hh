@@ -209,7 +209,7 @@ namespace muSpectre {
     DynRcoord_t domain_lengths;  //!< physical sizes of the cell
     Index_t nb_quad_pts;
     Index_t nb_components;
-    /**
+     /**
      * gradient (nabla) operator, can be computed using Fourier interpolation
      * or through a weighted residual
      */

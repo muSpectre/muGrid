@@ -169,8 +169,7 @@ namespace muSpectre {
           << ". Therefore, it does not get updated unless an eigen strain "
           << "function is passed to solve_load_increment"
           << "This is probably because you have already called this "
-          << "previously with an eigenstrain function."
-          << std::endl;
+          << "previously with an eigenstrain function." << std::endl;
       throw SolverError(err.str());
     }
     // check whether this solver's cell has been initialised already
@@ -399,13 +398,15 @@ namespace muSpectre {
 
     switch (this->cell_data->get_material_dim()) {
     case twoD: {
-      this->template action_increment_worker<twoD>(
-          *delta_grad_ptr, this->tangent->get_field(), alpha, del_flux_field);
+      this->template action_increment_worker_prep<twoD>(
+          *delta_grad_ptr, this->tangent->get_field(), alpha, del_flux_field,
+          this->get_displacement_rank());
       break;
     }
     case threeD: {
-      this->template action_increment_worker<threeD>(
-          *delta_grad_ptr, this->tangent->get_field(), alpha, del_flux_field);
+      this->template action_increment_worker_prep<threeD>(
+          *delta_grad_ptr, this->tangent->get_field(), alpha, del_flux_field,
+          this->get_displacement_rank());
       break;
     }
     default:
@@ -420,21 +421,55 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimM>
+  void SolverNewtonCG::action_increment_worker_prep(
+      const muGrid::TypedFieldBase<Real> & delta_grad,
+      const muGrid::TypedFieldBase<Real> & tangent, const Real & alpha,
+      muGrid::TypedFieldBase<Real> & delta_flux,
+      const Index_t & displacement_rank) {
+    switch (displacement_rank) {
+    case zerothOrder: {
+      // this is a scalar problem, e.g., heat equation
+      SolverNewtonCG::template action_increment_worker<DimM, zerothOrder>(
+          delta_grad, tangent, alpha, delta_flux);
+      break;
+    }
+    case firstOrder: {
+      // this is a vectorial problem, e.g., mechanics
+      SolverNewtonCG::template action_increment_worker<DimM, firstOrder>(
+          delta_grad, tangent, alpha, delta_flux);
+      break;
+    }
+    default:
+      throw SolverError("Can only handle scalar and vectorial problems");
+      break;
+    }
+  }
+  /* ---------------------------------------------------------------------- */
+  template <Dim_t DimM, Index_t DisplacementRank>
   void SolverNewtonCG::action_increment_worker(
       const muGrid::TypedFieldBase<Real> & delta_grad,
       const muGrid::TypedFieldBase<Real> & tangent, const Real & alpha,
       muGrid::TypedFieldBase<Real> & delta_flux) {
-    muGrid::T2FieldMap<Real, muGrid::Mapping::Const, DimM, IterUnit::SubPt>
+    constexpr Index_t GradRank{DisplacementRank + 1};
+    static_assert(
+        (GradRank == firstOrder) or (GradRank == secondOrder),
+        "Can only handle vectors and second-rank tensors as gradients");
+    constexpr Index_t TangentRank{GradRank + GradRank};
+    muGrid::TensorFieldMap<Real, muGrid::Mapping::Const, GradRank, DimM,
+                           IterUnit::SubPt>
         grad_map{delta_grad};
-    muGrid::T4FieldMap<Real, muGrid::Mapping::Const, DimM, IterUnit::SubPt>
+    muGrid::TensorFieldMap<Real, muGrid::Mapping::Const, TangentRank, DimM,
+                           IterUnit::SubPt>
         tangent_map{tangent};
-    muGrid::T2FieldMap<Real, muGrid::Mapping::Mut, DimM, IterUnit::SubPt>
+    muGrid::TensorFieldMap<Real, muGrid::Mapping::Mut, GradRank, DimM,
+                           IterUnit::SubPt>
         flux_map{delta_flux};
     for (auto && tup : akantu::zip(grad_map, tangent_map, flux_map)) {
       auto & df = std::get<0>(tup);
       auto & k = std::get<1>(tup);
       auto & dp = std::get<2>(tup);
-      dp += alpha * Matrices::tensmult(k, df);
+      Eigen::MatrixXd tmp{alpha * Matrices::tensmult(k, df)};
+      dp += tmp;
     }
   }
 
@@ -488,14 +523,23 @@ namespace muSpectre {
   void SolverNewtonCG::create_gradient_projection() {
     switch (this->cell_data->get_spatial_dim()) {
     case twoD: {
-      // fall_through
+      this->projection = std::make_shared<ProjectionGradient<twoD, firstOrder>>(
+          this->cell_data->get_FFT_engine(),
+          this->cell_data->get_domain_lengths());
+      break;
     }
     case threeD: {
-      // fall_through
+      this->projection =
+          std::make_shared<ProjectionGradient<threeD, firstOrder>>(
+              this->cell_data->get_FFT_engine(),
+              this->cell_data->get_domain_lengths());
+      break;
     }
     default:
       std::stringstream error_message{};
-      error_message << "generic gradient projection is not implemented yet";
+      error_message << "generic gradient projection is not implemented for "
+                    << this->cell_data->get_spatial_dim()
+                    << "-dimensional problems.";
       throw SolverError{error_message.str()};
       break;
     }
@@ -515,4 +559,38 @@ namespace muSpectre {
   bool SolverNewtonCG::has_eigen_strain_storage() const {
     return this->eval_grad != this->grad;
   }
+
+  /* ---------------------------------------------------------------------- */
+  Index_t SolverNewtonCG::get_displacement_rank() const {
+    return this->domain.rank() - 1;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  ProjectionBase & SolverNewtonCG::get_projection() {
+    if (this->projection == nullptr) {
+      throw SolverError("Projection is not yet defined.");
+    }
+    return *this->projection;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  auto SolverNewtonCG::get_eval_grad() const -> MappedField_t & {
+    return *this->eval_grad;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  auto SolverNewtonCG::get_grad() const -> MappedField_t & {
+    return *this->grad;
+  }
+  /* ---------------------------------------------------------------------- */
+
+  auto SolverNewtonCG::get_tangent() const -> const MappedField_t & {
+    return *this->tangent;
+  }
+  /* ---------------------------------------------------------------------- */
+
+  auto SolverNewtonCG::get_flux() const -> const MappedField_t & {
+    return *this->flux;
+  }
+
 }  // namespace muSpectre

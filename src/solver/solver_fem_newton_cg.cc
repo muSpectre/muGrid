@@ -66,8 +66,7 @@ namespace muSpectre {
           << ". Therefore, it does not get updated unless an eigen strain "
           << "function is passed to solve_load_increment"
           << "This is probably because you have already called this "
-          << "previously with an eigenstrain function."
-          << std::endl;
+          << "previously with an eigenstrain function." << std::endl;
       throw SolverError(err.str());
     }
     // check whether this solver's cell has been initialised already
@@ -399,6 +398,21 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   Index_t SolverFEMNewtonCG::get_displacement_rank() const {
     return this->domain.rank() - 1;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  auto SolverFEMNewtonCG::get_eval_grad() const -> MappedField_t & {
+    return *this->eval_grad;
+  }
+  /* ---------------------------------------------------------------------- */
+
+  auto SolverFEMNewtonCG::get_tangent() const -> const MappedField_t & {
+    return *this->tangent;
+  }
+  /* ---------------------------------------------------------------------- */
+
+  auto SolverFEMNewtonCG::get_flux() const -> const MappedField_t & {
+    return *this->flux;
   }
 
   /* ---------------------------------------------------------------------- */

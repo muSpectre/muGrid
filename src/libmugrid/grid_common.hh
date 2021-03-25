@@ -68,6 +68,7 @@ namespace muGrid {
   constexpr Index_t oneD{1};    //!< constant for a one-dimensional problem
   constexpr Index_t twoD{2};    //!< constant for a two-dimensional problem
   constexpr Index_t threeD{3};  //!< constant for a three-dimensional problem
+  constexpr Index_t zerothOrder{0};   //!< constant for scalars
   constexpr Index_t firstOrder{1};    //!< constant for vectors
   constexpr Index_t secondOrder{2};   //!< constant second-order tensors
   constexpr Index_t fourthOrder{4};   //!< constant fourth-order tensors
@@ -78,9 +79,9 @@ namespace muGrid {
   constexpr Index_t EightQuadPts{8};  //!< constant for 8 quadrature point/pixel
   constexpr Index_t OneNode{1};       //!< constant for 1 node per pixel
 
-  using Uint = unsigned int;     //!< type to use in math for unsigned integers
-  using Int = int;               //!< type to use in math for signed integers
-  using Real = double;           //!< type to use in math for real numbers
+  using Uint = unsigned int;  //!< type to use in math for unsigned integers
+  using Int = int;            //!< type to use in math for signed integers
+  using Real = double;        //!< type to use in math for real numbers
   using Complex =
       std::complex<Real>;  //!< type to use in math for complex numbers
 

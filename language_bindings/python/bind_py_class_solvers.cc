@@ -116,6 +116,11 @@ void add_spectral_newton_cg_solver(py::module & mod) {
                     const Uint &>(),
            "cell_data"_a, "krylov_solver"_a, "verbosity"_a, "newton_tol"_a,
            "equil_tol"_a, "max_iter"_a)
+      .def_property_readonly("projection", &SolverNewtonCG::get_projection)
+      .def_property_readonly("flux", &SolverNewtonCG::get_flux)
+      .def_property_readonly("grad", &SolverNewtonCG::get_grad)
+      .def_property_readonly("eval_grad", &SolverNewtonCG::get_eval_grad)
+      .def_property_readonly("tangent", &SolverNewtonCG::get_tangent)
       .def_property_readonly("nb_dof", &SolverNewtonCG::get_nb_dof);
 }
 

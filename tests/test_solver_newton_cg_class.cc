@@ -41,9 +41,11 @@
 #include "solver/solver_newton_cg.hh"
 #include "solver/solvers.hh"
 #include "materials/material_linear_elastic1.hh"
+#include "materials/material_linear_diffusion.hh"
 
 #include <cell/cell_factory.hh>
 #include <solver/krylov_solver_eigen.hh>
+#include <solver/krylov_solver_cg.hh>
 
 namespace muSpectre {
 
@@ -54,12 +56,57 @@ namespace muSpectre {
     this->cell_data->set_nb_quad_pts(OneQuadPt);
     MaterialLinearElastic1<Fix::SpatialDim>::make(this->cell_data, "material",
                                                   4, .3);
-    // std::shared_ptr<KrylovSolverCG> krylov_solver{
-    //     std::make_shared<KrylovSolverCG>(1e-8, 100)};
-    std::shared_ptr<KrylovSolverCGEigen> krylov_solver{nullptr};
+    auto krylov_solver{std::make_shared<KrylovSolverCGEigen>(1e-8, 100)};
     auto solver{std::make_shared<SolverNewtonCG>(this->cell_data, krylov_solver,
                                                  muGrid::Verbosity::Full, 1e-10,
                                                  1e-10, 100)};
+  }
+
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(scalar_problem_test, Fix, CellDataFixtures,
+                                   Fix) {
+    const Real high_conductivity{3.};
+    const Real low_conductivity{2.};
+    using Mat_t = MaterialLinearDiffusion<Fix::SpatialDim>;
+
+    this->cell_data->set_nb_quad_pts(OneQuadPt);
+    auto & low{Mat_t::make(this->cell_data, "low", low_conductivity)};
+    auto & high{Mat_t::make(this->cell_data, "high", high_conductivity)};
+
+    {
+      bool first{true};
+      for (auto && index_pixel : this->cell_data->get_pixels().enumerate()) {
+        auto && index{std::get<0>(index_pixel)};
+        if (first) {
+          first = false;
+          high.add_pixel(index);
+        } else {
+          low.add_pixel(index);
+        }
+      }
+    }
+
+    BOOST_TEST_CHECKPOINT("after material assignment");
+
+    constexpr Real cg_tol{1e-8}, newton_tol{1e-5}, equil_tol{1e-10};
+    const Uint maxiter{static_cast<Uint>(this->cell_data->get_spatial_dim()) *
+                       10};
+    constexpr Verbosity verbose{Verbosity::Full};
+
+    auto krylov_solver{
+        std::make_shared<KrylovSolverCG>(cg_tol, maxiter, verbose)};
+    auto solver{std::make_shared<SolverNewtonCG>(this->cell_data, krylov_solver,
+                                                 verbose, newton_tol, equil_tol,
+                                                 maxiter)};
+    const Eigen::VectorXd load{Eigen::VectorXd::Random(Fix::SpatialDim)};
+
+    solver->initialise_cell();
+
+    BOOST_TEST_CHECKPOINT("before load increment");
+    std::cout << std::endl
+              << "load:" << std::endl
+              << load << std::endl
+              << std::endl;
+    solver->solve_load_increment(load);
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(solver_test, Fix, CellDataFixtures, Fix) {

@@ -44,104 +44,17 @@
 
 #include "common/muSpectre_common.hh"
 #include "projection/projection_base.hh"
+#include "projection/projection_gradient.hh"
 
 namespace muSpectre {
 
   /**
-   * replaces `muSpectre::ProjectionFiniteStrain` with a faster and
-   * less memory-hungry alternative formulation. Use this if you don't
-   * have a very good reason not to (and tell me (author) about it,
-   * I'd be interested to hear it).
+   * This projection used to be its own class and is now just a special case of
+   * ProjectionGradient. It is kept for compatibility
    */
   template <Index_t DimS, Index_t NbQuadPts = OneQuadPt>
-  class ProjectionFiniteStrainFast : public ProjectionBase {
-   public:
-    using Parent = ProjectionBase;  //!< base class
-    //! gradient, i.e. derivatives in each Cartesian direction
-    using Gradient_t = muFFT::Gradient_t;
-    using Ccoord = Ccoord_t<DimS>;  //!< cell coordinates type
-    using Rcoord = Rcoord_t<DimS>;  //!< spatial coordinates type
-    //! Real space second order tensor fields (to be projected)
-    using Field_t = muGrid::TypedFieldBase<Real>;
-    //! Fourier-space field containing the projection operator itself
-    using Proj_t = muGrid::ComplexField;
-    //! iterable form of the operator
-    using Proj_map =
-        muGrid::MatrixFieldMap<Complex, Mapping::Mut, DimS * NbQuadPts, 1,
-                               muGrid::IterUnit::Pixel>;
-    //! iterable Fourier-space second-order tensor field
-    using Grad_map =
-        muGrid::MatrixFieldMap<Complex, Mapping::Mut, DimS, DimS * NbQuadPts,
-                               muGrid::IterUnit::Pixel>;
-
-    //! Default constructor
-    ProjectionFiniteStrainFast() = delete;
-
-    //! Constructor with FFT engine
-    ProjectionFiniteStrainFast(muFFT::FFTEngine_ptr engine,
-                               const DynRcoord_t & lengths,
-                               const Gradient_t & gradient);
-
-    //! Constructor with FFT engine and default (Fourier) gradient
-    ProjectionFiniteStrainFast(muFFT::FFTEngine_ptr engine,
-                               const DynRcoord_t & lengths);
-
-    //! Copy constructor
-    ProjectionFiniteStrainFast(const ProjectionFiniteStrainFast & other) =
-        delete;
-
-    //! Move constructor
-    ProjectionFiniteStrainFast(ProjectionFiniteStrainFast && other) = default;
-
-    //! Destructor
-    virtual ~ProjectionFiniteStrainFast() = default;
-
-    //! Copy assignment operator
-    ProjectionFiniteStrainFast &
-    operator=(const ProjectionFiniteStrainFast & other) = delete;
-
-    //! Move assignment operator
-    ProjectionFiniteStrainFast &
-    operator=(ProjectionFiniteStrainFast && other) = default;
-
-    //! initialises the fft engine (plan the transform)
-    void initialise() final;
-
-    //! apply the projection operator to a field
-    void apply_projection(Field_t & field) final;
-
-    //! compute the positions of the nodes of the pixels
-    Field_t & integrate(Field_t & strain) final;
-
-    Eigen::Map<MatrixXXc> get_operator();
-
-    /**
-     * returns the number of rows and cols for the strain matrix type
-     * (for full storage, the strain is stored in material_dim ×
-     * material_dim matrices, but in symmetriy storage, it is a column
-     * vector)
-     */
-    std::array<Index_t, 2> get_strain_shape() const final;
-
-    //! get number of components to project per pixel
-    constexpr static Index_t NbComponents() { return DimS * DimS * NbQuadPts; }
-
-    //! get number of components to project per pixel
-    virtual Index_t get_nb_dof_per_pixel() const { return NbComponents(); }
-
-    //! perform a deep copy of the projector (this should never be necessary in
-    //! c++)
-    std::unique_ptr<ProjectionBase> clone() const final;
-
-   protected:
-    //! field of projection operators
-    muGrid::MappedT1Field<Complex, Mapping::Mut, DimS * NbQuadPts,
-                          IterUnit::SubPt> proj_field;
-
-    //! field of integration operators
-    muGrid::MappedT1Field<Complex, Mapping::Mut, DimS * NbQuadPts,
-        IterUnit::SubPt> int_field;
-  };
+  using ProjectionFiniteStrainFast =
+      ProjectionGradient<DimS, secondOrder, NbQuadPts>;
 
 }  // namespace muSpectre
 

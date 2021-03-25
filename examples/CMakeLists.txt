@@ -163,6 +163,9 @@ endif(NETCDF_IO)
 muSpectre_add_example(free_surface_py_example
         TYPE PYTHON free_surface.py)
 
+muSpectre_add_example(scalar_spectral_py_example
+        TYPE PYTHON scalar_spectral_example.py)
+
 # additional file(s) to copy
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/concrete_micro_structure.npy
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)

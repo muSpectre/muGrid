@@ -444,6 +444,12 @@ namespace muGrid {
         return dim;
         break;
       }
+#if defined(__llvm__) || __GNUC__  > 5
+      case 3: {
+        throw RuntimeError("can't handle third-rank tensors");
+        break;
+      }
+#endif
       case 4: {
         return dim * dim;
         break;

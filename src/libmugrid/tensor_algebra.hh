@@ -228,34 +228,72 @@ namespace muGrid {
       return product;
     }
 
+    namespace internal {
+
+      template <Dim_t SmallRank>
+      struct TensorMultiplicationProvider {};
+
+      template <>
+      struct TensorMultiplicationProvider<secondOrder> {
+        template <typename T4, typename T2>
+        constexpr static auto multiply(const Eigen::MatrixBase<T4> & A,
+                                       const Eigen::MatrixBase<T2> & B)
+            -> Tens2_t<T2::RowsAtCompileTime> {
+          constexpr Dim_t dim{T2::RowsAtCompileTime};
+          static_assert(dim == T2::ColsAtCompileTime, "B is not square");
+          static_assert(dim != Eigen::Dynamic, "B not statically sized");
+          static_assert(dim * dim == T4::RowsAtCompileTime,
+                        "A and B not compatible");
+          static_assert(T4::RowsAtCompileTime == T4::ColsAtCompileTime,
+                        "A is not square");
+
+          Tens2_t<dim> result;
+          result.setZero();
+
+          for (Dim_t i = 0; i < dim; ++i) {
+            for (Dim_t j = 0; j < dim; ++j) {
+              for (Dim_t k = 0; k < dim; ++k) {
+                for (Dim_t l = 0; l < dim; ++l) {
+                  result(i, j) += get(A, i, j, k, l) * B(k, l);
+                }
+              }
+            }
+          }
+          return result;
+        }
+      };
+
+      template <>
+      struct TensorMultiplicationProvider<firstOrder> {
+        template <typename T2, typename T1>
+        constexpr static auto multiply(const Eigen::MatrixBase<T2> & A,
+                                       const Eigen::MatrixBase<T1> & B)
+            -> decltype(A * B) {
+          static_assert(static_cast<int>(decltype(A * B)::RowsAtCompileTime) ==
+                        static_cast<int>(T1::RowsAtCompileTime),
+                        "Wrong number of rows");
+          static_assert(static_cast<int>(decltype(A * B)::ColsAtCompileTime) ==
+                        static_cast<int>(T1::ColsAtCompileTime),
+                        "Wrong number of cols");
+          return A * B;
+        }
+      };
+
+    }  // namespace internal
+
     /**
      * Standart tensor multiplication
      */
-    template <typename T4, typename T2>
-    constexpr inline auto tensmult(const Eigen::MatrixBase<T4> & A,
-                                   const Eigen::MatrixBase<T2> & B)
-        -> Tens2_t<T2::RowsAtCompileTime> {
-      constexpr Dim_t dim{T2::RowsAtCompileTime};
-      static_assert(dim == T2::ColsAtCompileTime, "B is not square");
-      static_assert(dim != Eigen::Dynamic, "B not statically sized");
-      static_assert(dim * dim == T4::RowsAtCompileTime,
-                    "A and B not compatible");
-      static_assert(T4::RowsAtCompileTime == T4::ColsAtCompileTime,
-                    "A is not square");
-
-      Tens2_t<dim> result;
-      result.setZero();
-
-      for (Dim_t i = 0; i < dim; ++i) {
-        for (Dim_t j = 0; j < dim; ++j) {
-          for (Dim_t k = 0; k < dim; ++k) {
-            for (Dim_t l = 0; l < dim; ++l) {
-              result(i, j) += get(A, i, j, k, l) * B(k, l);
-            }
-          }
-        }
-      }
-      return result;
+    template <typename TLarge, typename TSmall>
+    constexpr inline decltype(auto)
+    tensmult(const Eigen::MatrixBase<TLarge> & A,
+             const Eigen::MatrixBase<TSmall> & B) {
+      constexpr Dim_t Dim{TSmall::RowsAtCompileTime};
+      constexpr Dim_t SmallRank{EigenCheck::tensor_rank<TSmall, Dim>::value};
+      constexpr Dim_t LargeRank{EigenCheck::tensor_rank<TLarge, Dim>::value};
+      static_assert(LargeRank == 2 * SmallRank or Dim == oneD,
+                    "Invalid tensor product");
+      return internal::TensorMultiplicationProvider<SmallRank>::multiply(A, B);
     }
 
     //! compile-time fourth-order tracer

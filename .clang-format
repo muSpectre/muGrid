@@ -2,5 +2,6 @@ AccessModifierOffset: -1
 SpacesBeforeTrailingComments: 2
 NamespaceIndentation: All
 SortIncludes: false
+SortUsingDeclarations: false
 PointerAlignment: Middle
 AlwaysBreakTemplateDeclarations: true

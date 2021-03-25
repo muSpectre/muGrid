@@ -95,11 +95,11 @@ namespace muSpectre {
     Index_t get_displacement_rank() const;
 
     //! Tangent moduli field
-    MappedField_t & get_eval_grad() const { return *this->eval_grad; }
+    MappedField_t & get_eval_grad() const;
     //! Tangent moduli field
-    const MappedField_t & get_tangent() const { return *this->tangent; }
+    const MappedField_t & get_tangent() const;
     //! Tangent moduli field
-    const MappedField_t & get_flux() const { return *this->flux; }
+    const MappedField_t & get_flux() const;
 
    protected:
     void initialise_eigen_strain_storage();

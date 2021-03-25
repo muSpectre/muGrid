@@ -90,6 +90,21 @@ namespace muSpectre {
     //! initialise cell data for this solver
     void initialise_cell() final;
 
+    //! return the rank of the displacement field for this PhysicsDomain
+    Index_t get_displacement_rank() const;
+
+    //! return the projection operator
+    ProjectionBase & get_projection();
+
+    //! evaluated gradient field
+    MappedField_t & get_eval_grad() const;
+    //! gradient field
+    MappedField_t & get_grad() const;
+    //! Tangent moduli field
+    const MappedField_t & get_tangent() const;
+    //! flux  field
+    const MappedField_t & get_flux() const;
+
    protected:
     void initialise_eigen_strain_storage();
     bool has_eigen_strain_storage() const;
@@ -98,6 +113,17 @@ namespace muSpectre {
      * operator
      */
     template <Dim_t DimM>
+    static void action_increment_worker_prep(
+        const muGrid::TypedFieldBase<Real> & delta_strain,
+        const muGrid::TypedFieldBase<Real> & tangent, const Real & alpha,
+        muGrid::TypedFieldBase<Real> & delta_stress,
+        const Index_t & displacement_rank);
+
+    /**
+     * statically dimensioned worker for evaluating the incremental tangent
+     * operator
+     */
+    template <Dim_t DimM, Index_t DisplacementRank>
     static void
     action_increment_worker(const muGrid::TypedFieldBase<Real> & delta_strain,
                             const muGrid::TypedFieldBase<Real> & tangent,

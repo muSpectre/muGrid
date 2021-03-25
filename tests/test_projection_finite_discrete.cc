@@ -41,6 +41,7 @@
 
 #include "projection/projection_finite_strain.hh"
 #include "projection/projection_finite_strain_fast.hh"
+#include "projection/projection_gradient.hh"
 
 #include "test_projection.hh"
 
@@ -54,7 +55,7 @@ namespace muSpectre {
   BOOST_AUTO_TEST_SUITE(projection_finite_strain_discrete);
 
   /* ---------------------------------------------------------------------- */
-  using fixlist = boost::mpl::list<
+  using fixlistRankTwo = boost::mpl::list<
       ProjectionFixture<twoD, twoD, Squares<twoD>, DiscreteGradient<twoD>,
                         ProjectionFiniteStrain<twoD>>,
       ProjectionFixture<threeD, threeD, Squares<threeD>,
@@ -68,11 +69,19 @@ namespace muSpectre {
       ProjectionFixture<threeD, threeD, Squares<threeD>,
                         DiscreteGradient<threeD>,
                         ProjectionFiniteStrainFast<threeD>>>;
+  using fixlistRankOne = boost::mpl::list<
+      ProjectionFixture<twoD, twoD, Squares<twoD>, DiscreteGradient<twoD>,
+                        ProjectionGradient<twoD, firstOrder>>,
+      ProjectionFixture<
+          twoD, twoD, Squares<twoD>, DiscreteGradient<twoD, TwoQuadPts>,
+          ProjectionGradient<twoD, firstOrder, TwoQuadPts>, TwoQuadPts>,
+      ProjectionFixture<threeD, threeD, Squares<threeD>,
+                        DiscreteGradient<threeD>,
+                        ProjectionGradient<threeD, firstOrder>>>;
 
   /* ---------------------------------------------------------------------- */
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(constructor_test, fix, fixlist, fix) {
-    BOOST_CHECK_NO_THROW(
-        fix::projector.initialise());
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(constructor_test, fix, fixlistRankTwo, fix) {
+    BOOST_CHECK_NO_THROW(fix::projector.initialise());
   }
 
   /* ---------------------------------------------------------------------- */
@@ -393,8 +402,8 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(Gradient_preservation_test, fix, fixlist,
-                                   fix) {
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(Gradient_preservation_test_rank_two, fix,
+                                   fixlistRankTwo, fix) {
     // create a first order central difference gradient field with a zero mean
     // gradient and verify that the projection preserves it.
     constexpr Dim_t dim{fix::sdim}, sdim{fix::sdim}, mdim{fix::mdim},
@@ -488,8 +497,8 @@ namespace muSpectre {
     BOOST_TEST_CHECKPOINT("projection applied");
 
     for (auto && tup : akantu::zip(
-             fields.get_pixels().template get_dimensioned_pixels<mdim>(),
-             grad, var)) {
+             fields.get_pixels().template get_dimensioned_pixels<mdim>(), grad,
+             var)) {
       auto & ccoord = std::get<0>(tup);
       auto & g = std::get<1>(tup);
       auto & v = std::get<2>(tup);
@@ -497,10 +506,8 @@ namespace muSpectre {
       Real error = (g - v).norm();
       BOOST_CHECK_LT(error, tol);
       if (error >= tol) {
-        std::cout << std::endl << "grad_ref :" << std::endl << g
-                  << std::endl;
-        std::cout << std::endl << "grad_proj :" << std::endl << v
-                  << std::endl;
+        std::cout << std::endl << "grad_ref :" << std::endl << g << std::endl;
+        std::cout << std::endl << "grad_proj :" << std::endl << v << std::endl;
         std::cout << std::endl << "ccoord :" << std::endl;
         muGrid::operator<<(std::cout, ccoord) << std::endl;
         std::cout << std::endl
@@ -515,14 +522,125 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(idempotent_test, fix, fixlist, fix) {
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(Gradient_preservation_test_rank_one, fix,
+                                   fixlistRankOne, fix) {
+    // create a first order central difference gradient field with a zero mean
+    // gradient and verify that the projection preserves it.
+    constexpr Dim_t dim{fix::sdim}, sdim{fix::sdim}, mdim{fix::mdim},
+        nb_quad{fix::nb_quad};
+    static_assert(
+        dim == fix::mdim,
+        "These tests assume that the material and spatial dimension are "
+        "identical");
+    using Fields = muGrid::GlobalFieldCollection;
+    using FieldMap = muGrid::MatrixFieldMap<Real, Mapping::Mut, mdim, nb_quad,
+                                            IterUnit::Pixel>;
+    using FieldMapNodal =
+        muGrid::ScalarFieldMap<Real, Mapping::Mut, IterUnit::SubPt>;
+
+    Gradient_t gradient{fix::GradientGiver::get_gradient()};
+
+    Fields fields{sdim};
+    fields.set_nb_sub_pts(QuadPtTag, nb_quad);
+    // displacement field
+    muGrid::RealField & f_disp{
+        fields.register_real_field("displacement", 1, QuadPtTag)};
+    // gradient of the displacement field
+    muGrid::RealField & f_grad{
+        fields.register_real_field("gradient", mdim, QuadPtTag)};
+    // field for comparision
+    muGrid::RealField & f_var{
+        fields.register_real_field("working field", mdim, QuadPtTag)};
+
+    FieldMapNodal disp(f_disp);
+    FieldMap grad(f_grad);
+    FieldMap var(f_var);
+
+    BOOST_TEST_CHECKPOINT("fields and maps constructed");
+
+    fields.initialise(fix::projector.get_nb_domain_grid_pts(),
+                      fix::projector.get_nb_subdomain_grid_pts(),
+                      fix::projector.get_subdomain_locations());
+
+    BOOST_TEST_CHECKPOINT("fields and maps initialised");
+
+    muFFT::FFT_freqs<dim> freqs{fix::projector.get_nb_domain_grid_pts(),
+                                fix::projector.get_domain_lengths()};
+
+    Rcoord_t<mdim> delta_x{(fix::projector.get_domain_lengths() /
+                            fix::projector.get_nb_domain_grid_pts())
+                               .template get<mdim>()};
+
+    // fill the displacement field with random numbers
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<> dis(-1.0, 1.0);
+    for (auto && d : disp) {
+      d = dis(gen);
+    }
+
+    BOOST_TEST_CHECKPOINT("displacement field filled");
+
+    // compute the gradient field in real space
+    for (Dim_t quad{0}; quad < nb_quad; ++quad) {
+      for (Dim_t i{0}; i < dim; ++i) {
+        Dim_t k{quad * dim + i};
+        auto derivative_op{
+            std::dynamic_pointer_cast<muFFT::DiscreteDerivative>(gradient[k])};
+        // Storage order of gradient fields: We want to be able to iterate
+        // over a gradient field using either QuadPts or Pixels iterators.
+        // A quadrature point iterator returns a dim × 1 vector. A pixels
+        // iterator must return a dim × nb_quad matrix, since every-
+        // thing is column major this matrix is just two dim x dim matrices
+        // that are stored consecutive in memory. This means the components of
+        // the displacement field, not the components of the gradient, must be
+        // stored consecutive in memory and are the first index.
+        derivative_op->apply(f_disp, 0, f_grad, k, 1.0 / delta_x[i]);
+        derivative_op->apply(f_disp, 0, f_var, k, 1.0 / delta_x[i]);
+      }
+    }
+
+    BOOST_TEST_CHECKPOINT("gradient field computed");
+
+    fix::projector.initialise();
+    fix::projector.apply_projection(f_var);
+
+    BOOST_TEST_CHECKPOINT("projection applied");
+
+    for (auto && tup : akantu::zip(
+             fields.get_pixels().template get_dimensioned_pixels<mdim>(), grad,
+             var)) {
+      auto & ccoord = std::get<0>(tup);
+      auto & g = std::get<1>(tup);
+      auto & v = std::get<2>(tup);
+      auto vec = muGrid::CcoordOps::get_vector(ccoord, delta_x);
+      Real error = (g - v).norm();
+      BOOST_CHECK_LT(error, tol);
+      if (error >= tol) {
+        std::cout << std::endl << "grad_ref :" << std::endl << g << std::endl;
+        std::cout << std::endl << "grad_proj :" << std::endl << v << std::endl;
+        std::cout << std::endl << "ccoord :" << std::endl;
+        muGrid::operator<<(std::cout, ccoord) << std::endl;
+        std::cout << std::endl
+                  << "vector :" << std::endl
+                  << vec.transpose() << std::endl;
+        std::cout << std::endl << "nb_grid_pts :" << std::endl;
+        muGrid::operator<<(std::cout,
+                           fix::projector.get_nb_subdomain_grid_pts())
+            << std::endl;
+      }
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(idempotent_test, fix, fixlistRankTwo, fix) {
     // check if the discrete projection operator is still a projection operator.
     // Thus it has to be idempotent, G^2=G or G:G:test_field = G:test_field.
     constexpr Dim_t dim{fix::sdim}, sdim{fix::sdim}, mdim{fix::mdim},
         nb_quad{fix::nb_quad};
     using Fields = muGrid::GlobalFieldCollection;
-    using FieldMap = muGrid::MatrixFieldMap<Real, Mapping::Mut, mdim, mdim,
-                                            IterUnit::SubPt>;
+    using FieldMap =
+        muGrid::MatrixFieldMap<Real, Mapping::Mut, mdim, mdim, IterUnit::SubPt>;
     using Vector = Eigen::Matrix<Real, dim, 1>;
 
     Fields fields{sdim};

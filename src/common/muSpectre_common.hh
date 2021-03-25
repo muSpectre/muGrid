@@ -57,20 +57,21 @@ namespace muSpectre {
   using muGrid::Uint;
 
   using muGrid::oneD;
-  using muGrid::threeD;
   using muGrid::twoD;
+  using muGrid::threeD;
 
   using muGrid::OneQuadPt;
   using muGrid::TwoQuadPts;
   using muGrid::FourQuadPts;
   using muGrid::SixQuadPts;
-  using muGrid::EightQuadPts;
+  using muGrid::EightQuadPts;  // clang-format on
 
   using muGrid::OneNode;
 
+  using muGrid::zerothOrder;
   using muGrid::firstOrder;
-  using muGrid::fourthOrder;
   using muGrid::secondOrder;
+  using muGrid::fourthOrder;
 
   using muGrid::Ccoord_t;
   using muGrid::Rcoord_t;
