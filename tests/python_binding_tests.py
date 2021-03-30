@@ -47,6 +47,8 @@ from python_material_linear_elastic_generic2_test import \
 from python_comparison_test_material_linear_elastic1 import MatTest as MatTest1
 from python_material_hyper_elasto_plastic2_test import \
     MaterialHyperElastoPlastic2_Check
+from python_material_phase_field_fracture_test import \
+    MaterialPhaseFieldFracture_Check
 from python_field_tests import FieldCollection_Check
 
 from python_exact_reference_elastic_test import LinearElastic_Check

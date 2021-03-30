@@ -83,6 +83,8 @@ void add_material_hyper_elasto_plastic2_helper(py::module & mod);
 template <Index_t Dim>
 void add_material_stochastic_plasticity_helper(py::module & mod);
 template <Index_t Dim>
+void add_material_phase_field_fracture_helper(py::module & mod);
+template <Index_t Dim>
 void add_material_visco_elastic_ss_helper(py::module & mod);
 template <Index_t Dim>
 void add_material_visco_elastic_damage_ss1_helper(py::module & mod);
@@ -282,6 +284,7 @@ void add_material_helper(py::module & mod) {
   add_material_linear_elastic_generic1_helper<Dim>(mod);
   add_material_linear_elastic_generic2_helper<Dim>(mod);
   add_material_stochastic_plasticity_helper<Dim>(mod);
+  add_material_phase_field_fracture_helper<Dim>(mod);
   add_material_visco_elastic_ss_helper<Dim>(mod);
   add_material_visco_elastic_damage_ss1_helper<Dim>(mod);
   add_material_visco_elastic_damage_ss2_helper<Dim>(mod);

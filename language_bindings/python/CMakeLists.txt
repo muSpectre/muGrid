@@ -73,6 +73,7 @@ set (PY_BINDING_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_hyper_elasto_plastic2.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_linear_elastic_generic.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_stochastic_plasticity.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_phase_field_fracture.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_krylov_solvers.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_projections.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_solvers.cc

@@ -1,6 +1,10 @@
 Change log for µSpectre
 =======================
 
+0.15.1 (not yet released)
+-------------------------
+- muSpectre: Added material for phase field fracture simulations
+
 0.15.0 (12Mar21)
 ----------------
 
