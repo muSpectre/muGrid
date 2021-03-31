@@ -1,8 +1,14 @@
 Change log for µSpectre
 =======================
 
-0.15.1 (not yet released)
--------------------------
+0.16.0 (31Mar21)
+----------------
+
+- µSpectre: The ProjectionGradient works for vectorial and rank-two-tensor
+  gradient fields and replaces ProjectionFiniteStrainFast
+- µSpectre: The SolverNewtonCG can now handle scalar problems (e.g., diffusion
+  equation, heat equation, etc.)
+- clang: No more warnings are emitted during compilation
 - muSpectre: Added material for phase field fracture simulations
 
 0.15.0 (12Mar21)
