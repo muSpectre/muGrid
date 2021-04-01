@@ -88,15 +88,6 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  void KrylovSolverBase::set_trust_region(Real new_trust_region) {
-    std::stringstream s;
-    s << "Setting a trust region is not supported by the " << this->get_name()
-      << " solver. (The desired trust region value was " << new_trust_region
-      << ".)";
-    throw SolverError(s.str());
-  }
-
-  /* ---------------------------------------------------------------------- */
   Uint KrylovSolverBase::get_counter() const { return this->counter; }
 
   /* ---------------------------------------------------------------------- */
@@ -106,8 +97,18 @@ namespace muSpectre {
   Real KrylovSolverBase::get_tol() const { return this->tol; }
 
   /* ---------------------------------------------------------------------- */
+  std::shared_ptr<MatrixAdaptable> KrylovSolverBase::get_matrix_holder() const {
+    return this->matrix_holder;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  std::weak_ptr<MatrixAdaptable> KrylovSolverBase::get_matrix_ptr() const {
+    return this->matrix_ptr;
+  }
+
+  /* ---------------------------------------------------------------------- */
   Index_t KrylovSolverBase::get_nb_dof() const {
-    return this->matrix_holder->get_nb_dof();
+    return this->matrix_ptr.lock()->get_nb_dof();
   }
 
 }  // namespace muSpectre

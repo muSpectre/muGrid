@@ -191,9 +191,9 @@ namespace muGrid {
 
 #else
   using std::apply;
-  using std::optional;
-  using std::nullopt_t;
   using std::nullopt;
+  using std::nullopt_t;
+  using std::optional;
 #endif
 
 }  // namespace muGrid

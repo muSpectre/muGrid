@@ -1,6 +1,14 @@
 Change log for µSpectre
 =======================
 
+0.17.0 (not yet released)
+-------------------------
+- muSpectre: Added trust region solver class and a simplistic damage material
+- muSpectre: physics have their specific name that might be used later for outputs
+-muSpectre: trsut region krylov solver has different resetart strategies available
+- muSpectre: gradient integration for solver class + cell data is now available
+
+
 0.16.0 (31Mar21)
 ----------------
 
@@ -9,6 +17,9 @@ Change log for µSpectre
 - µSpectre: The SolverNewtonCG can now handle scalar problems (e.g., diffusion
   equation, heat equation, etc.)
 - clang: No more warnings are emitted during compilation
+
+0.15.1 (30Mar21)
+-------------------------
 - muSpectre: Added material for phase field fracture simulations
 
 0.15.0 (12Mar21)

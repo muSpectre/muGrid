@@ -50,25 +50,40 @@ namespace muSpectre {
   KrylovSolverTrustRegionCG::KrylovSolverTrustRegionCG(
       std::shared_ptr<MatrixAdaptable> matrix_holder, const Real & tol,
       const Uint & maxiter, const Real & trust_region,
-      const Verbosity & verbose)
-      : Parent{matrix_holder, tol, maxiter, verbose},
-        comm{matrix_holder->get_communicator()}, trust_region{trust_region},
-        r_k(this->get_nb_dof()), p_k(this->get_nb_dof()),
-        Ap_k(this->get_nb_dof()), x_k(this->get_nb_dof()) {}
+      const Verbosity & verbose, const ResetCG & reset,
+      const Uint & reset_iter_count)
+      : Parent{matrix_holder, tol, maxiter, trust_region, verbose},
+        comm{matrix_holder->get_communicator()}, reset{reset},
+        reset_iter_count{reset_iter_count}, r_k(this->get_nb_dof()),
+        p_k(this->get_nb_dof()), Ap_k(this->get_nb_dof()),
+        x_k(this->get_nb_dof()) {}
 
   /* ---------------------------------------------------------------------- */
   KrylovSolverTrustRegionCG::KrylovSolverTrustRegionCG(
       const Real & tol, const Uint & maxiter, const Real & trust_region,
-      const Verbosity & verbose)
-      : Parent{tol, maxiter, verbose},
-        trust_region{trust_region}, r_k{}, p_k{}, Ap_k{}, x_k{} {}
+      const Verbosity & verbose, const ResetCG & reset,
+      const Uint & reset_iter_count)
+      : Parent{tol, maxiter, trust_region, verbose}, reset{reset},
+        reset_iter_count{reset_iter_count}, r_k{}, p_k{}, Ap_k{}, x_k{} {}
 
   /* ---------------------------------------------------------------------- */
   void KrylovSolverTrustRegionCG::set_matrix(
       std::shared_ptr<MatrixAdaptable> matrix_adaptable) {
     Parent::set_matrix(matrix_adaptable);
-    this->comm = this->matrix_holder->get_communicator();
-    auto && nb_dof{matrix_adaptable->get_nb_dof()};
+    this->set_internal_arrays();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void KrylovSolverTrustRegionCG::set_matrix(
+      std::weak_ptr<MatrixAdaptable> matrix_adaptable) {
+    Parent::set_matrix(matrix_adaptable);
+    this->set_internal_arrays();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void KrylovSolverTrustRegionCG::set_internal_arrays() {
+    this->comm = this->matrix_ptr.lock()->get_communicator();
+    auto && nb_dof{this->matrix_ptr.lock()->get_nb_dof()};
     this->r_k.resize(nb_dof);
     this->p_k.resize(nb_dof);
     this->Ap_k.resize(nb_dof);
@@ -76,13 +91,15 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  void KrylovSolverTrustRegionCG::set_trust_region(Real new_trust_region) {
-    this->trust_region = new_trust_region;
-  }
-
-  /* ---------------------------------------------------------------------- */
   auto KrylovSolverTrustRegionCG::solve(const ConstVector_ref rhs)
       -> Vector_map {
+    if (this->matrix_ptr.expired()) {
+      std::stringstream error_message{};
+      error_message << "The system matrix has been destroyed. Did you set the "
+                       "matrix using a weak_ptr instead of a shared_ptr?";
+      throw SolverError{error_message.str()};
+    }
+    this->is_on_bound = false;
     this->x_k.setZero();
     Real trust_region2{this->trust_region * this->trust_region};
 
@@ -134,9 +151,8 @@ namespace muSpectre {
     if (verbose > Verbosity::Silent) {
       count_width = static_cast<size_t>(std::log10(this->maxiter)) + 1;
     }
-
-    for (Uint i = 0; i < this->maxiter && rdr > rel_tol2;
-         ++i, ++this->counter) {
+    Uint iter_counter{0};
+    for (Uint i{0}; i < this->maxiter && rdr > rel_tol2; ++i, ++this->counter) {
       this->Ap_k = this->matrix * this->p_k;
 
       Real pdAp{comm.sum(this->p_k.dot(this->Ap_k))};
@@ -145,8 +161,8 @@ namespace muSpectre {
         // region bound
         if (verbose > Verbosity::Silent && comm.rank() == 0) {
           std::cout << "  CG finished, reason: Hessian is not positive "
-                       "definite"
-                    << std::endl;
+                       "definite (pdAp:"
+                    << pdAp << ")" << std::endl;
         }
         this->convergence = Convergence::HessianNotPositiveDefinite;
         return this->bound(rhs);
@@ -167,10 +183,62 @@ namespace muSpectre {
         return this->bound(rhs);
       }
 
+      if (this->reset == ResetCG::gradient_orthogonality) {
+        this->r_k_copy = this->r_k;
+      }
       this->r_k += alpha * this->Ap_k;
 
       Real new_rdr{comm.sum(this->r_k.squaredNorm())};
       Real beta{new_rdr / rdr};
+
+      //! CG reset worker
+      auto && reset_cg{[&beta, this, &rhs]() {
+        this->r_k = this->matrix * this->x_k - rhs;
+        beta = 0.0;
+      }};
+
+      switch (this->reset) {
+      case ResetCG::no_reset: {
+        break;
+      }
+      case ResetCG::fixed_iter_count: {
+        if (iter_counter > (this->get_nb_dof() / 4)) {
+          reset_cg();
+        } else {
+          iter_counter++;
+        }
+        break;
+      }
+      case ResetCG::user_defined_iter_count: {
+        if (this->reset_iter_count == 0) {
+          throw SolverError(
+              "Positive valued reset_iter_count is needed to perform user "
+              "defined iteration count restart for the CG solver");
+        }
+
+        if (iter_counter > this->reset_iter_count) {
+          reset_cg();
+        } else {
+          iter_counter++;
+        }
+        break;
+      }
+      case ResetCG::gradient_orthogonality: {
+        if ((comm.sum(this->r_k.dot(this->r_k_copy)) / rdr) > 0.2) {
+          reset_cg();
+        }
+        break;
+      }
+      case ResetCG::valid_direction: {
+        if (comm.sum(this->r_k.dot(this->p_k) > 0)) {
+          reset_cg();
+        }
+        break;
+      }
+      default:
+        throw SolverError("Unknown CG reset strategy ");
+        break;
+      }
       rdr = new_rdr;
 
       if (verbose > Verbosity::Silent && comm.rank() == 0) {
@@ -199,8 +267,10 @@ namespace muSpectre {
     return Vector_map(this->x_k.data(), this->x_k.size());
   }
 
+  /* ---------------------------------------------------------------------- */
   auto KrylovSolverTrustRegionCG::bound(const ConstVector_ref rhs)
       -> Vector_map {
+    this->is_on_bound = true;
     Real trust_region2{this->trust_region * this->trust_region};
 
     Real pdp{this->comm.sum(this->p_k.squaredNorm())};
@@ -226,4 +296,5 @@ namespace muSpectre {
     }
   }
 
+  /* ---------------------------------------------------------------------- */
 }  // namespace muSpectre

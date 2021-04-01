@@ -107,9 +107,62 @@ void add_cell_data_helper(py::module & mod) {
             return cell_data.get_domain_lengths();
           })
       .def_property_readonly("FFT_engine", &CellData::get_FFT_engine)
-      .def("save_history_variables", &CellData::save_history_variables);
+      .def("save_history_variables", &CellData::save_history_variables)
+      .def("get_globalised_internal_real_field",
+           &CellData::globalise_real_internal_field, "unique_name"_a,
+           "Convenience function to copy local (internal) fields of "
+           "materials into a global field. At least one of the materials in "
+           "the cell needs to contain an internal field named "
+           "`unique_name`. If multiple materials contain such a field, they "
+           "all need to be of same scalar type and same number of "
+           "components. This does not work for split pixel cells or "
+           "laminate pixel cells, as they can have multiple entries for the "
+           "same pixel. Pixels for which no field named `unique_name` "
+           "exists get an array of zeros."
+           "\n"
+           "Parameters:\n"
+           "unique_name: fieldname to fill the global field with. At "
+           "least one material must have such a field, or an "
+           "Exception is raised.",
+           py::return_value_policy::reference_internal)
+      .def("get_globalised_current_real_field",
+           &CellData::globalise_real_current_field, "unique_name"_a,
+           "Convenience function to copy local (internal) fields of "
+           "materials into a global field. At least one of the materials in "
+           "the cell needs to contain an internal field named "
+           "`unique_name`. If multiple materials contain such a field, they "
+           "all need to be of same scalar type and same number of "
+           "components. This does not work for split pixel cells or "
+           "laminate pixel cells, as they can have multiple entries for the "
+           "same pixel. Pixels for which no field named `unique_name` "
+           "exists get an array of zeros."
+           "\n"
+           "Parameters:\n"
+           "unique_name: fieldname to fill the global field with. At "
+           "least one material must have such a field, or an "
+           "Exception is raised.",
+           py::return_value_policy::reference_internal)
+      .def("get_globalised_old_real_field", &CellData::globalise_real_old_field,
+           "unique_name"_a, "nb_steps_ago"_a = 1,
+           "Convenience function to copy local (internal) fields of "
+           "materials into a global field. At least one of the materials in "
+           "the cell needs to contain an internal field named "
+           "`unique_name`. If multiple materials contain such a field, they "
+           "all need to be of same scalar type and same number of "
+           "components. This does not work for split pixel cells or "
+           "laminate pixel cells, as they can have multiple entries for the "
+           "same pixel. Pixels for which no field named `unique_name` "
+           "exists get an array of zeros."
+           "\n"
+           "Parameters:\n"
+           "unique_name: fieldname to fill the global field with. At "
+           "least one material must have such a field, or an "
+           "Exception is raised.",
+           py::return_value_policy::reference_internal)
+      .def_property_readonly("pixels", &CellData::get_pixels)
+      .def_property_readonly("dims", &CellData::get_spatial_dim)
+      .def_property_readonly("pixel_indices", &CellData::get_pixel_indices)
+      .def_property_readonly("quad_pt_indices", &CellData::get_quad_pt_indices);
 }
 
-void add_cell_data(py::module & mod) {
-  add_cell_data_helper(mod);
-}
+void add_cell_data(py::module & mod) { add_cell_data_helper(mod); }

@@ -57,253 +57,6 @@ namespace muSpectre {
         newton_tol{newton_tol}, equil_tol{equil_tol}, max_iter{max_iter} {}
 
   /* ---------------------------------------------------------------------- */
-  OptimizeResult SolverFEMNewtonCG::solve_load_increment(
-      const LoadStep & load_step, EigenStrainOptFunc_ref eigen_strain_func) {
-    if (eigen_strain_func == muGrid::nullopt and
-        this->has_eigen_strain_storage()) {
-      std::stringstream err{};
-      err << "eval_grad is different from the grad field of the cell"
-          << ". Therefore, it does not get updated unless an eigen strain "
-          << "function is passed to solve_load_increment"
-          << "This is probably because you have already called this "
-          << "previously with an eigenstrain function." << std::endl;
-      throw SolverError(err.str());
-    }
-    // check whether this solver's cell has been initialised already
-    if (not this->is_initialised) {
-      this->initialise_cell();
-    }
-
-    auto && comm{this->cell_data->get_communicator()};
-
-    // obtain this iteration's load and check its shape
-    const auto & macro_load{load_step.at(this->domain)};
-    if (macro_load.rows() != this->grad_shape[0] or
-        macro_load.cols() != this->grad_shape[1]) {
-      std::stringstream error_message{};
-      error_message << "Expected a macroscopic load step of shape "
-                    << this->grad_shape
-                    << ", but you've supplied a matrix of shape ("
-                    << macro_load.rows() << ", " << macro_load.cols() << ")."
-                    << std::endl;
-      throw SolverError{error_message.str()};
-    }
-
-    ++this->get_counter();
-    if (this->verbosity > Verbosity::Silent and comm.rank() == 0) {
-      std::cout << "at Load step " << std::setw(this->default_count_width)
-                << this->get_counter() << std::endl;
-    }
-
-    // define the number of newton iteration (initially equal to 0)
-    std::string message{"Has not converged"};
-    Real incr_norm{2 * newton_tol}, displacement_norm{1};
-    Real force_norm{2 * equil_tol};
-    bool has_converged{false};
-    bool last_step_was_nonlinear{true};
-    bool newton_tol_test{false};
-    bool equil_tol_test{false};
-
-    //! Checks two loop breaking criteria (newton tolerance and equilibrium
-    //! tolerance)
-    auto && early_convergence_test{[&incr_norm, &displacement_norm, this,
-                                    &force_norm, &message, &has_converged,
-                                    &newton_tol_test, &equil_tol_test] {
-      newton_tol_test = (incr_norm / displacement_norm) <= this->newton_tol;
-      equil_tol_test = force_norm < this->equil_tol;
-
-      if (newton_tol_test) {
-        message = "Residual tolerance reached";
-      } else if (equil_tol_test) {
-        message = "Reached force balance tolerance";
-      }
-      has_converged = newton_tol_test or equil_tol_test;
-      return has_converged;
-    }};
-
-    const std::string strain_symb{[this]() -> std::string {
-      if (this->is_mechanics()) {
-        if (this->get_formulation() == Formulation::finite_strain) {
-          return "F";
-        } else {
-          return "ε";
-        }
-      } else {
-        return "Grad";
-      }
-    }()};
-    //! Checks all convergence criteria, including detection of linear
-    //! problems
-    auto && full_convergence_test{[&early_convergence_test, this,
-                                   &has_converged, &message,
-                                   &last_step_was_nonlinear]() {
-      // the last step was nonlinear if either this is a finite strain
-      // mechanics problem or the material evaluation was non-linear
-      bool is_finite_strain_mechanics{this->is_mechanics() and
-                                      this->get_formulation() ==
-                                          Formulation::finite_strain};
-      last_step_was_nonlinear = is_finite_strain_mechanics or
-                                this->cell_data->was_last_eval_non_linear();
-      if (not last_step_was_nonlinear) {
-        message = "Linear problem, no more iteration necessary";
-      }
-      has_converged = early_convergence_test() or not last_step_was_nonlinear;
-      return has_converged;
-    }};
-
-    auto & grad_operator{*this->K.get_gradient_operator()};
-
-    this->grad->get_map() = macro_load;
-    grad_operator.apply_gradient_increment(this->disp_fluctuation->get_field(),
-                                           1., this->grad->get_field());
-    if (not(eigen_strain_func == muGrid::nullopt)) {
-      this->initialise_eigen_strain_storage();
-      this->eval_grad->get_field() = this->grad->get_field();
-      (eigen_strain_func.value())(this->eval_grad->get_field());
-    }
-
-    // this fills the tangent and flux fields of this solver, using the
-    // eval_grad field as input
-    auto res_tup{this->evaluate_stress_tangent()};
-    auto & flux{std::get<0>(res_tup)};
-    this->K.apply_divergence(flux.get_field(), this->force->get_field());
-
-    force_norm =
-        std::sqrt(comm.sum(this->force->get_field().eigen_vec().squaredNorm()));
-    *this->rhs = -this->force->get_field();
-
-    if (early_convergence_test()) {
-      has_converged = true;
-    }
-
-    Uint newt_iter{0};
-    for (; newt_iter < this->max_iter and not has_converged; ++newt_iter) {
-      // calling solver for solving the current (iteratively approximated)
-      // linear equilibrium problem
-      try {
-        this->disp_fluctuation_incr->get_field() =
-            this->krylov_solver->solve(this->rhs->get_field().eigen_vec());
-        Eigen::VectorXd rhs_reconstruct{
-            // TODO(junge/martin): what is this?
-            this->get_adaptor() *
-            this->disp_fluctuation_incr->get_field().eigen_vec()};
-      } catch (ConvergenceError & error) {
-        std::stringstream err{};
-        err << "Failure at load step " << this->get_counter()
-            << ". In Newton-Raphson step " << newt_iter << ":" << std::endl
-            << error.what() << std::endl
-            << "The applied boundary condition is Δ" << strain_symb << " ="
-            << std::endl
-            << macro_load << std::endl
-            << "and the load increment is Δ" << strain_symb << " =" << std::endl
-            << macro_load - this->previous_macro_load << std::endl;
-        throw ConvergenceError(err.str());
-      }
-
-      // updating cell strain with the periodic (non-constant) solution
-      // resulted from imposing the new macro_strain
-      this->disp_fluctuation->get_field() +=
-          this->disp_fluctuation_incr->get_field();
-
-      // updating the incremental differences for checking the termination
-      // criteria
-      incr_norm = std::sqrt(comm.sum(
-          this->disp_fluctuation_incr->get_field().eigen_vec().squaredNorm()));
-      displacement_norm = std::sqrt(
-          comm.sum(disp_fluctuation->get_field().eigen_vec().squaredNorm()));
-
-      if ((this->verbosity >= Verbosity::Detailed) and (comm.rank() == 0)) {
-        std::cout << "at Newton step " << std::setw(this->default_count_width)
-                  << newt_iter << ", |δu|/|Δu|" << std::setw(17)
-                  << incr_norm / displacement_norm << ", tol = " << newton_tol
-                  << std::endl;
-
-        if (this->verbosity > Verbosity::Detailed) {
-          std::cout << "<Grad> =" << std::endl
-                    << this->grad->get_map().mean() << std::endl;
-        }
-      }
-
-      this->grad->get_map() = macro_load;
-      grad_operator.apply_gradient_increment(
-          this->disp_fluctuation->get_field(), 1., this->grad->get_field());
-
-      if (not(eigen_strain_func == muGrid::nullopt)) {
-        this->eval_grad->get_field() = this->grad->get_field();
-        (eigen_strain_func.value())(this->eval_grad->get_field());
-      }
-
-      // this fills the tangent and flux fields of this solver, using the
-      // eval_grad field as input
-      auto res_tup{this->evaluate_stress_tangent()};
-      auto & flux{std::get<0>(res_tup)};
-      this->K.apply_divergence(flux.get_field(), this->force->get_field());
-
-      force_norm = std::sqrt(
-          comm.sum(this->force->get_field().eigen_vec().squaredNorm()));
-
-      *this->rhs = -this->force->get_field();
-      if (early_convergence_test()) {
-        break;
-      }
-      full_convergence_test();
-    }
-    // throwing meaningful error message if the number of iterations for
-    // newton_cg is exploited
-    if (newt_iter == this->krylov_solver->get_maxiter()) {
-      std::stringstream err{};
-      err << "Failure at load step " << this->get_counter()
-          << ". Newton-Raphson failed to converge. "
-          << "The applied boundary condition is Δ" << strain_symb << " ="
-          << std::endl
-          << macro_load << std::endl
-          << "and the load increment is Δ" << strain_symb << " =" << std::endl
-          << macro_load - this->previous_macro_load << std::endl;
-      throw ConvergenceError(err.str());
-    }
-
-    // update previous macroscopic strain
-    this->previous_macro_load = macro_load;
-
-    // store results
-
-    OptimizeResult ret_val{this->grad->get_field().eigen_sub_pt(),
-                           this->flux->get_field().eigen_sub_pt(),
-                           full_convergence_test(),
-                           Int(full_convergence_test()),
-                           message,
-                           newt_iter,
-                           this->krylov_solver->get_counter(),
-                           this->get_formulation()};
-
-    // store history variables for next load increment
-    this->cell_data->save_history_variables();
-
-    return ret_val;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  Index_t SolverFEMNewtonCG::get_nb_dof() const {
-    if (not this->is_initialised) {
-      throw SolverError{"Can't determine the number of degrees of freedom "
-                        "until I have been "
-                        "initialised!"};
-    }
-    return this->cell_data->get_pixels().size() *
-           this->cell_data->get_nb_nodal_pts() *
-           muGrid::ipow(this->cell_data->get_spatial_dim(),
-                        this->get_displacement_rank());
-  }
-
-  /* ---------------------------------------------------------------------- */
-  void SolverFEMNewtonCG::action_increment(EigenCVec_t delta_u,
-                                           const Real & alpha,
-                                           EigenVec_t delta_f) {
-    this->K.apply_increment(this->tangent->get_field(), delta_u, alpha,
-                            delta_f);
-  }
-
-  /* ---------------------------------------------------------------------- */
   void SolverFEMNewtonCG::initialise_cell() {
     if (this->is_initialised) {
       return;
@@ -393,6 +146,257 @@ namespace muSpectre {
     // here at the end, because set_matrix checks whether this is initialised
     std::weak_ptr<MatrixAdaptable> w_ptr{this->shared_from_this()};
     this->krylov_solver->set_matrix(w_ptr);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  OptimizeResult SolverFEMNewtonCG::solve_load_increment(
+      const LoadStep & load_step, EigenStrainFunc_ref eigen_strain_func,
+      CellExtractFieldFunc_ref /*cell_extract_func*/) {
+    if (eigen_strain_func == muGrid::nullopt and
+        this->has_eigen_strain_storage()) {
+      std::stringstream err{};
+      err << "eval_grad is different from the grad field of the cell"
+          << ". Therefore, it does not get updated unless an eigen strain "
+          << "function is passed to solve_load_increment"
+          << "This is probably because you have already called this "
+          << "previously with an eigenstrain function." << std::endl;
+      throw SolverError(err.str());
+    }
+    // check whether this solver's cell has been initialised already
+    if (not this->is_initialised) {
+      this->initialise_cell();
+    }
+
+    auto && comm{this->cell_data->get_communicator()};
+
+    // obtain this iteration's load and check its shape
+    const auto & macro_load{load_step.at(this->domain)};
+    if (macro_load.rows() != this->grad_shape[0] or
+        macro_load.cols() != this->grad_shape[1]) {
+      std::stringstream error_message{};
+      error_message << "Expected a macroscopic load step of shape "
+                    << this->grad_shape
+                    << ", but you've supplied a matrix of shape ("
+                    << macro_load.rows() << ", " << macro_load.cols() << ")."
+                    << std::endl;
+      throw SolverError{error_message.str()};
+    }
+
+    ++this->get_counter();
+    if (this->verbosity > Verbosity::Silent and comm.rank() == 0) {
+      std::cout << "at Load step " << std::setw(this->default_count_width)
+                << this->get_counter() << std::endl;
+    }
+
+    // define the number of newton iteration (initially equal to 0)
+    std::string message{"Has not converged"};
+    Real incr_norm{2 * newton_tol}, displacement_norm{1};
+    Real force_norm{2 * equil_tol};
+    bool has_converged{false};
+    bool last_step_was_nonlinear{true};
+    bool newton_tol_test{false};
+    bool equil_tol_test{false};
+
+    //! Checks two loop breaking criteria (newton tolerance and equilibrium
+    //! tolerance)
+    auto && early_convergence_test{[&incr_norm, &displacement_norm, this,
+                                    &force_norm, &message, &has_converged,
+                                    &newton_tol_test, &equil_tol_test] {
+      newton_tol_test = (incr_norm / displacement_norm) <= this->newton_tol;
+      equil_tol_test = force_norm < this->equil_tol;
+
+      if (newton_tol_test) {
+        message = "Residual tolerance reached";
+      } else if (equil_tol_test) {
+        message = "Reached force balance tolerance";
+      }
+      has_converged = newton_tol_test or equil_tol_test;
+      return has_converged;
+    }};
+
+    //! Checks all convergence criteria, including detection of linear
+    //! problems
+    auto && full_convergence_test{[&early_convergence_test, this,
+                                   &has_converged, &message,
+                                   &last_step_was_nonlinear]() {
+      // the last step was nonlinear if either this is a finite strain
+      // mechanics problem or the material evaluation was non-linear
+      bool is_finite_strain_mechanics{this->is_mechanics() and
+                                      this->get_formulation() ==
+                                          Formulation::finite_strain};
+      last_step_was_nonlinear = is_finite_strain_mechanics or
+                                this->cell_data->was_last_eval_non_linear();
+      if (not last_step_was_nonlinear) {
+        message = "Linear problem, no more iteration necessary";
+      }
+      has_converged = early_convergence_test() or not last_step_was_nonlinear;
+      return has_converged;
+    }};
+
+    const std::string strain_symb{[this]() -> std::string {
+      if (this->is_mechanics()) {
+        if (this->get_formulation() == Formulation::finite_strain) {
+          return "F";
+        } else {
+          return "ε";
+        }
+      } else {
+        return "Grad";
+      }
+    }()};
+
+    auto & grad_operator{*this->K.get_gradient_operator()};
+
+    this->grad->get_map() = macro_load;
+    grad_operator.apply_gradient_increment(this->disp_fluctuation->get_field(),
+                                           1., this->grad->get_field());
+    if (not(eigen_strain_func == muGrid::nullopt)) {
+      this->initialise_eigen_strain_storage();
+      this->eval_grad->get_field() = this->grad->get_field();
+      (eigen_strain_func.value())(this->eval_grad->get_field());
+    }
+
+    // this fills the tangent and flux fields of this solver, using the
+    // eval_grad field as input
+    clear_last_step_nonlinear();
+    auto res_tup{this->evaluate_stress_tangent()};
+    auto & flux{std::get<0>(res_tup)};
+    this->K.apply_divergence(flux.get_field(), this->force->get_field());
+
+    force_norm =
+        std::sqrt(comm.sum(this->force->get_field().eigen_vec().squaredNorm()));
+    *this->rhs = -this->force->get_field();
+
+    if (early_convergence_test()) {
+      has_converged = true;
+    }
+
+    Uint newt_iter{0};
+    for (; newt_iter < this->max_iter and not has_converged; ++newt_iter) {
+      // calling solver for solving the current (iteratively approximated)
+      // linear equilibrium problem
+      try {
+        this->disp_fluctuation_incr->get_field() =
+            this->krylov_solver->solve(this->rhs->get_field().eigen_vec());
+        Eigen::VectorXd rhs_reconstruct{
+            // TODO(junge/martin): what is this?
+            this->get_adaptor() *
+            this->disp_fluctuation_incr->get_field().eigen_vec()};
+      } catch (ConvergenceError & error) {
+        std::stringstream err{};
+        err << "Failure at load step " << this->get_counter()
+            << ". In Newton-Raphson step " << newt_iter << ":" << std::endl
+            << error.what() << std::endl
+            << "The applied boundary condition is Δ" << strain_symb << " ="
+            << std::endl
+            << macro_load << std::endl
+            << "and the load increment is Δ" << strain_symb << " =" << std::endl
+            << macro_load - this->previous_macro_load << std::endl;
+        throw ConvergenceError(err.str());
+      }
+
+      // updating cell strain with the periodic (non-constant) solution
+      // resulted from imposing the new macro_strain
+      this->disp_fluctuation->get_field() +=
+          this->disp_fluctuation_incr->get_field();
+
+      // updating the incremental differences for checking the termination
+      // criteria
+      incr_norm = std::sqrt(comm.sum(
+          this->disp_fluctuation_incr->get_field().eigen_vec().squaredNorm()));
+      displacement_norm = std::sqrt(
+          comm.sum(disp_fluctuation->get_field().eigen_vec().squaredNorm()));
+
+      if ((this->verbosity >= Verbosity::Detailed) and (comm.rank() == 0)) {
+        std::cout << "at Newton step " << std::setw(this->default_count_width)
+                  << newt_iter << ", |δu|/|Δu|" << std::setw(17)
+                  << incr_norm / displacement_norm << ", tol = " << newton_tol
+                  << std::endl;
+
+        if (this->verbosity > Verbosity::Detailed) {
+          std::cout << "<Grad> =" << std::endl
+                    << this->grad->get_map().mean() << std::endl;
+        }
+      }
+
+      this->grad->get_map() = macro_load;
+      grad_operator.apply_gradient_increment(
+          this->disp_fluctuation->get_field(), 1., this->grad->get_field());
+
+      if (not(eigen_strain_func == muGrid::nullopt)) {
+        this->eval_grad->get_field() = this->grad->get_field();
+        (eigen_strain_func.value())(this->eval_grad->get_field());
+      }
+
+      // this fills the tangent and flux fields of this solver, using the
+      // eval_grad field as input
+      clear_last_step_nonlinear();
+      auto res_tup{this->evaluate_stress_tangent()};
+      auto & flux{std::get<0>(res_tup)};
+      this->K.apply_divergence(flux.get_field(), this->force->get_field());
+
+      force_norm = std::sqrt(
+          comm.sum(this->force->get_field().eigen_vec().squaredNorm()));
+
+      *this->rhs = -this->force->get_field();
+      if (early_convergence_test()) {
+        break;
+      }
+      full_convergence_test();
+    }
+    // throwing meaningful error message if the number of iterations for
+    // newton_cg is exploited
+    if (newt_iter == this->krylov_solver->get_maxiter()) {
+      std::stringstream err{};
+      err << "Failure at load step " << this->get_counter()
+          << ". Newton-Raphson failed to converge. "
+          << "The applied boundary condition is Δ" << strain_symb << " ="
+          << std::endl
+          << macro_load << std::endl
+          << "and the load increment is Δ" << strain_symb << " =" << std::endl
+          << macro_load - this->previous_macro_load << std::endl;
+      throw ConvergenceError(err.str());
+    }
+
+    // update previous macroscopic strain
+    this->previous_macro_load = macro_load;
+
+    // store results
+
+    OptimizeResult ret_val{this->grad->get_field().eigen_sub_pt(),
+                           this->flux->get_field().eigen_sub_pt(),
+                           full_convergence_test(),
+                           Int(full_convergence_test()),
+                           message,
+                           newt_iter,
+                           this->krylov_solver->get_counter(),
+                           this->get_formulation()};
+
+    // store history variables for next load increment
+    this->cell_data->save_history_variables();
+
+    return ret_val;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  Index_t SolverFEMNewtonCG::get_nb_dof() const {
+    if (not this->is_initialised) {
+      throw SolverError{"Can't determine the number of degrees of freedom "
+                        "until I have been "
+                        "initialised!"};
+    }
+    return this->cell_data->get_pixels().size() *
+           this->cell_data->get_nb_nodal_pts() *
+           muGrid::ipow(this->cell_data->get_spatial_dim(),
+                        this->get_displacement_rank());
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void SolverFEMNewtonCG::action_increment(EigenCVec_t delta_u,
+                                           const Real & alpha,
+                                           EigenVec_t delta_f) {
+    this->K.apply_increment(this->tangent->get_field(), delta_u, alpha,
+                            delta_f);
   }
 
   /* ---------------------------------------------------------------------- */

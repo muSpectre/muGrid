@@ -342,6 +342,11 @@ namespace muSpectre {
     if (this->initialised == false) {
       this->initialise();
     }
+
+    for (auto & mat : this->materials) {
+      mat->clear_last_step_nonlinear();
+    }
+
     for (auto & mat : this->materials) {
       if (mat->get_formulation() != this->get_formulation()) {
         std::stringstream error_stream{};
@@ -366,6 +371,10 @@ namespace muSpectre {
   Cell::evaluate_stress_tangent() {
     if (not this->initialised) {
       this->initialise();
+    }
+
+    for (auto & mat : this->materials) {
+      mat->clear_last_step_nonlinear();
     }
 
     constexpr bool create_tangent{true};

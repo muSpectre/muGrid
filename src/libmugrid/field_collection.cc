@@ -664,12 +664,12 @@ namespace muGrid {
   std::ostream &
   operator<<(std::ostream & os,
              const muGrid::FieldCollection::ValidityDomain & value) {
-    const char* s = 0;
+    const char * s = 0;
     switch (value) {
     case (muGrid::FieldCollection::ValidityDomain::Global):
       s = "ValidityDomain::Global";
       break;
-    case(muGrid::FieldCollection::ValidityDomain::Local):
+    case (muGrid::FieldCollection::ValidityDomain::Local):
       s = "ValidityDomain::Local";
       break;
     default:

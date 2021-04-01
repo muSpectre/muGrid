@@ -170,6 +170,12 @@ namespace muGrid {
     const std::type_info & get_stored_typeid() const final { return typeid(T); }
 
     //! return a vector map onto the underlying data
+    Eigen_map eigen_mat();
+    //! return a const vector map onto the underlying data
+    Eigen_cmap eigen_mat() const;
+
+
+    //! return a vector map onto the underlying data
     EigenVec_map eigen_vec();
     //! return a const vector map onto the underlying data
     EigenVec_cmap eigen_vec() const;

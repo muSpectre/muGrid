@@ -1,5 +1,5 @@
 /**
- * @file   bind_py_common.cc
+ * @file   bind_py_common_muspectre.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *

@@ -46,7 +46,8 @@ namespace muSpectre {
     using Parent = SolverBase;
 
    public:
-    using EigenStrainOptFunc_ref = Parent::EigenStrainOptFunc_ref;
+    using EigenStrainFunc_ref = Parent::EigenStrainFunc_ref;
+    using CellExtractFieldFunc_ref = Parent::CellExtractFieldFunc_ref;
 
     //! Default constructor
     SolverSinglePhysics() = delete;
@@ -80,10 +81,12 @@ namespace muSpectre {
     template <class Derived>
     OptimizeResult solve_load_increment(
         const Eigen::MatrixBase<Derived> & load_step,
-        EigenStrainOptFunc_ref eigen_strain_func = muGrid::nullopt) {
+        EigenStrainFunc_ref eigen_strain_func = muGrid::nullopt,
+        CellExtractFieldFunc_ref cell_extract_func = muGrid::nullopt) {
       LoadStep step{};
       step[this->domain] = load_step;
-      return this->solve_load_increment(step, eigen_strain_func);
+      return this->solve_load_increment(step, eigen_strain_func,
+                                        cell_extract_func);
     }
 
     /**
@@ -98,6 +101,9 @@ namespace muSpectre {
     const MappedField_t & evaluate_stress();
     using Parent::evaluate_stress;
 
+    void clear_last_step_nonlinear();
+    using Parent::clear_last_step_nonlinear;
+
     /**
      * evaluates and returns the stress and tangent moduli for the currently set
      * strain
@@ -105,6 +111,13 @@ namespace muSpectre {
     std::tuple<const MappedField_t &, const MappedField_t &>
     evaluate_stress_tangent();
     using Parent::evaluate_stress_tangent;
+
+    //! getter function for grad filed
+    const muGrid::RealField & get_grad() const;
+    //! getter function for flux filed
+    const muGrid::RealField & get_flux() const;
+    //! getter function for tangent filed
+    const muGrid::RealField & get_tangent() const;
 
    protected:
     muGrid::PhysicsDomain domain;

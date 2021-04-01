@@ -232,9 +232,14 @@ namespace muSpectre {
      */
     virtual void set_time_step(const Real & /*dt*/) {}
 
+    //! setter of number of quad points in field collection of material
+    void set_nb_quad_pts(const Index_t & nb_quad_pts);
+
+    //! setter of number of nodal points in field collection of material
+    void set_nb_nodal_pts(const Index_t & nb_nodal_pts);
+
     //! returns whether or not a field with native stress has been stored
     virtual bool has_native_stress() const;
-
 
     /**
      * returns the stored native stress field. Throws a runtime error if native
@@ -253,6 +258,9 @@ namespace muSpectre {
     //    virtual Index_t get_tensor_rank() const = 0;
 
     virtual muGrid::PhysicsDomain get_physics_domain() const = 0;
+
+    //! discarding the previous linear/nonlinear status of the material
+    virtual void clear_last_step_nonlinear() {}
 
    protected:
     const std::string name;  //!< material's name (for output and debugging)

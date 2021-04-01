@@ -52,7 +52,7 @@ namespace muSpectre {
                        young_inf, young_v, eta_v, poisson, dt,
                        this->internal_fields),
         kappa_field{this->get_prefix() + "strain measure",
-                         *this->internal_fields, QuadPtTag},
+                    *this->internal_fields, QuadPtTag},
         kappa_init{kappa_init}, alpha{alpha}, beta{beta} {}
 
   /* ---------------------------------------------------------------------- */
@@ -82,8 +82,8 @@ namespace muSpectre {
       ScalarStRef_t kappa) -> T2_t {
     this->update_damage_measure(E, kappa);
     auto && damage{this->compute_damage_measure(kappa.current())};
-    auto && S{damage *
-              this->material_child.evaluate_stress(E, h_prev, s_null_prev)};
+    T2_t S{damage *
+           this->material_child.evaluate_stress(E, h_prev, s_null_prev)};
     return S;
   }
 

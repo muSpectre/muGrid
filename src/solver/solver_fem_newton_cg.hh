@@ -48,7 +48,8 @@ namespace muSpectre {
    public:
     using Parent = SolverSinglePhysics;
 
-    using EigenStrainOptFunc_ref = Parent::EigenStrainOptFunc_ref;
+    using EigenStrainFunc_ref = Parent::EigenStrainFunc_ref;
+    using CellExtractFieldFunc_ref = Parent::CellExtractFieldFunc_ref;
 
     //! Default constructor
     SolverFEMNewtonCG() = delete;
@@ -79,7 +80,8 @@ namespace muSpectre {
     //! solve for a single increment of strain
     OptimizeResult solve_load_increment(
         const LoadStep & load_step,
-        EigenStrainOptFunc_ref eigen_strain_func = muGrid::nullopt) final;
+        EigenStrainFunc_ref eigen_strain_func = muGrid::nullopt,
+        CellExtractFieldFunc_ref cell_extract_func = muGrid::nullopt) final;
 
     //! return the number of degrees of freedom of the solver problem
     Index_t get_nb_dof() const final;

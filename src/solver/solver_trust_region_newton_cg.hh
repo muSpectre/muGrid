@@ -1,5 +1,5 @@
 /**
- * @file   solver_newton_cg.hh
+ * @file   solver_trust_region_newton_cg.hh
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
@@ -34,53 +34,61 @@
  */
 
 #include "solver_single_physics.hh"
-#include "krylov_solver_base.hh"
+#include "krylov_solver_trust_region_base.hh"
 #include "projection/projection_base.hh"
 
 #include <libmugrid/units.hh>
 
-#ifndef SRC_SOLVER_SOLVER_NEWTON_CG_HH_
-#define SRC_SOLVER_SOLVER_NEWTON_CG_HH_
+#ifndef SRC_SOLVER_SOLVER_TRUST_REGION_NEWTON_CG_HH_
+#define SRC_SOLVER_SOLVER_TRUST_REGION_NEWTON_CG_HH_
 
 namespace muSpectre {
 
-  class SolverNewtonCG : public SolverSinglePhysics {
+  class SolverTrustRegionNewtonCG : public SolverSinglePhysics {
     using Parent = SolverSinglePhysics;
     using Gradient_t = muFFT::Gradient_t;
+    using Vector_t = Eigen::Matrix<Real, Eigen::Dynamic, 1>;
+    using Matrix_t = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
     using EigenStrainFunc_ref = Parent::EigenStrainFunc_ref;
     using CellExtractFieldFunc_ref = Parent::CellExtractFieldFunc_ref;
 
    public:
     //! Default constructor
-    SolverNewtonCG() = delete;
+    SolverTrustRegionNewtonCG() = delete;
 
     //! constructor
-    SolverNewtonCG(std::shared_ptr<CellData> cell_data,
-                   std::shared_ptr<KrylovSolverBase> krylov_solver,
-                   const muGrid::Verbosity & verbosity, const Real & newton_tol,
-                   const Real & equil_tol, const Uint & max_iter,
-                   const Gradient_t & gradient);
+    SolverTrustRegionNewtonCG(
+        std::shared_ptr<CellData> cell_data,
+        std::shared_ptr<KrylovSolverTrustRegionBase> krylov_solver,
+        const muGrid::Verbosity & verbosity, const Real & newton_tol,
+        const Real & equil_tol, const Uint & max_iter,
+        const Real & max_trust_radius, const Real & eta);
 
     //! constructor
-    SolverNewtonCG(std::shared_ptr<CellData> cell_data,
-                   std::shared_ptr<KrylovSolverBase> krylov_solver,
-                   const muGrid::Verbosity & verbosity, const Real & newton_tol,
-                   const Real & equil_tol, const Uint & max_iter);
+    SolverTrustRegionNewtonCG(
+        std::shared_ptr<CellData> cell_data,
+        std::shared_ptr<KrylovSolverTrustRegionBase> krylov_solver,
+        const muGrid::Verbosity & verbosity, const Real & newton_tol,
+        const Real & equil_tol, const Uint & max_iter,
+        const Real & max_trust_radius, const Real & eta,
+        const Gradient_t & gradient);
 
     //! Copy constructor
-    SolverNewtonCG(const SolverNewtonCG & other) = delete;
+    SolverTrustRegionNewtonCG(const SolverTrustRegionNewtonCG & other) = delete;
 
     //! Move constructor
-    SolverNewtonCG(SolverNewtonCG && other) = default;
+    SolverTrustRegionNewtonCG(SolverTrustRegionNewtonCG && other) = default;
 
     //! Destructor
-    virtual ~SolverNewtonCG() = default;
+    virtual ~SolverTrustRegionNewtonCG() = default;
 
     //! Copy assignment operator
-    SolverNewtonCG & operator=(const SolverNewtonCG & other) = delete;
+    SolverTrustRegionNewtonCG &
+    operator=(const SolverTrustRegionNewtonCG & other) = delete;
 
     //! Move assignment operator
-    SolverNewtonCG & operator=(SolverNewtonCG && other) = delete;
+    SolverTrustRegionNewtonCG &
+    operator=(SolverTrustRegionNewtonCG && other) = delete;
 
     using Parent::solve_load_increment;
     //! solve for a single increment of strain
@@ -99,20 +107,8 @@ namespace muSpectre {
     //! initialise cell data for this solver
     void initialise_cell() final;
 
-    //! return the rank of the displacement field for this PhysicsDomain
-    Index_t get_displacement_rank() const;
-
-    //! return the projection operator
-    ProjectionBase & get_projection();
-
-    //! evaluated gradient field
-    MappedField_t & get_eval_grad() const;
-    //! gradient field
-    MappedField_t & get_grad() const;
-    //! Tangent moduli field
-    const MappedField_t & get_tangent() const;
-    //! flux  field
-    const MappedField_t & get_flux() const;
+    //! return a const ref to the projection implementation
+    const ProjectionBase & get_projection() const;
 
    protected:
     void initialise_eigen_strain_storage();
@@ -122,17 +118,6 @@ namespace muSpectre {
      * operator
      */
     template <Dim_t DimM>
-    static void action_increment_worker_prep(
-        const muGrid::TypedFieldBase<Real> & delta_strain,
-        const muGrid::TypedFieldBase<Real> & tangent, const Real & alpha,
-        muGrid::TypedFieldBase<Real> & delta_stress,
-        const Index_t & displacement_rank);
-
-    /**
-     * statically dimensioned worker for evaluating the incremental tangent
-     * operator
-     */
-    template <Dim_t DimM, Index_t DisplacementRank>
     static void
     action_increment_worker(const muGrid::TypedFieldBase<Real> & delta_strain,
                             const muGrid::TypedFieldBase<Real> & tangent,
@@ -143,11 +128,11 @@ namespace muSpectre {
     template <Dim_t Dim>
     void create_mechanics_projection_worker();
     void create_mechanics_projection();
+
     //! create a generic gradient projection
     void create_gradient_projection();
 
     std::shared_ptr<ProjectionBase> projection{nullptr};
-
     using MappedField_t =
         muGrid::MappedField<muGrid::FieldMap<Real, Mapping::Mut>>;
     //! Newton loop gradient (or strain) increment
@@ -167,18 +152,25 @@ namespace muSpectre {
     //! right-hand-side field
     std::shared_ptr<MappedField_t> rhs{nullptr};
 
+    //! holder of the previous macroscopic load
     Eigen::MatrixXd previous_macro_load{};
     std::array<Index_t, 2> grad_shape{};
 
-    std::shared_ptr<KrylovSolverBase> krylov_solver;
+    std::shared_ptr<KrylovSolverTrustRegionBase> krylov_solver;
     Real newton_tol;
     Real equil_tol;
     Uint max_iter;
+
+    //! maximum radius of trust region
+    Real max_trust_radius;
+    //! threshold used in accepting or rejecting a sub-problem solution
+    Real eta;
 
     //! The gradient operator used in the projection
     std::shared_ptr<Gradient_t> gradient;
     Index_t nb_quad_pts{1};
   };
+
 }  // namespace muSpectre
 
-#endif  // SRC_SOLVER_SOLVER_NEWTON_CG_HH_
+#endif  // SRC_SOLVER_SOLVER_TRUST_REGION_NEWTON_CG_HH_

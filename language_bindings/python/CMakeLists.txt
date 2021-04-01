@@ -53,7 +53,7 @@ set (PY_BINDING_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_cell.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_cell_data.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_class_solvers.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_common.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_common_muspectre.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_fem_discretisation.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_linear_anisotropic.cc
@@ -74,6 +74,7 @@ set (PY_BINDING_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_linear_elastic_generic.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_stochastic_plasticity.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_phase_field_fracture.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_material_dunant.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_krylov_solvers.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_projections.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_solvers.cc

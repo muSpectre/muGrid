@@ -1,5 +1,5 @@
 /**
- * @file   solver_newton_cg.cc
+ * @file   solver_trust_region_newton_cg.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
@@ -33,7 +33,7 @@
  *
  */
 
-#include "solver_newton_cg.hh"
+#include "solver_trust_region_newton_cg.hh"
 #include "projection/projection_finite_strain_fast.hh"
 #include "projection/projection_small_strain.hh"
 #include "materials/material_mechanics_base.hh"
@@ -43,36 +43,39 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  SolverNewtonCG::SolverNewtonCG(
+  SolverTrustRegionNewtonCG::SolverTrustRegionNewtonCG(
       std::shared_ptr<CellData> cell_data,
-      std::shared_ptr<KrylovSolverBase> krylov_solver,
+      std::shared_ptr<KrylovSolverTrustRegionBase> krylov_solver,
       const muGrid::Verbosity & verbosity, const Real & newton_tol,
       const Real & equil_tol, const Uint & max_iter,
+      const Real & max_trust_radius, const Real & eta,
       const Gradient_t & gradient)
       : Parent{cell_data, verbosity}, krylov_solver{krylov_solver},
         newton_tol{newton_tol}, equil_tol{equil_tol}, max_iter{max_iter},
+        max_trust_radius{max_trust_radius}, eta{eta},
         gradient{std::make_shared<Gradient_t>(gradient)},
         nb_quad_pts{static_cast<Index_t>(gradient.size()) /
                     (this->cell_data->get_domain_lengths().get_dim())} {}
 
   /* ---------------------------------------------------------------------- */
-  SolverNewtonCG::SolverNewtonCG(
+  SolverTrustRegionNewtonCG::SolverTrustRegionNewtonCG(
       std::shared_ptr<CellData> cell_data,
-      std::shared_ptr<KrylovSolverBase> krylov_solver,
+      std::shared_ptr<KrylovSolverTrustRegionBase> krylov_solver,
       const muGrid::Verbosity & verbosity, const Real & newton_tol,
-      const Real & equil_tol, const Uint & max_iter)
+      const Real & equil_tol, const Uint & max_iter,
+      const Real & max_trust_radius, const Real & eta)
       : Parent{cell_data, verbosity}, krylov_solver{krylov_solver},
         newton_tol{newton_tol}, equil_tol{equil_tol}, max_iter{max_iter},
+        max_trust_radius{max_trust_radius}, eta{eta},
         gradient{std::make_shared<Gradient_t>(
             muFFT::make_fourier_gradient(this->cell_data->get_spatial_dim()))} {
   }
 
   /* ---------------------------------------------------------------------- */
-  void SolverNewtonCG::initialise_cell() {
+  void SolverTrustRegionNewtonCG::initialise_cell() {
     if (this->is_initialised) {
       return;
     }
-
     // make sure the number of subpoints is correct
     this->cell_data->set_nb_quad_pts(this->nb_quad_pts);
     this->cell_data->set_nb_nodal_pts(OneNode);
@@ -183,7 +186,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  OptimizeResult SolverNewtonCG::solve_load_increment(
+  OptimizeResult SolverTrustRegionNewtonCG::solve_load_increment(
       const LoadStep & load_step, EigenStrainFunc_ref eigen_strain_func,
       CellExtractFieldFunc_ref cell_extract_func) {
     if (eigen_strain_func == muGrid::nullopt and
@@ -196,6 +199,7 @@ namespace muSpectre {
           << "previously with an eigenstrain function." << std::endl;
       throw SolverError(err.str());
     }
+
     // check whether this solver's cell has been initialised already
     if (not this->is_initialised) {
       this->initialise_cell();
@@ -222,6 +226,7 @@ namespace muSpectre {
       throw SolverError{error_message.str()};
     }
 
+    // increment the counter of the solver
     ++this->get_counter();
     if (load_step.size() > 1 and this->verbosity > Verbosity::Silent and
         comm.rank() == 0) {
@@ -270,6 +275,24 @@ namespace muSpectre {
         return "Grad";
       }
     }()};
+
+    auto && linear_convrgence_test{
+        [this, &has_converged, &message,
+         &last_step_was_nonlinear]() {  // the last step was nonlinear if either
+                                        // this is a finite strain
+          // mechanics problem or the material evaluation was non-linear
+          bool is_finite_strain_mechanics{this->is_mechanics() and
+                                          this->get_formulation() ==
+                                              Formulation::finite_strain};
+          last_step_was_nonlinear = is_finite_strain_mechanics or
+                                    this->cell_data->was_last_eval_non_linear();
+          if (not last_step_was_nonlinear) {
+            message = "Linear problem, no more iteration necessary";
+          }
+          has_converged = not last_step_was_nonlinear;
+          return has_converged;
+        }};
+
     //! Checks all convergence criteria, including detection of linear
     //! problems
     auto && full_convergence_test{[&early_convergence_test, this,
@@ -289,15 +312,35 @@ namespace muSpectre {
       return has_converged;
     }};
 
+    // create and initialise the radius of the trust region with
+    // max_trust_region_radius
+    Real trust_region_radius{this->max_trust_radius};
+
+    if ((this->verbosity >= Verbosity::Detailed) and (comm.rank() == 0)) {
+      std::cout << std::setw(this->default_count_width) << "STEP"
+                << std::setw(15) << "ACTION" << std::setw(15) << "OLD TR. REG."
+                << std::setw(15) << "NEW TR. REG." << std::setw(15)
+                << "Δm model" << std::setw(15) << "ΔE estim." << std::setw(15)
+                << " estim. ρ" << std::setw(15) << "|GP|"
+                << "(equi tol)" << std::setw(15)
+                << ("|δ" + strain_symb + "|/|Δ" + strain_symb + "|")
+                << "(newt tol)" << std::endl;
+    }
+    // The vector created for holding a copy of the flux vector which will be
+    // used in objective function reduction estimation
+    Vector_t flux_copy_vec;
+
     if (not(eigen_strain_func == muGrid::nullopt)) {
       this->initialise_eigen_strain_storage();
       this->eval_grad->get_field() = this->grad->get_field();
       (eigen_strain_func.value())(this->eval_grad->get_field());
     }
-
     clear_last_step_nonlinear();
     auto res_tup{this->evaluate_stress_tangent()};
     auto & flux{std::get<0>(res_tup)};
+    // keep a copy of the flux in a vector shape (later needed for calculating
+    // the estimation of energy function reduction)
+    flux_copy_vec = flux.get_field().eigen_vec();
 
     *this->rhs = -flux.get_field();
     this->projection->apply_projection(this->rhs->get_field());
@@ -311,6 +354,16 @@ namespace muSpectre {
 
     Uint newt_iter{0};
     for (; newt_iter < this->max_iter and not has_converged; ++newt_iter) {
+      // setting the trust region radius of the solver of the sub-problem
+      try {
+        krylov_solver->set_trust_region(trust_region_radius);
+      } catch (ConvergenceError & error) {
+        std::stringstream err{};
+        err << "The Krylov solver needs to be a trust-region sub-problem "
+            << "solver (should have a trust region member to be set). "
+            << "For instance, use KrylovTrustRegionCG solver" << std::endl;
+        throw ConvergenceError(err.str());
+      }
       // calling solver for solving the current (iteratively approximated)
       // linear equilibrium problem
       try {
@@ -329,12 +382,6 @@ namespace muSpectre {
         throw ConvergenceError(err.str());
       }
 
-      // updating cell strain with the periodic (non-constant) solution
-      // resulted from imposing the new macro_strain
-      std::cout << "<δgrad> =" << std::endl
-                << this->grad_incr->get_map().mean() << std::endl;
-      this->grad->get_field() += this->grad_incr->get_field();
-
       // updating the incremental differences for checking the termination
       // criteria
       incr_norm = std::sqrt(
@@ -342,34 +389,109 @@ namespace muSpectre {
       grad_norm =
           std::sqrt(comm.sum(grad->get_field().eigen_vec().squaredNorm()));
 
-      if ((this->verbosity >= Verbosity::Detailed) and (comm.rank() == 0)) {
-        std::cout << "at Newton step " << std::setw(this->default_count_width)
-                  << newt_iter << ", |δ" << strain_symb << "|/|Δ" << strain_symb
-                  << "|" << std::setw(17) << incr_norm / grad_norm
-                  << ", tol = " << newton_tol << std::endl;
+      Vector_t grad_incr_vec{this->grad_incr->get_field().eigen_vec()};
+      Real flux_copy_grad_incr{comm.sum(flux_copy_vec.dot(grad_incr_vec))};
 
-        if (this->verbosity > Verbosity::Detailed) {
-          std::cout << "<Grad> =" << std::endl
-                    << this->grad->get_map().mean() << std::endl;
+      // δFₖᵀ: Bₖ : δFₖ (will be used in model reduction calculation)
+      Real grad_incr_B_grad_incr{comm.sum(grad_incr_vec.dot(
+          this->krylov_solver->get_matrix_ptr().lock()->get_adaptor() *
+          grad_incr_vec))};
+
+      // Δmₖ = mₖ(δFₖ)-mₖ(0) = 0.5 * δFₖᵀ Bₖ δFₖ + gₖᵀ δFₖ
+      Real del_m{0.5 * grad_incr_B_grad_incr + flux_copy_grad_incr};
+
+      // due to the trial newton step (it might be rejected)
+      // increment cell strain with trial strain
+      this->eval_grad->get_field() += this->grad_incr->get_field();
+
+      // gᵗʳⁱᵃˡₖ₊₁:
+      auto && flux_trial{this->evaluate_stress()};
+      Vector_t flux_trial_vec{flux_trial.get_field().eigen_vec()};
+
+      // restore cell strain back
+      this->eval_grad->get_field() -= this->grad_incr->get_field();
+
+      // Δ̱E estimated (estimated real energy reduction using trapezoidal
+      // approximation)
+      Real flux_trial_grad_incr{comm.sum(flux_trial_vec.dot(grad_incr_vec))};
+
+      // ΔE = 0.5 * (gᵀₖ : δFₖ + gᵀₖ₊₁ : δFₖ)
+      Real del_E_bar{0.5 * (flux_copy_grad_incr + flux_trial_grad_incr)};
+
+      // ρₖ estimated ratio  of the reduction of the energy of the
+      // system (Actual reduction) vs. its quadratic model (sub-problem
+      // estimation) in the trust region
+      Real rho_bar{del_E_bar / del_m};
+
+      // snapshot of trust region size history (printing purposes)
+      Real pre_tr{trust_region_radius};
+
+      // string descriptor for this step (for printing to screen)
+      std::string action_str{""};
+      Real eps{1.0e-6};
+      if (rho_bar < 0.25) {
+        // reduce trust region if the model estimation does not match the system
+        // energy reduction or the model does not predict reduction at all
+        trust_region_radius *= (1.0 / 4.0);
+        action_str = "decrease tr";
+      } else if (rho_bar > 0.75 and std::abs((incr_norm - trust_region_radius) /
+                                             trust_region_radius) < eps) {
+        // expand the trust region if estimated energy loss matches with
+        // the model energy reduction
+        trust_region_radius =
+            std::min(2.0 * trust_region_radius, this->max_trust_radius);
+        action_str = "increase tr";
+      } else {
+        action_str = "keep tr";
+      }
+
+      if ((this->verbosity >= Verbosity::Detailed) and (comm.rank() == 0)) {
+        std::cout << std::setw(3) << (newt_iter) << std::setw(15) << action_str
+                  << std::setw(15) << pre_tr << std::setw(15)
+                  << trust_region_radius << std::setw(15) << del_m
+                  << std::setw(15) << del_E_bar << std::setw(15) << rho_bar
+                  << std::setw(15) << rhs_norm << "(" << equil_tol << ")"
+                  << std::setw(15) << incr_norm / grad_norm << "(" << newton_tol
+                  << ")" << std::setw(15);
+      }
+
+      if (rho_bar < eta) {
+        if ((this->verbosity >= Verbosity::Detailed) and (comm.rank() == 0)) {
+          std::cout << "  (Rejected)" << std::endl;
+        }
+        linear_convrgence_test();
+        continue;
+      } else {
+        if ((this->verbosity >= Verbosity::Detailed) and (comm.rank() == 0)) {
+          std::cout << "  (Accepted)" << std::endl;
+        }
+
+        // updating cell strain with the periodic (non-constant) solution
+        // resulted from imposing the new macro_strain
+        // std::cout << "<δgrad> =" << std::endl
+        //           << this->grad_incr->get_map().mean() << std::endl;
+        this->grad->get_field() += this->grad_incr->get_field();
+
+        if (not(eigen_strain_func == muGrid::nullopt)) {
+          this->eval_grad->get_field() = this->grad->get_field();
+          (eigen_strain_func.value())(this->eval_grad->get_field());
+        }
+        // std::cout << "After Stress-Tangent Evaluation" << "\n";
+        auto res_tup{this->evaluate_stress_tangent()};
+
+        auto & flux_loop{std::get<0>(res_tup)};
+        flux_copy_vec = flux_loop.get_field().eigen_vec();
+
+        *this->rhs = -flux_loop.get_field();
+        this->projection->apply_projection(this->rhs->get_field());
+
+        rhs_norm = std::sqrt(
+            comm.sum(this->rhs->get_field().eigen_vec().squaredNorm()));
+
+        if (not this->krylov_solver->get_is_on_bound()) {
+          full_convergence_test();
         }
       }
-
-      if (not(eigen_strain_func == muGrid::nullopt)) {
-        this->eval_grad->get_field() = this->grad->get_field();
-        (eigen_strain_func.value())(this->eval_grad->get_field());
-      }
-
-      clear_last_step_nonlinear();
-      auto res_tup{this->evaluate_stress_tangent()};
-      auto & flux{std::get<0>(res_tup)};
-
-      *this->rhs = -flux.get_field();
-      this->projection->apply_projection(this->rhs->get_field());
-
-      rhs_norm =
-          std::sqrt(comm.sum(this->rhs->get_field().eigen_vec().squaredNorm()));
-
-      full_convergence_test();
     }
     // throwing meaningful error message if the number of iterations for
     // newton_cg is exploited
@@ -387,9 +509,7 @@ namespace muSpectre {
 
     // update previous macroscopic strain
     this->previous_macro_load = macro_load;
-
     // store results
-
     OptimizeResult ret_val{this->grad->get_field().eigen_sub_pt(),
                            this->flux->get_field().eigen_sub_pt(),
                            full_convergence_test(),
@@ -404,11 +524,12 @@ namespace muSpectre {
     if (not(cell_extract_func == muGrid::nullopt)) {
       (cell_extract_func.value())(this->get_cell_data());
     }
+
     return ret_val;
   }
 
   /* ---------------------------------------------------------------------- */
-  Index_t SolverNewtonCG::get_nb_dof() const {
+  Index_t SolverTrustRegionNewtonCG::get_nb_dof() const {
     if (not this->is_initialised) {
       throw SolverError{"Can't determine the number of degrees of freedom "
                         "until I have been "
@@ -420,9 +541,9 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  void SolverNewtonCG::action_increment(EigenCVec_t delta_grad,
-                                        const Real & alpha,
-                                        EigenVec_t del_flux) {
+  void SolverTrustRegionNewtonCG::action_increment(EigenCVec_t delta_grad,
+                                                   const Real & alpha,
+                                                   EigenVec_t del_flux) {
     auto && grad_size{this->grad_shape[0] * this->grad_shape[1]};
     auto delta_grad_ptr{muGrid::WrappedField<Real>::make_const(
         "delta Grad", this->cell_data->get_fields(), grad_size, delta_grad,
@@ -434,15 +555,13 @@ namespace muSpectre {
 
     switch (this->cell_data->get_material_dim()) {
     case twoD: {
-      this->template action_increment_worker_prep<twoD>(
-          *delta_grad_ptr, this->tangent->get_field(), alpha, del_flux_field,
-          this->get_displacement_rank());
+      this->template action_increment_worker<twoD>(
+          *delta_grad_ptr, this->tangent->get_field(), alpha, del_flux_field);
       break;
     }
     case threeD: {
-      this->template action_increment_worker_prep<threeD>(
-          *delta_grad_ptr, this->tangent->get_field(), alpha, del_flux_field,
-          this->get_displacement_rank());
+      this->template action_increment_worker<threeD>(
+          *delta_grad_ptr, this->tangent->get_field(), alpha, del_flux_field);
       break;
     }
     default:
@@ -457,61 +576,27 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimM>
-  void SolverNewtonCG::action_increment_worker_prep(
-      const muGrid::TypedFieldBase<Real> & delta_grad,
-      const muGrid::TypedFieldBase<Real> & tangent, const Real & alpha,
-      muGrid::TypedFieldBase<Real> & delta_flux,
-      const Index_t & displacement_rank) {
-    switch (displacement_rank) {
-    case zerothOrder: {
-      // this is a scalar problem, e.g., heat equation
-      SolverNewtonCG::template action_increment_worker<DimM, zerothOrder>(
-          delta_grad, tangent, alpha, delta_flux);
-      break;
-    }
-    case firstOrder: {
-      // this is a vectorial problem, e.g., mechanics
-      SolverNewtonCG::template action_increment_worker<DimM, firstOrder>(
-          delta_grad, tangent, alpha, delta_flux);
-      break;
-    }
-    default:
-      throw SolverError("Can only handle scalar and vectorial problems");
-      break;
-    }
-  }
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM, Index_t DisplacementRank>
-  void SolverNewtonCG::action_increment_worker(
+  void SolverTrustRegionNewtonCG::action_increment_worker(
       const muGrid::TypedFieldBase<Real> & delta_grad,
       const muGrid::TypedFieldBase<Real> & tangent, const Real & alpha,
       muGrid::TypedFieldBase<Real> & delta_flux) {
-    constexpr Index_t GradRank{DisplacementRank + 1};
-    static_assert(
-        (GradRank == firstOrder) or (GradRank == secondOrder),
-        "Can only handle vectors and second-rank tensors as gradients");
-    constexpr Index_t TangentRank{GradRank + GradRank};
-    muGrid::TensorFieldMap<Real, muGrid::Mapping::Const, GradRank, DimM,
-                           IterUnit::SubPt>
+    muGrid::T2FieldMap<Real, muGrid::Mapping::Const, DimM, IterUnit::SubPt>
         grad_map{delta_grad};
-    muGrid::TensorFieldMap<Real, muGrid::Mapping::Const, TangentRank, DimM,
-                           IterUnit::SubPt>
+    muGrid::T4FieldMap<Real, muGrid::Mapping::Const, DimM, IterUnit::SubPt>
         tangent_map{tangent};
-    muGrid::TensorFieldMap<Real, muGrid::Mapping::Mut, GradRank, DimM,
-                           IterUnit::SubPt>
+    muGrid::T2FieldMap<Real, muGrid::Mapping::Mut, DimM, IterUnit::SubPt>
         flux_map{delta_flux};
     for (auto && tup : akantu::zip(grad_map, tangent_map, flux_map)) {
       auto & df = std::get<0>(tup);
       auto & k = std::get<1>(tup);
       auto & dp = std::get<2>(tup);
-      Eigen::MatrixXd tmp{alpha * Matrices::tensmult(k, df)};
-      dp += tmp;
+      dp += alpha * Matrices::tensmult(k, df);
     }
   }
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t Dim>
-  void SolverNewtonCG::create_mechanics_projection_worker() {
+  void SolverTrustRegionNewtonCG::create_mechanics_projection_worker() {
     if (static_cast<Index_t>(this->gradient->size()) % Dim != 0) {
       std::stringstream error{};
       error << "There are " << this->gradient->size()
@@ -524,8 +609,6 @@ namespace muSpectre {
     auto fft_ptr{this->cell_data->get_FFT_engine()};
     // fft_ptr->create_plan(this->nb_quad_pts);
     // fft_ptr->create_plan(this->gradient->size());
-
-    std::cout << "Count of Quadrature Points: " << this->nb_quad_pts << "\n";
 
     const DynRcoord_t lengths{this->cell_data->get_domain_lengths()};
     switch (this->get_formulation()) {
@@ -608,7 +691,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  void SolverNewtonCG::create_mechanics_projection() {
+  void SolverTrustRegionNewtonCG::create_mechanics_projection() {
     switch (this->cell_data->get_spatial_dim()) {
     case twoD: {
       this->template create_mechanics_projection_worker<twoD>();
@@ -629,33 +712,24 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  void SolverNewtonCG::create_gradient_projection() {
+  void SolverTrustRegionNewtonCG::create_gradient_projection() {
     switch (this->cell_data->get_spatial_dim()) {
     case twoD: {
-      this->projection = std::make_shared<ProjectionGradient<twoD, firstOrder>>(
-          this->cell_data->get_FFT_engine(),
-          this->cell_data->get_domain_lengths());
-      break;
+      // fall_through
     }
     case threeD: {
-      this->projection =
-          std::make_shared<ProjectionGradient<threeD, firstOrder>>(
-              this->cell_data->get_FFT_engine(),
-              this->cell_data->get_domain_lengths());
-      break;
+      // fall_through
     }
     default:
       std::stringstream error_message{};
-      error_message << "generic gradient projection is not implemented for "
-                    << this->cell_data->get_spatial_dim()
-                    << "-dimensional problems.";
+      error_message << "generic gradient projection is not implemented yet";
       throw SolverError{error_message.str()};
       break;
     }
   }
 
   /* ---------------------------------------------------------------------- */
-  void SolverNewtonCG::initialise_eigen_strain_storage() {
+  void SolverTrustRegionNewtonCG::initialise_eigen_strain_storage() {
     if (not this->has_eigen_strain_storage()) {
       this->eval_grad = std::make_shared<MappedField_t>(
           "eval_grad", this->grad_shape[0], this->grad_shape[1],
@@ -665,41 +739,14 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  bool SolverNewtonCG::has_eigen_strain_storage() const {
+  bool SolverTrustRegionNewtonCG::has_eigen_strain_storage() const {
     return this->eval_grad != this->grad;
   }
 
   /* ---------------------------------------------------------------------- */
-  Index_t SolverNewtonCG::get_displacement_rank() const {
-    return this->domain.rank() - 1;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  ProjectionBase & SolverNewtonCG::get_projection() {
-    if (this->projection == nullptr) {
-      throw SolverError("Projection is not yet defined.");
-    }
+  auto SolverTrustRegionNewtonCG::get_projection() const
+      -> const ProjectionBase & {
     return *this->projection;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  auto SolverNewtonCG::get_eval_grad() const -> MappedField_t & {
-    return *this->eval_grad;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  auto SolverNewtonCG::get_grad() const -> MappedField_t & {
-    return *this->grad;
-  }
-  /* ---------------------------------------------------------------------- */
-
-  auto SolverNewtonCG::get_tangent() const -> const MappedField_t & {
-    return *this->tangent;
-  }
-  /* ---------------------------------------------------------------------- */
-
-  auto SolverNewtonCG::get_flux() const -> const MappedField_t & {
-    return *this->flux;
   }
 
 }  // namespace muSpectre

@@ -64,7 +64,7 @@ namespace muSpectre {
   using muGrid::TwoQuadPts;
   using muGrid::FourQuadPts;
   using muGrid::SixQuadPts;
-  using muGrid::EightQuadPts;  // clang-format on
+  using muGrid::EightQuadPts;
 
   using muGrid::OneNode;
 
@@ -140,11 +140,21 @@ namespace muSpectre {
   //! used to indicate whether internal (native) stresses should be stored
   enum class StoreNativeStress { yes, no };
 
-  //! finite differences flags
+  /**
+   * finite differences flags
+   * NOTE: it is really important to notice that in situations that forward and
+   * backward steps are different in nature (e.g. loading vs. unloading step on
+   * the damage surface of a damage material), the centred option does not
+   * correspond to any meaningful tangent of the material as it returns
+   * an average of the forward and the backward schemes, which does not
+   * represent the correct value of the tangent of in any case.
+   */
   enum class FiniteDiff {
     forward,   //!< ∂f/∂x ≈ (f(x+Δx) - f(x))/Δx
     backward,  //!< ∂f/∂x ≈ (f(x) - f(x-Δx))/Δx
-    centred    //!< ∂f/∂x ≈ (f(x+Δx) - f(x-Δx))/2Δx
+    centred,   //!< ∂f/∂x ≈ (f(x+Δx) - f(x-Δx))/2Δx
+    outward,   //!< ∂f/∂x ≈ (f(x+sign(x)*Δx) - f(x))/(sign(x)*Δx)
+    inward     //!< ∂f/∂x ≈ (f(x) - f(x-sign(x)*Δx))/(sign(x)*Δx)
   };
 
   /**

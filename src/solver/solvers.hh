@@ -37,6 +37,7 @@
 #define SRC_SOLVER_SOLVERS_HH_
 
 #include "solver/krylov_solver_base.hh"
+#include "solver/krylov_solver_trust_region_cg.hh"
 #include "cell/cell.hh"
 
 #include <Eigen/Dense>
@@ -59,9 +60,9 @@ namespace muSpectre {
       const size_t &, muGrid::TypedFieldBase<Real> &)>;
 
 #ifdef NO_EXPERIMENTAL
-  using EigenStrainOptFunc_ref = typename muGrid::optional<EigenStrainFunc_t &>;
+  using EigenStrainFunc_ref = typename muGrid::optional<EigenStrainFunc_t &>;
 #else
-  using EigenStrainOptFunc_ref =
+  using EigenStrainFunc_ref =
       typename muGrid::optional<std::reference_wrapper<EigenStrainFunc_t>>;
 #endif
   enum class IsStrainInitialised { True, False };
@@ -107,7 +108,7 @@ namespace muSpectre {
       KrylovSolverBase & solver, const Real & newton_tol,
       const Real & equil_tol, const Verbosity & verbose = Verbosity::Silent,
       const IsStrainInitialised & strain_init = IsStrainInitialised::False,
-      EigenStrainOptFunc_ref eigen_strain_func = muGrid::nullopt);
+      EigenStrainFunc_ref eigen_strain_func = muGrid::nullopt);
   /**
    * Uses the Newton-conjugate Gradient method to find the static
    * equilibrium of a cell given a mean applied strain.
@@ -118,7 +119,7 @@ namespace muSpectre {
       KrylovSolverBase & solver, const Real & newton_tol,
       const Real & equil_tol, const Verbosity & verbose = Verbosity::Silent,
       const IsStrainInitialised & strain_init = IsStrainInitialised::False,
-      EigenStrainOptFunc_ref eigen_strain_func = muGrid::nullopt) {
+      EigenStrainFunc_ref eigen_strain_func = muGrid::nullopt) {
     LoadSteps_t load_steps{load_step};
     auto ret_val{newton_cg(cell, load_steps, solver, newton_tol, equil_tol,
                            verbose, strain_init, eigen_strain_func)
@@ -164,11 +165,11 @@ namespace muSpectre {
    */
   std::vector<OptimizeResult> trust_region_newton_cg(
       std::shared_ptr<Cell> cell, const LoadSteps_t & load_steps,
-      KrylovSolverBase & solver, const Real & max_trust_region,
+      KrylovSolverTrustRegionBase & solver, const Real & max_trust_region,
       const Real & newton_tol, const Real & equil_tol, const Real & inc_tr_tol,
       const Real & dec_tr_tol, const Verbosity & verbose,
       const IsStrainInitialised & strain_init,
-      EigenStrainOptFunc_ref eigen_strain_func = muGrid::nullopt);
+      EigenStrainFunc_ref eigen_strain_func = muGrid::nullopt);
 
   /**
    * Uses the Newton-conjugate Gradient method to find the static
@@ -176,11 +177,11 @@ namespace muSpectre {
    */
   inline OptimizeResult trust_region_newton_cg(
       std::shared_ptr<Cell> cell, const Eigen::Ref<Eigen::MatrixXd> load_step,
-      KrylovSolverBase & solver, const Real & max_trust_region,
+      KrylovSolverTrustRegionBase & solver, const Real & max_trust_region,
       const Real & newton_tol, const Real & inc_tr_tol, const Real & dec_tr_tol,
       const Real & reduction_tol, const Verbosity & verbose = Verbosity::Silent,
       const IsStrainInitialised & strain_init = IsStrainInitialised::False,
-      EigenStrainOptFunc_ref eigen_strain_func = muGrid::nullopt) {
+      EigenStrainFunc_ref eigen_strain_func = muGrid::nullopt) {
     LoadSteps_t load_steps{load_step};
     auto ret_val{trust_region_newton_cg(cell, load_steps, solver,
                                         max_trust_region, newton_tol,

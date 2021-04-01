@@ -37,6 +37,7 @@
 #include "solver/solver_newton_cg.hh"
 #include "solver/solver_fem_newton_cg.hh"
 #include "solver/solver_fem_newton_pcg.hh"
+#include "solver/solver_trust_region_newton_cg.cc"
 
 #include <libmugrid/numpy_tools.hh>
 
@@ -53,16 +54,56 @@ using muSpectre::Verbosity;
 
 using pybind11::literals::operator""_a;
 
+using muFFT::Gradient_t;
 using muSpectre::CellData;
 using muSpectre::SolverBase;
 using muSpectre::SolverFEMNewtonCG;
 using muSpectre::SolverFEMNewtonPCG;
 using muSpectre::SolverNewtonCG;
+using SolverTRNewtonCG = muSpectre::SolverTrustRegionNewtonCG;
 using muSpectre::SolverSinglePhysics;
+
+class PySolverBase : public SolverBase {
+ public:
+  using Parent = SolverBase;
+
+  PySolverBase(std::shared_ptr<CellData> cell_data,
+               const muGrid::Verbosity & verbosity)
+      : Parent(cell_data, verbosity) {}
+
+  void initialise_cell() override {
+    PYBIND11_OVERLOAD_PURE(void, SolverBase, initialise_cell);
+  }
+
+  muSpectre::OptimizeResult
+  solve_load_increment(const LoadStep & load_step,
+                       EigenStrainFunc_ref eigen_strain_func,
+                       CellExtractFieldFunc_ref cell_extract_func) override {
+    PYBIND11_OVERLOAD_PURE(muSpectre::OptimizeResult, SolverBase,
+                           solve_load_increment, load_step, eigen_strain_func,
+                           cell_extract_func);
+  }
+
+  // using muSpectre::MatrixAdaptable::MatrixAdaptable;
+  Index_t get_nb_dof() const override {
+    PYBIND11_OVERLOAD_PURE(Index_t, SolverBase, get_nb_dof);
+  }
+  void action_increment(EigenCVec_t delta_grad, const Real & alpha,
+                        EigenVec_t del_flux) override {
+    PYBIND11_OVERLOAD_PURE(void, SolverBase, solve_load_increment, delta_grad,
+                           alpha, del_flux);
+  }
+
+  const muGrid::Communicator & get_communicator() const override {
+    PYBIND11_OVERLOAD_PURE(const muGrid::Communicator &, SolverBase,
+                           get_communicator);
+  }
+};
 
 void add_solver_base(py::module & mod) {
   py::class_<SolverBase, muSpectre::MatrixAdaptable,
-             std::shared_ptr<SolverBase>>(mod, "SolverBase")
+             std::shared_ptr<SolverBase>, PySolverBase>(mod, "SolverBase")
+      // .def(py::init<>())
       .def_property_readonly("counter",
                              [](const SolverBase & solver_base) {
                                return solver_base.get_counter();
@@ -75,8 +116,32 @@ void add_solver_base(py::module & mod) {
 
 void add_single_physics_solver(py::module & mod) {
   using EigenStrainFunc_t = std::function<void(muGrid::TypedFieldBase<Real> &)>;
+  using CellExtractFunc_t =
+      std::function<void(const std::shared_ptr<muSpectre::CellData>)>;
   py::class_<SolverSinglePhysics, SolverBase,
              std::shared_ptr<SolverSinglePhysics>>(mod, "SolverSinglePhysics")
+      .def(
+          "solve_load_increment",
+          [](SolverSinglePhysics & solver,
+             py::EigenDRef<Eigen::MatrixXd> load_step,
+             py::function & eigen_strain_pyfunc,
+             py::function & cell_extract_pyfunc) {
+            EigenStrainFunc_t eigen_strain_cpp_func{
+                [&eigen_strain_pyfunc](
+                    muGrid::TypedFieldBase<Real> & eigen_strain_field) {
+                  eigen_strain_pyfunc(muGrid::numpy_wrap(
+                      eigen_strain_field, muGrid::IterUnit::SubPt));
+                }};
+            CellExtractFunc_t cell_extract_cpp_func{
+                [&cell_extract_pyfunc, &solver](
+                    const std::shared_ptr<muSpectre::CellData> cell_data) {
+                  cell_extract_pyfunc(solver, cell_data);
+                }};
+            return solver.solve_load_increment(load_step, eigen_strain_cpp_func,
+                                               cell_extract_cpp_func);
+          },
+          "load_step"_a, "eigen_strain_func"_a = nullptr,
+          "cell_extract_func"_a = nullptr)
       .def(
           "solve_load_increment",
           [](SolverSinglePhysics & solver,
@@ -102,9 +167,13 @@ void add_single_physics_solver(py::module & mod) {
       .def_property_readonly("is_mechanic", &SolverSinglePhysics::is_mechanics)
       .def("evaluate_stress",
            [](SolverSinglePhysics & solver) { solver.evaluate_stress(); })
-      .def("evaluate_stress_tangent", [](SolverSinglePhysics & solver) {
-        solver.evaluate_stress_tangent();
-      });
+      .def("evaluate_stress_tangent",
+           [](SolverSinglePhysics & solver) {
+             solver.evaluate_stress_tangent();
+           })
+      .def_property_readonly("grad", &SolverSinglePhysics::get_grad)
+      .def_property_readonly("flux", &SolverSinglePhysics::get_flux)
+      .def_property_readonly("tangent", &SolverSinglePhysics::get_tangent);
 }
 
 void add_spectral_newton_cg_solver(py::module & mod) {
@@ -112,16 +181,44 @@ void add_spectral_newton_cg_solver(py::module & mod) {
              std::shared_ptr<SolverNewtonCG>>(mod, "SolverNewtonCG")
       .def(py::init<std::shared_ptr<CellData>,
                     std::shared_ptr<muSpectre::KrylovSolverBase>,
+                    const Verbosity &, const Real &, const Real &, const Uint &,
+                    const Gradient_t &>(),
+           "cell_data"_a, "krylov_solver"_a, "verbosity"_a, "newton_tol"_a,
+           "equil_tol"_a, "max_iter"_a, "gradient"_a)
+      .def(py::init<std::shared_ptr<CellData>,
+                    std::shared_ptr<muSpectre::KrylovSolverBase>,
                     const Verbosity &, const Real &, const Real &,
                     const Uint &>(),
            "cell_data"_a, "krylov_solver"_a, "verbosity"_a, "newton_tol"_a,
            "equil_tol"_a, "max_iter"_a)
+
       .def_property_readonly("projection", &SolverNewtonCG::get_projection)
       .def_property_readonly("flux", &SolverNewtonCG::get_flux)
       .def_property_readonly("grad", &SolverNewtonCG::get_grad)
       .def_property_readonly("eval_grad", &SolverNewtonCG::get_eval_grad)
       .def_property_readonly("tangent", &SolverNewtonCG::get_tangent)
-      .def_property_readonly("nb_dof", &SolverNewtonCG::get_nb_dof);
+      .def_property_readonly("nb_dof", &SolverNewtonCG::get_nb_dof)
+      .def_property_readonly("projection", &SolverNewtonCG::get_projection);
+}
+
+void add_spectral_trust_region_newton_cg_solver(py::module & mod) {
+  py::class_<SolverTRNewtonCG, SolverSinglePhysics,
+             std::shared_ptr<SolverTRNewtonCG>>(mod, "SolverTRNewtonCG")
+      .def(py::init<std::shared_ptr<CellData>,
+                    std::shared_ptr<muSpectre::KrylovSolverTrustRegionBase>,
+                    const Verbosity &, const Real &, const Real &, const Uint &,
+                    const Real &, const Real &>(),
+           "cell_data"_a, "krylov_solver"_a, "verbosity"_a, "newton_tol"_a,
+           "equil_tol"_a, "max_iter"_a, "trust_region_max"_a, "eta"_a)
+      .def(py::init<std::shared_ptr<CellData>,
+                    std::shared_ptr<muSpectre::KrylovSolverTrustRegionBase>,
+                    const Verbosity &, const Real &, const Real &, const Uint &,
+                    const Real &, const Real &, const Gradient_t &>(),
+           "cell_data"_a, "krylov_solver"_a, "verbosity"_a, "newton_tol"_a,
+           "equil_tol"_a, "max_iter"_a, "trust_region_max"_a, "eta"_a,
+           "gradient"_a)
+      .def_property_readonly("nb_dof", &SolverTRNewtonCG::get_nb_dof)
+      .def_property_readonly("projection", &SolverTRNewtonCG::get_projection);
 }
 
 void add_fem_newton_cg_solver(py::module & mod) {
@@ -164,4 +261,5 @@ void add_class_solvers(py::module & mod) {
   add_single_physics_solver(mod);
   add_spectral_newton_cg_solver(mod);
   add_fem_newton_cg_solver(mod);
+  add_spectral_trust_region_newton_cg_solver(mod);
 }

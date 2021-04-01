@@ -1,3 +1,4 @@
+
 #==============================================================================
 # file   CMakeLists.txt
 #
@@ -50,7 +51,7 @@ message("-- Installing muFFT Python modules to: ${PYTHON_USER_SITE}")
 
 set (PY_BINDING_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_module.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_common.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_common_mufft.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_derivatives.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_fftengine.cc
   )

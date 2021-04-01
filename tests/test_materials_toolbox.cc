@@ -395,6 +395,14 @@ namespace muSpectre {
         std::cout << "centered difference: " << std::endl;
         break;
       }
+      case FiniteDiff::outward: {
+        std::cout << "outward difference: " << std::endl;
+        break;
+      }
+      case FiniteDiff::inward: {
+        std::cout << " inward difference: " << std::endl;
+        break;
+      }
       }
 
       std::cout << "error = " << error << std::endl;

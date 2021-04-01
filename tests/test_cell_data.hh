@@ -187,6 +187,51 @@ namespace muSpectre {
   using CellDataFixtureEigenStrains2D =
       boost::mpl::list<CellDataFixtureEigenStrain<twoD>>;
 
+  /* ---------------------------------------------------------------------- */
+  template <Index_t Dim>
+  struct CellDataFixtureSquare {
+    constexpr static Index_t SpatialDim{Dim};
+    static DynCcoord_t get_size() {
+      switch (SpatialDim) {
+      case twoD: {
+        return {3, 3};
+        break;
+      }
+      default:
+        std::stringstream err_msg{};
+        err_msg << "can't give you a size for Dim = " << SpatialDim << ". "
+                << "I can only handle two-dimensional problems.";
+        throw muGrid::RuntimeError{err_msg.str()};
+        break;
+      }
+    }
+
+    static DynRcoord_t get_length() {
+      switch (SpatialDim) {
+      case twoD: {
+        return {1, 1};
+        break;
+      }
+      default:
+        std::stringstream err_msg{};
+        err_msg << "can't give you a size for Dim = " << SpatialDim << ". "
+                << "I can only handle two- and three-dimensional problems.";
+        throw muGrid::RuntimeError{err_msg.str()};
+        break;
+      }
+    }
+    CellDataFixtureSquare()
+        : cell_data(CellData::make(get_size(), get_length())) {}
+
+    CellData_ptr cell_data;
+  };
+
+  template <Index_t Dim>
+  constexpr Index_t CellDataFixtureSquare<Dim>::SpatialDim;
+
+  /* ---------------------------------------------------------------------- */
+  using CellDataFixtureSquares = boost::mpl::list<CellDataFixtureSquare<twoD>>;
+
 }  // namespace muSpectre
 
 #endif  // TESTS_TEST_CELL_DATA_HH_

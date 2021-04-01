@@ -1,5 +1,5 @@
 /**
- * @file   bind_py_common.cc
+ * @file   bind_py_common_mufft.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -41,7 +41,6 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/eigen.h>
-
 
 namespace py = pybind11;
 using pybind11::literals::operator""_a;
@@ -131,7 +130,7 @@ void add_fft_freqs(py::module & mod) {
   add_fft_freqs_helper<muGrid::threeD>(mod);
 }
 
-void add_common(py::module & mod) {
+void add_common_mufft(py::module & mod) {
   add_version(mod);
   py::enum_<muFFT::FFT_PlanFlags>(mod, "FFT_PlanFlags")
       .value("estimate", muFFT::FFT_PlanFlags::estimate)

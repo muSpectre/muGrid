@@ -88,11 +88,24 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
+  void
+  SolverBase::clear_last_step_nonlinear(const muGrid::PhysicsDomain & domain) {
+    if (not this->is_initialised) {
+      this->initialise_cell();
+    }
+
+    for (auto & mat : this->cell_data->get_domain_materials().at(domain)) {
+      mat->clear_last_step_nonlinear();
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
   auto SolverBase::evaluate_stress(const muGrid::PhysicsDomain & domain)
       -> const MappedField_t & {
     if (not this->is_initialised) {
       this->initialise_cell();
     }
+
     for (auto && mat : this->cell_data->get_domain_materials().at(domain)) {
       check_material_formulation(mat, this->get_formulation(), domain);
       mat->compute_stresses(this->eval_grads.at(domain)->get_field(),
@@ -107,6 +120,7 @@ namespace muSpectre {
     if (not this->is_initialised) {
       this->initialise_cell();
     }
+
     for (auto && mat : this->cell_data->get_domain_materials().at(domain)) {
       check_material_formulation(mat, this->get_formulation(), domain);
       mat->compute_stresses_tangent(this->eval_grads.at(domain)->get_field(),
@@ -122,6 +136,11 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   const muFFT::Communicator & SolverBase::get_communicator() const {
     return this->cell_data->get_communicator();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  const std::shared_ptr<CellData> SolverBase::get_cell_data() const {
+    return this->cell_data;
   }
 
 }  // namespace muSpectre

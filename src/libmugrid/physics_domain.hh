@@ -55,7 +55,8 @@ namespace muGrid {
     PhysicsDomain() = delete;
 
     //! constructor from rank, input- and output units, with validity check
-    PhysicsDomain(const Uint & rank, const Unit & input, const Unit & output);
+    PhysicsDomain(const Uint & rank, const Unit & input, const Unit & output,
+                  const std::string & name = "");
 
     //! Copy constructor
     PhysicsDomain(const PhysicsDomain & other);
@@ -93,9 +94,11 @@ namespace muGrid {
     //! return units of output variable
     const Unit & output() const;
 
+    const std::string & get_name() const;
 
    protected:
     friend std::ostream & operator<<(std::ostream &, const PhysicsDomain &);
+    std::string domain_name;
   };
 
   /* ---------------------------------------------------------------------- */

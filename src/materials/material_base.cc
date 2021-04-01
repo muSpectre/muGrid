@@ -203,4 +203,14 @@ namespace muSpectre {
     return this->last_step_was_nonlinear;
   }
 
+  /* ---------------------------------------------------------------------- */
+  void MaterialBase::set_nb_quad_pts(const Index_t & nb_quad_pts) {
+    this->internal_fields->set_nb_sub_pts(QuadPtTag, nb_quad_pts);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void MaterialBase::set_nb_nodal_pts(const Index_t & nb_nodal_pts) {
+    this->internal_fields->set_nb_sub_pts(NodalPtTag, nb_nodal_pts);
+  }
+
 }  // namespace muSpectre

@@ -85,7 +85,7 @@ namespace muSpectre {
             KrylovSolverBase & solver, const Real & newton_tol,
             const Real & equil_tol, const Verbosity & verbose,
             const IsStrainInitialised & strain_init,
-            EigenStrainOptFunc_ref eigen_strain_func) {
+            EigenStrainFunc_ref eigen_strain_func) {
     if (load_steps.size() == 0) {
       throw SolverError("No load steps specified.");
     }
@@ -158,13 +158,14 @@ namespace muSpectre {
                 << ", cg_tol = " << solver.get_tol()
                 << ", maxiter = " << solver.get_maxiter() << " and ";
       if (load_steps.size() > 1) {
-        std::cout << strain_symb << " from " << strain_symb << "₁ ="
-                  << std::endl << load_steps.front() << std::endl
+        std::cout << strain_symb << " from " << strain_symb
+                  << "₁ =" << std::endl
+                  << load_steps.front() << std::endl
                   << " to " << strain_symb << "ₙ =" << std::endl
                   << load_steps.back() << std::endl
                   << "in increments of Δ" << strain_symb << " =" << std::endl
                   << (load_steps.back() - load_steps.front()) /
-                     load_steps.size()
+                         load_steps.size()
                   << std::endl;
       } else {
         std::cout << "Δ" << strain_symb << " = " << std::endl
@@ -246,8 +247,8 @@ namespace muSpectre {
     // user-specified
     if (strain_init == IsStrainInitialised::True) {
       // storage for the previous mean strain (to compute ΔF or Δε )
-      Matrix_t initial_macro_strain{
-          comm.sum(F_general_map.sum()) / comm.sum(F_general_map.size())};
+      Matrix_t initial_macro_strain{comm.sum(F_general_map.sum()) /
+                                    comm.sum(F_general_map.size())};
       if (verbose > Verbosity::Silent && comm.rank() == 0) {
         std::cout << "The strain was initialised by the user to a value of "
                   << "<" << strain_symb << "> =" << std::endl
@@ -502,13 +503,14 @@ namespace muSpectre {
                 << ", cg_tol = " << solver.get_tol()
                 << ", maxiter = " << solver.get_maxiter() << " and ";
       if (load_steps.size() > 1) {
-        std::cout << strain_symb << " from " << strain_symb << "₁ ="
-                  << std::endl << load_steps.front() << std::endl
+        std::cout << strain_symb << " from " << strain_symb
+                  << "₁ =" << std::endl
+                  << load_steps.front() << std::endl
                   << " to " << strain_symb << "ₙ =" << std::endl
                   << load_steps.back() << std::endl
                   << "in increments of Δ" << strain_symb << " =" << std::endl
                   << (load_steps.back() - load_steps.front()) /
-                     load_steps.size()
+                         load_steps.size()
                   << std::endl;
       } else {
         std::cout << "Δ" << strain_symb << " = " << std::endl
@@ -838,11 +840,11 @@ namespace muSpectre {
   //--------------------------------------------------------------------------//
   std::vector<OptimizeResult> trust_region_newton_cg(
       std::shared_ptr<Cell> cell, const LoadSteps_t & load_steps,
-      KrylovSolverBase & solver, const Real & max_trust_region,
+      KrylovSolverTrustRegionBase & solver, const Real & max_trust_region,
       const Real & newton_tol, const Real & equil_tol, const Real & inc_tr_tol,
       const Real & dec_tr_tol, const Verbosity & verbose,
       const IsStrainInitialised & strain_init,
-      EigenStrainOptFunc_ref eigen_strain_func) {
+      EigenStrainFunc_ref eigen_strain_func) {
     if (load_steps.size() == 0) {
       throw SolverError("No load steps specified.");
     }
@@ -931,7 +933,7 @@ namespace muSpectre {
                   << load_steps.back() << std::endl
                   << "in increments of Δ" << strain_symb << " =" << std::endl
                   << (load_steps.back() - load_steps.front()) /
-                     load_steps.size()
+                         load_steps.size()
                   << std::endl;
       } else {
         std::cout << " = " << std::endl << load_steps.front() << std::endl;
@@ -1012,8 +1014,8 @@ namespace muSpectre {
     // user-specified
     if (strain_init == IsStrainInitialised::True) {
       // storage for the previous mean strain (to compute ΔF or Δε )
-      Matrix_t initial_macro_strain{
-          comm.sum(F_general_map.sum()) / comm.sum(F_general_map.size())};
+      Matrix_t initial_macro_strain{comm.sum(F_general_map.sum()) /
+                                    comm.sum(F_general_map.size())};
       if (verbose > Verbosity::Silent && comm.rank() == 0) {
         std::cout << "The strain was initialised by the user to a value of "
                   << "<" << strain_symb << "> =" << std::endl
@@ -1182,12 +1184,14 @@ namespace muSpectre {
                       << incr_norm / grad_norm << " (" << newton_tol << ")"
                       << std::endl;
           }
-          if (verbose > Verbosity::Detailed) {
+          if (verbose > Verbosity::Silent) {
             using StrainMap_t = muGrid::FieldMap<Real, Mapping::Const>;
             StrainMap_t m{general_strain_field, shape[0]};
             Matrix_t mean_strain{comm.sum(m.sum()) / comm.sum(m.size())};
             if (comm.rank() == 0) {
-              std::cout << "<" << strain_symb << "> =" << std::endl
+              std::cout << std::setw(count_width) << "NEWTON-STEP"
+                        << ": " << (newt_iter - 1) << "\n"
+                        << "<" << strain_symb << "> =" << std::endl
                         << mean_strain << std::endl;
             }
           }

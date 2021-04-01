@@ -113,6 +113,9 @@ muSpectre_add_example(crack_py_example
 muSpectre_add_example(buckling_py_example
   TYPE PYTHON buckling.py --to-file buckling.png 0.01)
 
+muSpectre_add_example(buckling_solver_class_py_example
+  TYPE PYTHON buckling_solver_class.py --to-file buckling.png 0.01)
+
 muSpectre_add_example(hyper-elasticity_py_example
   TYPE PYTHON hyper-elasticity.py)
 
@@ -171,6 +174,9 @@ file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/concrete_micro_structure.npy
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/random_field.npy
+    DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
+
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/plot_tri.py
     DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 
 

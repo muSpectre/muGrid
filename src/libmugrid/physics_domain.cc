@@ -1,3 +1,4 @@
+
 /**
  * @file   physics_domain.cc
  *
@@ -39,8 +40,8 @@
 
 namespace muGrid {
   PhysicsDomain::PhysicsDomain(const Uint & rank, const Unit & input,
-                               const Unit & output)
-      : Parent{rank, input, output} {
+                               const Unit & output, const std::string & name)
+      : Parent{rank, input, output}, domain_name{name} {
     Unit product{this->input() * this->output()};
     const Unit energy_density{Unit::mass() /
                               (Unit::length() * Unit::time() * Unit::time())};
@@ -56,7 +57,8 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   PhysicsDomain::PhysicsDomain(const PhysicsDomain & other)
-      : Parent{other.rank(), other.input(), other.output()} {};
+      : Parent{other.rank(), other.input(), other.output()},
+        domain_name{other.get_name()} {};
 
   /* ---------------------------------------------------------------------- */
   bool PhysicsDomain::operator<(const PhysicsDomain & other) const {
@@ -66,16 +68,22 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   PhysicsDomain PhysicsDomain::mechanics(const Int & tag) {
-    return PhysicsDomain{secondOrder, Unit::strain(tag), Unit::stress(tag)};
+    return PhysicsDomain{secondOrder, Unit::strain(tag), Unit::stress(tag),
+                         "mechanics"};
   }
 
   /* ---------------------------------------------------------------------- */
   PhysicsDomain PhysicsDomain::heat(const Int & tag) {
     return PhysicsDomain{firstOrder, Unit::temperature(tag) / Unit::length(tag),
                          Unit::mass(tag) / Unit::time(tag) / Unit::time(tag) /
-                             Unit::time(tag)};
+                             Unit::time(tag),
+                         "heat"};
   }
 
+  /* ---------------------------------------------------------------------- */
+  const std::string & PhysicsDomain::get_name() const {
+    return this->domain_name;
+  }
   /* ---------------------------------------------------------------------- */
   bool PhysicsDomain::operator==(const PhysicsDomain & other) const {
     return static_cast<const Parent &>(*this) ==

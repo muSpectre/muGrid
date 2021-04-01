@@ -55,13 +55,18 @@ namespace muSpectre {
     using EigenStrainFunc_t =
         typename std::function<void(muGrid::TypedFieldBase<Real> &)>;
 
-#ifdef NO_EXPERIMENTAL
-    using EigenStrainOptFunc_ref =
-        typename muGrid::optional<EigenStrainFunc_t &>;
+    using CellExtractFieldFunc_t = typename std::function<void(
+        const std::shared_ptr<muSpectre::CellData>)>;
 
+#ifdef NO_EXPERIMENTAL
+    using EigenStrainFunc_ref = typename muGrid::optional<EigenStrainFunc_t &>;
+    using CellExtractFieldFunc_ref =
+        typename muGrid::optional<CellExtractFieldFunc_t>;
 #else
-    using EigenStrainOptFunc_ref =
+    using EigenStrainFunc_ref =
         typename muGrid::optional<std::reference_wrapper<EigenStrainFunc_t>>;
+    using CellExtractFieldFunc_ref =
+        typename muGrid::optional<CellExtractFieldFunc_t>;
 #endif
 
     using Parent = MatrixAdaptable;
@@ -71,8 +76,11 @@ namespace muSpectre {
     using FilePath = std::string;
 
     //! Default constructor
-    explicit SolverBase(std::shared_ptr<CellData> cell_data,
-                        const muGrid::Verbosity & verbosity);
+    SolverBase() = delete;
+
+    //! Explicit constructor
+    SolverBase(std::shared_ptr<CellData> cell_data,
+               const muGrid::Verbosity & verbosity);
 
     //! Copy constructor
     SolverBase(const SolverBase & other) = delete;
@@ -97,7 +105,8 @@ namespace muSpectre {
      */
     virtual OptimizeResult
     solve_load_increment(const LoadStep & load_step,
-                         EigenStrainOptFunc_ref eigen_strain_func) = 0;
+                         EigenStrainFunc_ref eigen_strain_func,
+                         CellExtractFieldFunc_ref cell_extract_func) = 0;
 
     /**
      * set formulation (small vs finite strain) used fo
@@ -116,6 +125,11 @@ r mechanics domain.
     //! get current load step counter
     const Int & get_counter() const;
 
+    /** reset the linear/nonlinear status of all the materials in the given
+    domain
+    */
+    void clear_last_step_nonlinear(const muGrid::PhysicsDomain & domain);
+
     /**
      * evaluates and returns the stress for the currently set strain
      */
@@ -132,6 +146,9 @@ r mechanics domain.
     virtual void initialise_cell() = 0;
 
     const muFFT::Communicator & get_communicator() const;
+
+    //! getter of the cell data
+    const std::shared_ptr<CellData> get_cell_data() const;
 
    protected:
     //! get current load step counter

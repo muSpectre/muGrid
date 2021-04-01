@@ -50,7 +50,7 @@ message("-- Installing muGrid Python modules to: ${PYTHON_USER_SITE}")
 
 set (PY_BINDING_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_module.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_common.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_common_mugrid.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_communicator.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_field.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_state_field.cc

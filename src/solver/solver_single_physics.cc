@@ -58,6 +58,11 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
+  void SolverSinglePhysics::clear_last_step_nonlinear() {
+    Parent::clear_last_step_nonlinear(this->domain);
+  }
+
+  /* ---------------------------------------------------------------------- */
   auto SolverSinglePhysics::evaluate_stress() -> const MappedField_t & {
     return Parent::evaluate_stress(this->domain);
   }
@@ -66,6 +71,21 @@ namespace muSpectre {
   auto SolverSinglePhysics::evaluate_stress_tangent()
       -> std::tuple<const MappedField_t &, const MappedField_t &> {
     return Parent::evaluate_stress_tangent(this->domain);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  const muGrid::RealField & SolverSinglePhysics::get_flux() const {
+    return this->fluxes.at(this->domain)->get_field();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  const muGrid::RealField & SolverSinglePhysics::get_grad() const {
+    return this->grads.at(this->domain)->get_field();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  const muGrid::RealField & SolverSinglePhysics::get_tangent() const {
+    return this->tangents.at(this->domain)->get_field();
   }
 
 }  // namespace muSpectre

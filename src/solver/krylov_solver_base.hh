@@ -132,9 +132,6 @@ namespace muSpectre {
     //! reset the iteration counter to zero
     void reset_counter();
 
-    //! set size of trust region, exception if not supported
-    virtual void set_trust_region(Real new_trust_region);
-
     //! get the count of how many solve steps have been executed since
     //! construction of most recent counter reset
     Uint get_counter() const;
@@ -144,6 +141,10 @@ namespace muSpectre {
 
     //! returns the solving tolerance
     Real get_tol() const;
+
+    //! return the holder of the matrix of the  cell
+    std::shared_ptr<MatrixAdaptable> get_matrix_holder() const;
+    std::weak_ptr<MatrixAdaptable> get_matrix_ptr() const;
 
     //! returns the solver's name (i.e. 'CG', 'GMRES', etc)
     virtual std::string get_name() const = 0;

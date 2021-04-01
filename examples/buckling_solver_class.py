@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
-@file   buckling.py
+@file   buckling_solver_class.py
 
 @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
+@author Ali Falsafi <ali.falsafi@epfl.ch>
 
-@date   09 Aug 2020
+@date   10 Feb 2021
 
-@brief  buckling example demonstrating the trust-region Newton CG optimizer
+@brief  Functions for the integration of periodic first- and second-rank
+        tensor fields on an n-dimensional rectangular grid
 
-Copyright © 2019 Till Junge
+Copyright © 2018 Till Junge
 
 µSpectre is free software; you can redistribute it and/or
 modify it under the terms of the GNU Lesser General Public License as
@@ -42,7 +44,6 @@ import numpy as np
 try:
     import matplotlib.pyplot as plt
     from matplotlib.tri import Triangulation
-
     matplotlib_found = True
 except ImportError:
     matplotlib_found = False
@@ -63,6 +64,7 @@ parser.add_option('-f', '--to-file',
 options, args = parser.parse_args()
 
 ###
+
 
 def make_triangles(displ):
     displ_x, displ_y = displ
@@ -100,60 +102,72 @@ mask[np.logical_and(x > amplitude1 * (1 + s),
 nb_domain_grid_pts = mask.shape
 domain_lengths = [float(r) for r in nb_domain_grid_pts]
 
-## define the convergence tolerance for the Newton-Raphson increment
+# define the convergence tolerance for the Newton-Raphson increment
 newton_tol = 1e-6
 equil_tol = newton_tol
-inc_tr_tol = 1e-4
-dec_tr_tol = 1e-2
-## tolerance for the solver of the linear cell
+# tolerance for the solver of the linear cell
 cg_tol = 1e-6
 
-## macroscopic strain
+# macroscopic strain
 applied_strain = []
 if len(args) > 0:
     strain_steps = [float(s) for s in args]
 else:
-    strain_steps = np.linspace(0, 0.05, 10)
+    strain_steps = np.linspace(0, 0.05, 11)
 for s in strain_steps:
     applied_strain += [[[2 * s, 0], [0, -s]]]
 
 maxiter = 1000  # for linear cell solver
-trust_region = 100.0
+max_trust_region = 100.0
+eta = 1.0e-3
 
-## numerical derivative, two quadrature points
+# numerical derivative, two quadrature points
 gradient = Stencils2D.linear_finite_elements
 
 ###
-rve = msp.Cell(nb_domain_grid_pts, domain_lengths,
-               msp.Formulation.finite_strain, gradient,
-               fft='fftw', communicator=MPI.COMM_WORLD)
+
+rve = msp.cell.CellData.make(nb_domain_grid_pts, domain_lengths)
+rve.nb_quad_pts = 2
+
 hard = msp.material.MaterialLinearElastic1_2d.make(rve, "hard", 1., .33)
 vacuum = msp.material.MaterialLinearElastic1_2d.make(rve, "vacuum", 0.0, 0.33)
+
 for pixel_index, pixel in enumerate(rve.pixels):
     if mask[tuple(pixel)]:
         hard.add_pixel(pixel_index)
     else:
         vacuum.add_pixel(pixel_index)
-## we need the trust-region solver here because of the buckling instability where the
-## Hessian becomes negative definite
-solver = msp.solvers.KrylovSolverTrustRegionCG(
-    rve, maxiter=maxiter, verbose=msp.Verbosity.Silent)
 
-result = msp.solvers.trust_region_newton_cg(rve, applied_strain, solver,
-                                            trust_region=trust_region,
-                                            newton_tol=newton_tol,
-                                            equil_tol=equil_tol,
-                                            dec_tr_tol=dec_tr_tol,
-                                            inc_tr_tol=inc_tr_tol,
-                                            verbose=msp.Verbosity.Some)
+# we need the trust-region solver here because of
+# the buckling instability where the
+# Hessian becomes negative definite
+krylov_solver = msp.solvers.KrylovSolverTrustRegionCG(
+    cg_tol, maxiter,
+    verbose=msp.Verbosity.Silent)
+
+solver = msp.solvers.SolverTRNewtonCG(rve, krylov_solver,
+                                      msp.Verbosity.Full,
+                                      newton_tol, equil_tol,
+                                      maxiter, max_trust_region,
+                                      eta, gradient)
+
+
+solver.formulation = msp.Formulation.finite_strain
+solver.initialise_cell()
+result = []
+
+for i, strain_to_apply in enumerate(applied_strain):
+    print("load step number: {}".format(i))
+    res = solver.solve_load_increment(np.array(strain_to_apply))
+    result.append(res)
 
 ###
-
 if matplotlib_found and MPI.COMM_WORLD.Get_size() == 1:
     plt.figure()
     phase = np.vstack((mask, mask))
     for i, res in enumerate([result[0], result[-1]]):
-        F = res.grad.reshape((2, 2, 2) + tuple(nb_domain_grid_pts))
+        grad = res.grad.ravel(order="F").reshape(-1, 1)
+        F = grad.reshape((2, 2, 2) + tuple(nb_domain_grid_pts))
         detF = np.linalg.det(F.T).T
         print(i, np.logical_and(detF < 0, mask).sum())
 
@@ -162,8 +176,7 @@ if matplotlib_found and MPI.COMM_WORLD.Get_size() == 1:
             formulation=msp.Formulation.finite_strain)
 
         tri = make_triangles(displ)
-        # plt.subplot(1, len(result), i+1, aspect=1)
-        plt.subplot(1, 2, i + 1, aspect=1)
+        plt.subplot(1, 2, i + 1, aspect="equal")
         tpc = plt.tripcolor(tri, phase.reshape(-1), ec='black')
         plt.colorbar(tpc)
 
@@ -173,4 +186,3 @@ if matplotlib_found and MPI.COMM_WORLD.Get_size() == 1:
         plt.savefig(options.plot_file)
     else:
         plt.show()
-

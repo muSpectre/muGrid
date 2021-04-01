@@ -41,6 +41,7 @@ import muFFT.Stencils2D
 import muFFT.Stencils3D
 
 from .gradient_integration import get_complemented_positions
+from .gradient_integration import get_complemented_positions_class_solver
 
 
 # Linear finite elements in 2D (each pixel is subdivided into two triangles)
@@ -62,7 +63,7 @@ def write_3d(file_name, rve, cell_data=None):
 
     file_name  -- filename
     rve -- representative volume element, i.e. the `Cell` object
-    cell_data = dictionary of cell data with corresponding keys
+    data = dictionary of cell data with corresponding keys
     """
     import meshio
     # Size of RVE
@@ -70,7 +71,7 @@ def write_3d(file_name, rve, cell_data=None):
 
     # Positions, periodically complemented
     [x_def, y_def, z_def], [x_undef, y_undef, z_undef] \
-        = get_complemented_positions(rve)
+        = get_complemented_positions("pd", rve)
 
     # Global node indices
     def c2i(xp, yp, zp):
@@ -110,13 +111,13 @@ def write_3d(file_name, rve, cell_data=None):
     strain = rve.strain.array() \
         .reshape((3, 3, -1), order='F').T.swapaxes(1, 2)
 
-    if cell_data == None:
+    if data == None:
         # Write mesh to file
         meshio.write_points_cells(
             file_name,
             points,
             {"tetra": cells},
-            cell_data={
+            data={
                 'stress': np.array([stress]),
                 'strain': np.array([strain])
             })
@@ -126,12 +127,11 @@ def write_3d(file_name, rve, cell_data=None):
             file_name,
             points,
             {"tetra": cells},
-            cell_data=cell_data
+            data=data
         )
 
 
-
-def write_2d(file_name, rve, cell_data=None):
+def write_2d(file_name, cell_data=None):
     """
     Write results of a 3D calculation that employs a decomposition of each
     voxel in six tetrahedra (using the `gradient_3d` stencil) to a file. The
@@ -142,7 +142,7 @@ def write_2d(file_name, rve, cell_data=None):
 
     file_name  -- filename
     rve -- representative volume element, i.e. the `Cell` object
-    cell_data = dictionary of cell data with corresponding keys
+    data = dictionary of cell data with corresponding keys
     """
     import meshio
     # Size of RVE
@@ -150,7 +150,7 @@ def write_2d(file_name, rve, cell_data=None):
 
     # Positions, periodically complemented
     [x_def, y_def], [x_undef, y_undef] \
-        = get_complemented_positions(rve)
+        = get_complemented_positions("pd", rve)
 
     # Global node indices
     def c2i(xp, yp):
@@ -179,7 +179,7 @@ def write_2d(file_name, rve, cell_data=None):
     strain = rve.strain.array() \
         .reshape((2, 2, -1), order='F').T.swapaxes(1, 2)
 
-    if cell_data == None:
+    if data == None:
         # Write mesh to file
         meshio.write_points_cells(
             file_name,
@@ -195,5 +195,75 @@ def write_2d(file_name, rve, cell_data=None):
             file_name,
             points,
             {"triangle": cells},
-            cell_data=cell_data
+            cell_data=data
+        )
+
+
+def write_2d_class_solver(file_name, rve, solver, result, cell_data=None):
+    """
+    Write results of a 3D calculation that employs a decomposition of each
+    voxel in six tetrahedra (using the `gradient_3d` stencil) to a file. The
+    output is handled by `meshio`, which means all `meshio` formats are
+    supported.
+
+    More on `meshio` can be found here: https://github.com/nschloe/meshio
+
+    file_name  -- filename
+    rve -- representative volume element, i.e. the `Cell` object
+    data = dictionary of cell data with corresponding keys
+    """
+    import meshio
+    # Size of RVE
+    nx, ny = rve.nb_domain_grid_pts
+
+    # Positions, periodically complemented
+    [x_def, y_def], [x_undef, y_undef] \
+        = get_complemented_positions_class_solver("pd", rve=rve,
+                                                  solver=solver,
+                                                  result=result)
+
+    # Global node indices
+    def c2i(xp, yp):
+        return xp + (nx + 1) * yp
+
+    # Integer cell coordinates
+    xc, yc = np.mgrid[:nx, :ny]
+    xc = xc.ravel(order='F')
+    yc = yc.ravel(order='F')
+
+    x_def = x_def.ravel(order='F')
+    y_def = y_def.ravel(order='F')
+
+    # Construct mesh
+    points = np.transpose([x_def,
+                           y_def])
+    cells = np.swapaxes(
+        [[c2i(xc, yc), c2i(xc+1, yc), c2i(xc, yc+1)],
+         [c2i(xc, yc+1), c2i(xc+1, yc), c2i(xc+1, yc+1)]],
+        0, 1)
+    cells = cells.reshape((3, -1), order='F').T
+    # Get Stress
+    stress = solver.flux.array() \
+        .reshape((2, 2, -1), order='F').T.swapaxes(1, 2)
+    # Get Strain
+    strain = solver.grad.array() \
+        .reshape((2, 2, -1), order='F').T.swapaxes(1, 2)
+
+    if data == None:
+        # Write mesh to file
+        meshio.write_points_cells(
+            file_name,
+            points,
+            {"triangle": cells},
+            cell_data={
+                'stress': np.array([stress]),
+                'strain': np.array([strain])
+            })
+    else:
+        # Write mesh to file
+        meshio.write_points_cells(
+            file_name,
+            points,
+            {"triangle": cells},
+            cell_data=data
         )

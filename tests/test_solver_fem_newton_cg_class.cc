@@ -49,6 +49,8 @@
 #include <solver/krylov_solver_cg.hh>
 #include <solver/krylov_solver_pcg.hh>
 
+#include <cstdlib>
+
 namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE(fem_newton_cg_solverclass);
@@ -113,7 +115,9 @@ namespace muSpectre {
 
     auto strain_maker = [](auto && spatial_dim,
                            auto && formulation) -> Eigen::MatrixXd {
-      Eigen::MatrixXd retval{Eigen::MatrixXd::Random(spatial_dim, spatial_dim)};
+      // std::srand(42);
+      Eigen::MatrixXd retval{0.01 *
+                             Eigen::MatrixXd::Random(spatial_dim, spatial_dim)};
       switch (formulation) {
       case Formulation::finite_strain: {
         return retval;
@@ -345,7 +349,7 @@ namespace muSpectre {
 
     constexpr Real cg_tol{1e-8}, newton_tol{1e-8}, equil_tol{1e-10};
     const Uint maxiter{static_cast<Uint>(this->cell_data->get_spatial_dim()) *
-                       20};
+                       50};
     constexpr Verbosity verbose{Verbosity::Silent};
 
     auto krylov_solver{
@@ -353,10 +357,10 @@ namespace muSpectre {
     auto solver{std::make_shared<SolverFEMNewtonPCG>(
         discretisation, krylov_solver, verbose, newton_tol, equil_tol,
         maxiter)};
-
+    std::srand(42);
     auto strain_maker = [](auto && spatial_dim,
                            auto && formulation) -> Eigen::MatrixXd {
-      Eigen::MatrixXd retval{.2 *
+      Eigen::MatrixXd retval{.1 *
                              Eigen::MatrixXd::Random(spatial_dim, spatial_dim)};
       switch (formulation) {
       case Formulation::finite_strain: {
@@ -378,16 +382,14 @@ namespace muSpectre {
     solver->set_formulation(Form);
     solver->initialise_cell();
     solver->get_eval_grad().get_map() = Eigen::MatrixXd::Identity(twoD, twoD);
+    solver->clear_last_step_nonlinear();
     solver->evaluate_stress_tangent();
     auto ref_material{solver->get_tangent().get_map().mean()};
     solver->set_reference_material(ref_material);
 
     BOOST_TEST_CHECKPOINT("before load increment");
-    std::cout << std::endl
-              << "Gradient:" << std::endl
-              << grad << std::endl;
-    std::cout << "Formulation = " << Form
-              << std::endl;
+    std::cout << std::endl << "Gradient:" << std::endl << grad << std::endl;
+    std::cout << "Formulation = " << Form << std::endl;
 
     KrylovSolverCG legacy_krylov_solver{legacy_cell, cg_tol, maxiter, verbose};
     auto && legacy_result{newton_cg(legacy_cell, grad, legacy_krylov_solver,
@@ -395,6 +397,9 @@ namespace muSpectre {
     std::cout << "Done with legacy solver" << std::endl;
 
     Eigen::MatrixXd load_step{grad};
+
+    // std::cout << "grad:\n" << grad << "\n";
+    BOOST_TEST_CHECKPOINT("before fem solver call");
     auto && new_result{solver->solve_load_increment(load_step)};
     std::cout << "Newton-PCG converged in " << krylov_solver->get_counter()
               << " PCG steps and " << new_result.nb_it << " Newton steps."

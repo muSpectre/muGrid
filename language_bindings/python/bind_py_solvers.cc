@@ -171,7 +171,7 @@ void add_de_geus_helper(py::module & mod) {
 
 void add_trust_region_newton_cg_helper(py::module & mod) {
   const char name[]{"trust_region_newton_cg"};
-  using solver = muSpectre::KrylovSolverBase;
+  using solver = muSpectre::KrylovSolverTrustRegionBase;
   using grad = py::EigenDRef<Eigen::MatrixXd>;
   using grad_vec = muSpectre::LoadSteps_t;
 

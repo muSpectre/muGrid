@@ -36,11 +36,10 @@
 
 #include "fft_engine_base.hh"
 #include "fft_utils.hh"
-
 #include <libmugrid/ccoord_operations.hh>
 
-using muGrid::CcoordOps::get_col_major_strides;
 using muGrid::GlobalFieldCollection;
+using muGrid::CcoordOps::get_col_major_strides;
 using muGrid::operator<<;
 
 namespace muFFT {
@@ -52,9 +51,8 @@ namespace muFFT {
                                bool allow_temporary_buffer,
                                bool allow_destroy_input)
       : spatial_dimension{nb_grid_pts.get_dim()}, comm{comm},
-        real_field_collection{
-            this->spatial_dimension,
-            GlobalFieldCollection::SubPtMap_t{{PixelTag, 1}}},
+        real_field_collection{this->spatial_dimension,
+                              GlobalFieldCollection::SubPtMap_t{{PixelTag, 1}}},
         fourier_field_collection{
             this->spatial_dimension,
             GlobalFieldCollection::SubPtMap_t{{PixelTag, 1}}},
@@ -72,6 +70,7 @@ namespace muFFT {
         norm_factor{1. / muGrid::CcoordOps::get_size(nb_grid_pts)},
         plan_flags{plan_flags} {}
 
+  /* ---------------------------------------------------------------------- */
   //! forward transform, performs copy of buffer if required
   void FFTEngineBase::fft(const RealField_t & input_field,
                           FourierField_t & output_field) {
@@ -298,7 +297,7 @@ namespace muFFT {
 
   //! forward transform, performs copy of buffer if required
   void FFTEngineBase::hcfft(const RealField_t & input_field,
-                               RealField_t & output_field) {
+                            RealField_t & output_field) {
     // Sanity check 1: Do we have a plan?
     auto && nb_dof_per_pixel{input_field.get_nb_dof_per_pixel()};
     if (not this->has_plan_for(nb_dof_per_pixel)) {
@@ -410,7 +409,7 @@ namespace muFFT {
 
   //! inverse transform, performs copy of buffer if required
   void FFTEngineBase::ihcfft(const RealField_t & input_field,
-                           RealField_t & output_field) {
+                             RealField_t & output_field) {
     // Sanity check 1: Do we have a plan?
     auto && nb_dof_per_pixel{input_field.get_nb_dof_per_pixel()};
     if (not this->has_plan_for(nb_dof_per_pixel)) {
@@ -520,7 +519,6 @@ namespace muFFT {
     }
   }
 
-
   /* ---------------------------------------------------------------------- */
   auto
   FFTEngineBase::register_fourier_space_field(const std::string & unique_name,
@@ -565,11 +563,11 @@ namespace muFFT {
   /* ---------------------------------------------------------------------- */
   auto FFTEngineBase::fetch_or_register_fourier_space_field(
       const std::string & unique_name, const Shape_t & shape)
-  -> FourierField_t & {
+      -> FourierField_t & {
     this->create_plan(shape);
     if (this->fourier_field_collection.field_exists(unique_name)) {
       auto & field{dynamic_cast<FourierField_t &>(
-                       this->fourier_field_collection.get_field(unique_name))};
+          this->fourier_field_collection.get_field(unique_name))};
       if (field.get_components_shape() != shape) {
         std::stringstream message{};
         message << "Field '" << unique_name << "' exists, but it has shape of "
@@ -584,7 +582,7 @@ namespace muFFT {
 
   auto
   FFTEngineBase::register_halfcomplex_field(const std::string & unique_name,
-                                              const Index_t & nb_dof_per_pixel)
+                                            const Index_t & nb_dof_per_pixel)
       -> RealField_t & {
     this->create_plan(nb_dof_per_pixel);
     return this->halfcomplex_field_collection.register_real_field(
@@ -592,10 +590,8 @@ namespace muFFT {
   }
 
   /* ---------------------------------------------------------------------- */
-  auto
-  FFTEngineBase::register_halfcomplex_field(const std::string & unique_name,
-                                              const Shape_t & shape)
-  -> RealField_t & {
+  auto FFTEngineBase::register_halfcomplex_field(
+      const std::string & unique_name, const Shape_t & shape) -> RealField_t & {
     this->create_plan(shape);
     return this->halfcomplex_field_collection.register_real_field(
         unique_name, shape, PixelTag);
@@ -624,12 +620,11 @@ namespace muFFT {
 
   /* ---------------------------------------------------------------------- */
   auto FFTEngineBase::fetch_or_register_halfcomplex_field(
-      const std::string & unique_name, const Shape_t & shape)
-  -> RealField_t & {
+      const std::string & unique_name, const Shape_t & shape) -> RealField_t & {
     this->create_plan(shape);
     if (this->halfcomplex_field_collection.field_exists(unique_name)) {
       auto & field{dynamic_cast<RealField_t &>(
-        this->halfcomplex_field_collection.get_field(unique_name))};
+          this->halfcomplex_field_collection.get_field(unique_name))};
       if (field.get_components_shape() != shape) {
         std::stringstream message{};
         message << "Field '" << unique_name << "' exists, but it has shape of "
@@ -648,30 +643,29 @@ namespace muFFT {
   auto
   FFTEngineBase::register_real_space_field(const std::string & unique_name,
                                            const Index_t & nb_dof_per_pixel)
-  -> RealField_t & {
+      -> RealField_t & {
     this->create_plan(nb_dof_per_pixel);
     return this->real_field_collection.register_real_field(
         unique_name, nb_dof_per_pixel, PixelTag);
   }
 
   /* ---------------------------------------------------------------------- */
-  auto
-  FFTEngineBase::register_real_space_field(const std::string & unique_name,
-                                           const Shape_t & shape)
-  -> RealField_t & {
+  auto FFTEngineBase::register_real_space_field(const std::string & unique_name,
+                                                const Shape_t & shape)
+      -> RealField_t & {
     this->create_plan(shape);
-    return this->real_field_collection.register_real_field(
-        unique_name, shape, PixelTag);
+    return this->real_field_collection.register_real_field(unique_name, shape,
+                                                           PixelTag);
   }
 
   /* ---------------------------------------------------------------------- */
   auto FFTEngineBase::fetch_or_register_real_space_field(
       const std::string & unique_name, const Index_t & nb_dof_per_pixel)
-  -> RealField_t & {
+      -> RealField_t & {
     this->create_plan(nb_dof_per_pixel);
     if (this->real_field_collection.field_exists(unique_name)) {
       auto & field{dynamic_cast<RealField_t &>(
-                       this->real_field_collection.get_field(unique_name))};
+          this->real_field_collection.get_field(unique_name))};
       if (field.get_nb_dof_per_pixel() != nb_dof_per_pixel) {
         std::stringstream message{};
         message << "Field '" << unique_name << "' exists, but it has "
@@ -687,12 +681,11 @@ namespace muFFT {
 
   /* ---------------------------------------------------------------------- */
   auto FFTEngineBase::fetch_or_register_real_space_field(
-      const std::string & unique_name, const Shape_t & shape)
-  -> RealField_t & {
+      const std::string & unique_name, const Shape_t & shape) -> RealField_t & {
     this->create_plan(shape);
     if (this->real_field_collection.field_exists(unique_name)) {
       auto & field{dynamic_cast<RealField_t &>(
-                       this->real_field_collection.get_field(unique_name))};
+          this->real_field_collection.get_field(unique_name))};
       if (field.get_components_shape() != shape) {
         std::stringstream message{};
         message << "Field '" << unique_name << "' exists, but it has shape of "
@@ -761,8 +754,7 @@ namespace muFFT {
         this->fourier_field_collection);
   }
 
-  bool
-  FFTEngineBase::check_halfcomplex_field(const RealField_t & field) const {
+  bool FFTEngineBase::check_halfcomplex_field(const RealField_t & field) const {
     return field.get_collection().has_same_memory_layout(
         this->halfcomplex_field_collection);
   }
@@ -771,32 +763,29 @@ namespace muFFT {
 
   /* ---------------------------------------------------------------------- */
   void FFTEngineBase::compute_hcfft(const RealField_t & /*input_field*/,
-                               RealField_t & /*output_field*/) const {
+                                    RealField_t & /*output_field*/) const {
     throw FFTEngineError("Real to half-complex"
-      "transform not implemented in this FFTEngine");
+                         "transform not implemented in this FFTEngine");
   }
 
   /* ---------------------------------------------------------------------- */
   void FFTEngineBase::compute_ihcfft(const RealField_t & /*input_field*/,
-                                RealField_t & /*output_field*/) const {
+                                     RealField_t & /*output_field*/) const {
     throw FFTEngineError("Real to half-complex "
-      "inverse transform not implemented in this FFTEngine");
+                         "inverse transform not implemented in this FFTEngine");
   }
 
   /* ---------------------------------------------------------------------- */
   void FFTEngineBase::initialise_field_collections() {
-    this->real_field_collection.initialise(this->nb_domain_grid_pts,
-                                           this->nb_subdomain_grid_pts,
-                                           this->subdomain_locations,
-                                           this->subdomain_strides);
-    this->halfcomplex_field_collection.initialise(this->nb_domain_grid_pts,
-                                         this->nb_subdomain_grid_pts,
-                                         this->subdomain_locations,
-                                         this->subdomain_strides);
-    this->fourier_field_collection.initialise(this->nb_domain_grid_pts,
-                                              this->nb_fourier_grid_pts,
-                                              this->fourier_locations,
-                                              this->fourier_strides);
+    this->real_field_collection.initialise(
+        this->nb_domain_grid_pts, this->nb_subdomain_grid_pts,
+        this->subdomain_locations, this->subdomain_strides);
+    this->halfcomplex_field_collection.initialise(
+        this->nb_domain_grid_pts, this->nb_subdomain_grid_pts,
+        this->subdomain_locations, this->subdomain_strides);
+    this->fourier_field_collection.initialise(
+        this->nb_domain_grid_pts, this->nb_fourier_grid_pts,
+        this->fourier_locations, this->fourier_strides);
   }
 
 }  // namespace muFFT

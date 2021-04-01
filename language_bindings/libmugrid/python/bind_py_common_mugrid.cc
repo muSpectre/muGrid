@@ -1,5 +1,5 @@
 /**
- * @file   bind_py_common.cc
+ * @file   bind_py_common_mugrid.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -42,8 +42,8 @@
 #include "libmugrid/ccoord_operations.hh"
 #include "libmugrid/units.hh"
 
-using muGrid::Index_t;
 using muGrid::DynCcoord;
+using muGrid::Index_t;
 using muGrid::Real;
 using muGrid::threeD;
 using muGrid::Verbosity;
@@ -75,16 +75,18 @@ void add_dyn_ccoord_helper(py::module & mod, std::string name) {
       .def(py::init<const std::vector<T>>())
       .def(py::init<Index_t>())
       .def("__len__", &DynCcoord<MaxDim, T>::get_dim)
-      .def("__getitem__", [](const DynCcoord<MaxDim, T> & self,
-                             const Index_t & index) {
-        if (index < 0 || index >= self.get_dim()) {
-          std::stringstream s;
-          s << "index " << index << " out of range 0.." << self.get_dim() - 1;
-          throw std::out_of_range(s.str());
-        }
-        return self[index];
-      })
-    .def_property_readonly("dim", &DynCcoord<MaxDim, T>::get_dim);
+      .def("__getitem__",
+           [](const DynCcoord<MaxDim, T> & self, const Index_t & index) {
+             if (index < 0 or index >= self.get_dim()) {
+               std::stringstream err{};
+               err << "index " << index << " out of range 0.."
+                   << self.get_dim() - 1;
+               throw std::out_of_range(err.str());
+               std::cout << err.str() << "\n";
+             }
+             return self[index];
+           })
+      .def_property_readonly("dim", &DynCcoord<MaxDim, T>::get_dim);
   py::implicitly_convertible<py::list, DynCcoord<MaxDim, T>>();
   py::implicitly_convertible<py::tuple, DynCcoord<MaxDim, T>>();
 }
@@ -182,7 +184,7 @@ void add_unit(py::module & mod) {
       .def("amount", &muGrid::Unit::amount);
 }
 
-void add_common(py::module & mod) {
+void add_common_mugrid(py::module & mod) {
   add_enums(mod);
 
   add_dyn_ccoord_helper<threeD, Index_t>(mod, "DynCcoord");

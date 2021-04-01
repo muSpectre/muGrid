@@ -276,7 +276,9 @@ mugrid_sources = [
     'src/libmugrid/field_map.cc',
     'src/libmugrid/field_typed.cc',
     'src/libmugrid/file_io_base.cc',
+    'src/libmugrid/gradient_operator_default.cc',
     'src/libmugrid/grid_common.cc',
+    'src/libmugrid/physics_domain.cc',
     'src/libmugrid/raw_memory_operations.cc',
     'src/libmugrid/state_field.cc',
     'src/libmugrid/state_field_map.cc',
@@ -284,7 +286,7 @@ mugrid_sources = [
 ]
 pymugrid_sources = [
     'language_bindings/libmugrid/python/bind_py_module.cc',
-    'language_bindings/libmugrid/python/bind_py_common.cc',
+    'language_bindings/libmugrid/python/bind_py_common_mugrid.cc',
     'language_bindings/libmugrid/python/bind_py_communicator.cc',
     'language_bindings/libmugrid/python/bind_py_field.cc',
     'language_bindings/libmugrid/python/bind_py_state_field.cc',
@@ -298,7 +300,7 @@ mufft_sources = [
 ]
 pymufft_sources = [
     'language_bindings/libmufft/python/bind_py_module.cc',
-    'language_bindings/libmufft/python/bind_py_common.cc',
+    'language_bindings/libmufft/python/bind_py_common_mufft.cc',
     'language_bindings/libmufft/python/bind_py_derivatives.cc',
     'language_bindings/libmufft/python/bind_py_fftengine.cc',
 ]

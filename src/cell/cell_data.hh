@@ -43,6 +43,7 @@
 #include "common/muSpectre_common.hh"
 #include "materials/material_base.hh"
 
+#include <libmugrid/state_field.hh>
 #include <libmugrid/physics_domain.hh>
 #include <libmugrid/units.hh>
 #include <libmugrid/exception.hh>
@@ -334,6 +335,7 @@ namespace muSpectre {
 
     // Cell's (possibly shared) FFT engine
     std::shared_ptr<muFFT::FFTEngineBase> fft_engine;
+
     // different constitutive model categories are identified by their rank
     // and the units of the input and output fields. Input units multiplied
     // by output units must equal energy units for the model to be plausible

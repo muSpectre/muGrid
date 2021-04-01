@@ -101,7 +101,21 @@ void add_typed_field(py::module & mod, std::string name) {
           [](TypedFieldBase<T> & self, const muGrid::IterUnit & it) {
             return muGrid::numpy_wrap(self, it);
           },
-          "iteration_type"_a = muGrid::IterUnit::SubPt, py::keep_alive<0, 1>());
+          "iteration_type"_a = muGrid::IterUnit::SubPt, py::keep_alive<0, 1>())
+      .def(
+          "get_pixel_map",
+          [](TypedFieldBase<T> & field, const Index_t & nb_rows) {
+            return field.get_pixel_map(nb_rows);
+          },
+          "nb_rows"_a = muGrid::Unknown,
+          py::return_value_policy::reference_internal)
+      .def(
+          "get_sub_pt_map",
+          [](TypedFieldBase<T> & field, const Index_t & nb_rows) {
+            return field.get_sub_pt_map(nb_rows);
+          },
+          "nb_rows"_a = muGrid::Unknown,
+          py::return_value_policy::reference_internal);
 
   py::class_<TypedField<T>, TypedFieldBase<T>>(mod, name.c_str())
       .def("clone", &TypedField<T>::clone, "new_name"_a, "allow_overwrite"_a,

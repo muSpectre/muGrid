@@ -43,12 +43,22 @@
 using muSpectre::Real;
 using muSpectre::Uint;
 using muSpectre::Verbosity;
+using muSpectre::ResetCG;
 namespace py = pybind11;
 using pybind11::literals::operator""_a;
 
 /**
  * Solvers instanciated for cells with equal spatial and material dimension
  */
+
+void add_enum_reset(py::module & mod) {
+  py::enum_<ResetCG>(mod, "ResetCG")
+      .value("no_reset", ResetCG::no_reset)
+      .value("fixed_iter_count", ResetCG::fixed_iter_count)
+      .value("user_defined_iter_count", ResetCG::user_defined_iter_count)
+      .value("gradient_orthogonality", ResetCG::gradient_orthogonality)
+      .value("valid_direction", ResetCG::valid_direction);
+}
 
 template <class KrylovSolver>
 void add_krylov_solver_helper(py::module & mod, std::string name) {
@@ -80,10 +90,17 @@ template <class KrylovSolver>
 void add_krylov_solver_trust_region_helper(py::module & mod, std::string name) {
   py::class_<KrylovSolver, typename KrylovSolver::Parent,
              std::shared_ptr<KrylovSolver>>(mod, name.c_str())
-      .def(py::init<std::shared_ptr<muSpectre::MatrixAdaptable>, Real, Uint,
-                    Real, Verbosity>(),
+      .def(py::init<std::shared_ptr<muSpectre::MatrixAdaptable>, const Real &,
+                    const Uint &, const Real &, const Verbosity &,
+                    const ResetCG &, const Uint &>(),
            "cell"_a, "tol"_a = -1.0, "maxiter"_a = 1000, "trust_region"_a = 1.0,
-           "verbose"_a = Verbosity::Silent)
+           "verbose"_a = Verbosity::Silent, "reset"_a = ResetCG::no_reset,
+           "reset_iter_count"_a = 0)
+      .def(py::init<const Real &, const Uint &, const Real &, const Verbosity &,
+                    const ResetCG &, const Uint &>(),
+           "tol"_a, "maxiter"_a, "trust_region"_a = 1.0,
+           "verbose"_a = Verbosity::Silent, "reset"_a = ResetCG::no_reset,
+           "reset_iter_count"_a = 0)
       .def("initialise", &KrylovSolver::initialise)
       .def("solve", &KrylovSolver::solve, "rhs"_a)
       .def("set_trust_region",
@@ -118,6 +135,11 @@ void add_krylov_solver(py::module & mod) {
           "system_matrix_adaptable"_a)
       .def("solve", &muSpectre::KrylovSolverBase::solve);
 
+  py::class_<muSpectre::KrylovSolverTrustRegionBase,
+             muSpectre::KrylovSolverBase,
+             std::shared_ptr<muSpectre::KrylovSolverTrustRegionBase>>(
+      mod, "KrylovSolverTrustRegionBase");
+
   py::class_<muSpectre::KrylovSolverPreconditionedBase,
              muSpectre::KrylovSolverBase,
              std::shared_ptr<muSpectre::KrylovSolverPreconditionedBase>>(
@@ -126,6 +148,7 @@ void add_krylov_solver(py::module & mod) {
            &muSpectre::KrylovSolverPreconditionedBase::set_preconditioner,
            "inv_preconditioner_matrix_adaptable"_a);
 
+  add_enum_reset(mod);
   add_krylov_solver_helper<muSpectre::KrylovSolverCG>(mod, "KrylovSolverCG");
   add_krylov_solver_helper<muSpectre::KrylovSolverCGEigen>(
       mod, "KrylovSolverCGEigen");

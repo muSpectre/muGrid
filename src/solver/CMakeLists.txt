@@ -36,6 +36,7 @@
 
 set(solvers_SRC
   ${CMAKE_CURRENT_SOURCE_DIR}/krylov_solver_base.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/krylov_solver_trust_region_base.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/krylov_solver_preconditioned_base.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/matrix_adaptor.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/krylov_solver_cg.cc
@@ -47,6 +48,7 @@ set(solvers_SRC
   ${CMAKE_CURRENT_SOURCE_DIR}/solver_base.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/solver_single_physics.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/solver_newton_cg.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/solver_trust_region_newton_cg.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/solver_fem_newton_cg.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/solver_fem_newton_pcg.cc
   )

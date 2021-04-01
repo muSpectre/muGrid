@@ -245,11 +245,23 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   void CellData::set_nb_quad_pts(const Index_t & nb_quad_pts) {
     this->get_fields().set_nb_sub_pts(QuadPtTag, nb_quad_pts);
+    for (auto && domain_mat : this->domain_materials) {
+      auto && materials{std::get<1>(domain_mat)};
+      for (auto && mat : materials) {
+        mat->set_nb_quad_pts(nb_quad_pts);
+      }
+    }
   }
 
   /* ---------------------------------------------------------------------- */
   void CellData::set_nb_nodal_pts(const Index_t & nb_nodal_pts) {
     this->get_fields().set_nb_sub_pts(NodalPtTag, nb_nodal_pts);
+    for (auto && domain_mat : this->domain_materials) {
+      auto && materials{std::get<1>(domain_mat)};
+      for (auto && mat : materials) {
+        mat->set_nb_nodal_pts(nb_nodal_pts);
+      }
+    }
   }
 
   /* ---------------------------------------------------------------------- */
@@ -286,6 +298,412 @@ namespace muSpectre {
         mat->save_history_variables();
       }
     }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  muGrid::RealField &
+  CellData::globalise_real_internal_field(const std::string & unique_name) {
+    return this->template globalise_internal_field<Real>(unique_name);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  muGrid::IntField &
+  CellData::globalise_int_internal_field(const std::string & unique_name) {
+    return this->template globalise_internal_field<Int>(unique_name);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  muGrid::UintField &
+  CellData::globalise_uint_internal_field(const std::string & unique_name) {
+    return this->template globalise_internal_field<Uint>(unique_name);
+  }
+  /* ---------------------------------------------------------------------- */
+  muGrid::ComplexField &
+  CellData::globalise_complex_internal_field(const std::string & unique_name) {
+    return this->template globalise_internal_field<Complex>(unique_name);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  muGrid::RealField &
+  CellData::globalise_real_current_field(const std::string & unique_name) {
+    return this->template globalise_current_field<Real>(unique_name);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  muGrid::IntField &
+  CellData::globalise_int_current_field(const std::string & unique_name) {
+    return this->template globalise_current_field<Int>(unique_name);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  muGrid::UintField &
+  CellData::globalise_uint_current_field(const std::string & unique_name) {
+    return this->template globalise_current_field<Uint>(unique_name);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  muGrid::ComplexField &
+  CellData::globalise_complex_current_field(const std::string & unique_name) {
+    return this->template globalise_current_field<Complex>(unique_name);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  muGrid::RealField &
+  CellData::globalise_real_old_field(const std::string & unique_name,
+                                     const size_t & nb_steps_ago) {
+    return this->template globalise_old_field<Real>(unique_name, nb_steps_ago);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  muGrid::IntField &
+  CellData::globalise_int_old_field(const std::string & unique_name,
+                                    const size_t & nb_steps_ago) {
+    return this->template globalise_old_field<Int>(unique_name, nb_steps_ago);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  muGrid::UintField &
+  CellData::globalise_uint_old_field(const std::string & unique_name,
+                                     const size_t & nb_steps_ago) {
+    return this->template globalise_old_field<Uint>(unique_name, nb_steps_ago);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  muGrid::ComplexField &
+  CellData::globalise_complex_old_field(const std::string & unique_name,
+                                        const size_t & nb_steps_ago) {
+    return this->template globalise_old_field<Complex>(unique_name,
+                                                       nb_steps_ago);
+  }
+
+/* ---------------------------------------------------------------------- */
+  template <typename T>
+  muGrid::TypedField<T> &
+  CellData::globalise_internal_field(const std::string & unique_name) {
+    // start by checking that the field exists at least once, and that
+    // it always has th same number of components, and the same subdivision
+    // tag
+    std::set<Index_t> nb_component_categories{};
+    std::set<std::string> tag_categories{};
+    std::vector<std::reference_wrapper<const muGrid::Field>> local_fields;
+
+    for (auto && domain : this->domain_materials) {
+      for (auto && material : std::get<1>(domain)) {
+        auto && collection{material->get_collection()};
+        if (collection.field_exists(unique_name)) {
+          auto && field{muGrid::TypedField<T>::safe_cast(
+              collection.get_field(unique_name))};
+          local_fields.push_back(field);
+          nb_component_categories.insert(field.get_nb_components());
+          tag_categories.insert(field.get_sub_division_tag());
+        }
+      }
+    }
+
+    // reject if the field appears with differing numbers of components
+    if (nb_component_categories.size() != 1) {
+      const auto & nb_match{nb_component_categories.size()};
+      std::stringstream err_str{};
+      if (nb_match > 1) {
+        err_str
+            << "The fields named '" << unique_name << "' do not have the "
+            << "same number of components in every material, which is a "
+            << "requirement for globalising them! The following values were "
+            << "found by material:" << std::endl;
+        for (auto && domain : this->domain_materials) {
+          for (auto && material : std::get<1>(domain)) {
+            auto & coll = material->get_collection();
+            if (coll.field_exists(unique_name)) {
+              auto & field{coll.get_field(unique_name)};
+              err_str << field.get_nb_components()
+                      << " components in material '" << material->get_name()
+                      << "'" << std::endl;
+            }
+          }
+        }
+      } else {
+        err_str << "The field named '" << unique_name << "' does not exist in "
+                << "any of the materials and can therefore not be globalised!";
+      }
+      throw muGrid::RuntimeError(err_str.str());
+    }
+
+    const Index_t nb_components{*nb_component_categories.begin()};
+
+    // reject if the field appears with differing subdivision tags
+    if (tag_categories.size() != 1) {
+      const auto & nb_match{tag_categories.size()};
+      std::stringstream err_str{};
+      if (nb_match > 1) {
+        err_str
+            << "The fields named '" << unique_name << "' do not have the "
+            << "same sub-division in every material, which is a "
+            << "requirement for globalising them! The following values were "
+            << "found by material:" << std::endl;
+        for (auto && domain : this->domain_materials) {
+          for (auto && material : std::get<1>(domain)) {
+            auto & coll = material->get_collection();
+            if (coll.field_exists(unique_name)) {
+              auto & field{coll.get_field(unique_name)};
+              err_str << "tag '" << field.get_sub_division_tag()
+                      << "' in material '" << material->get_name() << "'"
+                      << std::endl;
+            }
+          }
+        }
+      } else {
+        err_str << "The field named '" << unique_name << "' does not exist in "
+                << "any of the materials and can therefore not be globalised!";
+      }
+      throw muGrid::RuntimeError(err_str.str());
+    }
+
+    const std::string tag{*tag_categories.begin()};
+
+    // get and prepare the field
+    muGrid::TypedField<T> & global_field{
+        this->fields->field_exists(unique_name)
+            ? dynamic_cast<muGrid::TypedField<T> &>(
+                  this->fields->get_field(unique_name))
+            : this->fields->template register_field<T>(unique_name,
+                                                       nb_components, tag)};
+    global_field.set_zero();
+
+    auto global_map{global_field.get_pixel_map()};
+
+    // fill it with local internal values
+    for (auto & local_field : local_fields) {
+      auto pixel_map{
+          muGrid::TypedField<T>::safe_cast(local_field).get_pixel_map()};
+      for (auto && pixel_id__value : pixel_map.enumerate_pixel_indices_fast()) {
+        const auto & pixel_id{std::get<0>(pixel_id__value)};
+        const auto & value{std::get<1>(pixel_id__value)};
+        global_map[pixel_id] = value;
+      }
+    }
+    return global_field;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
+  muGrid::TypedField<T> &
+  CellData::globalise_old_field(const std::string & unique_prefix,
+                                const size_t & nb_steps_ago) {
+    // start by checking that the field exists at least once, and that
+    // it always has th same number of components
+    std::set<Index_t> nb_component_categories{};
+    std::set<std::string> tag_categories{};
+    std::vector<std::reference_wrapper<const muGrid::Field>> local_fields_old;
+
+    for (auto && domain : this->domain_materials) {
+      for (auto && material : std::get<1>(domain)) {
+        auto && collection{material->get_collection()};
+        if (collection.state_field_exists(unique_prefix)) {
+          auto && state_field{collection.get_state_field(unique_prefix)};
+          auto && field_old{
+              muGrid::TypedField<T>::safe_cast(state_field.old(nb_steps_ago))};
+          local_fields_old.push_back(field_old);
+          nb_component_categories.insert(field_old.get_nb_components());
+          tag_categories.insert(field_old.get_sub_division_tag());
+        }
+      }
+    }
+
+    // reject if the field appears with differing numbers of components
+    if (nb_component_categories.size() != 1) {
+      const auto & nb_match{nb_component_categories.size()};
+      std::stringstream err_str{};
+      if (nb_match > 1) {
+        err_str
+            << "The state fields named '" << unique_prefix
+            << "' do not have the "
+            << "same number of components in every material, which is a "
+            << "requirement for globalising them! The following values were "
+            << "found by material:" << std::endl;
+        for (auto && domain : this->domain_materials) {
+          for (auto && material : std::get<1>(domain)) {
+            auto && coll{material->get_collection()};
+            if (coll.state_field_exists(unique_prefix)) {
+              auto && state_field{coll.get_state_field(unique_prefix)};
+              auto && field{state_field.old(nb_steps_ago)};
+              err_str << field.get_nb_components()
+                      << " components in material '" << material->get_name()
+                      << "'" << std::endl;
+            }
+          }
+        }
+      } else {
+        err_str << "The state field named '" << unique_prefix
+                << " does not exist in "
+                << "any of the materials and can therefore not be globalised!";
+      }
+      throw muGrid::RuntimeError(err_str.str());
+    }
+
+    const Index_t nb_components{*nb_component_categories.begin()};
+
+    // reject if the field appears with differing subdivision tags
+    if (tag_categories.size() != 1) {
+      const auto & nb_match{tag_categories.size()};
+      std::stringstream err_str{};
+      if (nb_match > 1) {
+        err_str
+            << "The fields named '" << unique_prefix << "' do not have the "
+            << "same sub-division in every material, which is a "
+            << "requirement for globalising them! The following values were "
+            << "found by material:" << std::endl;
+        for (auto && domain : this->domain_materials) {
+          for (auto && material : std::get<1>(domain)) {
+            auto & coll = material->get_collection();
+            if (coll.field_exists(unique_prefix)) {
+              auto & field{coll.get_field(unique_prefix)};
+              err_str << "tag '" << field.get_sub_division_tag()
+                      << "' in material '" << material->get_name() << "'"
+                      << std::endl;
+            }
+          }
+        }
+      } else {
+        err_str << "The field named '" << unique_prefix
+                << "' does not exist in "
+                << "any of the materials and can therefore not be globalised!";
+      }
+      throw muGrid::RuntimeError(err_str.str());
+    }
+
+    const std::string tag{*tag_categories.begin()};
+
+    muGrid::TypedField<T> & global_field{
+        this->fields->field_exists(unique_prefix)
+            ? dynamic_cast<muGrid::TypedField<T> &>(
+                  this->fields->get_field(unique_prefix))
+            : this->fields->template register_field<T>(unique_prefix,
+                                                       nb_components, tag)};
+    global_field.set_zero();
+
+    auto global_map{global_field.get_pixel_map()};
+
+    // fill it with local old state of internal values
+    for (auto & local_field : local_fields_old) {
+      auto pixel_map{
+          muGrid::TypedField<T>::safe_cast(local_field).get_pixel_map()};
+      for (auto && pixel_id__value : pixel_map.enumerate_pixel_indices_fast()) {
+        auto && pixel_id{std::get<0>(pixel_id__value)};
+        auto && value{std::get<1>(pixel_id__value)};
+        global_map[pixel_id] = value;
+      }
+    }
+    return global_field;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
+  muGrid::TypedField<T> &
+  CellData::globalise_current_field(const std::string & unique_prefix) {
+    // start by checking that the field exists at least once, and that
+    // it always has th same number of components
+    std::set<Index_t> nb_component_categories{};
+    std::set<std::string> tag_categories{};
+
+    std::vector<std::reference_wrapper<const muGrid::Field>>
+        local_fields_current;
+    for (auto && domain : this->domain_materials) {
+      for (auto && material : std::get<1>(domain)) {
+        auto && collection{material->get_collection()};
+        if (collection.state_field_exists(unique_prefix)) {
+          auto && state_field{collection.get_state_field(unique_prefix)};
+          auto && field_current(
+              muGrid::TypedField<T>::safe_cast(state_field.current()));
+          local_fields_current.push_back(field_current);
+          nb_component_categories.insert(field_current.get_nb_components());
+          tag_categories.insert(field_current.get_sub_division_tag());
+        }
+      }
+    }
+
+    // reject if the field appears with differing numbers of components
+    if (nb_component_categories.size() != 1) {
+      const auto & nb_match{nb_component_categories.size()};
+      std::stringstream err_str{};
+      if (nb_match > 1) {
+        err_str
+            << "The state fields named '" << unique_prefix
+            << "' do not have the "
+            << "same number of components in every material, which is a "
+            << "requirement for globalising them! The following values were "
+            << "found by material:" << std::endl;
+        for (auto && domain : this->domain_materials) {
+          for (auto && material : std::get<1>(domain)) {
+            auto && coll{material->get_collection()};
+            if (coll.state_field_exists(unique_prefix)) {
+              auto && field{coll.get_state_field(unique_prefix).current()};
+              err_str << field.get_nb_components()
+                      << " components in material '" << material->get_name()
+                      << "'" << std::endl;
+            }
+          }
+        }
+      } else {
+        err_str << "The state field named '" << unique_prefix
+                << "' does not exist in "
+                << "any of the materials and can therefore not be globalised!";
+      }
+      throw muGrid::RuntimeError(err_str.str());
+    }
+
+    const Index_t nb_components{*nb_component_categories.begin()};
+
+    // reject if the field appears with differing subdivision tags
+    if (tag_categories.size() != 1) {
+      const auto & nb_match{tag_categories.size()};
+      std::stringstream err_str{};
+      if (nb_match > 1) {
+        err_str
+            << "The fields named '" << unique_prefix << "' do not have the "
+            << "same sub-division in every material, which is a "
+            << "requirement for globalising them! The following values were "
+            << "found by material:" << std::endl;
+        for (auto && domain : this->domain_materials) {
+          for (auto && material : std::get<1>(domain)) {
+            auto & coll = material->get_collection();
+            if (coll.field_exists(unique_prefix)) {
+              auto & field{coll.get_field(unique_prefix)};
+              err_str << "tag '" << field.get_sub_division_tag()
+                      << "' in material '" << material->get_name() << "'"
+                      << std::endl;
+            }
+          }
+        }
+      } else {
+        err_str << "The field named '" << unique_prefix
+                << "' does not exist in "
+                << "any of the materials and can therefore not be globalised!";
+      }
+      throw muGrid::RuntimeError(err_str.str());
+    }
+    const std::string tag{*tag_categories.begin()};
+
+    muGrid::TypedField<T> & global_field{
+        this->fields->field_exists(unique_prefix)
+            ? dynamic_cast<muGrid::TypedField<T> &>(
+                  this->fields->get_field(unique_prefix))
+            : this->fields->template register_field<T>(unique_prefix,
+                                                       nb_components, tag)};
+    global_field.set_zero();
+
+    auto global_map{global_field.get_pixel_map()};
+
+    // fill it with local current state of internal values
+    for (auto & local_field : local_fields_current) {
+      auto pixel_map{
+          muGrid::TypedField<T>::safe_cast(local_field).get_pixel_map()};
+      for (auto && pixel_id__value : pixel_map.enumerate_pixel_indices_fast()) {
+        auto && pixel_id{std::get<0>(pixel_id__value)};
+        auto && value{std::get<1>(pixel_id__value)};
+        global_map[pixel_id] = value;
+      }
+    }
+    return global_field;
   }
 
 }  // namespace muSpectre

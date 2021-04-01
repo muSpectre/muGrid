@@ -119,7 +119,7 @@ def get_complemented_positions(quantities, rve):
         'p': placements (node positions)
         'g': grid positions (including applied homogeneous strain)
         '0': grid positions (without applied homogeneous strain)
-        'd': displacements
+        'd': nodal displacements
         The placements are displacement plus grid positions including applied
         strain.
     rve        -- Cell object
@@ -144,7 +144,63 @@ def get_complemented_positions(quantities, rve):
         positions - coords.T.dot(mean_strain.T).T, rve.dim)
     coords = (np.transpose(node_coords) * rve.domain_lengths /
               rve.nb_domain_grid_pts).T
+    retval = []
+    for q in quantities:
+        if q == 'p':
+            retval += [coords.T.dot(mean_strain.T).T + displacements + coords]
+        elif q == 'g':
+            retval += [coords.T.dot(mean_strain.T).T + coords]
+        elif q == '0':
+            retval += [coords]
+        elif q == 'd':
+            retval += [displacements]
+        else:
+            raise RuntimeError("Unknown quantity '{}'".format(q))
+    if len(retval) == 1:
+        return retval[0]
+    else:
+        return tuple(retval)
 
+
+def get_complemented_positions_class_solver(quantities, rve, solver, result):
+    """Takes an RVE (Cell) object and returns the deformed and undeformed nodal
+    positions, complemented periodically.
+
+    The quantities of interest are specified via string. For example
+        get_complemented_positions('pd', rve)
+    will return a tuple containing first the placements and second the
+    displacements. The supported quantities are listed below.
+
+    Arguments:
+    quantities -- string that indicates which quantities should be returned
+        'p': placements (node positions)
+        'g': grid positions (including applied homogeneous strain)
+        '0': grid positions (without applied homogeneous strain)
+        'd': nodal displacements
+        The placements are displacement plus grid positions including applied
+        strain.
+    rve        -- Cell object
+
+    Returns:
+    Tuple build according to the first argument of the function.
+    """
+    cell_coords = np.mgrid[tuple(slice(None, n)
+                                 for n in rve.nb_domain_grid_pts)]
+    node_coords = np.mgrid[tuple(slice(None, n + 1)
+                                 for n in rve.nb_domain_grid_pts)]
+    strain = result.grad.reshape(solver.grad.shape, order="F")
+    mean_strain = np.mean(
+        strain, axis=tuple(i for i in range(2, len(strain.shape))))
+    if solver.formulation == Formulation.finite_strain:
+        mean_strain -= np.identity(rve.dim)
+    positions = solver.projection.integrate(solver.grad) \
+        .array(muGrid.IterUnit.Pixel)
+    coords = (np.transpose(cell_coords) * rve.domain_lengths /
+              rve.nb_domain_grid_pts).T
+    displacements = complement_periodically(
+        positions - coords.T.dot(mean_strain.T).T, rve.spatial_dim)
+    coords = (np.transpose(node_coords) * rve.domain_lengths /
+              rve.nb_domain_grid_pts).T
     retval = []
     for q in quantities:
         if q == 'p':
