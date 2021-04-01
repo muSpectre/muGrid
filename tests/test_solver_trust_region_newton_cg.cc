@@ -84,15 +84,15 @@ namespace muSpectre {
     // poisson)};
     auto & elas{MatElastic_t::make(this->cell_data, "elastic", young, poisson)};
     {
-      int counter{0};
+      Index_t nb_dam{this->cell_data->get_nb_domain_grid_pts()[0]};
       for (auto && index_pixel : this->cell_data->get_pixels().enumerate()) {
         auto && index{std::get<0>(index_pixel)};
-        if (counter < 3) {
+        if (nb_dam) {
+          --nb_dam;
           dam.add_pixel(index);
         } else {
           elas.add_pixel(index);
         }
-        counter++;
       }
     }
 
@@ -135,27 +135,6 @@ namespace muSpectre {
     std::cout << new_result.stress << "\n";
     BOOST_TEST_CHECKPOINT("after load increment");
   }
-  // KrylovSolverCGEigen legacy_krylov_solver{legacy_cell, cg_tol, maxiter,
-  //                                          verbose};
-  // auto && legacy_result{newton_cg(legacy_cell, strain,
-  // legacy_krylov_solver,
-  //                                 newton_tol, equil_tol, verbose)};
-
-  // Eigen::Map<Eigen::ArrayXXd>
-  // legacy_stress_map{legacy_result.stress.data(),
-  //                                               new_result.stress.rows(),
-  //                                               new_result.stress.cols()};
-  // auto && error{
-  //     muGrid::testGoodies::rel_error(new_result.stress,
-  //     legacy_stress_map)};
-  // BOOST_CHECK_LE(error, tol);
-  // if (not(error < tol)) {
-  //   std::cout << "legacy stress result" << std::endl
-  //             << legacy_stress_map.transpose() << std::endl;
-  //   std::cout << "new stress result" << std::endl
-  //             << new_result.stress.transpose() << std::endl;
-  // }
-  // }
 
   BOOST_AUTO_TEST_SUITE_END();
 

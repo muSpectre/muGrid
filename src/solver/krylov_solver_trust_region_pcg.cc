@@ -1,7 +1,8 @@
 /**
- * @file   krylov_solver_pcg.cc
+ * @file   krylov_solver_trust_region_pcg.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
+ * @author Ali Falsafi <ali.falsafi@epfl.ch>
  *
  * @date   28 Aug 2020
  *
@@ -33,7 +34,7 @@
  *
  */
 
-#include "krylov_solver_pcg.hh"
+#include "krylov_solver_trust_region_pcg.hh"
 #include "matrix_adaptor.hh"
 
 #include <iomanip>
@@ -41,26 +42,43 @@
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  KrylovSolverPCG::KrylovSolverPCG(
+  KrylovSolverTrustRegionPCG::KrylovSolverTrustRegionPCG(
       std::shared_ptr<MatrixAdaptable> matrix_holder,
       std::shared_ptr<MatrixAdaptable> inv_preconditioner, const Real & tol,
-      const Uint & maxiter, const Verbosity & verbose)
+      const Uint & maxiter, const Real & trust_region,
+      const Verbosity & verbose, const bool & reset)
       : Parent{matrix_holder, inv_preconditioner, tol, maxiter, verbose},
-        comm{matrix_holder->get_communicator()}, r_k(this->get_nb_dof()),
+        comm{matrix_holder->get_communicator()},
+        trust_region{trust_region}, reset{reset}, r_k(this->get_nb_dof()),
         y_k(this->get_nb_dof()), p_k(this->get_nb_dof()),
         Ap_k(this->get_nb_dof()), x_k(this->get_nb_dof()) {}
 
   /* ---------------------------------------------------------------------- */
-  KrylovSolverPCG::KrylovSolverPCG(const Real & tol, const Uint & maxiter,
-                                   const Verbosity & verbose)
-      : Parent{tol, maxiter, verbose}, r_k{}, y_k{}, p_k{}, Ap_k{}, x_k{} {}
+  KrylovSolverTrustRegionPCG::KrylovSolverTrustRegionPCG(
+      const Real & tol, const Uint & maxiter, const Real & trust_region,
+      const Verbosity & verbose, const bool & reset)
+      : Parent{tol, maxiter, verbose}, trust_region{trust_region}, reset{reset},
+        r_k{}, y_k{}, p_k{}, Ap_k{}, x_k{} {}
 
   /* ---------------------------------------------------------------------- */
-  auto KrylovSolverPCG::solve(const ConstVector_ref rhs) -> Vector_map {
+  auto KrylovSolverTrustRegionPCG::solve(const ConstVector_ref rhs)
+      -> Vector_map {
+    if (this->matrix_ptr.expired()) {
+      std::stringstream error_message{};
+      error_message << "The system matrix has been destroyed. Did you set the "
+                       "matrix using a weak_ptr instead of a shared_ptr?";
+      throw SolverError{error_message.str()};
+    }
+
     // Following implementation of algorithm 5.3 in Nocedal's
     // Numerical Optimization (p. 119)
 
+    // reset the on_bound flag of the Krylov solver
+    this->is_on_bound = false;
+
     this->x_k.setZero();
+    Real trust_region2{this->trust_region * this->trust_region};
+
     /* initialisation:
      *           Set r₀ ← Ax₀-b
      *           Set y₀ ← M⁻¹r₀
@@ -106,13 +124,21 @@ namespace muSpectre {
     // because of the early termination criterion, we never count the last
     // iteration
     ++this->counter;
-    for (Uint i = 0; i < this->maxiter; ++i, ++this->counter) {
+    Uint j{0};
+    for (Uint i = 0; i < this->maxiter; ++i, ++this->counter, ++j) {
       this->Ap_k = matrix * this->p_k;
       Real pAp{this->comm.sum(this->p_k.dot(this->Ap_k))};
 
       if (pAp <= 0) {
-        // Hessian is not positive definite
-        throw SolverError("Hessian is not positive definite");
+        // Hessian is not positive definite, the minimizer is on the trust
+        // region bound
+        if (verbose > Verbosity::Silent && comm.rank() == 0) {
+          std::cout << "  CG finished, reason: Hessian is not positive "
+                       "definite (pdAp:"
+                    << pAp << ")" << std::endl;
+        }
+        this->convergence = Convergence::HessianNotPositiveDefinite;
+        return this->bound(rhs);
       }
 
       /*                    rᵀₖyₖ
@@ -122,6 +148,18 @@ namespace muSpectre {
 
       //             xₖ₊₁ ← xₖ + αₖpₖ
       this->x_k += alpha * this->p_k;
+
+      // we are exceeding the trust region, the minimizer is on the trust
+      // region bound
+      if (this->x_k.squaredNorm() >= trust_region2) {
+        if (verbose > Verbosity::Silent && comm.rank() == 0) {
+          std::cout << "  CG finished, reason: step exceeded trust region "
+                       "bounds"
+                    << std::endl;
+        }
+        this->convergence = Convergence::ExceededTrustRegionBound;
+        return this->bound(rhs);
+      }
 
       //             rₖ₊₁ ← rₖ + αₖApₖ
       this->r_k += alpha * this->Ap_k;
@@ -143,6 +181,20 @@ namespace muSpectre {
        *                      rᵀₖyₖ                                */
       Real new_rdy{this->comm.sum(this->r_k.dot(this->y_k))};
       Real beta{new_rdy / rdy};
+
+      // reset the CG solver if the number of the iterations gets large
+      // respective to the number of Degree of Freedom of the problem
+      if (this->reset) {
+        if (j > (this->get_nb_dof() / 4)) {
+          beta = 0.0;
+          j = 0;
+          if (verbose > Verbosity::Silent && comm.rank() == 0) {
+            std::cout << "RESTART"
+                      << "\n";
+          }
+        }
+      }
+
       rdy = new_rdy;
 
       //             pₖ₊₁ ← -yₖ₊₁ + βₖ₊₁pₖ
@@ -164,24 +216,24 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  std::string KrylovSolverPCG::get_name() const { return "PCG"; }
+  std::string KrylovSolverTrustRegionPCG::get_name() const { return "PCG"; }
 
   /* ---------------------------------------------------------------------- */
-  void KrylovSolverPCG::set_matrix(
+  void KrylovSolverTrustRegionPCG::set_matrix(
       std::shared_ptr<MatrixAdaptable> matrix_adaptable) {
     Parent::set_matrix(matrix_adaptable);
     this->set_internal_arrays();
   }
 
   /* ---------------------------------------------------------------------- */
-  void
-  KrylovSolverPCG::set_matrix(std::weak_ptr<MatrixAdaptable> matrix_adaptable) {
+  void KrylovSolverTrustRegionPCG::set_matrix(
+      std::weak_ptr<MatrixAdaptable> matrix_adaptable) {
     Parent::set_matrix(matrix_adaptable);
     this->set_internal_arrays();
   }
 
   /* ---------------------------------------------------------------------- */
-  void KrylovSolverPCG::set_internal_arrays() {
+  void KrylovSolverTrustRegionPCG::set_internal_arrays() {
     this->comm = this->matrix_ptr.lock()->get_communicator();
     auto && nb_dof{this->matrix_ptr.lock()->get_nb_dof()};
     this->r_k.resize(nb_dof);
@@ -191,9 +243,44 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  void KrylovSolverPCG::set_preconditioner(
+  void
+  KrylovSolverTrustRegionPCG::set_trust_region(const Real & new_trust_region) {
+    this->trust_region = new_trust_region;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void KrylovSolverTrustRegionPCG::set_preconditioner(
       std::shared_ptr<MatrixAdaptable> inv_preconditioner) {
     Parent::set_preconditioner(inv_preconditioner);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  auto KrylovSolverTrustRegionPCG::bound(const ConstVector_ref rhs)
+      -> Vector_map {
+    this->is_on_bound = true;
+    Real trust_region2{this->trust_region * this->trust_region};
+
+    Real pdp{this->comm.sum(this->p_k.squaredNorm())};
+    Real xdx{this->comm.sum(this->x_k.squaredNorm())};
+    Real pdx{this->comm.sum(this->p_k.dot(this->x_k))};
+    Real tmp{sqrt(pdx * pdx - pdp * (xdx - trust_region2))};
+    Real tau1{-(pdx + tmp) / pdp};
+    Real tau2{-(pdx - tmp) / pdp};
+
+    this->x_k += tau1 * this->p_k;
+    Real m1{-rhs.dot(this->x_k) +
+            0.5 * this->x_k.dot(this->matrix * this->x_k)};
+    this->x_k += (tau2 - tau1) * this->p_k;
+    Real m2{-rhs.dot(this->x_k) +
+            0.5 * this->x_k.dot(this->matrix * this->x_k)};
+
+    // check which direction is the minimizer
+    if (m2 < m1) {
+      return Vector_map(this->x_k.data(), this->x_k.size());
+    } else {
+      this->x_k += (tau1 - tau2) * this->p_k;
+      return Vector_map(this->x_k.data(), this->x_k.size());
+    }
   }
 
 }  // namespace muSpectre

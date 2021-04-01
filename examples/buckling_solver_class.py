@@ -8,10 +8,9 @@
 
 @date   10 Feb 2021
 
-@brief  Functions for the integration of periodic first- and second-rank
-        tensor fields on an n-dimensional rectangular grid
+@brief  buckling example demonstrating the trust-region Newton CG optimizer
 
-Copyright © 2018 Till Junge
+Copyright © 2019 Till Junge
 
 µSpectre is free software; you can redistribute it and/or
 modify it under the terms of the GNU Lesser General Public License as

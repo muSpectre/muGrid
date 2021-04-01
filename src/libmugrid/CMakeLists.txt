@@ -71,17 +71,17 @@ set(mugrid_HDRS
   )
 
 set(mugrid_SRCS
-  ${CMAKE_CURRENT_SOURCE_DIR}/exception.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/grid_common.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/ccoord_operations.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/exception.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/field.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/field_collection.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/field_collection_global.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/field_collection_local.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/file_io_base.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/field.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/field_typed.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/field_map.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/field_typed.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/file_io_base.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/gradient_operator_default.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/grid_common.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/physics_domain.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/raw_memory_operations.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/state_field.cc

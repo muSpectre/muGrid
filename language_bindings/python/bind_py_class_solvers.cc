@@ -38,6 +38,8 @@
 #include "solver/solver_fem_newton_cg.hh"
 #include "solver/solver_fem_newton_pcg.hh"
 #include "solver/solver_trust_region_newton_cg.cc"
+#include "solver/solver_fem_trust_region_newton_cg.cc"
+#include "solver/solver_fem_trust_region_newton_pcg.cc"
 
 #include <libmugrid/numpy_tools.hh>
 
@@ -61,6 +63,8 @@ using muSpectre::SolverFEMNewtonCG;
 using muSpectre::SolverFEMNewtonPCG;
 using muSpectre::SolverNewtonCG;
 using SolverTRNewtonCG = muSpectre::SolverTrustRegionNewtonCG;
+using SolverFEMTRNewtonCG = muSpectre::SolverFEMTrustRegionNewtonCG;
+using SolverFEMTRNewtonPCG = muSpectre::SolverFEMTrustRegionNewtonPCG;
 using muSpectre::SolverSinglePhysics;
 
 class PySolverBase : public SolverBase {
@@ -237,6 +241,8 @@ void add_fem_newton_cg_solver(py::module & mod) {
       .def_property_readonly("flux", &SolverFEMNewtonCG::get_flux,
                              py::return_value_policy::reference_internal)
       .def_property_readonly("tangent", &SolverFEMNewtonCG::get_tangent,
+                             py::return_value_policy::reference_internal)
+      .def_property_readonly("disp", &SolverFEMNewtonCG::get_disp_fluctuation,
                              py::return_value_policy::reference_internal);
 
   py::class_<SolverFEMNewtonPCG, SolverFEMNewtonCG,
@@ -256,10 +262,48 @@ void add_fem_newton_cg_solver(py::module & mod) {
           "material_properties"_a);
 }
 
+void add_fem_trust_region_newton_cg_solver(py::module & mod) {
+  py::class_<SolverFEMTRNewtonCG, SolverSinglePhysics,
+             std::shared_ptr<SolverFEMTRNewtonCG>>(mod, "SolverFEMTRNewtonCG")
+      .def(py::init<std::shared_ptr<muSpectre::Discretisation>,
+                    std::shared_ptr<muSpectre::KrylovSolverBase>,
+                    const Verbosity &, const Real &, const Real &, const Uint &,
+                    const Real &, const Real &>(),
+           "discretisation"_a, "krylov_solver"_a, "verbosity"_a, "newton_tol"_a,
+           "equil_tol"_a, "max_iter"_a, "trust_region_max"_a, "eta"_a)
+      .def_property_readonly("displacement_rank",
+                             &SolverFEMTRNewtonCG::get_displacement_rank)
+      .def_property_readonly("eval_grad", &SolverFEMTRNewtonCG::get_eval_grad,
+                             py::return_value_policy::reference_internal)
+      .def_property_readonly("flux", &SolverFEMTRNewtonCG::get_flux,
+                             py::return_value_policy::reference_internal)
+      .def_property_readonly("tangent", &SolverFEMTRNewtonCG::get_tangent,
+                             py::return_value_policy::reference_internal)
+      .def_property_readonly("disp", &SolverFEMTRNewtonCG::get_disp_fluctuation,
+                             py::return_value_policy::reference_internal);
+
+  py::class_<SolverFEMTRNewtonPCG, SolverFEMTRNewtonCG,
+             std::shared_ptr<SolverFEMTRNewtonPCG>>(mod, "SolverFEMTRNewtonPCG")
+      .def(py::init<std::shared_ptr<muSpectre::Discretisation>,
+                    std::shared_ptr<muSpectre::KrylovSolverPreconditionedBase>,
+                    const Verbosity &, const Real &, const Real &, const Uint &,
+                    const Real &, const Real &>(),
+           "discretisation"_a, "krylov_solver"_a, "verbosity"_a, "newton_tol"_a,
+           "equil_tol"_a, "max_iter"_a, "trust_region_max"_a, "eta"_a)
+      .def(
+          "set_reference_material",
+          [](SolverFEMTRNewtonPCG & solver,
+             py::EigenDRef<Eigen::MatrixXd> material_properties) {
+            solver.set_reference_material(material_properties);
+          },
+          "material_properties"_a);
+}
+
 void add_class_solvers(py::module & mod) {
   add_solver_base(mod);
   add_single_physics_solver(mod);
   add_spectral_newton_cg_solver(mod);
   add_fem_newton_cg_solver(mod);
   add_spectral_trust_region_newton_cg_solver(mod);
+  add_fem_trust_region_newton_cg_solver(mod);
 }

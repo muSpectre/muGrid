@@ -36,6 +36,7 @@
 #include "solver/krylov_solver_pcg.hh"
 #include "solver/krylov_solver_eigen.hh"
 #include "solver/krylov_solver_trust_region_cg.hh"
+#include "solver/krylov_solver_trust_region_pcg.hh"
 
 #include <pybind11/stl.h>
 #include <pybind11/eigen.h>
@@ -112,6 +113,33 @@ void add_krylov_solver_trust_region_helper(py::module & mod, std::string name) {
       .def_property_readonly("tol", &KrylovSolver::get_tol);
 }
 
+template <class KrylovSolver>
+void add_preconditioned_krylov_solver_trust_region_helper(py::module & mod,
+                                                          std::string name) {
+  py::class_<KrylovSolver, typename KrylovSolver::Parent,
+             std::shared_ptr<KrylovSolver>>(mod, name.c_str())
+      .def(py::init<std::shared_ptr<muSpectre::MatrixAdaptable>,
+                    std::shared_ptr<muSpectre::MatrixAdaptable>, const Real &,
+                    const Uint &, const Real &, const Verbosity &,
+                    const bool &>(),
+           "cell"_a, "inv_preconditioner"_a, "tol"_a = -1.0, "maxiter"_a = 1000,
+           "trust_region"_a = 1.0, "verbose"_a = Verbosity::Silent,
+           "reset"_a = false)
+      .def(py::init<const Real &, const Uint &, const Real &, const Verbosity &,
+                    const bool &>(),
+           "tol"_a, "maxiter"_a, "trust_region"_a = 1.0,
+           "verbose"_a = Verbosity::Silent, "reset"_a = false)
+      .def("initialise", &KrylovSolver::initialise)
+      .def("solve", &KrylovSolver::solve, "rhs"_a)
+      .def("set_trust_region",
+           &muSpectre::KrylovSolverTrustRegionPCG::set_trust_region,
+           "new_trust_region"_a)
+      .def_property_readonly("counter", &KrylovSolver::get_counter)
+      .def_property_readonly("maxiter", &KrylovSolver::get_maxiter)
+      .def_property_readonly("name", &KrylovSolver::get_name)
+      .def_property_readonly("tol", &KrylovSolver::get_tol);
+}
+
 void add_krylov_solver(py::module & mod) {
   py::class_<muSpectre::MatrixAdaptable,
              std::shared_ptr<muSpectre::MatrixAdaptable>>(mod,
@@ -164,6 +192,8 @@ void add_krylov_solver(py::module & mod) {
       mod, "KrylovSolverPCG");
   add_krylov_solver_trust_region_helper<muSpectre::KrylovSolverTrustRegionCG>(
       mod, "KrylovSolverTrustRegionCG");
+  add_preconditioned_krylov_solver_trust_region_helper<
+      muSpectre::KrylovSolverTrustRegionPCG>(mod, "KrylovSolverTrustRegionPCG");
 }
 
 void add_krylov_solvers(py::module & mod) { add_krylov_solver(mod); }

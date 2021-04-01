@@ -107,8 +107,10 @@ namespace muSpectre {
     // Numerical Optimization (p. 171)
 
     // initialisation of algorithm
+    /* initialisation:
+     *           Set r₀ ← Ax₀-b
+     *           Set p₀ ← -r₀, k ← 0 */
     this->r_k = this->matrix * this->x_k - rhs;
-
     this->p_k = -this->r_k;
     this->convergence = Convergence::DidNotConverge;
 
@@ -156,7 +158,7 @@ namespace muSpectre {
       this->Ap_k = this->matrix * this->p_k;
 
       Real pdAp{comm.sum(this->p_k.dot(this->Ap_k))};
-      if (pdAp <= 0) {
+      if (pdAp < -1.e-8) {
         // Hessian is not positive definite, the minimizer is on the trust
         // region bound
         if (verbose > Verbosity::Silent && comm.rank() == 0) {
@@ -167,9 +169,12 @@ namespace muSpectre {
         this->convergence = Convergence::HessianNotPositiveDefinite;
         return this->bound(rhs);
       }
-
+      /*                    rᵀₖyₖ
+       *             αₖ ← ————––
+       *                    pᵀₖApₖ                                  */
       Real alpha{rdr / pdAp};
 
+      //             xₖ₊₁ ← xₖ + αₖpₖ
       this->x_k += alpha * this->p_k;
       if (this->x_k.squaredNorm() >= trust_region2) {
         // we are exceeding the trust region, the minimizer is on the trust
@@ -186,9 +191,14 @@ namespace muSpectre {
       if (this->reset == ResetCG::gradient_orthogonality) {
         this->r_k_copy = this->r_k;
       }
+      //             rₖ₊₁ ← rₖ + αₖApₖ
       this->r_k += alpha * this->Ap_k;
 
       Real new_rdr{comm.sum(this->r_k.squaredNorm())};
+
+      /*                     rᵀₖ₊₁rₖ₊₁
+       *             βₖ₊₁ ← ————————–
+       *                      rᵀₖrₖ                                */
       Real beta{new_rdr / rdr};
 
       //! CG reset worker
@@ -249,6 +259,7 @@ namespace muSpectre {
                   << std::endl;
       }
 
+      //             pₖ₊₁ ← -rₖ₊₁ + βₖ₊₁pₖ
       this->p_k = -this->r_k + beta * this->p_k;
     }
 

@@ -111,4 +111,7 @@ namespace muSpectre {
     return this->matrix_ptr.lock()->get_nb_dof();
   }
 
+  /* ---------------------------------------------------------------------- */
+  const bool & KrylovSolverBase::get_is_on_bound() { return this->is_on_bound; }
+
 }  // namespace muSpectre

@@ -525,8 +525,6 @@ namespace muSpectre {
     // fft_ptr->create_plan(this->nb_quad_pts);
     // fft_ptr->create_plan(this->gradient->size());
 
-    std::cout << "Count of Quadrature Points: " << this->nb_quad_pts << "\n";
-
     const DynRcoord_t lengths{this->cell_data->get_domain_lengths()};
     switch (this->get_formulation()) {
     case Formulation::finite_strain: {

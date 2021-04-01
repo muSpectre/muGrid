@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
-@file   python_solverclass_test_new.py
+@file   python_solverclass_new_test.py
 
 @author Till Junge <till.junge@altermail.ch>
 
@@ -36,7 +36,7 @@ Program grant you additional permission to convey the resulting work.
 
 import unittest
 import numpy as np
-from python_test_imports_ML import muSpectre
+from python_test_imports import muSpectre
 from muSpectre import cell
 
 
@@ -50,7 +50,7 @@ class SolverClassCheck(unittest.TestCase):
         self.equil_tol = 1e-10
         self.maxiter = self.cell_data.spatial_dim * 50
         self.verbose = muSpectre.Verbosity.Full
-        self.fem_stencil = muSpectre.FemStencil.bilinear_quadrangle(
+        self.fem_stencil = muSpectre.FEMStencil.bilinear_quadrangle(
             self.cell_data)
 
         self.discretisation = muSpectre.Discretisation(self.fem_stencil)

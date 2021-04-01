@@ -1,8 +1,9 @@
 /**
- * @file   solver_fem_newton_cg.hh
+ * @file   solver_fem_trust_region_newton_cg.hh
  *
  * @author Till Junge <till.junge@altermail.ch>
  * @author Martin Ladecký <m.ladecky@gmail.com>
+ * @author Ali Falsafi <ali.falsafi@epfl.ch>
  *
  * @date   31 Aug 2020
  *
@@ -39,42 +40,48 @@
 
 #include "projection/discretisation.hh"
 
-#ifndef SRC_SOLVER_SOLVER_FEM_NEWTON_CG_HH_
-#define SRC_SOLVER_SOLVER_FEM_NEWTON_CG_HH_
+#ifndef SRC_SOLVER_SOLVER_FEM_TRUST_REGION_NEWTON_CG_HH_
+#define SRC_SOLVER_SOLVER_FEM_TRUST_REGION_NEWTON_CG_HH_
 
 namespace muSpectre {
 
-  class SolverFEMNewtonCG : public SolverSinglePhysics {
+  class SolverFEMTrustRegionNewtonCG : public SolverSinglePhysics {
    public:
     using Parent = SolverSinglePhysics;
 
+    using Vector_t = Eigen::Matrix<Real, Eigen::Dynamic, 1>;
     using EigenStrainFunc_ref = Parent::EigenStrainFunc_ref;
     using CellExtractFieldFunc_ref = Parent::CellExtractFieldFunc_ref;
 
     //! Default constructor
-    SolverFEMNewtonCG() = delete;
+    SolverFEMTrustRegionNewtonCG() = delete;
 
     //!
-    SolverFEMNewtonCG(std::shared_ptr<Discretisation> discretisation,
-                      std::shared_ptr<KrylovSolverBase> krylov_solver,
-                      const muGrid::Verbosity & verbosity,
-                      const Real & newton_tol, const Real & equil_tol,
-                      const Uint & max_iter);
+    SolverFEMTrustRegionNewtonCG(
+        std::shared_ptr<Discretisation> discretisation,
+        std::shared_ptr<KrylovSolverBase> krylov_solver,
+        const muGrid::Verbosity & verbosity, const Real & newton_tol,
+        const Real & equil_tol, const Uint & max_iter,
+        const Real & max_trust_radius, const Real & eta);
 
     //! Copy constructor
-    SolverFEMNewtonCG(const SolverFEMNewtonCG & other) = delete;
+    SolverFEMTrustRegionNewtonCG(const SolverFEMTrustRegionNewtonCG & other) =
+        delete;
 
     //! Move constructor
-    SolverFEMNewtonCG(SolverFEMNewtonCG && other) = default;
+    SolverFEMTrustRegionNewtonCG(SolverFEMTrustRegionNewtonCG && other) =
+        default;
 
     //! Destructor
-    virtual ~SolverFEMNewtonCG() = default;
+    virtual ~SolverFEMTrustRegionNewtonCG() = default;
 
     //! Copy assignment operator
-    SolverFEMNewtonCG & operator=(const SolverFEMNewtonCG & other) = delete;
+    SolverFEMTrustRegionNewtonCG &
+    operator=(const SolverFEMTrustRegionNewtonCG & other) = delete;
 
     //! Move assignment operator
-    SolverFEMNewtonCG & operator=(SolverFEMNewtonCG && other) = delete;
+    SolverFEMTrustRegionNewtonCG &
+    operator=(SolverFEMTrustRegionNewtonCG && other) = delete;
 
     using Parent::solve_load_increment;
     //! solve for a single increment of strain
@@ -96,15 +103,13 @@ namespace muSpectre {
     //! return the rank of the displacement field for this PhysicsDomain
     Index_t get_displacement_rank() const;
 
-    //! Tangent moduli field
-    MappedField_t & get_eval_grad() const;
-
     //! Displacement field
     const MappedField_t & get_disp_fluctuation() const;
 
     //! Tangent moduli field
+    MappedField_t & get_eval_grad() const;
+    //! Tangent moduli field
     const MappedField_t & get_tangent() const;
-
     //! Tangent moduli field
     const MappedField_t & get_flux() const;
 
@@ -144,8 +149,13 @@ namespace muSpectre {
     Real newton_tol;
     Real equil_tol;
     Uint max_iter;
+
+    //! maximum radius of trust region
+    Real max_trust_radius;
+    //! threshold used in accepting or rejecting a sub-problem solution
+    Real eta;
   };
 
 }  // namespace muSpectre
 
-#endif  // SRC_SOLVER_SOLVER_FEM_NEWTON_CG_HH_
+#endif  // SRC_SOLVER_SOLVER_FEM_TRUST_REGION_NEWTON_CG_HH_

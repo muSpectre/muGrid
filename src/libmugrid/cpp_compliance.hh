@@ -196,6 +196,42 @@ namespace muGrid {
   using std::optional;
 #endif
 
+  template <class T, class E>
+  class EnumUtils {
+    using enable_enum_t =
+        typename std::enable_if<std::is_enum<E>::value,
+                                typename std::underlying_type<E>::type>::type;
+
+   public:
+    static inline bool check_enum_from_int(enable_enum_t value) {
+      if (value < underlying_value(E::length) and value > 0) {
+        return true;
+      } else {
+        return false;
+      }
+    }
+
+    static inline typename std::enable_if<
+        std::is_enum<E>::value && std::is_integral<T>::value, E>::type
+    to_enum(T value) {
+      auto && is_in_range{check_enum_from_int(value)};
+      if (!is_in_range) {
+        std::stringstream error{};
+        error << "The inserted number (" << value
+              << ") does not belong to Enum class range" << std::endl;
+        throw RuntimeError(error.str());
+      }
+      return static_cast<E>(value);
+    }
+
+    //--------------------------------
+    static inline enable_enum_t underlying_value(E e) {
+      static_assert(std::is_enum<E>::value,
+                    "parameter is not of type enum or enum class");
+      return static_cast<typename std::underlying_type<E>::type>(e);
+    }
+  };
+
 }  // namespace muGrid
 
 #endif  // SRC_LIBMUGRID_CPP_COMPLIANCE_HH_

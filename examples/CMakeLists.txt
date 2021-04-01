@@ -170,14 +170,25 @@ muSpectre_add_example(scalar_spectral_py_example
         TYPE PYTHON scalar_spectral_example.py)
 
 # additional file(s) to copy
+# file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/concrete_micro_structure_201.npy
+#   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
+
+# file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/random_field_201.npy
+#   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
+
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/concrete_micro_structure.npy
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
+
 
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/random_field.npy
     DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/plot_tri.py
     DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
+
+# file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/dam_dunant_eg_fem_solver_conc_201.py
+#   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
+
 
 
 if(${MUSPECTRE_MPI_PARALLEL})

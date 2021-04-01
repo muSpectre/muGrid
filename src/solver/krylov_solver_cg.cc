@@ -97,8 +97,10 @@ namespace muSpectre {
     // Numerical Optimization (p. 112)
 
     // initialisation of algorithm
+    /* initialisation:
+     *           Set r₀ ← Ax₀-b
+     *           Set p₀ ← -r₀, k ← 0 */
     this->r_k = this->matrix * this->x_k - rhs;
-
     this->p_k = -this->r_k;
     this->convergence = Convergence::DidNotConverge;
 
@@ -153,12 +155,22 @@ namespace muSpectre {
         throw SolverError("Hessian is not positive definite");
       }
 
+      /*                    rᵀₖrₖ
+       *             αₖ ← ————––
+       *                    pᵀₖApₖ                                  */
       Real alpha{rdr / pdAp};
 
+      //             xₖ₊₁ ← xₖ + αₖpₖ
       this->x_k += alpha * this->p_k;
+
+      //             rₖ₊₁ ← rₖ + αₖApₖ
       this->r_k += alpha * this->Ap_k;
 
       Real new_rdr{comm.sum(this->r_k.squaredNorm())};
+
+      /*                      rᵀₖ₊₁rₖ₊₁
+       *             βₖ₊₁ ← ————————–
+       *                      rᵀₖyₖ                                */
       Real beta{new_rdr / rdr};
       rdr = new_rdr;
 
@@ -172,6 +184,7 @@ namespace muSpectre {
         break;
       }
 
+      //             pₖ₊₁ ← -rₖ₊₁ + βₖ₊₁pₖ
       this->p_k = -this->r_k + beta * this->p_k;
     }
 

@@ -154,6 +154,10 @@ namespace muSpectre {
 
     Index_t get_nb_dof() const;
 
+    //! return the member variable which expresses whether the solution of the
+    //! sub-problem is on the bound or not
+    const bool & get_is_on_bound();
+
    protected:
     std::shared_ptr<MatrixAdaptable> matrix_holder{nullptr};  //!< system matrix
     std::weak_ptr<MatrixAdaptable> matrix_ptr{};  //!< weak ref to matrix
@@ -164,6 +168,7 @@ namespace muSpectre {
     Uint counter{0};         //!< iteration counter
     Convergence convergence{
         Convergence::DidNotConverge};  //!< whether the solver has converged
+    bool is_on_bound{false};
   };
 
 }  // namespace muSpectre

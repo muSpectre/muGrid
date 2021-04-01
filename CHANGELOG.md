@@ -5,7 +5,7 @@ Change log for µSpectre
 -------------------------
 - muSpectre: Added trust region solver class and a simplistic damage material
 - muSpectre: physics have their specific name that might be used later for outputs
--muSpectre: trsut region krylov solver has different resetart strategies available
+- muSpectre: trsut region krylov solver has different resetart strategies available
 - muSpectre: gradient integration for solver class + cell data is now available
 
 
