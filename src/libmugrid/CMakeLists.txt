@@ -39,34 +39,34 @@ if(POLICY CMP0076)
 endif()
 
 set(mugrid_HDRS
-  ${CMAKE_CURRENT_SOURCE_DIR}/exception.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/numpy_tools.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/tensor_algebra.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/T4_map_proxy.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/mapped_state_field.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/ccoord_operations.hh
   ${CMAKE_CURRENT_SOURCE_DIR}/cpp_compliance.hh
   ${CMAKE_CURRENT_SOURCE_DIR}/eigen_tools.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/gradient_operator_base.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/gradient_operator_default.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/mapped_field.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/ref_array.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/field_map_static.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/ref_vector.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/field_map.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/grid_common.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/iterators.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/state_field.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/field_collection_local.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/state_field_map_static.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/physics_domain.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/field_collection_global.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/field_typed.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/exception.hh
   ${CMAKE_CURRENT_SOURCE_DIR}/field.hh
   ${CMAKE_CURRENT_SOURCE_DIR}/field_collection.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/field_collection_global.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/field_collection_local.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/field_map.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/field_map_static.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/field_typed.hh
   ${CMAKE_CURRENT_SOURCE_DIR}/file_io_base.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/ccoord_operations.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/gradient_operator_base.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/gradient_operator_default.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/grid_common.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/iterators.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/mapped_field.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/mapped_state_field.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/numpy_tools.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/physics_domain.hh
   ${CMAKE_CURRENT_SOURCE_DIR}/raw_memory_operations.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/ref_array.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/ref_vector.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/state_field.hh
   ${CMAKE_CURRENT_SOURCE_DIR}/state_field_map.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/state_field_map_static.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/tensor_algebra.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/T4_map_proxy.hh
   ${CMAKE_CURRENT_SOURCE_DIR}/units.hh
   )
 

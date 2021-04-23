@@ -230,14 +230,15 @@ namespace muSpectre {
         break;
       }
       case ResetCG::valid_direction: {
-        if (comm.sum(this->r_k.dot(this->p_k) > 0)) {
+        if (comm.sum(this->r_k.dot(this->p_k)) > 0) {
           reset_cg();
         }
         break;
       }
-      default:
+      default: {
         throw SolverError("Unknown CG reset strategy ");
         break;
+      }
       }
       rdr = new_rdr;
 
