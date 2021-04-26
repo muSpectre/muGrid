@@ -37,7 +37,8 @@
 #ifndef SRC_SOLVER_KRYLOV_SOLVER_TRUST_REGION_CG_HH_
 #define SRC_SOLVER_KRYLOV_SOLVER_TRUST_REGION_CG_HH_
 
-#include "solver/krylov_solver_trust_region_base.hh"
+#include "solver/krylov_solver_base.hh"
+#include "solver/krylov_solver_trust_region_traits.hh"
 
 namespace muSpectre {
   enum class ResetCG {
@@ -53,10 +54,11 @@ namespace muSpectre {
    * conjugate gradient solver with a trust region. This Krylov solver is meant
    * to be used with the nonlinear `trust_region_newton_cg` solver.
    */
-  class KrylovSolverTrustRegionCG : public KrylovSolverTrustRegionBase {
+  class KrylovSolverTrustRegionCG : public KrylovSolverBase,
+                                    public KrylovSolverTrustRegionTraits {
    public:
-    using Parent =
-        KrylovSolverTrustRegionBase;  //!< standard short-hand for base class
+    using Parent = KrylovSolverBase;  //!< standard short-hand for base class
+    using TraitsTR = KrylovSolverTrustRegionTraits;
     //! for storage of fields
     using Vector_t = Parent::Vector_t;
     //! Input vector for solvers
@@ -113,19 +115,19 @@ namespace muSpectre {
     operator=(KrylovSolverTrustRegionCG && other) = delete;
 
     //! initialisation does not need to do anything in this case
-    void initialise() final{};
+    void initialise() override{};
 
     //! returns the solver's name
-    std::string get_name() const final { return "TrustRegionCG"; }
+    std::string get_name() const override { return "TrustRegionCG"; }
 
     //! set the matrix
-    void set_matrix(std::shared_ptr<MatrixAdaptable> matrix_adaptable) final;
+    void set_matrix(std::shared_ptr<MatrixAdaptable> matrix_adaptable) override;
 
     //! set the matrix
-    void set_matrix(std::weak_ptr<MatrixAdaptable> matrix_adaptable) final;
+    void set_matrix(std::weak_ptr<MatrixAdaptable> matrix_adaptable) override;
 
     //! the actual solver
-    Vector_map solve(const ConstVector_ref rhs) final;
+    Vector_map solve(const ConstVector_ref rhs) override;
 
     Real reset_cg();
 

@@ -163,18 +163,39 @@ void add_krylov_solver(py::module & mod) {
           "system_matrix_adaptable"_a)
       .def("solve", &muSpectre::KrylovSolverBase::solve);
 
-  py::class_<muSpectre::KrylovSolverTrustRegionBase,
-             muSpectre::KrylovSolverBase,
-             std::shared_ptr<muSpectre::KrylovSolverTrustRegionBase>>(
-      mod, "KrylovSolverTrustRegionBase");
+  py::class_<muSpectre::KrylovSolverTrustRegionTraits,
+             std::shared_ptr<muSpectre::KrylovSolverTrustRegionTraits>>(
+      mod, "KrylovSolverTrustRegionTraits");
 
-  py::class_<muSpectre::KrylovSolverPreconditionedBase,
-             muSpectre::KrylovSolverBase,
-             std::shared_ptr<muSpectre::KrylovSolverPreconditionedBase>>(
-      mod, "KrylovSolverPreconditionedBase")
+  class PyKrylovSolverPreconditionedTraits
+      : public muSpectre::KrylovSolverPreconditionedTraits {
+   public:
+    using Parent = muSpectre::KrylovSolverPreconditionedTraits;
+    PyKrylovSolverPreconditionedTraits(
+        std::shared_ptr<muSpectre::MatrixAdaptable> preconditioner_adaptable)
+        : Parent(preconditioner_adaptable) {}
+    void set_preconditioner(std::shared_ptr<muSpectre::MatrixAdaptable>
+                                preconditioner_adaptable) override {
+      PYBIND11_OVERLOAD_PURE(void, Parent, set_precondtioner,
+                             preconditioner_adaptable);
+    }
+  };
+
+  py::class_<muSpectre::KrylovSolverPreconditionedTraits,
+             std::shared_ptr<muSpectre::KrylovSolverPreconditionedTraits>,
+             PyKrylovSolverPreconditionedTraits>(
+      mod, "KrylovSolverPreconditionedTraits")
       .def("set_preconditioner",
-           &muSpectre::KrylovSolverPreconditionedBase::set_preconditioner,
+           &muSpectre::KrylovSolverPreconditionedTraits::set_preconditioner,
            "inv_preconditioner_matrix_adaptable"_a);
+
+  // py::class_<muSpectre::KrylovSolverPreconditionedBase,
+  //            muSpectre::KrylovSolverBase,
+  //            std::shared_ptr<muSpectre::KrylovSolverPreconditionedBase>>(
+  //     mod, "KrylovSolverPreconditionedBase")
+  //     .def("set_preconditioner",
+  //          &muSpectre::KrylovSolverPreconditionedBase::set_preconditioner,
+  //          "inv_preconditioner_matrix_adaptable"_a);
 
   add_enum_reset(mod);
   add_krylov_solver_helper<muSpectre::KrylovSolverCG>(mod, "KrylovSolverCG");

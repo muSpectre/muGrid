@@ -37,14 +37,17 @@
 #ifndef SRC_SOLVER_KRYLOV_SOLVER_TRUST_REGION_PCG_HH_
 #define SRC_SOLVER_KRYLOV_SOLVER_TRUST_REGION_PCG_HH_
 
-#include "krylov_solver_preconditioned_base.hh"
+#include "krylov_solver_preconditioned_traits.hh"
+#include "krylov_solver_trust_region_cg.hh"
 
 namespace muSpectre {
 
-  class KrylovSolverTrustRegionPCG : public KrylovSolverPreconditionedBase {
+  class KrylovSolverTrustRegionPCG : public KrylovSolverTrustRegionCG,
+                                     public KrylovSolverPreconditionedTraits {
    public:
     //! standard short-hand for base class
-    using Parent = KrylovSolverPreconditionedBase;
+    using Parent = KrylovSolverTrustRegionCG;
+    using TraitsPC = KrylovSolverPreconditionedTraits;
     //! Input vector for solvers
     using ConstVector_ref = typename Parent::ConstVector_ref;
     //! Output vector for solvers
@@ -113,9 +116,6 @@ namespace muSpectre {
     //! returns the solver's name
     std::string get_name() const final;
 
-    //! set size of the trust region
-    void set_trust_region(const Real & new_trust_region) final;
-
     //! set the matrix
     void set_matrix(std::shared_ptr<MatrixAdaptable> matrix_adaptable) final;
 
@@ -142,8 +142,6 @@ namespace muSpectre {
     //! find the minimzer on the trust region bound (To be called if necessary
     //! during the solution procedure)
     Vector_map bound(const ConstVector_ref rhs);
-
-    Real trust_region;  //!< size of trust region
 
     bool reset;  //!< Determines whether restart will be carried out in solver
                  //!< steps or  not(if necessary)

@@ -48,7 +48,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   SolverFEMTrustRegionNewtonCG::SolverFEMTrustRegionNewtonCG(
       std::shared_ptr<Discretisation> discretisation,
-      std::shared_ptr<KrylovSolverBase> krylov_solver,
+      std::shared_ptr<KrylovSolverTrustRegionCG> krylov_solver,
       const muGrid::Verbosity & verbosity, const Real & newton_tol,
       const Real & equil_tol, const Uint & max_iter,
       const Real & max_trust_radius, const Real & eta)
@@ -319,12 +319,12 @@ namespace muSpectre {
       // setting the trust region radius of the solver of the sub-problem
       try {
         krylov_solver->set_trust_region(trust_region_radius);
-      } catch (ConvergenceError & error) {
+      } catch (SolverError & error) {
         std::stringstream err{};
         err << "The Krylov solver needs to be a trust-region sub-problem "
             << "solver (should have a trust region member to be set). "
             << "For instance, use KrylovTrustRegionCG solver" << std::endl;
-        throw ConvergenceError(err.str());
+        throw SolverError(err.str());
       }
       // calling solver for solving the current (iteratively approximated)
       // linear equilibrium problem
@@ -516,7 +516,7 @@ namespace muSpectre {
     }
     // throwing meaningful error message if the number of iterations for
     // newton_cg is exploited
-    if (newt_iter == this->krylov_solver->get_maxiter()) {
+    if (newt_iter == krylov_solver->get_maxiter()) {
       std::stringstream err{};
       err << "Failure at load step " << this->get_counter()
           << ". Newton-Raphson failed to converge. "

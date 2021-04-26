@@ -44,7 +44,8 @@ except ImportError:
 import _muGrid
 import _muFFT
 import _muSpectre
-from _muSpectre import SplitCell, Formulation, material, solvers, FiniteDiff, cell
+from _muSpectre import (SplitCell, Formulation,
+                        material, solvers, FiniteDiff, cell)
 from _muSpectre import OneQuadPt, version
 
 from _muSpectre import (version,

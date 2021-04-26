@@ -47,7 +47,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   SolverFEMNewtonPCG::SolverFEMNewtonPCG(
       std::shared_ptr<Discretisation> discretisation,
-      std::shared_ptr<KrylovSolverPreconditionedBase> krylov_solver,
+      std::shared_ptr<KrylovSolverPCG> krylov_solver,
       const muGrid::Verbosity & verbosity, const Real & newton_tol,
       const Real & equil_tol, const Uint & max_iter)
       : Parent{discretisation, krylov_solver, verbosity,
@@ -58,8 +58,7 @@ namespace muSpectre {
       Eigen::Ref<const Eigen::MatrixXd> material_properties) {
     this->ref_material = material_properties;
     auto pcg_krylov_solver{
-        std::dynamic_pointer_cast<KrylovSolverPreconditionedBase>(
-            this->krylov_solver)};
+        std::dynamic_pointer_cast<KrylovSolverPCG>(this->krylov_solver)};
 
     auto impulse_response{this->discretisation->compute_impulse_response(
         this->get_displacement_rank(), this->ref_material)};

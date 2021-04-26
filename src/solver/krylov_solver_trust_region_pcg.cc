@@ -47,9 +47,8 @@ namespace muSpectre {
       std::shared_ptr<MatrixAdaptable> inv_preconditioner, const Real & tol,
       const Uint & maxiter, const Real & trust_region,
       const Verbosity & verbose, const bool & reset)
-      : Parent{matrix_holder, inv_preconditioner, tol, maxiter, verbose},
-        comm{matrix_holder->get_communicator()},
-        trust_region{trust_region}, reset{reset}, r_k(this->get_nb_dof()),
+      : Parent{matrix_holder, tol, maxiter, trust_region, verbose},
+        TraitsPC{inv_preconditioner}, reset{reset}, r_k(this->get_nb_dof()),
         y_k(this->get_nb_dof()), p_k(this->get_nb_dof()),
         Ap_k(this->get_nb_dof()), x_k(this->get_nb_dof()) {}
 
@@ -57,8 +56,8 @@ namespace muSpectre {
   KrylovSolverTrustRegionPCG::KrylovSolverTrustRegionPCG(
       const Real & tol, const Uint & maxiter, const Real & trust_region,
       const Verbosity & verbose, const bool & reset)
-      : Parent{tol, maxiter, verbose}, trust_region{trust_region}, reset{reset},
-        r_k{}, y_k{}, p_k{}, Ap_k{}, x_k{} {}
+      : Parent{tol, maxiter, trust_region, verbose}, reset{reset}, r_k{}, y_k{},
+        p_k{}, Ap_k{}, x_k{} {}
 
   /* ---------------------------------------------------------------------- */
   auto KrylovSolverTrustRegionPCG::solve(const ConstVector_ref rhs)
@@ -124,8 +123,8 @@ namespace muSpectre {
     // because of the early termination criterion, we never count the last
     // iteration
     ++this->counter;
-    Uint j{0};
-    for (Uint i = 0; i < this->maxiter; ++i, ++this->counter, ++j) {
+    Uint iter_count{0};
+    for (Uint i = 0; i < this->maxiter; ++i, ++this->counter, ++iter_count) {
       this->Ap_k = matrix * this->p_k;
       Real pAp{this->comm.sum(this->p_k.dot(this->Ap_k))};
 
@@ -185,9 +184,9 @@ namespace muSpectre {
       // reset the CG solver if the number of the iterations gets large
       // respective to the number of Degree of Freedom of the problem
       if (this->reset) {
-        if (j > (this->get_nb_dof() / 4)) {
+        if (iter_count > (this->get_nb_dof() / 4)) {
           beta = 0.0;
-          j = 0;
+          iter_count = 0;
           if (verbose > Verbosity::Silent && comm.rank() == 0) {
             std::cout << "RESTART"
                       << "\n";
@@ -243,15 +242,9 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  void
-  KrylovSolverTrustRegionPCG::set_trust_region(const Real & new_trust_region) {
-    this->trust_region = new_trust_region;
-  }
-
-  /* ---------------------------------------------------------------------- */
   void KrylovSolverTrustRegionPCG::set_preconditioner(
       std::shared_ptr<MatrixAdaptable> inv_preconditioner) {
-    Parent::set_preconditioner(inv_preconditioner);
+    TraitsPC::set_preconditioner(inv_preconditioner);
   }
 
   /* ---------------------------------------------------------------------- */

@@ -45,7 +45,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   SolverTrustRegionNewtonCG::SolverTrustRegionNewtonCG(
       std::shared_ptr<CellData> cell_data,
-      std::shared_ptr<KrylovSolverTrustRegionBase> krylov_solver,
+      std::shared_ptr<KrylovSolverTrustRegionCG> krylov_solver,
       const muGrid::Verbosity & verbosity, const Real & newton_tol,
       const Real & equil_tol, const Uint & max_iter,
       const Real & max_trust_radius, const Real & eta,
@@ -60,7 +60,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   SolverTrustRegionNewtonCG::SolverTrustRegionNewtonCG(
       std::shared_ptr<CellData> cell_data,
-      std::shared_ptr<KrylovSolverTrustRegionBase> krylov_solver,
+      std::shared_ptr<KrylovSolverTrustRegionCG> krylov_solver,
       const muGrid::Verbosity & verbosity, const Real & newton_tol,
       const Real & equil_tol, const Uint & max_iter,
       const Real & max_trust_radius, const Real & eta)

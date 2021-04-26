@@ -36,7 +36,7 @@
  */
 
 #include "solver_single_physics.hh"
-#include "krylov_solver_base.hh"
+#include "krylov_solver_trust_region_cg.hh"
 
 #include "projection/discretisation.hh"
 
@@ -59,7 +59,7 @@ namespace muSpectre {
     //!
     SolverFEMTrustRegionNewtonCG(
         std::shared_ptr<Discretisation> discretisation,
-        std::shared_ptr<KrylovSolverBase> krylov_solver,
+        std::shared_ptr<KrylovSolverTrustRegionCG> krylov_solver,
         const muGrid::Verbosity & verbosity, const Real & newton_tol,
         const Real & equil_tol, const Uint & max_iter,
         const Real & max_trust_radius, const Real & eta);
@@ -143,7 +143,7 @@ namespace muSpectre {
     std::array<Index_t, 2> displacement_shape{};
     std::array<Index_t, 2> grad_shape{};
 
-    std::shared_ptr<KrylovSolverBase> krylov_solver;
+    std::shared_ptr<KrylovSolverTrustRegionCG> krylov_solver;
     std::shared_ptr<Discretisation> discretisation;
     StiffnessOperator K;
     Real newton_tol;

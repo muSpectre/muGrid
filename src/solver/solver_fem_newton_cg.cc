@@ -340,9 +340,7 @@ namespace muSpectre {
 
       *this->rhs = -this->force->get_field();
 
-      if (not this->krylov_solver->get_is_on_bound()) {
-        full_convergence_test();
-      }
+      full_convergence_test();
     }
 
     // throwing meaningful error message if the number of iterations for

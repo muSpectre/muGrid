@@ -47,7 +47,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   SolverFEMTrustRegionNewtonPCG::SolverFEMTrustRegionNewtonPCG(
       std::shared_ptr<Discretisation> discretisation,
-      std::shared_ptr<KrylovSolverPreconditionedBase> krylov_solver,
+      std::shared_ptr<KrylovSolverTrustRegionPCG> krylov_solver,
       const muGrid::Verbosity & verbosity, const Real & newton_tol,
       const Real & equil_tol, const Uint & max_iter,
       const Real & max_trust_radius, const Real & eta)
@@ -59,7 +59,7 @@ namespace muSpectre {
       Eigen::Ref<const Eigen::MatrixXd> material_properties) {
     this->ref_material = material_properties;
     auto pcg_krylov_solver{
-        std::dynamic_pointer_cast<KrylovSolverPreconditionedBase>(
+        std::dynamic_pointer_cast<KrylovSolverTrustRegionPCG>(
             this->krylov_solver)};
 
     auto impulse_response{this->discretisation->compute_impulse_response(

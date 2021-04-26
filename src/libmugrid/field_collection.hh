@@ -130,10 +130,10 @@ namespace muGrid {
      *                    Important: The pixels or subpoints have their own
      *                    storage order that is not affected by this setting.
      */
-    FieldCollection(
-        ValidityDomain domain, const Index_t & spatial_dimension,
-        const SubPtMap_t & nb_sub_pts,
-        StorageOrder storage_order = StorageOrder::ArrayOfStructures);
+    FieldCollection(ValidityDomain domain, const Index_t & spatial_dimension,
+                    const SubPtMap_t & nb_sub_pts,
+                    StorageOrder storage_order =
+                        StorageOrder::ArrayOfStructures);
 
    public:
     //! Default constructor
@@ -196,8 +196,8 @@ namespace muGrid {
       static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
                     "You can only register fields templated with one of the "
                     "numeric types Real, Complex, Int, or Uint");
-      return this->register_field_helper<T>(unique_name, components_shape,
-                                            sub_division_tag, unit);
+      return this->register_field_helper<T>(
+          unique_name, components_shape, sub_division_tag, unit);
     }
 
     /**
@@ -255,17 +255,17 @@ namespace muGrid {
                         const std::string & sub_division_tag = PixelTag,
                         const Unit & unit = Unit::unitless());
 
-    /**
-     * place a new complex-valued field  in the responsibility of this
-     * collection (Note, because fields have protected constructors, users can't
-     * create them
-     * @param unique_name unique identifier for this field
-     * @param nb_components number of components to be stored per sub-point
-     * (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a scalar
-     * field)
-     * @param sub_division_tag unique identifier of the subdivision scheme
-     * @param unit phyiscal unit of this field
-     */
+      /**
+       * place a new complex-valued field  in the responsibility of this
+       * collection (Note, because fields have protected constructors, users can't
+       * create them
+       * @param unique_name unique identifier for this field
+       * @param nb_components number of components to be stored per sub-point
+       * (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a scalar
+       * field)
+       * @param sub_division_tag unique identifier of the subdivision scheme
+       * @param unit phyiscal unit of this field
+       */
     TypedField<Complex> &
     register_complex_field(const std::string & unique_name,
                            const Index_t & nb_components,
@@ -470,14 +470,6 @@ namespace muGrid {
 
     void set_nb_sub_pts(const std::string & tag,
                         const Index_t & nb_sub_pts_per_pixel);
-
-    /**
-     * set the number of sub points per pixel/voxel for a given tag. Can only be
-     * done once per tag
-     */
-
-    void change_nb_sub_pts(const std::string & tag,
-                           const Index_t & nb_sub_pts_per_pixel);
 
     /**
      * return the number of subpoints per pixel/voxel for a given tag

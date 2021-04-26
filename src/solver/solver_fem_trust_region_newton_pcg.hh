@@ -35,8 +35,9 @@
  */
 
 #include "solver_fem_trust_region_newton_cg.hh"
-#include "krylov_solver_pcg.hh"
-#include "krylov_solver_preconditioned_base.hh"
+#include "krylov_solver_trust_region_pcg.hh"
+
+// #include "krylov_solver_pcg.hh"
 
 #include "projection/discretisation.hh"
 
@@ -54,7 +55,7 @@ namespace muSpectre {
     //!
     SolverFEMTrustRegionNewtonPCG(
         std::shared_ptr<Discretisation> discretisation,
-        std::shared_ptr<KrylovSolverPreconditionedBase> krylov_solver,
+        std::shared_ptr<KrylovSolverTrustRegionPCG> krylov_solver,
         const muGrid::Verbosity & verbosity, const Real & newton_tol,
         const Real & equil_tol, const Uint & max_iter,
         const Real & max_trust_radius, const Real & eta);

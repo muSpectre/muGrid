@@ -41,7 +41,7 @@ import muFFT.Stencils2D
 import muFFT.Stencils3D
 
 from .gradient_integration import get_complemented_positions
-from .gradient_integration import get_complemented_positions_class
+from .gradient_integration import get_complemented_positions_class_solver
 from .gradient_integration import get_complemented_positions_fem
 
 
@@ -53,7 +53,7 @@ gradient_2d = muFFT.Stencils2D.linear_finite_elements
 gradient_3d = muFFT.Stencils3D.linear_finite_elements
 
 
-def write_3d(file_name, rve, data=None):
+def write_3d(file_name, rve, cell_data=None):
     """
     Write results of a 3D calculation that employs a decomposition of each
     voxel in six tetrahedra (using the `gradient_3d` stencil) to a file. The
@@ -64,7 +64,7 @@ def write_3d(file_name, rve, data=None):
 
     file_name  -- filename
     rve -- representative volume element, i.e. the `Cell` object
-    data = dictionary of cell data with corresponding keys
+    cell_data = dictionary of cell data with corresponding keys
     """
     import meshio
     # Size of RVE
@@ -112,13 +112,13 @@ def write_3d(file_name, rve, data=None):
     strain = rve.strain.array() \
         .reshape((3, 3, -1), order='F').T.swapaxes(1, 2)
 
-    if data == None:
+    if cell_data == None:
         # Write mesh to file
         meshio.write_points_cells(
             file_name,
             points,
             {"tetra": cells},
-            data={
+            cell_data={
                 'stress': np.array([stress]),
                 'strain': np.array([strain])
             })
@@ -128,7 +128,7 @@ def write_3d(file_name, rve, data=None):
             file_name,
             points,
             {"tetra": cells},
-            data=data
+            cell_data=cell_data
         )
 
 
@@ -143,7 +143,7 @@ def write_2d(file_name, cell_data=None):
 
     file_name  -- filename
     rve -- representative volume element, i.e. the `Cell` object
-    data = dictionary of cell data with corresponding keys
+    cell_data = dictionary of cell data with corresponding keys
     """
     import meshio
     # Size of RVE
@@ -180,7 +180,7 @@ def write_2d(file_name, cell_data=None):
     strain = rve.strain.array() \
         .reshape((2, 2, -1), order='F').T.swapaxes(1, 2)
 
-    if data == None:
+    if cell_data == None:
         # Write mesh to file
         meshio.write_points_cells(
             file_name,
@@ -196,7 +196,7 @@ def write_2d(file_name, cell_data=None):
             file_name,
             points,
             {"triangle": cells},
-            cell_data=data
+            cell_data=cell_data
         )
 
 
@@ -211,7 +211,7 @@ def write_2d_class_solver(file_name, rve, solver, result, cell_data=None):
 
     file_name  -- filename
     rve -- representative volume element, i.e. the `Cell` object
-    data = dictionary of cell data with corresponding keys
+    cell_data = dictionary of cell data with corresponding keys
     """
     import meshio
     # Size of RVE
@@ -250,7 +250,7 @@ def write_2d_class_solver(file_name, rve, solver, result, cell_data=None):
     strain = solver.grad.array() \
         .reshape((2, 2, -1), order='F').T.swapaxes(1, 2)
 
-    if data == None:
+    if cell_data == None:
         # Write mesh to file
         meshio.write_points_cells(
             file_name,
@@ -266,11 +266,11 @@ def write_2d_class_solver(file_name, rve, solver, result, cell_data=None):
             file_name,
             points,
             {"triangle": cells},
-            cell_data=data
+            cell_data=cell_data
         )
 
 
-def write_2d_fem(file_name, rve, solver, result, data=None):
+def write_2d_fem(file_name, rve, solver, result, cell_data=None):
     """
     Write results of a 3D calculation that employs a decomposition of each
     voxel in six tetrahedra (using the `gradient_3d` stencil) to a file. The
@@ -281,7 +281,7 @@ def write_2d_fem(file_name, rve, solver, result, data=None):
 
     file_name  -- filename fem
     rve -- representative volume element, i.e. the `Cell` object
-    data = dictionary of cell data with corresponding keys
+    cell_data = dictionary of cell data with corresponding keys
     """
     import meshio
     # Size of RVE
@@ -320,7 +320,7 @@ def write_2d_fem(file_name, rve, solver, result, data=None):
     strain = solver.grad.array() \
         .reshape((2, 2, -1), order='F').T.swapaxes(1, 2)
 
-    if data == None:
+    if cell_data == None:
         # Write mesh to file
         meshio.write_points_cells(
             file_name, points,
@@ -335,5 +335,5 @@ def write_2d_fem(file_name, rve, solver, result, data=None):
             file_name,
             points,
             {"triangle": cells},
-            cell_data=data
+            cell_data=cell_data
         )

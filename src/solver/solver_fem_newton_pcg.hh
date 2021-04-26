@@ -36,7 +36,6 @@
 
 #include "solver_fem_newton_cg.hh"
 #include "krylov_solver_pcg.hh"
-#include "krylov_solver_preconditioned_base.hh"
 
 #include "projection/discretisation.hh"
 
@@ -52,11 +51,11 @@ namespace muSpectre {
     SolverFEMNewtonPCG() = delete;
 
     //!
-    SolverFEMNewtonPCG(
-        std::shared_ptr<Discretisation> discretisation,
-        std::shared_ptr<KrylovSolverPreconditionedBase> krylov_solver,
-        const muGrid::Verbosity & verbosity, const Real & newton_tol,
-        const Real & equil_tol, const Uint & max_iter);
+    SolverFEMNewtonPCG(std::shared_ptr<Discretisation> discretisation,
+                       std::shared_ptr<KrylovSolverPCG> krylov_solver,
+                       const muGrid::Verbosity & verbosity,
+                       const Real & newton_tol, const Real & equil_tol,
+                       const Uint & max_iter);
 
     //! Copy constructor
     SolverFEMNewtonPCG(const SolverFEMNewtonPCG & other) = delete;

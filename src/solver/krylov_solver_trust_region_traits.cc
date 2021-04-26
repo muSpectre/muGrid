@@ -1,13 +1,15 @@
 /**
- * @file   krylov_solver_preconditioned_base.cc
+ * @file   krylov_solver_trust_region_traits.cc
  *
- * @author Till Junge <till.junge@altermail.ch>
+ * @author Till Junge <till.junge@epfl.ch>
+ *         Ali Falsafi  <ali.falsafi@epfl.ch>
  *
- * @date   30 Aug 2020
  *
- * @brief  implementation for Krylov solver with preconditioner
+ * @date   25 July 2020
  *
- * Copyright © 2020 Till Junge
+ * @brief  Implementation of traits class for trust region Krylov solver
+ *
+ * Copyright © 2018 Till Junge
  *
  * µSpectre is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
@@ -22,7 +24,7 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with µSpectre; see the file COPYING. If not, write to the
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * * Boston, MA 02111-1307, USA.
  *
  * Additional permission under GNU GPL version 3 section 7
  *
@@ -33,29 +35,24 @@
  *
  */
 
-#include "krylov_solver_preconditioned_base.hh"
+#include "solver/krylov_solver_trust_region_traits.hh"
 
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  KrylovSolverPreconditionedBase::KrylovSolverPreconditionedBase(
-      std::shared_ptr<MatrixAdaptable> matrix_adaptable,
-      std::shared_ptr<MatrixAdaptable> preconditioner_adaptable,
-      const Real & tol, const Uint & maxiter, const Verbosity & verbose)
-      : Parent{matrix_adaptable, tol, maxiter, verbose},
-        preconditioner_holder{preconditioner_adaptable},
-        preconditioner{preconditioner_adaptable->get_adaptor()} {}
+  KrylovSolverTrustRegionTraits::KrylovSolverTrustRegionTraits(
+      const Real & trust_region)
+      : trust_region{trust_region} {}
 
   /* ---------------------------------------------------------------------- */
-  KrylovSolverPreconditionedBase::KrylovSolverPreconditionedBase(
-      const Real & tol, const Uint & maxiter, const Verbosity & verbose)
-      : Parent{tol, maxiter, verbose} {}
+  void KrylovSolverTrustRegionTraits::set_trust_region(
+      const Real & new_trust_region) {
+    this->trust_region = new_trust_region;
+  }
 
   /* ---------------------------------------------------------------------- */
-  void KrylovSolverPreconditionedBase::set_preconditioner(
-      std::shared_ptr<MatrixAdaptable> preconditioner_adaptable) {
-    this->preconditioner_holder = preconditioner_adaptable;
-    this->preconditioner = this->preconditioner_holder->get_adaptor();
+  const bool & KrylovSolverTrustRegionTraits::get_is_on_bound() {
+    return this->is_on_bound;
   }
 
 }  // namespace muSpectre

@@ -165,7 +165,7 @@ namespace muSpectre {
    */
   std::vector<OptimizeResult> trust_region_newton_cg(
       std::shared_ptr<Cell> cell, const LoadSteps_t & load_steps,
-      KrylovSolverTrustRegionBase & solver, const Real & max_trust_region,
+      KrylovSolverTrustRegionCG & solver, const Real & max_trust_region,
       const Real & newton_tol, const Real & equil_tol, const Real & inc_tr_tol,
       const Real & dec_tr_tol, const Verbosity & verbose,
       const IsStrainInitialised & strain_init,
@@ -177,7 +177,7 @@ namespace muSpectre {
    */
   inline OptimizeResult trust_region_newton_cg(
       std::shared_ptr<Cell> cell, const Eigen::Ref<Eigen::MatrixXd> load_step,
-      KrylovSolverTrustRegionBase & solver, const Real & max_trust_region,
+      KrylovSolverTrustRegionCG & solver, const Real & max_trust_region,
       const Real & newton_tol, const Real & inc_tr_tol, const Real & dec_tr_tol,
       const Real & reduction_tol, const Verbosity & verbose = Verbosity::Silent,
       const IsStrainInitialised & strain_init = IsStrainInitialised::False,

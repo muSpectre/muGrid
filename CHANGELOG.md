@@ -1,7 +1,13 @@
 Change log for µSpectre
 =======================
 
-0.17.0 (not yet released)
+
+0.18.0 (Not Released yet)
+-------------------------
+- muSpectre: Added trust fem region solver + ability to handle precondtioner
+- muSpectre: re-organized the krylov solver hierarchy to circumvent diamond inheritance by introducing KrylovSolverXXXTraits classes
+
+0.17.0 (24Apr21)
 -------------------------
 - muSpectre: Added trust region solver class and a simplistic damage material
 - muSpectre: physics have their specific name that might be used later for outputs

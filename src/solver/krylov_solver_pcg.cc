@@ -45,10 +45,11 @@ namespace muSpectre {
       std::shared_ptr<MatrixAdaptable> matrix_holder,
       std::shared_ptr<MatrixAdaptable> inv_preconditioner, const Real & tol,
       const Uint & maxiter, const Verbosity & verbose)
-      : Parent{matrix_holder, inv_preconditioner, tol, maxiter, verbose},
-        comm{matrix_holder->get_communicator()}, r_k(this->get_nb_dof()),
-        y_k(this->get_nb_dof()), p_k(this->get_nb_dof()),
-        Ap_k(this->get_nb_dof()), x_k(this->get_nb_dof()) {}
+      : Parent{matrix_holder, tol, maxiter, verbose},
+        TraitsPC{inv_preconditioner}, comm{matrix_holder->get_communicator()},
+        r_k(this->get_nb_dof()), y_k(this->get_nb_dof()),
+        p_k(this->get_nb_dof()), Ap_k(this->get_nb_dof()),
+        x_k(this->get_nb_dof()) {}
 
   /* ---------------------------------------------------------------------- */
   KrylovSolverPCG::KrylovSolverPCG(const Real & tol, const Uint & maxiter,
@@ -193,7 +194,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   void KrylovSolverPCG::set_preconditioner(
       std::shared_ptr<MatrixAdaptable> inv_preconditioner) {
-    Parent::set_preconditioner(inv_preconditioner);
+    TraitsPC::set_preconditioner(inv_preconditioner);
   }
 
 }  // namespace muSpectre

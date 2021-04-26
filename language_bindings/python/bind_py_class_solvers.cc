@@ -209,13 +209,13 @@ void add_spectral_trust_region_newton_cg_solver(py::module & mod) {
   py::class_<SolverTRNewtonCG, SolverSinglePhysics,
              std::shared_ptr<SolverTRNewtonCG>>(mod, "SolverTRNewtonCG")
       .def(py::init<std::shared_ptr<CellData>,
-                    std::shared_ptr<muSpectre::KrylovSolverTrustRegionBase>,
+                    std::shared_ptr<muSpectre::KrylovSolverTrustRegionCG>,
                     const Verbosity &, const Real &, const Real &, const Uint &,
                     const Real &, const Real &>(),
            "cell_data"_a, "krylov_solver"_a, "verbosity"_a, "newton_tol"_a,
            "equil_tol"_a, "max_iter"_a, "trust_region_max"_a, "eta"_a)
       .def(py::init<std::shared_ptr<CellData>,
-                    std::shared_ptr<muSpectre::KrylovSolverTrustRegionBase>,
+                    std::shared_ptr<muSpectre::KrylovSolverTrustRegionCG>,
                     const Verbosity &, const Real &, const Real &, const Uint &,
                     const Real &, const Real &, const Gradient_t &>(),
            "cell_data"_a, "krylov_solver"_a, "verbosity"_a, "newton_tol"_a,
@@ -248,7 +248,7 @@ void add_fem_newton_cg_solver(py::module & mod) {
   py::class_<SolverFEMNewtonPCG, SolverFEMNewtonCG,
              std::shared_ptr<SolverFEMNewtonPCG>>(mod, "SolverFEMNewtonPCG")
       .def(py::init<std::shared_ptr<muSpectre::Discretisation>,
-                    std::shared_ptr<muSpectre::KrylovSolverPreconditionedBase>,
+                    std::shared_ptr<muSpectre::KrylovSolverPCG>,
                     const Verbosity &, const Real &, const Real &,
                     const Uint &>(),
            "discretisation"_a, "krylov_solver"_a, "verbosity"_a, "newton_tol"_a,
@@ -266,7 +266,7 @@ void add_fem_trust_region_newton_cg_solver(py::module & mod) {
   py::class_<SolverFEMTRNewtonCG, SolverSinglePhysics,
              std::shared_ptr<SolverFEMTRNewtonCG>>(mod, "SolverFEMTRNewtonCG")
       .def(py::init<std::shared_ptr<muSpectre::Discretisation>,
-                    std::shared_ptr<muSpectre::KrylovSolverBase>,
+                    std::shared_ptr<muSpectre::KrylovSolverTrustRegionCG>,
                     const Verbosity &, const Real &, const Real &, const Uint &,
                     const Real &, const Real &>(),
            "discretisation"_a, "krylov_solver"_a, "verbosity"_a, "newton_tol"_a,
@@ -285,7 +285,7 @@ void add_fem_trust_region_newton_cg_solver(py::module & mod) {
   py::class_<SolverFEMTRNewtonPCG, SolverFEMTRNewtonCG,
              std::shared_ptr<SolverFEMTRNewtonPCG>>(mod, "SolverFEMTRNewtonPCG")
       .def(py::init<std::shared_ptr<muSpectre::Discretisation>,
-                    std::shared_ptr<muSpectre::KrylovSolverPreconditionedBase>,
+                    std::shared_ptr<muSpectre::KrylovSolverTrustRegionPCG>,
                     const Verbosity &, const Real &, const Real &, const Uint &,
                     const Real &, const Real &>(),
            "discretisation"_a, "krylov_solver"_a, "verbosity"_a, "newton_tol"_a,
