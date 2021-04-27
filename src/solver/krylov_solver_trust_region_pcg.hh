@@ -84,7 +84,8 @@ namespace muSpectre {
         std::shared_ptr<MatrixAdaptable> inv_preconditioner, const Real & tol,
         const Uint & maxiter, const Real & trust_region = 1.0,
         const Verbosity & verbose = Verbosity::Silent,
-        const bool & reset = false);
+        const ResetCG & reset = ResetCG::no_reset,
+        const Uint & reset_iter_count = 0);
 
     /**
      * Constructor without matrix adaptable. The adaptable has to be supplied
@@ -94,7 +95,8 @@ namespace muSpectre {
     KrylovSolverTrustRegionPCG(const Real & tol, const Uint & maxiter,
                                const Real & trust_region = 1.0,
                                const Verbosity & verbose = Verbosity::Silent,
-                               const bool & reset = false);
+                               const ResetCG & reset = ResetCG::no_reset,
+                               const Uint & reset_iter_count = 0);
 
     //! Destructor
     virtual ~KrylovSolverTrustRegionPCG() = default;
@@ -143,14 +145,12 @@ namespace muSpectre {
     //! during the solution procedure)
     Vector_map bound(const ConstVector_ref rhs);
 
-    bool reset;  //!< Determines whether restart will be carried out in solver
-                 //!< steps or  not(if necessary)
-
-    Vector_t r_k;   //!< residual
-    Vector_t y_k;   //!< preconditioned current solution
-    Vector_t p_k;   //!< search direction
-    Vector_t Ap_k;  //!< directional stiffness
-    Vector_t x_k;   //!< current solution
+    Vector_t r_k;         //!< residual
+    Vector_t y_k;         //!< preconditioned current solution
+    Vector_t p_k;         //!< search direction
+    Vector_t Ap_k;        //!< directional stiffness
+    Vector_t x_k;         //!< current solution
+    Vector_t r_k_copy{};  //! used to keep a copy of the residual if needed
   };
 
 }  // namespace muSpectre

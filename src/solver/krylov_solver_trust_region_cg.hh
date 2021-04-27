@@ -41,13 +41,6 @@
 #include "solver/krylov_solver_trust_region_traits.hh"
 
 namespace muSpectre {
-  enum class ResetCG {
-    no_reset = 0,
-    fixed_iter_count = 1,
-    user_defined_iter_count = 2,
-    gradient_orthogonality = 3,
-    valid_direction = 4
-  };
 
   /**
    * implements the `muSpectre::KrylovSolverBase` interface using a
@@ -129,8 +122,6 @@ namespace muSpectre {
     //! the actual solver
     Vector_map solve(const ConstVector_ref rhs) override;
 
-    Real reset_cg();
-
    protected:
     // to be called in set_matrix
     void set_internal_arrays();
@@ -139,12 +130,6 @@ namespace muSpectre {
     //! find the minimzer on the trust region bound (To be called if necessary
     //! during the solution procedure)
     Vector_map bound(const ConstVector_ref rhs);
-
-    ResetCG reset;  //!< Determines whether restart will be carried out in
-                    //!< solver steps or  not(if necessary)
-
-    Uint reset_iter_count;  //!< if user wants to give the iteration count after
-                            //! which the reset needs to be triggered
 
     Vector_t r_k;         //!< residual
     Vector_t p_k;         //!< search direction

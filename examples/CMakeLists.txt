@@ -173,7 +173,6 @@ muSpectre_add_example(scalar_spectral_py_example
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/concrete_micro_structure.npy
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 
-
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/random_field.npy
     DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 

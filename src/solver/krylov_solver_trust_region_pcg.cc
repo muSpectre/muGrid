@@ -46,18 +46,21 @@ namespace muSpectre {
       std::shared_ptr<MatrixAdaptable> matrix_holder,
       std::shared_ptr<MatrixAdaptable> inv_preconditioner, const Real & tol,
       const Uint & maxiter, const Real & trust_region,
-      const Verbosity & verbose, const bool & reset)
-      : Parent{matrix_holder, tol, maxiter, trust_region, verbose},
-        TraitsPC{inv_preconditioner}, reset{reset}, r_k(this->get_nb_dof()),
+      const Verbosity & verbose, const ResetCG & reset,
+      const Uint & reset_iter_count)
+      : Parent{matrix_holder, tol,   maxiter,         trust_region,
+               verbose,       reset, reset_iter_count},
+        TraitsPC{inv_preconditioner}, r_k(this->get_nb_dof()),
         y_k(this->get_nb_dof()), p_k(this->get_nb_dof()),
         Ap_k(this->get_nb_dof()), x_k(this->get_nb_dof()) {}
 
   /* ---------------------------------------------------------------------- */
   KrylovSolverTrustRegionPCG::KrylovSolverTrustRegionPCG(
       const Real & tol, const Uint & maxiter, const Real & trust_region,
-      const Verbosity & verbose, const bool & reset)
-      : Parent{tol, maxiter, trust_region, verbose}, reset{reset}, r_k{}, y_k{},
-        p_k{}, Ap_k{}, x_k{} {}
+      const Verbosity & verbose, const ResetCG & reset,
+      const Uint & reset_iter_count)
+      : Parent{tol, maxiter, trust_region, verbose, reset, reset_iter_count},
+        r_k{}, y_k{}, p_k{}, Ap_k{}, x_k{} {}
 
   /* ---------------------------------------------------------------------- */
   auto KrylovSolverTrustRegionPCG::solve(const ConstVector_ref rhs)
@@ -123,8 +126,8 @@ namespace muSpectre {
     // because of the early termination criterion, we never count the last
     // iteration
     ++this->counter;
-    Uint iter_count{0};
-    for (Uint i = 0; i < this->maxiter; ++i, ++this->counter, ++iter_count) {
+    Uint iter_counter{0};
+    for (Uint i = 0; i < this->maxiter; ++i, ++this->counter, ++iter_counter) {
       this->Ap_k = matrix * this->p_k;
       Real pAp{this->comm.sum(this->p_k.dot(this->Ap_k))};
 
@@ -160,6 +163,10 @@ namespace muSpectre {
         return this->bound(rhs);
       }
 
+      if (this->reset == ResetCG::gradient_orthogonality) {
+        this->r_k_copy = this->r_k;
+      }
+
       //             rₖ₊₁ ← rₖ + αₖApₖ
       this->r_k += alpha * this->Ap_k;
       rdr = this->comm.sum(this->r_k.squaredNorm());
@@ -181,17 +188,54 @@ namespace muSpectre {
       Real new_rdy{this->comm.sum(this->r_k.dot(this->y_k))};
       Real beta{new_rdy / rdy};
 
-      // reset the CG solver if the number of the iterations gets large
-      // respective to the number of Degree of Freedom of the problem
-      if (this->reset) {
-        if (iter_count > (this->get_nb_dof() / 4)) {
-          beta = 0.0;
-          iter_count = 0;
-          if (verbose > Verbosity::Silent && comm.rank() == 0) {
-            std::cout << "RESTART"
-                      << "\n";
-          }
+      //! CG reset worker
+      auto && reset_cg{[&beta, this, &rhs]() {
+        this->r_k = this->matrix * this->x_k - rhs;
+        beta = 0.0;
+      }};
+
+      switch (this->reset) {
+      case ResetCG::no_reset: {
+        break;
+      }
+      case ResetCG::fixed_iter_count: {
+        if (iter_counter > (this->get_nb_dof() / 4)) {
+          reset_cg();
+        } else {
+          iter_counter++;
         }
+        break;
+      }
+      case ResetCG::user_defined_iter_count: {
+        if (this->reset_iter_count == 0) {
+          throw SolverError(
+              "Positive valued reset_iter_count is needed to perform user "
+              "defined iteration count restart for the CG solver");
+        }
+
+        if (iter_counter > this->reset_iter_count) {
+          reset_cg();
+        } else {
+          iter_counter++;
+        }
+        break;
+      }
+      case ResetCG::gradient_orthogonality: {
+        if ((comm.sum(this->r_k.dot(this->r_k_copy)) / rdr) > 0.2) {
+          reset_cg();
+        }
+        break;
+      }
+      case ResetCG::valid_direction: {
+        if (comm.sum(this->r_k.dot(this->p_k)) > 0) {
+          reset_cg();
+        }
+        break;
+      }
+      default: {
+        throw SolverError("Unknown CG reset strategy ");
+        break;
+      }
       }
 
       rdy = new_rdy;

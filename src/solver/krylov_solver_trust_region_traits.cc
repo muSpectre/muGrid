@@ -41,8 +41,10 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   KrylovSolverTrustRegionTraits::KrylovSolverTrustRegionTraits(
-      const Real & trust_region)
-      : trust_region{trust_region} {}
+      const Real & trust_region, const ResetCG & reset,
+      const Uint & reset_iter_count)
+      : trust_region{trust_region}, reset{reset}, reset_iter_count{
+                                                      reset_iter_count} {}
 
   /* ---------------------------------------------------------------------- */
   void KrylovSolverTrustRegionTraits::set_trust_region(

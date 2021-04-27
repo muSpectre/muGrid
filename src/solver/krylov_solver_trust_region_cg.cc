@@ -52,9 +52,9 @@ namespace muSpectre {
       const Uint & maxiter, const Real & trust_region,
       const Verbosity & verbose, const ResetCG & reset,
       const Uint & reset_iter_count)
-      : Parent{matrix_holder, tol, maxiter, verbose}, TraitsTR{trust_region},
-        comm{matrix_holder->get_communicator()}, reset{reset},
-        reset_iter_count{reset_iter_count}, r_k(this->get_nb_dof()),
+      : Parent{matrix_holder, tol, maxiter, verbose},
+        TraitsTR{trust_region, reset, reset_iter_count},
+        comm{matrix_holder->get_communicator()}, r_k(this->get_nb_dof()),
         p_k(this->get_nb_dof()), Ap_k(this->get_nb_dof()),
         x_k(this->get_nb_dof()) {}
 
@@ -63,8 +63,9 @@ namespace muSpectre {
       const Real & tol, const Uint & maxiter, const Real & trust_region,
       const Verbosity & verbose, const ResetCG & reset,
       const Uint & reset_iter_count)
-      : Parent{tol, maxiter, verbose}, TraitsTR{trust_region}, reset{reset},
-        reset_iter_count{reset_iter_count}, r_k{}, p_k{}, Ap_k{}, x_k{} {}
+      : Parent{tol, maxiter, verbose}, TraitsTR{trust_region, reset,
+                                                reset_iter_count},
+        r_k{}, p_k{}, Ap_k{}, x_k{} {}
 
   /* ---------------------------------------------------------------------- */
   void KrylovSolverTrustRegionCG::set_matrix(
@@ -158,8 +159,7 @@ namespace muSpectre {
       this->Ap_k = this->matrix * this->p_k;
 
       Real pdAp{comm.sum(this->p_k.dot(this->Ap_k))};
-      // TODO(Ali): why -1.e-8?
-      if (pdAp < -1.e-8) {
+      if (pdAp <= 0) {
         // Hessian is not positive definite, the minimizer is on the trust
         // region bound
         if (verbose > Verbosity::Silent && comm.rank() == 0) {

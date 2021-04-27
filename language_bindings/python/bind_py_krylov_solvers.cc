@@ -121,14 +121,15 @@ void add_preconditioned_krylov_solver_trust_region_helper(py::module & mod,
       .def(py::init<std::shared_ptr<muSpectre::MatrixAdaptable>,
                     std::shared_ptr<muSpectre::MatrixAdaptable>, const Real &,
                     const Uint &, const Real &, const Verbosity &,
-                    const bool &>(),
+                    const ResetCG &, const Uint &>(),
            "cell"_a, "inv_preconditioner"_a, "tol"_a = -1.0, "maxiter"_a = 1000,
            "trust_region"_a = 1.0, "verbose"_a = Verbosity::Silent,
-           "reset"_a = false)
+           "reset"_a = ResetCG::no_reset, "reset_iter_count"_a = 0)
       .def(py::init<const Real &, const Uint &, const Real &, const Verbosity &,
-                    const bool &>(),
+                    const ResetCG &, const Uint &>(),
            "tol"_a, "maxiter"_a, "trust_region"_a = 1.0,
-           "verbose"_a = Verbosity::Silent, "reset"_a = false)
+           "verbose"_a = Verbosity::Silent, "reset"_a = ResetCG::no_reset,
+           "reset_iter_count"_a = 0)
       .def("initialise", &KrylovSolver::initialise)
       .def("solve", &KrylovSolver::solve, "rhs"_a)
       .def("set_trust_region",
