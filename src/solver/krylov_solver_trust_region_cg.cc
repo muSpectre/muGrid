@@ -53,7 +53,7 @@ namespace muSpectre {
       const Verbosity & verbose, const ResetCG & reset,
       const Uint & reset_iter_count)
       : Parent{matrix_holder, tol, maxiter, verbose},
-        TraitsTR{trust_region, reset, reset_iter_count},
+        FeaturesTR{trust_region, reset, reset_iter_count},
         comm{matrix_holder->get_communicator()}, r_k(this->get_nb_dof()),
         p_k(this->get_nb_dof()), Ap_k(this->get_nb_dof()),
         x_k(this->get_nb_dof()) {}
@@ -63,7 +63,7 @@ namespace muSpectre {
       const Real & tol, const Uint & maxiter, const Real & trust_region,
       const Verbosity & verbose, const ResetCG & reset,
       const Uint & reset_iter_count)
-      : Parent{tol, maxiter, verbose}, TraitsTR{trust_region, reset,
+      : Parent{tol, maxiter, verbose}, FeaturesTR{trust_region, reset,
                                                 reset_iter_count},
         r_k{}, p_k{}, Ap_k{}, x_k{} {}
 

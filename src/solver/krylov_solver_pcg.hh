@@ -37,7 +37,7 @@
 #define SRC_SOLVER_KRYLOV_SOLVER_PCG_HH_
 
 #include "krylov_solver_base.hh"
-#include "krylov_solver_preconditioned_traits.hh"
+#include "krylov_solver_preconditioned_features.hh"
 
 namespace muSpectre {
 
@@ -72,11 +72,11 @@ namespace muSpectre {
    *             k    ← k + 1
    */
   class KrylovSolverPCG : public KrylovSolverBase,
-                          public KrylovSolverPreconditionedTraits {
+                          public KrylovSolverPreconditionedFeatures {
    public:
     //! standard short-hand for base class
     using Parent = KrylovSolverBase;
-    using TraitsPC = KrylovSolverPreconditionedTraits;
+    using FeaturesPC = KrylovSolverPreconditionedFeatures;
 
     //! Input vector for solvers
     using ConstVector_ref = typename Parent::ConstVector_ref;

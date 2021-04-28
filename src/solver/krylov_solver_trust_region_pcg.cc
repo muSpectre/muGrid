@@ -50,7 +50,7 @@ namespace muSpectre {
       const Uint & reset_iter_count)
       : Parent{matrix_holder, tol,   maxiter,         trust_region,
                verbose,       reset, reset_iter_count},
-        TraitsPC{inv_preconditioner}, r_k(this->get_nb_dof()),
+        FeaturesPC{inv_preconditioner}, r_k(this->get_nb_dof()),
         y_k(this->get_nb_dof()), p_k(this->get_nb_dof()),
         Ap_k(this->get_nb_dof()), x_k(this->get_nb_dof()) {}
 
@@ -288,7 +288,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   void KrylovSolverTrustRegionPCG::set_preconditioner(
       std::shared_ptr<MatrixAdaptable> inv_preconditioner) {
-    TraitsPC::set_preconditioner(inv_preconditioner);
+    FeaturesPC::set_preconditioner(inv_preconditioner);
   }
 
   /* ---------------------------------------------------------------------- */

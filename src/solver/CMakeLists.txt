@@ -36,8 +36,8 @@
 
 set(solvers_SRC
   ${CMAKE_CURRENT_SOURCE_DIR}/krylov_solver_base.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/krylov_solver_trust_region_traits.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/krylov_solver_preconditioned_traits.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/krylov_solver_trust_region_features.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/krylov_solver_preconditioned_features.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/matrix_adaptor.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/krylov_solver_cg.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/krylov_solver_pcg.cc

@@ -38,7 +38,7 @@
 #define SRC_SOLVER_KRYLOV_SOLVER_TRUST_REGION_CG_HH_
 
 #include "solver/krylov_solver_base.hh"
-#include "solver/krylov_solver_trust_region_traits.hh"
+#include "solver/krylov_solver_trust_region_features.hh"
 
 namespace muSpectre {
 
@@ -48,10 +48,10 @@ namespace muSpectre {
    * to be used with the nonlinear `trust_region_newton_cg` solver.
    */
   class KrylovSolverTrustRegionCG : public KrylovSolverBase,
-                                    public KrylovSolverTrustRegionTraits {
+                                    public KrylovSolverTrustRegionFeatures {
    public:
     using Parent = KrylovSolverBase;  //!< standard short-hand for base class
-    using TraitsTR = KrylovSolverTrustRegionTraits;
+    using FeaturesTR = KrylovSolverTrustRegionFeatures;
     //! for storage of fields
     using Vector_t = Parent::Vector_t;
     //! Input vector for solvers

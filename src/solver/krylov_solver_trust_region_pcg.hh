@@ -37,17 +37,17 @@
 #ifndef SRC_SOLVER_KRYLOV_SOLVER_TRUST_REGION_PCG_HH_
 #define SRC_SOLVER_KRYLOV_SOLVER_TRUST_REGION_PCG_HH_
 
-#include "krylov_solver_preconditioned_traits.hh"
+#include "krylov_solver_preconditioned_features.hh"
 #include "krylov_solver_trust_region_cg.hh"
 
 namespace muSpectre {
 
   class KrylovSolverTrustRegionPCG : public KrylovSolverTrustRegionCG,
-                                     public KrylovSolverPreconditionedTraits {
+                                     public KrylovSolverPreconditionedFeatures {
    public:
     //! standard short-hand for base class
     using Parent = KrylovSolverTrustRegionCG;
-    using TraitsPC = KrylovSolverPreconditionedTraits;
+    using FeaturesPC = KrylovSolverPreconditionedFeatures;
     //! Input vector for solvers
     using ConstVector_ref = typename Parent::ConstVector_ref;
     //! Output vector for solvers

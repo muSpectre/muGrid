@@ -164,15 +164,15 @@ void add_krylov_solver(py::module & mod) {
           "system_matrix_adaptable"_a)
       .def("solve", &muSpectre::KrylovSolverBase::solve);
 
-  py::class_<muSpectre::KrylovSolverTrustRegionTraits,
-             std::shared_ptr<muSpectre::KrylovSolverTrustRegionTraits>>(
-      mod, "KrylovSolverTrustRegionTraits");
+  py::class_<muSpectre::KrylovSolverTrustRegionFeatures,
+             std::shared_ptr<muSpectre::KrylovSolverTrustRegionFeatures>>(
+      mod, "KrylovSolverTrustRegionFeatures");
 
-  class PyKrylovSolverPreconditionedTraits
-      : public muSpectre::KrylovSolverPreconditionedTraits {
+  class PyKrylovSolverPreconditionedFeatures
+      : public muSpectre::KrylovSolverPreconditionedFeatures {
    public:
-    using Parent = muSpectre::KrylovSolverPreconditionedTraits;
-    PyKrylovSolverPreconditionedTraits(
+    using Parent = muSpectre::KrylovSolverPreconditionedFeatures;
+    PyKrylovSolverPreconditionedFeatures(
         std::shared_ptr<muSpectre::MatrixAdaptable> preconditioner_adaptable)
         : Parent(preconditioner_adaptable) {}
     void set_preconditioner(std::shared_ptr<muSpectre::MatrixAdaptable>
@@ -182,12 +182,12 @@ void add_krylov_solver(py::module & mod) {
     }
   };
 
-  py::class_<muSpectre::KrylovSolverPreconditionedTraits,
-             std::shared_ptr<muSpectre::KrylovSolverPreconditionedTraits>,
-             PyKrylovSolverPreconditionedTraits>(
-      mod, "KrylovSolverPreconditionedTraits")
+  py::class_<muSpectre::KrylovSolverPreconditionedFeatures,
+             std::shared_ptr<muSpectre::KrylovSolverPreconditionedFeatures>,
+             PyKrylovSolverPreconditionedFeatures>(
+      mod, "KrylovSolverPreconditionedFeatures")
       .def("set_preconditioner",
-           &muSpectre::KrylovSolverPreconditionedTraits::set_preconditioner,
+           &muSpectre::KrylovSolverPreconditionedFeatures::set_preconditioner,
            "inv_preconditioner_matrix_adaptable"_a);
 
   // py::class_<muSpectre::KrylovSolverPreconditionedBase,

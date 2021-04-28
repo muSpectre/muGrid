@@ -1,15 +1,13 @@
 /**
- * @file   krylov_solver_trust_region_traits.cc
+ * @file   krylov_solver_preconditioned_features.cc
  *
- * @author Till Junge <till.junge@epfl.ch>
- *         Ali Falsafi  <ali.falsafi@epfl.ch>
+ * @author Till Junge <till.junge@altermail.ch>
  *
+ * @date   30 Aug 2020
  *
- * @date   25 July 2020
+ * @brief  implementation for Krylov solver with preconditioner
  *
- * @brief  Implementation of traits class for trust region Krylov solver
- *
- * Copyright © 2018 Till Junge
+ * Copyright © 2020 Till Junge
  *
  * µSpectre is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
@@ -24,7 +22,7 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with µSpectre; see the file COPYING. If not, write to the
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * * Boston, MA 02111-1307, USA.
+ * Boston, MA 02111-1307, USA.
  *
  * Additional permission under GNU GPL version 3 section 7
  *
@@ -35,26 +33,21 @@
  *
  */
 
-#include "solver/krylov_solver_trust_region_traits.hh"
+#include "krylov_solver_preconditioned_features.hh"
 
 namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
-  KrylovSolverTrustRegionTraits::KrylovSolverTrustRegionTraits(
-      const Real & trust_region, const ResetCG & reset,
-      const Uint & reset_iter_count)
-      : trust_region{trust_region}, reset{reset}, reset_iter_count{
-                                                      reset_iter_count} {}
+  KrylovSolverPreconditionedFeatures::KrylovSolverPreconditionedFeatures(
+      std::shared_ptr<MatrixAdaptable> preconditioner_adaptable)
+      : preconditioner_holder{preconditioner_adaptable},
+        preconditioner{preconditioner_adaptable->get_adaptor()} {}
 
   /* ---------------------------------------------------------------------- */
-  void KrylovSolverTrustRegionTraits::set_trust_region(
-      const Real & new_trust_region) {
-    this->trust_region = new_trust_region;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  const bool & KrylovSolverTrustRegionTraits::get_is_on_bound() {
-    return this->is_on_bound;
+  void KrylovSolverPreconditionedFeatures::set_preconditioner(
+      std::shared_ptr<MatrixAdaptable> preconditioner_adaptable) {
+    this->preconditioner_holder = preconditioner_adaptable;
+    this->preconditioner = this->preconditioner_holder->get_adaptor();
   }
 
 }  // namespace muSpectre

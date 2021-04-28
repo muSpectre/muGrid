@@ -1,11 +1,11 @@
 /**
- * @file   krylov_solver_preconditioned_traits.hh
+ * @file   krylov_solver_preconditioned_features.hh
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
  * @date   30 Aug 2020
  *
- * @brief  Traits class for solvers with a pre-conditioner
+ * @brief  Features class for solvers with a pre-conditioner
  *
  * Copyright © 2020 Till Junge
  *
@@ -35,52 +35,52 @@
 
 #include "krylov_solver_base.hh"
 
-#ifndef SRC_SOLVER_KRYLOV_SOLVER_PRECONDITIONED_TRAITS_HH_
-#define SRC_SOLVER_KRYLOV_SOLVER_PRECONDITIONED_TRAITS_HH_
+#ifndef SRC_SOLVER_KRYLOV_SOLVER_PRECONDITIONED_FEATURES_HH_
+#define SRC_SOLVER_KRYLOV_SOLVER_PRECONDITIONED_FEATURES_HH_
 
 namespace muSpectre {
 
-  class KrylovSolverPreconditionedTraits {
+  class KrylovSolverPreconditionedFeatures {
    public:
     //! Default constructor
-    KrylovSolverPreconditionedTraits() = default;
+    KrylovSolverPreconditionedFeatures() = default;
 
     /**
      * Constructor takes the matrix adaptables for the system matrix and the
      * preconditioner, tolerance, max number of iterations and verbosity flag as
      * input
      */
-    KrylovSolverPreconditionedTraits(
+    KrylovSolverPreconditionedFeatures(
         std::shared_ptr<MatrixAdaptable> preconditioner_adaptable);
 
     /**
      * Constructor without matrix adaptables. The adaptables have to be supplied
-     * using KrylovSolverTraits::set_matrix(...)  and
-     * KrylovSolverPreconditionedTraits::set_preconditioner(...) before
+     * using KrylovSolverFeatures::set_matrix(...)  and
+     * KrylovSolverPreconditionedFeatures::set_preconditioner(...) before
      * initialisation for this solver to be usable
      */
-    KrylovSolverPreconditionedTraits(
+    KrylovSolverPreconditionedFeatures(
         const Real & tol, const Uint & maxiter,
         const Verbosity & verbose = Verbosity::Silent);
 
     //! Copy constructor
-    KrylovSolverPreconditionedTraits(
-        const KrylovSolverPreconditionedTraits & other) = delete;
+    KrylovSolverPreconditionedFeatures(
+        const KrylovSolverPreconditionedFeatures & other) = delete;
 
     //! Move constructor
-    KrylovSolverPreconditionedTraits(
-        KrylovSolverPreconditionedTraits && other) = default;
+    KrylovSolverPreconditionedFeatures(
+        KrylovSolverPreconditionedFeatures && other) = default;
 
     //! Destructor
-    virtual ~KrylovSolverPreconditionedTraits() = default;
+    virtual ~KrylovSolverPreconditionedFeatures() = default;
 
     //! Copy assignment operator
-    KrylovSolverPreconditionedTraits &
-    operator=(const KrylovSolverPreconditionedTraits & other) = delete;
+    KrylovSolverPreconditionedFeatures &
+    operator=(const KrylovSolverPreconditionedFeatures & other) = delete;
 
     //! Move assignment operator
-    KrylovSolverPreconditionedTraits &
-    operator=(KrylovSolverPreconditionedTraits && other) = delete;
+    KrylovSolverPreconditionedFeatures &
+    operator=(KrylovSolverPreconditionedFeatures && other) = delete;
 
     //! set the preconditioner
     virtual void set_preconditioner(
@@ -94,4 +94,4 @@ namespace muSpectre {
 
 }  // namespace muSpectre
 
-#endif  // SRC_SOLVER_KRYLOV_SOLVER_PRECONDITIONED_TRAITS_HH_
+#endif  // SRC_SOLVER_KRYLOV_SOLVER_PRECONDITIONED_FEATURES_HH_

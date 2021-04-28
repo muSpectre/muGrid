@@ -1,5 +1,5 @@
 /**
- * @file   krylov_solver_trust_region_traits.hh
+ * @file   krylov_solver_trust_region_features.hh
  *
  * @author Till Junge <till.junge@epfl.ch>
  *         Ali Falsafi  <ali.falsafi@epfl.ch>
@@ -7,7 +7,7 @@
  *
  * @date   25 July 2020
  *
- * @brief  Traits class for trust region Krylov solver
+ * @brief  Features class for trust region Krylov solver
  *
  * Copyright © 2018 Till Junge
  *
@@ -37,8 +37,8 @@
 
 #include "solver_common.hh"
 
-#ifndef SRC_SOLVER_KRYLOV_SOLVER_TRUST_REGION_TRAITS_HH_
-#define SRC_SOLVER_KRYLOV_SOLVER_TRUST_REGION_TRAITS_HH_
+#ifndef SRC_SOLVER_KRYLOV_SOLVER_TRUST_REGION_FEATURES_HH_
+#define SRC_SOLVER_KRYLOV_SOLVER_TRUST_REGION_FEATURES_HH_
 
 namespace muSpectre {
   enum class ResetCG {
@@ -49,38 +49,38 @@ namespace muSpectre {
     valid_direction = 4
   };
 
-  class KrylovSolverTrustRegionTraits {
+  class KrylovSolverTrustRegionFeatures {
    public:
     //! Default constructor
-    KrylovSolverTrustRegionTraits() = default;
+    KrylovSolverTrustRegionFeatures() = default;
 
     //! Copy constructor
-    KrylovSolverTrustRegionTraits(const KrylovSolverTrustRegionTraits & other) =
-        delete;
+    KrylovSolverTrustRegionFeatures(
+        const KrylovSolverTrustRegionFeatures & other) = delete;
 
     /**
      * Constructor without matrix adaptable. The adaptable has to be supplied
-     * using KrylovSolverTraits::set_matrix(...) before initialisation for this
-     * solver to be usable
+     * using KrylovSolverFeatures::set_matrix(...) before initialisation for
+     * this solver to be usable
      */
-    KrylovSolverTrustRegionTraits(const Real & trust_region = 1.0,
-                                  const ResetCG & reset = ResetCG::no_reset,
-                                  const Uint & reset_iter_count = 0);
+    KrylovSolverTrustRegionFeatures(const Real & trust_region = 1.0,
+                                    const ResetCG & reset = ResetCG::no_reset,
+                                    const Uint & reset_iter_count = 0);
 
     //! Move constructor
-    KrylovSolverTrustRegionTraits(KrylovSolverTrustRegionTraits && other) =
+    KrylovSolverTrustRegionFeatures(KrylovSolverTrustRegionFeatures && other) =
         default;
 
     //! Destructor
-    virtual ~KrylovSolverTrustRegionTraits() = default;
+    virtual ~KrylovSolverTrustRegionFeatures() = default;
 
     //! Copy assignment operator
-    KrylovSolverTrustRegionTraits &
-    operator=(const KrylovSolverTrustRegionTraits & other) = delete;
+    KrylovSolverTrustRegionFeatures &
+    operator=(const KrylovSolverTrustRegionFeatures & other) = delete;
 
     //! Move assignment operator
-    KrylovSolverTrustRegionTraits &
-    operator=(KrylovSolverTrustRegionTraits && other) = delete;
+    KrylovSolverTrustRegionFeatures &
+    operator=(KrylovSolverTrustRegionFeatures && other) = delete;
 
     //! set size of trust region, exception if not supported
     void set_trust_region(const Real & new_trust_region);
@@ -105,4 +105,4 @@ namespace muSpectre {
   };
 }  // namespace muSpectre
 
-#endif  // SRC_SOLVER_KRYLOV_SOLVER_TRUST_REGION_TRAITS_HH_
+#endif  // SRC_SOLVER_KRYLOV_SOLVER_TRUST_REGION_FEATURES_HH_

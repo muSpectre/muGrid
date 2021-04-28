@@ -151,7 +151,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   OptimizeResult SolverFEMNewtonCG::solve_load_increment(
       const LoadStep & load_step, EigenStrainFunc_ref eigen_strain_func,
-      CellExtractFieldFunc_ref /*cell_extract_func*/) {
+      CellExtractFieldFunc_ref cell_extract_func) {
     if (eigen_strain_func == muGrid::nullopt and
         this->has_eigen_strain_storage()) {
       std::stringstream err{};
@@ -278,10 +278,10 @@ namespace muSpectre {
       try {
         this->disp_fluctuation_incr->get_field() =
             this->krylov_solver->solve(this->rhs->get_field().eigen_vec());
-        // Eigen::VectorXd rhs_reconstruct{
-        //     // TODO(junge/martin): what is this?
-        //     this->get_adaptor() *
-        //     this->disp_fluctuation_incr->get_field().eigen_vec()};
+        Eigen::VectorXd rhs_reconstruct{
+            // TODO(junge/martin): what is this?
+            this->get_adaptor() *
+            this->disp_fluctuation_incr->get_field().eigen_vec()};
       } catch (ConvergenceError & error) {
         std::stringstream err{};
         err << "Failure at load step " << this->get_counter()
@@ -373,9 +373,9 @@ namespace muSpectre {
 
     // store history variables for next load increment
     this->cell_data->save_history_variables();
-    // if (not(cell_extract_func == muGrid::nullopt)) {
-    //   (cell_extract_func.value())(this->get_cell_data());
-    // }
+    if (not(cell_extract_func == muGrid::nullopt)) {
+      (cell_extract_func.value())(this->get_cell_data());
+    }
     return ret_val;
   }
 
