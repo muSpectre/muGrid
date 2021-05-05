@@ -278,10 +278,6 @@ namespace muSpectre {
       try {
         this->disp_fluctuation_incr->get_field() =
             this->krylov_solver->solve(this->rhs->get_field().eigen_vec());
-        Eigen::VectorXd rhs_reconstruct{
-            // TODO(junge/martin): what is this?
-            this->get_adaptor() *
-            this->disp_fluctuation_incr->get_field().eigen_vec()};
       } catch (ConvergenceError & error) {
         std::stringstream err{};
         err << "Failure at load step " << this->get_counter()
