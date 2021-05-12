@@ -335,7 +335,7 @@ namespace muSpectre {
       this->eval_grad->get_field() = this->grad->get_field();
       (eigen_strain_func.value())(this->eval_grad->get_field());
     }
-    clear_last_step_nonlinear();
+    this->clear_last_step_nonlinear();
     auto res_tup{this->evaluate_stress_tangent()};
     auto & flux{std::get<0>(res_tup)};
     // keep a copy of the flux in a vector shape (later needed for calculating

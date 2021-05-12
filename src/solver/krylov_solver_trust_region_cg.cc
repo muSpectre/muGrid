@@ -203,54 +203,63 @@ namespace muSpectre {
       Real beta{new_rdr / rdr};
 
       //! CG reset worker
-      auto && reset_cg{[&beta, this, &rhs]() {
+      auto && reset_cg{[&beta, this, &rhs, &iter_counter]() {
         this->r_k = this->matrix * this->x_k - rhs;
         beta = 0.0;
+        iter_counter = 0;
       }};
 
-      switch (this->reset) {
-      case ResetCG::no_reset: {
-        break;
-      }
-      case ResetCG::fixed_iter_count: {
-        if (iter_counter > (this->get_nb_dof() / 4)) {
-          reset_cg();
-        } else {
-          iter_counter++;
+      if (i > 1) {
+        switch (this->reset) {
+        case ResetCG::no_reset: {
+          break;
         }
-        break;
-      }
-      case ResetCG::user_defined_iter_count: {
-        if (this->reset_iter_count == 0) {
-          throw SolverError(
-              "Positive valued reset_iter_count is needed to perform user "
-              "defined iteration count restart for the CG solver");
+        case ResetCG::fixed_iter_count: {
+          if (iter_counter > (this->get_nb_dof() / 4)) {
+            reset_cg();
+          } else {
+            iter_counter++;
+          }
+          break;
         }
+        case ResetCG::user_defined_iter_count: {
+          if (this->reset_iter_count == 0) {
+            throw SolverError(
+                "Positive valued reset_iter_count is needed to perform user "
+                "defined iteration count restart for the CG solver");
+          }
 
-        if (iter_counter > this->reset_iter_count) {
-          reset_cg();
-        } else {
-          iter_counter++;
+          if (iter_counter > this->reset_iter_count) {
+            reset_cg();
+          } else {
+            iter_counter++;
+          }
+          break;
         }
-        break;
-      }
-      case ResetCG::gradient_orthogonality: {
-        if ((comm.sum(this->r_k.dot(this->r_k_copy)) / rdr) > 0.2) {
-          reset_cg();
+        case ResetCG::gradient_orthogonality: {
+          /* Based on
+            RESTART PROCEDURES FOR THE CONJUGATE GRADIENT METHOD by:
+            M.J.D. POWELL
+            Mathematical Programming 12 (1977) 241-254.
+            North-Holland Publishing Company */
+          if (abs(comm.sum(this->r_k.dot(this->r_k_copy))) > 0.2 * new_rdr) {
+            reset_cg();
+          }
+          break;
         }
-        break;
-      }
-      case ResetCG::valid_direction: {
-        if (comm.sum(this->r_k.dot(this->p_k)) > 0) {
-          reset_cg();
+        case ResetCG::valid_direction: {
+          if (comm.sum(this->r_k.dot(this->p_k)) > 0) {
+            reset_cg();
+          }
+          break;
         }
-        break;
+        default: {
+          throw SolverError("Unknown CG reset strategy ");
+          break;
+        }
+        }
       }
-      default: {
-        throw SolverError("Unknown CG reset strategy ");
-        break;
-      }
-      }
+
       rdr = new_rdr;
 
       if (verbose > Verbosity::Silent && comm.rank() == 0) {

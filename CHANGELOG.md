@@ -2,7 +2,12 @@ Change log for µSpectre
 =======================
 
 
-0.18.0 (Not Released yet)
+0.18.1 (Not Released yet)
+-------------------------
+- muSpectre: Fix, changed the reset criterion ofr gradient orthogonality in fem trust region precondtioned krylov solvers
+- muSpectre: Fix, added calling clear_was_last_step_nonlinear in fem_newton_trust_region_pc solver
+
+0.18.0 (10May21)
 -------------------------
 - muSpectre: Added trust fem region solver + ability to handle precondtioner
 - muSpectre: re-organized the krylov solver hierarchy to circumvent diamond inheritance by introducing KrylovSolverXXXTraits classes
