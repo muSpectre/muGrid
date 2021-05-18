@@ -73,25 +73,24 @@ namespace muSpectre {
      * negative value for the tolerance tells the solver to automatically adjust
      * it.
      */
-    KrylovSolverTrustRegionCG(std::shared_ptr<MatrixAdaptable> matrix_holder,
-                              const Real & tol = -1.0,
-                              const Uint & maxiter = 1000,
-                              const Real & trust_region = 1.0,
-                              const Verbosity & verbose = Verbosity::Silent,
-                              const ResetCG & reset = ResetCG::no_reset,
-                              const Uint & reset_iter_count = 0);
+    KrylovSolverTrustRegionCG(
+        std::shared_ptr<MatrixAdaptable> matrix_holder, const Real & tol = -1.0,
+        const Uint & maxiter = 1000, const Real & trust_region = 1.0,
+        const Verbosity & verbose = Verbosity::Silent,
+        const ResetCG & reset = ResetCG::no_reset,
+        const Index_t & reset_iter_count = muGrid::Unknown);
 
     /**
      * Constructor without matrix adaptable. The adaptable has to be supplied
      * using KrylovSolverBase::set_matrix(...) before initialisation for this
      * solver to be usable
      */
-    KrylovSolverTrustRegionCG(const Real & tol = -1.0,
-                              const Uint & maxiter = 1000,
-                              const Real & trust_region = 1.0,
-                              const Verbosity & verbose = Verbosity::Silent,
-                              const ResetCG & reset = ResetCG::no_reset,
-                              const Uint & reset_iter_count = 0);
+    KrylovSolverTrustRegionCG(
+        const Real & tol = -1.0, const Uint & maxiter = 1000,
+        const Real & trust_region = 1.0,
+        const Verbosity & verbose = Verbosity::Silent,
+        const ResetCG & reset = ResetCG::no_reset,
+        const Index_t & reset_iter_count = muGrid::Unknown);
 
     //! Move constructor
     KrylovSolverTrustRegionCG(KrylovSolverTrustRegionCG && other) = default;
@@ -131,11 +130,12 @@ namespace muSpectre {
     //! during the solution procedure)
     Vector_map bound(const ConstVector_ref rhs);
 
-    Vector_t r_k;         //!< residual
-    Vector_t p_k;         //!< search direction
-    Vector_t Ap_k;        //!< directional stiffness
-    Vector_t x_k;         //!< current solution
-    Vector_t r_k_copy{};  //! used to keep a copy of the residual if needed
+    Vector_t r_k;   //!< residual
+    Vector_t p_k;   //!< search direction
+    Vector_t Ap_k;  //!< directional stiffness
+    Vector_t x_k;   //!< current solution
+    //! used to keep a copy of the previous residual if needed
+    Vector_t r_k_previous{};
   };
 
 }  // namespace muSpectre

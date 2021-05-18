@@ -47,18 +47,30 @@ namespace muSpectre {
       std::shared_ptr<MatrixAdaptable> inv_preconditioner, const Real & tol,
       const Uint & maxiter, const Real & trust_region,
       const Verbosity & verbose, const ResetCG & reset,
-      const Uint & reset_iter_count)
-      : Parent{matrix_holder, tol,   maxiter,         trust_region,
-               verbose,       reset, reset_iter_count},
+      const Index_t & reset_iter_count)
+      : Parent{matrix_holder,
+               tol,
+               maxiter,
+               trust_region,
+               verbose,
+               reset,
+               reset_iter_count == muGrid::Unknown ? this->get_nb_dof() / 4
+                                                   : reset_iter_count},
         FeaturesPC{inv_preconditioner}, r_k(this->get_nb_dof()),
         y_k(this->get_nb_dof()), p_k(this->get_nb_dof()),
-        Ap_k(this->get_nb_dof()), x_k(this->get_nb_dof()) {}
+        Ap_k(this->get_nb_dof()), x_k(this->get_nb_dof()) {
+    if (this->reset == ResetCG::iter_count and this->reset_iter_count <= 0) {
+      throw SolverError(
+          "Positive valued reset_iter_count is needed to perform user "
+          "defined iteration count restart for the CG solver");
+    }
+  }
 
   /* ---------------------------------------------------------------------- */
   KrylovSolverTrustRegionPCG::KrylovSolverTrustRegionPCG(
       const Real & tol, const Uint & maxiter, const Real & trust_region,
       const Verbosity & verbose, const ResetCG & reset,
-      const Uint & reset_iter_count)
+      const Index_t & reset_iter_count)
       : Parent{tol, maxiter, trust_region, verbose, reset, reset_iter_count},
         r_k{}, y_k{}, p_k{}, Ap_k{}, x_k{} {}
 
@@ -203,25 +215,9 @@ namespace muSpectre {
         case ResetCG::no_reset: {
           break;
         }
-        case ResetCG::fixed_iter_count: {
-          if (iter_counter > (this->get_nb_dof() / 4)) {
+        case ResetCG::iter_count: {
+          if (iter_counter++ > this->reset_iter_count) {
             reset_cg();
-          } else {
-            iter_counter++;
-          }
-          break;
-        }
-        case ResetCG::user_defined_iter_count: {
-          if (this->reset_iter_count == 0) {
-            throw SolverError(
-                "Positive valued reset_iter_count is needed to perform user "
-                "defined iteration count restart for the CG solver");
-          }
-
-          if (iter_counter > this->reset_iter_count) {
-            reset_cg();
-          } else {
-            iter_counter++;
           }
           break;
         }
@@ -295,6 +291,14 @@ namespace muSpectre {
     this->p_k.resize(nb_dof);
     this->Ap_k.resize(nb_dof);
     this->x_k.resize(nb_dof);
+    if (this->reset_iter_count == muGrid::Unknown) {
+      this->reset_iter_count = nb_dof / 4;
+    }
+    if (this->reset == ResetCG::iter_count and this->reset_iter_count <= 0) {
+      throw SolverError(
+          "Positive valued reset_iter_count is needed to perform user "
+          "defined iteration count restart for the CG solver");
+    }
   }
 
   /* ---------------------------------------------------------------------- */

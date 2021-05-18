@@ -123,7 +123,7 @@ namespace muSpectre {
     constexpr Verbosity verbose{Verbosity::Full};
 
     auto krylov_solver{std::make_shared<KrylovSolverTrustRegionPCG>(
-        cg_tol, maxiter, tr, verbose, ResetCG::fixed_iter_count)};
+        cg_tol, maxiter, tr, verbose, ResetCG::iter_count)};
     auto solver{std::make_shared<SolverFEMTrustRegionNewtonPCG>(
         discretisation, krylov_solver, verbose, newton_tol, equil_tol, maxiter,
         tr, eta)};

@@ -55,8 +55,7 @@ using pybind11::literals::operator""_a;
 void add_enum_reset(py::module & mod) {
   py::enum_<ResetCG>(mod, "ResetCG")
       .value("no_reset", ResetCG::no_reset)
-      .value("fixed_iter_count", ResetCG::fixed_iter_count)
-      .value("user_defined_iter_count", ResetCG::user_defined_iter_count)
+      .value("iter_count", ResetCG::iter_count)
       .value("gradient_orthogonality", ResetCG::gradient_orthogonality)
       .value("valid_direction", ResetCG::valid_direction);
 }

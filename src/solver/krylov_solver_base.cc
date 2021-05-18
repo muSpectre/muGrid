@@ -108,6 +108,10 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   Index_t KrylovSolverBase::get_nb_dof() const {
+    if (this->matrix_ptr.expired()) {
+      throw SolverError("The system matrix is not set, so the number of "
+                        "degrees of freedom can't be determined.");
+    }
     return this->matrix_ptr.lock()->get_nb_dof();
   }
 

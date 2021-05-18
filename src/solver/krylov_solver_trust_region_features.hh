@@ -42,11 +42,10 @@
 
 namespace muSpectre {
   enum class ResetCG {
-    no_reset = 0,
-    fixed_iter_count = 1,
-    user_defined_iter_count = 2,
-    gradient_orthogonality = 3,
-    valid_direction = 4
+    no_reset,
+    iter_count,
+    gradient_orthogonality,
+    valid_direction
   };
 
   class KrylovSolverTrustRegionFeatures {
@@ -65,7 +64,7 @@ namespace muSpectre {
      */
     KrylovSolverTrustRegionFeatures(const Real & trust_region = 1.0,
                                     const ResetCG & reset = ResetCG::no_reset,
-                                    const Uint & reset_iter_count = 0);
+                                    const Index_t & reset_iter_count = 0);
 
     //! Move constructor
     KrylovSolverTrustRegionFeatures(KrylovSolverTrustRegionFeatures && other) =
@@ -96,9 +95,9 @@ namespace muSpectre {
         ResetCG::no_reset};  //!< Determines whether restart will be carried out
                              //!< in solver steps or  not(if necessary)
 
-    Uint reset_iter_count{0};  //!< if user wants to give the iteration count
-                               //!< after
-                               //! which the reset needs to be triggered
+    Index_t reset_iter_count{0};  //!< if user wants to give the iteration count
+                                  //!< after
+                                  //! which the reset needs to be triggered
 
     bool is_on_bound{false};  //!< Boolean showing if the solution is on the
                               //! boundary of trust region

@@ -85,18 +85,18 @@ namespace muSpectre {
         const Uint & maxiter, const Real & trust_region = 1.0,
         const Verbosity & verbose = Verbosity::Silent,
         const ResetCG & reset = ResetCG::no_reset,
-        const Uint & reset_iter_count = 0);
+        const Index_t & reset_iter_count = muGrid::Unknown);
 
     /**
      * Constructor without matrix adaptable. The adaptable has to be supplied
      * usinge KrylovSolverBase::set_matrix(...) before initialisation for this
      * solver to be usable
      */
-    KrylovSolverTrustRegionPCG(const Real & tol, const Uint & maxiter,
-                               const Real & trust_region = 1.0,
-                               const Verbosity & verbose = Verbosity::Silent,
-                               const ResetCG & reset = ResetCG::no_reset,
-                               const Uint & reset_iter_count = 0);
+    KrylovSolverTrustRegionPCG(
+        const Real & tol, const Uint & maxiter, const Real & trust_region = 1.0,
+        const Verbosity & verbose = Verbosity::Silent,
+        const ResetCG & reset = ResetCG::no_reset,
+        const Index_t & reset_iter_count = muGrid::Unknown);
 
     //! Destructor
     virtual ~KrylovSolverTrustRegionPCG() = default;

@@ -51,18 +51,26 @@ namespace muSpectre {
       std::shared_ptr<MatrixAdaptable> matrix_holder, const Real & tol,
       const Uint & maxiter, const Real & trust_region,
       const Verbosity & verbose, const ResetCG & reset,
-      const Uint & reset_iter_count)
+      const Index_t & reset_iter_count)
       : Parent{matrix_holder, tol, maxiter, verbose},
-        FeaturesTR{trust_region, reset, reset_iter_count},
+        FeaturesTR{trust_region, reset,
+                   reset_iter_count == muGrid::Unknown ? this->get_nb_dof() / 4
+                                                       : reset_iter_count},
         comm{matrix_holder->get_communicator()}, r_k(this->get_nb_dof()),
         p_k(this->get_nb_dof()), Ap_k(this->get_nb_dof()),
-        x_k(this->get_nb_dof()) {}
+        x_k(this->get_nb_dof()) {
+    if (this->reset == ResetCG::iter_count and this->reset_iter_count <= 0) {
+      throw SolverError(
+          "Positive valued reset_iter_count is needed to perform user "
+          "defined iteration count restart for the CG solver");
+    }
+  }
 
   /* ---------------------------------------------------------------------- */
   KrylovSolverTrustRegionCG::KrylovSolverTrustRegionCG(
       const Real & tol, const Uint & maxiter, const Real & trust_region,
       const Verbosity & verbose, const ResetCG & reset,
-      const Uint & reset_iter_count)
+      const Index_t & reset_iter_count)
       : Parent{tol, maxiter, verbose}, FeaturesTR{trust_region, reset,
                                                 reset_iter_count},
         r_k{}, p_k{}, Ap_k{}, x_k{} {}
@@ -89,6 +97,14 @@ namespace muSpectre {
     this->p_k.resize(nb_dof);
     this->Ap_k.resize(nb_dof);
     this->x_k.resize(nb_dof);
+    if (this->reset_iter_count == muGrid::Unknown) {
+      this->reset_iter_count = nb_dof / 4;
+    }
+    if (this->reset == ResetCG::iter_count and this->reset_iter_count <= 0) {
+      throw SolverError(
+          "Positive valued reset_iter_count is needed to perform user "
+          "defined iteration count restart for the CG solver");
+    }
   }
 
   /* ---------------------------------------------------------------------- */
@@ -190,7 +206,7 @@ namespace muSpectre {
       }
 
       if (this->reset == ResetCG::gradient_orthogonality) {
-        this->r_k_copy = this->r_k;
+        this->r_k_previous = this->r_k;
       }
       //             rₖ₊₁ ← rₖ + αₖApₖ
       this->r_k += alpha * this->Ap_k;
@@ -214,25 +230,9 @@ namespace muSpectre {
         case ResetCG::no_reset: {
           break;
         }
-        case ResetCG::fixed_iter_count: {
-          if (iter_counter > (this->get_nb_dof() / 4)) {
+        case ResetCG::iter_count: {
+          if (iter_counter++ > this->reset_iter_count) {
             reset_cg();
-          } else {
-            iter_counter++;
-          }
-          break;
-        }
-        case ResetCG::user_defined_iter_count: {
-          if (this->reset_iter_count == 0) {
-            throw SolverError(
-                "Positive valued reset_iter_count is needed to perform user "
-                "defined iteration count restart for the CG solver");
-          }
-
-          if (iter_counter > this->reset_iter_count) {
-            reset_cg();
-          } else {
-            iter_counter++;
           }
           break;
         }
@@ -241,8 +241,11 @@ namespace muSpectre {
             RESTART PROCEDURES FOR THE CONJUGATE GRADIENT METHOD by:
             M.J.D. POWELL
             Mathematical Programming 12 (1977) 241-254.
-            North-Holland Publishing Company */
-          if (abs(comm.sum(this->r_k.dot(this->r_k_copy))) > 0.2 * new_rdr) {
+            North-Holland Publishing Company
+
+            The threshold of 0.2 is a recommended heuristic there*/
+          if (abs(comm.sum(this->r_k.dot(this->r_k_previous))) >
+              0.2 * new_rdr) {
             reset_cg();
           }
           break;
