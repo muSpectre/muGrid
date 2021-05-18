@@ -223,6 +223,10 @@ namespace muSpectre {
         this->r_k = this->matrix * this->x_k - rhs;
         beta = 0.0;
         iter_counter = 0;
+        if (verbose > Verbosity::Silent && comm.rank() == 0) {
+          std::cout << "Reset CG"
+                    << "\n";
+        }
       }};
 
       if (i > 1) {

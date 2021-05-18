@@ -481,6 +481,7 @@ namespace muSpectre {
         }
 
         // Flux(Stress)-Tangent Evaluation
+        this->clear_last_step_nonlinear();
         auto res_tup{this->evaluate_stress_tangent()};
 
         // keeping a copy of the Flux in order to use for ρ calculation

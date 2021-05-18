@@ -150,7 +150,7 @@ namespace muSpectre {
     Vector_t p_k;         //!< search direction
     Vector_t Ap_k;        //!< directional stiffness
     Vector_t x_k;         //!< current solution
-    Vector_t y_k_copy{};  //! used to keep a copy of the residual (in the
+    Vector_t y_k_prev{};  //! used to keep a copy of the residual (in the
                           //! projected space) if needed
   };
 

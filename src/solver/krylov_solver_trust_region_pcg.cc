@@ -176,7 +176,7 @@ namespace muSpectre {
       }
 
       if (this->reset == ResetCG::gradient_orthogonality) {
-        this->y_k_copy = this->y_k;
+        this->y_k_prev = this->y_k;
       }
 
       //             rₖ₊₁ ← rₖ + αₖApₖ
@@ -208,6 +208,10 @@ namespace muSpectre {
         this->y_k = this->preconditioner * this->r_k;
         beta = 0.0;
         iter_counter = 0;
+        if (verbose > Verbosity::Silent && comm.rank() == 0) {
+          std::cout << "Reset CG"
+                    << "\n";
+        }
       }};
 
       if (i > 1) {
@@ -227,7 +231,7 @@ namespace muSpectre {
              M.J.D. POWELL
              Mathematical Programming 12 (1977) 241-254.
              North-Holland Publishing Company */
-          if (abs(comm.sum(this->y_k.dot(this->y_k_copy))) >
+          if (abs(comm.sum(this->y_k.dot(this->y_k_prev))) >
               0.2 * this->comm.sum(this->y_k.squaredNorm())) {
             reset_cg();
           }

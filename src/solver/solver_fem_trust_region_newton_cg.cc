@@ -483,6 +483,7 @@ namespace muSpectre {
 
         // Calculating the Flux and Tangent using eval_grad and updating the
         // force Field with according to the Flux Field
+        this->clear_last_step_nonlinear();
         auto res_tup{this->evaluate_stress_tangent()};
         auto & flux_loop{std::get<0>(res_tup)};
         this->K.apply_divergence(flux_loop.get_field(),
