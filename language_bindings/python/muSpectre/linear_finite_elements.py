@@ -112,7 +112,7 @@ def write_3d(file_name, rve, cell_data=None):
     strain = rve.strain.array() \
         .reshape((3, 3, -1), order='F').T.swapaxes(1, 2)
 
-    if cell_data == None:
+    if cell_data is None:
         # Write mesh to file
         meshio.write_points_cells(
             file_name,
@@ -132,10 +132,10 @@ def write_3d(file_name, rve, cell_data=None):
         )
 
 
-def write_2d(file_name, cell_data=None):
+def write_2d(file_name, rve, cell_data=None):
     """
-    Write results of a 3D calculation that employs a decomposition of each
-    voxel in six tetrahedra (using the `gradient_3d` stencil) to a file. The
+    Write results of a 2D calculation that employs a decomposition of each
+    voxel in two triangles (using the `gradient_2d` stencil) to a file. The
     output is handled by `meshio`, which means all `meshio` formats are
     supported.
 
@@ -180,7 +180,7 @@ def write_2d(file_name, cell_data=None):
     strain = rve.strain.array() \
         .reshape((2, 2, -1), order='F').T.swapaxes(1, 2)
 
-    if cell_data == None:
+    if cell_data is None:
         # Write mesh to file
         meshio.write_points_cells(
             file_name,
@@ -200,17 +200,19 @@ def write_2d(file_name, cell_data=None):
         )
 
 
-def write_2d_class_solver(file_name, rve, solver, result, cell_data=None):
+def write_2d_class(file_name, rve, solver, result, cell_data=None):
     """
-    Write results of a 3D calculation that employs a decomposition of each
-    voxel in six tetrahedra (using the `gradient_3d` stencil) to a file. The
+    Write results of a 2D calculation that employs a decomposition of each
+    voxel in two triangles (using the `gradient_2d` stencil) to a file. The
     output is handled by `meshio`, which means all `meshio` formats are
     supported.
 
     More on `meshio` can be found here: https://github.com/nschloe/meshio
 
     file_name  -- filename
-    rve -- representative volume element, i.e. the `Cell` object
+    rve -- representative volume element, i.e. the `CellData` object
+    solver -- The solver used to solve the CellData with applied load
+    result -- µSpectre OptimizeResult object
     cell_data = dictionary of cell data with corresponding keys
     """
     import meshio
@@ -250,7 +252,7 @@ def write_2d_class_solver(file_name, rve, solver, result, cell_data=None):
     strain = solver.grad.array() \
         .reshape((2, 2, -1), order='F').T.swapaxes(1, 2)
 
-    if cell_data == None:
+    if cell_data is None:
         # Write mesh to file
         meshio.write_points_cells(
             file_name,
@@ -272,15 +274,16 @@ def write_2d_class_solver(file_name, rve, solver, result, cell_data=None):
 
 def write_2d_fem(file_name, rve, solver, result, cell_data=None):
     """
-    Write results of a 3D calculation that employs a decomposition of each
-    voxel in six tetrahedra (using the `gradient_3d` stencil) to a file. The
-    output is handled by `meshio`, which means all `meshio` formats are
-    supported.
+    Write results of a 2D calculation that employs a decomposition of each
+    voxel in two triangles to a file. The output is handled by `meshio`, which
+    means all `meshio` formats are supported.
 
     More on `meshio` can be found here: https://github.com/nschloe/meshio
 
-    file_name  -- filename fem
-    rve -- representative volume element, i.e. the `Cell` object
+    file_name  -- filename
+    rve -- representative volume element, i.e. the `CellData` object
+    solver -- The solver used to solve the CellData with applied load
+    result -- µSpectre OptimizeResult object
     cell_data = dictionary of cell data with corresponding keys
     """
     import meshio
@@ -315,12 +318,12 @@ def write_2d_fem(file_name, rve, solver, result, cell_data=None):
     cells = cells.reshape((3, -1), order='F').T
     # Get Stress
     stress = solver.flux.field.array() \
-        .reshape((2, 2, -1), order='F').T.swapaxes(1, 2)
+                              .reshape((2, 2, -1), order='F').T.swapaxes(1, 2)
     # Get Strain
     strain = solver.grad.array() \
-        .reshape((2, 2, -1), order='F').T.swapaxes(1, 2)
+                        .reshape((2, 2, -1), order='F').T.swapaxes(1, 2)
 
-    if cell_data == None:
+    if cell_data is None:
         # Write mesh to file
         meshio.write_points_cells(
             file_name, points,

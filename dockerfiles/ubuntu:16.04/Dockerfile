@@ -37,5 +37,5 @@ RUN apt-get -qq update && apt-get -y -qq install \
 
 # apt-get on one line due to https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#run
 
-RUN python3 -m pip install --upgrade pip
-RUN python3 -m pip install uvw
+RUN python3 -m pip install --upgrade "pip < 21.0"
+RUN python3 -m pip install uvw==0.3.2 meshio>=4.3.10 h5py netcdf4

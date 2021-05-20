@@ -256,9 +256,6 @@ def get_complemented_positions_fem(quantities, rve, solver, result):
     coords = (np.transpose(cell_coords) * rve.domain_lengths /
               rve.nb_domain_grid_pts).T
 
-    positions = complement_periodically(
-        displacements + coords.T.dot(mean_strain.T).T, rve.spatial_dim)
-
     displacements = displacements.reshape(coords.shape)
     displacements = complement_periodically(displacements, rve.spatial_dim)
 

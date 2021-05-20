@@ -29,6 +29,7 @@ RUN apt-get -qq update && apt-get -y -qq install \
     python3-breathe \
     python3-dev \
     python3-netcdf4 \
+    python3-meshio \
     python3-mpi4py \
     python3-numpy \
     python3-pytest \

@@ -34,6 +34,8 @@
 # Program grant you additional permission to convey the resulting work.
 # =============================================================================
 
+add_subdirectory(paper_examples)
+
 find_package(PythonInterp ${MUSPECTRE_PYTHON_MAJOR_VERSION} REQUIRED)
 find_package(Boost COMPONENTS unit_test_framework REQUIRED)
 
@@ -62,7 +64,6 @@ foreach(pyexample ${pyexamples})
     "${CMAKE_BINARY_DIR}/examples/${binaryname}.py"
     COPYONLY)
 endforeach()
-
 
 
 ######### Test examples ##########
@@ -164,20 +165,21 @@ if (NETCDF_IO)
 endif(NETCDF_IO)
 
 muSpectre_add_example(free_surface_py_example
-        TYPE PYTHON free_surface.py)
+  TYPE PYTHON free_surface.py)
 
 muSpectre_add_example(scalar_spectral_py_example
-        TYPE PYTHON scalar_spectral_example.py)
+  TYPE PYTHON scalar_spectral_example.py)
+
 
 # additional file(s) to copy
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/concrete_micro_structure.npy
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/random_field.npy
-    DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
+  DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/plot_tri.py
-    DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
+  DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 
 
 if(${MUSPECTRE_MPI_PARALLEL})
