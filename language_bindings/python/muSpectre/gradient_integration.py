@@ -134,22 +134,30 @@ def get_complemented_positions(quantities, rve):
     strain = rve.strain.array()
     mean_strain = np.mean(
         strain, axis=tuple(i for i in range(2, len(strain.shape))))
-    if rve.formulation == Formulation.finite_strain:
-        mean_strain -= np.identity(rve.dim)
+    # Deformed (displaced) node positions
     positions = rve.projection.integrate(rve.strain) \
         .array(muGrid.IterUnit.Pixel)
+    # Undeformed node positions in the reference configuration (strain = 0)
     coords = (np.transpose(cell_coords) * rve.domain_lengths /
               rve.nb_domain_grid_pts).T
+    # Displacements are the difference between the two above
     displacements = complement_periodically(
         positions - coords.T.dot(mean_strain.T).T, rve.dim)
+    # Undeformed node positions in the reference configuration, complemented
     coords = (np.transpose(node_coords) * rve.domain_lengths /
               rve.nb_domain_grid_pts).T
+
+    if rve.formulation == Formulation.small_strain:
+        # The small strain tensor is lacking the identity, so we need to add it
+        # for the final computation of the positions
+        mean_strain += np.identity(rve.dim)
+
     retval = []
     for q in quantities:
         if q == 'p':
-            retval += [coords.T.dot(mean_strain.T).T + displacements + coords]
+            retval += [coords.T.dot(mean_strain.T).T + displacements]
         elif q == 'g':
-            retval += [coords.T.dot(mean_strain.T).T + coords]
+            retval += [coords.T.dot(mean_strain.T).T]
         elif q == '0':
             retval += [coords]
         elif q == 'd':
@@ -217,7 +225,6 @@ def get_complemented_positions_class_solver(quantities, rve, solver, result):
         return retval[0]
     else:
         return tuple(retval)
-
 
 def get_complemented_positions_fem(quantities, rve, solver, result):
     """Takes an RVE (Cell) object and returns the deformed and undeformed nodal

@@ -64,7 +64,7 @@ def write_3d(file_name, rve, cell_data=None):
 
     file_name  -- filename
     rve -- representative volume element, i.e. the `Cell` object
-    cell_data = dictionary of cell data with corresponding keys
+    cell_data -- dictionary of cell data with corresponding keys
     """
     import meshio
     # Size of RVE

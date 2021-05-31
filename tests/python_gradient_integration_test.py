@@ -886,7 +886,77 @@ class GradientIntegration_Check(unittest.TestCase):
                             delta=0.015)
 
 
+    def test_get_complemented_positions(self):
+        nx, ny, nz = nb_domain_grid_pts = 2, 3, 4
+        sx, sy, sz = domain_lengths = 1.3, 1.1, 1.7
 
+        Youngs_modulus = 1
+        Poisson_ratio = 0.33
+
+        newton_tol = 1e-6
+        equil_tol = newton_tol
+        cg_tol = 1e-6
+
+        s = 0.01
+        strain_step = np.array([[-s, 0, 0], [0, -s, 0], [0, 0, 2*s]])
+
+        maxiter = 1000  # for linear cell solver
+
+        ## numerical derivative, six elements
+        gradient = µ.linear_finite_elements.gradient_3d
+
+        for form in [µ.Formulation.small_strain,
+                     µ.Formulation.finite_strain]:
+            rve = µ.Cell(nb_domain_grid_pts, domain_lengths, form, gradient,
+                         fft='fftw')
+            material = µ.material.MaterialLinearElastic1_3d.make(
+                rve, "material", Youngs_modulus, Poisson_ratio)
+            for pixel_index, pixel in enumerate(rve.pixels):
+                material.add_pixel(pixel_index)
+
+            solver = µ.solvers.KrylovSolverCG(
+                rve, cg_tol, maxiter=maxiter, verbose=µ.Verbosity.Silent)
+
+            µ.solvers.newton_cg(
+                rve, strain_step, solver,
+                newton_tol=newton_tol,
+                equil_tol=equil_tol,
+                IsStrainInitialised=µ.solvers.IsStrainInitialised.No,
+                verbose=µ.Verbosity.Silent)
+
+            [x_def, y_def, z_def], [dx, dy, dz], [gx, gy, gz], [x0, y0, z0] \
+                = µ.gradient_integration.get_complemented_positions("pdg0", rve)
+
+            self.assertTrue(
+                np.allclose(x_def,
+                            sx/nx * (1-s)*np.arange(nx+1).reshape(-1, 1, 1)))
+            self.assertTrue(
+                np.allclose(y_def,
+                            sy/ny * (1-s)*np.arange(ny+1).reshape(1, -1, 1)))
+            self.assertTrue(
+                np.allclose(z_def,
+                            sz/nz * (1+2*s)*np.arange(nz+1).reshape(1, 1, -1)))
+
+            self.assertTrue(
+                np.allclose(gx,
+                            sx/nx * (1-s)*np.arange(nx+1).reshape(-1, 1, 1)))
+            self.assertTrue(
+                np.allclose(gy,
+                            sy/ny * (1-s)*np.arange(ny+1).reshape(1, -1, 1)))
+            self.assertTrue(
+                np.allclose(gz,
+                            sz/nz * (1+2*s)*np.arange(nz+1).reshape(1, 1, -1)))
+
+            self.assertTrue(
+                np.allclose(x0, sx/nx * np.arange(nx+1).reshape(-1, 1, 1)))
+            self.assertTrue(
+                np.allclose(y0, sy/ny * np.arange(ny+1).reshape(1, -1, 1)))
+            self.assertTrue(
+                np.allclose(z0, sz/nz * np.arange(nz+1).reshape(1, 1, -1)))
+
+            self.assertTrue(np.allclose(x_def - gx, dx))
+            self.assertTrue(np.allclose(y_def - gy, dy))
+            self.assertTrue(np.allclose(z_def - gz, dz))
 
 if __name__ == '__main__':
     unittest.main()
