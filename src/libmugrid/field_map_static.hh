@@ -243,7 +243,7 @@ namespace muGrid {
     std::enable_if_t<IsPixelIterable, Enumeration_t> enumerate_indices() {
       static_assert(IsPixelIterable == (IterationType == IterUnit::Pixel),
                     "IsPixelIterable is a SFINAE parameter, do not touch it.");
-      return akantu::zip(this->field.get_collection().get_pixel_indices_fast(),
+      return akantu::zip(this->field.get_collection().get_pixel_indices(),
                          *this);
     }
 

@@ -92,21 +92,29 @@ namespace muGrid {
                                     const DynCcoord_t & subdomain_locations,
                                     const DynCcoord_t & pixels_strides) {
     // sanity check 1
-    if (std::accumulate(nb_domain_grid_pts.begin(),
+    auto nb_domain_grid_pts_total{
+        std::accumulate(nb_domain_grid_pts.begin(),
                         nb_domain_grid_pts.end(),
-                        1, std::multiplies<Index_t>()) <= 0) {
+                        static_cast<Index_t>(1),
+                        std::multiplies<Index_t>())};
+    if (nb_domain_grid_pts_total <= 0) {
       std::stringstream s;
-      s << "Invalid nb_domain_grid_pts (=" << nb_domain_grid_pts
-        << ") passed during initialisation.";
+      s << "Invalid nb_domain_grid_pts " << nb_domain_grid_pts << " ("
+        << nb_domain_grid_pts_total << " total grid points) passed during "
+        << "initialisation.";
       throw FieldCollectionError(s.str());
     }
     // sanity check 2 - the subdomain may be empty!
-    if (std::accumulate(nb_subdomain_grid_pts.begin(),
-                        nb_subdomain_grid_pts.end(),
-                        1, std::multiplies<Index_t>()) < 0) {
+    auto nb_subdomain_grid_pts_total{
+        std::accumulate(nb_domain_grid_pts.begin(),
+                        nb_domain_grid_pts.end(),
+                        static_cast<Index_t>(1),
+                        std::multiplies<Index_t>())};
+    if (nb_subdomain_grid_pts_total < 0) {
       std::stringstream s;
-      s << "Invalid nb_subdomain_grid_pts (=" << nb_subdomain_grid_pts
-        << ") passed during initialisation.";
+      s << "Invalid nb_subdomain_grid_pts " << nb_subdomain_grid_pts << " ("
+        << nb_subdomain_grid_pts << " total grid points) passed during "
+        << "initialisation.";
       throw FieldCollectionError(s.str());
     }
 

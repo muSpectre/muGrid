@@ -383,13 +383,8 @@ namespace muGrid {
   bool FieldCollection::is_initialised() const { return this->initialised; }
 
   /* ---------------------------------------------------------------------- */
-  auto FieldCollection::get_pixel_indices_fast() const -> PixelIndexIterable {
+  auto FieldCollection::get_pixel_indices() const -> PixelIndexIterable {
     return PixelIndexIterable{*this};
-  }
-
-  /* ---------------------------------------------------------------------- */
-  auto FieldCollection::get_pixel_indices() const -> IndexIterable {
-    return IndexIterable{*this};
   }
 
   /* ---------------------------------------------------------------------- */

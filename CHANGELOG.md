@@ -2,18 +2,26 @@ Change log for µSpectre
 =======================
 
 
-0.18.1 (Not Released yet)
--------------------------
-- muSpectre: Fix, changed the reset criterion ofr gradient orthogonality in fem trust region precondtioned krylov solvers
-- muSpectre: Fix, added calling clear_was_last_step_nonlinear in fem_newton_trust_region_pc solver
+0.18.1 (02Jun21)
+----------------
+- muSpectre: Fix, changed the reset criterion for gradient orthogonality in
+  FEM trust region precondtioned Krylov solvers
+- muSpectre: Fix, added calling clear_was_last_step_nonlinear in
+  fem_newton_trust_region_pc solver
+- muSpectre: Fixed get_complemented_positions
+- muFFT: Fixed large transforms
+- muFFT: Fixed segfault when input buffer had wrong shape
+
 
 0.18.0 (10May21)
--------------------------
+----------------
 - muSpectre: Added trust fem region solver + ability to handle precondtioner
-- muSpectre: re-organized the krylov solver hierarchy to circumvent diamond inheritance by introducing KrylovSolverXXXTraits classes
+- muSpectre: re-organized the krylov solver hierarchy to circumvent diamond
+  inheritance by introducing KrylovSolverXXXTraits classes
+
 
 0.17.0 (24Apr21)
--------------------------
+----------------
 - muSpectre: Added trust region solver class and a simplistic damage material
 - muSpectre: physics have their specific name that might be used later for outputs
 - muSpectre: trsut region krylov solver has different resetart strategies available
@@ -31,7 +39,9 @@ Change log for µSpectre
 
 0.15.1 (30Mar21)
 -------------------------
+
 - muSpectre: Added material for phase field fracture simulations
+- muGrid: Fix support for fields with >= 2^32 elements
 
 0.15.0 (12Mar21)
 ----------------

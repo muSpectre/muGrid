@@ -169,7 +169,13 @@ namespace muFFT {
     }
 
     Real * in{fftw_alloc_real(required_workspace_size)};
+    if (in == nullptr) {
+      throw FFTEngineError("'in' allocation failed");
+    }
     fftw_complex * out{fftw_alloc_complex(required_workspace_size / 2)};
+    if (out == nullptr) {
+      throw FFTEngineError("'out' allocation failed");
+    }
 
     // Reverse the order of the array dimensions, because FFTW expects a
     // row-major array and the arrays used in muSpectre are column-major

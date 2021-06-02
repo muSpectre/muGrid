@@ -87,6 +87,9 @@ namespace muFFT {
     size_t alloc_size{muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts) *
                       howmany};
     Real * r_work_space{fftw_alloc_real(alloc_size)};
+    if (r_work_space == nullptr) {
+      throw FFTEngineError("'r_work_space' allocation failed");
+    }
     Real * in{r_work_space};
     // nembed are tricky: they refer to physical layout
     const int * const inembed{nullptr};
@@ -100,6 +103,9 @@ namespace muFFT {
       return retval;
     }(this->get_nb_fourier_grid_pts())};
     fftw_complex * out{fftw_alloc_complex(howmany * nb_fft_pts)};
+    if (out == nullptr) {
+      throw FFTEngineError("'out' allocation failed");
+    }
     const int * const onembed{nullptr};
     int ostride{istride};
     int odist{idist};
@@ -146,6 +152,9 @@ namespace muFFT {
     // r2hc_plans
 
     Real * r_work_space_2{fftw_alloc_real(alloc_size)};
+    if (r_work_space_2 == nullptr) {
+      throw FFTEngineError("'r_work_space_2' allocation failed");
+    }
     Real * r2hc_out{r_work_space_2};
 
     std::vector<fftw_r2r_kind> fft_kinds(rank);

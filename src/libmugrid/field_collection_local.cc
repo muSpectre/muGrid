@@ -79,7 +79,7 @@ namespace muGrid {
       const std::string & new_name) const {
     LocalFieldCollection ret_val{this->get_spatial_dim(), new_name,
                                  this->nb_sub_pts};
-    for (const auto & pixel_id : this->get_pixel_indices_fast()) {
+    for (const auto & pixel_id : this->get_pixel_indices()) {
       ret_val.add_pixel(pixel_id);
     }
     return ret_val;

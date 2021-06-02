@@ -163,7 +163,7 @@ namespace muSpectre {
         {},
         {{QuadPtTag, Fix::NbQuadPts}}};
 
-    for (auto && pix_id : collection.get_pixel_indices_fast()) {
+    for (auto && pix_id : collection.get_pixel_indices()) {
       Fix::add_pixel(pix_id);
     }
     Fix::initialise();

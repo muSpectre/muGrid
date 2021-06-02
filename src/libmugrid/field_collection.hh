@@ -514,13 +514,7 @@ namespace muGrid {
      * return an iterable proxy to the collection which allows to efficiently
      * iterate over the indices fo the collection's pixels
      */
-    PixelIndexIterable get_pixel_indices_fast() const;
-
-    /**
-     * return an iterable proxy to the collection which allows to iterate over
-     * the indices fo the collection's pixels
-     */
-    IndexIterable get_pixel_indices() const;
+    PixelIndexIterable get_pixel_indices() const;
 
     /**
      * return an iterable proxy to the collection which allows to iterate over
@@ -694,11 +688,12 @@ namespace muGrid {
     size_t size() const;
 
    protected:
-    //! allow field collections to call the procted constructor of this iterable
+    //! allow field collections to call the protected constructor of this
+    //! iterable
     friend FieldCollection;
 
     //! Constructor is protected, because no one ever need to construct this
-    //! except the fieldcollection
+    //! except the field collection
     explicit PixelIndexIterable(const FieldCollection & collection);
 
     //! reference back to the proxied collection

@@ -345,6 +345,12 @@ void add_engine_helper(py::module & mod, const std::string & name) {
              py::array_t<Complex> & output_array) {
             const py::buffer_info & info = input_array.request();
             auto & dim{eng.get_fourier_pixels().get_dim()};
+            if (info.shape.size() < static_cast<size_t>(dim)) {
+              std::stringstream s;
+              s << "Input array has " << info.shape.size() << " dimensions "
+                << "but FFT engine was set up for " << dim << " dimensions.";
+              throw muFFT::FFTEngineError(s.str());
+            }
             auto nb_dof_per_pixel{
                 std::accumulate(info.shape.begin(), info.shape.end()-dim, 1,
                                 std::multiplies<Index_t>())};
@@ -367,6 +373,12 @@ void add_engine_helper(py::module & mod, const std::string & name) {
              py::array_t<Real> & output_array) {
             const py::buffer_info & info = input_array.request();
             auto & dim{eng.get_fourier_pixels().get_dim()};
+            if (info.shape.size() < static_cast<size_t>(dim)) {
+              std::stringstream s;
+              s << "Input array has " << info.shape.size() << " dimensions "
+                << "but FFT engine was set up for " << dim << " dimensions.";
+              throw muFFT::FFTEngineError(s.str());
+            }
             auto nb_dof_per_pixel{
                 std::accumulate(info.shape.begin(), info.shape.end()-dim, 1,
                                 std::multiplies<Index_t>())};
@@ -388,6 +400,12 @@ void add_engine_helper(py::module & mod, const std::string & name) {
              py::array_t<Real> & input_array) {
             const py::buffer_info & info = input_array.request();
             auto & dim{eng.get_fourier_pixels().get_dim()};
+            if (info.shape.size() < static_cast<size_t>(dim)) {
+              std::stringstream s;
+              s << "Input array has " << info.shape.size() << " dimensions "
+                << "but FFT engine was set up for " << dim << " dimensions.";
+              throw muFFT::FFTEngineError(s.str());
+            }
             auto nb_dof_per_pixel{
                 std::accumulate(info.shape.begin(), info.shape.end()-dim, 1,
                                 std::multiplies<Index_t>())};
@@ -410,6 +428,12 @@ void add_engine_helper(py::module & mod, const std::string & name) {
              py::array_t<Complex> & input_array) {
             const py::buffer_info & info = input_array.request();
             auto & dim{eng.get_fourier_pixels().get_dim()};
+            if (info.shape.size() < static_cast<size_t>(dim)) {
+              std::stringstream s;
+              s << "Input array has " << info.shape.size() << " dimensions "
+                << "but FFT engine was set up for " << dim << " dimensions.";
+              throw muFFT::FFTEngineError(s.str());
+            }
             auto nb_dof_per_pixel{
                 std::accumulate(info.shape.begin(), info.shape.end()-dim, 1,
                                 std::multiplies<Index_t>())};

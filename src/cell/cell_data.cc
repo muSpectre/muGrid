@@ -282,7 +282,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   muGrid::FieldCollection::PixelIndexIterable
   CellData::get_pixel_indices() const {
-    return this->fields->get_pixel_indices_fast();
+    return this->fields->get_pixel_indices();
   }
 
   /* ---------------------------------------------------------------------- */

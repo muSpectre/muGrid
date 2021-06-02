@@ -98,6 +98,13 @@ class FFT_Check(unittest.TestCase):
                              comm.size*(comm.size+1)/2 + 3*comm.size,
                              msg='{} engine'.format(engine_str))
 
+    # Disable this test for now because it requires a lot of memory. This is
+    # because it initializes the pixel_indices array, which is large.
+    # def test_large_transform(self):
+    #     for engine_str in self.engines:
+    #         muFFT.FFT([65536, 65536], fft=engine_str,
+    #                   communicator=self.communicator)
+
     def test_forward_transform_numpy_interface(self):
         for engine_str in self.engines:
             for nb_grid_pts, dims in self.grids:
@@ -360,6 +367,16 @@ class FFT_Check(unittest.TestCase):
                 # self.assertEqual(out_msp.shape, global_out_ref.shape)
                 # self.assertEqual(len(out_msp.shape), len(global_out_ref.shape))
 
+                # Convenience interface that returns an array
+                out_msp = engine.fft(in_arr)
+                # Check that the output array does not have a unit first dimension
+                self.assertEqual(tuple(out_msp.shape), engine.nb_fourier_grid_pts),# \
+
+                # Convenience interface with flattened array (should not give a
+                # segmentation fault)
+                self.assertRaises(RuntimeError,
+                                  lambda: engine.fft(in_arr.ravel()))
+
     def test_nb_components1_reverse_transform(self):
         """
         asserts that the output is of shape ( , ) and not ( , , 1)
@@ -394,6 +411,11 @@ class FFT_Check(unittest.TestCase):
                 assert out_msp.shape == (1, *engine.nb_subdomain_grid_pts), \
                     "{} not equal to {}".format(out_msp.shape,
                                                 engine.nb_subdomain_grid_pts)
+
+                # Convenience interface with flattened array (should not give a
+                # segmentation fault)
+                self.assertRaises(RuntimeError,
+                                  lambda: engine.ifft(in_arr.ravel()))
 
     @unittest.skipIf(communicator.size > 1,
                      'MPI parallel FFTs do not support 1D transforms')

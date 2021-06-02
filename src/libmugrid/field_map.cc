@@ -201,7 +201,7 @@ namespace muGrid {
       throw FieldMapError("Cannot enumerate pixels unless the iteration mode "
                           "of this map is Iteration::Pixels.");
     }
-    return akantu::zip(this->field.get_collection().get_pixel_indices_fast(),
+    return akantu::zip(this->field.get_collection().get_pixel_indices(),
                        *this);
   }
 

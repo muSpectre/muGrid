@@ -181,7 +181,13 @@ namespace muFFT {
     }
 
     Real * in{pfft_alloc_real(required_workspace_size)};
+    if (in == nullptr) {
+      throw FFTEngineError("'in' allocation failed");
+    }
     pfft_complex * out{pfft_alloc_complex(required_workspace_size / 2)};
+    if (out == nullptr) {
+      throw FFTEngineError("'out' allocation failed");
+    }
 
     this->fft_plans[nb_dof_per_pixel] = pfft_plan_many_dft_r2c(
         dim, narr.data(), narr.data(), narr.data(), howmany,
@@ -201,6 +207,9 @@ namespace muFFT {
     if (this->ifft_plans[nb_dof_per_pixel] == nullptr) {
       throw FFTEngineError("c2r plan failed");
     }
+
+    pfft_free(in);
+    pfft_free(out);
     this->planned_nb_dofs.insert(nb_dof_per_pixel);
   }
 

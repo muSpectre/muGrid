@@ -153,7 +153,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   auto MaterialBase::get_pixel_indices() const ->
       typename muGrid::LocalFieldCollection::PixelIndexIterable {
-    return this->internal_fields->get_pixel_indices_fast();
+    return this->internal_fields->get_pixel_indices();
   }
 
   /* ---------------------------------------------------------------------- */
