@@ -1,6 +1,9 @@
 Change log for µSpectre
 =======================
 
+0.18.2 (Not Released yet)
+-------------------------
+- muSpectre: Small bugfix and addition of regularization for slightly non-pd Hessians in phase field fracture material
 
 0.18.1 (02Jun21)
 ----------------

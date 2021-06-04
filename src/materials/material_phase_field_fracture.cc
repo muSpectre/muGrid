@@ -55,10 +55,7 @@ namespace muSpectre {
                  *this->internal_fields, QuadPtTag},
         phase_field(this->get_prefix() +
                      "local phase field",
-                 *this->internal_fields, QuadPtTag), ksmall{ksmall}
-  {
-    this->last_step_was_nonlinear = false;
-  }
+                 *this->internal_fields, QuadPtTag), ksmall{ksmall} {}
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
@@ -198,6 +195,14 @@ namespace muSpectre {
       stress += (lambda_prefactor*lambda*eig_vals.sum() +
           2*mu_prefactor(j)*mu*eig_vals(j)) * dyad;
     }
+    if ((DimM == 2) and (eig_vals[0] * eig_vals[1] < 0.0)) {
+      stress += 1e-16*mu*E;
+    }
+    if ((DimM == 3) and (not(
+        (eig_vals[0] >= 0.0 and eig_vals[1] >= 0.0 and eig_vals[2] >= 0.0)
+     or (eig_vals[0] < 0.0 and eig_vals[1] < 0.0 and eig_vals[2] < 0.0)))) {
+      stress += 1e-16*mu*E;
+    }
     return stress;
   }
 
@@ -232,21 +237,23 @@ namespace muSpectre {
     }
     switch (DimM) {
     case twoD: {
-      // shortcut for no decomposition
+      // shortcuts for no decomposition
       if (eig_vals[0] * eig_vals[1] >= 0.0) {
         stress_tangent = Hooke::compute_C_T4(lambda_prefactor*lambda,
             lambda_prefactor*mu);
         stress = Matrices::tensmult(stress_tangent, E);
       } else {
         stress_tangent = Hooke::compute_C_T4(lambda_prefactor*lambda, 0.0);
+        stress_tangent += 1e-16*mu*Matrices::Iiden<DimM>();
+        stress += 1e-16*mu*E;
         for (int i{0}; i < DimM; ++i) {
           for (int j{0}; j < DimM; ++j) {
             T2_t dyad = eig_vecs.col(i) * eig_vecs.col(j).transpose();
             T4_t outerDyad = Matrices::outer(dyad, dyad.transpose());
             if (i == j) {
-              stress_tangent += 2*mu_prefactor(j)* mu * outerDyad;
+              stress_tangent += 2.0*mu_prefactor(j)* mu * outerDyad;
               stress += (lambda_prefactor*lambda*trace
-                  + 2*mu_prefactor(i)*mu*eig_vals(i)) * dyad;
+                  + 2.0*mu_prefactor(i)*mu*eig_vals(i)) * dyad;
             } else {
               T4_t symmDyad = Matrices::outer(dyad+dyad.transpose(),
                   dyad+dyad.transpose());
@@ -272,19 +279,21 @@ namespace muSpectre {
           diff_ind = 2;
         }
         stress_tangent = Hooke::compute_C_T4(lambda_prefactor*lambda, 0.0);
+        stress_tangent += 1e-16*mu*Matrices::Iiden<DimM>();
+        stress += 1e-16*mu*E;
         for (int i{0}; i < DimM; ++i) {
           for (int j{0}; j < DimM; ++j) {
             T2_t dyad = eig_vecs.col(i) * eig_vecs.col(j).transpose();
             if (i == j) {
               stress += (lambda_prefactor*lambda*trace
-                  + 2*mu_prefactor(i)*mu*eig_vals(i)) * dyad;
+                  + 2.0*mu_prefactor(i)*mu*eig_vals(i)) * dyad;
               T4_t outerDyad = Matrices::outer(dyad, dyad.transpose());
-              stress_tangent += 2*mu_prefactor(i)*mu * outerDyad;
+              stress_tangent += 2.0*mu_prefactor(i)*mu * outerDyad;
             } else {
               T4_t symmDyad = Matrices::outer(dyad+dyad.transpose(),
                   dyad+dyad.transpose());
               if (i != diff_ind and j != diff_ind) {
-                stress_tangent += mu_prefactor(i)*mu*symmDyad/2;
+                stress_tangent += mu_prefactor(i)*mu*symmDyad/2.0;
               } else {
                 stress_tangent += mu_prefactor(i)*mu*eig_vals(i)
                     /(eig_vals(i) - eig_vals(j))*symmDyad;
