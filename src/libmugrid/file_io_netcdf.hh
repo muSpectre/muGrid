@@ -262,6 +262,11 @@ namespace muGrid {
     static std::string compute_dim_name(const std::string & dim_base_name,
                                         const std::string & suffix);
 
+    // compute the tensor index of a subpt dim, this is only possible for a
+    // NetCDFDim with base name "subpt". For NetCDFDims with an other base name
+    // -1 is returned, which in normal cases never should be returned.
+    int compute_subpt_tensor_dim_index() const;
+
     //! compare the dimension is equal to the given dim_name and size
     bool equal(const std::string & dim_name, const IOSize_t & dim_size) const;
 
@@ -521,7 +526,7 @@ namespace muGrid {
     //! A vector of IOSize_t values specifying the edge lengths along each
     //! dimension of the block of data values to be written. This function gives
     //! the count for distributed local fields written with ncmu_put_varn_all
-    std::vector<IOSize_t> get_count_local() const;
+    std::vector<IOSize_t> get_count_local(muGrid::Field & local_pixels) const;
 
     // A vector of Size_t integers that specifies the sampling interval
     // along each dimension of the netCDF variable.
@@ -595,6 +600,13 @@ namespace muGrid {
     //! the same type the increment will give you wrong results
     void * increment_buf_ptr(void * buf_ptr,
                              const IOSize_t & increment_nb_elements) const;
+
+    //! cross check the properties (start, count, stride and imap, which are
+    //! crucial for reading and writing) of the initialised NetCDFVarBase for
+    //! consistency.
+    void consistency_check_global_var() const;
+
+    void consistency_check_local_var(muGrid::Field & local_pixels) const;
 
     //! actual call of NetCDF functions to write a single NetCDFVar into the
     //! NetCDF file
@@ -936,7 +948,7 @@ namespace muGrid {
   };
 
   /**
-   * FileIO class for netcdf files.
+   * FileIO class for NetCDF files.
    */
   class FileIONetCDF : public FileIOBase {
    public:
