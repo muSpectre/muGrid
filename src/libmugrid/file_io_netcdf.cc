@@ -2246,10 +2246,8 @@ namespace muGrid {
   std::vector<IODiff_t> NetCDFVarField::get_nc_stride() const {
     std::vector<IODiff_t> strides{};
     std::vector<Index_t> s{this->get_field().get_pixels_shape()};
-    std::cout << this->get_name() << std::endl;
     for (auto & dim : this->netcdf_dims) {
       std::string base_name{dim->get_base_name()};
-      std::cout << "get_nc_stride base name: " << base_name << std::endl;
       IODiff_t stride{0};
 
       // find the correct stride for each dimension from its base_name
@@ -2314,8 +2312,6 @@ namespace muGrid {
     if (this->get_field().get_nb_components() == 1) {
       iter_type = muGrid::IterUnit::Pixel;
     }
-    std::cout << "get_field().get_nb_pixels(): " << get_field().get_nb_pixels()
-              << std::endl;
     std::vector<IODiff_t> imap_strides{
         this->get_field().get_nb_pixels() *
         this->get_field()
