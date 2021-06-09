@@ -365,6 +365,8 @@ namespace muSpectre {
                            message,
                            newt_iter,
                            this->krylov_solver->get_counter(),
+                           incr_norm / displacement_norm,
+                           force_norm,
                            this->get_formulation()};
 
     // store history variables for next load increment

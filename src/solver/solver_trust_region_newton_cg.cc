@@ -526,6 +526,8 @@ namespace muSpectre {
                            message,
                            newt_iter,
                            this->krylov_solver->get_counter(),
+                           incr_norm / grad_norm,
+                           rhs_norm,
                            this->get_formulation()};
 
     // store history variables for next load increment

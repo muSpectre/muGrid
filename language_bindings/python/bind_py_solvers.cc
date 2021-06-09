@@ -267,6 +267,8 @@ void add_solvers(py::module & solvers) {
       .def_readwrite("message", &OptimizeResult::message)
       .def_readwrite("nb_it", &OptimizeResult::nb_it)
       .def_readwrite("nb_fev", &OptimizeResult::nb_fev)
+      .def_readwrite("newton_norm", &OptimizeResult::newton_norm)
+      .def_readwrite("equil_norm", &OptimizeResult::equil_norm)
       .def_readwrite("formulation", &OptimizeResult::formulation);
 
   add_krylov_solvers(solvers);

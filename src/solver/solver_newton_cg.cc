@@ -251,7 +251,7 @@ namespace muSpectre {
       equil_tol_test = rhs_norm < this->equil_tol;
 
       if (newton_tol_test) {
-        message = "Residual  tolerance reached";
+        message = "Residual tolerance reached";
       } else if (equil_tol_test) {
         message = "Reached stress divergence tolerance";
       }
@@ -397,6 +397,8 @@ namespace muSpectre {
                            message,
                            newt_iter,
                            this->krylov_solver->get_counter(),
+                           incr_norm / grad_norm,
+                           rhs_norm,
                            this->get_formulation()};
 
     // store history variables for next load increment

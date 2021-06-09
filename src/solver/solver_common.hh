@@ -67,6 +67,10 @@ namespace muSpectre {
     Uint nb_it;
     //! number of cell evaluations
     Uint nb_fev;
+    //! Newton norm, |δF|/|ΔF| for finite strain and |δε|/|Δε| for small strain
+    Real newton_norm;
+    //! Equilibrium norm, |-G:P|
+    Real equil_norm;
     //! continuum mechanic flag
     Formulation formulation;
   };

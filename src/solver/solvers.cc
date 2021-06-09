@@ -296,7 +296,7 @@ namespace muSpectre {
                 stress_norm < equil_tol;
 
             if (convergence_criterion.get_newton_tol_test()) {
-              message = "Residual  tolerance reached";
+              message = "Residual tolerance reached";
             } else if (convergence_criterion.get_equil_tol_test()) {
               message = "Reached stress divergence tolerance";
             }
@@ -431,11 +431,21 @@ namespace muSpectre {
       // update previous macroscopic strain
       previous_macro_strain = macro_strain;
 
+      // print message with convergence reason
+      if (verbose > Verbosity::Silent && comm.rank() == 0) {
+        std::cout << message << std::endl;
+        if (verbose > Verbosity::Some) {
+          std::cout << "stress divergence: " << stress_norm
+                    << ", tol = " << equil_tol << std::endl;
+        }
+      }
+
       // store results
       ret_val.emplace_back(OptimizeResult{
           general_strain_field.eigen_vec(), cell->get_stress().eigen_vec(),
           full_convergence_test(), Int(full_convergence_test()), message,
-          newt_iter, solver.get_counter(), form});
+          newt_iter, solver.get_counter(), incr_norm / grad_norm, stress_norm,
+          form});
 
       // store history variables for next load increment
       cell->save_history_variables();
@@ -627,7 +637,7 @@ namespace muSpectre {
                 stress_norm < equil_tol;
 
             if (convergence_criterion.get_newton_tol_test()) {
-              message = "Residual  tolerance reached";
+              message = "Residual tolerance reached";
             } else if (convergence_criterion.get_equil_tol_test()) {
               message = "Reached stress divergence tolerance";
             }
@@ -823,11 +833,18 @@ namespace muSpectre {
         cell->evaluate_stress_tangent();
       }
 
+      // print message with convergence reason
+      if (verbose > Verbosity::Silent && comm.rank() == 0) {
+        std::cout << "The solver ended with the message: " << message
+                  << std::endl;
+      }
+
       // store results
       ret_val.emplace_back(
           OptimizeResult{F.eigen_vec(), cell->get_stress().eigen_vec(),
                          full_convergence_test(), Int(full_convergence_test()),
-                         message, newt_iter, solver.get_counter(), form});
+                         message, newt_iter, solver.get_counter(),
+                         incr_norm / grad_norm, stress_norm, form});
 
       // store history variables for next load increment
       cell->save_history_variables();
@@ -1064,7 +1081,7 @@ namespace muSpectre {
                 stress_norm < equil_tol;
 
             if (convergence_criterion.get_newton_tol_test()) {
-              message = "Residual  tolerance reached";
+              message = "Residual tolerance reached";
             } else if (convergence_criterion.get_equil_tol_test()) {
               message = "Reached stress divergence tolerance";
             }
@@ -1263,11 +1280,18 @@ namespace muSpectre {
       // update previous macroscopic strain
       previous_macro_strain = macro_strain;
 
+      // print message with convergence reason
+      if (verbose > Verbosity::Silent && comm.rank() == 0) {
+        std::cout << "The solver ended with the message: " << message
+                  << std::endl;
+      }
+
       // store results
       ret_val.emplace_back(OptimizeResult{
           general_strain_field.eigen_vec(), cell->get_stress().eigen_vec(),
           full_convergence_test(), Int(full_convergence_test()), message,
-          newt_iter, solver.get_counter(), form});
+          newt_iter, solver.get_counter(), incr_norm / grad_norm, stress_norm,
+          form});
 
       // store history variables for next load increment
       cell->save_history_variables();
