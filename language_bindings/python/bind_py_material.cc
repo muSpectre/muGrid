@@ -94,6 +94,10 @@ template <Index_t Dim>
 void add_material_neo_hookean_elastic_helper(py::module & mod);
 template <Index_t Dim>
 void add_material_dunant_helper(py::module & mod);
+template <Index_t Dim>
+void add_material_dunant_t_helper(py::module & mod);
+template <Index_t Dim>
+void add_material_dunant_tc_helper(py::module & mod);
 /* ---------------------------------------------------------------------- */
 template <Dim_t Dim>
 void add_material_linear_diffusion_helper(py::module & mod);
@@ -292,6 +296,8 @@ void add_material_helper(py::module & mod) {
   add_material_visco_elastic_damage_ss2_helper<Dim>(mod);
   add_material_neo_hookean_elastic_helper<Dim>(mod);
   add_material_dunant_helper<Dim>(mod);
+  add_material_dunant_t_helper<Dim>(mod);
+  add_material_dunant_tc_helper<Dim>(mod);
   add_material_evaluator<Dim>(mod);
 
 #ifdef WITH_SPLIT

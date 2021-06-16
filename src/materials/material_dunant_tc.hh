@@ -1,12 +1,17 @@
 /**
- * @file   material_dunant.hh
+ * @file   material_dunant_tc.hh
  *
  * @author Ali Falsafi <ali.falsafi@epfl.ch>
  *
  * @date   13 Jul 2020
  *
- * @brief  material used by dunant as a the damage model The stress-strain curve
- * is meant to be :
+ * @brief  material used by dunant_tc as a the damage model
+ * The failure criteria is based on weighted second norm of strain tensor.
+ * The critical values of strain (its eigen values) are weighted by different
+ * values based on whether they are tensile (+) or compressive (-) respectively
+ * with ρᵗ and ρᵗ. The stress-strain curve is meant to be and the material
+ * experiences strain softening if the weighted strain norm exceeds a certain
+ * threshold:
  **********************************
  *     σ                          *
  *     ^        ε_y               *
@@ -48,8 +53,8 @@
  *
  */
 
-#ifndef SRC_MATERIALS_MATERIAL_DUNANT_HH_
-#define SRC_MATERIALS_MATERIAL_DUNANT_HH_
+#ifndef SRC_MATERIALS_MATERIAL_DUNANT_TC_HH_
+#define SRC_MATERIALS_MATERIAL_DUNANT_TC_HH_
 
 #include "materials/material_linear_elastic1.hh"
 #include "materials/material_muSpectre_mechanics.hh"
@@ -61,22 +66,25 @@
 namespace muSpectre {
 
   template <Index_t DimM>
-  class MaterialDunant;
+  class MaterialDunantTC;
 
   /**
    * traits for objective linear visco_elasticity
    */
   template <Index_t DimM>
-  struct MaterialMuSpectre_traits<MaterialDunant<DimM>>
+  struct MaterialMuSpectre_traits<MaterialDunantTC<DimM>>
       : public DefaultMechanics_traits<DimM, StrainMeasure::GreenLagrange,
                                        StressMeasure::PK2> {};
 
   template <Index_t DimM>
-  class MaterialDunant
-      : public MaterialMuSpectreMechanics<MaterialDunant<DimM>, DimM> {
+  class MaterialDunantTC
+      : public MaterialMuSpectreMechanics<MaterialDunantTC<DimM>, DimM> {
    public:
     //! base class
-    using Parent = MaterialMuSpectreMechanics<MaterialDunant, DimM>;
+    using Parent = MaterialMuSpectreMechanics<MaterialDunantTC, DimM>;
+
+    //! short-hand for Vector type
+    using Vec_t = Eigen::Matrix<Real, DimM, 1>;
 
     //! short-hand for second-rank tensors
     using T2_t = Eigen::Matrix<Real, DimM, DimM>;
@@ -85,7 +93,7 @@ namespace muSpectre {
     using T4_t = muGrid::T4Mat<Real, DimM>;
 
     //! traits of this material
-    using traits = MaterialMuSpectre_traits<MaterialDunant>;
+    using traits = MaterialMuSpectre_traits<MaterialDunantTC>;
 
     //! Hooke's law implementation
     using Hooke =
@@ -117,30 +125,32 @@ namespace muSpectre {
     using MatChild_t = MaterialLinearElastic1<DimM>;
 
     //! Default constructor
-    MaterialDunant() = delete;
+    MaterialDunantTC() = delete;
 
     //! Copy constructor
-    MaterialDunant(const MaterialDunant & other) = delete;
+    MaterialDunantTC(const MaterialDunantTC & other) = delete;
 
     //! Construct by name, Young's modulus and Poisson's ratio
-    MaterialDunant(const std::string & name, const Index_t & spatial_dimension,
-                   const Index_t & nb_quad_pts, const Real & young,
-                   const Real & poisson, const Real & kappa_init,
-                   const Real & alpha,
-                   const std::shared_ptr<muGrid::LocalFieldCollection> &
-                       parent_field_collection = nullptr);
+    MaterialDunantTC(const std::string & name,
+                     const Index_t & spatial_dimension,
+                     const Index_t & nb_quad_pts, const Real & young,
+                     const Real & poisson, const Real & kappa_init,
+                     const Real & alpha, const Real & rho_c = 1.,
+                     const Real & rho_t = 1.,
+                     const std::shared_ptr<muGrid::LocalFieldCollection> &
+                         parent_field_collection = nullptr);
 
     //! Move constructor
-    MaterialDunant(MaterialDunant && other) = delete;
+    MaterialDunantTC(MaterialDunantTC && other) = delete;
 
     //! Destructor
-    virtual ~MaterialDunant() = default;
+    virtual ~MaterialDunantTC() = default;
 
     //! Copy assignment operator
-    MaterialDunant & operator=(const MaterialDunant & other) = delete;
+    MaterialDunantTC & operator=(const MaterialDunantTC & other) = delete;
 
     //! Move assignment operator
-    MaterialDunant & operator=(MaterialDunant && other) = delete;
+    MaterialDunantTC & operator=(MaterialDunantTC && other) = delete;
 
     /**
      * evaluates Kirchhoff stress given the current placement gradient
@@ -232,6 +242,13 @@ namespace muSpectre {
     //! restarting the last step nonlinear bool
     void clear_last_step_nonlinear() final;
 
+    std::tuple<T2_t, T2_t> compute_M2(const T2_t & E);
+
+    std::tuple<T4_t, T4_t, bool> compute_dM2_dE(const T2_t & E);
+
+    T4_t compute_dEct_dE(const T2_t & E, const T2_t & M2, const T4_t & dM2_dE,
+                         const bool & varying_M);
+
    protected:
     // Child material (used as a worker for evaluating stress and tangent)
     MatChild_t material_child;
@@ -249,9 +266,12 @@ namespace muSpectre {
     const Real kappa_fin;   //!< threshold of damage (strength)
     const Real
         alpha;  //! damage evaluation parameter( recommended to be in [0, 1])
+
+    const Real rho_c;  //!< compressive contribution coefficient
+    const Real rho_t;  //!< traction contribution coefficient
   };
 
   /* ---------------------------------------------------------------------- */
 }  // namespace muSpectre
 
-#endif  // SRC_MATERIALS_MATERIAL_DUNANT_HH_
+#endif  // SRC_MATERIALS_MATERIAL_DUNANT_TC_HH_

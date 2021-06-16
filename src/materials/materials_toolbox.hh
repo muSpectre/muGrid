@@ -58,6 +58,9 @@
 
 namespace muSpectre {
 
+  //! enum class for determining the status of a damage material
+  enum class StepState { elastic = 0, damaging = 1, fully_damaged = 2 };
+
   namespace MatTB {
 
     /**

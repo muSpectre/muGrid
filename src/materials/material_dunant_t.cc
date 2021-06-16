@@ -1,11 +1,11 @@
 /**
- * @file   material_dunant.cc
+ * @file   material_dunant_t.cc
  *
  * @author Ali Falsafi <ali.falsafi@epfl.ch>
  *
  * @date   13 Jul 2020
  *
- * @brief  implementation of Material Dunant
+ * @brief  implementation of Material DunantT
  *
  * Copyright © 2020 Ali Falsafi
  *
@@ -33,12 +33,12 @@
  *
  */
 
-#include "material_dunant.hh"
+#include "material_dunant_t.hh"
 
 namespace muSpectre {
 
   template <Index_t DimM>
-  MaterialDunant<DimM>::MaterialDunant(
+  MaterialDunantT<DimM>::MaterialDunantT(
       const std::string & name, const Index_t & spatial_dimension,
       const Index_t & nb_quad_pts, const Real & young, const Real & poisson,
       const Real & kappa_init, const Real & alpha,
@@ -57,21 +57,21 @@ namespace muSpectre {
         alpha{alpha} {}
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
-  void MaterialDunant<DimM>::save_history_variables() {
+  void MaterialDunantT<DimM>::save_history_variables() {
     this->get_kappa_field().get_state_field().cycle();
   }
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
-  void MaterialDunant<DimM>::initialise() {
+  void MaterialDunantT<DimM>::initialise() {
     Parent::initialise();
     this->save_history_variables();
   }
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
-  auto MaterialDunant<DimM>::evaluate_stress(const T2_t & E,
-                                             const size_t & quad_pt_index)
+  auto MaterialDunantT<DimM>::evaluate_stress(const T2_t & E,
+                                              const size_t & quad_pt_index)
       -> T2_t {
     auto && kappa{this->get_kappa_field()[quad_pt_index]};
     auto && kappa_init{this->get_kappa_init_field()[quad_pt_index]};
@@ -80,7 +80,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
-  auto MaterialDunant<DimM>::evaluate_stress_tangent(
+  auto MaterialDunantT<DimM>::evaluate_stress_tangent(
       const T2_t & E, const size_t & quad_pt_index) -> std ::tuple<T2_t, T4_t> {
     auto && kappa{this->get_kappa_field()[quad_pt_index]};
     auto && kappa_init{this->get_kappa_init_field()[quad_pt_index]};
@@ -89,9 +89,9 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
-  auto MaterialDunant<DimM>::evaluate_stress(const T2_t & E,
-                                             ScalarStRef_t kappa,
-                                             const Real & kappa_init_f)
+  auto MaterialDunantT<DimM>::evaluate_stress(const T2_t & E,
+                                              ScalarStRef_t kappa,
+                                              const Real & kappa_init_f)
       -> T2_t {
     this->update_damage_measure(E, kappa);
     auto && reduction{this->compute_reduction(kappa.current(), kappa_init_f)};
@@ -101,9 +101,9 @@ namespace muSpectre {
 
   /* ----------------------------------------------------------------------*/
   template <Index_t DimM>
-  auto MaterialDunant<DimM>::evaluate_stress_tangent(const T2_t & E,
-                                                     ScalarStRef_t kappa,
-                                                     const Real & kappa_init_f)
+  auto MaterialDunantT<DimM>::evaluate_stress_tangent(const T2_t & E,
+                                                      ScalarStRef_t kappa,
+                                                      const Real & kappa_init_f)
       -> std::tuple<T2_t, T4_t> {
     auto && step_status_current = this->update_damage_measure(E, kappa);
     auto && reduction{this->compute_reduction(kappa.current(), kappa_init_f)};
@@ -123,11 +123,16 @@ namespace muSpectre {
       break;
     }
     case StepState::damaging: {
-      T2_t dk_dE{(1.0 / kappa.current()) * E};
+      auto && spectral_decomp_strain{muGrid::spectral_decomposition(E)};
+      Vec_t eigen_vals{spectral_decomp_strain.eigenvalues()};
+      T2_t eigen_vecs{spectral_decomp_strain.eigenvectors()};
+
+      Vec_t q_max{eigen_vecs.col(DimM - 1)};     // last eig. vector
+      auto && dk_dE{q_max * q_max.transpose()};  // qₘₐₓ ⊗ qₘₐₓ
       Real dr_dk{-1.0 * ((1.0 + this->alpha) * this->kappa_init) /
                  std::pow(kappa.current(), 2)};
       T2_t drdE{dr_dk * dk_dE};
-      T4_t C{reduction * C_pristine + Matrices::outer(drdE, S_pristine)};
+      T4_t C{reduction * C_pristine + Matrices::outer(S_pristine, drdE)};
       return std::make_tuple(S, C);
       break;
     }
@@ -142,19 +147,20 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
-  auto MaterialDunant<DimM>::update_damage_measure(const T2_t & E,
-                                                   ScalarStRef_t kappa)
+  auto MaterialDunantT<DimM>::update_damage_measure(const T2_t & E,
+                                                    ScalarStRef_t kappa)
       -> StepState {
     StepState state{StepState::elastic};
     auto && kappa_current{this->compute_strain_measure(E)};
-    if (kappa_current > kappa.old()) {
+    // Further damage only happens if the maximum eigen value is positive
+    if (kappa_current > kappa.old() and kappa_current > 0.0) {
       kappa.current() = kappa_current;
       state = StepState::damaging;
       this->last_step_was_nonlinear |= kappa_current <= this->kappa_fin;
     } else {
       kappa.current() = kappa.old();
     }
-    if (kappa_current > kappa_fin) {
+    if (kappa_current > this->kappa_fin) {
       state = StepState::fully_damaged;
     }
     return state;
@@ -163,7 +169,7 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
 
   template <Index_t DimM>
-  void MaterialDunant<DimM>::add_pixel(const size_t & pixel_index) {
+  void MaterialDunantT<DimM>::add_pixel(const size_t & pixel_index) {
     this->internal_fields->add_pixel(pixel_index);
     this->get_kappa_field().get_state_field().current().push_back(
         this->get_kappa_init());
@@ -173,8 +179,8 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
-  void MaterialDunant<DimM>::add_pixel(const size_t & pixel_index,
-                                       const Real & kappa_variation) {
+  void MaterialDunantT<DimM>::add_pixel(const size_t & pixel_index,
+                                        const Real & kappa_variation) {
     this->internal_fields->add_pixel(pixel_index);
     this->get_kappa_field().get_state_field().current().push_back(
         this->get_kappa_init() + kappa_variation);
@@ -185,19 +191,22 @@ namespace muSpectre {
   /* --------------------------------------------------------------------- */
   template <Index_t DimM>
   template <class Derived>
-  Real MaterialDunant<DimM>::compute_strain_measure(
+  Real MaterialDunantT<DimM>::compute_strain_measure(
       const Eigen::MatrixBase<Derived> & E) {
     // Different damage criteria can be considered here.
     // In this material, the considered damage criterion is the strain norm
-    // measure = || E || =  √(E : E) →
-    auto && k{sqrt(muGrid::Matrices::ddot<DimM>(E, E))};
+    // measure = max λᵢ  → (λᵢ: eigen values(E))
+    auto && spectral_decomp_strain{muGrid::spectral_decomposition(E)};
+    Vec_t strain_eig_vals(spectral_decomp_strain.eigenvalues());
+    Real lambda_max{strain_eig_vals(DimM - 1)};
+    auto && k{lambda_max};
     return k;
   }
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
-  Real MaterialDunant<DimM>::compute_reduction(const Real & kappa,
-                                               const Real & kappa_init_f) {
+  Real MaterialDunantT<DimM>::compute_reduction(const Real & kappa,
+                                                const Real & kappa_init_f) {
     auto && reduction_measure{((1.0 + this->alpha) * (kappa_init_f / kappa)) -
                               this->alpha};
     return reduction_measure * static_cast<int>(reduction_measure > 0.);
@@ -205,12 +214,12 @@ namespace muSpectre {
 
   /* ----------------------------------------------------------------------- */
   template <Index_t DimM>
-  void MaterialDunant<DimM>::clear_last_step_nonlinear() {
+  void MaterialDunantT<DimM>::clear_last_step_nonlinear() {
     this->last_step_was_nonlinear = false;
   }
 
   /* ----------------------------------------------------------------------*/
-  template class MaterialDunant<twoD>;
-  template class MaterialDunant<threeD>;
+  template class MaterialDunantT<twoD>;
+  template class MaterialDunantT<threeD>;
 
 }  // namespace muSpectre

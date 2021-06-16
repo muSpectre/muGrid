@@ -1,12 +1,15 @@
 /**
- * @file   material_dunant.hh
+ * @file   material_dunant_t.hh
  *
  * @author Ali Falsafi <ali.falsafi@epfl.ch>
  *
  * @date   13 Jul 2020
  *
- * @brief  material used by dunant as a the damage model The stress-strain curve
- * is meant to be :
+ * @brief  material used by dunant as a the damage model
+ * The failure criteria is based on the maximum eigen value of the strain
+ * tensor. The stress-strain curve is meant to be  and the material experiences
+ * strain softening if its maximum eigen value (for strain tensor) exceeds a
+ * certain threshold:
  **********************************
  *     σ                          *
  *     ^        ε_y               *
@@ -48,8 +51,8 @@
  *
  */
 
-#ifndef SRC_MATERIALS_MATERIAL_DUNANT_HH_
-#define SRC_MATERIALS_MATERIAL_DUNANT_HH_
+#ifndef SRC_MATERIALS_MATERIAL_DUNANT_T_HH_
+#define SRC_MATERIALS_MATERIAL_DUNANT_T_HH_
 
 #include "materials/material_linear_elastic1.hh"
 #include "materials/material_muSpectre_mechanics.hh"
@@ -61,22 +64,25 @@
 namespace muSpectre {
 
   template <Index_t DimM>
-  class MaterialDunant;
+  class MaterialDunantT;
 
   /**
    * traits for objective linear visco_elasticity
    */
   template <Index_t DimM>
-  struct MaterialMuSpectre_traits<MaterialDunant<DimM>>
+  struct MaterialMuSpectre_traits<MaterialDunantT<DimM>>
       : public DefaultMechanics_traits<DimM, StrainMeasure::GreenLagrange,
                                        StressMeasure::PK2> {};
 
   template <Index_t DimM>
-  class MaterialDunant
-      : public MaterialMuSpectreMechanics<MaterialDunant<DimM>, DimM> {
+  class MaterialDunantT
+      : public MaterialMuSpectreMechanics<MaterialDunantT<DimM>, DimM> {
    public:
     //! base class
-    using Parent = MaterialMuSpectreMechanics<MaterialDunant, DimM>;
+    using Parent = MaterialMuSpectreMechanics<MaterialDunantT, DimM>;
+
+    //! short-hand for Vector type
+    using Vec_t = Eigen::Matrix<Real, DimM, 1>;
 
     //! short-hand for second-rank tensors
     using T2_t = Eigen::Matrix<Real, DimM, DimM>;
@@ -85,7 +91,7 @@ namespace muSpectre {
     using T4_t = muGrid::T4Mat<Real, DimM>;
 
     //! traits of this material
-    using traits = MaterialMuSpectre_traits<MaterialDunant>;
+    using traits = MaterialMuSpectre_traits<MaterialDunantT>;
 
     //! Hooke's law implementation
     using Hooke =
@@ -117,30 +123,30 @@ namespace muSpectre {
     using MatChild_t = MaterialLinearElastic1<DimM>;
 
     //! Default constructor
-    MaterialDunant() = delete;
+    MaterialDunantT() = delete;
 
     //! Copy constructor
-    MaterialDunant(const MaterialDunant & other) = delete;
+    MaterialDunantT(const MaterialDunantT & other) = delete;
 
     //! Construct by name, Young's modulus and Poisson's ratio
-    MaterialDunant(const std::string & name, const Index_t & spatial_dimension,
-                   const Index_t & nb_quad_pts, const Real & young,
-                   const Real & poisson, const Real & kappa_init,
-                   const Real & alpha,
-                   const std::shared_ptr<muGrid::LocalFieldCollection> &
-                       parent_field_collection = nullptr);
+    MaterialDunantT(const std::string & name, const Index_t & spatial_dimension,
+                    const Index_t & nb_quad_pts, const Real & young,
+                    const Real & poisson, const Real & kappa_init,
+                    const Real & alpha,
+                    const std::shared_ptr<muGrid::LocalFieldCollection> &
+                        parent_field_collection = nullptr);
 
     //! Move constructor
-    MaterialDunant(MaterialDunant && other) = delete;
+    MaterialDunantT(MaterialDunantT && other) = delete;
 
     //! Destructor
-    virtual ~MaterialDunant() = default;
+    virtual ~MaterialDunantT() = default;
 
     //! Copy assignment operator
-    MaterialDunant & operator=(const MaterialDunant & other) = delete;
+    MaterialDunantT & operator=(const MaterialDunantT & other) = delete;
 
     //! Move assignment operator
-    MaterialDunant & operator=(MaterialDunant && other) = delete;
+    MaterialDunantT & operator=(MaterialDunantT && other) = delete;
 
     /**
      * evaluates Kirchhoff stress given the current placement gradient
@@ -254,4 +260,4 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
 }  // namespace muSpectre
 
-#endif  // SRC_MATERIALS_MATERIAL_DUNANT_HH_
+#endif  // SRC_MATERIALS_MATERIAL_DUNANT_T_HH_

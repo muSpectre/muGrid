@@ -1,7 +1,12 @@
 Change log for µSpectre
 =======================
 
-0.18.2 (Not Released yet)
+0.19.0 (Not Released yet)
+-------------------------
+- muSpectre: added material_dunnat_tc (bilinear elastic- linear strain softening with tensile-compressive wiegthed norm as strain measure)
+-muSpectre:  added material_dunnat_t (bilinear elastic- linear strain softening with maiximum tensile principal strain as strain measure)
+
+0.18.2 (10Jun2021)
 -------------------------
 - muSpectre: Small bugfix and addition of regularization for slightly non-pd Hessians in phase field fracture material
 
