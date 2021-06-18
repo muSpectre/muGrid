@@ -1157,14 +1157,14 @@ namespace muGrid {
     auto & nb_grid_pts{
         dynamic_cast<muGrid::GlobalFieldCollection &>(field.get_collection())
             .get_nb_domain_grid_pts()};                     // x, y, z
-    auto & nb_subpts{field.get_nb_sub_pts()};               // s
+    auto & nb_subpt{field.get_nb_sub_pts()};               // s
     Shape_t component_shape{field.get_components_shape()};  // tensor dims
     auto & nb_dof_per_subpt{field.get_nb_components()};     // (n)
     std::vector<std::string> grid_names{"nx", "ny", "nz"};
 
     // add the field dims in the correct order as you want to have in the NetCDF
-    // file (frame, subpt_field-1, subpt_filed-2, ... , subpts, nx, ny, nz)
-    // the frame was already added before
+    // file (frame, tensor_dim__field-1, tensor_dim__filed-2, ... , subpt, nx,
+    // ny, nz) the frame was already added before
     if (nb_dof_per_subpt > 1) {
       // for state fields the field name is corrected by using the state field
       // name
@@ -1178,16 +1178,16 @@ namespace muGrid {
         std::string field_name_tensor_dim =
             field_name + "-" + std::to_string(tensor_dim);
         field_dims.push_back(this->add_dim(
-            NetCDFDim::compute_dim_name("subpt", field_name_tensor_dim),
+            NetCDFDim::compute_dim_name("tensor_dim", field_name_tensor_dim),
             tensor_dim_size));
       }
     }
 
-    if (nb_subpts != 1 or nb_dof_per_subpt != 1) {
+    if (nb_subpt != 1 or nb_dof_per_subpt != 1) {
       std::string suffix{field.get_sub_division_tag() + "-" +
-                         std::to_string(nb_subpts)};
+                         std::to_string(nb_subpt)};
       field_dims.push_back(this->add_dim(
-          NetCDFDim::compute_dim_name("subpts", suffix), nb_subpts));
+          NetCDFDim::compute_dim_name("subpt", suffix), nb_subpt));
     }
 
     int i{0};
@@ -1220,13 +1220,13 @@ namespace muGrid {
       const Communicator & comm, std::string state_field_name) {
     IOSize_t nb_pts{static_cast<IOSize_t>(field.get_nb_pixels())};  // i
     IOSize_t nb_pts_glob{comm.sum(nb_pts)};  // sum of all local nb_pts
-    IOSize_t nb_subpts{static_cast<IOSize_t>(field.get_nb_sub_pts())};  // s
+    IOSize_t nb_subpt{static_cast<IOSize_t>(field.get_nb_sub_pts())};  // s
     Shape_t component_shape{field.get_components_shape()};  // tensor dims
     IOSize_t nb_dof_per_subpt{
         static_cast<IOSize_t>(field.get_nb_components())};  // n
 
     // add the field dims in the correct order as you want to have in the NetCDF
-    // file (frame, subpt_field-1, subpt_filed-2, ... , subpts, pts)
+    // file (frame, tensor_dim__field-1, tensor_dim__filed-2, ... , subpt, pts)
     // the frame was already added before
     if (nb_dof_per_subpt > 1) {
       // for state fields the field name is corrected by using the state field
@@ -1241,15 +1241,15 @@ namespace muGrid {
         std::string field_name_tensor_dim =
             field_name + "-" + std::to_string(tensor_dim);
         field_dims.push_back(this->add_dim(
-            NetCDFDim::compute_dim_name("subpt", field_name_tensor_dim),
+            NetCDFDim::compute_dim_name("tensor_dim", field_name_tensor_dim),
             tensor_dim_size));
       }
     }
-    if (nb_subpts != 1 or nb_dof_per_subpt != 1) {
+    if (nb_subpt != 1 or nb_dof_per_subpt != 1) {
       std::string suffix{field.get_sub_division_tag() + "-" +
-                         std::to_string(nb_subpts)};
+                         std::to_string(nb_subpt)};
       field_dims.push_back(this->add_dim(
-          NetCDFDim::compute_dim_name("subpts", suffix), nb_subpts));
+          NetCDFDim::compute_dim_name("subpt", suffix), nb_subpt));
     }
     if (nb_pts_glob != 0) {
       // for state fields the field name is corrected by using the state field
@@ -1352,20 +1352,20 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  int NetCDFDim::compute_subpt_tensor_dim_index() const {
+  int NetCDFDim::compute_tensor_dim_index() const {
     std::string base_name{this->compute_base_name(this->name)};
-    int subpt_tensor_dim_index{-1};
-    if (base_name == "subpt") {
+    int tensor_dim_index{-1};
+    if (base_name == "tensor_dim") {
       // get the suffix after the last "-" pattern
       auto const pos{this->name.find_last_of("-")};
-      subpt_tensor_dim_index = std::stoi(this->name.substr(pos+1));
+      tensor_dim_index = std::stoi(this->name.substr(pos+1));
     } else {
-      FileIOError("The function 'NetCDFDim::compute_subpt_tensor_dim_index()' "
+      FileIOError("The function 'NetCDFDim::compute_tensor_dim_index()' "
                   "is only valid to call on NetCDFDims with base name "
-                  "'subpt'. You called it on the NetCDFDim '" +
+                  "'tensor_dim'. You called it on the NetCDFDim '" +
                   this->name + "' with base name '" + base_name + "'.");
     }
-    return subpt_tensor_dim_index;
+    return tensor_dim_index;
   }
 
   /* ---------------------------------------------------------------------- */
@@ -2158,12 +2158,12 @@ namespace muGrid {
         } else {
           throw FileIOError("err_local");
         }
-      } else if (base_name == "subpts") {
-        count = static_cast<IOSize_t>(this->get_field().get_nb_sub_pts());
       } else if (base_name == "subpt") {
+        count = static_cast<IOSize_t>(this->get_field().get_nb_sub_pts());
+      } else if (base_name == "tensor_dim") {
         Shape_t component_shape{this->get_field().get_components_shape()};
         count = static_cast<IOSize_t>(
-            component_shape[dim->compute_subpt_tensor_dim_index()]);
+            component_shape[dim->compute_tensor_dim_index()]);
       } else {
         throw FileIOError(
             "I can not find the number of indices for the dimension '" +
@@ -2198,12 +2198,12 @@ namespace muGrid {
             count = 1;
           } else if (base_name == "pts") {
             count = 1;
-          } else if (base_name == "subpts") {
-            count = static_cast<IOSize_t>(this->get_field().get_nb_sub_pts());
           } else if (base_name == "subpt") {
+            count = static_cast<IOSize_t>(this->get_field().get_nb_sub_pts());
+          } else if (base_name == "tensor_dim") {
             Shape_t component_shape{this->get_field().get_components_shape()};
             count = static_cast<IOSize_t>(
-                component_shape[dim->compute_subpt_tensor_dim_index()]);
+                component_shape[dim->compute_tensor_dim_index()]);
           } else {
             throw FileIOError(
                 "I can not find the number of indices for the dimension '" +
@@ -2757,9 +2757,9 @@ namespace muGrid {
         } else {
           throw FileIOError(err_local);
         }
-      } else if (base_name == "subpts") {
-        start = 0;
       } else if (base_name == "subpt") {
+        start = 0;
+      } else if (base_name == "tensor_dim") {
         start = 0;
       } else {
         throw FileIOError(
@@ -2800,9 +2800,9 @@ namespace muGrid {
             start = static_cast<IOSize_t>(frame);
           } else if (base_name == "pts") {
             start = offset;
-          } else if (base_name == "subpts") {
-            start = 0;
           } else if (base_name == "subpt") {
+            start = 0;
+          } else if (base_name == "tensor_dim") {
             start = 0;
           } else {
             throw FileIOError(
@@ -2837,9 +2837,9 @@ namespace muGrid {
         stride = 1;
       } else if (base_name == "pts") {
         stride = 1;
-      } else if (base_name == "subpts") {
-        stride = 1;
       } else if (base_name == "subpt") {
+        stride = 1;
+      } else if (base_name == "tensor_dim") {
         stride = 1;
       } else {
         throw FileIOError(
@@ -3006,9 +3006,9 @@ namespace muGrid {
         } else {
           throw FileIOError(err_local);
         }
-      } else if (base_name == "subpts") {
-        start = 0;
       } else if (base_name == "subpt") {
+        start = 0;
+      } else if (base_name == "tensor_dim") {
         start = 0;
       } else {
         throw FileIOError("I can not find a start offset for the dimension '" +
@@ -3051,9 +3051,9 @@ namespace muGrid {
             start = static_cast<IOSize_t>(this->state_field_index);
           } else if (base_name == "pts") {
             start = offset;
-          } else if (base_name == "subpts") {
-            start = 0;
           } else if (base_name == "subpt") {
+            start = 0;
+          } else if (base_name == "tensor_dim") {
             start = 0;
           } else {
             throw FileIOError(
@@ -3091,9 +3091,9 @@ namespace muGrid {
         stride = 1;
       } else if (base_name == "pts") {
         stride = 1;
-      } else if (base_name == "subpts") {
-        stride = 1;
       } else if (base_name == "subpt") {
+        stride = 1;
+      } else if (base_name == "tensor_dim") {
         stride = 1;
       } else {
         throw FileIOError(

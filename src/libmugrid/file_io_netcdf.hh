@@ -266,10 +266,10 @@ namespace muGrid {
     static std::string compute_dim_name(const std::string & dim_base_name,
                                         const std::string & suffix);
 
-    // compute the tensor index of a subpt dim, this is only possible for a
-    // NetCDFDim with base name "subpt". For NetCDFDims with an other base name
-    // -1 is returned, which in normal cases never should be returned.
-    int compute_subpt_tensor_dim_index() const;
+    // compute the tensor index of a tensor_dim, this is only possible for a
+    // NetCDFDim with base name "tensor_dim". For NetCDFDims with an other base
+    // name -1 is returned, which in normal cases never should be returned.
+    int compute_tensor_dim_index() const;
 
     //! compare the dimension is equal to the given dim_name and size
     bool equal(const std::string & dim_name, const IOSize_t & dim_size) const;
