@@ -102,6 +102,18 @@ namespace muGrid {
     muGrid::T1FieldMap<int, Mapping::Mut, FileIOFixture::spatial_dimension,
                        muGrid::IterUnit::SubPt>
         t1_field_map;
+
+    // Some global attributes
+    std::string global_att_1_name{"att_1"};
+    std::string global_att_2_name{"att_2"};
+    std::vector<muGrid::Int> global_att_1_value{-2, -1, 0, 1, 2};
+    std::vector<char> global_att_2_value{'m', 'c', 'v', '!'};
+
+    std::vector<std::string> global_att_names_default{
+        "creation_date",       "creation_time",
+        "last_modified_date",  "last_modified_time",
+        "muGrid_version_info", "muGrid_git_hash",
+        "muGrid_description",  "muGrid_git_branch_is_dirty"};
   };
 
   struct FileIOFixtureIterator {

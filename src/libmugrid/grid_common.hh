@@ -567,6 +567,21 @@ namespace muGrid {
     }
     return retval;
   }
+
+  namespace version {
+
+    /**
+     * returns a formatted text that can be printed to stdout or to output
+     * files. It contains the git commit hash and repository url used to compile
+     * µGrid and whether the current state was dirty or not.
+     */
+    std::string info();
+    const char * hash();
+    const char * description();
+    bool is_dirty();
+
+  }  // namespace version
+
 }  // namespace muGrid
 
 #include "cpp_compliance.hh"

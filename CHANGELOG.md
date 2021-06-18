@@ -9,6 +9,8 @@ Change log for µSpectre
 0.18.2 (10Jun2021)
 -------------------------
 - muSpectre: Small bugfix and addition of regularization for slightly non-pd Hessians in phase field fracture material
+- muGrid: Added functions for reporting version
+- muGrid: Added global attributes to FileIONetCDF
 
 0.18.1 (02Jun21)
 ----------------

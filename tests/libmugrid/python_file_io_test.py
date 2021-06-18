@@ -45,13 +45,18 @@ except ImportError:
 import numpy as np
 import os
 
+import random
+import string
+import time
+
 
 class FileIOTest(unittest.TestCase):
     def setUp(self):
         self.nb_domain_grid_pts = (3, 3, 3)
         self.nb_subdomain_grid_pts = (3, 3, 3)
-        self.file_f_name = "python_binding_tests.nc"
+        self.file_f_name = "python_binding_io_field-tests.nc"
         self.file_sf_name = "python_binding_io_state-field-tests.nc"
+        self.file_ga_name = "python_binding_io_global-attributes-tests.nc"
         if MPI:
             self.comm = muGrid.Communicator(MPI.COMM_WORLD)
         else:
@@ -239,6 +244,157 @@ class FileIOTest(unittest.TestCase):
         file_io_object.read(2)
         self.assertTrue((a_glob == 1234).all())
         self.assertTrue((a_loc == 5678).all())
+
+    def test_FileIONetCDF_global_attributes(self):
+        # --- write global attributes --- #
+        if os.path.exists(self.file_ga_name):
+            os.remove(self.file_ga_name)
+
+        file_io_object_w = muGrid.FileIONetCDF(
+            self.file_ga_name, muGrid.FileIONetCDF.OpenMode.Write, self.comm)
+
+        global_att_1_name = "global_att_str"
+        global_att_1_value = "123abc"
+        global_att_2_name = "global_att_Int"
+        global_att_2_value = np.array([1234, 5678],
+                                      dtype=int).tolist()
+        global_att_3_name = "global_att_Uint"
+        global_att_3_value = np.array([1234, 5678],
+                                      dtype=np.uintc).tolist()
+        global_att_4_name = "global_att_Index_t"
+        global_att_4_value = np.array([1234, 5678],
+                                      dtype=np.int64).tolist()
+        global_att_5_name = "global_att_Real"
+        global_att_5_value = np.array([1234, 5678],
+                                      dtype=np.double).tolist()
+        file_io_object_w.write_global_attribute(global_att_1_name,
+                                                global_att_1_value)
+        file_io_object_w.write_global_attribute(global_att_2_name,
+                                                global_att_2_value)
+        file_io_object_w.write_global_attribute(global_att_3_name,
+                                                global_att_3_value)
+        file_io_object_w.write_global_attribute(global_att_4_name,
+                                                global_att_4_value)
+        file_io_object_w.write_global_attribute(global_att_5_name,
+                                                global_att_5_value)
+        file_io_object_w.register_field_collection(self.fc_glob)
+        file_io_object_w.register_field_collection(self.fc_loc)
+        file_io_object_w.close()
+
+        # by default written global attributes
+        global_att_names_default = ['creation_date', 'creation_time',
+                                    'last_modified_date', 'last_modified_time',
+                                    'muGrid_version_info',
+                                    'muGrid_git_hash',
+                                    'muGrid_description',
+                                    'muGrid_git_branch_is_dirty']
+        global_att_values_default = [None]*len(global_att_names_default)
+
+        # actually added global attributes
+        global_att_names_ref = global_att_names_default.copy()
+        global_att_names_ref.extend([global_att_1_name, global_att_2_name,
+                                     global_att_3_name, global_att_4_name,
+                                     global_att_5_name])
+        global_att_values_ref = global_att_values_default.copy()
+        global_att_values_ref.extend([global_att_1_value, global_att_2_value,
+                                      global_att_3_value, global_att_4_value,
+                                      global_att_5_value])
+
+        # --- read global attribute --- #
+        file_io_object_r = muGrid.FileIONetCDF(
+            self.file_ga_name, muGrid.FileIONetCDF.OpenMode.Read, self.comm)
+
+        with self.assertRaises(RuntimeError) as cm:
+            file_io_object_r.write_global_attribute(global_att_1_name,
+                                                    global_att_1_value)
+            error_message = "It is only possible to write global attributes "\
+                + "when the FileIONetCDF object was open with "\
+                + "'FileIOBase::OpenMode::Write'."
+            self.assertEqual(cm.exception.error_code, error_message)
+
+        global_att_names = file_io_object_r.read_global_attribute_names()
+        self.assertTrue(global_att_names == global_att_names_ref)
+
+        for i, g_att_name in enumerate(global_att_names):
+            g_att_value = file_io_object_r.read_global_attribute(g_att_name)
+            if g_att_name not in global_att_names_default:
+                if type(g_att_value) == str or isinstance(g_att_value, list):
+                    self.assertTrue(g_att_value == global_att_values_ref[i])
+                elif isinstance(g_att_value, np.ndarray):
+                    self.assertTrue(
+                        (g_att_value == global_att_values_ref[i]).all())
+                else:
+                    raise RuntimeError("Unknow type '" + str(type(g_att_value)) +
+                                       "'of attribute value in 'FileIOTest."
+                                       "test_FileIONetCDF_global_attributes()'.")
+            else:
+                # add date and time to reference
+                global_att_values_ref[i] = g_att_value
+
+        # construct reference dictionary
+        global_att_ref_dic = dict(
+            zip(global_att_names_ref, global_att_values_ref))
+        global_att_dic = file_io_object_r.read_global_attributes()
+        for k in global_att_dic.keys():
+            self.assertTrue(global_att_dic[k] == global_att_ref_dic[k])
+
+        # --- change global attribute in append mode --- #
+        file_io_object_a = muGrid.FileIONetCDF(
+            self.file_ga_name, muGrid.FileIONetCDF.OpenMode.Append, self.comm)
+
+        old_name = global_att_1_name  # this is a str attribute
+        old_value = file_io_object_a.read_global_attribute(old_name)
+        too_long_value = old_value + "."  # exceeds old att value by one symbol
+        too_long_name = old_name + "."  # exceeds old att name by one symbol
+
+        # check for possible errors
+        with self.assertRaises(RuntimeError) as cm:
+            file_io_object_a.update_global_attribute(old_name,
+                                                     old_name,
+                                                     too_long_value)
+        error_code = ("The new global attribute value data exceeds the"
+                      + " old value data size which is not allowed!")
+        self.assertTrue(str(cm.exception)[:len(error_code)] == error_code)
+
+        with self.assertRaises(RuntimeError) as cm:
+            file_io_object_a.update_global_attribute(old_name,
+                                                     too_long_name,
+                                                     old_value)
+        error_code = ("The new global attribute name exceeds the old name"
+                      + " size which is not allowed!")
+        self.assertTrue(str(cm.exception)[:len(error_code)] == error_code)
+
+        def random_name_generator(size=6, chars=string.ascii_uppercase
+                                  + string.ascii_lowercase + string.digits):
+            return ''.join(random.choice(chars) for _ in range(size))
+
+        valid_new_value = random_name_generator(len(old_value))
+        valid_new_name = random_name_generator(len(old_name))
+
+        file_io_object_a.update_global_attribute(old_name,
+                                                 valid_new_name,
+                                                 valid_new_value)
+
+        time.sleep(1)  # delay to get a new time in last modified time
+        file_io_object_a.close()  # now the last modified time should be updated
+
+        # check if the global att and the last_modified_time were updated
+        file_io_object_r2 = muGrid.FileIONetCDF(
+            self.file_ga_name, muGrid.FileIONetCDF.OpenMode.Read, self.comm)
+
+        with self.assertRaises(RuntimeError) as cm:
+            file_io_object_r2.read_global_attribute(old_name)
+        error_code = ("The global attribute with name 'global_att_str' was"
+                      " not found. Maybe you forgot to register the"
+                      " corresponding NetCDFGlobalAtt?")
+        self.assertTrue(str(cm.exception)[:len(error_code)] == error_code)
+
+        updated_value = file_io_object_r2.read_global_attribute(valid_new_name)
+        self.assertEqual(updated_value, valid_new_value)
+
+        old_lmt = global_att_ref_dic["last_modified_time"]
+        new_lmt = file_io_object_r2.read_global_attribute("last_modified_time")
+        self.assertTrue(old_lmt != new_lmt)
 
 
 if __name__ == "__main__":

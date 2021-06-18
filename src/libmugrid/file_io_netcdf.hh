@@ -41,8 +41,10 @@
 #include <memory>
 #include <typeinfo>
 #include <type_traits>
+#include <iomanip>
 
 #include "communicator.hh"
+#include "grid_common.hh"
 #include "field.hh"
 #include "state_field.hh"
 #include "field_collection.hh"
@@ -79,6 +81,7 @@ const auto ncmu_put_varm = ncmpi_put_varm;
 const auto ncmu_put_varn_all = ncmpi_put_varn_all;
 const auto ncmu_put_att_text = ncmpi_put_att_text;
 const auto ncmu_put_att = ncmpi_put_att;
+const auto ncmu_rename_att = ncmpi_rename_att;
 using Datatype_t = MPI_Datatype;
 using IOSize_t = MPI_Offset;
 using IODiff_t = MPI_Offset;
@@ -110,6 +113,7 @@ const auto ncmu_put_varm = nc_put_varm;
 const auto ncmu_put_varn_all = nc_put_vara;
 const auto ncmu_put_att_text = nc_put_att_text;
 const auto ncmu_put_att = nc_put_att;
+const auto ncmu_rename_att = nc_rename_att;
 using Datatype_t = nc_type;
 using IOSize_t = size_t;
 using IODiff_t = ptrdiff_t;
@@ -297,6 +301,8 @@ namespace muGrid {
    * (att_name, data_type, nelems, value, name_initialised, value_initialised)
    **/
   class NetCDFAtt {
+    friend class NetCDFGlobalAtt;
+
    public:
     //! Default constructor
     NetCDFAtt() = delete;
@@ -359,8 +365,31 @@ namespace muGrid {
     //! return 'nelems' number of values stored in the attribute value
     const IOSize_t & get_nelems() const;
 
-    //! return a pointer on the attribute value
+    //! return the size of the attributes raw data in bytes
+    IOSize_t get_data_size() const;
+
+    //! return the size of the attributes name in bytes
+    IOSize_t get_name_size() const;
+
+    //! return a const pointer on the attribute value
     const void * get_value() const;
+
+    //! return the attribute values in its 'real type', there is a function for
+    //! each type indicated by the suffix of the function name. It is only
+    //! allowed to call the function of the correct return type. This can be
+    //! satisfyed by using NetCDFAtt::get_data_type(), i.e.
+    //! muGrid::MU_NC_CHAR    --  get_typed_value_c()
+    //! muGrid::MU_NC_INT     --  get_typed_value_i()
+    //! muGrid::MU_NC_UINT    --  get_typed_value_ui()
+    //! muGrid::MU_NC_INDEX_T --  get_typed_value_l()
+    //! muGrid::MU_NC_REAL    --  get_typed_value_d()
+    //! If you call a function which is not matching the data type a FileIOError
+    //! will be thrown.
+    const std::vector<char> & get_typed_value_c() const;
+    const std::vector<muGrid::Int> & get_typed_value_i() const;
+    const std::vector<muGrid::Uint> & get_typed_value_ui() const;
+    const std::vector<muGrid::Index_t> & get_typed_value_l() const;
+    const std::vector<muGrid::Real> & get_typed_value_d() const;
 
     //! return the attribute value as std::string
     std::string get_value_as_string() const;
@@ -391,6 +420,17 @@ namespace muGrid {
     bool is_value_initialised() const;
 
    private:
+    //! update the name and value of the NetCDFAtt while keeping the data_type.
+    //! The user of this function is responsible to take care of possible
+    //! resulting time consuming extensions of the NetCDF header.
+    void update_attribute(const std::string & new_att_name,
+                          const nc_type & new_att_data_type,
+                          const IOSize_t & new_att_nelems,
+                          void * new_att_value);
+
+    //! return a non const pointer on the attribute value
+    void * get_value_non_const_ptr();
+
     std::string att_name;
     nc_type data_type;
     IOSize_t nelems{0};
@@ -409,6 +449,118 @@ namespace muGrid {
     bool name_initialised{
         false};  // true if name, data_type and nelems was set, else false
     bool value_initialised{false};  // true if value was set, else false
+  };
+
+  /**
+   * Class to represent GLOBAL NetCDF attributes which do not belong to a
+   * NetCDFVar
+   **/
+  class NetCDFGlobalAtt : public NetCDFAtt {
+   public:
+    //! Default constructor
+    NetCDFGlobalAtt() = delete;
+
+    /**
+     * Constructor from parent with the attribute name and its value (char,
+     * muGrid::Int, muGrid::Uint, muGrid::real) the values are represented by
+     * std::vector<T> of the corresponding type 'T'. The type char has an
+     * additional convenience constructor which can take also std::string as
+     * input.
+     */
+    // char value
+    NetCDFGlobalAtt(const std::string & att_name,
+                    const std::vector<char> & value);
+
+    // char value, convenience constructor which can take a std::string value
+    NetCDFGlobalAtt(const std::string & att_name, const std::string & value);
+
+    // muGrid::Int value
+    NetCDFGlobalAtt(const std::string & att_name,
+                    const std::vector<muGrid::Int> & value);
+
+    // muGrid::Uint value
+    NetCDFGlobalAtt(const std::string & att_name,
+                    const std::vector<muGrid::Uint> & value);
+
+    // muGrid::Index_t value
+    NetCDFGlobalAtt(const std::string & att_name,
+                    const std::vector<muGrid::Index_t> & value);
+
+    // muGrid::Real value
+    NetCDFGlobalAtt(const std::string & att_name,
+                    const std::vector<muGrid::Real> & value);
+
+    /**
+     * Constructor from parent with the attribute name, data_type and nelems
+     */
+    NetCDFGlobalAtt(const std::string & att_name, const nc_type & att_data_type,
+                    const IOSize_t & att_nelems);
+
+    //! Copy constructor
+    NetCDFGlobalAtt(const NetCDFGlobalAtt & other) = default;
+
+    //! Move constructor
+    NetCDFGlobalAtt(NetCDFGlobalAtt && other) = delete;
+
+    //! Destructor
+    virtual ~NetCDFGlobalAtt() = default;
+
+    //! Copy assignment operator
+    NetCDFGlobalAtt & operator=(const NetCDFGlobalAtt & other) = delete;
+
+    //! Move assignment operator
+    NetCDFGlobalAtt & operator=(NetCDFGlobalAtt && other) = delete;
+
+    //! check if the global attribute was already written to the file;
+    //! true  -- the attribute was already written to the file
+    //! false -- the attribute was up to now not written to the file
+    bool is_already_written_to_file() { return this->is_written; }
+
+    //! call this function after the NetCDFGlobalAtt was written to the NetCDF
+    //! file to set is_written to true.
+    void was_written() { this->is_written = true; }
+
+    //! changes the global attributes value to new_value if the type of the
+    //! new_value matches the old value and the size of the new_value does not
+    //! exceed the size of the old value. Here with old value the current calue
+    //! of the global attribute is meant.
+    template <class T>
+    void update_global_attribute(const std::string & new_att_name,
+                                 T new_att_value) {
+      // construct a temp NetCDFAtt
+      NetCDFAtt tmp_netdcdf_att(new_att_name, new_att_value);
+
+      // check data type
+      if (this->get_data_type() != tmp_netdcdf_att.get_data_type()) {
+        throw FileIOError(
+            "The data types of the new (" +
+            std::to_string(this->get_data_type()) + ") and the old (" +
+            std::to_string(tmp_netdcdf_att.get_data_type()) +
+            ") NetCDFGlobalAtt are not equal which is not allowed!");
+      }
+
+      // check name size
+      if (this->get_name_size() < tmp_netdcdf_att.get_name_size()) {
+        throw FileIOError("The new global attribute name exceeds the old name "
+                          "size which is not allowed!");
+      }
+
+      // check data size
+      if (this->get_data_size() < tmp_netdcdf_att.get_data_size()) {
+        throw FileIOError("The new global attribute value data exceeds the old "
+                          "value data size which is not allowed!");
+      }
+
+      // update value and name
+      this->update_attribute(tmp_netdcdf_att.get_name(),
+                             tmp_netdcdf_att.get_data_type(),
+                             tmp_netdcdf_att.get_nelems(),
+                             tmp_netdcdf_att.get_value_non_const_ptr());
+    }
+
+   protected:
+    bool is_written;  //! true  -- the attribute was already written to the file
+                      //! false -- the attribute is yet not written to the file
   };
 
   /**
@@ -474,14 +626,14 @@ namespace muGrid {
 
     //! get a const std::vector<NetCDFAtt> & of all attributes belonging to the
     //! NetCDFVarBase
-    const std::vector<NetCDFAtt> & get_netcdf_atts() const;
+    const std::vector<NetCDFAtt> & get_netcdf_attributes() const;
 
     //! get a non const std::vector<NetCDFAtt> & of all attributes belonging to
     //! the NetCDFVarBase to set the actual values of the attributes
-    std::vector<NetCDFAtt> & set_netcdf_atts();
+    std::vector<NetCDFAtt> & set_netcdf_attributes();
 
     //! get a std::vector<std::string> with the names of all attributes
-    std::vector<std::string> get_netcdf_att_names() const;
+    std::vector<std::string> get_netcdf_attribute_names() const;
 
     //! get the FieldCollection::ValidityDomain & of the NetCDFVarBase
     const muGrid::FieldCollection::ValidityDomain & get_validity_domain() const;
@@ -576,7 +728,10 @@ namespace muGrid {
     //! std::vector<std::int64_t>           NC_INT64   long long int *
     //! std::vector<std::uint64_t>          NC_UINT64  unsigned long long int *
     template <typename T>
-    void add_attribute(const std::string & att_name, const T & value);
+    void add_attribute(const std::string & att_name, const T & value) {
+      NetCDFAtt attribute(att_name, value);
+      this->netcdf_atts.push_back(attribute);
+    }
 
     //! register an attribute by its name (att_name), data type (att_data_type)
     //! and number of elements (att_nelems), afterwards you can read in a value
@@ -876,13 +1031,101 @@ namespace muGrid {
     //! NetCDFDimensions object and throws a muGrid::FielIOError.
     std::shared_ptr<NetCDFDim> find_dim(const std::string & dim_name);
 
-    //! return a std::vector<std::shared_ptr<NetCDFDim>> & of all NetCDfDims
+    //! return a std::vector<std::shared_ptr<NetCDFDim>> & of all NetCDFDims
     //! belonging to the NetCDFDimensions
     const std::vector<std::shared_ptr<NetCDFDim>> & get_dim_vector() const;
 
    protected:
     std::vector<std::shared_ptr<NetCDFDim>> dim_vector{};
     std::vector<Index_t> global_domain_grid{0, 0, 0};
+  };
+
+  /**
+   * Class to store the GLOBAL NetCDF attributes
+   **/
+  class NetCDFGlobalAttributes {
+   public:
+    NetCDFGlobalAttributes() = default;
+
+    //! Copy constructor
+    NetCDFGlobalAttributes(const NetCDFGlobalAttributes & other) = delete;
+
+    //! Move constructor
+    NetCDFGlobalAttributes(NetCDFGlobalAttributes && other) = delete;
+
+    //! Destructor
+    virtual ~NetCDFGlobalAttributes() = default;
+
+    //! Copy assignment operator
+    NetCDFGlobalAttributes &
+    operator=(const NetCDFGlobalAttributes & other) = delete;
+
+    //! Move assignment operator
+    NetCDFGlobalAttributes &
+    operator=(NetCDFGlobalAttributes && other) = delete;
+
+    //! add a global attribute in all available value type versions
+    template <class T>
+    NetCDFGlobalAtt & add_attribute(const std::string & global_att_name,
+                                    const T & value) {
+      this->check_global_attribute_name(global_att_name);
+      this->global_att_vector.push_back(
+          std::make_shared<NetCDFGlobalAtt>(global_att_name, value));
+
+      return *this->global_att_vector.back();
+    }
+
+    //! get a global attribute from the global_att_vector by its name
+    const NetCDFGlobalAtt &
+    get_attribute(const std::string & global_att_name) const;
+
+    //! get a const std::vector<std::shared_ptr<NetCDFGlobalAtt>> of all
+    //! NetCDFGlobalAtts belonging to the NetCDFGlobalAttributes object, i.e. a
+    //! const view on the global_att_vector.
+    const std::vector<std::shared_ptr<NetCDFGlobalAtt>>
+    get_global_attribute_vector() const;
+
+    //! get a std::vector<std::shared_ptr<NetCDFGlobalAtt>> of all
+    //! NetCDFGlobalAtts belonging to the NetCDFGlobalAttributes object, i.e. a
+    //! non const view on the global_att_vector.
+    std::vector<std::shared_ptr<NetCDFGlobalAtt>> set_global_attribute_vector();
+
+    //! get a std::shared_ptr<NetCDFGlobalAtt> of the NetCDFGlobalAtt with name
+    //! 'global_att_name' from the global_att_vector.
+    std::shared_ptr<NetCDFGlobalAtt>
+    set_global_attribute(const std::string & global_att_name);
+
+    //! get a std::vector<std::string> of all global attribute names
+    std::vector<std::string> get_global_attribute_names() const;
+
+    //! register a global attribute by its name (g_att_name), data type
+    //! (g_att_data_type) and number of elements (g_att_nelems), afterwards you
+    //! can read in a value of type 'void *' from a NetCDF file by e.g.
+    //! ncmu_get_att()
+    void register_attribute(const std::string & g_att_name,
+                            const nc_type & g_att_data_type,
+                            const IOSize_t & g_att_nelems);
+
+    //! std::string todays date
+    std::string todays_date() const;
+
+    //! std::string time now
+    std::string time_now() const;
+
+    //! add the actual date and time to the global_att_vector as creation_date
+    //! and creation_time
+    void add_date_and_time(std::string name_prefix = "creation");
+
+    //! add muGrid version information
+    void add_muGrid_version_info();
+
+   protected:
+    //! check if the global_att_name is valid/already in use
+    //! no Error -- if global_att_name is valid and was not used before
+    //! Error -- if global_att_name is in use and can not be used twice
+    void check_global_attribute_name(const std::string global_att_name);
+
+    std::vector<std::shared_ptr<NetCDFGlobalAtt>> global_att_vector{};
   };
 
   /**
@@ -956,6 +1199,11 @@ namespace muGrid {
         10};  // maximum number of allowed attributes per variable
     constexpr static int MAX_LEN_ATTRIBUTE_NAME{
         20};  // maximum length of an attribute name
+    constexpr static int MAX_NB_GLOBAL_ATTRIBUTES{
+        30};  // maximum number of allowed global attributes per FileIONetCDF
+              // object
+    constexpr static int MAX_LEN_GLOBAL_ATTRIBUTE_NAME{
+        25};  // maximum length of an global attribute name
 
     enum class NetCDFMode { UndefinedMode, DefineMode, DataMode };
     //! Default constructor
@@ -1024,6 +1272,123 @@ namespace muGrid {
     //! static version of handle_frame
     static Index_t handle_frame(Index_t frame, Index_t tot_nb_frames);
 
+    //! register a NetCDFGlobalAtt to the global_attributes of FileIONetCDF.
+    //! This function can only be used in open_mode =
+    //! FileIOBase::OpenMode::Write and before write() was called the first time
+    //! otherwise there is the danger of having time expensive NetCDF header
+    //! expansions, which is the reason why this is prevented.
+    template <class T>
+    void write_global_attribute(const std::string & att_name, T value) {
+      if (this->global_attributes_defined) {
+        throw FileIOError(
+            "It is forbidden to write gloabal attributes after you have called "
+            "'FileIONetCDF::write()' the first time. This is to prevent "
+            "probably time expensive expansions of the NetCDF header after "
+            "there was data written to the NetCDF file. Therefore, please "
+            "write all global attributes before you write data to your file.");
+      }
+      if (this->open_mode != FileIOBase::OpenMode::Write) {
+        throw FileIOError(
+            "It is only possible to write global attributes when the "
+            "FileIONetCDF object was open with 'FileIOBase::OpenMode::Write'.");
+      }
+      this->global_attributes.add_attribute(att_name, value);
+    }
+
+    //! get a NetCDfGlobalAtt from the FileIONetCDF object by its name
+    const NetCDFGlobalAtt &
+    read_global_attribute(const std::string & att_name) const;
+
+    //! get a const std::vector<std::string> with the names of all current
+    //! global attributes
+    const std::vector<std::string> read_global_attribute_names() const;
+
+    //! update the value/s or name of an exisiting (already written to the
+    //! NetCDF file) global attribute. This is only allowed if the changes do
+    //! not lead to an increas of the size of the global attribute and the
+    //! data_type of the attribute is not changed. This function can only be
+    //! used in open_mode = FileIOBase::OpenMode::Write or
+    //! FileIOBase::OpenMode::Append.
+    template <class T>
+    void update_global_attribute(const std::string & old_att_name,
+                                 const std::string & new_att_name,
+                                 T new_att_value) {
+      // calling this function is only allowed in write or append mode
+      if (this->open_mode != FileIOBase::OpenMode::Write and
+          this->open_mode != FileIOBase::OpenMode::Append) {
+        throw FileIOError(
+            "It is only possible to update global attributes when the "
+            "FileIONetCDF object was open in 'FileIOBase::OpenMode::Write' or "
+            "'FileIOBase::OpenMode::Append'.");
+      }
+
+      // for safety reasons the file should be in data mode because there the
+      // header space cannot be expanded which might be time consuming.
+      if (this->netcdf_mode != FileIONetCDF::NetCDFMode::DataMode) {
+        // switch automatic into data mode and do not turn back into old mode
+        int status_enddef{ncmu_enddef(this->netcdf_id)};
+        if (status_enddef != NC_NOERR and status_enddef != NC_ENOTINDEFINE) {
+          throw FileIOError(ncmu_strerror(status_enddef));
+        }
+        this->netcdf_mode = NetCDFMode::DataMode;
+      }
+
+      // find the old NetCDFGlobalAtt
+      std::shared_ptr<NetCDFGlobalAtt> old_netcdf_global_attribute{
+          this->global_attributes.set_global_attribute(old_att_name)};
+
+      // check if the old NetCDFGlobalAtt was already written
+      if (not old_netcdf_global_attribute->is_already_written_to_file()) {
+        if (this->open_mode == FileIOBase::OpenMode::Write) {
+          throw FileIOError(
+              "You can only update a global attribute if it was already "
+              "written to the NetCDF file. It seems like the the global "
+              "attribute '" +
+              old_att_name +
+              "' was not written to the NetCDF file up to now. In "
+              "FileIOBase::OpenMode::Write the global attributes are written "
+              "during the first call of 'FileIONetCDF::write()' or when you "
+              "close the file with 'FileIONetCDF::close()'.");
+        } else if (this->open_mode == FileIOBase::OpenMode::Append) {
+          throw FileIOError(
+              "You can only update a global attribute if it was already "
+              "written to the NetCDF file. It seems like the the global "
+              "attribute '" +
+              old_att_name +
+              "' was not written to the NetCDF file. In "
+              "'FileIOBase::OpenMode::Append' this is an unexpected "
+              "behaviour and you should inform the programmers.");
+        } else {
+          throw FileIOError("Unexpected behaviour in "
+                            "'FileIONetCDF::update_global_attribute()' pleas "
+                            "inform the programmers.");
+        }
+      }
+
+      // update the old global attribute value by the new one
+      old_netcdf_global_attribute->update_global_attribute(new_att_name,
+                                                           new_att_value);
+
+      // rename the global attribute if the name has changed
+      if (old_att_name != new_att_name) {
+        int status{ncmu_rename_att(this->netcdf_id, NC_GLOBAL,
+                                   old_att_name.c_str(), new_att_name.c_str())};
+        if (status != NC_NOERR) {
+          throw FileIOError(ncmu_strerror(status));
+        }
+      }
+      // write the global attribute again to the NetCDF file
+      int status{ncmu_put_att(this->netcdf_id, NC_GLOBAL,
+                              old_netcdf_global_attribute->get_name().c_str(),
+                              old_netcdf_global_attribute->get_data_type(),
+                              old_netcdf_global_attribute->get_nelems(),
+                              old_netcdf_global_attribute->get_value())};
+      if (status != NC_NOERR) {
+        throw FileIOError(ncmu_strerror(status));
+      }
+      this->netcdf_file_changes();
+    }
+
    protected:
     //! open file for read/write
     //! This function is called by the constructor at instantiation.
@@ -1090,15 +1455,52 @@ namespace muGrid {
     //! IDs, their numbers can change. (to read or append a file)
     void register_netcdf_attribute_names();
 
-    //! register the values of all attributes with register names
+    //! register the values of all attributes with registered names
     void register_netcdf_attribute_values();
+
+    //! write NetCDFGlobalAtts from global_attributes (which are not already
+    //! written) this function is only called if the file was open in
+    //! FileIOBase::OpenMode::Write. Then it is only called twice, once in
+    //! FileIONetCDF::open() and once in FileIONetCDF::write() or
+    //! FileIONetCDF::close() if write() was not called before close.
+    void define_global_attributes();
+
+    //! call define global attributes and check all requiremnts and bring the
+    //! NetCDF file in the correct status if necessary. If no save call is
+    //! possible the function exits without doing anything
+    void define_global_attributes_save_call();
+
+    //! inquiry and register the global attribute names of variables from the
+    //! NetCDF file. Here the names are registered because global attributes
+    //! have no unique IDs, their numbers can change. (to read or append a file)
+    void register_netcdf_global_attribute_names();
+
+    //! register the values of all global attributes with registered names
+    void register_netcdf_global_attribute_values();
+
+    //! update the last modified flag by the current date and time
+    void update_global_attribute_last_modified();
+
+    //! save call of update_global_attribute_last_modified which checks all
+    //! necessary conditions and otherwise do not call the function.
+    void update_global_attribute_last_modified_save_call();
+
+    //! stes the flag netcdf_file_changed to true if it is not already true
+    void netcdf_file_changes();
+
 
     int netcdf_id{-1};  // the netcdf ID, -1 is an invalid value
     NetCDFMode netcdf_mode{
         NetCDFMode::UndefinedMode};  // save the modus of the NetCDF file e.g.
                                      // after ncmu_create it is in define_mode,
                                      // thus netcdf_mode = DefineMode.
+    bool netcdf_file_changed{false};  // is set to true if FileIONetCDF changes
+                                      // something in the NetCDF file
+    bool global_attributes_defined{
+        false};  // satisfy that global attributes are only written once.
+                 // "false" means they are not written up to now.
 
+    NetCDFGlobalAttributes global_attributes;
     NetCDFDimensions dimensions;
     NetCDFVariables variables;
 

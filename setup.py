@@ -283,6 +283,7 @@ mugrid_sources = [
     'src/libmugrid/state_field.cc',
     'src/libmugrid/state_field_map.cc',
     'src/libmugrid/units.cc',
+    'src/libmugrid/version.cc',
 ]
 pymugrid_sources = [
     'language_bindings/libmugrid/python/bind_py_module.cc',
@@ -672,16 +673,16 @@ try:
     dirty, version, hash = get_version_from_git()
     try:
         cc_dirty, cc_version, cc_hash = \
-            get_version_from_cc('src/libmufft/version.cc')
+            get_version_from_cc('src/libmugrid/version.cc')
         cc_found = True
     except:
         cc_found = False
     if not cc_found or cc_hash != hash or cc_version != version:
         # Write a new version.cc file
         if verbose:
-            print('  * Writing new src/libmufft/version.cc')
-        open('src/libmufft/version.cc', 'w').write(
-            open('src/libmufft/version.cc.skeleton').read()
+            print('  * Writing new src/libmugrid/version.cc')
+        open('src/libmugrid/version.cc', 'w').write(
+            open('src/libmugrid/version.cc.skeleton').read()
                 .replace('@GIT_IS_DIRTY@', 'true' if dirty else 'false')
                 .replace('@GIT_COMMIT_DESCRIBE@', version)
                 .replace('@GIT_HEAD_SHA1@', hash))
@@ -689,10 +690,10 @@ except:
     # Detection via git failed. Get version from version.cc file.
     try:
         dirty, version, hash = \
-            get_version_from_cc('src/libmufft/version.cc')
+            get_version_from_cc('src/libmugrid/version.cc')
     except:
         raise RuntimeError('Version detection failed. This is not a '
-                           'git repository and src/libmufft/version.cc '
+                           'git repository and src/libmugrid/version.cc '
                            'does not exist.')
 
 setup(

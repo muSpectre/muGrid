@@ -99,6 +99,21 @@ set(file_io_NETCDF_SRCS
 
 add_library(muGrid "")
 
+set(PRE_CONFIGURE_FILE "${CMAKE_CURRENT_SOURCE_DIR}/version.cc.skeleton")
+set(POST_CONFIGURE_FILE "${CMAKE_CURRENT_BINARY_DIR}/version.cc")
+include(git_watcher.cmake)
+
+# Create a library out of the compiled post-configure file.
+add_library(version STATIC ${POST_CONFIGURE_FILE})
+set_target_properties(version PROPERTIES
+        CXX_STANDARD 11
+        CXX_STANDARD_REQUIRED YES
+        CXX_EXTENSIONS NO
+        POSITION_INDEPENDENT_CODE ON)
+target_include_directories(version PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+add_dependencies(version check_git)
+target_link_libraries(muGrid PUBLIC version)
+
 if(NOT HAS_STD_OPTIONAL)
     target_compile_definitions(muGrid PUBLIC -DNO_EXPERIMENTAL)
     # Do not trust old gcc. the std::optional has memory bugs

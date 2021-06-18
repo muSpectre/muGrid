@@ -587,5 +587,96 @@ namespace muGrid {
     file_io_netcdf.close();
   }
 
+  BOOST_FIXTURE_TEST_CASE(GlobalAttributesWriteMode, FileIOFixture) {
+    // WRITE-MODE
+    const std::string file_name{"test_global_attributes.nc"};
+    remove(file_name.c_str());  // remove file if it already exists
+    auto open_mode_w = muGrid::FileIOBase::OpenMode::Write;
+    FileIONetCDF file_io_netcdf_w(file_name, open_mode_w, this->comm);
+    file_io_netcdf_w.write_global_attribute(this->global_att_1_name,
+                                            this->global_att_1_value);
+
+    // register something else than global attributes, a NetCDF file with only
+    // global attributes is empty.
+    file_io_netcdf_w.register_field_collection(this->global_fc);
+
+    // error for double registration of global attributes
+    BOOST_CHECK_THROW(file_io_netcdf_w.write_global_attribute(
+                          this->global_att_1_name, this->global_att_1_value),
+                      muGrid::FileIOError);
+
+    // check registration of global att after field registration
+    file_io_netcdf_w.write_global_attribute(this->global_att_2_name,
+                                            this->global_att_2_value);
+
+    // error registration after write()
+    file_io_netcdf_w.append_frame().write();
+    BOOST_CHECK_THROW(file_io_netcdf_w.write_global_attribute(
+                          this->global_att_2_name, this->global_att_2_value),
+                      muGrid::FileIOError);
+
+    // check read_global_att_names()
+    std::vector<std::string> global_att_names_ref{
+        this->global_att_names_default};
+    global_att_names_ref.push_back(global_att_1_name);
+    global_att_names_ref.push_back(global_att_2_name);
+    const std::vector<std::string> global_att_names{
+        file_io_netcdf_w.read_global_attribute_names()};
+    BOOST_CHECK_EQUAL(global_att_names.size(),
+                      global_att_names_ref.size());
+    for (size_t i{0}; i < global_att_names.size(); i++) {
+      BOOST_CHECK_EQUAL(global_att_names[i], global_att_names_ref[i]);
+    }
+    // check read_global_att()
+    BOOST_CHECK(file_io_netcdf_w.read_global_attribute(this->global_att_1_name)
+                    .equal_value(this->global_att_1_value.data()));
+    BOOST_CHECK(file_io_netcdf_w.read_global_attribute(this->global_att_2_name)
+                    .equal_value(this->global_att_2_value.data()));
+
+    file_io_netcdf_w.close();
+  }
+
+  BOOST_FIXTURE_TEST_CASE(GlobalAttributesReadMode, FileIOFixture) {
+    // READ-MODE
+    const std::string file_name{"test_global_attributes.nc"};
+    auto open_mode_r = muGrid::FileIOBase::OpenMode::Read;
+    FileIONetCDF file_io_netcdf_r(file_name, open_mode_r, this->comm);
+    std::vector<std::string> global_att_names_ref{
+        this->global_att_names_default};
+    global_att_names_ref.push_back(global_att_1_name);
+    global_att_names_ref.push_back(global_att_2_name);
+    const std::vector<std::string> global_att_names{
+        file_io_netcdf_r.read_global_attribute_names()};
+    BOOST_CHECK_EQUAL(global_att_names.size(),
+                      global_att_names_ref.size());
+    for (size_t i{0}; i < global_att_names.size(); i++) {
+      BOOST_CHECK_EQUAL(global_att_names[i], global_att_names_ref[i]);
+    }
+    for (auto & g_att_name : global_att_names) {
+      file_io_netcdf_r.read_global_attribute(g_att_name);
+    }
+  }
+
+  BOOST_FIXTURE_TEST_CASE(GlobalAttributesAppendMode, FileIOFixture) {
+    // APPEND-MODE
+    const std::string file_name{"test_global_attributes.nc"};
+    auto open_mode_a = muGrid::FileIOBase::OpenMode::Append;
+    FileIONetCDF file_io_netcdf_r(file_name, open_mode_a, this->comm);
+    std::vector<std::string> global_att_names_ref{
+        this->global_att_names_default};
+    global_att_names_ref.push_back(global_att_1_name);
+    global_att_names_ref.push_back(global_att_2_name);
+    const std::vector<std::string> global_att_names{
+        file_io_netcdf_r.read_global_attribute_names()};
+    BOOST_CHECK_EQUAL(global_att_names.size(),
+                      global_att_names_ref.size());
+    for (size_t i{0}; i < global_att_names.size(); i++) {
+      BOOST_CHECK_EQUAL(global_att_names[i], global_att_names_ref[i]);
+    }
+    for (auto & g_att_name : global_att_names) {
+      file_io_netcdf_r.read_global_attribute(g_att_name);
+    }
+  }
+
   BOOST_AUTO_TEST_SUITE_END();
 }  // namespace muGrid
