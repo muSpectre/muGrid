@@ -48,23 +48,22 @@ namespace muSpectre {
   template <Index_t DimS, Index_t NbQuadPts>
   ProjectionFiniteStrain<DimS, NbQuadPts>::ProjectionFiniteStrain(
       muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths,
-      const Gradient_t & gradient)
-      : Parent{std::move(engine), lengths, gradient,
-               Formulation::finite_strain} {
-  }
+      const Gradient_t & gradient, const MeanControl & mean_control)
+      : Parent{std::move(engine), lengths, gradient, Formulation::finite_strain,
+               mean_control} {}
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimS, Index_t NbQuadPts>
   ProjectionFiniteStrain<DimS, NbQuadPts>::ProjectionFiniteStrain(
-      muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths)
-      : ProjectionFiniteStrain{
-            std::move(engine), lengths,
-            muFFT::make_fourier_gradient(lengths.get_dim())} {}
+      muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths,
+      const MeanControl & mean_control)
+      : ProjectionFiniteStrain{std::move(engine), lengths,
+                               muFFT::make_fourier_gradient(lengths.get_dim()),
+                               mean_control} {}
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimS, Index_t NbQuadPts>
-  void
-  ProjectionFiniteStrain<DimS, NbQuadPts>::initialise() {
+  void ProjectionFiniteStrain<DimS, NbQuadPts>::initialise() {
     Parent::initialise();
     using FFTFreqs_t = muFFT::FFT_freqs<DimS>;
     using Vector_t = typename FFTFreqs_t::Vector;
@@ -117,9 +116,64 @@ namespace muSpectre {
         }
       }
     }
+
     if (this->get_subdomain_locations() == Ccoord{}) {
+      // Ghat (Project operator) is set to either 0ᵢⱼₖₗ or δᵢₖδⱼₗ (Ghat^*) based
+      // on that either mean strain value or mean stress value is imposed on the
+      // cell The formulation is Based on: An algorithm for stress and mixed
+      // control in Galerkin-based FFT homogenization, by Lucarini, and Segurado
+      // DOI: 10.1002/nme.6069
+      switch (this->mean_control) {
+      case MeanControl::StrainControl: {
+        // Ghat(ξ=0) ← 0ᵢⱼₖₗ
+        this->Ghat[0].setZero();
+        break;
+      }
+      case MeanControl::StressControl: {
+        // Ghat(ξ=0) ← δᵢₖδⱼₗ
+        switch (DimS) {
+        case oneD: {
+          for (Dim_t im{0}; im < DimS; ++im) {
+            for (Dim_t j{0}; j < DimS * NbQuadPts; ++j) {
+              this->Ghat[0](im + j * DimS, im + j * DimS) = 1;
+            }
+          }
+          break;
+        }
+        case twoD:
+        case threeD: {
+          auto && Iiden{Matrices::Iiden<DimS>()};
+          for (Dim_t im{0}; im < DimS; ++im) {
+            for (Dim_t j{0}; j < DimS * NbQuadPts; ++j) {
+              for (Dim_t l{0}; l < DimS * NbQuadPts; ++l) {
+                this->Ghat[0](im + j * DimS, im + l * DimS) =
+                    get(Iiden, im, j % NbQuadPts, im, l % NbQuadPts);
+              }
+            }
+          }
+          break;
+        }
+        default: {
+          throw muGrid::RuntimeError("Unknown Dimension");
+          break;
+        }
+        }
+        break;
+      }
+      case MeanControl::MixedControl: {
+        muGrid::RuntimeError("Mixed control projection is not implemented yet");
+        break;
+      }
+      default: {
+        throw muGrid::RuntimeError("Unknown value for mean_control value");
+        break;
+      }
+      }
+      // However, Ihat (integrator operator) is only set to 0
+      // because it is not used in the solvers developed here so far, and
+      // basically its only use case so far was to reconstruct the displacement
+      // field from the strain field for visualization purposes.
       this->Ihat[0].setZero();
-      this->Ghat[0].setZero();
     }
   }
 

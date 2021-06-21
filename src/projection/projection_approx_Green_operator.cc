@@ -124,6 +124,7 @@ namespace muSpectre {
     }
     /* New operator end*/
 
+    // Ghat(ξ=0) ← 0
     if (this->get_subdomain_locations() == Ccoord{}) {
       this->Ghat[0].setZero();
     }
@@ -133,8 +134,8 @@ namespace muSpectre {
   std::unique_ptr<ProjectionBase>
   ProjectionApproxGreenOperator<DimS>::clone() const {
     return std::make_unique<ProjectionApproxGreenOperator>(
-        this->get_fft_engine().clone(), this->get_domain_lengths(),
-        this->C_ref, this->get_gradient());
+        this->get_fft_engine().clone(), this->get_domain_lengths(), this->C_ref,
+        this->get_gradient());
   }
 
   template class ProjectionApproxGreenOperator<oneD>;

@@ -48,24 +48,26 @@ namespace muSpectre {
       std::shared_ptr<KrylovSolverBase> krylov_solver,
       const muGrid::Verbosity & verbosity, const Real & newton_tol,
       const Real & equil_tol, const Uint & max_iter,
-      const Gradient_t & gradient)
+      const Gradient_t & gradient, const MeanControl & mean_control)
       : Parent{cell_data, verbosity}, krylov_solver{krylov_solver},
         newton_tol{newton_tol}, equil_tol{equil_tol}, max_iter{max_iter},
         gradient{std::make_shared<Gradient_t>(gradient)},
         nb_quad_pts{static_cast<Index_t>(gradient.size()) /
-                    (this->cell_data->get_domain_lengths().get_dim())} {}
+                    (this->cell_data->get_domain_lengths().get_dim())},
+        mean_control{mean_control} {}
 
   /* ---------------------------------------------------------------------- */
   SolverNewtonCG::SolverNewtonCG(
       std::shared_ptr<CellData> cell_data,
       std::shared_ptr<KrylovSolverBase> krylov_solver,
       const muGrid::Verbosity & verbosity, const Real & newton_tol,
-      const Real & equil_tol, const Uint & max_iter)
+      const Real & equil_tol, const Uint & max_iter,
+      const MeanControl & mean_control)
       : Parent{cell_data, verbosity}, krylov_solver{krylov_solver},
         newton_tol{newton_tol}, equil_tol{equil_tol}, max_iter{max_iter},
         gradient{std::make_shared<Gradient_t>(
-            muFFT::make_fourier_gradient(this->cell_data->get_spatial_dim()))} {
-  }
+            muFFT::make_fourier_gradient(this->cell_data->get_spatial_dim()))},
+        mean_control{mean_control} {}
 
   /* ---------------------------------------------------------------------- */
   void SolverNewtonCG::initialise_cell() {
@@ -211,6 +213,7 @@ namespace muSpectre {
 
     // obtain this iteration's load and check its shape
     const auto & macro_load{load_step.at(this->domain)};
+
     if (macro_load.rows() != this->grad_shape[0] or
         macro_load.cols() != this->grad_shape[1]) {
       std::stringstream error_message{};
@@ -231,16 +234,34 @@ namespace muSpectre {
 
     // updating cell grad with the difference of the current and previous
     // grad input.
-    this->grad->get_map() += macro_load - this->previous_macro_load;
+
+    // Here we need to update the mean strain if the mean control is on the
+    // strain
+    if (this->mean_control == MeanControl::StrainControl) {
+      this->grad->get_map() += macro_load - this->previous_macro_load;
+    }
 
     // define the number of newton iteration (initially equal to 0)
     std::string message{"Has not converged"};
     Real incr_norm{2 * newton_tol}, grad_norm{1};
+    // Real incr_max{2 * newton_tol};
     Real rhs_norm{2 * equil_tol};
     bool has_converged{false};
     bool last_step_was_nonlinear{true};
     bool newton_tol_test{false};
     bool equil_tol_test{false};
+
+    const std::string strain_symb{[this]() -> std::string {
+      if (this->is_mechanics()) {
+        if (this->get_formulation() == Formulation::finite_strain) {
+          return "F";
+        } else {
+          return "ε";
+        }
+      } else {
+        return "Grad";
+      }
+    }()};
 
     //! Checks two loop breaking criteria (newton tolerance and equilibrium
     //! tolerance)
@@ -259,17 +280,6 @@ namespace muSpectre {
       return has_converged;
     }};
 
-    const std::string strain_symb{[this]() -> std::string {
-      if (this->is_mechanics()) {
-        if (this->get_formulation() == Formulation::finite_strain) {
-          return "F";
-        } else {
-          return "ε";
-        }
-      } else {
-        return "Grad";
-      }
-    }()};
     //! Checks all convergence criteria, including detection of linear
     //! problems
     auto && full_convergence_test{[&early_convergence_test, this,
@@ -300,6 +310,13 @@ namespace muSpectre {
     auto & flux{std::get<0>(res_tup)};
 
     *this->rhs = -flux.get_field();
+
+    // Here we need to subtract the mean stress if the control is on the mean
+    // stress
+    if (this->mean_control == MeanControl::StressControl) {
+      this->rhs->get_map() += macro_load - this->previous_macro_load;
+    }
+
     this->projection->apply_projection(this->rhs->get_field());
 
     rhs_norm =
@@ -331,16 +348,41 @@ namespace muSpectre {
 
       // updating cell strain with the periodic (non-constant) solution
       // resulted from imposing the new macro_strain
-      std::cout << "<δgrad> =" << std::endl
-                << this->grad_incr->get_map().mean() << std::endl;
+      if ((this->verbosity > Verbosity::Silent) and (comm.rank() == 0)) {
+        std::cout << "<δgrad> =" << std::endl
+                  << this->grad_incr->get_map().mean() << std::endl;
+      }
+
       this->grad->get_field() += this->grad_incr->get_field();
+
+      grad_norm =
+          std::sqrt(comm.sum(grad->get_field().eigen_vec().squaredNorm()));
 
       // updating the incremental differences for checking the termination
       // criteria
-      incr_norm = std::sqrt(
-          comm.sum(this->grad_incr->get_field().eigen_vec().squaredNorm()));
-      grad_norm =
-          std::sqrt(comm.sum(grad->get_field().eigen_vec().squaredNorm()));
+      switch (this->mean_control) {
+      case MeanControl::StrainControl: {
+        incr_norm = std::sqrt(
+            comm.sum(this->grad_incr->get_field().eigen_vec().squaredNorm()));
+        break;
+      }
+      case MeanControl::StressControl: {
+        // criteria according to "An algorithm for stress and mixed control in
+        // Galerkin-based FFT homogenization" by: S.Lucarini, J. Segurado
+        // doi: 10.1002/nme.6069
+        incr_norm = std::accumulate(
+            grad_incr->begin(), grad_incr->end(), 0.0,
+            [](Real max, auto && grad_incr_entry) -> Real {
+              Real grad_incr_entry_norm{grad_incr_entry.squaredNorm()};
+              return grad_incr_entry_norm > max ? grad_incr_entry_norm : max;
+            });
+        incr_norm /= grad_incr->get_field().get_nb_entries();
+        break;
+      }
+      default:
+        throw muGrid::RuntimeError("Unknown value for mean_control value");
+        break;
+      }
 
       if ((this->verbosity >= Verbosity::Detailed) and (comm.rank() == 0)) {
         std::cout << "at Newton step " << std::setw(this->default_count_width)
@@ -349,8 +391,23 @@ namespace muSpectre {
                   << ", tol = " << newton_tol << std::endl;
 
         if (this->verbosity > Verbosity::Detailed) {
-          std::cout << "<Grad> =" << std::endl
-                    << this->grad->get_map().mean() << std::endl;
+          switch (this->mean_control) {
+          case MeanControl::StrainControl: {
+            std::cout << "<Grad> =" << std::endl
+                      << this->grad->get_map().mean() << std::endl;
+            break;
+          }
+          case MeanControl::StressControl: {
+            std::cout << "<Flux> =" << std::endl
+                      << this->flux->get_map().mean() + macro_load << std::endl;
+            std::cout << "<Grad> =" << std::endl
+                      << this->grad->get_map().mean() << std::endl;
+            break;
+          }
+          default:
+            throw muGrid::RuntimeError("Unknown value for mean_control value");
+            break;
+          }
         }
       }
 
@@ -364,6 +421,13 @@ namespace muSpectre {
       auto & flux{std::get<0>(res_tup)};
 
       *this->rhs = -flux.get_field();
+
+      // Here we also need to subtract the mean stress value if the control
+      // is on the mean value of stress
+      if (this->mean_control == MeanControl::StressControl) {
+        this->rhs->get_map() += macro_load - this->previous_macro_load;
+      }
+
       this->projection->apply_projection(this->rhs->get_field());
 
       rhs_norm =
@@ -389,7 +453,6 @@ namespace muSpectre {
     this->previous_macro_load = macro_load;
 
     // store results
-
     OptimizeResult ret_val{this->grad->get_field().eigen_sub_pt(),
                            this->flux->get_field().eigen_sub_pt(),
                            full_convergence_test(),
@@ -534,25 +597,25 @@ namespace muSpectre {
       case OneQuadPt: {
         using Projection = ProjectionFiniteStrainFast<Dim, OneQuadPt>;
         this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient);
+            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
         break;
       }
       case TwoQuadPts: {
         using Projection = ProjectionFiniteStrainFast<Dim, TwoQuadPts>;
         this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient);
+            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
         break;
       }
       case FourQuadPts: {
         using Projection = ProjectionFiniteStrainFast<Dim, FourQuadPts>;
         this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient);
+            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
         break;
       }
       case SixQuadPts: {
         using Projection = ProjectionFiniteStrainFast<Dim, SixQuadPts>;
         this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient);
+            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
         break;
       }
       default: {
@@ -570,25 +633,25 @@ namespace muSpectre {
       case OneQuadPt: {
         using Projection = ProjectionSmallStrain<Dim, OneQuadPt>;
         this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient);
+            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
         break;
       }
       case TwoQuadPts: {
         using Projection = ProjectionSmallStrain<Dim, TwoQuadPts>;
         this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient);
+            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
         break;
       }
       case FourQuadPts: {
         using Projection = ProjectionSmallStrain<Dim, FourQuadPts>;
         this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient);
+            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
         break;
       }
       case SixQuadPts: {
         using Projection = ProjectionSmallStrain<Dim, SixQuadPts>;
         this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient);
+            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
         break;
       }
       default:
@@ -634,14 +697,14 @@ namespace muSpectre {
     case twoD: {
       this->projection = std::make_shared<ProjectionGradient<twoD, firstOrder>>(
           this->cell_data->get_FFT_engine(),
-          this->cell_data->get_domain_lengths());
+          this->cell_data->get_domain_lengths(), this->mean_control);
       break;
     }
     case threeD: {
       this->projection =
           std::make_shared<ProjectionGradient<threeD, firstOrder>>(
               this->cell_data->get_FFT_engine(),
-              this->cell_data->get_domain_lengths());
+              this->cell_data->get_domain_lengths(), this->mean_control);
       break;
     }
     default:

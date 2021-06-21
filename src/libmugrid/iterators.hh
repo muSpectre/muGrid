@@ -38,8 +38,7 @@
 namespace akantu {
 
   namespace tuple {
-    /* ------------------------------------------------------------------------
-     */
+    /* ---------------------------------------------------------------------- */
     namespace details {
       //! static for loop
       template <size_t N>
@@ -55,8 +54,7 @@ namespace akantu {
         }
       };
 
-      /* ----------------------------------------------------------------------
-       */
+      /* -------------------------------------------------------------------- */
       //! static comparison
       template <>
       struct Foreach<0> {
@@ -92,8 +90,7 @@ namespace akantu {
       }
     };  // namespace details
 
-    /* ------------------------------------------------------------------------
-     */
+    /* ---------------------------------------------------------------------- */
     //! detail
     template <class Tuple>
     bool are_not_equal(Tuple && a, Tuple && b) {
@@ -120,8 +117,7 @@ namespace akantu {
     }
   }  // namespace tuple
 
-  /* --------------------------------------------------------------------------
-   */
+  /* ------------------------------------------------------------------------ */
   namespace iterators {
     //! iterator for emulation of python zip
     template <class... Iterators>
@@ -161,8 +157,7 @@ namespace akantu {
     };
   }  // namespace iterators
 
-  /* --------------------------------------------------------------------------
-   */
+  /* ----------------------------------------------------------------------- */
   //! emulates python zip()
   template <class... Iterators>
   decltype(auto) zip_iterator(std::tuple<Iterators...> && iterators_tuple) {
@@ -171,8 +166,7 @@ namespace akantu {
     return zip;
   }
 
-  /* --------------------------------------------------------------------------
-   */
+  /* ----------------------------------------------------------------------- */
   namespace containers {
     //! helper for the emulation of python zip
     template <class... Containers>
@@ -217,8 +211,7 @@ namespace akantu {
     };
   }  // namespace containers
 
-  /* --------------------------------------------------------------------------
-   */
+  /* ------------------------------------------------------------------------ */
   /**
    * emulates python's zip()
    */
@@ -228,11 +221,9 @@ namespace akantu {
         std::forward<Containers>(conts)...);
   }
 
-  /* --------------------------------------------------------------------------
-   */
+  /* ------------------------------------------------------------------------ */
   /* Arange */
-  /* --------------------------------------------------------------------------
-   */
+  /* ------------------------------------------------------------------------ */
   namespace iterators {
     /**
      * emulates python's range iterator
@@ -348,8 +339,7 @@ namespace akantu {
         start, stop, step);
   }
 
-  /* --------------------------------------------------------------------------
-   */
+  /* ------------------------------------------------------------------------ */
 
   /**
    * emulates python's enumerate
@@ -360,6 +350,32 @@ namespace akantu {
     auto stop = std::forward<Container>(container).size();
     decltype(stop) start = start_;
     return zip(arange(start, stop), std::forward<Container>(container));
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /**
+   * emulates python's enumerate(zip())
+   */
+  template <class Container, class... Containers>
+  decltype(auto) enum_zip(Container && cont0, Containers &&... conts,
+                          size_t start_ = 0) {
+    auto && stop{std::forward<Container>(cont0).size()};
+    decltype(stop) start = start_;
+    return zip(arange(start, stop), std::forward<Container>(cont0),
+               std::forward<Containers>(conts)...);
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /**
+   * emulates python's enumerate(zip())
+   */
+  template <class Container0, class Container1>
+  decltype(auto) enum_zip(Container0 && cont0, Container1 && cont1,
+                          size_t start_ = 0) {
+    auto stop{std::forward<Container0>(cont0).size()};
+    decltype(stop) start = start_;
+    return zip(arange(start, stop), std::forward<Container0>(cont0),
+               std::forward<Container1>(cont1));
   }
 
 }  // namespace akantu

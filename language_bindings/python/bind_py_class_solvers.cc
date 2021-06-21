@@ -66,6 +66,17 @@ using SolverTRNewtonCG = muSpectre::SolverTrustRegionNewtonCG;
 using SolverFEMTRNewtonCG = muSpectre::SolverFEMTrustRegionNewtonCG;
 using SolverFEMTRNewtonPCG = muSpectre::SolverFEMTrustRegionNewtonPCG;
 using muSpectre::SolverSinglePhysics;
+using muSpectre::MeanControl;
+
+/**
+ * Solvers instanciated for cells with equal spatial and material dimension
+ */
+void add_enum_mean_control(py::module & mod) {
+  py::enum_<MeanControl>(mod, "MeanControl")
+      .value("strain_control", MeanControl::StrainControl)
+      .value("stress_control", MeanControl::StressControl)
+      .value("mixed_control", MeanControl::MixedControl);
+}
 
 class PySolverBase : public SolverBase {
  public:
@@ -186,15 +197,17 @@ void add_spectral_newton_cg_solver(py::module & mod) {
       .def(py::init<std::shared_ptr<CellData>,
                     std::shared_ptr<muSpectre::KrylovSolverBase>,
                     const Verbosity &, const Real &, const Real &, const Uint &,
-                    const Gradient_t &>(),
+                    const Gradient_t &, const MeanControl &>(),
            "cell_data"_a, "krylov_solver"_a, "verbosity"_a, "newton_tol"_a,
-           "equil_tol"_a, "max_iter"_a, "gradient"_a)
+           "equil_tol"_a, "max_iter"_a, "gradient"_a,
+           "mean_control"_a = MeanControl::StrainControl)
       .def(py::init<std::shared_ptr<CellData>,
                     std::shared_ptr<muSpectre::KrylovSolverBase>,
-                    const Verbosity &, const Real &, const Real &,
-                    const Uint &>(),
+                    const Verbosity &, const Real &, const Real &, const Uint &,
+                    const MeanControl &>(),
            "cell_data"_a, "krylov_solver"_a, "verbosity"_a, "newton_tol"_a,
-           "equil_tol"_a, "max_iter"_a)
+           "equil_tol"_a, "max_iter"_a,
+           "mean_control"_a = MeanControl::StrainControl)
 
       .def_property_readonly("projection", &SolverNewtonCG::get_projection)
       .def_property_readonly("flux", &SolverNewtonCG::get_flux)
@@ -211,16 +224,18 @@ void add_spectral_trust_region_newton_cg_solver(py::module & mod) {
       .def(py::init<std::shared_ptr<CellData>,
                     std::shared_ptr<muSpectre::KrylovSolverTrustRegionCG>,
                     const Verbosity &, const Real &, const Real &, const Uint &,
-                    const Real &, const Real &>(),
+                    const Real &, const Real &, const MeanControl &>(),
            "cell_data"_a, "krylov_solver"_a, "verbosity"_a, "newton_tol"_a,
-           "equil_tol"_a, "max_iter"_a, "trust_region_max"_a, "eta"_a)
+           "equil_tol"_a, "max_iter"_a, "trust_region_max"_a, "eta"_a,
+           "mean_control"_a = MeanControl::StrainControl)
       .def(py::init<std::shared_ptr<CellData>,
                     std::shared_ptr<muSpectre::KrylovSolverTrustRegionCG>,
                     const Verbosity &, const Real &, const Real &, const Uint &,
-                    const Real &, const Real &, const Gradient_t &>(),
+                    const Real &, const Real &, const Gradient_t &,
+                    const MeanControl &>(),
            "cell_data"_a, "krylov_solver"_a, "verbosity"_a, "newton_tol"_a,
            "equil_tol"_a, "max_iter"_a, "trust_region_max"_a, "eta"_a,
-           "gradient"_a)
+           "gradient"_a, "mean_control"_a = MeanControl::StrainControl)
       .def_property_readonly("nb_dof", &SolverTRNewtonCG::get_nb_dof)
       .def_property_readonly("projection", &SolverTRNewtonCG::get_projection);
 }
@@ -300,6 +315,7 @@ void add_fem_trust_region_newton_cg_solver(py::module & mod) {
 }
 
 void add_class_solvers(py::module & mod) {
+  add_enum_mean_control(mod);
   add_solver_base(mod);
   add_single_physics_solver(mod);
   add_spectral_newton_cg_solver(mod);

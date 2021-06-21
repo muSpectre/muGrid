@@ -59,13 +59,15 @@ namespace muSpectre {
     ProjectionFiniteStrain() = delete;
 
     //! Constructor with fft_engine and stencil
-    ProjectionFiniteStrain(muFFT::FFTEngine_ptr engine,
-                           const DynRcoord_t & lengths,
-                           const Gradient_t & gradient);
+    ProjectionFiniteStrain(
+        muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths,
+        const Gradient_t & gradient,
+        const MeanControl & mean_control = MeanControl::StrainControl);
 
     //! Constructor with fft_engine and default (Fourier) gradient
-    ProjectionFiniteStrain(muFFT::FFTEngine_ptr engine,
-                           const DynRcoord_t & lengths);
+    ProjectionFiniteStrain(
+        muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths,
+        const MeanControl & mean_control = MeanControl::StrainControl);
 
     //! Copy constructor
     ProjectionFiniteStrain(const ProjectionFiniteStrain & other) = delete;

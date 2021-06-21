@@ -44,13 +44,14 @@ namespace muSpectre {
   template <Index_t DimS, Index_t GradientRank, Index_t NbQuadPts>
   ProjectionGradient<DimS, GradientRank, NbQuadPts>::ProjectionGradient(
       muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths,
-      const Gradient_t & gradient)
+      const Gradient_t & gradient, const MeanControl & mean_control)
       : Parent{std::move(engine),
                lengths,
                static_cast<Index_t>(gradient.size()) / lengths.get_dim(),
                muGrid::ipow(DimS, GradientRank),
                gradient,
-               Formulation::finite_strain},
+               Formulation::finite_strain,
+               mean_control},
         proj_field{"Projection Operator",
                    this->fft_engine->get_fourier_field_collection(), PixelTag},
         int_field{"Integration Operator",
@@ -74,9 +75,11 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Index_t DimS, Index_t GradientRank, Index_t NbQuadPts>
   ProjectionGradient<DimS, GradientRank, NbQuadPts>::ProjectionGradient(
-      muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths)
+      muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths,
+      const MeanControl & mean_control)
       : ProjectionGradient{std::move(engine), lengths,
-                           muFFT::make_fourier_gradient(lengths.get_dim())} {
+                           muFFT::make_fourier_gradient(lengths.get_dim()),
+                           mean_control} {
     if (NbQuadPts != OneQuadPt) {
       throw ProjectionError(
           "Default constructor uses Fourier gradient "
@@ -104,8 +107,8 @@ namespace muSpectre {
                          .template get_dimensioned_pixels<DimS>(),
                      this->proj_field.get_map(), this->int_field.get_map())) {
       const auto & ccoord = std::get<0>(tup);
-      auto & projop = std::get<1>(tup);
-      auto & intop = std::get<2>(tup);
+      auto & proj_op = std::get<1>(tup);
+      auto & int_op = std::get<2>(tup);
 
       // compute phase (without the factor of 2 pi)
       const Vector_t phase{
@@ -115,24 +118,41 @@ namespace muSpectre {
       for (Index_t quad = 0; quad < NbQuadPts; ++quad) {
         for (Index_t dim = 0; dim < DimS; ++dim) {
           Index_t i = quad * DimS + dim;
-          projop[i] = this->gradient[i]->fourier(phase) / grid_spacing[dim];
+          // ξ(i)
+          proj_op[i] = this->gradient[i]->fourier(phase) / grid_spacing[dim];
         }
       }
 
-      intop = projop.conjugate();
-      auto n{projop.squaredNorm()};
+      int_op = proj_op.conjugate();
+      auto n{proj_op.squaredNorm()};
       if (n > 0) {
-        projop /= sqrt(n);
-        intop /= n;
+        proj_op /= sqrt(n);
+        int_op /= n;
       }
     }
 
-    if (this->fft_engine->has_grid_pts()) {
-      // locations are also zero if the engine is not active
-      if (this->get_subdomain_locations() == Ccoord{}) {
-        this->proj_field.get_map()[0].setZero();
-        this->int_field.get_map()[0].setZero();
-      }
+    if (this->fft_engine->has_grid_pts() and
+        (this->get_subdomain_locations() == Ccoord{})) {
+      this->proj_field.get_map()[0].setZero();
+      this->int_field.get_map()[0].setZero();
+    }
+
+    switch (this->mean_control) {
+    case MeanControl::StrainControl: {
+      this->zero_freq_proj_holder->setZero();
+      break;
+    }
+    case MeanControl::StressControl: {
+      this->zero_freq_proj_holder->setIdentity();
+      break;
+    }
+    case MeanControl::MixedControl: {
+      muGrid::RuntimeError("Mixed control projection is not implemented yet");
+      break;
+    }
+    default:
+      throw muGrid::RuntimeError("Unknown value for mean_control value");
+      break;
     }
   }
 
@@ -141,15 +161,60 @@ namespace muSpectre {
   void ProjectionGradient<DimS, GradientRank, NbQuadPts>::apply_projection(
       Field_t & field) {
     if (!this->initialised) {
+      throw ProjectionError("Applying a projection without having initialised"
+                            "the projector is not supported.");
+    }
+    // Storage order of gradient fields: We want to be able to iterate over a
+    // gradient field using either QuadPts or Pixels iterators. A quadrature
+    // point iterator returns a dim x dim matrix. A pixels iterator must
+
+    // a dim x dim * nb_quad matrix, since every-thing is column major this
+    // matrix is just two dim x dim matrices that are stored consecutive in
+    // memory. This means the components of the displacement field, not the
+    // gradient direction, must be stored consecutive in memory and are the
+    // first index.
+    this->fft_engine->fft(field, this->work_space);
+    Grad_map field_map{this->work_space};
+    Real factor = this->fft_engine->normalisation();
+
+    // Eigen::Matrix<Complex, DimS * GradientRank, DimS * NbQuadPts>
+    //     zero_freq_projected{
+    //         Eigen::Matrix<Real, DimS * GradientRank, DimS *
+    //         NbQuadPts>::Zero()};
+
+    // Eigen::Matrix<Complex, 1, DimS * NbQuadPts> zero_freq_projected{
+    //     Eigen::Matrix<Complex, 1, DimS * NbQuadPts>::Zero()};
+
+    Eigen::MatrixXcd zero_freq_projected(field_map[0].rows(),
+    field_map[0].cols());
+
+    if (this->get_subdomain_locations() == Ccoord{}) {
+      zero_freq_projected =
+          factor * (field_map[0] * this->zero_freq_proj).eval();
+    }
+    for (auto && tup : akantu::zip(this->proj_field.get_map(), field_map)) {
+      auto & proj_op{std::get<0>(tup)};
+      auto & f{std::get<1>(tup)};
+      f = factor * ((f * proj_op.conjugate()).eval() * proj_op.transpose());
+    }
+    field_map[0] = zero_freq_projected;
+    this->fft_engine->ifft(this->work_space, field);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Index_t DimS, Index_t GradientRank, Index_t NbQuadPts>
+  void ProjectionGradient<DimS, GradientRank, NbQuadPts>::
+      apply_projection_mean_strain_control(Field_t & field) {
+    if (!this->initialised) {
       throw ProjectionError("Applying a projection without having initialised "
                             "the projector is not supported.");
     }
     // Storage order of gradient fields: We want to be able to iterate over a
     // gradient field using either QuadPts or Pixels iterators. A quadrature
-    // point iterator returns a dim x dim matrix. A pixels iterator must return
-    // a dim x dim * nb_quad matrix, since every-thing is column major this
-    // matrix is just two dim x dim matrices that are stored consecutive in
-    // memory. This means the components of the displacement field, not the
+    // point iterator returns a dim x dim matrix. A pixels iterator must
+    // return a dim x dim * nb_quad matrix, since every-thing is column major
+    // this matrix is just two dim x dim matrices that are stored consecutive
+    // in memory. This means the components of the displacement field, not the
     // gradient direction, must be stored consecutive in memory and are the
     // first index.
     this->fft_engine->fft(field, this->work_space);
@@ -163,6 +228,42 @@ namespace muSpectre {
     this->fft_engine->ifft(this->work_space, field);
   }
 
+  /* ---------------------------------------------------------------------- */
+  template <Index_t DimS, Index_t GradientRank, Index_t NbQuadPts>
+  void ProjectionGradient<DimS, GradientRank, NbQuadPts>::
+      apply_projection_mean_stress_control(Field_t & field) {
+    if (!this->initialised) {
+      throw ProjectionError("Applying a projection without having initialised "
+                            "the projector is not supported.");
+    }
+    // Storage order of gradient fields: We want to be able to iterate over a
+    // gradient field using either QuadPts or Pixels iterators. A quadrature
+    // point iterator returns a dim x dim matrix. A pixels iterator must
+    // return a dim x dim * nb_quad matrix, since every-thing is column major
+    // this matrix is just two dim x dim matrices that are stored consecutive
+    // in memory. This means the components of the displacement field, not the
+    // gradient direction, must be stored consecutive in memory and are the
+    // first index.
+    this->fft_engine->fft(field, this->work_space);
+    Grad_map field_map{this->work_space};
+    Real factor = this->fft_engine->normalisation();
+    for (auto && itup :
+         akantu::enum_zip(this->proj_field.get_map(), field_map)) {
+      auto & index{std::get<0>(itup)};
+      auto & proj_op{std::get<1>(itup)};
+      auto & f{std::get<2>(itup)};
+      // Ghat (Project operator) is set to either 0ᵢⱼₖₗ or δᵢₖδⱼₗ (Ghat^*)
+      // based on that either mean strain value or mean stress value is
+      // imposed on the cell The formulation is Based on: An algorithm for
+      // stress and mixed control in Galerkin-based FFT homogenization, by
+      // Lucarini, and Segurado DOI: 10.1002/nme.6069
+      f = index == 0
+              ? factor * f
+              : (factor * (f * proj_op.conjugate() * proj_op.transpose()))
+                    .eval();
+    }
+    this->fft_engine->ifft(this->work_space, field);
+  }
   /* ---------------------------------------------------------------------- */
   template <Index_t DimS, Index_t GradientRank, Index_t NbQuadPts>
   auto
@@ -202,10 +303,10 @@ namespace muSpectre {
     // apply integrator
     for (auto && tup : akantu::zip(this->int_field.get_map(), grad_map,
                                    fourier_potential_map)) {
-      auto & intop{std::get<0>(tup)};
+      auto & int_op{std::get<0>(tup)};
       auto & g{std::get<1>(tup)};
       auto & p{std::get<2>(tup)};
-      p = factor * (g * intop).eval();
+      p = factor * (g * int_op).eval();
     }
     auto & potential{this->fft_engine->fetch_or_register_real_space_field(
         "Node potential (in real space)", NbPrimitiveRow * NbPrimitiveCol)};

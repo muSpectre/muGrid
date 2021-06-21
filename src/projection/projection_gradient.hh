@@ -116,6 +116,9 @@ namespace muSpectre {
     using Grad_map =
         internal::GradientMapProvider_t<DimS, GradientRank, NbQuadPts>;
 
+    using SingleProj_t =
+        Eigen::Matrix<Complex, DimS * NbQuadPts, DimS * NbQuadPts>;
+
     constexpr static Index_t NbGradRow{
         internal::GradientMapProvider<DimS, GradientRank, NbQuadPts>::NbRow()};
     constexpr static Index_t NbGradCol{
@@ -131,12 +134,15 @@ namespace muSpectre {
     ProjectionGradient() = delete;
 
     //! Constructor with FFT engine
-    ProjectionGradient(muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths,
-                       const Gradient_t & gradient);
+    ProjectionGradient(
+        muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths,
+        const Gradient_t & gradient,
+        const MeanControl & mean_control = MeanControl::StrainControl);
 
     //! Constructor with FFT engine and default (Fourier) gradient
-    ProjectionGradient(muFFT::FFTEngine_ptr engine,
-                       const DynRcoord_t & lengths);
+    ProjectionGradient(
+        muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths,
+        const MeanControl & mean_control = MeanControl::StrainControl);
 
     //! Copy constructor
     ProjectionGradient(const ProjectionGradient & other) = delete;
@@ -156,8 +162,19 @@ namespace muSpectre {
     //! initialises the fft engine (plan the transform)
     void initialise() final;
 
-    //! apply the projection operator to a field
+    //! apply the projection operator to a field in the case of determined
+    //! macroscopic average strain applied on the RVE
     void apply_projection(Field_t & field) final;
+
+    //! apply the projection operator to a field in the case of determined
+    //! macroscopic average stress applied on the RVE
+    //! according to "An algorithm for stress and mixed control in
+    //! Galerkin-based FFT homogenization" by: S.Lucarini, J. Segurado
+    //! doi: 10.1002/nme.6069
+    void apply_projection_mean_strain_control(Field_t & field) final;
+
+    //! apply the projection operator to a field
+    void apply_projection_mean_stress_control(Field_t & field) final;
 
     //! compute the positions of the nodes of the pixels
     Field_t & integrate(Field_t & strain) final;
@@ -192,6 +209,10 @@ namespace muSpectre {
     muGrid::MappedT1Field<Complex, Mapping::Mut, DimS * NbQuadPts,
                           IterUnit::SubPt>
         int_field;
+
+    std::unique_ptr<SingleProj_t> zero_freq_proj_holder{
+        std::make_unique<SingleProj_t>(SingleProj_t::Zero())};
+    SingleProj_t zero_freq_proj{*zero_freq_proj_holder};
   };
 
 }  // namespace muSpectre

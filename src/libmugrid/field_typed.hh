@@ -73,11 +73,7 @@ namespace muGrid {
     TypedFieldBase(const std::string & unique_name,
                    FieldCollection & collection, Index_t nb_components,
                    const std::string & sub_division, const Unit & unit)
-        : Parent{unique_name,
-                 collection,
-                 nb_components,
-                 sub_division,
-                 unit} {}
+        : Parent{unique_name, collection, nb_components, sub_division, unit} {}
 
     /**
      * `Field`s are supposed to only exist in the form of `std::unique_ptr`s
@@ -93,10 +89,7 @@ namespace muGrid {
                    FieldCollection & collection,
                    const Shape_t & components_shape,
                    const std::string & sub_division, const Unit & unit)
-        : Parent{unique_name,
-                 collection,
-                 components_shape,
-                 sub_division,
+        : Parent{unique_name, collection, components_shape, sub_division,
                  unit} {}
 
    public:
@@ -174,7 +167,6 @@ namespace muGrid {
     //! return a const vector map onto the underlying data
     Eigen_cmap eigen_mat() const;
 
-
     //! return a vector map onto the underlying data
     EigenVec_map eigen_vec();
     //! return a const vector map onto the underlying data
@@ -232,8 +224,7 @@ namespace muGrid {
      * @param nb_rows optional specification of the number of rows for the
      * iterate. If left to default value, a column vector is used
      */
-    FieldMap<T, Mapping::Mut>
-    get_sub_pt_map(const Index_t & nb_rows = Unknown);
+    FieldMap<T, Mapping::Mut> get_sub_pt_map(const Index_t & nb_rows = Unknown);
 
     /**
      * convenience function returns a const  map of this field, iterable per
@@ -301,10 +292,9 @@ namespace muGrid {
      * @param collection reference to the holding field collection.
      */
     TypedField(const std::string & unique_name, FieldCollection & collection,
-               const Index_t & nb_components,
-               const std::string & sub_division, const Unit & unit)
-        : Parent{unique_name, collection, nb_components, sub_division,
-                 unit} {}
+               const Index_t & nb_components, const std::string & sub_division,
+               const Unit & unit)
+        : Parent{unique_name, collection, nb_components, sub_division, unit} {}
 
     /**
      * `Field`s are supposed to only exist in the form of `std::unique_ptr`s
@@ -372,8 +362,7 @@ namespace muGrid {
      * cast a reference to a base type to this type safely, plus check whether
      * it has the right number of components
      */
-    static TypedField & safe_cast(Field & other,
-                                  const Index_t & nb_components,
+    static TypedField & safe_cast(Field & other, const Index_t & nb_components,
                                   const std::string & sub_division);
 
     /**
@@ -409,6 +398,11 @@ namespace muGrid {
      */
     TypedField & clone(const std::string & new_name,
                        const bool & allow_overwrite = false) const;
+
+    /**
+     * return the values of the field
+     */
+    std::vector<T> & get_values() { return this->values; }
 
     //! give access to collections
     friend FieldCollection;
@@ -494,20 +488,21 @@ namespace muGrid {
     /**
      * Emulation of a const constructor
      */
-    static std::unique_ptr<const WrappedField> make_const(
-        const std::string & unique_name, FieldCollection & collection,
-        const Index_t & nb_components,
-        const Eigen::Ref<const EigenRep_t> values,
-        const std::string & sub_division, const Unit & unit = Unit::unitless(),
-        const Shape_t & strides = {});
+    static std::unique_ptr<const WrappedField>
+    make_const(const std::string & unique_name, FieldCollection & collection,
+               const Index_t & nb_components,
+               const Eigen::Ref<const EigenRep_t> values,
+               const std::string & sub_division,
+               const Unit & unit = Unit::unitless(),
+               const Shape_t & strides = {});
 
     void set_zero() final;
     void set_pad_size(const size_t & pad_size) final;
 
     size_t get_buffer_size() const final;
 
-    Shape_t get_strides(
-        const IterUnit & iter_type, Index_t element_size = 1) const final;
+    Shape_t get_strides(const IterUnit & iter_type,
+                        Index_t element_size = 1) const final;
 
     StorageOrder get_storage_order() const final;
 

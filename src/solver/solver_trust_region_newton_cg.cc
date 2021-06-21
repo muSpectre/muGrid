@@ -49,13 +49,14 @@ namespace muSpectre {
       const muGrid::Verbosity & verbosity, const Real & newton_tol,
       const Real & equil_tol, const Uint & max_iter,
       const Real & max_trust_radius, const Real & eta,
-      const Gradient_t & gradient)
+      const Gradient_t & gradient, const MeanControl & mean_control)
       : Parent{cell_data, verbosity}, krylov_solver{krylov_solver},
         newton_tol{newton_tol}, equil_tol{equil_tol}, max_iter{max_iter},
         max_trust_radius{max_trust_radius}, eta{eta},
         gradient{std::make_shared<Gradient_t>(gradient)},
         nb_quad_pts{static_cast<Index_t>(gradient.size()) /
-                    (this->cell_data->get_domain_lengths().get_dim())} {}
+                    (this->cell_data->get_domain_lengths().get_dim())},
+        mean_control{mean_control} {}
 
   /* ---------------------------------------------------------------------- */
   SolverTrustRegionNewtonCG::SolverTrustRegionNewtonCG(
@@ -63,13 +64,14 @@ namespace muSpectre {
       std::shared_ptr<KrylovSolverTrustRegionCG> krylov_solver,
       const muGrid::Verbosity & verbosity, const Real & newton_tol,
       const Real & equil_tol, const Uint & max_iter,
-      const Real & max_trust_radius, const Real & eta)
+      const Real & max_trust_radius, const Real & eta,
+      const MeanControl & mean_control)
       : Parent{cell_data, verbosity}, krylov_solver{krylov_solver},
         newton_tol{newton_tol}, equil_tol{equil_tol}, max_iter{max_iter},
         max_trust_radius{max_trust_radius}, eta{eta},
         gradient{std::make_shared<Gradient_t>(
-            muFFT::make_fourier_gradient(this->cell_data->get_spatial_dim()))} {
-  }
+            muFFT::make_fourier_gradient(this->cell_data->get_spatial_dim()))},
+        mean_control{mean_control} {}
 
   /* ---------------------------------------------------------------------- */
   void SolverTrustRegionNewtonCG::initialise_cell() {
@@ -343,6 +345,13 @@ namespace muSpectre {
     flux_copy_vec = flux.get_field().eigen_vec();
 
     *this->rhs = -flux.get_field();
+
+    // Here we also need to subtract the mean stress value if the control
+    // is on the mean value of stress
+    if (this->mean_control == MeanControl::StressControl) {
+      this->rhs->get_map() -= macro_load - this->previous_macro_load;
+    }
+
     this->projection->apply_projection(this->rhs->get_field());
 
     rhs_norm =
@@ -490,6 +499,13 @@ namespace muSpectre {
 
         // Updating the RHS for feeding to CG
         *this->rhs = -flux_loop.get_field();
+
+        // Here we need to subtract the mean stress if the control is on the
+        // mean stress
+        if (this->mean_control == MeanControl::StressControl) {
+          this->rhs->get_map() -= macro_load - this->previous_macro_load;
+        }
+
         this->projection->apply_projection(this->rhs->get_field());
 
         rhs_norm = std::sqrt(
@@ -628,25 +644,25 @@ namespace muSpectre {
       case OneQuadPt: {
         using Projection = ProjectionFiniteStrainFast<Dim, OneQuadPt>;
         this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient);
+            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
         break;
       }
       case TwoQuadPts: {
         using Projection = ProjectionFiniteStrainFast<Dim, TwoQuadPts>;
         this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient);
+            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
         break;
       }
       case FourQuadPts: {
         using Projection = ProjectionFiniteStrainFast<Dim, FourQuadPts>;
         this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient);
+            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
         break;
       }
       case SixQuadPts: {
         using Projection = ProjectionFiniteStrainFast<Dim, SixQuadPts>;
         this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient);
+            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
         break;
       }
       default: {
@@ -664,25 +680,25 @@ namespace muSpectre {
       case OneQuadPt: {
         using Projection = ProjectionSmallStrain<Dim, OneQuadPt>;
         this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient);
+            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
         break;
       }
       case TwoQuadPts: {
         using Projection = ProjectionSmallStrain<Dim, TwoQuadPts>;
         this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient);
+            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
         break;
       }
       case FourQuadPts: {
         using Projection = ProjectionSmallStrain<Dim, FourQuadPts>;
         this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient);
+            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
         break;
       }
       case SixQuadPts: {
         using Projection = ProjectionSmallStrain<Dim, SixQuadPts>;
         this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient);
+            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
         break;
       }
       default:
@@ -726,14 +742,23 @@ namespace muSpectre {
   void SolverTrustRegionNewtonCG::create_gradient_projection() {
     switch (this->cell_data->get_spatial_dim()) {
     case twoD: {
-      // fall_through
+      this->projection = std::make_shared<ProjectionGradient<twoD, firstOrder>>(
+          this->cell_data->get_FFT_engine(),
+          this->cell_data->get_domain_lengths(), this->mean_control);
+      break;
     }
     case threeD: {
-      // fall_through
+      this->projection =
+          std::make_shared<ProjectionGradient<threeD, firstOrder>>(
+              this->cell_data->get_FFT_engine(),
+              this->cell_data->get_domain_lengths(), this->mean_control);
+      break;
     }
     default:
       std::stringstream error_message{};
-      error_message << "generic gradient projection is not implemented yet";
+      error_message << "generic gradient projection is not implemented for "
+                    << this->cell_data->get_spatial_dim()
+                    << "-dimensional problems.";
       throw SolverError{error_message.str()};
       break;
     }

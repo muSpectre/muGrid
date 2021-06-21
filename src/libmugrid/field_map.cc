@@ -45,8 +45,7 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T, Mapping Mutability>
-  FieldMap<T, Mutability>::FieldMap(
-      Field_t & field, const IterUnit & iter_type)
+  FieldMap<T, Mutability>::FieldMap(Field_t & field, const IterUnit & iter_type)
       : field{field}, iteration{iter_type}, stride{this->field.get_stride(
                                                 iter_type)},
         nb_rows{this->field.get_default_nb_rows(iter_type)},
@@ -201,8 +200,7 @@ namespace muGrid {
       throw FieldMapError("Cannot enumerate pixels unless the iteration mode "
                           "of this map is Iteration::Pixels.");
     }
-    return akantu::zip(this->field.get_collection().get_pixel_indices(),
-                       *this);
+    return akantu::zip(this->field.get_collection().get_pixel_indices(), *this);
   }
 
   /* ---------------------------------------------------------------------- */

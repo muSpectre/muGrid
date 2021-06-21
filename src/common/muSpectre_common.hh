@@ -158,6 +158,14 @@ namespace muSpectre {
   };
 
   /**
+   * The Enum class determining the boundary condition
+   */
+  enum class MeanControl {
+    StrainControl,  //!< strain boundary condition
+    StressControl,  //!< stress boundary condition
+    MixedControl    //!< mixed stress/strain boundary condition
+  };
+  /**
    * compile time computation of voigt vector
    */
   template <bool sym = true>

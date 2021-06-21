@@ -93,12 +93,11 @@ namespace muSpectre {
     ProjectionBase() = delete;
 
     //! Constructor with cell sizes
-    ProjectionBase(muFFT::FFTEngine_ptr engine,
-                   const DynRcoord_t & domain_lengths,
-                   const Index_t & nb_quad_pts,
-                   const Index_t & nb_components,
-                   const Gradient_t & gradient,
-                   const Formulation & form);
+    ProjectionBase(
+        muFFT::FFTEngine_ptr engine, const DynRcoord_t & domain_lengths,
+        const Index_t & nb_quad_pts, const Index_t & nb_components,
+        const Gradient_t & gradient, const Formulation & form,
+        const MeanControl & mean_control = MeanControl::StrainControl);
 
     //! Copy constructor
     ProjectionBase(const ProjectionBase & other) = delete;
@@ -120,6 +119,14 @@ namespace muSpectre {
 
     //! apply the projection operator to a field
     virtual void apply_projection(Field_t & field) = 0;
+
+    //! apply the projection operator to a field in the case of determined
+    //! macroscopic average strain applied on the RVE
+    virtual void apply_projection_mean_strain_control(Field_t & field) = 0;
+
+    //! apply the projection operator to a field in the case of determined
+    //! macroscopic average stress applied on the RVE
+    virtual void apply_projection_mean_stress_control(Field_t & field) = 0;
 
     //! compute the positions of the nodes of the pixels
     virtual Field_t & integrate(Field_t & strain) {
@@ -209,7 +216,7 @@ namespace muSpectre {
     DynRcoord_t domain_lengths;  //!< physical sizes of the cell
     Index_t nb_quad_pts;
     Index_t nb_components;
-     /**
+    /**
      * gradient (nabla) operator, can be computed using Fourier interpolation
      * or through a weighted residual
      */
@@ -231,6 +238,8 @@ namespace muSpectre {
     muGrid::TypedFieldBase<Complex> & work_space;
 
     bool initialised{false};  //! has the projection been initialised?
+
+    MeanControl mean_control;
   };
 
 }  // namespace muSpectre

@@ -151,6 +151,14 @@ namespace muGrid {
       return *this;
     }
 
+    //! Subtraction-assign a matrix-like value with dynamic size to every entry
+    template <bool IsMutableField = Mutability == Mapping::Mut>
+    std::enable_if_t<IsMutableField, StaticFieldMap> &
+    operator-=(const typename Parent::EigenRef & val) {
+      dynamic_cast<Parent &>(*this) -= val;
+      return *this;
+    }
+
     //! Assign a matrix-like value with static size to every entry
     template <bool IsMutableField = Mutability == Mapping::Mut>
     std::enable_if_t<IsMutableField && !MapType::IsScalarMapType(),
@@ -173,6 +181,18 @@ namespace muGrid {
       return *this;
     }
 
+
+    //! Subtraction-assign a matrix-like value with static size to every entry
+    template <bool IsMutableField = Mutability == Mapping::Mut>
+    std::enable_if_t<IsMutableField && !MapType::IsScalarMapType(),
+                     StaticFieldMap<T, Mutability, MapType, IterationType>> &
+    operator-=(const reference & val) {
+      for (auto && entry : *this) {
+        entry -= val;
+      }
+      return *this;
+    }
+
     //! Assign a scalar value to every entry
     template <bool IsMutableField = Mutability == Mapping::Mut>
     std::enable_if_t<IsMutableField && MapType::IsScalarMapType(),
@@ -184,13 +204,24 @@ namespace muGrid {
       return *this;
     }
 
-    //! Assign a scalar value to every entry
+    //! add a scalar value to every entry
     template <bool IsMutableField = Mutability == Mapping::Mut>
     std::enable_if_t<IsMutableField && MapType::IsScalarMapType(),
                      StaticFieldMap<T, Mutability, MapType, IterationType>> &
     operator+=(const Scalar & val) {
       for (auto && entry : *this) {
         entry += val;
+      }
+      return *this;
+    }
+
+    //! Subtract a scalar value from every entry
+    template <bool IsMutableField = Mutability == Mapping::Mut>
+    std::enable_if_t<IsMutableField && MapType::IsScalarMapType(),
+                     StaticFieldMap<T, Mutability, MapType, IterationType>> &
+    operator-=(const Scalar & val) {
+      for (auto && entry : *this) {
+        entry -= val;
       }
       return *this;
     }
@@ -444,7 +475,7 @@ namespace muGrid {
         return dim;
         break;
       }
-#if defined(__llvm__) || __GNUC__  > 5
+#if defined(__llvm__) || __GNUC__ > 5
       case 3: {
         throw RuntimeError("can't handle third-rank tensors");
         break;
@@ -456,7 +487,7 @@ namespace muGrid {
       }
       // old gcc fail to compile throw statements in constexpr, but new clang
       // requires all paths of execution to either return or throw
-#if defined(__llvm__) || __GNUC__  > 5
+#if defined(__llvm__) || __GNUC__ > 5
       default: {
         throw RuntimeError("unknown rank");
         break;

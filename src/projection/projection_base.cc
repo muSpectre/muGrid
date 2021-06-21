@@ -45,19 +45,21 @@ namespace muSpectre {
                                  const Index_t & nb_quad_pts,
                                  const Index_t & nb_components,
                                  const Gradient_t & gradient,
-                                 const Formulation & form)
+                                 const Formulation & form,
+                                 const MeanControl & mean_control)
       : fft_engine{std::move(engine)}, domain_lengths{domain_lengths},
-        nb_quad_pts{nb_quad_pts}, nb_components{nb_components},
-        gradient{gradient}, form{form},
+        nb_quad_pts{nb_quad_pts},
+        nb_components{nb_components}, gradient{gradient}, form{form},
         work_space{this->fft_engine->register_fourier_space_field(
-            "work_space", this->nb_components * this->nb_quad_pts)} {
+            "work_space", this->nb_components * this->nb_quad_pts)},
+        mean_control{mean_control} {
     if (nb_quad_pts <= 0) {
       throw std::runtime_error("Number of quadrature points must be larger "
                                "than zero.");
     }
     auto nb_dim{this->get_dim()};
-    for (auto tup : akantu::enumerate(
-        this->fft_engine->get_nb_domain_grid_pts())) {
+    for (auto tup :
+         akantu::enumerate(this->fft_engine->get_nb_domain_grid_pts())) {
       auto & dim{std::get<0>(tup)};
       auto & res{std::get<1>(tup)};
       if (res % 2 == 0) {
@@ -74,7 +76,7 @@ namespace muSpectre {
           // the Fourier derivative). In both cases, the derivative is
           // ambiguous and the calculation cannot continue. The division by res
           // simply adjusts the threshold for what it means to be zero.
-          if (std::abs(p) < 1e-6/res or std::abs(p-m) > 1e-6/res) {
+          if (std::abs(p) < 1e-6 / res or std::abs(p - m) > 1e-6 / res) {
             throw ProjectionError(
                 "Only an odd number of grid points is supported by this "
                 "stencil");
@@ -95,9 +97,7 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  void ProjectionBase::initialise() {
-    this->initialised = true;
-  }
+  void ProjectionBase::initialise() { this->initialised = true; }
 
   /* ---------------------------------------------------------------------- */
   const Index_t & ProjectionBase::get_dim() const {

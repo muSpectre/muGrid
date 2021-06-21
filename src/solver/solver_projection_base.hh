@@ -1,11 +1,11 @@
 /**
- * @file   solver_projection_based.hh
+ * @file   solver_projection_base.hh
  *
  * @author Till Junge <till.junge@altermail.ch>
  *
  * @date   22 Jul 2020
  *
- * @brief  Virtual base class for projection-based solvers
+ * @brief  Virtual base class for projection-base solvers
  *
  * Copyright © 2020 Till Junge
  *
@@ -36,31 +36,31 @@
 
 #include "projection/projection_base.hh"
 
-#ifndef SRC_SOLVER_SOLVER_PROJECTION_BASED_HH_
-#define SRC_SOLVER_SOLVER_PROJECTION_BASED_HH_
+#ifndef SRC_SOLVER_SOLVER_PROJECTION_BASE_HH_
+#define SRC_SOLVER_SOLVER_PROJECTION_BASE_HH_
 
 namespace muSpectre {
 
-  class SolverProjectionBased : virtual public SolverBase {
+  class SolverProjectionBase : virtual public SolverBase {
    public:
     //! Default constructor
-    SolverProjectionBased() = delete;
+    SolverProjectionBase() = delete;
 
     //! Copy constructor
-    SolverProjectionBased(const SolverProjectionBased & other) = delete;
+    SolverProjectionBase(const SolverProjectionBase & other) = delete;
 
     //! Move constructor
-    SolverProjectionBased(SolverProjectionBased && other) = default;
+    SolverProjectionBase(SolverProjectionBase && other) = default;
 
     //! Destructor
-    virtual ~SolverProjectionBased() = default;
+    virtual ~SolverProjectionBase() = default;
 
     //! Copy assignment operator
-    SolverProjectionBased &
-    operator=(const SolverProjectionBased & other) = delete;
+    SolverProjectionBase &
+    operator=(const SolverProjectionBase & other) = delete;
 
     //! Move assignment operator
-    SolverProjectionBased & operator=(SolverProjectionBased && other) = delete;
+    SolverProjectionBase & operator=(SolverProjectionBase && other) = delete;
 
     void apply_projection(muGrid::TypedFieldBase<Real> & rhs);
 
@@ -74,4 +74,4 @@ namespace muSpectre {
 
 }  // namespace muSpectre
 
-#endif  // SRC_SOLVER_SOLVER_PROJECTION_BASED_HH_
+#endif  // SRC_SOLVER_SOLVER_PROJECTION_BASE_HH_

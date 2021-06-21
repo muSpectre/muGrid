@@ -102,14 +102,20 @@ class PyProjectionBase : public ProjectionBaseUnclonable {
 
   PyProjectionBase(const muFFT::FFTEngine_ptr & engine,
                    const DynRcoord_t & domain_lengths,
-                   const Index_t & nb_quad_pts,
-                   const Index_t & nb_components,
-                   const Gradient_t & gradient,
-                   const Formulation & form)
+                   const Index_t & nb_quad_pts, const Index_t & nb_components,
+                   const Gradient_t & gradient, const Formulation & form)
       : ProjectionBaseUnclonable(engine, domain_lengths, nb_quad_pts,
                                  nb_components, gradient, form) {}
 
   void apply_projection(Field_t & field) override {
+    PYBIND11_OVERLOAD_PURE(void, Parent, apply_projection, field);
+  }
+
+  void apply_projection_mean_strain_control(Field_t & field) override {
+    PYBIND11_OVERLOAD_PURE(void, Parent, apply_projection, field);
+  }
+
+  void apply_projection_mean_stress_control(Field_t & field) override {
     PYBIND11_OVERLOAD_PURE(void, Parent, apply_projection, field);
   }
 
@@ -134,9 +140,9 @@ void add_projection_base(py::module & mod) {
       .def(py::init<const muFFT::FFTEngine_ptr &, const DynRcoord_t &,
                     const Index_t &, const Index_t &, const Gradient_t &,
                     const Formulation &>())
-          // apply_projection that takes Fields
+      // apply_projection that takes Fields
       .def("apply_projection", &ProjectionBase::apply_projection)
-          // apply_projection that takes numpy arrays
+      // apply_projection that takes numpy arrays
       .def("apply_projection",
            [](ProjectionBase & proj,
               py::array_t<Real, py::array::f_style> & vector_field) {
@@ -157,10 +163,10 @@ void add_projection_base(py::module & mod) {
              proj.apply_projection(proxy.get_field());
              return proj_vector_field;
            })
-          // integrate that takes Fields
+      // integrate that takes Fields
       .def("integrate", &ProjectionBase::integrate,
            py::return_value_policy::reference_internal)
-          // integrate that takes numpy arrays
+      // integrate that takes numpy arrays
       .def("integrate",
            [](ProjectionBase & proj,
               py::array_t<Real, py::array::f_style> & vector_field) {

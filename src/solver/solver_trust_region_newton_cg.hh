@@ -62,7 +62,8 @@ namespace muSpectre {
         std::shared_ptr<KrylovSolverTrustRegionCG> krylov_solver,
         const muGrid::Verbosity & verbosity, const Real & newton_tol,
         const Real & equil_tol, const Uint & max_iter,
-        const Real & max_trust_radius, const Real & eta);
+        const Real & max_trust_radius, const Real & eta,
+        const MeanControl & mean_control = MeanControl::StrainControl);
 
     //! constructor
     SolverTrustRegionNewtonCG(
@@ -71,7 +72,8 @@ namespace muSpectre {
         const muGrid::Verbosity & verbosity, const Real & newton_tol,
         const Real & equil_tol, const Uint & max_iter,
         const Real & max_trust_radius, const Real & eta,
-        const Gradient_t & gradient);
+        const Gradient_t & gradient,
+        const MeanControl & mean_control = MeanControl::StrainControl);
 
     //! Copy constructor
     SolverTrustRegionNewtonCG(const SolverTrustRegionNewtonCG & other) = delete;
@@ -168,7 +170,12 @@ namespace muSpectre {
 
     //! The gradient operator used in the projection
     std::shared_ptr<Gradient_t> gradient;
+
+    //! number of quadrature points
     Index_t nb_quad_pts{1};
+
+    //! The type of the mean controlled variable on the RVE:
+    MeanControl mean_control;
   };
 
 }  // namespace muSpectre

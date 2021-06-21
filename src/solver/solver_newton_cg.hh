@@ -55,17 +55,21 @@ namespace muSpectre {
     SolverNewtonCG() = delete;
 
     //! constructor
-    SolverNewtonCG(std::shared_ptr<CellData> cell_data,
-                   std::shared_ptr<KrylovSolverBase> krylov_solver,
-                   const muGrid::Verbosity & verbosity, const Real & newton_tol,
-                   const Real & equil_tol, const Uint & max_iter,
-                   const Gradient_t & gradient);
+    SolverNewtonCG(
+        std::shared_ptr<CellData> cell_data,
+        std::shared_ptr<KrylovSolverBase> krylov_solver,
+        const muGrid::Verbosity & verbosity, const Real & newton_tol,
+        const Real & equil_tol, const Uint & max_iter,
+        const Gradient_t & gradient,
+        const MeanControl & mean_control = MeanControl::StrainControl);
 
     //! constructor
-    SolverNewtonCG(std::shared_ptr<CellData> cell_data,
-                   std::shared_ptr<KrylovSolverBase> krylov_solver,
-                   const muGrid::Verbosity & verbosity, const Real & newton_tol,
-                   const Real & equil_tol, const Uint & max_iter);
+    SolverNewtonCG(
+        std::shared_ptr<CellData> cell_data,
+        std::shared_ptr<KrylovSolverBase> krylov_solver,
+        const muGrid::Verbosity & verbosity, const Real & newton_tol,
+        const Real & equil_tol, const Uint & max_iter,
+        const MeanControl & mean_control = MeanControl::StrainControl);
 
     //! Copy constructor
     SolverNewtonCG(const SolverNewtonCG & other) = delete;
@@ -143,6 +147,7 @@ namespace muSpectre {
     template <Dim_t Dim>
     void create_mechanics_projection_worker();
     void create_mechanics_projection();
+
     //! create a generic gradient projection
     void create_gradient_projection();
 
@@ -177,7 +182,12 @@ namespace muSpectre {
 
     //! The gradient operator used in the projection
     std::shared_ptr<Gradient_t> gradient;
+
+    //! number of quadrature points
     Index_t nb_quad_pts{1};
+
+    //! The type of the mean controlled variable on the RVE:
+    MeanControl mean_control;
   };
 }  // namespace muSpectre
 

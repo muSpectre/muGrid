@@ -264,7 +264,7 @@ namespace muGrid {
   template <typename T, Mapping Mutability, Dim_t Rank, Dim_t Dim,
             IterUnit IterationType>
   using MappedTensorField =
-    MappedField<TensorFieldMap<T, Mutability, Rank, Dim, IterationType>>;
+      MappedField<TensorFieldMap<T, Mutability, Rank, Dim, IterationType>>;
 
   /**
    * Alias of `muGrid::MappedField` for a map of second-rank with corresponding

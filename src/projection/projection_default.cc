@@ -41,23 +41,25 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Index_t DimS, Index_t NbQuadPts>
   ProjectionDefault<DimS, NbQuadPts>::ProjectionDefault(
-      muFFT::FFTEngine_ptr engine,
-      const DynRcoord_t & lengths,
-      const Gradient_t & gradient,
-      Formulation form)
-      : Parent{std::move(engine), lengths,
+      muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths,
+      const Gradient_t & gradient, const Formulation & form,
+      const MeanControl & mean_control)
+      : Parent{std::move(engine),
+               lengths,
                static_cast<Index_t>(gradient.size()) / lengths.get_dim(),
-               DimS * DimS, gradient, form},
+               DimS * DimS,
+               gradient,
+               form,
+               mean_control},
         Gfield{this->fft_engine->get_fourier_field_collection()
-                   .register_complex_field(
-                       "Projection Operator",
-                       DimS * DimS * NbQuadPts * DimS * DimS * NbQuadPts,
-                       PixelTag)},
-        Ghat{Gfield},
-        Ifield{this->fft_engine->get_fourier_field_collection()
-                   .register_complex_field(
-                       "Integration Operator",
-                       DimS * DimS * DimS * NbQuadPts, PixelTag)},
+                   .register_complex_field("Projection Operator",
+                                           DimS * DimS * NbQuadPts * DimS *
+                                               DimS * NbQuadPts,
+                                           PixelTag)},
+        Ghat{Gfield}, Ifield{this->fft_engine->get_fourier_field_collection()
+                                 .register_complex_field(
+                                     "Integration Operator",
+                                     DimS * DimS * DimS * NbQuadPts, PixelTag)},
         Ihat{Ifield} {
     if (this->get_dim() != DimS) {
       std::stringstream message{};
@@ -86,6 +88,25 @@ namespace muSpectre {
     Vector_map field_map{this->work_space};
     Real factor = this->fft_engine->normalisation();
     for (auto && tup : akantu::zip(this->Ghat, field_map)) {
+      auto && G{std::get<0>(tup)};
+      auto && f{std::get<1>(tup)};
+      f = factor * (G * f).eval();
+    }
+    this->fft_engine->ifft(this->work_space, field);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Index_t DimS, Index_t NbQuadPts>
+  void ProjectionDefault<DimS, NbQuadPts>::apply_projection_mean_strain_control(
+      Field_t & field) {
+    if (!this->initialised) {
+      throw ProjectionError("Applying a projection without having initialised "
+                            "the projector is not supported.");
+    }
+    this->fft_engine->fft(field, this->work_space);
+    Vector_map field_map{this->work_space};
+    Real factor = this->fft_engine->normalisation();
+    for (auto && tup : akantu::zip(this->Ghat, field_map)) {
       auto & G{std::get<0>(tup)};
       auto & f{std::get<1>(tup)};
       f = factor * (G * f).eval();
@@ -95,18 +116,41 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimS, Index_t NbQuadPts>
+  void ProjectionDefault<DimS, NbQuadPts>::apply_projection_mean_stress_control(
+      Field_t & field) {
+    if (!this->initialised) {
+      throw ProjectionError("Applying a projection without having initialised "
+                            "the projector is not supported.");
+    }
+    this->fft_engine->fft(field, this->work_space);
+    Vector_map field_map{this->work_space};
+    Real factor = this->fft_engine->normalisation();
+
+    for (auto && itup : akantu::enum_zip(this->Ghat, field_map)) {
+      auto && index{std::get<0>(itup)};
+      auto && G{std::get<1>(itup)};
+      auto && f{std::get<2>(itup)};
+      // according to "An algorithm for stress and mixed control in
+      // Galerkin-based FFT homogenization" by: S.Lucarini, J. Segurado
+      // doi: 10.1002/nme.6069
+      f = index == 0 ? f * factor : (factor * (G * f)).eval();
+    }
+    this->fft_engine->ifft(this->work_space, field);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Index_t DimS, Index_t NbQuadPts>
   typename ProjectionDefault<DimS, NbQuadPts>::Field_t &
   ProjectionDefault<DimS, NbQuadPts>::integrate(Field_t & grad) {
     //! iterable form of the integrator
-    using Grad_map =
-      muGrid::MatrixFieldMap<Complex, Mapping::Mut, DimS, DimS * NbQuadPts,
-                             IterUnit::Pixel>;
+    using Grad_map = muGrid::MatrixFieldMap<Complex, Mapping::Mut, DimS,
+                                            DimS * NbQuadPts, IterUnit::Pixel>;
     //! vectorized version of the Fourier-space positions
     using FourierPotential_map =
-      muGrid::T1FieldMap<Complex, Mapping::Mut, DimS, IterUnit::Pixel>;
+        muGrid::T1FieldMap<Complex, Mapping::Mut, DimS, IterUnit::Pixel>;
     //! vectorized version of the real-space positions
     using RealPotential_map =
-      muGrid::T1FieldMap<Real, Mapping::Mut, DimS, IterUnit::Pixel>;
+        muGrid::T1FieldMap<Real, Mapping::Mut, DimS, IterUnit::Pixel>;
 
     if (!this->initialised) {
       throw ProjectionError("Integrating a field without having initialised "
@@ -122,8 +166,10 @@ namespace muSpectre {
     // store average strain
     Grad_map grad_map{this->work_space};
     Real factor = this->fft_engine->normalisation();
-    Eigen::Matrix<Real, DimS, DimS * NbQuadPts> avg_strain{
-        grad_map[0].real()*factor};
+    Eigen::Matrix<Real, DimS, DimS * NbQuadPts> avg_strain{grad_map[0].real() *
+                                                           factor};
+
+    // avg_strain(ξ=0) ← 0
     if (!(this->get_subdomain_locations() == Ccoord{})) {
       avg_strain.setZero();
     }
@@ -132,8 +178,8 @@ namespace muSpectre {
     // apply integrator
     Vector_map vector_map{this->work_space};
     FourierPotential_map fourier_positions_map{potential_work_space};
-    for (auto && tup : akantu::zip(this->Ihat, vector_map,
-                                   fourier_positions_map)) {
+    for (auto && tup :
+         akantu::zip(this->Ihat, vector_map, fourier_positions_map)) {
       auto & I{std::get<0>(tup)};
       auto & g{std::get<1>(tup)};
       auto & p{std::get<2>(tup)};
@@ -145,8 +191,8 @@ namespace muSpectre {
     // add average strain to positions
     RealPotential_map real_positions_map{potential};
     auto grid_spacing{this->domain_lengths / this->get_nb_domain_grid_pts()};
-    for (auto && tup : akantu::zip(this->fft_engine->get_real_pixels(),
-                                   real_positions_map)) {
+    for (auto && tup :
+         akantu::zip(this->fft_engine->get_real_pixels(), real_positions_map)) {
       auto & c{std::get<0>(tup)};
       auto & p{std::get<1>(tup)};
       for (Index_t i{0}; i < DimS; ++i) {

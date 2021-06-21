@@ -148,7 +148,8 @@ solver = msp.solvers.SolverTRNewtonCG(rve, krylov_solver,
                                       msp.Verbosity.Full,
                                       newton_tol, equil_tol,
                                       maxiter, max_trust_region,
-                                      eta, gradient)
+                                      eta, gradient,
+                                      msp.solvers.MeanControl.strain_control)
 
 
 solver.formulation = msp.Formulation.finite_strain
