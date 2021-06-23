@@ -45,6 +45,7 @@ from python_example_imports import muSpectre as msp
 # solvers made simple, Computer Methods in Applied Mechanics and
 # Engineering, Volume 318, 2017
 # https://doi.org/10.1016/j.cma.2016.12.032
+dim = 2
 nb_grid_pts = [51, 51]
 center = np.array([r // 2 for r in nb_grid_pts])
 incl = nb_grid_pts[0] // 5
@@ -69,15 +70,15 @@ soft = msp.material.MaterialLinearElastic1_2d.make(
     cell, "soft", 70e7, .3)
 
 # assign each pixel to exactly one material
-material_geometry =np.ndarray(nb_grid_pts)
+material_geometry = np.ndarray(nb_grid_pts)
 for i, pixel in cell.pixels.enumerate():
 
-    if np.linalg.norm(center - np.array(pixel), 2) < incl:
-        material_geometry[np.array(pixel)[0],np.array(pixel)[1]] =1
+    if np.linalg.norm(center - np.array(pixel), dim) < incl:
+        material_geometry[np.array(pixel)[0], np.array(pixel)[1]] = 1
         soft.add_pixel(i)
 
     else:
-        material_geometry[np.array(pixel)[0],np.array(pixel)[1]] =0
+        material_geometry[np.array(pixel)[0], np.array(pixel)[1]] = 0
         hard.add_pixel(i)
 
 
@@ -100,7 +101,7 @@ maxiter = 500  # for linear cell solver
 # See Reference for explanations
 
 krylov_solver = msp.solvers.KrylovSolverCG(cg_tol, maxiter,
-                                         verbose=msp.Verbosity.Silent)
+                                           verbose=msp.Verbosity.Silent)
 
 
 # Verbosity levels:
@@ -139,7 +140,7 @@ print(result)
 stress = result.stress
 # stress is stored in a flatten stress tensor per pixel, i.e., a
 # dim^2 × prod(nb_grid_pts_i) array, so it needs to be reshaped
-stress = stress.reshape(*nb_grid_pts, 2, 2)
+stress = stress.reshape(dim, dim, *nb_grid_pts)
 
 
 # prevent visual output during ctest
@@ -148,10 +149,13 @@ if len(sys.argv[:]) == 2:
         pass
     else:
         import matplotlib.pyplot as plt
-        CS = plt.pcolormesh(-stress[:, :, 1, 0])
 
         fig = plt.figure()
         plt.pcolormesh(material_geometry)
-        CS = plt.pcolormesh(material_geometry)
+        CS_geometry = plt.pcolormesh(material_geometry)
 
+        for i in range(dim):
+            for j in range(dim):
+                fig = plt.figure()
+                CS_stress = plt.pcolormesh(-stress[i,  j,:, :])
         plt.show()

@@ -1,10 +1,15 @@
 Change log for µSpectre
 =======================
 
-0.19.0 (Not Released yet)
+0.19.1 (Not Released yet)
+-------------------------
+- Fixed a minor array reshape bug in the tutorial_example_new.py that was jeopardizing the output stress plot
+
+
+0.19.0 (16Jun2021)
 -------------------------
 - muSpectre: added material_dunnat_tc (bilinear elastic- linear strain softening with tensile-compressive wiegthed norm as strain measure)
--muSpectre:  added material_dunnat_t (bilinear elastic- linear strain softening with maiximum tensile principal strain as strain measure)
+- muSpectre:  added material_dunnat_t (bilinear elastic- linear strain softening with maiximum tensile principal strain as strain measure)
 
 0.18.2 (10Jun2021)
 -------------------------
