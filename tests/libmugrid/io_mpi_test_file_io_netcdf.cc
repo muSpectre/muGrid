@@ -322,12 +322,14 @@ namespace muGrid {
       muGrid::LocalFieldCollection local_fc_1(spatial_dimension, "local_FC",
                                               nb_sub_pts_local);
       if (comm_2.rank() == 0) {
-        for (size_t index = 2; index < 6; index++) {
-          local_fc_2.add_pixel(index);
+        size_t global_offset = 0;
+        for (size_t global_index = 2; global_index < 6; global_index++) {
+          local_fc_2.add_pixel(global_index - global_offset);
         }
       } else if (comm_2.rank() == 1) {
-        for (size_t index = 6; index < 8; index++) {
-          local_fc_2.add_pixel(index);
+        size_t global_offset = 6;  // local fc with 6 pixels on rank 0
+        for (size_t global_index = 6; global_index < 8; global_index++) {
+          local_fc_2.add_pixel(global_index - global_offset);
         }
       }
       local_fc_2.initialise();

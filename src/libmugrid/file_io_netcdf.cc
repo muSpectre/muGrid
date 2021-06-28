@@ -64,6 +64,12 @@ namespace muGrid {
   void FileIONetCDF::register_field_collection(
       muGrid::FieldCollection & fc, std::vector<std::string> field_names,
       std::vector<std::string> state_field_unique_prefixes) {
+    // check if the field collection is already initialised
+    if (not fc.is_initialised()) {
+      throw muGrid::FileIOError(
+          "A Field collection has to be initialised before you register it. ");
+    }
+
     // By default register all fields of the field collection if field_names is
     // the default, field_names == REGISTER_ALL_FIELDS. An empty vector is
     // preserved to register no fields. This can be usefull if you e.g. only
@@ -702,8 +708,6 @@ namespace muGrid {
       muGrid::T1FieldMap<muGrid::Index_t, Mapping::Mut, Dim,
                          muGrid::IterUnit::Pixel>
           local_pixels_map{local_pixels};
-      Index_t nb_pixels = local_pixels.get_nb_pixels();
-      Index_t global_offset = comm.cumulative_sum(nb_pixels) - nb_pixels;
 
       if (this->open_mode == FileIOBase::OpenMode::Write) {
         const std::vector<Index_t> & pixel_ids_on_proc{
@@ -712,16 +716,16 @@ namespace muGrid {
             pixel_ids_on_proc.size())};  // number of local pixels
         IOSize_t processor_offset_end{comm.cumulative_sum(num)};
         IOSize_t local_offset{processor_offset_end - num};  // offset begin
-        for (auto && local_global : akantu::enumerate(pixel_ids_on_proc)) {
-          auto && local_pixel_id{std::get<0>(local_global)};
-          auto && global_pixel_id{std::get<1>(local_global)};
-          std::uint64_t offset{local_offset + local_pixel_id};
+        for (auto && local_pix : akantu::enumerate(pixel_ids_on_proc)) {
+          auto && local_pixel_number_n{std::get<0>(local_pix)};
+          auto && local_pixel_id{std::get<1>(local_pix)};
+          std::uint64_t offset{local_offset + local_pixel_number_n};
           // netcdf offers only int or long long int but not long int
           muGrid::Index_t offset_lli{static_cast<muGrid::Index_t>(offset)};
           Eigen::Map<
               Eigen::Matrix<muGrid::Index_t, 1, 1>, 0,
               Eigen::Stride<0, 0>> fill_value(&offset_lli);
-          local_pixels_map[global_pixel_id - global_offset] = fill_value;
+          local_pixels_map[local_pixel_id] = fill_value;
         }
       }
     } else {

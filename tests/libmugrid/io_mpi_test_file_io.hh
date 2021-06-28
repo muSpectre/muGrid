@@ -76,12 +76,14 @@ namespace muGrid {
         }
       } else if (this->comm.size() == 2) {
         if (this->comm.rank() == 0) {
-          for (size_t index = 2; index < 6; index++) {
-            this->local_fc.add_pixel(index);
+          size_t global_offset = 0;
+          for (size_t global_index = 2; global_index < 6; global_index++) {
+            this->local_fc.add_pixel(global_index - global_offset);
           }
         } else if (this->comm.rank() == 1) {
-          for (size_t index = 6; index < 7; index++) {
-            this->local_fc.add_pixel(index);
+          size_t global_offset = 6;  // local fc with 6 pixels on rank 0
+          for (size_t global_index = 6; global_index < 7; global_index++) {
+            this->local_fc.add_pixel(global_index - global_offset);
           }
         }
       }

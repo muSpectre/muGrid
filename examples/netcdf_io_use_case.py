@@ -152,7 +152,11 @@ DelF_list = DelF_tot[np.newaxis,:] * steps[:,np.newaxis,np.newaxis]
 # create file io object
 file_name = "netcdf-use-case-{}.nc".format(case)
 if os.path.exists(file_name):
-            os.remove(file_name)
+    if comm.rank == 0:
+        os.remove(file_name)
+# wait for rank 0 to delete the old netcdf file
+MPI.COMM_WORLD.Barrier()
+
 file_io_object = muGrid.FileIONetCDF(
     file_name, muGrid.FileIONetCDF.OpenMode.Write, comm)
 # register global fields of the cell which you want to write
