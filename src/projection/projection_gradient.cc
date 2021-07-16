@@ -176,94 +176,20 @@ namespace muSpectre {
     this->fft_engine->fft(field, this->work_space);
     Grad_map field_map{this->work_space};
     Real factor = this->fft_engine->normalisation();
-
-    // Eigen::Matrix<Complex, DimS * GradientRank, DimS * NbQuadPts>
-    //     zero_freq_projected{
-    //         Eigen::Matrix<Real, DimS * GradientRank, DimS *
-    //         NbQuadPts>::Zero()};
-
-    // Eigen::Matrix<Complex, 1, DimS * NbQuadPts> zero_freq_projected{
-    //     Eigen::Matrix<Complex, 1, DimS * NbQuadPts>::Zero()};
-
-    Eigen::MatrixXcd zero_freq_projected(field_map[0].rows(),
-    field_map[0].cols());
-
+    PixelVec_t zero_freq_projected;
     if (this->get_subdomain_locations() == Ccoord{}) {
       zero_freq_projected =
-          factor * (field_map[0] * this->zero_freq_proj).eval();
+          factor * (this->zero_freq_proj * PixelVec_map(field_map[0].data()));
     }
     for (auto && tup : akantu::zip(this->proj_field.get_map(), field_map)) {
       auto & proj_op{std::get<0>(tup)};
       auto & f{std::get<1>(tup)};
       f = factor * ((f * proj_op.conjugate()).eval() * proj_op.transpose());
     }
-    field_map[0] = zero_freq_projected;
+    PixelVec_map(field_map[0].data()) = zero_freq_projected;
     this->fft_engine->ifft(this->work_space, field);
   }
 
-  /* ---------------------------------------------------------------------- */
-  template <Index_t DimS, Index_t GradientRank, Index_t NbQuadPts>
-  void ProjectionGradient<DimS, GradientRank, NbQuadPts>::
-      apply_projection_mean_strain_control(Field_t & field) {
-    if (!this->initialised) {
-      throw ProjectionError("Applying a projection without having initialised "
-                            "the projector is not supported.");
-    }
-    // Storage order of gradient fields: We want to be able to iterate over a
-    // gradient field using either QuadPts or Pixels iterators. A quadrature
-    // point iterator returns a dim x dim matrix. A pixels iterator must
-    // return a dim x dim * nb_quad matrix, since every-thing is column major
-    // this matrix is just two dim x dim matrices that are stored consecutive
-    // in memory. This means the components of the displacement field, not the
-    // gradient direction, must be stored consecutive in memory and are the
-    // first index.
-    this->fft_engine->fft(field, this->work_space);
-    Grad_map field_map{this->work_space};
-    Real factor = this->fft_engine->normalisation();
-    for (auto && tup : akantu::zip(this->proj_field.get_map(), field_map)) {
-      auto & projop{std::get<0>(tup)};
-      auto & f{std::get<1>(tup)};
-      f = factor * ((f * projop.conjugate()).eval() * projop.transpose());
-    }
-    this->fft_engine->ifft(this->work_space, field);
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <Index_t DimS, Index_t GradientRank, Index_t NbQuadPts>
-  void ProjectionGradient<DimS, GradientRank, NbQuadPts>::
-      apply_projection_mean_stress_control(Field_t & field) {
-    if (!this->initialised) {
-      throw ProjectionError("Applying a projection without having initialised "
-                            "the projector is not supported.");
-    }
-    // Storage order of gradient fields: We want to be able to iterate over a
-    // gradient field using either QuadPts or Pixels iterators. A quadrature
-    // point iterator returns a dim x dim matrix. A pixels iterator must
-    // return a dim x dim * nb_quad matrix, since every-thing is column major
-    // this matrix is just two dim x dim matrices that are stored consecutive
-    // in memory. This means the components of the displacement field, not the
-    // gradient direction, must be stored consecutive in memory and are the
-    // first index.
-    this->fft_engine->fft(field, this->work_space);
-    Grad_map field_map{this->work_space};
-    Real factor = this->fft_engine->normalisation();
-    for (auto && itup :
-         akantu::enum_zip(this->proj_field.get_map(), field_map)) {
-      auto & index{std::get<0>(itup)};
-      auto & proj_op{std::get<1>(itup)};
-      auto & f{std::get<2>(itup)};
-      // Ghat (Project operator) is set to either 0ᵢⱼₖₗ or δᵢₖδⱼₗ (Ghat^*)
-      // based on that either mean strain value or mean stress value is
-      // imposed on the cell The formulation is Based on: An algorithm for
-      // stress and mixed control in Galerkin-based FFT homogenization, by
-      // Lucarini, and Segurado DOI: 10.1002/nme.6069
-      f = index == 0
-              ? factor * f
-              : (factor * (f * proj_op.conjugate() * proj_op.transpose()))
-                    .eval();
-    }
-    this->fft_engine->ifft(this->work_space, field);
-  }
   /* ---------------------------------------------------------------------- */
   template <Index_t DimS, Index_t GradientRank, Index_t NbQuadPts>
   auto

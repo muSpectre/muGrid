@@ -97,49 +97,6 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimS, Index_t NbQuadPts>
-  void ProjectionDefault<DimS, NbQuadPts>::apply_projection_mean_strain_control(
-      Field_t & field) {
-    if (!this->initialised) {
-      throw ProjectionError("Applying a projection without having initialised "
-                            "the projector is not supported.");
-    }
-    this->fft_engine->fft(field, this->work_space);
-    Vector_map field_map{this->work_space};
-    Real factor = this->fft_engine->normalisation();
-    for (auto && tup : akantu::zip(this->Ghat, field_map)) {
-      auto & G{std::get<0>(tup)};
-      auto & f{std::get<1>(tup)};
-      f = factor * (G * f).eval();
-    }
-    this->fft_engine->ifft(this->work_space, field);
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <Index_t DimS, Index_t NbQuadPts>
-  void ProjectionDefault<DimS, NbQuadPts>::apply_projection_mean_stress_control(
-      Field_t & field) {
-    if (!this->initialised) {
-      throw ProjectionError("Applying a projection without having initialised "
-                            "the projector is not supported.");
-    }
-    this->fft_engine->fft(field, this->work_space);
-    Vector_map field_map{this->work_space};
-    Real factor = this->fft_engine->normalisation();
-
-    for (auto && itup : akantu::enum_zip(this->Ghat, field_map)) {
-      auto && index{std::get<0>(itup)};
-      auto && G{std::get<1>(itup)};
-      auto && f{std::get<2>(itup)};
-      // according to "An algorithm for stress and mixed control in
-      // Galerkin-based FFT homogenization" by: S.Lucarini, J. Segurado
-      // doi: 10.1002/nme.6069
-      f = index == 0 ? f * factor : (factor * (G * f)).eval();
-    }
-    this->fft_engine->ifft(this->work_space, field);
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <Index_t DimS, Index_t NbQuadPts>
   typename ProjectionDefault<DimS, NbQuadPts>::Field_t &
   ProjectionDefault<DimS, NbQuadPts>::integrate(Field_t & grad) {
     //! iterable form of the integrator

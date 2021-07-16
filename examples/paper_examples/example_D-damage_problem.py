@@ -41,7 +41,7 @@ Program grant you additional permission to convey the resulting work.
 # For obtaining the results similar to figure in the paper this script_size
 # should run with the following parameters:
 
-# dam_conc_201.py -N 201 -n 1000 -d 10 -a 10 -s 10 -r 2 - -g 0.02 -f 2.0e-3 -FEM
+# python3 example_D-damage_problem.py -N 201 -n 1000 -d 10 -a 10 -s 10 -r 2 - -g 0.02 -f 2.0e-3 -FEM
 
 import os
 import numpy as np
@@ -138,18 +138,14 @@ if reset == 0:
     reset_count = 0
     reset_cg_str = "no_reset"
 elif reset == 1:
-    reset_cg = µ.solvers.ResetCG.fixed_iter_count
+    reset_cg = µ.solvers.ResetCG.iter_count
     reset_count = 0
     reset_cg_str = "fixed_iter_count"
 elif reset == 2:
-    reset_cg = µ.solvers.ResetCG.user_defined_iter_count
-    reset_count = int(201 * 201 / 10)
-    reset_cg_str = "user_defined"
-elif reset == 3:
     reset_cg = µ.solvers.ResetCG.gradient_orthogonality
     reset_count = 0
     reset_cg_str = "gradient_orthogonality"
-elif reset == 4:
+elif reset == 3:
     reset_cg = µ.solvers.ResetCG.valid_direction
     reset_count = 0
     reset_cg_str = "valid_direction"
@@ -603,7 +599,8 @@ def main():
         newton_tol,
         equil_tol, maxiter_newton,
         trust_region, eta_solver,
-        gradient)
+        gradient,
+        µ.solvers.MeanControl.stress_control)
 
     solver.formulation = msp.Formulation.small_strain
     solver.initialise_cell()

@@ -120,14 +120,6 @@ namespace muSpectre {
     //! apply the projection operator to a field
     virtual void apply_projection(Field_t & field) = 0;
 
-    //! apply the projection operator to a field in the case of determined
-    //! macroscopic average strain applied on the RVE
-    virtual void apply_projection_mean_strain_control(Field_t & field) = 0;
-
-    //! apply the projection operator to a field in the case of determined
-    //! macroscopic average stress applied on the RVE
-    virtual void apply_projection_mean_stress_control(Field_t & field) = 0;
-
     //! compute the positions of the nodes of the pixels
     virtual Field_t & integrate(Field_t & strain) {
       std::stringstream s;

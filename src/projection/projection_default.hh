@@ -108,17 +108,6 @@ namespace muSpectre {
     //! apply the projection operator to a field
     void apply_projection(Field_t & field) final;
 
-    //! apply the projection operator to a field in the case of determined
-    //! macroscopic average strain applied on the RVE
-    void apply_projection_mean_strain_control(Field_t & field) final;
-
-    //! apply the projection operator to a field in the case of determined
-    //! macroscopic average stress applied on the RVE
-    //! according to "An algorithm for stress and mixed control in
-    //! Galerkin-based FFT homogenization" by: S.Lucarini, J. Segurado
-    //! doi: 10.1002/nme.6069
-    void apply_projection_mean_stress_control(Field_t & field) final;
-
     //! compute the positions of the nodes of the pixels
     Field_t & integrate(Field_t & strain) final;
 

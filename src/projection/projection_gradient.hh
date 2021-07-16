@@ -116,9 +116,6 @@ namespace muSpectre {
     using Grad_map =
         internal::GradientMapProvider_t<DimS, GradientRank, NbQuadPts>;
 
-    using SingleProj_t =
-        Eigen::Matrix<Complex, DimS * NbQuadPts, DimS * NbQuadPts>;
-
     constexpr static Index_t NbGradRow{
         internal::GradientMapProvider<DimS, GradientRank, NbQuadPts>::NbRow()};
     constexpr static Index_t NbGradCol{
@@ -129,6 +126,16 @@ namespace muSpectre {
     constexpr static Index_t NbPrimitiveCol{
         internal::GradientMapProvider<DimS, GradientRank,
                                       NbQuadPts>::NbPrimitiveCol()};
+
+    // Type of the matrix used as the zero frequency projection (as a mask
+    // operator)
+    using SingleProj_t =
+        Eigen::Matrix<Complex, NbGradRow * NbGradCol, NbGradRow * NbGradCol>;
+
+    // Types defined to cast single field entry to vector to apply a mask
+    // projection as the zero frequency projection
+    using PixelVec_t = Eigen ::Matrix<Complex, NbGradRow * NbGradCol, 1>;
+    using PixelVec_map = Eigen::Map<PixelVec_t>;
 
     //! Default constructor
     ProjectionGradient() = delete;
@@ -165,16 +172,6 @@ namespace muSpectre {
     //! apply the projection operator to a field in the case of determined
     //! macroscopic average strain applied on the RVE
     void apply_projection(Field_t & field) final;
-
-    //! apply the projection operator to a field in the case of determined
-    //! macroscopic average stress applied on the RVE
-    //! according to "An algorithm for stress and mixed control in
-    //! Galerkin-based FFT homogenization" by: S.Lucarini, J. Segurado
-    //! doi: 10.1002/nme.6069
-    void apply_projection_mean_strain_control(Field_t & field) final;
-
-    //! apply the projection operator to a field
-    void apply_projection_mean_stress_control(Field_t & field) final;
 
     //! compute the positions of the nodes of the pixels
     Field_t & integrate(Field_t & strain) final;

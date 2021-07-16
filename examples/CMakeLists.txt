@@ -162,12 +162,6 @@ muSpectre_add_example(sec_conc_py_example
 muSpectre_add_example(evaluator_materials_dunant_example
   TYPE PYTHON evaluator_materials_dunant_example.py 1)
 
-muSpectre_add_example(strain_stress_control_example
-  TYPE PYTHON strain_stress_control_example.py 1)
-
-muSpectre_add_example(strain_stress_control_example_fem_proj
-  TYPE PYTHON strain_stress_control_example_fem_proj.py 1)
-
 
 if (NETCDF_IO)
   muSpectre_add_example(netcdf_io_use_case

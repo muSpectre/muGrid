@@ -111,14 +111,6 @@ class PyProjectionBase : public ProjectionBaseUnclonable {
     PYBIND11_OVERLOAD_PURE(void, Parent, apply_projection, field);
   }
 
-  void apply_projection_mean_strain_control(Field_t & field) override {
-    PYBIND11_OVERLOAD_PURE(void, Parent, apply_projection, field);
-  }
-
-  void apply_projection_mean_stress_control(Field_t & field) override {
-    PYBIND11_OVERLOAD_PURE(void, Parent, apply_projection, field);
-  }
-
   //  Eigen::Map<MatrixXXc> get_operator() override {
   //    PYBIND11_OVERLOAD_PURE(Eigen::Map<MatrixXXc>, Parent, get_operator);
   //  }
