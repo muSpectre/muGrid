@@ -93,6 +93,8 @@ parser.add_argument("-s", "--seed", type=int,
 parser.add_argument("-r", "--reset", type=int, default=0,
                     help=("Reset criterion for cg solver"))
 
+parser.add_argument("-c", "--control", type=int, default=0,
+                    help=("Mean strain/stress control"))
 
 group_proj = parser.add_mutually_exclusive_group()
 
@@ -101,7 +103,6 @@ group_proj.add_argument("-FOU", "--fourier",
 
 group_proj.add_argument("-FEM", "--fem_proj",
                         action="store_true", help="The projection choice")
-
 
 args = parser.parse_args()
 
@@ -128,6 +129,8 @@ seed_no = args.seed
 seed_no = int(seed_no)
 reset = args.reset
 reset = int(reset)
+control = args.control
+control = int(control)
 
 reset_cg = µ.solvers.ResetCG.no_reset
 reset_count = 0
@@ -152,6 +155,13 @@ elif reset == 3:
 else:
     raise ValueError
 
+control_mean = µ.solvers.MeanControl.strain_control
+if control == 0:
+    control_mean = µ.solvers.MeanControl.strain_control
+elif control == 1:
+    control_mean = µ.solvers.MeanControl.stress_control
+else:
+    raise ValueError
 
 verbosity_cg = µ.Verbosity.Silent
 verbosity_newton = µ.Verbosity.Silent
@@ -172,7 +182,7 @@ rank = comm.Get_rank()
 directory = "./"
 name = "_conc_new" + "_f_" + str(eigenstrain_final) + "_g_" + \
     str(gel_percentage) + "_α_" + str(alpha) + "_g_" + str(gel_percentage) + \
-    "_seed_" + str(seed_no) + reset_cg_str
+    "_seed_" + str(seed_no) + "_control_" + str(control_mean) + "_"  + reset_cg_str
 print(name)
 
 output_name = grad_name + name + "len_" + str(Nx) + "_steps_" + str(nb_steps)
@@ -599,8 +609,7 @@ def main():
         newton_tol,
         equil_tol, maxiter_newton,
         trust_region, eta_solver,
-        gradient,
-        µ.solvers.MeanControl.stress_control)
+        gradient, control_mean)
 
     solver.formulation = msp.Formulation.small_strain
     solver.initialise_cell()

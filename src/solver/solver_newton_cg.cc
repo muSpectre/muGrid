@@ -233,17 +233,15 @@ namespace muSpectre {
     }
 
     // updating cell grad with the difference of the current and previous
-    // grad input.
-
-    // Here we need to update the mean strain if the mean control is on the
-    // strain
+    // grad input if the mean control is on the strain
     if (this->mean_control == MeanControl::StrainControl) {
       this->grad->get_map() += macro_load - this->previous_macro_load;
     }
 
     // define the number of newton iteration (initially equal to 0)
     std::string message{"Has not converged"};
-    Real incr_norm{2 * newton_tol}, grad_norm{1};
+    Real incr_norm{2 * newton_tol}, incr_norm_mean_control{2 * newton_tol},
+        grad_norm{1};
     // Real incr_max{2 * newton_tol};
     Real rhs_norm{2 * equil_tol};
     bool has_converged{false};
@@ -265,10 +263,11 @@ namespace muSpectre {
 
     //! Checks two loop breaking criteria (newton tolerance and equilibrium
     //! tolerance)
-    auto && early_convergence_test{[&incr_norm, &grad_norm, this, &rhs_norm,
-                                    &message, &has_converged, &newton_tol_test,
-                                    &equil_tol_test] {
-      newton_tol_test = (incr_norm / grad_norm) <= this->newton_tol;
+    auto && early_convergence_test{[&incr_norm_mean_control, &grad_norm, this,
+                                    &rhs_norm, &message, &has_converged,
+                                    &newton_tol_test, &equil_tol_test] {
+      newton_tol_test =
+          (incr_norm_mean_control / grad_norm) <= this->newton_tol;
       equil_tol_test = rhs_norm < this->equil_tol;
 
       if (newton_tol_test) {
@@ -314,7 +313,7 @@ namespace muSpectre {
     // Here we need to subtract the mean stress if the control is on the mean
     // stress
     if (this->mean_control == MeanControl::StressControl) {
-      this->rhs->get_map() += macro_load - this->previous_macro_load;
+      this->rhs->get_map() -= macro_load - this->previous_macro_load;
     }
 
     this->projection->apply_projection(this->rhs->get_field());
@@ -358,25 +357,28 @@ namespace muSpectre {
       grad_norm =
           std::sqrt(comm.sum(grad->get_field().eigen_vec().squaredNorm()));
 
-      // updating the incremental differences for checking the termination
-      // criteria
+      incr_norm = std::sqrt(
+          comm.sum(this->grad_incr->get_field().eigen_vec().squaredNorm()));
       switch (this->mean_control) {
       case MeanControl::StrainControl: {
-        incr_norm = std::sqrt(
-            comm.sum(this->grad_incr->get_field().eigen_vec().squaredNorm()));
+        incr_norm_mean_control = incr_norm;
         break;
       }
       case MeanControl::StressControl: {
         // criteria according to "An algorithm for stress and mixed control in
         // Galerkin-based FFT homogenization" by: S.Lucarini, J. Segurado
         // doi: 10.1002/nme.6069
-        incr_norm = std::accumulate(
+        incr_norm_mean_control = std::accumulate(
             grad_incr->begin(), grad_incr->end(), 0.0,
             [](Real max, auto && grad_incr_entry) -> Real {
               Real grad_incr_entry_norm{grad_incr_entry.squaredNorm()};
               return grad_incr_entry_norm > max ? grad_incr_entry_norm : max;
             });
-        incr_norm /= grad_incr->get_field().get_nb_entries();
+        incr_norm_mean_control /= grad_incr->get_field().get_nb_entries();
+        break;
+      }
+      case MeanControl::MixedControl: {
+        muGrid::RuntimeError("Mixed control projection is not implemented yet");
         break;
       }
       default:
