@@ -118,11 +118,13 @@ namespace muSpectre {
       break;
     }
     case StepState::fully_damaged: {
+      std::cout << "DAMAGED" << "\n";
       T4_t C{T4_t::Zero()};
       return std::make_tuple(S, C);
       break;
     }
     case StepState::damaging: {
+      std::cout << "DAMAGING" << "\n";
       T2_t dk_dE{(1.0 / kappa.current()) * E};
       Real dr_dk{-1.0 * ((1.0 + this->alpha) * this->kappa_init) /
                  std::pow(kappa.current(), 2)};

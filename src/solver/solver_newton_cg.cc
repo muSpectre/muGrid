@@ -313,7 +313,7 @@ namespace muSpectre {
     // Here we need to subtract the mean stress if the control is on the mean
     // stress
     if (this->mean_control == MeanControl::StressControl) {
-      this->rhs->get_map() -= macro_load - this->previous_macro_load;
+      this->rhs->get_map() += macro_load;
     }
 
     this->projection->apply_projection(this->rhs->get_field());
@@ -427,7 +427,7 @@ namespace muSpectre {
       // Here we also need to subtract the mean stress value if the control
       // is on the mean value of stress
       if (this->mean_control == MeanControl::StressControl) {
-        this->rhs->get_map() += macro_load - this->previous_macro_load;
+        this->rhs->get_map() += macro_load;
       }
 
       this->projection->apply_projection(this->rhs->get_field());

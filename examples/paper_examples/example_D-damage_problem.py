@@ -190,7 +190,12 @@ if not os.path.exists("./" + output_name):
     os.makedirs("./" + output_name)
 
 # solver parameters
-cg_tol, newton_tol, equil_tol = 1e-7, 1e-7, 0.0
+cg_tol, newton_tol, equil_tol = 1e-8, 1e-8, 0.0
+if control_mean == µ.solvers.MeanControl.strain_control:
+    cg_tol, newton_tol, equil_tol = 1e-8, 1e-8, 0.0
+elif control_mean == µ.solvers.MeanControl.stress_control:
+    cg_tol, newton_tol, equil_tol = 1e-9, 1e-9, 0.0
+
 maxiter_linear = 40000  # for linear cell solver
 maxiter_newton = 2000  # for linear cell solver
 trust_region = 5.0e-1  # initial trust region radius
@@ -631,6 +636,10 @@ def main():
                 make_vtk_single(res, cell, solver,
                                 phase_in_structure,
                                 eigen_pixels_in_structure, i)
+                print("mean stress:\n {}".format(
+                    solver.flux.get_sub_pt_map().mean()))
+                print("mean strain:\n {}".format(
+                    solver.grad.get_sub_pt_map().mean()))
             results.append(res)
             eigen_class.step_nb = eigen_class.step_nb + 1
             done_steps = done_steps + 1
