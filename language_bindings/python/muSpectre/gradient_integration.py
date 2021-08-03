@@ -105,7 +105,7 @@ def complement_periodically(array, dim):
     return out_arr
 
 
-def get_complemented_positions(quantities, rve):
+def get_complemented_positions(quantities, rve, F0=None):
     """Takes an RVE (Cell) object and returns the deformed and undeformed nodal
     positions, complemented periodically.
 
@@ -120,13 +120,22 @@ def get_complemented_positions(quantities, rve):
         'g': grid positions (including applied homogeneous strain)
         '0': grid positions (without applied homogeneous strain)
         'd': nodal displacements
+        'n': nodal nonaffine displacements (without homogeneous displacement field)
         The placements are displacement plus grid positions including applied
         strain.
     rve        -- Cell object
+    F0         -- F0 describes an affine deformation of the undeformed grid i.e.
+                  * rectangular grid: F0=np.eye(dim) which is the default case
+                                      and corresponds to the undeformed grid.
+                  * hexagonal grid 2D: with dy = sqrt(3)/2*dx
+                                    F0 = np.array([[ 1, 1/sqrt(3)],
+                                                   [ 0,     1    ]])
 
     Returns:
     Tuple build according to the first argument of the function.
     """
+    if F0 is None:
+        F0 = np.eye(len(rve.nb_domain_grid_pts))
     cell_coords = np.mgrid[tuple(slice(None, n)
                                  for n in rve.nb_domain_grid_pts)]
     node_coords = np.mgrid[tuple(slice(None, n + 1)
@@ -146,6 +155,8 @@ def get_complemented_positions(quantities, rve):
     # Undeformed node positions in the reference configuration, complemented
     coords = (np.transpose(node_coords) * rve.domain_lengths /
               rve.nb_domain_grid_pts).T
+    # correct coords for a transformation of the undeformed grid
+    coords = coords.T.dot(F0.T).T
 
     if rve.formulation == Formulation.small_strain:
         # The small strain tensor is lacking the identity, so we need to add it
@@ -161,6 +172,8 @@ def get_complemented_positions(quantities, rve):
         elif q == '0':
             retval += [coords]
         elif q == 'd':
+            retval += [coords.T.dot(mean_strain.T).T + displacements - coords]
+        elif q == 'n':
             retval += [displacements]
         else:
             raise RuntimeError("Unknown quantity '{}'".format(q))
@@ -225,6 +238,7 @@ def get_complemented_positions_class_solver(quantities, rve, solver, result):
         return retval[0]
     else:
         return tuple(retval)
+
 
 def get_complemented_positions_fem(quantities, rve, solver, result):
     """Takes an RVE (Cell) object and returns the deformed and undeformed nodal

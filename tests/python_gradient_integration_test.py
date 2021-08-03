@@ -924,8 +924,9 @@ class GradientIntegration_Check(unittest.TestCase):
                 IsStrainInitialised=µ.solvers.IsStrainInitialised.No,
                 verbose=µ.Verbosity.Silent)
 
-            [x_def, y_def, z_def], [dx, dy, dz], [gx, gy, gz], [x0, y0, z0] \
-                = µ.gradient_integration.get_complemented_positions("pdg0", rve)
+            [x_def, y_def, z_def], [dx, dy, dz], [gx, gy, gz], \
+                [x0, y0, z0], [ndx, ndy, ndz] \
+                = µ.gradient_integration.get_complemented_positions("pdg0n", rve)
 
             self.assertTrue(
                 np.allclose(x_def,
@@ -954,9 +955,81 @@ class GradientIntegration_Check(unittest.TestCase):
             self.assertTrue(
                 np.allclose(z0, sz/nz * np.arange(nz+1).reshape(1, 1, -1)))
 
-            self.assertTrue(np.allclose(x_def - gx, dx))
-            self.assertTrue(np.allclose(y_def - gy, dy))
-            self.assertTrue(np.allclose(z_def - gz, dz))
+            self.assertTrue(np.allclose(x_def - x0, dx))
+            self.assertTrue(np.allclose(y_def - y0, dy))
+            self.assertTrue(np.allclose(z_def - z0, dz))
+
+            self.assertTrue(np.allclose(x_def - gx, ndx))
+            self.assertTrue(np.allclose(y_def - gy, ndy))
+            self.assertTrue(np.allclose(z_def - gz, ndz))
+
+    def test_get_complemented_positions_hexagonal_grid(self):
+        nx, ny = nb_domain_grid_pts = 2, 3
+        sx = 2
+        sx, sy = domain_lengths = sx, sx/nx * np.sqrt(3)/2 * ny
+
+        Youngs_modulus = 1
+        Poisson_ratio = 0.33
+
+        newton_tol = 1e-6
+        equil_tol = newton_tol
+        cg_tol = 1e-6
+
+        s = 0.01
+        strain_step = np.array([[-s, 0], [0, s]])
+
+        maxiter = 1000  # for linear cell solver
+
+        ## numerical derivative, two elements for a hexagonal lattice
+        gradient = µ.linear_finite_elements.gradient_2d_hexagonal
+
+        form = µ.Formulation.finite_strain
+
+        rve = µ.Cell(nb_domain_grid_pts, domain_lengths, form, gradient,
+                     fft='fftw')
+        material = µ.material.MaterialLinearElastic1_2d.make(
+            rve, "material", Youngs_modulus, Poisson_ratio)
+        for pixel_index, pixel in enumerate(rve.pixels):
+            material.add_pixel(pixel_index)
+
+        solver = µ.solvers.KrylovSolverCG(
+            rve, cg_tol, maxiter=maxiter, verbose=µ.Verbosity.Silent)
+
+        µ.solvers.newton_cg(
+            rve, strain_step, solver,
+            newton_tol=newton_tol,
+            equil_tol=equil_tol,
+            IsStrainInitialised=µ.solvers.IsStrainInitialised.No,
+            verbose=µ.Verbosity.Silent)
+
+        F0 = np.array([[1, 1/np.sqrt(3)], [0, 1]])
+        [x_def, y_def], [dx, dy], [gx, gy], [x0, y0], [ndx, ndy] \
+            = µ.gradient_integration.get_complemented_positions("pdg0n", rve, F0)
+
+        self.assertTrue(
+            np.allclose(x_def, (1-s) * (sx/nx * np.arange(nx+1).reshape(-1, 1)
+                                        + sx/(2*nx) * np.arange(ny+1))))
+        self.assertTrue(
+            np.allclose(y_def, sy/ny * (1+s)*np.arange(ny+1).reshape(1, -1)))
+
+        self.assertTrue(
+            np.allclose(gx, (1-s) * (sx/nx * np.arange(nx+1).reshape(-1, 1)
+                                     + sx/(2*nx) * np.arange(ny+1))))
+        self.assertTrue(
+            np.allclose(gy, sy/ny * (1+s)*np.arange(ny+1).reshape(1, -1)))
+
+        self.assertTrue(
+            np.allclose(x0,
+                        sx/nx * np.arange(nx+1).reshape(-1, 1)
+                        + sx/(2*nx) * np.arange(ny+1)))
+        self.assertTrue(
+            np.allclose(y0, sy/ny * np.arange(ny+1).reshape(1, -1)))
+
+        self.assertTrue(np.allclose(x_def - x0, dx))
+        self.assertTrue(np.allclose(y_def - y0, dy))
+
+        self.assertTrue(np.allclose(x_def - gx, ndx))
+        self.assertTrue(np.allclose(y_def - gy, ndy))
 
 if __name__ == '__main__':
     unittest.main()

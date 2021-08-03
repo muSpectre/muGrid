@@ -446,6 +446,66 @@ class DerivativeCheck2d(unittest.TestCase):
                 ndiff = np.squeeze(ndiff)
                 self.assertAlmostEqual(diff_field[x, y], ndiff)
 
+    def test_hexagonal_T1_dx(self):
+        diffop = muFFT.Stencils2D.hexagonal_T1_dx
+        q = self.fft.fftfreq
+        d = diffop.fourier(q)
+        diff_field = np.zeros_like(self.field, order='f')
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
+        nx, ny = self.nb_pts
+        diff_field = np.squeeze(diff_field)
+        for x in range(nx):
+            for y in range(ny):
+                ndiff = self.field[(x+1)%nx, y] - self.field[x, y]
+                ndiff = np.squeeze(ndiff)
+                self.assertAlmostEqual(diff_field[x, y], ndiff)
+
+    def test_hexagonal_T1_dy(self):
+        diffop = muFFT.Stencils2D.hexagonal_T1_dy
+        q = self.fft.fftfreq
+        d = diffop.fourier(q)
+        diff_field = np.zeros_like(self.field, order='f')
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
+        nx, ny = self.nb_pts
+        diff_field = np.squeeze(diff_field)
+        for x in range(nx):
+            for y in range(ny):
+                ndiff = 1/2*(2*self.field[x, (y+1)%ny] - self.field[x, y] - self.field[(x+1)%nx, y])
+                ndiff = np.squeeze(ndiff)
+                self.assertAlmostEqual(diff_field[x, y], ndiff)
+
+    def test_hexagonal_T2_dx(self):
+        diffop = muFFT.Stencils2D.hexagonal_T2_dx
+        q = self.fft.fftfreq
+        d = diffop.fourier(q)
+        diff_field = np.zeros_like(self.field, order='f')
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
+        nx, ny = self.nb_pts
+        diff_field = np.squeeze(diff_field)
+        for x in range(nx):
+            for y in range(ny):
+                ndiff = self.field[(x+1)%nx, (y+1)%ny] - self.field[x, (y+1)%ny]
+                ndiff = np.squeeze(ndiff)
+                self.assertAlmostEqual(diff_field[x, y], ndiff)
+
+    def test_hexagonal_T2_dy(self):
+        diffop = muFFT.Stencils2D.hexagonal_T2_dy
+        q = self.fft.fftfreq
+        d = diffop.fourier(q)
+        diff_field = np.zeros_like(self.field, order='f')
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
+        nx, ny = self.nb_pts
+        diff_field = np.squeeze(diff_field)
+        for x in range(nx):
+            for y in range(ny):
+                ndiff = 1/2*(-2*self.field[(x+1)%nx, y] + self.field[x, (y+1)%ny] + self.field[(x+1)%nx, (y+1)%ny])
+                ndiff = np.squeeze(ndiff)
+                self.assertAlmostEqual(diff_field[x, y], ndiff)
+
 class DerivativeCheck3d(unittest.TestCase):
     def setUp(self):
         self.nb_pts = [23, 23, 17]
