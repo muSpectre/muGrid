@@ -183,7 +183,7 @@ def get_complemented_positions(quantities, rve, F0=None):
         return tuple(retval)
 
 
-def get_complemented_positions_class_solver(quantities, rve, solver, result):
+def get_complemented_positions_class_solver(quantities, rve, solver):
     """Takes an RVE (Cell) object and returns the deformed and undeformed nodal
     positions, complemented periodically.
 
@@ -209,7 +209,7 @@ def get_complemented_positions_class_solver(quantities, rve, solver, result):
                                  for n in rve.nb_domain_grid_pts)]
     node_coords = np.mgrid[tuple(slice(None, n + 1)
                                  for n in rve.nb_domain_grid_pts)]
-    strain = result.grad.reshape(solver.grad.shape, order="F")
+    strain = solver.grad.array().reshape(solver.grad.shape, order="F")
     mean_strain = np.mean(
         strain, axis=tuple(i for i in range(2, len(strain.shape))))
     if solver.formulation == Formulation.finite_strain:
@@ -240,7 +240,7 @@ def get_complemented_positions_class_solver(quantities, rve, solver, result):
         return tuple(retval)
 
 
-def get_complemented_positions_fem(quantities, rve, solver, result):
+def get_complemented_positions_fem(quantities, rve, solver):
     """Takes an RVE (Cell) object and returns the deformed and undeformed nodal
     positions, complemented periodically.
 
@@ -266,7 +266,7 @@ def get_complemented_positions_fem(quantities, rve, solver, result):
                                  for n in rve.nb_domain_grid_pts)]
     node_coords = np.mgrid[tuple(slice(None, n + 1)
                                  for n in rve.nb_domain_grid_pts)]
-    strain = result.grad.reshape(solver.grad.shape, order="F")
+    strain = solver.grad.array().reshape(solver.grad.shape, order="F")
     mean_strain = np.mean(
         strain, axis=tuple(i for i in range(2, len(strain.shape))))
     if solver.formulation == Formulation.finite_strain:

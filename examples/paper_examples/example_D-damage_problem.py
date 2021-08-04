@@ -478,7 +478,7 @@ def make_vtk_single(re, cell, solver,
                         "eigen": np.array([eigen_2])}
             msp.linear_finite_elements.write_2d_class(
                 out_file_name + ".xdmf",
-                cell, solver, re, c_data_2)
+                cell, solver, c_data_2)
         else:
             vt_ex.vtk_export(
                 fpath=out_file_name,

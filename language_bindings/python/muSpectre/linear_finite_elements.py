@@ -288,7 +288,7 @@ def write_2d(file_name, rve, cell_data=None, point_data=None,
         )
 
 
-def write_2d_class(file_name, rve, solver, result, cell_data=None):
+def write_2d_class(file_name, rve, solver, cell_data=None):
     """
     Write results of a 2D calculation that employs a decomposition of each
     voxel in two triangles (using the `gradient_2d` stencil) to a file. The
@@ -300,7 +300,6 @@ def write_2d_class(file_name, rve, solver, result, cell_data=None):
     file_name  -- filename
     rve -- representative volume element, i.e. the `CellData` object
     solver -- The solver used to solve the CellData with applied load
-    result -- µSpectre OptimizeResult object
     cell_data = dictionary of cell data with corresponding keys
     """
     import meshio
@@ -310,8 +309,7 @@ def write_2d_class(file_name, rve, solver, result, cell_data=None):
     # Positions, periodically complemented
     [x_def, y_def], [x_undef, y_undef] \
         = get_complemented_positions_class_solver("pd", rve=rve,
-                                                  solver=solver,
-                                                  result=result)
+                                                  solver=solver)
 
     # Global node indices
     def c2i(xp, yp):
@@ -360,7 +358,7 @@ def write_2d_class(file_name, rve, solver, result, cell_data=None):
         )
 
 
-def write_2d_fem(file_name, rve, solver, result, cell_data=None):
+def write_2d_fem(file_name, rve, solver, cell_data=None):
     """
     Write results of a 2D calculation that employs a decomposition of each
     voxel in two triangles to a file. The output is handled by `meshio`, which
@@ -371,7 +369,6 @@ def write_2d_fem(file_name, rve, solver, result, cell_data=None):
     file_name  -- filename
     rve -- representative volume element, i.e. the `CellData` object
     solver -- The solver used to solve the CellData with applied load
-    result -- µSpectre OptimizeResult object
     cell_data = dictionary of cell data with corresponding keys
     """
     import meshio
@@ -381,8 +378,7 @@ def write_2d_fem(file_name, rve, solver, result, cell_data=None):
     # Positions, periodically complemented
     [x_def, y_def], [x_undef, y_undef] \
         = get_complemented_positions_fem("pd", rve=rve,
-                                         solver=solver,
-                                         result=result)
+                                         solver=solver)
 
     # Global node indices
     def c2i(xp, yp):
