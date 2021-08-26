@@ -92,6 +92,7 @@ endif()
 
 # ------------------------------------------------------------------------------
 include(muspectreTools)
+include(muspectreExtraCompilationProfiles)
 include(muTools)
 include(cpplint)
 mark_as_advanced_prefix(CPPLINT)

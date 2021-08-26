@@ -31,6 +31,8 @@ RUN apt-get -qq update && apt-get -y -qq install \
     python3-sphinx \
     python3-sphinx-rtd-theme \
     valgrind \
+    gcovr \
+    ccache \
     && rm -rf /var/lib/apt/lists/*
 
 # apt-get on one line due to https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#run

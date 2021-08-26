@@ -1,92 +1,235 @@
 .builds:
   stage: build
   script:
-    - echo "free -h"
     - free -h
-    - echo "grep -c ^processor /proc/cpuinfo"
     - grep -c ^processor /proc/cpuinfo
     - cd build
-    - cmake -DCMAKE_BUILD_TYPE:STRING=Release -DNETCDF_IO=ON -DMUSPECTRE_RUNNING_IN_CI=ON ..
+    - cmake -DCMAKE_BUILD_TYPE:STRING=${BUILD_TYPE}
+            -DNETCDF_IO=ON
+            -DMUSPECTRE_RUNNING_IN_CI=ON
+            ${CMAKE_ADDITIONAL_FLAGS} ..
     - make -k
+  artifacts:
+    when: on_success
+    paths:
+      - build
+    exclude:
+      - build/**/*.o
+    expire_in: 5h
+
+.tests:
+  stage: test
+  script:
+    - cd build
     - ctest --output-on-failure
     - make test
+    - if [ "${BUILD_TYPE}" = "Coverage" ]; then
+    -   gcovr --xml
+              --gcov-executable "${GCOV_EXECUTABLE}"
+              --output coverage.xml
+              --object-directory ${CI_PROJECT_DIR}/build
+              --root ${CI_PROJECT_DIR}  -s || true
+    - fi
   artifacts:
     when: always
     paths:
-      - build
       - build/tests/test_results*.xml
       - build/tests/libmufft/test_results*.xml
       - build/tests/libmugrid/test_results*.xml
     reports:
       junit:
-      - build/tests/test_results*.xml
-      - build/tests/libmufft/test_results*.xml
-      - build/tests/libmugrid/test_results*.xml
+        - build/tests/test_results*.xml
+        - build/tests/libmufft/test_results*.xml
+        - build/tests/libmugrid/test_results*.xml
+      cobertura:
+        - build/coverage.xml
 
-build:testing_gcc_mpi:
-  extends: .builds
-
-  image: registry.gitlab.com/muspectre/muspectre:debian_testing
+.tests_muspectre:
+  stage: test
   script:
-    - echo "free -h"
-    - free -h
-    - echo "grep -c ^processor /proc/cpuinfo"
-    - grep -c ^processor /proc/cpuinfo
     - cd build
-    - cmake -DCMAKE_BUILD_TYPE:STRING=Release -DMUSPECTRE_MPI_PARALLEL=ON -DNETCDF_IO=ON -DMPIEXEC_MAX_NUMPROCS=2 -DMPIEXEC_PREFLAGS="--oversubscribe;--allow-run-as-root" -DMUSPECTRE_RUNNING_IN_CI=ON ..
-    - make -k
-    - ctest --output-on-failure
-    - make test
+    - valgrind --track-origins=yes --leak-check=full --error-exitcode=1 ./main_test_suite
 
-build:testing_gcc_setuptools:
-  extends: .builds
+# ------------------------------------------------------------------------------
+.compiler_gcc:
+  variables:
+    COMPILER_NAME: gcc
+    CC: /usr/lib/ccache/gcc
+    CXX: /usr/lib/ccache/g++
+    FC: gfortran
+    GCOV_EXECUTABLE: gcov
+
+.compiler_clang:
+  variables:
+    COMPILER_NAME: clang
+    CC: /usr/lib/ccache/clang
+    CXX: /usr/lib/ccache/clang++
+    FC: gfortran
+    GCOV_EXECUTABLE: llvm-cov gcov
+
+.image_debian_testing:
+  variables:
+    IMAGE_NAME: debian_testing
   image: registry.gitlab.com/muspectre/muspectre:debian_testing
+
+.image_debian_stable:
+  variables:
+    IMAGE_NAME: debian_stable
+  image: registry.gitlab.com/muspectre/muspectre:debian_stable
+
+.image_ubuntu_16_04:
+  variables:
+    IMAGE_NAME: ubuntu_16_04
+  image: registry.gitlab.com/muspectre/muspectre:ubuntu16.04
+
+.cache_build:
+  variables:
+    CCACHE_BASEDIR: ${CI_PROJECT_DIR}/build
+    CCACHE_DIR: ${CI_PROJECT_DIR}/.ccache
+    CCACHE_NOHASHDIR: 1
+    CCACHE_COMPILERCHECK: content
+  cache:
+    key: ${IMAGE_NAME}_${COMPILER_NAME}${CACHE_PREFIX}
+    policy: pull-push
+    paths:
+      - .ccache/
+  before_script:
+    - ccache --zero-stats || true
+  after_script:
+    - ccache --show-stats || true
+
+# ------------------------------------------------------------------------------
+build:testing_gcc_mpi:
+  variables:
+    BUILD_TYPE: Coverage
+    CMAKE_ADDITIONAL_FLAGS: -DMUSPECTRE_MPI_PARALLEL=ON -DMPIEXEC_MAX_NUMPROCS=2
+    CACHE_PREFIX: "_mpi"
+  extends:
+    - .builds
+    - .cache_build
+    - .compiler_gcc
+    - .image_debian_testing
+
+test:testing_gcc_mpi:
+  variables:
+    BUILD_TYPE: Coverage
+    OMPI_ALLOW_RUN_AS_ROOT: 1
+    OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: 1
+    OMPI_MCA_rmaps_base_oversubscribe: 1
+  extends:
+    - .tests
+    - .compiler_gcc
+    - .image_debian_testing
+  needs:
+    - job: build:testing_gcc_mpi
+      artifacts: true
+
+test_muspectre:testing_gcc:
+  extends:
+    - .tests_muspectre
+    - .image_debian_testing
+  needs:
+    - job: build:testing_gcc_mpi
+      artifacts: true
+
+# ------------------------------------------------------------------------------
+build:testing_clang:
+  variables:
+    BUILD_TYPE: Release
+  extends:
+    - .builds
+    - .cache_build
+    - .compiler_clang
+    - .image_debian_testing
+
+test:testing_clang:
+  extends:
+    - .tests
+    - .image_debian_testing
+  needs:
+    - job: build:testing_clang
+      artifacts: true
+
+test_muspectre:testing_clang:
+  extends:
+    - .tests_muspectre
+    - .image_debian_testing
+  needs:
+    - job: build:testing_clang
+      artifacts: true
+
+# ------------------------------------------------------------------------------
+build:stable_gcc:
+  variables:
+    BUILD_TYPE: Release
+  extends:
+    - .builds
+    - .cache_build
+    - .compiler_gcc
+    - .image_debian_stable
+
+test:stable_gcc:
+  extends:
+    - .tests
+    - .image_debian_stable
+  needs:
+    - job: build:stable_gcc
+      artifacts: true
+
+# ------------------------------------------------------------------------------
+build:ubuntu16.04_gcc:
+  variables:
+    BUILD_TYPE: Release
+  extends:
+    - .builds
+    - .cache_build
+    - .compiler_gcc
+    - .image_ubuntu_16_04
+
+test:ubuntu16.04_gcc:
+  extends:
+    - .tests
+    - .image_ubuntu_16_04
+  needs:
+    - job: build:ubuntu16.04_gcc
+      artifacts: true
+
+# ------------------------------------------------------------------------------
+build:testing_gcc_split:
+  variables:
+    BUILD_TYPE: Coverage
+    CMAKE_ADDITIONAL_FLAGS: -DSPLIT_CELL=ON
+    CACHE_PREFIX: "_split"
+  extends:
+    - .builds
+    - .cache_build
+    - .compiler_gcc
+    - .image_debian_testing
+
+test:testing_gcc_split:
+  variables:
+    BUILD_TYPE: Coverage
+  extends:
+    - .tests
+    - .image_debian_testing
+  needs:
+    - job: build:testing_gcc_split
+      artifacts: true
+
+# ------------------------------------------------------------------------------
+build:testing_gcc_setuptools:
+  extends:
+    - .builds
+    - .image_debian_testing
   script:
-    - echo "free -h"
     - free -h
-    - echo "grep -c ^processor /proc/cpuinfo"
     - grep -c ^processor /proc/cpuinfo
     - python3 setup.py sdist
     - python3 -m pip install --user dist/*.tar.gz
     - cd tests/libmufft
     - python3 python_binding_tests.py
 
-build:testing_clang:
-  extends: .builds
-  image: registry.gitlab.com/muspectre/muspectre:debian_testing
-  script:
-    - echo "free -h"
-    - free -h
-    - echo "grep -c ^processor /proc/cpuinfo"
-    - grep -c ^processor /proc/cpuinfo
-    - cd build
-    - CXX=clang++ cmake -DCMAKE_BUILD_TYPE:STRING=Release -DNETCDF_IO=ON -DMUSPECTRE_RUNNING_IN_CI=ON ..
-    - make -k
-    - ctest --output-on-failure
-    - make test
-
-build:stable_gcc:
-  extends: .builds
-  image: registry.gitlab.com/muspectre/muspectre:debian_stable
-
-build:ubuntu16.04_gcc:
-  extends: .builds
-  image: registry.gitlab.com/muspectre/muspectre:ubuntu16.04
-
-build:testing_gcc_split:
-  extends: .builds
-  image: registry.gitlab.com/muspectre/muspectre:debian_testing
-  script:
-    - echo "free -h"
-    - free -h
-    - echo "grep -c ^processor /proc/cpuinfo"
-    - grep -c ^processor /proc/cpuinfo
-    - cd build
-    - cmake -DCMAKE_BUILD_TYPE:STRING=Release -DSPLIT_CELL=ON -DNETCDF_IO=ON ..
-    - make
-    - ctest --output-on-failure
-    - make test
-
+# ------------------------------------------------------------------------------
 build:test_documention:
   stage: build
   image: registry.gitlab.com/muspectre/muspectre:debian_stable
@@ -98,23 +241,7 @@ build:test_documention:
     paths:
     - build/doc/html
 
-.tests:
-  stage: test
-  script:
-    - cd build
-    - valgrind --track-origins=yes --leak-check=full --error-exitcode=1 ./main_test_suite
-
-test:testing_gcc:
-  extends: .tests
-  image: registry.gitlab.com/muspectre/muspectre:debian_testing
-  dependencies:
-    - build:testing_gcc_mpi
-
-test:testing_clang:
-  extends: .tests
-  image: registry.gitlab.com/muspectre/muspectre:debian_testing
-  dependencies:
-    - build:testing_clang
+#------------------------------------------------------------------------------
 
 pages:
   stage: deploy

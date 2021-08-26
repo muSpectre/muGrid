@@ -1,4 +1,4 @@
-breathe
-sphinx>=1.6.6
-sphinx-rtd-theme
+sphinx==3.4.3
+sphinx-rtd-theme==0.5.2
+breathe==4.30.0
 sphinxcontrib-moderncmakedomain
