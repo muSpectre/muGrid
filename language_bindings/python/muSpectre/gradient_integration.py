@@ -239,7 +239,6 @@ def get_complemented_positions_class_solver(quantities, rve, solver):
     else:
         return tuple(retval)
 
-
 def get_complemented_positions_fem(quantities, rve, solver):
     """Takes an RVE (Cell) object and returns the deformed and undeformed nodal
     positions, complemented periodically.
@@ -258,6 +257,7 @@ def get_complemented_positions_fem(quantities, rve, solver):
         The placements are displacement plus grid positions including applied
         strain.
     rve        -- Cell object
+    solver     -- Solver object corespondent to the cell
 
     Returns:
     Tuple build according to the first argument of the function.

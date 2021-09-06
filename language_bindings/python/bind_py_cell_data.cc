@@ -37,6 +37,7 @@
 #include "solver/matrix_adaptor.hh"
 
 #include <libmufft/fft_engine_base.hh>
+#include <libmugrid/communicator.hh>
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -59,12 +60,29 @@ void add_cell_data_helper(py::module & mod) {
             return CellData::make(nb_domain_grid_pts, domain_lenghts);
           },
           "nb_domain_grid_pts"_a, "domain_lenghts"_a)
+#ifdef WITH_MPI
+      .def_static(
+          "make_parallel",
+          [](const muSpectre::DynCcoord_t & nb_domain_grid_pts,
+             const muGrid::DynRcoord_t & domain_lenghts,
+             const muGrid::Communicator & comm) -> CellData_ptr {
+            return CellData::make_parallel(nb_domain_grid_pts, domain_lenghts,
+                                           comm);
+          },
+          "nb_domain_grid_pts"_a, "domain_lenghts"_a, "communicator"_a)
+#endif
       .def_property_readonly(
           "fields",
           [](CellData & cell_data) -> muGrid::GlobalFieldCollection & {
             return cell_data.get_fields();
           },
           py::return_value_policy::reference_internal)
+      .def("get_field_collection", &CellData::get_field_collection,
+           py::return_value_policy::reference_internal)
+      .def("get_field_collection_field_names",
+           [](CellData & cell) {
+             return cell.get_field_collection().list_fields();
+           })
       .def("add_material", &CellData::add_material, "material"_a,
            py::return_value_policy::reference_internal)
       .def_property_readonly("spatial_dim", &CellData::get_spatial_dim)

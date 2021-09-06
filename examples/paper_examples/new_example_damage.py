@@ -5,6 +5,8 @@ import numpy as np
 np.set_printoptions(precision=3, linewidth=130)
 import random
 import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('tkagg')
 import argparse
 from wurlitzer import pipes, sys_pipes
 from enum import Enum
@@ -116,7 +118,7 @@ class EigenStrain:
 
 
 def compute_rve_fem_solver(incl_shape=InclusionShape.circle):
-    nb_steps = 100
+    nb_steps = 10
     nb_grid_pts = [11, 11]
     center = np.array([r // 2 for r in nb_grid_pts])
     incl = nb_grid_pts[0] // 5
@@ -301,15 +303,21 @@ def compute_rve_fem_solver(incl_shape=InclusionShape.circle):
     stress = stress.reshape(2, 2, 2,  *nb_grid_pts)
     CS = plt.pcolormesh(np.array(newton_solver.flux).reshape(
         2, 2, 2, *nb_grid_pts)[0, 0, 0, ...])
+    plt.title("Stress")
+    fig.savefig("phase.png")
 
     fig = plt.figure()
     strain = strain.reshape(2, 2, 2,  *nb_grid_pts)
+    plt.title("Strain")
     CS = plt.pcolormesh(np.array(newton_solver.grad).reshape(
         2, 2, 2, *nb_grid_pts)[0, 0, 0, ...])
+    fig.savefig("strain.png")
 
     fig = plt.figure()
     plt.pcolormesh(material_geometry)
+    plt.title("Phase")
     CS = plt.pcolormesh(material_geometry)
+    fig.savefig("stress.png")
 
     plt.show()
 

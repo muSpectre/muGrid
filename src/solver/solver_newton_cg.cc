@@ -425,7 +425,8 @@ namespace muSpectre {
       *this->rhs = -flux.get_field();
 
       // Here we also need to subtract the mean stress value if the control
-      // is on the mean value of stress
+      // is on the mean value of stress (we do not to subtract the macroscopic
+      // load the previous step since the RHS is overwritten in each step)
       if (this->mean_control == MeanControl::StressControl) {
         this->rhs->get_map() += macro_load;
       }

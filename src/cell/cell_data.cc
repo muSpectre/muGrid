@@ -96,6 +96,11 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
+  muGrid::FieldCollection & CellData::get_field_collection() {
+    return *this->fields;
+  }
+
+  /* ---------------------------------------------------------------------- */
   const muGrid::GlobalFieldCollection & CellData::get_fields() const {
     return *this->fields;
   }
@@ -376,7 +381,7 @@ namespace muSpectre {
                                                        nb_steps_ago);
   }
 
-/* ---------------------------------------------------------------------- */
+  /* ---------------------------------------------------------------------- */
   template <typename T>
   muGrid::TypedField<T> &
   CellData::globalise_internal_field(const std::string & unique_name) {
