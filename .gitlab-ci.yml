@@ -101,7 +101,7 @@
 # ------------------------------------------------------------------------------
 build:testing_gcc_mpi:
   variables:
-    BUILD_TYPE: Coverage
+    BUILD_TYPE: Release
     CMAKE_ADDITIONAL_FLAGS: -DMUSPECTRE_MPI_PARALLEL=ON -DMPIEXEC_MAX_NUMPROCS=2
     CACHE_PREFIX: "_mpi"
   extends:
@@ -112,7 +112,7 @@ build:testing_gcc_mpi:
 
 test:testing_gcc_mpi:
   variables:
-    BUILD_TYPE: Coverage
+    BUILD_TYPE: Release
     OMPI_ALLOW_RUN_AS_ROOT: 1
     OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: 1
     OMPI_MCA_rmaps_base_oversubscribe: 1
@@ -197,7 +197,7 @@ test:ubuntu16.04_gcc:
 # ------------------------------------------------------------------------------
 build:testing_gcc_split:
   variables:
-    BUILD_TYPE: Coverage
+    BUILD_TYPE: Release
     CMAKE_ADDITIONAL_FLAGS: -DSPLIT_CELL=ON
     CACHE_PREFIX: "_split"
   extends:
@@ -208,7 +208,7 @@ build:testing_gcc_split:
 
 test:testing_gcc_split:
   variables:
-    BUILD_TYPE: Coverage
+    BUILD_TYPE: Release
   extends:
     - .tests
     - .image_debian_testing

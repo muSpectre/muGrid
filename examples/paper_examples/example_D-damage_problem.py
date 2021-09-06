@@ -93,8 +93,9 @@ parser.add_argument("-s", "--seed", type=int,
 parser.add_argument("-r", "--reset", type=int, default=0,
                     help=("Reset criterion for cg solver"))
 
-parser.add_argument("-c", "--control", type=int, default=0,
-                    help=("Mean strain/stress control"))
+# parser.add_argument("-c", "--control", type=int, default=0,
+#                     help=("Mean strain/stress control"))
+
 
 group_proj = parser.add_mutually_exclusive_group()
 
@@ -103,6 +104,15 @@ group_proj.add_argument("-FOU", "--fourier",
 
 group_proj.add_argument("-FEM", "--fem_proj",
                         action="store_true", help="The projection choice")
+
+
+control_proj = parser.add_mutually_exclusive_group()
+
+control_proj.add_argument("-SNC", "--strain_control",
+                          action="store_true", help="The mean control choice")
+
+control_proj.add_argument("-SSC", "--stress_control",
+                          action="store_true", help="The mean control choice")
 
 args = parser.parse_args()
 
@@ -118,6 +128,13 @@ elif args.fem_proj:
 else:
     raise Exception("projection not defined")
 
+if args.strain_control:
+    control_mean = µ.solvers.MeanControl.strain_control
+elif args.stress_control:
+    control_mean = µ.solvers.MeanControl.stress_control
+else:
+    raise Exception("mean control not defined")
+
 # saving args parameters in local variables:
 nb_steps = args.nb_steps
 dump_freq = args.dump_freq
@@ -129,8 +146,6 @@ seed_no = args.seed
 seed_no = int(seed_no)
 reset = args.reset
 reset = int(reset)
-control = args.control
-control = int(control)
 
 reset_cg = µ.solvers.ResetCG.no_reset
 reset_count = 0
@@ -155,13 +170,6 @@ elif reset == 3:
 else:
     raise ValueError
 
-control_mean = µ.solvers.MeanControl.strain_control
-if control == 0:
-    control_mean = µ.solvers.MeanControl.strain_control
-elif control == 1:
-    control_mean = µ.solvers.MeanControl.stress_control
-else:
-    raise ValueError
 
 verbosity_cg = µ.Verbosity.Silent
 verbosity_newton = µ.Verbosity.Silent

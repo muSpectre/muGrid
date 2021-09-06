@@ -161,22 +161,7 @@ namespace muSpectre {
       }
       case MeanControl::StressControl: {
         // Ghat(ξ=0) ← δᵢₖδⱼₗ
-        auto && Isymm{Matrices::Isymm<DimS>()};
-        for (Dim_t theta{0}; theta < NbQuadPts; theta++) {
-          for (Dim_t lambda{0}; lambda < NbQuadPts; lambda++) {
-            for (Dim_t i{0}; i < DimS; ++i) {
-              for (Dim_t j{0}; j < DimS; ++j) {
-                for (Dim_t l{0}; l < DimS; ++l) {
-                  for (Dim_t m{0}; m < DimS; ++m) {
-                    this->Ghat[0](i + (j + theta * DimS) * DimS,
-                                  m + (l + lambda * DimS) * DimS) =
-                        get(Isymm, i, j, m, l);
-                  }
-                }
-              }
-            }
-          }
-        }
+        this->Ghat[0].setIdentity();
         break;
       }
       case MeanControl::MixedControl: {

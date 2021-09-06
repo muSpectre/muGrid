@@ -71,18 +71,20 @@ void add_cell_data_helper(py::module & mod) {
           },
           "nb_domain_grid_pts"_a, "domain_lenghts"_a, "communicator"_a)
 #endif
+      .def(
+          "get_fields",
+          [](CellData & cell_data) -> muGrid::GlobalFieldCollection & {
+            return cell_data.get_fields();
+          },
+          py::return_value_policy::reference_internal)
       .def_property_readonly(
           "fields",
           [](CellData & cell_data) -> muGrid::GlobalFieldCollection & {
             return cell_data.get_fields();
           },
           py::return_value_policy::reference_internal)
-      .def("get_field_collection", &CellData::get_field_collection,
-           py::return_value_policy::reference_internal)
-      .def("get_field_collection_field_names",
-           [](CellData & cell) {
-             return cell.get_field_collection().list_fields();
-           })
+      .def("get_field_names",
+           [](CellData & cell) { return cell.get_fields().list_fields(); })
       .def("add_material", &CellData::add_material, "material"_a,
            py::return_value_policy::reference_internal)
       .def_property_readonly("spatial_dim", &CellData::get_spatial_dim)

@@ -310,8 +310,13 @@ namespace muSpectre {
 
     *this->rhs = -flux.get_field();
 
-    // Here we need to subtract the mean stress if the control is on the mean
-    // stress
+    // Here we need to subtract the mean stress value if the control
+    // is on the mean value of stress (we do not to subtract the macroscopic
+    // load the previous step since the RHS is overwritten in each step)
+    // (for more clarification refer to equation 15 in "An algorithm for
+    // stress and mixed control in
+    // Galerkin-based FFT homogenization", 2019,  By: S. Lucarini , and J.
+    // Segurado, doi: 10.1002/nme.6069)
     if (this->mean_control == MeanControl::StressControl) {
       this->rhs->get_map() += macro_load;
     }
@@ -424,9 +429,13 @@ namespace muSpectre {
 
       *this->rhs = -flux.get_field();
 
-      // Here we also need to subtract the mean stress value if the control
+      // Here we need to subtract the mean stress value if the control
       // is on the mean value of stress (we do not to subtract the macroscopic
       // load the previous step since the RHS is overwritten in each step)
+      // (for more clarification refer to equation 15 in "An algorithm for
+      // stress and mixed control in
+      // Galerkin-based FFT homogenization", 2019,  By: S. Lucarini , and J.
+      // Segurado, doi: 10.1002/nme.6069)
       if (this->mean_control == MeanControl::StressControl) {
         this->rhs->get_map() += macro_load;
       }

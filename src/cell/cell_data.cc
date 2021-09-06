@@ -96,11 +96,6 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  muGrid::FieldCollection & CellData::get_field_collection() {
-    return *this->fields;
-  }
-
-  /* ---------------------------------------------------------------------- */
   const muGrid::GlobalFieldCollection & CellData::get_fields() const {
     return *this->fields;
   }

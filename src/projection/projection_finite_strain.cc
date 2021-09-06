@@ -131,33 +131,7 @@ namespace muSpectre {
       }
       case MeanControl::StressControl: {
         // Ghat(ξ=0) ← δᵢₖδⱼₗ
-        switch (DimS) {
-        case oneD: {
-          for (Dim_t im{0}; im < DimS; ++im) {
-            for (Dim_t j{0}; j < DimS * NbQuadPts; ++j) {
-              this->Ghat[0](im + j * DimS, im + j * DimS) = 1;
-            }
-          }
-          break;
-        }
-        case twoD:
-        case threeD: {
-          auto && Iiden{Matrices::Iiden<DimS>()};
-          for (Dim_t im{0}; im < DimS; ++im) {
-            for (Dim_t j{0}; j < DimS * NbQuadPts; ++j) {
-              for (Dim_t l{0}; l < DimS * NbQuadPts; ++l) {
-                this->Ghat[0](im + j * DimS, im + l * DimS) =
-                    get(Iiden, im, j % NbQuadPts, im, l % NbQuadPts);
-              }
-            }
-          }
-          break;
-        }
-        default: {
-          throw muGrid::RuntimeError("Unknown Dimension");
-          break;
-        }
-        }
+        this->Ghat[0].setIdentity();
         break;
       }
       case MeanControl::MixedControl: {
@@ -171,8 +145,8 @@ namespace muSpectre {
       }
       // However, Ihat (integrator operator) is only set to 0
       // because it is not used in the solvers developed here so far, and
-      // basically its only use case so far was to reconstruct the displacement
-      // field from the strain field for visualization purposes.
+      // basically its only use case so far was to reconstruct the
+      // displacement field from the strain field for visualization purposes.
       this->Ihat[0].setZero();
     }
   }

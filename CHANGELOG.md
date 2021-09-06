@@ -1,9 +1,37 @@
 Change log for µSpectre
 =======================
 
-0.19.1 (Not Released yet)
+
+0.22.0 (Not Released Yet)
 -------------------------
-- Fixed a minor array reshape bug in the tutorial_example_new.py that was jeopardizing the output stress plot
+- muSpectre: mean stress control bugs resolved
+- muSpectre: mean stress control is now usable in MPI
+- muSpectre: examples using mean stress control added
+
+0.21.0 (26Aug2021)
+-------------------------
+- CI: Refactoring of the CI with addition of coverage and ccache
+
+0.20.2 (04Aug2021)
+-------------------------
+- muSpectre: deleted an unnecssary parameter from write_2d_class function in iinear_finite_elements.py
+
+0.20.1 (03Aug2021)
+-------------------------
+- muSpectre: improve write_2d and write_3d functions, 2D stencil for hexagonal grid
+
+0.20.0 (15Jul2021)
+-------------------------
+- muSpectre: capability to apply mean stress (instead of mean strain added)
+
+
+0.19.2 (28Jun2021)
+-------------------------
+- muGrid: correct bugs in the FileIONetCDF
+
+0.19.1 (23Jun2021)
+-------------------------
+- muSpectre: Fixed a minor array reshape bug in the tutorial_example_new.py that was jeopardizing the output stress plot
 
 
 0.19.0 (16Jun2021)

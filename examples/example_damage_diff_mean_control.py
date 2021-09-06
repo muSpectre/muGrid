@@ -1,27 +1,57 @@
+#!/usr/bin/env python3
+# -*- coding:utf-8 -*-
+"""
+@file   example_damage_diff_mean_control.py
+
+@author Ali Falsafi<ali.falsafi@epfl.ch>
+
+@date   01 Sep 2021
+
+@brief  plot script for example C "Eshelby inhomogeneity" of the paper
+
+Copyright © 2021 Till Junge
+
+µSpectre is free software; you can redistribute it and/or
+modify it under the terms of the GNU Lesser General Public License as
+published by the Free Software Foundation, either version 3, or (at
+your option) any later version.
+
+µSpectre is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public License
+along with µSpectre; see the file COPYING. If not, write to the
+Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+Boston, MA 02111-1307, USA.
+
+Additional permission under GNU GPL version 3 section 7
+
+If you modify this Program, or any covered work, by linking or combining it
+with proprietary FFT implementations or numerical libraries, containing parts
+covered by the terms of those libraries' licenses, the licensors of this
+Program grant you additional permission to convey the resulting work.
+"""
+
+from python_example_imports import muSpectre as msp
+from python_example_imports import muSpectre as µ
+from python_example_imports import muSpectre_gradient_integration as gi
+from python_example_imports import muSpectre_vtk_export as vt_ex
+from muFFT import Stencils2D
+from enum import Enum
+import argparse
+import random
 import os
 import sys
 import traceback
 import numpy as np
 np.set_printoptions(precision=3, linewidth=130)
-import random
-import matplotlib.pyplot as plt
-import matplotlib
-matplotlib.use('tkagg')
-import argparse
-from wurlitzer import pipes, sys_pipes
-from enum import Enum
 
 try:
     from mpi4py import MPI
 except ImportError:
     MPI = None
-
-
-from python_paper_example_imports import muSpectre_vtk_export as vt_ex
-from python_paper_example_imports import muSpectre_gradient_integration as gi
-from python_paper_example_imports import muSpectre as µ
-from python_paper_example_imports import muSpectre as msp
-from muFFT import Stencils2D
 
 
 comm = MPI.COMM_WORLD
@@ -112,12 +142,11 @@ class EigenStrain:
                                                         pixel_coord[1]]:
                     strain_field[:, :, 0, i, j] -= strain_to_apply
                     strain_field[:, :, 1, i, j] -= strain_to_apply
-                    print(f"{pixel_coord=}")
-                    print(f"{strain_to_apply=}")
         comm.Barrier()
 
 
-def compute_rve_fem_solver(incl_shape=InclusionShape.circle):
+def compute_rve_fem_solver(control_mean,
+                           incl_shape=InclusionShape.circle):
     nb_steps = 10
     nb_grid_pts = [11, 11]
     center = np.array([r // 2 for r in nb_grid_pts])
@@ -136,7 +165,7 @@ def compute_rve_fem_solver(incl_shape=InclusionShape.circle):
 
     # eigen strain initial and final amplitude
     eigenstrain_init = 1e-6
-    eigenstrain_final = 2e-4
+    eigenstrain_final = 2e-5
 
     eigenstrain_step = ((eigenstrain_final -
                          eigenstrain_init) /
@@ -149,7 +178,9 @@ def compute_rve_fem_solver(incl_shape=InclusionShape.circle):
                               eigenstrain_init,
                               eigenstrain_step,
                               eigenstrain_shape)
-    print(f"{eigen_class.count_pixels=}")
+    print("{eigen_class.count_pixels=}")
+    print("{}".format(eigen_class.count_pixels))
+
     ## formulation (small_strain or finite_strain)
     formulation = msp.Formulation.small_strain
 
@@ -216,17 +247,18 @@ def compute_rve_fem_solver(incl_shape=InclusionShape.circle):
             #     pixel_id)
 
     # define the convergence tolerance for the Newton-Raphson increment
-    newton_tol = 1e-7
+    newton_tol = 1e-10
 
     # tolerance for the solver of the linear cell
     cg_tol = 1e-8
     equil_tol = 1e-7
 
     # Macroscopic strain
-    Del0 = np.array([[0.00000, 0.00000],
-                     [0.00000, 0.00000]])
+    Del0 = np.array([[1.e-6, 0.000],
+                     [0.000, 1e-6]])
     Del0 = .5 * (Del0 + Del0.T)
-    Del0 = Del0 * E_matrix * 1e-3
+    if  control_mean == µ.solvers.MeanControl.stress_control:
+        Del0 = Del0 * E_matrix
 
     maxiter = 500  # for linear cell solver
     maxiter_linear = 40000  # for linear cell solver
@@ -247,8 +279,6 @@ def compute_rve_fem_solver(incl_shape=InclusionShape.circle):
         reset_cg, reset_count)
 
     gradient = Stencils2D.linear_finite_elements
-    control_mean = µ.solvers.MeanControl.stress_control
-    # control_mean = µ.solvers.MeanControl.strain_control
 
     newton_solver = µ.solvers.SolverTRNewtonCG(
         cell, krylov_solver,
@@ -262,7 +292,7 @@ def compute_rve_fem_solver(incl_shape=InclusionShape.circle):
     newton_solver.initialise_cell()
 
     for i in range(nb_steps):
-        print(f"{i}th load step: ")
+        print("{}th load step: ".format(i))
         # print(np.linalg.norm((i + 1) * Del0))
         result = newton_solver.solve_load_increment(
             (i + 1) * Del0,
@@ -270,60 +300,64 @@ def compute_rve_fem_solver(incl_shape=InclusionShape.circle):
         eigen_class.step_nb = eigen_class.step_nb + 1
 
         print(result)
-        # print(
-        #     f"{np.array(newton_solver.flux).reshape(2,2,2,*nb_grid_pts)[0,0,0,...]}")
-        # print(
-        #     f"{np.array(newton_solver.flux).reshape(2,2,2,*nb_grid_pts)[0,0,1,...]}")
-        # print(
-        #     f"{np.array(newton_solver.flux).reshape(2,2,2,*nb_grid_pts)[0,1,0,...]}")
-        # print(
-        #     f"{np.array(newton_solver.flux).reshape(2,2,2,*nb_grid_pts)[0,1,1,...]}")
-        # print(
-        #     f"{np.array(newton_solver.flux).reshape(2,2,2,*nb_grid_pts)[1,0,0,...]}")
-        # print(
-        #     f"{np.array(newton_solver.flux).reshape(2,2,2,*nb_grid_pts)[1,0,1,...]}")
-        # print(
-        #     f"{np.array(newton_solver.flux).reshape(2,2,2,*nb_grid_pts)[1,1,0,...]}")
-        # print(
-        #     f"{np.array(newton_solver.flux).reshape(2,2,2,*nb_grid_pts)[1,1,1,...]}")
 
-        print(f"newton_solver.flux.get_sub_pt_map().mean()=")
-        print(f"{newton_solver.flux.get_sub_pt_map().mean()}")
-        print(f"newton_solver.grad.get_sub_pt_map().mean()=")
-        print(f"{newton_solver.grad.get_sub_pt_map().mean()}")
-        print(f"(i+1) * Del0):")
-        print(f"{((i+1) * Del0)}")
+        if control_mean == µ.solvers.MeanControl.stress_control:
+            print("expected mean flux:")
+            print("{}".format((i + 1) * Del0))
+            print("newton_solver.flux.get_sub_pt_map().mean()=")
+            print("{}".format(
+                newton_solver.flux.get_sub_pt_map().mean().reshape([2, 2])))
+        elif control_mean == µ.solvers.MeanControl.strain_control:
+            print("expected mean grad :")
+            print("{}".format((i+1) * Del0))
+            print("newton_solver.grad.get_sub_pt_map().mean()=")
+            print("{}".format(
+                newton_solver.grad.get_sub_pt_map().mean().reshape([2, 2])))
 
-    # visualise e.g., stress in y-direction
-    stress = result.stress
-    strain = result.grad
-    # stress is stored in a flatten stress tensor per pixel, i.e., a
-    # dim^2 × prod(nb_grid_pts_i) array, so it needs to be reshaped
-    fig = plt.figure()
-    stress = stress.reshape(2, 2, 2,  *nb_grid_pts)
-    CS = plt.pcolormesh(np.array(newton_solver.flux).reshape(
-        2, 2, 2, *nb_grid_pts)[0, 0, 0, ...])
-    plt.title("Stress")
-    fig.savefig("phase.png")
 
-    fig = plt.figure()
-    strain = strain.reshape(2, 2, 2,  *nb_grid_pts)
-    plt.title("Strain")
-    CS = plt.pcolormesh(np.array(newton_solver.grad).reshape(
-        2, 2, 2, *nb_grid_pts)[0, 0, 0, ...])
-    fig.savefig("strain.png")
+    if len(sys.argv[:]) == 2:
+        print(sys.argv[1])
+        if sys.argv[1] == 1:
+            pass
+        else:
+            import matplotlib.pyplot as plt
+            from matplotlib import rc
+            import matplotlib
+            import matplotlib.pyplot as plt
+            matplotlib.use('tkagg')
+            # visualise e.g., stress in y-direction
+            stress = result.stress
+            strain = result.grad
+            # stress is stored in a flatten stress tensor per pixel, i.e., a
+            # dim^2 × prod(nb_grid_pts_i) array, so it needs to be reshaped
+            fig = plt.figure()
+            stress = stress.reshape(2, 2, 2,  *nb_grid_pts)
+            CS = plt.pcolormesh(np.array(newton_solver.flux).reshape(
+                2, 2, 2, *nb_grid_pts)[0, 0, 0, ...])
+            plt.title("Stress")
+            fig.savefig("phase.png")
 
-    fig = plt.figure()
-    plt.pcolormesh(material_geometry)
-    plt.title("Phase")
-    CS = plt.pcolormesh(material_geometry)
-    fig.savefig("stress.png")
+            fig = plt.figure()
+            strain = strain.reshape(2, 2, 2,  *nb_grid_pts)
+            plt.title("Strain")
+            CS = plt.pcolormesh(np.array(newton_solver.grad).reshape(
+                2, 2, 2, *nb_grid_pts)[0, 0, 0, ...])
+            fig.savefig("strain.png")
 
-    plt.show()
+            fig = plt.figure()
+            plt.pcolormesh(material_geometry)
+            plt.title("Phase")
+            CS = plt.pcolormesh(material_geometry)
+            fig.savefig("stress.png")
+
+            plt.show()
 
 
 def main():
-    compute_rve_fem_solver()
+    print("SOLVING A SMALL DAMAGE PROBLEM WITH **ZERO** MEAN STRAIN CONTROL")
+    compute_rve_fem_solver(control_mean=µ.solvers.MeanControl.strain_control)
+    print("SOLVING A SMALL DAMAGE PROBLEM WITH **ZERO** MEAN STRESS CONTROL")
+    compute_rve_fem_solver(control_mean=µ.solvers.MeanControl.stress_control)
 
 
 if __name__ == "__main__":

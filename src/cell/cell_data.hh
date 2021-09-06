@@ -131,10 +131,6 @@ namespace muSpectre {
     //! returns a reference to the field collection
     const muGrid::GlobalFieldCollection & get_fields() const;
 
-    //! return a reference to the global field collection storing stress and
-    //! strain of the cell
-    muGrid::FieldCollection & get_field_collection();
-
     /**
      * adds a new material to the cell and returns a reference to the same
      * material

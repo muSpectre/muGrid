@@ -162,6 +162,15 @@ muSpectre_add_example(sec_conc_py_example
 muSpectre_add_example(evaluator_materials_dunant_example
   TYPE PYTHON evaluator_materials_dunant_example.py 1)
 
+muSpectre_add_example(strain_stress_control_example
+  TYPE PYTHON strain_stress_control_example.py 1)
+
+muSpectre_add_example(strain_stress_control_example_fem
+  TYPE PYTHON strain_stress_control_example_fem_proj.py 1)
+
+muSpectre_add_example(example_damage_diff_mean_control
+  TYPE PYTHON example_damage_diff_mean_control.py)
+
 
 if (NETCDF_IO)
   muSpectre_add_example(netcdf_io_use_case
@@ -180,6 +189,9 @@ file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/concrete_micro_structure.npy
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/random_field.npy
+  DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
+
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/random_field_11.npy
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/plot_tri.py

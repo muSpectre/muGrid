@@ -86,15 +86,6 @@ file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/concrete_micro_structure_201.npy
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/random_field_201.npy
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/random_field_11.npy
-  DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
-
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/random_field_5.npy
-  DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
-
 
 muSpectre_add_example(example_D-damage_problem
-  TYPE PYTHON example_D-damage_problem.py -a 10.0 -n 2 -d 1 -g 0.02 -f 2.0e-6 -s 10 -v 0 -FEM)
-
-muSpectre_add_example(example_new
-  TYPE PYTHON new_example_damage.py)
+  TYPE PYTHON example_D-damage_problem.py -a 10.0 -n 2 -d 1 -g 0.02 -f 2.0e-6 -s 10 -v 0 -FEM -SNC)
