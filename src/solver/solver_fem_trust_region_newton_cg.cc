@@ -308,7 +308,7 @@ namespace muSpectre {
     force_copy_vec = this->force->get_field().eigen_vec();
 
     force_norm =
-        std::sqrt(comm.sum(this->force->get_field().eigen_vec().squaredNorm()));
+        std::sqrt(this->squared_norm(this->force->get_field().eigen_vec()));
     *this->rhs = -this->force->get_field();
 
     if (early_convergence_test()) {
@@ -351,12 +351,13 @@ namespace muSpectre {
 
       // Fₖᵀ:δuₖ (will be used in calculating Δ̱E)
       Real force_copy_displacement_incr{
-          comm.sum(force_copy_vec.dot(displacement_incr_vec))};
+          this->dot(force_copy_vec, displacement_incr_vec)};
 
       // δuₖᵀ: Kₖ : δuₖ (will be used in model reduction calculation Δ̱m)
-      Real disp_incr_K_disp_incr{comm.sum(displacement_incr_vec.dot(
+      Real disp_incr_K_disp_incr{this->dot(
+          displacement_incr_vec,
           this->krylov_solver->get_matrix_ptr().lock()->get_adaptor() *
-          displacement_incr_vec))};
+              displacement_incr_vec)};
 
       // Δmₖ = mₖ(δuₖ) - mₖ(0) = 0.5 * δuₖᵀ : Kₖ : δuₖ + Fₖᵀ : δuₖ
       Real del_m{0.5 * disp_incr_K_disp_incr + force_copy_displacement_incr};
@@ -387,7 +388,7 @@ namespace muSpectre {
 
       // Fᵀₖ₊₁ : δuₖ
       Real force_trial_displacement_incr{
-          comm.sum(force_trial_vec.dot(displacement_incr_vec))};
+          this->dot(force_trial_vec, displacement_incr_vec)};
 
       // ΔE = 0.5 * (Fᵀₖ : δuₖ + Fᵀₖ₊₁ : δuₖ)
       Real del_E_bar{
@@ -453,12 +454,11 @@ namespace muSpectre {
         // updating the incremental differences for checking the termination
         // criteria
         // ||δuₖ||
-        incr_norm = std::sqrt(comm.sum(this->disp_fluctuation_incr->get_field()
-                                           .eigen_vec()
-                                           .squaredNorm()));
+        incr_norm = std::sqrt(this->squared_norm(
+            this->disp_fluctuation_incr->get_field().eigen_vec()));
         // ||uₖ||
         displacement_norm = std::sqrt(
-            comm.sum(disp_fluctuation->get_field().eigen_vec().squaredNorm()));
+            this->squared_norm(disp_fluctuation->get_field().eigen_vec()));
 
         if ((this->verbosity >= Verbosity::Detailed) and (comm.rank() == 0)) {
           std::cout << "at Newton step " << std::setw(this->default_count_width)
@@ -491,8 +491,8 @@ namespace muSpectre {
 
         // Keeping a copy of the Force field (be used in ρ calculation)
         force_copy_vec = this->force->get_field().eigen_vec();
-        force_norm = std::sqrt(
-            comm.sum(this->force->get_field().eigen_vec().squaredNorm()));
+        force_norm =
+            std::sqrt(this->squared_norm(this->force->get_field().eigen_vec()));
 
         // updating RHS for feeding to CG
         *this->rhs = -this->force->get_field();

@@ -124,7 +124,6 @@ namespace muSpectre {
    protected:
     // to be called in set_matrix
     void set_internal_arrays();
-    muGrid::Communicator comm{};
 
     //! find the minimzer on the trust region bound (To be called if necessary
     //! during the solution procedure)

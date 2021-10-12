@@ -160,7 +160,6 @@ namespace muSpectre {
 
    protected:
     void set_internal_arrays();
-    muGrid::Communicator comm{};
     Vector_t r_k;   //!< residual
     Vector_t y_k;   //!< preconditioned current solution
     Vector_t p_k;   //!< search direction

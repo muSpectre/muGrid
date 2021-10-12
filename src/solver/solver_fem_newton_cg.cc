@@ -264,7 +264,7 @@ namespace muSpectre {
     this->K.apply_divergence(flux.get_field(), this->force->get_field());
 
     force_norm =
-        std::sqrt(comm.sum(this->force->get_field().eigen_vec().squaredNorm()));
+        std::sqrt(this->squared_norm(this->force->get_field().eigen_vec()));
     *this->rhs = -this->force->get_field();
 
     if (early_convergence_test()) {
@@ -298,10 +298,10 @@ namespace muSpectre {
 
       // updating the incremental differences for checking the termination
       // criteria
-      incr_norm = std::sqrt(comm.sum(
-          this->disp_fluctuation_incr->get_field().eigen_vec().squaredNorm()));
+      incr_norm = std::sqrt(this->squared_norm(
+          this->disp_fluctuation_incr->get_field().eigen_vec()));
       displacement_norm = std::sqrt(
-          comm.sum(disp_fluctuation->get_field().eigen_vec().squaredNorm()));
+          this->squared_norm(disp_fluctuation->get_field().eigen_vec()));
 
       if ((this->verbosity >= Verbosity::Detailed) and (comm.rank() == 0)) {
         std::cout << "at Newton step " << std::setw(this->default_count_width)
@@ -331,8 +331,8 @@ namespace muSpectre {
       auto & flux{std::get<0>(res_tup)};
       this->K.apply_divergence(flux.get_field(), this->force->get_field());
 
-      force_norm = std::sqrt(
-          comm.sum(this->force->get_field().eigen_vec().squaredNorm()));
+      force_norm =
+          std::sqrt(this->squared_norm(this->force->get_field().eigen_vec()));
 
       *this->rhs = -this->force->get_field();
 

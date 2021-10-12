@@ -143,4 +143,16 @@ namespace muSpectre {
     return this->cell_data;
   }
 
+  /* ---------------------------------------------------------------------- */
+  Real SolverBase::squared_norm(const Vector_t & vec) {
+    auto && comm{this->cell_data->get_communicator()};
+    return comm.sum(vec.squaredNorm());
+  }
+
+  /* ---------------------------------------------------------------------- */
+  Real SolverBase::dot(const Vector_t & vec_a, const Vector_t & vec_b) {
+    auto && comm{this->cell_data->get_communicator()};
+    return comm.sum(vec_a.dot(vec_b));
+  }
+
 }  // namespace muSpectre

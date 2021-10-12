@@ -324,7 +324,7 @@ namespace muSpectre {
     this->projection->apply_projection(this->rhs->get_field());
 
     rhs_norm =
-        std::sqrt(comm.sum(this->rhs->get_field().eigen_vec().squaredNorm()));
+        std::sqrt(this->squared_norm(this->rhs->get_field().eigen_vec()));
 
     if (early_convergence_test()) {
       has_converged = true;
@@ -359,11 +359,10 @@ namespace muSpectre {
 
       this->grad->get_field() += this->grad_incr->get_field();
 
-      grad_norm =
-          std::sqrt(comm.sum(grad->get_field().eigen_vec().squaredNorm()));
+      grad_norm = std::sqrt(this->squared_norm(grad->get_field().eigen_vec()));
 
       incr_norm = std::sqrt(
-          comm.sum(this->grad_incr->get_field().eigen_vec().squaredNorm()));
+          this->squared_norm(this->grad_incr->get_field().eigen_vec()));
       switch (this->mean_control) {
       case MeanControl::StrainControl: {
         incr_norm_mean_control = incr_norm;
@@ -375,8 +374,8 @@ namespace muSpectre {
         // doi: 10.1002/nme.6069
         incr_norm_mean_control = std::accumulate(
             grad_incr->begin(), grad_incr->end(), 0.0,
-            [](Real max, auto && grad_incr_entry) -> Real {
-              Real grad_incr_entry_norm{grad_incr_entry.squaredNorm()};
+            [this](Real max, auto && grad_incr_entry) -> Real {
+              Real grad_incr_entry_norm{this->squared_norm(grad_incr_entry)};
               return grad_incr_entry_norm > max ? grad_incr_entry_norm : max;
             });
         incr_norm_mean_control /= grad_incr->get_field().get_nb_entries();
@@ -443,7 +442,7 @@ namespace muSpectre {
       this->projection->apply_projection(this->rhs->get_field());
 
       rhs_norm =
-          std::sqrt(comm.sum(this->rhs->get_field().eigen_vec().squaredNorm()));
+          std::sqrt(this->squared_norm(this->rhs->get_field().eigen_vec()));
 
       full_convergence_test();
     }

@@ -154,10 +154,17 @@ namespace muSpectre {
 
     Index_t get_nb_dof() const;
 
+    //! calculates the squared norm of a vector
+    Real squared_norm(const Vector_t & vec);
+
+    //! calculates the dot product of  two vectors
+    Real dot(const Vector_t & vec_a, const Vector_t & vec_b);
+
    protected:
     std::shared_ptr<MatrixAdaptable> matrix_holder{nullptr};  //!< system matrix
     std::weak_ptr<MatrixAdaptable> matrix_ptr{};  //!< weak ref to matrix
     MatrixAdaptor matrix{};  //!< matrix ref for convenience
+    muGrid::Communicator comm{};
     Real tol;                //!< convergence tolerance
     Uint maxiter;            //!< maximum allowed number of iterations
     Verbosity verbose;       //!< how much information is written to the stdout

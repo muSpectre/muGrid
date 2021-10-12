@@ -113,7 +113,6 @@ namespace muSpectre {
    protected:
     // to be called in set_matrix
     void set_internal_arrays();
-    muGrid::Communicator comm{};
     Vector_t r_k;   //!< residual
     Vector_t p_k;   //!< search direction
     Vector_t Ap_k;  //!< directional stiffness

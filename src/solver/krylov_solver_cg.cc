@@ -47,8 +47,7 @@ namespace muSpectre {
   KrylovSolverCG::KrylovSolverCG(std::shared_ptr<MatrixAdaptable> matrix_holder,
                                  const Real & tol, const Uint & maxiter,
                                  const Verbosity & verbose)
-      : Parent{matrix_holder, tol, maxiter, verbose},
-        comm{matrix_holder->get_communicator()}, r_k(this->get_nb_dof()),
+      : Parent{matrix_holder, tol, maxiter, verbose}, r_k(this->get_nb_dof()),
         p_k(this->get_nb_dof()), Ap_k(this->get_nb_dof()),
         x_k(this->get_nb_dof()) {}
 
@@ -104,8 +103,8 @@ namespace muSpectre {
     this->p_k = -this->r_k;
     this->convergence = Convergence::DidNotConverge;
 
-    Real rdr = this->comm.sum(r_k.squaredNorm());
-    Real rhs_norm2 = this->comm.sum(rhs.squaredNorm());
+    Real rdr = this->squared_norm(r_k);
+    Real rhs_norm2 = this->squared_norm(rhs);
 
     if (rhs_norm2 == 0) {
       std::stringstream msg{};
@@ -149,7 +148,7 @@ namespace muSpectre {
     for (Uint i{0}; i < this->maxiter && rdr > rel_tol2; ++i, ++this->counter) {
       this->Ap_k = this->matrix * this->p_k;
 
-      Real pdAp{comm.sum(this->p_k.dot(this->Ap_k))};
+      Real pdAp{this->dot(this->p_k, this->Ap_k)};
       if (pdAp <= 0) {
         // Hessian is not positive definite
         throw SolverError("Hessian is not positive definite");
@@ -166,7 +165,7 @@ namespace muSpectre {
       //             rₖ₊₁ ← rₖ + αₖApₖ
       this->r_k += alpha * this->Ap_k;
 
-      Real new_rdr{comm.sum(this->r_k.squaredNorm())};
+      Real new_rdr{this->squared_norm(this->r_k)};
 
       /*                      rᵀₖ₊₁rₖ₊₁
        *             βₖ₊₁ ← ————————–

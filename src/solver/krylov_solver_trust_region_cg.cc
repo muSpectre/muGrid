@@ -56,9 +56,8 @@ namespace muSpectre {
         FeaturesTR{trust_region, reset,
                    reset_iter_count == muGrid::Unknown ? this->get_nb_dof() / 4
                                                        : reset_iter_count},
-        comm{matrix_holder->get_communicator()}, r_k(this->get_nb_dof()),
-        p_k(this->get_nb_dof()), Ap_k(this->get_nb_dof()),
-        x_k(this->get_nb_dof()) {
+        r_k(this->get_nb_dof()), p_k(this->get_nb_dof()),
+        Ap_k(this->get_nb_dof()), x_k(this->get_nb_dof()) {
     if (this->reset == ResetCG::iter_count and this->reset_iter_count <= 0) {
       throw SolverError(
           "Positive valued reset_iter_count is needed to perform user "
@@ -72,7 +71,7 @@ namespace muSpectre {
       const Verbosity & verbose, const ResetCG & reset,
       const Index_t & reset_iter_count)
       : Parent{tol, maxiter, verbose}, FeaturesTR{trust_region, reset,
-                                                reset_iter_count},
+                                                  reset_iter_count},
         r_k{}, p_k{}, Ap_k{}, x_k{} {}
 
   /* ---------------------------------------------------------------------- */
@@ -131,8 +130,8 @@ namespace muSpectre {
     this->p_k = -this->r_k;
     this->convergence = Convergence::DidNotConverge;
 
-    Real rdr = this->comm.sum(r_k.squaredNorm());
-    Real rhs_norm2 = this->comm.sum(rhs.squaredNorm());
+    Real rdr = this->squared_norm(r_k);
+    Real rhs_norm2 = this->squared_norm(rhs);
 
     if (rhs_norm2 == 0) {
       std::stringstream msg{};
@@ -174,7 +173,7 @@ namespace muSpectre {
     for (Uint i{0}; i < this->maxiter && rdr > rel_tol2; ++i, ++this->counter) {
       this->Ap_k = this->matrix * this->p_k;
 
-      Real pdAp{comm.sum(this->p_k.dot(this->Ap_k))};
+      Real pdAp{this->dot(this->p_k, this->Ap_k)};
       if (pdAp <= 0) {
         // Hessian is not positive definite, the minimizer is on the trust
         // region bound
@@ -193,7 +192,7 @@ namespace muSpectre {
 
       //             xₖ₊₁ ← xₖ + αₖpₖ
       this->x_k += alpha * this->p_k;
-      if (this->x_k.squaredNorm() >= trust_region2) {
+      if (this->squared_norm(x_k) >= trust_region2) {
         // we are exceeding the trust region, the minimizer is on the trust
         // region bound
         if (verbose > Verbosity::Silent && comm.rank() == 0) {
@@ -211,7 +210,7 @@ namespace muSpectre {
       //             rₖ₊₁ ← rₖ + αₖApₖ
       this->r_k += alpha * this->Ap_k;
 
-      Real new_rdr{comm.sum(this->r_k.squaredNorm())};
+      Real new_rdr{this->squared_norm(this->r_k)};
 
       /*                     rᵀₖ₊₁rₖ₊₁
        *             βₖ₊₁ ← ————————–
@@ -248,14 +247,13 @@ namespace muSpectre {
             North-Holland Publishing Company
 
             The threshold of 0.2 is a recommended heuristic there*/
-          if (abs(comm.sum(this->r_k.dot(this->r_k_previous))) >
-              0.2 * new_rdr) {
+          if (abs(this->dot(this->r_k, this->r_k_previous)) > 0.2 * new_rdr) {
             reset_cg();
           }
           break;
         }
         case ResetCG::valid_direction: {
-          if (comm.sum(this->r_k.dot(this->p_k)) > 0) {
+          if (this->dot(this->r_k, this->p_k) > 0) {
             reset_cg();
           }
           break;
@@ -302,19 +300,19 @@ namespace muSpectre {
     this->is_on_bound = true;
     Real trust_region2{this->trust_region * this->trust_region};
 
-    Real pdp{this->comm.sum(this->p_k.squaredNorm())};
-    Real xdx{this->comm.sum(this->x_k.squaredNorm())};
-    Real pdx{this->comm.sum(this->p_k.dot(this->x_k))};
+    Real pdp{this->squared_norm(this->p_k)};
+    Real xdx{this->squared_norm(this->x_k)};
+    Real pdx{this->dot(this->p_k, this->x_k)};
     Real tmp{sqrt(pdx * pdx - pdp * (xdx - trust_region2))};
     Real tau1{-(pdx + tmp) / pdp};
     Real tau2{-(pdx - tmp) / pdp};
 
     this->x_k += tau1 * this->p_k;
-    Real m1{-rhs.dot(this->x_k) +
-            0.5 * this->x_k.dot(this->matrix * this->x_k)};
+    Real m1{this->dot(-rhs, this->x_k) +
+            0.5 * this->dot(x_k, this->matrix * this->x_k)};
     this->x_k += (tau2 - tau1) * this->p_k;
-    Real m2{-rhs.dot(this->x_k) +
-            0.5 * this->x_k.dot(this->matrix * this->x_k)};
+    Real m2{this->dot(-rhs, this->x_k) +
+            0.5 * this->dot(this->x_k, this->matrix * this->x_k)};
 
     // check which direction is the minimizer
     if (m2 < m1) {

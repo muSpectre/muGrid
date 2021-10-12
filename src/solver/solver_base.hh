@@ -58,6 +58,7 @@ namespace muSpectre {
     using CellExtractFieldFunc_t = typename std::function<void(
         const std::shared_ptr<muSpectre::CellData>)>;
 
+    using Vector_t = Eigen::Matrix<Real, Eigen::Dynamic, 1>;
 #ifdef NO_EXPERIMENTAL
     using EigenStrainFunc_ref = typename muGrid::optional<EigenStrainFunc_t &>;
     using CellExtractFieldFunc_ref =
@@ -149,6 +150,12 @@ r mechanics domain.
 
     //! getter of the cell data
     const std::shared_ptr<CellData> get_cell_data() const;
+
+    //! calculates the squared norm of a vector
+    Real squared_norm(const Vector_t & vec);
+
+    //! calculates the dot product of  two vectors
+    Real dot(const Vector_t & vec_a, const Vector_t & vec_b);
 
    protected:
     //! get current load step counter

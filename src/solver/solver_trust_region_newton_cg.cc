@@ -364,7 +364,7 @@ namespace muSpectre {
     this->projection->apply_projection(this->rhs->get_field());
 
     rhs_norm =
-        std::sqrt(comm.sum(this->rhs->get_field().eigen_vec().squaredNorm()));
+        std::sqrt(this->squared_norm(this->rhs->get_field().eigen_vec()));
 
     if (early_convergence_test()) {
       has_converged = true;
@@ -403,7 +403,7 @@ namespace muSpectre {
       // updating the incremental differences for checking the termination
       // criteria
       incr_norm = std::sqrt(
-          comm.sum(this->grad_incr->get_field().eigen_vec().squaredNorm()));
+          this->squared_norm(this->grad_incr->get_field().eigen_vec()));
       switch (this->mean_control) {
       case MeanControl::StrainControl: {
         incr_norm_mean_control = incr_norm;
@@ -415,8 +415,8 @@ namespace muSpectre {
         // doi: 10.1002/nme.6069
         incr_norm_mean_control = std::accumulate(
             grad_incr->begin(), grad_incr->end(), 0.0,
-            [](Real max, auto && grad_incr_entry) -> Real {
-              Real grad_incr_entry_norm{grad_incr_entry.squaredNorm()};
+            [this](Real max, auto && grad_incr_entry) -> Real {
+              Real grad_incr_entry_norm{this->squared_norm(grad_incr_entry)};
               return grad_incr_entry_norm > max ? grad_incr_entry_norm : max;
             });
         incr_norm_mean_control /= grad_incr->get_field().get_nb_entries();
@@ -430,19 +430,19 @@ namespace muSpectre {
         throw muGrid::RuntimeError("Unknown value for mean_control value");
         break;
       }
-      grad_norm =
-          std::sqrt(comm.sum(grad->get_field().eigen_vec().squaredNorm()));
+      grad_norm = std::sqrt(this->squared_norm(grad->get_field().eigen_vec()));
 
       // δFₖ
       Vector_t grad_incr_vec{this->grad_incr->get_field().eigen_vec()};
 
       // gₖᵀ δFₖ (will be used in calculating Δ̱E and Δ̱m)
-      Real flux_copy_grad_incr{comm.sum(flux_copy_vec.dot(grad_incr_vec))};
+      Real flux_copy_grad_incr{this->dot(flux_copy_vec, grad_incr_vec)};
 
       // δFₖᵀ: Bₖ : δFₖ (will be used in model reduction calculation)
-      Real grad_incr_B_grad_incr{comm.sum(grad_incr_vec.dot(
+      Real grad_incr_B_grad_incr{this->dot(
+          grad_incr_vec,
           this->krylov_solver->get_matrix_ptr().lock()->get_adaptor() *
-          grad_incr_vec))};
+              grad_incr_vec)};
 
       // Δmₖ = mₖ(δFₖ)-mₖ(0) = 0.5 * δFₖᵀ Bₖ δFₖ + gₖᵀ δFₖ
       Real del_m{0.5 * grad_incr_B_grad_incr + flux_copy_grad_incr};
@@ -460,7 +460,7 @@ namespace muSpectre {
 
       // Δ̱E estimated (estimated real energy reduction using trapezoidal
       // approximation)
-      Real flux_trial_grad_incr{comm.sum(flux_trial_vec.dot(grad_incr_vec))};
+      Real flux_trial_grad_incr{this->dot(flux_trial_vec, grad_incr_vec)};
 
       // ΔE = 0.5 * (gᵀₖ : δFₖ + gᵀₖ₊₁ : δFₖ)
       Real del_E_bar{0.5 * (flux_copy_grad_incr + flux_trial_grad_incr)};
@@ -548,8 +548,8 @@ namespace muSpectre {
 
         this->projection->apply_projection(this->rhs->get_field());
 
-        rhs_norm = std::sqrt(
-            comm.sum(this->rhs->get_field().eigen_vec().squaredNorm()));
+        rhs_norm =
+            std::sqrt(this->squared_norm(this->rhs->get_field().eigen_vec()));
 
         // performing convergence test
         if (not this->krylov_solver->get_is_on_bound()) {

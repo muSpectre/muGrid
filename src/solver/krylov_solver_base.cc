@@ -43,15 +43,17 @@ namespace muSpectre {
       const Uint & maxiter, const Verbosity & verbose)
       : matrix_holder{matrix_adaptable},
         matrix_ptr{matrix_adaptable}, matrix{matrix_adaptable->get_adaptor()},
-        tol{tol}, maxiter{maxiter}, verbose{verbose} {}
+        comm{matrix_holder->get_communicator()}, tol{tol}, maxiter{maxiter},
+        verbose{verbose} {}
 
   /* ---------------------------------------------------------------------- */
   KrylovSolverBase::KrylovSolverBase(
       std::weak_ptr<MatrixAdaptable> matrix_adaptable, const Real & tol,
       const Uint & maxiter, const Verbosity & verbose)
       : matrix_ptr{matrix_adaptable},
-        matrix{matrix_adaptable.lock()->get_adaptor()}, tol{tol},
-        maxiter{maxiter}, verbose{verbose} {}
+        matrix{matrix_adaptable.lock()->get_adaptor()},
+        comm{matrix_holder->get_communicator()}, tol{tol}, maxiter{maxiter},
+        verbose{verbose} {}
 
   /* ---------------------------------------------------------------------- */
   KrylovSolverBase::KrylovSolverBase(const Real & tol, const Uint & maxiter,
@@ -95,6 +97,16 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   Real KrylovSolverBase::get_tol() const { return this->tol; }
+
+  /* ---------------------------------------------------------------------- */
+  Real KrylovSolverBase::squared_norm(const Vector_t & vec) {
+    return this->comm.sum(vec.squaredNorm());
+  }
+
+  /* ---------------------------------------------------------------------- */
+  Real KrylovSolverBase::dot(const Vector_t & vec_a, const Vector_t & vec_b) {
+    return this->comm.sum(vec_a.dot(vec_b));
+  }
 
   /* ---------------------------------------------------------------------- */
   std::shared_ptr<MatrixAdaptable> KrylovSolverBase::get_matrix_holder() const {

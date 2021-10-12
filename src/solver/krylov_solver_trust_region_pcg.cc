@@ -101,9 +101,9 @@ namespace muSpectre {
     this->y_k = this->preconditioner * this->r_k;
     this->p_k = -this->y_k;
 
-    Real rdr{this->comm.sum(this->r_k.squaredNorm())};
-    Real rdy{this->comm.sum(this->r_k.dot(this->y_k))};
-    Real rhs_norm2{this->comm.sum(rhs.squaredNorm())};
+    Real rdr{this->squared_norm(this->r_k)};
+    Real rdy{this->dot(this->r_k, this->y_k)};
+    Real rhs_norm2{this->squared_norm(rhs)};
 
     if (rhs_norm2 == 0) {
       std::stringstream msg{};
@@ -141,8 +141,7 @@ namespace muSpectre {
     Uint iter_counter{0};
     for (Uint i = 0; i < this->maxiter; ++i, ++this->counter, ++iter_counter) {
       this->Ap_k = matrix * this->p_k;
-      Real pAp{this->comm.sum(this->p_k.dot(this->Ap_k))};
-
+      Real pAp{this->dot(this->p_k, this->Ap_k)};
       if (pAp <= 0) {
         // Hessian is not positive definite, the minimizer is on the trust
         // region bound
@@ -165,7 +164,7 @@ namespace muSpectre {
 
       // we are exceeding the trust region, the minimizer is on the trust
       // region bound
-      if (this->x_k.squaredNorm() >= trust_region2) {
+      if (this->squared_norm(this->x_k) >= trust_region2) {
         if (verbose > Verbosity::Silent && comm.rank() == 0) {
           std::cout << "  CG finished, reason: step exceeded trust region "
                        "bounds"
@@ -181,7 +180,7 @@ namespace muSpectre {
 
       //             rₖ₊₁ ← rₖ + αₖApₖ
       this->r_k += alpha * this->Ap_k;
-      rdr = this->comm.sum(this->r_k.squaredNorm());
+      rdr = this->squared_norm(this->r_k);
       if (this->verbose > Verbosity::Silent && this->comm.rank() == 0) {
         std::cout << "  at CG step " << std::setw(count_width) << i
                   << ": |r|/|b| = " << std::setw(15)
@@ -199,7 +198,7 @@ namespace muSpectre {
       /*                     rᵀₖ₊₁yₖ₊₁
        *             βₖ₊₁ ← ————————–
        *                      rᵀₖyₖ                                */
-      Real new_rdy{this->comm.sum(this->r_k.dot(this->y_k))};
+      Real new_rdy{this->dot(this->r_k, this->y_k)};
       Real beta{new_rdy / rdy};
 
       //! CG reset worker
@@ -231,14 +230,14 @@ namespace muSpectre {
              M.J.D. POWELL
              Mathematical Programming 12 (1977) 241-254.
              North-Holland Publishing Company */
-          if (abs(comm.sum(this->y_k.dot(this->y_k_prev))) >
-              0.2 * this->comm.sum(this->y_k.squaredNorm())) {
+          if (abs(this->dot(this->y_k, this->y_k_prev)) >
+              0.2 * this->squared_norm(this->y_k)) {
             reset_cg();
           }
           break;
         }
         case ResetCG::valid_direction: {
-          if (comm.sum(this->y_k.dot(this->p_k)) > 0) {
+          if (this->dot(this->y_k, this->p_k) > 0) {
             reset_cg();
           }
           break;
@@ -317,19 +316,19 @@ namespace muSpectre {
     this->is_on_bound = true;
     Real trust_region2{this->trust_region * this->trust_region};
 
-    Real pdp{this->comm.sum(this->p_k.squaredNorm())};
-    Real xdx{this->comm.sum(this->x_k.squaredNorm())};
-    Real pdx{this->comm.sum(this->p_k.dot(this->x_k))};
+    Real pdp{this->squared_norm(this->p_k)};
+    Real xdx{this->squared_norm(this->x_k)};
+    Real pdx{this->dot(this->p_k, this->x_k)};
     Real tmp{sqrt(pdx * pdx - pdp * (xdx - trust_region2))};
     Real tau1{-(pdx + tmp) / pdp};
     Real tau2{-(pdx - tmp) / pdp};
 
     this->x_k += tau1 * this->p_k;
-    Real m1{-rhs.dot(this->x_k) +
-            0.5 * this->x_k.dot(this->matrix * this->x_k)};
+    Real m1{this->dot(-rhs, this->x_k) +
+            0.5 * this->dot(this->x_k, this->matrix * this->x_k)};
     this->x_k += (tau2 - tau1) * this->p_k;
-    Real m2{-rhs.dot(this->x_k) +
-            0.5 * this->x_k.dot(this->matrix * this->x_k)};
+    Real m2{this->dot(-rhs, this->x_k) +
+            0.5 * this->dot(this->x_k, this->matrix * this->x_k)};
 
     // check which direction is the minimizer
     if (m2 < m1) {

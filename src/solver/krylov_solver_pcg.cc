@@ -46,10 +46,9 @@ namespace muSpectre {
       std::shared_ptr<MatrixAdaptable> inv_preconditioner, const Real & tol,
       const Uint & maxiter, const Verbosity & verbose)
       : Parent{matrix_holder, tol, maxiter, verbose},
-        FeaturesPC{inv_preconditioner}, comm{matrix_holder->get_communicator()},
-        r_k(this->get_nb_dof()), y_k(this->get_nb_dof()),
-        p_k(this->get_nb_dof()), Ap_k(this->get_nb_dof()),
-        x_k(this->get_nb_dof()) {}
+        FeaturesPC{inv_preconditioner}, r_k(this->get_nb_dof()),
+        y_k(this->get_nb_dof()), p_k(this->get_nb_dof()),
+        Ap_k(this->get_nb_dof()), x_k(this->get_nb_dof()) {}
 
   /* ---------------------------------------------------------------------- */
   KrylovSolverPCG::KrylovSolverPCG(const Real & tol, const Uint & maxiter,
@@ -70,9 +69,9 @@ namespace muSpectre {
     this->y_k = this->preconditioner * this->r_k;
     this->p_k = -this->y_k;
 
-    Real rdr{this->comm.sum(this->r_k.squaredNorm())};
-    Real rdy{this->comm.sum(this->r_k.dot(this->y_k))};
-    Real rhs_norm2{this->comm.sum(rhs.squaredNorm())};
+    Real rdr{this->squared_norm(this->r_k)};
+    Real rdy{this->dot(this->r_k, this->y_k)};
+    Real rhs_norm2{this->squared_norm(rhs)};
 
     if (rhs_norm2 == 0) {
       std::stringstream msg{};
@@ -109,7 +108,7 @@ namespace muSpectre {
     ++this->counter;
     for (Uint i = 0; i < this->maxiter; ++i, ++this->counter) {
       this->Ap_k = matrix * this->p_k;
-      Real pAp{this->comm.sum(this->p_k.dot(this->Ap_k))};
+      Real pAp{this->dot(this->p_k, this->Ap_k)};
 
       if (pAp <= 0) {
         // Hessian is not positive definite
@@ -126,7 +125,7 @@ namespace muSpectre {
 
       //             rₖ₊₁ ← rₖ + αₖApₖ
       this->r_k += alpha * this->Ap_k;
-      rdr = this->comm.sum(this->r_k.squaredNorm());
+      rdr = this->squared_norm(this->r_k);
       if (this->verbose > Verbosity::Silent && this->comm.rank() == 0) {
         std::cout << "  at CG step " << std::setw(count_width) << i
                   << ": |r|/|b| = " << std::setw(15)
@@ -142,7 +141,7 @@ namespace muSpectre {
       /*                     rᵀₖ₊₁yₖ₊₁
        *             βₖ₊₁ ← ————————–
        *                      rᵀₖyₖ                                */
-      Real new_rdy{this->comm.sum(this->r_k.dot(this->y_k))};
+      Real new_rdy{this->dot(this->r_k, this->y_k)};
       Real beta{new_rdy / rdy};
       rdy = new_rdy;
 
