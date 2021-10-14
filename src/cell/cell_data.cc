@@ -200,11 +200,11 @@ namespace muSpectre {
     for (auto && domain : this->domain_materials) {
       for (auto && material : std::get<1>(domain)) {
         if (material->was_last_step_nonlinear()) {
-          return true;
+              return this->communicator.logical_or(true);
         }
       }
     }
-    return false;
+    return this->communicator.logical_or(false);
   }
 
   /* ---------------------------------------------------------------------- */

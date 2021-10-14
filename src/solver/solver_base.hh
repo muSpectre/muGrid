@@ -151,10 +151,10 @@ r mechanics domain.
     //! getter of the cell data
     const std::shared_ptr<CellData> get_cell_data() const;
 
-    //! calculates the squared norm of a vector
+    //! calculates the squared norm of a vector distributed memory safe
     Real squared_norm(const Vector_t & vec);
 
-    //! calculates the dot product of  two vectors
+    //! calculates the dot product of  two vectors distributed memory safe
     Real dot(const Vector_t & vec_a, const Vector_t & vec_b);
 
    protected:

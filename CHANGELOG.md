@@ -1,8 +1,12 @@
 Change log for µSpectre
 =======================
 
+0.23.0 (Not Released Yet)
+-------------------------
+- muSpectre: making vector operation methods in solver classed with communicating inside them
+- muSpectre: added logical reduction on was_last_step_nonlinear evaluation in CellData 
 
-0.22.0 (Not Released Yet)
+0.22.0 (24Sep2021)
 -------------------------
 - muSpectre: mean stress control bugs resolved
 - muSpectre: mean stress control is now usable in MPI

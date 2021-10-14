@@ -154,10 +154,10 @@ namespace muSpectre {
 
     Index_t get_nb_dof() const;
 
-    //! calculates the squared norm of a vector
+    //! calculates the squared norm of a vector distributed memory safely
     Real squared_norm(const Vector_t & vec);
 
-    //! calculates the dot product of  two vectors
+    //! calculates the dot product of  two vectors distributed memory safely
     Real dot(const Vector_t & vec_a, const Vector_t & vec_b);
 
    protected:

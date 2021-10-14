@@ -59,7 +59,7 @@ namespace muGrid {
   template <typename T, typename T2 = T>
   inline decltype(auto) mpi_type() {
     static_assert(std::is_same<T, T2>::value,
-                   "T2 is a SFINAE parameter, do not touch");
+                  "T2 is a SFINAE parameter, do not touch");
     static_assert(std::is_same<T, T2>::value and not std::is_same<T, T2>::value,
                   "The type you're trying to map has not been declared.");
     return MPI_LONG;
@@ -271,6 +271,27 @@ namespace muGrid {
         return res;
       }
     }
+    //! return logical and
+    bool logical_and(const bool & arg) const {
+      if (this->comm == MPI_COMM_NULL) {
+        return arg;
+      } else {
+        bool res;
+        MPI_Allreduce(&arg, &res, 1, MPI_C_BOOL, MPI_LAND, this->comm);
+        return res;
+      }
+    }
+
+    //! return logical and
+    bool logical_or(const bool & arg) const {
+      if (this->comm == MPI_COMM_NULL) {
+        return arg;
+      } else {
+        bool res;
+        MPI_Allreduce(&arg, &res, 1, MPI_C_BOOL, MPI_LOR, this->comm);
+        return res;
+      }
+    }
 
     MPI_Comm get_mpi_comm() { return this->comm; }
 
@@ -281,7 +302,7 @@ namespace muGrid {
     MPI_Comm comm;
   };
 
-#else   // WITH_MPI
+#else  // WITH_MPI
 
   //! stub communicator object that doesn't communicate anything
   class Communicator {
@@ -319,6 +340,12 @@ namespace muGrid {
     T bcast(T & arg, const Int &) {
       return arg;
     }
+
+    //! return logical and
+    bool logical_or(const bool & arg) const { return arg; }
+
+    //! return logical and
+    bool logical_and(const bool & arg) const { return arg; }
 
     //! find whether the underlying communicator is mpi
     static bool has_mpi() { return false; }
