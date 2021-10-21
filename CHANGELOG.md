@@ -1,7 +1,11 @@
 Change log for µSpectre
 =======================
 
-0.23.0 (Not Released Yet)
+0.23.1 (Not Released Yet)
+-------------------------
+- muSpectre: A bug fixed in the call of the constructor of FieldCollection
+
+0.23.0 (15Oct2021)
 -------------------------
 - muSpectre: making vector operation methods in solver classed with communicating inside them
 - muSpectre: added logical reduction on was_last_step_nonlinear evaluation in CellData 

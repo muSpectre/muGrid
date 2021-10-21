@@ -47,7 +47,7 @@ namespace muSpectre {
       : fft_engine{engine}, domain_lengths{domain_lengths},
         fields{std::make_unique<muGrid::GlobalFieldCollection>(
             engine->get_nb_domain_grid_pts().get_dim(),
-            engine->get_nb_subdomain_grid_pts(),
+            engine->get_nb_domain_grid_pts(),
             engine->get_nb_subdomain_grid_pts(),
             engine->get_subdomain_locations())},
         communicator{engine->get_communicator()} {
