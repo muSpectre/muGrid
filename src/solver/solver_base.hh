@@ -121,10 +121,16 @@ r mechanics domain.
     const Formulation & get_formulation() const;
 
     //! resets the load step counter to zero
-    void reset_counter();
+    void reset_counter_load_step();
 
     //! get current load step counter
-    const Int & get_counter() const;
+    const Int & get_counter_load_step() const;
+
+    //! resets the Newton iteration counter to zero
+    void reset_counter_iteration();
+
+    //! get current newton iteration counter
+    const Int & get_counter_iteration() const;
 
     /** reset the linear/nonlinear status of all the materials in the given
     domain
@@ -162,8 +168,6 @@ r mechanics domain.
     Real dot(const Vector_t & vec_a, const Vector_t & vec_b);
 
    protected:
-    //! get current load step counter
-    Int & get_counter();
     std::shared_ptr<CellData> cell_data;
     muGrid::Verbosity verbosity;
     Formulation formulation{Formulation::not_set};
@@ -180,7 +184,8 @@ r mechanics domain.
     std::map<muGrid::PhysicsDomain, std::shared_ptr<MappedField_t>> fluxes{};
     //! Tangent moduli field
     std::map<muGrid::PhysicsDomain, std::shared_ptr<MappedField_t>> tangents{};
-    Int counter{};
+    Int counter_load_step{};         //!< load step counter
+    Int counter_iteration{};  //!< Newton iteration counter
     Int default_count_width{3};
     bool is_initialised{false};
   };

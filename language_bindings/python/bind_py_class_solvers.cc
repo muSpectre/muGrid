@@ -119,10 +119,15 @@ void add_solver_base(py::module & mod) {
   py::class_<SolverBase, muSpectre::MatrixAdaptable,
              std::shared_ptr<SolverBase>, PySolverBase>(mod, "SolverBase")
       // .def(py::init<>())
-      .def_property_readonly("counter",
+      .def_property_readonly("counter_load_step",
                              [](const SolverBase & solver_base) {
-                               return solver_base.get_counter();
+                               return solver_base.get_counter_load_step();
                              })
+      .def_property_readonly(
+          "counter_iteration",
+          [](const SolverBase & solver_base) {
+            return solver_base.get_counter_iteration();
+          })
       .def_property("formulation", &SolverBase::get_formulation,
                     &SolverBase::set_formulation)
       .def("initialise_cell", &SolverBase::initialise_cell)

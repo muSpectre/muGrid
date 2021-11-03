@@ -225,11 +225,11 @@ namespace muSpectre {
       throw SolverError{error_message.str()};
     }
 
-    ++this->get_counter();
+    ++this->counter_load_step;
     if (load_step.size() > 1 and this->verbosity > Verbosity::Silent and
         comm.rank() == 0) {
       std::cout << "at Load step " << std::setw(this->default_count_width)
-                << this->get_counter() << std::endl;
+                << this->get_counter_load_step() << std::endl;
     }
 
     // updating cell grad with the difference of the current and previous
@@ -339,7 +339,7 @@ namespace muSpectre {
             this->krylov_solver->solve(this->rhs->get_field().eigen_vec());
       } catch (ConvergenceError & error) {
         std::stringstream err{};
-        err << "Failure at load step " << this->get_counter()
+        err << "Failure at load step " << this->get_counter_load_step()
             << ". In Newton-Raphson step " << newt_iter << ":" << std::endl
             << error.what() << std::endl
             << "The applied boundary condition is Δ" << strain_symb << " ="
@@ -447,11 +447,15 @@ namespace muSpectre {
       full_convergence_test();
     }
 
+    // incrementing the number of Newton steps so far by the number of newton
+    // steps of current load step
+    this->counter_iteration += newt_iter;
+
     // throwing meaningful error message if the number of iterations for
     // newton_cg is exploited
     if (newt_iter == this->krylov_solver->get_maxiter()) {
       std::stringstream err{};
-      err << "Failure at load step " << this->get_counter()
+      err << "Failure at load step " << this->get_counter_load_step()
           << ". Newton-Raphson failed to converge. "
           << "The applied boundary condition is Δ" << strain_symb << " ="
           << std::endl

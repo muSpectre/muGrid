@@ -57,10 +57,23 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  void SolverBase::reset_counter() { this->counter = 0; }
+  void SolverBase::reset_counter_load_step() { this->counter_load_step = 0; }
 
   /* ---------------------------------------------------------------------- */
-  const Int & SolverBase::get_counter() const { return this->counter; }
+  const Int & SolverBase::get_counter_load_step() const {
+    return this->counter_load_step;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void SolverBase::reset_counter_iteration() {
+    this->counter_iteration = 0;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  const Int & SolverBase::get_counter_iteration() const {
+    return this->counter_iteration;
+  }
+  /* ---------------------------------------------------------------------- */
 
   void check_material_formulation(const CellData::Material_ptr mat,
                                   const Formulation & form,
@@ -129,9 +142,6 @@ namespace muSpectre {
     }
     return std::tie(*this->fluxes.at(domain), *this->tangents.at(domain));
   }
-
-  /* ---------------------------------------------------------------------- */
-  Int & SolverBase::get_counter() { return this->counter; }
 
   /* ---------------------------------------------------------------------- */
   const muFFT::Communicator & SolverBase::get_communicator() const {
