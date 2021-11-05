@@ -110,26 +110,60 @@ namespace muSpectre {
           stress_threshold,
       const Eigen::Ref<const Eigen::Matrix<Real, Eigen::Dynamic,
                                            Eigen::Dynamic>> & eigen_strain) {
-    // check if the users input eigen strain has the right dimension
-    if (eigen_strain.cols() != DimM || eigen_strain.rows() != DimM) {
+    // check if the users input has the right dimensions
+    if (plastic_increment.rows() !=
+        this->plastic_increment_field.get_field().get_nb_sub_pts()) {
+      std::stringstream error{};
+      error << "Got a wrong shape " << std::to_string(plastic_increment.rows())
+            << "×" << std::to_string(plastic_increment.cols())
+            << " for the plastic increment vector.\nI expected the shape: "
+            << std::to_string(
+                   this->plastic_increment_field.get_field().get_nb_sub_pts())
+            << "×"
+            << "1";
+      throw MaterialError(error.str());
+    }
+    if (stress_threshold.rows() !=
+        this->stress_threshold_field.get_field().get_nb_sub_pts()) {
+      std::stringstream error{};
+      error << "Got a wrong shape " << std::to_string(stress_threshold.rows())
+            << "×" << std::to_string(stress_threshold.cols())
+            << " for the stress threshold vector.\nI expected the shape: "
+            << std::to_string(
+                   this->stress_threshold_field.get_field().get_nb_sub_pts())
+            << "×"
+            << "1";
+      throw MaterialError(error.str());
+    }
+    if ((eigen_strain.rows() !=
+         this->eigen_strain_field.get_field().get_nb_sub_pts()) ||
+        (eigen_strain.cols() != DimM * DimM)) {
       std::stringstream error{};
       error << "Got a wrong shape " << std::to_string(eigen_strain.rows())
             << "×" << std::to_string(eigen_strain.cols())
-            << " for the eigen strain matrix.\nI expected the shape: "
-            << std::to_string(DimM) << "×" << std::to_string(DimM);
-      throw muGrid::RuntimeError(error.str());
+            << " for the eigen strain matrix.\nI expected the shape "
+               "(nb_quad_pts x DimM²): "
+            << std::to_string(
+                   this->eigen_strain_field.get_field().get_nb_sub_pts())
+            << "×" << DimM * DimM;
+      throw MaterialError(error.str());
     }
+
     this->internal_fields->add_pixel(pixel);
-    // store the first(lambda) and second(mu) Lame constant in the field
+    // store the material parameters in the corresponding fields
     Real lambda = Hooke::compute_lambda(Young_modulus, Poisson_ratio);
     Real mu = Hooke::compute_mu(Young_modulus, Poisson_ratio);
     this->lambda_field.get_field().push_back(lambda);
     this->mu_field.get_field().push_back(mu);
-    this->plastic_increment_field.get_field().push_back(plastic_increment);
-    this->stress_threshold_field.get_field().push_back(stress_threshold);
-    const Eigen::Map<const Eigen::Array<Real, DimM * DimM, 1>> strain_map(
-        eigen_strain.data());
-    this->eigen_strain_field.get_field().push_back(strain_map);
+    for (Index_t i{0}; i < plastic_increment.rows(); ++i) {
+      this->plastic_increment_field.get_field().push_back_single(
+          plastic_increment(i));
+      this->stress_threshold_field.get_field().push_back_single(
+          stress_threshold(i));
+      const Eigen::Map<const Eigen::Array<Real, DimM * DimM, 1>> strain_map(
+          eigen_strain.row(i).data());
+      this->eigen_strain_field.get_field().push_back_single(strain_map);
+    }
   }
 
   /* ---------------------------------------------------------------------- */

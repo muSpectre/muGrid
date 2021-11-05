@@ -115,6 +115,7 @@ def compute_response(N, lens, max_iter, cg_tol, newton_tol,
     res = µ.solvers.newton_cg(cell, dF_steps, solver, newton_tol,
                               equil_tol, verbose,
                               μ.solvers.IsStrainInitialised.No,
+                              µ.StoreNativeStress.No,
                               eigen_class.eigen_strain_func)
 
     nb_iters = []

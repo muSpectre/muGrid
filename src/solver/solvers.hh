@@ -108,6 +108,7 @@ namespace muSpectre {
       KrylovSolverBase & solver, const Real & newton_tol,
       const Real & equil_tol, const Verbosity & verbose = Verbosity::Silent,
       const IsStrainInitialised & strain_init = IsStrainInitialised::False,
+      const StoreNativeStress & store_native_stress = StoreNativeStress::no,
       EigenStrainFunc_ref eigen_strain_func = muGrid::nullopt);
   /**
    * Uses the Newton-conjugate Gradient method to find the static
@@ -119,10 +120,12 @@ namespace muSpectre {
       KrylovSolverBase & solver, const Real & newton_tol,
       const Real & equil_tol, const Verbosity & verbose = Verbosity::Silent,
       const IsStrainInitialised & strain_init = IsStrainInitialised::False,
+      const StoreNativeStress & store_native_stress = StoreNativeStress::no,
       EigenStrainFunc_ref eigen_strain_func = muGrid::nullopt) {
     LoadSteps_t load_steps{load_step};
     auto ret_val{newton_cg(cell, load_steps, solver, newton_tol, equil_tol,
-                           verbose, strain_init, eigen_strain_func)
+                           verbose, strain_init, store_native_stress,
+                           eigen_strain_func)
                      .front()};
     return ret_val;
   }

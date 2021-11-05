@@ -257,26 +257,30 @@ namespace muSpectre {
     /**
      * evaluates and returns the stress for the currently set strain
      */
-    virtual const muGrid::RealField & evaluate_stress();
+    virtual const muGrid::RealField & evaluate_stress(
+        const StoreNativeStress & store_native_stress = StoreNativeStress::no);
 
     /**
      * evaluates and returns the stress for the currently set strain
      */
-    EigenVec_cmap evaluate_stress_eigen();
+    EigenVec_cmap evaluate_stress_eigen(
+        const StoreNativeStress & store_native_stress = StoreNativeStress::no);
 
     /**
      * evaluates and returns the stress and tangent moduli for the currently set
      * strain
      */
     virtual std::tuple<const muGrid::RealField &, const muGrid::RealField &>
-    evaluate_stress_tangent();
+    evaluate_stress_tangent(
+        const StoreNativeStress & store_native_stress = StoreNativeStress::no);
 
     /**
      * evaluates and returns the stress and tangent moduli for the currently set
      * strain
      */
     std::tuple<const EigenVec_cmap, const EigenVec_cmap>
-    evaluate_stress_tangent_eigen();
+    evaluate_stress_tangent_eigen(
+        const StoreNativeStress & store_native_stress = StoreNativeStress::no);
 
     /**
      * collect the real-valued fields of name `unique_name` of each material in

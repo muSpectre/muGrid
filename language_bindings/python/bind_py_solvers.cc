@@ -55,6 +55,7 @@ using muSpectre::Real;
 using muSpectre::Uint;
 using pybind11::literals::operator""_a;
 using muSpectre::IsStrainInitialised;
+using muSpectre::StoreNativeStress;
 using muSpectre::Verbosity;
 namespace py = pybind11;
 using muGrid::NumpyProxy;
@@ -81,6 +82,7 @@ void add_newton_cg_helper(py::module & mod) {
       name,
       [](muSpectre::Cell & s, const grad & g, solver & so, Real nt, Real eqt,
          Verbosity verb, IsStrainInitialised strain_init,
+         StoreNativeStress store_native_stress,
          py::function & eigen_strain_pyfunc) -> OptimizeResult {
         const grad_vec & g_vec{g};
         Func_t eigen_strain_cpp_func{
@@ -93,28 +95,33 @@ void add_newton_cg_helper(py::module & mod) {
         auto cell_ptr{
             std::dynamic_pointer_cast<muSpectre::Cell>(s.shared_from_this())};
         return newton_cg(cell_ptr, g_vec, so, nt, eqt, verb, strain_init,
-                         eigen_strain_cpp_func)
+                         store_native_stress, eigen_strain_cpp_func)
             .front();
       },
       "cell"_a, "ΔF₀"_a, "solver"_a, "newton_tol"_a, "equil_tol"_a,
       "verbose"_a = Verbosity::Silent,
       "IsStrainInitialised"_a = IsStrainInitialised::False,
+      "store_native_stress"_a = StoreNativeStress::no,
       "eigen strain func"_a = nullptr);
   mod.def(
       name,
       [](std::shared_ptr<muSpectre::Cell> s, const grad & g, solver & so,
-         Real nt, Real eqt, Verbosity verb,
-         IsStrainInitialised strain_init) -> OptimizeResult {
+         Real nt, Real eqt, Verbosity verb, IsStrainInitialised strain_init,
+         StoreNativeStress store_native_stress) -> OptimizeResult {
         const grad_vec & g_vec{g};
-        return newton_cg(s, g_vec, so, nt, eqt, verb, strain_init).front();
+        return newton_cg(s, g_vec, so, nt, eqt, verb, strain_init,
+                         store_native_stress)
+            .front();
       },
       "cell"_a, "ΔF₀"_a, "solver"_a, "newton_tol"_a, "equil_tol"_a,
       "verbose"_a = Verbosity::Silent,
-      "IsStrainInitialised"_a = IsStrainInitialised::False);
+      "IsStrainInitialised"_a = IsStrainInitialised::False,
+      "store_native_stress"_a = StoreNativeStress::no);
   mod.def(
       name,
       [](std::shared_ptr<muSpectre::Cell> s, const grad_vec & g, solver & so,
          Real nt, Real eqt, Verbosity verb, IsStrainInitialised strain_init,
+         StoreNativeStress store_native_stress,
          const py::function & eigen_strain_pyfunc)
           -> std::vector<OptimizeResult> {
         Func_t eigen_strain_cpp_func{
@@ -126,22 +133,25 @@ void add_newton_cg_helper(py::module & mod) {
                                                      muGrid::IterUnit::SubPt));
             }};
         return newton_cg(s, g, so, nt, eqt, verb, strain_init,
-                         eigen_strain_cpp_func);
+                         store_native_stress, eigen_strain_cpp_func);
       },
       "cell"_a, "ΔF₀"_a, "solver"_a, "newton_tol"_a, "equil_tol"_a,
       "verbose"_a = Verbosity::Silent,
       "IsStrainInitialised"_a = IsStrainInitialised::False,
+      "store_native_stress"_a = StoreNativeStress::no,
       "eigen strain func"_a = nullptr);
   mod.def(
       name,
       [](std::shared_ptr<muSpectre::Cell> s, const grad_vec & g, solver & so,
-         Real nt, Real eqt, Verbosity verb,
-         IsStrainInitialised strain_init) -> std::vector<OptimizeResult> {
-        return newton_cg(s, g, so, nt, eqt, verb, strain_init);
+         Real nt, Real eqt, Verbosity verb, IsStrainInitialised strain_init,
+         StoreNativeStress store_native_stress) -> std::vector<OptimizeResult> {
+        return newton_cg(s, g, so, nt, eqt, verb, strain_init,
+                         store_native_stress);
       },
       "cell"_a, "ΔF₀"_a, "solver"_a, "newton_tol"_a, "equil_tol"_a,
       "verbose"_a = Verbosity::Silent,
-      "IsStrainInitialised"_a = IsStrainInitialised::False);
+      "IsStrainInitialised"_a = IsStrainInitialised::False,
+      "store_native_stress"_a = StoreNativeStress::no);
 }
 
 void add_de_geus_helper(py::module & mod) {

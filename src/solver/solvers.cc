@@ -85,6 +85,7 @@ namespace muSpectre {
             KrylovSolverBase & solver, const Real & newton_tol,
             const Real & equil_tol, const Verbosity & verbose,
             const IsStrainInitialised & strain_init,
+            const StoreNativeStress & store_native_stress,
             EigenStrainFunc_ref eigen_strain_func) {
     if (load_steps.size() == 0) {
       throw SolverError("No load steps specified.");
@@ -335,7 +336,7 @@ namespace muSpectre {
       }
       auto & rhs{rhs_field.get_field()};
       {
-        auto res_tup{cell->evaluate_stress_tangent()};
+        auto res_tup{cell->evaluate_stress_tangent(store_native_stress)};
         auto & P{std::get<0>(res_tup)};
         rhs = -P;
         cell->apply_projection(rhs);

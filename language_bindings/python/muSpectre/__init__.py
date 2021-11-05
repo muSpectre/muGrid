@@ -62,7 +62,8 @@ from _muSpectre import (version,
                         ProjectionFiniteStrainFast_2q_2d,
                         ProjectionFiniteStrainFast_2q_3d,
                         FEMStencil,
-                        Discretisation)
+                        Discretisation,
+                        StoreNativeStress)
 
 from muGrid import get_domain_ccoord, get_domain_index
 from muFFT import (Communicator, DiscreteDerivative, FourierDerivative,

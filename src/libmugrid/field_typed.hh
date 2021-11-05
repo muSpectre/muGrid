@@ -377,17 +377,41 @@ namespace muGrid {
 
     /**
      * add a new scalar value at the end of the field (incurs runtime cost, do
-     * not use this in any hot loop)
+     * not use this in any hot loop). If your field has more than one quadrature
+     * point per pixel the same scalar value is pushed back on all quadrature
+     * points of the pixel.
      */
     void push_back(const T & value);
 
     /**
+     * add a new scalar value at the end of the field (incurs runtime cost, do
+     * not use this in any hot loop). Even if you have several quadrature points
+     * per pixel you push back only a single value on a single quadrature point.
+     * Thus you can push back different values on quadrature points belongign to
+     * the same pixel.
+     */
+    void push_back_single(const T & value);
+
+    /**
      * add a new non-scalar value at the end of the field (incurs runtime cost,
-     * do not use this in any hot loop)
+     * do not use this in any hot loop) If your field has more than one
+     * quadrature point per pixel the same non-scalar value is pushed back on
+     * all quadrature points of the pixel.
      */
     void
     push_back(const Eigen::Ref<
               const Eigen::Array<T, Eigen::Dynamic, Eigen::Dynamic>> & value);
+
+    /**
+     * add a new non-scalar value at the end of the field (incurs runtime cost,
+     * do not use this in any hot loop) Even if you have several quadrature
+     * points per pixel you push back only a single non-scalar value on a single
+     * quadrature point. Thus you can push back different values on quadrature
+     * points belongign to the same pixel.
+     */
+    void push_back_single(
+        const Eigen::Ref<
+            const Eigen::Array<T, Eigen::Dynamic, Eigen::Dynamic>> & value);
 
     /**
      * perform a full copy of a field

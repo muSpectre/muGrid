@@ -129,6 +129,7 @@ class EigenStrainSolverCheck(unittest.TestCase):
                                        self.newton_tol, self.equil_tol,
                                        self.verbose,
                                        μ.solvers.IsStrainInitialised.No,
+                                       µ.StoreNativeStress.No,
                                        eigen_strain_func)
 
         r_material = µ.solvers.newton_cg(self.cell_material, self.Del0,

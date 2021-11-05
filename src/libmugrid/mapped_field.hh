@@ -153,7 +153,11 @@ namespace muGrid {
     }
 
     //! random access operator
-    Return_t operator[](size_t index) { return this->map[index]; }
+    Return_t operator[](size_t index) {
+      assert(this->field.get_collection().is_initialised());
+      assert(index <= static_cast<size_t>(this->field.get_nb_entries()));
+      return this->map[index];
+    }
 
     //! stl
     iterator begin() { return this->map.begin(); }

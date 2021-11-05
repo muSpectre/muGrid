@@ -76,8 +76,8 @@ void add_common(py::module & mod) {
       .value("non_split", muSpectre::SplitCell::no);
 
   py::enum_<StoreNativeStress>(mod, "StoreNativeStress")
-      .value("yes", StoreNativeStress::yes)
-      .value("no", StoreNativeStress::no);
+      .value("Yes", StoreNativeStress::yes)
+      .value("No", StoreNativeStress::no);
 
   py::enum_<StressMeasure>(mod, "StressMeasure")
       .value("Cauchy", StressMeasure::Cauchy)

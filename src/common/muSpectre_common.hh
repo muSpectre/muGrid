@@ -138,6 +138,7 @@ namespace muSpectre {
   enum class SplitCell { laminate, simple, no };
 
   //! used to indicate whether internal (native) stresses should be stored
+  //! (yes) or not stored (no)
   enum class StoreNativeStress { yes, no };
 
   /**

@@ -66,37 +66,60 @@ void add_communicator(py::module & mod) {
           "has_mpi", [](py::object) { return muGrid::Communicator::has_mpi(); })
       .def_property_readonly("rank", &muGrid::Communicator::rank)
       .def_property_readonly("size", &muGrid::Communicator::size)
-      .def("sum", [](muGrid::Communicator & comm, const int & arg) {
-        return comm.sum(arg);
-      })
-      .def("sum", [](muGrid::Communicator & comm, const Real & arg) {
-        return comm.sum(arg);
-      })
       .def("sum", [](muGrid::Communicator & comm,
-                     const Eigen::Ref<muGrid::DynMatrix_t<Real>> & arg) {
-        return comm.sum(arg);
-      })
+                     const int & arg) { return comm.sum(arg); })
       .def("sum", [](muGrid::Communicator & comm,
-                     const Eigen::Ref<muGrid::DynMatrix_t<Int>> & arg) {
-        return comm.sum(arg);
-      })
-      .def("sum", [](muGrid::Communicator & comm,
-                     const Eigen::Ref<muGrid::DynMatrix_t<Uint>> & arg) {
-        return comm.sum(arg);
-      })
-      .def("sum", [](muGrid::Communicator & comm,
-                     const Eigen::Ref<muGrid::DynMatrix_t<Complex>> & arg) {
-        return comm.sum(arg);
-      })
+                     const Real & arg) { return comm.sum(arg); })
+      .def("sum",
+           [](muGrid::Communicator & comm,
+              const Eigen::Ref<muGrid::DynMatrix_t<Real>> & arg) {
+             return comm.sum(arg);
+           })
+      .def("sum",
+           [](muGrid::Communicator & comm,
+              const Eigen::Ref<muGrid::DynMatrix_t<Int>> & arg) {
+             return comm.sum(arg);
+           })
+      .def("sum",
+           [](muGrid::Communicator & comm,
+              const Eigen::Ref<muGrid::DynMatrix_t<Uint>> & arg) {
+             return comm.sum(arg);
+           })
+      .def("sum",
+           [](muGrid::Communicator & comm,
+              const Eigen::Ref<muGrid::DynMatrix_t<Complex>> & arg) {
+             return comm.sum(arg);
+           })
       .def("cumulative_sum", &muGrid::Communicator::cumulative_sum<Int>)
       .def("cumulative_sum", &muGrid::Communicator::cumulative_sum<Real>)
       .def("cumulative_sum", &muGrid::Communicator::cumulative_sum<Uint>)
       .def("cumulative_sum", &muGrid::Communicator::cumulative_sum<Index_t>)
       .def("cumulative_sum", &muGrid::Communicator::cumulative_sum<Complex>)
-      .def("gather", &muGrid::Communicator::gather<Real>)
-      .def("gather", &muGrid::Communicator::gather<Int>)
-      .def("gather", &muGrid::Communicator::gather<Uint>)
-      .def("gather", &muGrid::Communicator::gather<Complex>)
+      .def("gather",
+           [](muGrid::Communicator & comm,
+              const Eigen::Ref<muGrid::DynMatrix_t<Real>> & arg) {
+             return comm.gather(arg);
+           })
+      .def("gather",
+           [](muGrid::Communicator & comm,
+              const Eigen::Ref<muGrid::DynMatrix_t<Int>> & arg) {
+             return comm.gather(arg);
+           })
+      .def("gather",
+           [](muGrid::Communicator & comm,
+              const Eigen::Ref<muGrid::DynMatrix_t<Uint>> & arg) {
+             return comm.gather(arg);
+           })
+      .def("gather",
+           [](muGrid::Communicator & comm,
+              const Eigen::Ref<muGrid::DynMatrix_t<Index_t>> & arg) {
+             return comm.gather(arg);
+           })
+      .def("gather",
+           [](muGrid::Communicator & comm,
+              const Eigen::Ref<muGrid::DynMatrix_t<Complex>> & arg) {
+             return comm.gather(arg);
+           })
       .def(
           "bcast",
           [](muGrid::Communicator & comm, Real & scalar_arg, const Int & root) {
@@ -113,6 +136,13 @@ void add_communicator(py::module & mod) {
           "bcast",
           [](muGrid::Communicator & comm, Uint & scalar_arg, const Int & root) {
             return comm.bcast<Uint>(scalar_arg, root);
+          },
+          "scalar_arg"_a, "root"_a)
+      .def(
+          "bcast",
+          [](muGrid::Communicator & comm, Index_t & scalar_arg,
+             const Int & root) {
+            return comm.bcast<Index_t>(scalar_arg, root);
           },
           "scalar_arg"_a, "root"_a)
       .def(

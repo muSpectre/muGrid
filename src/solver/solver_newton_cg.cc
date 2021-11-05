@@ -373,7 +373,7 @@ namespace muSpectre {
         // Galerkin-based FFT homogenization" by: S.Lucarini, J. Segurado
         // doi: 10.1002/nme.6069
         incr_norm_mean_control = std::accumulate(
-            grad_incr->begin(), grad_incr->end(), 0.0,
+            this->grad_incr->begin(), this->grad_incr->end(), 0.0,
             [this](Real max, auto && grad_incr_entry) -> Real {
               Real grad_incr_entry_norm{this->squared_norm(grad_incr_entry)};
               return grad_incr_entry_norm > max ? grad_incr_entry_norm : max;
@@ -446,6 +446,7 @@ namespace muSpectre {
 
       full_convergence_test();
     }
+
     // throwing meaningful error message if the number of iterations for
     // newton_cg is exploited
     if (newt_iter == this->krylov_solver->get_maxiter()) {
@@ -480,6 +481,7 @@ namespace muSpectre {
     if (not(cell_extract_func == muGrid::nullopt)) {
       (cell_extract_func.value())(this->get_cell_data());
     }
+
     return ret_val;
   }
 

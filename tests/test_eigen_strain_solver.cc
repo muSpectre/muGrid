@@ -164,7 +164,7 @@ namespace muSpectre {
 
     auto && res_solver{newton_cg(cell_solver, delF0, cg_solver, newton_tol,
                                  equi_tol, verbose, IsStrainInitialised::False,
-                                 eigen_func)};
+                                 StoreNativeStress::no, eigen_func)};
 
     auto && stress_solver{res_solver.stress};
     auto && stress_material{res_material.stress};
@@ -262,7 +262,7 @@ namespace muSpectre {
 
     auto && ress_solver{newton_cg(cell_solver, delFs, cg_solver, newton_tol,
                                   equi_tol, verbose, IsStrainInitialised::False,
-                                  eigen_func)};
+                                  StoreNativeStress::no, eigen_func)};
 
     int step_out{0};
     for (auto && tup : akantu::zip(ress_solver, ress_material)) {

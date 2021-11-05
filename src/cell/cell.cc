@@ -338,7 +338,8 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  const muGrid::RealField & Cell::evaluate_stress() {
+  const muGrid::RealField &
+  Cell::evaluate_stress(const StoreNativeStress & store_native_stress) {
     if (this->initialised == false) {
       this->initialise();
     }
@@ -356,19 +357,22 @@ namespace muSpectre {
                      << this->get_formulation() << ".";
         throw MaterialError{error_stream.str()};
       }
-      mat->compute_stresses(this->strain, this->stress);
+      mat->compute_stresses(this->strain, this->stress, SplitCell::no,
+                            store_native_stress);
     }
     return this->stress;
   }
 
   /* ---------------------------------------------------------------------- */
-  auto Cell::evaluate_stress_eigen() -> EigenVec_cmap {
-    return this->evaluate_stress().eigen_vec();
+  auto
+  Cell::evaluate_stress_eigen(const StoreNativeStress & store_native_stress)
+      -> EigenVec_cmap {
+    return this->evaluate_stress(store_native_stress).eigen_vec();
   }
 
   /* ---------------------------------------------------------------------- */
   std::tuple<const muGrid::RealField &, const muGrid::RealField &>
-  Cell::evaluate_stress_tangent() {
+  Cell::evaluate_stress_tangent(const StoreNativeStress & store_native_stress) {
     if (not this->initialised) {
       this->initialise();
     }
@@ -392,15 +396,17 @@ namespace muSpectre {
         throw MaterialError{error_stream.str()};
       }
       mat->compute_stresses_tangent(this->strain, this->stress,
-                                    this->tangent.value());
+                                    this->tangent.value(), SplitCell::no,
+                                    store_native_stress);
     }
     return std::tie(this->stress, this->tangent.value());
   }
 
   /* ---------------------------------------------------------------------- */
-  auto Cell::evaluate_stress_tangent_eigen()
+  auto Cell::evaluate_stress_tangent_eigen(
+      const StoreNativeStress & store_native_stress)
       -> std::tuple<const EigenVec_cmap, const EigenVec_cmap> {
-    auto && fields{this->evaluate_stress_tangent()};
+    auto && fields{this->evaluate_stress_tangent(store_native_stress)};
     return std::tuple<const EigenVec_cmap, const EigenVec_cmap>(
         std::get<0>(fields).eigen_vec(), std::get<1>(fields).eigen_vec());
   }

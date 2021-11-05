@@ -51,9 +51,6 @@ namespace muGrid {
   template <typename T>
   using DynMatrix_t = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
 
-  // template <typename T>
-  // using Matrix_t = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
-
 #ifdef WITH_MPI
 
   template <typename T, typename T2 = T>
@@ -213,17 +210,53 @@ namespace muGrid {
     }
 
     //! gather on EigenMatrix types
+    //! If the matrices are of different sizes they are collected along the
+    //! column index (second index). This is even possible for 0x0 arguments on
+    //! some cores. The following example shows how the gathered result is
+    //! collected for different sized matrices on the different cores:
+    //! core   argument matrix   result matrix
+    //!   0         3 x 1          3 x (24/3)
+    //!   1         3 x 5          3 x (24/3)
+    //!   2         0 x 0          3 x (24/3)
+    //!   3         3 x 2          3 x (24/3)
+    //!
+    //! where 24 (=3*1+3*5+0*0+3*2) is the total number of elements on all
+    //! cores. You should always have the same number of points in the row index
+    //! (first index) except for 0 if there is nothing to be gathered on the
+    //! core, otherwise there could be wrong behaviour. This condition is only
+    //! checked in Debug mode.
     template <typename T>
     DynMatrix_t<T> gather(const Eigen::Ref<DynMatrix_t<T>> & arg) const {
       if (this->comm == MPI_COMM_NULL)
         return arg;
-      Index_t send_buf_size(arg.size());
 
       int comm_size = this->size();
+
+      // gather the number of rows on each core to define the output shape
+      // (nb_rows_default = max(nb_rows_all) of the result
+      Index_t nb_rows_loc{arg.rows()};
+      Index_t nb_rows_max{0};
+      auto message{MPI_Allreduce(&nb_rows_loc, &nb_rows_max, 1,
+                                 mpi_type<Index_t>(), MPI_MAX, this->comm)};
+      if (message != 0) {
+        std::stringstream error{};
+        error << "MPI_Allreduce MPI_MAX failed with " << message << " on rank "
+              << this->rank();
+        throw RuntimeError(error.str());
+      }
+
+      // It is only allowed to have matrices with a fixed number of rows or
+      // empty matrices. Hence either nb_rows_loc == nb_rows_max or nb_rows_loc
+      // == 0. Otherwise you might have undefined behaviour because the output
+      // gathered matrix might have a wrong shape.
+      assert((nb_rows_loc == nb_rows_max) or (nb_rows_loc == 0));
+
+      // gather the number of elements on each core to define the output shape
+      // (nb_cols = nb_entries/nb_rows_max) of the result
+      Index_t send_buf_size(arg.size());
       std::vector<int> arg_sizes{comm_size};
-      auto message{MPI_Allgather(&send_buf_size, 1, mpi_type<int>(),
-                                 arg_sizes.data(), 1, mpi_type<int>(),
-                                 this->comm)};
+      message = MPI_Allgather(&send_buf_size, 1, mpi_type<int>(),
+                              arg_sizes.data(), 1, mpi_type<int>(), this->comm);
       if (message != 0) {
         std::stringstream error{};
         error << "MPI_Allgather failed with " << message << " on rank "
@@ -231,18 +264,20 @@ namespace muGrid {
         throw RuntimeError(error.str());
       }
 
-      std::vector<int> displs{comm_size};
-      displs[0] = 0;
-      for (auto i = 0; i < comm_size - 1; ++i) {
-        displs[i + 1] = displs[i] + arg_sizes[i];
-      }
-
       int nb_entries = 0;
       for (auto i = 0; i < comm_size; ++i) {
         nb_entries += arg_sizes[i];
       }
 
-      DynMatrix_t<T> res(arg.rows(), nb_entries / arg.rows());
+      // compute the offset at which the data from each processor is written
+      // into the result
+      std::vector<int> displs(comm_size, 0);
+      for (auto i = 0; i < comm_size - 1; ++i) {
+        displs[i + 1] = displs[i] + arg_sizes[i];
+      }
+
+      // initialise the result matrix with zeros
+      DynMatrix_t<T> res(nb_rows_max, nb_entries / nb_rows_max);
       res.setZero();
 
       message = MPI_Allgatherv(arg.data(), send_buf_size, mpi_type<T>(),

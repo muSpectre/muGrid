@@ -238,6 +238,24 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
+  void TypedField<T>::push_back_single(const T & value) {
+    if (this->is_global()) {
+      throw FieldError("push_back_single() makes no sense on global fields "
+                       "(you can't add individual pixels");
+    }
+    if (not this->has_nb_sub_pts()) {
+      throw FieldError("Can not push_back_single into a field before the "
+                       "number of sub-division points has been set for it");
+    }
+    if (this->nb_components != 1) {
+      throw FieldError("This is not a scalar field. push_back an array.");
+    }
+    this->current_nb_entries += 1;
+    this->values.push_back(value);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
   void TypedField<T>::push_back(
       const Eigen::Ref<const Eigen::Array<T, Eigen::Dynamic, Eigen::Dynamic>> &
           value) {
@@ -262,6 +280,32 @@ namespace muGrid {
       for (Index_t i{0}; i < this->nb_components; ++i) {
         this->values.push_back(value.data()[i]);
       }
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
+  void TypedField<T>::push_back_single(
+      const Eigen::Ref<const Eigen::Array<T, Eigen::Dynamic, Eigen::Dynamic>> &
+          value) {
+    if (this->is_global()) {
+      throw FieldError("push_back_single() makes no sense on global fields "
+                       "(you can't add individual pixels");
+    }
+    if (not this->has_nb_sub_pts()) {
+      throw FieldError("Can not push_back_single into a field before the number"
+                       " of sub-division points has bee set for.");
+    }
+    if (this->nb_components != value.size()) {
+      std::stringstream error{};
+      error << "You are trying to push an array with " << value.size()
+            << "components into a field with " << this->nb_components
+            << " components.";
+      throw FieldError(error.str());
+    }
+    this->current_nb_entries += 1;
+    for (Index_t i{0}; i < this->nb_components; ++i) {
+      this->values.push_back(value.data()[i]);
     }
   }
 

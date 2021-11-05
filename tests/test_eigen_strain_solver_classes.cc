@@ -190,9 +190,10 @@ namespace muSpectre {
     BOOST_TEST_CHECKPOINT("after load increment");
 
     KrylovSolverCG legacy_krylov_solver{legacy_cell, cg_tol, maxiter, verbose};
-    auto && legacy_result{newton_cg(
-        legacy_cell, strain, legacy_krylov_solver, newton_tol, equil_tol,
-        verbose, IsStrainInitialised::False, eigen_func_legacy)};
+    auto && legacy_result{newton_cg(legacy_cell, strain, legacy_krylov_solver,
+                                    newton_tol, equil_tol, verbose,
+                                    IsStrainInitialised::False,
+                                    StoreNativeStress::no, eigen_func_legacy)};
 
     Eigen::Map<Eigen::ArrayXXd> legacy_stress_map{legacy_result.stress.data(),
                                                   new_result.stress.rows(),
@@ -321,9 +322,10 @@ namespace muSpectre {
     }
 
     KrylovSolverCG legacy_krylov_solver{legacy_cell, cg_tol, maxiter, verbose};
-    auto && legacy_result{newton_cg(
-        legacy_cell, delFs, legacy_krylov_solver, newton_tol, equil_tol,
-        verbose, IsStrainInitialised::False, eigen_func_legacy)};
+    auto && legacy_result{newton_cg(legacy_cell, delFs, legacy_krylov_solver,
+                                    newton_tol, equil_tol, verbose,
+                                    IsStrainInitialised::False,
+                                    StoreNativeStress::no, eigen_func_legacy)};
 
     for (int i{0}; i < nb_steps; ++i) {
       this->step_nb = i;
@@ -474,9 +476,10 @@ namespace muSpectre {
     BOOST_TEST_CHECKPOINT("before legacy solver call");
 
     KrylovSolverCG legacy_krylov_solver{legacy_cell, cg_tol, maxiter, verbose};
-    auto && legacy_result{newton_cg(
-        legacy_cell, delFs, legacy_krylov_solver, newton_tol, equil_tol,
-        verbose, IsStrainInitialised::False, eigen_func_legacy)};
+    auto && legacy_result{newton_cg(legacy_cell, delFs, legacy_krylov_solver,
+                                    newton_tol, equil_tol, verbose,
+                                    IsStrainInitialised::False,
+                                    StoreNativeStress::no, eigen_func_legacy)};
 
     BOOST_TEST_CHECKPOINT("after legacy solver call");
 

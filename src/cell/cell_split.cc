@@ -167,7 +167,8 @@ namespace muSpectre {
   // this function handles the evaluation of stress
   // in case the cells have materials in which pixels are partially composed of
   // diffferent materials.
-  const muGrid::RealField & CellSplit::evaluate_stress() {
+  const muGrid::RealField &
+  CellSplit::evaluate_stress(const StoreNativeStress & store_native_stress) {
     if (not this->initialised) {
       this->initialise();
     }
@@ -178,7 +179,8 @@ namespace muSpectre {
     // initialised as zero filled tensors
     this->stress.set_zero();
     for (auto & mat : this->materials) {
-      mat->compute_stresses(this->strain, this->stress);
+      mat->compute_stresses(this->strain, this->stress, SplitCell::simple,
+                            store_native_stress);
     }
     return this->stress;
   }
@@ -188,7 +190,8 @@ namespace muSpectre {
   // in case the cells have materials in which pixels are partially composed of
   // diffferent materials.
   std::tuple<const muGrid::RealField &, const muGrid::RealField &>
-  CellSplit::evaluate_stress_tangent() {
+  CellSplit::evaluate_stress_tangent(
+      const StoreNativeStress & store_native_stress) {
     if (not this->initialised) {
       this->initialise();
     }
@@ -210,7 +213,7 @@ namespace muSpectre {
     // retruned by this function
     for (auto & mat : this->materials) {
       mat->compute_stresses_tangent(strain, this->stress, this->tangent.value(),
-                                    SplitCell::simple);
+                                    SplitCell::simple, store_native_stress);
     }
     return std::tie(this->stress, this->tangent.value());
   }

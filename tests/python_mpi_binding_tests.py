@@ -45,7 +45,6 @@ from python_mpi_projection_tests import *
 
 from python_solver_test import SolverCheck
 
-# FIXME: @Richard L. - please fix parallel stochastic plasticity model
 from python_mpi_stochastic_plasticity_search_test import \
     StochasticPlasticitySearch_Check
 

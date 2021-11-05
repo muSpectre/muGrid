@@ -202,11 +202,14 @@ namespace muSpectre {
     void check_material_coverage() const final;
 
     // full resppnse is composed of the stresses and tangent matrix
-    const muGrid::RealField & evaluate_stress() final;
+    const muGrid::RealField &
+    evaluate_stress(const StoreNativeStress & store_native_stress =
+                        StoreNativeStress::no) final;
 
     // stress and the tangent of the response of the cell_split
     std::tuple<const muGrid::RealField &, const muGrid::RealField &>
-    evaluate_stress_tangent() final;
+    evaluate_stress_tangent(const StoreNativeStress & store_native_stress =
+                                StoreNativeStress::no) final;
 
    protected:
     // this function make the initial magnitude of the

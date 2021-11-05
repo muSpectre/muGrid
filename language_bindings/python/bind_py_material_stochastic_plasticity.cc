@@ -112,50 +112,58 @@ void add_material_stochastic_plasticity_helper(py::module & mod) {
       .def_static("make_evaluator", []() { return Mat_t::make_evaluator(); })
       .def(
           "identify_overloaded_quad_pts",
+          [](Mat_t & mat, Cell_t & cell) {
+            return mat.identify_overloaded_quad_pts(cell);
+          },
+          "cell"_a)
+      .def(
+          "identify_overloaded_quad_pts",
           [](Mat_t & mat, Cell_t & cell, StressField_t & stress) {
             return mat.identify_overloaded_quad_pts(cell, stress);
           },
           "cell"_a, "stress"_a)
       .def(
           "set_plastic_increment",
-          [](Mat_t & mat, const size_t & quad_pt_id, const Real increment) {
-            return mat.set_plastic_increment(quad_pt_id, increment);
+          [](Mat_t & mat, const size_t & local_quad_pt_id,
+             const Real increment) {
+            return mat.set_plastic_increment(local_quad_pt_id, increment);
           },
-          "quad_pt_id"_a, "increment"_a)
+          "local_quad_pt_id"_a, "increment"_a)
       .def(
           "set_stress_threshold",
-          [](Mat_t & mat, const size_t & quad_pt_id, const Real threshold) {
-            return mat.set_stress_threshold(quad_pt_id, threshold);
+          [](Mat_t & mat, const size_t & local_quad_pt_id,
+             const Real threshold) {
+            return mat.set_stress_threshold(local_quad_pt_id, threshold);
           },
-          "quad_pt_id"_a, "threshold"_a)
+          "local_quad_pt_id"_a, "threshold"_a)
       .def(
           "set_eigen_strain",
-          [](Mat_t & mat, const size_t & quad_pt_id,
+          [](Mat_t & mat, const size_t & local_quad_pt_id,
              Eigen::Ref<Eigen::Matrix<Real, Dim, Dim>> eigen_strain) {
-            return mat.set_eigen_strain(quad_pt_id, eigen_strain);
+            return mat.set_eigen_strain(local_quad_pt_id, eigen_strain);
           },
-          "quad_pt_id"_a, "eigen_strain"_a)
+          "local_quad_pt_id"_a, "eigen_strain"_a)
       .def(
           "get_plastic_increment",
-          [](Mat_t & mat, const size_t & quad_pt_id) {
-            return mat.get_plastic_increment(quad_pt_id);
+          [](Mat_t & mat, const size_t & local_quad_pt_id) {
+            return mat.get_plastic_increment(local_quad_pt_id);
           },
-          "quad_pt_id"_a)
+          "local_quad_pt_id"_a)
       .def(
           "get_stress_threshold",
-          [](Mat_t & mat, const size_t & quad_pt_id) {
-            return mat.get_stress_threshold(quad_pt_id);
+          [](Mat_t & mat, const size_t & local_quad_pt_id) {
+            return mat.get_stress_threshold(local_quad_pt_id);
           },
-          "quad_pt_id"_a)
+          "local_quad_pt_id"_a)
       .def(
           "get_eigen_strain",
-          [](Mat_t & mat, const size_t & quad_pt_id) {
-            std::cout << "in get eigen strain..." << std::endl;
-            return mat.get_eigen_strain(quad_pt_id);
+          [](Mat_t & mat, const size_t & local_quad_pt_id) {
+            return mat.get_eigen_strain(local_quad_pt_id);
           },
-          "quad_pt_id"_a)
+          "local_quad_pt_id"_a)
       .def("reset_overloaded_quad_pts",
-           [](Mat_t & mat) { return mat.reset_overloaded_quad_pts(); });
+           [](Mat_t & mat) { return mat.reset_overloaded_quad_pts(); })
+      .def_property_readonly("native_stress", &Mat_t::get_native_stress);
 }
 
 template void

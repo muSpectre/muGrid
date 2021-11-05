@@ -210,7 +210,9 @@ namespace muSpectre {
     void add_pixel(const size_t & pixel_id) final;
 
     /**
-     * overload add_pixel to write into local stiffness tensor
+     * overload add_pixel all material parameters are defined per pixel thus if
+     * a pixel has several quad points the material parameters on all quad
+     * points belonging to a pixel are equal.
      */
     void add_pixel(const size_t & pixel_id, const Real & Youngs_modulus,
                    const Real & Poisson_ratio, const Real & plastic_increment,
@@ -219,9 +221,11 @@ namespace muSpectre {
                        Real, Eigen::Dynamic, Eigen::Dynamic>> & eigen_strain);
 
     /**
-     * overload add_pixel to write into local stiffness tensor
+     * overload add_pixel Youngs_modulus and Poisson_ratio are defined per
+     * pixel, plastic_increment, stress_threshold and eigen_strain are defined
+     * per quad point. There fore you have to hand over Eigen matrices
+     * containing in each row the value(s) for one quad point.
      */
-    // template <Index_t nb_quad_pts_per_pixel>
     void add_pixel(
         const size_t & pixel_id, const Real & Youngs_modulus,
         const Real & Poisson_ratio,
@@ -236,11 +240,15 @@ namespace muSpectre {
      * evaluate how many pixels have a higher stress than their stress threshold
      */
     inline decltype(auto)
+    identify_overloaded_quad_pts(Cell & cell);
+
+    inline decltype(auto)
     identify_overloaded_quad_pts(Cell & cell,
                                  Eigen::Ref<Vector_t> & stress_numpy_array);
 
     inline std::vector<size_t> & identify_overloaded_quad_pts(
-        const muGrid::TypedFieldBase<Real> & stress_field);
+        const muGrid::TypedFieldBase<Real> & stress_field,
+        const size_t & local_quad_pt_id_offset);
 
     /**
      * Update the eigen_strain_field of overloaded pixels by a discrete plastic
@@ -311,37 +319,89 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
   decltype(auto)
+  MaterialStochasticPlasticity<DimM>::identify_overloaded_quad_pts(
+      Cell & cell) {
+    // check if the native stress was stored
+    if (not this->has_native_stress()) {
+      throw MaterialError(
+          "The native stress was not stored. Either use one of the "
+          "'identify_overloaded_quad_pts' that takes the stress field as "
+          "parameter or turn StoreNativeStress on.");
+    }
+
+    auto && PK2_stress_field{this->get_native_stress()};
+
+    // compute quad point offset for local quad point ids
+    const DynCcoord_t & subdomain_locs{
+        cell.get_projection().get_subdomain_locations()};
+    const DynCcoord_t & nb_domain_grid_pts{
+        cell.get_projection().get_nb_domain_grid_pts()};
+    size_t local_quad_pt_id_offset{0};
+    int dim{subdomain_locs.get_dim()};
+    size_t factor{static_cast<size_t>(cell.get_nb_quad_pts())};
+    for (int i = 0; i < dim; i++) {
+      local_quad_pt_id_offset += subdomain_locs[i] * factor;
+      if (i != dim - 1) {
+          factor *= nb_domain_grid_pts[i];
+      }
+    }
+
+    return this->identify_overloaded_quad_pts(PK2_stress_field,
+                                              local_quad_pt_id_offset);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Index_t DimM>
+  decltype(auto)
       MaterialStochasticPlasticity<DimM>::identify_overloaded_quad_pts(
           Cell & cell, Eigen::Ref<Vector_t> & stress_numpy_array) {
     muGrid::WrappedField<Real> stress_field{
         "temp input for stress field", cell.get_fields(), DimM * DimM,
         stress_numpy_array, QuadPtTag};
-    return this->identify_overloaded_quad_pts(stress_field);
+
+    // compute quad point offset for local quad point ids
+    const DynCcoord_t & subdomain_locs{
+        cell.get_projection().get_subdomain_locations()};
+    const DynCcoord_t & nb_domain_grid_pts{
+        cell.get_projection().get_nb_domain_grid_pts()};
+    size_t local_quad_pt_id_offset{0};
+    int dim{subdomain_locs.get_dim()};
+    size_t factor{static_cast<size_t>(cell.get_nb_quad_pts())};
+    for (int i = 0; i < dim; i++) {
+      local_quad_pt_id_offset += subdomain_locs[i] * factor;
+      if (i != dim - 1) {
+          factor *= nb_domain_grid_pts[i];
+      }
+    }
+    return this->identify_overloaded_quad_pts(stress_field,
+                                              local_quad_pt_id_offset);
   }
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
   std::vector<size_t> &
   MaterialStochasticPlasticity<DimM>::identify_overloaded_quad_pts(
-      const muGrid::TypedFieldBase<Real> & stress_field) {
+      const muGrid::TypedFieldBase<Real> & stress_field,
+      const size_t & local_quad_pt_id_offset) {
     auto & threshold_map{this->stress_threshold_field.get_map()};
 
     muGrid::T2FieldMap<Real, Mapping::Const, DimM, IterUnit::SubPt>
         stress_map{stress_field};
     std::vector<size_t> & overloaded_quad_pts_ref{this->overloaded_quad_pts};
 
-    //! loop over all pixels and check if stress overcomes the threshold or not
-    for (const auto && pixel_threshold : threshold_map.enumerate_indices()) {
-      const auto & pixel{std::get<0>(pixel_threshold)};
-      const Real & threshold{std::get<1>(pixel_threshold)};
-      const auto & stress{stress_map[pixel]};
-      std::cout << "debug purpose overloaded quad pts: " << pixel << ", "
-                << threshold << ", " << stress << std::endl;
+    //! loop over all quad points and check if stress overcomes the threshold or
+    //! not
+    for (const auto && quad_pt_threshold : threshold_map.enumerate_indices()) {
+      const auto & quad_pt{std::get<0>(quad_pt_threshold)};
+      const Real & threshold{std::get<1>(quad_pt_threshold)};
+      const auto & stress{stress_map[quad_pt]};
       // check if stress is larger than threshold,
       const Real sigma_eq{MatTB::compute_equivalent_von_Mises_stress(stress)};
-      // if sigma_eq > threshold write pixel into Ccoord vector
-      if ((sigma_eq > threshold) == 1) {  // (sigma_eq > threshold){
-        overloaded_quad_pts_ref.push_back(pixel);
+      // if sigma_eq > threshold write quad_pt into Ccoord vector
+      if ((sigma_eq > threshold) == 1) {
+        // compute the global quad point id from the local quad_pt and the
+        // local_quad_pt_id_offset
+        overloaded_quad_pts_ref.push_back(quad_pt + local_quad_pt_id_offset);
       }
     }
     return overloaded_quad_pts_ref;

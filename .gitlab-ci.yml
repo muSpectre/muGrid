@@ -77,11 +77,6 @@
     IMAGE_NAME: debian_stable
   image: registry.gitlab.com/muspectre/muspectre:debian_stable
 
-.image_ubuntu_16_04:
-  variables:
-    IMAGE_NAME: ubuntu_16_04
-  image: registry.gitlab.com/muspectre/muspectre:ubuntu16.04
-
 .cache_build:
   variables:
     CCACHE_BASEDIR: ${CI_PROJECT_DIR}/build
@@ -177,24 +172,6 @@ test:stable_gcc:
       artifacts: true
 
 # ------------------------------------------------------------------------------
-build:ubuntu16.04_gcc:
-  variables:
-    BUILD_TYPE: Release
-  extends:
-    - .builds
-    - .cache_build
-    - .compiler_gcc
-    - .image_ubuntu_16_04
-
-test:ubuntu16.04_gcc:
-  extends:
-    - .tests
-    - .image_ubuntu_16_04
-  needs:
-    - job: build:ubuntu16.04_gcc
-      artifacts: true
-
-# ------------------------------------------------------------------------------
 build:testing_gcc_split:
   variables:
     BUILD_TYPE: Release
@@ -258,7 +235,7 @@ pages:
   only:
     - master
 
-pypi:
+.pypi:
   stage: deploy
   image: registry.gitlab.com/muspectre/muspectre:debian_stable
   script:

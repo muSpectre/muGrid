@@ -49,7 +49,7 @@ class SolverClassCheck(unittest.TestCase):
         self.newton_tol = 1e-6
         self.equil_tol = 1e-10
         self.maxiter = self.cell_data.spatial_dim * 20
-        self.verbose = muSpectre.Verbosity.Full
+        self.verbose = muSpectre.Verbosity.Silent
         self.fem_stencil = muSpectre.FEMStencil.bilinear_quadrangle(
             self.cell_data)
         self.discretisation = muSpectre.Discretisation(self.fem_stencil)
@@ -94,10 +94,6 @@ class SolverClassCheck(unittest.TestCase):
         load_step = np.array([[1., 0.],
                               [0., 2.]])
         result = solver.solve_load_increment(load_step)
-        print("Mechanics:")
-        print(
-            "Newton-PCG converged in {} PCG steps and {} Newton steps".format(
-                krylov_solver.counter, result.nb_it))
         self.assertTrue(result.success)
 
     def test_cg_mechanics(self):
@@ -123,9 +119,6 @@ class SolverClassCheck(unittest.TestCase):
         load_step = np.array([[1., 0.],
                               [0., 2.]])
         result = solver.solve_load_increment(load_step)
-        print("Mechanics:")
-        print("Newton-CG converged in {} CG steps and {} Newton steps".format(
-            krylov_solver.counter, result.nb_it))
         self.assertTrue(result.success)
 
     def setUp_diffusion(self):
@@ -164,10 +157,6 @@ class SolverClassCheck(unittest.TestCase):
         load_step = np.array([[1.],
                               [0.]])
         result = solver.solve_load_increment(load_step)
-        print("Diffusion:")
-        print(
-            "Newton-PCG converged in {} PCG steps and {} Newton steps".format(
-                krylov_solver.counter, result.nb_it))
         self.assertTrue(result.success)
 
     def test_cg_diffusion(self):
@@ -185,10 +174,6 @@ class SolverClassCheck(unittest.TestCase):
         load_step = np.array([[1.],
                               [0.]])
         result = solver.solve_load_increment(load_step)
-        print("Diffusion:")
-        print(
-            "Newton-CG converged in {} CG steps and {} Newton steps".format(
-                krylov_solver.counter, result.nb_it))
         self.assertTrue(result.success)
 
 
