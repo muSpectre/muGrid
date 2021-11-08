@@ -152,6 +152,16 @@ namespace muGrid {
       return res;
     }
 
+    //! max reduction on scalar types
+    template <typename T>
+    T max(const T & arg) const {
+      if (comm == MPI_COMM_NULL)
+        return arg;
+      T res;
+      MPI_Allreduce(&arg, &res, 1, mpi_type<T>(), MPI_MAX, this->comm);
+      return res;
+    }
+
     //! sum reduction on Eigen::Matrix types
     template <typename T, int RowsAtCompileTime, int ColsAtCompileTime>
     Eigen::Matrix<T, RowsAtCompileTime, ColsAtCompileTime>
@@ -354,6 +364,12 @@ namespace muGrid {
     //! sum reduction on scalar types
     template <typename T>
     T sum(const T & arg) const {
+      return arg;
+    }
+
+    //! max reduction on scalar types
+    template <typename T>
+    T max(const T & arg) const {
       return arg;
     }
 

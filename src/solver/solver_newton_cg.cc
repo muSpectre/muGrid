@@ -240,8 +240,8 @@ namespace muSpectre {
 
     // define the number of newton iteration (initially equal to 0)
     std::string message{"Has not converged"};
-    Real incr_norm{2 * newton_tol}, incr_norm_mean_control{2 * newton_tol},
-        grad_norm{1};
+    Real incr_second_norm{2 * newton_tol}, incr_inf_norm{2 * newton_tol},
+        incr_norm_mean_control{2 * newton_tol}, grad_norm{1};
     // Real incr_max{2 * newton_tol};
     Real rhs_norm{2 * equil_tol};
     bool has_converged{false};
@@ -361,24 +361,20 @@ namespace muSpectre {
 
       grad_norm = std::sqrt(this->squared_norm(grad->get_field().eigen_vec()));
 
-      incr_norm = std::sqrt(
+      incr_second_norm = std::sqrt(
           this->squared_norm(this->grad_incr->get_field().eigen_vec()));
       switch (this->mean_control) {
       case MeanControl::StrainControl: {
-        incr_norm_mean_control = incr_norm;
+        incr_norm_mean_control = incr_second_norm;
         break;
       }
       case MeanControl::StressControl: {
         // criteria according to "An algorithm for stress and mixed control in
         // Galerkin-based FFT homogenization" by: S.Lucarini, J. Segurado
         // doi: 10.1002/nme.6069
-        incr_norm_mean_control = std::accumulate(
-            this->grad_incr->begin(), this->grad_incr->end(), 0.0,
-            [this](Real max, auto && grad_incr_entry) -> Real {
-              Real grad_incr_entry_norm{this->squared_norm(grad_incr_entry)};
-              return grad_incr_entry_norm > max ? grad_incr_entry_norm : max;
-            });
-        incr_norm_mean_control /= grad_incr->get_field().get_nb_entries();
+        incr_inf_norm = this->inf_norm(grad_incr);
+        incr_norm_mean_control =
+            incr_inf_norm / grad_incr->get_field().get_nb_entries();
         break;
       }
       case MeanControl::MixedControl: {
@@ -393,7 +389,7 @@ namespace muSpectre {
       if ((this->verbosity >= Verbosity::Detailed) and (comm.rank() == 0)) {
         std::cout << "at Newton step " << std::setw(this->default_count_width)
                   << newt_iter << ", |δ" << strain_symb << "|/|Δ" << strain_symb
-                  << "|" << std::setw(17) << incr_norm / grad_norm
+                  << "|" << std::setw(17) << incr_second_norm / grad_norm
                   << ", tol = " << newton_tol << std::endl;
 
         if (this->verbosity > Verbosity::Detailed) {
@@ -476,7 +472,7 @@ namespace muSpectre {
                            message,
                            newt_iter,
                            this->krylov_solver->get_counter(),
-                           incr_norm / grad_norm,
+                           incr_second_norm / grad_norm,
                            rhs_norm,
                            this->get_formulation()};
 

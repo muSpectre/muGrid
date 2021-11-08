@@ -244,8 +244,8 @@ namespace muSpectre {
 
     // define the number of newton iteration (initially equal to 0)
     std::string message{"Has not converged"};
-    Real incr_norm{2 * newton_tol}, incr_norm_mean_control{2 * newton_tol},
-        grad_norm{1};
+    Real incr_second_norm{2 * newton_tol}, incr_inf_norm{2 * newton_tol},
+        incr_norm_mean_control{2 * newton_tol}, grad_norm{1};
     Real rhs_norm{2 * equil_tol};
     bool has_converged{false};
     bool last_step_was_nonlinear{true};
@@ -402,24 +402,20 @@ namespace muSpectre {
 
       // updating the incremental differences for checking the termination
       // criteria
-      incr_norm = std::sqrt(
+      incr_second_norm = std::sqrt(
           this->squared_norm(this->grad_incr->get_field().eigen_vec()));
       switch (this->mean_control) {
       case MeanControl::StrainControl: {
-        incr_norm_mean_control = incr_norm;
+        incr_norm_mean_control = incr_second_norm;
         break;
       }
       case MeanControl::StressControl: {
         // criteria according to "An algorithm for stress and mixed control in
         // Galerkin-based FFT homogenization" by: S.Lucarini, J. Segurado
         // doi: 10.1002/nme.6069
-        incr_norm_mean_control = std::accumulate(
-            grad_incr->begin(), grad_incr->end(), 0.0,
-            [this](Real max, auto && grad_incr_entry) -> Real {
-              Real grad_incr_entry_norm{this->squared_norm(grad_incr_entry)};
-              return grad_incr_entry_norm > max ? grad_incr_entry_norm : max;
-            });
-        incr_norm_mean_control /= grad_incr->get_field().get_nb_entries();
+        incr_inf_norm = this->inf_norm(grad_incr);
+        incr_norm_mean_control =
+            incr_inf_norm / grad_incr->get_field().get_nb_entries();
         break;
       }
       case MeanControl::MixedControl: {
@@ -481,8 +477,9 @@ namespace muSpectre {
         // energy reduction or the model does not predict reduction at all
         trust_region_radius *= (1.0 / 4.0);
         action_str = "decrease tr";
-      } else if (rho_bar > 0.75 and std::abs((incr_norm - trust_region_radius) /
-                                             trust_region_radius) < eps) {
+      } else if (rho_bar > 0.75 and
+                 std::abs((incr_second_norm - trust_region_radius) /
+                          trust_region_radius) < eps) {
         // expand the trust region if estimated energy loss matches with
         // the model energy reduction
         trust_region_radius =
@@ -498,8 +495,8 @@ namespace muSpectre {
                   << trust_region_radius << std::setw(15) << del_m
                   << std::setw(15) << del_E_bar << std::setw(15) << rho_bar
                   << std::setw(15) << rhs_norm << "(" << equil_tol << ")"
-                  << std::setw(15) << incr_norm / grad_norm << "(" << newton_tol
-                  << ")" << std::setw(15);
+                  << std::setw(15) << incr_second_norm / grad_norm << "("
+                  << newton_tol << ")" << std::setw(15);
       }
 
       if (rho_bar < eta) {
@@ -552,9 +549,9 @@ namespace muSpectre {
             std::sqrt(this->squared_norm(this->rhs->get_field().eigen_vec()));
 
         // performing convergence test
-        if (not this->krylov_solver->get_is_on_bound()) {
+        // if (not this->krylov_solver->get_is_on_bound()) {
           full_convergence_test();
-        }
+        // }
       }
     }
 
@@ -586,7 +583,7 @@ namespace muSpectre {
                            message,
                            newt_iter,
                            this->krylov_solver->get_counter(),
-                           incr_norm / grad_norm,
+                           incr_second_norm / grad_norm,
                            rhs_norm,
                            this->get_formulation()};
 

@@ -164,6 +164,17 @@ r mechanics domain.
       return comm.sum(vec.squaredNorm());
     }
 
+    template <class T>
+    Real inf_norm(const T & field) {
+      auto && comm{this->cell_data->get_communicator()};
+      return comm.max(std::accumulate(
+          field->begin(), field->end(), 0.0,
+          [](Real max, auto && field_entry) -> Real {
+            auto && field_entry_norm{field_entry.squaredNorm()};
+            return field_entry_norm > max ? field_entry_norm : max;
+          }));
+    }
+
     //! calculates the dot product of  two vectors distributed memory safe
     Real dot(const Vector_t & vec_a, const Vector_t & vec_b);
 
