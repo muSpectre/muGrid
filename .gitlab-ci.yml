@@ -2,13 +2,16 @@
   stage: build
   script:
     - free -h
+    - df -h
     - grep -c ^processor /proc/cpuinfo
     - cd build
+    - echo "Build type ${BUILD_TYPE} -- additional flags ${CMAKE_ADDITIONAL_FLAGS}"
     - cmake -DCMAKE_BUILD_TYPE:STRING=${BUILD_TYPE}
             -DNETCDF_IO=ON
             -DMUSPECTRE_RUNNING_IN_CI=ON
             ${CMAKE_ADDITIONAL_FLAGS} ..
     - make -k
+    - df -h
   artifacts:
     when: on_success
     paths:
@@ -23,6 +26,7 @@
     - cd build
     - ctest --output-on-failure
     - make test
+    - echo "Build type ${BUILD_TYPE}"
     - if [ "${BUILD_TYPE}" = "Coverage" ]; then
     -   gcovr --xml
               --gcov-executable "${GCOV_EXECUTABLE}"
@@ -81,8 +85,7 @@
   variables:
     CCACHE_BASEDIR: ${CI_PROJECT_DIR}/build
     CCACHE_DIR: ${CI_PROJECT_DIR}/.ccache
-    CCACHE_NOHASHDIR: 1
-    CCACHE_COMPILERCHECK: content
+    CCACHE_MAXSIZE: 1Gi
   cache:
     key: ${IMAGE_NAME}_${COMPILER_NAME}${CACHE_PREFIX}
     policy: pull-push
@@ -96,7 +99,7 @@
 # ------------------------------------------------------------------------------
 build:testing_gcc_mpi:
   variables:
-    BUILD_TYPE: Release
+    BUILD_TYPE: Coverage
     CMAKE_ADDITIONAL_FLAGS: -DMUSPECTRE_MPI_PARALLEL=ON -DMPIEXEC_MAX_NUMPROCS=2
     CACHE_PREFIX: "_mpi"
   extends:
@@ -107,7 +110,7 @@ build:testing_gcc_mpi:
 
 test:testing_gcc_mpi:
   variables:
-    BUILD_TYPE: Release
+    BUILD_TYPE: Coverage
     OMPI_ALLOW_RUN_AS_ROOT: 1
     OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: 1
     OMPI_MCA_rmaps_base_oversubscribe: 1
@@ -125,6 +128,24 @@ test_muspectre:testing_gcc:
     - .image_debian_testing
   needs:
     - job: build:testing_gcc_mpi
+      artifacts: true
+
+# ------------------------------------------------------------------------------
+build:testing_gcc:
+  variables:
+    BUILD_TYPE: Release
+  extends:
+    - .builds
+    - .cache_build
+    - .compiler_gcc
+    - .image_debian_stable
+
+test:testing_gcc:
+  extends:
+    - .tests
+    - .image_debian_stable
+  needs:
+    - job: build:testing_gcc
       artifacts: true
 
 # ------------------------------------------------------------------------------
@@ -188,6 +209,7 @@ test:testing_gcc_split:
     BUILD_TYPE: Release
   extends:
     - .tests
+    - .compiler_gcc
     - .image_debian_testing
   needs:
     - job: build:testing_gcc_split
