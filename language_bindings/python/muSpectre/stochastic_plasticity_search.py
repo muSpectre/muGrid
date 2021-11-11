@@ -739,8 +739,8 @@ def strain_cell(material, cell, solver, newton_tol, newton_equil_tol,
     if not is_strain_initialised:
         cell_strain = cell.strain.array()
         cell_strain[:] = np.tensordot(
-            np.eye(dim), np.ones((cell.nb_quad_pts,)
-                                 + tuple(cell.nb_subdomain_grid_pts)), axes=0)
+            F_old_average, np.ones((cell.nb_quad_pts,)
+                                   + tuple(cell.nb_subdomain_grid_pts)), axes=0)
 
     # -------------------- cross check input on consistency ----------------- #
     if yield_surface_accuracy <= 0:
