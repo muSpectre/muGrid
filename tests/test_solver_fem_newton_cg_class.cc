@@ -381,7 +381,8 @@ namespace muSpectre {
 
     solver->set_formulation(Form);
     solver->initialise_cell();
-    solver->get_eval_grad().get_map() = Eigen::MatrixXd::Identity(twoD, twoD);
+    solver->get_set_eval_grad().get_map() =
+        Eigen::MatrixXd::Identity(twoD, twoD);
     solver->clear_last_step_nonlinear();
     solver->evaluate_stress_tangent();
     auto ref_material{solver->get_tangent().get_map().mean()};

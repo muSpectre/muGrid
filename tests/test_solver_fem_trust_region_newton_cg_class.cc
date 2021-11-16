@@ -132,7 +132,8 @@ namespace muSpectre {
     solver->initialise_cell();
 
     BOOST_TEST_CHECKPOINT("before ref material assignment");
-    solver->get_eval_grad().get_map() = Eigen::MatrixXd::Identity(twoD, twoD);
+    solver->get_set_eval_grad().get_map() =
+        Eigen::MatrixXd::Identity(twoD, twoD);
     solver->evaluate_stress_tangent();
     auto ref_material{solver->get_tangent().get_map().mean()};
     solver->set_reference_material(ref_material);

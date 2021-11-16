@@ -52,7 +52,8 @@ namespace muSpectre {
       const muGrid::Verbosity & verbosity, const Real & newton_tol,
       const Real & equil_tol, const Uint & max_iter,
       const Real & max_trust_radius, const Real & eta)
-      : Parent{discretisation->get_cell(), verbosity},
+      : Parent{discretisation->get_cell(), verbosity,
+               SolverType::FiniteElements},
         krylov_solver{krylov_solver}, discretisation{discretisation},
         K{this->discretisation->get_stiffness_operator(
             this->get_displacement_rank())},
@@ -586,25 +587,9 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  auto SolverFEMTrustRegionNewtonCG::get_eval_grad() const -> MappedField_t & {
-    return *this->eval_grad;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  auto SolverFEMTrustRegionNewtonCG::get_tangent() const
-      -> const MappedField_t & {
-    return *this->tangent;
-  }
-
-  /* ---------------------------------------------------------------------- */
   auto SolverFEMTrustRegionNewtonCG::get_disp_fluctuation() const
       -> const MappedField_t & {
     return *this->disp_fluctuation;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  auto SolverFEMTrustRegionNewtonCG::get_flux() const -> const MappedField_t & {
-    return *this->flux;
   }
 
   /* ---------------------------------------------------------------------- */

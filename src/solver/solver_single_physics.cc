@@ -49,8 +49,10 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   SolverSinglePhysics::SolverSinglePhysics(std::shared_ptr<CellData> cell_data,
-                                           const muGrid::Verbosity & verbosity)
-      : Parent{cell_data, verbosity}, domain{get_only_domain(cell_data)} {};
+                                           const muGrid::Verbosity & verbosity,
+                                           const SolverType & solver_type)
+      : Parent{cell_data, verbosity, solver_type}, domain{get_only_domain(
+                                                       cell_data)} {};
 
   /* ---------------------------------------------------------------------- */
   bool SolverSinglePhysics::is_mechanics() const {
@@ -72,20 +74,28 @@ namespace muSpectre {
       -> std::tuple<const MappedField_t &, const MappedField_t &> {
     return Parent::evaluate_stress_tangent(this->domain);
   }
-
   /* ---------------------------------------------------------------------- */
-  const muGrid::RealField & SolverSinglePhysics::get_flux() const {
-    return this->fluxes.at(this->domain)->get_field();
+  auto SolverSinglePhysics::get_flux() const -> const MappedField_t & {
+    return *this->fluxes.at(this->domain);
   }
 
   /* ---------------------------------------------------------------------- */
-  const muGrid::RealField & SolverSinglePhysics::get_grad() const {
-    return this->grads.at(this->domain)->get_field();
+  auto SolverSinglePhysics::get_grad() const -> const MappedField_t & {
+    return *this->grads.at(this->domain);
+  }
+
+/* ---------------------------------------------------------------------- */
+  auto SolverSinglePhysics::get_eval_grad() const -> const MappedField_t & {
+    return *this->eval_grads.at(this->domain);
+  }
+/* ---------------------------------------------------------------------- */
+  auto SolverSinglePhysics::get_set_eval_grad()  ->  MappedField_t & {
+    return *this->eval_grads.at(this->domain);
   }
 
   /* ---------------------------------------------------------------------- */
-  const muGrid::RealField & SolverSinglePhysics::get_tangent() const {
-    return this->tangents.at(this->domain)->get_field();
+  auto SolverSinglePhysics::get_tangent() const -> const MappedField_t & {
+    return *this->tangents.at(this->domain);
   }
 
 }  // namespace muSpectre

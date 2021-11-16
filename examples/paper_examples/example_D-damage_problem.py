@@ -315,8 +315,8 @@ class CellEXtractionDunant:
             # if(True):
             glo_kappa = cell.get_globalised_old_real_field(
                 "strain measure")
-            glo_stress = solver.grad
-            glo_strain = solver.flux
+            glo_stress = solver.grad.field
+            glo_strain = solver.flux.field
             glo_tan = solver.tangent
             with open("./" + output_name + "/stress_strain_"+self.name +
                       "_{}_{}.npz".format(Nx, step_nb), 'wb') as f:
@@ -645,9 +645,9 @@ def main():
                                 phase_in_structure,
                                 eigen_pixels_in_structure, i)
                 print("mean stress:\n {}".format(
-                    solver.flux.get_sub_pt_map().mean()))
+                    solver.flux.field.get_sub_pt_map().mean()))
                 print("mean strain:\n {}".format(
-                    solver.grad.get_sub_pt_map().mean()))
+                    solver.grad.field.get_sub_pt_map().mean()))
             results.append(res)
             eigen_class.step_nb = eigen_class.step_nb + 1
             done_steps = done_steps + 1

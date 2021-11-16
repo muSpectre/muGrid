@@ -106,13 +106,6 @@ namespace muSpectre {
     //! Displacement field
     const MappedField_t & get_disp_fluctuation() const;
 
-    //! Tangent moduli field
-    MappedField_t & get_eval_grad() const;
-    //! Tangent moduli field
-    const MappedField_t & get_tangent() const;
-    //! Tangent moduli field
-    const MappedField_t & get_flux() const;
-
    protected:
     void initialise_eigen_strain_storage();
     bool has_eigen_strain_storage() const;

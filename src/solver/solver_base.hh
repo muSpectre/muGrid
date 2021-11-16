@@ -81,7 +81,8 @@ namespace muSpectre {
 
     //! Explicit constructor
     SolverBase(std::shared_ptr<CellData> cell_data,
-               const muGrid::Verbosity & verbosity);
+               const muGrid::Verbosity & verbosity,
+               const SolverType & solver_type);
 
     //! Copy constructor
     SolverBase(const SolverBase & other) = delete;
@@ -178,6 +179,8 @@ r mechanics domain.
     //! calculates the dot product of  two vectors distributed memory safe
     Real dot(const Vector_t & vec_a, const Vector_t & vec_b);
 
+    const SolverType & get_solver_type() const;
+
    protected:
     std::shared_ptr<CellData> cell_data;
     muGrid::Verbosity verbosity;
@@ -199,6 +202,8 @@ r mechanics domain.
     Int counter_iteration{};  //!< Newton iteration counter
     Int default_count_width{3};
     bool is_initialised{false};
+    SolverType solver_type;  //!< Type of the solver either
+                             //! Spectral or FiniteElements
   };
 
 }  // namespace muSpectre

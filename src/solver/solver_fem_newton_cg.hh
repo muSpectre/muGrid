@@ -96,17 +96,8 @@ namespace muSpectre {
     //! return the rank of the displacement field for this PhysicsDomain
     Index_t get_displacement_rank() const;
 
-    //! Tangent moduli field
-    MappedField_t & get_eval_grad() const;
-
     //! Displacement field
     const MappedField_t & get_disp_fluctuation() const;
-
-    //! Tangent moduli field
-    const MappedField_t & get_tangent() const;
-
-    //! Tangent moduli field
-    const MappedField_t & get_flux() const;
 
    protected:
     void initialise_eigen_strain_storage();

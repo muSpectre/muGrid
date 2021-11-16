@@ -67,6 +67,7 @@ using SolverFEMTRNewtonCG = muSpectre::SolverFEMTrustRegionNewtonCG;
 using SolverFEMTRNewtonPCG = muSpectre::SolverFEMTrustRegionNewtonPCG;
 using muSpectre::SolverSinglePhysics;
 using muSpectre::MeanControl;
+using muSpectre::SolverType;
 
 /**
  * Solvers instanciated for cells with equal spatial and material dimension
@@ -78,13 +79,20 @@ void add_enum_mean_control(py::module & mod) {
       .value("mixed_control", MeanControl::MixedControl);
 }
 
+void add_enum_solver_type(py::module & mod) {
+  py::enum_<SolverType>(mod, "SolverType")
+      .value("spectral", SolverType::Spectral)
+      .value("finite_elements", SolverType::FiniteElements);
+}
+
 class PySolverBase : public SolverBase {
  public:
   using Parent = SolverBase;
 
   PySolverBase(std::shared_ptr<CellData> cell_data,
-               const muGrid::Verbosity & verbosity)
-      : Parent(cell_data, verbosity) {}
+               const muGrid::Verbosity & verbosity,
+               const muSpectre::SolverType & solver_type)
+      : Parent(cell_data, verbosity, solver_type) {}
 
   void initialise_cell() override {
     PYBIND11_OVERLOAD_PURE(void, SolverBase, initialise_cell);
@@ -123,15 +131,15 @@ void add_solver_base(py::module & mod) {
                              [](const SolverBase & solver_base) {
                                return solver_base.get_counter_load_step();
                              })
-      .def_property_readonly(
-          "counter_iteration",
-          [](const SolverBase & solver_base) {
-            return solver_base.get_counter_iteration();
-          })
+      .def_property_readonly("counter_iteration",
+                             [](const SolverBase & solver_base) {
+                               return solver_base.get_counter_iteration();
+                             })
       .def_property("formulation", &SolverBase::get_formulation,
                     &SolverBase::set_formulation)
       .def("initialise_cell", &SolverBase::initialise_cell)
-      .def_property_readonly("communicator", &SolverBase::get_communicator);
+      .def_property_readonly("communicator", &SolverBase::get_communicator)
+      .def_property_readonly("solver_type", &SolverBase::get_solver_type);
 }
 
 void add_single_physics_solver(py::module & mod) {
@@ -191,9 +199,14 @@ void add_single_physics_solver(py::module & mod) {
            [](SolverSinglePhysics & solver) {
              solver.evaluate_stress_tangent();
            })
-      .def_property_readonly("grad", &SolverSinglePhysics::get_grad)
-      .def_property_readonly("flux", &SolverSinglePhysics::get_flux)
-      .def_property_readonly("tangent", &SolverSinglePhysics::get_tangent);
+      .def_property_readonly("grad", &SolverSinglePhysics::get_grad,
+                             py::return_value_policy::reference_internal)
+      .def_property_readonly("flux", &SolverSinglePhysics::get_flux,
+                             py::return_value_policy::reference_internal)
+      .def_property_readonly("tangent", &SolverSinglePhysics::get_tangent,
+                             py::return_value_policy::reference_internal)
+      .def_property_readonly("eval_grad", &SolverSinglePhysics::get_eval_grad,
+                             py::return_value_policy::reference_internal);
 }
 
 void add_spectral_newton_cg_solver(py::module & mod) {
@@ -215,10 +228,6 @@ void add_spectral_newton_cg_solver(py::module & mod) {
            "mean_control"_a = MeanControl::StrainControl)
 
       .def_property_readonly("projection", &SolverNewtonCG::get_projection)
-      .def_property_readonly("flux", &SolverNewtonCG::get_flux)
-      .def_property_readonly("grad", &SolverNewtonCG::get_grad)
-      .def_property_readonly("eval_grad", &SolverNewtonCG::get_eval_grad)
-      .def_property_readonly("tangent", &SolverNewtonCG::get_tangent)
       .def_property_readonly("nb_dof", &SolverNewtonCG::get_nb_dof)
       .def_property_readonly("projection", &SolverNewtonCG::get_projection);
 }
@@ -256,12 +265,6 @@ void add_fem_newton_cg_solver(py::module & mod) {
            "equil_tol"_a, "max_iter"_a)
       .def_property_readonly("displacement_rank",
                              &SolverFEMNewtonCG::get_displacement_rank)
-      .def_property_readonly("eval_grad", &SolverFEMNewtonCG::get_eval_grad,
-                             py::return_value_policy::reference_internal)
-      .def_property_readonly("flux", &SolverFEMNewtonCG::get_flux,
-                             py::return_value_policy::reference_internal)
-      .def_property_readonly("tangent", &SolverFEMNewtonCG::get_tangent,
-                             py::return_value_policy::reference_internal)
       .def_property_readonly("disp", &SolverFEMNewtonCG::get_disp_fluctuation,
                              py::return_value_policy::reference_internal);
 
@@ -293,10 +296,6 @@ void add_fem_trust_region_newton_cg_solver(py::module & mod) {
            "equil_tol"_a, "max_iter"_a, "trust_region_max"_a, "eta"_a)
       .def_property_readonly("displacement_rank",
                              &SolverFEMTRNewtonCG::get_displacement_rank)
-      .def_property_readonly("eval_grad", &SolverFEMTRNewtonCG::get_eval_grad,
-                             py::return_value_policy::reference_internal)
-      .def_property_readonly("flux", &SolverFEMTRNewtonCG::get_flux,
-                             py::return_value_policy::reference_internal)
       .def_property_readonly("tangent", &SolverFEMTRNewtonCG::get_tangent,
                              py::return_value_policy::reference_internal)
       .def_property_readonly("disp", &SolverFEMTRNewtonCG::get_disp_fluctuation,
@@ -321,6 +320,7 @@ void add_fem_trust_region_newton_cg_solver(py::module & mod) {
 
 void add_class_solvers(py::module & mod) {
   add_enum_mean_control(mod);
+  add_enum_solver_type(mod);
   add_solver_base(mod);
   add_single_physics_solver(mod);
   add_spectral_newton_cg_solver(mod);

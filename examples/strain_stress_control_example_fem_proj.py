@@ -124,6 +124,7 @@ def compute_func(control, Del0, E0, formulation):
 
     return stress, grad, reference_material_stiffness[0, 0]/E0
 
+
 def main():
     # Macroscopic strain
     del0 = 1.e-6
@@ -154,7 +155,8 @@ def main():
         compute_func(msp.solvers.MeanControl.stress_control,
                      mean_stress_strain_control, E0, formulation)
 
-    print("grad_flux_control=\n{}".format((grad_flux_control.mean(axis=(2, 3, 4)))))
+    print("grad_flux_control=\n{}".format(
+        (grad_flux_control.mean(axis=(2, 3, 4)))))
     print("stress_flux_control=\n{}".format(
         stress_flux_control.mean(axis=(2, 3, 4))))
 
@@ -191,6 +193,7 @@ def main():
 
     print("Δflux:\n{}".format(
         (stress_stress_control.mean(axis=(2, 3, 4))-stress0)/stress0))
+
 
 if __name__ == "__main__":
     main()

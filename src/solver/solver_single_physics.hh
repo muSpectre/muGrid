@@ -54,7 +54,8 @@ namespace muSpectre {
 
     //! constructor with units of input fields
     SolverSinglePhysics(std::shared_ptr<CellData> cell_data,
-                        const muGrid::Verbosity & verbosity);
+                        const muGrid::Verbosity & verbosity,
+                        const SolverType & solver_type);
 
     //! Copy constructor
     SolverSinglePhysics(const SolverSinglePhysics & other) = delete;
@@ -112,12 +113,17 @@ namespace muSpectre {
     evaluate_stress_tangent();
     using Parent::evaluate_stress_tangent;
 
-    //! getter function for grad filed
-    const muGrid::RealField & get_grad() const;
-    //! getter function for flux filed
-    const muGrid::RealField & get_flux() const;
-    //! getter function for tangent filed
-    const muGrid::RealField & get_tangent() const;
+    //! getter function for grad field
+    const MappedField_t & get_grad() const;
+    //! getter and setter function for evalgrad field
+    MappedField_t & get_set_eval_grad();
+
+    //! getter and setter function for evalgrad field
+    const MappedField_t & get_eval_grad() const;
+    //! getter function for flux field
+    const MappedField_t & get_flux() const;
+    //! getter function for tangent field
+    const MappedField_t & get_tangent() const;
 
    protected:
     muGrid::PhysicsDomain domain;

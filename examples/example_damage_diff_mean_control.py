@@ -306,13 +306,13 @@ def compute_rve_fem_solver(control_mean,
             print("{}".format((i + 1) * Del0))
             print("newton_solver.flux.get_sub_pt_map().mean()=")
             print("{}".format(
-                newton_solver.flux.get_sub_pt_map().mean().reshape([2, 2])))
+                newton_solver.flux.field.get_sub_pt_map().mean().reshape([2, 2])))
         elif control_mean == µ.solvers.MeanControl.strain_control:
             print("expected mean grad :")
             print("{}".format((i+1) * Del0))
             print("newton_solver.grad.get_sub_pt_map().mean()=")
             print("{}".format(
-                newton_solver.grad.get_sub_pt_map().mean().reshape([2, 2])))
+                newton_solver.grad.field.get_sub_pt_map().mean().reshape([2, 2])))
 
 
     if len(sys.argv[:]) == 2:

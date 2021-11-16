@@ -50,7 +50,8 @@ namespace muSpectre {
       std::shared_ptr<KrylovSolverBase> krylov_solver,
       const muGrid::Verbosity & verbosity, const Real & newton_tol,
       const Real & equil_tol, const Uint & max_iter)
-      : Parent{discretisation->get_cell(), verbosity},
+      : Parent{discretisation->get_cell(), verbosity,
+               SolverType::FiniteElements},
         krylov_solver{krylov_solver}, discretisation{discretisation},
         K{this->discretisation->get_stiffness_operator(
             this->get_displacement_rank())},
@@ -408,25 +409,9 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  auto SolverFEMNewtonCG::get_eval_grad() const -> MappedField_t & {
-    return *this->eval_grad;
-  }
-
-  /* ---------------------------------------------------------------------- */
   auto SolverFEMNewtonCG::get_disp_fluctuation() const
       -> const MappedField_t & {
     return *this->disp_fluctuation;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  auto SolverFEMNewtonCG::get_tangent() const -> const MappedField_t & {
-    return *this->tangent;
-  }
-
-  /* ---------------------------------------------------------------------- */
-
-  auto SolverFEMNewtonCG::get_flux() const -> const MappedField_t & {
-    return *this->flux;
   }
 
   /* ---------------------------------------------------------------------- */

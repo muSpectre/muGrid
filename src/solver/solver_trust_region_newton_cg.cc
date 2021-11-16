@@ -50,7 +50,8 @@ namespace muSpectre {
       const Real & equil_tol, const Uint & max_iter,
       const Real & max_trust_radius, const Real & eta,
       const Gradient_t & gradient, const MeanControl & mean_control)
-      : Parent{cell_data, verbosity}, krylov_solver{krylov_solver},
+      : Parent{cell_data, verbosity, SolverType::Spectral},
+        krylov_solver{krylov_solver},
         newton_tol{newton_tol}, equil_tol{equil_tol}, max_iter{max_iter},
         max_trust_radius{max_trust_radius}, eta{eta},
         gradient{std::make_shared<Gradient_t>(gradient)},
@@ -66,7 +67,8 @@ namespace muSpectre {
       const Real & equil_tol, const Uint & max_iter,
       const Real & max_trust_radius, const Real & eta,
       const MeanControl & mean_control)
-      : Parent{cell_data, verbosity}, krylov_solver{krylov_solver},
+      : Parent{cell_data, verbosity, SolverType::Spectral},
+        krylov_solver{krylov_solver},
         newton_tol{newton_tol}, equil_tol{equil_tol}, max_iter{max_iter},
         max_trust_radius{max_trust_radius}, eta{eta},
         gradient{std::make_shared<Gradient_t>(

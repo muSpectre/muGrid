@@ -43,8 +43,10 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   SolverBase::SolverBase(std::shared_ptr<CellData> cell_data,
-                         const muGrid::Verbosity & verbosity)
-      : Parent{}, cell_data{cell_data}, verbosity{verbosity} {};
+                         const muGrid::Verbosity & verbosity,
+                         const SolverType & solver_type)
+      : Parent{}, cell_data{cell_data}, verbosity{verbosity},
+        solver_type{solver_type} {};
 
   /* ---------------------------------------------------------------------- */
   void SolverBase::set_formulation(const Formulation & formulation) {
@@ -152,6 +154,12 @@ namespace muSpectre {
   const std::shared_ptr<CellData> SolverBase::get_cell_data() const {
     return this->cell_data;
   }
+
+  /* ---------------------------------------------------------------------- */
+  const SolverType & SolverBase::get_solver_type() const {
+    return this->solver_type;
+  }
+
 
   /* ---------------------------------------------------------------------- */
   Real SolverBase::dot(const Vector_t & vec_a, const Vector_t & vec_b) {

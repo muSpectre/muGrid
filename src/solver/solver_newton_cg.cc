@@ -49,7 +49,8 @@ namespace muSpectre {
       const muGrid::Verbosity & verbosity, const Real & newton_tol,
       const Real & equil_tol, const Uint & max_iter,
       const Gradient_t & gradient, const MeanControl & mean_control)
-      : Parent{cell_data, verbosity}, krylov_solver{krylov_solver},
+      : Parent{cell_data, verbosity, SolverType::Spectral},
+        krylov_solver{krylov_solver},
         newton_tol{newton_tol}, equil_tol{equil_tol}, max_iter{max_iter},
         gradient{std::make_shared<Gradient_t>(gradient)},
         nb_quad_pts{static_cast<Index_t>(gradient.size()) /
@@ -63,7 +64,8 @@ namespace muSpectre {
       const muGrid::Verbosity & verbosity, const Real & newton_tol,
       const Real & equil_tol, const Uint & max_iter,
       const MeanControl & mean_control)
-      : Parent{cell_data, verbosity}, krylov_solver{krylov_solver},
+      : Parent{cell_data, verbosity, SolverType::Spectral},
+        krylov_solver{krylov_solver},
         newton_tol{newton_tol}, equil_tol{equil_tol}, max_iter{max_iter},
         gradient{std::make_shared<Gradient_t>(
             muFFT::make_fourier_gradient(this->cell_data->get_spatial_dim()))},
@@ -756,26 +758,6 @@ namespace muSpectre {
       throw SolverError("Projection is not yet defined.");
     }
     return *this->projection;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  auto SolverNewtonCG::get_eval_grad() const -> MappedField_t & {
-    return *this->eval_grad;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  auto SolverNewtonCG::get_grad() const -> MappedField_t & {
-    return *this->grad;
-  }
-  /* ---------------------------------------------------------------------- */
-
-  auto SolverNewtonCG::get_tangent() const -> const MappedField_t & {
-    return *this->tangent;
-  }
-  /* ---------------------------------------------------------------------- */
-
-  auto SolverNewtonCG::get_flux() const -> const MappedField_t & {
-    return *this->flux;
   }
 
 }  // namespace muSpectre

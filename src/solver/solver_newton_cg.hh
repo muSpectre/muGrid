@@ -111,12 +111,6 @@ namespace muSpectre {
 
     //! evaluated gradient field
     MappedField_t & get_eval_grad() const;
-    //! gradient field
-    MappedField_t & get_grad() const;
-    //! Tangent moduli field
-    const MappedField_t & get_tangent() const;
-    //! flux  field
-    const MappedField_t & get_flux() const;
 
    protected:
     void initialise_eigen_strain_storage();
