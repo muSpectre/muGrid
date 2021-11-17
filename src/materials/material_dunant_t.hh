@@ -238,6 +238,18 @@ namespace muSpectre {
     //! restarting the last step nonlinear bool
     void clear_last_step_nonlinear() final;
 
+    // compute_the tensile masking tensor
+    T2_t compute_M2_t(const T2_t & E);
+
+    // compute the derivative of the tensile masking tensor w.r.t to the strain
+    // tensor
+    std::tuple<T4_t, bool> compute_dM2_t_dE(const T2_t & E);
+
+    // compute the derivative of the tensile or the compressive subpart of the
+    // strain tensor w.r.t the whole strain tensor
+    T4_t compute_dEt_dE(const T2_t & E, const T2_t & M2, const T4_t & dM2_dE,
+                         const bool & varying_M);
+
    protected:
     // Child material (used as a worker for evaluating stress and tangent)
     MatChild_t material_child;

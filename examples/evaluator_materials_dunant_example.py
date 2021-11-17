@@ -52,23 +52,24 @@ from python_example_imports import muSpectre as µ
 
 
 def compute_evaluator(nb_steps, young, kappa, alpha, dE,
-                      mat, eval, mat_c, eval_c):
+                      mat, eval, mat_c, eval_c, material_name):
     """
     description: this function takes a material, its evaluator, and its
     correspondent constants and using the output of the evaluator plots the
     strain-stress curve of the material under tensile and compressive loads
 
-    @param nb_steps: number of steps for applying the
-                     tensile and the compressive load
-    @param young:    The young modulus of the intact material
-    @param kappa:    The strain (or maybe other damage criterion) threshold
-    @param alpha:    The ratio of the slope of the damage part of the
-                     strain-stress curve wrt to the elastic part (positive)
-    @param dE:       The strain application step
-    @param mat:      The material to be evaluated in the tensile regime
-    @praam eval:     The material evaluator to be used in the tensile  regime
-    @param mat_c:    The material to be evaluated in the compressive regime
-    @praam eval_c:   The material evaluator to be used in compressive  regime
+    @param nb_steps:      number of steps for applying the
+                          tensile and the compressive load
+    @param young:         The young modulus of the intact material
+    @param kappa:         The strain (or maybe other damage criterion) threshold
+    @param alpha:         The ratio of the slope of the damage part of the
+                          strain-stress curve wrt to the elastic part (positive)
+    @param dE:            The strain application step
+    @param mat:           The material to be evaluated in the tensile regime
+    @praam eval:          The material evaluator to be used in the tensile  regime
+    @param mat_c:         The material to be evaluated in the compressive regime
+    @praam eval_c:        The material evaluator to be used in compressive  regime
+    @param material_name: The name o the material for plot title
 
     @return None
     """
@@ -174,6 +175,7 @@ def compute_evaluator(nb_steps, young, kappa, alpha, dE,
                                  s_id[0], s_id[1]],
                             '.', linewidth=4.0, color=next(colors))
             ax.legend()
+            plt.title(material_name)
             plt.show()
             fig.savefig(
                 "damage_material_kappa_{}_alpha_{}_new_tc.png"
@@ -181,14 +183,26 @@ def compute_evaluator(nb_steps, young, kappa, alpha, dE,
 
 
 def compute():
-    dE = np.array([[8.000, 0.000],
-                   [0.000, 8.000]]) * 2.5e-7
+    dE = np.array([[2.000, 0.000],
+                   [0.000, 2.000]]) * 1.e-6
 
     young = 2.2876e10
     alphas = np.array([2])
     for alpha in alphas:
         for kappa in [1.e-4]:
+            # do calculation and plot for material_dunant
+            material_name = "Material Dunant"
+            nb_steps = np.array([0, 60, 15, 23, 15, 30])
+            mat, eval = µ.material.MaterialDunant_2d.make_evaluator(
+                young, .33, kappa, alpha)
+            mat_c, eval_c = µ.material.MaterialDunant_2d.make_evaluator(
+                young, .33, kappa, alpha)
+            mat.add_pixel(0)
+            mat_c.add_pixel(0)
+            compute_evaluator(nb_steps, young, kappa, alpha, 0.55 * dE,
+                              mat, eval, mat_c, eval_c, material_name)
             # do calculation and plot for material_dunant_t
+            material_name = "Material Dunant T"
             nb_steps = np.array([0, 60, 15, 23, 15, 30])
             mat, eval = µ.material.MaterialDunantT_2d.make_evaluator(
                 young, .33, kappa, alpha)
@@ -197,9 +211,10 @@ def compute():
             mat.add_pixel(0)
             mat_c.add_pixel(0)
             compute_evaluator(nb_steps, young, kappa, alpha, dE,
-                              mat, eval, mat_c, eval_c)
+                              mat, eval, mat_c, eval_c, material_name)
 
             # do calculation and plot for material_dunant_tc
+            material_name = "Material Dunant TC assym."
             nb_steps2 = np.array([0, 45, 15, 23, 15, 30])
             mat2, eval2 = µ.material.MaterialDunantTC_2d.make_evaluator(
                 young, .33, kappa, alpha, 0.2, 1.0)
@@ -208,7 +223,7 @@ def compute():
             mat2.add_pixel(0)
             mat2_c.add_pixel(0)
             compute_evaluator(nb_steps2, young, kappa, alpha, dE,
-                              mat2, eval2, mat2_c, eval2_c)
+                              mat2, eval2, mat2_c, eval2_c, material_name)
 
 
 def main():

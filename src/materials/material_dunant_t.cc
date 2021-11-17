@@ -111,6 +111,7 @@ namespace muSpectre {
     auto && S_pristine{std::get<0>(SC_pristine)};
     auto && C_pristine{std::get<1>(SC_pristine)};
     T2_t S{reduction * S_pristine};
+
     switch (step_status_current) {
     case StepState::elastic: {
       T4_t C{reduction * C_pristine};
@@ -123,15 +124,37 @@ namespace muSpectre {
       break;
     }
     case StepState::damaging: {
+      Real dr_dk{-1.0 * ((1.0 + this->alpha) * kappa_init_f) /
+                 std::pow(kappa.current(), 2)};
+
+      auto && M2_t{this->compute_M2_t(E)};
+      T2_t E_t{M2_t * E * M2_t};
+      T4_t dM2t_dE{T4_t::Zero()};
+      bool varying_M{false};
+      std::tie(dM2t_dE, varying_M) = this->compute_dM2_t_dE(E);
+      T4_t dEt_dE{this->compute_dEt_dE(E, M2_t, dM2t_dE, varying_M)};
+
       auto && spectral_decomp_strain{muGrid::spectral_decomposition(E)};
       Vec_t eigen_vals{spectral_decomp_strain.eigenvalues()};
       T2_t eigen_vecs{spectral_decomp_strain.eigenvectors()};
 
-      Vec_t q_max{eigen_vecs.col(DimM - 1)};     // last eig. vector
-      auto && dk_dE{q_max * q_max.transpose()};  // qₘₐₓ ⊗ qₘₐₓ
-      Real dr_dk{-1.0 * ((1.0 + this->alpha) * this->kappa_init) /
-                 std::pow(kappa.current(), 2)};
-      T2_t drdE{dr_dk * dk_dE};
+      /*
+      κ = √[εᵗ : ε]
+                                  ∂εᵗ/∂ε::ε + εᵗ
+                    ∂κ/∂ε = ——————————————
+                                    2 * κ
+       */
+      // T2_t dk_dE{Matrices::tensmult(dEt_dE.transpose(), E)};
+      T2_t dk_dE{(Matrices::tensmult(dEt_dE.transpose(), E) + E_t) /
+                 (2.0 * kappa.current())};
+
+      T2_t drdE{dr_dk * dk_dE};  // ∂r/∂E = ∂r/∂K * ∂K/∂E
+
+      /*
+        σ = σ⁰ * r ⇒
+        ∂σ/∂ε = ( C⁰ * r + σ⁰ ⊗ ∂r/∂ε)
+       */
+
       T4_t C{reduction * C_pristine + Matrices::outer(S_pristine, drdE)};
       return std::make_tuple(S, C);
       break;
@@ -195,12 +218,18 @@ namespace muSpectre {
       const Eigen::MatrixBase<Derived> & E) {
     // Different damage criteria can be considered here.
     // In this material, the considered damage criterion is the strain norm
-    // measure = max λᵢ  → (λᵢ: eigen values(E))
+    // measure = κ = ||E_weighted|| =   √ (E : Eᵗ) =  √ (Eᵗ : Eᵗ) = ||Eᵗ||
     auto && spectral_decomp_strain{muGrid::spectral_decomposition(E)};
     Vec_t strain_eig_vals(spectral_decomp_strain.eigenvalues());
-    Real lambda_max{strain_eig_vals(DimM - 1)};
-    auto && k{lambda_max};
-    return k;
+    Vec_t strain_eig_vals_t(Vec_t::Zero());
+
+    for (Index_t i{0}; i < DimM; ++i) {
+      if (strain_eig_vals(i) > 0.0) {
+        strain_eig_vals_t(i) = strain_eig_vals(i);
+      }
+    }
+
+    return strain_eig_vals_t.dot(strain_eig_vals);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -212,7 +241,144 @@ namespace muSpectre {
     return reduction_measure * static_cast<int>(reduction_measure > 0.);
   }
 
-  /* ----------------------------------------------------------------------- */
+  /* ---------------------------------------------------------------------- */
+  template <Index_t DimM>
+  auto MaterialDunantT<DimM>::compute_dM2_t_dE(const T2_t & E)
+      -> std::tuple<T4_t, bool> {
+    bool varying_M{true};
+    auto && spectral_decomp_strain{muGrid::spectral_decomposition(E)};
+    Vec_t eigen_vals{spectral_decomp_strain.eigenvalues()};
+    T2_t eigen_vecs{spectral_decomp_strain.eigenvectors()};
+
+    switch (DimM) {
+    case twoD: {
+      // considering that we know that eigenvalues are in an **ascending
+      // order**
+      //  otherwise this algorithm might be invalid.
+      if (eigen_vals[0] * eigen_vals[1] >= 0.0) {
+        // (*I*) the eigenvalues have same sign => the masking tensor is
+        // constant
+        varying_M = false;
+        return std::make_tuple(T4_t::Zero(), varying_M);
+      } else {
+        T4_t dM2_t_dE{T4_t::Zero()};
+        // (*II*) ⇒ the first eigen value is (-) and the 2nd one is (+)
+        Vec_t q_0{eigen_vecs.col(0)};  //!< eig. vec. of neg. eig. val.
+        Vec_t q_1{eigen_vecs.col(1)};  //!< eig. vec. of pos. eig. val.
+        for (Index_t k{0}; k < DimM; ++k) {
+          for (Index_t l{0}; l < DimM; ++l) {
+            for (Index_t n{0}; n < DimM; ++n) {
+              for (Index_t p{0}; p < DimM; ++p) {
+                get(dM2_t_dE, k, l, n, p) +=
+                    ((q_0[n] * q_1[p]) * (q_0[k] * q_1[l] + q_1[k] * q_0[l])) /
+                    (eigen_vals[1] - eigen_vals[0]);
+              }
+            }
+          }
+        }
+        return std::make_tuple(dM2_t_dE, varying_M);
+      }
+      break;
+    }
+    case threeD: {
+      // considering that we know that eigenvalues are in an **ascending
+      // order**
+      if (eigen_vals[0] < 0 and eigen_vals[1] < 0 and eigen_vals[2] > 0) {
+        // (*I*). q₁, q₀<0 and q₂>0
+        T4_t dM2_t_dE{T4_t::Zero()};
+        Vec_t q_0{eigen_vecs.col(0)};  //!< eig. vec. of smaller neg. eig. val.
+        Vec_t q_1{eigen_vecs.col(1)};  //!< eig. vec. of larger neg. eig. val.
+        Vec_t q_2{eigen_vecs.col(2)};  //!< eig. vec. of pos. eig. val.
+        for (Index_t k{0}; k < DimM; ++k) {
+          for (Index_t l{0}; l < DimM; ++l) {
+            for (Index_t n{0}; n < DimM; ++n) {
+              for (Index_t p{0}; p < DimM; ++p) {
+                get(dM2_t_dE, k, l, n, p) +=
+                    (((q_0[n] * q_2[p]) * (q_0[k] * q_2[l] + q_2[k] * q_0[l])) /
+                     (eigen_vals[2] - eigen_vals[0])) +
+                    (((q_1[n] * q_2[p]) * (q_1[k] * q_2[l] + q_2[k] * q_1[l])) /
+                     (eigen_vals[2] - eigen_vals[1]));
+              }
+            }
+          }
+        }
+        return std::make_tuple(dM2_t_dE, varying_M);
+      } else if (eigen_vals[0] < 0 and eigen_vals[1] > 0 and
+                 eigen_vals[2] > 0) {
+        // (*II*). q₀<0 and q₁, q₂>0
+        T4_t dM2_c_dE{T4_t::Zero()};
+        Vec_t q_0{eigen_vecs.col(0)};  //!< eig. vec. of neg. eig. val.
+        Vec_t q_1{eigen_vecs.col(1)};  //!< eig. vec. of smaller pos. eig. val.
+        Vec_t q_2{eigen_vecs.col(2)};  //!< eig. vec. of larger pos. eig. val.
+        for (Index_t k{0}; k < DimM; ++k) {
+          for (Index_t l{0}; l < DimM; ++l) {
+            for (Index_t n{0}; n < DimM; ++n) {
+              for (Index_t p{0}; p < DimM; ++p) {
+                get(dM2_c_dE, k, l, n, p) +=
+                    (((q_1[n] * q_0[p]) * (q_0[k] * q_1[l] + q_1[k] * q_0[l])) /
+                     (eigen_vals[0] - eigen_vals[1])) +
+                    (((q_2[n] * q_0[p]) * (q_0[k] * q_2[l] + q_2[k] * q_0[l])) /
+                     (eigen_vals[0] - eigen_vals[2]));
+              }
+            }
+          }
+        }
+        return std::make_tuple(-dM2_c_dE, varying_M);
+      } else {
+        // (*III*). otherwise the masking tensors are constant
+        varying_M = false;
+        return std::make_tuple(T4_t::Zero(), varying_M);
+      }
+      break;
+    }
+    default: {
+      throw MaterialError("Only 2D or 3D supported");
+      break;
+    }
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Index_t DimM>
+  auto MaterialDunantT<DimM>::compute_dEt_dE(const T2_t & E, const T2_t & M2_t,
+                                             const T4_t & dM2_t_dE,
+                                             const bool & varying_M) -> T4_t {
+    T4_t dEct_dE{Matrices::outer_under(M2_t, M2_t.transpose())};
+    if (varying_M) {
+      T2_t ME{M2_t * E};
+      T2_t EM{E * M2_t};
+      for (Index_t a{0}; a < DimM; ++a) {
+        for (Index_t b{0}; b < DimM; ++b) {
+          for (Index_t d{0}; d < DimM; ++d) {
+            for (Index_t n{0}; n < DimM; ++n) {
+              for (Index_t p{0}; p < DimM; ++p) {
+                get(dEct_dE, a, d, n, p) +=
+                    (get(dM2_t_dE, a, b, n, p) * EM(b, d) +
+                     ME(a, b) * get(dM2_t_dE, b, d, n, p));
+              }
+            }
+          }
+        }
+      }
+    }
+    return dEct_dE;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Index_t DimM>
+  auto MaterialDunantT<DimM>::compute_M2_t(const T2_t & E) -> T2_t {
+    auto && spectral_decomp_strain{muGrid::spectral_decomposition(E)};
+    T2_t M2_t{T2_t::Zero()};
+    for (Index_t i{0}; i < DimM; ++i) {
+      if (spectral_decomp_strain.eigenvalues()[i] > 0) {
+        M2_t += spectral_decomp_strain.eigenvectors().col(i) *
+                spectral_decomp_strain.eigenvectors().col(i).transpose();
+      }
+    }
+    return M2_t;
+  }
+  /* -----------------------------------------------------------------------
+   */
   template <Index_t DimM>
   void MaterialDunantT<DimM>::clear_last_step_nonlinear() {
     this->last_step_was_nonlinear = false;

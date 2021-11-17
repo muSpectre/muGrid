@@ -35,6 +35,7 @@
 
 #include "common/muSpectre_common.hh"
 #include "materials/material_dunant.hh"
+#include "materials/material_dunant_max.hh"
 #include "materials/material_dunant_t.hh"
 #include "materials/material_dunant_tc.hh"
 #include "cell/cell.hh"
@@ -101,6 +102,54 @@ void add_material_dunant_helper(py::module & mod) {
           "pixel_index"_a, "kappa_variarion"_a);
 }
 
+/**
+ * python binding for the material with dunant's damage model (MaterialDunant)
+ */
+template <Index_t Dim>
+void add_material_dunant_max_helper(py::module & mod) {
+  std::stringstream name_stream{};
+  name_stream << "MaterialDunantMax_" << Dim << "d";
+  const auto name{name_stream.str()};
+
+  using Mat_t = muSpectre::MaterialDunantMax<Dim>;
+  using Cell = muSpectre::Cell;
+  using CellData = muSpectre::CellData;
+
+  py::class_<Mat_t, muSpectre::MaterialBase, std::shared_ptr<Mat_t>>(
+      mod, name.c_str())
+      .def_static(
+          "make",
+          [](std::shared_ptr<Cell> cell, std::string name, Real young,
+             Real poisson, Real kappa, Real alpha) -> Mat_t & {
+            return Mat_t::make(cell, name, young, poisson, kappa, alpha);
+          },
+          "cell"_a, "name"_a, "YoungModulus"_a, "PoissonRatio"_a, "Kappa"_a,
+          "Alpha"_a, py::return_value_policy::reference_internal)
+      .def_static(
+          "make",
+          [](std::shared_ptr<CellData> cell, std::string name, Real young,
+             Real poisson, Real kappa, Real alpha) -> Mat_t & {
+            return Mat_t::make(cell, name, young, poisson, kappa, alpha);
+          },
+          "cell"_a, "name"_a, "YoungModulus"_a, "PoissonRatio"_a, "Kappa"_a,
+          "Alpha"_a, py::return_value_policy::reference_internal)
+      .def_static(
+          "make_evaluator",
+          [](Real young, Real poisson, Real kappa, Real alpha) {
+            return Mat_t::make_evaluator(young, poisson, kappa, alpha);
+          },
+          "YoungModulus"_a, "PoissonRatio"_a, "Kappa"_a, "Alpha"_a)
+      .def(
+          "add_pixel",
+          [](Mat_t & mat, size_t pixel_index) { mat.add_pixel(pixel_index); },
+          "pixel_index"_a)
+      .def(
+          "add_pixel",
+          [](Mat_t & mat, size_t pixel_index, Real kappa_var) {
+            mat.add_pixel(pixel_index, kappa_var);
+          },
+          "pixel_index"_a, "kappa_variarion"_a);
+}
 
 /**
  * python binding for the material with dunant's damage model (MaterialDunant)
@@ -211,6 +260,9 @@ void add_material_dunant_tc_helper(py::module & mod) {
 
 template void add_material_dunant_helper<muSpectre::twoD>(py::module &);
 template void add_material_dunant_helper<muSpectre::threeD>(py::module &);
+
+template void add_material_dunant_max_helper<muSpectre::twoD>(py::module &);
+template void add_material_dunant_max_helper<muSpectre::threeD>(py::module &);
 
 template void add_material_dunant_t_helper<muSpectre::twoD>(py::module &);
 template void add_material_dunant_t_helper<muSpectre::threeD>(py::module &);

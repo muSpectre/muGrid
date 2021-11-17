@@ -283,17 +283,18 @@ namespace muSpectre {
                                 ρᶜ * (∂εᶜ/∂ε::ε + εᶜ) + ρₜ * (∂εᵗ/∂ε::ε + εᵗ)
                     ∂κ/∂ε = —————————————————————————
                                       2 * κ * (ρᶜ + ρᵗ)
-                  */
+      */
       T2_t dk_dE{
           (this->rho_c * (Matrices::tensmult(dEc_dE.transpose(), E) + E_c) +
            this->rho_t * (Matrices::tensmult(dEt_dE.transpose(), E) + E_t)) /
           (2.0 * kappa.current() * (this->rho_c + this->rho_t))};
 
-      T2_t drdE{dr_dk * dk_dE};
+      T2_t drdE{dr_dk * dk_dE};  // ∂r/∂E = ∂r/∂K * ∂K/∂E
+
       /*
-        σ = σ⁰ * r ⇒
-        ∂σ/∂ε = ( C⁰ * r + σ⁰ ⊗ ∂r/∂ε)
-       */
+         σ = σ⁰ * r ⇒
+         ∂σ/∂ε = ( C⁰ * r + σ⁰ ⊗ ∂r/∂ε)
+      */
       T4_t C{reduction * C_pristine + Matrices::outer(S_pristine, drdE)};
 
       return std::make_tuple(S, C);
@@ -335,8 +336,7 @@ namespace muSpectre {
     this->internal_fields->add_pixel(pixel_index);
     this->get_kappa_field().get_state_field().current().push_back(
         this->get_kappa_init());
-    this->get_kappa_init_field().get_field().push_back(
-        this->get_kappa_init());
+    this->get_kappa_init_field().get_field().push_back(this->get_kappa_init());
   }
 
   /* ---------------------------------------------------------------------- */
