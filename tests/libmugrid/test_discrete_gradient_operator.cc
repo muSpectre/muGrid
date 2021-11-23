@@ -151,7 +151,7 @@ namespace muGrid {
             Eigen::Map<Eigen::MatrixXd> quad_pt_grad{
                 all_quad_grads.col(q).data(), grad.rows(), grad.cols()};
             auto && error{testGoodies::rel_error(quad_pt_grad, grad)};
-            if (error != 0) {
+            if (error >= tol) {
               std::cout << "at quad pt " << q << " of ccoord " << ccoord
                         << ", reference :" << std::endl
                         << grad << std::endl

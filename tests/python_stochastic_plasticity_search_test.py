@@ -149,8 +149,6 @@ def init_file_io_object(f_name, cell, comm=muGrid.Communicator()):
     if os.path.exists(f_name):
         os.remove(f_name)
 
-    print("here...")
-    print("comm: ", comm.size, comm.rank)
     file_io_object = muGrid.FileIONetCDF(
         f_name, muGrid.FileIONetCDF.OpenMode.Write, comm)
 
@@ -728,7 +726,6 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
             file_io_object = init_file_io_object(f_name, cell)
 
             def save_and_test_fields(n_strain_loop, before_avalanche):
-                print(n_strain_loop, before_avalanche)
                 if before_avalanche:
                     file_io_object.append_frame().write(["stress", "strain"])
 
@@ -986,7 +983,6 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         eq_stress_1 = eq_stress
         eq_stress_2 = eq_stress * 1.01
         eq_stress_3 = eq_stress * 1.05
-        print(f"eq_stresses: {eq_stress_1}, {eq_stress_2}, {eq_stress_3}")
 
         ### init material, with fine tuned order of stress thresholds
         # high threshold
@@ -1033,8 +1029,6 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
                                n_max_bracket_search, DelF_init, self.verbose)
 
         def save_and_test_ava(n_strain_loop, ava_history):
-            print(f"ava hist:\n{ava_history}\n\n"
-                  + f"expected ava hist:\n{expected_ava_history}")
             self.assertTrue(
                 np.isclose(ava_history, expected_ava_history, equal_nan=True)
                 .all())
@@ -1043,7 +1037,6 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
             file_io_object = init_file_io_object(f_name, cell)
 
             def save_and_test_fields(n_strain_loop, before_avalanche):
-                print(n_strain_loop, before_avalanche)
                 if before_avalanche:
                     file_io_object.append_frame().write(["stress", "strain"])
 

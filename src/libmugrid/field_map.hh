@@ -288,7 +288,9 @@ namespace muGrid {
     /**
      * returns the number of iterates produced by this map (corresponds to the
      * number of field entries if Iteration::Subpt, or the number of
-     * pixels/voxels if Iteration::Pixel);
+     * pixels/voxels if Iteration::Pixel); In parallel, if the processor does
+     * not hold a part of the field (empty processor) this empty processor
+     * returns size=0.
      */
     size_t size() const;
 
@@ -324,10 +326,14 @@ namespace muGrid {
      */
     Enumeration_t enumerate_indices();
 
-    //! evaluate and return the sum of the map
+    //! evaluate and return the sum of the map. In parallel, if the processor
+    //! does not hold a part of the field (empty processor) this empty processor
+    //! returns a zero matrix of the proper size and type.
     PlainType sum() const;
 
-    //! evaluate and return the mean value of the map
+    //! evaluate and return the mean value of the map. In parallel, if the
+    //! processor does not hold a part of the field (empty processor) this empty
+    //! processor returns a zero matrix of the proper size and type.
     PlainType mean() const;
 
     //! return const reference to the mapped field

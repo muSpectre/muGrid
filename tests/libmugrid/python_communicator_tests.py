@@ -38,6 +38,8 @@ import unittest
 
 from python_test_imports import muGrid
 
+import numpy as np
+
 
 class Communicator_Check(unittest.TestCase):
     def test_sum_default(self):
@@ -101,6 +103,28 @@ class Communicator_Check(unittest.TestCase):
         scalar_arg = comm.rank + 1
         res = comm.bcast(scalar_arg=scalar_arg, root=comm.size - 1)
         self.assertEqual(res, comm.size)
+
+    def test_gather(self):
+        try:
+            from mpi4py import MPI
+            comm = muGrid.Communicator(MPI.COMM_WORLD)
+        except ImportError:
+            comm = muGrid.Communicator()
+
+        # gather arrays "a" with different lengths on the ranks
+        a = np.arange(comm.rank*2+4).reshape((-1, 2)).T
+
+        a_gathered = comm.gather(a)
+
+        # construct reference
+        for i in range(comm.size):
+            if i == 0:
+                a_ref = np.arange(i*2+4).reshape((-1, 2))
+            elif i >= 1:
+                a_tmp = np.arange(i*2+4).reshape((-1, 2))
+                a_ref = np.concatenate((a_ref, a_tmp), axis=0)
+
+        self.assertTrue((a_gathered == a_ref.T).all())
 
 
 if __name__ == '__main__':

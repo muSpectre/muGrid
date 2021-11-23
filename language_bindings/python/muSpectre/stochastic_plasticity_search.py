@@ -124,7 +124,6 @@ def propagate_avalanche_step(mat, cell, dim, solver, newton_tol,
     overloaded_quad_pts ndarray, Each rank returns its list of overloaded quad
                                  points.
     """
-    newton_verbose = µ.Verbosity.Silent
     zero_DelF = np.zeros((dim,)*2)
     µ.solvers.newton_cg(cell, zero_DelF, solver,
                         newton_tol, newton_equil_tol,
@@ -347,8 +346,9 @@ def bracket_search(material, cell, solver, newton_tol, newton_equil_tol,
         if reached_accuracy:
             if n_pix == 1:
                 F = result.grad
-                breaking_quad_pts = np.array(comm.gather(
-                    np.array(overloaded_quad_pts, dtype=np.int64))).reshape(-1)
+                breaking_quad_pts = \
+                    comm.gather(np.array(overloaded_quad_pts, dtype=np.int64)
+                                .reshape((-1, 1)).T).reshape(-1)
                 if verbose and comm.rank == 0:
                     print("I needed {} bracket search steps."
                           .format(n_bracket))
@@ -368,8 +368,9 @@ def bracket_search(material, cell, solver, newton_tol, newton_equil_tol,
                     "start the avalanche from a single quad point!"
                     .format(n_pix), RuntimeWarning)
                 F = result.grad
-                breaking_quad_pts = np.array(comm.gather(
-                    np.array(overloaded_quad_pts, dtype=np.int64))).reshape(-1)
+                breaking_quad_pts = \
+                    comm.gather(np.array(overloaded_quad_pts, dtype=np.int64)
+                                .reshape((-1, 1)).T).reshape(-1)
                 if verbose and comm.rank == 0:
                     print("I needed {} bracket search steps."
                           .format(n_bracket))
@@ -514,8 +515,8 @@ def propagate_avalanche(material, cell, solver, newton_tol, newton_equil_tol,
         if single_quad_pt_start:
             # select on rank 0 random a single quad point at which the
             # avalanche starts
-            iop = comm.gather(
-                np.array(overloaded_quad_pts, dtype=np.int64)).reshape(-1)
+            iop = comm.gather(np.array(overloaded_quad_pts, dtype=np.int64)
+                              .reshape((-1, 1)).T).reshape(-1)
             random_index = len(iop) + 1  # invalid index if not updated
             if comm.rank == 0:
                 random_index = np.random.randint(len(iop), size=1)[0]
@@ -594,8 +595,8 @@ def propagate_avalanche(material, cell, solver, newton_tol, newton_equil_tol,
 
     while (n_pix_avalanche >= 1) and (n_avalanche < n_max_avalanche):
         if save_avalanche is not None:
-            ava_t = comm.gather(
-                np.array(overloaded_quad_pts, dtype=np.int64)).reshape(-1)
+            ava_t = comm.gather(np.array(overloaded_quad_pts, dtype=np.int64)
+                                .reshape((-1, 1)).T).reshape(-1)
             if comm.rank == 0:
                 ava_history.append(ava_t.flatten())
 

@@ -36,7 +36,7 @@
 #ifndef TESTS_LIBMUGRID_IO_MPI_TEST_FILE_IO_HH_
 #define TESTS_LIBMUGRID_IO_MPI_TEST_FILE_IO_HH_
 
-#include "tests/libmufft/tests.hh"
+#include "tests.hh"
 #include "mpi_context.hh"
 
 #include <libmugrid/field_collection_local.hh>

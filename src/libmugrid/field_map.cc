@@ -176,9 +176,14 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   template <typename T, Mapping Mutability>
   size_t FieldMap<T, Mutability>::size() const {
-    return (this->iteration == IterUnit::SubPt)
-               ? this->field.get_current_nb_entries()
-               : this->field.get_collection().get_nb_pixels();
+    size_t size{0};
+    if (this->field.get_nb_entries() != 0) {
+      // size is only != 0 if the processor holds a part of the field
+      size = (this->iteration == IterUnit::SubPt)
+                 ? this->field.get_current_nb_entries()
+                 : this->field.get_collection().get_nb_pixels();
+    }
+    return size;
   }
 
   /* ---------------------------------------------------------------------- */
@@ -215,8 +220,13 @@ namespace muGrid {
   template <typename T, Mapping Mutability>
   auto FieldMap<T, Mutability>::sum() const -> PlainType {
     PlainType sum{PlainType::Zero(this->nb_rows, this->nb_cols)};
-    for (auto && val : *this) {
-      sum += val;
+    // only call iterator on '*this' if the field exists on the processor (non
+    // empty processor, field.get_nb_entries > 0) otherwise the iterator calls
+    // random access operations "[]" on non existing parts of the field.
+    if (this->field.get_nb_entries() != 0) {
+      for (auto && val : *this) {
+        sum += val;
+      }
     }
     return sum;
   }
@@ -225,10 +235,12 @@ namespace muGrid {
   template <typename T, Mapping Mutability>
   auto FieldMap<T, Mutability>::mean() const -> PlainType {
     PlainType mean{PlainType::Zero(this->nb_rows, this->nb_cols)};
-    for (auto && val : *this) {
-      mean += val;
+    // only call divide by size if the field exists on the processor (non
+    // empty processor, field.get_nb_entries > 0) otherwise the size is zero
+    // which would lead to a division "0/0" which can be prevented here.
+    if (this->field.get_nb_entries() != 0) {
+      mean = this->sum() / this->size();
     }
-    mean *= 1. / Real(this->size());
     return mean;
   }
 

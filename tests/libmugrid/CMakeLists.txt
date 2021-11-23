@@ -91,6 +91,8 @@ if(${MUSPECTRE_MPI_PARALLEL})
     python_mpi_binding_test.py)
   muGrid_add_test(mugrid_python_mpi_binding_test2 TYPE PYTHON MPI_NB_PROCS 2
     python_mpi_binding_test.py)
+  muGrid_add_test(mugrid_python_mpi_binding_test4 TYPE PYTHON MPI_NB_PROCS 4
+    python_mpi_binding_test.py)
 endif()
 
 ##############################################################################

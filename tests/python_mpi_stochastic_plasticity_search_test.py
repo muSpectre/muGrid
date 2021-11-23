@@ -45,7 +45,7 @@ import warnings
 import os
 import numpy as np
 
-from python_test_imports import µ, muFFT
+from python_test_imports import µ
 from muFFT import Stencils3D
 import muSpectre.stochastic_plasticity_search as sps
 from python_stochastic_plasticity_search_test import \
@@ -167,6 +167,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         self.newton_equil_tol = 1e-6  # tolerance for equilibrium
         self.maxiter = 100
         self.verbose = µ.Verbosity.Silent
+        self.verbose_sps = 0
 
         # stochastic plasticity maximum and accuracy parameters
         self.yield_surface_accuracy = 1e-6
@@ -250,7 +251,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         b = 14
         inv_cum_dist_func = lambda z: a + (b-a)*z
 
-        ### write first time a threshold on the pixel
+        # write first time a threshold on the pixel
         seed_1 = 19092019 * (self.comm.rank+1)
         np.random.seed(seed_1)
         sps.set_new_threshold(mat, quad_pt_id,
@@ -260,7 +261,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         threshold_read = mat.get_stress_threshold(quad_pt_id)
         self.assertLess(threshold_expected - threshold_read, 1e-8)
 
-        ### write second time a threshold on the pixel
+        # write second time a threshold on the pixel
         seed_2 = 2019 * (self.comm.rank+1)
         np.random.seed(seed_2)
         sps.set_new_threshold(mat, quad_pt_id,
@@ -292,7 +293,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         quad_pts = np.empty(self.comm.Get_size(), dtype=int)
         self.comm.Allgather([quad_pt, MPI.INT], [quad_pts, MPI.INT])
 
-        ### analytic
+        # analytic
         # analytic compute the equivalent stress for a given strain 'strain_xy'
         C = stiffness_matrix(self.young, self.poisson, self.dim)
         if self.formulation == µ.Formulation.finite_strain:
@@ -311,14 +312,13 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
             # analytic computed equivalent stress
             eq_stress = sigma_eq(cauchy_analytic)
 
-        ### numeric
+        # numeric
         # set the analytic computed equivalent stress reduced by a tiny amount
         # as threshold for one "weak pixel" and the other thresholds to
         # slightly higher values.
         fixed_yield_stress = np.ones(tuple(self.res) + (self.nb_quad_pts,),
                                      order='F') * eq_stress * (1 + 1e-8)
         for index, qpt in zip(weak_pixels, quad_pts):
-            print(f"loop {index}, {qpt}")
             fixed_yield_stress[tuple(index) + (qpt,)] = eq_stress * (1 - 1e-8)
 
         # init material
@@ -360,7 +360,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         3. Test if an error is raised when the maximum allowed bracket steps
            are reached.
         """
-        ### ------- 1. ------- ###
+        # ------- 1. ------- #
         # init data
         low_yield_stress = 9.5
         yield_surface_accuracy = 1e-7
@@ -375,9 +375,10 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
                                     [0,  0,  1]])
         elif self.formulation == µ.Formulation.small_strain:
             g_01 = 0.03473725  # approx. g_01/2 of finite strain
-            strain_init = np.array([[0, g_01 - yield_surface_accuracy/2*1.75, 0],
-                                    [g_01 - yield_surface_accuracy/2*1.75, 0, 0],
-                                    [0,  0,  0]])
+            strain_init = \
+                np.array([[0, g_01 - yield_surface_accuracy/2*1.75, 0],
+                          [g_01 - yield_surface_accuracy/2*1.75, 0, 0],
+                          [0,  0,  0]])
 
         fixed_yield_stress = np.ones(tuple(self.res) + (self.nb_quad_pts,),
                                      order='F')*14  # high threshold
@@ -411,7 +412,8 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         next_DelF_guess, PK2, F, breaking_quad_pts = \
             sps.bracket_search(mat, cell, cg_solver, self.newton_tol,
                                self.newton_equil_tol, yield_surface_accuracy,
-                               n_max_bracket_search, DelF_initial, self.verbose)
+                               n_max_bracket_search, DelF_initial,
+                               self.verbose_sps)
 
         # Is it exactly one breaking pixel and if yes is it pixel [0,0,0]?
         self.assertEqual(len(breaking_quad_pts), 1)
@@ -456,7 +458,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         # plasticity computes PK1 up to now but has to be changed to PK2)
         self.assertLess(np.linalg.norm(stress_analytic - stress_numeric), 1e-8)
 
-        ### ------- 2. ------- ###
+        # ------- 2. ------- #
         # init data
         low_yield_stress = 9.5
         yield_surface_accuracy = 1e-8
@@ -466,14 +468,16 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         # the needed bracket search steps
         if self.formulation == µ.Formulation.finite_strain:
             g_01 = 0.06941878  # final deformation
-            strain_init = np.array([[1, g_01 - yield_surface_accuracy**2*1.75, 0],
-                                    [0,  1,  0],
-                                    [0,  0,  1]])
+            strain_init = \
+                np.array([[1, g_01 - yield_surface_accuracy**2*1.75, 0],
+                          [0,  1,  0],
+                          [0,  0,  1]])
         elif self.formulation == µ.Formulation.small_strain:
             g_01 = 0.03473726  # approx. g_01/2 of finite strain
-            strain_init = np.array([[0, g_01 - yield_surface_accuracy**2/2*1.75, 0],
-                                    [g_01 - yield_surface_accuracy**2/2*1.75, 0, 0],
-                                    [0,  0,  0]])
+            strain_init = \
+                np.array([[0, g_01 - yield_surface_accuracy**2/2*1.75, 0],
+                          [g_01 - yield_surface_accuracy**2/2*1.75, 0, 0],
+                          [0,  0,  0]])
         n_max_bracket_search = 4
 
         fixed_yield_stress = np.ones(tuple(self.res) + (self.nb_quad_pts,),
@@ -495,7 +499,8 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
                          self.gradient, self.fft, self.comm)
         mat = init_mat(cell, self.young, self.poisson, fixed_yield_stress,
                        self.plastic_increment, self.eigen_strain)
-        cg_solver = init_cg_solver(cell, self.cg_tol, self.maxiter, self.verbose)
+        cg_solver = init_cg_solver(cell, self.cg_tol,
+                                   self.maxiter, self.verbose)
 
         DelF_initial = np.zeros((self.dim, self.dim))
         if self.formulation == µ.Formulation.finite_strain:
@@ -515,8 +520,9 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
             next_DelF_guess, PK2, F, breaking_quad_pts = \
                 sps.bracket_search(mat, cell, cg_solver, self.newton_tol,
                                    self.newton_equil_tol,
-                                   yield_surface_accuracy, n_max_bracket_search,
-                                   DelF_initial, self.verbose)
+                                   yield_surface_accuracy,
+                                   n_max_bracket_search,
+                                   DelF_initial, verbose=1)
             self.assertTrue(len(w) == 1)
             self.assertTrue(issubclass(w[-1].category, RuntimeWarning))
             self.assertTrue("bracket_search found 2 quad points overcoming "
@@ -532,7 +538,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         self.assertTrue((breaking_quad_pts ==
                          [w_qpt_1_global_id, w_qpt_2_global_id]).all())
 
-        ### ------- 3. ------- ###
+        # ------- 3. ------- #
         # use the initalization from the last test
         n_max_bracket_search = 2
         DelF_initial = np.zeros((self.dim, self.dim))
@@ -544,7 +550,8 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             sps.bracket_search(mat, cell, cg_solver, self.newton_tol,
                                self.newton_equil_tol, yield_surface_accuracy,
-                               n_max_bracket_search, DelF_initial, self.verbose)
+                               n_max_bracket_search, DelF_initial,
+                               self.verbose_sps)
 
     def test_propagate_avalanche(self):
         """
@@ -554,15 +561,15 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         2. Test if initially_overloaded_pixels behaves right.
         3. Test the parameter 'single_pixel_start'
         """
-        ### ------- 1. ------- ###
-        ### init parameters
+        # ------- 1. ------- #
+        # init parameters
         res = [3, 3, 3]
         lens = [1, 1, 1]
         dim = len(res)
         strain_xy_1 = 0.01
         plastic_increment = strain_xy_1 * 12
 
-        ### analytic compute eq_stress_1 for a given strain 'strain_xy_1'
+        # analytic compute eq_stress_1 for a given strain 'strain_xy_1'
         C = stiffness_matrix(self.young, self.poisson, self.dim)
         if self.formulation == µ.Formulation.finite_strain:
             F = np.eye(self.dim)
@@ -590,7 +597,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         pixel_3 = [1, 2, 1]
         qpt_3 = 3
 
-        ### init material, with fine tuned order of stress thresholds
+        # init material, with fine tuned order of stress thresholds
         fixed_yield_stress = np.ones(tuple(res) + (self.nb_quad_pts, ))*17
         fixed_yield_stress[tuple(pixel_1) + (qpt_1,)] = eq_stress_1
         fixed_yield_stress[tuple(pixel_2) + (qpt_2,)] = eq_stress_2
@@ -603,7 +610,8 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
                          self.gradient, self.fft, self.comm)
         mat = init_mat(cell, self.young, self.poisson, fixed_yield_stress,
                        plastic_increment, self.eigen_strain)
-        cg_solver = init_cg_solver(cell, self.cg_tol, self.maxiter, self.verbose)
+        cg_solver = init_cg_solver(cell, self.cg_tol,
+                                   self.maxiter, self.verbose)
 
         # compute quad_pt_ids
         quad_pt_1 = compute_global_quad_pt_id_from_pixel(
@@ -630,8 +638,8 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
                                              [quad_pt_3, quad_pt_4],
                                              [quad_pt_2, np.nan]])
 
-        ### overload one pixel which breaks and by its plastic increment
-        ### overloads two additional pixels.
+        # overload one pixel which breaks and by its plastic increment
+        # overloads two additional pixels.
 
         # propagate the avalanche
         yield_surface_accuracy = 1e-8
@@ -648,7 +656,8 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         elif self.formulation == µ.Formulation.small_strain:
             for i in range(self.dim):
                 strain_field[i, i, ...] = 0.0
-            strain_field[0, 1, ...] = strain_xy_1/2 - yield_surface_accuracy/2*1.25
+            strain_field[0, 1, ...] = \
+                strain_xy_1/2 - yield_surface_accuracy/2*1.25
             strain_field[1, 0, ...] = strain_field[0, 1, ...]
             DelF_init[0, 1] = yield_surface_accuracy/2
             DelF_init[1, 0] = DelF_init[0, 1]
@@ -659,7 +668,8 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         DelF, PK2, F, breaking_pixel = \
             sps.bracket_search(mat, cell, cg_solver, self.newton_tol,
                                self.newton_equil_tol, yield_surface_accuracy,
-                               n_max_bracket_search, DelF_init, self.verbose)
+                               n_max_bracket_search, DelF_init,
+                               self.verbose_sps)
 
         def save_and_test_ava(n_strain_loop, ava_history):
             # check avalanche history
@@ -667,6 +677,14 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
                                        equal_nan=True).all())
 
         def create_save_fields(f_name, cell):
+            # Clean up
+            if self.comm.rank == 0:
+                pwd = os.getcwd() + "/"
+                if os.path.exists(pwd + f_name):
+                    os.remove(pwd + f_name)
+            MPI.COMM_WORLD.Barrier()
+
+            # create new file
             if self.comm.size > 1:
                 file_io_object = init_file_io_object(f_name, cell,
                                                      cell.communicator)
@@ -692,18 +710,19 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
 
         sps.propagate_avalanche(mat, cell, cg_solver, self.newton_tol,
                                 self.newton_equil_tol, PK2, F, n_max_avalanche,
-                                self.verbose,
+                                self.verbose_sps,
                                 inverse_cumulative_dist_func=i_cdf,
                                 save_avalanche=save_and_test_ava,
                                 save_fields=save_fields,
                                 n_strain_loop=0)
 
-        ### ------- 2. ------- ###
+        # ------- 2. ------- #
         cell = init_cell(res, lens, self.formulation,
                          self.gradient, self.fft, self.comm)
         mat = init_mat(cell, self.young, self.poisson, fixed_yield_stress,
                        plastic_increment, self.eigen_strain)
-        cg_solver = init_cg_solver(cell, self.cg_tol, self.maxiter, self.verbose)
+        cg_solver = init_cg_solver(cell, self.cg_tol,
+                                   self.maxiter, self.verbose)
 
         strain_field = cell.strain.array()
         if self.formulation == µ.Formulation.finite_strain:
@@ -713,13 +732,15 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         elif self.formulation == µ.Formulation.small_strain:
             for i in range(self.dim):
                 strain_field[i, i, ...] = 0.0
-            strain_field[0, 1, ...] = strain_xy_1/2 - yield_surface_accuracy/2*1.25
+            strain_field[0, 1, ...] = \
+                strain_xy_1/2 - yield_surface_accuracy/2*1.25
             strain_field[1, 0, ...] = strain_field[0, 1, ...]
 
         DelF, PK2, F, breaking_quad_pts = \
             sps.bracket_search(mat, cell, cg_solver, self.newton_tol,
                                self.newton_equil_tol, yield_surface_accuracy,
-                               n_max_bracket_search, DelF_init, self.verbose)
+                               n_max_bracket_search, DelF_init,
+                               self.verbose_sps)
 
         # initial quad point is qpt_1 on pixel_1
         # which corresponds to global quad_pt_1
@@ -730,7 +751,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
 
         sps.propagate_avalanche(mat, cell, cg_solver, self.newton_tol,
                                 self.newton_equil_tol, PK2, F, n_max_avalanche,
-                                self.verbose,
+                                self.verbose_sps,
                                 initially_overloaded_quad_pts=breaking_quad_pts,
                                 inverse_cumulative_dist_func=i_cdf,
                                 save_avalanche=save_and_test_ava,
@@ -742,8 +763,8 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
             pwd = os.getcwd() + "/"
             os.remove(pwd + f_name)
 
-        ### ------- 3. ------- ###
-        ### init material, with two pixels of the same yield strength
+        # ------- 3. ------- #
+        # init material, with two pixels of the same yield strength
         pixel_1 = [1, 1, 1]
         qpt_1 = 5
         pixel_2 = [1, 1, 2]
@@ -794,7 +815,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
                                        self.newton_equil_tol,
                                        yield_surface_accuracy,
                                        n_max_bracket_search, DelF_init,
-                                       self.verbose)
+                                       self.verbose_sps)
             return mat, cell, cg_solver, PK2, F, breaking_quad_pts
 
         def sa_2break(n_strain_loop, ava_history):
@@ -814,7 +835,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         self.assertTrue((breaking_quad_pts == [quad_pt_1, quad_pt_2]).all())
         sps.propagate_avalanche(mat, cell, cg_solver, self.newton_tol,
                                 self.newton_equil_tol, PK2, F, n_max_avalanche,
-                                self.verbose,
+                                self.verbose_sps,
                                 initially_overloaded_quad_pts=None,
                                 single_quad_pt_start=False,
                                 inverse_cumulative_dist_func=i_cdf,
@@ -824,7 +845,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         mat, cell, cg_solver, PK2, F, breaking_quad_pts = setup_material()
         sps.propagate_avalanche(mat, cell, cg_solver, self.newton_tol,
                                 self.newton_equil_tol, PK2, F, n_max_avalanche,
-                                self.verbose,
+                                self.verbose_sps,
                                 initially_overloaded_quad_pts=breaking_quad_pts,
                                 single_quad_pt_start=False,
                                 inverse_cumulative_dist_func=i_cdf,
@@ -834,7 +855,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         mat, cell, cg_solver, PK2, F, breaking_quad_pts = setup_material()
         sps.propagate_avalanche(mat, cell, cg_solver, self.newton_tol,
                                 self.newton_equil_tol, PK2, F, n_max_avalanche,
-                                self.verbose,
+                                self.verbose_sps,
                                 initially_overloaded_quad_pts=breaking_quad_pts,
                                 single_quad_pt_start=True,
                                 inverse_cumulative_dist_func=i_cdf,
@@ -844,7 +865,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         mat, cell, cg_solver, PK2, F, breaking_quad_pts = setup_material()
         sps.propagate_avalanche(mat, cell, cg_solver, self.newton_tol,
                                 self.newton_equil_tol, PK2, F, n_max_avalanche,
-                                self.verbose,
+                                self.verbose_sps,
                                 initially_overloaded_quad_pts=None,
                                 single_quad_pt_start=True,
                                 inverse_cumulative_dist_func=i_cdf,
@@ -860,7 +881,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
             - PK2, stress field
             - F, deformation gradient field
         """
-        ### ------- 1. ------- ###
+        # ------- 1. ------- #
         DelF = np.zeros((self.dim, self.dim))
         DelF[0, 1] = 0.0001
         if self.formulation == µ.Formulation.small_strain:
@@ -886,7 +907,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
                                 self.yield_surface_accuracy,
                                 self.n_max_strain_loop,
                                 self.n_max_bracket_search,
-                                self.n_max_avalanche, self.verbose, False,
+                                self.n_max_avalanche, self.verbose_sps, False,
                                 self.inverse_cumulative_dist_func,
                                 save_avalanche=None,
                                 save_fields=None,
@@ -904,7 +925,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
             # It works for size = 1 but we save the time for this execution.
             return 0
 
-        ### setup
+        # setup
         res = [3, 3, 3]
         yield_stress = 1.5
         # set the same random seed on each core, otherwise the serial and
@@ -922,17 +943,19 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
 
         if self.formulation == µ.Formulation.finite_strain:
             g_01 = 0.00989125
-            strain_init = np.array([[1, g_01 - self.yield_surface_accuracy*1.75, 0],
-                                    [0,  1,  0],
-                                    [0,  0,  1]])
+            strain_init = \
+                np.array([[1, g_01 - self.yield_surface_accuracy*1.75, 0],
+                          [0,  1,  0],
+                          [0,  0,  1]])
             DelF[0, 1] = self.yield_surface_accuracy
             F_tot = np.eye(self.dim)
             F_tot[0, 1] = 0.01
         elif self.formulation == µ.Formulation.small_strain:
             g_01 = 0.00494575  # approx. 0.00989125 / 2
-            strain_init = np.array([[1, g_01 - self.yield_surface_accuracy/2*1.75, 0],
-                                    [g_01 - self.yield_surface_accuracy/2*1.75, 1, 0],
-                                    [0,  0,  1]])
+            strain_init = \
+                np.array([[1, g_01 - self.yield_surface_accuracy/2*1.75, 0],
+                          [g_01 - self.yield_surface_accuracy/2*1.75, 1, 0],
+                          [0,  0,  1]])
             DelF[0, 1] = self.yield_surface_accuracy / 2
             DelF[1, 0] = DelF[0, 1]
             F_tot = np.zeros((self.dim, self.dim))
@@ -946,14 +969,12 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         ava_parallel = []
 
         def save_and_test_ava_s(n_strain_loop, ava_history):
-            print(f"ava_hist s:\n{ava_history}")
             ava_serial.append(ava_history)
 
         def save_and_test_ava_p(n_strain_loop, ava_history):
-            print(f"ava_hist p:\n{ava_history}")
             ava_parallel.append(ava_history)
 
-        ### serial
+        # serial
         # create a new communicator with only one rank to make a effective
         # (cell with comm that has only one rank leads to a serial
         # computation, no mpi) serial computation.
@@ -975,19 +996,21 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
 
             DelF, PK2, F, breaking_quad_pts = \
                 sps.bracket_search(mat_s, cell_s, cg_solver_s, self.newton_tol,
-                                   self.newton_equil_tol, self.yield_surface_accuracy,
-                                   n_max_bracket_search, DelF, self.verbose)
+                                   self.newton_equil_tol,
+                                   self.yield_surface_accuracy,
+                                   n_max_bracket_search, DelF, self.verbose_sps)
 
             F_fin_s = sps.strain_cell(mat_s, cell_s, cg_solver_s,
                                       self.newton_tol, self.newton_equil_tol,
                                       DelF, F_tot, self.yield_surface_accuracy,
                                       n_max_strain_loop, n_max_bracket_search,
-                                      self.n_max_avalanche, self.verbose, False,
+                                      self.n_max_avalanche,
+                                      self.verbose_sps, False,
                                       i_cdf, save_avalanche=save_and_test_ava_s,
                                       save_fields=None,
                                       is_strain_initialised=True)
 
-        ### parallel
+        # parallel
         fft_p = "fftwmpi"
         comm_p = self.comm
         cell_p = init_cell(res, self.lens, self.formulation,
@@ -1003,35 +1026,164 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
             axes=0)
 
         DelF, PK2, F, breaking_quad_pts = \
-            sps.bracket_search(mat_p, cell_p, cg_solver_p, self.newton_tol,
-                               self.newton_equil_tol, self.yield_surface_accuracy,
-                               n_max_bracket_search, DelF, self.verbose)
+            sps.bracket_search(mat_p, cell_p,
+                               cg_solver_p, self.newton_tol,
+                               self.newton_equil_tol,
+                               self.yield_surface_accuracy,
+                               n_max_bracket_search,
+                               DelF, self.verbose_sps)
 
         F_fin_p = sps.strain_cell(mat_p, cell_p, cg_solver_p, self.newton_tol,
                                   self.newton_equil_tol, DelF, F_tot,
                                   self.yield_surface_accuracy,
                                   n_max_strain_loop, n_max_bracket_search,
-                                  self.n_max_avalanche, self.verbose, False,
+                                  self.n_max_avalanche, self.verbose_sps, False,
                                   i_cdf, save_avalanche=save_and_test_ava_p,
                                   save_fields=None,
                                   is_strain_initialised=True)
 
-        ### comparison
+        # comparison
         if self.comm.rank == 0:
             self.assertTrue(
                 np.array([np.isclose(s, p, equal_nan=True).all()
                           for s, p in zip(ava_serial, ava_parallel)]).all())
             self.assertTrue((abs(F_fin_s - F_fin_p) < 1e-8).all())
 
+    def test_gather_of_avalanches(self):
+        """
+        Test if a avalanche of "general" size can be gathered properly by the
+        stochastic plasticity module, i.e. we have different sizes of the
+        avalanche on the different cores.
+        1. One quad point breaking on rank 0 and two quadpoints breaking
+           on rank 1.
+        """
+        if self.comm.size != 2:
+            # make this tests only for parallel evaluations on two processors
+            return 0
+
+        # ------- 1. ------- #
+        # init parameters
+        res = [3, 3, 3]
+        lens = [1, 1, 1]
+        dim = len(res)
+        strain_xy_1 = 0.01
+        plastic_increment = 1e-5
+
+        # analytic compute eq_stress_1 for a given strain 'strain_xy_1'
+        C = stiffness_matrix(self.young, self.poisson, self.dim)
+        if self.formulation == µ.Formulation.finite_strain:
+            F = np.eye(self.dim)
+            F[0, 1] = strain_xy_1
+            E = green_lagrangian_strain_vector(F, self.dim)
+            PK2_analytic = PK2_tensor(C, E)
+            eq_stress = sigma_eq(PK2_analytic)
+        elif self.formulation == µ.Formulation.small_strain:
+            eps = np.zeros((self.dim, self.dim))
+            eps[0, 1] = strain_xy_1 / 2
+            eps[1, 0] = eps[0, 1]
+            eps_v = eps_voigt_vector(eps, self.dim)
+            cauchy_analytic = PK2_tensor(C, eps_v)
+            eq_stress = sigma_eq(cauchy_analytic)
+            plastic_increment /= 2
+
+        pixel_1 = [1, 1, 1]
+        qpt_1 = 5
+        pixel_2 = [0, 1, 2]
+        qpt_2 = 0
+        pixel_3 = [1, 2, 2]
+        qpt_3 = 3
+
+        # init material, with fine tuned order of stress thresholds
+        fixed_yield_stress = np.ones(tuple(res) + (self.nb_quad_pts, ))*17
+        fixed_yield_stress[tuple(pixel_1) + (qpt_1,)] = eq_stress
+        fixed_yield_stress[tuple(pixel_2) + (qpt_2,)] = eq_stress
+        fixed_yield_stress[tuple(pixel_3) + (qpt_3,)] = eq_stress
+        cell = init_cell(res, lens, self.formulation,
+                         self.gradient, self.fft, self.comm)
+        mat = init_mat(cell, self.young, self.poisson, fixed_yield_stress,
+                       plastic_increment, self.eigen_strain)
+        cg_solver = init_cg_solver(cell, self.cg_tol,
+                                   self.maxiter, self.verbose)
+
+        # compute quad_pt_ids
+        quad_pt_1 = compute_global_quad_pt_id_from_pixel(
+            pixel_1, cell.nb_domain_grid_pts, cell.nb_quad_pts,
+            pixel_quad_pt=qpt_1)
+        quad_pt_2 = compute_global_quad_pt_id_from_pixel(
+            pixel_2, cell.nb_domain_grid_pts, cell.nb_quad_pts,
+            pixel_quad_pt=qpt_2)
+        quad_pt_3 = compute_global_quad_pt_id_from_pixel(
+            pixel_3, cell.nb_domain_grid_pts, cell.nb_quad_pts,
+            pixel_quad_pt=qpt_3)
+
+        # expected avalanche histories
+        expected_ava_history = np.array([quad_pt_1, quad_pt_2, quad_pt_3])
+
+        # propagate the avalanche
+        yield_surface_accuracy = 1e-8  # for fast convergence
+        n_max_bracket_search = 2
+        # set the eigen strain field to the slightly modified previous fixed
+        # deformation 'strain_xy' for faster convergence
+        strain_field = cell.strain.array()
+        DelF_init = np.zeros((dim, dim))
+        if self.formulation == µ.Formulation.finite_strain:
+            for i in range(self.dim):
+                strain_field[i, i, ...] = 1.0
+
+            strain_field[0, 1, ...] = \
+                strain_xy_1 - yield_surface_accuracy**2*1.25
+            DelF_init[0, 1] = yield_surface_accuracy**2
+        elif self.formulation == µ.Formulation.small_strain:
+            for i in range(self.dim):
+                strain_field[i, i, ...] = 0.0
+
+            strain_field[0, 1, ...] = \
+                strain_xy_1/2 - yield_surface_accuracy**2/2*1.25
+            strain_field[1, 0, ...] = strain_field[0, 1, ...]
+            DelF_init[0, 1] = yield_surface_accuracy**2/2
+            DelF_init[1, 0] = DelF_init[0, 1]
+
+        n_max_avalanche = 2
+        i_cdf = lambda z: 17  # constant value
+
+        with warnings.catch_warnings():
+            # suppress warnings of bracket_search()
+            warnings.simplefilter("ignore")
+            DelF, PK2, F, breaking_pixel = \
+                sps.bracket_search(mat, cell, cg_solver,
+                                   self.newton_tol,
+                                   self.newton_equil_tol,
+                                   yield_surface_accuracy,
+                                   n_max_bracket_search,
+                                   DelF_init, self.verbose_sps)
+
+        def save_and_test_ava(n_strain_loop, ava_history):
+            # check avalanche history
+            self.assertTrue((ava_history == expected_ava_history).all())
+
+        def save_fields(n_strain_loop, before_avalanche):
+            return 0
+
+        sps.propagate_avalanche(mat, cell, cg_solver, self.newton_tol,
+                                self.newton_equil_tol, PK2, F, n_max_avalanche,
+                                self.verbose_sps,
+                                inverse_cumulative_dist_func=i_cdf,
+                                save_avalanche=save_and_test_ava,
+                                save_fields=save_fields,
+                                n_strain_loop=0)
+
     def test_empty_processors(self):
         """
         Tests:
-        1. Test if stochastic plasticity search crashes if one processor is empty
+        1. Test if stochastic plasticity search
+           crashes if one processor is empty.
         """
-        ### ------- 1. ------- ###
-        # TODO(RLeute): this test should run for small strain
-        formulation = µ.Formulation.finite_strain  # self.formulation
-        verbose = µ.Verbosity.Silent  # self.verbose
+        # ------- 1. ------- #
+        # TODO(RLeute): this test should run for small strain!
+        #     However, this might be not possible due to geometric constraints
+        #     in small-strain. One might have to carfully choos the
+        #     deformation and the yield thresholds to get this running.
+        formulation = µ.Formulation.finite_strain
 
         DelF = np.zeros((self.dim, self.dim))
         if formulation == µ.Formulation.finite_strain:
@@ -1052,25 +1204,24 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         mat = init_mat(cell, self.young, self.poisson, self.yield_stress,
                        self.plastic_increment, self.eigen_strain)
         cg_solver = init_cg_solver(cell, self.cg_tol, self.maxiter,
-                                   verbose)
+                                   self.verbose)
 
         def save_avalanche(n_strain_loop, ava_history):
             return 0
 
         def save_fields(n_strain_loop, before_avalanche):
-            print(n_strain_loop, before_avalanche)
             return 0
 
-        F_fin = sps.strain_cell(mat, cell, cg_solver, self.newton_tol,
-                                self.newton_equil_tol, DelF, F_tot,
-                                self.yield_surface_accuracy,
-                                self.n_max_strain_loop,
-                                self.n_max_bracket_search,
-                                self.n_max_avalanche, self.verbose, False,
-                                self.inverse_cumulative_dist_func,
-                                save_avalanche=save_avalanche,
-                                save_fields=save_fields,
-                                is_strain_initialised=False)
+        sps.strain_cell(mat, cell, cg_solver, self.newton_tol,
+                        self.newton_equil_tol, DelF, F_tot,
+                        self.yield_surface_accuracy,
+                        self.n_max_strain_loop,
+                        self.n_max_bracket_search,
+                        self.n_max_avalanche, self.verbose_sps, False,
+                        self.inverse_cumulative_dist_func,
+                        save_avalanche=save_avalanche,
+                        save_fields=save_fields,
+                        is_strain_initialised=False)
 
 
 if __name__ == '__main__':

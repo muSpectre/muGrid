@@ -271,5 +271,64 @@ namespace muGrid {
     }
   }
 
+  /* ---------------------------------------------------------------------- */
+  BOOST_FIXTURE_TEST_CASE(fieldmap_size_sum_mean_tests, SubDivisionFixture) {
+    constexpr Dim_t nb_comps{SubDivisionFixture::NbComponent};
+    // init random fields
+    auto && eigen_pix{this->pixel_field.eigen_vec()};
+    eigen_pix.setRandom();
+    auto && eigen_quad_pt{this->quad_pt_field.eigen_vec()};
+    eigen_quad_pt.setRandom();
+
+    // --- test FieldMaps size() ---
+    const auto nb_pix{this->fc.get_nb_pixels()};
+    const auto & nb_quad_pts{nb_pix *
+                             this->fc.get_nb_sub_pts(sub_division_tag())};
+    BOOST_CHECK_EQUAL(this->pixel_map.size(), nb_pix);
+    BOOST_CHECK_EQUAL(this->quad_pt_map.size(), nb_quad_pts);
+    BOOST_CHECK_EQUAL(this->pixel_quad_pt_map.size(), nb_pix);
+
+    // --- test FieldMaps sum() ---
+    // iterate over pixels
+    Eigen::Matrix<Real, nb_comps, 1> pix_sum;
+    pix_sum.setZero();
+    for (Index_t pix{0}; pix < nb_pix; pix++) {
+      pix_sum += this->pixel_map[pix];
+    }
+    BOOST_CHECK_EQUAL(this->pixel_map.sum(), pix_sum);
+
+    // iterate over quad points
+    Eigen::Matrix<Real, nb_comps, 1> quad_pt_sum;
+    quad_pt_sum.setZero();
+    for (Index_t qpt{0}; qpt < nb_quad_pts; qpt++) {
+      quad_pt_sum += this->quad_pt_map[qpt];
+    }
+    BOOST_CHECK_EQUAL(this->quad_pt_map.sum(), quad_pt_sum);
+
+    // iterate over pixels of a field with quad points
+    Eigen::Matrix<Real, nb_comps, nb_comps> pix_quad_sum;
+    pix_quad_sum.setZero();
+    for (Index_t pix{0}; pix < nb_pix; pix++) {
+      pix_quad_sum += this->pixel_quad_pt_map[pix];
+    }
+    BOOST_CHECK_EQUAL(this->pixel_quad_pt_map.sum(), pix_quad_sum);
+
+
+    // --- test FieldMap mean ---
+    // iterate over pixels
+    Eigen::Matrix<Real, nb_comps, 1> pix_mean{pix_sum / nb_pix};
+    BOOST_CHECK_EQUAL(this->pixel_map.mean(), pix_mean);
+
+    // iterate over quad points
+    Eigen::Matrix<Real, nb_comps, 1> quad_pt_mean{quad_pt_sum /
+                                                           nb_quad_pts};
+    BOOST_CHECK_EQUAL(this->quad_pt_map.mean(), quad_pt_mean);
+
+    // iterate over pixels of a field with quad points
+    Eigen::Matrix<Real, nb_comps, nb_comps> pix_quad_mean{
+        pix_quad_sum / nb_pix};
+    BOOST_CHECK_EQUAL(this->pixel_quad_pt_map.mean(), pix_quad_mean);
+  }
+
   BOOST_AUTO_TEST_SUITE_END();
 }  // namespace muGrid
