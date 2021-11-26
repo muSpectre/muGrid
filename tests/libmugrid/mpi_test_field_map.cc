@@ -178,8 +178,7 @@ namespace muGrid {
     // iterate over pixels
     Eigen::Matrix<Real, nb_comps, 1> pix_mean{nb_pix != 0 ? pix_sum / nb_pix
                                                           : pix_sum};
-    Eigen::Matrix<Real, nb_comps, nb_comps> pix_mean_comp{
-        this->pixel_map.mean()};
+    Eigen::Matrix<Real, nb_comps, 1> pix_mean_comp{this->pixel_map.mean()};
     for (Index_t i = 0; i < pix_mean.rows(); i++) {
       for (Index_t j = 0; j < pix_mean.cols(); j++) {
         BOOST_CHECK_CLOSE(pix_mean_comp(i, j), pix_mean(i, j), 1E-12);
@@ -189,7 +188,7 @@ namespace muGrid {
     // iterate over quad points
     Eigen::Matrix<Real, nb_comps, 1> quad_pt_mean{
         nb_quad_pts != 0 ? quad_pt_sum / nb_quad_pts : quad_pt_sum};
-    Eigen::Matrix<Real, nb_comps, nb_comps> quad_pt_mean_comp{
+    Eigen::Matrix<Real, nb_comps, 1> quad_pt_mean_comp{
         this->quad_pt_map.mean()};
     for (Index_t i = 0; i < quad_pt_mean.rows(); i++) {
       for (Index_t j = 0; j < quad_pt_mean.cols(); j++) {
@@ -228,7 +227,7 @@ namespace muGrid {
     // iterate over pixels
     Eigen::Matrix<Real, nb_comps, 1> pix_mean_all{comm.sum(pix_sum) /
                                                   comm.sum(nb_pix)};
-    Eigen::Matrix<Real, nb_comps, nb_comps> pix_mean_all_comp{
+    Eigen::Matrix<Real, nb_comps, 1> pix_mean_all_comp{
         comm.sum(this->pixel_map.mean()) / comm.size()};
     for (Index_t i = 0; i < pix_mean_all.rows(); i++) {
       for (Index_t j = 0; j < pix_mean_all.cols(); j++) {
@@ -239,7 +238,7 @@ namespace muGrid {
     // iterate over quad points
     Eigen::Matrix<Real, nb_comps, 1> quad_pt_mean_all{comm.sum(quad_pt_sum) /
                                                       comm.sum(nb_quad_pts)};
-    Eigen::Matrix<Real, nb_comps, nb_comps> quad_pt_mean_all_comp{
+    Eigen::Matrix<Real, nb_comps, 1> quad_pt_mean_all_comp{
         comm.sum(this->quad_pt_map.mean()) / comm.size()};
     for (Index_t i = 0; i < quad_pt_mean_all.rows(); i++) {
       for (Index_t j = 0; j < quad_pt_mean_all.cols(); j++) {

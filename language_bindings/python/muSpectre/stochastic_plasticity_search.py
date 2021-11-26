@@ -477,6 +477,7 @@ def propagate_avalanche(material, cell, solver, newton_tol, newton_equil_tol,
                         (default None, the avalanche is not saved)
     save_fields      -- call back function, executed in parallel and gets the
                         ordered parameters:
+                         cell             -- muSpectre cell object
                          n_strain_loop    -- int, number of the strain loop step
                          before_avalanche -- bool, indicates if the function is
                                              executed before (True) or after
@@ -584,11 +585,11 @@ def propagate_avalanche(material, cell, solver, newton_tol, newton_equil_tol,
     if save_avalanche is not None:
         ava_history = []
     if save_fields is not None:
-        # call save_fields(n_strain_loop, before_avalanche=True/False) which
-        # by itself can call file_io_object.append_frame().write() with the
-        # required field names. The fiel_io_object has to be set  up in the
+        # call save_fields(cell, n_strain_loop, before_avalanche=True/False)
+        # which by itself can call file_io_object.append_frame().write() with
+        # the required field names. The fiel_io_object has to be set  up in the
         # corect way outside of the function.
-        save_fields(n_strain_loop, before_avalanche=True)
+        save_fields(cell, n_strain_loop, before_avalanche=True)
 
     subdomain_quad_pt_offset = compute_global_quad_pt_id_from_pixel(
         cell.subdomain_locations, cell.nb_domain_grid_pts, cell.nb_quad_pts, 0)
@@ -640,11 +641,11 @@ def propagate_avalanche(material, cell, solver, newton_tol, newton_equil_tol,
             save_avalanche(n_strain_loop, ava_history)
 
     if save_fields is not None:
-        # call save_fields(n_strain_loop, before_avalanche=True/False) which
-        # by itself can call file_io_object.append_frame().write() with the
-        # required field names. The fiel_io_object has to be set  up in the
+        # call save_fields(cell, n_strain_loop, before_avalanche=True/False)
+        # which by itself can call file_io_object.append_frame().write() with
+        # the required field names. The fiel_io_object has to be set  up in the
         # corect way outside of the function.
-        save_fields(n_strain_loop, before_avalanche=False)
+        save_fields(cell, n_strain_loop, before_avalanche=False)
 
 
 def strain_cell(material, cell, solver, newton_tol, newton_equil_tol,
@@ -707,6 +708,7 @@ def strain_cell(material, cell, solver, newton_tol, newton_equil_tol,
                         (default None, the avalanche is not saved)
     save_fields      -- call back function, executed in parallel and gets the
                         ordered parameters:
+                         cell             -- muSpectre cell object
                          n_strain_loop    -- int, number of the strain loop step
                          before_avalanche -- bool, indicates if the function is
                                              executed before (True) or after
@@ -795,14 +797,14 @@ def strain_cell(material, cell, solver, newton_tol, newton_equil_tol,
     if save_fields is not None:
         n_para = len(signature(save_fields).parameters)
         str_para = str(signature(save_fields))
-        if n_para != 2:
+        if n_para != 3:
             raise ValueError("The signature of save_fields should be:\n"
-                             "save_fields(n_strain_loop, before_avalanche)\n"
+                             "save_fields(cell, n_strain_loop, before_avalanche)\n"
                              "You instead have given n={} keyword parameters"
                              .format(n_para))
-        if str_para != "(n_strain_loop, before_avalanche)":
+        if str_para != "(cell, n_strain_loop, before_avalanche)":
             raise ValueError("The signature of save_fields should be:\n"
-                             "save_fields(n_strain_loop, before_avalanche)\n"
+                             "save_fields(cell, n_strain_loop, before_avalanche)\n"
                              "You instead have given:\nsave_stress_strain{}"
                              .format(str_para))
 

@@ -725,7 +725,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         def create_save_and_test_fields(f_name, cell):
             file_io_object = init_file_io_object(f_name, cell)
 
-            def save_and_test_fields(n_strain_loop, before_avalanche):
+            def save_and_test_fields(cell, n_strain_loop, before_avalanche):
                 if before_avalanche:
                     file_io_object.append_frame().write(["stress", "strain"])
 
@@ -1036,7 +1036,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         def create_save_and_test_fields(f_name, cell):
             file_io_object = init_file_io_object(f_name, cell)
 
-            def save_and_test_fields(n_strain_loop, before_avalanche):
+            def save_and_test_fields(cell, n_strain_loop, before_avalanche):
                 if before_avalanche:
                     file_io_object.append_frame().write(["stress", "strain"])
 

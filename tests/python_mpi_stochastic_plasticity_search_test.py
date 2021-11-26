@@ -691,7 +691,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
             else:
                 file_io_object = init_file_io_object(f_name, cell)
 
-            def save_fields(n_strain_loop, before_avalanche):
+            def save_fields(cell, n_strain_loop, before_avalanche):
                 if before_avalanche:
                     file_io_object.append_frame().write(["stress", "strain"])
 
@@ -1161,7 +1161,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
             # check avalanche history
             self.assertTrue((ava_history == expected_ava_history).all())
 
-        def save_fields(n_strain_loop, before_avalanche):
+        def save_fields(cell, n_strain_loop, before_avalanche):
             return 0
 
         sps.propagate_avalanche(mat, cell, cg_solver, self.newton_tol,
@@ -1209,7 +1209,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         def save_avalanche(n_strain_loop, ava_history):
             return 0
 
-        def save_fields(n_strain_loop, before_avalanche):
+        def save_fields(cell, n_strain_loop, before_avalanche):
             return 0
 
         sps.strain_cell(mat, cell, cg_solver, self.newton_tol,

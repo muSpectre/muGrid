@@ -54,7 +54,7 @@ gradient_3d = muFFT.Stencils3D.linear_finite_elements
 
 #################### common functions implementation #############
 
-def add_disp_to_point_data(point_data, displacment):
+def add_disp_to_point_data(point_data, displacement):
     """
     add the displacement_field to the point data if necessary
 
@@ -216,8 +216,8 @@ def get_position_3d_helper(rve, cell_data=None, point_data=None,
                                    z_0.ravel(order='F')])
 
             # Get displacements
-            displacement = calculate_displacment(x_disp1, y_disp1, z_displ)
-            add_disp_to_point_data(point_data, displacment)
+            displacement = calculate_displacement(x_displ, y_displ, z_displ)
+            add_disp_to_point_data(point_data, displacement)
         else:
             [x_def, y_def, z_def] = get_complemented_positions("p", rve, F0)
             points = np.transpose([x_def.ravel(order='F'),
@@ -234,7 +234,7 @@ def get_position_3d_helper(rve, cell_data=None, point_data=None,
             points = np.transpose([x_0.ravel(order='F'),
                                    y_0.ravel(order='F'),
                                    z_0.ravel(order='F')])
-            displacment = calculate_displacment(x_disp1, y_disp1, z_displ)
+            displacment = calculate_displacement(x_displ, y_displ, z_displ)
             add_disp_to_point_data(point_data, displacment)
         else:
             [x_def, y_def, z_def] =\
@@ -286,8 +286,7 @@ def write_3d(file_name, rve, cell_data=None, point_data=None,
         .reshape((3, 3, -1), order='F').T.swapaxes(1, 2)
 
     write_3d_worker(file_name, rve, strain, stress, points,
-                    cell_data=None, point_data=None,
-                    F0=np.eye(3), displacement_field=False)
+                    cell_data, point_data, F0, displacement_field)
 
 
 def write_3d_class(file_name, rve, solver, cell_data=None, point_data=None,
@@ -327,8 +326,7 @@ def write_3d_class(file_name, rve, solver, cell_data=None, point_data=None,
         .reshape((3, 3, -1), order='F').T.swapaxes(1, 2)
 
     write_3d_worker(file_name, rve, strain, stress, points,
-                    cell_data=None, point_data=None,
-                    F0=np.eye(3), displacement_field=False)
+                    cell_data, point_data, F0, displacement_field)
 
 #################### 2d write functions implementation #############
 
@@ -369,7 +367,7 @@ def get_position_2d_helper(rve, cell_data=None, point_data=None,
             points = np.transpose([x_0.ravel(order='F'),
                                    y_0.ravel(order='F')])
             # Get displacements
-            displacment = calculate_displacment(x_disp1, y_disp1)
+            displacment = calculate_displacement(x_displ, y_displ)
             add_disp_to_point_data(point_data, displacment)
         else:
             [x_def, y_def] = get_complemented_positions("p", rve, F0)
@@ -385,7 +383,7 @@ def get_position_2d_helper(rve, cell_data=None, point_data=None,
                 "0d", rve, solver, F0)
             points = np.transpose([x_0.ravel(order='F'),
                                    y_0.ravel(order='F')])
-            displacment = calculate_displacment(x_0, y_0, x_disp1, y_disp1)
+            displacment = calculate_displacement(x_displ, y_displ)
             add_disp_to_point_data(point_data, displacment)
         else:
             [x_def, y_def] =\
@@ -506,8 +504,7 @@ def write_2d(file_name, rve, cell_data=None, point_data=None,
         .reshape((2, 2, -1), order='F').T.swapaxes(1, 2)
 
     write_2d_worker(file_name, rve, strain, stress, points,
-                    cell_data=None, point_data=None,
-                    F0=np.eye(2), displacement_field=False)
+                    cell_data, point_data, F0, displacement_field)
 
 
 def write_2d_class(file_name, rve, solver, cell_data=None, point_data=None,
@@ -552,5 +549,4 @@ def write_2d_class(file_name, rve, solver, cell_data=None, point_data=None,
         .reshape((2, 2, -1), order='F').T.swapaxes(1, 2)
 
     write_2d_worker(file_name, rve, strain, stress, points,
-                    cell_data, point_data,
-                    F0, displacement_field)
+                    cell_data, point_data, F0, displacement_field)
