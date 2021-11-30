@@ -279,6 +279,7 @@ mugrid_sources = [
     'src/libmugrid/gradient_operator_default.cc',
     'src/libmugrid/grid_common.cc',
     'src/libmugrid/physics_domain.cc',
+    'src/libmugrid/options_dictionary.cc',
     'src/libmugrid/raw_memory_operations.cc',
     'src/libmugrid/state_field.cc',
     'src/libmugrid/state_field_map.cc',
@@ -290,6 +291,7 @@ pymugrid_sources = [
     'language_bindings/libmugrid/python/bind_py_common_mugrid.cc',
     'language_bindings/libmugrid/python/bind_py_communicator.cc',
     'language_bindings/libmugrid/python/bind_py_field.cc',
+    'language_bindings/libmugrid/python/bind_py_options_dictionary.cc',
     'language_bindings/libmugrid/python/bind_py_state_field.cc',
     'language_bindings/libmugrid/python/bind_py_field_collection.cc',
 ]

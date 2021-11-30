@@ -58,6 +58,7 @@ set(mugrid_HDRS
   ${CMAKE_CURRENT_SOURCE_DIR}/mapped_field.hh
   ${CMAKE_CURRENT_SOURCE_DIR}/mapped_state_field.hh
   ${CMAKE_CURRENT_SOURCE_DIR}/numpy_tools.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/options_dictionary.hh
   ${CMAKE_CURRENT_SOURCE_DIR}/physics_domain.hh
   ${CMAKE_CURRENT_SOURCE_DIR}/raw_memory_operations.hh
   ${CMAKE_CURRENT_SOURCE_DIR}/ref_array.hh
@@ -83,6 +84,7 @@ set(mugrid_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/field_map.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/gradient_operator_default.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/physics_domain.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/options_dictionary.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/raw_memory_operations.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/state_field.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/state_field_map.cc

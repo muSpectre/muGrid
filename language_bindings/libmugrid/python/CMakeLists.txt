@@ -55,6 +55,7 @@ set (PY_BINDING_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_field.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_state_field.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_field_collection.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_options_dictionary.cc
   )
 
 if(${NETCDF_IO})

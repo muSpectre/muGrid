@@ -246,7 +246,6 @@ namespace muGrid {
 
     FieldMap<Real, Mapping::Mut> new_pix_quad{this->quad_pt_field,
                                               IterUnit::Pixel};
-    std::cout << new_pix_quad.size();
 
     // check correctness of random access
     auto && eigen_quad{this->quad_pt_field.eigen_vec()};

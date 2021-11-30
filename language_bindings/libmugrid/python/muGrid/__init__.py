@@ -39,7 +39,8 @@ import numpy as np
 import _muGrid
 from _muGrid import (get_domain_ccoord, get_domain_index, Pixel, StorageOrder,
                      SubPt, DynCcoord, DynRcoord, IterUnit, Verbosity,
-                     GlobalFieldCollection, LocalFieldCollection, Unit)
+                     GlobalFieldCollection, LocalFieldCollection, Unit,
+                     Dictionary)
 
 # FileIONetCDF is only compiled into the library if NetCDF libraries exist
 try:
