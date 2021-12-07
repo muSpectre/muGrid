@@ -61,61 +61,47 @@ namespace muFFT {
   /* ---------------------------------------------------------------------- */
   using fixlist = boost::mpl::list<
 #ifdef WITH_FFTWMPI
-      ProjectionFixture<twoD, twoD, Squares<twoD>,
-                        ProjectionFiniteStrain<twoD>,
+      ProjectionFixture<twoD, twoD, Squares<twoD>, ProjectionFiniteStrain<twoD>,
                         FFTWMPIEngine<twoD>>,
       ProjectionFixture<threeD, threeD, Squares<threeD>,
-                        ProjectionFiniteStrain<threeD>,
-                        FFTWMPIEngine<threeD>>,
-      ProjectionFixture<twoD, twoD, Sizes<twoD>,
-                        ProjectionFiniteStrain<twoD>,
+                        ProjectionFiniteStrain<threeD>, FFTWMPIEngine<threeD>>,
+      ProjectionFixture<twoD, twoD, Sizes<twoD>, ProjectionFiniteStrain<twoD>,
                         FFTWMPIEngine<twoD>>,
       ProjectionFixture<threeD, threeD, Sizes<threeD>,
-                        ProjectionFiniteStrain<threeD>,
-                        FFTWMPIEngine<threeD>>,
+                        ProjectionFiniteStrain<threeD>, FFTWMPIEngine<threeD>>,
 
       ProjectionFixture<twoD, twoD, Squares<twoD>,
-                        ProjectionFiniteStrainFast<twoD>,
-                        FFTWMPIEngine<twoD>>,
+                        ProjectionFiniteStrainFast<twoD>, FFTWMPIEngine<twoD>>,
       ProjectionFixture<threeD, threeD, Squares<threeD>,
                         ProjectionFiniteStrainFast<threeD>,
                         FFTWMPIEngine<threeD>>,
       ProjectionFixture<twoD, twoD, Sizes<twoD>,
-                        ProjectionFiniteStrainFast<twoD>,
-                        FFTWMPIEngine<twoD>>,
+                        ProjectionFiniteStrainFast<twoD>, FFTWMPIEngine<twoD>>,
       ProjectionFixture<threeD, threeD, Sizes<threeD>,
                         ProjectionFiniteStrainFast<threeD>,
                         FFTWMPIEngine<threeD>>,
 #endif
 #ifdef WITH_PFFT
-      ProjectionFixture<twoD, twoD, Squares<twoD>,
-                        ProjectionFiniteStrain<twoD>, PFFTEngine<twoD>>,
+      ProjectionFixture<twoD, twoD, Squares<twoD>, ProjectionFiniteStrain<twoD>,
+                        PFFTEngine<twoD>>,
       ProjectionFixture<threeD, threeD, Squares<threeD>,
-                        ProjectionFiniteStrain<threeD>,
-                        PFFTEngine<threeD>>,
-      ProjectionFixture<twoD, twoD, Sizes<twoD>,
-                        ProjectionFiniteStrain<twoD>, PFFTEngine<twoD>>,
+                        ProjectionFiniteStrain<threeD>, PFFTEngine<threeD>>,
+      ProjectionFixture<twoD, twoD, Sizes<twoD>, ProjectionFiniteStrain<twoD>,
+                        PFFTEngine<twoD>>,
       ProjectionFixture<threeD, threeD, Sizes<threeD>,
-                        ProjectionFiniteStrain<threeD>,
-                        PFFTEngine<threeD>>,
+                        ProjectionFiniteStrain<threeD>, PFFTEngine<threeD>>,
 
       ProjectionFixture<twoD, twoD, Squares<twoD>,
-                        ProjectionFiniteStrainFast<twoD>,
-                        PFFTEngine<twoD>>,
+                        ProjectionFiniteStrainFast<twoD>, PFFTEngine<twoD>>,
       ProjectionFixture<threeD, threeD, Squares<threeD>,
-                        ProjectionFiniteStrainFast<threeD>,
-                        PFFTEngine<threeD>>,
+                        ProjectionFiniteStrainFast<threeD>, PFFTEngine<threeD>>,
       ProjectionFixture<twoD, twoD, Sizes<twoD>,
-                        ProjectionFiniteStrainFast<twoD>,
-                        PFFTEngine<twoD>>,
+                        ProjectionFiniteStrainFast<twoD>, PFFTEngine<twoD>>,
       ProjectionFixture<threeD, threeD, Sizes<threeD>,
-                        ProjectionFiniteStrainFast<threeD>,
-                        PFFTEngine<threeD>>,
+                        ProjectionFiniteStrainFast<threeD>, PFFTEngine<threeD>>,
 #endif
-      ProjectionFixture<twoD, twoD, Squares<twoD>,
-                        ProjectionFiniteStrain<twoD>,
-                        FFTWEngine<twoD>,
-                        false>>;
+      ProjectionFixture<twoD, twoD, Squares<twoD>, ProjectionFiniteStrain<twoD>,
+                        FFTWEngine<twoD>, false>>;
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(constructor_test, fix, fixlist, fix) {
@@ -123,6 +109,100 @@ namespace muFFT {
       BOOST_CHECK_NO_THROW(fix::projector.initialise(FFT_PlanFlags::estimate));
     }
     std::cout << "Hello world!" << std::endl;
+  }
+
+  BOOST_FIXTURE_TEST_CASE(full_gradient_preservation_test, fix, fixlist, fix) {
+    if (!fix::is_parallel || fix::projector.get_communicator().size() > 1) {
+      return;
+    }
+    // create a gradient field with a zero mean gradient and verify
+    // that the projection preserves it
+    constexpr Dim_t dim{fix::sdim}, sdim{fix::sdim}, mdim{fix::mdim};
+    static_assert(
+        dim == fix::mdim,
+        "These tests assume that the material and spatial dimension are "
+        "identical");
+    using Fields = muGrid::GlobalFieldCollection<sdim>;
+    using RealFieldT = muGrid::RealField;
+    using FourierFieldT = muGrid::ComplexField;
+    using FieldMap = muGrid::MatrixFieldMap<Real, false, mdim, mdim>;
+    using FieldMapGradFourier =
+        muGrid::MatrixFieldMap<Complex, false, mdim, mdim>;
+    using FieldMapDispFourier = muGrid::MatrixFieldMap<Complex, false, mdim, 1>;
+    using Vector = Eigen::Matrix<Real, dim, 1>;
+
+    Fields fields{1};
+    RealFieldT & f_disp{
+        fields.template register_field<RealFieldT>("displacement", mdim)};
+    RealFieldT & f_grad{
+        fields.template register_field<RealFieldT>("gradient", mdim * mdim)};
+    RealFieldT & f_var{fields.template register_field<RealFieldT>(
+        "working field", mdim * mdim)};
+
+    fields.initialise(fix::projector.get_nb_domain_grid_pts(),
+                      fix::projector.get_nb_subdomain_grid_pts(),
+                      fix::projector.get_subdomain_locations());
+
+    // create a random displacement field with zero mean
+    f_disp.eigen_vec().setRandom();
+    disp -= disp.mean();
+
+    // differentiate displacement field in fourier space
+    auto && fft_engine{fix::projector.get_fft_engine()};
+    FourierFieldT & f_disp_q{
+        fft_engine.fetch_or_register_fourier_space_field("fourier disp", mdim)};
+    FourierFieldT & f_grad_q{fft_engine.fetch_or_register_fourier_space_field(
+        "fourier grad", mdim * mdim)};
+    FieldMapGradFourier grad_q{f_grad_q};
+    FieldMapDispFourier disp_q{f_disp_q};
+    fix::projector.initialise(FFT_PlanFlags::estimate);
+
+    fft_engine->fft(f_disp, f_disp_q);
+
+    BOOST_CHECK_LE(tol, f_disp_q.eigen_vec().squared_norm());
+
+    auto && nb_domain_grid_pts{fix::projector.get_nb_domain_grid_pts()};
+    muFFT::FFT_freqs<dim> fft_freqs{nb_domain_grid_pts};
+    const Vector_t grid_spacing{
+        eigen((fft_engine->get_domain_lengths() / nb_domain_grid_pts)
+                  .template get<dim>())};
+    auto && gradient_operator{fft_engine.get_gradient()};
+    for (auto && ccoord_disp_grad :
+         akantu::zip(fft_engine->get_fourier_pixels()
+                         .template get_dimensioned_pixels<DimS>(),
+                     disp_q, grad_q)) {
+      auto && ccoord{std::get<0>(ccoord_disp_grad)};
+      auto && u{std::get<1>(ccoord_disp_grad)};
+      auto && g{std::get<2>(ccoord_disp_grad)};
+      const Vector_t xi{(fft_freqs.get_xi(ccoord).array() /
+                         eigen(nb_domain_grid_pts.template get<DimS>())
+                             .array()
+                             .template cast<Real>())
+                            .matrix()};
+      // compute derivative operator
+      Eigen::Matrix<Complex, dim, 1> diffop;
+      for (Index_t dim = 0; dim < DimS; ++dim) {
+        Index_t i = quad * DimS + dim;
+        diffop(i) = gradient_operator[i]->fourier(xi) / grid_spacing[dim];
+      }
+      g = diffop.dot(u);
+    }
+
+    fft_engine->ifft(f_grad_q, f_grad);
+
+    f_var = f_grad;
+
+    fix::projector.apply_projection(f_var);
+
+    Real error { testGoodies::rel_error(fvar.eigen_vec(), f_grad.eigen_vec()) }
+    if (not(error < = tol)) {
+      std::cout << "Projection failure:" << std::endl
+                << "reference gradient = " << std::endl
+                << f_grad.eigen_vec().transpose() << std::endl
+                << "projected gradient = " << std::endl
+                << f_var.eigen_vec().transpose() << std::endl;
+    }
+    BOOST_CHECK_LE(error, tol);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -139,15 +219,15 @@ namespace muFFT {
         "These tests assume that the material and spatial dimension are "
         "identical");
     using Fields = muGrid::GlobalFieldCollection<sdim>;
-    using FieldT = muGrid::RealField;
+    using RealFieldT = muGrid::RealField;
     using FieldMap = muGrid::MatrixFieldMap<Real, false, mdim, mdim>;
     using Vector = Eigen::Matrix<Real, dim, 1>;
 
     Fields fields{1};
-    FieldT & f_grad{fields.template register_field<FieldT>(
-        "gradient", mdim*mdim)};
-    FieldT & f_var{fields.template register_field<FieldT>(
-        "working field", mdim*mdim)};
+    RealFieldT & f_grad{
+        fields.template register_field<RealFieldT>("gradient", mdim * mdim)};
+    RealFieldT & f_var{fields.template register_field<RealFieldT>(
+        "working field", mdim * mdim)};
 
     FieldMap grad(f_grad);
     FieldMap var(f_var);

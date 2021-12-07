@@ -135,24 +135,24 @@ namespace muSpectre {
         (this->get_subdomain_locations() == Ccoord{})) {
       this->proj_field.get_map()[0].setZero();
       this->int_field.get_map()[0].setZero();
-    }
 
-    switch (this->mean_control) {
-    case MeanControl::StrainControl: {
-      this->zero_freq_proj_holder->setZero();
-      break;
-    }
-    case MeanControl::StressControl: {
-      this->zero_freq_proj_holder->setIdentity();
-      break;
-    }
-    case MeanControl::MixedControl: {
-      muGrid::RuntimeError("Mixed control projection is not implemented yet");
-      break;
-    }
-    default:
-      throw muGrid::RuntimeError("Unknown value for mean_control value");
-      break;
+      switch (this->mean_control) {
+      case MeanControl::StrainControl: {
+        this->zero_freq_proj_holder->setZero();
+        break;
+      }
+      case MeanControl::StressControl: {
+        this->zero_freq_proj_holder->setIdentity();
+        break;
+      }
+      case MeanControl::MixedControl: {
+        muGrid::RuntimeError("Mixed control projection is not implemented yet");
+        break;
+      }
+      default:
+        throw muGrid::RuntimeError("Unknown value for mean_control value");
+        break;
+      }
     }
   }
 

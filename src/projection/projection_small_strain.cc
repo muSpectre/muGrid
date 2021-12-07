@@ -147,51 +147,53 @@ namespace muSpectre {
       }
     }
 
-    // Ghat (Project operator) is set to either 0ᵢⱼₖₗ or δᵢₖδⱼₗ (Ghat^*) based
-    // on that either mean strain value or mean stress value is imposed on the
-    // cell The formulation is Based on: An algorithm for stress and mixed
-    // control in Galerkin-based FFT homogenization, by Lucarini, and Segurado
-    // DOI: 10.1002/nme.6069
-    switch (this->mean_control) {
-    case MeanControl::StrainControl: {
-      // Ghat(ξ=0) ← 0ᵢⱼₖₗ
-      this->Ghat[0].setZero();
-      break;
-    }
-    case MeanControl::StressControl: {
-      // Ghat(ξ=0) ← δᵢₖδⱼₗ
-      auto G{this->Ghat[0]};
-      auto I_symm{Matrices::Isymm<DimS>()};
-      for (Dim_t theta{0}; theta < NbQuadPts; theta++) {
-        for (Dim_t lambda{0}; lambda < NbQuadPts; lambda++) {
-          for (Dim_t i{0}; i < DimS; ++i) {
-            for (Dim_t j{0}; j < DimS; ++j) {
-              for (Dim_t l{0}; l < DimS; ++l) {
-                for (Dim_t m{0}; m < DimS; ++m) {
-                  G(i + (j + theta * DimS) * DimS,
-                    m + (l + lambda * DimS) * DimS) = get(I_symm, i, j, l, m);
+    if (this->get_subdomain_locations() == Ccoord{}) {
+      // Ghat (Project operator) is set to either 0ᵢⱼₖₗ or δᵢₖδⱼₗ (Ghat^*) based
+      // on that either mean strain value or mean stress value is imposed on the
+      // cell The formulation is Based on: An algorithm for stress and mixed
+      // control in Galerkin-based FFT homogenization, by Lucarini, and Segurado
+      // DOI: 10.1002/nme.6069
+      switch (this->mean_control) {
+      case MeanControl::StrainControl: {
+        // Ghat(ξ=0) ← 0ᵢⱼₖₗ
+        this->Ghat[0].setZero();
+        break;
+      }
+      case MeanControl::StressControl: {
+        // Ghat(ξ=0) ← δᵢₖδⱼₗ
+        auto G{this->Ghat[0]};
+        auto I_symm{Matrices::Isymm<DimS>()};
+        for (Dim_t theta{0}; theta < NbQuadPts; theta++) {
+          for (Dim_t lambda{0}; lambda < NbQuadPts; lambda++) {
+            for (Dim_t i{0}; i < DimS; ++i) {
+              for (Dim_t j{0}; j < DimS; ++j) {
+                for (Dim_t l{0}; l < DimS; ++l) {
+                  for (Dim_t m{0}; m < DimS; ++m) {
+                    G(i + (j + theta * DimS) * DimS,
+                      m + (l + lambda * DimS) * DimS) = get(I_symm, i, j, l, m);
+                  }
                 }
               }
             }
           }
         }
+        break;
       }
-      break;
+      case MeanControl::MixedControl: {
+        muGrid::RuntimeError("Mixed control projection is not implemented yet");
+        break;
+      }
+      default: {
+        throw muGrid::RuntimeError("Unknown value for mean_control value");
+        break;
+      }
+      }
+      // However, Ihat (integrator operator) is only set to 0
+      // because it is not used in the solvers developed here so far, and
+      // basically its only use case so far was to reconstruct the displacement
+      // field from the strain field for visualization purposes.
+      this->Ihat[0].setZero();
     }
-    case MeanControl::MixedControl: {
-      muGrid::RuntimeError("Mixed control projection is not implemented yet");
-      break;
-    }
-    default: {
-      throw muGrid::RuntimeError("Unknown value for mean_control value");
-      break;
-    }
-    }
-    // However, Ihat (integrator operator) is only set to 0
-    // because it is not used in the solvers developed here so far, and
-    // basically its only use case so far was to reconstruct the displacement
-    // field from the strain field for visualization purposes.
-    this->Ihat[0].setZero();
   }
 
   template <Index_t DimS, Index_t NbQuadPts>
