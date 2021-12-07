@@ -36,6 +36,7 @@
 
 find_package(Boost COMPONENTS unit_test_framework REQUIRED)
 
+
 function(get_test_name test_name test_fname prefix)
   get_filename_component(test_fname_we ${test_fname} NAME_WE)
   string(REGEX REPLACE "(${prefix}_?)(.*)" "\\2" _test_name "${test_fname_we}")

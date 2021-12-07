@@ -37,7 +37,8 @@
 #define BOOST_MPL_LIMIT_LIST_SIZE 50
 
 #include "projection/projection_small_strain.hh"
-#include "mpi_test_projection.hh"
+#include "test_projection.hh"
+#include "libmugrid/test_goodies.hh"
 
 #include <libmufft/fft_utils.hh>
 #include <libmufft/fftw_engine.hh>
@@ -50,7 +51,7 @@
 
 #include <Eigen/Dense>
 
-namespace muFFT {
+namespace muSpectre {
   using muSpectre::ProjectionSmallStrain;
   using muSpectre::tol;
   using muGrid::operator/;
@@ -60,63 +61,155 @@ namespace muFFT {
 
   using fixlist = boost::mpl::list<
 #ifdef WITH_FFTWMPI
-      ProjectionFixture<twoD, twoD, Squares<twoD>,
-                        ProjectionSmallStrain<twoD>, FFTWMPIEngine<twoD>>,
-      ProjectionFixture<threeD, threeD, Squares<threeD>,
-                        ProjectionSmallStrain<threeD>,
-                        FFTWMPIEngine<threeD>>,
-      ProjectionFixture<twoD, twoD, Sizes<twoD>,
-                        ProjectionSmallStrain<twoD>, FFTWMPIEngine<twoD>>,
-      ProjectionFixture<threeD, threeD, Sizes<threeD>,
-                        ProjectionSmallStrain<threeD>,
-                        FFTWMPIEngine<threeD>>,
+      MPIProjectionFixture<twoD, twoD, Squares<twoD>, FourierGradient<twoD>,
+                           ProjectionSmallStrain<twoD>, 1,
+                           muFFT::FFTWMPIEngine>,
+      MPIProjectionFixture<
+          threeD, threeD, Squares<threeD>, FourierGradient<threeD>,
+          ProjectionSmallStrain<threeD>, 1, muFFT::FFTWMPIEngine>,
+      MPIProjectionFixture<twoD, twoD, Sizes<twoD>, FourierGradient<twoD>,
+                           ProjectionSmallStrain<twoD>, 1,
+                           muFFT::FFTWMPIEngine>,
+      MPIProjectionFixture<
+          threeD, threeD, Sizes<threeD>, FourierGradient<threeD>,
+          ProjectionSmallStrain<threeD>, 1, muFFT::FFTWMPIEngine>
 #endif
+#if defined(WITH_FFTWMPI) && defined(WITH_PFFT)
+      ,
+#endif /* defined(WITH_FFTWMPI) && defined(WITH_PFFT)*/
 #ifdef WITH_PFFT
-      ProjectionFixture<twoD, twoD, Squares<twoD>,
-                        ProjectionSmallStrain<twoD>, PFFTEngine<twoD>>,
-      ProjectionFixture<threeD, threeD, Squares<threeD>,
-                        ProjectionSmallStrain<threeD>,
-                        PFFTEngine<threeD>>,
-      ProjectionFixture<twoD, twoD, Sizes<twoD>,
-                        ProjectionSmallStrain<twoD>, PFFTEngine<twoD>>,
-      ProjectionFixture<threeD, threeD, Sizes<threeD>,
-                        ProjectionSmallStrain<threeD>,
-                        PFFTEngine<threeD>>,
+      MPIProjectionFixture<twoD, twoD, Squares<twoD>, FourierGradient<twoD>,
+                           ProjectionSmallStrain<twoD>, 1, muFFT::PFFTEngine>,
+      MPIProjectionFixture<threeD, threeD, Squares<threeD>,
+                           FourierGradient<threeD>,
+                           ProjectionSmallStrain<threeD>, 1, muFFT::PFFTEngine>,
+      MPIProjectionFixture<twoD, twoD, Sizes<twoD>, FourierGradient<twoD>,
+                           ProjectionSmallStrain<twoD>, 1, muFFT::PFFTEngine>,
+      MPIProjectionFixture<threeD, threeD, Sizes<threeD>,
+                           FourierGradient<threeD>,
+                           ProjectionSmallStrain<threeD>, 1, muFFT::PFFTEngine>
 #endif
-      ProjectionFixture<twoD, twoD, Squares<twoD>,
-                        ProjectionSmallStrain<twoD>, FFTWEngine<twoD>,
-                        false>>;
+      >;
 
   /* ---------------------------------------------------------------------- */
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(constructor_test, fix, fixlist, fix) {
-    if (fix::is_parallel || fix::projector.get_communicator().size() == 1) {
-      BOOST_CHECK_NO_THROW(fix::projector.initialise(FFT_PlanFlags::estimate));
-    }
-  }
-
-  /* ---------------------------------------------------------------------- */
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(Gradient_preservation_test, fix, fixlist,
-                                   fix) {
-    if (!fix::is_parallel || fix::projector.get_communicator().size() > 1) {
-      return;
-    }
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(full_gradient_preservation_test, fix,
+                                   fixlist, fix) {
     // create a gradient field with a zero mean gradient and verify
     // that the projection preserves it
-    constexpr Dim_t dim{fix::sdim}, sdim{fix::sdim}, mdim{fix::mdim};
+    constexpr Dim_t dim{fix::sdim}, mdim{fix::mdim};
     static_assert(
         dim == fix::mdim,
         "These tests assume that the material and spatial dimension are "
         "identical");
-    using Fields = muGrid::GlobalFFieldCollection<sdim>;
+    using Fields = muGrid::GlobalFieldCollection;
+    using RealFieldT = muGrid::RealField;
+    using FourierFieldT = muGrid::TypedFieldBase<Complex>;
+    using FieldMap =
+        muGrid::MatrixFieldMap<Real, Mapping::Mut, mdim, 1, IterUnit::Pixel>;
+    using FieldMapGradFourier =
+        muGrid::MatrixFieldMap<Complex, Mapping::Mut, mdim, mdim,
+                               IterUnit::Pixel>;
+    using FieldMapDispFourier =
+        muGrid::MatrixFieldMap<Complex, Mapping::Const, mdim, 1,
+                               IterUnit::Pixel>;
+    Fields fields{1};
+    RealFieldT & f_disp{fields.register_real_field("displacement", mdim)};
+    RealFieldT & f_grad{fields.register_real_field("gradient", mdim * mdim)};
+    RealFieldT & f_var{
+        fields.register_real_field("working field", mdim * mdim)};
+
+    fields.initialise(fix::projector.get_nb_domain_grid_pts(),
+                      fix::projector.get_nb_subdomain_grid_pts(),
+                      fix::projector.get_subdomain_locations());
+
+    // create a random displacement field with zero mean
+    f_disp.eigen_vec().setRandom();
+
+    FieldMap disp{f_disp};
+    disp -= disp.mean();
+
+    // differentiate displacement field in fourier space
+    auto && fft_engine{fix::projector.get_fft_engine()};
+    FourierFieldT & f_disp_q{
+        fft_engine.fetch_or_register_fourier_space_field("fourier disp", mdim)};
+    FourierFieldT & f_grad_q{fft_engine.fetch_or_register_fourier_space_field(
+        "fourier grad", mdim * mdim)};
+    FieldMapGradFourier grad_q{f_grad_q};
+    FieldMapDispFourier disp_q{f_disp_q};
+    fix::projector.initialise();
+
+    fft_engine.fft(f_disp, f_disp_q);
+
+    BOOST_CHECK_LE(tol, f_disp_q.eigen_vec().squaredNorm());
+
+    auto && nb_domain_grid_pts{fix::projector.get_nb_domain_grid_pts()};
+    muFFT::FFT_freqs<dim> fft_freqs{nb_domain_grid_pts};
+    using Vector_t = typename muFFT::FFT_freqs<dim>::Vector;
+    const Vector_t grid_spacing(
+        eigen((fix::projector.get_domain_lengths() / nb_domain_grid_pts)
+                  .template get<dim>()));
+    auto && gradient_operator{fix::projector.get_gradient()};
+    for (auto && ccoord_disp_grad :
+         akantu::zip(fft_engine.get_fourier_pixels()
+                         .template get_dimensioned_pixels<dim>(),
+                     disp_q, grad_q)) {
+      auto && ccoord{std::get<0>(ccoord_disp_grad)};
+      auto && u{std::get<1>(ccoord_disp_grad)};
+      auto && g{std::get<2>(ccoord_disp_grad)};
+      const Vector_t xi((fft_freqs.get_xi(ccoord).array() /
+                         eigen(nb_domain_grid_pts.template get<dim>())
+                             .array()
+                             .template cast<Real>())
+                            .matrix());
+
+      // compute derivative operator
+      Eigen::Matrix<Complex, dim, 1> diffop;
+      for (Index_t i = 0; i < dim; ++i) {
+        diffop[i] = gradient_operator[i]->fourier(xi) / grid_spacing[i];
+      }
+      g = (diffop * u.transpose()).transpose();
+      // We need to add I to the term, because this field has a net
+      // zero gradient, which leads to a net -I strain
+      g = 0.5 * (g.transpose() + g).eval();
+    }
+
+    fft_engine.ifft(f_grad_q, f_grad);
+
+    f_var = f_grad;
+
+    fix::projector.apply_projection(f_var);
+
+    Real error{
+        muGrid::testGoodies::rel_error(f_var.eigen_vec(), f_grad.eigen_vec())};
+    if (not(error <= tol)) {
+      std::cout << "Projection failure:" << std::endl
+                << "reference gradient = " << std::endl
+                << f_grad.eigen_vec().transpose() << std::endl
+                << "projected gradient = " << std::endl
+                << f_var.eigen_vec().transpose() << std::endl;
+    }
+    BOOST_CHECK_LE(error, tol);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(gradient_preservation_test, fix, fixlist,
+                                   fix) {
+    // create a gradient field with a zero mean gradient and verify
+    // that the projection preserves it
+    constexpr Dim_t dim{fix::sdim}, mdim{fix::mdim};
+    static_assert(
+        dim == fix::mdim,
+        "These tests assume that the material and spatial dimension are "
+        "identical");
+    using Fields = muGrid::GlobalFieldCollection;
     using FieldT = muGrid::RealField;
-    using FieldMap = muGrid::MatrixFieldMap<Real, false, mdim, mdim>;
+    using FieldMap =
+        muGrid::MatrixFieldMap<Real, Mapping::Mut, mdim, mdim, IterUnit::Pixel>;
     using Vector = Eigen::Matrix<Real, dim, 1>;
 
     Fields fields{1};
-    FieldT & f_grad{fields.template register_field<FieldT>(
-        "strain", mdim*mdim)};
-    FieldT & f_var{fields.template register_field<FieldT>(
-        "working field", mdim*mdim)};
+    FieldT & f_grad{fields.register_real_field("strain", mdim * mdim)};
+    FieldT & f_var{fields.register_real_field("working field", mdim * mdim)};
 
     FieldMap grad(f_grad);
     FieldMap var(f_var);
@@ -124,8 +217,6 @@ namespace muFFT {
     fields.initialise(fix::projector.get_nb_domain_grid_pts(),
                       fix::projector.get_nb_subdomain_grid_pts(),
                       fix::projector.get_subdomain_locations());
-    grad.initialise();
-    var.initialise();
 
     Vector k;
     for (Dim_t i = 0; i < dim; ++i) {
@@ -139,31 +230,32 @@ namespace muFFT {
       auto & g = std::get<1>(tup);
       auto & v = std::get<2>(tup);
       Vector vec = muGrid::CcoordOps::get_vector(
-          ccoord, fix::projector.get_domain_lengths() /
-                      fix::projector.get_nb_domain_grid_pts());
+          ccoord.template get<mdim>(), (fix::projector.get_domain_lengths() /
+                                        fix::projector.get_nb_domain_grid_pts())
+                                           .template get<mdim>());
       g.row(0) << k.transpose() * cos(k.dot(vec));
 
       // We need to add I to the term, because this field has a net
       // zero gradient, which leads to a net -I strain
-      g = 0.5 * ((g - g.Identity()).transpose() + (g - g.Identity())).eval() +
-          g.Identity();
+      g = 0.5 * (g.transpose() + g).eval();
       v = g;
     }
 
-    fix::projector.initialise(FFT_PlanFlags::estimate);
+    fix::projector.initialise();
     fix::projector.apply_projection(f_var);
 
-    constexpr Verbosity verbose{Verbosity::Silent};
+    constexpr muGrid::Verbosity verbose{muGrid::Verbosity::Silent};
     for (auto && tup : akantu::zip(fields.get_pixels(), grad, var)) {
       auto & ccoord = std::get<0>(tup);
       auto & g = std::get<1>(tup);
       auto & v = std::get<2>(tup);
       Vector vec = muGrid::CcoordOps::get_vector(
-          ccoord, fix::projector.get_domain_lengths() /
-                      fix::projector.get_nb_domain_grid_pts());
+          ccoord.template get<dim>(), (fix::projector.get_domain_lengths() /
+                                       fix::projector.get_nb_domain_grid_pts())
+                                          .template get<dim>());
       Real error = (g - v).norm();
       BOOST_CHECK_LT(error, tol);
-      if ((error >= tol) || verbose > Verbosity::Silent) {
+      if ((error >= tol) || verbose > muGrid::Verbosity::Silent) {
         std::cout << std::endl << "grad_ref :" << std::endl << g << std::endl;
         std::cout << std::endl << "grad_proj :" << std::endl << v << std::endl;
         std::cout << std::endl
@@ -183,4 +275,4 @@ namespace muFFT {
 
   BOOST_AUTO_TEST_SUITE_END();
 
-}  // namespace muFFT
+}  // namespace muSpectre

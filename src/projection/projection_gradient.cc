@@ -186,7 +186,9 @@ namespace muSpectre {
       auto & f{std::get<1>(tup)};
       f = factor * ((f * proj_op.conjugate()).eval() * proj_op.transpose());
     }
-    PixelVec_map(field_map[0].data()) = zero_freq_projected;
+    if (this->get_subdomain_locations() == Ccoord{}) {
+      PixelVec_map(field_map[0].data()) = zero_freq_projected;
+    }
     this->fft_engine->ifft(this->work_space, field);
   }
 

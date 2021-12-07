@@ -48,6 +48,8 @@
 #include <libmufft/pfft_engine.hh>
 #endif
 
+#include "mpi_context.hh"
+
 #include <libmugrid/ccoord_operations.hh>
 #include <libmugrid/field_collection.hh>
 #include <libmugrid/field_map_static.hh>
@@ -236,7 +238,7 @@ namespace muFFT {
     send_mat(1, 0) = 4.;
     send_mat(1, 1) = 5.;
     send_mat(1, 2) = 6.;
-    auto res{comm.template sum_mat<Real>(send_mat)};
+    auto res{comm.template sum<Real>(send_mat)};
     const auto nb_cols{send_mat.cols()};
     const auto nb_rows{send_mat.rows()};
     for (int row{0}; row < nb_rows; row++) {
@@ -251,7 +253,7 @@ namespace muFFT {
     auto & comm{MPIContext::get_context().comm};
     auto rank{comm.rank()};
     int send_val{rank + 1};
-    int res{comm.template cum_sum<int>(send_val)};
+    int res{comm.template cumulative_sum<int>(send_val)};
     // 1 + 2 + 3 + ... + n = n*(n+1)/2
     BOOST_CHECK_EQUAL(res, rank * (rank + 1) / 2 + rank + 1);
   }

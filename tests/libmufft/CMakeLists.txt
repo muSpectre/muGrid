@@ -62,10 +62,10 @@ if(${MUSPECTRE_MPI_PARALLEL})
 
   muFFT_add_test(mufft_mpi_main_test_suite1
     SOURCES mpi_main_test_suite.cc ${TEST_SRCS}
-    TARGET mpi_main_test_suite
+    TARGET mpi_main_mufft_test_suite
     TYPE BOOST MPI_NB_PROCS 1 --report_level=detailed)
   muFFT_add_test(mufft_mpi_main_test_suite2
-    TARGET mpi_main_test_suite
+    TARGET mpi_main_mufft_test_suite
     TYPE BOOST MPI_NB_PROCS 2 --report_level=detailed)
 
   muFFT_add_test(mufft_python_mpi_binding_test1 TYPE PYTHON MPI_NB_PROCS 1

@@ -37,10 +37,14 @@
 #include "tests.hh"
 #include <libmufft/derivative.hh>
 #include <libmufft/fftw_engine.hh>
-
+#ifdef WITH_MPI
+#include <libmufft/fftwmpi_engine.hh>
+#include "libmufft/mpi_context.hh"
+#endif
 #include <boost/mpl/list.hpp>
 #include <Eigen/Dense>
 #include <iostream>
+#include <type_traits>
 
 #ifndef TESTS_TEST_PROJECTION_HH_
 #define TESTS_TEST_PROJECTION_HH_
@@ -157,19 +161,44 @@ namespace muSpectre {
             class Proj, Dim_t NbQuadPts = 1>
   struct ProjectionFixture {
     using Engine = muFFT::FFTWEngine;
+
     using Parent = Proj;
     using SizeGiver = SizeGiver_;
     using GradientGiver = GradientGiver_;
     constexpr static Dim_t sdim{DimS};
     constexpr static Dim_t mdim{DimM};
     constexpr static Dim_t nb_quad{NbQuadPts};
+
     ProjectionFixture()
         : projector(std::make_unique<Engine>(
                         DynCcoord_t(SizeGiver::get_nb_grid_pts())),
                     DynRcoord_t(SizeGiver::get_lengths()),
-                    Gradient_t(GradientGiver::get_gradient())) {}
+                    Gradient_t{GradientGiver::get_gradient()}) {}
+
     Parent projector;
   };
+
+  /* ---------------------------------------------------------------------- */
+#if defined(WITH_FFTWMPI) || defined(WITH_PFFT)
+  template <Dim_t DimS, Dim_t DimM, class SizeGiver_, class GradientGiver_,
+            class Proj, Dim_t NbQuadPts = 1, class Engine = muFFT::FFTWEngine>
+  struct MPIProjectionFixture {
+    using Parent = Proj;
+    using SizeGiver = SizeGiver_;
+    using GradientGiver = GradientGiver_;
+    constexpr static Dim_t sdim{DimS};
+    constexpr static Dim_t mdim{DimM};
+    constexpr static Dim_t nb_quad{NbQuadPts};
+
+    MPIProjectionFixture()
+        : projector(std::make_unique<Engine>(
+                        DynCcoord_t(SizeGiver::get_nb_grid_pts()),
+                        muFFT::MPIContext::get_context().comm),
+                    DynRcoord_t(SizeGiver::get_lengths()),
+                    Gradient_t{GradientGiver::get_gradient()}) {}
+    Parent projector;
+  };
+#endif /*defined(WITH_FFTWMPI) || defined(WITH_PFFT) */
 
 }  // namespace muSpectre
 

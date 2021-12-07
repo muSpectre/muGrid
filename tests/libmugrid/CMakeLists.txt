@@ -81,10 +81,10 @@ if(${MUSPECTRE_MPI_PARALLEL})
   endif()
   muGrid_add_test(mugrid_mpi_main_test_suite1
     SOURCES main_test_suite.cc ${TEST_SRCS} ${IO_TEST_SRCS}
-    TARGET mpi_main_test_suite
+    TARGET mpi_main_mugrid_test_suite
     TYPE BOOST MPI_NB_PROCS 1 --report_level=detailed)
   muGrid_add_test(mugrid_mpi_main_test_suite2
-    TARGET mpi_main_test_suite
+    TARGET mpi_main_mugrid_test_suite
     TYPE BOOST MPI_NB_PROCS 2 --report_level=detailed)
 
   muGrid_add_test(mugrid_python_mpi_binding_test1 TYPE PYTHON MPI_NB_PROCS 1
