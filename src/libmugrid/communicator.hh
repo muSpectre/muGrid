@@ -264,7 +264,7 @@ namespace muGrid {
       // gather the number of elements on each core to define the output shape
       // (nb_cols = nb_entries/nb_rows_max) of the result
       Index_t send_buf_size(arg.size());
-      std::vector<int> arg_sizes{comm_size};
+      std::vector<int> arg_sizes(comm_size, 0);
       message = MPI_Allgather(&send_buf_size, 1, mpi_type<int>(),
                               arg_sizes.data(), 1, mpi_type<int>(), this->comm);
       if (message != 0) {
@@ -279,6 +279,12 @@ namespace muGrid {
         nb_entries += arg_sizes[i];
       }
 
+      // check if by accident a vector was handed over, rows=0, cols!=0. Thus
+      // nb_rows is zero everywhere and so nb_rows_max is zero. However, there
+      // are columns != 0, which leads to nb_entries != 0 and would lead in the
+      // following to a zero division.
+      assert(!((nb_rows_max == 0) and (nb_entries != 0)));
+
       // compute the offset at which the data from each processor is written
       // into the result
       std::vector<int> displs(comm_size, 0);
@@ -287,6 +293,11 @@ namespace muGrid {
       }
 
       // initialise the result matrix with zeros
+      if ((nb_rows_max == 0) and (nb_entries == 0)) {
+        // If there is no data to collect return a 0x0 matrix.
+        DynMatrix_t<T> res(0, 0);
+        return res;
+      }
       DynMatrix_t<T> res(nb_rows_max, nb_entries / nb_rows_max);
       res.setZero();
 

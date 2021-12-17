@@ -60,11 +60,11 @@ if(${MUSPECTRE_MPI_PARALLEL})
   # add MPI tests
   file(GLOB TEST_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/mpi_*.cc")
 
-  muFFT_add_test(mufft_mpi_main_test_suite1
+  muFFT_add_test(mpi_main_mufft_test_suite1
     SOURCES mpi_main_test_suite.cc ${TEST_SRCS}
     TARGET mpi_main_mufft_test_suite
     TYPE BOOST MPI_NB_PROCS 1 --report_level=detailed)
-  muFFT_add_test(mufft_mpi_main_test_suite2
+  muFFT_add_test(mpi_main_mufft_test_suite2
     TARGET mpi_main_mufft_test_suite
     TYPE BOOST MPI_NB_PROCS 2 --report_level=detailed)
 

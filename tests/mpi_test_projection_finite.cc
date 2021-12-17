@@ -95,7 +95,7 @@ namespace muSpectre {
       MPIProjectionFixture<twoD, twoD, Squares<twoD>, FourierGradient<twoD>,
                            ProjectionFiniteStrain<twoD>, 1, muFFT::PFFTEngine>,
       MPIProjectionFixture<
-          threeD, threeD, Squares<threeD>, FourierGradient<threeD>, ,
+          threeD, threeD, Squares<threeD>, FourierGradient<threeD>,
           ProjectionFiniteStrain<threeD>, 1, muFFT::PFFTEngine>,
       MPIProjectionFixture<twoD, twoD, Sizes<twoD>, FourierGradient<twoD>,
                            ProjectionFiniteStrain<twoD>, 1, muFFT::PFFTEngine>,
@@ -107,7 +107,7 @@ namespace muSpectre {
                            ProjectionFiniteStrainFast<twoD>, 1,
                            muFFT::PFFTEngine>,
       MPIProjectionFixture<
-          threeD, threeD, Squares<threeD>, FourierGradient<threeD>, ,
+          threeD, threeD, Squares<threeD>, FourierGradient<threeD>,
           ProjectionFiniteStrainFast<threeD>, 1, muFFT::PFFTEngine>,
       MPIProjectionFixture<twoD, twoD, Sizes<twoD>, FourierGradient<twoD>,
                            ProjectionFiniteStrainFast<twoD>, 1,

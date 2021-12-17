@@ -47,14 +47,14 @@ namespace muFFT {
    */
   class MPIContext {
    public:
-    Communicator comm;
+    muGrid::Communicator comm;
     static MPIContext & get_context() {
       static MPIContext context;
       return context;
     }
 
    private:
-    MPIContext() : comm(Communicator(MPI_COMM_WORLD)) {
+    MPIContext() : comm(muGrid::Communicator(MPI_COMM_WORLD)) {
       MPI_Init(&boost::unit_test::framework::master_test_suite().argc,
                &boost::unit_test::framework::master_test_suite().argv);
     }

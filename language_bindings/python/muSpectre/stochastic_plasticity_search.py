@@ -624,7 +624,7 @@ def propagate_avalanche(material, cell, solver, newton_tol, newton_equil_tol,
 
         n_avalanche += 1
 
-    if verbose:
+    if verbose and comm.rank == 0:
         print("I needed {} avalanche time steps".format(n_avalanche))
 
     if (n_avalanche == n_max_avalanche):  # recognise if avalanche overflows!

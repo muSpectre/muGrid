@@ -87,6 +87,11 @@ void add_communicator(py::module & mod) {
            })
       .def("sum",
            [](muGrid::Communicator & comm,
+              const Eigen::Ref<muGrid::DynMatrix_t<Index_t>> & arg) {
+             return comm.sum(arg);
+           })
+      .def("sum",
+           [](muGrid::Communicator & comm,
               const Eigen::Ref<muGrid::DynMatrix_t<Complex>> & arg) {
              return comm.sum(arg);
            })

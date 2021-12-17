@@ -79,13 +79,21 @@ if(${MUSPECTRE_MPI_PARALLEL})
   if(${NETCDF_IO})
     file(GLOB IO_TEST_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/io_mpi_*.cc")
   endif()
-  muGrid_add_test(mugrid_mpi_main_test_suite1
+  muGrid_add_test(mpi_main_mugrid_test_suite1
     SOURCES main_test_suite.cc ${TEST_SRCS} ${IO_TEST_SRCS}
     TARGET mpi_main_mugrid_test_suite
     TYPE BOOST MPI_NB_PROCS 1 --report_level=detailed)
-  muGrid_add_test(mugrid_mpi_main_test_suite2
+  muGrid_add_test(mpi_main_mugrid_test_suite2
+    SOURCES main_test_suite.cc ${TEST_SRCS} ${IO_TEST_SRCS}
     TARGET mpi_main_mugrid_test_suite
     TYPE BOOST MPI_NB_PROCS 2 --report_level=detailed)
+  muGrid_add_test(mpi_communicator_test_suite6
+    SOURCES main_test_suite.cc "mpi_test_communicator.cc"
+    TARGET mpi_communicator_test_suite
+    TYPE BOOST MPI_NB_PROCS 6 --report_level=detailed)
+  muGrid_add_test(mpi_communicator_test_suite8
+    TARGET mpi_communicator_test_suite
+    TYPE BOOST MPI_NB_PROCS 8 --report_level=detailed)
 
   muGrid_add_test(mugrid_python_mpi_binding_test1 TYPE PYTHON MPI_NB_PROCS 1
     python_mpi_binding_test.py)
