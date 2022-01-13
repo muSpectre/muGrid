@@ -44,7 +44,8 @@ import numpy as np
 import itertools
 import time
 
-### Helper functions
+
+# Helper functions
 def init_X_F_Chi(lens, res, rank=2):
     """
     Setup all the needed parameters for initialization of the deformation
@@ -79,6 +80,7 @@ def init_X_F_Chi(lens, res, rank=2):
 
     return delta_x, dim, x_n, x_c, F, Chi_n
 
+
 class GradientIntegration_Check(unittest.TestCase):
     """
     Check the implementation of all muSpectre.gradient_integration functions.
@@ -101,8 +103,8 @@ class GradientIntegration_Check(unittest.TestCase):
     def test_make_grid(self):
         """
         Test the function compute_grid which creates an orthogonal
-        equally spaced grid of the given number of grid points in each dimension
-        and the corresponding  lengths.
+        equally spaced grid of the given number of grid points in each
+        dimension and the corresponding  lengths.
         """
         lens = self.lengths
         res = self.nb_grid_pts
@@ -173,7 +175,6 @@ class GradientIntegration_Check(unittest.TestCase):
         fourier_gradient = [µ.FourierDerivative(dim, i) for i in range(dim)]
         fft_engine = muFFT.FFT(list(res_e))
 
-        #freqs = fft_engine.wavevectors(lens_e)
         freqs = fft_engine.fftfreq * res_e.reshape((dim,)+(1,)*dim)
         shift = np.exp(-1j*2*np.pi *
                        np.einsum("i...,i->...", freqs, delta_x_e/2))
@@ -220,7 +221,6 @@ class GradientIntegration_Check(unittest.TestCase):
               [0. - 0.j, -0.16666667+0.09622504j,  0. + 0.19245009j]]])
         self.assertLess(np.linalg.norm(integrator-int_ana), 1e-7)
 
-
     def test_fourier_integrate_tensor_2(self):
         """
         Test the correct integration of a second-rank tensor gradient field,
@@ -244,10 +244,9 @@ class GradientIntegration_Check(unittest.TestCase):
 
         self.assertLess(np.linalg.norm(Chi_n - placement_n), self.norm_tol)
 
-
         # cosinus, diagonal deformation gradient 3D
         res = np.array([36, 14, 15])
-        fft_engine = muFFT.FFT(list(res)) # new engine is now 3d
+        fft_engine = muFFT.FFT(list(res))  # new engine is now 3d
         lens = np.array([7, 1.4, 3])
         delta_x, dim, x_n, x_c, F, _ = init_X_F_Chi(lens, res)
         for i in range(dim):
@@ -291,7 +290,7 @@ class GradientIntegration_Check(unittest.TestCase):
 
     def test_shear_composite(self):
         # Realistic test:
-        #   shear of a two dimensional material with two different Young moduli.
+        # shear of a two dimensional material with two different Young moduli.
         # initialize material structure
         res = [9, 21]  # nb_grid_pts
         lens = [9, 21]  # lengths
@@ -372,21 +371,19 @@ class GradientIntegration_Check(unittest.TestCase):
         # integration constant = integral of the nonaffine deformation gradient/N
         int_const =\
             - ((placement_ana_c[0, :, :] - F_homo[0, 1, :, :] * x_c[1, :, :])
-                       .sum(axis=1))[0] / res[1]
+               .sum(axis=1))[0] / res[1]
         ana_sol_n = placement_ana_n + x_n + \
             np.array([int_const, 0]).reshape((dim,) + (1,)*dim)
 
         # check the numeric vs the analytic solution
         norm_n = \
-            (np.linalg.norm(placement_n - ana_sol_n)/
-             np.prod(np.array(res)))
+            (np.linalg.norm(placement_n - ana_sol_n)
+             / np.prod(np.array(res)))
         self.assertLess(norm_n, 1.17e-5)
         norm_n_disc = \
-            (np.linalg.norm(placement_n_disc - ana_sol_n)/
-             np.prod(np.array(res)))
+            (np.linalg.norm(placement_n_disc - ana_sol_n)
+             / np.prod(np.array(res)))
         self.assertLess(norm_n_disc, 3.89e-6)
-
-
 
     def test_fourier_integrate_tensor_2_small_strain(self):
         """
@@ -411,7 +408,7 @@ class GradientIntegration_Check(unittest.TestCase):
             E, fft_engine, delta_x)
         self.assertLess(np.linalg.norm(u_n - u_integrated_n), self.norm_tol)
 
-        #### Non Diagonal 2D:
+        # Non Diagonal 2D:
         delta_x, dim, x_n, x_c, E, u_n = init_X_F_Chi(lens, res)
         for i in range(dim):
             u_n[i, :, :] = strain_amp * (np.sin(2*np.pi*x_n[i]/lens[i]) +
@@ -436,7 +433,7 @@ class GradientIntegration_Check(unittest.TestCase):
         for i in range(dim):
             E[i, i, :, :] = \
                 (strain_amp * (2*np.pi/lens[i])
-                 *np.cos(2*np.pi * x_c[i]/lens[i]))
+                 * np.cos(2*np.pi * x_c[i]/lens[i]))
             u_n = \
                 strain_amp * np.sin(2*np.pi*x_n/(lens.reshape((dim,)+(1,)*dim)))
         fft_engine = muFFT.FFT(list(res))
@@ -446,7 +443,7 @@ class GradientIntegration_Check(unittest.TestCase):
             E, fft_engine, delta_x)
         self.assertLess(np.linalg.norm(u_n - u_integrated_n), self.norm_tol)
 
-        #### Non Diagonal 2D:
+        # Non Diagonal 2D:
         delta_x, dim, x_n, x_c, E, u_n = init_X_F_Chi(lens, res)
         for i in range(dim):
             u_n[i, :, :] = strain_amp * (np.sin(2*np.pi*x_n[i]/lens[i]) +
@@ -470,7 +467,6 @@ class GradientIntegration_Check(unittest.TestCase):
             E, fft_engine, delta_x)
         self.assertLess(np.linalg.norm(u_n - u_integrated_n), self.norm_tol)
 
-
     def test_discrete_integrate_tensor_2(self):
         """
         Test the correct integration of a second-rank tensor gradient field,
@@ -482,7 +478,7 @@ class GradientIntegration_Check(unittest.TestCase):
         res = [23, 45, 11]
         lens = [1.4, 2.3, 1.1]
         dim = len(res)
-        delta_x = [l/r for l, r in zip(lens, res)]
+        delta_x = [ll/r for ll, r in zip(lens, res)]
         # Create a random displacement field
         x = (((np.random.random([len(res)]+res)).T-0.5)*delta_x).T
         for i in range(dim):
@@ -524,7 +520,7 @@ class GradientIntegration_Check(unittest.TestCase):
         res = [23, 45]
         lens = [1.4, 2.3]
         dim = len(res)
-        delta_x = [l/r for l, r in zip(lens, res)]
+        delta_x = [ll/r for ll, r in zip(lens, res)]
         # Create a random displacement field
         x = np.random.random(res)-0.5
         x -= x.mean()
@@ -545,7 +541,7 @@ class GradientIntegration_Check(unittest.TestCase):
         int_x = µ.gradient_integration.integrate_vector(
             g, fft_engine, discrete_gradient, delta_x)
 
-        self.assertTrue(np.allclose(x, int_x[0,:-1, :-1]))
+        self.assertTrue(np.allclose(x, int_x[0, :-1, :-1]))
 
     def test_discrete_integrate_vector_3d(self):
         """
@@ -557,7 +553,7 @@ class GradientIntegration_Check(unittest.TestCase):
         lens = [1.4, 2.3, 1.7]
         res1 = [r+1 for r in res]
         dim = len(res)
-        delta_x = [l/r for l, r in zip(lens, res)]
+        delta_x = [ll/r for ll, r in zip(lens, res)]
         # Create a random displacement field
         x = np.random.random(res)-0.5
         x -= x.mean()  # mean of random field should be zero
@@ -586,7 +582,7 @@ class GradientIntegration_Check(unittest.TestCase):
 
     def test_compute_placement(self):
         """Test the computation of placements and the original positions."""
-        ### shear of a homogeneous material ###
+        # shear of a homogeneous material #
         res = [3, 11]  # nb_grid_pts
         lens = [10, 10]  # lengths
         dim = len(res)  # dimension
@@ -601,7 +597,7 @@ class GradientIntegration_Check(unittest.TestCase):
             mat.add_pixel(pixel_id)
         cell.initialise()
         DelF = np.array([[0, 0.05],
-                         [0, 0   ]])
+                         [0,    0]])
         # analytic
         placement_ana = np.copy(x_n)
         placement_ana[0, :, :] += DelF[0, 1]*x_n[1, :, :]
@@ -625,10 +621,9 @@ class GradientIntegration_Check(unittest.TestCase):
                                            placement), 1e-12, msg=msg)
             self.assertTrue((x_n == x).all(), msg=msg)
 
-
     def test_compute_placement_small_strain(self):
         """Test the computation of placements and the original positions."""
-        ### shear of a homogeneous material ###
+        # shear of a homogeneous material #
         res = [3, 11]  # nb_grid_pts
         lens = [10, 12]  # lengths
         dim = len(res)  # dimension
@@ -642,8 +637,8 @@ class GradientIntegration_Check(unittest.TestCase):
         for pixel_id in cell.pixel_indices:
             mat.add_pixel(pixel_id)
         cell.initialise()
-        DelE = 1e-4 * np.array([[0   , 0.05],
-                                [0.05, 0   ]])
+        DelE = 1e-4 * np.array([[0,   0.05],
+                                [0.05,   0]])
 
         # analytic
         placement_ana = np.copy(x_n)
@@ -666,7 +661,6 @@ class GradientIntegration_Check(unittest.TestCase):
             self.assertLess(np.linalg.norm(placement_ana -
                                            u_n), 1e-12)
             self.assertTrue((x_n == x).all())
-
 
     def test_compare_small_strain_finite_strain(self):
         """Tests the equality of the displacement field obtained from
@@ -706,11 +700,11 @@ class GradientIntegration_Check(unittest.TestCase):
         phase[:, low_y:high_y, :] = 1
         phase[left_x:right_x, high_y:high_y+h, :] = xy_bump
 
-        ### Run muSpectre ###
-        #-------------------#
+        #  Run muSpectre #
+        # -------------- #
         fourier_gradient =\
-            [µ.FourierDerivative(dim , i) for i in range(dim)]
-        ######finite strain:
+            [µ.FourierDerivative(dim, i) for i in range(dim)]
+        # finite strain:
         DelF = F_amp * np.array([[+0.50, +0.20, +0.00],
                                  [+0.00, -0.03, +0.15],
                                  [+0.00, +0.15, +0.40]])
@@ -734,7 +728,7 @@ class GradientIntegration_Check(unittest.TestCase):
         result_finite = µ.solvers.newton_cg(cell_finite, DelF,
                                             solver_newton_finite,
                                             newton_tol, equil_tol, verbose)
-        ######small strain:
+        # small strain:
         DelE = 0.5 * ((F.T).dot(F) - np.identity(DelF.shape[0]))
 
         cell_small =\
@@ -755,21 +749,20 @@ class GradientIntegration_Check(unittest.TestCase):
                                            solver_newton_small,
                                            newton_tol, equil_tol, verbose)
 
-        #-------------------#
+        # -----------------#
         # integration of the deformation gradient field
         placement_n_finite, x = \
             µ.gradient_integration.compute_placement(
                 result_finite, lengths, nb_grid_pts, fourier_gradient,
-                formulation = result_finite.formulation)
+                formulation=result_finite.formulation)
 
         placement_n_small, x = \
             µ.gradient_integration.compute_placement(
                 result_small, lengths, nb_grid_pts, fourier_gradient,
-                formulation = result_small.formulation)
+                formulation=result_small.formulation)
 
         err_norm = np.linalg.norm(placement_n_small - placement_n_finite)
         self.assertLess(err_norm, F_amp * 5)
-
 
     def test_vacuum(self):
         form = µ.Formulation.finite_strain
@@ -823,7 +816,6 @@ class GradientIntegration_Check(unittest.TestCase):
                 equil_tol = 1e-8  # tolerance for equilibrium
                 maxiter = 1000
                 verbose = µ.Verbosity.Silent
-                #verbose = µ.Verbosity.Full
 
                 solver = µ.solvers.KrylovSolverCG(cell, cg_tol, maxiter,
                                                   verbose)
@@ -885,7 +877,6 @@ class GradientIntegration_Check(unittest.TestCase):
                             1.5-(nb_pts-1)/nb_pts*(1 + Poisson*0.1*dim),
                             delta=0.015)
 
-
     def test_get_complemented_positions(self):
         nx, ny, nz = nb_domain_grid_pts = 2, 3, 4
         sx, sy, sz = domain_lengths = 1.3, 1.1, 1.7
@@ -902,7 +893,7 @@ class GradientIntegration_Check(unittest.TestCase):
 
         maxiter = 1000  # for linear cell solver
 
-        ## numerical derivative, six elements
+        # numerical derivative, six elements
         gradient = µ.linear_finite_elements.gradient_3d
 
         for form in [µ.Formulation.small_strain,
@@ -926,7 +917,8 @@ class GradientIntegration_Check(unittest.TestCase):
 
             [x_def, y_def, z_def], [dx, dy, dz], [gx, gy, gz], \
                 [x0, y0, z0], [ndx, ndy, ndz] \
-                = µ.gradient_integration.get_complemented_positions("pdg0n", rve)
+                = µ.gradient_integration.get_complemented_positions(
+                    "pdg0n", rve, periodically_complemented=True)
 
             self.assertTrue(
                 np.allclose(x_def,
@@ -980,7 +972,7 @@ class GradientIntegration_Check(unittest.TestCase):
 
         maxiter = 1000  # for linear cell solver
 
-        ## numerical derivative, two elements for a hexagonal lattice
+        # numerical derivative, two elements for a hexagonal lattice
         gradient = µ.linear_finite_elements.gradient_2d_hexagonal
 
         form = µ.Formulation.finite_strain
@@ -1004,7 +996,8 @@ class GradientIntegration_Check(unittest.TestCase):
 
         F0 = np.array([[1, 1/np.sqrt(3)], [0, 1]])
         [x_def, y_def], [dx, dy], [gx, gy], [x0, y0], [ndx, ndy] \
-            = µ.gradient_integration.get_complemented_positions("pdg0n", rve, F0)
+            = µ.gradient_integration.get_complemented_positions(
+                "pdg0n", rve, F0, periodically_complemented=True)
 
         self.assertTrue(
             np.allclose(x_def, (1-s) * (sx/nx * np.arange(nx+1).reshape(-1, 1)
@@ -1030,6 +1023,7 @@ class GradientIntegration_Check(unittest.TestCase):
 
         self.assertTrue(np.allclose(x_def - gx, ndx))
         self.assertTrue(np.allclose(y_def - gy, ndy))
+
 
 if __name__ == '__main__':
     unittest.main()

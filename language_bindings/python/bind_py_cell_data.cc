@@ -127,6 +127,7 @@ void add_cell_data_helper(py::module & mod) {
             return cell_data.get_domain_lengths();
           })
       .def_property_readonly("FFT_engine", &CellData::get_FFT_engine)
+      .def_property_readonly("communicator", &CellData::get_communicator)
       .def("save_history_variables", &CellData::save_history_variables)
       .def("get_globalised_internal_real_field",
            &CellData::globalise_real_internal_field, "unique_name"_a,

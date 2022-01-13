@@ -173,8 +173,13 @@ namespace muSpectre {
     //! macroscopic average strain applied on the RVE
     void apply_projection(Field_t & field) final;
 
-    //! compute the positions of the nodes of the pixels
+    //! compute the positions of the nodes of the pixels.
+    //! This function is only applicable in serial.
     Field_t & integrate(Field_t & strain) final;
+
+    //! compute the nonaffine displacements of the nodes of the pixels.
+    //! This function is applicable in serial and parallel.
+    Field_t & integrate_nonaffine_displacements(Field_t & strain) final;
 
     Eigen::Map<MatrixXXc> get_operator();
 

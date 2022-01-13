@@ -197,13 +197,52 @@ namespace muSpectre {
   auto
   ProjectionGradient<DimS, GradientRank, NbQuadPts>::integrate(Field_t & grad)
       -> Field_t & {
-    //! vectorized version of the Fourier-space potential
-    using FourierPotential_map =
-        muGrid::MatrixFieldMap<Complex, Mapping::Mut, NbPrimitiveRow,
-                               NbPrimitiveCol, IterUnit::SubPt>;
     //! vectorized version of the real-space potential
     using RealPotential_map =
         muGrid::MatrixFieldMap<Real, Mapping::Mut, NbPrimitiveRow,
+                               NbPrimitiveCol, IterUnit::SubPt>;
+
+    // store average strain
+    this->fft_engine->fft(grad, this->work_space);
+    Grad_map grad_map{this->work_space};
+    Real factor = this->fft_engine->normalisation();
+    Eigen::Matrix<Real, NbGradRow, NbGradCol> avg_grad{grad_map[0].real() *
+                                                       factor};
+    if (!(this->get_subdomain_locations() == Ccoord{})) {
+      avg_grad.setZero();
+    }
+    avg_grad = this->get_communicator().sum(avg_grad);
+
+    // This operation writes the integrated nonaffine displacement field into
+    // the real space field "Node potential (in real space)" which then can be
+    // fetched. So it is necessary that the real space potential field in
+    // ProjectionGradient::integrate_nonaffine_displacements has the same name
+    // as in ProjectionGradient::integrate.
+    this->integrate_nonaffine_displacements(grad);
+    auto & potential{this->fft_engine->fetch_or_register_real_space_field(
+        "Node potential (in real space)", NbPrimitiveRow * NbPrimitiveCol)};
+
+    // add average strain to potential
+    RealPotential_map real_potential_map{potential};
+    auto grid_spacing{this->domain_lengths / this->get_nb_domain_grid_pts()};
+    for (auto && tup :
+         akantu::zip(this->fft_engine->get_real_pixels(), real_potential_map)) {
+      auto & c{std::get<0>(tup)};
+      auto & p{std::get<1>(tup)};
+      for (Index_t i{0}; i < DimS; ++i) {
+        p += avg_grad.col(i) * c[i] * grid_spacing[i];
+      }
+    }
+    return potential;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Index_t DimS, Index_t GradientRank, Index_t NbQuadPts>
+  auto ProjectionGradient<DimS, GradientRank, NbQuadPts>::
+      integrate_nonaffine_displacements(Field_t & grad) -> Field_t & {
+    //! vectorized version of the Fourier-space potential
+    using FourierPotential_map =
+        muGrid::MatrixFieldMap<Complex, Mapping::Mut, NbPrimitiveRow,
                                NbPrimitiveCol, IterUnit::SubPt>;
 
     if (!this->initialised) {
@@ -220,14 +259,6 @@ namespace muSpectre {
     FourierPotential_map fourier_potential_map{potential_work_space};
     Real factor = this->fft_engine->normalisation();
 
-    // store average strain
-    Eigen::Matrix<Real, NbGradRow, NbGradCol> avg_grad{grad_map[0].real() *
-                                                       factor};
-    if (!(this->get_subdomain_locations() == Ccoord{})) {
-      avg_grad.setZero();
-    }
-    avg_grad = this->get_communicator().sum(avg_grad);
-
     // apply integrator
     for (auto && tup : akantu::zip(this->int_field.get_map(), grad_map,
                                    fourier_potential_map)) {
@@ -239,17 +270,6 @@ namespace muSpectre {
     auto & potential{this->fft_engine->fetch_or_register_real_space_field(
         "Node potential (in real space)", NbPrimitiveRow * NbPrimitiveCol)};
     this->fft_engine->ifft(potential_work_space, potential);
-    // add average strain to potential
-    RealPotential_map real_potential_map{potential};
-    auto grid_spacing{this->domain_lengths / this->get_nb_domain_grid_pts()};
-    for (auto && tup :
-         akantu::zip(this->fft_engine->get_real_pixels(), real_potential_map)) {
-      auto & c{std::get<0>(tup)};
-      auto & p{std::get<1>(tup)};
-      for (Index_t i{0}; i < DimS; ++i) {
-        p += avg_grad.col(i) * c[i] * grid_spacing[i];
-      }
-    }
     return potential;
   }
 

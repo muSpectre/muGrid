@@ -274,8 +274,8 @@ for i, grad_type in enumerate(grad_types):
     grad[grad_type] = \
         result.grad.reshape(*nb_grid_pts_mu_int, len(gradient), dim).T
 
-    placement[grad_type], x[grad_type] = \
-        gi.get_complemented_positions('p0', rve)
+    placement[grad_type], x[grad_type] = gi.get_complemented_positions(
+        'p0', rve, periodically_complemented=True)
 
     if formulation == msp.Formulation.finite_strain:
         # correct the gradient by subtracting the unit gradient

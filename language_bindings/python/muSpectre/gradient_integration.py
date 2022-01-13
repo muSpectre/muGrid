@@ -106,13 +106,9 @@ def complement_periodically(array, dim):
     return out_arr
 
 
-def get_complemented_positions_worker(quantities, rve, F0,
-                                      strain,
-                                      mean_strain,
-                                      formulation,
-                                      dim,
-                                      projection=None,
-                                      disps=None):
+def get_complemented_positions_worker(
+        quantities, rve, F0, strain, mean_strain, formulation, dim,
+        projection=None, disps=None, periodically_complemented=False):
     """
     worker function to do the get_complemented_positions task
     Arguments:
@@ -138,34 +134,54 @@ def get_complemented_positions_worker(quantities, rve, F0,
     projection -- Projection Object obtained either from the Cell object
                   or a Solver object in an upstream function
     disp -- displacement field
+    periodically_complemented -- bool, decides whether the output quantities
+            are periodically complemented (True) or not (False). The periodic
+            complementation is not available in parallel and will raise an
+            error if choosen. The default is False.
 
     Returns:
     Tuple build according to the first argument of the function.
 
     """
+    comm = rve.communicator
+    serial = False if comm.size > 1 else True
+
+    if not serial and periodically_complemented:
+        raise RuntimeError("Periodically complemented output quantities "
+                           "are currently not implemented in the parallel "
+                           "version. Either compute serial or use the "
+                           "periodically not complemented quantities.")
+
     if F0 is None:
         F0 = np.eye(len(rve.nb_domain_grid_pts))
-    cell_coords = np.mgrid[tuple(slice(None, n)
-                                 for n in rve.nb_domain_grid_pts)]
-    node_coords = np.mgrid[tuple(slice(None, n + 1)
-                                 for n in rve.nb_domain_grid_pts)]
-    if projection is None and not(disps is None):
-        displacements = disps.reshape(coords.shape)
-        displacements = complement_periodically(displacements,
-                                                rve.spatial_dim)
-    elif disps is None and not (projection is None):
-        # Deformed (displaced) node positions
-        positions = projection.integrate(strain).array(muGrid.IterUnit.Pixel)
-        # Undeformed node positions in the reference configuration (strain = 0)
-        coords = (np.transpose(cell_coords) * rve.domain_lengths /
-                  rve.nb_domain_grid_pts).T
-        # Displacements are the difference between the two above
-        displacements = complement_periodically(
-            positions - coords.T.dot(mean_strain.T).T, dim)
+
+    cell_coords = \
+        np.mgrid[tuple(slice(s, e) for s, e in
+                       zip(rve.subdomain_locations,
+                           np.array(rve.subdomain_locations)
+                           + np.array(rve.nb_subdomain_grid_pts)))]
+    if serial and periodically_complemented:
+        node_coords = np.mgrid[tuple(slice(None, n + 1)
+                                     for n in rve.nb_domain_grid_pts)]
     else:
-        raise RuntimeError(
-            "One and only one of the projection or the displacements" +
-            " should be determined")
+        node_coords = cell_coords
+
+    if projection is None and not(disps is None):
+        displacements = disps.reshape(cell_coords.shape)
+        if periodically_complemented:
+            displacements = complement_periodically(displacements,
+                                                    rve.spatial_dim)
+    elif disps is None and not (projection is None):
+        # Nodal nonaffine displacements
+        displacements = projection.integrate_nonaffine_displacements(strain)\
+                                  .array(muGrid.IterUnit.Pixel)
+        if periodically_complemented:
+            displacements = complement_periodically(displacements, dim)
+    else:
+        if comm.rank == 0:
+            raise RuntimeError(
+                "One and only one of the projection or the displacements" +
+                " should be determined")
     # Undeformed node positions in the reference configuration,complemented
     coords = (np.transpose(node_coords) * rve.domain_lengths /
               rve.nb_domain_grid_pts).T
@@ -197,7 +213,8 @@ def get_complemented_positions_worker(quantities, rve, F0,
         return tuple(retval)
 
 
-def get_complemented_positions(quantities, rve, F0=None):
+def get_complemented_positions(quantities, rve, F0=None,
+                               periodically_complemented=False):
     """Takes an RVE (Cell) object and returns the deformed and undeformed nodal
     positions, complemented periodically.
 
@@ -223,22 +240,26 @@ def get_complemented_positions(quantities, rve, F0=None):
                   * hexagonal grid 2D: with dy = sqrt(3)/2*dx
                                     F0 = np.array([[ 1, 1/sqrt(3)],
                                                    [ 0,     1    ]])
+    periodically_complemented -- bool, decides whether the output quantities
+            are periodically complemented (True) or not (False). The periodic
+            complementation is not available in parallel and will raise an
+            error if choosen. The default is False.
 
     Returns:
     Tuple build according to the first argument of the function.
     """
-    strain = rve.strain.array()
+    strain = rve.strain
     mean_strain = np.mean(
-        strain, axis=tuple(i for i in range(2, len(strain.shape))))
-    return get_complemented_positions_worker(quantities, rve, F0,
-                                             rve.strain,
-                                             mean_strain,
-                                             rve.formulation,
-                                             rve.dim,
-                                             projection=rve.projection)
+        strain.array(), axis=tuple(i for i in range(2, len(strain.shape))))
+
+    return get_complemented_positions_worker(
+        quantities, rve, F0, strain, mean_strain, rve.formulation,
+        rve.dim, projection=rve.projection,
+        periodically_complemented=periodically_complemented)
 
 
-def get_complemented_positions_class_solver(quantities, rve, solver, F0=None):
+def get_complemented_positions_class_solver(quantities, rve, solver, F0=None,
+                                            periodically_complemented=False):
     """Takes an RVE (Cell) object and returns the deformed and undeformed nodal
     positions, complemented periodically.
 
@@ -263,6 +284,10 @@ def get_complemented_positions_class_solver(quantities, rve, solver, F0=None):
                   * hexagonal grid 2D: with dy = sqrt(3)/2*dx
                                     F0 = np.array([[ 1, 1/sqrt(3)],
                                                    [ 0,     1    ]])
+    periodically_complemented -- bool, decides whether the output quantities
+            are periodically complemented (True) or not (False). The periodic
+            complementation is not available in parallel and will raise an
+            error if choosen. The default is False.
 
     Returns:
     Tuple build according to the first argument of the function.
@@ -278,7 +303,8 @@ def get_complemented_positions_class_solver(quantities, rve, solver, F0=None):
             mean_strain,
             solver.formulation,
             rve.spatial_dim,
-            disps=displacements)
+            disps=displacements,
+            periodically_complemented=periodically_complemented)
     else:
         return get_complemented_positions_worker(
             quantities, rve, F0,
@@ -286,7 +312,8 @@ def get_complemented_positions_class_solver(quantities, rve, solver, F0=None):
             mean_strain,
             solver.formulation,
             rve.spatial_dim,
-            projection=solver.projection)
+            projection=solver.projection,
+            periodically_complemented=periodically_complemented)
 
 
 def get_integrator(fft, gradient_op, grid_spacing):

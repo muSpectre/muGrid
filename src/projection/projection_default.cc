@@ -102,12 +102,53 @@ namespace muSpectre {
     //! iterable form of the integrator
     using Grad_map = muGrid::MatrixFieldMap<Complex, Mapping::Mut, DimS,
                                             DimS * NbQuadPts, IterUnit::Pixel>;
-    //! vectorized version of the Fourier-space positions
-    using FourierPotential_map =
-        muGrid::T1FieldMap<Complex, Mapping::Mut, DimS, IterUnit::Pixel>;
     //! vectorized version of the real-space positions
     using RealPotential_map =
         muGrid::T1FieldMap<Real, Mapping::Mut, DimS, IterUnit::Pixel>;
+
+    // store average strain
+    this->fft_engine->fft(grad, this->work_space);
+    Grad_map grad_map{this->work_space};
+    Real factor = this->fft_engine->normalisation();
+    Eigen::Matrix<Real, DimS, DimS * NbQuadPts> avg_strain{grad_map[0].real() *
+                                                           factor};
+    // avg_strain(ξ=0) ← 0
+    if (!(this->get_subdomain_locations() == Ccoord{})) {
+      avg_strain.setZero();
+    }
+    avg_strain = this->get_communicator().sum(avg_strain);
+
+    // This operation writes the integrated nonaffine displacement field into
+    // the real space field "Node potential (in real space)" which then can be
+    // fetched. So it is necessary that the real space potential field in
+    // ProjectionDefault::integrate_nonaffine_displacements has the same name
+    // as in ProjectionDefault::integrate.
+    this->integrate_nonaffine_displacements(grad);
+    auto & potential{this->fft_engine->fetch_or_register_real_space_field(
+        "Node positions (in real space)", DimS)};
+
+    // add average strain to positions
+    RealPotential_map real_positions_map{potential};
+    auto grid_spacing{this->domain_lengths / this->get_nb_domain_grid_pts()};
+    for (auto && tup :
+         akantu::zip(this->fft_engine->get_real_pixels(), real_positions_map)) {
+      auto & c{std::get<0>(tup)};
+      auto & p{std::get<1>(tup)};
+      for (Index_t i{0}; i < DimS; ++i) {
+        p += avg_strain.col(i) * c[i] * grid_spacing[i];
+      }
+    }
+    return potential;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Index_t DimS, Index_t NbQuadPts>
+  typename ProjectionDefault<DimS, NbQuadPts>::Field_t &
+  ProjectionDefault<DimS, NbQuadPts>::integrate_nonaffine_displacements(
+      Field_t & grad) {
+    //! vectorized version of the Fourier-space positions
+    using FourierPotential_map =
+        muGrid::T1FieldMap<Complex, Mapping::Mut, DimS, IterUnit::Pixel>;
 
     if (!this->initialised) {
       throw ProjectionError("Integrating a field without having initialised "
@@ -117,20 +158,9 @@ namespace muSpectre {
     // positions in Fourier space
     auto & potential_work_space{
         this->fft_engine->fetch_or_register_fourier_space_field(
-            "Node positions (in Fourier space)", DimS)};
+            "Nodal nonaffine displacements (in Fourier space)", DimS)};
     this->fft_engine->fft(grad, this->work_space);
-
-    // store average strain
-    Grad_map grad_map{this->work_space};
     Real factor = this->fft_engine->normalisation();
-    Eigen::Matrix<Real, DimS, DimS * NbQuadPts> avg_strain{grad_map[0].real() *
-                                                           factor};
-
-    // avg_strain(ξ=0) ← 0
-    if (!(this->get_subdomain_locations() == Ccoord{})) {
-      avg_strain.setZero();
-    }
-    avg_strain = this->get_communicator().sum(avg_strain);
 
     // apply integrator
     Vector_map vector_map{this->work_space};
@@ -145,17 +175,6 @@ namespace muSpectre {
     auto & potential{this->fft_engine->fetch_or_register_real_space_field(
         "Node positions (in real space)", DimS)};
     this->fft_engine->ifft(potential_work_space, potential);
-    // add average strain to positions
-    RealPotential_map real_positions_map{potential};
-    auto grid_spacing{this->domain_lengths / this->get_nb_domain_grid_pts()};
-    for (auto && tup :
-         akantu::zip(this->fft_engine->get_real_pixels(), real_positions_map)) {
-      auto & c{std::get<0>(tup)};
-      auto & p{std::get<1>(tup)};
-      for (Index_t i{0}; i < DimS; ++i) {
-        p += avg_strain.col(i) * c[i] * grid_spacing[i];
-      }
-    }
     return potential;
   }
 

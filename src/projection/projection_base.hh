@@ -128,6 +128,15 @@ namespace muSpectre {
       throw std::logic_error(s.str());
     }
 
+    //! compute the nonaffine displacements of the nodes of the pixels
+    virtual Field_t & integrate_nonaffine_displacements(Field_t & strain) {
+      std::stringstream s;
+      s << "`integrate_nonaffine_displacements` is not implemented; do not "
+           "know how to integrate field "
+        << strain.get_name();
+      throw std::logic_error(s.str());
+    }
+
     /**
      * returns the process-local number of grid points in each direction of the
      * cell

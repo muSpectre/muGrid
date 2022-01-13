@@ -229,20 +229,28 @@ namespace muSpectre {
     using RealFieldT = muGrid::RealField;
     using FieldMap =
         muGrid::MatrixFieldMap<Real, Mapping::Mut, mdim, mdim, IterUnit::Pixel>;
+    using VectorFieldMap =
+        muGrid::MatrixFieldMap<Real, Mapping::Mut, mdim, 1, IterUnit::Pixel>;
     using Vector = Eigen::Matrix<Real, dim, 1>;
 
     Fields fields{1};
     RealFieldT & f_grad{fields.register_real_field("gradient", mdim * mdim)};
+    RealFieldT & f_primitive{fields.register_real_field("primitive", mdim)};
     RealFieldT & f_var{
         fields.register_real_field("working field", mdim * mdim)};
 
     FieldMap grad(f_grad);
     FieldMap var(f_var);
+    VectorFieldMap primitive(f_primitive);
 
     fields.initialise(fix::projector.get_nb_domain_grid_pts(),
                       fix::projector.get_nb_subdomain_grid_pts(),
                       fix::projector.get_subdomain_locations());
+
     Vector k;
+    // arbitrary number to avoid zero values of sine wave at discretisation
+    // points
+    Real phase_shift{.25};
     for (Dim_t i = 0; i < dim; ++i) {
       // the wave vector has to be such that it leads to an integer
       // number of periods in each length of the domain
@@ -250,17 +258,25 @@ namespace muSpectre {
     }
 
     using muGrid::operator/;
-    for (auto && tup : akantu::zip(fields.get_pixels(), grad, var)) {
+    // start_field_iteration_snippet
+    for (auto && tup : akantu::zip(fields.get_pixels(), grad, var, primitive)) {
       auto & ccoord = std::get<0>(tup);
       auto & g = std::get<1>(tup);
       auto & v = std::get<2>(tup);
+      auto & p = std::get<3>(tup);
       Vector vec = muGrid::CcoordOps::get_vector(
           ccoord.template get<mdim>(), (fix::projector.get_domain_lengths() /
                                         fix::projector.get_nb_domain_grid_pts())
                                            .template get<mdim>());
-      g.row(0) = k.transpose() * cos(k.dot(vec));
+      g.row(0) = k.transpose() * cos(k.dot(vec) + phase_shift);
+      p(0) = sin(k.dot(vec) + phase_shift);
+      p(1) = 0;
+      if (mdim == 3) {
+        p(2) = 0;
+      }
       v.row(0) = g.row(0);
     }
+    // end_field_iteration_snippet
 
     fix::projector.initialise();
     fix::projector.apply_projection(f_var);

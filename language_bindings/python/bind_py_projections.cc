@@ -155,10 +155,10 @@ void add_projection_base(py::module & mod) {
              proj.apply_projection(proxy.get_field());
              return proj_vector_field;
            })
-      // integrate that takes Fields
+      // integrate that takes Fields; computes the node positions
       .def("integrate", &ProjectionBase::integrate,
            py::return_value_policy::reference_internal)
-      // integrate that takes numpy arrays
+      // integrate that takes numpy arrays; computes the node positions
       .def("integrate",
            [](ProjectionBase & proj,
               py::array_t<Real, py::array::f_style> & vector_field) {
@@ -169,6 +169,24 @@ void add_projection_base(py::module & mod) {
                  proj.get_subdomain_locations(), proj.get_nb_quad_pts(),
                  {strain_shape[0], strain_shape[1]}, vector_field);
              return numpy_wrap(proj.integrate(proxy.get_field()));
+           })
+      // integrate that takes Fields; computes the nodal nonaffine displacements
+      .def("integrate_nonaffine_displacements",
+           &ProjectionBase::integrate_nonaffine_displacements,
+           py::return_value_policy::reference_internal)
+      // integrate that takes numpy arrays; computes the nodal nonaffine
+      // displacements
+      .def("integrate_nonaffine_displacements",
+           [](ProjectionBase & proj,
+              py::array_t<Real, py::array::f_style> & vector_field) {
+             auto strain_shape = proj.get_strain_shape();
+             NumpyProxy<Real, py::array::f_style> proxy(
+                 proj.get_nb_domain_grid_pts(),
+                 proj.get_nb_subdomain_grid_pts(),
+                 proj.get_subdomain_locations(), proj.get_nb_quad_pts(),
+                 {strain_shape[0], strain_shape[1]}, vector_field);
+             return numpy_wrap(
+                 proj.integrate_nonaffine_displacements(proxy.get_field()));
            });
 }
 

@@ -433,7 +433,8 @@ class SimpleCompositeTest(unittest.TestCase):
                             newton_tol, equil_tol, verbose)
         numerical_stress = self.cell.stress.array()
         (x, y), (x0, y0) = \
-            µ.gradient_integration.get_complemented_positions('p0', self.cell)
+            µ.gradient_integration.get_complemented_positions(
+                'p0', self.cell, periodically_complemented=True)
 
         # Analytic result
         Nx, Ny = self.nb_grid_pts
@@ -628,7 +629,8 @@ def build_fe_test(nb_grid_pts, lengths, Young=1.0, Poisson=0.33):
                                 newton_tol, equil_tol, verbose)
 
             (x, y), (x0, y0) = \
-                µ.gradient_integration.get_complemented_positions('pg', self.cell)
+                µ.gradient_integration.get_complemented_positions(
+                    'pg', self.cell, periodically_complemented=True)
             x = x.reshape((-1,))
             y = y.reshape((-1,))
             x0 = x0.reshape((-1,))

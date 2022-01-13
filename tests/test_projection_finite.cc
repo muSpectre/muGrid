@@ -378,7 +378,7 @@ namespace muSpectre {
       }
     }
 
-    BOOST_TEST_CHECKPOINT("Before integration");
+    BOOST_TEST_CHECKPOINT("Before nodal placement integration");
     auto && reconstructed_primitive{fix::projector.integrate(f_grad)};
     ScalarFieldMap_t r_primitive{reconstructed_primitive};
 
@@ -390,6 +390,24 @@ namespace muSpectre {
       if (not(error < tol)) {
         std::cout << "reconstructed value: " << reconstructed
                   << " != " << original << ", the original value" << std::endl;
+      }
+    }
+
+    BOOST_TEST_CHECKPOINT("Before nodal nonaffine displacement integration");
+    auto && reconstructed_nonaff_primitive{
+        fix::projector.integrate_nonaffine_displacements(f_grad)};
+    ScalarFieldMap_t r_nonaff_primitive{reconstructed_nonaff_primitive};
+
+    for (auto && tup : akantu::zip(r_nonaff_primitive, primitive)) {
+      auto && nonaff_reconstructed{std::get<0>(tup)};
+      auto && nonaff_original{std::get<1>(tup)};
+      auto && error{muGrid::testGoodies::rel_error(nonaff_reconstructed,
+                                                   nonaff_original)};
+      BOOST_CHECK_LT(error, tol);
+      if (not(error < tol)) {
+        std::cout << "nonaffine reconstructed value: " << nonaff_reconstructed
+                  << " != " << nonaff_original
+                  << ", the nonaffine original value" << std::endl;
       }
     }
   }
