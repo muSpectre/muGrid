@@ -63,6 +63,7 @@ namespace muSpectre {
   using muGrid::OneQuadPt;
   using muGrid::TwoQuadPts;
   using muGrid::FourQuadPts;
+  using muGrid::FiveQuadPts;
   using muGrid::SixQuadPts;
   using muGrid::EightQuadPts;
 

@@ -39,6 +39,7 @@ import numpy as np
 
 from python_test_imports import muFFT
 
+
 class DerivativeCheck1d(unittest.TestCase):
     def setUp(self):
         self.nb_pts = [23]
@@ -62,7 +63,7 @@ class DerivativeCheck1d(unittest.TestCase):
         nx, = self.nb_pts
         diff_field = np.squeeze(diff_field)
         for x in range(nx):
-            ndiff = self.field[(x+1)%nx] - self.field[x]
+            ndiff = self.field[(x+1) % nx] - self.field[x]
             ndiff = np.squeeze(ndiff)
             self.assertAlmostEqual(diff_field[x], ndiff)
 
@@ -76,7 +77,7 @@ class DerivativeCheck1d(unittest.TestCase):
         nx, = self.nb_pts
         diff_field = np.squeeze(diff_field)
         for x in range(nx):
-            ndiff = (self.field[(x+1)%nx] - self.field[(x-1)%nx])/2
+            ndiff = (self.field[(x+1) % nx] - self.field[(x-1) % nx])/2
             ndiff = np.squeeze(ndiff)
             self.assertAlmostEqual(diff_field[x], ndiff)
 
@@ -90,7 +91,8 @@ class DerivativeCheck1d(unittest.TestCase):
         nx, = self.nb_pts
         diff_field = np.squeeze(diff_field)
         for x in range(nx):
-            ndiff = self.field[(x+1)%nx] - 2*self.field[x] + self.field[(x-1)%nx]
+            ndiff = self.field[(x+1) % nx] - 2*self.field[x] \
+                + self.field[(x-1) % nx]
             ndiff = np.squeeze(ndiff)
             self.assertAlmostEqual(diff_field[x], ndiff)
 
@@ -104,14 +106,15 @@ class DerivativeCheck1d(unittest.TestCase):
         nx, = self.nb_pts
         diff_field = np.squeeze(diff_field)
         for x in range(nx):
-            ndiff = -1/60*self.field[(x-3)%nx] \
-                    +3/20*self.field[(x-2)%nx] \
-                    -3/4*self.field[(x-1)%nx] \
-                    +3/4*self.field[(x+1)%nx] \
-                    -3/20*self.field[(x+2)%nx] \
-                    +1/60*self.field[(x+3)%nx]
+            ndiff = - 1/60*self.field[(x-3) % nx] \
+                    + 3/20*self.field[(x-2) % nx] \
+                    - 3/4*self.field[(x-1) % nx] \
+                    + 3/4*self.field[(x+1) % nx] \
+                    - 3/20*self.field[(x+2) % nx] \
+                    + 1/60*self.field[(x+3) % nx]
             ndiff = np.squeeze(ndiff)
             self.assertAlmostEqual(diff_field[x], ndiff)
+
 
 class DerivativeCheck2d(unittest.TestCase):
     def setUp(self):
@@ -180,12 +183,12 @@ class DerivativeCheck2d(unittest.TestCase):
         ndiff = np.squeeze(ndiff)
         for x in range(nx):
             for y in range(ny):
-                self.assertAlmostEqual(diff_field[x,y], ndiff[x,y])
+                self.assertAlmostEqual(diff_field[x, y], ndiff[x, y])
 
     def test_fourier_derivative_2_corner(self):
-        #shift the fourier derivative into the lower left shift=[-1/6, -1/6]
-        #corner. (Here the grid spacing is 1 in each direction, otherwise one
-        #should consider it to give the real space shift correct.)
+        # shift the fourier derivative into the lower left shift=[-1/6, -1/6]
+        # corner. (Here the grid spacing is 1 in each direction, otherwise one
+        # should consider it to give the real space shift correct.)
         shift = np.array([-1/6, -1/6])
         diffop = muFFT.FourierDerivative(2, 0, shift)
         q = self.fft.fftfreq
@@ -196,20 +199,20 @@ class DerivativeCheck2d(unittest.TestCase):
         self.fft.ifft(d * self.fourier_field, diff_field)
         diff_field *= self.fft.normalisation
         self.fft.ifft(1j*2*np.pi*q[0] *
-                              np.exp(1j*2*np.pi*np.einsum("i,i...->...", shift, q)) *
-                              fourier_field_copy, ndiff)
+                      np.exp(1j*2*np.pi*np.einsum("i,i...->...", shift, q)) *
+                      fourier_field_copy, ndiff)
         ndiff *= self.fft.normalisation
         nx, ny = self.nb_pts
         diff_field = np.squeeze(diff_field)
         ndiff = np.squeeze(ndiff)
         for x in range(nx):
             for y in range(ny):
-                self.assertAlmostEqual(diff_field[x,y], ndiff[x,y])
+                self.assertAlmostEqual(diff_field[x, y], ndiff[x, y])
 
     def test_fourier_derivative_2_full(self):
-        #shift the fourier derivative by one grid point in x- and y-direction
-        #shift=[1, 1]. (Here the grid spacing is 1 in each direction, otherwise
-        #one should consider it to give the real space shift correct.)
+        # shift the fourier derivative by one grid point in x- and y-direction
+        # shift=[1, 1]. (Here the grid spacing is 1 in each direction, other-
+        # wise one should consider it to give the real space shift correct.)
         shift = np.array([1, 1])
         diffop = muFFT.FourierDerivative(2, 0, shift)
         q = self.fft.fftfreq
@@ -226,7 +229,8 @@ class DerivativeCheck2d(unittest.TestCase):
         ndiff = np.squeeze(ndiff)
         for x in range(nx):
             for y in range(ny):
-                self.assertAlmostEqual(diff_field[x,y], ndiff[(x+1)%nx, (y+1)%ny])
+                self.assertAlmostEqual(diff_field[x, y],
+                                       ndiff[(x+1) % nx, (y+1) % ny])
 
     def test_upwind_differences_x(self):
         diffop = muFFT.Stencils2D.upwind_x
@@ -239,7 +243,7 @@ class DerivativeCheck2d(unittest.TestCase):
         diff_field = np.squeeze(diff_field)
         for x in range(nx):
             for y in range(ny):
-                ndiff = self.field[(x+1)%nx, y] - self.field[x, y]
+                ndiff = self.field[(x+1) % nx, y] - self.field[x, y]
                 ndiff = np.squeeze(ndiff)
                 self.assertAlmostEqual(diff_field[x, y], ndiff)
 
@@ -254,7 +258,7 @@ class DerivativeCheck2d(unittest.TestCase):
         diff_field = np.squeeze(diff_field)
         for x in range(nx):
             for y in range(ny):
-                ndiff = self.field[x, (y+1)%ny] - self.field[x, y]
+                ndiff = self.field[x, (y+1) % ny] - self.field[x, y]
                 ndiff = np.squeeze(ndiff)
                 self.assertAlmostEqual(diff_field[x, y], ndiff)
 
@@ -269,7 +273,8 @@ class DerivativeCheck2d(unittest.TestCase):
         diff_field = np.squeeze(diff_field)
         for x in range(nx):
             for y in range(ny):
-                ndiff = self.field[(x+1)%nx, (y+1)%ny] - self.field[x, (y+1)%ny]
+                ndiff = self.field[(x+1) % nx, (y+1) % ny] \
+                    - self.field[x, (y+1) % ny]
                 ndiff = np.squeeze(ndiff)
                 self.assertAlmostEqual(diff_field[x, y], ndiff)
 
@@ -284,13 +289,14 @@ class DerivativeCheck2d(unittest.TestCase):
         diff_field = np.squeeze(diff_field)
         for x in range(nx):
             for y in range(ny):
-                ndiff = self.field[(x+1)%nx, (y+1)%ny] - self.field[(x+1)%nx, y]
+                ndiff = self.field[(x+1) % nx, (y+1) % ny] \
+                    - self.field[(x+1) % nx, y]
                 ndiff = np.squeeze(ndiff)
                 self.assertAlmostEqual(diff_field[x, y], ndiff)
 
     def test_upwind_differences_y2(self):
         diffop = muFFT.DiscreteDerivative([0, 0], [[-1, 1],
-                                                   [ 0, 0]])
+                                                   [0,  0]])
         q = self.fft.fftfreq
         d = diffop.fourier(q)
         diff_field = np.zeros_like(self.field, order='f')
@@ -300,12 +306,12 @@ class DerivativeCheck2d(unittest.TestCase):
         diff_field = np.squeeze(diff_field)
         for x in range(nx):
             for y in range(ny):
-                ndiff = self.field[x, (y+1)%ny] - self.field[x, y]
+                ndiff = self.field[x, (y+1) % ny] - self.field[x, y]
                 ndiff = np.squeeze(ndiff)
                 self.assertAlmostEqual(diff_field[x, y], ndiff)
 
     def test_shifted_upwind_differences_y(self):
-        diffop = muFFT.DiscreteDerivative([0, 0], [[ 0, 0],
+        diffop = muFFT.DiscreteDerivative([0, 0], [[0,  0],
                                                    [-1, 1]])
         q = self.fft.fftfreq
         d = diffop.fourier(q)
@@ -316,7 +322,8 @@ class DerivativeCheck2d(unittest.TestCase):
         diff_field = np.squeeze(diff_field)
         for x in range(nx):
             for y in range(ny):
-                ndiff = self.field[(x+1)%nx, (y+1)%ny] - self.field[(x+1)%nx, y]
+                ndiff = self.field[(x+1) % nx, (y+1) % ny] \
+                    - self.field[(x+1) % nx, y]
                 ndiff = np.squeeze(ndiff)
                 self.assertAlmostEqual(diff_field[x, y], ndiff)
 
@@ -331,8 +338,9 @@ class DerivativeCheck2d(unittest.TestCase):
         diff_field = np.squeeze(diff_field)
         for x in range(nx):
             for y in range(ny):
-                ndiff = (self.field[(x+1)%nx, y] - self.field[x, y] \
-                         + self.field[(x+1)%nx, (y+1)%ny] - self.field[x, (y+1)%ny])/2
+                ndiff = (self.field[(x+1) % nx, y] - self.field[x, y]
+                         + self.field[(x+1) % nx, (y+1) % ny]
+                         - self.field[x, (y+1) % ny])/2
                 ndiff = np.squeeze(ndiff)
                 self.assertAlmostEqual(diff_field[x, y], ndiff)
 
@@ -348,8 +356,9 @@ class DerivativeCheck2d(unittest.TestCase):
         diff_field = np.squeeze(diff_field)
         for x in range(nx):
             for y in range(ny):
-                ndiff = (self.field[x, (y+1)%ny] - self.field[x, y] \
-                         + self.field[(x+1)%nx, (y+1)%ny] - self.field[(x+1)%nx, y])/2
+                ndiff = (self.field[x, (y+1) % ny] - self.field[x, y]
+                         + self.field[(x+1) % nx, (y+1) % ny]
+                         - self.field[(x+1) % nx, y])/2
                 ndiff = np.squeeze(ndiff)
                 self.assertAlmostEqual(diff_field[x, y], ndiff)
 
@@ -364,7 +373,8 @@ class DerivativeCheck2d(unittest.TestCase):
         diff_field = np.squeeze(diff_field)
         for x in range(nx):
             for y in range(ny):
-                ndiff = (self.field[(x+1)%nx, y] - self.field[(x-1)%nx, y])/2
+                ndiff = (self.field[(x+1) % nx, y]
+                         - self.field[(x-1) % nx, y])/2
                 ndiff = np.squeeze(ndiff)
                 self.assertAlmostEqual(diff_field[x, y], ndiff)
 
@@ -379,7 +389,8 @@ class DerivativeCheck2d(unittest.TestCase):
         diff_field = np.squeeze(diff_field)
         for x in range(nx):
             for y in range(ny):
-                ndiff = (self.field[x, (y+1)%ny] - self.field[x, (y-1)%ny])/2
+                ndiff = (self.field[x, (y+1) % ny]
+                         - self.field[x, (y-1) % ny])/2
                 ndiff = np.squeeze(ndiff)
                 self.assertAlmostEqual(diff_field[x, y], ndiff)
 
@@ -397,12 +408,12 @@ class DerivativeCheck2d(unittest.TestCase):
         diff_field = np.squeeze(diff_field)
         for x in range(nx):
             for y in range(ny):
-                ndiff = -1/60*self.field[x, (y-3)%ny] \
-                    +3/20*self.field[x, (y-2)%ny] \
-                    -3/4*self.field[x, (y-1)%ny] \
-                    +3/4*self.field[x, (y+1)%ny] \
-                    -3/20*self.field[x, (y+2)%ny] \
-                    +1/60*self.field[x, (y+3)%ny]
+                ndiff = -1/60*self.field[x, (y-3) % ny] \
+                    + 3/20*self.field[x, (y-2) % ny] \
+                    - 3/4*self.field[x, (y-1) % ny] \
+                    + 3/4*self.field[x, (y+1) % ny] \
+                    - 3/20*self.field[x, (y+2) % ny] \
+                    + 1/60*self.field[x, (y+3) % ny]
                 ndiff = np.squeeze(ndiff)
                 self.assertAlmostEqual(diff_field[x, y], ndiff)
 
@@ -425,7 +436,7 @@ class DerivativeCheck2d(unittest.TestCase):
         nx, ny = self.nb_pts
         for x in range(nx):
             for y in range(ny):
-                ndiff = self.field[(x+1)%nx, y] - self.field[x, y]
+                ndiff = self.field[(x+1) % nx, y] - self.field[x, y]
                 if x == 0 and y == 0:
                     print('ndiff:', ndiff)
                 ndiff = np.squeeze(ndiff)
@@ -442,7 +453,8 @@ class DerivativeCheck2d(unittest.TestCase):
         diff_field = np.squeeze(diff_field)
         for x in range(nx):
             for y in range(ny):
-                ndiff = self.field[x, (y+1)%ny] - 2*self.field[x, y] + self.field[x, (y-1)%ny]
+                ndiff = self.field[x, (y+1) % ny] - 2*self.field[x, y] \
+                    + self.field[x, (y-1) % ny]
                 ndiff = np.squeeze(ndiff)
                 self.assertAlmostEqual(diff_field[x, y], ndiff)
 
@@ -457,7 +469,7 @@ class DerivativeCheck2d(unittest.TestCase):
         diff_field = np.squeeze(diff_field)
         for x in range(nx):
             for y in range(ny):
-                ndiff = self.field[(x+1)%nx, y] - self.field[x, y]
+                ndiff = self.field[(x+1) % nx, y] - self.field[x, y]
                 ndiff = np.squeeze(ndiff)
                 self.assertAlmostEqual(diff_field[x, y], ndiff)
 
@@ -472,7 +484,8 @@ class DerivativeCheck2d(unittest.TestCase):
         diff_field = np.squeeze(diff_field)
         for x in range(nx):
             for y in range(ny):
-                ndiff = 1/2*(2*self.field[x, (y+1)%ny] - self.field[x, y] - self.field[(x+1)%nx, y])
+                ndiff = 1/2*(2*self.field[x, (y+1) % ny] - self.field[x, y]
+                             - self.field[(x+1) % nx, y])
                 ndiff = np.squeeze(ndiff)
                 self.assertAlmostEqual(diff_field[x, y], ndiff)
 
@@ -487,7 +500,8 @@ class DerivativeCheck2d(unittest.TestCase):
         diff_field = np.squeeze(diff_field)
         for x in range(nx):
             for y in range(ny):
-                ndiff = self.field[(x+1)%nx, (y+1)%ny] - self.field[x, (y+1)%ny]
+                ndiff = self.field[(x+1) % nx, (y+1) % ny] \
+                    - self.field[x, (y+1) % ny]
                 ndiff = np.squeeze(ndiff)
                 self.assertAlmostEqual(diff_field[x, y], ndiff)
 
@@ -502,9 +516,12 @@ class DerivativeCheck2d(unittest.TestCase):
         diff_field = np.squeeze(diff_field)
         for x in range(nx):
             for y in range(ny):
-                ndiff = 1/2*(-2*self.field[(x+1)%nx, y] + self.field[x, (y+1)%ny] + self.field[(x+1)%nx, (y+1)%ny])
+                ndiff = 1/2*(-2*self.field[(x+1) % nx, y]
+                             + self.field[x, (y+1) % ny]
+                             + self.field[(x+1) % nx, (y+1) % ny])
                 ndiff = np.squeeze(ndiff)
                 self.assertAlmostEqual(diff_field[x, y], ndiff)
+
 
 class DerivativeCheck3d(unittest.TestCase):
     def setUp(self):
@@ -529,7 +546,7 @@ class DerivativeCheck3d(unittest.TestCase):
         for x in range(nx):
             for y in range(ny):
                 for z in range(nz):
-                    ndiff = self.field[(x+1)%nx, y, z] - self.field[x, y, z]
+                    ndiff = self.field[(x+1) % nx, y, z] - self.field[x, y, z]
                     ndiff = np.squeeze(ndiff)
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
@@ -545,7 +562,7 @@ class DerivativeCheck3d(unittest.TestCase):
         for x in range(nx):
             for y in range(ny):
                 for z in range(nz):
-                    ndiff = self.field[x, (y+1)%ny, z] - self.field[x, y, z]
+                    ndiff = self.field[x, (y+1) % ny, z] - self.field[x, y, z]
                     ndiff = np.squeeze(ndiff)
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
@@ -561,7 +578,7 @@ class DerivativeCheck3d(unittest.TestCase):
         for x in range(nx):
             for y in range(ny):
                 for z in range(nz):
-                    ndiff = self.field[x, y, (z+1)%nz] - self.field[x, y, z]
+                    ndiff = self.field[x, y, (z+1) % nz] - self.field[x, y, z]
                     ndiff = np.squeeze(ndiff)
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
@@ -577,7 +594,7 @@ class DerivativeCheck3d(unittest.TestCase):
         for x in range(nx):
             for y in range(ny):
                 for z in range(nz):
-                    ndiff = self.field[(x+1)%nx, y, z] - self.field[x, y, z]
+                    ndiff = self.field[(x+1) % nx, y, z] - self.field[x, y, z]
                     ndiff = np.squeeze(ndiff)
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
@@ -593,7 +610,8 @@ class DerivativeCheck3d(unittest.TestCase):
         for x in range(nx):
             for y in range(ny):
                 for z in range(nz):
-                    ndiff = self.field[(x+1)%nx, (y+1)%ny, z] - self.field[x, (y+1)%ny, z]
+                    ndiff = self.field[(x+1) % nx, (y+1) % ny, z] \
+                        - self.field[x, (y+1) % ny, z]
                     ndiff = np.squeeze(ndiff)
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
@@ -609,7 +627,8 @@ class DerivativeCheck3d(unittest.TestCase):
         for x in range(nx):
             for y in range(ny):
                 for z in range(nz):
-                    ndiff = self.field[(x+1)%nx, (y+1)%ny, (z+1)%nz] - self.field[x, (y+1)%ny, (z+1)%nz]
+                    ndiff = self.field[(x+1) % nx, (y+1) % ny, (z+1) % nz] \
+                        - self.field[x, (y+1) % ny, (z+1) % nz]
                     ndiff = np.squeeze(ndiff)
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
@@ -625,7 +644,8 @@ class DerivativeCheck3d(unittest.TestCase):
         for x in range(nx):
             for y in range(ny):
                 for z in range(nz):
-                    ndiff = self.field[(x+1)%nx, y, (z+1)%nz] - self.field[x, y, (z+1)%nz]
+                    ndiff = self.field[(x+1) % nx, y, (z+1) % nz] \
+                        - self.field[x, y, (z+1) % nz]
                     ndiff = np.squeeze(ndiff)
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
@@ -641,7 +661,7 @@ class DerivativeCheck3d(unittest.TestCase):
         for x in range(nx):
             for y in range(ny):
                 for z in range(nz):
-                    ndiff = self.field[x, (y+1)%ny, z] - self.field[x, y, z]
+                    ndiff = self.field[x, (y+1) % ny, z] - self.field[x, y, z]
                     ndiff = np.squeeze(ndiff)
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
@@ -657,10 +677,10 @@ class DerivativeCheck3d(unittest.TestCase):
         for x in range(nx):
             for y in range(ny):
                 for z in range(nz):
-                    ndiff = self.field[(x+1)%nx, (y+1)%ny, z] - self.field[(x+1)%nx, y, z]
+                    ndiff = self.field[(x+1) % nx, (y+1) % ny, z] \
+                        - self.field[(x+1) % nx, y, z]
                     ndiff = np.squeeze(ndiff)
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
-
 
     def test_d_111_101(self):
         diffop = muFFT.Stencils3D.d_111_101
@@ -674,7 +694,8 @@ class DerivativeCheck3d(unittest.TestCase):
         for x in range(nx):
             for y in range(ny):
                 for z in range(nz):
-                    ndiff = self.field[(x+1)%nx, (y+1)%ny, (z+1)%nz] - self.field[(x+1)%nx, y, (z+1)%nz]
+                    ndiff = self.field[(x+1) % nx, (y+1) % ny, (z+1) % nz] \
+                        - self.field[(x+1) % nx, y, (z+1) % nz]
                     ndiff = np.squeeze(ndiff)
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
@@ -690,7 +711,8 @@ class DerivativeCheck3d(unittest.TestCase):
         for x in range(nx):
             for y in range(ny):
                 for z in range(nz):
-                    ndiff = self.field[x, (y+1)%ny, (z+1)%nz] - self.field[x, y, (z+1)%nz]
+                    ndiff = self.field[x, (y+1) % ny, (z+1) % nz] \
+                        - self.field[x, y, (z+1) % nz]
                     ndiff = np.squeeze(ndiff)
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
@@ -706,7 +728,7 @@ class DerivativeCheck3d(unittest.TestCase):
         for x in range(nx):
             for y in range(ny):
                 for z in range(nz):
-                    ndiff = self.field[x, y, (z+1)%nz] - self.field[x, y, z]
+                    ndiff = self.field[x, y, (z+1) % nz] - self.field[x, y, z]
                     ndiff = np.squeeze(ndiff)
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
@@ -722,7 +744,8 @@ class DerivativeCheck3d(unittest.TestCase):
         for x in range(nx):
             for y in range(ny):
                 for z in range(nz):
-                    ndiff = self.field[(x+1)%nx, y, (z+1)%nz] - self.field[(x+1)%nx, y, z]
+                    ndiff = self.field[(x+1) % nx, y, (z+1) % nz] \
+                        - self.field[(x+1) % nx, y, z]
                     ndiff = np.squeeze(ndiff)
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
@@ -738,7 +761,8 @@ class DerivativeCheck3d(unittest.TestCase):
         for x in range(nx):
             for y in range(ny):
                 for z in range(nz):
-                    ndiff = self.field[(x+1)%nx, (y+1)%ny, (z+1)%nz] - self.field[(x+1)%nx, (y+1)%ny, z]
+                    ndiff = self.field[(x+1) % nx, (y+1) % ny, (z+1) % nz] \
+                        - self.field[(x+1) % nx, (y+1) % ny, z]
                     ndiff = np.squeeze(ndiff)
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
@@ -754,7 +778,8 @@ class DerivativeCheck3d(unittest.TestCase):
         for x in range(nx):
             for y in range(ny):
                 for z in range(nz):
-                    ndiff = self.field[x, (y+1)%ny, (z+1)%nz] - self.field[x, (y+1)%ny, z]
+                    ndiff = self.field[x, (y+1) % ny, (z+1) % nz] \
+                        - self.field[x, (y+1) % ny, z]
                     ndiff = np.squeeze(ndiff)
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
@@ -770,10 +795,13 @@ class DerivativeCheck3d(unittest.TestCase):
         for x in range(nx):
             for y in range(ny):
                 for z in range(nz):
-                    ndiff = (self.field[(x+1)%nx, y, z] - self.field[x, y, z] \
-                             + self.field[(x+1)%nx, (y+1)%ny, z] - self.field[x, (y+1)%ny, z] \
-                             + self.field[(x+1)%nx, y, (z+1)%nz] - self.field[x, y, (z+1)%nz] \
-                             + self.field[(x+1)%nx, (y+1)%ny, (z+1)%nz] - self.field[x, (y+1)%ny, (z+1)%nz])/4
+                    ndiff = (self.field[(x+1) % nx, y, z] - self.field[x, y, z]
+                             + self.field[(x+1) % nx, (y+1) % ny, z]
+                             - self.field[x, (y+1) % ny, z]
+                             + self.field[(x+1) % nx, y, (z+1) % nz]
+                             - self.field[x, y, (z+1) % nz]
+                             + self.field[(x+1) % nx, (y+1) % ny, (z+1) % nz]
+                             - self.field[x, (y+1) % ny, (z+1) % nz])/4
                     ndiff = np.squeeze(ndiff)
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
@@ -789,10 +817,14 @@ class DerivativeCheck3d(unittest.TestCase):
         for x in range(nx):
             for y in range(ny):
                 for z in range(nz):
-                    ndiff = (self.field[x, (y+1)%ny, z] - self.field[x, y, z] \
-                             + self.field[(x+1)%nx, (y+1)%ny, z] - self.field[(x+1)%nx, y, z] \
-                             + self.field[x, (y+1)%ny, (z+1)%nz] - self.field[x, y, (z+1)%nz] \
-                             + self.field[(x+1)%nx, (y+1)%ny, (z+1)%nz] - self.field[(x+1)%nx, y, (z+1)%nz])/4
+                    ndiff = (self.field[x, (y+1) % ny, z]
+                             - self.field[x, y, z]
+                             + self.field[(x+1) % nx, (y+1) % ny, z]
+                             - self.field[(x+1) % nx, y, z]
+                             + self.field[x, (y+1) % ny, (z+1) % nz]
+                             - self.field[x, y, (z+1) % nz]
+                             + self.field[(x+1) % nx, (y+1) % ny, (z+1) % nz]
+                             - self.field[(x+1) % nx, y, (z+1) % nz])/4
                     ndiff = np.squeeze(ndiff)
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
@@ -808,10 +840,14 @@ class DerivativeCheck3d(unittest.TestCase):
         for x in range(nx):
             for y in range(ny):
                 for z in range(nz):
-                    ndiff = (self.field[x, y, (z+1)%nz] - self.field[x, y, z] \
-                             + self.field[(x+1)%nx, y, (z+1)%nz] - self.field[(x+1)%nx, y, z] \
-                             + self.field[x, (y+1)%ny, (z+1)%nz] - self.field[x, (y+1)%ny, z] \
-                             + self.field[(x+1)%nx, (y+1)%ny, (z+1)%nz] - self.field[(x+1)%nx, (y+1)%ny, z])/4
+                    ndiff = (self.field[x, y, (z+1) % nz]
+                             - self.field[x, y, z]
+                             + self.field[(x+1) % nx, y, (z+1) % nz]
+                             - self.field[(x+1) % nx, y, z]
+                             + self.field[x, (y+1) % ny, (z+1) % nz]
+                             - self.field[x, (y+1) % ny, z]
+                             + self.field[(x+1) % nx, (y+1) % ny, (z+1) % nz]
+                             - self.field[(x+1) % nx, (y+1) % ny, z])/4
                     ndiff = np.squeeze(ndiff)
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
@@ -827,7 +863,8 @@ class DerivativeCheck3d(unittest.TestCase):
         for x in range(nx):
             for y in range(ny):
                 for z in range(nz):
-                    ndiff = (self.field[(x+1)%nx, y, z] - self.field[(x-1)%nx, y, z])/2
+                    ndiff = (self.field[(x+1) % nx, y, z]
+                             - self.field[(x-1) % nx, y, z])/2
                     ndiff = np.squeeze(ndiff)
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
@@ -843,7 +880,8 @@ class DerivativeCheck3d(unittest.TestCase):
         for x in range(nx):
             for y in range(ny):
                 for z in range(nz):
-                    ndiff = (self.field[x, (y+1)%ny, z] - self.field[x, (y-1)%ny, z])/2
+                    ndiff = (self.field[x, (y+1) % ny, z]
+                             - self.field[x, (y-1) % ny, z])/2
                     ndiff = np.squeeze(ndiff)
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
@@ -859,7 +897,8 @@ class DerivativeCheck3d(unittest.TestCase):
         for x in range(nx):
             for y in range(ny):
                 for z in range(nz):
-                    ndiff = (self.field[x, y, (z+1)%nz] - self.field[x, y, (z-1)%nz])/2
+                    ndiff = (self.field[x, y, (z+1) % nz]
+                             - self.field[x, y, (z-1) % nz])/2
                     ndiff = np.squeeze(ndiff)
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
 
@@ -873,9 +912,68 @@ class DerivativeCheck3d(unittest.TestCase):
         for x in range(nx):
             for y in range(ny):
                 for z in range(nz):
-                    ndiff = (self.field[x, y, (z+1)%nz] - self.field[x, y, (z-1)%nz])/2
+                    ndiff = (self.field[x, y, (z+1) % nz]
+                             - self.field[x, y, (z-1) % nz])/2
                     ndiff = np.squeeze(ndiff)
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
+
+    def test_five_tetraheda_T0_derivative_x(self):
+        diffop = muFFT.Stencils3D.linear_finite_elements_5[0]
+        q = self.fft.fftfreq
+        d = diffop.fourier(q)
+        diff_field = np.zeros_like(self.field, order='f')
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
+        nx, ny, nz = self.nb_pts
+        diff_field = np.squeeze(diff_field)
+        for x in range(nx):
+            for y in range(ny):
+                for z in range(nz):
+                    ndiff = (self.field[(x+1) % nx, (y+1) % ny, (z+1) % nz]
+                             + self.field[(x+1) % nx, y, z]
+                             - self.field[x, (y+1) % ny, z]
+                             - self.field[x, y, (z+1) % nz])/2
+                    ndiff = np.squeeze(ndiff)
+                    self.assertAlmostEqual(diff_field[x, y, z], ndiff)
+
+    def test_five_tetraheda_T0_derivative_y(self):
+        diffop = muFFT.Stencils3D.linear_finite_elements_5[1]
+        q = self.fft.fftfreq
+        d = diffop.fourier(q)
+        diff_field = np.zeros_like(self.field, order='f')
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
+        nx, ny, nz = self.nb_pts
+        diff_field = np.squeeze(diff_field)
+        for x in range(nx):
+            for y in range(ny):
+                for z in range(nz):
+                    ndiff = (self.field[(x+1) % nx, (y+1) % ny, (z+1) % nz]
+                             - self.field[(x+1) % nx, y, z]
+                             + self.field[x, (y+1) % ny, z]
+                             - self.field[x, y, (z+1) % nz])/2
+                    ndiff = np.squeeze(ndiff)
+                    self.assertAlmostEqual(diff_field[x, y, z], ndiff)
+
+    def test_five_tetraheda_T0_derivative_z(self):
+        diffop = muFFT.Stencils3D.linear_finite_elements_5[2]
+        q = self.fft.fftfreq
+        d = diffop.fourier(q)
+        diff_field = np.zeros_like(self.field, order='f')
+        self.fft.ifft(d * self.fourier_field, diff_field)
+        diff_field *= self.fft.normalisation
+        nx, ny, nz = self.nb_pts
+        diff_field = np.squeeze(diff_field)
+        for x in range(nx):
+            for y in range(ny):
+                for z in range(nz):
+                    ndiff = (self.field[(x+1) % nx, (y+1) % ny, (z+1) % nz]
+                             - self.field[(x+1) % nx, y, z]
+                             - self.field[x, (y+1) % ny, z]
+                             + self.field[x, y, (z+1) % nz])/2
+                    ndiff = np.squeeze(ndiff)
+                    self.assertAlmostEqual(diff_field[x, y, z], ndiff)
+
 
 if __name__ == "__main__":
     unittest.main()

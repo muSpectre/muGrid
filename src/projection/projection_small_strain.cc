@@ -207,13 +207,16 @@ namespace muSpectre {
   template class ProjectionSmallStrain<oneD, OneQuadPt>;
   template class ProjectionSmallStrain<oneD, TwoQuadPts>;
   template class ProjectionSmallStrain<oneD, FourQuadPts>;
+  template class ProjectionSmallStrain<oneD, FiveQuadPts>;
   template class ProjectionSmallStrain<oneD, SixQuadPts>;
   template class ProjectionSmallStrain<twoD, OneQuadPt>;
   template class ProjectionSmallStrain<twoD, TwoQuadPts>;
   template class ProjectionSmallStrain<twoD, FourQuadPts>;
+  template class ProjectionSmallStrain<twoD, FiveQuadPts>;
   template class ProjectionSmallStrain<twoD, SixQuadPts>;
   template class ProjectionSmallStrain<threeD, OneQuadPt>;
   template class ProjectionSmallStrain<threeD, TwoQuadPts>;
   template class ProjectionSmallStrain<threeD, FourQuadPts>;
+  template class ProjectionSmallStrain<threeD, FiveQuadPts>;
   template class ProjectionSmallStrain<threeD, SixQuadPts>;
 }  // namespace muSpectre

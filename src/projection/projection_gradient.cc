@@ -298,26 +298,32 @@ namespace muSpectre {
   template class ProjectionGradient<oneD, firstOrder, OneQuadPt>;
   template class ProjectionGradient<oneD, firstOrder, TwoQuadPts>;
   template class ProjectionGradient<oneD, firstOrder, FourQuadPts>;
+  template class ProjectionGradient<oneD, firstOrder, FiveQuadPts>;
   template class ProjectionGradient<oneD, firstOrder, SixQuadPts>;
   template class ProjectionGradient<twoD, firstOrder, OneQuadPt>;
   template class ProjectionGradient<twoD, firstOrder, TwoQuadPts>;
   template class ProjectionGradient<twoD, firstOrder, FourQuadPts>;
+  template class ProjectionGradient<twoD, firstOrder, FiveQuadPts>;
   template class ProjectionGradient<twoD, firstOrder, SixQuadPts>;
   template class ProjectionGradient<threeD, firstOrder, OneQuadPt>;
   template class ProjectionGradient<threeD, firstOrder, TwoQuadPts>;
   template class ProjectionGradient<threeD, firstOrder, FourQuadPts>;
+  template class ProjectionGradient<threeD, firstOrder, FiveQuadPts>;
   template class ProjectionGradient<threeD, firstOrder, SixQuadPts>;
 
   template class ProjectionGradient<oneD, secondOrder, OneQuadPt>;
   template class ProjectionGradient<oneD, secondOrder, TwoQuadPts>;
   template class ProjectionGradient<oneD, secondOrder, FourQuadPts>;
+  template class ProjectionGradient<oneD, secondOrder, FiveQuadPts>;
   template class ProjectionGradient<oneD, secondOrder, SixQuadPts>;
   template class ProjectionGradient<twoD, secondOrder, OneQuadPt>;
   template class ProjectionGradient<twoD, secondOrder, TwoQuadPts>;
   template class ProjectionGradient<twoD, secondOrder, FourQuadPts>;
+  template class ProjectionGradient<twoD, secondOrder, FiveQuadPts>;
   template class ProjectionGradient<twoD, secondOrder, SixQuadPts>;
   template class ProjectionGradient<threeD, secondOrder, OneQuadPt>;
   template class ProjectionGradient<threeD, secondOrder, TwoQuadPts>;
   template class ProjectionGradient<threeD, secondOrder, FourQuadPts>;
+  template class ProjectionGradient<threeD, secondOrder, FiveQuadPts>;
   template class ProjectionGradient<threeD, secondOrder, SixQuadPts>;
 }  // namespace muSpectre

@@ -195,13 +195,16 @@ namespace muSpectre {
   template class ProjectionDefault<oneD, OneQuadPt>;
   template class ProjectionDefault<oneD, TwoQuadPts>;
   template class ProjectionDefault<oneD, FourQuadPts>;
+  template class ProjectionDefault<oneD, FiveQuadPts>;
   template class ProjectionDefault<oneD, SixQuadPts>;
   template class ProjectionDefault<twoD, OneQuadPt>;
   template class ProjectionDefault<twoD, TwoQuadPts>;
   template class ProjectionDefault<twoD, FourQuadPts>;
+  template class ProjectionDefault<twoD, FiveQuadPts>;
   template class ProjectionDefault<twoD, SixQuadPts>;
   template class ProjectionDefault<threeD, OneQuadPt>;
   template class ProjectionDefault<threeD, TwoQuadPts>;
   template class ProjectionDefault<threeD, FourQuadPts>;
+  template class ProjectionDefault<threeD, FiveQuadPts>;
   template class ProjectionDefault<threeD, SixQuadPts>;
 }  // namespace muSpectre

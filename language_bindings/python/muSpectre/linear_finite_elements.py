@@ -142,21 +142,43 @@ def write_3d_worker(file_name, rve, strain, stress, points,
     def c2i(xp, yp, zp):
         return xp + (nx + 1) * (yp + (ny + 1) * zp)
 
-    # Construct mesh
-    cells = np.swapaxes(
-        [[c2i(xc, yc, zc), c2i(xc+1, yc, zc),
-          c2i(xc+1, yc+1, zc), c2i(xc+1, yc+1, zc+1)],
-         [c2i(xc, yc, zc), c2i(xc+1, yc, zc),
-          c2i(xc+1, yc, zc+1), c2i(xc+1, yc+1, zc+1)],
-         [c2i(xc, yc, zc), c2i(xc, yc+1, zc),
-          c2i(xc+1, yc+1, zc), c2i(xc+1, yc+1, zc+1)],
-         [c2i(xc, yc, zc), c2i(xc, yc+1, zc),
-          c2i(xc, yc+1, zc+1), c2i(xc+1, yc+1, zc+1)],
-         [c2i(xc, yc, zc), c2i(xc, yc, zc+1),
-          c2i(xc+1, yc, zc+1), c2i(xc+1, yc+1, zc+1)],
-         [c2i(xc, yc, zc), c2i(xc, yc, zc+1),
-          c2i(xc, yc+1, zc+1), c2i(xc+1, yc+1, zc+1)]],
-        0, 1)
+    # Construct mesh depending on the number of quad points
+    if rve.nb_quad_pts == 6:
+        # each pixel is subdivided in 6 tetrahedra of equal volume
+        cells = np.swapaxes(
+            [[c2i(xc, yc, zc), c2i(xc+1, yc, zc),
+              c2i(xc+1, yc+1, zc), c2i(xc+1, yc+1, zc+1)],
+             [c2i(xc, yc, zc), c2i(xc+1, yc, zc),
+              c2i(xc+1, yc, zc+1), c2i(xc+1, yc+1, zc+1)],
+             [c2i(xc, yc, zc), c2i(xc, yc+1, zc),
+              c2i(xc+1, yc+1, zc), c2i(xc+1, yc+1, zc+1)],
+             [c2i(xc, yc, zc), c2i(xc, yc+1, zc),
+              c2i(xc, yc+1, zc+1), c2i(xc+1, yc+1, zc+1)],
+             [c2i(xc, yc, zc), c2i(xc, yc, zc+1),
+              c2i(xc+1, yc, zc+1), c2i(xc+1, yc+1, zc+1)],
+             [c2i(xc, yc, zc), c2i(xc, yc, zc+1),
+              c2i(xc, yc+1, zc+1), c2i(xc+1, yc+1, zc+1)]],
+            0, 1)
+    elif rve.nb_quad_pts == 5:
+        # each voxel is subdivided in 5 tetrahedra
+        # of which the first one has twice the volume of the others.
+        cells = np.swapaxes(
+            [[c2i(xc, yc, zc+1), c2i(xc, yc+1, zc),
+              c2i(xc+1, yc, zc), c2i(xc+1, yc+1, zc+1)],
+             [c2i(xc, yc, zc), c2i(xc, yc, zc+1),
+              c2i(xc, yc+1, zc), c2i(xc+1, yc, zc)],
+             [c2i(xc+1, yc+1, zc), c2i(xc, yc+1, zc),
+              c2i(xc+1, yc, zc), c2i(xc+1, yc+1, zc+1)],
+             [c2i(xc, yc, zc+1), c2i(xc+1, yc, zc+1),
+              c2i(xc+1, yc, zc), c2i(xc+1, yc+1, zc+1)],
+             [c2i(xc, yc, zc+1), c2i(xc, yc+1, zc),
+              c2i(xc, yc+1, zc+1), c2i(xc+1, yc+1, zc+1)]],
+            0, 1)
+    else:
+        RuntimeError("Currently, we support only the reconstruction of 5 or 6 "
+                     "tetrahedra per 3D-voxel. However, the method can be "
+                     "straight forward applied to other decompositions. Please"
+                     " contact the developers if you need advice.")
 
     cells = cells.reshape((4, -1), order='F').T
 
@@ -210,7 +232,8 @@ def get_position_3d_helper(rve, cell_data=None, point_data=None,
         # Positions, periodically complemented
         if displacement_field:
             [x_0, y_0, z_0], [x_displ, y_displ, z_displ] \
-                = get_complemented_positions("0d", rve, F0)
+                = get_complemented_positions("0d", rve, F0,
+                                             periodically_complemented=True)
             points = np.transpose([x_0.ravel(order='F'),
                                    y_0.ravel(order='F'),
                                    z_0.ravel(order='F')])
@@ -219,7 +242,9 @@ def get_position_3d_helper(rve, cell_data=None, point_data=None,
             displacement = calculate_displacement(x_displ, y_displ, z_displ)
             add_disp_to_point_data(point_data, displacement)
         else:
-            [x_def, y_def, z_def] = get_complemented_positions("p", rve, F0)
+            [x_def, y_def, z_def] = \
+                get_complemented_positions("p", rve, F0,
+                                           periodically_complemented=True)
             points = np.transpose([x_def.ravel(order='F'),
                                    y_def.ravel(order='F'),
                                    z_def.ravel(order='F')])
@@ -230,7 +255,7 @@ def get_position_3d_helper(rve, cell_data=None, point_data=None,
         if displacement_field:
             [x_0, y_0, z_0], [x_displ, y_displ.z_displ] \
                 = get_complemented_positions_class_solver(
-                "0d", rve, solver, F0)
+                "0d", rve, solver, F0, periodically_complemented=True)
             points = np.transpose([x_0.ravel(order='F'),
                                    y_0.ravel(order='F'),
                                    z_0.ravel(order='F')])
@@ -239,7 +264,7 @@ def get_position_3d_helper(rve, cell_data=None, point_data=None,
         else:
             [x_def, y_def, z_def] =\
                 get_complemented_positions_class_solver(
-                    "p", rve, solver, F0)
+                    "p", rve, solver, F0, periodically_complemented=True)
             points = np.transpose([x_def.ravel(order='F'),
                                    y_def.ravel(order='F'),
                                    z_def.ravel(order='F')])
@@ -363,14 +388,17 @@ def get_position_2d_helper(rve, cell_data=None, point_data=None,
         # Positions, periodically complemented
         if displacement_field:
             [x_0, y_0], [x_displ, y_displ] \
-                = get_complemented_positions("0d", rve, F0)
+                = get_complemented_positions("0d", rve, F0,
+                                             periodically_complemented=True)
             points = np.transpose([x_0.ravel(order='F'),
                                    y_0.ravel(order='F')])
             # Get displacements
             displacment = calculate_displacement(x_displ, y_displ)
             add_disp_to_point_data(point_data, displacment)
         else:
-            [x_def, y_def] = get_complemented_positions("p", rve, F0)
+            [x_def, y_def] = \
+                get_complemented_positions("p", rve, F0,
+                                           periodically_complemented=True)
             points = np.transpose([x_def.ravel(order='F'),
                                    y_def.ravel(order='F')])
             if point_data is None:
@@ -380,7 +408,7 @@ def get_position_2d_helper(rve, cell_data=None, point_data=None,
         if displacement_field:
             [x_0, y_0], [x_displ, y_displ] \
                 = get_complemented_positions_class_solver(
-                "0d", rve, solver, F0)
+                "0d", rve, solver, F0, periodically_complemented=True)
             points = np.transpose([x_0.ravel(order='F'),
                                    y_0.ravel(order='F')])
             displacment = calculate_displacement(x_displ, y_displ)
@@ -388,7 +416,7 @@ def get_position_2d_helper(rve, cell_data=None, point_data=None,
         else:
             [x_def, y_def] =\
                 get_complemented_positions_class_solver(
-                "p", rve, solver, F0)
+                "p", rve, solver, F0, periodically_complemented=True)
             points = np.transpose([x_def.ravel(order='F'),
                                    y_def.ravel(order='F')])
             if point_data is None:

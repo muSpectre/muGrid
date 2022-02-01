@@ -93,6 +93,10 @@ namespace muSpectre {
           using Projection = ProjectionFiniteStrainFast<DimS, FourQuadPts>;
           return std::make_unique<Projection>(std::move(fft_ptr), lengths,
                                               gradient);
+        } else if (nb_quad_pts == FiveQuadPts) {
+          using Projection = ProjectionFiniteStrainFast<DimS, FiveQuadPts>;
+          return std::make_unique<Projection>(std::move(fft_ptr), lengths,
+                                              gradient);
         } else if (nb_quad_pts == SixQuadPts) {
           using Projection = ProjectionFiniteStrainFast<DimS, SixQuadPts>;
           return std::make_unique<Projection>(std::move(fft_ptr), lengths,

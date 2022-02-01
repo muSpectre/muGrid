@@ -627,6 +627,12 @@ namespace muSpectre {
             std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
         break;
       }
+      case FiveQuadPts: {
+        using Projection = ProjectionFiniteStrainFast<Dim, FiveQuadPts>;
+        this->projection = std::make_shared<Projection>(
+            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
+        break;
+      }
       case SixQuadPts: {
         using Projection = ProjectionFiniteStrainFast<Dim, SixQuadPts>;
         this->projection = std::make_shared<Projection>(
@@ -659,6 +665,12 @@ namespace muSpectre {
       }
       case FourQuadPts: {
         using Projection = ProjectionSmallStrain<Dim, FourQuadPts>;
+        this->projection = std::make_shared<Projection>(
+            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
+        break;
+      }
+      case FiveQuadPts: {
+        using Projection = ProjectionSmallStrain<Dim, FiveQuadPts>;
         this->projection = std::make_shared<Projection>(
             std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
         break;

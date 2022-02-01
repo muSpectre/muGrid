@@ -75,6 +75,7 @@ namespace muGrid {
   constexpr Index_t OneQuadPt{1};     //!< constant for 1 quadrature point/pixel
   constexpr Index_t TwoQuadPts{2};    //!< constant for 2 quadrature point/pixel
   constexpr Index_t FourQuadPts{4};   //!< constant for 4 quadrature point/pixel
+  constexpr Index_t FiveQuadPts{5};   //!< constant for 5 quadrature point/pixel
   constexpr Index_t SixQuadPts{6};    //!< constant for 6 quadrature point/pixel
   constexpr Index_t EightQuadPts{8};  //!< constant for 8 quadrature point/pixel
   constexpr Index_t OneNode{1};       //!< constant for 1 node per pixel

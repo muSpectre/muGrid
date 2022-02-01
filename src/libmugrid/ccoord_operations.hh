@@ -421,7 +421,8 @@ namespace muGrid {
       }
       for (size_t i{0}; i < dim; ++i) {
         retval[i] += locations[i];
-      }      return retval;
+      }
+      return retval;
     }
 
     //! get the i-th pixel in a grid of size nb_grid_pts, with strides

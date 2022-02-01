@@ -35,6 +35,7 @@ Program grant you additional permission to convey the resulting work.
 """
 
 import muFFT
+import numpy as np
 
 upwind_x = muFFT.DiscreteDerivative([0, 0, 0], [[[-1, 1]]]) \
     .rollaxes(-1).rollaxes(-1)
@@ -103,4 +104,51 @@ linear_finite_elements = (
     d_111_011,  # x-derivative
     d_011_001,  # y-derivative
     d_001_000   # z-derivative
+)
+
+# Linear finite elements in 3D (each voxel is subdivided into five tetrahedra)
+# On the zeros thetrahedron four all four corner points are used for the
+# derivatives. On the four other thetrahedra the derivatives are given by
+# first order forward differences along the tetrahedron edge aligned with the
+# respective axis.
+# ∂f/∂x = 1/2 * (f₁₁₁ + f₁₀₀ - f₀₁₀ - f₀₀₁)
+_dx_helper = np.zeros([2, 2, 2])
+_dx_helper[1, 1, 1] = 1/2
+_dx_helper[1, 0, 0] = 1/2
+_dx_helper[0, 1, 0] = -1/2
+_dx_helper[0, 0, 1] = -1/2
+# ∂f/∂y = 1/2 * (f₁₁₁ - f₁₀₀ + f₀₁₀ - f₀₀₁)
+_dy_helper = np.zeros([2, 2, 2])
+_dy_helper[1, 1, 1] = 1/2
+_dy_helper[1, 0, 0] = -1/2
+_dy_helper[0, 1, 0] = 1/2
+_dy_helper[0, 0, 1] = -1/2
+# ∂f/∂z = 1/2 * (f₁₁₁ - f₁₀₀ - f₀₁₀ + f₀₀₁)
+_dz_helper = np.zeros([2, 2, 2])
+_dz_helper[1, 1, 1] = 1/2
+_dz_helper[1, 0, 0] = -1/2
+_dz_helper[0, 1, 0] = -1/2
+_dz_helper[0, 0, 1] = 1/2
+
+linear_finite_elements_5 = (
+    # Central tetrahedron
+    muFFT.DiscreteDerivative([0, 0, 0], _dx_helper),  # x-derivative
+    muFFT.DiscreteDerivative([0, 0, 0], _dy_helper),  # y-derivative
+    muFFT.DiscreteDerivative([0, 0, 0], _dz_helper),  # z-derivative
+    # First corner tetrahedron
+    d_100_000,  # x-derivative
+    d_010_000,  # y-derivative
+    d_001_000,  # z-derivative
+    # Second corner tetrahedron
+    d_110_010,  # x-derivative
+    d_110_100,  # y-derivative
+    d_111_110,  # z-derivative
+    # Third corner tetrahedron
+    d_101_001,  # x-derivative
+    d_111_101,  # y-derivative
+    d_101_100,  # z-derivative
+    # Fourth corner tetrahedron
+    d_111_011,  # x-derivative
+    d_011_001,  # y-derivative
+    d_011_010,  # z-derivative
 )

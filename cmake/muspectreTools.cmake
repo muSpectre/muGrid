@@ -229,7 +229,7 @@ endfunction()
 
 # ------------------------------------------------------------------------------
 function(muSpectre_set_global_compile_options)
-  add_compile_options(-Wall -Wextra -Weffc++)
+  add_compile_options(-Wall -Wextra)
 
   string(TOLOWER "${CMAKE_BUILD_TYPE}" build_type )
   if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")

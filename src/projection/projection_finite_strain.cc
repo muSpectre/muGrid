@@ -163,13 +163,16 @@ namespace muSpectre {
   template class ProjectionFiniteStrain<oneD, OneQuadPt>;
   template class ProjectionFiniteStrain<oneD, TwoQuadPts>;
   template class ProjectionFiniteStrain<oneD, FourQuadPts>;
+  template class ProjectionFiniteStrain<oneD, FiveQuadPts>;
   template class ProjectionFiniteStrain<oneD, SixQuadPts>;
   template class ProjectionFiniteStrain<twoD, OneQuadPt>;
   template class ProjectionFiniteStrain<twoD, TwoQuadPts>;
   template class ProjectionFiniteStrain<twoD, FourQuadPts>;
+  template class ProjectionFiniteStrain<twoD, FiveQuadPts>;
   template class ProjectionFiniteStrain<twoD, SixQuadPts>;
   template class ProjectionFiniteStrain<threeD, OneQuadPt>;
   template class ProjectionFiniteStrain<threeD, TwoQuadPts>;
   template class ProjectionFiniteStrain<threeD, FourQuadPts>;
+  template class ProjectionFiniteStrain<threeD, FiveQuadPts>;
   template class ProjectionFiniteStrain<threeD, SixQuadPts>;
 }  // namespace muSpectre
