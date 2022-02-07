@@ -142,6 +142,22 @@ namespace muGrid {
       return res;
     }
 
+    //! Barrier syncronization, muGrids communicator is calling MPI's Barrier()
+    //! A Barrier blocks until all processes in the communicator have reached
+    //! this point
+    void barrier() {
+      if (comm == MPI_COMM_NULL) {
+        return;
+      }
+      int message{MPI_Barrier(this->comm)};
+      if (message != 0) {
+        std::stringstream error{};
+        error << "MPI_BArrier failed with " << message << " on rank "
+              << this->rank();
+        throw RuntimeError(error.str());
+      }
+    }
+
     //! sum reduction on scalar types
     template <typename T>
     T sum(const T & arg) const {
@@ -371,6 +387,9 @@ namespace muGrid {
 
     //! get total number of processes
     int size() const { return 1; }
+
+    //! Barrier syncronization, nothing to be done in serial
+    void barrier() { return; }
 
     //! sum reduction on scalar types
     template <typename T>

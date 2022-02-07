@@ -187,7 +187,19 @@ void add_projection_base(py::module & mod) {
                  {strain_shape[0], strain_shape[1]}, vector_field);
              return numpy_wrap(
                  proj.integrate_nonaffine_displacements(proxy.get_field()));
-           });
+           })
+      .def_property_readonly("gradient", &ProjectionBase::get_gradient)
+      .def_property_readonly("formulation", &ProjectionBase::get_formulation,
+                             "return a Formulation enum indicating whether the "
+                             "projection is small or finite strain")
+      .def_property_readonly("nb_subdomain_grid_pts",
+                             &ProjectionBase::get_nb_subdomain_grid_pts)
+      .def_property_readonly("subdomain_locations",
+                             &ProjectionBase::get_subdomain_locations)
+      .def_property_readonly("nb_domain_grid_pts",
+                             &ProjectionBase::get_nb_domain_grid_pts)
+      .def_property_readonly("domain_lengths",
+                             &ProjectionBase::get_nb_domain_grid_pts);
 }
 
 template <class Proj, Index_t DimS>

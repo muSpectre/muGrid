@@ -810,8 +810,9 @@ namespace muGrid {
         if (status != NC_NOERR) {
           if (status == NC_EBADDIM) {
             std::cout << "Hint: Do you maybe try to read a variable or "
-                         "dimension which does not exist in the file?"
-                      << std::endl;
+                         "dimension which does not exist in the file? I am "
+                         "having problems with registering the dimension '"
+                      << dim->get_name() << "'." << std::endl;
           }
           throw FileIOError(ncmu_strerror(status));
         }

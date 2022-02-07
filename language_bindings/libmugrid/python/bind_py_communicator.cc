@@ -66,6 +66,7 @@ void add_communicator(py::module & mod) {
           "has_mpi", [](py::object) { return muGrid::Communicator::has_mpi(); })
       .def_property_readonly("rank", &muGrid::Communicator::rank)
       .def_property_readonly("size", &muGrid::Communicator::size)
+      .def("barrier", &muGrid::Communicator::barrier)
       .def("sum", [](muGrid::Communicator & comm,
                      const int & arg) { return comm.sum(arg); })
       .def("sum", [](muGrid::Communicator & comm,
